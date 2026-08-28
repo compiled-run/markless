@@ -3,10 +3,13 @@
 // trips per family and add timing the seed cannot reproduce.
 
 import type { Rng } from './seed.ts';
+import { type TabStep, emulateTab } from './tab-order.ts';
 
 export type ChaosAction = {
 	/** One line for the replay log a failure prints. */
 	readonly note: string;
+	/** What the gesture turned out to do that the note could not know in advance. */
+	readonly trace?: string[];
 	run(): Promise<void>;
 };
 
@@ -162,18 +165,39 @@ function fireMouse(node: HTMLElement, type: string, at: Point, detail: number): 
 	);
 }
 
-function fireKey(node: HTMLElement, key: string, shiftKey = false): void {
-	for (const type of ['keydown', 'keyup']) {
-		node.dispatchEvent(
-			new KeyboardEvent(type, {
-				key,
-				shiftKey,
-				bubbles: true,
-				cancelable: true,
-				composed: true,
-			}),
-		);
+function keyEvent(type: string, key: string, shiftKey: boolean): KeyboardEvent {
+	return new KeyboardEvent(type, {
+		key,
+		shiftKey,
+		bubbles: true,
+		cancelable: true,
+		composed: true,
+	});
+}
+
+function describeTabStep(step: TabStep, shiftKey: boolean): string {
+	const pressed = shiftKey ? 'Shift+Tab' : 'Tab';
+	const start = step.from ? describeTarget(step.from) : '<body>';
+	if (!step.to) {
+		return `${pressed} from ${start} left the page: nothing tabbable after it, focus dropped to <body>`;
 	}
+	return `${pressed} from ${start} moved focus to ${describeTarget(step.to)}`;
+}
+
+/**
+ * Down then up. Answers a line for the gesture log when the key moved focus: a
+ * dispatched `Tab` gets no focus move from the browser, so `tab-order.ts` does it
+ * by hand and the log has to say where it went.
+ */
+function fireKey(node: HTMLElement, key: string, shiftKey = false): string | null {
+	const origin = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+	const down = keyEvent('keydown', key, shiftKey);
+	node.dispatchEvent(down);
+	const step = key === 'Tab' && !down.defaultPrevented ? emulateTab(origin, shiftKey) : null;
+	// A Tab's keyup lands on whatever the move focused, not on where it started.
+	const upTarget = step ? (step.to ?? document.body) : node;
+	upTarget.dispatchEvent(keyEvent('keyup', key, shiftKey));
+	return step ? describeTabStep(step, shiftKey) : null;
 }
 
 /** One press: down, up, click - the sequence a family's handlers listen for. */
@@ -266,12 +290,15 @@ function keyMash(rng: Rng, root: HTMLElement): ChaosAction {
 		keys.push({ key, shift: key === 'Tab' ? rng.chance(0.5) : false });
 	}
 	const spelled = keys.map(({ key, shift }) => `${shift ? 'Shift+' : ''}${key}`).join(' ');
+	const trace: string[] = [];
 	return {
 		note: `key-mash ${spelled} at ${describeTarget(target)}`,
+		trace,
 		async run() {
 			for (const { key, shift } of keys) {
 				// Aim at wherever focus ended up, the way a real burst of keys does.
-				fireKey(focusedInside(root) ?? target, key, shift);
+				const moved = fireKey(focusedInside(root) ?? target, key, shift);
+				if (moved) trace.push(moved);
 				await tick();
 			}
 		},
@@ -309,15 +336,19 @@ function typeInto(rng: Rng, root: HTMLElement): ChaosAction {
 function interrupt(rng: Rng, root: HTMLElement): ChaosAction {
 	const held = pickTarget(rng, root);
 	const other = pickTarget(rng, root);
+	const key = rng.pick(MASH_KEYS);
+	const trace: string[] = [];
 	return {
-		note: `interrupt: hold ${describeTarget(held)}, then key + click ${describeTarget(other)}, then release`,
+		note: `interrupt: hold ${describeTarget(held)}, then ${key} + click ${describeTarget(other)}, then release`,
+		trace,
 		async run() {
 			nextPointerId += 1;
 			const start = centerOf(held);
 			firePointer(held, 'pointerdown', start, 1);
 			firePointer(held, 'pointermove', { x: start.x + 3, y: start.y + 3 }, 1);
 			await tick();
-			fireKey(focusedInside(root) ?? held, rng.pick(MASH_KEYS));
+			const moved = fireKey(focusedInside(root) ?? held, key);
+			if (moved) trace.push(moved);
 			press(other, centerOf(other));
 			await tick();
 			firePointer(held, 'pointerup', centerOf(held), 0);

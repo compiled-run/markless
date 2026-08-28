@@ -70,7 +70,10 @@ After every storm, and during it for the first one:
    log ends at the gesture that provoked it rather than 30 gestures later.
 2. **Focus is not lost.** After a keyboard-only storm, `document.activeElement`
    has to be a real, still-connected, focusable element. Falling back to `<body>`
-   is the failure: a keyboard user stranded with no way back into the widget.
+   is the failure: a keyboard user stranded with no way back into the widget. The
+   single exception is a `Tab` that walked off the last tabbable element on the
+   page — see [Emulated `Tab`](#emulated-tab) — which is where the user asked to
+   go, and which the next `Tab` returns from.
 3. **ARIA agrees with what is on screen.** A trigger reporting
    `aria-expanded="false"` must not still be showing the element its
    `aria-controls` names.
@@ -81,6 +84,47 @@ After every storm, and during it for the first one:
 
 Recovery runs after an `Escape` unwind, because a storm can leave a modal drawer
 open with its own trigger inert. That is the storm's leftovers, not a defect.
+
+## Emulated `Tab`
+
+A dispatched `keydown` is untrusted, and the browser performs sequential focus
+navigation only for trusted keys. So a synthetic `Tab` used to fire the family's
+handler and then move nothing, and the two halves of a correct family disagreed:
+`select` closes its listbox on `Tab` and deliberately does not pull focus back to
+its trigger, because a real `Tab` is on its way somewhere else. With the move
+missing, focus stayed on an option that had just been hidden, the browser dropped
+it to `<body>`, and the lost-focus check reported a strand that a real keyboard
+user would never have hit.
+
+[`tab-order.ts`](./tab-order.ts) performs the move itself. After a `Tab` or
+`Shift+Tab` `keydown` that was not `defaultPrevented`, it collects the page's
+tabbable elements — `tabIndex >= 0`, rendered and visible, not disabled, not
+inside an `[inert]` subtree — orders them the way the browser does (a positive
+`tabindex` first, ascending, then everything at 0 in document order) and focuses
+the next one, or the previous one for `Shift+Tab`. The `keyup` then goes to
+wherever focus landed, as it would in a browser.
+
+Three details are worth knowing:
+
+- **The move starts from where focus was when the key went down**, not from
+  wherever it is by the time the move runs. A handler can hide the focused
+  element mid-press, and the browser drops focus to `<body>` before the emulation
+  gets to look; starting from the recorded element matches the navigation point
+  the HTML spec keeps at the position of the element that went away.
+- **When the focused element is not itself tabbable** — a roving `tabindex="-1"`
+  option, say — the walk continues from its position in document order.
+- **There is no wrap.** If nothing tabbable follows, focus is blurred to `<body>`
+  on purpose, exactly as a browser hands focus out to its own chrome. The move is
+  recorded, the gesture log says so, and the lost-focus check accepts `<body>`
+  only while that record stands. Anything that takes focus afterwards clears it,
+  so a genuine strand later in the same storm still fails, and a page left with
+  no tabbable element at all is not recorded as a tab-out — there would be
+  nothing for the next `Tab` to come back to. A press made while nothing is
+  focused walks in from the first (or last) tabbable, which is the press that
+  comes back out of the chrome.
+
+Everything stays seed-driven: the emulation reads the DOM and the pressed key,
+never the clock and never `Math.random`.
 
 ## Coverage
 
@@ -135,9 +179,11 @@ binds family source, not tests.
   timing the seed cannot reproduce. Dispatched events reach the same handlers.
   Trusted input is the obvious v2 axis, and the recovery step already uses it
   where a family's own suite does.
-- **`Tab` does not actually move focus.** A dispatched `Tab` is not trusted, so
-  the browser ignores it. What the storm tests is the family's own response to
-  `Tab`, which is the interesting part.
+- **`Tab` moves focus by emulation, not by the browser.** The lane computes tab
+  order and focuses the next element itself (see [Emulated `Tab`](#emulated-tab)).
+  It is a good model, not the browser's own: focus inside a shadow root, an
+  `iframe`, or a `dialog`'s top layer is not accounted for, and neither is the
+  browser chrome the real key hands focus to.
 - **A dangling `aria-controls` is not reported.** These families keep their
   surfaces attached, so it would be a real defect, but a storm can be read
   mid-move and a first run should not be spent on it.
