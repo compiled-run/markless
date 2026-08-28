@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import { FAMILY_ANCHORS } from '../../../../../apps/sr-gallery/preview-server.ts';
 import {
 	missingFacts,
 	readUntil,
@@ -23,20 +24,12 @@ const WALK_LIMIT = 200;
 const CHANGE_TIMEOUT_MS = 15_000;
 const GROUP = 'Overall rating';
 
-/**
- * Where the rating group sits on the gallery page.
- *
- * A literal rather than a read of `FAMILY_ANCHORS`, because the gallery has no
- * rating-group section yet: adding the section and the anchor beside it is the
- * registration unit's work, and until it lands these two lanes have nothing to
- * walk. The name is the one that unit will register.
- */
-export const RATING_GROUP_ANCHOR = '/#rating-group';
-
 export async function readRatingGroupTranscript(sr: ScreenReaderDriver, page: Page) {
-	const section = page.locator(`#${RATING_GROUP_ANCHOR.slice(2)}`);
+	const section = page.locator(`#${FAMILY_ANCHORS['rating-group'].slice(2)}`);
 
-	const group = await readUntil(sr, { role: 'radiogroup' }, WALK_LIMIT);
+	// Named, not merely a radiogroup: the gallery serves the radio-group family's
+	// own group earlier in the same document, and a walk from the top reaches it first.
+	const group = await readUntil(sr, { role: 'radiogroup', name: GROUP }, WALK_LIMIT);
 	expect(
 		missingFacts(sr, group, { role: 'radiogroup', name: GROUP }),
 		`${sr.name} announced "${group}"`,

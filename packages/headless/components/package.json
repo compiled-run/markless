@@ -50,6 +50,7 @@
 		"./progress": "./src/progress/index.ts",
 		"./qrcode": "./src/qr-code/index.ts",
 		"./radiogroup": "./src/radio-group/index.ts",
+		"./ratinggroup": "./src/rating-group/index.ts",
 		"./select": "./src/select/index.ts",
 		"./slider": "./src/slider/index.ts",
 		"./tooltip": "./src/tooltip/index.ts",

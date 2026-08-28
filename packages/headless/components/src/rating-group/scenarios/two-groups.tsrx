@@ -1,4 +1,4 @@
-import * as ratinggroup from '../index.ts';
+import { ratinggroup } from '../../index.ts';
 
 // Two groups on one page, one of them ten marks long. Each root is its own
 // instance boundary, so rating one must leave the other exactly where it was.

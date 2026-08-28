@@ -1,4 +1,4 @@
-import * as ratinggroup from '../index.ts';
+import { ratinggroup } from '../../index.ts';
 
 // Half values: the near half of a mark is worth half of it, by pointer and by key.
 export function HalfStars() @{

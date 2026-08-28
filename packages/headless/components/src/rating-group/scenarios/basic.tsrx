@@ -1,7 +1,4 @@
-// Registration is a follow-up unit, so the family is imported from its own
-// barrel rather than the package's. The call sites are the ones a consumer will
-// write: `import { ratinggroup } from '@markless/ui'`.
-import * as ratinggroup from '../index.ts';
+import { ratinggroup } from '../../index.ts';
 
 // The starter a consumer copies: five marks, nothing rated yet.
 export function Basic() @{

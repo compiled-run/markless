@@ -43,6 +43,7 @@ const RENDERED_ROLE: Record<FamilyName, AriaRole> = {
 	// the DOM whether or not the trigger has been pressed.
 	modal: 'dialog',
 	'radio-group': 'radiogroup',
+	'rating-group': 'radiogroup',
 	tabs: 'tablist',
 	// Closed hides the surface but never detaches it, so the dialog role is in the
 	// DOM before the trigger is pressed.
@@ -125,6 +126,9 @@ const RENDERED_COUNT: Partial<Record<FamilyName, number>> = {
 	// The plain drawer, the snapped one, and the nested pair: a count catches a
 	// nested inner root that never became a widget instance of its own.
 	drawer: 4,
+	// The plain rating, the half-value one and the read-only aggregate: a count
+	// catches a section that rendered the starter and lost the other two shapes.
+	'rating-group': 3,
 };
 
 const appDir = fileURLToPath(new URL('..', import.meta.url));
@@ -689,6 +693,50 @@ async function main() {
 				);
 			} else {
 				console.log('#drawer serves the trigger announced as holding a dialog.');
+			}
+		}
+
+		// The role count above says three groups rendered. What a reader lane then
+		// turns on is that a group is named by its label part, that every position
+		// is a stop of its own rather than one control carrying a number, and that
+		// the read-only aggregate still reads its value back.
+		const rating = page.locator('#rating-group [role="radiogroup"]').first();
+		const ratingLabelledBy = await rating.getAttribute('aria-labelledby');
+		if (ratingLabelledBy === null) {
+			failures.push('#rating-group\'s group points at no label through aria-labelledby.');
+		} else {
+			const title = await page.locator(`[id="${ratingLabelledBy}"]`).textContent();
+			if (title?.trim() !== 'Overall rating') {
+				failures.push(
+					`#rating-group's aria-labelledby reaches "${title?.trim()}", not its label part.`,
+				);
+			} else {
+				console.log('#rating-group serves a group named by its label part.');
+			}
+		}
+
+		const marks = page.locator('#rating-group [role="radio"]');
+		if ((await marks.count()) !== 15) {
+			failures.push(
+				`#rating-group serves ${await marks.count()} role="radio" marks, not the 15 its three groups of five need.`,
+			);
+		} else {
+			console.log('#rating-group serves five marks per group.');
+		}
+
+		const readOnly = page.locator('#rating-group [role="radiogroup"][aria-readonly="true"]');
+		if ((await readOnly.count()) !== 1) {
+			failures.push(
+				`#rating-group serves ${await readOnly.count()} groups reading aria-readonly="true", not the 1 its aggregate needs.`,
+			);
+		} else {
+			const readout = await readOnly.locator('output').textContent();
+			if (readout?.trim() !== '4.5 of 5') {
+				failures.push(
+					`#rating-group's read-only group reads back "${readout?.trim()}", not "4.5 of 5".`,
+				);
+			} else {
+				console.log('#rating-group\'s read-only group reads its value back as "4.5 of 5".');
 			}
 		}
 

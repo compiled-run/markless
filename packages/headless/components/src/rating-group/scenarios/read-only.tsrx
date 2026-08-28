@@ -1,4 +1,4 @@
-import * as ratinggroup from '../index.ts';
+import { ratinggroup } from '../../index.ts';
 
 // The display-only aggregate most rendered ratings are: still a rating a reader
 // can read, and nothing a person does changes it.

@@ -20,6 +20,7 @@ import {
 	popover,
 	progress,
 	radiogroup,
+	ratinggroup,
 	select,
 	slider,
 	tabs,
@@ -33,7 +34,7 @@ import {
 // Every shipped family's Basic scenario - the starter a consumer copies - on one
 // page, each in a section a reader can jump to by its anchor: /#checkbox,
 // /#toggle, /#textbox, /#progress, /#checklist, /#select, /#modal,
-// /#radio-group, /#tabs, /#popover, /#tooltip, /#slider, /#datebox,
+// /#radio-group, /#rating-group, /#tabs, /#popover, /#tooltip, /#slider, /#datebox,
 // /#fileupload, /#hovercard, /#calendar, /#menu, /#menubar, /#colorpicker,
 // /#buttongroup, /#numberbox, /#ink, /#pad, /#crop, /#tour, /#toolbar, /#drawer. A family whose
 // second shape a reader announces differently gets its own section too: /#slider-range,
@@ -186,6 +187,36 @@ export function Gallery() @{
 						<radiogroup.itemlabel>Lifetime</radiogroup.itemlabel>
 					</radiogroup.item>
 				</radiogroup.root>
+			</div>
+		</section>
+
+		<section id="rating-group">
+			<h2>Rating group</h2>
+			{/* Already rated, because the claim the real readers settle here is that a fill covering three marks is still one checked radio and four unchecked ones. */}
+			<div class="scenario">
+				<ratinggroup.root defaultValue={3}>
+					<ratinggroup.label>Overall rating</ratinggroup.label>
+					<RatingMarks />
+					<ratinggroup.valuelabel />
+				</ratinggroup.root>
+			</div>
+
+			{/* Half values: the near half of a mark is worth half of it. */}
+			<div class="scenario">
+				<ratinggroup.root half defaultValue={2.5}>
+					<ratinggroup.label>Cleanliness</ratinggroup.label>
+					<RatingMarks />
+					<ratinggroup.valuelabel />
+				</ratinggroup.root>
+			</div>
+
+			{/* The display-only aggregate: still a rating a reader can read, and nothing a person does changes it. */}
+			<div class="scenario">
+				<ratinggroup.root readonly half value={4.5}>
+					<ratinggroup.label>Average guest rating</ratinggroup.label>
+					<RatingMarks />
+					<ratinggroup.valuelabel />
+				</ratinggroup.root>
 			</div>
 		</section>
 
@@ -689,6 +720,21 @@ function TourSection() @{
 				<tour.close>Done</tour.close>
 			</tour.item>
 		</tour.root>
+	</div>
+}
+
+// The marks are the consumer's own markup and sit inside the root, for the reason
+// the month below carries. A construct may not be the direct child of a component
+// tag either, so the repeat opens in a plain element.
+function RatingMarks() @{
+	const rating = ratinggroup.state();
+
+	<div>
+		@for (const position of rating.positions; key position) {
+			<ratinggroup.item value={position}>
+				<span aria-hidden="true">★</span>
+			</ratinggroup.item>
+		}
 	</div>
 }
 
