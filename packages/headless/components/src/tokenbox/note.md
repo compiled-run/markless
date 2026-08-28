@@ -172,6 +172,7 @@ contract than JSON.
 
 ## Two rows that pin the substrate rather than this family
 
+
 `tokenbox.browser.ts` carries two rows whose subject is the browser, and they say
 so in place:
 
@@ -194,14 +195,70 @@ found '@'`, reported at the enclosing `@for` rather than at the comment. The sam
 comment one line above the `@for` parses. Worked around here by moving the
 comment out; it is a compiler defect worth its own witness.
 
-## Not yet registered
+## Registration
 
-The package barrel (`src/index.ts`), the `exports` map in `package.json` and the
-gallery anchor in `apps/sr-gallery/preview-server.ts` do not know about this
-family yet — registration is a follow-up. Two consequences until it lands:
+`src/index.ts` exports the family and the scenarios import from `../../index.ts`.
+Still outstanding: the `exports` map in `package.json`, and the gallery anchor in
+`apps/sr-gallery/preview-server.ts` — `tokenbox-transcript.ts` holds the anchor
+as the literal `'/#tokenbox'` with the swap to `FAMILY_ANCHORS.tokenbox` noted at
+the constant.
 
-- Scenarios import `{ tokenbox }` from `../barrel.ts`, a one-line namespace
-  re-export that exists only to give them the same shape `src/index.ts` will.
-  Delete it and repoint the five scenarios when the barrel line lands.
-- `tokenbox-transcript.ts` holds the gallery anchor as the literal `'/#tokenbox'`
-  with the swap to `FAMILY_ANCHORS.tokenbox` noted at the constant.
+## Four framework rules this family ran into, and what they cost
+
+The ui lane refuses things `pnpm typecheck` cannot see, because the refusals come
+from the vite plugin. Recorded here because none of them is discoverable from the
+type checker and all four shaped the design.
+
+1. **A handler may not name an `element()` handle inside a larger expression.**
+   `MARKLESS_SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE`. Read it into a local on
+   its own line first (`const tokens = tokenEls;`) and build from the local. The
+   local for a roster consulted after a write must still be read *after* that
+   write, or it holds the pre-render array.
+2. **A roster may not be indexed by a computed expression.**
+   `MARKLESS_STATE_DYNAMIC_PATH_READ` — graph read paths must be statically
+   resolvable. Hand the whole roster to a plain module and let it index
+   (`elementAt` in `token-range.ts`; taglist's `elementForValue` is the same
+   shape).
+3. **A `shared()` method cannot be called from another module.**
+   `MARKLESS_SHARED_METHOD_CROSS_MODULE` — a method call compiles by copying the
+   method's authored body into the caller's handler module, and the definition
+   module's imports do not travel with the copy. This is why `tokenbox.itemtrigger`
+   exists: a consumer cannot call `insertToken` from their own handler, so the
+   family publishes the control that calls it. It is also why the popover anchor
+   rect is a field on the `trigger` cell rather than an `anchorRect()` method —
+   reads cross module boundaries fine, calls do not.
+   A related trap from the same copying: a local named `context` inside a shared
+   method collides with a binding the generated symbol module already holds and
+   throws `Cannot access 'context' before initialization` at gesture time. Locals
+   in shared methods need names that cannot collide.
+4. **A component body may seed a shared cell only from its own props or from
+   constants.** `MARKLESS_SHARED_SEED_UNSUPPORTED`. `tokenbox.segments = <prop>`
+   is legal; `tokenbox.segments = withIds(defaultValue)` is not.
+
+## Known red, and the redesign it needs
+
+**The family compiles and the ui lane runs 40 rows: 10 pass, 30 fail.** Everything
+that asserts rendered content fails, because the surface renders empty.
+
+The cause is rule 4 above meeting rule 3. The root currently seeds through
+`tokenbox.seed(defaultValue)` / `tokenbox.adopt(value)` — shared-method calls from
+an eagerly-rendered component body, which do not take effect, so `segments` stays
+empty. Writing the same logic inline in the root is refused by rule 4, because it
+derives a local (`withIds(...)`) instead of assigning a prop straight across.
+
+The redesign that fits the framework, not yet done:
+
+- The root assigns `tokenbox.segments = value` directly, taglist-style, with no
+  derivation in the body. That means the id-minting the current value model
+  depends on cannot happen there.
+- So `id` comes off the public segment type, and the surface's repeat keys on
+  content plus position instead — computed inside the surface part, where a
+  `computed()` is legal. An echo of structurally identical content then yields
+  identical keys and patches nothing, which is what protects the caret; a real
+  change yields different keys and re-renders. That preserves the v1 bet without
+  needing the echo-suppression the root can no longer express.
+- `reported` cannot be seeded from the root either, so `tokenbox.field` submits
+  an empty value until the first edit. It needs to fall back to `segments`.
+
+The pure value arithmetic in `token-walk.ts` and the Range work in
+`token-range.ts` are unaffected by all of this — those rows pass.

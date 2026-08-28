@@ -17,7 +17,7 @@
  */
 
 import { fromParts } from './token-walk.ts';
-import type { TokenBoxKeyedSegment } from './tokenbox-types.ts';
+import type { TokenBoxKeyedSegment, TokenBoxRect } from './tokenbox-types.ts';
 
 /** One token as the DOM currently has it: what it is, and the offsets it occupies. */
 export type PlacedToken = {
@@ -113,6 +113,22 @@ export function readValue(
 }
 
 /**
+ * The element at a position in a roster the family bound.
+ *
+ * The indexing happens here rather than at the call site because a graph read
+ * path has to be statically resolvable: `roster[someExpression]` cannot be
+ * recorded as a subscription, so the whole roster is handed over and a plain
+ * module picks from it — the same shape taglist's `elementForValue` uses.
+ */
+export function elementAt(
+	elements: readonly HTMLElement[],
+	index: number,
+): HTMLElement | undefined {
+	if (index < 0) return undefined;
+	return elements[index];
+}
+
+/**
  * The selected range as two offsets in the flattened text, collapsed to the same
  * number when nothing is selected. `undefined` when the selection is not in this
  * surface.
@@ -151,7 +167,10 @@ export function selectionRange(
  * instead, which is a worse anchor but never a wrong one. A collapsed range
  * still reports a rect in every engine that ships anchor positioning.
  */
-export function rectBehindCaret(surface: HTMLElement, back: number): DOMRect | undefined {
+export function rectBehindCaret(
+	surface: HTMLElement,
+	back: number,
+): TokenBoxRect | undefined {
 	const doc = documentOf(surface);
 	const selection = selectionIn(surface);
 	const node = selection?.focusNode ?? undefined;
@@ -165,7 +184,16 @@ export function rectBehindCaret(surface: HTMLElement, back: number): DOMRect | u
 	} catch {
 		return undefined;
 	}
-	return run.getBoundingClientRect();
+	const box = run.getBoundingClientRect();
+	// Plain numbers: this rides in a graph cell, and a DOMRect does not serialize.
+	return {
+		top: box.top,
+		left: box.left,
+		width: box.width,
+		height: box.height,
+		bottom: box.bottom,
+		right: box.right,
+	};
 }
 
 /**

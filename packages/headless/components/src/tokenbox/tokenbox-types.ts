@@ -55,6 +55,25 @@ export type TokenBoxTrigger = {
 	readonly start: number;
 	/** The caret's offset in the flattened value. */
 	readonly end: number;
+	/**
+	 * Where the trigger run sits on screen, for a popover to be anchored against.
+	 *
+	 * Plain numbers rather than a `DOMRect`, because this rides in a graph cell
+	 * that has to survive serialization. It spans trigger-to-caret when the
+	 * caret's own text node holds those characters, and falls back to the
+	 * collapsed caret rect when it does not — a worse anchor, never a wrong one.
+	 */
+	readonly rect: TokenBoxRect | undefined;
+};
+
+/** A screen rectangle as plain numbers, in viewport coordinates. */
+export type TokenBoxRect = {
+	readonly top: number;
+	readonly left: number;
+	readonly width: number;
+	readonly height: number;
+	readonly bottom: number;
+	readonly right: number;
 };
 
 /**
@@ -139,6 +158,8 @@ export type TokenBoxInstanceState = Seeded<
 	trigger: TokenBoxTrigger | undefined;
 	/** True between `compositionstart` and `compositionend`. Nothing mutates while it is up. */
 	composing: boolean;
+	/** Whether `defaultValue` has been taken. A seed is read once, not every render. */
+	seeded: boolean;
 	onChange?: TokenBoxRootProps['onChange'];
 };
 
@@ -161,6 +182,34 @@ export type TokenBoxLabelProps = PropsOf<'label'>;
  * and the family does not derive anything from them.
  */
 export type TokenBoxInputProps = PropsOf<'div'>;
+
+/**
+ * One choice in an autocomplete list: pressing it puts that token in the box,
+ * replacing whatever the trigger was searching on.
+ *
+ * This is a part rather than a method a consumer calls, and the reason is a hard
+ * compiler rule, not a style preference. Calling a `shared()` method compiles to
+ * copying the method's authored body into the calling handler's module; across
+ * files the definition's imports do not travel with the copy, so the build
+ * refuses (`MARKLESS_SHARED_METHOD_CROSS_MODULE`). The family therefore publishes
+ * the control that performs the insertion, and a consumer composes it.
+ *
+ * Everything else an autocomplete needs is ordinary state a consumer reads from
+ * `tokenbox.state()`: `trigger` carries the character, the query and the rect to
+ * anchor a popover against. Reads cross module boundaries fine; only calls do not.
+ */
+export type TokenBoxItemTriggerProps = Omit<PropsOf<'button'>, 'value'> & {
+	/** The token's value — what `onChange` reports and what the markup carries. */
+	readonly value: string;
+	/** The token's rendered text, and its accessible text. */
+	readonly label: string;
+};
+
+/**
+ * One instance per rendered `tokenbox.itemtrigger`, so the button's own handler
+ * reads the token it inserts off its instance rather than off a prop identifier.
+ */
+export type TokenBoxItemInstanceState = Seeded<TokenBoxItemTriggerProps, 'value' | 'label'>;
 
 /**
  * Supporting text, named by the surface's `aria-describedby`. Mount it alongside

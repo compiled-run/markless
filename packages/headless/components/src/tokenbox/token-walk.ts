@@ -43,6 +43,11 @@ export function withIds(segments: readonly TokenBoxSegment[]): readonly TokenBox
 	);
 }
 
+/** A token's value, or '' for a text run. Lets markup read the union without narrowing. */
+export function valueOf(segment: TokenBoxSegment): string {
+	return segment.kind === 'token' ? segment.value : '';
+}
+
 /** What one segment renders as text: its own text, or a token's label. */
 export function textOf(segment: TokenBoxSegment): string {
 	return segment.kind === 'text' ? segment.text : segment.label;
@@ -225,7 +230,7 @@ export function triggerAt(
 	segments: readonly TokenBoxSegment[],
 	caret: number,
 	triggers: readonly string[],
-): TokenBoxTrigger | undefined {
+): Omit<TokenBoxTrigger, 'rect'> | undefined {
 	if (triggers.length === 0) return undefined;
 	const at = spans(segments);
 

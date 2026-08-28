@@ -17,14 +17,13 @@ function Suggestions() @{
 	<div data-testid="suggestions" ui-open={box.trigger !== undefined}>
 		<output data-testid="trigger-char">{box.trigger?.char ?? ''}</output>
 		<output data-testid="trigger-query">{box.trigger?.query ?? ''}</output>
+		<output data-testid="trigger-anchored">{box.trigger?.rect === undefined ? 'no' : 'yes'}</output>
 		@for (const person of own.people; key person.value) {
-			<button
-				type="button"
+			<tokenbox.itemtrigger
+				value={person.value}
+				label={person.label}
 				data-testid={`suggest-${person.value}`}
-				onClick={() => {
-					box.insertToken(person.value, person.label);
-				}}
-			>{person.label}</button>
+			/>
 		}
 	</div>
 }

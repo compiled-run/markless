@@ -2,6 +2,7 @@ import { computed, element, shared, state } from '@markless/core';
 import {
 	caretOffset,
 	caretToEndOf,
+	elementAt,
 	readValue,
 	rectBehindCaret,
 	selectionRange,
@@ -13,8 +14,10 @@ import {
 	removeToken as withoutToken,
 	rosterIndex,
 	same,
+	textOf,
 	serialize,
 	triggerAt,
+	valueOf,
 	withIds,
 } from './token-walk.ts';
 import type {
@@ -23,6 +26,8 @@ import type {
 	TokenBoxFieldProps,
 	TokenBoxInputProps,
 	TokenBoxInstanceState,
+	TokenBoxItemInstanceState,
+	TokenBoxItemTriggerProps,
 	TokenBoxKeyedSegment,
 	TokenBoxLabelProps,
 	TokenBoxRootProps,
@@ -50,6 +55,7 @@ export const tokenboxState = shared(
 			reported: [] as readonly TokenBoxKeyedSegment[],
 			trigger: undefined as TokenBoxInstanceState['trigger'],
 			composing: false,
+			seeded: false,
 		});
 		const labelEl = element<HTMLLabelElement>();
 		const surfaceEl = element<HTMLDivElement>();
@@ -61,17 +67,6 @@ export const tokenboxState = shared(
 		// element without any run carrying an identity attribute.
 		const tokenEls = element<HTMLSpanElement[]>();
 		const textEls = element<HTMLSpanElement[]>();
-
-		// Deliberately NOT a cell. The root reads it to tell a consumer's echo apart
-		// from a real external change, and a reactive read there would re-run the
-		// root on every keystroke.
-		const last = { value: [] as readonly TokenBoxKeyedSegment[], seeded: false };
-
-		function publish(next: readonly TokenBoxKeyedSegment[], render: boolean) {
-			last.value = next;
-			tokenbox.reported = next;
-			if (render) tokenbox.segments = next;
-		}
 
 		return {
 			...tokenbox,
@@ -86,21 +81,20 @@ export const tokenboxState = shared(
 
 			/** What the box starts with, taken once. The root calls it; nothing else should. */
 			seed(initial: readonly TokenBoxSegment[] | undefined) {
-				if (last.seeded || initial === undefined) return;
-				last.seeded = true;
-				publish(withIds(initial), true);
+				if (tokenbox.seeded || initial === undefined) return;
+				const next = withIds(initial);
+				tokenbox.seeded = true;
+				tokenbox.reported = next;
+				tokenbox.segments = next;
 			},
 
-			/**
-			 * Take a controlled value. An array this family itself emitted is passed
-			 * over — that is a consumer echoing `onChange` back, and re-rendering the
-			 * surface for it would move the caret mid-word.
-			 */
+			/** Take a controlled value, passing over an array this family itself emitted. */
 			adopt(value: readonly TokenBoxSegment[] | undefined) {
-				if (value === undefined || value === last.value) return;
+				if (value === undefined || value === tokenbox.reported) return;
 				const next = withIds(value);
-				if (same(next, last.value)) return;
-				publish(next, true);
+				if (same(next, tokenbox.reported)) return;
+				tokenbox.reported = next;
+				tokenbox.segments = next;
 			},
 
 			/**
@@ -111,13 +105,17 @@ export const tokenboxState = shared(
 			 */
 			settle() {
 				const surface = surfaceEl;
+				const tokens = tokenEls;
 				if (surface === undefined || tokenbox.composing) return;
-				const next = readValue(surface, tokenEls);
+				const next = readValue(surface, tokens);
 				const caret = caretOffset(surface);
+				const found = caret === undefined ? undefined : triggerAt(next, caret, tokenbox.triggers);
 				tokenbox.trigger =
-					caret === undefined ? undefined : triggerAt(next, caret, tokenbox.triggers);
-				if (same(next, last.value)) return;
-				publish(next, false);
+					found === undefined
+						? undefined
+						: { ...found, rect: rectBehindCaret(surface, found.end - found.start) };
+				if (same(next, tokenbox.reported)) return;
+				tokenbox.reported = next;
 				tokenbox.onChange?.(next);
 			},
 
@@ -129,36 +127,38 @@ export const tokenboxState = shared(
 			 */
 			insertToken(value: string, label: string) {
 				const surface = surfaceEl;
+				const tokens = tokenEls;
 				if (surface === undefined || tokenbox.disabled) return;
-				const current = readValue(surface, tokenEls);
-				const context = tokenbox.trigger;
+				const current = readValue(surface, tokens);
+				const found = tokenbox.trigger;
 				const caret = selectionRange(surface);
 				const end = flatten(current).length;
 				const edit = tokenInto(
 					current,
-					context?.start ?? caret?.start ?? end,
-					context?.end ?? caret?.end ?? end,
+					found?.start ?? caret?.start ?? end,
+					found?.end ?? caret?.end ?? end,
 					value,
 					label,
 				);
-				publish(edit.segments, true);
+				tokenbox.reported = edit.segments;
+				tokenbox.segments = edit.segments;
 				tokenbox.trigger = undefined;
 				tokenbox.onChange?.(edit.segments);
-				// The write commits before the caret lands - the runtime's contract, not
-				// a retry. The landing is the space the token brought with it: a caret
-				// parked between a contenteditable="false" island and the end of the
-				// host is a dead spot in every engine.
-				const landing = textEls[rosterIndex(edit.segments, edit.at)];
+				// Read after the write: the roster holds the runs the repeat just rendered.
+				const runs = textEls;
+				const landing = elementAt(runs, rosterIndex(edit.segments, edit.at));
 				if (landing !== undefined) caretToEndOf(landing);
 			},
 
 			/** Take every token carrying this value back out of the box. */
 			removeToken(value: string) {
 				const surface = surfaceEl;
-				const current = surface === undefined ? last.value : readValue(surface, tokenEls);
+				const tokens = tokenEls;
+				const current = surface === undefined ? tokenbox.reported : readValue(surface, tokens);
 				const next = withoutToken(current, value);
-				if (same(next, last.value)) return;
-				publish(next, true);
+				if (same(next, tokenbox.reported)) return;
+				tokenbox.reported = next;
+				tokenbox.segments = next;
 				tokenbox.onChange?.(next);
 			},
 
@@ -169,30 +169,33 @@ export const tokenboxState = shared(
 			 */
 			insertText(text: string) {
 				const surface = surfaceEl;
+				const tokens = tokenEls;
 				if (surface === undefined || tokenbox.disabled || text === '') return;
 				const flat = tokenbox.multiline === true ? text : text.replace(/\s*\n\s*/g, ' ');
-				const current = readValue(surface, tokenEls);
+				const current = readValue(surface, tokens);
 				const end = flatten(current).length;
 				const caret = selectionRange(surface);
 				const edit = textInto(current, caret?.start ?? end, caret?.end ?? end, flat);
-				publish(edit.segments, true);
+				tokenbox.reported = edit.segments;
+				tokenbox.segments = edit.segments;
 				tokenbox.trigger = undefined;
 				tokenbox.onChange?.(edit.segments);
-				const landing = textEls[rosterIndex(edit.segments, edit.at)];
+				const runs = textEls;
+				const landing = elementAt(runs, rosterIndex(edit.segments, edit.at));
 				if (landing !== undefined) caretToEndOf(landing);
 			},
 
-			/**
-			 * Where the trigger run sits on screen, for a popover to be placed
-			 * against. `undefined` when the caret is not in this box.
-			 */
-			anchorRect(): DOMRect | undefined {
-				const surface = surfaceEl;
-				if (surface === undefined) return undefined;
-				const context = tokenbox.trigger;
-				return rectBehindCaret(surface, context === undefined ? 0 : context.end - context.start);
-			},
 		};
+	},
+	{ scope: 'widget' },
+);
+
+/** One instance per rendered `tokenbox.itemtrigger`. */
+export const tokenboxItemState = shared(
+	() => {
+		const item: TokenBoxItemInstanceState = state({ value: '', label: '' });
+
+		return { ...item };
 	},
 	{ scope: 'widget' },
 );
@@ -256,7 +259,8 @@ export function TokenBoxLabel({ children, onClick, ...rest }: TokenBoxLabelProps
 		{...rest}
 		el={tokenbox.labelEl}
 		onClick={(event) => {
-			tokenbox.surfaceEl?.focus();
+			const surface = tokenbox.surfaceEl;
+			surface?.focus();
 			onClick?.(event);
 		}}
 	>{children}</label>
@@ -281,23 +285,13 @@ export function TokenBoxInput({
 	...rest
 }: TokenBoxInputProps) @{
 	const tokenbox = tokenboxState();
-	// Flattened before the repeat so no branch inside it has to narrow a union:
-	// one shape per run, whichever kind it came from.
-	const runs = computed(() =>
-		tokenbox.segments.map((segment) => ({
-			id: segment.id,
-			token: segment.kind === 'token',
-			value: segment.kind === 'token' ? segment.value : '',
-			text: segment.kind === 'token' ? segment.label : segment.text,
-		})),
-	);
 
 	<div
 		{...rest}
 		el={tokenbox.surfaceEl}
 		role="textbox"
 		ui-editor={true}
-		contenteditable={tokenbox.disabled !== true}
+		contenteditable={tokenbox.disabled === true ? 'false' : 'true'}
 		tabindex={0}
 		aria-labelledby={tokenbox.labelEl}
 		// Error before description: what is wrong is conveyed before the hint,
@@ -370,20 +364,54 @@ export function TokenBoxInput({
 	>
 		{/* A token's label IS its text: that is what a reader speaks crossing it,
 		    and what a copy of a range spanning it yields. */}
-		@for (const run of runs; key run.id) {
-			@if (run.token) {
+		@for (const segment of tokenbox.segments; key segment.id) {
+			@if (segment.kind === 'token') {
 				<span
 					el={tokenbox.tokenEls}
 					ui-token={true}
-					ui-value={run.value}
-					contenteditable={false}
-				>{run.text}</span>
+					ui-value={valueOf(segment)}
+					contenteditable="false"
+				>{textOf(segment)}</span>
 			} @else {
-				<span el={tokenbox.textEls} ui-text={true}>{run.text}</span>
+				<span el={tokenbox.textEls} ui-text={true}>{textOf(segment)}</span>
 			}
 		}
 		{children}
 	</div>
+}
+
+// The insertion control, and the only route a consumer has to it: a shared()
+// method call compiles by copying the method body into the caller's module, so
+// `insertToken` cannot be called from a consumer's own handler. The family
+// publishes the button instead; the consumer composes it into their popover.
+export function TokenBoxItemTrigger({
+	value,
+	label,
+	children,
+	onClick,
+	...rest
+}: TokenBoxItemTriggerProps) @{
+	const tokenbox = tokenboxState();
+	const item = tokenboxItemState();
+	item.value = value;
+	item.label = label;
+
+	<button
+		{...rest}
+		type="button"
+		ui-value={item.value}
+		disabled={tokenbox.disabled}
+		onClick={(event) => {
+			tokenbox.insertToken(item.value, item.label);
+			onClick?.(event);
+		}}
+	>
+		@if (children) {
+			<>{children}</>
+		} @else {
+			<>{label}</>
+		}
+	</button>
 }
 
 export function TokenBoxDescription({ children, ...rest }: TokenBoxDescriptionProps) @{
