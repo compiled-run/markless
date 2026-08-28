@@ -73,10 +73,8 @@ async function focused() {
 }
 
 function expectBasicRendered() {
-	// The trigger is a combobox, not a button: a reader that says "button, collapsed"
-	// fails aria-at's `Role 'combobox' is conveyed` row.
 	expect(el(Trigger).tagName).toBe('BUTTON');
-	expect(el(Trigger).getAttribute('role')).toBe('combobox');
+	expect(el(Trigger).hasAttribute('role')).toBe(false);
 	expect(el(Trigger).getAttribute('aria-haspopup')).toBe('listbox');
 	expect(el(Trigger).getAttribute('aria-expanded')).toBe('false');
 	expect(el(Content).getAttribute('role')).toBe('listbox');
@@ -240,7 +238,7 @@ async function expectSelectsStayIsolated() {
 }
 
 for (const mode of MODES) {
-	test(`${mode}: the starter renders a named combobox over a hidden listbox`, async () => {
+	test(`${mode}: the starter renders a named trigger over a hidden listbox`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
 		expectBasicRendered();
@@ -361,7 +359,8 @@ test('CSR: ArrowUp opens the popup and lands on the last option', async () => {
 });
 
 // Enter and Space reach the popup through the button's own activation, because
-// preventDefault() from a deferred handler cannot suppress the native click.
+// preventDefault() from a deferred handler cannot suppress the native click. The
+// landing is therefore asked for from that click, which is the dispatch that opens.
 test('CSR: Enter and Space open the popup and land on the first option', async () => {
 	await render(Basic);
 	await openWith('{Enter}');
@@ -390,7 +389,7 @@ test('CSR: opening a select that already has a choice lands on the chosen option
 	await expect.poll(async () => await focused()).toBe(el(Banana));
 });
 
-test('CSR: Alt+ArrowDown opens the popup and leaves focus on the combobox', async () => {
+test('CSR: Alt+ArrowDown opens the popup and leaves focus on the trigger', async () => {
 	await render(Basic);
 	el(Trigger).focus();
 	await userEvent.keyboard('{Alt>}{ArrowDown}{/Alt}');
@@ -482,7 +481,7 @@ test('CSR: Tab out of the open listbox commits and closes', async () => {
 });
 
 // Typeahead is two graph cells and a Date.now() comparison, over a 750ms window.
-test('CSR: typing a letter on the closed combobox opens on the first match', async () => {
+test('CSR: typing a letter on the closed trigger opens on the first match', async () => {
 	await render(LongList);
 	el(Trigger).focus();
 	await userEvent.keyboard('c');

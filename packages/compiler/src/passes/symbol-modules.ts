@@ -1,4 +1,5 @@
 import type {
+	ArmEscalationCandidate,
 	CaptureSlot,
 	CaptureSlotRoute,
 	GeneratedSymbolModule,
@@ -11,6 +12,8 @@ import type {
 	PlannedSymbolCrossModuleInline,
 	RenderDataArtifact,
 	RenderDataBranch,
+	SemanticElementRosterCount,
+	SemanticElementRosterPosition,
 	SemanticGraphArtifact,
 	SemanticMarkupChunk,
 	SemanticMarkupSlot,
@@ -21,16 +24,28 @@ import type {
 	SymbolModulesInput,
 	SymbolResolverPlan,
 } from '../artifacts.ts';
-import { PROTOCOL_PROPS_GRAPH_NODE_ID } from '@markless/serializer';
+import { PROTOCOL_PROPS_GRAPH_NODE_ID, protocolElementHandleReadId } from '@markless/serializer';
 import type { SourceSpan } from '../diagnostics.ts';
 import {
 	armChildDescent,
+	armChildOwnValueRefusal,
 	type ArmChildProp,
 	type ArmImportedInterfaces,
 } from './arm-child-content.ts';
 import { asNodes, isNode, type AnyNode } from '../ast/nodes.ts';
 import { parseJavaScriptModule } from '../js-ast.ts';
+import {
+	bindingOrigins,
+	carryForeignFactoryScope,
+	isPlatformGlobal,
+	sharedDefinitionFilename,
+	SHARED_COMPUTED_CROSS_MODULE_CODE,
+	type BindingOrigin,
+	type ForeignScopeRefusal,
+} from './foreign-scope.ts';
 import { isClassInstanceValue } from './semantic-graph/collect-state.ts';
+import { ownedModuleAstOrNull } from './semantic-graph/shared-ast.ts';
+import { valueModuleImports } from './semantic-graph/imports.ts';
 import {
 	arrayNode,
 	arrowFunctionNode,
@@ -84,6 +99,25 @@ import {
 	moduleScopeLines,
 	SSR_CALLBACKS_PROP_NAME,
 } from './public-render/shared.ts';
+import { captureSlotFoldsToConstant } from './symbol-resolver.ts';
+
+/**
+ * The branch sites whose every arm refusal a page re-render can answer. The
+ * protocol view runs ahead of this pass, so it asks the same question here
+ * rather than restating the rule; a page with no flippable branch answers
+ * without walking anything.
+ */
+export function armEscalationCandidateSiteIds(input: SymbolModulesInput): ReadonlySet<string> {
+	const flippable = (input.renderData?.branches ?? []).some(
+		(branch) => branch.update !== 'boundary',
+	);
+	if (!flippable) return new Set();
+	return new Set(
+		renderBranchArms(input, asyncComputedGraphNodeIds(input.semanticGraph)).escalationCandidates.map(
+			(candidate) => candidate.branchSiteId,
+		),
+	);
+}
 
 export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtifact {
 	const moduleDeclarations = sourceModuleScopeLines(input.source);
@@ -160,7 +194,7 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 	const boundaryArmsById = renderBoundaryArms(input.renderData, asyncComputedNodeIds);
 	const sourceFileName = input.source?.filename ?? 'markless-module.tsrx';
 	const authoredSource = input.source?.source ?? '';
-	const modules: GeneratedSymbolModule[] = input.symbolResolver.symbols.flatMap((symbol) => {
+	const emittedModules: GeneratedSymbolModule[] = input.symbolResolver.symbols.flatMap((symbol) => {
 			if (unsupportedCaptureSymbolIds.has(symbol.id)) return [];
 			if (symbol.kind === 'branch-update') {
 				const arms = branchArms.armsBySite.get(symbol.branchSiteId);
@@ -206,12 +240,19 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 			);
 	});
 
+	const foreignScope = foreignFactoryScopeCarry(input, emittedModules, captureSlotsBySymbol);
+	const modules = foreignScope.modules;
+
 	return {
 		passId: 'symbol-modules',
 		modules,
+		...(branchArms.escalationCandidates.length > 0
+			? { armEscalationCandidates: branchArms.escalationCandidates }
+			: {}),
 		diagnostics: [
 			...input.captureAnalysis.diagnostics,
 			...branchArms.diagnostics,
+			...foreignScope.diagnostics,
 			...divergentModuleInstanceCarries(modules).map(divergentModuleInstanceDiagnostic),
 			...sharedResolvingExportedFunctions(input.source).map(
 				sharedInstanceExportedFunctionDiagnostic,
@@ -223,8 +264,145 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 				sharedInstanceLocalNames(input.semanticGraph),
 				localNamesBySymbol,
 				sourceModuleScopeDeclaredNames(input.source),
+				new Set(
+					(input.semanticGraph?.moduleImports ?? []).map(
+						(moduleImport) => moduleImport.localName,
+					),
+				),
 			).map(unresolvedGraphReferenceDiagnostic),
 		],
+	};
+}
+
+// ---------------------------------------------------------------------------
+// A factory computed's expression, copied into a module of another file.
+//
+// A shared() computed has no instance in a symbol module to ask, so the browser
+// re-derives it from a copy of the factory's expression — and from another file
+// that copy arrives without the scope it was written in. The served module
+// already carries that scope off the definition record; this carries the same
+// one into the client module and refuses what it cannot. A sibling cell needs
+// nothing here: the lowering turns `other` into a graph read, and the sibling's
+// own derive module gets this carry in its own right.
+
+function foreignFactoryScopeCarry(
+	input: SymbolModulesInput,
+	modules: ReadonlyArray<GeneratedSymbolModule>,
+	captureSlotsBySymbol: ReadonlyMap<string, ReadonlyArray<CaptureSlot>>,
+): {
+	readonly modules: ReadonlyArray<GeneratedSymbolModule>;
+	readonly diagnostics: ReadonlyArray<SymbolModulesDiagnostic>;
+} {
+	const source = input.source;
+	const semanticGraph = input.semanticGraph;
+	const definitions = semanticGraph?.sharedDefinitions ?? [];
+	if (!source || !semanticGraph || definitions.length === 0) return { modules, diagnostics: [] };
+
+	const symbolsById = new Map(input.symbolResolver.symbols.map((symbol) => [symbol.id, symbol]));
+	const diagnostics: SymbolModulesDiagnostic[] = [];
+	let origins: ReadonlyMap<string, BindingOrigin> | undefined;
+
+	const carried = modules.map((module) => {
+		const symbol = symbolsById.get(module.symbolId);
+		if (symbol?.kind !== 'sync-computed-derive') return module;
+		const definedIn = sharedDefinitionFilename(symbol.graphNodeId);
+		if (definedIn === null || definedIn === source.filename) return module;
+
+		const freeNames = unboundForeignBodyNames(
+			symbol,
+			captureSlotsBySymbol.get(symbol.id) ?? [],
+		);
+		if (freeNames.size === 0) return module;
+
+		origins ??= bindingOrigins({
+			filename: source.filename,
+			declarations: consumerModuleScopeDeclarations(source),
+			imports: semanticGraph.moduleImports,
+		});
+		const scope = carryForeignFactoryScope({
+			bodies: [
+				{
+					graphNodeId: symbol.graphNodeId,
+					name: symbol.name,
+					source: symbol.source,
+					definedIn,
+					freeNames,
+				},
+			],
+			sharedDefinitions: definitions,
+			consumerOrigins: origins,
+			consumerFilename: source.filename,
+		});
+		for (const refusal of scope.refusals)
+			diagnostics.push(foreignFactoryScopeDiagnostic(refusal, module));
+		if (scope.importLines.length === 0 && scope.declarations.length === 0) return module;
+
+		return {
+			...module,
+			source: [...scope.importLines, ...scope.declarations, '', module.source].join('\n'),
+		};
+	});
+
+	return { modules: carried, diagnostics };
+}
+
+/**
+ * The names the copied expression still needs from a module scope, read off the
+ * derive module emitted with this file's own carries suppressed: those carries
+ * are matched to the copy by name alone, so with them in place a consumer
+ * binding that happens to share a name hides the gap and the capture both.
+ */
+function unboundForeignBodyNames(
+	symbol: Extract<PlannedSymbol, { readonly kind: 'sync-computed-derive' }>,
+	captureSlots: ReadonlyArray<CaptureSlot>,
+): ReadonlySet<string> {
+	const bare: GeneratedSymbolModule = {
+		symbolId: symbol.id,
+		kind: symbol.kind,
+		exportName: symbolExportName(symbol.id),
+		source: emitSyncComputedDeriveModule({ ...symbol, moduleImports: [] }, captureSlots, true, [], []),
+	};
+	return new Set([...freeIdentifierNames(bare)].filter((name) => !isPlatformGlobal(name)));
+}
+
+function consumerModuleScopeDeclarations(source: NonNullable<SymbolModulesInput['source']>) {
+	try {
+		return moduleScopeDeclarations(source.source, source.filename);
+	} catch {
+		// An authored file that will not parse is a different defect; claim nothing.
+		return [];
+	}
+}
+
+function foreignFactoryScopeDiagnostic(
+	refusal: ForeignScopeRefusal,
+	module: GeneratedSymbolModule,
+): SymbolModulesDiagnostic {
+	const { body, name, held } = refusal;
+	return {
+		code: SHARED_COMPUTED_CROSS_MODULE_CODE,
+		severity: 'error',
+		phase: 'public-render',
+		passId: 'symbol-modules',
+		artifactKeys: ['symbolModules'],
+		title: `A shared() computed cannot be re-derived from another module yet ("${body.name}")`,
+		message: held
+			? `The browser re-derives "${body.name}" by fetching a module built from a copy of its expression in ${body.definedIn} (${module.symbolId}). The copied expression names "${name}", which ${body.definedIn} means as its own, and THIS file already binds "${name}" as ${held.text}; one module scope cannot hold both, and matched against it by name alone the browser would re-derive the value from this module's "${name}" rather than the one ${body.definedIn} means.`
+			: `The browser re-derives "${body.name}" by fetching a module built from a copy of its expression in ${body.definedIn} (${module.symbolId}). The copied expression names "${name}", and nothing in that module binds it, so the first re-derive in the browser would throw a ReferenceError.`,
+		why: 'A shared() factory has no instance inside a symbol module to ask for a computed value, so the browser re-derives the value from a copy of the factory\'s own expression. Copying text moves the statements but not the scope they were written in. The imports and module-scope constants the expression names travel with the definition and are emitted beside the copy, but a name the reading file already binds from somewhere else cannot be: the emitted module would bind it twice, and matching by name alone would re-derive the value from this file\'s value instead. The server renders the first paint correctly either way, so the failure would first appear on a refresh or a client write.',
+		suggestions: [
+			held
+				? {
+						message: `Rename this module's "${name}", or import it under another local name, so the one ${body.definedIn} means can be carried in beside the copy.`,
+					}
+				: {
+						message: `Write "${body.name}" so it needs nothing from ${body.definedIn}'s module scope - out of the factory's own state and platform globals only - and it copies into any module unchanged.`,
+					},
+			{
+				message: `Or read "${body.name}" from a part that ${body.definedIn} publishes and compose that part here. Inside its own module the same expression copies back into the scope it was written in.`,
+			},
+		],
+		docsUrl: `https://markless.dev/errors/${SHARED_COMPUTED_CROSS_MODULE_CODE}`,
 	};
 }
 
@@ -260,7 +438,7 @@ function divergentModuleInstanceCarries(
 	const symbolIdsByName = new Map<string, string[]>();
 	for (const emitted of modules) {
 		if (emitted.kind !== 'event-handler' && emitted.kind !== 'callback-prop') continue;
-		for (const name of moduleScopeInstanceNames(emitted.source)) {
+		for (const name of moduleScopeInstanceNames(emitted)) {
 			const seen = symbolIdsByName.get(name);
 			if (seen) seen.push(emitted.symbolId);
 			else symbolIdsByName.set(name, [emitted.symbolId]);
@@ -272,16 +450,22 @@ function divergentModuleInstanceCarries(
 		.map(([name, symbolIds]) => ({ name, symbolIds }));
 }
 
+/**
+ * The tree of a module this pass just printed, read as JavaScript and shared by
+ * every reader of that module. A module that carries TypeScript — a shared()
+ * method inlined into it keeps the author's annotations — is rejected here and
+ * gets `null`; the reader that needs it then reparses as TypeScript.
+ */
+function printedModuleAst(emitted: GeneratedSymbolModule): AnyNode | null {
+	return ownedModuleAstOrNull(emitted, emitted.source, 'generated.js');
+}
+
 /** Module-scope bindings this emitted module initializes with a class instance. */
-function moduleScopeInstanceNames(source: string): ReadonlyArray<string> {
-	let ast: AnyNode;
-	try {
-		ast = parseJavaScriptModule(source);
-	} catch {
-		// A module the compiler just printed and cannot reparse is a different
-		// defect; it is not evidence that this one is absent, so claim nothing.
-		return [];
-	}
+function moduleScopeInstanceNames(emitted: GeneratedSymbolModule): ReadonlyArray<string> {
+	// A module the compiler just printed and cannot reparse is a different
+	// defect; it is not evidence that this one is absent, so claim nothing.
+	const ast = printedModuleAst(emitted);
+	if (!ast) return [];
 
 	return asNodes(ast.body).flatMap((statement) => {
 		if (statement.type !== 'VariableDeclaration') return [];
@@ -380,6 +564,15 @@ type UnresolvedGraphReference = {
 	 * this check the gap ships silently and crashes only client-side.
 	 */
 	readonly moduleDeclaration?: boolean;
+	/**
+	 * Whether an import in the same authored file binds the name.
+	 *
+	 * Same failure as `moduleDeclaration` and same blind spot — SSR evaluates the
+	 * authored module and stays green — but the repair is an import statement in
+	 * the emitted module rather than a copied declaration, so it takes its own
+	 * advice.
+	 */
+	readonly moduleImport?: boolean;
 	/**
 	 * The cross-module shared() method splice this name came out of.
 	 *
@@ -520,26 +713,31 @@ function unresolvedGraphReferences(
 	sharedInstanceNames: ReadonlySet<string>,
 	localNamesBySymbol: ReadonlyMap<string, ReadonlySet<string>>,
 	moduleDeclaredNames: ReadonlySet<string>,
+	moduleImportNames: ReadonlySet<string> = new Set(),
 ): ReadonlyArray<UnresolvedGraphReference> {
 	const anyCrossModuleInline = symbols.some((symbol) => crossModuleInlineOf(symbol) !== undefined);
 	if (
 		graphNames.size === 0 &&
 		localNamesBySymbol.size === 0 &&
 		moduleDeclaredNames.size === 0 &&
+		moduleImportNames.size === 0 &&
 		!anyCrossModuleInline
 	) {
 		return [];
 	}
 
 	return modules.flatMap((emitted) => {
-		const free = freeIdentifierNames(emitted.source);
+		const free = freeIdentifierNames(emitted);
 		const symbol = symbols.find((candidate) => candidate.id === emitted.symbolId);
 		const localNames = localNamesBySymbol.get(emitted.symbolId) ?? emptyLocalNames;
 
 		const allowlisted = [...free]
 			.filter(
 				(name) =>
-					graphNames.has(name) || localNames.has(name) || moduleDeclaredNames.has(name),
+					graphNames.has(name) ||
+					localNames.has(name) ||
+					moduleDeclaredNames.has(name) ||
+					moduleImportNames.has(name),
 			)
 			.sort()
 			.map((name) => ({
@@ -561,6 +759,14 @@ function unresolvedGraphReferences(
 				!graphNames.has(name) &&
 				!localNames.has(name)
 					? { moduleDeclaration: true }
+					: {}),
+				// Lowest of all: an import is only the explanation when nothing this
+				// file declares is.
+				...(moduleImportNames.has(name) &&
+				!moduleDeclaredNames.has(name) &&
+				!graphNames.has(name) &&
+				!localNames.has(name)
+					? { moduleImport: true }
 					: {}),
 			}));
 
@@ -669,21 +875,22 @@ function identifierRootNames(valueSource: string): ReadonlySet<string> {
  * over-approximates deliberately: over-counting a binding can only make this walk
  * quieter, never louder.
  *
- * Read as TypeScript, because an emitted handler module can carry TypeScript: a
- * shared() method inlined into it keeps the annotations the author wrote on its
- * parameters (`(next: boolean) => { ... }`). Parsed as plain JavaScript that
- * module threw, the catch below claimed nothing, and this whole check went quiet
- * for exactly the modules an inlined method could break — a fail-open the
- * annotations alone were enough to trigger.
+ * A module the JavaScript read rejects must be read as TypeScript rather than
+ * skipped: a shared() method inlined into a handler keeps the annotations the
+ * author wrote on its parameters (`(next: boolean) => { ... }`), and treating
+ * that throw as "nothing to report" took this whole check out for exactly the
+ * modules an inlined method could break.
  */
-function freeIdentifierNames(source: string): ReadonlySet<string> {
-	let ast: AnyNode;
-	try {
-		ast = parseJavaScriptModule(source, 'generated.ts');
-	} catch {
-		// A module the compiler just printed and cannot reparse is a different
-		// defect; it is not evidence that this one is present, so claim nothing.
-		return new Set();
+function freeIdentifierNames(emitted: GeneratedSymbolModule): ReadonlySet<string> {
+	let ast = printedModuleAst(emitted);
+	if (!ast) {
+		try {
+			ast = parseJavaScriptModule(emitted.source, 'generated.ts') as AnyNode;
+		} catch {
+			// A module the compiler just printed and cannot reparse at all is a
+			// different defect; claim nothing rather than report a phantom gap.
+			return new Set();
+		}
 	}
 
 	const bound = new Set<string>();
@@ -781,6 +988,7 @@ function unresolvedGraphReferenceDiagnostic(
 	if (reference.moduleDeclaration === true) {
 		return moduleDeclarationReferenceDiagnostic(reference, where);
 	}
+	if (reference.moduleImport === true) return moduleImportReferenceDiagnostic(reference, where);
 
 	return {
 		code: SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE,
@@ -956,6 +1164,39 @@ function moduleDeclarationReferenceDiagnostic(
 	};
 }
 
+/**
+ * The same refusal for an import the emitter did not carry.
+ *
+ * Until this branch existed the allowlist could not see an imported name at all,
+ * so an emitted module that named one was reported by nothing: SSR evaluates the
+ * authored module, where the import is in scope, and the failure surfaced only as
+ * a client-side ReferenceError on first render.
+ */
+function moduleImportReferenceDiagnostic(
+	reference: UnresolvedGraphReference,
+	where: string,
+): SymbolModulesDiagnostic {
+	return {
+		code: SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE,
+		severity: 'error',
+		phase: 'public-render',
+		passId: 'symbol-modules',
+		artifactKeys: ['symbolModules'],
+		title: `The emitted module for ${reference.symbolId} is missing the import of "${reference.name}"`,
+		message: `The emitted ${reference.kind} module for ${reference.symbolId} still names "${reference.name}" directly. ${where} "${reference.name}" is imported at module scope in this file, and the emitted module does not import it, so this module would throw a ReferenceError the first time it runs in the browser. The server render would not: it evaluates the authored module, where the import is in scope.`,
+		why: "Every symbol is compiled into a module that is fetched and evaluated on its own, so an import its spliced text still names has to be re-declared in it. That carry is the compiler's to make, and this check exists because a missing one is invisible otherwise: the server renders from the authored module and stays green, so the gap reaches the browser and crashes on the first render rather than failing the build.",
+		suggestions: [
+			{
+				message: `This is a compiler gap, not a mistake in this file: reading an imported binding from a component is supported. Report it with the import of "${reference.name}" and the symbol kind above.`,
+			},
+			{
+				message: `To keep building meanwhile, write the value of "${reference.name}" out at the position that names it.`,
+			},
+		],
+		docsUrl: `https://markless.dev/errors/${SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE}`,
+	};
+}
+
 // This pass owns the code; readers import it rather than restating the string.
 export const SHARED_INSTANCE_EXPORTED_FUNCTION_CODE =
 	'MARKLESS_SHARED_INSTANCE_EXPORTED_FUNCTION' as const;
@@ -1042,6 +1283,9 @@ function armPartReadPath(
 type ArmRefusal = {
 	readonly detail: string;
 	readonly span?: SourceSpan;
+	// A same-module component that has to run: the one refusal a re-render of the
+	// page through the prerender evaluator can answer.
+	readonly escalatable?: boolean;
 };
 
 type ArmPartsContext = {
@@ -1062,11 +1306,13 @@ function renderBranchArms(
 ): {
 	readonly armsBySite: ReadonlyMap<string, PublicRenderPlanBranchArms>;
 	readonly diagnostics: ReadonlyArray<SymbolModulesDiagnostic>;
+	readonly escalationCandidates: ReadonlyArray<ArmEscalationCandidate>;
 } {
 	const renderData = input.renderData;
-	if (!renderData) return { armsBySite: new Map(), diagnostics: [] };
+	if (!renderData) return { armsBySite: new Map(), diagnostics: [], escalationCandidates: [] };
 	const armsBySite = new Map<string, PublicRenderPlanBranchArms>();
 	const diagnostics: SymbolModulesDiagnostic[] = [];
+	const escalationCandidates: ArmEscalationCandidate[] = [];
 	for (const branch of renderData.branches ?? []) {
 		if (branch.update === 'boundary') continue;
 		const refusals: ArmRefusal[] = [];
@@ -1094,8 +1340,19 @@ function renderBranchArms(
 					candidate.kind === 'branch-update' &&
 					candidate.branchSiteId === branch.branchSiteId,
 			);
-			if (symbol)
-				diagnostics.push(branchArmUnsupportedDiagnostic(branch, refusals[0], symbol.id));
+			if (symbol) {
+				const diagnostic = branchArmUnsupportedDiagnostic(branch, refusals[0], symbol.id);
+				diagnostics.push(diagnostic);
+				// Every refusal escalatable, or none: a branch that also holds a shape
+				// no re-render answers stays plainly refused. A refusal that only warns
+				// blocks no build, so its branch keeps shipping the plan it ships today.
+				if (
+					diagnostic.severity === 'error' &&
+					refusals.length > 0 &&
+					refusals.every((refusal) => refusal.escalatable)
+				)
+					escalationCandidates.push({ branchSiteId: branch.branchSiteId, symbolId: symbol.id });
+			}
 			continue;
 		}
 		armsBySite.set(branch.branchSiteId, {
@@ -1106,7 +1363,7 @@ function renderBranchArms(
 			...(branch.declaredEmptyArms ? { declaredEmptyArms: branch.declaredEmptyArms } : {}),
 		});
 	}
-	return { armsBySite, diagnostics };
+	return { armsBySite, diagnostics, escalationCandidates };
 }
 
 function branchArmUnsupportedDiagnostic(
@@ -1168,8 +1425,12 @@ function renderChunkParts(
 	child?: ArmChildScope,
 ): PublicRenderPlanBranchArms['arms'][number] | null {
 	const { renderData, asyncComputedNodeIds } = context;
-	const refuse = (detail: string, span?: SourceSpan) => {
-		context.refusals?.push({ detail, ...(span ? { span } : {}) });
+	const refuse = (detail: string, span?: SourceSpan, escalatable?: boolean) => {
+		context.refusals?.push({
+			detail,
+			...(span ? { span } : {}),
+			...(escalatable ? { escalatable: true } : {}),
+		});
 		return null;
 	};
 	const chunk = (child?.chunks ?? renderData.chunks).find((candidate) => candidate.id === chunkId);
@@ -1215,11 +1476,14 @@ function renderChunkParts(
 				if (child?.imported)
 					return refuse(`<${child.componentName}> shows a component of its own`);
 				const childParts = childComponentParts(context, slot);
-				if (childParts === null)
+				if (childParts === null) {
+					const reason = childRefusalReason(context, slot);
 					return refuse(
-						`<${slot.childComponentName}> has to run to produce its content`,
+						`<${slot.childComponentName}> ${reason.detail}`,
 						componentEdgeSpan(context, slot.componentEdgeId),
+						reason.escalatable,
 					);
+				}
 				for (const part of childParts) {
 					if ('text' in part) pushText(part.text);
 					else parts.push(part);
@@ -1249,10 +1513,38 @@ function renderChunkParts(
 				} });
 				continue;
 			}
-			return refuse(`it holds a ${slot.kind} binding`);
+			// The id a bound element carries is minted from the rendered widget's
+			// token, which no flip can reach; the render that served the arm resolves
+			// it onto the branch record and the symbol reads it back through the same
+			// read channel its value parts use.
+			if (
+				slot.kind === 'attribute' &&
+				slot.alwaysPresent === true &&
+				slot.residue.kind === 'element-handle-id' &&
+				slot.residue.idref !== true &&
+				!child
+			) {
+				parts.push({ read: {
+					graphNodeId: protocolElementHandleReadId(slot.residue.handleGraphNodeId),
+					path: [],
+				} });
+				continue;
+			}
+			return refuse(armSlotRefusalDetail(slot));
 		}
 	}
 	return parts;
+}
+
+// `el={handle}` alone leaves no slot behind and flips fine; what a flip cannot
+// answer is the id an IDREF elsewhere made the bound element carry, since that
+// id is minted per rendered widget and the arm module has no widget to ask.
+function armSlotRefusalDetail(slot: SemanticMarkupSlot): string {
+	if ('residue' in slot && slot.residue.kind === 'element-handle-id')
+		return 'an element() handle it binds is named by an IDREF, and that id is minted for the rendered widget, which a flip has no way to mint again';
+	if ('residue' in slot && slot.residue.kind === 'element-handle-id-list')
+		return 'an element() handle it binds is named by an IDREF list, and those ids are minted for the rendered widget, which a flip has no way to mint again';
+	return `it holds ${slot.kind === 'attribute' || slot.kind === 'async' ? 'an' : 'a'} ${slot.kind} binding`;
 }
 
 // One prop name to the value a flip rebuilds the child's markup with.
@@ -1368,6 +1660,27 @@ function staticChildComponentMarkup(
 			hostNodeIds.has(record.hostNodeId),
 	);
 	return wired ? null : chunk.statics.join('');
+}
+
+// Names the one value that kept the flip out; falls back to the shape-level
+// refusal for a child this descent cannot express for any other reason. Only a
+// same-module child's own value is escalatable: an imported child's markup and
+// records belong to a module this one cannot address.
+function childRefusalReason(
+	context: ArmPartsContext,
+	slot: Extract<SemanticMarkupSlot, { readonly kind: 'child-component' }>,
+): { readonly detail: string; readonly escalatable: boolean } {
+	const semanticGraph = context.inline?.semanticGraph;
+	const edge = semanticGraph?.componentEdges.find(
+		(candidate) => candidate.id === slot.componentEdgeId,
+	);
+	const own =
+		semanticGraph && edge && !edge.importSource
+			? armChildOwnValueRefusal(semanticGraph, edge.childComponentName)
+			: undefined;
+	return own
+		? { detail: own, escalatable: true }
+		: { detail: 'has to run to produce its content', escalatable: false };
 }
 
 function componentEdgeSpan(
@@ -1693,16 +2006,7 @@ function domJournalEntryNode(
 			propertyNode('type', literalNode('setAttr')),
 			propertyNode('locator', locator),
 			propertyNode('name', literalNode('class')),
-			propertyNode(
-				'value',
-				target.trueValue !== undefined && target.falseValue !== undefined
-					? conditionalNode(
-							domUpdateValueNode(),
-							literalNode(target.trueValue),
-							literalNode(target.falseValue),
-						)
-					: domUpdateValueNode(),
-			),
+			propertyNode('value', classDomUpdateValueNode(target)),
 		]);
 	}
 
@@ -1733,6 +2037,29 @@ function domLocatorNode(hostNodeId: string): EmissionNode {
  */
 function domUpdateValueNode(): EmissionNode {
 	return memberChainNode('context.value');
+}
+
+/** The AST twin of dom-update.ts `classTargetValue`. */
+function classDomUpdateValueNode(
+	target: Extract<DomUpdateTarget, { readonly kind: 'class' }>,
+): EmissionNode {
+	const mapped = (): EmissionNode =>
+		target.trueValue !== undefined && target.falseValue !== undefined
+			? conditionalNode(
+					domUpdateValueNode(),
+					literalNode(target.trueValue),
+					literalNode(target.falseValue),
+				)
+			: domUpdateValueNode();
+
+	const constant = target.constantClass;
+	if (constant === undefined) return mapped();
+
+	return conditionalNode(
+		mapped(),
+		binaryNode('+', mapped(), literalNode(` ${constant}`)),
+		literalNode(constant),
+	);
 }
 
 /** The AST twin of `textDomUpdateValueSource`. */
@@ -2111,7 +2438,15 @@ export function buildStateInitializerEmission(
 		input.symbol.source,
 		input.sourceFileName,
 	);
-	const referencedNames = referencedIdentifierNames(projection.program as unknown as AnyNode);
+	// The prop defaults are spliced after the projection is built, so their names
+	// are added here rather than read off it.
+	const referencedNames = new Set([
+		...referencedIdentifierNames(projection.program as unknown as AnyNode),
+		...splicedSourceReferencedNames(
+			propReadDefaultSources(input.propReads),
+			input.sourceFileName,
+		),
+	]);
 	const imports = dedupeModuleImports([
 		...(input.symbol.moduleImports ?? []),
 		...input.moduleImports.filter((moduleImport) => referencedNames.has(moduleImport.localName)),
@@ -2174,22 +2509,18 @@ export function emitStateInitializerModuleNodes(
 // ---------------------------------------------------------------------------
 
 /**
- * No module-scope declaration carry, and none is possible.
- *
- * Every other emitter that splices authored text takes `moduleDeclarations` so a
- * same-file `const`/`class` the text names travels into the module it is fetched
- * as. This one cannot need it: `isUnloweredSharedSeed` in `state-lowering.ts`
- * refuses any component-body seed whose value names anything but this
- * component's own prop locals and the six literal keywords (`true`, `false`,
- * `null`, `undefined`, `NaN`, `Infinity`). A module-scope declaration is never
- * among them, so a seed expression that would need a carry fails the build two
- * passes before this emitter sees it. `unresolvedGraphReferences` still covers
- * the emitted module, so relaxing that rule surfaces here as a build error
- * rather than as a browser ReferenceError.
+ * The seed VALUE cannot name a module-scope binding — `isUnloweredSharedSeed` in
+ * `state-lowering.ts` refuses anything but this component's prop locals and the
+ * six literal keywords — but a prop DEFAULT spliced beside it can, and that text
+ * is scanned for imports here rather than at plan time, where only the value
+ * source is known. A same-file declaration a default names is still uncarried and
+ * is refused by `unresolvedGraphReferences` instead.
  */
 export type SharedSeedEmissionInput = {
 	readonly symbol: Extract<PlannedSymbol, { readonly kind: 'shared-seed' }>;
 	readonly propReads: ReadonlyArray<StateInitializerPropRead>;
+	/** Every import this file declares; the ones the spliced text names are carried. */
+	readonly moduleImports?: readonly SemanticModuleImport[];
 	/** The authored file the seed was extracted from; names the map. */
 	readonly sourceFileName: string;
 };
@@ -2203,7 +2534,16 @@ export function buildSharedSeedEmission(input: SharedSeedEmissionInput): Emissio
 		symbolId: input.symbol.id,
 	};
 
-	const imports = dedupeModuleImports(input.symbol.moduleImports ?? []);
+	const splicedNames = splicedSourceReferencedNames(
+		propReadDefaultSources(input.propReads),
+		input.sourceFileName,
+	);
+	const imports = dedupeModuleImports([
+		...(input.symbol.moduleImports ?? []),
+		...(input.moduleImports ?? []).filter((moduleImport) =>
+			splicedNames.has(moduleImport.localName),
+		),
+	]);
 	const seedLocal = 'marklessSharedSeed';
 	// A callback slot's value is the composing edge's own answer, handed to this
 	// root among its props; there is no authored expression to read.
@@ -2578,6 +2918,33 @@ function initializerReferencedNames(initializerSource: string, filename: string)
 	return referencedIdentifierNames(parsed);
 }
 
+/**
+ * The destructuring defaults a prop read splices into the emitted module.
+ *
+ * These are authored expressions the module evaluates, so whatever they name has
+ * to travel with them — and they are NOT part of the symbol's own source, which
+ * is the only text the plan scanned when it chose the imports to carry.
+ */
+function propReadDefaultSources(
+	propReads: ReadonlyArray<StateInitializerPropRead>,
+): readonly string[] {
+	return propReads.flatMap((propRead) =>
+		propRead.defaultSource === undefined ? [] : [propRead.defaultSource],
+	);
+}
+
+/** The identifiers a set of spliced authored expressions names, parsed once each. */
+function splicedSourceReferencedNames(
+	sources: readonly string[],
+	filename: string,
+): ReadonlySet<string> {
+	const names = new Set<string>();
+	for (const source of sources) {
+		for (const name of initializerReferencedNames(source, filename)) names.add(name);
+	}
+	return names;
+}
+
 /** The names a parsed module's top-level declarations bind. */
 function declaredStatementNames(program: AnyNode): string[] {
 	return asNodes(program.body).flatMap((statement) => {
@@ -2633,6 +3000,9 @@ function referencedIdentifierNames(root: AnyNode): Set<string> {
 /**
  * The AST path's import dedupe. Same key as `uniqueModuleImports`, which sits
  * inside the scanner band a migrated site may not call.
+ *
+ * Every band's carry funnels through this or its twin, which is why the
+ * type-only drop lives here rather than at each of the six selection sites.
  */
 function dedupeModuleImports(
 	moduleImports: ReadonlyArray<SemanticModuleImport>,
@@ -2640,7 +3010,7 @@ function dedupeModuleImports(
 	const seen = new Set<string>();
 	const unique: SemanticModuleImport[] = [];
 
-	for (const moduleImport of moduleImports) {
+	for (const moduleImport of valueModuleImports(moduleImports)) {
 		const key = [
 			moduleImport.kind,
 			moduleImport.localName,
@@ -2926,7 +3296,14 @@ function syncComputedDeriveStatements(
 			? asNodes(body.body)
 			: [{ type: 'ReturnStatement', argument: body } as AnyNode];
 
-	rewriteDeriveReads(statements, symbol.dependencies ?? [], captureSlots, wrappedSource);
+	rewriteDeriveReads(
+		statements,
+		symbol.dependencies ?? [],
+		captureSlots,
+		wrappedSource,
+		symbol.rosterPosition,
+		symbol.rosterCount,
+	);
 
 	const declarationStatements = (parsed?.declarations ??
 		[]) as unknown as ReadonlyArray<EmissionNode>;
@@ -3010,14 +3387,27 @@ function rewriteDeriveReads(
 	dependencies: ReadonlyArray<SemanticGraphDependency>,
 	captureSlots: ReadonlyArray<CaptureSlot>,
 	wrappedSource: string,
+	rosterPosition?: SemanticElementRosterPosition,
+	rosterCount?: SemanticElementRosterCount,
 ): void {
-	if (dependencies.length === 0) return;
+	if (dependencies.length === 0 && !rosterPosition && !rosterCount) return;
 
 	const visit = (
 		node: AnyNode,
 		parent: AnyNode | undefined,
 		replace: ((next: EmissionNode) => void) | null,
 	): void => {
+		if (replace && (rosterPosition || rosterCount)) {
+			const text = nodeText(node, wrappedSource);
+			if (rosterPosition && text === rosterPosition.source) {
+				replace(rosterPositionNode(rosterPosition));
+				return;
+			}
+			if (rosterCount && text === rosterCount.source) {
+				replace(rosterCountNode(rosterCount));
+				return;
+			}
+		}
 		const dependency = matchingDependency(node, parent, dependencies, wrappedSource);
 		if (dependency && replace) {
 			replace(deriveReadNode(dependency, captureSlots));
@@ -3090,10 +3480,92 @@ function matchingDependency(
 ): SemanticGraphDependency | null {
 	if (!isGraphReadExpression(node)) return null;
 	if (!isValuePositionGraphRead(node, parent)) return null;
-	if (typeof node.start !== 'number' || typeof node.end !== 'number') return null;
+	const text = nodeText(node, wrappedSource);
+	if (text === null) return null;
 
-	const text = wrappedSource.slice(node.start, node.end);
 	return dependencies.find((dependency) => dependency.source === text) ?? null;
+}
+
+function nodeText(node: AnyNode, wrappedSource: string): string | null {
+	if (typeof node.start !== 'number' || typeof node.end !== 'number') return null;
+	return wrappedSource.slice(node.start, node.end);
+}
+
+/**
+ * `context.rosterPosition("<roster node>", "<member handle node>")` — the one
+ * call both regimes answer: at server render from the order the instance emitted
+ * its parts, after resume from the roster's live document order.
+ *
+ * The member handle travels as an id rather than as a value, because a derive
+ * body holds no DOM node to pass; the answering side owns the lookup.
+ */
+function rosterPositionNode(record: SemanticElementRosterPosition): EmissionNode {
+	return callNode(memberChainNode('context.rosterPosition'), [
+		literalNode(record.rosterGraphNodeId),
+		literalNode(record.handleGraphNodeId),
+	]);
+}
+
+/**
+ * `context.rosterCount("<roster node>")` — how many parts the family instance
+ * has, answered at server render from the count it emitted and after resume from
+ * the roster's live membership.
+ */
+function rosterCountNode(record: SemanticElementRosterCount): EmissionNode {
+	return callNode(memberChainNode('context.rosterCount'), [
+		literalNode(record.rosterGraphNodeId),
+	]);
+}
+
+/**
+ * A slot every incoming edge answers with the same compile-time value is the
+ * value. The bound-symbol planner mints no row for such a slot, so nothing at
+ * runtime would supply a capture context to read it from.
+ */
+function constantCaptureSlotNode(slot: CaptureSlot): EmissionNode | null {
+	if (!captureSlotFoldsToConstant(slot)) return null;
+	const constant = slot.routes.flatMap((route) =>
+		route.kind === 'compiler-known-constant' ? [route.value] : [],
+	)[0];
+	return constantValueNode(
+		slot.path.reduce<unknown>(
+			(value, key) =>
+				value === null || value === undefined
+					? undefined
+					: (value as Record<string, unknown>)[key],
+			constant,
+		),
+	);
+}
+
+// Null for anything emission cannot spell exactly; the capture read stays.
+function constantValueNode(value: unknown): EmissionNode | null {
+	if (value === null) return literalNode(null);
+	if (typeof value === 'string' || typeof value === 'boolean') return literalNode(value);
+	if (typeof value === 'number') return Number.isFinite(value) ? literalNode(value) : null;
+	if (Array.isArray(value)) {
+		const elements = value.map((entry) => constantValueNode(entry));
+		return elements.every((entry) => entry !== null)
+			? arrayNode(elements as ReadonlyArray<EmissionNode>)
+			: null;
+	}
+	if (typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+		const properties: EmissionNode[] = [];
+		for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+			const emitted = constantValueNode(entry);
+			if (!emitted) return null;
+			properties.push(stringKeyPropertyNode(key, emitted));
+		}
+		return objectNode(properties);
+	}
+	return null;
+}
+
+function captureSlotReadNode(slot: CaptureSlot): EmissionNode {
+	return (
+		constantCaptureSlotNode(slot) ??
+		callNode(memberChainNode('context.capture.read'), [literalNode(slot.id)])
+	);
 }
 
 function deriveReadNode(
@@ -3102,7 +3574,7 @@ function deriveReadNode(
 ): EmissionNode {
 	const slot = captureSlots.find((candidate) => captureSlotMatchesRead(candidate, dependency));
 	if (slot) {
-		return callNode(memberChainNode('context.capture.read'), [literalNode(slot.id)]);
+		return captureSlotReadNode(slot);
 	}
 
 	return graphReadCall({
@@ -3447,13 +3919,14 @@ function symbolExportName(symbolId: string): string {
 	return `_${name}`;
 }
 
+/** `dedupeModuleImports`' scanner-band twin; drops type-only imports the same way. */
 function uniqueModuleImports(
 	moduleImports: ReadonlyArray<SemanticModuleImport>,
 ): ReadonlyArray<SemanticModuleImport> {
 	const seen = new Set<string>();
 	const unique: SemanticModuleImport[] = [];
 
-	for (const moduleImport of moduleImports) {
+	for (const moduleImport of valueModuleImports(moduleImports)) {
 		const key = [
 			moduleImport.kind,
 			moduleImport.localName,
@@ -3521,7 +3994,7 @@ function emitModuleImport(moduleImport: SemanticModuleImport): string {
 //     the map's `sourcesContent` should therefore hold.
 //
 // The non-null-map guard (invariant 3) still runs, and still passes, but at
-// these two sites it proves less than it reads as: `yuku-codegen@0.9.0` returns
+// these two sites it proves less than it reads as: `yuku-codegen@0.9.1` returns
 // a non-null map for an empty `source` too, so the guard cannot distinguish a
 // module whose source was threaded through from one whose source is absent. The
 // guard is kept because invariant 3 requires it and because it does catch a
@@ -3591,19 +4064,28 @@ export function buildBranchUpdateEmission(input: BranchUpdateEmissionInput): Emi
 					logicalNode('??', memberChainNode('context.arm'), armSelector),
 				),
 				constDeclarationNode(
+					'armParts',
+					computedMemberNode(identifierNode('marklessBranchArms'), identifierNode('arm')),
+				),
+				// The runtime's proof the arm exists: empty html is then a value, not a miss.
+				constDeclarationNode(
+					'resolved',
+					binaryNode('!==', identifierNode('armParts'), identifierNode('undefined')),
+				),
+				constDeclarationNode(
 					'parts',
-					logicalNode(
-						'??',
-						computedMemberNode(identifierNode('marklessBranchArms'), identifierNode('arm')),
-						arrayNode([]),
-					),
+					logicalNode('??', identifierNode('armParts'), arrayNode([])),
 				),
 				constDeclarationNode(
 					'html',
 					armPartsHtmlExpression('marklessBranchText', hasRepeatParts),
 				),
 				returnStatementNode(
-					objectNode([shorthandPropertyNode('arm'), shorthandPropertyNode('html')]),
+					objectNode([
+						shorthandPropertyNode('arm'),
+						shorthandPropertyNode('html'),
+						shorthandPropertyNode('resolved'),
+					]),
 				),
 			]),
 		),
@@ -4537,7 +5019,7 @@ function rewriteGraphReadsAndLocals(
 // **Comment migration across a move is settled, and the answer is yes.** The
 // spec lists it as an open question because probe `p5c` has no recorded output
 // and the acceptance case printed without `attachComments`. Re-probed against
-// the installed `yuku-codegen@0.9.0` while writing this band, and asserted in
+// the installed `yuku-codegen@0.9.1` while writing this band, and asserted in
 // `test/emit-event-handler.test.ts`: with `EMISSION_PARSE_OPTIONS`'
 // `attachComments: true`, the parser hangs each comment off the *node* it
 // belongs to, in that node's own `comments` array. Moving the node into a
@@ -5104,7 +5586,17 @@ function importedHandlerCallStatement(
 			callee,
 			usesArguments
 				? [spreadNode(logicalNode('??', memberChainNode('context.args'), arrayNode([])))]
-				: [memberChainNode('context.event')],
+				: symbol.kind === 'callback-prop'
+					? [
+							spreadNode(
+								logicalNode(
+									'??',
+									memberChainNode('context.args'),
+									arrayNode([memberChainNode('context.event')]),
+								),
+							),
+						]
+					: [memberChainNode('context.event')],
 		),
 	);
 }
@@ -5118,22 +5610,35 @@ function eventHandlerParameterStatements(input: EventHandlerEmissionInput): Emis
 	const parameters = symbol.parameters ?? [];
 	if (parameters.length === 0) return [];
 
+	// The binder is not always visible here, so a callback prop tests for the
+	// argument vector at call time rather than being compiled for one route.
+	const argumentAt = (index: number): EmissionNode => ({
+		type: 'ChainExpression',
+		expression: {
+			type: 'MemberExpression',
+			object: memberChainNode('context.args'),
+			property: literalNode(index),
+			computed: true,
+			optional: true,
+		},
+	});
+
 	return parameters.map((parameter, index) => {
-		if (symbol.kind !== 'callback-prop' || (!input.usesArgumentVector && parameters.length <= 1)) {
+		if (symbol.kind !== 'callback-prop') {
 			return constDeclarationNode(parameter, memberChainNode('context.event'));
 		}
 
+		if (!input.usesArgumentVector && parameters.length <= 1) {
+			return constDeclarationNode(parameter, {
+				type: 'ConditionalExpression',
+				test: memberChainNode('context.args'),
+				consequent: argumentAt(index),
+				alternate: memberChainNode('context.event'),
+			});
+		}
+
 		return withTrailingBlockComment(
-			constDeclarationNode(parameter, {
-				type: 'ChainExpression',
-				expression: {
-					type: 'MemberExpression',
-					object: memberChainNode('context.args'),
-					property: literalNode(index),
-					computed: true,
-					optional: true,
-				},
-			}),
+			constDeclarationNode(parameter, argumentAt(index)),
 			` legacy callback binding was: const ${parameter} = context.event; `,
 		);
 	});
@@ -6466,6 +6971,7 @@ export function buildSymbolModuleEmission(
 				input.semanticGraph,
 				input.sourceFileName,
 			),
+			moduleImports: input.moduleImports,
 			sourceFileName: input.sourceFileName,
 		});
 	}
@@ -6530,30 +7036,26 @@ export function emitSymbolModuleNodes(input: SymbolModuleEmissionInput): Emitted
 // ---------------------------------------------------------------------------
 
 /**
- * The widened module-declaration filter, run over emitted modules a caller
- * supplies directly.
+ * The widened module-scope filter, run over emitted modules a caller supplies
+ * directly.
  *
- * Every emitter that can splice authored text now carries the module-scope
- * declarations that text names, so no authored file reaches the filter's
- * module-declaration branch any more — which is the intent, and which also means
- * an end-to-end fixture can no longer pin it. This seam keeps it pinned by
- * handing the real filter and the real diagnostic builder one emitted module
- * that leaves a declared name free. It runs production's own code: the pass
- * still calls the private `unresolvedGraphReferences` with its full argument
- * set, and nothing here relaxes what that call reports.
+ * Every emitter that splices authored text carries the imports that text names,
+ * so the import branch is unreachable from an authored file once the carry is
+ * right — which is the intent, and which also means an end-to-end fixture can no
+ * longer pin it. This seam keeps both branches pinned by handing the real filter
+ * and the real diagnostic builder one emitted module that leaves a name free. It
+ * runs production's own code: the pass still calls the private
+ * `unresolvedGraphReferences` with its full argument set, and nothing here
+ * relaxes what that call reports.
  *
- * Four emitters have no carry channel, and none of them can need one. The
- * dom-update, branch-update, and async-boundary-update bands synthesize their
- * whole module from render data, ids, and JSON, so they splice no authored
- * identifier at all. The shared-seed band does splice authored text, but
- * `isUnloweredSharedSeed` in `state-lowering.ts` refuses any seed value naming
- * anything but this component's prop locals and six literal keywords, so a
- * module-scope declaration cannot reach it. The filter still covers all four, so
- * relaxing either rule surfaces as a build error rather than a browser crash.
+ * The declaration branch IS reachable from an authored file: the shared-seed band
+ * splices a prop's destructuring default, which may name a same-file `const`, and
+ * that band carries imports but not declarations.
  */
 export function unresolvedModuleDeclarationDiagnostics(
 	modules: ReadonlyArray<GeneratedSymbolModule>,
 	moduleDeclaredNames: ReadonlySet<string>,
+	moduleImportNames: ReadonlySet<string> = new Set(),
 ): ReadonlyArray<SymbolModulesDiagnostic> {
 	return unresolvedGraphReferences(
 		modules,
@@ -6562,6 +7064,7 @@ export function unresolvedModuleDeclarationDiagnostics(
 		new Set(),
 		new Map(),
 		moduleDeclaredNames,
+		moduleImportNames,
 	).map(unresolvedGraphReferenceDiagnostic);
 }
 

@@ -98,7 +98,15 @@ export type ScreenReaderDriver = {
 	next(): Promise<void>;
 	previous(): Promise<void>;
 	press(key: string): Promise<void>;
-	/** Say the item under the cursor again, without moving on. */
+	/**
+	 * Say the item under the cursor again, without moving on.
+	 *
+	 * Readers have no such command, so every driver fakes it by stepping off the
+	 * item and back onto it. The round trip only returns to where it started
+	 * while nothing else is moving the cursor, so it is for a gesture that
+	 * changed an attribute in place - never for one that moved a roving focus,
+	 * which the reader follows on its own and `settleOnFocus()` reads.
+	 */
 	reannounce(): Promise<string>;
 	/**
 	 * Wait for the announcement the page's own focus move set in motion, and hand

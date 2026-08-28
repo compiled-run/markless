@@ -1,36 +1,38 @@
 packages:
-    - packages/*
-    - packages/*/fixtures/*
-    - packages/headless/*
-    - apps/*
-    - demos/*
-    - docs
-    # yuku-tsrx is consumed through the generated self-contained local host.
+  - packages/*
+  - packages/*/fixtures/*
+  - packages/headless/*
+  - apps/*
+  - demos/*
+  - docs
+  # yuku-tsrx is consumed through the generated self-contained local host.
 
 catalogs:
-    default:
-        '@jridgewell/sourcemap-codec': ^1.5.5
-        '@noble/hashes': ^2.2.0
-        '@sveltejs/acorn-typescript': ^1.0.9
-        '@thi.ng/dgraph': ^2.1.205
-        '@types/estree': ^1.0.8
-        '@types/estree-jsx': ^1.0.5
-        '@types/node': ^24.3.0
-        '@typescript-eslint/types': ^8.40.0
-        '@volar/language-core': ~2.4.28
-        '@volar/typescript': ~2.4.28
-        '@vscode/vsce': ^3.9.1
-        adm-zip: ^0.5.16
-        acorn: ^8.15.0
-        csstype: ^3.2.3
-        esrap: ^2.2.8
-        hast-util-to-html: ^9.0.5
-        is-reference: ^3.0.3
-        magic-string: ^0.30.18
-        nitro: 3.0.260429-beta
-        pathe: ^2.0.3
-        satteri: 0.6.3
-        typescript: ^5.9.3
-        ufo: ^1.6.4
-        vscode-languageserver-types: ^3.17.5
-        zimmerframe: ^1.1.2
+  default:
+    '@jridgewell/sourcemap-codec': ^1.5.5
+    '@noble/hashes': ^2.2.0
+    '@sveltejs/acorn-typescript': ^1.0.9
+    '@thi.ng/dgraph': ^2.1.205
+    '@types/estree': ^1.0.8
+    '@types/estree-jsx': ^1.0.5
+    '@types/node': ^24.3.0
+    '@typescript-eslint/types': ^8.40.0
+    '@volar/language-core': ~2.4.28
+    '@volar/typescript': ~2.4.28
+    '@vscode/vsce': ^3.9.1
+    acorn: ^8.15.0
+    adm-zip: ^0.5.16
+    csstype: ^3.2.3
+    esrap: ^2.2.8
+    hast-util-to-html: ^9.0.5
+    is-reference: ^3.0.3
+    magic-string: ^0.30.18
+    nitro: 3.0.260429-beta
+    pathe: ^2.0.3
+    satteri: 0.6.3
+    typescript: ^5.9.3
+    ufo: ^1.6.4
+    vscode-languageserver-types: ^3.17.5
+    zimmerframe: ^1.1.2
+patchedDependencies:
+  '@voidzero-dev/vite-plus-test@0.1.20': patches/@voidzero-dev__vite-plus-test@0.1.20.patch

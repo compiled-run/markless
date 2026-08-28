@@ -27,6 +27,7 @@ import {
 	type PrerenderBootArtifact,
 } from './inline/resumer.ts';
 import { prepareSsrResumeRecords } from './prerender/records.ts';
+import { marklessSsrRosterPositionContext } from './fns/roster-position.ts';
 import { derivePrerenderResumeRecords } from './prerender/evaluator.ts';
 
 export { prepareSsrResumeRecords } from './prerender/records.ts';
@@ -44,10 +45,16 @@ export type SsrRenderOutput = {
 	};
 };
 
+// The property the bundler stamps a non-root component export with. That export
+// is a bare render part: it carries none of its module's page wiring.
+export const MARKLESS_COMPONENT_PART_BRAND = 'marklessComponentPart';
+
 export type SsrRenderArtifact = {
 	// renderContext carries the per-request prerender/streaming mode the compiled
 	// artifact reads; hosts that do not set a mode omit it.
 	readonly renderSsr: (props?: unknown, renderContext?: unknown) => SsrRenderOutput;
+	/** The export name, when this artifact is a bare part rather than a page surface. */
+	readonly marklessComponentPart?: string;
 	readonly headInjections?: ReadonlyArray<RenderHeadInjection>;
 	readonly storageSeeds?: ReadonlyArray<StorageSeedMetadata>;
 	readonly modulePreloads?: ReadonlyArray<ModulePreloadInput>;
@@ -305,18 +312,45 @@ export async function renderSsrOutput(
 	props: unknown,
 	renderContext: unknown,
 ): Promise<SsrRenderOutput> {
+	assertPageRenderable(component);
+	// One position counter per render, minted here because this is the one place
+	// a served page's render context is made.
+	const context = marklessSsrRosterPositionContext(renderContext);
 	if (typeof component === 'function') {
 		return (component as (props?: unknown, renderContext?: unknown) => SsrRenderOutput)(
 			props,
-			renderContext,
+			context,
 		);
 	}
 	if (component && typeof component.renderSsr === 'function') {
 		return (
 			component.renderSsr as (props?: unknown, renderContext?: unknown) => SsrRenderOutput
-		)(props, renderContext);
+		)(props, context);
 	}
 	throw new TypeError('renderToString(App) requires a compiled TSRX artifact.');
+}
+
+/**
+ * Refuses a bare component part used AS A PAGE. `renderSsrOutput` is the one
+ * place a surface becomes a served page - composition reaches a part through
+ * `marklessSsrComponentPart` and never comes here - so the refusal costs
+ * composition nothing while a part-as-page can no longer be served inert.
+ */
+export function assertPageRenderable(component: SsrRenderable): void {
+	const partName = componentPartName(component);
+	if (partName === undefined) return;
+	throw new Error(
+		`MARKLESS_COMPONENT_PART_AS_PAGE: "${partName}" is published as a bare render part, not a page. ` +
+			`A non-root export carries none of its module's page wiring (no resume module, no preloads, no head injections), ` +
+			`so a page rendered from it is served complete and inert: no client runtime is ever fetched and no gesture can dispatch. ` +
+			`Render "${partName}" inside a page, or make it the module's root export - the root is published merged with the module surface.`,
+	);
+}
+
+function componentPartName(component: SsrRenderable): string | undefined {
+	if (typeof component !== 'object' || component === null) return undefined;
+	const name = (component as Record<string, unknown>)[MARKLESS_COMPONENT_PART_BRAND];
+	return typeof name === 'string' ? name : undefined;
 }
 
 export function artifactResumeModuleUrl(component: SsrRenderable): string | undefined {
@@ -446,10 +480,11 @@ function hasBrowserTriggers(view: ProtocolViewPayload, state: ProtocolStatePaylo
 		// Keyed repeat row events live on rowEvents, not view.events.
 		(view.keyedRepeats ?? []).some((repeat) => repeat.rowEvents.length > 0) ||
 		// Branch arm events live on armRecords, not view.events.
-		(view.branches ?? []).some((branch) =>
-			(branch.armRecords ?? []).some((arm) =>
-				arm.events.some(protocolEventDispatchesMarkless),
-			),
+		(view.branches ?? []).some(
+			(branch) =>
+				(branch.armRecords ?? []).some((arm) =>
+					arm.events.some(protocolEventDispatchesMarkless),
+				) || branchServedArmEventNames(branch).length > 0,
 		) ||
 		// Async boundary arm events also nest under armRecords (D3).
 		view.asyncBoundaries.some((boundary) => boundaryArmEventNames(boundary).length > 0)
@@ -510,6 +545,21 @@ function boundaryArmEventNames(
 	];
 }
 
+// An escalating branch's served arm holds the events the page actually painted;
+// they are the wake set for that arm just as a boundary's armized events are.
+function branchServedArmEventNames(
+	branch: NonNullable<ProtocolViewPayload['branches']>[number],
+): ReadonlyArray<string> {
+	const armRecords = branch.servedArmRecords;
+	if (!armRecords) return [];
+	return [
+		...armRecords.events.filter(protocolEventDispatchesMarkless).map((event) => event.eventName),
+		...(armRecords.keyedRepeats ?? []).flatMap((repeat) =>
+			repeat.rowEvents.map((event) => event.eventName),
+		),
+	];
+}
+
 function browserEventNames(view: ProtocolViewPayload): ReadonlyArray<string> {
 	return [
 		...new Set([
@@ -517,11 +567,12 @@ function browserEventNames(view: ProtocolViewPayload): ReadonlyArray<string> {
 			...(view.keyedRepeats ?? []).flatMap((repeat) =>
 				repeat.rowEvents.map((event) => event.eventName),
 			),
-			...(view.branches ?? []).flatMap((branch) =>
-				(branch.armRecords ?? []).flatMap((arm) =>
+			...(view.branches ?? []).flatMap((branch) => [
+				...(branch.armRecords ?? []).flatMap((arm) =>
 					arm.events.filter(protocolEventDispatchesMarkless).map((event) => event.eventName),
 				),
-			),
+				...branchServedArmEventNames(branch),
+			]),
 			...view.asyncBoundaries.flatMap(boundaryArmEventNames),
 		]),
 	].filter((eventName) => eventName !== 'visible');

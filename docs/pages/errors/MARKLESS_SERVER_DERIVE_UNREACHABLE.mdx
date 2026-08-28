@@ -1,0 +1,21 @@
+# MARKLESS_SERVER_DERIVE_UNREACHABLE
+
+This computed value cannot be worked out on the server
+
+- Package: compiler
+- Pass or phase: public-render
+- Severity: error
+
+## Message
+
+… Anything reading it would render as if the value were missing.
+
+## Why
+
+Server rendering works each computed value out once and puts it in the state the page is served with. A value it cannot work out reads as undefined, and every attribute and piece of text built from it silently disappears from the HTML.
+
+## Emitted from
+
+- `packages/compiler/src/passes/public-render/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

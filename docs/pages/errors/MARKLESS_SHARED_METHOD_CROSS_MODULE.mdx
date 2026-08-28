@@ -1,0 +1,22 @@
+# MARKLESS_SHARED_METHOD_CROSS_MODULE
+
+A shared() method cannot be called from another module yet (…)
+
+- Package: compiler
+- Pass or phase: symbol-modules
+- Severity: error
+
+## Message
+
+The emitted … module for … was built by copying the body of … out of … into this file. … …
+
+## Why
+
+Calling a shared() method compiles to copying the method's authored body into the calling handler, because no shared instance exists inside a handler module to call the method on. Copying text moves the statements but not the scope they were written in, so the copy only means what the author wrote while the definition and the call are in one file. Across files the definition module's imports and module-scope declarations do not travel, and the calling module's imports are matched against the copied text by name, which can capture a same-named binding that means something else entirely. Both failures are invisible until the gesture runs, so this build refuses instead.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/symbol-modules.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

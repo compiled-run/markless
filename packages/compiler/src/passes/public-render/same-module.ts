@@ -3,7 +3,11 @@ import type { PublicRenderModuleInput } from '../../artifacts.ts';
 import type { AnyNode } from '../../ast/nodes.ts';
 import { firstComponentRoot } from './plan.ts';
 import { renderBodyLines } from './render-body.ts';
-import { ssrSeedForwardBlockLines, type SsrDataLines } from './ssr-module.ts';
+import {
+	carriedSharedSeedSources,
+	ssrSeedForwardBlockLines,
+	type SsrDataLines,
+} from './ssr-module.ts';
 import {
 	componentSharedSeeds,
 	sharedSeedConsumeLine,
@@ -99,7 +103,7 @@ export function emitSameModuleSsrComponents(
 			']);',
 			localName ? `const ${localName} = { renderSsr: ${functionName} };` : null,
 			`async function ${functionName}(props = {}, marklessSsrRenderContext) {`,
-			destructureProps(rootInfo.propNames, rootInfo.component, input.source.source),
+			destructureProps(rootInfo.propNames, rootInfo.component, input.source.source, input.source.filename),
 			...sharedSeedPassLines(
 				componentSharedSeeds(input, componentName),
 				valuesName,
@@ -111,10 +115,12 @@ export function emitSameModuleSsrComponents(
 					dataLines.seedForward,
 					dataLines.bodySharedComputed,
 				),
+				carriedSharedSeedSources(input),
 			),
 			`	const marklessSsrPayloadState = ${payloadStateExpression};`,
 			`	const marklessSsrRenderStateValues = new Map(${valuesName});`,
 			sharedSeedConsumeLine(input, componentName, 'marklessSsrRenderStateValues'),
+			...dataLines.carriedSeed,
 			...renderBodyLines(
 				input,
 				rootInfo,
@@ -129,6 +135,7 @@ export function emitSameModuleSsrComponents(
 				],
 				dataLines.bodySharedComputed,
 			),
+			...dataLines.serveComputed,
 			'	const html = marklessSsrRendered.html;',
 			'	const marklessSsrComposition = marklessSsrComposeView(marklessSsrRendered.structure, payloadView, marklessSsrChildren, marklessSsrAsyncSnapshots, marklessSsrIdPrefix);',
 			`	const marklessSsrState = ${ssrComposeStateExpression(input, rootInfo.component, componentName)};`,

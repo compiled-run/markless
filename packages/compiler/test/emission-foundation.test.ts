@@ -2,7 +2,7 @@
  * Foundation tests for the emission codegen module
  * (`specs/framework/14-emission-codegen-migration.md`, stage 1 unit 1).
  *
- * These re-run, in-repo and against the installed `yuku-codegen@0.9.0`, the
+ * These re-run, in-repo and against the installed `yuku-codegen@0.9.1`, the
  * printer capabilities the campaign's audit recorded in an ephemeral
  * scratchpad, and they hold invariants 3, 4, 7, and 8 for the module the
  * per-site migrations build on. No emitter is migrated here.
@@ -10,6 +10,7 @@
 import { expect, test } from 'vitest';
 import { generate } from 'yuku-codegen';
 import {
+	EMISSION_CODEGEN_FAILED_CODE,
 	EMISSION_NONDETERMINISTIC_CODE,
 	EMISSION_PARSE_OPTIONS,
 	EMISSION_PRINT_OPTIONS,
@@ -93,7 +94,7 @@ test('the print options are the ones the compiler depends on, stated once', () =
 		indent: 2,
 		quotes: 'preserve',
 		comments: 'all',
-		strip: false,
+		strip: true,
 		minify: false,
 	});
 	expect(EMISSION_PARSE_OPTIONS).toEqual({
@@ -171,13 +172,91 @@ test('comments survive only when the parse and the print both opt in', () => {
 	expect(generate(attached, EMISSION_PRINT_OPTIONS).code).toContain('// inside');
 });
 
-test('strip:false leaves TypeScript annotations in place, as splicing did', () => {
+test('strip:true drops TypeScript annotations, so an emitted .js is valid JavaScript', () => {
 	const source = 'export function f(a: number): number {\n  const x: number = a;\n  return x;\n}';
-	expect(printModuleText(source)).toBe(source);
+	expect(printModuleText(source)).toBe('export function f(a) {\n  const x = a;\n  return x;\n}');
 	const { program } = parseEmissionSource(source, 'a.ts');
-	expect(generate(program, { ...EMISSION_PRINT_OPTIONS, strip: true }).code).toBe(
-		'export function f(a) {\n  const x = a;\n  return x;\n}',
-	);
+	expect(generate(program, { ...EMISSION_PRINT_OPTIONS, strip: false }).code).toBe(source);
+});
+
+test('strip:true leaves text with no TypeScript syntax byte-identical', () => {
+	const source = 'export function f(a) {\n  const x = a;\n  return x;\n}';
+	expect(printModuleText(source)).toBe(source);
+});
+
+// The constructs with no JavaScript equivalent: the printer reports them
+// instead of eliding them, and printEmittedModule turns that into a refusal.
+// A namespace is refused a step earlier, by the TSRX-node assertion, because
+// TSModuleDeclaration is already in the refused-node set.
+test.each([
+	[
+		'enum',
+		'export enum E {\n  A\n}',
+		'TypeScript enums cannot be stripped to JavaScript',
+		EMISSION_CODEGEN_FAILED_CODE,
+	],
+	[
+		'namespace',
+		'namespace N {\n  export const k = 1;\n}',
+		'TSModuleDeclaration',
+		EMISSION_TSRX_NODE_CODE,
+	],
+	[
+		'parameter property',
+		'class C {\n  constructor(private a: number) {}\n}',
+		'parameter properties cannot be stripped to JavaScript',
+		EMISSION_CODEGEN_FAILED_CODE,
+	],
+	[
+		'import = require',
+		'import X = require("y");',
+		'`import = require()` cannot be stripped to JavaScript',
+		EMISSION_CODEGEN_FAILED_CODE,
+	],
+])('%s is refused by name rather than silently elided', (_label, source, named, code) => {
+	let thrown: unknown;
+	try {
+		printEmittedModule({
+			program: parseEmissionSource(source, 'a.ts').program,
+			source,
+			outputFileName: 'a.js',
+			site,
+		});
+	} catch (error) {
+		thrown = error;
+	}
+	expect(thrown).toBeInstanceOf(EmissionDiagnosticError);
+	expect((thrown as EmissionDiagnosticError).diagnostic.code).toBe(code);
+	expect((thrown as EmissionDiagnosticError).diagnostic.message).toContain(named);
+});
+
+test.each([
+	['enum', 'export enum E {\n  A\n}', 'TypeScript enums cannot be stripped to JavaScript'],
+	[
+		'namespace',
+		'namespace N {\n  export const k = 1;\n}',
+		'TypeScript namespaces cannot be stripped to JavaScript',
+	],
+	[
+		'parameter property',
+		'class C {\n  constructor(private a: number) {}\n}',
+		'parameter properties cannot be stripped to JavaScript',
+	],
+	[
+		'import = require',
+		'import X = require("y");',
+		'`import = require()` cannot be stripped to JavaScript',
+	],
+])('the printer reports %s rather than eliding it quietly', (_label, source, message) => {
+	const { program } = parseEmissionSource(source, 'a.ts');
+	expect(generate(program, EMISSION_PRINT_OPTIONS).errors.map((one) => one.message)).toEqual([
+		message,
+	]);
+});
+
+// `declare` has no runtime form to preserve, so eliding it is not a refusal.
+test('a `declare` statement is erased without a refusal', () => {
+	expect(printModuleText('declare const D: number;\nconst w = 1;')).toBe('const w = 1;');
 });
 
 // --- Source maps (invariant 3) ---------------------------------------------
@@ -425,7 +504,7 @@ test('the assertion does not fire on plain TypeScript or on plain JSX', () => {
 	);
 	expect(findTsrxOnlyNodeType(plain)).toBeNull();
 
-	// Plain JSX prints without error in yuku-codegen@0.9.0, so refusing it would
+	// Plain JSX prints without error in yuku-codegen@0.9.1, so refusing it would
 	// be a false positive. Only the TSRX-exclusive node types are refused.
 	const jsx = parseModule('const a = <div className="x">{y}</div>;', 'a.tsx', {
 		...EMISSION_PARSE_OPTIONS,

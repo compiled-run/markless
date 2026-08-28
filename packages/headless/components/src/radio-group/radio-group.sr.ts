@@ -23,9 +23,9 @@ function expectConveys(phrase: string, conveys: Conveys) {
 	expect(missingFacts(sr, phrase, conveys), `${sr.name} announced "${phrase}"`).toEqual([]);
 }
 
-// A choice reaches the DOM after the dispatch it woke returns, so the reader is asked again until the new state is what it reads.
-async function expectAnnouncesAfterChange(conveys: Conveys) {
-	await expect.poll(async () => missingFacts(sr, await sr.reannounce(), conveys)).toEqual([]);
+// An arrow moves a roving focus, which this reader speaks by itself a task-queue turn later: a re-read started inside that window steps the cursor one item past the option, onto the label text, and every later re-read repeats the offset.
+async function expectAnnouncesFocused(conveys: Conveys) {
+	await expect.poll(async () => missingFacts(sr, await sr.settleOnFocus(), conveys)).toEqual([]);
 }
 
 test('entering the group conveys the radiogroup role and the group name', async () => {
@@ -71,9 +71,7 @@ test('arrowing to the next option moves the reader onto that option', async () =
 	await open(Basic);
 	await readUntil(sr, { role: 'radio', name: 'Monthly' });
 	await sr.press(sr.keys.arrowDown);
-	await expect
-		.poll(async () => missingFacts(sr, await sr.reannounce(), { role: 'radio', name: 'Annual' }))
-		.toEqual([]);
+	await expectAnnouncesFocused({ role: 'radio', name: 'Annual' });
 });
 
 // Expected red against this reader, not the family: it reads the `checked` content attribute, which is the default state, while the family sets the current-state property.
@@ -81,7 +79,7 @@ test.fails('arrowing to the next option announces that option as checked', async
 	await open(Basic);
 	await readUntil(sr, { role: 'radio', name: 'Monthly' });
 	await sr.press(sr.keys.arrowDown);
-	await expectAnnouncesAfterChange({
+	await expectAnnouncesFocused({
 		role: 'radio',
 		name: 'Annual',
 		state: ['checked'],
@@ -97,7 +95,7 @@ test('an option nobody may choose conveys that it is disabled', async () => {
 	});
 });
 
-// `disabled` on the fieldset disables every option natively, so the reader conveys it on the group and on each option.
+// The group's `disabled` reaches the group's own aria and every option's input, so the reader conveys it on both.
 test('a group nobody may touch conveys disabled on the group and on its options', async () => {
 	await open(UnavailableOptions);
 	expectConveys(await readUntil(sr, { role: 'radiogroup', name: 'Support Plan' }), {

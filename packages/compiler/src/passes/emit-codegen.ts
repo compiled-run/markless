@@ -20,7 +20,7 @@
  *   is a named compiler diagnostic instead of an upstream crash
  * - the determinism helper (invariant 7), which every migrated site's test uses
  *
- * Evidence, re-run against the installed `yuku-codegen@0.9.0` while writing
+ * Evidence, re-run against the installed `yuku-codegen@0.9.1` while writing
  * this module and asserted in `test/emission-foundation.test.ts`:
  * `preserveParens: false` removes `ParenthesizedExpression` nodes and the
  * printer still derives correct parentheses; comments survive only when
@@ -105,9 +105,11 @@ export const EMISSION_PARSE_OPTIONS = Object.freeze({
  *   `JSON.stringify` produced for graph ids and paths.
  * - `comments: 'all'` — the printer's default is `'some'`, which drops line
  *   comments. Emission must not silently delete an authored comment.
- * - `strip: false` — the string scanners copied authored TypeScript through
- *   verbatim, so leaving annotations in place is the behavior-preserving
- *   choice. Whether stage 1 should strip types is not settled by the spec.
+ * - `strip: true` — an emitted module is named `.js` and is loaded as
+ *   JavaScript, so authored `as`/annotations printed back out are a syntax
+ *   error in any consumer that does not transpile. Stripping keeps the file
+ *   honest to its extension; a construct with no JavaScript equivalent is
+ *   reported in `errors` below rather than elided silently.
  * - `minify: false` — stated so an upstream default change cannot minify
  *   emitted modules without this line changing.
  */
@@ -116,7 +118,7 @@ export const EMISSION_PRINT_OPTIONS = Object.freeze({
 	indent: 2,
 	quotes: 'preserve',
 	comments: 'all',
-	strip: false,
+	strip: true,
 	minify: false,
 } as const) satisfies GenerateOptions;
 
@@ -127,7 +129,7 @@ export const EMISSION_PRINT_OPTIONS = Object.freeze({
  * invariant 4 requires that premise be asserted rather than assumed.
  *
  * Plain JSX (`JSXElement`, `JSXExpressionContainer`, ...) is deliberately not
- * in this set: `yuku-codegen@0.9.0` prints those without error, so refusing
+ * in this set: `yuku-codegen@0.9.1` prints those without error, so refusing
  * them would be a false positive. `TSModuleDeclaration` and `TSModuleBlock`
  * also print without error today; they are kept because the specification
  * enumerates them, and no stage-1 extracted symbol contains a namespace.
@@ -610,7 +612,7 @@ export function optionalMemberNode(object: EmissionNode, property: string): Emis
  *
  * The printer takes comments from a node's own `comments` array, in the shape
  * the parser attaches — `leadingComments` is ignored, which was checked against
- * the installed `yuku-codegen@0.9.0` while writing this. `value` is the text
+ * the installed `yuku-codegen@0.9.1` while writing this. `value` is the text
  * between the delimiters and excludes them: passing `" marker "` prints a block
  * comment whose body is `" marker "`, with the printer supplying `slash-star`
  * and `star-slash` itself.

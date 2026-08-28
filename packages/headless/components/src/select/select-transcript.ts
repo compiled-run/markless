@@ -1,15 +1,13 @@
 import { expect, type Page } from '@playwright/test';
 import { FAMILY_ANCHORS } from '../../../../../apps/sr-gallery/preview-server.ts';
 import { missingFacts, readUntil, type ScreenReaderDriver } from '../../test-support/driver.ts';
+import { GALLERY_WALK_LIMIT } from '../../test-support/gallery-walk.ts';
 
 /**
  * Expectations are `Conveys` facts rather than any reader's wording, so this file
  * runs unchanged against NVDA and VoiceOver.
  */
 
-// The gallery is one page of nine families, so a walk that starts at the top of
-// the document needs far more steps than the virtual lane's container walk.
-const WALK_LIMIT = 140;
 const CHANGE_TIMEOUT_MS = 15_000;
 const OPTIONS = ['Apple', 'Banana', 'Cherry'] as const;
 
@@ -18,12 +16,16 @@ const OPTIONS = ['Apple', 'Banana', 'Cherry'] as const;
 // in both readers' default mode.
 export async function readSelectTranscript(sr: ScreenReaderDriver, page: Page) {
 	const section = page.locator(`#${FAMILY_ANCHORS.select.slice(2)}`);
-	const combobox = section.getByRole('combobox');
+	const trigger = section.getByRole('button', { name: 'Favorite Fruit' });
 
-	const collapsed = await readUntil(sr, { role: 'combobox' }, WALK_LIMIT);
+	const collapsed = await readUntil(
+		sr,
+		{ role: 'button', name: 'Favorite Fruit' },
+		GALLERY_WALK_LIMIT,
+	);
 	expect(
 		missingFacts(sr, collapsed, {
-			role: 'combobox',
+			role: 'button',
 			name: 'Favorite Fruit',
 			state: ['notExpanded'],
 		}),
@@ -31,11 +33,11 @@ export async function readSelectTranscript(sr: ScreenReaderDriver, page: Page) {
 	).toEqual([]);
 
 	await sr.press(sr.keys.enter);
-	await expect(combobox).toHaveAttribute('aria-expanded', 'true', { timeout: CHANGE_TIMEOUT_MS });
+	await expect(trigger).toHaveAttribute('aria-expanded', 'true', { timeout: CHANGE_TIMEOUT_MS });
 
 	// A closed listbox keeps its options out of the tree, so reaching all three by
 	// name is the proof the popup opened for the reader and not only for the DOM.
 	for (const option of OPTIONS) {
-		await readUntil(sr, { name: option }, WALK_LIMIT);
+		await readUntil(sr, { role: 'option', name: option }, GALLERY_WALK_LIMIT);
 	}
 }

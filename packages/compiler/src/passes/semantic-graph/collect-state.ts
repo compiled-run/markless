@@ -6,6 +6,8 @@ import {
 	type AnyNode,
 } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
+import { parseModule } from '../../js-ast.ts';
+import { getComponentFunction } from '../../ast/tsrx.ts';
 import type {
 	ModuleGraphInterfaceArtifact,
 	ModuleGraphInterfaceExport,
@@ -43,6 +45,7 @@ import {
 	templateAsValueDiagnostic,
 	unstableStateCreationSiteDiagnostic,
 } from './diagnostics.ts';
+import { ownedModuleAst } from './shared-ast.ts';
 import type { SemanticView } from 'yuku-tsrx';
 import type { WalkState } from './types.ts';
 import { collectSharedInstance, resolveSharedCall } from './collect-shared.ts';
@@ -171,7 +174,7 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 		}
 
 		if (!frameworkApi) {
-			const templateValue = findTemplateValue(init);
+			const templateValue = findTemplateValue(init, state.handledTemplateValues);
 			if (templateValue) {
 				reportTemplateAsValue(
 					state,
@@ -179,7 +182,7 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 					`${declarationKind ?? 'const'} ${name} = ${expressionSource(init, state.source)}`,
 					name,
 				);
-				markTemplateValueHandled(templateValue);
+				markTemplateValueHandled(templateValue, state);
 			}
 		}
 
@@ -203,7 +206,7 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 				);
 				continue;
 			}
-			const templateValue = findTemplateValue(initial);
+			const templateValue = findTemplateValue(initial, state.handledTemplateValues);
 			if (templateValue) {
 				reportTemplateAsValue(
 					state,
@@ -211,10 +214,13 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 					expressionSource(init, state.source),
 					name,
 				);
-				markTemplateValueHandled(templateValue);
+				markTemplateValueHandled(templateValue, state);
 				continue;
 			}
-			const evaluatedInitial = evaluateInitialStateValue(initial);
+			const evaluatedInitial = evaluateInitialStateValue(initial, state);
+			const partialInitial = evaluatedInitial.ok
+				? null
+				: partialInitialStateValue(initial, state);
 			const elementHandle = findElementHandleStateValue(initial, state);
 			if (elementHandle) {
 				state.graph.diagnostics.push(
@@ -241,7 +247,10 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 				...(evaluatedInitial.ok
 					? { initialValue: evaluatedInitial.value, initialValueKnown: true }
 					: initial
-						? { initializerSource: expressionSource(initial, state.source) }
+						? {
+								...(partialInitial ? { initialValue: partialInitial.value } : {}),
+								initializerSource: expressionSource(initial, state.source),
+							}
 						: {}),
 			};
 			state.graph.graphBindings.push(binding);
@@ -339,10 +348,10 @@ export function collectComputedBinding(input: {
 		);
 		return null;
 	}
-	const templateValue = findComputedTemplateValue(body);
+	const templateValue = findComputedTemplateValue(body, state.handledTemplateValues);
 	if (templateValue) {
 		reportTemplateAsValue(state, templateValue, expressionSource(init, state.source), name);
-		markTemplateValueHandled(templateValue);
+		markTemplateValueHandled(templateValue, state);
 		return null;
 	}
 	const isAsync = body?.async === true;
@@ -502,7 +511,7 @@ function directHelperGraphReturn(
 
 			if (frameworkApi === 'state') {
 				const initial = firstArgument(init!);
-				const evaluatedInitial = evaluateInitialStateValue(initial);
+				const evaluatedInitial = evaluateInitialStateValue(initial, state);
 				return {
 					kind: 'state',
 					localName: returnedName,
@@ -788,9 +797,84 @@ function graphBindingId(
 		const call = state.currentHelperCall;
 		return `${kind}:${call.componentName}.${call.localName}.${call.helperName}.${name}`;
 	}
-	return state.currentSharedDefinitionId
-		? `${state.currentSharedDefinitionId}/${kind}:${name}`
+	if (state.currentSharedDefinitionId) {
+		return `${state.currentSharedDefinitionId}/${kind}:${name}`;
+	}
+	const componentName = state.currentComponentName;
+	return componentName && collidingComponentLocalCells(state).has(`${kind}:${name}`)
+		? `${kind}:${componentName}.${name}`
 		: `${kind}:${name}`;
+}
+
+// The id is a serialized wire key: emitted verbatim and read back across the
+// SSR/resume boundary. Two components in one module declaring the same local
+// cell name minted the same key, so one runtime cell answered both formulas and
+// the loser's binding was silently wrong. Qualifying costs emitted bytes, so it
+// happens only for a name a SECOND component in the module also declares -
+// every other module keeps the key it has always emitted.
+const collidingCellsByWalk = new WeakMap<WalkState, ReadonlySet<string>>();
+
+function collidingComponentLocalCells(state: WalkState): ReadonlySet<string> {
+	const cached = collidingCellsByWalk.get(state);
+	if (cached) return cached;
+
+	const declarers = new Map<string, Set<string>>();
+	const ast = parseModule(state.source, state.filename) as unknown as AnyNode;
+	for (const statement of asNodes(ast.body)) {
+		const componentFunction = getComponentFunction(statement);
+		if (!componentFunction) continue;
+		collectComponentLocalCellDeclarers(
+			componentFunction.node.body as AnyNode | undefined,
+			componentFunction.name,
+			declarers,
+			state,
+		);
+	}
+
+	const colliding = new Set<string>();
+	for (const [cell, components] of declarers) {
+		if (components.size > 1) colliding.add(cell);
+	}
+	collidingCellsByWalk.set(state, colliding);
+	return colliding;
+}
+
+function collectComponentLocalCellDeclarers(
+	node: AnyNode | undefined,
+	componentName: string,
+	declarers: Map<string, Set<string>>,
+	state: WalkState,
+): void {
+	if (!node) return;
+	// A cell declared inside a nested function is never component-local: a
+	// shared() factory, a computed body and a handler each mint under their own
+	// scope, so descending into one would count a name this rule cannot qualify.
+	if (
+		node.type === 'ArrowFunctionExpression' ||
+		node.type === 'FunctionExpression' ||
+		node.type === 'FunctionDeclaration'
+	) {
+		return;
+	}
+
+	if (node.type === 'VariableDeclaration') {
+		for (const declaration of asNodes(node.declarations)) {
+			const name = getIdentifierName(declaration.id as AnyNode | undefined);
+			const api = getFrameworkApiForCall(
+				declaration.init as AnyNode | undefined,
+				state.frameworkApiImports,
+			);
+			if (!name || (api !== 'state' && api !== 'computed' && api !== 'element')) continue;
+			const cell = `${api}:${name}`;
+			const components = declarers.get(cell) ?? new Set<string>();
+			components.add(componentName);
+			declarers.set(cell, components);
+		}
+	}
+
+	for (const child of childNodes(node)) {
+		collectComponentLocalCellDeclarers(child, componentName, declarers, state);
+	}
 }
 
 function graphBindingName(name: string, state: WalkState): string {
@@ -1272,28 +1356,34 @@ function reportTemplateAsValue(
 	);
 }
 
-function findComputedTemplateValue(node: AnyNode | undefined): AnyNode | null {
+function findComputedTemplateValue(
+	node: AnyNode | undefined,
+	handled: WeakSet<object>,
+): AnyNode | null {
 	if (!node) return null;
 	if (node.type === 'ArrowFunctionExpression') {
 		const body = node.body as AnyNode | undefined;
-		const template = findTemplateValue(body);
+		const template = findTemplateValue(body, handled);
 		if (template) return template;
-		return findReturnTemplateValue(body);
+		return findReturnTemplateValue(body, handled);
 	}
 	if (node.type === 'FunctionExpression') {
-		return findReturnTemplateValue(node.body as AnyNode | undefined);
+		return findReturnTemplateValue(node.body as AnyNode | undefined, handled);
 	}
 	return null;
 }
 
-function findReturnTemplateValue(node: AnyNode | undefined): AnyNode | null {
+function findReturnTemplateValue(
+	node: AnyNode | undefined,
+	handled: WeakSet<object>,
+): AnyNode | null {
 	if (!node) return null;
 	if (node.type === 'ReturnStatement') {
 		const argument = node.argument as AnyNode | undefined;
-		return findTemplateValue(argument);
+		return findTemplateValue(argument, handled);
 	}
 	for (const child of asNodes(node.body)) {
-		const found = findReturnTemplateValue(child);
+		const found = findReturnTemplateValue(child, handled);
 		if (found) return found;
 	}
 	return null;
@@ -1313,26 +1403,30 @@ function initialValueKind(rawNode: AnyNode | undefined): SemanticGraphBinding['v
 
 function evaluateInitialStateValue(
 	rawNode: AnyNode | undefined,
+	state?: WalkState,
+	visiting?: ReadonlySet<string>,
 ): { readonly ok: true; readonly value: unknown } | { readonly ok: false } {
 	const node = unwrapTypeAssertion(rawNode);
 	if (!node) return { ok: false };
 
 	if (node.type === 'Literal') return { ok: true, value: node.value };
-	if (node.type === 'Identifier' && getIdentifierName(node) === 'undefined') {
-		return { ok: true, value: undefined };
+	if (node.type === 'Identifier') {
+		if (getIdentifierName(node) === 'undefined') return { ok: true, value: undefined };
+		return evaluateNamedConstant(node, state, visiting);
 	}
-	if (node.type === 'ObjectExpression') return evaluateObjectExpression(node);
+	if (node.type === 'MemberExpression') return evaluateGlobalMemberConstant(node, state);
+	if (node.type === 'ObjectExpression') return evaluateObjectExpression(node, state, visiting);
 	if (node.type === 'ArrayExpression') {
 		const values: unknown[] = [];
 		for (const element of asNodes(node.elements)) {
-			const value = evaluateInitialStateValue(element);
+			const value = evaluateInitialStateValue(element, state, visiting);
 			if (!value.ok) return { ok: false };
 			values.push(value.value);
 		}
 		return { ok: true, value: values };
 	}
 	if (node.type === 'UnaryExpression') {
-		const argument = evaluateInitialStateValue(node.argument as AnyNode | undefined);
+		const argument = evaluateInitialStateValue(node.argument as AnyNode | undefined, state, visiting);
 		if (!argument.ok) return { ok: false };
 		if (node.operator === '-') return { ok: true, value: -Number(argument.value) };
 		if (node.operator === '+') return { ok: true, value: Number(argument.value) };
@@ -1340,6 +1434,130 @@ function evaluateInitialStateValue(
 	}
 
 	return { ok: false };
+}
+
+/**
+ * The properties of a seed that DO fold, when at least one of its siblings does
+ * not. The authored expression is carried beside this subset rather than instead
+ * of it, so a folded property still reaches the page as a constant.
+ *
+ * An unfoldable property is kept with an `undefined` value: the field set of the
+ * shape is read off these keys, and dropping one unregisters a field the factory
+ * plainly declares. A spread or a computed key makes the key set a runtime
+ * answer, so neither admits a partial fold at all.
+ */
+function partialInitialStateValue(
+	rawNode: AnyNode | undefined,
+	state: WalkState | undefined,
+): { readonly value: Record<string, unknown> } | null {
+	const node = unwrapTypeAssertion(rawNode);
+	if (node?.type !== 'ObjectExpression') return null;
+
+	const output: Record<string, unknown> = {};
+	let folded = 0;
+	for (const property of asNodes(node.properties)) {
+		if (property.type !== 'Property' || property.computed === true) return null;
+
+		const key = objectPropertyKey(property.key as AnyNode | undefined);
+		if (key === null) return null;
+
+		const value = evaluateInitialStateValue(property.value as AnyNode | undefined, state);
+		if (value.ok) folded++;
+		output[key] = value.ok ? value.value : undefined;
+	}
+
+	return folded > 0 ? { value: output } : null;
+}
+
+/** A frozen data property on a global object — `Number.MAX_SAFE_INTEGER`, `Math.PI`. */
+function frozenGlobalProperty(
+	holderName: string,
+	propertyName: string,
+): { readonly ok: true; readonly value: unknown } | { readonly ok: false } {
+	const holder =
+		holderName === 'globalThis'
+			? (globalThis as object)
+			: (globalThis as unknown as Record<string, unknown>)[holderName];
+	if (holder === null || (typeof holder !== 'object' && typeof holder !== 'function'))
+		return { ok: false };
+
+	const descriptor = Object.getOwnPropertyDescriptor(holder, propertyName);
+	if (!descriptor || descriptor.writable !== false || descriptor.configurable !== false)
+		return { ok: false };
+	if (typeof descriptor.value !== 'number' && typeof descriptor.value !== 'string')
+		return { ok: false };
+
+	return { ok: true, value: descriptor.value };
+}
+
+// Only these bases: a seed naming anything else wants the value it holds at
+// render time, not the one this build read.
+const FOLDABLE_GLOBAL_BASES = new Set(['Number', 'Math']);
+
+function evaluateGlobalMemberConstant(
+	node: AnyNode,
+	state: WalkState | undefined,
+): { readonly ok: true; readonly value: unknown } | { readonly ok: false } {
+	if (!state || node.computed === true) return { ok: false };
+
+	const object = node.object as AnyNode | undefined;
+	const property = node.property as AnyNode | undefined;
+	if (object?.type !== 'Identifier' || !property) return { ok: false };
+
+	const holderName = getIdentifierName(object);
+	const propertyName = getIdentifierName(property);
+	if (!holderName || !propertyName || !FOLDABLE_GLOBAL_BASES.has(holderName)) return { ok: false };
+	// A module that declares its own `Number` means that one, not the global.
+	if (typeof object.start !== 'number') return { ok: false };
+	if (resolvedSymbolAt(state.semantic(), object.start) !== null) return { ok: false };
+
+	return frozenGlobalProperty(holderName, propertyName);
+}
+
+function evaluateNamedConstant(
+	node: AnyNode,
+	state: WalkState | undefined,
+	visiting: ReadonlySet<string> | undefined,
+): { readonly ok: true; readonly value: unknown } | { readonly ok: false } {
+	const name = getIdentifierName(node);
+	if (!state || !name) return { ok: false };
+
+	if (typeof node.start !== 'number') return { ok: false };
+	const semantic = state.semantic();
+	const symbolId = resolvedSymbolAt(semantic, node.start);
+	if (symbolId === null) return frozenGlobalProperty('globalThis', name);
+	if (visiting?.has(name)) return { ok: false };
+
+	const init = moduleConstantInitializer(name, symbolId, state);
+	if (!init) return { ok: false };
+
+	return evaluateInitialStateValue(init, state, new Set([...(visiting ?? []), name]));
+}
+
+/** The initializer of a module-scope `const` this identifier actually resolves to. */
+function moduleConstantInitializer(
+	name: string,
+	symbolId: number,
+	state: WalkState,
+): AnyNode | undefined {
+	const ast = ownedModuleAst(state, state.source, state.filename);
+	for (const statement of asNodes(ast.body)) {
+		const declaration =
+			statement.type === 'ExportNamedDeclaration'
+				? (statement.declaration as AnyNode | undefined)
+				: statement;
+		if (declaration?.type !== 'VariableDeclaration') continue;
+		if (variableDeclarationKind(declaration) !== 'const') continue;
+
+		for (const declarator of asNodes(declaration.declarations)) {
+			const id = declarator.id as AnyNode | undefined;
+			if (!id || typeof id.start !== 'number' || getIdentifierName(id) !== name) continue;
+			if (declaredSymbolAt(state.semantic(), id.start) !== symbolId) continue;
+			return declarator.init as AnyNode | undefined;
+		}
+	}
+
+	return undefined;
 }
 
 export function evaluateSyncPolicyConstant(
@@ -1471,6 +1689,8 @@ function evaluateSyncPolicyAddConstant(
 
 function evaluateObjectExpression(
 	node: AnyNode,
+	state?: WalkState,
+	visiting?: ReadonlySet<string>,
 ): { readonly ok: true; readonly value: Record<string, unknown> } | { readonly ok: false } {
 	const output: Record<string, unknown> = {};
 
@@ -1480,7 +1700,7 @@ function evaluateObjectExpression(
 		const key = objectPropertyKey(property.key as AnyNode | undefined);
 		if (!key) return { ok: false };
 
-		const value = evaluateInitialStateValue(property.value as AnyNode | undefined);
+		const value = evaluateInitialStateValue(property.value as AnyNode | undefined, state, visiting);
 		if (!value.ok) return { ok: false };
 		output[key] = value.value;
 	}

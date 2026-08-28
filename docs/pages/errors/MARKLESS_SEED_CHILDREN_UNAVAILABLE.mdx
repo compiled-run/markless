@@ -1,0 +1,21 @@
+# MARKLESS_SEED_CHILDREN_UNAVAILABLE
+
+These children cannot be seeded into shared state
+
+- Package: compiler
+- Pass or phase: public-render
+- Severity: error
+
+## Message
+
+\<…\> seeds "…" from its children, but the children written here contain a value that is worked out while they render, so the seed would read nothing.
+
+## Why
+
+Shared state is seeded before the projected children render, because those children render from what the seed wrote. Only children the consumer passes as a prop, and children the compiler already spells in full - text, or markup with no expression in it - are known that early.
+
+## Emitted from
+
+- `packages/compiler/src/passes/public-render/seed-children-diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

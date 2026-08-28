@@ -34,7 +34,7 @@ export const toasterState = shared(
 			minted: 0,
 			ticker: 0,
 		});
-		const regionEl = element<HTMLOListElement>();
+		const regionEl = element<HTMLDivElement>();
 
 		return {
 			...toaster,
@@ -87,7 +87,6 @@ export const toasterItemState = shared(
 			description: '',
 			tone: 'neutral',
 			icon: '',
-			index: 0,
 		});
 
 		return { ...item };
@@ -96,6 +95,8 @@ export const toasterItemState = shared(
 );
 
 // No attach= on this root: a behavior on a page-scoped root crashes the render.
+// The region is not an <ol> and a row is not an <li>: a consumer's repeat has to
+// sit inside a wrapper element, and <ol> may hold nothing but <li>.
 export function ToasterRoot({
 	children,
 	onPointerover,
@@ -106,7 +107,7 @@ export function ToasterRoot({
 }: ToasterRootProps) @{
 	const toaster = toasterState();
 
-	<ol
+	<div
 		{...rest}
 		el={toaster.regionEl}
 		// The region is in the DOM before the first message: a live region that arrives together with its text is not announced.
@@ -134,7 +135,7 @@ export function ToasterRoot({
 		}}
 	>
 		{children}
-	</ol>
+	</div>
 }
 
 export function ToasterItem({ toast, children, ...rest }: ToasterItemProps) @{
@@ -149,7 +150,7 @@ export function ToasterItem({ toast, children, ...rest }: ToasterItemProps) @{
 	const isFront = computed(() => positionOf(toaster.queue, item.id) === 0);
 	const stacking = computed(() => stackingStyle(positionOf(toaster.queue, item.id)));
 
-	<li {...rest} ui-toast="" ui-tone={item.tone} ui-front={isFront} style={stacking}>{children}</li>
+	<div {...rest} ui-toast="" ui-tone={item.tone} ui-front={isFront} style={stacking}>{children}</div>
 }
 
 export function ToasterItemTitle({ children, ...rest }: ToasterItemTitleProps) @{
@@ -157,9 +158,9 @@ export function ToasterItemTitle({ children, ...rest }: ToasterItemTitleProps) @
 
 	<div {...rest} ui-toasttitle="">
 		@if (children) {
-			{children}
+			<>{children}</>
 		} @else {
-			{item.title}
+			<>{item.title}</>
 		}
 	</div>
 }
@@ -169,9 +170,9 @@ export function ToasterItemDescription({ children, ...rest }: ToasterItemDescrip
 
 	<div {...rest} ui-toastdescription="">
 		@if (children) {
-			{children}
+			<>{children}</>
 		} @else {
-			{item.description}
+			<>{item.description}</>
 		}
 	</div>
 }
@@ -181,9 +182,9 @@ export function ToasterItemIcon({ children, ...rest }: ToasterItemIconProps) @{
 
 	<span {...rest} ui-toasticon="" aria-hidden="true">
 		@if (children) {
-			{children}
+			<>{children}</>
 		} @else {
-			{item.icon}
+			<>{item.icon}</>
 		}
 	</span>
 }

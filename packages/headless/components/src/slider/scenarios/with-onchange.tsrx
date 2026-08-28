@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as slider from '../index.ts';
+import { slider } from '../../index.ts';
 
 // Both callbacks write into page state the page renders, so what the DOM shows
 // is what the consumer's handlers were called with, and how often.

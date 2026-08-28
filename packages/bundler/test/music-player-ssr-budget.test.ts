@@ -1,14 +1,35 @@
-import { execFile } from 'node:child_process';
-import { readFile, rm } from 'node:fs/promises';
-import { promisify } from 'node:util';
-import { gzipSync } from 'node:zlib';
+import { rm } from 'node:fs/promises';
+import { protocolEventDispatchesMarkless, type ProtocolViewPayload } from '@markless/serializer';
 import { resolve } from 'pathe';
-import { expect, test } from 'vitest';
+import { beforeAll, expect, test } from 'vitest';
+import { decodePayloadScripts } from '../../serializer/src/protocol-client.ts';
+import { MARKLESS_BUILD_PREFIX } from '../src/build/chunking.ts';
+import {
+	chunkName,
+	createStageLadder,
+	eagerChunkNames,
+	execPnpm,
+	gzipByChunk,
+	importedChunkNames,
+	payloadScript,
+	readClientBuildArtifacts,
+	renderServedPage,
+	RESUME_MODULE_ATTRIBUTE,
+	ROUTER_LINK_RESUMER_ATTRIBUTE,
+	scriptSrc,
+	scriptTags,
+	stageOverruns,
+	stageReport,
+	staticClosure,
+	wakeClosure,
+	type BudgetMeasurement,
+	type StageAnchor,
+} from './helpers/staged-budget.ts';
 
-const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../..');
 const demo = resolve(root, 'demos/music-player-ssr');
-const clientBuild = resolve(demo, '.output/public/build');
+const clientPublic = resolve(demo, '.output/public');
+const clientBuild = resolve(clientPublic, MARKLESS_BUILD_PREFIX);
 
 // Production `executionLog: never` measurement: 62,464 B across 76 distinct
 // size-map chunks; 62,500 B is the permanent shipped wall (owner ratification
@@ -185,51 +206,207 @@ const clientBuild = resolve(demo, '.output/public/build');
 // no after-children projections. Clawback named for bundler-diet: the renderer's
 // client copy should demand-gate or split the projection-splice path the same
 // way the row mint did (fns-module + demand record precedent).
+// RETIRED 2026-08-24 (owner ruling): "total runtime size as a metric is
+// irrelevant - what matters is page load size, first, 2nd, third interaction
+// size etc." The aggregate number above no longer gates anything; it is
+// reported as an informational line so the history in this comment block stays
+// comparable, and the staged anchors below are what must-not-exceed now.
 const MAX_SHIPPED_JS_GZIP_BYTES = 69_800;
 
-test('music-player-ssr production build stays within its shipped JS budget', async () => {
-	await rm(resolve(demo, '.output'), { force: true, recursive: true });
-	// Consumer posture: the wall measures the 'never' build even though the
-	// demo's default build keeps the lab instrument (owner rulings 2026-07-12).
-	await execPnpm(['--dir', demo, 'build'], { MARKLESS_CONSUMER_BUILD: '1' });
+// Staged anchors, measured on this tree (local macOS worktree, NODE_ENV=test
+// per the measurement landmine above, MARKLESS_CONSUMER_BUILD=1). Each is a
+// must-not-exceed ceiling of anchor + margin; the margin absorbs gzip run
+// variance and the few bytes an absolute build path costs. Walk them DOWN.
+// Re-measured 2026-08-27 on this tree, same conditions. One line per stage, each
+// naming what moved it:
+//   page-load download  65,067 -> 69,588 (+4,521 across 97 chunks). The served
+//     page's fetch set carries the same shared dispatch-core chunk the vite
+//     fixtures measure: focus replay moved into it (529caa2d) and the
+//     widget-instance qualification landed in it (9fbedb5c, 65ab93e3,
+//     c288d956).
+//   page-load execute   4,010 -> 4,214 (+204). Same dispatch core, which is in
+//     this stage's static import closure.
+//   interaction 1       1,931 -> 1,932 (+1)
+//   interaction 2       1,567 -> 1,568 (+1)
+//   interaction 3       1,094 -> 1,092 (-2). All three were already inside their
+//     margins; restated to the measured value so the margin means what it says.
+//   first-navigation    23,860 -> 23,333 (-527). Walks DOWN with the client
+//     render path the router link imports.
+// Attribution here is by named change over the anchor..tip window, confirmed by
+// which identifiers the measured chunks contain; it is not a revert-measurement.
+//   page-load download  69,588 -> 69,722 (+134, render-order ordinals). This one
+//     IS a revert-measurement: the same worktree builds 69,632 with the whole
+//     change set reverted and 69,766 with it in, 97 eager chunks either way, so
+//     the delta is +134 and the absolute readings carry this worktree's own
+//     absolute-path offset (the margin covers it, per the 64,514 entry's note).
+//     The three chunks that moved, and nothing else did:
+//       +35  the locator registry files one more element-handle key per
+//            registration, the row segments of the host it was registered on -
+//            which is what lets a component-local handle name one rendered part.
+//       +43  the resume start-up wiring reading the live-roster loader off the
+//            global, and calling it.
+//       +54  a sync computed's re-derive reading the same loader for the
+//            position reader it hands the derive symbol.
+//     Cost class: the same pay-per-use shape as the row mint. An earlier form of
+//     this change measured +1,423 here and +301 on first-navigation, all of it
+//     chunk GROUPING rather than code - two `import()` specifiers written inside
+//     modules every resumed page runs turned `fns/instance-scope` (already in the
+//     eager dispatch core) into a dynamic entry, and rolldown answered with
+//     re-export shim chunks the preload planner then fetched. Moving the
+//     specifiers into the app's own resume module, gated on the payload carrying
+//     computed nodes, gave 1,346 of that back and returned the chunk count to 97.
+const STAGE_ANCHORS = {
+	'page-load download': { gzipBytes: 69_722, margin: 128 },
+	'page-load execute': { gzipBytes: 4_214, margin: 32 },
+	'interaction 1 marginal': { gzipBytes: 1_932, margin: 32 },
+	'interaction 2 marginal': { gzipBytes: 1_568, margin: 32 },
+	'interaction 3 marginal': { gzipBytes: 1_092, margin: 32 },
+	'first-navigation marginal': { gzipBytes: 23_333, margin: 128 },
+} as const satisfies Record<string, StageAnchor>;
 
-	const sizes = JSON.parse(
-		await readFile(resolve(clientBuild, 'execution-sizes.json'), 'utf8'),
-	) as Record<string, { readonly chunk?: string; readonly instrument?: true }>;
-	const chunkNames = [
-		...new Set(
-			Object.values(sizes)
-				.map((entry) => entry.chunk)
-				.filter(isString),
-		),
-	].sort();
-	const compressedChunks = await Promise.all(
-		chunkNames.map(async (fileName) =>
-			gzipSync(await readFile(resolve(clientBuild, fileName)), { level: 9 }),
-		),
+let measured: BudgetMeasurement;
+
+beforeAll(async () => {
+	measured = await measureBuiltDemo();
+}, 240_000);
+
+test('music-player-ssr production build holds every staged budget', () => {
+	expect(measured.stages.length, 'staged measurement must produce stages').toBe(
+		Object.keys(STAGE_ANCHORS).length,
 	);
-	const gzipBytes = compressedChunks.reduce((total, chunk) => total + chunk.length, 0);
-
-	expect(chunkNames.length, 'production build must emit client JS chunks').toBeGreaterThan(0);
 	expect(
-		Object.values(sizes).filter((entry) => entry.instrument),
+		measured.instrumented,
 		'production build must keep execution instrumentation stripped',
 	).toEqual([]);
 	expect(
-		gzipBytes,
-		`production shipped JS: ${gzipBytes} gzip bytes across ${chunkNames.length} distinct chunks`,
-	).toBeLessThanOrEqual(MAX_SHIPPED_JS_GZIP_BYTES);
-}, 120_000);
+		measured.aggregate.chunks,
+		'production build must emit client JS chunks',
+	).toBeGreaterThan(0);
+	expect(stageOverruns(measured.stages, STAGE_ANCHORS), report(measured)).toEqual([]);
+});
 
-async function execPnpm(args: string[], env: Record<string, string> = {}): Promise<void> {
-	try {
-		await exec('pnpm', args, { cwd: root, env: { ...process.env, ...env } });
-	} catch (error) {
-		const next = error as Error & { stdout?: string; stderr?: string };
-		throw new Error([next.message, next.stdout, next.stderr].filter(Boolean).join('\n'));
-	}
+test('the staged budget goes red and names the stage it caught', () => {
+	const stage = measured.stages[0]!;
+	const perturbed = { ...STAGE_ANCHORS, [stage.stage]: { gzipBytes: 1, margin: 0 } };
+
+	const overruns = stageOverruns(measured.stages, perturbed);
+
+	expect(overruns).toHaveLength(1);
+	expect(overruns[0]).toContain(stage.stage);
+	expect(overruns[0]).toContain(String(stage.gzipBytes));
+	expect(overruns[0]).toContain('anchor 1 (+0 margin) = 1');
+});
+
+function report(budget: BudgetMeasurement): string {
+	return stageReport({
+		title: 'music-player-ssr staged budget',
+		budget,
+		anchors: STAGE_ANCHORS,
+		aggregateNote: `informational, not gated - total size-mapped shipped JS: ${budget.aggregate.gzipBytes} gzip bytes across ${budget.aggregate.chunks} chunks (retired aggregate wall was ${MAX_SHIPPED_JS_GZIP_BYTES})`,
+	});
 }
 
-function isString(value: string | undefined): value is string {
-	return value !== undefined;
+async function measureBuiltDemo(): Promise<BudgetMeasurement> {
+	await rm(resolve(demo, '.output'), { force: true, recursive: true });
+	// Consumer posture: the wall measures the 'never' build even though the
+	// demo's default build keeps the lab instrument (owner rulings 2026-07-12).
+	await execPnpm(root, ['--dir', demo, 'build'], { MARKLESS_CONSUMER_BUILD: '1' });
+
+	const { aggregateChunks, graph, instrumented } = await readClientBuildArtifacts(clientPublic);
+	const gzip = gzipByChunk(clientBuild);
+	const sum = (chunks: Iterable<string>) => [...chunks].reduce((total, name) => total + gzip(name), 0);
+
+	const page = parseServedPage(await renderServedPage(demo));
+	const ladder = createStageLadder(sum);
+
+	ladder.standalone(
+		'page-load download',
+		'every JS file the served HTML makes the browser fetch before any interaction',
+		page.eagerChunks,
+	);
+	ladder.marginal(
+		'page-load execute',
+		'the static import closure of the resume module the served page names',
+		staticClosure(graph, [...page.entryChunks, page.resumeChunk]),
+	);
+	for (const [index, event] of page.interactions.slice(0, 3).entries()) {
+		ladder.marginal(
+			`interaction ${index + 1} marginal`,
+			`${event.eventName} on <${event.tagName}> waking ${event.symbolIds.join(', ')}`,
+			wakeClosure(graph, event.symbolIds),
+		);
+	}
+	ladder.marginal(
+		'first-navigation marginal',
+		'the client render path the served page imports for a router link',
+		staticClosure(graph, page.navigationChunks),
+	);
+
+	return {
+		stages: ladder.stages,
+		aggregate: { chunks: aggregateChunks.length, gzipBytes: sum(aggregateChunks) },
+		instrumented,
+	};
+}
+
+type ServedPage = {
+	readonly eagerChunks: readonly string[];
+	readonly entryChunks: readonly string[];
+	readonly resumeChunk: string;
+	readonly navigationChunks: readonly string[];
+	readonly interactions: readonly {
+		readonly eventName: string;
+		readonly tagName: string;
+		readonly symbolIds: readonly string[];
+	}[];
+};
+
+function parseServedPage(html: string): ServedPage {
+	const scripts = scriptTags(html);
+	const resumer = scripts.find((script) => RESUME_MODULE_ATTRIBUTE.test(script.attributes));
+	if (!resumer) throw new Error('served page carries no resume module marker');
+	const routerLinks = scripts.find((script) =>
+		ROUTER_LINK_RESUMER_ATTRIBUTE.test(script.attributes),
+	);
+	if (!routerLinks) throw new Error('served page carries no router-link resumer');
+
+	const { view } = decodePayloadScripts({
+		stateScript: payloadScript(scripts, 'markless/state'),
+		viewScript: payloadScript(scripts, 'markless/view'),
+	});
+
+	const resumeChunk = chunkName(RESUME_MODULE_ATTRIBUTE.exec(resumer.attributes)![1]!);
+	return {
+		eagerChunks: eagerChunkNames(html, scripts),
+		entryChunks: scripts.flatMap((script) => {
+			const src = scriptSrc(script);
+			return src && chunkName(src) !== resumeChunk ? [chunkName(src)] : [];
+		}),
+		resumeChunk,
+		navigationChunks: [...new Set(importedChunkNames(routerLinks.body))],
+		interactions: scriptedInteractions(view),
+	};
+}
+
+// The scripted order is DOM order: a reader meets a page's controls top-down,
+// so the first three interactions are the first three dispatching elements.
+function scriptedInteractions(view: ProtocolViewPayload): ServedPage['interactions'] {
+	const locators = new Map(view.locators.map((locator) => [locator.hostNodeId, locator]));
+	return view.events
+		.filter(protocolEventDispatchesMarkless)
+		.flatMap((event) => {
+			const locator = locators.get(event.hostNodeId);
+			return locator
+				? [
+						{
+							eventName: event.eventName,
+							tagName: locator.tagName,
+							symbolIds: [...event.symbolIds],
+							index: locator.index,
+						},
+					]
+				: [];
+		})
+		.sort((left, right) => left.index - right.index)
+		.map(({ index: _index, ...interaction }) => interaction);
 }

@@ -6,15 +6,13 @@ import {
 	type Conveys,
 	type ScreenReaderDriver,
 } from '../../test-support/driver.ts';
+import { GALLERY_WALK_LIMIT } from '../../test-support/gallery-walk.ts';
 
 /**
  * Expectations are `Conveys` facts rather than any reader's wording, so this file
  * runs unchanged against NVDA and VoiceOver.
  */
 
-// The popover section is the tenth of eleven on the gallery page, so a walk that
-// starts at the top of the document needs more steps than the earlier families'.
-const WALK_LIMIT = 200;
 const CHANGE_TIMEOUT_MS = 15_000;
 const TRIGGER = 'Share';
 const TITLE = 'Share this page';
@@ -54,7 +52,7 @@ export async function readPopoverTranscript(sr: ScreenReaderDriver, page: Page) 
 	const trigger = section.getByRole('button', { name: TRIGGER });
 	const surface = section.getByRole('dialog');
 
-	expectConveys(sr, await readUntil(sr, collapsedTrigger, WALK_LIMIT), collapsedTrigger);
+	expectConveys(sr, await readUntil(sr, collapsedTrigger, GALLERY_WALK_LIMIT), collapsedTrigger);
 
 	await sr.press(sr.keys.enter);
 	await expect(trigger).toHaveAttribute('aria-expanded', 'true', { timeout: CHANGE_TIMEOUT_MS });
@@ -70,7 +68,7 @@ export async function readPopoverTranscript(sr: ScreenReaderDriver, page: Page) 
 	// A closed surface is `hidden`, which takes the whole subtree out of the tree a
 	// reader walks, so reaching the dialog by role and name is the proof it opened
 	// for the reader and not only for the DOM.
-	expectConveys(sr, await readUntil(sr, { role: 'dialog', name: TITLE }, WALK_LIMIT), {
+	expectConveys(sr, await readUntil(sr, { role: 'dialog', name: TITLE }, GALLERY_WALK_LIMIT), {
 		role: 'dialog',
 		name: TITLE,
 	});

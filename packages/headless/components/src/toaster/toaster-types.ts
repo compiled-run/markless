@@ -42,7 +42,7 @@ export type ToastOptions = {
  * messages show is decided by the consumer's own repeat. `toaster.shown(queue, n)`
  * is the cap they write against.
  */
-export type ToasterRootProps = PropsOf<'ol'>;
+export type ToasterRootProps = PropsOf<'div'>;
 
 /**
  * The cells every toaster part reads and writes. One graph per page.
@@ -67,11 +67,9 @@ export type ToasterInstanceState = {
  * attribute to carry the stacking, so style it from a stylesheet rather than a
  * `style` prop.
  */
-export type ToasterItemProps = PropsOf<'li'> & {
+export type ToasterItemProps = PropsOf<'div'> & {
 	/** The message this row shows. */
 	readonly toast: ToastRecord;
-	/** Where it stands in the stack: 0 is the front one. */
-	readonly index?: number;
 };
 
 /** One instance per rendered `toaster.item`, read by the parts inside it. */
@@ -81,7 +79,6 @@ export type ToasterItemInstanceState = {
 	description: string;
 	tone: ToastTone;
 	icon: string;
-	index: number;
 };
 
 /**

@@ -58,7 +58,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 	];
 	// Every handle this module can name, by the graph node state lowering resolves
 	// its reads to. A read that lands here is a handle read, not a state read.
-	const handlesByGraphNodeId = elementHandlesByGraphNodeId(input.payloadArena);
+	const handlesByGraphNodeId = elementHandlesByGraphNodeId(input.payloadArena, input.semanticGraph);
 
 	const handleReadsOf = (reads: ReadonlyArray<LoweredStateRead> | undefined) =>
 		elementHandleReads(reads, handlesByGraphNodeId);
@@ -188,6 +188,16 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 	for (const computed of input.payloadArena.state.computed) {
 		const source = computed.functionSource ?? '';
 		const moduleImports = referencedModuleImports(input.semanticGraph.moduleImports, source);
+		const rosterPosition = computed.async
+			? undefined
+			: (input.semanticGraph.elementRosterPositions ?? []).find(
+					(record) => record.computedGraphNodeId === computed.graphNodeId,
+				);
+		const rosterCount = computed.async
+			? undefined
+			: (input.semanticGraph.elementRosterCounts ?? []).find(
+					(record) => record.computedGraphNodeId === computed.graphNodeId,
+				);
 
 		symbols.push({
 			id: `symbol:${nextSymbolId++}`,
@@ -198,6 +208,8 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 			...(computed.dependencies && computed.dependencies.length > 0
 				? { dependencies: computed.dependencies }
 				: {}),
+			...(rosterPosition ? { rosterPosition } : {}),
+			...(rosterCount ? { rosterCount } : {}),
 			...(moduleImports.length > 0 ? { moduleImports } : {}),
 		});
 	}
@@ -347,6 +359,24 @@ function resolveBranchTestRead(
 	);
 }
 
+/**
+ * Whether every edge answers this slot with the SAME compile-time value. Such a
+ * slot is emitted as that value, so it needs no bound row to read it from —
+ * and one whose edges disagree does, or the instances would share one answer.
+ */
+export function captureSlotFoldsToConstant(slot: {
+	readonly routes: ReadonlyArray<{ readonly kind: string; readonly value?: unknown }>;
+}): boolean {
+	const constants = slot.routes.flatMap((route) =>
+		route.kind === 'compiler-known-constant' ? [route.value] : [],
+	);
+	return (
+		constants.length > 0 &&
+		constants.length === slot.routes.length &&
+		new Set(constants.map((value) => JSON.stringify(value) ?? 'undefined')).size === 1
+	);
+}
+
 export function planBoundSymbolResolver(
 	input: BoundSymbolResolverInput,
 ): BoundSymbolResolverArtifact {
@@ -400,7 +430,11 @@ export function planBoundSymbolResolver(
 				if (
 					symbol.kind !== 'event-handler' &&
 					symbol.kind !== 'callback-prop' &&
-					captureSlots.every((slot) => slot.route.kind === 'compiler-known-constant')
+					captureSlots.every((slot) => slot.route.kind === 'compiler-known-constant') &&
+					// A derive's constant slot is emitted as its value, which only works
+					// when every edge agrees; edges that disagree need a row each.
+					(symbol.kind !== 'sync-computed-derive' ||
+						edgeDependentSlots.every(captureSlotFoldsToConstant))
 				)
 					continue;
 				const ancestry = path.map((edge) => ({
@@ -1008,15 +1042,18 @@ function findModuleImport(
 }
 
 /**
- * Every element() handle this module renders, keyed by the graph node that state
- * lowering resolves a read of it to.
+ * Every element() handle this module can name, keyed by the graph node that
+ * state lowering resolves a read of it to.
  *
  * Handles bound in a keyed row and handles inside an async boundary arm are
  * collected too: a handler in either place still names the same authored handle,
  * and the resume registry answers by the same name.
+ * Handles a shared() factory declares are admitted even when this module never
+ * binds them: a read of one must still lower to getElementHandle, not graph.read.
  */
 function elementHandlesByGraphNodeId(
 	payloadArena: SymbolResolverInput['payloadArena'],
+	semanticGraph: SymbolResolverInput['semanticGraph'],
 ): ReadonlyMap<string, { readonly handleId: string; readonly name: string }> {
 	const byGraphNodeId = new Map<string, { handleId: string; name: string }>();
 	for (const handle of [
@@ -1028,6 +1065,11 @@ function elementHandlesByGraphNodeId(
 	]) {
 		if (!byGraphNodeId.has(handle.handleId))
 			byGraphNodeId.set(handle.handleId, { handleId: handle.handleId, name: handle.name });
+	}
+	for (const binding of semanticGraph.graphBindings) {
+		if (binding.kind !== 'element' || binding.sharedDefinitionId === undefined) continue;
+		if (!byGraphNodeId.has(binding.id))
+			byGraphNodeId.set(binding.id, { handleId: binding.id, name: binding.name });
 	}
 	return byGraphNodeId;
 }

@@ -1,6 +1,16 @@
-import type { PublicRenderModuleInput } from '../../artifacts.ts';
+import { jsonSourceWithNonFiniteNumbers } from '@markless/serializer';
+import type {
+	PublicRenderModuleInput,
+	SemanticElementRosterCount,
+	SemanticElementRosterPosition,
+} from '../../artifacts.ts';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource } from '../../ast/source.ts';
+import {
+	stripAuthoredExpression,
+	stripAuthoredStatements,
+	strippedExpressionSource,
+} from './authored-strip.ts';
 import { isIgnorableJsxTextNode as isIgnorableTextNode } from '../../ast/tsrx.ts';
 import {
 	findSharedInstance,
@@ -8,11 +18,28 @@ import {
 	sharedCallbackSlotGraphNodeId,
 	sharedInstanceVisibleFrom,
 } from '../semantic-graph/collect-shared.ts';
+import { splitStaticGraphPath } from '../../artifact-helpers/graph-paths.ts';
 import { sharedInstancePreludeLines } from './residue-reader.ts';
 import type { PublicRenderRoot } from './types.ts';
 
 type GraphBinding = PublicRenderModuleInput['semanticGraph']['graphBindings'][number];
 const loweredFrameworkCalls = new Set(['computed', 'element', 'handler', 'storage']);
+
+// Same-named cells in sibling parts are distinct bindings, so a rendering
+// component only ever sees its own declaration plus the module-scope ones.
+function componentBindingMap(
+	input: PublicRenderModuleInput,
+	kind: GraphBinding['kind'],
+	componentName: string,
+): Map<string, GraphBinding> {
+	const bindings = new Map<string, GraphBinding>();
+	for (const binding of input.semanticGraph.graphBindings) {
+		if (binding.kind !== kind) continue;
+		if (binding.componentName !== undefined && binding.componentName !== componentName) continue;
+		bindings.set(binding.name, binding);
+	}
+	return bindings;
+}
 
 export function renderBodyLines(
 	input: PublicRenderModuleInput,
@@ -26,16 +53,8 @@ export function renderBodyLines(
 	const body = rootInfo.component.body as AnyNode | undefined;
 	if (!body) return indentLines(rootLines);
 
-	const stateBindings = new Map<string, GraphBinding>(
-		input.semanticGraph.graphBindings.flatMap((binding) =>
-			binding.kind === 'state' ? [[binding.name, binding]] : [],
-		),
-	);
-	const computedBindings = new Map<string, GraphBinding>(
-		input.semanticGraph.graphBindings.flatMap((binding) =>
-			binding.kind === 'computed' ? [[binding.name, binding]] : [],
-		),
-	);
+	const stateBindings = componentBindingMap(input, 'state', rootInfo.componentName);
+	const computedBindings = componentBindingMap(input, 'computed', rootInfo.componentName);
 	const sharedInstanceNames = sharedInstanceLocalNames(input.semanticGraph, rootInfo.componentName);
 	const lines: string[] = [];
 	let emittedRoot = false;
@@ -58,6 +77,7 @@ export function renderBodyLines(
 			stateValueFunctionName,
 			stateValuesName,
 			statePayloadName,
+			input.source.filename,
 		);
 		if (stateLine) {
 			lines.push(stateLine);
@@ -82,6 +102,15 @@ export function renderBodyLines(
 		}
 		if (isLoweredFrameworkDeclaration(statement)) continue;
 		if (isSharedInstanceDeclaration(statement, sharedInstanceNames)) continue;
+		if (
+			isSharedInstancePathAliasDeclaration(
+				statement,
+				input.semanticGraph.aliases ?? [],
+				sharedInstanceNames,
+				rootInfo.componentName,
+			)
+		)
+			continue;
 
 		const seedLine = sharedStateSeedLine(
 			statement,
@@ -99,7 +128,13 @@ export function renderBodyLines(
 		if (isSharedInstanceAssignment(statement, input, sharedInstanceNames)) continue;
 
 		const source = expressionSource(statement, input.source.source);
-		if (source) lines.push(source);
+		if (source)
+			lines.push(
+				stripAuthoredStatements(source, {
+					filename: input.source.filename,
+					what: 'a component-body statement carried into the SSR module',
+				}),
+			);
 	}
 	if (!emittedRoot) {
 		if (!derivedSharedComputed) lines.push(...bodySharedComputedLines);
@@ -136,7 +171,10 @@ function sharedStateSeedLine(
 		);
 	}
 
-	const value = expressionSource(assignment.right as AnyNode, input.source.source);
+	const value = strippedExpressionSource(assignment.right as AnyNode, input.source.source, {
+		filename: input.source.filename,
+		what: 'a shared-state seed value',
+	});
 	const read = `${stateValuesName}.get(${JSON.stringify(resolved.binding.id)})`;
 	// The seed writes the served payload too: resume never re-runs the body, so a
 	// payload left holding the factory initial resumes a value nobody rendered.
@@ -233,6 +271,16 @@ function computedDeclarationLine(
 	}
 
 	const declarationKind = binding.declarationKind ?? 'const';
+	const roster = (input.semanticGraph.elementRosterPositions ?? []).find(
+		(record) =>
+			record.computedGraphNodeId === binding.id && record.componentName === componentName,
+	);
+	if (roster) return rosterPositionDeclarationLine(declarationKind, binding.name, roster);
+	const count = (input.semanticGraph.elementRosterCounts ?? []).find(
+		(record) =>
+			record.computedGraphNodeId === binding.id && record.componentName === componentName,
+	);
+	if (count) return rosterCountDeclarationLine(declarationKind, binding.name, count);
 	// No instance local exists here; rebuild it from the graph, as the residue readers do.
 	const prelude = sharedInstancePreludeLines(
 		input.semanticGraph,
@@ -242,11 +290,53 @@ function computedDeclarationLine(
 		(graphNodeId, path) =>
 			`marklessSsrReadPublicPath(${stateValuesName}.get(${JSON.stringify(graphNodeId)}), ${JSON.stringify(path)})`,
 	);
+	const derive = stripAuthoredExpression(binding.functionSource, {
+		filename: input.source.filename,
+		what: 'a computed derive carried into the SSR module',
+	});
 	if (prelude.length === 0) {
-		return `${declarationKind} ${binding.name} = (${binding.functionSource})();`;
+		return `${declarationKind} ${binding.name} = (${derive})();`;
 	}
 
-	return `${declarationKind} ${binding.name} = (() => { ${prelude.join(' ')} return (${binding.functionSource})(); })();`;
+	return `${declarationKind} ${binding.name} = (() => { ${prelude.join(' ')} return (${derive})(); })();`;
+}
+
+/**
+ * The server-render half of a roster position: the same two ids the resume
+ * derive passes, asked of the render context, which answers from the order this
+ * widget instance emitted its parts in. It does not answer it yet - an
+ * unanswered position throws by name rather than standing in as a number,
+ * because every part would otherwise silently render position 0.
+ */
+function rosterPositionDeclarationLine(
+	declarationKind: string,
+	name: string,
+	record: SemanticElementRosterPosition,
+): string {
+	const unanswered = `(()=>{throw new Error(${JSON.stringify(
+		`MARKLESS_SSR_ROSTER_POSITION_UNANSWERED: ${record.computedGraphNodeId}`,
+	)});})`;
+	return `${declarationKind} ${name} = (marklessSsrRenderContext?.rosterPosition ?? ${unanswered})(${JSON.stringify(
+		record.rosterGraphNodeId,
+	)}, ${JSON.stringify(record.handleGraphNodeId)});`;
+}
+
+/**
+ * The server-render half of a roster count, asked and unanswered on the same
+ * terms as the position: standing in as a number would make every family render
+ * a count of zero and say nothing about it.
+ */
+function rosterCountDeclarationLine(
+	declarationKind: string,
+	name: string,
+	record: SemanticElementRosterCount,
+): string {
+	const unanswered = `(()=>{throw new Error(${JSON.stringify(
+		`MARKLESS_SSR_ROSTER_COUNT_UNANSWERED: ${record.computedGraphNodeId}`,
+	)});})`;
+	return `${declarationKind} ${name} = (marklessSsrRenderContext?.rosterCount ?? ${unanswered})(${JSON.stringify(
+		record.rosterGraphNodeId,
+	)});`;
 }
 
 function stateDeclarationLine(
@@ -255,6 +345,7 @@ function stateDeclarationLine(
 	stateValueFunctionName: string,
 	stateValuesName: string,
 	statePayloadName: string,
+	filename: string,
 ): string | null {
 	if (statement.type !== 'VariableDeclaration') return null;
 	const declarations = asNodes(statement.declarations);
@@ -268,9 +359,16 @@ function stateDeclarationLine(
 		(!isFrameworkCall(init, 'state') && !(binding.storage && isFrameworkCall(init, 'storage')))
 	)
 		return null;
+	const authoredInitializer = (binding as GraphBinding & { readonly initializerSource?: string })
+		.initializerSource;
 	const initializerSource =
-		(binding as GraphBinding & { readonly initializerSource?: string }).initializerSource ??
-		(binding.storage ? JSON.stringify(binding.initialValue) : undefined);
+		(authoredInitializer === undefined
+			? undefined
+			: stripAuthoredExpression(authoredInitializer, {
+					filename,
+					what: 'a state initializer',
+				})) ??
+		(binding.storage ? jsonSourceWithNonFiniteNumbers(binding.initialValue) : undefined);
 	const args = [
 		stateValuesName,
 		statePayloadName,
@@ -306,6 +404,40 @@ export function isSharedInstanceDeclaration(
 	return declarators.every((declarator) => {
 		const name = getIdentifierName(declarator.id as AnyNode | undefined);
 		return !!name && sharedInstanceNames.has(name);
+	});
+}
+
+/**
+ * `const days = cal.days` beside `const cal = calendarState()`. The instance
+ * local is dropped from the emitted body, so a name declared from a path through
+ * it would read an undeclared receiver; every read through the alias is already
+ * a graph node id, so the declaration goes with it.
+ */
+export function isSharedInstancePathAliasDeclaration(
+	statement: AnyNode,
+	aliases: ReadonlyArray<{
+		readonly name: string;
+		readonly target: string;
+		readonly componentName?: string;
+		readonly sharedDefinitionId?: string;
+	}>,
+	sharedInstanceNames: ReadonlySet<string>,
+	componentName?: string,
+): boolean {
+	if (statement.type !== 'VariableDeclaration' || sharedInstanceNames.size === 0) return false;
+	const declarators = asNodes(statement.declarations);
+	if (declarators.length === 0) return false;
+	return declarators.every((declarator) => {
+		const name = getIdentifierName(declarator.id as AnyNode | undefined);
+		if (!name) return false;
+		return aliases.some(
+			(alias) =>
+				alias.name === name &&
+				alias.sharedDefinitionId === undefined &&
+				alias.componentName !== undefined &&
+				alias.componentName === componentName &&
+				sharedInstanceNames.has(splitStaticGraphPath(alias.target)[0] ?? ''),
+		);
 	});
 }
 
@@ -376,16 +508,8 @@ export function renderValuePreludeLines(
 ): string[] {
 	const body = rootInfo.component.body as AnyNode | undefined;
 	if (!body) return [];
-	const stateBindings = new Map(
-		input.semanticGraph.graphBindings.flatMap((binding) =>
-			binding.kind === 'state' ? [[binding.name, binding] as const] : [],
-		),
-	);
-	const computedBindings = new Map(
-		input.semanticGraph.graphBindings.flatMap((binding) =>
-			binding.kind === 'computed' ? [[binding.name, binding] as const] : [],
-		),
-	);
+	const stateBindings = componentBindingMap(input, 'state', rootInfo.componentName);
+	const computedBindings = componentBindingMap(input, 'computed', rootInfo.componentName);
 	const sharedInstanceNames = sharedInstanceLocalNames(input.semanticGraph, rootInfo.componentName);
 	const statements = childNodes(body).filter((statement) => {
 		if (isIgnorableTextNode(statement)) return false;

@@ -627,7 +627,7 @@ test('carried declarations keep authored order, so a class is bound before it is
 import { computed, state } from '@markless/core';
 
 class Rate {
-	constructor(public step: number) {}
+	constructor(step: number) { this.step = step; }
 	scale(value: number) { return value * this.step; }
 }
 const rate = new Rate(3);
@@ -738,7 +738,7 @@ test('carried behavior declarations keep authored order, so a class is bound bef
 		'/workspace/app/src/BehaviorOrder.tsrx',
 		`
 class Painter {
-	constructor(public tone: string) {}
+	constructor(tone: string) { this.tone = tone; }
 	paint(el: HTMLElement) { el.dataset.tone = this.tone; }
 }
 const painter = new Painter('warm');
@@ -831,7 +831,7 @@ test('carried runner declarations keep authored order, so a class is bound befor
 import { computed, state } from '@markless/core';
 
 class Endpoint {
-	constructor(public host: string) {}
+	constructor(host: string) { this.host = host; }
 	url(id: number) { return this.host + id; }
 }
 const endpoint = new Endpoint('ready');
@@ -954,12 +954,13 @@ export function BoxRoot({ tag }) @{
 
 test('an emitted module that leaves a module-scope declaration free is reported', () => {
 	// This test was pointed at whichever emitter still lacked a carry channel:
-	// the behavior band, then the async-computed runner. Both carry now, and so
-	// do the shared-seed band and every other emitter that splices authored text
-	// — so no authored file reaches this branch of the filter any more, and there
-	// is no compiled fixture left to point at. It is pinned by construction
+	// the behavior band, then the async-computed runner. Both carry now, so this
+	// kind has no compiled fixture left to point at and is pinned by construction
 	// instead, through `unresolvedModuleDeclarationDiagnostics`, which runs the
-	// same private filter and the same diagnostic builder production runs.
+	// same private filter and the same diagnostic builder production runs. The
+	// branch is still reachable from an authored file through the shared-seed
+	// band, which carries imports but not declarations — see
+	// `test/seed-imports/`.
 	//
 	// Checked by reading every `*EmissionInput` type in `symbol-modules.ts`
 	// against the ten `PlannedSymbol` kinds (qualified, not a guessless receipt):

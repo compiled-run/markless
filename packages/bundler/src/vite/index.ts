@@ -32,6 +32,7 @@ import { createDevPrerender } from './dev-prerender.ts';
 import {
 	isServerViteEnvironment,
 	marklessEnvironment,
+	serverModuleRunner,
 	transformMarklessRequest,
 	viteEnvironmentName,
 } from './environment.ts';
@@ -267,6 +268,10 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 			rolldownOptions.devServer = {
 				transformRequest: (url, environment) =>
 					transformMarklessRequest(server, url, environment, options),
+				importModule: (source) =>
+					serverModuleRunner(server, viteEnvironmentName('server', options)).import(
+						source,
+					),
 				invalidateModule: (id, environment) => {
 					const target =
 						server.environments[viteEnvironmentName(environment, options)];

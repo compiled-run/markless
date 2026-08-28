@@ -1,3 +1,4 @@
+import type { Awaitable } from '../ssr-data/awaitable.ts';
 import type {
 	PrerenderDataDefinition,
 	PrerenderDataSurface,
@@ -66,7 +67,7 @@ export type SharedSeedPass = {
 	slot: { readonly componentEdgeId: string; readonly projectionChunkId?: string },
 	read: PrerenderRead,
 	inherited: ReadonlyMap<string, unknown> | undefined,
-) => Promise<ReadonlyMap<string, unknown> | undefined>);
+) => Awaitable<ReadonlyMap<string, unknown> | undefined>);
 
 let installedPass: SharedSeedPass | undefined;
 
@@ -76,4 +77,73 @@ export function installSharedSeedPass(pass: SharedSeedPass): void {
 
 export function sharedSeedPass(): SharedSeedPass | undefined {
 	return installedPass;
+}
+
+/**
+ * Where a part stands in its family's roster, answered for the two regimes that
+ * ask it: at render there is no DOM, so the answer is the order this widget
+ * instance EMITS its members; after resume the roster is live, so the answer is
+ * its document order. The compiler lowers `roster.indexOf(mine)` to one call in
+ * each regime with the same two node ids, so the two cannot disagree.
+ */
+
+/**
+ * The seed-map key this render's position counter travels under. The seed map
+ * is the one channel that reaches both the compiled SSR child render and the
+ * CSR component evaluation, and it already carries the widget-instance token a
+ * position counts within.
+ */
+export const MARKLESS_ROSTER_POSITIONS_KEY = 'markless:roster-positions';
+
+export type MarklessRosterPositions = {
+	/**
+	 * The seed map of the part now rendering. Server render asks with two ids and
+	 * nothing else — the compiled call is `(ctx?.rosterPosition ?? throw)(a, b)`,
+	 * which loses the context — so the renderer publishes each child's seeds here
+	 * as it hands the child over. CSR passes its seeds directly and never reads it.
+	 */
+	seeds?: ReadonlyMap<string, unknown>;
+	readonly taken: Map<string, number>;
+};
+
+export function marklessRosterPositions(
+	seeds: ReadonlyMap<string, unknown> | undefined,
+): MarklessRosterPositions | undefined {
+	const held = seeds?.get(MARKLESS_ROSTER_POSITIONS_KEY);
+	return held && typeof held === 'object' ? (held as MarklessRosterPositions) : undefined;
+}
+
+/** The render's seed map with a counter filed on it, minted once per render. */
+export function marklessRosterPositionSeeds(
+	seeds?: ReadonlyMap<string, unknown>,
+): ReadonlyMap<string, unknown> {
+	const held = marklessRosterPositions(seeds);
+	if (held) return seeds as ReadonlyMap<string, unknown>;
+	const filed = new Map<string, unknown>(seeds ?? []);
+	filed.set(MARKLESS_ROSTER_POSITIONS_KEY, { taken: new Map<string, number>() });
+	return filed;
+}
+
+/**
+ * The nth member of this instance's roster to ask is the nth in it.
+ *
+ * Render walks a widget instance in document order, so counting the asks IS
+ * that order — there is no DOM yet to compare against. The count is per widget
+ * instance, which is what keeps a second collection on the page starting at
+ * zero; the token is asked per family, exactly as a minted handle id asks it.
+ */
+export function marklessRenderRosterPosition(
+	positions: MarklessRosterPositions,
+	seeds: ReadonlyMap<string, unknown> | undefined,
+	rosterGraphNodeId: string,
+	handleGraphNodeId: string,
+): number {
+	const scope = seeds ?? positions.seeds;
+	const family = rosterGraphNodeId.slice(0, rosterGraphNodeId.lastIndexOf('/'));
+	const instance =
+		scope?.get(marklessWidgetInstanceKey(family)) ?? scope?.get(MARKLESS_WIDGET_INSTANCE_KEY);
+	const key = `${String(instance)}|${rosterGraphNodeId}|${handleGraphNodeId}`;
+	const taken = positions.taken.get(key) ?? 0;
+	positions.taken.set(key, taken + 1);
+	return taken;
 }

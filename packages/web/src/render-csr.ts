@@ -11,8 +11,17 @@ import type { RuntimeGraph } from '@markless/runtime';
 import { marklessAttributeValue } from './dom-attribute.ts';
 import type { CsrRenderContainer, CsrRenderOptions, CsrRenderOutput } from './render.ts';
 import { marklessInstanceScopedLoadSymbol } from './fns/instance-scope.ts';
+import {
+	runSyncPolicyActions,
+	type SyncPolicyDomEvent,
+	type SyncPolicyGraph,
+} from './inline/sync-policy-core.ts';
 import { registerServedArmEventRecords } from './resume-arm-records.ts';
-import type { ResumeAsyncBoundaryPayload, ResumeDomElement } from './resume-types.ts';
+import type {
+	ResumeAsyncBoundaryPayload,
+	ResumeDispatchOptions,
+	ResumeDomElement,
+} from './resume-types.ts';
 import type { ResumeRuntime, ResumeRuntimeInput, ResumeSymbol } from './resume.ts';
 import { reportRuntimeErrorToHost } from './runtime-error-reporting.ts';
 
@@ -109,6 +118,7 @@ export async function renderCsrRuntime(input: {
 					renderBranchHtml: options.renderBranchHtml ?? globalDocumentBranchHtml(),
 					demandAsyncBoundaries: true,
 					registerDelegatedEventRecord: delegatedTriggers.registerEventRecord,
+					renderData: output.renderData,
 				});
 				await runtime.start();
 				dispatchHandler = (event, dispatchOptions) =>
@@ -152,11 +162,29 @@ export async function renderCsrRuntime(input: {
 		holdPendingSettleCommits: async (ms) =>
 			(await demandRuntime()).holdPendingSettleCommits?.(ms),
 	};
-	const delegatedTriggers = installDelegatedTriggers(output, view, dispatchQueued);
+	const delegatedTriggers = installDelegatedTriggers(
+		output,
+		view,
+		dispatchQueued,
+		{
+			// The graph is demand-loaded, so a policy read before the first dispatch
+			// answers off the values the mount seeded its cells with.
+			read: (graphNodeId, path) =>
+				graph
+					? graph.read(graphNodeId, path)
+					: readSeededStateValue(state, graphNodeId, path),
+		},
+		loadSymbol,
+	);
 	registerServedArmEventRecords(
 		output.root as unknown as ResumeDomElement,
 		view.asyncBoundaries as ReadonlyArray<ResumeAsyncBoundaryPayload>,
 		delegatedTriggers.registerEventRecord,
+		(view.branches ?? []) as ReadonlyArray<{
+			readonly startAnchor: ResumeAsyncBoundaryPayload['startAnchor'];
+			readonly endAnchor: ResumeAsyncBoundaryPayload['endAnchor'];
+			readonly servedArmRecords?: unknown;
+		}>,
 	);
 	if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
 		await registerDelegatedTriggerDebug(output, view);
@@ -241,15 +269,48 @@ async function activateAuthoredBehaviors(
 	return cleanup;
 }
 
+// Focus reaches an element before any key event can, so a record naming one of
+// these is a handler the page is about to need. Restated here rather than
+// shared: a module of its own is a chunk on the resume path's dispatch census.
+const FOCUS_KEY_EVENT_NAMES = ['keydown', 'keyup', 'keypress'];
+const FOCUS_EDITABLE_EVENT_NAMES = ['beforeinput', 'input'];
+// A pointer crosses onto a control before it presses it, and Safari focuses no
+// button on click - so hover, not focus, is what reliably precedes a first press.
+// A focused control still reaches these through Enter and Space.
+const PRESS_EVENT_NAMES = ['click', 'pointerdown', 'pointerup'];
+
+function focusPreloadEventNames(element: {
+	readonly tagName?: unknown;
+	readonly isContentEditable?: unknown;
+}): ReadonlyArray<string> {
+	const tagName = typeof element.tagName === 'string' ? element.tagName.toUpperCase() : '';
+	return element.isContentEditable === true ||
+		tagName === 'INPUT' ||
+		tagName === 'TEXTAREA' ||
+		tagName === 'SELECT'
+		? [...FOCUS_KEY_EVENT_NAMES, ...FOCUS_EDITABLE_EVENT_NAMES, ...PRESS_EVENT_NAMES]
+		: [...FOCUS_KEY_EVENT_NAMES, ...PRESS_EVENT_NAMES];
+}
+
+function isFocusPreloadEventName(eventName: string): boolean {
+	return (
+		FOCUS_KEY_EVENT_NAMES.includes(eventName) ||
+		FOCUS_EDITABLE_EVENT_NAMES.includes(eventName) ||
+		PRESS_EVENT_NAMES.includes(eventName)
+	);
+}
+
 function installDelegatedTriggers(
 	output: CsrRenderOutput,
 	view: ProtocolViewPayload,
-	dispatch: (event: NonNullable<Parameters<ResumeRuntime['dispatch']>[0]>) => Promise<void>,
+	dispatch: (
+		event: NonNullable<Parameters<ResumeRuntime['dispatch']>[0]>,
+		dispatchOptions?: ResumeDispatchOptions,
+	) => Promise<void>,
+	syncPolicyGraph: SyncPolicyGraph,
+	loadSymbol: ResumeRuntimeInput['loadSymbol'],
 ): {
-	readonly registerEventRecord: (
-		element: object,
-		record: ProtocolEventRecord,
-	) => void;
+	readonly registerEventRecord: (element: object, record: ProtocolEventRecord) => void;
 	readonly dispose: () => void;
 } {
 	// One capture listener remains the container's dispatch authority.
@@ -263,14 +324,22 @@ function installDelegatedTriggers(
 	const releases: Array<() => void> = [];
 	const installedEventNames = new Set<string>();
 	type DelegatedEvent = NonNullable<Parameters<ResumeRuntime['dispatch']>[0]>;
-	const routes: Partial<Record<string, (event: DelegatedEvent) => Promise<void>>> = {
+	type DelegatedRoute = (
+		event: DelegatedEvent,
+		dispatchOptions?: ResumeDispatchOptions,
+	) => Promise<void>;
+	const routes: Partial<Record<string, DelegatedRoute>> = {
 		[PROTOCOL_EVENT_ACTION_KIND.event]: dispatch,
 		[PROTOCOL_EVENT_ACTION_KIND.externalDelegate]: async () => {},
-	} satisfies Record<ProtocolEventActionKind, (event: DelegatedEvent) => Promise<void>>;
+	} satisfies Record<ProtocolEventActionKind, DelegatedRoute>;
 	const installEventListener = (eventName: string) => {
 		if (eventName === 'visible' || installedEventNames.has(eventName)) return;
 		installedEventNames.add(eventName);
 		const route = async (event: DelegatedEvent) => {
+			// A row event name is listened for on behalf of rows that may not exist
+			// yet, so this listener takes every event of that name, named or not.
+			let named = false;
+			let syncPolicyApplied = false;
 			let actionKind: ProtocolEventActionKind | undefined = rowEventNames.has(event.type)
 				? PROTOCOL_EVENT_ACTION_KIND.event
 				: undefined;
@@ -280,7 +349,20 @@ function installDelegatedTriggers(
 				element = element.parentElement ?? null
 			) {
 				const record = recordsByElement.get(element)?.get(event.type);
-				if (record) actionKind = protocolEventActionKind(record);
+				if (record) {
+					actionKind = protocolEventActionKind(record);
+					named = true;
+					// The browser reads defaultPrevented when this dispatch returns,
+					// and the handler module is still being fetched then.
+					if (record.syncPolicy && actionKind === PROTOCOL_EVENT_ACTION_KIND.event) {
+						runSyncPolicyActions(
+							record.syncPolicy,
+							syncPolicyGraph,
+							event as unknown as SyncPolicyDomEvent,
+						);
+						syncPolicyApplied = true;
+					}
+				}
 			}
 			// This container listener exists for whichever element registered the
 			// record; a sibling with no record of its own is simply not ours.
@@ -293,7 +375,14 @@ function installDelegatedTriggers(
 					throw unroutedDelegatedTriggerError(actionKind);
 				return;
 			}
-			await action(event);
+			await action(
+				event,
+				named
+					? syncPolicyApplied
+						? { syncPolicyAlreadyApplied: true }
+						: undefined
+					: { ignoreUnmatched: true },
+			);
 		};
 		// addEventListener drops the returned promise, so a rejection would escape
 		// the flush unhandled: contain it here and report it instead.
@@ -310,12 +399,55 @@ function installDelegatedTriggers(
 			output.root.removeEventListener?.(eventName, listener, { capture: true }),
 		);
 	};
+	// Focus lands before any key can, so the focused element's key records name
+	// the handler modules this page is about to need. Fetch only; never dispatch.
+	const preloadedSymbolIds = new Set<string>();
+	const preloadSymbolsFor = (
+		target: DelegatedEvent['target'],
+		namesFor: (element: NonNullable<DelegatedEvent['target']>) => ReadonlyArray<string>,
+	) => {
+		for (
+			let element: DelegatedEvent['target'] = target;
+			element;
+			element = element.parentElement ?? null
+		) {
+			const records = recordsByElement.get(element);
+			if (records)
+				for (const eventName of namesFor(element)) {
+					for (const symbolId of records.get(eventName)?.symbolIds ?? []) {
+						if (preloadedSymbolIds.has(symbolId)) continue;
+						preloadedSymbolIds.add(symbolId);
+						void Promise.resolve(loadSymbol(symbolId)).catch(() => {});
+					}
+				}
+			if ((element as object) === (output.root as object)) break;
+		}
+	};
+	const installedPreloadTriggers = new Set<string>();
+	const installPreloadTrigger = (
+		triggerName: string,
+		namesFor: (element: NonNullable<DelegatedEvent['target']>) => ReadonlyArray<string>,
+	) => {
+		if (installedPreloadTriggers.has(triggerName)) return;
+		installedPreloadTriggers.add(triggerName);
+		const listener = (event: DelegatedEvent) => preloadSymbolsFor(event.target, namesFor);
+		output.root.addEventListener?.(triggerName, listener, { capture: true });
+		releases.push(() =>
+			output.root.removeEventListener?.(triggerName, listener, { capture: true }),
+		);
+	};
 	const registerEventRecord = (element: object, record: ProtocolEventRecord) => {
 		const records = recordsByElement.get(element) ?? new Map<string, ProtocolEventRecord>();
 		if (records.get(record.eventName) === record) return;
 		records.set(record.eventName, record);
 		recordsByElement.set(element, records);
 		installEventListener(record.eventName);
+		if (isFocusPreloadEventName(record.eventName))
+			installPreloadTrigger('focusin', focusPreloadEventNames);
+		// pointerenter does not bubble, so a delegated listener would only ever see
+		// the container's own crossing.
+		if (PRESS_EVENT_NAMES.includes(record.eventName))
+			installPreloadTrigger('pointerover', () => PRESS_EVENT_NAMES);
 	};
 	for (const record of view.events) {
 		if (record.eventName === 'visible') continue;
@@ -349,6 +481,24 @@ function unroutedDelegatedTriggerError(actionKind: string): Error {
 	return error;
 }
 
+// Live-channel values only: a served cell's encoded `value` is an envelope, and
+// an envelope object is truthy whatever it wraps.
+function readSeededStateValue(
+	state: ProtocolStatePayload,
+	graphNodeId: string,
+	path: ReadonlyArray<string> = [],
+): unknown {
+	const seeded =
+		state.cells.find((cell) => cell.graphNodeId === graphNodeId) ??
+		state.computed.find((computed) => computed.graphNodeId === graphNodeId);
+	let value = seeded?.directValue;
+	for (const key of path) {
+		if (value === null || typeof value !== 'object') return undefined;
+		value = (value as Record<string, unknown>)[key];
+	}
+	return value;
+}
+
 function delegatedTargetTag(target: { readonly tagName?: unknown } | null | undefined): string {
 	return typeof target?.tagName === 'string' ? target.tagName.toLowerCase() : 'element';
 }
@@ -370,7 +520,11 @@ async function applyDefaultCsrDomJournal(
 			const target = runtime.getElement(String(entry.locator)) as
 				| CsrDomJournalTarget
 				| undefined;
-			if (target) target.textContent = stringifyDomValue(entry.value);
+			if (!target) continue;
+			// A rewrite with the value already there is still a mutation, and an
+			// aria-live region announces on it.
+			const text = stringifyDomValue(entry.value);
+			if (target.textContent !== text) target.textContent = text;
 			continue;
 		}
 		if (entry.type === 'setAttr') {

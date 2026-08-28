@@ -1,26 +1,46 @@
 import { render, renderSSR } from '@markless/vitest-browser';
 import Accordion from '../src/accordion/scenarios/basic.tsrx';
 import BaseParts from '../src/base/scenarios/basic.tsrx';
+import ButtonGroup from '../src/buttongroup/scenarios/basic.tsrx';
+import Calendar from '../src/calendar/scenarios/basic.tsrx';
 import Carousel from '../src/carousel/scenarios/basic.tsrx';
 import Checkbox from '../src/checkbox/scenarios/basic.tsrx';
 import Checklist from '../src/checklist/scenarios/basic.tsrx';
 import Collapsible from '../src/collapsible/scenarios/basic.tsrx';
+import Colorpicker from '../src/colorpicker/scenarios/basic.tsrx';
+import Crop from '../src/crop/scenarios/basic.tsrx';
+import DateBox from '../src/datebox/scenarios/basic.tsrx';
+import Editable from '../src/editable/scenarios/basic.tsrx';
+import FileUpload from '../src/fileupload/scenarios/basic.tsrx';
+import Hovercard from '../src/hovercard/scenarios/basic.tsrx';
+import Ink from '../src/ink/scenarios/basic.tsrx';
+import Menu from '../src/menu/scenarios/basic.tsrx';
+import Menubar from '../src/menubar/scenarios/basic.tsrx';
 import { Basic as Combobox } from '../src/combobox/scenarios/basic.tsrx';
+import Drawer from '../src/drawer/scenarios/basic.tsrx';
 import Modal from '../src/modal/scenarios/basic.tsrx';
 import Navbar from '../src/navbar/scenarios/basic.tsrx';
+import Numberbox from '../src/numberbox/scenarios/basic.tsrx';
 import Otp from '../src/otp/scenarios/basic.tsrx';
+import Pad from '../src/pad/scenarios/basic.tsrx';
 import Pagination from '../src/pagination/scenarios/basic.tsrx';
 import Popover from '../src/popover/scenarios/basic.tsrx';
 import Progress from '../src/progress/scenarios/basic.tsrx';
 import QrCode from '../src/qr-code/scenarios/basic.tsrx';
 import { Basic as RadioGroup } from '../src/radio-group/scenarios/basic.tsrx';
+import { Basic as RatingGroup } from '../src/rating-group/scenarios/basic.tsrx';
 import { Basic as Select } from '../src/select/scenarios/basic.tsrx';
 import Slider from '../src/slider/scenarios/basic.tsrx';
 import Tabs from '../src/tabs/scenarios/basic.tsrx';
+import TagList from '../src/taglist/scenarios/basic.tsrx';
 import Textbox from '../src/textbox/scenarios/basic.tsrx';
 import Toaster from '../src/toaster/scenarios/basic.tsrx';
 import Toggle from '../src/toggle/scenarios/basic.tsrx';
+import Toolbar from '../src/toolbar/scenarios/basic.tsrx';
+import Tooltip from '../src/tooltip/scenarios/basic.tsrx';
+import Tour from '../src/tour/scenarios/basic.tsrx';
 import Tree from '../src/tree/scenarios/basic.tsrx';
+import { describe, expect, test } from 'vitest';
 import { runConformance, type FamilyDescriptor } from './conformance.ts';
 
 // Every family's Basic scenario, held against the one shared battery in
@@ -75,6 +95,14 @@ const descriptors: readonly FamilyDescriptor[] = [
 		// contract to hold it to beyond the wrapper the scenario writes.
 		rootAria: {},
 		supportsDisabled: false,
+	},
+	{
+		family: 'buttongroup',
+		mount: { CSR: () => render(ButtonGroup), SSR: () => renderSSR(ButtonGroup) },
+		root: 'root',
+		parts: ['root', 'label', 'left', 'center', 'right'],
+		rootAria: { role: 'group' },
+		supportsDisabled: true,
 	},
 	{
 		family: 'carousel',
@@ -152,6 +180,31 @@ const descriptors: readonly FamilyDescriptor[] = [
 		supportsDisabled: true,
 	},
 	{
+		family: 'colorpicker',
+		mount: { CSR: () => render(Colorpicker), SSR: () => renderSSR(Colorpicker) },
+		root: 'root',
+		// The Basic scenario is the inline picker; `trigger` only exists under
+		// `popup`, so there is no openCycle here. The popup shape - open, focus in,
+		// Escape back to the trigger, outside press - is held in
+		// src/colorpicker/colorpicker.browser.ts, where a `popup` root is on the page.
+		parts: [
+			'root',
+			'label',
+			'content',
+			'area',
+			'area-thumb',
+			'hue-track',
+			'hue-thumb',
+			'valuelabel',
+			'field',
+		],
+		rootAria: { role: null },
+		// Which channel a rail carries, which axis of the plane a control moves, and
+		// the colour in force: each is information a consumer styles against.
+		valuedAttributes: ['ui-channel', 'ui-axis', 'ui-value'],
+		supportsDisabled: true,
+	},
+	{
 		family: 'combobox',
 		mount: { CSR: () => render(Combobox), SSR: () => renderSSR(Combobox) },
 		root: 'root',
@@ -190,6 +243,196 @@ const descriptors: readonly FamilyDescriptor[] = [
 		supportsDisabled: true,
 	},
 	{
+		family: 'crop',
+		mount: { CSR: () => render(Crop), SSR: () => renderSSR(Crop) },
+		root: 'root',
+		parts: [
+			'root',
+			'label',
+			'description',
+			'area',
+			'selection',
+			'handle-block-start',
+			'handle-block-end',
+			'handle-inline-start',
+			'handle-inline-end',
+			'handle-top-start',
+			'handle-top-end',
+			'handle-bottom-start',
+			'handle-bottom-end',
+			'field',
+		],
+		rootAria: { role: null },
+		// No openCycle: the rectangle is a role="group" that is always on the page,
+		// so the battery's click-a-trigger cycle has nothing of the family's own to
+		// click. The selection and all eight handles are tab stops — that is how a
+		// rectangle is moved and each edge resized without a pointer. The keys, the
+		// drag and the live readout live in src/crop/crop.browser.ts.
+		valuedAttributes: [],
+		supportsDisabled: true,
+	},
+	{
+		family: 'calendar',
+		mount: { CSR: () => render(Calendar), SSR: () => renderSSR(Calendar) },
+		root: 'root',
+		// The Basic scenario is the inline month; `trigger` only exists under
+		// `popup`, so there is no openCycle here. The popup shape - open, focus in,
+		// Escape back to the trigger, outside press - is held in
+		// src/calendar/calendar.browser.ts, where a `popup` root is on the page.
+		parts: ['root', 'label', 'content', 'title', 'back', 'forward', 'field'],
+		rootAria: { role: null },
+		supportsDisabled: true,
+	},
+	{
+		family: 'datebox',
+		mount: { CSR: () => render(DateBox), SSR: () => renderSSR(DateBox) },
+		root: 'root',
+		parts: ['root', 'label', 'monthinput', 'dayinput', 'yearinput', 'field'],
+		// The minted idref the group's name rides on is checked by `idrefs`, not
+		// here: it has no fixed value to declare.
+		rootAria: { role: 'group', 'aria-disabled': 'false' },
+		// Which part of the date a box holds, and what it holds now: both carry
+		// information a consumer styles on, so both stay key-value.
+		valuedAttributes: ['ui-type', 'ui-value'],
+		supportsDisabled: true,
+	},
+	{
+		family: 'editable',
+		mount: { CSR: () => render(Editable), SSR: () => renderSSR(Editable) },
+		root: 'root',
+		parts: ['root', 'label', 'trigger', 'input', 'field'],
+		// Preview and edit are the same room, swapped by `hidden` on two elements
+		// that are both always in the DOM. That is not an openCycle: there is no
+		// surface a trigger reports through aria-expanded, and nothing to dismiss.
+		rootAria: { role: 'group', 'aria-disabled': null },
+		// The words themselves, which is the one thing about this family a
+		// consumer styles against; every other mark here is presence.
+		valuedAttributes: ['ui-value'],
+		supportsDisabled: true,
+	},
+	{
+		family: 'fileupload',
+		mount: { CSR: () => render(FileUpload), SSR: () => renderSSR(FileUpload) },
+		root: 'root',
+		// The rows are not on the page until a file arrives, so only what the
+		// scenario renders at rest is named here. There is no openCycle: nothing
+		// this family owns opens, and the picker it does open is the operating
+		// system's, outside the document entirely.
+		parts: ['root', 'label', 'droparea', 'trigger', 'field', 'rows'],
+		rootAria: { role: null },
+		supportsDisabled: true,
+	},
+	{
+		family: 'hovercard',
+		mount: { CSR: () => render(Hovercard), SSR: () => renderSSR(Hovercard) },
+		root: 'root',
+		parts: ['root', 'trigger', 'content'],
+		rootAria: { role: null },
+		// No openCycle: the trigger is a link, and pressing it goes where it points
+		// rather than opening anything. Hover and focus are the only ways in, and
+		// both are timed — so the battery's click-to-open cycle would be asserting a
+		// gesture this family deliberately refuses. The disclosure wiring, the
+		// delays, Tab into the card and both dismissal paths live in
+		// src/hovercard/hovercard.browser.ts.
+		valuedAttributes: [],
+		supportsDisabled: false,
+	},
+	{
+		family: 'ink',
+		mount: { CSR: () => render(Ink), SSR: () => renderSSR(Ink) },
+		root: 'root',
+		parts: ['root', 'label', 'description', 'area', 'field'],
+		rootAria: { role: null },
+		// No openCycle: the surface is a role="img" that is always on the page, so
+		// the battery's click-a-trigger cycle has nothing of the family's own to
+		// click. The area is still a tab stop — that is how undo and redo are
+		// reached. The stroke and form rows live in src/ink/ink.browser.ts.
+		valuedAttributes: [],
+		supportsDisabled: true,
+	},
+	{
+		family: 'menu',
+		mount: { CSR: () => render(Menu), SSR: () => renderSSR(Menu) },
+		root: 'root',
+		// The Basic scenario is the trigger menu, so `contextarea` is not on the
+		// page here; the right-click shape is held in src/menu/menu.browser.ts.
+		// The surface is hidden rather than detached when closed, so its items are
+		// present at rest.
+		parts: ['root', 'trigger', 'content', 'item-cut', 'item-copy', 'item-paste', 'item-delete'],
+		rootAria: { role: null },
+		openCycle: {
+			trigger: 'trigger',
+			surface: 'content',
+			haspopup: 'menu',
+			ridesOverlay: true,
+			focusLands: true,
+			// Only Escape hands focus back; a press anywhere - the trigger included,
+			// which reaches the surface as an outside press - is a person choosing
+			// where to be, so the family deliberately leaves focus there. The Escape
+			// return is held in src/menu/menu.browser.ts.
+			focusReturns: false,
+		},
+		// Which way the surface settled is information a consumer styles against.
+		valuedAttributes: [],
+		supportsDisabled: true,
+	},
+	{
+		family: 'menubar',
+		mount: { CSR: () => render(Menubar), SSR: () => renderSSR(Menubar) },
+		root: 'root',
+		// Three whole menus stand inside the bar and each one's surface is hidden
+		// rather than detached, so every panel and item below is on the page at rest.
+		parts: [
+			'root',
+			'label',
+			'menu-file',
+			'bar-file',
+			'panel-file',
+			'item-new',
+			'level-recent',
+			'panel-recent',
+			'item-draft',
+			'item-notes',
+			'menu-edit',
+			'bar-edit',
+			'panel-edit',
+			'item-undo',
+			'item-redo',
+			'menu-view',
+			'bar-view',
+			'panel-view',
+			'item-wrap',
+			'item-zoom',
+		],
+		rootAria: { role: 'menubar', 'aria-orientation': 'horizontal' },
+		// No openCycle: a bar opens nothing of its own. What opens is each enclosed
+		// menu, through that family's own trigger, and `menu` already holds that
+		// cycle in its own descriptor. The bar's roving stop, its arrow walk and the
+		// travel between open menus live in src/menubar/menubar.browser.ts.
+		valuedAttributes: [],
+		// The family takes no props at all, `disabled` included.
+		supportsDisabled: false,
+	},
+	{
+		family: 'drawer',
+		mount: { CSR: () => render(Drawer), SSR: () => renderSSR(Drawer) },
+		root: 'root',
+		parts: ['root', 'trigger', 'backdrop', 'content', 'title', 'close'],
+		rootAria: { role: null },
+		valuedAttributes: ['ui-orientation'],
+		openCycle: {
+			trigger: 'trigger',
+			surface: 'content',
+			closeBy: 'close',
+			haspopup: 'dialog',
+			reportsExpanded: false,
+			ridesOverlay: true,
+			focusLands: true,
+			focusReturns: true,
+		},
+		supportsDisabled: false,
+	},
+	{
 		family: 'modal',
 		mount: { CSR: () => render(Modal), SSR: () => renderSSR(Modal) },
 		root: 'root',
@@ -201,6 +444,7 @@ const descriptors: readonly FamilyDescriptor[] = [
 			// The trigger only opens; the dialog's own close button shuts it.
 			closeBy: 'close',
 			haspopup: 'dialog',
+			reportsExpanded: false,
 			ridesOverlay: true,
 			focusLands: true,
 			focusReturns: true,
@@ -238,6 +482,19 @@ const descriptors: readonly FamilyDescriptor[] = [
 		supportsDisabled: false,
 	},
 	{
+		family: 'numberbox',
+		mount: { CSR: () => render(Numberbox), SSR: () => renderSSR(Numberbox) },
+		root: 'root',
+		parts: ['root', 'label', 'backtrigger', 'input', 'forwardtrigger', 'valuelabel', 'field'],
+		// One control with two buttons that are not tab stops: nothing for a group
+		// role to group that the label does not already name.
+		rootAria: { role: null },
+		// The formatted number is what a consumer styles against, so it is
+		// key-value by design rather than a presence mark.
+		valuedAttributes: ['ui-value'],
+		supportsDisabled: true,
+	},
+	{
 		family: 'otp',
 		mount: { CSR: () => render(Otp), SSR: () => renderSSR(Otp) },
 		root: 'root',
@@ -261,6 +518,22 @@ const descriptors: readonly FamilyDescriptor[] = [
 		supportsDisabled: true,
 	},
 	{
+		family: 'pad',
+		mount: { CSR: () => render(Pad), SSR: () => renderSSR(Pad) },
+		root: 'root',
+		parts: ['root', 'label', 'description', 'area', 'indicator', 'thumb', 'valuelabel', 'field'],
+		rootAria: { role: null },
+		// No openCycle: the field is a role="group" that is always on the page, so
+		// the battery's click-a-trigger cycle has nothing of the family's own to
+		// click. Every handle is its own tab stop and nothing roves - that is how a
+		// second control point is reached. The keys, the gesture and the two-axis
+		// announcement live in src/pad/pad.browser.ts.
+		// The readout's text is what a consumer styles against, so it stays
+		// key-value; every other mark this family writes is a presence attribute.
+		valuedAttributes: ['ui-value'],
+		supportsDisabled: true,
+	},
+	{
 		family: 'pagination',
 		mount: { CSR: () => render(Pagination), SSR: () => renderSSR(Pagination) },
 		root: 'root',
@@ -279,7 +552,7 @@ const descriptors: readonly FamilyDescriptor[] = [
 			'itemtrigger-5',
 			'forwardtrigger',
 		],
-		rootAria: { role: null, 'aria-label': 'Pagination' },
+		rootAria: { role: null },
 		supportsDisabled: true,
 	},
 	{
@@ -299,14 +572,14 @@ const descriptors: readonly FamilyDescriptor[] = [
 			focusReturns: false,
 		},
 		// Which edge the surface settles against is what a consumer styles on.
-		valuedAttributes: ['ui-side'],
+		valuedAttributes: [],
 		supportsDisabled: false,
 	},
 	{
 		family: 'progress',
 		mount: { CSR: () => render(Progress), SSR: () => renderSSR(Progress) },
 		root: 'root',
-		parts: ['root', 'label', 'track', 'indicator'],
+		parts: ['root', 'label', 'valuelabel', 'track', 'indicator'],
 		rootAria: {
 			role: 'progressbar',
 			'aria-valuemin': '0',
@@ -349,12 +622,21 @@ const descriptors: readonly FamilyDescriptor[] = [
 			'lifetime-indicator',
 			'lifetime-label',
 		],
-		rootAria: {
-			role: 'radiogroup',
-			'aria-orientation': 'vertical',
-			'aria-required': 'false',
-			'aria-invalid': 'false',
-		},
+		rootAria: { role: 'radiogroup' },
+		supportsDisabled: true,
+	},
+	{
+		family: 'rating-group',
+		mount: { CSR: () => render(RatingGroup), SSR: () => renderSSR(RatingGroup) },
+		root: 'root',
+		// The five marks are one repeat under a single `star` testid, which is what
+		// the family's own suite counts them by, so the wrapper is the part a
+		// one-element-per-testid list can name.
+		parts: ['root', 'label', 'stars', 'valuelabel'],
+		rootAria: { role: 'radiogroup' },
+		// How many marks there are and where the rating sits are numbers a consumer
+		// styles against, so they are key-value by design rather than presence marks.
+		valuedAttributes: ['ui-count', 'ui-value'],
 		supportsDisabled: true,
 	},
 	{
@@ -384,8 +666,7 @@ const descriptors: readonly FamilyDescriptor[] = [
 			// This family owns its own dismissal handlers rather than carrying the
 			// bare `overlay` mark, so the two dismissal rows do not apply to it.
 			ridesOverlay: false,
-			// The trigger carries role="combobox": the pattern points at the
-			// highlighted option rather than requiring focus to move.
+			// The popup points at the highlighted option rather than requiring focus to move.
 			focusLands: false,
 			focusReturns: false,
 		},
@@ -396,8 +677,7 @@ const descriptors: readonly FamilyDescriptor[] = [
 		mount: { CSR: () => render(Slider), SSR: () => renderSSR(Slider) },
 		root: 'root',
 		parts: ['root', 'label', 'valuelabel', 'track', 'thumb'],
-		// One thumb is the whole control, so the root takes no wrapper role; the
-		// thumb is the element carrying role="slider".
+		// One thumb is the whole control, so the root takes no wrapper role.
 		rootAria: { role: null },
 		// The rail's numbers and which way it runs are what a consumer styles
 		// against, so they are key-value by design rather than presence marks.
@@ -419,6 +699,22 @@ const descriptors: readonly FamilyDescriptor[] = [
 			'billing-content',
 		],
 		rootAria: { role: null },
+		supportsDisabled: true,
+	},
+	{
+		family: 'taglist',
+		mount: { CSR: () => render(TagList), SSR: () => renderSSR(TagList) },
+		root: 'root',
+		// The chips are the consumer's own markup keyed by each tag's words, so
+		// their testids carry a value and are not fixed part names; what is named
+		// here is what the family itself puts on the page at rest.
+		parts: ['root', 'label', 'input', 'field'],
+		// No openCycle: the row has no surface, and the edit field a tag can open
+		// is `hidden` in the same room rather than a thing a trigger expands.
+		rootAria: { role: 'group', 'aria-disabled': null },
+		// The tag's own words, which is the identity every part inside a chip is
+		// keyed by; every other mark this family writes is presence.
+		valuedAttributes: ['ui-value'],
 		supportsDisabled: true,
 	},
 	{
@@ -453,6 +749,71 @@ const descriptors: readonly FamilyDescriptor[] = [
 		supportsDisabled: true,
 	},
 	{
+		family: 'toolbar',
+		mount: { CSR: () => render(Toolbar), SSR: () => renderSSR(Toolbar) },
+		root: 'root',
+		parts: ['root', 'label', 'copy', 'cut', 'paste'],
+		rootAria: { role: 'toolbar', 'aria-orientation': 'horizontal' },
+		// No openCycle: a toolbar opens nothing of its own. It groups controls that
+		// keep their own roles and collapses their tab stops into one, so the
+		// battery's click-a-trigger cycle has no part of this family's to click. The
+		// roving stop, the arrow walk and the foreign-control registration live in
+		// src/toolbar/toolbar.browser.ts.
+		valuedAttributes: [],
+		supportsDisabled: true,
+	},
+	{
+		family: 'tooltip',
+		mount: { CSR: () => render(Tooltip), SSR: () => renderSSR(Tooltip) },
+		root: 'root',
+		parts: ['root', 'trigger', 'content'],
+		rootAria: { role: null },
+		// No openCycle: a tooltip's trigger is described by the tip, it does not
+		// activate it. Hover and focus are the only ways in, and clicking the
+		// trigger of a showing tip closes it rather than toggling — so the battery's
+		// click-to-open cycle would be testing a gesture this family refuses. The
+		// dismissal, hover and focus rows live in src/tooltip/tooltip.browser.ts.
+		valuedAttributes: [],
+		supportsDisabled: false,
+	},
+	{
+		family: 'tour',
+		mount: { CSR: () => render(Tour), SSR: () => renderSSR(Tour) },
+		root: 'root',
+		parts: [
+			'root',
+			'backdrop',
+			'step-save',
+			'save-title',
+			'save-description',
+			'save-count',
+			'save-back',
+			'save-forward',
+			'save-close',
+			'step-share',
+			'share-title',
+			'share-description',
+			'share-count',
+			'share-back',
+			'share-forward',
+			'share-close',
+			'step-trash',
+			'trash-title',
+			'trash-description',
+			'trash-count',
+			'trash-back',
+			'trash-forward',
+			'trash-close',
+		],
+		rootAria: { role: null },
+		// No openCycle: this family ships no trigger part. A tour is opened by the
+		// consumer flipping `open`, so the battery's click-a-part cycle has nothing
+		// of the family's own to click. The open, dismissal and step rows live in
+		// src/tour/tour.browser.ts.
+		valuedAttributes: ['ui-max', 'ui-value'],
+		supportsDisabled: true,
+	},
+	{
 		family: 'tree',
 		mount: { CSR: () => render(Tree), SSR: () => renderSSR(Tree) },
 		root: 'root',
@@ -472,3 +833,44 @@ const descriptors: readonly FamilyDescriptor[] = [
 ];
 
 for (const descriptor of descriptors) runConformance(descriptor);
+
+// axe grants the bar its `aria-required-children` only because it flattens the
+// roleless, unnamed wrapper each enclosed menu renders, so the triggers inside
+// count as the bar's own items. An accessible name on one of those wrappers -
+// `aria-label` on a `menu.root` is the easy way - exposes it as a named generic,
+// the bar loses every child, and the axe row above goes red far from the cause.
+// The gallery's own copy of this shape is held in apps/sr-gallery/scripts/boot-check.ts.
+describe('menubar wrappers', () => {
+	for (const [mode, mount] of [
+		['CSR', () => render(Menubar)],
+		['SSR', () => renderSSR(Menubar)],
+	] as const) {
+		test(`${mode}: nothing between the bar and its items carries a name or a role`, async () => {
+			const { container } = await mount();
+			if (!(container instanceof Element)) {
+				throw new Error('The mount did not hand back a real DOM container.');
+			}
+
+			const bar = container.querySelector('[role="menubar"]');
+			expect(bar, 'the scenario renders a role="menubar"').not.toBeNull();
+			if (!bar) return;
+
+			// The bar's own items open menus and sit outside every surface; commands inside a surface do not count.
+			const items = bar.querySelectorAll('[role="menuitem"][aria-haspopup="menu"]:not([role="menu"] *)');
+			expect(items.length, 'one menuitem per menubar.item').toBe(3);
+
+			for (const item of items) {
+				const where = `between the bar and "${item.textContent}"`;
+				for (
+					let wrapper = item.parentElement;
+					wrapper !== null && wrapper !== bar;
+					wrapper = wrapper.parentElement
+				) {
+					expect(wrapper.getAttribute('aria-label'), `aria-label ${where}`).toBe(null);
+					expect(wrapper.getAttribute('aria-labelledby'), `aria-labelledby ${where}`).toBe(null);
+					expect(wrapper.getAttribute('role'), `role ${where}`).toBe(null);
+				}
+			}
+		});
+	}
+});

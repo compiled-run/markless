@@ -6,6 +6,7 @@ import type {
 	PayloadKeyedRepeat,
 	SemanticComponentPropBinding,
 	SemanticGraphBinding,
+	SemanticTemplateRead,
 } from '../artifacts.ts';
 import {
 	graphBindingMap,
@@ -34,8 +35,10 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 	const bindings = new Map<string, SemanticGraphBinding>();
 	const bindingsById = new Map<string, SemanticGraphBinding>();
 	const aliases = semanticAliasMap(input.semanticGraph);
-	const componentBindings = graphBindingMap(input.semanticGraph, null);
-	const componentAliases = semanticAliasMap(input.semanticGraph, null);
+	const moduleScopeBindings = {
+		bindings: graphBindingMap(input.semanticGraph, null),
+		aliases: semanticAliasMap(input.semanticGraph, null),
+	};
 	// The component a host element belongs to. Its chunk is the only record of
 	// which component body a hostNodeId-keyed read was authored in.
 	const componentByHostNodeId = new Map<string, string>(
@@ -43,6 +46,23 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 			chunk.hosts.map((host) => [host.hostNodeId, chunk.componentName] as const),
 		),
 	);
+	const readScopeOf = componentGraphScopes(input.semanticGraph, moduleScopeBindings, null);
+	// Component scope only: a factory local and the instance local markup names
+	// routinely collide, and two sibling parts may each declare the same local, so
+	// a module-wide map answers with whichever came last (defect 46). The reading
+	// component is the read's own when it carries one, else the one that renders
+	// the host it is bound to.
+	const resolveTemplateRead = (read: SemanticTemplateRead) => {
+		const scope = readScopeOf(read.componentName ?? componentByHostNodeId.get(read.hostNodeId));
+		return (
+			resolveGraphPath(read.source, scope.bindings, scope.aliases) ??
+			resolveSharedInstanceGraphPath(
+				read.source,
+				input.semanticGraph,
+				componentByHostNodeId.get(read.hostNodeId),
+			)
+		);
+	};
 
 	for (const binding of input.semanticGraph.graphBindings) {
 		bindings.set(binding.name, binding);
@@ -115,6 +135,9 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 	const behaviors = input.semanticGraph.behaviors.map((behavior) =>
 		payloadBehavior(behavior, bindings, aliases),
 	);
+	// A sibling part's destructured prop shares the page's handle name, so an
+	// `el=` binding resolves in the component that authored it, not module-wide.
+	const handleScopeOf = componentGraphScopes(input.semanticGraph, { bindings, aliases });
 	const keyedRepeats = renderData.repeats.flatMap(
 		(repeat): PayloadKeyedRepeat[] => {
 			if (!repeat.collectionGraphNodeId) return [];
@@ -122,12 +145,7 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 			const rowElementHandles = input.semanticGraph.elementHandleBindings.flatMap(
 				(binding) => {
 					if (binding.rowOwner?.repeatId !== repeat.repeatId) return [];
-					const graphBinding = resolveElementHandleBinding(
-						binding,
-						input,
-						bindings,
-						aliases,
-					);
+					const graphBinding = resolveElementHandleBinding(binding, input, handleScopeOf);
 					if (!graphBinding || graphBinding.kind !== 'element') return [];
 					return [
 						{
@@ -147,6 +165,7 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 				{
 					id: repeat.repeatId,
 					parentHostNodeId: repeat.parentHostNodeId,
+					...(repeat.ownerHostNodeId ? { ownerHostNodeId: repeat.ownerHostNodeId } : {}),
 					...(repeat.rowHostNodeId ? { rowHostNodeId: repeat.rowHostNodeId } : {}),
 					collectionGraphNodeId: repeat.collectionGraphNodeId,
 					collectionPath: repeat.collectionPath,
@@ -158,6 +177,10 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 		},
 	);
 	const viewDomUpdates = input.semanticGraph.templateReads.flatMap((read) => {
+		// A read authored directly in a branch arm has no host of its own: bound
+		// to the enclosing element it would erase the sibling arm's markers, so
+		// it drives the arm's range instead (branchContentReads below).
+		if (read.armScopeBranchSiteId) return [];
 		if (read.computedGraphNodeId) {
 			return [
 				{
@@ -170,17 +193,7 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 			];
 		}
 
-		// Component scope only: a factory local and the instance local markup names
-		// routinely collide. A template read carries no component of its own, so the
-		// reading component is the one that renders the host it is bound to; without
-		// it a read resolves to a sibling component's same-named local (defect 46).
-		const resolved =
-			resolveGraphPath(read.source, componentBindings, componentAliases) ??
-			resolveSharedInstanceGraphPath(
-				read.source,
-				input.semanticGraph,
-				componentByHostNodeId.get(read.hostNodeId),
-			);
+		const resolved = resolveTemplateRead(read);
 		if (!resolved) return [];
 
 		return [
@@ -193,10 +206,25 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 			},
 		];
 	});
+	const branchContentReads = input.semanticGraph.templateReads.flatMap((read) => {
+		if (!read.armScopeBranchSiteId) return [];
+		const entry = { branchSiteId: read.armScopeBranchSiteId, source: read.source };
+		if (read.computedGraphNodeId)
+			return [{ ...entry, graphNodeId: read.computedGraphNodeId, path: [] }];
+		const resolved = resolveTemplateRead(read);
+		if (!resolved) return [];
+		return [
+			{
+				...entry,
+				graphNodeId: resolved.binding.id,
+				path: runtimeGraphReadPath(resolved.binding, resolved.path),
+			},
+		];
+	});
 	const elementHandles = input.semanticGraph.elementHandleBindings.flatMap((binding) => {
 		if (binding.rowOwner || binding.keyedRepeatScopeIds.length > 0) return [];
 
-		const graphBinding = resolveElementHandleBinding(binding, input, bindings, aliases);
+		const graphBinding = resolveElementHandleBinding(binding, input, handleScopeOf);
 		if (!graphBinding || graphBinding.kind !== 'element') return [];
 
 		return [
@@ -300,6 +328,7 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 			),
 			elementHandles,
 			asyncBoundaries,
+			...(branchContentReads.length > 0 ? { branchContentReads } : {}),
 			branchSites: renderData.branches.map((site) => ({
 				id: site.branchSiteId,
 				anchorOrder: site.anchorOrder,
@@ -309,11 +338,41 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 	};
 }
 
+type ComponentGraphScope = {
+	readonly bindings: ReadonlyMap<string, SemanticGraphBinding>;
+	readonly aliases: ReturnType<typeof semanticAliasMap>;
+};
+
+/**
+ * Name lookup scoped to the component a binding was authored in. A page's
+ * `element()` local and a sibling part's destructured prop of the same name are
+ * two declarations, and a module-wide map keeps only whichever came last.
+ */
+function componentGraphScopes(
+	graph: PayloadArenaInput['semanticGraph'],
+	moduleWide: ComponentGraphScope,
+	sharedDefinitionId?: string | null,
+): (componentName: string | undefined) => ComponentGraphScope {
+	const cache = new Map<string, ComponentGraphScope>();
+
+	return (componentName) => {
+		if (componentName === undefined) return moduleWide;
+		const cached = cache.get(componentName);
+		if (cached) return cached;
+
+		const scope = {
+			bindings: graphBindingMap(graph, sharedDefinitionId, componentName),
+			aliases: semanticAliasMap(graph, sharedDefinitionId, componentName),
+		};
+		cache.set(componentName, scope);
+		return scope;
+	};
+}
+
 function resolveElementHandleBinding(
 	binding: PayloadArenaInput['semanticGraph']['elementHandleBindings'][number],
 	input: PayloadArenaInput,
-	bindings: ReadonlyMap<string, SemanticGraphBinding>,
-	aliases: ReturnType<typeof semanticAliasMap>,
+	scopeOf: (componentName: string | undefined) => ComponentGraphScope,
 ): SemanticGraphBinding | undefined {
 	const shared = resolveSharedInstanceGraphPath(
 		binding.handleName,
@@ -322,7 +381,8 @@ function resolveElementHandleBinding(
 	);
 	if (shared?.binding.kind === 'element' && shared.path.length === 0) return shared.binding;
 
-	const direct = resolveGraphPath(binding.handleName, bindings, aliases);
+	const scope = scopeOf(binding.componentName);
+	const direct = resolveGraphPath(binding.handleName, scope.bindings, scope.aliases);
 	if (!direct) return undefined;
 	if (direct.binding.kind === 'element' && direct.path.length === 0) return direct.binding;
 	if (direct.binding.kind !== 'prop' || !binding.componentName) return undefined;
@@ -482,6 +542,7 @@ function literalBehaviorInputValue(source: string): BehaviorInputValue | undefin
 	if (valueSource === 'null') return { value: null };
 	if (/^[+-]?(?:\d+|\d*\.\d+)(?:e[+-]?\d+)?$/i.test(valueSource)) {
 		const value = Number(valueSource);
+		// The view payload is bare JSON.parse'd and handed over undecoded: a non-finite input would land as null.
 		if (Number.isFinite(value)) return { value };
 	}
 
