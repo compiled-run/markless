@@ -131,6 +131,10 @@ export type SemanticModuleImport = {
 	readonly source: string;
 	readonly kind: 'default' | 'named' | 'namespace';
 	readonly importedName?: string;
+	// `import type` or an inline `type` specifier. The binding exists for the
+	// type checker only, so no emitted module may carry it as a value import:
+	// the specifier need not have a runtime export behind it at all.
+	readonly typeOnly?: boolean;
 };
 
 export type SemanticGraphBinding = {

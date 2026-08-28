@@ -1,5 +1,6 @@
 import { parseModule } from '../../js-ast.ts';
 import { createSourceMemo, ownedModuleAst } from '../semantic-graph/shared-ast.ts';
+import { valueModuleImports } from '../semantic-graph/imports.ts';
 import {
 	deserializeGraphValue,
 	jsonSourceWithNonFiniteNumbers,
@@ -618,7 +619,7 @@ export function publicRenderValueImports(
 	moduleScopeSource = '',
 ): ReadonlyArray<SemanticModuleImport> {
 	const componentLocalNames = new Set(componentEdges.map((edge) => edge.childComponentName));
-	return moduleImports.filter(
+	return valueModuleImports(moduleImports).filter(
 		(moduleImport) =>
 			!componentLocalNames.has(moduleImport.localName) ||
 			referencesIdentifier(moduleScopeSource, moduleImport.localName),

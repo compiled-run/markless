@@ -44,6 +44,7 @@ import {
 } from './foreign-scope.ts';
 import { isClassInstanceValue } from './semantic-graph/collect-state.ts';
 import { ownedModuleAstOrNull } from './semantic-graph/shared-ast.ts';
+import { valueModuleImports } from './semantic-graph/imports.ts';
 import {
 	arrayNode,
 	arrowFunctionNode,
@@ -2998,6 +2999,9 @@ function referencedIdentifierNames(root: AnyNode): Set<string> {
 /**
  * The AST path's import dedupe. Same key as `uniqueModuleImports`, which sits
  * inside the scanner band a migrated site may not call.
+ *
+ * Every band's carry funnels through this or its twin, which is why the
+ * type-only drop lives here rather than at each of the six selection sites.
  */
 function dedupeModuleImports(
 	moduleImports: ReadonlyArray<SemanticModuleImport>,
@@ -3005,7 +3009,7 @@ function dedupeModuleImports(
 	const seen = new Set<string>();
 	const unique: SemanticModuleImport[] = [];
 
-	for (const moduleImport of moduleImports) {
+	for (const moduleImport of valueModuleImports(moduleImports)) {
 		const key = [
 			moduleImport.kind,
 			moduleImport.localName,
@@ -3894,13 +3898,14 @@ function symbolExportName(symbolId: string): string {
 	return `_${name}`;
 }
 
+/** `dedupeModuleImports`' scanner-band twin; drops type-only imports the same way. */
 function uniqueModuleImports(
 	moduleImports: ReadonlyArray<SemanticModuleImport>,
 ): ReadonlyArray<SemanticModuleImport> {
 	const seen = new Set<string>();
 	const unique: SemanticModuleImport[] = [];
 
-	for (const moduleImport of moduleImports) {
+	for (const moduleImport of valueModuleImports(moduleImports)) {
 		const key = [
 			moduleImport.kind,
 			moduleImport.localName,
