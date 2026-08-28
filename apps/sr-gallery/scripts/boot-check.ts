@@ -26,7 +26,7 @@
 
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { chromium, type Page } from '@playwright/test';
+import { chromium, type Locator, type Page } from '@playwright/test';
 import { FAMILY_ANCHORS, PREVIEW_ORIGIN, type FamilyName } from '../preview-server.ts';
 
 type AriaRole = Parameters<Page['getByRole']>[0];
@@ -80,6 +80,9 @@ const RENDERED_ROLE: Record<FamilyName, AriaRole> = {
 	colorpicker: 'slider',
 	// The group is a role="group" div; its items are the real buttons.
 	buttongroup: 'button',
+	// Each editable root is a role="group"; the preview button and the field it
+	// swaps with are both always in the DOM, so the group is what counts a shape.
+	editable: 'group',
 	// A real text input and no role of its own; the submitted field beside it is a
 	// second, aria-hidden one, which includeHidden counts too.
 	numberbox: 'textbox',
@@ -129,6 +132,9 @@ const RENDERED_COUNT: Partial<Record<FamilyName, number>> = {
 	// The plain rating, the half-value one and the read-only aggregate: a count
 	// catches a section that rendered the starter and lost the other two shapes.
 	'rating-group': 3,
+	// The starter, the double-click one and the read-only one: a count catches a
+	// section that rendered the starter and lost the other two shapes.
+	editable: 3,
 };
 
 const appDir = fileURLToPath(new URL('..', import.meta.url));
@@ -737,6 +743,47 @@ async function main() {
 				);
 			} else {
 				console.log('#rating-group\'s read-only group reads its value back as "4.5 of 5".');
+			}
+		}
+
+		// The role count above says three shapes rendered. What a reader lane then
+		// turns on is that the preview carries the value's own words, that
+		// activating it puts a real field in the same room, and that Enter puts the
+		// new words back on the preview. These rows run last because the commit
+		// changes the value the page is serving.
+		const showed = async (target: Locator) => {
+			try {
+				await target.waitFor({ state: 'visible', timeout: 5_000 });
+				return true;
+			} catch {
+				return false;
+			}
+		};
+
+		const editableSection = page.locator('#editable');
+		const preview = editableSection.getByRole('button', { name: 'Quarterly plan' });
+		if ((await preview.count()) !== 1) {
+			failures.push(
+				`#editable serves ${await preview.count()} preview buttons reading "Quarterly plan", not the 1 its starter needs.`,
+			);
+		} else {
+			console.log('#editable serves a preview button named by the value it holds.');
+
+			await preview.click();
+			const field = editableSection.getByRole('textbox', { name: 'Document name' });
+			if (!(await showed(field))) {
+				failures.push('#editable reveals no field named "Document name" when its preview is pressed.');
+			} else {
+				console.log('#editable opens a session on the field its label names.');
+
+				await field.fill('Annual plan');
+				await field.press('Enter');
+				const committed = editableSection.getByRole('button', { name: 'Annual plan' });
+				if (!(await showed(committed))) {
+					failures.push('#editable does not put the committed words back on its preview when Enter closes the session.');
+				} else {
+					console.log('#editable commits on Enter and reads the new words back on its preview.');
+				}
 			}
 		}
 

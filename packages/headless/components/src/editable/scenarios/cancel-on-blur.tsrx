@@ -1,6 +1,5 @@
 import { state } from '@markless/core';
-// Registration is a follow-up unit, so the barrel has no `editable` export yet.
-import * as editable from '../index.ts';
+import { editable } from '../../index.ts';
 
 // Moving focus out gives the previous value back instead of taking the words.
 // The other half of the blur policy; the default is the opposite.

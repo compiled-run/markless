@@ -1,8 +1,5 @@
 import { state } from '@markless/core';
-// Registration is a follow-up unit, so the barrel has no `editable` export yet.
-// This is the same namespace object `import { editable } from '../../index.ts'`
-// will hand back once it does.
-import * as editable from '../index.ts';
+import { editable } from '../../index.ts';
 
 // The starter a consumer copies: a named value, a preview control that opens the
 // session, the field it is edited in, and the hidden input that carries it into a

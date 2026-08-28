@@ -9,6 +9,7 @@ import {
 	crop,
 	datebox,
 	drawer,
+	editable,
 	fileupload,
 	hovercard,
 	ink,
@@ -36,7 +37,7 @@ import {
 // /#toggle, /#textbox, /#progress, /#checklist, /#select, /#modal,
 // /#radio-group, /#rating-group, /#tabs, /#popover, /#tooltip, /#slider, /#datebox,
 // /#fileupload, /#hovercard, /#calendar, /#menu, /#menubar, /#colorpicker,
-// /#buttongroup, /#numberbox, /#ink, /#pad, /#crop, /#tour, /#toolbar, /#drawer. A family whose
+// /#buttongroup, /#editable, /#numberbox, /#ink, /#pad, /#crop, /#tour, /#toolbar, /#drawer. A family whose
 // second shape a reader announces differently gets its own section too: /#slider-range,
 // /#numberbox-min-max-step, /#numberbox-currency, /#crop-image.
 //
@@ -425,6 +426,37 @@ export function Gallery() @{
 					<buttongroup.item value="center">Center</buttongroup.item>
 					<buttongroup.item value="right">Right</buttongroup.item>
 				</buttongroup.root>
+			</div>
+		</section>
+
+		{/* After #buttongroup on purpose: the buttongroup transcript walks to the first role="group" on the page by role alone, and an editable root is a role="group" too. */}
+		<section id="editable">
+			<h2>Editable</h2>
+			<div class="scenario">
+				<editable.root name="title" defaultValue="Quarterly plan">
+					<editable.label>Document name</editable.label>
+					<editable.trigger />
+					<editable.input />
+					<editable.field />
+				</editable.root>
+			</div>
+
+			{/* Two clicks open this one; Enter and Space on the preview still do, because a gesture only a mouse can make is not a keyboard-operable control. */}
+			<div class="scenario">
+				<editable.root editOnDoubleClick defaultValue="notes.md">
+					<editable.label>File name</editable.label>
+					<editable.trigger />
+					<editable.input />
+				</editable.root>
+			</div>
+
+			{/* Read-only: still focusable and still readable, and no gesture opens a session. */}
+			<div class="scenario">
+				<editable.root readonly defaultValue="published">
+					<editable.label>Published name</editable.label>
+					<editable.trigger />
+					<editable.input />
+				</editable.root>
 			</div>
 		</section>
 

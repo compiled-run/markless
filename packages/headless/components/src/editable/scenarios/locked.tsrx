@@ -1,5 +1,4 @@
-// Registration is a follow-up unit, so the barrel has no `editable` export yet.
-import * as editable from '../index.ts';
+import { editable } from '../../index.ts';
 
 // The two ways a value refuses to be edited, side by side. `disabled` takes the
 // preview out of the tab order; `readonly` leaves it focusable and readable and

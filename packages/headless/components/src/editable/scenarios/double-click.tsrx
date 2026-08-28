@@ -1,6 +1,5 @@
 import { state } from '@markless/core';
-// Registration is a follow-up unit, so the barrel has no `editable` export yet.
-import * as editable from '../index.ts';
+import { editable } from '../../index.ts';
 
 // Two clicks open the session; one does nothing. Enter and Space on the preview
 // still open it, because a gesture only a mouse can make is not a keyboard-
