@@ -73,7 +73,24 @@ const resumeOnDemandEntries = [
 // 20,996 -> 20,983 (re-anchor 2026-08-22, teardown-dispatch fix): the disposed
 // flag went unconditional and hosts dispose with ignoreFutureEvents; comment
 // trims inside resume-runtime.ts paid for the logic, net -13.
-const sourceByteLimit = 20983;
+// 20,983 -> 33,510 (2026-08-27): the element-handle qualifier slot moved out of
+// resume-locators.ts into resume-arm-records.ts, so resume.ts's closure gains
+// resume-arm-records.ts (13,633) and loses the 791 chars of slot text that left
+// resume-locators.ts. Exactly +12,842, measured, one file.
+// This proxy OVER-PRICES that edge and the measurement says so. The wall exists to
+// predict chunk bloat; here the shipped number moved the other way. The dispatch
+// core (resume-events.ts) statically imports fns/instance-scope.ts, which already
+// statically imports resume-arm-records.ts - so arm-records' chunk is loaded on
+// every page no matter what, and resume-locators' chunk already imported that same
+// chunk through inline/resume-errors.ts. resume.ts therefore fetches zero extra
+// bytes for this edge, while moving the slot took resume-locators + resume-census
+// back OUT of the always-loaded dispatch chunk: largest runtime chunk 6,202 -> 5,149
+// gzip on vite-csr, below its pre-qualifier 5,151.
+// NOT paid, and owed: the slot itself is ~330 chars. Hosting it in its own module
+// instead of inside a 13,633-char one would cost this wall ~+350 rather than
+// +12,842. That module is the repayment; this number is the price of keeping the
+// slot in the only module the contract allowed.
+const sourceByteLimit = 33510;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',

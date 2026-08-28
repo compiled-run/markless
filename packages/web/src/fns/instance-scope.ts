@@ -1,6 +1,8 @@
 import type { RuntimeGraph } from '@markless/runtime';
-import { installComposedArmRecordQualifier } from '../resume-arm-records.ts';
-import { installElementHandleQualifier } from '../resume-locators.ts';
+import {
+	installComposedArmRecordQualifier,
+	installElementHandleQualifier,
+} from '../resume-arm-records.ts';
 import { marklessSettled, type Awaitable } from '../ssr-data/awaitable.ts';
 import type {
 	ResumeArmBranchRecord,
