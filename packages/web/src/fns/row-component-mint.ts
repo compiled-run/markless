@@ -88,7 +88,10 @@ export function marklessRowComponentMint(
 	graph?: RuntimeGraph,
 	host?: RowComponentMintHost,
 ): RowComponentMintApi {
-	let prepared = new Map<unknown, MintedRow>();
+	// Keyed by repeat, not by row key alone: two repeats over ONE collection are
+	// asked to build in the same tick and hold the same key, and one shared map
+	// hands the second repeat's row to the first.
+	const prepared = new Map<string, Map<unknown, MintedRow>>();
 	// Rows built but not yet registered. A repeat asked to build twice before the
 	// flush behind it runs - a second write in one statement - must not drop the
 	// first batch's registration on the floor.
@@ -129,13 +132,14 @@ export function marklessRowComponentMint(
 		mintRow(parent, repeat, item, rowMintGraph) {
 			if (!repeat.rowComponent)
 				return mintTemplateRow(parent, repeat, item, rowMintGraph ?? graph);
-			return prepared.get(rowKeyOf(item, repeat))?.rowRoot;
+			return prepared.get(repeat.id)?.get(rowKeyOf(item, repeat))?.rowRoot;
 		},
 		rows(repeat, parent, served) {
 			// A refusal answers as a rejection, the shape every caller already has;
 			// only a warm build skips the wait.
 			try {
-				prepared = new Map();
+				const preparedRows = new Map<unknown, MintedRow>();
+				prepared.set(repeat.id, preparedRows);
 				const rowGraph = graph,
 					rowHost = host;
 				const built =
@@ -153,7 +157,7 @@ export function marklessRowComponentMint(
 										return marklessWalk(items.length, (rowIndex) => {
 											const item = items[rowIndex];
 											const rowKey = rowKeyOf(item, repeat);
-											if (served.has(rowKey) || prepared.has(rowKey))
+											if (served.has(rowKey) || preparedRows.has(rowKey))
 												return undefined;
 											return marklessThen(
 												mintComponentRow({
@@ -171,7 +175,7 @@ export function marklessRowComponentMint(
 													registration: rowHost,
 												}),
 												(row) => {
-													prepared.set(rowKey, row);
+													preparedRows.set(rowKey, row);
 												},
 											);
 										});
@@ -180,9 +184,9 @@ export function marklessRowComponentMint(
 							)
 						: undefined;
 				return marklessThen(built, () => {
-					awaitingCommit = [...awaitingCommit, ...prepared.values()];
+					awaitingCommit = [...awaitingCommit, ...preparedRows.values()];
 					return async () => {
-						prepared = new Map();
+						prepared.delete(repeat.id);
 						const settling = awaitingCommit;
 						awaitingCommit = [];
 						for (const row of settling) await row.commit();
@@ -263,6 +267,35 @@ function rowKeyOf(item: unknown, repeat: ResumeKeyedRepeatRecord): unknown {
 
 type RowRegistration = RowComponentMintHost;
 
+/**
+ * One row render at a time.
+ *
+ * The widget roots a row resolves its parts against are installed in ONE
+ * module-level scope for the length of that row's render, and a render is
+ * async whenever a symbol has to be fetched. Two repeats minting at once - two
+ * family roots over one collection, one row appended to each - therefore
+ * overlap their windows: the second install wins, the first row reads roots
+ * that are not its own, and whichever settles first restores the scope out from
+ * under the other. Queueing keeps each row's window its own. A page whose row
+ * render is already warm never queues.
+ */
+let rowRenderQueue: Promise<unknown> | undefined;
+
+function oneRowRenderAtATime<T>(render: () => Awaitable<T>): Awaitable<T> {
+	const held = rowRenderQueue;
+	const answered = held ? held.then(render) : render();
+	if (!marklessIsThenable(answered as never)) return answered;
+	const queued = (answered as Promise<T>).then(
+		() => undefined,
+		() => undefined,
+	);
+	rowRenderQueue = queued;
+	void queued.then(() => {
+		if (rowRenderQueue === queued) rowRenderQueue = undefined;
+	});
+	return answered;
+}
+
 function mintComponentRow(input: {
 	readonly surface: PrerenderDataSurface;
 	readonly parent: ResumeDomElement;
@@ -276,26 +309,33 @@ function mintComponentRow(input: {
 	readonly registration: RowRegistration;
 }): Awaitable<MintedRow> {
 	const rowComponent = input.repeat.rowComponent!;
+	const rowInstancePath = rowKeyInstancePath(input.repeat, input.enclosing);
 	return marklessThen(loadEvaluator(), ({ renderRepeatRowComponent, rowSegmentOf }) => {
 		const rowSegment = rowSegmentOf({
 			rowKey: input.rowKey,
-			enclosingInstancePath: input.enclosing.instancePath,
+			enclosingInstancePath: rowInstancePath,
 		});
 		return marklessThen(
-			renderRepeatRowComponent({
-				surface: input.surface,
-				ownerComponentName: rowComponent.componentName,
-				componentEdgeId: rowComponent.componentEdgeId,
-				itemPropName: rowComponent.itemPropName,
-				item: input.item,
-				rowKey: input.rowKey,
-				rowIndex: input.rowIndex,
-				loadSymbol: input.loadSymbol,
-				read: (graphNodeId, path = []) => input.graph.read(graphNodeId, path),
-				idPrefix: ownerIdPrefix(input.surface, rowComponent.componentName, input.repeat),
-				enclosingWidgetRoots: input.enclosing.roots,
-				enclosingInstancePath: input.enclosing.instancePath,
-			}),
+			oneRowRenderAtATime(() =>
+				renderRepeatRowComponent({
+					surface: input.surface,
+					ownerComponentName: rowComponent.componentName,
+					componentEdgeId: rowComponent.componentEdgeId,
+					itemPropName: rowComponent.itemPropName,
+					item: input.item,
+					rowKey: input.rowKey,
+					rowIndex: input.rowIndex,
+					loadSymbol: input.loadSymbol,
+					read: (graphNodeId, path = []) => input.graph.read(graphNodeId, path),
+					idPrefix: ownerIdPrefix(
+						input.surface,
+						rowComponent.componentName,
+						input.repeat,
+					),
+					enclosingWidgetRoots: input.enclosing.roots,
+					enclosingInstancePath: rowInstancePath,
+				}),
+			),
 			(rendered) => placeMintedRow(input, rowComponent, rowSegment, rendered),
 		);
 	});
@@ -423,6 +463,25 @@ type EnclosingWidgets = {
 };
 
 /**
+ * The path a minted row's key is spelled against.
+ *
+ * A row key is unique only WITHIN one rendered repeat, so the segment carries a
+ * path that tells two renderings of one `@for` apart. The record's own
+ * `instancePath` is that path - composition writes it per rendered repeat - and
+ * it answers where the collection cannot: two family roots over ONE page-level
+ * collection read a node in page space, so a key taken from the collection is
+ * spelled identically by both and the second row collides with the first. A
+ * repeat the root module authored ships no path and falls back to the
+ * collection's, which is the same answer it always gave.
+ */
+function rowKeyInstancePath(
+	repeat: ResumeKeyedRepeatRecord,
+	enclosing: EnclosingWidgets,
+): string {
+	return repeat.instancePath ?? enclosing.instancePath;
+}
+
+/**
  * The rendered widgets the repeat host stands inside, off the LIVE graph.
  *
  * Two questions, because a repeat reaches a widget two ways. The collection node
@@ -435,9 +494,8 @@ type EnclosingWidgets = {
  * answers it: a host id names its instance, and a host holding the repeat's
  * parent names an instance the repeat is inside.
  *
- * The anchor the rows are keyed by is still the collection's: two family roots
- * over one collection mint the same row key twice, and nothing here tells those
- * two rows apart - the second is refused by the root collision below.
+ * What the rows are KEYED by is a third question, answered by the record's own
+ * `instancePath` rather than by anything here - see `rowKeyInstancePath`.
  */
 function enclosingWidgetsFor(
 	graph: RuntimeGraph,

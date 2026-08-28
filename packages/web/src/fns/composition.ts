@@ -44,12 +44,14 @@ export type ComposeKeyedRepeat = {
 	readonly collectionGraphNodeId?: string;
 	readonly collectionPath: ReadonlyArray<string>;
 	readonly rowTemplate?: ComposeRowTemplate;
+	readonly instancePath?: string;
 	readonly [key: string]: unknown;
 };
 // `rowTemplate` is present and undefined exactly when the child shipped one that
 // composition then dropped, which is what tells a caller to unset its own.
 export type ComposeMappedKeyedRepeat = ComposeGraphRead & {
 	readonly rowTemplate?: ComposeRowTemplate;
+	readonly instancePath?: string;
 };
 export type ComposeStateNode = {
 	readonly graphNodeId: string;
@@ -771,11 +773,18 @@ export function marklessCsrRemapChildKeyedRepeat(
 		);
 		if (!mapped) throw new Error('MARKLESS_COMPOSED_READ_UNMAPPED: ' + hostPrefix + repeat.id);
 	}
+	// The repeat's OWN path, not the collection's: a `@for` reading a page-level
+	// cell from inside two composed panels has one collection and two renderings,
+	// and only this tells the two apart.
+	const composedInstancePath = instancePath + (repeat.instancePath ?? '');
+	const withPath = composedInstancePath
+		? { ...mapped, instancePath: composedInstancePath }
+		: mapped;
 	// A row's outside read is a graph node id like the collection's, so it takes
 	// the same qualification or the mint reads a node the live graph never holds.
 	return repeat.rowTemplate
 		? {
-				...mapped,
+				...withPath,
 				rowTemplate: composedRowTemplate(
 					repeat.rowTemplate,
 					graphProps,
@@ -783,7 +792,7 @@ export function marklessCsrRemapChildKeyedRepeat(
 					instancePath,
 				),
 			}
-		: mapped;
+		: withPath;
 }
 
 // One unqualifiable slot drops the WHOLE template: a slot cannot be dropped

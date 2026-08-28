@@ -393,6 +393,21 @@ export type ProtocolViewPayload = {
 		 * reader that needs the owner's own id space reads it.
 		 */
 		readonly ownerHostNodeId?: string;
+		/**
+		 * The graph instance path of the component that AUTHORED this `@for`, as
+		 * composition spells it (`c<n>:`/`p<n>:` segments, outermost first).
+		 *
+		 * A row key is only unique within one rendered repeat, and the repeat's own
+		 * path is the only thing that tells two renderings of one `@for` apart: two
+		 * family roots over ONE page-level collection read a collection node in page
+		 * space, so a row keyed off the collection is spelled the same by both. The
+		 * mint keys a minted row's segment on this plus the row key.
+		 *
+		 * Pay-per-use: a repeat the root module authored itself stands at no
+		 * instance and omits the field, so its record is byte-identical to what it
+		 * was before this existed. Only composition writes it.
+		 */
+		readonly instancePath?: string;
 		readonly collectionGraphNodeId?: string;
 		readonly collectionPath: ReadonlyArray<string>;
 		readonly keyPath: ReadonlyArray<string>;
