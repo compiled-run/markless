@@ -89,6 +89,29 @@ export function tick(ms = 0): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * Stops a storm's clicks from navigating the page away. Several scenarios hold a
+ * real `a[href]` - hovercard's trigger is one - and a dispatched click follows it
+ * like any other, which tears the test iframe out from under the whole run.
+ *
+ * The listener is last in the bubble phase, so every family handler has already
+ * seen the untouched event: only the browser's own navigation is cancelled.
+ */
+export function holdTheLinksOnThePage(): { stop(): void } {
+	const onClick = (event: Event) => {
+		const followed = event
+			.composedPath()
+			.find((node): node is HTMLAnchorElement => node instanceof HTMLAnchorElement);
+		if (followed?.hasAttribute('href')) event.preventDefault();
+	};
+	document.addEventListener('click', onClick);
+	return {
+		stop() {
+			document.removeEventListener('click', onClick);
+		},
+	};
+}
+
 /** Everything in the widget a gesture could plausibly land on, root included. */
 export function stormTargets(root: HTMLElement): HTMLElement[] {
 	const found = new Set<HTMLElement>([root]);

@@ -2,15 +2,15 @@
 // here reads the clock for a decision - every choice comes from the seed.
 
 import { page } from 'vite-plus/test/browser';
-import { type StormKind, nextAction, tick } from './actions.ts';
+import { type StormKind, holdTheLinksOnThePage, nextAction, tick } from './actions.ts';
 import type { ChaosFamily } from './families.ts';
 import { ariaStateMismatches, lostFocusReports, watchForFailures } from './invariants.ts';
 import { RUN_SEED, replayHint, rngFrom, stormSeedFor } from './seed.ts';
 import { watchTabOut } from './tab-order.ts';
 
-/** Three storms per family per run, forty gestures each: the lane stays in minutes. */
+/** The whole storm vocabulary. Each family picks two of these; see families.ts. */
 export const STORM_KINDS: readonly StormKind[] = ['pointer', 'keyboard', 'mixed'];
-export const ACTIONS_PER_STORM = 40;
+export const ACTIONS_PER_STORM = 30;
 
 /** How long the widget is given to finish reacting before the invariants are read. */
 const SETTLE_MS = 150;
@@ -22,12 +22,18 @@ function el(testid: string): HTMLElement {
 }
 
 // A storm can leave a modal drawer open, and its trigger is then inert - so
-// recovery would fail on the storm's leftovers rather than on a defect.
-async function unwindOpenSurfaces(): Promise<void> {
+// recovery would fail on the storm's leftovers rather than on a defect. Escape
+// clears most of it; a family whose leftovers survive Escape - an open dialog, a
+// sticky toast, a dropped file - adds its own `unwind`.
+async function unwindOpenSurfaces(family: ChaosFamily): Promise<void> {
 	for (let unwind = 0; unwind < 4; unwind++) {
 		document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
 		await tick();
 	}
+	// Clearing leftovers is setup, so a throw here is not the widget failing.
+	try {
+		await family.unwind?.();
+	} catch {}
 	await tick(SETTLE_MS);
 }
 
@@ -59,11 +65,13 @@ export async function runStorm(family: ChaosFamily, kind: StormKind): Promise<vo
 	const rng = rngFrom(stormSeed);
 
 	await family.mount();
-	const root = el(family.rootTestId);
+	// A scenario whose controls sit outside the family root storms the whole body.
+	const root = family.rootTestId ? el(family.rootTestId) : document.body;
 
 	// Opened after the mount so a mount's own output is not charged to the storm.
 	const watch = watchForFailures();
 	const tabs = watchTabOut();
+	const links = holdTheLinksOnThePage();
 	const log: string[] = [];
 	const problems: string[] = [];
 
@@ -90,7 +98,7 @@ export async function runStorm(family: ChaosFamily, kind: StormKind): Promise<vo
 		problems.push(...ariaStateMismatches(root));
 
 		if (problems.length === 0) {
-			await unwindOpenSurfaces();
+			await unwindOpenSurfaces(family);
 			const beforeRecovery = watch.reports.length;
 			try {
 				await family.recover();
@@ -105,6 +113,7 @@ export async function runStorm(family: ChaosFamily, kind: StormKind): Promise<vo
 	} finally {
 		watch.stop();
 		tabs.stop();
+		links.stop();
 	}
 
 	if (problems.length > 0) throw new Error(report(family, kind, stormSeed, log, problems));

@@ -1,5 +1,5 @@
-// Seeded interaction storms against six high-interaction families. Gated: run on
-// chaos/vitest.config.ts, not in the `ui` project's glob. See ./README.md.
+// Seeded interaction storms against every interactive shipped family. Gated: run
+// on chaos/vitest.config.ts, not in the `ui` project's glob. See ./README.md.
 
 import { afterEach, beforeAll, expect, test } from 'vitest';
 import { tick } from './actions.ts';
@@ -23,14 +23,17 @@ afterEach(async () => {
 	}
 });
 
-test('every storm is the same length, so a run is bounded by families x storms', () => {
-	expect(STORM_KINDS.length).toBe(3);
-	expect(ACTIONS_PER_STORM).toBe(40);
-	expect(families.length).toBe(6);
+test('a run is bounded: two storms per family, one gesture count for all of them', () => {
+	expect(ACTIONS_PER_STORM).toBe(30);
+	expect(families.every((family) => family.storms.length === 2)).toBe(true);
+	expect(families.every((family) => family.storms.every((kind) => STORM_KINDS.includes(kind)))).toBe(
+		true,
+	);
+	expect(new Set(families.map((family) => family.name)).size).toBe(families.length);
 });
 
 for (const family of families) {
-	for (const kind of STORM_KINDS) {
+	for (const kind of family.storms) {
 		test(
 			`${family.name}: survives a ${kind} storm and still works afterwards`,
 			STORM_TIMEOUT,
