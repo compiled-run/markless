@@ -390,10 +390,12 @@ export function TagListItemClose({
 			const key = event.key;
 			const held = item.value;
 			if (key === 'Backspace' || key === 'Delete') {
-				// The neighbour is looked up BEFORE the removal: afterwards the repeat
-				// has already taken this row out and a stale node takes no focus.
-				const next = elementForValue(taglist.closeEls, afterRemoval(taglist.value, held));
+				// The neighbour is named before the removal but its element is read
+				// after it: the write commits first, so the handle already holds the
+				// node the repeat kept.
+				const landing = afterRemoval(taglist.value, held);
 				taglist.remove(held);
+				const next = elementForValue(taglist.closeEls, landing);
 				if (next !== undefined) next.focus();
 				if (next === undefined) taglist.inputEl?.focus();
 			} else {

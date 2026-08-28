@@ -78,24 +78,25 @@ Two things about that shape are load-bearing and were found the hard way:
 
 ## Findings
 
-- **A consumer component that reads `taglist.state()` in a child position sees empty cells.**
-  Moving the repeat into a nested `function Row()` that calls `taglist.state()` gave `undefined` for
-  every seeded cell, including `name`, while the family's own parts in the same tree read the right
-  values. The `fileupload` scenarios do the identical thing and work, so the trigger is **not
-  isolated** and no runtime witness is filed on this evidence. Scenarios repeat over the consumer's
-  own array instead, which is the better idiom for a controlled `string[]` anyway.
-- **Focus after a keyboard removal does not survive the keyed repeat.** Deleting a focused tag with
-  Backspace or Delete moves the highlight to the neighbour correctly, but the neighbour's button —
-  looked up through the family's own plural handle, before or after the write — does not hold DOM
-  focus: it lands on `<body>`. The browser row pins the highlight and says so in a comment rather
-  than pinning focus. This is a candidate runtime witness (keyed reconcile replacing sibling nodes),
-  not a family bug that a retry loop may paper over.
-- **One red row: `the form field hands back one entry per tag under one name`** (CSR and SSR). In
-  `topics-form.tsrx` the delimiter clears the field — so the handler ran and committed — but
-  `taglist.value` never changes, and the hidden inputs stay at the tag the scenario started with.
-  The identical gesture against `basic.tsrx` passes. Ruling out `required`/`invalid` by removing
-  them changed nothing, so the difference is the `<form>` ancestor or the extra `error`/`description`
-  parts. Not diagnosed; the row is left red rather than weakened.
+- **The field never mints a hidden input for a tag the first render did not carry.** Dropping a tag
+  the row started with takes its input away, and typing that same tag back brings it back; a tag the
+  first render never carried gets no input, ever. An attribute binding over `taglist.value` on the
+  field's own host element refreshes on the same write, so the cell is subscribed and the write
+  reaches the DOM — the row minting is what is missing. Not the `<form>`, not `required`/`invalid`,
+  not the `error`/`description` parts: `basic.tsrx` fails the same way and only looked green because
+  no row read the hidden inputs after an add. Two rows stay pinned `test.fails`. Framework, not
+  family; the measurements and the reduction are in
+  `goals/headless-components/notes/U697-taglist-defects.md`.
+- **A consumer component's text over `taglist.value` does not refresh.** `scenarios/consumer-state.tsrx`
+  mounts a consumer-owned component inside the root that calls `taglist.state()`. Every seeded cell
+  reads correctly, so U692's "empty cells" does not reproduce. After an add, an attribute over the
+  collection refreshes and a text child derived from it on the same element does not. One pinned row.
+- **Focus after a keyboard removal lands on `<body>`, and the keyed repeat is not why.** The
+  neighbour's button is the same DOM node before and after the gesture and is still connected, so
+  nothing replaced it. The family focuses that live element; the commit that removes the previously
+  focused element then blanks focus. Looking the neighbour up after the write rather than before
+  changes nothing, and that is the ordering that ships because it is the one the repo rule asks for.
+  The browser row pins the highlight, not focus. Runtime, not family — no retry loop.
 - **No `<style>` block.** SPEC calls for CSS defaults where the family needs them — anchor
   positioning, hidden-until-open, stacking. taglist needs none: the edit field is hidden with the
   `hidden` attribute and chip layout is entirely the consumer's.
