@@ -73,7 +73,20 @@ const seedProjectingChild: SharedSeedPass = (context, definition, slot, read, in
 	const chain = childrenProjectionChain(context.surface, rootEdge.childComponentName);
 	const composedRoot = chain.map((link) => link.edge.symbolPrefix).join('');
 	const inheritedSeeds = new Map(inherited ?? []);
-	const rootedDefinitions = renderedWidgetRootsOf(context.surface, rootEdge.childComponentName);
+	// A carrier of an unseeded family roots it when the page gives it composition's
+	// standing, so the token has to be asked with WHERE this child stands, not just
+	// which component it is: otherwise the count a part of that instance asks for
+	// mints a placeholder under the bare handle id while composition has qualified
+	// every handle of the instance, and the ask answers nothing at first paint.
+	const rootedDefinitions = renderedWidgetRootsOf(context.surface, rootEdge.childComponentName, {
+		enclosing: enclosingProjectingChildNames(context.surface, componentEdgeId).map(
+			(componentName) => ({ surface: context.surface, componentName }),
+		),
+		enclosed: projectedChildNames(context.surface, definition, componentEdgeId, read).map(
+			(componentName) => ({ surface: context.surface, componentName }),
+		),
+		inRow: (context.rowSegment ?? '') !== '',
+	});
 	// Filed per definition as well as under the plain key: an element inside this
 	// child can carry handles from ANOTHER family's instance, and that family's
 	// token must not be overwritten by this one. See marklessWidgetInstanceKey.
@@ -380,6 +393,54 @@ function projectedEdges(
 		const edge = edges.find((candidate) => candidate.id === edgeId);
 		return edge && !edge.materialized ? [edge] : [];
 	});
+}
+
+/**
+ * Every component placed INSIDE one child's projection, at any depth: what that
+ * child would enclose if it rooted a widget. The same walk `projectedEdges`
+ * makes - the taken arm only, and no boundary pruning, because whether the child
+ * is a boundary is the question this answers.
+ */
+function projectedChildNames(
+	surface: PrerenderDataSurface,
+	definition: PrerenderDataDefinition,
+	componentEdgeId: string,
+	read: PrerenderReadSeed,
+): string[] {
+	const chunks = surface.renderData.chunks.filter(
+		(chunk) => chunk.componentName === definition.name,
+	);
+	const byId = new Map(chunks.map((chunk) => [chunk.id, chunk]));
+	const edges = definition.edges ?? [];
+	const rootProjectionChunkId = chunks.flatMap((chunk) =>
+		chunk.slots.flatMap((slot) =>
+			slot.kind === 'child-component' &&
+			slot.componentEdgeId === componentEdgeId &&
+			slot.projectionChunkId
+				? [slot.projectionChunkId]
+				: [],
+		),
+	)[0];
+	if (rootProjectionChunkId === undefined) return [];
+	const names: string[] = [];
+	const walked = new Set<string>();
+	const walk = (chunkId: string) => {
+		if (walked.has(chunkId)) return;
+		walked.add(chunkId);
+		for (const slot of byId.get(chunkId)?.slots ?? []) {
+			if (slot.kind === 'branch') {
+				const armChunkId = slot.armTemplateIds[takenArm(definition, slot.branchSiteId, read)];
+				if (armChunkId) walk(armChunkId);
+				continue;
+			}
+			if (slot.kind !== 'child-component') continue;
+			const edge = edges.find((candidate) => candidate.id === slot.componentEdgeId);
+			if (edge && !edge.materialized) names.push(edge.childComponentName);
+			if (slot.projectionChunkId) walk(slot.projectionChunkId);
+		}
+	};
+	walk(rootProjectionChunkId);
+	return names;
 }
 
 /**

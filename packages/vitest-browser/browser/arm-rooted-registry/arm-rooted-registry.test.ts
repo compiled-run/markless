@@ -50,15 +50,14 @@ for (const mode of ['CSR', 'SSR'] as const) {
 		expect(max('plain-root')).toBe('2');
 	});
 
-	// The live count is this instance's own; the FIRST-PAINT one is not yet. The
-	// render side answers a count by minting a placeholder keyed with the widget
-	// instance token `fns/shared-seed.ts` files, and that token comes from
-	// `widgetRootsOf` (`prerender/children-projection.ts`), which still reads a
-	// carrier as rooting nothing. So the placeholder is keyed with the bare handle
-	// id while composition has qualified every one of this instance's handles, no
-	// handle matches, and the ask answers 0 until the first flip re-derives it.
-	// Measured on both modes: 0 at paint, 4 after the arm applies, 3 after it drops.
-	test.fails(`${mode}: each instance counts its own roster at first paint`, async () => {
+	// SSR files the widget instance token from the compiler's per-component
+	// `marklessWidgetRoots` marker, which is a fact about the component alone and
+	// cannot see that this page gives the carrier a root's standing. So the count
+	// placeholder is keyed with the bare handle id while composition has qualified
+	// every handle of the instance, no handle matches, and the ask answers 0 until
+	// the first flip re-derives it. Measured: 0 at paint, 4 with the arm, 3 without.
+	const firstPaint = mode === 'CSR' ? test : test.fails;
+	firstPaint(`${mode}: each instance counts its own roster at first paint`, async () => {
 		await mount();
 
 		await expect.poll(() => max('armed-root'), { timeout: 2000 }).toBe('3');

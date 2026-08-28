@@ -295,7 +295,7 @@ export function marklessQualifyChildState(
 export function marklessRegisterComposedWidgets(children: ReadonlyArray<ComposeChild>): void {
 	const roots: string[] = [];
 	const projections: Array<readonly [string, string]> = [];
-	const designated = marklessDesignatedWidgetPaths(children);
+	const sites = marklessComposedWidgetSites(children);
 	for (const child of children) {
 		const instancePath = marklessComposedInstancePath(child);
 		if (!instancePath) continue;
@@ -304,7 +304,11 @@ export function marklessRegisterComposedWidgets(children: ReadonlyArray<ComposeC
 			if (!marklessCarriesWidgetCells(child, definition.id)) continue;
 			if (
 				!marklessDesignatesWidget(child, definition.id) &&
-				!marklessCarrierRootsWidget(children, child, instancePath, definition.id, designated)
+				!marklessCarrierRootsWidget(sites.get(definition.id) ?? [], {
+					path: instancePath,
+					designates: false,
+					inRow: instancePath.includes('r:'),
+				})
 			)
 				continue;
 			roots.push(instancePath + definition.id);
@@ -324,29 +328,46 @@ function marklessCarriesWidgetCells(child: ComposeChild, definitionId: string): 
 	);
 }
 
-// Where each widget family this level composes is already rooted: the paths of
-// the children that DESIGNATE it, which is the answer the carrier rule below
-// has to defer to.
-function marklessDesignatedWidgetPaths(
+// Every place one widget family's cells stand at this compose level, keyed by
+// definition: the input the carrier rule reads, and the only thing about a
+// compose child that rule needs.
+function marklessComposedWidgetSites(
 	children: ReadonlyArray<ComposeChild>,
-): Map<string, string[]> {
-	const paths = new Map<string, string[]>();
+): Map<string, MarklessWidgetSite[]> {
+	const sites = new Map<string, MarklessWidgetSite[]>();
 	for (const child of children) {
 		const instancePath = marklessComposedInstancePath(child);
 		if (!instancePath) continue;
-		for (const definition of child.output?.state?.sharedDefinitions ?? [])
-			if (
-				definition.scope === 'widget' &&
-				marklessCarriesWidgetCells(child, definition.id) &&
-				marklessDesignatesWidget(child, definition.id)
-			) {
-				const held = paths.get(definition.id);
-				if (held) held.push(instancePath);
-				else paths.set(definition.id, [instancePath]);
-			}
+		for (const definition of child.output?.state?.sharedDefinitions ?? []) {
+			if (definition.scope !== 'widget') continue;
+			if (!marklessCarriesWidgetCells(child, definition.id)) continue;
+			const site: MarklessWidgetSite = {
+				path: instancePath,
+				designates: marklessDesignatesWidget(child, definition.id),
+				inRow: instancePath.includes('r:'),
+			};
+			const held = sites.get(definition.id);
+			if (held) held.push(site);
+			else sites.set(definition.id, [site]);
+		}
 	}
-	return paths;
+	return sites;
 }
+
+/**
+ * One place a widget family's cells stand: where it stands relative to the other
+ * places, whether it DESIGNATES the family rather than merely carrying it, and
+ * whether it stands in a repeat row.
+ *
+ * `path` is compared only by prefix, so a caller with no instance paths of its
+ * own — the render-side twin, working from build-time projection data — may
+ * spell the nesting in any strings whose prefix relation is the same one.
+ */
+export type MarklessWidgetSite = {
+	readonly path: string;
+	readonly designates: boolean;
+	readonly inRow: boolean;
+};
 
 /**
  * Whether a CARRIER is nevertheless the root of the family it carries.
@@ -367,31 +388,23 @@ function marklessDesignatedWidgetPaths(
  * family's options inside the family's own designated root encloses them too,
  * and is a part of that widget rather than the start of a second one nested in
  * it. A row's carrier never roots either; its cells are dropped below.
+ *
+ * Composition and the render-side seed pass both ask this, over the same sites
+ * spelled from what each of them has.
  */
-function marklessCarrierRootsWidget(
-	children: ReadonlyArray<ComposeChild>,
-	carrier: ComposeChild,
-	instancePath: string,
-	definitionId: string,
-	designated: ReadonlyMap<string, ReadonlyArray<string>>,
+export function marklessCarrierRootsWidget(
+	sites: ReadonlyArray<MarklessWidgetSite>,
+	carrier: MarklessWidgetSite,
 ): boolean {
-	if (instancePath.includes('r:')) return false;
-	if (
-		(designated.get(definitionId) ?? []).some(
-			(rootPath) => instancePath.length > rootPath.length && instancePath.startsWith(rootPath),
-		)
-	)
+	if (carrier.inRow) return false;
+	if (sites.some((site) => site.designates && marklessEncloses(site.path, carrier.path)))
 		return false;
-	return children.some((other) => {
-		if (other === carrier) return false;
-		const otherPath = marklessComposedInstancePath(other);
-		return (
-			otherPath.length > instancePath.length &&
-			otherPath.startsWith(instancePath) &&
-			marklessCarriesWidgetCells(other, definitionId) &&
-			!marklessDesignatesWidget(other, definitionId)
-		);
-	});
+	return sites.some((site) => !site.designates && marklessEncloses(carrier.path, site.path));
+}
+
+// A proper prefix: what `inner` resolves out through on its way to `outer`.
+function marklessEncloses(outer: string, inner: string): boolean {
+	return inner.length > outer.length && inner.startsWith(outer);
 }
 
 /**
