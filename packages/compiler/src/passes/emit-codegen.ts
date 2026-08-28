@@ -105,9 +105,11 @@ export const EMISSION_PARSE_OPTIONS = Object.freeze({
  *   `JSON.stringify` produced for graph ids and paths.
  * - `comments: 'all'` — the printer's default is `'some'`, which drops line
  *   comments. Emission must not silently delete an authored comment.
- * - `strip: false` — the string scanners copied authored TypeScript through
- *   verbatim, so leaving annotations in place is the behavior-preserving
- *   choice. Whether stage 1 should strip types is not settled by the spec.
+ * - `strip: true` — an emitted module is named `.js` and is loaded as
+ *   JavaScript, so authored `as`/annotations printed back out are a syntax
+ *   error in any consumer that does not transpile. Stripping keeps the file
+ *   honest to its extension; a construct with no JavaScript equivalent is
+ *   reported in `errors` below rather than elided silently.
  * - `minify: false` — stated so an upstream default change cannot minify
  *   emitted modules without this line changing.
  */
@@ -116,7 +118,7 @@ export const EMISSION_PRINT_OPTIONS = Object.freeze({
 	indent: 2,
 	quotes: 'preserve',
 	comments: 'all',
-	strip: false,
+	strip: true,
 	minify: false,
 } as const) satisfies GenerateOptions;
 

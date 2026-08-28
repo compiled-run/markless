@@ -72,7 +72,9 @@ test('an `import type` a prop default names is not carried into the shared-seed 
 	expect(errors(compiled)).toEqual([]);
 	// The value the default actually reads still travels; the type name does not.
 	expect(importLines(seedModule)).toEqual(['import { WIDTH } from "./limits.ts";']);
-	expect(seedModule).toContain('marklessProp_cap === undefined ? WIDTH as Limit');
+	// The assertion the default was authored with is stripped at emission.
+	expect(seedModule).toContain('marklessProp_cap === undefined ? WIDTH :');
+	expect(seedModule).not.toContain('as Limit');
 });
 
 test('an inline `type` specifier in a mixed list is dropped while its value siblings carry', async () => {
@@ -202,11 +204,12 @@ test('a carried module-scope declaration brings its value import, not the type i
 	const compiled = await compile(MODULE_SCOPE_SOURCE);
 
 	expect(errors(compiled)).toEqual([]);
-	// The declaration keeps its annotation, so the name is present in the emitted
-	// text; what must not follow it is a value import for a type-only binding.
+	// The declaration's annotation is stripped at emission, so the type name is
+	// gone from the text as well as from the import list.
 	for (const kind of ['event-handler', 'state-initializer']) {
 		const emitted = moduleOfKind(compiled, kind);
-		expect(emitted).toContain('const BASE: Limit = WIDTH;');
+		expect(emitted).toContain('const BASE = WIDTH;');
+		expect(emitted).not.toContain('Limit');
 		expect(importLines(emitted)).toEqual(['import { WIDTH } from "./limits.ts";']);
 	}
 });

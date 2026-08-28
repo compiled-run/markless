@@ -627,7 +627,7 @@ test('carried declarations keep authored order, so a class is bound before it is
 import { computed, state } from '@markless/core';
 
 class Rate {
-	constructor(public step: number) {}
+	constructor(step: number) { this.step = step; }
 	scale(value: number) { return value * this.step; }
 }
 const rate = new Rate(3);
@@ -738,7 +738,7 @@ test('carried behavior declarations keep authored order, so a class is bound bef
 		'/workspace/app/src/BehaviorOrder.tsrx',
 		`
 class Painter {
-	constructor(public tone: string) {}
+	constructor(tone: string) { this.tone = tone; }
 	paint(el: HTMLElement) { el.dataset.tone = this.tone; }
 }
 const painter = new Painter('warm');
@@ -831,7 +831,7 @@ test('carried runner declarations keep authored order, so a class is bound befor
 import { computed, state } from '@markless/core';
 
 class Endpoint {
-	constructor(public host: string) {}
+	constructor(host: string) { this.host = host; }
 	url(id: number) { return this.host + id; }
 }
 const endpoint = new Endpoint('ready');
