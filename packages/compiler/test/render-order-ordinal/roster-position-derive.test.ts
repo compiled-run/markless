@@ -147,19 +147,25 @@ test('the rendered attribute still reads the computed node through its derive sy
 // the reason is named per case, because "roster position" is one question and
 // not a licence to read handles while deriving.
 
-test('the roster read alone is still refused', async () => {
+/**
+ * `roster.length` is the OTHER admitted question, pinned in
+ * `roster-count-derive.test.ts`. Every remaining way to reach into the roster is
+ * still a DOM read a derive body cannot answer.
+ */
+test('a roster read that is neither the position nor the count is still refused', async () => {
 	const result = await compile(
 		'src/RosterOnly.tsrx',
 		ADMITTED.replace(
 			'const pos = computed(() => w.itemEls.indexOf(mine as HTMLDivElement));',
-			'const pos = computed(() => w.itemEls.length);',
+			'const pos = computed(() => w.itemEls.at(0));',
 		),
 	);
 
 	const [refusal, ...rest] = refusals(result);
 	expect(rest).toEqual([]);
-	expect(refusal?.message).toContain('"w.itemEls.length"');
+	expect(refusal?.message).toContain('"w.itemEls"');
 	expect(result.semanticGraph.elementRosterPositions).toBeUndefined();
+	expect(result.semanticGraph.elementRosterCounts).toBeUndefined();
 });
 
 test('the position query plus anything else is refused, both reads', async () => {

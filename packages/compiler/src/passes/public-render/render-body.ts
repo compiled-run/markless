@@ -1,6 +1,7 @@
 import { jsonSourceWithNonFiniteNumbers } from '@markless/serializer';
 import type {
 	PublicRenderModuleInput,
+	SemanticElementRosterCount,
 	SemanticElementRosterPosition,
 } from '../../artifacts.ts';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
@@ -275,6 +276,11 @@ function computedDeclarationLine(
 			record.computedGraphNodeId === binding.id && record.componentName === componentName,
 	);
 	if (roster) return rosterPositionDeclarationLine(declarationKind, binding.name, roster);
+	const count = (input.semanticGraph.elementRosterCounts ?? []).find(
+		(record) =>
+			record.computedGraphNodeId === binding.id && record.componentName === componentName,
+	);
+	if (count) return rosterCountDeclarationLine(declarationKind, binding.name, count);
 	// No instance local exists here; rebuild it from the graph, as the residue readers do.
 	const prelude = sharedInstancePreludeLines(
 		input.semanticGraph,
@@ -313,6 +319,24 @@ function rosterPositionDeclarationLine(
 	return `${declarationKind} ${name} = (marklessSsrRenderContext?.rosterPosition ?? ${unanswered})(${JSON.stringify(
 		record.rosterGraphNodeId,
 	)}, ${JSON.stringify(record.handleGraphNodeId)});`;
+}
+
+/**
+ * The server-render half of a roster count, asked and unanswered on the same
+ * terms as the position: standing in as a number would make every family render
+ * a count of zero and say nothing about it.
+ */
+function rosterCountDeclarationLine(
+	declarationKind: string,
+	name: string,
+	record: SemanticElementRosterCount,
+): string {
+	const unanswered = `(()=>{throw new Error(${JSON.stringify(
+		`MARKLESS_SSR_ROSTER_COUNT_UNANSWERED: ${record.computedGraphNodeId}`,
+	)});})`;
+	return `${declarationKind} ${name} = (marklessSsrRenderContext?.rosterCount ?? ${unanswered})(${JSON.stringify(
+		record.rosterGraphNodeId,
+	)});`;
 }
 
 function stateDeclarationLine(

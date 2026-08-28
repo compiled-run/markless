@@ -422,7 +422,7 @@ function collectElementHandleDeriveReads(graph: MutableSemanticGraphArtifact): v
 		for (const dependency of binding.dependencies ?? []) {
 			const handle = elementBindings.get(dependency.graphNodeId);
 			if (!handle) continue;
-			if (isRosterPositionRead(graph, binding, dependency.graphNodeId)) continue;
+			if (isRosterQueryRead(graph, binding, dependency.graphNodeId)) continue;
 			graph.diagnostics.push(
 				elementHandleDeriveReadDiagnostic({
 					handleName: handle.name,
@@ -436,16 +436,21 @@ function collectElementHandleDeriveReads(graph: MutableSemanticGraphArtifact): v
 }
 
 /**
- * The roster of a derive already admitted as a position query. Only the roster
- * node is exempt: the member handle is off the dependency list by then, so any
- * other handle a derive reads still reaches the refusal above.
+ * The roster of a derive already admitted as a position or a count query. Only
+ * the roster node is exempt: a position's member handle is off the dependency
+ * list by then, so any other handle a derive reads still reaches the refusal
+ * above.
  */
-function isRosterPositionRead(
+function isRosterQueryRead(
 	graph: MutableSemanticGraphArtifact,
 	binding: SemanticGraphBinding,
 	graphNodeId: string,
 ): boolean {
-	return (graph.elementRosterPositions ?? []).some(
+	const records = [
+		...(graph.elementRosterPositions ?? []),
+		...(graph.elementRosterCounts ?? []),
+	];
+	return records.some(
 		(record) =>
 			record.computedGraphNodeId === binding.id &&
 			record.componentName === binding.componentName &&

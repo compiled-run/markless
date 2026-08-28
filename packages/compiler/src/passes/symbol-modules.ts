@@ -12,6 +12,7 @@ import type {
 	PlannedSymbolCrossModuleInline,
 	RenderDataArtifact,
 	RenderDataBranch,
+	SemanticElementRosterCount,
 	SemanticElementRosterPosition,
 	SemanticGraphArtifact,
 	SemanticMarkupChunk,
@@ -3301,6 +3302,7 @@ function syncComputedDeriveStatements(
 		captureSlots,
 		wrappedSource,
 		symbol.rosterPosition,
+		symbol.rosterCount,
 	);
 
 	const declarationStatements = (parsed?.declarations ??
@@ -3386,17 +3388,25 @@ function rewriteDeriveReads(
 	captureSlots: ReadonlyArray<CaptureSlot>,
 	wrappedSource: string,
 	rosterPosition?: SemanticElementRosterPosition,
+	rosterCount?: SemanticElementRosterCount,
 ): void {
-	if (dependencies.length === 0 && !rosterPosition) return;
+	if (dependencies.length === 0 && !rosterPosition && !rosterCount) return;
 
 	const visit = (
 		node: AnyNode,
 		parent: AnyNode | undefined,
 		replace: ((next: EmissionNode) => void) | null,
 	): void => {
-		if (replace && rosterPosition && nodeText(node, wrappedSource) === rosterPosition.source) {
-			replace(rosterPositionNode(rosterPosition));
-			return;
+		if (replace && (rosterPosition || rosterCount)) {
+			const text = nodeText(node, wrappedSource);
+			if (rosterPosition && text === rosterPosition.source) {
+				replace(rosterPositionNode(rosterPosition));
+				return;
+			}
+			if (rosterCount && text === rosterCount.source) {
+				replace(rosterCountNode(rosterCount));
+				return;
+			}
 		}
 		const dependency = matchingDependency(node, parent, dependencies, wrappedSource);
 		if (dependency && replace) {
@@ -3493,6 +3503,17 @@ function rosterPositionNode(record: SemanticElementRosterPosition): EmissionNode
 	return callNode(memberChainNode('context.rosterPosition'), [
 		literalNode(record.rosterGraphNodeId),
 		literalNode(record.handleGraphNodeId),
+	]);
+}
+
+/**
+ * `context.rosterCount("<roster node>")` — how many parts the family instance
+ * has, answered at server render from the count it emitted and after resume from
+ * the roster's live membership.
+ */
+function rosterCountNode(record: SemanticElementRosterCount): EmissionNode {
+	return callNode(memberChainNode('context.rosterCount'), [
+		literalNode(record.rosterGraphNodeId),
 	]);
 }
 

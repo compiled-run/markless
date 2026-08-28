@@ -89,7 +89,7 @@ export function collectElementRosterPositions(state: WalkState): void {
 	if (records.length > 0) graph.elementRosterPositions = records;
 }
 
-function replaceDependencies(
+export function replaceDependencies(
 	bindings: SemanticGraphBinding[],
 	owner: SemanticGraphBinding,
 	dependencies: ReadonlyArray<SemanticGraphDependency>,
@@ -139,16 +139,7 @@ type PositionQuery = {
  * declared element type, and it is not a different question.
  */
 function positionQueryExpression(body: AnyNode | undefined): PositionQuery | null {
-	if (!body) return null;
-	if (body.type !== 'ArrowFunctionExpression' && body.type !== 'FunctionExpression') return null;
-	if (body.async === true || asNodes(body.params).length > 0) return null;
-
-	const inner = body.body as AnyNode | undefined;
-	if (!inner) return null;
-	const call =
-		inner.type === 'BlockStatement'
-			? singleReturnArgument(inner)
-			: (inner as AnyNode | undefined);
+	const call = deriveQueryExpression(body);
 	if (call?.type !== 'CallExpression' || call.optional === true) return null;
 
 	const callee = call.callee as AnyNode | undefined;
@@ -164,6 +155,22 @@ function positionQueryExpression(body: AnyNode | undefined): PositionQuery | nul
 	if (member.type !== 'Identifier') return null;
 
 	return { call, roster, member };
+}
+
+/**
+ * The one expression a derive body evaluates to, or null if the body is anything
+ * more than that. Both admitted roster queries are whole-body queries, because
+ * the SSR half replaces the declaration rather than an inner span.
+ */
+export function deriveQueryExpression(body: AnyNode | undefined): AnyNode | null {
+	if (!body) return null;
+	if (body.type !== 'ArrowFunctionExpression' && body.type !== 'FunctionExpression') return null;
+	if (body.async === true || asNodes(body.params).length > 0) return null;
+
+	const inner = body.body as AnyNode | undefined;
+	if (!inner) return null;
+	const expression = inner.type === 'BlockStatement' ? singleReturnArgument(inner) : inner;
+	return expression ?? null;
 }
 
 function singleReturnArgument(block: AnyNode): AnyNode | undefined {

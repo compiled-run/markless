@@ -193,6 +193,11 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 			: (input.semanticGraph.elementRosterPositions ?? []).find(
 					(record) => record.computedGraphNodeId === computed.graphNodeId,
 				);
+		const rosterCount = computed.async
+			? undefined
+			: (input.semanticGraph.elementRosterCounts ?? []).find(
+					(record) => record.computedGraphNodeId === computed.graphNodeId,
+				);
 
 		symbols.push({
 			id: `symbol:${nextSymbolId++}`,
@@ -204,6 +209,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 				? { dependencies: computed.dependencies }
 				: {}),
 			...(rosterPosition ? { rosterPosition } : {}),
+			...(rosterCount ? { rosterCount } : {}),
 			...(moduleImports.length > 0 ? { moduleImports } : {}),
 		});
 	}

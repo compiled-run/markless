@@ -827,6 +827,26 @@ export type SemanticElementRosterPosition = {
 	readonly sourceSpan?: SourceSpan;
 };
 
+/**
+ * The second derive-time handle read the compiler answers: how many parts the
+ * family instance has. Same reason as the position — the count is render order,
+ * which the framework knows on both sides — and no member handle is needed, so
+ * the root or any part may ask.
+ */
+export type SemanticElementRosterCount = {
+	/** The `computed()` whose whole body is the count query. */
+	readonly computedGraphNodeId: string;
+	readonly computedName: string;
+	/** The component that declared the derive. */
+	readonly componentName: string;
+	/** The plural element() handle being counted. */
+	readonly rosterGraphNodeId: string;
+	readonly rosterSource: string;
+	/** The authored `roster.length` this replaces, matched verbatim when lowering. */
+	readonly source: string;
+	readonly sourceSpan?: SourceSpan;
+};
+
 export type SemanticBehavior = {
 	readonly hostNodeId: string;
 	readonly source: string;
@@ -1051,6 +1071,8 @@ export type SemanticGraphArtifact = {
 	// Omitted when empty: a module with no roster-position derive carries no key
 	// for one, so every artifact that predates this record is byte-unchanged.
 	readonly elementRosterPositions?: ReadonlyArray<SemanticElementRosterPosition>;
+	// Omitted when empty, for the same byte-equality reason as the positions above.
+	readonly elementRosterCounts?: ReadonlyArray<SemanticElementRosterCount>;
 	readonly localBindings: ReadonlyArray<SemanticLocalBinding>;
 	readonly localDeclarations: ReadonlyArray<SemanticLocalDeclaration>;
 	readonly aliases: ReadonlyArray<SemanticGraphAlias>;
@@ -1523,6 +1545,8 @@ export type PlannedSymbol =
 			// Present when the whole body is a roster position query, which lowers to
 			// one call instead of to graph reads of two DOM locators.
 			readonly rosterPosition?: SemanticElementRosterPosition;
+			// Present when the whole body is a roster count query.
+			readonly rosterCount?: SemanticElementRosterCount;
 	  }
 	| {
 			readonly id: string;
