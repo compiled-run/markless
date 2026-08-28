@@ -32,6 +32,7 @@ export const FAMILY_ANCHORS = {
 	select: '/#select',
 	modal: '/#modal',
 	'radio-group': '/#radio-group',
+	'rating-group': '/#rating-group',
 	tabs: '/#tabs',
 	popover: '/#popover',
 	slider: '/#slider',

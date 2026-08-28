@@ -1,4 +1,4 @@
-import * as ratinggroup from '../index.ts';
+import { ratinggroup } from '../../index.ts';
 
 // A group that already holds a rating, with the help text a form gives.
 export function Prefilled() @{

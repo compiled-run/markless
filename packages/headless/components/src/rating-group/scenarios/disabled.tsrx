@@ -1,4 +1,4 @@
-import * as ratinggroup from '../index.ts';
+import { ratinggroup } from '../../index.ts';
 
 // A group nobody may touch: out of the tab order, and every gesture ignored.
 export function Disabled() @{

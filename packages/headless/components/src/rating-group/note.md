@@ -106,22 +106,22 @@ things it measured are worth keeping:
 
 `rating-group.nvda.ts` and `rating-group.voiceover.ts` carry the row the virtual
 lane cannot: that a cumulative fill is heard as one checked mark among four
-unchecked ones. **They cannot run yet.** The gallery has no rating-group section
-and `FAMILY_ANCHORS` has no entry for it, so the anchor is a literal
-(`RATING_GROUP_ANCHOR` in `rating-group-transcript.ts`) rather than a read of the
-owning module. Adding the section, the anchor, and the swap to `FAMILY_ANCHORS`
-is the registration unit's work; neither lane was run here.
+unchecked ones. Both now read `FAMILY_ANCHORS['rating-group']` and walk the
+gallery's `#rating-group` section, whose first group is already rated 3 so the
+fill covers three marks. Neither reader lane has been run here: real readers need
+a VM or a CI runner, not a desktop.
 
-## Not registered yet
+## Registered
 
-`packages/headless/components/src/index.ts` does not export this family, so the
-scenarios import their own barrel:
+`src/index.ts` exports the family as `ratinggroup` — the hyphen-free spelling
+`radio-group` uses for `radiogroup` — and `package.json` carries
+`./ratinggroup`. The scenarios import the barrel the way a consumer does:
 
 ```ts
-import * as ratinggroup from '../index.ts';
+import { ratinggroup } from '../../index.ts';
 ```
 
-The call sites are the ones a consumer will write. Registration adds
-`export * as ratinggroup from './rating-group/index.ts'` — the hyphen-free
-spelling `radio-group` uses for `radiogroup` — after which the scenarios can
-switch to `import { ratinggroup } from '../../index.ts'`.
+`api/manifest.json` describes the family, the conformance battery carries a
+`rating-group` descriptor, the gallery serves `#rating-group`, and the three
+reader matrices name it. See
+`goals/headless-components/notes/U695-rating-group-registration.md`.

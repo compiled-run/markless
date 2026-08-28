@@ -27,6 +27,7 @@ import Popover from '../src/popover/scenarios/basic.tsrx';
 import Progress from '../src/progress/scenarios/basic.tsrx';
 import QrCode from '../src/qr-code/scenarios/basic.tsrx';
 import { Basic as RadioGroup } from '../src/radio-group/scenarios/basic.tsrx';
+import { Basic as RatingGroup } from '../src/rating-group/scenarios/basic.tsrx';
 import { Basic as Select } from '../src/select/scenarios/basic.tsrx';
 import Slider from '../src/slider/scenarios/basic.tsrx';
 import Tabs from '../src/tabs/scenarios/basic.tsrx';
@@ -606,6 +607,20 @@ const descriptors: readonly FamilyDescriptor[] = [
 			'lifetime-label',
 		],
 		rootAria: { role: 'radiogroup' },
+		supportsDisabled: true,
+	},
+	{
+		family: 'rating-group',
+		mount: { CSR: () => render(RatingGroup), SSR: () => renderSSR(RatingGroup) },
+		root: 'root',
+		// The five marks are one repeat under a single `star` testid, which is what
+		// the family's own suite counts them by, so the wrapper is the part a
+		// one-element-per-testid list can name.
+		parts: ['root', 'label', 'stars', 'valuelabel'],
+		rootAria: { role: 'radiogroup' },
+		// How many marks there are and where the rating sits are numbers a consumer
+		// styles against, so they are key-value by design rather than presence marks.
+		valuedAttributes: ['ui-count', 'ui-value'],
 		supportsDisabled: true,
 	},
 	{

@@ -1,4 +1,4 @@
-import * as ratinggroup from '../index.ts';
+import { ratinggroup } from '../../index.ts';
 
 // Help text and a validation message. The second group writes its error BEFORE
 // the marks, because document order must not decide what the group describes

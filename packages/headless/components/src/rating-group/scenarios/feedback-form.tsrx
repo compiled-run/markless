@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as ratinggroup from '../index.ts';
+import { ratinggroup } from '../../index.ts';
 
 // The feedback form a checkout has: a real form, a required rating, and an
 // output that writes what the browser itself put in the FormData.
