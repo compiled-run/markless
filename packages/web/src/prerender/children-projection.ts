@@ -1,3 +1,4 @@
+import { marklessSsrEscape } from '../fns/html.ts';
 import type { PrerenderDataDefinition, PrerenderDataSurface } from './evaluator.ts';
 
 type ProjectionEdge = NonNullable<PrerenderDataDefinition['edges']>[number];
@@ -56,14 +57,37 @@ export function renderedWidgetRootsOf(
 	return [...new Set([...widgetRootsOf(surface, componentName), ...composed])];
 }
 
+// The escaper's own table, read back off it, so the decode cannot drift from the
+// escape it inverts. The CSR twin of the compiler's `projection-text.ts`.
+const DECODED_BY_ENTITY = new Map(
+	Array.from({ length: 128 }, (_, code) => String.fromCharCode(code))
+		.map((character) => [marklessSsrEscape(character), character] as const)
+		.filter(([entity, character]) => entity !== character),
+);
+
+const ENTITY_PATTERN = new RegExp([...DECODED_BY_ENTITY.keys()].join('|'), 'g');
+
 /**
- * The `children` one placed child's projection already has BEFORE it renders.
+ * The text a projection's compiled statics render as: tags dropped, entities
+ * decoded in one left-to-right pass, never chained replacements — authored
+ * `&lt;` is `&amp;lt;` in the statics and must decode back to `&lt;`, not to
+ * `<`. The CSR twin of the compiler's `projectionTextContent`.
+ */
+function projectionTextContent(statics: ReadonlyArray<string>): string {
+	return statics
+		.join('')
+		.replaceAll(/<[^>]*>/g, '')
+		.replaceAll(ENTITY_PATTERN, (entity) => DECODED_BY_ENTITY.get(entity) ?? entity);
+}
+
+/**
+ * The text content one placed child's projection already has BEFORE it renders.
  * The seed pass runs ahead of the projection, so a part that seeds from
- * `children` normally sees undefined; a projection of static text alone is
- * spelled in the chunk's statics and is therefore the exact string the render
- * will hand that part. Anything with an element or a read has no value until it
- * renders, and returns nothing. The CSR twin of the compiler's
- * `staticProjectionChildren`, over the same build-time chunks.
+ * `children` normally sees undefined; a projection spelled entirely in the
+ * chunk's statics — plain text, or markup carrying no expression — is known this
+ * early. A slot is the line: it has no value until it renders, and returns
+ * nothing. The CSR twin of the compiler's `staticProjectionChildren`, over the
+ * same build-time chunks.
  */
 export function staticProjectionChildren(
 	surface: PrerenderDataSurface,
@@ -81,8 +105,8 @@ export function staticProjectionChildren(
 	)[0];
 	if (projectionChunkId === undefined) return undefined;
 	const projection = chunks.find((chunk) => chunk.id === projectionChunkId);
-	if (!projection || projection.hosts.length > 0 || projection.slots.length > 0) return undefined;
-	return projection.statics.join('');
+	if (!projection || projection.slots.length > 0) return undefined;
+	return projectionTextContent(projection.statics);
 }
 
 // The surface that publishes a placed child: its own module when the child is
