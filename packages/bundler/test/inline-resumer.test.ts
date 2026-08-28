@@ -27,6 +27,8 @@ test('Rolldown OXC deterministically minifies the typed event-only resumer', asy
 	expect(first.event).not.toContain('inline-resumer');
 	expect(first.event).not.toContain('router-delegation');
 	expect(first.event).not.toContain('MARKLESS_DEBUG_');
+	// The budget is the sum of a per-feature attribution: over budget means a
+	// feature landed without a line, not that the number should go up.
 	expect(gzipSync(first.event, { level: 9 }).length).toBeLessThanOrEqual(
 		EVENT_ONLY_RESUMER_TARGET_BYTES,
 	);
