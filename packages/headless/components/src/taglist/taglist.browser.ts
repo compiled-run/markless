@@ -499,6 +499,41 @@ for (const mode of MODES) {
 		await expect.poll(() => editFor('draft').hidden).toBe(false);
 	});
 
+	// The other focus regime: DOM focus is on the tag's delete button, so Enter and
+	// Space are that button's own activation and F2 is the key left for opening an
+	// edit. The three rows below are that route and the two things it must not take.
+	test(`${mode}: F2 on a tag under the walk opens its own field with its words in it`, async () => {
+		if (mode === 'CSR') await render(Editable);
+		else await renderSSR(Editable);
+
+		closeFor('draft').focus();
+		await expect.poll(() => at('item-draft').hasAttribute('ui-highlighted')).toBe(true);
+		await userEvent.keyboard('{F2}');
+		await expect.poll(() => editFor('draft').hidden).toBe(false);
+		await expect.poll(() => document.activeElement).toBe(editFor('draft'));
+		expect(editFor('draft').value).toBe('draft');
+	});
+
+	test(`${mode}: enter on a focused delete button removes the tag instead of opening it`, async () => {
+		if (mode === 'CSR') await render(Editable);
+		else await renderSSR(Editable);
+
+		closeFor('draft').focus();
+		await userEvent.keyboard('{Enter}');
+		await expect.poll(() => el(Held).textContent).toBe('review');
+	});
+
+	test(`${mode}: F2 opens nothing on a row that mounts no edit field`, async () => {
+		if (mode === 'CSR') await render(DisplayOnly);
+		else await renderSSR(DisplayOnly);
+
+		closeFor('green').focus();
+		await expect.poll(() => at('item-green').hasAttribute('ui-highlighted')).toBe(true);
+		await userEvent.keyboard('{F2}');
+		await expect.poll(() => at('item-green').hasAttribute('ui-editing')).toBe(false);
+		expect(el(Held).textContent).toBe('red|green|blue');
+	});
+
 	test(`${mode}: an edit field is hidden until its own tag is the one being edited`, async () => {
 		if (mode === 'CSR') await render(Editable);
 		else await renderSSR(Editable);

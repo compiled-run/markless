@@ -33,9 +33,10 @@ export type TagListRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	 */
 	readonly delimiter?: string;
 	/**
-	 * A tag can be opened for editing in place: Enter on a highlighted tag, or a
-	 * double-click on the tag itself. Off by default, like every other
-	 * behavioural boolean in this package.
+	 * A tag can be opened for editing in place: Enter on a highlighted tag while
+	 * the caret is in the field, F2 on a tag that has focus, or a double-click on
+	 * the tag itself. Off by default, like every other behavioural boolean in this
+	 * package.
 	 */
 	readonly editable?: boolean;
 	/** Submitted under this name by `taglist.field`, one entry per tag. */
