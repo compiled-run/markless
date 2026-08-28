@@ -103,7 +103,7 @@ export function emitSameModuleSsrComponents(
 			']);',
 			localName ? `const ${localName} = { renderSsr: ${functionName} };` : null,
 			`async function ${functionName}(props = {}, marklessSsrRenderContext) {`,
-			destructureProps(rootInfo.propNames, rootInfo.component, input.source.source),
+			destructureProps(rootInfo.propNames, rootInfo.component, input.source.source, input.source.filename),
 			...sharedSeedPassLines(
 				componentSharedSeeds(input, componentName),
 				valuesName,

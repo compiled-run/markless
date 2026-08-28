@@ -34,8 +34,19 @@ export function authoredResidueSources(chunks: RenderChunks): ReadonlyArray<stri
 
 // One case per authored expression, keyed by the authored source text that the
 // render data carries as the residue's identity.
-export function authoredResidueReadCases(sources: ReadonlyArray<string>): string[] {
-	return sources.map((source) => `case ${JSON.stringify(source)}:return (${source});`);
+/**
+ * The case LABEL stays authored: it is the id `renderData` names the residue by,
+ * and rewriting it would stop the switch matching. Only the returned expression
+ * is stripped, and only when a caller asks (the SSR module, which is loaded as
+ * JavaScript). The client reader ships through the bundler's own strip.
+ */
+export function authoredResidueReadCases(
+	sources: ReadonlyArray<string>,
+	strip?: (source: string) => string,
+): string[] {
+	return sources.map(
+		(source) => `case ${JSON.stringify(source)}:return (${strip ? strip(source) : source});`,
+	);
 }
 
 /**

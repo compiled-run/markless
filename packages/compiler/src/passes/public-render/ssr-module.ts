@@ -1,4 +1,5 @@
 import { parseModule } from '../../js-ast.ts';
+import { stripAuthoredExpression, stripAuthoredStatements } from './authored-strip.ts';
 import {
 	protocolElementHandleReadId,
 	type ProtocolBranchIdrefSite,
@@ -192,7 +193,14 @@ export function emitPublicSsrRenderModule(
 	);
 	const asyncRunnerDefinitions = collectSsrAsyncRunnerDefinitions(input);
 	const hasAsyncDependencyRegistry = asyncRunnerDefinitions.size > 0;
-	const moduleScope = moduleScopeLines(input.source.source, input.source.filename);
+	// The SSR module is loaded as JavaScript, so a carried module-scope
+	// declaration is reprinted without its types rather than spliced verbatim.
+	const moduleScope = moduleScopeLines(input.source.source, input.source.filename).map((line) =>
+		stripAuthoredStatements(line, {
+			filename: input.source.filename,
+			what: 'a module-scope declaration carried into the SSR module',
+		}),
+	);
 	// A factory expression copied out of another file arrives with that file's
 	// scope stripped off; this is the part of it the copy still names.
 	const foreignScope = foreignSharedComputedScope(input);
@@ -241,7 +249,7 @@ export function emitPublicSsrRenderModule(
 		// (T107): renderToStream threads it through child renders and async
 		// runners. Omitted = exact blocking behavior.
 		'async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {',
-		destructureProps(rootInfo.propNames, rootInfo.component, input.source.source),
+		destructureProps(rootInfo.propNames, rootInfo.component, input.source.source, input.source.filename),
 		...sharedSeedPassLines(
 			componentSharedSeeds(input, rootInfo.componentName),
 			'marklessSsrStateValues',
@@ -648,7 +656,12 @@ function emitSsrDataLines(
 				)}), ${JSON.stringify(path)})`,
 		),
 	];
-	const readCases = authoredResidueReadCases(residueSources);
+	const stripSpan = (what: string) => (span: string) =>
+		stripAuthoredExpression(span, { filename: input.source.filename, what });
+	const readCases = authoredResidueReadCases(
+		residueSources,
+		stripSpan('an authored residue expression'),
+	);
 	// Pay-per-use: a module with no IDREF record emits no mint at all, so the
 	// shared renderer never carries one for the pages that never ask for an id.
 	const handleIds = elementHandleIdSources(chunks);
@@ -660,7 +673,9 @@ function emitSsrDataLines(
 			const testRead = branch.testReads.length === 1 ? branch.testReads[0] : undefined;
 			const testSource = testRead
 				? `marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(${JSON.stringify(testRead.graphNodeId)}),${JSON.stringify(testRead.path)})`
-				: branch.testSource;
+				: branch.testSource === undefined
+					? undefined
+					: stripSpan('a branch arm test')(branch.testSource);
 			return [
 				branch.branchSiteId,
 				{
@@ -717,7 +732,11 @@ function emitSsrDataLines(
 							`case ${JSON.stringify(repeat.repeatId)}:return marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(${JSON.stringify(repeat.collectionGraphNodeId)}),${JSON.stringify(repeat.collectionPath)});`,
 						]
 					: repeat.collectionSource
-						? [`case ${JSON.stringify(repeat.repeatId)}:return (${repeat.collectionSource});`]
+						? [
+								`case ${JSON.stringify(repeat.repeatId)}:return (${stripSpan(
+									'a repeat collection',
+								)(repeat.collectionSource)});`,
+							]
 						: // Neither source of rows: no case, so the callback's default throw
 							// names the repeat instead of rendering an empty list.
 							[],
@@ -845,7 +864,14 @@ function emitSsrDataLines(
 				return [
 					`${objectPropertyName(prop.name)}:${elementHandleIdSource(prop.graphNodeId)}`,
 				];
-			return prop.source ? [`${objectPropertyName(prop.name)}:(${prop.source})`] : [];
+			return prop.source
+				? [
+						`${objectPropertyName(prop.name)}:(${stripAuthoredExpression(prop.source, {
+							filename: input.source.filename,
+							what: "a child component's authored prop value",
+						})})`,
+					]
+				: [];
 		});
 		const projectionChunkId = chunks.flatMap((chunk) =>
 			chunk.slots.flatMap((slot) =>

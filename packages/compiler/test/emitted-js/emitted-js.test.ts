@@ -174,16 +174,100 @@ export function Root() @{
 });
 
 /**
- * The SSR module is NOT emitted through the symbol-module printer: it is
- * assembled as text by `public-render`, so authored TypeScript still survives
- * in it. That is covered downstream — the bundler runs `stripEmittedTypes` over
- * the whole source module before anything loads it — so this pin records the
- * seam that is still string-built rather than asserting a defect.
+ * The SSR module is still assembled as TEXT by `public-render` — the template
+ * around the spliced spans is hand-written and is NOT reprinted. What changed is
+ * the spans: each authored span is parsed as TypeScript and reprinted stripped
+ * before it is spliced, so the module is JavaScript without the template moving.
+ *
+ * A residue `case` LABEL is the exception, and deliberately: it is the id
+ * `renderData` names the residue by, so it stays authored (TypeScript and all)
+ * or the switch stops matching. It is a string literal, so it is data, exactly
+ * as `authoredSource` is above.
  */
-test('the SSR module is still string-built, so authored TypeScript survives in it', async () => {
+function ssrCode(source: string): string {
+	return source.replaceAll(/case "(?:[^"\\]|\\.)*":/g, 'case 0:');
+}
+
+test('the SSR module parses as JavaScript', async () => {
+	const compiled = await compile(BANDS_SOURCE);
+	expect(errors(compiled)).toEqual([]);
+
+	const ssr = ssrCode(compiled.publicRenderModule.ssrModuleSource);
+	expect(javaScriptDiagnostics(ssr), ssr).toEqual([]);
+});
+
+test.each([
+	['a carried module declaration', 'const BASE: Limit = WIDTH;', 'const BASE = WIDTH;'],
+	['an annotated parameter', '(label: string) =>', '(label) =>'],
+	["a prop's authored default", 'cap = WIDTH as Limit', 'cap = WIDTH'],
+	['a state initializer', '(BASE as number) + pick<Limit>(WIDTH)!', 'BASE + pick(WIDTH)'],
+	['a computed derive', '(g.x as number) * 2', 'g.x * 2'],
+	['an async runner', '(g.x satisfies Limit)', 'g.x'],
+])('%s reaches the SSR module stripped', async (_label, authored, stripped) => {
 	const compiled = await compile(BANDS_SOURCE);
 	const ssr = compiled.publicRenderModule.ssrModuleSource;
 
-	expect(ssr).toContain('const BASE: Limit = WIDTH;');
-	expect(javaScriptDiagnostics(ssr).length).toBeGreaterThan(0);
+	expect(ssr).not.toContain(authored);
+	expect(ssr).toContain(stripped);
+});
+
+/**
+ * A generic call is the shape the JavaScript-only parse cannot catch —
+ * `pick<Limit>(WIDTH)` parses clean as two comparisons — so it is pinned by its
+ * stripped text, as the symbol-module band above is.
+ */
+test('a generic call in an SSR span loses its type arguments', async () => {
+	const compiled = await compile(BANDS_SOURCE);
+	const ssr = compiled.publicRenderModule.ssrModuleSource;
+
+	expect(ssr).toContain('pick(WIDTH)');
+	expect(ssr).not.toContain('pick<Limit>');
+});
+
+/** The template around the spans is untouched: a TypeScript-free span is
+ * spliced byte-for-byte, so no SSR fixture reformats. */
+test('a TypeScript-free SSR span is spliced unchanged', async () => {
+	const compiled = await compile(`
+import { state } from '@markless/core';
+
+const STEP = 1;
+
+export function Root() @{
+	let count = state(0);
+
+	<button onClick={() => { count = count + STEP; }}>{count}</button>
+}
+`);
+	expect(errors(compiled)).toEqual([]);
+
+	const ssr = compiled.publicRenderModule.ssrModuleSource;
+	expect(ssr).toContain('const STEP = 1;');
+	expect(javaScriptDiagnostics(ssrCode(ssr)), ssr).toEqual([]);
+});
+
+/**
+ * A parameter property has no JavaScript form, so a module-scope class carrying
+ * one refuses by name rather than emitting an SSR module missing the assignment.
+ * The refusal names the construct AND the splice site it came from.
+ */
+test('an SSR span that cannot be reprinted refuses by name', async () => {
+	await expect(
+		compile(`
+import { state } from '@markless/core';
+
+class Rate {
+	constructor(private step: number) {}
+	read() { return this.step; }
+}
+const rate = new Rate(2);
+
+export function Root() @{
+	let count = state(rate.read());
+
+	<button onClick={() => { count = count + 1; }}>{count}</button>
+}
+`),
+	).rejects.toThrow(
+		/a module-scope declaration carried into the SSR module.*parameter properties cannot be stripped to JavaScript/s,
+	);
 });
