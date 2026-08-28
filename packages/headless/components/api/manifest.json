@@ -3087,30 +3087,30 @@
 			}
 		]
 	},
-	"ratinggroup": {
+	"rating": {
 		"parts": [
 			{
 				"part": "description",
-				"component": "RatingGroupDescription",
+				"component": "RatingDescription",
 				"doc": "Supporting text for the group, wired into the group's `aria-describedby`.",
 				"props": []
 			},
 			{
 				"part": "error",
-				"component": "RatingGroupError",
+				"component": "RatingError",
 				"doc": "The group's validation message, wired into the group's `aria-describedby`\nahead of the description, so what is wrong is conveyed before the hint.\nRender it only when there is something to say.",
 				"props": []
 			},
 			{
 				"part": "field",
-				"component": "RatingGroupField",
-				"doc": "The clipped native input that carries the rating into a form. It takes no\nconfiguration of its own: `name` comes from `ratinggroup.root`, so one place\ndecides what a form receives.",
+				"component": "RatingField",
+				"doc": "The clipped native input that carries the rating into a form. It takes no\nconfiguration of its own: `name` comes from `rating.root`, so one place\ndecides what a form receives.",
 				"props": []
 			},
 			{
 				"part": "item",
-				"component": "RatingGroupItem",
-				"doc": "One position. `role=\"radio\"` on the mark itself rather than a native input\nbeside it: a rating carries half values, and a radio cannot be half checked,\nso the number a form receives lives on `ratinggroup.field` alone.",
+				"component": "RatingItem",
+				"doc": "One position. `role=\"radio\"` on the mark itself rather than a native input\nbeside it: a rating carries half values, and a radio cannot be half checked,\nso the number a form receives lives on `rating.field` alone.",
 				"props": [
 					{
 						"name": "value",
@@ -3122,14 +3122,14 @@
 			},
 			{
 				"part": "label",
-				"component": "RatingGroupLabel",
+				"component": "RatingLabel",
 				"doc": "The group's name: the `role=\"radiogroup\"` element points its `aria-labelledby` here.",
 				"props": []
 			},
 			{
 				"part": "root",
-				"component": "RatingGroupRoot",
-				"doc": "A rating: one number chosen out of `count` positions, drawn as a run of\nfilled marks. Radiogroup semantics under the hood, but not a radio group -\nthe fill is cumulative rather than one checked member, a hover previews a\nvalue nobody has committed, and a position can be half filled.\n\nThe root owns the list. `count` decides how many positions there are, and\n`ratinggroup.state().positions` hands them back as `1 … count` for the\nconsumer's repeat: an item never takes an index, because a position derived\nfrom render order is not readable at render time today.",
+				"component": "RatingRoot",
+				"doc": "A rating: one number chosen out of `count` positions, drawn as a run of\nfilled marks. Radiogroup semantics under the hood, but not a radio group -\nthe fill is cumulative rather than one checked member, a hover previews a\nvalue nobody has committed, and a position can be half filled.\n\nThe root owns the list. `count` decides how many positions there are, and\n`rating.state().positions` hands them back as `1 … count` for the\nconsumer's repeat: an item never takes an index, because a position derived\nfrom render order is not readable at render time today.",
 				"props": [
 					{
 						"name": "value",
@@ -3184,7 +3184,7 @@
 						"type": "string",
 						"required": false,
 						"default": "''",
-						"doc": "The name `ratinggroup.field` submits under. Omit it and the group submits nothing."
+						"doc": "The name `rating.field` submits under. Omit it and the group submits nothing."
 					},
 					{
 						"name": "onChange",
@@ -3196,7 +3196,7 @@
 			},
 			{
 				"part": "valuelabel",
-				"component": "RatingGroupValueLabel",
+				"component": "RatingValueLabel",
 				"doc": "The rating as text - `3 of 5`, and `0 of 5` when nothing is rated. It takes\nno children: a consumer who wants their own wording writes their own element\nand reads `ui-value` off it.",
 				"props": []
 			}

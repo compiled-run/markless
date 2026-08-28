@@ -33,7 +33,7 @@ async function expectAnnouncesFocused(conveys: Conveys) {
  * Whether anything the reader has said since the log was cleared conveys the
  * facts asked for.
  *
- * The last phrase will not do here: `ratinggroup.valuelabel` is an `<output>`,
+ * The last phrase will not do here: `rating.valuelabel` is an `<output>`,
  * which is a polite live region, so every rating change is followed by the
  * reader repeating the readout - and that phrase, not the mark's, is what
  * `lastSpokenPhrase()` answers with.
