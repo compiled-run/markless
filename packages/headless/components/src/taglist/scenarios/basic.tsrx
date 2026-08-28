@@ -1,8 +1,5 @@
 import { state } from '@markless/core';
-// Registration is a follow-up unit, so the barrel has no `taglist` export yet.
-// This is the same namespace object `import { taglist } from '../../index.ts'`
-// will hand back once it does.
-import * as taglist from '../index.ts';
+import { taglist } from '../../index.ts';
 
 // The starter a consumer copies: a named field, two tags already committed, a
 // delete button on each, and the hidden inputs that carry them into a form.

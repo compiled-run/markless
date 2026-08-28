@@ -36,6 +36,7 @@ copies — one section each, on an anchor a driver can be sent to:
 | colorpicker            | `/#colorpicker`            |
 | buttongroup            | `/#buttongroup`            |
 | editable               | `/#editable`               |
+| taglist                | `/#taglist`                |
 | numberbox              | `/#numberbox`              |
 | numberbox-min-max-step | `/#numberbox-min-max-step` |
 | numberbox-currency     | `/#numberbox-currency`     |

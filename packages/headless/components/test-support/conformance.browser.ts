@@ -32,6 +32,7 @@ import { Basic as RatingGroup } from '../src/rating-group/scenarios/basic.tsrx';
 import { Basic as Select } from '../src/select/scenarios/basic.tsrx';
 import Slider from '../src/slider/scenarios/basic.tsrx';
 import Tabs from '../src/tabs/scenarios/basic.tsrx';
+import TagList from '../src/taglist/scenarios/basic.tsrx';
 import Textbox from '../src/textbox/scenarios/basic.tsrx';
 import Toaster from '../src/toaster/scenarios/basic.tsrx';
 import Toggle from '../src/toggle/scenarios/basic.tsrx';
@@ -698,6 +699,22 @@ const descriptors: readonly FamilyDescriptor[] = [
 			'billing-content',
 		],
 		rootAria: { role: null },
+		supportsDisabled: true,
+	},
+	{
+		family: 'taglist',
+		mount: { CSR: () => render(TagList), SSR: () => renderSSR(TagList) },
+		root: 'root',
+		// The chips are the consumer's own markup keyed by each tag's words, so
+		// their testids carry a value and are not fixed part names; what is named
+		// here is what the family itself puts on the page at rest.
+		parts: ['root', 'label', 'input', 'field'],
+		// No openCycle: the row has no surface, and the edit field a tag can open
+		// is `hidden` in the same room rather than a thing a trigger expands.
+		rootAria: { role: 'group', 'aria-disabled': null },
+		// The tag's own words, which is the identity every part inside a chip is
+		// keyed by; every other mark this family writes is presence.
+		valuedAttributes: ['ui-value'],
 		supportsDisabled: true,
 	},
 	{

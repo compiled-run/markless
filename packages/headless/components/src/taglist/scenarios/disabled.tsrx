@@ -1,8 +1,5 @@
 import { state } from '@markless/core';
-// Registration is a follow-up unit, so the barrel has no `taglist` export yet.
-// This is the same namespace object `import { taglist } from '../../index.ts'`
-// will hand back once it does.
-import * as taglist from '../index.ts';
+import { taglist } from '../../index.ts';
 
 // Nobody may change this list. The field and every delete button refuse, and the
 // refusal is the native `disabled` attribute rather than a handler that shrugs.

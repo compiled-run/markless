@@ -51,6 +51,7 @@ export const FAMILY_ANCHORS = {
 	colorpicker: '/#colorpicker',
 	buttongroup: '/#buttongroup',
 	editable: '/#editable',
+	taglist: '/#taglist',
 	numberbox: '/#numberbox',
 	'numberbox-min-max-step': '/#numberbox-min-max-step',
 	'numberbox-currency': '/#numberbox-currency',
