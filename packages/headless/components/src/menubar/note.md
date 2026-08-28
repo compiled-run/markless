@@ -102,7 +102,7 @@ renders `tabindex="0"` while `entered` is false, every trigger renders `-1`, and
 the first `focusin` hands focus straight to the trigger holding `active` and
 drops the bar out of the tab order for good.
 
-That is a deliberate divergence from the retired flag, which used togglegroup's
+That is a deliberate divergence from the retired flag, which used buttongroup's
 rule (every bar item tabbable until a focus says otherwise) and therefore offered
 three tab stops on a cold page. One is right.
 

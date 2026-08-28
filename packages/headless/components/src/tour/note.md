@@ -112,7 +112,7 @@ tour's length.
   **`numberbox` has the same collision unfixed**, at `NumberboxBackTrigger` and
   `NumberboxForwardTrigger`.
 - **A component may only forward-reference another same-module component from the
-  module's first component.** `progress`, `radio-group`, `togglegroup` and
+  module's first component.** `progress`, `radio-group`, `buttongroup` and
   `datebox` all declare their inner part immediately after the root, which is the
   module's first component, and compile. With `tour.item` sitting fourth,
   rendering a `TourCard` declared below it fails at module evaluation with
