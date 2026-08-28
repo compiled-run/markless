@@ -53,6 +53,7 @@ export function CollapsibleRoot({
 
 	<div
 		{...rest}
+		aria-live="polite"
 		ui-open={collapsible.open}
 		ui-closed={collapsible.open !== true}
 		ui-disabled={collapsible.disabled}
@@ -67,6 +68,7 @@ export function CollapsibleTrigger({ children, onClick, ...rest }: CollapsibleTr
 		{...rest}
 		el={collapsible.triggerEl}
 		type="button"
+		aria-disabled={collapsible.disabled ? 'true' : 'false'}
 		aria-expanded={collapsible.open ? 'true' : 'false'}
 		aria-controls={collapsible.contentEl}
 		disabled={collapsible.disabled}

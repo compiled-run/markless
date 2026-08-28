@@ -231,6 +231,9 @@ export async function resumeFullEventOnly(
 	});
 	await runtime.dispatch(input.event, {
 		syncPolicyAlreadyApplied: input.syncPolicyAlreadyApplied === true,
+		// Escalation reaches here for a record-less forward too, which is the entry
+		// capture's broad sweep and passes through the live listener the same way.
+		ignoreUnmatched: input.eventRecord == null,
 	});
 	return undefined as unknown as EventOnlyResumeContainer;
 }
@@ -376,6 +379,7 @@ function decodeScalarSlot(slot: SerializedSlot | undefined): unknown {
 	if (!slot || !('$type' in slot)) return undefined;
 	if (slot.$type === 'undefined') return undefined;
 	if (slot.$type === 'bigint') return BigInt(slot.value);
+	if (slot.$type === 'number') return Number(slot.value);
 	if (slot.$type === 'date') return new Date(slot.value);
 	return undefined;
 }

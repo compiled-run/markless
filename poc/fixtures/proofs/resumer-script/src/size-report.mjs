@@ -1,7 +1,7 @@
 import { gzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { minifySync } from 'rolldown/experimental';
-import { EVENT_ONLY_RESUMER_TARGET_BYTES, eventOnlyResumerSource } from './resumer-source.mjs';
+import { POC_EVENT_ONLY_RESUMER_TARGET_BYTES, eventOnlyResumerSource } from './resumer-source.mjs';
 
 export function measureEventOnlyResumer() {
 	const source = eventOnlyResumerSource();
@@ -15,11 +15,11 @@ export function measureEventOnlyResumer() {
 	const minified = result.code;
 	const gzipBytes = gzipSync(minified, { level: 9 }).length;
 	return {
-		targetBytes: EVENT_ONLY_RESUMER_TARGET_BYTES,
+		targetBytes: POC_EVENT_ONLY_RESUMER_TARGET_BYTES,
 		rawBytes: byteLength(source),
 		minifiedBytes: byteLength(minified),
 		gzipBytes,
-		withinTarget: gzipBytes <= EVENT_ONLY_RESUMER_TARGET_BYTES,
+		withinTarget: gzipBytes <= POC_EVENT_ONLY_RESUMER_TARGET_BYTES,
 		minified,
 	};
 }

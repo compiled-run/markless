@@ -1,0 +1,21 @@
+# MARKLESS_TEMPLATE_READ_UNDECLARED
+
+Template read is not declared in render scope
+
+- Package: compiler
+- Pass or phase: public-render
+- Severity: error
+
+## Message
+
+TODO: this code has no builder message in source.
+
+## Why
+
+Public CSR and SSR render modules execute template expressions directly during initial render. An identifier that is not declared in the emitted render scope would crash instead of rendering HTML.
+
+## Emitted from
+
+- `packages/compiler/src/passes/public-render/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

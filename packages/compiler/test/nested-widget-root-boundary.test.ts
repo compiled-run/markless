@@ -101,7 +101,7 @@ test("the outer root's seed pass guards every part against a nested root of its 
 
 	// The outer root asks its own module surface which families it started, then
 	// guards each part against a child that roots one of them.
-	expect(outerCase).toContain('const marklessSsrWidgetFamilies=marklessSsrWidgetRoots(');
+	expect(outerCase).toContain('const marklessSsrWidgetFamilies=[...marklessSsrWidgetRoots(');
 	expect(outerCase).toContain('!marklessSsrWidgetBoundary(marklessSsrWidgetFamilies,');
 	// The root's OWN seed still runs first and unguarded.
 	expect(outerCase.indexOf('marklessSharedSeeds:marklessSsrSeeds')).toBeLessThan(
@@ -110,6 +110,40 @@ test("the outer root's seed pass guards every part against a nested root of its 
 	// The nested root has a seed case of its own, with its own instance token.
 	expect(seedChild).toContain('case "component-edge:2"');
 	expect(seedChild).toContain('marklessSsrIdPrefix+"c0:p2:"');
+});
+
+// A projecting PART roots nothing, so asking only ITS families answered an empty
+// set and every guard under it went dead - a root written into the part's own
+// children seeded the enclosing instance, overwriting the seed its root wrote.
+const rootInsidePart = `${family}
+export function Page() @{
+	<section>
+		<Root label="one">
+			<Trigger />
+			<Err>
+				<Root label="two">
+					<Trigger />
+				</Root>
+			</Err>
+		</Root>
+	</section>
+}
+`;
+
+test("a part's own seed case reads the families of the widget enclosing it", async () => {
+	const seedChild = seedChildSource(await compile(rootInsidePart));
+	const partEdgeId = 'component-edge:2';
+	const partCase = seedChild.slice(
+		seedChild.indexOf(`case "${partEdgeId}"`),
+		seedChild.indexOf('case "component-edge:3"'),
+	);
+
+	expect(partCase).not.toBe('');
+	// Its own surface answers nothing, so the enclosing root's surface is asked too.
+	expect(partCase).toContain('const marklessSsrWidgetFamilies=[...marklessSsrWidgetRoots(');
+	expect(partCase.split('...marklessSsrWidgetRoots(').length - 1).toBeGreaterThan(1);
+	// With a family in scope the nested root is recognised and its seed is guarded.
+	expect(partCase).toContain('!marklessSsrWidgetBoundary(marklessSsrWidgetFamilies,');
 });
 
 test('a part under a nested root is guarded by the nested root, not only by itself', () => {

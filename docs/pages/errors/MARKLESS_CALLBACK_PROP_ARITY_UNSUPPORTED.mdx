@@ -1,0 +1,21 @@
+# MARKLESS_CALLBACK_PROP_ARITY_UNSUPPORTED
+
+Callback props accept at most one parameter
+
+- Package: compiler
+- Pass or phase: semantic-graph
+
+## Message
+
+Callback prop `…` is unsupported because …. Lazy callback symbols accept zero parameters or one simple identifier, object pattern, or array pattern without top-level defaults or rest.
+
+## Why
+
+The callback transport carries one callback value across the lazy-symbol boundary. Multiple parameters, defaults, and rest bindings do not have supported parameter semantics when the symbol runs.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
