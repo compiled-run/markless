@@ -45,9 +45,17 @@ and removes on the second press; Delete removes the highlighted tag; Escape give
 the caret. Home and End are left to the caret.
 
 On a delete button: ArrowLeft/ArrowRight/Home/End move focus along the row; Enter and Space remove
-through native button activation; Backspace and Delete remove and move on.
+through native button activation; Backspace and Delete remove and move on; F2 opens the tag for
+editing when the row is `editable` and that tag mounts a `taglist.iteminput`.
 
 In an edit field: Enter commits, Escape restores, blur commits.
+
+The two ways in are the two focus regimes, not two spellings of one gesture. With the caret in the
+field the tag under the walk is opened with **Enter**, which is what every reference ships and what
+the field has spare. With DOM focus on the tag itself — the display-only row, and anyone who tabs to
+a chip — Enter and Space are already that delete button's native activation, so the key there is
+**F2**, the APG's edit-in-place key. Neither route changes what Enter does anywhere it already
+meant something.
 
 ## Consumer shape
 
@@ -75,6 +83,15 @@ Two things about that shape are load-bearing and were found the hard way:
   A repeat follows a property write; reassigning the binding leaves it showing the old array.
 - The repeat must sit in a plain element, because a construct may not be the direct child of a
   component tag.
+
+## The edit session is shared with editable
+
+`taglist.iteminput` and the edit mode on `taglist.item` run
+`packages/headless/components/src/editable/edit-walk.ts` rather than a second copy of it: `editKey`
+decides what one press inside an open session means, `settled` decides the words it leaves behind,
+`landCaret` puts them in the field and selects them, and `opensEdit` decides whether a press on the
+tag opens one. What stays here is the list arithmetic — `rename` splices, dedupes and merges on
+collision, which is what a keyed row of an array needs and a single string does not.
 
 ## Findings
 

@@ -1,5 +1,7 @@
 import { computed, element, shared, state } from '@markless/core';
 import VisuallyHidden from '../base/visually-hidden.tsrx';
+// One tag's inline rename is editable's session over one row of the array.
+import { editKey, landCaret, opensEdit, settled } from '../editable/edit-walk.ts';
 import {
 	admit,
 	afterRemoval,
@@ -111,23 +113,18 @@ export const taglistState = shared(
 				if (taglist.disabled || taglist.editable !== true) return;
 				taglist.editing = value;
 				taglist.highlighted = value;
-				// The words go on the element rather than into a bound cell: the field
-				// belongs to the person from the moment it shows, and a binding would
-				// fight the caret.
-				const box = elementForValue(editEls, value) as HTMLInputElement | undefined;
-				if (box !== undefined) box.value = value;
-				if (box !== undefined) box.focus();
-				if (box !== undefined) box.select();
+				landCaret(elementForValue(editEls, value) as HTMLInputElement | undefined, value);
 			},
 
 			/** Take the edited words, or give the tag back unchanged. */
 			settle(was: string, now: string, keep: boolean) {
 				taglist.editing = '';
-				if (keep !== true) return;
 				const held = taglist.value;
-				const after = rename(held, was, now);
+				// A cancel settles on the words from before, and renaming a tag to what it
+				// already reads gives the array back - so the cancel path needs no branch.
+				const one = settled(was, now, keep);
+				const after = rename(held, was, one);
 				if (after === held) return;
-				const one = now.trim();
 				taglist.highlighted = held.includes(one) || one === '' ? '' : one;
 				taglist.value = after;
 				taglist.spoken = one === '' ? `${was} removed` : `${was} is now ${one}`;
@@ -299,7 +296,13 @@ export function TagListInput({
 	/>
 }
 
-export function TagListItem({ value, children, onClick, ...rest }: TagListItemProps) @{
+export function TagListItem({
+	value,
+	children,
+	onClick,
+	onKeydown,
+	...rest
+}: TagListItemProps) @{
 	const taglist = taglistState();
 	const item = taglistItemState();
 	item.value = value;
@@ -316,10 +319,32 @@ export function TagListItem({ value, children, onClick, ...rest }: TagListItemPr
 		ui-editing={isEditing}
 		ui-disabled={taglist.disabled}
 		onClick={(event) => {
-			// `detail` is the platform's own double-click count, so no second event
-			// name and no timer of our own.
-			if (event.detail === 2 && taglist.editable === true) taglist.edit(item.value);
+			// A keyboard activation carries `detail` 0, and the delete button's own is
+			// one of those: a click out of that button must not open the tag it removed.
+			const close = elementForValue(taglist.closeEls, item.value);
+			const fromClose = close !== undefined && close.contains(event.target as Node);
+			if (!fromClose && opensEdit(event.detail, true) && taglist.editable === true) {
+				taglist.edit(item.value);
+			}
 			onClick?.(event);
+		}}
+		// F2, not Enter: this lands from the focused delete button, where Enter and
+		// Space are that button's own activation. Enter opens the edit from the field.
+		onKeydown={(event) => {
+			if (event.key === 'F2') event.preventDefault();
+
+			const key = event.key;
+			const box = elementForValue(taglist.editEls, item.value);
+			if (
+				key === 'F2' &&
+				box !== undefined &&
+				taglist.editable === true &&
+				taglist.highlighted === item.value &&
+				taglist.editing !== item.value
+			) {
+				taglist.edit(item.value);
+			}
+			onKeydown?.(event);
 		}}
 	>{children}</div>
 }
@@ -433,11 +458,10 @@ export function TagListItemInput({
 		onKeydown={(event) => {
 			if (event.key === 'Enter' || event.key === 'Escape') event.preventDefault();
 
-			const key = event.key;
+			const move = editKey(event.key);
 			const typed = (event.target as HTMLInputElement).value;
-			if (key === 'Enter') taglist.settle(item.value, typed, true);
-			if (key === 'Escape') taglist.settle(item.value, typed, false);
-			if (key === 'Enter' || key === 'Escape') taglist.inputEl?.focus();
+			if (move !== undefined) taglist.settle(item.value, typed, move === 'commit');
+			if (move !== undefined) taglist.inputEl?.focus();
 			onKeydown?.(event);
 		}}
 		onBlur={(event) => {
