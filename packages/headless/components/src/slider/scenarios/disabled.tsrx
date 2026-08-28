@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as slider from '../index.ts';
+import { slider } from '../../index.ts';
 
 export default function Disabled() @{
 	const log = state({ calls: 0 });

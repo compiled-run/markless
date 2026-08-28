@@ -1,0 +1,21 @@
+# MARKLESS_STATE_CROSS_MODULE_IMPORT
+
+Imported module-scope state is not resumable
+
+- Package: compiler
+- Pass or phase: semantic-graph
+
+## Message
+
+Cannot import graph state "…" from "…" into "…".
+
+## Why
+
+Module-scope state has no per-request graph ownership. Importing it would compile reads as dead snapshots and writes as plain module mutation instead of connecting to this document payload.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

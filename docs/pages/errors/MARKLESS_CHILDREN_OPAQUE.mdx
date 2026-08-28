@@ -1,0 +1,21 @@
+# MARKLESS_CHILDREN_OPAQUE
+
+children cannot be inspected or transformed
+
+- Package: compiler
+- Pass or phase: public-render
+- Severity: error
+
+## Message
+
+children is an opaque template projection: place it with \{children\}, wrap it, or pass it through — mapping, counting, indexing, or mutating it is not supported.
+
+## Why
+
+The compiler owns children projection; there is no render-output array to inspect, so React-style children access would silently misbehave.
+
+## Emitted from
+
+- `packages/compiler/src/passes/public-render/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

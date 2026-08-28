@@ -252,7 +252,7 @@ test('a part with no rooted instance refuses loudly rather than minting a stray 
 		// The per-FAMILY token is asked first now, because one element can carry
 		// handles from two widget instances; the plain key is the fallback, and
 		// neither answering is still the loud refusal.
-		`${JSON.stringify(MARKLESS_WIDGET_INSTANCE_KEY)}+'|'+residue.handleGraphNodeId.slice(0,residue.handleGraphNodeId.indexOf('/')))??marklessSsrRenderStateValues.get(${JSON.stringify(MARKLESS_WIDGET_INSTANCE_KEY)}))??(()=>{throw new Error('MARKLESS_ELEMENT_HANDLE_WIDGET_INSTANCE_MISSING: '`,
+		`${JSON.stringify(MARKLESS_WIDGET_INSTANCE_KEY)}+'|'+residue.handleGraphNodeId.slice(0,residue.handleGraphNodeId.lastIndexOf('/')))??marklessSsrRenderStateValues.get(${JSON.stringify(MARKLESS_WIDGET_INSTANCE_KEY)}))??(()=>{throw new Error('MARKLESS_ELEMENT_HANDLE_WIDGET_INSTANCE_MISSING: '`,
 	);
 });
 

@@ -1,0 +1,21 @@
+# MARKLESS_ARTIFACT_CHILD_PROP_NOT_BUILD_KNOWN
+
+Delegate child prop is not build-known
+
+- Package: compiler
+- Pass or phase: link
+- Severity: error
+
+## Message
+
+\<…\> prop … must be a build-known static value. Runtime component execution is not a fallback.
+
+## Why
+
+A delegate is rendered once at build time, so every prop it reads must be a value the compiler can read at build time.
+
+## Emitted from
+
+- `packages/compiler/src/passes/link/delegate-children.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
