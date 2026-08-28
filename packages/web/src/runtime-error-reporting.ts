@@ -13,6 +13,15 @@ export type RuntimeErrorReportContext =
 			readonly symbolId?: string;
 	  };
 
+/**
+ * Adds markless's reporting fields to whatever was thrown, without ever throwing
+ * itself: a `DOMException`'s `code` is a getter with no setter, so writing it
+ * throws and the reporter would destroy the error it was called to describe.
+ * Such an error keeps its own `code`, `name` and `message`, and carries the
+ * markless code on `marklessCode` instead - read it as
+ * `error.code ?? error.marklessCode`. An error that refuses every write (a
+ * frozen one) is reported exactly as it was thrown.
+ */
 export function enrichRuntimeErrorForReporting(
 	error: unknown,
 	context: RuntimeErrorReportContext,
@@ -22,19 +31,25 @@ export function enrichRuntimeErrorForReporting(
 			? (error as ReportableError)
 			: (new Error(String(error)) as ReportableError);
 	const code = typeof reportable.code === 'string' ? reportable.code : 'MARKLESS_RUNTIME_ERROR';
-	reportable.code = code;
-	reportable.severity ??= 'error';
-	reportable.phase ??= 'runtime';
-	reportable.docsUrl ??= `https://markless.dev/errors/${code}`;
-	if ('hostNodeId' in context) reportable.hostNodeId ??= context.hostNodeId;
-	if ('eventName' in context) reportable.eventName ??= context.eventName;
-	const branchId = (context as { readonly branchId?: unknown }).branchId;
-	if (typeof branchId === 'string') reportable.branchId ??= branchId;
-	const graphNodeId = (context as { readonly graphNodeId?: unknown }).graphNodeId;
-	if (typeof graphNodeId === 'string') reportable.graphNodeId ??= graphNodeId;
-	const selector = (context as { readonly selector?: unknown }).selector;
-	if (typeof selector === 'string') reportable.selector ??= selector;
-	if (context.symbolId) reportable.symbolId ??= context.symbolId;
+	try {
+		try {
+			reportable.code = code;
+		} catch {
+			reportable.marklessCode = code;
+		}
+		reportable.severity ??= 'error';
+		reportable.phase ??= 'runtime';
+		reportable.docsUrl ??= `https://markless.dev/errors/${code}`;
+		if ('hostNodeId' in context) reportable.hostNodeId ??= context.hostNodeId;
+		if ('eventName' in context) reportable.eventName ??= context.eventName;
+		const branchId = (context as { readonly branchId?: unknown }).branchId;
+		if (typeof branchId === 'string') reportable.branchId ??= branchId;
+		const graphNodeId = (context as { readonly graphNodeId?: unknown }).graphNodeId;
+		if (typeof graphNodeId === 'string') reportable.graphNodeId ??= graphNodeId;
+		const selector = (context as { readonly selector?: unknown }).selector;
+		if (typeof selector === 'string') reportable.selector ??= selector;
+		if (context.symbolId) reportable.symbolId ??= context.symbolId;
+	} catch {}
 	return reportable;
 }
 
@@ -43,7 +58,9 @@ export function enrichRuntimeErrorForReporting(
 const RUNTIME_ERROR_REPORTED = '__marklessRuntimeErrorReported';
 
 export function markRuntimeErrorReported(error: ReportableError): void {
-	error[RUNTIME_ERROR_REPORTED] = true;
+	try {
+		error[RUNTIME_ERROR_REPORTED] = true;
+	} catch {}
 }
 
 export function reportRuntimeErrorToHost(
