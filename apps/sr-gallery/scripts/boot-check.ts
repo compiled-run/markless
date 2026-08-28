@@ -105,6 +105,10 @@ const RENDERED_ROLE: Record<FamilyName, AriaRole> = {
 	// The divider is a focusable role="separator": the panels either side carry no
 	// role of their own, so the separator is the whole exposure.
 	resizable: 'separator',
+	// One spinbutton per part of the time; the group around them is named by its
+	// label rather than carrying a role a count could find.
+	timebox: 'spinbutton',
+	'timebox-twelve-hour': 'spinbutton',
 };
 
 /** Sections whose point is how many of that role they serve, not merely that they serve one. */
@@ -149,6 +153,10 @@ const RENDERED_COUNT: Partial<Record<FamilyName, number>> = {
 	// One divider per group: a count catches a section that rendered the starter
 	// and lost the collapsible shape.
 	resizable: 2,
+	// Hour, minute and the AM/PM box: a count catches a 12-hour clock that lost
+	// the period box the locale asks for.
+	timebox: 3,
+	'timebox-twelve-hour': 3,
 };
 
 const appDir = fileURLToPath(new URL('..', import.meta.url));
@@ -853,6 +861,81 @@ async function main() {
 				} else {
 					console.log('#resizable\'s divider reaches the panel it controls.');
 				}
+			}
+		}
+
+		// The role counts above say three boxes rendered in each section. What a
+		// reader lane then turns on is the family's central bet: every box is its own
+		// tab stop, a box holding part of a time announces that part's number, and
+		// the one box whose number says nothing carries the words instead.
+		for (const label of ['hour input', 'minute input', 'AM or PM']) {
+			const box = page.locator('#timebox').getByRole('spinbutton', { name: label });
+			if ((await box.count()) !== 1) {
+				failures.push(
+					`#timebox serves ${await box.count()} spinbuttons named "${label}", not the 1 its starter needs.`,
+				);
+				continue;
+			}
+			const stop = await box.getAttribute('tabindex');
+			if (stop !== '0') {
+				failures.push(
+					`#timebox's "${label}" box reads tabindex="${stop}", not "0", so no keyboard reaches it.`,
+				);
+			} else {
+				console.log(`#timebox serves a "${label}" box a keyboard can reach.`);
+			}
+		}
+
+		const seeded = page.locator('#timebox-twelve-hour');
+		for (const label of ['hour input', 'minute input', 'AM or PM']) {
+			const box = seeded.getByRole('spinbutton', { name: label });
+			if ((await box.count()) !== 1) {
+				failures.push(
+					`#timebox-twelve-hour serves ${await box.count()} spinbuttons named "${label}", not 1.`,
+				);
+				continue;
+			}
+			const now = await box.getAttribute('aria-valuenow');
+			if (now === null) {
+				failures.push(
+					`#timebox-twelve-hour's "${label}" box carries no aria-valuenow, so a seeded time announces no number there.`,
+				);
+			} else {
+				console.log(`#timebox-twelve-hour's "${label}" box announces ${now}.`);
+			}
+		}
+
+		// The period's number is 0 or 1, which means nothing spoken, so the box
+		// renders the same words it shows. Compared against its own text rather than
+		// a literal: the words are the locale's data, not this family's.
+		const period = seeded.getByRole('spinbutton', { name: 'AM or PM' });
+		if ((await period.count()) === 1) {
+			const spoken = await period.getAttribute('aria-valuetext');
+			const shownText = (await period.textContent())?.trim() ?? '';
+			if (spoken !== shownText || spoken === '') {
+				failures.push(
+					`#timebox-twelve-hour's period box shows "${shownText}" but speaks ${JSON.stringify(spoken)}.`,
+				);
+			} else {
+				console.log(`#timebox-twelve-hour's period box speaks the words it shows: ${spoken}.`);
+			}
+		}
+
+		// A segmented time reaches a form through one hidden field carrying the whole
+		// 24-hour value, which no role above can see.
+		const timeField = seeded.locator('input[name="endet"]');
+		if ((await timeField.count()) !== 1) {
+			failures.push(
+				`#timebox-twelve-hour serves ${await timeField.count()} fields named "endet", not the 1 a form submits.`,
+			);
+		} else {
+			const submitted = await timeField.inputValue();
+			if (submitted !== '14:30') {
+				failures.push(
+					`#timebox-twelve-hour submits "${submitted}", not the 14:30 its seeded time reads as.`,
+				);
+			} else {
+				console.log(`#timebox-twelve-hour submits its seeded time as ${submitted}.`);
 			}
 		}
 

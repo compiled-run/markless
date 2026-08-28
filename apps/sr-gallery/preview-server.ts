@@ -59,6 +59,8 @@ export const FAMILY_ANCHORS = {
 	toolbar: '/#toolbar',
 	drawer: '/#drawer',
 	resizable: '/#resizable',
+	timebox: '/#timebox',
+	'timebox-twelve-hour': '/#timebox-twelve-hour',
 } as const;
 
 export type FamilyName = keyof typeof FAMILY_ANCHORS;

@@ -28,6 +28,7 @@ import {
 	tabs,
 	taglist,
 	textbox,
+	timebox,
 	toggle,
 	toolbar,
 	tooltip,
@@ -40,9 +41,9 @@ import {
 // /#radio-group, /#rating, /#tabs, /#popover, /#tooltip, /#slider, /#datebox,
 // /#fileupload, /#hovercard, /#calendar, /#menu, /#menubar, /#colorpicker,
 // /#buttongroup, /#editable, /#taglist, /#numberbox, /#ink, /#pad, /#crop, /#tour, /#toolbar, /#drawer,
-// /#resizable. A family whose
+// /#resizable, /#timebox. A family whose
 // second shape a reader announces differently gets its own section too: /#slider-range,
-// /#numberbox-min-max-step, /#numberbox-currency, /#crop-image.
+// /#numberbox-min-max-step, /#numberbox-currency, /#crop-image, /#timebox-twelve-hour.
 //
 // This is consumer code, not test code. It imports through the package barrel
 // the way a reader of the docs would, carries no test hooks, and the markup is
@@ -749,6 +750,35 @@ export function Gallery() @{
 					/>
 					<resizable.item value="editor">Editor</resizable.item>
 				</resizable.root>
+			</div>
+		</section>
+
+		<section id="timebox">
+			<h2>Time box</h2>
+			<div class="scenario">
+				<timebox.root locale="en-US" name="starts">
+					<timebox.label>Start time</timebox.label>
+					<timebox.hourinput />
+					<timebox.minuteinput />
+					<timebox.dayperiodinput />
+					<timebox.field />
+				</timebox.root>
+			</div>
+		</section>
+
+		{/* Its own anchor rather than a second scenario above: the boxes carry the
+		    same names whatever the locale, so one section holding both would leave a
+		    reader two "hour input" spinbuttons and no way to say which it walked. */}
+		<section id="timebox-twelve-hour">
+			<h2>Time box on a 12-hour clock</h2>
+			<div class="scenario">
+				<timebox.root locale="de-DE" hour12 value="14:30" name="endet">
+					<timebox.label>Endzeit</timebox.label>
+					<timebox.hourinput />
+					<timebox.minuteinput />
+					<timebox.dayperiodinput />
+					<timebox.field />
+				</timebox.root>
 			</div>
 		</section>
 	</main>

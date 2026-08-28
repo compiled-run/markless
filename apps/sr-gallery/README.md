@@ -44,6 +44,8 @@ copies — one section each, on an anchor a driver can be sent to:
 | toolbar                | `/#toolbar`                |
 | drawer                 | `/#drawer`                 |
 | resizable              | `/#resizable`              |
+| timebox                | `/#timebox`                |
+| timebox-twelve-hour    | `/#timebox-twelve-hour`    |
 
 <!-- anchors:end -->
 

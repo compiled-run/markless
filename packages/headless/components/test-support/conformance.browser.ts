@@ -35,6 +35,7 @@ import Slider from '../src/slider/scenarios/basic.tsrx';
 import Tabs from '../src/tabs/scenarios/basic.tsrx';
 import TagList from '../src/taglist/scenarios/basic.tsrx';
 import Textbox from '../src/textbox/scenarios/basic.tsrx';
+import TimeBox from '../src/timebox/scenarios/basic.tsrx';
 import Toaster from '../src/toaster/scenarios/basic.tsrx';
 import Toggle from '../src/toggle/scenarios/basic.tsrx';
 import Toolbar from '../src/toolbar/scenarios/basic.tsrx';
@@ -739,6 +740,23 @@ const descriptors: readonly FamilyDescriptor[] = [
 		root: 'root',
 		parts: ['root', 'label', 'input'],
 		rootAria: { role: null },
+		supportsDisabled: true,
+	},
+	{
+		family: 'timebox',
+		mount: { CSR: () => render(TimeBox), SSR: () => renderSSR(TimeBox) },
+		root: 'root',
+		parts: ['root', 'label', 'hourinput', 'minuteinput', 'dayperiodinput', 'field'],
+		// The minted idref the group's name rides on is checked by `idrefs`, not
+		// here: it has no fixed value to declare.
+		rootAria: { role: 'group', 'aria-disabled': 'false' },
+		// No openCycle: nothing here opens. Every box is its own tab stop and an
+		// arrow steps it, which the family's own suite drives.
+		//
+		// The order the locale writes its parts in, which part of the time a box
+		// holds, and the digits it holds now are all values a consumer styles
+		// against, so they are key-value by design.
+		valuedAttributes: ['ui-order', 'ui-type', 'ui-value'],
 		supportsDisabled: true,
 	},
 	{

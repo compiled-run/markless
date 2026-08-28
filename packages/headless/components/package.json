@@ -59,6 +59,7 @@
 		"./tabs": "./src/tabs/index.ts",
 		"./taglist": "./src/taglist/index.ts",
 		"./textbox": "./src/textbox/index.ts",
+		"./timebox": "./src/timebox/index.ts",
 		"./toaster": "./src/toaster/index.ts",
 		"./toggle": "./src/toggle/index.ts",
 		"./toolbar": "./src/toolbar/index.ts",
