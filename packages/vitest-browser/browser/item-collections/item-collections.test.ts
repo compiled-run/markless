@@ -137,6 +137,9 @@ test('SSR: a component edge does not change an item position', async () => {
 
 // --- added and removed after resume -----------------------------------------
 
+// Red for the ordinal, not the mint: the row is built and attached now, and its
+// four items are in the DOM - nothing stamps `ui-pos` until a handler walks the
+// roster, which is the same reason the drop row below is red.
 test.fails('SSR: an item added after resume takes the next position by itself', async () => {
 	await renderSSR(MutatingPage);
 	await userEvent.click(document.querySelector('[data-ic-add]') as HTMLElement);
@@ -153,14 +156,9 @@ test.fails('SSR: dropping the first item renumbers the ones behind it', async ()
 	expect(positions()).toEqual(['0', '1']);
 });
 
-// Red for a SECOND reason, not the index one: minting a row that holds a part
-// reading the family's widget instance is refused outright
-// (MARKLESS_REPEAT_ROW_COMPONENT_WIDGET_UNRESOLVED, `assertRowWidgetsResolved`
-// in packages/web/src/fns/row-component-mint.ts:433). The repeat's collection is
-// the consumer's own cell, which sits outside the widget, so the minted row
-// resolves no enclosing instance. Dropping a row is fine; only adding one is
-// refused.
-test.fails('SSR: the roster renumbers after an item is added', async () => {
+// The row a consumer's `@for` mints after resume reads the family instance its
+// rows physically stand in, not the one its collection names.
+test('SSR: the roster renumbers after an item is added', async () => {
 	await renderSSR(MutatingPage);
 	await userEvent.click(document.querySelector('[data-ic-add]') as HTMLElement);
 	await expect.poll(() => items().length, { timeout: 5000 }).toBe(4);

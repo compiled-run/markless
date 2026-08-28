@@ -52,6 +52,8 @@ export type RowComponentMintHost = {
 	readonly runtimeInput: { readonly loadSymbol: (symbolId: string) => unknown };
 	readonly armRegistrationDeps: (records: ResumeArmRecordSet) => Promise<ArmRegistrationDeps>;
 	readonly installArmEventType: (eventType: string) => void;
+	/** The page's live host census, read to place the repeat inside a rendered widget. */
+	readonly elementsByHostId?: ReadonlyMap<string, ResumeDomElement>;
 };
 
 export type MintedRow = {
@@ -136,31 +138,42 @@ export function marklessRowComponentMint(
 				const built =
 					repeat.rowComponent && rowGraph && rowHost
 						? marklessThen(pageSurface(repeat), (pageSurfaceValue) =>
-								marklessThen(enclosingWidgetsFor(rowGraph, repeat), (enclosing) => {
-									const items = readKeyedRepeatCollection(rowGraph, repeat);
-									return marklessWalk(items.length, (rowIndex) => {
-										const item = items[rowIndex];
-										const rowKey = rowKeyOf(item, repeat);
-										if (served.has(rowKey) || prepared.has(rowKey)) return undefined;
-										return marklessThen(
-											mintComponentRow({
-												surface: pageSurfaceValue,
-												parent,
-												repeat,
-												item,
-												rowKey,
-												rowIndex,
-												graph: rowGraph,
-												enclosing,
-												loadSymbol: settledSymbol(rowHost.runtimeInput.loadSymbol),
-												registration: rowHost,
-											}),
-											(row) => {
-												prepared.set(rowKey, row);
-											},
-										);
-									});
-								}),
+								marklessThen(
+									enclosingWidgetsFor(
+										rowGraph,
+										repeat,
+										parent,
+										rowHost.elementsByHostId,
+									),
+									(enclosing) => {
+										const items = readKeyedRepeatCollection(rowGraph, repeat);
+										return marklessWalk(items.length, (rowIndex) => {
+											const item = items[rowIndex];
+											const rowKey = rowKeyOf(item, repeat);
+											if (served.has(rowKey) || prepared.has(rowKey))
+												return undefined;
+											return marklessThen(
+												mintComponentRow({
+													surface: pageSurfaceValue,
+													parent,
+													repeat,
+													item,
+													rowKey,
+													rowIndex,
+													graph: rowGraph,
+													enclosing,
+													loadSymbol: settledSymbol(
+														rowHost.runtimeInput.loadSymbol,
+													),
+													registration: rowHost,
+												}),
+												(row) => {
+													prepared.set(rowKey, row);
+												},
+											);
+										});
+									},
+								),
 							)
 						: undefined;
 				return marklessThen(built, () => {
@@ -219,17 +232,21 @@ let instanceScopeLoad: Promise<InstanceScopeModule> | undefined;
 // Loaded here, not named at the top: this module is the demand gate, and a
 // static edge would put the evaluator's closure inside every page that has one.
 function loadEvaluator(): Awaitable<EvaluatorModule> {
-	return (evaluatorModule ??
+	return (
+		evaluatorModule ??
 		(evaluatorLoad ??= import('../prerender/evaluator.ts').then(
 			(module) => (evaluatorModule = module),
-		)));
+		))
+	);
 }
 
 function loadInstanceScope(): Awaitable<InstanceScopeModule> {
-	return (instanceScopeModule ??
+	return (
+		instanceScopeModule ??
 		(instanceScopeLoad ??= import('./instance-scope.ts').then(
 			(module) => (instanceScopeModule = module),
-		)));
+		))
+	);
 }
 
 function rowKeyOf(item: unknown, repeat: ResumeKeyedRepeatRecord): unknown {
@@ -403,28 +420,55 @@ type EnclosingWidgets = {
 /**
  * The rendered widgets the repeat host stands inside, off the LIVE graph.
  *
- * The anchor is the instance path of the collection node the repeat itself
- * reads: a live position at or above the repeat host, resolved when the page was
- * served through the same widget machinery a served row's part resolves through.
- * Walking the live registry from there answers with the instances an ancestor
- * widget really rendered, so a minted row's parts read them instead of minting a
- * second set. A repeat whose collection carries no instance path answers with
- * nothing, and a row that then reads a widget is refused below rather than
- * silently forked.
+ * Two questions, because a repeat reaches a widget two ways. The collection node
+ * answers when the widget OWNS the collection: its instance path is a live
+ * position at or above the repeat host, and walking the registry from there
+ * reaches the instances an ancestor widget really rendered. A consumer's `@for`
+ * projected into a family root owns its collection itself, so that path is page
+ * space and answers nothing - while the rows still stand inside the rendered
+ * family. Where they stand is the second question, and the live host census
+ * answers it: a host id names its instance, and a host holding the repeat's
+ * parent names an instance the repeat is inside.
+ *
+ * The anchor the rows are keyed by is still the collection's: two family roots
+ * over one collection mint the same row key twice, and nothing here tells those
+ * two rows apart - the second is refused by the root collision below.
  */
 function enclosingWidgetsFor(
 	graph: RuntimeGraph,
 	repeat: ResumeKeyedRepeatRecord,
+	parent: ResumeDomElement,
+	hosts: ReadonlyMap<string, ResumeDomElement> | undefined,
 ): Awaitable<EnclosingWidgets> {
 	return marklessThen(loadInstanceScope(), (instanceScope) => {
 		const instancePath = instanceScope.marklessInstancePath(repeat.collectionGraphNodeId);
 		const registry = instanceScope.marklessGraphWidgetRegistry(graph);
 		if (registry.rootPaths.size === 0) return { instancePath, roots: new Map() };
-		return {
-			instancePath,
-			roots: instanceScope.marklessEnclosingWidgetRoots(instancePath, registry),
-		};
+		const roots = new Map(instanceScope.marklessEnclosingWidgetRoots(instancePath, registry));
+		for (const [definitionId, rootPath] of instanceScope.marklessWidgetRootsAroundPaths(
+			registry,
+			hostInstancePathsAround(parent, hosts, instanceScope.marklessInstancePath),
+		))
+			if (!roots.has(definitionId)) roots.set(definitionId, rootPath);
+		return { instancePath, roots };
 	});
+}
+
+// The instance paths of the live hosts the repeat's rows sit inside, walked up
+// through the census rather than looked up: a host id names its instance.
+function hostInstancePathsAround(
+	parent: ResumeDomElement,
+	hosts: ReadonlyMap<string, ResumeDomElement> | undefined,
+	instancePathOf: (id: string) => string,
+): ReadonlySet<string> {
+	const paths = new Set<string>();
+	if (!hosts?.size) return paths;
+	const ancestors = new Set<ResumeDomElement>();
+	for (let node: ResumeDomElement | null | undefined = parent; node; node = node.parentElement)
+		ancestors.add(node);
+	for (const [hostNodeId, element] of hosts)
+		if (ancestors.has(element)) paths.add(instancePathOf(hostNodeId));
+	return paths;
 }
 
 // A widget-scoped definition whose composed id still names no instance belongs
@@ -688,11 +732,7 @@ function mintedRowBoundary(
 	} as unknown as ResumeAsyncBoundaryRecord;
 }
 
-function rowComponentError(
-	repeat: ResumeKeyedRepeatRecord,
-	code: string,
-	detail: string,
-): Error {
+function rowComponentError(repeat: ResumeKeyedRepeatRecord, code: string, detail: string): Error {
 	const error = new Error(`${code}: ${repeat.id} ${detail}`) as Error & Record<string, unknown>;
 	error.name = 'KeyedRepeatRuntimeError';
 	error.code = code;
