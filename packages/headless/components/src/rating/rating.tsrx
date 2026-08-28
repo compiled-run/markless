@@ -20,24 +20,24 @@ import {
 	shownValue,
 	valueAtPointer,
 	valueText,
-} from './rating-group-math.ts';
-import { isRightToLeft, markAt, markBox, markToFocus } from './rating-group-walk.ts';
+} from './rating-math.ts';
+import { isRightToLeft, markAt, markBox, markToFocus } from './rating-walk.ts';
 import type {
-	RatingGroupBoxProps,
-	RatingGroupDescriptionProps,
-	RatingGroupErrorProps,
-	RatingGroupFieldProps,
-	RatingGroupInstanceState,
-	RatingGroupItemPosition,
-	RatingGroupItemProps,
-	RatingGroupLabelProps,
-	RatingGroupRootProps,
-	RatingGroupValueLabelProps,
-} from './rating-group-types.ts';
+	RatingBoxProps,
+	RatingDescriptionProps,
+	RatingErrorProps,
+	RatingFieldProps,
+	RatingInstanceState,
+	RatingItemPosition,
+	RatingItemProps,
+	RatingLabelProps,
+	RatingRootProps,
+	RatingValueLabelProps,
+} from './rating-types.ts';
 
-export const ratinggroupState = shared(
+export const ratingState = shared(
 	() => {
-		const rating: RatingGroupInstanceState = state({
+		const rating: RatingInstanceState = state({
 			seed: 0,
 			given: undefined,
 			held: null,
@@ -57,7 +57,7 @@ export const ratinggroupState = shared(
 		// The array type argument makes the handle plural: bound on every mark, read back live and in document order.
 		const itemEls = element<HTMLDivElement[]>();
 
-		// `rated`, not `value`: a lifted symbol inside `ratinggroup.item` that reads
+		// `rated`, not `value`: a lifted symbol inside `rating.item` that reads
 		// `instance.value` while the part declares a `value` prop is refused by capture analysis.
 		const rated = computed(() => {
 			const given = rating.given;
@@ -151,7 +151,7 @@ export const ratinggroupState = shared(
 	{ scope: 'widget' },
 );
 
-export function RatingGroupRoot({
+export function RatingRoot({
 	value,
 	defaultValue = 0,
 	count = 5,
@@ -163,8 +163,8 @@ export function RatingGroupRoot({
 	onChange,
 	children,
 	...rest
-}: RatingGroupRootProps) @{
-	const rating = ratinggroupState();
+}: RatingRootProps) @{
+	const rating = ratingState();
 	rating.onChange = onChange;
 	rating.given = value;
 	rating.seed = defaultValue;
@@ -175,13 +175,13 @@ export function RatingGroupRoot({
 	rating.required = required;
 	rating.name = name;
 
-	<RatingGroupBox {...rest}>{children}</RatingGroupBox>
+	<RatingBox {...rest}>{children}</RatingBox>
 }
 
 // A separate part rather than the root's own element: a widget root cannot read its
 // own instance token, so the label IDREF only resolves one component deeper.
-function RatingGroupBox({ children, onPointerleave, ...rest }: RatingGroupBoxProps) @{
-	const rating = ratinggroupState();
+function RatingBox({ children, onPointerleave, ...rest }: RatingBoxProps) @{
+	const rating = ratingState();
 	const boxAriaDisabled = computed(() => (rating.disabled ? 'true' : undefined));
 	const boxAriaReadonly = computed(() => (rating.readonly ? 'true' : undefined));
 	const boxAriaRequired = computed(() => (rating.required ? 'true' : undefined));
@@ -211,20 +211,20 @@ function RatingGroupBox({ children, onPointerleave, ...rest }: RatingGroupBoxPro
 	>{children}</div>
 }
 
-export function RatingGroupLabel({ children, ...rest }: RatingGroupLabelProps) @{
-	const rating = ratinggroupState();
+export function RatingLabel({ children, ...rest }: RatingLabelProps) @{
+	const rating = ratingState();
 
 	<span {...rest} el={rating.labelEl} ui-disabled={rating.disabled}>{children}</span>
 }
 
-export function RatingGroupDescription({ children, ...rest }: RatingGroupDescriptionProps) @{
-	const rating = ratinggroupState();
+export function RatingDescription({ children, ...rest }: RatingDescriptionProps) @{
+	const rating = ratingState();
 
 	<div {...rest} el={rating.descriptionEl}>{children}</div>
 }
 
-export function RatingGroupError({ children, ...rest }: RatingGroupErrorProps) @{
-	const rating = ratinggroupState();
+export function RatingError({ children, ...rest }: RatingErrorProps) @{
+	const rating = ratingState();
 
 	<div {...rest} el={rating.errorEl}>{children}</div>
 }
@@ -232,20 +232,20 @@ export function RatingGroupError({ children, ...rest }: RatingGroupErrorProps) @
 /**
  * One position. `role="radio"` on the mark itself rather than a native input
  * beside it: a rating carries half values, and a radio cannot be half checked,
- * so the number a form receives lives on `ratinggroup.field` alone.
+ * so the number a form receives lives on `rating.field` alone.
  */
-export function RatingGroupItem({
+export function RatingItem({
 	value,
 	children,
 	onClick,
 	onKeydown,
 	onPointermove,
 	...rest
-}: RatingGroupItemProps) @{
-	const rating = ratinggroupState();
+}: RatingItemProps) @{
+	const rating = ratingState();
 	// The position as a graph cell: a computed() that closes over the prop itself
 	// is MARKLESS_CAPTURE_OPAQUE_PROP, because the prop is one repeat row's own value.
-	const star: RatingGroupItemPosition = state({ value });
+	const star: RatingItemPosition = state({ value });
 
 	const starChecked = computed(() => {
 		const at = star.value;
@@ -359,8 +359,8 @@ export function RatingGroupItem({
 
 // Renders the value rather than accepting children: a part cannot tell whether it
 // was given any, so a fallback branch would render nothing for everybody.
-export function RatingGroupValueLabel({ ...rest }: RatingGroupValueLabelProps) @{
-	const rating = ratinggroupState();
+export function RatingValueLabel({ ...rest }: RatingValueLabelProps) @{
+	const rating = ratingState();
 	const readoutText = computed(() => {
 		const now = rating.rated;
 		const total = rating.count;
@@ -377,8 +377,8 @@ export function RatingGroupValueLabel({ ...rest }: RatingGroupValueLabelProps) @
 
 // No handler of its own: the input is clipped, aria-hidden and out of the tab
 // order, so nothing but the family ever changes it.
-export function RatingGroupField({ ...rest }: RatingGroupFieldProps) @{
-	const rating = ratinggroupState();
+export function RatingField({ ...rest }: RatingFieldProps) @{
+	const rating = ratingState();
 	const fieldSubmitted = computed(() => {
 		const now = rating.rated;
 		return `${now}`;

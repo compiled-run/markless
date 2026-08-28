@@ -1,5 +1,5 @@
 /**
- * Every number `rating-group` computes: what the group holds, what a hover is
+ * Every number `rating` computes: what the group holds, what a hover is
  * offering, how far a position is filled, and where a key or a pointer sends
  * the rating. The family's `.tsrx` holds markup and gesture wiring and nothing
  * else.
@@ -122,7 +122,7 @@ export function itemName(at: number, count: number): string {
 	return `${at} of ${count}`;
 }
 
-/** The rating as text. `ratinggroup.valuelabel` renders this, and `ui-value` carries it. */
+/** The rating as text. `rating.valuelabel` renders this, and `ui-value` carries it. */
 export function valueText(value: number, count: number): string {
 	return `${value} of ${count}`;
 }

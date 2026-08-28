@@ -28,7 +28,7 @@ import Popover from '../src/popover/scenarios/basic.tsrx';
 import Progress from '../src/progress/scenarios/basic.tsrx';
 import QrCode from '../src/qr-code/scenarios/basic.tsrx';
 import { Basic as RadioGroup } from '../src/radio-group/scenarios/basic.tsrx';
-import { Basic as RatingGroup } from '../src/rating-group/scenarios/basic.tsrx';
+import { Basic as Rating } from '../src/rating/scenarios/basic.tsrx';
 import { Basic as Select } from '../src/select/scenarios/basic.tsrx';
 import Slider from '../src/slider/scenarios/basic.tsrx';
 import Tabs from '../src/tabs/scenarios/basic.tsrx';
@@ -626,8 +626,8 @@ const descriptors: readonly FamilyDescriptor[] = [
 		supportsDisabled: true,
 	},
 	{
-		family: 'rating-group',
-		mount: { CSR: () => render(RatingGroup), SSR: () => renderSSR(RatingGroup) },
+		family: 'rating',
+		mount: { CSR: () => render(Rating), SSR: () => renderSSR(Rating) },
 		root: 'root',
 		// The five marks are one repeat under a single `star` testid, which is what
 		// the family's own suite counts them by, so the wrapper is the part a

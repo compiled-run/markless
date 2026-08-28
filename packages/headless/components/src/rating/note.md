@@ -1,19 +1,20 @@
-# rating-group — implementation notes
+# rating — implementation notes
 
-Research and the decisions it settled: `goals/headless-components/notes/U693-rating-group.md`.
+Research and the decisions it settled: `goals/headless-components/notes/U693-rating-group.md`
+(filed under the family's former name).
 
 ## Shape
 
-One widget family, `ratinggroupState`, rooted by `ratinggroup.root`. There is no
+One widget family, `ratingState`, rooted by `rating.root`. There is no
 per-item shared instance: a mark's position is its own `value` prop held in a
 `state()` cell, and everything else — the fill, the checked mark, the tab stop,
 the keyboard walk — is arithmetic on that position and the group's `count`, in
-`rating-group-math.ts`. `rating-group-walk.ts` holds the only reads of the
+`rating-math.ts`. `rating-walk.ts` holds the only reads of the
 element roster: which mark to focus after a rating change, and which mark's box
 to measure for the half-value midway test.
 
-The root renders no element of its own. `ratinggroup.root` writes its props onto
-the instance and renders one private `RatingGroupBox`, which owns the
+The root renders no element of its own. `rating.root` writes its props onto
+the instance and renders one private `RatingBox`, which owns the
 `role="radiogroup"` element — a widget root cannot read its own instance token,
 so the `aria-labelledby` and `aria-describedby` IDREFs only resolve one
 component deeper. That is radio-group's and progress's idiom.
@@ -22,12 +23,12 @@ component deeper. That is radio-group's and progress's idiom.
 
 **Measured on the pilot tip `89dd2deb`, four compiles.** The family first
 published the committed rating on its instance as `value`, alongside
-`ratinggroup.item`'s own `value` prop. That combination is a **compile-time
+`rating.item`'s own `value` prop. That combination is a **compile-time
 refusal**, not a silent shadow and not a runtime surprise:
 
 ```
 MARKLESS_CAPTURE_OPAQUE_PROP: Cannot bind lazy symbol "symbol:2" because prop
-"value" for "RatingGroupItem" is read through a path the compiler cannot reduce
+"value" for "RatingItem" is read through a path the compiler cannot reduce
 to a capture slot, so "value" would reach the browser unbound.
 ```
 
@@ -40,7 +41,7 @@ The refusal is deliberate and the diagnostic says why: the alternative is a
 passes and then crashes is traded for a build that refuses.
 
 What made the name free was `rating.value` — the *instance's* member — read
-inside symbols owned by `RatingGroupItem`, which declares a `value` prop. Two
+inside symbols owned by `RatingItem`, which declares a `value` prop. Two
 symbols read it (`starChecked` and `starTabStop`), which is exactly the two
 errors reported. Three things were tried and did **not** help, so none of them is
 the cause: renaming the state cell's key (`state({ at: value })` versus
@@ -53,7 +54,7 @@ Radio-group has the same pair of names and compiles, because no symbol owned by
 prop of their own. So the collision needs all three: one component, a prop, and a
 lifted symbol naming the same word through an instance.
 
-The consumer-facing name is untouched: `ratinggroup.item` still takes `value`,
+The consumer-facing name is untouched: `rating.item` still takes `value`,
 the same word `radiogroup.item` and `calendar.item` take. Only the instance
 member moved, and the instance publishes `rated` (committed), `shown` (what the
 marks draw, preview included) and `positions`.
@@ -63,7 +64,7 @@ marks draw, preview included) and `positions`.
 `previewAt` holds what a hover is offering, with `-1` for "nothing offered" —
 not 0, because 0 is a rating a person can give. `shown` is `previewAt` when one
 is offered and `rated` otherwise, and every fill attribute reads `shown` while
-`aria-checked`, `ui-value` and `ratinggroup.valuelabel` read `rated`. That split
+`aria-checked`, `ui-value` and `rating.valuelabel` read `rated`. That split
 is the whole of "transient": a preview cannot reach a callback, a form or a
 reader.
 
@@ -75,7 +76,7 @@ re-resolvable there, so the calls are the portable spelling. The one literal
 
 ## CSS defaults
 
-One rule, in `@layer markless` inside `ratinggroup.item`:
+One rule, in `@layer markless` inside `rating.item`:
 
 ```css
 [ui-star] { position: relative; -webkit-user-select: none; user-select: none; }
@@ -89,10 +90,10 @@ across the marks selects their glyphs. The root ships no CSS and does not own it
 
 ## Reader lanes
 
-`rating-group.sr.ts` (virtual) is green, six rows, three consecutive runs. Two
+`rating.sr.ts` (virtual) is green, six rows, three consecutive runs. Two
 things it measured are worth keeping:
 
-- **`ratinggroup.valuelabel` is an `<output>`, so it is a polite live region.**
+- **`rating.valuelabel` is an `<output>`, so it is a polite live region.**
   After every rating change the reader repeats the readout, and *that* is what
   `lastSpokenPhrase()` answers with — not the mark's own announcement. Rows that
   care about the mark read the spoken log, or ask the reader again.
@@ -104,24 +105,24 @@ things it measured are worth keeping:
   row `test.fails` for the same underlying ordering; here the re-read makes it
   provable instead.
 
-`rating-group.nvda.ts` and `rating-group.voiceover.ts` carry the row the virtual
+`rating.nvda.ts` and `rating.voiceover.ts` carry the row the virtual
 lane cannot: that a cumulative fill is heard as one checked mark among four
-unchecked ones. Both now read `FAMILY_ANCHORS['rating-group']` and walk the
-gallery's `#rating-group` section, whose first group is already rated 3 so the
+unchecked ones. Both now read `FAMILY_ANCHORS['rating']` and walk the
+gallery's `#rating` section, whose first group is already rated 3 so the
 fill covers three marks. Neither reader lane has been run here: real readers need
 a VM or a CI runner, not a desktop.
 
 ## Registered
 
-`src/index.ts` exports the family as `ratinggroup` — the hyphen-free spelling
-`radio-group` uses for `radiogroup` — and `package.json` carries
-`./ratinggroup`. The scenarios import the barrel the way a consumer does:
+`src/index.ts` exports the family as `rating`, and `package.json` carries
+`./rating`. The scenarios import the barrel the way a consumer does:
 
 ```ts
-import { ratinggroup } from '../../index.ts';
+import { rating } from '../../index.ts';
 ```
 
 `api/manifest.json` describes the family, the conformance battery carries a
-`rating-group` descriptor, the gallery serves `#rating-group`, and the three
+`rating` descriptor, the gallery serves `#rating`, and the three
 reader matrices name it. See
-`goals/headless-components/notes/U695-rating-group-registration.md`.
+`goals/headless-components/notes/U695-rating-group-registration.md` (filed under the
+family's former name).
