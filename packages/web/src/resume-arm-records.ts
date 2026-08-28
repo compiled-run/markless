@@ -270,40 +270,6 @@ export function composedArmRecordQualifier(): ComposedArmRecordQualifier | undef
 }
 
 /**
- * Re-spells a handle id in the rendered widget's own key space, given the id of
- * the record that filed it — a branch id, whose instance path names the widget.
- *
- * Composition qualifies every handle the served payload carries; a handle bound
- * inside a flippable `@if` arm is filed at resume instead, from an arm record the
- * serializer left in module space. It lives beside the composed-record fold above
- * for one reason that is a shipped-bytes constraint, not tidiness: the dispatch
- * core statically imports fns/instance-scope.ts, so a slot instance-scope has to
- * reach must never sit in a module the locator registry owns — that edge drags
- * the whole locator chunk into the always-loaded dispatch chunk.
- */
-export type ElementHandleQualifier = (
-	handleId: string,
-	ownerRecordId: string,
-	graph?: unknown,
-) => string;
-
-let elementHandleQualifier: ElementHandleQualifier | undefined;
-
-export function installElementHandleQualifier(qualifier: ElementHandleQualifier): void {
-	elementHandleQualifier = qualifier;
-}
-
-export function qualifiedElementHandleId(
-	handleId: string,
-	ownerRecordId: string | undefined,
-	graph: unknown,
-): string {
-	return ownerRecordId && elementHandleQualifier
-		? elementHandleQualifier(handleId, ownerRecordId, graph)
-		: handleId;
-}
-
-/**
  * An IDREF outside the arms names a handle one arm binds, so the attribute is
  * earned exactly while that arm is the painted one. Keyed on the PAINTED arm,
  * never on what a materialization filed: the arm the render served is never

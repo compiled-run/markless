@@ -11,7 +11,7 @@ import {
 	missingElementLocatorError,
 } from './inline/resume-errors.ts';
 import { censusElements, spliceCensus } from './resume-census.ts';
-import { qualifiedElementHandleId } from './resume-arm-records.ts';
+import { qualifiedElementHandleId } from './resume-handle-qualifier.ts';
 
 export function materializeDomLocators(
 	root: ResumeDomElement,

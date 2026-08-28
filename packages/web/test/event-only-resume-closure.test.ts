@@ -74,23 +74,21 @@ const resumeOnDemandEntries = [
 // flag went unconditional and hosts dispose with ignoreFutureEvents; comment
 // trims inside resume-runtime.ts paid for the logic, net -13.
 // 20,983 -> 33,510 (2026-08-27): the element-handle qualifier slot moved out of
-// resume-locators.ts into resume-arm-records.ts, so resume.ts's closure gains
-// resume-arm-records.ts (13,633) and loses the 791 chars of slot text that left
-// resume-locators.ts. Exactly +12,842, measured, one file.
-// This proxy OVER-PRICES that edge and the measurement says so. The wall exists to
-// predict chunk bloat; here the shipped number moved the other way. The dispatch
-// core (resume-events.ts) statically imports fns/instance-scope.ts, which already
-// statically imports resume-arm-records.ts - so arm-records' chunk is loaded on
-// every page no matter what, and resume-locators' chunk already imported that same
-// chunk through inline/resume-errors.ts. resume.ts therefore fetches zero extra
-// bytes for this edge, while moving the slot took resume-locators + resume-census
-// back OUT of the always-loaded dispatch chunk: largest runtime chunk 6,202 -> 5,149
-// gzip on vite-csr, below its pre-qualifier 5,151.
-// NOT paid, and owed: the slot itself is ~330 chars. Hosting it in its own module
-// instead of inside a 13,633-char one would cost this wall ~+350 rather than
-// +12,842. That module is the repayment; this number is the price of keeping the
-// slot in the only module the contract allowed.
-const sourceByteLimit = 33510;
+// resume-locators.ts into resume-arm-records.ts, the only module the then-contract
+// allowed that fns/instance-scope.ts already imported. resume.ts's closure gained
+// the whole of resume-arm-records.ts for a ~330-char slot. The proxy over-priced
+// the edge - the shipped chunk moved the other way, 6,202 -> 5,149 gzip on vite-csr
+// - but the wall was still raised without real code behind it, and that was named
+// as debt owed at the time.
+// 33,510 -> 20,970 (2026-08-27, repaid): the slot now lives in its own module,
+// resume-handle-qualifier.ts, which resume-locators.ts and fns/instance-scope.ts
+// both import. resume-arm-records.ts leaves resume.ts's closure entirely and the
+// 846-char module takes its place: resume.ts measures 20,728, and the largest
+// closure this wall governs is once more resume-runtime.ts at 20,970 - a
+// single-file closure nothing here touches. Every governed entry re-measured.
+// The chunk anchors that justified the move are unchanged: the dispatch core still
+// never reaches resume-locators, so the locator registry stays demand-loaded.
+const sourceByteLimit = 20970;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',
@@ -150,6 +148,24 @@ test.each([
 	for (const forbidden of forbiddenResumeSerializerFiles) {
 		expect(relativeClosure).not.toContain(forbidden);
 	}
+});
+
+// The qualifier slot has its own module so neither side drags the other in: the
+// locator registry must not pull the arm-record fold into browser resume, and the
+// dispatch core (which reaches fns/instance-scope.ts) must not pull the locator
+// registry into the always-loaded chunk.
+test('the element-handle qualifier slot stands in its own module', () => {
+	const closure = collectStaticImportClosure(resumeEntry);
+	const relativeClosure = closure.files.map((file) => toRepoPath(file)).sort();
+
+	expect(relativeClosure).toContain('packages/web/src/resume-handle-qualifier.ts');
+	expect(relativeClosure).not.toContain('packages/web/src/resume-arm-records.ts');
+
+	const qualifier = readFileSync(
+		join(repoRoot, 'packages/web/src/resume-handle-qualifier.ts'),
+		'utf8',
+	);
+	expect(staticRuntimeImportSpecifiers(qualifier)).toEqual([]);
 });
 
 test('resume core and on-demand runtime modules keep static source closures lean', () => {
