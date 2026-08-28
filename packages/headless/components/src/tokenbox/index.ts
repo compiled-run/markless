@@ -18,7 +18,6 @@ export type {
 	TokenBoxInputProps,
 	TokenBoxItemInstanceState,
 	TokenBoxItemTriggerProps,
-	TokenBoxKeyedSegment,
 	TokenBoxLabelProps,
 	TokenBoxRect,
 	TokenBoxRootProps,

@@ -1,6 +1,6 @@
 import { state } from '@markless/core';
 import { tokenbox } from '../../index.ts';
-import type { TokenBoxKeyedSegment } from '../tokenbox-types.ts';
+import type { TokenBoxSegment } from '../tokenbox-types.ts';
 
 // A value that already interleaves text and tokens: the shape a saved draft is
 // restored into. `defaultValue` is read once, and the surface owns itself after
@@ -19,7 +19,7 @@ export default function Prefilled() @{
 				{ kind: 'token', value: 'doc_9', label: 'Q3 plan' },
 				{ kind: 'text', text: ' today' },
 			]}
-			onChange={(next: readonly TokenBoxKeyedSegment[]) => {
+			onChange={(next: readonly TokenBoxSegment[]) => {
 				held = next
 					.map((one) => (one.kind === 'token' ? `[${one.value}]` : one.text))
 					.join('');

@@ -1,8 +1,4 @@
-import type {
-	TokenBoxKeyedSegment,
-	TokenBoxSegment,
-	TokenBoxTrigger,
-} from './tokenbox-types.ts';
+import type { TokenBoxSegment, TokenBoxTrigger } from './tokenbox-types.ts';
 
 /**
  * The tokenbox's value arithmetic, held on its own.
@@ -18,30 +14,6 @@ import type {
  * measures (`token-range.ts`), which is what lets the two halves meet without
  * either one walking a tree.
  */
-
-let minted = 0;
-
-/** A fresh key for a rendered run. Ids are opaque and never leave the family. */
-export function mintId(): string {
-	minted += 1;
-	return `t${minted}`;
-}
-
-/**
- * The segments with a key on every one.
- *
- * The array is handed straight back when every segment already carries a key, so
- * a consumer echoing `onChange` output into `value` produces no new identity and
- * the root's re-render check sees nothing changed.
- */
-export function withIds(segments: readonly TokenBoxSegment[]): readonly TokenBoxKeyedSegment[] {
-	if (segments.every((segment) => segment.id !== undefined)) {
-		return segments as readonly TokenBoxKeyedSegment[];
-	}
-	return segments.map((segment) =>
-		segment.id === undefined ? { ...segment, id: mintId() } : (segment as TokenBoxKeyedSegment),
-	);
-}
 
 /** A token's value, or '' for a text run. Lets markup read the union without narrowing. */
 export function valueOf(segment: TokenBoxSegment): string {
@@ -98,7 +70,7 @@ export function tokenSpans(
  * how a caller knows to leave the caret alone.
  */
 export type TokenBoxEdit = {
-	readonly segments: readonly TokenBoxKeyedSegment[];
+	readonly segments: readonly TokenBoxSegment[];
 	readonly at: number;
 };
 
@@ -145,7 +117,7 @@ export function splice(
 	const kept = before.filter(carries);
 	const added = replacement.filter(carries);
 	return {
-		segments: withIds([...kept, ...added, ...after.filter(carries)]),
+		segments: [...kept, ...added, ...after.filter(carries)],
 		at: added.length === 0 ? -1 : kept.length + added.length - 1,
 	};
 }
@@ -208,11 +180,9 @@ export function rosterIndex(segments: readonly TokenBoxSegment[], index: number)
 export function removeToken(
 	segments: readonly TokenBoxSegment[],
 	value: string,
-): readonly TokenBoxKeyedSegment[] {
+): readonly TokenBoxSegment[] {
 	const kept = segments.filter((segment) => segment.kind !== 'token' || segment.value !== value);
-	return kept.length === segments.length
-		? withIds(segments)
-		: withIds(kept.filter(carries));
+	return kept.length === segments.length ? segments : kept.filter(carries);
 }
 
 /**
@@ -285,7 +255,7 @@ export function serialize(segments: readonly TokenBoxSegment[]): string {
  * family writes is dropped rather than guessed at, so a mangled field gives an
  * empty box instead of a half-parsed one.
  */
-export function parse(text: string): readonly TokenBoxKeyedSegment[] {
+export function parse(text: string): readonly TokenBoxSegment[] {
 	let raw: unknown;
 	try {
 		raw = JSON.parse(text);
@@ -306,7 +276,7 @@ export function parse(text: string): readonly TokenBoxKeyedSegment[] {
 			out.push({ kind: 'token', value: one.value, label: one.label });
 		}
 	}
-	return withIds(out.filter(carries));
+	return out.filter(carries);
 }
 
 /**
@@ -325,7 +295,7 @@ export function fromParts(
 		readonly value: string;
 		readonly label: string;
 	}>,
-): readonly TokenBoxKeyedSegment[] {
+): readonly TokenBoxSegment[] {
 	const out: TokenBoxSegment[] = [];
 	let at = 0;
 	for (const token of tokens) {
@@ -337,7 +307,7 @@ export function fromParts(
 	}
 	const tail = text.slice(at);
 	if (tail !== '') out.push({ kind: 'text', text: tail });
-	return withIds(out);
+	return out;
 }
 
 /** Whether two values hold the same text and the same tokens in the same order. */

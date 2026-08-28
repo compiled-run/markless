@@ -1,6 +1,6 @@
 import { state } from '@markless/core';
 import { tokenbox } from '../../index.ts';
-import type { TokenBoxKeyedSegment } from '../tokenbox-types.ts';
+import type { TokenBoxSegment } from '../tokenbox-types.ts';
 
 // The docs "prompt field" recipe in miniature, and the starter a consumer
 // copies. The box owns the trigger context; the suggestion list is ordinary
@@ -36,7 +36,7 @@ export default function Mention() @{
 			data-testid="root"
 			name="prompt"
 			triggers={['@', '/']}
-			onChange={(next: readonly TokenBoxKeyedSegment[]) => {
+			onChange={(next: readonly TokenBoxSegment[]) => {
 				held = next
 					.map((one) => (one.kind === 'token' ? `[${one.value}]` : one.text))
 					.join('');

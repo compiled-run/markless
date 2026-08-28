@@ -1,17 +1,9 @@
 import type { PropsOf, Seeded } from '@markless/core';
 
-/**
- * One run of ordinary text in a tokenbox value.
- *
- * `id` is the family's own key for the rendered run. A consumer writing a
- * prefilled value leaves it out and the root mints one; a consumer echoing back
- * what `onChange` handed them keeps the one it carries, which is what stops an
- * echo from re-rendering the surface under the caret.
- */
+/** One run of ordinary text in a tokenbox value. */
 export type TokenBoxTextSegment = {
 	readonly kind: 'text';
 	readonly text: string;
-	readonly id?: string;
 };
 
 /**
@@ -26,7 +18,6 @@ export type TokenBoxTokenSegment = {
 	readonly kind: 'token';
 	readonly value: string;
 	readonly label: string;
-	readonly id?: string;
 };
 
 /**
@@ -35,9 +26,6 @@ export type TokenBoxTokenSegment = {
  * `string[]` with the typed text held outside it.
  */
 export type TokenBoxSegment = TokenBoxTextSegment | TokenBoxTokenSegment;
-
-/** A segment after the root has minted its key: the shape `onChange` reports. */
-export type TokenBoxKeyedSegment = TokenBoxSegment & { readonly id: string };
 
 /**
  * Where an autocomplete popover belongs, and what to search for.
@@ -95,9 +83,10 @@ export type TokenBoxRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	/**
 	 * The value, in order. Omit it and the box starts empty.
 	 *
-	 * Hold it on a state object rather than building a fresh array literal each
-	 * render: the root re-renders the surface when it is handed an array it did
-	 * not itself emit, and re-rendering a contenteditable moves the caret.
+	 * Handing back what `onChange` gave you is safe under the caret: the surface
+	 * keys its runs on content and position, so a value that comes back
+	 * structurally unchanged patches nothing. A genuinely different value does
+	 * re-render, which is what controlling it is for.
 	 */
 	readonly value?: readonly TokenBoxSegment[];
 	/**
@@ -127,7 +116,7 @@ export type TokenBoxRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	/** Submitted under this name by `tokenbox.field`, as one JSON string. */
 	readonly name?: string;
 	/** Called with the whole value every time it changes. */
-	readonly onChange?: (value: readonly TokenBoxKeyedSegment[]) => void;
+	readonly onChange?: (value: readonly TokenBoxSegment[]) => void;
 };
 
 /**
@@ -137,29 +126,25 @@ export type TokenBoxRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
  *
  * `segments` is what the surface RENDERS. It is deliberately not written while a
  * person types: the browser is editing those text nodes, and a write would
- * re-render them out from under the caret. `emitted` is the last array handed to
- * `onChange`, and comparing it against the `value` prop by identity is what
- * tells a consumer's echo apart from a real external change.
+ * re-render them out from under the caret.
  */
 export type TokenBoxInstanceState = Seeded<
 	TokenBoxRootProps,
 	'disabled' | 'required' | 'invalid' | 'multiline' | 'triggers' | 'name'
 > & {
 	/** The rendered value. Written on structural changes only. */
-	segments: readonly TokenBoxKeyedSegment[];
+	segments: readonly TokenBoxSegment[];
 	/**
 	 * The value as it stands right now, including text the browser has typed into
 	 * the surface since the last structural change. This is what `tokenbox.field`
 	 * submits and what a consumer's own summary should read; `segments` is only
 	 * what was last rendered.
 	 */
-	reported: readonly TokenBoxKeyedSegment[];
+	reported: readonly TokenBoxSegment[];
 	/** The trigger context under the caret, or `undefined` when there is none. */
 	trigger: TokenBoxTrigger | undefined;
 	/** True between `compositionstart` and `compositionend`. Nothing mutates while it is up. */
 	composing: boolean;
-	/** Whether `defaultValue` has been taken. A seed is read once, not every render. */
-	seeded: boolean;
 	onChange?: TokenBoxRootProps['onChange'];
 };
 

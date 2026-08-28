@@ -1,6 +1,6 @@
 import { state } from '@markless/core';
 import { tokenbox } from '../../index.ts';
-import type { TokenBoxKeyedSegment } from '../tokenbox-types.ts';
+import type { TokenBoxSegment } from '../tokenbox-types.ts';
 
 // Two of them alive in one document: every handle read, every minted id and
 // every instance write has to answer for its OWN widget. The left one takes
@@ -14,7 +14,7 @@ export default function TwoTokenBoxes() @{
 			data-testid="left-root"
 			name="left"
 			triggers={['@']}
-			onChange={(next: readonly TokenBoxKeyedSegment[]) => {
+			onChange={(next: readonly TokenBoxSegment[]) => {
 				leftHeld = next
 					.map((one) => (one.kind === 'token' ? `[${one.value}]` : one.text))
 					.join('');
@@ -31,7 +31,7 @@ export default function TwoTokenBoxes() @{
 				{ kind: 'text', text: 'see ' },
 				{ kind: 'token', value: 'doc_9', label: 'Q3 plan' },
 			]}
-			onChange={(next: readonly TokenBoxKeyedSegment[]) => {
+			onChange={(next: readonly TokenBoxSegment[]) => {
 				rightHeld = next
 					.map((one) => (one.kind === 'token' ? `[${one.value}]` : one.text))
 					.join('');

@@ -235,7 +235,50 @@ type checker and all four shaped the design.
    constants.** `MARKLESS_SHARED_SEED_UNSUPPORTED`. `tokenbox.segments = <prop>`
    is legal; `tokenbox.segments = withIds(defaultValue)` is not.
 
-## Known red, and the redesign it needs
+## What the redesign changed, and the two walls it hit
+
+The root now assigns `tokenbox.segments = value ?? defaultValue ?? []` and
+`tokenbox.reported` the same way — both legal seeds, both live: a changed `value`
+prop DOES reach the cell (witnessed: a component reading `segments.length` went
+0 to 2 when a reset button replaced the value). So the note's earlier claim that
+`reported` cannot be seeded from the root is wrong, and `tokenbox.field` needs no
+fallback. `id` is off the public segment type and `withIds`/`mintId` are gone.
+
+Two framework walls stopped the rest, both witnessed in the ui lane:
+
+1. **A `@for` is reactive only over a state cell read directly.** Over a
+   `computed()` — component-local OR on the shared factory, written
+   self-contained the way ink writes its `rows` — the surface rendered its first
+   pass and then never patched again, while a plain text binding on the same cell
+   in another component updated. Repeating over `tokenbox.segments` itself
+   re-rendered immediately.
+2. **A repeat key must be a static property path on the row item.**
+   `MARKLESS_REPEAT_KEY_UNSTABLE` refuses `key keyOf(segment, at)`; the key is
+   required (`MARKLESS_REPEAT_KEY_REQUIRED`); `index at; key at` compiles with a
+   `MARKLESS_REPEAT_KEY_IS_INDEX` warning. So "key on content plus position"
+   cannot be written at all — the only content key available is a field the
+   segment already carries, which is the `id` this redesign removed because the
+   root cannot mint one.
+
+The surface therefore keys by position today. That renders correctly and holds
+the caret through ordinary typing, but an external value change does not reach
+the surface, so the controlled row is still red.
+
+Also found and fixed: every engine stores a space that would collapse at the end
+of a line as U+00A0, so the derived value came back with non-breaking spaces in
+it. `asValueText` in `token-range.ts` normalises them where the DOM's text
+becomes the value; the substitution is one character for one, so caret offsets
+survive it.
+
+## Lane state after the redesign
+
+32 of 40 rows pass. The 8 red are four rows in both modes: the trigger context
+never opens (cause not yet found — `settle` derives and reports correctly, so it
+is the `trigger` cell or its cross-module read), the token-insertion row that
+polls the same trigger, the controlled row (wall 1 above), and the axe row, whose
+`textContent` poll still spells a plain space where the DOM holds U+00A0.
+
+## Superseded: known red, and the redesign it needs
 
 **The family compiles and the ui lane runs 40 rows: 10 pass, 30 fail.** Everything
 that asserts rendered content fails, because the surface renders empty.

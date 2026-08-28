@@ -15,10 +15,9 @@ import {
 	rosterIndex,
 	same,
 	textOf,
+	valueOf,
 	serialize,
 	triggerAt,
-	valueOf,
-	withIds,
 } from './token-walk.ts';
 import type {
 	TokenBoxDescriptionProps,
@@ -28,7 +27,6 @@ import type {
 	TokenBoxInstanceState,
 	TokenBoxItemInstanceState,
 	TokenBoxItemTriggerProps,
-	TokenBoxKeyedSegment,
 	TokenBoxLabelProps,
 	TokenBoxRootProps,
 	TokenBoxSegment,
@@ -51,11 +49,10 @@ export const tokenboxState = shared(
 			multiline: false,
 			triggers: [] as readonly string[],
 			name: '',
-			segments: [] as readonly TokenBoxKeyedSegment[],
-			reported: [] as readonly TokenBoxKeyedSegment[],
+			segments: [] as readonly TokenBoxSegment[],
+			reported: [] as readonly TokenBoxSegment[],
 			trigger: undefined as TokenBoxInstanceState['trigger'],
 			composing: false,
-			seeded: false,
 		});
 		const labelEl = element<HTMLLabelElement>();
 		const surfaceEl = element<HTMLDivElement>();
@@ -77,25 +74,7 @@ export const tokenboxState = shared(
 			tokenEls,
 			textEls,
 			// literal function type: a callback slot is only recognised from the written annotation
-			onChange: undefined as ((value: readonly TokenBoxKeyedSegment[]) => void) | undefined,
-
-			/** What the box starts with, taken once. The root calls it; nothing else should. */
-			seed(initial: readonly TokenBoxSegment[] | undefined) {
-				if (tokenbox.seeded || initial === undefined) return;
-				const next = withIds(initial);
-				tokenbox.seeded = true;
-				tokenbox.reported = next;
-				tokenbox.segments = next;
-			},
-
-			/** Take a controlled value, passing over an array this family itself emitted. */
-			adopt(value: readonly TokenBoxSegment[] | undefined) {
-				if (value === undefined || value === tokenbox.reported) return;
-				const next = withIds(value);
-				if (same(next, tokenbox.reported)) return;
-				tokenbox.reported = next;
-				tokenbox.segments = next;
-			},
+			onChange: undefined as ((value: readonly TokenBoxSegment[]) => void) | undefined,
 
 			/**
 			 * Take what the surface is showing as the value, and report it.
@@ -223,8 +202,10 @@ export function TokenBoxRoot({
 	tokenbox.multiline = multiline;
 	tokenbox.triggers = triggers;
 	tokenbox.name = name;
-	tokenbox.seed(defaultValue);
-	tokenbox.adopt(value);
+	// Assigned straight across, never derived: a component body seeds a shared
+	// instance only from its own props or from constants.
+	tokenbox.segments = value ?? defaultValue ?? [];
+	tokenbox.reported = value ?? defaultValue ?? [];
 
 	<div
 		{...rest}
@@ -364,7 +345,9 @@ export function TokenBoxInput({
 	>
 		{/* A token's label IS its text: that is what a reader speaks crossing it,
 		    and what a copy of a range spanning it yields. */}
-		@for (const segment of tokenbox.segments; key segment.id) {
+		{/* A token's label IS its text: that is what a reader speaks crossing it,
+		    and what a copy of a range spanning it yields. */}
+		@for (const segment of tokenbox.segments; index at; key at) {
 			@if (segment.kind === 'token') {
 				<span
 					el={tokenbox.tokenEls}
