@@ -1,10 +1,10 @@
+import { jsonSourceWithNonFiniteNumbers } from '@markless/serializer';
 import { parseModule } from '../../js-ast.ts';
 import type { PublicRenderModuleArtifact, PublicRenderModuleInput } from '../../artifacts.ts';
 import type { AnyNode } from '../../ast/nodes.ts';
 import { collectPublicRenderComponentDefinitions } from './component-definitions.ts';
 import { collectSsrDeriveSetDiagnostics } from './derive-set.ts';
 import { emitDirectPublicRenderModule } from './direct-module.ts';
-import { jsonSourceWithNonFiniteNumbers } from './non-finite-json.ts';
 import { emitPublicSsrRenderModule } from './ssr-module.ts';
 import { firstComponentRoot, selectPublicRenderRoot } from './plan.ts';
 import { collectSeedChildrenDiagnostics } from './seed-children-diagnostics.ts';

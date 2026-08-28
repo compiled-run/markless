@@ -1,7 +1,6 @@
-import { nonFiniteName } from '@markless/serializer';
+import { jsonSourceWithNonFiniteNumbers, nonFiniteName } from '@markless/serializer';
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../../src/index.ts';
-import { jsonSourceWithNonFiniteNumbers } from '../../src/passes/public-render/non-finite-json.ts';
 import { renderBodyLines } from '../../src/passes/public-render/render-body.ts';
 
 /**
