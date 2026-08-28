@@ -384,21 +384,9 @@ export function childrenWidgetRootMarkerLine(
  * spawn a second instance beside the one it meant to read.
  */
 export function widgetRootComponents(input: PublicRenderModuleInput): Map<string, string> {
-	const seedingComponent = new Map<string, string>();
-	for (const symbol of input.symbolResolver.symbols) {
-		if (symbol.kind !== 'shared-seed' || !symbol.componentName) continue;
-		const definitionId = symbol.graphNodeId.slice(0, symbol.graphNodeId.lastIndexOf('/'));
-		if (!seedingComponent.has(definitionId))
-			seedingComponent.set(definitionId, symbol.componentName);
-	}
+	const seedingComponent = seedingComponents(input);
 	const roots = new Map<string, string>();
-	for (const definition of input.semanticGraph.sharedDefinitions) {
-		if (definition.scope !== 'widget') continue;
-		// The id carries the declaring module's filename, so it answers ownership.
-		if (
-			definition.id !== sharedDefinitionId(input.semanticGraph.filename, definition.exportedName)
-		)
-			continue;
+	for (const definition of declaredWidgetDefinitions(input)) {
 		const resolver = input.semanticGraph.sharedInstances.find(
 			(instance) => instance.definitionId === definition.id && instance.componentName,
 		);
@@ -406,6 +394,89 @@ export function widgetRootComponents(input: PublicRenderModuleInput): Map<string
 		if (owner) roots.set(definition.id, owner);
 	}
 	return roots;
+}
+
+function seedingComponents(input: PublicRenderModuleInput): Map<string, string> {
+	const seedingComponent = new Map<string, string>();
+	for (const symbol of input.symbolResolver.symbols) {
+		if (symbol.kind !== 'shared-seed' || !symbol.componentName) continue;
+		const definitionId = symbol.graphNodeId.slice(0, symbol.graphNodeId.lastIndexOf('/'));
+		if (!seedingComponent.has(definitionId))
+			seedingComponent.set(definitionId, symbol.componentName);
+	}
+	return seedingComponent;
+}
+
+function declaredWidgetDefinitions(input: PublicRenderModuleInput) {
+	// The id carries the declaring module's filename, so it answers ownership.
+	return input.semanticGraph.sharedDefinitions.filter(
+		(definition) =>
+			definition.scope === 'widget' &&
+			definition.id === sharedDefinitionId(input.semanticGraph.filename, definition.exportedName),
+	);
+}
+
+/**
+ * The components that CARRY a widget-scoped definition's cells without rooting
+ * it, keyed by definition id.
+ *
+ * Rooting follows the cells, and the cells can only be emitted once per compile
+ * — so a page that never renders the designated root above would find the
+ * definition rooted nowhere and read a cell that exists at no id at all. Every
+ * resolver carrying them closes that, and the mark is what keeps the extra
+ * carriers from composing as roots of their own.
+ *
+ * Only a definition NOTHING seeds has carriers: a seeded one roots where its
+ * seed lands, which is a component the page must render for the seed to run, so
+ * every family that writes its shared state in a body is untouched.
+ */
+export function widgetFallbackComponents(
+	input: PublicRenderModuleInput,
+): Map<string, ReadonlyArray<string>> {
+	const seedingComponent = seedingComponents(input);
+	const roots = widgetRootComponents(input);
+	const fallbacks = new Map<string, ReadonlyArray<string>>();
+	for (const definition of declaredWidgetDefinitions(input)) {
+		if (seedingComponent.has(definition.id)) continue;
+		const root = roots.get(definition.id);
+		const carriers = [
+			...new Set(
+				input.semanticGraph.sharedInstances.flatMap((instance) =>
+					instance.definitionId === definition.id &&
+					instance.componentName &&
+					instance.componentName !== root
+						? [instance.componentName]
+						: [],
+				),
+			),
+		];
+		if (carriers.length > 0) fallbacks.set(definition.id, carriers);
+	}
+	return fallbacks;
+}
+
+/**
+ * The same answer as a field on the SSR render OUTPUT, which is the one channel
+ * that reaches composition from every child placement: the compose child a
+ * render-data placement pushes is built by the PLACING module, which cannot see
+ * whether an imported child carries a family without rooting it.
+ */
+export function widgetFallbacksOutputField(
+	input: PublicRenderModuleInput,
+	componentName: string,
+): string {
+	const carried = widgetFallbackDefinitionIds(input, componentName);
+	return carried.length > 0 ? `, widgetFallbacks: ${JSON.stringify(carried)}` : '';
+}
+
+/** The widget-scoped definitions one component carries without rooting. */
+export function widgetFallbackDefinitionIds(
+	input: PublicRenderModuleInput,
+	componentName: string,
+): string[] {
+	return [...widgetFallbackComponents(input)].flatMap(([definitionId, carriers]) =>
+		carriers.includes(componentName) ? [definitionId] : [],
+	);
 }
 
 /**

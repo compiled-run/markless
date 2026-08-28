@@ -50,6 +50,16 @@ export type SharedSeedPass = {
 	 * because that keeps a page with no widget seeds from loading either.
 	 */
 	childrenWidgetRoot?: (surface: PrerenderDataSurface, componentName: string) => string;
+	/**
+	 * The widget families a placed child CARRIES the cells of without rooting.
+	 * Which families' cells a child owns is not the same question as which it
+	 * starts: every resolver of a family nothing seeds owns them. It rides here
+	 * for the same reason the line above does.
+	 */
+	widgetFallbacks?: (
+		surface: PrerenderDataSurface,
+		componentName: string,
+	) => ReadonlyArray<string> | undefined;
 } & ((
 	context: {
 		readonly surface: PrerenderDataSurface;

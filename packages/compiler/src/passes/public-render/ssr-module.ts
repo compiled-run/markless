@@ -41,6 +41,7 @@ import {
 	elementHandleMarkerSource,
 	componentBoundElementHandles,
 	projectedHandleEdgeIdsUnder,
+	widgetFallbacksOutputField,
 	widgetRootMarkerLine,
 } from './shared-seed-pass.ts';
 import { emitCatalogHelperImports, stateRuntimeImports } from './runtime-helpers.ts';
@@ -318,6 +319,9 @@ export function emitPublicSsrRenderModule(
 		'		externalSymbolIds: marklessSsrComposition.externalSymbolIds,',
 		'		structure: marklessSsrRendered.structure,',
 		'		structureTokens: marklessSsrRendered.structureTokens,',
+		...(widgetFallbacksOutputField(input, rootInfo.componentName)
+			? [`	${widgetFallbacksOutputField(input, rootInfo.componentName).slice(2)},`]
+			: []),
 		'	};',
 		remapsInternalGraphProps
 			? `	marklessSsrRemapGraphOutput(marklessSsrOutput, ${JSON.stringify(internalGraphProps)});`

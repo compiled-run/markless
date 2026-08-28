@@ -11,20 +11,17 @@ import SeededPage from './no-writer-page.tsrx';
  * A widget-scope `shared()` collection no component body ever writes, pushed to
  * by a sibling part's handler.
  *
- * The first three shapes are green and are the floor a fix must not break: no
- * body writer is NOT an ingredient, and neither is an empty seed. The failing
- * shapes differ in one thing only — which component of the family module the
- * page renders outermost. The cells of a widget-scoped definition go to the
- * first component in its module that resolves it, and only a composed child
- * carrying those cells registers a widget root, so a page whose outermost part
- * is some other component roots the widget nowhere: the part's read answers
- * undefined and the handler's `[...box.items, 'gamma']` throws
- * `context.graph.read is not a function or its return value is not iterable`.
+ * No body writer is not an ingredient, and neither is an empty seed. What used
+ * to separate the rows was which component of the family module the page
+ * renders outermost: the cells of a widget-scoped definition went to one
+ * component, and only a composed child carrying them registered a widget root,
+ * so a page whose outermost part was some other component rooted the widget
+ * nowhere and the handler's `[...box.items, 'gamma']` spread undefined.
  *
- * That throw is an unhandled rejection, which fails the whole file, so it is
- * captured below and the rows assert instead of dying. The mechanism and the
- * two owning functions are in
- * goals/headless-components/notes/U715-shared-collection-no-body-writer.md.
+ * A family nothing seeds now hands its cells to every component that resolves
+ * it, and the compiler marks the extra carriers so only the designated root
+ * composes as one. A throw would be an unhandled rejection, which fails the
+ * whole file, so it is captured below and the rows assert instead of dying.
  */
 afterEach(() => cleanup());
 
@@ -86,29 +83,21 @@ for (const mode of ['CSR', 'SSR'] as const) {
 		await takesTheWrite([]);
 	});
 
-	// Pinned: the definition's cells went to a component this page never renders,
-	// so no composed child registers a widget root, the part's read stays in page
-	// space where no cell exists, and the handler's spread of undefined throws.
-	test.fails(
-		`${mode}: a sibling writer reaches a widget whose cell-owning component never renders`,
-		async () => {
-			if (mode === 'CSR') await render(AloofPage);
-			else await renderSSR(AloofPage);
+	// Pins marked rooting: nothing seeds this family, so every component that
+	// resolves it carries the cells and only the designated root composes as a
+	// widget root. The sibling parts of a page that renders none of them are the
+	// one instance of the family on the page.
+	test(`${mode}: a sibling writer reaches a widget whose cell-owning component never renders`, async () => {
+		if (mode === 'CSR') await render(AloofPage);
+		else await renderSSR(AloofPage);
 
-			await takesTheWrite([]);
-		},
-	);
+		await takesTheWrite([]);
+	});
 
-	// Pinned at the same mechanism: nesting the writer inside a part that does
-	// resolve the definition roots nothing either, because rooting follows the
-	// cells rather than the render tree.
-	test.fails(
-		`${mode}: a nested writer reaches a widget whose cell-owning component never renders`,
-		async () => {
-			if (mode === 'CSR') await render(NestedPage);
-			else await renderSSR(NestedPage);
+	test(`${mode}: a nested writer reaches a widget whose cell-owning component never renders`, async () => {
+		if (mode === 'CSR') await render(NestedPage);
+		else await renderSSR(NestedPage);
 
-			await takesTheWrite([]);
-		},
-	);
+		await takesTheWrite([]);
+	});
 }

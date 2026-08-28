@@ -14,6 +14,7 @@ import {
 	staticProjectionChildren,
 	type ChildrenProjectionLink,
 	renderedWidgetRootsOf,
+	widgetFallbacksOf,
 	widgetRootsOf,
 } from '../prerender/children-projection.ts';
 import { marklessInstancePath } from './instance-scope.ts';
@@ -650,5 +651,6 @@ export function installMarklessSharedSeedPass(): void {
 	// The composition seam asks the same declared chain this pass descends, so the
 	// widget a part resolves to is one answer given to both.
 	seedProjectingChild.childrenWidgetRoot = childrenWidgetRootPath;
+	seedProjectingChild.widgetFallbacks = widgetFallbacksOf;
 	installSharedSeedPass(seedProjectingChild);
 }
