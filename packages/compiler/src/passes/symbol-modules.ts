@@ -12,6 +12,7 @@ import type {
 	PlannedSymbolCrossModuleInline,
 	RenderDataArtifact,
 	RenderDataBranch,
+	SemanticElementRosterPosition,
 	SemanticGraphArtifact,
 	SemanticMarkupChunk,
 	SemanticMarkupSlot,
@@ -3189,7 +3190,13 @@ function syncComputedDeriveStatements(
 			? asNodes(body.body)
 			: [{ type: 'ReturnStatement', argument: body } as AnyNode];
 
-	rewriteDeriveReads(statements, symbol.dependencies ?? [], captureSlots, wrappedSource);
+	rewriteDeriveReads(
+		statements,
+		symbol.dependencies ?? [],
+		captureSlots,
+		wrappedSource,
+		symbol.rosterPosition,
+	);
 
 	const declarationStatements = (parsed?.declarations ??
 		[]) as unknown as ReadonlyArray<EmissionNode>;
@@ -3273,14 +3280,19 @@ function rewriteDeriveReads(
 	dependencies: ReadonlyArray<SemanticGraphDependency>,
 	captureSlots: ReadonlyArray<CaptureSlot>,
 	wrappedSource: string,
+	rosterPosition?: SemanticElementRosterPosition,
 ): void {
-	if (dependencies.length === 0) return;
+	if (dependencies.length === 0 && !rosterPosition) return;
 
 	const visit = (
 		node: AnyNode,
 		parent: AnyNode | undefined,
 		replace: ((next: EmissionNode) => void) | null,
 	): void => {
+		if (replace && rosterPosition && nodeText(node, wrappedSource) === rosterPosition.source) {
+			replace(rosterPositionNode(rosterPosition));
+			return;
+		}
 		const dependency = matchingDependency(node, parent, dependencies, wrappedSource);
 		if (dependency && replace) {
 			replace(deriveReadNode(dependency, captureSlots));
@@ -3353,10 +3365,30 @@ function matchingDependency(
 ): SemanticGraphDependency | null {
 	if (!isGraphReadExpression(node)) return null;
 	if (!isValuePositionGraphRead(node, parent)) return null;
-	if (typeof node.start !== 'number' || typeof node.end !== 'number') return null;
+	const text = nodeText(node, wrappedSource);
+	if (text === null) return null;
 
-	const text = wrappedSource.slice(node.start, node.end);
 	return dependencies.find((dependency) => dependency.source === text) ?? null;
+}
+
+function nodeText(node: AnyNode, wrappedSource: string): string | null {
+	if (typeof node.start !== 'number' || typeof node.end !== 'number') return null;
+	return wrappedSource.slice(node.start, node.end);
+}
+
+/**
+ * `context.rosterPosition("<roster node>", "<member handle node>")` — the one
+ * call both regimes answer: at server render from the order the instance emitted
+ * its parts, after resume from the roster's live document order.
+ *
+ * The member handle travels as an id rather than as a value, because a derive
+ * body holds no DOM node to pass; the answering side owns the lookup.
+ */
+function rosterPositionNode(record: SemanticElementRosterPosition): EmissionNode {
+	return callNode(memberChainNode('context.rosterPosition'), [
+		literalNode(record.rosterGraphNodeId),
+		literalNode(record.handleGraphNodeId),
+	]);
 }
 
 /**

@@ -8,6 +8,7 @@ import type {
 	SemanticBehavior,
 	SemanticElementHandleBinding,
 	SemanticElementHandleIdref,
+	SemanticElementRosterPosition,
 	SemanticEvent,
 	SemanticGraphAlias,
 	SemanticGraphBinding,
@@ -54,6 +55,9 @@ export type MutableSemanticGraphArtifact = {
 	overlays: SemanticOverlay[];
 	elementHandleBindings: SemanticElementHandleBinding[];
 	elementHandleIdrefs: SemanticElementHandleIdref[];
+	// Assigned only when a module has one, so an artifact without the shape keeps
+	// the exact key set it had before roster positions existed.
+	elementRosterPositions?: SemanticElementRosterPosition[];
 	localBindings: SemanticLocalBinding[];
 	localDeclarations: SemanticLocalDeclaration[];
 	aliases: SemanticGraphAlias[];

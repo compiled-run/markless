@@ -792,6 +792,37 @@ export type SemanticElementHandleIdref = {
 	readonly asyncBoundaryId?: string;
 };
 
+/**
+ * The one derive-time handle read the compiler answers instead of refusing: a
+ * part asking where it sits in its family's roster.
+ *
+ * Every other handle read in a `computed()` stays refused, because a handle is a
+ * DOM locator and a derive body holds no DOM. This shape is different in kind:
+ * the roster and the part's own handle are bound on ONE element of the part
+ * (`el={[w.itemEls, mine]}`), so the question is about render order, which the
+ * framework knows on both sides — emission order within the widget instance at
+ * server render, the roster's live document order after resume. They agree, so
+ * one lowered call answers both.
+ */
+export type SemanticElementRosterPosition = {
+	/** The `computed()` whose whole body is the position query. */
+	readonly computedGraphNodeId: string;
+	readonly computedName: string;
+	/** The part that declared both the derive and its own handle. */
+	readonly componentName: string;
+	/** The plural element() handle the position is measured in. */
+	readonly rosterGraphNodeId: string;
+	readonly rosterSource: string;
+	/** The part's own singular handle, one member of that roster. */
+	readonly handleGraphNodeId: string;
+	readonly handleName: string;
+	/** The host element both handles are bound on; the proof they are the same element. */
+	readonly hostNodeId: string;
+	/** The authored call this replaces, matched verbatim when lowering. */
+	readonly source: string;
+	readonly sourceSpan?: SourceSpan;
+};
+
 export type SemanticBehavior = {
 	readonly hostNodeId: string;
 	readonly source: string;
@@ -1013,6 +1044,9 @@ export type SemanticGraphArtifact = {
 	readonly overlays: ReadonlyArray<SemanticOverlay>;
 	readonly elementHandleBindings: ReadonlyArray<SemanticElementHandleBinding>;
 	readonly elementHandleIdrefs: ReadonlyArray<SemanticElementHandleIdref>;
+	// Omitted when empty: a module with no roster-position derive carries no key
+	// for one, so every artifact that predates this record is byte-unchanged.
+	readonly elementRosterPositions?: ReadonlyArray<SemanticElementRosterPosition>;
 	readonly localBindings: ReadonlyArray<SemanticLocalBinding>;
 	readonly localDeclarations: ReadonlyArray<SemanticLocalDeclaration>;
 	readonly aliases: ReadonlyArray<SemanticGraphAlias>;
@@ -1482,6 +1516,9 @@ export type PlannedSymbol =
 			readonly source: string;
 			readonly dependencies?: ReadonlyArray<SemanticGraphDependency>;
 			readonly moduleImports?: ReadonlyArray<SemanticModuleImport>;
+			// Present when the whole body is a roster position query, which lowers to
+			// one call instead of to graph reads of two DOM locators.
+			readonly rosterPosition?: SemanticElementRosterPosition;
 	  }
 	| {
 			readonly id: string;

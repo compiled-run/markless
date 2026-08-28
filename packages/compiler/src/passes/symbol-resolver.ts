@@ -188,6 +188,11 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 	for (const computed of input.payloadArena.state.computed) {
 		const source = computed.functionSource ?? '';
 		const moduleImports = referencedModuleImports(input.semanticGraph.moduleImports, source);
+		const rosterPosition = computed.async
+			? undefined
+			: (input.semanticGraph.elementRosterPositions ?? []).find(
+					(record) => record.computedGraphNodeId === computed.graphNodeId,
+				);
 
 		symbols.push({
 			id: `symbol:${nextSymbolId++}`,
@@ -198,6 +203,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 			...(computed.dependencies && computed.dependencies.length > 0
 				? { dependencies: computed.dependencies }
 				: {}),
+			...(rosterPosition ? { rosterPosition } : {}),
 			...(moduleImports.length > 0 ? { moduleImports } : {}),
 		});
 	}

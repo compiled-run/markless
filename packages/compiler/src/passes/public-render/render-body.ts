@@ -1,5 +1,8 @@
 import { jsonSourceWithNonFiniteNumbers } from '@markless/serializer';
-import type { PublicRenderModuleInput } from '../../artifacts.ts';
+import type {
+	PublicRenderModuleInput,
+	SemanticElementRosterPosition,
+} from '../../artifacts.ts';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource } from '../../ast/source.ts';
 import { isIgnorableJsxTextNode as isIgnorableTextNode } from '../../ast/tsrx.ts';
@@ -252,6 +255,11 @@ function computedDeclarationLine(
 	}
 
 	const declarationKind = binding.declarationKind ?? 'const';
+	const roster = (input.semanticGraph.elementRosterPositions ?? []).find(
+		(record) =>
+			record.computedGraphNodeId === binding.id && record.componentName === componentName,
+	);
+	if (roster) return rosterPositionDeclarationLine(declarationKind, binding.name, roster);
 	// No instance local exists here; rebuild it from the graph, as the residue readers do.
 	const prelude = sharedInstancePreludeLines(
 		input.semanticGraph,
@@ -266,6 +274,26 @@ function computedDeclarationLine(
 	}
 
 	return `${declarationKind} ${binding.name} = (() => { ${prelude.join(' ')} return (${binding.functionSource})(); })();`;
+}
+
+/**
+ * The server-render half of a roster position: the same two ids the resume
+ * derive passes, asked of the render context, which answers from the order this
+ * widget instance emitted its parts in. It does not answer it yet - an
+ * unanswered position throws by name rather than standing in as a number,
+ * because every part would otherwise silently render position 0.
+ */
+function rosterPositionDeclarationLine(
+	declarationKind: string,
+	name: string,
+	record: SemanticElementRosterPosition,
+): string {
+	const unanswered = `(()=>{throw new Error(${JSON.stringify(
+		`MARKLESS_SSR_ROSTER_POSITION_UNANSWERED: ${record.computedGraphNodeId}`,
+	)});})`;
+	return `${declarationKind} ${name} = (marklessSsrRenderContext?.rosterPosition ?? ${unanswered})(${JSON.stringify(
+		record.rosterGraphNodeId,
+	)}, ${JSON.stringify(record.handleGraphNodeId)});`;
 }
 
 function stateDeclarationLine(

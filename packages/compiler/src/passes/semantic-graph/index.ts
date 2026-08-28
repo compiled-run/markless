@@ -21,6 +21,7 @@ import {
 	getFrameworkApiForCall,
 } from './imports.ts';
 import { collectComponentProps } from './collect-components.ts';
+import { collectElementRosterPositions } from './roster-position.ts';
 import { spreadHostsField } from './spread-hosts.ts';
 import { armMaterialField } from './arm-material.ts';
 import { componentConstructReach } from '../construct-reach.ts';
@@ -137,6 +138,9 @@ export async function buildSemanticGraph(
 	finalizeComputedDependencies(state);
 	propagateAsyncComputedCapability(graph);
 	collectComputedDependencyCycleDiagnostics(graph);
+	// Before the handle diagnostics: it decides which derive-time handle reads are
+	// a roster position, and the refusal below reads that answer.
+	collectElementRosterPositions(state);
 	collectElementHandleDiagnostics(graph, state.pendingElementHandleIdrefs);
 	collectAsyncBoundaryDiagnostics(graph);
 	graph.markup = collectSemanticMarkup({
