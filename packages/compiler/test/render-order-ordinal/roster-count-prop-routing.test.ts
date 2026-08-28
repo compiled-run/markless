@@ -331,13 +331,12 @@ export function IcRoot() @{
 });
 
 /**
- * The hole this card did NOT close, pinned so it is a known one rather than a
- * surprise: the routing follows a prop into a child the SAME MODULE declares.
- * A child imported from another module is not walked here, so its spend is
- * neither deferred nor refused - it needs a linking-time pass that has both
- * modules' graphs in hand.
+ * This walk follows a prop only into a child the SAME MODULE declares. A child
+ * imported from elsewhere is judged from the interface its own module
+ * published, which a compile handed no interfaces has not read - so nothing is
+ * said here. `roster-count-cross-module.test.ts` pins the linked edge.
  */
-test('a count passed to a child in another module is not routed', async () => {
+test('a count passed to a child whose module was not linked says nothing', async () => {
 	const result = await compile(`
 import { IcLabel } from './IcLabel.tsrx';
 

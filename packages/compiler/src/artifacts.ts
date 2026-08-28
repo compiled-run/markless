@@ -256,6 +256,7 @@ export type ModuleGraphInterfaceArtifact = {
 			readonly spreadHosts?: ReadonlyArray<ModuleGraphInterfaceSpreadHost>;
 			readonly armMaterial?: ModuleGraphInterfaceArmMaterial;
 			readonly seedsFromProps?: ReadonlyArray<ModuleGraphInterfaceSeedFromProp>;
+			readonly propSpends?: ReadonlyArray<ModuleGraphInterfacePropSpend>;
 		}>;
 	};
 };
@@ -274,6 +275,30 @@ export type ModuleGraphInterfaceArtifact = {
 export type ModuleGraphInterfaceSeedFromProp = {
 	readonly prop: string;
 	readonly statePath: string;
+};
+
+/**
+ * A prop this component SPENDS at render rather than only printing, and the
+ * innermost operation the spend performs.
+ *
+ * It exists so a module handing this prop a roster count can judge a spend it
+ * cannot see. A count is a placeholder until the page has composed, so
+ * arithmetic on it paints a wrong number wherever it is written; the deriving
+ * module knows a count is crossing, and only the component's own module knows
+ * what happens to the value once it lands.
+ *
+ * `componentName` and `localName` name where the spend actually happens, which
+ * may be a component this one forwards the prop to - in this module or, through
+ * that component's own published spends, in a further one. Absent when the
+ * component spends no prop, and absent on an interface built before this field
+ * existed.
+ */
+export type ModuleGraphInterfacePropSpend = {
+	readonly prop: string;
+	readonly componentName: string;
+	readonly localName: string;
+	readonly operation: string;
+	readonly source: string;
 };
 
 /**
