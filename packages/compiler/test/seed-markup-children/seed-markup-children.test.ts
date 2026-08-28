@@ -3,14 +3,12 @@ import { compileTsrxModule } from '../../src/index.ts';
 import { SEED_CHILDREN_UNAVAILABLE_CODE } from '../../src/passes/public-render/seed-children-diagnostics.ts';
 
 /**
- * What a seed would have to read out of a projection to carry its children's
- * TEXT CONTENT, measured on the compiled chunk rather than argued.
+ * What the seed reads out of a projection to carry its children's TEXT CONTENT,
+ * measured on the compiled chunk rather than argued.
  *
- * A seeding part placed with markup between its tags is refused today. These
- * rows hold the two facts that decide whether the refusal can become a value:
- * a markup projection with no expression in it is fully spelled in the chunk,
- * and the statics it is spelled in are HTML-escaped — so the text a reader
- * hears is not the bytes the seed would be handed.
+ * Two facts carry it: a markup projection with no expression in it is fully
+ * spelled in the chunk, and the statics it is spelled in are HTML-escaped — so
+ * the text a reader hears is what the seed must be handed, not those bytes.
  */
 const FAMILY = `import { shared, state } from '@markless/core';
 export const meterState = shared(() => {
@@ -85,24 +83,31 @@ test('a tag boundary is unambiguous: a > inside an attribute value is escaped', 
 });
 
 /**
- * The statics are HTML, so authored text reaches them escaped. The seed a
- * static-text projection already feeds carries those escaped bytes, not the text
- * the label renders — the label shows `Tom & Jerry rows`, the seeded cell holds
- * `Tom &amp; Jerry rows`. Any rule that gives the seed a markup projection's
- * text content has to settle this branch too, and settling it moves the bytes of
- * modules that compile today.
+ * The statics are HTML, so authored text reaches them escaped. The seed carries
+ * what the label shows, not those bytes — otherwise the sibling bar's
+ * `aria-valuetext` says "&amp;" out loud where the label reads "&".
  */
-test('the static-text seed carries the escaped bytes, not the text the label shows', async () => {
+test('the static-text seed carries the text the label shows, not the escaped bytes', async () => {
 	const result = await compilePage('Tom & Jerry rows');
 	const chunk = await projectionChunk('Tom & Jerry rows');
 
 	expect(chunk.statics.join('')).toBe('Tom &amp; Jerry rows');
-	expect(result.publicRenderModule.ssrModuleSource).toContain('children:"Tom &amp; Jerry rows"');
+	expect(result.publicRenderModule.ssrModuleSource).toContain('children:"Tom & Jerry rows"');
+	expect(result.publicRenderModule.ssrModuleSource).not.toContain('Tom &amp; Jerry rows');
 	expect(result.publicRenderModule.diagnostics).toEqual([]);
 });
 
-test('markup children stay refused at the placement', async () => {
+test('markup children seed their text content instead of being refused', async () => {
 	const result = await compilePage('<em>50</em> of 100 rows');
+
+	expect(result.publicRenderModule.diagnostics.map((diagnostic) => diagnostic.code)).not.toContain(
+		SEED_CHILDREN_UNAVAILABLE_CODE,
+	);
+	expect(result.publicRenderModule.ssrModuleSource).toContain('children:"50 of 100 rows"');
+});
+
+test('an expression inside the markup is still refused: it has no value this early', async () => {
+	const result = await compilePage('<em>{30}</em> of 100 rows');
 
 	expect(result.publicRenderModule.diagnostics.map((diagnostic) => diagnostic.code)).toContain(
 		SEED_CHILDREN_UNAVAILABLE_CODE,

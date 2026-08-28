@@ -11,11 +11,12 @@ export const SEED_CHILDREN_UNAVAILABLE_CODE = 'MARKLESS_SEED_CHILDREN_UNAVAILABL
  *
  * The seed pass runs before a projection renders, because the parts inside that
  * projection render from what the seed wrote. So the only `children` a seed can
- * be handed is one the consumer spelled as a prop, or a projection of static
- * text, which is already in the compiled chunk. A projection carrying elements
- * or reactive reads has no value until it renders, and the seed would silently
- * take undefined - and the sibling that reads the seeded cell would already have
- * painted by the time the real value arrived.
+ * be handed is one the consumer spelled as a prop, or a projection the compiled
+ * chunk already spells in full - plain text, or markup carrying no expression,
+ * whose text content is known this early. A projection with an expression in it
+ * has no value until it renders, and the seed would silently take undefined -
+ * and the sibling that reads the seeded cell would already have painted by the
+ * time the real value arrived.
  */
 export function seedChildrenUnavailableDiagnostic(input: {
 	readonly componentName: string;
@@ -27,15 +28,15 @@ export function seedChildrenUnavailableDiagnostic(input: {
 		severity: 'error',
 		phase: 'public-render',
 		title: 'These children cannot be seeded into shared state',
-		message: `<${input.componentName}> seeds "${input.statePath}" from its children, but the children written here contain markup or a value that is worked out while they render, so the seed would read nothing.`,
-		why: 'Shared state is seeded before the projected children render, because those children render from what the seed wrote. Only children the consumer passes as a prop, or children that are plain static text, are known that early.',
+		message: `<${input.componentName}> seeds "${input.statePath}" from its children, but the children written here contain a value that is worked out while they render, so the seed would read nothing.`,
+		why: 'Shared state is seeded before the projected children render, because those children render from what the seed wrote. Only children the consumer passes as a prop, and children the compiler already spells in full - text, or markup with no expression in it - are known that early.',
 		...(input.sourceSpan ? { primarySpan: input.sourceSpan } : {}),
 		passId: 'public-render-module',
 		artifactKeys: ['publicRenderModule'],
 		statePath: input.statePath,
 		suggestions: [
 			{
-				message: `Write the value as a prop (children={...}), or put plain text between the tags, or move the write into an event handler where the shared instance is already live.`,
+				message: `Write the value as a prop (children={...}), or put text between the tags with no expression in it, or move the write into an event handler where the shared instance is already live.`,
 			},
 		],
 		docsUrl: `https://markless.dev/errors/${SEED_CHILDREN_UNAVAILABLE_CODE}`,

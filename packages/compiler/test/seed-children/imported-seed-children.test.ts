@@ -96,7 +96,7 @@ export function Page() @{
 	expect(byName('MeterRoot')?.seedsFromProps).toBeUndefined();
 });
 
-test('a markup projection into an imported seeding part is refused', async () => {
+test('a markup projection into an imported seeding part seeds its text content', async () => {
 	const { pageResult } = await compileFamilyAndPage(
 		FAMILY,
 		`import { MeterRoot, MeterBar, MeterLabel } from './meter.tsrx';
@@ -104,6 +104,38 @@ export function Page() @{
 	<MeterRoot>
 		<MeterBar value={30} />
 		<MeterLabel><em>30</em> of 100 rows</MeterLabel>
+	</MeterRoot>
+}`,
+	);
+
+	expect(seedRefusals(pageResult.publicRenderModule.diagnostics)).toEqual([]);
+	expect(pageResult.publicRenderModule.ssrModuleSource).toContain('children:"30 of 100 rows"');
+});
+
+test('the same imported shape under other names seeds the same way', async () => {
+	const { pageResult } = await compileFamilyAndPage(
+		ALTERNATE_FAMILY,
+		`import { GaugeShell, GaugeCaption, GaugeNeedle } from './meter.tsrx';
+export function Screen() @{
+	<GaugeShell>
+		<GaugeCaption><i>eleven</i> of twelve</GaugeCaption>
+		<GaugeNeedle level={11} />
+	</GaugeShell>
+}`,
+	);
+
+	expect(seedRefusals(pageResult.publicRenderModule.diagnostics)).toEqual([]);
+	expect(pageResult.publicRenderModule.ssrModuleSource).toContain('children:"eleven of twelve"');
+});
+
+test('an expression inside an imported part\'s projection is still refused', async () => {
+	const { pageResult } = await compileFamilyAndPage(
+		FAMILY,
+		`import { MeterRoot, MeterBar, MeterLabel } from './meter.tsrx';
+export function Page() @{
+	<MeterRoot>
+		<MeterBar value={30} />
+		<MeterLabel><em>{30}</em> of 100 rows</MeterLabel>
 	</MeterRoot>
 }`,
 	);
@@ -116,25 +148,6 @@ export function Page() @{
 	expect(refusal?.message).toContain('MeterLabel');
 	// The refusal points at the placement the consumer can fix, not at the family.
 	expect(refusal?.primarySpan?.filename).toBe('src/page.tsrx');
-});
-
-test('the same imported shape under other names is refused the same way', async () => {
-	const { pageResult } = await compileFamilyAndPage(
-		ALTERNATE_FAMILY,
-		`import { GaugeShell, GaugeCaption, GaugeNeedle } from './meter.tsrx';
-export function Screen() @{
-	<GaugeShell>
-		<GaugeCaption><i>eleven</i> of twelve</GaugeCaption>
-		<GaugeNeedle level={11} />
-	</GaugeShell>
-}`,
-	);
-	const refusal = seedRefusals(pageResult.publicRenderModule.diagnostics)[0] as
-		| (typeof pageResult.publicRenderModule.diagnostics)[number]
-		| undefined;
-
-	expect(refusal?.statePath).toBe('gauge.caption');
-	expect(refusal?.message).toContain('GaugeCaption');
 });
 
 test('static text into an imported seeding part compiles', async () => {

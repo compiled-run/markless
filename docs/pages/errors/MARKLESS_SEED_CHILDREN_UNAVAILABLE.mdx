@@ -8,11 +8,11 @@ These children cannot be seeded into shared state
 
 ## Message
 
-\<…\> seeds "…" from its children, but the children written here contain markup or a value that is worked out while they render, so the seed would read nothing.
+\<…\> seeds "…" from its children, but the children written here contain a value that is worked out while they render, so the seed would read nothing.
 
 ## Why
 
-Shared state is seeded before the projected children render, because those children render from what the seed wrote. Only children the consumer passes as a prop, or children that are plain static text, are known that early.
+Shared state is seeded before the projected children render, because those children render from what the seed wrote. Only children the consumer passes as a prop, and children the compiler already spells in full - text, or markup with no expression in it - are known that early.
 
 ## Emitted from
 

@@ -4,17 +4,20 @@ import {
 	sharedDefinitionId,
 	sharedDefinitionIdOf,
 } from '../semantic-graph/collect-shared.ts';
+import { projectionTextContent } from './projection-text.ts';
 import { MARKLESS_WIDGET_INSTANCE_KEY } from './residue-reader.ts';
 
 /** The prop a projection is written as, whichever way the consumer spells it. */
 export const PROJECTION_PROP_NAME = 'children' as const;
 
 /**
- * The `children` a projection already has BEFORE it renders. The seed pass runs
- * ahead of the projection, so a part that seeds from `children` normally sees
- * undefined; a projection of static text alone is spelled in the chunk's statics
- * and is therefore the exact string the render will hand that part. Anything
- * with an element or a read has no value until it renders, and returns nothing.
+ * The text content a projection already has BEFORE it renders. The seed pass
+ * runs ahead of the projection, so a part that seeds from `children` normally
+ * sees undefined; a projection spelled entirely in the chunk's statics — plain
+ * text, or markup carrying no expression — is known this early, and its text
+ * content is what the seeded cell should hold. A slot is the line: it has no
+ * value until it renders, and returns nothing. An element does not: the chunk
+ * already spells it, so `hosts` says nothing about what is knowable.
  */
 export function staticProjectionChildren(
 	chunks: ReadonlyArray<SemanticMarkupChunk>,
@@ -22,8 +25,8 @@ export function staticProjectionChildren(
 ): string | undefined {
 	if (projectionChunkId === undefined) return undefined;
 	const chunk = chunks.find((candidate) => candidate.id === projectionChunkId);
-	if (!chunk || chunk.hosts.length > 0 || chunk.slots.length > 0) return undefined;
-	return chunk.statics.join('');
+	if (!chunk || chunk.slots.length > 0) return undefined;
+	return projectionTextContent(chunk.statics);
 }
 
 type SharedSeedSymbol = {

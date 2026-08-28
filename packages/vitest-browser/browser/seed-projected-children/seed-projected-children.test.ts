@@ -4,9 +4,11 @@ import SeedProjectedChildrenPage from './page.tsrx';
 
 // The seed pass runs before a projection renders, so a part seeding from its own
 // `children` used to see undefined whenever the consumer wrote that text between
-// the tags instead of as a prop. Static text is spelled in the compiled chunk, so
-// both render paths now hand it to the seed. The sibling bar paints during the
-// projection - there is no second paint - which is what makes this observable.
+// the tags instead of as a prop. A projection the compiled chunk spells in full -
+// text, or markup with no expression in it - is known that early, and its TEXT
+// CONTENT is what both render paths hand the seed. The sibling bar paints during
+// the projection - there is no second paint - which is what makes this
+// observable, and its `aria-valuetext` is what a screen reader says out loud.
 afterEach(() => cleanup());
 
 function bar(container: ParentNode, placement: string) {
@@ -30,6 +32,15 @@ function expectSeededFromChildren(container: ParentNode) {
 	expect(bar(container, 'prop').getAttribute('aria-valuetext')).toBe('40 of 100 rows');
 	expect(label(container, 'prop').textContent).toBe('40 of 100 rows');
 
+	// Markup children: the bar reads the text, and the emphasis still renders.
+	expect(bar(container, 'markup').getAttribute('aria-valuetext')).toBe('50 of 100 rows');
+	expect(label(container, 'markup').textContent).toBe('50 of 100 rows');
+	expect(label(container, 'markup').querySelector('em')?.textContent).toBe('50');
+
+	// The statics are HTML, so the authored `&` arrives escaped. What the reader
+	// hears is the character the label shows, not the entity that spells it.
+	expect(bar(container, 'entity').getAttribute('aria-valuetext')).toBe('Tom & Jerry rows');
+	expect(label(container, 'entity').textContent).toBe('Tom & Jerry rows');
 }
 
 test('CSR: JSX text content reaches the seed the sibling bar reads', async () => {
@@ -50,9 +61,5 @@ test('each placement seeds its own widget, not its neighbour', async () => {
 		[...container.querySelectorAll('[data-meter-bar]')].map((node) =>
 			node.getAttribute('aria-valuetext'),
 		),
-	).toEqual(['30 of 100 rows', '40 of 100 rows']);
-});
-
-test('children carrying markup are refused at the placement - they have no value until they render, after the seed pass', async () => {
-	await expect(import('./markup-page.tsrx')).rejects.toThrow();
+	).toEqual(['30 of 100 rows', '40 of 100 rows', '50 of 100 rows', 'Tom & Jerry rows']);
 });

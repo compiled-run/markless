@@ -125,13 +125,49 @@ test('children spelled as a prop still reaches the seed, and adds no second chil
 	expect(result.publicRenderModule.diagnostics).toEqual([]);
 });
 
-test('a markup projection is refused at compile time rather than seeding undefined', async () => {
+test('markup with no expression in it seeds the text content it renders as', async () => {
 	const result = await compilePage(
 		FAMILY,
 		`export function Page() @{
 	<MeterRoot>
 		<MeterBar value={30} />
 		<MeterLabel><em>30</em> of 100 rows</MeterLabel>
+	</MeterRoot>
+}`,
+	);
+
+	expect(seedCallProps(result.publicRenderModule.ssrModuleSource, '__marklessSsrComponent2')).toBe(
+		'children:"30 of 100 rows"',
+	);
+	expect(result.publicRenderModule.diagnostics).toEqual([]);
+});
+
+// The statics are HTML, so the authored `&` arrives escaped. What the bar's
+// `aria-valuetext` carries is what a reader says out loud, so the seed decodes.
+test('the seed carries the text the label shows, not the escaped bytes', async () => {
+	const result = await compilePage(
+		FAMILY,
+		`export function Page() @{
+	<MeterRoot>
+		<MeterBar value={30} />
+		<MeterLabel>Tom & Jerry rows</MeterLabel>
+	</MeterRoot>
+}`,
+	);
+
+	expect(seedCallProps(result.publicRenderModule.ssrModuleSource, '__marklessSsrComponent2')).toBe(
+		'children:"Tom & Jerry rows"',
+	);
+	expect(result.publicRenderModule.diagnostics).toEqual([]);
+});
+
+test('a projection with an expression in it is refused rather than seeding undefined', async () => {
+	const result = await compilePage(
+		FAMILY,
+		`export function Page() @{
+	<MeterRoot>
+		<MeterBar value={30} />
+		<MeterLabel><em>{30}</em> of 100 rows</MeterLabel>
 	</MeterRoot>
 }`,
 	);
