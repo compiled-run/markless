@@ -7,7 +7,7 @@ import { orderedRoster, readPositions } from './ic-order.ts';
 // walks the same roster from a handler so the two readings can be compared.
 export const ic = shared(
 	() => {
-		const s = state({ seen: 'unread', count: 0 });
+		const s = state({ seen: 'unread', count: 0, armed: false });
 		const itemEls = element<HTMLDivElement[]>();
 
 		return {
@@ -19,6 +19,10 @@ export const ic = shared(
 				const roster = orderedRoster(bound);
 				s.seen = readPositions(roster);
 				s.count = roster.length;
+			},
+			/** Show or hide the member an `@if` arm gates. */
+			toggleArm() {
+				s.armed = s.armed !== true;
 			},
 		};
 	},
@@ -48,4 +52,37 @@ export function IcItem({ children }) @{
 	const pos = computed(() => w.itemEls.indexOf(mine as HTMLDivElement));
 
 	<div data-ic-item el={[w.itemEls, mine]} ui-pos={pos}>{children}</div>
+}
+
+// The same root, with its FIRST roster member gated by an `@if` arm. An arm
+// cannot hold an attribute binding, so this member joins the roster without
+// reporting a position of its own - the flat items behind it are what renumber,
+// and applying or dropping the arm is the only thing that moves the collection.
+export function IcArmRoot({ children }) @{
+	const w = ic();
+	const total = computed(() => w.itemEls.length);
+
+	<div
+		data-ic-root
+		ui-max={total}
+		ui-count={w.count}
+		ui-seen={w.seen}
+		onClick={() => {
+			w.survey();
+		}}
+	>@if (w.armed) {
+			<div data-ic-extra el={w.itemEls}>extra</div>
+		}{children}<span data-ic-total>{total}</span></div>
+}
+
+export function IcArmToggle() @{
+	const w = ic();
+
+	<button
+		type="button"
+		data-ic-arm-toggle
+		onClick={() => {
+			w.toggleArm();
+		}}
+	>toggle</button>
 }
