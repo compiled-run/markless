@@ -27,6 +27,29 @@ export type ButtonProps = Pick<PropsOf<'button'>, 'children' | 'disabled'> & {
 export type LabelProps = Pick<PropsOf<'label'>, 'children' | 'for'>;
 
 /**
+ * A display separator: a static `role="separator"` that divides content, with
+ * no focus, no keys and no value. Give it `decorative` and it drops the role
+ * entirely and hides from readers, for a rule that is only paint.
+ *
+ * A separator a person can move is not this part. ARIA gives `role="separator"`
+ * two natures, and the focusable one is a window-splitter widget with value
+ * semantics; that lives in the `resizable` family, which shares only the role
+ * string.
+ */
+export type SeparatorProps = {
+	/**
+	 * Which way the separator runs, as the reader announces it. Defaults to
+	 * `horizontal`, matching ARIA's own default for the role.
+	 */
+	readonly orientation?: 'horizontal' | 'vertical';
+	/**
+	 * Provide it and the separator is paint only: no role and `aria-hidden`, so
+	 * no reader stops on a line that carries no meaning.
+	 */
+	readonly decorative?: boolean;
+};
+
+/**
  * Content that is hidden from sight but still reached by screen readers and
  * still focusable. The clipping style is written inline and no class ships, so
  * no consumer stylesheet can collide with it.
