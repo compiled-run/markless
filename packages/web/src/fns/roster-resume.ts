@@ -134,6 +134,12 @@ function oneElement(get: ElementHandleRegistry['get'], key: string): unknown {
  * every reader of one answers from the handle registry, so the binding's cell
  * carries a revision: bumping it is how the parts deriving a place in that
  * roster are told to derive it again.
+ *
+ * Resume is itself the first revision. A render answers a place from emission
+ * order and paints it, but the number never reaches the derivation's graph cell,
+ * so an expression that SPENDS the place - `code.slice(pos, pos + 1)` - reads
+ * `undefined` the first time it re-derives. Deriving once against the live
+ * roster puts the number in the cell before anything asks for it.
  */
 export function wireRosterRevisions(input: {
 	readonly graph: RosterRevisionGraph;
@@ -152,6 +158,15 @@ export function wireRosterRevisions(input: {
 		for (const dependency of record.dependencies ?? [])
 			if (isElementBinding(dependency.graphNodeId)) rosters.add(dependency.graphNodeId);
 	if (rosters.size === 0) return;
+	const bump = () => {
+		for (const roster of rosters) {
+			const revision = input.graph.read(roster, []);
+			input.graph.write({
+				graphNodeId: roster,
+				value: (typeof revision === 'number' ? revision : 0) + 1,
+			});
+		}
+	};
 	for (const repeat of input.keyedRepeats) {
 		const collection = repeat.collectionGraphNodeId;
 		if (!collection) continue;
@@ -162,18 +177,11 @@ export function wireRosterRevisions(input: {
 				id: `roster-revision:${repeat.id}:${collection}`,
 				graphNodeId: collection,
 				path: repeat.collectionPath,
-				run: () => {
-					for (const roster of rosters) {
-						const revision = input.graph.read(roster, []);
-						input.graph.write({
-							graphNodeId: roster,
-							value: (typeof revision === 'number' ? revision : 0) + 1,
-						});
-					}
-				},
+				run: bump,
 			}),
 		);
 	}
+	bump();
 }
 
 function isElementBinding(graphNodeId: string): boolean {

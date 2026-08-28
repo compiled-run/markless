@@ -10,16 +10,17 @@ import type {
 export const otpState = shared(
 	() => {
 		const otp: OtpInstanceState = state({
-			length: 0,
 			value: '',
 			disabled: false,
 			shiftPWManagers: true,
 		});
 		const fieldEl = element<HTMLInputElement>();
+		const itemEls = element<HTMLDivElement[]>();
 
 		return {
 			...otp,
 			fieldEl,
+			itemEls,
 			// literal function types: a callback slot is only recognised from the written annotation
 			onChange: undefined as ((value: string) => void) | undefined,
 			onComplete: undefined as ((value: string) => void) | undefined,
@@ -31,12 +32,14 @@ export const otpState = shared(
 				// A password manager paints its icon at the input's right edge, so the input is widened past the root and that strip clipped away.
 				return 'position: absolute; inset: 0; box-sizing: border-box; height: 100%; width: calc(100% + 45px); opacity: 0; clip-path: inset(0 45px 0 0);';
 			}),
-			commit() {
+			commit(boxes: number) {
+				// A count rendered before its boxes existed is patched into the payload as text, so it is coerced before the comparison below.
+				const length = Number(boxes);
 				// `maxlength` truncates typing but not a paste or autofill, so the slice is what enforces the length.
-				const code = otp.value.slice(0, otp.length);
+				const code = otp.value.slice(0, length);
 				otp.value = code;
 				otp.onChange?.(code);
-				if (code.length === otp.length) otp.onComplete?.(code);
+				if (code.length === length) otp.onComplete?.(code);
 			},
 		};
 	},
@@ -65,6 +68,8 @@ export function OtpRoot({
 
 export function OtpField({ onInput, onFocus, ...rest }: OtpFieldProps) @{
 	const otp = otpState();
+	// The length of the code is how many boxes the consumer wrote, and the field asks for it before a single box has rendered.
+	const boxes = computed(() => otp.itemEls.length);
 
 	<input
 		{...rest}
@@ -72,7 +77,7 @@ export function OtpField({ onInput, onFocus, ...rest }: OtpFieldProps) @{
 		style={otp.fieldStyle}
 		type="text"
 		value={otp.value}
-		maxlength={otp.length}
+		maxlength={boxes}
 		disabled={otp.disabled}
 		inputmode="numeric"
 		autocomplete="one-time-code"
@@ -89,22 +94,23 @@ export function OtpField({ onInput, onFocus, ...rest }: OtpFieldProps) @{
 		onInput={(event) => {
 			// `currentTarget` is live here because this handler is never resumed.
 			otp.value = event.currentTarget.value;
-			otp.commit();
+			otp.commit(boxes);
 			onInput?.(event);
 		}}
 	/>
 }
 
-export function OtpItem({ index, children, ...rest }: OtpItemProps) @{
+export function OtpItem({ children, ...rest }: OtpItemProps) @{
 	const otp = otpState();
-	const item = state({ index });
-	// Each box registers its place as it renders, so one past the last box's index is the length of the code. The right-hand side must not read the shared instance: an SSR seed copies it verbatim, where `otp` is out of scope.
-	otp.length = index + 1;
-	// slice, not value[index]: a graph read path has to be statically resolvable
-	const char = computed(() => otp.value.slice(item.index, item.index + 1));
+	const mine = element<HTMLDivElement>();
+	// Which box this is, is where it stands among the boxes: nobody counts them out.
+	const at = computed(() => otp.itemEls.indexOf(mine as HTMLDivElement));
+	// slice, not value[at]: a graph read path has to be statically resolvable
+	const char = computed(() => otp.value.slice(at, at + 1));
 
 	<div
 		{...rest}
+		el={[otp.itemEls, mine]}
 		ui-empty={char === ''}
 		ui-disabled={otp.disabled}
 	>{char}{children}</div>

@@ -464,3 +464,93 @@ test('SSR: no placeholder count survives the render', async () => {
 
 	expect(PLACEHOLDER.test(document.body.innerHTML)).toBe(false);
 });
+
+// --- a place another expression can USE --------------------------------------
+
+// Painting a position proves it derived; it does not prove it can be READ. Every
+// real family spends its place inside a second derivation - `otp.item` slices
+// its own character out of the code, `tour.item` compares its place with the
+// step showing - so the item derives `code.slice(pos, pos + 1)` beside `ui-pos`
+// and writes it as `ui-mine`. A dependent that answers `''` is a position that
+// reached its markup and not its own graph cell.
+
+const mines = (within?: string) => items(within).map((one) => one.getAttribute('ui-mine'));
+const writeCode = async (at = 0) => {
+	await userEvent.click([...document.querySelectorAll('[data-ic-write]')][at] as HTMLElement);
+};
+
+test('CSR: a dependent derivation spends the position at first paint', async () => {
+	await render(StaticPage);
+
+	expect(mines()).toEqual(['a', 'b', 'c']);
+});
+
+test('SSR: a dependent derivation spends the position at first paint', async () => {
+	await renderSSR(StaticPage);
+
+	expect(mines()).toEqual(['a', 'b', 'c']);
+});
+
+test('CSR: a dependent derivation re-reads the position after a write', async () => {
+	await render(StaticPage);
+	await writeCode();
+
+	await expect.poll(mines, { timeout: 5000 }).toEqual(['A', 'B', 'C']);
+});
+
+test('SSR: a dependent derivation re-reads the position after a write', async () => {
+	await renderSSR(StaticPage);
+	await writeCode();
+
+	await expect.poll(mines, { timeout: 5000 }).toEqual(['A', 'B', 'C']);
+});
+
+test('CSR: a dependent derivation follows an item arriving, then a write', async () => {
+	await render(MutatingPage);
+	await userEvent.click(document.querySelector('[data-ic-add]') as HTMLElement);
+	await expect.poll(() => items().length, { timeout: 5000 }).toBe(4);
+	await writeCode();
+
+	await expect.poll(mines, { timeout: 5000 }).toEqual(['A', 'B', 'C', 'D']);
+});
+
+test('SSR: a dependent derivation follows an item arriving, then a write', async () => {
+	await renderSSR(MutatingPage);
+	await userEvent.click(document.querySelector('[data-ic-add]') as HTMLElement);
+	await expect.poll(() => items().length, { timeout: 5000 }).toBe(4);
+	await writeCode();
+
+	await expect.poll(mines, { timeout: 5000 }).toEqual(['A', 'B', 'C', 'D']);
+});
+
+test('CSR: a dependent derivation renumbers behind a removal', async () => {
+	await render(MutatingPage);
+	await userEvent.click(document.querySelector('[data-ic-drop-first]') as HTMLElement);
+	await expect.poll(() => items().length, { timeout: 5000 }).toBe(2);
+
+	await expect.poll(mines, { timeout: 5000 }).toEqual(['a', 'b']);
+});
+
+test('SSR: a dependent derivation renumbers behind a removal', async () => {
+	await renderSSR(MutatingPage);
+	await userEvent.click(document.querySelector('[data-ic-drop-first]') as HTMLElement);
+	await expect.poll(() => items().length, { timeout: 5000 }).toBe(2);
+
+	await expect.poll(mines, { timeout: 5000 }).toEqual(['a', 'b']);
+});
+
+test('CSR: a flat instance spends its own places and leaves its sibling alone', async () => {
+	await render(FlatPage);
+	await writeCode(0);
+
+	await expect.poll(() => mines('[data-ic-first]'), { timeout: 5000 }).toEqual(['A', 'B', 'C']);
+	expect(mines('[data-ic-second]')).toEqual(['a', 'b']);
+});
+
+test('SSR: a flat instance spends its own places and leaves its sibling alone', async () => {
+	await renderSSR(FlatPage);
+	await writeCode(0);
+
+	await expect.poll(() => mines('[data-ic-first]'), { timeout: 5000 }).toEqual(['A', 'B', 'C']);
+	expect(mines('[data-ic-second]')).toEqual(['a', 'b']);
+});
