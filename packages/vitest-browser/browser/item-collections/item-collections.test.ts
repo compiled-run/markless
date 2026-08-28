@@ -860,12 +860,7 @@ test('CSR: the count follows an @if arm applying and dropping', async () => {
 	expect(totals()).toEqual(['3', '2']);
 });
 
-// The first-paint count stands in CSR, where the seed pass asks the carrier rule
-// with where this child stands on the page. SSR files the instance token from the
-// compiler's per-component `marklessWidgetRoots` marker instead, which cannot see
-// a placement, so the count placeholder is keyed with the bare handle id and the
-// ask answers 0 until the first flip. Measured: ['0','2'] at paint here.
-test.fails('SSR: the count follows an @if arm applying and dropping', async () => {
+test('SSR: the count follows an @if arm applying and dropping', async () => {
 	await renderSSR(ArmPage);
 
 	expect(maxes()).toEqual(['3', '2']);

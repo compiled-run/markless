@@ -1,4 +1,5 @@
 import {
+	marklessCarrierRootsWidget,
 	marklessCarryWidgetRegistry,
 	marklessComposedInstancePath,
 	marklessComposedSyncPolicy,
@@ -19,6 +20,7 @@ import type {
 	ComposeGraphRead,
 	ComposeRowTemplate,
 	ComposeStateDraft,
+	MarklessWidgetSite,
 } from './composition.ts';
 import {
 	marklessBaseSymbolId,
@@ -143,6 +145,13 @@ type SsrChildComponent = {
 		 * instance of it starts a widget instance of its own.
 		 */
 		readonly marklessWidgetRoots?: ReadonlyArray<string>;
+		/**
+		 * The widget-scoped shared definitions this component holds the cells of
+		 * WITHOUT designating them. Whether such a carrier is nevertheless a root
+		 * is a fact about where the page puts it, so the marker names the
+		 * candidates and the placement decides.
+		 */
+		readonly marklessWidgetCarries?: ReadonlyArray<string>;
 		readonly marklessChildrenWidgetRoot?: string;
 	};
 	/** SSR entry per exported component, for a module that serves more than one. */
@@ -275,6 +284,74 @@ export function marklessSsrWidgetRoots(
 ): ReadonlyArray<string> {
 	const part = componentName ? marklessSsrComponentPart(component, componentName) : component;
 	return part?.renderSsr?.marklessWidgetRoots ?? [];
+}
+
+/** The widget families a placed child holds the cells of without designating them. */
+function marklessSsrWidgetCarries(
+	component: SsrChildComponent | undefined,
+	componentName: string | undefined,
+): ReadonlyArray<string> {
+	const part = componentName ? marklessSsrComponentPart(component, componentName) : component;
+	return part?.renderSsr?.marklessWidgetCarries ?? [];
+}
+
+/** One other child placed on the same page, spelled as the seed pass spells a child. */
+export type MarklessSsrPlacedChild = readonly [
+	component: SsrChildComponent | undefined,
+	componentName: string | undefined,
+];
+
+/**
+ * The widget families a placed child STARTS where this page puts it: the ones
+ * its own marker names, plus the ones it merely CARRIES and roots anyway
+ * because it encloses other parts of the family and nothing designates the
+ * family above it.
+ *
+ * The seed pass's twin of what composition asks (`marklessCarrierRootsWidget`)
+ * over the same rule. It has no instance paths of its own this early, so the
+ * nesting is spelled in strings whose prefix relation is the one composition
+ * reads: one depth mark per enclosing placement, a distinct tail per enclosed
+ * one. `enclosing` runs innermost first.
+ */
+export function marklessSsrPlacedWidgetRoots(
+	component: SsrChildComponent | undefined,
+	componentName: string | undefined,
+	enclosing: ReadonlyArray<MarklessSsrPlacedChild>,
+	enclosed: ReadonlyArray<MarklessSsrPlacedChild>,
+	inRow = false,
+): ReadonlyArray<string> {
+	const roots = marklessSsrWidgetRoots(component, componentName);
+	const carried = marklessSsrWidgetCarries(component, componentName);
+	if (carried.length === 0 || inRow) return roots;
+	const path = ':'.repeat(enclosing.length + 1);
+	const rooted = carried.filter((definitionId) =>
+		marklessCarrierRootsWidget(
+			[
+				...enclosing.map((placed, index) =>
+					marklessSsrWidgetSite(placed, definitionId, ':'.repeat(enclosing.length - index)),
+				),
+				...enclosed.map((placed, index) =>
+					marklessSsrWidgetSite(placed, definitionId, `${path}@${index}`),
+				),
+			].flatMap((site) => (site ? [site] : [])),
+			{ path, designates: false, inRow: false },
+		),
+	);
+	return rooted.length > 0 ? [...roots, ...rooted] : roots;
+}
+
+// A placed child is a site of one family only when its own markers name that
+// family; which of the two names it is what `designates` answers.
+function marklessSsrWidgetSite(
+	placed: MarklessSsrPlacedChild,
+	definitionId: string,
+	path: string,
+): MarklessWidgetSite | undefined {
+	if (marklessSsrWidgetRoots(placed[0], placed[1]).includes(definitionId))
+		return { path, designates: true, inRow: false };
+	if (marklessSsrWidgetCarries(placed[0], placed[1]).includes(definitionId))
+		return { path, designates: false, inRow: false };
+	return undefined;
 }
 
 /**

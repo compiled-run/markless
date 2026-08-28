@@ -16,7 +16,9 @@ import {
 	widgetRootDefinitionIds,
 	elementHandleMarkerLine,
 	componentBoundElementHandles,
+	widgetFallbackDefinitionIds,
 	widgetFallbacksOutputField,
+	widgetCarriesMarkerLine,
 	widgetRootMarkerLine,
 } from './shared-seed-pass.ts';
 import {
@@ -152,6 +154,7 @@ export function emitSameModuleSsrComponents(
 				functionName,
 				dataLines.composedRootSurfaceArgs,
 			),
+			widgetCarriesMarkerLine(widgetFallbackDefinitionIds(input, componentName), functionName),
 			elementHandleMarkerLine(
 				componentBoundElementHandles(input, componentName),
 				functionName,
