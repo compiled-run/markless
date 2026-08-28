@@ -7,11 +7,11 @@ import type { PropsOf, Seeded } from '@markless/core';
  * value nobody has committed, and a position can be half filled.
  *
  * The root owns the list. `count` decides how many positions there are, and
- * `ratinggroup.state().positions` hands them back as `1 … count` for the
+ * `rating.state().positions` hands them back as `1 … count` for the
  * consumer's repeat: an item never takes an index, because a position derived
  * from render order is not readable at render time today.
  */
-export type RatingGroupRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
+export type RatingRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	/**
 	 * The rating now. Passing this makes the group controlled: a gesture reports
 	 * through `onChange` and nothing fills until the new number comes back in.
@@ -34,7 +34,7 @@ export type RatingGroupRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	readonly disabled?: boolean;
 	/** A rating is needed before the form submits. */
 	readonly required?: boolean;
-	/** The name `ratinggroup.field` submits under. Omit it and the group submits nothing. */
+	/** The name `rating.field` submits under. Omit it and the group submits nothing. */
 	readonly name?: string;
 	/**
 	 * Intended to be called with the new rating whenever it changes. Omit it and
@@ -50,7 +50,7 @@ export type RatingGroupRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
  * before anyone commits it. `NO_PREVIEW` means nothing is being offered, which
  * cannot be 0 because 0 is a rating a person can give.
  */
-export type RatingGroupInstanceState = {
+export type RatingInstanceState = {
 	/** `defaultValue`, untouched. */
 	seed: number;
 	/** The `value` prop. Defined means controlled. */
@@ -65,24 +65,24 @@ export type RatingGroupInstanceState = {
 	name: string;
 	/** The rating a hover is offering, or the "nothing offered" sentinel. */
 	previewAt: number;
-	onChange?: RatingGroupRootProps['onChange'];
+	onChange?: RatingRootProps['onChange'];
 };
 
-/** What `ratinggroup.root` hands the group element it renders: everything it was given. */
-export type RatingGroupBoxProps = PropsOf<'div'>;
+/** What `rating.root` hands the group element it renders: everything it was given. */
+export type RatingBoxProps = PropsOf<'div'>;
 
 /** The group's name: the `role="radiogroup"` element points its `aria-labelledby` here. */
-export type RatingGroupLabelProps = PropsOf<'span'>;
+export type RatingLabelProps = PropsOf<'span'>;
 
 /** Supporting text for the group, wired into the group's `aria-describedby`. */
-export type RatingGroupDescriptionProps = PropsOf<'div'>;
+export type RatingDescriptionProps = PropsOf<'div'>;
 
 /**
  * The group's validation message, wired into the group's `aria-describedby`
  * ahead of the description, so what is wrong is conveyed before the hint.
  * Render it only when there is something to say.
  */
-export type RatingGroupErrorProps = PropsOf<'div'>;
+export type RatingErrorProps = PropsOf<'div'>;
 
 /**
  * One position, and one `role="radio"`. `value` is the rating this position
@@ -92,24 +92,24 @@ export type RatingGroupErrorProps = PropsOf<'div'>;
  * The family owns this element's `style` attribute to carry `--rating-fill`,
  * so style it from a stylesheet rather than a `style` prop.
  */
-export type RatingGroupItemProps = PropsOf<'div'> & {
+export type RatingItemProps = PropsOf<'div'> & {
 	/** The rating this position commits. */
 	readonly value: number;
 };
 
-/** One instance per rendered `ratinggroup.item`: the position it was written with. */
-export type RatingGroupItemPosition = Seeded<RatingGroupItemProps, 'value'>;
+/** One instance per rendered `rating.item`: the position it was written with. */
+export type RatingItemPosition = Seeded<RatingItemProps, 'value'>;
 
 /**
  * The rating as text - `3 of 5`, and `0 of 5` when nothing is rated. It takes
  * no children: a consumer who wants their own wording writes their own element
  * and reads `ui-value` off it.
  */
-export type RatingGroupValueLabelProps = Omit<PropsOf<'output'>, 'children'>;
+export type RatingValueLabelProps = Omit<PropsOf<'output'>, 'children'>;
 
 /**
  * The clipped native input that carries the rating into a form. It takes no
- * configuration of its own: `name` comes from `ratinggroup.root`, so one place
+ * configuration of its own: `name` comes from `rating.root`, so one place
  * decides what a form receives.
  */
-export type RatingGroupFieldProps = PropsOf<'input'>;
+export type RatingFieldProps = PropsOf<'input'>;

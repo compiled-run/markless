@@ -254,6 +254,8 @@ export type ResumeSymbolContext = {
 		rosterGraphNodeId: string,
 		handleGraphNodeId: string,
 	) => number;
+	/** How many parts this symbol's family instance has in that roster. */
+	readonly rosterCount?: (rosterGraphNodeId: string) => number;
 	readonly locals?: Readonly<Record<string, unknown>>;
 	readonly arm?: number;
 	readonly branchId?: string;

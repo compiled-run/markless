@@ -43,14 +43,14 @@ export async function refreshSyncComputed(input: {
 	readonly elementHandles: ElementHandleRegistry;
 }): Promise<void> {
 	const graph = seedSourceGraph(input.graph, input.computed);
+	const roster = await (globalThis as RosterResumeHost).__marklessRosterResume?.();
 	const result = (await input.loadSymbol(input.computed.deriveSymbolId))({
 		graph,
 		read: graph.read,
 		element: input.root,
 		getElementHandle: input.elementHandles.get,
-		rosterPosition: (
-			await (globalThis as RosterResumeHost).__marklessRosterResume?.()
-		)?.createRosterPositionReader(input),
+		rosterPosition: roster?.createRosterPositionReader(input),
+		rosterCount: roster?.createRosterCountReader(input),
 	});
 	input.graph.write({
 		graphNodeId: input.computed.graphNodeId,

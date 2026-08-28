@@ -1,12 +1,12 @@
-import { ratinggroup } from '../../index.ts';
+import { rating } from '../../index.ts';
 
 // The starter a consumer copies: five marks, nothing rated yet.
 export function Basic() @{
-	<ratinggroup.root data-testid="root">
-		<ratinggroup.label data-testid="label">Overall rating</ratinggroup.label>
+	<rating.root data-testid="root">
+		<rating.label data-testid="label">Overall rating</rating.label>
 		<Stars />
-		<ratinggroup.valuelabel data-testid="valuelabel" />
-	</ratinggroup.root>
+		<rating.valuelabel data-testid="valuelabel" />
+	</rating.root>
 }
 
 // The marks are the consumer's own markup, and they sit INSIDE the root: a
@@ -15,13 +15,13 @@ export function Basic() @{
 // be the direct child of a component tag either, so the repeat opens in a plain
 // element.
 function Stars() @{
-	const rating = ratinggroup.state();
+	const group = rating.state();
 
 	<div data-testid="stars">
-		@for (const position of rating.positions; key position) {
-			<ratinggroup.item value={position} data-testid="star">
+		@for (const position of group.positions; key position) {
+			<rating.item value={position} data-testid="star">
 				<span data-testid="glyph" aria-hidden="true">*</span>
-			</ratinggroup.item>
+			</rating.item>
 		}
 	</div>
 }

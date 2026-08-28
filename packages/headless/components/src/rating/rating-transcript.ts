@@ -22,8 +22,8 @@ import { GALLERY_WALK_LIMIT } from '../../test-support/gallery-walk.ts';
 const CHANGE_TIMEOUT_MS = 15_000;
 const GROUP = 'Overall rating';
 
-export async function readRatingGroupTranscript(sr: ScreenReaderDriver, page: Page) {
-	const section = page.locator(`#${FAMILY_ANCHORS['rating-group'].slice(2)}`);
+export async function readRatingTranscript(sr: ScreenReaderDriver, page: Page) {
+	const section = page.locator(`#${FAMILY_ANCHORS['rating'].slice(2)}`);
 
 	// Named, not merely a radiogroup: the gallery serves the radio-group family's
 	// own group earlier in the same document, and a walk from the top reaches it first.

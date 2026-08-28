@@ -15,6 +15,10 @@ function Cell({ label }) @{
 	<span>{label}</span>
 }
 
+// A bare call: the read collector cannot see inside it, so it mints no computed
+// and the value exists only where rendering produced it.
+function shout(value: string) { return String(value).toUpperCase(); }
+
 export function App() @{
 	let rows = state([{ id: 'a', label: 'Alpha', cls: 'plain', on: true }]);
 	let chosen = state('a');
@@ -36,18 +40,49 @@ function rowRecord(compiled: Awaited<ReturnType<typeof compilePage>>) {
 	return compiled.protocolView.keyedRepeats?.[0];
 }
 
-test('a row reading a value that is not on the item warns that the list can never grow', async () => {
+// A read outside the item is a graph node the record can name, so it mints.
+test('a row reading a cell outside the item mints and stays silent', async () => {
 	const compiled = await compilePage(
 		`<ul>@for (const row of rows; key row.id) { <li>{chosen}{row.label}</li> }</ul>`,
 	);
 
+	expect(rowMintWarnings(compiled)).toEqual([]);
+	expect(rowRecord(compiled)?.rowTemplate?.textSlots).toEqual([
+		{ path: [0, 0], graphNodeId: 'state:chosen', graphPath: [] },
+		{ path: [0, 1], itemPath: ['label'] },
+	]);
+});
+
+// What no record can name: a value only rendering produces. The clause names the
+// read itself rather than its category.
+test('a row whose value only rendering produces warns, naming the read', async () => {
+	const compiled = await compilePage(
+		`<ul>@for (const row of rows; key row.id) { <li>{shout(chosen)}{row.label}</li> }</ul>`,
+	);
+
 	expect(rowMintWarnings(compiled)).toEqual([
-		[
-			'warning',
-			expect.stringContaining('reads a value that is not a property of row'),
-		],
+		['warning', expect.stringContaining('This @for row over row renders shout(chosen)')],
 	]);
 	expect(rowRecord(compiled)?.rowTemplate).toBeUndefined();
+});
+
+// The same cell through a method call is a different answer, and the silence is
+// the point: that call lifts into a computed, so the row template names the
+// lifted node and the row grows.
+test('a row calling a method on that cell mints from the lifted node and stays silent', async () => {
+	const compiled = await compilePage(
+		`<ul>@for (const row of rows; key row.id) { <li>{chosen.toUpperCase()}{row.label}</li> }</ul>`,
+	);
+
+	expect(rowMintWarnings(compiled)).toEqual([]);
+	expect(rowRecord(compiled)?.rowTemplate?.textSlots).toEqual([
+		{
+			path: [0, 0],
+			graphNodeId: expect.stringContaining('templateExpression'),
+			graphPath: [],
+		},
+		{ path: [0, 1], itemPath: ['label'] },
+	]);
 });
 
 test('a row holding a construct warns that the list can never grow', async () => {
@@ -79,9 +114,9 @@ test('a row whose element wraps a component stays silent - both halves ship', as
 
 // The wrapper is minted from markup, so a wrapper slot markup cannot finish
 // still refuses the whole row - the child's identity does not rescue it.
-test('a wrapper reading a value that is not on the item warns, component inside or not', async () => {
+test('a wrapper whose value only rendering produces warns, component inside or not', async () => {
 	const compiled = await compilePage(
-		`<ul>@for (const row of rows; key row.id) { <li data-row={chosen}><Cell label={row.label} /></li> }</ul>`,
+		`<ul>@for (const row of rows; key row.id) { <li data-row={shout(chosen)}><Cell label={row.label} /></li> }</ul>`,
 	);
 
 	expect(rowMintWarnings(compiled)).toEqual([

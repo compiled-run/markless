@@ -2034,8 +2034,8 @@ function createUnknownSymbolError(id) {
       "severity": "warning",
       "phase": "public-render",
       "title": "This list can never grow in the browser",
-      "message": "This @for row reads a value that is not a property of entry, and the browser builds a row from the row item alone. The browser has no renderer, so a row that arrives after the page loads has no markup to be built from: this list will render the rows the server sent, reorder them and remove them, and silently ignore every new one.",
-      "why": "The payload carries one row of finished markup so the browser can build a row the server never rendered. It can fill text read off the row item and nothing else, so a row needing anything more ships no template at all.",
+      "message": "This @for row over entry sets class from chosen === entry.code ? 'picked' : 'plain', which only rendering produces - the browser fills a row from entry and from state the page holds, and this is neither. The browser has no renderer, so a row that arrives after the page loads has no markup to be built from: this list will render the rows the server sent, reorder them and remove them, and silently ignore every new one.",
+      "why": "The payload carries one row of finished markup so the browser can build a row the server never rendered. It can fill text and attributes read off the row item or off a state cell the page holds, and nothing else, so a row needing anything more ships no template at all.",
       "primarySpan": {
         "filename": "src/KeyedRepeat.tsrx",
         "start": 159,
@@ -2047,7 +2047,7 @@ function createUnknownSymbolError(id) {
       ],
       "suggestions": [
         {
-          "message": "Read the value off entry - put it on the item before the list is built - or keep the row to text read off entry."
+          "message": "Read the value off entry or off a state cell directly - move the expression into a computed, or put the value on the item before the list is built."
         }
       ],
       "docsUrl": "https://markless.dev/errors/MARKLESS_KEYED_REPEAT_ROW_MINT_UNSUPPORTED"

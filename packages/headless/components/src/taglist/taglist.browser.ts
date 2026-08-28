@@ -308,11 +308,10 @@ for (const mode of MODES) {
 		await expect.poll(() => el(Held).textContent).toBe('alpha|beta|gamma|delta');
 	});
 
-	// Pinned: the row's `name={taglist.name}` reads a cell outside the repeated
-	// tag, which takes the row's markup off the payload, so a tag the first render
-	// did not carry can never be built. Dropping and re-admitting a rendered tag
-	// need no markup and both work.
-	test.fails(`${mode}: the form field hands back one entry per tag under one name`, async () => {
+	// The row's `name={taglist.name}` reads a cell outside the repeated tag, and
+	// the row template carries that read, so a tag the first render did not carry
+	// is built with the name the served rows have.
+	test(`${mode}: the form field hands back one entry per tag under one name`, async () => {
 		if (mode === 'CSR') await render(TopicsForm);
 		else await renderSSR(TopicsForm);
 
@@ -355,7 +354,7 @@ for (const mode of MODES) {
 	// Pinned: the text CALLS a method on the array (`join`), and an expression
 	// that calls a method in a template position is wired to nothing. The position
 	// is not the ingredient - an attribute spelled the same way stays stale too.
-	test.fails(`${mode}: a consumer component's text over the family's value refreshes`, async () => {
+	test(`${mode}: a consumer component's text over the family's value refreshes`, async () => {
 		if (mode === 'CSR') await render(ConsumerState);
 		else await renderSSR(ConsumerState);
 
@@ -431,13 +430,16 @@ for (const mode of MODES) {
 		if (mode === 'CSR') await render(DisplayOnly);
 		else await renderSSR(DisplayOnly);
 
+		const blueBefore = closeFor('blue');
 		closeFor('green').focus();
 		await userEvent.keyboard('{Delete}');
 		await expect.poll(() => el(Held).textContent).toBe('red|blue');
-		// The highlight lands on the neighbour. Where DOM focus lands is not pinned
-		// here: the keyed repeat replaces the row's nodes, and the button this
-		// handler focused is gone by the time the browser applies it.
 		await expect.poll(() => at('item-blue').hasAttribute('ui-highlighted')).toBe(true);
+		// DOM focus, not just the highlight. The commit re-inserts the rows it
+		// keeps, so the button this handler focused is out of the document for part
+		// of it - the runtime re-lands the focus once the commit is done.
+		expect(closeFor('blue')).toBe(blueBefore);
+		expect(document.activeElement).toBe(closeFor('blue'));
 	});
 
 	test(`${mode}: focusing a tag moves the walk onto it`, async () => {

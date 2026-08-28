@@ -17,6 +17,7 @@ import type {
 	ComposeChildOutput,
 	ComposeGraphProps,
 	ComposeGraphRead,
+	ComposeRowTemplate,
 	ComposeStateDraft,
 } from './composition.ts';
 import {
@@ -70,6 +71,7 @@ type SsrKeyedRepeatRecord = SsrRecord & {
 	readonly ownerHostNodeId?: string;
 	readonly collectionGraphNodeId?: string;
 	readonly collectionPath: ReadonlyArray<string>;
+	readonly rowTemplate?: ComposeRowTemplate;
 	readonly rowEvents: ReadonlyArray<SsrRowEventRecord>;
 };
 type SsrAnchoredRecord = SsrRecord & {
@@ -1351,6 +1353,7 @@ export function marklessSsrAppendChildView(context: {
 				: {}),
 			collectionGraphNodeId: mapped.graphNodeId,
 			collectionPath: mapped.path,
+			...(repeat.rowTemplate ? { rowTemplate: mapped.rowTemplate } : {}),
 			rowEvents,
 		});
 	}
@@ -1625,6 +1628,7 @@ export function marklessSsrPrefixBoundaryArmRecords(
 								: {}),
 							collectionGraphNodeId: mapped.graphNodeId,
 							collectionPath: mapped.path,
+							...(repeat.rowTemplate ? { rowTemplate: mapped.rowTemplate } : {}),
 							rowEvents: repeat.rowEvents.map((event) => ({
 								...event,
 								symbolIds: event.symbolIds.map((symbolId) =>

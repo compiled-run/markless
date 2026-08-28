@@ -1,11 +1,11 @@
 /**
  * The walk over the group's marks. The roster is the `element()` handle the
- * family binds on every `ratinggroup.item`, read back live and in document
+ * family binds on every `rating.item`, read back live and in document
  * order, so the mark at rating position `at` is the one at `at - 1`. Nothing
  * here queries the DOM and nothing counts rendered elements: the positions are
  * `1 … count`, which the root derived before any mark rendered.
  */
-import { focusPosition } from './rating-group-math.ts';
+import { focusPosition } from './rating-math.ts';
 
 type Marks = ReadonlyArray<HTMLElement>;
 

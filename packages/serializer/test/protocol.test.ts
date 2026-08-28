@@ -386,6 +386,79 @@ test('keyed repeat row markup round-trips and refuses a malformed shape', () => 
 	).toThrow(/keyedRepeat\[0\]\.rowTemplate\.textSlots\[0\]/);
 });
 
+// A row slot's value comes from the repeated item OR from a graph node the page
+// already holds, and exactly one of the two: a slot naming both would give the
+// mint two answers for one position, and one naming neither would write
+// undefined where the server wrote a value.
+test('a row slot names the item or a graph node, and exactly one of the two', () => {
+	const rowTemplate = {
+		html: '<input><!--markless-slot:0-->',
+		textSlots: [{ path: [1], itemPath: ['title'] }],
+		attributeSlots: [
+			{ path: [0], name: 'name', graphNodeId: 'state:box', graphPath: ['name'] },
+		],
+	};
+	const repeat = {
+		id: 'repeat:rows',
+		parentHostNodeId: 'h0',
+		collectionGraphNodeId: 'state:rows',
+		collectionPath: [],
+		keyPath: ['id'],
+		itemName: 'row',
+		rowElementCount: 1,
+		rowTemplate,
+		rowEvents: [],
+	};
+	const view: ProtocolViewPayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		keyedRepeats: [repeat],
+		asyncBoundaries: [],
+	};
+	const state: ProtocolStatePayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		cells: [],
+		computed: [],
+	};
+	const withTextSlots = (textSlots: unknown) =>
+		decodePayloadScripts(
+			renderPayloadScripts({
+				state,
+				view: {
+					...view,
+					keyedRepeats: [{ ...repeat, rowTemplate: { ...rowTemplate, textSlots } }],
+				} as never,
+			}),
+		);
+
+	// Both channels ride one ordered list, because a row mixing them - a hidden
+	// input named from the page's state and valued from the item - is the shape
+	// that needs this at all.
+	expect(decodePayloadScripts(renderPayloadScripts({ state, view })).view.keyedRepeats?.[0]
+		?.rowTemplate).toEqual(rowTemplate);
+
+	expect(() =>
+		withTextSlots([{ path: [1], itemPath: ['title'], graphNodeId: 'state:box', graphPath: [] }]),
+	).toThrow(/keyedRepeat\[0\]\.rowTemplate\.textSlots\[0\]/);
+	expect(() => withTextSlots([{ path: [1] }])).toThrow(
+		/keyedRepeat\[0\]\.rowTemplate\.textSlots\[0\]/,
+	);
+	// Half the graph pair is neither channel.
+	expect(() => withTextSlots([{ path: [1], graphNodeId: 'state:box' }])).toThrow(
+		/keyedRepeat\[0\]\.rowTemplate\.textSlots\[0\]/,
+	);
+	expect(() => withTextSlots([{ path: [1], graphNodeId: 7, graphPath: [] }])).toThrow(
+		/keyedRepeat\[0\]\.rowTemplate\.textSlots\[0\]/,
+	);
+	expect(() => withTextSlots([{ path: [1], graphNodeId: 'state:box', graphPath: [7] }])).toThrow(
+		/keyedRepeat\[0\]\.rowTemplate\.textSlots\[0\]/,
+	);
+});
+
 // A row whose content is a component crosses the wire as identity alone. The
 // mint runs an edge from it, so a malformed identity must never reach it.
 test('keyed repeat row component identity round-trips and refuses a malformed shape', () => {

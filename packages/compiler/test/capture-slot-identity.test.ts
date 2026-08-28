@@ -87,6 +87,7 @@ function familyModules(): ReadonlyArray<{ readonly name: string; readonly source
 // Ids key the slot map a symbol resolves against at resume, so two slots of one
 // symbol sharing an id would lose one of them; the trailing arrival ordinal is
 // what keeps reads that agree on component, prop, and path apart.
+// One compile per shipped family: the budget scales with the catalog.
 test('across the shipped families, no symbol carries two capture slots under one id', async () => {
 	const modules = [{ name: 'forwarder.tsrx', source: FORWARDER }, ...familyModules()];
 	expect(modules.length).toBeGreaterThan(10);
@@ -102,4 +103,4 @@ test('across the shipped families, no symbol carries two capture slots under one
 
 	expect(collisions).toEqual([]);
 	expect(offsetSpelled).toEqual([]);
-});
+}, 60_000);

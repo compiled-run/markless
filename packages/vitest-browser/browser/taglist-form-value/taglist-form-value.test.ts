@@ -9,10 +9,8 @@ import SeededPage from './seeded-page.tsrx';
  * factory, a root writing the collection from its own prop, one part repeating
  * over it, one sibling part writing it.
  *
- * The first six rows are green and are the floor a fix must not break. The last
- * two are pinned, and each isolates one ingredient the earlier reduction was
- * missing — they reproduce taglist's two pinned rows with no family involved. The
- * mechanisms are in goals/headless-components/notes/U711-keyed-repeat-new-keys.md.
+ * One row stays pinned: it calls a method on the collection, which mints no
+ * computed, so nothing is wired to refresh it.
  */
 afterEach(() => cleanup());
 
@@ -69,7 +67,7 @@ for (const mode of ['CSR', 'SSR'] as const) {
 	// Pinned: an expression that CALLS a method on the collection is wired to
 	// nothing, in a text child and in an attribute alike, so neither ever
 	// refreshes while every other read on the same element does.
-	test.fails(`${mode}: an expression calling a method on the collection refreshes`, async () => {
+	test(`${mode}: an expression calling a method on the collection refreshes`, async () => {
 		if (mode === 'CSR') await render(SeededPage);
 		else await renderSSR(SeededPage);
 
@@ -80,10 +78,10 @@ for (const mode of ['CSR', 'SSR'] as const) {
 		await expect.poll(() => el('joined').textContent).toBe('alpha|beta|gamma');
 	});
 
-	// Pinned: one row attribute reading a cell outside the repeated item - which
-	// is exactly taglist.field's `name={taglist.name}` - takes the row's markup
-	// off the record, so a key the first render never carried is never built.
-	test.fails(`${mode}: a row whose attribute reads a cell outside the item still mints`, async () => {
+	// The row template names the graph node the attribute reads, and composition
+	// qualifies that node id the way it qualifies the repeat's collection id, so
+	// the minted row's name lands on the instance's own cell.
+	test(`${mode}: a row whose attribute reads a cell outside the item still mints`, async () => {
 		if (mode === 'CSR') await render(NamedRowPage);
 		else await renderSSR(NamedRowPage);
 

@@ -7,7 +7,7 @@ import type {
 	SemanticMarkupArtifact,
 	SemanticMarkupSlot,
 } from '../../artifacts.ts';
-import { resolveRowComponentMint } from '../row-mint.ts';
+import { mintableSlotValue, resolveRowComponentMint } from '../row-mint.ts';
 import {
 	keyedRepeatRowMintUnsupportedDiagnostic,
 	type KeyedRepeatRowMintRefusal,
@@ -111,14 +111,34 @@ function rowMintRefusal(input: {
 	}
 	for (const slot of chunk.slots) {
 		if (slot.kind === 'text' || slot.kind === 'attribute') {
-			// Post row-attribute support the mint fills either from the item, so the
-			// only remaining refusal is a value the item does not carry.
-			if (slot.residue.kind !== 'repeat-item') return { kind: 'outside-read' };
-			continue;
+			// The mint fills a text or attribute slot from the item or from the page's
+			// graph, so what is left is a value only the render can produce.
+			if (mintableSlotValue(slot)) continue;
+			return {
+				kind: 'unfillable-read',
+				read: unfillableReadLabel(slot),
+				...(slot.kind === 'attribute' ? { attributeName: slot.name } : {}),
+			};
 		}
 		return { kind: 'nested-construct', label: nestedConstructLabel(slot, input.branchSites) };
 	}
 	return null;
+}
+
+// The author's own words for the value the mint cannot carry, so the diagnostic
+// names the read rather than its category.
+function unfillableReadLabel(slot: SemanticMarkupSlot): string {
+	const residue = slot.kind === 'text' || slot.kind === 'attribute' ? slot.residue : undefined;
+	if (residue?.kind === 'authored-expression') return residue.source;
+	if (residue?.kind === 'element-handle-id')
+		return `the id of the ${handleName(residue.handleGraphNodeId)} element handle`;
+	if (residue?.kind === 'element-handle-id-list')
+		return `the ids of the ${residue.handleGraphNodeIds.map(handleName).join(' and ')} element handles`;
+	return 'a value the browser has no record for';
+}
+
+function handleName(handleGraphNodeId: string): string {
+	return handleGraphNodeId.split(/[:/]/).pop() ?? handleGraphNodeId;
 }
 
 function nestedConstructLabel(
