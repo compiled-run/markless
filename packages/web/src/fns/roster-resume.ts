@@ -1,5 +1,9 @@
 import type { RuntimeGraph } from '@markless/runtime';
 import type { ElementHandleRegistry } from '../resume-types.ts';
+import {
+	MARKLESS_ROSTER_COUNT_CLOSE,
+	MARKLESS_ROSTER_COUNT_OPEN,
+} from '../prerender/shared-seed-slot.ts';
 import { marklessInstancePath, marklessInstanceScopedElementHandle } from './instance-scope.ts';
 
 /**
@@ -67,6 +71,29 @@ export function createRosterPositionReader(input: {
 			oneElement(input.elementHandles.get, scope + handleGraphNodeId) ??
 			oneElement(input.elementHandles.get, handleGraphNodeId);
 		return Array.isArray(roster) && member ? roster.indexOf(member) : -1;
+	};
+}
+
+/**
+ * How many parts this family instance has in the roster, now that there is a
+ * DOM: the roster's own live members. No member handle is needed - a count does
+ * not depend on the asker being in the roster.
+ */
+export function createRosterCountReader(input: {
+	readonly computed: RosterComputedRecord;
+	readonly graph: RuntimeGraph;
+	readonly elementHandles: ElementHandleRegistry;
+}): ((rosterGraphNodeId: string) => number) | undefined {
+	if (!input.computed.dependencies?.some((dependency) => isElementBinding(dependency.graphNodeId)))
+		return undefined;
+	const rosterOf = marklessInstanceScopedElementHandle(
+		input.elementHandles.get,
+		marklessInstancePath(input.computed.graphNodeId),
+		input.graph,
+	);
+	return (rosterGraphNodeId) => {
+		const roster = rosterOf?.(rosterGraphNodeId);
+		return Array.isArray(roster) ? roster.length : 0;
 	};
 }
 
@@ -151,4 +178,50 @@ export function wireRosterRevisions(input: {
 
 function isElementBinding(graphNodeId: string): boolean {
 	return graphNodeId.includes(ELEMENT_BINDING_SEGMENT);
+}
+
+const ROSTER_COUNT = new RegExp(
+	`${MARKLESS_ROSTER_COUNT_OPEN}([^${MARKLESS_ROSTER_COUNT_CLOSE}]*)${MARKLESS_ROSTER_COUNT_CLOSE}`,
+	'g',
+);
+
+/**
+ * Every placeholder count a render minted, answered from the page it produced:
+ * the roster's members are its element-handle registrations, and composition has
+ * already qualified each one with the rendered widget it belongs to.
+ *
+ * This is the render half, and it lives here because it is the same pay-per-use
+ * fact the resume half is: a page whose payload holds no computed node can hold
+ * no count, and never names this module.
+ *
+ * The payload is answered alongside the html because a computed a handler reads
+ * is SERVED with its rendered value, and a placeholder there would outlive paint.
+ */
+export function marklessResolveRosterCounts<
+	Surface extends {
+		readonly html: string;
+		readonly state?: unknown;
+		readonly view?: { readonly elementHandles?: ReadonlyArray<{ readonly handleId: string }> };
+	},
+>(surface: Surface): Surface {
+	const handles = surface.view?.elementHandles ?? [];
+	const answer = (text: string) =>
+		text.replace(ROSTER_COUNT, (_all, key: string) =>
+			String(handles.filter((handle) => handle.handleId === key).length),
+		);
+	return {
+		...surface,
+		html: answer(surface.html),
+		...(surface.state === undefined ? {} : { state: answered(surface.state, answer) }),
+	} as Surface;
+}
+
+// Rebuilt only where a placeholder was found, so a payload holding none is the
+// object it arrived as and nothing downstream reads a spurious divergence.
+function answered(value: unknown, answer: (text: string) => string): unknown {
+	if (typeof value === 'string') return answer(value);
+	if (!value || typeof value !== 'object') return value;
+	const held = Object.entries(value).map(([key, one]) => [key, answered(one, answer)] as const);
+	if (!held.some(([key, one]) => one !== (value as Record<string, unknown>)[key])) return value;
+	return Array.isArray(value) ? held.map(([, one]) => one) : Object.fromEntries(held);
 }

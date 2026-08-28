@@ -27,15 +27,19 @@ export const ic = shared(
 
 export function IcRoot({ children }) @{
 	const w = ic();
+	// The count the family owes its own markup: nobody authors it, and the root
+	// asks for it before a single item has rendered.
+	const total = computed(() => w.itemEls.length);
 
 	<div
 		data-ic-root
+		ui-max={total}
 		ui-count={w.count}
 		ui-seen={w.seen}
 		onClick={() => {
 			w.survey();
 		}}
-	>{children}</div>
+	>{children}<span data-ic-total>{total}</span></div>
 }
 
 export function IcItem({ children }) @{

@@ -1,6 +1,8 @@
 import {
 	installSharedSeedPass,
 	MARKLESS_WIDGET_INSTANCE_KEY,
+	marklessRosterPositions,
+	marklessRosterRenderContext,
 	marklessWidgetInstanceKey,
 	type SharedSeedPass,
 } from '../prerender/shared-seed-slot.ts';
@@ -206,7 +208,16 @@ function composedScopeRead(
 					// failing the render: the composed root still gets every prop that resolved.
 					if (typeof loaded !== 'function') return undefined;
 					return marklessThen(
-						(loaded.length > 0 ? loaded({ graph: { read }, read }) : loaded()) as Awaitable<unknown>,
+						// A derive reaching this seam is the same derive the component render
+						// reaches, so the roster answers it the same way: the seed map it runs
+						// against carries both the counter and the instance to count within.
+						(loaded.length > 0
+							? loaded({
+									graph: { read },
+									read,
+									...marklessRosterRenderContext(marklessRosterPositions(seeded), seeded),
+								})
+							: loaded()) as Awaitable<unknown>,
 						(value) => {
 							values.set(initial.graphNodeId, value);
 						},
