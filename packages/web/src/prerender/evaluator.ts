@@ -43,6 +43,7 @@ import {
 	marklessRosterPositions,
 	marklessRosterPositionSeeds,
 	marklessRosterRenderContext,
+	marklessRosterSeedPass,
 	sharedSeedPass,
 } from './shared-seed-slot.ts';
 import { branchArmIdrefResolution } from '../ssr-data/branch-arm-idrefs.ts';
@@ -845,19 +846,21 @@ function evaluatePrerenderDataComponent(input: {
 						return snapshot?.status === 'fulfilled' ? 0 : snapshot?.status === 'rejected' ? 2 : 1;
 					},
 					seedChild: (slot, context) =>
-						sharedSeedPass()?.(
-							{
-								...input,
-								// Seeds load by compile-time symbol id; the row reaches them as identity.
-								symbolPrefix: marklessRowFreeSymbolId(input.symbolPrefix, input.symbolPrefix),
-								rowSegment:
-									context.repeatKey === undefined ? '' : marklessRowSegment(context.repeatKey),
-								readEdgeProp: (prop) => readDecision(prop.source, context),
-							},
-							definition,
-							slot,
-							read,
-							context.sharedSeeds,
+						marklessRosterSeedPass(context.sharedSeeds, () =>
+							sharedSeedPass()?.(
+								{
+									...input,
+									// Seeds load by compile-time symbol id; the row reaches them as identity.
+									symbolPrefix: marklessRowFreeSymbolId(input.symbolPrefix, input.symbolPrefix),
+									rowSegment:
+										context.repeatKey === undefined ? '' : marklessRowSegment(context.repeatKey),
+									readEdgeProp: (prop) => readDecision(prop.source, context),
+								},
+								definition,
+								slot,
+								read,
+								context.sharedSeeds,
+							),
 						),
 					renderChild: (slot, context) => {
 						const edge = (definition.edges ?? []).find(
@@ -1266,19 +1269,21 @@ function renderRowComponentEdge(
 							throw new Error('MARKLESS_PRERENDER_RESIDUE_MISSING');
 						},
 						seedChild: (slot, context) =>
-							sharedSeedPass()?.(
-								{
-									surface: input.surface,
-									idPrefix: ownerIdPrefix,
-									loadSymbol: input.loadSymbol,
-									symbolPrefix: marklessRowFreeSymbolId(ownerSymbolPrefix, ownerSymbolPrefix),
-									rowSegment,
-									readEdgeProp: (prop) => readDecision(prop.source, context),
-								},
-								definition,
-								slot,
-								read,
-								context.sharedSeeds,
+							marklessRosterSeedPass(context.sharedSeeds, () =>
+								sharedSeedPass()?.(
+									{
+										surface: input.surface,
+										idPrefix: ownerIdPrefix,
+										loadSymbol: input.loadSymbol,
+										symbolPrefix: marklessRowFreeSymbolId(ownerSymbolPrefix, ownerSymbolPrefix),
+										rowSegment,
+										readEdgeProp: (prop) => readDecision(prop.source, context),
+									},
+									definition,
+									slot,
+									read,
+									context.sharedSeeds,
+								),
 							),
 						renderChild: (slot, context) => {
 							const projectedEdge = (definition.edges ?? []).find(
