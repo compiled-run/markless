@@ -18,7 +18,7 @@ import { marklessInstancePath, marklessInstanceScopedElementHandle } from './ins
 // An element() binding's graph node id, restating the compiler's spelling for
 // the reason instance-scope.ts restates the serializer's grammar.
 const ELEMENT_BINDING_SEGMENT = '/element:';
-const ROW_SEGMENT = /r:[^:]*:/g;
+const INSTANCE_SEGMENT = /r:[^:]*:|[cp]\d+:/g;
 
 type RosterComputedRecord = {
 	readonly graphNodeId: string;
@@ -58,16 +58,36 @@ export function createRosterPositionReader(input: {
 		instancePath,
 		input.graph,
 	);
-	// The member handle's own id names no instance, so the rows this derivation
-	// stands in are what separate its element from every sibling part's.
-	const rows = instancePath.match(ROW_SEGMENT)?.join('') ?? '';
+	// The member handle's own id names no instance, so the host path this
+	// derivation stands in separates its element from every sibling part's.
+	const scope = hostScopePath(instancePath);
 	return (rosterGraphNodeId, handleGraphNodeId) => {
 		const roster = rosterOf?.(rosterGraphNodeId);
 		const member =
-			oneElement(input.elementHandles.get, rows + handleGraphNodeId) ??
+			oneElement(input.elementHandles.get, scope + handleGraphNodeId) ??
 			oneElement(input.elementHandles.get, handleGraphNodeId);
 		return Array.isArray(roster) && member ? roster.indexOf(member) : -1;
 	};
+}
+
+/**
+ * The host id space spelling of an instance path, which is the space element
+ * handles are registered in.
+ *
+ * Both spaces number one component edge the same, but only symbol space carries
+ * the edge a PROJECTED component was projected into: symbol `c0:p1:` and host
+ * `c1:` name one rendered component. So a segment another segment projects out
+ * of is dropped, and what is left is respelled as the host's own `c`.
+ */
+function hostScopePath(instancePath: string): string {
+	const segments = instancePath.match(INSTANCE_SEGMENT) ?? [];
+	let scope = '';
+	for (let at = 0; at < segments.length; at++) {
+		const segment = segments[at]!;
+		if (segments[at + 1]?.startsWith('p')) continue;
+		scope += segment.startsWith('p') ? 'c' + segment.slice(1) : segment;
+	}
+	return scope;
 }
 
 // A key naming more than one rendered part answers no part, and the caller has
