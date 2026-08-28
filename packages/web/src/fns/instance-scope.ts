@@ -1,6 +1,15 @@
 import type { RuntimeGraph } from '@markless/runtime';
 import { installComposedArmRecordQualifier } from '../resume-arm-records.ts';
-import type { ResumeArmRecordSet, ResumeSymbol, ResumeSymbolContext } from '../resume-types.ts';
+import { installElementHandleQualifier } from '../resume-locators.ts';
+import { marklessSettled, type Awaitable } from '../ssr-data/awaitable.ts';
+import type {
+	ResumeArmBranchRecord,
+	ResumeArmRecordSet,
+	ResumeSymbol,
+	ResumeSymbolContext,
+} from '../resume-types.ts';
+
+type BranchContentReads = NonNullable<ResumeArmBranchRecord['contentReads']>;
 
 // A composed child's compiled symbols spell the child module's own graph node
 // ids, but composition merged that child's nodes into the page graph under its
@@ -85,6 +94,22 @@ export function marklessRecordRowScope(
 	return pairs.length > 0 ? pairs.reverse() : undefined;
 }
 
+/**
+ * Which instance authored the symbol a widget root parked in its slot.
+ *
+ * The root path names where the root RENDERED. The authoring position is that
+ * path less the component edge that placed the root — and less the projection
+ * and row segments trailing it, which the same module spells: a root written
+ * inside another component's tag is still the enclosing module's own JSX, so its
+ * callback closure is that module's, not the component it was projected into.
+ */
+export function marklessComposerInstancePath(rootPath: string): string {
+	const segments = rootPath.match(INSTANCE_SEGMENT) ?? [];
+	let end = segments.length;
+	while (end > 0 && !segments[end - 1]!.startsWith('c')) end -= 1;
+	return segments.slice(0, Math.max(end - 1, 0)).join('');
+}
+
 export function marklessRowScopedGraphNodeId(
 	graphNodeId: string,
 	scope: MarklessRowScope,
@@ -92,10 +117,43 @@ export function marklessRowScopedGraphNodeId(
 ): string {
 	const widget = marklessRowWidgetGraphNodeId(graphNodeId, scope, registry);
 	if (widget !== undefined) return widget;
+	assertWidgetReadResolved(graphNodeId, registry);
 	for (const { rowFree, withRows, rowBoundary } of scope)
 		if (!rowBoundary && graphNodeId.startsWith(rowFree))
 			return withRows + graphNodeId.slice(rowFree.length);
 	return graphNodeId;
+}
+
+/**
+ * Refuse a widget-scoped read that reached no rendered widget.
+ *
+ * Left alone the id stays in page space, the graph answers `undefined`, and the
+ * handler runs to completion writing nothing - a dismiss that matches no message.
+ * Only an id whose prefix names the edge a part was compiled at, for a definition
+ * this page files as a widget, is that: page-scoped `shared()` and storage ids
+ * are page space on purpose, and a bare widget id claims no instance.
+ */
+function assertWidgetReadResolved(graphNodeId: string, registry: MarklessWidgetRegistry): void {
+	const pageSpace = PAGE_SPACE_ID.exec(graphNodeId);
+	if (!pageSpace || pageSpace[2] !== 'shared' || !pageSpace[1] || pageSpace[1].includes('r:'))
+		return;
+	const sharedId = graphNodeId.slice(pageSpace[1].length);
+	const slash = sharedId.lastIndexOf('/');
+	const definitionId = slash > 0 ? sharedId.slice(0, slash) : sharedId;
+	// The registry files every widget-scoped definition the graph lists, rendered
+	// or not, so membership here is what says "widget-scoped" rather than a guess.
+	if (!registry.rootPaths.has(definitionId) && !registry.rowRooted.has(definitionId)) return;
+	const error = new Error(
+		`MARKLESS_WIDGET_INSTANCE_UNRESOLVED: ${graphNodeId} was read at dispatch from a part whose widget instance no rendered widget owns, so the read would answer for no instance at all.`,
+	) as Error & Record<string, unknown>;
+	error.name = 'WidgetInstanceRuntimeError';
+	error.code = 'MARKLESS_WIDGET_INSTANCE_UNRESOLVED';
+	error.severity = 'error';
+	error.phase = 'runtime';
+	error.graphNodeId = graphNodeId;
+	error.definitionId = definitionId;
+	error.docsUrl = 'https://markless.dev/errors/MARKLESS_WIDGET_INSTANCE_UNRESOLVED';
+	throw error;
 }
 
 /**
@@ -209,7 +267,10 @@ function marklessRowRootedGraphNodeId(
 // second kind is a row's, which is what the prefix match above decides. The tag
 // keeps a re-entrant dispatch - a bound handler invoking a parent callback that
 // runs through this same path - from inserting the row a second time.
-type MarklessRowScopedGraph = MarklessScopedGraph & { readonly marklessRowScope?: string };
+type MarklessRowScopedGraph = MarklessScopedGraph & {
+	readonly marklessRowScope?: string;
+	readonly marklessWidgetHostGraph?: object;
+};
 
 export function marklessRowScopedGraph(
 	graph: RuntimeGraph,
@@ -220,9 +281,18 @@ export function marklessRowScopedGraph(
 	const registry = marklessGraphWidgetRegistry(graph);
 	const qualify = (graphNodeId: string) =>
 		marklessRowScopedGraphNodeId(graphNodeId, scope, registry);
+	const outerQualify = (graph as MarklessRowScopedGraph).marklessQualifyGraphNodeId;
 	const scoped = {
 		...graph,
 		marklessRowScope: tag,
+		marklessQualifyGraphNodeId: (graphNodeId: string) =>
+			outerQualify ? outerQualify(qualify(graphNodeId)) : qualify(graphNodeId),
+		// An own field, not the WeakMap alone: this graph is spread again on its way
+		// to the symbol (the imported-capture adapter builds its own reader over it),
+		// and a copy the map has never seen mints a registry of its own - one that
+		// never heard of a row minted after boot, so the row's parts resolve to
+		// nothing.
+		marklessWidgetHostGraph: marklessRegistryHolder(graph),
 		read: (graphNodeId, path) => graph.read(qualify(graphNodeId), path),
 		write: (write) => graph.write({ ...write, graphNodeId: qualify(write.graphNodeId) }),
 		update: (update) => graph.update({ ...update, graphNodeId: qualify(update.graphNodeId) }),
@@ -324,12 +394,10 @@ export function marklessWidgetHandleId(
  * The reading half of the same key.
  *
  * The compiled symbol asks for the module-level id, so the instance it is
- * running in is what has to be added here. The qualified id is asked first; the
- * id exactly as compiled answers when this page registered no qualified handle
- * at all - a single-instance page, or a handle whose host never travelled
- * through composition. The registry itself refuses a raw id that more than one
- * rendered widget registered, so the fallback can never hand back an arbitrary
- * instance's element.
+ * running in is what has to be added here. Every registration a rendered widget
+ * makes is qualified the same way - the page-level ones at composition, the
+ * ones an `@if` arm files at resume - so a reader whose instance is named asks
+ * the qualified key and nothing else.
  */
 export function marklessInstanceScopedElementHandle(
 	getElementHandle: ResumeSymbolContext['getElementHandle'],
@@ -348,10 +416,11 @@ export function marklessInstanceScopedElementHandle(
 			instancePath,
 			graph ? marklessGraphWidgetRegistry(graph) : marklessWidgetScope.active,
 		);
-		return (
-			(scoped === handleIdOrName ? undefined : getElementHandle(scoped)) ??
-			getElementHandle(handleIdOrName)
-		);
+		// The qualified key alone: the compiled id names every instance on the page,
+		// and `scoped === handleIdOrName` is exactly the id no rendered widget owns.
+		return scoped === handleIdOrName
+			? getElementHandle(handleIdOrName)
+			: getElementHandle(scoped);
 	};
 }
 
@@ -367,6 +436,9 @@ export function marklessInstanceScopedElementHandle(
 export type MarklessScopedGraph = RuntimeGraph & {
 	readonly marklessPageGraph?: RuntimeGraph;
 	readonly marklessInstancePath?: string;
+	// Reads chain adapter into adapter, so only the composed answer says which id a
+	// read really lands on; one adapter's own path is a partial answer.
+	readonly marklessQualifyGraphNodeId?: (graphNodeId: string) => string;
 };
 
 export function marklessInstanceScopedGraph(
@@ -384,10 +456,13 @@ export function marklessInstanceScopedGraph(
 	// Page-space families (shared, storage) keep their page ids through every adapter.
 	const qualify = (graphNodeId: string) =>
 		marklessComposedGraphNodeId(graphNodeId, instancePath, registry);
+	const outerQualify = (graph as MarklessScopedGraph).marklessQualifyGraphNodeId;
 	return {
 		...graph,
 		marklessPageGraph: (graph as MarklessScopedGraph).marklessPageGraph ?? graph,
 		marklessInstancePath: instancePath,
+		marklessQualifyGraphNodeId: (graphNodeId: string) =>
+			outerQualify ? outerQualify(qualify(graphNodeId)) : qualify(graphNodeId),
 		read: (graphNodeId, path) => graph.read(qualify(graphNodeId), path),
 		write: (write) => graph.write({ ...write, graphNodeId: qualify(write.graphNodeId) }),
 		update: (update) => graph.update({ ...update, graphNodeId: qualify(update.graphNodeId) }),
@@ -479,7 +554,8 @@ function marklessScopeWidgetsTo(registry: MarklessWidgetRegistry): MarklessWidge
 }
 
 function marklessRegistryHolder(graph: RuntimeGraph): object {
-	return (graph as MarklessScopedGraph).marklessPageGraph ?? graph;
+	const scoped = graph as MarklessRowScopedGraph;
+	return scoped.marklessPageGraph ?? scoped.marklessWidgetHostGraph ?? graph;
 }
 
 /**
@@ -523,6 +599,95 @@ export function marklessNoteWidgetRoot(
 	registry.rootPaths.set(id, rootPath);
 	if (rootPath.includes('r:'))
 		registry.rowRooted.add(id.slice(marklessInstancePath(id).length));
+}
+
+/**
+ * The rendered widgets a client-minted repeat row is standing INSIDE.
+ *
+ * A minted row composes alone, so the registry that render builds holds only the
+ * roots the row itself is. A part reading a widget rooted in an ancestor - the
+ * collection the repeat iterates, most of all - would find nothing and mint a
+ * second instance of it, whose writes no served node ever sees. The mint reads
+ * the live page's roots off its graph and installs them here for the row's
+ * render; the `rowSegment` guard is what keeps a render running beside it from
+ * reading the answer, the same separation `marklessWidgetScope` settles for.
+ */
+const enclosingWidgetScope: {
+	rowSegment: string;
+	roots: ReadonlyMap<string, string> | undefined;
+} = { rowSegment: '', roots: undefined };
+
+/**
+ * The ancestor roots a row minted at `anchorInstancePath` can reach, by the
+ * definition id its parts spell. The anchor is a live position at or above the
+ * repeat host, so this is the same walk a served row's part resolves through.
+ */
+export function marklessEnclosingWidgetRoots(
+	anchorInstancePath: string,
+	registry: MarklessWidgetRegistry,
+): ReadonlyMap<string, string> {
+	const roots = new Map<string, string>();
+	if (!anchorInstancePath) return roots;
+	for (const id of registry.rootPaths.keys()) {
+		const definitionId = id.slice(marklessInstancePath(id).length);
+		if (roots.has(definitionId)) continue;
+		const rootPath = marklessWidgetRootPathThroughRows(
+			definitionId,
+			anchorInstancePath,
+			registry,
+		);
+		if (rootPath) roots.set(definitionId, rootPath);
+	}
+	return roots;
+}
+
+export function marklessWithEnclosingWidgetRoots<T>(
+	rowSegment: string,
+	roots: ReadonlyMap<string, string> | undefined,
+	render: () => Awaitable<T>,
+): Awaitable<T> {
+	if (!roots?.size) return render();
+	const heldSegment = enclosingWidgetScope.rowSegment,
+		heldRoots = enclosingWidgetScope.roots;
+	enclosingWidgetScope.rowSegment = rowSegment;
+	enclosingWidgetScope.roots = roots;
+	const release = () => {
+		enclosingWidgetScope.rowSegment = heldSegment;
+		enclosingWidgetScope.roots = heldRoots;
+	};
+	let answered: Awaitable<T>;
+	// The synchronous prologue of a render that never returns is the one edge
+	// marklessSettled cannot see, and leaving the roots installed there would
+	// hand them to whatever renders next.
+	try {
+		answered = render();
+	} catch (error) {
+		release();
+		throw error;
+	}
+	return marklessSettled(answered, release, (settled) => settled);
+}
+
+/** The ancestor root for a bare widget id, or the id untouched when none owns it. */
+export function marklessEnclosingWidgetGraphNodeId(
+	graphNodeId: string,
+	roots: ReadonlyMap<string, string>,
+): string {
+	const pageSpace = PAGE_SPACE_ID.exec(graphNodeId);
+	if (!pageSpace || pageSpace[2] !== 'shared' || pageSpace[1]) return graphNodeId;
+	const rootPath = enclosingRootPathFor(graphNodeId, roots);
+	return rootPath ? rootPath + graphNodeId : graphNodeId;
+}
+
+function enclosingRootPathFor(
+	graphNodeId: string,
+	roots: ReadonlyMap<string, string>,
+): string | undefined {
+	const slash = graphNodeId.lastIndexOf('/');
+	return (
+		roots.get(graphNodeId) ??
+		(slash > 0 ? roots.get(graphNodeId.slice(0, slash)) : undefined)
+	);
 }
 
 // The widget this child-local `shared:` id belongs to: the answer registered for
@@ -639,6 +804,13 @@ export function marklessComposedGraphNodeId(
 	if (pageSpace[1]) return instancePath + graphNodeId;
 	const rootPath = marklessWidgetRootPathThroughRows(graphNodeId, instancePath, registry);
 	if (rootPath) return rootPath + graphNodeId;
+	// Only a minted row installs enclosing roots, and only for ids its own render
+	// registered no root for - so a widget the row IS still answers with the row's.
+	const enclosing =
+		enclosingWidgetScope.roots && instancePath.startsWith(enclosingWidgetScope.rowSegment)
+			? enclosingRootPathFor(graphNodeId, enclosingWidgetScope.roots)
+			: undefined;
+	if (enclosing) return enclosing + graphNodeId;
 	return marklessUnresolvedWidgetGraphNodeId(graphNodeId, instancePath, registry);
 }
 
@@ -679,6 +851,10 @@ function composedBoundaryArmRecords(
 		...read,
 		graphNodeId: marklessComposedGraphNodeId(read.graphNodeId, instancePath, registry),
 	});
+	const contentReadsOf = (branch: unknown): BranchContentReads | undefined => {
+		const reads = (branch as { readonly contentReads?: unknown }).contentReads;
+		return Array.isArray(reads) && reads.length > 0 ? (reads as BranchContentReads) : undefined;
+	};
 	// Arm-scoped branch records ride the protocol's untyped record bag.
 	const qualifyLooseRead = (record: Record<string, unknown>): Record<string, unknown> =>
 		typeof record.graphNodeId === 'string'
@@ -716,6 +892,9 @@ function composedBoundaryArmRecords(
 			...repeat,
 			id: prefix + repeat.id,
 			parentHostNodeId: prefix + repeat.parentHostNodeId,
+			...(repeat.ownerHostNodeId
+				? { ownerHostNodeId: prefix + repeat.ownerHostNodeId }
+				: {}),
 			...(repeat.collectionGraphNodeId
 				? {
 						collectionGraphNodeId: marklessComposedGraphNodeId(
@@ -736,6 +915,9 @@ function composedBoundaryArmRecords(
 						...branch,
 						id: prefix + branch.id,
 						testReads: branch.testReads.map(qualifyRead),
+						...(contentReadsOf(branch)
+							? { contentReads: contentReadsOf(branch)!.map(qualifyRead) }
+							: {}),
 						...(branch.symbolId ? { symbolId: prefix + branch.symbolId } : {}),
 						...(branch.armRecords
 							? {
@@ -772,4 +954,13 @@ function composedBoundaryArmRecords(
  */
 export function installMarklessComposedArmRecords(): void {
 	installComposedArmRecordQualifier(composedBoundaryArmRecords);
+	// An `@if` arm's handles are filed at resume from the arm record, which the
+	// serializer never qualified: the record's owning id carries the instance.
+	installElementHandleQualifier((handleId, ownerId, graph) =>
+		marklessWidgetHandleId(
+			handleId,
+			marklessInstancePath(ownerId),
+			marklessGraphWidgetRegistry(graph as RuntimeGraph | undefined),
+		),
+	);
 }

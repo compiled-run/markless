@@ -1,0 +1,22 @@
+# MARKLESS_SHARED_SEED_UNRESOLVED_VALUE
+
+a shared() seed value has nothing to bind to
+
+- Package: compiler
+- Pass or phase: semantic-graph
+- Severity: error
+
+## Message
+
+The state() seed for "…" in shared() definition "…" is `…`, and "…" is not a literal, a module-scope declaration of this file, an import, or a global.
+
+## Why
+
+A factory seed is re-evaluated in a module of its own, carrying only this file's module scope and imports. A name that is none of those has nothing to bind to there, so the seed throws a ReferenceError and the whole shape loses its fields — which then reads as an error at every consumer of the shape rather than here.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

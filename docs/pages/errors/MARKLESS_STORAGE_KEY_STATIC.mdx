@@ -1,0 +1,25 @@
+# MARKLESS_STORAGE_KEY_STATIC
+
+Storage fallback must be static; Storage key must be static
+
+- Package: compiler
+- Pass or phase: semantic-graph
+
+## Message
+
+storage() requires its fallback to be a static string literal.
+
+storage(key, fallback) requires an explicit key to be a static string literal; omit it to derive markless:\<identifier\>.
+
+## Why
+
+The compiler bakes the key into a stable graph identity and storage key at compile time; it cannot be a runtime value.
+
+The compiler must embed the fallback as the initial graph value without executing storage() at runtime.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

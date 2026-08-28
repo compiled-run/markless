@@ -1,15 +1,24 @@
-import { computed, element, shared, state } from '@markless/core';
-import { surfaceAnchorStyle } from './popover-anchor.ts';
+import { element, shared, state } from '@markless/core';
 import type {
 	PopoverCloseProps,
 	PopoverContentProps,
 	PopoverDescriptionProps,
 	PopoverInstanceState,
 	PopoverRootProps,
-	PopoverSide,
 	PopoverTitleProps,
 	PopoverTriggerProps,
 } from './popover-types.ts';
+
+// The surface is placed by CSS anchoring alone: the trigger declares the anchor,
+// the surface points at it, and the geometry beyond one default `position-area`
+// is the consumer's stylesheet. Nothing here measures a box, so a surface served
+// already showing is placed on its first layout.
+// The scope class these <style> blocks compile against is per MODULE, so each
+// block's subject must be structurally unique across every part: the trigger is
+// the module's only button carrying `aria-haspopup`, the surface its only element
+// carrying `overlay`, and the root the div that is left.
+// `@layer markless` is what keeps these defaults losing to a consumer's own
+// unlayered rules without a specificity fight.
 
 /** How long a press that closed the surface keeps the click behind it from re-opening, in milliseconds. */
 const CLICK_GRACE = 300;
@@ -18,7 +27,6 @@ export const popoverState = shared(
 	() => {
 		const popover: PopoverInstanceState = state({
 			open: false,
-			side: 'bottom' as PopoverSide,
 			graceUntil: 0,
 		});
 		const triggerEl = element<HTMLButtonElement>();
@@ -48,7 +56,6 @@ export const popoverState = shared(
 
 export function PopoverRoot({
 	open = false,
-	side = 'bottom',
 	onChange,
 	children,
 	...rest
@@ -56,14 +63,19 @@ export function PopoverRoot({
 	const popover = popoverState();
 	popover.onChange = onChange;
 	popover.open = open;
-	popover.side = side;
 
 	<div
 		{...rest}
-		style="anchor-scope: --ui-popover;"
 		ui-open={popover.open}
 		ui-closed={popover.open !== true}
-	>{children}</div>
+	>
+		<style>
+			@layer markless {
+				div:not([overlay]) { anchor-scope: --ui-popover; }
+			}
+		</style>
+		{children}
+	</div>
 }
 
 export function PopoverTrigger({ children, onClick, ...rest }: PopoverTriggerProps) @{
@@ -72,7 +84,6 @@ export function PopoverTrigger({ children, onClick, ...rest }: PopoverTriggerPro
 	<button
 		{...rest}
 		el={popover.triggerEl}
-		style="anchor-name: --ui-popover;"
 		type="button"
 		aria-haspopup="dialog"
 		aria-expanded={popover.open ? 'true' : 'false'}
@@ -83,19 +94,24 @@ export function PopoverTrigger({ children, onClick, ...rest }: PopoverTriggerPro
 			if (popover.graceUntil <= Date.now()) popover.setOpen(popover.open !== true);
 			onClick?.(event);
 		}}
-	>{children}</button>
+	>
+		<style>
+			@layer markless {
+				button[aria-haspopup] { anchor-name: --ui-popover; }
+			}
+		</style>
+		{children}
+	</button>
 }
 
 // Closed hides the surface, never detaches it: the trigger points at this element's minted id, and an enlisted element removed from the document leaves the overlay stack's marks behind.
 // `overlay` is a bare attribute the primitive reads; while enlisted it reports Escape and outside presses as `dismiss`, closing nothing and moving no focus itself.
 export function PopoverContent({ children, onDismiss, ...rest }: PopoverContentProps) @{
 	const popover = popoverState();
-	const placement = computed(() => surfaceAnchorStyle(popover.side));
 
 	<div
 		{...rest}
 		el={popover.contentEl}
-		style={placement}
 		overlay
 		role="dialog"
 		aria-labelledby={popover.titleEl}
@@ -103,7 +119,6 @@ export function PopoverContent({ children, onDismiss, ...rest }: PopoverContentP
 		hidden={popover.open !== true}
 		ui-open={popover.open}
 		ui-closed={popover.open !== true}
-		ui-side={popover.side}
 		onDismiss={(event) => {
 			const surface = popover.contentEl;
 			const back = popover.triggerEl;
@@ -119,7 +134,19 @@ export function PopoverContent({ children, onDismiss, ...rest }: PopoverContentP
 			if (event.detail.reason === 'escape' && isFocusInside) back?.focus();
 			onDismiss?.(event);
 		}}
-	>{children}</div>
+	>
+		<style>
+			@layer markless {
+				[overlay] {
+					--ui-anchor: --ui-popover;
+					position: absolute;
+					position-anchor: --ui-popover;
+					position-area: block-end;
+				}
+			}
+		</style>
+		{children}
+	</div>
 }
 
 export function PopoverTitle({ children, ...rest }: PopoverTitleProps) @{

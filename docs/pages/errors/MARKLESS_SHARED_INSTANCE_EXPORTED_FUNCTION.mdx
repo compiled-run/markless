@@ -1,0 +1,22 @@
+# MARKLESS_SHARED_INSTANCE_EXPORTED_FUNCTION
+
+The exported function "…" resolves a shared() definition at module scope
+
+- Package: compiler
+- Pass or phase: symbol-modules
+- Severity: error
+
+## Message
+
+"…" is exported from this file and calls `…()` in its body. A shared() instance is resolved by a component as it renders, and this function is not a component, so there is no instance for the call to return. Compiling this file drops the `export` keyword from "…" and carries the rest into the emitted symbol modules, where `…` is not carried at all — the definition ships as payload graph nodes rather than as code. The copy that lands would throw the moment it runs, and the export a consumer imported is gone.
+
+## Why
+
+A shared() definition is graph data, not module code: its factory is compiled into payload nodes and the runtime resolves a property of it only for a component instance that asked for one. That makes a component body the only place a resolving call means anything. An exported plain function is neither carried with its definition nor reachable as a part, so the compiler would have to silently publish less than the file says it publishes.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/symbol-modules.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
