@@ -145,36 +145,30 @@ own row's cells. Nothing is ever told a coordinate.
   stops without making the table a grid" and the tab-stop assertion in "a
   cells-only table has no tab stop".
 
-- **On the server path a `table.rowcontent` renders as an empty `<table>`.**
-  Measured, not inferred: `renderSSR(scenarios/cells.tsrx)` puts this in the
-  document, where every cell should be a `<td>`/`<th>` inside the row —
+- ~~**On the server path a `table.rowcontent` renders as an empty `<table>`.**~~
+  **Fixed in the compiler.** The measurement was: `renderSSR(scenarios/cells.tsrx)`
+  served the cell as the family's own `<table>` tag carrying the cell's props
+  (`rowheader=""` among them, so the destructured prop had not even been
+  consumed), with the cell's text left outside the row.
 
-  ```html
-  <tbody><tr data-testid="readme-item" ui-value="readme"></tr></tbody></table>
-  README.md<table rowheader="" data-testid="readme-name" class="mk-3xcuej"></table>
-  4.1 kB<table data-testid="readme-size" class="mk-3xcuej"></table>
-  ```
+  The cause was one compiler predicate, not anything in this family.
+  `TableRowContent` is the only part here whose body is nothing but an
+  `@if`/`@else` over two other components, so it has markup but no element tag of
+  its own. `sameModuleSsrComponentNames` in
+  `packages/compiler/src/passes/public-render/same-module.ts` asked
+  `firstComponentRoot`, which answers only for a body that opens with an element.
+  A branch-only component therefore got no server render function and was
+  published under no SSR export name, and the composing page's lookup fell back to
+  the module's default component — the `<table>`. The fix asks
+  `componentMarkupRoot` instead, which is the same root the semantic graph already
+  uses to build the component's chunks, and is why CSR was always correct. Module
+  root selection still uses `firstComponentRoot`: a page root really does need an
+  element to be the container.
 
-  Three things are wrong at once and they point at one cause: the cell's element
-  is the family's `<table>` tag rather than its own, the cell's props (including
-  `rowheader`, which `TableRowContent` destructures and never forwards) are spread
-  onto it, and the cell's text is left outside the row. `TableRowContent` is the
-  only part in this family whose body is nothing but an `@if`/`@else` over two
-  other components, and the tag it comes back with is the first element in the
-  module — so the server renderer looks to be resolving a delegating component to
-  the wrong element. CSR is unaffected; the same scenarios are green there.
-
-  This is a framework defect, outside this family's fix: it is owned by whoever
-  owns the server renderer, and it was not adjudicated in the ruling this note
-  records. Three rows in `table.browser.ts` are pinned `test.fails` under SSR for
-  it and announce themselves as expected failures; they are the acceptance for the
-  fix. Two of them were among the rows the build left red, so the red set had two
-  causes, not one.
-
-- **`table.sr.ts` still expects the cut behaviour.** Its "a table of cells is
-  announced as a grid" row reads the cells-only scenario and asserts the grid
-  role, which no longer exists. The screen-reader lane is a separate unit's
-  contract; that row wants the same rewrite the browser row got.
+  The general witness is `packages/web/test/branch-only-component-ssr.test.ts` —
+  two differently-shaped branch-only fixtures, server-rendered, plus the export
+  name a cross-module placement resolves by. The three `table.browser.ts` rows
+  that were pinned `test.fails` under SSR are unpinned and green.
 - **`scope` cannot be written.** The JSX type service ships no table attributes
   at all — `scope`, `colspan`, `rowspan`, `headers` are all absent from
   `TagNameSpecificAttributes`, so `<th scope="col">` does not typecheck anywhere,

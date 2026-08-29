@@ -1,7 +1,7 @@
 import { parseModule } from '../../js-ast.ts';
 import type { PublicRenderModuleInput } from '../../artifacts.ts';
 import type { AnyNode } from '../../ast/nodes.ts';
-import { firstComponentRoot } from './plan.ts';
+import { componentMarkupRoot } from './component-markup-root.ts';
 import { renderBodyLines } from './render-body.ts';
 import {
 	carriedSharedSeedSources,
@@ -40,6 +40,11 @@ export function ssrComponentFunctionName(componentName: string): string {
 // component other than the root that declares markup of its own. A composing
 // page reaches one of these by the name it is exported under, so they emit
 // whether or not this module composes them itself.
+//
+// Markup, not an element: a body that is only a branch over two other components
+// renders one of them and has no tag of its own. The module root is picked more
+// strictly - a page still needs an element to be the container - so these two
+// questions read different roots on purpose.
 export function sameModuleSsrComponentNames(
 	input: PublicRenderModuleInput,
 	ast: AnyNode,
@@ -49,7 +54,7 @@ export function sameModuleSsrComponentNames(
 	return input.semanticGraph.components.flatMap((component) => {
 		if (component.name === rootComponentName) return [];
 		const node = componentMap.get(component.name);
-		return node && firstComponentRoot(node) ? [component.name] : [];
+		return node && componentMarkupRoot(node) ? [component.name] : [];
 	});
 }
 
@@ -84,7 +89,7 @@ export function emitSameModuleSsrComponents(
 	);
 	return sameModuleSsrComponentNames(input, ast, rootComponentName).flatMap((componentName) => {
 		const component = componentMap.get(componentName);
-		const root = firstComponentRoot(component);
+		const root = component ? componentMarkupRoot(component) : null;
 		if (!component || !root) return [];
 		const rootInfo = {
 			component,

@@ -51,12 +51,6 @@ function el<T extends Element = HTMLElement>(locator: { element(): Element | nul
 }
 
 for (const mode of MODES) {
-	// On the server path every `table.rowcontent` comes back as an empty `<table>`
-	// carrying the cell's own props, and the cell's text is left outside the row.
-	// A row that reads a cell is pinned failing under SSR until a cell part keeps
-	// its own tag there; the same rows are the acceptance for that fix.
-	const cellRow = mode === 'SSR' ? test.fails : test;
-
 	/**
 	 * Rung 1 of the ladder, and the claim the whole family is built around: a
 	 * table nobody has configured is a plain HTML table. No role - not `grid`, not
@@ -165,7 +159,7 @@ for (const mode of MODES) {
 	 * see what its descendants mounted, so cells alone earn no role - the elements
 	 * keep the meaning they already have, and every cell is still a focus stop.
 	 */
-	cellRow(`${mode}: cells become focus stops without making the table a grid`, async () => {
+	test(`${mode}: cells become focus stops without making the table a grid`, async () => {
 		if (mode === 'CSR') await render(Cells);
 		else await renderSSR(Cells);
 
@@ -185,7 +179,7 @@ for (const mode of MODES) {
 	});
 
 	/** The other half: with selection the family owns focus, so the roles are written. */
-	cellRow(`${mode}: a selectable table of cells is a grid and names every cell`, async () => {
+	test(`${mode}: a selectable table of cells is a grid and names every cell`, async () => {
 		if (mode === 'CSR') await render(PickedCells);
 		else await renderSSR(PickedCells);
 
@@ -209,7 +203,7 @@ for (const mode of MODES) {
 	});
 
 	/** The charter's acceptance test: a row model drives the family with no adapter. */
-	cellRow(`${mode}: a row model renders its headers, its rows and its cells`, async () => {
+	test(`${mode}: a row model renders its headers, its rows and its cells`, async () => {
 		if (mode === 'CSR') await render(RowModel);
 		else await renderSSR(RowModel);
 

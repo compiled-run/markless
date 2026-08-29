@@ -5,6 +5,7 @@ import Basic from './scenarios/basic.tsrx';
 import Cells from './scenarios/cells.tsrx';
 import Disabled from './scenarios/disabled.tsrx';
 import Multiple from './scenarios/multiple.tsrx';
+import PickedCells from './scenarios/picked-cells.tsrx';
 import Prepicked from './scenarios/prepicked.tsrx';
 import Sortable from './scenarios/sortable.tsrx';
 
@@ -139,12 +140,20 @@ test('a sortable header is announced as a column header', async () => {
 	expectConveys(await readFor([say.columnheader, 'Size']), [say.columnheader, 'Size']);
 });
 
-// The other half of the progressive claim: once cells are focus stops the family
-// owns the focus management, and the table is announced as a grid.
-test('a table of cells is announced as a grid, and its row headers as row headers', async () => {
+// Cells alone earn no role, so a reader hears exactly what the elements already
+// mean: a table, and the body-row `<th>` that names each row as its row header.
+// The grid word arrives with the selection props, not with the cells.
+test('a table of cells is announced as a table, and its row headers as row headers', async () => {
 	await open(Cells);
-	expectConveys(await readFor([say.grid]), [say.grid]);
+	expectConveys(await readFor([say.table]), [say.table]);
 	expectConveys(await readFor([say.rowheader, 'README.md']), [say.rowheader, 'README.md']);
+});
+
+// The other half of the progressive claim, heard: the selection props are what
+// make the family own focus management, and only then is a grid announced.
+test('a selectable table of cells is announced as a grid', async () => {
+	await open(PickedCells);
+	expectConveys(await readFor([say.grid]), [say.grid]);
 });
 
 test('a row of a selectable table conveys whether it is picked', async () => {
