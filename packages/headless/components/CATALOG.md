@@ -134,6 +134,16 @@ References: https://react-aria.adobe.com/GridList · https://react-aria.adobe.co
 https://next.melt-ui.com/components/spatialmenu/ (WIP, no documented ARIA; its tolerance-based
 spatial navigation over unaligned items is worth stealing for the nav engine).
 
+Settled by the owner on 2026-08-29, so the research note's open questions are closed:
+- No new `cell` component role. The 2D focus stop is `table.rowcontent` (`<td>`, or `<th>` with
+  `role="rowheader"` under a `rowheader` boolean), and `row`/`col` join the prefix list in SPEC.
+- Parts are `root` `item` `rowcontent` `coltrigger` `rowfield`; `<thead>`/`<tbody>`/`<caption>`
+  and non-sortable `<th>`s stay the consumer's own elements with no parts.
+- `role="grid"` is progressive: a bare table writes no role at all, and the root becomes a grid
+  only once the family manages focus or selection (selection props present, or cells mounted).
+- No counts or indexes in v1; `onSortChange(column)` reports the pressed column and never a
+  computed next descriptor; selection is derived from `value`/`onChange`/`multiple`.
+
 ### datebox / timebox (date/time cluster)
 
 Time field parked as the beachhead of the cluster: it establishes segment machinery without
