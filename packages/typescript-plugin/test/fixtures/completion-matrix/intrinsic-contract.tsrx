@@ -31,6 +31,20 @@ export function IntrinsicContract() @{
 	<button attach={[installButton]} onClick={(event) => event.currentTarget.focus()}>
 		Array attach, single handler
 	</button>
+	<table>
+		<thead>
+			<tr>
+				<th id="h1" scope="col" colspan={2} abbr="Name">
+					Name
+				</th>
+			</tr>
+		</thead>
+		<tbody>
+			<tr>
+				<td headers="h1" rowspan={2}>Cell</td>
+			</tr>
+		</tbody>
+	</table>
 	<div
 		overlay
 		onDismiss={(event) => {

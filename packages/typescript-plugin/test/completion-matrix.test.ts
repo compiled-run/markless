@@ -878,7 +878,9 @@ test('M10 intrinsic contract rejects className, bogus and tag-wrong attributes, 
 	expectDiagnosticSpan(fixture.source, diagnosticMatching(diagnostics, /invalid/), 'invalid');
 	// A `dismiss` detail that were `any` would accept this narrowing silently.
 	expectDiagnosticSpan(fixture.source, diagnosticMatching(diagnostics, /outside-press/), 'only');
-	expect(diagnostics).toHaveLength(5);
+	// `scope` belongs to <th> alone, so a global widening of the table attributes would pass silently.
+	expectDiagnosticSpan(fixture.source, diagnosticMatching(diagnostics, /scope/), 'scope');
+	expect(diagnostics).toHaveLength(6);
 }, 20_000);
 
 test('M16 PropsOf and Children from @markless/core type a component and its children in .tsrx', async () => {

@@ -314,6 +314,22 @@ declare namespace __MarklessTypeService {
 		y2?: string | number;
 	};
 
+	type TableCellAttributes = {
+		colspan?: number;
+		/**
+		 * A space-separated list of header cell ids. It stays a plain string rather
+		 * than IdrefValue because the compiler's IDREF_ATTRIBUTES set does not carry
+		 * it, so an element() handle written here would never resolve.
+		 */
+		headers?: string;
+		rowspan?: number;
+	};
+
+	type TableHeaderAttributes = TableCellAttributes & {
+		abbr?: string;
+		scope?: 'row' | 'col' | 'rowgroup' | 'colgroup';
+	};
+
 	type Attributes<E extends globalThis.Element> = GlobalAttributes &
 		MarklessAttributes<E> &
 		NativeEventAttributes<E>;
@@ -398,26 +414,30 @@ declare namespace __MarklessTypeService {
 																			| string
 																			| readonly string[];
 																	}
-																: Tag extends 'textarea'
-																	? FormAttributes & {
-																			cols?: number;
-																			disabled?: boolean;
-																			placeholder?: string;
-																			readonly?: boolean;
-																			required?: boolean;
-																			rows?: number;
-																			value?: string;
-																		}
-																	: Tag extends 'video'
-																		? MediaAttributes & {
-																				height?: number;
-																				playsinline?: boolean;
-																				poster?: string;
-																				width?: number;
-																			}
-																		: Tag extends keyof SVGElementTagNameMap
-																			? SvgAttributes
-																			: {};
+																: Tag extends 'td'
+																	? TableCellAttributes
+																	: Tag extends 'th'
+																		? TableHeaderAttributes
+																		: Tag extends 'textarea'
+																			? FormAttributes & {
+																					cols?: number;
+																					disabled?: boolean;
+																					placeholder?: string;
+																					readonly?: boolean;
+																					required?: boolean;
+																					rows?: number;
+																					value?: string;
+																				}
+																			: Tag extends 'video'
+																				? MediaAttributes & {
+																						height?: number;
+																						playsinline?: boolean;
+																						poster?: string;
+																						width?: number;
+																					}
+																				: Tag extends keyof SVGElementTagNameMap
+																					? SvgAttributes
+																					: {};
 
 	type IntrinsicElementFor<Tag extends PropertyKey> = Tag extends keyof HTMLElementTagNameMap
 		? Attributes<HTMLElementTagNameMap[Tag]> & TagNameSpecificAttributes<Tag>
