@@ -204,8 +204,11 @@ Sole reference implementation: https://react-aria.adobe.com/TokenField — study
   one `aria-current="step"`, decorative indicators hidden, non-interactive steps out of the tab
   order — no keyboard protocol, no focus management. The gating "state machine" is consumer
   logic (Ark's own API is isStepValid/isStepSkippable callbacks — the inputgroup shape). Right
-  home: a docs recipe — wizards compose tabs + consumer gating; indicators are a list with
-  aria-current and an optional live region. Promote only if consumers keep rebuilding the gating.
+  home: a docs recipe over EXISTING families (owner-confirmed): the interactive wizard composes
+  carousel or tabs (trigger-chooses-a-panel is already their machinery) + consumer gating; the
+  display-only indicator is navbar when steps are real links (aria-current="step" instead of
+  "page") or a plain non-interactive list otherwise, with an optional live region. Promote only
+  if consumers keep rebuilding the gating.
 - **scroll-area** — considered and skipped (2026-08-28): the styling 90% is plain CSS now
   (scrollbar-width/-color, ::-webkit-scrollbar) and custom-drawn scrollbars are routinely worse
   for AT than native. Revisit only if the docs site itself needs one.
