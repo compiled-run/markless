@@ -109,6 +109,9 @@ const RENDERED_ROLE: Record<FamilyName, AriaRole> = {
 	// label rather than carrying a role a count could find.
 	timebox: 'spinbutton',
 	'timebox-twelve-hour': 'spinbutton',
+	// The rows are what focus rests on and what gets picked; the grid around them
+	// is named by its label, and the cells inside carry nothing a reader stops on.
+	gridlist: 'row',
 };
 
 /** Sections whose point is how many of that role they serve, not merely that they serve one. */
@@ -157,6 +160,9 @@ const RENDERED_COUNT: Partial<Record<FamilyName, number>> = {
 	// the period box the locale asks for.
 	timebox: 3,
 	'timebox-twelve-hour': 3,
+	// One row per file: a count catches a section that rendered the grid and its
+	// name and lost the rows the walk is about.
+	gridlist: 3,
 };
 
 const appDir = fileURLToPath(new URL('..', import.meta.url));
@@ -936,6 +942,66 @@ async function main() {
 				);
 			} else {
 				console.log(`#timebox-twelve-hour submits its seeded time as ${submitted}.`);
+			}
+		}
+
+		// The role count above says three rows rendered. What a reader lane then
+		// turns on is the family's central bet: the whole list is one tab stop until
+		// focus is inside it, the row is what focus rests on, and picking a row is a
+		// state on the row rather than on the mark a consumer paints beside it.
+		const gridSection = page.locator('#gridlist');
+		const grid = gridSection.getByRole('grid', { name: 'Files' });
+		if ((await grid.count()) !== 1) {
+			failures.push(
+				`#gridlist serves ${await grid.count()} grids named "Files", not the 1 its starter needs.`,
+			);
+		} else {
+			const gridStop = await grid.getAttribute('tabindex');
+			if (gridStop !== '0') {
+				failures.push(
+					`#gridlist's grid reads tabindex="${gridStop}", not "0", so no keyboard reaches the list.`,
+				);
+			} else {
+				console.log('#gridlist serves a named grid a keyboard can reach.');
+			}
+
+			const firstRow = gridSection.getByRole('row').first();
+			const rowStop = await firstRow.getAttribute('tabindex');
+			if (rowStop !== '-1') {
+				failures.push(
+					`#gridlist's first row reads tabindex="${rowStop}", not "-1", so the list is more than one tab stop before focus is inside it.`,
+				);
+			} else {
+				console.log('#gridlist keeps its rows out of the tab order until focus is inside.');
+			}
+
+			await firstRow.focus();
+			if ((await grid.getAttribute('tabindex')) !== '-1') {
+				failures.push('#gridlist keeps the grid a tab stop after focus landed on a row.');
+			} else if ((await firstRow.getAttribute('tabindex')) !== '0') {
+				failures.push('#gridlist does not hand the tab stop to the row focus landed on.');
+			} else {
+				console.log('#gridlist moves its one tab stop onto the row focus landed on.');
+			}
+
+			await firstRow.press(' ');
+			if ((await firstRow.getAttribute('aria-selected')) !== 'true') {
+				failures.push('#gridlist does not report a row as picked when the space bar picks it.');
+			} else {
+				console.log('#gridlist reports the picked row with aria-selected on the row itself.');
+			}
+
+			// The mark beside a picked row would otherwise be a second announcement of
+			// the state the row already carries.
+			const mark = firstRow.locator('[ui-selected]');
+			if ((await mark.count()) !== 1) {
+				failures.push(
+					`#gridlist's picked row holds ${await mark.count()} marks reporting the pick, not the 1 its starter paints.`,
+				);
+			} else if ((await mark.getAttribute('aria-hidden')) !== 'true') {
+				failures.push('#gridlist leaves the mark beside its picked row visible to a reader.');
+			} else {
+				console.log('#gridlist keeps the mark beside a picked row out of the announcement.');
 			}
 		}
 

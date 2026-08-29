@@ -11,6 +11,7 @@ import {
 	drawer,
 	editable,
 	fileupload,
+	gridlist,
 	hovercard,
 	ink,
 	menu,
@@ -41,7 +42,7 @@ import {
 // /#radio-group, /#rating, /#tabs, /#popover, /#tooltip, /#slider, /#datebox,
 // /#fileupload, /#hovercard, /#calendar, /#menu, /#menubar, /#colorpicker,
 // /#buttongroup, /#editable, /#taglist, /#numberbox, /#ink, /#pad, /#crop, /#tour, /#toolbar, /#drawer,
-// /#resizable, /#timebox. A family whose
+// /#resizable, /#timebox, /#gridlist. A family whose
 // second shape a reader announces differently gets its own section too: /#slider-range,
 // /#numberbox-min-max-step, /#numberbox-currency, /#crop-image, /#timebox-twelve-hour.
 //
@@ -779,6 +780,36 @@ export function Gallery() @{
 					<timebox.dayperiodinput />
 					<timebox.field />
 				</timebox.root>
+			</div>
+		</section>
+
+		{/* Selectable rather than the plain starter: what a real reader is here to
+		    settle is that picking a row is announced as a state on the row, and a
+		    list nobody can pick from has no such state to announce. */}
+		<section id="gridlist">
+			<h2>Grid list</h2>
+			<div class="scenario">
+				<gridlist.root selectable>
+					<gridlist.label>Files</gridlist.label>
+					<gridlist.item value="readme">
+						<gridlist.itemcontent>
+							<gridlist.itemindicator>✓</gridlist.itemindicator>
+							<gridlist.itemlabel>README.md</gridlist.itemlabel>
+						</gridlist.itemcontent>
+					</gridlist.item>
+					<gridlist.item value="license">
+						<gridlist.itemcontent>
+							<gridlist.itemindicator>✓</gridlist.itemindicator>
+							<gridlist.itemlabel>LICENSE</gridlist.itemlabel>
+						</gridlist.itemcontent>
+					</gridlist.item>
+					<gridlist.item value="changelog">
+						<gridlist.itemcontent>
+							<gridlist.itemindicator>✓</gridlist.itemindicator>
+							<gridlist.itemlabel>CHANGELOG.md</gridlist.itemlabel>
+						</gridlist.itemcontent>
+					</gridlist.item>
+				</gridlist.root>
 			</div>
 		</section>
 	</main>

@@ -20,6 +20,7 @@ import CropBasic from '../src/crop/scenarios/basic.tsrx';
 import DateboxBasic from '../src/datebox/scenarios/basic.tsrx';
 import DrawerBasic from '../src/drawer/scenarios/basic.tsrx';
 import FileuploadBasic from '../src/fileupload/scenarios/basic.tsrx';
+import GridListBasic from '../src/gridlist/scenarios/basic.tsrx';
 import HovercardBasic from '../src/hovercard/scenarios/basic.tsrx';
 import InkBasic from '../src/ink/scenarios/basic.tsrx';
 import MenuBasic from '../src/menu/scenarios/basic.tsrx';
@@ -395,6 +396,26 @@ export const families: readonly ChaosFamily[] = [
 				.poll(() => [...(el<HTMLInputElement>('field').files ?? [])].map((one) => one.name))
 				.toEqual(['notes.txt']);
 			expect(el('droparea').hasAttribute('ui-dragging')).toBe(false);
+		},
+	},
+	{
+		name: 'gridlist',
+		mount: () => render(GridListBasic),
+		rootTestId: 'root',
+		keyboardEntryTestId: 'root',
+		storms: ['keyboard', 'mixed'],
+		async recover() {
+			el<HTMLElement>('readme-item').focus();
+			await expect.poll(() => document.activeElement).toBe(el('readme-item'));
+
+			await userEvent.keyboard('{ArrowDown}');
+			await expect.poll(() => document.activeElement).toBe(el('license-item'));
+			await expect.poll(() => el('license-item').getAttribute('tabindex')).toBe('0');
+			expect(el('readme-item').getAttribute('tabindex')).toBe('-1');
+			expect(el('root').getAttribute('tabindex')).toBe('-1');
+
+			await userEvent.keyboard('{ArrowUp}');
+			await expect.poll(() => document.activeElement).toBe(el('readme-item'));
 		},
 	},
 	{

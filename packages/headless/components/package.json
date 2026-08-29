@@ -38,6 +38,7 @@
 		"./drawer": "./src/drawer/index.ts",
 		"./editable": "./src/editable/index.ts",
 		"./fileupload": "./src/fileupload/index.ts",
+		"./gridlist": "./src/gridlist/index.ts",
 		"./ink": "./src/ink/index.ts",
 		"./menu": "./src/menu/index.ts",
 		"./menubar": "./src/menubar/index.ts",

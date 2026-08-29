@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import { FAMILY_ANCHORS } from '../../../../../apps/sr-gallery/preview-server.ts';
 import type { ScreenReaderDriver } from '../../test-support/driver.ts';
 import { GALLERY_WALK_LIMIT } from '../../test-support/gallery-walk.ts';
 
@@ -19,13 +20,8 @@ const CHANGE_TIMEOUT_MS = 15_000;
 const NAME = 'Files';
 const FIRST = 'README.md';
 
-/**
- * Where the starter sits on the gallery page.
- *
- * A literal, where every registered family reads `FAMILY_ANCHORS`: registration
- * is a follow-up unit and swaps this for the imported anchor.
- */
-export const GRIDLIST_ANCHOR = '/#gridlist';
+/** Where the starter sits on the gallery page. */
+export const GRIDLIST_ANCHOR = FAMILY_ANCHORS.gridlist;
 
 function missing(phrase: string, facts: readonly string[]): string[] {
 	return facts.filter((fact) => !phrase.includes(fact));

@@ -1876,6 +1876,108 @@
 			}
 		]
 	},
+	"gridlist": {
+		"parts": [
+			{
+				"part": "item",
+				"component": "GridListItem",
+				"doc": "One row. It is the thing focus rests on and the thing that gets picked, so it\ncarries the row's own identity as `value` - the string that appears in the\nroot's `value` array while this row is picked.\n\nA row reports `ui-selected` and `ui-disabled`, and carries `aria-selected`\nfor as long as the list is selectable at all.",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": true,
+						"doc": "This row's identity in the picked set. Two rows must not share one."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "This row cannot be reached by the walk or picked."
+					}
+				]
+			},
+			{
+				"part": "itemcontent",
+				"component": "GridListItemContent",
+				"doc": "The cell a row's content sits in. ARIA gives a row no meaning without one, so\nevery `gridlist.item` holds at least this part; a list of rich items has one\nlogical column, so it holds exactly one.",
+				"props": []
+			},
+			{
+				"part": "itemindicator",
+				"component": "GridListItemIndicator",
+				"doc": "A mark showing that this row is picked. It is hidden from readers on purpose:\nthe row already carries `aria-selected`, and a second announcement of the same\nfact is noise. It reports `ui-selected`.",
+				"props": []
+			},
+			{
+				"part": "itemlabel",
+				"component": "GridListItemLabel",
+				"doc": "The row's own words. Typeahead matches against this part when a row has one\nand against everything the row reads when it does not, so a row carrying a\ndate and a file size still answers to the file's name.",
+				"props": []
+			},
+			{
+				"part": "itemtrigger",
+				"component": "GridListItemTrigger",
+				"doc": "A control the row holds - a rename button, an overflow menu. It is out of the\ntab order because the row is the tab stop: `Enter` on the row moves focus to\nthe first of these, the arrows step between them, and `Escape` returns focus\nto the row.\n\nThe walk only knows the controls written as this part. A bare `<button>`\ndropped into a row is still reachable by `Tab`, but `Enter` on the row will\nnot find it.",
+				"props": []
+			},
+			{
+				"part": "label",
+				"component": "GridListLabel",
+				"doc": "The list's name: the element `role=\"grid\"` points its `aria-labelledby` at.\nA grid has no single control for a `for` to point at, so the name is carried\nby the IDREF.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "GridListRoot",
+				"doc": "A list of rich items - a card gallery, a file browser - where a row may hold\ncontrols of its own. It is the grid itself and the home of what is picked: put\na `gridlist.label` and as many `gridlist.item` rows as the page needs inside\nit.\n\nA plain list cannot hold a button a keyboard can reach, which is the whole\nreason this family exists. Focus rests on one row at a time; the arrows move\nbetween rows, `Enter` moves into the controls that row holds, and `Escape`\nbrings focus back out to the row.\n\nThe move between rows is measured rather than counted, so the same list works\nstacked in one column and wrapped across a gallery: a row's neighbour upwards\nis the row whose box sits above it in the same column, not simply the row\nwritten before it.\n\nIt reports `ui-selectable`, `ui-multiple`, `ui-disabled` and `ui-inside` for\nstyling.",
+				"props": [
+					{
+						"name": "value",
+						"type": "readonly string[]",
+						"required": false,
+						"default": "[]",
+						"doc": "The rows that are picked, named by the `value` each `gridlist.item` was\nwritten with. Omit it and nothing starts picked."
+					},
+					{
+						"name": "selectable",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Rows can be picked, one at a time. Picking a row that is already picked\nlets it go."
+					},
+					{
+						"name": "multiple",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Several rows can be picked at once. Writing it also makes the list selectable."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "No row can be reached or picked, and the list drops out of the tab order."
+					},
+					{
+						"name": "wrap",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "A walk off the last row comes back round to the first. Omit it and the walk\nstops at the ends, which is what a list of files behaves like."
+					},
+					{
+						"name": "onChange",
+						"type": "(value: readonly string[]) => void",
+						"required": false,
+						"doc": "Called with the rows that are picked whenever that changes. Omit it and the\nlist still works; the call site simply does nothing."
+					}
+				]
+			}
+		]
+	},
 	"hovercard": {
 		"parts": [
 			{
@@ -4389,14 +4491,8 @@
 			{
 				"part": "item",
 				"component": "TourItem",
-				"doc": "One step: the card the person reads, and the element on the page it is about.\n\nThe card is placed by CSS anchoring against the target, so it holds while the\npage scrolls and reflows with no script. Placement is CSS, never a prop: the\ncard ships a default `position-area` of `block-end` inside `@layer markless`,\nand one unlayered rule of yours replaces it -\n`.my-card { position-area: block-start }`. A step with no `target` anchors to\nnothing, which leaves the `position-area` inert and the card wherever your own\nungated rule puts it - `inset: 0; margin: auto` for a centred step.",
+				"doc": "One step: the card the person reads, and the element on the page it is about.\n\nWhere the step comes in the tour is where you wrote it. There is no `index`:\nthe step's place is its place among the cards the tour has bound, and the\ntour's length is how many of them there are, so a reorder or a loop cannot\nmake a hand-written number lie.\n\nThe card is placed by CSS anchoring against the target, so it holds while the\npage scrolls and reflows with no script. Placement is CSS, never a prop: the\ncard ships a default `position-area` of `block-end` inside `@layer markless`,\nand one unlayered rule of yours replaces it -\n`.my-card { position-area: block-start }`. A step with no `target` anchors to\nnothing, which leaves the `position-area` inert and the card wherever your own\nungated rule puts it - `inset: 0; margin: auto` for a centred step.",
 				"props": [
-					{
-						"name": "index",
-						"type": "number",
-						"required": true,
-						"doc": "Where this step comes in the tour, counting from zero.\n\nRequired, because `step` is an ordinal and a step has to know its own place\nwhile it renders to decide whether it is the one showing. Number the steps\n`0`, `1`, `2`… in the order you write them: the tour's length is one past\nthe highest number registered, and moving a step lands focus on the card in\nthat document position."
-					},
 					{
 						"name": "target",
 						"type": "HTMLElement",
