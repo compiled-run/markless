@@ -39,8 +39,8 @@ Playwright can drive, and no other browser lane running at the same time.
 
 ### How long a run is
 
-Every family gets exactly **two** storms of **30** gestures. With 37 families
-that is 74 storms and 2,220 gestures, and the guard row at the top of
+Every family gets exactly **two** storms of **30** gestures. With 39 families
+that is 78 storms and 2,340 gestures, and the guard row at the top of
 `families.chaos.ts` fails if a family ever declares a third — the arithmetic is
 pinned rather than described.
 
@@ -54,7 +54,7 @@ Which two a family gets is stated in its own entry:
   hover-and-press surface, and a keyboard-only storm would never reach it.
 
 The lane was 6 families x 3 storms x 40 gestures when it was a pilot. Three
-storms and forty gestures across 37 families would have been 4,440 gestures and
+storms and forty gestures across 39 families would have been 4,680 gestures and
 took the run past the budget; two storms of thirty keeps it there while adding
 five times the families. Measured: **84 seconds of tests**, 96 seconds wall clock
 including the module import, on one headless Chromium.
@@ -182,6 +182,7 @@ copy, used unchanged.
 | datebox     | `src/datebox/scenarios/basic.tsrx`       | keyboard, mixed    |
 | drawer      | `src/drawer/scenarios/basic.tsrx`        | keyboard, mixed    |
 | fileupload  | `src/fileupload/scenarios/basic.tsrx`    | pointer, mixed     |
+| gridlist    | `src/gridlist/scenarios/basic.tsrx`      | keyboard, mixed    |
 | hovercard   | `src/hovercard/scenarios/basic.tsrx`     | pointer, mixed     |
 | ink         | `src/ink/scenarios/basic.tsrx`           | pointer, mixed     |
 | menu        | `src/menu/scenarios/basic.tsrx`          | keyboard, mixed    |
@@ -197,6 +198,7 @@ copy, used unchanged.
 | resizable   | `src/resizable/scenarios/basic.tsrx`     | pointer, mixed     |
 | select      | `src/select/scenarios/basic.tsrx`        | keyboard, mixed    |
 | slider      | `src/slider/scenarios/basic.tsrx`        | pointer, mixed     |
+| table       | `src/table/scenarios/picked-cells.tsrx`  | keyboard, mixed    |
 | tabs        | `src/tabs/scenarios/basic.tsrx`          | keyboard, mixed    |
 | textbox     | `src/textbox/scenarios/basic.tsrx`       | keyboard, mixed    |
 | timebox     | `src/timebox/scenarios/basic.tsrx`       | keyboard, mixed    |
@@ -211,6 +213,12 @@ copy, used unchanged.
 on hover intent, and hover intent is a timer a dispatched pointer event cannot
 wind forward. `click-only` is the same family driven by presses, which is what a
 storm makes.
+
+`table` storms `picked-cells` rather than `basic`: the starter is a plain HTML
+table on purpose — no role, no tab stop and no handler that answers a key — so a
+storm would have nothing to break and recovery nothing to assert. `picked-cells`
+is the rung where the family owns the focus management and the picked set, which
+is the contract a storm can actually break.
 
 ### Families deliberately not stormed
 

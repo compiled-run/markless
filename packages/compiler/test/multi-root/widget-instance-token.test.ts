@@ -65,14 +65,14 @@ function seedChildSource(compiled: Awaited<ReturnType<typeof compile>>) {
 	return emitted.slice(start, emitted.indexOf('renderChild:', start));
 }
 
-test('a served widget root files its instance token under every family it roots', async () => {
+test('a served widget root files its instance token under every family it roots where this page puts it', async () => {
 	const seedChild = seedChildSource(await compile());
 
 	// The plain key stays exactly as it was — it is the fallback a single-family
 	// page still reads — and the per-family keys are filed beside it.
 	expect(seedChild).toContain(`marklessSsrSeeds.set(${JSON.stringify(MARKLESS_WIDGET_INSTANCE_KEY)},`);
 	expect(seedChild).toContain(
-		`for(const marklessSsrFamily of marklessSsrWidgetRoots(__marklessSsrComponent0,undefined))marklessSsrSeeds.set(${JSON.stringify(
+		`for(const marklessSsrFamily of marklessSsrPlacedWidgetRoots(__marklessSsrComponent0,undefined,[],[[__marklessSsrComponent1,undefined],[__marklessSsrComponent2,undefined]]))marklessSsrSeeds.set(${JSON.stringify(
 			MARKLESS_WIDGET_INSTANCE_KEY,
 		)}+'|'+marklessSsrFamily,`,
 	);

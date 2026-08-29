@@ -8,7 +8,7 @@ import type {
 } from '@markless/serializer/protocol';
 import { PROTOCOL_EVENT_ACTION_KIND } from '@markless/serializer/protocol';
 import type { MarklessExecutionLogMode } from '../dev-log.ts';
-import type { OverlayPrimedDismissalHost } from '../overlay-handoff.ts';
+import type { OverlayInstalledRoot, OverlayPrimedDismissalHost } from '../overlay-handoff.ts';
 
 type InlineDebugControls = {
 	record(
@@ -106,6 +106,7 @@ export type MarklessSettledArmHandoff = {
 };
 
 type InlineRoot = HTMLElement &
+	OverlayInstalledRoot &
 	OverlayPrimedDismissalHost & {
 		__asyncResumeRuntimeStarted?: boolean;
 		__marklessDelegatedDispatch?: boolean;
@@ -672,10 +673,16 @@ function runInlineResumerSelfWake(fallbackResumeModuleUrl: string | undefined): 
  * dismiss nothing. This listens above the container, leaves the reason where the
  * behaviour's installer takes it, and lets the wake finish the job.
  *
- * Deliberately one-shot, and deliberately not the waker of first resort. The
- * container's own capture listener runs after this one and wakes the runtime for
- * any event the page has a record for; waking here as well would start a second
- * runtime for one gesture. Deciding a task later is what tells the two apart.
+ * It stays armed until that installer runs, because a wake that has STARTED is
+ * not a behaviour that is LISTENING - the installer is an import away, and an
+ * earlier gesture (a focus arriving on a control the page has a record for is
+ * enough) starts the wake without covering the keyboard. An Escape landing in
+ * that window is silently lost unless this still takes it.
+ *
+ * Deliberately not the waker of first resort. The container's own capture
+ * listener runs after this one and wakes the runtime for any event the page has
+ * a record for; waking here as well would start a second runtime for one
+ * gesture. Deciding a task later is what tells the two apart.
  */
 function runInlineResumerOverlayPrimer(
 	fallbackResumeModuleUrl: string | undefined,
@@ -687,15 +694,16 @@ function runInlineResumerOverlayPrimer(
 		currentScript?.getAttribute?.('data-markless-resume-module') ?? fallbackResumeModuleUrl;
 	if (!root || !resumeModuleUrl) return;
 	const prime = (event: Event) => {
-		removeEventListener('keydown', prime, true);
-		removeEventListener('pointerdown', prime, true);
-		// Window capture runs before the container's own, so this still reads
-		// whether an EARLIER gesture already woke the page. If one did, the
-		// behaviour is installed and owns the keyboard; leaving a reason behind
-		// would dismiss something twice.
-		if (root.__marklessDelegatedDispatch) return;
+		// Installed is the only state that means something else owns the keyboard;
+		// a reason left behind after that would dismiss something twice.
+		if (root.__marklessOverlayInstalled) {
+			removeEventListener('keydown', prime, true);
+			removeEventListener('pointerdown', prime, true);
+			return;
+		}
 		if ((event as KeyboardEvent).key === 'Escape')
 			root.__marklessOverlayPrimedDismissal = 'escape';
+		if (root.__marklessDelegatedDispatch) return;
 		setTimeout(() => {
 			if (root.__marklessDelegatedDispatch) return;
 			root.__marklessDelegatedDispatch = true;

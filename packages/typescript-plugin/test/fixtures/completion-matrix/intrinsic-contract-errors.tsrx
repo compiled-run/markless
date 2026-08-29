@@ -4,4 +4,5 @@ export function IntrinsicContractErrors() @{
 	<div src="not-div-specific">specificity</div>
 	<div>{{ invalid: 'child' }}</div>
 	<div overlay onDismiss={(event) => { const only: 'escape' = event.detail.reason; }}>reason</div>
+	<td scope="col">header-only attribute</td>
 }

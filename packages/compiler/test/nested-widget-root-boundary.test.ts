@@ -92,16 +92,18 @@ test('a component that roots a family carries the marker a composing module read
 	expect(source.split('.marklessWidgetRoots =').length - 1).toBe(1);
 });
 
-test("the outer root's seed pass guards every part against a nested root of its family", async () => {
+test("the outer root's seed pass guards every part against a nested root of the family it starts where this page puts it", async () => {
 	const seedChild = seedChildSource(await compile(nestedRoots));
 	const outerCase = seedChild.slice(
 		seedChild.indexOf('case "component-edge:0"'),
 		seedChild.indexOf('case "component-edge:2"'),
 	);
 
-	// The outer root asks its own module surface which families it started, then
-	// guards each part against a child that roots one of them.
-	expect(outerCase).toContain('const marklessSsrWidgetFamilies=[...marklessSsrWidgetRoots(');
+	// The outer root asks its own module surface which families it started —
+	// with where this page stands it, since a carrier standing outside the parts
+	// projected into it roots one too — then guards each part against a child
+	// that roots one of them.
+	expect(outerCase).toContain('const marklessSsrWidgetFamilies=[...marklessSsrPlacedWidgetRoots(');
 	expect(outerCase).toContain('!marklessSsrWidgetBoundary(marklessSsrWidgetFamilies,');
 	// The root's OWN seed still runs first and unguarded.
 	expect(outerCase.indexOf('marklessSharedSeeds:marklessSsrSeeds')).toBeLessThan(
@@ -130,7 +132,7 @@ export function Page() @{
 }
 `;
 
-test("a part's own seed case reads the families of the widget enclosing it", async () => {
+test("a part's own seed case reads the families of the widget enclosing it, both asked with where this page puts them", async () => {
 	const seedChild = seedChildSource(await compile(rootInsidePart));
 	const partEdgeId = 'component-edge:2';
 	const partCase = seedChild.slice(
@@ -140,8 +142,8 @@ test("a part's own seed case reads the families of the widget enclosing it", asy
 
 	expect(partCase).not.toBe('');
 	// Its own surface answers nothing, so the enclosing root's surface is asked too.
-	expect(partCase).toContain('const marklessSsrWidgetFamilies=[...marklessSsrWidgetRoots(');
-	expect(partCase.split('...marklessSsrWidgetRoots(').length - 1).toBeGreaterThan(1);
+	expect(partCase).toContain('const marklessSsrWidgetFamilies=[...marklessSsrPlacedWidgetRoots(');
+	expect(partCase.split('...marklessSsrPlacedWidgetRoots(').length - 1).toBeGreaterThan(1);
 	// With a family in scope the nested root is recognised and its seed is guarded.
 	expect(partCase).toContain('!marklessSsrWidgetBoundary(marklessSsrWidgetFamilies,');
 });

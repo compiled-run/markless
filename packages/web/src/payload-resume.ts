@@ -6,7 +6,11 @@ import { type ResumePayloadScriptsInput, type ResumePayloadScriptsResult } from 
 import type { decodePayloadScripts } from '../../serializer/src/protocol-client.ts';
 import type { DecodedPayloadScripts } from '../../serializer/src/protocol-client-storage.ts';
 import { createRuntimeGraphFromResumePayload } from './payload-graph-construct.ts';
-import { getAlreadyResumedPayload, setResumedPayload } from './payload-resume-registry.ts';
+import {
+	getAlreadyResumedPayload,
+	getRetiredResumedPayload,
+	setResumedPayload,
+} from './payload-resume-registry.ts';
 import { marklessInstanceScopedLoadSymbol } from './fns/instance-scope.ts';
 
 // Streamed settles (T107) leave records + snapshot patches in the document.
@@ -38,6 +42,8 @@ export async function resumeFromPayloadScriptsImpl(
 ): Promise<ResumePayloadScriptsResult> {
 	const resumed = getAlreadyResumedPayload(input.root);
 	if (resumed) return resumed;
+	const retired = getRetiredResumedPayload(input.root);
+	if (retired) return retired;
 	const root = input.root as typeof input.root & {
 		__mStart?: Promise<ResumePayloadScriptsResult>;
 	};
@@ -51,6 +57,8 @@ export async function resumeFromPrerenderRecordsImpl(
 ): Promise<ResumePayloadScriptsResult> {
 	const resumed = getAlreadyResumedPayload(input.root);
 	if (resumed) return resumed;
+	const retired = getRetiredResumedPayload(input.root);
+	if (retired) return retired;
 	const root = input.root as typeof input.root & {
 		__mStart?: Promise<ResumePayloadScriptsResult>;
 	};

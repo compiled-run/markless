@@ -62,21 +62,21 @@ export default function Controlled() @{
 				<tour.valuelabel data-testid="chrome-count" />
 			</div>
 
-			<tour.item index={0} data-testid="step-save" target={saveEl}>
+			<tour.item data-testid="step-save" target={saveEl}>
 				<tour.title data-testid="save-title">Save your work</tour.title>
 				<tour.description data-testid="save-description">
 					The Save button in the toolbar keeps a copy of the document.
 				</tour.description>
 			</tour.item>
 
-			<tour.item index={1} data-testid="step-share" target={shareEl}>
+			<tour.item data-testid="step-share" target={shareEl}>
 				<tour.title data-testid="share-title">Share it</tour.title>
 				<tour.description data-testid="share-description">
 					The Share button beside Save sends a read-only link.
 				</tour.description>
 			</tour.item>
 
-			<tour.item index={2} data-testid="step-trash" target={trashEl}>
+			<tour.item data-testid="step-trash" target={trashEl}>
 				<tour.title data-testid="trash-title">Delete it</tour.title>
 				<tour.description data-testid="trash-description">
 					The Delete button at the end of the toolbar throws the document away.

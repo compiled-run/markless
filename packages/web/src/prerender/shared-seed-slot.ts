@@ -1,4 +1,4 @@
-import type { Awaitable } from '../ssr-data/awaitable.ts';
+import { marklessSettled, type Awaitable } from '../ssr-data/awaitable.ts';
 import {
 	MARKLESS_DEFERRED_COUNT_CLOSE,
 	MARKLESS_DEFERRED_COUNT_OPEN,
@@ -119,6 +119,16 @@ export type MarklessRosterPositions = {
 	seeds?: ReadonlyMap<string, unknown>;
 	readonly taken: Map<string, number>;
 	/**
+	 * The ledger a SEED pass counts on, held only while one is running.
+	 *
+	 * A seed pass builds a composing link's scope by evaluating its module's
+	 * initial values, and the producer hands every component of a module the whole
+	 * module's list — so a part's position derive runs there without a part being
+	 * rendered. Counting those asks on `taken` moves the render's numbering off
+	 * the emission order the whole mechanism rests on.
+	 */
+	seeding?: Map<string, number>;
+	/**
 	 * Whether some part of this render asked a COUNT. A count is not knowable
 	 * while the render is still emitting the members it counts, so the ask writes
 	 * a placeholder and the surface resolves it once composition is done - which
@@ -180,9 +190,36 @@ function renderRosterPosition(
 ): number {
 	const instance = rosterInstance(seeds ?? positions.seeds, rosterGraphNodeId);
 	const key = `${String(instance)}|${rosterGraphNodeId}|${handleGraphNodeId}`;
-	const taken = positions.taken.get(key) ?? 0;
-	positions.taken.set(key, taken + 1);
+	const ledger = positions.seeding ?? positions.taken;
+	const taken = ledger.get(key) ?? 0;
+	ledger.set(key, taken + 1);
 	return taken;
+}
+
+/**
+ * Run one shared-seed pass with the render's positions held aside.
+ *
+ * The pass walks its own scope, not this instance's members, so it counts on a
+ * ledger of its own and the render still asks exactly once per rendered part —
+ * which is what the served page does, and what makes the nth ask the nth member.
+ * Sequential by construction: every seed pass is awaited before the render that
+ * follows it, so one pass is in flight at a time.
+ */
+export function marklessRosterSeedPass<T>(
+	seeds: ReadonlyMap<string, unknown> | undefined,
+	run: () => Awaitable<T>,
+): Awaitable<T> {
+	const positions = marklessRosterPositions(seeds);
+	if (!positions) return run();
+	const held = positions.seeding;
+	positions.seeding = new Map<string, number>();
+	return marklessSettled(
+		run(),
+		() => {
+			positions.seeding = held;
+		},
+		(value) => value,
+	);
 }
 
 // A placeholder count, delimited by two private-use code points so nothing an

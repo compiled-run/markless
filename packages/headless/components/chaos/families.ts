@@ -20,6 +20,7 @@ import CropBasic from '../src/crop/scenarios/basic.tsrx';
 import DateboxBasic from '../src/datebox/scenarios/basic.tsrx';
 import DrawerBasic from '../src/drawer/scenarios/basic.tsrx';
 import FileuploadBasic from '../src/fileupload/scenarios/basic.tsrx';
+import GridListBasic from '../src/gridlist/scenarios/basic.tsrx';
 import HovercardBasic from '../src/hovercard/scenarios/basic.tsrx';
 import InkBasic from '../src/ink/scenarios/basic.tsrx';
 import MenuBasic from '../src/menu/scenarios/basic.tsrx';
@@ -35,6 +36,7 @@ import { Basic as RadioGroupBasic } from '../src/radio-group/scenarios/basic.tsr
 import ResizableBasic from '../src/resizable/scenarios/basic.tsrx';
 import { Basic as SelectBasic } from '../src/select/scenarios/basic.tsrx';
 import SliderBasic from '../src/slider/scenarios/basic.tsrx';
+import TablePickedCells from '../src/table/scenarios/picked-cells.tsrx';
 import TabsBasic from '../src/tabs/scenarios/basic.tsrx';
 import TextboxBasic from '../src/textbox/scenarios/basic.tsrx';
 import TimeBoxBasic from '../src/timebox/scenarios/basic.tsrx';
@@ -398,6 +400,26 @@ export const families: readonly ChaosFamily[] = [
 		},
 	},
 	{
+		name: 'gridlist',
+		mount: () => render(GridListBasic),
+		rootTestId: 'root',
+		keyboardEntryTestId: 'root',
+		storms: ['keyboard', 'mixed'],
+		async recover() {
+			el<HTMLElement>('readme-item').focus();
+			await expect.poll(() => document.activeElement).toBe(el('readme-item'));
+
+			await userEvent.keyboard('{ArrowDown}');
+			await expect.poll(() => document.activeElement).toBe(el('license-item'));
+			await expect.poll(() => el('license-item').getAttribute('tabindex')).toBe('0');
+			expect(el('readme-item').getAttribute('tabindex')).toBe('-1');
+			expect(el('root').getAttribute('tabindex')).toBe('-1');
+
+			await userEvent.keyboard('{ArrowUp}');
+			await expect.poll(() => document.activeElement).toBe(el('readme-item'));
+		},
+	},
+	{
 		name: 'hovercard',
 		mount: () => render(HovercardBasic),
 		rootTestId: 'root',
@@ -689,6 +711,38 @@ export const families: readonly ChaosFamily[] = [
 			await userEvent.keyboard('{ArrowRight}');
 			await expect.poll(() => el('thumb').getAttribute('aria-valuenow')).toBe('1');
 			expect(el('valuelabel').textContent?.trim()).toBe('1');
+		},
+	},
+	{
+		name: 'table',
+		mount: () => render(TablePickedCells),
+		rootTestId: 'root',
+		keyboardEntryTestId: 'readme-name',
+		storms: ['keyboard', 'mixed'],
+		// The harness dispatches its Escape on `document`, which is not on the
+		// table's own event path, so a storm's picks survive it and the one measured
+		// press below would toggle rather than pick.
+		async unwind() {
+			el<HTMLElement>('readme-name').focus();
+			await userEvent.keyboard('{Escape}');
+		},
+		async recover() {
+			el<HTMLElement>('readme-name').focus();
+			await expect.poll(() => document.activeElement).toBe(el('readme-name'));
+			await expect.poll(() => el('root').getAttribute('tabindex')).toBe('-1');
+
+			await userEvent.keyboard('{ArrowRight}');
+			await expect.poll(() => document.activeElement).toBe(el('readme-size'));
+			await expect.poll(() => el('readme-size').getAttribute('tabindex')).toBe('0');
+			expect(el('readme-name').getAttribute('tabindex')).toBe('-1');
+
+			await userEvent.keyboard('{ArrowDown}');
+			await expect.poll(() => document.activeElement).toBe(el('license-size'));
+
+			// A cell is never itself selectable: the space bar picks the row it sits in.
+			await userEvent.keyboard(' ');
+			await expect.poll(() => el('license-item').getAttribute('ui-selected')).toBe('');
+			await expect.poll(() => el('picked').textContent).toBe('license');
 		},
 	},
 	{

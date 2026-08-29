@@ -85,6 +85,11 @@ a recomposition rather than a from-scratch family.
 
 ## Unparked 2026-08-28 (owner go, building now)
 
+Tokenbox ruling (owner, 2026-08-28): NO id on the public TokenBoxSegment — row identity belongs
+to the framework (element() handles live per JSX row lifetime), never to the value model. The
+family stays unregistered with its three row-pairs pinned until the repeat-keying/@for-computed
+walls resolve framework-side; the pins are the acceptance for that work.
+
 - **timebox** — charter decisions taken as the recorded recommendations: segmented spinbuttons
   (React Aria lineage) and platform `Intl.DateTimeFormat.formatToParts`, plain time-of-day value.
   Segment engine stays internal to the family, liftable when datebox arrives.
@@ -128,6 +133,18 @@ Table owner requirements:
 References: https://react-aria.adobe.com/GridList · https://react-aria.adobe.com/Table ·
 https://next.melt-ui.com/components/spatialmenu/ (WIP, no documented ARIA; its tolerance-based
 spatial navigation over unaligned items is worth stealing for the nav engine).
+
+Settled by the owner on 2026-08-29, so the research note's open questions are closed:
+- No new `cell` component role. The 2D focus stop is `table.rowcontent` (`<td>`, or `<th>` with
+  `role="rowheader"` under a `rowheader` boolean), and `row`/`col` join the prefix list in SPEC.
+- Parts are `root` `item` `rowcontent` `coltrigger` `rowfield`; `<thead>`/`<tbody>`/`<caption>`
+  and non-sortable `<th>`s stay the consumer's own elements with no parts.
+- `role="grid"` is progressive: a bare table writes no role at all, and the root becomes a grid
+  once the selection props are present. The ruling also had mounted cells earn the role; that
+  half is framework-blocked and was cut on 2026-08-29 — a root cannot observe what its
+  descendants mounted, so a cells-only table keeps its 2D navigation and writes no role.
+- No counts or indexes in v1; `onSortChange(column)` reports the pressed column and never a
+  computed next descriptor; selection is derived from `value`/`onChange`/`multiple`.
 
 ### datebox / timebox (date/time cluster)
 
@@ -198,6 +215,20 @@ Sole reference implementation: https://react-aria.adobe.com/TokenField — study
   (`aria-hidden` on duplicates, `prefers-reduced-motion`). Pause-on-hover is
   `animation-play-state: paused` on `:hover`/`:focus-within`, no JS. Docs snippet at most; note
   WCAG 2.2.2 wants a real pause control if it runs > 5s.
+- **steps** (stepper/wizard; ruled 2026-08-28 after research) — no APG pattern exists and no
+  primitives-tier library ships one (React Aria, Radix, Base UI, HeadlessUI, Melt: none; only
+  Ark/Zag, with undocumented ARIA). The a11y consensus is prose-sized: a labeled list, exactly
+  one `aria-current="step"`, decorative indicators hidden, non-interactive steps out of the tab
+  order — no keyboard protocol, no focus management. The gating "state machine" is consumer
+  logic (Ark's own API is isStepValid/isStepSkippable callbacks — the inputgroup shape). Right
+  home: a docs recipe over EXISTING families (owner-confirmed): the interactive wizard composes
+  carousel or tabs (trigger-chooses-a-panel is already their machinery) + consumer gating; the
+  display-only indicator is navbar when steps are real links (aria-current="step" instead of
+  "page") or a plain non-interactive list otherwise, with an optional live region. Promote only
+  if consumers keep rebuilding the gating.
+- **scroll-area** — considered and skipped (2026-08-28): the styling 90% is plain CSS now
+  (scrollbar-width/-color, ::-webkit-scrollbar) and custom-drawn scrollbars are routinely worse
+  for AT than native. Revisit only if the docs site itself needs one.
 - **floating-panel** — a miniature window manager (drag-by-titlebar, resize handles,
   minimize/maximize, stacking). Only Ark/Zag ship it. Out unless a concrete consumer appears:
   it is a different engine entirely (free pixel positioning from pointer deltas, not the anchor

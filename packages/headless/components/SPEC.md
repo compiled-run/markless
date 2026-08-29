@@ -39,7 +39,8 @@ Established roles (shipped in 3+ families, or ruled by the owner):
 | `area` | a bounded region with its own interaction rules | scroll area; candidates as they earn it |
 | `selection` | the chosen region inside an area, movable and resizable by the person | crop (ruled); candidates: slider range, calendar range |
 
-Explicitly **not** roles: `arrow` (no behavior here — anchored arrows are
+Explicitly **not** roles: `cell` (ruled 2026-08-29 — a cell is `content` wearing a
+`row` prefix), `arrow` (no behavior here — anchored arrows are
 consumer CSS over the anchor data surface; revisit only if three families need a
 behaviored arrow), `portal`, `positioner`, `viewport`, `value` (that is a
 prefix), `group` (below the 3-use bar today; first candidate when select/combobox
@@ -53,7 +54,9 @@ needs the same owner sign-off as a role.
 Established prefixes: `item` (belongs to one item of the set — `itemtrigger`,
 `itemcontent`, `itemlabel`, `itemindicator`, `itemfield`, `itemtitle`,
 `itemclose`, `itemicon`, `itemlink`), `value` (carries the current value —
-`valuelabel`), `nav` (carousel `navtrigger`), `play` (carousel `playtrigger`).
+`valuelabel`), `nav` (carousel `navtrigger`), `play` (carousel `playtrigger`),
+`row` and `col` (belongs to one row or one column of a rows-and-columns family —
+table `rowcontent`, `rowfield`, `coltrigger`).
 
 The worked example: the text in a trigger showing the selected value is not a new
 role. Its purpose is *label*; the information it carries is the *value*; the name
@@ -133,8 +136,7 @@ An item's position is derived from render order — its place in the family's ow
 roster of bound elements — and a family never takes an index prop for it: a
 consumer numbering its own parts by hand is a rename, a reorder or a loop away
 from lying, and the family already knows. The count follows from the same
-roster. `tour.item` is the one part still taking `index`, migrating behind
-T042.
+roster. No family takes one: `tour.item` was the last, and it does not.
 
 ## Timing
 

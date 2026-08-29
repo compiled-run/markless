@@ -46,7 +46,7 @@ function instanceRegistrations(
 ): Array<{ edgeId: string; instancePath: string; guarded: boolean }> {
 	const key = JSON.stringify(MARKLESS_WIDGET_INSTANCE_KEY);
 	const pattern = new RegExp(
-		`case "(component-edge:\\d+)":\\{(if\\(marklessSsrWidgetRoots\\([^)]*\\)\\.length\\))?marklessSsrSeeds\\.set\\(${key},marklessSsrIdPrefix\\+([^+]*)\\+`,
+		`case "(component-edge:\\d+)":\\{(if\\(marklessSsr(?:Placed)?WidgetRoots\\(.*?\\)\\.length\\))?marklessSsrSeeds\\.set\\(${key},marklessSsrIdPrefix\\+([^+]*)\\+`,
 		'g',
 	);
 	return [...seedChild.matchAll(pattern)].map((match) => ({

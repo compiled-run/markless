@@ -103,10 +103,13 @@ const STAGE_ANCHORS = {
 	// lane, not this one; this lane prices the same source delta higher because
 	// it modulepreloads nearly every chunk it emits.
 	// +106: keyed-repeat row-template slots qualified through composition (rows may read outside their item); +9: component-local handles keyed by host scope;
-	// +134: deferred count-dependent bindings (thunk registry + resolver splice); +21: carrier-rooting rule in composition; +3: shared carrier predicate.
-	'page-load download': { gzipBytes: 137_401, margin: 128 },
-	// +5: roster-count placeholder minted in the eager seed slot (the resolver itself is demand-loaded).
-	'page-load execute': { gzipBytes: 14_226, margin: 128 },
+	// +134: deferred count-dependent bindings (thunk registry + resolver splice); +21: carrier-rooting rule in composition; +3: shared carrier predicate;
+	// +177: seed passes count roster positions on their own ledger (marklessRosterSeedPass around both seedChild sites);
+	// +245: control-edit-hold - a commit's write onto an editable control's value/checked is held when keystrokes landed since the handler read it.
+	'page-load download': { gzipBytes: 137_823, margin: 128 },
+	// +5: roster-count placeholder minted in the eager seed slot (the resolver itself is demand-loaded);
+	// +114: seed-pass roster ledger in the eager seed slot; +228: control-edit-hold in the eager runtime chunk.
+	'page-load execute': { gzipBytes: 14_568, margin: 128 },
 	'interaction 1 marginal': { gzipBytes: 2_416, margin: 32 },
 	'interaction 2 marginal': { gzipBytes: 2_705, margin: 32 },
 	'interaction 3 marginal': { gzipBytes: 2_706, margin: 32 },

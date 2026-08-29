@@ -41,7 +41,9 @@ import {
 	elementHandleMarkerSource,
 	componentBoundElementHandles,
 	projectedHandleEdgeIdsUnder,
+	widgetFallbackDefinitionIds,
 	widgetFallbacksOutputField,
+	widgetCarriesMarkerLine,
 	widgetRootMarkerLine,
 } from './shared-seed-pass.ts';
 import { emitCatalogHelperImports, stateRuntimeImports } from './runtime-helpers.ts';
@@ -339,6 +341,10 @@ export function emitPublicSsrRenderModule(
 			'marklessRenderSsr',
 			rootDataLines.composedRootSurfaceArgs,
 		),
+		widgetCarriesMarkerLine(
+			widgetFallbackDefinitionIds(input, rootInfo.componentName),
+			'marklessRenderSsr',
+		),
 		elementHandleMarkerLine(
 			componentBoundElementHandles(input, rootInfo.componentName),
 			'marklessRenderSsr',
@@ -392,6 +398,7 @@ export function emitPublicSsrRenderModule(
 					'marklessSsrSpreadProps',
 					'marklessSsrSeedChild',
 					'marklessSsrWidgetRoots',
+					'marklessSsrPlacedWidgetRoots',
 					'marklessSsrChildrenWidgetRoot',
 					'marklessSsrWidgetBoundary',
 					// Keep the emitted SSR helper distinct from authored bindings.
@@ -861,6 +868,44 @@ function emitSsrDataLines(
 				entry.definition.scope === 'widget' &&
 				entry.graphBindings.some((binding) => binding.kind === 'element'),
 		);
+	// Where every child this render places STANDS: its instance path and the two
+	// arguments that reach its markers. The carrier rule reads the nesting off the
+	// prefix relation between those paths, exactly as composition reads it off the
+	// instance paths its compose children carry.
+	const placementByEdgeId = new Map<string, { readonly path: string; readonly args: string }>();
+	for (const edge of edges) {
+		const component = referenceByName.get(edge.childComponentName);
+		if (!component) continue;
+		const declaredName = edgeDeclaredComponentName(edge);
+		placementByEdgeId.set(edge.id, {
+			path: componentEdgeInstanceSegment(edge, input.semanticGraph.componentEdges),
+			args: `${component},${declaredName ? JSON.stringify(declaredName) : 'undefined'}`,
+		});
+	}
+	// The families a placed child roots, asked with where the page puts it when
+	// that can change the answer. A child enclosing nobody can never be a carrier
+	// root, so it keeps the marker-only ask and its page emits what it emitted
+	// before, byte for byte.
+	const widgetRootsSource = (edgeId: string): string => {
+		const own = placementByEdgeId.get(edgeId);
+		if (!own) return '[]';
+		const near = [...placementByEdgeId].flatMap(([otherId, other]) =>
+			otherId === edgeId ? [] : [other],
+		);
+		const inside = (outer: string, inner: string) =>
+			inner.length > outer.length && inner.startsWith(outer);
+		const list = (placements: ReadonlyArray<{ readonly args: string }>) =>
+			`[${[...new Set(placements.map((placed) => placed.args))].map((args) => `[${args}]`).join(',')}]`;
+		const enclosed = near.filter((other) => inside(own.path, other.path));
+		if (enclosed.length === 0) return `marklessSsrWidgetRoots(${own.args})`;
+		// Innermost first: the depth marks the spelled paths carry count outwards.
+		const enclosing = near
+			.filter((other) => inside(other.path, own.path))
+			.sort((left, right) => right.path.length - left.path.length);
+		return `marklessSsrPlacedWidgetRoots(${own.args},${list(enclosing)},${list(enclosed)}${
+			rowScopedEdges.has(edgeId) ? ',true' : ''
+		})`;
+	};
 	const instanceOnlyEdgeIds = new Set<string>();
 	const widgetInstanceLineByEdgeId = new Map<string, string>();
 	// What the emitted seed pass hands the boundary check to ask a placed child
@@ -989,7 +1034,7 @@ function emitSsrDataLines(
 			// take over the plain key an outer family's parts still mint from. The
 			// CSR seed pass files exactly these keys; the loop is empty, and so
 			// costs nothing, for a projecting child that roots nothing.
-			const registerFamilies = `for(const marklessSsrFamily of marklessSsrWidgetRoots(${surfaceArgs}))marklessSsrSeeds.set(${JSON.stringify(
+			const registerFamilies = `for(const marklessSsrFamily of ${widgetRootsSource(edge.id)})marklessSsrSeeds.set(${JSON.stringify(
 				MARKLESS_WIDGET_INSTANCE_KEY,
 			)}+'|'+marklessSsrFamily,marklessSsrSeeds.get(${JSON.stringify(
 				MARKLESS_WIDGET_INSTANCE_KEY,
@@ -1007,7 +1052,7 @@ function emitSsrDataLines(
 					(!edge.importSource &&
 					widgetRootDefinitionIds(input, edge.childComponentName).length > 0
 						? registerInstance
-						: `if(marklessSsrWidgetRoots(${surfaceArgs}).length)${registerInstance}`) +
+						: `if(${widgetRootsSource(edge.id)}.length)${registerInstance}`) +
 						registerFamilies,
 				);
 		}
@@ -1146,18 +1191,17 @@ function emitSsrDataLines(
 		const needsFamilies = blocks.some((block) => block.includes('marklessSsrWidgetBoundary'));
 		// A projecting child that roots nothing is a PART: the families in scope are
 		// the enclosing widget's, so the boundary check reads them too.
-		const familyArgs = [
-			...(rootSurfaceArgs ? [rootSurfaceArgs] : []),
-			...enclosingProjectingEdgeIds(input.renderData.chunks, edgeId).flatMap((ancestorEdgeId) => {
-				const args = childSurfaceArgsByEdgeId.get(ancestorEdgeId);
-				return args ? [args] : [];
-			}),
+		const familyEdgeIds = [
+			...(rootSurfaceArgs ? [edgeId] : []),
+			...enclosingProjectingEdgeIds(input.renderData.chunks, edgeId).filter((ancestorEdgeId) =>
+				childSurfaceArgsByEdgeId.has(ancestorEdgeId),
+			),
 		];
 		return [
 			`case ${JSON.stringify(edgeId)}:{${widgetInstanceLineByEdgeId.get(edgeId) ?? ''}${
 				needsFamilies
-					? `const marklessSsrWidgetFamilies=[${familyArgs
-							.map((args) => `...marklessSsrWidgetRoots(${args})`)
+					? `const marklessSsrWidgetFamilies=[${familyEdgeIds
+							.map((familyEdgeId) => `...${widgetRootsSource(familyEdgeId)}`)
 							.join(',')}];`
 					: ''
 			}${handleLines.join('')}${blocks.join('')}return marklessSsrSeeds;}`,

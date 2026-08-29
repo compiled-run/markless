@@ -50,14 +50,7 @@ for (const mode of ['CSR', 'SSR'] as const) {
 		expect(max('plain-root')).toBe('2');
 	});
 
-	// SSR files the widget instance token from the compiler's per-component
-	// `marklessWidgetRoots` marker, which is a fact about the component alone and
-	// cannot see that this page gives the carrier a root's standing. So the count
-	// placeholder is keyed with the bare handle id while composition has qualified
-	// every handle of the instance, no handle matches, and the ask answers 0 until
-	// the first flip re-derives it. Measured: 0 at paint, 4 with the arm, 3 without.
-	const firstPaint = mode === 'CSR' ? test : test.fails;
-	firstPaint(`${mode}: each instance counts its own roster at first paint`, async () => {
+	test(`${mode}: each instance counts its own roster at first paint`, async () => {
 		await mount();
 
 		await expect.poll(() => max('armed-root'), { timeout: 2000 }).toBe('3');

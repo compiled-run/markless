@@ -3,6 +3,7 @@ import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../../src/index.ts';
 import ArmPage from './ic-arm-page.tsrx';
 import ComposedPage from './ic-composed-page.tsrx';
+import ComposedPartPage from './ic-composed-part-page.tsrx';
 import FlatPage from './ic-flat-page.tsrx';
 import KeyedPage from './ic-keyed-page.tsrx';
 import MutatingPage from './ic-mutating-page.tsrx';
@@ -689,6 +690,26 @@ test('SSR: a dependent derivation spends the position at first paint', async () 
 	expect(mines()).toEqual(['a', 'b', 'c']);
 });
 
+// A part reached through a wrapper in its OWN module: the seed pass evaluates
+// that module's initials to build the wrapper's scope, so the position derive
+// runs there once per composing link with no part rendered. Those asks are not
+// members arriving, and counting them moves the render's numbering off document
+// order - CSR paints the third card at 8 and its character empty.
+
+test('CSR: a part composed by a wrapper in its own module still counts from zero', async () => {
+	await render(ComposedPartPage);
+
+	expect(positions()).toEqual(['0', '1', '2']);
+	expect(mines()).toEqual(['a', 'b', 'c']);
+});
+
+test('SSR: a part composed by a wrapper in its own module still counts from zero', async () => {
+	await renderSSR(ComposedPartPage);
+
+	expect(positions()).toEqual(['0', '1', '2']);
+	expect(mines()).toEqual(['a', 'b', 'c']);
+});
+
 test('CSR: a dependent derivation re-reads the position after a write', async () => {
 	await render(StaticPage);
 	await writeCode();
@@ -839,12 +860,7 @@ test('CSR: the count follows an @if arm applying and dropping', async () => {
 	expect(totals()).toEqual(['3', '2']);
 });
 
-// The first-paint count stands in CSR, where the seed pass asks the carrier rule
-// with where this child stands on the page. SSR files the instance token from the
-// compiler's per-component `marklessWidgetRoots` marker instead, which cannot see
-// a placement, so the count placeholder is keyed with the bare handle id and the
-// ask answers 0 until the first flip. Measured: ['0','2'] at paint here.
-test.fails('SSR: the count follows an @if arm applying and dropping', async () => {
+test('SSR: the count follows an @if arm applying and dropping', async () => {
 	await renderSSR(ArmPage);
 
 	expect(maxes()).toEqual(['3', '2']);

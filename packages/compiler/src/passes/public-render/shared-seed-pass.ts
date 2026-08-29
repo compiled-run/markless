@@ -480,6 +480,22 @@ export function widgetFallbackDefinitionIds(
 }
 
 /**
+ * How a composing module learns that a child it places holds a family's cells
+ * WITHOUT designating them: the seed pass runs before the child renders, so the
+ * `widgetFallbacks` output field composition reads is not there yet. Whether
+ * such a carrier is nevertheless a root is the placement's answer, and this
+ * marker is what the placement is asked about.
+ */
+export function widgetCarriesMarkerLine(
+	definitionIds: ReadonlyArray<string>,
+	functionName: string,
+): string | null {
+	return definitionIds.length > 0
+		? `${functionName}.marklessWidgetCarries = ${JSON.stringify(definitionIds)};`
+		: null;
+}
+
+/**
  * The widget-scoped definitions this module only ADOPTED from an import.
  *
  * A family's CELLS are its instance identity: the runtime reads "this component

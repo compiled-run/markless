@@ -9,7 +9,7 @@ import type {
 	ResumeDomElement,
 	ResumeDomOwnerDocument,
 } from './resume-types.ts';
-import { getAlreadyResumedPayload } from './payload-resume-registry.ts';
+import { getAlreadyResumedPayload, getRetiredResumedPayload } from './payload-resume-registry.ts';
 import type { ResumePayloadScriptsInput, ResumePayloadScriptsResult } from './payload-full.ts';
 
 export type PayloadScriptElement = {
@@ -34,6 +34,8 @@ export async function resumeFromPayloadDocumentWith(
 	assertPayloadDocumentAccessAllowed(input.root);
 	const resumed = getAlreadyResumedPayload(input.root);
 	if (resumed) return resumed;
+	const retired = getRetiredResumedPayload(input.root);
+	if (retired) return retired;
 	return resume({
 		...input,
 		...readPayloadScriptsFromDocument(input.document),

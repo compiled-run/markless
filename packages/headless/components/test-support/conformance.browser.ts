@@ -12,6 +12,7 @@ import Crop from '../src/crop/scenarios/basic.tsrx';
 import DateBox from '../src/datebox/scenarios/basic.tsrx';
 import Editable from '../src/editable/scenarios/basic.tsrx';
 import FileUpload from '../src/fileupload/scenarios/basic.tsrx';
+import GridList from '../src/gridlist/scenarios/basic.tsrx';
 import Hovercard from '../src/hovercard/scenarios/basic.tsrx';
 import Ink from '../src/ink/scenarios/basic.tsrx';
 import Menu from '../src/menu/scenarios/basic.tsrx';
@@ -32,6 +33,7 @@ import { Basic as Rating } from '../src/rating/scenarios/basic.tsrx';
 import Resizable from '../src/resizable/scenarios/basic.tsrx';
 import { Basic as Select } from '../src/select/scenarios/basic.tsrx';
 import Slider from '../src/slider/scenarios/basic.tsrx';
+import Table from '../src/table/scenarios/basic.tsrx';
 import Tabs from '../src/tabs/scenarios/basic.tsrx';
 import TagList from '../src/taglist/scenarios/basic.tsrx';
 import Textbox from '../src/textbox/scenarios/basic.tsrx';
@@ -325,6 +327,39 @@ const descriptors: readonly FamilyDescriptor[] = [
 		supportsDisabled: true,
 	},
 	{
+		family: 'gridlist',
+		mount: { CSR: () => render(GridList), SSR: () => renderSSR(GridList) },
+		root: 'root',
+		parts: [
+			'root',
+			'label',
+			'readme-item',
+			'readme-itemcontent',
+			'readme-itemlabel',
+			'license-item',
+			'license-itemcontent',
+			'license-itemlabel',
+			'changelog-item',
+			'changelog-itemcontent',
+			'changelog-itemlabel',
+		],
+		// The minted idref the grid's name rides on is checked by `idrefs`, not
+		// here: it has no fixed value to declare. The starter is not selectable, so
+		// the grid declares no aria-multiselectable at all.
+		rootAria: {
+			role: 'grid',
+			'aria-multiselectable': null,
+			'aria-disabled': 'false',
+		},
+		// No openCycle: nothing here opens. The grid is one tab stop and the arrows
+		// step between rows from there, which the family's own suite drives.
+		//
+		// The row's identity in the picked set, which every part inside a row is
+		// keyed by; every other mark this family writes is presence.
+		valuedAttributes: ['ui-value'],
+		supportsDisabled: true,
+	},
+	{
 		family: 'hovercard',
 		mount: { CSR: () => render(Hovercard), SSR: () => renderSSR(Hovercard) },
 		root: 'root',
@@ -387,7 +422,6 @@ const descriptors: readonly FamilyDescriptor[] = [
 		parts: [
 			'root',
 			'label',
-			'menu-file',
 			'bar-file',
 			'panel-file',
 			'item-new',
@@ -395,12 +429,10 @@ const descriptors: readonly FamilyDescriptor[] = [
 			'panel-recent',
 			'item-draft',
 			'item-notes',
-			'menu-edit',
 			'bar-edit',
 			'panel-edit',
 			'item-undo',
 			'item-redo',
-			'menu-view',
 			'bar-view',
 			'panel-view',
 			'item-wrap',
@@ -699,6 +731,30 @@ const descriptors: readonly FamilyDescriptor[] = [
 		// The rail's numbers and which way it runs are what a consumer styles
 		// against, so they are key-value by design rather than presence marks.
 		valuedAttributes: ['ui-orientation', 'ui-value', 'ui-min', 'ui-max'],
+		supportsDisabled: true,
+	},
+	{
+		family: 'table',
+		mount: { CSR: () => render(Table), SSR: () => renderSSR(Table) },
+		root: 'root',
+		parts: ['root', 'readme-item', 'license-item', 'changelog-item'],
+		// Every fact here is an absence, and that is the family's whole claim at this
+		// rung: a table nobody is steering keeps its native semantics, so no role is
+		// written over `<table>`, and a table with no selection says nothing about
+		// picking. The name is the consumer's own `<caption>`, which needs no part
+		// and no idref.
+		rootAria: {
+			role: null,
+			'aria-multiselectable': null,
+			'aria-disabled': null,
+		},
+		// No openCycle: nothing here opens, and nothing here is a tab stop either -
+		// the grid role and the focus management it obliges arrive at a later rung,
+		// which the family's own suite drives.
+		//
+		// The row's identity in the picked set; every other mark this family writes
+		// is presence.
+		valuedAttributes: ['ui-value'],
 		supportsDisabled: true,
 	},
 	{
