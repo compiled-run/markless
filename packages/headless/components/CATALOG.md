@@ -198,6 +198,17 @@ Sole reference implementation: https://react-aria.adobe.com/TokenField — study
   (`aria-hidden` on duplicates, `prefers-reduced-motion`). Pause-on-hover is
   `animation-play-state: paused` on `:hover`/`:focus-within`, no JS. Docs snippet at most; note
   WCAG 2.2.2 wants a real pause control if it runs > 5s.
+- **steps** (stepper/wizard; ruled 2026-08-28 after research) — no APG pattern exists and no
+  primitives-tier library ships one (React Aria, Radix, Base UI, HeadlessUI, Melt: none; only
+  Ark/Zag, with undocumented ARIA). The a11y consensus is prose-sized: a labeled list, exactly
+  one `aria-current="step"`, decorative indicators hidden, non-interactive steps out of the tab
+  order — no keyboard protocol, no focus management. The gating "state machine" is consumer
+  logic (Ark's own API is isStepValid/isStepSkippable callbacks — the inputgroup shape). Right
+  home: a docs recipe — wizards compose tabs + consumer gating; indicators are a list with
+  aria-current and an optional live region. Promote only if consumers keep rebuilding the gating.
+- **scroll-area** — considered and skipped (2026-08-28): the styling 90% is plain CSS now
+  (scrollbar-width/-color, ::-webkit-scrollbar) and custom-drawn scrollbars are routinely worse
+  for AT than native. Revisit only if the docs site itself needs one.
 - **floating-panel** — a miniature window manager (drag-by-titlebar, resize handles,
   minimize/maximize, stacking). Only Ark/Zag ship it. Out unless a concrete consumer appears:
   it is a different engine entirely (free pixel positioning from pointer deltas, not the anchor
