@@ -57,6 +57,7 @@
 		"./select": "./src/select/index.ts",
 		"./slider": "./src/slider/index.ts",
 		"./tooltip": "./src/tooltip/index.ts",
+		"./table": "./src/table/index.ts",
 		"./tabs": "./src/tabs/index.ts",
 		"./taglist": "./src/taglist/index.ts",
 		"./textbox": "./src/textbox/index.ts",

@@ -112,6 +112,9 @@ const RENDERED_ROLE: Record<FamilyName, AriaRole> = {
 	// The rows are what focus rests on and what gets picked; the grid around them
 	// is named by its label, and the cells inside carry nothing a reader stops on.
 	gridlist: 'row',
+	// The cell that names its row is what focus rests on and what a reader reads
+	// the row by; the grid around it is named by its caption, which carries no role.
+	table: 'rowheader',
 };
 
 /** Sections whose point is how many of that role they serve, not merely that they serve one. */
@@ -163,6 +166,9 @@ const RENDERED_COUNT: Partial<Record<FamilyName, number>> = {
 	// One row per file: a count catches a section that rendered the grid and its
 	// name and lost the rows the walk is about.
 	gridlist: 3,
+	// One row header per file: a count catches a section whose cells went back to
+	// plain markup, which is what losing the grid rung looks like here.
+	table: 3,
 };
 
 const appDir = fileURLToPath(new URL('..', import.meta.url));
@@ -352,6 +358,29 @@ async function prewarm(): Promise<void> {
 	console.log(
 		`Pre-warmed ${fetched.length} entry-graph requests in ${((Date.now() - started) / 1000).toFixed(1)}s: ${fetched.join(', ')}`,
 	);
+}
+
+/**
+ * The value an attribute settles on, not the one racing the page.
+ *
+ * A family that roves focus writes the new tabindex from a handler symbol the
+ * page loads on the first event that wakes it, so the write lands a beat after
+ * the gesture returns. Reading straight after the gesture reports the value the
+ * handler has not replaced yet, which looks exactly like a family that never
+ * roves at all.
+ */
+async function settledAttribute(
+	target: Locator,
+	name: string,
+	wanted: string | null,
+): Promise<string | null> {
+	const deadline = Date.now() + 5_000;
+	let seen = await target.getAttribute(name);
+	while (seen !== wanted && Date.now() < deadline) {
+		await target.page().waitForTimeout(50);
+		seen = await target.getAttribute(name);
+	}
+	return seen;
 }
 
 async function main() {
@@ -976,7 +1005,7 @@ async function main() {
 			}
 
 			await firstRow.focus();
-			if ((await grid.getAttribute('tabindex')) !== '-1') {
+			if ((await settledAttribute(grid, 'tabindex', '-1')) !== '-1') {
 				failures.push('#gridlist keeps the grid a tab stop after focus landed on a row.');
 			} else if ((await firstRow.getAttribute('tabindex')) !== '0') {
 				failures.push('#gridlist does not hand the tab stop to the row focus landed on.');
@@ -985,7 +1014,7 @@ async function main() {
 			}
 
 			await firstRow.press(' ');
-			if ((await firstRow.getAttribute('aria-selected')) !== 'true') {
+			if ((await settledAttribute(firstRow, 'aria-selected', 'true')) !== 'true') {
 				failures.push('#gridlist does not report a row as picked when the space bar picks it.');
 			} else {
 				console.log('#gridlist reports the picked row with aria-selected on the row itself.');
@@ -1002,6 +1031,68 @@ async function main() {
 				failures.push('#gridlist leaves the mark beside its picked row visible to a reader.');
 			} else {
 				console.log('#gridlist keeps the mark beside a picked row out of the announcement.');
+			}
+		}
+
+		// The role count above says three row headers rendered. What a reader lane
+		// then turns on is the family's central bet: the whole table is one tab stop
+		// until focus is inside it, a cell is the focus stop in both directions, and
+		// the space bar over a cell picks the row that cell sits in.
+		const tableSection = page.locator('#table');
+		const tableGrid = tableSection.getByRole('grid', { name: 'Files' });
+		if ((await tableGrid.count()) !== 1) {
+			failures.push(
+				`#table serves ${await tableGrid.count()} grids named "Files", not the 1 its starter needs.`,
+			);
+		} else {
+			const tableStop = await tableGrid.getAttribute('tabindex');
+			if (tableStop !== '0') {
+				failures.push(
+					`#table's grid reads tabindex="${tableStop}", not "0", so no keyboard reaches the table.`,
+				);
+			} else {
+				console.log('#table serves a named grid a keyboard can reach.');
+			}
+
+			const firstCell = tableSection.getByRole('rowheader').first();
+			const cellStop = await firstCell.getAttribute('tabindex');
+			if (cellStop !== '-1') {
+				failures.push(
+					`#table's first cell reads tabindex="${cellStop}", not "-1", so the table is more than one tab stop before focus is inside it.`,
+				);
+			} else {
+				console.log('#table keeps its cells out of the tab order until focus is inside.');
+			}
+
+			await firstCell.focus();
+			if ((await settledAttribute(tableGrid, 'tabindex', '-1')) !== '-1') {
+				failures.push('#table keeps the grid a tab stop after focus landed on a cell.');
+			} else if ((await firstCell.getAttribute('tabindex')) !== '0') {
+				failures.push('#table does not hand the tab stop to the cell focus landed on.');
+			} else {
+				console.log('#table moves its one tab stop onto the cell focus landed on.');
+			}
+
+			// The second axis is what separates this family from the list of rows
+			// gridlist serves: the arrows walk across a row as well as down the table.
+			const beside = tableSection.getByRole('gridcell').first();
+			await firstCell.press('ArrowRight');
+			if ((await settledAttribute(beside, 'tabindex', '0')) !== '0') {
+				failures.push('#table does not walk sideways from a row header to the cell beside it.');
+			} else {
+				console.log('#table walks sideways along a row, not only down the rows.');
+			}
+
+			// A cell is never itself selectable: the pick is a state on the row, not on
+			// the cell the keystroke arrived at.
+			const firstTableRow = tableSection.getByRole('row').first();
+			await beside.press(' ');
+			if ((await settledAttribute(firstTableRow, 'aria-selected', 'true')) !== 'true') {
+				failures.push('#table does not report a row as picked when a cell of it takes the space bar.');
+			} else if ((await beside.getAttribute('aria-selected')) !== null) {
+				failures.push('#table reports the pick on the cell as well as on the row that holds it.');
+			} else {
+				console.log('#table reports the picked row with aria-selected on the row itself.');
 			}
 		}
 
