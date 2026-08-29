@@ -33,6 +33,7 @@ import { Basic as Rating } from '../src/rating/scenarios/basic.tsrx';
 import Resizable from '../src/resizable/scenarios/basic.tsrx';
 import { Basic as Select } from '../src/select/scenarios/basic.tsrx';
 import Slider from '../src/slider/scenarios/basic.tsrx';
+import Table from '../src/table/scenarios/basic.tsrx';
 import Tabs from '../src/tabs/scenarios/basic.tsrx';
 import TagList from '../src/taglist/scenarios/basic.tsrx';
 import Textbox from '../src/textbox/scenarios/basic.tsrx';
@@ -730,6 +731,30 @@ const descriptors: readonly FamilyDescriptor[] = [
 		// The rail's numbers and which way it runs are what a consumer styles
 		// against, so they are key-value by design rather than presence marks.
 		valuedAttributes: ['ui-orientation', 'ui-value', 'ui-min', 'ui-max'],
+		supportsDisabled: true,
+	},
+	{
+		family: 'table',
+		mount: { CSR: () => render(Table), SSR: () => renderSSR(Table) },
+		root: 'root',
+		parts: ['root', 'readme-item', 'license-item', 'changelog-item'],
+		// Every fact here is an absence, and that is the family's whole claim at this
+		// rung: a table nobody is steering keeps its native semantics, so no role is
+		// written over `<table>`, and a table with no selection says nothing about
+		// picking. The name is the consumer's own `<caption>`, which needs no part
+		// and no idref.
+		rootAria: {
+			role: null,
+			'aria-multiselectable': null,
+			'aria-disabled': null,
+		},
+		// No openCycle: nothing here opens, and nothing here is a tab stop either -
+		// the grid role and the focus management it obliges arrive at a later rung,
+		// which the family's own suite drives.
+		//
+		// The row's identity in the picked set; every other mark this family writes
+		// is presence.
+		valuedAttributes: ['ui-value'],
 		supportsDisabled: true,
 	},
 	{

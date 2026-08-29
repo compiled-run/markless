@@ -26,6 +26,7 @@ import {
 	resizable,
 	select,
 	slider,
+	table,
 	tabs,
 	taglist,
 	textbox,
@@ -42,7 +43,7 @@ import {
 // /#radio-group, /#rating, /#tabs, /#popover, /#tooltip, /#slider, /#datebox,
 // /#fileupload, /#hovercard, /#calendar, /#menu, /#menubar, /#colorpicker,
 // /#buttongroup, /#editable, /#taglist, /#numberbox, /#ink, /#pad, /#crop, /#tour, /#toolbar, /#drawer,
-// /#resizable, /#timebox, /#gridlist. A family whose
+// /#resizable, /#timebox, /#gridlist, /#table. A family whose
 // second shape a reader announces differently gets its own section too: /#slider-range,
 // /#numberbox-min-max-step, /#numberbox-currency, /#crop-image, /#timebox-twelve-hour.
 //
@@ -810,6 +811,34 @@ export function Gallery() @{
 						</gridlist.itemcontent>
 					</gridlist.item>
 				</gridlist.root>
+			</div>
+		</section>
+
+		{/* Cells and a picked set rather than the plain starter: what a real reader
+		    is here to settle is that a cell is a focus stop in two directions and
+		    that picking is announced on the row, and a bare table has neither. No
+		    header row: the transcript reads the section's first row as the row the
+		    space bar picks, and a header row would be that first row. */}
+		<section id="table">
+			<h2>Table</h2>
+			<div class="scenario">
+				<table.root value={[]}>
+					<caption>Files</caption>
+					<tbody>
+						<table.item value="readme">
+							<table.rowcontent rowheader>README.md</table.rowcontent>
+							<table.rowcontent>4.1 kB</table.rowcontent>
+						</table.item>
+						<table.item value="license">
+							<table.rowcontent rowheader>LICENSE</table.rowcontent>
+							<table.rowcontent>1.1 kB</table.rowcontent>
+						</table.item>
+						<table.item value="changelog">
+							<table.rowcontent rowheader>CHANGELOG.md</table.rowcontent>
+							<table.rowcontent>12.4 kB</table.rowcontent>
+						</table.item>
+					</tbody>
+				</table.root>
 			</div>
 		</section>
 	</main>

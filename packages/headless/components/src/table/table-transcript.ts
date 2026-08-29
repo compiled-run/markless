@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import { FAMILY_ANCHORS } from '../../../../../apps/sr-gallery/preview-server.ts';
 import type { ScreenReaderDriver } from '../../test-support/driver.ts';
 import { GALLERY_WALK_LIMIT } from '../../test-support/gallery-walk.ts';
 
@@ -20,12 +21,8 @@ const NAME = 'Files';
 const FIRST = 'README.md';
 const SECOND = 'LICENSE';
 
-/**
- * Where the starter sits on the gallery page. A literal, because this family is
- * not registered yet: every registered family reads `FAMILY_ANCHORS`, and the
- * registration unit swaps this line for that read.
- */
-export const TABLE_ANCHOR = '/#table';
+/** Where the starter sits on the gallery page. */
+export const TABLE_ANCHOR = FAMILY_ANCHORS.table;
 
 function missing(phrase: string, facts: readonly string[]): string[] {
 	return facts.filter((fact) => !phrase.includes(fact));

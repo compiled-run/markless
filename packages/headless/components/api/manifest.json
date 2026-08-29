@@ -3648,6 +3648,108 @@
 			}
 		]
 	},
+	"table": {
+		"parts": [
+			{
+				"part": "coltrigger",
+				"component": "TableColTrigger",
+				"doc": "A sortable column header. It is the `<th scope=\"col\">` itself rather than a\nbutton inside one, so `aria-sort` and the press sit on one element.\n\nA header that cannot be sorted needs no part at all: a plain `<th scope=\"col\">`\nalready associates its column, and no library improves on `scope`.",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": true,
+						"doc": "This column's name, as it appears in `sort.column` and in `onSortChange`."
+					}
+				]
+			},
+			{
+				"part": "item",
+				"component": "TableItem",
+				"doc": "One body row. It carries the row's own identity as `value` - the string that\nappears in the root's `value` array while this row is picked. Position is\nnever identity, so the `value` is required.\n\nA row reports `ui-selected` and `ui-disabled`.",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": true,
+						"doc": "This row's identity in the picked set. Two rows must not share one."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "This row cannot be reached by the walk or picked."
+					}
+				]
+			},
+			{
+				"part": "root",
+				"component": "TableRoot",
+				"doc": "Tabular data where the columns are load-bearing: header association,\nper-column sort, and a person who navigates in two directions.\n\nThe family does no data work at all. Sorting, filtering, grouping and paging\nare the consumer's `computed()`; what arrives here is the rows already in the\norder they should read, plus which column that order came from. That is what\nlets a table row model from a data library drive this family with nothing in\nbetween: plain data in, plain callbacks out.\n\nIt is progressive, and the ladder has four rungs. A bare `table.root` holding\nthe consumer's own `<caption>`, `<thead>`, `<tbody>` and `table.item` rows is\na plain HTML table: no role, no focus management, nothing to configure.\nSwapping a `<th scope=\"col\">` for a `table.coltrigger` makes that column\nsortable. Passing `value`/`onChange` makes the rows selectable. Wrapping the\ncells in `table.rowcontent` makes each cell a focus stop, and only then does\nthe table become `role=\"grid\"` - the role is honest exactly when the family\nis doing the focus management the role obliges.\n\n`<thead>`, `<tbody>`, `<tfoot>`, the header row and `<caption>` need no parts.\nThey are the consumer's own elements, they already carry `rowgroup`, `row` and\nthe table's accessible name, and the family needs nothing from them.\n\nIt reports `ui-selectable`, `ui-multiple`, `ui-disabled` and `ui-celled` for\nstyling.",
+				"props": [
+					{
+						"name": "value",
+						"type": "readonly string[]",
+						"required": false,
+						"doc": "The rows that are picked, named by the `value` each `table.item` was written\nwith. Writing it at all is what makes the rows selectable."
+					},
+					{
+						"name": "multiple",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Several rows can be picked at once, and the table says so with `aria-multiselectable`."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "No row can be reached or picked, and the table drops out of the tab order."
+					},
+					{
+						"name": "sort",
+						"type": "TableSort",
+						"required": false,
+						"doc": "Which column the rows are already sorted by. Omit it and every sortable\nheader reads `aria-sort=\"none\"`; the family never sorts anything itself."
+					},
+					{
+						"name": "onChange",
+						"type": "(value: readonly string[]) => void",
+						"required": false,
+						"doc": "Called with the rows that are picked whenever that changes. Writing it is\nthe other way to make the rows selectable."
+					},
+					{
+						"name": "onSortChange",
+						"type": "(column: string) => void",
+						"required": false,
+						"doc": "Called with the column a `table.coltrigger` was activated for. It reports\nthe press, not a direction: what the next sort should be depends on the\nconsumer's own policy, and a family that computed it would pick a fight with\nevery data library that computes it differently."
+					}
+				]
+			},
+			{
+				"part": "rowcontent",
+				"component": "TableRowContent",
+				"doc": "One cell, and the thing focus rests on once a table navigates in two\ndirections. A cell's column is where it sits among its own row's cells, so\nnothing is ever told a coordinate.\n\nMounting even one of these is what makes the family the owner of focus, which\nis what turns the table into a `role=\"grid\"`. A table that wants none of that\nwrites plain `<td>` elements and stays a plain table.",
+				"props": [
+					{
+						"name": "rowheader",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "This cell is what names its row: it renders `<th scope=\"row\">` with\n`role=\"rowheader\"` instead of a `<td>`. A reader announces it when it\nreaches the row."
+					}
+				]
+			},
+			{
+				"part": "rowfield",
+				"component": "TableRowField",
+				"doc": "Carries one row's picked state into a form, and nothing else: it is hidden\nfrom sight and from readers, because the row already says whether it is\npicked. Give it a `name` and the form submits the picked rows under it.\n\nIt goes inside a cell, never straight inside the row: a `<tr>` may only hold\ncells, and the parser would lift anything else out of the table.",
+				"props": []
+			}
+		]
+	},
 	"tabs": {
 		"parts": [
 			{

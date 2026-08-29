@@ -62,6 +62,7 @@ export const FAMILY_ANCHORS = {
 	timebox: '/#timebox',
 	'timebox-twelve-hour': '/#timebox-twelve-hour',
 	gridlist: '/#gridlist',
+	table: '/#table',
 } as const;
 
 export type FamilyName = keyof typeof FAMILY_ANCHORS;

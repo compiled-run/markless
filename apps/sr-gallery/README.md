@@ -47,6 +47,7 @@ copies — one section each, on an anchor a driver can be sent to:
 | timebox                | `/#timebox`                |
 | timebox-twelve-hour    | `/#timebox-twelve-hour`    |
 | gridlist               | `/#gridlist`               |
+| table                  | `/#table`                  |
 
 <!-- anchors:end -->
 
