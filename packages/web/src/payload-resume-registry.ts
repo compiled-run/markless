@@ -17,6 +17,7 @@ export type ResumeAlreadyResumedWarning = {
 export type ResumeContainerKey = ResumeDomElement | Element;
 
 const resumedPayloadContainers = new WeakMap<ResumeContainerKey, ResumePayloadScriptsResult>();
+const disposedPayloadContainers = new WeakMap<ResumeContainerKey, ResumePayloadScriptsResult>();
 
 export function getAlreadyResumedPayload(
 	root: ResumeDomElement,
@@ -25,10 +26,32 @@ export function getAlreadyResumedPayload(
 	return resumed && { ...resumed, warnings: [alreadyResumedWarning] };
 }
 
+/**
+ * The answer for a gesture that reached the runtime after its container was
+ * disposed AND taken out of the document: a resume that no longer has a page to
+ * run on. Booting one again re-reads the served locators against DOM the first
+ * runtime already edited, which refuses with a locator mismatch nothing can act
+ * on; the event resolves as a no-op instead. A disposed container still in the
+ * document is the documented dispose-then-resume-again case and re-boots.
+ */
+export function getRetiredResumedPayload(
+	root: ResumeContainerKey,
+): ResumePayloadScriptsResult | undefined {
+	if ((root as { readonly isConnected?: boolean }).isConnected !== false) return undefined;
+	const disposed = disposedPayloadContainers.get(root);
+	return (
+		disposed && {
+			...disposed,
+			runtime: { ...disposed.runtime, dispatch: () => Promise.resolve() },
+		}
+	);
+}
+
 export function setResumedPayload(
 	root: ResumeDomElement,
 	result: ResumePayloadScriptsResult,
 ): void {
+	disposedPayloadContainers.delete(root);
 	resumedPayloadContainers.set(root, result);
 }
 
@@ -37,6 +60,7 @@ export function deleteResumedPayload(
 ): ResumePayloadScriptsResult | undefined {
 	const resumed = resumedPayloadContainers.get(root);
 	resumedPayloadContainers.delete(root);
+	if (resumed) disposedPayloadContainers.set(root, resumed);
 	return resumed;
 }
 
