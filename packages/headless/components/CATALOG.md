@@ -85,6 +85,11 @@ a recomposition rather than a from-scratch family.
 
 ## Unparked 2026-08-28 (owner go, building now)
 
+Tokenbox ruling (owner, 2026-08-28): NO id on the public TokenBoxSegment — row identity belongs
+to the framework (element() handles live per JSX row lifetime), never to the value model. The
+family stays unregistered with its three row-pairs pinned until the repeat-keying/@for-computed
+walls resolve framework-side; the pins are the acceptance for that work.
+
 - **timebox** — charter decisions taken as the recorded recommendations: segmented spinbuttons
   (React Aria lineage) and platform `Intl.DateTimeFormat.formatToParts`, plain time-of-day value.
   Segment engine stays internal to the family, liftable when datebox arrives.
