@@ -47,6 +47,7 @@
 import type {
 	OverlayFocusOriginHost,
 	OverlayHiddenBoundRoot,
+	OverlayInstalledRoot,
 	OverlayPrimedDismissalHost,
 } from '../overlay-handoff.ts';
 
@@ -118,6 +119,9 @@ let primedPressTarget: Element | undefined;
  * how a page with no overlay pays nothing.
  */
 export function installOverlayBehavior(root: Element | Document): (() => void) | undefined {
+	// Marked before the gates below, because every one of them means the same
+	// thing to the inline primer: nothing further is coming for this root.
+	(root as OverlayInstalledRoot).__marklessOverlayInstalled = true;
 	if (!root.querySelector?.(OVERLAY_SELECTOR)) return undefined;
 	const owner = ownerDocumentOf(root);
 	const observerFactory = (

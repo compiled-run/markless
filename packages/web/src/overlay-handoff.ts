@@ -64,3 +64,16 @@ export type OverlayFocusOriginHost = {
 export type OverlayPrimedDismissalHost = {
 	__marklessOverlayPrimedDismissal?: OverlayDismissReason;
 };
+
+/**
+ * Whether the overlay behaviour has been installed for this root.
+ *
+ * The distinction the inline primer needs, and the only one that says whether
+ * anything is listening: a wake that has STARTED is a dynamic import in flight,
+ * and the document listener that reports Escape does not exist until that import
+ * lands. A press arriving in between belongs to the primer, not to a behaviour
+ * that is not there yet.
+ */
+export type OverlayInstalledRoot = {
+	__marklessOverlayInstalled?: boolean;
+};
