@@ -28,8 +28,6 @@ export const tableState = shared(
 			selectable: false,
 			multiple: false,
 			disabled: false,
-			celled: false,
-			sortable: false,
 			column: '',
 			direction: '' as '' | 'ascending' | 'descending',
 			anchor: '',
@@ -128,16 +126,16 @@ export function TableRoot({
 function TableGrid({ children, onClick, onFocusin, onKeydown, ...rest }: TableGridProps) @{
 	const table = tableState();
 	// The role is earned, not declared: a table nobody is steering keeps its native
-	// semantics, and `grid` arrives with the focus management it obliges.
-	const gridRole = computed(() =>
-		table.celled === true || table.selectable === true ? 'grid' : undefined,
-	);
+	// semantics, and `grid` arrives with the focus management it obliges. What earns
+	// it is the selection props alone - a root cannot see what its descendants
+	// mounted, so a cells-only table stays a plain table (note.md, "Known gaps").
+	const gridRole = computed(() => (table.selectable === true ? 'grid' : undefined));
 	const ariaMulti = computed(() => (table.multiple === true ? 'true' : null));
 	const ariaDisabled = computed(() => (table.disabled === true ? 'true' : null));
 	// The table is the widget's only tab stop until focus lands inside it, so
 	// Shift+Tab out of the first cell leaves the table.
 	const tabStop = computed(() => {
-		if (table.celled !== true && table.selectable !== true) return undefined;
+		if (table.selectable !== true) return undefined;
 		return table.disabled === true ? -1 : 0;
 	});
 
@@ -151,16 +149,14 @@ function TableGrid({ children, onClick, onFocusin, onKeydown, ...rest }: TableGr
 		ui-selectable={table.selectable}
 		ui-multiple={table.multiple}
 		ui-disabled={table.disabled}
-		ui-celled={table.celled}
 		onFocusin={(event) => {
 			// `target`, not `currentTarget`: a lazy handler symbol runs after the native dispatch, when `currentTarget` is null.
 			const target = event.target as HTMLElement;
 			const root = table.tableEl;
 			const rowEls = table.rowEls;
 			const cellEls = table.cellEls;
-			// The roster itself, not the flag the cells set as they render: a handler
-			// reads the handle the family bound, and that is true whenever a cell is
-			// actually on the page.
+			// A handler may ask the roster what is mounted; a derivation may not, which
+			// is why the role above cannot use this and the walk below can.
 			const celled = (cellEls?.length ?? 0) > 0;
 			const steering = celled || table.selectable === true;
 			if (root === undefined || !steering) {
@@ -212,10 +208,10 @@ function TableGrid({ children, onClick, onFocusin, onKeydown, ...rest }: TableGr
 		onKeydown={(event) => {
 			// Written out from event fields alone: the policy has to be readable
 			// before the handler symbol loads, and narrowing it to the rungs that
-			// actually walk - `table.celled`, written by the cells as they render -
-			// is MARKLESS_SYNC_POLICY_UNEXTRACTABLE. So a bare table holding a
-			// control of the consumer's own loses the arrows and the space bar while
-			// focus is inside it, which is the gap `gridlist` recorded first.
+			// actually walk needs graph state, which is
+			// MARKLESS_SYNC_POLICY_UNEXTRACTABLE. So a bare table holding a control
+			// of the consumer's own loses the arrows and the space bar while focus
+			// is inside it, which is the gap `gridlist` recorded first.
 			if (
 				event.key === 'ArrowDown' ||
 				event.key === 'ArrowUp' ||
@@ -357,9 +353,7 @@ export function TableItem({ value, disabled = false, children, ...rest }: TableI
 	// Absent rather than false while nothing can be picked: a row reporting it is
 	// not selected in a table that has no selection has said something untrue, and
 	// a plain table has no roles of its own to write over the native ones.
-	const rowRole = computed(() =>
-		table.celled === true || table.selectable === true ? 'row' : undefined,
-	);
+	const rowRole = computed(() => (table.selectable === true ? 'row' : undefined));
 	const ariaSelected = computed(() =>
 		table.selectable === true ? (table.value.includes(item.value) ? 'true' : 'false') : null,
 	);
@@ -367,9 +361,7 @@ export function TableItem({ value, disabled = false, children, ...rest }: TableI
 		table.disabled === true || item.disabled === true ? 'true' : null,
 	);
 	// The table is the tab stop until focus lands inside, and the roving write moves it from there.
-	const tabStop = computed(() =>
-		table.celled === true || table.selectable === true ? -1 : undefined,
-	);
+	const tabStop = computed(() => (table.selectable === true ? -1 : undefined));
 
 	<tr
 		{...rest}
@@ -392,26 +384,27 @@ export function TableRowContent({ rowheader = false, children, ...rest }: TableR
 	}
 }
 
-// Mounting a cell is what makes the family the owner of 2D focus, which is what
-// earns the table its grid role - so the cell's own roles are written outright.
+// `gridcell` is only meaningful inside a grid, so it rides the same condition the
+// root's role does: without it a `<td>` claiming to be a gridcell would be
+// describing a container that is not one. The cell is a focus stop either way.
 function TableDataCell({ children, ...rest }: TableCellProps) @{
 	const table = tableState();
-	table.celled = true;
+	const cellRole = computed(() => (table.selectable === true ? 'gridcell' : undefined));
 
-	<td {...rest} el={table.cellEls} role="gridcell" tabindex={-1}>{children}</td>
+	<td {...rest} el={table.cellEls} role={cellRole} tabindex={-1}>{children}</td>
 }
 
 function TableRowHeaderCell({ children, ...rest }: TableCellProps) @{
 	const table = tableState();
-	table.celled = true;
+	// Left off outside a grid the same way, where `<th>` in a body row already maps to it.
+	const cellRole = computed(() => (table.selectable === true ? 'rowheader' : undefined));
 
-	<th {...rest} el={table.cellEls} role="rowheader" tabindex={-1}>{children}</th>
+	<th {...rest} el={table.cellEls} role={cellRole} tabindex={-1}>{children}</th>
 }
 
 export function TableColTrigger({ value, children, ...rest }: TableColTriggerProps) @{
 	const table = tableState();
 	const column = state({ value });
-	table.sortable = true;
 
 	// Every sortable column carries `aria-sort`, "none" for the ones that are not
 	// currently sorted: a column that says nothing is a column that cannot be sorted.

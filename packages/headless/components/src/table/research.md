@@ -94,6 +94,13 @@ when rows expand) unconditionally, and its tests assert
   writes `role="grid"`. Now the family owns the focus management the grid role
   obliges, so the role is honest.
 
+**What shipped, 2026-08-29:** only the selection half. Mounting cells cannot make
+the root a grid on this framework — a cell's render-time write never reaches the
+root's already-rendered attribute, and an element handle cannot be read while
+deriving — so a cells-only table navigates in two directions and writes no role.
+The family note's "Known gaps" carries the measurement and what a framework
+change would have to give.
+
 This costs nothing at the API surface (there is no `role` prop; SPEC bans mode
 enums anyway) and it is derived from what the consumer actually mounted, which is
 the same rule the whole family runs on. It is recorded in §9 as an owner question

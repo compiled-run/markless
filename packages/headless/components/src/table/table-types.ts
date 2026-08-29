@@ -26,17 +26,19 @@ export type TableSort = {
  * the consumer's own `<caption>`, `<thead>`, `<tbody>` and `table.item` rows is
  * a plain HTML table: no role, no focus management, nothing to configure.
  * Swapping a `<th scope="col">` for a `table.coltrigger` makes that column
- * sortable. Passing `value`/`onChange` makes the rows selectable. Wrapping the
- * cells in `table.rowcontent` makes each cell a focus stop, and only then does
- * the table become `role="grid"` - the role is honest exactly when the family
- * is doing the focus management the role obliges.
+ * sortable. Passing `value`/`onChange`/`multiple` makes the rows selectable, and
+ * that is what turns the table into a `role="grid"` carrying `row`, `gridcell`
+ * and `rowheader`: the roles arrive exactly when the family is doing the focus
+ * management they oblige. Wrapping the cells in `table.rowcontent` makes each
+ * cell a focus stop and gives the table its second axis; on its own, with no
+ * selection props, it writes no roles - see the family note for why the root
+ * cannot see what its descendants mounted.
  *
  * `<thead>`, `<tbody>`, `<tfoot>`, the header row and `<caption>` need no parts.
  * They are the consumer's own elements, they already carry `rowgroup`, `row` and
  * the table's accessible name, and the family needs nothing from them.
  *
- * It reports `ui-selectable`, `ui-multiple`, `ui-disabled` and `ui-celled` for
- * styling.
+ * It reports `ui-selectable`, `ui-multiple` and `ui-disabled` for styling.
  */
 export type TableRootProps = Omit<PropsOf<'table'>, 'onChange'> & {
 	/**
@@ -89,9 +91,12 @@ export type TableItemProps = PropsOf<'tr'> & {
  * directions. A cell's column is where it sits among its own row's cells, so
  * nothing is ever told a coordinate.
  *
- * Mounting even one of these is what makes the family the owner of focus, which
- * is what turns the table into a `role="grid"`. A table that wants none of that
- * writes plain `<td>` elements and stays a plain table.
+ * Mounting these gives the table its second axis: the arrows walk cell by cell
+ * and column by column, Home and End reach the ends of a row and the corners of
+ * the table, and the space bar picks the row the focused cell sits in. A table
+ * that wants none of that writes plain `<td>` elements. Cells alone do not make
+ * the table a grid - the selection props do, and only then do the cells carry
+ * `gridcell` and `rowheader`.
  */
 export type TableRowContentProps = PropsOf<'td'> & {
 	/**
@@ -128,12 +133,10 @@ export type TableColTriggerProps = PropsOf<'th'> & {
 export type TableRowFieldProps = PropsOf<'input'>;
 
 /**
- * The graph cells every table part reads and writes.
- *
- * `celled` and `sortable` are written by the parts themselves as they render:
- * mounting a cell is what makes the family the owner of 2D focus, and mounting a
- * sortable header is what makes the space bar mean something on a header. Both
- * are how the table's role stays honest without a prop that announces it.
+ * The graph cells every table part reads and writes. Everything here is written
+ * by the root from its own props: nothing a descendant renders lands in it,
+ * because a render-time write from a cell never reaches an attribute the root
+ * has already rendered.
  *
  * `column` and `direction` are the sort descriptor flattened, empty when nothing
  * is sorted. `anchor` is the row a Shift walk measures its run from, and
@@ -144,8 +147,6 @@ export type TableInstanceState = {
 	selectable: boolean;
 	multiple: boolean;
 	disabled: boolean;
-	celled: boolean;
-	sortable: boolean;
 	column: string;
 	direction: '' | 'ascending' | 'descending';
 	anchor: string;
