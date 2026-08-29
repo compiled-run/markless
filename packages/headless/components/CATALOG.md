@@ -140,7 +140,9 @@ Settled by the owner on 2026-08-29, so the research note's open questions are cl
 - Parts are `root` `item` `rowcontent` `coltrigger` `rowfield`; `<thead>`/`<tbody>`/`<caption>`
   and non-sortable `<th>`s stay the consumer's own elements with no parts.
 - `role="grid"` is progressive: a bare table writes no role at all, and the root becomes a grid
-  only once the family manages focus or selection (selection props present, or cells mounted).
+  once the selection props are present. The ruling also had mounted cells earn the role; that
+  half is framework-blocked and was cut on 2026-08-29 — a root cannot observe what its
+  descendants mounted, so a cells-only table keeps its 2D navigation and writes no role.
 - No counts or indexes in v1; `onSortChange(column)` reports the pressed column and never a
   computed next descriptor; selection is derived from `value`/`onChange`/`multiple`.
 

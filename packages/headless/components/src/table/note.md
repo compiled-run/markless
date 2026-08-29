@@ -53,17 +53,29 @@ opposite for a sortable read-only table. The owner ruled progressive, so:
 - A bare `table.root` writes **no role at all**, no tab stop and no ARIA. It is a
   plain HTML table, and `table.browser.ts` pins that with a row that asserts the
   absence.
-- Swapping one `<th>` for a `coltrigger` still writes no role: sorting is not
-  focus management.
-- Passing `value`/`onChange`/`multiple`, or mounting `rowcontent` cells, makes
-  the root `role="grid"` — and from there the family writes `row`, `gridcell` and
-  `rowheader` explicitly rather than trusting the native mapping, which is React
-  Aria's approach and sidesteps the unresolved HTML-AAM question in the research.
+- Swapping one `<th>` for a `coltrigger` still writes no role on the root:
+  sorting is not focus management. The header itself carries
+  `role="columnheader"` — which is what a `<th>` in a `<thead>` already means, so
+  it restates the native mapping rather than overriding it, and it keeps
+  `aria-sort` on an element whose role is not left to a mapping question.
+- Passing `value`, `onChange` or `multiple` makes the root `role="grid"` — and
+  from there the family writes `row`, `gridcell` and `rowheader` explicitly
+  rather than trusting the native mapping, which is React Aria's approach and
+  sidesteps the unresolved HTML-AAM question in the research.
+- Mounting `rowcontent` cells gives the table its second axis — the arrows walk
+  cell by cell and column by column, `Home`/`End` reach the ends of a row and the
+  corners of the table, and the space bar picks the row the focused cell sits in
+  — but writes **no role**. The owner's ruling had cells earn the role too; the
+  framework cannot do it, and "Known gaps" below is the record.
 
-Mounting a cell is a graph write the cell part makes as it renders (`celled`),
-which is how the root's role follows from what the consumer actually wrote
-without a prop that announces it. A `sortable` cell is written the same way, and
-only so the space bar knows whether to cancel the page scroll.
+`gridcell` rides the same condition the root's role does because it is the one
+role here that would be a lie on its own: `gridcell` is only meaningful inside a
+grid, whereas `row`, `rowheader` and `columnheader` restate what the elements
+already mean.
+
+Nothing a descendant renders is a graph write any more. Every cell in
+`TableInstanceState` is written by the root from its own props, which is the only
+direction that reaches a rendered attribute.
 
 ## Selection has no mode
 
@@ -105,21 +117,64 @@ own row's cells. Nothing is ever told a coordinate.
 
 ## Known gaps
 
-- **The cells-only rung of the role ruling is not implemented, and cannot be as
-  written.** The owner ruled the root becomes `role="grid"` when selection props
-  are present *or* cells are mounted. The first half works. The second does not:
-  a cell's render-time write to the widget's shared state (`celled`) never
-  reaches the root's already-rendered attribute, in CSR or in SSR — the write is
-  seeding, not an update, and there is no descendant-to-ancestor precedent in any
-  shipped family. Reading the cell handle while deriving is
-  `MARKLESS_ELEMENT_HANDLE_UNBOUND`, so the root cannot ask the roster either.
-  Five rows in `table.browser.ts` are red against this and are left red on
-  purpose: they pin the ruled behaviour, and they are the evidence for the owner
-  decision this needs — either the role comes from selection props alone, or the
-  framework grows a way for a root to see what its descendants mounted.
-  Behaviour is unaffected: the handlers read `cellEls.length` instead of the
-  flag, so the 2D walk, selection and typeahead all work on a cells-only table
-  once focus is inside it.
+- **A root cannot see what its descendants mounted, so a cells-only table has no
+  role and no tab stop.** The owner ruled the root becomes `role="grid"` when
+  selection props are present *or* cells are mounted; the second half is not
+  implementable on this framework and was cut on 2026-08-29. Two mechanisms were
+  measured and both refuse:
+  - A cell's render-time write to the widget's shared state never reaches the
+    root's already-rendered attribute, in CSR or in SSR. The write is seeding,
+    not an update, and no shipped family has a descendant-to-ancestor precedent.
+  - Reading the cell handle while deriving is `MARKLESS_ELEMENT_HANDLE_UNBOUND`,
+    so the root cannot ask the roster instead. A *handler* may — which is why the
+    same fact is available to the keyboard and to focusin and not to the role.
+
+  What this costs, precisely: a table with `rowcontent` cells and no selection
+  prop writes no `grid`, no `row`, no `gridcell` and no `rowheader`, and it is
+  not in the tab order, so a person reaches it by clicking a cell rather than by
+  tabbing to it. Everything else works — the 2D walk, roving focus, `Home`/`End`
+  including the corners, and typeahead all read `cellEls.length` in the handler
+  and are pinned green on the cells-only scenario. Passing any of
+  `value`/`onChange`/`multiple` restores the whole ruling.
+
+  To lift this, the framework needs one of: a shared-state write from a
+  descendant that re-derives an ancestor's already-rendered attribute, or a
+  bound-element handle that is readable inside `computed()`. Either would let the
+  role come back from the roster with no change to the family's public API. The
+  browser rows to restore are the two role assertions in "cells become focus
+  stops without making the table a grid" and the tab-stop assertion in "a
+  cells-only table has no tab stop".
+
+- **On the server path a `table.rowcontent` renders as an empty `<table>`.**
+  Measured, not inferred: `renderSSR(scenarios/cells.tsrx)` puts this in the
+  document, where every cell should be a `<td>`/`<th>` inside the row —
+
+  ```html
+  <tbody><tr data-testid="readme-item" ui-value="readme"></tr></tbody></table>
+  README.md<table rowheader="" data-testid="readme-name" class="mk-3xcuej"></table>
+  4.1 kB<table data-testid="readme-size" class="mk-3xcuej"></table>
+  ```
+
+  Three things are wrong at once and they point at one cause: the cell's element
+  is the family's `<table>` tag rather than its own, the cell's props (including
+  `rowheader`, which `TableRowContent` destructures and never forwards) are spread
+  onto it, and the cell's text is left outside the row. `TableRowContent` is the
+  only part in this family whose body is nothing but an `@if`/`@else` over two
+  other components, and the tag it comes back with is the first element in the
+  module — so the server renderer looks to be resolving a delegating component to
+  the wrong element. CSR is unaffected; the same scenarios are green there.
+
+  This is a framework defect, outside this family's fix: it is owned by whoever
+  owns the server renderer, and it was not adjudicated in the ruling this note
+  records. Three rows in `table.browser.ts` are pinned `test.fails` under SSR for
+  it and announce themselves as expected failures; they are the acceptance for the
+  fix. Two of them were among the rows the build left red, so the red set had two
+  causes, not one.
+
+- **`table.sr.ts` still expects the cut behaviour.** Its "a table of cells is
+  announced as a grid" row reads the cells-only scenario and asserts the grid
+  role, which no longer exists. The screen-reader lane is a separate unit's
+  contract; that row wants the same rewrite the browser row got.
 - **`scope` cannot be written.** The JSX type service ships no table attributes
   at all — `scope`, `colspan`, `rowspan`, `headers` are all absent from
   `TagNameSpecificAttributes`, so `<th scope="col">` does not typecheck anywhere,

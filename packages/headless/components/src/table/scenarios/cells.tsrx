@@ -1,11 +1,12 @@
 import { table } from '../../index.ts';
 
-// Rung 4: the `<td>`s become parts and every cell is a focus stop. Nothing was
-// restructured to get here - and this is the rung that earns the grid role,
-// because now the family is doing the focus management the role obliges.
+// Rung 4: the `<td>`s become parts and every cell is a focus stop, so the arrows
+// walk in two directions. Nothing was restructured to get here. No selection prop
+// is passed, so the table writes no role and stays a plain HTML table - cells
+// alone cannot earn one, because a root cannot see what its descendants mounted.
 //
 // The first cell of each row is its row header: it is what names the row for a
-// reader, and it renders `<th>` with `role="rowheader"` rather than a `<td>`.
+// reader, and it renders `<th>` rather than a `<td>`.
 export default function Cells() @{
 	<table.root data-testid="root">
 		<caption>Files</caption>
