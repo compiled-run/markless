@@ -22,17 +22,21 @@ import SeededRootPage from './seeded-page.tsrx';
  *
  * A family nothing seeds now hands its cells to every component that resolves
  * it, and the compiler marks the extra carriers so only the designated root
- * composes as one. A throw would be an unhandled rejection, which fails the
- * whole file, so it is captured below and the rows assert instead of dying.
+ * composes as one. The refusal is a throw, so the adder catches it and records
+ * the name on `data-refused`, and the rows read that record.
  */
 afterEach(() => cleanup());
 
-const thrown: string[] = [];
+// A refusal that escapes a handler is reported to the host as an uncaught error,
+// which the runner attributes to whichever row it is on when the report lands -
+// so an escape here fails an innocent neighbour instead of this file. Anything
+// this collects is that defect, not a passing row.
+const escaped: string[] = [];
 
 beforeEach(() => {
-	thrown.length = 0;
+	escaped.length = 0;
 	const note = (reason: unknown) => {
-		thrown.push(String((reason as { readonly message?: string } | null)?.message ?? reason));
+		escaped.push(String((reason as { readonly message?: string } | null)?.message ?? reason));
 		return true;
 	};
 	const onRejection = (event: PromiseRejectionEvent) => {
@@ -53,6 +57,8 @@ const el = (testid: string) => page.getByTestId(testid).element() as HTMLElement
 const fieldValues = () => [...el('field').querySelectorAll('input')].map((one) => one.value);
 const count = () => el('field').getAttribute('ui-count');
 const click = (testid: string) => (el(testid) as HTMLButtonElement).click();
+const ran = () => el('adder').getAttribute('data-ran');
+const refused = () => el('adder').getAttribute('data-refused');
 
 async function takesTheWrite(seeded: ReadonlyArray<string>) {
 	expect(fieldValues()).toEqual(seeded);
@@ -60,7 +66,7 @@ async function takesTheWrite(seeded: ReadonlyArray<string>) {
 	await expect.poll(() => count()).toBe(String(seeded.length + 1));
 	await expect.poll(() => fieldValues()).toEqual([...seeded, 'gamma']);
 	expect(el('field').getAttribute('ui-seen')).toBe('gamma added');
-	expect(thrown).toEqual([]);
+	expect(escaped).toEqual([]);
 }
 
 for (const mode of ['CSR', 'SSR'] as const) {
@@ -119,9 +125,7 @@ for (const mode of ['CSR', 'SSR'] as const) {
 
 		click('add');
 
-		await expect
-			.poll(() => thrown.join('\n'))
-			.toMatch(/MARKLESS_WIDGET_INSTANCE_UNRESOLVED/);
+		await expect.poll(() => refused()).toMatch(/MARKLESS_WIDGET_INSTANCE_UNRESOLVED/);
 	});
 
 	test(`${mode}: that page reads undefined rather than writing into the void`, async () => {
@@ -131,10 +135,14 @@ for (const mode of ['CSR', 'SSR'] as const) {
 		expect(fieldValues()).toEqual([]);
 		click('add');
 
-		await expect
-			.poll(() => thrown.join('\n'))
-			.toContain('is not a function or its return value is not iterable');
+		// The refusal names the read, not the instance, and the handler ran and
+		// caught it - so nothing reached the collection and nothing escaped.
+		await expect.poll(() => ran()).toBe('1');
+		expect(refused()).toContain('is not a function or its return value is not iterable');
 		expect(fieldValues()).toEqual([]);
+		expect(count()).toBe('0');
+		expect(el('field').getAttribute('ui-seen')).toBe('');
+		expect(escaped).toEqual([]);
 	});
 
 	test(`${mode}: the same part takes the write once its family's root renders`, async () => {
@@ -145,6 +153,7 @@ for (const mode of ['CSR', 'SSR'] as const) {
 		click('add');
 		await expect.poll(() => count()).toBe('3');
 		await expect.poll(() => fieldValues()).toEqual(['alpha', 'beta', 'gamma']);
-		expect(thrown).toEqual([]);
+		expect(refused()).toBe('');
+		expect(escaped).toEqual([]);
 	});
 }
