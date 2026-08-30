@@ -3,6 +3,8 @@ import axe from 'axe-core';
 import { page, userEvent } from 'vite-plus/test/browser';
 import { expect, test } from 'vitest';
 import {
+	HOLD_DELAY_MS,
+	REPEAT_MS,
 	announcedText,
 	canonicalText,
 	committedValue,
@@ -65,10 +67,32 @@ function submit() {
 	return el(Submitted);
 }
 
+// A gesture crosses the driver, the dispatch and the family's demand load before
+// anything it moved can be read back, and that round trip has been measured past
+// a second on a loaded runner. Every poll that waits on one is given the same
+// budget rather than the shorter default.
+const GESTURE_MS = 5000;
+
 // A stopped clock is proved by time passing, not by polling a value that already
-// agrees, so the hold rows wait out more than one repeat interval.
-const QUIET_MS = 900;
+// agrees, so the hold rows wait out the delay before the repeat plus eight of it.
+const QUIET_MS = HOLD_DELAY_MS + REPEAT_MS * 8;
 const rest = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// What a hold landed on, read only once the clock has stopped moving it. The
+// pointer event that ends a press reaches the graph through a dispatch, so ticks
+// can still be in flight when `dispatchEvent` returns and the first reading after
+// it is not yet the value the release settled on.
+async function quiesced(read: () => string): Promise<string> {
+	const deadline = Date.now() + GESTURE_MS;
+	let last = read();
+	for (;;) {
+		await rest(REPEAT_MS * 4);
+		const now = read();
+		if (now === last) return now;
+		if (Date.now() > deadline) throw new Error(`The hold was still moving at ${now}.`);
+		last = now;
+	}
+}
 
 async function typeInto(locator: { element(): Element | null }, keys: string) {
 	el(locator).focus();
@@ -424,9 +448,17 @@ test('CSR: a minus is refused outright by a field that cannot go below zero', as
 
 	el(Input).focus();
 	await userEvent.clear(el<HTMLInputElement>(Input));
+	// Emptied before the minus goes in: a minus that arrived while the clear was
+	// still being taken would be refused for a reason this row is not about.
+	await expect.poll(() => shown(Input), { timeout: GESTURE_MS }).toBe('');
+
 	await userEvent.keyboard('-');
+	// Refused on its own, with no digit after it to hide behind.
+	await expect.poll(() => shown(Input), { timeout: GESTURE_MS }).toBe('');
+
 	await userEvent.keyboard('5');
-	await expect.poll(() => shown(Input)).toBe('5');
+	await expect.poll(() => shown(Input), { timeout: GESTURE_MS }).toBe('5');
+	await expect.poll(() => el<HTMLInputElement>(Field).value, { timeout: GESTURE_MS }).toBe('5');
 });
 
 test('CSR: a whole currency string can be typed back into the field it came from', async () => {
@@ -445,11 +477,14 @@ test('CSR: an entry beyond the bounds is pulled back when it commits', async () 
 	await userEvent.fill(el<HTMLInputElement>(Input), '99');
 	// Never while typing: a field with min 0.5 that rewrote a lone 9 under the
 	// person's fingers would make 99 unreachable.
-	await expect.poll(() => shown(Input)).toBe('99');
+	await expect.poll(() => shown(Input), { timeout: GESTURE_MS }).toBe('99');
 
+	// `blur()` only raises an event from the element that actually holds focus, so
+	// the field the driver left focused is proved before the commit is asked for.
+	await expect.poll(() => document.activeElement, { timeout: GESTURE_MS }).toBe(el(Input));
 	el(Input).blur();
-	await expect.poll(() => shown(Input)).toBe('3.00');
-	await expect.poll(() => el<HTMLInputElement>(Field).value).toBe('3');
+	await expect.poll(() => shown(Input), { timeout: GESTURE_MS }).toBe('3.00');
+	await expect.poll(() => el<HTMLInputElement>(Field).value, { timeout: GESTURE_MS }).toBe('3');
 });
 
 test('CSR: clearing the field empties the value and the form', async () => {
@@ -580,11 +615,15 @@ test('CSR: holding a trigger repeats, and releasing stops it', async () => {
 
 	pointer(el(Forward), 'pointerdown');
 	// One step lands at once; the repeat waits before it starts, so a value past
-	// the second step is the repeat and nothing else.
-	await expect.poll(() => Number(shown(Input)), { timeout: 4000 }).toBeGreaterThan(3);
+	// the first step is the clock and nothing else. Repetition is then proved by
+	// the value climbing again rather than by a count - how many ticks fit in a
+	// span is the runner's to decide, not this row's.
+	await expect.poll(() => Number(shown(Input)), { timeout: GESTURE_MS }).toBeGreaterThan(0);
+	const once = Number(shown(Input));
+	await expect.poll(() => Number(shown(Input)), { timeout: GESTURE_MS }).toBeGreaterThan(once);
 	pointer(el(Forward), 'pointerup');
 
-	const settled = shown(Input);
+	const settled = await quiesced(() => shown(Input));
 	await rest(QUIET_MS);
 	expect(shown(Input)).toBe(settled);
 });
@@ -593,10 +632,10 @@ test('CSR: dragging off a held trigger ends the press', async () => {
 	await render(Basic);
 
 	pointer(el(Forward), 'pointerdown');
-	await expect.poll(() => shown(Input)).toBe('0');
+	await expect.poll(() => shown(Input), { timeout: GESTURE_MS }).toBe('0');
 	pointer(el(Forward), 'pointerleave');
 
-	const settled = shown(Input);
+	const settled = await quiesced(() => shown(Input));
 	await rest(QUIET_MS);
 	expect(shown(Input)).toBe(settled);
 });
@@ -605,8 +644,10 @@ test('CSR: a trigger goes off at its bound and the hold stops rather than spinni
 	await render(MinMaxStep);
 
 	pointer(el(Forward), 'pointerdown');
-	await expect.poll(() => shown(Input), { timeout: 5000 }).toBe('3.00');
-	await expect.poll(() => el<HTMLButtonElement>(Forward).disabled).toBe(true);
+	await expect.poll(() => shown(Input), { timeout: GESTURE_MS }).toBe('3.00');
+	await expect
+		.poll(() => el<HTMLButtonElement>(Forward).disabled, { timeout: GESTURE_MS })
+		.toBe(true);
 	pointer(el(Forward), 'pointerup');
 	expect(shown(Input)).toBe('3.00');
 });
