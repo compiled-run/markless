@@ -42,3 +42,7 @@ AGENTS.md.bak
 CLAUDE.md.bak
 .mcp.json.bak
 .codex/config.toml.bak
+
+# goal boards are session-local working state
+goals/
+docs/goals/
