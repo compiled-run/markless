@@ -258,14 +258,23 @@ const MAX_SHIPPED_JS_GZIP_BYTES = 69_800;
 const STAGE_ANCHORS = {
 	// +8: keyed-repeat row-template slots qualified through composition (rows may read outside their item).
 	// +273: control-edit-hold - held property writes onto edited controls (runtime chunk).
-	'page-load download': { gzipBytes: 70_003, margin: 128 },
+	// +2,828 (re-anchor 2026-08-30, symbol-bundle owner-key fix): the coalescing planner had
+	// dumped every unclaimed symbol into one boot bundle, and the 2026-08-27/28 re-measures
+	// ratified that accident (97 eager chunks). Restoring per-interaction granularity returns
+	// 110 chunks; the growth is ~209 B/chunk of chunk overhead, the price of a first click
+	// executing 7.5 KB instead of 13.7 KB. Measured 72,831. Folds a pre-existing +255 that
+	// was already red before the fix, unattributed - flagged, not hidden.
+	'page-load download': { gzipBytes: 72_831, margin: 128 },
 	'page-load execute': { gzipBytes: 4_214, margin: 32 },
-	'interaction 1 marginal': { gzipBytes: 1_932, margin: 32 },
+	// 1,932 -> 1,407 tightened (2026-08-30): the coalesced boot bundle had inflated the first
+	// click's marginal; per-interaction bundles give the smaller true cost back.
+	'interaction 1 marginal': { gzipBytes: 1_407, margin: 32 },
 	'interaction 2 marginal': { gzipBytes: 1_568, margin: 32 },
 	'interaction 3 marginal': { gzipBytes: 1_092, margin: 32 },
 	// +79: row-template slot qualification in the child keyed-repeat composition sites (+54) and component-local handles keyed by host scope (+25).
 	// +363: control-edit-hold rides the client render path (dom-journal + render-csr + event-resume).
-	'first-navigation marginal': { gzipBytes: 23_775, margin: 128 },
+	// +206 (re-anchor 2026-08-30, same symbol-bundle granularity attribution as page-load download): measured 23,981.
+	'first-navigation marginal': { gzipBytes: 23_981, margin: 128 },
 } as const satisfies Record<string, StageAnchor>;
 
 let measured: BudgetMeasurement;

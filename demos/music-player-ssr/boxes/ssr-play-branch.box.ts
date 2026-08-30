@@ -58,7 +58,12 @@ const LOAD_INSTRUMENT_BYTES = 0;
 // reach this box since the boxes step went skipped behind a red unit step. Origin
 // unexplained; covers the measured linux actual with no headroom, tighten-only
 // policy unchanged.
-const FIRST_PLAY_APP_BYTES_MAX = 7_524;
+// 7,524 -> 7,551 (2026-08-30): +28 B in the Player branch-arm renderer chunk
+// (523 -> 551 B) from the branch-only-component SSR emit fix — components whose
+// body is only a branch now get their own server render function. Correctness
+// cost, attributed; the other nine chunks match the prior sizes within 1 B.
+// Covers the measured local actual (7,550) plus the known 1 B linux delta.
+const FIRST_PLAY_APP_BYTES_MAX = 7_551;
 // 2,400 -> 2,520 (owner receipt 2026-07-12): the wiring repair relocated
 // ~111 B of accounting from the app chunk into the lazy logger - app bytes
 // unchanged, never-mode byte-identical; instrument growth stays visible.

@@ -106,11 +106,16 @@ const STAGE_ANCHORS = {
 	// +134: deferred count-dependent bindings (thunk registry + resolver splice); +21: carrier-rooting rule in composition; +3: shared carrier predicate;
 	// +177: seed passes count roster positions on their own ledger (marklessRosterSeedPass around both seedChild sites);
 	// +245: control-edit-hold - a commit's write onto an editable control's value/checked is held when keystrokes landed since the handler read it.
-	'page-load download': { gzipBytes: 137_823, margin: 128 },
+	// +1,364 (re-anchor 2026-08-30, symbol-bundle owner-key fix): per-interaction bundle
+	// granularity restored (113 chunks; the prior anchor ratified the accidental boot-bundle
+	// coalescing). Chunk overhead only; the first click's executed and marginal bytes shrank.
+	// Measured 139,187.
+	'page-load download': { gzipBytes: 139_187, margin: 128 },
 	// +5: roster-count placeholder minted in the eager seed slot (the resolver itself is demand-loaded);
 	// +114: seed-pass roster ledger in the eager seed slot; +228: control-edit-hold in the eager runtime chunk.
 	'page-load execute': { gzipBytes: 14_568, margin: 128 },
-	'interaction 1 marginal': { gzipBytes: 2_416, margin: 32 },
+	// 2,416 -> 2,376 tightened (2026-08-30): de-coalescing gave the first click its true marginal back.
+	'interaction 1 marginal': { gzipBytes: 2_376, margin: 32 },
 	'interaction 2 marginal': { gzipBytes: 2_705, margin: 32 },
 	'interaction 3 marginal': { gzipBytes: 2_706, margin: 32 },
 } as const satisfies Record<string, StageAnchor>;
