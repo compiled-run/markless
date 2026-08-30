@@ -37,6 +37,11 @@ export default defineProject({
 		// ceiling (p99 1230ms parallel vs 363ms serial) — and serial is FASTER
 		// (~50s vs ~118s; cold imports 24s vs 1265s cumulative).
 		fileParallelism: false,
+		// CI's 2-core runners push gesture latency past the 1000ms poll default
+		// even serial (the p99 measurement above); every expect.poll in the lane
+		// gets the budget the slow environment actually needs, and fast machines
+		// still return on the first poll.
+		expect: { poll: { timeout: 5_000 } },
 		browser: {
 			enabled: true,
 			headless: true,
