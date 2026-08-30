@@ -1,5 +1,5 @@
 import { cleanup, render, renderSSR } from '@markless/vitest-browser';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, beforeEach, expect, test } from 'vitest';
 import NestedPage from './nested-page.tsrx';
 import OutsidePage from './outside-page.tsrx';
 import RowsPage from './rows-page.tsrx';
@@ -9,6 +9,35 @@ import SiblingsPage from './siblings-page.tsrx';
 // must reach the element of the instance the handler is running in, however many
 // other instances of that family the page carries.
 afterEach(() => cleanup());
+
+const AMBIGUOUS = 'MARKLESS_ELEMENT_HANDLE_INSTANCE_AMBIGUOUS';
+
+// A resume refusal that runs off a handler lands on the window, and every page
+// here is supposed to resolve the read or to catch the refusal. Anything this
+// collects escaped a handler, which is a defect rather than a passing row.
+const escaped: string[] = [];
+
+beforeEach(() => {
+	escaped.length = 0;
+	const note = (reason: unknown) => {
+		const code = (reason as { readonly code?: string } | null)?.code;
+		if (typeof code !== 'string') return false;
+		escaped.push(code);
+		return true;
+	};
+	const onRejection = (event: PromiseRejectionEvent) => {
+		if (note(event.reason)) event.preventDefault();
+	};
+	const onError = (event: ErrorEvent) => {
+		if (note(event.error)) event.preventDefault();
+	};
+	window.addEventListener('unhandledrejection', onRejection);
+	window.addEventListener('error', onError);
+	return () => {
+		window.removeEventListener('unhandledrejection', onRejection);
+		window.removeEventListener('error', onError);
+	};
+});
 
 function contents(container: ParentNode, expected: number) {
 	const found = [...container.querySelectorAll<HTMLElement>('[data-level-content]')];
@@ -124,6 +153,11 @@ async function expectOutsideRefused(container: ParentNode) {
 		.toBe('1');
 	expect(levels[0]!.getAttribute('data-outside-hit')).toBeNull();
 	expect(levels[1]!.getAttribute('data-outside-hit')).toBeNull();
+	// The refusal is loud where it was asked, and it stops there.
+	await expect
+		.poll(() => container.querySelector('[data-outside-page]')?.getAttribute('data-refused'))
+		.toBe(AMBIGUOUS);
+	expect(escaped).toEqual([]);
 }
 
 test('CSR: a page-level read of a two-instance handle is refused', async () => {
