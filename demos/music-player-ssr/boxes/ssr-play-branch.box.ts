@@ -74,7 +74,11 @@ const FIRST_PLAY_APP_BYTES_MAX = 7_551;
 // ledger arithmetic (the ledger, the attribution lookup, the chunk dedupe); it
 // stays in its own category and out of the headline, which is what the pin wanted
 // visible.
-const FIRST_PLAY_INSTRUMENT_BYTES_MAX = 9_537;
+// 9,537 -> 9,792 (2026-08-30): the execution mirror learned to route an eventless
+// wake (the inline resumer's primer/self-wake, event: 0) to a resume turn instead
+// of counting it as an interaction; the +255 is that wake-classification branch in
+// the specialized wrapper. Instrument bytes only - app bytes unmoved.
+const FIRST_PLAY_INSTRUMENT_BYTES_MAX = 9_792;
 
 export default box(
 	{
