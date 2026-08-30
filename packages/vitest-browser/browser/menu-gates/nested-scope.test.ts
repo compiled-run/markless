@@ -20,6 +20,38 @@ const owner = (testid: string) => el(testid).getAttribute('data-nest-owner');
 const bumps = (testid: string) => Number(el(testid).textContent);
 const click = (testid: string) => el<HTMLButtonElement>(testid).click();
 
+// ── Temporary probe for a Linux-only failure ───────────────────────────────
+// The add handler stamps `data-nest-diag` on its own button before spreading the
+// collection, so the CI log says whether the shape read came back at all. Remove
+// with the probe in nest.tsrx once the mechanism is named.
+
+/** Every add button's recorded collection shape, whichever one just ran. */
+function diagSnapshot(): string {
+	return [...document.querySelectorAll('[data-nest-add]')]
+		.map(
+			(node) =>
+				`${node.getAttribute('data-testid')}=${node.getAttribute('data-nest-diag') ?? '<unset>'}`,
+		)
+		.join(' ');
+}
+
+window.addEventListener('error', (event) => {
+	console.error(`[nest-diag] uncaught: ${event.message} | ${diagSnapshot()}`);
+});
+window.addEventListener('unhandledrejection', (event) => {
+	console.error(`[nest-diag] unhandled rejection: ${String(event.reason)} | ${diagSnapshot()}`);
+});
+
+/** Clicks an add button and logs what the handler recorded, even when a later assertion fails. */
+async function clickAdd(testid: string, label: string) {
+	click(testid);
+	const read = () => el(testid).getAttribute('data-nest-diag');
+	for (let attempt = 0; attempt < 50 && read() === null; attempt += 1) {
+		await new Promise((resolve) => setTimeout(resolve, 20));
+	}
+	console.error(`[nest-diag] ${label} ${testid}=${read() ?? '<unset>'} | ${diagSnapshot()}`);
+}
+
 /** Minted rows under one list. The id was built by the handler from its own instance's label. */
 const rows = (testid: string) =>
 	[...el(testid).querySelectorAll('[data-nest-item]')].map((row) => row.textContent);
@@ -65,15 +97,15 @@ async function expectWritesStayOnTheirOwnRoot() {
 }
 
 async function expectMintedRowsStayOnTheirOwnRoot() {
-	click('inner-add');
+	await clickAdd('inner-add', 'minted-rows click 1');
 	await expect.poll(() => rows('inner-items')).toEqual(['inner-1']);
 	expect(rows('outer-items')).toEqual([]);
 
-	click('outer-add');
+	await clickAdd('outer-add', 'minted-rows click 2');
 	await expect.poll(() => rows('outer-items')).toEqual(['outer-1']);
 	expect(rows('inner-items')).toEqual(['inner-1']);
 
-	click('inner-add');
+	await clickAdd('inner-add', 'minted-rows click 3');
 	await expect.poll(() => rows('inner-items')).toEqual(['inner-1', 'inner-2']);
 	expect(rows('outer-items')).toEqual(['outer-1']);
 }
@@ -114,20 +146,20 @@ test('SSR: a row minted after resume lands under the root it was minted from', a
 // like any other row.
 test('CSR: a repeat row reading the widget shared state mints rows', async () => {
 	await render(SinglePage);
-	click('only-add');
+	await clickAdd('only-add', 'CSR single-page owned row');
 	await expect.poll(() => ownedRows('only-owned-items')).toEqual(['only:only-1']);
 });
 
 test('SSR: a repeat row reading the widget shared state mints rows', async () => {
 	await renderSSR(SinglePage);
-	click('only-add');
+	await clickAdd('only-add', 'SSR single-page owned row');
 	await expect.poll(() => ownedRows('only-owned-items')).toEqual(['only:only-1']);
 });
 
 // An item minted inside the INNER root names the inner root, not the outer.
 test('CSR: a row minted inside the inner root names the inner instance', async () => {
 	await render(Page);
-	click('inner-add');
+	await clickAdd('inner-add', 'CSR nested owned row');
 	await expect.poll(() => ownedRows('inner-owned-items')).toEqual(['inner:inner-1']);
 	expect(ownedRows('outer-owned-items')).toEqual([]);
 });

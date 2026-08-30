@@ -53,7 +53,12 @@ export function NestAdd({ ...rest }) @{
 		{...rest}
 		type="button"
 		data-nest-add
-		onClick={() => {
+		onClick={(event) => {
+			// Temporary probe for a Linux-only failure: a non-iterable read first, so the log tells a missing read apart from an undefined one.
+			const probe = n.items;
+			const cell = event.target;
+			cell?.setAttribute('data-nest-diag', String(Array.isArray(probe)) + ':' + typeof probe);
+
 			n.items = [...n.items, { id: n.label + '-' + (n.items.length + 1) }];
 		}}
 	>add</button>
