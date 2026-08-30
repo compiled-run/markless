@@ -1,5 +1,5 @@
 import { voiceOverTest } from '@guidepup/playwright';
-import { PREVIEW_ORIGIN } from '../../../../../apps/sr-gallery/preview-server.ts';
+import { PREVIEW_ORIGIN } from '../../../sr-app/preview-server.ts';
 import { realDriver } from '../../test-support/page-driver.ts';
 import { voiceOverSpec } from '../../test-support/vocabularies.ts';
 import { readToolbarTranscript, TOOLBAR_ANCHOR } from './toolbar-transcript.ts';

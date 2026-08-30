@@ -22,7 +22,7 @@
 		"test:headless": "vp test --project ui",
 		"test:sr": "vp test run --config packages/headless/components/test-support/vitest.config.ts",
 		"test:sr-real": "playwright test -c packages/headless/components/test-support/playwright.config.ts",
-		"sr-gallery:boot-check": "node apps/sr-gallery/scripts/boot-check.ts",
+		"sr-app:boot-check": "node packages/headless/sr-app/scripts/boot-check.ts",
 		"typecheck:sr": "node packages/typescript-plugin/src/tsc.ts -p packages/headless/components/test-support/tsconfig.json",
 		"typecheck:sr-real": "node packages/typescript-plugin/src/tsc.ts -p packages/headless/components/test-support/tsconfig.real.json",
 		"publish": "pnpm --filter '@markless/*' --filter create-markless publish --access public --no-git-checks",

@@ -16,8 +16,8 @@
  * fetches that graph from node first and only then launches the browser. What
  * the browser is timed against is rendering, never compiling.
  *
- *   node apps/sr-gallery/scripts/boot-check.ts
- *   SR_GALLERY_PORT=4325 node apps/sr-gallery/scripts/boot-check.ts
+ *   node packages/headless/sr-app/scripts/boot-check.ts
+ *   SR_GALLERY_PORT=4325 node packages/headless/sr-app/scripts/boot-check.ts
  *
  * `SR_GALLERY_PORT` moves the whole app - this check, the server it spawns and
  * the vite config that binds - off the default 4319, so two worktrees can run
@@ -182,7 +182,7 @@ if (drift !== null) {
 	console.error(`::error::${drift}`);
 	process.exit(1);
 }
-console.log('apps/sr-gallery/README.md lists the anchors this server serves.');
+console.log('packages/headless/sr-app/README.md lists the anchors this server serves.');
 
 // A squatter on the port would answer waitForBoot for a server that never
 // bound, so the check would read someone else's tree and go green. Probe

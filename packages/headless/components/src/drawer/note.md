@@ -144,7 +144,7 @@ renders drawer markup but never enlists`, which asserts what actually happens.
    new boolean in the same grammar as `crop.thumb`'s `inlineStart`/`blockStart` and the spec's own
    `ui-side="start"` example, but it is not itself an established name.
 3. **Registration.** Done, except the conformance battery: the barrel, the package export map, the
-   api manifest, the sr-gallery section and the three CI reader matrices all carry `drawer`, the
+   api manifest, the sr-app section and the three CI reader matrices all carry `drawer`, the
    scenarios import the consumer form `import { drawer } from '../../index.ts'`, and
    `drawer-transcript.ts` reads `FAMILY_ANCHORS.drawer`. The conformance descriptor in
    `test-support/` is the one piece still outstanding.

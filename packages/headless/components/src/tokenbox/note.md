@@ -199,7 +199,7 @@ comment out; it is a compiler defect worth its own witness.
 
 `src/index.ts` exports the family and the scenarios import from `../../index.ts`.
 Still outstanding: the `exports` map in `package.json`, and the gallery anchor in
-`apps/sr-gallery/preview-server.ts` — `tokenbox-transcript.ts` holds the anchor
+`packages/headless/sr-app/preview-server.ts` — `tokenbox-transcript.ts` holds the anchor
 as the literal `'/#tokenbox'` with the swap to `FAMILY_ANCHORS.tokenbox` noted at
 the constant.
 

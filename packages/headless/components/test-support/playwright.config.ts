@@ -1,7 +1,7 @@
 import { screenReaderConfig } from '@guidepup/playwright';
 import { defineConfig } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
-import { PREVIEW_ORIGIN } from '../../../../apps/sr-gallery/preview-server.ts';
+import { PREVIEW_ORIGIN } from '../../sr-app/preview-server.ts';
 
 // The repo root, so the web server command reads the same way it does in CI.
 const repoRoot = fileURLToPath(new URL('../../../../', import.meta.url));
@@ -24,7 +24,7 @@ export default defineConfig({
 	// it when nothing is listening yet and reuses whatever is, so the CI boot
 	// check and this config never race for the port.
 	webServer: {
-		command: 'pnpm --dir apps/sr-gallery dev',
+		command: 'pnpm --dir packages/headless/sr-app dev',
 		cwd: repoRoot,
 		url: PREVIEW_ORIGIN,
 		reuseExistingServer: true,

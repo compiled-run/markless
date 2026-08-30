@@ -190,7 +190,7 @@ unnamed `menu.root` div each enclosed menu renders, so the trigger inside counts
 as the bar's own item. An `aria-label` on one of those divs exposes it as a named
 generic and the bar loses every child, with the failure landing on the axe row
 rather than on the name. `test-support/conformance.browser.ts` holds that for the
-Basic scenario and `apps/sr-gallery/scripts/boot-check.ts` for the gallery's copy.
+Basic scenario and `packages/headless/sr-app/scripts/boot-check.ts` for the gallery's copy.
 
 ## Follow-ups this unit names rather than does
 

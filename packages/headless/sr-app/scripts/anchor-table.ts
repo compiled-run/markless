@@ -2,8 +2,8 @@
  * Writes the README's section/anchor table from `FAMILY_ANCHORS`, so the anchors
  * are written down once rather than hand-copied.
  *
- *   node apps/sr-gallery/scripts/anchor-table.ts           # rewrite the table
- *   node apps/sr-gallery/scripts/anchor-table.ts --check   # exit 1 when stale
+ *   node packages/headless/sr-app/scripts/anchor-table.ts           # rewrite the table
+ *   node packages/headless/sr-app/scripts/anchor-table.ts --check   # exit 1 when stale
  *
  * The boot check runs `--check`, so a family added without regenerating is
  * caught by the same gate that guards the reader lanes.
@@ -42,7 +42,7 @@ export function withAnchorTable(readme: string): string {
 	const end = readme.indexOf(END);
 	if (start === -1 || end === -1 || end < start) {
 		throw new Error(
-			`apps/sr-gallery/README.md has no ${START} … ${END} region for the anchor table.`,
+			`packages/headless/sr-app/README.md has no ${START} … ${END} region for the anchor table.`,
 		);
 	}
 	const head = readme.slice(0, start + START.length);
@@ -54,7 +54,7 @@ export function withAnchorTable(readme: string): string {
 export async function anchorTableDrift(): Promise<string | null> {
 	const readme = await readFile(README, 'utf8');
 	if (withAnchorTable(readme) === readme) return null;
-	return `apps/sr-gallery/README.md's anchor table no longer matches FAMILY_ANCHORS (${Object.keys(FAMILY_ANCHORS).length} sections); run \`node apps/sr-gallery/scripts/anchor-table.ts\`.`;
+	return `packages/headless/sr-app/README.md's anchor table no longer matches FAMILY_ANCHORS (${Object.keys(FAMILY_ANCHORS).length} sections); run \`node packages/headless/sr-app/scripts/anchor-table.ts\`.`;
 }
 
 // Only when run as the program, so the boot check can import the check above.
@@ -67,14 +67,14 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 			process.exit(1);
 		}
 		console.log(
-			`apps/sr-gallery/README.md lists all ${Object.keys(FAMILY_ANCHORS).length} anchors.`,
+			`packages/headless/sr-app/README.md lists all ${Object.keys(FAMILY_ANCHORS).length} anchors.`,
 		);
 	} else if (updated === readme) {
-		console.log('apps/sr-gallery/README.md was already current.');
+		console.log('packages/headless/sr-app/README.md was already current.');
 	} else {
 		await writeFile(README, updated);
 		console.log(
-			`Wrote ${Object.keys(FAMILY_ANCHORS).length} anchor rows into apps/sr-gallery/README.md.`,
+			`Wrote ${Object.keys(FAMILY_ANCHORS).length} anchor rows into packages/headless/sr-app/README.md.`,
 		);
 	}
 }

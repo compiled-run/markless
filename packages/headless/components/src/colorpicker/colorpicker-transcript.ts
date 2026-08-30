@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test';
-import { PREVIEW_ORIGIN } from '../../../../../apps/sr-gallery/preview-server.ts';
+import { PREVIEW_ORIGIN } from '../../../sr-app/preview-server.ts';
 import type { ScreenReaderDriver } from '../../test-support/driver.ts';
 
 /**

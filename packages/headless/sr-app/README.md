@@ -1,4 +1,4 @@
-# sr-gallery
+# sr-app
 
 The page a real screen reader reads.
 
@@ -67,8 +67,8 @@ on `<html>`, set once the mount resolves, so a reader waits on the DOM instead
 of a timer.
 
 ```sh
-pnpm --dir apps/sr-gallery dev        # serve it at http://127.0.0.1:4319
-node apps/sr-gallery/scripts/boot-check.ts   # serve it and check every family rendered
+pnpm --dir packages/headless/sr-app dev        # serve it at http://127.0.0.1:4319
+node packages/headless/sr-app/scripts/boot-check.ts   # serve it and check every family rendered
 ```
 
 `preview-server.ts` owns the port and the anchors. The boot check and
@@ -80,7 +80,7 @@ config's binding, the boot check and the reader lanes together, so two worktrees
 can run the check at once:
 
 ```sh
-SR_GALLERY_PORT=4325 node apps/sr-gallery/scripts/boot-check.ts
+SR_GALLERY_PORT=4325 node packages/headless/sr-app/scripts/boot-check.ts
 ```
 
 A fresh dev server spends minutes compiling this page's entry graph on its first
@@ -100,7 +100,7 @@ transcript shares one limit on that walk,
 is measured rather than guessed:
 
 ```sh
-node apps/sr-gallery/scripts/measure-walk.ts
+node packages/headless/sr-app/scripts/measure-walk.ts
 ```
 
 That serves the page, runs @guidepup/virtual-screen-reader over it, and prints

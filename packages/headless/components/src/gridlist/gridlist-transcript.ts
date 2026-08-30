@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test';
-import { FAMILY_ANCHORS } from '../../../../../apps/sr-gallery/preview-server.ts';
+import { FAMILY_ANCHORS } from '../../../sr-app/preview-server.ts';
 import type { ScreenReaderDriver } from '../../test-support/driver.ts';
 import { GALLERY_WALK_LIMIT } from '../../test-support/gallery-walk.ts';
 

@@ -22,7 +22,7 @@ const FIRST_TOKEN = 'Alice Chen';
  * Where the box sits on the gallery page.
  *
  * A literal because registration is a follow-up unit: swap this for
- * `FAMILY_ANCHORS.tokenbox` (imported from `apps/sr-gallery/preview-server.ts`,
+ * `FAMILY_ANCHORS.tokenbox` (imported from `packages/headless/sr-app/preview-server.ts`,
  * the way every registered family's transcript does it) the moment the anchor is
  * added, and delete this comment with it.
  */

@@ -929,7 +929,7 @@ for (const descriptor of descriptors) runConformance(descriptor);
 // count as the bar's own items. An accessible name on one of those wrappers -
 // `aria-label` on a `menu.root` is the easy way - exposes it as a named generic,
 // the bar loses every child, and the axe row above goes red far from the cause.
-// The gallery's own copy of this shape is held in apps/sr-gallery/scripts/boot-check.ts.
+// The gallery's own copy of this shape is held in packages/headless/sr-app/scripts/boot-check.ts.
 describe('menubar wrappers', () => {
 	for (const [mode, mount] of [
 		['CSR', () => render(Menubar)],

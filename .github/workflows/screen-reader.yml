@@ -13,7 +13,7 @@ name: Screen reader
 # The matrix key is the component family. A new family adds its name to each
 # matrix and nothing else changes.
 #
-# The two real-reader lanes read a served page: apps/sr-gallery renders every
+# The two real-reader lanes read a served page: packages/headless/sr-app renders every
 # family's Basic scenario, and each family's <family>.nvda.ts / .voiceover.ts,
 # colocated under packages/headless/components/src/<family>/, drives NVDA or
 # VoiceOver over it with the same transcript expectations the virtual lane
@@ -26,14 +26,14 @@ on:
     pull_request:
         paths:
             - 'packages/headless/**'
-            - 'apps/sr-gallery/**'
+            - 'packages/headless/sr-app/**'
             - '.github/workflows/screen-reader.yml'
     push:
         branches:
             - main
         paths:
             - 'packages/headless/**'
-            - 'apps/sr-gallery/**'
+            - 'packages/headless/sr-app/**'
             - '.github/workflows/screen-reader.yml'
     workflow_dispatch:
 
@@ -211,7 +211,7 @@ jobs:
             - name: Serve and render the screen-reader gallery
               id: gallery
               continue-on-error: true
-              run: node apps/sr-gallery/scripts/boot-check.ts
+              run: node packages/headless/sr-app/scripts/boot-check.ts
 
             # continue-on-error so the transcript is still uploaded and summarised
             # when the read fails; the gate step below turns that back into red.
@@ -345,7 +345,7 @@ jobs:
             - name: Serve and render the screen-reader gallery
               id: gallery
               continue-on-error: true
-              run: node apps/sr-gallery/scripts/boot-check.ts
+              run: node packages/headless/sr-app/scripts/boot-check.ts
 
             # See the nvda job: the read is allowed to fail so its transcript is
             # still uploaded and summarised, and the gate step below re-reds it.

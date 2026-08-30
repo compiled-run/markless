@@ -2,8 +2,8 @@
  * Prints the reading step each gallery section is reached at, which is what
  * `GALLERY_WALK_LIMIT` is sized from.
  *
- *   node apps/sr-gallery/scripts/measure-walk.ts
- *   SR_GALLERY_PORT=4338 node apps/sr-gallery/scripts/measure-walk.ts
+ *   node packages/headless/sr-app/scripts/measure-walk.ts
+ *   SR_GALLERY_PORT=4338 node packages/headless/sr-app/scripts/measure-walk.ts
  *
  * The virtual reader is a floor: NVDA and VoiceOver speak items it passes over
  * silently, so the shared limit takes a margin over what this prints.

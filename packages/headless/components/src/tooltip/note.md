@@ -335,8 +335,8 @@ both dismissal paths are covered in `tooltip.browser.ts` instead.
   outside this unit's contract, which is the only reason the prose was left
   standing.
 - **The gallery section is not wired into the real-reader lanes.**
-  `apps/sr-gallery/preview-server.ts` needs `tooltip: '/#tooltip'` in
-  `FAMILY_ANCHORS`, and `apps/sr-gallery/scripts/boot-check.ts` needs
+  `packages/headless/sr-app/preview-server.ts` needs `tooltip: '/#tooltip'` in
+  `FAMILY_ANCHORS`, and `packages/headless/sr-app/scripts/boot-check.ts` needs
   `tooltip: 'tooltip'` in its `RENDERED_ROLE` table, which is total over
   `FamilyName`. Both are one line and both are outside this unit's contract.
 - **The tooltip section shifts slider's walk.** The gallery section sits between
