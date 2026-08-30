@@ -26,9 +26,30 @@ test('router navigation chunk co-locates route imports with navigation', async (
 	);
 
 	expect(navigationChunks, 'expected exactly one router navigation entry chunk').toHaveLength(1);
-	expect(navigationChunks[0]?.code).toMatch(
-		/["']\/pages\/index\.tsrx["']:\(\)=>import\([`"']\.\/chunk-[^`"']+\.js[`"']\)/,
-	);
+	// vite-plus 0.3.0 may emit the entry as a re-export facade over a shared chunk;
+	// co-location then means the route map sits in the entry's STATIC closure - one
+	// fetch wave, no dynamic hop. Walk static imports rather than the entry alone.
+	const byFile = new Map(chunks.map((chunk) => [chunk.file, chunk.code]));
+	const closure = new Set<string>();
+	const queue = [navigationChunks[0]?.file ?? ''];
+	while (queue.length > 0) {
+		const file = queue.pop() as string;
+		if (closure.has(file) || !byFile.has(file)) continue;
+		closure.add(file);
+		for (const match of (byFile.get(file) as string).matchAll(
+			/(?:from|import)\s*[`"']\.\/([^`"']+\.js)[`"']/g,
+		)) {
+			queue.push(match[1] as string);
+		}
+	}
+	expect(
+		[...closure].some((file) =>
+			/["']\/pages\/index\.tsrx["']:\(\)=>import\([`"']\.\/chunk-[^`"']+\.js[`"']\)/.test(
+				byFile.get(file) as string,
+			),
+		),
+		`route map not in the navigation entry's static closure: ${[...closure].join(', ')}`,
+	).toBe(true);
 	expect(
 		chunks.some(
 			({ code }) =>
