@@ -73,6 +73,18 @@ role here that would be a lie on its own: `gridcell` is only meaningful inside a
 grid, whereas `row`, `rowheader` and `columnheader` restate what the elements
 already mean.
 
+**The HTML-AAM question the research left open — does a `<td>` inside a
+`role="grid"` map to `gridcell` on its own — is settled by measurement, and the
+answer is yes.** `scenarios/prepicked.tsrx` is a selectable table whose cells are
+the consumer's own plain `<td>`s with no `itemcontent` mounted, so the family
+writes no cell role anywhere in it, and the virtual reader still announces
+`gridcell, README.md` for each cell and reads every row with its name and its
+picked state. So a selectable table is structurally valid without cell parts: the
+grid's required-children chain holds on the native mapping, and writing the roles
+explicitly is insurance against a reader that does not, not the thing keeping the
+rows in the tree. The transcript is in `table.sr.ts`, "a row of a selectable
+table conveys whether it is picked".
+
 Nothing a descendant renders is a graph write any more. Every cell in
 `TableInstanceState` is written by the root from its own props, which is the only
 direction that reaches a rendered attribute.
@@ -194,7 +206,9 @@ own row's cells. Nothing is ever told a coordinate.
   checkbox is the recommended shape.
 - Typeahead matches everything a row reads rather than its row-header cell alone.
   Binding the header cell to a second handle would have meant two handles on one
-  element, which is untried.
+  element, which is untried. It costs less than it looks like it does: a row is
+  named from its contents, so a reader announces the row under that same whole
+  text ("row, README.md 4.1 kB"), and typeahead matches what was said.
 - No `aria-rowcount`/`aria-colcount`/`aria-rowindex`/`aria-colindex`. They mean
   nothing without virtualization, and the absolute row number a server-paged
   consumer would need cannot be derived from render order — SPEC bans the index
