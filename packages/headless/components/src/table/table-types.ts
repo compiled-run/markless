@@ -29,7 +29,7 @@ export type TableSort = {
  * sortable. Passing `value`/`onChange`/`multiple` makes the rows selectable, and
  * that is what turns the table into a `role="grid"` carrying `row`, `gridcell`
  * and `rowheader`: the roles arrive exactly when the family is doing the focus
- * management they oblige. Wrapping the cells in `table.rowcontent` makes each
+ * management they oblige. Wrapping the cells in `table.itemcontent` makes each
  * cell a focus stop and gives the table its second axis; on its own, with no
  * selection props, it writes no roles - see the family note for why the root
  * cannot see what its descendants mounted.
@@ -98,7 +98,7 @@ export type TableItemProps = PropsOf<'tr'> & {
  * the table a grid - the selection props do, and only then do the cells carry
  * `gridcell` and `rowheader`.
  */
-export type TableRowContentProps = PropsOf<'td'> & {
+export type TableItemContentProps = PropsOf<'td'> & {
 	/**
 	 * This cell is what names its row: it renders `<th scope="row">` with
 	 * `role="rowheader"` instead of a `<td>`. A reader announces it when it
@@ -107,8 +107,8 @@ export type TableRowContentProps = PropsOf<'td'> & {
 	readonly rowheader?: boolean;
 };
 
-/** What the two shapes of `table.rowcontent` render: everything it was given. */
-export type TableCellProps = PropsOf<'td'>;
+/** What the two shapes of `table.itemcontent` render: everything it was given. */
+export type TableItemContentBaseProps = PropsOf<'td'>;
 
 /**
  * A sortable column header. It is the `<th scope="col">` itself rather than a
@@ -130,7 +130,7 @@ export type TableColTriggerProps = PropsOf<'th'> & {
  * It goes inside a cell, never straight inside the row: a `<tr>` may only hold
  * cells, and the parser would lift anything else out of the table.
  */
-export type TableRowFieldProps = PropsOf<'input'>;
+export type TableItemFieldProps = PropsOf<'input'>;
 
 /**
  * The graph cells every table part reads and writes. Everything here is written

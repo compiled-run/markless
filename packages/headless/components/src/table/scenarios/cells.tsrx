@@ -19,19 +19,19 @@ export default function Cells() @{
 		</thead>
 		<tbody>
 			<table.item value="readme" data-testid="readme-item">
-				<table.rowcontent rowheader data-testid="readme-name">README.md</table.rowcontent>
-				<table.rowcontent data-testid="readme-size">4.1 kB</table.rowcontent>
-				<table.rowcontent data-testid="readme-changed">Today</table.rowcontent>
+				<table.itemcontent rowheader data-testid="readme-name">README.md</table.itemcontent>
+				<table.itemcontent data-testid="readme-size">4.1 kB</table.itemcontent>
+				<table.itemcontent data-testid="readme-changed">Today</table.itemcontent>
 			</table.item>
 			<table.item value="license" data-testid="license-item">
-				<table.rowcontent rowheader data-testid="license-name">LICENSE</table.rowcontent>
-				<table.rowcontent data-testid="license-size">1.1 kB</table.rowcontent>
-				<table.rowcontent data-testid="license-changed">Last week</table.rowcontent>
+				<table.itemcontent rowheader data-testid="license-name">LICENSE</table.itemcontent>
+				<table.itemcontent data-testid="license-size">1.1 kB</table.itemcontent>
+				<table.itemcontent data-testid="license-changed">Last week</table.itemcontent>
 			</table.item>
 			<table.item value="changelog" data-testid="changelog-item">
-				<table.rowcontent rowheader data-testid="changelog-name">CHANGELOG.md</table.rowcontent>
-				<table.rowcontent data-testid="changelog-size">12.4 kB</table.rowcontent>
-				<table.rowcontent data-testid="changelog-changed">In March</table.rowcontent>
+				<table.itemcontent rowheader data-testid="changelog-name">CHANGELOG.md</table.itemcontent>
+				<table.itemcontent data-testid="changelog-size">12.4 kB</table.itemcontent>
+				<table.itemcontent data-testid="changelog-changed">In March</table.itemcontent>
 			</table.item>
 		</tbody>
 	</table.root>

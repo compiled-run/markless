@@ -826,16 +826,16 @@ export function Gallery() @{
 					<caption>Files</caption>
 					<tbody>
 						<table.item value="readme">
-							<table.rowcontent rowheader>README.md</table.rowcontent>
-							<table.rowcontent>4.1 kB</table.rowcontent>
+							<table.itemcontent rowheader>README.md</table.itemcontent>
+							<table.itemcontent>4.1 kB</table.itemcontent>
 						</table.item>
 						<table.item value="license">
-							<table.rowcontent rowheader>LICENSE</table.rowcontent>
-							<table.rowcontent>1.1 kB</table.rowcontent>
+							<table.itemcontent rowheader>LICENSE</table.itemcontent>
+							<table.itemcontent>1.1 kB</table.itemcontent>
 						</table.item>
 						<table.item value="changelog">
-							<table.rowcontent rowheader>CHANGELOG.md</table.rowcontent>
-							<table.rowcontent>12.4 kB</table.rowcontent>
+							<table.itemcontent rowheader>CHANGELOG.md</table.itemcontent>
+							<table.itemcontent>12.4 kB</table.itemcontent>
 						</table.item>
 					</tbody>
 				</table.root>

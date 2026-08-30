@@ -3686,7 +3686,7 @@
 			{
 				"part": "root",
 				"component": "TableRoot",
-				"doc": "Tabular data where the columns are load-bearing: header association,\nper-column sort, and a person who navigates in two directions.\n\nThe family does no data work at all. Sorting, filtering, grouping and paging\nare the consumer's `computed()`; what arrives here is the rows already in the\norder they should read, plus which column that order came from. That is what\nlets a table row model from a data library drive this family with nothing in\nbetween: plain data in, plain callbacks out.\n\nIt is progressive, and the ladder has four rungs. A bare `table.root` holding\nthe consumer's own `<caption>`, `<thead>`, `<tbody>` and `table.item` rows is\na plain HTML table: no role, no focus management, nothing to configure.\nSwapping a `<th scope=\"col\">` for a `table.coltrigger` makes that column\nsortable. Passing `value`/`onChange` makes the rows selectable. Wrapping the\ncells in `table.rowcontent` makes each cell a focus stop, and only then does\nthe table become `role=\"grid\"` - the role is honest exactly when the family\nis doing the focus management the role obliges.\n\n`<thead>`, `<tbody>`, `<tfoot>`, the header row and `<caption>` need no parts.\nThey are the consumer's own elements, they already carry `rowgroup`, `row` and\nthe table's accessible name, and the family needs nothing from them.\n\nIt reports `ui-selectable`, `ui-multiple`, `ui-disabled` and `ui-celled` for\nstyling.",
+				"doc": "Tabular data where the columns are load-bearing: header association,\nper-column sort, and a person who navigates in two directions.\n\nThe family does no data work at all. Sorting, filtering, grouping and paging\nare the consumer's `computed()`; what arrives here is the rows already in the\norder they should read, plus which column that order came from. That is what\nlets a table row model from a data library drive this family with nothing in\nbetween: plain data in, plain callbacks out.\n\nIt is progressive, and the ladder has four rungs. A bare `table.root` holding\nthe consumer's own `<caption>`, `<thead>`, `<tbody>` and `table.item` rows is\na plain HTML table: no role, no focus management, nothing to configure.\nSwapping a `<th scope=\"col\">` for a `table.coltrigger` makes that column\nsortable. Passing `value`/`onChange`/`multiple` makes the rows selectable, and\nthat is what turns the table into a `role=\"grid\"` carrying `row`, `gridcell`\nand `rowheader`: the roles arrive exactly when the family is doing the focus\nmanagement they oblige. Wrapping the cells in `table.itemcontent` makes each\ncell a focus stop and gives the table its second axis; on its own, with no\nselection props, it writes no roles - see the family note for why the root\ncannot see what its descendants mounted.\n\n`<thead>`, `<tbody>`, `<tfoot>`, the header row and `<caption>` need no parts.\nThey are the consumer's own elements, they already carry `rowgroup`, `row` and\nthe table's accessible name, and the family needs nothing from them.\n\nIt reports `ui-selectable`, `ui-multiple` and `ui-disabled` for styling.",
 				"props": [
 					{
 						"name": "value",
@@ -3729,9 +3729,9 @@
 				]
 			},
 			{
-				"part": "rowcontent",
-				"component": "TableRowContent",
-				"doc": "One cell, and the thing focus rests on once a table navigates in two\ndirections. A cell's column is where it sits among its own row's cells, so\nnothing is ever told a coordinate.\n\nMounting even one of these is what makes the family the owner of focus, which\nis what turns the table into a `role=\"grid\"`. A table that wants none of that\nwrites plain `<td>` elements and stays a plain table.",
+				"part": "itemcontent",
+				"component": "TableItemContent",
+				"doc": "One cell, and the thing focus rests on once a table navigates in two\ndirections. A cell's column is where it sits among its own row's cells, so\nnothing is ever told a coordinate.\n\nMounting these gives the table its second axis: the arrows walk cell by cell\nand column by column, Home and End reach the ends of a row and the corners of\nthe table, and the space bar picks the row the focused cell sits in. A table\nthat wants none of that writes plain `<td>` elements. Cells alone do not make\nthe table a grid - the selection props do, and only then do the cells carry\n`gridcell` and `rowheader`.",
 				"props": [
 					{
 						"name": "rowheader",
@@ -3743,8 +3743,8 @@
 				]
 			},
 			{
-				"part": "rowfield",
-				"component": "TableRowField",
+				"part": "itemfield",
+				"component": "TableItemField",
 				"doc": "Carries one row's picked state into a form, and nothing else: it is hidden\nfrom sight and from readers, because the row already says whether it is\npicked. Give it a `name` and the form submits the picked rows under it.\n\nIt goes inside a cell, never straight inside the row: a `<tr>` may only hold\ncells, and the parser would lift anything else out of the table.",
 				"props": []
 			}
