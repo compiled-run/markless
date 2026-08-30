@@ -156,10 +156,13 @@ test('CSR: the right-click default action is cancelled inside the dispatch', asy
 
 // ── The keyboard route to the same menu ────────────────────────────────────
 
-// The mechanism the two pinned keyboard rows rest on: the key itself reaches
-// the page - the handler counts it and names it - and no contextmenu event
-// follows it. Nothing in the framework is between the key and the menu here.
-test('CSR: Shift+F10 reaches the page as a keydown and no contextmenu follows it', async () => {
+// The key itself always reaches the page - the handler counts it and names it.
+// Whether a contextmenu event then follows is the driver's choice, not the
+// framework's: headless macOS Chromium never synthesizes one from the keyboard,
+// headless Linux Chromium does. The framework invariant a row can pin on every
+// platform is consistency - the handler fires exactly as often as the event
+// exists, never more (a phantom dispatch) and never less (a swallowed one).
+test('CSR: Shift+F10 reaches the page as a keydown; the handler fires exactly when a contextmenu follows', async () => {
 	const probe = watchContextmenu();
 	try {
 		await render(Page);
@@ -168,14 +171,13 @@ test('CSR: Shift+F10 reaches the page as a keydown and no contextmenu follows it
 		await expect.poll(lastKey).toBe('F10');
 		expect(keys()).toBeGreaterThan(0);
 		await quiet();
-		expect(probe.seen.length).toBe(0);
-		expect(hits()).toBe(0);
+		expect(hits()).toBe(probe.seen.length);
 	} finally {
 		probe.stop();
 	}
 });
 
-test('CSR: the ContextMenu key reaches the page as a keydown and no contextmenu follows it', async () => {
+test('CSR: the ContextMenu key reaches the page as a keydown; the handler fires exactly when a contextmenu follows', async () => {
 	const probe = watchContextmenu();
 	try {
 		await render(Page);
@@ -183,8 +185,7 @@ test('CSR: the ContextMenu key reaches the page as a keydown and no contextmenu 
 		await userEvent.keyboard('{ContextMenu}');
 		await expect.poll(lastKey).toBe('ContextMenu');
 		await quiet();
-		expect(probe.seen.length).toBe(0);
-		expect(hits()).toBe(0);
+		expect(hits()).toBe(probe.seen.length);
 	} finally {
 		probe.stop();
 	}
@@ -220,19 +221,31 @@ test.fails('SSR cold: the ContextMenu key on the focused root reaches the handle
 	expect(isKeyboardOrigin(x, y, box), `keyboard contextmenu at ${x},${y}`).toBe(true);
 });
 
-// PINNED. Same mechanism, measured on a client render so the two paths are
-// pinned symmetrically rather than one being read across to the other.
-test.fails('CSR: Shift+F10 on the focused root reaches the handler', async () => {
-	await render(Page);
-	focusRoot();
-	await userEvent.keyboard('{Shift>}{F10}{/Shift}');
-	await expect.poll(hits).toBe(1);
+// The client-render halves of the consistency rows above: same driver-dependent
+// synthesis, so the pin is again hits-match-events rather than either platform's
+// absolute.
+test('CSR: Shift+F10 on the focused root reaches the handler exactly when the browser synthesizes the event', async () => {
+	const probe = watchContextmenu();
+	try {
+		await render(Page);
+		focusRoot();
+		await userEvent.keyboard('{Shift>}{F10}{/Shift}');
+		await quiet();
+		expect(hits()).toBe(probe.seen.length);
+	} finally {
+		probe.stop();
+	}
 });
 
-// PINNED. Same mechanism, ContextMenu key on a client render.
-test.fails('CSR: the ContextMenu key on the focused root reaches the handler', async () => {
-	await render(Page);
-	focusRoot();
-	await userEvent.keyboard('{ContextMenu}');
-	await expect.poll(hits).toBe(1);
+test('CSR: the ContextMenu key on the focused root reaches the handler exactly when the browser synthesizes the event', async () => {
+	const probe = watchContextmenu();
+	try {
+		await render(Page);
+		focusRoot();
+		await userEvent.keyboard('{ContextMenu}');
+		await quiet();
+		expect(hits()).toBe(probe.seen.length);
+	} finally {
+		probe.stop();
+	}
 });
