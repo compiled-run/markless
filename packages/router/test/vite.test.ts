@@ -489,6 +489,7 @@ test('persists client assets for a fresh server plugin instance', async () => {
 			'/docs/build/styled-child-D4.js',
 			'/docs/build/prerender-wake-K1.js',
 			'/docs/build/page-handler-H8.js',
+			'/docs/build/navigation-A1.js',
 		]);
 		expect(persisted.routes.navigation['pages/index.tsrx']).not.toContain(
 			'/docs/build/other-handler-J0.js',
@@ -804,7 +805,13 @@ test('emits exact route modulepreload maps from client build chunks', () => {
 			'build/docs-symbol.js': chunk({ fileName: 'build/docs-symbol.js' }),
 			'build/docs-resume.js': chunk({ fileName: 'build/docs-resume.js' }),
 			'build/home-resume.js': chunk({ fileName: 'build/home-resume.js' }),
-			'build/navigation-polyfill.js': chunk({ fileName: 'build/navigation-polyfill.js' }),
+				// Heavier than the navigation entry, so the SSR plan leaves it on
+				// demand: a capability polyfill is a payload of its own, not a seam
+				// into code the page already holds.
+				'build/navigation-polyfill.js': chunk({
+					code: `export const polyfillNavigation = () => {};${'/* vendored capability shim */'.repeat(40)}`,
+					fileName: 'build/navigation-polyfill.js',
+				}),
 			'build/resume-runtime.js': chunk({ fileName: 'build/resume-runtime.js' }),
 			'build/scalar-specialized.js': chunk({ fileName: 'build/scalar-specialized.js' }),
 			'build/shared.js': chunk({
@@ -868,6 +875,8 @@ test('emits exact route modulepreload maps from client build chunks', () => {
 		'/app/build/docs-runtime.js',
 		'/app/build/scalar-specialized.js',
 		'/app/build/docs-symbol.js',
+		'/app/build/navigation.js',
+		'/app/build/shared.js',
 	]);
 	expect(ssrPreloads['pages/docs/[...slug].mdx']).not.toContain(
 		'/app/build/navigation-polyfill.js',
@@ -879,6 +888,104 @@ test('emits exact route modulepreload maps from client build chunks', () => {
 	expect(ssrPreloads['pages/index.tsrx']).toContain('/app/build/home-resume.js');
 	expect(ssrPreloads['pages/index.tsrx']).not.toContain('/app/build/docs-resume.js');
 });
+
+// A first navigation is a second waterfall hop, so the served page preloads the
+// navigation entry and the demand edges of it that cost nothing but themselves.
+// Run twice with the two candidate chunks' names traded, so the outcome can only
+// follow the shape of the graph and the weight of the bytes.
+for (const [thin, heavy] of [
+	['build/render-csr.js', 'build/navigation-polyfill.js'],
+	['build/navigation-polyfill.js', 'build/render-csr.js'],
+] as const) {
+	test(`plans the navigation entry and its near-free edges, with ${thin} as the thin one`, () => {
+		const plugins = flattenPlugins([router()]);
+		const configPlugin = plugins.find((plugin) => plugin.name === 'markless-router:vite');
+		const routePlugin = plugins.find((plugin) => plugin.name === 'markless-router:routes');
+		const routeLoad = hookHandler(routePlugin?.load) as
+			| ((id: string) => string | undefined)
+			| undefined;
+		const navigationChunk = chunk({
+			code: `const routePreloadsJson = "__MARKLESS_ROUTER_ROUTE_PRELOADS__";${'/* navigation entry body */'.repeat(20)}`,
+			dynamicImports: [thin, heavy, 'build/prerender-gate.js', 'build/other.js'],
+			fileName: 'build/navigation.js',
+			imports: ['build/nav-shared.js'],
+			moduleIds: ['/repo/packages/router/src/vite/entries/client-entry.ts'],
+		});
+
+		routePlugin?.configResolved?.({ base: '/app/', root: '/project' } as never);
+		configPlugin?.configResolved?.({ base: '/app/', root: '/project' } as never);
+		hookHandler(configPlugin?.generateBundle)?.call(
+			{ environment: { config: { consumer: 'client' } } },
+			{},
+			{
+				'build/navigation.js': navigationChunk,
+				'build/resume.js': chunk({
+					code: `tsrxResumeModuleLoaders = Object.assign({"/pages/index.tsrx":()=>import("./home-resume.js")});`,
+					dynamicImports: ['build/home-resume.js'],
+					fileName: 'build/resume.js',
+					imports: ['build/runtime.js'],
+					moduleIds: ['/repo/packages/router/src/vite/entries/resume-entry.ts'],
+				}),
+				'build/home.js': chunk({
+					fileName: 'build/home.js',
+					moduleIds: ['/project/pages/index.tsrx'],
+				}),
+				'build/home-resume.js': chunk({ fileName: 'build/home-resume.js' }),
+				'build/runtime.js': chunk({ code: 'export const run = 1;', fileName: 'build/runtime.js' }),
+				'build/nav-shared.js': chunk({
+					code: 'export const shared = 1;',
+					fileName: 'build/nav-shared.js',
+				}),
+				// A seam into code the landing page already holds: its whole static
+				// closure is planned, so it costs only its own bytes.
+				[thin]: chunk({
+					code: 'export { render } from "./runtime.js";',
+					fileName: thin,
+					imports: ['build/runtime.js'],
+				}),
+				// Self-contained and heavier than the navigation entry.
+				[heavy]: chunk({
+					code: `export const polyfill = () => {};${'/* vendored capability shim */'.repeat(40)}`,
+					fileName: heavy,
+				}),
+				// Cheap on its own, but it cannot run without a chunk nobody planned:
+				// preloading it would move the waterfall hop, not remove it.
+				'build/prerender-gate.js': chunk({
+					code: 'export { gate } from "./cold.js";',
+					fileName: 'build/prerender-gate.js',
+					imports: ['build/cold.js'],
+				}),
+				'build/cold.js': chunk({ code: 'export const cold = 1;', fileName: 'build/cold.js' }),
+				// Another route's page chunk: structurally near-free, still excluded —
+				// route chunks belong to their own route's plan.
+				'build/other.js': chunk({
+					code: 'export const other = 1;',
+					fileName: 'build/other.js',
+					moduleIds: ['/project/pages/other.tsrx'],
+				}),
+			},
+		);
+
+		const serverSource = routeLoad?.call(
+			{ environment: { config: { consumer: 'server' } } },
+			'\0virtual:markless-router/route-preloads',
+		);
+		const ssrPreloads = (
+			JSON.parse(
+				serverSource?.match(/routePreloadData = routePreloadsJson === .* \? (\{.*\}) :/)?.[1] ??
+					'{}',
+			) as { readonly ssr?: Record<string, string[]> }
+		).ssr?.['pages/index.tsrx'];
+
+		expect(ssrPreloads).toContain('/app/build/navigation.js');
+		expect(ssrPreloads).toContain('/app/build/nav-shared.js');
+		expect(ssrPreloads).toContain(`/app/${thin}`);
+		expect(ssrPreloads).not.toContain(`/app/${heavy}`);
+		expect(ssrPreloads).not.toContain('/app/build/prerender-gate.js');
+		expect(ssrPreloads).not.toContain('/app/build/cold.js');
+		expect(ssrPreloads).not.toContain('/app/build/other.js');
+	});
+}
 
 test('includes destination route resume chunks reached from the navigation route table', () => {
 	const plugins = flattenPlugins([router()]);

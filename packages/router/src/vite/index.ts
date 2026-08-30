@@ -931,6 +931,22 @@ function routeModulePreloadsFromBundle(input: {
 			}
 		}
 
+		// The served page never names the navigation entry, so a first navigation
+		// starts its fetch only once the reader clicks — a second waterfall hop
+		// after the page has finished loading. Preload the entry, and the demand
+		// edges of it that cost nothing but themselves.
+		if (input.navigationChunk) {
+			includeChunk(ssrFileNames, chunksByFileName, input.navigationChunk.fileName);
+			for (const fileName of navigationEdgesWorthPreloading(
+				input.navigationChunk,
+				chunksByFileName,
+				ssrFileNames,
+				routeChunkFileNames,
+			)) {
+				includeChunk(ssrFileNames, chunksByFileName, fileName);
+			}
+		}
+
 		navigation[routeFile] = [...navigationFileNames].map((fileName) =>
 			joinURL(input.base, fileName),
 		);
@@ -942,6 +958,41 @@ function routeModulePreloadsFromBundle(input: {
 		);
 	}
 	return { navigation, ssr, styles };
+}
+
+// Which of the navigation entry's demand edges the landing page should already
+// hold. Two structural conditions, no chunk names and no per-app knowledge:
+//   - the edge's whole static closure, minus the edge itself, is already
+//     planned, so preloading it costs exactly the edge's own rendered bytes and
+//     the browser can run it the moment it is wanted;
+//   - those bytes stay under the navigation entry's own, the one chunk a
+//     navigation is certain to fetch. A speculative edge may complete that
+//     certainty, never outweigh it — which is what keeps a vendored capability
+//     polyfill (larger than the entry, loaded only by engines missing the API)
+//     on demand while thin render-path adapters ride along.
+function navigationEdgesWorthPreloading(
+	navigationChunk: OutputChunkLike,
+	chunksByFileName: ReadonlyMap<string, OutputChunkLike>,
+	planned: ReadonlySet<string>,
+	routeChunkFileNames: ReadonlySet<string>,
+): string[] {
+	const budget = renderedByteLength(navigationChunk);
+	if (budget === 0) return [];
+	const edges: string[] = [];
+	for (const fileName of navigationChunk.dynamicImports) {
+		const edge = chunksByFileName.get(fileName);
+		if (!edge || planned.has(fileName) || routeChunkFileNames.has(fileName)) continue;
+		if (renderedByteLength(edge) >= budget) continue;
+		const closure = new Set<string>();
+		includeChunk(closure, chunksByFileName, fileName);
+		closure.delete(fileName);
+		if ([...closure].every((name) => planned.has(name))) edges.push(fileName);
+	}
+	return edges;
+}
+
+function renderedByteLength(chunk: OutputChunkLike): number {
+	return chunk.code?.length ?? 0;
 }
 
 // A route source compiles into several client chunks (route, resume,
