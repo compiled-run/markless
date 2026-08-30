@@ -312,8 +312,12 @@ export function TokenBoxInput({
 			tokenbox.insertText(text);
 			onPaste?.(event);
 		}}
+		// `isComposing` is read off the event rather than trusted to `composing`
+		// alone: a handler runs a dispatch behind the gesture that raised it, so
+		// the flag the compositionstart handler sets can still be false when the
+		// first pre-edit lands. An event is never late about itself.
 		onInput={(event) => {
-			tokenbox.settle();
+			if ((event as unknown as InputEvent).isComposing !== true) tokenbox.settle();
 			onInput?.(event);
 		}}
 		// Between these two the browser owns a region of the DOM. Nothing derives,

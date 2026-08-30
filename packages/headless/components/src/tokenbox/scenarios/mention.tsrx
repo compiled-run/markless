@@ -30,6 +30,10 @@ function Suggestions() @{
 
 export default function Mention() @{
 	let held = state('');
+	// Append-only, because DOM commits coalesce: the last value a field shows
+	// cannot tell a test which values came before it, and "nothing was reported
+	// mid-composition" is a claim about the ones in between.
+	let reports = state('');
 
 	<main>
 		<tokenbox.root
@@ -37,9 +41,11 @@ export default function Mention() @{
 			name="prompt"
 			triggers={['@', '/']}
 			onChange={(next: readonly TokenBoxSegment[]) => {
-				held = next
+				const text = next
 					.map((one) => (one.kind === 'token' ? `[${one.value}]` : one.text))
 					.join('');
+				held = text;
+				reports = `${reports}${text};`;
 			}}
 		>
 			<tokenbox.label data-testid="label">Message</tokenbox.label>
@@ -50,5 +56,6 @@ export default function Mention() @{
 			<Suggestions />
 		</tokenbox.root>
 		<output data-testid="held">{held}</output>
+		<output data-testid="reports">{reports}</output>
 	</main>
 }

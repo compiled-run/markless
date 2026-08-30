@@ -25,6 +25,7 @@ const Root = page.getByTestId('root');
 const Label = page.getByTestId('label');
 const Input = page.getByTestId('input');
 const Held = page.getByTestId('held');
+const Reports = page.getByTestId('reports');
 const Description = page.getByTestId('description');
 const ErrorMessage = page.getByTestId('error');
 const Submitted = page.getByTestId('submitted');
@@ -93,6 +94,73 @@ function caretAfterToken(value: string, surface: Element = el(Input)) {
 	const selection = window.getSelection();
 	selection?.removeAllRanges();
 	selection?.addRange(range);
+}
+
+// A handler runs a dispatch behind the gesture that raised it, so a value that
+// leaked can still be in the queue when the next line reads the field. "Nothing
+// was reported" is proved by letting the queue drain, the same way the hold rows
+// in this lane prove a stopped clock. Measured: a leak lands well inside 600ms.
+const drained = () => new Promise((resolve) => setTimeout(resolve, 1000));
+
+/** What the family's own read of the surface normalises away. */
+const plainSpaces = (text: string | null) => (text ?? '').replaceAll('\u00a0', ' ');
+
+/**
+ * The region an IME owns between its two boundaries, as a function that rewrites
+ * the pre-edit in place and raises the events a real composition raises around
+ * it. Call it once the caret is where the composition starts.
+ */
+function composition(surface: Element = el(Input)) {
+	const selection = window.getSelection();
+	const range = selection?.getRangeAt(0);
+	const node = range?.startContainer;
+	if (!range || !node || node.nodeType !== Node.TEXT_NODE)
+		throw new Error('An IME composes inside the text run the caret is in.');
+	const run = node as Text;
+	const before = run.data.slice(0, range.startOffset);
+	const after = run.data.slice(range.startOffset);
+	// The text is in the surface before the events that announce it, which is the
+	// order that makes a pre-edit visible without being part of the value.
+	const write = (text: string) => {
+		run.data = before + text + after;
+		const caret = document.createRange();
+		caret.setStart(run, before.length + text.length);
+		caret.collapse(true);
+		selection?.removeAllRanges();
+		selection?.addRange(caret);
+	};
+	return {
+		preEdit(text: string) {
+			write(text);
+			surface.dispatchEvent(
+				new CompositionEvent('compositionupdate', { bubbles: true, data: text }),
+			);
+			surface.dispatchEvent(
+				new InputEvent('input', {
+					bubbles: true,
+					inputType: 'insertCompositionText',
+					data: text,
+					isComposing: true,
+				}),
+			);
+		},
+		/** The candidate that was chosen, which is not what the pre-edit showed. */
+		commit(text: string) {
+			write(text);
+			surface.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: text }));
+		},
+	};
+}
+
+/**
+ * Everything the box reports from here on, read off the scenario's append-only
+ * log. Sampling the value field cannot answer "was anything reported": the DOM
+ * commit coalesces, so a value taken mid-composition and the one taken at the
+ * end reach the field as a single write.
+ */
+function reportsFrom() {
+	const before = (el(Reports).textContent ?? '').length;
+	return () => (el(Reports).textContent ?? '').slice(before);
 }
 
 async function expectNoAxeViolations(container: Element, phase: string) {
@@ -359,6 +427,12 @@ for (const mode of MODES) {
 	// The one rule the whole IME story reduces to: never mutate mid-composition.
 	// Nothing is derived, nothing is reported and nothing re-renders until the
 	// browser hands the region back.
+	//
+	// The pre-edit is dispatched rather than typed. A driver keystroke is a
+	// committed insertion on every platform - `isComposing` false, no
+	// compositionupdate - so typing between the two boundaries synthesises no
+	// composition at all, and whether the guard is reached in time then depends
+	// on how fast the runner drains its dispatch queue.
 	test(`${mode}: nothing is derived or reported while a composition is in flight`, async () => {
 		if (mode === 'CSR') await render(Mention);
 		else await renderSSR(Mention);
@@ -366,15 +440,61 @@ for (const mode of MODES) {
 		caretToEnd();
 		await userEvent.keyboard('hi ');
 		await expect.poll(() => el(Held).textContent).toBe('hi ');
+		// The typing is let go of first: `settle` takes the surface as it is when
+		// the handler runs, so a keystroke draining after the pre-edit is on screen
+		// would report the pre-edit for a reason that is not about the guard.
+		await drained();
 
+		const since = reportsFrom();
 		el(Input).dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
-		await userEvent.keyboard('nihao');
-		// The DOM has the pre-edit string; the value deliberately does not.
-		await expect.poll(() => el(Input).textContent).toBe('hi nihao');
-		expect(el(Held).textContent).toBe('hi ');
+		const compose = composition();
+		// Three updates, the way a pre-edit actually grows under an IME.
+		for (const preEdit of ['n', 'ni', 'nihao']) {
+			compose.preEdit(preEdit);
+			// The DOM has the pre-edit string; the value deliberately does not. A
+			// trailing space in a contenteditable is held as a non-breaking one,
+			// which the family's own read normalises and a raw textContent does not.
+			await expect.poll(() => plainSpaces(el(Input).textContent)).toBe(`hi ${preEdit}`);
+			expect(el(Held).textContent).toBe('hi ');
+		}
 
-		el(Input).dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
-		await expect.poll(() => el(Held).textContent).toBe('hi nihao');
+		// The pre-edit stays on screen until every dispatch it raised has run, so a
+		// late derivation still reads it and still shows up in the log below.
+		await drained();
+
+		// The candidate is not the pre-edit, which is what makes a mid-flight
+		// derivation nameable: 'hi nihao' is a value this box must never have had.
+		compose.commit('你好');
+		await expect.poll(() => el(Held).textContent).toBe('hi 你好');
+		// One report, the committed one. Every pre-edit passed unreported.
+		expect(since()).toBe('hi 你好;');
+	});
+
+	// The same rule with the boundary taken away, which is the ordering a real IME
+	// can hand a handler that runs a dispatch behind the gesture: the pre-edit is
+	// already arriving while the compositionstart handler is still queued. An
+	// input event that says it is composing is not derived from either way.
+	test(`${mode}: an input that says it is composing is not derived from`, async () => {
+		if (mode === 'CSR') await render(Mention);
+		else await renderSSR(Mention);
+
+		caretToEnd();
+		await userEvent.keyboard('hi ');
+		await expect.poll(() => el(Held).textContent).toBe('hi ');
+		// The typing is let go of first: `settle` takes the surface as it is when
+		// the handler runs, so a keystroke draining after the pre-edit is on screen
+		// would report the pre-edit for a reason that is not about the guard.
+		await drained();
+
+		const since = reportsFrom();
+		const compose = composition();
+		compose.preEdit('nihao');
+		await expect.poll(() => plainSpaces(el(Input).textContent)).toBe('hi nihao');
+		await drained();
+
+		compose.commit('你好');
+		await expect.poll(() => el(Held).textContent).toBe('hi 你好');
+		expect(since()).toBe('hi 你好;');
 	});
 
 	// repeat keys must be a static property path on the row item; positional keys re-render on echo - framework wall
