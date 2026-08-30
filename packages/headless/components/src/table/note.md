@@ -11,12 +11,12 @@ ruled against its recommendation, this note is what shipped.
 
 ## Parts
 
-`root` `item` `rowcontent` `coltrigger` `rowfield`
+`root` `item` `itemcontent` `coltrigger` `itemfield`
 
 The owner's ruling of 2026-08-29 closed the research note's naming questions, and
 it went the other way from the recommendation there. There is **no new `cell`
 role**: a cell is `content` wearing a `row` prefix, so the part the research
-called `table.cell` is `table.rowcontent`, and the part it called
+called `table.cell` is `table.itemcontent`, and the part it called
 `table.columntrigger` is `table.coltrigger`. `row` and `col` are the new
 prefixes, both recorded in `SPEC.md`.
 
@@ -26,7 +26,7 @@ prefixes, both recorded in `SPEC.md`.
 name because the row *is* the repeated unit — the prefixes are for parts scoped
 to a row or a column, not for the row itself.
 
-`rowcontent` is one cell and the thing focus rests on. `rowheader` on it renders
+`itemcontent` is one cell and the thing focus rests on. `rowheader` on it renders
 `<th>` with `role="rowheader"` instead of `<td>`: that is the cell that names the
 row for a reader.
 
@@ -34,7 +34,7 @@ row for a reader.
 press, all on one element rather than split across a nested button, which is what
 React Aria's `usePress`-on-the-header does and why the two facts stay together.
 
-`rowfield` is a hidden checkbox carrying one row's picked state into a form. It
+`itemfield` is a hidden checkbox carrying one row's picked state into a form. It
 is `aria-hidden` and out of the tab order because the row already carries
 `aria-selected`.
 
@@ -62,7 +62,7 @@ opposite for a sortable read-only table. The owner ruled progressive, so:
   from there the family writes `row`, `gridcell` and `rowheader` explicitly
   rather than trusting the native mapping, which is React Aria's approach and
   sidesteps the unresolved HTML-AAM question in the research.
-- Mounting `rowcontent` cells gives the table its second axis — the arrows walk
+- Mounting `itemcontent` cells gives the table its second axis — the arrows walk
   cell by cell and column by column, `Home`/`End` reach the ends of a row and the
   corners of the table, and the space bar picks the row the focused cell sits in
   — but writes **no role**. The owner's ruling had cells earn the role too; the
@@ -129,7 +129,7 @@ own row's cells. Nothing is ever told a coordinate.
     so the root cannot ask the roster instead. A *handler* may — which is why the
     same fact is available to the keyboard and to focusin and not to the role.
 
-  What this costs, precisely: a table with `rowcontent` cells and no selection
+  What this costs, precisely: a table with `itemcontent` cells and no selection
   prop writes no `grid`, no `row`, no `gridcell` and no `rowheader`, and it is
   not in the tab order, so a person reaches it by clicking a cell rather than by
   tabbing to it. Everything else works — the 2D walk, roving focus, `Home`/`End`
@@ -145,14 +145,14 @@ own row's cells. Nothing is ever told a coordinate.
   stops without making the table a grid" and the tab-stop assertion in "a
   cells-only table has no tab stop".
 
-- ~~**On the server path a `table.rowcontent` renders as an empty `<table>`.**~~
+- ~~**On the server path a `table.itemcontent` renders as an empty `<table>`.**~~
   **Fixed in the compiler.** The measurement was: `renderSSR(scenarios/cells.tsrx)`
   served the cell as the family's own `<table>` tag carrying the cell's props
   (`rowheader=""` among them, so the destructured prop had not even been
   consumed), with the cell's text left outside the row.
 
   The cause was one compiler predicate, not anything in this family.
-  `TableRowContent` is the only part here whose body is nothing but an
+  `TableItemContent` is the only part here whose body is nothing but an
   `@if`/`@else` over two other components, so it has markup but no element tag of
   its own. `sameModuleSsrComponentNames` in
   `packages/compiler/src/passes/public-render/same-module.ts` asked
@@ -190,7 +190,7 @@ own row's cells. Nothing is ever told a coordinate.
 - Clicking anywhere in a row picks it when the table is selectable, and there is
   no `itemtrigger`-shaped part to carve an exception out for, so a control a
   consumer drops in a cell picks the row too. Roselli's objection to click
-  handlers on `<tr>` is on the record; `rowfield` plus the consumer's own
+  handlers on `<tr>` is on the record; `itemfield` plus the consumer's own
   checkbox is the recommended shape.
 - Typeahead matches everything a row reads rather than its row-header cell alone.
   Binding the header cell to a second handle would have meant two handles on one

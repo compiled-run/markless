@@ -135,9 +135,9 @@ https://next.melt-ui.com/components/spatialmenu/ (WIP, no documented ARIA; its t
 spatial navigation over unaligned items is worth stealing for the nav engine).
 
 Settled by the owner on 2026-08-29, so the research note's open questions are closed:
-- No new `cell` component role. The 2D focus stop is `table.rowcontent` (`<td>`, or `<th>` with
+- No new `cell` component role. The 2D focus stop is `table.itemcontent` (`<td>`, or `<th>` with
   `role="rowheader"` under a `rowheader` boolean), and `row`/`col` join the prefix list in SPEC.
-- Parts are `root` `item` `rowcontent` `coltrigger` `rowfield`; `<thead>`/`<tbody>`/`<caption>`
+- Parts are `root` `item` `itemcontent` `coltrigger` `itemfield`; `<thead>`/`<tbody>`/`<caption>`
   and non-sortable `<th>`s stay the consumer's own elements with no parts.
 - `role="grid"` is progressive: a bare table writes no role at all, and the root becomes a grid
   once the selection props are present. The ruling also had mounted cells earn the role; that

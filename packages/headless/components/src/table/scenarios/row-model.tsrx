@@ -71,9 +71,9 @@ export default function RowModel() @{
 			<tbody>
 				@for (const row of rows; key row.id) {
 					<table.item value={row.id} data-testid="model-item">
-						<table.rowcontent rowheader data-testid="model-cell">{row.name}</table.rowcontent>
-						<table.rowcontent data-testid="model-cell">{row.size}</table.rowcontent>
-						<table.rowcontent data-testid="model-cell">{row.changed}</table.rowcontent>
+						<table.itemcontent rowheader data-testid="model-cell">{row.name}</table.itemcontent>
+						<table.itemcontent data-testid="model-cell">{row.size}</table.itemcontent>
+						<table.itemcontent data-testid="model-cell">{row.changed}</table.itemcontent>
 					</table.item>
 				}
 			</tbody>

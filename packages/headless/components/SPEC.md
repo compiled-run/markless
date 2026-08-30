@@ -39,8 +39,8 @@ Established roles (shipped in 3+ families, or ruled by the owner):
 | `area` | a bounded region with its own interaction rules | scroll area; candidates as they earn it |
 | `selection` | the chosen region inside an area, movable and resizable by the person | crop (ruled); candidates: slider range, calendar range |
 
-Explicitly **not** roles: `cell` (ruled 2026-08-29 — a cell is `content` wearing a
-`row` prefix), `arrow` (no behavior here — anchored arrows are
+Explicitly **not** roles: `cell` (ruled 2026-08-29 — a cell is its row-item's
+`itemcontent`, the gridlist precedent), `arrow` (no behavior here — anchored arrows are
 consumer CSS over the anchor data surface; revisit only if three families need a
 behaviored arrow), `portal`, `positioner`, `viewport`, `value` (that is a
 prefix), `group` (below the 3-use bar today; first candidate when select/combobox
@@ -55,8 +55,10 @@ Established prefixes: `item` (belongs to one item of the set — `itemtrigger`,
 `itemcontent`, `itemlabel`, `itemindicator`, `itemfield`, `itemtitle`,
 `itemclose`, `itemicon`, `itemlink`), `value` (carries the current value —
 `valuelabel`), `nav` (carousel `navtrigger`), `play` (carousel `playtrigger`),
-`row` and `col` (belongs to one row or one column of a rows-and-columns family —
-table `rowcontent`, `rowfield`, `coltrigger`).
+`col` (belongs to one column of a rows-and-columns family — table `coltrigger`;
+`row` is ruled alongside it for row-scoped parts, none shipping yet — the row is
+the family's `item`, so its cell is `itemcontent` and its form carrier is
+`itemfield`).
 
 The worked example: the text in a trigger showing the selected value is not a new
 role. Its purpose is *label*; the information it carries is the *value*; the name

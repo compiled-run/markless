@@ -8,12 +8,12 @@ export default function TwoTables() @{
 			<caption>Sources</caption>
 			<tbody>
 				<table.item value="index" data-testid="left-index-item">
-					<table.rowcontent rowheader data-testid="left-index-name">index.ts</table.rowcontent>
-					<table.rowcontent data-testid="left-index-size">2.0 kB</table.rowcontent>
+					<table.itemcontent rowheader data-testid="left-index-name">index.ts</table.itemcontent>
+					<table.itemcontent data-testid="left-index-size">2.0 kB</table.itemcontent>
 				</table.item>
 				<table.item value="app" data-testid="left-app-item">
-					<table.rowcontent rowheader data-testid="left-app-name">app.tsrx</table.rowcontent>
-					<table.rowcontent data-testid="left-app-size">3.0 kB</table.rowcontent>
+					<table.itemcontent rowheader data-testid="left-app-name">app.tsrx</table.itemcontent>
+					<table.itemcontent data-testid="left-app-size">3.0 kB</table.itemcontent>
 				</table.item>
 			</tbody>
 		</table.root>
@@ -21,12 +21,12 @@ export default function TwoTables() @{
 			<caption>Docs</caption>
 			<tbody>
 				<table.item value="intro" data-testid="right-intro-item">
-					<table.rowcontent rowheader data-testid="right-intro-name">intro.md</table.rowcontent>
-					<table.rowcontent data-testid="right-intro-size">1.0 kB</table.rowcontent>
+					<table.itemcontent rowheader data-testid="right-intro-name">intro.md</table.itemcontent>
+					<table.itemcontent data-testid="right-intro-size">1.0 kB</table.itemcontent>
 				</table.item>
 				<table.item value="guide" data-testid="right-guide-item">
-					<table.rowcontent rowheader data-testid="right-guide-name">guide.md</table.rowcontent>
-					<table.rowcontent data-testid="right-guide-size">5.0 kB</table.rowcontent>
+					<table.itemcontent rowheader data-testid="right-guide-name">guide.md</table.itemcontent>
+					<table.itemcontent data-testid="right-guide-size">5.0 kB</table.itemcontent>
 				</table.item>
 			</tbody>
 		</table.root>

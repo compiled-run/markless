@@ -5,12 +5,12 @@ import { isSearchKey, matchAt, nextSearch } from '../gridlist/grid-typeahead.ts'
 import { ownParts, reachableRows, rowAt, rowValues } from '../gridlist/grid-walk.ts';
 import { cellAt, reachableCells, rowText } from './table-walk.ts';
 import type {
-	TableCellProps,
+	TableItemContentBaseProps,
 	TableColTriggerProps,
 	TableGridProps,
 	TableInstanceState,
-	TableRowContentProps,
-	TableRowFieldProps,
+	TableItemContentProps,
+	TableItemFieldProps,
 	TableItemInstanceState,
 	TableItemProps,
 	TableRootProps,
@@ -376,25 +376,25 @@ export function TableItem({ value, disabled = false, children, ...rest }: TableI
 	>{children}</tr>
 }
 
-export function TableRowContent({ rowheader = false, children, ...rest }: TableRowContentProps) @{
+export function TableItemContent({ rowheader = false, children, ...rest }: TableItemContentProps) @{
 	@if (rowheader) {
-		<TableRowHeaderCell {...rest}>{children}</TableRowHeaderCell>
+		<TableItemContentHeader {...rest}>{children}</TableItemContentHeader>
 	} @else {
-		<TableDataCell {...rest}>{children}</TableDataCell>
+		<TableItemContentData {...rest}>{children}</TableItemContentData>
 	}
 }
 
 // `gridcell` is only meaningful inside a grid, so it rides the same condition the
 // root's role does: without it a `<td>` claiming to be a gridcell would be
 // describing a container that is not one. The cell is a focus stop either way.
-function TableDataCell({ children, ...rest }: TableCellProps) @{
+function TableItemContentData({ children, ...rest }: TableItemContentBaseProps) @{
 	const table = tableState();
 	const cellRole = computed(() => (table.selectable === true ? 'gridcell' : undefined));
 
 	<td {...rest} el={table.cellEls} role={cellRole} tabindex={-1}>{children}</td>
 }
 
-function TableRowHeaderCell({ children, ...rest }: TableCellProps) @{
+function TableItemContentHeader({ children, ...rest }: TableItemContentBaseProps) @{
 	const table = tableState();
 	// Left off outside a grid the same way, where `<th>` in a body row already maps to it.
 	const cellRole = computed(() => (table.selectable === true ? 'rowheader' : undefined));
@@ -426,7 +426,7 @@ export function TableColTrigger({ value, children, ...rest }: TableColTriggerPro
 	>{children}</th>
 }
 
-export function TableRowField({ ...rest }: TableRowFieldProps) @{
+export function TableItemField({ ...rest }: TableItemFieldProps) @{
 	const table = tableState();
 	const item = tableItemState();
 	const isChecked = computed(() => table.value.includes(item.value));
