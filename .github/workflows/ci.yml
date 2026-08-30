@@ -82,8 +82,10 @@ jobs:
             - name: Validate the CI workflow structure
               run: node scripts/ci/check-workflow.mjs .github/workflows/ci.yml
 
+            # The wrapper, not raw tsc: family source imports .tsrx, which only
+            # the typescript-plugin's tsc entry resolves.
             - name: Typecheck
-              run: pnpm exec tsc --noEmit -p tsconfig.json
+              run: pnpm typecheck
 
             - name: Lint
               run: pnpm exec vp check --no-fmt
