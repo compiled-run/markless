@@ -118,7 +118,7 @@ collision, which is what a keyed row of an array needs and a single string does 
   positioning, hidden-until-open, stacking. taglist needs none: the edit field is hidden with the
   `hidden` attribute and chip layout is entirely the consumer's.
 - **Registered.** The barrel exports `taglist`, `package.json` exports `./taglist`, the conformance
-  battery carries a descriptor, and the sr-gallery serves `#taglist` with the tags input, the
+  battery carries a descriptor, and the sr-app serves `#taglist` with the tags input, the
   display-only row and the editable one. Scenarios import `{ taglist }` from the barrel the way a
   consumer would, and `taglist-transcript.ts` reads `FAMILY_ANCHORS.taglist` and the shared
   `GALLERY_WALK_LIMIT`. What that unit found is in

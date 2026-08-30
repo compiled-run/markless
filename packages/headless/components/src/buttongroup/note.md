@@ -155,5 +155,5 @@ attributes, so roving DOM focus is the only model.
 ## Not wired into the gallery yet
 
 `buttongroup-transcript.ts` spells its own gallery anchor rather than reading
-`FAMILY_ANCHORS`, because the sr-gallery section and the CI matrix entry land in
+`FAMILY_ANCHORS`, because the sr-app section and the CI matrix entry land in
 a follow-up. The two real-reader lanes are written and have never been run.

@@ -871,7 +871,7 @@ function TourSection() @{
 		>
 			<tour.backdrop />
 
-			<tour.item index={0} target={saveEl}>
+			<tour.item target={saveEl}>
 				<tour.title>Save your work</tour.title>
 				<tour.description>
 					The Save button in the toolbar keeps a copy of the document.
@@ -882,7 +882,7 @@ function TourSection() @{
 				<tour.close>Skip the tour</tour.close>
 			</tour.item>
 
-			<tour.item index={1} target={shareEl}>
+			<tour.item target={shareEl}>
 				<tour.title>Share it</tour.title>
 				<tour.description>
 					The Share button beside Save sends a read-only link.
@@ -893,7 +893,7 @@ function TourSection() @{
 				<tour.close>Skip the tour</tour.close>
 			</tour.item>
 
-			<tour.item index={2} target={trashEl}>
+			<tour.item target={trashEl}>
 				<tour.title>Delete it</tour.title>
 				<tour.description>
 					The Delete button at the end of the toolbar throws the document away.

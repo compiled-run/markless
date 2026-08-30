@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test';
-import { FAMILY_ANCHORS, PREVIEW_ORIGIN } from '../../../../../apps/sr-gallery/preview-server.ts';
+import { FAMILY_ANCHORS, PREVIEW_ORIGIN } from '../../../sr-app/preview-server.ts';
 import {
 	missingFacts,
 	readUntil,

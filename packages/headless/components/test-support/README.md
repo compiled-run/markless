@@ -41,7 +41,7 @@ already use.
 The real-reader lanes need the reader installed, and read a served page:
 
 ```sh
-node apps/sr-gallery/scripts/boot-check.ts   # serve it and check every family rendered
+node packages/headless/sr-app/scripts/boot-check.ts   # serve it and check every family rendered
 pnpm test:sr-real -- --project=nvda          # Windows, NVDA installed
 pnpm test:sr-real -- --project=voiceover     # macOS, automation permission granted
 pnpm typecheck:sr-real                       # types for the real-reader lane
@@ -133,7 +133,7 @@ either reader file, because two copies of an expectation drift.
 
 ## The page the real readers read
 
-`apps/sr-gallery` — every shipped family's Basic scenario, one section each, on
+`packages/headless/sr-app` — every shipped family's Basic scenario, one section each, on
 anchors a reader can be sent to (`/#checkbox`, `/#toggle`, …). It is consumer
 code: it imports through the `@markless/ui` barrel and carries no test hooks.
 The one affordance for a driver is `data-gallery-ready` on `<html>`, set after
@@ -235,11 +235,11 @@ folder.
 An app that uses member tags — `<checkbox.root>`, the entire authoring surface
 of `@markless/ui` — loses exports through the compiler's public-render pass:
 
-- **Serving** (`pnpm --dir apps/sr-gallery dev`) answers 200, then the browser
+- **Serving** (`pnpm --dir packages/headless/sr-app dev`) answers 200, then the browser
   reports
   `SyntaxError: The requested module '…/packages/headless/components/src/checkbox/checkbox.tsrx?import' does not provide an export named 'CheckboxDescription'`,
   and nothing mounts.
-- **Building** (`pnpm --dir apps/sr-gallery build`) fails in the client
+- **Building** (`pnpm --dir packages/headless/sr-app build`) fails in the client
   environment with `MISSING_EXPORT`, including for the app's own component:
   `"Gallery" is not exported by "src/Gallery.tsrx"`.
 
@@ -297,7 +297,7 @@ disagree, that disagreement is the finding.
    `.github/workflows/screen-reader.yml`, and to the `nvda` and `voiceover` lists
    only once step 3 exists — a name with no spec file makes the run find no
    tests. Nothing else in the workflow changes.
-5. Give the family a section in `apps/sr-gallery` on the anchor the reader files
+5. Give the family a section in `packages/headless/sr-app` on the anchor the reader files
    name: the real lanes read that served page, not a rendered container.
 
 Never invent an expected phrase. Every phrase traces to an aria-at assertion or

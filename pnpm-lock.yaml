@@ -89,31 +89,6 @@ importers:
         specifier: 2.9.0
         version: 2.9.0
 
-  apps/sr-gallery:
-    dependencies:
-      '@markless/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-      '@markless/ui':
-        specifier: workspace:*
-        version: link:../../packages/headless/components
-    devDependencies:
-      '@markless/typescript-plugin':
-        specifier: workspace:*
-        version: link:../../packages/typescript-plugin
-      rolldown:
-        specifier: 1.0.3
-        version: 1.0.3
-      typescript:
-        specifier: 5.9.3
-        version: 5.9.3
-      vite:
-        specifier: 8.0.16
-        version: 8.0.16(@types/node@24.12.2)(jiti@2.7.0)(yaml@2.9.0)
-      vite-plus:
-        specifier: 0.1.20
-        version: 0.1.20(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(vite@8.0.16(@types/node@24.12.2)(jiti@2.7.0)(yaml@2.9.0))(yaml@2.9.0)
-
   demos/async-waterfall:
     dependencies:
       '@markless/core':
@@ -900,6 +875,31 @@ importers:
       yuku-analyzer:
         specifier: 0.9.1
         version: 0.9.1
+
+  packages/headless/sr-app:
+    dependencies:
+      '@markless/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@markless/ui':
+        specifier: workspace:*
+        version: link:../components
+    devDependencies:
+      '@markless/typescript-plugin':
+        specifier: workspace:*
+        version: link:../../typescript-plugin
+      rolldown:
+        specifier: 1.0.3
+        version: 1.0.3
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vite:
+        specifier: 8.0.16
+        version: 8.0.16(@types/node@24.12.2)(jiti@2.7.0)(yaml@2.9.0)
+      vite-plus:
+        specifier: 0.1.20
+        version: 0.1.20(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(vite@8.0.16(@types/node@24.12.2)(jiti@2.7.0)(yaml@2.9.0))(yaml@2.9.0)
 
   packages/router:
     dependencies:

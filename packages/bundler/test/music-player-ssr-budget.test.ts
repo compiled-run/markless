@@ -100,7 +100,7 @@ const clientBuild = resolve(clientPublic, MARKLESS_BUILD_PREFIX);
 // order; repayment stays with bundler-diet.
 // 65,444 -> 65,452 (re-anchor 2026-08-22, U112/U116 merge window): +8 across two candidate
 // classes, not individually revert-measured (de-minimis): compiled modules now publish real
-// ES named exports per served component (plain-ESM consumers link — the sr-gallery gate), and
+// ES named exports per served component (plain-ESM consumers link — the sr-app gate), and
 // handler symbol modules carry same-file module-scope declarations they name. Both are
 // consumer-capability payload, not waste. Repayment stays with bundler-diet.
 // MEASUREMENT LANDMINE, found by U157: this wall's number is a NODE_ENV=test build, because vitest

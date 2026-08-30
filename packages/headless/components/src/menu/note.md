@@ -429,7 +429,7 @@ menu). All of them are at zero on this tip. The bar's own rows moved to
 popup and expanded state, the submenu announcing itself under that item's name,
 and Escape returning to the item. `menu-transcript.ts` carries the
 reader-agnostic transcript that `menu.nvda.ts` and `menu.voiceover.ts` run
-against real readers on the sr-gallery page - **which does not have a menu
+against real readers on the sr-app page - **which does not have a menu
 section yet**: adding it, along with the `menu` and `menuitem` words in the shared
 `Vocabulary` and the `FAMILY_ANCHORS` entry the transcript names locally in the
 meantime, belongs to the unit that registers this family. The real-reader lanes

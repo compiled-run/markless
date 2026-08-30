@@ -10,6 +10,6 @@
 		"./playwright.config.ts",
 		"../src/**/*.nvda.ts",
 		"../src/**/*.voiceover.ts",
-		"../../../../apps/sr-gallery/preview-server.ts"
+		"../../sr-app/preview-server.ts"
 	]
 }
