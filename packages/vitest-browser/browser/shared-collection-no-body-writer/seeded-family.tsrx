@@ -26,14 +26,24 @@ export function SeededRoot({ items = [] as readonly string[], children }) @{
 /** Reads the family only from a handler, so a page holding it alone still renders. */
 export function SeededAdder() @{
 	const box = seededBox();
+	const asked = state({ ran: 0, refused: '' });
 
-	<div data-testid="adder">
+	<div data-testid="adder" data-ran={asked.ran} data-refused={asked.refused}>
 		<button
 			type="button"
 			data-testid="add"
+			// An unresolved instance refuses by throwing, and an escaped throw is
+			// reported to the host as an uncaught error that lands on whichever row
+			// the runner is on next - so the refusal is caught where it was asked.
 			onClick={() => {
-				box.items = [...box.items, 'gamma'];
-				box.seen = 'gamma added';
+				asked.ran = asked.ran + 1;
+				try {
+					box.items = [...box.items, 'gamma'];
+					box.seen = 'gamma added';
+				} catch (error) {
+					const refusal = error as { readonly code?: string; readonly message?: string } | null;
+					asked.refused = String(refusal?.code ?? refusal?.message ?? error);
+				}
 			}}
 		>add</button>
 	</div>
