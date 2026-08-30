@@ -4,6 +4,7 @@ import { resolve } from 'pathe';
 import { beforeAll, expect, test } from 'vitest';
 import { decodePayloadScripts } from '../../serializer/src/protocol-client.ts';
 import { MARKLESS_BUILD_PREFIX } from '../src/build/chunking.ts';
+import type { ParsedBundleGraphRecord } from '../src/build/preload-plan.ts';
 import {
 	chunkName,
 	createStageLadder,
@@ -267,7 +268,14 @@ const STAGE_ANCHORS = {
 	// +783 (re-anchor 2026-08-30, vite-plus 0.3.0): the toolchain's bundled oxc codegen rewrote
 	// every lazy-ESM init wrapper (measured +838 across this lane's 179 wrappers; the vite-csr
 	// control built with unchanged vite+rolldown is byte-identical). Measured 73,614.
-	'page-load download': { gzipBytes: 73_614, margin: 128 },
+	// +10,941 (re-anchor 2026-08-30, navigation preload set): the served page now preloads the
+	// navigation entry and the demand edges of it that cost nothing but their own bytes, so the
+	// reader stops paying a second waterfall hop for the client render path. Revert-measured in
+	// one worktree: 73,224 across 107 chunks without the planner change, 84,165 across 112 with
+	// it. The delta is what travels; the absolutes carry this worktree's own path offset (-390
+	// against the previous root-checkout anchor), so the anchor is the ratified 73,614 plus the
+	// measured delta and wants a root-checkout confirmation.
+	'page-load download': { gzipBytes: 84_555, margin: 128 },
 	// +81 (2026-08-30): same 0.3.0 wrapper codegen. Measured 4,295.
 	'page-load execute': { gzipBytes: 4_295, margin: 32 },
 	// 1,932 -> 1,407 tightened (2026-08-30): the coalesced boot bundle had inflated the first
@@ -275,15 +283,20 @@ const STAGE_ANCHORS = {
 	'interaction 1 marginal': { gzipBytes: 1_477, margin: 32 }, // +70 2026-08-30 wrapper codegen
 	'interaction 2 marginal': { gzipBytes: 1_649, margin: 32 }, // +81 2026-08-30 wrapper codegen
 	'interaction 3 marginal': { gzipBytes: 1_154, margin: 32 }, // +62 2026-08-30 wrapper codegen
-	// +79: row-template slot qualification in the child keyed-repeat composition sites (+54) and component-local handles keyed by host scope (+25).
-	// +363: control-edit-hold rides the client render path (dom-journal + render-csr + event-resume).
-	// +206 (re-anchor 2026-08-30, same symbol-bundle granularity attribution as page-load download): measured 23,981.
-	// NOT tightened to the 6,921 this stage now measures (2026-08-30): under 0.3.0 six chunks
-	// (15,982 gzip) of the client render path moved from the router chunk's static closure to
-	// demand edges the served HTML does not preload - the user still fetches them on first
-	// navigation, as a second waterfall hop. The stage under-measures until the preload planner
-	// emits those edges; the anchor stays so the number cannot be mistaken for a win.
-	'first-navigation marginal': { gzipBytes: 23_981, margin: 128 },
+	// REDEFINED 2026-08-30, and not comparable to the numbers before it. This stage used to sum
+	// the static import closure of the chunk the router link names, which stopped answering the
+	// question the moment chunk planning moved code onto demand edges: the bytes vanished from
+	// the stage while the reader still fetched them, one hop later. It now sums what a first
+	// navigation actually fetches - the router link entry's whole reachable set, demand edges
+	// included, minus every chunk the served page already preloaded. Measured 25,374 across 6
+	// chunks, revert-measured in the same worktree against 36,296 across 11 chunks without the
+	// navigation preload set: the planner moved 10,922 out of the second hop and onto the page's
+	// preload links (see page-load download). What is left is genuinely conditional - the
+	// prerender-data branch and the navigation polyfill only engines without the API fetch - so
+	// this is a ceiling no engine pays in full, and the number cannot silently under-measure
+	// again. Wants a root-checkout confirmation; the definition changed, so no prior absolute
+	// travels into it.
+	'first-navigation marginal': { gzipBytes: 25_374, margin: 128 },
 } as const satisfies Record<string, StageAnchor>;
 
 let measured: BudgetMeasurement;
@@ -360,8 +373,8 @@ async function measureBuiltDemo(): Promise<BudgetMeasurement> {
 	}
 	ladder.marginal(
 		'first-navigation marginal',
-		'the client render path the served page imports for a router link',
-		staticClosure(graph, page.navigationChunks),
+		'everything the router link can still demand that the served page did not preload',
+		firstNavigationFetches(graph, page.navigationChunks, page.eagerChunks),
 	);
 
 	return {
@@ -369,6 +382,33 @@ async function measureBuiltDemo(): Promise<BudgetMeasurement> {
 		aggregate: { chunks: aggregateChunks.length, gzipBytes: sum(aggregateChunks) },
 		instrumented,
 	};
+}
+
+// What a first navigation actually costs the reader: every chunk the router
+// link's entry can reach - its static closure and every demand edge behind it -
+// minus what the served page's preload links already put in the browser. Demand
+// edges count because a chunk that falls out of the static closure is still
+// fetched, just one hop later; leaving them out let a planning change read as a
+// win when it had only moved the fetch. A ceiling, not an average: an edge the
+// running engine skips (a navigation polyfill Chromium never asks for) is
+// counted, because no build artifact says which engine is reading.
+function firstNavigationFetches(
+	graph: ReadonlyMap<string, ParsedBundleGraphRecord>,
+	roots: Iterable<string>,
+	preloaded: Iterable<string>,
+): Set<string> {
+	const already = new Set(preloaded);
+	const seen = new Set<string>();
+	const fetched = new Set<string>();
+	const pending = [...roots];
+	while (pending.length > 0) {
+		const name = pending.pop()!;
+		if (seen.has(name)) continue;
+		seen.add(name);
+		if (name.endsWith('.js') && !already.has(name)) fetched.add(name);
+		for (const dep of graph.get(name)?.deps ?? []) pending.push(dep.name);
+	}
+	return fetched;
 }
 
 type ServedPage = {
