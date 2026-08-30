@@ -1,6 +1,6 @@
 import type { InputOptions, Plugin } from 'rolldown';
 import { computeExecutionAttribution, type LinkedModuleChildResolution } from '@markless/compiler';
-import { MARKLESS_BUILD_PREFIX, MARKLESS_BUNDLE_GRAPH, outputDefaults } from './build/chunking.ts';
+import { outputDefaults } from './build/chunking.ts';
 import { createMarklessDevGraph } from './dev.ts';
 import {
 	invalidateAllGeneratedModules,

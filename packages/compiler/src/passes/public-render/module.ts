@@ -6,7 +6,7 @@ import { collectPublicRenderComponentDefinitions } from './component-definitions
 import { collectSsrDeriveSetDiagnostics } from './derive-set.ts';
 import { emitDirectPublicRenderModule } from './direct-module.ts';
 import { emitPublicSsrRenderModule } from './ssr-module.ts';
-import { firstComponentRoot, selectPublicRenderRoot } from './plan.ts';
+import { selectPublicRenderRoot } from './plan.ts';
 import { collectSeedChildrenDiagnostics } from './seed-children-diagnostics.ts';
 import { hasExecutableBodyStatements, sharedInstanceLocalNames } from './render-body.ts';
 import { sameModuleSsrComponentNames, ssrComponentFunctionName } from './same-module.ts';

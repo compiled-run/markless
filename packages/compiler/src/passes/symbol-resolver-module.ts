@@ -269,7 +269,7 @@ function serializeBoundRows(rows: SymbolResolverModuleInput['boundSymbols']): st
 		row.id,
 		{
 			...row,
-			ancestry: row.ancestry.map(({ componentEdgeId: _, ...entry }) => entry),
+			ancestry: row.ancestry.map(({ componentEdgeId: _componentEdgeId, ...entry }) => entry),
 		},
 	]);
 	return JSON.stringify(
