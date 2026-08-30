@@ -283,10 +283,21 @@ export async function installMarklessExecutionLog(input = {}) {
 	return marklessInstallPromise;
 }
 export async function logMarklessInteraction(event) { await installMarklessExecutionLog({ printResumeSummary: false }); globalThis.__mxLogInteraction?.(event); }
+// The inline resumer wakes the runtime with no event (self-wake at load, overlay
+// primer on pointerdown). That is a resume, not a gesture: counting it would
+// close load early and charge one user click as two interactions.
 export async function logMarklessSpecializedInteraction(input, before) {
-	const target = input.element ?? input.event?.target;
+	if (!input.event) return logMarklessSpecializedWake();
+	const target = input.element ?? input.event.target;
 	const tag = typeof target?.tagName === 'string' ? target.tagName.toLowerCase() : 'element';
-	await logMarklessInteraction({ eventName: input.event?.type ?? 'event', eventRecord: input.eventRecord, before, selector: tag + (target?.id ? '#' + target.id : ''), after: new Set(globalThis.__mxLog) });
+	await logMarklessInteraction({ eventName: input.event.type ?? 'event', eventRecord: input.eventRecord, before, selector: tag + (target?.id ? '#' + target.id : ''), after: new Set(globalThis.__mxLog) });
+}
+async function logMarklessSpecializedWake() {
+	await installMarklessExecutionLog({ printResumeSummary: false });
+	const log = globalThis.__mxLog; if (!log) return;
+	const moduleSizes = await loadModuleSizes({}); const l = marklessLedger();
+	const turn = ledgerApply(l, 'resume', undefined, ledgerCharge(l, modules(log), moduleSizes));
+	ledgerMirror(l, turn, ledgerLine(l, turn), turn.kind === 'resume' ? 'data-markless-log-summary' : 'data-markless-log-last');
 }
 function marklessRenderSummaryTurnEnd() {
 	// Each injected entry module calls in from its own dynamic-import

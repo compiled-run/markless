@@ -878,6 +878,34 @@ test('generated logger formats specialized interaction snapshots in the lazy bri
 	expect(attributes.get('data-markless-log-last')).toContain('this keydown +');
 });
 
+// The inline resumer wakes with `event: 0`; the click that caused it arrives a
+// task later. Counting the wake charges one user gesture as two interactions.
+test('generated logger counts an eventless wake as a resume, not an interaction', async () => {
+	const attributes = stubExecutionLogDom();
+	(globalThis as ExecutionLogGlobal).__mxLog = new Set(['app:action']);
+	vi.spyOn(console, 'groupCollapsed').mockImplementation(() => {});
+	vi.spyOn(console, 'groupEnd').mockImplementation(() => {});
+	vi.spyOn(console, 'log').mockImplementation(() => {});
+
+	const mod = await importExecutionLogModule(executionLogVirtualModuleSource());
+	await mod.logMarklessSpecializedInteraction({ root: {}, event: 0 }, new Set<string>());
+
+	expect(attributes.get('data-markless-log-interactions')).toBeUndefined();
+	expect(attributes.get('data-markless-log-last')).toBeUndefined();
+	expect(attributes.get('data-markless-log-summary')).toContain('executed at load');
+
+	await mod.logMarklessSpecializedInteraction(
+		{
+			event: { type: 'click', target: { id: 'counter', tagName: 'BUTTON' } },
+			eventRecord: { hostNodeId: 'h1', symbolIds: [] },
+		},
+		new Set<string>(),
+	);
+
+	expect(attributes.get('data-markless-log-interactions')).toBe('1');
+	expect(attributes.get('data-markless-log-turn-label')).toBe('click [button#counter]');
+});
+
 test('generated logger treats old unmarked object size maps as app entries', async () => {
 	const attributes = stubExecutionLogDom();
 	(globalThis as ExecutionLogGlobal).__mxLog = new Set(['app:legacy']);
