@@ -264,16 +264,25 @@ const STAGE_ANCHORS = {
 	// 110 chunks; the growth is ~209 B/chunk of chunk overhead, the price of a first click
 	// executing 7.5 KB instead of 13.7 KB. Measured 72,831. Folds a pre-existing +255 that
 	// was already red before the fix, unattributed - flagged, not hidden.
-	'page-load download': { gzipBytes: 72_831, margin: 128 },
-	'page-load execute': { gzipBytes: 4_214, margin: 32 },
+	// +783 (re-anchor 2026-08-30, vite-plus 0.3.0): the toolchain's bundled oxc codegen rewrote
+	// every lazy-ESM init wrapper (measured +838 across this lane's 179 wrappers; the vite-csr
+	// control built with unchanged vite+rolldown is byte-identical). Measured 73,614.
+	'page-load download': { gzipBytes: 73_614, margin: 128 },
+	// +81 (2026-08-30): same 0.3.0 wrapper codegen. Measured 4,295.
+	'page-load execute': { gzipBytes: 4_295, margin: 32 },
 	// 1,932 -> 1,407 tightened (2026-08-30): the coalesced boot bundle had inflated the first
 	// click's marginal; per-interaction bundles give the smaller true cost back.
-	'interaction 1 marginal': { gzipBytes: 1_407, margin: 32 },
-	'interaction 2 marginal': { gzipBytes: 1_568, margin: 32 },
-	'interaction 3 marginal': { gzipBytes: 1_092, margin: 32 },
+	'interaction 1 marginal': { gzipBytes: 1_477, margin: 32 }, // +70 2026-08-30 wrapper codegen
+	'interaction 2 marginal': { gzipBytes: 1_649, margin: 32 }, // +81 2026-08-30 wrapper codegen
+	'interaction 3 marginal': { gzipBytes: 1_154, margin: 32 }, // +62 2026-08-30 wrapper codegen
 	// +79: row-template slot qualification in the child keyed-repeat composition sites (+54) and component-local handles keyed by host scope (+25).
 	// +363: control-edit-hold rides the client render path (dom-journal + render-csr + event-resume).
 	// +206 (re-anchor 2026-08-30, same symbol-bundle granularity attribution as page-load download): measured 23,981.
+	// NOT tightened to the 6,921 this stage now measures (2026-08-30): under 0.3.0 six chunks
+	// (15,982 gzip) of the client render path moved from the router chunk's static closure to
+	// demand edges the served HTML does not preload - the user still fetches them on first
+	// navigation, as a second waterfall hop. The stage under-measures until the preload planner
+	// emits those edges; the anchor stays so the number cannot be mistaken for a win.
 	'first-navigation marginal': { gzipBytes: 23_981, margin: 128 },
 } as const satisfies Record<string, StageAnchor>;
 

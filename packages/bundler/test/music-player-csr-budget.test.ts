@@ -110,7 +110,10 @@ const STAGE_ANCHORS = {
 	// granularity restored (113 chunks; the prior anchor ratified the accidental boot-bundle
 	// coalescing). Chunk overhead only; the first click's executed and marginal bytes shrank.
 	// Measured 139,187.
-	'page-load download': { gzipBytes: 139_187, margin: 128 },
+	// +801 (re-anchor 2026-08-30, vite-plus 0.3.0): bundled oxc codegen rewrote the lazy-ESM
+	// init wrappers (+869 measured across this lane's 160 wrappers; vite-csr control unchanged).
+	// Measured 139,988.
+	'page-load download': { gzipBytes: 139_988, margin: 128 },
 	// +5: roster-count placeholder minted in the eager seed slot (the resolver itself is demand-loaded);
 	// +114: seed-pass roster ledger in the eager seed slot; +228: control-edit-hold in the eager runtime chunk.
 	'page-load execute': { gzipBytes: 14_568, margin: 128 },
