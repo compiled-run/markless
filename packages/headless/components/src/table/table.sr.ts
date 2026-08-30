@@ -73,6 +73,11 @@ const WORDS: Record<string, TableWords> = {
 
 const say = WORDS[sr.name] ?? WORDS.virtual;
 
+// A row is named from its contents, so the name an announcement carries is every
+// cell's text in document order - never the one cell the row is recognised by.
+const ROW_README = 'README.md 4.1 kB';
+const ROW_LICENSE = 'LICENSE 1.1 kB';
+
 async function open(component: Parameters<typeof render>[0]) {
 	const { container } = await render(component);
 	await sr.start(container as unknown as HTMLElement);
@@ -129,10 +134,12 @@ test('a bare table is announced as a table, named by its caption', async () => {
 	expectConveys(await readFor([say.table, 'Files']), [say.table, 'Files']);
 });
 
+// The row role here is the elements' own: the family writes none on a bare table,
+// and a `<tr>` already maps to `row`.
 test('each row conveys the row role and its own words', async () => {
 	await open(Basic);
-	expectConveys(await readFor([say.row, 'README.md']), [say.row, 'README.md']);
-	expectConveys(await readFor([say.row, 'LICENSE']), [say.row, 'LICENSE']);
+	expectConveys(await readFor([say.row, ROW_README]), [say.row, ROW_README]);
+	expectConveys(await readFor([say.row, ROW_LICENSE]), [say.row, ROW_LICENSE]);
 });
 
 test('a sortable header is announced as a column header', async () => {
@@ -158,13 +165,13 @@ test('a selectable table of cells is announced as a grid', async () => {
 
 test('a row of a selectable table conveys whether it is picked', async () => {
 	await open(Prepicked);
-	expectConveys(await readFor([say.row, 'README.md']), [say.selected]);
-	expectConveys(await readFor([say.row, 'LICENSE']), [say.notSelected]);
+	expectConveys(await readFor([say.row, ROW_README]), [say.selected]);
+	expectConveys(await readFor([say.row, ROW_LICENSE]), [say.notSelected]);
 });
 
 test('a table nobody can pick from says nothing about picking', async () => {
 	await open(Basic);
-	const phrase = await readFor([say.row, 'README.md']);
+	const phrase = await readFor([say.row, ROW_README]);
 	expect(phrase, `${sr.name} announced "${phrase}"`).not.toContain(say.selected);
 });
 
@@ -186,5 +193,5 @@ test('a table that takes several rows at once says so', async () => {
 
 test('a table nobody may use conveys that its rows are unavailable', async () => {
 	await open(Disabled);
-	expectConveys(await readFor([say.row, 'LICENSE']), [say.row, say.disabled]);
+	expectConveys(await readFor([say.row, ROW_LICENSE]), [say.row, say.disabled]);
 });
