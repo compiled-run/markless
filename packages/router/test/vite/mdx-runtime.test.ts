@@ -14,6 +14,10 @@ import {
 } from '../../../serializer/src/protocol-constants.ts';
 import { transformMdxRoute } from '../../src/vite/mdx.ts';
 
+// A loader answers with a symbol, and the route scopes what it gets back, so a
+// stand-in has to be callable for its answer to survive the round trip.
+type MdxTestSymbol = (context: unknown) => unknown;
+
 describe('Markless Router MDX route runtime helpers', () => {
 	it('composes child state payloads for one MDX route container', () => {
 		const state = composeMdxState([
@@ -178,7 +182,7 @@ describe('composeMdxState symbol namespacing', () => {
 					],
 				},
 				loadSymbol(symbolId) {
-					return `child0:${symbolId}`;
+					return () => `child0:${symbolId}`;
 				},
 			},
 		},
@@ -201,7 +205,7 @@ describe('composeMdxState symbol namespacing', () => {
 					],
 				},
 				loadSymbol(symbolId) {
-					return `child1:${symbolId}`;
+					return () => `child1:${symbolId}`;
 				},
 			},
 		},
@@ -242,7 +246,9 @@ describe('composeMdxState symbol namespacing', () => {
 		);
 
 		expect(
-			symbolIds.map((symbolId) => loadMdxSymbol(symbolId, childrenWithComputeds, [])),
+			symbolIds.map((symbolId) =>
+				(loadMdxSymbol(symbolId, childrenWithComputeds, []) as MdxTestSymbol)({}),
+			),
 		).toEqual(['child0:symbol:2', 'child1:c0:symbol:5']);
 	});
 
@@ -283,18 +289,20 @@ describe('composeMdxState symbol namespacing', () => {
 		const symbolId = state?.computed?.[1]?.deriveSymbolId;
 
 		expect(
-			loadMdxSymbol(
-				symbolId!,
-				[],
-				[
-					{
-						prefix: 'm1:',
-						loadSymbol(id) {
-							return `static:${id.slice('m1:'.length)}`;
+			(
+				loadMdxSymbol(
+					symbolId!,
+					[],
+					[
+						{
+							prefix: 'm1:',
+							loadSymbol(id) {
+								return () => `static:${id.slice('m1:'.length)}`;
+							},
 						},
-					},
-				],
-			),
+					],
+				) as MdxTestSymbol
+			)({}),
 		).toBe('static:c0:symbol:5');
 	});
 });
@@ -419,5 +427,48 @@ describe('MDX slot prefixes against the composition instance-path grammar', () =
 		expect(view?.domUpdates).toEqual([
 			{ hostNodeId: 'm0:h1', graphNodeId: 'state:count', symbolId: 'm0:symbol:3' },
 		]);
+	});
+
+	// A child that nests its own widget ships qualified cells (`c0:state:count`) while
+	// its handler spells the bare id. Resume recovers no instance path from behind a slot
+	// prefix, so unless the route applies the run itself the write lands on nothing.
+	it('scopes a nested child symbol onto the cell the composed page ships', () => {
+		const child: MdxChild = {
+			componentIndex: 0,
+			hostPrefix: 'm0:',
+			symbolPrefix: 'm0:',
+			output: {
+				state: { version: 1, cells: [{ graphNodeId: 'c0:state:count' }], computed: [] },
+			},
+		};
+		const writes: string[] = [];
+		const graph = {
+			read: (graphNodeId: string) => graphNodeId,
+			write: (entry: { readonly graphNodeId: string }) => {
+				writes.push(entry.graphNodeId);
+			},
+		};
+		const symbol = loadMdxSymbol(
+			'm0:c0:symbol:0',
+			[],
+			[
+				{
+					prefix: 'm0:',
+					loadSymbol(symbolId) {
+						expect(symbolId).toBe('m0:c0:symbol:0');
+						return (context: { readonly graph: typeof graph }) =>
+							context.graph.write({ graphNodeId: 'state:count' });
+					},
+				},
+			],
+		) as MdxTestSymbol;
+
+		symbol({ graph });
+
+		const cells = composeMdxState([child])?.cells as ReadonlyArray<{
+			readonly graphNodeId: string;
+		}>;
+		expect(writes).toEqual(['c0:state:count']);
+		expect(writes).toEqual([cells[0]!.graphNodeId]);
 	});
 });

@@ -1,3 +1,7 @@
+import {
+	marklessInstancePath,
+	marklessInstanceScopedLoadSymbol,
+} from '@markless/web/fns/instance-scope';
 import { protocolStateVersion } from '../../../../serializer/src/protocol-constants.ts';
 
 export type MdxRoutePart =
@@ -330,18 +334,35 @@ export function loadMdxSymbol(
 	loaders: readonly MdxSymbolLoader[],
 ): unknown {
 	for (const child of children) {
-		if (symbolId.startsWith(child.symbolPrefix) && child.output?.loadSymbol) {
-			return child.output.loadSymbol(symbolId.slice(child.symbolPrefix.length));
-		}
+		if (!symbolId.startsWith(child.symbolPrefix)) continue;
+		const load = child.output?.loadSymbol?.bind(child.output);
+		if (load) return loadScopedMdxSymbol(symbolId, child.symbolPrefix, load);
 	}
 
 	for (const loader of loaders) {
 		if (symbolId.startsWith(loader.prefix)) {
-			return loader.loadSymbol(symbolId);
+			return loadScopedMdxSymbol(symbolId, loader.prefix, (id) =>
+				loader.loadSymbol(loader.prefix + id),
+			);
 		}
 	}
 
 	return Promise.reject(new Error(`Unknown Markless MDX symbol ${symbolId}`));
+}
+
+type MdxInstanceScopedLoad = Parameters<typeof marklessInstanceScopedLoadSymbol>[0];
+
+// A slot prefix is outside the instance-path grammar on purpose, so resume scopes
+// nothing for a symbol behind one and a nested child's handler writes bare ids the
+// composed page never observes. The `c<n>:` run behind the slot becomes scope here.
+function loadScopedMdxSymbol(
+	symbolId: string,
+	prefix: string,
+	load: (symbolId: string) => unknown,
+): unknown {
+	const remainder = symbolId.slice(prefix.length);
+	if (marklessInstancePath(symbolId)) return load(remainder);
+	return marklessInstanceScopedLoadSymbol(load as MdxInstanceScopedLoad)(remainder);
 }
 
 function appendMdxChildView(context: {
