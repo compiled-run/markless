@@ -4,7 +4,6 @@ import {
 	planSymbolBundles,
 	symbolBundleVirtualModuleId,
 	symbolBundleVirtualModuleSourceFile,
-	SYMBOL_BUNDLE_BOOT_KEY,
 } from '../src/build/symbol-bundles.ts';
 
 const symbol = (id: string) => ({ symbolId: id, moduleId: `module:${id}` });
@@ -42,16 +41,58 @@ test('a symbol two interactions wake never joins either interaction bundle', () 
 	]);
 });
 
-test('symbols no interaction wakes form the boot bundle', () => {
+// The interaction view a caller passes is one module's local trigger groups: it
+// cannot name a symbol whose waking host node lives in a child module (a
+// callback prop) or whose waking write is any of several interactions (a
+// dom-update). Unnamed therefore means "owner unknown", and grouping unknowns
+// together made one click execute every other interaction's handler.
+test('symbols the interaction view does not name are never grouped together', () => {
 	const bundles = planSymbolBundles({
 		filename: '/src/root.tsrx',
-		symbols: [symbol('a'), symbol('boot1'), symbol('boot2')],
+		symbols: [symbol('a'), symbol('unnamed1'), symbol('unnamed2')],
 		interactions: [{ id: 'play:click', symbolIds: ['a'] }],
 	});
 
+	expect(bundles).toEqual([]);
+});
+
+test('a page whose handlers cross component edges keeps one chunk per handler', () => {
+	// Shape of the music-player page: two own-host handlers plus a behavior the
+	// local groups name, and callback props / dom-updates they cannot name.
+	const bundles = planSymbolBundles({
+		filename: '/pages/index.tsrx',
+		symbols: [
+			symbol('sym:0'),
+			symbol('sym:1'),
+			...['sym:2', 'sym:3', 'sym:4', 'sym:5', 'sym:6', 'sym:7', 'sym:8', 'sym:9'].map(symbol),
+			symbol('sym:10'),
+			symbol('sym:11'),
+		],
+		interactions: [
+			{ id: 'h2:click', symbolIds: ['sym:0', 'sym:11'] },
+			{ id: 'h3:click', symbolIds: ['sym:1', 'sym:11'] },
+		],
+	});
+
+	expect(bundles).toEqual([]);
+});
+
+test('an alternate-shaped module bundles only the symbols one interaction claims', () => {
+	const bundles = planSymbolBundles({
+		filename: '/widgets/Panel.tsrx',
+		symbols: [
+			symbol('fn/toggle'),
+			symbol('fn/paint'),
+			symbol('fn/detached-a'),
+			symbol('fn/detached-b'),
+			symbol('fn/detached-c'),
+		],
+		interactions: [{ id: 'node7:pointerdown', symbolIds: ['fn/toggle', 'fn/paint'] }],
+	});
+
 	expect(bundles).toHaveLength(1);
-	expect(bundles[0]!.key).toBe(SYMBOL_BUNDLE_BOOT_KEY);
-	expect(bundles[0]!.symbolModuleIds).toEqual(['module:boot1', 'module:boot2']);
+	expect(bundles[0]!.key).toBe('node7:pointerdown');
+	expect(bundles[0]!.symbolModuleIds).toEqual(['module:fn/paint', 'module:fn/toggle']);
 });
 
 test('a lone symbol keeps its own module rather than gaining a re-export hop', () => {
