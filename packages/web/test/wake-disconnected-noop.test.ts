@@ -47,7 +47,7 @@ function view(): ProtocolViewPayload {
 	};
 }
 
-function payloadDocument() {
+function payloadDocument(stateText?: string) {
 	const scripts = renderPayloadScripts({
 		state: createProtocolStatePayload({
 			cells: [{ graphNodeId: 'state:count', name: 'count', valueKind: 'scalar', value: 0 }],
@@ -57,7 +57,7 @@ function payloadDocument() {
 	const content = (script: string) =>
 		script.replace(/^<script type="markless\/(?:state|view)">/, '').replace('</script>', '');
 	const entries: Record<string, { readonly textContent: string } | undefined> = {
-		'script[type="markless/state"]': { textContent: content(scripts.stateScript) },
+		'script[type="markless/state"]': { textContent: stateText ?? content(scripts.stateScript) },
 		'script[type="markless/view"]': { textContent: content(scripts.viewScript) },
 	};
 	return {
@@ -107,11 +107,24 @@ test('an explicit resume on a detached root stays loud', async () => {
 	).rejects.toThrow();
 });
 
-test('a wake boot that refuses on a live root is reported once instead of left unhandled', async () => {
-	// Still in the document, so the census is worth being right about: the
-	// refusal must surface, but through the host's error sink rather than as a
-	// rejection every wake site drops on the floor.
+// Connected when the wake called in, so nothing filed it as retired; the
+// teardown lands while the boot is in flight. Reading the children is the first
+// thing locator resolution does, which is where the container goes away.
+function tornDownMidBoot(): FakeElement {
 	const root = element('SECTION');
+	let connected = true;
+	Object.defineProperty(root, 'isConnected', { get: () => connected });
+	Object.defineProperty(root, 'childNodes', {
+		get: () => {
+			connected = false;
+			return [];
+		},
+	});
+	return root;
+}
+
+test('a wake boot that refuses after its container left the document is a silent no-op', async () => {
+	const root = tornDownMidBoot();
 	(root as FakeElement & { __asyncResumeRuntimeStarted?: boolean }).__asyncResumeRuntimeStarted =
 		true;
 	const host = globalThis as { reportError?: (error: unknown) => void };
@@ -134,12 +147,57 @@ test('a wake boot that refuses on a live root is reported once instead of left u
 		else delete host.reportError;
 	}
 
-	expect(reports).toHaveLength(1);
-	expect(reports[0]).toMatchObject({
-		phase: 'runtime',
-		severity: 'error',
-		message: expect.stringContaining('Resume locator h1'),
-	});
+	expect(root.isConnected).toBe(false);
+	expect(reports).toEqual([]);
+});
+
+// The other half: a container still in the document keeps the boot's rejection.
+// Generated wake code drops the promise, so the page's unhandled-rejection
+// reporting is what sees the refusal, carrying the payload's own code and docs
+// link. Routing it to the host error sink instead would swap a rejection a page
+// can cancel for an uncancellable global error.
+test('a tampered payload on a live wake root rejects with its own code and docs link', async () => {
+	const root = element('SECTION');
+	(root as FakeElement & { __asyncResumeRuntimeStarted?: boolean }).__asyncResumeRuntimeStarted =
+		true;
+	const host = globalThis as { reportError?: (error: unknown) => void };
+	const previous = host.reportError;
+	const reports: unknown[] = [];
+	host.reportError = (error) => {
+		reports.push(error);
+	};
+	try {
+		await expect(
+			resumeFromPayloadDocument({
+				document: payloadDocument(JSON.stringify({ version: 1, cells: 'tampered' })),
+				root: root as never,
+				loadSymbol: () => () => undefined,
+			}),
+		).rejects.toMatchObject({
+			code: 'MARKLESS_PAYLOAD_INVALID',
+			docsUrl: 'https://markless.dev/errors/MARKLESS_PAYLOAD_INVALID',
+		});
+	} finally {
+		if (previous) host.reportError = previous;
+		else delete host.reportError;
+	}
+
+	// One surface, not two: the rejection is the report.
+	expect(reports).toEqual([]);
+});
+
+test('a wake boot that refuses on a root still in the document keeps its rejection', async () => {
+	const root = element('SECTION');
+	(root as FakeElement & { __asyncResumeRuntimeStarted?: boolean }).__asyncResumeRuntimeStarted =
+		true;
+
+	await expect(
+		resumeFromPayloadDocument({
+			document: payloadDocument(),
+			root: root as never,
+			loadSymbol: () => () => undefined,
+		}),
+	).rejects.toThrow(/Resume locator h1/);
 });
 
 test('a disposed root still in the document re-boots', async () => {

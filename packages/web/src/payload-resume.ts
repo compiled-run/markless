@@ -13,12 +13,13 @@ import {
 	wakeNoopResume,
 } from './payload-resume-registry.ts';
 import { marklessInstanceScopedLoadSymbol } from './fns/instance-scope.ts';
-import { reportRuntimeErrorToHost } from './runtime-error-reporting.ts';
 
-// Every wake site drops the promise `resumeContainerEvent` returns, so a boot
-// that refuses would leave as an unhandled rejection with nothing naming it.
-// The generated handoff marks the root before it calls in; an explicit
-// `resumeFromPayloadDocument` carries no mark and keeps its rejection.
+// Every wake site drops the promise `resumeContainerEvent` returns. A container
+// torn down mid-boot refuses against DOM that is gone and that refusal names
+// nothing, so it resolves as a no-op; a root still in the document keeps its
+// rejection, the one channel a live page can see the refusal on. The generated
+// handoff marks the root before it calls in; an explicit
+// `resumeFromPayloadDocument` carries no mark and always stays loud.
 function containWakeBoot(
 	root: ResumePayloadScriptsInput['root'],
 	boot: Promise<ResumePayloadScriptsResult>,
@@ -26,7 +27,7 @@ function containWakeBoot(
 	if (!(root as { readonly __asyncResumeRuntimeStarted?: boolean }).__asyncResumeRuntimeStarted)
 		return boot;
 	return boot.catch((error) => {
-		reportRuntimeErrorToHost(error, { phase: 'runtime' });
+		if ((root as { readonly isConnected?: boolean }).isConnected !== false) throw error;
 		return wakeNoopResume;
 	});
 }

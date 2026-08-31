@@ -113,13 +113,17 @@ const STAGE_ANCHORS = {
 	// +801 (re-anchor 2026-08-30, vite-plus 0.3.0): bundled oxc codegen rewrote the lazy-ESM
 	// init wrappers (+869 measured across this lane's 160 wrappers; vite-csr control unchanged).
 	// Measured 139,988.
-	// +90 (re-anchor 2026-08-30, disconnected-wake no-op): the resume registry answers a wake on
-	// an out-of-document root without booting, and the resume entry routes a wake boot's refusal
-	// through the host error sink instead of dropping the promise. Revert-measured in one
-	// worktree: 140,605 without the change, 140,695 with it, 113 chunks both ways. Only the delta
-	// travels - the absolutes carry this worktree's own path offset - so this wants a
-	// root-checkout confirmation.
-	'page-load download': { gzipBytes: 140_078, margin: 128 },
+	// +71 net (re-anchor 2026-08-30, disconnected-wake no-op): the resume registry answers a wake
+	// on an out-of-document root without booting, and a wake boot that refuses is contained only
+	// once its container has left the document - a root still in the document keeps its rejection,
+	// which is the only channel a live page sees it on. Revert-measured twice: +90 in the worktree
+	// that landed the containment (140,605 -> 140,695), then -19 here when the live-root branch
+	// stopped routing through the host error sink (140,707 -> 140,688), 113 chunks throughout.
+	// Only the deltas travel - the absolutes carry each worktree's own path offset - so this wants
+	// a root-checkout confirmation. This worktree still measures ~630 over the anchor on stages
+	// this change does not touch (the three interaction marginals are over by 52/48/44 with the
+	// change reverted), so the CSR lane is red here for reasons that predate it.
+	'page-load download': { gzipBytes: 140_059, margin: 128 },
 	// +5: roster-count placeholder minted in the eager seed slot (the resolver itself is demand-loaded);
 	// +114: seed-pass roster ledger in the eager seed slot; +228: control-edit-hold in the eager runtime chunk.
 	'page-load execute': { gzipBytes: 14_568, margin: 128 },
