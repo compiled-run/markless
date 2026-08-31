@@ -275,7 +275,13 @@ const STAGE_ANCHORS = {
 	// it. The delta is what travels; the absolutes carry this worktree's own path offset (-390
 	// against the previous root-checkout anchor), so the anchor is the ratified 73,614 plus the
 	// measured delta and wants a root-checkout confirmation.
-	'page-load download': { gzipBytes: 84_555, margin: 128 },
+	// +110 (re-anchor 2026-08-30, disconnected-wake no-op): the resume registry answers a wake on
+	// an out-of-document root without booting, and the resume entry routes a wake boot's refusal
+	// through the host error sink instead of dropping the promise. Revert-measured in one
+	// worktree: 84,745 without the change, 84,855 with it, 114 chunks both ways. Only the delta
+	// travels - the absolutes carry this worktree's own path offset - so this wants a
+	// root-checkout confirmation.
+	'page-load download': { gzipBytes: 84_665, margin: 128 },
 	// +81 (2026-08-30): same 0.3.0 wrapper codegen. Measured 4,295.
 	'page-load execute': { gzipBytes: 4_295, margin: 32 },
 	// 1,932 -> 1,407 tightened (2026-08-30): the coalesced boot bundle had inflated the first
@@ -349,7 +355,8 @@ async function measureBuiltDemo(): Promise<BudgetMeasurement> {
 
 	const { aggregateChunks, graph, instrumented } = await readClientBuildArtifacts(clientPublic);
 	const gzip = gzipByChunk(clientBuild);
-	const sum = (chunks: Iterable<string>) => [...chunks].reduce((total, name) => total + gzip(name), 0);
+	const sum = (chunks: Iterable<string>) =>
+		[...chunks].reduce((total, name) => total + gzip(name), 0);
 
 	const page = parseServedPage(await renderServedPage(demo));
 	const ladder = createStageLadder(sum);

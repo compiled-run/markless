@@ -10,8 +10,26 @@ import {
 	getAlreadyResumedPayload,
 	getRetiredResumedPayload,
 	setResumedPayload,
+	wakeNoopResume,
 } from './payload-resume-registry.ts';
 import { marklessInstanceScopedLoadSymbol } from './fns/instance-scope.ts';
+import { reportRuntimeErrorToHost } from './runtime-error-reporting.ts';
+
+// Every wake site drops the promise `resumeContainerEvent` returns, so a boot
+// that refuses would leave as an unhandled rejection with nothing naming it.
+// The generated handoff marks the root before it calls in; an explicit
+// `resumeFromPayloadDocument` carries no mark and keeps its rejection.
+function containWakeBoot(
+	root: ResumePayloadScriptsInput['root'],
+	boot: Promise<ResumePayloadScriptsResult>,
+): Promise<ResumePayloadScriptsResult> {
+	if (!(root as { readonly __asyncResumeRuntimeStarted?: boolean }).__asyncResumeRuntimeStarted)
+		return boot;
+	return boot.catch((error) => {
+		reportRuntimeErrorToHost(error, { phase: 'runtime' });
+		return wakeNoopResume;
+	});
+}
 
 // Streamed settles (T107) leave records + snapshot patches in the document.
 // Only pages that actually streamed pay for the adoption module: the check
@@ -47,9 +65,12 @@ export async function resumeFromPayloadScriptsImpl(
 	const root = input.root as typeof input.root & {
 		__mStart?: Promise<ResumePayloadScriptsResult>;
 	};
-	return (root.__mStart ??= startPayloadResume(input, decode).finally(() => {
-		delete root.__mStart;
-	}));
+	return containWakeBoot(
+		root,
+		(root.__mStart ??= startPayloadResume(input, decode).finally(() => {
+			delete root.__mStart;
+		})),
+	);
 }
 
 export async function resumeFromPrerenderRecordsImpl(
@@ -62,9 +83,12 @@ export async function resumeFromPrerenderRecordsImpl(
 	const root = input.root as typeof input.root & {
 		__mStart?: Promise<ResumePayloadScriptsResult>;
 	};
-	return (root.__mStart ??= startDecodedResume(input, input).finally(() => {
-		delete root.__mStart;
-	}));
+	return containWakeBoot(
+		root,
+		(root.__mStart ??= startDecodedResume(input, input).finally(() => {
+			delete root.__mStart;
+		})),
+	);
 }
 
 async function startPayloadResume(

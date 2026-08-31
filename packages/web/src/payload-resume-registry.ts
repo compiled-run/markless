@@ -33,19 +33,32 @@ export function getAlreadyResumedPayload(
  * runtime already edited, which refuses with a locator mismatch nothing can act
  * on; the event resolves as a no-op instead. A disposed container still in the
  * document is the documented dispose-then-resume-again case and re-boots.
+ *
+ * A wake gets the same answer on any out-of-document root, filed or not: a
+ * container torn down before its first resume finished never reached
+ * `setResumedPayload`, so nothing files it, and the late wake would boot a whole
+ * runtime against a dead page. The generated wake handoff marks the root with
+ * `__asyncResumeRuntimeStarted` before calling in; an explicit
+ * `resumeFromPayloadDocument` carries no such mark and stays loud on a detached
+ * element.
  */
 export function getRetiredResumedPayload(
 	root: ResumeContainerKey,
 ): ResumePayloadScriptsResult | undefined {
 	if ((root as { readonly isConnected?: boolean }).isConnected !== false) return undefined;
 	const disposed = disposedPayloadContainers.get(root);
-	return (
-		disposed && {
-			...disposed,
-			runtime: { ...disposed.runtime, dispatch: () => Promise.resolve() },
-		}
-	);
+	if (disposed)
+		return { ...disposed, runtime: { ...disposed.runtime, dispatch: () => Promise.resolve() } };
+	return (root as { readonly __asyncResumeRuntimeStarted?: boolean }).__asyncResumeRuntimeStarted
+		? wakeNoopResume
+		: undefined;
 }
+
+// Wake callers read `runtime` and dispatch through it; a container with no live
+// resume behind it has no records left to reconstruct.
+export const wakeNoopResume = {
+	runtime: { dispatch: () => Promise.resolve() },
+} as unknown as ResumePayloadScriptsResult;
 
 export function setResumedPayload(
 	root: ResumeDomElement,

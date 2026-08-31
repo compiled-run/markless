@@ -113,7 +113,13 @@ const STAGE_ANCHORS = {
 	// +801 (re-anchor 2026-08-30, vite-plus 0.3.0): bundled oxc codegen rewrote the lazy-ESM
 	// init wrappers (+869 measured across this lane's 160 wrappers; vite-csr control unchanged).
 	// Measured 139,988.
-	'page-load download': { gzipBytes: 139_988, margin: 128 },
+	// +90 (re-anchor 2026-08-30, disconnected-wake no-op): the resume registry answers a wake on
+	// an out-of-document root without booting, and the resume entry routes a wake boot's refusal
+	// through the host error sink instead of dropping the promise. Revert-measured in one
+	// worktree: 140,605 without the change, 140,695 with it, 113 chunks both ways. Only the delta
+	// travels - the absolutes carry this worktree's own path offset - so this wants a
+	// root-checkout confirmation.
+	'page-load download': { gzipBytes: 140_078, margin: 128 },
 	// +5: roster-count placeholder minted in the eager seed slot (the resolver itself is demand-loaded);
 	// +114: seed-pass roster ledger in the eager seed slot; +228: control-edit-hold in the eager runtime chunk.
 	'page-load execute': { gzipBytes: 14_568, margin: 128 },
