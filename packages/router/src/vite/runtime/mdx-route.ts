@@ -1,7 +1,7 @@
 import {
 	marklessInstancePath,
 	marklessInstanceScopedLoadSymbol,
-} from '@markless/web/fns/instance-scope';
+} from '../../../../web/src/fns/instance-scope.ts';
 import { protocolStateVersion } from '../../../../serializer/src/protocol-constants.ts';
 
 export type MdxRoutePart =
