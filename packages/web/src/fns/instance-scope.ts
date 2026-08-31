@@ -445,6 +445,11 @@ export type MarklessScopedGraph = RuntimeGraph & {
 	// Reads chain adapter into adapter, so only the composed answer says which id a
 	// read really lands on; one adapter's own path is a partial answer.
 	readonly marklessQualifyGraphNodeId?: (graphNodeId: string) => string;
+	// This adapter's rendered widgets, re-spelled in the local space its symbol
+	// reads in. An own field, not the WeakMap alone, for the reason
+	// `marklessWidgetHostGraph` is one: the graph is spread again on its way to the
+	// symbol, and a copy the map never saw falls back to the page's own spelling.
+	readonly marklessComposedWidgets?: MarklessWidgetRegistry | undefined;
 };
 
 export function marklessInstanceScopedGraph(
@@ -458,15 +463,21 @@ export function marklessInstanceScopedGraph(
 	// per adapter, not once per registry: a settled arm can add definitions after
 	// this graph's registry was first asked for.
 	const registry = marklessGraphWidgetRegistry(graph);
-	marklessNoteGraphWidgetRoots(registry, graph);
+	// Only a graph's OWN registry is spelled in the same space as its definitions; a
+	// composed view files roots in a descendant's local space, where a page-space
+	// definition id names a different place.
+	if (!composedRegistryViews.has(registry)) marklessNoteGraphWidgetRoots(registry, graph);
 	// Page-space families (shared, storage) keep their page ids through every adapter.
 	const qualify = (graphNodeId: string) =>
 		marklessComposedGraphNodeId(graphNodeId, instancePath, registry);
 	const outerQualify = (graph as MarklessScopedGraph).marklessQualifyGraphNodeId;
-	return {
+	const scoped: MarklessScopedGraph = {
 		...graph,
 		marklessPageGraph: (graph as MarklessScopedGraph).marklessPageGraph ?? graph,
 		marklessInstancePath: instancePath,
+		// Written unconditionally: the spread above would otherwise hand a nested
+		// scope the enclosing one's view, which is a different local space.
+		marklessComposedWidgets: composedWidgetRegistryView(registry, instancePath),
 		marklessQualifyGraphNodeId: (graphNodeId: string) =>
 			outerQualify ? outerQualify(qualify(graphNodeId)) : qualify(graphNodeId),
 		read: (graphNodeId, path) => graph.read(qualify(graphNodeId), path),
@@ -481,6 +492,47 @@ export function marklessInstanceScopedGraph(
 				graphNodeId: qualify(subscription.graphNodeId),
 			}),
 	};
+	if (scoped.marklessComposedWidgets)
+		marklessShareWidgetRegistry(scoped, scoped.marklessComposedWidgets);
+	return scoped;
+}
+
+/**
+ * The rendered widgets a part reading in THIS scope's LOCAL space can name.
+ *
+ * A component's compiled parts spell every id against that module's own edges.
+ * When the component is itself composed one wrapper deep - its markup projected
+ * through another component's children - the family root it composes is filed in
+ * the registry at its PAGE path (`c0:p1:c0:`) while the part reads with the
+ * module-local path (`c0:p1:p2:p3:`). Neither is a prefix of the other and
+ * `widgetRootPathFor` can only chop segments off the right, so every lookup
+ * misses, the id stays bare, and the write lands on a node no rendered widget
+ * owns. Re-spelling the roots that stand under this adapter's path without it
+ * puts reader and registry in one space; the adapter's own rule for an
+ * already-prefixed `shared:` id then carries the answer back to page space.
+ *
+ * Roots OUTSIDE the path are dropped rather than carried through unstripped,
+ * because a local path and a page path can spell the same segments: an
+ * unstripped entry would answer a local reader with a page root and this adapter
+ * would prefix it a second time. An id no root here claims is left bare, which
+ * is exactly what hands it back to this adapter, which resolves it as before.
+ */
+function composedWidgetRegistryView(
+	registry: MarklessWidgetRegistry,
+	instancePath: string,
+): MarklessWidgetRegistry | undefined {
+	let view: MarklessWidgetRegistry | undefined;
+	for (const [id, rootPath] of registry.rootPaths) {
+		if (!id.startsWith(instancePath) || !rootPath.startsWith(instancePath)) continue;
+		view ??= { rootPaths: new Map(), rowRooted: new Set() };
+		marklessNoteWidgetRoot(
+			view,
+			id.slice(instancePath.length),
+			rootPath.slice(instancePath.length),
+		);
+	}
+	if (view) composedRegistryViews.add(view);
+	return view;
 }
 
 // Mirrors PROTOCOL_PAGE_SPACE_ID_PREFIXES, past any instance path a nested
@@ -525,6 +577,10 @@ export type MarklessWidgetRegistry = {
  * same page graph and all of them must reach the same answer.
  */
 const graphRegistries = new WeakMap<object, MarklessWidgetRegistry>();
+
+// A view is spelled in a descendant's local space, not the page's, so nothing
+// may re-note the page's own definitions into one.
+const composedRegistryViews = new WeakSet<MarklessWidgetRegistry>();
 
 // Nothing writes to this one. It is the answer for a lookup with no graph in
 // hand and no compose running: no rendered widget, so no id belongs to one.
@@ -572,6 +628,11 @@ function marklessRegistryHolder(graph: RuntimeGraph): object {
  */
 export function marklessGraphWidgetRegistry(graph?: RuntimeGraph): MarklessWidgetRegistry {
 	if (!graph) return marklessWidgetScope.active;
+	// An adapter may hold a registry of its OWN - the local-space view an instance
+	// scope files for the parts reading through it - which its page graph's
+	// registry cannot answer for. Ask the object itself before its holder.
+	const own = (graph as MarklessScopedGraph).marklessComposedWidgets ?? graphRegistries.get(graph);
+	if (own) return marklessScopeWidgetsTo(own);
 	const holder = marklessRegistryHolder(graph);
 	const held = graphRegistries.get(holder);
 	if (held) return marklessScopeWidgetsTo(held);

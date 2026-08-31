@@ -10,6 +10,7 @@ import {
 } from '../src/fns/composition.ts';
 import {
 	marklessComposedGraphNodeId,
+	marklessGraphWidgetRegistry,
 	marklessInstanceScopedGraph,
 } from '../src/fns/instance-scope.ts';
 
@@ -135,4 +136,78 @@ test('resume registers the projection site from the payload, with no render in s
 	};
 
 	expect(scoped.read(CELL)).toBe(`${rootPath}${CELL}`);
+});
+
+// A family root that renders its children directly - `accordion.root` and every
+// family shaped like it - carries no children-widget-root marker, so composition
+// writes no projection site and the qualified root id is the only bridge resume
+// has.
+function familyOwningChild(symbolPrefix: string, rootPath: string) {
+	return {
+		hostPrefix: symbolPrefix,
+		symbolPrefix,
+		output: {
+			state: {
+				cells: [{ graphNodeId: `${rootPath}${CELL}` }],
+				computed: [],
+				sharedDefinitions: [
+					{
+						id: `${rootPath}${DEFINITION}`,
+						name: 'pwr',
+						exportedName: 'pwr',
+						scope: 'widget',
+						version: 0,
+						graphNodeIds: [`${rootPath}${CELL}`],
+					},
+				],
+			},
+		},
+	};
+}
+
+// What the compiled symbol-resolver module's bound adapter does to a dispatching
+// part's writes, over whatever scope resume already applied to the symbol.
+function boundPartGraph(graph: object, instancePath: string) {
+	const registry = marklessGraphWidgetRegistry(graph as never);
+	const write = (graph as { readonly write: (write: { graphNodeId: string }) => void }).write;
+	return {
+		write: (graphNodeId: string) =>
+			write({
+				graphNodeId: marklessComposedGraphNodeId(graphNodeId, instancePath, registry),
+			}),
+	};
+}
+
+// The shape every in-tree scenario misses: the component that composes the
+// family root is itself projected through a wrapper, so its parts read with the
+// module's OWN path while the registry files the root at the page path the
+// wrapper placed it at. Neither path is a prefix of the other, so an unbridged
+// lookup leaves the id bare and the write lands on a node nothing owns.
+test('a family composed one wrapper deeper than the page writes the composed cell', () => {
+	const site = `${protocolInstanceSegment(0)}${protocolProjectionSegment(1)}`;
+	const local = protocolInstanceSegment(0);
+	const composed = marklessComposeState({ cells: [], computed: [] }, [
+		familyOwningChild(site, local),
+	]);
+
+	expect(composed.sharedDefinitions).toEqual([
+		expect.objectContaining({ id: `${site}${local}${DEFINITION}` }),
+	]);
+	expect(composed.sharedDefinitions?.[0]).not.toHaveProperty('projectionIds');
+
+	const writes: string[] = [];
+	const page = {
+		read: (graphNodeId: string) => graphNodeId,
+		write: (write: { graphNodeId: string }) => void writes.push(write.graphNodeId),
+		listSharedDefinitions: () => composed.sharedDefinitions ?? [],
+	};
+
+	// Resume scopes the symbol by the path riding its id - the wrapper placement -
+	// and the bound record then scopes by the trigger's path in the child module's
+	// own space, which is where the family root stands at `c0:`.
+	const resumed = marklessInstanceScopedGraph(page as never, site);
+	const trigger = `${local}${protocolProjectionSegment(1)}${protocolProjectionSegment(2)}`;
+	boundPartGraph(resumed, trigger).write(CELL);
+
+	expect(writes).toEqual([`${site}${local}${CELL}`]);
 });
