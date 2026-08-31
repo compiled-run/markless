@@ -26,6 +26,45 @@ export function Box({ cls }) @{
 
 const UNSCOPED = SCOPED.replace(/\t*<style>[\s\S]*?<\/style>\n/, '');
 
+/**
+ * A class written on a component call-site lands in the DOM through the child's
+ * own rest spread, so without the scope class the caller's own `<style>` cannot
+ * match the element it just named.
+ */
+const CALL_SITES = `import { state } from '@markless/core';
+import * as accordion from '@markless/ui/accordion';
+
+export function Page({ cls }) @{
+	let on = state(false);
+	<div>
+		<style>
+			.card { color: red; }
+		</style>
+		<accordion.item class="card">a</accordion.item>
+		<accordion.item class={cls}>b</accordion.item>
+		<accordion.item value="one">c</accordion.item>
+		<button onClick={() => { on = !on; }}>t</button>
+	</div>
+}`;
+
+const UNSCOPED_CALL_SITES = CALL_SITES.replace(/\t*<style>[\s\S]*?<\/style>\n/, '');
+
+async function callSiteClassProps(source: string) {
+	const graph = await buildSemanticGraph({ filename: 'src/Page.tsrx', source });
+	const scope = /mk-[a-z0-9]+/.exec(
+		graph.markup.chunks.find((chunk) => chunk.id === 'template:Page')?.statics.join('') ?? '',
+	)?.[0];
+	return {
+		scope,
+		props: graph.componentEdges.map((edge) =>
+			edge.props.find((prop) => prop.name === 'class'),
+		),
+		computeds: graph.graphBindings.filter((binding) =>
+			binding.id.startsWith('computed:templateExpression:'),
+		),
+	};
+}
+
 async function statics(source: string, filename = 'src/Box.tsrx'): Promise<string> {
 	const graph = await buildSemanticGraph({ filename, source });
 	return graph.markup.chunks.find((chunk) => chunk.id === 'template:Box')?.statics.join('§') ?? '';
@@ -70,6 +109,40 @@ test('a dynamic class that is not a two-literal conditional carries the scope as
 	const scope = /mk-[a-z0-9]+/.exec(await statics(SCOPED))?.[0];
 
 	expect(targets).toContainEqual({ kind: 'class', constantClass: scope });
+});
+
+test('a class prop on a component call-site carries the calling module scope', async () => {
+	const { scope, props, computeds } = await callSiteClassProps(CALL_SITES);
+	expect(scope).toBeDefined();
+
+	// Static: composed at build time, exactly as a host element's class is.
+	expect(props[0]).toMatchObject({ kind: 'serializable', value: `card ${scope}` });
+	// Dynamic: the value is only known at runtime, so the scope rides in a
+	// computed of its own - the edge carries no constant beside a graph read.
+	expect(props[1]).toMatchObject({ kind: 'graph-reference', graphBindingKind: 'computed' });
+	expect(computeds).toHaveLength(1);
+	expect(computeds[0]?.functionSource).toContain(scope);
+	expect(computeds[0]?.dependencies).toContainEqual({
+		source: 'cls',
+		graphNodeId: 'prop:props',
+		path: ['cls'],
+	});
+	// A call-site that wrote no class gets none synthesized.
+	expect(props[2]).toBeUndefined();
+});
+
+test('a module with no style block leaves its call-site class props alone', async () => {
+	const { scope, props, computeds } = await callSiteClassProps(UNSCOPED_CALL_SITES);
+
+	expect(scope).toBeUndefined();
+	expect(props[0]).toMatchObject({ kind: 'serializable', value: 'card', source: '"card"' });
+	expect(props[1]).toMatchObject({
+		kind: 'graph-reference',
+		graphNodeId: 'prop:props',
+		path: ['cls'],
+	});
+	expect(computeds).toHaveLength(0);
+	expect(props[2]).toBeUndefined();
 });
 
 test('a module with no style block emits the same class bytes it always did', async () => {

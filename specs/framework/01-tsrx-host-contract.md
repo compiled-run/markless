@@ -124,10 +124,14 @@ a stable build-hashed scope class (`mk-<hash>` from the module filename).
 Every selector's subject compound gains the scope class, at-rule blocks are
 descended, and `@keyframes` contents are left untransformed. Host elements
 the component renders gain the scope class in emitted HTML across static,
-dynamic, spread, and dynamic-tag attribute paths. The compiled CSS ships as a
-bundler-owned virtual `.css` module imported by the transformed module, so
-Vite/Rolldown's CSS pipeline owns bundling and delivery; no JavaScript runs
-to apply styles. Style blocks that cannot be scope-compiled keep a fail-loud
+dynamic, spread, and dynamic-tag attribute paths. A `class` prop written on a
+component call-site gains the calling module's scope class too, static and
+dynamic alike, so a scoped selector matches the element the child spreads
+that class onto; a call-site that writes no `class` prop gets none
+synthesized. The compiled CSS ships as a bundler-owned virtual `.css` module
+imported by the transformed module, so Vite/Rolldown's CSS pipeline owns
+bundling and delivery; no JavaScript runs to apply styles. Style blocks that
+cannot be scope-compiled keep a fail-loud
 `MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT` diagnostic. Style composition
 metadata and `:global(...)`-style escapes remain unspecified.
 

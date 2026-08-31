@@ -1296,7 +1296,7 @@ function conditionalClassTarget(
 	};
 }
 
-function scopedClassValue(value: string, styleScopeClass: string | null): string {
+export function scopedClassValue(value: string, styleScopeClass: string | null): string {
 	if (!styleScopeClass) return value;
 	return value ? `${value} ${styleScopeClass}` : styleScopeClass;
 }

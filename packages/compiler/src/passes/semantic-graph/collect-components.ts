@@ -25,9 +25,11 @@ import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import {
 	type GraphReadScope,
 	collectCompositeTemplateExpression,
+	mintTemplateExpressionComputed,
 	pureCompositeReadSources,
 	readsWritableGraphCell,
 } from './composite-reads.ts';
+import { scopedClassValue } from './collect-elements.ts';
 import {
 	callbackPropArityUnsupportedDiagnostic,
 	componentPropExpressionUnsupportedDiagnostic,
@@ -286,6 +288,16 @@ function componentPropBindings(
 			continue;
 		}
 
+		// A class on a child tag reaches the DOM through the child's rest spread, so
+		// the caller's scoped selectors match it only if the scope crosses the edge.
+		if (name === 'class' && state.currentStyleScopeClass) {
+			const scoped = scopedCallSiteClass(expression ?? value, source, state, scope);
+			if (scoped) {
+				props.push({ ...scoped, sourceSpan: span });
+				continue;
+			}
+		}
+
 		// The enclosing family's instance answers through its own return map, so
 		// `checklist.allChecked` reaches the computed rather than a state member.
 		// An enclosing `@for` row binding goes first, the way markup residues
@@ -379,6 +391,48 @@ function componentPropBindings(
 	}
 
 	return props;
+}
+
+/**
+ * The call-site `class` with the calling module's style-scope class composed in.
+ * A literal composes at build time; a dynamic value is only known at runtime, so
+ * the scope rides in a computed of its own - a graph-reference prop carries a
+ * node id and nothing beside it. Null when neither shape fits, and the caller
+ * keeps the unscoped binding rather than dropping the prop.
+ */
+function scopedCallSiteClass(
+	valueNode: AnyNode | undefined,
+	source: string,
+	state: WalkState,
+	scope: GraphReadScope,
+): SemanticComponentPropBinding | null {
+	const styleScopeClass = state.currentStyleScopeClass;
+	if (!valueNode || !styleScopeClass) return null;
+
+	if (valueNode.type === 'Literal') {
+		if (typeof valueNode.value !== 'string') return null;
+		const value = scopedClassValue(valueNode.value, styleScopeClass);
+		return { name: 'class', source: JSON.stringify(value), kind: 'serializable', value };
+	}
+
+	const readSources = pureCompositeReadSources(valueNode, state, { methodCalls: true });
+	if (!readSources) return null;
+	const composed = mintTemplateExpressionComputed(
+		`() => [${source}, ${JSON.stringify(styleScopeClass)}].filter(Boolean).join(' ')`,
+		readSources,
+		state,
+		false,
+		scope,
+	);
+	if (!composed) return null;
+	return {
+		name: 'class',
+		source,
+		kind: 'graph-reference',
+		graphNodeId: composed.graphNodeId,
+		graphBindingKind: 'computed',
+		path: [],
+	};
 }
 
 /**
