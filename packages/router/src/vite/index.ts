@@ -931,6 +931,10 @@ function routeModulePreloadsFromBundle(input: {
 			}
 		}
 
+		// Snapshot before the navigation-entry additions below: those reach
+		// foreign routes' edges, and a page must link only its own CSS.
+		const styleFileNames = new Set([...navigationFileNames, ...ssrFileNames]);
+
 		// The served page never names the navigation entry, so a first navigation
 		// starts its fetch only once the reader clicks — a second waterfall hop
 		// after the page has finished loading. Preload the entry, and the demand
@@ -953,6 +957,7 @@ function routeModulePreloadsFromBundle(input: {
 		ssr[routeFile] = [...ssrFileNames].map((fileName) => joinURL(input.base, fileName));
 		styles[routeFile] = routeStylesheetsForChunks(
 			routeFileChunks,
+			styleFileNames,
 			chunksByFileName,
 			input.base,
 		);
@@ -995,12 +1000,13 @@ function renderedByteLength(chunk: OutputChunkLike): number {
 	return chunk.code?.length ?? 0;
 }
 
-// A route source compiles into several client chunks (route, resume,
-// symbols-only, render-data), and the scoped-style import rides the
-// render-data module — not the primary route chunk. Every chunk the route owns
-// contributes, or the built page ships without its stylesheet link.
+// CSS rides chunks no static import edge reaches — dynamically demanded
+// component chunks and symbol chunks — so harvest over the route's planned
+// closure, not just the chunks the route source owns. Visiting a chunk's
+// dependencies before the chunk keeps cascade order stable across builds.
 function routeStylesheetsForChunks(
 	routeFileChunks: readonly OutputChunkLike[],
+	closureFileNames: ReadonlySet<string>,
 	chunksByFileName: ReadonlyMap<string, OutputChunkLike>,
 	base: string,
 ): readonly string[] {
@@ -1017,6 +1023,12 @@ function routeStylesheetsForChunks(
 			styles.add(joinURL(base, stylesheet));
 		}
 	};
+	for (const fileName of closureFileNames) {
+		const chunk = chunksByFileName.get(fileName);
+		if (chunk) visit(chunk);
+	}
+	// Route-owned chunks the preload closure skips (the symbols-only chunk)
+	// still carry the route's scoped styles.
 	for (const chunk of routeFileChunks) visit(chunk);
 	return [...styles];
 }
