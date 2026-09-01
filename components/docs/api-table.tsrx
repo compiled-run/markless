@@ -49,32 +49,43 @@ export default function ApiTable({
 		})),
 	}));
 
-	<table class="api-table">
-		<thead>
-			<tr>
-				<th>Prop</th>
-				<th>What it does</th>
-			</tr>
-		</thead>
-		<tbody>
-			@for (const row of painted; key row.name) {
-				<tr>
-					<td>
-						<span class="tsrx-hover prop-name" tabindex="0" role="img" aria-label={row.label}>
-							<code class={row.nameClass}>{row.name}</code>
-							<span class="tsrx-tip" aria-hidden="true">
-								<span class="tsrx-tip-title">{row.name}</span>
-								<span class="tsrx-tip-body">{row.type}</span>
-							</span>
-						</span>
-					</td>
-					<td>
-						@for (const piece of row.pieces; key piece.id) {
-							<code class={piece.pieceClass}>{piece.text}</code>
-						}
-					</td>
-				</tr>
-			}
-		</tbody>
-	</table>
+	// Both repeats sit under one root element: a repeat as the component's own root renders nothing here.
+	const tables = painted.length === 0 ? [] : [{ id: 'props' }];
+	const notes = painted.length === 0 ? [{ id: 'none', text: 'No props of its own.' }] : [];
+
+	<div class="api-part">
+		@for (const note of notes; key note.id) {
+			<p class="api-none">{note.text}</p>
+		}
+		@for (const table of tables; key table.id) {
+			<table class="api-table">
+				<thead>
+					<tr>
+						<th>Prop</th>
+						<th>What it does</th>
+					</tr>
+				</thead>
+				<tbody>
+					@for (const row of painted; key row.name) {
+						<tr>
+							<td>
+								<span class="tsrx-hover prop-name" tabindex="0" role="img" aria-label={row.label}>
+									<code class={row.nameClass}>{row.name}</code>
+									<span class="tsrx-tip" aria-hidden="true">
+										<span class="tsrx-tip-title">{row.name}</span>
+										<span class="tsrx-tip-body">{row.type}</span>
+									</span>
+								</span>
+							</td>
+							<td>
+								@for (const piece of row.pieces; key piece.id) {
+									<code class={piece.pieceClass}>{piece.text}</code>
+								}
+							</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		}
+	</div>
 }
