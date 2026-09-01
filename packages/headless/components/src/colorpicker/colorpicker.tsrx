@@ -618,6 +618,7 @@ export function ColorpickerArea({
 	onPointerdown,
 	onPointermove,
 	onPointerup,
+	onPointercancel,
 	onFocusin,
 	...rest
 }: ColorpickerAreaProps) @{
@@ -649,6 +650,11 @@ export function ColorpickerArea({
 			picker.endDrag();
 			onPointerup?.(event);
 		}}
+		// A pointer the platform takes back settles where it left the colour.
+		onPointercancel={(event) => {
+			picker.endDrag();
+			onPointercancel?.(event);
+		}}
 		onFocusin={(event) => {
 			picker.enterArea(event.relatedTarget);
 			onFocusin?.(event);
@@ -675,6 +681,7 @@ export function ColorpickerTrack({
 	onPointerdown,
 	onPointermove,
 	onPointerup,
+	onPointercancel,
 	...rest
 }: ColorpickerTrackProps) @{
 	const picker = colorpickerState();
@@ -711,6 +718,10 @@ export function ColorpickerTrack({
 		onPointerup={(event) => {
 			picker.endDrag();
 			onPointerup?.(event);
+		}}
+		onPointercancel={(event) => {
+			picker.endDrag();
+			onPointercancel?.(event);
 		}}
 	>
 		<style>

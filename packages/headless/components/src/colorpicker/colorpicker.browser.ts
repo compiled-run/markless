@@ -346,6 +346,42 @@ test('CSR: a drag along the hue rail moves hue and leaves the plane where it was
 	await expect.poll(() => rail.hasAttribute('ui-dragging')).toBe(false);
 });
 
+// The platform takes the pointer away mid-gesture (a scroll wins, the pen leaves
+// range). Without this the picker stays in flight and keeps tracking a pointer
+// nobody is pressing.
+test('CSR: a cancelled pointer ends a plane drag and stops tracking it', async () => {
+	await render(Basic);
+
+	const start = inArea(0.8, 1);
+	pointer(el(Area), 'pointerdown', start.x, start.y);
+	const mid = inArea(0.5, 0.5);
+	pointer(el(Area), 'pointermove', mid.x, mid.y);
+	await expect.poll(() => axes()[0].getAttribute('aria-valuenow')).toBe('50');
+
+	pointer(el(Area), 'pointercancel', mid.x, mid.y);
+	await expect.poll(() => el(Area).hasAttribute('ui-dragging')).toBe(false);
+
+	const far = inArea(0.1, 0.1);
+	pointer(el(Area), 'pointermove', far.x, far.y);
+	await expect.poll(() => axes()[0].getAttribute('aria-valuenow')).toBe('50');
+});
+
+test('CSR: a cancelled pointer ends a rail drag and stops tracking it', async () => {
+	await render(Basic);
+
+	const rail = el(HueTrack);
+	const at = alongRail(rail, 0.5);
+	pointer(rail, 'pointerdown', at.x, at.y);
+	await expect.poll(() => el(HueThumb).getAttribute('aria-valuenow')).toBe('180');
+
+	pointer(rail, 'pointercancel', at.x, at.y);
+	await expect.poll(() => rail.hasAttribute('ui-dragging')).toBe(false);
+
+	const far = alongRail(rail, 0.9);
+	pointer(rail, 'pointermove', far.x, far.y);
+	await expect.poll(() => el(HueThumb).getAttribute('aria-valuenow')).toBe('180');
+});
+
 // A press can reach the family with its pointer already lifted - the runtime
 // replays a recorded press once its handler has loaded - and capturing a pointer
 // the platform is no longer tracking throws. Both the plane and the rails capture.
