@@ -78,7 +78,7 @@ export default function AccordionMultiple() @{
 				opacity: 0.55;
 			}
 
-			.panel {
+			.section[ui-open] .panel {
 				padding: 0 0.8em 0.7em;
 				font-size: var(--step--1);
 			}
