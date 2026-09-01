@@ -56,6 +56,8 @@ export interface MarklessVirtualModule {
 	symbolClaims?: ReadonlyArray<string>;
 	/** `symbol-bundle` only: the symbol module ids this bundle ships as one chunk. */
 	bundledSymbolModuleIds?: ReadonlyArray<string>;
+	/** `resolver` only: published by a first pass so the id resolves; never served as content. */
+	provisional?: boolean;
 }
 
 export interface TransformTsrxModuleInput {

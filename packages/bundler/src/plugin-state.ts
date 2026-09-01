@@ -153,31 +153,16 @@ export function registerTransformArtifacts(
 	const ids = new Set<string>();
 	const renderDataHashes = new Map<string, string>();
 	for (const module of input.result.virtualModules) {
-		if (input.finalPublication === false && module.type === 'resolver') continue;
 		const isClientSymbol = input.environment === 'client' && module.type === 'symbol';
 		// The symbol virtual module id embeds the source filename, so it is the
 		// collision-free execution-log id: re-key the injected hook (dev builds)
 		// and the size estimate to that same id so the join always resolves.
 		const stored = isClientSymbol
 			? { ...module, source: requalifyExecutionLogModuleHook(module.source, module.id) }
-			: module;
-		const current = state.virtualModules.get(module.id);
-		if (module.type === 'resolver' && current?.type === 'resolver') {
-			const verdict = linkedResolverClaimVerdict({
-				resolverId: module.id,
-				current: current.symbolClaims,
-				next: module.symbolClaims,
-			});
-			if (verdict.action === 'keep-current') continue;
-			if (verdict.action === 'diverged') throw new Error(verdict.diagnostic.message);
-		}
-		// Parallel sibling transforms share this id: canonical render data must not be replaced.
-		if (
-			module.type !== 'render-data' ||
-			current?.type !== 'render-data' ||
-			current.canonicalRenderData !== true ||
-			module.canonicalRenderData === true
-		) {
+			: input.finalPublication === false && module.type === 'resolver'
+				? { ...module, provisional: true }
+				: module;
+		if (publishesVirtualModule(stored, state.virtualModules.get(module.id))) {
 			state.virtualModules.set(module.id, stored);
 		}
 		ids.add(module.id);
@@ -238,6 +223,33 @@ export function registerTransformArtifacts(
 	}
 	input.dev.record(input.source, ids, input.environment);
 	if (renderDataHashes.size > 0) input.updateDevPrerenderHashes?.(renderDataHashes);
+}
+
+// A first pass publishes the resolver into an empty slot only: the artifacts it publishes
+// import that id, so it must resolve while the owner still links; any final publication replaces it.
+function publishesVirtualModule(
+	next: MarklessVirtualModule,
+	current: MarklessVirtualModule | undefined,
+): boolean {
+	if (!current) return true;
+	if (next.type === 'resolver' && current.type === 'resolver') {
+		if (next.provisional === true) return false;
+		if (current.provisional === true) return true;
+		const verdict = linkedResolverClaimVerdict({
+			resolverId: next.id,
+			current: current.symbolClaims,
+			next: next.symbolClaims,
+		});
+		if (verdict.action === 'diverged') throw new Error(verdict.diagnostic.message);
+		return verdict.action === 'replace';
+	}
+	// Parallel sibling transforms share this id: canonical render data must not be replaced.
+	return !(
+		next.type === 'render-data' &&
+		current.type === 'render-data' &&
+		current.canonicalRenderData === true &&
+		next.canonicalRenderData !== true
+	);
 }
 
 // Applies one ownership verdict: displaced owners lose their claims, the chosen

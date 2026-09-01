@@ -102,6 +102,8 @@ export async function loadHook(ctx: MarklessHookContext, pluginContext: PluginCo
 	}
 	const normalizedId = normalizeVirtualId(id);
 	const resolverSource = resolverVirtualModuleSourceFile(normalizedId);
+	// The id resolves from its owner's first pass; only a final publication ships.
+	if (resolverSource) await moduleMetadata.awaitSourceClaimsPublished(resolverSource);
 	if (
 		resolverSource &&
 		ctx.getEnvironment(pluginContext) === 'client' &&
@@ -125,6 +127,11 @@ export async function loadHook(ctx: MarklessHookContext, pluginContext: PluginCo
 		normalizedId,
 		ctx.getEnvironment(pluginContext),
 	);
+	if (module?.provisional === true) {
+		throw new Error(
+			`MARKLESS_RESOLVER_UNPUBLISHED: Resolver ${JSON.stringify(normalizedId)} was loaded before its owner ${JSON.stringify(resolverSource)} published a final compile.`,
+		);
+	}
 	if (module) {
 		return virtualModuleSourceForLoad(module, {
 			dev: internalOptions.dev === true && ctx.getEnvironment(pluginContext) === 'client',
