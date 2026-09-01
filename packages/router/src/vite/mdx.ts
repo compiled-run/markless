@@ -132,7 +132,8 @@ function emitComposedMdxRoute(route: MdxRoute, id: string): string {
 		// child's render-data chunk.
 		'    renderData: marklessMdxRenderData,',
 		'  });',
-		'  await runtime.dispatch(input.event, { syncPolicyAlreadyApplied: true });',
+		// A crossing the inline resumer forwarded with no record is not a routing defect on a page that mints component rows.
+		'  await runtime.dispatch(input.event, { syncPolicyAlreadyApplied: true, ignoreUnmatched: input.eventRecord == null });',
 		'}',
 		'',
 		'function marklessMdxLoadSymbol(symbolId, children = []) {',
