@@ -55,6 +55,9 @@ export type ToasterInstanceState = {
 	queue: ToastRecord[];
 	paused: boolean;
 	pausedAt: number;
+	/** WCAG 2.2.2 gives two independent reasons to stop the clock, so one ending is not both ending. */
+	hovered: boolean;
+	focused: boolean;
 	/** How many messages have been minted, so an unnamed one gets its own id. */
 	minted: number;
 	/** The stack's one clock, or 0 while nothing is counting down. */

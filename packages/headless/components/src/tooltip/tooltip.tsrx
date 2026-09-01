@@ -105,7 +105,9 @@ export function TooltipRoot({
 			window.clearTimeout(tooltip.openTimer);
 			tooltip.openTimer = 0;
 			tooltip.restingUntil = 0;
-			tooltip.setOpen(false);
+			// Hover and focus are two reasons for a tip to be up, and this ends only one of them: blur ends the other.
+			const isHeld = box.contains(document.activeElement);
+			if (isHeld !== true) tooltip.setOpen(false);
 			onPointerout?.(event);
 		}}
 	>

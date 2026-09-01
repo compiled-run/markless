@@ -3,6 +3,7 @@ import { cleanup, render, renderSSR } from '@markless/vitest-browser';
 import { page } from 'vite-plus/test/browser';
 import { afterEach, expect, test } from 'vitest';
 import Basic from './scenarios/basic.tsrx';
+import Held from './scenarios/held.tsrx';
 import Limits from './scenarios/limits.tsrx';
 import OneMessage from './scenarios/one-message.tsrx';
 import OverModal from './scenarios/over-modal.tsrx';
@@ -123,6 +124,50 @@ test.fails('CSR: a message with its own duration leaves by itself', async () => 
 	el<HTMLButtonElement>(Save).click();
 	await expect.poll(() => titles()).toEqual(['Saved']);
 	await expect.poll(() => titles(), { timeout: 1500 }).toEqual([]);
+});
+
+// WCAG 2.2.2 gives two separate reasons to stop the clock, and the region reports
+// the stop as `ui-paused`. One reason ending is not both ending: a person who
+// tabbed into a row to press Dismiss keeps it while the pointer wanders off, and a
+// person still hovering keeps it while focus goes elsewhere.
+test('CSR: focus in the region keeps the clock stopped after the pointer leaves', async () => {
+	await render(Held);
+	el<HTMLButtonElement>(Save).click();
+	await expect.poll(() => titles()).toEqual(['Saved']);
+	const region = el(Root);
+
+	region.dispatchEvent(new PointerEvent('pointerover', { bubbles: true, relatedTarget: null }));
+	await expect.poll(() => region.hasAttribute('ui-paused')).toBe(true);
+
+	el<HTMLButtonElement>(page.getByTestId('itemclose')).focus();
+	await new Promise((resolve) => setTimeout(resolve, 20));
+
+	region.dispatchEvent(
+		new PointerEvent('pointerout', { bubbles: true, relatedTarget: el(Elsewhere) }),
+	);
+	await new Promise((resolve) => setTimeout(resolve, 50));
+	expect(region.hasAttribute('ui-paused')).toBe(true);
+
+	// Both reasons gone is what starts it again.
+	el<HTMLButtonElement>(Elsewhere).focus();
+	await expect.poll(() => region.hasAttribute('ui-paused')).toBe(false);
+});
+
+test('CSR: the pointer resting on the region keeps the clock stopped after focus leaves', async () => {
+	await render(Held);
+	el<HTMLButtonElement>(Save).click();
+	await expect.poll(() => titles()).toEqual(['Saved']);
+	const region = el(Root);
+
+	el<HTMLButtonElement>(page.getByTestId('itemclose')).focus();
+	await expect.poll(() => region.hasAttribute('ui-paused')).toBe(true);
+
+	region.dispatchEvent(new PointerEvent('pointerover', { bubbles: true, relatedTarget: null }));
+	await new Promise((resolve) => setTimeout(resolve, 20));
+
+	el<HTMLButtonElement>(Elsewhere).focus();
+	await new Promise((resolve) => setTimeout(resolve, 50));
+	expect(region.hasAttribute('ui-paused')).toBe(true);
 });
 
 test('SSR: a message raised after resume renders in the served region', async () => {

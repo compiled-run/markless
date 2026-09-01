@@ -130,6 +130,13 @@ export function HovercardRoot({
 				return;
 			}
 
+			// Focus inside is the other reason the card is up, and hiding it would pull a `hidden` subtree out from under the cursor: focusout is what ends that reason.
+			const isHeld = box.contains(document.activeElement);
+			if (isHeld === true) {
+				onPointerout?.(event);
+				return;
+			}
+
 			// The card sits at a visible offset by convention, so the pointer crosses
 			// dead space that is inside neither part. `closeDelay` is what carries it.
 			const now = Date.now();
