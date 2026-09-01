@@ -310,35 +310,45 @@ function mintComponentRow(input: {
 }): Awaitable<MintedRow> {
 	const rowComponent = input.repeat.rowComponent!;
 	const rowInstancePath = rowKeyInstancePath(input.repeat, input.enclosing);
-	return marklessThen(loadEvaluator(), ({ renderRepeatRowComponent, rowSegmentOf }) => {
-		const rowSegment = rowSegmentOf({
-			rowKey: input.rowKey,
-			enclosingInstancePath: rowInstancePath,
-		});
-		return marklessThen(
-			oneRowRenderAtATime(() =>
-				renderRepeatRowComponent({
-					surface: input.surface,
-					ownerComponentName: rowComponent.componentName,
-					componentEdgeId: rowComponent.componentEdgeId,
-					itemPropName: rowComponent.itemPropName,
-					item: input.item,
-					rowKey: input.rowKey,
-					rowIndex: input.rowIndex,
-					loadSymbol: input.loadSymbol,
-					read: (graphNodeId, path = []) => input.graph.read(graphNodeId, path),
-					idPrefix: ownerIdPrefix(
-						input.surface,
-						rowComponent.componentName,
-						input.repeat,
-					),
-					enclosingWidgetRoots: input.enclosing.roots,
-					enclosingInstancePath: rowInstancePath,
-				}),
-			),
-			(rendered) => placeMintedRow(input, rowComponent, rowSegment, rendered),
-		);
-	});
+	return marklessThen(
+		loadEvaluator(),
+		({ marklessOwningSurface, renderRepeatRowComponent, rowSegmentOf }) => {
+			const rowSegment = rowSegmentOf({
+				rowKey: input.rowKey,
+				enclosingInstancePath: rowInstancePath,
+			});
+			// A composed page declares no child's components itself: the owner sits
+			// an import down, under the prefix its symbols must be spelled in.
+			const owner = marklessOwningSurface(input.surface, rowComponent.componentName) ?? {
+				surface: input.surface,
+				symbolPrefix: '',
+			};
+			return marklessThen(
+				oneRowRenderAtATime(() =>
+					renderRepeatRowComponent({
+						surface: owner.surface,
+						ownerComponentName: rowComponent.componentName,
+						componentEdgeId: rowComponent.componentEdgeId,
+						itemPropName: rowComponent.itemPropName,
+						item: input.item,
+						rowKey: input.rowKey,
+						rowIndex: input.rowIndex,
+						loadSymbol: input.loadSymbol,
+						read: (graphNodeId, path = []) => input.graph.read(graphNodeId, path),
+						idPrefix: ownerIdPrefix(
+							owner.surface,
+							rowComponent.componentName,
+							input.repeat,
+						),
+						symbolPrefix: owner.symbolPrefix,
+						enclosingWidgetRoots: input.enclosing.roots,
+						enclosingInstancePath: rowInstancePath,
+					}),
+				),
+				(rendered) => placeMintedRow(input, rowComponent, rowSegment, rendered),
+			);
+		},
+	);
 }
 
 function placeMintedRow(

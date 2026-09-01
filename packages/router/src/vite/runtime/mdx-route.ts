@@ -1,7 +1,4 @@
-import {
-	marklessInstancePath,
-	marklessInstanceScopedLoadSymbol,
-} from '../../../../web/src/fns/instance-scope.ts';
+import { marklessInstanceScopedLoadSymbol } from '../../../../web/src/fns/instance-scope.ts';
 import { marklessSsrRosterPositionContext } from '../../../../web/src/fns/roster-position.ts';
 import { marklessSsrIslandRosterAnswered } from '../../../../web/src/prerender/island-roster.ts';
 import {
