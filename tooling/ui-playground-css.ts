@@ -1,10 +1,14 @@
 // The generated chrome's own CSS behind one `pg-` namespace: a demo's authored
 // CSS lands in the same scoped block, so a demo class named `panel` or `switch`
-// must not collide with the chrome's. The playground card takes both blocks; a
-// standalone code panel takes only the code block and the registry tip.
+// must not collide with the chrome's. The playground card takes every block; an
+// example card takes the stage, the code block and the hover-doc registry.
 
-/** The look every hover tip in the chrome shares; each caller positions it. */
-function tipLook(tip: string, title: string, body: string): string {
+/**
+ * The one tip recipe in a card: the control hints and the hover docs share it,
+ * and each caller positions its own. Title, sentence and type line are the
+ * `tsrx-tip-*` classes the site's fences already use.
+ */
+function tipLook(tip: string): string {
 	return `			${tip} {
 				z-index: 40;
 				width: max-content;
@@ -23,30 +27,46 @@ function tipLook(tip: string, title: string, body: string): string {
 				white-space: normal;
 			}
 
-			${title},
-			${body} {
+			${tip} .tsrx-tip-title,
+			${tip} .tsrx-tip-body,
+			${tip} .tsrx-tip-type {
 				display: block;
+				padding: 0.35em 0.6em;
 				font-family: var(--font-mono);
 				color: inherit;
 			}
 
-			${title} {
-				padding: 0.35em 0.6em;
+			${tip} .tsrx-tip-title {
 				background: transparent;
 				border-block-end: 1px solid color-mix(in oklch, var(--slab-ink) 30%, transparent);
 				font-weight: 700;
 			}
 
-			${body} {
-				padding: 0.35em 0.6em;
+			${tip} .tsrx-tip-body:empty {
+				display: none;
 			}
 
-			${body}:empty {
-				display: none;
+			${tip} .tsrx-tip-type {
+				border-block-start: 1px solid color-mix(in oklch, var(--slab-ink) 30%, transparent);
+				opacity: 0.8;
 			}`;
 }
 
+/**
+ * A tip or list pinned to its anchor by the browser, below it and flipping
+ * above (and to the other side) when that would leave the viewport. Fixed, so
+ * the card's clip never cuts it; the caller names the anchor.
+ */
+function anchored(anchor: string, area: string): string {
+	return `position: fixed;
+				inset: auto;
+				position-anchor: ${anchor};
+				position-area: ${area};
+				position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline;`;
+}
+
 export const CONTROLS_CSS = `			.pg {
+				position: relative;
 				display: grid;
 				/* Sized by the card, never by the widest code line: the code scrolls inside. */
 				grid-template-columns: minmax(0, 1fr);
@@ -152,7 +172,7 @@ export const CONTROLS_CSS = `			.pg {
 				align-items: center;
 			}
 
-			/* The type hint is a quiet superscript, not a second control in the cell. */
+			/* The hint is a quiet superscript, not a second control in the cell. */
 			.pg-dot {
 				padding: 0 0.15em;
 				border: 0;
@@ -173,33 +193,32 @@ export const CONTROLS_CSS = `			.pg {
 				opacity: 1;
 			}
 
-
-			/* One tip for the whole card: the type hints and the code panel's hover docs
-			   share it, and both open below their token so the first line of a clamped
-			   panel is never covered. */
-			.pg-tip,
-			.pg .tsrx-tip {
+			.pg-tip {
 				position: absolute;
 				inset-block-start: calc(100% + 0.35em);
 				inset-block-end: auto;
 				inset-inline-start: 0;
 			}
 
-${tipLook('.pg-tip,\n\t\t\t.pg .tsrx-tip', '.pg .tsrx-tip-title', '.pg .tsrx-tip-body')}
-
-			.pg-tip {
-				padding: 0.35em 0.6em;
-			}
+${tipLook('.pg-tip')}
 
 			.pg-tip[ui-closed] {
 				display: none;
 			}
 
-			@supports (anchor-scope: --tsrx-token) {
-				.pg .tsrx-tip {
-					position: fixed;
-					inset-block-start: calc(anchor(bottom) + 0.35em);
-					inset-block-end: auto;
+			/* Named here, not left to the family's layer: the vendored tooltip ships no anchor on its trigger. */
+			@supports (position-area: block-end) {
+				.pg-hint {
+					anchor-scope: --pg-hint;
+				}
+
+				.pg-dot {
+					anchor-name: --pg-hint;
+				}
+
+				.pg-tip {
+					${anchored('--pg-hint', 'block-end span-inline-end')}
+					margin-block: 0.35em;
 				}
 			}
 
@@ -238,6 +257,10 @@ ${tipLook('.pg-tip,\n\t\t\t.pg .tsrx-tip', '.pg .tsrx-tip-title', '.pg .tsrx-tip
 			}
 
 			.pg-pick-trigger {
+				display: flex;
+				gap: 0.6em;
+				align-items: center;
+				justify-content: space-between;
 				min-width: 6.5em;
 				padding: 0.25em 0.6em;
 				border: 1px solid var(--ink);
@@ -251,13 +274,23 @@ ${tipLook('.pg-tip,\n\t\t\t.pg .tsrx-tip', '.pg .tsrx-tip-title', '.pg .tsrx-tip
 				cursor: pointer;
 			}
 
+			/* The chevron follows the trigger's own open attribute, like an accordion's. */
+			.pg-pick-trigger::after {
+				content: '\\2304';
+				transition: transform 140ms ease;
+			}
+
+			.pg-pick-trigger[ui-open]::after {
+				transform: rotate(180deg);
+			}
+
 			.pg-pick-list {
 				position: absolute;
 				inset-block-start: 100%;
 				inset-inline-start: 0;
 				z-index: 5;
 				min-width: 8em;
-				margin-block-start: 0.25em;
+				margin-block: 0.25em;
 				padding: 0.2em;
 				border: 1px solid var(--ink);
 				border-radius: 3px;
@@ -266,6 +299,17 @@ ${tipLook('.pg-tip,\n\t\t\t.pg .tsrx-tip', '.pg .tsrx-tip-title', '.pg .tsrx-tip
 
 			.pg-pick-list[ui-closed] {
 				display: none;
+			}
+
+			/* Only the open trigger is an anchor, so each list finds its own. */
+			@supports (position-area: block-end) {
+				.pg-pick-trigger[ui-open] {
+					anchor-name: --pg-pick;
+				}
+
+				.pg-pick-list {
+					${anchored('--pg-pick', 'block-end span-inline-end')}
+				}
 			}
 
 			.pg-pick-item {
@@ -293,20 +337,6 @@ ${tipLook('.pg-tip,\n\t\t\t.pg .tsrx-tip', '.pg .tsrx-tip-title', '.pg .tsrx-tip
 				display: none;
 			}
 
-			/* The stage is its own frame inside the card, so the demo reads as the
-			   exhibit rather than as more chrome. */
-			.pg-stage {
-				display: grid;
-				place-items: center;
-				min-height: 15rem;
-				margin: var(--space-s);
-				padding: var(--space-s);
-				border: 1px solid var(--code-edge);
-				border-radius: 2px;
-				background: var(--code-surface);
-			}
-
-
 			.pg-bar-pick {
 				display: flex;
 				gap: 0.5em;
@@ -322,15 +352,7 @@ ${tipLook('.pg-tip,\n\t\t\t.pg .tsrx-tip', '.pg .tsrx-tip-title', '.pg .tsrx-tip
 			}
 
 			.pg-bar-trigger {
-				display: flex;
-				gap: 0.6em;
-				align-items: center;
-				justify-content: space-between;
 				min-width: 8.5em;
-			}
-
-			.pg-bar-trigger::after {
-				content: '\\2304';
 			}
 
 			.pg-bar-list {
@@ -338,6 +360,12 @@ ${tipLook('.pg-tip,\n\t\t\t.pg .tsrx-tip', '.pg .tsrx-tip-title', '.pg .tsrx-tip
 				inset-inline-end: 0;
 			}
 
+			@supports (position-area: block-end) {
+				.pg-bar-list {
+					inset: auto;
+					position-area: block-end span-inline-start;
+				}
+			}
 
 			/* Full bleed on a phone: the card runs edge to edge, so the page gutter
 			   the shell adds is taken back here. */
@@ -363,6 +391,18 @@ ${tipLook('.pg-tip,\n\t\t\t.pg .tsrx-tip', '.pg .tsrx-tip-title', '.pg .tsrx-tip
 				}
 			}`;
 
+/** The stage is its own frame inside the card, so the demo reads as the exhibit rather than as more chrome. */
+export const STAGE_CSS = `			.pg-stage {
+				display: grid;
+				place-items: center;
+				min-height: 15rem;
+				margin: var(--space-s);
+				padding: var(--space-s);
+				border: 1px solid var(--code-edge);
+				border-radius: 2px;
+				background: var(--code-surface);
+			}`;
+
 export const CODE_CSS = `			/* One row between the stage and the code: the file tabs sit on the left
 			   edge and the scenario picker on the right. */
 			.pg-bar {
@@ -376,7 +416,6 @@ export const CODE_CSS = `			/* One row between the stage and the code: the file 
 				padding: 0.6em 0.9em 0;
 				border-block-start: 1px solid var(--code-edge);
 			}
-
 
 			.pg-code {
 				min-width: 0;
@@ -433,7 +472,8 @@ export const CODE_CSS = `			/* One row between the stage and the code: the file 
 				min-width: 0;
 			}
 
-			/* The clamp: the code always shows, and opening only lifts the ceiling. */
+			/* The clamp: one per panel, round every tab, so the code always shows and
+			   opening it once lifts the ceiling for every file. */
 			.pg-clamp {
 				position: relative;
 			}
@@ -499,16 +539,55 @@ export const CODE_CSS = `			/* One row between the stage and the code: the file 
 			}
 `;
 
+/**
+ * The hover docs of one card: every distinct doc written once in a registry
+ * after the code, pinned to whichever token is hovered or focused — the only
+ * one carrying the anchor name. `root` is the card's own class.
+ */
+export function docCss(root: string): string {
+	return `			/* Hidden is display: none, never visibility: a hidden fixed, anchored box still costs pre-paint work on every scroll frame. */
+			${root} .cp-doc {
+				display: none;
+				position: absolute;
+				inset-inline-start: var(--space-s);
+				inset-block-end: 0.5em;
+				user-select: none;
+			}
+
+${tipLook(`${root} .cp-doc`)}
+
+			${root} .tsrx-hover:is(:hover, :focus-visible) {
+				anchor-name: --cp-hot;
+			}
+
+			@supports (position-area: block-end) {
+				${root} .cp-doc {
+					${anchored('--cp-hot', 'block-end span-inline-end')}
+					margin-block: 0.35em;
+				}
+			}`;
+}
+
+/** One rule per registry entry: the entry shows while any token naming it is hovered or focused. */
+export function docRules(keys: readonly string[], root: string): string {
+	return keys
+		.map(
+			(key) => `			${root}:has(.tsrx-hover[data-doc="${key}"]:is(:hover, :focus-visible)) .cp-doc[data-doc="${key}"] {
+				display: block;
+			}`,
+		)
+		.join('\n\n');
+}
+
 export const CHROME_CSS = `${CONTROLS_CSS}
 
-${CODE_CSS}`;
+${STAGE_CSS}
 
-/**
- * A standalone code panel: the same card frame as the playground, and one doc
- * per distinct hover written once in a registry after the panes. The registry
- * sits after the code in the DOM so anchor positioning may pin an entry to the
- * token that is hovered, which is the only one carrying the anchor name.
- */
+${CODE_CSS}
+
+${docCss('.pg')}`;
+
+/** A standalone card: the playground's frame round a stage and a code panel. */
 export const CODE_PANEL_CSS = `			.cp {
 				position: relative;
 				display: grid;
@@ -524,30 +603,13 @@ export const CODE_PANEL_CSS = `			.cp {
 				border-block-start: 0;
 			}
 
-			.cp-doc {
-				position: absolute;
-				inset-inline-start: var(--space-s);
-				inset-block-end: 0.5em;
-				visibility: hidden;
-				opacity: 0;
-				user-select: none;
+			.cp .pg-stage + .pg-code .pg-bar {
+				border-block-start: 1px solid var(--code-edge);
 			}
 
-${tipLook('.cp-doc', '.cp-doc .tsrx-tip-title', '.cp-doc .tsrx-tip-body')}
+${STAGE_CSS}
 
-			.cp .tsrx-hover:is(:hover, :focus-visible) {
-				anchor-name: --cp-hot;
-			}
-
-			@supports (anchor-scope: --tsrx-token) {
-				.cp-doc {
-					position: fixed;
-					position-anchor: --cp-hot;
-					inset-block-start: calc(anchor(bottom) + 0.35em);
-					inset-block-end: auto;
-					inset-inline-start: anchor(left);
-				}
-			}
+${docCss('.cp')}
 
 			@media (max-width: 866px) {
 				.cp {
@@ -556,14 +618,3 @@ ${tipLook('.cp-doc', '.cp-doc .tsrx-tip-title', '.cp-doc .tsrx-tip-body')}
 					border-radius: 0;
 				}
 			}`;
-
-/** One rule per registry entry: the entry shows while any token naming it is hovered or focused. */
-export function docRules(count: number): string {
-	const rules: string[] = [];
-	for (let index = 0; index < count; index += 1)
-		rules.push(`			.cp:has(.tsrx-hover[data-doc="${index}"]:is(:hover, :focus-visible)) .cp-doc[data-doc="${index}"] {
-				visibility: visible;
-				opacity: 1;
-			}`);
-	return rules.join('\n\n');
-}

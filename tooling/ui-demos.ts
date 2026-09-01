@@ -7,8 +7,15 @@
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import type { Plugin } from 'vite';
-import { highlightFences } from './highlight-code.ts';
-import { codePanelModule, codePanelName, codePanelPath, type PanelPane } from './ui-code-panel.ts';
+import {
+	codePanelModule,
+	codePanelName,
+	codePanelPath,
+	exampleName,
+	examplePath,
+	type PanelPane,
+} from './ui-code-panel.ts';
+import { ColourTable, DocRegistry, highlightHtml, paneLines } from './ui-code-runs.ts';
 import { CHROME_CSS } from './ui-playground-css.ts';
 import {
 	analyzeDemo,
@@ -98,133 +105,6 @@ export type CodePane = {
 };
 
 const STYLE_BLOCK = /^[ \t]*<style>[ \t]*\n([\s\S]*?)\n[ \t]*<\/style>[ \t]*\n?/m;
-
-const ENTITIES: Readonly<Record<string, string>> = {
-	amp: '&',
-	apos: "'",
-	gt: '>',
-	lt: '<',
-	nbsp: ' ',
-	quot: '"',
-};
-
-function decodeEntities(text: string): string {
-	return text.replace(/&(#x[0-9a-fA-F]+|#\d+|[a-zA-Z]+);/g, (match, body: string) => {
-		if (body.startsWith('#x') || body.startsWith('#X'))
-			return String.fromCodePoint(Number.parseInt(body.slice(2), 16));
-		if (body.startsWith('#')) return String.fromCodePoint(Number.parseInt(body.slice(1), 10));
-		return ENTITIES[body.toLowerCase()] ?? match;
-	});
-}
-
-function escapeHtml(text: string): string {
-	return text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
-}
-
-const TAG_OR_TEXT = /<(\/?)([a-zA-Z][\w-]*)((?:"[^"]*"|[^">])*)>|([^<]+)/g;
-const ATTRIBUTE = /([\w:-]+)="([^"]*)"/g;
-
-type Frame = {
-	readonly style: string;
-	readonly title?: string;
-	readonly doc?: string;
-	readonly label?: string;
-	readonly quiet: boolean;
-};
-
-/** A run as the parser accumulates it, before it is sorted into the two lists. */
-type RawToken = {
-	text: string;
-	readonly style: string;
-	readonly title?: string;
-	readonly doc?: string;
-	readonly label?: string;
-};
-
-function paint(raw: RawToken, index: number): CodeToken {
-	const id = `t${index}`;
-	const run = { id, text: raw.text, style: raw.style };
-	if (raw.title === undefined || raw.title === '') return { id, plain: [run], hover: [] };
-	return {
-		id,
-		plain: [],
-		hover: [{ ...run, title: raw.title, doc: raw.doc ?? '', label: raw.label ?? raw.title }],
-	};
-}
-
-/**
- * Reads the highlighter's own markup back into data the panel can draw with
- * `@for`. Markless has no way to drop a string of HTML into a component, so the
- * spans shiki wrote — and the `.tsrx-hover` wrappers `highlight-code.ts` puts
- * around documented tokens — have to come back as values, not as text.
- *
- * Nesting is followed generically rather than shape-matched, so markup this file
- * has not met keeps its text and simply loses the decoration it did not name.
- */
-function parseHighlighted(html: string): CodeLine[] {
-	const opened = html.indexOf('<code');
-	const start = opened < 0 ? -1 : html.indexOf('>', opened);
-	const end = html.lastIndexOf('</code>');
-	const body = start < 0 || end < 0 ? html : html.slice(start + 1, end);
-	return body.split('\n').map((raw, index) => {
-		const stack: Frame[] = [{ style: '', quiet: false }];
-		const tokens: RawToken[] = [];
-		TAG_OR_TEXT.lastIndex = 0;
-		for (const match of raw.matchAll(TAG_OR_TEXT)) {
-			const [, closing, , attributes, text] = match;
-			const top = stack[stack.length - 1];
-			if (text !== undefined) {
-				if (top.quiet) continue;
-				const content = decodeEntities(text);
-				const last = tokens[tokens.length - 1];
-				if (
-					last &&
-					last.style === top.style &&
-					last.title === top.title &&
-					last.doc === top.doc &&
-					last.label === top.label
-				)
-					last.text += content;
-				else
-					tokens.push({
-						text: content,
-						style: top.style,
-						title: top.title,
-						doc: top.doc,
-						label: top.label,
-					});
-				continue;
-			}
-			if (closing === '/') {
-				if (stack.length > 1) stack.pop();
-				continue;
-			}
-			const attrs = new Map<string, string>();
-			for (const attribute of (attributes ?? '').matchAll(ATTRIBUTE))
-				attrs.set(attribute[1], decodeEntities(attribute[2]));
-			const className = attrs.get('class') ?? '';
-			stack.push({
-				style: attrs.get('style') ?? top.style,
-				title: attrs.get('data-doc-title') ?? top.title,
-				doc: attrs.get('data-doc') ?? top.doc,
-				label: attrs.get('aria-label') ?? top.label,
-				// The tip is the hover's own copy of the text; drawing it here would
-				// print every documented token twice.
-				quiet: top.quiet || className.split(/\s+/).includes('tsrx-tip'),
-			});
-		}
-		return { id: `l${index}`, tokens: tokens.map(paint) };
-	});
-}
-
-/**
- * Runs one block through the site's own fence highlighter, so a code panel and a
- * code fence on the same page are coloured by one pipeline rather than two.
- */
-async function highlightBlock(code: string, language: string): Promise<CodeLine[]> {
-	const fence = `<pre><code class="language-${language}">${escapeHtml(code)}</code></pre>`;
-	return parseHighlighted(await highlightFences(fence));
-}
 
 /** Drops the common leading tabs a `<style>` block carries from its indentation. */
 function dedent(css: string): string {
@@ -323,8 +203,8 @@ function expandMdxImports(code: string, id: string, root: string, watch: (file: 
 	return changed ? next : undefined;
 }
 
-// `<CodePanel scenario="accordion/basic" />` in an .mdx page. The family and the
-// demo file are named in the page; the panel behind it is generated below.
+// `<Example scenario="accordion/basic" />` in an .mdx page. The family and the
+// demo file are named in the page; the card behind it is generated below.
 const SCENARIO_TAG =
 	/<([A-Z][A-Za-z0-9]*)((?:[^>"]|"[^"]*")*?)\sscenario="([a-z][a-z0-9-]*)\/([a-z0-9-]+)"((?:[^>"]|"[^"]*")*?)\/>/g;
 
@@ -353,20 +233,33 @@ function dropUnusedImport(code: string, name: string): string {
 	return code.replace(new RegExp(`^import\\s+${name}\\s+from\\s+['"][^'"]+['"];?[ \\t]*\\n`, 'm'), '');
 }
 
+/** The two files a demo is made of, as the code chrome tabs them. */
+function panesOf(family: string, demo: Demo): PanelPane[] {
+	const { code, css } = splitDemo(readFileSync(demo.file, 'utf8'));
+	const panes: PanelPane[] = [{ value: 'source', label: `${demo.stem}.tsrx`, code, language: 'tsrx' }];
+	if (css !== '') panes.push({ value: 'css', label: `${family}.css`, code: css, language: 'css' });
+	return panes;
+}
+
 /**
- * `<CodePanel scenario="accordion/multiple" />` in an .mdx page. The panel is
- * generated from the demo the page names — the code as literal markup, the
- * chrome the playground uses — and written to disk as its own module, so the
- * page carries the import of that module and the element. The `CodePanel`
- * import the page wrote goes with the tag once nothing renders it.
+ * The `scenario="family/demo"` tags an .mdx page writes, each swapped for a
+ * module generated from the demo it names and written to disk, so the page
+ * carries the import of that module and the element:
+ *
+ * - `<Playground scenario=… />`: the hero card — controls, stage, code panel;
+ * - `<Example scenario=… />`: the demo on a stage above its code panel, one card;
+ * - `<CodePanel scenario=… />`: the code panel alone.
+ *
+ * `Playground` and `Example` are the build's own names; a `CodePanel` import
+ * the page wrote goes with the tag once nothing renders it.
  */
-async function injectCodePanels(
+async function injectScenarioTags(
 	code: string,
 	id: string,
 	root: string,
 	watch: (file: string) => void,
 ): Promise<string | undefined> {
-	const matches = [...code.matchAll(SCENARIO_TAG)].filter((match) => match[1] !== 'Playground');
+	const matches = [...code.matchAll(SCENARIO_TAG)];
 	if (matches.length === 0) return undefined;
 	const imports = new Map<string, string>();
 	const swaps = new Map<string, string>();
@@ -374,65 +267,32 @@ async function injectCodePanels(
 	for (const match of matches) {
 		const [whole, tag, , family, stem] = match;
 		if (swaps.has(whole)) continue;
-		tags.add(tag);
 		const demo = readFamily(root, family).find((entry) => entry.stem === stem);
 		if (!demo)
-			throw new Error(
-				`ui-demos: ${DEMOS_DIR}/${family}/ has no '${stem}.tsrx' for the code panel in ${id}.`,
-			);
+			throw new Error(`ui-demos: ${DEMOS_DIR}/${family}/ has no '${stem}.tsrx' for the <${tag}> in ${id}.`);
 		watch(demo.file);
-		const { code: source, css } = splitDemo(readFileSync(demo.file, 'utf8'));
-		const panes: PanelPane[] = [
-			{ value: 'source', label: `${demo.stem}.tsrx`, code: source, language: 'tsrx' },
-		];
-		if (css !== '') panes.push({ value: 'css', label: `${family}.css`, code: css, language: 'css' });
-		const file = codePanelPath(root, family, stem);
-		writeGenerated(file, await codePanelModule({ family, stem, panes }));
-		const local = codePanelName(family, stem);
+		let file: string;
+		let local: string;
+		if (tag === 'Playground') {
+			file = generatedPath(root, family, stem);
+			local = componentName(family, stem);
+			writeGenerated(file, await playgroundSource(root, family, stem, watch));
+		} else if (tag === 'Example') {
+			file = examplePath(root, family, stem);
+			local = exampleName(family, stem);
+			writeGenerated(file, await codePanelModule({ family, stem, panes: panesOf(family, demo), demo: specifierFrom(file, demo.file) }));
+		} else {
+			tags.add(tag);
+			file = codePanelPath(root, family, stem);
+			local = codePanelName(family, stem);
+			writeGenerated(file, await codePanelModule({ family, stem, panes: panesOf(family, demo) }));
+		}
 		imports.set(local, specifierFrom(id, file));
 		swaps.set(whole, `<${local} />`);
 	}
 	let next = code;
 	for (const [before, after] of swaps) next = next.split(before).join(after);
 	for (const tag of tags) next = dropUnusedImport(next, tag);
-	const lines = [...imports].map(
-		([local, specifier]) => `import ${local} from ${JSON.stringify(specifier)};`,
-	);
-	// The blank line matters: MDX reads an import touching the next line as prose.
-	return `${lines.join('\n')}\n\n${next}`;
-}
-
-/**
- * `<Playground scenario="accordion/basic" />` in an .mdx page. The card behind it
- * is generated from the demo the page names, so the page carries the import of
- * the generated module and the element, and nothing else.
- */
-async function injectPlaygrounds(
-	code: string,
-	id: string,
-	root: string,
-	watch: (file: string) => void,
-): Promise<string | undefined> {
-	const matches = [...code.matchAll(SCENARIO_TAG)].filter((match) => match[1] === 'Playground');
-	if (matches.length === 0) return undefined;
-	const imports = new Map<string, string>();
-	const swaps = new Map<string, string>();
-	for (const match of matches) {
-		const [whole, , , family, stem] = match;
-		const demo = readFamily(root, family).find((entry) => entry.stem === stem);
-		if (!demo)
-			throw new Error(
-				`ui-playground: ${DEMOS_DIR}/${family}/ has no '${stem}.tsrx' for the playground in ${id}.`,
-			);
-		watch(demo.file);
-		const file = generatedPath(root, family, stem);
-		writeGenerated(file, await playgroundSource(root, family, stem, watch));
-		const local = componentName(family, stem);
-		imports.set(local, specifierFrom(id, file));
-		swaps.set(whole, `<${local} />`);
-	}
-	let next = code;
-	for (const [before, after] of swaps) next = next.split(before).join(after);
 	const lines = [...imports].map(
 		([local, specifier]) => `import ${local} from ${JSON.stringify(specifier)};`,
 	);
@@ -450,13 +310,19 @@ async function playgroundSource(root: string, family: string, stem: string, watc
 	const meta = metaFor(family);
 	const controls = playgroundControls(analysis, meta);
 	const slots = codeSlots(analysis, controls);
+	const registry = new DocRegistry(`pg-${family}-${stem}`);
+	const colours = new ColourTable();
+	const sourceLines = paneLines(await highlightHtml(displaySource(analysis, slots), 'tsrx'), registry, colours);
+	const cssLines = analysis.css === '' ? [] : paneLines(await highlightHtml(analysis.css, 'css'), registry, colours);
 	return playgroundModule({
 		demo: analysis,
 		meta,
 		controls,
 		slots,
-		sourceLines: await highlightBlock(displaySource(analysis, slots), 'tsrx'),
-		cssLines: analysis.css === '' ? [] : await highlightBlock(analysis.css, 'css'),
+		sourceLines,
+		cssLines,
+		docs: registry.docs,
+		colourCss: colours.css(),
 		sourceLabel: `${stem}.tsrx`,
 		cssLabel: `${family}.css`,
 		chromeCss: CHROME_CSS,
@@ -510,9 +376,7 @@ export function uiDemos(): Plugin {
 				const expanded = code.includes(PREFIX)
 					? expandMdxImports(code, id, root, watch)
 					: undefined;
-				const played = await injectPlaygrounds(expanded ?? code, id, root, watch);
-				const next = await injectCodePanels(played ?? expanded ?? code, id, root, watch);
-				const result = next ?? played ?? expanded;
+				const result = (await injectScenarioTags(expanded ?? code, id, root, watch)) ?? expanded;
 				return result === undefined ? undefined : { code: result, map: null };
 			},
 		},
