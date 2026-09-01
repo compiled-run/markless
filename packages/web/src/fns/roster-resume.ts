@@ -28,7 +28,7 @@ import { marklessInstancePath, marklessInstanceScopedElementHandle } from './ins
 // An element() binding's graph node id, restating the compiler's spelling for
 // the reason instance-scope.ts restates the serializer's grammar.
 const ELEMENT_BINDING_SEGMENT = '/element:';
-const INSTANCE_SEGMENT = /r:[^:]*:|[cp]\d+:/g;
+const INSTANCE_SEGMENT = /r:[^:]*:|[cpm]\d+:/g;
 
 type RosterComputedRecord = {
 	readonly graphNodeId: string;
@@ -118,7 +118,8 @@ function hostScopePath(instancePath: string): string {
 	let scope = '';
 	for (let at = 0; at < segments.length; at++) {
 		const segment = segments[at]!;
-		if (segments[at + 1]?.startsWith('p')) continue;
+		// An island segment names no component edge, so no projection collapses it.
+		if (!segment.startsWith('m') && segments[at + 1]?.startsWith('p')) continue;
 		scope += segment.startsWith('p') ? 'c' + segment.slice(1) : segment;
 	}
 	return scope;

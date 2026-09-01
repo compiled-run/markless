@@ -38,8 +38,10 @@ export function materializeDomLocators(
 // The instance path a composed widget-scoped handle id carries, restated here
 // for the reason fns/instance-scope.ts restates the serializer's grammar: the
 // lean resume chunk strips one prefix rather than taking an import edge for it.
+// No `m` here on purpose: the bare key is the module-space alias, and stripping
+// an island segment would file two islands' rosters under one key.
 const HANDLE_INSTANCE_PATH = /^(?:[cp]\d+:|r:[^:]*:)+(?=shared:)/;
-const HOST_SCOPE = /r:[^:]*:|c\d+:/g;
+const HOST_SCOPE = /r:[^:]*:|[cm]\d+:/g;
 
 /**
  * One element per key, and a loud refusal when a key names more than one.

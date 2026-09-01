@@ -60,6 +60,13 @@ import {
  *         disabled: { control: 'billing-trigger' },
  *     });
  *
+ * `interaction.keys` replaces the click with a keystroke, for a family whose only
+ * real gesture is typing. A textbox, an OTP field and a date's segments have no
+ * control a pointer can activate at all: `activate` is focused and the keys are
+ * sent to it, and the state attribute is read exactly as it is after a click
+ * (`interaction: { activate: 'input', keys: 'ada', observe: 'root', ... }`).
+ * Leave it off and the gesture stays a click.
+ *
  * `disabled` takes two testids when the element a pointer can reach is not the
  * element carrying the state: `control` is what gets clicked, `observe` is what
  * gets read (`disabled: { control: 'row-3-cell', observe: 'row-3' }`). A family
@@ -133,6 +140,11 @@ export type MultiEmbedInteraction = {
 	readonly activate: string;
 	/** Testid whose attribute reports the result. Defaults to `activate`. */
 	readonly observe?: string;
+	/**
+	 * Keys sent to a focused `activate` instead of a click, in `userEvent.keyboard`
+	 * notation. Omit for a pointer gesture.
+	 */
+	readonly keys?: string;
 	/** The attribute that reports open/checked/selected state. */
 	readonly stateAttribute: string;
 	/** Its value at rest. `null` means the attribute is absent at rest. */
@@ -325,12 +337,17 @@ function runMultiEmbedMode(
 		// (b) A gesture in one embed is a gesture in one embed.
 		register('interaction-isolation', 'activating one embed leaves every other at rest', async () => {
 			await mount();
-			const { activate, observe, stateAttribute, restValue, activeValue } =
+			const { activate, observe, keys, stateAttribute, restValue, activeValue } =
 				descriptor.interaction;
 			const controls = parts(activate, embeds);
 			const observed = parts(observe ?? activate, embeds);
 
-			await userEvent.click(controls[0]!);
+			if (keys === undefined) {
+				await userEvent.click(controls[0]!);
+			} else {
+				controls[0]!.focus();
+				await userEvent.keyboard(keys);
+			}
 
 			await expect
 				.poll(() => readState(observed[0]!, stateAttribute))

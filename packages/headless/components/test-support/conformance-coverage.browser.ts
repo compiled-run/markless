@@ -23,16 +23,11 @@ const ALLOWLIST: readonly string[] = [
 	'carousel',
 	'colorpicker',
 	'crop',
-	'datebox',
 	'fileupload',
 	'ink',
-	'otp',
 	'pad',
 	'resizable',
 	'slider',
-	'taglist',
-	'textbox',
-	'timebox',
 ];
 
 // The registered family list, read from the package's own export surface rather

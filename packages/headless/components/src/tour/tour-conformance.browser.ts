@@ -27,25 +27,20 @@ runMultiEmbedConformance({
 	// so expressing it takes a second tour widget per embed rather than a locked
 	// item inside this one.
 	//
-	// The step DOES move in the embed that was clicked, and only there — what
-	// never lands is the card's own `ui-current`. A card derives it from
-	// `tour.itemEls.indexOf(mine)`, and at resume that member lookup asks the
-	// handle registry under a key built from the host path. Both spellings of
-	// that path drop the island segment the serializer's own grammar carries
-	// (`/^(?:[cpm]\d+:|r:[^:]*:)+/`): the registering half in
-	// packages/web/src/resume-locators.ts files a component-local handle under
-	// `HOST_SCOPE = /r:[^:]*:|c\d+:/g`, and the reading half in
-	// packages/web/src/fns/roster-resume.ts asks under
-	// `INSTANCE_SEGMENT = /r:[^:]*:|[cp]\d+:/g`. With one island `c2:c0:element:mine`
-	// names one card; with two it names both islands' first card, the registry
-	// refuses an ambiguous key, and indexOf reads -1, so no card is current.
-	// Adding `m` to both character classes is the candidate fix; neither file is
-	// in this unit's contract. One island of this same scenario advances and
-	// shows the incoming card, so this is island scoping, not the family.
+	// The step moves in the clicked embed and only there; what never lands is the
+	// card's `ui-current`. A card derives it from `tour.itemEls.indexOf(mine)`,
+	// which at resume is answered by the roster reader in
+	// packages/web/src/fns/roster-resume.ts — and that module is reached through
+	// the `globalThis.__marklessRosterResume` loader the bundler writes into a
+	// page's own resume module. The composed island resume module this battery
+	// mounts never emits that line, so no reader is built and the card keeps its
+	// rendered place forever. Witnessed directly: the reader's body never runs on
+	// a two-island page. One island of this same scenario advances and shows the
+	// incoming card, so this is the composed page's resume module, not the family.
 	exemptions: [
 		{
 			check: 'interaction-isolation',
-			reason: 'island segment dropped from the resume handle key (resume-locators/roster-resume)',
+			reason: 'composed island resume module emits no roster loader, so no card re-derives its place',
 		},
 	],
 });
