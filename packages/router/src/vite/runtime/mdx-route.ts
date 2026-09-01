@@ -2,6 +2,8 @@ import {
 	marklessInstancePath,
 	marklessInstanceScopedLoadSymbol,
 } from '../../../../web/src/fns/instance-scope.ts';
+import { marklessSsrRosterPositionContext } from '../../../../web/src/fns/roster-position.ts';
+import { marklessSsrIslandRosterAnswered } from '../../../../web/src/prerender/island-roster.ts';
 import {
 	protocolInstancePath,
 	protocolInstanceQualifies,
@@ -38,7 +40,10 @@ export type MdxChild = {
 export type MdxComponentArtifact = {
 	// MaybePromise: compiled artifacts are async — a sync type here is what
 	// let unawaited .html reads slip past vp check.
-	readonly renderSsr?: (props?: unknown) => MdxRenderOutput | Promise<MdxRenderOutput>;
+	readonly renderSsr?: (
+		props?: unknown,
+		renderContext?: unknown,
+	) => MdxRenderOutput | Promise<MdxRenderOutput>;
 	readonly renderCsr?: (props?: unknown) => MdxRenderOutput | Promise<MdxRenderOutput>;
 };
 
@@ -267,7 +272,19 @@ export async function renderMdxChild(
 	// Compiled marklessRenderSsr is async (initial render awaits demanded
 	// async work); the unawaited Promise passed the truthy guard while .html
 	// read undefined — the MDX child silently dropped from SSR html.
-	const output = await component.renderSsr?.(props);
+	//
+	// Each island renders under its own roster context and answers its own
+	// counts here: this render is the only place the island's handles are still
+	// spelled the way the counts it minted name them.
+	const renderContext = marklessSsrRosterPositionContext(undefined);
+	const rendered = await component.renderSsr?.(props, renderContext);
+	const output =
+		rendered && typeof rendered.html === 'string'
+			? await marklessSsrIslandRosterAnswered(
+					renderContext,
+					rendered as MdxRenderOutput & { readonly html: string },
+				)
+			: rendered;
 	if (output) children.push({ ...child, output });
 	return output?.html ?? '';
 }
