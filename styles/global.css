@@ -928,15 +928,14 @@ html {
 	text-align: left;
 	white-space: normal;
 	user-select: none;
-	visibility: hidden;
-	opacity: 0;
+	/* Hidden by display, not visibility: a hidden fixed anchored box still costs pre-paint on every scroll frame, and the page carries dozens. */
+	display: none;
 }
 
 .tsrx-hover:hover > .tsrx-tip,
 .tsrx-hover:focus > .tsrx-tip,
 .tsrx-hover:focus-visible > .tsrx-tip {
-	visibility: visible;
-	opacity: 1;
+	display: block;
 }
 
 @supports (anchor-scope: --tsrx-token) {
