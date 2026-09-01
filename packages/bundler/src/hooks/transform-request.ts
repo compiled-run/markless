@@ -5,6 +5,7 @@ import type { TransformPluginContext } from 'rolldown';
 import { withQuery } from 'ufo';
 import { normalizeExecutionLogMode } from '../execution-log.ts';
 import { moduleIsEntry } from '../link-driver.ts';
+import { moduleIdFor } from '../module-id.ts';
 import type { MarklessEnvironment, TransformTsrxModuleInput } from '../types.ts';
 import {
 	MARKLESS_ROUTE_SOURCE_QUERY_RE,
@@ -102,6 +103,7 @@ export function planTransformHookRequest(
 	const { prerenderRecords } = plan;
 	const transformInput: TransformTsrxModuleInput = {
 		filename: source,
+		moduleId: moduleIdFor(source, ctx.getRoot()),
 		source: code,
 		dev: plan.dev,
 		buildId: internalOptions.buildId,

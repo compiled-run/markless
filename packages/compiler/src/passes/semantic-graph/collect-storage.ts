@@ -49,7 +49,7 @@ export function collectStorageBinding(input: {
 	}
 
 	const binding: SemanticGraphBinding & { readonly initialValueKnown: true } = {
-		id: storageGraphId(input.state.filename, key),
+		id: storageGraphId(input.state.moduleId, key),
 		name: input.name,
 		kind: 'state',
 		declarationKind: input.declarationKind,

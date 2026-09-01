@@ -1,5 +1,6 @@
 import { expect, test, vi } from 'vitest';
 import { marklessClient, marklessServer, transformTsrxModule } from '../src/rolldown.ts';
+import { moduleIdFor } from '../src/module-id.ts';
 import { callBuildStart, callLoad, callResolveId, callTransform } from './helpers.ts';
 import { resolve } from 'pathe';
 
@@ -76,7 +77,7 @@ test('concurrent symbols-only transforms preserve sibling render-data artifacts'
 		callTransform(plugin, child.source, `${child.filename}?markless-symbols`),
 	);
 	for (const child of children) {
-		const renderDataId = `virtual:markless:render-data:${encodeURIComponent(child.filename)}`;
+		const renderDataId = `virtual:markless:render-data:${encodeURIComponent(moduleIdFor(child.filename, '/workspace/app'))}`;
 		await expect(callResolveId(plugin, renderDataId)).resolves.toMatchObject({
 			id: `\0${renderDataId}`,
 		});
@@ -338,6 +339,7 @@ test('linking leaves source-module output unchanged when there are no tsrx impor
 	const source = `export function App() @{ <main>Standalone</main> }`;
 	const direct = await transformTsrxModule({
 		filename: importerFilename,
+		moduleId: moduleIdFor(importerFilename, '/workspace/app'),
 		source,
 		environment: 'server',
 		executionLog: 'auto',
@@ -369,7 +371,7 @@ test('a child implementation edit reuses the parent while its versioned interfac
 	const second = await callTransform(plugin, parentSource, importerFilename, { resolve });
 
 	expect(second).toBe(first);
-	const childRenderDataId = `virtual:markless:render-data:${encodeURIComponent(childFilename)}`;
+	const childRenderDataId = `virtual:markless:render-data:${encodeURIComponent(moduleIdFor(childFilename, '/workspace/app'))}`;
 	const childRenderData = await callLoad(plugin, `\0${childRenderDataId}`);
 	expect(childRenderData).toContain('After');
 	expect(childRenderData).not.toContain('Before');
@@ -422,7 +424,7 @@ test('render-data-only invalidation keeps the linked module graph intact', async
 	);
 
 	expect(invalidated).toEqual([
-		`\0virtual:markless:render-data:${encodeURIComponent(childFilename)}`,
+		`\0virtual:markless:render-data:${encodeURIComponent(moduleIdFor(childFilename, '/workspace/app'))}`,
 	]);
 	expect(invalidated).not.toContain(
 		`\0virtual:markless:resolver:${encodeURIComponent(importerFilename)}`,
@@ -446,7 +448,7 @@ test('a symbol implementation edit still invalidates all generated modules', asy
 		`\0virtual:markless:symbol:${encodeURIComponent(filename)}:symbol%3A0`,
 	);
 	expect(invalidated).toContain(
-		`\0virtual:markless:render-data:${encodeURIComponent(filename)}`,
+		`\0virtual:markless:render-data:${encodeURIComponent(moduleIdFor(filename, '/workspace/app'))}`,
 	);
 });
 

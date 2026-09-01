@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { readFile, rm } from 'node:fs/promises';
+import { readFile, readdir, rm } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { resolve } from 'pathe';
 import { describe, expect, test } from 'vitest';
@@ -199,6 +199,9 @@ describe('fixture builds', () => {
 
 			await execPnpm(['--filter', fixture.filter, 'build']);
 
+			for (const output of fixture.outputs)
+				await expectNoMachinePathInOutput(resolve(root, output));
+
 			if ('bundleGraph' in fixture) {
 				const graph = JSON.parse(
 					await readFile(resolve(root, fixture.bundleGraph), 'utf8'),
@@ -223,6 +226,33 @@ describe('fixture builds', () => {
 		}, 120_000);
 	}
 });
+
+// Every id the compiler mints is root-relative, so nothing a build writes - the
+// served HTML, a client or server chunk, a stylesheet, or a stylesheet's file
+// name - carries the machine's path. Build metadata JSON is tooling keyed by
+// resolved ids; a JS chunk named from a symbol id is the router's to relativise.
+const fixturesDirectory = resolve(root, 'packages/bundler/fixtures');
+const SCANNED_OUTPUT = /\.(?:html|m?js|css)$/;
+const NAMED_OUTPUT = /\.(?:html|css)$/;
+
+async function expectNoMachinePathInOutput(directory: string): Promise<void> {
+	const leaks: string[] = [];
+	for (const entry of await readdir(directory, { recursive: true, withFileTypes: true })) {
+		if (!entry.isFile()) continue;
+		const path = resolve(entry.parentPath, entry.name);
+		// Vite spells an encoded id into a file name with `/` as `_2F` or `_`.
+		if (
+			NAMED_OUTPUT.test(entry.name) &&
+			['_2F', '_'].some((slash) => entry.name.includes(fixturesDirectory.replaceAll('/', slash)))
+		)
+			leaks.push(`file name: ${path}`);
+		if (!SCANNED_OUTPUT.test(entry.name)) continue;
+		const text = await readFile(path, 'utf8');
+		const occurrences = text.split(fixturesDirectory).length - 1;
+		if (occurrences > 0) leaks.push(`${path}: ${occurrences} occurrence(s)`);
+	}
+	expect(leaks, `build output must not carry ${fixturesDirectory}`).toEqual([]);
+}
 
 async function execPnpm(args: string[]) {
 	try {

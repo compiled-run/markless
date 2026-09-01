@@ -34,6 +34,7 @@ import {
 } from './arm-child-content.ts';
 import { asNodes, isNode, type AnyNode } from '../ast/nodes.ts';
 import { parseJavaScriptModule } from '../js-ast.ts';
+import { moduleIdOf } from '../module-id.ts';
 import {
 	bindingOrigins,
 	carryForeignFactoryScope,
@@ -306,7 +307,7 @@ function foreignFactoryScopeCarry(
 		const symbol = symbolsById.get(module.symbolId);
 		if (symbol?.kind !== 'sync-computed-derive') return module;
 		const definedIn = sharedDefinitionFilename(symbol.graphNodeId);
-		if (definedIn === null || definedIn === source.filename) return module;
+		if (definedIn === null || definedIn === moduleIdOf(source)) return module;
 
 		const freeNames = unboundForeignBodyNames(
 			symbol,
@@ -315,7 +316,7 @@ function foreignFactoryScopeCarry(
 		if (freeNames.size === 0) return module;
 
 		origins ??= bindingOrigins({
-			filename: source.filename,
+			moduleId: moduleIdOf(source),
 			declarations: consumerModuleScopeDeclarations(source),
 			imports: semanticGraph.moduleImports,
 		});
@@ -331,7 +332,7 @@ function foreignFactoryScopeCarry(
 			],
 			sharedDefinitions: definitions,
 			consumerOrigins: origins,
-			consumerFilename: source.filename,
+			consumerModuleId: moduleIdOf(source),
 		});
 		for (const refusal of scope.refusals)
 			diagnostics.push(foreignFactoryScopeDiagnostic(refusal, module));

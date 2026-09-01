@@ -9,7 +9,14 @@ import type { CompilerDiagnostic, SourceSpan } from './diagnostics.ts';
 export type { CompilerDiagnostic, DiagnosticSuggestion, SourceSpan } from './diagnostics.ts';
 
 export type SemanticGraphInput = {
+	/** Where the file is on disk: diagnostics and module ownership read it. */
 	readonly filename: string;
+	/**
+	 * The id every minted id is spelled from (shared definition, storage, element
+	 * and scope ids, the render-data record): root-relative posix, never the
+	 * machine path. Defaults to `filename`.
+	 */
+	readonly moduleId?: string;
 	readonly source: string;
 	readonly importedModuleInterfaces?: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 	readonly artifactChildMaterializations?: Readonly<Record<string, ArtifactChildMaterialization>>;
@@ -229,6 +236,7 @@ export type ModuleGraphInterfaceSharedDefinition = {
 export type ModuleGraphInterfaceArtifact = {
 	readonly passId: 'module-graph-interface';
 	readonly filename: string;
+	readonly moduleId?: string;
 	readonly exports: ReadonlyArray<ModuleGraphInterfaceExport>;
 	readonly reexports?: ReadonlyArray<ModuleGraphInterfaceReexport>;
 	readonly linkedComponents?: ReadonlyArray<ModuleGraphInterfaceLinkedComponent>;
@@ -1097,6 +1105,7 @@ export type SemanticMarkupArtifact = {
 export type SemanticGraphArtifact = {
 	readonly passId: 'tsrx-semantic-graph';
 	readonly filename: string;
+	readonly moduleId: string;
 	readonly components: ReadonlyArray<SemanticComponent>;
 	readonly componentPropBindings: ReadonlyArray<SemanticComponentPropDeclaration>;
 	readonly componentEdges: ReadonlyArray<SemanticComponentEdge>;

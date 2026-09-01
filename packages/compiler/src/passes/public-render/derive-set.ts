@@ -1,5 +1,6 @@
 import type { PublicRenderModuleInput } from '../../artifacts.ts';
 import type { CompilerDiagnostic } from '../../diagnostics.ts';
+import { moduleIdOf } from '../../module-id.ts';
 import {
 	carryForeignFactoryScope,
 	computedReadCallRefusals,
@@ -480,7 +481,7 @@ function foreignCopiedBodies(input: PublicRenderModuleInput): ReadonlyArray<Fore
 	return [...reached].flatMap((graphNodeId) => {
 		const source = sharedSources.get(graphNodeId);
 		const definedIn = sharedDefinitionFilename(graphNodeId);
-		return source === undefined || definedIn === null || definedIn === input.source.filename
+		return source === undefined || definedIn === null || definedIn === moduleIdOf(input.source)
 			? []
 			: [
 					{
@@ -516,7 +517,7 @@ export function foreignSharedComputedScope(input: PublicRenderModuleInput): Fore
 		bodies: foreignCopiedBodies(input),
 		sharedDefinitions: input.semanticGraph.sharedDefinitions,
 		consumerOrigins: consumerBindingOrigins(input),
-		consumerFilename: input.source.filename,
+		consumerModuleId: moduleIdOf(input.source),
 	});
 	return {
 		importLines: carried.importLines,

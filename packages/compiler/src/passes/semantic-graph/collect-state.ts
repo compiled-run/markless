@@ -431,6 +431,7 @@ export function collectModuleGraphInterface(input: {
 	return {
 		passId: 'module-graph-interface',
 		filename: input.state.filename,
+		moduleId: input.state.moduleId,
 		exports: exportedHelpers,
 		...(reexports.length > 0 ? { reexports } : {}),
 		render: { version: 1, components: [] },

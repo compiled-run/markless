@@ -144,7 +144,7 @@ export async function virtualModuleForRequest(
 	const registered = virtualModules.get(normalizedId);
 	if (registered || internalOptions.dev !== true) return registered;
 
-	const source = marklessVirtualModuleSourceFile(normalizedId);
+	const source = marklessVirtualModuleSourceFile(normalizedId, ctx.getRoot());
 	if (!source || !TSRX_SOURCE_FILE.test(source) || regeneratingVirtualModules.has(normalizedId)) {
 		return undefined;
 	}

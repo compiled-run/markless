@@ -60,18 +60,21 @@ import { collectBranchSite } from './collect-branches.ts';
 import { collectModuleGraphInterface, collectVariableDeclaration } from './collect-state.ts';
 import { createMutableSemanticGraphArtifact, createWalkState, type WalkState } from './types.ts';
 import { collectSemanticMarkup, componentStyleScopeClass } from './collect-markup.ts';
+import { moduleIdOf } from '../../module-id.ts';
 
 export async function buildSemanticGraph(
 	input: SemanticGraphInput,
 ): Promise<SemanticGraphArtifact> {
 	const ast = parseModule(input.source, input.filename) as unknown as AnyNode;
 	const statements = asNodes(ast.body);
-	const graph = createMutableSemanticGraphArtifact(input.filename);
+	const moduleId = moduleIdOf(input);
+	const graph = createMutableSemanticGraphArtifact(input.filename, moduleId);
 	const apiSources = frameworkApiSources(input.additionalFrameworkApiSources);
 	graph.moduleImports.push(...collectModuleImports(statements, apiSources));
 	const frameworkApiImports = collectImports(statements, apiSources);
 	const state = createWalkState({
 		filename: input.filename,
+		moduleId,
 		source: input.source,
 		graph,
 		frameworkApiImports,
@@ -123,6 +126,7 @@ export async function buildSemanticGraph(
 		state.currentStyleScopeClass = componentStyleScopeClass(
 			componentFunction.node,
 			input.filename,
+			moduleId,
 		);
 		prepareComponentLocalBindings(componentFunction.node.body as AnyNode, state);
 		collectComponentProps(componentFunction.node, state);
@@ -149,6 +153,7 @@ export async function buildSemanticGraph(
 		ast,
 		source: input.source,
 		filename: input.filename,
+		moduleId,
 		graph,
 		hostIds: state.hostIds,
 	});
@@ -166,7 +171,7 @@ export async function buildSemanticGraph(
 	// collected after that point, and a consumer adopts exactly those.
 	const sharedDefinitions = moduleInterfaceSharedDefinitions({
 		statements,
-		filename: input.filename,
+		moduleId,
 		sharedDefinitions: graph.sharedDefinitions,
 		graphBindings: graph.graphBindings,
 	});

@@ -6,6 +6,7 @@ import type {
 	PublicRenderPlanInput,
 } from '../../artifacts.ts';
 import { collectModuleStyleScopes } from './style-scopes.ts';
+import { moduleIdOf } from '../../module-id.ts';
 import { collectAsyncBoundaryNodes } from './async-boundaries.ts';
 import { resolveBoundaryRunners } from './boundary-runner.ts';
 import { gatePlanDisagreementDiagnostic, tryBlockToggleRerenderDiagnostic } from './diagnostics.ts';
@@ -67,7 +68,7 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 		return emptyPlan(undeclaredTemplateReadDiagnostics);
 	}
 
-	const styles = collectModuleStyleScopes(ast, input.source.filename);
+	const styles = collectModuleStyleScopes(ast, input.source.filename, moduleIdOf(input.source));
 	const boundaryNodes = collectAsyncBoundaryNodes(selectedRoot.root);
 	const boundaryRunners = resolveBoundaryRunners(input.semanticGraph);
 	const boundaryRunnerDiagnostics = input.semanticGraph.asyncBoundaries.flatMap(

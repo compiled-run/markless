@@ -15,6 +15,7 @@ import {
 import { MARKLESS_EXECUTION_LOG_MODULE_ID } from '../src/execution-log.ts';
 import { UNSHIPPED_HOOK_REASON } from '../src/build/execution-sizes.ts';
 import { verifyGeneratedSymbolTableRoutes } from '../src/build/symbol-table.ts';
+import { moduleIdFor } from '../src/module-id.ts';
 import {
 	callBuildStart,
 	callGenerateBundle,
@@ -669,7 +670,7 @@ let active = state(true);
 			code: string;
 		};
 		const encoded = encodeURIComponent('/workspace/app/src/App.tsrx');
-		const payloadId = `virtual:markless:payload:${encoded}`;
+		const payloadId = `virtual:markless:payload:${encodeURIComponent(moduleIdFor('/workspace/app/src/App.tsrx', '/workspace/app'))}`;
 		const resolverId = `virtual:markless:resolver:${encoded}`;
 		const resumeId = `virtual:markless:resume:${encoded}`;
 
@@ -990,7 +991,7 @@ export default function LiveFeed() @{
 		callBuildStart(plugin, { cwd: '/workspace/app' });
 		await callTransform(plugin, source, '/workspace/app/src/App.tsrx');
 		const encoded = encodeURIComponent('/workspace/app/src/App.tsrx');
-		const payloadId = `virtual:markless:payload:${encoded}`;
+		const payloadId = `virtual:markless:payload:${encodeURIComponent(moduleIdFor('/workspace/app/src/App.tsrx', '/workspace/app'))}`;
 		const payloadSource = (await callLoad(plugin, `\0${payloadId}`)) as string;
 		expect(payloadSource).toContain('export const state =');
 		expect(payloadSource).not.toContain('export default');
@@ -1451,7 +1452,7 @@ export default function Page() @{ <main><StaticFrame /><StyledChild /></main> }`
 				resolve: resolveImport,
 				getModuleInfo: () => ({ isEntry: false }),
 			})) as { code: string };
-			const canonicalChildId = `virtual:markless:render-data:${encodeURIComponent(childFilename)}`;
+			const canonicalChildId = `virtual:markless:render-data:${encodeURIComponent(moduleIdFor(childFilename, appRoot))}`;
 			const canonicalChild = (await callLoad(plugin, `\0${canonicalChildId}`)) as string;
 
 			expect(pageRenderData.code).toContain(JSON.stringify(reachedChildId));
@@ -1517,6 +1518,7 @@ export default function Page() @{ <main><Child /></main> }`;
 		try {
 			const canonical = await transformTsrxModule({
 				filename: pageFilename,
+				moduleId: moduleIdFor(pageFilename, appRoot),
 				source: pageSource,
 				environment: 'client',
 				dev: true,
@@ -1598,7 +1600,7 @@ export default function Page() @{ <main><Child /></main> }`;
 			).not.toEqual(
 				expect.arrayContaining([
 					expect.stringContaining(
-						`virtual:markless:render-data:${encodeURIComponent(childFilename)}`,
+						`virtual:markless:render-data:${encodeURIComponent(moduleIdFor(childFilename, appRoot))}`,
 					),
 					expect.stringContaining('markless-reached-from'),
 				]),

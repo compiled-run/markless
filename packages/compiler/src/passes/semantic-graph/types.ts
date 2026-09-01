@@ -39,6 +39,7 @@ import type { StyleConstResolver } from './style-object.ts';
 export type MutableSemanticGraphArtifact = {
 	passId: 'tsrx-semantic-graph';
 	filename: string;
+	moduleId: string;
 	components: SemanticComponent[];
 	componentPropBindings: SemanticComponentPropDeclaration[];
 	componentEdges: SemanticComponentEdge[];
@@ -91,6 +92,7 @@ export type PendingElementHandleIdref = Omit<
 
 export type WalkState = {
 	readonly filename: string;
+	readonly moduleId: string;
 	readonly source: string;
 	/**
 	 * yuku's semantic tables for this file: the scopes, the bindings each scope
@@ -178,10 +180,14 @@ export type DeferredComputedWrite = {
 
 export type SemanticGraphWalk = (node: AnyNode | null | undefined, state: WalkState) => void;
 
-export function createMutableSemanticGraphArtifact(filename: string): MutableSemanticGraphArtifact {
+export function createMutableSemanticGraphArtifact(
+	filename: string,
+	moduleId: string,
+): MutableSemanticGraphArtifact {
 	return {
 		passId: 'tsrx-semantic-graph',
 		filename,
+		moduleId,
 		components: [],
 		componentPropBindings: [],
 		componentEdges: [],
@@ -211,6 +217,7 @@ export function createMutableSemanticGraphArtifact(filename: string): MutableSem
 		moduleGraphInterface: {
 			passId: 'module-graph-interface',
 			filename,
+			moduleId,
 			exports: [],
 			render: { version: 1, components: [] },
 		},
@@ -220,6 +227,7 @@ export function createMutableSemanticGraphArtifact(filename: string): MutableSem
 
 export function createWalkState(input: {
 	readonly filename: string;
+	readonly moduleId: string;
 	readonly source: string;
 	readonly graph: MutableSemanticGraphArtifact;
 	readonly frameworkApiImports: ReadonlyMap<string, FrameworkApiName>;
@@ -232,6 +240,7 @@ export function createWalkState(input: {
 	let semanticView: SemanticView | undefined;
 	return {
 		filename: input.filename,
+		moduleId: input.moduleId,
 		source: input.source,
 		semantic: () => (semanticView ??= analyzeSemantics(input.source, input.filename)),
 		graph: input.graph,

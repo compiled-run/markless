@@ -23,6 +23,7 @@ import {
 	stripEmittedTypes,
 	transformTsrxModule,
 } from '../transform.ts';
+import { moduleIdFor } from '../module-id.ts';
 import { isRelativeImport as isRelative, normalizeVirtualId, pathname } from '../virtual-ids.ts';
 
 // Every extension whose file is authored source rather than runnable JavaScript.
@@ -38,7 +39,7 @@ export type DelegateSpecifierResolve = (
 ) => Promise<string | undefined>;
 
 export type BuildDelegateLoader = {
-	load(source: string, resolve: DelegateSpecifierResolve): Promise<unknown>;
+	load(source: string, resolve: DelegateSpecifierResolve, root?: string): Promise<unknown>;
 	clear(): void;
 };
 
@@ -69,7 +70,7 @@ export function createBuildDelegateLoader(): BuildDelegateLoader {
 	let virtualSources = new Map<string, string>();
 	let graph = new Map<string, Promise<Record<string, unknown>>>();
 
-	async function moduleCode(id: string): Promise<string> {
+	async function moduleCode(id: string, root: string | undefined): Promise<string> {
 		const virtual = virtualSources.get(normalizeVirtualId(id));
 		if (virtual !== undefined) return virtual;
 		const file = pathname(id);
@@ -77,6 +78,7 @@ export function createBuildDelegateLoader(): BuildDelegateLoader {
 		if (!TSRX_MODULE.test(file)) return await stripEmittedTypes(source, file);
 		const transformed = await transformTsrxModule({
 			filename: file,
+			moduleId: moduleIdFor(file, root),
 			source,
 			environment: 'server',
 		});
@@ -90,14 +92,15 @@ export function createBuildDelegateLoader(): BuildDelegateLoader {
 		specifier: string,
 		importer: string,
 		resolve: DelegateSpecifierResolve,
+		root: string | undefined,
 	): Promise<unknown> {
 		const virtualId = normalizeVirtualId(specifier);
-		const virtualOwner = marklessVirtualModuleSourceFile(virtualId);
+		const virtualOwner = marklessVirtualModuleSourceFile(virtualId, root);
 		if (virtualOwner) {
 			// A sibling minted by a module this loader has not compiled yet: compile
 			// the owner first, which is what registers the sibling's code.
-			if (!virtualSources.has(virtualId)) await load(virtualOwner, resolve);
-			return await load(virtualId, resolve);
+			if (!virtualSources.has(virtualId)) await load(virtualOwner, resolve, root);
+			return await load(virtualId, resolve, root);
 		}
 		const runtimeId = marklessRuntimeSpecifierId(specifier);
 		const resolved =
@@ -109,20 +112,21 @@ export function createBuildDelegateLoader(): BuildDelegateLoader {
 		if (resolved === undefined) return await import(specifier);
 		if (!isAbsolute(pathname(resolved))) return await import(resolved);
 		return SOURCE_MODULE.test(pathname(resolved))
-			? await load(resolved, resolve)
+			? await load(resolved, resolve, root)
 			: await import(pathToFileURL(pathname(resolved)).href);
 	}
 
 	async function evaluate(
 		id: string,
 		resolve: DelegateSpecifierResolve,
+		root: string | undefined,
 	): Promise<Record<string, unknown>> {
-		const code = await moduleCode(id);
+		const code = await moduleCode(id, root);
 		const file = pathname(id);
 		const transformed = await moduleRunnerTransform(code, null, file, code);
 		const exports: Record<string, unknown> = Object.create(null);
 		Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
-		const request = (dep: string) => importSpecifier(dep, file, resolve);
+		const request = (dep: string) => importSpecifier(dep, file, resolve, root);
 		const context: ModuleRunnerContext = {
 			[ssrModuleExportsKey]: exports,
 			[ssrImportKey]: request,
@@ -140,17 +144,17 @@ export function createBuildDelegateLoader(): BuildDelegateLoader {
 		return exports;
 	}
 
-	function load(id: string, resolve: DelegateSpecifierResolve) {
+	function load(id: string, resolve: DelegateSpecifierResolve, root: string | undefined) {
 		const running = graph.get(id);
 		if (running) return running;
-		const started = evaluate(id, resolve);
+		const started = evaluate(id, resolve, root);
 		graph.set(id, started);
 		return started;
 	}
 
 	return {
-		load(source, resolve) {
-			return load(source, resolve);
+		load(source, resolve, root) {
+			return load(source, resolve, root);
 		},
 		clear() {
 			graph = new Map();

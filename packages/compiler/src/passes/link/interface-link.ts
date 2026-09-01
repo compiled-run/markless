@@ -98,11 +98,13 @@ function symbolClaimSignature(claims: ReadonlyArray<LinkedInterfaceClaim>): stri
 
 export async function compileTsrxModuleLinkArtifact(input: {
 	readonly filename: string;
+	readonly moduleId?: string;
 	readonly source: string;
 	readonly buildId?: string;
 }): Promise<ModuleLinkArtifact> {
 	const compiled = await compileTsrxModule({
 		filename: input.filename,
+		moduleId: input.moduleId,
 		source: input.source,
 		buildId: input.buildId,
 		symbols: [],

@@ -49,7 +49,7 @@ export function collectSharedDefinition(input: {
 	const factorySource = factory ? expressionSource(factory, input.state.source) : '';
 	const carried = factoryModuleScopeCarry(input.state, factorySource);
 	const definition: SemanticSharedDefinition = {
-		id: sharedDefinitionId(input.state.filename, input.name),
+		id: sharedDefinitionId(input.state.moduleId, input.name),
 		name: input.name,
 		exportedName: input.name,
 		...(scope ? { scope } : {}),
@@ -545,7 +545,7 @@ function staticCalleePath(node: AnyNode | undefined | null): ReadonlyArray<strin
  */
 export function moduleInterfaceSharedDefinitions(input: {
 	readonly statements: ReadonlyArray<AnyNode>;
-	readonly filename: string;
+	readonly moduleId: string;
 	readonly sharedDefinitions: ReadonlyArray<SemanticSharedDefinition>;
 	readonly graphBindings: ReadonlyArray<SemanticGraphBinding>;
 }): ReadonlyArray<ModuleGraphInterfaceSharedDefinition> {
@@ -554,7 +554,7 @@ export function moduleInterfaceSharedDefinitions(input: {
 	return input.sharedDefinitions.flatMap((definition) => {
 		// A definition this module adopted from an import is that module's to
 		// publish; republishing it here would give one definition two owners.
-		if (definition.id !== sharedDefinitionId(input.filename, definition.exportedName)) return [];
+		if (definition.id !== sharedDefinitionId(input.moduleId, definition.exportedName)) return [];
 
 		return (exportNames.get(definition.name) ?? []).map((exportName) => ({
 			exportName,
@@ -813,7 +813,7 @@ export function collectSharedCallbackBindings(state: WalkState): void {
 export function collectImplicitFamilyScopeDiagnostics(state: WalkState): void {
 	for (const definition of state.graph.sharedDefinitions) {
 		if (definition.scope !== undefined) continue;
-		if (definition.id !== sharedDefinitionId(state.filename, definition.exportedName)) continue;
+		if (definition.id !== sharedDefinitionId(state.moduleId, definition.exportedName)) continue;
 
 		const componentNames = [
 			...new Set(
@@ -836,8 +836,8 @@ export function collectImplicitFamilyScopeDiagnostics(state: WalkState): void {
 	}
 }
 
-export function sharedDefinitionId(filename: string, exportedName: string): string {
-	return `shared:${filename}#${exportedName}`;
+export function sharedDefinitionId(moduleId: string, exportedName: string): string {
+	return `shared:${moduleId}#${exportedName}`;
 }
 
 /**

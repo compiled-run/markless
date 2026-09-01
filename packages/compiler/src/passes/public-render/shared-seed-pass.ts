@@ -408,11 +408,11 @@ function seedingComponents(input: PublicRenderModuleInput): Map<string, string> 
 }
 
 function declaredWidgetDefinitions(input: PublicRenderModuleInput) {
-	// The id carries the declaring module's filename, so it answers ownership.
+	// The id carries the declaring module id, so it answers ownership.
 	return input.semanticGraph.sharedDefinitions.filter(
 		(definition) =>
 			definition.scope === 'widget' &&
-			definition.id === sharedDefinitionId(input.semanticGraph.filename, definition.exportedName),
+			definition.id === sharedDefinitionId(input.semanticGraph.moduleId, definition.exportedName),
 	);
 }
 
@@ -516,7 +516,7 @@ export function adoptedWidgetDefinitionIds(
 	return new Set(
 		input.semanticGraph.sharedDefinitions.flatMap((definition) =>
 			definition.scope === 'widget' &&
-			definition.id !== sharedDefinitionId(input.semanticGraph.filename, definition.exportedName)
+			definition.id !== sharedDefinitionId(input.semanticGraph.moduleId, definition.exportedName)
 				? [definition.id]
 				: [],
 		),

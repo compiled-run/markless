@@ -40,6 +40,7 @@ import { createRuntimeDemandMap } from './passes/runtime-demand-map.ts';
 import { createTriggerGroups } from './passes/trigger-groups.ts';
 import { buildSemanticGraph } from './passes/semantic-graph/index.ts';
 import { createMutableSemanticGraphArtifact } from './passes/semantic-graph/types.ts';
+import { moduleIdOf } from './module-id.ts';
 import { lowerStateAccess } from './passes/state-lowering.ts';
 import { emitSymbolModules } from './passes/symbol-modules.ts';
 import {
@@ -161,7 +162,10 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 						return { semanticGraph: await buildSemanticGraph(source) };
 					} catch (error) {
 						if (!isExternalParserSyntaxError(error)) throw error;
-						const semanticGraph = createMutableSemanticGraphArtifact(source.filename);
+						const semanticGraph = createMutableSemanticGraphArtifact(
+							source.filename,
+							moduleIdOf(source),
+						);
 						semanticGraph.diagnostics.push(parseErrorDiagnostic(error, source));
 						return { semanticGraph };
 					}

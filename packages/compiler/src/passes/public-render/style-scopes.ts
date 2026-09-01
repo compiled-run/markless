@@ -20,14 +20,22 @@ type StyleScopeCollection = {
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 };
 
-export function collectStyleScopes(root: AnyNode, filename: string): StyleScopeCollection {
-	return compileStyleNodes(findStyleNodes(root), filename);
+export function collectStyleScopes(
+	root: AnyNode,
+	filename: string,
+	moduleId: string,
+): StyleScopeCollection {
+	return compileStyleNodes(findStyleNodes(root), filename, moduleId);
 }
 
 // The module, not the selected render root, owns the shipped CSS: every
 // component mints the module's scope class onto its own elements, so a block
 // left behind here paints nothing while its class is still stamped in the HTML.
-export function collectModuleStyleScopes(ast: AnyNode, filename: string): StyleScopeCollection {
+export function collectModuleStyleScopes(
+	ast: AnyNode,
+	filename: string,
+	moduleId: string,
+): StyleScopeCollection {
 	const shipped: AnyNode[] = [];
 	const covered = new Set<AnyNode>();
 	for (const statement of asNodes(ast.body)) {
@@ -54,7 +62,7 @@ export function collectModuleStyleScopes(ast: AnyNode, filename: string): StyleS
 					'Move the block inside the markup a component returns, or into an imported stylesheet.',
 			}),
 		);
-	const compiled = compileStyleNodes(shipped, filename);
+	const compiled = compileStyleNodes(shipped, filename, moduleId);
 	return {
 		styleScopes: compiled.styleScopes,
 		diagnostics: [...compiled.diagnostics, ...strayDiagnostics],
@@ -95,10 +103,11 @@ function findStyleNodes(root: AnyNode): AnyNode[] {
 function compileStyleNodes(
 	styleNodes: ReadonlyArray<AnyNode>,
 	filename: string,
+	moduleId: string,
 ): StyleScopeCollection {
 	if (styleNodes.length === 0) return { styleScopes: [], diagnostics: [] };
 
-	const scopeId = styleScopeId(filename);
+	const scopeId = styleScopeId(moduleId);
 	const diagnostics: CompilerDiagnostic[] = [];
 	const cssParts: string[] = [];
 
@@ -171,11 +180,11 @@ function isInsideKeyframes(rule: Rule): boolean {
 	return false;
 }
 
-// FNV-1a over the filename: stable per component module, runtime-agnostic.
-function styleScopeId(filename: string): string {
+// FNV-1a over the module id: stable per component module, runtime-agnostic.
+function styleScopeId(moduleId: string): string {
 	let hash = 0x811c9dc5;
-	for (let index = 0; index < filename.length; index++) {
-		hash ^= filename.charCodeAt(index);
+	for (let index = 0; index < moduleId.length; index++) {
+		hash ^= moduleId.charCodeAt(index);
 		hash = Math.imul(hash, 0x01000193) >>> 0;
 	}
 	return `mk-${hash.toString(36)}`;

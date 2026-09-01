@@ -1,4 +1,4 @@
-import { relative } from 'pathe';
+import { moduleIdFor } from '../module-id.ts';
 import type {
 	BundleGraphAdder,
 	GlobalInjections,
@@ -206,13 +206,7 @@ function mapBundleNames(
 function getOrigins(item: MarklessBuildMetadataChunk, root: string | undefined) {
 	return item.moduleIds
 		.filter((id) => !id.startsWith('\0'))
-		.map((id) => {
-			if (root) {
-				return relative(root, id);
-			}
-
-			return id;
-		})
+		.map((id) => moduleIdFor(id, root))
 		.sort();
 }
 

@@ -1,4 +1,5 @@
 import { dirname, isAbsolute, resolve } from 'pathe';
+import { sourceForModuleId } from './module-id.ts';
 import {
 	artifactChildCandidates,
 	collectTsrxModuleDiagnostics,
@@ -202,8 +203,13 @@ export async function transformTsrxModule(
 
 // Reads back the owner of `virtual:markless:<kind>:<encoded source>[:<detail>]`,
 // the shape every generated id above is minted in; style ids append `.css`.
+// The payload, render-data and style ids encode the owner's module id, which
+// reads back to a file only through `root`; the rest encode the file itself.
 // Accepts rolldown-resolved ids (leading `\0`); null when the id carries no source.
-export function marklessVirtualModuleSourceFile(moduleId: string): string | null {
+export function marklessVirtualModuleSourceFile(
+	moduleId: string,
+	root?: string,
+): string | null {
 	const bare = moduleId.startsWith('\0') ? moduleId.slice(1) : moduleId;
 	if (!bare.startsWith(MARKLESS_VIRTUAL_PREFIX)) return null;
 	const rest = bare.slice(MARKLESS_VIRTUAL_PREFIX.length);
@@ -212,7 +218,7 @@ export function marklessVirtualModuleSourceFile(moduleId: string): string | null
 	const encoded = rest.slice(kindEnd + 1).split(':')[0].replace(/\.css$/, '');
 	if (!encoded) return null;
 	try {
-		return decodeURIComponent(encoded);
+		return sourceForModuleId(decodeURIComponent(encoded), root);
 	} catch {
 		return null;
 	}
@@ -225,8 +231,9 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 	linkedChildHasBrowserTriggers: boolean,
 ): Promise<TransformTsrxModuleResult> {
 	const encodedFilename = encodeURIComponent(input.filename);
-	const payloadId = `${MARKLESS_VIRTUAL_PREFIX}payload:${encodedFilename}`;
-	const renderDataId = `${MARKLESS_VIRTUAL_PREFIX}render-data:${encodedFilename}`;
+	const encodedModuleId = encodeURIComponent(input.moduleId ?? input.filename);
+	const payloadId = `${MARKLESS_VIRTUAL_PREFIX}payload:${encodedModuleId}`;
+	const renderDataId = `${MARKLESS_VIRTUAL_PREFIX}render-data:${encodedModuleId}`;
 	const resolverId = `${MARKLESS_VIRTUAL_PREFIX}resolver:${encodedFilename}`;
 	const resumeId = resumeVirtualModuleId(input.filename);
 	const prerenderWakeId = prerenderWakeVirtualModuleId(input.filename);
@@ -326,7 +333,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		.join('\n');
 	const styleId =
 		compiled.publicRenderPlan.styleScopes.length > 0
-			? `${MARKLESS_VIRTUAL_PREFIX}style:${encodedFilename}.css`
+			? `${MARKLESS_VIRTUAL_PREFIX}style:${encodedModuleId}.css`
 			: null;
 	const pageNeedsFullResume = needsFullResume(
 		compiled.protocolState,
@@ -414,6 +421,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 									input.renderDataImportSources,
 									input.artifactChildMaterializations,
 									input.filename,
+									input.moduleId ?? input.filename,
 								)
 							: compiled.publicRenderModule.renderDataModuleSource,
 					},
@@ -684,6 +692,7 @@ async function prerenderDataModuleSource(
 	renderDataImportSources: TransformTsrxModuleInput['renderDataImportSources'],
 	artifactChildMaterializations: TransformTsrxModuleInput['artifactChildMaterializations'],
 	sourceFilename: string,
+	moduleId: string,
 ): Promise<string> {
 	const importedComponents = new Map<
 		string,
@@ -701,7 +710,7 @@ async function prerenderDataModuleSource(
 		importedComponents.set(edge.childComponentName, {
 			source:
 				renderDataImportSources?.[edge.importSource] ??
-				`${MARKLESS_VIRTUAL_PREFIX}render-data:${encodeURIComponent(linked.filename)}`,
+				`${MARKLESS_VIRTUAL_PREFIX}render-data:${encodeURIComponent(linked.moduleId ?? linked.filename)}`,
 			local: `marklessPrerenderImport${importedComponents.size}`,
 		});
 	}
@@ -713,7 +722,7 @@ async function prerenderDataModuleSource(
 	// These three fields are the only authored slices in this module, so they are
 	// the only ones the type stripper touches: reprinting the whole emission grows
 	// the JSON blob and breaks the CSS entries beside it.
-	const renderDataId = `${MARKLESS_VIRTUAL_PREFIX}render-data:${encodeURIComponent(sourceFilename)}`;
+	const renderDataId = `${MARKLESS_VIRTUAL_PREFIX}render-data:${encodeURIComponent(moduleId)}`;
 	const readerImports = new Map<string, string>();
 	const readerDeclarations = new Map<string, string>();
 	const componentEntries: string[] = [];
@@ -858,12 +867,12 @@ function fulfilledEscalationSymbolIds(
 	compiled: CompileTsrxModuleResult,
 	input: Pick<
 		TransformTsrxModuleInput,
-		'filename' | 'importedModuleInterfaces' | 'artifactChildMaterializations'
+		'filename' | 'moduleId' | 'importedModuleInterfaces' | 'artifactChildMaterializations'
 	>,
 	resolverId: string,
 ): ReadonlySet<string> {
 	if ((compiled.symbolModules.armEscalationCandidates ?? []).length === 0) return new Set();
-	const renderDataId = `${MARKLESS_VIRTUAL_PREFIX}render-data:${encodeURIComponent(input.filename)}`;
+	const renderDataId = `${MARKLESS_VIRTUAL_PREFIX}render-data:${encodeURIComponent(input.moduleId ?? input.filename)}`;
 	return new Set(
 		linkedRenderDataBoundarySymbols(
 			linkedSymbolInput(compiled, input, renderDataId, resolverId, true),
@@ -875,6 +884,7 @@ async function compileWithBlockingDiagnostics(
 	input: Pick<
 		TransformTsrxModuleInput,
 		| 'filename'
+		| 'moduleId'
 		| 'source'
 		| 'buildId'
 		| 'symbols'
@@ -886,6 +896,7 @@ async function compileWithBlockingDiagnostics(
 ) {
 	const compiled = await compileTsrxModule({
 		filename: input.filename,
+		moduleId: input.moduleId,
 		source: input.source,
 		buildId: input.buildId,
 		resolverId,

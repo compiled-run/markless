@@ -44,6 +44,7 @@ import { withQuery } from 'ufo';
 import type { BuildDelegateLoader, DelegateSpecifierResolve } from './build/delegate-loader.ts';
 import { yieldToEventLoop } from './event-loop.ts';
 import type { ModuleMetadataRegistry } from './module-metadata-registry.ts';
+import { moduleIdFor } from './module-id.ts';
 import { MARKLESS_VIRTUAL_PREFIX } from './transform.ts';
 import type {
 	MarklessEnvironment,
@@ -188,6 +189,7 @@ export async function linkBarrelComponentInterfaces(
 	moduleImports: ReadonlyArray<{ readonly source: string }>,
 	artifacts: ReadonlyMap<string, MarklessModuleLinkArtifact>,
 	buildId: string | undefined,
+	root: string | undefined,
 ): Promise<{
 	readonly interfaces: Record<string, ModuleGraphInterfaceArtifact>;
 	readonly children: ReadonlyArray<LinkedModuleChildResolution>;
@@ -241,7 +243,10 @@ export async function linkBarrelComponentInterfaces(
 		);
 		await Promise.all(
 			artifact.pendingInterfaces.map(async (filename) => {
-				interfacesByFile.set(filename, await barrelModuleInterface(filename, artifacts, buildId));
+				interfacesByFile.set(
+					filename,
+					await barrelModuleInterface(filename, artifacts, buildId, root),
+				);
 			}),
 		);
 		artifact = linkBarrelComponents(passInput());
@@ -349,6 +354,7 @@ async function barrelModuleInterface(
 	filename: string,
 	artifacts: ReadonlyMap<string, MarklessModuleLinkArtifact>,
 	buildId: string | undefined,
+	root: string | undefined,
 ): Promise<ModuleGraphInterfaceArtifact | null> {
 	const known = artifacts.get(filename)?.moduleGraphInterface;
 	if (known) return known;
@@ -356,6 +362,7 @@ async function barrelModuleInterface(
 	await yieldToEventLoop();
 	const linked = await compileTsrxModuleLinkArtifact({
 		filename,
+		moduleId: moduleIdFor(filename, root),
 		source: readFileSync(filename, 'utf8'),
 		buildId,
 	});
@@ -590,6 +597,7 @@ export function delegateLoadOptions(
 		readonly internalOptions: {
 			readonly devServer?: { readonly importModule?: DelegateModuleImport };
 		};
+		readonly getRoot?: () => string | undefined;
 	},
 	resolveContext: LinkResolveContext,
 ) {
@@ -599,7 +607,7 @@ export function delegateLoadOptions(
 		modules: ctx.state.delegateModules,
 		importModule:
 			ctx.internalOptions.devServer?.importModule ??
-			((source: string) => buildDelegateLoader.load(source, resolve)),
+			((source: string) => buildDelegateLoader.load(source, resolve, ctx.getRoot?.())),
 	};
 }
 

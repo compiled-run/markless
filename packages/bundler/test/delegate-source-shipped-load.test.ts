@@ -6,6 +6,7 @@ import type { LinkedArtifactChild } from '@markless/compiler';
 import { createBuildDelegateLoader } from '../src/build/delegate-loader.ts';
 import { createDelegateModuleCache, materializeDelegateChildren } from '../src/link-driver.ts';
 import { marklessClient } from '../src/rolldown.ts';
+import { moduleIdFor } from '../src/module-id.ts';
 import { callBuildStart, callLoad, callTransform } from './helpers.ts';
 
 const directory = mkdtempSync(join(tmpdir(), 'markless-source-delegate-'));
@@ -198,7 +199,7 @@ export default function Page() @{ <main><Frame label="Sized" /></main> }`,
 	);
 	const loaded = await callLoad(
 		plugin,
-		`\0virtual:markless:render-data:${encodeURIComponent(page)}`,
+		`\0virtual:markless:render-data:${encodeURIComponent(moduleIdFor(page, appRoot))}`,
 	);
 	const renderData =
 		typeof loaded === 'string' ? loaded : ((loaded as { code?: string } | null)?.code ?? '');

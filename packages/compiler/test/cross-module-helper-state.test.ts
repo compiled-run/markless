@@ -12,6 +12,7 @@ test('T130 produces a module graph interface for exported state helper functions
 	expect(result.moduleGraphInterface).toEqual({
 		passId: 'module-graph-interface',
 		filename: 'src/helpers.tsrx',
+		moduleId: 'src/helpers.tsrx',
 		exports: [
 			{
 				exportName: 'counterPair',

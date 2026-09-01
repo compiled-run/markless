@@ -28,6 +28,7 @@ export function compileCacheKey(input: CompileTsrxModuleInput): string | null {
 	try {
 		return JSON.stringify([
 			input.filename,
+			input.moduleId ?? null,
 			input.source,
 			input.buildId ?? null,
 			input.resolverId ?? null,

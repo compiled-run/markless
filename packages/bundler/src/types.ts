@@ -60,6 +60,8 @@ export interface MarklessVirtualModule {
 
 export interface TransformTsrxModuleInput {
 	filename: string;
+	/** Root-relative id the compiler spells every minted id from; defaults to `filename`. */
+	moduleId?: string;
 	source: string;
 	dev?: boolean;
 	importedModuleInterfaces?: SemanticGraphInput['importedModuleInterfaces'];

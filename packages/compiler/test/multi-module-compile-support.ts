@@ -3,6 +3,7 @@ import type { CompileTsrxModuleResult, ModuleGraphInterfaceArtifact } from '../s
 
 type CompileInput = {
 	readonly filename: string;
+	readonly moduleId?: string;
 	readonly source: string;
 	readonly importSource?: string;
 };
@@ -16,6 +17,7 @@ export async function compileTsrxModulesWithInterfaces(
 	for (const module of modules) {
 		const result = await compileTsrxModule({
 			filename: module.filename,
+			...(module.moduleId ? { moduleId: module.moduleId } : {}),
 			source: module.source,
 			symbols: [],
 			importedModuleInterfaces,

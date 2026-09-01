@@ -2,6 +2,7 @@ import { expect, test, vi } from 'vitest';
 import { dirname, resolve } from 'pathe';
 import { existsSync, readFileSync } from 'node:fs';
 import { marklessClient } from '../src/rolldown.ts';
+import { moduleIdFor } from '../src/module-id.ts';
 import { callBuildStart, callLoad, callTransform } from './helpers.ts';
 
 // A headless component package ships its parts through a barrel, and an app may
@@ -37,7 +38,7 @@ async function transformApp(source: string) {
 		});
 	}
 	const result = await callTransform(plugin, source, appFilename, { resolve: resolveId });
-	const renderDataId = `\0virtual:markless:render-data:${encodeURIComponent(appFilename)}`;
+	const renderDataId = `\0virtual:markless:render-data:${encodeURIComponent(moduleIdFor(appFilename, fixtures))}`;
 	const renderData = (await callLoad(plugin, renderDataId)) as
 		| { readonly code: string }
 		| string

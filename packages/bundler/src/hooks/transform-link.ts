@@ -126,6 +126,7 @@ export async function linkTransformChildren(
 		transformed.moduleImports,
 		moduleLinkArtifacts,
 		internalOptions.buildId,
+		ctx.getRoot(),
 	);
 	// The interfaces this module links: the barrel's synthetic entry first, so a
 	// real compiled interface for the same specifier always wins.

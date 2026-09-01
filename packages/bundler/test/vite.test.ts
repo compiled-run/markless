@@ -11,6 +11,7 @@ import {
 import { transformTsrxModule } from '../src/rolldown.ts';
 import { createViteHmr } from '../src/vite/hmr.ts';
 import { markless } from '../src/vite/index.ts';
+import { moduleIdFor } from '../src/module-id.ts';
 import {
 	callBuildApp,
 	callBuildStart,
@@ -361,7 +362,7 @@ describe('Vite adapter structure', () => {
 		expect(result.code).toMatch(
 			/"href": "\/dev\/@id\/__x00__virtual:markless:style:.*\.css\?direct"/,
 		);
-		const styleId = `\0virtual:markless:style:${encodeURIComponent('/workspace/app/src/App.tsrx')}.css`;
+		const styleId = `\0virtual:markless:style:${encodeURIComponent(moduleIdFor('/workspace/app/src/App.tsrx', '/workspace/app'))}.css`;
 		const resolvedStyle = await callResolveId(plugin, `${styleId}?direct`);
 		expect(resolvedStyle).toMatchObject({ id: `${styleId}?direct` });
 		expect(await callLoad(plugin, `${styleId}?direct`)).toContain('background: red');
@@ -552,7 +553,7 @@ export function App() @{
 		});
 		await callTransform(plugin, source, filename, createViteHookContext('client'));
 
-		const canonicalId = `\0virtual:markless:payload:${encodeURIComponent(filename)}`;
+		const canonicalId = `\0virtual:markless:payload:${encodeURIComponent(moduleIdFor(filename, '/workspace/app'))}`;
 		const resolved = await callResolveId(plugin, `${canonicalId}?import`);
 		expect(resolved).toMatchObject({ id: canonicalId });
 
@@ -575,7 +576,7 @@ export function App() @{
 		});
 		await callTransform(plugin, source, filename, createViteHookContext('client'));
 
-		const canonicalId = `\0virtual:markless:payload:${encodeURIComponent(filename)}`;
+		const canonicalId = `\0virtual:markless:payload:${encodeURIComponent(moduleIdFor(filename, '/workspace/app'))}`;
 		const damagedId = decodeURI(`${canonicalId}?import`);
 		expect(damagedId).toContain('[repo]');
 
@@ -1050,7 +1051,7 @@ export function App() @{
 	test('hot updates invalidate direct virtual style modules', async () => {
 		const plugin = getAsyncPlugin();
 		const filename = '/workspace/app/src/App.tsrx';
-		const directStyleId = `\0virtual:markless:style:${encodeURIComponent(filename)}.css?direct`;
+		const directStyleId = `\0virtual:markless:style:${encodeURIComponent(moduleIdFor(filename, '/workspace/app'))}.css?direct`;
 		const directStyleModule = { id: directStyleId };
 		const environment = {
 			config: { consumer: 'client' },

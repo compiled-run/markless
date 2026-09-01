@@ -14,11 +14,12 @@ import {
 	moduleScopeDeclarations,
 	publicRenderValueImports,
 } from './public-render/shared.ts';
+import { moduleIdOf } from '../module-id.ts';
 
 /** This pass owns the code; readers import it rather than restating the string. */
 export const SHARED_COMPUTED_CROSS_MODULE_CODE = 'MARKLESS_SHARED_COMPUTED_CROSS_MODULE';
 
-/** The file a `shared:<filename>#<name>/...` node was defined in. */
+/** The module id a `shared:<moduleId>#<name>/...` node was defined in. */
 export function sharedDefinitionFilename(graphNodeId: string): string | null {
 	const hash = graphNodeId.indexOf('#');
 	return graphNodeId.startsWith('shared:') && hash !== -1
@@ -78,9 +79,9 @@ export function carryForeignFactoryScope(input: {
 	readonly bodies: ReadonlyArray<ForeignCopiedBody>;
 	readonly sharedDefinitions: ReadonlyArray<SemanticSharedDefinition>;
 	readonly consumerOrigins: ReadonlyMap<string, BindingOrigin>;
-	readonly consumerFilename: string;
+	readonly consumerModuleId: string;
 }): CarriedForeignScope {
-	const { bodies, consumerOrigins, consumerFilename } = input;
+	const { bodies, consumerOrigins, consumerModuleId } = input;
 	if (bodies.length === 0) return emptyCarriedForeignScope;
 
 	const definitionOf = (graphNodeId: string) =>
@@ -137,7 +138,7 @@ export function carryForeignFactoryScope(input: {
 				importLines.push(
 					emitValueImport({
 						...moduleImport,
-						source: rebaseSpecifier(moduleImport.source, body.definedIn, consumerFilename),
+						source: rebaseSpecifier(moduleImport.source, body.definedIn, consumerModuleId),
 					}),
 				);
 			}
@@ -157,7 +158,7 @@ export function consumerBindingOrigins(
 ): ReadonlyMap<string, BindingOrigin> {
 	const declarations = moduleScopeDeclarations(input.source.source, input.source.filename);
 	return bindingOrigins({
-		filename: input.source.filename,
+		moduleId: moduleIdOf(input.source),
 		declarations,
 		imports: publicRenderValueImports(
 			input.semanticGraph.moduleImports,
@@ -169,7 +170,7 @@ export function consumerBindingOrigins(
 
 /** The same question asked of any file: what its module scope binds, and from where. */
 export function bindingOrigins(input: {
-	readonly filename: string;
+	readonly moduleId: string;
 	readonly declarations: ReadonlyArray<SemanticSharedModuleDeclaration>;
 	readonly imports: ReadonlyArray<SemanticModuleImport>;
 }): ReadonlyMap<string, BindingOrigin> {
@@ -177,16 +178,16 @@ export function bindingOrigins(input: {
 	for (const declaration of input.declarations)
 		for (const name of declaration.names)
 			origins.set(name, {
-				key: `declaration:${input.filename}:${declaration.source}`,
+				key: `declaration:${input.moduleId}:${declaration.source}`,
 				text: 'a module-scope declaration in this file',
 			});
 	for (const moduleImport of input.imports)
-		origins.set(moduleImport.localName, importOrigin(moduleImport, input.filename));
+		origins.set(moduleImport.localName, importOrigin(moduleImport, input.moduleId));
 	return origins;
 }
 
-function importOrigin(moduleImport: SemanticModuleImport, ownerFilename: string): BindingOrigin {
-	const resolved = resolveSpecifier(moduleImport.source, ownerFilename);
+function importOrigin(moduleImport: SemanticModuleImport, ownerModuleId: string): BindingOrigin {
+	const resolved = resolveSpecifier(moduleImport.source, ownerModuleId);
 	const imported =
 		moduleImport.kind === 'named'
 			? (moduleImport.importedName ?? moduleImport.localName)
@@ -371,23 +372,23 @@ function isRelativeSpecifier(specifier: string): boolean {
 }
 
 /** A relative specifier as a path from the project root; anything else unchanged. */
-function resolveSpecifier(specifier: string, importerFilename: string): string {
+function resolveSpecifier(specifier: string, importerModuleId: string): string {
 	if (!isRelativeSpecifier(specifier)) return specifier;
 	return normalizePathSegments([
-		...importerFilename.split('/').slice(0, -1),
+		...importerModuleId.split('/').slice(0, -1),
 		...specifier.split('/'),
 	]).join('/');
 }
 
-/** The same module the factory's file names, spelled from the copying file. */
+/** The same module the factory's file names, spelled from the copying module; both are module ids. */
 export function rebaseSpecifier(
 	specifier: string,
-	fromFilename: string,
-	toFilename: string,
+	fromModuleId: string,
+	toModuleId: string,
 ): string {
 	if (!isRelativeSpecifier(specifier)) return specifier;
-	const target = resolveSpecifier(specifier, fromFilename).split('/');
-	const base = normalizePathSegments(toFilename.split('/').slice(0, -1));
+	const target = resolveSpecifier(specifier, fromModuleId).split('/');
+	const base = normalizePathSegments(toModuleId.split('/').slice(0, -1));
 	let common = 0;
 	while (common < base.length && common < target.length - 1 && base[common] === target[common])
 		common += 1;

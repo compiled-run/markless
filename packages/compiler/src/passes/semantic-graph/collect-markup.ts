@@ -84,6 +84,7 @@ export function collectSemanticMarkup(input: {
 	readonly ast: AnyNode;
 	readonly source: string;
 	readonly filename: string;
+	readonly moduleId: string;
 	readonly graph: MutableSemanticGraphArtifact;
 	readonly hostIds: WeakMap<object, string>;
 }): SemanticMarkupArtifact {
@@ -128,7 +129,8 @@ export function collectSemanticMarkup(input: {
 
 	for (const component of components) {
 		context.styleScopeClass =
-			collectStyleScopes(component.root, input.filename).styleScopes[0]?.scopeId ?? null;
+			collectStyleScopes(component.root, input.filename, input.moduleId).styleScopes[0]
+				?.scopeId ?? null;
 		const restSignature = propsRestSignature(component.node);
 		context.destructuredNames = [...(restSignature?.destructuredNames ?? [])];
 		context.restName = restSignature?.restName ?? null;
@@ -844,10 +846,14 @@ function spendsRosterCount(
 }
 
 /** The scope class every element of this component carries, or null when it declares no <style>. */
-export function componentStyleScopeClass(component: AnyNode, filename: string): string | null {
+export function componentStyleScopeClass(
+	component: AnyNode,
+	filename: string,
+	moduleId: string,
+): string | null {
 	const root = componentMarkupRoot(component);
 	if (!root) return null;
-	return collectStyleScopes(root, filename).styleScopes[0]?.scopeId ?? null;
+	return collectStyleScopes(root, filename, moduleId).styleScopes[0]?.scopeId ?? null;
 }
 
 function isPublicRoot(node: AnyNode): boolean {

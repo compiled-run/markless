@@ -240,6 +240,7 @@ async function runFirstPassTransform(
 					provisional.moduleImports,
 					moduleLinkArtifacts,
 					internalOptions.buildId,
+					ctx.getRoot(),
 				);
 			} catch {
 				throw error;

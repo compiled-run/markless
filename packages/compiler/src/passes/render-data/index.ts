@@ -41,7 +41,7 @@ export function createRenderData(input: {
 
 	return {
 		passId: 'render-data',
-		filename: semanticGraph.filename,
+		filename: semanticGraph.moduleId,
 		root: semanticGraph.markup.root,
 		chunks: semanticGraph.markup.chunks,
 		hosts: semanticGraph.hostNodes.map((host) => ({ ...host, hostNodeId: host.id })),
