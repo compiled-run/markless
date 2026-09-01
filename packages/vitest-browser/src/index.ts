@@ -4,9 +4,13 @@ import {
 	type CsrRenderable,
 	type CsrRenderContainer,
 	type CsrRenderOptions,
+	type CsrRenderOutput,
 	type RenderTarget,
 } from '@markless/web';
+import { composeCsrIslands, type CsrIslandComponent } from './csr-islands.ts';
 import type { SsrFixtureRenderOptions } from './ssr-plugin.ts';
+
+export type { CsrIslandComponent } from './csr-islands.ts';
 
 export type BrowserRenderElement = RenderTarget & {
 	innerHTML?: string;
@@ -75,6 +79,29 @@ export async function render(
 	});
 
 	return createRenderResult(setup, runtime);
+}
+
+export type CsrIslandsRenderResult = BrowserRenderResult & {
+	/** The merged payload the one runtime started over, for payload-level pins. */
+	readonly state: CsrRenderOutput['state'];
+	readonly view: CsrRenderOutput['view'];
+};
+
+/**
+ * The CSR twin of renderSSRIslands(): each component becomes its own island of
+ * one CLIENT-rendered page, merged through the router's composeMdxState /
+ * composeMdxView and woken by a single runtime.
+ *
+ * No transform and no Node round trip, so unlike the SSR marker this one takes
+ * components as ordinary values — a shared battery can be handed the array.
+ */
+export async function renderCsrIslands(
+	components: ReadonlyArray<CsrIslandComponent>,
+	options: BrowserRenderOptions = {},
+): Promise<CsrIslandsRenderResult> {
+	const composed = await composeCsrIslands(components, globalDomDocument());
+	const result = await render({ renderCsr: () => composed.output }, options);
+	return { ...result, state: composed.state, view: composed.view };
 }
 
 export type SsrRenderHtmlOptions = {

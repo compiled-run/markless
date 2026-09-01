@@ -1,3 +1,4 @@
+import type { CsrIslandsRenderResult } from '@markless/vitest-browser';
 import { userEvent } from 'vite-plus/test/browser';
 import { describe, expect, test } from 'vitest';
 // The instance-identity grammar itself, from the package that owns it. The
@@ -18,24 +19,34 @@ import {
  * descriptor; the checks below are the same code for every family, so an
  * isolation rule can never hold for one family by accident.
  *
+ * TWO MODES, ONE DESCRIPTOR. Every check runs twice: once over a page the
+ * server rendered and the browser resumed (`ssr`), and once over a page the
+ * BROWSER composed (`csr`). Only the mount differs; the checks, the testids and
+ * the widget suffixes are written once. An isolation rule that holds on a served
+ * page and breaks on a client-composed one is exactly what the second mode is
+ * there to witness.
+ *
  * CALLING CONVENTION — read this before writing a family's descriptor.
  *
- * The battery does NOT mount anything itself, and it cannot. The SSR island
- * lever is a marker rewritten by a STRING-LEVEL transform in
+ * The battery does NOT mount anything itself, and for the SSR mode it cannot.
+ * That lever is a marker rewritten by a STRING-LEVEL transform in
  * packages/vitest-browser/src/ssr-plugin.ts: it resolves each component
  * identifier against the import statements of the file the call is written in,
  * and rejects anything that is not an identifier imported from a `.tsrx`
  * module. A component handed to a shared helper as a parameter is invisible to
  * it. So the literal call lives in the FAMILY's own suite and the descriptor
- * carries a thunk:
+ * carries a thunk. `renderCsrIslands` needs no transform and would take the
+ * components as values, but it is written the same way so both mounts read as
+ * one pair:
  *
- *     import { renderSSRIslands } from '@markless/vitest-browser';
+ *     import { renderCsrIslands, renderSSRIslands } from '@markless/vitest-browser';
  *     import TabsIsland from './scenarios/multi-embed.tsrx';
  *     import { runMultiEmbedConformance } from '../../test-support/multi-embed-conformance.ts';
  *
  *     runMultiEmbedConformance({
  *         family: 'accordion',
  *         render: () => renderSSRIslands([FaqIsland, FaqIsland]),
+ *         renderCsr: () => renderCsrIslands([FaqIsland, FaqIsland]),
  *         embedFrame: 'frame',
  *         widgetDefinitionSuffixes: ['#accordionState'],
  *         interaction: {
@@ -48,6 +59,13 @@ import {
  *         rovingFrom: 'returns-trigger',
  *         disabled: { control: 'billing-trigger' },
  *     });
+ *
+ * `disabled` takes two testids when the element a pointer can reach is not the
+ * element carrying the state: `control` is what gets clicked, `observe` is what
+ * gets read (`disabled: { control: 'row-3-cell', observe: 'row-3' }`). A family
+ * whose locked item is `aria-disabled` needs both — Playwright refuses to click
+ * such an element, so aiming the gesture there would only witness its
+ * actionability wait. One testid still means "click it and read it".
  *
  * The scenario module must be the WHOLE embed — one component that renders the
  * family once — because each entry in the array becomes its own island. Two
@@ -84,18 +102,31 @@ export type MultiEmbedCheckId =
 	| 'disabled-inert'
 	| 'page-scope-shared';
 
+/** Which composition path a run of the checks mounts through. */
+export type MultiEmbedMode = 'ssr' | 'csr';
+
+const MODES: readonly MultiEmbedMode[] = ['ssr', 'csr'];
+
 export type MultiEmbedExemption = {
 	readonly check: MultiEmbedCheckId;
+	/** Omit to exempt the check in both modes. */
+	readonly mode?: MultiEmbedMode;
 	readonly reason: string;
 };
 
 /**
- * Mounts the composed multi-island page. Always a thunk wrapping a literal
- * `renderSSRIslands([...])` written in the caller's own file — see the calling
- * convention above. The return value is ignored; the battery reads the live
- * document, because the merged payload is only reachable there.
+ * Mounts the composed multi-island page on the SERVER path. Always a thunk
+ * wrapping a literal `renderSSRIslands([...])` written in the caller's own file
+ * — see the calling convention above. The return value is ignored; the battery
+ * reads the live document and the payload script the server embedded.
  */
 export type EmbedRender = () => Promise<unknown>;
+
+/**
+ * The same page composed in the BROWSER. The merged payload never reaches the
+ * document on this path, so the mount hands it back instead.
+ */
+export type EmbedCsrRender = () => Promise<Pick<CsrIslandsRenderResult, 'state'>>;
 
 export type MultiEmbedInteraction = {
 	/** Testid of the control that activates one item. Rendered once per embed. */
@@ -113,6 +144,14 @@ export type MultiEmbedInteraction = {
 export type MultiEmbedDisabled = {
 	/** Testid of a control the scenario renders disabled/locked, once per embed. */
 	readonly control: string;
+	/**
+	 * Testid whose attribute reports the result, when that is not `control`
+	 * itself. Point `control` at whatever a pointer can actually reach and
+	 * `observe` at the element carrying the state: an `aria-disabled` row is one
+	 * Playwright refuses to click, so the gesture has to land on a child while the
+	 * read stays on the row. Defaults to `control`.
+	 */
+	readonly observe?: string;
 	/** Defaults to the interaction's state attribute. */
 	readonly stateAttribute?: string;
 };
@@ -120,6 +159,8 @@ export type MultiEmbedDisabled = {
 export type MultiEmbedPageScope = {
 	/** A thunk mounting N islands of a component that reads a page-scoped `shared()`. */
 	readonly render: EmbedRender;
+	/** The same islands composed in the browser. */
+	readonly renderCsr: EmbedCsrRender;
 	/** Substring identifying the page-scoped cell in the merged payload. */
 	readonly cellIdIncludes: string;
 	/** Testid of the element displaying the shared value, once per embed. */
@@ -136,6 +177,7 @@ export type MultiEmbedDescriptor = {
 	/** How many islands `render` mounts. Two is enough to witness a merge. */
 	readonly embeds?: number;
 	readonly render: EmbedRender;
+	readonly renderCsr: EmbedCsrRender;
 	/** Testid of a per-embed wrapper element, rendered exactly once per embed. */
 	readonly embedFrame: string;
 	/**
@@ -173,10 +215,18 @@ type StatePayload = {
 // fetch plus a write to land, short enough not to dominate the lane.
 const QUIET_MS = 800;
 
-function statePayload(): StatePayload {
-	const script = document.querySelector('script[type="markless/state"]');
-	if (!script?.textContent) throw new Error('Expected a serialized markless/state payload.');
-	return JSON.parse(script.textContent) as StatePayload;
+// The merged payload, from wherever the mode actually keeps it: a served page
+// embeds it in the document, a client-composed one never writes it to the DOM
+// at all and hands it back from the mount.
+function mountedStatePayload(mode: MultiEmbedMode, mounted: unknown): StatePayload {
+	if (mode === 'ssr') {
+		const script = document.querySelector('script[type="markless/state"]');
+		if (!script?.textContent) throw new Error('Expected a serialized markless/state payload.');
+		return JSON.parse(script.textContent) as StatePayload;
+	}
+	const state = (mounted as Pick<CsrIslandsRenderResult, 'state'>).state;
+	if (!state) throw new Error('The CSR island mount composed no merged state payload.');
+	return state;
 }
 
 function parts(testid: string, embeds: number): HTMLElement[] {
@@ -205,9 +255,22 @@ export function runMultiEmbedConformance(descriptor: MultiEmbedDescriptor): void
 		);
 	}
 
-	describe(`${descriptor.family} multi-embed`, () => {
+	for (const mode of MODES) runMultiEmbedMode(descriptor, embeds, mode);
+}
+
+function runMultiEmbedMode(
+	descriptor: MultiEmbedDescriptor,
+	embeds: number,
+	mode: MultiEmbedMode,
+): void {
+	describe(`${descriptor.family} multi-embed (${mode})`, () => {
+		// One mount per mode, so a check body never names a lever directly.
+		const mount = () => (mode === 'ssr' ? descriptor.render() : descriptor.renderCsr());
+		const mountedState = async () => mountedStatePayload(mode, await mount());
 		const register = (check: MultiEmbedCheckId, title: string, body: () => Promise<void>) => {
-			const exemption = (descriptor.exemptions ?? []).find((one) => one.check === check);
+			const exemption = (descriptor.exemptions ?? []).find(
+				(one) => one.check === check && (one.mode === undefined || one.mode === mode),
+			);
 			if (!exemption) {
 				test(title, body);
 				return;
@@ -219,8 +282,7 @@ export function runMultiEmbedConformance(descriptor: MultiEmbedDescriptor): void
 		// identical compiler paths, so the merged payload can only keep them
 		// apart by the host's island segment.
 		register('distinct-widget-ids', 'each embed owns a distinct widget definition id', async () => {
-			await descriptor.render();
-			const definitions = statePayload().sharedDefinitions ?? [];
+			const definitions = (await mountedState()).sharedDefinitions ?? [];
 
 			for (const suffix of descriptor.widgetDefinitionSuffixes) {
 				const ids = definitions.map((one) => one.id).filter((id) => id.endsWith(suffix));
@@ -254,7 +316,7 @@ export function runMultiEmbedConformance(descriptor: MultiEmbedDescriptor): void
 
 		// (b) A gesture in one embed is a gesture in one embed.
 		register('interaction-isolation', 'activating one embed leaves every other at rest', async () => {
-			await descriptor.render();
+			await mount();
 			const { activate, observe, stateAttribute, restValue, activeValue } =
 				descriptor.interaction;
 			const controls = parts(activate, embeds);
@@ -279,7 +341,7 @@ export function runMultiEmbedConformance(descriptor: MultiEmbedDescriptor): void
 		if (descriptor.rovingKey) {
 			const rovingKey = descriptor.rovingKey;
 			register('focus-containment', 'the roving key never moves focus out of its embed', async () => {
-				await descriptor.render();
+				await mount();
 				const frames = parts(descriptor.embedFrame, embeds);
 				const from = parts(
 					descriptor.rovingFrom ?? descriptor.interaction.activate,
@@ -306,16 +368,17 @@ export function runMultiEmbedConformance(descriptor: MultiEmbedDescriptor): void
 		if (descriptor.disabled) {
 			const disabled = descriptor.disabled;
 			register('disabled-inert', 'a disabled item never changes state from any embed', async () => {
-				await descriptor.render();
+				await mount();
 				const attribute = disabled.stateAttribute ?? descriptor.interaction.stateAttribute;
-				const locked = parts(disabled.control, embeds);
-				const before = locked.map((one) => readState(one, attribute));
+				const observed = disabled.observe ?? disabled.control;
+				const before = parts(observed, embeds).map((one) => readState(one, attribute));
 
-				for (const control of locked) await userEvent.click(control);
+				for (const control of parts(disabled.control, embeds))
+					await userEvent.click(control);
 				await wait(QUIET_MS);
 
 				expect(
-					parts(disabled.control, embeds).map((one) => readState(one, attribute)),
+					parts(observed, embeds).map((one) => readState(one, attribute)),
 					'a disabled item changed state',
 				).toEqual(before);
 			});
@@ -327,8 +390,9 @@ export function runMultiEmbedConformance(descriptor: MultiEmbedDescriptor): void
 		if (descriptor.pageScoped) {
 			const pageScoped = descriptor.pageScoped;
 			register('page-scope-shared', 'a page-scoped shared cell stays one cell across embeds', async () => {
-				await pageScoped.render();
-				const cellIds = (statePayload().cells ?? [])
+				const mounted =
+					mode === 'ssr' ? await pageScoped.render() : await pageScoped.renderCsr();
+				const cellIds = (mountedStatePayload(mode, mounted).cells ?? [])
 					.map((cell) => cell.graphNodeId)
 					.filter((id) => id.includes(pageScoped.cellIdIncludes));
 
