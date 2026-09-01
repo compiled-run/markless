@@ -367,6 +367,25 @@ test('CSR: a drag reports every step and settles exactly once', async () => {
 	expect(el(SettledAt).textContent).toBe('80');
 });
 
+// The platform takes the pointer away mid-gesture (a scroll wins, the pen leaves
+// range). Without this the slider stays in flight and keeps tracking a pointer
+// nobody is pressing.
+test('CSR: a cancelled pointer ends the drag and stops tracking it', async () => {
+	await render(Basic);
+
+	downTrack(0.5);
+	moveTrack(0.6);
+	await expect.poll(() => el(Thumb).getAttribute('aria-valuenow')).toBe('60');
+
+	const at = alongTrack(0.6);
+	pointer(el(Track), 'pointercancel', at.x, at.y);
+	await expect.poll(() => el(Track).hasAttribute('ui-dragging')).toBe(false);
+	expect(el(Thumb).hasAttribute('ui-dragging')).toBe(false);
+
+	moveTrack(0.9);
+	await expect.poll(() => el(Thumb).getAttribute('aria-valuenow')).toBe('60');
+});
+
 test('CSR: a press on the rail moves the value and takes the focus', async () => {
 	await render(Basic);
 

@@ -369,6 +369,25 @@ for (const mode of MODES) {
 		expect(fields()[0].value).toBe('0.8,0.2');
 	});
 
+	test(`${mode}: a cancelled pointer ends the drag and stops tracking it`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+		const area = el(Area);
+		const [thumb] = handles();
+
+		const from = inArea(0.5, 0.5);
+		pointer(area, 'pointerdown', from.x, from.y);
+		await expect.poll(() => thumb.getAttribute('aria-valuetext')).toBe('X 0.5, Y 0.5');
+
+		pointer(area, 'pointercancel', from.x, from.y);
+		await expect.poll(() => el(Root).hasAttribute('ui-dragging')).toBe(false);
+		expect(thumb.hasAttribute('ui-active')).toBe(false);
+
+		const far = inArea(0.9, 0.1);
+		pointer(area, 'pointermove', far.x, far.y);
+		await expect.poll(() => thumb.getAttribute('aria-valuetext')).toBe('X 0.5, Y 0.5');
+	});
+
 	test(`${mode}: a press in a two-handle field moves the nearer handle`, async () => {
 		if (mode === 'CSR') await render(Curve);
 		else await renderSSR(Curve);

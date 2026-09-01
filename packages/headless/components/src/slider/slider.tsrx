@@ -217,6 +217,7 @@ export function SliderTrack({
 	onPointerdown,
 	onPointermove,
 	onPointerup,
+	onPointercancel,
 	...rest
 }: SliderTrackProps) @{
 	const slider = sliderState();
@@ -243,6 +244,11 @@ export function SliderTrack({
 		onPointerup={(event) => {
 			slider.endDrag();
 			onPointerup?.(event);
+		}}
+		// A pointer the platform takes back settles where it left the thumb; `pad` ships the same rule.
+		onPointercancel={(event) => {
+			slider.endDrag();
+			onPointercancel?.(event);
 		}}
 	>{children}</div>
 }
