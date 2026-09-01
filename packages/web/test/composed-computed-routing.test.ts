@@ -111,7 +111,7 @@ async function mountAndWrite(input: {
 	readonly cellId: string;
 	readonly value: number;
 	readonly loadSymbol: (symbolId: string) => (context: {
-		readonly graph: { read(graphNodeId: string): unknown };
+		readonly graph: { read(graphNodeId: string, path?: ReadonlyArray<string>): unknown };
 	}) => unknown;
 }) {
 	const root = {
@@ -524,4 +524,61 @@ test('root-owned sync computed keeps routing to the root loader after child comp
 
 	expect(loaderCalls).toEqual(['symbol:root']);
 	expect(container.graph.read('computed:rootOutput')).toBe(30);
+});
+
+// A prop passed as a static literal never gets a live route, so the child's read
+// of `prop:props` has to reach the instance-qualified cell the compose emitted.
+test('composed child computed reads a prop never passed as a graph reference', async () => {
+	const staticPropState = {
+		...createProtocolStatePayload({
+			cells: [
+				{
+					graphNodeId: 'prop:props',
+					name: 'props',
+					valueKind: 'object',
+					value: { label: 'panel-one' },
+				},
+				{ graphNodeId: 'state:trigger', name: 'trigger', valueKind: 'scalar', value: 0 },
+			],
+		}),
+		computed: [
+			{
+				graphNodeId: 'computed:selected',
+				name: 'selected',
+				async: false,
+				deriveSymbolId: 'symbol:selected',
+				dependencies: [
+					{ graphNodeId: 'state:trigger', path: [] },
+					{ graphNodeId: 'prop:props', path: ['label'] },
+				],
+			},
+		],
+	} as ProtocolStatePayload;
+	const reads: unknown[] = [];
+	const childRecord = child(
+		staticPropState,
+		'c0:',
+		[],
+		((symbolId: string) => {
+			if (symbolId !== 'symbol:selected') throw new Error(`Unknown child symbol ${symbolId}`);
+			return ({ graph }) => {
+				const label = graph.read('prop:props', ['label']);
+				reads.push(label);
+				return `${label}:${graph.read('state:trigger')}`;
+			};
+		}) as never,
+	);
+	const state = composeCsrState(emptyState(), [childRecord]);
+	const container = await mountAndWrite({
+		state,
+		cellId: 'c0:state:trigger',
+		value: 1,
+		loadSymbol(symbolId) {
+			if (!symbolId.startsWith('c0:')) throw new Error(`Unknown root symbol ${symbolId}`);
+			return childRecord.output.loadSymbol!(symbolId.slice(3)) as never;
+		},
+	});
+
+	expect(reads.at(-1)).toBe('panel-one');
+	expect(container.graph.read('c0:computed:selected')).toBe('panel-one:1');
 });

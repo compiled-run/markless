@@ -252,7 +252,13 @@ export function marklessQualifyChildState(
 		...(computed.dependencies && {
 			dependencies: computed.dependencies.map(
 				(dependency) =>
-					marklessCsrRemapChildGraph(dependency, graphProps, instancePath) ?? dependency,
+					marklessCsrRemapChildGraph(dependency, graphProps, instancePath) ?? {
+						...dependency,
+						graphNodeId: marklessComposedGraphNodeId(
+							dependency.graphNodeId,
+							instancePath,
+						),
+					},
 			),
 		}),
 	}));
@@ -725,7 +731,13 @@ function marklessComposedSymbol(
 				);
 				if (handle) return handle.value;
 			}
-			return graph.read(mapped?.graphNodeId ?? graphNodeId, mapped?.path ?? path);
+			// No live route means the prop was never passed as a graph reference, so
+			// the value sits in this instance's own qualified prop cell.
+			return graph.read(
+				mapped?.graphNodeId ??
+					marklessComposedGraphNodeId(graphNodeId, instancePath, registry),
+				mapped?.path ?? path,
+			);
 		};
 		return symbol({
 			...context,
