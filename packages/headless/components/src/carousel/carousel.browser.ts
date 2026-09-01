@@ -4,6 +4,7 @@ import { beforeEach, expect, test } from 'vitest';
 import { installCarouselCss } from './scenarios/carousel-css.ts';
 import Basic from './scenarios/basic.tsrx';
 import GalleryAutoplay from './scenarios/gallery-autoplay.tsrx';
+import Rewind from './scenarios/rewind.tsrx';
 import Tabbed from './scenarios/tabbed.tsrx';
 import TwoCarousels from './scenarios/two-carousels.tsrx';
 import Untitled from './scenarios/untitled.tsrx';
@@ -313,4 +314,114 @@ test('SSR resume: autoplay declared off has advanced nothing before the page res
 	expect(el(Root).getAttribute('aria-live')).toBe('polite');
 	await new Promise((resolve) => setTimeout(resolve, 300));
 	expect(activeValue()).toBe('paris');
+});
+
+// ------------------------------------------------------ coming round the ends
+
+test('a rewinding carousel comes round at both ends', async () => {
+	await render(Rewind);
+
+	// Back from the first slide reaches the last one, which is what `rewind` buys.
+	await userEvent.click(el(BackTrigger));
+	await expect.poll(activeValue).toBe('lima');
+
+	await userEvent.click(el(ForwardTrigger));
+	await expect.poll(activeValue).toBe('paris');
+});
+
+test('a rewinding carousel comes round from its pickers too, and Home and End still jump', async () => {
+	await render(Rewind);
+
+	el<HTMLButtonElement>(ParisNav).focus();
+	await userEvent.keyboard('{ArrowLeft}');
+	await expect.poll(activeValue).toBe('lima');
+
+	await userEvent.keyboard('{ArrowRight}');
+	await expect.poll(activeValue).toBe('paris');
+
+	await userEvent.keyboard('{End}');
+	await expect.poll(activeValue).toBe('lima');
+	await userEvent.keyboard('{Home}');
+	await expect.poll(activeValue).toBe('paris');
+});
+
+// `rewind` brings the ends round without making the carousel a loop, so the flag
+// a consumer styles against still says it is not one.
+test('a rewinding carousel does not claim to be a looping one', async () => {
+	await render(Rewind);
+	expect(el(Root).hasAttribute('ui-loop')).toBe(false);
+});
+
+// ------------------------------------------------------- release and the snap
+
+// The mouse is pointer 1 and the platform always holds it; nothing holds this one.
+const UNTRACKED_POINTER = 9101;
+
+function pointer(target: Element, type: string, clientX: number, pointerId = 1) {
+	target.dispatchEvent(
+		new PointerEvent(type, {
+			bubbles: true,
+			cancelable: true,
+			button: 0,
+			buttons: type === 'pointerup' ? 0 : 1,
+			clientX,
+			clientY: 50,
+			pointerType: 'mouse',
+			pointerId,
+			isPrimary: true,
+		}),
+	);
+}
+
+/** A whole drag on the window: press, travel, release. */
+function dragBy(alongX: number, options: { pointerId?: number } = {}) {
+	const area = el(ScrollArea);
+	const id = options.pointerId ?? 1;
+	const box = area.getBoundingClientRect();
+	const from = box.left + box.width / 2;
+	pointer(area, 'pointerdown', from, id);
+	pointer(area, 'pointermove', from + alongX / 2, id);
+	pointer(area, 'pointermove', from + alongX, id);
+	pointer(area, 'pointerup', from + alongX, id);
+}
+
+test('a press with no travel is a tap, and settles on nothing', async () => {
+	await render(Basic);
+
+	dragBy(0);
+	await new Promise((resolve) => setTimeout(resolve, 200));
+	expect(activeValue()).toBe('paris');
+});
+
+test('a drag shorter than the fling threshold settles back on the slide it started from', async () => {
+	await render(Basic);
+
+	dragBy(-4);
+	await new Promise((resolve) => setTimeout(resolve, 200));
+	expect(activeValue()).toBe('paris');
+});
+
+test('a drag run past the last slide settles on it rather than off the end', async () => {
+	await render(Basic);
+
+	dragBy(-400);
+	await expect.poll(activeValue, { timeout: 2000 }).toBe('lima');
+});
+
+test('a press from a pointer the platform is not tracking throws nothing', async () => {
+	await render(Basic);
+
+	const failures: string[] = [];
+	const record = (event: ErrorEvent) => failures.push(event.message);
+	const recordRejection = (event: PromiseRejectionEvent) => failures.push(String(event.reason));
+	window.addEventListener('error', record);
+	window.addEventListener('unhandledrejection', recordRejection);
+	try {
+		dragBy(-400, { pointerId: UNTRACKED_POINTER });
+		await expect.poll(activeValue, { timeout: 2000 }).toBe('lima');
+		expect(failures).toEqual([]);
+	} finally {
+		window.removeEventListener('error', record);
+		window.removeEventListener('unhandledrejection', recordRejection);
+	}
 });

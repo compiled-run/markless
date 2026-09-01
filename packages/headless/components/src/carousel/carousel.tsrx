@@ -1,5 +1,5 @@
 import { computed, element, shared, state } from '@markless/core';
-import { moveToValue, slideEngine } from './carousel-engine.ts';
+import { capturePointer, moveToValue, slideEngine } from './carousel-engine.ts';
 import {
 	autoplayValue,
 	keyValue,
@@ -153,7 +153,7 @@ export const carouselState = shared(
 				if (!engine || !track) return;
 
 				// Pointer capture rather than window listeners: the gesture keeps arriving here once the pointer leaves the carousel.
-				track.setPointerCapture(pointerId);
+				capturePointer(track, pointerId);
 				carousel.isDragging = true;
 				engine.beginDrag(along, isTouch ? carousel.touchSensitivity : carousel.mouseSensitivity);
 			},

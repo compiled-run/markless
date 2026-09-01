@@ -7,6 +7,7 @@ import {
 	dragLeaveOutside,
 	dropOn,
 	fileOf,
+	transferOf,
 } from '../../test-support/drag.ts';
 import Accept from './scenarios/accept.tsrx';
 import Basic from './scenarios/basic.tsrx';
@@ -366,4 +367,79 @@ test('CSR: two uploads on one page keep their own names and labels', async () =>
 	expect(left.id).not.toBe(right.id);
 	expect(el<HTMLLabelElement>('left-label').getAttribute('for')).toBe(left.id);
 	expect(el<HTMLLabelElement>('right-label').getAttribute('for')).toBe(right.id);
+});
+
+// --------------------------------------------------------------- the picker path
+
+// What the OS picker does to the page: it replaces the field's own list and fires
+// change. The drop rows above never exercise that route, and it is the one the
+// browse button and the keyboard reach.
+function pickOn(field: HTMLInputElement, ...files: readonly File[]) {
+	field.files = transferOf(...files).files;
+	field.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+test('CSR: without multiple, a picked file replaces the one already chosen', async () => {
+	await render(Basic);
+	const field = el<HTMLInputElement>('field');
+	expect(field.multiple).toBe(false);
+
+	pickOn(field, fileOf('one.txt'));
+	await expect.poll(() => names()).toEqual(['one.txt']);
+
+	pickOn(field, fileOf('two.txt'));
+	await expect.poll(() => names()).toEqual(['two.txt']);
+	expect(fieldNames()).toEqual(['two.txt']);
+});
+
+test('CSR: without multiple, picking several at once keeps only the first', async () => {
+	await render(Basic);
+	pickOn(el<HTMLInputElement>('field'), fileOf('one.txt'), fileOf('two.txt'));
+	await expect.poll(() => names()).toEqual(['one.txt']);
+	expect(fieldNames()).toEqual(['one.txt']);
+});
+
+test('CSR: with multiple, a picked file is added to the list', async () => {
+	await render(Multiple);
+	const field = el<HTMLInputElement>('field');
+	expect(field.multiple).toBe(true);
+
+	pickOn(field, fileOf('one.txt'));
+	await expect.poll(() => names()).toEqual(['one.txt']);
+
+	pickOn(field, fileOf('two.txt'));
+	await expect.poll(() => names()).toEqual(['one.txt', 'two.txt']);
+	expect(fieldNames()).toEqual(['one.txt', 'two.txt']);
+});
+
+// The browser applies accept to what the picker offers, but a field can still be
+// handed a file the list rejects; it is filtered here and taken back off the field.
+test('CSR: a picked file the accept list rejects never arrives, and leaves the field empty', async () => {
+	await render(Accept);
+	const field = el<HTMLInputElement>('field');
+
+	pickOn(field, fileOf('notes.txt', 'text/plain'));
+	await expect.poll(() => fieldNames()).toEqual([]);
+	expect(names()).toEqual([]);
+
+	pickOn(field, fileOf('photo.png', 'image/png'));
+	await expect.poll(() => names()).toEqual(['photo.png']);
+});
+
+test('CSR: one pick keeps what the accept list allows and drops the rest', async () => {
+	await render(Accept);
+	pickOn(
+		el<HTMLInputElement>('field'),
+		fileOf('a.png', 'image/png'),
+		fileOf('b.pdf', 'application/pdf'),
+	);
+	await expect.poll(() => names()).toEqual(['a.png']);
+	expect(fieldNames()).toEqual(['a.png']);
+});
+
+test('CSR: a disabled upload takes nothing from the picker either', async () => {
+	await render(Disabled);
+	pickOn(el<HTMLInputElement>('field'), fileOf('notes.txt'));
+	await new Promise((resolve) => setTimeout(resolve, 300));
+	expect(names()).toEqual([]);
 });

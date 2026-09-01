@@ -6,6 +6,7 @@ import Basic from './scenarios/basic.tsrx';
 import BookingForm from './scenarios/booking-form.tsrx';
 import Bounded from './scenarios/bounded.tsrx';
 import Controlled from './scenarios/controlled.tsrx';
+import Locked from './scenarios/locked.tsrx';
 import Multiple from './scenarios/multiple.tsrx';
 import Popup from './scenarios/popup.tsrx';
 import PopupWithDateBox from './scenarios/popup-with-datebox.tsrx';
@@ -597,3 +598,139 @@ for (const mode of MODES) {
 		await sweepAxe(mounted.container, '2026-08-20', true);
 	});
 }
+
+// ------------------------------------------------- month and year boundaries
+
+test('CSR: an arrow off the start of the month crosses back into the one before', async () => {
+	await render(Basic);
+	await expect.poll(() => days().length, { timeout: 5000 }).toBe(42);
+
+	dayFor('2026-08-01').focus();
+	await userEvent.keyboard('{ArrowLeft}');
+	await expect.poll(() => text(Title), { timeout: 5000 }).toBe('July 2026');
+	await expect
+		.poll(() => (document.activeElement as HTMLElement | null)?.getAttribute('value'), {
+			timeout: 5000,
+		})
+		.toBe('2026-07-31');
+});
+
+test('CSR: a walk across the turn of the year lands in the next January and back', async () => {
+	await render(Basic);
+	await expect.poll(() => days().length, { timeout: 5000 }).toBe(42);
+
+	for (let step = 0; step < 4; step += 1) el<HTMLButtonElement>(Forward).click();
+	await expect.poll(() => text(Title), { timeout: 5000 }).toBe('December 2026');
+
+	dayFor('2026-12-31').focus();
+	await userEvent.keyboard('{ArrowRight}');
+	await expect.poll(() => text(Title), { timeout: 5000 }).toBe('January 2027');
+	await expect
+		.poll(() => (document.activeElement as HTMLElement | null)?.getAttribute('value'), {
+			timeout: 5000,
+		})
+		.toBe('2027-01-01');
+
+	await userEvent.keyboard('{ArrowLeft}');
+	await expect.poll(() => text(Title), { timeout: 5000 }).toBe('December 2026');
+	await expect
+		.poll(() => (document.activeElement as HTMLElement | null)?.getAttribute('value'), {
+			timeout: 5000,
+		})
+		.toBe('2026-12-31');
+});
+
+// The walk carries no min/max wall: a day past the bound is reachable and says so,
+// and the refusal happens when it is chosen. That is the same "focusable, not
+// selectable" split the click rows pin.
+test('CSR: the keyboard walks onto a day past the bound, which still refuses to be chosen', async () => {
+	await render(Bounded);
+	await expect.poll(() => days().length, { timeout: 5000 }).toBe(42);
+
+	dayFor('2026-08-05').focus();
+	await userEvent.keyboard('{ArrowLeft}');
+	await expect
+		.poll(() => (document.activeElement as HTMLElement | null)?.getAttribute('value'), {
+			timeout: 5000,
+		})
+		.toBe('2026-08-04');
+	expect(dayFor('2026-08-04').getAttribute('aria-disabled')).toBe('true');
+
+	await userEvent.keyboard('{Enter}');
+	await settled();
+	expect(text(page.getByTestId('calls'))).toBe('0');
+});
+
+test('CSR: Space on a day past the far bound chooses nothing', async () => {
+	await render(Bounded);
+	await expect.poll(() => days().length, { timeout: 5000 }).toBe(42);
+
+	dayFor('2026-08-26').focus();
+	await userEvent.keyboard(' ');
+	await settled();
+	expect(text(page.getByTestId('calls'))).toBe('0');
+	expect(text(page.getByTestId('value'))).toBe('');
+});
+
+// Month navigation is not bounded by min/max either: a person may look at a month
+// that holds no choosable day, and every day in it refuses.
+test('CSR: the month triggers walk past the declared bounds, and the month they reach chooses nothing', async () => {
+	await render(Bounded);
+	await expect.poll(() => days().length, { timeout: 5000 }).toBe(42);
+
+	el<HTMLButtonElement>(Forward).click();
+	await expect.poll(() => text(Title), { timeout: 5000 }).toBe('September 2026');
+
+	dayFor('2026-09-10').click();
+	await settled();
+	expect(text(page.getByTestId('calls'))).toBe('0');
+	expect(dayFor('2026-09-10').getAttribute('aria-disabled')).toBe('true');
+
+	el<HTMLButtonElement>(Back).click();
+	el<HTMLButtonElement>(Back).click();
+	await expect.poll(() => text(Title), { timeout: 5000 }).toBe('July 2026');
+	expect(dayFor('2026-07-10').getAttribute('aria-disabled')).toBe('true');
+});
+
+// ---------------------------------------------------------- a locked calendar
+
+test('CSR: a locked calendar leaves no tab stop and refuses every choice', async () => {
+	await render(Locked);
+	await expect.poll(() => days().length, { timeout: 5000 }).toBe(42);
+
+	expect(days().filter((one) => one.getAttribute('tabindex') === '0').length).toBe(0);
+	expect(days().every((one) => one.getAttribute('aria-disabled') === 'true')).toBe(true);
+
+	dayFor('2026-08-10').click();
+	await settled();
+	expect(text(page.getByTestId('calls'))).toBe('0');
+
+	dayFor('2026-08-10').focus();
+	await userEvent.keyboard('{Enter}');
+	await settled();
+	expect(text(page.getByTestId('calls'))).toBe('0');
+	expect(text(page.getByTestId('value'))).toBe('');
+});
+
+// Pins what a locked calendar does TODAY, not what it should do: walking the grid
+// and stepping the month are refused nowhere, so the keys and the month triggers
+// still work on a calendar nobody may change. Whether they should is an open
+// question for the owner; this row is the record of the current answer and is
+// expected to be rewritten when that question is settled.
+test('CSR: a locked calendar still walks its grid and steps its month', async () => {
+	await render(Locked);
+	await expect.poll(() => days().length, { timeout: 5000 }).toBe(42);
+
+	dayFor('2026-08-14').focus();
+	await userEvent.keyboard('{ArrowRight}');
+	await expect
+		.poll(() => (document.activeElement as HTMLElement | null)?.getAttribute('value'), {
+			timeout: 5000,
+		})
+		.toBe('2026-08-15');
+
+	el<HTMLButtonElement>(Forward).click();
+	await expect.poll(() => text(Title), { timeout: 5000 }).toBe('September 2026');
+	el<HTMLButtonElement>(Back).click();
+	await expect.poll(() => text(Title), { timeout: 5000 }).toBe('August 2026');
+});
