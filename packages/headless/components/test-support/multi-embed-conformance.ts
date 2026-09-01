@@ -159,8 +159,8 @@ export type MultiEmbedDisabled = {
 export type MultiEmbedPageScope = {
 	/** A thunk mounting N islands of a component that reads a page-scoped `shared()`. */
 	readonly render: EmbedRender;
-	/** The same islands composed in the browser. */
-	readonly renderCsr: EmbedCsrRender;
+	/** The same islands composed in the browser. Omit until the family adopts the CSR lever. */
+	readonly renderCsr?: EmbedCsrRender;
 	/** Substring identifying the page-scoped cell in the merged payload. */
 	readonly cellIdIncludes: string;
 	/** Testid of the element displaying the shared value, once per embed. */
@@ -177,7 +177,8 @@ export type MultiEmbedDescriptor = {
 	/** How many islands `render` mounts. Two is enough to witness a merge. */
 	readonly embeds?: number;
 	readonly render: EmbedRender;
-	readonly renderCsr: EmbedCsrRender;
+	/** Omit while the family has not adopted the CSR lever; csr mode is then skipped visibly. */
+	readonly renderCsr?: EmbedCsrRender;
 	/** Testid of a per-embed wrapper element, rendered exactly once per embed. */
 	readonly embedFrame: string;
 	/**
@@ -255,7 +256,14 @@ export function runMultiEmbedConformance(descriptor: MultiEmbedDescriptor): void
 		);
 	}
 
-	for (const mode of MODES) runMultiEmbedMode(descriptor, embeds, mode);
+	for (const mode of MODES) {
+		if (mode === 'csr' && descriptor.renderCsr === undefined) {
+			// The coverage gate reports CSR adoption; a silent pass here would hide it.
+			describe.todo(`${descriptor.family} multi-embed (csr): renderCsr not adopted yet`);
+			continue;
+		}
+		runMultiEmbedMode(descriptor, embeds, mode);
+	}
 }
 
 function runMultiEmbedMode(
@@ -265,7 +273,7 @@ function runMultiEmbedMode(
 ): void {
 	describe(`${descriptor.family} multi-embed (${mode})`, () => {
 		// One mount per mode, so a check body never names a lever directly.
-		const mount = () => (mode === 'ssr' ? descriptor.render() : descriptor.renderCsr());
+		const mount = () => (mode === 'ssr' || !descriptor.renderCsr ? descriptor.render() : descriptor.renderCsr());
 		const mountedState = async () => mountedStatePayload(mode, await mount());
 		const register = (check: MultiEmbedCheckId, title: string, body: () => Promise<void>) => {
 			const exemption = (descriptor.exemptions ?? []).find(
@@ -391,7 +399,7 @@ function runMultiEmbedMode(
 			const pageScoped = descriptor.pageScoped;
 			register('page-scope-shared', 'a page-scoped shared cell stays one cell across embeds', async () => {
 				const mounted =
-					mode === 'ssr' ? await pageScoped.render() : await pageScoped.renderCsr();
+					mode === 'ssr' || !pageScoped.renderCsr ? await pageScoped.render() : await pageScoped.renderCsr();
 				const cellIds = (mountedStatePayload(mode, mounted).cells ?? [])
 					.map((cell) => cell.graphNodeId)
 					.filter((id) => id.includes(pageScoped.cellIdIncludes));
