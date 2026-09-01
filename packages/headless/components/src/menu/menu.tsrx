@@ -624,10 +624,14 @@ export function MenuItem({
 					event.stopPropagation();
 				}
 			} else if (key === 'Enter' || key === ' ') {
-				// Routed through the item's own click rule, so one place in this family activates.
-				item.itemEl?.click();
-				// Space toggles a selection item and leaves the menu up; Enter takes the whole chain down.
-				if (key === 'Enter' && isSelection) dismissChain(surfaces, item.itemEl);
+				// The two cells, not the `isLocked` computed: a computed() read from a handler body does not guard.
+					// The dismissal needs the guard too - an item that never activated has no chain to take down.
+					if (item.disabled !== true && menu.disabled !== true) {
+						// Routed through the item's own click rule, so one place in this family activates.
+						item.itemEl?.click();
+						// Space toggles a selection item and leaves the menu up; Enter takes the whole chain down.
+						if (key === 'Enter' && isSelection) dismissChain(surfaces, item.itemEl);
+					}
 			}
 			onKeydown?.(event);
 		}}

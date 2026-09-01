@@ -44,8 +44,10 @@ export const numberboxState = shared(
 			max: undefined,
 			step: 1,
 			currency: '',
-			disabled: false,
-			readonly: false,
+			disabledProp: false,
+			disabledPart: false,
+			readonlyProp: false,
+			readonlyPart: false,
 			required: false,
 			invalidProp: false,
 			errored: false,
@@ -117,6 +119,11 @@ export const numberboxState = shared(
 		// their own, so a part can make the field stricter and a re-render of either
 		// one cannot take back what the other said.
 		const invalid = computed(() => numberbox.invalidProp || numberbox.errored);
+		// Two cells, one answer, as with `invalid`: the root's prop and the control's
+		// own each set their own, so a part can make the field stricter and a
+		// re-render of either one cannot take back what the other said.
+		const disabled = computed(() => numberbox.disabledProp || numberbox.disabledPart);
+		const readonly = computed(() => numberbox.readonlyProp || numberbox.readonlyPart);
 		// A bound is a graph cell of its own rather than a `!== undefined` written in
 		// the guard: `Home` and `End` are inert without one, and a browser-critical
 		// condition is only hoistable when it is a truthy read of graph state.
@@ -161,6 +168,8 @@ export const numberboxState = shared(
 			valuetext,
 			isEmpty,
 			invalid,
+			disabled,
+			readonly,
 			hasMin,
 			hasMax,
 			atBackBound,
@@ -174,7 +183,7 @@ export const numberboxState = shared(
 			 * may carry that name.
 			 */
 			settle(from: EventTarget | null, next: number | null) {
-				if (numberbox.disabled || numberbox.readonly) return;
+				if (numberbox.disabledProp || numberbox.disabledPart || numberbox.readonlyProp || numberbox.readonlyPart) return;
 
 				const box = from as HTMLInputElement | null;
 
@@ -197,7 +206,7 @@ export const numberboxState = shared(
 			 * formatted from here on.
 			 */
 			commit(from: EventTarget | null) {
-				if (numberbox.disabled || numberbox.readonly) return;
+				if (numberbox.disabledProp || numberbox.disabledPart || numberbox.readonlyProp || numberbox.readonlyPart) return;
 
 				// The element off the event, never the handle: a bound element's own
 				// properties are the graph's to write, and mid-edit the element is ahead
@@ -230,7 +239,7 @@ export const numberboxState = shared(
 			},
 
 			increment(from: EventTarget | null, big: boolean) {
-				if (numberbox.disabled || numberbox.readonly) return;
+				if (numberbox.disabledProp || numberbox.disabledPart || numberbox.readonlyProp || numberbox.readonlyPart) return;
 
 				// The element off the event, never the handle: a bound element's own
 				// properties are the graph's to write, and mid-edit the element is ahead
@@ -264,7 +273,7 @@ export const numberboxState = shared(
 			},
 
 			decrement(from: EventTarget | null, big: boolean) {
-				if (numberbox.disabled || numberbox.readonly) return;
+				if (numberbox.disabledProp || numberbox.disabledPart || numberbox.readonlyProp || numberbox.readonlyPart) return;
 
 				// The element off the event, never the handle: a bound element's own
 				// properties are the graph's to write, and mid-edit the element is ahead
@@ -318,7 +327,12 @@ export const numberboxState = shared(
 					numberbox.step,
 					numberbox.currency,
 				);
-				if (numberbox.disabled || numberbox.readonly) {
+				if (
+					numberbox.disabledProp ||
+					numberbox.disabledPart ||
+					numberbox.readonlyProp ||
+					numberbox.readonlyPart
+				) {
 					input.value = showing;
 					return;
 				}
@@ -355,7 +369,7 @@ export const numberboxState = shared(
 			 * `release` speaks the value the hold landed on.
 			 */
 			press(up: boolean, mouse: boolean) {
-				if (numberbox.disabled || numberbox.readonly) return;
+				if (numberbox.disabledProp || numberbox.disabledPart || numberbox.readonlyProp || numberbox.readonlyPart) return;
 
 				// The handle as a local first: a handler module cannot name a graph
 				// binding directly. It is only ever read here - a bound element's own
@@ -474,8 +488,8 @@ export function NumberboxRoot({
 	numberbox.max = max;
 	numberbox.step = step;
 	numberbox.currency = currency;
-	numberbox.disabled = disabled;
-	numberbox.readonly = readonly;
+	numberbox.disabledProp = disabled;
+	numberbox.readonlyProp = readonly;
 	numberbox.required = required;
 	numberbox.invalidProp = invalid;
 	numberbox.name = name;
@@ -522,6 +536,8 @@ export function NumberboxInput({
 	...rest
 }: NumberboxInputProps) @{
 	const numberbox = numberboxState();
+	numberbox.disabledPart = disabled === true;
+	numberbox.readonlyPart = readonly === true;
 	const ariaInvalid = computed(() => (numberbox.invalid ? 'true' : undefined));
 
 	// No `role="spinbutton"`: it cannot be focused with VoiceOver, and this control
@@ -537,8 +553,8 @@ export function NumberboxInput({
 		aria-describedby={[numberbox.errorEl, numberbox.descriptionEl]}
 		aria-invalid={ariaInvalid}
 		value={numberbox.shown}
-		disabled={numberbox.disabled || disabled === true}
-		readonly={numberbox.readonly || readonly === true}
+		disabled={numberbox.disabled}
+		readonly={numberbox.readonly}
 		required={numberbox.required || required === true}
 		onKeydown={(event) => {
 			// Guarded by event fields and graph state alone, the only shapes a

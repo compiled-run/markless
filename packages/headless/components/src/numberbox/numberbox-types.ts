@@ -115,8 +115,10 @@ export type NumberboxInstanceState = {
 	max: number | undefined;
 	step: number;
 	currency: string;
-	disabled: boolean;
-	readonly: boolean;
+	disabledProp: boolean;
+	disabledPart: boolean;
+	readonlyProp: boolean;
+	readonlyPart: boolean;
 	required: boolean;
 	invalidProp: boolean;
 	errored: boolean;

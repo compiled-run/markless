@@ -22,6 +22,7 @@ import Disabled from './scenarios/disabled.tsrx';
 import Form from './scenarios/form.tsrx';
 import Invalid from './scenarios/invalid.tsrx';
 import MinMaxStep from './scenarios/min-max-step.tsrx';
+import PartReadOnly from './scenarios/part-readonly.tsrx';
 import ReadOnly from './scenarios/readonly.tsrx';
 import Required from './scenarios/required.tsrx';
 
@@ -355,6 +356,18 @@ for (const mode of MODES) {
 		expectReadOnlyRendered();
 	});
 
+	// A restriction the control sets reaches the whole family, so the triggers go
+	// off with it: a part can add one and never remove one.
+	test(`${mode}: a restriction set on the control alone reaches every part`, async () => {
+		if (mode === 'CSR') await render(PartReadOnly);
+		else await renderSSR(PartReadOnly);
+
+		expect(el<HTMLInputElement>(Input).readOnly).toBe(true);
+		expect(el(Root).getAttribute('ui-readonly')).toBe('');
+		expect(el<HTMLButtonElement>(Back).disabled).toBe(true);
+		expect(el<HTMLButtonElement>(Forward).disabled).toBe(true);
+	});
+
 	test(`${mode}: a required number is reported by the input and the hidden element`, async () => {
 		if (mode === 'CSR') await render(Required);
 		else await renderSSR(Required);
@@ -662,6 +675,21 @@ test('CSR: a read-only field refuses both the arrows and the triggers', async ()
 	pointer(el(Forward), 'pointerup');
 	await expect.poll(() => shown(Input)).toBe('12');
 	expect(document.activeElement).toBe(el(Input));
+});
+
+// A refusal is proved by time passing: polling for the value already on screen
+// agrees on the first reading and passes before the gesture has even landed.
+test('CSR: neither trigger steps a control that set its own read-only', async () => {
+	await render(PartReadOnly);
+
+	pointer(el(Forward), 'pointerdown');
+	pointer(el(Forward), 'pointerup');
+	pointer(el(Back), 'pointerdown');
+	pointer(el(Back), 'pointerup');
+	el(Input).focus();
+	await userEvent.keyboard('{ArrowUp}');
+	await rest(GESTURE_MS);
+	expect(shown(Input)).toBe('12');
 });
 
 // ---------------------------------------------------------------------------
