@@ -4,6 +4,7 @@ import { page, userEvent } from 'vite-plus/test/browser';
 import { expect, test } from 'vitest';
 import Basic from './scenarios/basic.tsrx';
 import ConsumerAttributes from './scenarios/consumer-attributes.tsrx';
+import DisabledForm from './scenarios/disabled-form.tsrx';
 import DisabledItems from './scenarios/disabled-items.tsrx';
 import Form from './scenarios/form.tsrx';
 import ItemsFromData from './scenarios/items-from-data.tsrx';
@@ -300,6 +301,18 @@ for (const mode of MODES) {
 		expect(el(LockedBold).getAttribute('aria-pressed')).toBe('true');
 	});
 
+	// `disabled` is how buttongroup keeps an item out of the form data, so a locked
+	// item has to reach the field too: pressed and locked still submits nothing.
+	test(`${mode}: a locked pressed item and a locked group are left out of the form data`, async () => {
+		if (mode === 'CSR') await render(DisabledForm);
+		else await renderSSR(DisabledForm);
+		expect(el<HTMLInputElement>(BoldField).disabled).toBe(false);
+		expect(el<HTMLInputElement>(ItalicField).disabled).toBe(true);
+		expect(el<HTMLInputElement>(LeftField).disabled).toBe(true);
+		el(Submit).click();
+		await expect.poll(() => el(Submitted).textContent).toBe('bold|');
+	});
+
 	test(`${mode}: the form submits one name per pressed item`, async () => {
 		if (mode === 'CSR') await render(Form);
 		else await renderSSR(Form);
@@ -360,6 +373,30 @@ test('CSR: an arrow moves focus along the group and never presses', async () => 
 
 	await userEvent.keyboard('{ArrowLeft}');
 	await expect.poll(() => document.activeElement).toBe(el(Left));
+});
+
+// Cmd-arrow is browser history and Ctrl-Home is scroll-to-top; a group holding
+// focus must not swallow either. The plain arrow first warms the handler module, so
+// "nothing moved" is a decision rather than a gesture still in flight.
+test('CSR: a browser chord on an arrow is left to the browser', async () => {
+	await render(Basic);
+	el(Left).focus();
+	await userEvent.keyboard('{ArrowRight}');
+	await expect.poll(() => document.activeElement).toBe(el(Center));
+
+	el(Left).focus();
+	for (const modifier of ['metaKey', 'ctrlKey', 'altKey'] as const) {
+		const chord = new KeyboardEvent('keydown', {
+			key: 'ArrowRight',
+			[modifier]: true,
+			bubbles: true,
+			cancelable: true,
+		});
+		el(Left).dispatchEvent(chord);
+		expect(chord.defaultPrevented, `${modifier}+ArrowRight`).toBe(false);
+	}
+	await settled();
+	expect(document.activeElement).toBe(el(Left));
 });
 
 test('CSR: the ends of a group that does not loop stay put', async () => {

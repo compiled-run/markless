@@ -108,26 +108,35 @@ export function TabsTrigger({
 			onFocus?.(event);
 		}}
 		onKeydown={(event) => {
-			// Guarded by event fields alone: a guard over locals derived from graph state is MARKLESS_SYNC_POLICY_UNEXTRACTABLE.
+			// Guarded by event fields alone, every comparison `field === literal`: a guard over
+			// locals derived from graph state is MARKLESS_SYNC_POLICY_UNEXTRACTABLE, and a bare
+			// truthy field does not extract either. The modifiers keep browser chords - history
+			// back, scroll to end - out of the walk.
 			if (
-				event.key === 'ArrowRight' ||
-				event.key === 'ArrowLeft' ||
-				event.key === 'ArrowUp' ||
-				event.key === 'ArrowDown' ||
-				event.key === 'Home' ||
-				event.key === 'End'
+				event.altKey === false &&
+				event.ctrlKey === false &&
+				event.metaKey === false &&
+				(event.key === 'ArrowRight' ||
+					event.key === 'ArrowLeft' ||
+					event.key === 'ArrowUp' ||
+					event.key === 'ArrowDown' ||
+					event.key === 'Home' ||
+					event.key === 'End')
 			) {
 				event.preventDefault();
 			}
 
+			const chorded = event.altKey === true || event.ctrlKey === true || event.metaKey === true;
 			// This trigger's own element off its own instance handle: a handler on the element that binds the handle resolves per instance.
-			const next = nextTriggerToFocus(
-				tabs.triggerEls,
-				tab.el,
-				event.key,
-				tabs.orientation !== 'vertical',
-				tabs.loop,
-			);
+			const next = chorded
+				? undefined
+				: nextTriggerToFocus(
+						tabs.triggerEls,
+						tab.el,
+						event.key,
+						tabs.orientation !== 'vertical',
+						tabs.loop,
+					);
 			// Focus only: whether focus also shows the tab is selectOnFocus's call, made once in onFocus.
 			if (next) next.focus();
 			onKeydown?.(event);

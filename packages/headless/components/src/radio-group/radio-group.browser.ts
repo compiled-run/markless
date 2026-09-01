@@ -2,6 +2,7 @@ import { render, renderSSR } from '@markless/vitest-browser';
 import { page, userEvent } from 'vite-plus/test/browser';
 import { expect, test } from 'vitest';
 import { Basic } from './scenarios/basic.tsrx';
+import { LockedChoice } from './scenarios/locked-choice.tsrx';
 import { OptionsFromData } from './scenarios/options-from-data.tsrx';
 import { PlanPickerForm } from './scenarios/plan-picker-form.tsrx';
 import { Prefilled } from './scenarios/prefilled.tsrx';
@@ -380,6 +381,44 @@ test('CSR: ArrowDown moves focus to the next option and chooses it', async () =>
 	await expect.poll(() => document.activeElement).toBe(field(AnnualField));
 	await expect.poll(() => el(AnnualIndicator).textContent).toBe('Chosen');
 	expect(el(MonthlyIndicator).textContent).toBe('');
+});
+
+// A group whose chosen option has since been withdrawn: the tab stop is derived
+// from the chosen value alone, so it lands on the one input the browser will not
+// focus and no enabled option takes it instead - the group drops out of the tab
+// order entirely. Closing it needs an item to tell the group its own availability,
+// which is a shape the family does not have today.
+test.fails('CSR: a group whose chosen option is locked keeps a tab stop somewhere reachable', async () => {
+	await render(LockedChoice);
+	const stops = [MonthlyField, LifetimeField, AnnualField]
+		.map((one) => field(one))
+		.filter((one) => one.disabled !== true && one.getAttribute('tabindex') === '0');
+	expect(stops.length).toBe(1);
+});
+
+// Cmd-arrow is browser history and Ctrl-Home is scroll-to-top; a group holding
+// focus must not swallow either. The plain arrow first warms the handler module, so
+// "nothing moved" is a decision rather than a gesture still in flight.
+test('CSR: a browser chord on an arrow is left to the browser', async () => {
+	await render(Basic);
+	field(MonthlyField).focus();
+	await userEvent.keyboard('{ArrowDown}');
+	await expect.poll(() => document.activeElement).toBe(field(AnnualField));
+
+	field(MonthlyField).focus();
+	for (const modifier of ['metaKey', 'ctrlKey', 'altKey'] as const) {
+		const chord = new KeyboardEvent('keydown', {
+			key: 'ArrowDown',
+			[modifier]: true,
+			bubbles: true,
+			cancelable: true,
+		});
+		field(MonthlyField).dispatchEvent(chord);
+		expect(chord.defaultPrevented, `${modifier}+ArrowDown`).toBe(false);
+	}
+	await new Promise((resolve) => setTimeout(resolve, 150));
+	expect(document.activeElement).toBe(field(MonthlyField));
+	expect(el(AnnualIndicator).textContent).toBe('Chosen');
 });
 
 test('CSR: ArrowUp moves to the previous option and chooses it', async () => {

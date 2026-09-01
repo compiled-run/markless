@@ -67,6 +67,10 @@ function el<T extends Element = HTMLElement>(locator: { element(): Element | nul
 	return found as T;
 }
 
+async function settled() {
+	await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+}
+
 function expectBasicRendered() {
 	expect(el(List).getAttribute('role')).toBe('tablist');
 	expect(el(List).getAttribute('aria-orientation')).toBe(null);
@@ -320,6 +324,31 @@ test('CSR: the arrows walk past a tab nobody may open', async () => {
 
 	await userEvent.keyboard('{ArrowLeft}');
 	await expect.poll(() => document.activeElement).toBe(el(ProfileTrigger));
+});
+
+// Cmd-arrow is browser history and Ctrl-Home is scroll-to-top; a tab list holding
+// focus must not swallow either. The plain arrow first warms the handler module, so
+// "nothing moved" is a decision rather than a gesture still in flight.
+test('CSR: a browser chord on an arrow is left to the browser', async () => {
+	await render(Basic);
+	el(OverviewTrigger).focus();
+	await userEvent.keyboard('{ArrowRight}');
+	await expect.poll(() => document.activeElement).toBe(el(UsageTrigger));
+
+	el(OverviewTrigger).focus();
+	for (const modifier of ['metaKey', 'ctrlKey', 'altKey'] as const) {
+		const chord = new KeyboardEvent('keydown', {
+			key: 'ArrowRight',
+			[modifier]: true,
+			bubbles: true,
+			cancelable: true,
+		});
+		el(OverviewTrigger).dispatchEvent(chord);
+		expect(chord.defaultPrevented, `${modifier}+ArrowRight`).toBe(false);
+	}
+	await settled();
+	expect(document.activeElement).toBe(el(OverviewTrigger));
+	expect(el(OverviewTrigger).getAttribute('aria-selected')).toBe('true');
 });
 
 test('CSR: Home and End show the first and the last tab', async () => {
