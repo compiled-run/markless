@@ -1,0 +1,38 @@
+import AnatomyTable from '../../../components/docs/anatomy-table.tsrx';
+import KeyboardTable from '../../../components/docs/keyboard-table.tsrx';
+import ApiTable from '../../../components/docs/api-table.tsrx';
+
+# Derived tables
+
+A scratch page proving the three docs tables draw themselves from data. Nothing below is written
+out by hand: the parts and props come from the vendored `@markless/ui` manifest, and the keyboard
+rows come from `components/docs/ui-meta/accordion.ts`, the one hand-authored file a family gets.
+
+## Anatomy
+
+<AnatomyTable family="accordion" />
+
+## Keyboard
+
+Every keycap shows a symbol and carries its plain word, so a screen reader says "Enter" where the
+page shows a return glyph.
+
+<KeyboardTable family="accordion" />
+
+## API reference
+
+### `accordion.root`
+
+<ApiTable family="accordion" part="root" />
+
+### `accordion.item`
+
+<ApiTable family="accordion" part="item" />
+
+### `accordion.itemcontent`
+
+The panel takes no props of its own, so its table comes back with nothing in it. That empty table is
+the point: a part with no props is drawn from the manifest like every other one, and a page carrying
+it needs no special case.
+
+<ApiTable family="accordion" part="itemcontent" />

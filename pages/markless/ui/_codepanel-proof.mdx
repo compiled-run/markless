@@ -1,0 +1,19 @@
+import CodePanel from '../../../components/docs/code-panel.tsrx';
+
+# Code panel proof
+
+A scratch page: it exists to witness the code panel, not to teach anything.
+
+## A demo with no CSS of its own
+
+`accordion/basic.tsrx` composes another demo, so it has no `<style>` block and
+the panel shows one tab.
+
+<CodePanel scenario="accordion/basic" />
+
+## A demo that carries its own CSS
+
+`accordion/multiple.tsrx` styles itself, so the panel shows a second tab holding
+the CSS lifted out of the file.
+
+<CodePanel scenario="accordion/multiple" />
