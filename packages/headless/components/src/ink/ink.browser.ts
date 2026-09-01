@@ -749,6 +749,84 @@ test('a drawing served with strokes carries them in the served markup', async ()
 	expect(liveRegion().textContent).toBe('2 strokes');
 });
 
+// -------------------------------------------------- more than one pointer at a time
+
+// The family tracks one stroke at a time: it records the pointer that started
+// the stroke but never checks a later event against it. So a second finger
+// landing mid-stroke takes the stroke over - the first pointer's samples go with
+// it - and one stroke is what gets committed. This row pins that current answer.
+// Whether a second pointer should instead be ignored until the first lifts is an
+// open question for the owner, not something these rows decide.
+test('a second pointer landing mid-stroke takes the stroke over, and only one lands', async () => {
+	await render(Basic);
+	const area = el<SVGSVGElement>(Area);
+	const box = area.getBoundingClientRect();
+
+	pointer(area, 'pointerdown', box.left + 20, box.top + 20);
+	pointer(area, 'pointermove', box.left + 60, box.top + 60);
+	await expect.poll(() => currentPath().getAttribute('d') ?? '').not.toBe('');
+	const first = currentPath().getAttribute('d') ?? '';
+
+	pointer(area, 'pointerdown', box.left + 200, box.top + 100, { pointerId: 2 });
+	pointer(area, 'pointermove', box.left + 240, box.top + 120, { pointerId: 2 });
+	await expect.poll(() => currentPath().getAttribute('d') ?? '').not.toBe(first);
+
+	pointer(area, 'pointerup', box.left + 240, box.top + 120, { pointerId: 2 });
+	await expect.poll(() => committed().length).toBe(1);
+
+	// The first pointer's own lift finds no stroke in flight and commits nothing.
+	pointer(area, 'pointerup', box.left + 60, box.top + 60);
+	await new Promise((resolve) => setTimeout(resolve, 200));
+	expect(committed().length).toBe(1);
+	expect(el(Root).hasAttribute('ui-drawing')).toBe(false);
+});
+
+// The same one-stroke-at-a-time rule seen from the other side, and pinned as the
+// current answer rather than the settled one.
+test('a lift from a pointer that never pressed still commits the stroke in flight', async () => {
+	await render(Basic);
+	const area = el<SVGSVGElement>(Area);
+	const box = area.getBoundingClientRect();
+
+	pointer(area, 'pointerdown', box.left + 20, box.top + 20);
+	pointer(area, 'pointermove', box.left + 80, box.top + 80);
+	await expect.poll(() => currentPath().getAttribute('d') ?? '').not.toBe('');
+
+	pointer(area, 'pointerup', box.left + 80, box.top + 80, { pointerId: 7 });
+	await expect.poll(() => committed().length).toBe(1);
+	expect(el(Root).hasAttribute('ui-drawing')).toBe(false);
+});
+
+test('a cancel from a second pointer drops the stroke the first one is drawing', async () => {
+	await render(Basic);
+	const area = el<SVGSVGElement>(Area);
+	const box = area.getBoundingClientRect();
+
+	pointer(area, 'pointerdown', box.left + 20, box.top + 20);
+	pointer(area, 'pointermove', box.left + 80, box.top + 80);
+	await expect.poll(() => currentPath().getAttribute('d') ?? '').not.toBe('');
+
+	pointer(area, 'pointercancel', box.left + 80, box.top + 80, { pointerId: 7 });
+	await expect.poll(() => el(Root).hasAttribute('ui-drawing')).toBe(false);
+	expect(committed()).toHaveLength(0);
+	expect(currentPath().getAttribute('d')).toBe('');
+});
+
+test('a stroke abandoned mid-flight leaves the surface ready for the next one', async () => {
+	await render(Basic);
+	const area = el<SVGSVGElement>(Area);
+	const box = area.getBoundingClientRect();
+
+	pointer(area, 'pointerdown', box.left + 20, box.top + 20);
+	pointer(area, 'pointermove', box.right + 300, box.bottom + 300);
+	pointer(area, 'pointercancel', box.right + 300, box.bottom + 300);
+	await expect.poll(() => el(Root).hasAttribute('ui-drawing')).toBe(false);
+
+	drawStroke(20);
+	await expect.poll(() => committed().length).toBe(1);
+	expect(el(Root).hasAttribute('ui-empty')).toBe(false);
+});
+
 // A shared() method called from a handler in another module is text-spliced without
 // the family's imports or graph wiring, so the compiler refuses it at build time.
 // This row pins the refusal: the quarantined scenario cannot even load. It becomes

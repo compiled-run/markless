@@ -14,6 +14,7 @@ import Basic from './scenarios/basic.tsrx';
 import Collapsible from './scenarios/collapsible.tsrx';
 import Controlled from './scenarios/controlled.tsrx';
 import Disabled from './scenarios/disabled.tsrx';
+import FineStep from './scenarios/fine-step.tsrx';
 import Nested from './scenarios/nested.tsrx';
 import Rtl from './scenarios/rtl.tsrx';
 import Three from './scenarios/three.tsrx';
@@ -631,4 +632,71 @@ test('axe finds nothing once a panel is collapsed', async () => {
 	await expect.poll(() => el(Sidebar).getAttribute('ui-size')).toBe('5');
 
 	await expectNoAxeViolations(scopeOf(mounted), 'the sidebar is collapsed');
+});
+
+// ------------------------------------------- clamping and drift over many keys
+
+// A fractional step over a long run: every landing is rounded to two decimals, so
+// the pair still sums to the whole group rather than drifting apart by float dust.
+test('CSR: a long run of fractional steps never drifts the pair off the whole', async () => {
+	await render(FineStep);
+	el<HTMLElement>(Thumb).focus();
+
+	for (let press = 0; press < 25; press += 1) await userEvent.keyboard('{ArrowRight}');
+	await expect.poll(() => el(Nav).getAttribute('ui-size')).toBe('32.5');
+	expect(el(Main).getAttribute('ui-size')).toBe('67.5');
+
+	for (let press = 0; press < 25; press += 1) await userEvent.keyboard('{ArrowLeft}');
+	await expect.poll(() => el(Nav).getAttribute('ui-size')).toBe('30');
+	expect(el(Main).getAttribute('ui-size')).toBe('70');
+});
+
+test('CSR: repeated arrows stop at the wall and stop reporting once they are on it', async () => {
+	await render(WithOnChange);
+	el<HTMLElement>(Thumb).focus();
+
+	for (let press = 0; press < 25; press += 1) await userEvent.keyboard('{ArrowLeft}');
+	await expect.poll(() => el(Nav).getAttribute('ui-size')).toBe('10');
+	expect(el(Main).getAttribute('ui-size')).toBe('90');
+	// Twenty steps of one reach the declared floor; the last five report nothing.
+	expect(el(Changed).textContent).toBe('20');
+	expect(el(Settled).textContent).toBe('20');
+	expect(el(Last).textContent).toBe('10');
+});
+
+test('CSR: an arrow out of a collapsed panel lands on its declared floor and clears the flag', async () => {
+	await render(Collapsible);
+	el<HTMLElement>(Thumb).focus();
+
+	await userEvent.keyboard('{Enter}');
+	await expect.poll(() => el(Sidebar).getAttribute('ui-size')).toBe('5');
+	expect(el(Sidebar).hasAttribute('ui-collapsed')).toBe(true);
+
+	// The collapsed size sits under the divider's own minimum, so the first step out
+	// of it lands on that minimum rather than one step above the collapsed size.
+	await userEvent.keyboard('{ArrowRight}');
+	await expect.poll(() => el(Sidebar).getAttribute('ui-size')).toBe('15');
+	expect(el(Editor).getAttribute('ui-size')).toBe('85');
+	expect(el(Sidebar).hasAttribute('ui-collapsed')).toBe(false);
+	expect(el(Thumb).hasAttribute('ui-collapsed')).toBe(false);
+});
+
+// Pins what the divider does TODAY, not what it should do: the keydown handler
+// cancels the browser default for every arrow, so a side-by-side group's divider
+// swallows Up and Down even though it will never move on them - which is what
+// `isResizeKey` in the maths module answers and the handler never asks. Whether
+// the handler should consult it is an open question for the owner; this row is the
+// record of the current answer.
+test('CSR: a divider cancels the default for an arrow of the other axis it will never act on', async () => {
+	await render(Basic);
+	const divider = el<HTMLElement>(Thumb);
+	divider.focus();
+
+	expect(isResizeKey('ArrowUp', 'vertical')).toBe(true);
+	expect(isResizeKey('ArrowUp', 'horizontal')).toBe(false);
+
+	const event = new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true });
+	divider.dispatchEvent(event);
+	await expect.poll(() => el(Nav).getAttribute('ui-size')).toBe('30');
+	expect(event.defaultPrevented).toBe(true);
 });

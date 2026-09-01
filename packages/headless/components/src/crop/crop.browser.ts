@@ -795,3 +795,69 @@ for (const mode of MODES) {
 		await expectNoAxeViolations(scopeOf(mounted), `the picture rests in ${mode}`);
 	});
 }
+
+// ------------------------------------------------------- past the area's edges
+
+test('arrows walked off the area stop flush against it and keep the size', async () => {
+	await render(Basic);
+	const selection = el(Selection);
+
+	for (let step = 0; step < 5; step += 1) press(selection, 'ArrowLeft', { ctrl: true });
+	await expect.poll(() => shown()).toEqual({ x: 0, y: 30, width: 200, height: 150 });
+
+	for (let step = 0; step < 10; step += 1) press(selection, 'ArrowRight', { ctrl: true });
+	// The area is 400 wide and the rectangle 200, so 200 is as far as it starts.
+	await expect.poll(() => shown()).toEqual({ x: 200, y: 30, width: 200, height: 150 });
+
+	for (let step = 0; step < 5; step += 1) press(selection, 'ArrowUp', { ctrl: true });
+	await expect.poll(() => shown()).toEqual({ x: 200, y: 0, width: 200, height: 150 });
+
+	for (let step = 0; step < 10; step += 1) press(selection, 'ArrowDown', { ctrl: true });
+	await expect.poll(() => shown()).toEqual({ x: 200, y: 150, width: 200, height: 150 });
+});
+
+test('a drag of the whole rectangle past both corners lands it flush in each one', async () => {
+	await render(Basic);
+	drag(el(Selection), -900, -900);
+	await expect.poll(() => shown()).toEqual({ x: 0, y: 0, width: 200, height: 150 });
+
+	drag(el(Selection), 900, 900);
+	await expect.poll(() => shown()).toEqual({ x: 200, y: 150, width: 200, height: 150 });
+});
+
+// ------------------------------------------------ a locked ratio at the limits
+
+test('a locked resize run past the area stops at the declared cap with the ratio kept', async () => {
+	await render(Aspect);
+	const far = handle('handle-inline-end');
+
+	press(far, 'End');
+	await expect.poll(() => shown()).toEqual({ x: 20, y: 20, width: 320, height: 160 });
+
+	for (let step = 0; step < 3; step += 1) press(far, 'ArrowRight', { ctrl: true });
+	await expect.poll(() => shown()).toEqual({ x: 20, y: 20, width: 320, height: 160 });
+	expect(shown().width / shown().height).toBe(2);
+});
+
+test('a locked resize run down to nothing stops at the smallest size with the ratio kept', async () => {
+	await render(Aspect);
+	const far = handle('handle-inline-end');
+
+	for (let step = 0; step < 6; step += 1) press(far, 'ArrowLeft', { ctrl: true });
+	await expect.poll(() => shown()).toEqual({ x: 20, y: 20, width: 40, height: 20 });
+	expect(shown().width / shown().height).toBe(2);
+
+	press(far, 'ArrowLeft');
+	await expect.poll(() => shown()).toEqual({ x: 20, y: 20, width: 40, height: 20 });
+});
+
+test('a locked corner dragged far past the area keeps the ratio and both caps', async () => {
+	await render(Aspect);
+	drag(handle('handle-bottom-end'), 900, 900);
+	const landed = shown();
+	expect(landed.width).toBeLessThanOrEqual(320);
+	expect(landed.height).toBeLessThanOrEqual(160);
+	expect(landed.width / landed.height).toBe(2);
+	expect(landed.x + landed.width).toBeLessThanOrEqual(400);
+	expect(landed.y + landed.height).toBeLessThanOrEqual(300);
+});

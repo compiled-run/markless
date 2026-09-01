@@ -113,6 +113,14 @@ DOM traversal anywhere in the family: no `querySelector*`, no `closest()`.
 3. **`a vertical carousel says so and still steps` (CSR and SSR)** — defect 82, fixed
    here. Diagnosis and fix below; the earlier entry ruled measurement out and was
    wrong about it.
+4. **`a press from a pointer the platform is not tracking throws nothing`** — fixed
+   here. `beginDrag` called `setPointerCapture` bare, so a press whose pointer the
+   platform no longer holds — a press replayed after its handler loaded is the real
+   case — threw `NotFoundError` inside the handler and killed the whole drag before
+   the engine ever saw it. Every sibling pointer family (crop, ink, resizable) already
+   tolerated that id through a `capturePointer` helper; carousel now has the same one
+   in `carousel-engine.ts`. The gesture runs uncaptured, which is the right fallback:
+   only samples that reach the window are seen.
 
 ## Defect 82 — the vertical axis, and why measurement was the seat
 

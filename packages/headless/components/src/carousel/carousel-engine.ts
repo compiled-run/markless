@@ -397,6 +397,20 @@ export class SlideEngine {
 	}
 }
 
+/**
+ * Captures the pointer, tolerating an id the platform is not tracking: a press
+ * replayed after its handler loaded can arrive with the pointer already lifted,
+ * and capturing one of those throws `NotFoundError` rather than doing nothing.
+ * The gesture runs without capture; only samples that reach the window are seen.
+ */
+export function capturePointer(target: HTMLElement, pointerId: number): void {
+	try {
+		target.setPointerCapture(pointerId);
+	} catch (error) {
+		if (!(error instanceof DOMException) || error.name !== 'NotFoundError') throw error;
+	}
+}
+
 const engines = new WeakMap<HTMLElement, SlideEngine>();
 
 /**
