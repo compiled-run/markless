@@ -10,3 +10,6 @@ pnpm-lock.yaml
 .claude/
 .claude/
 .fable-opus/
+
+# written by tooling/ui-demos.ts at build time from the authored demo
+components/docs/playground/generated/
