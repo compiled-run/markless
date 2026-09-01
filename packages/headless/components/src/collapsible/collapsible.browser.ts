@@ -2,6 +2,7 @@ import { render, renderSSR } from '@markless/vitest-browser';
 import { page, userEvent } from 'vite-plus/test/browser';
 import { expect, test } from 'vitest';
 import Basic from './scenarios/basic.tsrx';
+import ClampInPropPanel from './scenarios/clamp-in-prop-panel.tsrx';
 import Faq from './scenarios/faq.tsrx';
 import Unavailable from './scenarios/unavailable.tsrx';
 import WithOnChange from './scenarios/with-onchange.tsrx';
@@ -381,4 +382,35 @@ test('SSR: the served panel is hidden, and the first click after resume shows it
 	el(Trigger).click();
 	await expect.poll(() => el(Trigger).getAttribute('aria-expanded')).toBe('false');
 	await expect.poll(() => el(Content).getAttribute('hidden')).toBe('until-found');
+});
+
+const panelExpands = () => page.getByTestId('panel-expand').elements() as HTMLElement[];
+const panelClamps = () => page.getByTestId('panel-clamp').elements() as HTMLElement[];
+
+// The docs code panel reported `aria-expanded` stuck at "false" while `ui-open`
+// landed. It holds in the reported nesting: a clamp inside a tab panel, inside a
+// keyed repeat, inside a host wrapper, inside a component fed its panes by a prop.
+async function expectClampInPanelOpens() {
+	expect(panelExpands().length).toBe(2);
+	const trigger = panelExpands()[0]!;
+	expect(trigger.getAttribute('aria-expanded')).toBe('false');
+	expect(panelClamps()[0]!.hasAttribute('ui-open')).toBe(false);
+
+	trigger.click();
+	await expect.poll(() => panelExpands()[0]!.getAttribute('aria-expanded')).toBe('true');
+	expect(panelExpands()[0]!.hasAttribute('ui-open')).toBe(true);
+	expect(panelClamps()[0]!.hasAttribute('ui-open')).toBe(true);
+	// The clamp in the next panel stays shut: one instance per root, not one per widget.
+	expect(panelExpands()[1]!.getAttribute('aria-expanded')).toBe('false');
+	expect(panelClamps()[1]!.hasAttribute('ui-open')).toBe(false);
+}
+
+test('CSR: a clamp nested in a repeat-minted tab panel reports itself expanded', async () => {
+	await render(ClampInPropPanel);
+	await expectClampInPanelOpens();
+});
+
+test('SSR: a clamp nested in a repeat-minted tab panel reports itself expanded after resume', async () => {
+	await renderSSR(ClampInPropPanel);
+	await expectClampInPanelOpens();
 });

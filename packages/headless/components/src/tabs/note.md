@@ -102,6 +102,24 @@ Everything below is measured on this tip, not assumed.
    widget, move correctly. It is the computed cell that is stale, not one
    attribute: `ui-selected` and `hidden` read the same cell and both are wrong.
    Every CSR equivalent is green.
+
+   *Re-measured 2026-09-01, sharper.* The panel does not merely keep what the
+   server served. Open the set on the **second** of three tabs and click back onto
+   the first (`panes-static-second.tsrx`): the panel that was open closes, and no
+   panel opens — all three end hidden. So the cell is refreshing; it just answers
+   "not showing" for every panel whatever the root's value is. `tabs.value` is
+   right at that moment, because the triggers beside it move correctly, so what a
+   resumed `tabs.content` gets wrong is the other side of the comparison: its own
+   `value`, read as a component prop captured inside the `computed()`. The trigger
+   escapes it only because it seeds its prop into a shared-instance cell first.
+
+   *The keyed repeat is not involved.* The docs code panel reported this against
+   parts minted inside `@for`, but the same two panes written out by hand fail
+   identically after resume, and the repeat form is green in CSR. Measured over
+   six shapes: static, keyed repeat over a local `computed()`, keyed repeat over a
+   handed-down prop, the same with the root's `value` also a prop, a child-owned
+   computed, and the docs panel itself. All six behave the same in each mode, so
+   the compiler's repeat collection is not what to look at.
 2. **The trigger needed its value as a cell, the panel did not tolerate one.**
    Written the way research §7 sketches it — every part comparing
    `tabs.value === value`, its own prop — the trigger's `aria-selected` and
@@ -111,6 +129,13 @@ Everything below is measured on this tip, not assumed.
    then stopped refreshing in CSR as well (10 red rows). So the panel ships
    comparing against its prop, the trigger ships comparing against a cell, and
    the asymmetry is a measurement rather than a preference.
+
+   *Re-tried 2026-09-01, on the tip carrying the widget-registry projection fix,
+   and it still does not work.* Rooting `tabsPartState` in `tabs.content` and
+   comparing two cells makes CSR fail exactly the way SSR already does — every
+   panel hidden after a click, in all six shapes above, where CSR was green
+   before. The family has no fix available: seeding the value into a cell is the
+   one move that repairs the trigger, and it is the move the panel refuses.
 3. **One graph cell per read position.** Each part derives a single
    `computed()` and reads it for `aria-selected`, `tabindex`, `hidden` and
    `ui-selected` alike. Radio-group measured that an inline conditional

@@ -3,10 +3,12 @@ import { page, userEvent } from 'vite-plus/test/browser';
 import { expect, test } from 'vitest';
 import ArmTabs from './scenarios/arm-tabs.tsrx';
 import Basic from './scenarios/basic.tsrx';
+import CodePanel from './scenarios/code-panel.tsrx';
 import ConsumerAttributes from './scenarios/consumer-attributes.tsrx';
 import FromData from './scenarios/from-data.tsrx';
 import Looping from './scenarios/looping.tsrx';
 import ManualActivation from './scenarios/manual-activation.tsrx';
+import PanesStaticSecond from './scenarios/panes-static-second.tsrx';
 import SettingsPanels from './scenarios/settings-panels.tsrx';
 import TwoWidgets from './scenarios/two-widgets.tsrx';
 import Vertical from './scenarios/vertical.tsrx';
@@ -533,6 +535,59 @@ test.fails('SSR: clicking a looped tab moves the looped panels', async () => {
 	await renderSSR(FromData);
 	(rowTriggers()[1] as HTMLElement).click();
 	await expect.poll(shownRow).toBe(1);
+});
+
+const panelTriggers = () => page.getByTestId('panel-trigger').elements() as HTMLElement[];
+const panelPanes = () => page.getByTestId('panel-content').elements() as HTMLElement[];
+
+// The docs code panel: a tab per file, every trigger and every panel minted from a
+// keyed repeat under a host wrapper, and a clamp nested in each panel.
+test('CSR: the docs code panel switches both the tab and the panel', async () => {
+	await render(CodePanel);
+	expect(panelTriggers().length).toBe(2);
+	panelTriggers()[1]!.click();
+	await expect.poll(() => panelTriggers()[1]!.getAttribute('aria-selected')).toBe('true');
+	expect(panelTriggers()[0]!.getAttribute('aria-selected')).toBe('false');
+	await expect.poll(() => panelPanes()[1]!.hasAttribute('hidden')).toBe(false);
+	expect(panelPanes()[0]!.hasAttribute('hidden')).toBe(true);
+});
+
+// The tab half survives resume: the trigger seeds its own value into a cell.
+test('SSR: clicking a tab in the docs code panel moves the tab', async () => {
+	await renderSSR(CodePanel);
+	panelTriggers()[1]!.click();
+	await expect.poll(() => panelTriggers()[1]!.getAttribute('aria-selected')).toBe('true');
+	expect(panelTriggers()[0]!.getAttribute('aria-selected')).toBe('false');
+});
+
+// PINNED: the panel half does not. This is pin (1) above reached through the docs
+// shape, not a defect of the repeat - `panes-static-second.tsrx` below spells the
+// same failure with the panels written out by hand.
+test.fails('SSR: clicking a tab in the docs code panel shows that tab panel', async () => {
+	await renderSSR(CodePanel);
+	panelTriggers()[1]!.click();
+	await expect.poll(() => panelPanes()[1]!.hasAttribute('hidden')).toBe(false);
+});
+
+const staticTriggers = () => page.getByTestId('prop-trigger').elements() as HTMLElement[];
+const staticPanes = () => page.getByTestId('prop-content').elements() as HTMLElement[];
+
+test('CSR: a click back onto the first tab shows the first panel', async () => {
+	await render(PanesStaticSecond);
+	expect(staticPanes().map((p) => p.hasAttribute('hidden'))).toEqual([true, false, true]);
+	staticTriggers()[0]!.click();
+	await expect.poll(() => staticPanes()[0]!.hasAttribute('hidden')).toBe(false);
+	expect(staticPanes().map((p) => p.hasAttribute('hidden'))).toEqual([false, true, true]);
+});
+
+// PINNED, and the sharpest reading of pin (1): after resume every `tabs.content` in
+// the widget answers "not showing", whatever the root's value is. The panel that was
+// open does close - so the cell is refreshing - but no panel ever opens, and no
+// repeat is involved. The measured after-state here is all three hidden.
+test.fails('SSR: a click back onto the first tab shows the first panel', async () => {
+	await renderSSR(PanesStaticSecond);
+	staticTriggers()[0]!.click();
+	await expect.poll(() => staticPanes()[0]!.hasAttribute('hidden')).toBe(false);
 });
 
 test('SSR: the keyboard walk works on a resumed page', async () => {
