@@ -19,6 +19,7 @@ import Basic from './scenarios/basic.tsrx';
 import Controlled from './scenarios/controlled.tsrx';
 import Currency from './scenarios/currency.tsrx';
 import Disabled from './scenarios/disabled.tsrx';
+import FineStep from './scenarios/fine-step.tsrx';
 import Form from './scenarios/form.tsrx';
 import Invalid from './scenarios/invalid.tsrx';
 import MinMaxStep from './scenarios/min-max-step.tsrx';
@@ -571,6 +572,79 @@ test('CSR: an empty field starts from its floor rather than one step above it', 
 	await userEvent.clear(el<HTMLInputElement>(Input));
 	await userEvent.keyboard('{ArrowUp}');
 	await expect.poll(() => shown(Input)).toBe('0.50');
+});
+
+// Every step re-snaps to the grid from `min`, so a run of them cannot walk off it
+// and a bound cannot be stepped through however many keys arrive.
+test('CSR: a run of arrows lands on the ceiling and stays there', async () => {
+	await render(MinMaxStep);
+
+	// 1.5 in steps of 0.25 reaches 3 in six, so the last four have nowhere to go.
+	await typeInto(Input, '{ArrowUp}'.repeat(10));
+	await expect.poll(() => shown(Input)).toBe('3.00');
+	// The bound itself, not a number a step overshot and a format rounded back.
+	await expect.poll(() => el<HTMLInputElement>(Field).value).toBe('3');
+
+	await userEvent.keyboard('{ArrowDown}');
+	await expect.poll(() => shown(Input)).toBe('2.75');
+});
+
+test('CSR: a run of arrows lands on the floor and stays there', async () => {
+	await render(MinMaxStep);
+
+	await typeInto(Input, '{ArrowDown}'.repeat(10));
+	await expect.poll(() => shown(Input)).toBe('0.50');
+	await expect.poll(() => el<HTMLInputElement>(Field).value).toBe('0.5');
+
+	await userEvent.keyboard('{ArrowUp}');
+	await expect.poll(() => shown(Input)).toBe('0.75');
+});
+
+// A tenth cannot be held exactly in binary, so adding one ten times is where a
+// step that carried its own error forward would show 0.30000000000000004.
+test('CSR: ten steps of a tenth land on whole numbers, not on binary dust', async () => {
+	await render(FineStep);
+
+	await typeInto(Input, '{ArrowUp}{ArrowUp}{ArrowUp}');
+	await expect.poll(() => shown(Input)).toBe('0.3');
+	await expect.poll(() => el<HTMLInputElement>(Field).value).toBe('0.3');
+
+	await userEvent.keyboard('{ArrowUp}'.repeat(4));
+	await expect.poll(() => shown(Input)).toBe('0.7');
+	await expect.poll(() => el<HTMLInputElement>(Field).value).toBe('0.7');
+
+	await userEvent.keyboard('{ArrowUp}'.repeat(3));
+	await expect.poll(() => shown(Input)).toBe('1.0');
+	await expect.poll(() => el<HTMLInputElement>(Field).value).toBe('1');
+
+	// Back down the same ladder, which is where a one-directional rounding fix
+	// would leave a residue behind.
+	await userEvent.keyboard('{ArrowDown}'.repeat(10));
+	await expect.poll(() => shown(Input)).toBe('0.0');
+	await expect.poll(() => el<HTMLInputElement>(Field).value).toBe('0');
+});
+
+// The family binds no Escape: `onChange` fires on blur, Enter and every step, and
+// there is no fourth key that puts a half-typed number back. Pinned as it stands
+// rather than decided here - whether typing should be revertible is an owner
+// question, and inventing a revert would be a new surface.
+test('CSR: escape does not put a half-typed number back', async () => {
+	await render(MinMaxStep);
+
+	await userEvent.clear(el<HTMLInputElement>(Input));
+	await userEvent.keyboard('2.5');
+	await expect.poll(() => shown(Input)).toBe('2.5');
+
+	await userEvent.keyboard('{Escape}');
+	// A second, visible keystroke through the same field is what waits the escape
+	// out: had the escape emptied the field, this digit would stand alone.
+	await userEvent.keyboard('9');
+	await expect.poll(() => shown(Input)).toBe('2.59');
+
+	// And the blur after it still commits what escape left alone.
+	el(Input).blur();
+	await expect.poll(() => shown(Input)).toBe('2.59');
+	await expect.poll(() => el<HTMLInputElement>(Field).value).toBe('2.59');
 });
 
 test('CSR: enter commits and the form still submits with the committed value', async () => {

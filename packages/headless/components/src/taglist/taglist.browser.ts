@@ -598,6 +598,62 @@ for (const mode of MODES) {
 		expect(inputs.map((one) => one.value)).toEqual(['alpha', 'beta']);
 		expect(inputs.every((one) => one.type === 'hidden')).toBe(true);
 	});
+
+	// The two fields answer blur differently on purpose: the add field is where a
+	// person is still choosing their words, and the edit field is where they were
+	// changing words the row already holds.
+	test(`${mode}: blur leaves the add field's words uncommitted and still typed`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+
+		await typeInto(Input, 'gamma');
+		closeFor('alpha').focus();
+		await expect.poll(() => document.activeElement).toBe(closeFor('alpha'));
+
+		// Pressing Enter back in the field is what waits the blur out: the words
+		// are still there to commit, so a blur that had taken or dropped them
+		// would show here rather than in a value that never moved.
+		await typeInto(Input, '{Enter}');
+		await expect.poll(() => el(Held).textContent).toBe('alpha|beta|gamma');
+		expect(shownTags()).toEqual(['alpha', 'beta', 'gamma']);
+	});
+
+	test(`${mode}: blur takes the words an edit field was holding`, async () => {
+		if (mode === 'CSR') await render(Editable);
+		else await renderSSR(Editable);
+
+		await pressAtCaret(el<HTMLInputElement>(Input), 0, '{ArrowLeft}{Enter}');
+		await expect.poll(() => document.activeElement).toBe(editFor('review'));
+
+		editFor('review').setSelectionRange(0, editFor('review').value.length);
+		await userEvent.keyboard('signoff');
+		el<HTMLInputElement>(Input).focus();
+		await expect.poll(() => el(Held).textContent).toBe('draft|signoff');
+	});
+
+	// Where the highlight goes when the tag under it is taken: onto the neighbour
+	// while there is one, and back to the caret when the row runs out.
+	test(`${mode}: the highlight walks left along the row and lands on the caret when it empties`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+
+		await pressAtCaret(el<HTMLInputElement>(Input), 0, '{ArrowLeft}');
+		await expect.poll(() => at('item-beta').hasAttribute('ui-highlighted')).toBe(true);
+
+		await userEvent.keyboard('{Delete}');
+		await expect.poll(() => el(Held).textContent).toBe('alpha');
+		// The row shrank under the highlight, so it lands on what is left.
+		await expect.poll(() => at('item-alpha').hasAttribute('ui-highlighted')).toBe(true);
+
+		await userEvent.keyboard('{Delete}');
+		await expect.poll(() => el(Held).textContent).toBe('');
+		expect(shownTags()).toEqual([]);
+		// Nothing left to highlight, so the field's own keys come back: a digit
+		// typed now lands as text rather than walking a row that is not there.
+		await userEvent.keyboard('x');
+		await expect.poll(() => el<HTMLInputElement>(Input).value).toBe('x');
+		expect(document.activeElement).toBe(el(Input));
+	});
 }
 
 // ---------------------------------------------------------------------------
