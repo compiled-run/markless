@@ -219,6 +219,20 @@ async function expectConsumerCallbacksCarryTheirValue() {
 	expect(el(Calls).textContent).toBe('1');
 }
 
+// A real pointer, not `.click()`: a synthesised click carries no pointer, and the
+// question here is where focus goes once the option the pointer focused is hidden.
+async function expectPointerChoiceHandsFocusBack() {
+	await userEvent.click(Trigger);
+	await expect.poll(() => el<HTMLElement>(Content).hidden).toBe(false);
+
+	await userEvent.click(Banana);
+	await expect.poll(() => el<HTMLElement>(Content).hidden).toBe(true);
+	await expect.poll(() => el(Value).textContent).toBe('banana');
+	await expect.poll(() => el(Calls).textContent).toBe('1');
+	await expect.poll(async () => await focused()).toBe(el(Trigger));
+	expect(el(Calls).textContent).toBe('1');
+}
+
 async function expectOmittedCallbacksStillChoose() {
 	el(Trigger).click();
 	await expect.poll(() => el<HTMLElement>(Content).hidden).toBe(false);
@@ -308,6 +322,12 @@ for (const mode of MODES) {
 		if (mode === 'CSR') await render(WithOnChange);
 		else await renderSSR(WithOnChange);
 		await expectConsumerCallbacksCarryTheirValue();
+	});
+
+	test(`${mode}: a pointer choice closes the popup and hands focus back to the trigger`, async () => {
+		if (mode === 'CSR') await render(WithOnChange);
+		else await renderSSR(WithOnChange);
+		await expectPointerChoiceHandsFocusBack();
 	});
 
 	test(`${mode}: omitted callbacks still choose and still open`, async () => {

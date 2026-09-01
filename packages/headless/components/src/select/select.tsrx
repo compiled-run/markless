@@ -276,6 +276,8 @@ export function SelectItem({
 			if (item.disabled !== true && select.disabled !== true) {
 				select.choose(item.value);
 				select.setOpen(false);
+				// Closing hides the option the pointer focused; the keyboard path's synthesised click (detail 0) hands focus back itself, Tab excepted.
+				if (event.detail !== 0) select.triggerEl?.focus({ preventScroll: true });
 			}
 			onClick?.(event);
 		}}
