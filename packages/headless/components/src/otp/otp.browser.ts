@@ -622,3 +622,64 @@ test('CSR: an arm-delivered box follows the code like any other', async () => {
 	expect(item('sms-item-', 1).textContent).toBe('3');
 	expect(item('sms-item-', 2).getAttribute('ui-empty')).toBe('');
 });
+
+// ---------------------------------------------------------------------------
+// Walking the code. There is one real input under every box, so left and right
+// move a caret through one string rather than moving focus between boxes, and
+// what the boxes show is that string sliced up. These rows pin what that costs.
+// ---------------------------------------------------------------------------
+
+// The family carries a caret policy on focus only, so a caret a person then walks
+// backwards is where the next digit goes in. Pinned as it stands: whether a code
+// field should overwrite the box under the caret instead of pushing the rest
+// along is an owner question this row does not answer.
+test('CSR: a digit typed with the caret walked back is pushed in, not written over', async () => {
+	await render(Basic);
+	const input = el<HTMLInputElement>(Field);
+	input.focus();
+
+	await userEvent.keyboard('1234');
+	await expect.poll(() => item('item-', 3).textContent).toBe('4');
+
+	await userEvent.keyboard('{ArrowLeft}9');
+	await expect.poll(() => item('item-', 3).textContent).toBe('9');
+	// The character that was under the caret moved along rather than being replaced.
+	expect(item('item-', 4).textContent).toBe('4');
+	expect(input.value).toBe('12394');
+});
+
+test('CSR: backspace with the caret walked back takes the character before it', async () => {
+	await render(Basic);
+	const input = el<HTMLInputElement>(Field);
+	input.focus();
+
+	await userEvent.keyboard('1234');
+	await expect.poll(() => item('item-', 3).textContent).toBe('4');
+
+	await userEvent.keyboard('{ArrowLeft}{Backspace}');
+	await expect.poll(() => item('item-', 2).textContent).toBe('4');
+	expect(item('item-', 3).getAttribute('ui-empty')).toBe('');
+	expect(input.value).toBe('124');
+});
+
+// `maxlength` is enforced by the browser before any handler runs, so a full code
+// has no room for an insertion however the caret is placed.
+test('CSR: a full code takes no digit, even with the caret in the middle', async () => {
+	await render(Basic);
+	const input = el<HTMLInputElement>(Field);
+	input.focus();
+
+	await userEvent.keyboard('123456');
+	await expect.poll(() => item('item-', 5).textContent).toBe('6');
+
+	await userEvent.keyboard('{ArrowLeft}{ArrowLeft}7');
+	// The refused digit is waited out by a Backspace through the same field: it
+	// lands, so the keystroke before it had its turn and changed nothing. The
+	// poll is on the box rather than the field - `maxlength` settles the field's
+	// own text in the browser before any handler runs, so only the box proves
+	// the committed write.
+	await userEvent.keyboard('{Backspace}');
+	await expect.poll(() => item('item-', 3).textContent).toBe('5');
+	expect(item('item-', 5).getAttribute('ui-empty')).toBe('');
+	expect(input.value).toBe('12356');
+});

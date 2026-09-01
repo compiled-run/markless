@@ -509,3 +509,88 @@ test('SSR: a resumed date keeps the ceiling its month sets', async () => {
 	await typeInto(Month, '2');
 	await expect.poll(() => shown(Day)).toBe('29');
 });
+
+// The walk stops at both ends rather than wrapping: `press` looks the landing box
+// up by index and there is nothing either side of the row, so focus stays put.
+// A refusal is not provable by polling for a value that never changed, so each of
+// these rows drives a second, visible key through the same handler and waits for
+// that instead - if the refused key had landed, the row reads the wrong box.
+test('CSR: left is refused on the first box and the walk stays where it is', async () => {
+	await render(DayMonthYear);
+
+	el(Day).focus();
+	await userEvent.keyboard('{ArrowLeft}');
+	// The digit proves the walk never moved: it lands in the day box, not before it.
+	await userEvent.keyboard('7');
+	await expect.poll(() => shown(Day)).toBe('7');
+	expect(document.activeElement).toBe(el(Month));
+	expect(shown(Month)).toBe('3');
+});
+
+test('CSR: a digit that fills the last box leaves the walk on it', async () => {
+	await render(Basic);
+
+	await typeInto(Year, '2024');
+	await expect.poll(() => shown(Year)).toBe('2024');
+	// Full, and there is no box after it, so the move is asked for and goes nowhere.
+	expect(document.activeElement).toBe(el(Year));
+});
+
+test('CSR: backspace on the first box empties it and the walk stays', async () => {
+	await render(DayMonthYear);
+
+	await typeInto(Day, '{Backspace}');
+	await expect.poll(() => shown(Day)).toBe('3');
+	await userEvent.keyboard('{Backspace}');
+	await expect.poll(() => shown(Day)).toBe('dd');
+	// Now empty, so backspace asks to walk back - off the front of the row.
+	await userEvent.keyboard('{Backspace}');
+	await userEvent.keyboard('8');
+	await expect.poll(() => shown(Day)).toBe('8');
+	expect(shown(Month)).toBe('3');
+});
+
+// A half-typed date is not a date: the hidden field carries nothing until all
+// three boxes are spelled, and starts carrying one on the keystroke that
+// completes it.
+test('CSR: the hidden field stays empty until every box is filled', async () => {
+	await render(Basic);
+
+	await typeInto(Month, '4');
+	await expect.poll(() => shown(Month)).toBe('4');
+	expect(el<HTMLInputElement>(Field).value).toBe('');
+	expect(el(Root).hasAttribute('ui-empty')).toBe(false);
+
+	await typeInto(Day, '12');
+	await expect.poll(() => shown(Day)).toBe('12');
+	expect(el<HTMLInputElement>(Field).value).toBe('');
+
+	await typeInto(Year, '2024');
+	await expect.poll(() => el<HTMLInputElement>(Field).value).toBe('2024-04-12');
+});
+
+// Two open owner questions, pinned as they stand rather than answered: this
+// family has no readonly concept at all - its sibling timebox does - and no root
+// prop reaches the invalid cell, so mounting the error part is the only thing
+// that ever sets it.
+test('CSR: a datebox has no readonly affordance and is valid until an error is mounted', async () => {
+	await render(Basic);
+
+	expect(el(Root).hasAttribute('ui-readonly')).toBe(false);
+	expect(el(Root).hasAttribute('aria-readonly')).toBe(false);
+	for (const box of [Month, Day, Year]) {
+		expect(el(box).hasAttribute('ui-readonly')).toBe(false);
+		expect(el(box).hasAttribute('aria-readonly')).toBe(false);
+		expect(el(box).getAttribute('aria-invalid')).toBe('false');
+	}
+});
+
+// A box holding two digits is full, so the next digit starts it over rather than
+// pushing a third one in.
+test('CSR: a digit typed into a filled box replaces what was there', async () => {
+	await render(Prefilled);
+
+	await typeInto(Day, '2');
+	await expect.poll(() => shown(Day)).toBe('2');
+	expect(el<HTMLInputElement>(Field).value).toBe('2024-03-02');
+});

@@ -253,3 +253,79 @@ test('CSR: a disabled control takes no typing', async () => {
 	await userEvent.keyboard('nope');
 	expect(el<HTMLInputElement>(Input).value).toBe('');
 });
+
+// The family binds no key handler at all, so Enter means what the platform says
+// it means in each control. A real submit would navigate the test iframe, so the
+// form's own event is caught and counted instead.
+function countSubmits(form: HTMLFormElement) {
+	const seen = { count: 0 };
+	form.addEventListener('submit', (event) => {
+		event.preventDefault();
+		seen.count += 1;
+	});
+	return seen;
+}
+
+function formOf(control: HTMLInputElement | HTMLTextAreaElement) {
+	const { form } = control;
+	if (!form) throw new Error('Expected the control to be inside a form.');
+	return form;
+}
+
+test('CSR: enter in the single-line control submits and never reaches its value', async () => {
+	await render(SignupForm);
+	const control = el<HTMLInputElement>(UsernameInput);
+	const seen = countSubmits(formOf(control));
+
+	await userEvent.fill(control, 'ada');
+	control.focus();
+	await userEvent.keyboard('{Enter}');
+	await expect.poll(() => seen.count).toBe(1);
+	// Implicit submission, not text: the value is exactly what was typed.
+	expect(control.value).toBe('ada');
+	expect(el(UsernameRoot).hasAttribute('ui-empty')).toBe(false);
+});
+
+test('CSR: enter in the multiline control breaks the line and submits nothing', async () => {
+	await render(SignupForm);
+	const control = el<HTMLTextAreaElement>(BioTextarea);
+	const seen = countSubmits(formOf(control));
+
+	await userEvent.fill(control, 'first');
+	control.focus();
+	await userEvent.keyboard('{Enter}second');
+	await expect.poll(() => control.value).toBe('first\nsecond');
+	// The gesture window has been waited out by the poll above, so a submit that
+	// was going to arrive has arrived.
+	expect(seen.count).toBe(0);
+});
+
+// There is no commit step to revert to: the control writes the family cell on
+// every keystroke, so escape leaves both exactly as typed. A commit/revert
+// session is the `editable` family's job, not this one's.
+test('CSR: escape leaves the typed words in place', async () => {
+	await render(Basic);
+	const control = el<HTMLInputElement>(Input);
+
+	await userEvent.fill(control, 'half typed');
+	control.focus();
+	await userEvent.keyboard('{Escape}');
+	await expect.poll(() => el(Root).hasAttribute('ui-empty')).toBe(false);
+	expect(control.value).toBe('half typed');
+});
+
+test('CSR: blur leaves the typed words in place', async () => {
+	await render(SignupForm);
+	const control = el<HTMLInputElement>(UsernameInput);
+
+	await userEvent.fill(control, 'ada');
+	// The typing has to have reached the family cell before focus leaves, or the
+	// row proves nothing about what blur did to it.
+	await expect.poll(() => el(UsernameRoot).hasAttribute('ui-empty')).toBe(false);
+
+	control.focus();
+	el<HTMLTextAreaElement>(BioTextarea).focus();
+	await expect.poll(() => document.activeElement).toBe(el(BioTextarea));
+	expect(control.value).toBe('ada');
+	expect(el(UsernameRoot).hasAttribute('ui-empty')).toBe(false);
+});

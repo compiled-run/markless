@@ -410,6 +410,64 @@ test('CSR: left and right walk the boxes as well as Tab', async () => {
 	await expect.poll(() => document.activeElement).toBe(el(Minute));
 });
 
+// The walk stops at both ends rather than wrapping: the landing box is looked up
+// by index and there is nothing either side of the row. A key that is refused
+// cannot be proved by polling a value that never moved, so each end drives a
+// second, visible key through the same handler and waits for that instead.
+test('CSR: the walk holds at the right end of the row', async () => {
+	await render(Basic);
+
+	el(Period).focus();
+	await userEvent.keyboard('{ArrowRight}');
+	// The period box answers letters, so this lands only if focus stayed on it.
+	await userEvent.keyboard('p');
+	await expect.poll(() => shown(Period)).toBe('PM');
+	expect(document.activeElement).toBe(el(Period));
+});
+
+test('CSR: the walk holds at the left end of the row', async () => {
+	await render(Basic);
+
+	el(Hour).focus();
+	await userEvent.keyboard('{ArrowLeft}');
+	// A 3 cannot start a two-digit hour, so it fills the hour box and moves on -
+	// which is only true if the arrow left focus where it was.
+	await userEvent.keyboard('3');
+	await expect.poll(() => shown(Hour)).toBe('3');
+	expect(shown(Minute)).toBe('mm');
+	await expect.poll(() => document.activeElement).toBe(el(Minute));
+});
+
+test('CSR: backspace off the front of the row leaves the first box alone', async () => {
+	await render(Prefilled);
+
+	await typeInto(Hour, '{Backspace}{Backspace}');
+	await expect.poll(() => shown(Hour)).toBe('hh');
+	// Empty now, so backspace asks to walk back past the first box.
+	await userEvent.keyboard('{Backspace}');
+	await userEvent.keyboard('9');
+	await expect.poll(() => shown(Hour)).toBe('9');
+	expect(shown(Minute)).toBe('30');
+});
+
+// A half-typed time is not a time: the hidden field carries nothing until every
+// box is spelled, and starts carrying one on the keystroke that completes it.
+test('CSR: the hidden field stays empty until every box is filled', async () => {
+	await render(Basic);
+
+	await typeInto(Hour, '3');
+	await expect.poll(() => shown(Hour)).toBe('3');
+	expect(el<HTMLInputElement>(Field).value).toBe('');
+
+	await typeInto(Minute, '45');
+	await expect.poll(() => shown(Minute)).toBe('45');
+	// An hour and a minute with no half of the day still spell no time.
+	expect(el<HTMLInputElement>(Field).value).toBe('');
+
+	await typeInto(Period, 'p');
+	await expect.poll(() => el<HTMLInputElement>(Field).value).toBe('15:45');
+});
+
 // ------------------------------------------------------------ placeholders
 
 test('CSR: stepping an empty box lands on its placeholder value', async () => {
