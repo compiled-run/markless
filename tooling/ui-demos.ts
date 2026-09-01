@@ -4,10 +4,20 @@
 // `basic.tsrx` is the hero, every other file is a named example, and the
 // exported name is the file name in PascalCase (`find` -> `Find`,
 // `until-found` -> `UntilFound`).
-import { readdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import type { Plugin } from 'vite';
 import { highlightFences } from './highlight-code.ts';
+import { CHROME_CSS } from './ui-playground-css.ts';
+import {
+	analyzeDemo,
+	componentName,
+	displaySource,
+	generatedPath,
+	playgroundControls,
+	playgroundModule,
+} from './ui-playground.ts';
+import { metaFor } from '../components/docs/ui-meta/index.ts';
 
 const PREFIX = 'ui-demos:';
 const VIRTUAL = '\0ui-demos:';
@@ -384,6 +394,73 @@ async function injectScenarioTabs(
 	return next === code ? undefined : next;
 }
 
+/**
+ * `<Playground scenario="accordion/basic" />` in an .mdx page. The card behind it
+ * is generated from the demo the page names, so the page carries the import of
+ * the generated module and the element, and nothing else.
+ */
+async function injectPlaygrounds(
+	code: string,
+	id: string,
+	root: string,
+	watch: (file: string) => void,
+): Promise<string | undefined> {
+	const matches = [...code.matchAll(SCENARIO_TAG)].filter((match) => match[1] === 'Playground');
+	if (matches.length === 0) return undefined;
+	const imports = new Map<string, string>();
+	const swaps = new Map<string, string>();
+	for (const match of matches) {
+		const [whole, , , family, stem] = match;
+		const demo = readFamily(root, family).find((entry) => entry.stem === stem);
+		if (!demo)
+			throw new Error(
+				`ui-playground: ${DEMOS_DIR}/${family}/ has no '${stem}.tsrx' for the playground in ${id}.`,
+			);
+		watch(demo.file);
+		const file = generatedPath(root, family, stem);
+		mkdirSync(dirname(file), { recursive: true });
+		writeFileSync(file, await playgroundSource(root, family, stem, watch));
+		const local = componentName(family, stem);
+		let specifier = relative(dirname(id.split('?', 1)[0]), file);
+		if (!specifier.startsWith('.')) specifier = `./${specifier}`;
+		imports.set(local, specifier);
+		swaps.set(whole, `<${local} />`);
+	}
+	let next = code;
+	for (const [before, after] of swaps) next = next.split(before).join(after);
+	const lines = [...imports].map(
+		([local, specifier]) => `import ${local} from ${JSON.stringify(specifier)};`,
+	);
+	// The blank line matters: MDX reads an import touching the next line as prose.
+	return `${lines.join('\n')}\n\n${next}`;
+}
+
+/** The generated module's text: chrome, demo and code panel in one island. */
+async function playgroundSource(root: string, family: string, stem: string, watch: (file: string) => void): Promise<string> {
+	const demo = readFamily(root, family).find((entry) => entry.stem === stem);
+	if (!demo)
+		throw new Error(`ui-playground: ${DEMOS_DIR}/${family}/ has no '${stem}.tsrx' to build a playground from.`);
+	watch(demo.file);
+	const analysis = await analyzeDemo(family, stem, demo.file);
+	const meta = metaFor(family);
+	const controls = playgroundControls(analysis, meta);
+	const slots = analysis.attributes.filter(
+		(attribute) =>
+			attribute.valueStart !== undefined &&
+			controls.some((one) => one.prop === attribute.name && one.kind !== 'event'),
+	);
+	return playgroundModule({
+		demo: analysis,
+		meta,
+		controls,
+		sourceLines: await highlightBlock(displaySource(analysis, slots.map((attribute) => ({ attribute }))), 'tsrx'),
+		cssLines: analysis.css === '' ? [] : await highlightBlock(analysis.css, 'css'),
+		sourceLabel: `${stem}.tsrx`,
+		cssLabel: `${family}.css`,
+		chromeCss: CHROME_CSS,
+	});
+}
+
 export function uiDemos(): Plugin {
 	let root = process.cwd();
 	return {
@@ -431,8 +508,9 @@ export function uiDemos(): Plugin {
 				const expanded = code.includes(PREFIX)
 					? expandMdxImports(code, id, root, watch)
 					: undefined;
-				const next = await injectScenarioTabs(expanded ?? code, id, root, watch);
-				const result = next ?? expanded;
+				const played = await injectPlaygrounds(expanded ?? code, id, root, watch);
+				const next = await injectScenarioTabs(played ?? expanded ?? code, id, root, watch);
+				const result = next ?? played ?? expanded;
 				return result === undefined ? undefined : { code: result, map: null };
 			},
 		},

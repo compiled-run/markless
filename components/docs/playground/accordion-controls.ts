@@ -1,3 +1,4 @@
+import { accordion } from '../ui-meta/accordion.ts';
 import type { PlaygroundConfig, PlaygroundPreset } from './types.ts';
 
 // Hand-written for the widget's proof. W3 generates this exact shape from
@@ -56,52 +57,9 @@ export const accordionPlayground: PlaygroundConfig = {
 			initial: 'false',
 		},
 	],
-	presets: [
-		{
-			name: 'basic',
-			label: 'Basic',
-			values: {
-				multiple: 'false',
-				collapsible: 'true',
-				disabled: 'false',
-				disableUntilFound: 'false',
-				value: 'ship',
-			},
-		},
-		{
-			name: 'multiple',
-			label: 'Multiple',
-			values: {
-				multiple: 'true',
-				collapsible: 'true',
-				disabled: 'false',
-				disableUntilFound: 'false',
-				value: 'ship',
-			},
-		},
-		{
-			name: 'locked',
-			label: 'Locked',
-			values: {
-				multiple: 'false',
-				collapsible: 'true',
-				disabled: 'true',
-				disableUntilFound: 'false',
-				value: 'ship',
-			},
-		},
-		{
-			name: 'find',
-			label: 'Find in page',
-			values: {
-				multiple: 'false',
-				collapsible: 'true',
-				disabled: 'false',
-				disableUntilFound: 'true',
-				value: '',
-			},
-		},
-	],
+	// The named value sets live in ui-meta/accordion.ts, where the generated
+	// playground also reads them.
+	presets: accordion.presets,
 };
 
 // The Scenario select hands its handler a preset name; the handler needs the
