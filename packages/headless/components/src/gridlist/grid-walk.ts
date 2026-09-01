@@ -24,10 +24,19 @@ export function rowAt<Row extends HTMLElement>(rows: Parts<Row>, target: Node | 
 	return null;
 }
 
+/**
+ * Whether a row is one a person may reach and act on. A row is a plain element
+ * with no native `disabled`, so nothing but this predicate stops a press or a
+ * space bar landing on one that is marked unavailable.
+ */
+export function isReachable(row: HTMLElement): boolean {
+	return !row.hasAttribute('ui-disabled');
+}
+
 /** The rows a person can reach: the walk steps over the ones marked unavailable. */
 export function reachableRows<Row extends HTMLElement>(rows: Parts<Row>): Row[] {
 	const open: Row[] = [];
-	for (const row of rows ?? []) if (!row.hasAttribute('ui-disabled')) open.push(row);
+	for (const row of rows ?? []) if (isReachable(row)) open.push(row);
 	return open;
 }
 

@@ -2,7 +2,7 @@ import { computed, element, shared, state } from '@markless/core';
 import VisuallyHidden from '../base/visually-hidden.tsrx';
 import { allOf, same, spanBetween, toggled } from '../gridlist/grid-select.ts';
 import { isSearchKey, matchAt, nextSearch } from '../gridlist/grid-typeahead.ts';
-import { ownParts, reachableRows, rowAt, rowValues } from '../gridlist/grid-walk.ts';
+import { isReachable, ownParts, reachableRows, rowAt, rowValues } from '../gridlist/grid-walk.ts';
 import { cellAt, reachableCells, rowText } from './table-walk.ts';
 import type {
 	TableItemContentBaseProps,
@@ -202,7 +202,8 @@ function TableGrid({ children, onClick, onFocusin, onKeydown, ...rest }: TableGr
 			}
 
 			const row = rowAt(rowEls, target);
-			if (row !== null) table.pick(row.getAttribute('ui-value') ?? '');
+			// A row has no native disabled, so isReachable is the only refusal a press meets.
+				if (row !== null && isReachable(row)) table.pick(row.getAttribute('ui-value') ?? '');
 			onClick?.(event);
 		}}
 		onKeydown={(event) => {
@@ -298,7 +299,7 @@ function TableGrid({ children, onClick, onFocusin, onKeydown, ...rest }: TableGr
 				table.settle([]);
 			} else if (key === ' ') {
 				// A cell is not selectable; the space bar picks the row the cell sits in.
-				table.pick(held);
+				if (isReachable(here)) table.pick(held);
 			} else if (jump && (key === 'a' || key === 'A') && isMultiple) {
 				table.anchor = order[0] ?? '';
 				table.settle(allOf(order));

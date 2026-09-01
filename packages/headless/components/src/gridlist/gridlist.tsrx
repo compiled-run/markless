@@ -3,6 +3,7 @@ import { allOf, same, spanBetween, toggled } from './grid-select.ts';
 import { isSearchKey, matchAt, nextSearch } from './grid-typeahead.ts';
 import {
 	heldBy,
+	isReachable,
 	ownParts,
 	reachableRows,
 	rowAt,
@@ -176,7 +177,10 @@ function GridListGrid({ children, onClick, onFocusin, onKeydown, ...rest }: Grid
 
 			// A press that came out of a control the row holds is that control's, not a pick.
 			const widgets = ownParts(triggerEls, row);
-			if (!heldBy(widgets, target)) gridlist.pick(row.getAttribute('ui-value') ?? '');
+			// A row has no native disabled, so isReachable is the only refusal a press meets.
+				if (!heldBy(widgets, target) && isReachable(row)) {
+					gridlist.pick(row.getAttribute('ui-value') ?? '');
+				}
 			onClick?.(event);
 		}}
 		onKeydown={(event) => {
@@ -269,7 +273,7 @@ function GridListGrid({ children, onClick, onFocusin, onKeydown, ...rest }: Grid
 				gridlist.anchor = '';
 				gridlist.settle([]);
 			} else if (key === ' ') {
-				gridlist.pick(held);
+				if (isReachable(here)) gridlist.pick(held);
 			} else if ((ctrl || meta) && (key === 'a' || key === 'A') && isMultiple) {
 				gridlist.anchor = order[0] ?? '';
 				gridlist.settle(allOf(order));
