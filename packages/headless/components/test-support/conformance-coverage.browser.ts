@@ -40,7 +40,6 @@ const ALLOWLIST: readonly string[] = [
 	'taglist',
 	'textbox',
 	'timebox',
-	'toaster',
 	'tokenbox',
 ];
 
