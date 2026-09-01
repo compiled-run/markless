@@ -28,9 +28,9 @@ import {
 	stateEntries,
 	hasPropDependentComputed,
 	sameModuleComponentMap,
-	ssrComposeStateExpression,
 	type ComponentReference,
 } from './shared.ts';
+import { ssrComposeStateExpression } from './prop-cell-seed.ts';
 
 export function ssrComponentFunctionName(componentName: string): string {
 	return `marklessRenderSsr${componentName}`;

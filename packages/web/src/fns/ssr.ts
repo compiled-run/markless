@@ -806,19 +806,26 @@ export function marklessSsrCallbackSymbol(
 		value = (value as Readonly<Record<string, unknown>> | null | undefined)?.[key];
 	return typeof value === 'string' ? value : undefined;
 }
-// An arm rebuild reads its props back out of the graph, which a CSR mount seeds
-// and a served page must carry; `keys` narrows the bag, null means a lone prop.
+// An arm rebuild and a resume-time derive read their props back out of the
+// graph, which a CSR mount seeds and a served page must carry; `keys` narrows
+// the bag, null means a lone prop. A `scalarKeys` property is one only a derive
+// reads, carried only when its value is a scalar: a structured prop is projected
+// markup or data the composer routes from its graph, so a copy ships it twice.
 export function marklessSsrSeedPropCells(
 	state: ComposeStateDraft,
 	props: Readonly<Record<string, unknown>> | undefined,
 	cells: ReadonlyArray<{
 		readonly graphNodeId: string;
 		readonly keys: ReadonlyArray<string> | null;
+		readonly scalarKeys?: ReadonlyArray<string>;
 	}>,
 ) {
 	const seeded = cells.flatMap((cell) => {
 		const name = cell.graphNodeId.slice('prop:'.length);
-		const present = (cell.keys ?? []).filter((key) => props?.[key] !== undefined);
+		const present = [
+			...(cell.keys ?? []).filter((key) => props?.[key] !== undefined),
+			...(cell.scalarKeys ?? []).filter((key) => marklessIsScalarProp(props?.[key])),
+		];
 		if (cell.keys ? present.length === 0 : props?.[name] === undefined) return [];
 		const value = cell.keys
 			? Object.fromEntries(present.map((key) => [key, props?.[key]]))
@@ -837,6 +844,13 @@ export function marklessSsrSeedPropCells(
 		...state,
 		cells: [...(state.cells ?? []), ...seeded],
 	});
+}
+
+function marklessIsScalarProp(value: unknown) {
+	return (
+		value !== undefined &&
+		(value === null || (typeof value !== 'object' && typeof value !== 'function'))
+	);
 }
 
 function marklessSsrValueKind(value: unknown) {

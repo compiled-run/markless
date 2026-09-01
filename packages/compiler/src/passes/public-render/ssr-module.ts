@@ -73,8 +73,8 @@ import {
 	staticHostLocators,
 	moduleScopeLines,
 	objectPropertyName,
-	ssrComposeStateExpression,
 } from './shared.ts';
+import { ssrComposeStateExpression } from './prop-cell-seed.ts';
 import {
 	armBoundHandleReadSource,
 	armBoundIdrefHandles,
