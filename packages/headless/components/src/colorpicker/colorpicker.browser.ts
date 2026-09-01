@@ -23,6 +23,11 @@ import Popup from './scenarios/popup.tsrx';
 import Swatches from './scenarios/swatches.tsrx';
 import TypedEntry from './scenarios/typed-entry.tsrx';
 
+// A refusal is only proved by time passing: a gesture crosses the driver, the
+// dispatch and the family's demand load before anything it moved can be read.
+const QUIET_MS = 800;
+const quiet = () => new Promise((resolve) => setTimeout(resolve, QUIET_MS));
+
 const Root = page.getByTestId('root');
 const Label = page.getByTestId('label');
 const Content = page.getByTestId('content');
@@ -363,6 +368,7 @@ test('CSR: a cancelled pointer ends a plane drag and stops tracking it', async (
 
 	const far = inArea(0.1, 0.1);
 	pointer(el(Area), 'pointermove', far.x, far.y);
+	await quiet();
 	await expect.poll(() => axes()[0].getAttribute('aria-valuenow')).toBe('50');
 });
 
@@ -379,6 +385,7 @@ test('CSR: a cancelled pointer ends a rail drag and stops tracking it', async ()
 
 	const far = alongRail(rail, 0.9);
 	pointer(rail, 'pointermove', far.x, far.y);
+	await quiet();
 	await expect.poll(() => el(HueThumb).getAttribute('aria-valuenow')).toBe('180');
 });
 

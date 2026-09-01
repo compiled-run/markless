@@ -25,6 +25,11 @@ import PressureOff from './scenarios/pressure-off.tsrx';
 import Readonly from './scenarios/readonly.tsrx';
 import Signature from './scenarios/signature.tsrx';
 
+// A refusal is only proved by time passing: a gesture crosses the driver, the
+// dispatch and the family's demand load before anything it moved can be read.
+const QUIET_MS = 800;
+const quiet = () => new Promise((resolve) => setTimeout(resolve, QUIET_MS));
+
 const Root = page.getByTestId('root');
 const Label = page.getByTestId('label');
 const Description = page.getByTestId('description');
@@ -490,6 +495,7 @@ test('a new stroke ends the redo chain', async () => {
 	await expect.poll(() => committed().length).toBe(1);
 	press('z', { meta: true, shift: true });
 	// Nothing to put back: the undone stroke was dropped when a new one landed.
+	await quiet();
 	await expect.poll(() => committed().length).toBe(1);
 });
 
@@ -584,10 +590,12 @@ test('a disabled drawing takes no stroke and is out of the tab order', async () 
 	expect(el<HTMLInputElement>(Field).disabled).toBe(true);
 
 	drawStroke();
+	await quiet();
 	await expect.poll(() => el(Root).hasAttribute('ui-drawing')).toBe(false);
 	expect(committed()).toHaveLength(0);
 
 	press('z', { meta: true });
+	await quiet();
 	expect(committed()).toHaveLength(0);
 });
 
@@ -600,8 +608,10 @@ test('a readonly drawing is shown, submitted, and cannot be changed', async () =
 	expect(el(Area).getAttribute('tabindex')).toBe('0');
 
 	drawStroke();
+	await quiet();
 	await expect.poll(() => committed().length).toBe(1);
 	press('z', { meta: true });
+	await quiet();
 	await expect.poll(() => committed().length).toBe(1);
 });
 

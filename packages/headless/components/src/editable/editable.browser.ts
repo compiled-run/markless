@@ -13,6 +13,11 @@ import OnFocus from './scenarios/on-focus.tsrx';
 import RenameForm from './scenarios/rename-form.tsrx';
 import TwoEditables from './scenarios/two-editables.tsrx';
 
+// A refusal is only proved by time passing: a gesture crosses the driver, the
+// dispatch and the family's demand load before anything it moved can be read.
+const QUIET_MS = 800;
+const quiet = () => new Promise((resolve) => setTimeout(resolve, QUIET_MS));
+
 const Root = page.getByTestId('root');
 const Label = page.getByTestId('label');
 const Trigger = page.getByTestId('trigger');
@@ -308,6 +313,7 @@ for (const mode of MODES) {
 		el(Trigger).dispatchEvent(
 			new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }),
 		);
+		await quiet();
 		await expect.poll(() => el(Root).hasAttribute('ui-editing')).toBe(false);
 		expect(el<HTMLInputElement>(Input).hidden).toBe(true);
 	});
@@ -398,6 +404,7 @@ for (const mode of MODES) {
 		trigger.focus();
 		expect(document.activeElement).toBe(trigger);
 		trigger.click();
+		await quiet();
 		await expect.poll(() => at('ro-root').hasAttribute('ui-editing')).toBe(false);
 	});
 

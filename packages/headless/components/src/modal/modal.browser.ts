@@ -14,6 +14,11 @@ import Unnamed from './scenarios/unnamed.tsrx';
 import WithOnChange from './scenarios/with-onchange.tsrx';
 import WithoutOnChange from './scenarios/without-onchange.tsrx';
 
+// A refusal is only proved by time passing: a gesture crosses the driver, the
+// dispatch and the family's demand load before anything it moved can be read.
+const QUIET_MS = 800;
+const quiet = () => new Promise((resolve) => setTimeout(resolve, QUIET_MS));
+
 const Background = page.getByTestId('background');
 const Root = page.getByTestId('root');
 const Trigger = page.getByTestId('trigger');
@@ -393,6 +398,7 @@ test('CSR: a click on the close button while the dialog is closed changes nothin
 	// The surface is hidden rather than detached, so a closed dialog's close button
 	// is still reachable by script and must not report a second close.
 	el(FirstClose).click();
+	await quiet();
 	await expect.poll(() => el(Calls).textContent).toBe('0');
 	expect(el(FirstBackdrop).hasAttribute('hidden')).toBe(true);
 });
@@ -406,12 +412,14 @@ test('CSR: an alert announces as alertdialog and refuses an outside press', asyn
 	await expect.poll(() => document.activeElement).toBe(el(Close));
 
 	press(el<HTMLElement>(Backdrop));
+	await quiet();
 	expect(el(Backdrop).hasAttribute('hidden')).toBe(false);
 	expectShowing(el<HTMLElement>(Backdrop), el<HTMLElement>(Content));
 	expectBackgroundOutOfReach(el(Background));
 	expect(document.body.style.overflow).toBe('hidden');
 
 	el(Background).dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+	await quiet();
 	expect(el(Backdrop).hasAttribute('hidden')).toBe(false);
 
 	await userEvent.keyboard('{Escape}');
@@ -542,12 +550,14 @@ test('CSR: a disabled trigger does not open the dialog and a disabled close does
 	// `disabled` is not a family prop; it rides {...rest} onto the button.
 	expect(el<HTMLButtonElement>(StuckTrigger).disabled).toBe(true);
 	el(StuckTrigger).click();
+	await quiet();
 	expect(el(StuckBackdrop).hasAttribute('hidden')).toBe(true);
 
 	el(OpenTrigger).click();
 	await expect.poll(() => el(OpenBackdrop).hasAttribute('hidden')).toBe(false);
 	expect(el<HTMLButtonElement>(OpenClose).disabled).toBe(true);
 	el(OpenClose).click();
+	await quiet();
 	expect(el(OpenBackdrop).hasAttribute('hidden')).toBe(false);
 
 	// Escape is the way out of a dialog whose close button is disabled.

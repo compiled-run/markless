@@ -4,6 +4,11 @@ import { expect, test } from 'vitest';
 import Nested from './scenarios/nested.tsrx';
 import Unavailable from './scenarios/unavailable.tsrx';
 
+// A refusal is only proved by time passing: a gesture crosses the driver, the
+// dispatch and the family's demand load before anything it moved can be read.
+const QUIET_MS = 800;
+const quiet = () => new Promise((resolve) => setTimeout(resolve, QUIET_MS));
+
 const Root = page.getByTestId('root');
 const SrcItem = page.getByTestId('src-item');
 const SrcTrigger = page.getByTestId('src-itemtrigger');
@@ -121,13 +126,16 @@ test('CSR: a tree nobody may change never opens or closes from the keyboard', as
 	// Every path the root's keyboard has into a node goes through the node's own
 	// trigger, and a disabled native button refuses a synthetic press.
 	await userEvent.keyboard('{ArrowRight}');
+	await quiet();
 	await expect.poll(() => el(SrcItem).hasAttribute('aria-expanded')).toBe(false);
 	await userEvent.keyboard('{Enter}');
+	await quiet();
 	await expect.poll(() => el(SrcItem).hasAttribute('aria-expanded')).toBe(false);
 	expect(el(SrcTrigger).hasAttribute('disabled')).toBe(true);
 
 	el(DocsItem).focus();
 	await userEvent.keyboard('{ArrowLeft}');
+	await quiet();
 	await expect.poll(() => el(DocsItem).getAttribute('aria-expanded')).toBe('true');
 	expect(el(DocsContent).hasAttribute('hidden')).toBe(false);
 });

@@ -9,6 +9,11 @@ import Curve from './scenarios/curve.tsrx';
 import Disabled from './scenarios/disabled.tsrx';
 import Form from './scenarios/form.tsrx';
 
+// A refusal is only proved by time passing: a gesture crosses the driver, the
+// dispatch and the family's demand load before anything it moved can be read.
+const QUIET_MS = 800;
+const quiet = () => new Promise((resolve) => setTimeout(resolve, QUIET_MS));
+
 const Root = page.getByTestId('root');
 const Label = page.getByTestId('label');
 const Description = page.getByTestId('description');
@@ -385,6 +390,7 @@ for (const mode of MODES) {
 
 		const far = inArea(0.9, 0.1);
 		pointer(area, 'pointermove', far.x, far.y);
+		await quiet();
 		await expect.poll(() => thumb.getAttribute('aria-valuetext')).toBe('X 0.5, Y 0.5');
 	});
 

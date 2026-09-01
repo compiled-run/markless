@@ -433,6 +433,7 @@ test('CSR: a typed group separator survives, and never reaches the form', async 
 	await expect.poll(() => el<HTMLInputElement>(Field).value).toBe('1234');
 
 	await userEvent.keyboard('{Enter}');
+	await rest(QUIET_MS);
 	await expect.poll(() => shown(Input)).toBe('1,234');
 });
 

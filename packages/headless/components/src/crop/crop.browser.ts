@@ -27,6 +27,11 @@ import Form from './scenarios/form.tsrx';
 import Picture from './scenarios/image.tsrx';
 import MultiEmbed from './scenarios/multi-embed.tsrx';
 
+// A refusal is only proved by time passing: a gesture crosses the driver, the
+// dispatch and the family's demand load before anything it moved can be read.
+const QUIET_MS = 800;
+const quiet = () => new Promise((resolve) => setTimeout(resolve, QUIET_MS));
+
 const Root = page.getByTestId('root');
 const Label = page.getByTestId('label');
 const Description = page.getByTestId('description');
@@ -558,6 +563,7 @@ test('a key the family does not own is left to the page', async () => {
 	const before = shown();
 	press(selection, 'Enter');
 	press(selection, 'a');
+	await quiet();
 	await expect.poll(() => shown()).toEqual(before);
 });
 
@@ -569,6 +575,7 @@ test('the arrows on a handle move that handle edge alone', async () => {
 	await expect.poll(() => shown()).toEqual({ x: 40, y: 20, width: 201, height: 160 });
 	// An arrow across a handle's own axis is not its business.
 	press(handle('handle-inline-end'), 'ArrowDown');
+	await quiet();
 	await expect.poll(() => shown()).toEqual({ x: 40, y: 20, width: 201, height: 160 });
 });
 
@@ -700,6 +707,7 @@ test('a disabled crop is out of the tab order and takes no gesture at all', asyn
 	press(selection, 'ArrowRight');
 	drag(handle('handle-inline-end'), 40, 0);
 	press(handle('handle-inline-end'), 'ArrowRight');
+	await quiet();
 	await expect.poll(() => shown()).toEqual(START);
 });
 

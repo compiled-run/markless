@@ -11,6 +11,11 @@ import Untitled from './scenarios/untitled.tsrx';
 import Vertical from './scenarios/vertical.tsrx';
 import WithOnChange from './scenarios/with-onchange.tsrx';
 
+// A refusal is only proved by time passing: a gesture crosses the driver, the
+// dispatch and the family's demand load before anything it moved can be read.
+const QUIET_MS = 800;
+const quiet = () => new Promise((resolve) => setTimeout(resolve, QUIET_MS));
+
 const Root = page.getByTestId('root');
 const Title = page.getByTestId('title');
 const ScrollArea = page.getByTestId('scrollarea');
@@ -129,6 +134,7 @@ for (const mode of MODES) {
 		await expect.poll(activeValue).toBe('lima');
 
 		await userEvent.click(el(ForwardTrigger));
+		await quiet();
 		await expect.poll(activeValue).toBe('lima');
 	});
 
@@ -200,6 +206,7 @@ for (const mode of MODES) {
 
 		// Already at the end: nothing changes, so nothing is announced.
 		await userEvent.click(el(ForwardTrigger));
+		await quiet();
 		await expect.poll(() => el(Calls).textContent).toBe('1');
 	});
 }
@@ -240,6 +247,7 @@ test('arrowing through the pickers shows each slide, and the ends stop', async (
 	await expect.poll(activeValue).toBe('lima');
 
 	await userEvent.keyboard('{ArrowRight}');
+	await quiet();
 	await expect.poll(activeValue).toBe('lima');
 
 	await userEvent.keyboard('{Home}');

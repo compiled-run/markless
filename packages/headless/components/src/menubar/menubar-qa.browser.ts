@@ -3,6 +3,11 @@ import { page, userEvent } from 'vite-plus/test/browser';
 import { expect, test } from 'vitest';
 import UnavailableItem from './scenarios/unavailable-item.tsrx';
 
+// A refusal is only proved by time passing: a gesture crosses the driver, the
+// dispatch and the family's demand load before anything it moved can be read.
+const QUIET_MS = 800;
+const quiet = () => new Promise((resolve) => setTimeout(resolve, QUIET_MS));
+
 const BarFile = page.getByTestId('bar-file');
 const BarEdit = page.getByTestId('bar-edit');
 const BarView = page.getByTestId('bar-view');
@@ -34,13 +39,17 @@ test('CSR: an item nobody may open refuses Enter, Space and a press', async () =
 	el(BarEdit).focus();
 
 	await userEvent.keyboard('{Enter}');
+	await quiet();
 	await expect.poll(() => el(BarEdit).getAttribute('aria-expanded')).toBe('false');
 	await userEvent.keyboard(' ');
+	await quiet();
 	await expect.poll(() => el(BarEdit).getAttribute('aria-expanded')).toBe('false');
 	await userEvent.keyboard('{ArrowDown}');
+	await quiet();
 	await expect.poll(() => el(BarEdit).getAttribute('aria-expanded')).toBe('false');
 
 	el(BarEdit).click();
+	await quiet();
 	await expect.poll(() => el(BarEdit).getAttribute('aria-expanded')).toBe('false');
 });
 

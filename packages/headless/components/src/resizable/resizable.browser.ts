@@ -23,6 +23,11 @@ import TwoGroups from './scenarios/two-groups.tsrx';
 import Vertical from './scenarios/vertical.tsrx';
 import WithOnChange from './scenarios/with-onchange.tsrx';
 
+// A refusal is only proved by time passing: a gesture crosses the driver, the
+// dispatch and the family's demand load before anything it moved can be read.
+const QUIET_MS = 800;
+const quiet = () => new Promise((resolve) => setTimeout(resolve, QUIET_MS));
+
 const Root = page.getByTestId('root');
 const Nav = page.getByTestId('nav');
 const Main = page.getByTestId('main');
@@ -283,6 +288,7 @@ test('CSR: an arrow moves the divider by one step in either direction', async ()
 	// The arrows of the other axis are not this divider's keys.
 	await userEvent.keyboard('{ArrowUp}');
 	await userEvent.keyboard('{ArrowDown}');
+	await quiet();
 	await expect.poll(() => el(Thumb).getAttribute('aria-valuenow')).toBe('30');
 });
 
@@ -304,12 +310,14 @@ test('CSR: Home and End reach the limits the divider declares', async () => {
 	expect(el(Main).getAttribute('ui-size')).toBe('20');
 
 	await userEvent.keyboard('{ArrowRight}');
+	await quiet();
 	await expect.poll(() => el(Thumb).getAttribute('aria-valuenow')).toBe('80');
 
 	await userEvent.keyboard('{Home}');
 	await expect.poll(() => el(Thumb).getAttribute('aria-valuenow')).toBe('10');
 
 	await userEvent.keyboard('{ArrowLeft}');
+	await quiet();
 	await expect.poll(() => el(Thumb).getAttribute('aria-valuenow')).toBe('10');
 });
 
@@ -324,6 +332,7 @@ test('CSR: a stacked group is moved by the up and down arrows', async () => {
 	await expect.poll(() => el(Thumb).getAttribute('aria-valuenow')).toBe('60');
 
 	await userEvent.keyboard('{ArrowRight}');
+	await quiet();
 	await expect.poll(() => el(Thumb).getAttribute('aria-valuenow')).toBe('60');
 });
 
@@ -478,6 +487,7 @@ test('CSR: a stacked group drags along its own axis', async () => {
 	// Travel across the axis is not this divider's business.
 	const grown = el(Preview).getAttribute('ui-size');
 	dragBy(el(Thumb), 40, 0);
+	await quiet();
 	await expect.poll(() => el(Preview).getAttribute('ui-size')).toBe(grown);
 });
 

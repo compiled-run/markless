@@ -29,6 +29,11 @@ import Unnamed from './scenarios/unnamed.tsrx';
 import WithOnChange from './scenarios/with-onchange.tsrx';
 import WithoutOnChange from './scenarios/without-onchange.tsrx';
 
+// A refusal is only proved by time passing: a gesture crosses the driver, the
+// dispatch and the family's demand load before anything it moved can be read.
+const QUIET_MS = 800;
+const quiet = () => new Promise((resolve) => setTimeout(resolve, QUIET_MS));
+
 const Background = page.getByTestId('background');
 const Root = page.getByTestId('root');
 const Trigger = page.getByTestId('trigger');
@@ -704,6 +709,7 @@ test('CSR: the arrow keys along the axis step the rest positions', async () => {
 
 	// The walk stops at the end rather than cycling round to the top.
 	press(content, 'ArrowDown');
+	await quiet();
 	await expect.poll(() => el(Calls).textContent).toBe('2');
 	expect(offset(content)).toBe(0.5);
 });
@@ -728,7 +734,7 @@ test('CSR: a drawer with one rest position ignores the arrows', async () => {
 
 	press(content, 'ArrowUp');
 	press(content, 'ArrowDown');
-	await tick();
+	await quiet();
 
 	expect(offset(content)).toBe(0);
 	expect(el(Backdrop).hasAttribute('hidden')).toBe(false);
