@@ -521,17 +521,14 @@ test('SSR: the selection is in the served HTML, and the first click after resume
 	expect(el(OverviewTrigger).getAttribute('aria-selected')).toBe('false');
 });
 
-// PINNED: after resume a `tabs.content` never refreshes, so the panels keep what the
-// server served while the triggers in the same widget move. Measured both ways round -
-// rooting the comparison on a part instance breaks CSR too, so it is not the fix.
-test.fails('SSR: clicking a tab moves the panels', async () => {
+// A panel compares the shared value against its own static prop, which only
+// refreshes after resume because the served payload carries that prop's cell.
+test('SSR: clicking a tab moves the panels', async () => {
 	await renderSSR(Basic);
 	await expectClickMovesThePanels();
 });
 
-// The same pin, reached through a keyed `@for`: looping the parts neither fixes
-// nor worsens it.
-test.fails('SSR: clicking a looped tab moves the looped panels', async () => {
+test('SSR: clicking a looped tab moves the looped panels', async () => {
 	await renderSSR(FromData);
 	(rowTriggers()[1] as HTMLElement).click();
 	await expect.poll(shownRow).toBe(1);
@@ -560,10 +557,7 @@ test('SSR: clicking a tab in the docs code panel moves the tab', async () => {
 	expect(panelTriggers()[0]!.getAttribute('aria-selected')).toBe('false');
 });
 
-// PINNED: the panel half does not. This is pin (1) above reached through the docs
-// shape, not a defect of the repeat - `panes-static-second.tsrx` below spells the
-// same failure with the panels written out by hand.
-test.fails('SSR: clicking a tab in the docs code panel shows that tab panel', async () => {
+test('SSR: clicking a tab in the docs code panel shows that tab panel', async () => {
 	await renderSSR(CodePanel);
 	panelTriggers()[1]!.click();
 	await expect.poll(() => panelPanes()[1]!.hasAttribute('hidden')).toBe(false);
@@ -580,11 +574,8 @@ test('CSR: a click back onto the first tab shows the first panel', async () => {
 	expect(staticPanes().map((p) => p.hasAttribute('hidden'))).toEqual([false, true, true]);
 });
 
-// PINNED, and the sharpest reading of pin (1): after resume every `tabs.content` in
-// the widget answers "not showing", whatever the root's value is. The panel that was
-// open does close - so the cell is refreshing - but no panel ever opens, and no
-// repeat is involved. The measured after-state here is all three hidden.
-test.fails('SSR: a click back onto the first tab shows the first panel', async () => {
+// No repeat involved: the panels are written out by hand, each with its own prop.
+test('SSR: a click back onto the first tab shows the first panel', async () => {
 	await renderSSR(PanesStaticSecond);
 	staticTriggers()[0]!.click();
 	await expect.poll(() => staticPanes()[0]!.hasAttribute('hidden')).toBe(false);
