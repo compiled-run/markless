@@ -31,6 +31,19 @@ export type ControlOverride = {
 	readonly label?: string;
 };
 
+/**
+ * A named set of control values: the playground's "Scenario" select. Picking one
+ * writes every prop it lists, so a preset is a real edit of the same controls
+ * rather than a second source of truth. Values are written the way a control
+ * writes them - `'true'`, `'ship'` - and a prop a preset omits keeps its opening
+ * value.
+ */
+export type FamilyPreset = {
+	readonly name: string;
+	readonly label: string;
+	readonly values: Readonly<Record<string, string>>;
+};
+
 /** One real-world example the page carries. The id is the demo file's stem. */
 export type ExampleEntry = {
 	/** `faq` names `components/demos/ui/<family>/faq.tsrx`. */
@@ -48,6 +61,8 @@ export type FamilyMeta = {
 	/** The props "Show all" reveals, in order, after the quick row. */
 	readonly showAll: readonly PropRef[];
 	readonly overrides?: readonly ControlOverride[];
+	/** The named value sets the playground's Scenario select offers, first one first. */
+	readonly presets: readonly FamilyPreset[];
 	readonly keyboard: readonly KeyboardShortcut[];
 	readonly examples: readonly ExampleEntry[];
 };

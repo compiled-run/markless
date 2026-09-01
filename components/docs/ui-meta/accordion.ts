@@ -14,6 +14,52 @@ export const accordion: FamilyMeta = {
 		{ part: 'root', prop: 'value' },
 		{ part: 'root', prop: 'onChange' },
 	],
+	presets: [
+		{
+			name: 'basic',
+			label: 'Basic',
+			values: {
+				multiple: 'false',
+				collapsible: 'true',
+				disabled: 'false',
+				disableUntilFound: 'false',
+				value: 'ship',
+			},
+		},
+		{
+			name: 'multiple',
+			label: 'Multiple',
+			values: {
+				multiple: 'true',
+				collapsible: 'true',
+				disabled: 'false',
+				disableUntilFound: 'false',
+				value: 'ship',
+			},
+		},
+		{
+			name: 'locked',
+			label: 'Locked',
+			values: {
+				multiple: 'false',
+				collapsible: 'true',
+				disabled: 'true',
+				disableUntilFound: 'false',
+				value: 'ship',
+			},
+		},
+		{
+			name: 'find',
+			label: 'Find in page',
+			values: {
+				multiple: 'false',
+				collapsible: 'true',
+				disabled: 'false',
+				disableUntilFound: 'true',
+				value: '',
+			},
+		},
+	],
 	keyboard: [
 		{ caps: [keys.down], does: 'Focus the next trigger, wrapping round to the first.' },
 		{ caps: [keys.up], does: 'Focus the previous trigger, wrapping round to the last.' },
