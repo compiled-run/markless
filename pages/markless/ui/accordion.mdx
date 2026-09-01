@@ -1,223 +1,98 @@
-import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Subtitle from '../../../components/docs/subtitle.tsrx';
+import AccordionPlayground from '../../../components/docs/playground/accordion-playground.tsrx';
+import CodePanel from '../../../components/docs/code-panel.tsrx';
+import AnatomyTable from '../../../components/docs/anatomy-table.tsrx';
 import KeyboardTable from '../../../components/docs/keyboard-table.tsrx';
 import ApiTable from '../../../components/docs/api-table.tsrx';
-import { Basic, Value, Multiple, Locked, Disabled, Find } from 'ui-demos:accordion';
+import { Multiple, Disabled, Value, Find, Locked, Faq, Settings } from 'ui-demos:accordion';
 
-# accordion
+# Accordion
 
-<ThemeToggle />
+<Subtitle text="Vertically stacked sections that expand to reveal content." />
 
-<Basic shows="Three questions. Opening one closes the last." />
+<AccordionPlayground />
 
-Questions on a help page, the parts of a long form: an accordion shows one section at a time and
-keeps the rest folded away. Each section is named by its own `value`, so the root's `value` is
-simply the name of the one showing, and reordering sections changes nothing.
+<CodePanel scenario="accordion/basic" />
 
-## Structure
+## Examples
 
-```tsrx
-import { accordion } from '@markless/ui';
+<Multiple />
 
-export default function Faq() @{
-	<accordion.root class="accordion" value="ship">
-		<accordion.item class="section" value="ship">
-			<accordion.itemlabel class="heading">
-				<accordion.itemtrigger class="trigger">When does my order ship?</accordion.itemtrigger>
-			</accordion.itemlabel>
-			<accordion.itemcontent class="panel">Orders leave within two working days.</accordion.itemcontent>
-		</accordion.item>
-		<accordion.item class="section" value="returns">
-			<accordion.itemlabel class="heading">
-				<accordion.itemtrigger class="trigger">How do I return something?</accordion.itemtrigger>
-			</accordion.itemlabel>
-			<accordion.itemcontent class="panel">Start a return from your orders page.</accordion.itemcontent>
-		</accordion.item>
-		<accordion.item class="section" value="overseas">
-			<accordion.itemlabel class="heading">
-				<accordion.itemtrigger class="trigger">Do you ship overseas?</accordion.itemtrigger>
-			</accordion.itemlabel>
-			<accordion.itemcontent class="panel">Everywhere but Antarctica, which keeps losing our parcels.</accordion.itemcontent>
-		</accordion.item>
+With `multiple`, sections open on their own and `value` becomes the list of open ones. Opening the
+third here leaves the first two as they are.
 
-		<style>
-			.accordion {
-				display: grid;
-				gap: 0.5em;
-				width: min(32rem, 100%);
-			}
+<CodePanel scenario="accordion/multiple" />
 
-			.section {
-				border: 2px solid var(--code-edge);
-				border-radius: 6px;
-				background: var(--paper);
-				overflow: clip;
-			}
+<Disabled />
 
-			.section[ui-open] {
-				border-color: var(--pink);
-			}
+A disabled item's trigger is a disabled `<button>`, so the arrow-key walk steps straight past it and
+nothing has to remember to skip it.
 
-			.heading {
-				margin: 0;
-				font-size: var(--step-0);
-			}
+<CodePanel scenario="accordion/disabled" />
 
-			.trigger {
-				display: flex;
-				gap: 0.6em;
-				align-items: center;
-				justify-content: space-between;
-				width: 100%;
-				padding: 0.6em 0.8em;
-				border: 0;
-				background: transparent;
-				color: var(--ink);
-				font: inherit;
-				font-weight: 700;
-				text-align: left;
-				cursor: pointer;
-			}
+<Value />
 
-			.trigger::after {
-				content: '▾';
-				transition: transform 140ms ease;
-			}
+`value` on the root names the section that is open, matched against each item's own `value`. Name a
+section and the accordion starts with that one showing.
 
-			.trigger[ui-open]::after {
-				transform: rotate(180deg);
-			}
+<CodePanel scenario="accordion/value" />
 
-			.trigger:hover {
-				background: var(--tinted-quiet);
-			}
+<Find />
 
-			.trigger:disabled {
-				cursor: not-allowed;
-				opacity: 0.55;
-			}
+A closed panel is `hidden="until-found"`, so searching this page for Antarctica opens the section
+holding it. Setting `disableUntilFound` on the root hides closed panels outright instead.
 
-			.panel {
-				padding: 0 0.8em 0.7em;
-				font-size: var(--step--1);
-			}
-		</style>
-	</accordion.root>
-}
-```
+<CodePanel scenario="accordion/find" />
 
-That is the whole file behind the demo above, styling included. The open look keys off `ui-open`:
-[how styling works](/markless/ui/styling).
+<Locked />
 
-## Props
+`collapsible={false}` keeps one section open: pressing the trigger of the open section does nothing,
+and only opening the other one closes it.
 
-- `value` on the root names the section showing. Omit it and everything starts closed.
-- `multiple` lets sections open on their own, and `value` becomes the list of names.
-- `collapsible={false}` stops the open section being closed, so one always shows.
-- `value` on an item is that section's name. It is the one required prop.
-- `disabled` locks a single item, or the whole accordion from the root.
+<CodePanel scenario="accordion/locked" />
+
+## Real-world examples
+
+<Faq />
+
+A help centre block. It opens with one answer showing so the section is never a row of empty
+headings, and `multiple` lets a reader keep two answers side by side while comparing them.
+
+<CodePanel scenario="accordion/faq" />
+
+<Settings />
+
+Three groups of settings, one open at a time. Each trigger carries the group name and a line saying
+what is inside, and both sit in the one button, so the group is a single stop for the keyboard.
+
+<CodePanel scenario="accordion/settings" />
+
+## Anatomy
+
+<AnatomyTable family="accordion" />
 
 ## Keyboard
 
-Focus lives on the triggers, and the walk steps over any trigger that is disabled.
-
-<KeyboardTable rows={[
-	{ keys: ['Down'], does: 'Focus the next trigger, wrapping round to the first.' },
-	{ keys: ['Up'], does: 'Focus the previous trigger, wrapping round to the last.' },
-	{ keys: ['Home'], does: 'Focus the first trigger.' },
-	{ keys: ['End'], does: 'Focus the last trigger.' },
-	{ keys: ['Enter', 'Space'], join: 'or', does: 'Open or close the focused section.' }
-]} />
-
-## Managing which section is open
-
-`onChange` hands you the new value each time a person opens or closes a section.
-
-<Value shows="The value names the second section, so the second one is open." />
-
-```tsrx
-<accordion.root value="returns" onChange={(next) => console.log(next)}>
-```
-
-## Several open at once
-
-<Multiple shows="Two panels open together. Opening the third leaves both alone." />
-
-```tsrx
-<accordion.root multiple value={['ship', 'returns']}>
-```
-
-## Always one open
-
-<Locked shows="Press the open trigger and it stays open. Only the other one closes it." />
-
-```tsrx
-<accordion.root value="ship" collapsible={false}>
-```
-
-## A section that will not open
-
-The trigger is disabled natively, so nothing has to remember to skip it.
-
-<Disabled shows="The middle trigger is dead. Arrow keys jump straight past it." />
-
-```tsrx
-<accordion.item value="trade" disabled>
-```
-
-## Find in page
-
-A closed panel is `hidden="until-found"`, so a browser search opens the section it lands in. A
-disabled section's panel is hidden outright, and `disableUntilFound` does that to every closed
-panel.
-
-<Find shows="Search the page for Antarctica. The closed section opens on the match." />
-
-```tsrx
-<accordion.root disableUntilFound>
-```
+<KeyboardTable family="accordion" />
 
 ## API reference
 
-Every prop is optional unless its row says otherwise. State arrives as `ui-*` attributes, which
-[styling](/markless/ui/styling) explains once for every family.
-
 ### `accordion.root`
 
-<ApiTable rows={[
-	{ name: 'value', type: 'string | readonly string[]', does: 'Which section is showing. With `multiple` it is the list of sections showing. Omit it and everything starts closed.' },
-	{ name: 'multiple', type: 'boolean', does: 'Several sections may show at once. Without it, opening one closes the rest.' },
-	{ name: 'collapsible', type: 'boolean', does: 'Whether the section showing may be closed again, leaving nothing open. On by default.' },
-	{ name: 'disabled', type: 'boolean', does: 'Nothing opens or closes while this is set.' },
-	{ name: 'disableUntilFound', type: 'boolean', does: 'Closed panels are hidden outright, so find-in-page cannot reach the text inside them.' },
-	{ name: 'onChange', type: '(value: string | readonly string[]) => void', does: 'Called with the new value when a person opens or closes a section.' }
-]} />
-
-Renders a `<div>`, which everything but `onChange` passes through to. Writes `ui-multiple` and
-`ui-disabled`.
+<ApiTable family="accordion" part="root" />
 
 ### `accordion.item`
 
-<ApiTable rows={[
-	{ name: 'value', type: 'string', required: true, does: "Required. This section's own name, and what the root's `value` matches against." },
-	{ name: 'disabled', type: 'boolean', does: 'This one section opens and closes for nobody.' }
-]} />
-
-Renders a `<div>`, which everything else passes through to. Writes `ui-value`, `ui-open`,
-`ui-closed` and `ui-disabled`.
+<ApiTable family="accordion" part="item" />
 
 ### `accordion.itemlabel`
 
-The heading naming the panel. No props of its own; renders an `<h3>`, and `accordion.itemcontent`
-points its `aria-labelledby` here.
+<ApiTable family="accordion" part="itemlabel" />
 
 ### `accordion.itemtrigger`
 
-The button that opens and closes the section. No props of its own; renders a `<button>`, and your
-own `onClick` runs after the section has opened or closed. Writes `ui-open`, `ui-closed`,
-`aria-expanded`, `aria-controls`, and the native `disabled`.
+<ApiTable family="accordion" part="itemtrigger" />
 
 ### `accordion.itemcontent`
 
-The panel. No props of its own; renders a `<div>` with `role="region"`, and your own
-`onBeforematch` runs after find-in-page has opened the section. Writes `ui-open`, `ui-closed`,
-`aria-labelledby` and `hidden`.
+<ApiTable family="accordion" part="itemcontent" />
