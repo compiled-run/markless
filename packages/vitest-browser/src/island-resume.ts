@@ -10,6 +10,10 @@ import { loadMdxSymbol, type MdxSymbolLoader } from '../../router/src/vite/runti
 
 export type { MdxSymbolLoader };
 
+type MarklessRosterResumeHost = {
+	__marklessRosterResume?: () => Promise<typeof import('@markless/web/fns/roster-resume')>;
+};
+
 type IslandResumeInput = {
 	readonly root: Element & { __asyncResumeRuntimeStarted?: boolean };
 	readonly event: Event | 0;
@@ -24,6 +28,12 @@ type IslandResumeInput = {
 export function createIslandResumeContainerEvent(
 	loaders: ReadonlyArray<MdxSymbolLoader>,
 ): (input: IslandResumeInput) => Promise<void> {
+	// The composed page's resume half never loads an island's own source module,
+	// which is where the bundler installs this loader (emitRosterResumeLoaderInstall
+	// in packages/bundler/src/source-module.ts, same specifier). Without it a card
+	// that derives its place from a roster keeps its rendered one forever.
+	(globalThis as MarklessRosterResumeHost).__marklessRosterResume ??= () =>
+		import('@markless/web/fns/roster-resume');
 	// loadMdxSymbol answers `unknown` because the router's own callers are the
 	// plain JS it emits; the resume input wants the symbol shape it returns.
 	const loadSymbol = ((symbolId: string) =>

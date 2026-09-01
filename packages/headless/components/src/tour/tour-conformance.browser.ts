@@ -26,21 +26,4 @@ runMultiEmbedConformance({
 	// No disabled entry: `disabled` is a root prop that freezes the whole walk,
 	// so expressing it takes a second tour widget per embed rather than a locked
 	// item inside this one.
-	//
-	// The step moves in the clicked embed and only there; what never lands is the
-	// card's `ui-current`. A card derives it from `tour.itemEls.indexOf(mine)`,
-	// which at resume is answered by the roster reader in
-	// packages/web/src/fns/roster-resume.ts — and that module is reached through
-	// the `globalThis.__marklessRosterResume` loader the bundler writes into a
-	// page's own resume module. The composed island resume module this battery
-	// mounts never emits that line, so no reader is built and the card keeps its
-	// rendered place forever. Witnessed directly: the reader's body never runs on
-	// a two-island page. One island of this same scenario advances and shows the
-	// incoming card, so this is the composed page's resume module, not the family.
-	exemptions: [
-		{
-			check: 'interaction-isolation',
-			reason: 'composed island resume module emits no roster loader, so no card re-derives its place',
-		},
-	],
 });
