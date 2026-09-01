@@ -14,8 +14,15 @@ import {
 	initialValue,
 	type ControlDescriptor,
 } from '../components/docs/api-derive/control-kind.ts';
+import {
+	attributeText,
+	listText,
+	pickValue,
+	valueText,
+	type ControlValue,
+} from '../components/docs/playground/slot-text.ts';
 import type { FamilyMeta, FamilyPreset, PropRef } from '../components/docs/ui-meta/index.ts';
-import type { CodeLine, CodeToken } from './ui-demos.ts';
+import type { CodeLine, CodeRun, CodeToken } from './ui-demos.ts';
 
 /**
  * The generated module is written to disk rather than served from a virtual id:
@@ -97,7 +104,7 @@ export type RootAttribute = {
 	readonly valueStart?: number;
 	readonly valueEnd?: number;
 	/** The value read back, when it is a literal the build can see. */
-	readonly literal?: string | number | boolean;
+	readonly literal?: ControlValue | number;
 	/** The value expression verbatim, for an authored handler the wrapper calls. */
 	readonly expression?: string;
 };
@@ -124,8 +131,14 @@ export type DemoAnalysis = {
 	readonly itemValues: readonly string[];
 };
 
-function literalOf(node: AstNode | null | undefined): string | number | boolean | undefined {
+function literalOf(node: AstNode | null | undefined): ControlValue | number | undefined {
 	if (!node) return undefined;
+	if (node.type === 'ArrayExpression') {
+		const items = ((node as { elements?: (AstNode | null)[] }).elements ?? []).map((item) =>
+			literalOf(item),
+		);
+		return items.every((item): item is string => typeof item === 'string') ? items : undefined;
+	}
 	if (node.type !== 'Literal') return undefined;
 	const value = (node as { value?: unknown }).value;
 	if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean')
@@ -265,19 +278,25 @@ export type PlaygroundControl = {
 	readonly part: string;
 	readonly prop: string;
 	readonly kind: 'toggle' | 'select' | 'textbox' | 'event';
-	/** The prop's type text, shown in the control's info tip. */
+	/** The prop's type text, shown in the control's info tip and typing the cell. */
 	readonly type: string;
 	readonly options: readonly string[];
 	/** `cMultiple` — the cell the demo's prop reads. */
 	readonly cell: string;
-	/** `tMultiple` — the readout cell. Only a text slot tracks a cell live. */
+	/** `tMultiple` — what the code panel prints for the prop. Only a text slot tracks a cell live. */
 	readonly text: string;
-	/** How the cell is written, which decides the readout's shape. */
+	/** `sValue` — the select trigger's label, `ship, returns` for a list. */
+	readonly shown: string;
+	/** `pValue` — the value the select holding the control is given. */
+	readonly pick: string;
+	/** How the cell is written. */
 	readonly holds: 'boolean' | 'string';
-	/** The cell's opening value as source text. */
-	readonly initial: string;
-	/** The readout's opening value as source text. */
-	readonly initialText: string;
+	/** The type admits a list of strings, so `multiple` turns the value into one. */
+	readonly list: boolean;
+	/** The cell's opening value. */
+	readonly seen: ControlValue;
+	/** The family's own default, which the code panel leaves unwritten. */
+	readonly fallback: boolean | string;
 	/** `onChange` only: the callback's parameter type. */
 	readonly parameter?: string;
 };
@@ -334,14 +353,17 @@ function manifestProp(family: string, part: string, prop: string): ManifestProp 
 	return found;
 }
 
-function sourceLiteral(holds: 'boolean' | 'string', value: string | number | boolean | undefined): string {
-	if (holds === 'boolean') return value === true || value === 'true' ? 'true' : 'false';
-	return quote(value === undefined ? '' : String(value));
+function controlValue(holds: 'boolean' | 'string', value: ControlValue | number | undefined): ControlValue {
+	if (holds === 'boolean') return value === true || value === 'true';
+	if (value === undefined) return '';
+	if (typeof value === 'boolean') return String(value);
+	return typeof value === 'number' ? String(value) : value;
 }
 
-function readoutLiteral(holds: 'boolean' | 'string', value: string | number | boolean | undefined): string {
-	if (holds === 'boolean') return quote(value === true || value === 'true' ? 'true' : 'false');
-	return quote(value === undefined ? '' : String(value));
+function sourceLiteral(value: ControlValue): string {
+	if (typeof value === 'boolean') return value ? 'true' : 'false';
+	if (typeof value === 'string') return quote(value);
+	return `[${value.map(quote).join(', ')}]`;
 }
 
 function controlOf(
@@ -352,6 +374,12 @@ function controlOf(
 	const prop = manifestProp(demo.family, ref.part, ref.prop);
 	const descriptor: ControlDescriptor = controlFor(prop.type);
 	const authored = demo.attributes.find((attribute) => attribute.name === ref.prop);
+	const cells = {
+		cell: `c${identifier(ref.prop)}`,
+		text: `t${identifier(ref.prop)}`,
+		shown: `s${identifier(ref.prop)}`,
+		pick: `p${identifier(ref.prop)}`,
+	};
 
 	if (descriptor.kind === 'event') {
 		// A callback is edited as an on/off event log, so the cell it writes is the
@@ -362,17 +390,19 @@ function controlOf(
 			kind: 'event',
 			type: descriptor.type,
 			options: [],
+			...cells,
 			cell: 'logging',
-			text: 'tLogging',
 			holds: 'boolean',
-			initial: 'false',
-			initialText: quote('false'),
+			list: false,
+			seen: false,
+			fallback: false,
 			parameter: callbackParameter(descriptor.type),
 		};
 	}
 
 	const holds: 'boolean' | 'string' = descriptor.kind === 'toggle' ? 'boolean' : 'string';
-	const seen = authored?.literal ?? initialValue(prop.default);
+	const fallback = controlValue(holds, initialValue(prop.default));
+	const seen = controlValue(holds, authored?.literal ?? initialValue(prop.default));
 	let kind: PlaygroundControl['kind'] = descriptor.kind === 'toggle' ? 'toggle' : descriptor.kind === 'select' ? 'select' : 'textbox';
 	let options: readonly string[] = descriptor.options ?? [];
 
@@ -397,11 +427,11 @@ function controlOf(
 		kind,
 		type: descriptor.type,
 		options,
-		cell: `c${identifier(ref.prop)}`,
-		text: `t${identifier(ref.prop)}`,
+		...cells,
 		holds,
-		initial: sourceLiteral(holds, seen),
-		initialText: readoutLiteral(holds, seen),
+		list: holds === 'string' && descriptor.members.some((member) => /\bstring\[\]$|^Array<|^ReadonlyArray</.test(member)),
+		seen,
+		fallback: typeof fallback === 'boolean' || typeof fallback === 'string' ? fallback : '',
 	};
 }
 
@@ -415,30 +445,139 @@ export function playgroundControls(demo: DemoAnalysis, meta: FamilyMeta): readon
 	);
 }
 
-// --- the generated module ---------------------------------------------------
+// --- the code panel's slots -------------------------------------------------
 
 const SLOT = (index: number) => `PGSLOT${index}`;
+const SLOT_PATTERN = /(PGSLOT\d+)/;
 
-/** A run of the highlighted source that follows a control instead of sitting still. */
-type SlotRun = { readonly style: string; readonly cell: string };
+/**
+ * One run of the shown source that follows a control. An authored string value
+ * keeps its `value=` and the slot stands in for the quoted literal; every other
+ * control's slot is the whole attribute, or nothing at its default.
+ */
+export type CodeSlot = {
+	readonly control: PlaygroundControl;
+	readonly form: 'value' | 'attribute';
+	/** The whitespace the slot prints ahead of the attribute, taken from the source. */
+	readonly lead: string;
+	/** What the slot replaces in the authored file; absent for a prop the demo never wrote. */
+	readonly start?: number;
+	readonly end?: number;
+	/** The characters either side of the sentinel that the slot's text carries itself. */
+	readonly before: string;
+	readonly after: string;
+};
+
+/** Where the controls the demo never wrote are printed: just inside the root's `>`. */
+function tagEnd(demo: DemoAnalysis): number {
+	let at = demo.openingEnd - (demo.selfClosing ? 2 : 1);
+	while (at > demo.openingStart && /\s/.test(demo.source[at - 1] ?? '')) at -= 1;
+	return at;
+}
+
+/** The slot each editable control gets in the code panel, authored or not. */
+export function codeSlots(demo: DemoAnalysis, controls: readonly PlaygroundControl[]): readonly CodeSlot[] {
+	return controls
+		.filter((control) => control.kind !== 'event')
+		.map((control) => {
+			const authored = demo.attributes.find((attribute) => attribute.name === control.prop);
+			if (!authored) return { control, form: 'attribute', lead: ' ', before: ' ', after: '' };
+			if (control.holds === 'string' && authored.valueStart !== undefined && authored.valueEnd !== undefined)
+				return {
+					control,
+					form: 'value',
+					lead: '',
+					start: authored.valueStart,
+					end: authored.valueEnd,
+					before: demo.source[authored.valueStart - 1] ?? '',
+					after: demo.source[authored.valueEnd] ?? '',
+				};
+			const spaced = demo.source[authored.start - 1] === ' ' && !/\s/.test(demo.source[authored.start - 2] ?? '');
+			return {
+				control,
+				form: 'attribute',
+				lead: spaced ? ' ' : '',
+				start: authored.start,
+				end: authored.end,
+				before: spaced ? ' ' : '',
+				after: '',
+			};
+		});
+}
+
+/**
+ * The demo as the code panel shows it: the authored file with each slot swapped
+ * for a sentinel, and the `<style>` block lifted out into its own tab.
+ */
+function displaySource(demo: DemoAnalysis, slots: readonly CodeSlot[]): string {
+	const edits: { readonly at: number; readonly to: number; readonly text: string }[] = slots.flatMap(
+		(slot, index) =>
+			slot.start === undefined || slot.end === undefined ? [] : [{ at: slot.start, to: slot.end, text: SLOT(index) }],
+	);
+	const inserted = slots.flatMap((slot, index) => (slot.start === undefined ? [` ${SLOT(index)}`] : []));
+	if (inserted.length > 0) edits.push({ at: tagEnd(demo), to: tagEnd(demo), text: inserted.join('') });
+	edits.sort((left, right) => right.at - left.at);
+	let text = demo.source;
+	for (const edit of edits) text = `${text.slice(0, edit.at)}${edit.text}${text.slice(edit.to)}`;
+	if (demo.styleStart === undefined || demo.styleEnd === undefined) return text.trimEnd();
+	const styleStart = demo.styleStart + (text.length - demo.source.length);
+	const styleEnd = demo.styleEnd + (text.length - demo.source.length);
+	const lineStart = text.lastIndexOf('\n', styleStart) + 1;
+	let lineEnd = text.indexOf('\n', styleEnd);
+	if (lineEnd < 0) lineEnd = text.length;
+	else lineEnd += 1;
+	return `${text.slice(0, lineStart).trimEnd()}\n${text.slice(lineEnd)}`.trimEnd();
+}
 
 type LineSegment =
 	| { readonly kind: 'tokens'; readonly tokens: readonly CodeToken[] }
-	| { readonly kind: 'slot'; readonly run: SlotRun };
+	| { readonly kind: 'slot'; readonly style: string; readonly slot: CodeSlot };
 
 type PanelLine =
 	| { readonly kind: 'plain'; readonly line: CodeLine }
 	| { readonly kind: 'split'; readonly id: string; readonly segments: readonly LineSegment[] };
 
+function hasSlot(token: CodeToken): boolean {
+	for (const run of token.plain) if (SLOT_PATTERN.test(run.text)) return true;
+	for (const run of token.hover) if (SLOT_PATTERN.test(run.text)) return true;
+	return false;
+}
+
+function runsOf(token: CodeToken): readonly CodeRun[] {
+	return token.hover.length > 0 ? token.hover : token.plain;
+}
+
+function withRuns(token: CodeToken, runs: readonly CodeRun[]): CodeToken {
+	return token.hover.length > 0 ? { ...token, hover: runs as CodeToken['hover'] } : { ...token, plain: runs };
+}
+
+/** Drops `char` from the edge of the neighbouring text, when it is there to drop. */
+function trimEdge(tokens: readonly CodeToken[], char: string, side: 'end' | 'start'): readonly CodeToken[] {
+	if (char === '' || tokens.length === 0) return tokens;
+	const at = side === 'end' ? tokens.length - 1 : 0;
+	const token = tokens[at];
+	const runs = runsOf(token);
+	if (runs.length === 0) return tokens;
+	const run = runs[side === 'end' ? runs.length - 1 : 0];
+	const matches = side === 'end' ? run.text.endsWith(char) : run.text.startsWith(char);
+	if (!matches) return tokens;
+	const text = side === 'end' ? run.text.slice(0, -char.length) : run.text.slice(char.length);
+	const kept = text === '' ? runs.filter((one) => one !== run) : runs.map((one) => (one === run ? { ...one, text } : one));
+	const next = [...tokens];
+	if (kept.length === 0) next.splice(at, 1);
+	else next[at] = withRuns(token, kept);
+	return next;
+}
+
 /**
  * Splits the highlighted lines at the sentinels the display source carries, so
- * each root attribute value becomes a text slot bound to its readout cell.
+ * each slot becomes a text run bound to its control's text cell. The character
+ * either side of a sentinel — the space before an attribute, the quotes round a
+ * value — is dropped from the still text because the slot prints it itself.
  */
-function panelLines(lines: readonly CodeLine[], cells: readonly string[]): readonly PanelLine[] {
-	const pattern = new RegExp(`(${cells.map((_, index) => SLOT(index)).join('|')})`);
+function panelLines(lines: readonly CodeLine[], slots: readonly CodeSlot[]): readonly PanelLine[] {
 	return lines.map((line) => {
-		if (cells.length === 0 || !line.tokens.some((token) => hasSlot(token, pattern)))
-			return { kind: 'plain', line };
+		if (slots.length === 0 || !line.tokens.some(hasSlot)) return { kind: 'plain', line };
 		const segments: LineSegment[] = [];
 		let run: CodeToken[] = [];
 		let serial = 0;
@@ -448,17 +587,16 @@ function panelLines(lines: readonly CodeLine[], cells: readonly string[]): reado
 		};
 		for (const token of line.tokens) {
 			const runs = [...token.plain, ...token.hover];
-			const carrier = runs.find((one) => pattern.test(one.text));
+			const carrier = runs.find((one) => SLOT_PATTERN.test(one.text));
 			if (!carrier) {
 				run.push(token);
 				continue;
 			}
-			const parts = carrier.text.split(pattern);
-			for (const part of parts) {
-				const at = cells.findIndex((_, index) => part === SLOT(index));
+			for (const part of carrier.text.split(SLOT_PATTERN)) {
+				const at = slots.findIndex((_, index) => part === SLOT(index));
 				if (at >= 0) {
 					flush();
-					segments.push({ kind: 'slot', run: { style: carrier.style, cell: cells[at] } });
+					segments.push({ kind: 'slot', style: carrier.style, slot: slots[at] });
 					continue;
 				}
 				if (part === '') continue;
@@ -467,36 +605,21 @@ function panelLines(lines: readonly CodeLine[], cells: readonly string[]): reado
 			}
 		}
 		flush();
-		return { kind: 'split', id: line.id, segments };
+		for (let at = 0; at < segments.length; at += 1) {
+			const segment = segments[at];
+			if (segment.kind !== 'slot') continue;
+			const previous = segments[at - 1];
+			if (previous?.kind === 'tokens')
+				segments[at - 1] = { kind: 'tokens', tokens: trimEdge(previous.tokens, segment.slot.before, 'end') };
+			const following = segments[at + 1];
+			if (following?.kind === 'tokens')
+				segments[at + 1] = { kind: 'tokens', tokens: trimEdge(following.tokens, segment.slot.after, 'start') };
+		}
+		return { kind: 'split', id: line.id, segments: segments.filter((segment) => segment.kind === 'slot' || segment.tokens.length > 0) };
 	});
 }
 
-function hasSlot(token: CodeToken, pattern: RegExp): boolean {
-	for (const run of token.plain) if (pattern.test(run.text)) return true;
-	for (const run of token.hover) if (pattern.test(run.text)) return true;
-	return false;
-}
-
-/**
- * The demo as the code panel shows it: the authored file with each controlled
- * root attribute value swapped for a sentinel, and the `<style>` block lifted
- * out into its own tab.
- */
-function displaySource(demo: DemoAnalysis, slots: readonly { readonly attribute: RootAttribute }[]): string {
-	const edits = slots
-		.map((slot, index) => ({ slot, index }))
-		.filter(({ slot }) => slot.attribute.valueStart !== undefined)
-		.sort((left, right) => (right.slot.attribute.valueStart ?? 0) - (left.slot.attribute.valueStart ?? 0));
-	let text = demo.source;
-	for (const { slot, index } of edits)
-		text = `${text.slice(0, slot.attribute.valueStart)}${SLOT(index)}${text.slice(slot.attribute.valueEnd)}`;
-	if (demo.styleStart === undefined || demo.styleEnd === undefined) return text.trimEnd();
-	const lineStart = text.lastIndexOf('\n', demo.styleStart) + 1;
-	let lineEnd = text.indexOf('\n', demo.styleEnd);
-	if (lineEnd < 0) lineEnd = text.length;
-	else lineEnd += 1;
-	return `${text.slice(0, lineStart).trimEnd()}\n${text.slice(lineEnd)}`.trimEnd();
-}
+// --- the generated module ---------------------------------------------------
 
 function componentName(family: string, stem: string): string {
 	return `${identifier(family)}${identifier(stem)}Playground`;
@@ -504,28 +627,50 @@ function componentName(family: string, stem: string): string {
 
 const CHROME_FAMILIES = ['collapsible', 'select', 'tabs', 'toggle', 'tooltip'];
 
-
-
-function toggleCell(control: PlaygroundControl, extra: string): string {
-	const label = control.kind === 'event' ? control.prop : control.prop;
-	return `				<div class="pg-cell">
-					<toggle.root
-						class="pg-ctl"
-						checked={${control.cell}}
-						onChange={(next: boolean) => {
-							${control.cell} = next;
-							${control.text} = next ? 'true' : 'false';${extra}
-						}}
-					>
-						<toggle.label class="pg-name">${label}</toggle.label>
-						<toggle.trigger class="pg-switch">
-							<toggle.thumb class="pg-knob" />
-						</toggle.trigger>
-					</toggle.root>
-					<span class="pg-state">{${control.text}}</span>
-${hintFor(control)}
-				</div>`;
+/** The code panel's text for a control, as a source expression over `value`. */
+function slotTextSource(slot: CodeSlot, value: string): string {
+	if (slot.form === 'value') return `valueText(${value})`;
+	return `attributeText(${quote(slot.control.prop)}, ${value}, ${sourceLiteral(slot.control.fallback)}, ${quote(slot.lead)})`;
 }
+
+/** The code panel's opening text for a control. */
+function slotText(slot: CodeSlot): string {
+	const { control } = slot;
+	if (slot.form === 'value') return valueText(control.seen as string | readonly string[]);
+	return attributeText(control.prop, control.seen, control.fallback, slot.lead);
+}
+
+/**
+ * Every cell a control owns, written from one value expression. Reading the
+ * value into a local first keeps each text derived from what was just written.
+ */
+function writes(slots: readonly CodeSlot[], control: PlaygroundControl, value: string, indent: string): string {
+	const slot = slots.find((one) => one.control === control);
+	const local = `next${identifier(control.prop)}`;
+	const lines = [`const ${local} = ${value};`, `${control.cell} = ${local};`];
+	if (slot) lines.push(`${control.text} = ${slotTextSource(slot, local)};`);
+	if (control.kind === 'select') {
+		lines.push(`${control.shown} = listText(${local});`);
+		lines.push(`${control.pick} = pickValue(${local});`);
+	}
+	return lines.map((line) => `${indent}${line}`).join('\n');
+}
+
+/**
+ * A list-capable `value` follows the `multiple` switch: on, the value becomes
+ * the list it names; off, the first held entry. The code panel then prints the
+ * form a consumer would write for that mode.
+ */
+function listFollowsMultiple(controls: readonly PlaygroundControl[]): { readonly multiple: PlaygroundControl; readonly value: PlaygroundControl } | undefined {
+	const multiple = controls.find((one) => one.prop === 'multiple' && one.kind === 'toggle');
+	const value = controls.find((one) => one.prop === 'value' && one.kind !== 'event' && one.list);
+	return multiple && value ? { multiple, value } : undefined;
+}
+
+type Emit = {
+	readonly controls: readonly PlaygroundControl[];
+	readonly slots: readonly CodeSlot[];
+};
 
 function hintFor(control: PlaygroundControl): string {
 	return `					<tooltip.root class="pg-hint">
@@ -534,7 +679,32 @@ function hintFor(control: PlaygroundControl): string {
 					</tooltip.root>`;
 }
 
-function selectCell(control: PlaygroundControl): string {
+function toggleCell(emit: Emit, control: PlaygroundControl, extra: string): string {
+	const paired = listFollowsMultiple(emit.controls);
+	const follow =
+		paired && paired.multiple === control
+			? `\n${writes(emit.slots, paired.value, `next ? heldList(${paired.value.cell}) : (heldList(${paired.value.cell})[0] ?? '')`, '\t\t\t\t\t\t\t')}`
+			: '';
+	return `				<div class="pg-cell">
+					<toggle.root
+						class="pg-ctl"
+						checked={${control.cell}}
+						onChange={(next: boolean) => {
+${writes(emit.slots, control, 'next', '\t\t\t\t\t\t\t')}${extra}${follow}
+						}}
+					>
+						<toggle.label class="pg-name">${control.prop}</toggle.label>
+						<toggle.trigger class="pg-switch">
+							<toggle.thumb class="pg-knob" />
+						</toggle.trigger>
+					</toggle.root>
+${hintFor(control)}
+				</div>`;
+}
+
+function selectCell(emit: Emit, control: PlaygroundControl): string {
+	const paired = listFollowsMultiple(emit.controls);
+	const chosen = paired && paired.value === control ? `${paired.multiple.cell} ? toggled(${control.cell}, next) : next` : 'next';
 	const items = control.options
 		.map(
 			(option) => `							<select.item class="pg-pick-item" value=${quote(option)}>
@@ -545,15 +715,14 @@ function selectCell(control: PlaygroundControl): string {
 	return `				<div class="pg-cell">
 					<select.root
 						class="pg-ctl pg-pick"
-						value={${control.cell}}
+						value={${control.pick}}
 						onChange={(next: string) => {
-							${control.cell} = next;
-							${control.text} = next;
+${writes(emit.slots, control, chosen, '\t\t\t\t\t\t\t')}
 						}}
 					>
 						<select.label class="pg-name">${control.prop}</select.label>
 						<select.trigger class="pg-pick-trigger">
-							<span class="pg-pick-value">{${control.text}}</span>
+							<span class="pg-pick-value">{${control.shown}}</span>
 						</select.trigger>
 						<select.content class="pg-pick-list">
 ${items}
@@ -563,37 +732,37 @@ ${hintFor(control)}
 				</div>`;
 }
 
-function textboxCell(control: PlaygroundControl): string {
+function textboxCell(emit: Emit, control: PlaygroundControl): string {
 	return `				<div class="pg-cell">
 					<textbox.root
 						class="pg-ctl"
 						value={${control.cell}}
 						onChange={(next: string) => {
-							${control.cell} = next;
-							${control.text} = next;
+${writes(emit.slots, control, 'next', '\t\t\t\t\t\t\t')}
 						}}
 					>
 						<textbox.label class="pg-name">${control.prop}</textbox.label>
 						<textbox.input class="pg-field" />
 					</textbox.root>
-					<span class="pg-state">{${control.text}}</span>
 ${hintFor(control)}
 				</div>`;
 }
 
-function controlCell(control: PlaygroundControl): string {
+function controlCell(emit: Emit, control: PlaygroundControl): string {
 	if (control.kind === 'event')
 		return toggleCell(
+			emit,
 			control,
 			`\n							logClass = next ? 'pg-log' : 'pg-log pg-log-quiet';`,
 		);
-	if (control.kind === 'toggle') return toggleCell(control, '');
-	if (control.kind === 'select') return selectCell(control);
-	return textboxCell(control);
+	if (control.kind === 'toggle') return toggleCell(emit, control, '');
+	if (control.kind === 'select') return selectCell(emit, control);
+	return textboxCell(emit, control);
 }
 
 /** The root's opening tag, with every controlled attribute reading a cell. */
-function openingTag(demo: DemoAnalysis, controls: readonly PlaygroundControl[]): string {
+function openingTag(demo: DemoAnalysis, emit: Emit): string {
+	const { controls, slots } = emit;
 	const byProp = new Map(controls.filter((one) => one.kind !== 'event').map((one) => [one.prop, one]));
 	const event = controls.find((one) => one.kind === 'event' && one.prop === 'onChange');
 	const value = controls.find((one) => one.prop === 'value' && one.kind !== 'event');
@@ -613,30 +782,16 @@ function openingTag(demo: DemoAnalysis, controls: readonly PlaygroundControl[]):
 	for (const control of byProp.values())
 		if (!seen.has(control.prop)) written.push(`${control.prop}={${control.cell}}`);
 
+	const authored = demo.attributes.find((one) => one.name === 'onChange');
 	if (event) {
-		const authored = demo.attributes.find((one) => one.name === 'onChange');
 		const lines: string[] = [];
-		if (value) {
-			lines.push(
-				value.holds === 'boolean'
-					? `\t\t\t\t\t\t${value.cell} = next === true;`
-					: `\t\t\t\t\t\tconst shown = typeof next === 'string' ? next : (next[0] ?? '');\n\t\t\t\t\t\t${value.cell} = shown;`,
-			);
-			lines.push(
-				value.holds === 'boolean'
-					? `\t\t\t\t\t\t${value.text} = next === true ? 'true' : 'false';`
-					: `\t\t\t\t\t\t${value.text} = shown;`,
-			);
-		}
+		if (value) lines.push(writes(slots, value, value.holds === 'boolean' ? 'next === true' : 'next', '\t\t\t\t\t\t'));
 		lines.push('\t\t\t\t\t\tevents = logging ? events + 1 : events;');
 		if (authored?.expression) lines.push(`\t\t\t\t\t\t(${authored.expression})(next);`);
 		written.push(
 			`onChange={(next: ${event.parameter ?? 'unknown'}) => {\n${lines.join('\n')}\n\t\t\t\t\t}}`,
 		);
-	} else {
-		const authored = demo.attributes.find((one) => one.name === 'onChange');
-		if (authored) written.push(demo.source.slice(authored.start, authored.end));
-	}
+	} else if (authored) written.push(demo.source.slice(authored.start, authored.end));
 
 	const body = written.map((one) => `\n\t\t\t\t\t${one}`).join('');
 	return `<${demo.tag}${body}\n\t\t\t\t${demo.selfClosing ? '/>' : '>'}`;
@@ -710,8 +865,8 @@ function paneMarkup(lines: readonly PanelLine[], prefix: string, indent: string)
 				inner.push(tokenListMarkup(name, `${indent}\t`));
 				continue;
 			}
-			const style = segment.run.style === '' ? '' : ` style=${quote(segment.run.style)}`;
-			inner.push(`${indent}\t<span class="pg-run"><span${style}>{${segment.run.cell}}</span></span>`);
+			const style = segment.style === '' ? '' : ` style=${quote(segment.style)}`;
+			inner.push(`${indent}\t<span class="pg-run"><span${style}>{${segment.slot.control.text}}</span></span>`);
 		}
 		chunks.push(`${indent}<span class="pg-line">\n${inner.join('\n')}\n${indent}</span>`);
 	}
@@ -723,6 +878,7 @@ export type PlaygroundInput = {
 	readonly demo: DemoAnalysis;
 	readonly meta: FamilyMeta;
 	readonly controls: readonly PlaygroundControl[];
+	readonly slots: readonly CodeSlot[];
 	readonly sourceLines: readonly CodeLine[];
 	readonly cssLines: readonly CodeLine[];
 	readonly sourceLabel: string;
@@ -736,26 +892,21 @@ function presetTable(controls: readonly PlaygroundControl[], presets: readonly F
 		const fields = [`label: ${quote(preset.label)}`];
 		for (const control of editable) {
 			const written = preset.values[control.prop];
-			const holds = control.holds;
-			fields.push(
-				`${control.cell}: ${written === undefined ? control.initial : sourceLiteral(holds, written)}`,
-			);
-			fields.push(
-				`${control.text}: ${written === undefined ? control.initialText : readoutLiteral(holds, written)}`,
-			);
+			fields.push(`${control.cell}: ${sourceLiteral(written === undefined ? control.seen : controlValue(control.holds, written))}`);
 		}
 		return `\t${quote(preset.name)}: { ${fields.join(', ')} },`;
 	});
-	return `const presets: Readonly<Record<string, Readonly<Record<string, string | boolean>>>> = {\n${rows.join('\n')}\n};`;
+	return `const presets: Readonly<Record<string, Readonly<Record<string, string | boolean | readonly string[]>>>> = {\n${rows.join('\n')}\n};`;
 }
 
-function scenarioBar(controls: readonly PlaygroundControl[], presets: readonly FamilyPreset[]): string {
-	const editable = controls.filter((one) => one.kind !== 'event');
-	const writes = editable
-		.flatMap((control) => [
-			`							${control.cell} = preset[${quote(control.cell)}] as ${control.holds};`,
-			`							${control.text} = preset[${quote(control.text)}] as string;`,
-		])
+function cellType(control: PlaygroundControl): string {
+	return control.holds === 'boolean' ? 'boolean' : control.list ? 'string | readonly string[]' : 'string';
+}
+
+function scenarioBar(emit: Emit, presets: readonly FamilyPreset[]): string {
+	const editable = emit.controls.filter((one) => one.kind !== 'event');
+	const written = editable
+		.map((control) => writes(emit.slots, control, `preset[${quote(control.cell)}] as ${cellType(control)}`, '\t\t\t\t\t\t'))
 		.join('\n');
 	const items = presets
 		.map(
@@ -771,7 +922,7 @@ function scenarioBar(controls: readonly PlaygroundControl[], presets: readonly F
 					const preset = presets[next];
 					scenarioName = next;
 					scenario = preset.label as string;
-${writes}
+${written}
 				}}
 			>
 				<select.label class="pg-bar-name">Scenario</select.label>
@@ -786,66 +937,66 @@ ${items}
 
 /** The whole generated module: chrome, demo, code panel, one island. */
 export function playgroundModule(input: PlaygroundInput): string {
-	const { demo, meta, controls } = input;
+	const { demo, meta, controls, slots } = input;
 	const presets = meta.presets ?? [];
 	if (presets.length === 0)
 		throw new Error(
 			`ui-playground: ui-meta/${demo.family}.ts lists no presets, so the Scenario select has nothing to offer.`,
 		);
+	const emit: Emit = { controls, slots };
 
-	const slots = demo.attributes
-		.filter((attribute) => attribute.valueStart !== undefined)
-		.map((attribute) => ({
-			attribute,
-			control: controls.find((one) => one.prop === attribute.name && one.kind !== 'event'),
-		}))
-		.filter((entry): entry is { attribute: RootAttribute; control: PlaygroundControl } => entry.control !== undefined);
-
-	const source = paneMarkup(
-		panelLines(input.sourceLines, slots.map((entry) => entry.control.text)),
-		'srcLines',
-		'\t\t\t\t\t\t\t\t\t',
-	);
+	const source = paneMarkup(panelLines(input.sourceLines, slots), 'srcLines', '\t\t\t\t\t\t\t\t\t');
 	const css = paneMarkup(panelLines(input.cssLines, []), 'cssLines', '\t\t\t\t\t\t\t\t\t');
 
 	const families = [...new Set([demo.family, ...CHROME_FAMILIES, ...(controls.some((one) => one.kind === 'textbox') ? ['textbox'] : [])])].sort();
 
 	const cells: string[] = [];
 	for (const control of controls) {
-		cells.push(`\tlet ${control.cell} = state(${control.initial});`);
-		cells.push(`\tlet ${control.text} = state(${control.initialText});`);
+		if (control.kind === 'event') {
+			cells.push(`\tlet ${control.cell} = state(false);`);
+			continue;
+		}
+		const slot = slots.find((one) => one.control === control);
+		cells.push(`\tlet ${control.cell} = state<${cellType(control)}>(${sourceLiteral(control.seen)});`);
+		if (slot) cells.push(`\tlet ${control.text} = state(${quote(slotText(slot))});`);
+		if (control.kind === 'select') {
+			const held = control.seen as string | readonly string[];
+			cells.push(`\tlet ${control.shown} = state(${quote(listText(held))});`);
+			cells.push(`\tlet ${control.pick} = state(${quote(pickValue(held))});`);
+		}
 	}
 	cells.push(`\tlet events = state(0);`);
 	cells.push(`\tlet logClass = state('pg-log pg-log-quiet');`);
 	cells.push(`\tlet scenario = state(${quote(presets[0].label)});`);
 	cells.push(`\tlet scenarioName = state(${quote(presets[0].name)});`);
 
-	const quick = controls.slice(0, meta.quick.length).map(controlCell).join('\n\n');
-	const rest = controls.slice(meta.quick.length).map(controlCell).join('\n\n');
+	const quick = controls.slice(0, meta.quick.length).map((control) => controlCell(emit, control)).join('\n\n');
+	const rest = controls.slice(meta.quick.length).map((control) => controlCell(emit, control)).join('\n\n');
 
 	const cssTab =
 		input.cssLines.length === 0
 			? ''
 			: `
-					<tabs.trigger class="pg-tab" value="css">${input.cssLabel}</tabs.trigger>`;
+						<tabs.trigger class="pg-tab" value="css">${input.cssLabel}</tabs.trigger>`;
 	const cssPane =
 		input.cssLines.length === 0
 			? ''
 			: `
-					<tabs.content class="pg-pane" value="css">
-						<collapsible.root class="pg-clamp">
-							<div class="pg-code-body">
-								<pre class="pg-shiki">
+						<tabs.content class="pg-pane" value="css">
+							<collapsible.root class="pg-clamp">
+								<div class="pg-code-body">
+									<pre class="pg-shiki shiki">
 ${css.markup}
-								</pre>
-							</div>
-							<span class="pg-fade" aria-hidden="true"></span>
-							<collapsible.trigger class="pg-expand">Expand code</collapsible.trigger>
-						</collapsible.root>
-					</tabs.content>`;
+									</pre>
+								</div>
+								<span class="pg-fade" aria-hidden="true"></span>
+								<collapsible.trigger class="pg-expand">Expand code</collapsible.trigger>
+							</collapsible.root>
+						</tabs.content>`;
 
 	return `import { state } from '@markless/core';
 import { ${families.join(', ')} } from '@markless/ui';
+import { attributeText, heldList, listText, pickValue, toggled, valueText } from '../slot-text.ts';
 
 ${source.consts.join('\n')}
 ${css.consts.join('\n')}
@@ -859,7 +1010,10 @@ ${cells.join('\n')}
 			<div class="pg-quick">
 ${quick}
 
-				<collapsible.trigger class="pg-showall">Show all</collapsible.trigger>
+				<collapsible.trigger class="pg-showall">
+					<span class="pg-showall-more">Show all</span>
+					<span class="pg-showall-less">Show less</span>
+				</collapsible.trigger>
 			</div>
 
 			<collapsible.content class="pg-rest">
@@ -870,26 +1024,25 @@ ${rest}
 		<p class={logClass}>onChange called {events} time(s)</p>
 
 		<div class="pg-stage">
-			${openingTag(demo, controls)}${demoBody(demo)}${demo.closing}
-		</div>
-
-		<div class="pg-bar">
-${scenarioBar(controls, presets)}
+			${openingTag(demo, emit)}${demoBody(demo)}${demo.closing}
 		</div>
 
 		<div class="pg-code">
 			<div class="pg-panel-outer" data-scenario=${quote(`${demo.family}/${demo.stem}`)}>
 				<tabs.root class="pg-panel" value="source">
-					<tabs.list class="pg-strip">
-						<div class="pg-strip-row" role="presentation">
-							<tabs.trigger class="pg-tab" value="source">${input.sourceLabel}</tabs.trigger>${cssTab}
-						</div>
-					</tabs.list>
+					<div class="pg-bar">
+						<tabs.list class="pg-strip">
+							<div class="pg-strip-row" role="presentation">
+								<tabs.trigger class="pg-tab" value="source">${input.sourceLabel}</tabs.trigger>${cssTab}
+							</div>
+						</tabs.list>
+${scenarioBar(emit, presets)}
+					</div>
 					<div class="pg-panes">
 						<tabs.content class="pg-pane" value="source">
 							<collapsible.root class="pg-clamp">
 								<div class="pg-code-body">
-									<pre class="pg-shiki">
+									<pre class="pg-shiki shiki">
 ${source.markup}
 									</pre>
 								</div>

@@ -1,12 +1,13 @@
-// The generated card's own CSS, lifted from the hand-written
-// `accordion-playground.tsrx` and the code panel and put behind one `pg-`
-// namespace: the demo's authored CSS lands in the same scoped block, so a demo
-// class named `panel` or `switch` must not collide with the chrome's.
+// The generated card's own CSS behind one `pg-` namespace: the demo's authored
+// CSS lands in the same scoped block, so a demo class named `panel` or `switch`
+// must not collide with the chrome's.
 export const CHROME_CSS = `			.pg {
 				display: grid;
+				/* Sized by the card, never by the widest code line: the code scrolls inside. */
+				grid-template-columns: minmax(0, 1fr);
 				margin-block: var(--space-s);
-				border: 2px solid var(--code-edge);
-				border-radius: 10px;
+				border: 1px solid var(--code-edge);
+				border-radius: 3px;
 				background: var(--raised);
 				overflow: clip;
 			}
@@ -15,20 +16,20 @@ export const CHROME_CSS = `			.pg {
 				display: grid;
 				gap: 0.5em;
 				padding: 0.7em 0.9em;
-				border-block-end: 2px solid var(--code-edge);
+				border-block-end: 1px solid var(--code-edge);
 			}
 
 			.pg-quick,
 			.pg-rest {
 				display: flex;
 				flex-wrap: wrap;
-				gap: 0.4em 1.1em;
+				gap: 0.5em 1.4em;
 				align-items: center;
 			}
 
 			.pg-rest {
 				padding-block-start: 0.6em;
-				border-block-start: 2px dashed var(--code-edge);
+				border-block-start: 1px solid var(--code-edge);
 			}
 
 			.pg-rest[ui-closed] {
@@ -37,7 +38,7 @@ export const CHROME_CSS = `			.pg {
 
 			.pg-cell {
 				display: flex;
-				gap: 0.4em;
+				gap: 0.3em;
 				align-items: center;
 			}
 
@@ -45,14 +46,6 @@ export const CHROME_CSS = `			.pg {
 				display: flex;
 				gap: 0.45em;
 				align-items: center;
-			}
-
-			.pg-state {
-				font-family: var(--font-mono);
-				font-size: var(--step--1);
-				line-height: 1.3;
-				color: var(--ink);
-				opacity: 0.65;
 			}
 
 			.pg-name {
@@ -65,10 +58,10 @@ export const CHROME_CSS = `			.pg {
 			.pg-switch {
 				display: flex;
 				align-items: center;
-				width: 2.4em;
-				height: 1.3em;
-				padding: 0.12em;
-				border: 2px solid var(--ink);
+				width: 2.2em;
+				height: 1.2em;
+				padding: 0.1em;
+				border: 1px solid var(--ink);
 				border-radius: 999px;
 				background: var(--paper);
 				cursor: pointer;
@@ -85,22 +78,22 @@ export const CHROME_CSS = `			.pg {
 
 			.pg-knob {
 				display: block;
-				width: 0.95em;
-				height: 0.95em;
+				width: 0.9em;
+				height: 0.9em;
 				border-radius: 999px;
 				background: var(--ink);
 				transition: transform 130ms ease;
 			}
 
 			.pg-switch[ui-checked] .pg-knob {
-				transform: translateX(1.1em);
+				transform: translateX(1em);
 			}
 
 			.pg-field {
 				min-width: 7em;
 				padding: 0.2em 0.5em;
-				border: 2px solid var(--ink);
-				border-radius: 6px;
+				border: 1px solid var(--ink);
+				border-radius: 3px;
 				background: var(--paper);
 				color: var(--ink);
 				font: inherit;
@@ -114,40 +107,84 @@ export const CHROME_CSS = `			.pg {
 				align-items: center;
 			}
 
+			/* The type hint is a quiet superscript, not a second control in the cell. */
 			.pg-dot {
-				display: grid;
-				place-items: center;
-				width: 1.15em;
-				height: 1.15em;
-				padding: 0;
-				border: 2px solid var(--code-edge);
-				border-radius: 999px;
+				padding: 0 0.15em;
+				border: 0;
 				background: transparent;
 				color: var(--ink);
+				opacity: 0.55;
 				font: inherit;
+				font-family: var(--font-mono);
 				font-size: var(--step--2);
 				line-height: 1;
+				text-decoration: underline dotted;
+				text-underline-offset: 0.2em;
 				cursor: help;
 			}
 
-			.pg-tip {
+			.pg-dot:hover,
+			.pg-dot:focus-visible {
+				opacity: 1;
+			}
+
+			/* One tip for the whole card: the type hints and the code panel's hover docs
+			   share it, and both open below their token so the first line of a clamped
+			   panel is never covered. */
+			.pg-tip,
+			.pg .tsrx-tip {
 				position: absolute;
-				inset-block-start: 100%;
+				inset-block-start: calc(100% + 0.35em);
+				inset-block-end: auto;
 				inset-inline-start: 0;
-				z-index: 6;
+				z-index: 40;
 				width: max-content;
-				max-width: 14rem;
-				margin-block-start: 0.3em;
-				padding: 0.25em 0.55em;
-				border-radius: 4px;
+				max-width: min(36ch, calc(100vw - 2 * var(--space-s-l)));
+				margin: 0;
+				padding: 0;
+				border: 0;
+				border-radius: 3px;
 				background: var(--slab);
+				box-shadow: none;
 				color: var(--slab-ink);
 				font-family: var(--font-mono);
 				font-size: var(--step--2);
+				line-height: 1.45;
+				text-align: start;
+				white-space: normal;
+			}
+
+			.pg-tip {
+				padding: 0.35em 0.6em;
 			}
 
 			.pg-tip[ui-closed] {
 				display: none;
+			}
+
+			.pg .tsrx-tip-title,
+			.pg .tsrx-tip-body {
+				font-family: var(--font-mono);
+				color: inherit;
+			}
+
+			.pg .tsrx-tip-title {
+				padding: 0.35em 0.6em;
+				background: transparent;
+				border-block-end: 1px solid color-mix(in oklch, var(--slab-ink) 30%, transparent);
+				font-weight: 700;
+			}
+
+			.pg .tsrx-tip-body {
+				padding: 0.35em 0.6em;
+			}
+
+			@supports (anchor-scope: --tsrx-token) {
+				.pg .tsrx-tip {
+					position: fixed;
+					inset-block-start: calc(anchor(bottom) + 0.35em);
+					inset-block-end: auto;
+				}
 			}
 
 			.pg-showall {
@@ -166,6 +203,16 @@ export const CHROME_CSS = `			.pg {
 				content: ' \\203A';
 			}
 
+			/* The label follows the trigger's own open attribute, so it flips with the panel. */
+			.pg-showall-less,
+			.pg-showall[ui-open] .pg-showall-more {
+				display: none;
+			}
+
+			.pg-showall[ui-open] .pg-showall-less {
+				display: inline;
+			}
+
 			.pg-showall[ui-open]::after {
 				content: ' \\2304';
 			}
@@ -177,8 +224,8 @@ export const CHROME_CSS = `			.pg {
 			.pg-pick-trigger {
 				min-width: 6.5em;
 				padding: 0.25em 0.6em;
-				border: 2px solid var(--ink);
-				border-radius: 6px;
+				border: 1px solid var(--ink);
+				border-radius: 3px;
 				background: var(--paper);
 				color: var(--ink);
 				font: inherit;
@@ -196,8 +243,8 @@ export const CHROME_CSS = `			.pg {
 				min-width: 8em;
 				margin-block-start: 0.25em;
 				padding: 0.2em;
-				border: 2px solid var(--ink);
-				border-radius: 6px;
+				border: 1px solid var(--ink);
+				border-radius: 3px;
 				background: var(--paper);
 			}
 
@@ -207,7 +254,7 @@ export const CHROME_CSS = `			.pg {
 
 			.pg-pick-item {
 				padding: 0.25em 0.5em;
-				border-radius: 4px;
+				border-radius: 2px;
 				font-family: var(--font-mono);
 				font-size: var(--step--1);
 				cursor: pointer;
@@ -230,27 +277,38 @@ export const CHROME_CSS = `			.pg {
 				display: none;
 			}
 
+			/* The stage is its own frame inside the card, so the demo reads as the
+			   exhibit rather than as more chrome. */
 			.pg-stage {
 				display: grid;
 				place-items: center;
 				min-height: 15rem;
+				margin: var(--space-s);
 				padding: var(--space-s);
-				background: var(--paper);
+				border: 1px solid var(--code-edge);
+				border-radius: 2px;
+				background: var(--code-surface);
 			}
 
+			/* One row between the stage and the code: the file tabs sit on the left
+			   edge and the scenario picker on the right. */
 			.pg-bar {
 				display: flex;
-				flex-wrap: wrap;
+				/* Reversed wrap puts the picker above the tabs on a phone; it also
+				   flips the cross axis, so flex-start here is the visual bottom. */
+				flex-wrap: wrap-reverse;
 				gap: 0.5em 1em;
-				justify-content: end;
-				padding: 0.6em 0.9em;
-				border-block-start: 2px solid var(--code-edge);
+				align-items: flex-start;
+				justify-content: space-between;
+				padding: 0.6em 0.9em 0;
+				border-block-start: 1px solid var(--code-edge);
 			}
 
 			.pg-bar-pick {
-				display: grid;
-				gap: 0.2em;
-				justify-items: start;
+				display: flex;
+				gap: 0.5em;
+				align-items: center;
+				padding-block-end: 0.6em;
 			}
 
 			.pg-bar-name {
@@ -272,27 +330,29 @@ export const CHROME_CSS = `			.pg {
 				content: '\\2304';
 			}
 
-			/* The bar is the last row of a clipped container, so its list opens up. */
 			.pg-bar-list {
-				inset-block-start: auto;
-				inset-block-end: 100%;
-				margin-block: 0 0.25em;
+				inset-inline-start: auto;
+				inset-inline-end: 0;
 			}
 
 			.pg-code {
-				border-block-start: 2px solid var(--code-edge);
+				min-width: 0;
 				background: var(--code-surface);
 			}
 
 			.pg-panel {
 				display: block;
+				min-width: 0;
 				background: var(--raised);
 				overflow: clip;
 			}
 
+			/* Sits one pixel into the pane border so the selected tab attaches to the code. */
 			.pg-strip {
-				padding: 0.35em 0.5em 0;
-				border-block-end: 1px solid var(--code-edge);
+				position: relative;
+				z-index: 1;
+				margin-block-end: -1px;
+				padding: 0;
 			}
 
 			.pg-strip-row {
@@ -301,9 +361,10 @@ export const CHROME_CSS = `			.pg {
 			}
 
 			.pg-tab {
-				padding: 0.25em 0.75em;
-				border: 0;
-				border-radius: 6px 6px 0 0;
+				padding: 0.3em 0.75em;
+				border: 1px solid transparent;
+				border-block-end: 0;
+				border-radius: 3px 3px 0 0;
 				background: transparent;
 				color: var(--ink);
 				font-family: var(--font-mono);
@@ -313,9 +374,20 @@ export const CHROME_CSS = `			.pg {
 			}
 
 			.pg-tab[ui-selected] {
-				background: var(--paper);
+				border-color: var(--code-edge);
+				background: var(--code-surface);
 				opacity: 1;
 				font-weight: 700;
+			}
+
+			.pg-panes {
+				min-width: 0;
+				border-block-start: 1px solid var(--code-edge);
+				background: var(--code-surface);
+			}
+
+			.pg-pane {
+				min-width: 0;
 			}
 
 			/* The clamp: the code always shows, and opening only lifts the ceiling. */
@@ -352,7 +424,7 @@ export const CHROME_CSS = `			.pg {
 				inset-inline: 0;
 				bottom: 0;
 				height: 5rem;
-				background: linear-gradient(to bottom, transparent, var(--raised) 70%);
+				background: linear-gradient(to bottom, transparent, var(--code-surface) 70%);
 				pointer-events: none;
 			}
 
@@ -381,8 +453,11 @@ export const CHROME_CSS = `			.pg {
 				display: none;
 			}
 
+			/* Full bleed on a phone: the card runs edge to edge, so the page gutter
+			   the shell adds is taken back here. */
 			@media (max-width: 866px) {
 				.pg {
+					margin-inline: calc(-1 * var(--space-s-l));
 					border-inline: 0;
 					border-radius: 0;
 				}
@@ -393,11 +468,11 @@ export const CHROME_CSS = `			.pg {
 					align-items: start;
 				}
 
-				.pg-showall {
-					margin-inline-start: 0;
+				.pg-cell {
+					width: 100%;
 				}
 
-				.pg-bar {
-					justify-content: start;
+				.pg-showall {
+					margin-inline-start: 0;
 				}
 			}`;

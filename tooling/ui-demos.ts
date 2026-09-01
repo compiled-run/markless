@@ -11,6 +11,7 @@ import { highlightFences } from './highlight-code.ts';
 import { CHROME_CSS } from './ui-playground-css.ts';
 import {
 	analyzeDemo,
+	codeSlots,
 	componentName,
 	displaySource,
 	generatedPath,
@@ -444,16 +445,13 @@ async function playgroundSource(root: string, family: string, stem: string, watc
 	const analysis = await analyzeDemo(family, stem, demo.file);
 	const meta = metaFor(family);
 	const controls = playgroundControls(analysis, meta);
-	const slots = analysis.attributes.filter(
-		(attribute) =>
-			attribute.valueStart !== undefined &&
-			controls.some((one) => one.prop === attribute.name && one.kind !== 'event'),
-	);
+	const slots = codeSlots(analysis, controls);
 	return playgroundModule({
 		demo: analysis,
 		meta,
 		controls,
-		sourceLines: await highlightBlock(displaySource(analysis, slots.map((attribute) => ({ attribute }))), 'tsrx'),
+		slots,
+		sourceLines: await highlightBlock(displaySource(analysis, slots), 'tsrx'),
 		cssLines: analysis.css === '' ? [] : await highlightBlock(analysis.css, 'css'),
 		sourceLabel: `${stem}.tsrx`,
 		cssLabel: `${family}.css`,
