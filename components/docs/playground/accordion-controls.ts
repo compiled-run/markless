@@ -1,4 +1,4 @@
-import type { PlaygroundConfig } from './types.ts';
+import type { PlaygroundConfig, PlaygroundPreset } from './types.ts';
 
 // Hand-written for the widget's proof. W3 generates this exact shape from
 // `@markless/ui/api/manifest.json` (name, type, initial) plus
@@ -34,11 +34,8 @@ export const accordionPlayground: PlaygroundConfig = {
 			initial: 'false',
 		},
 		{
-			// `value` is a string prop, so the string mapping (textbox) is what the
-			// manifest derives. The demo's item names are a closed set, so
-			// ui-meta also offers them as a select — the two edit one cell and
-			// neither is redundant: the list names an item, the box takes a name
-			// the list does not have.
+			// A textbox is only for a string prop with no closed option set; the
+			// demo's item names are closed, so `value` is a select.
 			name: 'value',
 			kind: 'select',
 			type: 'string | readonly string[]',
@@ -51,11 +48,12 @@ export const accordionPlayground: PlaygroundConfig = {
 			],
 		},
 		{
-			name: 'value',
-			kind: 'textbox',
-			type: 'string | readonly string[]',
-			initial: 'ship',
-			placeholder: 'an item name',
+			// A function prop is edited as an on/off event log, QDS's convention for
+			// showing that a callback fired without printing its argument.
+			name: 'onChange',
+			kind: 'toggle',
+			type: '(value: string | readonly string[]) => void',
+			initial: 'false',
 		},
 	],
 	presets: [
@@ -105,3 +103,9 @@ export const accordionPlayground: PlaygroundConfig = {
 		},
 	],
 };
+
+// The Scenario select hands its handler a preset name; the handler needs the
+// preset without searching, so the same list is offered keyed by name.
+export const accordionPresetsByName: Readonly<Record<string, PlaygroundPreset>> = Object.fromEntries(
+	accordionPlayground.presets.map((preset) => [preset.name, preset]),
+);
