@@ -205,6 +205,23 @@ for (const mode of MODES) {
 		expectClosed(el(BillingTrigger), el(BillingContent));
 	});
 
+	// The native `disabled` attribute only refuses gestures the browser routes; it
+	// says nothing about find-in-page, which reaches the panel directly, or about a
+	// dispatched activation. The refusal has to live at the call site.
+	test(`${mode}: user interaction on a disabled item is a no-op`, async () => {
+		if (mode === 'CSR') await render(Faq);
+		else await renderSSR(Faq);
+
+		el(BillingTrigger).dispatchEvent(new MouseEvent('click', { bubbles: true }));
+		el(BillingContent).dispatchEvent(new Event('beforematch', { bubbles: true }));
+		await new Promise((resolve) => setTimeout(resolve, 150));
+
+		expectClosed(el(BillingTrigger), el(BillingContent));
+		expect(openValues()).toBe('rules');
+		// Locked and closed is hidden outright, so find-in-page never reaches it.
+		expect(el(BillingContent).getAttribute('hidden')).toBe('');
+	});
+
 	test(`${mode}: the walk steps past a section nobody may open`, async () => {
 		if (mode === 'CSR') await render(Faq);
 		else await renderSSR(Faq);
@@ -232,6 +249,20 @@ for (const mode of MODES) {
 		await new Promise((resolve) => setTimeout(resolve, 150));
 		expectClosed(el(ShutTrigger), el(ShutContent));
 		expectOpen(el(OpenTrigger), el(OpenContent));
+	});
+
+	test(`${mode}: user interaction cannot open a section of an accordion nobody may change`, async () => {
+		if (mode === 'CSR') await render(Locked);
+		else await renderSSR(Locked);
+
+		el(ShutTrigger).dispatchEvent(new MouseEvent('click', { bubbles: true }));
+		el(ShutContent).dispatchEvent(new Event('beforematch', { bubbles: true }));
+		el(OpenTrigger).dispatchEvent(new MouseEvent('click', { bubbles: true }));
+		await new Promise((resolve) => setTimeout(resolve, 150));
+
+		expectClosed(el(ShutTrigger), el(ShutContent));
+		expectOpen(el(OpenTrigger), el(OpenContent));
+		expect(el(ShutContent).getAttribute('hidden')).toBe('');
 	});
 
 	test(`${mode}: with multiple, every section the value names starts open and the rest answer for themselves`, async () => {

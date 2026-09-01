@@ -162,6 +162,9 @@ export function AccordionItemTrigger({
 		ui-open={isOpen}
 		ui-closed={isOpen !== true}
 		onClick={(event) => {
+			// The native `disabled` attribute only refuses the gestures the browser
+			// routes; the refusal itself belongs here, where every path reaches it.
+			if (isLocked) return;
 			accordion.toggle(item.value);
 			onClick?.(event);
 		}}
@@ -196,9 +199,12 @@ export function AccordionItemContent({
 		if (typeof held === 'string') return held === item.value;
 		return held.includes(item.value);
 	});
+	const isLocked = computed(() => item.disabled || accordion.disabled);
 	// The open case is `false`, not `undefined`: the attribute writer reads `false` as "remove this" and `undefined` as no record at all.
+	// A locked closed panel is hidden outright, never `until-found`: find-in-page would otherwise strip the attribute itself and leave the panel showing under a section that refuses to open.
 	const hiddenPath = computed(() => {
 		if (isOpen) return false;
+		if (isLocked) return true;
 		return accordion.disableUntilFound ? true : 'until-found';
 	});
 
@@ -212,6 +218,7 @@ export function AccordionItemContent({
 		ui-open={isOpen}
 		ui-closed={isOpen !== true}
 		onBeforematch={(event) => {
+			if (isLocked) return;
 			accordion.reveal(item.value);
 			onBeforematch?.(event);
 		}}
