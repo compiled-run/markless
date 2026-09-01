@@ -403,6 +403,11 @@ function emitNode(
 		const name = getIdentifierName(candidate.name as AnyNode | undefined);
 		return name ? [name] : [];
 	});
+	// In a scoped module a spread may carry a caller's class. HTML keeps only the
+	// first of two class attributes, so the spread leaves `class` to one slot that
+	// writes the scope class beside whatever the caller passed.
+	const spreadCount = elementAttributes.filter(isSpreadAttribute).length;
+	let spreadClassResidue: SemanticMarkupResidue | null = null;
 	for (const attribute of elementAttributes) {
 		if (isSpreadAttribute(attribute)) {
 			const expression = unwrapExpressionContainer(
@@ -414,13 +419,23 @@ function emitNode(
 				// object is one the author built: it keeps every key it carries.
 				const spreadsRestBinding =
 					context.restName !== null && getIdentifierName(expression) === context.restName;
+				const residue = expressionResidue(expression, context, repeat, builder.componentName);
+				const excludeNames = spreadsRestBinding
+					? [...new Set([...declaredAttributeNames, ...context.destructuredNames])]
+					: [...declaredAttributeNames];
+				if (
+					context.styleScopeClass &&
+					spreadCount === 1 &&
+					!declaredAttributeNames.includes('class')
+				) {
+					spreadClassResidue = memberResidue(residue, 'class');
+					if (spreadClassResidue && !excludeNames.includes('class')) excludeNames.push('class');
+				}
 				addSlot(builder, {
 					kind: 'spread-attributes',
 					coordinate: { kind: 'child-index', path },
-					residue: expressionResidue(expression, context, repeat, builder.componentName),
-					excludeNames: spreadsRestBinding
-						? [...new Set([...declaredAttributeNames, ...context.destructuredNames])]
-						: declaredAttributeNames,
+					residue,
+					excludeNames,
 					...(context.destructuredNames.length > 0
 						? { destructuredNames: context.destructuredNames }
 						: {}),
@@ -505,8 +520,19 @@ function emitNode(
 		});
 		if (alwaysPresent) append(builder, scopeSuffix ? ` ${scopeSuffix}"` : '"');
 	}
-	if (context.styleScopeClass && !classSeen)
-		append(builder, ` class="${context.styleScopeClass}"`);
+	if (context.styleScopeClass && !classSeen) {
+		if (spreadClassResidue) {
+			append(builder, ` class="${context.styleScopeClass} `);
+			addSlot(builder, {
+				kind: 'attribute',
+				name: 'class',
+				coordinate: { kind: 'child-index', path },
+				residue: spreadClassResidue,
+				alwaysPresent: true,
+			});
+			append(builder, '"');
+		} else append(builder, ` class="${context.styleScopeClass}"`);
+	}
 	append(builder, '>');
 	emitNodes(asNodes(node.children), [...path, 0], builder, context, repeat);
 	append(builder, `</${tagName}>`);
@@ -829,6 +855,15 @@ function expressionResidue(
 	return computedRead?.computedGraphNodeId && !spendsRosterCount(context, componentName, source)
 		? { kind: 'graph-read', graphNodeId: computedRead.computedGraphNodeId, path: [] }
 		: { kind: 'authored-expression', source };
+}
+
+/** One member of the object a residue reads, or null for a residue that is not an object read. */
+function memberResidue(residue: SemanticMarkupResidue, member: string): SemanticMarkupResidue | null {
+	if (residue.kind === 'graph-read' || residue.kind === 'repeat-item')
+		return { ...residue, path: [...residue.path, member] };
+	if (residue.kind === 'authored-expression')
+		return { kind: 'authored-expression', source: `(${residue.source})?.${member}` };
+	return null;
 }
 
 function spendsRosterCount(
