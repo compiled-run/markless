@@ -36,36 +36,35 @@ export default function CodePanel({
 					}
 				</div>
 			</tabs.list>
-			<div class="panes">
-				@for (const pane of list; key pane.value) {
-					<tabs.content class="pane" value={pane.value}>
-						<collapsible.root class="clamp">
-							<div class="code">
-								<pre class="shiki">
-									@for (const line of pane.lines; key line.id) {
-										<span class="line">
-											@for (const token of line.tokens; key token.id) {
-												{/* The two repeats need a host element over them, and only one of
-												    them has anything in it: `@if` hangs this build. */}
-												<span class="run">
-													@for (const run of token.plain; key run.id) {
-														<span style={run.style}>{run.text}</span>
-													}
-													@for (const run of token.hover; key run.id) {
-														<span class="tsrx-hover" tabindex="0" role="img" aria-label={run.label} data-doc-title={run.title} data-doc={run.doc}><span style={run.style}>{run.text}</span><span class="tsrx-tip" aria-hidden="true"><span class="tsrx-tip-title">{run.title}</span><span class="tsrx-tip-body">{run.doc}</span></span></span>
-													}
-												</span>
-											}
-										</span>
-									}
-								</pre>
-							</div>
-							<span class="fade" aria-hidden="true"></span>
-							<collapsible.trigger class="expand">Expand code</collapsible.trigger>
-						</collapsible.root>
-					</tabs.content>
-				}
-			</div>
+			{/* One clamp round every tab: expanding once lifts the ceiling for every file. */}
+			<collapsible.root class="clamp">
+				<div class="code">
+					@for (const pane of list; key pane.value) {
+						<tabs.content class="pane" value={pane.value}>
+							<pre class="shiki">
+								@for (const line of pane.lines; key line.id) {
+									<span class="line">
+										@for (const token of line.tokens; key token.id) {
+											{/* The two repeats need a host element over them, and only one of
+											    them has anything in it: `@if` hangs this build. */}
+											<span class="run">
+												@for (const run of token.plain; key run.id) {
+													<span style={run.style}>{run.text}</span>
+												}
+												@for (const run of token.hover; key run.id) {
+													<span class="tsrx-hover" tabindex="0" role="img" aria-label={run.label} data-doc-title={run.title} data-doc={run.doc}><span style={run.style}>{run.text}</span><span class="tsrx-tip" aria-hidden="true"><span class="tsrx-tip-title">{run.title}</span><span class="tsrx-tip-body">{run.doc}</span></span></span>
+												}
+											</span>
+										}
+									</span>
+								}
+							</pre>
+						</tabs.content>
+					}
+				</div>
+				<span class="fade" aria-hidden="true"></span>
+				<collapsible.trigger class="expand">Expand code</collapsible.trigger>
+			</collapsible.root>
 		</tabs.root>
 
 		<style>

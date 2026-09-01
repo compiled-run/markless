@@ -22,7 +22,8 @@ import {
 	type ControlValue,
 } from '../components/docs/playground/slot-text.ts';
 import type { FamilyMeta, FamilyPreset, PropRef } from '../components/docs/ui-meta/index.ts';
-import type { CodeLine, CodeRun, CodeToken } from './ui-demos.ts';
+import { RUN_TYPES, docsMarkup, runMarkup, type Doc, type Line, type Run } from './ui-code-runs.ts';
+import { docRules } from './ui-playground-css.ts';
 
 /**
  * The generated module is written to disk rather than served from a virtual id:
@@ -278,8 +279,10 @@ export type PlaygroundControl = {
 	readonly part: string;
 	readonly prop: string;
 	readonly kind: 'toggle' | 'select' | 'textbox' | 'event';
-	/** The prop's type text, shown in the control's info tip and typing the cell. */
+	/** The prop's type text, on the last line of the control's hint and typing the cell. */
 	readonly type: string;
+	/** What the prop does, a sentence or two from the manifest, for the control's hint. */
+	readonly doc: string;
 	readonly options: readonly string[];
 	/** `cMultiple` — the cell the demo's prop reads. */
 	readonly cell: string;
@@ -300,6 +303,17 @@ export type PlaygroundControl = {
 	/** `onChange` only: the callback's parameter type. */
 	readonly parameter?: string;
 };
+
+/**
+ * The manifest doc cut down to a hint: its first paragraph, the first two
+ * sentences of that, and the backticks dropped since the tip is mono already.
+ */
+function hintDoc(doc: string | undefined): string {
+	const paragraph = (doc ?? '').split(/\n[ \t]*\n/)[0].replace(/\s+/g, ' ').trim();
+	const sentences = paragraph.match(/[^.!?]+[.!?]+(?=\s|$)/g);
+	const cut = sentences ? sentences.slice(0, 2).join('').trim() : paragraph;
+	return cut.replaceAll('`', '');
+}
 
 function identifier(prop: string): string {
 	return prop.charAt(0).toUpperCase() + prop.slice(1).replace(/[^A-Za-z0-9]/g, '');
@@ -389,6 +403,7 @@ function controlOf(
 			prop: ref.prop,
 			kind: 'event',
 			type: descriptor.type,
+			doc: hintDoc(prop.doc),
 			options: [],
 			...cells,
 			cell: 'logging',
@@ -426,6 +441,7 @@ function controlOf(
 		prop: ref.prop,
 		kind,
 		type: descriptor.type,
+		doc: hintDoc(prop.doc),
 		options,
 		...cells,
 		holds,
@@ -530,43 +546,31 @@ function displaySource(demo: DemoAnalysis, slots: readonly CodeSlot[]): string {
 }
 
 type LineSegment =
-	| { readonly kind: 'tokens'; readonly tokens: readonly CodeToken[] }
-	| { readonly kind: 'slot'; readonly style: string; readonly slot: CodeSlot };
+	| { readonly kind: 'runs'; readonly runs: readonly Run[] }
+	| { readonly kind: 'slot'; readonly class?: string; readonly slot: CodeSlot };
 
 type PanelLine =
-	| { readonly kind: 'plain'; readonly line: CodeLine }
+	| { readonly kind: 'plain'; readonly line: Line }
 	| { readonly kind: 'split'; readonly id: string; readonly segments: readonly LineSegment[] };
 
-function hasSlot(token: CodeToken): boolean {
-	for (const run of token.plain) if (SLOT_PATTERN.test(run.text)) return true;
-	for (const run of token.hover) if (SLOT_PATTERN.test(run.text)) return true;
-	return false;
-}
-
-function runsOf(token: CodeToken): readonly CodeRun[] {
-	return token.hover.length > 0 ? token.hover : token.plain;
-}
-
-function withRuns(token: CodeToken, runs: readonly CodeRun[]): CodeToken {
-	return token.hover.length > 0 ? { ...token, hover: runs as CodeToken['hover'] } : { ...token, plain: runs };
-}
-
 /** Drops `char` from the edge of the neighbouring text, when it is there to drop. */
-function trimEdge(tokens: readonly CodeToken[], char: string, side: 'end' | 'start'): readonly CodeToken[] {
-	if (char === '' || tokens.length === 0) return tokens;
-	const at = side === 'end' ? tokens.length - 1 : 0;
-	const token = tokens[at];
-	const runs = runsOf(token);
-	if (runs.length === 0) return tokens;
-	const run = runs[side === 'end' ? runs.length - 1 : 0];
+function trimEdge(runs: readonly Run[], char: string, side: 'end' | 'start'): readonly Run[] {
+	if (char === '' || runs.length === 0) return runs;
+	const at = side === 'end' ? runs.length - 1 : 0;
+	const run = runs[at];
 	const matches = side === 'end' ? run.text.endsWith(char) : run.text.startsWith(char);
-	if (!matches) return tokens;
+	if (!matches) return runs;
 	const text = side === 'end' ? run.text.slice(0, -char.length) : run.text.slice(char.length);
-	const kept = text === '' ? runs.filter((one) => one !== run) : runs.map((one) => (one === run ? { ...one, text } : one));
-	const next = [...tokens];
-	if (kept.length === 0) next.splice(at, 1);
-	else next[at] = withRuns(token, kept);
+	const next = [...runs];
+	if (text === '') next.splice(at, 1);
+	else next[at] = { ...run, text };
 	return next;
+}
+
+/** The colour class alone: a piece cut off a run keeps its colour, not its hover. */
+function colourOf(run: Run): string | undefined {
+	const kept = (run.class ?? '').replace(/\btsrx-hover\b/, '').trim();
+	return kept === '' ? undefined : kept;
 }
 
 /**
@@ -575,33 +579,33 @@ function trimEdge(tokens: readonly CodeToken[], char: string, side: 'end' | 'sta
  * either side of a sentinel — the space before an attribute, the quotes round a
  * value — is dropped from the still text because the slot prints it itself.
  */
-function panelLines(lines: readonly CodeLine[], slots: readonly CodeSlot[]): readonly PanelLine[] {
+function panelLines(lines: readonly Line[], slots: readonly CodeSlot[]): readonly PanelLine[] {
 	return lines.map((line) => {
-		if (slots.length === 0 || !line.tokens.some(hasSlot)) return { kind: 'plain', line };
+		if (slots.length === 0 || !line.runs.some((run) => SLOT_PATTERN.test(run.text)))
+			return { kind: 'plain', line };
 		const segments: LineSegment[] = [];
-		let run: CodeToken[] = [];
+		let held: Run[] = [];
 		let serial = 0;
 		const flush = () => {
-			if (run.length > 0) segments.push({ kind: 'tokens', tokens: run });
-			run = [];
+			if (held.length > 0) segments.push({ kind: 'runs', runs: held });
+			held = [];
 		};
-		for (const token of line.tokens) {
-			const runs = [...token.plain, ...token.hover];
-			const carrier = runs.find((one) => SLOT_PATTERN.test(one.text));
-			if (!carrier) {
-				run.push(token);
+		for (const run of line.runs) {
+			if (!SLOT_PATTERN.test(run.text)) {
+				held.push(run);
 				continue;
 			}
-			for (const part of carrier.text.split(SLOT_PATTERN)) {
+			const colour = colourOf(run);
+			for (const part of run.text.split(SLOT_PATTERN)) {
 				const at = slots.findIndex((_, index) => part === SLOT(index));
 				if (at >= 0) {
 					flush();
-					segments.push({ kind: 'slot', style: carrier.style, slot: slots[at] });
+					segments.push({ kind: 'slot', class: colour, slot: slots[at] });
 					continue;
 				}
 				if (part === '') continue;
 				serial += 1;
-				run.push({ id: `${token.id}s${serial}`, plain: [{ id: `${token.id}r${serial}`, text: part, style: carrier.style }], hover: [] });
+				held.push({ id: `${run.id}s${serial}`, text: part, ...(colour === undefined ? {} : { class: colour }) });
 			}
 		}
 		flush();
@@ -609,13 +613,17 @@ function panelLines(lines: readonly CodeLine[], slots: readonly CodeSlot[]): rea
 			const segment = segments[at];
 			if (segment.kind !== 'slot') continue;
 			const previous = segments[at - 1];
-			if (previous?.kind === 'tokens')
-				segments[at - 1] = { kind: 'tokens', tokens: trimEdge(previous.tokens, segment.slot.before, 'end') };
+			if (previous?.kind === 'runs')
+				segments[at - 1] = { kind: 'runs', runs: trimEdge(previous.runs, segment.slot.before, 'end') };
 			const following = segments[at + 1];
-			if (following?.kind === 'tokens')
-				segments[at + 1] = { kind: 'tokens', tokens: trimEdge(following.tokens, segment.slot.after, 'start') };
+			if (following?.kind === 'runs')
+				segments[at + 1] = { kind: 'runs', runs: trimEdge(following.runs, segment.slot.after, 'start') };
 		}
-		return { kind: 'split', id: line.id, segments: segments.filter((segment) => segment.kind === 'slot' || segment.tokens.length > 0) };
+		return {
+			kind: 'split',
+			id: line.id,
+			segments: segments.filter((segment) => segment.kind === 'slot' || segment.runs.length > 0),
+		};
 	});
 }
 
@@ -674,8 +682,12 @@ type Emit = {
 
 function hintFor(control: PlaygroundControl): string {
 	return `					<tooltip.root class="pg-hint">
-						<tooltip.trigger class="pg-dot" aria-label="Type of ${control.prop}">?</tooltip.trigger>
-						<tooltip.content class="pg-tip">{${quote(control.type)}}</tooltip.content>
+						<tooltip.trigger class="pg-dot" aria-label="About ${control.prop}">?</tooltip.trigger>
+						<tooltip.content class="pg-tip">
+							<span class="tsrx-tip-title">${control.prop}</span>
+							<span class="tsrx-tip-body">{${quote(control.doc)}}</span>
+							<span class="tsrx-tip-type">{${quote(control.type)}}</span>
+						</tooltip.content>
 					</tooltip.root>`;
 }
 
@@ -812,42 +824,25 @@ function demoBody(demo: DemoAnalysis): string {
 function lineMarkup(list: string, indent: string): string {
 	return `${indent}@for (const line of ${list}; key line.id) {
 ${indent}	<span class="pg-line">
-${indent}		@for (const token of line.tokens; key token.id) {
-${indent}			<span class="pg-run">
-${tokenRuns(`${indent}				`)}
-${indent}			</span>
-${indent}		}
-${indent}	</span>
-${indent}}`;
-}
-
-function tokenRuns(indent: string): string {
-	return `${indent}@for (const run of token.plain; key run.id) {
-${indent}	<span style={run.style}>{run.text}</span>
-${indent}}
-${indent}@for (const run of token.hover; key run.id) {
-${indent}	<span class="tsrx-hover" tabindex="0" role="img" aria-label={run.label} data-doc-title={run.title} data-doc={run.doc}><span style={run.style}>{run.text}</span><span class="tsrx-tip" aria-hidden="true"><span class="tsrx-tip-title">{run.title}</span><span class="tsrx-tip-body">{run.doc}</span></span></span>
-${indent}}`;
-}
-
-function tokenListMarkup(list: string, indent: string): string {
-	return `${indent}@for (const token of ${list}; key token.id) {
-${indent}	<span class="pg-run">
-${tokenRuns(`${indent}		`)}
+${runMarkup(`${indent}\t\t`)}
 ${indent}	</span>
 ${indent}}`;
 }
 
 type PaneEmission = { readonly consts: string[]; readonly markup: string };
 
+/**
+ * A pane's markup: plain lines as keyed repeats over module constants, and a
+ * line holding a slot written out with the slot as a text run bound to its cell.
+ */
 function paneMarkup(lines: readonly PanelLine[], prefix: string, indent: string): PaneEmission {
 	const consts: string[] = [];
 	const chunks: string[] = [];
-	let plain: CodeLine[] = [];
+	let plain: Line[] = [];
 	const flush = () => {
 		if (plain.length === 0) return;
 		const name = `${prefix}${consts.length}`;
-		consts.push(`const ${name} = ${JSON.stringify(plain)};`);
+		consts.push(`const ${name}: readonly Line[] = ${JSON.stringify(plain)};`);
 		chunks.push(lineMarkup(name, indent));
 		plain = [];
 	};
@@ -859,14 +854,14 @@ function paneMarkup(lines: readonly PanelLine[], prefix: string, indent: string)
 		flush();
 		const inner: string[] = [];
 		for (const segment of entry.segments) {
-			if (segment.kind === 'tokens') {
+			if (segment.kind === 'runs') {
 				const name = `${prefix}${consts.length}`;
-				consts.push(`const ${name} = ${JSON.stringify(segment.tokens)};`);
-				inner.push(tokenListMarkup(name, `${indent}\t`));
+				consts.push(`const ${name}: readonly Run[] = ${JSON.stringify(segment.runs)};`);
+				inner.push(runMarkup(`${indent}\t`, name));
 				continue;
 			}
-			const style = segment.style === '' ? '' : ` style=${quote(segment.style)}`;
-			inner.push(`${indent}\t<span class="pg-run"><span${style}>{${segment.slot.control.text}}</span></span>`);
+			const cls = segment.class === undefined ? '' : ` class=${quote(segment.class)}`;
+			inner.push(`${indent}\t<span${cls}>{${segment.slot.control.text}}</span>`);
 		}
 		chunks.push(`${indent}<span class="pg-line">\n${inner.join('\n')}\n${indent}</span>`);
 	}
@@ -894,17 +889,11 @@ export function codePanelChrome(input: {
 		.join('\n');
 	const panes = input.panes
 		.map(
-			(pane) => `${indent}\t\t<tabs.content class="pg-pane" value=${quote(pane.value)}>
-${indent}\t\t\t<collapsible.root class="pg-clamp">
-${indent}\t\t\t\t<div class="pg-code-body">
+			(pane) => `${indent}\t\t\t\t<tabs.content class="pg-pane" value=${quote(pane.value)}>
 ${indent}\t\t\t\t\t<pre class="pg-shiki shiki">
 ${pane.markup}
 ${indent}\t\t\t\t\t</pre>
-${indent}\t\t\t\t</div>
-${indent}\t\t\t\t<span class="pg-fade" aria-hidden="true"></span>
-${indent}\t\t\t\t<collapsible.trigger class="pg-expand">Expand code</collapsible.trigger>
-${indent}\t\t\t</collapsible.root>
-${indent}\t\t</tabs.content>`,
+${indent}\t\t\t\t</tabs.content>`,
 		)
 		.join('\n');
 	return `${indent}<div class="pg-panel-outer" data-scenario=${quote(input.scenario)}>
@@ -916,9 +905,15 @@ ${tabs}
 ${indent}\t\t\t\t</div>
 ${indent}\t\t\t</tabs.list>${input.bar === undefined ? '' : `\n${input.bar}`}
 ${indent}\t\t</div>
-${indent}\t\t<div class="pg-panes">
+${indent}\t\t<collapsible.root class="pg-clamp">
+${indent}\t\t\t<div class="pg-code-body">
+${indent}\t\t\t\t<div class="pg-panes">
 ${panes}
-${indent}\t\t</div>
+${indent}\t\t\t\t</div>
+${indent}\t\t\t</div>
+${indent}\t\t\t<span class="pg-fade" aria-hidden="true"></span>
+${indent}\t\t\t<collapsible.trigger class="pg-expand">Expand code</collapsible.trigger>
+${indent}\t\t</collapsible.root>
 ${indent}\t</tabs.root>
 ${indent}</div>`;
 }
@@ -928,8 +923,12 @@ export type PlaygroundInput = {
 	readonly meta: FamilyMeta;
 	readonly controls: readonly PlaygroundControl[];
 	readonly slots: readonly CodeSlot[];
-	readonly sourceLines: readonly CodeLine[];
-	readonly cssLines: readonly CodeLine[];
+	readonly sourceLines: readonly Line[];
+	readonly cssLines: readonly Line[];
+	/** Every distinct hover doc of both panes, for the card's registry. */
+	readonly docs: readonly Doc[];
+	/** The colour classes the runs of both panes point at. */
+	readonly colourCss: string;
 	readonly sourceLabel: string;
 	readonly cssLabel: string;
 	readonly chromeCss: string;
@@ -994,6 +993,13 @@ export function playgroundModule(input: PlaygroundInput): string {
 		);
 	const emit: Emit = { controls, slots };
 
+	// A sentinel the highlighter documented becomes a slot, so its doc is never pointed at.
+	const pointed = new Set<string>();
+	for (const line of [...input.sourceLines, ...input.cssLines])
+		for (const run of line.runs)
+			if (run.doc !== undefined && !SLOT_PATTERN.test(run.text)) pointed.add(run.doc);
+	const docs = input.docs.filter((doc) => pointed.has(doc.n));
+
 	const source = paneMarkup(panelLines(input.sourceLines, slots), 'srcLines', '\t\t\t\t\t\t\t\t\t');
 	const css = paneMarkup(panelLines(input.cssLines, []), 'cssLines', '\t\t\t\t\t\t\t\t\t');
 
@@ -1029,8 +1035,11 @@ export function playgroundModule(input: PlaygroundInput): string {
 import { ${families.join(', ')} } from '@markless/ui';
 import { attributeText, heldList, listText, pickValue, toggled, valueText } from '../slot-text.ts';
 
+${RUN_TYPES}
+
 ${source.consts.join('\n')}
 ${css.consts.join('\n')}
+const docs: readonly Doc[] = ${JSON.stringify(docs)};
 ${presetTable(controls, presets)}
 
 export default function ${componentName(demo.family, demo.stem)}() @{
@@ -1061,9 +1070,14 @@ ${rest}
 		<div class="pg-code">
 ${codePanelChrome({ scenario: `${demo.family}/${demo.stem}`, panes, bar: scenarioBar(emit, presets), indent: '\t\t\t' })}
 		</div>
+${docsMarkup('\t\t')}
 
 		<style>
 ${input.chromeCss}
+
+${input.colourCss}
+
+${docRules(docs.map((doc) => doc.n), '.pg')}
 
 ${demo.css}
 		</style>
