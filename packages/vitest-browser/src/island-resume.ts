@@ -17,6 +17,8 @@ type MarklessRosterResumeHost = {
 type IslandResumeInput = {
 	readonly root: Element & { __asyncResumeRuntimeStarted?: boolean };
 	readonly event: Event | 0;
+	/** The record the inline resumer matched on its walk; null for its broad sweep. */
+	readonly eventRecord?: unknown;
 };
 
 /**
@@ -47,6 +49,11 @@ export function createIslandResumeContainerEvent(
 		});
 		// `0` is the inline resumer's self-wake spelling; the runtime accepts it
 		// the same way the router's emitted resume entry passes it through.
-		await runtime.dispatch(input.event as never, { syncPolicyAlreadyApplied: true });
+		// Record-less forwards are the inline resumer's broad sweep and pass through;
+		// a forward that named a record and matches nothing is the refusal's case.
+		await runtime.dispatch(input.event as never, {
+			syncPolicyAlreadyApplied: true,
+			ignoreUnmatched: input.eventRecord == null,
+		});
 	};
 }
