@@ -15,6 +15,7 @@ import {
 	type MdxComponentArtifact,
 	type MdxRoutePart,
 } from '../../router/src/vite/runtime/mdx-route.ts';
+import { protocolIslandSegment } from '../../serializer/src/protocol-constants.ts';
 
 // Node-side vitest plugin for SSR/resume browser tests. It rewrites
 // renderSSR(Component), renderSSRIslands([Component, ...]),
@@ -47,12 +48,9 @@ export type SsrIslandInput = {
 };
 
 // The island discriminator the router mints per composed MDX child
-// (`packages/router/src/vite/mdx.ts`, componentPart). It is written inline
-// there, so there is nothing to import; the harness has to spell it to compose
-// the same page shape.
-function islandPrefix(index: number): string {
-	return `m${index}:`;
-}
+// (`packages/router/src/vite/mdx.ts`, componentPart), from the package that owns
+// the grammar — so the SSR and CSR island levers cannot drift from the route.
+const islandPrefix = protocolIslandSegment;
 
 // A real module id plus a query, not a bare `virtual:` id: the generated module
 // then resolves its own relative imports against this directory, and the served
