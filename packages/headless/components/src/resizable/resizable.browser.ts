@@ -13,6 +13,7 @@ import {
 import Basic from './scenarios/basic.tsrx';
 import Collapsible from './scenarios/collapsible.tsrx';
 import Controlled from './scenarios/controlled.tsrx';
+import MultiEmbed from './scenarios/multi-embed.tsrx';
 import Disabled from './scenarios/disabled.tsrx';
 import FineStep from './scenarios/fine-step.tsrx';
 import Nested from './scenarios/nested.tsrx';
@@ -561,6 +562,17 @@ test('CSR: a controlled widget moves only when the record comes back in', async 
 	el<HTMLButtonElement>(Reset).click();
 	await expect.poll(() => el(Nav).getAttribute('ui-size')).toBe('30');
 	expect(el(Main).getAttribute('ui-size')).toBe('70');
+});
+
+// The counter-evidence the multi-embed suite's expected red cites: under a plain
+// mount the same scenario follows sizes the page writes in, so what fails under a
+// composed multi-island mount is the composition, not this family.
+test('CSR: sizes written in before any gesture still move the panels', async () => {
+	await render(MultiEmbed);
+
+	expect(el(Nav).getAttribute('ui-size')).toBe('30');
+	el<HTMLButtonElement>(page.getByTestId('step')).click();
+	await expect.poll(() => el(Nav).getAttribute('ui-size')).toBe('45');
 });
 
 // ----------------------------------------------------------------------- math
