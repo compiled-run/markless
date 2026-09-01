@@ -9,6 +9,7 @@ import Disabled from './scenarios/disabled.tsrx';
 import Form from './scenarios/form.tsrx';
 import Nested from './scenarios/nested.tsrx';
 import ServedOpen from './scenarios/served-open.tsrx';
+import SpentTrigger from './scenarios/spent-trigger.tsrx';
 import Unnamed from './scenarios/unnamed.tsrx';
 import WithOnChange from './scenarios/with-onchange.tsrx';
 import WithoutOnChange from './scenarios/without-onchange.tsrx';
@@ -552,6 +553,25 @@ test('CSR: a disabled trigger does not open the dialog and a disabled close does
 	// Escape is the way out of a dialog whose close button is disabled.
 	await userEvent.keyboard('{Escape}');
 	await expect.poll(() => el(OpenBackdrop).hasAttribute('hidden')).toBe(true);
+});
+
+// An open question, not a bug the family may answer on its own. `focusBackToOpener`
+// knows two openers - the trigger it saw pressed, and the reading the overlay
+// behaviour took - and a trigger the page turned off while the dialog was up is
+// neither: `.focus()` on it does nothing, the surface goes `hidden` under the
+// cursor, and the page is left on the body with no way back by keyboard. Where
+// focus SHOULD land has no answer in SPEC.md, and inventing one (the root? the
+// nearest still-focusable part? nothing at all?) is the owner's call, so this
+// records the symptom rather than picking.
+test.fails('CSR: closing leaves focus somewhere reachable when the trigger was turned off', async () => {
+	await render(SpentTrigger);
+	el(Trigger).click();
+	await expect.poll(() => el(Backdrop).hasAttribute('hidden')).toBe(false);
+	expect(el<HTMLButtonElement>(Trigger).disabled).toBe(true);
+
+	el(Close).click();
+	await expect.poll(() => el(Backdrop).hasAttribute('hidden')).toBe(true);
+	expect(document.activeElement).not.toBe(document.body);
 });
 
 test('CSR: a form inside the surface saves and the dialog closes with focus restored', async () => {

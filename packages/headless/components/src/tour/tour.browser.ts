@@ -20,6 +20,9 @@ const SaveCount = page.getByTestId('save-count');
 const SaveForward = page.getByTestId('save-forward');
 const SaveBack = page.getByTestId('save-back');
 const ShareBack = page.getByTestId('share-back');
+const ShareForward = page.getByTestId('share-forward');
+const TrashBack = page.getByTestId('trash-back');
+const TrashForward = page.getByTestId('trash-forward');
 const SaveClose = page.getByTestId('save-close');
 const Opener = page.getByTestId('opener');
 const Closer = page.getByTestId('closer');
@@ -155,6 +158,71 @@ for (const mode of MODES) {
 		el(ShareBack).click();
 		await expect.poll(() => el(StepSave).hasAttribute('hidden')).toBe(false);
 		expect(el(Step).textContent).toBe('0');
+	});
+
+	// Whether Back is off is a fact about the step showing now, so it moves as the
+	// tour walks. It reads only the step, the loop flag and the lock, which is what
+	// lets it live in a named cell of its own.
+	test(`${mode}: the back trigger is off at the first step and on everywhere after`, async () => {
+		const { container } = mode === 'CSR' ? await render(Basic) : await renderSSR(Basic);
+		void container;
+
+		await openBasic();
+		expect(el<HTMLButtonElement>(SaveBack).disabled).toBe(true);
+		expect(el<HTMLButtonElement>(SaveForward).disabled).toBe(false);
+
+		el(SaveForward).click();
+		await expect.poll(() => el(StepShare).hasAttribute('hidden')).toBe(false);
+		expect(el<HTMLButtonElement>(ShareBack).disabled).toBe(false);
+
+		el(ShareBack).click();
+		await expect.poll(() => el(StepSave).hasAttribute('hidden')).toBe(false);
+		expect(el<HTMLButtonElement>(SaveBack).disabled).toBe(true);
+	});
+
+	// Next is the mirror of the row above and cannot be written the same way. Its
+	// condition needs the step COUNT, which only the roster of bound cards knows,
+	// and the count is spelled inline in the attribute because the compiler refuses
+	// both ways out: a second computed() reading the roster in this component is
+	// MARKLESS_ELEMENT_HANDLE_UNBOUND, and a computed() consuming the count cell
+	// publishes a placeholder. So the attribute renders once, against step 0, and
+	// never moves: Next stays pressable on the last step. `walk()` still refuses to
+	// go anywhere, so the tour cannot run off the end - what is wrong is only what
+	// the control says about itself, which is what a screen reader conveys.
+	test.fails(`${mode}: the forward trigger turns off on the last step`, async () => {
+		const { container } = mode === 'CSR' ? await render(Basic) : await renderSSR(Basic);
+		void container;
+
+		await openBasic();
+		el(SaveForward).click();
+		await expect.poll(() => el(StepShare).hasAttribute('hidden')).toBe(false);
+		el(ShareForward).click();
+		await expect.poll(() => el(StepTrash).hasAttribute('hidden')).toBe(false);
+
+		expect(el(Step).textContent).toBe('2');
+		expect(el<HTMLButtonElement>(TrashForward).disabled).toBe(true);
+	});
+
+	// The end is held anyway: pressing a Next the attribute left pressable moves
+	// nothing, because `walk()` clamps at the last step.
+	test(`${mode}: the tour never walks off the last step`, async () => {
+		const { container } = mode === 'CSR' ? await render(Basic) : await renderSSR(Basic);
+		void container;
+
+		await openBasic();
+		el(SaveForward).click();
+		await expect.poll(() => el(StepShare).hasAttribute('hidden')).toBe(false);
+		el(ShareForward).click();
+		await expect.poll(() => el(StepTrash).hasAttribute('hidden')).toBe(false);
+
+		el(TrashForward).click();
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(el(Step).textContent).toBe('2');
+		expect(el(StepTrash).hasAttribute('hidden')).toBe(false);
+
+		el(TrashBack).click();
+		await expect.poll(() => el(StepShare).hasAttribute('hidden')).toBe(false);
+		expect(el(Step).textContent).toBe('1');
 	});
 
 	test(`${mode}: Escape closes the tour from anywhere`, async () => {

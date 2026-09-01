@@ -314,6 +314,25 @@ test('CSR: a showing tip never hides on its own', async () => {
 	expectShowing(el(BoldContent));
 });
 
+// WCAG 1.4.13 persistent, the mixed-input half: hover and focus are two separate
+// reasons for a tip to be up, and the pointer wandering off does not take away
+// the one the keyboard put there. A sighted keyboard user still reading the tip
+// is not served by `aria-describedby` alone.
+test('CSR: the pointer leaving does not hide a tip the focused trigger is holding open', async () => {
+	await render(Basic);
+	el<HTMLElement>(Trigger).focus();
+	await expect.poll(() => el(Content).hasAttribute('hidden')).toBe(false);
+
+	enter(el(Trigger));
+	leave(el(Trigger), document.body);
+	await wait(100);
+	expectShowing(el(Content));
+
+	// Focus leaving is the reason that IS left, so it still hides.
+	el<HTMLElement>(Trigger).blur();
+	await expect.poll(() => el(Content).hasAttribute('hidden')).toBe(true);
+});
+
 test('CSR: Escape hides the tip with focus still on the trigger', async () => {
 	await render(Basic);
 	el<HTMLElement>(Trigger).focus();

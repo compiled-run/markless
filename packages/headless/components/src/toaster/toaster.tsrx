@@ -31,6 +31,8 @@ export const toasterState = shared(
 			queue: [],
 			paused: false,
 			pausedAt: 0,
+			hovered: false,
+			focused: false,
 			minted: 0,
 			ticker: 0,
 		});
@@ -63,13 +65,23 @@ export const toasterState = shared(
 				toaster.queue = dismiss(toaster.queue, id);
 			},
 			/** Hovering or tabbing in stops every clock, WCAG 2.2.2's own rule. */
-			pause() {
+			pause(isPointer: boolean) {
+				if (isPointer === true) toaster.hovered = true;
+				else toaster.focused = true;
 				if (toaster.paused) return;
 				toaster.pausedAt = Date.now();
 				toaster.queue = holdAll(toaster.queue, Date.now());
 				toaster.paused = true;
 			},
-			resume() {
+			/** Both reasons have to be gone: the flags are read before this call clears its own. */
+			resume(isPointer: boolean) {
+				const wasHovered = toaster.hovered;
+				const wasFocused = toaster.focused;
+				if (isPointer === true) toaster.hovered = false;
+				else toaster.focused = false;
+				const stillHovered = isPointer === true ? false : wasHovered;
+				const stillFocused = isPointer === true ? wasFocused : false;
+				if (stillHovered === true || stillFocused === true) return;
 				if (toaster.paused !== true) return;
 				toaster.queue = releaseAll(toaster.queue, Date.now());
 				toaster.paused = false;
@@ -118,19 +130,19 @@ export function ToasterRoot({
 		ui-toaster=""
 		ui-paused={toaster.paused}
 		onPointerover={(event) => {
-			toaster.pause();
+			toaster.pause(true);
 			onPointerover?.(event);
 		}}
 		onPointerout={(event) => {
-			toaster.resume();
+			toaster.resume(true);
 			onPointerout?.(event);
 		}}
 		onFocusin={(event) => {
-			toaster.pause();
+			toaster.pause(false);
 			onFocusin?.(event);
 		}}
 		onFocusout={(event) => {
-			toaster.resume();
+			toaster.resume(false);
 			onFocusout?.(event);
 		}}
 	>

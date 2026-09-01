@@ -330,6 +330,24 @@ test('CSR: the pointer leaving the whole card hides it after the close delay, no
 	await expect.poll(() => el(Content).hasAttribute('hidden'), { timeout: 2000 }).toBe(true);
 });
 
+// The mixed-input half of the Tab rows above: once focus is inside the card, the
+// pointer is no longer what is keeping it up, and the close delay running out
+// would pull the surface out from under the cursor - `hidden` cannot hold focus,
+// so the page would be left on the body.
+test('CSR: the pointer leaving does not hide a card that holds focus', async () => {
+	await render(Rich);
+	el<HTMLElement>(Trigger).focus();
+	await expect.poll(() => el(Content).hasAttribute('hidden'), { timeout: 2000 }).toBe(false);
+
+	await userEvent.keyboard('{Tab}');
+	expect(document.activeElement).toBe(el(CardName));
+
+	leave(el(Content), document.body);
+	await wait(CLOSE_DELAY + 200);
+	expectShowing(el(Content), el(Trigger));
+	expect(document.activeElement).toBe(el(CardName));
+});
+
 // WCAG 1.4.13 persistent. A regression here is silent: an auto-hide looks like
 // nothing at all until someone is still reading when it goes.
 test('CSR: a showing card never hides on its own', async () => {
