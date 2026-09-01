@@ -971,6 +971,12 @@ html {
 	padding: 0.4em 0.6em 0.5em;
 }
 
+/* A token with no sentence gets a title-only tip rather than an empty padded
+   strip. The panel always draws the element, so the emptiness is decided here. */
+.tsrx-tip-body:empty {
+	display: none;
+}
+
 /* ---------------------------------------------------------------------------
    Keycaps in the keyboard tables (components/docs/keyboard-table.tsrx). A real
    `<kbd>` drawn as a key: the heavier bottom edge is what makes a chip read as
@@ -989,6 +995,21 @@ html {
 
 /* Empty on the first keycap of a row, so it reserves nothing there. */
 .kbd-join:empty {
+	display: none;
+}
+
+/* Both forms of every cap are in the HTML and one is shown, because the server
+   has no user agent to read. With no class stamped yet the plain-word form
+   stands, since it is the one that reads on either keyboard. */
+.kbd.is-mac {
+	display: none;
+}
+
+html.is-mac .kbd.is-mac {
+	display: inline-block;
+}
+
+html.is-mac .kbd.is-other {
 	display: none;
 }
 

@@ -45,19 +45,33 @@ function readFamily(root: string, family: string): Demo[] {
 	return demos;
 }
 
-/** One run of code the panel draws, carrying whatever the highlighter said about it. */
-export type CodeToken = {
+/** One run of code, coloured and nothing else. */
+export type CodeRun = {
 	/** Unique within its line, because `@for` needs a key and two runs can read alike. */
 	readonly id: string;
 	readonly text: string;
 	/** Shiki's inline colours, light plus the `--shiki-dark` channel. Empty when unstyled. */
 	readonly style: string;
-	/** Hover heading, when the highlighter wrapped this run in a `.tsrx-hover`. */
-	readonly title?: string;
-	/** Hover body. */
-	readonly doc?: string;
+};
+
+/** A run the highlighter documented, carrying everything its hover doc needs. */
+export type HoverRun = CodeRun & {
+	/** The line shown in bold at the top of the doc. */
+	readonly title: string;
+	/** The sentence under it. Empty when the token has none. */
+	readonly doc: string;
 	/** What a screen reader is told the hover says. */
-	readonly label?: string;
+	readonly label: string;
+};
+
+/**
+ * One run of code the panel draws. Exactly one list is filled; a repeat over the
+ * empty one draws nothing, which is how the panel picks a shape without `@if`.
+ */
+export type CodeToken = {
+	readonly id: string;
+	readonly plain: readonly CodeRun[];
+	readonly hover: readonly HoverRun[];
 };
 
 /** One source line. `id` exists because `@for` needs a key. */
@@ -118,6 +132,26 @@ type Frame = {
 	readonly quiet: boolean;
 };
 
+/** A run as the parser accumulates it, before it is sorted into the two lists. */
+type RawToken = {
+	text: string;
+	readonly style: string;
+	readonly title?: string;
+	readonly doc?: string;
+	readonly label?: string;
+};
+
+function paint(raw: RawToken, index: number): CodeToken {
+	const id = `t${index}`;
+	const run = { id, text: raw.text, style: raw.style };
+	if (raw.title === undefined || raw.title === '') return { id, plain: [run], hover: [] };
+	return {
+		id,
+		plain: [],
+		hover: [{ ...run, title: raw.title, doc: raw.doc ?? '', label: raw.label ?? raw.title }],
+	};
+}
+
 /**
  * Reads the highlighter's own markup back into data the panel can draw with
  * `@for`. Markless has no way to drop a string of HTML into a component, so the
@@ -134,7 +168,7 @@ function parseHighlighted(html: string): CodeLine[] {
 	const body = start < 0 || end < 0 ? html : html.slice(start + 1, end);
 	return body.split('\n').map((raw, index) => {
 		const stack: Frame[] = [{ style: '', quiet: false }];
-		const tokens: CodeToken[] = [];
+		const tokens: RawToken[] = [];
 		TAG_OR_TEXT.lastIndex = 0;
 		for (const match of raw.matchAll(TAG_OR_TEXT)) {
 			const [, closing, , attributes, text] = match;
@@ -150,10 +184,9 @@ function parseHighlighted(html: string): CodeLine[] {
 					last.doc === top.doc &&
 					last.label === top.label
 				)
-					tokens[tokens.length - 1] = { ...last, text: last.text + content };
+					last.text += content;
 				else
 					tokens.push({
-						id: `t${tokens.length}`,
 						text: content,
 						style: top.style,
 						title: top.title,
@@ -180,7 +213,7 @@ function parseHighlighted(html: string): CodeLine[] {
 				quiet: top.quiet || className.split(/\s+/).includes('tsrx-tip'),
 			});
 		}
-		return { id: `l${index}`, tokens };
+		return { id: `l${index}`, tokens: tokens.map(paint) };
 	});
 }
 

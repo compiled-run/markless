@@ -4,10 +4,12 @@
 // nowhere else. `rows` is still accepted for a table with no family behind it.
 //
 // Every keycap is drawn as a symbol and labelled with the plain word, so a
-// screen reader says "Enter" where the page shows ⏎. Keycap styling lives in
+// screen reader says "Enter" where the page shows ⏎. Both platform forms ship in
+// the HTML and CSS shows one, because the server has no user agent; the probe
+// below stamps `is-mac` or `is-other` on <html>. Keycap styling lives in
 // styles/global.css, not in a block here: a component whose only styling is its
 // own style block renders unstyled on this build (NOTES.md finding 26).
-import { formFor, metaFor, type KeyPlatform } from './ui-meta/index.ts';
+import { metaFor } from './ui-meta/index.ts';
 
 export type KeyboardRow = {
 	/** One keycap per entry: `['Enter', 'Space']` draws two. */
@@ -18,41 +20,48 @@ export type KeyboardRow = {
 	readonly does: string;
 };
 
+// No `&`, `<` or `>`: the HTML parser does not decode entities inside a script,
+// so anything the serializer escapes would reach the browser as a syntax error.
+const PLATFORM_PROBE =
+	"(function(){var d=document.documentElement,u=navigator.userAgentData,p=(u?u.platform:'')||navigator.platform||'';d.classList.add(/mac|iphone|ipad|ipod/i.test(p)?'is-mac':'is-other')})()";
+
 export default function KeyboardTable({
 	family,
 	rows,
-	platform,
 }: {
 	readonly family?: string;
 	readonly rows?: readonly KeyboardRow[];
-	/** Which keyboard the caps are drawn for. The server has no user agent, so it draws the symbol form. */
-	readonly platform?: KeyPlatform;
 }) @{
 	const source = rows
 		? rows.map((row) => ({
 				does: row.does,
 				join: row.join ?? 'or',
-				forms: row.keys.map((key) => ({ symbol: key, label: key })),
+				caps: row.keys.map((key) => ({ mac: { symbol: key, label: key }, other: { symbol: key, label: key } })),
 			}))
 		: metaFor(family ?? '').keyboard.map((row) => ({
 				does: row.does,
 				join: row.join ?? 'or',
-				forms: row.caps.map((cap) => formFor(cap, platform ?? 'mac')),
+				caps: row.caps,
 			}));
 
 	// The separator is folded into each keycap as the thing drawn before it, because
 	// a loop cannot interleave a second element between its own iterations.
 	const painted = source.map((row) => ({
 		does: row.does,
-		caps: row.forms.map((form, index) => ({
-			symbol: form.symbol,
-			label: form.label,
+		caps: row.caps.map((cap, index) => ({
+			macSymbol: cap.mac.symbol,
+			macLabel: cap.mac.label,
+			otherSymbol: cap.other.symbol,
+			otherLabel: cap.other.label,
 			id: row.does + ':' + index,
 			lead: index === 0 ? '' : row.join,
 		})),
 	}));
 
+	// A script is a legal child of <table>, so the probe runs while the parser is
+	// still above the rows and no cap is ever painted in the wrong form.
 	<table class="keyboard-table">
+		<script>{PLATFORM_PROBE}</script>
 		<thead>
 			<tr>
 				<th>Key</th>
@@ -66,7 +75,8 @@ export default function KeyboardTable({
 						@for (const cap of row.caps; key cap.id) {
 							<span class="kbd-cap">
 								<span class="kbd-join">{cap.lead}</span>
-								<kbd class="kbd" role="img" aria-label={cap.label}>{cap.symbol}</kbd>
+								<kbd class="kbd is-mac" role="img" aria-label={cap.macLabel}>{cap.macSymbol}</kbd>
+								<kbd class="kbd is-other" role="img" aria-label={cap.otherLabel}>{cap.otherSymbol}</kbd>
 							</span>
 						}
 					</td>

@@ -14,8 +14,11 @@ rows come from `components/docs/ui-meta/accordion.ts`, the one hand-authored fil
 
 ## Keyboard
 
-Every keycap shows a symbol and carries its plain word, so a screen reader says "Enter" where the
-page shows a return glyph.
+Every cap ships in both forms — what a Mac keyboard prints and what everything else prints — and
+CSS shows one, because the server has no user agent to read. A probe in the table stamps `is-mac` or
+`is-other` on the document before the rows are parsed, and with neither class the plain-word form
+stands. Each form carries its own plain word, so a screen reader says "Enter" where a Mac reader
+sees a return glyph.
 
 <KeyboardTable family="accordion" />
 
