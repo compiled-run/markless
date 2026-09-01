@@ -14,6 +14,12 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { createHighlighter, type HighlighterGeneric } from 'shiki';
 import { docForToken, knownTokens, tooltipLabel, tooltipTitle } from './tsrx-docs.ts';
+import {
+	createQuickInfoService,
+	hasQuickInfo,
+	type QuickInfo,
+	type QuickInfoService,
+} from './twoslash-quickinfo.ts';
 
 /** Fence language -> the language shiki is asked for. */
 const FENCE_ALIASES: Readonly<Record<string, string>> = {
@@ -31,6 +37,13 @@ const LIGHT_THEME = 'github-light';
 const DARK_THEME = 'github-dark';
 
 let highlighterPromise: Promise<HighlighterGeneric<string, string>> | undefined;
+let quickInfoService: QuickInfoService | undefined;
+
+/** Built on the first fence that could use it: standing up the program costs a moment. */
+function quickInfo(): QuickInfoService {
+	quickInfoService ??= createQuickInfoService();
+	return quickInfoService;
+}
 
 export function getHighlighter(): Promise<HighlighterGeneric<string, string>> {
 	highlighterPromise ??= (async () => {
@@ -97,20 +110,30 @@ function escapeText(text: string): string {
 	return text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 }
 
+/**
+ * The site's one hover shape: `data-doc-title` is the line shown in bold,
+ * `data-doc` the sentence under it, and the inline `.tsrx-tip` is what a reader
+ * without a pointer sees. A token with no sentence gets a title-only tip rather
+ * than an empty padded strip.
+ */
+function hoverMarkup(rendered: string, title: string, doc: string, label: string): string {
+	return [
+		'<span class="tsrx-hover" tabindex="0" role="img"',
+		` aria-label="${escapeAttribute(label)}"`,
+		` data-doc-title="${escapeAttribute(title)}" data-doc="${escapeAttribute(doc)}">`,
+		rendered,
+		'<span class="tsrx-tip" aria-hidden="true">',
+		`<span class="tsrx-tip-title">${escapeText(title)}</span>`,
+		doc ? `<span class="tsrx-tip-body">${escapeText(doc)}</span>` : '',
+		'</span></span>',
+	].join('');
+}
+
 function hoverSpan(token: string, rendered: string): string {
 	const doc = docForToken(token);
 	if (!doc) return rendered;
 	const title = tooltipTitle(token, doc);
-	return [
-		'<span class="tsrx-hover" tabindex="0" role="img"',
-		` aria-label="${escapeAttribute(tooltipLabel(token, doc))}"`,
-		` data-doc-title="${escapeAttribute(title)}" data-doc="${escapeAttribute(doc.doc)}">`,
-		rendered,
-		'<span class="tsrx-tip" aria-hidden="true">',
-		`<span class="tsrx-tip-title">${escapeText(title)}</span>`,
-		`<span class="tsrx-tip-body">${escapeText(doc.doc)}</span>`,
-		'</span></span>',
-	].join('');
+	return hoverMarkup(rendered, title, doc.doc, tooltipLabel(token, doc));
 }
 
 /** Alternation of every documented token, longest first, ready to embed in a regex. */
@@ -141,6 +164,84 @@ export function addTsrxHovers(html: string): string {
 			return rendered === escapeText(token) ? match : `${open}${lead}${rendered}${close}`;
 		},
 	);
+}
+
+/** Text runs and tags, in the order shiki wrote them. */
+const HTML_PIECE = /<[^>]*>|[^<]+/g;
+
+/** A hover target has to be one whole word: a run of code, never part of one. */
+const WHOLE_TOKEN = /^[\w$.]+$/;
+
+/**
+ * Wraps every shiki span whose text is one identifier the type checker resolved.
+ * The span's text is matched against the fence source by walking the rendered
+ * HTML and counting decoded text, which is exact because shiki emits the code
+ * verbatim; a span holding anything but one bare word is left alone, as is any
+ * token `tsrx-docs.ts` already explains — those keep the hand-written prose and
+ * are wrapped afterwards by `addTsrxHovers`.
+ *
+ * For a span like `accordion.root`, the hover shows the type of the part the
+ * span ends on, which is what an editor shows with the caret on `root`.
+ */
+export function addQuickInfoHovers(
+	html: string,
+	code: string,
+	infos: readonly QuickInfo[],
+): string {
+	if (infos.length === 0) return html;
+	const byEnd = new Map<number, QuickInfo>();
+	for (const info of infos) {
+		const end = info.start + info.length;
+		const held = byEnd.get(end);
+		if (!held || held.length > info.length) byEnd.set(end, info);
+	}
+
+	let out = '';
+	let offset = 0;
+	let open: string | undefined;
+	let buffer = '';
+	let bufferStart = 0;
+	const close = (): string => {
+		const text = decodeEntities(buffer);
+		const token = text.trim();
+		const lead = text.length - text.trimStart().length;
+		const plain = `${open}${buffer}</span>`;
+		if (!WHOLE_TOKEN.test(token) || docForToken(token)) return plain;
+		const start = bufferStart + lead;
+		const info = byEnd.get(start + token.length);
+		if (!info || info.start < start) return plain;
+		const wrapped = hoverMarkup(
+			escapeText(token),
+			info.signature,
+			info.doc,
+			info.doc ? `${info.signature}. ${info.doc}` : info.signature,
+		);
+		return `${open}${buffer.slice(0, lead)}${wrapped}${buffer.slice(lead + token.length)}</span>`;
+	};
+
+	for (const piece of html.match(HTML_PIECE) ?? []) {
+		if (!piece.startsWith('<')) {
+			if (open === undefined) out += piece;
+			else buffer += piece;
+			offset += decodeEntities(piece).length;
+			continue;
+		}
+		if (open === undefined) {
+			if (piece.startsWith('<span style="')) {
+				open = piece;
+				buffer = '';
+				bufferStart = offset;
+			} else out += piece;
+		} else if (piece === '</span>') {
+			out += close();
+			open = undefined;
+		} else {
+			// A tag inside the span means it is no longer one bare word; hand it back.
+			out += `${open}${buffer}${piece}`;
+			open = undefined;
+		}
+	}
+	return open === undefined ? out : `${out}${open}${buffer}`;
 }
 
 /**
@@ -186,7 +287,14 @@ export async function highlightFences(html: string): Promise<string> {
 			// single-theme output with one extra custom property beside it.
 			defaultColor: 'light',
 		});
-		return addTsrxHovers(useSiteSurface(rendered, lightForeground, darkForeground)).replace(
+		// Real types first: the quick-info pass reads the rendered code by counting
+		// characters, and the tooltip text `addTsrxHovers` injects is not code.
+		const typed = addQuickInfoHovers(
+			useSiteSurface(rendered, lightForeground, darkForeground),
+			code,
+			hasQuickInfo(fenceLanguage) ? quickInfo().queryFence(code, fenceLanguage) : [],
+		);
+		return addTsrxHovers(typed).replace(
 			'<pre class="shiki',
 			`<pre data-lang="${fenceLanguage}" class="shiki`,
 		);
