@@ -4,6 +4,7 @@ import {
 	protocolInstancePath,
 	protocolInstanceSegment,
 	protocolProjectionSegment,
+	protocolRowSegment,
 } from '../../serializer/src/protocol.ts';
 import { protocolIslandSegment } from '../../serializer/src/protocol-constants.ts';
 import {
@@ -15,6 +16,8 @@ import {
 import {
 	marklessInstanceScopedGraph,
 	marklessInstanceScopedLoadSymbol,
+	marklessRecordRowScope,
+	marklessRowScopedGraph,
 } from '../src/fns/instance-scope.ts';
 
 // The browser copy of composition restates the page-space families and the
@@ -214,4 +217,57 @@ test('a composed symbol remaps context.read through the same child route as its 
 	symbol({ graph: { read }, read });
 
 	expect(reads).toEqual([`${instancePath}state:count`, `${instancePath}state:count`]);
+});
+
+// Resume's loader strips the row off a row instance's symbol id and scopes the
+// symbol at the full path; a route loader beneath it sees only the row-free id
+// and scopes again at that path. One instance, so the row path is applied once.
+test('a loader nested under resume scopes the row-free id onto the row path once', () => {
+	const island = protocolIslandSegment(0);
+	const edge = protocolInstanceSegment(0) + protocolProjectionSegment(1);
+	const withRow = island + protocolRowSegment('styles') + edge;
+	let read = '';
+	const inner = marklessInstanceScopedLoadSymbol(() => (context) => {
+		read = String(context.graph.read('computed:isSelected'));
+		return null;
+	});
+	const outer = marklessInstanceScopedLoadSymbol((symbolId) => {
+		expect(symbolId).toBe(`${island}${edge}symbol:7`);
+		return inner(symbolId);
+	});
+	const symbol = outer(`${withRow}symbol:7`) as (context: {
+		readonly graph: { readonly read: (graphNodeId: string) => unknown };
+	}) => unknown;
+	symbol({ graph: { read: (graphNodeId: string) => graphNodeId } });
+	expect(read).toBe(`${withRow}computed:isSelected`);
+});
+
+// A part rendered in a repeat row roots its widget under the row, while its
+// dispatching bound symbol spells the edge path with no row. The dispatched
+// record's row bridges the two, and it must still bridge them when a segment
+// stands ahead of the row: an island's segment made the row-free readings
+// answer first, with the island-level template root, and the write landed on a
+// node no rendered row owns.
+test('a row widget resolves to its own row root behind an island segment', () => {
+	const row = protocolRowSegment('styles');
+	const part = 'shared:src/tabs.tsrx#tabsPartState';
+	const tabs = 'shared:src/tabs.tsrx#tabsState';
+	for (const island of ['', protocolIslandSegment(0)]) {
+		const rowRoot = `${island}${row}c0:p1:p2:`;
+		const definitions = [
+			{ id: `${island}c0:${tabs}`, scope: 'widget' },
+			{ id: `${rowRoot}${part}`, scope: 'widget' },
+			{ id: `${island}c0:p1:${part}`, scope: 'widget' },
+			{ id: `${island}${part}`, scope: 'widget' },
+		];
+		const graph = {
+			listSharedDefinitions: () => definitions,
+			read: (graphNodeId: string) => graphNodeId,
+		} as never;
+		const scope = marklessRecordRowScope(`${island}${row}c2:h2`, graph);
+		expect(scope).toBeDefined();
+		const scoped = marklessRowScopedGraph(graph, scope!);
+		expect(scoped.read(`${island}c0:p1:${part}/state:part`)).toBe(`${rowRoot}${part}/state:part`);
+		expect(scoped.read(`${island}c0:${tabs}/state:tabs`)).toBe(`${island}c0:${tabs}/state:tabs`);
+	}
 });

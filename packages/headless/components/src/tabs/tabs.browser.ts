@@ -1,4 +1,4 @@
-import { render, renderSSR } from '@markless/vitest-browser';
+import { render, renderCsrIslands, renderSSR, renderSSRIslands } from '@markless/vitest-browser';
 import { page, userEvent } from 'vite-plus/test/browser';
 import { expect, test } from 'vitest';
 import ArmTabs from './scenarios/arm-tabs.tsrx';
@@ -579,6 +579,49 @@ test('SSR: a click back onto the first tab shows the first panel', async () => {
 	await renderSSR(PanesStaticSecond);
 	staticTriggers()[0]!.click();
 	await expect.poll(() => staticPanes()[0]!.hasAttribute('hidden')).toBe(false);
+});
+
+// The docs site composes the page from islands: an island segment stands ahead of
+// every id, including the row of a repeat-minted trigger, and a click must still
+// reach that row's own part cell with the island's path applied exactly once.
+async function expectFirstIslandPanelMoves() {
+	expect(staticPanes().length).toBe(6);
+	staticTriggers()[0]!.click();
+	await expect.poll(() => staticTriggers()[0]!.getAttribute('aria-selected')).toBe('true');
+	await expect.poll(() => staticPanes()[0]!.hasAttribute('hidden')).toBe(false);
+	expect(staticPanes().map((p) => p.hasAttribute('hidden'))).toEqual([false, true, true, true, false, true]);
+	expect(staticTriggers()[3]!.getAttribute('aria-selected')).toBe('false');
+	expect(staticTriggers()[4]!.getAttribute('aria-selected')).toBe('true');
+}
+
+test('CSR islands: clicking a tab in the first island shows its panel and leaves the second island put', async () => {
+	await renderCsrIslands([PanesStaticSecond, PanesStaticSecond]);
+	await expectFirstIslandPanelMoves();
+});
+
+test('SSR islands: clicking a tab in the first island shows its panel and leaves the second island put', async () => {
+	await renderSSRIslands([PanesStaticSecond, PanesStaticSecond]);
+	await expectFirstIslandPanelMoves();
+});
+
+async function expectFirstIslandCodePanelMoves() {
+	expect(panelPanes().length).toBe(4);
+	panelTriggers()[1]!.click();
+	await expect.poll(() => panelTriggers()[1]!.getAttribute('aria-selected')).toBe('true');
+	await expect.poll(() => panelPanes()[1]!.hasAttribute('hidden')).toBe(false);
+	expect(panelPanes().map((p) => p.hasAttribute('hidden'))).toEqual([true, false, false, true]);
+	expect(panelTriggers()[2]!.getAttribute('aria-selected')).toBe('true');
+	expect(panelTriggers()[3]!.getAttribute('aria-selected')).toBe('false');
+}
+
+test('CSR islands: clicking a tab in the first docs code panel shows its panel and leaves the second put', async () => {
+	await renderCsrIslands([CodePanel, CodePanel]);
+	await expectFirstIslandCodePanelMoves();
+});
+
+test('SSR islands: clicking a tab in the first docs code panel shows its panel and leaves the second put', async () => {
+	await renderSSRIslands([CodePanel, CodePanel]);
+	await expectFirstIslandCodePanelMoves();
 });
 
 test('SSR: the keyboard walk works on a resumed page', async () => {
