@@ -3,6 +3,7 @@ import axe from 'axe-core';
 import { page, userEvent } from 'vite-plus/test/browser';
 import { expect, test } from 'vitest';
 import Controlled from './scenarios/controlled.tsrx';
+import DisabledForm from './scenarios/disabled-form.tsrx';
 import Mention from './scenarios/mention.tsrx';
 import Prefilled from './scenarios/prefilled.tsrx';
 import PromptForm from './scenarios/prompt-form.tsrx';
@@ -522,6 +523,36 @@ for (const mode of MODES) {
 		await expect.poll(() => el(Submitted).textContent).toBe(
 			'[{"kind":"text","text":"hi "},{"kind":"token","value":"u_1","label":"Alice Chen"}]',
 		);
+	});
+
+	// A disabled control is barred from submission by the platform, so the flag has
+	// to reach the hidden input and not just the editing surface.
+	test(`${mode}: a disabled box submits nothing`, async () => {
+		if (mode === 'CSR') await render(DisabledForm);
+		else await renderSSR(DisabledForm);
+
+		const hidden = el(page.getByTestId('field')).querySelector('input');
+		expect(hidden).not.toBe(null);
+		expect((hidden as HTMLInputElement).disabled).toBe(true);
+		at('submit').click();
+		await expect.poll(() => el(Submitted).textContent).toBe('absent');
+	});
+
+	// The splice is guarded in the shared method rather than in the handler, so a
+	// paste onto a surface the browser is not letting anyone edit inserts nothing.
+	test(`${mode}: a paste into a disabled box inserts nothing`, async () => {
+		if (mode === 'CSR') await render(DisabledForm);
+		else await renderSSR(DisabledForm);
+
+		const before = el(Input).textContent;
+		const transfer = new DataTransfer();
+		transfer.setData('text/plain', 'intruder');
+		el(Input).dispatchEvent(
+			new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: transfer }),
+		);
+
+		await expect.poll(() => el(Input).textContent).toBe(before);
+		expect(el(Input).textContent).not.toContain('intruder');
 	});
 
 	test(`${mode}: the error is named ahead of the hint, and carries an alert role`, async () => {

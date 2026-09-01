@@ -6,6 +6,7 @@ import Basic from './scenarios/basic.tsrx';
 import Capped from './scenarios/capped.tsrx';
 import ConsumerState from './scenarios/consumer-state.tsrx';
 import Disabled from './scenarios/disabled.tsrx';
+import DisabledForm from './scenarios/disabled-form.tsrx';
 import DisplayOnly from './scenarios/display-only.tsrx';
 import Editable from './scenarios/editable.tsrx';
 import TopicsForm from './scenarios/topics-form.tsrx';
@@ -339,6 +340,21 @@ for (const mode of MODES) {
 		await expect
 			.poll(() => [...el(Field).querySelectorAll('input')].map((one) => one.value))
 			.toEqual(['beta', 'alpha']);
+	});
+
+	// A disabled control is barred from submission by the platform, so the flag has
+	// to reach the hidden inputs and not just the parts a person can touch.
+	test(`${mode}: a disabled row submits none of its tags`, async () => {
+		if (mode === 'CSR') await render(DisabledForm);
+		else await renderSSR(DisabledForm);
+
+		const hidden = [...el(Field).querySelectorAll('input')];
+		expect(hidden.map((one) => one.value)).toEqual(['news', 'sport']);
+		expect(hidden.map((one) => one.disabled)).toEqual([true, true]);
+		el(page.getByTestId('form')).dispatchEvent(
+			new Event('submit', { bubbles: true, cancelable: true }),
+		);
+		await expect.poll(() => el(page.getByTestId('submitted')).textContent).toBe('');
 	});
 
 	test(`${mode}: a consumer component inside the root reads the family's seeded state`, async () => {

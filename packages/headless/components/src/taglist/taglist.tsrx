@@ -500,7 +500,7 @@ export function TagListField({ ...rest }: TagListFieldProps) @{
 
 	<div {...rest} role="presentation">
 		@for (const tag of taglist.value; key tag) {
-			<input type="hidden" name={taglist.name} value={tag} />
+			<input type="hidden" name={taglist.name} value={tag} disabled={taglist.disabled} />
 		}
 	</div>
 }
