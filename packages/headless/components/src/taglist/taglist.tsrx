@@ -221,6 +221,13 @@ export function TagListInput({
 		aria-required={taglist.required ? 'true' : 'false'}
 		ui-empty={taglist.input === ''}
 		onInput={(event) => {
+			// The whole composition is taken once, at the end: a delimiter sitting
+			// inside a pre-edit is not a tag boundary yet.
+			if ((event as unknown as InputEvent).isComposing === true) {
+				onInput?.(event);
+				return;
+			}
+
 			const next = (event.target as HTMLInputElement).value;
 			const mark = taglist.delimiter;
 			const at = mark === '' ? -1 : next.lastIndexOf(mark);
@@ -242,6 +249,13 @@ export function TagListInput({
 			onPaste?.(event);
 		}}
 		onKeydown={(event) => {
+			// Both fields in this family: an IME accepts a candidate with Enter and
+			// drops a pre-edit with Escape, and neither is this row's commit.
+			if (event.isComposing === true) {
+				onKeydown?.(event);
+				return;
+			}
+
 			// Written out from event fields and graph state alone: the policy has to
 			// be readable before the handler symbol loads. ArrowLeft is absent on
 			// purpose - it walks only from an empty field or a caret already at 0,
@@ -456,6 +470,11 @@ export function TagListItemInput({
 		disabled={taglist.disabled}
 		aria-label={item.value}
 		onKeydown={(event) => {
+			if (event.isComposing === true) {
+				onKeydown?.(event);
+				return;
+			}
+
 			if (event.key === 'Enter' || event.key === 'Escape') event.preventDefault();
 
 			const move = editKey(event.key);
