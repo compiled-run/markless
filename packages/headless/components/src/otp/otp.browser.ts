@@ -470,11 +470,7 @@ test('CSR: a field with no onChange still fills its boxes', async () => {
 	expect(el<HTMLInputElement>(Field).value).toBe('12');
 });
 
-// Red once the wait-out was added: `OtpField`'s onInput (otp.tsrx) commits every
-// input event, so an autofill or re-paste of the code already held calls
-// `commit` again and onComplete fires a second time. Delete the pin when the
-// handler skips an input event whose value the field already holds.
-test.fails('CSR: onComplete fires once, on the keystroke that fills the last box', async () => {
+test('CSR: onComplete fires once, on the keystroke that fills the last box', async () => {
 	await render(WithOnComplete);
 	el(Field).focus();
 

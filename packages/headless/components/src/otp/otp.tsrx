@@ -16,6 +16,8 @@ export const otpState = shared(
 		});
 		const fieldEl = element<HTMLInputElement>();
 		const itemEls = element<HTMLDivElement[]>();
+		// The last code handed to the consumer. `onInput` writes the field's text into `otp.value` before `commit` runs, so this is the only thing left to compare a repeat against.
+		const reported = state({ code: '' });
 
 		return {
 			...otp,
@@ -38,8 +40,12 @@ export const otpState = shared(
 				// `maxlength` truncates typing but not a paste or autofill, so the slice is what enforces the length.
 				const code = otp.value.slice(0, length);
 				otp.value = code;
-				otp.onChange?.(code);
-				if (code.length === length) otp.onComplete?.(code);
+				// An input event carrying the code already reported changed nothing, so it reports nothing: autofill and a second paste of the same code both deliver one.
+				if (code !== reported.code) {
+					reported.code = code;
+					otp.onChange?.(code);
+					if (code.length === length) otp.onComplete?.(code);
+				}
 			},
 		};
 	},
