@@ -19,15 +19,6 @@ import { expect, test } from 'vitest';
 // Families still owed multi-embed conformance pins. Shrink this as waves land;
 // never grow it without a ruling.
 const ALLOWLIST: readonly string[] = [
-	'calendar',
-	'carousel',
-	'colorpicker',
-	'crop',
-	'fileupload',
-	'ink',
-	'pad',
-	'resizable',
-	'slider',
 ];
 
 // The registered family list, read from the package's own export surface rather
