@@ -1,0 +1,124 @@
+FAIL: light/390: the document is no wider than the viewport
+FAIL: dark/390: the document is no wider than the viewport
+ok: light/1280: seven generated code panels on the page (found 7)
+ok: light/1280 accordion/multiple: served source text copies back as the demo file minus its <style> (blank lines differ)
+ok: light/1280 accordion/multiple: Expand code opens the clamp (150px -> 534px)
+ok: light/1280 accordion/multiple: hovering 'AccordionMultiple' shows registry doc 0 ('function AccordionMultiple(): Element')
+ok: light/1280 accordion/multiple: no other registry doc shows while 'AccordionMultiple' is hovered
+ok: light/1280 accordion/disabled: served source text copies back as the demo file minus its <style> (blank lines differ)
+ok: light/1280 accordion/disabled: Expand code opens the clamp (150px -> 534px)
+ok: light/1280 accordion/disabled: hovering 'AccordionDisabled' shows registry doc 0 ('function AccordionDisabled(): Element')
+ok: light/1280 accordion/disabled: no other registry doc shows while 'AccordionDisabled' is hovered
+ok: light/1280 accordion/value: served source text copies back as the demo file minus its <style> (blank lines differ)
+ok: light/1280 accordion/value: Expand code opens the clamp (150px -> 411px)
+ok: light/1280 accordion/value: hovering 'AccordionValue' shows registry doc 0 ('function AccordionValue(): Element')
+ok: light/1280 accordion/value: no other registry doc shows while 'AccordionValue' is hovered
+ok: light/1280 accordion/find: served source text copies back as the demo file minus its <style> (blank lines differ)
+ok: light/1280 accordion/find: Expand code opens the clamp (150px -> 411px)
+ok: light/1280 accordion/find: hovering 'AccordionFind' shows registry doc 0 ('function AccordionFind(): Element')
+ok: light/1280 accordion/find: no other registry doc shows while 'AccordionFind' is hovered
+ok: light/1280 accordion/locked: served source text copies back as the demo file minus its <style> (blank lines differ)
+ok: light/1280 accordion/locked: Expand code opens the clamp (150px -> 411px)
+ok: light/1280 accordion/locked: hovering 'AccordionLocked' shows registry doc 0 ('function AccordionLocked(): Element')
+ok: light/1280 accordion/locked: no other registry doc shows while 'AccordionLocked' is hovered
+ok: light/1280 accordion/faq: served source text copies back as the demo file minus its <style> (blank lines differ)
+ok: light/1280 accordion/faq: Expand code opens the clamp (150px -> 984px)
+ok: light/1280 accordion/faq: hovering 'Faq' shows registry doc 0 ('function Faq(): Element')
+ok: light/1280 accordion/faq: no other registry doc shows while 'Faq' is hovered
+ok: light/1280 accordion/settings: served source text copies back as the demo file minus its <style> (blank lines differ)
+ok: light/1280 accordion/settings: Expand code opens the clamp (150px -> 1251px)
+ok: light/1280 accordion/settings: hovering 'Settings' shows registry doc 0 ('function Settings(): Element')
+ok: light/1280 accordion/settings: no other registry doc shows while 'Settings' is hovered
+ok: light/1280: the document is no wider than the viewport
+ok: light/1280: no page errors ()
+ok: light/390: seven generated code panels on the page (found 7)
+ok: light/390 accordion/multiple: served source text copies back as the demo file minus its <style> (blank lines differ)
+ok: light/390 accordion/multiple: Expand code opens the clamp (150px -> 519px)
+ok: light/390 accordion/multiple: hovering 'AccordionMultiple' shows registry doc 0 ('function AccordionMultiple(): Element')
+ok: light/390 accordion/multiple: no other registry doc shows while 'AccordionMultiple' is hovered
+ok: light/390 accordion/disabled: served source text copies back as the demo file minus its <style> (blank lines differ)
+ok: light/390 accordion/disabled: Expand code opens the clamp (150px -> 519px)
+ok: light/390 accordion/disabled: hovering 'AccordionDisabled' shows registry doc 0 ('function AccordionDisabled(): Element')
+ok: light/390 accordion/disabled: no other registry doc shows while 'AccordionDisabled' is hovered
+ok: light/390 accordion/value: served source text copies back as the demo file minus its <style> (blank lines differ)
+ok: light/390 accordion/value: Expand code opens the clamp (150px -> 398px)
+ok: light/390 accordion/value: hovering 'AccordionValue' shows registry doc 0 ('function AccordionValue(): Element')
+ok: light/390 accordion/value: no other registry doc shows while 'AccordionValue' is hovered
+ok: light/390 accordion/find: served source text copies back as the demo file minus its <style> (blank lines differ)
+ok: light/390 accordion/find: Expand code opens the clamp (150px -> 398px)
+ok: light/390 accordion/find: hovering 'AccordionFind' shows registry doc 0 ('function AccordionFind(): Element')
+ok: light/390 accordion/find: no other registry doc shows while 'AccordionFind' is hovered
+ok: light/390 accordion/locked: served source text copies back as the demo file minus its <style> (blank lines differ)
+ok: light/390 accordion/locked: Expand code opens the clamp (150px -> 398px)
+ok: light/390 accordion/locked: hovering 'AccordionLocked' shows registry doc 0 ('function AccordionLocked(): Element')
+ok: light/390 accordion/locked: no other registry doc shows while 'AccordionLocked' is hovered
+ok: light/390 accordion/faq: served source text copies back as the demo file minus its <style> (blank lines differ)
+ok: light/390 accordion/faq: Expand code opens the clamp (150px -> 959px)
+ok: light/390 accordion/faq: hovering 'Faq' shows registry doc 0 ('function Faq(): Element')
+ok: light/390 accordion/faq: no other registry doc shows while 'Faq' is hovered
+ok: light/390 accordion/settings: served source text copies back as the demo file minus its <style> (blank lines differ)
+ok: light/390 accordion/settings: Expand code opens the clamp (150px -> 1219px)
+ok: light/390 accordion/settings: hovering 'Settings' shows registry doc 0 ('function Settings(): Element')
+ok: light/390 accordion/settings: no other registry doc shows while 'Settings' is hovered
+ok: light/390: no page errors ()
+ok: dark/1280: seven generated code panels on the page (found 7)
+ok: dark/1280 accordion/multiple: served source text copies back as the demo file minus its <style> (blank lines differ)
+ok: dark/1280 accordion/multiple: Expand code opens the clamp (150px -> 534px)
+ok: dark/1280 accordion/multiple: hovering 'AccordionMultiple' shows registry doc 0 ('function AccordionMultiple(): Element')
+ok: dark/1280 accordion/multiple: no other registry doc shows while 'AccordionMultiple' is hovered
+ok: dark/1280 accordion/disabled: served source text copies back as the demo file minus its <style> (blank lines differ)
+ok: dark/1280 accordion/disabled: Expand code opens the clamp (150px -> 534px)
+ok: dark/1280 accordion/disabled: hovering 'AccordionDisabled' shows registry doc 0 ('function AccordionDisabled(): Element')
+ok: dark/1280 accordion/disabled: no other registry doc shows while 'AccordionDisabled' is hovered
+ok: dark/1280 accordion/value: served source text copies back as the demo file minus its <style> (blank lines differ)
+ok: dark/1280 accordion/value: Expand code opens the clamp (150px -> 411px)
+ok: dark/1280 accordion/value: hovering 'AccordionValue' shows registry doc 0 ('function AccordionValue(): Element')
+ok: dark/1280 accordion/value: no other registry doc shows while 'AccordionValue' is hovered
+ok: dark/1280 accordion/find: served source text copies back as the demo file minus its <style> (blank lines differ)
+ok: dark/1280 accordion/find: Expand code opens the clamp (150px -> 411px)
+ok: dark/1280 accordion/find: hovering 'AccordionFind' shows registry doc 0 ('function AccordionFind(): Element')
+ok: dark/1280 accordion/find: no other registry doc shows while 'AccordionFind' is hovered
+ok: dark/1280 accordion/locked: served source text copies back as the demo file minus its <style> (blank lines differ)
+ok: dark/1280 accordion/locked: Expand code opens the clamp (150px -> 411px)
+ok: dark/1280 accordion/locked: hovering 'AccordionLocked' shows registry doc 0 ('function AccordionLocked(): Element')
+ok: dark/1280 accordion/locked: no other registry doc shows while 'AccordionLocked' is hovered
+ok: dark/1280 accordion/faq: served source text copies back as the demo file minus its <style> (blank lines differ)
+ok: dark/1280 accordion/faq: Expand code opens the clamp (150px -> 984px)
+ok: dark/1280 accordion/faq: hovering 'Faq' shows registry doc 0 ('function Faq(): Element')
+ok: dark/1280 accordion/faq: no other registry doc shows while 'Faq' is hovered
+ok: dark/1280 accordion/settings: served source text copies back as the demo file minus its <style> (blank lines differ)
+ok: dark/1280 accordion/settings: Expand code opens the clamp (150px -> 1251px)
+ok: dark/1280 accordion/settings: hovering 'Settings' shows registry doc 0 ('function Settings(): Element')
+ok: dark/1280 accordion/settings: no other registry doc shows while 'Settings' is hovered
+ok: dark/1280: the document is no wider than the viewport
+ok: dark/1280: no page errors ()
+ok: dark/390: seven generated code panels on the page (found 7)
+ok: dark/390 accordion/multiple: served source text copies back as the demo file minus its <style> (blank lines differ)
+ok: dark/390 accordion/multiple: Expand code opens the clamp (150px -> 519px)
+ok: dark/390 accordion/multiple: hovering 'AccordionMultiple' shows registry doc 0 ('function AccordionMultiple(): Element')
+ok: dark/390 accordion/multiple: no other registry doc shows while 'AccordionMultiple' is hovered
+ok: dark/390 accordion/disabled: served source text copies back as the demo file minus its <style> (blank lines differ)
+ok: dark/390 accordion/disabled: Expand code opens the clamp (150px -> 519px)
+ok: dark/390 accordion/disabled: hovering 'AccordionDisabled' shows registry doc 0 ('function AccordionDisabled(): Element')
+ok: dark/390 accordion/disabled: no other registry doc shows while 'AccordionDisabled' is hovered
+ok: dark/390 accordion/value: served source text copies back as the demo file minus its <style> (blank lines differ)
+ok: dark/390 accordion/value: Expand code opens the clamp (150px -> 398px)
+ok: dark/390 accordion/value: hovering 'AccordionValue' shows registry doc 0 ('function AccordionValue(): Element')
+ok: dark/390 accordion/value: no other registry doc shows while 'AccordionValue' is hovered
+ok: dark/390 accordion/find: served source text copies back as the demo file minus its <style> (blank lines differ)
+ok: dark/390 accordion/find: Expand code opens the clamp (150px -> 398px)
+ok: dark/390 accordion/find: hovering 'AccordionFind' shows registry doc 0 ('function AccordionFind(): Element')
+ok: dark/390 accordion/find: no other registry doc shows while 'AccordionFind' is hovered
+ok: dark/390 accordion/locked: served source text copies back as the demo file minus its <style> (blank lines differ)
+ok: dark/390 accordion/locked: Expand code opens the clamp (150px -> 398px)
+ok: dark/390 accordion/locked: hovering 'AccordionLocked' shows registry doc 0 ('function AccordionLocked(): Element')
+ok: dark/390 accordion/locked: no other registry doc shows while 'AccordionLocked' is hovered
+ok: dark/390 accordion/faq: served source text copies back as the demo file minus its <style> (blank lines differ)
+ok: dark/390 accordion/faq: Expand code opens the clamp (150px -> 959px)
+ok: dark/390 accordion/faq: hovering 'Faq' shows registry doc 0 ('function Faq(): Element')
+ok: dark/390 accordion/faq: no other registry doc shows while 'Faq' is hovered
+ok: dark/390 accordion/settings: served source text copies back as the demo file minus its <style> (blank lines differ)
+ok: dark/390 accordion/settings: Expand code opens the clamp (150px -> 1219px)
+ok: dark/390 accordion/settings: hovering 'Settings' shows registry doc 0 ('function Settings(): Element')
+ok: dark/390 accordion/settings: no other registry doc shows while 'Settings' is hovered
+ok: dark/390: no page errors ()

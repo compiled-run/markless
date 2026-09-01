@@ -874,6 +874,55 @@ function paneMarkup(lines: readonly PanelLine[], prefix: string, indent: string)
 	return { consts, markup: chunks.join('\n') };
 }
 
+/** One tab of the code chrome: the file name on the tab and the `<pre>` body as TSRX markup. */
+export type ChromePane = { readonly value: string; readonly label: string; readonly markup: string };
+
+/**
+ * The tabs-and-clamp chrome round highlighted code, shared by the playground and
+ * the standalone code panels so the two read as one thing. `bar` is extra
+ * markup for the strip row, the playground's scenario picker.
+ */
+export function codePanelChrome(input: {
+	readonly scenario: string;
+	readonly panes: readonly ChromePane[];
+	readonly bar?: string;
+	readonly indent: string;
+}): string {
+	const { indent } = input;
+	const tabs = input.panes
+		.map((pane) => `${indent}\t\t\t\t<tabs.trigger class="pg-tab" value=${quote(pane.value)}>${pane.label}</tabs.trigger>`)
+		.join('\n');
+	const panes = input.panes
+		.map(
+			(pane) => `${indent}\t\t<tabs.content class="pg-pane" value=${quote(pane.value)}>
+${indent}\t\t\t<collapsible.root class="pg-clamp">
+${indent}\t\t\t\t<div class="pg-code-body">
+${indent}\t\t\t\t\t<pre class="pg-shiki shiki">
+${pane.markup}
+${indent}\t\t\t\t\t</pre>
+${indent}\t\t\t\t</div>
+${indent}\t\t\t\t<span class="pg-fade" aria-hidden="true"></span>
+${indent}\t\t\t\t<collapsible.trigger class="pg-expand">Expand code</collapsible.trigger>
+${indent}\t\t\t</collapsible.root>
+${indent}\t\t</tabs.content>`,
+		)
+		.join('\n');
+	return `${indent}<div class="pg-panel-outer" data-scenario=${quote(input.scenario)}>
+${indent}\t<tabs.root class="pg-panel" value=${quote(input.panes[0].value)}>
+${indent}\t\t<div class="pg-bar">
+${indent}\t\t\t<tabs.list class="pg-strip">
+${indent}\t\t\t\t<div class="pg-strip-row" role="presentation">
+${tabs}
+${indent}\t\t\t\t</div>
+${indent}\t\t\t</tabs.list>${input.bar === undefined ? '' : `\n${input.bar}`}
+${indent}\t\t</div>
+${indent}\t\t<div class="pg-panes">
+${panes}
+${indent}\t\t</div>
+${indent}\t</tabs.root>
+${indent}</div>`;
+}
+
 export type PlaygroundInput = {
 	readonly demo: DemoAnalysis;
 	readonly meta: FamilyMeta;
@@ -973,26 +1022,8 @@ export function playgroundModule(input: PlaygroundInput): string {
 	const quick = controls.slice(0, meta.quick.length).map((control) => controlCell(emit, control)).join('\n\n');
 	const rest = controls.slice(meta.quick.length).map((control) => controlCell(emit, control)).join('\n\n');
 
-	const cssTab =
-		input.cssLines.length === 0
-			? ''
-			: `
-						<tabs.trigger class="pg-tab" value="css">${input.cssLabel}</tabs.trigger>`;
-	const cssPane =
-		input.cssLines.length === 0
-			? ''
-			: `
-						<tabs.content class="pg-pane" value="css">
-							<collapsible.root class="pg-clamp">
-								<div class="pg-code-body">
-									<pre class="pg-shiki shiki">
-${css.markup}
-									</pre>
-								</div>
-								<span class="pg-fade" aria-hidden="true"></span>
-								<collapsible.trigger class="pg-expand">Expand code</collapsible.trigger>
-							</collapsible.root>
-						</tabs.content>`;
+	const panes: ChromePane[] = [{ value: 'source', label: input.sourceLabel, markup: source.markup }];
+	if (input.cssLines.length > 0) panes.push({ value: 'css', label: input.cssLabel, markup: css.markup });
 
 	return `import { state } from '@markless/core';
 import { ${families.join(', ')} } from '@markless/ui';
@@ -1028,31 +1059,7 @@ ${rest}
 		</div>
 
 		<div class="pg-code">
-			<div class="pg-panel-outer" data-scenario=${quote(`${demo.family}/${demo.stem}`)}>
-				<tabs.root class="pg-panel" value="source">
-					<div class="pg-bar">
-						<tabs.list class="pg-strip">
-							<div class="pg-strip-row" role="presentation">
-								<tabs.trigger class="pg-tab" value="source">${input.sourceLabel}</tabs.trigger>${cssTab}
-							</div>
-						</tabs.list>
-${scenarioBar(emit, presets)}
-					</div>
-					<div class="pg-panes">
-						<tabs.content class="pg-pane" value="source">
-							<collapsible.root class="pg-clamp">
-								<div class="pg-code-body">
-									<pre class="pg-shiki shiki">
-${source.markup}
-									</pre>
-								</div>
-								<span class="pg-fade" aria-hidden="true"></span>
-								<collapsible.trigger class="pg-expand">Expand code</collapsible.trigger>
-							</collapsible.root>
-						</tabs.content>${cssPane}
-					</div>
-				</tabs.root>
-			</div>
+${codePanelChrome({ scenario: `${demo.family}/${demo.stem}`, panes, bar: scenarioBar(emit, presets), indent: '\t\t\t' })}
 		</div>
 
 		<style>
@@ -1065,4 +1072,4 @@ ${demo.css}
 `;
 }
 
-export { displaySource, componentName };
+export { displaySource, componentName, identifier };

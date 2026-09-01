@@ -1,16 +1,14 @@
 // The code under a demo: one pane per file the demo is made of, clipped to a
 // few lines until a reader asks for the rest.
 //
-// `panes` is not written by hand. A page names a demo — `<CodePanel
-// scenario="accordion/basic" />` — and `tooling/ui-demos.ts` fills the panes in
-// at build time, because @markless/router's MDX transform takes default imports
-// from `.tsrx` files only and a page therefore cannot import the data itself.
+// A page writes `<CodePanel scenario="accordion/basic" />`. At build time
+// `tooling/ui-demos.ts` swaps that tag for a module it generates from the demo
+// (`tooling/ui-code-panel.ts`: the code as literal markup, the playground's
+// chrome), so this component is what the page imports by name and what a
+// hand-written `panes` prop draws — a data-driven panel over highlighted runs.
 //
 // The tab strip is the tabs family and the expand mechanism is the collapsible
 // family, both from @markless/ui: the docs run on the components they document.
-// The code itself is spans carrying shiki's own colours, the same convention the
-// front page's hero card uses, because the highlighter's output is HTML and
-// Markless has no way to drop a string of HTML into a component.
 import { collapsible, tabs } from '@markless/ui';
 import type { CodePane } from '../../tooling/ui-demos.ts';
 

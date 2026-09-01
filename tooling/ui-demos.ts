@@ -8,6 +8,7 @@ import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import type { Plugin } from 'vite';
 import { highlightFences } from './highlight-code.ts';
+import { codePanelModule, codePanelName, codePanelPath, type PanelPane } from './ui-code-panel.ts';
 import { CHROME_CSS } from './ui-playground-css.ts';
 import {
 	analyzeDemo,
@@ -94,18 +95,6 @@ export type CodePane = {
 	/** What the tab strip shows — the file's own name, never a fixed label. */
 	readonly label: string;
 	readonly lines: readonly CodeLine[];
-};
-
-/** Everything the docs know about one demo file. */
-export type ScenarioCode = {
-	readonly stem: string;
-	readonly name: string;
-	readonly label: string;
-	/** The file as written, minus its `<style>` block. */
-	readonly sourceText: string;
-	/** The CSS from that block, dedented. Empty when the demo has none. */
-	readonly cssText: string;
-	readonly panes: readonly CodePane[];
 };
 
 const STYLE_BLOCK = /^[ \t]*<style>[ \t]*\n([\s\S]*?)\n[ \t]*<\/style>[ \t]*\n?/m;
@@ -264,30 +253,12 @@ function splitDemo(source: string): { readonly code: string; readonly css: strin
 	return { code: code.trimEnd(), css: dedent(found[1]) };
 }
 
-async function scenarioCode(family: string, demo: Demo): Promise<ScenarioCode> {
-	const source = readFileSync(demo.file, 'utf8');
-	const { code, css } = splitDemo(source);
-	const panes: CodePane[] = [
-		{ value: 'source', label: `${demo.stem}.tsrx`, lines: await highlightBlock(code, 'tsrx') },
-	];
-	if (css !== '')
-		panes.push({ value: 'css', label: `${family}.css`, lines: await highlightBlock(css, 'css') });
-	return {
-		stem: demo.stem,
-		name: demo.name,
-		label: `${demo.stem}.tsrx`,
-		sourceText: code,
-		cssText: css,
-		panes,
-	};
-}
-
 /**
  * Static imports and re-exports only. Each demo stays an ordinary .tsrx module
  * the Markless compiler sees on its own, and the family module is nothing but
  * bindings pointing at them.
  */
-async function moduleSource(family: string, demos: readonly Demo[]): Promise<string> {
+function moduleSource(demos: readonly Demo[]): string {
 	const lines = demos.map(
 		(demo, index) => `import demo${index} from ${JSON.stringify(demo.file)};`,
 	);
@@ -302,8 +273,6 @@ async function moduleSource(family: string, demos: readonly Demo[]): Promise<str
 			.map((demo) => `${JSON.stringify(demo.stem)}: ${JSON.stringify(readFileSync(demo.file, 'utf8'))}`)
 			.join(', ')}};`,
 	);
-	const scenarios = await Promise.all(demos.map((demo) => scenarioCode(family, demo)));
-	lines.push(`export const scenarios = ${JSON.stringify(scenarios)};`);
 	return `${lines.join('\n')}\n`;
 }
 
@@ -355,44 +324,82 @@ function expandMdxImports(code: string, id: string, root: string, watch: (file: 
 }
 
 // `<CodePanel scenario="accordion/basic" />` in an .mdx page. The family and the
-// demo file are named in the page; the panes are filled in below.
+// demo file are named in the page; the panel behind it is generated below.
 const SCENARIO_TAG =
 	/<([A-Z][A-Za-z0-9]*)((?:[^>"]|"[^"]*")*?)\sscenario="([a-z][a-z0-9-]*)\/([a-z0-9-]+)"((?:[^>"]|"[^"]*")*?)\/>/g;
 
 /**
- * Fills a code panel's `panes` in from the demo file the page named.
- *
- * A prop rather than an import because @markless/router's MDX transform takes
- * default imports from `.tsrx` specifiers only — a page cannot import the
- * scenario data, so the data has to arrive already written into the page.
+ * Writes a generated module only when its text changed. Pages are transformed
+ * in parallel with the modules they name being loaded, and rewriting an
+ * unchanged file truncates it for a moment that a concurrent load can land in.
  */
-async function injectScenarioTabs(
+function writeGenerated(file: string, text: string): void {
+	try {
+		if (readFileSync(file, 'utf8') === text) return;
+	} catch {}
+	mkdirSync(dirname(file), { recursive: true });
+	writeFileSync(file, text);
+}
+
+/** A page-relative specifier for a generated module. */
+function specifierFrom(id: string, file: string): string {
+	const specifier = relative(dirname(id.split('?', 1)[0]), file);
+	return specifier.startsWith('.') ? specifier : `./${specifier}`;
+}
+
+/** Drops `import Name from '…'` once the page no longer renders `<Name`. */
+function dropUnusedImport(code: string, name: string): string {
+	if (new RegExp(`<${name}\\b`).test(code)) return code;
+	return code.replace(new RegExp(`^import\\s+${name}\\s+from\\s+['"][^'"]+['"];?[ \\t]*\\n`, 'm'), '');
+}
+
+/**
+ * `<CodePanel scenario="accordion/multiple" />` in an .mdx page. The panel is
+ * generated from the demo the page names — the code as literal markup, the
+ * chrome the playground uses — and written to disk as its own module, so the
+ * page carries the import of that module and the element. The `CodePanel`
+ * import the page wrote goes with the tag once nothing renders it.
+ */
+async function injectCodePanels(
 	code: string,
 	id: string,
 	root: string,
 	watch: (file: string) => void,
 ): Promise<string | undefined> {
-	const matches = [...code.matchAll(SCENARIO_TAG)];
+	const matches = [...code.matchAll(SCENARIO_TAG)].filter((match) => match[1] !== 'Playground');
 	if (matches.length === 0) return undefined;
-	const filled = new Map<string, string>();
+	const imports = new Map<string, string>();
+	const swaps = new Map<string, string>();
+	const tags = new Set<string>();
 	for (const match of matches) {
-		const [whole, tag, before, family, stem, after] = match;
-		if (filled.has(whole)) continue;
+		const [whole, tag, , family, stem] = match;
+		if (swaps.has(whole)) continue;
+		tags.add(tag);
 		const demo = readFamily(root, family).find((entry) => entry.stem === stem);
 		if (!demo)
 			throw new Error(
 				`ui-demos: ${DEMOS_DIR}/${family}/ has no '${stem}.tsrx' for the code panel in ${id}.`,
 			);
 		watch(demo.file);
-		const scenario = await scenarioCode(family, demo);
-		filled.set(
-			whole,
-			`<${tag}${before} scenario="${family}/${stem}"${after} panes={${JSON.stringify(scenario.panes)}} />`,
-		);
+		const { code: source, css } = splitDemo(readFileSync(demo.file, 'utf8'));
+		const panes: PanelPane[] = [
+			{ value: 'source', label: `${demo.stem}.tsrx`, code: source, language: 'tsrx' },
+		];
+		if (css !== '') panes.push({ value: 'css', label: `${family}.css`, code: css, language: 'css' });
+		const file = codePanelPath(root, family, stem);
+		writeGenerated(file, await codePanelModule({ family, stem, panes }));
+		const local = codePanelName(family, stem);
+		imports.set(local, specifierFrom(id, file));
+		swaps.set(whole, `<${local} />`);
 	}
 	let next = code;
-	for (const [before, after] of filled) next = next.split(before).join(after);
-	return next === code ? undefined : next;
+	for (const [before, after] of swaps) next = next.split(before).join(after);
+	for (const tag of tags) next = dropUnusedImport(next, tag);
+	const lines = [...imports].map(
+		([local, specifier]) => `import ${local} from ${JSON.stringify(specifier)};`,
+	);
+	// The blank line matters: MDX reads an import touching the next line as prose.
+	return `${lines.join('\n')}\n\n${next}`;
 }
 
 /**
@@ -419,12 +426,9 @@ async function injectPlaygrounds(
 			);
 		watch(demo.file);
 		const file = generatedPath(root, family, stem);
-		mkdirSync(dirname(file), { recursive: true });
-		writeFileSync(file, await playgroundSource(root, family, stem, watch));
+		writeGenerated(file, await playgroundSource(root, family, stem, watch));
 		const local = componentName(family, stem);
-		let specifier = relative(dirname(id.split('?', 1)[0]), file);
-		if (!specifier.startsWith('.')) specifier = `./${specifier}`;
-		imports.set(local, specifier);
+		imports.set(local, specifierFrom(id, file));
 		swaps.set(whole, `<${local} />`);
 	}
 	let next = code;
@@ -496,7 +500,7 @@ export function uiDemos(): Plugin {
 			const family = id.slice(VIRTUAL.length);
 			const demos = readFamily(root, family);
 			for (const demo of demos) this.addWatchFile(demo.file);
-			return moduleSource(family, demos);
+			return moduleSource(demos);
 		},
 		transform: {
 			order: 'pre',
@@ -507,7 +511,7 @@ export function uiDemos(): Plugin {
 					? expandMdxImports(code, id, root, watch)
 					: undefined;
 				const played = await injectPlaygrounds(expanded ?? code, id, root, watch);
-				const next = await injectScenarioTabs(played ?? expanded ?? code, id, root, watch);
+				const next = await injectCodePanels(played ?? expanded ?? code, id, root, watch);
 				const result = next ?? played ?? expanded;
 				return result === undefined ? undefined : { code: result, map: null };
 			},

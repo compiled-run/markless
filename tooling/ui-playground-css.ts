@@ -1,7 +1,52 @@
-// The generated card's own CSS behind one `pg-` namespace: the demo's authored
+// The generated chrome's own CSS behind one `pg-` namespace: a demo's authored
 // CSS lands in the same scoped block, so a demo class named `panel` or `switch`
-// must not collide with the chrome's.
-export const CHROME_CSS = `			.pg {
+// must not collide with the chrome's. The playground card takes both blocks; a
+// standalone code panel takes only the code block and the registry tip.
+
+/** The look every hover tip in the chrome shares; each caller positions it. */
+function tipLook(tip: string, title: string, body: string): string {
+	return `			${tip} {
+				z-index: 40;
+				width: max-content;
+				max-width: min(36ch, calc(100vw - 2 * var(--space-s-l)));
+				margin: 0;
+				padding: 0;
+				border: 0;
+				border-radius: 3px;
+				background: var(--slab);
+				box-shadow: none;
+				color: var(--slab-ink);
+				font-family: var(--font-mono);
+				font-size: var(--step--2);
+				line-height: 1.45;
+				text-align: start;
+				white-space: normal;
+			}
+
+			${title},
+			${body} {
+				display: block;
+				font-family: var(--font-mono);
+				color: inherit;
+			}
+
+			${title} {
+				padding: 0.35em 0.6em;
+				background: transparent;
+				border-block-end: 1px solid color-mix(in oklch, var(--slab-ink) 30%, transparent);
+				font-weight: 700;
+			}
+
+			${body} {
+				padding: 0.35em 0.6em;
+			}
+
+			${body}:empty {
+				display: none;
+			}`;
+}
+
+export const CONTROLS_CSS = `			.pg {
 				display: grid;
 				/* Sized by the card, never by the widest code line: the code scrolls inside. */
 				grid-template-columns: minmax(0, 1fr);
@@ -128,6 +173,7 @@ export const CHROME_CSS = `			.pg {
 				opacity: 1;
 			}
 
+
 			/* One tip for the whole card: the type hints and the code panel's hover docs
 			   share it, and both open below their token so the first line of a clamped
 			   panel is never covered. */
@@ -137,22 +183,9 @@ export const CHROME_CSS = `			.pg {
 				inset-block-start: calc(100% + 0.35em);
 				inset-block-end: auto;
 				inset-inline-start: 0;
-				z-index: 40;
-				width: max-content;
-				max-width: min(36ch, calc(100vw - 2 * var(--space-s-l)));
-				margin: 0;
-				padding: 0;
-				border: 0;
-				border-radius: 3px;
-				background: var(--slab);
-				box-shadow: none;
-				color: var(--slab-ink);
-				font-family: var(--font-mono);
-				font-size: var(--step--2);
-				line-height: 1.45;
-				text-align: start;
-				white-space: normal;
 			}
+
+${tipLook('.pg-tip,\n\t\t\t.pg .tsrx-tip', '.pg .tsrx-tip-title', '.pg .tsrx-tip-body')}
 
 			.pg-tip {
 				padding: 0.35em 0.6em;
@@ -160,23 +193,6 @@ export const CHROME_CSS = `			.pg {
 
 			.pg-tip[ui-closed] {
 				display: none;
-			}
-
-			.pg .tsrx-tip-title,
-			.pg .tsrx-tip-body {
-				font-family: var(--font-mono);
-				color: inherit;
-			}
-
-			.pg .tsrx-tip-title {
-				padding: 0.35em 0.6em;
-				background: transparent;
-				border-block-end: 1px solid color-mix(in oklch, var(--slab-ink) 30%, transparent);
-				font-weight: 700;
-			}
-
-			.pg .tsrx-tip-body {
-				padding: 0.35em 0.6em;
 			}
 
 			@supports (anchor-scope: --tsrx-token) {
@@ -290,19 +306,6 @@ export const CHROME_CSS = `			.pg {
 				background: var(--code-surface);
 			}
 
-			/* One row between the stage and the code: the file tabs sit on the left
-			   edge and the scenario picker on the right. */
-			.pg-bar {
-				display: flex;
-				/* Reversed wrap puts the picker above the tabs on a phone; it also
-				   flips the cross axis, so flex-start here is the visual bottom. */
-				flex-wrap: wrap-reverse;
-				gap: 0.5em 1em;
-				align-items: flex-start;
-				justify-content: space-between;
-				padding: 0.6em 0.9em 0;
-				border-block-start: 1px solid var(--code-edge);
-			}
 
 			.pg-bar-pick {
 				display: flex;
@@ -334,6 +337,46 @@ export const CHROME_CSS = `			.pg {
 				inset-inline-start: auto;
 				inset-inline-end: 0;
 			}
+
+
+			/* Full bleed on a phone: the card runs edge to edge, so the page gutter
+			   the shell adds is taken back here. */
+			@media (max-width: 866px) {
+				.pg {
+					margin-inline: calc(-1 * var(--space-s-l));
+					border-inline: 0;
+					border-radius: 0;
+				}
+
+				.pg-quick,
+				.pg-rest {
+					flex-direction: column;
+					align-items: start;
+				}
+
+				.pg-cell {
+					width: 100%;
+				}
+
+				.pg-showall {
+					margin-inline-start: 0;
+				}
+			}`;
+
+export const CODE_CSS = `			/* One row between the stage and the code: the file tabs sit on the left
+			   edge and the scenario picker on the right. */
+			.pg-bar {
+				display: flex;
+				/* Reversed wrap puts the picker above the tabs on a phone; it also
+				   flips the cross axis, so flex-start here is the visual bottom. */
+				flex-wrap: wrap-reverse;
+				gap: 0.5em 1em;
+				align-items: flex-start;
+				justify-content: space-between;
+				padding: 0.6em 0.9em 0;
+				border-block-start: 1px solid var(--code-edge);
+			}
+
 
 			.pg-code {
 				min-width: 0;
@@ -417,6 +460,8 @@ export const CHROME_CSS = `			.pg {
 			.pg-line {
 				display: block;
 				white-space: pre;
+				/* A blank line is an empty block; without a floor it has no height. */
+				min-height: 1lh;
 			}
 
 			.pg-fade {
@@ -452,27 +497,73 @@ export const CHROME_CSS = `			.pg {
 			.pg-clamp[ui-open] .pg-expand {
 				display: none;
 			}
+`;
 
-			/* Full bleed on a phone: the card runs edge to edge, so the page gutter
-			   the shell adds is taken back here. */
+export const CHROME_CSS = `${CONTROLS_CSS}
+
+${CODE_CSS}`;
+
+/**
+ * A standalone code panel: the same card frame as the playground, and one doc
+ * per distinct hover written once in a registry after the panes. The registry
+ * sits after the code in the DOM so anchor positioning may pin an entry to the
+ * token that is hovered, which is the only one carrying the anchor name.
+ */
+export const CODE_PANEL_CSS = `			.cp {
+				position: relative;
+				display: grid;
+				grid-template-columns: minmax(0, 1fr);
+				margin-block: var(--space-s);
+				border: 1px solid var(--code-edge);
+				border-radius: 3px;
+				background: var(--raised);
+				overflow: clip;
+			}
+
+			.cp .pg-bar {
+				border-block-start: 0;
+			}
+
+			.cp-doc {
+				position: absolute;
+				inset-inline-start: var(--space-s);
+				inset-block-end: 0.5em;
+				visibility: hidden;
+				opacity: 0;
+				user-select: none;
+			}
+
+${tipLook('.cp-doc', '.cp-doc .tsrx-tip-title', '.cp-doc .tsrx-tip-body')}
+
+			.cp .tsrx-hover:is(:hover, :focus-visible) {
+				anchor-name: --cp-hot;
+			}
+
+			@supports (anchor-scope: --tsrx-token) {
+				.cp-doc {
+					position: fixed;
+					position-anchor: --cp-hot;
+					inset-block-start: calc(anchor(bottom) + 0.35em);
+					inset-block-end: auto;
+					inset-inline-start: anchor(left);
+				}
+			}
+
 			@media (max-width: 866px) {
-				.pg {
+				.cp {
 					margin-inline: calc(-1 * var(--space-s-l));
 					border-inline: 0;
 					border-radius: 0;
 				}
-
-				.pg-quick,
-				.pg-rest {
-					flex-direction: column;
-					align-items: start;
-				}
-
-				.pg-cell {
-					width: 100%;
-				}
-
-				.pg-showall {
-					margin-inline-start: 0;
-				}
 			}`;
+
+/** One rule per registry entry: the entry shows while any token naming it is hovered or focused. */
+export function docRules(count: number): string {
+	const rules: string[] = [];
+	for (let index = 0; index < count; index += 1)
+		rules.push(`			.cp:has(.tsrx-hover[data-doc="${index}"]:is(:hover, :focus-visible)) .cp-doc[data-doc="${index}"] {
+				visibility: visible;
+				opacity: 1;
+			}`);
+	return rules.join('\n\n');
+}
