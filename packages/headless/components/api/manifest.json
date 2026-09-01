@@ -63,7 +63,7 @@
 						"type": "boolean",
 						"required": false,
 						"default": "true",
-						"doc": "Whether the section that is showing may be closed again, leaving nothing\nopen. On by default, which is Qwik UI's own default."
+						"doc": "Whether the section that is showing may be closed again, leaving nothing\nopen. On by default."
 					},
 					{
 						"name": "disabled",
@@ -1067,7 +1067,7 @@
 						"name": "label",
 						"type": "string",
 						"required": false,
-						"doc": "The words the field shows once this option is chosen. Omit it and the value\nis used. Qwik UI harvests this from `ItemLabel`'s children at pre-render;\nmarkless has no build-time child scan, so the text arrives as data."
+						"doc": "The words the field shows once this option is chosen. Omit it and the value\nis used. There is no build-time scan of the label's children, so the text\narrives as data."
 					},
 					{
 						"name": "disabled",
@@ -1099,7 +1099,7 @@
 			{
 				"part": "root",
 				"component": "ComboboxRoot",
-				"doc": "A combobox is a text field with a list attached. It is NOT a select: DOM focus\nnever leaves the input, the highlighted option is family state rather than the\nfocused element, and printable keys belong to the field.\n\nThe root holds the family's configuration and renders `role=\"group\"`, exactly\nas Qwik UI's `HComboboxRootImpl` does.",
+				"doc": "A combobox is a text field with a list attached. It is NOT a select: DOM focus\nnever leaves the input, the highlighted option is family state rather than the\nfocused element, and printable keys belong to the field.\n\nThe root holds the family's configuration and renders `role=\"group\"`.",
 				"props": [
 					{
 						"name": "value",

@@ -5,8 +5,7 @@ import type { PropsOf, Seeded } from '@markless/core';
  * never leaves the input, the highlighted option is family state rather than the
  * focused element, and printable keys belong to the field.
  *
- * The root holds the family's configuration and renders `role="group"`, exactly
- * as Qwik UI's `HComboboxRootImpl` does.
+ * The root holds the family's configuration and renders `role="group"`.
  */
 export type ComboboxRootProps = Omit<PropsOf<'div'>, 'onChange' | 'onInput'> & {
 	/**
@@ -55,8 +54,7 @@ export type ComboboxRootProps = Omit<PropsOf<'div'>, 'onChange' | 'onInput'> & {
  * handles, the consumer's callbacks and the shared methods are not cells and are
  * not listed here; they are added to the instance the factory returns.
  *
- * `isPointerInContent` and `isKeyboardMove` are the two guards Qwik UI carries
- * as `isMouseOverPopupSig` and `isKeyboardFocusSig`: a list that opens under a
+ * `isPointerInContent` and `isKeyboardMove` are two guards: a list that opens under a
  * resting mouse must not have its keyboard highlight stolen by a pointer that
  * never moved. `wasFieldEmpty` and `wasFieldReset` are the two-flag dance
  * `removeOnBackspace` needs, so the first backspace deletes text and only the
@@ -103,8 +101,8 @@ export type ComboboxItemProps = PropsOf<'div'> & {
 	readonly value: string;
 	/**
 	 * The words the field shows once this option is chosen. Omit it and the value
-	 * is used. Qwik UI harvests this from `ItemLabel`'s children at pre-render;
-	 * markless has no build-time child scan, so the text arrives as data.
+	 * is used. There is no build-time scan of the label's children, so the text
+	 * arrives as data.
 	 */
 	readonly label?: string;
 	/** Nobody can choose this option, and the arrow walk steps past it. */

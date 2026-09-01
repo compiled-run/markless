@@ -16,7 +16,7 @@ export type AccordionRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	readonly multiple?: boolean;
 	/**
 	 * Whether the section that is showing may be closed again, leaving nothing
-	 * open. On by default, which is Qwik UI's own default.
+	 * open. On by default.
 	 */
 	readonly collapsible?: boolean;
 	/** Nothing opens or closes while this is set. */
