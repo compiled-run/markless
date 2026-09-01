@@ -8,8 +8,10 @@ import Indeterminate from './scenarios/indeterminate.tsrx';
 import Live from './scenarios/live.tsrx';
 import Measurement from './scenarios/measurement.tsrx';
 import Moving from './scenarios/moving.tsrx';
+import OutOfRange from './scenarios/out-of-range.tsrx';
 import OwnName from './scenarios/own-name.tsrx';
 import OwnText from './scenarios/own-text.tsrx';
+import Transitions from './scenarios/transitions.tsrx';
 
 const Root = page.getByTestId('root');
 const Label = page.getByTestId('label');
@@ -198,6 +200,44 @@ test('CSR: the value label shows a measurement the consumer changes', async () =
 	el<HTMLButtonElement>(Advance).click();
 	await expect.poll(() => el(Root).getAttribute('aria-valuetext')).toBe('60 of 100 rows');
 	expect(el(ValueLabel).textContent?.trim()).toBe('60 of 100 rows');
+});
+
+// An unknown amount reports no current value at all, so becoming known has to ADD
+// what a reader hears and becoming unknown again has to take it away: an
+// `aria-valuenow` left behind from before is a number the bar no longer stands behind.
+test('CSR: a bar that learns its amount reports it, and drops it again', async () => {
+	await render(Transitions);
+	expect(el(Root).getAttribute('ui-progress')).toBe('indeterminate');
+	expect(el(Root).hasAttribute('aria-valuenow')).toBe(false);
+
+	el<HTMLButtonElement>(page.getByTestId('to-measured')).click();
+	await expect.poll(() => el(Root).getAttribute('aria-valuenow')).toBe('40');
+	expect(el(Root).getAttribute('aria-valuetext')).toBe('40%');
+	expect(el(Root).getAttribute('ui-progress')).toBe('loading');
+	expect(el(Root).getAttribute('ui-value')).toBe('40');
+	expect(el(ValueLabel).textContent?.trim()).toBe('40%');
+	expect(el(Indicator).getAttribute('style')).toBe('transform: translateX(-60%)');
+
+	el<HTMLButtonElement>(page.getByTestId('to-unknown')).click();
+	await expect.poll(() => el(Root).getAttribute('ui-progress')).toBe('indeterminate');
+	expect(el(Root).hasAttribute('aria-valuenow')).toBe(false);
+	expect(el(Root).hasAttribute('aria-valuetext')).toBe(false);
+	expect(el(Root).hasAttribute('ui-value')).toBe(false);
+	expect(el(ValueLabel).textContent?.trim()).toBe('');
+	expect(el(Indicator).getAttribute('style')).toBe('transform: translateX(-100%)');
+});
+
+// A bar cannot be more than full or less than empty. Unclamped, an amount past the top
+// writes `translateX(--50%)` - not a CSS value at all, so the whole transform is thrown
+// away and the overshooting bar draws as if it were empty.
+test('CSR: an amount outside the range still draws a bar between empty and full', async () => {
+	await render(OutOfRange);
+	expect(el(page.getByTestId('over-indicator')).getAttribute('style')).toBe(
+		'transform: translateX(-0%)',
+	);
+	expect(el(page.getByTestId('under-indicator')).getAttribute('style')).toBe(
+		'transform: translateX(-100%)',
+	);
 });
 
 // Expected red: a component-body shared seed runs on the initial render only, so a

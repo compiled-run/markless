@@ -170,6 +170,32 @@ async function expectConsumerCallbackFires() {
 	await expect.poll(() => el(Calls).textContent).toBe('2');
 }
 
+// A key reaches the flip by a different route than a press - the native button
+// synthesises the click - so the guard that keeps a plain button plain has to hold on
+// both. This primitive is under every family, so a leak here leaks fleet-wide.
+async function expectKeyboardLeavesAPlainButtonPlain() {
+	el(Plain).focus();
+	await userEvent.keyboard('{Enter}');
+	await userEvent.keyboard(' ');
+	await new Promise((resolve) => setTimeout(resolve, 150));
+
+	expect(el(Plain).hasAttribute('aria-pressed')).toBe(false);
+	expect(el(Plain).hasAttribute('ui-pressed')).toBe(false);
+	expect(el(Calls).textContent).toBe('0');
+}
+
+async function expectLockedButtonNeverFlips() {
+	el(Locked).click();
+	el(Locked).focus();
+	await userEvent.keyboard('{Enter}');
+	await userEvent.keyboard(' ');
+	await new Promise((resolve) => setTimeout(resolve, 150));
+
+	expect(el(Locked).getAttribute('aria-pressed')).toBe('false');
+	expect(el(Locked).hasAttribute('ui-pressed')).toBe(false);
+	expect(document.activeElement).not.toBe(el(Locked));
+}
+
 // A button with no handler of the consumer's own still flips.
 async function expectOmittedOnChangeFlipsAnyway() {
 	el(Bold).click();
@@ -232,5 +258,25 @@ for (const mode of MODES) {
 		if (mode === 'CSR') await render(ToggleButtons);
 		else await renderSSR(ToggleButtons);
 		await expectOmittedOnChangeFlipsAnyway();
+	});
+
+	test(`${mode}: the keyboard leaves a plain button plain`, async () => {
+		if (mode === 'CSR') await render(ToggleButtons);
+		else await renderSSR(ToggleButtons);
+		await expectKeyboardLeavesAPlainButtonPlain();
+	});
+
+	test(`${mode}: a button nobody may press refuses every gesture`, async () => {
+		if (mode === 'CSR') await render(ToggleButtons);
+		else await renderSSR(ToggleButtons);
+		await expectLockedButtonNeverFlips();
+	});
+
+	test(`${mode}: the buttons report no axe violations, pressed or not`, async () => {
+		const mounted = mode === 'CSR' ? await render(ToggleButtons) : await renderSSR(ToggleButtons);
+		await expectNoAxeViolations(scopeOf(mounted), `${mode} buttons at rest`);
+		el(Mute).click();
+		await expect.poll(() => el(Mute).getAttribute('aria-pressed')).toBe('true');
+		await expectNoAxeViolations(scopeOf(mounted), `${mode} buttons after a flip`);
 	});
 }

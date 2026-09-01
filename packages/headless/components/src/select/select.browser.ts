@@ -563,3 +563,87 @@ test('CSR: an arrow key walks a looped listbox', async () => {
 	await userEvent.keyboard('{ArrowDown}');
 	await expect.poll(async () => await focused()).toBe(rows[1]);
 });
+
+// A chord is the page's own shortcut - select-all, paste, a consumer hotkey - and
+// never a search. Matching on the printable key alone makes Cmd+A open the list and
+// hunt for "a", which is both a stolen shortcut and a listbox nobody asked for.
+test('CSR: a chord on the closed trigger is not typeahead', async () => {
+	await render(LongList);
+	// A lazily loaded key handler cannot be shown inert until it has been shown live:
+	// without this the first chord's quiet is only the module still arriving.
+	await openWith('{ArrowDown}');
+	await userEvent.keyboard('{Escape}');
+	await expect.poll(() => el(Trigger).getAttribute('aria-expanded')).toBe('false');
+
+	el(Trigger).focus();
+	await userEvent.keyboard('{Control>}a{/Control}');
+	await new Promise((resolve) => setTimeout(resolve, 150));
+	expect(el(Trigger).getAttribute('aria-expanded')).toBe('false');
+
+	await userEvent.keyboard('{Meta>}c{/Meta}');
+	await new Promise((resolve) => setTimeout(resolve, 150));
+	expect(el(Trigger).getAttribute('aria-expanded')).toBe('false');
+});
+
+test('CSR: a chord inside the open listbox leaves the roving focus where it was', async () => {
+	await render(LongList);
+	await openWith('{ArrowDown}');
+	await expect.poll(async () => await focused()).toBe(el(page.getByTestId('apple')));
+
+	// The listbox owns a key handler of its own, so it needs its own warming step.
+	await userEvent.keyboard('{ArrowDown}');
+	await expect.poll(async () => await focused()).toBe(el(page.getByTestId('apricot')));
+	await userEvent.keyboard('{ArrowUp}');
+	await expect.poll(async () => await focused()).toBe(el(page.getByTestId('apple')));
+
+	await userEvent.keyboard('{Control>}m{/Control}');
+	await new Promise((resolve) => setTimeout(resolve, 150));
+	expect(document.activeElement).toBe(el(page.getByTestId('apple')));
+
+	await userEvent.keyboard('{Meta>}m{/Meta}');
+	await new Promise((resolve) => setTimeout(resolve, 150));
+	expect(document.activeElement).toBe(el(page.getByTestId('apple')));
+});
+
+// Banana is the only option starting with "b" and nobody may choose it, so the
+// buffer matches nothing: the list opens and the focus has nowhere to go.
+test('CSR: typeahead never lands on an option nobody may choose', async () => {
+	await render(UnavailableOptions);
+	el(Trigger).focus();
+
+	await userEvent.keyboard('b');
+	await expect.poll(() => el(Trigger).getAttribute('aria-expanded')).toBe('true');
+	await new Promise((resolve) => setTimeout(resolve, 150));
+	expect(document.activeElement).not.toBe(el(Banana));
+	expect(el(Banana).getAttribute('aria-selected')).toBe('false');
+});
+
+test('CSR: the hidden native control carries the choice, and a form reset leaves it there', async () => {
+	await render(SignupForm);
+	expect(el<HTMLSelectElement>(Field).value).toBe('');
+
+	el(Annual).click();
+	await expect.poll(() => el<HTMLSelectElement>(Field).value).toBe('annual');
+
+	// One option, whose own text is the value: a reset re-picks the same option, so
+	// the control the form reads cannot drift away from what the family holds.
+	el<HTMLFormElement>(page.getByTestId('form')).reset();
+	expect(el<HTMLSelectElement>(Field).value).toBe('annual');
+	expect(el(Annual).getAttribute('aria-selected')).toBe('true');
+	await expect.poll(() => submit().textContent).toBe('{"plan":"annual"}');
+});
+
+// PENDING BEHAVIOUR - the listbox is not an overlay. It carries no `overlay` mark and
+// no dismissal handler, so a press anywhere else on the page leaves it showing, with
+// the roving focus still inside it. Combobox closes on an outside press with `overlay`
+// plus an `onDismiss` rule and a short grace window that stops the trigger's own click
+// from re-opening what the press just closed; select needs that same pair, which is a
+// new prop on `select.content` and therefore an owner call rather than a QA fix.
+test.fails('CSR: a press outside the open listbox dismisses it', async () => {
+	await render(Basic);
+	el(Trigger).click();
+	await expect.poll(() => el<HTMLElement>(Content).hidden).toBe(false);
+
+	document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+	await expect.poll(() => el<HTMLElement>(Content).hidden).toBe(true);
+});

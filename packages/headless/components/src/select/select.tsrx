@@ -156,7 +156,12 @@ export function SelectTrigger({ children, onClick, onKeydown, ...rest }: SelectT
 			const isOpenAtFirstKey = key === 'ArrowDown' || key === 'Home';
 			const isOpenAtLastKey = key === 'ArrowUp' || key === 'End';
 			// Enter and Space stay the button's own activation - a lazy handler's preventDefault lands after the native dispatch, so also opening here would toggle straight back shut - and the click they synthesise carries the landing.
-			const isTypeaheadChar = key.length === 1 && key !== ' ';
+			// A chord is the page's own shortcut, never a search: Cmd+A must not open the list and hunt for "a".
+			const isTypeaheadChar =
+				key.length === 1 &&
+				key !== ' ' &&
+				event.ctrlKey !== true &&
+				event.metaKey !== true;
 
 			if (!select.disabled && (isOpenAtFirstKey || isOpenAtLastKey || isTypeaheadChar)) {
 				const now = Date.now();
@@ -210,7 +215,11 @@ export function SelectContent({ children, onKeydown, ...rest }: SelectContentPro
 			const key = event.key;
 			// `target`, not `currentTarget`: a lazy handler symbol runs after the native dispatch, when `currentTarget` is null.
 			const here = event.target as HTMLElement;
-			const isTypeaheadChar = key.length === 1 && key !== ' ';
+			const isTypeaheadChar =
+				key.length === 1 &&
+				key !== ' ' &&
+				event.ctrlKey !== true &&
+				event.metaKey !== true;
 			const isNavigationKey =
 				key === 'ArrowDown' || key === 'ArrowUp' || key === 'Home' || key === 'End';
 			const isSelectionKey = key === 'Enter' || key === ' ' || key === 'Tab';

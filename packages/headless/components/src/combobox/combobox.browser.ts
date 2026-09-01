@@ -713,6 +713,87 @@ for (const mode of MODES) {
 	});
 }
 
+// Nothing was ever chosen, so emptying the field takes nothing back. A callback for a
+// value that did not move is a change the consumer's own store will happily record.
+test('CSR: emptying an already empty choice announces nothing', async () => {
+	await render(WithCallbacks);
+	await typeInto(el<HTMLInputElement>(Input), 'ba');
+	await expect.poll(() => el(Typed).textContent).toBe('ba');
+
+	await userEvent.keyboard('{Backspace}{Backspace}');
+	await expect.poll(() => el<HTMLInputElement>(Input).value).toBe('');
+	await settle();
+	expect(el(Changes).textContent).toBe('0');
+	expect(el(Chosen).textContent).toBe('');
+});
+
+// The highlight is a value, and the consumer's filter can take the option carrying it
+// off the page. The walk must restart from what is left rather than stall on a name
+// that no longer stands for anything.
+test('CSR: a filter that drops the highlighted option leaves the walk usable', async () => {
+	await render(Filtered);
+	el<HTMLElement>(Input).focus();
+	await userEvent.keyboard('{ArrowDown}{ArrowDown}');
+	await expect
+		.poll(() => el(Rows).querySelectorAll('[ui-highlighted]').length)
+		.toBe(1);
+	expect((el(Rows).querySelector('[ui-highlighted]')?.textContent ?? '').trim()).toBe('Banana');
+
+	await userEvent.keyboard('ap');
+	await expect.poll(() => el(Rows).querySelectorAll('[role="option"]').length).toBe(2);
+
+	await userEvent.keyboard('{ArrowDown}');
+	await expect
+		.poll(() => (el(Rows).querySelector('[ui-highlighted]')?.textContent ?? '').trim())
+		.toBe('Apple');
+	await userEvent.keyboard('{Enter}');
+	await expect.poll(() => el<HTMLInputElement>(Input).value).toBe('Apple');
+});
+
+test('CSR: with nothing matching, the keys take nothing and the empty arm stays', async () => {
+	await render(Filtered);
+	await typeInto(el<HTMLInputElement>(Input), 'zzz');
+	await expect.poll(() => Empty.element()?.textContent).toBe('Nothing matches');
+
+	await userEvent.keyboard('{ArrowDown}{Enter}');
+	await settle();
+	expect(el(Rows).querySelectorAll('[role="option"]').length).toBe(0);
+	expect(Empty.element()?.textContent).toBe('Nothing matches');
+	expect(el<HTMLInputElement>(Input).value).toBe('zzz');
+	expect(document.activeElement).toBe(el(Input));
+});
+
+// Emptying the field is how a choice is given back when there is only one to hold, so
+// the hidden control a form reads has to follow it down to nothing.
+test('CSR: clearing the field gives the choice back and empties the hidden control', async () => {
+	await render(SignupForm);
+	el(Annual).click();
+	await expect.poll(() => el<HTMLInputElement>(Input).value).toBe('Annual');
+	await expect.poll(() => el<HTMLSelectElement>(Field).value).toBe('annual');
+
+	const input = el<HTMLInputElement>(Input);
+	input.focus();
+	input.value = '';
+	input.dispatchEvent(new Event('input', { bubbles: true }));
+
+	await expect.poll(() => el(Annual).getAttribute('aria-selected')).toBe('false');
+	await expect.poll(() => el<HTMLSelectElement>(Field).value).toBe('');
+	await expectSubmitted({ plan: '' });
+});
+
+// One option whose own text is the value: a reset re-picks it, so a form's own reset
+// cannot leave the control disagreeing with the choice the widget still shows.
+test('CSR: a form reset leaves the hidden control agreeing with the choice', async () => {
+	await render(SignupForm);
+	el(Annual).click();
+	await expect.poll(() => el<HTMLSelectElement>(Field).value).toBe('annual');
+
+	el<HTMLFormElement>(page.getByTestId('form')).reset();
+	expect(el<HTMLSelectElement>(Field).value).toBe('annual');
+	expect(el(Annual).getAttribute('aria-selected')).toBe('true');
+	await expectSubmitted({ plan: 'annual' });
+});
+
 // PENDING CAPABILITY - `overlay` with an instance-constant conditional value.
 // `overlayLiteralValue` returns null for anything but a boolean literal, so
 // `combobox.content` writes `overlay` unconditionally and an inline list enlists in
