@@ -3,6 +3,7 @@ import { page } from 'vite-plus/test/browser';
 import { expect, test } from 'vitest';
 import { encodeQrModules, modulesToPath, qrPath, qrViewBox, toUtf8Bytes } from './qr-encode.ts';
 import Basic from './scenarios/basic.tsrx';
+import Hardened from './scenarios/hardened.tsrx';
 import Pairing from './scenarios/pairing.tsrx';
 import RecoveryLevels from './scenarios/recovery-levels.tsrx';
 import SpreadFirst from './scenarios/spread-first.tsrx';
@@ -92,6 +93,31 @@ test('non-ASCII text encodes as UTF-8 bytes', () => {
 
 test('text too long for the largest symbol is refused rather than truncated', () => {
 	expect(() => qrPath('x'.repeat(1400), 'high')).toThrow(/more room/);
+});
+
+// A field a person has not filled in yet is the ordinary first frame of a code bound to
+// page state, so the empty string has to encode rather than throw or draw nothing.
+test('the empty string is a real symbol, not a refusal and not a blank', () => {
+	const side = sideOf('', 'medium');
+	expect(side).toBe(21);
+	expect(qrViewBox('', 'medium')).toBe('0 0 21 21');
+	// The three finder squares are dark in every symbol, so a path is always drawn.
+	expect(qrPath('', 'medium').length).toBeGreaterThan(0);
+});
+
+// One byte under the largest symbol still encodes: the refusal above is a real ceiling
+// rather than a margin that rejects codes a reader could have read.
+test('the longest text that fits is encoded rather than refused', () => {
+	expect(qrPath('x'.repeat(1200), 'low').length).toBeGreaterThan(0);
+	expect(sideOf('x'.repeat(1200), 'low')).toBeLessThanOrEqual(177);
+});
+
+// The pattern carries no quiet zone: the viewBox is exactly the modules, so the margin a
+// scanner needs is the consumer's own padding around the svg and never invented here.
+test('the viewBox is the modules alone, with no margin baked in', () => {
+	const modules = encodeQrModules(BASIC_VALUE, 'medium');
+	expect(qrViewBox(BASIC_VALUE, 'medium')).toBe(`0 0 ${modules.length} ${modules.length}`);
+	expect(modulesToPath(modules).startsWith('M 0 0')).toBe(true);
 });
 
 function expectBasicRendered() {
@@ -269,6 +295,19 @@ for (const mode of MODES) {
 		await expectRotatingTheValueReDerivesThePattern();
 	});
 }
+
+// Recovery is the other half of what the pattern is derived from, and the derive has to
+// answer to it the same way it answers to the value.
+test('CSR: raising the recovery level re-derives the pattern for the same string', async () => {
+	const value = 'https://example.com/receipt/9f2c1a';
+	await render(Hardened);
+	expect(el(PatternPath).getAttribute('d')).toBe(qrPath(value, 'medium'));
+
+	el(page.getByTestId('harden')).click();
+	await expect.poll(() => el(PatternPath).getAttribute('d')).toBe(qrPath(value, 'high'));
+	await expect.poll(() => el(PatternSvg).getAttribute('viewBox')).toBe(qrViewBox(value, 'high'));
+	expect(qrPath(value, 'high')).not.toBe(qrPath(value, 'medium'));
+});
 
 // This is the family's whole pitch, so it is asserted rather than claimed: the
 // pattern is finished markup on arrival, and for a static value nothing on the

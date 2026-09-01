@@ -35,10 +35,14 @@ export const progressState = shared(
 				const covered = (progress.value - progress.min) / (progress.max - progress.min);
 				return `${Math.round(covered * 100)}%`;
 			}),
+			// Clamped: unclamped, an amount past the top writes `translateX(--50%)`, which
+			// is not a CSS value, so the browser throws the whole transform away and the
+			// overshooting bar draws as if it were empty.
 			indicatorStyle: computed(() => {
 				const value = progress.value === null ? progress.min : progress.value;
 				const covered = (value - progress.min) / (progress.max - progress.min);
-				return `transform: translateX(-${100 - covered * 100}%)`;
+				const inside = covered > 1 ? 1 : covered > 0 ? covered : 0;
+				return `transform: translateX(-${100 - inside * 100}%)`;
 			}),
 		};
 	},

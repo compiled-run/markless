@@ -86,6 +86,9 @@ export const comboboxState = shared(
 				}
 				const isHeld = held === next;
 				const after = isHeld ? '' : next;
+				// Emptying a field that was holding nothing takes nothing back, and a
+				// callback for a value that did not move is a change a consumer's store records.
+				if (after === held) return;
 				combobox.value = after;
 				combobox.input = isHeld ? '' : label;
 				combobox.highlighted = after;
