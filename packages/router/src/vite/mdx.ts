@@ -128,6 +128,9 @@ function emitComposedMdxRoute(route: MdxRoute, id: string): string {
 		'    document: input.root,',
 		'    root: input.root,',
 		'    loadSymbol: marklessMdxLoadSymbol,',
+		// Lazy, so a page that never mints a component row never fetches a
+		// child's render-data chunk.
+		'    renderData: marklessMdxRenderData,',
 		'  });',
 		'  await runtime.dispatch(input.event, { syncPolicyAlreadyApplied: true });',
 		'}',

@@ -1118,6 +1118,46 @@ export function rowSegmentOf(input: {
 	return marklessRowSegment((input.enclosingInstancePath ?? '') + String(input.rowKey));
 }
 
+export type OwningSurfaceReach = {
+	readonly surface: PrerenderDataSurface;
+	readonly hostPrefix: string;
+	readonly symbolPrefix: string;
+};
+
+/** The surface whose own components hold `componentName`, and the prefixes the page reaches it under. */
+export function marklessOwningSurface(
+	surface: PrerenderDataSurface,
+	componentName: string,
+): OwningSurfaceReach | undefined {
+	const seen = new Set<PrerenderDataSurface>();
+	// Breadth-first: the shortest composition path is the one the page rendered.
+	let frontier: ReadonlyArray<OwningSurfaceReach> = [
+		{ surface, hostPrefix: '', symbolPrefix: '' },
+	];
+	while (frontier.length > 0) {
+		const next: OwningSurfaceReach[] = [];
+		for (const reach of frontier) {
+			if (seen.has(reach.surface)) continue;
+			seen.add(reach.surface);
+			if (reach.surface.components[componentName]) return reach;
+			for (const definition of Object.values(reach.surface.components))
+				for (const edge of definition.edges ?? []) {
+					const imported = reach.surface.components[edge.childComponentName]
+						? undefined
+						: reach.surface.imports[edge.childComponentName];
+					if (imported)
+						next.push({
+							surface: imported,
+							hostPrefix: reach.hostPrefix + edge.hostPrefix,
+							symbolPrefix: reach.symbolPrefix + edge.symbolPrefix,
+						});
+				}
+		}
+		frontier = next;
+	}
+	return undefined;
+}
+
 function renderRowComponentEdge(
 	input: RepeatRowComponentInput,
 ): Awaitable<RepeatRowComponentRender> {
@@ -1333,7 +1373,8 @@ function renderRowComponentEdge(
 									projected.push({
 										output: partOutput as SsrComposableChildOutput,
 										hostPrefix: rowSegment + projectedEdge.hostPrefix,
-										symbolPrefix: rowSegment + projectedEdge.symbolPrefix,
+										symbolPrefix:
+											ownerSymbolPrefix + rowSegment + projectedEdge.symbolPrefix,
 										graphProps: projectedEdge.props,
 										asyncBoundaryId: projectedEdge.asyncBoundaryId,
 										boundSymbols: projectedEdge.boundSymbols ?? {},
@@ -1391,7 +1432,9 @@ function renderRowComponentEdge(
 					const child: MarklessSsrComposedChild = {
 						output: output as SsrComposableChildOutput,
 						hostPrefix,
-						symbolPrefix,
+						// Host ids take the owner's prefix through composition's own
+						// argument; symbol ids have no such channel and take it here.
+						symbolPrefix: ownerSymbolPrefix + symbolPrefix,
 						graphProps: edge.props,
 						asyncBoundaryId: edge.asyncBoundaryId,
 						boundSymbols: edge.boundSymbols ?? {},
