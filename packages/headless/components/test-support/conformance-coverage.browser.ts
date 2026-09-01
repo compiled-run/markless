@@ -26,10 +26,8 @@ const ALLOWLIST: readonly string[] = [
 	'combobox',
 	'crop',
 	'datebox',
-	'editable',
 	'fileupload',
 	'ink',
-	'numberbox',
 	'otp',
 	'pad',
 	'progress',
@@ -40,7 +38,6 @@ const ALLOWLIST: readonly string[] = [
 	'taglist',
 	'textbox',
 	'timebox',
-	'tokenbox',
 ];
 
 // The registered family list, read from the package's own export surface rather
