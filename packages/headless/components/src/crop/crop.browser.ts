@@ -25,6 +25,7 @@ import Disabled from './scenarios/disabled.tsrx';
 import Fixed from './scenarios/fixed.tsrx';
 import Form from './scenarios/form.tsrx';
 import Picture from './scenarios/image.tsrx';
+import MultiEmbed from './scenarios/multi-embed.tsrx';
 
 const Root = page.getByTestId('root');
 const Label = page.getByTestId('label');
@@ -674,6 +675,17 @@ test('a controlled crop the page writes back to lands where the page put it', as
 	await expect.poll(() => shown().x).toBe(90);
 	el(page.getByTestId('reset')).click();
 	await expect.poll(() => shown()).toEqual(START);
+});
+
+// The counter-evidence the multi-embed suite's expected red cites: under a plain
+// mount the same scenario follows a rectangle the page writes in, so what fails
+// under a composed multi-island mount is the composition, not this family.
+test('a rectangle written in before any gesture still moves the crop', async () => {
+	await render(MultiEmbed);
+	expect(handle('handle-inline-end').getAttribute('aria-valuenow')).toBe('240');
+	el(page.getByTestId('step')).click();
+	await expect.poll(() => el(page.getByTestId('held')).getAttribute('data-x')).toBe('41');
+	await expect.poll(() => handle('handle-inline-end').getAttribute('aria-valuenow')).toBe('241');
 });
 
 test('a disabled crop is out of the tab order and takes no gesture at all', async () => {
