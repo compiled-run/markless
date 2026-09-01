@@ -29,10 +29,19 @@ export const ASYNC_BOUNDARY_ARM_MAX = 2;
 // compiler's edge, not render order, so a sibling above renumbers nothing.
 // `r:<key>:` is a third, RUNTIME segment kind: one keyed `@for` row, so each
 // iteration of a compile-time edge is its own instance. Encoding escapes `:`.
-const PROTOCOL_INSTANCE_PATH = /^(?:[cp]\d+:|r:[^:]*:)+/;
+// `m<n>:` is a fourth, HOST segment kind: one island a page host (the router's
+// MDX route) mounted. Each island composes from its own root, so two islands of
+// one component spell identical `c`/`p` paths; without this segment their
+// widget cells, computeds and element-handle rosters merge into one.
+const PROTOCOL_INSTANCE_PATH = /^(?:[cpm]\d+:|r:[^:]*:)+/;
 
 export function protocolInstanceSegment(edgeIndex: number): string {
 	return `c${edgeIndex}:`;
+}
+
+/** One island's identity segment, outermost of any path it prefixes. */
+export function protocolIslandSegment(islandIndex: number): string {
+	return `m${islandIndex}:`;
 }
 
 export function protocolProjectionSegment(edgeIndex: number): string {

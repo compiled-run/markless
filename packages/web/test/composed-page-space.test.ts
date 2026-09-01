@@ -5,6 +5,7 @@ import {
 	protocolInstanceSegment,
 	protocolProjectionSegment,
 } from '../../serializer/src/protocol.ts';
+import { protocolIslandSegment } from '../../serializer/src/protocol-constants.ts';
 import {
 	marklessComposedGraphNodeId,
 	marklessComposedInstancePath,
@@ -82,13 +83,13 @@ test('the loader reads back exactly the instance path the protocol spells', () =
 	expect(seen).toBe(`${path}state:count`);
 });
 
-// The regression that took the router's MDX routes down: composition read the
-// child's whole symbol prefix as its instance path and qualified the child's
-// cells with `m0:`, while the symbol side — which recovers the path from the
-// symbol id by the protocol grammar — kept reading and writing unqualified.
-// The click reached the handler and wrote to a node no dom update watched.
+// The two halves must name one node whichever segment kind the prefix is: the
+// composed cell and the write its own symbol makes. They came apart once, when
+// composition qualified the child's cells with `m0:` while the symbol side —
+// which recovers the path from the symbol id by the protocol grammar — read that
+// prefix as nothing and kept writing unqualified.
 test('the state a child composes into is the state its symbols read', () => {
-	for (const symbolPrefix of [protocolInstanceSegment(0), 'm0:']) {
+	for (const symbolPrefix of [protocolInstanceSegment(0), protocolIslandSegment(0)]) {
 		const composed = marklessComposeState({ cells: [], computed: [] }, [
 			{
 				hostPrefix: symbolPrefix,
@@ -109,11 +110,22 @@ test('the state a child composes into is the state its symbols read', () => {
 	}
 });
 
-test('a prefix the protocol grammar does not spell is no instance path', () => {
-	expect(marklessComposedInstancePath({ symbolPrefix: 'm0:' })).toBe('');
+// The grammar now spells a fourth segment kind: `m<n>:`, one island the page
+// host mounted. Two islands of one component compose from their own roots and
+// spell identical `c`/`p` paths, so that segment is the only thing telling their
+// widget cells and element-handle rosters apart. A prefix outside the grammar is
+// still no instance path at all.
+test('an island segment is an instance path and a foreign prefix is not', () => {
+	const island = protocolIslandSegment(0);
+	expect(protocolInstancePath(island)).toBe(island);
+	expect(marklessComposedInstancePath({ symbolPrefix: island })).toBe(island);
+	expect(marklessComposedInstancePath({ symbolPrefix: `${island}${protocolInstanceSegment(3)}` })).toBe(
+		`${island}${protocolInstanceSegment(3)}`,
+	);
 	expect(marklessComposedInstancePath({ symbolPrefix: protocolInstanceSegment(3) })).toBe(
 		protocolInstanceSegment(3),
 	);
+	expect(marklessComposedInstancePath({ symbolPrefix: 'slot0:' })).toBe('');
 });
 
 // Every id a scoped adapter touches — reads, writes, subscriptions, and the

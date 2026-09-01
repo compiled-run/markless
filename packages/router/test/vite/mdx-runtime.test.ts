@@ -106,32 +106,34 @@ describe('Markless Router MDX route runtime helpers', () => {
 		expect(view?.asyncBoundaries).toEqual([]);
 	});
 
+	// The answer arrives scoped, so the stand-in has to be callable for it to
+	// survive the round trip; which loader answered is what this pins.
 	it('loads symbols from live CSR children before falling back to static MDX loaders', () => {
-		expect(
-			loadMdxSymbol(
-				'm0:symbol:click',
-				[
-					{
-						componentIndex: 0,
-						hostPrefix: 'm0:',
-						symbolPrefix: 'm0:',
-						output: {
-							loadSymbol(symbolId) {
-								return `live:${symbolId}`;
-							},
-						},
-					},
-				],
-				[
-					{
-						prefix: 'm0:',
+		const symbol = loadMdxSymbol(
+			'm0:symbol:click',
+			[
+				{
+					componentIndex: 0,
+					hostPrefix: 'm0:',
+					symbolPrefix: 'm0:',
+					output: {
 						loadSymbol(symbolId) {
-							return `static:${symbolId}`;
+							return () => `live:${symbolId}`;
 						},
 					},
-				],
-			),
-		).toBe('live:symbol:click');
+				},
+			],
+			[
+				{
+					prefix: 'm0:',
+					loadSymbol(symbolId) {
+						return () => `static:${symbolId}`;
+					},
+				},
+			],
+		) as MdxTestSymbol;
+
+		expect(symbol({})).toBe('live:symbol:click');
 	});
 });
 
@@ -218,24 +220,27 @@ describe('composeMdxState symbol namespacing', () => {
 
 		expect(state?.computed).toEqual([
 			expect.objectContaining({
-				graphNodeId: 'computed:double',
+				graphNodeId: 'm0:computed:double',
 				deriveSymbolId: 'm0:symbol:2',
 			}),
 			expect.objectContaining({
-				graphNodeId: 'computed:total',
+				graphNodeId: 'm1:computed:total',
 				deriveSymbolId: 'm1:c0:symbol:5',
 			}),
-			expect.objectContaining({ graphNodeId: 'computed:pending' }),
+			expect.objectContaining({ graphNodeId: 'm1:computed:pending' }),
 		]);
 		expect(state?.computed?.[2]).not.toHaveProperty('deriveSymbolId');
 	});
 
-	it('leaves cells and graph node ids in the namespace the view records read', () => {
+	// Each island's own segment, and nothing shorter: two islands of one component
+	// compose from their own roots and spell identical child-local ids, so a merge
+	// that left them alone put both islands' cells on one node.
+	it('gives every child cell the island segment its own symbols are scoped by', () => {
 		const state = composeMdxState(childrenWithComputeds);
 
 		expect(state?.cells).toEqual([
-			{ graphNodeId: 'count', name: 'count' },
-			{ graphNodeId: 'price', name: 'price' },
+			{ graphNodeId: 'm0:count', name: 'count' },
+			{ graphNodeId: 'm1:price', name: 'price' },
 		]);
 	});
 
@@ -386,22 +391,25 @@ describe('composeMdxState storage records', () => {
 });
 
 describe('MDX slot prefixes against the composition instance-path grammar', () => {
-	// An MDX route composes its children's records VERBATIM: cells and the view
-	// records that read them stay in the child's own graph-node namespace. A slot
-	// prefix that read as an instance path made client-side composition qualify
-	// the child's cells while its symbols kept writing unqualified ids, and every
-	// composed .tsrx child on a navigated MDX route went dead on click.
-	it('mints slot prefixes the protocol does not read as an instance path', async () => {
+	// An island's slot prefix IS its instance path: composition qualifies the
+	// child's cells with it and resume recovers the same segment from the symbol
+	// id, so both halves name one namespace. A prefix the grammar could not read
+	// back left the two halves in different spaces and every composed .tsrx child
+	// on a navigated MDX route went dead on click.
+	it('mints slot prefixes the protocol reads back whole as an instance path', async () => {
 		const code = await transformMdxRoute(
 			"import Counter from '../components/Counter.tsrx';\n\n# Docs\n\n<Counter />\n",
 			'/project/pages/docs.mdx',
 		);
 		const prefixes = [...code.matchAll(/symbolPrefix: "([^"]*)"/g)].map((match) => match[1]!);
 		expect(prefixes.length).toBeGreaterThan(0);
-		for (const prefix of prefixes) expect(protocolInstancePath(prefix)).toBe('');
+		for (const prefix of prefixes) expect(protocolInstancePath(prefix)).toBe(prefix);
 	});
 
-	it('composes child records without qualifying their graph node ids', () => {
+	// One namespace, both halves: whatever segment a cell takes, the view record
+	// that reads that cell takes the same one, or the dom update watches a node no
+	// handler ever writes.
+	it('composes a child cell and the view record that reads it into one namespace', () => {
 		const child: MdxChild = {
 			componentIndex: 0,
 			hostPrefix: 'm0:',
@@ -423,15 +431,16 @@ describe('MDX slot prefixes against the composition instance-path grammar', () =
 		};
 		const state = composeMdxState([child]);
 		const view = composeMdxView([{ kind: 'component', componentIndex: 0 }], [child], 0);
-		expect(state?.cells).toEqual([{ graphNodeId: 'state:count' }]);
+		expect(state?.cells).toEqual([{ graphNodeId: 'm0:state:count' }]);
 		expect(view?.domUpdates).toEqual([
-			{ hostNodeId: 'm0:h1', graphNodeId: 'state:count', symbolId: 'm0:symbol:3' },
+			{ hostNodeId: 'm0:h1', graphNodeId: 'm0:state:count', symbolId: 'm0:symbol:3' },
 		]);
 	});
 
-	// A child that nests its own widget ships qualified cells (`c0:state:count`) while
-	// its handler spells the bare id. Resume recovers no instance path from behind a slot
-	// prefix, so unless the route applies the run itself the write lands on nothing.
+	// A child that nests its own widget ships qualified cells while its handler
+	// spells the bare id. The scope the route applies is the WHOLE path — island
+	// segment and the child's own `c` run — so the handler's write lands on exactly
+	// the cell the composed page ships, not one segment short of it.
 	it('scopes a nested child symbol onto the cell the composed page ships', () => {
 		const child: MdxChild = {
 			componentIndex: 0,
@@ -468,7 +477,7 @@ describe('MDX slot prefixes against the composition instance-path grammar', () =
 		const cells = composeMdxState([child])?.cells as ReadonlyArray<{
 			readonly graphNodeId: string;
 		}>;
-		expect(writes).toEqual(['c0:state:count']);
+		expect(writes).toEqual(['m0:c0:state:count']);
 		expect(writes).toEqual([cells[0]!.graphNodeId]);
 	});
 });

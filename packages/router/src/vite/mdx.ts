@@ -14,6 +14,7 @@ import {
 	visitHastHandle,
 } from 'satteri';
 import { decodePath, parsePath, parseURL, withQuery } from 'ufo';
+import { protocolIslandSegment } from '../../../serializer/src/protocol-constants.ts';
 
 export function mdxTransformPlugin(): Plugin {
 	return {
@@ -275,7 +276,7 @@ function componentPart(node: MdxJsxElementNode, context: RoutePartsContext): Mdx
 	const children = renderStaticHtml(node.children, context.id);
 	context.components.push({
 		...imported,
-		prefix: `m${componentIndex}:`,
+		prefix: protocolIslandSegment(componentIndex),
 		props: children
 			? [
 					...props,

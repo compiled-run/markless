@@ -23,9 +23,11 @@ type RowTemplateSlot =
 // bundler's symbol route, the dev harness, a test's own loadSymbol — recovers
 // the instance from the id it was asked for. INSTANCE_PATH restates the
 // serializer's grammar; composed-page-space.test.ts keeps the two in step.
-const INSTANCE_PATH = /^(?:[cp]\d+:|r:[^:]*:)+/;
+const INSTANCE_PATH = /^(?:[cpm]\d+:|r:[^:]*:)+/;
 
-// The one reading of a prefix as an instance path; host-minted prefixes (router `m<n>:`) are not one.
+// The one reading of a prefix as an instance path. `m<n>:` is an island the page
+// host mounted: two islands of one component spell identical `c`/`p` paths, so
+// without that outermost segment their widget cells and rosters are one.
 export function marklessInstancePath(prefix: string | undefined): string {
 	return (prefix && INSTANCE_PATH.exec(prefix)?.[0]) || '';
 }
@@ -44,7 +46,7 @@ export function marklessRowFreeSymbolId(symbolId: string, instancePath?: string)
 	return path.replace(ROW_SEGMENT, '') + symbolId.slice(path.length);
 }
 
-const INSTANCE_SEGMENT = /[cp]\d+:|r:[^:]*:/g;
+const INSTANCE_SEGMENT = /[cpm]\d+:|r:[^:]*:/g;
 
 /**
  * What a rendered row's record knows that a bound symbol's id cannot.
@@ -396,6 +398,10 @@ export function marklessWidgetHandleId(
 	return marklessComposedGraphNodeId(handleId, instancePath, registry);
 }
 
+type ScopedHandleReader = ResumeSymbolContext['getElementHandle'] & {
+	marklessHandleScope?: string;
+};
+
 /**
  * The reading half of the same key.
  *
@@ -413,7 +419,11 @@ export function marklessInstanceScopedElementHandle(
 	// Several context builders cast an object literal into the symbol context, so
 	// a context that never carried a handle reader reaches here as undefined.
 	if (typeof getElementHandle !== 'function') return getElementHandle;
-	return (handleIdOrName: string) => {
+	// One instance, one wrapper: a second at the same path re-qualifies a key the
+	// first already resolved onto its root, which no registration is filed under.
+	if ((getElementHandle as ScopedHandleReader).marklessHandleScope === instancePath)
+		return getElementHandle;
+	const scopedReader = (handleIdOrName: string) => {
 		// Resolved per read, not per symbol: the widget registry is filled by the
 		// scoped graph this same context builds, so the answer exists only once the
 		// symbol body runs.
@@ -428,6 +438,8 @@ export function marklessInstanceScopedElementHandle(
 			? getElementHandle(handleIdOrName)
 			: getElementHandle(scoped);
 	};
+	(scopedReader as ScopedHandleReader).marklessHandleScope = instancePath;
+	return scopedReader;
 }
 
 // Only ids the symbol itself spells are child-local. Shared definitions and the
@@ -457,6 +469,10 @@ export function marklessInstanceScopedGraph(
 	instancePath: string,
 ): MarklessScopedGraph {
 	if (!instancePath) return graph;
+	// One instance, one adapter: stacking a second at the same path qualifies every
+	// id twice, so an already-resolved widget id takes its root path again.
+	if ((graph as MarklessScopedGraph).marklessInstancePath === instancePath)
+		return graph as MarklessScopedGraph;
 	// Resume loads a widget piece's symbol by its instance path alone; the widget
 	// roots it must map onto are the qualified definition ids the payload carries,
 	// along with the projection sites composition registered them under. Re-read
@@ -471,13 +487,25 @@ export function marklessInstanceScopedGraph(
 	const qualify = (graphNodeId: string) =>
 		marklessComposedGraphNodeId(graphNodeId, instancePath, registry);
 	const outerQualify = (graph as MarklessScopedGraph).marklessQualifyGraphNodeId;
+	// A registry that is ALREADY a composed view is spelled in the very local space
+	// this adapter's parts read in; deriving a second view from it asks for its
+	// keys under a page-space prefix they never carry and answers nothing.
+	const takeWidgetView = (): MarklessWidgetRegistry | undefined =>
+		composedRegistryViews.has(registry)
+			? registry
+			: composedWidgetRegistryView(registry, instancePath);
+	let widgetView = takeWidgetView();
 	const scoped: MarklessScopedGraph = {
 		...graph,
 		marklessPageGraph: (graph as MarklessScopedGraph).marklessPageGraph ?? graph,
 		marklessInstancePath: instancePath,
 		// Written unconditionally: the spread above would otherwise hand a nested
-		// scope the enclosing one's view, which is a different local space.
-		marklessComposedWidgets: composedWidgetRegistryView(registry, instancePath),
+		// scope the enclosing one's view, which is a different local space. Re-taken
+		// while empty because the page registry fills from the payload AFTER this
+		// adapter is built, and cached emptiness reads as "owns no widget" forever.
+		get marklessComposedWidgets() {
+			return (widgetView ??= takeWidgetView());
+		},
 		marklessQualifyGraphNodeId: (graphNodeId: string) =>
 			outerQualify ? outerQualify(qualify(graphNodeId)) : qualify(graphNodeId),
 		read: (graphNodeId, path) => graph.read(qualify(graphNodeId), path),
@@ -492,8 +520,7 @@ export function marklessInstanceScopedGraph(
 				graphNodeId: qualify(subscription.graphNodeId),
 			}),
 	};
-	if (scoped.marklessComposedWidgets)
-		marklessShareWidgetRegistry(scoped, scoped.marklessComposedWidgets);
+	if (widgetView) marklessShareWidgetRegistry(scoped, widgetView);
 	return scoped;
 }
 
@@ -538,7 +565,7 @@ function composedWidgetRegistryView(
 // Mirrors PROTOCOL_PAGE_SPACE_ID_PREFIXES, past any instance path a nested
 // compose already applied; composed-page-space.test.ts keeps the two in step so
 // the browser never imports the serializer's protocol module.
-const PAGE_SPACE_ID = /^((?:[cp]\d+:|r:[^:]*:)*)(shared|storage):/;
+const PAGE_SPACE_ID = /^((?:[cpm]\d+:|r:[^:]*:)*)(shared|storage):/;
 
 /**
  * One render's answer to "which rendered widget owns this id".

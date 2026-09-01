@@ -2,7 +2,11 @@ import {
 	marklessInstancePath,
 	marklessInstanceScopedLoadSymbol,
 } from '../../../../web/src/fns/instance-scope.ts';
-import { protocolStateVersion } from '../../../../serializer/src/protocol-constants.ts';
+import {
+	protocolInstancePath,
+	protocolInstanceQualifies,
+	protocolStateVersion,
+} from '../../../../serializer/src/protocol-constants.ts';
 
 export type MdxRoutePart =
 	| {
@@ -179,8 +183,29 @@ export function createMdxRenderDataSurface(
 	};
 }
 
+type MdxGraphRead = {
+	readonly graphNodeId: string;
+	readonly [key: string]: unknown;
+};
+
+type MdxCellRecord = {
+	readonly graphNodeId?: string;
+	readonly [key: string]: unknown;
+};
+
 type MdxComputedRecord = {
+	readonly graphNodeId?: string;
 	readonly deriveSymbolId?: string;
+	readonly dependencies?: readonly MdxGraphRead[];
+	readonly [key: string]: unknown;
+};
+
+type MdxSharedDefinitionRecord = {
+	readonly id: string;
+	readonly scope?: string;
+	readonly graphNodeIds?: readonly string[];
+	readonly projectionIds?: readonly string[];
+	readonly returnProperties?: readonly MdxCellRecord[];
 	readonly [key: string]: unknown;
 };
 
@@ -191,9 +216,9 @@ type MdxStorageRecord = {
 
 type MdxStatePayload = {
 	readonly version: unknown;
-	readonly cells?: readonly unknown[];
+	readonly cells?: readonly MdxCellRecord[];
 	readonly computed?: readonly MdxComputedRecord[];
-	readonly sharedDefinitions?: readonly unknown[];
+	readonly sharedDefinitions?: readonly MdxSharedDefinitionRecord[];
 	readonly storage?: readonly MdxStorageRecord[];
 };
 
@@ -212,6 +237,14 @@ type MdxEventRecord = {
 type MdxSymbolRecord = {
 	readonly hostNodeId: string;
 	readonly symbolId?: string;
+	readonly graphNodeId?: string;
+	readonly inputGraphReads?: readonly MdxGraphRead[];
+	readonly [key: string]: unknown;
+};
+
+type MdxHandleRecord = {
+	readonly hostNodeId: string;
+	readonly handleId: string;
 	readonly [key: string]: unknown;
 };
 
@@ -221,7 +254,7 @@ type MdxViewPayload = {
 	readonly events?: readonly MdxEventRecord[];
 	readonly domUpdates?: readonly MdxSymbolRecord[];
 	readonly behaviors?: readonly MdxSymbolRecord[];
-	readonly elementHandles?: readonly MdxSymbolRecord[];
+	readonly elementHandles?: readonly MdxHandleRecord[];
 	readonly asyncBoundaries?: readonly unknown[];
 };
 
@@ -249,24 +282,139 @@ export function composeMdxState(children: readonly MdxChild[]): MdxStatePayload 
 		return undefined;
 	}
 
-	// Verbatim, like cells: the client matches each record to a cell by graphNodeId.
-	// Inheriting the first child's version stamped 2 with no storage array, which the
-	// client refuses — every island on the page died.
+	// Storage is page-wide by protocol, so it merges verbatim. Inheriting the
+	// first child's version stamped 2 with no storage array, which the client
+	// refuses — every island on the page died.
 	const storage = childStates.flatMap(({ state }) => state.storage ?? []);
 	return {
 		version: protocolStateVersion(storage),
-		cells: childStates.flatMap(({ state }) => state.cells ?? []),
-		computed: childStates.flatMap(({ child, state }) =>
-			(state.computed ?? []).map((record) => prefixMdxComputedRecord(record, child)),
-		),
+		cells: childStates.flatMap(({ child, state }) => {
+			const island = islandScope(child, state);
+			return (state.cells ?? []).map((cell) => islandScopedGraphRecord(cell, island));
+		}),
+		computed: childStates.flatMap(({ child, state }) => {
+			const island = islandScope(child, state);
+			return (state.computed ?? []).map((record) => ({
+				...islandScopedGraphRecord(record, island),
+				...(record.dependencies
+					? {
+							dependencies: record.dependencies.map((read) =>
+								islandScopedGraphRecord(read, island),
+							),
+						}
+					: {}),
+				...(record.deriveSymbolId
+					? { deriveSymbolId: child.symbolPrefix + record.deriveSymbolId }
+					: {}),
+			}));
+		}),
 		...(childStates.some(({ state }) => state.sharedDefinitions?.length)
 			? {
-					sharedDefinitions: childStates.flatMap(
-						({ state }) => state.sharedDefinitions ?? [],
-					),
+					sharedDefinitions: childStates.flatMap(({ child, state }) => {
+						const island = islandScope(child, state);
+						return (state.sharedDefinitions ?? []).map((definition) =>
+							islandScopedSharedDefinition(definition, island),
+						);
+					}),
 				}
 			: {}),
 		...(storage.length > 0 ? { storage } : {}),
+	};
+}
+
+/**
+ * The island segment every id this child owns takes, plus the widget-scoped
+ * definitions that segment is allowed to reach.
+ *
+ * The segment is read back out of the child's own prefix rather than minted
+ * here: a prefix the instance-path grammar cannot spell is no instance path, and
+ * qualifying a graph node id with one would put the payload in a namespace no
+ * reader can recover from a symbol id.
+ */
+type MdxIslandScope = {
+	readonly segment: string;
+	readonly widgetDefinitionIds: ReadonlySet<string>;
+};
+
+function islandScope(child: MdxChild, state: MdxStatePayload): MdxIslandScope {
+	const prefix = child.symbolPrefix;
+	return {
+		segment: prefix && protocolInstancePath(prefix) === prefix ? prefix : '',
+		widgetDefinitionIds: new Set(
+			(state.sharedDefinitions ?? [])
+				.filter((definition) => definition.scope === 'widget')
+				.map((definition) => definition.id),
+		),
+	};
+}
+
+/**
+ * Which of a child's ids belong to the island, and which are the whole page's.
+ *
+ * Two islands of one component compose from their own roots, so both spell the
+ * same `c`/`p` path and their cells, computeds and element-handle rosters land
+ * on one node unless the island segment separates them. What must NOT take the
+ * segment is the page-space families that mean one node per page on purpose: a
+ * `scope: 'page' | 'container' | 'request'` shared() graph and a storage slot
+ * are shared BETWEEN islands, and prefixing them gives each island a private
+ * copy of state the author asked to be common.
+ *
+ * A widget-scoped shared() id is the exception inside the exception — one graph
+ * per rendered widget, so it is the island's — and a bare one (no path, because
+ * no registered widget root claimed it at compose) is recognised by asking the
+ * child's own definitions which scope it was declared at.
+ */
+function islandScopedGraphNodeId(graphNodeId: string, island: MdxIslandScope): string {
+	if (!island.segment) return graphNodeId;
+	if (protocolInstancePath(graphNodeId)) return island.segment + graphNodeId;
+	if (protocolInstanceQualifies(graphNodeId) !== false) return island.segment + graphNodeId;
+	const slash = graphNodeId.lastIndexOf('/');
+	const isWidgetOwned =
+		island.widgetDefinitionIds.has(graphNodeId) ||
+		(slash > 0 && island.widgetDefinitionIds.has(graphNodeId.slice(0, slash)));
+	return isWidgetOwned ? island.segment + graphNodeId : graphNodeId;
+}
+
+/**
+ * The registering half of a handle key, mirrored on the reading half.
+ *
+ * Resume re-spells only a widget-scoped `shared:` handle id per rendered widget;
+ * a component-local handle is already one element per key and the reading symbol
+ * asks for it exactly as its module compiled it. Segmenting that second kind
+ * here would file it under a key nothing ever asks for.
+ */
+function islandScopedHandleId(handleId: string, island: MdxIslandScope): string {
+	return protocolInstanceQualifies(handleId) !== false
+		? handleId
+		: islandScopedGraphNodeId(handleId, island);
+}
+
+function islandScopedGraphRecord<T extends { readonly graphNodeId?: string }>(
+	record: T,
+	island: MdxIslandScope,
+): T {
+	return record.graphNodeId
+		? { ...record, graphNodeId: islandScopedGraphNodeId(record.graphNodeId, island) }
+		: record;
+}
+
+function islandScopedSharedDefinition(
+	definition: MdxSharedDefinitionRecord,
+	island: MdxIslandScope,
+): MdxSharedDefinitionRecord {
+	const scoped = (id: string) => islandScopedGraphNodeId(id, island);
+	return {
+		...definition,
+		id: scoped(definition.id),
+		...(definition.graphNodeIds ? { graphNodeIds: definition.graphNodeIds.map(scoped) } : {}),
+		...(definition.projectionIds ? { projectionIds: definition.projectionIds.map(scoped) } : {}),
+		...(definition.returnProperties
+			? {
+					returnProperties: definition.returnProperties.map((property) =>
+						islandScopedGraphRecord(property, island),
+					),
+				}
+			: {}),
 	};
 }
 
@@ -293,7 +441,7 @@ export function composeMdxView(
 	const events: MdxEventRecord[] = [];
 	const domUpdates: MdxSymbolRecord[] = [];
 	const behaviors: MdxSymbolRecord[] = [];
-	const elementHandles: MdxSymbolRecord[] = [];
+	const elementHandles: MdxHandleRecord[] = [];
 	let elementOffset = initialElementOffset;
 
 	for (const part of parts) {
@@ -352,17 +500,18 @@ export function loadMdxSymbol(
 
 type MdxInstanceScopedLoad = Parameters<typeof marklessInstanceScopedLoadSymbol>[0];
 
-// A slot prefix is outside the instance-path grammar on purpose, so resume scopes
-// nothing for a symbol behind one and a nested child's handler writes bare ids the
-// composed page never observes. The `c<n>:` run behind the slot becomes scope here.
+// The WHOLE path scopes the symbol, island segment included: composeMdxState
+// spelled this child's cells under `m<n>:` + the child's own `c`/`p` run, so a
+// handler scoped by anything less writes to a node the composed page does not
+// carry. The loader still gets the id in the child's own space.
 function loadScopedMdxSymbol(
 	symbolId: string,
 	prefix: string,
 	load: (symbolId: string) => unknown,
 ): unknown {
-	const remainder = symbolId.slice(prefix.length);
-	if (marklessInstancePath(symbolId)) return load(remainder);
-	return marklessInstanceScopedLoadSymbol(load as MdxInstanceScopedLoad)(remainder);
+	const loadChildLocal = ((childSymbolId: string) =>
+		load(childSymbolId.slice(prefix.length))) as MdxInstanceScopedLoad;
+	return marklessInstanceScopedLoadSymbol(loadChildLocal)(symbolId);
 }
 
 function appendMdxChildView(context: {
@@ -372,9 +521,10 @@ function appendMdxChildView(context: {
 	readonly events: MdxEventRecord[];
 	readonly domUpdates: MdxSymbolRecord[];
 	readonly behaviors: MdxSymbolRecord[];
-	readonly elementHandles: MdxSymbolRecord[];
+	readonly elementHandles: MdxHandleRecord[];
 }) {
 	const childView = context.child.view;
+	const island = islandScope(context.child, context.child.output?.state ?? { version: 1 });
 
 	for (const locator of childView.locators ?? []) {
 		context.locators.push({
@@ -391,34 +541,41 @@ function appendMdxChildView(context: {
 		});
 	}
 	for (const update of childView.domUpdates ?? []) {
-		context.domUpdates.push(prefixMdxSymbolRecord(update, context.child));
+		context.domUpdates.push(prefixMdxSymbolRecord(update, context.child, island));
 	}
 	for (const behavior of childView.behaviors ?? []) {
-		context.behaviors.push(prefixMdxSymbolRecord(behavior, context.child));
+		context.behaviors.push(prefixMdxSymbolRecord(behavior, context.child, island));
 	}
+	// A widget-scoped handle id IS the roster key, so an island-blind one merges
+	// two islands' plural handles into one roster and the arrow walk leaves the
+	// island it was pressed in.
 	for (const handle of childView.elementHandles ?? []) {
 		context.elementHandles.push({
 			...handle,
 			hostNodeId: context.child.hostPrefix + handle.hostNodeId,
+			handleId: islandScopedHandleId(handle.handleId, island),
 		});
 	}
 }
 
-// deriveSymbolId is the only state field loadMdxSymbol resolves; graph node ids stay
-// unprefixed because the view records that read them are unprefixed too.
-function prefixMdxComputedRecord(record: MdxComputedRecord, child: MdxChild): MdxComputedRecord {
+// A view record reads the state records composeMdxState just wrote, so its graph
+// node ids take the same island segment those did — one namespace, or the dom
+// update watches a node the handler never writes.
+function prefixMdxSymbolRecord(
+	record: MdxSymbolRecord,
+	child: MdxChild,
+	island: MdxIslandScope,
+): MdxSymbolRecord {
 	return {
-		...record,
-		...(record.deriveSymbolId
-			? { deriveSymbolId: child.symbolPrefix + record.deriveSymbolId }
-			: {}),
-	};
-}
-
-function prefixMdxSymbolRecord(record: MdxSymbolRecord, child: MdxChild): MdxSymbolRecord {
-	return {
-		...record,
+		...islandScopedGraphRecord(record, island),
 		hostNodeId: child.hostPrefix + record.hostNodeId,
+		...(record.inputGraphReads
+			? {
+					inputGraphReads: record.inputGraphReads.map((read) =>
+						islandScopedGraphRecord(read, island),
+					),
+				}
+			: {}),
 		...(record.symbolId ? { symbolId: child.symbolPrefix + record.symbolId } : {}),
 	};
 }
