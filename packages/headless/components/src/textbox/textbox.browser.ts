@@ -254,6 +254,86 @@ test('CSR: a disabled control takes no typing', async () => {
 	expect(el<HTMLInputElement>(Input).value).toBe('');
 });
 
+// ---------------------------------------------------------------------------
+// Composition. This family mirrors the control rather than deriving from it and
+// binds no commit key, so the thing an IME can break here is the write-back:
+// `value={textbox.value}` puts the family's own idea of the text onto the
+// element, and a pre-edit is text the family has no idea about yet.
+// ---------------------------------------------------------------------------
+
+const drained = () => new Promise((resolve) => setTimeout(resolve, 1000));
+
+/**
+ * The region an IME owns inside a plain field, as the events a real composition
+ * raises around a pre-edit that is already in the field's own text.
+ */
+function composition(field: HTMLInputElement | HTMLTextAreaElement) {
+	field.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+	const write = (text: string) => {
+		field.value = text;
+		field.setSelectionRange(text.length, text.length);
+	};
+	return {
+		preEdit(text: string) {
+			write(text);
+			field.dispatchEvent(
+				new CompositionEvent('compositionupdate', { bubbles: true, data: text }),
+			);
+			field.dispatchEvent(
+				new InputEvent('input', {
+					bubbles: true,
+					inputType: 'insertCompositionText',
+					data: text,
+					isComposing: true,
+				}),
+			);
+		},
+		/** The candidate that was chosen, which is not what the pre-edit showed. */
+		commit(text: string) {
+			write(text);
+			field.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: text }));
+			field.dispatchEvent(
+				new InputEvent('input', { bubbles: true, inputType: 'insertCompositionText', data: text }),
+			);
+		},
+	};
+}
+
+test('CSR: a pre-edit is never written back over, and the candidate is what lands', async () => {
+	await render(Basic);
+	const control = el<HTMLInputElement>(Input);
+	control.focus();
+
+	const compose = composition(control);
+	for (const preEdit of ['n', 'ni', 'nihao']) compose.preEdit(preEdit);
+
+	// Every write the pre-edits scheduled is let go of: a write-back that was
+	// going to replace the pre-edit with the family's own text has landed by now.
+	await drained();
+	expect(control.value).toBe('nihao');
+
+	// The candidate is not the pre-edit, which is what makes a write-back of the
+	// wrong text nameable: 'nihao' is a value this control must not end on.
+	compose.commit('你好');
+	await expect.poll(() => control.value).toBe('你好');
+	await expect.poll(() => el(Root).hasAttribute('ui-empty')).toBe(false);
+});
+
+test('CSR: a composition into the multiline control lands the same way', async () => {
+	await render(SignupForm);
+	const control = el<HTMLTextAreaElement>(BioTextarea);
+	control.focus();
+
+	const compose = composition(control);
+	compose.preEdit('nihao');
+	await drained();
+	expect(control.value).toBe('nihao');
+
+	compose.commit('你好');
+	await expect.poll(() => control.value).toBe('你好');
+	await expect.poll(() => el(BioRoot).hasAttribute('ui-empty')).toBe(false);
+});
+
 // The family binds no key handler at all, so Enter means what the platform says
 // it means in each control. A real submit would navigate the test iframe, so the
 // form's own event is caught and counted instead.

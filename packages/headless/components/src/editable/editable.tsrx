@@ -249,6 +249,13 @@ export function EditableInput({ onKeydown, onBlur, ...rest }: EditableInputProps
 		onKeydown={(event) => {
 			// Written out from event fields alone: the policy has to be readable
 			// before the handler symbol loads.
+			// An IME accepts its candidate with Enter and drops a pre-edit with
+			// Escape; both arrive inside the composition and neither ends the session.
+			if (event.isComposing === true) {
+				onKeydown?.(event);
+				return;
+			}
+
 			if (event.key === 'Enter' || event.key === 'Escape') event.preventDefault();
 
 			const decision = editKey(event.key);

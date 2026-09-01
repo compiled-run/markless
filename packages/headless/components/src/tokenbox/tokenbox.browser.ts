@@ -425,6 +425,23 @@ for (const mode of MODES) {
 		await expect.poll(() => el(Held).textContent).toBe('one two');
 	});
 
+	// The paste row above covers a newline arriving in text. This is the other way
+	// a break reaches a single-line box: the key itself, refused at beforeinput.
+	test(`${mode}: a single-line box refuses the Enter key as well as a pasted newline`, async () => {
+		if (mode === 'CSR') await render(Mention);
+		else await renderSSR(Mention);
+
+		caretToEnd();
+		await userEvent.keyboard('one');
+		await expect.poll(() => el(Held).textContent).toBe('one');
+
+		// The words after the refused key are what wait it out: they land on the
+		// same line, so the break never reached the surface.
+		await userEvent.keyboard('{Enter}two');
+		await expect.poll(() => el(Held).textContent).toBe('onetwo');
+		expect(plainSpaces(el(Input).textContent)).toBe('onetwo');
+	});
+
 	// The one rule the whole IME story reduces to: never mutate mid-composition.
 	// Nothing is derived, nothing is reported and nothing re-renders until the
 	// browser hands the region back.

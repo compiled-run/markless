@@ -53,6 +53,58 @@ async function retype(words: string) {
 	await userEvent.keyboard(words);
 }
 
+// A handler runs a dispatch behind the gesture that raised it, so a commit that
+// leaked can still be in the queue when the next line reads the field. "Nothing
+// was taken" is proved by letting the queue drain.
+const drained = () => new Promise((resolve) => setTimeout(resolve, 1000));
+
+/**
+ * The region an IME owns inside a plain field, as the events a real composition
+ * raises around a pre-edit that is already in the field's own text.
+ */
+function composition(field: HTMLInputElement) {
+	field.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+	const write = (text: string) => {
+		field.value = text;
+		field.setSelectionRange(text.length, text.length);
+	};
+	return {
+		preEdit(text: string) {
+			write(text);
+			field.dispatchEvent(
+				new CompositionEvent('compositionupdate', { bubbles: true, data: text }),
+			);
+			field.dispatchEvent(
+				new InputEvent('input', {
+					bubbles: true,
+					inputType: 'insertCompositionText',
+					data: text,
+					isComposing: true,
+				}),
+			);
+		},
+		/** The key an IME accepts a candidate with: Enter, still inside the composition. */
+		accept() {
+			field.dispatchEvent(
+				new KeyboardEvent('keydown', {
+					key: 'Enter',
+					bubbles: true,
+					cancelable: true,
+					isComposing: true,
+				}),
+			);
+		},
+		/** The candidate that was chosen, which is not what the pre-edit showed. */
+		commit(text: string) {
+			write(text);
+			field.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: text }));
+			field.dispatchEvent(
+				new InputEvent('input', { bubbles: true, inputType: 'insertCompositionText', data: text }),
+			);
+		},
+	};
+}
+
 async function expectNoAxeViolations(container: Element, phase: string) {
 	const results = await axe.run(container as HTMLElement, {
 		runOnly: { type: 'tag', values: [...AXE_TAGS] },
@@ -445,6 +497,68 @@ for (const mode of MODES) {
 // axe, per scenario. The battery in test-support holds the starter to the same
 // checks; these rows cover the shapes it does not mount.
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Composition. An IME accepts its candidate with Enter, and that Enter is a
+// boundary inside the composition rather than the session's commit key: a person
+// choosing 你好 has not yet said they are done renaming.
+// ---------------------------------------------------------------------------
+
+test('CSR: an IME accept key chooses a candidate without closing the session', async () => {
+	await render(Basic);
+	await openSession();
+	const field = el<HTMLInputElement>(Input);
+
+	const compose = composition(field);
+	for (const preEdit of ['n', 'ni', 'nihao']) compose.preEdit(preEdit);
+	await expect.poll(() => field.value).toBe('nihao');
+	// The pre-edit is on screen and is not a value: this family binds no onInput,
+	// so nothing has been read off the field yet either way.
+	expect(field.hidden).toBe(false);
+	expect(el(Held).textContent).toBe('Quarterly plan');
+
+	compose.accept();
+	// The whole dispatch queue is let go of, so a commit that leaked has landed
+	// by the time the session is read.
+	await drained();
+	expect(field.hidden).toBe(false);
+	expect(el(Root).hasAttribute('ui-editing')).toBe(true);
+	expect(el(Held).textContent).toBe('Quarterly plan');
+	// Only the opening edge was reported: nothing shut.
+	expect(el(Sessions).textContent).toBe('open ');
+
+	// The candidate lands, and the Enter after the composition is the commit.
+	compose.commit('你好');
+	await userEvent.keyboard('{Enter}');
+	await expect.poll(() => el(Held).textContent).toBe('你好');
+	await expect.poll(() => field.hidden).toBe(true);
+	expect(el(Sessions).textContent).toBe('open shut ');
+});
+
+// Escape inside a composition is the IME's own cancel - it drops the pre-edit and
+// leaves the field - so it must not be the session's cancel either.
+test('CSR: an escape inside a composition does not cancel the session', async () => {
+	await render(Basic);
+	await openSession();
+	const field = el<HTMLInputElement>(Input);
+
+	const compose = composition(field);
+	compose.preEdit('nihao');
+	await expect.poll(() => field.value).toBe('nihao');
+
+	field.dispatchEvent(
+		new KeyboardEvent('keydown', {
+			key: 'Escape',
+			bubbles: true,
+			cancelable: true,
+			isComposing: true,
+		}),
+	);
+	await drained();
+	expect(field.hidden).toBe(false);
+	expect(el(Root).hasAttribute('ui-editing')).toBe(true);
+	expect(el(Sessions).textContent).toBe('open ');
+});
 
 test('CSR: axe finds nothing in the starter', async () => {
 	await expectNoAxeViolations(scopeOf(await render(Basic)), 'the starter is showing');
