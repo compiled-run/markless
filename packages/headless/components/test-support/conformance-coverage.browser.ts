@@ -19,21 +19,16 @@ import { expect, test } from 'vitest';
 // Families still owed multi-embed conformance pins. Shrink this as waves land;
 // never grow it without a ruling.
 const ALLOWLIST: readonly string[] = [
-	'base',
 	'calendar',
 	'carousel',
 	'colorpicker',
-	'combobox',
 	'crop',
 	'datebox',
 	'fileupload',
 	'ink',
 	'otp',
 	'pad',
-	'progress',
-	'qr-code',
 	'resizable',
-	'select',
 	'slider',
 	'taglist',
 	'textbox',
