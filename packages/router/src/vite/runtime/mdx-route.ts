@@ -208,6 +208,13 @@ type MdxComputedRecord = {
 	readonly [key: string]: unknown;
 };
 
+type MdxSharedSeedRecord = {
+	readonly graphNodeId: string;
+	readonly deriveSymbolId: string;
+	readonly dependencies?: readonly (MdxGraphRead & { readonly reads?: MdxGraphRead })[];
+	readonly [key: string]: unknown;
+};
+
 type MdxSharedDefinitionRecord = {
 	readonly id: string;
 	readonly scope?: string;
@@ -226,6 +233,7 @@ type MdxStatePayload = {
 	readonly version: unknown;
 	readonly cells?: readonly MdxCellRecord[];
 	readonly computed?: readonly MdxComputedRecord[];
+	readonly sharedSeeds?: readonly MdxSharedSeedRecord[];
 	readonly sharedDefinitions?: readonly MdxSharedDefinitionRecord[];
 	readonly storage?: readonly MdxStorageRecord[];
 };
@@ -333,6 +341,34 @@ export function composeMdxState(children: readonly MdxChild[]): MdxStatePayload 
 					: {}),
 			}));
 		}),
+		// Dropping a seed here stops a prop bound into an island following its page cell.
+		...(childStates.some(({ state }) => state.sharedSeeds?.length)
+			? {
+					sharedSeeds: childStates.flatMap(({ child, state }) => {
+						const island = islandScope(child, state);
+						return (state.sharedSeeds ?? []).map((seed) => ({
+							...islandScopedGraphRecord(seed, island),
+							deriveSymbolId: child.symbolPrefix + seed.deriveSymbolId,
+							...(seed.dependencies
+								? {
+										dependencies: seed.dependencies.map((dependency) => ({
+											...islandScopedGraphRecord(dependency, island),
+											// The seed's symbol runs instance-scoped, so the id reaching its read router is already segmented.
+											...(dependency.reads
+												? {
+														reads: islandScopedGraphRecord(
+															dependency.reads,
+															island,
+														),
+													}
+												: {}),
+										})),
+									}
+								: {}),
+						}));
+					}),
+				}
+			: {}),
 		...(childStates.some(({ state }) => state.sharedDefinitions?.length)
 			? {
 					sharedDefinitions: childStates.flatMap(({ child, state }) => {
@@ -432,7 +468,9 @@ function islandScopedSharedDefinition(
 		...definition,
 		id: scoped(definition.id),
 		...(definition.graphNodeIds ? { graphNodeIds: definition.graphNodeIds.map(scoped) } : {}),
-		...(definition.projectionIds ? { projectionIds: definition.projectionIds.map(scoped) } : {}),
+		...(definition.projectionIds
+			? { projectionIds: definition.projectionIds.map(scoped) }
+			: {}),
 		...(definition.returnProperties
 			? {
 					returnProperties: definition.returnProperties.map((property) =>
@@ -534,7 +572,10 @@ function mdxRenderedCensus(output: MdxRenderOutput | undefined): MdxNodeCensus {
 	if (output.root) return mdxDomCensus(output.root as unknown as MdxCensusNode);
 	const scanned = typeof output.html === 'string' ? mdxHtmlCensus(output.html) : undefined;
 	return {
-		elements: typeof output.elementCount === 'number' ? output.elementCount : (scanned?.elements ?? 0),
+		elements:
+			typeof output.elementCount === 'number'
+				? output.elementCount
+				: (scanned?.elements ?? 0),
 		comments: scanned?.comments ?? 0,
 	};
 }
@@ -788,7 +829,9 @@ function islandScopedFamilyRecord(
 	for (const key of MDX_SYMBOL_ID_KEYS)
 		if (typeof record[key] === 'string') mapped[key] = child.symbolPrefix + record[key];
 	if (Array.isArray(record.symbolIds))
-		mapped.symbolIds = record.symbolIds.map((symbolId) => child.symbolPrefix + String(symbolId));
+		mapped.symbolIds = record.symbolIds.map(
+			(symbolId) => child.symbolPrefix + String(symbolId),
+		);
 	for (const key of MDX_GRAPH_ID_KEYS)
 		if (typeof record[key] === 'string')
 			mapped[key] = islandScopedGraphNodeId(record[key] as string, island);

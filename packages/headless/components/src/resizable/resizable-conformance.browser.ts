@@ -23,13 +23,6 @@ runMultiEmbedConformance({
 	// group it belongs to; a merged handle would make that walk leave the embed.
 	rovingKey: '{ArrowRight}',
 	rovingFrom: 'thumb',
-	exemptions: [
-		{
-			check: 'interaction-isolation',
-			reason:
-				'sizes the page writes back in never reach the widget cell under a composed multi-island mount, though the same scenario follows them under a plain mount — see resizable.browser.ts "CSR: sizes written in before any gesture still move the panels". The composition, not the family, owns it: packages/vitest-browser/src/csr-islands.ts and packages/vitest-browser/src/ssr-plugin.ts over packages/router/src/vite/mdx.ts',
-		},
-	],
 	// No disabled: `disabled` is a root prop, so one group is either wholly
 	// locked or wholly live and cannot carry a locked divider beside a live one.
 });

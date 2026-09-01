@@ -1,7 +1,8 @@
-import { render, renderSSR } from '@markless/vitest-browser';
+import { render, renderCsrIslands, renderSSR, renderSSRIslands } from '@markless/vitest-browser';
 import { page, userEvent } from 'vite-plus/test/browser';
 import { expect, test } from 'vitest';
 import Basic from './scenarios/basic.tsrx';
+import Controlled from './scenarios/controlled.tsrx';
 import Faq from './scenarios/faq.tsrx';
 import FromData from './scenarios/from-data.tsrx';
 import Locked from './scenarios/locked.tsrx';
@@ -374,3 +375,89 @@ for (const mode of MODES) {
 		await expect.poll(openValues).toBe('beta');
 	});
 }
+
+// A page cell bound into the root has to keep reaching the family after mount,
+// under a plain mount and under a composed multi-island page alike.
+function embed(testid: string, index: number): HTMLElement {
+	const found = document.querySelectorAll<HTMLElement>(`[data-testid="${testid}"]`)[index];
+	if (!found) throw new Error(`Expected a "${testid}" in embed ${index}.`);
+	return found;
+}
+
+async function pinPageWriteReachesTheAccordion(index: number) {
+	const at = (testid: string) => embed(testid, index);
+
+	expectClosed(at('engine-trigger'), at('engine-content'));
+	expectClosed(at('brakes-trigger'), at('brakes-content'));
+
+	await userEvent.click(at('open-brakes'));
+	await expect.poll(() => at('brakes-trigger').getAttribute('aria-expanded')).toBe('true');
+	expectOpen(at('brakes-trigger'), at('brakes-content'));
+	expectClosed(at('engine-trigger'), at('engine-content'));
+	expect(at('root').hasAttribute('ui-multiple')).toBe(false);
+
+	await userEvent.click(at('open-both'));
+	await expect.poll(() => at('root').getAttribute('ui-multiple')).toBe('');
+	expectOpen(at('engine-trigger'), at('engine-content'));
+	expectOpen(at('brakes-trigger'), at('brakes-content'));
+}
+
+async function pinWriteBackSettles(index: number) {
+	const at = (testid: string) => embed(testid, index);
+
+	await userEvent.click(at('engine-trigger'));
+	await expect.poll(() => at('held').getAttribute('data-value')).toBe('engine');
+	expectOpen(at('engine-trigger'), at('engine-content'));
+
+	await userEvent.click(at('engine-trigger'));
+	await expect.poll(() => at('held').getAttribute('data-value')).toBe('');
+	expectClosed(at('engine-trigger'), at('engine-content'));
+}
+
+test('CSR: a page cell written after mount reaches the accordion', async () => {
+	await render(Controlled);
+	await pinPageWriteReachesTheAccordion(0);
+});
+
+test('SSR: a page cell written after mount reaches the accordion', async () => {
+	await renderSSR(Controlled);
+	await pinPageWriteReachesTheAccordion(0);
+});
+
+test('CSR islands: a page cell written after mount reaches its own island', async () => {
+	await renderCsrIslands([Controlled, Controlled]);
+	await pinPageWriteReachesTheAccordion(1);
+	expectClosed(embed('engine-trigger', 0), embed('engine-content', 0));
+	expectClosed(embed('brakes-trigger', 0), embed('brakes-content', 0));
+	expect(embed('root', 0).hasAttribute('ui-multiple')).toBe(false);
+});
+
+test('SSR islands: a page cell written after mount reaches its own island', async () => {
+	await renderSSRIslands([Controlled, Controlled]);
+	await pinPageWriteReachesTheAccordion(1);
+	expectClosed(embed('engine-trigger', 0), embed('engine-content', 0));
+	expectClosed(embed('brakes-trigger', 0), embed('brakes-content', 0));
+	expect(embed('root', 0).hasAttribute('ui-multiple')).toBe(false);
+});
+
+test('CSR: the accordion writes back to the page cell and settles', async () => {
+	await render(Controlled);
+	await pinWriteBackSettles(0);
+});
+
+test('SSR: the accordion writes back to the page cell and settles', async () => {
+	await renderSSR(Controlled);
+	await pinWriteBackSettles(0);
+});
+
+test('CSR islands: the accordion writes back to its own page cell and settles', async () => {
+	await renderCsrIslands([Controlled, Controlled]);
+	await pinWriteBackSettles(1);
+	expect(embed('held', 0).getAttribute('data-value')).toBe('');
+});
+
+test('SSR islands: the accordion writes back to its own page cell and settles', async () => {
+	await renderSSRIslands([Controlled, Controlled]);
+	await pinWriteBackSettles(1);
+	expect(embed('held', 0).getAttribute('data-value')).toBe('');
+});
