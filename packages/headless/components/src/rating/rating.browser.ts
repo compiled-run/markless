@@ -398,6 +398,32 @@ test('CSR: Space rates the focused mark whole', async () => {
 	await expect.poll(() => el(ValueLabel).textContent).toBe('5 of 5');
 });
 
+// Cmd-arrow is browser history and Ctrl-Home is scroll-to-top; a rating holding
+// focus must not swallow either, and a chord on Space must not rate the mark.
+// The plain arrow first warms the handler module, so "nothing moved" is a decision
+// rather than a gesture still in flight.
+test('CSR: a browser chord on a key is left to the browser', async () => {
+	await render(Prefilled);
+	marks()[2].focus();
+	await userEvent.keyboard('{ArrowRight}');
+	await expect.poll(() => el(ValueLabel).textContent).toBe('4 of 5');
+
+	for (const key of ['ArrowRight', 'Home', 'End', ' ']) {
+		for (const modifier of ['metaKey', 'ctrlKey', 'altKey'] as const) {
+			const chord = new KeyboardEvent('keydown', {
+				key,
+				[modifier]: true,
+				bubbles: true,
+				cancelable: true,
+			});
+			marks()[3].dispatchEvent(chord);
+			expect(chord.defaultPrevented, `${modifier}+${key}`).toBe(false);
+		}
+	}
+	await new Promise((resolve) => setTimeout(resolve, 150));
+	expect(el(ValueLabel).textContent).toBe('4 of 5');
+});
+
 test('CSR: the rating stops at both ends', async () => {
 	await render(Basic);
 	marks()[0].focus();

@@ -2,6 +2,7 @@ import { render, renderSSR } from '@markless/vitest-browser';
 import { page, userEvent } from 'vite-plus/test/browser';
 import { expect, test } from 'vitest';
 import Basic from './scenarios/basic.tsrx';
+import DisabledForm from './scenarios/disabled-form.tsrx';
 import ErrorBeforeTrigger from './scenarios/error-first.tsrx';
 import Invalid from './scenarios/invalid.tsrx';
 import NotificationsForm from './scenarios/notifications-form.tsrx';
@@ -245,6 +246,17 @@ for (const mode of MODES) {
 		if (mode === 'CSR') await render(SavedSettingsForm);
 		else await renderSSR(SavedSettingsForm);
 		expectSavedFieldRendered();
+	});
+
+	// A disabled control is left out of the form data set; the field is the only
+	// part of a switch a submission reads, so `disabled` has to reach it.
+	test(`${mode}: a switch nobody may flip submits nothing`, async () => {
+		if (mode === 'CSR') await render(DisabledForm);
+		else await renderSSR(DisabledForm);
+		expect(el<HTMLInputElement>(page.getByTestId('off-field')).disabled).toBe(true);
+		expect(el<HTMLInputElement>(page.getByTestId('off-field')).checked).toBe(true);
+		expect(el<HTMLInputElement>(page.getByTestId('on-field')).disabled).toBe(false);
+		await expect.poll(() => submit().textContent).toBe('{"notifications":"enabled"}');
 	});
 
 	test(`${mode}: an off switch submits nothing`, async () => {

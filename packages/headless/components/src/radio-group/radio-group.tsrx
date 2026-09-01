@@ -195,26 +195,35 @@ export function RadioGroupItemField({ onChange, onFocus, onKeydown, ...rest }: R
 				onFocus?.(event);
 			}}
 			onKeydown={(event) => {
-				// Guarded by event fields alone: this policy has to be readable before the handler symbol loads.
+				// Guarded by event fields alone, every comparison `field === literal`: this policy
+				// has to be readable before the handler symbol loads. The modifiers keep browser
+				// chords - history back, scroll to end - out of the walk.
 				if (
-					event.key === 'ArrowDown' ||
-					event.key === 'ArrowUp' ||
-					event.key === 'ArrowLeft' ||
-					event.key === 'ArrowRight' ||
-					event.key === 'Home' ||
-					event.key === 'End'
+					event.altKey === false &&
+					event.ctrlKey === false &&
+					event.metaKey === false &&
+					(event.key === 'ArrowDown' ||
+						event.key === 'ArrowUp' ||
+						event.key === 'ArrowLeft' ||
+						event.key === 'ArrowRight' ||
+						event.key === 'Home' ||
+						event.key === 'End')
 				) {
 					event.preventDefault();
 				}
 
+				const chorded =
+					event.altKey === true || event.ctrlKey === true || event.metaKey === true;
 				// `target`, not `currentTarget`: a lazy handler symbol runs after the native dispatch, when `currentTarget` is null.
-				const next = nextFieldToFocus(
-					group.fieldEls,
-					event.target as HTMLInputElement,
-					event.key,
-					group.orientation === 'horizontal',
-					group.loop,
-				);
+				const next = chorded
+					? undefined
+					: nextFieldToFocus(
+							group.fieldEls,
+							event.target as HTMLInputElement,
+							event.key,
+							group.orientation === 'horizontal',
+							group.loop,
+						);
 				if (next) {
 					next.focus();
 					// APG: an arrow moves focus AND chooses. Unlike tabs, selection is not optional.

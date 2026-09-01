@@ -2,6 +2,7 @@ import { render, renderSSR } from '@markless/vitest-browser';
 import { page, userEvent } from 'vite-plus/test/browser';
 import { expect, test } from 'vitest';
 import Basic from './scenarios/basic.tsrx';
+import DisabledForm from './scenarios/disabled-form.tsrx';
 import WithOnChange from './scenarios/with-onchange.tsrx';
 import TermsForm from './scenarios/form.tsrx';
 import Invalid from './scenarios/invalid.tsrx';
@@ -35,7 +36,9 @@ const AlertsIndicator = page.getByTestId('alerts-indicator');
 const OffTrigger = page.getByTestId('off-trigger');
 const OffIndicator = page.getByTestId('off-indicator');
 const OffRoot = page.getByTestId('off-root');
+const OffField = page.getByTestId('off-field');
 const OnRoot = page.getByTestId('on-root');
+const OnField = page.getByTestId('on-field');
 const AfterTrigger = page.getByTestId('after-trigger');
 const AfterDescription = page.getByTestId('after-description');
 const AfterError = page.getByTestId('after-error');
@@ -248,6 +251,17 @@ for (const mode of MODES) {
 		if (mode === 'CSR') await render(PartialSelection);
 		else await renderSSR(PartialSelection);
 		expectPartialFieldRendered();
+	});
+
+	// A disabled control is left out of the form data set; the field is the only
+	// part of a checkbox a submission reads, so `disabled` has to reach it.
+	test(`${mode}: a checked box nobody may untick submits nothing`, async () => {
+		if (mode === 'CSR') await render(DisabledForm);
+		else await renderSSR(DisabledForm);
+		expect(el<HTMLInputElement>(OffField).disabled).toBe(true);
+		expect(el<HTMLInputElement>(OffField).checked).toBe(true);
+		expect(el<HTMLInputElement>(OnField).disabled).toBe(false);
+		await expect.poll(() => submit().textContent).toBe('{"news":"on"}');
 	});
 
 	test(`${mode}: an unchecked terms form submits nothing`, async () => {

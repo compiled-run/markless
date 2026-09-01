@@ -142,6 +142,9 @@ export function CheckboxField({ ...rest }: CheckboxFieldProps) @{
 			name={checkbox.name}
 			value={checkbox.value}
 			required={checkbox.required}
+			// A disabled control is left out of the form data set: this is the only
+			// part a submission reads, so the box's own `disabled` has to reach it.
+			disabled={checkbox.disabled}
 			checked={checkbox.checked === true}
 			indeterminate={checkbox.checked === 'mixed'}
 		/>

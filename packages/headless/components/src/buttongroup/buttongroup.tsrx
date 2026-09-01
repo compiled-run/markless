@@ -175,26 +175,33 @@ export function ButtonGroupItem({
 			// over locals derived from graph state is MARKLESS_SYNC_POLICY_UNEXTRACTABLE.
 			// Enter and Space are absent on purpose - the item is a real button and
 			// the browser activates it, so handling them here would press twice.
+			// The modifiers keep browser chords - history back, scroll to end - out of the walk.
 			if (
-				event.key === 'ArrowRight' ||
-				event.key === 'ArrowLeft' ||
-				event.key === 'ArrowUp' ||
-				event.key === 'ArrowDown' ||
-				event.key === 'Home' ||
-				event.key === 'End'
+				event.altKey === false &&
+				event.ctrlKey === false &&
+				event.metaKey === false &&
+				(event.key === 'ArrowRight' ||
+					event.key === 'ArrowLeft' ||
+					event.key === 'ArrowUp' ||
+					event.key === 'ArrowDown' ||
+					event.key === 'Home' ||
+					event.key === 'End')
 			) {
 				event.preventDefault();
 			}
 
+			const chorded = event.altKey === true || event.ctrlKey === true || event.metaKey === true;
 			// This item's own element off its own instance handle: a handler on the
 			// element that binds the handle resolves per instance.
-			const next = nextItemToFocus(
-				group.itemEls,
-				item.el,
-				event.key,
-				group.orientation !== 'vertical',
-				group.loop,
-			);
+			const next = chorded
+				? undefined
+				: nextItemToFocus(
+						group.itemEls,
+						item.el,
+						event.key,
+						group.orientation !== 'vertical',
+						group.loop,
+					);
 			// Focus only. An arrow never presses, which is the rule radiogroup inverts.
 			if (next) next.focus();
 			onKeydown?.(event);
@@ -205,17 +212,16 @@ export function ButtonGroupItem({
 export function ButtonGroupItemField({ ...rest }: ButtonGroupItemFieldProps) @{
 	const group = buttongroupState();
 	const item = buttongroupItemState();
-	const isPressed = computed(() => heldValues(group.value).indexOf(item.value) !== -1);
+	// One cell rather than the two tests written inline: a comparison spelled out in
+	// an attribute renders once and then goes stale.
+	const isOmitted = computed(() => {
+		if (item.disabled || group.disabled) return true;
+		return heldValues(group.value).indexOf(item.value) === -1;
+	});
 
 	// `type="hidden"` is what keeps this legal inside the button: an input in the
 	// hidden state is not interactive content, so it neither takes focus nor
-	// reaches the accessibility tree. `disabled` is how an unpressed item submits
-	// nothing - a disabled control is left out of the form data set.
-	<input
-		{...rest}
-		type="hidden"
-		name={group.name}
-		value={item.value}
-		disabled={isPressed !== true}
-	/>
+	// reaches the accessibility tree. `disabled` is how an unpressed or locked item
+	// submits nothing - a disabled control is left out of the form data set.
+	<input {...rest} type="hidden" name={group.name} value={item.value} disabled={isOmitted} />
 }

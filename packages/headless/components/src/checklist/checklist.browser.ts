@@ -11,6 +11,7 @@ import CondimentsForm from './scenarios/condiments-form.tsrx';
 import ItemsFromData from './scenarios/items-from-data.tsrx';
 import Partial from './scenarios/partial.tsrx';
 import TwoLists from './scenarios/two-lists.tsrx';
+import UnavailableForm from './scenarios/unavailable-form.tsrx';
 import UnavailableOptions from './scenarios/unavailable-options.tsrx';
 import WithError from './scenarios/with-error.tsrx';
 import WithOnChange from './scenarios/with-onchange.tsrx';
@@ -29,6 +30,7 @@ const TomatoTrigger = page.getByTestId('tomato-trigger');
 const TomatoIndicator = page.getByTestId('tomato-indicator');
 const TomatoField = page.getByTestId('tomato-field');
 const MustardTrigger = page.getByTestId('mustard-trigger');
+const CaviarField = page.getByTestId('caviar-field');
 const CaviarTrigger = page.getByTestId('caviar-trigger');
 const CaviarIndicator = page.getByTestId('caviar-indicator');
 const LockedRoot = page.getByTestId('locked-root');
@@ -327,6 +329,17 @@ for (const mode of MODES) {
 		if (mode === 'CSR') await render(CondimentsForm);
 		else await renderSSR(CondimentsForm);
 		expectFormConfigRendered();
+	});
+
+	// An item's field is a checkbox field, so the item's own `disabled` has to
+	// reach it: a disabled control is left out of the form data set.
+	test(`${mode}: a ticked item nobody may untick is left out of what the form submits`, async () => {
+		if (mode === 'CSR') await render(UnavailableForm);
+		else await renderSSR(UnavailableForm);
+		expect(el<HTMLInputElement>(LettuceField).disabled).toBe(false);
+		expect(el<HTMLInputElement>(CaviarField).disabled).toBe(true);
+		expect(el<HTMLInputElement>(CaviarField).checked).toBe(true);
+		await expect.poll(() => submit().textContent).toBe('{"lettuce":"lettuce"}');
 	});
 
 	test.skip(`${mode}: only ticked items appear in what the form submits`, async () => {

@@ -319,16 +319,25 @@ export function RatingItem({
 		}}
 		onKeydown={(event) => {
 			// Guarded by event fields alone: a guard over locals derived from graph state is MARKLESS_SYNC_POLICY_UNEXTRACTABLE.
+			// The modifiers keep browser chords - history back, scroll to end - off the rating.
 			if (
-				event.key === 'ArrowUp' ||
-				event.key === 'ArrowDown' ||
-				event.key === 'ArrowLeft' ||
-				event.key === 'ArrowRight' ||
-				event.key === 'Home' ||
-				event.key === 'End' ||
-				event.key === ' '
+				event.altKey === false &&
+				event.ctrlKey === false &&
+				event.metaKey === false &&
+				(event.key === 'ArrowUp' ||
+					event.key === 'ArrowDown' ||
+					event.key === 'ArrowLeft' ||
+					event.key === 'ArrowRight' ||
+					event.key === 'Home' ||
+					event.key === 'End' ||
+					event.key === ' ')
 			) {
 				event.preventDefault();
+			}
+
+			if (event.altKey === true || event.ctrlKey === true || event.metaKey === true) {
+				onKeydown?.(event);
+				return;
 			}
 
 			if (event.key === ' ' || event.key === 'Enter') {
