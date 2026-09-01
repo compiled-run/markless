@@ -9,11 +9,14 @@ import {
 	protocolInstanceQualifies,
 	protocolStateVersion,
 } from '../../../../serializer/src/protocol-constants.ts';
+import { isArmBranchAnchorComment } from '../../../../web/src/resume-anchor-census.ts';
+import type { ProtocolViewPayload } from '../../../../serializer/src/protocol.ts';
 
 export type MdxRoutePart =
 	| {
 			readonly kind: 'html';
 			readonly elementCount: number;
+			readonly commentCount?: number;
 			readonly html?: string;
 			readonly elementTags?: ReadonlyArray<string>;
 	  }
@@ -27,6 +30,9 @@ export type MdxRenderOutput = {
 	readonly root?: ChildNode;
 	readonly state?: MdxStatePayload;
 	readonly view?: MdxViewPayload;
+	// What the compiled artifact counted as it rendered: every element it
+	// emitted, arm content and repeat rows included.
+	readonly elementCount?: number;
 	readonly loadSymbol?: (symbolId: string) => unknown;
 };
 
@@ -253,6 +259,8 @@ type MdxHandleRecord = {
 	readonly [key: string]: unknown;
 };
 
+type MdxFamilyRecord = Readonly<Record<string, unknown>>;
+
 type MdxViewPayload = {
 	readonly version: unknown;
 	readonly locators?: readonly MdxLocator[];
@@ -260,7 +268,10 @@ type MdxViewPayload = {
 	readonly domUpdates?: readonly MdxSymbolRecord[];
 	readonly behaviors?: readonly MdxSymbolRecord[];
 	readonly elementHandles?: readonly MdxHandleRecord[];
-	readonly asyncBoundaries?: readonly unknown[];
+	readonly keyedRepeats?: readonly MdxFamilyRecord[];
+	readonly branches?: readonly MdxFamilyRecord[];
+	readonly asyncBoundaries?: readonly MdxFamilyRecord[];
+	readonly asyncRunners?: Readonly<Record<string, string>>;
 };
 
 export async function renderMdxChild(
@@ -439,58 +450,185 @@ export function composeMdxView(
 	parts: readonly MdxRoutePart[],
 	children: readonly MdxChild[],
 	initialElementOffset: number,
+	initialCommentOffset = 0,
 ): MdxViewPayload | undefined {
-	const childViews = children
-		.map((child) => ({
-			...child,
-			view: child.output?.view,
-			hostCount: child.output?.view?.locators?.length ?? 0,
-		}))
-		.filter((child): child is typeof child & { readonly view: MdxViewPayload } =>
-			Boolean(child.view),
-		);
-	if (childViews.length === 0) {
+	const childCensus = children.map((child) => ({
+		...child,
+		view: child.output?.view,
+		census: mdxRenderedCensus(child.output),
+	}));
+	const firstView = childCensus.find((child) => child.view)?.view;
+	if (!firstView) {
 		return undefined;
 	}
 
-	const childByIndex = new Map(childViews.map((child) => [child.componentIndex, child]));
+	const childByIndex = new Map(childCensus.map((child) => [child.componentIndex, child]));
 	const locators: MdxLocator[] = [];
 	const events: MdxEventRecord[] = [];
 	const domUpdates: MdxSymbolRecord[] = [];
 	const behaviors: MdxSymbolRecord[] = [];
 	const elementHandles: MdxHandleRecord[] = [];
+	const keyedRepeats: MdxFamilyRecord[] = [];
+	const branches: MdxFamilyRecord[] = [];
+	const asyncBoundaries: MdxFamilyRecord[] = [];
+	const asyncRunners: Record<string, string> = {};
 	let elementOffset = initialElementOffset;
+	let commentOffset = initialCommentOffset;
 
 	for (const part of parts) {
 		if (part.kind === 'html') {
 			elementOffset += part.elementCount;
+			commentOffset += part.commentCount ?? 0;
 			continue;
 		}
 
 		const child = childByIndex.get(part.componentIndex);
 		if (!child) continue;
-		appendMdxChildView({
-			child,
-			elementOffset,
-			locators,
-			events,
-			domUpdates,
-			behaviors,
-			elementHandles,
-		});
-		elementOffset += child.hostCount;
+		if (child.view) {
+			appendMdxChildView({
+				child: child as MdxChild & { readonly view: MdxViewPayload },
+				elementOffset,
+				commentOffset,
+				locators,
+				events,
+				domUpdates,
+				behaviors,
+				elementHandles,
+				keyedRepeats,
+				branches,
+				asyncBoundaries,
+				asyncRunners,
+			});
+		}
+		// The island's own markup — every element and comment of it, not just the
+		// hosts it locates — is what the client census walks past to reach the
+		// next island.
+		elementOffset += child.census.elements;
+		commentOffset += child.census.comments;
 	}
 
 	locators.sort((a, b) => a.index - b.index);
 	return {
-		version: childViews[0]!.view.version,
+		version: firstView.version,
 		locators,
 		events,
 		domUpdates,
 		behaviors,
 		elementHandles,
-		asyncBoundaries: [],
+		...(keyedRepeats.length > 0 ? { keyedRepeats } : {}),
+		...(branches.length > 0 ? { branches } : {}),
+		asyncBoundaries,
+		...(Object.keys(asyncRunners).length > 0 ? { asyncRunners } : {}),
 	};
+}
+
+type MdxNodeCensus = { readonly elements: number; readonly comments: number };
+
+/**
+ * The tally the client keeps of one island's markup.
+ *
+ * Resume pins a depth-first census of every element under the container and
+ * resolves each locator by its index into it, and it walks comments the same
+ * way for anchors, so both offsets have to be counted the way the DOM counts
+ * them or a later island's records land on the wrong nodes.
+ */
+function mdxRenderedCensus(output: MdxRenderOutput | undefined): MdxNodeCensus {
+	if (!output) return { elements: 0, comments: 0 };
+	if (output.root) return mdxDomCensus(output.root as unknown as MdxCensusNode);
+	const scanned = typeof output.html === 'string' ? mdxHtmlCensus(output.html) : undefined;
+	return {
+		elements: typeof output.elementCount === 'number' ? output.elementCount : (scanned?.elements ?? 0),
+		comments: scanned?.comments ?? 0,
+	};
+}
+
+type MdxCensusNode = {
+	readonly nodeType?: number;
+	readonly data?: string;
+	readonly childNodes?: ArrayLike<MdxCensusNode>;
+};
+
+function mdxDomCensus(root: MdxCensusNode): MdxNodeCensus {
+	let elements = 0;
+	let comments = 0;
+	(function visit(node: MdxCensusNode): void {
+		if (node.nodeType === 1) elements++;
+		else if (node.nodeType === 8 && !isArmBranchAnchorComment({ nodeType: 8, data: node.data }))
+			comments++;
+		for (const child of Array.from(node.childNodes ?? [])) visit(child);
+	})(root);
+	return { elements, comments };
+}
+
+// Template content is a fragment the census never walks, and raw-text content
+// is text however much it looks like markup.
+const MDX_RAW_TEXT_TAGS = new Set(['script', 'style', 'textarea', 'title']);
+
+function mdxHtmlCensus(html: string): MdxNodeCensus {
+	let elements = 0;
+	let comments = 0;
+	let templateDepth = 0;
+	let at = 0;
+	while (at < html.length) {
+		const open = html.indexOf('<', at);
+		if (open < 0) break;
+		if (html.startsWith('<!--', open)) {
+			const close = html.indexOf('-->', open + 4);
+			const text = html.slice(open + 4, close < 0 ? html.length : close);
+			if (templateDepth === 0 && !isArmBranchAnchorComment({ nodeType: 8, data: text }))
+				comments++;
+			at = close < 0 ? html.length : close + 3;
+			continue;
+		}
+		if (html[open + 1] === '!' || html[open + 1] === '?') {
+			at = mdxTagEnd(html, open);
+			continue;
+		}
+		const closing = html[open + 1] === '/';
+		const name = mdxTagName(html, open + (closing ? 2 : 1));
+		if (!name) {
+			at = open + 1;
+			continue;
+		}
+		const tagEnd = mdxTagEnd(html, open);
+		at = tagEnd;
+		if (closing) {
+			if (name === 'template' && templateDepth > 0) templateDepth--;
+			continue;
+		}
+		if (templateDepth === 0) elements++;
+		const selfClosing = html.slice(open, tagEnd).trimEnd().endsWith('/>');
+		if (selfClosing) continue;
+		if (name === 'template') templateDepth++;
+		else if (MDX_RAW_TEXT_TAGS.has(name)) {
+			const close = html.toLowerCase().indexOf(`</${name}`, tagEnd);
+			at = close < 0 ? html.length : close;
+		}
+	}
+	return { elements, comments };
+}
+
+function mdxTagName(html: string, at: number): string {
+	let end = at;
+	while (end < html.length && !/[\s/>]/.test(html[end]!)) end++;
+	const name = html.slice(at, end).toLowerCase();
+	return /^[a-z][a-z0-9:-]*$/.test(name) ? name : '';
+}
+
+// Quote-aware: an attribute value may hold a `>`, and stopping there would read
+// the rest of the value as markup.
+function mdxTagEnd(html: string, at: number): number {
+	let quote = '';
+	for (let index = at + 1; index < html.length; index++) {
+		const character = html[index]!;
+		if (quote) {
+			if (character === quote) quote = '';
+			continue;
+		}
+		if (character === '"' || character === "'") quote = character;
+		else if (character === '>') return index + 1;
+	}
+	return html.length;
 }
 
 export function loadMdxSymbol(
@@ -534,14 +672,33 @@ function loadScopedMdxSymbol(
 function appendMdxChildView(context: {
 	readonly child: MdxChild & { readonly view: MdxViewPayload };
 	readonly elementOffset: number;
+	readonly commentOffset: number;
 	readonly locators: MdxLocator[];
 	readonly events: MdxEventRecord[];
 	readonly domUpdates: MdxSymbolRecord[];
 	readonly behaviors: MdxSymbolRecord[];
 	readonly elementHandles: MdxHandleRecord[];
+	readonly keyedRepeats: MdxFamilyRecord[];
+	readonly branches: MdxFamilyRecord[];
+	readonly asyncBoundaries: MdxFamilyRecord[];
+	readonly asyncRunners: Record<string, string>;
 }) {
 	const childView = context.child.view;
 	const island = islandScope(context.child, context.child.output?.state ?? { version: 1 });
+	const familyContext: MdxFamilyContext = {
+		child: context.child,
+		island,
+		commentOffset: context.commentOffset,
+	};
+	for (const repeat of childView.keyedRepeats ?? [])
+		context.keyedRepeats.push(islandScopedFamilyRecord(repeat, familyContext));
+	for (const branch of childView.branches ?? [])
+		context.branches.push(islandScopedFamilyRecord(branch, familyContext));
+	for (const boundary of childView.asyncBoundaries ?? [])
+		context.asyncBoundaries.push(islandScopedFamilyRecord(boundary, familyContext));
+	for (const [graphNodeId, symbolId] of Object.entries(childView.asyncRunners ?? {}))
+		context.asyncRunners[islandScopedGraphNodeId(graphNodeId, island)] =
+			context.child.symbolPrefix + symbolId;
 
 	for (const locator of childView.locators ?? []) {
 		context.locators.push({
@@ -573,6 +730,100 @@ function appendMdxChildView(context: {
 			handleId: islandScopedHandleId(handle.handleId, island),
 		});
 	}
+}
+
+type MdxFamilyContext = {
+	readonly child: MdxChild;
+	readonly island: MdxIslandScope;
+	readonly commentOffset: number;
+};
+
+type MdxAnchorStrategy = NonNullable<
+	ProtocolViewPayload['branches']
+>[number]['startAnchor']['strategy'];
+
+// The page-wide comment walk is what a `dom-order-comment` anchor indexes into.
+// An arm-branch anchor indexes its own boundary's local census and never moves.
+const MDX_PAGE_ANCHOR_STRATEGY: MdxAnchorStrategy = 'dom-order-comment';
+
+const MDX_HOST_ID_KEYS = ['hostNodeId', 'parentHostNodeId', 'ownerHostNodeId'] as const;
+const MDX_SYMBOL_ID_KEYS = ['symbolId', 'updateSymbolId', 'runnerSymbolId'] as const;
+const MDX_GRAPH_ID_KEYS = ['graphNodeId', 'runnerGraphNodeId', 'collectionGraphNodeId'] as const;
+const MDX_INSTANCE_PATH_KEYS = ['instancePath', 'composedInstancePath'] as const;
+const MDX_NESTED_RECORD_KEYS = [
+	'testReads',
+	'contentReads',
+	'asyncReads',
+	'inputGraphReads',
+	'composedGraphProps',
+	'idrefSites',
+	'locators',
+	'events',
+	'domUpdates',
+	'behaviors',
+	'elementHandles',
+	'rowEvents',
+	'rowElementHandles',
+	'keyedRepeats',
+	'branches',
+	'armRecords',
+	'servedArmRecords',
+] as const;
+
+/**
+ * One island's repeat / branch / boundary record in the composed page's spaces.
+ *
+ * Every id the record carries takes the island's own prefix for the same reason
+ * the flat records do — two embeds of one component spell identical ids — and
+ * the two comment anchors take the page's comment offset. Arm-relative
+ * coordinates inside an arm record set are island-local by construction and are
+ * deliberately left alone.
+ */
+function islandScopedFamilyRecord(
+	record: MdxFamilyRecord,
+	context: MdxFamilyContext,
+): MdxFamilyRecord {
+	const { child, island } = context;
+	const mapped: Record<string, unknown> = { ...record };
+	if (typeof record.id === 'string') mapped.id = child.hostPrefix + record.id;
+	for (const key of MDX_HOST_ID_KEYS)
+		if (typeof record[key] === 'string') mapped[key] = child.hostPrefix + record[key];
+	for (const key of MDX_SYMBOL_ID_KEYS)
+		if (typeof record[key] === 'string') mapped[key] = child.symbolPrefix + record[key];
+	if (Array.isArray(record.symbolIds))
+		mapped.symbolIds = record.symbolIds.map((symbolId) => child.symbolPrefix + String(symbolId));
+	for (const key of MDX_GRAPH_ID_KEYS)
+		if (typeof record[key] === 'string')
+			mapped[key] = islandScopedGraphNodeId(record[key] as string, island);
+	if (typeof record.handleId === 'string')
+		mapped.handleId = islandScopedHandleId(record.handleId, island);
+	for (const key of MDX_INSTANCE_PATH_KEYS)
+		if (typeof record[key] === 'string') mapped[key] = island.segment + record[key];
+	if (isFamilyRecord(record.elementHandleIds))
+		mapped.elementHandleIds = Object.fromEntries(
+			Object.entries(record.elementHandleIds).map(([readId, handleId]) => [
+				readId,
+				islandScopedHandleId(String(handleId), island),
+			]),
+		);
+	for (const key of ['startAnchor', 'endAnchor'] as const) {
+		const anchor = record[key];
+		if (isFamilyRecord(anchor) && anchor.strategy === MDX_PAGE_ANCHOR_STRATEGY)
+			mapped[key] = { ...anchor, index: context.commentOffset + Number(anchor.index) };
+	}
+	for (const key of MDX_NESTED_RECORD_KEYS) {
+		const nested = record[key];
+		if (Array.isArray(nested))
+			mapped[key] = nested.map((entry) =>
+				isFamilyRecord(entry) ? islandScopedFamilyRecord(entry, context) : entry,
+			);
+		else if (isFamilyRecord(nested)) mapped[key] = islandScopedFamilyRecord(nested, context);
+	}
+	return mapped;
+}
+
+function isFamilyRecord(value: unknown): value is MdxFamilyRecord {
+	return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 // A view record reads the state records composeMdxState just wrote, so its graph

@@ -390,6 +390,224 @@ describe('composeMdxState storage records', () => {
 	});
 });
 
+describe('composeMdxView island element offsets', () => {
+	// The client pins a census of EVERY rendered element under the container, so
+	// the offset the next island starts at is the island's rendered element
+	// count. A locator list names only the static template's hosts: `@for` rows
+	// and arm content render elements that no top-level locator points at.
+	const locator = (hostNodeId: string, tagName: string) => ({
+		hostNodeId,
+		strategy: 'dom-order' as const,
+		index: 0,
+		tagName,
+	});
+	const island = (componentIndex: number, output: MdxChild['output']): MdxChild => ({
+		componentIndex,
+		hostPrefix: `m${componentIndex}:`,
+		symbolPrefix: `m${componentIndex}:`,
+		output,
+	});
+	// div > table > tbody > tr > td: five elements, one locator.
+	const tableHtml =
+		'<div class="api"><table><tbody><tr><td>open</td></tr></tbody></table></div>';
+
+	it('advances the offset by the island rendered element count, not its locator count', () => {
+		const view = composeMdxView(
+			[
+				{ kind: 'component', componentIndex: 0 },
+				{ kind: 'html', elementCount: 1 },
+				{ kind: 'component', componentIndex: 1 },
+			],
+			[
+				island(0, {
+					html: tableHtml,
+					elementCount: 5,
+					view: {
+						version: 1,
+						locators: [locator('h0', 'div')],
+						events: [],
+						domUpdates: [],
+						behaviors: [],
+						elementHandles: [],
+					},
+				}),
+				island(1, {
+					html: '<button>toggle</button>',
+					elementCount: 1,
+					view: {
+						version: 1,
+						locators: [locator('h0', 'button')],
+						events: [],
+						domUpdates: [],
+						behaviors: [],
+						elementHandles: [],
+					},
+				}),
+			],
+			0,
+		);
+
+		// Hand-counted census: div,table,tbody,tr,td (0-4), the markdown element
+		// (5), then the second island's button.
+		expect(view?.locators).toEqual([
+			expect.objectContaining({ hostNodeId: 'm0:h0', index: 0 }),
+			expect.objectContaining({ hostNodeId: 'm1:h0', index: 6 }),
+		]);
+	});
+
+	// A child with no view is filtered out of the composed records, but its
+	// markup is still in the page the census walks.
+	it('counts a viewless island markup from its own rendered html', () => {
+		const view = composeMdxView(
+			[
+				{ kind: 'component', componentIndex: 0 },
+				{ kind: 'component', componentIndex: 1 },
+			],
+			[
+				island(0, { html: '<div><span>a</span><span>b</span></div>' }),
+				island(1, {
+					html: '<button>toggle</button>',
+					view: {
+						version: 1,
+						locators: [locator('h0', 'button')],
+						events: [],
+						domUpdates: [],
+						behaviors: [],
+						elementHandles: [],
+					},
+				}),
+			],
+			0,
+		);
+
+		expect(view?.locators).toEqual([expect.objectContaining({ hostNodeId: 'm1:h0', index: 3 })]);
+	});
+});
+
+describe('composeMdxView payload families', () => {
+	const child: MdxChild = {
+		componentIndex: 0,
+		hostPrefix: 'm0:',
+		symbolPrefix: 'm0:',
+		output: {
+			html: '<!--markless:branch:0--><ul><li>a</li></ul><!--/markless:branch:0-->',
+			elementCount: 2,
+			state: { version: 1, cells: [{ graphNodeId: 'state:rows' }], computed: [] },
+			view: {
+				version: 1,
+				locators: [],
+				events: [],
+				domUpdates: [],
+				behaviors: [],
+				elementHandles: [],
+				keyedRepeats: [
+					{
+						id: 'repeat:0',
+						parentHostNodeId: 'h1',
+						collectionGraphNodeId: 'state:rows',
+						collectionPath: [],
+						keyPath: ['id'],
+						itemName: 'row',
+						rowElementCount: 1,
+						instancePath: 'c0:',
+						rowElementHandles: [{ hostPath: [0], handleId: 'shared:rows', name: 'rows' }],
+						rowEvents: [{ hostPath: [0], eventName: 'click', symbolIds: ['symbol:1'] }],
+					},
+				],
+				branches: [
+					{
+						id: 'branch:0',
+						startAnchor: { strategy: 'dom-order-comment', index: 0 },
+						endAnchor: { strategy: 'dom-order-comment', index: 1 },
+						symbolId: 'symbol:2',
+						testReads: [{ source: 'graph', graphNodeId: 'state:rows', path: [] }],
+					},
+				],
+				asyncBoundaries: [
+					{
+						id: 'boundary:0',
+						runnerGraphNodeId: 'state:rows',
+						initiallyServedArm: 1,
+						updateSymbolId: 'symbol:3',
+						startAnchor: { strategy: 'dom-order-comment', index: 2 },
+						endAnchor: { strategy: 'dom-order-comment', index: 3 },
+						asyncReads: [{ source: 'graph', graphNodeId: 'state:rows', path: [] }],
+					},
+				],
+			},
+		},
+	};
+
+	// The three families were dropped on the floor by MDX composition, so an
+	// island's own `@for`/`@if`/`@try` interactivity never resumed on a docs page.
+	it('forwards keyed repeats, branches and boundaries island-scoped', () => {
+		const view = composeMdxView(
+			[
+				{ kind: 'html', elementCount: 2, commentCount: 1 },
+				{ kind: 'component', componentIndex: 0 },
+			],
+			[child],
+			0,
+		);
+
+		expect(view?.keyedRepeats).toEqual([
+			expect.objectContaining({
+				id: 'm0:repeat:0',
+				parentHostNodeId: 'm0:h1',
+				collectionGraphNodeId: 'm0:state:rows',
+				instancePath: 'm0:c0:',
+				rowEvents: [expect.objectContaining({ symbolIds: ['m0:symbol:1'] })],
+			}),
+		]);
+		expect(view?.branches).toEqual([
+			expect.objectContaining({
+				id: 'm0:branch:0',
+				symbolId: 'm0:symbol:2',
+				// One markdown comment stands before the island.
+				startAnchor: { strategy: 'dom-order-comment', index: 1 },
+				endAnchor: { strategy: 'dom-order-comment', index: 2 },
+				testReads: [{ source: 'graph', graphNodeId: 'm0:state:rows', path: [] }],
+			}),
+		]);
+		expect(view?.asyncBoundaries).toEqual([
+			expect.objectContaining({
+				id: 'm0:boundary:0',
+				runnerGraphNodeId: 'm0:state:rows',
+				updateSymbolId: 'm0:symbol:3',
+				startAnchor: { strategy: 'dom-order-comment', index: 3 },
+				endAnchor: { strategy: 'dom-order-comment', index: 4 },
+				asyncReads: [{ source: 'graph', graphNodeId: 'm0:state:rows', path: [] }],
+			}),
+		]);
+	});
+
+	it('counts an island own comments into the next island anchor offset', () => {
+		const second: MdxChild = {
+			...child,
+			componentIndex: 1,
+			hostPrefix: 'm1:',
+			symbolPrefix: 'm1:',
+		};
+		const view = composeMdxView(
+			[
+				{ kind: 'component', componentIndex: 0 },
+				{ kind: 'component', componentIndex: 1 },
+			],
+			[child, second],
+			0,
+		);
+		const branches = view?.branches as ReadonlyArray<{
+			readonly id: string;
+			readonly startAnchor: { readonly index: number };
+		}>;
+
+		expect(branches.map((branch) => [branch.id, branch.startAnchor.index])).toEqual([
+			['m0:branch:0', 0],
+			['m1:branch:0', 2],
+		]);
+	});
+});
+
 describe('MDX slot prefixes against the composition instance-path grammar', () => {
 	// An island's slot prefix IS its instance path: composition qualifies the
 	// child's cells with it and resume recovers the same segment from the symbol

@@ -88,6 +88,7 @@ type MdxPart =
 			readonly kind: 'html';
 			readonly html: string;
 			readonly elementCount: number;
+			readonly commentCount?: number;
 			readonly elementTags: ReadonlyArray<string>;
 	  }
 	| {
@@ -299,7 +300,16 @@ function appendHtmlPart(parts: MdxPart[], nodes: readonly HastNode[], id: string
 	const html = toHtml({ type: 'root', children: staticNodes }, { allowDangerousHtml: true });
 	if (html) {
 		const elementTags = hastElementTags(staticNodes);
-		parts.push({ kind: 'html', html, elementCount: elementTags.length, elementTags });
+		// Markdown comments join the page's comment walk, which is what every
+		// island's branch and boundary anchors index into.
+		const commentCount = hastCommentCount(staticNodes);
+		parts.push({
+			kind: 'html',
+			html,
+			elementCount: elementTags.length,
+			...(commentCount > 0 ? { commentCount } : {}),
+			elementTags,
+		});
 	}
 }
 
@@ -532,6 +542,16 @@ function hastElementTags(nodes: readonly HastNode[]): string[] {
 		}
 	}
 	return tags;
+}
+
+function hastCommentCount(nodes: readonly HastNode[]): number {
+	let comments = 0;
+	for (const node of nodes) {
+		if (node.type === 'comment') comments++;
+		if ('children' in node && Array.isArray(node.children))
+			comments += hastCommentCount(node.children as HastNode[]);
+	}
+	return comments;
 }
 
 // A compiled .tsrx child carries its own storage seeds; the MDX page is the
