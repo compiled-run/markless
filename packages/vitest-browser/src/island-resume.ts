@@ -1,0 +1,42 @@
+import {
+	resumeFromPayloadDocument,
+	type ResumePayloadDocumentInput,
+} from '@markless/core/web/resume';
+// The router's own island symbol router, not a copy: it is what applies the
+// instance-path scoping behind a `m<n>:` prefix. Reached by path because
+// @markless/router is not a dependency of this test-only package, the same way
+// the router's own mdx-route module reaches into web/ and serializer/.
+import { loadMdxSymbol, type MdxSymbolLoader } from '../../router/src/vite/runtime/mdx-route.ts';
+
+export type { MdxSymbolLoader };
+
+type IslandResumeInput = {
+	readonly root: Element & { __asyncResumeRuntimeStarted?: boolean };
+	readonly event: Event | 0;
+};
+
+/**
+ * The resume entry a multi-island test page loads, built from the same pieces
+ * `emitComposedMdxRoute` writes into a composed MDX route: prefix-keyed symbol
+ * loaders routed through `loadMdxSymbol`, one `resumeFromPayloadDocument` over
+ * the merged payload, then the gesture that woke the page.
+ */
+export function createIslandResumeContainerEvent(
+	loaders: ReadonlyArray<MdxSymbolLoader>,
+): (input: IslandResumeInput) => Promise<void> {
+	// loadMdxSymbol answers `unknown` because the router's own callers are the
+	// plain JS it emits; the resume input wants the symbol shape it returns.
+	const loadSymbol = ((symbolId: string) =>
+		loadMdxSymbol(symbolId, [], loaders)) as ResumePayloadDocumentInput['loadSymbol'];
+	return async function resumeContainerEvent(input) {
+		input.root.__asyncResumeRuntimeStarted = true;
+		const { runtime } = await resumeFromPayloadDocument({
+			document: input.root as never,
+			root: input.root as never,
+			loadSymbol,
+		});
+		// `0` is the inline resumer's self-wake spelling; the runtime accepts it
+		// the same way the router's emitted resume entry passes it through.
+		await runtime.dispatch(input.event as never, { syncPolicyAlreadyApplied: true });
+	};
+}

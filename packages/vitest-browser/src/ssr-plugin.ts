@@ -1,21 +1,36 @@
 import { renderToString, type RenderToStringOptions, type SsrRenderable } from '@markless/web';
 import { renderToStream } from '@markless/web/render-to-stream';
+import { fileURLToPath } from 'node:url';
 import { dirname, isAbsolute, resolve } from 'pathe';
 import type { Plugin } from 'vite';
 import type { BrowserCommand } from 'vitest/node';
+// The production island merge itself. Reached by path because @markless/router
+// is not a dependency of this test-only package; emulating it here would make
+// every multi-island pin a statement about the harness instead of the router.
+import {
+	composeMdxState,
+	composeMdxView,
+	renderMdxChild,
+	type MdxChild,
+	type MdxComponentArtifact,
+	type MdxRoutePart,
+} from '../../router/src/vite/runtime/mdx-route.ts';
 
 // Node-side vitest plugin for SSR/resume browser tests. It rewrites
-// renderSSR(Component), renderSSRPhased(Component), and
-// renderStreamShell(Component) marker calls in browser
-// test files into a Vitest browser command RPC, and registers the command that
-// renders the compiled TSRX artifact with @markless/web renderToString or
-// renderToStream on the same Vite dev server that serves the browser's client
-// modules.
+// renderSSR(Component), renderSSRIslands([Component, ...]),
+// renderSSRPhased(Component), and renderStreamShell(Component) marker calls in
+// browser test files into a Vitest browser command RPC, and registers the
+// command that renders the compiled TSRX artifact with @markless/web
+// renderToString or renderToStream on the same Vite dev server that serves the
+// browser's client modules. It also serves the island resume module the
+// multi-island page loads.
 //
 // v1 limitations (fail loudly instead of half-working):
 // - the component must be imported from a separate `.tsrx` module; local
 //   components declared inside the test file are not supported.
-// - props are not supported. The optional second argument is limited to the
+// - renderSSRIslands takes an inline array literal of those identifiers: the
+//   transform is string-level and never sees the call's runtime value.
+// - props are not supported. The optional trailing argument is limited to the
 //   render options the browser fixture harness exposes.
 
 const TEST_FILE_ID = /\.[jt]s(?:[?#].*)?$/;
@@ -24,6 +39,54 @@ const TSRX_MODULE = /\.tsrx$/;
 type SsrCommandResult = { readonly html: string };
 type StreamShellCommandResult = { readonly shell: string };
 export type SsrFixtureRenderOptions = Pick<RenderToStringOptions, 'nonce'>;
+
+/** One scenario root mounted as its own island on a composed test page. */
+export type SsrIslandInput = {
+	readonly componentModulePath: string;
+	readonly exportName: string;
+};
+
+// The island discriminator the router mints per composed MDX child
+// (`packages/router/src/vite/mdx.ts`, componentPart). It is written inline
+// there, so there is nothing to import; the harness has to spell it to compose
+// the same page shape.
+function islandPrefix(index: number): string {
+	return `m${index}:`;
+}
+
+// A real module id plus a query, not a bare `virtual:` id: the generated module
+// then resolves its own relative imports against this directory, and the served
+// URL is the same `/@fs/` form the framework's dev resume module already uses.
+const ISLAND_RESUME_ANCHOR = fileURLToPath(new URL('./island-resume.ts', import.meta.url));
+const ISLAND_RESUME_QUERY = 'markless-island-resume';
+const ISLAND_RESUME_ID = /[?&]markless-island-resume=([\w-]+)/;
+
+function islandResumeModuleUrl(islands: ReadonlyArray<SsrIslandInput>): string {
+	const encoded = Buffer.from(
+		JSON.stringify(islands.map((island) => island.componentModulePath)),
+		'utf8',
+	).toString('base64url');
+	return `/@fs/${ISLAND_RESUME_ANCHOR.replace(/^\//, '')}?${ISLAND_RESUME_QUERY}=${encoded}`;
+}
+
+// Mirrors emitComposedMdxRoute's resume half: per-island `m<n>:`-keyed loaders
+// over `?markless-symbols`, wired into the router's own loadMdxSymbol.
+function islandResumeModuleSource(modulePaths: ReadonlyArray<string>): string {
+	const loaders = modulePaths.map((modulePath, index) => {
+		const prefix = islandPrefix(index);
+		const symbolUrl = `/@fs/${modulePath.replace(/^\//, '')}?markless-symbols`;
+		return (
+			`{ prefix: ${JSON.stringify(prefix)}, loadSymbol(symbolId) { ` +
+			`return import(${JSON.stringify(symbolUrl)}).then((mod) => mod.loadSymbol(symbolId.slice(${prefix.length}))); } }`
+		);
+	});
+	return [
+		`import { createIslandResumeContainerEvent } from './island-resume.ts';`,
+		'',
+		`export const resumeContainerEvent = createIslandResumeContainerEvent([${loaders.join(', ')}]);`,
+		'',
+	].join('\n');
+}
 
 const renderSsrCommand: BrowserCommand<
 	[componentModulePath: string, exportName: string, options?: SsrFixtureRenderOptions],
@@ -45,6 +108,79 @@ const renderSsrCommand: BrowserCommand<
 		);
 	}
 	return { html: await renderToString(artifact, { ...options, executionLog: 'never' }) };
+};
+
+// Composes N scenario roots as SEPARATE islands on one page and merges their
+// payloads through the ROUTER's composeMdxState/composeMdxView — the same call
+// an MDX route with N `<Component />` children makes. The page then resumes
+// once, through the virtual island resume module served below.
+const renderSsrIslandsCommand: BrowserCommand<
+	[islands: ReadonlyArray<SsrIslandInput>, options?: SsrFixtureRenderOptions],
+	SsrCommandResult
+> = async (context, islands, options) => {
+	if (islands.length === 0) {
+		throw new Error('renderSSRIslands([...]): at least one island component is required.');
+	}
+	const vite = context.project.browser?.vite ?? context.project.vite;
+	const artifacts = await Promise.all(
+		islands.map(async (island) => {
+			const moduleExports = (await vite.ssrLoadModule(island.componentModulePath)) as Record<
+				string,
+				SsrRenderable | undefined
+			>;
+			const artifact = moduleExports[island.exportName];
+			if (!artifact) {
+				throw new Error(
+					`renderSSRIslands: export "${island.exportName}" not found in ${island.componentModulePath}. ` +
+						`Available exports: ${Object.keys(moduleExports).join(', ')}`,
+				);
+			}
+			return artifact;
+		}),
+	);
+
+	// An MDX page whose parts are nothing but its component children: one part
+	// per island, in mount order, which is what fixes each island's element
+	// offset in composeMdxView.
+	const parts: MdxRoutePart[] = islands.map((_, componentIndex) => ({
+		kind: 'component',
+		componentIndex,
+	}));
+	const composed = {
+		storageSeeds: artifacts.flatMap(
+			(artifact) =>
+				(typeof artifact === 'object' ? (artifact.storageSeeds ?? []) : []) as never[],
+		),
+		async renderSsr() {
+			const children: MdxChild[] = [];
+			let html = '';
+			for (const [index, artifact] of artifacts.entries()) {
+				html += await renderMdxChild(
+					children,
+					artifact as MdxComponentArtifact,
+					{},
+					{
+						componentIndex: index,
+						hostPrefix: islandPrefix(index),
+						symbolPrefix: islandPrefix(index),
+					},
+				);
+			}
+			const state = composeMdxState(children);
+			const view = composeMdxView(parts, children, 0);
+			return { html, ...(state ? { state } : {}), ...(view ? { view } : {}) };
+		},
+		// The composed page is not a compiled artifact, so it carries no resume
+		// module of its own; the island resume module below is its entry.
+	} as unknown as SsrRenderable;
+
+	return {
+		html: await renderToString(composed, {
+			...options,
+			executionLog: 'never',
+			resumeModuleUrl: islandResumeModuleUrl(islands),
+		}),
+	};
 };
 
 const renderStreamShellCommand: BrowserCommand<
@@ -78,6 +214,10 @@ declare module 'vitest/browser' {
 			exportName: string,
 			options?: SsrFixtureRenderOptions,
 		): Promise<{ readonly html: string }>;
+		renderSSRIslands(
+			islands: ReadonlyArray<SsrIslandInput>,
+			options?: SsrFixtureRenderOptions,
+		): Promise<{ readonly html: string }>;
 		renderStreamShell(
 			componentModulePath: string,
 			exportName: string,
@@ -96,16 +236,31 @@ export function testSSR(): Plugin {
 					browser: {
 						commands: {
 							renderSSR: renderSsrCommand,
+							renderSSRIslands: renderSsrIslandsCommand,
 							renderStreamShell: renderStreamShellCommand,
 						},
 					},
 				},
 			} as never;
 		},
+		// Claiming the id before vite:resolve means the `/@fs/` request prefix is
+		// still on it; strip it here or the generated module's own relative
+		// import resolves against a directory that does not exist.
+		resolveId(id) {
+			if (!ISLAND_RESUME_ID.test(id)) return undefined;
+			return id.startsWith('/@fs/') ? id.slice('/@fs'.length) : id;
+		},
+		load(id) {
+			const encoded = id.match(ISLAND_RESUME_ID)?.[1];
+			if (!encoded) return undefined;
+			return islandResumeModuleSource(
+				JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8')) as string[],
+			);
+		},
 		transform: {
 			filter: {
 				id: TEST_FILE_ID,
-				code: /renderSSR(?:Phased)?|renderStreamShell/,
+				code: /renderSSR(?:Islands|Phased)?|renderStreamShell/,
 			},
 			handler(code, id) {
 				return transformRenderSsrCalls(code, id);
@@ -126,7 +281,9 @@ export function transformRenderSsrCalls(
 	id: string,
 ): { code: string; map: null } | null {
 	const calls = [
-		...code.matchAll(/(?<![.\w$])(renderSSR|renderSSRPhased|renderStreamShell)\s*\(([^)]*)\)/g),
+		...code.matchAll(
+			/(?<![.\w$])(renderSSRIslands|renderSSR|renderSSRPhased|renderStreamShell)\s*\(([^)]*)\)/g,
+		),
 	];
 	if (calls.length === 0) return null;
 
@@ -136,6 +293,7 @@ export function transformRenderSsrCalls(
 	const imports = collectImportedNames(code);
 	const marker =
 		imports.get('renderSSR') ??
+		imports.get('renderSSRIslands') ??
 		imports.get('renderSSRPhased') ??
 		imports.get('renderStreamShell');
 	if (!marker) return null;
@@ -151,31 +309,22 @@ export function transformRenderSsrCalls(
 					'a component and optional render options.',
 			);
 		}
-		if (!/^[A-Za-z_$][\w$]*$/.test(argument)) {
-			throw new Error(
-				`${helperName}(${argument}) in ${id}: v1 supports only a component ` +
-					'identifier imported from a separate .tsrx module.',
-			);
-		}
-		const component = imports.get(argument);
-		if (!component || !TSRX_MODULE.test(component.source)) {
-			throw new Error(
-				`${helperName}(${argument}) in ${id}: "${argument}" must be imported ` +
-					'from a separate .tsrx module. Local test-file components are not supported yet.',
-			);
-		}
-		const componentModulePath = component.source.startsWith('.')
-			? resolve(dirname(id.replace(/[?#].*$/, '')), component.source)
-			: component.source;
-		if (!isAbsolute(componentModulePath)) {
-			throw new Error(
-				`${helperName}(${argument}) in ${id}: bare-specifier component modules ` +
-					`("${component.source}") are not supported yet. Use a relative import.`,
-			);
-		}
-		const commandName = helperName === 'renderStreamShell' ? 'renderStreamShell' : 'renderSSR';
 		const renderOptions = options ? `, ${options}` : '';
-		const renderCall = ` const ssr = await __marklessSsrCommands.${commandName}(${JSON.stringify(componentModulePath)}, ${JSON.stringify(component.exportName)}${renderOptions});`;
+		let renderCall: string;
+		if (helperName === 'renderSSRIslands') {
+			const islands = islandArgumentComponents(argument, imports, id).map((component) =>
+				JSON.stringify({
+					componentModulePath: component.componentModulePath,
+					exportName: component.exportName,
+				}),
+			);
+			renderCall = ` const ssr = await __marklessSsrCommands.renderSSRIslands([${islands.join(', ')}]${renderOptions});`;
+		} else {
+			const component = resolveMarkerComponent(helperName, argument, imports, id);
+			const commandName =
+				helperName === 'renderStreamShell' ? 'renderStreamShell' : 'renderSSR';
+			renderCall = ` const ssr = await __marklessSsrCommands.${commandName}(${JSON.stringify(component.componentModulePath)}, ${JSON.stringify(component.exportName)}${renderOptions});`;
+		}
 		const returnValue =
 			helperName === 'renderSSRPhased'
 				? ' return { html: ssr.html, mount(options) { return __marklessRenderServerHTML(ssr.html, options); } };'
@@ -192,6 +341,66 @@ export function transformRenderSsrCalls(
 		`import { commands as __marklessSsrCommands } from 'vitest/browser';\n` +
 		`import { renderServerHTML as __marklessRenderServerHTML } from ${JSON.stringify(marker.source)};\n`;
 	return { code: injectedImports + transformed, map: null };
+}
+
+type ResolvedMarkerComponent = {
+	readonly componentModulePath: string;
+	readonly exportName: string;
+};
+
+// The one supported argument shape for the multi-island marker: an inline array
+// literal of component identifiers. Anything else would need the call's runtime
+// value, which this string-level transform never sees.
+function islandArgumentComponents(
+	argument: string,
+	imports: ReadonlyMap<string, ImportedName>,
+	id: string,
+): ResolvedMarkerComponent[] {
+	const inner = argument.match(/^\[([\s\S]*)\]$/)?.[1];
+	if (inner === undefined) {
+		throw new Error(
+			`renderSSRIslands(${argument}) in ${id}: expects an inline array of component ` +
+				'identifiers, e.g. renderSSRIslands([Island, Island]).',
+		);
+	}
+	const entries = splitCallArguments(inner).filter((entry) => entry.length > 0);
+	if (entries.length === 0) {
+		throw new Error(
+			`renderSSRIslands([]) in ${id}: at least one island component is required.`,
+		);
+	}
+	return entries.map((entry) => resolveMarkerComponent('renderSSRIslands', entry, imports, id));
+}
+
+function resolveMarkerComponent(
+	helperName: string,
+	argument: string,
+	imports: ReadonlyMap<string, ImportedName>,
+	id: string,
+): ResolvedMarkerComponent {
+	if (!/^[A-Za-z_$][\w$]*$/.test(argument)) {
+		throw new Error(
+			`${helperName}(${argument}) in ${id}: v1 supports only a component ` +
+				'identifier imported from a separate .tsrx module.',
+		);
+	}
+	const component = imports.get(argument);
+	if (!component || !TSRX_MODULE.test(component.source)) {
+		throw new Error(
+			`${helperName}(${argument}) in ${id}: "${argument}" must be imported ` +
+				'from a separate .tsrx module. Local test-file components are not supported yet.',
+		);
+	}
+	const componentModulePath = component.source.startsWith('.')
+		? resolve(dirname(id.replace(/[?#].*$/, '')), component.source)
+		: component.source;
+	if (!isAbsolute(componentModulePath)) {
+		throw new Error(
+			`${helperName}(${argument}) in ${id}: bare-specifier component modules ` +
+				`("${component.source}") are not supported yet. Use a relative import.`,
+		);
+	}
+	return { componentModulePath, exportName: component.exportName };
 }
 
 function splitCallArguments(source: string): string[] {

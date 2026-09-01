@@ -111,6 +111,25 @@ export function renderSSR(
 	);
 }
 
+// Marker rewritten by testSSR() into the Node-side commands.renderSSRIslands
+// RPC plus renderServerHTML(). Each component becomes its OWN island on one
+// page, merged through the router's composeMdxState/composeMdxView, so a suite
+// can pin what N same-shape instances do to each other's ids and rosters —
+// which a single renderSSR() root can never show.
+export function renderSSRIslands(
+	components: ReadonlyArray<unknown>,
+	options?: SsrFixtureRenderOptions,
+): Promise<SsrRenderResult> {
+	void components;
+	void options;
+	throw new Error(
+		'renderSSRIslands([Component, Component]) was not transformed. Add testSSR() from ' +
+			'@markless/vitest-browser/ssr-plugin to the browser test project plugins ' +
+			'(before the markless plugin). v1 supports an inline array of component ' +
+			'identifiers imported from separate .tsrx modules and no props.',
+	);
+}
+
 // Marker rewritten by testSSR() into the same Node-side render command as
 // renderSSR(), but leaves client mounting explicit so tests can reset
 // instrumentation between server render and browser load.
