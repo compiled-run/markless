@@ -5,6 +5,7 @@ import { expect, test } from 'vitest';
 import { editKey, heldText, opensEdit, previewText, settled, showsPlaceholder } from './edit-walk.ts';
 import Basic from './scenarios/basic.tsrx';
 import CancelOnBlur from './scenarios/cancel-on-blur.tsrx';
+import DisabledForm from './scenarios/disabled-form.tsrx';
 import DoubleClick from './scenarios/double-click.tsrx';
 import Empty from './scenarios/empty.tsrx';
 import Locked from './scenarios/locked.tsrx';
@@ -373,6 +374,20 @@ for (const mode of MODES) {
 			new Event('submit', { bubbles: true, cancelable: true }),
 		);
 		await expect.poll(() => el(Submitted).textContent).toBe('Untitled');
+	});
+
+	// A disabled control is barred from submission by the platform, so the flag has
+	// to reach the hidden input and not just the parts a person can touch.
+	test(`${mode}: a disabled editable submits nothing`, async () => {
+		if (mode === 'CSR') await render(DisabledForm);
+		else await renderSSR(DisabledForm);
+
+		expect(el<HTMLInputElement>(Field).value).toBe('Untitled');
+		expect(el<HTMLInputElement>(Field).disabled).toBe(true);
+		el(page.getByTestId('form')).dispatchEvent(
+			new Event('submit', { bubbles: true, cancelable: true }),
+		);
+		await expect.poll(() => el(Submitted).textContent).toBe('absent');
 	});
 
 	test(`${mode}: a committed rename reaches the form`, async () => {

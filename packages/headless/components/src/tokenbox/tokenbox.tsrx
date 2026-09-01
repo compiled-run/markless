@@ -422,6 +422,6 @@ export function TokenBoxField({ ...rest }: TokenBoxFieldProps) @{
 	const payload = computed(() => serialize(tokenbox.reported));
 
 	<div {...rest} role="presentation">
-		<input type="hidden" name={tokenbox.name} value={payload} />
+		<input type="hidden" name={tokenbox.name} value={payload} disabled={tokenbox.disabled} />
 	</div>
 }

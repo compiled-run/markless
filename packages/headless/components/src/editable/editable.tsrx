@@ -290,5 +290,11 @@ export function EditableError({ children, ...rest }: EditableErrorProps) @{
 export function EditableField({ ...rest }: EditableFieldProps) @{
 	const editable = editableState();
 
-	<input {...rest} type="hidden" name={editable.name} value={editable.written} />
+	<input
+		{...rest}
+		type="hidden"
+		name={editable.name}
+		value={editable.written}
+		disabled={editable.disabled}
+	/>
 }
