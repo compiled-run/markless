@@ -192,14 +192,15 @@ function marklessRowWidgetGraphNodeId(
 		return undefined;
 	const edgePath = pageSpace[1];
 	const sharedId = graphNodeId.slice(edgePath.length);
+	// A row's reading answers only with a root inside that row; an island segment ahead of the row would otherwise let the walk chop past it.
 	for (const { rowFree, withRows } of scope) {
-		if (!edgePath.startsWith(rowFree)) continue;
+		if (!withRows.includes('r:') || !edgePath.startsWith(rowFree)) continue;
 		const rootPath = marklessWidgetRootPath(
 			sharedId,
 			withRows + edgePath.slice(rowFree.length),
 			registry,
 		);
-		if (rootPath) return rootPath + sharedId;
+		if (rootPath.startsWith(withRows)) return rootPath + sharedId;
 	}
 	// The prefix walk above can only CHOP segments, so it never crosses a root
 	// that stands deeper than the reading edge path; a widget rooted inside this
@@ -252,15 +253,18 @@ function marklessRowRootedGraphNodeId(
 			? sharedId.slice(0, slash)
 			: undefined;
 	if (definitionId === undefined) return undefined;
-	for (const { withRows } of scope) {
-		if (!withRows.includes('r:')) continue;
+	for (const { rowFree, withRows } of scope) {
+		if (!withRows.includes('r:') || !edgePath.startsWith(rowFree)) continue;
+		// Both spellings relative to the row: the edge path keeps whatever stands ahead of it.
+		const edgeBeyondRow = edgePath.slice(rowFree.length);
 		let answer: string | undefined;
 		for (const [id, rootPath] of registry.rootPaths) {
 			if (!rootPath.startsWith(withRows) || id !== rootPath + definitionId) continue;
 			const beyondRow = rootPath.slice(withRows.length);
 			// One containment, two spellings: whichever is shorter must be a prefix
 			// of the other, or these are different places that share a row.
-			if (!beyondRow.startsWith(edgePath) && !edgePath.startsWith(beyondRow)) continue;
+			if (!beyondRow.startsWith(edgeBeyondRow) && !edgeBeyondRow.startsWith(beyondRow))
+				continue;
 			if (answer !== undefined && answer !== rootPath) return undefined;
 			answer = rootPath;
 		}
@@ -339,9 +343,22 @@ export function marklessInstanceScopedLoadSymbol(
 	};
 }
 
+type ScopedSymbol = ResumeSymbol & {
+	readonly marklessScopedBase?: ResumeSymbol;
+	readonly marklessScopedPath?: string;
+};
+
 function scopeSymbol(symbol: ResumeSymbol, instancePath: string): ResumeSymbol {
 	if (composedSymbols.has(symbol)) return symbol;
-	return (context: ResumeSymbolContext) => {
+	// A loader beneath resume's scoped the row-free id at the row-free path: one instance, so the row path replaces it rather than stacking.
+	const { marklessScopedBase, marklessScopedPath } = symbol as ScopedSymbol;
+	if (
+		marklessScopedBase &&
+		(marklessScopedPath === instancePath ||
+			marklessScopedPath === instancePath.replace(ROW_SEGMENT, ''))
+	)
+		return scopeSymbol(marklessScopedBase, instancePath);
+	const scoped: ScopedSymbol = (context: ResumeSymbolContext) => {
 		const graph = context.graph;
 		return symbol({
 			...context,
@@ -373,6 +390,7 @@ function scopeSymbol(symbol: ResumeSymbol, instancePath: string): ResumeSymbol {
 				: {}),
 		});
 	};
+	return Object.assign(scoped, { marklessScopedBase: symbol, marklessScopedPath: instancePath });
 }
 
 /**
