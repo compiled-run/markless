@@ -246,6 +246,7 @@ export function HovercardTrigger({ children, ...rest }: HovercardTriggerProps) @
 // Written after the trigger: a CSS anchor must be laid out strictly before the element that names it, which an in-flow trigger satisfies from anywhere - but a consumer who absolutely positions their trigger and writes the card first gets a silent miss.
 // Hidden hides the card, never detaches it: `hidden` is also what keeps its links out of the tab order while closed, the trigger points at this element's minted id, and an enlisted element removed from the document leaves the overlay stack's marks behind.
 // No role at all. Not `tooltip`, which would call a tab stop holding buttons a description; not `dialog`, which would demand a name and imply a modality this family refuses.
+// `overlay-hint` puts the card on the stack's hint terms: one hint shows at a time, another surface opening supersedes it, and it never dismisses the surface beneath it.
 export function HovercardContent({ children, onDismiss, ...rest }: HovercardContentProps) @{
 	const hovercard = hovercardState();
 
@@ -253,6 +254,7 @@ export function HovercardContent({ children, onDismiss, ...rest }: HovercardCont
 		{...rest}
 		el={hovercard.contentEl}
 		overlay
+		overlay-hint
 		hidden={hovercard.open !== true}
 		ui-open={hovercard.open}
 		ui-closed={hovercard.open !== true}
@@ -262,7 +264,7 @@ export function HovercardContent({ children, onDismiss, ...rest }: HovercardCont
 			// Read before the close: a hidden subtree cannot hold focus, so afterwards the answer is gone.
 			const isFocusInside = surface !== undefined && surface.contains(document.activeElement);
 			hovercard.setOpen(false);
-			// A press elsewhere is a person choosing where to be, so only Escape hands focus back.
+			// A press elsewhere is a person choosing where to be, and a surface superseding the card is one the person is now in, so only Escape hands focus back.
 			if (event.detail.reason === 'escape' && isFocusInside) back?.focus();
 			onDismiss?.(event);
 		}}

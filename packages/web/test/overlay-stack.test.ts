@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { installOverlayBehavior } from '../src/fns/overlay.ts';
+import { OVERLAY_HINT_ATTRIBUTE, installOverlayBehavior } from '../src/fns/overlay.ts';
 import type { OverlayDismissDetail } from '../src/fns/overlay.ts';
 
 // The overlay stack outlives every root that pushed onto it: it is one module
@@ -65,7 +65,12 @@ function fakeDocument(): FakeDocument {
 // node run has no answer for at all, so the fakes are real instances of one stub.
 class StubNode {}
 
-function surface(owner: FakeDocument, marked = true, holds: FakeElement[] = []): FakeElement {
+function surface(
+	owner: FakeDocument,
+	marked = true,
+	holds: FakeElement[] = [],
+	hint = false,
+): FakeElement {
 	return Object.assign(new StubNode(), {
 		nodeType: 1 as const,
 		hidden: false,
@@ -76,6 +81,7 @@ function surface(owner: FakeDocument, marked = true, holds: FakeElement[] = []):
 		matches(selector: string): boolean {
 			// Marked, never modal: modality is a separate mechanism and these rows
 			// are about which entry a dismissal reaches.
+			if (selector === `[${OVERLAY_HINT_ATTRIBUTE}]`) return marked && hint;
 			return selector === '[overlay]' && marked;
 		},
 		querySelector(): null {
@@ -108,6 +114,26 @@ function root(owner: FakeDocument, children: FakeElement[]): FakeRoot {
 	return node;
 }
 
+/** A hint at rest under a root, so showing it later is the transition the observer reports. */
+function hiddenHint(owner: FakeDocument, holds: FakeElement[] = []): FakeElement {
+	const element = surface(owner, true, holds, true);
+	element.hidden = true;
+	return element;
+}
+
+function hiddenSurface(owner: FakeDocument): FakeElement {
+	const element = surface(owner);
+	element.hidden = true;
+	return element;
+}
+
+/** The `hidden` flip the observer would see for an element becoming shown. */
+function show(element: FakeElement): void {
+	element.hidden = false;
+	for (const observe of observers)
+		observe([{ attributeName: 'hidden', target: element, oldValue: '' }]);
+}
+
 const teardowns: Array<() => void> = [];
 
 function install(node: FakeRoot): (() => void) | undefined {
@@ -128,7 +154,16 @@ function pressDown(owner: FakeDocument, target: FakeElement): void {
 		if (entry.type === 'pointerdown') entry.listener({ target });
 }
 
+type ObserverCallback = (
+	records: ReadonlyArray<{ attributeName: string; target: unknown; oldValue: string | null }>,
+) => void;
+
+const observers: ObserverCallback[] = [];
+
 class StubMutationObserver {
+	constructor(callback: ObserverCallback) {
+		observers.push(callback);
+	}
 	observe(): void {}
 	disconnect(): void {}
 }
@@ -143,6 +178,7 @@ beforeEach(() => {
 
 afterEach(() => {
 	for (const teardown of teardowns.splice(0).reverse()) teardown();
+	observers.length = 0;
 	globalHost.__marklessOverlayPrimedDismissal = undefined;
 	vi.unstubAllGlobals();
 	vi.restoreAllMocks();
@@ -255,4 +291,83 @@ test('a page with no marked element leaves a primed dismissal unconsumed', () =>
 	const live = surface(owner);
 	install(root(owner, [live]));
 	expect(live.dismissals).toEqual([{ reason: 'escape' }]);
+});
+
+// The hint tier. A tooltip or hovercard is a surface that describes rather than
+// one a person works in, and it rides the same stack on the native
+// `popover="hint"` terms: hints are exclusive, anything else opening takes them
+// down, and a hint never takes down what is under it.
+
+test('a hint becoming shown supersedes every other hint and leaves the surface beneath alone', () => {
+	const owner = fakeDocument();
+	const popover = surface(owner);
+	const first = hiddenHint(owner);
+	const second = hiddenHint(owner);
+	install(root(owner, [popover, first, second]));
+
+	show(first);
+	expect(popover.dismissals).toEqual([]);
+	expect(first.dismissals).toEqual([]);
+
+	show(second);
+	expect(first.dismissals).toEqual([{ reason: 'superseded' }]);
+	expect(second.dismissals).toEqual([]);
+	expect(popover.dismissals).toEqual([]);
+});
+
+test('an ordinary surface becoming shown supersedes the hints, except one it sits inside', () => {
+	const owner = fakeDocument();
+	const beside = hiddenHint(owner);
+	const menu = hiddenSurface(owner);
+	const around = hiddenHint(owner, [menu]);
+	install(root(owner, [beside, around, menu]));
+
+	show(beside);
+	show(around);
+	// Two hints shown: the second superseded the first, which is the exclusivity row above.
+	expect(beside.dismissals).toEqual([{ reason: 'superseded' }]);
+
+	show(menu);
+	expect(around.dismissals).toEqual([]);
+	expect(menu.dismissals).toEqual([]);
+});
+
+test('an outside press reaches the topmost hint and the topmost ordinary surface, each only when it landed outside it', () => {
+	const owner = fakeDocument();
+	const background = surface(owner, false);
+	const inside = surface(owner, false);
+	const popover = surface(owner, true, [inside]);
+	const tip = hiddenHint(owner);
+	install(root(owner, [popover, tip]));
+	show(tip);
+
+	pressDown(owner, inside);
+	expect(tip.dismissals).toEqual([{ reason: 'outside-press', pressTarget: inside }]);
+	expect(popover.dismissals).toEqual([]);
+
+	pressDown(owner, background);
+	expect(tip.dismissals).toHaveLength(2);
+	expect(popover.dismissals).toEqual([{ reason: 'outside-press', pressTarget: background }]);
+});
+
+test('Escape reaches only the topmost entry, hint or not', () => {
+	const owner = fakeDocument();
+	const popover = surface(owner);
+	const tip = hiddenHint(owner);
+	install(root(owner, [popover, tip]));
+	show(tip);
+
+	pressEscape(owner);
+	expect(tip.dismissals).toEqual([{ reason: 'escape' }]);
+	expect(popover.dismissals).toEqual([]);
+});
+
+test('hints served shown enlist without superseding one another', () => {
+	const owner = fakeDocument();
+	const first = surface(owner, true, [], true);
+	const second = surface(owner, true, [], true);
+	install(root(owner, [first, second]));
+
+	expect(first.dismissals).toEqual([]);
+	expect(second.dismissals).toEqual([]);
 });

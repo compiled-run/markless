@@ -126,6 +126,12 @@ Placement is never a prop — no `side`, `align` or `offset` under any name. A
 family ships one default `position-area` in its layer and the consumer overrides
 it in CSS, with `position-try-fallbacks` of their own.
 
+A surface that describes rather than one a person works in (tooltip, hovercard)
+writes `overlay-hint` beside `overlay`, the native `popover="hint"` word: the
+overlay stack keeps one hint shown at a time (`dismiss` reason `superseded`), any
+other surface opening supersedes the hints, and a hint never dismisses the
+surface beneath it.
+
 ## Recursive composition
 
 A family whose parts nest in themselves (tree, menu submenus) recurses with the

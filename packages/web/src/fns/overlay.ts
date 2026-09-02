@@ -17,6 +17,21 @@
  * Escape is pressed or a press lands outside it, carrying `detail.reason` and,
  * for an outside press, the `detail.pressTarget` the press landed on.
  *
+ * Hints. An element marked `overlay-hint` beside `overlay` - a tooltip, a
+ * hovercard - is a surface that describes something rather than one a person
+ * works in, and it rides the stack on the native `popover="hint"` terms: hints
+ * are exclusive, so a hint becoming shown reports `superseded` to every other
+ * enlisted hint; anything else becoming shown - a menu, a popover, a dialog -
+ * supersedes the hints too, because the hint was describing what the person
+ * just left; and a hint never dismisses the surface beneath it. A surface shown
+ * inside a hint is the one exception, since the hint is what it is anchored to.
+ * Escape still goes to the topmost entry of either kind. An outside press is
+ * reported to the topmost hint AND to the topmost ordinary surface, each only
+ * when the press landed outside it: the hint was going to hide anyway, and the
+ * press was aimed at whatever is under it. Surfaces served already shown enlist
+ * without superseding one another - two tips an author served open are both
+ * what the author asked for.
+ *
  * What it deliberately does not do. It never closes anything and never moves
  * focus. It does READ focus - `document.activeElement` at the moment an element
  * enlists is left on that element, because only this module is present at that
@@ -53,10 +68,16 @@ import type {
 
 /** The DOM spelling the compiler lowers the `overlay` mark to. */
 const OVERLAY_SELECTOR = '[overlay]';
+/** The second mark a hint surface writes beside `overlay`, as authored. */
+export const OVERLAY_HINT_ATTRIBUTE = 'overlay-hint';
+const HINT_SELECTOR = `[${OVERLAY_HINT_ATTRIBUTE}]`;
 const MODAL_SELECTOR = '[aria-modal="true"]';
 const DISMISS_EVENT = 'dismiss';
 
-export type OverlayDismissReason = 'escape' | 'outside-press';
+/** The gestures the document produces; the only reasons a primer can hold. */
+export type OverlayGestureReason = 'escape' | 'outside-press';
+/** `superseded` is not a gesture: another surface became shown over a hint. */
+export type OverlayDismissReason = OverlayGestureReason | 'superseded';
 
 /**
  * What a `dismiss` report carries.
@@ -75,12 +96,13 @@ export type OverlayDismissDetail = {
 
 type OverlayEntry = {
 	readonly element: HTMLElement;
+	readonly hint: boolean;
 	readonly undo: Array<() => void>;
 };
 
 /** A dismissal waiting for something live to report it to. */
 type PrimedDismissal = {
-	readonly reason: OverlayDismissReason;
+	readonly reason: OverlayGestureReason;
 	readonly pressTarget?: Element;
 };
 
@@ -140,7 +162,7 @@ export function installOverlayBehavior(root: Element | Document): (() => void) |
 			const wasShown = record.oldValue === null;
 			const isShown = !element.hidden;
 			if (wasShown === isShown) continue;
-			if (isShown) enlist(element, owner);
+			if (isShown) enlist(element, owner, true);
 			else release(element);
 		}
 	});
@@ -156,7 +178,7 @@ export function installOverlayBehavior(root: Element | Document): (() => void) |
 	// that set, and currently shown is open BECAUSE its binding says so, which is
 	// enlistment. An element outside the set looks identical in the DOM and is
 	// left alone - that is the inline shape, and it stays free.
-	for (const element of hiddenBoundSurfaces(root)) enlist(element, owner);
+	for (const element of hiddenBoundSurfaces(root)) enlist(element, owner, false);
 
 	// The Escape that woke this page arrived before there was anything to report
 	// it to. Reporting it now, to whatever the enlistment above left topmost, is
@@ -221,17 +243,23 @@ function primeDismissal(primed: PrimedDismissal): void {
 	primedPressTarget = primed.pressTarget;
 }
 
-/** The topmost entry still in the document, dropping the dead ones on the way. */
-function liveTop(): OverlayEntry | undefined {
+/** The topmost accepted entry still in the document, dropping the dead ones on the way. */
+function liveTop(accept: (entry: OverlayEntry) => boolean = () => true): OverlayEntry | undefined {
 	for (let index = stack.length - 1; index >= 0; index -= 1) {
 		const entry = stack[index];
 		if (!entry) continue;
-		if (entry.element.isConnected) return entry;
-		reportDetachedEntry(entry.element);
-		release(entry.element);
+		if (!entry.element.isConnected) {
+			reportDetachedEntry(entry.element);
+			release(entry.element);
+			continue;
+		}
+		if (accept(entry)) return entry;
 	}
 	return undefined;
 }
+
+const isHint = (entry: OverlayEntry): boolean => entry.hint;
+const isSurface = (entry: OverlayEntry): boolean => !entry.hint;
 
 function reportDetachedEntry(element: HTMLElement): void {
 	if (!import.meta.env?.DEV) return;
@@ -241,9 +269,16 @@ function reportDetachedEntry(element: HTMLElement): void {
 	);
 }
 
-function enlist(element: HTMLElement, owner: Document): void {
+function enlist(element: HTMLElement, owner: Document, becameShown: boolean): void {
 	if (findEntry(element)) return;
-	const entry: OverlayEntry = { element, undo: [] };
+	const hint = element.matches?.(HINT_SELECTOR) === true;
+	// Reported before the newcomer joins, so a hint's own handler hiding it
+	// releases a stack the newcomer is not yet on. A hint the newcomer sits
+	// inside is what it is anchored to and stays.
+	if (becameShown)
+		for (const other of stack.filter(isHint))
+			if (!other.element.contains(element)) reportDismiss(other.element, 'superseded');
+	const entry: OverlayEntry = { element, hint, undo: [] };
 	stack.push(entry);
 
 	// Read before anything below marks the background: marking makes the subtree
@@ -425,17 +460,21 @@ function onKeyDown(event: KeyboardEvent): void {
 }
 
 function onPointerDown(event: Event): void {
-	const top = liveTop();
+	const hint = liveTop(isHint);
+	const top = liveTop(isSurface);
 	const target = event.target;
 	const pressTarget = target instanceof Element ? target : undefined;
-	if (!top) {
+	if (!hint && !top) {
 		primeDismissal({ reason: 'outside-press', pressTarget });
 		return;
 	}
-	if (target instanceof Node && top.element.contains(target)) return;
 	// The report is made on the press, not the click, so a drag that starts
 	// inside the surface and ends outside it never counts as an outside press.
 	// The pressed element rides along, so a family can tell a press on its own
 	// trigger from an unrelated one by asking where it landed.
-	reportDismiss(top.element, 'outside-press', pressTarget);
+	for (const entry of [hint, top]) {
+		if (!entry) continue;
+		if (target instanceof Node && entry.element.contains(target)) continue;
+		reportDismiss(entry.element, 'outside-press', pressTarget);
+	}
 }
