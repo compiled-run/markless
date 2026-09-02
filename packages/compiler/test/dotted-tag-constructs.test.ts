@@ -2,8 +2,8 @@ import { expect, test } from 'vitest';
 import { buildSemanticGraph } from '../src/passes/semantic-graph/index.ts';
 
 // Pins the yuku-tsrx parse boundary: a member-expression tag (<family.part>)
-// cannot hold a construct in its children, while the identifier spelling can.
-// The refusal comes from the JSX child parser, before any Markless pass runs.
+// holds a construct in its children exactly as the identifier spelling does,
+// and the construct lands in the component-projection chunk either way.
 
 function moduleWith(body: string) {
 	return `import { state } from '@markless/core';
@@ -18,70 +18,74 @@ ${body}
 }`;
 }
 
-async function refusalOf(body: string) {
-	try {
-		await buildSemanticGraph({ filename: 'src/Dotted.tsrx', source: moduleWith(body) });
-		return null;
-	} catch (error) {
-		return (error as Error).message;
-	}
+async function graphOf(body: string) {
+	return buildSemanticGraph({ filename: 'src/Dotted.tsrx', source: moduleWith(body) });
 }
 
-const CHILD_CONSTRUCT_REFUSAL = "Expected '</' to close the JSX element, but found '@'";
+function projectionSlotKinds(graph: Awaited<ReturnType<typeof graphOf>>) {
+	return graph.markup.chunks
+		.filter((chunk) => chunk.kind === 'component-projection')
+		.map((chunk) => chunk.slots.map((slot) => slot.kind));
+}
 
 test('an identifier tag holds @for and @if in its children', async () => {
 	expect(
-		await refusalOf(`	<ToasterRoot>
-		@for (const item of items) {
+		projectionSlotKinds(
+			await graphOf(`	<ToasterRoot>
+		@for (const item of items; key item) {
 			<p>{item}</p>
 		}
 	</ToasterRoot>`),
-	).toBe(null);
+		),
+	).toEqual([['repeat']]);
 	expect(
-		await refusalOf(`	<ToasterRoot>
+		projectionSlotKinds(
+			await graphOf(`	<ToasterRoot>
 		@if (open) {
 			<p>x</p>
 		}
 	</ToasterRoot>`),
-	).toBe(null);
+		),
+	).toEqual([['branch']]);
 });
 
 test('a member-expression tag holds plain elements in its children', async () => {
-	expect(
-		await refusalOf(`	<toaster.root>
+	const graph = await graphOf(`	<toaster.root>
 		<p>x</p>
-	</toaster.root>`),
-	).toBe(null);
+	</toaster.root>`);
+	expect(graph.diagnostics).toEqual([]);
+	expect(projectionSlotKinds(graph)).toEqual([[]]);
 });
 
-test('a member-expression tag refuses @for in its children at the parser', async () => {
-	expect(
-		await refusalOf(`	<toaster.root>
-		@for (const item of items) {
+test('a member-expression tag holds @for in its children', async () => {
+	const graph = await graphOf(`	<toaster.root>
+		@for (const item of items; key item) {
 			<p>{item}</p>
 		}
-	</toaster.root>`),
-	).toBe(CHILD_CONSTRUCT_REFUSAL);
+	</toaster.root>`);
+	expect(graph.diagnostics).toEqual([]);
+	expect(projectionSlotKinds(graph)).toEqual([['repeat']]);
 });
 
-test('a member-expression tag refuses @if in its children at the parser', async () => {
-	expect(
-		await refusalOf(`	<toaster.root>
+test('a member-expression tag holds @if in its children', async () => {
+	const graph = await graphOf(`	<toaster.root>
 		@if (open) {
 			<p>x</p>
 		}
-	</toaster.root>`),
-	).toBe(CHILD_CONSTRUCT_REFUSAL);
+	</toaster.root>`);
+	expect(graph.diagnostics).toEqual([]);
+	expect(projectionSlotKinds(graph)).toEqual([['branch']]);
+	expect(graph.branchSites).toHaveLength(1);
 });
 
-test('nesting the member-expression tag under an element does not change the refusal', async () => {
-	expect(
-		await refusalOf(`	<section>
+test('nesting the member-expression tag under an element keeps the construct in the projection', async () => {
+	const graph = await graphOf(`	<section>
 		<toaster.root>
-			@for (const item of items) {
+			@for (const item of items; key item) {
 				<p>{item}</p>
 			}
 		</toaster.root>
-	</section>`),
-	).toBe(CHILD_CONSTRUCT_REFUSAL);
+	</section>`);
+	expect(graph.diagnostics).toEqual([]);
+	expect(projectionSlotKinds(graph)).toEqual([['repeat']]);
 });

@@ -26,13 +26,11 @@ export default function CodePanel() @{
 	<div data-testid="panel-wrap">
 		<tabs.root value="source" data-testid="panel-root">
 			<tabs.list data-testid="panel-list">
-				<div role="presentation" data-testid="panel-strip">
-					@for (const pane of panes; key pane.value) {
-						<tabs.trigger value={pane.value} data-testid="panel-trigger">
-							{pane.label}
-						</tabs.trigger>
-					}
-				</div>
+				@for (const pane of panes; key pane.value) {
+					<tabs.trigger value={pane.value} data-testid="panel-trigger">
+						{pane.label}
+					</tabs.trigger>
+				}
 			</tabs.list>
 			<div data-testid="panel-panes">
 				@for (const pane of panes; key pane.value) {

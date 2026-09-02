@@ -2,6 +2,7 @@ import { render, renderCsrIslands, renderSSR, renderSSRIslands } from '@markless
 import { page, userEvent } from 'vite-plus/test/browser';
 import { expect, test } from 'vitest';
 import Basic from './scenarios/basic.tsrx';
+import ConstructsInChildren from './scenarios/constructs-in-children.tsrx';
 import Controlled from './scenarios/controlled.tsrx';
 import DynamicClass from './scenarios/dynamic-class.tsrx';
 import Faq from './scenarios/faq.tsrx';
@@ -567,4 +568,181 @@ test('SSR islands: a dynamic class on a part keeps the consumer scope class in i
 	await renderSSRIslands([DynamicClass, DynamicClass]);
 	await pinDynamicClassKeepsScope(1);
 	expectScopedBorder(embed('ternary-item', 0), GREEN);
+});
+
+// A `@for` written directly under `<accordion.root>` renders its rows inside the
+// root's own element: the family walks them, toggles them, and they resume under
+// a plain mount and under a composed multi-island page alike.
+async function pinRowsLiveInTheRoot(index: number) {
+	const root = embed('root', index);
+	const rows = () =>
+		Array.from(document.querySelectorAll<HTMLElement>('[data-testid="row"]')).slice(
+			index * 3,
+			index * 3 + 3,
+		);
+	const triggers = () =>
+		Array.from(document.querySelectorAll<HTMLElement>('[data-testid="row-trigger"]')).slice(
+			index * 3,
+			index * 3 + 3,
+		);
+	const contents = () =>
+		Array.from(document.querySelectorAll<HTMLElement>('[data-testid="row-content"]')).slice(
+			index * 3,
+			index * 3 + 3,
+		);
+	expect(rows()).toHaveLength(3);
+	for (const row of rows()) expect(row.parentElement).toBe(root);
+	for (let i = 0; i < 3; i++) expectClosed(triggers()[i]!, contents()[i]!);
+
+	triggers()[0]!.focus();
+	await userEvent.keyboard('{ArrowDown}');
+	await expect.poll(() => document.activeElement).toBe(triggers()[1]);
+	await userEvent.keyboard('{End}');
+	await expect.poll(() => document.activeElement).toBe(triggers()[2]);
+
+	await userEvent.click(triggers()[1]!);
+	await expect.poll(() => triggers()[1]!.getAttribute('aria-expanded')).toBe('true');
+	expectOpen(triggers()[1]!, contents()[1]!);
+	expectClosed(triggers()[0]!, contents()[0]!);
+
+	await userEvent.click(triggers()[1]!);
+	await expect.poll(() => triggers()[1]!.getAttribute('aria-expanded')).toBe('false');
+	expectClosed(triggers()[1]!, contents()[1]!);
+}
+
+test('CSR: rows authored directly under the root render inside it, walk and toggle', async () => {
+	await render(FromData);
+	await pinRowsLiveInTheRoot(0);
+});
+
+test('SSR: rows authored directly under the root render inside it, walk and toggle', async () => {
+	await renderSSR(FromData);
+	await pinRowsLiveInTheRoot(0);
+});
+
+test('CSR islands: rows authored directly under the root stay inside their own island', async () => {
+	await renderCsrIslands([FromData, FromData]);
+	await pinRowsLiveInTheRoot(1);
+	expect(embed('row-trigger', 0).getAttribute('aria-expanded')).toBe('false');
+});
+
+test('SSR islands: rows authored directly under the root stay inside their own island', async () => {
+	await renderSSRIslands([FromData, FromData]);
+	await pinRowsLiveInTheRoot(1);
+	expect(embed('row-trigger', 0).getAttribute('aria-expanded')).toBe('false');
+});
+
+// Every construct-as-direct-child shape at once, rendering and UPDATING: rows
+// minted and removed under the root and under a consumer component with a hole
+// behind a heading, arms flipped under the root, under a non-root part inside a
+// row, and under that consumer component, in every mount.
+async function pinConstructsInChildren(index: number, opensMintedRow = true) {
+	const root = embed('root', index);
+	const card = embed('card', index);
+	const inside = (scope: Element, testid: string) =>
+		Array.from(scope.querySelectorAll<HTMLElement>(`[data-testid="${testid}"]`));
+	const rows = () => inside(root, 'row');
+	const cardRows = () => inside(card, 'card-row');
+
+	const fixed = embed('fixed', index);
+
+	expect(rows()).toHaveLength(2);
+	for (const row of rows()) expect(row.parentElement).toBe(root);
+	expect(cardRows()).toHaveLength(2);
+	for (const row of cardRows()) expect(row.parentElement).toBe(card);
+	expect(card.firstElementChild).toBe(inside(card, 'card-heading')[0]);
+	expect(inside(root, 'root-note')).toHaveLength(0);
+	expect(inside(card, 'card-note')).toHaveLength(0);
+	expect(inside(card, 'card-kind')[0]?.textContent).toBe('calm');
+	expect(inside(fixed, 'fixed-plain')).toHaveLength(1);
+
+	await userEvent.click(embed('add', index));
+	await expect.poll(() => rows().length).toBe(3);
+	expect(rows()[2]!.parentElement).toBe(root);
+	await expect.poll(() => cardRows().length).toBe(3);
+	expect(cardRows()[2]!.parentElement).toBe(card);
+	expect(cardRows()[2]!.textContent).toBe('gamma');
+
+	// The minted row is a real section: the family walks onto it and opens it.
+	inside(root, 'row-trigger')[1]!.focus();
+	await userEvent.keyboard('{ArrowDown}');
+	await expect.poll(() => document.activeElement).toBe(inside(root, 'row-trigger')[2]);
+	if (opensMintedRow) {
+		await userEvent.click(inside(root, 'row-trigger')[2]!);
+		await expect.poll(() => inside(root, 'row-trigger')[2]!.getAttribute('aria-expanded')).toBe(
+			'true',
+		);
+	}
+
+	await userEvent.click(embed('flip', index));
+	await expect.poll(() => inside(root, 'root-note').length).toBe(1);
+	expect(inside(root, 'root-note')[0]!.parentElement).toBe(root);
+	await expect.poll(() => inside(fixed, 'fixed-note').length).toBe(1);
+	expect(inside(fixed, 'fixed-plain')).toHaveLength(0);
+	expect(inside(fixed, 'fixed-note')[0]!.parentElement).toBe(embed('fixed-content', index));
+	await expect.poll(() => inside(card, 'card-note').length).toBe(1);
+	expect(inside(card, 'card-note')[0]!.parentElement).toBe(card);
+	await expect.poll(() => inside(card, 'card-kind')[0]?.textContent).toBe('hot');
+	expect(inside(card, 'card-kind')[0]!.tagName).toBe('STRONG');
+
+	await userEvent.click(embed('drop', index));
+	await expect.poll(() => rows().length).toBe(2);
+	await expect.poll(() => cardRows().length).toBe(2);
+	expect(inside(root, 'root-note')).toHaveLength(1);
+
+	await userEvent.click(embed('flip', index));
+	await expect.poll(() => inside(root, 'root-note').length).toBe(0);
+	await expect.poll(() => inside(fixed, 'fixed-plain').length).toBe(1);
+	await expect.poll(() => inside(card, 'card-note').length).toBe(0);
+	await expect.poll(() => inside(card, 'card-kind')[0]?.textContent).toBe('calm');
+	expect(rows()).toHaveLength(2);
+}
+
+test('CSR: constructs directly under family parts and consumer components render and update', async () => {
+	await render(ConstructsInChildren);
+	await pinConstructsInChildren(0);
+});
+
+test('SSR: constructs directly under family parts and consumer components render and update', async () => {
+	await renderSSR(ConstructsInChildren);
+	await pinConstructsInChildren(0);
+});
+
+test('CSR islands: constructs directly under family parts update inside their own island', async () => {
+	await renderCsrIslands([ConstructsInChildren, ConstructsInChildren]);
+	await pinConstructsInChildren(1, false);
+	expect(embed('root', 0).querySelectorAll('[data-testid="row"]')).toHaveLength(2);
+	expect(embed('root', 0).querySelectorAll('[data-testid="root-note"]')).toHaveLength(0);
+});
+
+test('SSR islands: constructs directly under family parts update inside their own island', async () => {
+	await renderSSRIslands([ConstructsInChildren, ConstructsInChildren]);
+	await pinConstructsInChildren(1, false);
+	expect(embed('root', 0).querySelectorAll('[data-testid="row"]')).toHaveLength(2);
+	expect(embed('root', 0).querySelectorAll('[data-testid="root-note"]')).toHaveLength(0);
+});
+
+// A row minted after mount paints and takes focus in a composed island, but its
+// trigger does not open it: the gesture reaches a section whose open/closed
+// cell the island's own resume never wired. Served rows in the same island do
+// open (the rows-in-the-root pins above), and the same minted row opens under a
+// plain mount, so this is the island's row-mint surface, not the family.
+async function pinMintedRowOpens(index: number) {
+	const root = embed('root', index);
+	const triggers = () =>
+		Array.from(root.querySelectorAll<HTMLElement>('[data-testid="row-trigger"]'));
+	await userEvent.click(embed('add', index));
+	await expect.poll(() => triggers().length).toBe(3);
+	await userEvent.click(triggers()[2]!);
+	await expect.poll(() => triggers()[2]!.getAttribute('aria-expanded')).toBe('true');
+}
+
+test.fails('CSR islands: a row minted after mount opens in its own island', async () => {
+	await renderCsrIslands([ConstructsInChildren, ConstructsInChildren]);
+	await pinMintedRowOpens(1);
+});
+
+test.fails('SSR islands: a row minted after mount opens in its own island', async () => {
+	await renderSSRIslands([ConstructsInChildren, ConstructsInChildren]);
+	await pinMintedRowOpens(1);
 });

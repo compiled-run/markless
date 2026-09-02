@@ -53,5 +53,12 @@
 		"vitest": "4.1.11",
 		"yaml": "2.9.0"
 	},
+	"pnpm": {
+		"overrides": {
+			"yuku-tsrx": "file:vendor/yuku-tsrx-0.1.5.tgz",
+			"@yuku-tsrx/binding-darwin-arm64": "file:vendor/yuku-tsrx-binding-darwin-arm64-0.1.5.tgz",
+			"@yuku-tsrx/binding-linux-x64-gnu": "file:vendor/yuku-tsrx-binding-linux-x64-gnu-0.1.5.tgz"
+		}
+	},
 	"packageManager": "pnpm@10.33.2"
 }

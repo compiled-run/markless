@@ -47,20 +47,18 @@ export default function DynamicClass() @{
 				</accordion.itemlabel>
 				<accordion.itemcontent>A template over a page cell.</accordion.itemcontent>
 			</accordion.item>
-			<div role="presentation" data-testid="rows">
-				@for (const group of groups; key group.value) {
-					<accordion.item
-						value={group.value}
-						class={group.danger ? 'group is-danger' : 'group'}
-						data-testid="row-item"
-					>
-						<accordion.itemlabel>
-							<accordion.itemtrigger data-testid="row-trigger">{group.value}</accordion.itemtrigger>
-						</accordion.itemlabel>
-						<accordion.itemcontent>A ternary over a row.</accordion.itemcontent>
-					</accordion.item>
-				}
-			</div>
+			@for (const group of groups; key group.value) {
+				<accordion.item
+					value={group.value}
+					class={group.danger ? 'group is-danger' : 'group'}
+					data-testid="row-item"
+				>
+					<accordion.itemlabel>
+						<accordion.itemtrigger data-testid="row-trigger">{group.value}</accordion.itemtrigger>
+					</accordion.itemlabel>
+					<accordion.itemcontent>A ternary over a row.</accordion.itemcontent>
+				</accordion.item>
+			}
 		</accordion.root>
 		<button
 			type="button"
