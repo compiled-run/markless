@@ -1,25 +1,33 @@
 import { accordion } from '@markless/ui';
 
 export default function AccordionLocked() @{
+	const options = [
+		{ value: 'ship', name: 'Standard delivery', detail: 'Two working days, no charge over twenty pounds.' },
+		{ value: 'express', name: 'Express delivery', detail: 'Next working day if you order before noon.' },
+	];
+
 	<accordion.root class="accordion" value="ship" collapsible={false}>
-		<accordion.item class="section" value="ship">
-			<accordion.itemlabel class="heading">
-				<accordion.itemtrigger class="trigger">Standard delivery</accordion.itemtrigger>
-			</accordion.itemlabel>
-			<accordion.itemcontent class="panel">Two working days, no charge over twenty pounds.</accordion.itemcontent>
-		</accordion.item>
-		<accordion.item class="section" value="express">
-			<accordion.itemlabel class="heading">
-				<accordion.itemtrigger class="trigger">Express delivery</accordion.itemtrigger>
-			</accordion.itemlabel>
-			<accordion.itemcontent class="panel">Next working day if you order before noon.</accordion.itemcontent>
-		</accordion.item>
+		{/* A repeat cannot open directly inside a component tag, so a host element carries it. */}
+		<div class="sections" role="presentation">
+			@for (const option of options; key option.value) {
+				<accordion.item class="section" value={option.value}>
+					<accordion.itemlabel class="heading">
+						<accordion.itemtrigger class="trigger">{option.name}</accordion.itemtrigger>
+					</accordion.itemlabel>
+					<accordion.itemcontent class="panel">{option.detail}</accordion.itemcontent>
+				</accordion.item>
+			}
+		</div>
 
 		<style>
 			.accordion {
 				display: grid;
 				gap: 0.5em;
 				width: min(32rem, 100%);
+			}
+
+			.sections {
+				display: contents;
 			}
 
 			.section {
