@@ -39,6 +39,13 @@ function el<T extends Element = HTMLElement>(locator: { element(): Element | nul
 // A box draws its own digits, so what it shows is its text.
 const shown = (locator: { element(): Element | null }) => el(locator).textContent;
 
+// The month's name in whatever language this runtime speaks: the family has no
+// locale of its own, so the expectation is read off the same platform table.
+const monthName = (month: number) =>
+	new Intl.DateTimeFormat(undefined, { month: 'long', timeZone: 'UTC' }).format(
+		new Date(Date.UTC(2024, month - 1, 1)),
+	);
+
 // A real submit would navigate the test iframe, so the event is dispatched.
 function submit() {
 	el(page.getByTestId('form')).dispatchEvent(
@@ -61,11 +68,15 @@ function expectBasicRendered() {
 	expect(el(Label).id).not.toBe('');
 	expect(el(Root).getAttribute('aria-disabled')).toBe('false');
 	expect(el(Root).getAttribute('ui-empty')).toBe('');
+	expect(el(Root).hasAttribute('ui-invalid')).toBe(false);
 
 	for (const box of [Month, Day, Year]) {
 		expect(el(box).getAttribute('role')).toBe('spinbutton');
 		expect(el(box).getAttribute('tabindex')).toBe('0');
 		expect(el(box).hasAttribute('aria-valuenow')).toBe(false);
+		// An empty box has no value to put words to, and nothing is required of it.
+		expect(el(box).hasAttribute('aria-valuetext')).toBe(false);
+		expect(el(box).hasAttribute('aria-required')).toBe(false);
 		expect(el(box).getAttribute('ui-placeholder')).toBe('');
 		expect(el(box).getAttribute('ui-value')).toBe('');
 		// Neither message part is placed, so both handles drop out and no empty
@@ -100,6 +111,11 @@ function expectPrefilledRendered() {
 	expect(el(Month).getAttribute('aria-valuenow')).toBe('3');
 	expect(el(Day).getAttribute('aria-valuenow')).toBe('30');
 	expect(el(Year).getAttribute('aria-valuenow')).toBe('2024');
+	// A reader speaks the month by name; a day or a year is its own number.
+	expect(el(Month).getAttribute('aria-valuetext')).toBe(monthName(3));
+	expect(el(Month).getAttribute('aria-valuetext')).not.toBe('3');
+	expect(el(Day).hasAttribute('aria-valuetext')).toBe(false);
+	expect(el(Year).hasAttribute('aria-valuetext')).toBe(false);
 	expect(el(Root).hasAttribute('ui-empty')).toBe(false);
 	// March has 31 days, so the day's ceiling is the month's own length.
 	expect(el(Day).getAttribute('aria-valuemax')).toBe('31');
@@ -127,7 +143,10 @@ function expectInvalidRendered() {
 		expect(el(page.getByTestId(testid)).getAttribute('aria-invalid')).toBe('true');
 	}
 	// A group carries no aria-invalid of its own, so the message is named from the
-	// boxes: they are the controls the state belongs to.
+	// boxes: they are the controls the state belongs to. The root still reports the
+	// state for styling.
+	expect(el(page.getByTestId('after-root')).getAttribute('ui-invalid')).toBe('');
+	expect(el(page.getByTestId('before-root')).getAttribute('ui-invalid')).toBe('');
 	const error = el(page.getByTestId('after-error'));
 	expect(error.id).toBeTruthy();
 	for (const testid of boxes) {
@@ -227,9 +246,21 @@ for (const mode of MODES) {
 		if (mode === 'CSR') await render(BookingForm);
 		else await renderSSR(BookingForm);
 		expect(el(Field).getAttribute('required')).toBe('');
+		// The hidden input is what a form checks; the boxes are what a reader hears.
+		for (const box of [Month, Day, Year]) {
+			expect(el(box).getAttribute('aria-required')).toBe('true');
+		}
 		await expect.poll(() => submit().textContent).toBe('{"arrival":"2024-03-30"}');
 	});
 }
+
+test('CSR: a typed month is put into words as it changes', async () => {
+	await render(Basic);
+
+	await typeInto(Month, '4');
+	await expect.poll(() => el(Month).getAttribute('aria-valuetext')).toBe(monthName(4));
+	expect(el(Day).hasAttribute('aria-valuetext')).toBe(false);
+});
 
 test('CSR: typing a digit fills a box and moves on once it can hold no more', async () => {
 	await render(Basic);
@@ -442,6 +473,124 @@ test('CSR: a bound holds a stepped month back too', async () => {
 	// April is past the 20 March ceiling, so the date lands on the ceiling itself.
 	await expect.poll(() => shown(Day)).toBe('20');
 	expect(shown(Month)).toBe('3');
+});
+
+// ---------------------------------------------------------------------------
+// Typing under a bound. A bound holds the date a box settles on, not the digits on
+// their way there: a half-typed box may sit past the bound until it is full or left.
+// ---------------------------------------------------------------------------
+
+test('CSR: a digit typed under a bound is kept until the box is full', async () => {
+	await render(Bounded);
+
+	await typeInto(Day, '1');
+	// The 1st is before the 10th, and it stays a 1: the 12th is still on its way.
+	await expect.poll(() => shown(Day)).toBe('1');
+	expect(el<HTMLInputElement>(Field).value).toBe('2024-03-01');
+
+	await userEvent.keyboard('2');
+	await expect.poll(() => shown(Day)).toBe('12');
+	await expect.poll(() => el<HTMLInputElement>(Field).value).toBe('2024-03-12');
+});
+
+test('CSR: a box left half-typed settles on the bound', async () => {
+	await render(Bounded);
+
+	await typeInto(Day, '1');
+	await expect.poll(() => shown(Day)).toBe('1');
+
+	el(Day).blur();
+	await expect.poll(() => shown(Day)).toBe('10');
+	expect(el<HTMLInputElement>(Field).value).toBe('2024-03-10');
+});
+
+test('CSR: a box filled past a bound settles on it as focus moves on', async () => {
+	await render(Bounded);
+
+	await typeInto(Day, '25');
+	await expect.poll(() => shown(Day)).toBe('20');
+	await expect.poll(() => document.activeElement).toBe(el(Year));
+	expect(el<HTMLInputElement>(Field).value).toBe('2024-03-20');
+});
+
+test('CSR: walking off a half-typed box settles it on the bound', async () => {
+	await render(Bounded);
+
+	await typeInto(Day, '1');
+	await expect.poll(() => shown(Day)).toBe('1');
+
+	await userEvent.keyboard('{ArrowRight}');
+	await expect.poll(() => document.activeElement).toBe(el(Year));
+	await expect.poll(() => shown(Day)).toBe('10');
+});
+
+test('CSR: a year can be typed one digit at a time under a bound', async () => {
+	await render(Bounded);
+
+	await typeInto(Year, '2');
+	// Year 2 is centuries before the bound, and it stays a 2 rather than snapping
+	// to 2024 with three digits still to come.
+	await expect.poll(() => shown(Year)).toBe('2');
+
+	await userEvent.keyboard('024');
+	await expect.poll(() => shown(Year)).toBe('2024');
+	expect(shown(Day)).toBe('15');
+});
+
+test('CSR: backspace under a bound erases a digit rather than snapping to the bound', async () => {
+	await render(Bounded);
+
+	await typeInto(Day, '{Backspace}');
+	await expect.poll(() => shown(Day)).toBe('1');
+	expect(document.activeElement).toBe(el(Day));
+});
+
+test('SSR: the first digit after a resume is kept under a bound', async () => {
+	await renderSSR(Bounded);
+
+	await typeInto(Day, '1');
+	await expect.poll(() => shown(Day)).toBe('1');
+	await userEvent.keyboard('2');
+	await expect.poll(() => shown(Day)).toBe('12');
+});
+
+// Space scrolls the page when nothing swallows it; a spinbutton holding focus does.
+test('CSR: space is swallowed rather than left to scroll the page', async () => {
+	await render(Basic);
+	el(Month).focus();
+
+	const space = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
+	el(Month).dispatchEvent(space);
+	expect(space.defaultPrevented).toBe(true);
+
+	const letter = new KeyboardEvent('keydown', { key: 'a', bubbles: true, cancelable: true });
+	el(Month).dispatchEvent(letter);
+	expect(letter.defaultPrevented).toBe(false);
+});
+
+// Cmd-arrow is browser history and Ctrl-Home is scroll-to-top; a box holding
+// focus must not swallow either or step on it. The plain arrow first warms the
+// handler module, so "nothing stepped" is a decision rather than a gesture still
+// in flight, and the second plain arrow waits the chords out.
+test('CSR: a browser chord on a key is left to the browser', async () => {
+	await render(Prefilled);
+
+	await typeInto(Month, '{ArrowUp}');
+	await expect.poll(() => shown(Month)).toBe('4');
+
+	for (const modifier of ['metaKey', 'ctrlKey', 'altKey'] as const) {
+		const chord = new KeyboardEvent('keydown', {
+			key: 'ArrowUp',
+			[modifier]: true,
+			bubbles: true,
+			cancelable: true,
+		});
+		el(Month).dispatchEvent(chord);
+		expect(chord.defaultPrevented, `${modifier}+ArrowUp`).toBe(false);
+	}
+
+	await userEvent.keyboard('{ArrowUp}');
+	await expect.poll(() => shown(Month)).toBe('5');
 });
 
 test('CSR: a keystroke calls the consumer onChange once with the new date', async () => {

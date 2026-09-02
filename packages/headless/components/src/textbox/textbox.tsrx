@@ -5,6 +5,7 @@ import { element, shared, state } from '@markless/core';
 import type {
 	TextboxDescriptionProps,
 	TextboxErrorProps,
+	TextboxInstanceState,
 	TextboxLabelProps,
 	TextboxTextareaProps,
 	TextboxRootProps,
@@ -13,7 +14,7 @@ import type {
 
 export const textboxState = shared(
 	() => {
-		const textbox = state({
+		const textbox: TextboxInstanceState = state({
 			value: '',
 			disabled: false,
 			required: false,
@@ -27,7 +28,28 @@ export const textboxState = shared(
 		const descriptionEl = element<HTMLDivElement>();
 		const errorEl = element<HTMLDivElement>();
 
-		return { ...textbox, inputEl, textareaEl, labelEl, descriptionEl, errorEl };
+		return {
+			...textbox,
+			inputEl,
+			textareaEl,
+			labelEl,
+			descriptionEl,
+			errorEl,
+			// literal function type: a callback slot is only recognised from the written annotation
+			onChange: undefined as ((value: string) => void) | undefined,
+
+			// `event.target`, never `currentTarget`: a dispatch runs after the browser
+			// has finished with the event, and `currentTarget` is null by then.
+			type(from: EventTarget | null) {
+				const control = from as HTMLInputElement | HTMLTextAreaElement | null;
+				if (!control) return;
+
+				const next = control.value;
+				if (next === textbox.value) return;
+				textbox.value = next;
+				textbox.onChange?.(next);
+			},
+		};
 	},
 	{ scope: 'widget' },
 );
@@ -43,6 +65,7 @@ export function TextboxRoot({
 	...rest
 }: TextboxRootProps) @{
 	const textbox = textboxState();
+	textbox.onChange = onChange;
 	textbox.value = value;
 	textbox.disabled = disabled;
 	textbox.required = required;
@@ -54,6 +77,7 @@ export function TextboxRoot({
 		ui-disabled={textbox.disabled}
 		ui-required={textbox.required}
 		ui-readonly={textbox.readonly}
+		ui-invalid={textbox.invalid}
 		ui-empty={textbox.value === ''}
 	>{children}</div>
 }
@@ -80,7 +104,7 @@ export function TextboxInput({
 		required={textbox.required || required === true}
 		readonly={textbox.readonly || readonly === true}
 		onInput={(event) => {
-			textbox.value = event.currentTarget.value;
+			textbox.type(event.target);
 			onInput?.(event);
 		}}
 	/>
@@ -108,7 +132,7 @@ export function TextboxTextarea({
 		required={textbox.required || required === true}
 		readonly={textbox.readonly || readonly === true}
 		onInput={(event) => {
-			textbox.value = event.currentTarget.value;
+			textbox.type(event.target);
 			onInput?.(event);
 		}}
 	/>

@@ -9,6 +9,7 @@ import PartRestrictions from './scenarios/part-restrictions.tsrx';
 import PrefilledField from './scenarios/prefilled.tsrx';
 import SignupForm from './scenarios/signup-form.tsrx';
 import FieldWithHelp from './scenarios/with-help.tsrx';
+import WithOnChange from './scenarios/with-onchange.tsrx';
 
 const Root = page.getByTestId('root');
 const Input = page.getByTestId('input');
@@ -30,6 +31,13 @@ const AfterInput = page.getByTestId('after-input');
 const AfterError = page.getByTestId('after-error');
 const BeforeInput = page.getByTestId('before-input');
 const BeforeError = page.getByTestId('before-error');
+const AfterRoot = page.getByTestId('after-root');
+const BeforeRoot = page.getByTestId('before-root');
+const SingleInput = page.getByTestId('single-input');
+const SingleValue = page.getByTestId('single-value');
+const MultiTextarea = page.getByTestId('multi-textarea');
+const MultiValue = page.getByTestId('multi-value');
+const Calls = page.getByTestId('calls');
 
 // The SSR harness rewrites a literal `renderSSR` call site, so each test must branch
 // on the mode rather than take the mount by reference.
@@ -51,6 +59,7 @@ function expectBasicRendered() {
 	expect(el(Root).hasAttribute('ui-disabled')).toBe(false);
 	expect(el(Root).hasAttribute('ui-required')).toBe(false);
 	expect(el(Root).hasAttribute('ui-readonly')).toBe(false);
+	expect(el(Root).hasAttribute('ui-invalid')).toBe(false);
 	// The label names the control by a minted id nobody spelled, and nothing else does.
 	expect(el(Label).getAttribute('for')).toBe(control.getAttribute('id'));
 	expect(control.id).toBeTruthy();
@@ -104,6 +113,7 @@ function expectPartRestrictions() {
 function expectHelpRendered() {
 	expect(el(Description).textContent).toBe("We'll never share your email");
 	expect(el<HTMLInputElement>(Input).hasAttribute('aria-invalid')).toBe(false);
+	expect(el(Root).hasAttribute('ui-invalid')).toBe(false);
 	// Only the description was placed, so the error drops out of the list.
 	expect(el<HTMLInputElement>(Input).getAttribute('aria-describedby')).toBe(el(Description).id);
 	expect(el(Description).id).toBeTruthy();
@@ -114,6 +124,9 @@ function expectInvalidRendered() {
 	// Every part of one widget instance seeds before any part renders, so document
 	// order does not decide what a part reads - the error marks the control either way.
 	expect(el<HTMLInputElement>(AfterInput).getAttribute('aria-invalid')).toBe('true');
+	// The root reports the same state for styling, whichever side the error sits on.
+	expect(el(AfterRoot).getAttribute('ui-invalid')).toBe('');
+	expect(el(BeforeRoot).getAttribute('ui-invalid')).toBe('');
 	// Only the error was placed, so the description drops out and the error is
 	// named alone - no stray space, no dangling id.
 	expect(el<HTMLInputElement>(AfterInput).getAttribute('aria-describedby')).toBe(
@@ -192,7 +205,77 @@ for (const mode of MODES) {
 		else await renderSSR(FieldWithHelpAndError);
 		expectHelpAndErrorRendered();
 	});
+
+	test(`${mode}: the text a field starts with calls nobody`, async () => {
+		if (mode === 'CSR') await render(WithOnChange);
+		else await renderSSR(WithOnChange);
+		expect(el<HTMLInputElement>(SingleInput).value).toBe('ada');
+		expect(el(Calls).textContent).toBe('0');
+		expect(el(SingleValue).textContent).toBe('');
+	});
 }
+
+// ---------------------------------------------------------------------------
+// The consumer's callback. Each keystroke is polled for before the next: a burst
+// typed into a control whose handler is still waking reaches the family as one
+// change, and one change is one call.
+// ---------------------------------------------------------------------------
+
+// A programmatic focus leaves the caret at the front of a prefilled control.
+function focusAtEnd(control: HTMLInputElement | HTMLTextAreaElement) {
+	control.focus();
+	control.setSelectionRange(control.value.length, control.value.length);
+}
+
+test('CSR: every keystroke calls the consumer once with the text so far', async () => {
+	await render(WithOnChange);
+
+	focusAtEnd(el<HTMLInputElement>(SingleInput));
+	await userEvent.keyboard('m');
+	await expect.poll(() => el(SingleValue).textContent).toBe('adam');
+	await expect.poll(() => el(Calls).textContent).toBe('1');
+
+	await userEvent.keyboard('s');
+	await expect.poll(() => el(SingleValue).textContent).toBe('adams');
+	await expect.poll(() => el(Calls).textContent).toBe('2');
+	expect(el(MultiValue).textContent).toBe('');
+});
+
+test('CSR: the multiline control reports to the consumer the same way', async () => {
+	await render(WithOnChange);
+
+	focusAtEnd(el<HTMLTextAreaElement>(MultiTextarea));
+	await userEvent.keyboard('h');
+	await expect.poll(() => el(MultiValue).textContent).toBe('h');
+	await expect.poll(() => el(Calls).textContent).toBe('1');
+
+	await userEvent.keyboard('i');
+	await expect.poll(() => el(MultiValue).textContent).toBe('hi');
+	await expect.poll(() => el(Calls).textContent).toBe('2');
+	expect(el(SingleValue).textContent).toBe('');
+});
+
+test('CSR: clearing a field calls the consumer with the empty text', async () => {
+	await render(WithOnChange);
+
+	focusAtEnd(el<HTMLInputElement>(SingleInput));
+	await userEvent.keyboard('m');
+	await expect.poll(() => el(Calls).textContent).toBe('1');
+
+	await userEvent.clear(el<HTMLInputElement>(SingleInput));
+	await expect.poll(() => el(Calls).textContent).toBe('2');
+	expect(el(SingleValue).textContent).toBe('');
+	expect(el(page.getByTestId('single-root')).getAttribute('ui-empty')).toBe('');
+});
+
+test('SSR: the first keystroke after a resume reaches the consumer', async () => {
+	await renderSSR(WithOnChange);
+
+	focusAtEnd(el<HTMLInputElement>(SingleInput));
+	await userEvent.keyboard('m');
+	await expect.poll(() => el(SingleValue).textContent).toBe('adam');
+	await expect.poll(() => el(Calls).textContent).toBe('1');
+});
 
 // Expected red: an element() handle binds one live host, so the label's `for` always
 // names the single-line control and a textarea-only field names an id nothing carries.

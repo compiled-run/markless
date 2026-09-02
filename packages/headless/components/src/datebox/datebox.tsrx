@@ -11,10 +11,12 @@ import {
 	resolvedDayMax,
 	resolvedDisplay,
 	resolvedEmpty,
+	resolvedMonthName,
 	resolvedNumber,
 	resolvedText,
 	resolvedTexts,
 	resolvedValue,
+	settled,
 	type SegmentType,
 } from './datebox-math.ts';
 import type {
@@ -118,6 +120,30 @@ export const dateboxState = shared(
 				const after = composeIso(outcome.year, outcome.month, outcome.day);
 				if (after !== before) datebox.onChange?.(after);
 			},
+
+			// Focus leaving a box is where a half-typed date is held to the bounds.
+			leave() {
+				if (datebox.disabled) return;
+
+				const texts = resolvedTexts(
+					datebox.seed,
+					datebox.dayAt,
+					datebox.monthAt,
+					datebox.yearAt,
+				);
+				const next = settled(texts, datebox.min, datebox.max);
+				if (next.day === texts.day && next.month === texts.month && next.year === texts.year) {
+					return;
+				}
+
+				datebox.dayAt = next.day;
+				datebox.monthAt = next.month;
+				datebox.yearAt = next.year;
+
+				const before = composeIso(texts.year, texts.month, texts.day);
+				const after = composeIso(next.year, next.month, next.day);
+				if (after !== before) datebox.onChange?.(after);
+			},
 		};
 	},
 	{ scope: 'widget' },
@@ -162,6 +188,7 @@ function DateBoxGroup({ children, ...rest }: DateBoxGroupProps) @{
 		aria-disabled={ariaDisabled}
 		ui-disabled={datebox.disabled}
 		ui-required={datebox.required}
+		ui-invalid={datebox.invalid}
 		ui-empty={isEmpty}
 	>{children}</div>
 }
@@ -180,6 +207,7 @@ function DateBoxItem({
 	placeholder,
 	showLeadingZero = false,
 	onKeydown,
+	onBlur,
 	onPaste,
 	...rest
 }: Omit<DateBoxItemProps, 'placeholder'> & {
@@ -232,6 +260,16 @@ function DateBoxItem({
 				datebox.yearAt,
 			) === '',
 	);
+	const spoken = computed(
+		() =>
+			resolvedMonthName(
+				segment.type,
+				datebox.seed,
+				datebox.dayAt,
+				datebox.monthAt,
+				datebox.yearAt,
+			) || null,
+	);
 	const named = computed(() => `${segment.type} input`);
 	const lowest = computed(() =>
 		segment.type === 'day' ? MIN_DAY : segment.type === 'month' ? MIN_MONTH : MIN_YEAR,
@@ -245,6 +283,7 @@ function DateBoxItem({
 	);
 	const ariaInvalid = computed(() => (datebox.invalid ? 'true' : 'false'));
 	const ariaDisabled = computed(() => (datebox.disabled ? 'true' : 'false'));
+	const ariaRequired = computed(() => (datebox.required ? 'true' : undefined));
 	const tabStop = computed(() => (datebox.disabled ? -1 : 0));
 
 	<span
@@ -259,8 +298,10 @@ function DateBoxItem({
 		aria-valuenow={now}
 		aria-valuemin={lowest}
 		aria-valuemax={highest}
+		aria-valuetext={spoken}
 		aria-invalid={ariaInvalid}
 		aria-disabled={ariaDisabled}
+		aria-required={ariaRequired}
 		ui-type={segment.type}
 		ui-value={digits}
 		ui-placeholder={isPlaceholder}
@@ -268,23 +309,35 @@ function DateBoxItem({
 		onKeydown={(event) => {
 			// Guarded by event fields alone, and only `===` chains extract: a guard
 			// over locals derived from graph state is MARKLESS_SYNC_POLICY_UNEXTRACTABLE.
+			// The modifiers keep browser chords - history back, scroll to top - out of
+			// the boxes, and Space is swallowed so it cannot scroll the page.
 			if (
-				event.key === 'ArrowUp' ||
-				event.key === 'ArrowDown' ||
-				event.key === 'ArrowLeft' ||
-				event.key === 'ArrowRight' ||
-				event.key === 'PageUp' ||
-				event.key === 'PageDown' ||
-				event.key === 'Home' ||
-				event.key === 'End' ||
-				event.key === 'Backspace' ||
-				event.key === 'Delete'
+				event.altKey === false &&
+				event.ctrlKey === false &&
+				event.metaKey === false &&
+				(event.key === 'ArrowUp' ||
+					event.key === 'ArrowDown' ||
+					event.key === 'ArrowLeft' ||
+					event.key === 'ArrowRight' ||
+					event.key === 'PageUp' ||
+					event.key === 'PageDown' ||
+					event.key === 'Home' ||
+					event.key === 'End' ||
+					event.key === 'Backspace' ||
+					event.key === 'Delete' ||
+					event.key === ' ')
 			) {
 				event.preventDefault();
 			}
 
-			datebox.press(event.target, event.key);
+			if (event.altKey === false && event.ctrlKey === false && event.metaKey === false) {
+				datebox.press(event.target, event.key);
+			}
 			onKeydown?.(event);
+		}}
+		onBlur={(event) => {
+			datebox.leave();
+			onBlur?.(event);
 		}}
 		onPaste={(event) => {
 			event.preventDefault();

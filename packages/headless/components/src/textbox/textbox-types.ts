@@ -3,9 +3,9 @@ import type { PropsOf } from '@markless/core';
 /**
  * The text box itself; the label, the control, and any description or error go
  * inside it. It holds the text and the restrictions, and reports `ui-disabled`,
- * `ui-required`, `ui-readonly` and `ui-empty` for styling. Put either a
- * `textbox.input` or a `textbox.textarea` inside - the root renders no control
- * of its own.
+ * `ui-required`, `ui-readonly`, `ui-invalid` and `ui-empty` for styling. Put
+ * either a `textbox.input` or a `textbox.textarea` inside - the root renders no
+ * control of its own.
  */
 export type TextboxRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	/** The text the box shows. Omit it and the box starts empty. */
@@ -19,8 +19,9 @@ export type TextboxRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	/** Submitted under this name by whichever control the family renders. */
 	readonly name?: string;
 	/**
-	 * Called with the new text as a person types. Omit it and the box still works;
-	 * the call site simply does nothing.
+	 * Called with the new text on every change a person makes, once per change,
+	 * and never for the text the box started with. Omit it and the box still
+	 * works; the call site simply does nothing.
 	 */
 	readonly onChange?: (value: string) => void;
 };
@@ -51,3 +52,14 @@ export type TextboxDescriptionProps = PropsOf<'div'>;
  * only when there is an error to show.
  */
 export type TextboxErrorProps = PropsOf<'div'>;
+
+/** The graph cells every textbox part reads and writes. */
+export type TextboxInstanceState = {
+	value: string;
+	disabled: boolean;
+	required: boolean;
+	readonly: boolean;
+	invalid: boolean;
+	name: string;
+	onChange?: TextboxRootProps['onChange'];
+};

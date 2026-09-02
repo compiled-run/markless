@@ -301,6 +301,27 @@ export function resolvedNumber(
 	return segmentNumber(resolvedText(type, seed, dayAt, monthAt, yearAt));
 }
 
+/**
+ * The month box's value in words, so a reader speaks "March" rather than "3";
+ * empty for any other box and while the month box holds no whole month. The
+ * family has no locale of its own, so the name comes from whatever this runtime
+ * is set to.
+ */
+export function resolvedMonthName(
+	type: SegmentType,
+	seed: string,
+	dayAt: string | null,
+	monthAt: string | null,
+	yearAt: string | null,
+): string {
+	if (type !== 'month') return '';
+	const month = resolvedNumber(type, seed, dayAt, monthAt, yearAt);
+	if (month === null || month < MIN_MONTH || month > MAX_MONTH) return '';
+	return new Intl.DateTimeFormat(undefined, { month: 'long', timeZone: 'UTC' }).format(
+		new Date(Date.UTC(2024, month - 1, 1)),
+	);
+}
+
 /** The text one box shows right now: its digits, or its placeholder while it is empty. */
 export function resolvedDisplay(
 	type: SegmentType,
@@ -323,7 +344,9 @@ export function resolvedDisplay(
  * The two corrections a date owes after any one box changes: a day that the
  * chosen month does not have drops to the last day it does (30 February becomes
  * 29 February in a leap year), and a whole date beyond `min` or `max` is pulled
- * back to that bound - which can move all three boxes at once.
+ * back to that bound - which can move all three boxes at once. Pass empty
+ * bounds to owe only the first: a box still being typed into is held to its
+ * month, not to the bounds, or `12` could never be typed under a `min` of 10.
  */
 export function settled(next: SegmentTexts, min: string, max: string): SegmentTexts {
 	const ceiling = dayCeiling(next.year, next.month);
@@ -359,6 +382,10 @@ function replaced(type: SegmentType, texts: SegmentTexts, text: string): Segment
  * further, Home and End jump to the box's bounds, digits type, Backspace erases
  * and then walks back, and left and right move between boxes. `null` is a key
  * this family does not handle.
+ *
+ * A step lands on a settled date, so `min` and `max` apply to it at once. Typing
+ * and erasing leave a box half-done, so they apply only once the box is left:
+ * the digit that fills it, a walk off it, or the blur `leave` answers.
  */
 export function keyOutcome(
 	type: SegmentType,
@@ -378,8 +405,8 @@ export function keyOutcome(
 		move: 0,
 	});
 
-	if (key === 'ArrowLeft') return { ...texts, move: -1 };
-	if (key === 'ArrowRight') return { ...texts, move: 1 };
+	if (key === 'ArrowLeft') return { ...settled(texts, min, max), move: -1 };
+	if (key === 'ArrowRight') return { ...settled(texts, min, max), move: 1 };
 	if (key === 'ArrowUp') return step(1);
 	if (key === 'ArrowDown') return step(-1);
 	if (key === 'PageUp') return step(PAGE_STEP[type]);
@@ -390,12 +417,14 @@ export function keyOutcome(
 	}
 	if (key === 'Backspace') {
 		if (text === '') return { ...texts, move: -1 };
-		return { ...settled(replaced(type, texts, erasedText(text)), min, max), move: 0 };
+		return { ...settled(replaced(type, texts, erasedText(text)), '', ''), move: 0 };
 	}
-	if (key === 'Delete') return { ...settled(replaced(type, texts, ''), min, max), move: 0 };
+	if (key === 'Delete') return { ...settled(replaced(type, texts, ''), '', ''), move: 0 };
 	if (key.length === 1 && key >= '0' && key <= '9') {
 		const typed = typedText(type, text, key, texts.year, texts.month);
-		return { ...settled(replaced(type, texts, typed.text), min, max), move: typed.full ? 1 : 0 };
+		const next = replaced(type, texts, typed.text);
+		if (typed.full) return { ...settled(next, min, max), move: 1 };
+		return { ...settled(next, '', ''), move: 0 };
 	}
 	return null;
 }

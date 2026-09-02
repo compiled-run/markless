@@ -296,9 +296,9 @@ function TimeBoxItem({
 				timebox.locale,
 			) === '',
 	);
-	// The one place this family renders `aria-valuetext` where `datebox` renders
-	// none: the period's value is 0 or 1, and a reader speaking a bare number here
-	// has conveyed nothing. Null keeps the attribute off the numeric boxes.
+	// The one place this family renders `aria-valuetext` (datebox does the same for
+	// the month): the period's value is 0 or 1, and a reader speaking a bare number
+	// here has conveyed nothing. Null keeps the attribute off the numeric boxes.
 	const spoken = computed(() =>
 		segment.type === 'dayperiod'
 			? resolvedPeriodWord(
