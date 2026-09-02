@@ -61,8 +61,8 @@ export function createProtocolViewPayload(
 	// since page-absolute locators cannot name elements a flip or an async
 	// settle replaces (D3).
 	const excludedHostIds = new Set([...armHostIds(input), ...boundaryArmHostIds(input)]);
-	// The consumer function props a composed child's `{...rest}` carries onto its
-	// own elements. Joined here, at build time, they are ordinary view records.
+	// The consumer props a composed child's `{...rest}` carries onto its own
+	// elements. Joined here, at build time, they are ordinary view records.
 	const forwarded = forwardedSpreadViewRecords(input);
 	return {
 		version: ASYNC_PROTOCOL_VERSION,
@@ -84,14 +84,17 @@ export function createProtocolViewPayload(
 				})),
 			forwarded.events,
 		),
-		domUpdates: input.payloadArena.view.domUpdates
-			.filter((domUpdate) => !armHostIds(input).has(domUpdate.hostNodeId))
-			.map((domUpdate) => ({
-				...domUpdate,
-				symbolId: domUpdateSymbols.get(
-					`${domUpdate.hostNodeId}:${domUpdateTargetKey(domUpdate.target)}:${domUpdate.graphNodeId}:${domUpdate.source}`,
-				),
-			})),
+		domUpdates: [
+			...input.payloadArena.view.domUpdates
+				.filter((domUpdate) => !armHostIds(input).has(domUpdate.hostNodeId))
+				.map((domUpdate) => ({
+					...domUpdate,
+					symbolId: domUpdateSymbols.get(
+						`${domUpdate.hostNodeId}:${domUpdateTargetKey(domUpdate.target)}:${domUpdate.graphNodeId}:${domUpdate.source}`,
+					),
+				})),
+			...forwarded.domUpdates,
+		],
 		behaviors: input.payloadArena.view.behaviors
 			.filter((behavior) => !excludedHostIds.has(behavior.hostNodeId))
 			.map((behavior, index) => ({

@@ -22,7 +22,7 @@ export const defaultCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 	{
 		passId: 'symbol-resolver',
 		description: 'Plan lazy symbols and sync policy records for the generated resolver.',
-		consumes: ['semanticGraph', 'stateLowering', 'payloadArena'],
+		consumes: ['source', 'semanticGraph', 'stateLowering', 'payloadArena'],
 		produces: ['symbolResolver'],
 	},
 	{
@@ -46,7 +46,7 @@ export const defaultCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 	{
 		passId: 'protocol-state',
 		description: 'Create the serializable protocol state payload.',
-		consumes: ['semanticGraph', 'payloadArena'],
+		consumes: ['semanticGraph', 'payloadArena', 'symbolResolver'],
 		produces: ['protocolState'],
 	},
 	{

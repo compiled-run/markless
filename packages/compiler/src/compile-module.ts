@@ -211,6 +211,7 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 						semanticGraph,
 						payloadArena: inputs.payloadArena as PayloadArenaArtifact,
 						stateLowering: inputs.stateLowering as StateLoweringArtifact,
+						source: inputs.source as CompileTsrxModuleInput,
 					});
 					// Every later pass reads this symbol list, so the eager sync policy's
 					// calls must already be lifted out of it here.
@@ -311,6 +312,7 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 						protocolState: createProtocolStatePayloadFromArena({
 							semanticGraph: inputs.semanticGraph as SemanticGraphArtifact,
 							payloadArena: inputs.payloadArena as PayloadArenaArtifact,
+							symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
 						}),
 					};
 				},

@@ -466,9 +466,9 @@ test('SSR islands: the accordion writes back to its own page cell and settles', 
 // A consumer's scoped rule (`.group.mk-…`) reaches a part only if the part
 // carries the consumer's scope class. A static class always did; a dynamic
 // class - a ternary over a `@for` row, a ternary or template over a page cell -
-// must carry it too, in every mount. A plain element beside them keeps the
-// scope through the class rewrite once the cell moves; a value crossing a
-// part's rest spread renders once, so the parts are pinned as rendered.
+// must carry it too, in every mount. Once the cell moves, the parts follow it
+// the way the plain element beside them does - class and data attribute
+// rewritten with the scope kept - and come back to the rendered bytes.
 const GREEN = 'rgb(0, 128, 0)';
 const RED = 'rgb(200, 0, 0)';
 
@@ -495,13 +495,40 @@ async function pinDynamicClassKeepsScope(index: number) {
 	expectScopedBorder(rows()[0]!, RED);
 	expectScopedBorder(rows()[1]!, GREEN);
 
+	// The rendered attribute strings, which every write must come back to.
+	const rendered = {
+		ternary: at('ternary-item').getAttribute('class'),
+		template: at('template-item').getAttribute('class'),
+		fixed: at('fixed-item').getAttribute('class'),
+	};
+	const scope = rendered.ternary!.replace(/^group\s*/, '');
+	expect(scope).toMatch(/^mk-/);
+	expect(rendered.template).toBe(`group is-calm ${scope}`);
+	expect(at('ternary-item').getAttribute('data-tone')).toBe('calm');
+	expect(at('host').getAttribute('data-tone')).toBe('calm');
+
 	await userEvent.click(at('toggle-danger'));
 	await expect.poll(() => at('host').classList.contains('is-danger')).toBe(true);
 	expectScopedBorder(at('host'), RED);
+	expect(at('host').getAttribute('data-tone')).toBe('hot');
+	// The parts follow the cell exactly as the plain element beside them does:
+	// class and data attribute rewritten, the consumer scope class kept.
+	await expect.poll(() => at('ternary-item').getAttribute('class')).toBe(`group is-danger ${scope}`);
+	await expect.poll(() => at('template-item').getAttribute('class')).toBe(`group is-danger ${scope}`);
+	await expect.poll(() => at('ternary-item').getAttribute('data-tone')).toBe('hot');
+	expectScopedBorder(at('ternary-item'), RED);
+	expectScopedBorder(at('template-item'), RED);
+	expect(at('fixed-item').getAttribute('class')).toBe(rendered.fixed);
 
 	await userEvent.click(at('toggle-danger'));
 	await expect.poll(() => at('host').classList.contains('is-danger')).toBe(false);
 	expectScopedBorder(at('host'), GREEN);
+	await expect.poll(() => at('ternary-item').getAttribute('class')).toBe(rendered.ternary);
+	await expect.poll(() => at('template-item').getAttribute('class')).toBe(rendered.template);
+	await expect.poll(() => at('ternary-item').getAttribute('data-tone')).toBe('calm');
+	expectScopedBorder(at('ternary-item'), GREEN);
+	expectScopedBorder(at('template-item'), GREEN);
+	expect(at('fixed-item').getAttribute('class')).toBe(rendered.fixed);
 }
 
 test('CSR: a dynamic class on a part keeps the consumer scope class across updates', async () => {

@@ -2,11 +2,12 @@ import { state } from '@markless/core';
 import { accordion } from '../../index.ts';
 
 // The docs-site shape: a consumer with a <style> of its own writes a DYNAMIC
-// class on a family part - a ternary over a `@for` row, a ternary and a
-// template over a page cell - and on a plain element beside them. Its own
-// scoped rule must reach every element it named, before and after the cell moves.
+// class and a data attribute on a family part - a ternary over a `@for` row, a
+// ternary and a template over a page cell - and on a plain element beside them.
+// Its own scoped rule must reach every element it named, before and after the
+// cell moves, and the part must follow the cell exactly as the plain element does.
 export default function DynamicClass() @{
-	const page = state({ danger: false });
+	const page = state({ danger: false, tone: 'calm' });
 	const groups = state([
 		{ value: 'alpha', danger: true },
 		{ value: 'beta', danger: false },
@@ -17,7 +18,7 @@ export default function DynamicClass() @{
 			.group { border: 2px solid rgb(0, 128, 0); }
 			.group.is-danger { border-color: rgb(200, 0, 0); }
 		</style>
-		<p class={page.danger ? 'group is-danger' : 'group'} data-testid="host">Host</p>
+		<p class={page.danger ? 'group is-danger' : 'group'} data-tone={page.tone} data-testid="host">Host</p>
 		<accordion.root data-testid="root">
 			<accordion.item value="fixed" class="group" data-testid="fixed-item">
 				<accordion.itemlabel>
@@ -28,6 +29,7 @@ export default function DynamicClass() @{
 			<accordion.item
 				value="ternary"
 				class={page.danger ? 'group is-danger' : 'group'}
+				data-tone={page.tone}
 				data-testid="ternary-item"
 			>
 				<accordion.itemlabel>
@@ -65,6 +67,7 @@ export default function DynamicClass() @{
 			data-testid="toggle-danger"
 			onClick={() => {
 				page.danger = !page.danger;
+				page.tone = page.danger ? 'hot' : 'calm';
 			}}
 		>Toggle danger</button>
 	</section>

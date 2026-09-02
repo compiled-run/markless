@@ -61,15 +61,16 @@ function textTargetValue(
 	return `${target.prefix ?? ''}${mapped == null ? '' : String(mapped)}${target.suffix ?? ''}`;
 }
 
-// A class write replaces the whole attribute, so the module's style scope has to
-// be composed back in or the first update strips every scoped rule off the element.
+// A class write replaces the whole attribute, so the style scopes have to be
+// composed back in - a part's own ahead of the value, the module's behind it -
+// or the first update strips every scoped rule off the element.
 function classTargetValue(
 	target: Extract<DomUpdateEntryInput['target'], { readonly kind: 'class' }>,
 	value: unknown,
 ): unknown {
 	const mapped = conditionalTargetValue(target, value);
-	if (target.constantClass === undefined) return mapped;
-	return mapped ? `${mapped} ${target.constantClass}` : target.constantClass;
+	if (target.constantClass === undefined && target.leadingClass === undefined) return mapped;
+	return [target.leadingClass, mapped, target.constantClass].filter(Boolean).join(' ');
 }
 
 function conditionalTargetValue(

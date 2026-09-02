@@ -54,7 +54,9 @@ test('default compiler passes declare stable artifact boundaries', () => {
 			expect.objectContaining({
 				passId: 'symbol-resolver',
 				description: expect.stringContaining('symbol'),
-				consumes: ['semanticGraph', 'stateLowering', 'payloadArena'],
+				// `source` carries the imported interfaces whose spread hosts a
+				// consumer's props land on; their rewrites are symbols of this module.
+				consumes: ['source', 'semanticGraph', 'stateLowering', 'payloadArena'],
 				produces: ['symbolResolver'],
 			}),
 			expect.objectContaining({

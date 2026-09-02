@@ -74,9 +74,9 @@ function addRecordGraphNodes(
 	view: ProtocolViewPayload,
 ): void {
 	if (recordId.startsWith('dom-update:')) {
-		const [, hostNodeId, symbolId = ''] = recordId.split(':');
+		// Matched whole: a composed host id (`c0:h1`) has colons of its own.
 		for (const record of view.domUpdates)
-			if (record.hostNodeId === hostNodeId && (record.symbolId ?? '') === symbolId)
+			if (recordId === `dom-update:${record.hostNodeId}:${record.symbolId ?? ''}`)
 				graphNodeIds.add(record.graphNodeId);
 		return;
 	}
