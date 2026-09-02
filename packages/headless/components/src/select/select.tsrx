@@ -25,6 +25,9 @@ import type {
 /** How long a typeahead buffer stays open, in milliseconds. */
 const TYPEAHEAD_WINDOW = 750;
 
+/** How long a press that dismissed the list keeps the trigger's own click from re-opening it, in milliseconds. */
+const PRESS_GRACE = 300;
+
 export const selectState = shared(
 	() => {
 		const select: SelectInstanceState = state({
@@ -35,6 +38,7 @@ export const selectState = shared(
 			name: '',
 			search: '',
 			searchAt: 0,
+			pressGraceUntil: 0,
 		});
 		const labelEl = element<HTMLLabelElement>();
 		const contentEl = element<HTMLDivElement>();
@@ -134,9 +138,11 @@ export function SelectTrigger({ children, onClick, onKeydown, ...rest }: SelectT
 		ui-closed={select.open !== true}
 		onClick={(event) => {
 			const isOpening = select.open !== true;
-			select.setOpen(isOpening);
+			// Without the grace the press closes an open list and the click it becomes re-opens it; armed by identity in the listbox's `onDismiss`.
+			const isGraced = select.pressGraceUntil > Date.now();
+			if (isGraced !== true) select.setOpen(isOpening);
 			// A click synthesised from Enter or Space carries no click count, and this is the dispatch that opens: asked for from the keydown before it, the landing would want a box the listbox does not have yet.
-			if (isOpening && event.detail === 0 && select.disabled !== true) {
+			if (isGraced !== true && isOpening && event.detail === 0 && select.disabled !== true) {
 				focusOpeningOption(select.optionEls, select.optionLabelEls, '', false);
 			}
 			onClick?.(event);
@@ -186,18 +192,31 @@ export function SelectTrigger({ children, onClick, onKeydown, ...rest }: SelectT
 	>{children}</button>
 }
 
-// Closed hides the listbox, never detaches it: the trigger points at this element's minted id, and an unmount would leave that reference dangling.
-export function SelectContent({ children, onKeydown, ...rest }: SelectContentProps) @{
+// Closed hides the listbox, never detaches it: the trigger points at this element's minted id, and an enlisted element removed from the document leaves the overlay stack's marks behind.
+// `overlay` is a bare attribute the primitive reads; while enlisted it reports Escape and outside presses as `dismiss`, closing nothing and moving no focus itself.
+export function SelectContent({ children, onDismiss, onKeydown, ...rest }: SelectContentProps) @{
 	const select = selectState();
 
 	<div
 		{...rest}
 		el={select.contentEl}
+		overlay
 		role="listbox"
 		aria-labelledby={select.labelEl}
 		hidden={select.open !== true}
 		ui-open={select.open}
 		ui-closed={select.open !== true}
+		onDismiss={(event) => {
+			const pressed = event.detail.pressTarget;
+			const trigger = select.triggerEl;
+			// `contains` rather than `===`: a consumer may put an icon inside the trigger, and the press lands on that.
+			const isOwnTrigger = pressed !== undefined && trigger !== undefined && trigger.contains(pressed);
+			select.setOpen(false);
+			if (isOwnTrigger) select.pressGraceUntil = Date.now() + PRESS_GRACE;
+			// A press elsewhere is a person choosing where to be, so only Escape hands focus back.
+			if (event.detail.reason === 'escape') trigger?.focus();
+			onDismiss?.(event);
+		}}
 		onKeydown={(event) => {
 			// Escape is prevented too: a listbox inside a dialog must not close both.
 			if (
@@ -222,7 +241,7 @@ export function SelectContent({ children, onKeydown, ...rest }: SelectContentPro
 				event.metaKey !== true;
 			const isNavigationKey =
 				key === 'ArrowDown' || key === 'ArrowUp' || key === 'Home' || key === 'End';
-			const isSelectionKey = key === 'Enter' || key === ' ' || key === 'Tab';
+			const isSelectionKey = key === 'Enter' || key === ' ';
 
 			if (isTypeaheadChar) {
 				const now = Date.now();
@@ -237,7 +256,10 @@ export function SelectContent({ children, onKeydown, ...rest }: SelectContentPro
 			} else if (isSelectionKey) {
 				// Routed through the option's own click rule, so one place in this family reads a value.
 				commitFocusedOption(select.optionEls, here);
-				if (key !== 'Tab') select.triggerEl?.focus();
+				select.triggerEl?.focus();
+			} else if (key === 'Tab') {
+				// Tab never chooses; it closes and keeps its native move.
+				select.setOpen(false);
 			} else if (key === 'Escape') {
 				select.setOpen(false);
 				select.triggerEl?.focus();

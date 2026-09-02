@@ -41,6 +41,7 @@ const RightBasicIndicator = page.getByTestId('right-basic-itemindicator');
 const Value = page.getByTestId('value');
 const Calls = page.getByTestId('calls');
 const Opens = page.getByTestId('opens');
+const After = page.getByTestId('after');
 
 // The SSR harness rewrites a literal `renderSSR` call site, so each test must branch
 // on the mode rather than take the mount by reference.
@@ -233,6 +234,70 @@ async function expectPointerChoiceHandsFocusBack() {
 	expect(el(Calls).textContent).toBe('1');
 }
 
+async function expectAPressOutsideDismissesTheList() {
+	el(Trigger).click();
+	await expect.poll(() => el<HTMLElement>(Content).hidden).toBe(false);
+
+	document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+	await expect.poll(() => el<HTMLElement>(Content).hidden).toBe(true);
+	await expect.poll(() => el(Trigger).getAttribute('aria-expanded')).toBe('false');
+}
+
+// A real pointer on something outside the root: the list closes, nothing is chosen,
+// and the close is reported to the consumer.
+async function expectARealClickOutsideDismissesTheList() {
+	await userEvent.click(Trigger);
+	await expect.poll(() => el<HTMLElement>(Content).hidden).toBe(false);
+
+	await userEvent.click(Calls);
+	await expect.poll(() => el<HTMLElement>(Content).hidden).toBe(true);
+	await expect.poll(() => el(Opens).textContent).toBe('oc');
+	expect(el(Calls).textContent).toBe('0');
+	expect(el(Value).textContent).toBe('');
+}
+
+// Without the grace window the press closes the list and the click it becomes re-opens it.
+async function expectPressingTheTriggerOfAnOpenListClosesItAndLeavesItClosed() {
+	await userEvent.click(Trigger);
+	await expect.poll(() => el<HTMLElement>(Content).hidden).toBe(false);
+
+	await userEvent.click(Trigger);
+	await expect.poll(() => el<HTMLElement>(Content).hidden).toBe(true);
+	await new Promise((resolve) => setTimeout(resolve, 150));
+	expect(el<HTMLElement>(Content).hidden).toBe(true);
+	expect(el(Trigger).getAttribute('aria-expanded')).toBe('false');
+}
+
+async function expectEscapeClosesWithoutChoosingAndHandsFocusBack() {
+	await openWith('{ArrowDown}');
+	await expect.poll(async () => await focused()).toBe(el(Apple));
+	await userEvent.keyboard('{ArrowDown}');
+	await expect.poll(async () => await focused()).toBe(el(Banana));
+
+	await userEvent.keyboard('{Escape}');
+	await expect.poll(() => el<HTMLElement>(Content).hidden).toBe(true);
+	await expect.poll(async () => await focused()).toBe(el(Trigger));
+	expect(el(Calls).textContent).toBe('0');
+	expect(el(Value).textContent).toBe('');
+}
+
+// Tab never chooses: the value stays whatever was last chosen and focus keeps its
+// native move, the Radix and React Aria rule rather than the APG's commit-on-Tab.
+async function expectTabClosesWithoutChoosing() {
+	await openWith('{ArrowDown}');
+	await expect.poll(async () => await focused()).toBe(el(Apple));
+	await userEvent.keyboard('{ArrowDown}');
+	await expect.poll(async () => await focused()).toBe(el(Banana));
+
+	await userEvent.keyboard('{Tab}');
+	await expect.poll(() => el<HTMLElement>(Content).hidden).toBe(true);
+	await new Promise((resolve) => setTimeout(resolve, 150));
+	expect(el(Calls).textContent).toBe('0');
+	expect(el(Value).textContent).toBe('');
+	expect(el(Banana).getAttribute('aria-selected')).toBe('false');
+	expect(document.activeElement).toBe(el(After));
+}
+
 async function expectOmittedCallbacksStillChoose() {
 	el(Trigger).click();
 	await expect.poll(() => el<HTMLElement>(Content).hidden).toBe(false);
@@ -328,6 +393,36 @@ for (const mode of MODES) {
 		if (mode === 'CSR') await render(WithOnChange);
 		else await renderSSR(WithOnChange);
 		await expectPointerChoiceHandsFocusBack();
+	});
+
+	test(`${mode}: a press outside the open listbox dismisses it`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+		await expectAPressOutsideDismissesTheList();
+	});
+
+	test(`${mode}: a real click outside the open listbox closes it and chooses nothing`, async () => {
+		if (mode === 'CSR') await render(WithOnChange);
+		else await renderSSR(WithOnChange);
+		await expectARealClickOutsideDismissesTheList();
+	});
+
+	test(`${mode}: a pointer press on the trigger of an open listbox closes it and leaves it closed`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+		await expectPressingTheTriggerOfAnOpenListClosesItAndLeavesItClosed();
+	});
+
+	test(`${mode}: Escape closes the listbox without choosing and hands focus back to the trigger`, async () => {
+		if (mode === 'CSR') await render(WithOnChange);
+		else await renderSSR(WithOnChange);
+		await expectEscapeClosesWithoutChoosingAndHandsFocusBack();
+	});
+
+	test(`${mode}: Tab out of the open listbox closes it without choosing`, async () => {
+		if (mode === 'CSR') await render(WithOnChange);
+		else await renderSSR(WithOnChange);
+		await expectTabClosesWithoutChoosing();
 	});
 
 	test(`${mode}: omitted callbacks still choose and still open`, async () => {
@@ -490,14 +585,18 @@ test('CSR: Escape closes the popup and leaves the value untouched', async () => 
 	expect(el(Cherry).getAttribute('aria-selected')).toBe('false');
 });
 
-test('CSR: Tab out of the open listbox commits and closes', async () => {
+// Alt+ArrowDown opens and leaves focus on the trigger, where the listbox's own key
+// table cannot hear the Escape; the overlay stack reports it instead.
+test('CSR: Escape with focus still on the trigger closes the open listbox', async () => {
 	await render(Basic);
-	await openWith('{ArrowDown}');
-	await expect.poll(async () => await focused()).toBe(el(Apple));
+	el(Trigger).focus();
+	await userEvent.keyboard('{Alt>}{ArrowDown}{/Alt}');
+	await expect.poll(() => el<HTMLElement>(Content).hidden).toBe(false);
+	expect(document.activeElement).toBe(el(Trigger));
 
-	await userEvent.keyboard('{Tab}');
-	await expect.poll(() => el(Apple).getAttribute('aria-selected')).toBe('true');
+	await userEvent.keyboard('{Escape}');
 	await expect.poll(() => el<HTMLElement>(Content).hidden).toBe(true);
+	expect(document.activeElement).toBe(el(Trigger));
 });
 
 // Typeahead is two graph cells and a Date.now() comparison, over a 750ms window.
@@ -651,19 +750,4 @@ test('CSR: the hidden native control carries the choice, and a form reset leaves
 	expect(el<HTMLSelectElement>(Field).value).toBe('annual');
 	expect(el(Annual).getAttribute('aria-selected')).toBe('true');
 	await expect.poll(() => submit().textContent).toBe('{"plan":"annual"}');
-});
-
-// PENDING BEHAVIOUR - the listbox is not an overlay. It carries no `overlay` mark and
-// no dismissal handler, so a press anywhere else on the page leaves it showing, with
-// the roving focus still inside it. Combobox closes on an outside press with `overlay`
-// plus an `onDismiss` rule and a short grace window that stops the trigger's own click
-// from re-opening what the press just closed; select needs that same pair, which is a
-// new prop on `select.content` and therefore an owner call rather than a QA fix.
-test.fails('CSR: a press outside the open listbox dismisses it', async () => {
-	await render(Basic);
-	el(Trigger).click();
-	await expect.poll(() => el<HTMLElement>(Content).hidden).toBe(false);
-
-	document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
-	await expect.poll(() => el<HTMLElement>(Content).hidden).toBe(true);
 });

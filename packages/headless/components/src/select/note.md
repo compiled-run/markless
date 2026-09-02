@@ -401,7 +401,11 @@ option and stop at the ends (a select's list has a top and a bottom; unlike a
 radio group it does not wrap). `Home`/`End` are absolute moves in the same walk.
 A printable character moves the focus. `Enter`/`Space` commit and close and hand
 focus back to the trigger. `Escape` closes, leaves the value untouched, and hands
-focus back. `Tab` commits and closes and keeps its native move.
+focus back. `Tab` closes without choosing and keeps its native move — the Radix
+and React Aria rule, an owner ruling against the APG's commit-on-Tab. A press
+outside the open list closes it and moves no focus: the listbox carries the
+`overlay` mark and reads the stack's `dismiss` report, with the same grace window
+combobox uses so the trigger's own press does not close and re-open.
 
 **Moving the highlight is never choosing.** That is the rule separating this
 family from radio group, where the APG says an arrow always chooses, and it is

@@ -17,7 +17,9 @@ const Content = page.getByTestId('content');
 const ReversedContent = page.getByTestId('reversed-content');
 const BoldTrigger = page.getByTestId('bold-trigger');
 const BoldContent = page.getByTestId('bold-content');
+const ItalicTrigger = page.getByTestId('italic-trigger');
 const ItalicContent = page.getByTestId('italic-content');
+const UnderlineContent = page.getByTestId('underline-content');
 const FirstRoot = page.getByTestId('first-root');
 const FirstTrigger = page.getByTestId('first-trigger');
 const FirstContent = page.getByTestId('first-content');
@@ -453,6 +455,30 @@ test('CSR: a press outside both reaches only the tip, and the popover survives i
 	await expect.poll(() => el(Content).hasAttribute('hidden')).toBe(true);
 	expect(el(PopoverContent).hasAttribute('hidden')).toBe(false);
 });
+
+// KNOWN GAP, pinned as what should happen. Only one tooltip is visible at a time
+// (React Aria TooltipTrigger, Radix Tooltip.Provider, APG): showing one hides any
+// other, however the first was shown. The overlay stack tells an enlisted surface
+// nothing when another enlists over it, and each root knows only its own parts,
+// so a tip held open by focus stays up while a hovered neighbour shows beside it.
+// The platform's answer is a hint tier in the overlay stack, a web-package change;
+// a family-local registry reaching across instances is not the fix.
+for (const mode of MODES) {
+	test.fails(`${mode}: showing one tip hides the tip a focused trigger was holding`, async () => {
+		if (mode === 'CSR') await render(Toolbar);
+		else await renderSSR(Toolbar);
+
+		el<HTMLElement>(BoldTrigger).focus();
+		await expect.poll(() => el(BoldContent).hasAttribute('hidden'), { timeout: 2000 }).toBe(false);
+
+		await showByHover(el(ItalicTrigger), el(ItalicContent));
+		await expect.poll(() => el(BoldContent).hasAttribute('hidden')).toBe(true);
+		expect(el(UnderlineContent).hasAttribute('hidden')).toBe(true);
+
+		await userEvent.keyboard('{Escape}');
+		await expect.poll(() => el(ItalicContent).hasAttribute('hidden')).toBe(true);
+	});
+}
 
 test('SSR: the served tip is present, hidden, elevated and fully wired', async () => {
 	await renderSSR(Basic);

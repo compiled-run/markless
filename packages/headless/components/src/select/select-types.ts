@@ -42,6 +42,8 @@ export type SelectInstanceState = Seeded<
 > & {
 	search: string;
 	searchAt: number;
+	/** Until when a press that dismissed the list keeps the trigger's own click from re-opening it. */
+	pressGraceUntil: number;
 	onChange?: SelectRootProps['onChange'];
 	onOpenChange?: SelectRootProps['onOpenChange'];
 };
@@ -78,7 +80,11 @@ export type SelectTriggerProps = PropsOf<'button'>;
 /**
  * The popup the options go in. Closed hides it, never detaches it - the
  * trigger's `aria-controls` points at this element. It owns the arrow, Home,
- * End, Enter, Space, Escape and typeahead keys while it is showing.
+ * End, Enter, Space, Escape, Tab and typeahead keys while it is showing.
+ *
+ * It carries the `overlay` mark, so Escape and a press outside it close it;
+ * Escape also hands focus back to the trigger. A consumer's `onDismiss` runs
+ * after the family has closed the list.
  */
 export type SelectContentProps = PropsOf<'div'>;
 

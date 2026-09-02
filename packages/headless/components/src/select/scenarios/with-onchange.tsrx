@@ -36,5 +36,6 @@ export function WithOnChange() @{
 		<output data-testid="value">{chosen}</output>
 		<output data-testid="calls">{calls}</output>
 		<output data-testid="opens">{opens}</output>
+		<button type="button" data-testid="after">After</button>
 	</section>
 }
