@@ -68,14 +68,19 @@ function islandResumeModuleUrl(islands: ReadonlyArray<SsrIslandInput>): string {
 }
 
 // Mirrors emitComposedMdxRoute's resume half: per-island `m<n>:`-keyed loaders
-// over `?markless-symbols`, wired into the router's own loadMdxSymbol.
+// over `?markless-symbols` wired into the router's own loadMdxSymbol, and the
+// island's canonical render-data surface over `?markless-render-data`, which is
+// the only surface a component row minted after resume can render against.
 function islandResumeModuleSource(modulePaths: ReadonlyArray<string>): string {
 	const loaders = modulePaths.map((modulePath, index) => {
 		const prefix = islandPrefix(index);
-		const symbolUrl = `/@fs/${modulePath.replace(/^\//, '')}?markless-symbols`;
+		const moduleUrl = `/@fs/${modulePath.replace(/^\//, '')}`;
+		const symbolUrl = `${moduleUrl}?markless-symbols`;
+		const renderDataUrl = `${moduleUrl}?markless-render-data`;
 		return (
 			`{ prefix: ${JSON.stringify(prefix)}, loadSymbol(symbolId) { ` +
-			`return import(${JSON.stringify(symbolUrl)}).then((mod) => mod.loadSymbol(symbolId.slice(${prefix.length}))); } }`
+			`return import(${JSON.stringify(symbolUrl)}).then((mod) => mod.loadSymbol(symbolId.slice(${prefix.length}))); }, ` +
+			`loadRenderData() { return import(${JSON.stringify(renderDataUrl)}).then((mod) => mod.marklessPrerenderData); } }`
 		);
 	});
 	return [
