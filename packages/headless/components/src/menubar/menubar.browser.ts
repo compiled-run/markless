@@ -286,6 +286,20 @@ for (const mode of MODES) {
 		expect(el('root').getAttribute('role')).toBe('menubar');
 	});
 
+	test(`${mode}: a press outside closes the open menu and moves no focus`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+
+		await openBar('bar-edit', 'panel-edit');
+		await expectFocused('item-undo');
+
+		el('background').focus();
+		el('background').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+		await expectClosed('panel-edit');
+		expect(el('bar-edit').getAttribute('aria-expanded')).toBe('false');
+		expect(document.activeElement).toBe(el('background'));
+	});
+
 	test(`${mode}: a command reports to the bar's own root and returns focus to its item`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);

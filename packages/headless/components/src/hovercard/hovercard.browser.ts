@@ -7,6 +7,7 @@ import InsidePopover from './scenarios/inside-popover.tsrx';
 import Rich from './scenarios/rich.tsrx';
 import ServedOpen from './scenarios/served-open.tsrx';
 import TwoCards from './scenarios/two-cards.tsrx';
+import TwoCardsAtRest from './scenarios/two-cards-at-rest.tsrx';
 import WithOnChange from './scenarios/with-onchange.tsrx';
 
 const Background = page.getByTestId('background');
@@ -505,6 +506,29 @@ test.fails(
 		await expect.poll(() => el(PopoverContent).hasAttribute('hidden')).toBe(true);
 	},
 );
+
+// KNOWN GAP, pinned as what should happen: one card at a time, as with tooltip.
+// The overlay stack tells an enlisted surface nothing when another enlists over
+// it, and each root knows only its own parts, so a card held open by focus stays
+// up while a hovered neighbour shows beside it. The platform's answer is a hint
+// tier in the overlay stack, a web-package change; a family-local registry
+// reaching across instances is not the fix.
+for (const mode of MODES) {
+	test.fails(`${mode}: showing one card hides the card a focused trigger was holding`, async () => {
+		if (mode === 'CSR') await render(TwoCardsAtRest);
+		else await renderSSR(TwoCardsAtRest);
+
+		el<HTMLElement>(FirstTrigger).focus();
+		await expect.poll(() => el(FirstContent).hasAttribute('hidden'), { timeout: 2000 }).toBe(false);
+
+		enter(el(SecondTrigger));
+		await expect.poll(() => el(SecondContent).hasAttribute('hidden'), { timeout: 2000 }).toBe(false);
+		await expect.poll(() => el(FirstContent).hasAttribute('hidden')).toBe(true);
+
+		await userEvent.keyboard('{Escape}');
+		await expect.poll(() => el(SecondContent).hasAttribute('hidden')).toBe(true);
+	});
+}
 
 test('SSR: the served card is present, hidden, elevated and fully wired', async () => {
 	await renderSSR(Basic);

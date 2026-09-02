@@ -3443,7 +3443,7 @@
 			{
 				"part": "content",
 				"component": "SelectContent",
-				"doc": "The popup the options go in. Closed hides it, never detaches it - the\ntrigger's `aria-controls` points at this element. It owns the arrow, Home,\nEnd, Enter, Space, Escape and typeahead keys while it is showing.",
+				"doc": "The popup the options go in. Closed hides it, never detaches it - the\ntrigger's `aria-controls` points at this element. It owns the arrow, Home,\nEnd, Enter, Space, Escape, Tab and typeahead keys while it is showing.\n\nIt carries the `overlay` mark, so Escape and a press outside it close it;\nEscape also hands focus back to the trigger. A consumer's `onDismiss` runs\nafter the family has closed the list.",
 				"props": []
 			},
 			{
