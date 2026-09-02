@@ -24,7 +24,10 @@ export type NavbarRootProps = Omit<PropsOf<'nav'>, 'onChange'> & {
 	 * say that.
 	 */
 	readonly value?: string;
-	/** Dropdowns open when the pointer rests on an item. Omit it and they do. */
+	/**
+	 * Dropdowns open when the pointer rests on an item, and close once the pointer
+	 * has been out of the landmark for a moment. Omit it and they do.
+	 */
 	readonly hover?: boolean;
 	/**
 	 * How long the pointer must rest on an item before its dropdown opens, in
@@ -99,12 +102,18 @@ export type NavbarItemLinkProps = PropsOf<'a'> & {
  * The shared instance every navbar part reads and writes: the root's seeded
  * fields, plus the consumer's `onChange`, stored by the root for `show()`,
  * `toggle()` and `closeAll()` to call.
+ *
+ * The two numbers are what a pointer leaving the landmark has to remember: the
+ * timer that will re-deliver the leave, and the moment after which that leave
+ * closes. Both are zero while the pointer is inside.
  */
 export type NavbarInstanceState = Seeded<
 	NavbarRootProps,
 	'value' | 'hover' | 'delay' | 'clickGrace'
 > & {
 	onChange?: NavbarRootProps['onChange'];
+	leaveTimer: number;
+	leaveUntil: number;
 };
 
 /**

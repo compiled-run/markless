@@ -134,12 +134,13 @@ Everything below is measured on this tip, not assumed.
    API was added for this.** A capability that let a scheduled callback reach the
    graph would let the fifteen lines collapse to three, and it is worth
    chartering.
-3. **A dispatching write has not reached the DOM by the next line.** `ArrowDown`
-   opens the dropdown and then focuses the first link inside it; the panel is
-   still `hidden` when the next statement runs, and nothing inside a hidden
-   subtree can take focus. Measured: the dropdown opened and focus stayed on the
-   button. The focus move therefore waits for the DOM rather than for the call,
-   in a DOM-only callback bounded at 20 tries over 200 ms rather than a spin.
+3. **A dispatching write reaches the DOM before the next line.** `ArrowDown`
+   opens the dropdown and then focuses the first link inside it in the same
+   handler, one call and no retry - the runtime commits the `hidden` write
+   before the handler's next statement runs, which is what menu's `focusEdge`
+   relies on too. An earlier build measured focus staying on the button and
+   polled the DOM for it; that poll is gone and both Down-arrow rows (CSR and
+   after resume) pass on the single call.
 4. **A destructuring default cannot be read from a template position.**
    `navbar.itemlink` is written `({ current, ... })` with the fallback at the read
    site, because `({ current = false })` plus `aria-current={current ? …}` is
@@ -515,9 +516,15 @@ and flipped green when the framework closed it.
 
 The pointer's leaving route closes from somewhere else, which is why it is a
 separate pair of rows: the runtime hands a crossing to the nearest part that
-declared a handler and stops, so it is `NavbarItem`'s `onPointerout` that closes —
-a different component from the one that stored the callback. The root's own
-`onPointerout` never sees a crossing that started inside an item.
+declared a handler and stops, so it is `NavbarItem`'s `onPointerout` that sees
+the pointer leave the landmark — a different component from the one that stored
+the callback. The root's own `onPointerout` never sees a crossing that started
+inside an item. Leaving does not close at once: the item writes a 150 ms
+deadline (Radix NavigationMenu's leave timer) and asks the browser to deliver a
+`pointerout` on the `<nav>` once it is up, the root's handler reads the deadline
+and closes, and any `pointerover` inside the landmark before then - on an item
+or on the root - clears both. The suite row counts `onChange` calls to tell a
+kept dropdown from one that closed and re-opened.
 
 The five dismissal rows are what the overlay adoption is proved by:
 
@@ -585,6 +592,3 @@ to wire at fan-in.
   has the error and the one-word fix.
 - **A navbar entry inside a flipping arm.** Point 9 above.
 - **A dev-mode diagnostic for an unnamed landmark.** Deviation 5.
-- **`Home`/`End` at the top level.** `spec.md` promises them and QDS's code
-  implements only the arrows; the authoring practices list them as optional. Not
-  implemented here either, and recorded rather than silently inherited.

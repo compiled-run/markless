@@ -2480,7 +2480,7 @@
 						"type": "boolean",
 						"required": false,
 						"default": "true",
-						"doc": "Dropdowns open when the pointer rests on an item. Omit it and they do."
+						"doc": "Dropdowns open when the pointer rests on an item, and close once the pointer\nhas been out of the landmark for a moment. Omit it and they do."
 					},
 					{
 						"name": "delay",
