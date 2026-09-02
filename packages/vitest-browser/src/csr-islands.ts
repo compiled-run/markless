@@ -15,6 +15,7 @@ import { protocolIslandSegment } from '../../serializer/src/protocol-constants.t
 // takes under @markless/web render(). Not on that package's entry, so reached by
 // path the same way.
 import { renderCanonicalClientOutput } from '../../web/src/render-canonical.ts';
+import { composeIslandRenderData } from './island-resume.ts';
 
 /**
  * A compiled `.tsrx` artifact mounted as one island of a composed client page.
@@ -60,6 +61,7 @@ export async function composeCsrIslands(
 
 	const children: MdxChild[] = [];
 	const liveHostNodes = new Map<string, ResumeDomElement>();
+	const islandRenderData: Array<Parameters<typeof composeIslandRenderData>[0][number]> = [];
 	for (const [componentIndex, component] of components.entries()) {
 		const segment = protocolIslandSegment(componentIndex);
 		const output = await renderCanonicalClientOutput(
@@ -72,6 +74,8 @@ export async function composeCsrIslands(
 			symbolPrefix: segment,
 			output: output as unknown as MdxChild['output'],
 		});
+		if (output.renderData)
+			islandRenderData.push({ prefix: segment, loadRenderData: output.renderData });
 		for (const [hostNodeId, element] of output.liveHostNodes ?? []) {
 			liveHostNodes.set(segment + hostNodeId, element);
 		}
@@ -99,6 +103,11 @@ export async function composeCsrIslands(
 			// resolves off the island that rendered it.
 			loadSymbol: ((symbolId: string) =>
 				loadMdxSymbol(symbolId, children, [])) as CsrRenderOutput['loadSymbol'],
+			// Only a page whose every island rendered off a canonical surface has one
+			// to compose; a component row minted on any other page keeps its refusal.
+			...(islandRenderData.length === components.length
+				? { renderData: composeIslandRenderData(islandRenderData) as CsrRenderOutput['renderData'] }
+				: {}),
 		},
 		state,
 		view,

@@ -6,9 +6,52 @@ import {
 // instance-path scoping behind a `m<n>:` prefix. Reached by path because
 // @markless/router is not a dependency of this test-only package, the same way
 // the router's own mdx-route module reaches into web/ and serializer/.
-import { loadMdxSymbol, type MdxSymbolLoader } from '../../router/src/vite/runtime/mdx-route.ts';
+import {
+	createMdxRenderDataSurface,
+	loadMdxSymbol,
+	type MdxRoutePart,
+	type MdxSymbolLoader,
+} from '../../router/src/vite/runtime/mdx-route.ts';
 
 export type { MdxSymbolLoader };
+
+type IslandRenderDataSurface = Parameters<typeof createMdxRenderDataSurface>[1][number]['surface'];
+
+/** One island's symbol loader plus its canonical render-data surface, both keyed by its `m<n>:` prefix. */
+export type IslandLoader = MdxSymbolLoader & {
+	readonly loadRenderData: () => IslandRenderDataSurface | Promise<IslandRenderDataSurface>;
+};
+
+/**
+ * The composed page's render-data surface: the page's parts are nothing but its
+ * islands in mount order, and each island's own surface hangs off an edge under
+ * its prefix — what `renderMdxRenderDataLoader` emits for a real MDX route.
+ * Lazy and fetched once, so a page that never mints a component row never
+ * loads a render-data chunk.
+ */
+export function composeIslandRenderData(
+	islands: ReadonlyArray<Pick<IslandLoader, 'prefix' | 'loadRenderData'>>,
+): NonNullable<ResumePayloadDocumentInput['renderData']> {
+	const parts: MdxRoutePart[] = islands.map((_, componentIndex) => ({
+		kind: 'component',
+		componentIndex,
+	}));
+	let surface: Promise<IslandRenderDataSurface> | undefined;
+	return () =>
+		(surface ??= Promise.all(islands.map((island) => island.loadRenderData())).then(
+			(surfaces) =>
+				createMdxRenderDataSurface(
+					parts,
+					surfaces.map((islandSurface, componentIndex) => ({
+						componentIndex,
+						hostPrefix: islands[componentIndex]!.prefix,
+						symbolPrefix: islands[componentIndex]!.prefix,
+						props: {},
+						surface: islandSurface,
+					})),
+				),
+		)) as never;
+}
 
 type MarklessRosterResumeHost = {
 	__marklessRosterResume?: () => Promise<typeof import('@markless/web/fns/roster-resume')>;
@@ -32,7 +75,7 @@ type IslandResumeInput = {
  * the merged payload, then the gesture that woke the page.
  */
 export function createIslandResumeContainerEvent(
-	loaders: ReadonlyArray<MdxSymbolLoader>,
+	loaders: ReadonlyArray<IslandLoader>,
 ): (input: IslandResumeInput) => Promise<void> {
 	// The composed page's resume half never loads an island's own source module,
 	// which is where the bundler installs this loader (emitRosterResumeLoaderInstall
@@ -44,6 +87,7 @@ export function createIslandResumeContainerEvent(
 	// plain JS it emits; the resume input wants the symbol shape it returns.
 	const loadSymbol = ((symbolId: string) =>
 		loadMdxSymbol(symbolId, [], loaders)) as ResumePayloadDocumentInput['loadSymbol'];
+	const renderData = composeIslandRenderData(loaders);
 	return async function resumeContainerEvent(input) {
 		// Matches emitComposedMdxRoute; per wake, not per evaluation, because the browser caches this module across mounts.
 		(globalThis as MarklessOverlayHost).__marklessOverlay ??= (root) =>
@@ -55,6 +99,7 @@ export function createIslandResumeContainerEvent(
 			document: input.root as never,
 			root: input.root as never,
 			loadSymbol,
+			renderData,
 		});
 		// `0` is the inline resumer's self-wake spelling; the runtime accepts it
 		// the same way the router's emitted resume entry passes it through.

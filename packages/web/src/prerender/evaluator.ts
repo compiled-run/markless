@@ -1103,8 +1103,12 @@ export function renderRepeatRowComponent(
 	// A refusal still answers as a rejection, so only a warm render skips the wait.
 	try {
 		if (!input.enclosingWidgetRoots?.size) return renderRowComponentEdge(input);
-		return marklessWithEnclosingWidgetRoots(rowSegmentOf(input), input.enclosingWidgetRoots, () =>
-			renderRowComponentEdge(input),
+		// The row's graph ids compose behind the owner's symbol prefix (an island
+		// segment, a composed child's edge), so the held segment carries it too.
+		return marklessWithEnclosingWidgetRoots(
+			marklessInstancePath((input.symbolPrefix ?? '') + rowSegmentOf(input)),
+			input.enclosingWidgetRoots,
+			() => renderRowComponentEdge(input),
 		);
 	} catch (error) {
 		return Promise.reject(error);
