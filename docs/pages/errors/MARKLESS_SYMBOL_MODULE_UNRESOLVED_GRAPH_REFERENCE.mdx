@@ -1,6 +1,6 @@
 # MARKLESS_SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE
 
-The emitted module for … is missing the declaration of "…"; This expression passes "…" around instead of calling it; This expression reads "…" in a shape the compiler cannot lower; This expression uses the row item "…" in a position the compiler cannot lower
+The emitted module for … is missing the declaration of "…"; The emitted module for … is missing the import of "…"; This expression passes "…" around instead of calling it; This expression reads "…" in a shape the compiler cannot lower; This expression uses the row item "…" in a position the compiler cannot lower
 
 - Package: compiler
 - Pass or phase: symbol-modules
@@ -14,6 +14,8 @@ The emitted … module for … still names "…" directly. … "…" is a state 
 
 The emitted … module for … still names "…" directly. … "…" is declared at module scope in this file, and the emitted module does not declare it, so this module would throw a ReferenceError the first time it runs in the browser. The server render would not: it evaluates the authored module, where the declaration is in scope.
 
+The emitted … module for … still names "…" directly. … "…" is imported at module scope in this file, and the emitted module does not import it, so this module would throw a ReferenceError the first time it runs in the browser. The server render would not: it evaluates the authored module, where the import is in scope.
+
 The emitted … module for … still names "…" directly. … "…" is the item of the enclosing @for row, which the repeat runtime supplies to the module rather than the module declaring it, so this module would throw a ReferenceError the first time it runs.
 
 ## Why
@@ -25,6 +27,8 @@ A handler is compiled into a module of its own and every read of state has to be
 A handler is compiled into a module of its own, and a call to a shared() method is compiled by copying that method's body in. Only a call has a body to copy: a method read as a value — passed to a function, stored in a local, or set as an object property — leaves the instance name standing with nothing behind it.
 
 Every symbol is compiled into a module that is fetched and evaluated on its own, so a module-scope declaration it still names has to be copied into it. That copy is the compiler's to make, and this check exists because a missing one is invisible otherwise: the server renders from the authored module and stays green, so the gap reaches the browser and crashes on the first re-render rather than failing the build.
+
+Every symbol is compiled into a module that is fetched and evaluated on its own, so an import its spliced text still names has to be re-declared in it. That carry is the compiler's to make, and this check exists because a missing one is invisible otherwise: the server renders from the authored module and stays green, so the gap reaches the browser and crashes on the first render rather than failing the build.
 
 ## Emitted from
 

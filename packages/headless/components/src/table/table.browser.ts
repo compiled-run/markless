@@ -357,17 +357,29 @@ test('CSR: a Shift walk picks the run of rows it started from', async () => {
 	await expect.poll(() => el(ReadmeItem).getAttribute('ui-selected')).toBe('');
 });
 
+// The select-all chord shares the one guard the arrows are lifted from, so its
+// default is cancelled on the first press too, before the handler module loads.
 test('CSR: Control+A picks every row and Escape lets go of them', async () => {
 	await render(PickedCells);
-	el(ReadmeName).focus();
+	const seen: boolean[] = [];
+	const log = (event: KeyboardEvent) => {
+		if (event.key === 'a') seen.push(event.defaultPrevented);
+	};
+	document.addEventListener('keydown', log);
+	try {
+		el(ReadmeName).focus();
 
-	await userEvent.keyboard('{Control>}a{/Control}');
-	await expect.poll(() => el(ReadmeItem).getAttribute('ui-selected')).toBe('');
-	await expect.poll(() => el(LicenseItem).getAttribute('ui-selected')).toBe('');
-	await expect.poll(() => el(ChangelogItem).getAttribute('ui-selected')).toBe('');
+		await userEvent.keyboard('{Control>}a{/Control}');
+		await expect.poll(() => el(ReadmeItem).getAttribute('ui-selected')).toBe('');
+		await expect.poll(() => el(LicenseItem).getAttribute('ui-selected')).toBe('');
+		await expect.poll(() => el(ChangelogItem).getAttribute('ui-selected')).toBe('');
+		expect(seen).toEqual([true]);
 
-	await userEvent.keyboard('{Escape}');
-	await expect.poll(() => el(ReadmeItem).hasAttribute('ui-selected')).toBe(false);
+		await userEvent.keyboard('{Escape}');
+		await expect.poll(() => el(ReadmeItem).hasAttribute('ui-selected')).toBe(false);
+	} finally {
+		document.removeEventListener('keydown', log);
+	}
 });
 
 test('CSR: a letter walks to the next row whose words start with it', async () => {

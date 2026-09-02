@@ -196,8 +196,7 @@ function TourCard({ children, onDismiss, onFocus, onKeydown, ...rest }: TourCard
 			onFocus?.(event);
 		}}
 		onKeydown={(event) => {
-			// Guarded by event fields alone, and only `===` chains extract: a guard over
-			// locals derived from graph state is MARKLESS_SYNC_POLICY_UNEXTRACTABLE.
+			// Guarded by event fields alone: a guard over locals derived from graph state is MARKLESS_SYNC_POLICY_UNEXTRACTABLE.
 			if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
 				event.preventDefault();
 			}

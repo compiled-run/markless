@@ -275,37 +275,35 @@ test('B914 folds module constant equality in sync event policy guards', async ()
 	expect(semanticGraph.diagnostics).toEqual([]);
 });
 
-test('compiler extracts the sync policy a composed handler declares first', async () => {
+// Only the first cancel statement becomes the policy; the second would wait for
+// the lazy symbol and never reach the event, so the handler is refused outright.
+test('a composed handler with a second cancel statement keeps the first policy and is refused', async () => {
 	const semanticGraph = await buildSemanticGraph({
 		filename: 'src/Menu.tsrx',
 		source: composedHandlerSyncPolicySource,
 	});
-	const stateLowering = lowerStateAccess({ semanticGraph });
-	const payload = planPayloadArena({ semanticGraph, stateLowering });
-
-	const syncPolicy = {
-		when: {
-			type: 'and',
-			conditions: [
-				{ type: 'graph-truthy', graphNodeId: 'state:menu', path: ['open'] },
-				{ type: 'event-equals', field: 'key', value: 'Escape' },
-			],
-		},
-		actions: ['preventDefault'],
-	};
+	const secondCancel = composedHandlerSyncPolicySource.indexOf('event.stopPropagation()');
 
 	expect(semanticGraph.events).toEqual([
 		expect.objectContaining({
 			eventName: 'keydown',
 			hasSyncPolicyCandidate: true,
-			syncPolicy,
+			syncPolicy: {
+				when: {
+					type: 'and',
+					conditions: [
+						{ type: 'graph-truthy', graphNodeId: 'state:menu', path: ['open'] },
+						{ type: 'event-equals', field: 'key', value: 'Escape' },
+					],
+				},
+				actions: ['preventDefault'],
+			},
 		}),
 	]);
-	expect(semanticGraph.diagnostics).toEqual([]);
-	expect(payload.view.events).toEqual([
+	expect(semanticGraph.diagnostics).toEqual([
 		expect.objectContaining({
-			eventName: 'keydown',
-			syncPolicy,
+			code: 'MARKLESS_SYNC_POLICY_SECOND_CANCEL',
+			primarySpan: expect.objectContaining({ start: secondCancel }),
 		}),
 	]);
 });

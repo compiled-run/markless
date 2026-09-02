@@ -378,6 +378,26 @@ for (const mode of MODES) {
 		expect(el('panel-file').hasAttribute('hidden')).toBe(false);
 	});
 
+	// The bar's surface reads ArrowRight from any depth as travel unless it landed on a nesting item, however deep.
+	test(`${mode}: ArrowRight on a nesting item two levels down opens its own level and travels nowhere`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+
+		await openBar('bar-file', 'panel-file');
+		el('level-recent').focus();
+		keyOn(el('level-recent'), 'ArrowRight');
+		await expectShowing('panel-recent');
+
+		el('level-archive').focus();
+		keyOn(el('level-archive'), 'ArrowRight');
+		await expectShowing('panel-archive');
+		await expectFocused('item-old');
+		await wait(QUIET_MS);
+		expect(el('panel-edit').hasAttribute('hidden')).toBe(true);
+		expect(el('panel-file').hasAttribute('hidden')).toBe(false);
+		expect(el('panel-recent').hasAttribute('hidden')).toBe(false);
+	});
+
 	test(`${mode}: an item's menu hangs under it where a nested one sits beside its command`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);

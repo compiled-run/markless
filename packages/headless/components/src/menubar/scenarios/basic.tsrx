@@ -25,6 +25,12 @@ export default function Basic() @{
 						<menu.itemcontent data-testid="panel-recent">
 							<menu.item value="draft" data-testid="item-draft">draft.md</menu.item>
 							<menu.item value="notes" data-testid="item-notes">notes.md</menu.item>
+							<menu.item value="archive" submenu data-testid="level-archive">
+								Archive
+								<menu.itemcontent data-testid="panel-archive">
+									<menu.item value="old" data-testid="item-old">old.md</menu.item>
+								</menu.itemcontent>
+							</menu.item>
 						</menu.itemcontent>
 					</menu.item>
 				</menubar.itemcontent>

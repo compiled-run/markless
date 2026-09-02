@@ -591,8 +591,7 @@ function ColorpickerAxis({ axis }: { readonly axis: 'x' | 'y' }) @{
 		ui-axis={own.axis}
 		ui-value={axisNow}
 		onKeydown={(event) => {
-			// Guarded by event fields alone, and only `===` chains extract: a guard
-			// over locals derived from graph state is MARKLESS_SYNC_POLICY_UNEXTRACTABLE.
+			// Guarded by event fields alone: a guard over locals derived from graph state is MARKLESS_SYNC_POLICY_UNEXTRACTABLE.
 			if (
 				event.key === 'ArrowUp' ||
 				event.key === 'ArrowDown' ||
