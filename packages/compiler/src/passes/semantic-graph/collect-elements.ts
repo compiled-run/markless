@@ -102,7 +102,7 @@ import type {
 const TEMPLATE_READ_OPTIONS: CompositeReadOptions = { methodCalls: true, unaryOperators: true };
 
 export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGraphWalk): void {
-	collectComponentEdge(node, state, walk);
+	const componentEdgeId = collectComponentEdge(node, state, walk);
 
 	const tagName = getElementTagName(node);
 	const previousHost = state.currentHostNodeId;
@@ -140,6 +140,9 @@ export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGr
 	}
 
 	const previousTextTarget = state.currentTextTarget;
+	const previousProjectionScope = state.currentProjectionScope;
+	if (componentEdgeId)
+		state.currentProjectionScope = { componentEdgeId, hostNodeId: previousHost };
 	for (const child of asNodes(node.children)) {
 		state.currentTextTarget =
 			isHostElement && isTemplateExpressionChild(child)
@@ -147,6 +150,7 @@ export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGr
 				: null;
 		walk(child, state);
 	}
+	state.currentProjectionScope = previousProjectionScope;
 	state.currentTextTarget = previousTextTarget;
 
 	state.currentHostNodeId = previousHost;
@@ -167,6 +171,11 @@ export function collectTemplateExpression(
 
 	const armScoped =
 		!!state.currentArmScope && state.currentArmScope.hostNodeId === state.currentHostNodeId;
+	// An arm re-renders its whole range, child edges included, so the arm wins.
+	const projected =
+		!armScoped &&
+		!!state.currentProjectionScope &&
+		state.currentProjectionScope.hostNodeId === state.currentHostNodeId;
 
 	state.graph.templateReads.push({
 		hostNodeId: state.currentHostNodeId,
@@ -175,6 +184,9 @@ export function collectTemplateExpression(
 		target: state.currentTextTarget ?? { kind: 'text' },
 		asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
 		...(armScoped ? { armScopeBranchSiteId: state.currentArmScope!.branchSiteId } : {}),
+		...(projected
+			? { projectedComponentEdgeId: state.currentProjectionScope!.componentEdgeId }
+			: {}),
 		computedGraphNodeId: composite?.graphNodeId,
 		componentName: state.currentComponentName ?? undefined,
 	});

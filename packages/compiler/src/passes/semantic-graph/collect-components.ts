@@ -102,14 +102,15 @@ export function collectComponentProps(component: AnyNode, state: WalkState): voi
 	});
 }
 
+/** Records the edge a component tag opens and returns its id; null for a host tag. */
 export function collectComponentEdge(
 	node: AnyNode,
 	state: WalkState,
 	walk: SemanticGraphWalk,
-): boolean {
+): string | null {
 	const tagName = getElementTagName(node);
-	if (!tagName || isHostTagName(tagName)) return false;
-	if (!state.currentComponentName) return false;
+	if (!tagName || isHostTagName(tagName)) return null;
+	if (!state.currentComponentName) return null;
 
 	// A member tag off a local object names that object's component directly.
 	const localTarget = state.memberTagTargets.get(tagName) ?? tagName;
@@ -153,8 +154,9 @@ export function collectComponentEdge(
 		childComponentName,
 		importSource: importSource.importSource,
 	});
+	const edgeId = `component-edge:${state.nextComponentEdgeId++}`;
 	state.graph.componentEdges.push({
-		id: `component-edge:${state.nextComponentEdgeId++}`,
+		id: edgeId,
 		parentComponentName: state.currentComponentName,
 		childComponentName,
 		...(state.currentAsyncBoundaryId ? { asyncBoundaryId: state.currentAsyncBoundaryId } : {}),
@@ -176,7 +178,7 @@ export function collectComponentEdge(
 		walk(expression, state);
 	}
 
-	return true;
+	return edgeId;
 }
 
 function componentPropBindings(

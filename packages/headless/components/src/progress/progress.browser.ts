@@ -261,14 +261,27 @@ test('SSR: a served amount outside the range reports the clamped value', async (
 	expectOutOfRangeRendered();
 });
 
-// Expected red: a component-body shared seed runs on the initial render only, so a
-// new `value` prop never re-seeds the instance. The `amount` probe proves the write
-// itself landed — the family just never hears about it.
-test.fails('CSR: the bar follows an amount the consumer changes from outside', async () => {
+// The `{amount}` inside the label's children used to be filed as a text write on the
+// enclosing <section>, so the first outside write replaced the whole scenario with
+// the text `70`; the parts must all survive the write.
+test('CSR: the bar follows an amount the consumer changes from outside', async () => {
 	await render(Live);
 	expect(el(Root).getAttribute('aria-valuetext')).toBe('30%');
 
 	el<HTMLButtonElement>(Advance).click();
 	await expect.poll(() => el(Amount).textContent).toBe('70');
 	await expect.poll(() => el(Root).getAttribute('aria-valuetext')).toBe('70%');
+	expect(el(Root).getAttribute('ui-value')).toBe('70');
+	expect(el(Indicator).getAttribute('style')).toBe('transform: translateX(-30%)');
+	expect(el(Label).textContent).toContain('Progress:');
+});
+
+// Expected red: a cell interpolated inside a part's children is rendered once by the
+// consumer and projected into the part; no record re-renders the projection when the
+// cell moves, so the label keeps the served text while the bar itself follows.
+test.fails('CSR: a cell interpolated inside the label follows the outside write', async () => {
+	await render(Live);
+	el<HTMLButtonElement>(Advance).click();
+	await expect.poll(() => el(Amount).textContent).toBe('70');
+	await expect.poll(() => el(Label).textContent).toBe('Progress: 70%');
 });

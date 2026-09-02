@@ -748,6 +748,9 @@ export type SemanticTemplateRead = {
 	// The branch site whose arm body holds this read directly, with no host of
 	// its own. Such a read drives the arm's range, never the enclosing element.
 	readonly armScopeBranchSiteId?: string;
+	// The component edge whose children hold this read directly. It is projected
+	// into that child, so this module owns no element for it to write.
+	readonly projectedComponentEdgeId?: string;
 	readonly computedGraphNodeId?: string;
 	// The component body this read was authored in, for the same reason the branch
 	// site carries one: `{w.label}` in two components is two reads of two different

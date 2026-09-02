@@ -181,6 +181,9 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 		// to the enclosing element it would erase the sibling arm's markers, so
 		// it drives the arm's range instead (branchContentReads below).
 		if (read.armScopeBranchSiteId) return [];
+		// A read projected into a child edge's children has no element here either:
+		// written to the enclosing host it replaces that host's whole content.
+		if (read.projectedComponentEdgeId) return [];
 		if (read.computedGraphNodeId) {
 			return [
 				{

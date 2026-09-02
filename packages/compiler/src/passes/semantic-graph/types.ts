@@ -122,6 +122,12 @@ export type WalkState = {
 	// host at arm entry: a read still seeing it has no host of its own inside
 	// the arm, so hosting it there would erase the sibling arm's markers.
 	currentArmScope: { readonly branchSiteId: string; readonly hostNodeId: string | null } | null;
+	// Set while walking a component edge's children; `hostNodeId` is the enclosing
+	// host at entry. A read still seeing it is projected into the child.
+	currentProjectionScope: {
+		readonly componentEdgeId: string;
+		readonly hostNodeId: string | null;
+	} | null;
 	currentTextTarget: SemanticTemplateBindingTarget | null;
 	currentAsyncBoundaryId: string | null;
 	// Arm index inside the current boundary: 0 = @try, 1 = @pending, 2 = @catch.
@@ -255,6 +261,7 @@ export function createWalkState(input: {
 		currentKeyedRepeatScopeIds: [],
 		currentHostNodeId: null,
 		currentArmScope: null,
+		currentProjectionScope: null,
 		currentTextTarget: null,
 		currentAsyncBoundaryId: null,
 		currentAsyncBoundaryArm: null,
