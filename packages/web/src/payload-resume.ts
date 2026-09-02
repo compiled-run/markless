@@ -1,6 +1,7 @@
 // Static edge: full-tier resume always constructs the browser resume runtime;
 // the demand map co-demands web/resume with web/payload-resume on every tier
 // that loads this module. The chunk groups keep resume core in its own chunk.
+import type { RuntimeGraph } from '@markless/runtime';
 import { createResumeRuntime, type ResumeRuntime } from './resume.ts';
 import { type ResumePayloadScriptsInput, type ResumePayloadScriptsResult } from './payload-full.ts';
 import type { decodePayloadScripts } from '../../serializer/src/protocol-client.ts';
@@ -92,6 +93,14 @@ export async function resumeFromPrerenderRecordsImpl(
 	);
 }
 
+// The inline resumer keeps dispatch for the page's life and reads its key policies
+// off this map, so once the runtime owns the cells it answers from the live graph.
+function liveSyncPolicyCells(graph: RuntimeGraph): Map<string, unknown> {
+	const cells = new Map<string, unknown>();
+	cells.get = (graphNodeId) => graph.read(graphNodeId, []);
+	return cells;
+}
+
 async function startPayloadResume(
 	input: ResumePayloadScriptsInput,
 	decode: typeof decodePayloadScripts,
@@ -114,7 +123,7 @@ async function startDecodedResume(
 		root: input.root,
 		loadSymbol,
 	});
-	delete input.root.__marklessEventOnlyGraph;
+	input.root.__marklessEventOnlyGraph = liveSyncPolicyCells(graph);
 	let runtime: ResumeRuntime | undefined;
 	const applyDomJournal =
 		input.applyDomJournal ??

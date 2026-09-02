@@ -111,4 +111,6 @@ export function disposeResumedPayload(root: ResumeContainerKey): void {
 	resumed?.runtime.dispose();
 	delete (root as ResumeContainerKey & { __asyncResumeRuntimeStarted?: boolean })
 		.__asyncResumeRuntimeStarted;
+	delete (root as ResumeContainerKey & { __marklessEventOnlyGraph?: unknown })
+		.__marklessEventOnlyGraph;
 }

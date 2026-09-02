@@ -896,12 +896,7 @@ test('CSR: the caret keys come back to the field as the list closes', async () =
 	expect(prevented(el(Input), 'Home')).toBe(false);
 });
 
-// PENDING CAPABILITY - a resumed page stops answering a cell to the key policy
-// once a handler has written it: the served value is read until the first write,
-// and nothing after. The guard is written as a negation so that unanswered read
-// cancels the key, which is what shipped; the keys stay the list's after resume
-// even once it has closed.
-test.fails('SSR: the caret keys come back to the field as the list closes after resume', async () => {
+test('SSR: the caret keys come back to the field as the list closes after resume', async () => {
 	await renderSSR(OpenList);
 	expect(prevented(el(Input), 'Home')).toBe(true);
 	el<HTMLElement>(Input).focus();
