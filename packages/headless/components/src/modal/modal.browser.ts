@@ -566,15 +566,8 @@ test('CSR: a disabled trigger does not open the dialog and a disabled close does
 	await expect.poll(() => el(OpenBackdrop).hasAttribute('hidden')).toBe(true);
 });
 
-// An open question, not a bug the family may answer on its own. `focusBackToOpener`
-// knows two openers - the trigger it saw pressed, and the reading the overlay
-// behaviour took - and a trigger the page turned off while the dialog was up is
-// neither: `.focus()` on it does nothing, the surface goes `hidden` under the
-// cursor, and the page is left on the body with no way back by keyboard. Where
-// focus SHOULD land has no answer in SPEC.md, and inventing one (the root? the
-// nearest still-focusable part? nothing at all?) is the owner's call, so this
-// records the symptom rather than picking.
-test.fails('CSR: closing leaves focus somewhere reachable when the trigger was turned off', async () => {
+// A trigger the page turned off while the dialog was up: closing still leaves focus somewhere reachable.
+test('CSR: closing leaves focus somewhere reachable when the trigger was turned off', async () => {
 	await render(SpentTrigger);
 	el(Trigger).click();
 	await expect.poll(() => el(Backdrop).hasAttribute('hidden')).toBe(false);
