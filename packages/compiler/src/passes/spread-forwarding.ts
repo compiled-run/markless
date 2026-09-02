@@ -1,5 +1,5 @@
 import type { ProtocolViewPayload } from '@markless/serializer';
-import { isEventAttribute, normalizeEventName } from 'yuku-tsrx';
+import { isEventAttribute, normalizeEventName } from '@tsrx/yuku';
 import type {
 	ModuleGraphInterfaceSpreadHost,
 	PlannedSymbol,

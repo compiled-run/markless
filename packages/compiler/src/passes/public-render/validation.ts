@@ -1,4 +1,4 @@
-import { analyze, isEventAttribute } from 'yuku-tsrx';
+import { analyze, isEventAttribute } from '@tsrx/yuku';
 import { asNodes, childNodes, getIdentifierName, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource } from '../../ast/source.ts';
 import {

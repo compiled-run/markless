@@ -1,12 +1,6 @@
 import { expect, test } from 'vitest';
 import { collectTsrxModuleDiagnostics, compileTsrxModule } from '../src/index.ts';
 
-// Defect 101: a plain `else` after an @if arm is not a parse error. TSRX reads
-// it as a JSXText sibling (" else ") plus a JSXExpressionContainer holding the
-// swallowed body, so the @if keeps a single arm and the page renders the word
-// "else" followed by the arm's own source as escaped text. The refusal is
-// anchored on the preceding sibling so ordinary prose stays clean.
-
 const ELSE_CODE = 'MARKLESS_BRANCH_ELSE_SPELLING';
 
 async function compile(source: string) {
@@ -118,14 +112,10 @@ test('a plain `else if` refuses with the branch-spelling code', async () => {
 	);
 });
 
-test('a stray @else with no @if stays a parse error', async () => {
+test('a stray @else with no @if follows the parser bare-at text rule', async () => {
 	const result = await compile(strayAtElse);
 
-	expect(collectTsrxModuleDiagnostics(result)).toEqual(
-		expect.arrayContaining([
-			expect.objectContaining({ code: 'MARKLESS_PARSE_ERROR', severity: 'error' }),
-		]),
-	);
+	expect(collectTsrxModuleDiagnostics(result)).toEqual([]);
 });
 
 test('the @else spelling still compiles clean', async () => {

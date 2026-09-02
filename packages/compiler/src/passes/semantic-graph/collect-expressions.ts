@@ -12,7 +12,7 @@ import {
 } from './diagnostics.ts';
 import { repeatRowBindsName } from './collect-repeat.ts';
 import { getFrameworkApiForCall } from './imports.ts';
-import type { SemanticView } from 'yuku-tsrx';
+import type { SemanticView } from '@tsrx/yuku';
 import type { DeferredComputedWrite, WalkState } from './types.ts';
 
 export function collectAssignment(node: AnyNode, state: WalkState): void {

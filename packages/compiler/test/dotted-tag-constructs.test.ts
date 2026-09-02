@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { buildSemanticGraph } from '../src/passes/semantic-graph/index.ts';
 
-// Pins the yuku-tsrx parse boundary: a member-expression tag (<family.part>)
+// Pins the @tsrx/yuku parse boundary: a member-expression tag (<family.part>)
 // holds a construct in its children exactly as the identifier spelling does,
 // and the construct lands in the component-projection chunk either way.
 

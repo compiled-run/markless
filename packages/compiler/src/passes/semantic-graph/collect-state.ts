@@ -46,7 +46,7 @@ import {
 	unstableStateCreationSiteDiagnostic,
 } from './diagnostics.ts';
 import { ownedModuleAst } from './shared-ast.ts';
-import type { SemanticView } from 'yuku-tsrx';
+import type { SemanticView } from '@tsrx/yuku';
 import type { WalkState } from './types.ts';
 import { collectSharedInstance, resolveSharedCall } from './collect-shared.ts';
 

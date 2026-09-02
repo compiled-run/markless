@@ -8,7 +8,7 @@
  * parses clean as two comparisons, so it is pinned by its stripped text instead.
  */
 import { expect, test } from 'vitest';
-import { parse } from 'yuku-tsrx';
+import { parse } from '@tsrx/yuku';
 import { compileTsrxModule } from '../../src/index.ts';
 
 type Compiled = Awaited<ReturnType<typeof compileTsrxModule>>;

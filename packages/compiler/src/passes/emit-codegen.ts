@@ -31,12 +31,12 @@
  */
 import { generate, type GenerateOptions, type SourceMap } from 'yuku-codegen';
 import type { CompilerDiagnostic } from '../diagnostics.ts';
-import type { Program } from 'yuku-tsrx';
+import type { Program } from '@tsrx/yuku';
 import { parseModule, type MarklessCompileError } from '../js-ast.ts';
 
 /**
  * `yuku-codegen` types its input against `@yuku-toolchain/types`, which models
- * the same ESTree shapes as `yuku-tsrx` but is a separate declaration. The two
+ * the same ESTree shapes as `@tsrx/yuku` but is a separate declaration. The two
  * `Program` interfaces are structurally distinct (`hashbang`, and the body
  * element union), so the compiler's tree needs one cast to cross the boundary.
  * It is taken here, once, rather than at every print site.

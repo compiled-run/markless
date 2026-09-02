@@ -1,4 +1,4 @@
-import { isEventAttribute, normalizeEventName } from 'yuku-tsrx';
+import { isEventAttribute, normalizeEventName } from '@tsrx/yuku';
 import { asNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource } from '../../ast/source.ts';
 import {

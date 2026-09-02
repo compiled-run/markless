@@ -96,7 +96,7 @@ const clientBuild = resolve(clientPublic, MARKLESS_BUILD_PREFIX);
 // carries a seed per property, which its id cannot tell apart). Repayment owed by bundler-diet.
 // 65,441 -> 65,444 (re-anchor 2026-08-22, main merge at 8f9db739): +3 measured on the merge
 // commit itself, before the T075h seed-phase change (which added 0 on top). The merge brought
-// main's yuku-tsrx 0.1.2 adapter dissolution into the compiler; emission-side churn of that
+// main's @tsrx/yuku adapter dissolution into the compiler; emission-side churn of that
 // size is codegen noise, not a new payload class. De-minimis interim per the proportionality
 // order; repayment stays with bundler-diet.
 // 65,444 -> 65,452 (re-anchor 2026-08-22, U112/U116 merge window): +8 across two candidate

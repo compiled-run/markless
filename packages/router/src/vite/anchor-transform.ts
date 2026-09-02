@@ -1,4 +1,4 @@
-import { parseModule } from 'yuku-tsrx';
+import { parseModule } from '@tsrx/yuku';
 import type { RouteManifestRoute } from '../route-manifest.ts';
 import { buildRouteManifestFromFileIds } from '../route-manifest.ts';
 import type { Plugin } from 'vite';

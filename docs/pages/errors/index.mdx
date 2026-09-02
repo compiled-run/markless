@@ -94,7 +94,7 @@ Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not ed
 | `MARKLESS_MODULE_INSTANCE_DIVERGENT_HANDLERS` | compiler | symbol-modules | This module-scope instance would become one instance per handler | Module-scope instance "…" is carried into … handler modules (…). Each of those modules runs its own constructor, so they hold … separate instances and anything one of them records is invisible to the others. |
 | `MARKLESS_OVERLAY_HOST_ELEMENT_REQUIRED` | compiler | semantic-graph | overlay can only be marked on host elements | Cannot mark overlay on component …. overlay elevates one concrete host element above the rest of the UI and needs a host element owner. |
 | `MARKLESS_OVERLAY_VALUE_UNSUPPORTED` | compiler | semantic-graph | overlay accepts only a literal | …. overlay must be written on the element itself as bare `overlay`, `overlay={true}`, or `overlay={false}`. |
-| `MARKLESS_PARSE_ERROR` | compiler | compile-module, parse, semantic-graph | TSRX parser rejected this source | yuku-tsrx reported: … |
+| `MARKLESS_PARSE_ERROR` | compiler | compile-module, parse, semantic-graph | TSRX parser rejected this source | @tsrx/yuku reported: … |
 | `MARKLESS_PAYLOAD_INVALID` | serializer, web | event-only-lean, fns, payload, payload-document-common, protocol-client, protocol-validation | Invalid Markless payload; Invalid resumability payload | Missing … payload script content. (+1 more) |
 | `MARKLESS_PRERENDER_BOUNDARY_MISSING` | web | prerender | TODO: no builder title | TODO: no builder message |
 | `MARKLESS_PRERENDER_BRANCH_MISSING` | web | prerender | TODO: no builder title | TODO: no builder message |

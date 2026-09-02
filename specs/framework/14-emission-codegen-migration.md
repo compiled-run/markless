@@ -35,7 +35,7 @@ Emission cannot reuse the semantic information the analyzer already computes; it
 re-derives capture and reference facts from text.
 
 The owner directive authorizing this campaign, and its spec-first sequencing, is
-recorded in the progress ledger under goal `yuku-tsrx-analyzer-migration`
+recorded in the progress ledger under the parser-and-analyzer migration goal
 (entry dated 2026-08-20, read via the state CLI). That directive also separates
 this campaign from the analyzer migration's merge condition: the analyzer work
 is judged on net production line count, this campaign is not.
@@ -48,10 +48,10 @@ output was recorded. The audit ran in a session scratchpad —
 ephemeral. Probe scripts and their `OUTPUT-*.txt` transcripts should be re-run
 and re-recorded by the first unit of any stage that depends on them.
 
-Probes were run against `yuku-codegen@0.9.0`, `yuku-analyzer@0.9.0`, and
-`yuku-tsrx@0.1.1` — the same analyzer and TSRX versions `packages/compiler`
-already depends on. `yuku-codegen` is not yet a dependency of any package in
-this repository.
+Probes were run against `yuku-codegen@0.9.0`, `yuku-analyzer@0.9.0`, and the
+pre-rename TSRX host at version 0.1.1 — the same analyzer and TSRX versions
+`packages/compiler` already depends on. `yuku-codegen` is not yet a dependency
+of any package in this repository.
 
 Recorded probes, and what each one licenses:
 

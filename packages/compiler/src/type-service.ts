@@ -1,4 +1,4 @@
-import type { Program } from 'yuku-tsrx';
+import type { Program } from '@tsrx/yuku';
 import {
 	parseModule,
 	type MarklessCompileError,

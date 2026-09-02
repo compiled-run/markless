@@ -1,6 +1,6 @@
 import type { AnyNode } from '../../ast/nodes.ts';
 import type { SourceSpan } from '../../diagnostics.ts';
-import { analyze, type SemanticView } from 'yuku-tsrx';
+import { analyze, type SemanticView } from '@tsrx/yuku';
 import type {
 	SemanticComponent,
 	SemanticComponentPropDeclaration,

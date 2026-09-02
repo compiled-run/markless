@@ -1,4 +1,4 @@
-import { isEventAttribute, normalizeEventName } from 'yuku-tsrx';
+import { isEventAttribute, normalizeEventName } from '@tsrx/yuku';
 import { ownedModuleAst } from './shared-ast.ts';
 import { asNodes, getIdentifierName, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';

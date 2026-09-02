@@ -187,7 +187,7 @@ export default function Home() @{
 }
 `;
 
-test('compileTsrxModule wraps yuku-tsrx parse SyntaxErrors as structured diagnostics', async () => {
+test('compileTsrxModule wraps @tsrx/yuku parse SyntaxErrors as structured diagnostics', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/DynamicTagCall.tsrx',
 		source: `
@@ -217,7 +217,7 @@ export function App() @{
 		'TSRX dynamic tag expression must resolve to an element name',
 	);
 	expect(result.semanticGraph.diagnostics[0]?.why).toContain(
-		'yuku-tsrx parser failed at phase parse',
+		'@tsrx/yuku parser failed at phase parse',
 	);
 	expect(result.semanticGraph.diagnostics[0]?.suggestions[0]?.message).toContain(
 		'https://tsrx.dev/specification',

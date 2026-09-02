@@ -1,4 +1,4 @@
-import { isEventAttribute } from 'yuku-tsrx';
+import { isEventAttribute } from '@tsrx/yuku';
 import { asNodes, getIdentifierName, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, expressionSourceOrFallback, sourceSpan } from '../../ast/source.ts';
 import type { SemanticComponentEdge, SemanticComponentPropBinding } from '../../artifacts.ts';

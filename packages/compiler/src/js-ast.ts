@@ -8,7 +8,7 @@ import {
 	type Diagnostic,
 	type ParseModuleOptions,
 	type Program,
-} from 'yuku-tsrx';
+} from '@tsrx/yuku';
 
 export type MarklessSourcePosition = {
 	readonly line: number;
@@ -225,7 +225,7 @@ function blankMarklessAllowDirective(node: BaseNode): void {
  * Markless reports parse failures as `SyntaxError`s carrying the offsets, the
  * `loc`, and the filename a caller needs to place the failure, plus a `type`
  * separating a module that cannot be compiled at all (`fatal`) from one whose
- * authoring mistake is recoverable (`usage`). The spans come from yuku-tsrx as
+ * authoring mistake is recoverable (`usage`). The spans come from @tsrx/yuku as
  * given: `parseModule` there already re-anchors the malformed-markup shapes
  * onto the markup the author wrote.
  */

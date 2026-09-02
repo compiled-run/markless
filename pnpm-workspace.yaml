@@ -5,7 +5,7 @@ packages:
   - apps/*
   - demos/*
   - docs
-  # yuku-tsrx is consumed through the generated self-contained local host.
+  # @tsrx/yuku is consumed through its generated self-contained host.
 
 catalogs:
   default:

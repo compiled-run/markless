@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { analyze, isEventAttribute, normalizeEventName } from 'yuku-tsrx';
+import { analyze, isEventAttribute, normalizeEventName } from '@tsrx/yuku';
 import {
 	parseModule,
 	type MarklessCompileError,
@@ -27,7 +27,7 @@ function findNode(root: unknown, type: string): AstNode {
 	return found;
 }
 
-test('reshapes yuku-tsrx recovery channels into Markless-owned error and comment shapes', () => {
+test('reshapes @tsrx/yuku recovery channels into Markless-owned error and comment shapes', () => {
 	const source = '/* lead */ const = ;';
 	const errors: MarklessCompileError[] = [];
 	const comments: MarklessParserComment[] = [];
@@ -57,7 +57,7 @@ test('reshapes yuku-tsrx recovery channels into Markless-owned error and comment
 	expect(() => parseModule(source, 'broken.tsrx')).toThrow(SyntaxError);
 });
 
-test('reports parser diagnostics on the authored tokens yuku-tsrx anchors them to', () => {
+test('reports parser diagnostics on the authored tokens @tsrx/yuku anchors them to', () => {
 	const cases = [
 		{
 			source: 'export function Controls() @{ <button>Save</button>> }',
@@ -98,7 +98,7 @@ test('classifies recoverable duplicate bindings as usage diagnostics', () => {
 	]);
 });
 
-test('uses yuku-tsrx parser-owned loose recovery and event naming', () => {
+test('uses @tsrx/yuku parser-owned loose recovery and event naming', () => {
 	const comments: MarklessParserComment[] = [];
 	const program = parseModule(
 		'export function App() @{ <div>{/* kept */}<span>text</div> }',
