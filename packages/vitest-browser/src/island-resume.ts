@@ -14,6 +14,10 @@ type MarklessRosterResumeHost = {
 	__marklessRosterResume?: () => Promise<typeof import('@markless/web/fns/roster-resume')>;
 };
 
+type MarklessOverlayHost = {
+	__marklessOverlay?: (root: Element) => Promise<(() => void) | undefined> | undefined;
+};
+
 type IslandResumeInput = {
 	readonly root: Element & { __asyncResumeRuntimeStarted?: boolean };
 	readonly event: Event | 0;
@@ -41,6 +45,11 @@ export function createIslandResumeContainerEvent(
 	const loadSymbol = ((symbolId: string) =>
 		loadMdxSymbol(symbolId, [], loaders)) as ResumePayloadDocumentInput['loadSymbol'];
 	return async function resumeContainerEvent(input) {
+		// Matches emitComposedMdxRoute; per wake, not per evaluation, because the browser caches this module across mounts.
+		(globalThis as MarklessOverlayHost).__marklessOverlay ??= (root) =>
+			root.querySelector('[overlay]')
+				? import('@markless/web/fns/overlay').then((m) => m.installOverlayBehavior(root))
+				: undefined;
 		input.root.__asyncResumeRuntimeStarted = true;
 		const { runtime } = await resumeFromPayloadDocument({
 			document: input.root as never,

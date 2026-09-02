@@ -75,6 +75,34 @@ This page is static markdown.
 		expect(code).toContain('<h1>Body</h1>');
 	});
 
+	// A composed page reaches an island's own module only lazily, through the
+	// `?markless-symbols` loader on the first dispatch that needs a symbol - after
+	// the runtime start has already asked once whether an overlay loader exists.
+	// The route module itself has to name the behaviour, or a served docs page
+	// never installs the stack and an outside press closes nothing.
+	it('composed routes install the overlay loader before any island resumes', async () => {
+		const code = await transformMdxRoute(
+			`import Share from '../../components/Share.tsrx';
+
+# Body
+
+<Share />
+`,
+			'/project/pages/docs/popover.mdx',
+		);
+
+		expect(code).toContain('globalThis.__marklessOverlay ??=');
+		expect(code).toContain(`import('@markless/web/fns/overlay')`);
+		expect(code.indexOf('globalThis.__marklessOverlay ??=')).toBeLessThan(
+			code.indexOf('export async function resumeContainerEvent'),
+		);
+	});
+
+	it('static markdown routes name no overlay loader', async () => {
+		const code = await transformMdxRoute('# Docs\n', '/project/pages/docs.mdx');
+		expect(code).not.toContain('__marklessOverlay');
+	});
+
 	it('links MDX child render data through the materialized route context', async () => {
 		const code = await transformMdxRoute(
 			`import InteractiveCounter from '../../components/InteractiveCounter.tsrx';

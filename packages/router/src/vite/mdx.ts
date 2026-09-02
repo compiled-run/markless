@@ -107,6 +107,9 @@ function emitComposedMdxRoute(route: MdxRoute, id: string): string {
 		`const marklessMdxRenderData = ${renderMdxRenderDataLoader(route.components, id)};`,
 		`const marklessMdxStorageSeeds = ${renderStorageSeeds(route.components)};`,
 		'',
+		// An island's own module names the overlay behaviour, but a composed page reaches it only lazily, after the runtime start has already asked once for the loader; still fetched only for a root carrying a mark.
+		"globalThis.__marklessOverlay ??= (root) => root.querySelector('[overlay]') ? import('@markless/web/fns/overlay').then((m) => m.installOverlayBehavior(root)) : undefined;",
+		'',
 		'const marklessMdxPage = {',
 		'  renderData: marklessMdxRenderData,',
 		'  storageSeeds: marklessMdxStorageSeeds,',
