@@ -62,7 +62,7 @@ declare namespace __MarklessTypeService {
 	 * the plugin's own declared dependencies, which the runtime is not. The two
 	 * spellings change together.
 	 */
-	type OverlayDismissReason = 'escape' | 'outside-press';
+	type OverlayDismissReason = 'escape' | 'outside-press' | 'superseded';
 
 	type OverlayDismissDetail = {
 		readonly reason: OverlayDismissReason;
