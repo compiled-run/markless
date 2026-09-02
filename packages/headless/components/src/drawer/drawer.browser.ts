@@ -406,6 +406,9 @@ function expectBasicRendered() {
 	expectBackgroundReachable(el(Background));
 	expect(el(Root).getAttribute('ui-closed')).toBe('');
 	expect(el(Root).getAttribute('ui-orientation')).toBe('vertical');
+	expect(el(Trigger).getAttribute('aria-expanded')).toBe('false');
+	expect(el(Trigger).getAttribute('aria-controls')).toBe(content.id);
+	expect(content.id).toBeTruthy();
 	// The root destructured `open`, so it never reaches the element as an attribute.
 	expect(el(Root).hasAttribute('open')).toBe(false);
 	expect(el(Root).hasAttribute('snapPoints')).toBe(false);

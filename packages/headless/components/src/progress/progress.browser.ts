@@ -230,14 +230,35 @@ test('CSR: a bar that learns its amount reports it, and drops it again', async (
 // A bar cannot be more than full or less than empty. Unclamped, an amount past the top
 // writes `translateX(--50%)` - not a CSS value at all, so the whole transform is thrown
 // away and the overshooting bar draws as if it were empty.
-test('CSR: an amount outside the range still draws a bar between empty and full', async () => {
-	await render(OutOfRange);
+function expectOutOfRangeRendered() {
 	expect(el(page.getByTestId('over-indicator')).getAttribute('style')).toBe(
 		'transform: translateX(-0%)',
 	);
 	expect(el(page.getByTestId('under-indicator')).getAttribute('style')).toBe(
 		'transform: translateX(-100%)',
 	);
+	// ARIA: aria-valuenow sits inside min..max, so what the bar reports is clamped
+	// like what it draws; the consumer's own number still reaches the data surface.
+	const over = el(page.getByTestId('over-root'));
+	expect(over.getAttribute('aria-valuenow')).toBe('100');
+	expect(over.getAttribute('aria-valuetext')).toBe('100%');
+	expect(over.getAttribute('ui-progress')).toBe('complete');
+	expect(over.getAttribute('ui-value')).toBe('150');
+	const under = el(page.getByTestId('under-root'));
+	expect(under.getAttribute('aria-valuenow')).toBe('0');
+	expect(under.getAttribute('aria-valuetext')).toBe('0%');
+	expect(under.getAttribute('ui-progress')).toBe('loading');
+	expect(under.getAttribute('ui-value')).toBe('-20');
+}
+
+test('CSR: an amount outside the range still draws a bar between empty and full', async () => {
+	await render(OutOfRange);
+	expectOutOfRangeRendered();
+});
+
+test('SSR: a served amount outside the range reports the clamped value', async () => {
+	await renderSSR(OutOfRange);
+	expectOutOfRangeRendered();
 });
 
 // Expected red: a component-body shared seed runs on the initial render only, so a

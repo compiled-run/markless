@@ -317,6 +317,8 @@ export function DrawerTrigger({ children, onClick, ...rest }: DrawerTriggerProps
 		el={drawer.triggerEl}
 		type="button"
 		aria-haspopup="dialog"
+		aria-expanded={drawer.open ? 'true' : 'false'}
+		aria-controls={drawer.contentEl}
 		ui-open={drawer.open}
 		ui-closed={drawer.open !== true}
 		onClick={(event) => {

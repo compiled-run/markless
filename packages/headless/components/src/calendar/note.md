@@ -23,7 +23,9 @@ no role by those names anywhere.
 
 `calendar.content` is the one surface in both shapes. Inline it renders in place;
 with `popup` on the root it is what `calendar.trigger` reveals, and the markup
-inside it is identical either way. It is `role="group"`, named by
+inside it is identical either way. Inline it is `role="group"`; as a popup it is
+the `role="dialog"` the trigger's `aria-haspopup="dialog"` promises (React Aria
+DatePicker renders its popover as a Dialog). Either way it is named by
 `aria-labelledby` pointing at `calendar.title`, and it owns the whole keyboard
 model — including the one `onFocusin` that keeps the tab stop on whichever day a
 person reached. That handler is on the content and not on the 42 days on purpose:

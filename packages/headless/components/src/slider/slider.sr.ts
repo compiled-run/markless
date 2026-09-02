@@ -211,14 +211,11 @@ test('moving the lower thumb of a range conveys the new value on that thumb alon
 	await expectAnnouncesAfterChange([say.slider, say.value(21)]);
 });
 
-// The axis is a visual arrangement the family never states in ARIA, so a reader speaks its own default for both.
-test('the axis a slider runs along is not announced', async () => {
+// The thumb states its axis, so a reader tells a person which arrow keys move it.
+test('a vertical slider conveys the axis it runs along', async () => {
 	await open(Vertical);
 	const spoken = await readFor([say.slider, 'Height']);
-	expectConveys(spoken, [say.slider, 'Height']);
-	expect(missing(spoken, [say.along('vertical')]), `${sr.name} announced "${spoken}"`).toEqual([
-		say.along('vertical'),
-	]);
+	expectConveys(spoken, [say.slider, 'Height', say.along('vertical')]);
 });
 
 test('a slider nobody may move conveys that it is disabled', async () => {

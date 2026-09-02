@@ -2871,7 +2871,7 @@
 			{
 				"part": "itemlink",
 				"component": "PaginationItemLink",
-				"doc": "The same control as `itemtrigger` over an `<a>`, for pagination that is real\nnavigation with real URLs. An anchor has no `disabled` attribute, so an\nunavailable link reports `aria-disabled` and stays in the tab order.",
+				"doc": "The same control as `itemtrigger` over an `<a>`, for pagination that is real\nnavigation with real URLs. An anchor has no `disabled` attribute, so an\nunavailable link reports `aria-disabled` and stays in the tab order; it keeps\nits `href` for crawlers, but a press on it goes nowhere.",
 				"props": []
 			},
 			{
@@ -2883,7 +2883,7 @@
 			{
 				"part": "root",
 				"component": "PaginationRoot",
-				"doc": "The `<nav>` landmark that holds the page controls. It is a landmark, so it\ncarries a name: `aria-label=\"Pagination\"` by default, and a consumer's own\n`aria-label` replaces it - a page with a site nav, a breadcrumb and a\npagination has three navigation landmarks, and a reader lists them by name.",
+				"doc": "The `<nav>` landmark that holds the page controls. It is a landmark, so give\nit a name with `aria-label` - a page with a site nav, a breadcrumb and a\npagination has three navigation landmarks, and a reader lists them by name.\nThe family writes no default: a default the consumer could still replace is\nnot expressible today, and one they could not would leave two paginations on\none page indistinguishable.",
 				"props": [
 					{
 						"name": "count",
@@ -3085,13 +3085,13 @@
 			{
 				"part": "description",
 				"component": "RadioGroupDescription",
-				"doc": "Supporting text for the group. It renders its children and changes nothing else.",
+				"doc": "Supporting text for the group, wired into the group's `aria-describedby`.",
 				"props": []
 			},
 			{
 				"part": "error",
 				"component": "RadioGroupError",
-				"doc": "The group's validation message. Mounting it is what marks the group invalid\nfor as long as it is in the page, so render it only when there is an error to\nshow.",
+				"doc": "The group's validation message. Mounting it is what marks the group\n`aria-invalid` for as long as it is in the page, so render it only when there\nis an error to show; it is described first, ahead of the description.",
 				"props": []
 			},
 			{
@@ -3147,7 +3147,7 @@
 			{
 				"part": "root",
 				"component": "RadioGroupRoot",
-				"doc": "The group: a `role=\"radiogroup\"` element named by `radiogroup.label` through\n`aria-labelledby`.",
+				"doc": "The group: a `role=\"radiogroup\"` element named by `radiogroup.label` through\n`aria-labelledby`. It reports `aria-orientation`, `aria-required` when a\nchoice is needed, and `aria-invalid` plus `aria-describedby` from the error\nand description parts.",
 				"props": [
 					{
 						"name": "value",
@@ -3563,7 +3563,7 @@
 			{
 				"part": "root",
 				"component": "SliderRoot",
-				"doc": "The slider itself; the label, track and thumbs go inside it. It holds the\nrange and the current value, and the shape of `value` is what decides the\nslider: one number for one thumb, a pair for two. The family owns this\nelement's `style` attribute to carry the filled portion, so style the root\nfrom a stylesheet rather than a `style` prop.",
+				"doc": "The slider itself; the label, track and thumbs go inside it. It holds the\nrange and the current value, and the shape of `value` is what decides the\nslider: one number for one thumb, a pair for two thumbs wrapped in a\n`role=\"group\"` named by `slider.label`. The family owns this element's\n`style` attribute to carry the filled portion, so style the root from a\nstylesheet rather than a `style` prop.",
 				"props": [
 					{
 						"name": "value",
@@ -4227,7 +4227,7 @@
 			{
 				"part": "item",
 				"component": "ToasterItem",
-				"doc": "One message's row. Everything it shows comes from the `toast` record it is\ngiven. It reports `ui-tone` and `ui-front`, and the family owns its `style`\nattribute to carry the stacking, so style it from a stylesheet rather than a\n`style` prop.",
+				"doc": "One message's row. Everything it shows comes from the `toast` record it is\ngiven. It is `role=\"status\"`, or `role=\"alert\"` for the `error` tone so a\nreader interrupts for it. It reports `ui-tone` and `ui-front`, and the family\nowns its `style` attribute to carry the stacking, so style it from a\nstylesheet rather than a `style` prop.",
 				"props": [
 					{
 						"name": "toast",
@@ -4240,7 +4240,7 @@
 			{
 				"part": "itemclose",
 				"component": "ToasterItemClose",
-				"doc": "The button that dismisses the message it sits in. It takes no id: the item\naround it holds one, the same way `select.itemindicator` reads its option.",
+				"doc": "The button that dismisses the message it sits in. It takes no id: the item\naround it holds one, the same way `select.itemindicator` reads its option.\nLeave it empty and it renders hidden \"Close\" text as its name; give it a\nvisible mark such as \"×\" and add an `aria-label`, or a reader says \"times\".",
 				"props": []
 			},
 			{

@@ -69,7 +69,7 @@ export const paginationItemState = shared(
 	{ scope: 'widget' },
 );
 
-// The landmark's name is written before the spread and its state attributes after, so a consumer can rename it but cannot overwrite the state.
+// No default landmark name: a declared aria-label would drop the consumer's own from the spread, and two paginations on a page must stay told apart.
 export function PaginationRoot({
 	count,
 	page = 1,
@@ -123,13 +123,14 @@ export function PaginationItemLink({ children, onClick, ...rest }: PaginationIte
 	const pagination = paginationState();
 	const item = paginationItemState();
 
-	// An anchor has no `disabled`, so it stays focusable and says so with aria-disabled; goTo() is what refuses to move.
+	// An anchor has no `disabled`, so it stays focusable and says so with aria-disabled; goTo() is what refuses to move, and the href it keeps for crawlers is not followed.
 	<a
 		{...rest}
 		aria-current={pagination.page === item.value ? 'page' : false}
 		aria-disabled={pagination.disabled ? 'true' : false}
 		ui-active={pagination.page === item.value}
 		onClick={(event) => {
+			if (pagination.disabled) event.preventDefault();
 			pagination.goTo(item.value);
 			onClick?.(event);
 		}}

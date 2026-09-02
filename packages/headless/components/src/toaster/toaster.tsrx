@@ -1,4 +1,5 @@
 import { computed, element, shared, state } from '@markless/core';
+import VisuallyHidden from '../base/visually-hidden.tsrx';
 import {
 	DEFAULT_DURATION,
 	TICK,
@@ -161,8 +162,19 @@ export function ToasterItem({ toast, children, ...rest }: ToasterItemProps) @{
 	// One computed() cell per rendered fact - an expression written inline in an attribute renders once and then goes stale.
 	const isFront = computed(() => positionOf(toaster.queue, item.id) === 0);
 	const stacking = computed(() => stackingStyle(positionOf(toaster.queue, item.id)));
+	// Each row is its own live region inside the polite one: an error is the tone a reader interrupts for (APG Alert), every other tone waits its turn.
+	const rowRole = computed(() => (item.tone === 'error' ? 'alert' : 'status'));
+	const rowLive = computed(() => (item.tone === 'error' ? 'assertive' : 'polite'));
 
-	<div {...rest} ui-toast="" ui-tone={item.tone} ui-front={isFront} style={stacking}>{children}</div>
+	<div
+		{...rest}
+		role={rowRole}
+		aria-live={rowLive}
+		ui-toast=""
+		ui-tone={item.tone}
+		ui-front={isFront}
+		style={stacking}
+	>{children}</div>
 }
 
 export function ToasterItemTitle({ children, ...rest }: ToasterItemTitleProps) @{
@@ -205,6 +217,7 @@ export function ToasterItemClose({ children, onClick, ...rest }: ToasterItemClos
 	const toaster = toasterState();
 	const item = toasterItemState();
 
+	// Hidden text, not a default aria-label: a declared aria-label would drop the consumer's own from the spread.
 	<button
 		{...rest}
 		type="button"
@@ -213,5 +226,11 @@ export function ToasterItemClose({ children, onClick, ...rest }: ToasterItemClos
 			toaster.dismiss(item.id);
 			onClick?.(event);
 		}}
-	>{children}</button>
+	>
+		@if (children) {
+			<>{children}</>
+		} @else {
+			<VisuallyHidden>Close</VisuallyHidden>
+		}
+	</button>
 }

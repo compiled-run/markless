@@ -185,7 +185,8 @@ for (const mode of MODES) {
 		if (mode === 'CSR') await render(Faq);
 		else await renderSSR(Faq);
 
-		await userEvent.click(el(RulesTrigger));
+		// Forced: the header says aria-disabled, which the driver would otherwise wait out.
+		await userEvent.click(el(RulesTrigger), { force: true });
 		// Nothing changed is not something a poll can wait for: give the dispatch
 		// the room a real activation gets, then read the section once.
 		await new Promise((resolve) => setTimeout(resolve, 150));
@@ -194,6 +195,21 @@ for (const mode of MODES) {
 		await userEvent.click(el(PermitTrigger));
 		await expect.poll(openValues).toBe('permit');
 		expectClosed(el(RulesTrigger), el(RulesContent));
+	});
+
+	// APG: when collapsing is not permitted, the open header says so with aria-disabled.
+	test(`${mode}: without collapsible the open header reports it cannot be closed`, async () => {
+		if (mode === 'CSR') await render(Faq);
+		else await renderSSR(Faq);
+
+		expect(el(RulesTrigger).getAttribute('aria-disabled')).toBe('true');
+		expect(el(PermitTrigger).hasAttribute('aria-disabled')).toBe(false);
+		// The header is refused, not inert: it keeps the tab stop the walk relies on.
+		expect(el<HTMLButtonElement>(RulesTrigger).disabled).toBe(false);
+
+		await userEvent.click(el(PermitTrigger));
+		await expect.poll(() => el(PermitTrigger).getAttribute('aria-disabled')).toBe('true');
+		expect(el(RulesTrigger).hasAttribute('aria-disabled')).toBe(false);
 	});
 
 	test(`${mode}: a section nobody may open says so and does not move`, async () => {

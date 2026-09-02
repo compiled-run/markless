@@ -26,14 +26,22 @@ export const progressState = shared(
 				const covered = (progress.value - progress.min) / (progress.max - progress.min);
 				return covered >= 1 ? 'complete' : 'loading';
 			}),
-			// ARIA: an indeterminate bar reports no current value at all, so null here
-			// rather than a percentage computed from `min`.
+			// ARIA: aria-valuenow sits inside min..max, so an overshooting counter reports
+			// the bar as full rather than a number past the top; an indeterminate bar reports
+			// no current value at all, so null here rather than a percentage computed from `min`.
+			reported: computed(() => {
+				if (progress.value === null) return null;
+				if (progress.value > progress.max) return progress.max;
+				if (progress.value < progress.min) return progress.min;
+				return progress.value;
+			}),
 			valueText: computed(() => {
 				if (progress.value === null) return null;
 				if (typeof progress.ownText === 'string' && progress.ownText !== '')
 					return progress.ownText;
 				const covered = (progress.value - progress.min) / (progress.max - progress.min);
-				return `${Math.round(covered * 100)}%`;
+				const inside = covered > 1 ? 1 : covered > 0 ? covered : 0;
+				return `${Math.round(inside * 100)}%`;
 			}),
 			// Clamped: unclamped, an amount past the top writes `translateX(--50%)`, which
 			// is not a CSS value, so the browser throws the whole transform away and the
@@ -75,7 +83,7 @@ function ProgressBar({ children, ...rest }: ProgressBarProps) @{
 		aria-labelledby={progress.labelEl}
 		aria-valuemin={progress.min}
 		aria-valuemax={progress.max}
-		aria-valuenow={progress.value}
+		aria-valuenow={progress.reported}
 		aria-valuetext={progress.valueText}
 		ui-progress={progress.status}
 		ui-value={progress.value}

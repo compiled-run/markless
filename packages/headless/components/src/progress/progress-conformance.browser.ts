@@ -62,13 +62,7 @@ for (const mode of MODES) {
 		// Everything derived from the value, not just the number: the percentage a
 		// reader hears and the text the bar shows come off separate computed cells,
 		// and a merged bar would move all of them in both embeds at once.
-		//
-		// Expected red for the same reason the widget-id row is exempted, and it is
-		// the second half of that finding: the embed's parts are split across the two
-		// instances the island merge minted, so the root follows the write while the
-		// value label beside it still reads the seed. Owned by the widget-scope
-		// instance path under the router island merge, not by progress.
-		test.fails('one embed advancing leaves every other reporting its own value', async () => {
+		test('one embed advancing leaves every other reporting its own value', async () => {
 			await mount();
 			const roots = parts('root');
 			const labels = parts('valuelabel');

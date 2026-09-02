@@ -402,12 +402,14 @@ export function CalendarContent({
 	const calendar = calendarState();
 	const isShowing = computed(() => calendar.popup !== true || calendar.open === true);
 	const ariaDisabled = computed(() => (calendar.disabled ? 'true' : 'false'));
+	// The surface the trigger promises with haspopup="dialog" is the one it opens; inline, the month is a group in the page.
+	const surfaceRole = computed(() => (calendar.popup === true ? 'dialog' : 'group'));
 
 	<div
 		{...rest}
 		el={calendar.contentEl}
 		overlay
-		role="group"
+		role={surfaceRole}
 		aria-labelledby={calendar.titleEl}
 		// Error before description: what is wrong is conveyed before the hint,
 		// wherever the two parts sit in the page.

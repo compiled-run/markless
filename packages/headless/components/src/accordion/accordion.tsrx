@@ -150,6 +150,12 @@ export function AccordionItemTrigger({
 		return held.includes(item.value);
 	});
 	const isLocked = computed(() => item.disabled || accordion.disabled);
+	// APG: the one header that may not collapse says so; it keeps its tab stop, so `false` removes the attribute rather than `disabled` taking over.
+	const isHeldOpen = computed(() => {
+		const held = accordion.value;
+		const isOpen = typeof held === 'string' ? held === item.value : held.includes(item.value);
+		return isOpen && accordion.collapsible !== true;
+	});
 
 	// A native button already activates on Enter and Space, so the keydown below is the roving walk and nothing else.
 	<button
@@ -158,6 +164,7 @@ export function AccordionItemTrigger({
 		type="button"
 		aria-expanded={isOpen ? 'true' : 'false'}
 		aria-controls={item.contentEl}
+		aria-disabled={isHeldOpen ? 'true' : false}
 		disabled={isLocked}
 		ui-open={isOpen}
 		ui-closed={isOpen !== true}

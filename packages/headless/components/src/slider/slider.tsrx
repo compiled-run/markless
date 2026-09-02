@@ -14,6 +14,7 @@ import {
 } from './slider-math.ts';
 import { capturePointer, isRightToLeft, measureTrack } from './slider-track.ts';
 import type {
+	SliderBoxProps,
 	SliderInstanceState,
 	SliderLabelProps,
 	SliderOrientation,
@@ -189,15 +190,44 @@ export function SliderRoot({
 	slider.orientation = orientation;
 	slider.disabled = disabled;
 
-	// A group only when there are two thumbs: one thumb is the whole control and needs no wrapper role.
-	const groupRole = computed(() => (Array.isArray(slider.seed) ? 'group' : undefined));
+	// Two shapes: an IDREF cannot be conditional, and a name must not land on the roleless single-thumb box.
+	const isRange = computed(() => Array.isArray(slider.seed));
+
+	@if (isRange) {
+		<SliderGroup {...rest}>{children}</SliderGroup>
+	} @else {
+		<SliderBox {...rest}>{children}</SliderBox>
+	}
+}
+
+// One thumb is the whole control and needs no wrapper role.
+function SliderBox({ children, ...rest }: SliderBoxProps) @{
+	const slider = sliderState();
 	const filled = computed(() =>
 		rootStyleText(slider.start, slider.end, slider.min, slider.max),
 	);
 
 	<div
 		{...rest}
-		role={groupRole}
+		style={filled}
+		ui-orientation={slider.orientation}
+		ui-disabled={slider.disabled}
+		ui-min={slider.min}
+		ui-max={slider.max}
+	>{children}</div>
+}
+
+// Two thumbs share one label, so the group holding them carries the same name.
+function SliderGroup({ children, ...rest }: SliderBoxProps) @{
+	const slider = sliderState();
+	const filled = computed(() =>
+		rootStyleText(slider.start, slider.end, slider.min, slider.max),
+	);
+
+	<div
+		{...rest}
+		role="group"
+		aria-labelledby={slider.labelEl}
 		style={filled}
 		ui-orientation={slider.orientation}
 		ui-disabled={slider.disabled}
@@ -283,6 +313,7 @@ export function SliderThumb({ side = 'end', children, onKeydown, ...rest }: Slid
 		aria-valuemin={lowest}
 		aria-valuemax={highest}
 		aria-valuenow={now}
+		aria-orientation={slider.orientation}
 		aria-disabled={ariaDisabled}
 		ui-orientation={slider.orientation}
 		ui-disabled={slider.disabled}

@@ -79,8 +79,11 @@ function expectBasicRendered() {
 	expect(el(Root).getAttribute('aria-labelledby')).toBe(el(Label).id);
 	expect(el(Label).id).not.toBe('');
 	expect(el(Label).textContent).toBe('Billing Period');
-	expect(el(Root).hasAttribute('aria-orientation')).toBe(false);
+	expect(el(Root).getAttribute('aria-orientation')).toBe('vertical');
 	expect(el(Root).hasAttribute('ui-horizontal')).toBe(false);
+	// No help parts, so nothing describes the group and nothing marks it invalid.
+	expect(el(Root).hasAttribute('aria-invalid')).toBe(false);
+	expect(el(Root).hasAttribute('aria-describedby')).toBe(false);
 
 	expect(page.getByRole('radio').elements().length).toBe(3);
 	for (const option of [MonthlyField, AnnualField, LifetimeField]) {
@@ -183,9 +186,16 @@ function expectHelpRendered() {
 	expect(el(AfterError).textContent).toBe('Pick a billing period');
 	// Every part of one instance seeds before any part renders, so document order
 	// does not decide - the error marks the group either way.
-	expect(el(AfterRoot).hasAttribute('aria-invalid')).toBe(false);
+	expect(el(AfterRoot).getAttribute('aria-invalid')).toBe('true');
 	expect(el(BeforeError).textContent).toBe('Pick a support plan');
-	expect(el(BeforeRoot).hasAttribute('aria-invalid')).toBe(false);
+	expect(el(BeforeRoot).getAttribute('aria-invalid')).toBe('true');
+	// Error before description: what is wrong is conveyed before the hint.
+	expect(el(AfterError).id).toBeTruthy();
+	expect(el(AfterDescription).id).toBeTruthy();
+	expect(el(AfterRoot).getAttribute('aria-describedby')).toBe(
+		`${el(AfterError).id} ${el(AfterDescription).id}`,
+	);
+	expect(el(BeforeRoot).getAttribute('aria-describedby')).toBe(el(BeforeError).id);
 }
 
 function expectFormConfigRendered() {
@@ -194,7 +204,8 @@ function expectFormConfigRendered() {
 	expect(field(AnnualField).getAttribute('name')).toBe('plan');
 	expect(field(MonthlyField).getAttribute('value')).toBe('monthly');
 	expect(field(AnnualField).getAttribute('value')).toBe('annual');
-	expect(el(Root).hasAttribute('aria-required')).toBe(false);
+	// The group says it once; the options carry the native constraint for the form.
+	expect(el(Root).getAttribute('aria-required')).toBe('true');
 	expect(field(MonthlyField).required).toBe(true);
 	expect(field(AnnualField).required).toBe(true);
 }
@@ -480,7 +491,7 @@ test('CSR: the arrow keys walk past an option nobody may choose', async () => {
 
 test('CSR: a horizontal group walks the horizontal axis and leaves the other alone', async () => {
 	await render(SegmentedControl);
-	expect(el(Root).hasAttribute('aria-orientation')).toBe(false);
+	expect(el(Root).getAttribute('aria-orientation')).toBe('horizontal');
 	expect(el(Root).getAttribute('ui-horizontal')).toBe('');
 	field(WeekField).focus();
 

@@ -54,7 +54,45 @@ function expectPartsFilled() {
 	expect(el(page.getByTestId('itemicon')).getAttribute('aria-hidden')).toBe('true');
 	expect(el(page.getByTestId('written-itemtitle')).textContent).toBe('Written instead');
 	expect(el(page.getByTestId('item')).getAttribute('ui-tone')).toBe('success');
+	// Each row is its own status: a reader hears the message, not the whole region.
+	expect(el(page.getByTestId('item')).getAttribute('role')).toBe('status');
+	expect(el(page.getByTestId('item')).getAttribute('aria-live')).toBe('polite');
+	// The consumer's name wins; a self-closed close is still named, by hidden text.
+	expect(el(page.getByTestId('itemclose')).getAttribute('aria-label')).toBe('Dismiss');
+	expect(el(page.getByTestId('itemclose')).textContent).toBe('×');
+	expect(el(page.getByTestId('written-itemclose')).hasAttribute('aria-label')).toBe(false);
+	expect(el(page.getByTestId('written-itemclose')).textContent).toBe('Close');
 }
+
+// `error` is the one tone a reader interrupts for: APG Alert, Radix's foreground toast.
+function expectUrgentRow(tone: string) {
+	const row = el(Root).querySelector('[ui-toast]');
+	expect(row?.getAttribute('ui-tone')).toBe(tone);
+	expect(row?.getAttribute('role')).toBe('alert');
+	expect(row?.getAttribute('aria-live')).toBe('assertive');
+}
+
+test('CSR: an error message interrupts, and any other tone waits its turn', async () => {
+	await render(Basic);
+	el<HTMLButtonElement>(Sticky).click();
+	await expect.poll(() => titles()).toEqual(['Upload failed']);
+	expectUrgentRow('error');
+	(el(Root).querySelector('[ui-toastclose]') as HTMLButtonElement).click();
+	await expect.poll(() => titles()).toEqual([]);
+
+	el<HTMLButtonElement>(Elsewhere).click();
+	await expect.poll(() => titles()).toEqual(['From elsewhere']);
+	const row = el(Root).querySelector('[ui-toast]');
+	expect(row?.getAttribute('role')).toBe('status');
+	expect(row?.getAttribute('aria-live')).toBe('polite');
+});
+
+test('SSR: an error message raised after resume interrupts', async () => {
+	await renderSSR(Basic);
+	el<HTMLButtonElement>(Sticky).click();
+	await expect.poll(() => titles()).toEqual(['Upload failed']);
+	expectUrgentRow('error');
+});
 
 test('CSR: a written-out row renders the message it was given', async () => {
 	await render(OneMessage);
