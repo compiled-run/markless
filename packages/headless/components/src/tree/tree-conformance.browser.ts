@@ -10,13 +10,12 @@ runMultiEmbedConformance({
 	render: () => renderSSRIslands([MultiEmbed, MultiEmbed]),
 	embedFrame: 'frame',
 	widgetDefinitionSuffixes: ['#treeState'],
-	// A closed node carries no aria-expanded at all, so rest is the absent
-	// attribute; the trigger is the control and the row is what reports.
+	// The trigger is the control and the row is what reports.
 	interaction: {
 		activate: 'src-itemtrigger',
 		observe: 'src-item',
 		stateAttribute: 'aria-expanded',
-		restValue: null,
+		restValue: 'false',
 		activeValue: 'true',
 	},
 	rovingKey: '{ArrowDown}',

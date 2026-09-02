@@ -97,7 +97,7 @@ test('CSR: ArrowLeft closes an open node and climbs out of a child', async () =>
 	await expect.poll(() => document.activeElement).toBe(el(SrcItem));
 
 	await userEvent.keyboard('{ArrowLeft}');
-	await expect.poll(() => el(SrcItem).hasAttribute('aria-expanded')).toBe(false);
+	await expect.poll(() => el(SrcItem).getAttribute('aria-expanded')).toBe('false');
 });
 
 test('CSR: Enter on the row opens the node its trigger would', async () => {
@@ -127,10 +127,10 @@ test('CSR: a tree nobody may change never opens or closes from the keyboard', as
 	// trigger, and a disabled native button refuses a synthetic press.
 	await userEvent.keyboard('{ArrowRight}');
 	await quiet();
-	await expect.poll(() => el(SrcItem).hasAttribute('aria-expanded')).toBe(false);
+	await expect.poll(() => el(SrcItem).getAttribute('aria-expanded')).toBe('false');
 	await userEvent.keyboard('{Enter}');
 	await quiet();
-	await expect.poll(() => el(SrcItem).hasAttribute('aria-expanded')).toBe(false);
+	await expect.poll(() => el(SrcItem).getAttribute('aria-expanded')).toBe('false');
 	expect(el(SrcTrigger).hasAttribute('disabled')).toBe(true);
 
 	el(DocsItem).focus();

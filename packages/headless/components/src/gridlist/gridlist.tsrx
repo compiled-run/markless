@@ -178,31 +178,38 @@ function GridListGrid({ children, onClick, onFocusin, onKeydown, ...rest }: Grid
 			// A press that came out of a control the row holds is that control's, not a pick.
 			const widgets = ownParts(triggerEls, row);
 			// A row has no native disabled, so isReachable is the only refusal a press meets.
-				if (!heldBy(widgets, target) && isReachable(row)) {
-					gridlist.pick(row.getAttribute('ui-value') ?? '');
+			if (!heldBy(widgets, target) && isReachable(row)) {
+				const value = row.getAttribute('ui-value') ?? '';
+				if (event.shiftKey && gridlist.multiple === true) {
+					// A Shift press picks the run from the anchor, the way a Shift walk does.
+					const anchor = gridlist.anchor === '' ? value : gridlist.anchor;
+					gridlist.anchor = anchor;
+					gridlist.settle(spanBetween(rowValues(reachableRows(rowEls)), anchor, value));
+				} else {
+					gridlist.pick(value);
 				}
+			}
 			onClick?.(event);
 		}}
 		onKeydown={(event) => {
-			// Written out from event fields and graph state read directly: the policy
-			// has to be readable before the handler symbol loads, and a key list
-			// joined to a state read in one guard is MARKLESS_SYNC_POLICY_UNEXTRACTABLE.
-			// The arrows are cancelled whether or not focus is inside a row, which
-			// costs nothing on a button and is why the walk only manages buttons.
+			// One guard, written from event fields and graph cells: only the first
+			// cancel the compiler can extract runs before the handler symbol loads.
+			// The keys belong to the control a row holds for as long as it has focus,
+			// and select-all is the page's unless the list can hold several rows.
 			if (
-				event.key === 'ArrowDown' ||
-				event.key === 'ArrowUp' ||
-				event.key === 'ArrowLeft' ||
-				event.key === 'ArrowRight' ||
-				event.key === 'Home' ||
-				event.key === 'End'
+				(!gridlist.inside &&
+					(event.key === 'ArrowDown' ||
+						event.key === 'ArrowUp' ||
+						event.key === 'ArrowLeft' ||
+						event.key === 'ArrowRight' ||
+						event.key === 'Home' ||
+						event.key === 'End' ||
+						event.key === ' ')) ||
+				(gridlist.inside && event.key === 'Escape') ||
+				(gridlist.multiple &&
+					(event.ctrlKey === true || event.metaKey === true) &&
+					(event.key === 'a' || event.key === 'A'))
 			) {
-				event.preventDefault();
-			}
-			// The space bar belongs to the control that has focus for as long as it has it.
-			if (event.key === ' ' && gridlist.inside !== true) event.preventDefault();
-			if (event.key === 'Escape' && gridlist.inside === true) event.preventDefault();
-			if ((event.ctrlKey || event.metaKey) && (event.key === 'a' || event.key === 'A')) {
 				event.preventDefault();
 			}
 

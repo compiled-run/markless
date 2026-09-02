@@ -6,6 +6,7 @@ import Disabled from './scenarios/disabled.tsrx';
 import DisabledRow from './scenarios/disabled-row.tsrx';
 import Gallery from './scenarios/gallery.tsrx';
 import Multiple from './scenarios/multiple.tsrx';
+import Overflowing from './scenarios/overflowing.tsrx';
 import Prepicked from './scenarios/prepicked.tsrx';
 import RowsFromData from './scenarios/rows-from-data.tsrx';
 import Selectable from './scenarios/selectable.tsrx';
@@ -43,6 +44,23 @@ const LeftRoot = page.getByTestId('left-root');
 const LeftIndexItem = page.getByTestId('left-index-item');
 const LeftAppItem = page.getByTestId('left-app-item');
 const RightIntroItem = page.getByTestId('right-intro-item');
+const FirstItem = page.getByTestId('first-item');
+const LastItem = page.getByTestId('last-item');
+const ChangelogLabel = page.getByTestId('changelog-itemlabel');
+const LicenseLabel = page.getByTestId('license-itemlabel');
+
+function picked(root: Element) {
+	return Array.from(root.querySelectorAll('[role="row"][ui-selected]')).map((row) =>
+		row.getAttribute('ui-value'),
+	);
+}
+
+function keydownLog() {
+	const seen: string[] = [];
+	const log = (event: KeyboardEvent) => seen.push(`${event.key}:${event.defaultPrevented}`);
+	document.addEventListener('keydown', log);
+	return { seen, stop: () => document.removeEventListener('keydown', log) };
+}
 
 // The SSR harness rewrites a literal `renderSSR` call site, so each test must branch
 // on the mode rather than take the mount by reference.
@@ -463,4 +481,118 @@ test('CSR: two lists on one page keep their own focus and their own picked rows'
 	expect(document.activeElement).not.toBe(el(RightIntroItem));
 	expect(el(RightIntroItem).hasAttribute('ui-selected')).toBe(false);
 	expect(el(LeftRoot).getAttribute('role')).toBe('grid');
+});
+
+// A Shift press picks the run from the anchor to the pressed row, the way a
+// Shift walk does, and a second Shift press replaces that run rather than growing it.
+for (const mode of MODES) {
+	test(`${mode}: a Shift press picks the run from the row picked last`, async () => {
+		if (mode === 'CSR') await render(Multiple);
+		else await renderSSR(Multiple);
+		el(ReadmeLabel).click();
+		await expect.poll(() => picked(el(Root))).toEqual(['readme']);
+
+		await userEvent.click(el(ChangelogLabel), { modifiers: ['Shift'] });
+		await expect.poll(() => picked(el(Root))).toEqual(['readme', 'license', 'changelog']);
+
+		await userEvent.click(el(LicenseLabel), { modifiers: ['Shift'] });
+		await expect.poll(() => picked(el(Root))).toEqual(['readme', 'license']);
+	});
+}
+
+test('CSR: a Shift press with nothing picked yet picks that row and anchors there', async () => {
+	await render(Multiple);
+	await userEvent.click(el(LicenseLabel), { modifiers: ['Shift'] });
+	await expect.poll(() => picked(el(Root))).toEqual(['license']);
+
+	await userEvent.click(el(page.getByTestId('notice-itemlabel')), { modifiers: ['Shift'] });
+	await expect.poll(() => picked(el(Root))).toEqual(['license', 'changelog', 'notice']);
+});
+
+test('CSR: a Shift press in a list that picks one row at a time picks only that row', async () => {
+	await render(Selectable);
+	el(ReadmeLabel).click();
+	await expect.poll(() => picked(el(Root))).toEqual(['readme']);
+
+	await userEvent.click(el(ChangelogLabel), { modifiers: ['Shift'] });
+	await expect.poll(() => picked(el(Root))).toEqual(['changelog']);
+});
+
+// The keys belong to the control a row holds for as long as it has focus: the
+// list neither cancels them there nor walks its rows from there.
+test('CSR: the arrows inside the controls a row holds are left to the control', async () => {
+	await render(WithWidgets);
+	el(ReadmeItem).focus();
+	await userEvent.keyboard('{Enter}');
+	await expect.poll(() => document.activeElement).toBe(el(ReadmeRename));
+	await expect.poll(() => el(Root).getAttribute('ui-inside')).toBe('');
+
+	const log = keydownLog();
+	try {
+		await userEvent.keyboard('{ArrowDown}');
+		await userEvent.keyboard('{Home}');
+		await userEvent.keyboard('{End}');
+		await userEvent.keyboard('{ArrowRight}');
+		await expect.poll(() => document.activeElement).toBe(el(ReadmeDelete));
+		expect(log.seen).toEqual([
+			'ArrowDown:false',
+			'Home:false',
+			'End:false',
+			'ArrowRight:false',
+		]);
+
+		await userEvent.keyboard('{Escape}');
+		await expect.poll(() => document.activeElement).toBe(el(ReadmeItem));
+		expect(log.seen.at(-1)).toBe('Escape:true');
+
+		await userEvent.keyboard('{ArrowDown}');
+		await expect.poll(() => document.activeElement).toBe(el(LicenseItem));
+		expect(log.seen.at(-1)).toBe('ArrowDown:true');
+	} finally {
+		log.stop();
+	}
+});
+
+// Select-all is the page's unless the list can hold several rows at once.
+test('CSR: Control+A on a list that picks one row at a time is left to the page', async () => {
+	await render(Selectable);
+	el(ReadmeItem).focus();
+	await userEvent.keyboard('{ArrowDown}');
+	await expect.poll(() => document.activeElement).toBe(el(LicenseItem));
+
+	const log = keydownLog();
+	try {
+		await userEvent.keyboard('{Control>}a{/Control}');
+		await new Promise((resolve) => setTimeout(resolve, 300));
+		expect(log.seen).toContain('a:false');
+		expect(picked(el(Root))).toEqual([]);
+	} finally {
+		log.stop();
+	}
+});
+
+test("CSR: Control+A on a list that picks several is the list's", async () => {
+	await render(Multiple);
+	el(ReadmeItem).focus();
+
+	const log = keydownLog();
+	try {
+		await userEvent.keyboard('{Control>}a{/Control}');
+		await expect
+			.poll(() => picked(el(Root)))
+			.toEqual(['readme', 'license', 'changelog', 'notice']);
+		expect(log.seen).toContain('a:true');
+	} finally {
+		log.stop();
+	}
+});
+
+test('CSR: the row the walk lands on is scrolled into view', async () => {
+	await render(Overflowing);
+	el(FirstItem).focus();
+	expect(el(Root).scrollTop).toBe(0);
+
+	await userEvent.keyboard('{End}');
+	await expect.poll(() => document.activeElement).toBe(el(LastItem));
+	expect(el(Root).scrollTop).toBeGreaterThan(0);
 });

@@ -226,19 +226,16 @@ assertion: the sr suite asserts against a row with only a label for that reason.
 ## A compiler constraint this build hit
 
 `MARKLESS_SYNC_POLICY_UNEXTRACTABLE`, at the cost of one round trip. A
-`preventDefault` guard joining a list of key comparisons to a graph-state read in
-one condition —
-
-```ts
-if ((event.key === 'ArrowDown' || … || event.key === ' ') && gridlist.inside !== true)
-```
-
-— cannot be extracted, even though each half is extractable alone (`tree` ships
-the bare key list, `taglist` ships a single key joined to a state read). Split
-into two statements it compiles. The behavioural consequence was taken rather
-than worked around: the arrows are now cancelled whether or not focus is inside a
-row, which costs nothing on a button and is a further reason the widget walk
-manages buttons only.
+`preventDefault` guard joining a list of key comparisons to a graph-state read
+written as `gridlist.inside !== true` cannot be extracted: the policy extractor
+reads `===`/`==` against a literal, a bare graph path as truthy, and `!` over
+either, but never `!==`. Written as `!gridlist.inside` the same guard extracts,
+and that is the shape the family ships. Two further facts the fix surfaced:
+only the FIRST `if` holding a cancel becomes the policy, so every cancel that
+must run before the handler symbol loads is folded into one guard; and a cancel
+left in a later statement did not land in the browser lane (the Ctrl+A pin was
+red with that cancel in place), because the handler runs after the native
+dispatch.
 
 ## Gaps this build knowingly leaves
 

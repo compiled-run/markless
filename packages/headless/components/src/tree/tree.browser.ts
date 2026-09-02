@@ -13,6 +13,9 @@ import TwoTrees from './scenarios/two-trees.tsrx';
 import Unavailable from './scenarios/unavailable.tsrx';
 import WithOnChange from './scenarios/with-onchange.tsrx';
 import WithoutOnChange from './scenarios/without-onchange.tsrx';
+import Overflowing from './scenarios/overflowing.tsrx';
+import Siblings from './scenarios/siblings.tsrx';
+import UnavailableNode from './scenarios/unavailable-node.tsrx';
 
 const Root = page.getByTestId('root');
 const Label = page.getByTestId('label');
@@ -60,6 +63,9 @@ const Depth3Trigger = page.getByTestId('depth-3-itemtrigger');
 const Depth3Content = page.getByTestId('depth-3-itemcontent');
 const Depth2Item = page.getByTestId('depth-2-item');
 const Depth1Item = page.getByTestId('depth-1-item');
+const CacheItem = page.getByTestId('cache-item');
+const FirstItem = page.getByTestId('first-item');
+const LastItem = page.getByTestId('last-item');
 
 // The SSR harness rewrites a literal `renderSSR` call site, so each test must branch
 // on the mode rather than take the mount by reference.
@@ -97,9 +103,9 @@ function expectStarterRendered() {
 		expect(item.getAttribute('aria-level')).toBe('1');
 		expect(item.getAttribute('tabindex')).toBe('-1');
 		expect(item.getAttribute('ui-leaf')).toBe('');
-		// Only an open node reports aria-expanded; every node reports aria-selected="false".
+		// An end node reports no open state at all, and no row claims a selection nobody offered.
 		expect(item.hasAttribute('aria-expanded')).toBe(false);
-		expect(item.getAttribute('aria-selected')).toBe('false');
+		expect(item.hasAttribute('aria-selected')).toBe(false);
 	}
 	// The DOM fully represents the hierarchy, so the APG's counters are absent.
 	expect(el(ReadmeItem).hasAttribute('aria-setsize')).toBe(false);
@@ -108,7 +114,7 @@ function expectStarterRendered() {
 }
 
 async function expectNestedRendered() {
-	expect(el(SrcItem).hasAttribute('aria-expanded')).toBe(false);
+	expect(el(SrcItem).getAttribute('aria-expanded')).toBe('false');
 	expect(el(SrcItem).getAttribute('ui-closed')).toBe('');
 	expect(el(SrcItem).getAttribute('aria-level')).toBe('1');
 	expect(el(SrcContent).getAttribute('role')).toBe('group');
@@ -144,7 +150,7 @@ async function expectPreopenedRendered() {
 	expect(el(SrcContent).hasAttribute('hidden')).toBe(false);
 	expect(el(SrcItem).getAttribute('ui-open')).toBe('');
 	expect(el(IndexItem).getAttribute('aria-level')).toBe('2');
-	expect(el(DocsItem).hasAttribute('aria-expanded')).toBe(false);
+	expect(el(DocsItem).getAttribute('aria-expanded')).toBe('false');
 	expect(el(DocsContent).hasAttribute('hidden')).toBe(true);
 	expect(visibleRows(el(Root)).map((row) => row.getAttribute('data-testid'))).toEqual([
 		'src-item',
@@ -166,7 +172,7 @@ function expectDeepRendered() {
 	expect(el(Depth2Item).contains(el(Depth1Item))).toBe(true);
 	expect(el(Depth1Item).contains(el(Depth4Item))).toBe(false);
 	for (const item of [el(Depth4Item), el(Depth3Item), el(Depth2Item), el(Depth1Item)]) {
-		expect(item.hasAttribute('aria-expanded')).toBe(false);
+		expect(item.getAttribute('aria-expanded')).toBe('false');
 	}
 	expect(visibleRows(el(Root)).map((row) => row.getAttribute('data-testid'))).toEqual([
 		'depth-4-item',
@@ -198,7 +204,7 @@ function expectUnavailableRendered() {
 	expect(el(page.getByTestId('src-itemtrigger')).hasAttribute('disabled')).toBe(true);
 	expect(el(page.getByTestId('docs-itemtrigger')).hasAttribute('disabled')).toBe(true);
 	// A locked tree still reports what is open, and the raw prop never reaches it.
-	expect(el(SrcItem).hasAttribute('aria-expanded')).toBe(false);
+	expect(el(SrcItem).getAttribute('aria-expanded')).toBe('false');
 	expect(el(DocsItem).getAttribute('aria-expanded')).toBe('true');
 	expect(el(Root).hasAttribute('disabled')).toBe(false);
 }
@@ -206,7 +212,7 @@ function expectUnavailableRendered() {
 async function expectUnavailableBlocks() {
 	el(page.getByTestId('src-itemtrigger')).click();
 	await new Promise((resolve) => setTimeout(resolve, 150));
-	expect(el(SrcItem).hasAttribute('aria-expanded')).toBe(false);
+	expect(el(SrcItem).getAttribute('aria-expanded')).toBe('false');
 	expect(el(SrcContent).hasAttribute('hidden')).toBe(true);
 }
 
@@ -218,7 +224,7 @@ async function expectTriggerOpensAndCloses() {
 	expect(el(SrcIndicator).getAttribute('ui-open')).toBe('');
 
 	el(SrcTrigger).click();
-	await expect.poll(() => el(SrcItem).hasAttribute('aria-expanded')).toBe(false);
+	await expect.poll(() => el(SrcItem).getAttribute('aria-expanded')).toBe('false');
 	expect(el(SrcContent).hasAttribute('hidden')).toBe(true);
 	await expect.element(IndexItem).toBeInTheDocument();
 }
@@ -241,8 +247,8 @@ async function expectNestedNodeReachesItsOwnHandler() {
 	await expect.poll(() => el(UiValue).textContent).toBe('false');
 	await expect.poll(() => el(Calls).textContent).toBe('1');
 	expect(el(SrcValue).textContent).toBe('');
-	expect(el(SrcItem).hasAttribute('aria-expanded')).toBe(false);
-	expect(el(UiItem).hasAttribute('aria-expanded')).toBe(false);
+	expect(el(SrcItem).getAttribute('aria-expanded')).toBe('false');
+	expect(el(UiItem).getAttribute('aria-expanded')).toBe('false');
 }
 
 async function expectOmittedCallbackStillToggles() {
@@ -285,7 +291,7 @@ for (const mode of MODES) {
 		else await renderSSR(Preopened);
 		expect(el(SrcItem).getAttribute('aria-expanded')).toBe('true');
 		expect(el(SrcItem).getAttribute('ui-open')).toBe('');
-		expect(el(DocsItem).hasAttribute('aria-expanded')).toBe(false);
+		expect(el(DocsItem).getAttribute('aria-expanded')).toBe('false');
 		expect(el(IndexItem).getAttribute('aria-level')).toBe('2');
 	});
 
@@ -346,8 +352,8 @@ test('CSR: each unrolled level owns its own open state', async () => {
 
 	el(Depth4Trigger).click();
 	await expect.poll(() => el(Depth4Item).getAttribute('aria-expanded')).toBe('true');
-	expect(el(Depth3Item).hasAttribute('aria-expanded')).toBe(false);
-	expect(el(Depth2Item).hasAttribute('aria-expanded')).toBe(false);
+	expect(el(Depth3Item).getAttribute('aria-expanded')).toBe('false');
+	expect(el(Depth2Item).getAttribute('aria-expanded')).toBe('false');
 	expect(visibleRows(el(Root)).map((row) => row.getAttribute('data-testid'))).toEqual([
 		'depth-4-item',
 		'depth-3-item',
@@ -357,11 +363,11 @@ test('CSR: each unrolled level owns its own open state', async () => {
 	await expect.poll(() => el(Depth3Item).getAttribute('aria-expanded')).toBe('true');
 	expect(el(Depth3Content).hasAttribute('hidden')).toBe(false);
 	expect(el(Depth4Item).getAttribute('aria-expanded')).toBe('true');
-	expect(el(Depth2Item).hasAttribute('aria-expanded')).toBe(false);
+	expect(el(Depth2Item).getAttribute('aria-expanded')).toBe('false');
 
 	// Closing the outermost level leaves every level below it as it was.
 	el(Depth4Trigger).click();
-	await expect.poll(() => el(Depth4Item).hasAttribute('aria-expanded')).toBe(false);
+	await expect.poll(() => el(Depth4Item).getAttribute('aria-expanded')).toBe('false');
 	expect(el(Depth3Item).getAttribute('aria-expanded')).toBe('true');
 	expect(visibleRows(el(Root)).map((row) => row.getAttribute('data-testid'))).toEqual([
 		'depth-4-item',
@@ -402,7 +408,7 @@ test('CSR: ArrowDown never opens anything', async () => {
 
 	await userEvent.keyboard('{ArrowDown}');
 	await expect.poll(() => document.activeElement).toBe(el(ReadmeItem));
-	expect(el(SrcItem).hasAttribute('aria-expanded')).toBe(false);
+	expect(el(SrcItem).getAttribute('aria-expanded')).toBe('false');
 	expect(el(SrcContent).hasAttribute('hidden')).toBe(true);
 });
 
@@ -447,7 +453,7 @@ test('CSR: ArrowLeft closes an open node, and does not move focus doing it', asy
 	el(SrcItem).focus();
 
 	await userEvent.keyboard('{ArrowLeft}');
-	await expect.poll(() => el(SrcItem).hasAttribute('aria-expanded')).toBe(false);
+	await expect.poll(() => el(SrcItem).getAttribute('aria-expanded')).toBe('false');
 	expect(document.activeElement).toBe(el(SrcItem));
 	expect(el(SrcContent).hasAttribute('hidden')).toBe(true);
 
@@ -488,7 +494,7 @@ test('CSR: Enter on a row closes it again', async () => {
 	await userEvent.keyboard('{Enter}');
 	await expect.poll(() => el(AssetsItem).getAttribute('aria-expanded')).toBe('true');
 	await userEvent.keyboard('{Enter}');
-	await expect.poll(() => el(AssetsItem).hasAttribute('aria-expanded')).toBe(false);
+	await expect.poll(() => el(AssetsItem).getAttribute('aria-expanded')).toBe('false');
 	await expect.element(LogoItem).toBeInTheDocument();
 });
 
@@ -563,12 +569,12 @@ test('CSR: arrowing in one tree never touches the other', async () => {
 	await expect.poll(() => document.activeElement).toBe(el(LeftSrcItem));
 	await userEvent.keyboard('{ArrowRight}');
 	await expect.poll(() => el(LeftSrcItem).getAttribute('aria-expanded')).toBe('true');
-	expect(el(RightSrcItem).hasAttribute('aria-expanded')).toBe(false);
+	expect(el(RightSrcItem).getAttribute('aria-expanded')).toBe('false');
 });
 
 test('SSR: the first ArrowRight after resume opens the node, and the second descends', async () => {
 	await renderSSR(Nested);
-	expect(el(SrcItem).hasAttribute('aria-expanded')).toBe(false);
+	expect(el(SrcItem).getAttribute('aria-expanded')).toBe('false');
 	expect(el(SrcContent).hasAttribute('hidden')).toBe(true);
 
 	el(SrcItem).focus();
@@ -601,8 +607,8 @@ test('SSR: each unrolled level resumes with its own open state', async () => {
 
 	el(Depth3Trigger).click();
 	await expect.poll(() => el(Depth3Item).getAttribute('aria-expanded')).toBe('true');
-	expect(el(Depth4Item).hasAttribute('aria-expanded')).toBe(false);
-	expect(el(Depth2Item).hasAttribute('aria-expanded')).toBe(false);
+	expect(el(Depth4Item).getAttribute('aria-expanded')).toBe('false');
+	expect(el(Depth2Item).getAttribute('aria-expanded')).toBe('false');
 });
 
 for (const mode of MODES) {
@@ -612,7 +618,7 @@ for (const mode of MODES) {
 		const folders = page.getByTestId('folder-item').elements();
 		expect(folders).toHaveLength(2);
 		expect(folders[0]?.getAttribute('aria-level')).toBe('1');
-		expect(folders[0]?.hasAttribute('aria-expanded')).toBe(false);
+		expect(folders[0]?.getAttribute('aria-expanded')).toBe('false');
 		expect(folders[0]?.textContent).toContain('src');
 		expect(folders[1]?.textContent).toContain('docs');
 	});
@@ -620,13 +626,16 @@ for (const mode of MODES) {
 	// PINNED in CSR only: a keyed `@for` inside `tree.itemcontent` renders the outer
 	// loop's two folders and zero files, with no diagnostic and no runtime error.
 	const nestedLoop = mode === 'CSR' ? test.skip : test;
-	nestedLoop(`${mode}: the nested level of a loop over nested data renders its nodes`, async () => {
-		if (mode === 'CSR') await render(NodesFromData);
-		else await renderSSR(NodesFromData);
-		const files = page.getByTestId('file-item').elements();
-		expect(files).toHaveLength(3);
-		expect(files[0]?.getAttribute('aria-level')).toBe('2');
-	});
+	nestedLoop(
+		`${mode}: the nested level of a loop over nested data renders its nodes`,
+		async () => {
+			if (mode === 'CSR') await render(NodesFromData);
+			else await renderSSR(NodesFromData);
+			const files = page.getByTestId('file-item').elements();
+			expect(files).toHaveLength(3);
+			expect(files[0]?.getAttribute('aria-level')).toBe('2');
+		},
+	);
 }
 
 // PINNED: a node seeded `open` has its group served showing only at the first level.
@@ -647,7 +656,7 @@ test('CSR: a second-level node opens and closes its own group from the first ges
 	expect(el(UiItem).getAttribute('aria-expanded')).toBe('true');
 
 	el(UiTrigger).click();
-	await expect.poll(() => el(UiItem).hasAttribute('aria-expanded')).toBe(false);
+	await expect.poll(() => el(UiItem).getAttribute('aria-expanded')).toBe('false');
 	expect(el(UiContent).hasAttribute('hidden')).toBe(true);
 
 	el(UiTrigger).click();
@@ -663,7 +672,7 @@ test('CSR: a node served expanded collapses on its first gesture', async () => {
 	expect(el(SrcItem).getAttribute('aria-expanded')).toBe('true');
 
 	el(SrcTrigger).click();
-	await expect.poll(() => el(SrcItem).hasAttribute('aria-expanded')).toBe(false);
+	await expect.poll(() => el(SrcItem).getAttribute('aria-expanded')).toBe('false');
 	expect(el(SrcContent).hasAttribute('hidden')).toBe(true);
 });
 
@@ -676,5 +685,178 @@ test('CSR: a looped node opens the folder the click landed on', async () => {
 
 	second.click();
 	await expect.poll(() => folders[1]?.getAttribute('aria-expanded')).toBe('true');
-	expect(folders[0]?.hasAttribute('aria-expanded')).toBe(false);
+	expect(folders[0]?.getAttribute('aria-expanded')).toBe('false');
+});
+
+// A closed parent says so: without `aria-expanded="false"` a reader cannot tell
+// a folder that is shut from a file, which is the one fact the tree exists to convey.
+for (const mode of MODES) {
+	test(`${mode}: a closed parent reports aria-expanded="false" and an end node reports nothing`, async () => {
+		if (mode === 'CSR') await render(Nested);
+		else await renderSSR(Nested);
+		expect(el(SrcItem).getAttribute('aria-expanded')).toBe('false');
+		expect(el(IndexItem).hasAttribute('aria-expanded')).toBe(false);
+		expect(el(ReadmeItem).hasAttribute('aria-expanded')).toBe(false);
+	});
+
+	// The tree offers no selection, so it writes none - and it keeps its hands off the consumer's.
+	test(`${mode}: a row carries only the aria-selected the consumer wrote`, async () => {
+		if (mode === 'CSR') await render(Siblings);
+		else await renderSSR(Siblings);
+		expect(el(AppsItem).hasAttribute('aria-selected')).toBe(false);
+		expect(el(ReadmeItem).getAttribute('aria-selected')).toBe('true');
+	});
+
+	test(`${mode}: a node nobody may change renders locked while its siblings do not`, async () => {
+		if (mode === 'CSR') await render(UnavailableNode);
+		else await renderSSR(UnavailableNode);
+		expect(el(SrcItem).getAttribute('aria-disabled')).toBe('true');
+		expect(el(SrcItem).getAttribute('ui-disabled')).toBe('');
+		expect(el<HTMLButtonElement>(page.getByTestId('src-itemtrigger')).disabled).toBe(true);
+		expect(el(SrcItem).getAttribute('aria-expanded')).toBe('false');
+		expect(el(AssetsItem).hasAttribute('aria-disabled')).toBe(false);
+		expect(el(AssetsItem).hasAttribute('ui-disabled')).toBe(false);
+		expect(el<HTMLButtonElement>(page.getByTestId('assets-itemtrigger')).disabled).toBe(false);
+		expect(el(SrcItem).hasAttribute('disabled')).toBe(false);
+		// Locked open is still open.
+		expect(el(DocsItem).getAttribute('aria-expanded')).toBe('true');
+		expect(el(DocsContent).hasAttribute('hidden')).toBe(false);
+	});
+
+	test(`${mode}: * opens every closed sibling of the focused node and nothing deeper`, async () => {
+		if (mode === 'CSR') await render(Siblings);
+		else await renderSSR(Siblings);
+		el(AppsItem).focus();
+
+		await userEvent.keyboard('*');
+		await expect.poll(() => el(AppsItem).getAttribute('aria-expanded')).toBe('true');
+		await expect.poll(() => el(BuildItem).getAttribute('aria-expanded')).toBe('true');
+		await expect.poll(() => el(DocsItem).getAttribute('aria-expanded')).toBe('true');
+		expect(el(CacheItem).getAttribute('aria-expanded')).toBe('false');
+		expect(document.activeElement).toBe(el(AppsItem));
+	});
+}
+
+test("CSR: * from a nested node opens its own siblings, not its parent's", async () => {
+	await render(Siblings);
+	el(page.getByTestId('build-itemtrigger')).click();
+	await expect.poll(() => el(BuildItem).getAttribute('aria-expanded')).toBe('true');
+	el(CacheItem).focus();
+
+	await userEvent.keyboard('*');
+	await expect.poll(() => el(CacheItem).getAttribute('aria-expanded')).toBe('true');
+	expect(el(AppsItem).getAttribute('aria-expanded')).toBe('false');
+	expect(el(DocsItem).getAttribute('aria-expanded')).toBe('false');
+});
+
+// The walk belongs to the row. A link or a button inside it owns its own keys,
+// and the tree neither moves focus off it nor cancels what the key would do there.
+test('CSR: the arrows from a focusable inside a row are left to it', async () => {
+	await render(FileExplorer);
+	const seen: string[] = [];
+	const log = (event: KeyboardEvent) => seen.push(`${event.key}:${event.defaultPrevented}`);
+	document.addEventListener('keydown', log);
+	try {
+		el(AssetsLink).focus();
+		await expect.poll(() => el(Root).getAttribute('ui-inside')).toBe('');
+
+		await userEvent.keyboard('{ArrowDown}');
+		await userEvent.keyboard('{End}');
+		await userEvent.keyboard('{Home}');
+		await userEvent.keyboard('{ArrowRight}');
+		await new Promise((resolve) => setTimeout(resolve, 300));
+		expect(document.activeElement).toBe(el(AssetsLink));
+		expect(el(AssetsItem).getAttribute('aria-expanded')).toBe('false');
+		expect(seen).toEqual(['ArrowDown:false', 'End:false', 'Home:false', 'ArrowRight:false']);
+	} finally {
+		document.removeEventListener('keydown', log);
+	}
+});
+
+test('CSR: the arrows walk again once focus is back on the row', async () => {
+	await render(FileExplorer);
+	el(AssetsLink).focus();
+	await expect.poll(() => el(Root).getAttribute('ui-inside')).toBe('');
+	el(AssetsItem).focus();
+	await expect.poll(() => el(Root).hasAttribute('ui-inside')).toBe(false);
+
+	await userEvent.keyboard('{ArrowDown}');
+	await expect.poll(() => document.activeElement).toBe(el(ReadmeItem));
+});
+
+test('CSR: the space bar on a row toggles the node and is not left to the page', async () => {
+	await render(FileExplorer);
+	const seen: boolean[] = [];
+	const log = (event: KeyboardEvent) => {
+		if (event.key === ' ') seen.push(event.defaultPrevented);
+	};
+	document.addEventListener('keydown', log);
+	try {
+		el(AssetsItem).focus();
+		await userEvent.keyboard(' ');
+		await expect.poll(() => el(AssetsItem).getAttribute('aria-expanded')).toBe('true');
+		expect(seen).toEqual([true]);
+	} finally {
+		document.removeEventListener('keydown', log);
+	}
+});
+
+// The trigger is a native button: its space bar is its own, and it toggles once.
+test('CSR: the space bar on the trigger inside a row still presses the trigger', async () => {
+	await render(FileExplorer);
+	const seen: boolean[] = [];
+	const log = (event: KeyboardEvent) => {
+		if (event.key === ' ') seen.push(event.defaultPrevented);
+	};
+	document.addEventListener('keydown', log);
+	try {
+		el(page.getByTestId('assets-itemtrigger')).focus();
+		await expect.poll(() => el(Root).getAttribute('ui-inside')).toBe('');
+		await userEvent.keyboard(' ');
+		await expect.poll(() => el(AssetsItem).getAttribute('aria-expanded')).toBe('true');
+		await new Promise((resolve) => setTimeout(resolve, 300));
+		expect(el(AssetsItem).getAttribute('aria-expanded')).toBe('true');
+		expect(seen).toEqual([false]);
+	} finally {
+		document.removeEventListener('keydown', log);
+	}
+});
+
+test('CSR: the walk steps over a node nobody may change', async () => {
+	await render(UnavailableNode);
+	el(AssetsItem).focus();
+
+	await userEvent.keyboard('{ArrowDown}');
+	await expect.poll(() => document.activeElement).toBe(el(ReadmeItem));
+	expect(document.activeElement).not.toBe(el(SrcItem));
+
+	// The child of a locked node written open is still a row a person can reach.
+	await userEvent.keyboard('{End}');
+	await expect.poll(() => document.activeElement).toBe(el(IntroItem));
+	await userEvent.keyboard('{ArrowUp}');
+	await expect.poll(() => document.activeElement).toBe(el(ReadmeItem));
+	await userEvent.keyboard('{Home}');
+	await expect.poll(() => document.activeElement).toBe(el(AssetsItem));
+});
+
+test('CSR: a node nobody may change never opens from the keyboard', async () => {
+	await render(UnavailableNode);
+	// A press lands focus on the row even though the walk never would.
+	el(SrcItem).focus();
+
+	await userEvent.keyboard('{ArrowRight}');
+	await userEvent.keyboard('{Enter}');
+	await new Promise((resolve) => setTimeout(resolve, 300));
+	expect(el(SrcItem).getAttribute('aria-expanded')).toBe('false');
+	expect(el(SrcContent).hasAttribute('hidden')).toBe(true);
+});
+
+test('CSR: the row the walk lands on is scrolled into view', async () => {
+	await render(Overflowing);
+	el(FirstItem).focus();
+	expect(el(Root).scrollTop).toBe(0);
+
+	await userEvent.keyboard('{End}');
+	await expect.poll(() => document.activeElement).toBe(el(LastItem));
+	expect(el(Root).scrollTop).toBeGreaterThan(0);
 });

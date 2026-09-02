@@ -30,6 +30,11 @@ export type TreeItemProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	 * family cannot also read the enclosing instance of that same family.
 	 */
 	readonly level?: number;
+	/**
+	 * Nobody can open or close this node, and the walk steps over it. A locked
+	 * node written `open` stays open, and the nodes inside it are still reachable.
+	 */
+	readonly disabled?: boolean;
 	/** Called with the new state when a person opens or closes this node. */
 	readonly onChange?: (open: boolean) => void;
 };
@@ -55,18 +60,24 @@ export type TreeItemLabelProps = PropsOf<'span'>;
 export type TreeItemIndicatorProps = PropsOf<'span'>;
 
 /**
- * The shared instance every part of one tree reads. It carries the root's one
- * seeded field and nothing else: which row holds the tab stop and what has been
- * typed at the tree both live on the container element, because the handlers
- * that maintain them sit on the element that roots this instance and cannot
- * read it. */
-export type TreeInstanceState = Seeded<TreeRootProps, 'disabled'>;
+ * The shared instance every part of one tree reads. Which row holds the tab
+ * stop and what has been typed at the tree live on the container element rather
+ * than here. `inside` is true while focus sits on a link or a control a row
+ * holds rather than on the row: the keys belong to that element for as long as
+ * it does.
+ */
+export type TreeInstanceState = Seeded<TreeRootProps, 'disabled'> & {
+	inside: boolean;
+};
 
 /**
  * One rendered `tree.item`. Its own parts read this; the nodes inside its
  * content root their own instances of the same family and never see this one.
  */
-export type TreeItemInstanceState = Seeded<TreeItemProps, 'open' | 'leaf' | 'level'> & {
+export type TreeItemInstanceState = Seeded<
+	TreeItemProps,
+	'open' | 'leaf' | 'level' | 'disabled'
+> & {
 	/** The consumer's callback, stored by the node for `toggle()` to call. */
 	onChange?: TreeItemProps['onChange'];
 };

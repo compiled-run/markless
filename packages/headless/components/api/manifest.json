@@ -4693,6 +4693,13 @@
 						"doc": "How deep this node sits, counting from 1. It is written rather than read\noff the enclosing node, because a component that roots an instance of a\nfamily cannot also read the enclosing instance of that same family."
 					},
 					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nobody can open or close this node, and the walk steps over it. A locked\nnode written `open` stays open, and the nodes inside it are still reachable."
+					},
+					{
 						"name": "onChange",
 						"type": "(open: boolean) => void",
 						"required": false,

@@ -203,7 +203,17 @@ function TableGrid({ children, onClick, onFocusin, onKeydown, ...rest }: TableGr
 
 			const row = rowAt(rowEls, target);
 			// A row has no native disabled, so isReachable is the only refusal a press meets.
-				if (row !== null && isReachable(row)) table.pick(row.getAttribute('ui-value') ?? '');
+			if (row !== null && isReachable(row)) {
+				const value = row.getAttribute('ui-value') ?? '';
+				if (event.shiftKey && table.multiple === true) {
+					// A Shift press picks the run from the anchor, the way a Shift walk does.
+					const anchor = table.anchor === '' ? value : table.anchor;
+					table.anchor = anchor;
+					table.settle(spanBetween(rowValues(reachableRows(rowEls)), anchor, value));
+				} else {
+					table.pick(value);
+				}
+			}
 			onClick?.(event);
 		}}
 		onKeydown={(event) => {
@@ -298,8 +308,14 @@ function TableGrid({ children, onClick, onFocusin, onKeydown, ...rest }: TableGr
 				table.anchor = '';
 				table.settle([]);
 			} else if (key === ' ') {
-				// A cell is not selectable; the space bar picks the row the cell sits in.
-				if (isReachable(here)) table.pick(held);
+				// A cell is not selectable; the space bar picks the row the cell sits in,
+				// and with Shift held it picks the run from the anchor to that row.
+				if (isReachable(here) && shift && isMultiple) {
+					if (anchor === '') table.anchor = held;
+					table.settle(spanBetween(order, anchor === '' ? held : anchor, held));
+				} else if (isReachable(here)) {
+					table.pick(held);
+				}
 			} else if (jump && (key === 'a' || key === 'A') && isMultiple) {
 				table.anchor = order[0] ?? '';
 				table.settle(allOf(order));

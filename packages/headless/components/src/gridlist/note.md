@@ -91,11 +91,10 @@ move rather than a rewrite.
 
 ## Known gaps
 
-- The arrows are cancelled on every keystroke, inside a row's controls as well as
-  on a row. Harmless on a button, which is all the walk manages, but a bare text
-  field dropped into a row would lose caret movement. The guard that would have
-  narrowed it is `MARKLESS_SYNC_POLICY_UNEXTRACTABLE`; the research note records
-  the exact shape that fails.
+- The keys are cancelled only while `inside` is false, and `inside` is set by
+  `Enter`/`F2` on the row and cleared by landing back on it. A bare text field
+  dropped into a row and reached with `Tab` is not "inside", so the arrows on it
+  are still cancelled; only the controls the walk manages are exempt.
 - No `PageUp`/`PageDown`. They need a viewport height and a scroll container this
   family does not own; the work belongs with whatever brings virtualization.
 - The widget walk only knows controls written as `gridlist.itemtrigger`. A bare
@@ -105,7 +104,3 @@ move rather than a rewrite.
 - No `aria-rowcount`/`aria-colcount`: the DOM holds every row, so the browser
   computes them. `table` will owe the decision the moment it windows.
 - No drag and drop, no virtualization, no empty state, no `onAction` callback.
-- Not registered: the gallery, manifest, conformance and chaos lanes do not know
-  this family yet, and `gridlist-transcript.ts` carries a literal `'/#gridlist'`
-  where every registered family reads `FAMILY_ANCHORS`. Registration is a
-  follow-up unit and swaps that literal.

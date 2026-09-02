@@ -17,7 +17,7 @@ import type {
 
 export const treeState = shared(
 	() => {
-		const tree: TreeInstanceState = state({ disabled: false });
+		const tree: TreeInstanceState = state({ disabled: false, inside: false });
 		const rootEl = element<HTMLDivElement>();
 		// The array type argument makes a handle plural: bound on every part of its
 		// kind, read back as the live elements in document order.
@@ -34,7 +34,12 @@ export const treeState = shared(
 // Rooted by every `tree.item`, so a node written inside another item's content gets its own instance.
 export const treeItemState = shared(
 	() => {
-		const item: TreeItemInstanceState = state({ open: false, leaf: false, level: 1 });
+		const item: TreeItemInstanceState = state({
+			open: false,
+			leaf: false,
+			level: 1,
+			disabled: false,
+		});
 		const labelEl = element<HTMLSpanElement>();
 
 		return {
@@ -69,6 +74,7 @@ export function TreeRoot({
 		role="tree"
 		tabindex={0}
 		ui-disabled={tree.disabled}
+		ui-inside={tree.inside}
 		onFocusin={(event) => {
 			// `target`, not `currentTarget`: a lazy handler symbol runs after the native dispatch, when `currentTarget` is null.
 			const target = event.target as HTMLElement;
@@ -87,6 +93,8 @@ export function TreeRoot({
 			}
 
 			const row = rowAt(tree.rowEls, target);
+			// A link or a button inside the row owns the keys while it has focus.
+			tree.inside = row !== null && target !== row;
 			if (row) {
 				// Roving is written straight to the DOM: container and rows render tabindex as literals, so nothing else moves it.
 				root.setAttribute('tabindex', '-1');
@@ -98,14 +106,17 @@ export function TreeRoot({
 			onFocusin?.(event);
 		}}
 		onKeydown={(event) => {
-			// Enter and Space are absent on purpose: the row's own trigger is a native button and already consumes them.
+			// Written from event fields and one graph cell: the policy runs before the handler symbol loads.
+			// Enter is absent on purpose: the row's own trigger is a native button and already consumes it.
 			if (
-				event.key === 'ArrowDown' ||
-				event.key === 'ArrowUp' ||
-				event.key === 'ArrowRight' ||
-				event.key === 'ArrowLeft' ||
-				event.key === 'Home' ||
-				event.key === 'End'
+				!tree.inside &&
+				(event.key === 'ArrowDown' ||
+					event.key === 'ArrowUp' ||
+					event.key === 'ArrowRight' ||
+					event.key === 'ArrowLeft' ||
+					event.key === 'Home' ||
+					event.key === 'End' ||
+					event.key === ' ')
 			) {
 				event.preventDefault();
 			}
@@ -147,9 +158,14 @@ export function TreeRoot({
 				return;
 			}
 
+			// The walk is the row's: a key on a focusable inside it is that element's own.
+			if (target !== here) {
+				onKeydown?.(event);
+				return;
+			}
+
 			// The row's own trigger, and only its own: "first focusable inside" follows a link instead of opening a folder.
 			const trigger = ownPart(tree.triggerEls, rowEls, here);
-			// A closed node reports no aria-expanded, so the state attribute is what tells it from a leaf.
 			const expanded = here.getAttribute('aria-expanded') === 'true';
 			const collapsed = here.hasAttribute('ui-closed');
 			const at = rows.indexOf(here);
@@ -170,10 +186,16 @@ export function TreeRoot({
 			} else if (key === 'ArrowLeft') {
 				if (expanded) trigger?.click();
 				else next = parentRow(tree.rowEls, here);
-			} else if (target === here && (key === 'Enter' || key === ' ')) {
-				// Gated on the row itself: the trigger inside it is a native button, and handling here too would toggle twice.
+			} else if (key === 'Enter' || key === ' ') {
 				trigger?.click();
-			} else if (target === here && key.length === 1) {
+			} else if (key === '*') {
+				// Every closed node at this row's level, this one included; a disabled trigger refuses the press on its own.
+				const parent = parentRow(rowEls, here);
+				for (const row of rows) {
+					if (parentRow(rowEls, row) !== parent || !row.hasAttribute('ui-closed')) continue;
+					ownPart(tree.triggerEls, rowEls, row)?.click();
+				}
+			} else if (key.length === 1) {
 				// The typeahead buffer lives on the element and is aged by a clock read, so no timer is outstanding across resume.
 				const now = Date.now();
 				const since = Number(root.getAttribute('ui-typeahead-at') ?? '0');
@@ -206,6 +228,7 @@ export function TreeItem({
 	open = false,
 	leaf = false,
 	level = 1,
+	disabled = false,
 	onChange,
 	children,
 	...rest
@@ -216,26 +239,35 @@ export function TreeItem({
 	item.open = open;
 	item.leaf = leaf;
 	item.level = level;
+	item.disabled = disabled;
 	const isClosed = computed(() => item.leaf !== true && item.open !== true);
 	const isShowing = computed(() => item.leaf !== true && item.open === true);
+	// A leaf reports no open state at all; a closed parent says "false", which is what tells it from a leaf.
+	const ariaExpanded = computed(() =>
+		item.leaf === true ? null : item.open === true ? 'true' : 'false',
+	);
+	const ariaDisabled = computed(() => (item.disabled === true ? 'true' : null));
 
+	// No aria-selected: the tree offers no selection, and a consumer's own comes through rest.
 	<div
 		{...rest}
 		el={tree.rowEls}
 		role="treeitem"
-		aria-expanded={isShowing ? 'true' : undefined}
-		aria-selected="false"
+		aria-expanded={ariaExpanded}
+		aria-disabled={ariaDisabled}
 		aria-level={item.level}
 		tabindex={-1}
 		ui-open={isShowing}
 		ui-closed={isClosed}
 		ui-leaf={item.leaf}
+		ui-disabled={item.disabled}
 	>{children}</div>
 }
 
 export function TreeItemTrigger({ children, onClick, ...rest }: TreeItemTriggerProps) @{
 	const tree = treeState();
 	const item = treeItemState();
+	const isDisabled = computed(() => tree.disabled === true || item.disabled === true);
 
 	// tabindex -1 because the row is the tab stop.
 	<button
@@ -244,7 +276,7 @@ export function TreeItemTrigger({ children, onClick, ...rest }: TreeItemTriggerP
 		type="button"
 		tabindex={-1}
 		aria-labelledby={item.labelEl}
-		disabled={tree.disabled}
+		disabled={isDisabled}
 		ui-open={item.open}
 		ui-closed={item.open !== true}
 		onClick={(event) => {

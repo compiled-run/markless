@@ -8,7 +8,7 @@
 
 type Parts<T extends HTMLElement> = ReadonlyArray<T> | undefined;
 
-/** The rows a person can reach: no closed group holds them. */
+/** The rows a person can reach: no closed group holds them, and the walk steps over a locked one. */
 export function visibleRows<Row extends HTMLElement>(
 	rows: Parts<Row>,
 	groups: Parts<HTMLElement>,
@@ -18,6 +18,7 @@ export function visibleRows<Row extends HTMLElement>(
 
 	const visible: Row[] = [];
 	for (const row of rows ?? []) {
+		if (row.hasAttribute('ui-disabled')) continue;
 		let isHidden = false;
 		for (const group of closed)
 			if (group.contains(row)) {

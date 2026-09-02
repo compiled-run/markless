@@ -5,6 +5,7 @@ import Basic from './scenarios/basic.tsrx';
 import Cells from './scenarios/cells.tsrx';
 import Disabled from './scenarios/disabled.tsrx';
 import Multiple from './scenarios/multiple.tsrx';
+import Overflowing from './scenarios/overflowing.tsrx';
 import PickedCells from './scenarios/picked-cells.tsrx';
 import Prepicked from './scenarios/prepicked.tsrx';
 import RowModel from './scenarios/row-model.tsrx';
@@ -39,6 +40,15 @@ const LeftRoot = page.getByTestId('left-root');
 const LeftIndexName = page.getByTestId('left-index-name');
 const LeftAppName = page.getByTestId('left-app-name');
 const RightIntroItem = page.getByTestId('right-intro-item');
+const Frame = page.getByTestId('frame');
+const FirstItem = page.getByTestId('first-item');
+const LastItem = page.getByTestId('last-item');
+
+function picked(root: Element) {
+	return Array.from(root.querySelectorAll('tr[ui-selected]')).map((row) =>
+		row.getAttribute('ui-value'),
+	);
+}
 
 // The SSR harness rewrites a literal `renderSSR` call site, so each test must branch
 // on the mode rather than take the mount by reference.
@@ -302,12 +312,16 @@ test('CSR: Home and End go to the ends of the row, and with Control to the corne
 	el(LicenseSize).focus();
 
 	await userEvent.keyboard('{End}');
-	await expect.poll(() => document.activeElement).toBe(el(LicenseName).parentElement?.lastElementChild);
+	await expect
+		.poll(() => document.activeElement)
+		.toBe(el(LicenseName).parentElement?.lastElementChild);
 	await userEvent.keyboard('{Home}');
 	await expect.poll(() => document.activeElement).toBe(el(LicenseName));
 
 	await userEvent.keyboard('{Control>}{End}{/Control}');
-	await expect.poll(() => document.activeElement).toBe(el(ChangelogName).parentElement?.lastElementChild);
+	await expect
+		.poll(() => document.activeElement)
+		.toBe(el(ChangelogName).parentElement?.lastElementChild);
 	await userEvent.keyboard('{Control>}{Home}{/Control}');
 	await expect.poll(() => document.activeElement).toBe(el(ReadmeName));
 });
@@ -450,10 +464,63 @@ test('CSR: two tables on one page keep their own focus and their own picked rows
 	await render(TwoTables);
 	el(LeftIndexName).focus();
 	await userEvent.keyboard(' ');
-	await expect.poll(() => el(page.getByTestId('left-index-item')).getAttribute('ui-selected')).toBe('');
+	await expect
+		.poll(() => el(page.getByTestId('left-index-item')).getAttribute('ui-selected'))
+		.toBe('');
 
 	await userEvent.keyboard('{ArrowDown}');
 	await expect.poll(() => document.activeElement).toBe(el(LeftAppName));
 	expect(el(RightIntroItem).hasAttribute('ui-selected')).toBe(false);
 	expect(el(LeftRoot).getAttribute('role')).toBe('grid');
+});
+
+// A Shift press picks the run from the anchor to the pressed row, the way a
+// Shift walk does, and a second Shift press replaces that run rather than growing it.
+for (const mode of MODES) {
+	test(`${mode}: a Shift press picks the run from the row picked last`, async () => {
+		if (mode === 'CSR') await render(Multiple);
+		else await renderSSR(Multiple);
+		el(ReadmeItem).click();
+		await expect.poll(() => picked(el(Root))).toEqual(['readme']);
+
+		await userEvent.click(el(ChangelogItem), { modifiers: ['Shift'] });
+		await expect.poll(() => picked(el(Root))).toEqual(['readme', 'license', 'changelog']);
+		await expect.poll(() => el(Picked).textContent).toBe('readme license changelog');
+
+		await userEvent.click(el(LicenseItem), { modifiers: ['Shift'] });
+		await expect.poll(() => picked(el(Root))).toEqual(['readme', 'license']);
+	});
+}
+
+test('CSR: a Shift press in a table that picks one row at a time picks only that row', async () => {
+	await render(Selectable);
+	el(ReadmeItem).click();
+	await expect.poll(() => picked(el(Root))).toEqual(['readme']);
+
+	await userEvent.click(el(ChangelogItem), { modifiers: ['Shift'] });
+	await expect.poll(() => picked(el(Root))).toEqual(['changelog']);
+});
+
+test('CSR: Shift and the space bar pick the run from the row picked last', async () => {
+	await render(Multiple);
+	el(ReadmeItem).focus();
+	await userEvent.keyboard(' ');
+	await expect.poll(() => picked(el(Root))).toEqual(['readme']);
+
+	await userEvent.keyboard('{ArrowDown}');
+	await userEvent.keyboard('{ArrowDown}');
+	await expect.poll(() => document.activeElement).toBe(el(ChangelogItem));
+	await userEvent.keyboard('{Shift>} {/Shift}');
+	await expect.poll(() => picked(el(Root))).toEqual(['readme', 'license', 'changelog']);
+	await expect.poll(() => el(Calls).textContent).toBe('2');
+});
+
+test('CSR: the row the walk lands on is scrolled into view', async () => {
+	await render(Overflowing);
+	el(FirstItem).focus();
+	expect(el(Frame).scrollTop).toBe(0);
+
+	await userEvent.keyboard('{End}');
+	await expect.poll(() => document.activeElement).toBe(el(LastItem));
+	expect(el(Frame).scrollTop).toBeGreaterThan(0);
 });
