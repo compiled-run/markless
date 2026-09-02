@@ -486,35 +486,24 @@ test('CSR: a card inside an open popover shows without closing the popover', asy
 	expect(el(PopoverContent).hasAttribute('hidden')).toBe(false);
 });
 
-// KNOWN GAP, pinned as what should happen rather than as what does. The overlay
-// behaviour keeps ONE stack and tells only its topmost entry about a dismissal,
-// so a card enlisted over a popover swallows the press that was meant for the
-// popover underneath and the popover stays open. The platform's answer is a
-// separate stack for hint-tier surfaces; that is a change to the overlay code in
-// the web package, and the day it lands this row goes green instead of
-// surprising someone.
-test.fails(
-	'CSR: a press outside both should reach the popover under the card — known gap: one stack, topmost only',
-	async () => {
-		await render(InsidePopover);
-		el<HTMLElement>(PopoverTrigger).click();
-		await expect.poll(() => el(PopoverContent).hasAttribute('hidden')).toBe(false);
-		await showByHover(el(Trigger), el(Content));
+// The card is a hint: it was going to hide anyway, and the press was aimed at
+// whatever is under it, so the overlay stack reports the press to the popover too.
+test('CSR: a press outside both reaches the card and the popover under it', async () => {
+	await render(InsidePopover);
+	el<HTMLElement>(PopoverTrigger).click();
+	await expect.poll(() => el(PopoverContent).hasAttribute('hidden')).toBe(false);
+	await showByHover(el(Trigger), el(Content));
 
-		el(Background).dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
-		await expect.poll(() => el(Content).hasAttribute('hidden')).toBe(true);
-		await expect.poll(() => el(PopoverContent).hasAttribute('hidden')).toBe(true);
-	},
-);
+	el(Background).dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+	await expect.poll(() => el(Content).hasAttribute('hidden')).toBe(true);
+	await expect.poll(() => el(PopoverContent).hasAttribute('hidden')).toBe(true);
+});
 
-// KNOWN GAP, pinned as what should happen: one card at a time, as with tooltip.
-// The overlay stack tells an enlisted surface nothing when another enlists over
-// it, and each root knows only its own parts, so a card held open by focus stays
-// up while a hovered neighbour shows beside it. The platform's answer is a hint
-// tier in the overlay stack, a web-package change; a family-local registry
-// reaching across instances is not the fix.
+// One card at a time, as with tooltip. Each root knows only its own parts, so
+// this is the overlay stack's hint tier superseding the card that was up, never
+// a registry reaching across roots.
 for (const mode of MODES) {
-	test.fails(`${mode}: showing one card hides the card a focused trigger was holding`, async () => {
+	test(`${mode}: showing one card hides the card a focused trigger was holding`, async () => {
 		if (mode === 'CSR') await render(TwoCardsAtRest);
 		else await renderSSR(TwoCardsAtRest);
 

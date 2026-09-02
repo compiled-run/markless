@@ -15,7 +15,7 @@
  * This module is types only, so naming the property costs no bytes anywhere.
  */
 
-import type { OverlayDismissReason } from './fns/overlay.ts';
+import type { OverlayGestureReason } from './fns/overlay.ts';
 
 export type OverlayHiddenBoundRoot = {
 	/**
@@ -62,7 +62,7 @@ export type OverlayFocusOriginHost = {
  * so the next installation takes it. Either way it is taken once.
  */
 export type OverlayPrimedDismissalHost = {
-	__marklessOverlayPrimedDismissal?: OverlayDismissReason;
+	__marklessOverlayPrimedDismissal?: OverlayGestureReason;
 };
 
 /**

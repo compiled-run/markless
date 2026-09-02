@@ -712,9 +712,7 @@ const descriptors: readonly FamilyDescriptor[] = [
 			trigger: 'trigger',
 			surface: 'content',
 			haspopup: 'listbox',
-			// This family owns its own dismissal handlers rather than carrying the
-			// bare `overlay` mark, so the two dismissal rows do not apply to it.
-			ridesOverlay: false,
+			ridesOverlay: true,
 			// The popup points at the highlighted option rather than requiring focus to move.
 			focusLands: false,
 			focusReturns: false,

@@ -2,6 +2,7 @@ import { render, renderSSR } from '@markless/vitest-browser';
 import { page, userEvent } from 'vite-plus/test/browser';
 import { afterEach, beforeEach, expect, test } from 'vitest';
 import Basic from './scenarios/basic.tsrx';
+import BesideMenu from './scenarios/beside-menu.tsrx';
 import IconButton from './scenarios/icon-button.tsrx';
 import InsidePopover from './scenarios/inside-popover.tsrx';
 import Reversed from './scenarios/reversed.tsrx';
@@ -28,6 +29,8 @@ const SecondTrigger = page.getByTestId('second-trigger');
 const SecondContent = page.getByTestId('second-content');
 const PopoverTrigger = page.getByTestId('popover-trigger');
 const PopoverContent = page.getByTestId('popover-content');
+const MenuTrigger = page.getByTestId('menu-trigger');
+const MenuContent = page.getByTestId('menu-content');
 const Calls = page.getByTestId('calls');
 const Last = page.getByTestId('last');
 
@@ -439,13 +442,9 @@ test('CSR: a tooltip inside an open popover shows without closing the popover', 
 	expect(el(PopoverContent).hasAttribute('hidden')).toBe(false);
 });
 
-// KNOWN DEBT, asserted as it stands rather than as it should be. The overlay
-// primitive keeps ONE stack and tells only its topmost entry about a dismissal,
-// so the tip - which was going to hide on pointer-leave anyway - swallows the
-// press that was meant for the popover under it. The platform's answer is a
-// separate stack for hint-tier surfaces; that is a framework change, and the day
-// it lands this row flips instead of surprising someone.
-test('CSR: a press outside both reaches only the tip, and the popover survives it', async () => {
+// The tip is a hint: it was going to hide anyway, and the press was aimed at
+// whatever is under it, so the overlay stack reports the press to the popover too.
+test('CSR: a press outside both reaches the tip and the popover under it', async () => {
 	await render(InsidePopover);
 	el<HTMLElement>(PopoverTrigger).click();
 	await expect.poll(() => el(PopoverContent).hasAttribute('hidden')).toBe(false);
@@ -453,18 +452,15 @@ test('CSR: a press outside both reaches only the tip, and the popover survives i
 
 	el(Background).dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
 	await expect.poll(() => el(Content).hasAttribute('hidden')).toBe(true);
-	expect(el(PopoverContent).hasAttribute('hidden')).toBe(false);
+	await expect.poll(() => el(PopoverContent).hasAttribute('hidden')).toBe(true);
 });
 
-// KNOWN GAP, pinned as what should happen. Only one tooltip is visible at a time
-// (React Aria TooltipTrigger, Radix Tooltip.Provider, APG): showing one hides any
-// other, however the first was shown. The overlay stack tells an enlisted surface
-// nothing when another enlists over it, and each root knows only its own parts,
-// so a tip held open by focus stays up while a hovered neighbour shows beside it.
-// The platform's answer is a hint tier in the overlay stack, a web-package change;
-// a family-local registry reaching across instances is not the fix.
+// Only one tooltip is visible at a time (React Aria TooltipTrigger, Radix
+// Tooltip.Provider, APG): showing one hides any other, however the first was
+// shown. Each root knows only its own parts, so this is the overlay stack's hint
+// tier superseding the tip that was up, never a registry reaching across roots.
 for (const mode of MODES) {
-	test.fails(`${mode}: showing one tip hides the tip a focused trigger was holding`, async () => {
+	test(`${mode}: showing one tip hides the tip a focused trigger was holding`, async () => {
 		if (mode === 'CSR') await render(Toolbar);
 		else await renderSSR(Toolbar);
 
@@ -477,6 +473,33 @@ for (const mode of MODES) {
 
 		await userEvent.keyboard('{Escape}');
 		await expect.poll(() => el(ItalicContent).hasAttribute('hidden')).toBe(true);
+	});
+
+	// A hint and a menu on one stack, on different terms: the menu opening is the
+	// person leaving what the tip described, so the tip goes; the tip showing over
+	// the open menu describes something in reach, so the menu stays.
+	test(`${mode}: a menu opening hides the tip that was showing`, async () => {
+		if (mode === 'CSR') await render(BesideMenu);
+		else await renderSSR(BesideMenu);
+		await showByHover(el(Trigger), el(Content));
+
+		el<HTMLElement>(MenuTrigger).click();
+		await expect.poll(() => el(MenuContent).hasAttribute('hidden')).toBe(false);
+		await expect.poll(() => el(Content).hasAttribute('hidden')).toBe(true);
+	});
+
+	test(`${mode}: a tip showing over an open menu leaves the menu open`, async () => {
+		if (mode === 'CSR') await render(BesideMenu);
+		else await renderSSR(BesideMenu);
+		el<HTMLElement>(MenuTrigger).click();
+		await expect.poll(() => el(MenuContent).hasAttribute('hidden')).toBe(false);
+
+		await showByHover(el(Trigger), el(Content));
+		expect(el(MenuContent).hasAttribute('hidden')).toBe(false);
+
+		await userEvent.keyboard('{Escape}');
+		await expect.poll(() => el(Content).hasAttribute('hidden')).toBe(true);
+		expect(el(MenuContent).hasAttribute('hidden')).toBe(false);
 	});
 }
 

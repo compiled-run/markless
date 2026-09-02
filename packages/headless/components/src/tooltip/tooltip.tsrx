@@ -153,6 +153,7 @@ export function TooltipTrigger({ children, onFocus, onBlur, ...rest }: TooltipTr
 // Written after the trigger: a CSS anchor must be laid out strictly before the element that names it, which an in-flow trigger satisfies from anywhere - but a consumer who absolutely positions their trigger and writes the tip first gets a silent miss.
 // Hidden hides the tip, never detaches it: the trigger points at this element's minted id, and an enlisted element removed from the document leaves the overlay stack's marks behind.
 // `overlay` is a bare attribute the primitive reads; while enlisted it reports Escape and outside presses - including a press on the tooltip's own trigger - as `dismiss`.
+// `overlay-hint` puts the tip on the stack's hint terms: one hint shows at a time, another surface opening supersedes it, and it never dismisses the surface beneath it.
 export function TooltipContent({ children, onDismiss, ...rest }: TooltipContentProps) @{
 	const tooltip = tooltipState();
 
@@ -160,12 +161,13 @@ export function TooltipContent({ children, onDismiss, ...rest }: TooltipContentP
 		{...rest}
 		el={tooltip.contentEl}
 		overlay
+		overlay-hint
 		role="tooltip"
 		hidden={tooltip.open !== true}
 		ui-open={tooltip.open}
 		ui-closed={tooltip.open !== true}
 		onDismiss={(event) => {
-			// No focus return: the tip never holds focus, so there is nowhere to hand it back from.
+			// No focus return: the tip never holds focus, so there is nowhere to hand it back from. Superseded - another tip or a surface opened - hides it the same way.
 			tooltip.setOpen(false);
 			onDismiss?.(event);
 		}}
