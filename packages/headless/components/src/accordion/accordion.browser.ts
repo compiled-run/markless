@@ -766,7 +766,7 @@ function drawerParts(index: number) {
 }
 
 async function pinRowsServedInTheChildsArm(index: number) {
-	const { drawer, inside, list, rows } = drawerParts(index);
+	const { drawer, list, rows } = drawerParts(index);
 	expect(rows()).toHaveLength(2);
 	expect(list()?.parentElement).toBe(drawer);
 	for (const row of rows()) expect(row.parentElement).toBe(list());
