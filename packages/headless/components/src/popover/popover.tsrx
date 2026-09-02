@@ -20,14 +20,10 @@ import type {
 // `@layer markless` is what keeps these defaults losing to a consumer's own
 // unlayered rules without a specificity fight.
 
-/** How long a press that closed the surface keeps the click behind it from re-opening, in milliseconds. */
-const CLICK_GRACE = 300;
-
 export const popoverState = shared(
 	() => {
 		const popover: PopoverInstanceState = state({
 			open: false,
-			graceUntil: 0,
 		});
 		const triggerEl = element<HTMLButtonElement>();
 		const contentEl = element<HTMLDivElement>();
@@ -91,7 +87,7 @@ export function PopoverTrigger({ children, onClick, ...rest }: PopoverTriggerPro
 		ui-open={popover.open}
 		ui-closed={popover.open !== true}
 		onClick={(event) => {
-			if (popover.graceUntil <= Date.now()) popover.setOpen(popover.open !== true);
+			popover.setOpen(popover.open !== true);
 			onClick?.(event);
 		}}
 	>
@@ -128,8 +124,8 @@ export function PopoverContent({ children, onDismiss, ...rest }: PopoverContentP
 			const pressed = event.detail.pressTarget;
 			const isOwnTriggerPress =
 				pressed !== undefined && back !== undefined && back.contains(pressed);
-			popover.setOpen(false);
-			if (isOwnTriggerPress) popover.graceUntil = Date.now() + CLICK_GRACE;
+			// A press on the own trigger is not a dismissal: the click it becomes toggles the surface, however long the press is held.
+			if (isOwnTriggerPress !== true) popover.setOpen(false);
 			// The primitive moves no focus, and a press elsewhere is a person choosing where to be, so only Escape hands it back.
 			if (event.detail.reason === 'escape' && isFocusInside) back?.focus();
 			onDismiss?.(event);

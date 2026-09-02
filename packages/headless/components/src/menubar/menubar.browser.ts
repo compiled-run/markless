@@ -342,6 +342,24 @@ for (const mode of MODES) {
 
 	// ── The nesting below one item is the menu family's own ──────────────────
 
+	// The APG's rule for a leaf: ArrowRight has no submenu to open, so it is the bar's.
+	test(`${mode}: ArrowRight on a leaf inside a nested submenu hops to the next bar menu`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+
+		await openBar('bar-file', 'panel-file');
+		el('level-recent').focus();
+		keyOn(el('level-recent'), 'ArrowRight');
+		await expectShowing('panel-recent');
+		await expectFocused('item-draft');
+
+		keyOn(el('item-draft'), 'ArrowRight');
+		await expectShowing('panel-edit');
+		await expectClosed('panel-file');
+		await expectClosed('panel-recent');
+		await expectFocused('item-undo');
+	});
+
 	test(`${mode}: a nested submenu keeps the shipped ArrowRight walk`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);

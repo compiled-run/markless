@@ -20,6 +20,9 @@ export type ToolbarRootProps = PropsOf<'div'> & {
  * the position in the registered roster that owns the bar's one tab stop.
  */
 export type ToolbarInstanceState = Seeded<ToolbarRootProps, 'orientation'> & {
+	/** The orientation as two flags a key policy can read: which arrow pair is the bar's. */
+	vertical: boolean;
+	horizontal: boolean;
 	/** A bar is rendered around this read. A control outside every bar reads `false`. */
 	mounted: boolean;
 	/** The position in the roster, read back in document order, that owns the bar's tab stop. */

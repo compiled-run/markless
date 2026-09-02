@@ -14,6 +14,8 @@ export const toolbarState = shared(
 	() => {
 		const toolbar: ToolbarInstanceState = state({
 			orientation: 'horizontal' as ToolbarOrientation,
+			vertical: false,
+			horizontal: true,
 			// The bar exists. A control of another family reads this to know whether
 			// it is inside a toolbar at all: a control outside every bar resolves to
 			// no instance and reads the seed, which no rendered bar ever writes.
@@ -51,6 +53,8 @@ export const toolbarItemState = shared(
 export function ToolbarRoot({ orientation = 'horizontal', children, ...rest }: ToolbarRootProps) @{
 	const toolbar = toolbarState();
 	toolbar.orientation = orientation;
+	toolbar.vertical = orientation === 'vertical';
+	toolbar.horizontal = orientation !== 'vertical';
 
 	<ToolbarBar {...rest}>{children}</ToolbarBar>
 }
@@ -94,18 +98,12 @@ function ToolbarBar({ children, onKeydown, onFocusin, ...rest }: ToolbarBarProps
 			onFocusin?.(event);
 		}}
 		onKeydown={(event) => {
-			// A flat `===` chain over `event.key` alone: the resumer applies this
-			// policy before the handler module loads, so a guard over the bar's
-			// orientation would be MARKLESS_SYNC_POLICY_UNEXTRACTABLE. The off-axis
-			// arrows are prevented too, which costs a page scroll the way `tabs` and
-			// `buttongroup` already pay it.
+			// Event fields and bare cells only, the shape the resumer applies before the handler module loads. Each axis negates its own flag: a resumed page stops answering a cell once a handler has written it, and a negation over nothing cancels, which is the safe side.
 			if (
-				event.key === 'ArrowRight' ||
-				event.key === 'ArrowLeft' ||
-				event.key === 'ArrowUp' ||
-				event.key === 'ArrowDown' ||
 				event.key === 'Home' ||
-				event.key === 'End'
+				event.key === 'End' ||
+				((event.key === 'ArrowRight' || event.key === 'ArrowLeft') && !toolbar.vertical) ||
+				((event.key === 'ArrowUp' || event.key === 'ArrowDown') && !toolbar.horizontal)
 			) {
 				event.preventDefault();
 			}

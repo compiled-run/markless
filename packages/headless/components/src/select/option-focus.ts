@@ -11,6 +11,9 @@
 
 type Options = ReadonlyArray<HTMLElement>;
 
+/** How many options a page key steps over. */
+export const PAGE_STEP = 10;
+
 /** Land the roving focus among `options`, on a chosen one or at an end. */
 export function focusOpeningOption(
 	options: Options | undefined,
@@ -47,13 +50,21 @@ export function focusMatchingOption(
 	matchingOption(options, labels, search)?.focus();
 }
 
-/** Move the roving focus one step, or to an end. The ends do not wrap. */
+/** Move the roving focus one step, a page, or to an end. The ends do not wrap. */
 export function focusNeighbourOption(
 	options: Options | undefined,
 	target: HTMLElement,
 	key: string,
 ): void {
 	if (!options) return;
+	if (key === 'PageDown' || key === 'PageUp') {
+		const walkable = options.filter(isWalkable);
+		const at = walkable.findIndex((option) => option.contains(target));
+		const step = key === 'PageDown' ? PAGE_STEP : -PAGE_STEP;
+		const landed = at === -1 ? 0 : Math.min(walkable.length - 1, Math.max(0, at + step));
+		walkable[landed]?.focus();
+		return;
+	}
 
 	let first: HTMLElement | undefined;
 	let last: HTMLElement | undefined;

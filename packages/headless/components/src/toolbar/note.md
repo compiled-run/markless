@@ -177,12 +177,10 @@ placement props, no RTL `dir`.
 
 ## Follow-ups this unit names rather than does
 
-**`menu.trigger` registration.** A menu inside a toolbar renders and works today,
-but its trigger is not a bar stop: it is not in the roster, the arrows do not
-reach it, and it keeps its own tab stop. `scenarios/mixed.tsrx` deliberately does
-not contain one. The wiring is three lines in `menu.tsrx` — the same three every
-other control took — and it is held because a menubar branch is contending that
-file.
+**`menu.trigger` registration** shipped: the trigger reads `toolbarState()`,
+registers into the roster and hands its tab stop over, the same three lines every
+other control took, and `scenarios/mixed.tsrx` carries one so the arrows reaching
+it and its own ArrowDown still opening the menu are pinned.
 
 **A `toolbar` slot in `test-support/driver.ts`'s `Vocabulary`.** The virtual
 reader announces "toolbar" and `toolbar.sr.ts` asserts it from a local word table,

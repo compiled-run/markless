@@ -26,6 +26,8 @@ export const buttongroupState = shared(
 			required: false,
 			name: '',
 			focused: '',
+			vertical: false,
+			horizontal: true,
 		});
 		// The array type argument makes the handle plural: bound on every item, read back as the live buttons in document order.
 		const itemEls = element<HTMLButtonElement[]>();
@@ -85,6 +87,8 @@ export function ButtonGroupRoot({
 	group.value = value;
 	group.multiple = multiple;
 	group.orientation = orientation;
+	group.vertical = orientation === 'vertical';
+	group.horizontal = orientation !== 'vertical';
 	group.loop = loop;
 	group.disabled = disabled;
 	group.required = required;
@@ -171,8 +175,7 @@ export function ButtonGroupItem({
 			onFocus?.(event);
 		}}
 		onKeydown={(event) => {
-			// Guarded by event fields alone, and only `===` chains extract: a guard
-			// over locals derived from graph state is MARKLESS_SYNC_POLICY_UNEXTRACTABLE.
+			// Event fields and bare cells only, the shape lifted into the policy that runs before the handler loads. Each axis negates its own flag: a resumed page stops answering a cell once a handler has written it, and a negation over nothing cancels, which is the safe side.
 			// Enter and Space are absent on purpose - the item is a real button and
 			// the browser activates it, so handling them here would press twice.
 			// The modifiers keep browser chords - history back, scroll to end - out of the walk.
@@ -180,12 +183,10 @@ export function ButtonGroupItem({
 				event.altKey === false &&
 				event.ctrlKey === false &&
 				event.metaKey === false &&
-				(event.key === 'ArrowRight' ||
-					event.key === 'ArrowLeft' ||
-					event.key === 'ArrowUp' ||
-					event.key === 'ArrowDown' ||
-					event.key === 'Home' ||
-					event.key === 'End')
+				(event.key === 'Home' ||
+					event.key === 'End' ||
+					((event.key === 'ArrowRight' || event.key === 'ArrowLeft') && !group.vertical) ||
+					((event.key === 'ArrowUp' || event.key === 'ArrowDown') && !group.horizontal))
 			) {
 				event.preventDefault();
 			}

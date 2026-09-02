@@ -95,6 +95,12 @@ export type TourInstanceState = Seeded<
 	/** Which step is showing, counting from zero. */
 	step: number;
 	/**
+	 * The step showing is the last one. Banked as a cell by every walk and by a
+	 * card taking focus, because the count lives in the roster of bound cards and
+	 * a derived attribute mixing that roster with the step does not track.
+	 */
+	atEnd: boolean;
+	/**
 	 * The current step's target element, or `undefined` for a centred step.
 	 *
 	 * The only raw element on any family's public surface, and it is here because

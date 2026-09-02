@@ -5,6 +5,7 @@ import { afterEach, expect, test } from 'vitest';
 import Basic from './scenarios/basic.tsrx';
 import CheckboxItems from './scenarios/checkbox-items.tsrx';
 import Context from './scenarios/context.tsrx';
+import ContextDisabled from './scenarios/context-disabled.tsrx';
 import ContextKeyboard from './scenarios/context-keyboard.tsrx';
 import Controlled from './scenarios/controlled.tsrx';
 import Deep from './scenarios/deep.tsrx';
@@ -342,6 +343,20 @@ for (const mode of MODES) {
 		await wait(60);
 		expect(text('calls')).toBe('0');
 		expect(el('content').hasAttribute('hidden')).toBe(false);
+	});
+
+	test(`${mode}: a pointer moving over an item focuses it, and never a disabled one`, async () => {
+		if (mode === 'CSR') await render(Disabled);
+		else await renderSSR(Disabled);
+
+		await openByClick();
+		el('item-cut').focus();
+		el('item-undo').dispatchEvent(new PointerEvent('pointermove', { bubbles: true }));
+		await expectFocused('item-undo');
+
+		el('item-paste').dispatchEvent(new PointerEvent('pointermove', { bubbles: true }));
+		await wait(QUIET_MS / 4);
+		expect(document.activeElement).toBe(el('item-undo'));
 	});
 
 	test(`${mode}: a disabled menu does not open`, async () => {
@@ -800,6 +815,22 @@ for (const mode of MODES) {
 			expect(el('content').getAttribute('style')).toContain('--x:');
 			expect(placed.left).toBeGreaterThanOrEqual(from.left - 1);
 			expect(placed.top).toBeGreaterThanOrEqual(from.top - 1);
+		} finally {
+			probe.stop();
+		}
+	});
+
+	test(`${mode}: a disabled context area leaves the browser's own menu alone`, async () => {
+		const probe = watchContextmenu();
+		try {
+			if (mode === 'CSR') await render(ContextDisabled);
+			else await renderSSR(ContextDisabled);
+
+			await rightClick('locked-area-text');
+			await expect.poll(() => probe.cancelledInDispatch.length, COLD_POLL).toBe(1);
+			expect(probe.cancelledInDispatch).toEqual([false]);
+			await wait(QUIET_MS / 4);
+			expect(el('locked-content').hasAttribute('hidden')).toBe(true);
 		} finally {
 			probe.stop();
 		}

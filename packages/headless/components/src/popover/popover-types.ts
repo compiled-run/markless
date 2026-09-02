@@ -56,14 +56,4 @@ export type PopoverCloseProps = PropsOf<'button'>;
  */
 export type PopoverInstanceState = Seeded<PopoverRootProps, 'open'> & {
 	onChange?: PopoverRootProps['onChange'];
-	/**
-	 * When the trigger's next click is ignored, as a timestamp.
-	 *
-	 * A press on the trigger of an open popover is an outside press, so it closes
-	 * the surface before the click that follows reaches the trigger. Without the
-	 * grace that click re-opens what the press just shut. Nothing renders from it,
-	 * but it lives in the instance state because that is the only thing a part's
-	 * handler may write to.
-	 */
-	graceUntil: number;
 };

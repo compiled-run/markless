@@ -26,6 +26,7 @@ export const tourState = shared(
 		const tour: TourInstanceState = state({
 			open: false,
 			step: 0,
+			atEnd: false,
 			loop: false,
 			closeOnInteractOutside: true,
 			disabled: false,
@@ -78,6 +79,7 @@ export const tourState = shared(
 				const leaving = tour.target;
 				releaseTarget(leaving);
 				tour.step = to;
+				tour.atEnd = to >= steps - 1;
 				tour.onChange?.(to);
 				focusIntoCard(cards, to);
 			},
@@ -328,13 +330,19 @@ export function TourBackTrigger({ children, onClick, ...rest }: TourBackTriggerP
 
 export function TourForwardTrigger({ children, onClick, ...rest }: TourForwardTriggerProps) @{
 	const tour = tourState();
+	const isForwardOff = computed(() => {
+		const locked = tour.disabled;
+		const wraps = tour.loop;
+		const end = tour.atEnd;
+		return locked === true || (wraps !== true && end === true);
+	});
 	const forwardCount = computed(() => tour.itemEls.length);
 
 	<button
 		{...rest}
 		type="button"
-		disabled={tour.disabled === true || tour.loop !== true && tour.step >= forwardCount - 1}
-		ui-disabled={tour.disabled === true || tour.loop !== true && tour.step >= forwardCount - 1}
+		disabled={isForwardOff}
+		ui-disabled={isForwardOff}
 		onClick={(event) => {
 			const steps = Number(forwardCount);
 			tour.walk(1, steps);

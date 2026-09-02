@@ -112,6 +112,13 @@ export type CarouselInstanceState = Seeded<
 	isTabbed: boolean;
 	/** A drag is in flight, so the reactive move must keep its hands off. */
 	isDragging: boolean;
+	/** The orientation as two flags a key policy can read: which arrow pair is the carousel's. */
+	vertical: boolean;
+	horizontal: boolean;
+	/** The pointer is resting over the carousel, so a running rotation waits for it to leave. */
+	hoverPaused: boolean;
+	/** A press on the rotation control was refused because the person asked for reduced motion. */
+	reducedMotion: boolean;
 	/** The running autoplay interval, or 0. A number, so the graph can hold it. */
 	autoplayTimer: number;
 	onChange?: CarouselRootProps['onChange'];

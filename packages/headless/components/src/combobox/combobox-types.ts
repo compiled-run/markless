@@ -86,6 +86,8 @@ export type ComboboxInstanceState = Seeded<
 	wasFieldEmpty: boolean;
 	wasFieldReset: boolean;
 	pressGraceUntil: number;
+	/** The list is not showing: neither open nor inline. The inverse of `open` a key policy can read. */
+	closed: boolean;
 	onChange?: ComboboxRootProps['onChange'];
 	onInput?: ComboboxRootProps['onInput'];
 	onOpenChange?: ComboboxRootProps['onOpenChange'];

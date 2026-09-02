@@ -180,27 +180,27 @@ for (const mode of MODES) {
 		expect(el<HTMLButtonElement>(SaveBack).disabled).toBe(true);
 	});
 
-	// Next is the mirror of the row above and cannot be written the same way. Its
-	// condition needs the step COUNT, which only the roster of bound cards knows,
-	// and the count is spelled inline in the attribute because the compiler refuses
-	// both ways out: a second computed() reading the roster in this component is
-	// MARKLESS_ELEMENT_HANDLE_UNBOUND, and a computed() consuming the count cell
-	// publishes a placeholder. So the attribute renders once, against step 0, and
-	// never moves: Next stays pressable on the last step. `walk()` still refuses to
-	// go anywhere, so the tour cannot run off the end - what is wrong is only what
-	// the control says about itself, which is what a screen reader conveys.
-	test.fails(`${mode}: the forward trigger turns off on the last step`, async () => {
+	// Next is the mirror of Back. Its condition needs the step COUNT, which only
+	// the roster of bound cards knows and no second computed() here may read, so
+	// whether the tour is at its end is banked as a cell each walk writes.
+	test(`${mode}: the forward trigger turns off on the last step and back on before it`, async () => {
 		const { container } = mode === 'CSR' ? await render(Basic) : await renderSSR(Basic);
 		void container;
 
 		await openBasic();
 		el(SaveForward).click();
 		await expect.poll(() => el(StepShare).hasAttribute('hidden')).toBe(false);
+		expect(el<HTMLButtonElement>(ShareForward).disabled).toBe(false);
 		el(ShareForward).click();
 		await expect.poll(() => el(StepTrash).hasAttribute('hidden')).toBe(false);
 
 		expect(el(Step).textContent).toBe('2');
-		expect(el<HTMLButtonElement>(TrashForward).disabled).toBe(true);
+		await expect.poll(() => el<HTMLButtonElement>(TrashForward).disabled).toBe(true);
+		expect(el(TrashForward).hasAttribute('ui-disabled')).toBe(true);
+
+		el(TrashBack).click();
+		await expect.poll(() => el(StepShare).hasAttribute('hidden')).toBe(false);
+		expect(el<HTMLButtonElement>(ShareForward).disabled).toBe(false);
 	});
 
 	// The end is held anyway: pressing a Next the attribute left pressable moves

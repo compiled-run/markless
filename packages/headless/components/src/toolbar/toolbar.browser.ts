@@ -20,6 +20,9 @@ const Wrap = page.getByTestId('wrap');
 const Font = page.getByTestId('font');
 const FontContent = page.getByTestId('font-content');
 const Print = page.getByTestId('print');
+const More = page.getByTestId('more');
+const MoreContent = page.getByTestId('more-content');
+const Export = page.getByTestId('export');
 
 const Up = page.getByTestId('up');
 const Down = page.getByTestId('down');
@@ -179,6 +182,46 @@ async function expectRovingAcrossMixedControls() {
 
 	await userEvent.keyboard('{ArrowLeft}');
 	await expect.poll(() => document.activeElement).toBe(el(Font));
+}
+
+// A menu's trigger registers like every other control: it takes the stop, the
+// arrows reach it, and its own ArrowDown still opens the menu.
+async function expectAMenuTriggerIsOneOfTheStops() {
+	await enter(el(Root), el(Left));
+	el(Print).focus();
+	await expect.poll(() => el(Print).getAttribute('tabindex')).toBe('0');
+
+	await userEvent.keyboard('{ArrowRight}');
+	await expect.poll(() => document.activeElement).toBe(el(More));
+	await expect.poll(() => el(More).getAttribute('tabindex')).toBe('0');
+	expectOneTabStopIn(el(Root));
+
+	await userEvent.keyboard('{ArrowLeft}');
+	await expect.poll(() => document.activeElement).toBe(el(Print));
+	await userEvent.keyboard('{ArrowRight}');
+	await expect.poll(() => document.activeElement).toBe(el(More));
+
+	await userEvent.keyboard('{ArrowDown}');
+	await expect.poll(() => el(MoreContent).hasAttribute('hidden')).toBe(false);
+	await expect.poll(() => document.activeElement).toBe(el(Export));
+}
+
+/** A cancelable keydown, and whether the family's synchronous policy cancelled it. */
+function prevented(target: Element, key: string): boolean {
+	const keydown = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+	target.dispatchEvent(keydown);
+	return keydown.defaultPrevented;
+}
+
+// The bar cancels only the arrows on its axis, decided before the handler loads;
+// the other pair keeps its page scroll. Both off-axis keys are asked in one
+// tick, before the first dispatch has woken anything.
+function expectOffAxisArrowsAreThePages(control: HTMLElement, axis: 'horizontal' | 'vertical') {
+	const own = axis === 'horizontal' ? ['ArrowRight', 'ArrowLeft'] : ['ArrowDown', 'ArrowUp'];
+	const off = axis === 'horizontal' ? ['ArrowDown', 'ArrowUp'] : ['ArrowRight', 'ArrowLeft'];
+	for (const key of off) expect(prevented(control, key), `${key} off-axis`).toBe(false);
+	for (const key of own) expect(prevented(control, key), `${key} on-axis`).toBe(true);
+	expect(prevented(control, 'Home'), 'Home').toBe(true);
 }
 
 function expectEveryControlKeepsItsOwnRole() {
@@ -356,6 +399,24 @@ for (const mode of MODES) {
 		await expectTheEndsStayPut();
 	});
 
+	test(`${mode}: a horizontal bar leaves Up and Down to the page`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+		expectOffAxisArrowsAreThePages(el(Copy), 'horizontal');
+	});
+
+	test(`${mode}: a stacked bar leaves Left and Right to the page`, async () => {
+		if (mode === 'CSR') await render(Vertical);
+		else await renderSSR(Vertical);
+		expectOffAxisArrowsAreThePages(el(Up), 'vertical');
+	});
+
+	test(`${mode}: a menu's trigger is one of the bar's stops`, async () => {
+		if (mode === 'CSR') await render(Mixed);
+		else await renderSSR(Mixed);
+		await expectAMenuTriggerIsOneOfTheStops();
+	});
+
 	test(`${mode}: Home and End reach the first and last control`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
@@ -448,3 +509,14 @@ for (const mode of MODES) {
 		await expectNoAxeViolations(locked.container as HTMLElement, `${mode} disabled`);
 	});
 }
+
+// The orientation is a cell no handler writes, so a resumed page keeps answering
+// it to the key policy and the off-axis pair keeps its page scroll after resume.
+test("SSR: the off-axis arrows stay the page's after the first gesture", async () => {
+	await renderSSR(Basic);
+	await enter(el(Root), el(Copy));
+	await userEvent.keyboard('{ArrowRight}');
+	await expect.poll(() => document.activeElement).toBe(el(Cut));
+	await settled();
+	expect(prevented(el(Cut), 'ArrowDown')).toBe(false);
+});

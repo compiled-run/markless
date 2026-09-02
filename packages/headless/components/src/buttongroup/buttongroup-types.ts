@@ -99,6 +99,9 @@ export type ButtonGroupInstanceState = Seeded<
 	'value' | 'multiple' | 'orientation' | 'loop' | 'disabled' | 'required' | 'name'
 > & {
 	focused: string;
+	/** The orientation as two flags a key policy can read: which arrow pair is the group's. */
+	vertical: boolean;
+	horizontal: boolean;
 	onChange?: ButtonGroupRootProps['onChange'];
 };
 

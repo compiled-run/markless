@@ -431,18 +431,20 @@ export function MenubarItemContent({
 			const here = event.target as HTMLElement;
 			const surfaces = surfacesOf(undefined, menu.itemContentEls);
 			const mine = level.itemContentEl;
-			// A key inside a submenu belongs to that submenu's own surface.
-			if (mine === undefined || surfaceOf(surfaces, here) !== mine) {
+			const key = event.key;
+			const isOwn = mine !== undefined && surfaceOf(surfaces, here) === mine;
+			// A key inside a submenu belongs to that submenu's own surface - except ArrowRight on a leaf, which the submenu leaves alone and the bar reads as travel; a nesting item stops it before it gets here.
+			if (mine === undefined || (isOwn !== true && key !== 'ArrowRight')) {
 				onKeydown?.(event);
 				return;
 			}
 
-			const key = event.key;
 			const items = ownItems(surfaces, menu.itemEls, mine);
 			const at = itemAt(items, here);
 			// Space is a typeahead character only while a buffer is live, so typing "save as" never activates "Save".
-			const isTypeaheadChar = key.length === 1 && (key !== ' ' || level.typeahead !== '');
-			const isWalkKey = key === 'ArrowDown' || key === 'ArrowUp' || key === 'Home' || key === 'End';
+			const isTypeaheadChar = isOwn && key.length === 1 && (key !== ' ' || level.typeahead !== '');
+			const isWalkKey =
+				isOwn && (key === 'ArrowDown' || key === 'ArrowUp' || key === 'Home' || key === 'End');
 			const isTravel = key === 'ArrowLeft' || key === 'ArrowRight';
 
 			if (isWalkKey) {
@@ -459,7 +461,7 @@ export function MenubarItemContent({
 					applyStops(roster, next);
 				}
 				event.stopPropagation();
-			} else if (key === 'Tab') {
+			} else if (isOwn && key === 'Tab') {
 				// The APG's rule, and free here: the surface is not portalled and not trapped, so Tab keeps its native move.
 				level.expanded = false;
 				event.stopPropagation();

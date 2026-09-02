@@ -289,6 +289,25 @@ test('CSR: pressing the trigger of an open popover closes it and leaves it close
 	expectClosed(el(Trigger), el(Content));
 });
 
+// The press is told apart by where it landed, not by how long ago: a press held
+// on the trigger for as long as a person likes closes once and stays closed.
+for (const mode of MODES) {
+	test(`${mode}: a long press on the trigger of an open popover closes it and leaves it closed`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+		await openBasic();
+
+		const trigger = el<HTMLElement>(Trigger);
+		trigger.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }));
+		await new Promise((resolve) => setTimeout(resolve, 400));
+		trigger.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, button: 0 }));
+		trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }));
+		await expect.poll(() => el(Content).hasAttribute('hidden')).toBe(true);
+		await new Promise((resolve) => setTimeout(resolve, 150));
+		expectClosed(el(Trigger), el(Content));
+	});
+}
+
 test('CSR: the close part closes the surface and hands focus back to the trigger', async () => {
 	await render(Basic);
 	await openBasic();

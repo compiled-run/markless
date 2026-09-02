@@ -4,9 +4,11 @@ import { expect, test } from 'vitest';
 import { Basic } from './scenarios/basic.tsrx';
 import { Filtered } from './scenarios/filtered.tsrx';
 import { Inline } from './scenarios/inline.tsrx';
+import { LongList } from './scenarios/long-list.tsrx';
 import { Multiple } from './scenarios/multiple.tsrx';
 import { OpenList } from './scenarios/open-list.tsrx';
 import { Prefilled } from './scenarios/prefilled.tsrx';
+import { PrefilledForm } from './scenarios/prefilled-form.tsrx';
 import { SignupForm } from './scenarios/signup-form.tsrx';
 import { TwoComboboxes } from './scenarios/two-comboboxes.tsrx';
 import { UnavailableOptions } from './scenarios/unavailable-options.tsrx';
@@ -816,13 +818,123 @@ test.fails('the field names the highlighted option for a screen reader', async (
 	expect(named).toBe(el(Apple).getAttribute('id'));
 });
 
-// PENDING BEHAVIOUR - scroll the highlight into view. Not blocked, just unbuilt: one
-// `scrollIntoView({ block: 'nearest' })` on the option the walk already hands back.
-test.fails('the highlighted option is scrolled into view', async () => {
-	await render(OpenList);
+/** A cancelable keydown, and whether the family's synchronous policy cancelled it. */
+function prevented(target: Element, key: string): boolean {
+	const keydown = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+	target.dispatchEvent(keydown);
+	return keydown.defaultPrevented;
+}
+
+const FIELD_KEYS = ['Home', 'End', 'PageDown', 'PageUp', 'Enter'] as const;
+
+for (const mode of MODES) {
+	// The keys are cancelled before the handler loads, so the policy reads whether
+	// the list shows: closed, the caret keys and Enter are the field's own.
+	test(`${mode}: Home, End, the page keys and Enter are the field's own while the list is closed`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+
+		for (const key of FIELD_KEYS) expect(prevented(el(Input), key), `${key} closed`).toBe(false);
+		expect(prevented(el(Input), 'ArrowDown'), 'ArrowDown closed').toBe(true);
+	});
+
+	test(`${mode}: Home, End, the page keys and Enter are the list's while it shows`, async () => {
+		if (mode === 'CSR') await render(OpenList);
+		else await renderSSR(OpenList);
+
+		for (const key of FIELD_KEYS) expect(prevented(el(Input), key), `${key} open`).toBe(true);
+	});
+
+	// The first gesture on a served page: the policy reads the served cell.
+	test(`${mode}: Enter in a closed field submits the enclosing form`, async () => {
+		if (mode === 'CSR') await render(PrefilledForm);
+		else await renderSSR(PrefilledForm);
+
+		el<HTMLElement>(Input).focus();
+		await userEvent.keyboard('{Enter}');
+		await expect
+			.poll(() => JSON.parse(el(Submitted).textContent || '{}'))
+			.toEqual({ plan: 'annual' });
+	});
+
+	test(`${mode}: the page keys step the highlight by ten and stop at the ends`, async () => {
+		if (mode === 'CSR') await render(LongList);
+		else await renderSSR(LongList);
+
+		el<HTMLElement>(Input).focus();
+		await userEvent.keyboard('{ArrowDown}');
+		await expect.poll(() => el(Apple).getAttribute('ui-highlighted')).toBe('');
+		await userEvent.keyboard('{PageDown}');
+		await expect.poll(() => el(page.getByTestId('lemon')).getAttribute('ui-highlighted')).toBe('');
+		await userEvent.keyboard('{PageDown}');
+		await expect.poll(() => el(page.getByTestId('peach')).getAttribute('ui-highlighted')).toBe('');
+		await userEvent.keyboard('{PageUp}');
+		await expect.poll(() => el(Banana).getAttribute('ui-highlighted')).toBe('');
+	});
+
+	test(`${mode}: the highlighted option is scrolled into view`, async () => {
+		if (mode === 'CSR') await render(OpenList);
+		else await renderSSR(OpenList);
+
+		el<HTMLElement>(Input).focus();
+		await userEvent.keyboard('{End}');
+		await expect.poll(() => el(Cherry).getAttribute('ui-highlighted')).toBe('');
+		await expect.poll(() => el(Content).scrollTop).toBeGreaterThan(0);
+	});
+
+}
+
+// The keys follow the list as it opens and closes: the policy reads the live cell.
+test('CSR: the caret keys come back to the field as the list closes', async () => {
+	await render(Basic);
+	expect(prevented(el(Input), 'Home')).toBe(false);
+	prevented(el(Input), 'ArrowDown');
+	await expect.poll(() => el(Input).getAttribute('aria-expanded')).toBe('true');
+	expect(prevented(el(Input), 'Home')).toBe(true);
+	prevented(el(Input), 'Escape');
+	await expect.poll(() => el(Input).getAttribute('aria-expanded')).toBe('false');
+	expect(prevented(el(Input), 'Home')).toBe(false);
+});
+
+// PENDING CAPABILITY - a resumed page stops answering a cell to the key policy
+// once a handler has written it: the served value is read until the first write,
+// and nothing after. The guard is written as a negation so that unanswered read
+// cancels the key, which is what shipped; the keys stay the list's after resume
+// even once it has closed.
+test.fails('SSR: the caret keys come back to the field as the list closes after resume', async () => {
+	await renderSSR(OpenList);
+	expect(prevented(el(Input), 'Home')).toBe(true);
 	el<HTMLElement>(Input).focus();
+	await userEvent.keyboard('{Escape}');
+	await expect.poll(() => el(Input).getAttribute('aria-expanded')).toBe('false');
+	await settle();
+	expect(prevented(el(Input), 'Home')).toBe(false);
+});
+
+// A chosen option closes the list, so the Enter after it is the form's: implicit submission.
+test('CSR: Enter after choosing submits the enclosing form', async () => {
+	await render(SignupForm);
+
+	el<HTMLElement>(Input).focus();
+	await userEvent.keyboard('{ArrowDown}');
+	await expect.poll(() => el(Monthly).getAttribute('ui-highlighted')).toBe('');
+	await userEvent.keyboard('{Enter}');
+	await expect.poll(() => el<HTMLElement>(Content).hidden).toBe(true);
+	await userEvent.keyboard('{Enter}');
+	await expect
+		.poll(() => JSON.parse(el(Submitted).textContent || '{}'))
+		.toEqual({ plan: 'monthly' });
+});
+
+test('CSR: Home and End move the caret while the list is closed', async () => {
+	await render(Basic);
+	await typeInto(el<HTMLInputElement>(Input), 'abc');
+	await expect.poll(() => el(Input).getAttribute('aria-expanded')).toBe('true');
+	await userEvent.keyboard('{Escape}');
+	await expect.poll(() => el(Input).getAttribute('aria-expanded')).toBe('false');
+
+	await userEvent.keyboard('{Home}');
+	await expect.poll(() => el<HTMLInputElement>(Input).selectionStart).toBe(0);
 	await userEvent.keyboard('{End}');
-	await expect.poll(() => el(Cherry).getAttribute('ui-highlighted')).toBe('');
-	const list = el(Content);
-	expect(list.scrollTop).toBeGreaterThan(0);
+	await expect.poll(() => el<HTMLInputElement>(Input).selectionStart).toBe(3);
 });

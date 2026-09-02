@@ -488,6 +488,57 @@ for (const mode of MODES) {
 		await expect.poll(() => document.activeElement).toBe(closeFor('red'));
 	});
 
+	// Enter and Space are the delete button's own activation, and the landing is
+	// the same one Delete makes: the neighbour, or the field once the row is empty.
+	test(`${mode}: activating a focused delete button by key lands focus on the neighbour`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+
+		closeFor('alpha').focus();
+		await userEvent.keyboard('{Enter}');
+		await expect.poll(() => el(Held).textContent).toBe('beta');
+		await expect.poll(() => document.activeElement).toBe(closeFor('beta'));
+
+		await userEvent.keyboard(' ');
+		await expect.poll(() => el(Held).textContent).toBe('');
+		await expect.poll(() => document.activeElement).toBe(el(Input));
+	});
+
+	// The walk keys are cancelled in the field only while a tag is highlighted,
+	// decided before the handler loads: Backspace on text stays the field's own.
+	test(`${mode}: the field's walk keys are cancelled only while a tag is highlighted`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+
+		const prevented = (key: string) => {
+			const keydown = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+			el(Input).dispatchEvent(keydown);
+			return keydown.defaultPrevented;
+		};
+		expect(prevented('Backspace')).toBe(false);
+		expect(prevented('ArrowRight')).toBe(false);
+		expect(prevented('Enter')).toBe(true);
+
+		await typeInto(Input, '{ArrowLeft}');
+		await expect.poll(() => at('item-beta').hasAttribute('ui-highlighted')).toBe(true);
+		if (mode === 'CSR') {
+			expect(prevented('Backspace')).toBe(true);
+			expect(prevented('Delete')).toBe(true);
+		}
+	});
+
+	test(`${mode}: clicking a tag highlights it`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+
+		await userEvent.click(at('itemlabel-alpha'));
+		await expect.poll(() => at('item-alpha').hasAttribute('ui-highlighted')).toBe(true);
+		await userEvent.click(at('itemlabel-beta'));
+		await expect.poll(() => at('item-beta').hasAttribute('ui-highlighted')).toBe(true);
+		expect(at('item-alpha').hasAttribute('ui-highlighted')).toBe(false);
+		expect(el(Held).textContent).toBe('alpha|beta');
+	});
+
 	test(`${mode}: delete on a focused tag removes it and focus lands on the neighbour`, async () => {
 		if (mode === 'CSR') await render(DisplayOnly);
 		else await renderSSR(DisplayOnly);

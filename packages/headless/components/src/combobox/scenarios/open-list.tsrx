@@ -2,12 +2,13 @@ import { combobox } from '../../index.ts';
 
 // Handed over already showing. Every row that reads an option needs one of
 // these: a reader cannot walk into a `hidden` list, and neither can a click.
+// The list is shorter than its options so a walk has something to scroll.
 export function OpenList() @{
 	<combobox.root open data-testid="root">
 		<combobox.label data-testid="label">Favorite Fruit</combobox.label>
 		<combobox.input data-testid="input" />
 		<combobox.trigger data-testid="trigger">Show</combobox.trigger>
-		<combobox.content data-testid="content">
+		<combobox.content data-testid="content" style="max-height: 2em; overflow-y: auto">
 			<combobox.item value="apple" label="Apple" data-testid="apple">
 				<combobox.itemlabel data-testid="apple-itemlabel">Apple</combobox.itemlabel>
 				<combobox.itemindicator data-testid="apple-itemindicator">Chosen</combobox.itemindicator>
