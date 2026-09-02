@@ -241,8 +241,16 @@ tip closes. Offset with the tip's own margin only in the direction *away* from
 the trigger, and keep the visual gap inside the tip's padding. Navbar has the
 same property today.
 
-Focus opens with **no** delay at all. A person who arrived by keyboard has
-already declared the intent a resting pointer only implies.
+Keyboard focus opens with **no** delay at all. A person who arrived by keyboard
+has already declared the intent a resting pointer only implies. The focus a
+pointer press hands the trigger is not that (Radix remembers the press, React
+Aria asks for focus-visible): the trigger notes `pointerdown` and the focus that
+follows shows nothing; the click that ends the gesture clears the note, so it is
+read after focus on mouse and on touch alike. The press itself is an outside
+press the overlay primitive reports, so a click on a showing tip hides it, and
+nothing re-shows it until the pointer leaves and returns or focus arrives from
+the keyboard. Only a tip that keyboard focus opened survives the pointer
+leaving; a pointer-focused trigger holds nothing.
 
 ## No cross-tooltip skip window in v1
 

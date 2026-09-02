@@ -387,6 +387,25 @@ test('CSR: home and end jump to the first and last link inside a dropdown', asyn
 // The dismissability requirement: content revealed on hover or focus has to be
 // dismissable without moving the pointer, and focus has to come back somewhere
 // usable. QDS gets both from `popover="auto"`; this family writes them.
+// The optional APG rows at the top level, and the same rule as the arrows there:
+// an open dropdown standing between two entries is never where End lands.
+test('CSR: home and end at the top level jump to the first and last control', async () => {
+	await render(Basic);
+	el(ProductsTrigger).focus();
+
+	await userEvent.keyboard('{End}');
+	await expect.poll(() => document.activeElement).toBe(el(DocsTrigger));
+	await userEvent.keyboard('{Home}');
+	await expect.poll(() => document.activeElement).toBe(el(HomeItemLink));
+
+	el(ProductsTrigger).click();
+	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('true');
+	el(HomeItemLink).focus();
+	await userEvent.keyboard('{End}');
+	await expect.poll(() => document.activeElement).toBe(el(DocsTrigger));
+	expect(document.activeElement).not.toBe(el(MiceLink));
+});
+
 test('CSR: escape inside a dropdown closes it and puts focus back on the trigger', async () => {
 	await render(Basic);
 	el(ProductsTrigger).focus();
@@ -568,6 +587,16 @@ test('SSR: the first down arrow after resume opens the dropdown and steps inside
 	await expect.poll(() => document.activeElement).toBe(el(KeyboardsLink));
 });
 
+test('SSR: the first end after resume moves focus to the last top-level control', async () => {
+	await renderSSR(Basic);
+	el(HomeItemLink).focus();
+
+	await userEvent.keyboard('{End}');
+	await expect.poll(() => document.activeElement).toBe(el(DocsTrigger));
+	await userEvent.keyboard('{Home}');
+	await expect.poll(() => document.activeElement).toBe(el(HomeItemLink));
+});
+
 test('SSR: escape after resume closes the dropdown and returns focus', async () => {
 	await renderSSR(Basic);
 	el(ProductsTrigger).focus();
@@ -634,6 +663,23 @@ test('CSR: the pointer leaving the landmark closes what it opened', async () => 
 	await userEvent.hover(el(SignIn));
 	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('false');
 	expect(el(ProductsContent).hasAttribute('hidden')).toBe(true);
+});
+
+// Radix NavigationMenu waits 150 ms before a leave closes: a pointer that clips
+// the edge of the landmark on its way somewhere does not lose the dropdown. The
+// call count is the witness, because a close-then-reopen ends up looking open.
+test('CSR: the pointer coming straight back after leaving keeps the dropdown showing', async () => {
+	await render(WithOnChangeLeaving);
+	await userEvent.hover(el(ProductsTrigger));
+	await expect.poll(() => el(Value).textContent).toBe('products');
+	await expect.poll(() => el(Calls).textContent).toBe('1');
+
+	await userEvent.hover(el(SignIn));
+	await userEvent.hover(el(ProductsTrigger));
+	await new Promise((resolve) => setTimeout(resolve, 400));
+	expect(el(Calls).textContent).toBe('1');
+	expect(el(ProductsTrigger).getAttribute('aria-expanded')).toBe('true');
+	expect(el(ProductsContent).hasAttribute('hidden')).toBe(false);
 });
 
 test('CSR: a click inside the grace window leaves a hover-opened dropdown showing', async () => {

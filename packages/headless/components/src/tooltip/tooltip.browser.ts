@@ -361,6 +361,52 @@ test('CSR: a press on the trigger hides the tip and leaves it hidden', async () 
 	expectHidden(el(BoldContent));
 });
 
+// The focus a pointer press gives the trigger is not a request for the tip
+// (Radix tracks the press, React Aria asks for focus-visible), and a click on a
+// showing tip hides it for good: nothing re-shows it until the pointer leaves
+// and comes back, or focus arrives from the keyboard.
+for (const mode of MODES) {
+	test(`${mode}: a real click while the tip is showing hides it and leaves it hidden`, async () => {
+		if (mode === 'CSR') await render(Toolbar);
+		else await renderSSR(Toolbar);
+
+		await userEvent.hover(el(BoldTrigger));
+		await expect.poll(() => el(BoldContent).hasAttribute('hidden'), { timeout: 2000 }).toBe(false);
+
+		await userEvent.click(el(BoldTrigger));
+		await expect.poll(() => el(BoldContent).hasAttribute('hidden')).toBe(true);
+		expect(document.activeElement).toBe(el(BoldTrigger));
+		await wait(150);
+		expectHidden(el(BoldContent));
+
+		// Leaving and coming back is a fresh hover, pointer focus or not.
+		await userEvent.hover(el(Background));
+		await userEvent.hover(el(BoldTrigger));
+		await expect.poll(() => el(BoldContent).hasAttribute('hidden'), { timeout: 2000 }).toBe(false);
+
+		// And that hover ends the way any hover does: the pointer focus holds nothing.
+		await userEvent.hover(el(Background));
+		await expect.poll(() => el(BoldContent).hasAttribute('hidden')).toBe(true);
+	});
+
+	test(`${mode}: focus from a pointer press does not show the tip, focus from the keyboard does`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+
+		await userEvent.click(el(Trigger));
+		await expect.poll(() => document.activeElement).toBe(el(Trigger));
+		// Past the hover delay too: the press also cancels the show the crossing had scheduled.
+		await wait(DELAY + 200);
+		expectHidden(el(Content));
+
+		await userEvent.keyboard('{Shift>}{Tab}{/Shift}');
+		await expect.poll(() => document.activeElement).toBe(el(Background));
+		await userEvent.keyboard('{Tab}');
+		await expect.poll(() => document.activeElement).toBe(el(Trigger));
+		await expect.poll(() => el(Content).hasAttribute('hidden'), { timeout: 200 }).toBe(false);
+	});
+}
+
 test('CSR: a touch crossing never shows the tip', async () => {
 	await render(Toolbar);
 

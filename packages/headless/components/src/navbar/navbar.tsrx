@@ -13,6 +13,10 @@ import type {
 // A disclosure, not a menubar - see navbar-types.ts.
 // Every preventDefault guard reads event fields alone, so it decides before the handler symbol loads.
 // Walks start at `event.target`: a lazily loaded handler has no `currentTarget`.
+// The runtime hands an event to the nearest part that declared a handler and stops, so the root and the item each see only the pointer crossings that land on them.
+
+// A pointer that leaves the landmark gets this long to come back before the dropdown closes (Radix NavigationMenu).
+const LEAVE_GRACE = 150;
 
 // Which dropdown is showing lives on the root, named by value: an instance rooted by an item cannot reach its siblings.
 export const navbarState = shared(
@@ -22,6 +26,8 @@ export const navbarState = shared(
 			hover: true,
 			delay: 200,
 			clickGrace: 300,
+			leaveTimer: 0,
+			leaveUntil: 0,
 		});
 		const navEl = element<HTMLElement>();
 		// The array type argument makes a handle plural: bound on every trigger and
@@ -87,6 +93,7 @@ export function NavbarRoot({
 	children,
 	onFocusout,
 	onKeydown,
+	onPointerover,
 	onPointerout,
 	...rest
 }: NavbarRootProps) @{
@@ -113,24 +120,49 @@ export function NavbarRoot({
 			if (next === null || root.contains(next) !== true) navbar.closeAll();
 			onFocusout?.(event);
 		}}
+		onPointerover={(event) => {
+			window.clearTimeout(navbar.leaveTimer);
+			navbar.leaveTimer = 0;
+			navbar.leaveUntil = 0;
+			onPointerover?.(event);
+		}}
 		onPointerout={(event) => {
-			// Closing on leave belongs to the root: the leaving item's pointerout fires before the arriving item's pointerover.
 			const root = navbar.navEl;
 			const went = event.relatedTarget as Node | null;
-			if (navbar.hover !== true || root === undefined) {
+			if (
+				navbar.hover !== true ||
+				root === undefined ||
+				(went !== null && root.contains(went) === true)
+			) {
 				onPointerout?.(event);
 				return;
 			}
-			if (went === null || root.contains(went) !== true) navbar.closeAll();
+			// The timer re-delivers the leave here rather than closing: shared reads are rewritten only at the handler's top level, so `navbar.closeAll()` inside this closure is a ReferenceError.
+			const now = Date.now();
+			if (navbar.leaveUntil !== 0 && now >= navbar.leaveUntil) {
+				navbar.leaveTimer = 0;
+				navbar.leaveUntil = 0;
+				navbar.closeAll();
+			} else if (navbar.leaveUntil === 0) {
+				navbar.leaveUntil = now + LEAVE_GRACE;
+				navbar.leaveTimer = window.setTimeout(() => {
+					root.dispatchEvent(new PointerEvent('pointerout', { bubbles: true }));
+				}, LEAVE_GRACE + 5);
+			}
 			onPointerout?.(event);
 		}}
 		onKeydown={(event) => {
-			if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+			if (
+				event.key === 'ArrowLeft' ||
+				event.key === 'ArrowRight' ||
+				event.key === 'Home' ||
+				event.key === 'End'
+			) {
 				event.preventDefault();
 			}
 
 			const key = event.key;
-			if (key !== 'ArrowLeft' && key !== 'ArrowRight') {
+			if (key !== 'ArrowLeft' && key !== 'ArrowRight' && key !== 'Home' && key !== 'End') {
 				onKeydown?.(event);
 				return;
 			}
@@ -144,7 +176,9 @@ export function NavbarRoot({
 			}
 
 			const walk = topLevelControls(navbar.controlEls, navbar.panelEls);
-			const next = stepTo(walk, here, key === 'ArrowRight' ? 'next' : 'previous');
+			const step =
+				key === 'Home' ? 'first' : key === 'End' ? 'last' : key === 'ArrowRight' ? 'next' : 'previous';
+			const next = stepTo(walk, here, step);
 			if (next) next.focus();
 			onKeydown?.(event);
 		}}
@@ -176,6 +210,9 @@ export function NavbarItem({
 		onPointerover={(event) => {
 			const box = item.boxEl;
 			const came = event.relatedTarget as Node | null;
+			window.clearTimeout(navbar.leaveTimer);
+			navbar.leaveTimer = 0;
+			navbar.leaveUntil = 0;
 			// pointerover fires again for every element inside the item; only a crossing from outside it is an enter.
 			if (
 				navbar.hover !== true ||
@@ -217,13 +254,17 @@ export function NavbarItem({
 				item.openTimer = 0;
 				item.restingUntil = 0;
 			}
-			// Written here rather than on the root: the runtime hands the event to the nearest part that declared a handler and stops.
+			// Leaving the landmark from inside an item starts the grace; the timer re-delivers the leave on the root, whose handler closes once it is up.
 			if (
 				navbar.hover === true &&
 				nav !== undefined &&
-				(went === null || nav.contains(went) !== true)
+				(went === null || nav.contains(went) !== true) &&
+				navbar.leaveUntil === 0
 			) {
-				navbar.closeAll();
+				navbar.leaveUntil = Date.now() + LEAVE_GRACE;
+				navbar.leaveTimer = window.setTimeout(() => {
+					nav.dispatchEvent(new PointerEvent('pointerout', { bubbles: true }));
+				}, LEAVE_GRACE + 5);
 			}
 			onPointerout?.(event);
 		}}
@@ -258,7 +299,9 @@ export function NavbarItemTrigger({
 			if (
 				event.key === 'ArrowDown' ||
 				event.key === 'ArrowLeft' ||
-				event.key === 'ArrowRight'
+				event.key === 'ArrowRight' ||
+				event.key === 'Home' ||
+				event.key === 'End'
 			) {
 				event.preventDefault();
 			}
@@ -268,32 +311,22 @@ export function NavbarItemTrigger({
 
 			if (key === 'ArrowDown') {
 				navbar.show(item.value);
-				// Read at the handler's top level: a shared read inside the closure below is a ReferenceError.
-				const panel = item.contentEl;
-				const first = controlsInside(navbar.controlEls, panel)[0];
-				// The panel is still `hidden` here - the DOM lands after this handler returns - so the focus move waits for the DOM, not the call.
-				let tries = 0;
-				const stepIn = () => {
-					tries = tries + 1;
-					if (panel !== undefined && panel.hasAttribute('hidden') !== true && first) {
-						first.focus();
-					} else if (tries < 20) {
-						window.setTimeout(stepIn, 10);
-					}
-				};
-				stepIn();
+				// One call, no retry: the runtime commits the `hidden` write before this returns, so the link is focusable now.
+				controlsInside(navbar.controlEls, item.contentEl)[0]?.focus();
 				onKeydown?.(event);
 				return;
 			}
 
-			if (key !== 'ArrowLeft' && key !== 'ArrowRight') {
+			if (key !== 'ArrowLeft' && key !== 'ArrowRight' && key !== 'Home' && key !== 'End') {
 				onKeydown?.(event);
 				return;
 			}
 
 			const here = controlAt(navbar.controlEls, from);
 			const walk = topLevelControls(navbar.controlEls, navbar.panelEls);
-			const next = stepTo(walk, here, key === 'ArrowRight' ? 'next' : 'previous');
+			const step =
+				key === 'Home' ? 'first' : key === 'End' ? 'last' : key === 'ArrowRight' ? 'next' : 'previous';
+			const next = stepTo(walk, here, step);
 			if (next) next.focus();
 			onKeydown?.(event);
 		}}
@@ -400,11 +433,11 @@ export function NavbarItemLink({ current, children, onKeydown, ...rest }: Navbar
 			const from = event.target as HTMLElement;
 			const panel = panelAt(navbar.panelEls, from);
 
-			// One walk, two scopes: inside a dropdown all six keys walk its links, at the top level only the arrows walk and they skip open dropdowns.
+			// One walk, two scopes: inside a dropdown all six keys walk its links; at the top level Up and Down do nothing and the walk skips open dropdowns.
 			const isInsideDropdown = panel !== undefined;
 			const isForwardKey = key === 'ArrowRight' || (isInsideDropdown && key === 'ArrowDown');
 			const isBackwardKey = key === 'ArrowLeft' || (isInsideDropdown && key === 'ArrowUp');
-			const isJumpKey = isInsideDropdown && (key === 'Home' || key === 'End');
+			const isJumpKey = key === 'Home' || key === 'End';
 			if (!isForwardKey && !isBackwardKey && !isJumpKey) {
 				onKeydown?.(event);
 				return;
