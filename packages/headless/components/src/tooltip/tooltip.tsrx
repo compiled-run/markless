@@ -21,6 +21,8 @@ export const tooltipState = shared(
 			delay: 600,
 			openTimer: 0,
 			restingUntil: 0,
+			pointerDown: false,
+			heldByFocus: false,
 		});
 		const rootEl = element<HTMLDivElement>();
 		const triggerEl = element<HTMLButtonElement>();
@@ -106,8 +108,7 @@ export function TooltipRoot({
 			tooltip.openTimer = 0;
 			tooltip.restingUntil = 0;
 			// Hover and focus are two reasons for a tip to be up, and this ends only one of them: blur ends the other.
-			const isHeld = box.contains(document.activeElement);
-			if (isHeld !== true) tooltip.setOpen(false);
+			if (tooltip.heldByFocus !== true) tooltip.setOpen(false);
 			onPointerout?.(event);
 		}}
 	>
@@ -120,11 +121,18 @@ export function TooltipRoot({
 	</div>
 }
 
-export function TooltipTrigger({ children, onFocus, onBlur, ...rest }: TooltipTriggerProps) @{
+export function TooltipTrigger({
+	children,
+	onFocus,
+	onBlur,
+	onPointerdown,
+	onClick,
+	...rest
+}: TooltipTriggerProps) @{
 	const tooltip = tooltipState();
 
 	// `aria-describedby` is permanent: a directly referenced hidden node still contributes its text, so Tab conveys the tip with nothing shown.
-	// Focus shows the tip at once - a person who reached the control by keyboard has already declared the intent a resting pointer only implies.
+	// Keyboard focus shows the tip at once - a person who reached the control that way has declared the intent a resting pointer only implies. The focus a press hands the control is not that, so the press is remembered until its click lands (after focus on mouse and on touch alike); the primitive reports the press itself as an outside press and hides the tip.
 	<button
 		{...rest}
 		el={tooltip.triggerEl}
@@ -132,11 +140,28 @@ export function TooltipTrigger({ children, onFocus, onBlur, ...rest }: TooltipTr
 		aria-describedby={tooltip.contentEl}
 		ui-open={tooltip.open}
 		ui-closed={tooltip.open !== true}
+		onPointerdown={(event) => {
+			window.clearTimeout(tooltip.openTimer);
+			tooltip.openTimer = 0;
+			tooltip.restingUntil = 0;
+			tooltip.pointerDown = true;
+			tooltip.heldByFocus = false;
+			onPointerdown?.(event);
+		}}
+		onClick={(event) => {
+			tooltip.pointerDown = false;
+			onClick?.(event);
+		}}
 		onFocus={(event) => {
-			tooltip.setOpen(true);
+			if (tooltip.pointerDown !== true) {
+				tooltip.heldByFocus = true;
+				tooltip.setOpen(true);
+			}
 			onFocus?.(event);
 		}}
 		onBlur={(event) => {
+			tooltip.pointerDown = false;
+			tooltip.heldByFocus = false;
 			tooltip.setOpen(false);
 			onBlur?.(event);
 		}}

@@ -4540,7 +4540,7 @@
 						"type": "number",
 						"required": false,
 						"default": "600",
-						"doc": "How long the pointer must rest on the trigger before the tooltip shows, in\nmilliseconds. Omit it and it is 600. Focus shows it at once, with no wait."
+						"doc": "How long the pointer must rest on the trigger before the tooltip shows, in\nmilliseconds. Omit it and it is 600. Keyboard focus shows it at once, with\nno wait; the focus a click gives the trigger shows nothing."
 					},
 					{
 						"name": "onChange",
@@ -4553,7 +4553,7 @@
 			{
 				"part": "trigger",
 				"component": "TooltipTrigger",
-				"doc": "The control the tooltip describes. It carries the CSS anchor the tip is\nplaced against, declared in the part's own scoped stylesheet - your `style`\nand `class` compose untouched.\n\nIt points at the tip with `aria-describedby` at all times, showing or not: a\ndirectly referenced hidden element still contributes its text to the\ndescription, so tabbing to the trigger conveys the tip without it ever being\nshown.\n\nAn icon-only trigger needs its own accessible name - write `aria-label` on it.\nThe tooltip describes the control; it never names it.",
+				"doc": "The control the tooltip describes. It carries the CSS anchor the tip is\nplaced against, declared in the part's own scoped stylesheet - your `style`\nand `class` compose untouched.\n\nIt points at the tip with `aria-describedby` at all times, showing or not: a\ndirectly referenced hidden element still contributes its text to the\ndescription, so tabbing to the trigger conveys the tip without it ever being\nshown.\n\nA click on it while the tip is showing hides the tip, and the focus that click\nleaves behind does not show it again: the tip comes back when the pointer\nleaves and returns, or when focus arrives from the keyboard.\n\nAn icon-only trigger needs its own accessible name - write `aria-label` on it.\nThe tooltip describes the control; it never names it.",
 				"props": []
 			}
 		]

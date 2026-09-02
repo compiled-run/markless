@@ -13,7 +13,8 @@ export type TooltipRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	readonly open?: boolean;
 	/**
 	 * How long the pointer must rest on the trigger before the tooltip shows, in
-	 * milliseconds. Omit it and it is 600. Focus shows it at once, with no wait.
+	 * milliseconds. Omit it and it is 600. Keyboard focus shows it at once, with
+	 * no wait; the focus a click gives the trigger shows nothing.
 	 */
 	readonly delay?: number;
 	/**
@@ -32,6 +33,10 @@ export type TooltipRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
  * directly referenced hidden element still contributes its text to the
  * description, so tabbing to the trigger conveys the tip without it ever being
  * shown.
+ *
+ * A click on it while the tip is showing hides the tip, and the focus that click
+ * leaves behind does not show it again: the tip comes back when the pointer
+ * leaves and returns, or when focus arrives from the keyboard.
  *
  * An icon-only trigger needs its own accessible name - write `aria-label` on it.
  * The tooltip describes the control; it never names it.
@@ -83,4 +88,12 @@ export type TooltipInstanceState = Seeded<TooltipRootProps, 'open' | 'delay'> & 
 	 * may write to.
 	 */
 	restingUntil: number;
+	/**
+	 * A press is down on the trigger, so the focus that follows it is not a
+	 * request for the tip. Set on pointerdown, cleared by the click or blur that
+	 * ends the gesture.
+	 */
+	pointerDown: boolean;
+	/** Keyboard focus is what showed the tip, so the pointer leaving does not hide it. */
+	heldByFocus: boolean;
 };
