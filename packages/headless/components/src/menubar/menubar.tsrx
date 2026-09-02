@@ -1,6 +1,7 @@
 import { computed, element, shared, state } from '@markless/core';
 import { MenuRoot, menuState } from '../menu/menu.tsrx';
 import {
+	isOpeningKey,
 	itemAt,
 	matchingItem,
 	ownItems,
@@ -140,10 +141,7 @@ function MenubarBar({ children, onFocusin, onKeydown, onPointerover, ...rest }: 
 			onFocusin?.(event);
 		}}
 		onKeydown={(event) => {
-			// A flat `===` chain over `event.key` alone: the resumer applies this
-			// policy before the handler module loads, so a guard over what is open
-			// would be MARKLESS_SYNC_POLICY_UNEXTRACTABLE. It covers the whole bar,
-			// so a surface travelling on Left or Right has its default cancelled cold.
+			// Event fields alone, the shape lifted into the policy that runs before the handler loads; it covers the whole bar, so a surface travelling on Left or Right has its default cancelled cold.
 			if (
 				event.key === 'ArrowLeft' ||
 				event.key === 'ArrowRight' ||
@@ -176,7 +174,6 @@ function MenubarBar({ children, onFocusin, onKeydown, onPointerover, ...rest }: 
 					bar.active = next;
 					applyStops(items, next);
 				}
-				event.stopPropagation();
 			} else if (isWalk) {
 				const next = nextStop(items, at, key);
 				if (next !== undefined) {
@@ -184,7 +181,6 @@ function MenubarBar({ children, onFocusin, onKeydown, onPointerover, ...rest }: 
 					applyStops(items, next);
 					items[next]?.focus();
 				}
-				event.stopPropagation();
 			} else if (isTypeaheadChar) {
 				const now = Date.now();
 				const isStale = now - bar.typeaheadAt > TYPEAHEAD_WINDOW;
@@ -198,7 +194,6 @@ function MenubarBar({ children, onFocusin, onKeydown, onPointerover, ...rest }: 
 					applyStops(items, moved);
 					found.focus();
 				}
-				event.stopPropagation();
 			}
 			onKeydown?.(event);
 		}}
@@ -317,7 +312,6 @@ function MenubarItemControl({
 			const edge = key === 'ArrowUp' ? 'End' : 'Home';
 			level.expanded = true;
 			surface?.dispatchEvent(new KeyboardEvent('keydown', { key: edge, bubbles: true }));
-			event.stopPropagation();
 			onKeydown?.(event);
 		}}
 	>
@@ -433,7 +427,7 @@ export function MenubarItemContent({
 			const mine = level.itemContentEl;
 			const key = event.key;
 			const isOwn = mine !== undefined && surfaceOf(surfaces, here) === mine;
-			// A key inside a submenu belongs to that submenu's own surface - except ArrowRight on a leaf, which the submenu leaves alone and the bar reads as travel; a nesting item stops it before it gets here.
+			// A key inside a submenu belongs to that submenu's own surface - except ArrowRight on a leaf, which the submenu leaves alone and the bar reads as travel.
 			if (mine === undefined || (isOwn !== true && key !== 'ArrowRight')) {
 				onKeydown?.(event);
 				return;
@@ -441,6 +435,11 @@ export function MenubarItemContent({
 
 			const items = ownItems(surfaces, menu.itemEls, mine);
 			const at = itemAt(items, here);
+			// A nesting item's open key is its own at any depth: ArrowRight there opens the level below, not the neighbour's menu. The deepest holder, not this surface's own item, which contains everything under it.
+			if (isOpeningKey(itemAt(menu.itemEls ?? [], here), key)) {
+				onKeydown?.(event);
+				return;
+			}
 			// Space is a typeahead character only while a buffer is live, so typing "save as" never activates "Save".
 			const isTypeaheadChar = isOwn && key.length === 1 && (key !== ' ' || level.typeahead !== '');
 			const isWalkKey =
@@ -449,7 +448,6 @@ export function MenubarItemContent({
 
 			if (isWalkKey) {
 				walkTarget(items, at, key, level.loop === true)?.focus();
-				event.stopPropagation();
 			} else if (isTravel) {
 				// Left and Right leave this menu for the neighbouring item's, which is what a bar does with them.
 				const roster = orderedRoster(bar.itemEls, bar.barEl);
@@ -460,11 +458,9 @@ export function MenubarItemContent({
 					bar.active = next;
 					applyStops(roster, next);
 				}
-				event.stopPropagation();
 			} else if (isOwn && key === 'Tab') {
 				// The APG's rule, and free here: the surface is not portalled and not trapped, so Tab keeps its native move.
 				level.expanded = false;
-				event.stopPropagation();
 			} else if (isTypeaheadChar) {
 				const now = Date.now();
 				const isStale = now - level.typeaheadAt > TYPEAHEAD_WINDOW;
@@ -472,7 +468,6 @@ export function MenubarItemContent({
 				level.typeahead = search;
 				level.typeaheadAt = now;
 				matchingItem(items, search, at)?.focus();
-				event.stopPropagation();
 			}
 			onKeydown?.(event);
 		}}

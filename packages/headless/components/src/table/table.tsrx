@@ -217,12 +217,7 @@ function TableGrid({ children, onClick, onFocusin, onKeydown, ...rest }: TableGr
 			onClick?.(event);
 		}}
 		onKeydown={(event) => {
-			// Written out from event fields alone: the policy has to be readable
-			// before the handler symbol loads, and narrowing it to the rungs that
-			// actually walk needs graph state, which is
-			// MARKLESS_SYNC_POLICY_UNEXTRACTABLE. So a bare table holding a control
-			// of the consumer's own loses the arrows and the space bar while focus
-			// is inside it, which is the gap `gridlist` recorded first.
+			// One guard over event fields alone, the shape lifted into the policy that runs before the handler loads: it cannot narrow to the rungs that walk, so a bare table holding a consumer's own control loses the arrows and the space bar while focus is inside it.
 			if (
 				event.key === 'ArrowDown' ||
 				event.key === 'ArrowUp' ||
@@ -230,11 +225,10 @@ function TableGrid({ children, onClick, onFocusin, onKeydown, ...rest }: TableGr
 				event.key === 'ArrowRight' ||
 				event.key === 'Home' ||
 				event.key === 'End' ||
-				event.key === ' '
+				event.key === ' ' ||
+				((event.ctrlKey === true || event.metaKey === true) &&
+					(event.key === 'a' || event.key === 'A'))
 			) {
-				event.preventDefault();
-			}
-			if ((event.ctrlKey || event.metaKey) && (event.key === 'a' || event.key === 'A')) {
 				event.preventDefault();
 			}
 

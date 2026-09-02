@@ -5,6 +5,7 @@ import {
 	TYPEAHEAD_WINDOW,
 	dismissChain,
 	focusEdge,
+	isOpeningKey,
 	itemAt,
 	matchingItem,
 	ownItems,
@@ -28,7 +29,7 @@ import type {
 // Every preventDefault guard reads event fields alone, so it decides before the handler symbol loads.
 // Walks start at `event.target`: a lazily loaded handler has no `currentTarget`.
 // One computed() cell per comparison - a comparison written inline in an attribute renders once and then goes stale.
-// A gesture inside a submenu bubbles through every item and surface above it, so each handler first asks whether the target is in ITS OWN level and leaves the event alone when it is not; the surface that answered then stops it.
+// A gesture inside a submenu bubbles through every item and surface above it, so each handler asks whether the target is in ITS OWN level and leaves the event alone when it is not; nothing stops propagation. An open key on a nesting item is the item's own, and the surface holding it leaves that alone too.
 
 /** How long a touch rests before the context menu opens, in milliseconds. */
 const LONG_PRESS = 500;
@@ -443,6 +444,10 @@ export function MenuContent({
 			const key = event.key;
 			const items = ownItems(surfaces, menu.itemEls, mine);
 			const at = itemAt(items, here);
+			if (isOpeningKey(at, key)) {
+				onKeydown?.(event);
+				return;
+			}
 			// Space is a typeahead character only while a buffer is live, so typing "save as" never activates "Save".
 			const isTypeaheadChar = key.length === 1 && (key !== ' ' || menu.typeahead !== '');
 			const isWalkKey = key === 'ArrowDown' || key === 'ArrowUp' || key === 'Home' || key === 'End';
@@ -614,14 +619,10 @@ export function MenuItem({
 			const isOpenKey = key === 'ArrowRight' || key === 'Enter' || key === ' ';
 
 			if (item.submenu === true) {
-				if (isOpenKey) {
-					if (item.disabled !== true && menu.disabled !== true) {
-						item.expanded = true;
-						item.byHover = false;
-						focusEdge(ownItems(surfaces, menu.itemEls, panel), false);
-					}
-					// An enclosing menubar reads a bare ArrowRight as travel to the next menu; opening a nesting item's own submenu is not that.
-					event.stopPropagation();
+				if (isOpenKey && item.disabled !== true && menu.disabled !== true) {
+					item.expanded = true;
+					item.byHover = false;
+					focusEdge(ownItems(surfaces, menu.itemEls, panel), false);
 				}
 			} else if (key === 'Enter' || key === ' ') {
 				// The two cells, not the `isLocked` computed: a computed() read from a handler body does not guard.
@@ -798,29 +799,29 @@ export function MenuItemContent({
 			const key = event.key;
 			const items = ownItems(surfaces, menu.itemEls, mine);
 			const at = itemAt(items, here);
+			if (isOpeningKey(at, key)) {
+				onKeydown?.(event);
+				return;
+			}
 			const isTypeaheadChar = key.length === 1 && (key !== ' ' || menu.typeahead !== '');
 			const isWalkKey = key === 'ArrowDown' || key === 'ArrowUp' || key === 'Home' || key === 'End';
 
 			if (isWalkKey) {
 				walkTarget(items, at, key, menu.loop === true)?.focus();
-				event.stopPropagation();
 			} else if (key === 'ArrowLeft') {
 				// One level out, onto the item that opened this submenu. Escape does the same through the overlay's own report.
 				item.expanded = false;
 				item.byHover = false;
 				item.itemEl?.focus();
-				event.stopPropagation();
 			} else if (key === 'Tab') {
 				item.expanded = false;
 				menu.hide();
-				event.stopPropagation();
 			} else if (isTypeaheadChar) {
 				const now = Date.now();
 				const isStale = now - menu.typeaheadAt > TYPEAHEAD_WINDOW;
 				const search = (isStale ? '' : menu.typeahead) + key.toLowerCase();
 				menu.type(search);
 				matchingItem(items, search, at)?.focus();
-				event.stopPropagation();
 			}
 			onKeydown?.(event);
 		}}

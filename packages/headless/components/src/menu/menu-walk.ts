@@ -51,6 +51,12 @@ export function itemAt(
 	return found;
 }
 
+/** Whether a key opens the submenu an item declares: the item's own answer, which the surface holding it leaves alone. */
+export function isOpeningKey(item: HTMLElement | undefined, key: string): boolean {
+	if (item === undefined || item.getAttribute('aria-haspopup') !== 'menu') return false;
+	return key === 'ArrowRight' || key === 'Enter' || key === ' ';
+}
+
 /** One surface's OWN items: the ones no deeper surface holds. */
 export function ownItems(
 	surfaces: readonly HTMLElement[],

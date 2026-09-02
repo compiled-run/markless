@@ -428,8 +428,7 @@ export function CalendarContent({
 			onFocusin?.(event);
 		}}
 		onKeydown={(event) => {
-			// Guarded by event fields alone, and only `===` chains extract: a guard
-			// over locals derived from graph state is MARKLESS_SYNC_POLICY_UNEXTRACTABLE.
+			// Guarded by event fields alone: a guard over locals derived from graph state is MARKLESS_SYNC_POLICY_UNEXTRACTABLE.
 			// Enter and Space are absent on purpose - the day is a real button and
 			// the browser activates it, so handling them here would choose twice.
 			if (
