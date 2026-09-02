@@ -1,6 +1,6 @@
 import { computed, element, shared, state } from '@markless/core';
 import VisuallyHidden from '../base/visually-hidden.tsrx';
-import { clickOptionWithValue, nextHighlightValue } from './option-walk.ts';
+import { clickOptionWithValue, nextHighlightValue, scrollOptionIntoView } from './option-walk.ts';
 import type {
 	ComboboxContentProps,
 	ComboboxDescriptionProps,
@@ -43,6 +43,7 @@ export const comboboxState = shared(
 			wasFieldEmpty: false,
 			wasFieldReset: false,
 			pressGraceUntil: 0,
+			closed: true,
 		});
 		const labelEl = element<HTMLLabelElement>();
 		const inputEl = element<HTMLInputElement>();
@@ -97,6 +98,7 @@ export const comboboxState = shared(
 			setOpen(next: boolean) {
 				if (combobox.disabled || combobox.open === next) return;
 				combobox.open = next;
+				combobox.closed = next !== true && combobox.inline !== true;
 				combobox.onOpenChange?.(next);
 			},
 			/** The field's text changed. The consumer filters their own list from it. */
@@ -154,6 +156,7 @@ export function ComboboxRoot({
 	combobox.onOpenChange = onOpenChange;
 	combobox.value = value;
 	combobox.open = open;
+	combobox.closed = open !== true && inline !== true;
 	combobox.disabled = disabled;
 	combobox.required = required;
 	combobox.invalid = invalid;
@@ -223,15 +226,17 @@ export function ComboboxInput({
 			onInput?.(event);
 		}}
 		onKeydown={(event) => {
-			// Written out from event fields alone: the policy has to be readable before the handler symbol loads.
+			// One guard over event fields and a bare cell, the only shape lifted into the policy that runs before the handler loads: the arrows are always the list's, the rest only while it shows, so a closed field keeps its caret keys and Enter submits its form.
+			// `!closed` rather than `open`: a resumed page stops answering a cell to this policy once a handler has written it, and a negation over nothing cancels, which is the safe side.
 			if (
 				event.key === 'ArrowDown' ||
 				event.key === 'ArrowUp' ||
-				event.key === 'Home' ||
-				event.key === 'End' ||
-				event.key === 'PageDown' ||
-				event.key === 'PageUp' ||
-				event.key === 'Enter'
+				((event.key === 'Home' ||
+					event.key === 'End' ||
+					event.key === 'PageDown' ||
+					event.key === 'PageUp' ||
+					event.key === 'Enter') &&
+					!combobox.closed)
 			) {
 				event.preventDefault();
 			}
@@ -244,7 +249,8 @@ export function ComboboxInput({
 			const isLooping = combobox.loop === true;
 			const highlighted = combobox.highlighted;
 			const isStepKey = key === 'ArrowDown' || key === 'ArrowUp';
-			const isJumpKey = key === 'Home' || key === 'End';
+			const isJumpKey =
+				key === 'Home' || key === 'End' || key === 'PageDown' || key === 'PageUp';
 
 			if (key === 'Backspace') {
 				// The family's cell, not the field's: a lazily loaded handler runs after the native dispatch, so the element already reads empty and only the cell still holds the text from before this keystroke.
@@ -259,6 +265,7 @@ export function ComboboxInput({
 				const landing = nextHighlightValue(options, highlighted, key, isLooping);
 				if (landing !== undefined) combobox.isKeyboardMove = true;
 				if (landing !== undefined) combobox.highlighted = landing;
+				if (landing !== undefined) scrollOptionIntoView(options, landing);
 			} else if (key === 'Enter' && isShowing && highlighted !== '') {
 				// Through the option's own click rule, so one place decides whether the list closes.
 				clickOptionWithValue(options, highlighted);

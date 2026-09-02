@@ -520,6 +520,52 @@ test('a press from a pointer the platform is not tracking throws nothing', async
 	}
 });
 
+// A gesture belongs to the pointer that began it: a second pointer landing
+// mid-drag neither restarts it from where the rectangle now is nor steers it,
+// and lifting that second pointer does not end it.
+test('a second pointer arriving mid-drag is not the gesture', async () => {
+	await render(Basic);
+	const box = el(Selection).getBoundingClientRect();
+	const fromX = box.left + box.width / 2;
+	const fromY = box.top + box.height / 2;
+	pointer(el(Selection), 'pointerdown', fromX, fromY, 1);
+	pointer(el(Area), 'pointermove', fromX + 30, fromY + 20, 1);
+	await expect.poll(() => shown()).toEqual({ x: 70, y: 50, width: 200, height: 150 });
+
+	pointer(el(Selection), 'pointerdown', fromX + 30, fromY + 20, 2);
+	pointer(el(Area), 'pointermove', fromX + 130, fromY + 120, 2);
+	pointer(el(Area), 'pointerup', fromX + 130, fromY + 120, 2);
+	await quiet();
+	expect(shown()).toEqual({ x: 70, y: 50, width: 200, height: 150 });
+	expect(el(Selection).hasAttribute('ui-dragging')).toBe(true);
+
+	pointer(el(Area), 'pointermove', fromX + 60, fromY + 40, 1);
+	await expect.poll(() => shown()).toEqual({ x: 100, y: 70, width: 200, height: 150 });
+	pointer(el(Area), 'pointerup', fromX + 60, fromY + 40, 1);
+	await expect.poll(() => el(Selection).hasAttribute('ui-dragging')).toBe(false);
+});
+
+test('a second pointer pressing the rectangle mid-resize does not turn it into a move', async () => {
+	await render(Basic);
+	const grabbed = handle('handle-inline-end');
+	const box = grabbed.getBoundingClientRect();
+	const fromX = box.left + box.width / 2;
+	const fromY = box.top + box.height / 2;
+	pointer(grabbed, 'pointerdown', fromX, fromY, 1);
+	pointer(el(Area), 'pointermove', fromX + 40, fromY, 1);
+	await expect.poll(() => shown()).toEqual({ x: 40, y: 30, width: 240, height: 150 });
+
+	const inside = el(Selection).getBoundingClientRect();
+	pointer(el(Selection), 'pointerdown', inside.left + 20, inside.top + 20, 2);
+	pointer(el(Area), 'pointermove', inside.left + 80, inside.top + 80, 2);
+	await quiet();
+	expect(shown()).toEqual({ x: 40, y: 30, width: 240, height: 150 });
+	expect(el(Selection).hasAttribute('ui-resizing')).toBe(true);
+	expect(el(Selection).hasAttribute('ui-dragging')).toBe(false);
+	pointer(el(Area), 'pointerup', fromX + 40, fromY, 1);
+	await expect.poll(() => el(Selection).hasAttribute('ui-resizing')).toBe(false);
+});
+
 // ------------------------------------------------------------------ keyboard
 
 test('the arrows move the rectangle by one step, ten with shift and fifty with the modifier', async () => {

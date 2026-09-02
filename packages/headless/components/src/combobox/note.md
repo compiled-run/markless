@@ -185,6 +185,16 @@ closes and leaves the value untouched; in inline mode it is a no-op, which is
 what upstream asserts. `Tab` closes and keeps its native move. `Backspace`
 records the pre-keystroke emptiness for `removeOnBackspace`.
 
+**Closed, the field's keys are the field's.** `Home`, `End`, `PageUp`,
+`PageDown` and `Enter` are cancelled only while the list shows, so a closed field
+keeps its caret keys and `Enter` submits the enclosing form. The guard reads a
+`closed` cell under a negation rather than `open`: a resumed page stops answering
+a cell to a key policy once a handler has written it, and a negation over nothing
+cancels, which is what shipped before. `combobox.browser.ts` carries an
+SSR `test.fails` witness for the half that waits on the runtime. `PageUp` and
+`PageDown` walk the highlight ten options and stop at the ends, and every
+keyboard move scrolls the highlighted option into view.
+
 **Printable keys are absent on purpose.** Typing belongs to the field: there is
 no typeahead buffer, no `Alt+ArrowDown`, and no all-same-character cycling. That
 is the rule most likely to be got backwards by whoever writes this family and

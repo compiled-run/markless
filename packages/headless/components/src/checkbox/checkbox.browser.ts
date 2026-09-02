@@ -235,6 +235,21 @@ for (const mode of MODES) {
 		expectDisabledBlocks();
 	});
 
+	// `.click()` is refused by a disabled button natively; a dispatched click is not,
+	// and the family's own toggle must refuse it too.
+	test(`${mode}: a dispatched click on a disabled trigger changes nothing`, async () => {
+		if (mode === 'CSR') await render(UnavailableOptions);
+		else await renderSSR(UnavailableOptions);
+
+		el(OffTrigger).dispatchEvent(new MouseEvent('click', { bubbles: true }));
+		el(page.getByTestId('on-trigger')).dispatchEvent(new MouseEvent('click', { bubbles: true }));
+		await new Promise((resolve) => setTimeout(resolve, 150));
+		expect(el(OffTrigger).getAttribute('aria-checked')).toBe('false');
+		expect(el(OffRoot).hasAttribute('ui-checked')).toBe(false);
+		expect(el(page.getByTestId('on-trigger')).getAttribute('aria-checked')).toBe('true');
+		expect(el(OnRoot).hasAttribute('ui-checked')).toBe(true);
+	});
+
 	test(`${mode}: the terms form renders the config a form needs`, async () => {
 		if (mode === 'CSR') await render(TermsForm);
 		else await renderSSR(TermsForm);

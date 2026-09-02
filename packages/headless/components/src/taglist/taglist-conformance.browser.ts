@@ -23,11 +23,4 @@ runMultiEmbedConformance({
 	// No disabled entry: `disabled` locks the whole row — there is no per-tag lock —
 	// and a second locked root in the same embed would give this family two
 	// `taglistState` definitions per island, which the widget-id check forbids.
-	exemptions: [
-		{
-			check: 'interaction-isolation',
-			reason:
-				'the delete button is the only control this family renders inside a keyed repeat, and its click never reaches `remove`: the root stays non-empty for the whole poll in both modes, though `remove` writes the value cell directly. Suspected owner is composeMdxView in packages/router/src/vite/runtime/mdx-route.ts, which drops keyed repeats, so a control inside a repeat loses its view records once the payloads are merged.',
-		},
-	],
 });

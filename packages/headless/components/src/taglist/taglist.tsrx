@@ -256,17 +256,14 @@ export function TagListInput({
 				return;
 			}
 
-			// Written out from event fields and graph state alone: the policy has to
-			// be readable before the handler symbol loads. ArrowLeft is absent on
-			// purpose - it walks only from an empty field or a caret already at 0,
-			// and in both of those the native default moves nothing.
-			if (event.key === 'Enter') event.preventDefault();
+			// One guard over event fields and a bare cell, the shape lifted into the policy that runs before the handler loads; only the first cancel in a handler is lifted, so the two are folded. ArrowLeft is absent on purpose - it walks only from an empty field or a caret already at 0, and in both of those the native default moves nothing.
 			if (
-				(event.key === 'ArrowRight' ||
+				event.key === 'Enter' ||
+				((event.key === 'ArrowRight' ||
 					event.key === 'Backspace' ||
 					event.key === 'Delete' ||
 					event.key === 'Escape') &&
-				taglist.highlighted !== ''
+					taglist.highlighted)
 			) {
 				event.preventDefault();
 			}
@@ -337,6 +334,7 @@ export function TagListItem({
 			// one of those: a click out of that button must not open the tag it removed.
 			const close = elementForValue(taglist.closeEls, item.value);
 			const fromClose = close !== undefined && close.contains(event.target as Node);
+			if (!fromClose && taglist.disabled !== true) taglist.highlight(item.value);
 			if (!fromClose && opensEdit(event.detail, true) && taglist.editable === true) {
 				taglist.edit(item.value);
 			}
@@ -403,7 +401,13 @@ export function TagListItemClose({
 		aria-label={name}
 		disabled={taglist.disabled}
 		onClick={(event) => {
-			taglist.remove(item.value);
+			// The same landing the Delete key makes: the button that was focused is gone with its tag, so focus goes to the neighbour, else the field.
+			const held = item.value;
+			const landing = afterRemoval(taglist.value, held);
+			taglist.remove(held);
+			const next = elementForValue(taglist.closeEls, landing);
+			if (next !== undefined) next.focus();
+			if (next === undefined) taglist.inputEl?.focus();
 			onClick?.(event);
 		}}
 		onFocus={(event) => {

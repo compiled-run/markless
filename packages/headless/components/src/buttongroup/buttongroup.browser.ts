@@ -358,6 +358,33 @@ for (const mode of MODES) {
 	});
 }
 
+/** A cancelable keydown, and whether the family's synchronous policy cancelled it. */
+function prevented(target: Element, key: string): boolean {
+	const keydown = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+	target.dispatchEvent(keydown);
+	return keydown.defaultPrevented;
+}
+
+// The group cancels only the arrows on its axis, decided before the handler
+// loads; the other pair keeps its page scroll.
+for (const mode of MODES) {
+	test(`${mode}: a horizontal group leaves Up and Down to the page`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+		expect(prevented(el(Left), 'ArrowDown')).toBe(false);
+		expect(prevented(el(Left), 'ArrowUp')).toBe(false);
+		expect(prevented(el(Left), 'ArrowRight')).toBe(true);
+	});
+
+	test(`${mode}: a stacked group leaves Left and Right to the page`, async () => {
+		if (mode === 'CSR') await render(Vertical);
+		else await renderSSR(Vertical);
+		expect(prevented(el(High), 'ArrowRight')).toBe(false);
+		expect(prevented(el(High), 'ArrowLeft')).toBe(false);
+		expect(prevented(el(High), 'ArrowDown')).toBe(true);
+	});
+}
+
 test('CSR: an arrow moves focus along the group and never presses', async () => {
 	await render(Basic);
 	el(Left).focus();

@@ -224,6 +224,8 @@ export function SelectContent({ children, onDismiss, onKeydown, ...rest }: Selec
 				event.key === 'ArrowUp' ||
 				event.key === 'Home' ||
 				event.key === 'End' ||
+				event.key === 'PageDown' ||
+				event.key === 'PageUp' ||
 				event.key === 'Enter' ||
 				event.key === ' ' ||
 				event.key === 'Escape'
@@ -240,7 +242,12 @@ export function SelectContent({ children, onDismiss, onKeydown, ...rest }: Selec
 				event.ctrlKey !== true &&
 				event.metaKey !== true;
 			const isNavigationKey =
-				key === 'ArrowDown' || key === 'ArrowUp' || key === 'Home' || key === 'End';
+				key === 'ArrowDown' ||
+				key === 'ArrowUp' ||
+				key === 'Home' ||
+				key === 'End' ||
+				key === 'PageDown' ||
+				key === 'PageUp';
 			const isSelectionKey = key === 'Enter' || key === ' ';
 
 			if (isTypeaheadChar) {

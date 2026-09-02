@@ -292,8 +292,8 @@ export function MenuContextarea({
 		ui-open={menu.open}
 		ui-closed={menu.open !== true}
 		onContextmenu={(event) => {
-			// Unconditional and reading nothing, which is the only shape the compiler lifts into the synchronous policy that cancels the browser's own menu on a served page's FIRST right-click.
-			event.preventDefault();
+			// A bare cell under a negation is a shape the synchronous policy lifts, and it cancels the browser's own menu on a served page's FIRST right-click; `disabled` is never written by a handler, so a resumed page keeps answering it.
+			if (!menu.disabled) event.preventDefault();
 
 			const key = menu.keyboardAt;
 			// The keyboard route already opened it on the keydown; a platform that also synthesises `contextmenu` must not open it twice.
@@ -644,7 +644,8 @@ export function MenuItem({
 				return;
 			}
 			const mine = item.itemEl;
-			if (mine !== undefined && document.activeElement !== mine) mine.focus();
+			const isLocked = item.disabled === true || menu.disabled === true;
+			if (isLocked !== true && mine !== undefined && document.activeElement !== mine) mine.focus();
 			onPointermove?.(event);
 		}}
 		onPointerover={(event) => {

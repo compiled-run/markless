@@ -3,6 +3,7 @@ import { page, userEvent } from 'vite-plus/test/browser';
 import { expect, test } from 'vitest';
 import { Basic } from './scenarios/basic.tsrx';
 import { LongList } from './scenarios/long-list.tsrx';
+import { LongOpenList } from './scenarios/long-open-list.tsrx';
 import { OpenList } from './scenarios/open-list.tsrx';
 import { OptionalOption } from './scenarios/optional-option.tsrx';
 import { OptionsFromData } from './scenarios/options-from-data.tsrx';
@@ -441,6 +442,19 @@ for (const mode of MODES) {
 		if (mode === 'CSR') await render(LongList);
 		else await renderSSR(LongList);
 		expect(page.getByRole('option', { includeHidden: true }).elements().length).toBe(13);
+	});
+
+	test(`${mode}: the page keys move the roving focus ten options and stop at the ends`, async () => {
+		if (mode === 'CSR') await render(LongOpenList);
+		else await renderSSR(LongOpenList);
+
+		el<HTMLElement>(Apple).focus();
+		await userEvent.keyboard('{PageDown}');
+		await expect.poll(async () => await focused()).toBe(el(page.getByTestId('lemon')));
+		await userEvent.keyboard('{PageDown}');
+		await expect.poll(async () => await focused()).toBe(el(page.getByTestId('peach')));
+		await userEvent.keyboard('{PageUp}');
+		await expect.poll(async () => await focused()).toBe(el(Banana));
 	});
 
 	test(`${mode}: a select handed over open renders its popup showing`, async () => {

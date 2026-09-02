@@ -71,18 +71,22 @@ export function stepValue(
 	return reachable[raw];
 }
 
-/** Where a key lands. Home and End jump; the arrows step and may wrap. */
+/** Where a key lands. Home and End jump; the arrows on the axis step and may wrap; the other pair lands nowhere. */
 export function keyValue(
 	reachable: readonly string[],
 	current: string,
 	key: string,
 	isWrapping: boolean,
+	isVertical: boolean,
 ): string | undefined {
 	if (reachable.length === 0) return undefined;
 	if (key === 'Home') return reachable[0];
 	if (key === 'End') return reachable[reachable.length - 1];
 
-	return stepValue(reachable, current, key === 'ArrowRight' ? 1 : -1, isWrapping);
+	const forward = isVertical ? 'ArrowDown' : 'ArrowRight';
+	const back = isVertical ? 'ArrowUp' : 'ArrowLeft';
+	if (key !== forward && key !== back) return undefined;
+	return stepValue(reachable, current, key === forward ? 1 : -1, isWrapping);
 }
 
 /** Autoplay always comes round, whatever `loop` says. */

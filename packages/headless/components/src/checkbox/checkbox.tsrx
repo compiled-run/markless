@@ -32,6 +32,7 @@ export const checkboxState = shared(
 			errorEl,
 			onChange: undefined as ((checked: boolean | 'mixed') => void) | undefined,
 			toggle() {
+				if (checkbox.disabled) return;
 				checkbox.checked = checkbox.checked !== true;
 				checkbox.onChange?.(checkbox.checked);
 			},

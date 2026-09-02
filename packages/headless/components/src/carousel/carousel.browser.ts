@@ -5,10 +5,12 @@ import { installCarouselCss } from './scenarios/carousel-css.ts';
 import Basic from './scenarios/basic.tsrx';
 import GalleryAutoplay from './scenarios/gallery-autoplay.tsrx';
 import Rewind from './scenarios/rewind.tsrx';
+import Stepped from './scenarios/stepped.tsrx';
 import Tabbed from './scenarios/tabbed.tsrx';
 import TwoCarousels from './scenarios/two-carousels.tsrx';
 import Untitled from './scenarios/untitled.tsrx';
 import Vertical from './scenarios/vertical.tsrx';
+import VerticalTabbed from './scenarios/vertical-tabbed.tsrx';
 import WithOnChange from './scenarios/with-onchange.tsrx';
 
 // A refusal is only proved by time passing: a gesture crosses the driver, the
@@ -303,6 +305,120 @@ test('the pointer arriving over the carousel stops the rotation', async () => {
 	await userEvent.hover(el(ParisItem));
 	await expect.poll(() => el(Root).getAttribute('aria-live')).toBe('polite');
 });
+
+// The APG's hover rule is a pause: the pointer leaving the carousel resumes a
+// rotation the pointer paused, and only that.
+test('the pointer leaving the carousel resumes a rotation it paused', async () => {
+	await render(GalleryAutoplay);
+
+	await userEvent.click(el(PlayTrigger));
+	await expect.poll(() => el(Root).getAttribute('aria-live')).toBe('off');
+	await userEvent.hover(el(ParisItem));
+	await expect.poll(() => el(Root).getAttribute('aria-live')).toBe('polite');
+	expect(el(PlayTrigger).getAttribute('aria-label')).toBe('stop automatic slide show');
+
+	const paused = activeValue();
+	await new Promise((resolve) => setTimeout(resolve, 250));
+	expect(activeValue()).toBe(paused);
+
+	el(Root).dispatchEvent(new PointerEvent('pointerout', { bubbles: true, relatedTarget: document.body }));
+	await expect.poll(() => el(Root).getAttribute('aria-live')).toBe('off');
+	await expect.poll(activeValue, { timeout: 3000 }).not.toBe(paused);
+});
+
+test('the pointer leaving resumes nothing that focus stopped', async () => {
+	await render(GalleryAutoplay);
+
+	await userEvent.click(el(PlayTrigger));
+	await expect.poll(() => el(Root).getAttribute('aria-live')).toBe('off');
+	el<HTMLButtonElement>(ForwardTrigger).focus();
+	await expect.poll(() => el(Root).getAttribute('aria-live')).toBe('polite');
+
+	el(Root).dispatchEvent(new PointerEvent('pointerout', { bubbles: true, relatedTarget: document.body }));
+	const stopped = activeValue();
+	await new Promise((resolve) => setTimeout(resolve, 400));
+	expect(el(Root).getAttribute('aria-live')).toBe('polite');
+	expect(activeValue()).toBe(stopped);
+});
+
+// A press the family refuses is said so on the control, never swallowed: the
+// trigger reports itself unavailable and the root carries the reason.
+test('under reduced motion the play trigger says it is refused rather than staying silent', async () => {
+	await render(GalleryAutoplay);
+	const matchMedia = window.matchMedia;
+	window.matchMedia = ((query: string) =>
+		({ matches: query.includes('prefers-reduced-motion'), media: query }) as MediaQueryList) as typeof window.matchMedia;
+	try {
+		await userEvent.click(el(PlayTrigger));
+		await expect.poll(() => el(PlayTrigger).getAttribute('aria-disabled')).toBe('true');
+		expect(el(PlayTrigger).hasAttribute('ui-reduced-motion')).toBe(true);
+		expect(el(Root).hasAttribute('ui-reduced-motion')).toBe(true);
+		expect(el(PlayTrigger).getAttribute('aria-label')).toBe('start automatic slide show');
+		await new Promise((resolve) => setTimeout(resolve, 300));
+		expect(el(Root).getAttribute('aria-live')).toBe('polite');
+		expect(activeValue()).toBe('paris');
+	} finally {
+		window.matchMedia = matchMedia;
+	}
+});
+
+/** A cancelable keydown, and whether the family's synchronous policy cancelled it. */
+function prevented(target: Element, key: string): boolean {
+	const keydown = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+	target.dispatchEvent(keydown);
+	return keydown.defaultPrevented;
+}
+
+for (const mode of MODES) {
+	test(`${mode}: a vertical tab list says so and its pickers walk on Up and Down`, async () => {
+		if (mode === 'CSR') await render(VerticalTabbed);
+		else await renderSSR(VerticalTabbed);
+
+		expect(el(NavList).getAttribute('aria-orientation')).toBe('vertical');
+		const top = el<HTMLButtonElement>(page.getByTestId('top-navtrigger'));
+		// The off-axis arrows are the page's, decided before the handler loads.
+		expect(prevented(top, 'ArrowRight')).toBe(false);
+		expect(prevented(top, 'ArrowLeft')).toBe(false);
+		await quiet();
+		expect(activeValue()).toBe('top');
+
+		top.focus();
+		await userEvent.keyboard('{ArrowDown}');
+		await expect.poll(activeValue).toBe('middle');
+		await expect.poll(() => document.activeElement).toBe(el(page.getByTestId('middle-navtrigger')));
+		await userEvent.keyboard('{End}');
+		await expect.poll(activeValue).toBe('bottom');
+		await userEvent.keyboard('{ArrowUp}');
+		await expect.poll(activeValue).toBe('middle');
+		await userEvent.keyboard('{Home}');
+		await expect.poll(activeValue).toBe('top');
+	});
+
+	test(`${mode}: a horizontal tab list leaves Up and Down to the page`, async () => {
+		if (mode === 'CSR') await render(Tabbed);
+		else await renderSSR(Tabbed);
+
+		expect(el(NavList).getAttribute('aria-orientation')).toBe('horizontal');
+		expect(prevented(el(ParisNav), 'ArrowDown')).toBe(false);
+		expect(prevented(el(ParisNav), 'ArrowUp')).toBe(false);
+		expect(prevented(el(ParisNav), 'ArrowRight')).toBe(true);
+	});
+
+	// Stepping two at a time lands on every other slide; the picker that takes
+	// focus is the one for the slide showing, not the one at the step's index.
+	test(`${mode}: a walk over stepped slides focuses the picker for the slide showing`, async () => {
+		if (mode === 'CSR') await render(Stepped);
+		else await renderSSR(Stepped);
+
+		el<HTMLButtonElement>(page.getByTestId('one-navtrigger')).focus();
+		await userEvent.keyboard('{ArrowRight}');
+		await expect.poll(activeValue).toBe('three');
+		await expect.poll(() => document.activeElement).toBe(el(page.getByTestId('three-navtrigger')));
+		await userEvent.keyboard('{ArrowRight}');
+		await expect.poll(activeValue).toBe('five');
+		await expect.poll(() => document.activeElement).toBe(el(page.getByTestId('five-navtrigger')));
+	});
+}
 
 // SSR resume: what the server served has to be usable, and the first gesture
 // after resume has to land.

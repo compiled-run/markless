@@ -164,6 +164,9 @@ export const cropState = shared(
 			beginMove(target: EventTarget | null, clientX: number, clientY: number, pointerId: number) {
 				const off = crop.disabled;
 				if (off) return;
+				// A second pointer landing mid-gesture is not a new gesture.
+				const busy = crop.moving || crop.resizing;
+				if (busy) return;
 				const surface = areaEl;
 				if (!surface) return;
 				const handles = thumbEls;
@@ -204,6 +207,8 @@ export const cropState = shared(
 			) {
 				const off = crop.disabled;
 				if (off) return;
+				const busy = crop.moving || crop.resizing;
+				if (busy) return;
 				const surface = areaEl;
 				if (!surface) return;
 
@@ -236,10 +241,12 @@ export const cropState = shared(
 			 * grabbed rather than from the last move, so a drag that leaves the area
 			 * and comes back lands where the pointer is.
 			 */
-			dragTo(clientX: number, clientY: number) {
+			dragTo(clientX: number, clientY: number, pointerId: number) {
 				const isMoving = crop.moving;
 				const isResizing = crop.resizing;
 				if (!isMoving && !isResizing) return;
+				const owner = crop.pointerId;
+				if (pointerId !== owner) return;
 
 				const origin = crop.originInline;
 				const sign = crop.inlineSign;
@@ -298,10 +305,12 @@ export const cropState = shared(
 			},
 
 			/** Commits the gesture. A gesture that changed nothing reports nothing. */
-			endDrag() {
+			endDrag(pointerId: number) {
 				const isMoving = crop.moving;
 				const isResizing = crop.resizing;
 				if (!isMoving && !isResizing) return;
+				const owner = crop.pointerId;
+				if (pointerId !== owner) return;
 
 				const moved = crop.changed;
 				const own = crop.own;
@@ -316,10 +325,12 @@ export const cropState = shared(
 			},
 
 			/** Drops the gesture in flight without reporting it. */
-			cancelDrag() {
+			cancelDrag(pointerId: number) {
 				const isMoving = crop.moving;
 				const isResizing = crop.resizing;
 				if (!isMoving && !isResizing) return;
+				const owner = crop.pointerId;
+				if (pointerId !== owner) return;
 				crop.moving = false;
 				crop.resizing = false;
 				crop.changed = false;
@@ -546,15 +557,15 @@ export function CropArea({
 		ui-dragging={crop.moving}
 		ui-resizing={crop.resizing}
 		onPointermove={(event) => {
-			crop.dragTo(event.clientX, event.clientY);
+			crop.dragTo(event.clientX, event.clientY, event.pointerId);
 			onPointermove?.(event);
 		}}
 		onPointerup={(event) => {
-			crop.endDrag();
+			crop.endDrag(event.pointerId);
 			onPointerup?.(event);
 		}}
 		onPointercancel={(event) => {
-			crop.cancelDrag();
+			crop.cancelDrag(event.pointerId);
 			onPointercancel?.(event);
 		}}
 		onFocusin={(event) => {

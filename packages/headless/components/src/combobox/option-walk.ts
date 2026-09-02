@@ -16,6 +16,9 @@
 
 type Options = ReadonlyArray<HTMLElement>;
 
+/** How many options a page key steps over. */
+export const PAGE_STEP = 10;
+
 /** The value an option carries, or '' for an element that carries none. */
 export function optionValue(option: HTMLElement): string {
 	return option.getAttribute('ui-value') ?? '';
@@ -62,6 +65,7 @@ export function nextHighlightValue(
 	if (first === undefined || last === undefined) return undefined;
 	if (key === 'Home') return optionValue(first);
 	if (key === 'End') return optionValue(last);
+	if (key === 'PageDown' || key === 'PageUp') return pageValue(options, current, key === 'PageDown');
 	// Nothing highlighted yet: down lands on the first, up lands on the LAST.
 	// That asymmetry is Qwik UI's, and it is what makes ArrowUp from a closed
 	// field open on the end of the list.
@@ -73,6 +77,21 @@ export function nextHighlightValue(
 	}
 	if (before) return optionValue(before);
 	return isLooping ? optionValue(last) : undefined;
+}
+
+/** A page from the current option, clamped to the ends: a page never wraps. */
+function pageValue(options: Options, current: string, isForward: boolean): string | undefined {
+	const walkable = options.filter(isWalkable);
+	if (walkable.length === 0) return undefined;
+	const at = walkable.findIndex((option) => optionValue(option) === current);
+	if (at === -1) return optionValue(isForward ? walkable[0] : walkable[walkable.length - 1]);
+	const landed = Math.min(walkable.length - 1, Math.max(0, at + (isForward ? PAGE_STEP : -PAGE_STEP)));
+	return optionValue(walkable[landed]);
+}
+
+/** Bring the option carrying `value` into the list's view, moving as little as possible. */
+export function scrollOptionIntoView(options: Options | undefined, value: string): void {
+	options?.find((option) => optionValue(option) === value)?.scrollIntoView({ block: 'nearest' });
 }
 
 /**

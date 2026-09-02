@@ -43,7 +43,12 @@ export const carouselState = shared(
 			isTabbed: false,
 			isDragging: false,
 			autoplayTimer: 0,
+			vertical: false,
+			horizontal: true,
+			hoverPaused: false,
+			reducedMotion: false,
 		});
+		const rootEl = element<HTMLDivElement>();
 		const titleEl = element<HTMLDivElement>();
 		const scrollEl = element<HTMLDivElement>();
 		const viewportEl = element<HTMLDivElement>();
@@ -52,6 +57,7 @@ export const carouselState = shared(
 
 		return {
 			...carousel,
+			rootEl,
 			titleEl,
 			scrollEl,
 			viewportEl,
@@ -101,7 +107,7 @@ export const carouselState = shared(
 				const reachable = reachableValues(slides, perView, carousel.move, carousel.loop);
 				const isWrapping = carousel.rewind || carousel.loop;
 
-				const next = keyValue(reachable, carousel.value, key, isWrapping);
+				const next = keyValue(reachable, carousel.value, key, isWrapping, carousel.vertical);
 				if (next === undefined) return;
 				if (carousel.value !== next) {
 					carousel.value = next;
@@ -110,26 +116,39 @@ export const carouselState = shared(
 
 				moveToValue(scrollEl, viewportEl, carousel.orientation, slides, next, carousel.align);
 
+				// The picker for the slide showing, by its own value: with `move` above one the reachable slides and the pickers do not line up by index.
 				const pickers = navEls ?? [];
-				const landed = reachable.indexOf(next);
-				pickers[landed]?.focus();
+				pickers.find((picker) => picker.getAttribute('ui-value') === next)?.focus();
 			},
 
-			/** The APG's rule: any focus or hover inside stops the rotation, and only the rotation control starts it again. */
+			/** The APG's rule: focus inside stops the rotation, and only the rotation control starts it again. */
 			stopAutoplay() {
 				if (carousel.autoplayTimer !== 0) window.clearInterval(carousel.autoplayTimer);
 				carousel.autoplayTimer = 0;
 				carousel.autoplay = false;
+				carousel.hoverPaused = false;
 			},
 
+			/** The pointer resting over the carousel holds the rotation without ending it. */
+			pauseAutoplay() {
+				if (carousel.autoplay !== true) return;
+				if (carousel.autoplayTimer !== 0) window.clearInterval(carousel.autoplayTimer);
+				carousel.autoplayTimer = 0;
+				carousel.hoverPaused = true;
+			},
+
+			/** Starts, or gives back what a pause held: the pointer leaving asks for this only while a pause is on. */
 			startAutoplay() {
 				if (carousel.autoplayTimer !== 0) window.clearInterval(carousel.autoplayTimer);
 				carousel.autoplayTimer = 0;
 
+				// Refused out loud: the control says it is unavailable and the root says why, so the press is never swallowed.
 				const isReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+				carousel.reducedMotion = isReducedMotion;
 				if (isReducedMotion) return;
 
 				carousel.autoplay = true;
+				carousel.hoverPaused = false;
 				carousel.autoplayTimer = window.setInterval(() => {
 					const slides = slideEls ?? [];
 					const engine = slideEngine(scrollEl, viewportEl, carousel.orientation);
@@ -205,6 +224,7 @@ export function CarouselRoot({
 	onChange,
 	onFocusin,
 	onPointerover,
+	onPointerout,
 	children,
 	...rest
 }: CarouselRootProps) @{
@@ -219,25 +239,43 @@ export function CarouselRoot({
 	carousel.autoplayInterval = autoplayInterval;
 	carousel.move = move;
 	carousel.orientation = orientation;
+	carousel.vertical = orientation === 'vertical';
+	carousel.horizontal = orientation !== 'vertical';
 	carousel.mousewheel = mousewheel;
 	carousel.mouseSensitivity = sensitivity?.mouse ?? 1.5;
 	carousel.touchSensitivity = sensitivity?.touch ?? 1.25;
+	// Live only while nothing is rotating: a pause under the pointer is not rotating.
+	const liveness = computed(() =>
+		carousel.autoplay === true && carousel.hoverPaused !== true ? 'off' : 'polite',
+	);
 
 	<div
 		{...rest}
+		el={carousel.rootEl}
 		role="group"
 		aria-roledescription="carousel"
-		aria-live={carousel.autoplay ? 'off' : 'polite'}
+		aria-live={liveness}
 		aria-atomic="false"
 		ui-vertical={carousel.orientation === 'vertical'}
 		ui-loop={carousel.loop}
+		ui-reduced-motion={carousel.reducedMotion}
 		onFocusin={(event) => {
 			carousel.stopAutoplay();
 			onFocusin?.(event);
 		}}
 		onPointerover={(event) => {
-			carousel.stopAutoplay();
+			carousel.pauseAutoplay();
 			onPointerover?.(event);
+		}}
+		onPointerout={(event) => {
+			// Crossing between parts fires this too; only a pointer leaving the whole carousel resumes, and only what its arrival paused.
+			const root = carousel.rootEl;
+			const went = event.relatedTarget as Node | null;
+			const isAway = root !== undefined && (went === null || root.contains(went) !== true);
+			if (isAway && carousel.autoplay === true && carousel.hoverPaused === true) {
+				carousel.startAutoplay();
+			}
+			onPointerout?.(event);
 		}}
 	>{children}</div>
 }
@@ -313,7 +351,9 @@ export function CarouselItem({ value, children, ...rest }: CarouselItemProps) @{
 }
 
 export function CarouselNavList({ children, ...rest }: CarouselNavListProps) @{
-	<div {...rest} role="tablist">{children}</div>
+	const carousel = carouselState();
+
+	<div {...rest} role="tablist" aria-orientation={carousel.orientation}>{children}</div>
 }
 
 export function CarouselNavTrigger({
@@ -334,6 +374,7 @@ export function CarouselNavTrigger({
 		el={carousel.navEls}
 		type="button"
 		role="tab"
+		ui-value={value}
 		aria-selected={isSelected ? 'true' : 'false'}
 		tabindex={isSelected ? 0 : -1}
 		ui-active={isSelected}
@@ -346,12 +387,12 @@ export function CarouselNavTrigger({
 			onFocus?.(event);
 		}}
 		onKeydown={(event) => {
-			// Guarded by event fields alone: a guard over locals derived from graph state is MARKLESS_SYNC_POLICY_UNEXTRACTABLE.
+			// Event fields and bare cells only, the shape lifted into the policy that runs before the handler loads. Each axis negates its own flag: a resumed page stops answering a cell once a handler has written it, and a negation over nothing cancels, which is the safe side.
 			if (
-				event.key === 'ArrowRight' ||
-				event.key === 'ArrowLeft' ||
 				event.key === 'Home' ||
-				event.key === 'End'
+				event.key === 'End' ||
+				((event.key === 'ArrowRight' || event.key === 'ArrowLeft') && !carousel.vertical) ||
+				((event.key === 'ArrowUp' || event.key === 'ArrowDown') && !carousel.horizontal)
 			) {
 				event.preventDefault();
 				carousel.walk(event.key);
@@ -396,10 +437,14 @@ export function CarouselForwardTrigger({
 
 export function CarouselPlayTrigger({ children, onClick, ...rest }: CarouselPlayTriggerProps) @{
 	const carousel = carouselState();
+	// `false` removes the attribute: a control that may be pressed carries no record.
+	const refused = computed(() => (carousel.reducedMotion === true ? 'true' : false));
 
 	<button
 		{...rest}
 		type="button"
+		aria-disabled={refused}
+		ui-reduced-motion={carousel.reducedMotion}
 		aria-label={carousel.autoplay ? 'stop automatic slide show' : 'start automatic slide show'}
 		onClick={(event) => {
 			if (carousel.autoplay) carousel.stopAutoplay();
