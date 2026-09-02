@@ -2,6 +2,75 @@
 // CSS lands in the same scoped block, so a demo class named `panel` or `switch`
 // must not collide with the chrome's. The playground card takes every block; an
 // example card takes the stage, the code block and the hover-doc registry.
+//
+// The look is the site's paper sticker: a 2px ink edge, one hard accent shadow,
+// and only hairlines (`--code-edge`) inside. Every colour, radius and face is a
+// token from styles/global.css; the accent is `--pg-accent`, muted on dark paper.
+
+/** The crayon arrow after "Expand code", painted in the current colour through a mask. */
+const ARROW_MASK = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12.5 3.5C11.2 8 12.8 13.5 11.8 19.5'/%3E%3Cpath d='M5.5 13.5c2.4 2.2 4.6 4.3 6.3 6.3 1.6-2.5 3.9-4.7 6.7-6.6'/%3E%3C/g%3E%3C/svg%3E")`;
+
+/** A crayon chevron drawn centred in its box, so it can turn in place. Points down at rest. */
+const CARET_MASK = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='%23000' stroke-width='2.8' stroke-linecap='round' stroke-linejoin='round' d='M6 9c2.3 1.9 4.3 3.9 6 6 1.8-2.2 3.8-4.2 6-6'/%3E%3C/svg%3E")`;
+
+/** The mask box behind every caret: a square with the mark at its centre and the pivot there too. */
+function caret(): string {
+	return `content: '';
+				display: inline-block;
+				flex: none;
+				width: 1em;
+				height: 1em;
+				background: currentColor;
+				opacity: 0.65;
+				-webkit-mask-image: ${CARET_MASK};
+				mask-image: ${CARET_MASK};
+				-webkit-mask-size: 100% 100%;
+				mask-size: 100% 100%;
+				-webkit-mask-repeat: no-repeat;
+				mask-repeat: no-repeat;
+				transform-origin: center;
+				transition: transform 140ms ease;`;
+}
+
+/** The card's one accent: the site's pink, and the same pink let through thinner on dark paper (a mix with the paper would drag its hue). */
+function accent(card: string): string {
+	return `			${card} {
+				--pg-accent: var(--pink);
+			}
+
+			html[data-theme='dark'] ${card} {
+				--pg-accent: color-mix(in oklch, var(--pink) 60%, transparent);
+			}`;
+}
+
+/** The sticker itself: what `.pg` and `.cp` share. */
+function sticker(card: string): string {
+	return `			${card} {
+				position: relative;
+				display: grid;
+				/* Sized by the card, never by the widest code line: the code scrolls inside. */
+				grid-template-columns: minmax(0, 1fr);
+				margin-block: var(--space-m);
+				border: 2px solid var(--ink);
+				border-radius: 8px;
+				background: var(--raised);
+				box-shadow: 4px 4px 0 var(--pg-accent);
+				overflow: clip;
+			}
+
+${accent(card)}
+
+			/* Full bleed on a phone: the card runs edge to edge, so the page gutter
+			   the shell adds is taken back here. */
+			@media (max-width: 866px) {
+				${card} {
+					margin-inline: calc(-1 * var(--space-s-l));
+					border-inline: 0;
+					border-radius: 0;
+					box-shadow: 0 4px 0 var(--pg-accent);
+				}
+			}`;
+}
 
 /**
  * The one tip recipe in a card: the control hints and the hover docs share it,
@@ -14,15 +83,15 @@ function tipLook(tip: string): string {
 				width: max-content;
 				max-width: min(36ch, calc(100vw - 2 * var(--space-s-l)));
 				margin: 0;
-				padding: 0;
+				padding: 0.15em 0;
 				border: 0;
-				border-radius: 3px;
+				border-radius: 6px;
 				background: var(--slab);
-				box-shadow: none;
+				box-shadow: 3px 3px 0 var(--pg-accent);
 				color: var(--slab-ink);
-				font-family: var(--font-mono);
-				font-size: var(--step--2);
-				line-height: 1.45;
+				font-family: 'Joy Elia', system-ui, sans-serif;
+				font-size: var(--step--1);
+				line-height: 1.4;
 				text-align: start;
 				white-space: normal;
 			}
@@ -31,15 +100,20 @@ function tipLook(tip: string): string {
 			${tip} .tsrx-tip-body,
 			${tip} .tsrx-tip-type {
 				display: block;
-				padding: 0.35em 0.6em;
-				font-family: var(--font-mono);
+				background: transparent;
+				border: 0;
 				color: inherit;
 			}
 
 			${tip} .tsrx-tip-title {
-				background: transparent;
-				border-block-end: 1px solid color-mix(in oklch, var(--slab-ink) 30%, transparent);
+				padding: 0.45em 0.75em 0.35em;
+				font-family: var(--font-mono);
+				font-size: var(--step--2);
 				font-weight: 700;
+			}
+
+			${tip} .tsrx-tip-body {
+				padding: 0 0.75em 0.5em;
 			}
 
 			${tip} .tsrx-tip-body:empty {
@@ -47,7 +121,10 @@ function tipLook(tip: string): string {
 			}
 
 			${tip} .tsrx-tip-type {
+				padding: 0.4em 0.75em;
 				border-block-start: 1px solid color-mix(in oklch, var(--slab-ink) 30%, transparent);
+				font-family: var(--font-mono);
+				font-size: var(--step--2);
 				opacity: 0.8;
 			}`;
 }
@@ -65,22 +142,104 @@ function anchored(anchor: string, area: string): string {
 				position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline;`;
 }
 
-export const CONTROLS_CSS = `			.pg {
-				position: relative;
-				display: grid;
-				/* Sized by the card, never by the widest code line: the code scrolls inside. */
-				grid-template-columns: minmax(0, 1fr);
-				margin-block: var(--space-s);
-				border: 1px solid var(--code-edge);
-				border-radius: 3px;
-				background: var(--raised);
-				overflow: clip;
+/** The site's select: a 2px ink frame, paper inside, the sidebar's caret. */
+const PICK_CSS = `			.pg-pick-trigger {
+				display: flex;
+				gap: 0.7em;
+				align-items: center;
+				justify-content: space-between;
+				min-width: 6.5em;
+				padding: 0.3em 0.7em;
+				border: 2px solid var(--ink);
+				border-radius: 6px;
+				background: var(--paper);
+				color: var(--ink);
+				font: inherit;
+				font-family: var(--font-mono);
+				font-size: var(--step--1);
+				line-height: 1.3;
+				text-align: start;
+				cursor: pointer;
 			}
+
+			/* The caret follows the trigger's own open attribute, turning about its own centre. */
+			.pg-pick-trigger::after {
+				${caret()}
+			}
+
+			.pg-pick-trigger[ui-open]::after {
+				transform: rotate(180deg);
+			}
+
+			.pg-pick-list {
+				position: absolute;
+				inset-block-start: 100%;
+				inset-inline-start: 0;
+				z-index: 5;
+				min-width: 8em;
+				margin-block: 0.3em;
+				padding: 0.3em;
+				border: 2px solid var(--ink);
+				border-radius: 6px;
+				background: var(--paper);
+				box-shadow: 3px 3px 0 var(--pg-accent);
+			}
+
+			.pg-pick-list[ui-closed] {
+				display: none;
+			}
+
+			/* The anchor is scoped to each picker's own root, so a list never resolves another picker's trigger. */
+			@supports (position-area: block-end) {
+				.pg-pick {
+					anchor-scope: --pg-pick;
+				}
+
+				.pg-pick-trigger[ui-open] {
+					anchor-name: --pg-pick;
+				}
+
+				.pg-pick-list {
+					${anchored('--pg-pick', 'block-end span-inline-end')}
+				}
+			}
+
+			.pg-pick-item {
+				padding: 0.3em 0.6em;
+				border-radius: 4px;
+				color: var(--ink);
+				font-family: var(--font-mono);
+				font-size: var(--step--1);
+				cursor: pointer;
+			}
+
+			.pg-pick-item:hover {
+				background: color-mix(in oklch, var(--ink) var(--hover-wash), transparent);
+			}
+
+			.pg-pick-item[ui-selected] {
+				background: var(--tinted);
+			}`;
+
+/** One focus ring for every control the chrome draws: the site's yellow, as its hover docs use. */
+const FOCUS_CSS = `			.pg-switch:focus-visible,
+			.pg-dot:focus-visible,
+			.pg-showall:focus-visible,
+			.pg-pick-trigger:focus-visible,
+			.pg-pick-item:focus-visible,
+			.pg-field:focus-visible,
+			.pg-tab:focus-visible,
+			.pg-expand:focus-visible {
+				outline: 2px solid var(--yellow);
+				outline-offset: 2px;
+			}`;
+
+export const CONTROLS_CSS = `${sticker('.pg')}
 
 			.pg-controls {
 				display: grid;
-				gap: 0.5em;
-				padding: 0.7em 0.9em;
+				gap: 0.6em;
+				padding: 0.85em var(--space-s);
 				border-block-end: 1px solid var(--code-edge);
 			}
 
@@ -88,12 +247,12 @@ export const CONTROLS_CSS = `			.pg {
 			.pg-rest {
 				display: flex;
 				flex-wrap: wrap;
-				gap: 0.5em 1.4em;
+				gap: 0.6em 1em;
 				align-items: center;
 			}
 
 			.pg-rest {
-				padding-block-start: 0.6em;
+				padding-block-start: 0.75em;
 				border-block-start: 1px solid var(--code-edge);
 			}
 
@@ -123,12 +282,14 @@ export const CONTROLS_CSS = `			.pg {
 			.pg-switch {
 				display: flex;
 				align-items: center;
-				width: 2.2em;
-				height: 1.2em;
+				box-sizing: border-box;
+				width: 2.5em;
+				height: 1.4em;
 				padding: 0.1em;
-				border: 1px solid var(--ink);
+				border: 2px solid var(--ink);
 				border-radius: 999px;
 				background: var(--paper);
+				font-size: var(--step--2);
 				cursor: pointer;
 			}
 
@@ -141,24 +302,26 @@ export const CONTROLS_CSS = `			.pg {
 				opacity: 0.55;
 			}
 
+			/* The knob travels the track's own content width, so it lands flush at either end. */
 			.pg-knob {
 				display: block;
-				width: 0.9em;
-				height: 0.9em;
+				width: 0.8em;
+				height: 0.8em;
+				margin-inline-start: 0;
 				border-radius: 999px;
 				background: var(--ink);
-				transition: transform 130ms ease;
+				transition: margin-inline-start 130ms ease;
 			}
 
 			.pg-switch[ui-checked] .pg-knob {
-				transform: translateX(1em);
+				margin-inline-start: calc(100% - 0.8em);
 			}
 
 			.pg-field {
 				min-width: 7em;
-				padding: 0.2em 0.5em;
-				border: 1px solid var(--ink);
-				border-radius: 3px;
+				padding: 0.25em 0.6em;
+				border: 2px solid var(--ink);
+				border-radius: 6px;
 				background: var(--paper);
 				color: var(--ink);
 				font: inherit;
@@ -172,19 +335,23 @@ export const CONTROLS_CSS = `			.pg {
 				align-items: center;
 			}
 
-			/* The hint is a quiet superscript, not a second control in the cell. */
+			/* The hint is a small circled question mark, quiet until pointed at. */
 			.pg-dot {
-				padding: 0 0.15em;
-				border: 0;
+				display: inline-grid;
+				place-items: center;
+				box-sizing: border-box;
+				width: 1.25em;
+				height: 1.25em;
+				padding: 0;
+				border: 1.5px solid currentColor;
+				border-radius: 999px;
 				background: transparent;
 				color: var(--ink);
-				opacity: 0.55;
+				opacity: 0.6;
 				font: inherit;
-				font-family: var(--font-mono);
 				font-size: var(--step--2);
+				font-weight: 700;
 				line-height: 1;
-				text-decoration: underline dotted;
-				text-underline-offset: 0.2em;
 				cursor: help;
 			}
 
@@ -223,22 +390,33 @@ ${tipLook('.pg-tip')}
 			}
 
 			.pg-showall {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.2em;
 				margin-inline-start: auto;
-				padding: 0.2em 0.5em;
+				padding: 0.2em 0.4em;
 				border: 0;
 				background: transparent;
 				color: var(--ink);
 				font: inherit;
 				font-size: var(--step--1);
 				font-weight: 700;
+				line-height: 1.3;
 				cursor: pointer;
 			}
 
-			.pg-showall::after {
-				content: ' \\203A';
+			.pg-showall:hover {
+				text-decoration: underline;
+				text-decoration-color: var(--pink);
+				text-underline-offset: 0.15em;
 			}
 
-			/* The label follows the trigger's own open attribute, so it flips with the panel. */
+			/* Points along the row while closed, down once the rest of the controls are out. */
+			.pg-showall::after {
+				${caret()}
+				transform: rotate(-90deg);
+			}
+
 			.pg-showall-less,
 			.pg-showall[ui-open] .pg-showall-more {
 				display: none;
@@ -249,110 +427,48 @@ ${tipLook('.pg-tip')}
 			}
 
 			.pg-showall[ui-open]::after {
-				content: ' \\2304';
+				transform: rotate(0deg);
 			}
 
 			.pg-pick {
 				position: relative;
 			}
 
-			.pg-pick-trigger {
-				display: flex;
-				gap: 0.6em;
-				align-items: center;
-				justify-content: space-between;
-				min-width: 6.5em;
-				padding: 0.25em 0.6em;
-				border: 1px solid var(--ink);
-				border-radius: 3px;
-				background: var(--paper);
-				color: var(--ink);
-				font: inherit;
-				font-family: var(--font-mono);
-				font-size: var(--step--1);
-				text-align: start;
-				cursor: pointer;
-			}
-
-			/* The chevron follows the trigger's own open attribute, like an accordion's. */
-			.pg-pick-trigger::after {
-				content: '\\2304';
-				transition: transform 140ms ease;
-			}
-
-			.pg-pick-trigger[ui-open]::after {
-				transform: rotate(180deg);
-			}
-
-			.pg-pick-list {
-				position: absolute;
-				inset-block-start: 100%;
-				inset-inline-start: 0;
-				z-index: 5;
-				min-width: 8em;
-				margin-block: 0.25em;
-				padding: 0.2em;
-				border: 1px solid var(--ink);
-				border-radius: 3px;
-				background: var(--paper);
-			}
-
-			.pg-pick-list[ui-closed] {
-				display: none;
-			}
-
-			/* Only the open trigger is an anchor, so each list finds its own. */
-			@supports (position-area: block-end) {
-				.pg-pick-trigger[ui-open] {
-					anchor-name: --pg-pick;
-				}
-
-				.pg-pick-list {
-					${anchored('--pg-pick', 'block-end span-inline-end')}
-				}
-			}
-
-			.pg-pick-item {
-				padding: 0.25em 0.5em;
-				border-radius: 2px;
-				font-family: var(--font-mono);
-				font-size: var(--step--1);
-				cursor: pointer;
-			}
-
-			.pg-pick-item:hover,
-			.pg-pick-item[ui-selected] {
-				background: var(--tinted);
-			}
+${PICK_CSS}
 
 			.pg-log {
 				margin: 0;
-				padding: 0.5em 0.9em 0;
+				padding: 0.6em var(--space-s) 0;
 				font-family: var(--font-mono);
-				font-size: var(--step--1);
+				font-size: var(--step--2);
 				color: var(--ink);
+				opacity: 0.8;
 			}
 
 			.pg-log-quiet {
 				display: none;
 			}
 
+			/* The scenario picker: a small-caps label over the select, like a sidebar section. */
 			.pg-bar-pick {
-				display: flex;
-				gap: 0.5em;
-				align-items: center;
+				display: grid;
+				gap: 0.3em;
+				justify-items: start;
+				margin-inline-start: auto;
 				padding-block-end: 0.6em;
 			}
 
 			.pg-bar-name {
 				font-size: var(--step--2);
-				font-weight: 700;
-				letter-spacing: 0.04em;
+				text-transform: uppercase;
+				letter-spacing: 0.08em;
+				line-height: 1;
 				color: var(--ink);
+				opacity: 0.7;
 			}
 
 			.pg-bar-trigger {
-				min-width: 8.5em;
+				min-width: 9em;
 			}
 
 			.pg-bar-list {
@@ -367,15 +483,9 @@ ${tipLook('.pg-tip')}
 				}
 			}
 
-			/* Full bleed on a phone: the card runs edge to edge, so the page gutter
-			   the shell adds is taken back here. */
-			@media (max-width: 866px) {
-				.pg {
-					margin-inline: calc(-1 * var(--space-s-l));
-					border-inline: 0;
-					border-radius: 0;
-				}
+${FOCUS_CSS}
 
+			@media (max-width: 866px) {
 				.pg-quick,
 				.pg-rest {
 					flex-direction: column;
@@ -389,47 +499,48 @@ ${tipLook('.pg-tip')}
 				.pg-showall {
 					margin-inline-start: 0;
 				}
+
+				.pg-bar-pick {
+					margin-inline-start: 0;
+				}
 			}`;
 
-/** The stage is its own frame inside the card, so the demo reads as the exhibit rather than as more chrome. */
+/** The stage is a framed, tinted sheet inside the card, so the demo reads as the exhibit rather than as more chrome. */
 export const STAGE_CSS = `			.pg-stage {
 				display: grid;
 				place-items: center;
-				min-height: 15rem;
+				min-height: 18rem;
 				margin: var(--space-s);
-				padding: var(--space-s);
+				padding: var(--space-m) var(--space-s);
 				border: 1px solid var(--code-edge);
-				border-radius: 2px;
+				border-radius: 6px;
 				background: var(--code-surface);
 			}`;
 
 export const CODE_CSS = `			/* One row between the stage and the code: the file tabs sit on the left
-			   edge and the scenario picker on the right. */
+			   edge, attached to the code, and the scenario picker on the right. */
 			.pg-bar {
 				display: flex;
 				/* Reversed wrap puts the picker above the tabs on a phone; it also
 				   flips the cross axis, so flex-start here is the visual bottom. */
 				flex-wrap: wrap-reverse;
-				gap: 0.5em 1em;
+				gap: 0.6em 1em;
 				align-items: flex-start;
 				justify-content: space-between;
-				padding: 0.6em 0.9em 0;
-				border-block-start: 1px solid var(--code-edge);
+				padding: 0.2em var(--space-s) 0;
 			}
 
 			.pg-code {
 				min-width: 0;
-				background: var(--code-surface);
 			}
 
 			.pg-panel {
 				display: block;
 				min-width: 0;
-				background: var(--raised);
 				overflow: clip;
 			}
 
-			/* Sits one pixel into the pane border so the selected tab attaches to the code. */
+			/* Sits one pixel into the pane edge so the selected tab attaches to the code. */
 			.pg-strip {
 				position: relative;
 				z-index: 1;
@@ -439,20 +550,27 @@ export const CODE_CSS = `			/* One row between the stage and the code: the file 
 
 			.pg-strip-row {
 				display: flex;
-				gap: 0.2em;
+				gap: 0.25em;
+				align-items: flex-end;
 			}
 
+			/* Paper index tabs: the selected one lifted onto the code sheet, the rest quiet. */
 			.pg-tab {
-				padding: 0.3em 0.75em;
+				padding: 0.45em 0.9em;
 				border: 1px solid transparent;
 				border-block-end: 0;
-				border-radius: 3px 3px 0 0;
+				border-radius: 6px 6px 0 0;
 				background: transparent;
 				color: var(--ink);
 				font-family: var(--font-mono);
 				font-size: var(--step--2);
+				line-height: 1.3;
 				opacity: 0.6;
 				cursor: pointer;
+			}
+
+			.pg-tab:hover {
+				opacity: 0.85;
 			}
 
 			.pg-tab[ui-selected] {
@@ -479,7 +597,7 @@ export const CODE_CSS = `			/* One row between the stage and the code: the file 
 			}
 
 			.pg-code-body {
-				max-height: 150px;
+				max-height: 10rem;
 				overflow: clip;
 			}
 
@@ -491,9 +609,11 @@ export const CODE_CSS = `			/* One row between the stage and the code: the file 
 			.pg-shiki {
 				margin: 0;
 				padding: var(--space-s);
+				color: var(--ink);
 				font-family: var(--font-mono);
 				font-size: var(--step--2);
-				line-height: 160%;
+				line-height: 1.6;
+				tab-size: 2;
 				overflow-x: auto;
 			}
 
@@ -508,8 +628,8 @@ export const CODE_CSS = `			/* One row between the stage and the code: the file 
 				position: absolute;
 				inset-inline: 0;
 				bottom: 0;
-				height: 5rem;
-				background: linear-gradient(to bottom, transparent, var(--code-surface) 70%);
+				height: 5.5rem;
+				background: linear-gradient(to bottom, transparent, var(--code-surface) 75%);
 				pointer-events: none;
 			}
 
@@ -519,18 +639,41 @@ export const CODE_CSS = `			/* One row between the stage and the code: the file 
 				position: absolute;
 				inset-inline: 0;
 				bottom: 0;
-				height: 5rem;
+				height: 5.5rem;
 				display: flex;
 				align-items: flex-end;
 				justify-content: center;
-				padding-bottom: 0.6em;
+				gap: 0.4em;
+				padding-bottom: 0.75em;
 				border: 0;
 				background: transparent;
 				color: var(--ink);
 				font: inherit;
 				font-size: var(--step--1);
 				font-weight: 700;
+				line-height: 1.3;
 				cursor: pointer;
+			}
+
+			.pg-expand::after {
+				content: '';
+				display: block;
+				width: 1em;
+				height: 1em;
+				margin-block-end: 0.1em;
+				background: currentColor;
+				-webkit-mask-image: ${ARROW_MASK};
+				mask-image: ${ARROW_MASK};
+				-webkit-mask-size: 100% 100%;
+				mask-size: 100% 100%;
+				-webkit-mask-repeat: no-repeat;
+				mask-repeat: no-repeat;
+			}
+
+			.pg-expand:hover {
+				text-decoration: underline;
+				text-decoration-color: var(--pink);
+				text-underline-offset: 0.15em;
 			}
 
 			.pg-clamp[ui-open] .pg-fade,
@@ -587,34 +730,11 @@ ${CODE_CSS}
 
 ${docCss('.pg')}`;
 
-/** A standalone card: the playground's frame round a stage and a code panel. */
-export const CODE_PANEL_CSS = `			.cp {
-				position: relative;
-				display: grid;
-				grid-template-columns: minmax(0, 1fr);
-				margin-block: var(--space-s);
-				border: 1px solid var(--code-edge);
-				border-radius: 3px;
-				background: var(--raised);
-				overflow: clip;
-			}
-
-			.cp .pg-bar {
-				border-block-start: 0;
-			}
-
-			.cp .pg-stage + .pg-code .pg-bar {
-				border-block-start: 1px solid var(--code-edge);
-			}
+/** A standalone card: the playground's sticker round a stage and a code panel. */
+export const CODE_PANEL_CSS = `${sticker('.cp')}
 
 ${STAGE_CSS}
 
-${docCss('.cp')}
+${FOCUS_CSS}
 
-			@media (max-width: 866px) {
-				.cp {
-					margin-inline: calc(-1 * var(--space-s-l));
-					border-inline: 0;
-					border-radius: 0;
-				}
-			}`;
+${docCss('.cp')}`;
