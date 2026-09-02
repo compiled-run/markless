@@ -66,9 +66,10 @@ export type ToasterInstanceState = {
 
 /**
  * One message's row. Everything it shows comes from the `toast` record it is
- * given. It reports `ui-tone` and `ui-front`, and the family owns its `style`
- * attribute to carry the stacking, so style it from a stylesheet rather than a
- * `style` prop.
+ * given. It is `role="status"`, or `role="alert"` for the `error` tone so a
+ * reader interrupts for it. It reports `ui-tone` and `ui-front`, and the family
+ * owns its `style` attribute to carry the stacking, so style it from a
+ * stylesheet rather than a `style` prop.
  */
 export type ToasterItemProps = PropsOf<'div'> & {
 	/** The message this row shows. */
@@ -102,5 +103,7 @@ export type ToasterItemIconProps = PropsOf<'span'>;
 /**
  * The button that dismisses the message it sits in. It takes no id: the item
  * around it holds one, the same way `select.itemindicator` reads its option.
+ * Leave it empty and it renders hidden "Close" text as its name; give it a
+ * visible mark such as "×" and add an `aria-label`, or a reader says "times".
  */
 export type ToasterItemCloseProps = PropsOf<'button'>;

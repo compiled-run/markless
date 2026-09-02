@@ -84,17 +84,14 @@ assumed:
    with the value hoisted were green 3 for 3. The hoist is therefore kept as a
    measurement, not a preference.
 
-## Pinned row
+## Error and description
 
-`a mounted error marks the group invalid` is pinned `test.fails` in both modes.
-`radiogroup.error` sets `group.invalid = true` from its own component body, and
-the root's `aria-invalid` never picks it up: both roots read `"false"` in CSR and
-SSR alike, whichever side of the options the error is written on. A write made
-while the shared instance is still rendering schedules no refresh for a part that
-already rendered, so document order is not the cause and no in-family shape
-avoids it. Checklist pins the same row for the same reason. It is deterministic,
-so `test.fails` rather than skip: the row turns red the day the write propagates,
-which is the signal to unpin it.
+`radiogroup.error` sets `group.invalid = true` from its own component body and the
+group element reads it as `aria-invalid="true"` in both modes, whichever side of
+the options the error is written on - the same shape textbox ships. The error and
+description parts bind handles the group names in `aria-describedby`, error
+first, so a reader hears what is wrong before the hint. `aria-required` sits on
+the group once; the native `required` on every option is what the form checks.
 
 ## What the compiler forced originally
 

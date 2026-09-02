@@ -16,9 +16,10 @@ export type SliderValue = number | [number, number];
 /**
  * The slider itself; the label, track and thumbs go inside it. It holds the
  * range and the current value, and the shape of `value` is what decides the
- * slider: one number for one thumb, a pair for two. The family owns this
- * element's `style` attribute to carry the filled portion, so style the root
- * from a stylesheet rather than a `style` prop.
+ * slider: one number for one thumb, a pair for two thumbs wrapped in a
+ * `role="group"` named by `slider.label`. The family owns this element's
+ * `style` attribute to carry the filled portion, so style the root from a
+ * stylesheet rather than a `style` prop.
  */
 export type SliderRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	/** Where the slider sits now. A pair means two values. Omit it and it starts at `min`. */
@@ -68,6 +69,9 @@ export type SliderInstanceState = Seeded<
 
 /** Names the slider for a reader: every thumb points its `aria-labelledby` here. */
 export type SliderLabelProps = PropsOf<'span'>;
+
+/** What `slider.root` hands the element it renders: everything it was given. */
+export type SliderBoxProps = PropsOf<'div'>;
 
 /**
  * The rail, and the hit area a pointer gesture runs on. The family ships no CSS,

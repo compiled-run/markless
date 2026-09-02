@@ -46,10 +46,11 @@ handler (the same fact tabs, tree, navbar, select and otp all record).
 
 ## The trigger's aria
 
-`aria-haspopup="dialog"`, `aria-expanded` and `aria-controls` are all present. The previous
-implementation carried a comment claiming "Base UI, Radix and Kobalte all omit expanded here too";
-that claim is false on the evidence - Base UI's `popupConformanceTests` asserts both `aria-expanded`
-and `aria-controls` on a dialog trigger, and asserts them again in its multiple-trigger cases.
+`aria-haspopup="dialog"`, `aria-expanded` and `aria-controls` are all written by the trigger and
+pinned in `modal.browser.ts` and the shared battery. An earlier implementation omitted the last two
+behind a comment claiming "Base UI, Radix and Kobalte all omit expanded here too"; that claim is
+false on the evidence - Base UI's `popupConformanceTests` asserts both `aria-expanded` and
+`aria-controls` on a dialog trigger, and asserts them again in its multiple-trigger cases.
 
 One `modal.trigger` per root, per the ruling. Every other opener is the consumer flipping their own
 open state, which `scenarios/controlled.tsrx` is.

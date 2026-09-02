@@ -281,8 +281,18 @@ for (const mode of MODES) {
 		expect(el(Trigger).getAttribute('aria-haspopup')).toBe('dialog');
 		expect(el(Trigger).getAttribute('aria-expanded')).toBe('false');
 		expect(el(Trigger).getAttribute('aria-controls')).toBe(el(Content).id);
+		// The surface the trigger promises is the one it opens: a named dialog, not a group.
+		expect(el(Content).getAttribute('role')).toBe('dialog');
+		expect(el(Content).getAttribute('aria-labelledby')).toBe(el(Label).id);
 		expect(el(Content).hasAttribute('hidden')).toBe(true);
 		expect(el(Root).hasAttribute('ui-closed')).toBe(true);
+	});
+
+	test(`${mode}: an inline picker's surface is a group in the page, not a dialog`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+		expect(el(Content).getAttribute('role')).toBe('group');
+		expect(el(Content).hasAttribute('hidden')).toBe(false);
 	});
 
 	test(`${mode}: swatches are buttons naming their colour and reporting which is in force`, async () => {

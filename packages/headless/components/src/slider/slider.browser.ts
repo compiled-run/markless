@@ -86,7 +86,7 @@ function expectBasicRendered() {
 	expect(thumb.getAttribute('aria-valuemax')).toBe('100');
 	expect(thumb.getAttribute('aria-valuenow')).toBe('40');
 	expect(thumb.hasAttribute('aria-valuetext')).toBe(false);
-	expect(thumb.hasAttribute('aria-orientation')).toBe(false);
+	expect(thumb.getAttribute('aria-orientation')).toBe('horizontal');
 	expect(thumb.getAttribute('aria-disabled')).toBe('false');
 	expect(thumb.getAttribute('aria-labelledby')).toBe(el(Label).id);
 	expect(el(Label).id).toBeTruthy();
@@ -129,7 +129,9 @@ function expectRootDropsDestructuredProps() {
 }
 
 function expectRangeRendered() {
+	// Two thumbs share one label, so the group holding them carries the same name.
 	expect(el(Root).getAttribute('role')).toBe('group');
+	expect(el(Root).getAttribute('aria-labelledby')).toBe(el(Label).id);
 
 	const start = el(StartThumb);
 	const end = el(EndThumb);
@@ -162,7 +164,7 @@ function expectCustomRangeRendered() {
 }
 
 function expectVerticalRendered() {
-	expect(el(Thumb).hasAttribute('aria-orientation')).toBe(false);
+	expect(el(Thumb).getAttribute('aria-orientation')).toBe('vertical');
 	expect(el(Root).getAttribute('ui-orientation')).toBe('vertical');
 	expect(el(Track).getAttribute('ui-orientation')).toBe('vertical');
 }

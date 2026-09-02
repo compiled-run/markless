@@ -32,11 +32,15 @@ export const radiogroupState = shared(
 		// The array type argument makes the handle plural: bound on every option's input, read back live and in document order.
 		const fieldEls = element<HTMLInputElement[]>();
 		const labelEl = element<HTMLLabelElement>();
+		const descriptionEl = element<HTMLDivElement>();
+		const errorEl = element<HTMLDivElement>();
 
 		return {
 			...group,
 			fieldEls,
 			labelEl,
+			descriptionEl,
+			errorEl,
 			// literal function type: a callback slot is only recognised from the written annotation
 			onChange: undefined as ((value: string) => void) | undefined,
 			// One way only: nothing a person does returns a group to nothing chosen.
@@ -89,11 +93,16 @@ export function RadioGroupRoot({
 function RadioGroupBox({ children, ...rest }: RadioGroupBoxProps) @{
 	const group = radiogroupState();
 
+	// Error before description: what is wrong is conveyed before the hint, wherever the two parts sit in the page.
 	<div
 		{...rest}
 		role="radiogroup"
 		aria-labelledby={group.labelEl}
+		aria-describedby={[group.errorEl, group.descriptionEl]}
+		aria-orientation={group.orientation}
 		aria-disabled={group.disabled ? 'true' : undefined}
+		aria-required={group.required ? 'true' : undefined}
+		aria-invalid={group.invalid ? 'true' : undefined}
 		ui-horizontal={group.orientation === 'horizontal'}
 		ui-disabled={group.disabled}
 		ui-required={group.required}
@@ -107,7 +116,9 @@ export function RadioGroupLabel({ children, ...rest }: RadioGroupLabelProps) @{
 }
 
 export function RadioGroupDescription({ children, ...rest }: RadioGroupDescriptionProps) @{
-	<div {...rest}>{children}</div>
+	const group = radiogroupState();
+
+	<div {...rest} el={group.descriptionEl}>{children}</div>
 }
 
 export function RadioGroupError({ children, ...rest }: RadioGroupErrorProps) @{
@@ -115,7 +126,7 @@ export function RadioGroupError({ children, ...rest }: RadioGroupErrorProps) @{
 	// Mounting the error part is what marks the group invalid.
 	group.invalid = true;
 
-	<div {...rest}>{children}</div>
+	<div {...rest} el={group.errorEl}>{children}</div>
 }
 
 export function RadioGroupItem({ value, disabled = false, children, ...rest }: RadioGroupItemProps) @{

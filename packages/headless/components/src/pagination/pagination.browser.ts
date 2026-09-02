@@ -184,7 +184,8 @@ test('pageRange: the range is seven entries wide at every page of a long count',
 });
 
 function expectBasicRendered() {
-	// The root is a navigation landmark; naming it is the consumer's.
+	// The root is a navigation landmark; naming it is the consumer's, because a
+	// family default would suppress the consumer's own aria-label in the spread.
 	expect(el(Root).tagName).toBe('NAV');
 	expect(el(Root).hasAttribute('aria-label')).toBe(false);
 

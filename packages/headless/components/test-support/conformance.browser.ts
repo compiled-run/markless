@@ -459,7 +459,6 @@ const descriptors: readonly FamilyDescriptor[] = [
 			surface: 'content',
 			closeBy: 'close',
 			haspopup: 'dialog',
-			reportsExpanded: false,
 			ridesOverlay: true,
 			focusLands: true,
 			focusReturns: true,
@@ -478,7 +477,6 @@ const descriptors: readonly FamilyDescriptor[] = [
 			// The trigger only opens; the dialog's own close button shuts it.
 			closeBy: 'close',
 			haspopup: 'dialog',
-			reportsExpanded: false,
 			ridesOverlay: true,
 			focusLands: true,
 			focusReturns: true,

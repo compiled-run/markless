@@ -32,6 +32,7 @@ export default function OneMessage() @{
 			<div role="presentation" data-testid="written-rows">
 				<toaster.item toast={held} data-testid="written-item">
 					<toaster.itemtitle data-testid="written-itemtitle">Written instead</toaster.itemtitle>
+					<toaster.itemclose data-testid="written-itemclose" />
 				</toaster.item>
 			</div>
 		</toaster.root>

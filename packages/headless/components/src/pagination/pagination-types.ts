@@ -1,10 +1,12 @@
 import type { PropsOf, Seeded } from '@markless/core';
 
 /**
- * The `<nav>` landmark that holds the page controls. It is a landmark, so it
- * carries a name: `aria-label="Pagination"` by default, and a consumer's own
- * `aria-label` replaces it - a page with a site nav, a breadcrumb and a
+ * The `<nav>` landmark that holds the page controls. It is a landmark, so give
+ * it a name with `aria-label` - a page with a site nav, a breadcrumb and a
  * pagination has three navigation landmarks, and a reader lists them by name.
+ * The family writes no default: a default the consumer could still replace is
+ * not expressible today, and one they could not would leave two paginations on
+ * one page indistinguishable.
  */
 export type PaginationRootProps = Omit<PropsOf<'nav'>, 'onChange'> & {
 	/**
@@ -52,7 +54,8 @@ export type PaginationItemTriggerProps = PropsOf<'button'>;
 /**
  * The same control as `itemtrigger` over an `<a>`, for pagination that is real
  * navigation with real URLs. An anchor has no `disabled` attribute, so an
- * unavailable link reports `aria-disabled` and stays in the tab order.
+ * unavailable link reports `aria-disabled` and stays in the tab order; it keeps
+ * its `href` for crawlers, but a press on it goes nowhere.
  */
 export type PaginationItemLinkProps = PropsOf<'a'>;
 

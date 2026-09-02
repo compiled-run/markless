@@ -442,6 +442,9 @@ for (const mode of MODES) {
 		expect(el(Trigger).getAttribute('aria-haspopup')).toBe('dialog');
 		expect(el(Trigger).getAttribute('aria-expanded')).toBe('false');
 		expect(el(Trigger).getAttribute('aria-controls')).toBe(el(Content).id);
+		// The surface the trigger promises is the one it opens: a named dialog, not a group.
+		expect(el(Content).getAttribute('role')).toBe('dialog');
+		expect(el(Content).getAttribute('aria-labelledby')).toBe(el(Title).id);
 		expect(el(Content).hasAttribute('hidden')).toBe(true);
 		await expectNoAxeViolations(where, 'the popup is closed');
 

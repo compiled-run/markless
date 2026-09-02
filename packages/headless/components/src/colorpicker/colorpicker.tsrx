@@ -455,12 +455,14 @@ export function ColorpickerContent({
 		const showing = picker.open;
 		return asPopup !== true || showing === true;
 	});
+	// The surface the trigger promises with haspopup="dialog" is the one it opens; inline, the picker is a group in the page.
+	const surfaceRole = computed(() => (picker.popup === true ? 'dialog' : 'group'));
 
 	<div
 		{...rest}
 		el={picker.contentEl}
 		overlay
-		role="group"
+		role={surfaceRole}
 		aria-labelledby={picker.labelEl}
 		hidden={surfaceShowing !== true}
 		ui-popup={picker.popup}

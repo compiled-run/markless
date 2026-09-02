@@ -23,9 +23,12 @@ test('CSR: a link on a pagination nobody may move never reaches the consumer', a
 	expect(at('itemlink-2').getAttribute('aria-disabled')).toBe('true');
 	expect(at('itemlink-2').hasAttribute('disabled')).toBe(false);
 
+	const before = window.location.href;
 	at('itemlink-2').click();
 	await settled();
 	expect(at('calls').textContent).toBe('0');
+	// An unavailable link keeps its href for crawlers and still goes nowhere when pressed.
+	expect(window.location.href).toBe(before);
 	// The page never moved, so the current mark is still where it was served.
 	expect(at('itemlink-3').getAttribute('aria-current')).toBe('page');
 	expect(at('itemlink-2').hasAttribute('aria-current')).toBe(false);

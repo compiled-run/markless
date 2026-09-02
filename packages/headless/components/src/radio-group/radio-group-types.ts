@@ -5,7 +5,9 @@ export type RadioGroupOrientation = 'horizontal' | 'vertical';
 
 /**
  * The group: a `role="radiogroup"` element named by `radiogroup.label` through
- * `aria-labelledby`.
+ * `aria-labelledby`. It reports `aria-orientation`, `aria-required` when a
+ * choice is needed, and `aria-invalid` plus `aria-describedby` from the error
+ * and description parts.
  */
 export type RadioGroupRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	/** The value of the chosen option. Omit it and nothing is chosen. */
@@ -70,13 +72,13 @@ export type RadioGroupBoxProps = PropsOf<'div'>;
 /** The group's name: the element `role="radiogroup"` points its `aria-labelledby` at. */
 export type RadioGroupLabelProps = PropsOf<'label'>;
 
-/** Supporting text for the group. It renders its children and changes nothing else. */
+/** Supporting text for the group, wired into the group's `aria-describedby`. */
 export type RadioGroupDescriptionProps = PropsOf<'div'>;
 
 /**
- * The group's validation message. Mounting it is what marks the group invalid
- * for as long as it is in the page, so render it only when there is an error to
- * show.
+ * The group's validation message. Mounting it is what marks the group
+ * `aria-invalid` for as long as it is in the page, so render it only when there
+ * is an error to show; it is described first, ahead of the description.
  */
 export type RadioGroupErrorProps = PropsOf<'div'>;
 
