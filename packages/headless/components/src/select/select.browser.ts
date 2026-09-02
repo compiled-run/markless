@@ -1,4 +1,4 @@
-import { render, renderSSR } from '@markless/vitest-browser';
+import { render, renderCsrIslands, renderSSR, renderSSRIslands } from '@markless/vitest-browser';
 import { page, userEvent } from 'vite-plus/test/browser';
 import { expect, test } from 'vitest';
 import { Basic } from './scenarios/basic.tsrx';
@@ -751,3 +751,89 @@ test('CSR: the hidden native control carries the choice, and a form reset leaves
 	expect(el(Annual).getAttribute('aria-selected')).toBe('true');
 	await expect.poll(() => submit().textContent).toBe('{"plan":"annual"}');
 });
+
+// Two islands of one composed page, the shape a docs page mounts demos in. An
+// outside press has to reach the overlay stack through the island resume path
+// exactly as it does under a plain mount, and only one list may be open at a time
+// across the islands.
+type IslandMount = 'SSR islands' | 'CSR islands';
+const ISLAND_MOUNTS: ReadonlyArray<IslandMount> = ['SSR islands', 'CSR islands'];
+
+async function mountTwoSelectIslands(mount: IslandMount) {
+	if (mount === 'SSR islands') await renderSSRIslands([Basic, Basic]);
+	else await renderCsrIslands([Basic, Basic]);
+	const triggers = [...document.querySelectorAll<HTMLElement>('[data-testid="trigger"]')];
+	const contents = [...document.querySelectorAll<HTMLElement>('[data-testid="content"]')];
+	expect(triggers).toHaveLength(2);
+	expect(contents).toHaveLength(2);
+	// An open listbox anchors below its trigger, where the next island sits; a real
+	// click needs a clear hit target, so the islands are spaced past it.
+	for (const trigger of triggers)
+		trigger.closest<HTMLElement>('[data-testid="root"]')!.style.paddingBlockEnd = '20rem';
+	return { triggers, contents };
+}
+
+function watchRejections() {
+	const raised: string[] = [];
+	const onRejection = (event: PromiseRejectionEvent) => {
+		event.preventDefault();
+		raised.push(String(event.reason));
+	};
+	window.addEventListener('unhandledrejection', onRejection);
+	return {
+		raised,
+		release: () => window.removeEventListener('unhandledrejection', onRejection),
+	};
+}
+
+// A sibling above the container: outside both islands, like a docs page's heading.
+function outsideElement() {
+	const outside = document.createElement('button');
+	outside.type = 'button';
+	outside.textContent = 'Outside';
+	document.body.prepend(outside);
+	return outside;
+}
+
+for (const mount of ISLAND_MOUNTS) {
+	test(`${mount}: a real click outside both islands closes the open listbox and chooses nothing`, async () => {
+		const { triggers, contents } = await mountTwoSelectIslands(mount);
+		const outside = outsideElement();
+		const watch = watchRejections();
+		try {
+			await userEvent.click(page.elementLocator(triggers[0]!));
+			await expect.poll(() => contents[0]!.hidden).toBe(false);
+
+			await userEvent.click(page.elementLocator(outside));
+			await expect.poll(() => contents[0]!.hidden).toBe(true);
+			expect(triggers[0]!.getAttribute('aria-expanded')).toBe('false');
+			expect(triggers[0]!.textContent).toBe('Choose a Fruit');
+			for (const option of document.querySelectorAll('[role="option"]'))
+				expect(option.getAttribute('aria-selected')).toBe('false');
+			await new Promise((resolve) => setTimeout(resolve, 150));
+			expect(watch.raised).toEqual([]);
+		} finally {
+			watch.release();
+			outside.remove();
+		}
+	});
+
+	test(`${mount}: a real click on the other island's trigger closes the first list and opens the second`, async () => {
+		const { triggers, contents } = await mountTwoSelectIslands(mount);
+		const watch = watchRejections();
+		try {
+			await userEvent.click(page.elementLocator(triggers[0]!));
+			await expect.poll(() => contents[0]!.hidden).toBe(false);
+
+			await userEvent.click(page.elementLocator(triggers[1]!));
+			await expect.poll(() => contents[1]!.hidden).toBe(false);
+			await expect.poll(() => contents[0]!.hidden).toBe(true);
+			expect(triggers[0]!.getAttribute('aria-expanded')).toBe('false');
+			expect(triggers[1]!.getAttribute('aria-expanded')).toBe('true');
+			await new Promise((resolve) => setTimeout(resolve, 150));
+			expect(watch.raised).toEqual([]);
+		} finally {
+			watch.release();
+		}
+	});
+}
