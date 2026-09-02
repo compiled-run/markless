@@ -877,18 +877,24 @@ function marklessSsrUnbindLocalRecordSet(set: SsrArmRecordSet) {
 	return set;
 }
 
-function marklessSsrUnbindLocalView(view: SsrViewDraft, localHostIds: ReadonlySet<string>) {
+function marklessSsrUnbindLocalView(
+	view: SsrViewDraft,
+	localHostIds: ReadonlySet<string>,
+	renderedRepeat: (repeat: { readonly id: string }) => boolean = () => false,
+) {
 	const events = view.events.filter((event) => localHostIds.has(event.hostNodeId));
 	for (const event of events)
 		event.symbolIds = event.symbolIds.map(marklessSsrUnbindLocalSymbolId);
 	const domUpdates = view.domUpdates.filter((update) => localHostIds.has(update.hostNodeId));
 	for (const update of domUpdates)
 		if (update.symbolId) update.symbolId = marklessSsrUnbindLocalSymbolId(update.symbolId);
-	// Whose repeat this is, is a question about the markup that WROTE it: a
-	// projected repeat renders into a child's element, so its parent host is never
-	// one of this render's own locators.
+	// Rendered anchors identify hostless repeats that belong to this render.
 	const keyedRepeats = (view.keyedRepeats ?? [])
-		.filter((repeat) => localHostIds.has(repeat.ownerHostNodeId ?? repeat.parentHostNodeId))
+		.filter(
+			(repeat) =>
+				localHostIds.has(repeat.ownerHostNodeId ?? repeat.parentHostNodeId) ||
+				renderedRepeat(repeat),
+		)
 		.map((repeat) => ({
 			...repeat,
 			rowEvents: repeat.rowEvents.map((event) => ({
@@ -964,8 +970,11 @@ function marklessSsrComposedView(
 		}))
 		.filter((child): child is SsrChildData => Boolean(child.view));
 	const locators: SsrLocatorRecord[] = [];
+	const renderedRepeatIds = new Set(structure.repeatIds ?? []);
 	const { events, domUpdates, keyedRepeats, branches, asyncBoundaries } =
-		marklessSsrUnbindLocalView(view, localHostIds);
+		marklessSsrUnbindLocalView(view, localHostIds, (repeat) =>
+			renderedRepeatIds.has(idPrefix + repeat.id),
+		);
 	const behaviors = view.behaviors.filter((behavior) => localHostIds.has(behavior.hostNodeId));
 	const elementHandles = view.elementHandles.filter((handle) =>
 		localHostIds.has(handle.hostNodeId),

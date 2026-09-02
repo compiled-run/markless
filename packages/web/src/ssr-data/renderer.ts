@@ -175,6 +175,8 @@ export type SsrDataStructure = {
 		readonly html: string;
 	}>;
 	readonly elementCount: number;
+	/** Repeat slots walked by this render, including their id prefix. */
+	readonly repeatIds?: ReadonlyArray<string>;
 };
 
 export type SsrDataCoordinates = {
@@ -410,7 +412,12 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 				...(input.view ? { view: input.view } : {}),
 				...(payloadScripts ? { payloadScripts } : {}),
 				coordinates: { locators, anchors },
-				structure: materializeStructure(rendered.tokens),
+				structure: {
+					...materializeStructure(rendered.tokens),
+					repeatIds: anchors.flatMap((anchor) =>
+						anchor.kind === 'repeat' ? [anchor.id] : [],
+					),
+				},
 				structureTokens: rendered.tokens,
 			};
 		},

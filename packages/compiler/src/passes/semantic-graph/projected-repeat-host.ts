@@ -36,12 +36,14 @@ export function retargetProjectedRepeatHosts(input: {
 		repeats[index] = {
 			...repeat,
 			parentHostNodeId: placement.parentHostNodeId,
-			ownerHostNodeId: repeat.parentHostNodeId,
+			...(repeat.parentHostNodeId ? { ownerHostNodeId: repeat.parentHostNodeId } : {}),
 			...(placement.elementsBefore > 0
 				? { projectedElementsBefore: placement.elementsBefore }
 				: {}),
 		};
 	}
+	for (let index = repeats.length - 1; index >= 0; index--)
+		if (repeats[index]!.parentHostNodeId === '') repeats.splice(index, 1);
 }
 
 type ProjectedRepeatPlacement =

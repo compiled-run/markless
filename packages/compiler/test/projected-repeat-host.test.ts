@@ -66,23 +66,27 @@ const spellings = {
 	member: { importLine: `import { ui } from './index.ts';`, tag: 'ui.panel' },
 } as const;
 
-function pageWith(spelling: keyof typeof spellings, body: string) {
+function pageWith(spelling: keyof typeof spellings, body: string, enclosed = true) {
+	const tag = `<${spellings[spelling].tag}>
+			${body}
+		</${spellings[spelling].tag}>`;
 	return `${spellings[spelling].importLine}
 import { state } from '@markless/core';
 
 export function Page() @{
 	const box = state({ rows: [{ id: 'a' }, { id: 'b' }], open: true, kind: 'x' });
 
-	<main>
-		<${spellings[spelling].tag}>
-			${body}
-		</${spellings[spelling].tag}>
-	</main>
+	${enclosed ? `<main>${tag}</main>` : tag}
 }`;
 }
 
-async function compileConsumer(hole: Hole, spelling: keyof typeof spellings, body: string) {
-	const consumer = await compileConsumerModule(hole.child, spelling, body);
+async function compileConsumer(
+	hole: Hole,
+	spelling: keyof typeof spellings,
+	body: string,
+	enclosed = true,
+) {
+	const consumer = await compileConsumerModule(hole.child, spelling, body, enclosed);
 	expect(
 		consumer.semanticGraph.diagnostics.filter((entry) => entry.severity === 'error'),
 	).toEqual([]);
@@ -93,6 +97,7 @@ async function compileConsumerModule(
 	child: string,
 	spelling: keyof typeof spellings,
 	body: string,
+	enclosed = true,
 ) {
 	const [panel] = await compileTsrxModulesWithInterfaces([
 		{ filename: 'src/panel.tsrx', source: child, importSource: './panel.tsrx' },
@@ -115,7 +120,7 @@ async function compileConsumerModule(
 	};
 	return compileTsrxModule({
 		filename: 'src/page.tsrx',
-		source: pageWith(spelling, body),
+		source: pageWith(spelling, body, enclosed),
 		symbols: [],
 		importedModuleInterfaces: {
 			'./panel.tsrx': panel!.moduleGraphInterface,
@@ -230,3 +235,13 @@ test('a repeat under the consumer’s own element inside the projection keeps th
 	expect(repeat?.parentHostNodeId).toBe('h1');
 	expect(repeat?.ownerHostNodeId).toBeUndefined();
 });
+
+for (const spelling of Object.keys(spellings) as ReadonlyArray<keyof typeof spellings>) {
+	test(`@for under an ${spelling} tag that is the component root: rows anchor on the child's element`, async () => {
+		const consumer = await compileConsumer(holes[0]!, spelling, constructs['@for'], false);
+		expect(projectionSlotKinds(consumer)).toEqual([['repeat']]);
+		const [repeat] = consumer.protocolView.keyedRepeats ?? [];
+		expect(repeat?.parentHostNodeId).toBe('c0:h0');
+		expect(repeat?.ownerHostNodeId).toBeUndefined();
+	});
+}

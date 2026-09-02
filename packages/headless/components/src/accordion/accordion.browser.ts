@@ -10,6 +10,7 @@ import FromData from './scenarios/from-data.tsrx';
 import HoleUnderIf from './scenarios/hole-under-if.tsrx';
 import Locked from './scenarios/locked.tsrx';
 import Multiple from './scenarios/multiple.tsrx';
+import RowsAtTheComponentRoot from './scenarios/rows-at-the-component-root.tsrx';
 import TwoAccordions from './scenarios/two-accordions.tsrx';
 import WithOnChange from './scenarios/with-onchange.tsrx';
 import WithoutFindInPage from './scenarios/without-find-in-page.tsrx';
@@ -826,4 +827,62 @@ test('SSR islands: rows projected into a hole under the child’s own @if grow i
 	await pinRowsFollowTheChildsArm(1);
 	expect(embed('drawer', 0).querySelectorAll('[data-testid="drawer-row"]')).toHaveLength(2);
 	expect(embed('picked', 0).textContent).toBe('none');
+});
+
+async function pinRowsAtTheComponentRoot(index: number) {
+	const root = embed('root', index);
+	const inside = (testid: string) =>
+		Array.from(root.querySelectorAll<HTMLElement>(`[data-testid="${testid}"]`));
+	const rows = () => inside('row');
+	const triggers = () => inside('row-trigger');
+	const contents = () => inside('row-content');
+
+	expect(rows()).toHaveLength(3);
+	for (const row of rows()) expect(row.parentElement).toBe(root);
+	expectOpen(triggers()[0]!, contents()[0]!);
+	expectClosed(triggers()[1]!, contents()[1]!);
+
+	triggers()[0]!.focus();
+	await userEvent.keyboard('{ArrowDown}');
+	await expect.poll(() => document.activeElement).toBe(triggers()[1]);
+
+	await userEvent.click(triggers()[1]!);
+	await expect.poll(() => triggers()[1]!.getAttribute('aria-expanded')).toBe('true');
+	expectOpen(triggers()[1]!, contents()[1]!);
+	expectClosed(triggers()[0]!, contents()[0]!);
+
+	await userEvent.click(embed('add', index));
+	await expect.poll(() => rows().length).toBe(4);
+	expect(rows()[3]!.parentElement).toBe(root);
+	expect(triggers()[3]!.textContent).toBe('The fourth question');
+}
+
+test('CSR: rows under a root that is the component root render inside it, walk, toggle and grow', async () => {
+	await render(RowsAtTheComponentRoot);
+	await pinRowsAtTheComponentRoot(0);
+});
+
+test('SSR: rows under a root that is the component root render inside it, walk, toggle and grow', async () => {
+	await renderSSR(RowsAtTheComponentRoot);
+	await pinRowsAtTheComponentRoot(0);
+});
+
+test('CSR islands: rows under a root that is the component root stay inside their own island', async () => {
+	await renderCsrIslands([RowsAtTheComponentRoot, RowsAtTheComponentRoot]);
+	await pinRowsAtTheComponentRoot(1);
+	expect(embed('root', 0).querySelectorAll('[data-testid="row"]')).toHaveLength(3);
+});
+
+test('SSR islands: every island serves its rows and drives them after resume', async () => {
+	const ssr = await renderSSRIslands([RowsAtTheComponentRoot, RowsAtTheComponentRoot]);
+	const roots = ssr.container.querySelectorAll<HTMLElement>('[data-testid="root"]');
+	expect(roots).toHaveLength(2);
+	for (const root of roots) {
+		const rows = root.querySelectorAll<HTMLElement>('[data-testid="row"]');
+		expect(rows).toHaveLength(3);
+		for (const row of rows) expect(row.parentElement).toBe(root);
+	}
+	await pinRowsAtTheComponentRoot(1);
+	expect(embed('root', 0).querySelectorAll('[data-testid="row"]')).toHaveLength(3);
+	expect(embed('row-trigger', 1).getAttribute('aria-expanded')).toBe('false');
 });

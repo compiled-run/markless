@@ -21,7 +21,8 @@ import { firstReactiveRowRead, repeatRowNames } from './repeat-reactivity.ts';
 import type { WalkState } from './types.ts';
 
 export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | null {
-	if (!state.currentHostNodeId) return null;
+	// Projected repeats are retargeted after markup collection.
+	if (!state.currentHostNodeId && !state.currentProjectionScope) return null;
 
 	const itemName = repeatItemName(node);
 	const collectionNode = node.right as AnyNode | undefined;
@@ -159,7 +160,7 @@ export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | nu
 	const repeatIndex = state.graph.keyedRepeats.length;
 	state.graph.keyedRepeats.push({
 		id: `repeat:${repeatIndex}`,
-		parentHostNodeId: state.currentHostNodeId,
+		parentHostNodeId: state.currentHostNodeId ?? '',
 		...(state.currentAsyncBoundaryId ? { asyncBoundaryId: state.currentAsyncBoundaryId } : {}),
 		itemName,
 		...(indexName ? { indexName } : {}),
