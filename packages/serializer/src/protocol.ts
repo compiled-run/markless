@@ -355,6 +355,8 @@ export type ProtocolViewPayload = {
 					readonly falseValue?: string;
 					/** Class names every write must keep — the module's style scope, which the runtime would otherwise overwrite. */
 					readonly constantClass?: string;
+					/** Class names every write keeps in front of the value — a part's own style scope, which its markup writes before the class its consumer handed it. */
+					readonly leadingClass?: string;
 			  }
 			| {
 					readonly kind: 'style';

@@ -439,6 +439,9 @@ function emitNode(
 					...(context.destructuredNames.length > 0
 						? { destructuredNames: context.destructuredNames }
 						: {}),
+					...(spreadClassResidue && context.styleScopeClass
+						? { leadingClass: context.styleScopeClass }
+						: {}),
 				});
 			}
 			continue;

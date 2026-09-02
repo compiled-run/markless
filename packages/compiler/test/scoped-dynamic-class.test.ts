@@ -34,6 +34,7 @@ const CONSUMER = `import { state } from '@markless/core';
 import { Item } from './item.tsrx';
 export function Page() @{
 	let danger = state(false);
+	const page = state({ tone: 'warm' });
 	let groups = state([
 		{ id: 'a', danger: true, tone: 'warm' },
 		{ id: 'b', danger: false, tone: 'cool' },
@@ -44,7 +45,7 @@ export function Page() @{
 		</style>
 		<div class={danger ? 'group is-danger' : 'group'}>host ternary</div>
 		<div class={\`group \${danger ? 'is-danger' : 'is-calm'}\`}>host template</div>
-		<Item class={danger ? 'group is-danger' : 'group'}>state ternary</Item>
+		<Item class={danger ? 'group is-danger' : 'group'} data-tone={page.tone} data-fixed="yes">state ternary</Item>
 		<Item class={\`group \${danger ? 'is-danger' : 'is-calm'}\`}>state template</Item>
 		<div>
 			@for (const group of groups; key group.id) {
@@ -64,6 +65,7 @@ const CONSUMER_ALTERNATE = `import { state } from '@markless/core';
 import { Item } from './item.tsrx';
 export function Board() @{
 	let lit = state(true);
+	const board = state({ hue: 'amber' });
 	let lamps = state([
 		{ key: 'x', lit: false, hue: 'amber' },
 		{ key: 'y', lit: true, hue: 'ice' },
@@ -81,7 +83,7 @@ export function Board() @{
 			}
 		</ul>
 		<Item class={\`lamp \${lit ? 'lamp-on' : 'lamp-off'}\`}>state template</Item>
-		<Item class={lit ? 'lamp lamp-on' : 'lamp'}>state ternary</Item>
+		<Item aria-label="static" class={lit ? 'lamp lamp-on' : 'lamp'} data-hue={board.hue}>state ternary</Item>
 		<p class={\`lamp \${lit ? 'lamp-on' : 'lamp-off'}\`}>host template</p>
 		<p class={lit ? 'lamp lamp-on' : 'lamp'}>host ternary</p>
 	</section>
@@ -219,6 +221,114 @@ test('the alternate-shaped consumer composes the same way', async () => {
 	const text = statics(page, 'Board');
 	expect(text).toContain(`<p class="§ ${scope}">host template</p>`);
 	expect(text).toContain(`<p class="§ ${scope}">host ternary</p>`);
+});
+
+/**
+ * A part that spreads its props writes the consumer's `class` and `data-*` once,
+ * at render. The consumer's cell moves afterwards, so the consumer's own view
+ * carries an update record per prop that crosses into the spread host - the
+ * same host prefix its forwarded events use - and the part's scope class
+ * stays in front of every class write, where the part's markup put it.
+ */
+function spreadHostOf(family: Compiled) {
+	const host = family.moduleGraphInterface.render.components.find(
+		(component) => component.componentName === 'Item',
+	)?.spreadHosts?.[0];
+	expect(host).toBeDefined();
+	return host!;
+}
+
+function forwardedUpdates(page: Compiled, edgeIndex: number, hostNodeId: string) {
+	return page.protocolView.domUpdates.filter(
+		(update) => update.hostNodeId === `c${edgeIndex}:${hostNodeId}`,
+	);
+}
+
+test('every prop crossing into the spread host gets an update record on the consumer side', async () => {
+	const { family, page } = await compilePair(CONSUMER);
+	const familyScope = scopeOf(family);
+	const host = spreadHostOf(family);
+	expect(host.leadingClass).toBe(familyScope);
+
+	const first = forwardedUpdates(page, 0, host.hostNodeId);
+	const classProp = classProps(page, 'Page')[0]!;
+	expect(classProp.kind).toBe('graph-reference');
+	expect(first).toContainEqual({
+		hostNodeId: `c0:${host.hostNodeId}`,
+		source: classProp.source,
+		graphNodeId: (classProp as { graphNodeId: string }).graphNodeId,
+		path: [],
+		target: { kind: 'class', leadingClass: familyScope },
+		symbolId: expect.stringMatching(/^symbol:\d+$/),
+	});
+	expect(first).toContainEqual({
+		hostNodeId: `c0:${host.hostNodeId}`,
+		source: 'page.tone',
+		graphNodeId: 'state:page',
+		path: ['tone'],
+		target: { kind: 'attribute', name: 'data-tone' },
+		symbolId: expect.stringMatching(/^symbol:\d+$/),
+	});
+	// A static attribute is final at render; nothing is planned for it.
+	expect(first.map((update) => update.target)).not.toContainEqual({
+		kind: 'attribute',
+		name: 'data-fixed',
+	});
+	expect(first).toHaveLength(2);
+	expect(page.protocolView.locators).toContainEqual({
+		hostNodeId: `c0:${host.hostNodeId}`,
+		strategy: 'dom-order',
+		index: 0,
+		tagName: '*',
+	});
+
+	// Each record's symbol is a planned dom-update the resolver can load.
+	for (const update of first) {
+		const symbol = page.symbolResolver.symbols.find(
+			(candidate) => candidate.id === update.symbolId,
+		);
+		expect(symbol).toMatchObject({
+			kind: 'dom-update',
+			hostNodeId: update.hostNodeId,
+			target: update.target,
+		});
+	}
+
+	// The template-literal edge carries its class the same way.
+	expect(forwardedUpdates(page, 1, host.hostNodeId)).toHaveLength(1);
+	// A row's read has no cell of its own to subscribe to; the row renders it.
+	expect(forwardedUpdates(page, 2, host.hostNodeId)).toHaveLength(0);
+	expect(forwardedUpdates(page, 3, host.hostNodeId)).toHaveLength(0);
+});
+
+test('the alternate-shaped consumer plans the same forwarded updates', async () => {
+	const { family, page } = await compilePair(CONSUMER_ALTERNATE);
+	const familyScope = scopeOf(family);
+	const host = spreadHostOf(family);
+	// Edges are numbered in authored order: two row edges, then the two cells.
+	expect(forwardedUpdates(page, 0, host.hostNodeId)).toHaveLength(0);
+	expect(forwardedUpdates(page, 1, host.hostNodeId)).toHaveLength(0);
+	expect(forwardedUpdates(page, 2, host.hostNodeId)).toHaveLength(1);
+	const last = forwardedUpdates(page, 3, host.hostNodeId);
+	expect(last.map((update) => update.target)).toEqual([
+		{ kind: 'class', leadingClass: familyScope },
+		{ kind: 'attribute', name: 'data-hue' },
+	]);
+	expect(last[1]).toMatchObject({ graphNodeId: 'state:board', path: ['hue'] });
+});
+
+test('an unscoped part takes the consumer class through its spread with no leading class', async () => {
+	const unscopedFamily = FAMILY.replace(/\t*<style>[\s\S]*?<\/style>\n/, '');
+	const [family, page] = await compileTsrxModulesWithInterfaces([
+		{ filename: '/parts/item.tsrx', source: unscopedFamily, importSource: './item.tsrx' },
+		{ filename: '/pages/page.tsrx', source: CONSUMER },
+	]);
+	expect(family!.publicRenderPlan.styleScopes).toHaveLength(0);
+	const host = spreadHostOf(family!);
+	expect(host.leadingClass).toBeUndefined();
+	expect(host.excludeNames).not.toContain('class');
+	const targets = forwardedUpdates(page!, 0, host.hostNodeId).map((update) => update.target);
+	expect(targets).toEqual([{ kind: 'class' }, { kind: 'attribute', name: 'data-tone' }]);
 });
 
 test('an unscoped consumer hands the part exactly what it wrote', async () => {

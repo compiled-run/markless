@@ -37,6 +37,7 @@ import {
 	sharedCallbackSlotGraphNodeId,
 } from './semantic-graph/collect-shared.ts';
 import { resolveBoundaryRunners } from './public-render/boundary-runner.ts';
+import { forwardedSpreadAttributeUpdates } from './spread-forwarding.ts';
 
 export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPlan {
 	const symbols: PlannedSymbol[] = [];
@@ -155,7 +156,13 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 		}
 	}
 
-	for (const domUpdate of input.payloadArena.view.domUpdates) {
+	// A consumer prop that lands on a child's spread host is this module's own
+	// rewrite too: the cell it reads is this module's, and the view pass files the
+	// record under the same `c<n>:` host its forwarded events use.
+	for (const domUpdate of [
+		...input.payloadArena.view.domUpdates,
+		...forwardedSpreadAttributeUpdates(input),
+	]) {
 		symbols.push({
 			id: `symbol:${nextSymbolId++}`,
 			kind: 'dom-update',

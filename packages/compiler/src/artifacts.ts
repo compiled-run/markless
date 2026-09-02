@@ -332,6 +332,8 @@ export type ModuleGraphInterfaceSpreadHost = {
 	readonly hostNodeId: string;
 	readonly excludeNames: ReadonlyArray<string>;
 	readonly destructuredNames: ReadonlyArray<string>;
+	/** The class the element writes ahead of a spread-carried `class`: its module's style scope. */
+	readonly leadingClass?: string;
 };
 
 /**
@@ -719,32 +721,9 @@ export type SemanticStateRead = {
 	readonly sourceSpan?: SourceSpan;
 };
 
-export type SemanticTemplateBindingTarget =
-	| {
-			readonly kind: 'text';
-			readonly prefix?: string;
-			readonly suffix?: string;
-			readonly trueValue?: string;
-			readonly falseValue?: string;
-	  }
-	| {
-			readonly kind: 'attribute';
-			readonly name: string;
-	  }
-	| {
-			readonly kind: 'property';
-			readonly name: string;
-	  }
-	| {
-			readonly kind: 'class';
-			readonly trueValue?: string;
-			readonly falseValue?: string;
-			/** Class names every write must keep — the module's style scope, which the runtime would otherwise overwrite. */
-			readonly constantClass?: string;
-	  }
-	| {
-			readonly kind: 'style';
-	  };
+export type SemanticTemplateBindingTarget = NonNullable<
+	ProtocolViewPayload['domUpdates'][number]['target']
+>;
 
 export type SemanticGraphAlias = {
 	readonly name: string;
@@ -1030,6 +1009,9 @@ export type SemanticMarkupSlot = SemanticMarkupLocatedSlot &
 				// Prop names the component signature already took out of the rest
 				// binding, so they never reach this spread at all.
 				readonly destructuredNames?: ReadonlyArray<string>;
+				// The module's scope class, when the element writes it ahead of the
+				// spread's `class` in one attribute (which is why `class` is excluded).
+				readonly leadingClass?: string;
 		  }
 		| {
 				readonly kind: 'child-component';
@@ -1475,6 +1457,8 @@ export type SymbolResolverInput = {
 	readonly semanticGraph: SemanticGraphArtifact;
 	readonly payloadArena: PayloadArenaArtifact;
 	readonly stateLowering?: StateLoweringArtifact;
+	// The imported interfaces name the spread hosts a consumer's props land on.
+	readonly source?: Pick<CompileTsrxModuleInput, 'importedModuleInterfaces'>;
 };
 
 /**

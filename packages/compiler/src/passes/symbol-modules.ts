@@ -2053,13 +2053,18 @@ function classDomUpdateValueNode(
 				)
 			: domUpdateValueNode();
 
+	const leading = target.leadingClass;
 	const constant = target.constantClass;
-	if (constant === undefined) return mapped();
+	if (leading === undefined && constant === undefined) return mapped();
 
+	let composed =
+		leading === undefined ? mapped() : binaryNode('+', literalNode(`${leading} `), mapped());
+	if (constant !== undefined)
+		composed = binaryNode('+', composed, literalNode(` ${constant}`));
 	return conditionalNode(
 		mapped(),
-		binaryNode('+', mapped(), literalNode(` ${constant}`)),
-		literalNode(constant),
+		composed,
+		literalNode([leading, constant].filter(Boolean).join(' ')),
 	);
 }
 

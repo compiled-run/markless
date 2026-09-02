@@ -133,6 +133,34 @@ const FIXTURES: ReadonlyArray<Fixture> = [
 		cases: [{ context: { value: 'a b' }, expected: attributeEntry('class', 'a b') }],
 	},
 	{
+		// The module's own scope class trails every write, and stands alone when
+		// the value is empty.
+		name: 'class-constant',
+		target: { kind: 'class', constantClass: 'mk-page' },
+		cases: [
+			{ context: { value: 'a b' }, expected: attributeEntry('class', 'a b mk-page') },
+			{ context: { value: '' }, expected: attributeEntry('class', 'mk-page') },
+		],
+	},
+	{
+		// A part's scope class leads the class its consumer handed it through a
+		// spread, exactly where the part's markup wrote it.
+		name: 'class-leading',
+		target: { kind: 'class', leadingClass: 'mk-part' },
+		cases: [
+			{ context: { value: 'a b' }, expected: attributeEntry('class', 'mk-part a b') },
+			{ context: { value: '' }, expected: attributeEntry('class', 'mk-part') },
+		],
+	},
+	{
+		name: 'class-leading-and-constant',
+		target: { kind: 'class', leadingClass: 'mk-part', constantClass: 'mk-page' },
+		cases: [
+			{ context: { value: 'a' }, expected: attributeEntry('class', 'mk-part a mk-page') },
+			{ context: { value: '' }, expected: attributeEntry('class', 'mk-part mk-page') },
+		],
+	},
+	{
 		name: 'style',
 		target: { kind: 'style' },
 		cases: [
