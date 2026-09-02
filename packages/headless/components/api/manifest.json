@@ -1435,7 +1435,7 @@
 			{
 				"part": "monthinput",
 				"component": "DateBoxMonthInput",
-				"doc": "The month, 1 to 12.",
+				"doc": "The month, 1 to 12, put into words for a reader as `aria-valuetext`.",
 				"props": [
 					{
 						"name": "placeholder",
@@ -1454,7 +1454,7 @@
 			{
 				"part": "root",
 				"component": "DateBoxRoot",
-				"doc": "A date typed one part at a time, as three number boxes rather than one text\nfield. It is the group the three boxes sit in and the home of the date they\nspell: put a `datebox.label`, a `datebox.dayinput`, a\n`datebox.monthinput` and a `datebox.yearinput` inside it, in whichever\norder the date should read, and a `datebox.field` when a form has to submit\nit.\n\nIt reports `ui-disabled`, `ui-required` and `ui-empty` for styling, and it is\nthe element a reader announces as the group the boxes belong to.",
+				"doc": "A date typed one part at a time, as three number boxes rather than one text\nfield. It is the group the three boxes sit in and the home of the date they\nspell: put a `datebox.label`, a `datebox.dayinput`, a\n`datebox.monthinput` and a `datebox.yearinput` inside it, in whichever\norder the date should read, and a `datebox.field` when a form has to submit\nit.\n\nIt reports `ui-disabled`, `ui-required`, `ui-invalid` and `ui-empty` for\nstyling, and it is the element a reader announces as the group the boxes\nbelong to.",
 				"props": [
 					{
 						"name": "value",
@@ -1468,14 +1468,14 @@
 						"type": "string",
 						"required": false,
 						"default": "''",
-						"doc": "The earliest date the boxes will settle on, as `yyyy-mm-dd`."
+						"doc": "The earliest date the boxes will settle on, as `yyyy-mm-dd`. A step lands\non it at once; a box being typed into may pass it until the box is full or\nleft, and is pulled back to it then."
 					},
 					{
 						"name": "max",
 						"type": "string",
 						"required": false,
 						"default": "''",
-						"doc": "The latest date the boxes will settle on, as `yyyy-mm-dd`."
+						"doc": "The latest date the boxes will settle on, as `yyyy-mm-dd`; held the same way as `min`."
 					},
 					{
 						"name": "disabled",
@@ -1489,7 +1489,7 @@
 						"type": "boolean",
 						"required": false,
 						"default": "false",
-						"doc": "A whole date is needed before a form submits."
+						"doc": "A whole date is needed before a form submits; every box says so with `aria-required`."
 					},
 					{
 						"name": "name",
@@ -3990,7 +3990,7 @@
 			{
 				"part": "root",
 				"component": "TextboxRoot",
-				"doc": "The text box itself; the label, the control, and any description or error go\ninside it. It holds the text and the restrictions, and reports `ui-disabled`,\n`ui-required`, `ui-readonly` and `ui-empty` for styling. Put either a\n`textbox.input` or a `textbox.textarea` inside - the root renders no control\nof its own.",
+				"doc": "The text box itself; the label, the control, and any description or error go\ninside it. It holds the text and the restrictions, and reports `ui-disabled`,\n`ui-required`, `ui-readonly`, `ui-invalid` and `ui-empty` for styling. Put\neither a `textbox.input` or a `textbox.textarea` inside - the root renders no\ncontrol of its own.",
 				"props": [
 					{
 						"name": "value",
@@ -4031,7 +4031,7 @@
 						"name": "onChange",
 						"type": "(value: string) => void",
 						"required": false,
-						"doc": "Called with the new text as a person types. Omit it and the box still works;\nthe call site simply does nothing."
+						"doc": "Called with the new text on every change a person makes, once per change,\nand never for the text the box started with. Omit it and the box still\nworks; the call site simply does nothing."
 					}
 				]
 			},

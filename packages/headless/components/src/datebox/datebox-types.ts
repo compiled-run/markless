@@ -9,21 +9,26 @@ import type { SegmentType } from './datebox-math.ts';
  * order the date should read, and a `datebox.field` when a form has to submit
  * it.
  *
- * It reports `ui-disabled`, `ui-required` and `ui-empty` for styling, and it is
- * the element a reader announces as the group the boxes belong to.
+ * It reports `ui-disabled`, `ui-required`, `ui-invalid` and `ui-empty` for
+ * styling, and it is the element a reader announces as the group the boxes
+ * belong to.
  */
 export type DateBoxRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	/**
 	 * The date the boxes show, as `yyyy-mm-dd`. Omit it and they start empty.
 	 */
 	readonly value?: string;
-	/** The earliest date the boxes will settle on, as `yyyy-mm-dd`. */
+	/**
+	 * The earliest date the boxes will settle on, as `yyyy-mm-dd`. A step lands
+	 * on it at once; a box being typed into may pass it until the box is full or
+	 * left, and is pulled back to it then.
+	 */
 	readonly min?: string;
-	/** The latest date the boxes will settle on, as `yyyy-mm-dd`. */
+	/** The latest date the boxes will settle on, as `yyyy-mm-dd`; held the same way as `min`. */
 	readonly max?: string;
 	/** Nothing can be typed in any box, and they all drop out of the tab order. */
 	readonly disabled?: boolean;
-	/** A whole date is needed before a form submits. */
+	/** A whole date is needed before a form submits; every box says so with `aria-required`. */
 	readonly required?: boolean;
 	/** Submitted under this name by `datebox.field`. */
 	readonly name?: string;
@@ -51,7 +56,7 @@ export type DateBoxItemProps = Omit<PropsOf<'span'>, 'children'> & {
 /** The day of the month, 1 to whatever the chosen month and year allow. */
 export type DateBoxDayInputProps = DateBoxItemProps;
 
-/** The month, 1 to 12. */
+/** The month, 1 to 12, put into words for a reader as `aria-valuetext`. */
 export type DateBoxMonthInputProps = DateBoxItemProps;
 
 /** The year. */

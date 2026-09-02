@@ -23,6 +23,7 @@ type SegmentWords = {
 	readonly spinbutton: string;
 	readonly group: string;
 	readonly value: (amount: number) => string;
+	readonly month: (amount: number) => string;
 	readonly bound: (edge: 'min' | 'max', amount: number) => string;
 	readonly disabled: string;
 	readonly invalid: string;
@@ -30,13 +31,22 @@ type SegmentWords = {
 
 const unobserved = () => '';
 
+// The month box carries its name as aria-valuetext, read off the same platform
+// table the family reads, since neither has a locale of its own.
+const monthName = (month: number) =>
+	new Intl.DateTimeFormat(undefined, { month: 'long', timeZone: 'UTC' }).format(
+		new Date(Date.UTC(2024, month - 1, 1)),
+	);
+
 const WORDS: Record<string, SegmentWords> = {
 	// measured: this reader's own output for our markup
 	virtual: {
 		spinbutton: 'spinbutton',
 		group: 'group',
-		// With no aria-valuetext the reader speaks the bare number.
+		// With no aria-valuetext the reader speaks the bare number; with one it
+		// wraps the words in a phrase.
 		value: (amount) => `${amount}`,
+		month: (amount) => `current value ${monthName(amount)}`,
 		bound: (edge, amount) => `${edge} value ${amount}`,
 		disabled: 'disabled',
 		invalid: 'invalid',
@@ -47,6 +57,7 @@ const WORDS: Record<string, SegmentWords> = {
 		spinbutton: 'spin button',
 		group: 'grouping',
 		value: unobserved,
+		month: unobserved,
 		bound: unobserved,
 		disabled: 'unavailable',
 		invalid: 'invalid entry',
@@ -56,6 +67,7 @@ const WORDS: Record<string, SegmentWords> = {
 		spinbutton: 'stepper',
 		group: 'group',
 		value: unobserved,
+		month: unobserved,
 		bound: unobserved,
 		disabled: 'dimmed',
 		invalid: 'invalid data',
@@ -129,7 +141,7 @@ test('each box conveys the spinbutton role and which part of the date it holds',
 test('a filled box conveys its value and the two bounds it may move between', async () => {
 	await open(Prefilled);
 	expectConveys(await readFor([say.spinbutton, 'month input']), [
-		say.value(3),
+		say.month(3),
 		say.bound('min', 1),
 		say.bound('max', 12),
 	]);
@@ -148,11 +160,11 @@ test('the day box conveys the ceiling its month and year set', async () => {
 test('stepping a box with an arrow conveys the new value', async () => {
 	await open(Prefilled);
 	const month = await focusBox('monthinput');
-	expectConveys(await sr.lastSpokenPhrase(), [say.spinbutton, say.value(3)]);
+	expectConveys(await sr.lastSpokenPhrase(), [say.spinbutton, say.month(3)]);
 
 	await sr.press('ArrowUp');
 	await expect.poll(() => month.getAttribute('aria-valuenow')).toBe('4');
-	await expectAnnouncesAfterChange([say.spinbutton, say.value(4)]);
+	await expectAnnouncesAfterChange([say.spinbutton, say.month(4)]);
 });
 
 // Changing the month changes what the day box may hold, and a reader is told so.

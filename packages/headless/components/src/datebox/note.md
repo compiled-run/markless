@@ -67,7 +67,9 @@ months or five years — React Aria's `PAGE_STEP`. `Home`/`End` jump to the box'
 own bounds. Digits type, and a box that can hold no more passes focus on.
 `Backspace` erases a digit and then walks back a box; `Delete` clears one.
 `ArrowLeft`/`ArrowRight` move between boxes. `Tab` walks them natively — three
-real tab stops, which is what QDS, React Aria and the APG all do.
+real tab stops, which is what QDS, React Aria and the APG all do. `Space` is
+swallowed so it cannot scroll the page, and a key under Alt, Ctrl or Meta is
+left to the browser: history back and scroll-to-top keep working from a box.
 
 ## Why a box is not an `<input>`
 
@@ -95,9 +97,14 @@ native text for the state to argue with. Two consequences worth knowing:
 The value is an ISO date string, `yyyy-mm-dd`, and `null` while the boxes do not
 spell a whole one. `min` and `max` are ISO dates too, and they hold the *date*
 rather than any one box: a step that carries the date past a bound pulls the whole
-date back to it, which can move all three boxes at once. Month lengths and the
-comparison are worked out in `datebox-math.ts` — `@markless/ui` depends on
-`@markless/core` and nothing else, so there is no date library behind this.
+date back to it, which can move all three boxes at once. Typing is held to the
+bounds only once a box is left — the digit that fills it, a walk off it, or
+blur — because a half-typed `1` on its way to `12` is below a `min` of 10 and
+clamping it per keystroke made every bounded date impossible to type. React Aria
+never clamps and reports the range through validation; the clamp-on-leave is
+this family's own middle. Month lengths and the comparison are worked out in
+`datebox-math.ts` — `@markless/ui` depends on `@markless/core` and nothing else,
+so there is no date library behind this.
 
 ## Researched defaults applied without an owner answer
 
@@ -105,9 +112,10 @@ The research memo put nine questions to the owner. The family name and the three
 segment prefixes have since been ruled on; the rest were answered by the build
 packet's researched defaults and are still open for revision:
 
-- No `aria-valuetext`. QDS renders none, so a month announces "3" rather than
-  "March" and an empty box announces no value. React Aria and the APG both render
-  it and both name this as the gap it closes.
+- `aria-valuetext` on the month box only, carrying the month's name in the
+  runtime's own language (`Intl`, no locale prop), so a reader speaks "March"
+  rather than "3". Day and year speak their number; an empty box announces no
+  value. React Aria also speaks "Empty" for a placeholder box — not built.
 - QDS's `aria-label` spelling verbatim. React Aria prepends the field's label to
   each box because iOS VoiceOver does not announce groups, so the group's name
   never reaches a box there.
