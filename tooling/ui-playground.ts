@@ -128,9 +128,44 @@ export type DemoAnalysis = {
 	readonly styleStart?: number;
 	readonly styleEnd?: number;
 	readonly css: string;
-	/** Literal `value=` on the family's own parts below the root: a closed option set. */
+	/**
+	 * The values the family's own parts below the root can hold: literal `value=`
+	 * attributes, or the `value` field of the data a `@for` repeats them over.
+	 */
 	readonly itemValues: readonly string[];
+	/** The statements the demo body runs ahead of its element, the data a repeat reads. */
+	readonly prelude: string;
 };
+
+/** `name` -> the array literal a body-level `const name = [...]` holds. */
+function arrayBindings(statements: readonly AstNode[]): Map<string, AstNode> {
+	const found = new Map<string, AstNode>();
+	for (const statement of statements) {
+		if (statement.type !== 'VariableDeclaration') continue;
+		for (const declarator of (statement as { declarations?: AstNode[] }).declarations ?? []) {
+			const id = declarator.id as AstNode;
+			const init = (declarator as { init?: AstNode | null }).init;
+			if (id.type === 'Identifier' && init?.type === 'ArrayExpression') found.set(String(id.name), init);
+		}
+	}
+	return found;
+}
+
+/** The string each object in `array` holds under `field`. */
+function fieldLiterals(array: AstNode, field: string): string[] {
+	const out: string[] = [];
+	for (const element of ((array as { elements?: (AstNode | null)[] }).elements ?? [])) {
+		if (element?.type !== 'ObjectExpression') continue;
+		for (const property of (element as { properties?: AstNode[] }).properties ?? []) {
+			const key = property.key as AstNode | undefined;
+			const name = key?.type === 'Identifier' ? String(key.name) : key?.type === 'Literal' ? String(key.value) : '';
+			if (name !== field) continue;
+			const value = literalOf(property.value as AstNode);
+			if (typeof value === 'string') out.push(value);
+		}
+	}
+	return out;
+}
 
 function literalOf(node: AstNode | null | undefined): ControlValue | number | undefined {
 	if (!node) return undefined;
@@ -225,22 +260,50 @@ export async function analyzeDemo(family: string, stem: string, file: string): P
 	const style = kids.find((node) => node.type === 'JSXStyleElement');
 	const closingNode = (root as { closingElement?: AstNode }).closingElement;
 
+	const statements = ((block as { body?: AstNode[] }).body ?? []) as AstNode[];
+	const arrays = arrayBindings(statements);
+	const prelude =
+		statements.length === 0
+			? ''
+			: source.slice(source.lastIndexOf('\n', statements[0].start) + 1, statements[statements.length - 1].end);
+
 	const itemValues: string[] = [];
-	const walk = (node: AstNode) => {
+	const hold = (value: string) => {
+		if (!itemValues.includes(value)) itemValues.push(value);
+	};
+	// `rows` maps a repeat's row name to the array it walks, for `value={row.field}`.
+	const walk = (node: AstNode, rows: ReadonlyMap<string, AstNode>) => {
+		let scope = rows;
+		if (node.type === 'JSXForExpression') {
+			const loop = node.statement as AstNode;
+			const row = ((loop.left as AstNode).declarations as AstNode[])?.[0]?.id as AstNode | undefined;
+			const over = loop.right as AstNode;
+			const array = over.type === 'Identifier' ? arrays.get(String(over.name)) : undefined;
+			if (row?.type === 'Identifier' && array) scope = new Map([...rows, [String(row.name), array]]);
+		}
 		if (node.type === 'JSXElement' && node !== root) {
 			const name = jsxName((node.openingElement as AstNode).name as AstNode);
 			if (name.startsWith(`${family}.`)) {
 				for (const attribute of ((node.openingElement as AstNode).attributes as AstNode[]) ?? []) {
 					if (attribute.type !== 'JSXAttribute') continue;
 					const read = attributeOf(source, attribute);
-					if (read.name === 'value' && typeof read.literal === 'string' && !itemValues.includes(read.literal))
-						itemValues.push(read.literal);
+					if (read.name !== 'value') continue;
+					if (typeof read.literal === 'string') {
+						hold(read.literal);
+						continue;
+					}
+					const expression = (attribute.value as AstNode | null)?.type === 'JSXExpressionContainer' ? ((attribute.value as AstNode).expression as AstNode) : undefined;
+					if (expression?.type !== 'MemberExpression' || expression.computed) continue;
+					const object = expression.object as AstNode;
+					const property = expression.property as AstNode;
+					const array = object.type === 'Identifier' ? scope.get(String(object.name)) : undefined;
+					if (array && property.type === 'Identifier') for (const value of fieldLiterals(array, String(property.name))) hold(value);
 				}
 			}
 		}
-		for (const child of children(node)) walk(child);
+		for (const child of children(node)) walk(child, scope);
 	};
-	walk(root);
+	walk(root, new Map());
 
 	const css =
 		style === undefined
@@ -269,6 +332,7 @@ export async function analyzeDemo(family: string, stem: string, file: string): P
 		styleEnd: style?.end,
 		css,
 		itemValues,
+		prelude,
 	};
 }
 
@@ -1044,7 +1108,7 @@ ${presetTable(controls, presets)}
 
 export default function ${componentName(demo.family, demo.stem)}() @{
 ${cells.join('\n')}
-
+${demo.prelude === '' ? '' : `\n${demo.prelude}\n`}
 	<section class="pg">
 		<collapsible.root class="pg-controls">
 			<div class="pg-quick">

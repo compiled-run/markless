@@ -1,25 +1,33 @@
 import { accordion } from '@markless/ui';
 
 export default function AccordionFind() @{
+	const questions = [
+		{ value: 'ship', question: 'When does my order ship?', answer: 'Orders leave within two working days.' },
+		{ value: 'overseas', question: 'Do you ship overseas?', answer: 'Everywhere but Antarctica, which keeps losing our parcels.' },
+	];
+
 	<accordion.root class="accordion" value="ship">
-		<accordion.item class="section" value="ship">
-			<accordion.itemlabel class="heading">
-				<accordion.itemtrigger class="trigger">When does my order ship?</accordion.itemtrigger>
-			</accordion.itemlabel>
-			<accordion.itemcontent class="panel">Orders leave within two working days.</accordion.itemcontent>
-		</accordion.item>
-		<accordion.item class="section" value="overseas">
-			<accordion.itemlabel class="heading">
-				<accordion.itemtrigger class="trigger">Do you ship overseas?</accordion.itemtrigger>
-			</accordion.itemlabel>
-			<accordion.itemcontent class="panel">Everywhere but Antarctica, which keeps losing our parcels.</accordion.itemcontent>
-		</accordion.item>
+		{/* A repeat cannot open directly inside a component tag, so a host element carries it. */}
+		<div class="sections" role="presentation">
+			@for (const q of questions; key q.value) {
+				<accordion.item class="section" value={q.value}>
+					<accordion.itemlabel class="heading">
+						<accordion.itemtrigger class="trigger">{q.question}</accordion.itemtrigger>
+					</accordion.itemlabel>
+					<accordion.itemcontent class="panel">{q.answer}</accordion.itemcontent>
+				</accordion.item>
+			}
+		</div>
 
 		<style>
 			.accordion {
 				display: grid;
 				gap: 0.5em;
 				width: min(32rem, 100%);
+			}
+
+			.sections {
+				display: contents;
 			}
 
 			.section {

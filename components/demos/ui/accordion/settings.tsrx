@@ -1,66 +1,86 @@
 import { accordion } from '@markless/ui';
 
 export default function Settings() @{
+	const groups = [
+		{
+			value: 'profile',
+			name: 'Profile',
+			note: 'Name and public handle',
+			tone: 'default',
+			fields: [
+				{ id: 'settings-name', name: 'name', label: 'Display name', value: 'Ada Lovelace', placeholder: '' },
+				{ id: 'settings-handle', name: 'handle', label: 'Handle', value: 'ada-lovelace', placeholder: '' },
+			],
+			checks: [],
+			actions: [],
+		},
+		{
+			value: 'notifications',
+			name: 'Notifications',
+			note: 'What we are allowed to email you about',
+			tone: 'default',
+			fields: [],
+			checks: [
+				{ name: 'digest', label: 'Weekly digest', checked: true },
+				{ name: 'mentions', label: 'Someone mentions me', checked: false },
+			],
+			actions: [],
+		},
+		{
+			value: 'danger',
+			name: 'Danger zone',
+			note: 'Deleting an account cannot be undone',
+			tone: 'danger',
+			fields: [{ id: 'settings-confirm', name: 'confirm', label: 'Type DELETE to confirm', value: '', placeholder: 'DELETE' }],
+			checks: [],
+			actions: [{ name: 'delete', label: 'Delete this account' }],
+		},
+	];
+
 	<accordion.root class="settings" value="profile">
-		<accordion.item class="group" value="profile">
-			<accordion.itemlabel class="group-heading">
-				<accordion.itemtrigger class="group-trigger">
-					<span class="group-name">Profile</span>
-					<span class="group-note">Name and public handle</span>
-				</accordion.itemtrigger>
-			</accordion.itemlabel>
-			<accordion.itemcontent class="group-panel">
-				<div class="field">
-					<label class="field-name" for="settings-name">Display name</label>
-					<input class="field-input" id="settings-name" name="name" value="Ada Lovelace" />
-				</div>
-				<div class="field">
-					<label class="field-name" for="settings-handle">Handle</label>
-					<input class="field-input" id="settings-handle" name="handle" value="ada-lovelace" />
-				</div>
-			</accordion.itemcontent>
-		</accordion.item>
-
-		<accordion.item class="group" value="notifications">
-			<accordion.itemlabel class="group-heading">
-				<accordion.itemtrigger class="group-trigger">
-					<span class="group-name">Notifications</span>
-					<span class="group-note">What we are allowed to email you about</span>
-				</accordion.itemtrigger>
-			</accordion.itemlabel>
-			<accordion.itemcontent class="group-panel">
-				<label class="check">
-					<input class="check-box" type="checkbox" name="digest" checked />
-					<span>Weekly digest</span>
-				</label>
-				<label class="check">
-					<input class="check-box" type="checkbox" name="mentions" />
-					<span>Someone mentions me</span>
-				</label>
-			</accordion.itemcontent>
-		</accordion.item>
-
-		<accordion.item class="group is-danger" value="danger">
-			<accordion.itemlabel class="group-heading">
-				<accordion.itemtrigger class="group-trigger">
-					<span class="group-name">Danger zone</span>
-					<span class="group-note">Deleting an account cannot be undone</span>
-				</accordion.itemtrigger>
-			</accordion.itemlabel>
-			<accordion.itemcontent class="group-panel">
-				<div class="field">
-					<label class="field-name" for="settings-confirm">Type DELETE to confirm</label>
-					<input class="field-input" id="settings-confirm" name="confirm" placeholder="DELETE" />
-				</div>
-				<button class="danger-button" type="button">Delete this account</button>
-			</accordion.itemcontent>
-		</accordion.item>
+		{/* A repeat cannot open directly inside a component tag, so a host element carries it. */}
+		<div class="groups" role="presentation">
+			@for (const group of groups; key group.value) {
+				<accordion.item class="group" value={group.value} data-tone={group.tone}>
+					<accordion.itemlabel class="group-heading">
+						<accordion.itemtrigger class="group-trigger">
+							<span class="group-name">{group.name}</span>
+							<span class="group-note">{group.note}</span>
+						</accordion.itemtrigger>
+					</accordion.itemlabel>
+					<accordion.itemcontent class="group-panel">
+						<div class="group-fields" role="presentation">
+							@for (const field of group.fields; key field.id) {
+								<div class="field">
+									<label class="field-name" for={field.id}>{field.label}</label>
+									<input class="field-input" id={field.id} name={field.name} value={field.value} placeholder={field.placeholder} />
+								</div>
+							}
+							@for (const check of group.checks; key check.name) {
+								<label class="check">
+									<input class="check-box" type="checkbox" name={check.name} checked={check.checked} />
+									<span>{check.label}</span>
+								</label>
+							}
+							@for (const action of group.actions; key action.name) {
+								<button class="danger-button" type="button">{action.label}</button>
+							}
+						</div>
+					</accordion.itemcontent>
+				</accordion.item>
+			}
+		</div>
 
 		<style>
 			.settings {
 				display: grid;
 				gap: 0.6em;
 				width: min(34rem, 100%);
+			}
+
+			.groups,
+			.group-fields {
+				display: contents;
 			}
 
 			.group {
@@ -74,7 +94,7 @@ export default function Settings() @{
 				border-color: var(--ink);
 			}
 
-			.group.is-danger[ui-open] {
+			.group[data-tone='danger'][ui-open] {
 				border-color: var(--pink);
 			}
 

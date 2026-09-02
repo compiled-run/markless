@@ -1,31 +1,34 @@
 import { accordion } from '@markless/ui';
 
 export default function AccordionDisabled() @{
+	const questions = [
+		{ value: 'ship', question: 'When does my order ship?', answer: 'Orders leave within two working days.', disabled: false },
+		{ value: 'trade', question: 'Trade accounts', answer: 'Sign in to a trade account to read this.', disabled: true },
+		{ value: 'overseas', question: 'Do you ship overseas?', answer: 'Everywhere but Antarctica.', disabled: false },
+	];
+
 	<accordion.root class="accordion" value="ship">
-		<accordion.item class="section" value="ship">
-			<accordion.itemlabel class="heading">
-				<accordion.itemtrigger class="trigger">When does my order ship?</accordion.itemtrigger>
-			</accordion.itemlabel>
-			<accordion.itemcontent class="panel">Orders leave within two working days.</accordion.itemcontent>
-		</accordion.item>
-		<accordion.item class="section" value="trade" disabled>
-			<accordion.itemlabel class="heading">
-				<accordion.itemtrigger class="trigger">Trade accounts</accordion.itemtrigger>
-			</accordion.itemlabel>
-			<accordion.itemcontent class="panel">Sign in to a trade account to read this.</accordion.itemcontent>
-		</accordion.item>
-		<accordion.item class="section" value="overseas">
-			<accordion.itemlabel class="heading">
-				<accordion.itemtrigger class="trigger">Do you ship overseas?</accordion.itemtrigger>
-			</accordion.itemlabel>
-			<accordion.itemcontent class="panel">Everywhere but Antarctica.</accordion.itemcontent>
-		</accordion.item>
+		{/* A repeat cannot open directly inside a component tag, so a host element carries it. */}
+		<div class="sections" role="presentation">
+			@for (const q of questions; key q.value) {
+				<accordion.item class="section" value={q.value} disabled={q.disabled}>
+					<accordion.itemlabel class="heading">
+						<accordion.itemtrigger class="trigger">{q.question}</accordion.itemtrigger>
+					</accordion.itemlabel>
+					<accordion.itemcontent class="panel">{q.answer}</accordion.itemcontent>
+				</accordion.item>
+			}
+		</div>
 
 		<style>
 			.accordion {
 				display: grid;
 				gap: 0.5em;
 				width: min(32rem, 100%);
+			}
+
+			.sections {
+				display: contents;
 			}
 
 			.section {

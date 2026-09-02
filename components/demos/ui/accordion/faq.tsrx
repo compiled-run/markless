@@ -1,45 +1,47 @@
 import { accordion } from '@markless/ui';
 
 export default function Faq() @{
+	const questions = [
+		{
+			value: 'ship',
+			question: 'When does my order ship?',
+			answer:
+				'Orders placed before 3pm leave the same working day. You get a tracking link as soon as the parcel is scanned.',
+		},
+		{
+			value: 'returns',
+			question: 'How do I return something?',
+			answer:
+				'Start a return from your orders page within 30 days. Post it back with the printed label and the refund lands about a week later.',
+		},
+		{
+			value: 'overseas',
+			question: 'Do you ship overseas?',
+			answer:
+				'Everywhere but Antarctica, which keeps losing our parcels. Duties are shown at checkout, so nothing turns up with a bill attached.',
+		},
+		{
+			value: 'invoice',
+			question: 'Can I have a VAT invoice?',
+			answer:
+				'Every order page has a Download invoice button. Add your company details first and they are printed on it.',
+		},
+	];
+
 	<section class="faq">
 		<h2 class="faq-title">Frequently asked questions</h2>
 		<accordion.root class="faq-list" multiple value={['ship']}>
-			<accordion.item class="faq-item" value="ship">
-				<accordion.itemlabel class="faq-heading">
-					<accordion.itemtrigger class="faq-trigger">When does my order ship?</accordion.itemtrigger>
-				</accordion.itemlabel>
-				<accordion.itemcontent class="faq-panel">
-					Orders placed before 3pm leave the same working day. You get a tracking link as soon as
-					the parcel is scanned.
-				</accordion.itemcontent>
-			</accordion.item>
-			<accordion.item class="faq-item" value="returns">
-				<accordion.itemlabel class="faq-heading">
-					<accordion.itemtrigger class="faq-trigger">How do I return something?</accordion.itemtrigger>
-				</accordion.itemlabel>
-				<accordion.itemcontent class="faq-panel">
-					Start a return from your orders page within 30 days. Post it back with the printed label
-					and the refund lands about a week later.
-				</accordion.itemcontent>
-			</accordion.item>
-			<accordion.item class="faq-item" value="overseas">
-				<accordion.itemlabel class="faq-heading">
-					<accordion.itemtrigger class="faq-trigger">Do you ship overseas?</accordion.itemtrigger>
-				</accordion.itemlabel>
-				<accordion.itemcontent class="faq-panel">
-					Everywhere but Antarctica, which keeps losing our parcels. Duties are shown at checkout,
-					so nothing turns up with a bill attached.
-				</accordion.itemcontent>
-			</accordion.item>
-			<accordion.item class="faq-item" value="invoice">
-				<accordion.itemlabel class="faq-heading">
-					<accordion.itemtrigger class="faq-trigger">Can I have a VAT invoice?</accordion.itemtrigger>
-				</accordion.itemlabel>
-				<accordion.itemcontent class="faq-panel">
-					Every order page has a Download invoice button. Add your company details first and they
-					are printed on it.
-				</accordion.itemcontent>
-			</accordion.item>
+			{/* A repeat cannot open directly inside a component tag, so a host element carries it. */}
+			<div class="faq-items" role="presentation">
+				@for (const q of questions; key q.value) {
+					<accordion.item class="faq-item" value={q.value}>
+						<accordion.itemlabel class="faq-heading">
+							<accordion.itemtrigger class="faq-trigger">{q.question}</accordion.itemtrigger>
+						</accordion.itemlabel>
+						<accordion.itemcontent class="faq-panel">{q.answer}</accordion.itemcontent>
+					</accordion.item>
+				}
+			</div>
 		</accordion.root>
 		<p class="faq-foot">Still stuck? Write to the help desk and a person answers.</p>
 
@@ -61,6 +63,10 @@ export default function Faq() @{
 
 			.faq-list {
 				display: grid;
+			}
+
+			.faq-items {
+				display: contents;
 			}
 
 			.faq-item {
