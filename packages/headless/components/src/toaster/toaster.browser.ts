@@ -13,8 +13,24 @@ const Save = page.getByTestId('save');
 const Sticky = page.getByTestId('sticky');
 const Elsewhere = page.getByTestId('elsewhere');
 
+// Every row here is a component minted after the page is live. A mint that
+// refuses answers as a rejection nothing awaits, so a lane can pass while a real
+// page throws and loses the rest of its handlers; the sweep below makes that red.
+const unhandledRejections: string[] = [];
+window.addEventListener('unhandledrejection', (event) => {
+	unhandledRejections.push(
+		String((event.reason as { message?: string })?.message ?? event.reason),
+	);
+});
+
+async function rejectionsSurfaced(): Promise<string[]> {
+	await new Promise((resolve) => setTimeout(resolve, 0));
+	return unhandledRejections.splice(0);
+}
+
 afterEach(async () => {
 	await cleanup();
+	expect(await rejectionsSurfaced()).toEqual([]);
 });
 
 function el<T extends Element = HTMLElement>(locator: { element(): Element | null }) {
@@ -102,6 +118,28 @@ test('CSR: a written-out row renders the message it was given', async () => {
 test('SSR: the served row renders the message it was given', async () => {
 	await renderSSR(OneMessage);
 	expectPartsFilled();
+});
+
+async function raiseFromEveryHandler() {
+	el<HTMLButtonElement>(Save).click();
+	await expect.poll(() => titles()).toEqual(['Saved']);
+	el<HTMLButtonElement>(Sticky).click();
+	await expect.poll(() => titles()).toContain('Upload failed');
+	el<HTMLButtonElement>(page.getByTestId('two')).click();
+	await expect.poll(() => titles()).toContain('Copied');
+	el<HTMLButtonElement>(Elsewhere).click();
+	await expect.poll(() => titles()).toContain('From elsewhere');
+	expect(await rejectionsSurfaced()).toEqual([]);
+}
+
+test('CSR: rows minted after mount raise no unhandled rejection', async () => {
+	await render(Basic);
+	await raiseFromEveryHandler();
+});
+
+test('SSR: rows minted after resume raise no unhandled rejection', async () => {
+	await renderSSR(Basic);
+	await raiseFromEveryHandler();
 });
 
 test('CSR: a message appears once', async () => {
