@@ -3,6 +3,7 @@ import { page, userEvent } from 'vite-plus/test/browser';
 import { expect, test } from 'vitest';
 import Basic from './scenarios/basic.tsrx';
 import Controlled from './scenarios/controlled.tsrx';
+import DynamicClass from './scenarios/dynamic-class.tsrx';
 import Faq from './scenarios/faq.tsrx';
 import FromData from './scenarios/from-data.tsrx';
 import Locked from './scenarios/locked.tsrx';
@@ -460,4 +461,67 @@ test('SSR islands: the accordion writes back to its own page cell and settles', 
 	await renderSSRIslands([Controlled, Controlled]);
 	await pinWriteBackSettles(1);
 	expect(embed('held', 0).getAttribute('data-value')).toBe('');
+});
+
+// A consumer's scoped rule (`.group.mk-…`) reaches a part only if the part
+// carries the consumer's scope class. A static class always did; a dynamic
+// class - a ternary over a `@for` row, a ternary or template over a page cell -
+// must carry it too, in every mount. A plain element beside them keeps the
+// scope through the class rewrite once the cell moves; a value crossing a
+// part's rest spread renders once, so the parts are pinned as rendered.
+const GREEN = 'rgb(0, 128, 0)';
+const RED = 'rgb(200, 0, 0)';
+
+function expectScopedBorder(element: HTMLElement, color: string) {
+	const style = getComputedStyle(element);
+	expect(element.classList.contains('group')).toBe(true);
+	expect(style.borderTopWidth).toBe('2px');
+	expect(style.borderTopColor).toBe(color);
+}
+
+async function pinDynamicClassKeepsScope(index: number) {
+	const at = (testid: string) => embed(testid, index);
+	const rows = () =>
+		Array.from(document.querySelectorAll<HTMLElement>('[data-testid="row-item"]')).slice(
+			index * 2,
+			index * 2 + 2,
+		);
+	expect(rows()).toHaveLength(2);
+
+	expectScopedBorder(at('fixed-item'), GREEN);
+	expectScopedBorder(at('host'), GREEN);
+	expectScopedBorder(at('ternary-item'), GREEN);
+	expectScopedBorder(at('template-item'), GREEN);
+	expectScopedBorder(rows()[0]!, RED);
+	expectScopedBorder(rows()[1]!, GREEN);
+
+	await userEvent.click(at('toggle-danger'));
+	await expect.poll(() => at('host').classList.contains('is-danger')).toBe(true);
+	expectScopedBorder(at('host'), RED);
+
+	await userEvent.click(at('toggle-danger'));
+	await expect.poll(() => at('host').classList.contains('is-danger')).toBe(false);
+	expectScopedBorder(at('host'), GREEN);
+}
+
+test('CSR: a dynamic class on a part keeps the consumer scope class across updates', async () => {
+	await render(DynamicClass);
+	await pinDynamicClassKeepsScope(0);
+});
+
+test('SSR: a dynamic class on a part keeps the consumer scope class across updates', async () => {
+	await renderSSR(DynamicClass);
+	await pinDynamicClassKeepsScope(0);
+});
+
+test('CSR islands: a dynamic class on a part keeps the consumer scope class in its own island', async () => {
+	await renderCsrIslands([DynamicClass, DynamicClass]);
+	await pinDynamicClassKeepsScope(1);
+	expectScopedBorder(embed('ternary-item', 0), GREEN);
+});
+
+test('SSR islands: a dynamic class on a part keeps the consumer scope class in its own island', async () => {
+	await renderSSRIslands([DynamicClass, DynamicClass]);
+	await pinDynamicClassKeepsScope(1);
+	expectScopedBorder(embed('ternary-item', 0), GREEN);
 });

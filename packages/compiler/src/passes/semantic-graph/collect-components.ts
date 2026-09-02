@@ -383,10 +383,16 @@ function componentPropBindings(
 			);
 			continue;
 		}
+		// A class no computed could carry - a `@for` row read, a local the graph
+		// does not own - still owes the scope, so it rides the expression itself.
+		const opaqueSource =
+			name === 'class' && state.currentStyleScopeClass
+				? scopedClassSource(source, state.currentStyleScopeClass)
+				: source;
 		props.push(
 			literal.known
 				? { name, source, kind: 'serializable', value: literal.value, sourceSpan: span }
-				: { name, source, kind: 'opaque', sourceSpan: span },
+				: { name, source: opaqueSource, kind: 'opaque', sourceSpan: span },
 		);
 	}
 
@@ -418,7 +424,7 @@ function scopedCallSiteClass(
 	const readSources = pureCompositeReadSources(valueNode, state, { methodCalls: true });
 	if (!readSources) return null;
 	const composed = mintTemplateExpressionComputed(
-		`() => [${source}, ${JSON.stringify(styleScopeClass)}].filter(Boolean).join(' ')`,
+		`() => ${scopedClassSource(source, styleScopeClass)}`,
 		readSources,
 		state,
 		false,
@@ -433,6 +439,11 @@ function scopedCallSiteClass(
 		graphBindingKind: 'computed',
 		path: [],
 	};
+}
+
+/** The authored class expression with the scope class joined onto its runtime value. */
+function scopedClassSource(source: string, styleScopeClass: string): string {
+	return `[${source}, ${JSON.stringify(styleScopeClass)}].filter(Boolean).join(' ')`;
 }
 
 /**
