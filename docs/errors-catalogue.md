@@ -2,7 +2,7 @@
 
 Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
 
-200 codes. Each one is served at `https://markless.dev/errors/<CODE>`.
+206 codes. Each one is served at `https://markless.dev/errors/<CODE>`.
 
 | Code | Package | Pass / phase | Title | Message |
 | --- | --- | --- | --- | --- |
@@ -121,6 +121,7 @@ Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not ed
 | `MARKLESS_REPEAT_KEY_UNSTABLE` | compiler | semantic-graph | @for key must identify the item stably | key … does not derive identity from … or an explicit index alias. Row state, event wiring, and DOM reuse follow the key, so rows of … could not be matched with themselves reliably. |
 | `MARKLESS_REPEAT_ROWS_FROZEN` | compiler | semantic-graph | This @for renders its rows once and never updates them | @for (const … of …) takes its rows from `…`, which is neither a state cell nor a computed, so the repeat resolves to no graph node and its rows are built on the server and never rebuilt in the browser. The row body reads `…`, a … that can change after that render, and those rows would silently keep their first-render values. |
 | `MARKLESS_RESOLVER_CLAIMS_DIVERGED` | compiler | link | Resolver claim sets disagree | Resolver … has incompatible final claim sets. |
+| `MARKLESS_RESOLVER_UNPUBLISHED` | bundler | hooks | TODO: no builder title | Resolver … was loaded before its owner … published a final compile. |
 | `MARKLESS_RESUME_ALREADY_RESUMED` | web | payload-resume-registry, resume, resume-already-resumed-warning | This container was already resumed | resumeFromPayloadDocument was called again on an already live container. |
 | `MARKLESS_RESUME_LOCATOR_MISMATCH` | web | inline | TODO: no builder title | Resume locator … expected <…> at DOM order index … but found <…>. |
 | `MARKLESS_RESUME_LOCATOR_MISSING` | web | inline, resume, resume-arm-records, resume-async-boundaries | TODO: no builder title | Arm-scoped branch … expected an arm-branch comment anchor at arm-local index …. (+3 more) |
@@ -128,6 +129,7 @@ Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not ed
 | `MARKLESS_RESUME_RECORD_DELTA_REMOVAL_UNSUPPORTED` | serializer | resume-record-delta | TODO: no builder title | async runner set. (+2 more) |
 | `MARKLESS_RESUME_RECORD_DELTA_VERSION_MISMATCH` | serializer | resume-record-delta, resume-record-merge | TODO: no builder title | TODO: no builder message |
 | `MARKLESS_RESUME_RECORD_DIVERGENCE_UNSERIALIZABLE` | serializer | resume-record-delta | TODO: no builder title | … contains |
+| `MARKLESS_ROSTER_COUNT_NOT_A_NUMBER` | compiler | semantic-graph | roster count is spent as a number before the page can answer it | Cannot spend the roster count "…" in … ("…") in …: at server render the count is a placeholder the renderer resolves once the page has composed, so only a bare read printed as text or as an attribute value carries it.… |
 | `MARKLESS_ROUTER_DOCUMENT_STORAGE_UNSUPPORTED` | router | vite | TODO: no builder title | the document declares storage cells (…), but the router serves only the document's HTML, so their state payload never reaches the browser and they can never resume. Declare storage() at module scope in a component the page renders instead. |
 | `MARKLESS_ROUTER_RENDER_DATA_MISSING` | router | route-renderer | TODO: no builder title | Navigated route … has no linked render-data module. |
 | `MARKLESS_ROUTER_UNKNOWN_HASH_ROUTE` | router | spa-navigation | TODO: no builder title | Navigation to "…" matched no route file. |
@@ -172,6 +174,9 @@ Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not ed
 | `MARKLESS_SSR_DATA_CHUNK_MISSING` | web | ssr-data | TODO: no builder title | TODO: no builder message |
 | `MARKLESS_SSR_DATA_HOST_MISSING` | web | fns | TODO: no builder title | TODO: no builder message |
 | `MARKLESS_SSR_DATA_SERVED_ARM_INVALID` | web | ssr-data | TODO: no builder title | TODO: no builder message |
+| `MARKLESS_SSR_ROSTER_COUNT_UNANSWERED` | compiler | public-render | TODO: no builder title | TODO: no builder message |
+| `MARKLESS_SSR_ROSTER_POSITION_UNANSWERED` | compiler | public-render | TODO: no builder title | TODO: no builder message |
+| `MARKLESS_SSR_STRIP_FAILED` | compiler | public-render | TODO: no builder title | TODO: no builder message |
 | `MARKLESS_STATE_CONST_REASSIGNMENT` | compiler | state-lowering | Cannot reassign a const graph binding | Cannot update "…" because it was declared with const. JavaScript const binding semantics are preserved for state(). |
 | `MARKLESS_STATE_CREATION_SITE_UNSTABLE` | compiler | semantic-graph | state() and computed() need a stable creation site | …() creates "…" …. That would ship a graph cell whose identity does not match when this code runs. |
 | `MARKLESS_STATE_CROSS_MODULE_IMPORT` | compiler | semantic-graph | Imported module-scope state is not resumable | Cannot import graph state "…" from "…" into "…". |
@@ -197,7 +202,8 @@ Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not ed
 | `MARKLESS_STREAM_ARM_RENDER_MISSING` | web | render-to-stream | TODO: no builder title | Async boundary … settled during streaming, but the re-render pass produced no … in its …. The settled @try/@catch content cannot stream. |
 | `MARKLESS_STYLE_OBJECT_UNSUPPORTED` | compiler | semantic-graph | This style object shape is not supported | style={…} uses …, which style objects do not support. Supported: an object literal written on the element, or an unmodified same-file `const` object literal referenced by name or flattened with `...spread`, with keys that are plain names or compile-time strings and values that are literals, state, computed values, or props. |
 | `MARKLESS_SUBMODULE_UNSUPPORTED` | compiler | semantic-graph | TSRX submodules are not supported by this host yet | The identifier-source import "import ... from …;" has no submodule resolution in markless yet; nothing is split out of the client bundle. (+1 more) |
-| `MARKLESS_SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE` | compiler | symbol-modules | The emitted module for … is missing the declaration of "…"; This expression passes "…" around instead of calling it; This expression reads "…" in a shape the compiler cannot lower; This expression uses the row item "…" in a position the compiler cannot lower | The emitted … module for … still names "…" directly. … "…" is a shared() instance built by the component, and no instance exists inside the handler module, so this module would throw a ReferenceError the first time it runs. (+3 more) |
+| `MARKLESS_SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE` | compiler | symbol-modules | The emitted module for … is missing the declaration of "…"; The emitted module for … is missing the import of "…"; This expression passes "…" around instead of calling it; This expression reads "…" in a shape the compiler cannot lower; This expression uses the row item "…" in a position the compiler cannot lower | The emitted … module for … still names "…" directly. … "…" is a shared() instance built by the component, and no instance exists inside the handler module, so this module would throw a ReferenceError the first time it runs. (+4 more) |
+| `MARKLESS_SYNC_POLICY_SECOND_CANCEL` | compiler | semantic-graph | Only one cancel statement becomes the synchronous event policy | This …() for … sits outside the statement the synchronous policy was extracted from, so it would run only after the lazy handler loads and never reach the event. |
 | `MARKLESS_SYNC_POLICY_UNEXTRACTABLE` | compiler | semantic-graph | Cannot extract synchronous event policy | Cannot extract a synchronous … policy for … because the guard is not limited to graph state, event fields, props, and constants. (+1 more) |
 | `MARKLESS_TEMPLATE_AS_VALUE` | compiler | semantic-graph | A template is not a value | … puts a template… where Markless needs runtime data. Templates compile into page structure with locators, not values to store, pass, or serialize. |
 | `MARKLESS_TEMPLATE_EXPRESSION_STATIC` | compiler | state-lowering | This expression reads state but never updates | This text reads `…`, but only plain reads like `{…}` update the page today. The expression renders its initial value and never changes when `…` changes. |

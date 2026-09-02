@@ -78,6 +78,37 @@ export function unextractableSyncPolicyDiagnostic(
 	};
 }
 
+// The policy runs exactly the calls of the one statement it was lifted from; a
+// cancel anywhere else in the handler waits for the lazy symbol and never
+// reaches the event, so it is refused rather than left silently inert.
+export function secondSyncPolicyCancelDiagnostic(
+	attributeName: string,
+	stray: {
+		readonly action: SemanticSyncPolicyAction;
+		readonly node: AnyNode;
+		readonly eventParam: string;
+	},
+	state: Pick<WalkState, 'filename'>,
+): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_SYNC_POLICY_SECOND_CANCEL',
+		severity: 'error',
+		phase: 'sync-policy',
+		title: 'Only one cancel statement becomes the synchronous event policy',
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		message: `This ${stray.action}() for ${attributeName} sits outside the statement the synchronous policy was extracted from, so it would run only after the lazy handler loads and never reach the event.`,
+		why: 'The compiler lifts one guarded cancel per handler into the policy the resumer applies before the handler symbol loads; every other cancel stays in the lazy handler, where the event has already finished dispatching.',
+		primarySpan: sourceSpan(stray.node, state.filename),
+		suggestions: [
+			{
+				message: `Fold the guards into one extractable condition, e.g. \`if (first || second) ${stray.eventParam}.${stray.action}()\`, or remove the extra ${stray.action}().`,
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_SYNC_POLICY_SECOND_CANCEL',
+	};
+}
+
 function fallbackSpan(filename: string): SourceSpan {
 	return { filename, start: 0, end: 0 };
 }
@@ -91,8 +122,38 @@ export function extractSyncPolicy(
 	if (!node) return undefined;
 
 	const eventParam = getIdentifierName(asNodes(node.params)[0]) ?? 'event';
-	return extractSyncPolicyFromBody(node.body as AnyNode | undefined, eventParam, state);
+	return locateSyncPolicy(node.body as AnyNode | undefined, eventParam, state)?.branch;
 }
+
+export function uncoveredSyncPolicyCall(
+	node: AnyNode | undefined,
+	state: Pick<WalkState, 'graph' | 'source'>,
+): {
+	readonly action: SemanticSyncPolicyAction;
+	readonly node: AnyNode;
+	readonly eventParam: string;
+} | null {
+	if (!node) return null;
+
+	const eventParam = getIdentifierName(asNodes(node.params)[0]) ?? 'event';
+	const body = node.body as AnyNode | undefined;
+	const located = locateSyncPolicy(body, eventParam, state);
+	if (!located) return null;
+
+	const covered = new Set(located.calls);
+	const stray = syncActionCallNodes(body, eventParam, ALL_SYNC_POLICY_ACTIONS).find(
+		(call) => !covered.has(call),
+	);
+	if (!stray) return null;
+
+	const action = syncActionCall(stray, eventParam);
+	return action ? { action, node: stray, eventParam } : null;
+}
+
+const ALL_SYNC_POLICY_ACTIONS: ReadonlySet<SemanticSyncPolicyAction> = new Set([
+	'preventDefault',
+	'stopPropagation',
+]);
 
 export function hasSyncEventPolicyCandidate(node: AnyNode | undefined): boolean {
 	return firstSyncPolicyActionCall(node) !== null;
@@ -191,11 +252,16 @@ export function firstDetachedSyncPolicyReference(node: AnyNode | undefined): {
 	return detached;
 }
 
-function extractSyncPolicyFromBody(
+type SyncPolicyLocation = {
+	readonly branch: SemanticSyncPolicyBranch;
+	readonly calls: ReadonlyArray<AnyNode>;
+};
+
+function locateSyncPolicy(
 	body: AnyNode | undefined,
 	eventParam: string,
 	state: Pick<WalkState, 'graph' | 'source'>,
-): SemanticSyncPolicyBranch | undefined {
+): SyncPolicyLocation | undefined {
 	if (!body) return undefined;
 
 	const statements = body.type === 'BlockStatement' ? asNodes(body.body) : [body];
@@ -206,19 +272,26 @@ function extractSyncPolicyFromBody(
 					? (statement.expression as AnyNode | undefined)
 					: statement;
 			const action = syncActionCall(expression, eventParam);
-			if (action) {
-				return { when: { type: 'constant-truthy', value: true }, actions: [action] };
+			if (action && expression) {
+				return {
+					branch: { when: { type: 'constant-truthy', value: true }, actions: [action] },
+					calls: [unwrapParens(expression) ?? expression],
+				};
 			}
 			continue;
 		}
 
-		const actions = extractSyncActions(statement.consequent as AnyNode | undefined, eventParam);
+		const consequent = statement.consequent as AnyNode | undefined;
+		const actions = extractSyncActions(consequent, eventParam);
 		if (actions.length === 0) continue;
 
 		const when = extractSyncCondition(statement.test as AnyNode | undefined, eventParam, state);
 		if (!when) continue;
 
-		return { when, actions };
+		return {
+			branch: { when, actions },
+			calls: syncActionCallNodes(consequent, eventParam, new Set(actions)),
+		};
 	}
 
 	return undefined;
@@ -330,28 +403,13 @@ function extractSyncCondition(
 
 	if (node.type === 'BinaryExpression') {
 		const operator = typeof node.operator === 'string' ? node.operator : '';
+		if (operator === '!==' || operator === '!=') {
+			const equality = extractSyncEquality(node, eventParam, state);
+			return equality ? { type: 'not', condition: equality } : undefined;
+		}
 		if (operator !== '===' && operator !== '==') return undefined;
 
-		const leftField = eventFieldName(node.left as AnyNode | undefined, eventParam);
-		const rightValue = literalValue(node.right as AnyNode | undefined);
-		if (leftField && rightValue.ok) {
-			return { type: 'event-equals', field: leftField, value: rightValue.value };
-		}
-
-		const rightField = eventFieldName(node.right as AnyNode | undefined, eventParam);
-		const leftValue = literalValue(node.left as AnyNode | undefined);
-		if (rightField && leftValue.ok) {
-			return { type: 'event-equals', field: rightField, value: leftValue.value };
-		}
-
-		const constants = state.graph.syncPolicyConstants ?? [];
-		const leftSyncValue = syncPolicyStaticValue(node.left as AnyNode | undefined, constants);
-		const rightSyncValue = syncPolicyStaticValue(node.right as AnyNode | undefined, constants);
-		if (leftSyncValue.ok && rightSyncValue.ok) {
-			return { type: 'constant-truthy', value: leftSyncValue.value === rightSyncValue.value };
-		}
-
-		return undefined;
+		return extractSyncEquality(node, eventParam, state);
 	}
 
 	if (node.type === 'UnaryExpression') {
@@ -388,6 +446,34 @@ function extractSyncCondition(
 		graphNodeId: resolved.binding.id,
 		path: resolved.path,
 	};
+}
+
+// `a !== b` is `!(a === b)`, so both operators share one equality reader.
+function extractSyncEquality(
+	node: AnyNode,
+	eventParam: string,
+	state: Pick<WalkState, 'graph' | 'source'>,
+): SemanticSyncPolicyCondition | undefined {
+	const leftField = eventFieldName(node.left as AnyNode | undefined, eventParam);
+	const rightValue = literalValue(node.right as AnyNode | undefined);
+	if (leftField && rightValue.ok) {
+		return { type: 'event-equals', field: leftField, value: rightValue.value };
+	}
+
+	const rightField = eventFieldName(node.right as AnyNode | undefined, eventParam);
+	const leftValue = literalValue(node.left as AnyNode | undefined);
+	if (rightField && leftValue.ok) {
+		return { type: 'event-equals', field: rightField, value: leftValue.value };
+	}
+
+	const constants = state.graph.syncPolicyConstants ?? [];
+	const leftSyncValue = syncPolicyStaticValue(node.left as AnyNode | undefined, constants);
+	const rightSyncValue = syncPolicyStaticValue(node.right as AnyNode | undefined, constants);
+	if (leftSyncValue.ok && rightSyncValue.ok) {
+		return { type: 'constant-truthy', value: leftSyncValue.value === rightSyncValue.value };
+	}
+
+	return undefined;
 }
 
 function syncPolicyStaticValue(

@@ -41,6 +41,8 @@ import {
 	extractSyncPolicy,
 	firstDetachedSyncPolicyReference,
 	hasSyncEventPolicyCandidate,
+	secondSyncPolicyCancelDiagnostic,
+	uncoveredSyncPolicyCall,
 	unextractableSyncPolicyDiagnostic,
 } from './collect-sync-policy.ts';
 import {
@@ -668,6 +670,12 @@ function collectAttribute(
 						handler ? [handler.node] : [],
 						state,
 					),
+				);
+			}
+			const strayCancel = syncPolicy ? uncoveredSyncPolicyCall(handler?.node, state) : null;
+			if (strayCancel) {
+				state.graph.diagnostics.push(
+					secondSyncPolicyCancelDiagnostic(attributeName, strayCancel, state),
 				);
 			}
 			state.graph.events.push({

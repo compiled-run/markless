@@ -44,6 +44,8 @@ import {
 	extractSyncPolicy,
 	firstDetachedSyncPolicyReference,
 	hasSyncEventPolicyCandidate,
+	secondSyncPolicyCancelDiagnostic,
+	uncoveredSyncPolicyCall,
 	unextractableSyncPolicyDiagnostic,
 } from './collect-sync-policy.ts';
 
@@ -272,6 +274,10 @@ function componentPropBindings(
 				state.graph.diagnostics.push(
 					unextractableSyncPolicyDiagnostic(name, callback, [callback], state),
 				);
+			}
+			const strayCancel = syncPolicy ? uncoveredSyncPolicyCall(callback, state) : null;
+			if (strayCancel && spreadForwardsProp(name, link, state, childComponentName)) {
+				state.graph.diagnostics.push(secondSyncPolicyCancelDiagnostic(name, strayCancel, state));
 			}
 
 			props.push({
