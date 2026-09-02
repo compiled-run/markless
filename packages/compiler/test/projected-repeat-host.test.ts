@@ -82,8 +82,20 @@ export function Page() @{
 }
 
 async function compileConsumer(hole: Hole, spelling: keyof typeof spellings, body: string) {
+	const consumer = await compileConsumerModule(hole.child, spelling, body);
+	expect(
+		consumer.semanticGraph.diagnostics.filter((entry) => entry.severity === 'error'),
+	).toEqual([]);
+	return consumer;
+}
+
+async function compileConsumerModule(
+	child: string,
+	spelling: keyof typeof spellings,
+	body: string,
+) {
 	const [panel] = await compileTsrxModulesWithInterfaces([
-		{ filename: 'src/panel.tsrx', source: hole.child, importSource: './panel.tsrx' },
+		{ filename: 'src/panel.tsrx', source: child, importSource: './panel.tsrx' },
 	]);
 	// The barrel is what makes `ui` an object of components: `<ui.panel>` links to `Panel`.
 	const barrel: ModuleGraphInterfaceArtifact = {
@@ -101,7 +113,7 @@ async function compileConsumer(hole: Hole, spelling: keyof typeof spellings, bod
 		],
 		render: { version: 1, components: [] },
 	};
-	const consumer = await compileTsrxModule({
+	return compileTsrxModule({
 		filename: 'src/page.tsrx',
 		source: pageWith(spelling, body),
 		symbols: [],
@@ -110,10 +122,6 @@ async function compileConsumer(hole: Hole, spelling: keyof typeof spellings, bod
 			'./index.ts': barrel,
 		},
 	});
-	expect(
-		consumer.semanticGraph.diagnostics.filter((entry) => entry.severity === 'error'),
-	).toEqual([]);
-	return consumer;
 }
 
 function projectionSlotKinds(consumer: Awaited<ReturnType<typeof compileConsumer>>) {
@@ -124,18 +132,11 @@ function projectionSlotKinds(consumer: Awaited<ReturnType<typeof compileConsumer
 
 for (const hole of holes) {
 	for (const spelling of Object.keys(spellings) as ReadonlyArray<keyof typeof spellings>) {
-		// The retarget bails silently when the child's hole sits inside a construct
-		// (`projectedRepeatPlacement` in projected-repeat-host.ts returns undefined on
-		// `projectionInsideConstruct`), so the rows keep the consumer's enclosing
-		// element and grow beside the child. Red until that placement is computed.
-		const repeatPin = hole.insideConstruct ? test.fails : test;
-		repeatPin(`@for under an ${spelling} tag, ${hole.name}: rows anchor on the element the child wraps its hole in`, async () => {
+		test(`@for under an ${spelling} tag, ${hole.name}: rows anchor on the element the child wraps its hole in`, async () => {
 			const consumer = await compileConsumer(hole, spelling, constructs['@for']);
 			expect(projectionSlotKinds(consumer)).toEqual([['repeat']]);
 			const [repeat] = consumer.protocolView.keyedRepeats ?? [];
 			expect(repeat?.parentHostNodeId).toBe(hole.parentHostNodeId);
-			// The consumer's own enclosing element travels with it: the row render is
-			// still spelled in the id space of the component that wrote the rows.
 			expect(repeat?.ownerHostNodeId).toBe('h0');
 			expect(repeat?.rowStartOffset).toBe(hole.rowStartOffset);
 		});
@@ -151,6 +152,45 @@ for (const hole of holes) {
 	}
 }
 
+const repeatedHoles = {
+	'a row element around the hole': `import { state } from '@markless/core';
+export function Panel({ children, ...rest }) @{
+	const box = state({ slots: [{ id: 's1' }, { id: 's2' }] });
+	<ol {...rest} ui-panel="">@for (const slot of box.slots; key slot.id) { <li ui-slot="">{children}</li> }</ol>
+}`,
+	'a heading before the hole in each row': `import { state } from '@markless/core';
+export function Panel({ children, ...rest }) @{
+	const cells = state([{ key: 'x' }]);
+	<section {...rest} ui-panel=""><h2 ui-title="">rows</h2>@for (const cell of cells; key cell.key) { <div ui-cell=""><p ui-lead="">{cell.key}</p>{children}</div> }</section>
+}`,
+} as const;
+
+for (const [shape, child] of Object.entries(repeatedHoles)) {
+	for (const spelling of Object.keys(spellings) as ReadonlyArray<keyof typeof spellings>) {
+		test(`@for under an ${spelling} tag into ${shape} the child repeats is refused by name`, async () => {
+			const consumer = await compileConsumerModule(child, spelling, constructs['@for']);
+			const refusals = consumer.semanticGraph.diagnostics.filter(
+				(entry) => entry.code === 'MARKLESS_PROJECTED_REPEAT_HOLE_REPEATED',
+			);
+			expect(refusals).toHaveLength(1);
+			expect(refusals[0]?.severity).toBe('error');
+			expect(refusals[0]?.message).toContain('<Panel>');
+			expect(refusals[0]?.message).toContain('box.rows');
+			expect(refusals[0]?.primarySpan).toBeDefined();
+			const [repeat] = consumer.semanticGraph.keyedRepeats;
+			expect(repeat?.parentHostNodeId).toBe('h0');
+			expect(repeat?.ownerHostNodeId).toBeUndefined();
+		});
+	}
+}
+
+test('a @for projected into a hole the child does not repeat raises no refusal', async () => {
+	const consumer = await compileConsumer(holes[2]!, 'identifier', constructs['@for']);
+	expect(consumer.semanticGraph.diagnostics.map((entry) => entry.code)).not.toContain(
+		'MARKLESS_PROJECTED_REPEAT_HOLE_REPEATED',
+	);
+});
+
 // A sibling the CONSUMER writes before the loop, inside the same children, is
 // counted from the projection chunk. A plain element counts as one; a component
 // part's element count is only known while rendering, so `rowStartOffset` comes
@@ -158,18 +198,15 @@ for (const hole of holes) {
 // rather than pair a key with the wrong element. The rows the server sent then
 // render and never grow, and nothing says so. Red until the prefix is counted
 // (or the drop is announced).
-test.fails(
-	'a part written before a projected repeat leaves the repeat in the protocol view',
-	async () => {
-		const consumer = await compileConsumer(
-			holes[0]!,
-			'identifier',
-			`<Panel data-lead="">lead</Panel>
+test.fails('a part written before a projected repeat leaves the repeat in the protocol view', async () => {
+	const consumer = await compileConsumer(
+		holes[0]!,
+		'identifier',
+		`<Panel data-lead="">lead</Panel>
 			${constructs['@for']}`,
-		);
-		expect(consumer.protocolView.keyedRepeats ?? []).toHaveLength(1);
-	},
-);
+	);
+	expect(consumer.protocolView.keyedRepeats ?? []).toHaveLength(1);
+});
 
 test('a plain element written before a projected repeat stands in front of the rows', async () => {
 	const consumer = await compileConsumer(

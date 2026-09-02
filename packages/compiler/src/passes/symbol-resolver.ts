@@ -59,7 +59,10 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 	];
 	// Every handle this module can name, by the graph node state lowering resolves
 	// its reads to. A read that lands here is a handle read, not a state read.
-	const handlesByGraphNodeId = elementHandlesByGraphNodeId(input.payloadArena, input.semanticGraph);
+	const handlesByGraphNodeId = elementHandlesByGraphNodeId(
+		input.payloadArena,
+		input.semanticGraph,
+	);
 
 	const handleReadsOf = (reads: ReadonlyArray<LoweredStateRead> | undefined) =>
 		elementHandleReads(reads, handlesByGraphNodeId);
@@ -125,7 +128,10 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 				semanticsReader,
 			);
 			const source = inlined.source;
-			const moduleImports = referencedModuleImports(input.semanticGraph.moduleImports, source);
+			const moduleImports = referencedModuleImports(
+				input.semanticGraph.moduleImports,
+				source,
+			);
 			const crossModuleInline = crossModuleInlineMark(
 				inlined.foreignBodies,
 				input.semanticGraph.moduleImports,
@@ -292,19 +298,18 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 
 	// Branch flip symbols (gate-blind like the arena; protocol-view wires only
 	// gate-supported ones onto branch records).
-	const branchBindings = graphBindingMap(input.semanticGraph);
-	const branchAliases = semanticAliasMap(input.semanticGraph);
 	for (const site of input.semanticGraph.branchSites) {
 		// A recombined condition already has its node: the semantic graph minted one
 		// computed over every read inside it. Prefer that over re-resolving the
 		// authored text, which names no binding once it is more than a bare read.
+		// Resolve equal local names within the component that owns the branch.
 		const resolved = site.testComputedGraphNodeId
 			? { binding: { id: site.testComputedGraphNodeId }, path: [] as ReadonlyArray<string> }
 			: resolveBranchTestRead(
 					site.testSource,
 					input,
-					branchBindings,
-					branchAliases,
+					graphBindingMap(input.semanticGraph, undefined, site.componentName),
+					semanticAliasMap(input.semanticGraph, undefined, site.componentName),
 					site.componentName,
 				);
 		symbols.push({
@@ -449,7 +454,10 @@ export function planBoundSymbolResolver(
 					branchScopeIds: edge.branchScopeIds,
 					keyedRepeatScopeIds: edge.keyedRepeatScopeIds,
 				}));
-				const instancePath = componentEdgeInstancePath(path, input.semanticGraph.componentEdges);
+				const instancePath = componentEdgeInstancePath(
+					path,
+					input.semanticGraph.componentEdges,
+				);
 				rows.push({
 					id: boundSymbolId(symbol.symbolId, ancestry),
 					// Imported symbols keep the child-local ID in the bound record ID,
@@ -683,7 +691,8 @@ function sharedMethodParameterEnd(propertySource: string, open: number): number 
 		let bodyStart = -1;
 		walkNode(ast, (node) => {
 			if (bodyStart !== -1) return;
-			if (node.type !== 'FunctionExpression' && node.type !== 'ArrowFunctionExpression') return;
+			if (node.type !== 'FunctionExpression' && node.type !== 'ArrowFunctionExpression')
+				return;
 			const body = node.body as AnyNode | undefined;
 			if (typeof body?.start === 'number') bodyStart = body.start - offset;
 		});
@@ -810,7 +819,8 @@ function replaceMethodCalls(
 	// call nested inside one already replaced travelled with that replacement.
 	const ordered = [...edits].sort((left, right) => left.start - right.start);
 	const applied: typeof ordered = [];
-	for (const edit of ordered) if (!applied.some((held) => held.end >= edit.end)) applied.push(edit);
+	for (const edit of ordered)
+		if (!applied.some((held) => held.end >= edit.end)) applied.push(edit);
 	let mutations: Array<{ start: number; end: number; text: string }> = [...applied];
 	if (awaitsCall) {
 		const asyncified = new Set<number>();

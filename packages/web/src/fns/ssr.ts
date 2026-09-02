@@ -328,7 +328,11 @@ export function marklessSsrPlacedWidgetRoots(
 		marklessCarrierRootsWidget(
 			[
 				...enclosing.map((placed, index) =>
-					marklessSsrWidgetSite(placed, definitionId, ':'.repeat(enclosing.length - index)),
+					marklessSsrWidgetSite(
+						placed,
+						definitionId,
+						':'.repeat(enclosing.length - index),
+					),
 				),
 				...enclosed.map((placed, index) =>
 					marklessSsrWidgetSite(placed, definitionId, `${path}@${index}`),
@@ -1008,9 +1012,7 @@ function marklessSsrComposedView(
 		return {
 			...boundary,
 			armRecords: boundary.armRecords.map((arm, index) =>
-				index === 0
-					? { ...arm, branches: [...(arm.branches ?? []), ...composed] }
-					: arm,
+				index === 0 ? { ...arm, branches: [...(arm.branches ?? []), ...composed] } : arm,
 			),
 		};
 	});
@@ -1027,9 +1029,7 @@ function marklessSsrComposedView(
 		idPrefix,
 	);
 	const renderedBranchIds = new Set(
-		structure.anchors
-			.filter((anchor) => anchor.kind === 'branch')
-			.map((anchor) => anchor.id),
+		structure.anchors.filter((anchor) => anchor.kind === 'branch').map((anchor) => anchor.id),
 	);
 	const composedBranches = marklessSsrArmizeBranches(
 		structure,
@@ -1081,7 +1081,10 @@ export function marklessSsrArmizeBoundaries(
 	idPrefix = '',
 ) {
 	if (boundaries.length === 0) return boundaries;
-	const anchorById = new Map<string, { readonly elementStart: number; readonly elementEnd: number }>(
+	const anchorById = new Map<
+		string,
+		{ readonly elementStart: number; readonly elementEnd: number }
+	>(
 		structure.anchors
 			.filter((anchor) => anchor.kind === 'async')
 			.map((anchor) => [anchor.id, anchor]),
@@ -1209,22 +1212,65 @@ export function marklessSsrArmizeBranches(
 	},
 	idPrefix = '',
 ): ReadonlyArray<SsrBranchRecord> {
-	if (!branches.some((branch) => branch.escalates === true)) return branches;
+	if (branches.length === 0) return branches;
 	const anchorById = new Map(
 		structure.anchors
 			.filter((anchor) => anchor.kind === 'branch')
 			.map((anchor) => [anchor.id, anchor] as const),
 	);
 	return branches.map((branch) => {
-		if (branch.escalates !== true) return branch;
-		// A branch lifted from a child already armized its own arm inside that
-		// child's composition; its records left these streams there, so moving
-		// the range again would overwrite the set with an empty one.
-		if (branch.servedArmRecords) return branch;
 		const anchor = anchorById.get(idPrefix + branch.id);
 		if (!anchor) throw new Error(`MARKLESS_SSR_DATA_ANCHOR_MISSING: branch:${branch.id}`);
-		return { ...branch, servedArmRecords: marklessSsrMoveArmRange(streams, anchor) };
+		if (branch.escalates === true) {
+			if (branch.servedArmRecords) return branch;
+			return { ...branch, servedArmRecords: marklessSsrMoveArmRange(streams, anchor) };
+		}
+		const projected = marklessSsrMoveServedBranchRepeats(
+			structure,
+			streams.keyedRepeats,
+			anchor,
+			idPrefix,
+		);
+		if (!projected) return branch;
+		return { ...branch, escalates: true, servedArmRecords: projected };
 	});
+}
+
+function marklessSsrMoveServedBranchRepeats(
+	structure: SsrDataStructure,
+	repeats: SsrKeyedRepeatRecord[],
+	anchor: { readonly elementStart: number; readonly elementEnd: number },
+	idPrefix: string,
+): SsrArmRecordSet | undefined {
+	const locators: SsrLocatorRecord[] = [];
+	const keyedRepeats: SsrKeyedRepeatRecord[] = [];
+	for (let index = repeats.length - 1; index >= 0; index--) {
+		const repeat = repeats[index]!;
+		const rendered = structure.locators.find(
+			(locator) =>
+				locator.hostNodeId === idPrefix + repeat.parentHostNodeId &&
+				locator.index >= anchor.elementStart &&
+				locator.index < anchor.elementEnd,
+		);
+		if (!rendered) continue;
+		locators.unshift({
+			hostNodeId: repeat.parentHostNodeId,
+			strategy: 'arm-relative',
+			index: rendered.index - anchor.elementStart,
+			tagName: rendered.tagName,
+		});
+		keyedRepeats.unshift(...repeats.splice(index, 1));
+	}
+	if (keyedRepeats.length === 0) return undefined;
+	return {
+		locators,
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		keyedRepeats,
+		branches: [],
+	};
 }
 
 function marklessSsrMoveArmRange(
@@ -1566,7 +1612,8 @@ export function marklessSsrAppendChildView(context: {
 				: {}),
 		};
 		if (context.child.asyncBoundaryId) {
-			const armBranches = context.boundaryArmBranches.get(context.child.asyncBoundaryId) ?? [];
+			const armBranches =
+				context.boundaryArmBranches.get(context.child.asyncBoundaryId) ?? [];
 			armBranches.push(mappedBranch);
 			context.boundaryArmBranches.set(context.child.asyncBoundaryId, armBranches);
 		} else {
@@ -1616,10 +1663,7 @@ export function marklessSsrAppendChildView(context: {
 // A child boundary's armized record set keeps its arm-relative coordinates
 // through composition (the anchor is located live at resume); only host ids,
 // symbol ids, and behavior graph reads need the child prefixes/remaps.
-export function marklessSsrPrefixBoundaryArmRecords(
-	set: SsrArmRecordSet,
-	child: SsrPrefixChild,
-) {
+export function marklessSsrPrefixBoundaryArmRecords(set: SsrArmRecordSet, child: SsrPrefixChild) {
 	const instancePath = marklessComposedInstancePath(child);
 	const exhaustive = {
 		locators: true,
@@ -1718,9 +1762,7 @@ export function marklessSsrPrefixBoundaryArmRecords(
 							...(repeat.ownerHostNodeId
 								? { ownerHostNodeId: child.hostPrefix + repeat.ownerHostNodeId }
 								: {}),
-							...(mapped.instancePath
-								? { instancePath: mapped.instancePath }
-								: {}),
+							...(mapped.instancePath ? { instancePath: mapped.instancePath } : {}),
 							collectionGraphNodeId: mapped.graphNodeId,
 							collectionPath: mapped.path,
 							...(repeat.rowTemplate ? { rowTemplate: mapped.rowTemplate } : {}),
@@ -1753,7 +1795,8 @@ export function marklessSsrPrefixBoundaryArmRecords(
 						const liveTestReads = (branch.testReads ?? []).filter(
 							(read) => !marklessCsrChildReadIsStatic(read, child.graphProps),
 						);
-						if ((branch.testReads ?? []).length > 0 && liveTestReads.length === 0) return [];
+						if ((branch.testReads ?? []).length > 0 && liveTestReads.length === 0)
+							return [];
 						return [
 							{
 								...branch,
@@ -1845,12 +1888,12 @@ function marklessSsrComposedGraphProp(
 function marklessSsrArmRecordSetIsLive(arm: SsrArmRecordSet | undefined): boolean {
 	return Boolean(
 		arm &&
-			((arm.events?.length ?? 0) > 0 ||
-				(arm.domUpdates?.length ?? 0) > 0 ||
-				(arm.behaviors?.length ?? 0) > 0 ||
-				(arm.elementHandles?.length ?? 0) > 0 ||
-				(arm.keyedRepeats?.length ?? 0) > 0 ||
-				(arm.branches?.length ?? 0) > 0),
+		((arm.events?.length ?? 0) > 0 ||
+			(arm.domUpdates?.length ?? 0) > 0 ||
+			(arm.behaviors?.length ?? 0) > 0 ||
+			(arm.elementHandles?.length ?? 0) > 0 ||
+			(arm.keyedRepeats?.length ?? 0) > 0 ||
+			(arm.branches?.length ?? 0) > 0),
 	);
 }
 

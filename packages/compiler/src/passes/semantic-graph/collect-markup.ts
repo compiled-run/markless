@@ -80,6 +80,11 @@ type NewAnchorSlot = WithoutCoordinate<NewSlot>;
 // Captures native markup while the semantic pass still owns the parsed TSRX
 // tree. Consumers receive strings and direct coordinates, never a structure
 // of element/tag/children records that could become a runtime walker.
+/** Whether a chunk id names a `@for` row or its `@empty` arm, spelled below. */
+export function isRepeatChunkId(chunkId: string): boolean {
+	return chunkId.startsWith('repeat:');
+}
+
 export function collectSemanticMarkup(input: {
 	readonly ast: AnyNode;
 	readonly source: string;
@@ -419,7 +424,12 @@ function emitNode(
 				// object is one the author built: it keeps every key it carries.
 				const spreadsRestBinding =
 					context.restName !== null && getIdentifierName(expression) === context.restName;
-				const residue = expressionResidue(expression, context, repeat, builder.componentName);
+				const residue = expressionResidue(
+					expression,
+					context,
+					repeat,
+					builder.componentName,
+				);
 				const excludeNames = spreadsRestBinding
 					? [...new Set([...declaredAttributeNames, ...context.destructuredNames])]
 					: [...declaredAttributeNames];
@@ -429,7 +439,8 @@ function emitNode(
 					!declaredAttributeNames.includes('class')
 				) {
 					spreadClassResidue = memberResidue(residue, 'class');
-					if (spreadClassResidue && !excludeNames.includes('class')) excludeNames.push('class');
+					if (spreadClassResidue && !excludeNames.includes('class'))
+						excludeNames.push('class');
 				}
 				addSlot(builder, {
 					kind: 'spread-attributes',
@@ -457,7 +468,13 @@ function emitNode(
 		}
 		// A CSS anchor spelled as an attribute is refused by the semantic pass; it
 		// is dropped here so a refused module never leaks `anchorname="..."`.
-		if (!name || isEventAttribute(name) || name === 'attach' || name === 'el' || isCssAnchorAttribute(name))
+		if (
+			!name ||
+			isEventAttribute(name) ||
+			name === 'attach' ||
+			name === 'el' ||
+			isCssAnchorAttribute(name)
+		)
 			continue;
 		const idrefHandles = elementHandleIdrefTarget(context, node, name);
 		if (idrefHandles) {
@@ -565,8 +582,7 @@ function elementHandleIdrefTarget(
 
 /** One residue for however many handles an IDREF position named. */
 function elementHandleIdrefResidue(handles: ReadonlyArray<string>): SemanticMarkupResidue {
-	if (handles.length > 1)
-		return { kind: 'element-handle-id-list', handleGraphNodeIds: handles };
+	if (handles.length > 1) return { kind: 'element-handle-id-list', handleGraphNodeIds: handles };
 	const handleGraphNodeId = handles[0]!;
 	return {
 		kind: 'element-handle-id',
@@ -688,7 +704,13 @@ function emitDynamicHost(
 			if (isElevated(attribute)) staticAttributes[OVERLAY_DOM_ATTRIBUTE] = '';
 			continue;
 		}
-		if (!name || isEventAttribute(name) || name === 'attach' || name === 'el' || isCssAnchorAttribute(name))
+		if (
+			!name ||
+			isEventAttribute(name) ||
+			name === 'attach' ||
+			name === 'el' ||
+			isCssAnchorAttribute(name)
+		)
 			continue;
 		const idrefHandles = elementHandleIdrefTarget(context, node, name);
 		if (idrefHandles) {
@@ -861,7 +883,10 @@ function expressionResidue(
 }
 
 /** One member of the object a residue reads, or null for a residue that is not an object read. */
-function memberResidue(residue: SemanticMarkupResidue, member: string): SemanticMarkupResidue | null {
+function memberResidue(
+	residue: SemanticMarkupResidue,
+	member: string,
+): SemanticMarkupResidue | null {
 	if (residue.kind === 'graph-read' || residue.kind === 'repeat-item')
 		return { ...residue, path: [...residue.path, member] };
 	if (residue.kind === 'authored-expression')
@@ -1060,7 +1085,10 @@ function isAlwaysPresentValue(expression: AnyNode): boolean {
 	if (expression.type !== 'ConditionalExpression') return false;
 	return [expression.consequent, expression.alternate].every((arm) => {
 		const node = arm as AnyNode | undefined;
-		return node?.type === 'Literal' && (typeof node.value === 'string' || typeof node.value === 'number');
+		return (
+			node?.type === 'Literal' &&
+			(typeof node.value === 'string' || typeof node.value === 'number')
+		);
 	});
 }
 

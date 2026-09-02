@@ -236,6 +236,7 @@ export function createResumeRuntime(
 				storeHostSubscription,
 				addBehaviorRecords: behaviors?.addBehaviorRecords ?? (() => {}),
 				commitArm: commitBoundaryArm,
+				registerServedArmRecords: registerServedBranchArmRecords,
 				skipStartupBranchIds: options.skipStartupBranchIds,
 			}),
 		);
@@ -285,14 +286,16 @@ export function createResumeRuntime(
 					records.flatMap((repeat) => repeat.rowEvents),
 				);
 				const { wireKeyedRepeats } = await import('./resume-keyed-repeats.ts');
-				wireKeyedRepeats({
-					graph: input.graph,
-					view: { ...input.view, keyedRepeats: records },
-					elementsByHostId,
-					events: eventWiring,
-					storeContainerSubscription,
-					renderData: input.renderData,
-				});
+				for (const record of records)
+					wireKeyedRepeats({
+						graph: input.graph,
+						view: { ...input.view, keyedRepeats: [record] },
+						elementsByHostId,
+						events: eventWiring,
+						storeContainerSubscription: (release) =>
+							storeHostSubscription(record.parentHostNodeId, release),
+						renderData: input.renderData,
+					});
 			},
 			addBehaviors: behaviors
 				? async (hostNodeId, records) => {
@@ -307,6 +310,18 @@ export function createResumeRuntime(
 					await behaviorRuntime?.activateBehaviors(hostNodeId, { flush: false });
 			},
 		};
+	}
+	async function registerServedBranchArmRecords(
+		branch: ResumeArmRange,
+		armRecords: ResumeArmRecordSet,
+	): Promise<void> {
+		const { registerArmRecordSet } = await import('./resume-commit-arm.ts');
+		await registerArmRecordSet(
+			await armRegistrationDeps(armRecords),
+			installArmEventType,
+			branch,
+			{ armRecords },
+		);
 	}
 	function installArmEventType(eventType: string): void {
 		if (eventTypes.has(eventType)) return;

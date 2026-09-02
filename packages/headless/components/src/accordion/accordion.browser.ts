@@ -7,6 +7,7 @@ import Controlled from './scenarios/controlled.tsrx';
 import DynamicClass from './scenarios/dynamic-class.tsrx';
 import Faq from './scenarios/faq.tsrx';
 import FromData from './scenarios/from-data.tsrx';
+import HoleUnderIf from './scenarios/hole-under-if.tsrx';
 import Locked from './scenarios/locked.tsrx';
 import Multiple from './scenarios/multiple.tsrx';
 import TwoAccordions from './scenarios/two-accordions.tsrx';
@@ -530,8 +531,12 @@ async function pinDynamicClassKeepsScope(index: number) {
 	expect(at('host').getAttribute('data-tone')).toBe('hot');
 	// The parts follow the cell exactly as the plain element beside them does:
 	// class and data attribute rewritten, the consumer scope class kept.
-	await expect.poll(() => at('ternary-item').getAttribute('class')).toBe(`group is-danger ${scope}`);
-	await expect.poll(() => at('template-item').getAttribute('class')).toBe(`group is-danger ${scope}`);
+	await expect
+		.poll(() => at('ternary-item').getAttribute('class'))
+		.toBe(`group is-danger ${scope}`);
+	await expect
+		.poll(() => at('template-item').getAttribute('class'))
+		.toBe(`group is-danger ${scope}`);
 	await expect.poll(() => at('ternary-item').getAttribute('data-tone')).toBe('hot');
 	expectScopedBorder(at('ternary-item'), RED);
 	expectScopedBorder(at('template-item'), RED);
@@ -669,9 +674,9 @@ async function pinConstructsInChildren(index: number, opensMintedRow = true) {
 	await expect.poll(() => document.activeElement).toBe(inside(root, 'row-trigger')[2]);
 	if (opensMintedRow) {
 		await userEvent.click(inside(root, 'row-trigger')[2]!);
-		await expect.poll(() => inside(root, 'row-trigger')[2]!.getAttribute('aria-expanded')).toBe(
-			'true',
-		);
+		await expect
+			.poll(() => inside(root, 'row-trigger')[2]!.getAttribute('aria-expanded'))
+			.toBe('true');
 	}
 
 	await userEvent.click(embed('flip', index));
@@ -745,4 +750,80 @@ test.fails('CSR islands: a row minted after mount opens in its own island', asyn
 test.fails('SSR islands: a row minted after mount opens in its own island', async () => {
 	await renderSSRIslands([ConstructsInChildren, ConstructsInChildren]);
 	await pinMintedRowOpens(1);
+});
+
+function drawerParts(index: number) {
+	const drawer = embed('drawer', index);
+	const inside = (testid: string) =>
+		Array.from(drawer.querySelectorAll<HTMLElement>(`[data-testid="${testid}"]`));
+	return {
+		drawer,
+		inside,
+		list: () => inside('drawer-list')[0],
+		rows: () => inside('drawer-row'),
+	};
+}
+
+async function pinRowsServedInTheChildsArm(index: number) {
+	const { drawer, inside, list, rows } = drawerParts(index);
+	expect(rows()).toHaveLength(2);
+	expect(list()?.parentElement).toBe(drawer);
+	for (const row of rows()) expect(row.parentElement).toBe(list());
+	expect(rows().map((row) => row.textContent)).toEqual(['alpha', 'beta']);
+	expect(embed('picked', index).textContent).toBe('none');
+}
+
+async function pinRowsFollowTheChildsArm(index: number) {
+	const { inside, list, rows } = drawerParts(index);
+	await pinRowsServedInTheChildsArm(index);
+	await userEvent.click(inside('pick')[1]!);
+	await expect.poll(() => embed('picked', index).textContent).toBe('beta');
+
+	await userEvent.click(embed('add', index));
+	await expect.poll(() => rows().length).toBe(3);
+	expect(rows()[2]!.parentElement).toBe(list());
+	expect(rows()[2]!.textContent).toBe('gamma');
+
+	await userEvent.click(inside('pick')[2]!);
+	await expect.poll(() => embed('picked', index).textContent).toBe('gamma');
+
+	await userEvent.click(embed('drop', index));
+	await expect.poll(() => rows().length).toBe(2);
+
+	await userEvent.click(inside('drawer-toggle')[0]!);
+	await expect.poll(() => inside('drawer-closed').length).toBe(1);
+	expect(rows()).toHaveLength(0);
+
+	await userEvent.click(inside('drawer-toggle')[0]!);
+	await expect.poll(() => inside('drawer-list').length).toBe(1);
+	await expect.poll(() => rows().length).toBe(2);
+	for (const row of rows()) expect(row.parentElement).toBe(list());
+
+	await userEvent.click(embed('add', index));
+	await expect.poll(() => rows().length).toBe(3);
+	expect(rows()[2]!.parentElement).toBe(list());
+}
+
+test('CSR: rows projected into a hole under the child’s own @if grow there and follow the arm', async () => {
+	await render(HoleUnderIf);
+	await pinRowsFollowTheChildsArm(0);
+});
+
+test('SSR: rows projected into a hole under the child’s own @if grow there and follow the arm', async () => {
+	await renderSSR(HoleUnderIf);
+	await pinRowsFollowTheChildsArm(0);
+});
+
+test('CSR islands: rows projected into a hole under the child’s own @if grow in their island', async () => {
+	await renderCsrIslands([HoleUnderIf, HoleUnderIf]);
+	await pinRowsFollowTheChildsArm(1);
+	expect(embed('drawer', 0).querySelectorAll('[data-testid="drawer-row"]')).toHaveLength(2);
+	expect(embed('picked', 0).textContent).toBe('none');
+});
+
+test('SSR islands: rows projected into a hole under the child’s own @if grow in their island', async () => {
+	await renderSSRIslands([HoleUnderIf, HoleUnderIf]);
+	await pinRowsFollowTheChildsArm(1);
+	expect(embed('drawer', 0).querySelectorAll('[data-testid="drawer-row"]')).toHaveLength(2);
+	expect(embed('picked', 0).textContent).toBe('none');
 });

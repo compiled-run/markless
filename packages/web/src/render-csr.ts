@@ -332,7 +332,7 @@ function installDelegatedTriggers(
 	output.root.__marklessDelegatedDispatch = true;
 	const recordsByElement = new Map<object, Map<string, ProtocolEventRecord>>();
 	const rowEventNames = new Set(
-		(view.keyedRepeats ?? []).flatMap((repeat) =>
+		rowEventRepeats(view).flatMap((repeat) =>
 			repeat.rowEvents.map((event) => event.eventName),
 		),
 	);
@@ -481,6 +481,13 @@ function installDelegatedTriggers(
 			for (const release of releases.splice(0)) release();
 		},
 	};
+}
+
+function rowEventRepeats(view: ProtocolViewPayload) {
+	return [
+		...(view.keyedRepeats ?? []),
+		...(view.branches ?? []).flatMap((branch) => branch.servedArmRecords?.keyedRepeats ?? []),
+	];
 }
 
 // A record matched the element but its action kind names no route: the payload

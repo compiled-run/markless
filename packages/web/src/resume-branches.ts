@@ -63,6 +63,8 @@ export function wireBranches(input: any) {
 			if (!branch || arm === undefined || !branch.armRecords?.[arm]) continue;
 			for (const hostNodeId of materializeBranchArmRecords(input, branch, arm))
 				await activate(hostNodeId);
+			if (branch.takenArm === arm && branch.servedArmRecords)
+				await input.registerServedArmRecords?.(branch, branch.servedArmRecords);
 		}
 	}
 	async function disposeRemovedRangeHosts(
@@ -138,7 +140,10 @@ function createBranchRegistration(
 			const symbol = await input.loadSymbol(branch.symbolId);
 			let graph = composedBranchGraph(input.graph, branch);
 			if (branch.elementHandleIds)
-				graph = (await import('./resume-arm-records.ts')).armElementHandleIdGraph(graph, branch);
+				graph = (await import('./resume-arm-records.ts')).armElementHandleIdGraph(
+					graph,
+					branch,
+				);
 			const update = await symbol({
 				graph,
 				arm,

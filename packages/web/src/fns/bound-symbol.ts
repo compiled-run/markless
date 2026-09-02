@@ -6,7 +6,7 @@ export function marklessBoundSymbolId(
 	symbolId: string,
 ): string {
 	const direct = child.boundSymbols?.[symbolId];
-	if (direct) return direct;
+	if (direct) return marklessBoundOwnerPrefix(child.symbolPrefix) + direct;
 
 	// A nested composed view can already carry the bound ID selected by its
 	// immediate parent. Rebind that symbol through the outer instance row when
@@ -14,7 +14,13 @@ export function marklessBoundSymbolId(
 	// resolver and lose the outer instance's capture adapter.
 	const baseSymbolId = marklessBaseSymbolId(symbolId);
 	const rebound = baseSymbolId ? child.boundSymbols?.[baseSymbolId] : undefined;
-	return rebound ?? `${child.symbolPrefix ?? ''}${symbolId}`;
+	return rebound
+		? marklessBoundOwnerPrefix(child.symbolPrefix) + rebound
+		: `${child.symbolPrefix ?? ''}${symbolId}`;
+}
+
+function marklessBoundOwnerPrefix(symbolPrefix: string | undefined): string {
+	return /^m\d+:/.exec(symbolPrefix ?? '')?.[0] ?? '';
 }
 
 // A composed DOM update receives its current value from the remapped graph

@@ -64,8 +64,29 @@ test('the module root does not claim a child branch test it cannot evaluate', as
 	);
 });
 
-// The same question with the branch in the root: the root holds the branch, so
-// the node stays where it already was.
+test('a branch test resolves to its own component’s cell over a same-named cell elsewhere', async () => {
+	const compiled = await compileTsrxModule({
+		filename: 'src/Nested.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+function Drawer({ children }) @{
+	const box = state({ open: true });
+	<section>@if (box.open) { <ol>{children}</ol> } @else { <p>closed</p> }</section>
+}
+
+export function App() @{
+	const box = state({ rows: [{ id: 'a' }] });
+	<main><Drawer>@for (const row of box.rows; key row.id) { <li>{row.id}</li> }</Drawer></main>
+}
+`,
+		symbols: [],
+	});
+	expect(compiled.renderData.branches.map((branch) => branch.testReads)).toEqual([
+		[{ graphNodeId: 'state:Drawer.box', path: ['open'] }],
+	]);
+});
+
 test('a branch test in the module root stays with the root', async () => {
 	const all = await definitions(`
 import { state } from '@markless/core';

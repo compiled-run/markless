@@ -281,6 +281,23 @@ export function computedDependencyGraphCycleDiagnostic(input: {
 	});
 }
 
+export function projectedRepeatHoleRepeatedDiagnostic(input: {
+	readonly childComponentName: string;
+	readonly collectionSource: string;
+	readonly span?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	const child = `<${input.childComponentName}>`;
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_PROJECTED_REPEAT_HOLE_REPEATED',
+		title: 'This list is projected into a hole that repeats',
+		message: `The @for over \`${input.collectionSource}\` is written inside ${child}'s children, and ${child} renders its \`{children}\` inside its own @for row, so the list would be painted once per row and has no single element to grow in.`,
+		why: 'A keyed repeat records one parent element: resume keys the served rows under it and inserts new rows into it. A hole inside a repeated row renders the projection once per row, so there is no one element the record could name, and the rows would silently never update.',
+		span: input.span,
+		suggestion: `Move the @for into a component of its own and render that component inside ${child}'s row, or lift the list above ${child}.`,
+		docsUrl: 'https://markless.dev/errors/MARKLESS_PROJECTED_REPEAT_HOLE_REPEATED',
+	});
+}
+
 function semanticGraphDiagnostic(input: {
 	readonly code: SemanticGraphDiagnostic['code'];
 	readonly title: string;
@@ -806,7 +823,8 @@ export function unnamedSharedReturnDiagnostic(input: {
 				message: `Name the cells and return the name: \`const s = ${input.apiName}(...); return s;\`.`,
 			},
 			{
-				message: 'Return a wrapper that spreads them when the factory also exposes methods: `return { ...s, toggle() { … } };`.',
+				message:
+					'Return a wrapper that spreads them when the factory also exposes methods: `return { ...s, toggle() { … } };`.',
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_SHARED_RETURN_UNNAMED',
@@ -826,7 +844,7 @@ export function sharedSeedUnresolvedValueDiagnostic(input: {
 		phase: 'semantic-graph',
 		title: 'a shared() seed value has nothing to bind to',
 		message: `The state() seed for "${input.fieldName}" in shared() definition "${input.definitionName}" is \`${input.valueSource}\`, and "${input.freeName}" is not a literal, a module-scope declaration of this file, an import, or a global.`,
-		why: 'A factory seed is re-evaluated in a module of its own, carrying only this file\'s module scope and imports. A name that is none of those has nothing to bind to there, so the seed throws a ReferenceError and the whole shape loses its fields — which then reads as an error at every consumer of the shape rather than here.',
+		why: "A factory seed is re-evaluated in a module of its own, carrying only this file's module scope and imports. A name that is none of those has nothing to bind to there, so the seed throws a ReferenceError and the whole shape loses its fields — which then reads as an error at every consumer of the shape rather than here.",
 		primarySpan: input.span,
 		passId: 'tsrx-semantic-graph',
 		artifactKeys: ['semanticGraph'],
@@ -836,7 +854,8 @@ export function sharedSeedUnresolvedValueDiagnostic(input: {
 				message: `Seed "${input.fieldName}" with a literal, or with a module-scope \`const\` of this file that "${input.freeName}" can resolve to.`,
 			},
 			{
-				message: 'Compute the value inside a factory method or a computed() instead, where the instance is live.',
+				message:
+					'Compute the value inside a factory method or a computed() instead, where the instance is live.',
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_SHARED_SEED_UNRESOLVED_VALUE',

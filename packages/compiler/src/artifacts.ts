@@ -638,6 +638,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_ASYNC_POST_AWAIT_READ'
 		| 'MARKLESS_ASYNC_BOUNDARY_REQUIRED'
 		| 'MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED'
+		| 'MARKLESS_PROJECTED_REPEAT_HOLE_REPEATED'
 		| 'MARKLESS_STATE_ELEMENT_HANDLE_UNSERIALIZABLE'
 		| 'MARKLESS_STATE_WRITE_IN_TEMPLATE'
 		| 'MARKLESS_STATE_WRITE_IN_COMPUTED'
@@ -980,7 +981,7 @@ export type SemanticMarkupResidue =
 	| {
 			readonly kind: 'element-handle-id-list';
 			readonly handleGraphNodeIds: ReadonlyArray<string>;
-	  }
+	  };
 
 type SemanticMarkupLocatedSlot = {
 	readonly coordinate: SemanticMarkupSlotCoordinate;

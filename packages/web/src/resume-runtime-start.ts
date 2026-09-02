@@ -12,9 +12,7 @@ import type {
 type BehaviorRuntime = ReturnType<
 	(typeof import('./resume-behaviors.ts'))['createBehaviorRuntime']
 >;
-type BranchRuntime = Awaited<
-	ReturnType<(typeof import('./resume-branches.ts'))['wireBranches']>
->;
+type BranchRuntime = Awaited<ReturnType<(typeof import('./resume-branches.ts'))['wireBranches']>>;
 type EventWiring = ReturnType<(typeof import('./resume-events.ts'))['createEventWiring']>;
 type RuntimeShared = ReturnType<
 	(typeof import('./resume-runtime-shared.ts'))['createResumeRuntimeShared']
@@ -269,8 +267,7 @@ export async function startResumeRuntime(input: {
 	}
 	if ((runtimeInput.view.branches ?? []).length > 0) {
 		const branches = await loadBranchRuntime();
-		// An escalating branch's served arm is already in the DOM; it registers the
-		// way a served boundary arm does, against the branch's own anchor pair.
+		// Served branch records register against the branch's live anchor pair.
 		let registerArm: typeof import('./resume-commit-arm.ts').registerArmRecordSet | undefined;
 		for (const branch of branches.branchesById.values()) {
 			const armRecords = branch.servedArmRecords;

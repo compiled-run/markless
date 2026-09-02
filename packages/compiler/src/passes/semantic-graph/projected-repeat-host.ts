@@ -4,37 +4,35 @@ import type {
 	SemanticBranchSite,
 	SemanticComponentEdge,
 	SemanticGraphArtifact,
+	SemanticGraphDiagnostic,
 	SemanticKeyedRepeat,
 	SemanticMarkupChunk,
 } from '../../artifacts.ts';
+import { isRepeatChunkId } from './collect-markup.ts';
+import { projectedRepeatHoleRepeatedDiagnostic } from './diagnostics.ts';
 import { projectionPlacementFields } from './projection-placement.ts';
 
-/**
- * Point a `@for` written inside a child's `{children}` at the element that child
- * wraps the hole in.
- *
- * The repeat's parent host is read off the markup the AUTHOR wrote, which is the
- * enclosing element of the `<Child>` tag, not of the rows. The child splices the
- * projection inside its own markup, so the rows the server paints and the rows a
- * client mints both belong to an element this module never wrote - and resume
- * looked the wrong one up, found no served row to key, and grew the list beside
- * the child instead of into it.
- *
- * The child publishes that element on its interface; the page-space spelling is
- * the child edge's own `c<n>:` prefix in front of it, the same prefix every
- * other record of that child takes. Retargeting needs BOTH that host and a
- * defended count of the elements the child renders in front of the hole, so a
- * projection whose interface leaves either unknown keeps the host it had.
- */
+/** Retarget a projected `@for` to the child element that renders its rows. */
 export function retargetProjectedRepeatHosts(input: {
 	readonly graph: SemanticGraphArtifact;
 	readonly importedModuleInterfaces?: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 }): void {
 	const repeats = input.graph.keyedRepeats as SemanticKeyedRepeat[];
+	const diagnostics = input.graph.diagnostics as SemanticGraphDiagnostic[];
 	for (let index = 0; index < repeats.length; index++) {
 		const repeat = repeats[index]!;
 		const placement = projectedRepeatPlacement(input, repeat.id);
 		if (!placement) continue;
+		if (placement.kind === 'repeated-hole') {
+			diagnostics.push(
+				projectedRepeatHoleRepeatedDiagnostic({
+					childComponentName: placement.childComponentName,
+					collectionSource: repeat.collectionSource,
+					span: placement.span,
+				}),
+			);
+			continue;
+		}
 		repeats[index] = {
 			...repeat,
 			parentHostNodeId: placement.parentHostNodeId,
@@ -46,23 +44,32 @@ export function retargetProjectedRepeatHosts(input: {
 	}
 }
 
+type ProjectedRepeatPlacement =
+	| {
+			readonly kind: 'element';
+			readonly parentHostNodeId: string;
+			readonly elementsBefore: number;
+	  }
+	| {
+			readonly kind: 'repeated-hole';
+			readonly childComponentName: string;
+			readonly span: SemanticComponentEdge['sourceSpan'];
+	  };
+
 function projectedRepeatPlacement(
 	input: {
 		readonly graph: SemanticGraphArtifact;
-		readonly importedModuleInterfaces?: Readonly<
-			Record<string, ModuleGraphInterfaceArtifact>
-		>;
+		readonly importedModuleInterfaces?: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 	},
 	repeatId: string,
-): { readonly parentHostNodeId: string; readonly elementsBefore: number } | undefined {
+): ProjectedRepeatPlacement | undefined {
 	const chunks = input.graph.markup.chunks;
 	const owner = chunks.find((chunk) =>
 		chunk.slots.some((slot) => slot.kind === 'repeat' && slot.repeatId === repeatId),
 	);
 	if (owner?.kind !== 'component-projection') return undefined;
 	const anchor = owner.slots.find((slot) => slot.kind === 'repeat' && slot.repeatId === repeatId);
-	// A repeat under an element the author wrote inside the projection already
-	// names that element; only one sitting at the projection's own root is homeless.
+	// A repeat under the projection's own element already names its parent.
 	if (anchor?.coordinate.kind !== 'comment-anchor' || anchor.coordinate.path.length !== 1)
 		return undefined;
 
@@ -76,11 +83,17 @@ function projectedRepeatPlacement(
 	if (!edge) return undefined;
 
 	const projection = childProjection(input, edge);
-	if (!projection?.parentHostNodeId || projection.projectionInsideConstruct) return undefined;
-	// The hole's own place inside that element decides where the rows begin, and a
-	// side render time settles cannot be counted from here.
+	if (projection?.projectionChunkId && isRepeatChunkId(projection.projectionChunkId))
+		return {
+			kind: 'repeated-hole',
+			childComponentName: edge.childComponentName,
+			span: edge.sourceSpan,
+		};
+	if (!projection?.parentHostNodeId) return undefined;
+	// A render-dependent prefix cannot provide a safe row offset.
 	if (projection.elementsBeforeProjection === 'unknown') return undefined;
 	return {
+		kind: 'element',
 		parentHostNodeId: `c${edgeIndex}:${projection.parentHostNodeId}`,
 		elementsBefore: projection.elementsBeforeProjection,
 	};
@@ -97,15 +110,11 @@ function projectionSlotFor(
 	return undefined;
 }
 
-// A child behind an import answers from the interface its own module published;
-// a child declared here answers from this module's chunks, through the one
-// function that computes the fact either way.
+// Imported and local children expose the same projection placement fact.
 function childProjection(
 	input: {
 		readonly graph: SemanticGraphArtifact;
-		readonly importedModuleInterfaces?: Readonly<
-			Record<string, ModuleGraphInterfaceArtifact>
-		>;
+		readonly importedModuleInterfaces?: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 	},
 	edge: SemanticComponentEdge,
 ): ModuleGraphInterfaceProjection | undefined {

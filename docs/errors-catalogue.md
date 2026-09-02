@@ -2,7 +2,7 @@
 
 Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
 
-206 codes. Each one is served at `https://markless.dev/errors/<CODE>`.
+207 codes. Each one is served at `https://markless.dev/errors/<CODE>`.
 
 | Code | Package | Pass / phase | Title | Message |
 | --- | --- | --- | --- | --- |
@@ -105,6 +105,7 @@ Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not ed
 | `MARKLESS_PRERENDER_PROP_UNDERIVABLE` | web | prerender | TODO: no builder title | TODO: no builder message |
 | `MARKLESS_PRERENDER_RENDER_DATA_MISSING` | bundler | transform | TODO: no builder title | Imported child … from … has no linked render-data artifact. |
 | `MARKLESS_PRERENDER_WAKE_RESOLVER_MISSING` | compiler | link | Prerender wake variant has no resolver to own its routes | MARKLESS_PRERENDER_WAKE_RESOLVER_MISSING |
+| `MARKLESS_PROJECTED_REPEAT_HOLE_REPEATED` | compiler | semantic-graph | This list is projected into a hole that repeats | The @for over `…` is written inside …'s children, and … renders its `{children}` inside its own @for row, so the list would be painted once per row and has no single element to grow in. |
 | `MARKLESS_PROJECTION_NOT_RENDERED` | web | ssr-data | TODO: no builder title | <…> was given projected children but never rendered them, so they are counted by the served locator table and absent from the served HTML. Render `{children}` somewhere in <…>'s own markup, including inside an @if/@else arm. |
 | `MARKLESS_PROTOCOL_VERSION_MISMATCH` | serializer | payload, protocol-client, protocol-validation | Unsupported resumability protocol version | Unsupported … protocol version …. |
 | `MARKLESS_PUBLIC_RENDER_GATE_PLAN_DISAGREEMENT` | compiler | public-render | … passed render support checks but has no usable render plan | TODO: no builder message |

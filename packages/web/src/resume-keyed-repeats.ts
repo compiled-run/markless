@@ -135,7 +135,11 @@ export function findKeyedRepeatRowEventMatch(input: {
 				input.materializeHost(repeat.parentHostNodeId);
 			if (!parent) continue;
 			const items = readKeyedRepeatCollection(input.graph, repeat);
-			for (const [rowIndex, rowRoot] of repeatRowElements(parent, repeat, items.length).entries()) {
+			for (const [rowIndex, rowRoot] of repeatRowElements(
+				parent,
+				repeat,
+				items.length,
+			).entries()) {
 				const rowKey = repeatItemKey(items[rowIndex], repeat);
 				for (const rowEvent of rowEvents) {
 					if (rowEventHost(rowRoot, rowEvent.hostPath) === element) {
@@ -180,11 +184,11 @@ export function wireKeyedRepeats(
 		// never touches the import, and one that does fetches at wiring time.
 		const builds = Boolean(repeat.rowTemplate ?? repeat.emptyArm ?? repeat.rowComponent),
 			cell = builds ? rowMintCell(input.graph) : undefined;
-		if (builds)
-			void loadRowMint(input.renderData, input.graph, rowComponentHost)?.catch(
-				() => undefined,
-			);
-		for (const [rowIndex, rowRoot] of repeatRowElements(parent, repeat, items.length).entries()) {
+		for (const [rowIndex, rowRoot] of repeatRowElements(
+			parent,
+			repeat,
+			items.length,
+		).entries()) {
 			const rowKey = repeatItemKey(items[rowIndex], repeat);
 			rowRootsByKey.set(rowKey, rowRoot);
 			registerRowEvents(rowRoot, rowKey);
@@ -201,6 +205,10 @@ export function wireKeyedRepeats(
 				registerRowEvents,
 			);
 		};
+		if (builds)
+			void loadRowMint(input.renderData, input.graph, rowComponentHost)
+				?.then((mint) => apply(mint))
+				.catch(() => undefined);
 		// Absent means this pass has to await: a mint still in flight, or a component
 		// row whose render answered with a promise. Asked of the REPEAT, not the
 		// loaded module, and a departed key keeps its row.
@@ -226,14 +234,19 @@ export function wireKeyedRepeats(
 			graphNodeId: repeat.collectionGraphNodeId,
 			path: repeat.collectionPath,
 			settle: () =>
-				(builds && !cell?.mint ? cell?.load : typeof pending === 'object' ? pending : undefined)
-					?.then(() => undefined),
+				(builds && !cell?.mint
+					? cell?.load
+					: typeof pending === 'object'
+						? pending
+						: undefined
+				)?.then(() => undefined),
 			// A duplicate key, and anything the render throws, is the flush's to report.
 			run(): void {
 				try {
 					const settled = settledMint();
 					if (!settled) return;
-					if (!uniqueRepeatKeys(repeat, readKeyedRepeatCollection(input.graph, repeat))) return;
+					if (!uniqueRepeatKeys(repeat, readKeyedRepeatCollection(input.graph, repeat)))
+						return;
 					apply(settled.mint);
 				} catch {}
 			},
@@ -257,11 +270,14 @@ export function wireKeyedRepeats(
 						return typeof held === 'function' ? held() : undefined;
 					}
 					return (
-						loadRowMint(input.renderData, input.graph, rowComponentHost)?.then(async (mint) => {
-							const commit = await (held ?? mint.rows?.(repeat, parent, rowRootsByKey));
-							apply(mint);
-							await commit?.();
-						}) ?? apply(undefined)
+						loadRowMint(input.renderData, input.graph, rowComponentHost)?.then(
+							async (mint) => {
+								const commit = await (held ??
+									mint.rows?.(repeat, parent, rowRootsByKey));
+								apply(mint);
+								await commit?.();
+							},
+						) ?? apply(undefined)
 					);
 				},
 			}),
@@ -310,7 +326,8 @@ function applyKeyedRepeatRowOrder(
 		// The rows agreeing is not the whole answer once a repeat has an `@empty`
 		// arm: nothing-to-nothing still has to raise the arm the first time.
 		(nextRows.length > 0 || arm.mounted || !repeat.emptyArm)
-	) return;
+	)
+		return;
 	// Every attach and detach below is reported to the pinned census: a mint that
 	// entered without one shifts the index of every element after this repeat.
 	const census = censusRoot(parent);
@@ -447,10 +464,7 @@ function firstDuplicateRepeatKey(
 		seen.add(key);
 	}
 }
-function uniqueRepeatKeys(
-	repeat: ResumeKeyedRepeatRecord,
-	items: ReadonlyArray<unknown>,
-): boolean {
+function uniqueRepeatKeys(repeat: ResumeKeyedRepeatRecord, items: ReadonlyArray<unknown>): boolean {
 	return !firstDuplicateRepeatKey(repeat, items);
 }
 function assertUniqueRepeatKeys(
