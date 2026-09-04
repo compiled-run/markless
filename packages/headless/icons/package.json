@@ -9,8 +9,7 @@
 		"directory": "packages/headless/icons"
 	},
 	"files": [
-		"dist",
-		"generated"
+		"dist"
 	],
 	"type": "module",
 	"sideEffects": false,
@@ -36,20 +35,20 @@
 		}
 	},
 	"publishConfig": {
-		"types": "./generated/packs.d.ts",
+		"types": "./dist/packs.d.ts",
 		"typesVersions": {
 			"*": {
 				"vite": [
 					"dist/vite.d.ts"
 				],
 				"*": [
-					"generated/packs.d.ts"
+					"dist/packs.d.ts"
 				]
 			}
 		},
 		"exports": {
 			".": {
-				"types": "./generated/packs.d.ts",
+				"types": "./dist/packs.d.ts",
 				"default": "./dist/index.js"
 			},
 			"./vite": {
@@ -63,7 +62,8 @@
 	"scripts": {
 		"generate": "node scripts/generate-types.ts",
 		"prepare": "node scripts/generate-types.ts",
-		"prepublishOnly": "node ../../../scripts/release/verify-publish-ready.mjs"
+		"prepublishOnly": "node ../../../scripts/release/verify-publish-ready.mjs",
+		"prepack": "cp generated/packs.d.ts dist/packs.d.ts"
 	},
 	"dependencies": {
 		"@iconify/json": "^2.2.382",
