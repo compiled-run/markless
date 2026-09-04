@@ -9,7 +9,8 @@
 		"directory": "packages/headless/icons"
 	},
 	"files": [
-		"dist"
+		"dist",
+		"generated"
 	],
 	"type": "module",
 	"sideEffects": false,
@@ -35,20 +36,20 @@
 		}
 	},
 	"publishConfig": {
-		"types": "./dist/index.d.ts",
+		"types": "./generated/packs.d.ts",
 		"typesVersions": {
 			"*": {
 				"vite": [
 					"dist/vite.d.ts"
 				],
 				"*": [
-					"dist/index.d.ts"
+					"generated/packs.d.ts"
 				]
 			}
 		},
 		"exports": {
 			".": {
-				"types": "./dist/index.d.ts",
+				"types": "./generated/packs.d.ts",
 				"default": "./dist/index.js"
 			},
 			"./vite": {
