@@ -47,6 +47,8 @@ const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Primary-source tracking is scoped to the resolved client graph.',
 	"packages/bundler/src/hooks/transform-emit.ts :: if (currentEnvironment === 'client' && renderDataRequest) {":
 		'Client render-data requests are answered with the client-shaped module from the resolved build environment.',
+	"packages/bundler/src/hooks/resolve-load.ts :: currentEnvironment === 'client' &&":
+		'A shared render-data id is served to the resolved client compilation from its own emission.',
 	"packages/bundler/src/hooks/transform-request.ts :: internalOptions.dev === true && currentEnvironment === 'server'":
 		'Development resume URLs are emitted by the resolved server compilation.',
 	"packages/bundler/src/hooks/transform-request.ts :: : currentEnvironment === 'server'":
