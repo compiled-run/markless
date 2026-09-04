@@ -1158,6 +1158,72 @@ export function Dashboard() @{
 	expect(output.html).toBe('<main>Chosen root</main>');
 });
 
+test('compileTsrxModule preserves authored script elements in SSR html', async () => {
+	const inlineScript = "window.ready = 1;\n\t\t\t\tif (a < b && c) start();";
+	const result = await compileTsrxModule({
+		filename: 'src/Document.tsrx',
+		source: `
+export function Document() @{
+	<html>
+		<head>
+			<title>Doc</title>
+			<script src="/x.js"></script>
+			<script src="/y.js" defer></script>
+			<script type="module">
+				${inlineScript}
+			</script>
+		</head>
+		<body></body>
+	</html>
+}
+`,
+		symbols: [],
+	});
+
+	// Verbatim body: static-text emission would escape and collapse it into broken JS.
+	const expectedHtml =
+		'<html><head><title>Doc</title><script src="/x.js"></script><script src="/y.js" defer=""></script>' +
+		`<script type="module">\n\t\t\t\t${inlineScript}\n\t\t\t</script>` +
+		'</head><body></body></html>';
+	expect(result.semanticGraph.diagnostics).toEqual([]);
+	expect(result.semanticGraph.hostNodes.map((host) => host.tagName)).toEqual([
+		'html',
+		'head',
+		'title',
+		'script',
+		'script',
+		'script',
+		'body',
+	]);
+	expect(
+		result.semanticGraph.markup.chunks.find((chunk) => chunk.id === 'template:Document')
+			?.statics,
+	).toEqual([expectedHtml]);
+	const output = await renderTestSsr(result);
+	expect(output.html).toBe(expectedHtml);
+});
+
+test('compileTsrxModule renders a fragment root holding a script element', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Frag.tsrx',
+		source: `
+export function Frag() @{
+	<>
+		<div><script src="/x.js"></script></div>
+		<p>hi</p>
+	</>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.semanticGraph.diagnostics).toEqual([]);
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	expect(
+		result.semanticGraph.markup.chunks.find((chunk) => chunk.id === 'template:Frag')?.statics,
+	).toEqual(['<div><script src="/x.js"></script></div><p>hi</p>']);
+});
+
 test('compileTsrxModule diagnoses modules with no renderable component root', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/OnlyHelpers.tsrx',

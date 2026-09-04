@@ -1,0 +1,12 @@
+{
+	"name": "@fixture/delegate-linked-ui",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		"./select": "./src/select/index.ts"
+	},
+	"publishConfig": {
+		"marklessShipsSource": true
+	}
+}

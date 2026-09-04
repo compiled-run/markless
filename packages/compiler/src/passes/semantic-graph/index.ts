@@ -422,6 +422,7 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 	switch (node.type) {
 		case 'Element':
 		case 'JSXElement':
+		case 'JSXScriptElement':
 			collectElement(node, state, walk);
 			return;
 		case 'TSRXExpression':

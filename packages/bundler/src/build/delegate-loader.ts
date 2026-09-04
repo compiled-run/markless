@@ -8,6 +8,10 @@ import { pathToFileURL } from 'node:url';
 import { dirname, isAbsolute, join } from 'pathe';
 import { moduleRunnerTransform } from 'vite';
 import {
+	compileTsrxModuleLinkArtifact,
+	type ModuleGraphInterfaceArtifact,
+} from '@markless/compiler';
+import {
 	ESModulesEvaluator,
 	createNodeImportMeta,
 	ssrDynamicImportKey,
@@ -69,18 +73,78 @@ export function createBuildDelegateLoader(): BuildDelegateLoader {
 	// no file behind them, so their code is kept here rather than read back.
 	let virtualSources = new Map<string, string>();
 	let graph = new Map<string, Promise<Record<string, unknown>>>();
+	let interfaces = new Map<string, Promise<ModuleGraphInterfaceArtifact>>();
 
-	async function moduleCode(id: string, root: string | undefined): Promise<string> {
+	function moduleInterface(file: string, root: string | undefined) {
+		const sourceFile = pathname(file);
+		const known = interfaces.get(sourceFile);
+		if (known) return known;
+		const started = readFile(sourceFile, 'utf8').then(
+			async (source) =>
+				(
+					await compileTsrxModuleLinkArtifact({
+						filename: sourceFile,
+						moduleId: moduleIdFor(sourceFile, root),
+						source,
+					})
+				).moduleGraphInterface,
+		);
+		interfaces.set(sourceFile, started);
+		return started;
+	}
+
+	async function resolvedSource(
+		specifier: string,
+		importer: string,
+		resolve: DelegateSpecifierResolve,
+	) {
+		return (
+			(await resolve(specifier, importer)) ??
+			(isRelative(specifier) ? join(dirname(pathname(importer)), specifier) : undefined)
+		);
+	}
+
+	async function moduleCode(
+		id: string,
+		resolve: DelegateSpecifierResolve,
+		root: string | undefined,
+	): Promise<string> {
 		const virtual = virtualSources.get(normalizeVirtualId(id));
 		if (virtual !== undefined) return virtual;
 		const file = pathname(id);
 		const source = await readFile(file, 'utf8');
 		if (!TSRX_MODULE.test(file)) return await stripEmittedTypes(source, file);
+		const linked = await compileTsrxModuleLinkArtifact({
+			filename: file,
+			moduleId: moduleIdFor(file, root),
+			source,
+		});
+		const importedModuleInterfaces = Object.fromEntries(
+			(
+				await Promise.all(
+					linked.moduleImports
+						.filter((moduleImport) => TSRX_MODULE.test(moduleImport.source))
+						.map(async (moduleImport) => {
+							const imported = await resolvedSource(
+								moduleImport.source,
+								file,
+								resolve,
+							);
+							if (!imported || !isAbsolute(pathname(imported))) return null;
+							return [
+								moduleImport.source,
+								await moduleInterface(imported, root),
+							] as const;
+						}),
+				)
+			).filter((entry) => entry !== null),
+		);
 		const transformed = await transformTsrxModule({
 			filename: file,
 			moduleId: moduleIdFor(file, root),
 			source,
 			environment: 'server',
+			importedModuleInterfaces,
 		});
 		for (const module of transformed.virtualModules) {
 			virtualSources.set(normalizeVirtualId(module.id), module.source);
@@ -103,12 +167,7 @@ export function createBuildDelegateLoader(): BuildDelegateLoader {
 			return await load(virtualId, resolve, root);
 		}
 		const runtimeId = marklessRuntimeSpecifierId(specifier);
-		const resolved =
-			runtimeId ??
-			(await resolve(specifier, importer)) ??
-			// A dependency's own file is not in the app's module graph, so the build
-			// resolver can decline it; its own directory still answers.
-			(isRelative(specifier) ? join(dirname(pathname(importer)), specifier) : undefined);
+		const resolved = runtimeId ?? (await resolvedSource(specifier, importer, resolve));
 		if (resolved === undefined) return await import(specifier);
 		if (!isAbsolute(pathname(resolved))) return await import(resolved);
 		return SOURCE_MODULE.test(pathname(resolved))
@@ -121,7 +180,7 @@ export function createBuildDelegateLoader(): BuildDelegateLoader {
 		resolve: DelegateSpecifierResolve,
 		root: string | undefined,
 	): Promise<Record<string, unknown>> {
-		const code = await moduleCode(id, root);
+		const code = await moduleCode(id, resolve, root);
 		const file = pathname(id);
 		const transformed = await moduleRunnerTransform(code, null, file, code);
 		const exports: Record<string, unknown> = Object.create(null);
@@ -159,6 +218,7 @@ export function createBuildDelegateLoader(): BuildDelegateLoader {
 		clear() {
 			graph = new Map();
 			virtualSources = new Map();
+			interfaces = new Map();
 		},
 	};
 }

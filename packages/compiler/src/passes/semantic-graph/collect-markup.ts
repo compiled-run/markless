@@ -332,7 +332,12 @@ function emitNode(
 		return 1;
 	}
 
-	if (node.type !== 'Element' && node.type !== 'JSXElement') return 0;
+	if (
+		node.type !== 'Element' &&
+		node.type !== 'JSXElement' &&
+		node.type !== 'JSXScriptElement'
+	)
+		return 0;
 	const dynamicTag = getDynamicTagExpression(node);
 	if (dynamicTag) {
 		emitDynamicHost(node, dynamicTag, path, builder, context, repeat);
@@ -554,7 +559,9 @@ function emitNode(
 		} else append(builder, ` class="${context.styleScopeClass}"`);
 	}
 	append(builder, '>');
-	emitNodes(asNodes(node.children), [...path, 0], builder, context, repeat);
+	// A script body is raw text: static-text emission would escape and collapse it.
+	if (node.type === 'JSXScriptElement' && typeof node.raw === 'string') append(builder, node.raw);
+	else emitNodes(asNodes(node.children), [...path, 0], builder, context, repeat);
 	append(builder, `</${tagName}>`);
 	return 1;
 }
@@ -940,7 +947,12 @@ function isPublicRoot(node: AnyNode): boolean {
 function isPlainStaticHostSubtree(node: AnyNode): boolean {
 	if (isStaticTextNode(node)) return true;
 	if (node.type === 'JSXExpressionContainer' || node.type === 'TSRXExpression') return true;
-	if (node.type !== 'Element' && node.type !== 'JSXElement') return false;
+	if (
+		node.type !== 'Element' &&
+		node.type !== 'JSXElement' &&
+		node.type !== 'JSXScriptElement'
+	)
+		return false;
 	const tagName = getElementTagName(node);
 	return (
 		!!tagName &&
