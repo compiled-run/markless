@@ -100,7 +100,11 @@ function describeUnsupportedTemplateNode(
 	enclosingTag: string | null,
 ): string | null {
 	const inside = enclosingTag ? ` inside <${enclosingTag}>` : '';
-	if (node.type !== 'Element' && node.type !== 'JSXElement') {
+	if (
+		node.type !== 'Element' &&
+		node.type !== 'JSXElement' &&
+		node.type !== 'JSXScriptElement'
+	) {
 		if (isStaticTextNode(node)) return null;
 		if (node.type === 'JSXExpressionContainer' || node.type === 'TSRXExpression') return null;
 		const block = node.type !== undefined ? controlFlowBlockLabels[node.type] : undefined;

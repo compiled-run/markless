@@ -63,7 +63,12 @@ export function getDynamicTagExpression(node: AnyNode): AnyNode | undefined {
 export function isPlainHostTemplateNode(node: AnyNode): boolean {
 	if (isStaticTextNode(node)) return true;
 	if (node.type === 'JSXExpressionContainer' || node.type === 'TSRXExpression') return true;
-	if (node.type !== 'Element' && node.type !== 'JSXElement') return false;
+	if (
+		node.type !== 'Element' &&
+		node.type !== 'JSXElement' &&
+		node.type !== 'JSXScriptElement'
+	)
+		return false;
 	const tagName = getElementTagName(node);
 	if (!tagName || !isHostTagName(tagName)) return false;
 	return asNodes(node.children).every(
