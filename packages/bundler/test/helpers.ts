@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join, resolve } from 'pathe';
 import type { EnvironmentOptions, Plugin as VitePlugin, ResolvedConfig } from 'vite';
 import { vi } from 'vitest';
 
@@ -193,4 +195,45 @@ function getHook(value: unknown, name: string): FunctionHook {
 		}
 	}
 	throw new Error(`Expected function ${name} hook`);
+}
+
+// Dev-server tests resolve workspace packages by alias. Subpaths are derived from
+// each package's own exports map so an alias can never point at a file the
+// published package does not expose (`@markless/web/resume` is payload-full.ts).
+export function marklessSourceAliases(
+	root: string,
+): Array<{ find: string | RegExp; replacement: string }> {
+	const repo = (path: string) => resolve(root, path);
+	const subpaths: Array<{ find: string | RegExp; replacement: string }> = [
+		{ find: '@markless/bundler/rolldown', replacement: repo('packages/bundler/src/rolldown.ts') },
+		{ find: '@markless/bundler/preload', replacement: repo('packages/bundler/src/preload.ts') },
+		{ find: '@markless/bundler/vite', replacement: repo('packages/bundler/src/vite/index.ts') },
+	];
+	const roots: Array<{ find: string | RegExp; replacement: string }> = [];
+	for (const name of ['core', 'web', 'runtime', 'serializer']) {
+		const directory = repo(`packages/${name}`);
+		const manifest = JSON.parse(
+			readFileSync(join(directory, 'package.json'), 'utf8'),
+		) as { exports: Record<string, string> };
+		for (const [subpath, target] of Object.entries(manifest.exports)) {
+			const specifier = `@markless/${name}${subpath.slice(1)}`;
+			const file = resolve(directory, target);
+			if (subpath === '.') {
+				roots.push({ find: specifier, replacement: file });
+			} else if (subpath.includes('*')) {
+				subpaths.push({
+					find: new RegExp(`^${escapeAliasPattern(specifier).replace('\\*', '(.+)')}$`),
+					replacement: file.replace('*', '$1'),
+				});
+			} else {
+				subpaths.push({ find: specifier, replacement: file });
+			}
+		}
+	}
+	// A bare package name also matches its own subpaths, so it goes last.
+	return [...subpaths, ...roots];
+}
+
+function escapeAliasPattern(value: string) {
+	return value.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '\\*');
 }

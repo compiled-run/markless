@@ -18,6 +18,10 @@ import {
 } from '../build/prerender.ts';
 import { executionLogActivationInjection } from '../execution-log.ts';
 import { outputDefaults } from '../build/chunking.ts';
+import {
+	RESUME_ENTRY_SPECIFIER,
+	STORAGE_FREE_RESUME_ENTRY_SPECIFIER,
+} from '../source-module.ts';
 import { createMarklessRolldownPlugin } from '../rolldown.ts';
 import {
 	type BundleGraphAdder,
@@ -164,6 +168,12 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 				__MARKLESS_DEV_ENABLED__: devDefine,
 			};
 			configDefaults(config, options, rolldownOptions);
+			if (devEnabled) {
+				includeOptimizedDeps(config, [
+					RESUME_ENTRY_SPECIFIER,
+					STORAGE_FREE_RESUME_ENTRY_SPECIFIER,
+				]);
+			}
 			// MARKLESS_PRERENDER apps keep their entry regardless of the wake
 			// channel; only the shell prerender itself stays MARKLESS_PRERENDER's.
 			if (prerender || stagePrerenderWake) {
@@ -402,6 +412,21 @@ function skipDuplicateBuilds(builder: ViteBuilder, names: readonly string[]) {
 		}
 		return build(environment);
 	};
+}
+
+// Emitted code reaches these entries only from a browser interaction, so dev has
+// to pre-bundle them up front or the first click triggers a re-optimize that
+// invalidates the hashed chunk URLs pages are already holding.
+export function includeOptimizedDeps(
+	config: UserConfig,
+	specifiers: ReadonlyArray<string>,
+): void {
+	const optimizeDeps = (config.optimizeDeps ??= {});
+	const include = optimizeDeps.include ?? [];
+	optimizeDeps.include = [
+		...include,
+		...specifiers.filter((specifier) => !include.includes(specifier)),
+	];
 }
 
 function configDefaults(

@@ -16,10 +16,18 @@ import {
 import { decodePath, parsePath, parseURL, withQuery } from 'ufo';
 import { protocolIslandSegment } from '../../../serializer/src/protocol-constants.ts';
 
+// Dev has to pre-bundle this or the first MDX route discovers it and Vite
+// re-optimizes mid-session.
+export const MDX_ROUTE_RUNTIME_SPECIFIER = '@markless/router/vite/runtime/mdx-route';
+
 export function mdxTransformPlugin(): Plugin {
 	return {
 		name: 'markless-router:mdx',
 		enforce: 'pre',
+		config(_config, env) {
+			if (env.command !== 'serve') return undefined;
+			return { optimizeDeps: { include: [MDX_ROUTE_RUNTIME_SPECIFIER] } };
+		},
 		transform: {
 			order: 'pre',
 			async handler(code, id) {
@@ -41,7 +49,7 @@ export async function transformMdxRoute(source: string, id: string) {
 	const html = route.parts.map((part) => (part.kind === 'html' ? part.html : '')).join('');
 	if (route.components.length === 0) {
 		return [
-			`import { createMdxRenderDataSurface } from '@markless/router/vite/runtime/mdx-route';`,
+			`import { createMdxRenderDataSurface } from '${MDX_ROUTE_RUNTIME_SPECIFIER}';`,
 			`const marklessMdxParts = ${JSON.stringify(route.parts)};`,
 			'const marklessMdxRenderData = createMdxRenderDataSurface(marklessMdxParts, []);',
 			'const marklessMdxPage = {',
@@ -99,7 +107,7 @@ type MdxPart =
 function emitComposedMdxRoute(route: MdxRoute, id: string): string {
 	return [
 		`import { resumeFromPayloadDocument } from '@markless/core/web/resume';`,
-		`import { composeMdxState, composeMdxView, createMdxRenderDataSurface, loadMdxSymbol, renderMdxChild } from '@markless/router/vite/runtime/mdx-route';`,
+		`import { composeMdxState, composeMdxView, createMdxRenderDataSurface, loadMdxSymbol, renderMdxChild } from '${MDX_ROUTE_RUNTIME_SPECIFIER}';`,
 		...route.imports,
 		'',
 		`const marklessMdxParts = ${JSON.stringify(route.parts)};`,

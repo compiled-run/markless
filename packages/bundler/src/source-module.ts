@@ -58,6 +58,11 @@ export type BoundSymbolDescriptorMap = Readonly<
 
 export const MARKLESS_BOUND_SYMBOLS_EXPORT = 'marklessBoundSymbols';
 
+// The two resume entries emitted code imports. Dev has to pre-bundle both or the
+// first interaction discovers one and Vite re-optimizes mid-session.
+export const RESUME_ENTRY_SPECIFIER = '@markless/core/web/resume';
+export const STORAGE_FREE_RESUME_ENTRY_SPECIFIER = '@markless/core/web/resume-storage-free';
+
 const SYMBOL_VIRTUAL_PREFIX = `${MARKLESS_VIRTUAL_PREFIX}symbol:`;
 
 export function symbolVirtualModuleId(filename: string, symbolId: string) {
@@ -1029,8 +1034,8 @@ function emitResumeContainerEvent(
 	componentRowRenderDataId?: string,
 ): string {
 	const resumeEntry = storageFreePayload
-		? '@markless/core/web/resume-storage-free'
-		: '@markless/core/web/resume';
+		? STORAGE_FREE_RESUME_ENTRY_SPECIFIER
+		: RESUME_ENTRY_SPECIFIER;
 	// The page a component row is rendered against, handed to the resume runtime
 	// so the mint reads it off this container instead of off a shared global.
 	// Lazy: a page that never mints never fetches the render-data chunk.

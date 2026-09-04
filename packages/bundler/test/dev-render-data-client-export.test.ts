@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
 import { createServer, type ViteDevServer } from 'vite';
 import { markless } from '../src/vite/index.ts';
+import { marklessSourceAliases } from './helpers.ts';
 
 const root = resolve(import.meta.dirname, '../../..');
 const cleanupRoots: string[] = [];
@@ -53,7 +54,7 @@ async function createDevServer(fixture: { entry: string; root: string }) {
 			},
 		},
 		plugins: [markless({ executionLog: 'never' })],
-		resolve: { alias: marklessSourceAliases() },
+		resolve: { alias: marklessSourceAliases(root) },
 		server: { middlewareMode: true, ws: false },
 	});
 }
@@ -99,28 +100,3 @@ test('the server environment keeps its own render-data module', async () => {
 	}
 }, 120_000);
 
-function repo(path: string) {
-	return resolve(root, path);
-}
-
-function marklessSourceAliases() {
-	return [
-		{
-			find: '@markless/serializer/decode-client',
-			replacement: repo('packages/serializer/src/value-decode-client.ts'),
-		},
-		{
-			find: '@markless/bundler/rolldown',
-			replacement: repo('packages/bundler/src/rolldown.ts'),
-		},
-		{ find: '@markless/bundler/preload', replacement: repo('packages/bundler/src/preload.ts') },
-		{ find: '@markless/bundler/vite', replacement: repo('packages/bundler/src/vite/index.ts') },
-		...(['core', 'web', 'runtime', 'serializer'] as const).flatMap((name) => [
-			{
-				find: new RegExp(`^@markless/${name}/(.+)$`),
-				replacement: repo(`packages/${name}/src/$1.ts`),
-			},
-			{ find: `@markless/${name}`, replacement: repo(`packages/${name}/src/index.ts`) },
-		]),
-	];
-}

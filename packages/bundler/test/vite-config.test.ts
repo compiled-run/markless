@@ -1,5 +1,9 @@
-import type { EnvironmentOptions } from 'vite';
+import type { EnvironmentOptions, UserConfig } from 'vite';
 import { describe, expect, test } from 'vitest';
+import {
+	RESUME_ENTRY_SPECIFIER,
+	STORAGE_FREE_RESUME_ENTRY_SPECIFIER,
+} from '../src/source-module.ts';
 import { markless } from '../src/vite/index.ts';
 import {
 	callConfigEnvironment,
@@ -37,6 +41,39 @@ describe('Vite config integration', () => {
 			]);
 		},
 	);
+
+	test('pre-bundles the resume entries emitted code imports on the dev server', () => {
+		const plugin = getMarklessPlugin();
+		const config: UserConfig = {};
+		callConfig(plugin, config, { command: 'serve' });
+
+		expect(config.optimizeDeps?.include).toEqual([
+			RESUME_ENTRY_SPECIFIER,
+			STORAGE_FREE_RESUME_ENTRY_SPECIFIER,
+		]);
+	});
+
+	test('keeps a consumer optimizeDeps include and does not duplicate an entry', () => {
+		const plugin = getMarklessPlugin();
+		const config: UserConfig = {
+			optimizeDeps: { include: ['some-dep', RESUME_ENTRY_SPECIFIER] },
+		};
+		callConfig(plugin, config, { command: 'serve' });
+
+		expect(config.optimizeDeps?.include).toEqual([
+			'some-dep',
+			RESUME_ENTRY_SPECIFIER,
+			STORAGE_FREE_RESUME_ENTRY_SPECIFIER,
+		]);
+	});
+
+	test('leaves the dependency optimizer alone for production builds', () => {
+		const plugin = getMarklessPlugin();
+		const config: UserConfig = {};
+		callConfig(plugin, config, { command: 'build' });
+
+		expect(config.optimizeDeps?.include).toBeUndefined();
+	});
 
 	test('shares plugin state across app build environments', () => {
 		expect(getMarklessPlugin().sharedDuringBuild).toBe(true);

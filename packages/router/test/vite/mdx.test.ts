@@ -1,7 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { transformMdxRoute } from '../../src/vite/mdx.ts';
+import {
+	MDX_ROUTE_RUNTIME_SPECIFIER,
+	mdxTransformPlugin,
+	transformMdxRoute,
+} from '../../src/vite/mdx.ts';
 
 describe('Markless Router MDX transform', () => {
+	it('pre-bundles its runtime entry on the dev server and not for a build', () => {
+		const config = mdxTransformPlugin().config;
+		const hook = typeof config === 'function' ? config : config?.handler;
+
+		expect(hook?.call({} as never, {}, { command: 'serve', mode: 'development' })).toEqual({
+			optimizeDeps: { include: [MDX_ROUTE_RUNTIME_SPECIFIER] },
+		});
+		expect(
+			hook?.call({} as never, {}, { command: 'build', mode: 'production' }),
+		).toBeUndefined();
+	});
+
 	it('turns static markdown route content into an Markless SSR artifact', async () => {
 		const code = await transformMdxRoute(
 			`# Docs

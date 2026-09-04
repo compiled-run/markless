@@ -7,6 +7,7 @@ import { markless } from '../src/vite/index.ts';
 import type { MarklessRolldownPluginApi } from '../src/types.ts';
 import { MARKLESS_DEV_ERROR_CLIENT_ID } from '../src/dev-error/index.ts';
 import { fixtureSsrHost } from '../fixtures/vite-ssr/src/dev-server.ts';
+import { marklessSourceAliases } from './helpers.ts';
 
 const root = resolve(import.meta.dirname, '../../..');
 const cleanupRoots: string[] = [];
@@ -27,7 +28,7 @@ describe('SSR module runner program reload', () => {
 				root: fixture.root,
 				environments: { ssr: { build: { rolldownOptions: { input: fixture.entry } } } },
 				plugins: [markless(), fixtureSsrHost()],
-				resolve: { alias: marklessSourceAliases() },
+				resolve: { alias: marklessSourceAliases(root) },
 				server: { hmr: true, middlewareMode: true, ws: false },
 			});
 
@@ -65,7 +66,7 @@ describe('SSR module runner program reload', () => {
 				root: fixture.root,
 				environments: { ssr: { build: { rolldownOptions: { input: fixture.entry } } } },
 				plugins: [markless(), fixtureSsrHost()],
-				resolve: { alias: marklessSourceAliases() },
+				resolve: { alias: marklessSourceAliases(root) },
 				server: { hmr: true, middlewareMode: true, ws: false },
 			});
 
@@ -107,7 +108,7 @@ describe('SSR module runner program reload', () => {
 				root: fixture.root,
 				environments: { ssr: { build: { rolldownOptions: { input: fixture.entry } } } },
 				plugins: [...plugins, fixtureSsrHost()],
-				resolve: { alias: marklessSourceAliases() },
+				resolve: { alias: marklessSourceAliases(root) },
 				server: { hmr: true, middlewareMode: true, ws: false },
 			});
 
@@ -279,28 +280,3 @@ async function waitForFullReloadCountAbove(
 	return fullReloads;
 }
 
-function marklessSourceAliases() {
-	return [
-		{
-			find: '@markless/serializer/decode-client',
-			replacement: repo('packages/serializer/src/value-decode-client.ts'),
-		},
-		{
-			find: '@markless/bundler/rolldown',
-			replacement: repo('packages/bundler/src/rolldown.ts'),
-		},
-		{ find: '@markless/bundler/preload', replacement: repo('packages/bundler/src/preload.ts') },
-		{ find: '@markless/bundler/vite', replacement: repo('packages/bundler/src/vite/index.ts') },
-		...(['core', 'web', 'runtime', 'serializer'] as const).flatMap((name) => [
-			{
-				find: new RegExp(`^@markless/${name}/(.+)$`),
-				replacement: repo(`packages/${name}/src/$1.ts`),
-			},
-			{ find: `@markless/${name}`, replacement: repo(`packages/${name}/src/index.ts`) },
-		]),
-	];
-}
-
-function repo(path: string) {
-	return resolve(root, path);
-}
