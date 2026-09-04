@@ -14,6 +14,7 @@ type VersionPackage = {
 	readonly name: string;
 	readonly version: string;
 	readonly private?: boolean;
+	readonly directory?: string;
 };
 
 type VersionFixtureSpec = {
@@ -39,8 +40,15 @@ function manifestJson(manifest: Record<string, unknown>): string {
 async function versionFixture(spec: VersionFixtureSpec): Promise<string> {
 	const fixture = await mkdtemp(join(tmpdir(), 'markless-version-sync-'));
 	await writeFile(join(fixture, 'package.json'), manifestJson({ version: spec.root }));
+	await writeFile(
+		join(fixture, 'pnpm-workspace.yaml'),
+		"packages:\n  - 'packages/*'\n  - 'packages/headless/*'\n",
+	);
 	for (const pkg of spec.packages) {
-		const directory = join(fixture, 'packages', packageDirectory(pkg.name));
+		const directory = join(
+			fixture,
+			pkg.directory ?? join('packages', packageDirectory(pkg.name)),
+		);
 		await mkdir(directory, { recursive: true });
 		const manifest: Record<string, unknown> = {
 			name: pkg.name,
@@ -97,6 +105,21 @@ test('sync-version rewrites every derived release manifest to the root version',
 	await runSync(fixture);
 	expect(await versionOf(fixture, 'packages/a/package.json')).toBe('1.2.3');
 	expect(await versionOf(fixture, 'packages/private/package.json')).toBe('9.9.9');
+});
+
+test('sync-version discovers nested packages through pnpm workspace globs', async () => {
+	const fixture = await versionFixture({
+		root: '1.2.3',
+		packages: [
+			{
+				name: '@markless/icons',
+				version: '0.0.1',
+				directory: 'packages/headless/icons',
+			},
+		],
+	});
+	await runSync(fixture);
+	expect(await versionOf(fixture, 'packages/headless/icons/package.json')).toBe('1.2.3');
 });
 
 test('--check reports drift without writing', async () => {

@@ -19,7 +19,7 @@
 //      the tarball (a published export that resolves to a missing file is a
 //      broken install that no local build catches)
 //
-// Scope is derived: every packages/* manifest carrying `publishConfig`. That
+// Scope is derived from the pnpm workspace: every manifest carrying `publishConfig`. That
 // includes packages deliberately still `private` (@markless/vitest-browser), so
 // their packaging is proven before the flag is ever flipped.
 import { spawnSync } from 'node:child_process';
@@ -118,9 +118,13 @@ try {
 		const extractDir = join(packDir, 'extracted');
 		mkdirSync(extractDir, { recursive: true });
 
-		const packed = run('pnpm', ['--filter', entry.name, 'pack', '--pack-destination', packDir], {
-			cwd: repoRoot,
-		});
+		const packed = run(
+			'pnpm',
+			['--filter', entry.name, 'pack', '--pack-destination', packDir],
+			{
+				cwd: repoRoot,
+			},
+		);
 		if (packed.status !== 0) {
 			failures.push(`${label}: pnpm pack failed\n${packed.stderr || packed.stdout}`);
 			continue;
@@ -179,19 +183,23 @@ try {
 		}
 
 		const targets = [
+			...(typeof manifest.types === 'string' ? [['types', manifest.types]] : []),
 			...Object.entries(manifest.exports ?? {}).flatMap(([subpath, target]) =>
 				exportTargets(target).map((path) => [`exports["${subpath}"]`, path]),
 			),
-			...Object.entries(manifest.bin ?? {}).map(([binName, path]) => [`bin.${binName}`, path]),
+			...Object.entries(manifest.bin ?? {}).map(([binName, path]) => [
+				`bin.${binName}`,
+				path,
+			]),
 		];
-		// A source-shipped package's exports live under src by design.
-		const shipsSource = manifest.publishConfig?.marklessShipsSource === true ||
-			(manifest.marklessShipsSource === true);
-		const requiredPrefix = shipsSource ? './src/' : './dist/';
+		const shipsSource =
+			manifest.publishConfig?.marklessShipsSource === true ||
+			manifest.marklessShipsSource === true;
 		for (const [where, path] of targets) {
 			const isShippedData = shipsSource && path.endsWith('.json');
-			if (!path.startsWith(requiredPrefix) && !isShippedData) {
-				failures.push(`${label}: ${where} -> ${path} must target ${requiredPrefix.slice(0, -1)}`);
+			const isShippedSource = shipsSource && path.startsWith('./src/');
+			if (!path.startsWith('./dist/') && !isShippedSource && !isShippedData) {
+				failures.push(`${label}: ${where} -> ${path} must target shipped source or ./dist`);
 				continue;
 			}
 			const relativePath = path.slice('./'.length);

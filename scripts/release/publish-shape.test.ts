@@ -14,9 +14,8 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 // third copy of the release set — and a copy like it is exactly how
 // `verify-publish-ready.mjs --all` silently stopped covering
 // @markless/analyzer and @markless/typescript-plugin.
-const releasePackageDirs: readonly string[] = releasePackages().map(
-	(entry: { dir: string }) => entry.dir,
-);
+const releasePackageEntries = releasePackages();
+const releasePackagesByName = new Map(releasePackageEntries.map((entry) => [entry.name, entry]));
 
 type ExportTarget = string | { readonly [condition: string]: ExportTarget | undefined };
 
@@ -26,21 +25,28 @@ type PackageManifest = {
 	readonly private?: boolean;
 	readonly license?: string;
 	readonly files?: readonly string[];
+	readonly types?: string;
 	readonly exports?: Record<string, ExportTarget>;
 	readonly bin?: Record<string, string>;
 	readonly scripts?: Record<string, string>;
 	readonly dependencies?: Record<string, string>;
+	readonly repository?: { readonly url?: string; readonly directory?: string };
 	readonly publishConfig?: {
 		readonly access?: string;
+		readonly provenance?: boolean;
+		readonly marklessShipsSource?: boolean;
+		readonly types?: string;
 		readonly exports?: Record<string, ExportTarget>;
 		readonly bin?: Record<string, string>;
 	};
 };
 
 function readManifest(packageName: string): PackageManifest {
-	return JSON.parse(
-		readFileSync(resolve(repoRoot, 'packages', packageName, 'package.json'), 'utf8'),
-	) as PackageManifest;
+	const entry =
+		releasePackagesByName.get(packageName) ??
+		releasePackagesByName.get(`@markless/${packageName}`);
+	if (entry === undefined) throw new Error(`release package ${packageName} not found`);
+	return JSON.parse(readFileSync(entry.manifestPath, 'utf8')) as PackageManifest;
 }
 
 /**
@@ -73,6 +79,7 @@ function isDeclarationTarget(path: string): boolean {
  * `./dist/fns/*.js` is checked once per real `./src/fns/*.ts` module.
  */
 function expandPublishedTargets(
+	packageDir: string,
 	packageName: string,
 	subpath: string,
 	sourceTarget: ExportTarget,
@@ -87,7 +94,7 @@ function expandPublishedTargets(
 		throw new Error(`${packageName}: glob subpath ${subpath} has no source glob to expand`);
 	}
 	const [sourceDirPart] = sourcePattern.split('*');
-	const sourceDir = resolve(repoRoot, 'packages', packageName, sourceDirPart ?? '');
+	const sourceDir = resolve(packageDir, sourceDirPart ?? '');
 	const stems = readdirSync(sourceDir)
 		.filter((file) => file.endsWith('.ts'))
 		.map((file) => file.slice(0, -'.ts'.length));
@@ -113,39 +120,47 @@ describe('publish manifest shape', () => {
 	test('release version is a concrete semver', () => {
 		expect(releaseVersion).toMatch(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/);
 	});
-	for (const packageName of releasePackageDirs) {
-		test(`@markless/${packageName} carries publishable fields`, () => {
+	for (const entry of releasePackageEntries) {
+		const packageName = entry.name;
+		test(`${packageName} carries publishable fields`, () => {
 			const manifest = readManifest(packageName);
 			expect(manifest.private, `${packageName} must not be private`).toBeUndefined();
 			expect(manifest.version, `${packageName} version`).toBe(releaseVersion);
 			expect(manifest.license, `${packageName} license`).toBe('MIT');
 			expect(manifest.publishConfig?.access, `${packageName} access`).toBe('public');
+			expect(manifest.publishConfig?.provenance, `${packageName} provenance`).toBe(true);
+			expect(manifest.repository?.url, `${packageName} repository.url`).toBeTypeOf('string');
+			expect(manifest.repository?.directory, `${packageName} repository.directory`).toBe(
+				entry.directory,
+			);
+			if (
+				manifest.types !== undefined &&
+				manifest.publishConfig?.marklessShipsSource !== true
+			) {
+				expect(manifest.publishConfig?.types, `${packageName} published types`).toMatch(
+					/^\.\/dist\//,
+				);
+			}
 			if (manifest.publishConfig?.marklessShipsSource === true) {
-				// Source-shipped: the tarball IS src, compiled in the consumer's build.
 				expect(
 					manifest.files,
 					`${packageName} ships src (source-shipped package)`,
 				).toContain('src');
-				return;
+			} else {
+				expect(manifest.files, `${packageName} files field`).toContain('dist');
+				expect(
+					manifest.files,
+					`${packageName} must not ship TypeScript source`,
+				).not.toContain('src');
 			}
-			expect(manifest.files, `${packageName} files field`).toContain('dist');
-			expect(
-				manifest.files,
-				`${packageName} must not ship TypeScript source`,
-			).not.toContain('src');
 			expect(
 				manifest.scripts?.prepublishOnly,
 				`${packageName} prepublishOnly guard`,
 			).toContain('verify-publish-ready.mjs');
 		});
 
-		test(`@markless/${packageName} publishConfig.exports mirrors the dev exports surface into dist`, () => {
+		test(`${packageName} publishConfig.exports mirrors its complete dev exports surface`, () => {
 			const manifest = readManifest(packageName);
-			if (manifest.publishConfig?.marklessShipsSource === true) {
-				// Source-shipped: dev exports ARE the published exports; no dist mirror.
-				expect(manifest.publishConfig?.exports, `${packageName} needs no dist mirror`).toBeUndefined();
-				return;
-			}
 			const devExports = manifest.exports ?? {};
 			const publishedExports = manifest.publishConfig?.exports;
 			expect(publishedExports, `${packageName} publishConfig.exports`).toBeDefined();
@@ -153,20 +168,28 @@ describe('publish manifest shape', () => {
 				Object.keys(devExports).sort(),
 			);
 			for (const [subpath, target] of Object.entries(publishedExports ?? {})) {
-				for (const path of targetPaths(target)) {
+				const paths = targetPaths(target);
+				const distBacked = paths.some((path) => path.startsWith('./dist/'));
+				if (manifest.publishConfig?.marklessShipsSource === true && !distBacked) {
+					expect(paths, `${packageName} ${subpath} source targets`).toEqual(
+						targetPaths(devExports[subpath] ?? {}),
+					);
+				} else {
+					for (const path of paths) {
+						expect(
+							path.startsWith('./dist/'),
+							`${packageName} ${subpath} -> ${path} must target ./dist`,
+						).toBe(true);
+					}
 					expect(
-						path.startsWith('./dist/'),
-						`${packageName} ${subpath} -> ${path} must target ./dist`,
+						paths.some(isDeclarationTarget),
+						`${packageName} ${subpath} needs a types target`,
 					).toBe(true);
 				}
-				expect(
-					targetPaths(target).some(isDeclarationTarget),
-					`${packageName} ${subpath} needs a types target`,
-				).toBe(true);
 			}
 		});
 
-		test(`@markless/${packageName} workspace dependencies stay on the workspace protocol`, () => {
+		test(`${packageName} workspace dependencies stay on the workspace protocol`, () => {
 			const manifest = readManifest(packageName);
 			for (const [dependency, range] of Object.entries(manifest.dependencies ?? {})) {
 				if (dependency.startsWith('@markless/')) {
@@ -193,9 +216,11 @@ describe('publish manifest shape', () => {
 		const pluginSource = readFileSync(resolve(routerDir, 'src/vite/index.ts'), 'utf8');
 		const requestedEntryFiles = [
 			...new Set(
-				[...(pluginSource.match(/virtualEntryFiles = \{[^}]*\}/)?.[0] ?? '').matchAll(
-					/'([\w-]+\.ts)'/g,
-				)].map((match) => match[1]),
+				[
+					...(pluginSource.match(/virtualEntryFiles = \{[^}]*\}/)?.[0] ?? '').matchAll(
+						/'([\w-]+\.ts)'/g,
+					),
+				].map((match) => match[1]),
 			),
 		];
 
@@ -224,7 +249,9 @@ describe('publish manifest shape', () => {
 					const [, packageName, ...rest] = specifier.split('/');
 					const subpath = rest.length === 0 ? '.' : `./${rest.join('/')}`;
 					expect(
-						readManifest(packageName ?? '').publishConfig?.exports?.[subpath],
+						readManifest(`@markless/${packageName ?? ''}`).publishConfig?.exports?.[
+							subpath
+						],
 						`entries/${fileName} imports '${specifier}' but @markless/${packageName} publishes no ${subpath} export`,
 					).toBeDefined();
 				}
@@ -233,7 +260,7 @@ describe('publish manifest shape', () => {
 	});
 
 	test('create-markless bin is rewritten to a dist file and ships templates', () => {
-		const manifest = readManifest('cli');
+		const manifest = readManifest('create-markless');
 		const publishedBin = manifest.publishConfig?.bin?.['create-markless'];
 		expect(publishedBin, 'cli publishConfig.bin').toBeDefined();
 		expect(publishedBin?.startsWith('./dist/')).toBe(true);
@@ -244,26 +271,28 @@ describe('publish manifest shape', () => {
 // Requires `vp pack` output. Skipped when dist is absent (CI runs `vp test`
 // without packing); the prepublishOnly guard re-enforces this fail-closed at
 // publish time, so a publish can never skip these checks.
-const packedDistExists = releasePackageDirs.every((packageName) =>
-	existsSync(resolve(repoRoot, 'packages', packageName, 'dist')),
+const packedDistExists = releasePackageEntries.every((entry) =>
+	existsSync(resolve(entry.packageDir, 'dist')),
 );
 
 describe.skipIf(!packedDistExists)('packed dist output (run `vp pack` first)', () => {
-	for (const packageName of releasePackageDirs) {
-		test(`@markless/${packageName} publishConfig.exports targets all exist after vp pack`, () => {
+	for (const entry of releasePackageEntries) {
+		const packageName = entry.name;
+		test(`${packageName} publishConfig.exports targets exist after vp pack`, () => {
 			const manifest = readManifest(packageName);
 			const devExports = manifest.exports ?? {};
 			for (const [subpath, target] of Object.entries(manifest.publishConfig?.exports ?? {})) {
 				const sourceTarget = devExports[subpath];
 				expect(sourceTarget, `${packageName} ${subpath} has a dev export`).toBeDefined();
 				for (const path of expandPublishedTargets(
+					entry.packageDir,
 					packageName,
 					subpath,
 					sourceTarget as ExportTarget,
 					target,
 				)) {
 					expect(
-						existsSync(resolve(repoRoot, 'packages', packageName, path)),
+						existsSync(resolve(entry.packageDir, path)),
 						`${packageName} ${subpath} -> ${path} missing from dist`,
 					).toBe(true);
 				}
@@ -272,7 +301,7 @@ describe.skipIf(!packedDistExists)('packed dist output (run `vp pack` first)', (
 	}
 
 	test('create-markless packed bin exists and keeps its shebang', () => {
-		const manifest = readManifest('cli');
+		const manifest = readManifest('create-markless');
 		const binPath = manifest.publishConfig?.bin?.['create-markless'];
 		expect(binPath).toBeDefined();
 		const absolute = resolve(repoRoot, 'packages', 'cli', binPath ?? '');
@@ -297,10 +326,9 @@ describe.skipIf(!packedDistExists)('packed dist output (run `vp pack` first)', (
 		expect(rootJs, 'core root js target').toBeDefined();
 		const code = readFileSync(resolve(repoRoot, 'packages', 'core', rootJs ?? ''), 'utf8');
 		for (const specifier of staticImportSpecifiers(code)) {
-			expect(
-				specifier.startsWith('node:'),
-				`core root entry imports ${specifier}`,
-			).toBe(false);
+			expect(specifier.startsWith('node:'), `core root entry imports ${specifier}`).toBe(
+				false,
+			);
 			for (const forbidden of ['rolldown', 'vite', '@markless/bundler']) {
 				expect(
 					specifier === forbidden || specifier.startsWith(`${forbidden}/`),

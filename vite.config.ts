@@ -248,7 +248,11 @@ export default defineConfig({
 				test: {
 					name: 'node',
 					environment: 'node',
-					include: ['packages/*/test/**/*.test.ts', 'scripts/**/*.test.ts'],
+					include: [
+						'packages/*/test/**/*.test.ts',
+						'packages/headless/*/test/**/*.test.ts',
+						'scripts/**/*.test.ts',
+					],
 					exclude: ['packages/typescript-plugin/test/completion-matrix.test.ts'],
 					// One id per run: the typescript-plugin test files build the same
 					// dist/ from separate workers and lock on it to build it once.

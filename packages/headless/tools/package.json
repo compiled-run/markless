@@ -1,8 +1,13 @@
 {
 	"name": "@markless/ui-tools",
-	"version": "0.0.0",
+	"version": "0.4.0",
 	"description": "Build tools for the Markless UI design system.",
 	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/compiled-run/markless.git",
+		"directory": "packages/headless/tools"
+	},
 	"files": [
 		"dist"
 	],
@@ -17,7 +22,12 @@
 				"types": "./dist/vite.d.ts",
 				"default": "./dist/vite.js"
 			}
-		}
+		},
+		"access": "public",
+		"provenance": true
+	},
+	"scripts": {
+		"prepublishOnly": "node ../../../scripts/release/verify-publish-ready.mjs"
 	},
 	"dependencies": {
 		"@markless/icons": "workspace:*"

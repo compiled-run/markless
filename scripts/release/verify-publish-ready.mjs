@@ -3,8 +3,8 @@
 // published exports surface. Run with `--all` from the repo root to check the
 // whole release set (the `pnpm release` flow does this after `vp pack`).
 //
-// The release set is derived from packages/*/package.json by
-// release-packages.mjs. It used to be an eight-name literal here, which had
+// The release set is derived from pnpm-workspace.yaml by release-packages.mjs.
+// It used to be an eight-name literal here, which had
 // silently stopped covering @markless/analyzer and @markless/typescript-plugin.
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -61,48 +61,34 @@ function verifyPackage(packageDir) {
 	if (manifest.publishConfig?.access !== 'public') {
 		failures.push(`${label}: publishConfig.access must be "public"`);
 	}
-	// A source-shipped package (consumer-compiled .tsrx, like the router's app
-	// entries but package-wide): exports stay on src, the tarball ships src, and
-	// the dist rules below do not apply. The flag is the package's own fact.
-	if (manifest.publishConfig?.marklessShipsSource === true) {
-		if (manifest.publishConfig?.provenance !== true) {
-			failures.push(`${label}: publishConfig.provenance must be true (npm provenance attestation)`);
-		}
-		if (typeof manifest.repository?.url !== 'string') {
-			failures.push(`${label}: repository.url is required for npm provenance`);
-		}
-		if (!Array.isArray(manifest.files) || !manifest.files.some((f) => f === 'src' || f.startsWith('src'))) {
-			failures.push(`${label}: files must ship "src" (source-shipped package)`);
-		}
-		for (const [subpath, target] of Object.entries(manifest.exports ?? {})) {
-			for (const path of targetPaths(target)) {
-				// Data files (the generated API manifest) ship beside src.
-				const isShippedData = path.endsWith('.json') && manifest.files.some((f) => path.startsWith(`./${f}`));
-				if (!path.startsWith('./src/') && !isShippedData) {
-					failures.push(`${label}: ${subpath} -> ${path} must target ./src (source-shipped package)`);
-				} else if (!path.includes('*') && !existsSync(resolve(packageDir, path))) {
-					failures.push(`${label}: ${subpath} -> ${path} missing on disk`);
-				}
-			}
-		}
-		return failures;
-	}
+	const shipsSource = manifest.publishConfig?.marklessShipsSource === true;
 	// Provenance is a package-owned fact, declared once per manifest. The
 	// release workflow must not set NPM_CONFIG_PROVENANCE=true instead; that
 	// would be a second copy of it that can drift.
 	if (manifest.publishConfig?.provenance !== true) {
-		failures.push(`${label}: publishConfig.provenance must be true (npm provenance attestation)`);
+		failures.push(
+			`${label}: publishConfig.provenance must be true (npm provenance attestation)`,
+		);
 	}
 	// npm refuses to attest a package whose manifest names a different
 	// repository than the one publishing it.
 	if (typeof manifest.repository?.url !== 'string') {
 		failures.push(`${label}: repository.url is required for npm provenance`);
 	}
-	if (!Array.isArray(manifest.files) || !manifest.files.includes('dist')) {
-		failures.push(`${label}: files must include "dist"`);
-	}
-	if (manifest.files?.includes('src')) {
-		failures.push(`${label}: files must not ship TypeScript source`);
+	if (shipsSource) {
+		if (!Array.isArray(manifest.files) || !manifest.files.includes('src')) {
+			failures.push(`${label}: files must ship "src" (source-shipped package)`);
+		}
+	} else {
+		if (!Array.isArray(manifest.files) || !manifest.files.includes('dist')) {
+			failures.push(`${label}: files must include "dist"`);
+		}
+		if (manifest.files?.includes('src')) {
+			failures.push(`${label}: files must not ship TypeScript source`);
+		}
+		if (manifest.types !== undefined && !manifest.publishConfig?.types?.startsWith('./dist/')) {
+			failures.push(`${label}: publishConfig.types must target ./dist`);
+		}
 	}
 
 	const devExports = manifest.exports ?? {};
@@ -116,15 +102,30 @@ function verifyPackage(packageDir) {
 			}
 		}
 		for (const [subpath, target] of Object.entries(publishedExports)) {
+			const paths = targetPaths(target);
+			const distBacked = paths.some((path) => path.startsWith('./dist/'));
+			if (distBacked && !manifest.files?.includes('dist')) {
+				failures.push(`${label}: files must include "dist" for ${subpath}`);
+			}
+			if (distBacked && !paths.some((path) => /\.d\.(?:c|m)?ts$/.test(path))) {
+				failures.push(`${label}: ${subpath} needs a types target`);
+			}
 			for (const path of expandPublishedTargets(
 				packageDir,
 				subpath,
 				devExports[subpath],
 				target,
 			)) {
-				if (!path.startsWith('./dist/')) {
-					failures.push(`${label}: ${subpath} -> ${path} must target ./dist`);
-				} else if (!existsSync(resolve(packageDir, path))) {
+				const isShippedData =
+					shipsSource &&
+					path.endsWith('.json') &&
+					manifest.files?.some((file) => path.startsWith(`./${file}`));
+				const isSource = shipsSource && path.startsWith('./src/');
+				if (!path.startsWith('./dist/') && !isSource && !isShippedData) {
+					failures.push(
+						`${label}: ${subpath} -> ${path} must target a shipped source or ./dist`,
+					);
+				} else if (!path.includes('*') && !existsSync(resolve(packageDir, path))) {
 					failures.push(`${label}: ${subpath} -> ${path} missing on disk (run vp pack)`);
 				}
 			}
@@ -143,7 +144,9 @@ function verifyPackage(packageDir) {
 		for (const fileName of readdirSync(appEntriesDir)) {
 			if (!fileName.endsWith('.ts')) continue;
 			const code = readFileSync(resolve(appEntriesDir, fileName), 'utf8');
-			for (const match of code.matchAll(/(?:from\s*|^import\s*|\bimport\()\s*['"]([^'"]+)['"]/gm)) {
+			for (const match of code.matchAll(
+				/(?:from\s*|^import\s*|\bimport\()\s*['"]([^'"]+)['"]/gm,
+			)) {
 				if (match[1]?.startsWith('.')) {
 					failures.push(
 						`${label}: src/vite/entries/${fileName} imports '${match[1]}' relatively — unresolvable from the published tarball`,

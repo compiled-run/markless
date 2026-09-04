@@ -1,7 +1,7 @@
 // The one place that answers "which packages does a release cover".
 //
-// The answer is DERIVED from packages/*/package.json, never restated as a
-// literal list. A hand-maintained copy is how `verify-publish-ready.mjs --all`
+// The answer is derived from pnpm-workspace.yaml, never restated as a literal
+// list. A hand-maintained copy is how `verify-publish-ready.mjs --all`
 // silently stopped checking @markless/analyzer and @markless/typescript-plugin,
 // and it is what CLAUDE.md forbids ("config facts are imported from their
 // owning package, never restated as literals").
@@ -13,38 +13,35 @@
 //                        be verifiable, including packages still held private
 //                        on purpose (@markless/vitest-browser), so preparation
 //                        work is proven before the flag is ever flipped.
-import { readFileSync, readdirSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { globSync, readFileSync } from 'node:fs';
+import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parse } from 'yaml';
 
 export const repoRoot = resolve(fileURLToPath(import.meta.url), '../../..');
 
-/**
- * Every packages/<dir>/package.json that parses, in directory order — plus one
- * level deeper where a directory holds no manifest of its own (packages/headless
- * is a folder of packages, and pnpm's workspace globs already publish through
- * it, so the release set must see what publish would).
- */
+/** Every package.json selected by pnpm-workspace.yaml, in path order. */
 export function workspacePackages(root = repoRoot) {
-	return readdirSync(resolve(root, 'packages'), { withFileTypes: true })
-		.filter((entry) => entry.isDirectory())
-		.flatMap((entry) => {
-			const hasManifest = (() => {
-				try {
-					JSON.parse(readFileSync(resolve(root, 'packages', entry.name, 'package.json'), 'utf8'));
-					return true;
-				} catch {
-					return false;
-				}
-			})();
-			if (hasManifest) return [entry];
-			return readdirSync(resolve(root, 'packages', entry.name), { withFileTypes: true })
-				.filter((child) => child.isDirectory())
-				.map((child) => ({ ...child, name: `${entry.name}/${child.name}` }));
-		})
-		.map((entry) => {
-			const directory = `packages/${entry.name}`;
-			const manifestPath = resolve(root, directory, 'package.json');
+	const workspace = parse(readFileSync(resolve(root, 'pnpm-workspace.yaml'), 'utf8'));
+	const patterns = Array.isArray(workspace?.packages) ? workspace.packages : [];
+	const manifestPaths = new Set();
+	const excludedManifestPaths = new Set();
+	for (const pattern of patterns) {
+		if (typeof pattern !== 'string') continue;
+		const excluded = pattern.startsWith('!');
+		const packagePattern = `${excluded ? pattern.slice(1) : pattern}/package.json`;
+		for (const manifestPath of globSync(packagePattern, { cwd: root })) {
+			if (excluded) excludedManifestPaths.add(manifestPath);
+			else manifestPaths.add(manifestPath);
+		}
+	}
+
+	return [...manifestPaths]
+		.filter((manifestPath) => !excludedManifestPaths.has(manifestPath))
+		.sort()
+		.map((relativeManifestPath) => {
+			const manifestPath = resolve(root, relativeManifestPath);
+			const directory = relative(root, dirname(manifestPath));
 			let manifest;
 			try {
 				manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
@@ -56,7 +53,7 @@ export function workspacePackages(root = repoRoot) {
 			}
 			return {
 				name: manifest.name,
-				dir: entry.name,
+				dir: directory,
 				directory,
 				packageDir: resolve(root, directory),
 				manifestPath,
