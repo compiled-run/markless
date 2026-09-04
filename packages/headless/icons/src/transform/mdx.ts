@@ -1,6 +1,5 @@
 import MagicString from 'magic-string';
 import type { CollectionLoader } from '../collection-loader.ts';
-import { nearestName } from '../naming.ts';
 import type { ResolvedIconsOptions } from '../options.ts';
 import { cleanImports, renderSvg, type AttributeSpan } from './shared.ts';
 
@@ -23,10 +22,8 @@ export async function transformMdx(
 		const local = parts[0]!;
 		const pack = bindings.get(local)!;
 		const prefix = options.packs.get(pack);
-		if (!prefix) {
-			const nearest = nearestName(pack, options.packs.keys());
-			throw new Error(`@markless/icons: ${file}: unknown pack ${pack} for ${pack}.${parts[1]}${nearest ? `; nearest name is ${nearest}` : ''}`);
-		}
+		// A namespace from a shared source that is not a pack is a component family; leave it.
+		if (!prefix) continue;
 		const icon = await loader.icon(prefix, parts[1]!, file, pack, diagnostic);
 		magic.overwrite(
 			tag.start,

@@ -84,7 +84,7 @@ Text <i.downward title={"Down"} /> here.
 		expect(result?.code).not.toContain("from '@markless/icons'");
 	});
 
-	test('loads a collection once and reports nearest unknown names', async () => {
+	test('loads a collection once, reports unknown icons, leaves non-pack namespaces alone', async () => {
 		const setup = transformer();
 		await setup.transform(
 			`import { testpack } from '@markless/icons'; export function A() @{ <><testpack.arrowdown/><testpack.downward/></> }`,
@@ -97,12 +97,13 @@ Text <i.downward title={"Down"} /> here.
 				'/bad.tsrx',
 			),
 		).rejects.toThrow('/bad.tsrx');
+		// A namespace that is not a pack is a component family (accordion, select): left alone.
 		await expect(
 			setup.transform(
 				`import { missing } from '@markless/icons'; export function A() @{ <missing.arrowdown/> }`,
 				'/pack.tsrx',
 			),
-		).rejects.toThrow(/missing.*testpack/);
+		).resolves.toBeUndefined();
 	});
 
 	test('the transformed TSRX compiles without an icon component runtime', async () => {
