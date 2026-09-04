@@ -1,5 +1,6 @@
 import { readdirSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
 import type { Plugin } from 'vite';
 import { CollectionLoader } from './collection-loader.ts';
 import { nearestName, packName } from './naming.ts';
@@ -60,7 +61,8 @@ function resolveOptions(input: IconsOptions): ResolvedIconsOptions {
 }
 
 function installedPrefixes(): string[] {
-	const directory = fileURLToPath(new URL('../node_modules/@iconify/json/json/', import.meta.url));
+	const manifest = createRequire(import.meta.url).resolve('@iconify/json/package.json');
+	const directory = join(dirname(manifest), 'json');
 	return readdirSync(directory)
 		.filter((file) => file.endsWith('.json'))
 		.map((file) => file.slice(0, -'.json'.length));

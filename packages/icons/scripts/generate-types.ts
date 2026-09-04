@@ -1,10 +1,14 @@
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { IconifyJSON } from '@iconify/types';
 
 const packageDirectory = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const collectionDirectory = resolve(packageDirectory, 'node_modules/@iconify/json/json');
+const collectionDirectory = resolve(
+	dirname(createRequire(import.meta.url).resolve('@iconify/json/package.json')),
+	'json',
+);
 const generatedDirectory = resolve(packageDirectory, 'generated');
 const sourceDirectory = resolve(packageDirectory, 'src');
 const prefixes = readdirSync(collectionDirectory)
