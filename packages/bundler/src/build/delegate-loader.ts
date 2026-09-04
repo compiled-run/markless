@@ -8,10 +8,6 @@ import { pathToFileURL } from 'node:url';
 import { dirname, isAbsolute, join } from 'pathe';
 import { moduleRunnerTransform } from 'vite';
 import {
-	compileTsrxModuleLinkArtifact,
-	type ModuleGraphInterfaceArtifact,
-} from '@markless/compiler';
-import {
 	ESModulesEvaluator,
 	createNodeImportMeta,
 	ssrDynamicImportKey,
@@ -29,18 +25,16 @@ import {
 } from '../transform.ts';
 import { moduleIdFor } from '../module-id.ts';
 import { isRelativeImport as isRelative, normalizeVirtualId, pathname } from '../virtual-ids.ts';
+import {
+	createLinkedModuleInterfaces,
+	isTsrxModule,
+	type DelegateSpecifierResolve,
+} from './linked-interfaces.ts';
 
 // Every extension whose file is authored source rather than runnable JavaScript.
 const SOURCE_MODULE = /\.(?:m|c)?tsx?$|\.tsrx$/;
-const TSRX_MODULE = /\.tsrx$/;
 
-// Resolves one of a delegate's own import specifiers, normally the build's
-// `this.resolve`. `undefined` means "not ours" and the specifier is imported
-// by Node instead.
-export type DelegateSpecifierResolve = (
-	specifier: string,
-	importer: string,
-) => Promise<string | undefined>;
+export type { DelegateSpecifierResolve };
 
 export type BuildDelegateLoader = {
 	load(source: string, resolve: DelegateSpecifierResolve, root?: string): Promise<unknown>;
@@ -73,25 +67,7 @@ export function createBuildDelegateLoader(): BuildDelegateLoader {
 	// no file behind them, so their code is kept here rather than read back.
 	let virtualSources = new Map<string, string>();
 	let graph = new Map<string, Promise<Record<string, unknown>>>();
-	let interfaces = new Map<string, Promise<ModuleGraphInterfaceArtifact>>();
-
-	function moduleInterface(file: string, root: string | undefined) {
-		const sourceFile = pathname(file);
-		const known = interfaces.get(sourceFile);
-		if (known) return known;
-		const started = readFile(sourceFile, 'utf8').then(
-			async (source) =>
-				(
-					await compileTsrxModuleLinkArtifact({
-						filename: sourceFile,
-						moduleId: moduleIdFor(sourceFile, root),
-						source,
-					})
-				).moduleGraphInterface,
-		);
-		interfaces.set(sourceFile, started);
-		return started;
-	}
+	const linkedInterfaces = createLinkedModuleInterfaces();
 
 	async function resolvedSource(
 		specifier: string,
@@ -113,31 +89,12 @@ export function createBuildDelegateLoader(): BuildDelegateLoader {
 		if (virtual !== undefined) return virtual;
 		const file = pathname(id);
 		const source = await readFile(file, 'utf8');
-		if (!TSRX_MODULE.test(file)) return await stripEmittedTypes(source, file);
-		const linked = await compileTsrxModuleLinkArtifact({
-			filename: file,
-			moduleId: moduleIdFor(file, root),
+		if (!isTsrxModule(file)) return await stripEmittedTypes(source, file);
+		const importedModuleInterfaces = await linkedInterfaces.importedInterfacesFor(
+			file,
 			source,
-		});
-		const importedModuleInterfaces = Object.fromEntries(
-			(
-				await Promise.all(
-					linked.moduleImports
-						.filter((moduleImport) => TSRX_MODULE.test(moduleImport.source))
-						.map(async (moduleImport) => {
-							const imported = await resolvedSource(
-								moduleImport.source,
-								file,
-								resolve,
-							);
-							if (!imported || !isAbsolute(pathname(imported))) return null;
-							return [
-								moduleImport.source,
-								await moduleInterface(imported, root),
-							] as const;
-						}),
-				)
-			).filter((entry) => entry !== null),
+			resolve,
+			root,
 		);
 		const transformed = await transformTsrxModule({
 			filename: file,
@@ -218,7 +175,7 @@ export function createBuildDelegateLoader(): BuildDelegateLoader {
 		clear() {
 			graph = new Map();
 			virtualSources = new Map();
-			interfaces = new Map();
+			linkedInterfaces.clear();
 		},
 	};
 }

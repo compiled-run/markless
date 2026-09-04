@@ -1,6 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { relative, resolve } from 'pathe';
 import { describe, expect, test } from 'vitest';
+import { createLinkedModuleInterfaces } from '../src/build/linked-interfaces.ts';
 import { transformTsrxModule } from '../src/rolldown.ts';
 
 const repoRoot = resolve(import.meta.dirname, '../../..');
@@ -159,6 +160,9 @@ describe('mechanical doctrine guard', () => {
 
 		const fixtureRoot = resolve(repoRoot, 'packages/bundler/fixtures');
 		const files = await findFiles(fixtureRoot, '.tsrx');
+		// Dependency-shaped fixtures call a sibling's state helper, so the guard links
+		// siblings the way the build delegate loader does before compiling each entry.
+		const linkedInterfaces = createLinkedModuleInterfaces();
 		const entries = await Promise.all(
 			files.map(async (file): Promise<ClientGraphEntry> => {
 				const source = await readFile(file, 'utf8');
@@ -167,6 +171,12 @@ describe('mechanical doctrine guard', () => {
 					source,
 					environment: 'client',
 					clientOutput: 'symbols-only',
+					importedModuleInterfaces: await linkedInterfaces.importedInterfacesFor(
+						file,
+						source,
+						async () => undefined,
+						fixtureRoot,
+					),
 				});
 				return {
 					file: relative(repoRoot, file),
