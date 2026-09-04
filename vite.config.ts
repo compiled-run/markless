@@ -197,6 +197,14 @@ const buildOrder: PackUserConfig[] = [
 		},
 	}),
 	marklessPack({
+		packageName: 'icons',
+		platform: 'node',
+		entry: {
+			index: './src/index.ts',
+			vite: './src/vite.ts',
+		},
+	}),
+	marklessPack({
 		packageName: 'vitest-browser',
 		devDependencies: true,
 		entry: {

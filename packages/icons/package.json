@@ -28,6 +28,7 @@
 	"sideEffects": false,
 	"files": [
 		"src",
+		"dist",
 		"generated"
 	],
 	"scripts": {
@@ -42,5 +43,27 @@
 	},
 	"devDependencies": {
 		"@iconify/types": "^2.0.0"
+	},
+	"publishConfig": {
+		"exports": {
+			".": {
+				"types": "./generated/packs.d.ts",
+				"default": "./dist/index.js"
+			},
+			"./vite": {
+				"types": "./dist/vite.d.ts",
+				"default": "./dist/vite.js"
+			}
+		},
+		"typesVersions": {
+			"*": {
+				"vite": [
+					"dist/vite.d.ts"
+				],
+				"*": [
+					"generated/packs.d.ts"
+				]
+			}
+		}
 	}
 }
