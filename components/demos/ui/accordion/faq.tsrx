@@ -174,6 +174,10 @@ export default function Faq() @{
 				padding: 0 0.8em 0.9em;
 			}
 
+			.faq-panel[hidden] {
+				display: none;
+			}
+
 			.faq-foot {
 				margin: 0.9em 0 0;
 				padding-top: 0.8em;

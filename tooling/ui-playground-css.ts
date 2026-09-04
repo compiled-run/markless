@@ -35,6 +35,10 @@ function sticker(card: string): string {
 
 ${accent(card)}
 
+			html[data-theme='dark'] ${card} {
+				background: var(--raised);
+			}
+
 			/* Full bleed on a phone: the card runs edge to edge, so the page gutter
 			   the shell adds is taken back here. */
 			@media (max-width: 866px) {
@@ -99,6 +103,11 @@ function tipLook(tip: string): string {
 				font-family: var(--font-mono);
 				font-size: var(--step--2);
 				opacity: 0.8;
+			}
+
+			html[data-theme='dark'] ${tip} {
+				background: var(--raised);
+				color: var(--ink);
 			}`;
 }
 
@@ -147,6 +156,10 @@ const PICK_CSS = `			.pg-pick-trigger {
 				transform: rotate(180deg);
 			}
 
+			html[data-theme='dark'] .pg-pick-trigger {
+				background: var(--raised);
+			}
+
 			.pg-pick-list {
 				position: absolute;
 				inset-block-start: 100%;
@@ -161,8 +174,12 @@ const PICK_CSS = `			.pg-pick-trigger {
 				box-shadow: var(--card-shadow);
 			}
 
-			.pg-pick-list[ui-closed] {
+			.pg-pick-list:is([ui-closed], [hidden]) {
 				display: none;
+			}
+
+			html[data-theme='dark'] .pg-pick-list {
+				background: var(--raised);
 			}
 
 			/* The anchor is scoped to each picker's own root, so a list never resolves another picker's trigger. */
@@ -356,7 +373,7 @@ export const CONTROLS_CSS = `${sticker('.pg')}
 
 ${tipLook('.pg-tip')}
 
-			.pg-tip[ui-closed] {
+			.pg-tip:is([ui-closed], [hidden]) {
 				display: none;
 			}
 
@@ -424,6 +441,10 @@ ${tipLook('.pg-tip')}
 			}
 
 ${PICK_CSS}
+
+			html[data-theme='dark'] :is(.pg-switch, .pg-field, .pg-showall) {
+				background: var(--raised);
+			}
 
 			.pg-log {
 				margin: 0;
@@ -500,6 +521,10 @@ export const STAGE_CSS = `			.pg-stage {
 				place-items: center;
 				padding: var(--space-m) var(--space-s);
 				background: var(--paper);
+			}
+
+			html[data-theme='dark'] .pg-stage {
+				background: var(--raised);
 			}`;
 
 export const CODE_CSS = `			/* One row between the stage and the code: the file tabs sit on the left
@@ -566,12 +591,20 @@ export const CODE_CSS = `			/* One row between the stage and the code: the file 
 				font-weight: 700;
 			}
 
+			html[data-theme='dark'] .pg-tab[ui-selected] {
+				background: var(--raised);
+			}
+
 			.pg-panes {
 				min-width: 0;
 			}
 
 			.pg-pane {
 				min-width: 0;
+			}
+
+			.pg-pane[hidden] {
+				display: none;
 			}
 
 			/* The clamp: one per panel, round every tab, so the code always shows and
@@ -608,6 +641,10 @@ export const CODE_CSS = `			/* One row between the stage and the code: the file 
 				height: 5.5rem;
 				background: linear-gradient(to bottom, transparent, var(--paper) 75%);
 				pointer-events: none;
+			}
+
+			html[data-theme='dark'] .pg-fade {
+				background: linear-gradient(to bottom, transparent, var(--raised) 75%);
 			}
 
 			/* The whole faded strip is the target, so a reader can click the code

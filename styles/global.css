@@ -315,6 +315,49 @@ html[data-variant='c'] .ico:not(.ico-c) {
 	font-size: var(--step--1);
 }
 
+.variant-picker {
+	display: inline-flex;
+	gap: 0.2rem;
+	align-items: center;
+}
+
+.variant-picker a {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	box-sizing: border-box;
+	inline-size: 1.45rem;
+	block-size: 1.45rem;
+	font-family: 'Joy Elia', system-ui, sans-serif;
+	font-size: var(--step--2);
+	line-height: 1;
+	color: var(--ink);
+	background: var(--paper);
+	border: 1.5px solid var(--code-edge);
+	border-radius: 3px;
+	text-decoration: none;
+}
+
+html[data-variant='a'] .variant-a,
+html[data-variant='b'] .variant-b,
+html[data-variant='c'] .variant-c {
+	color: var(--on-accent);
+	background: var(--yellow);
+	border-color: var(--ink);
+	box-shadow: 1.5px 1.5px 0 var(--purple);
+	transform: rotate(-1deg);
+}
+
+html[data-theme='dark'] .variant-picker a {
+	background: var(--raised);
+}
+
+html[data-theme='dark'][data-variant='a'] .variant-a,
+html[data-theme='dark'][data-variant='b'] .variant-b,
+html[data-theme='dark'][data-variant='c'] .variant-c {
+	background: var(--yellow);
+}
+
 .theme-toggle {
 	display: inline-flex;
 	align-items: center;
@@ -767,6 +810,10 @@ html[data-theme='dark'] .theme-toggle-to-light {
 	font-size: var(--step--1);
 	line-height: 1.6;
 	tab-size: 2;
+}
+
+html[data-theme='dark'] :is(.prose pre, .pg-shiki) {
+	background: var(--raised);
 }
 
 .prose pre code,
@@ -1344,19 +1391,19 @@ html[data-variant='a'] {
 html[data-theme='dark'][data-variant='a'] {
 	--state-hover-bg: linear-gradient(
 		transparent 18%,
-		color-mix(in oklch, var(--yellow) 45%, transparent) 18% 88%,
+		color-mix(in oklch, var(--yellow) 30%, transparent) 18% 88%,
 		transparent 88%
 	);
 	--state-hover-fg: var(--ink);
 	--state-selected-bg: linear-gradient(
 		transparent 18%,
-		color-mix(in oklch, var(--pink) 55%, transparent) 18% 88%,
+		color-mix(in oklch, var(--pink) 30%, transparent) 18% 88%,
 		transparent 88%
 	);
 	--state-selected-fg: var(--ink);
 	--state-selected-edge: none;
 	--state-selected-shadow: none;
-	--state-highlight-bg: color-mix(in oklch, var(--yellow) 45%, transparent);
+	--state-highlight-bg: color-mix(in oklch, var(--yellow) 30%, transparent);
 	--card-shadow: 3px 3px 0 var(--pink);
 	--card-edge: 2px solid var(--ink);
 	--inline-code-bg: linear-gradient(
@@ -1368,7 +1415,7 @@ html[data-theme='dark'][data-variant='a'] {
 	--inline-code-edge: none;
 	--swipe: linear-gradient(
 		transparent 18%,
-		color-mix(in oklch, var(--pink) 55%, transparent) 18% 88%,
+		color-mix(in oklch, var(--pink) 30%, transparent) 18% 88%,
 		transparent 88%
 	);
 	--code-surface-image: none;
@@ -1392,9 +1439,9 @@ html[data-variant='b'] {
 }
 
 html[data-theme='dark'][data-variant='b'] {
-	--state-hover-bg: var(--paper);
+	--state-hover-bg: var(--raised);
 	--state-hover-fg: var(--ink);
-	--state-selected-bg: var(--paper);
+	--state-selected-bg: var(--raised);
 	--state-selected-fg: var(--ink);
 	--state-selected-edge: 2px solid var(--ink);
 	--state-selected-shadow: 3px 3px 0 var(--purple);
@@ -1429,7 +1476,7 @@ html[data-variant='c'] {
 }
 
 html[data-theme='dark'][data-variant='c'] {
-	--state-hover-bg: var(--paper);
+	--state-hover-bg: var(--raised);
 	--state-hover-fg: var(--ink);
 	--state-selected-bg: var(--ink);
 	--state-selected-fg: var(--paper);
@@ -2425,6 +2472,14 @@ html[data-theme='dark'] .shiki span:not(.tsrx-tip):not(.tsrx-tip-title):not(.tsr
 	border: 2px solid var(--ink);
 	border-radius: 8px;
 	box-shadow: var(--card-shadow);
+}
+
+.mode-select-content[hidden] {
+	display: none;
+}
+
+html[data-theme='dark'] :is(.mode-select-fallback, .mode-select-trigger, .mode-select-content) {
+	background: var(--raised);
 }
 
 .mode-select-item {

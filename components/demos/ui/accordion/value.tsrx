@@ -136,6 +136,10 @@ export default function AccordionValue() @{
 				padding: 0 0.8em 0.7em;
 				font-size: var(--step--1);
 			}
+
+			.panel[hidden] {
+				display: none;
+			}
 		</style>
 	</accordion.root>
 }

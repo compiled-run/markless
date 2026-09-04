@@ -197,6 +197,10 @@ export default function Settings() @{
 				padding: 0.2em 0.9em 0.9em;
 			}
 
+			.group-panel[hidden] {
+				display: none;
+			}
+
 			.field {
 				display: grid;
 				gap: 0.25em;
