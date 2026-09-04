@@ -1,0 +1,46 @@
+{
+	"name": "@markless/icons",
+	"version": "0.0.0",
+	"description": "Every Iconify icon pack as <pack.icon /> tags in TSRX and MDX, inlined at build time.",
+	"license": "MIT",
+	"type": "module",
+	"exports": {
+		".": {
+			"types": "./generated/packs.d.ts",
+			"default": "./src/index.ts"
+		},
+		"./vite": {
+			"types": "./src/vite.ts",
+			"default": "./src/vite.ts"
+		}
+	},
+	"types": "./generated/packs.d.ts",
+	"typesVersions": {
+		"*": {
+			"vite": [
+				"src/vite.ts"
+			],
+			"*": [
+				"generated/packs.d.ts"
+			]
+		}
+	},
+	"sideEffects": false,
+	"files": [
+		"src",
+		"generated"
+	],
+	"scripts": {
+		"generate": "node scripts/generate-types.ts",
+		"prepare": "node scripts/generate-types.ts"
+	},
+	"dependencies": {
+		"@iconify/json": "^2.2.382",
+		"@iconify/utils": "^3.0.1",
+		"@tsrx/yuku": "0.2.0",
+		"magic-string": "^0.30.17"
+	},
+	"devDependencies": {
+		"@iconify/types": "^2.0.0"
+	}
+}

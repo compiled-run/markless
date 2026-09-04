@@ -899,6 +899,25 @@ importers:
         specifier: 0.3.0
         version: 0.3.0(@types/node@24.12.2)(@vitest/browser-playwright@4.1.11(playwright@1.58.2)(vite@8.0.16(@types/node@24.12.2)(jiti@2.7.0)(yaml@2.9.0))(vitest@4.1.11))(jiti@2.7.0)(typescript@5.9.3)(vite@8.0.16(@types/node@24.12.2)(jiti@2.7.0)(yaml@2.9.0))(yaml@2.9.0)
 
+  packages/icons:
+    dependencies:
+      '@iconify/json':
+        specifier: ^2.2.382
+        version: 2.2.483
+      '@iconify/utils':
+        specifier: ^3.0.1
+        version: 3.1.3
+      '@tsrx/yuku':
+        specifier: 0.2.0
+        version: 0.2.0
+      magic-string:
+        specifier: ^0.30.17
+        version: 0.30.21
+    devDependencies:
+      '@iconify/types':
+        specifier: ^2.0.0
+        version: 2.0.0
+
   packages/router:
     dependencies:
       '@markless/bundler':
@@ -1083,6 +1102,9 @@ importers:
         version: link:../analyzer
 
 packages:
+
+  '@antfu/install-pkg@1.1.0':
+    resolution: {integrity: sha512-MGQsmw10ZyI+EJo45CdSER4zEb+p31LpDAFp2Z3gkSd1yqVZGi0Ebx++YTEMonJy4oChEMLsxZ64j8FH6sSqtQ==}
 
   '@async/witness@0.7.0':
     resolution: {integrity: sha512-EYJ4RG8uMl4abIgGqg/NgIOakZZwmm5J1Jb6ady9M7nY47S0GCPniHs0G0/TFN/y8ZCypMkdQum0Nl3QKdMPqg==}
@@ -1281,6 +1303,15 @@ packages:
   '@guidepup/virtual-screen-reader@0.32.1':
     resolution: {integrity: sha512-QoxyFmIkE4em+Up0VJ+cchpVndHbwMGUztbTWasNbjWfxT28Sf5XYq3U+ueM1sENk7AV4+0N7ahoYxjcFVAo8w==}
     engines: {node: '>=20'}
+
+  '@iconify/json@2.2.483':
+    resolution: {integrity: sha512-LpxtDg0b1akhxSxXu0Kpx8Pz+wq3AAO9Nb4ZWAeTEG2tVcfonKLXdGAS1CWRsz6DTCliIema1kI5r1/7TI2VHw==}
+
+  '@iconify/types@2.0.0':
+    resolution: {integrity: sha512-+wluvCrRhXrhyOmRDJ3q8mux9JkKy5SJ/v8ol2tu4FVjyYvtEzkc/3pK15ET6RKg4b4w4BmTk1+gsCUhf21Ykg==}
+
+  '@iconify/utils@3.1.3':
+    resolution: {integrity: sha512-LPKOXPn/zV+zis1oOfGWogaXVpqUybF3ZS6SCZIsz8vg0ivVp9+fVqyYB7xq0aiST/VhUQYGO1qo6uoYSiEJqw==}
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
@@ -2797,6 +2828,9 @@ packages:
   httpxy@0.5.3:
     resolution: {integrity: sha512-SMS9V6Sn7VWaS11lYhoAr0ceoaiolTWf4jYdJn0NJhCdKMu9R2H9Fh0LBDWBHQF6HRLI1PmaePYsjanSpE5PEw==}
 
+  import-meta-resolve@4.2.0:
+    resolution: {integrity: sha512-Iqv2fzaTQN28s/FwZAoFq0ZSs/7hMAHJVX+w8PZl3cY19Pxk6jFFalxQoIfW2826i/fDLXv8IiEZRIT0lDuWcg==}
+
   is-docker@3.0.0:
     resolution: {integrity: sha512-eljcgEDlEns/7AXFosB5K/2nCM4P7FQPkGc/DWLy5rmFEWvZayGrik1d9/QIY5nJ4f9YsVvBkA6kJpHn9rISdQ==}
     engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
@@ -3606,6 +3640,11 @@ packages:
 
 snapshots:
 
+  '@antfu/install-pkg@1.1.0':
+    dependencies:
+      package-manager-detector: 1.7.0
+      tinyexec: 1.2.4
+
   '@async/witness@0.7.0(vite@8.0.16(@types/node@24.12.2)(jiti@2.7.0)(yaml@2.9.0))':
     dependencies:
       mitt: 3.0.1
@@ -3900,6 +3939,19 @@ snapshots:
       '@testing-library/user-event': 14.6.1(@testing-library/dom@10.4.1)
       dom-accessibility-api: 0.7.1
       html-aria: 0.5.3
+
+  '@iconify/json@2.2.483':
+    dependencies:
+      '@iconify/types': 2.0.0
+      pathe: 2.0.3
+
+  '@iconify/types@2.0.0': {}
+
+  '@iconify/utils@3.1.3':
+    dependencies:
+      '@antfu/install-pkg': 1.1.0
+      '@iconify/types': 2.0.0
+      import-meta-resolve: 4.2.0
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
@@ -5113,6 +5165,8 @@ snapshots:
     optional: true
 
   httpxy@0.5.3: {}
+
+  import-meta-resolve@4.2.0: {}
 
   is-docker@3.0.0: {}
 
