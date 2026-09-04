@@ -1203,6 +1203,121 @@ export function Document() @{
 	expect(output.html).toBe(expectedHtml);
 });
 
+test('compileTsrxModule interpolates an expression child of a script element', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Probe.tsrx',
+		source: `const PLATFORM_PROBE = "window.platform = 'web';";
+export function Probe() @{
+	<html>
+		<head><script>{PLATFORM_PROBE}</script></head>
+		<body></body>
+	</html>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.semanticGraph.diagnostics).toEqual([]);
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	// An expression child must not shift the host stream the raw path produced.
+	expect(result.semanticGraph.hostNodes.map((host) => host.tagName)).toEqual([
+		'html',
+		'head',
+		'script',
+		'body',
+	]);
+	expect(
+		result.semanticGraph.markup.chunks.find((chunk) => chunk.id === 'template:Probe')?.statics,
+	).toEqual(['<html><head><script>', '</script></head><body></body></html>']);
+	const output = await renderTestSsr(result);
+
+	expect(output.html).toBe(
+		`<html><head><script>window.platform = 'web';</script></head><body></body></html>`,
+	);
+});
+
+test('compileTsrxModule leaves a script expression value unescaped', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Guard.tsrx',
+		source: `const GUARD = "if (a < b && c) start();";
+export function Guard() @{
+	<html>
+		<head><script>{GUARD}</script></head>
+		<body></body>
+	</html>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.semanticGraph.diagnostics).toEqual([]);
+	const output = await renderTestSsr(result);
+
+	expect(output.html).toBe(
+		'<html><head><script>if (a < b && c) start();</script></head><body></body></html>',
+	);
+	expect(output.html).not.toContain('&lt;');
+	expect(output.html).not.toContain('&amp;');
+});
+
+test('compileTsrxModule keeps literal and expression script children in order', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Mixed.tsrx',
+		source: `const MIDDLE = "middle";
+export function Mixed() @{
+	<html>
+		<head><script>head {MIDDLE} tail</script></head>
+		<body></body>
+	</html>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.semanticGraph.diagnostics).toEqual([]);
+	expect(
+		result.semanticGraph.markup.chunks.find((chunk) => chunk.id === 'template:Mixed')?.statics,
+	).toEqual(['<html><head><script>head ', ' tail</script></head><body></body></html>']);
+	const output = await renderTestSsr(result);
+
+	expect(output.html).toBe(
+		'<html><head><script>head middle tail</script></head><body></body></html>',
+	);
+});
+
+test('compileTsrxModule reads a prop and a computed value inside a script element', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Boot.tsrx',
+		source: `import { computed } from '@markless/core';
+export function Boot({ nonce }: { nonce: string }) @{
+	const banner = computed(() => 'window.banner = 1;');
+	<html>
+		<head><script>{nonce}</script><script>{banner}</script></head>
+		<body></body>
+	</html>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.semanticGraph.diagnostics).toEqual([]);
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	expect(
+		result.semanticGraph.markup.chunks
+			.find((chunk) => chunk.id === 'template:Boot')
+			?.slots.map((slot) => (slot.kind === 'text' ? slot.residue : null)),
+	).toEqual([
+		{ kind: 'graph-read', graphNodeId: 'prop:props', path: ['nonce'] },
+		{ kind: 'graph-read', graphNodeId: 'computed:banner', path: [] },
+	]);
+	const output = await renderTestSsr(result, { nonce: 'window.nonce = 1;' });
+
+	expect(output.html).toBe(
+		'<html><head><script>window.nonce = 1;</script><script>window.banner = 1;</script>' +
+			'</head><body></body></html>',
+	);
+});
+
 test('compileTsrxModule renders a fragment root holding a script element', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/Frag.tsrx',

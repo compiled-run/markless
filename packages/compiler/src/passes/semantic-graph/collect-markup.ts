@@ -26,6 +26,7 @@ import type {
 	SemanticMarkupChunk,
 	SemanticMarkupResidue,
 	SemanticMarkupSlot,
+	SourceSpan,
 } from '../../artifacts.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import {
@@ -559,11 +560,129 @@ function emitNode(
 		} else append(builder, ` class="${context.styleScopeClass}"`);
 	}
 	append(builder, '>');
-	// A script body is raw text: static-text emission would escape and collapse it.
-	if (node.type === 'JSXScriptElement' && typeof node.raw === 'string') append(builder, node.raw);
+	if (node.type === 'JSXScriptElement') emitScriptBody(node, path, builder, context, repeat);
 	else emitNodes(asNodes(node.children), [...path, 0], builder, context, repeat);
 	append(builder, `</${tagName}>`);
 	return 1;
+}
+
+// The parser hands a script body over as one raw JSXText, braces and all: literal
+// runs go out verbatim (escaping would corrupt the JS), each `{...}` run interpolates.
+function emitScriptBody(
+	node: AnyNode,
+	path: ReadonlyArray<number>,
+	builder: ChunkBuilder,
+	context: CollectionContext,
+	repeat: { readonly id: string; readonly itemName: string } | null,
+): void {
+	const raw = typeof node.raw === 'string' ? node.raw : null;
+	const span = scriptBodySpan(node);
+	// Offsets that do not reproduce `raw` cannot be trusted to slice expressions out.
+	if (!span || (raw !== null && context.source.slice(span.start, span.end) !== raw)) {
+		if (raw !== null) append(builder, raw);
+		return;
+	}
+	let childIndex = 0;
+	for (const segment of scriptBodySegments(context.source, span.start, span.end)) {
+		if (segment.kind === 'text') append(builder, context.source.slice(segment.start, segment.end));
+		else
+			addSlot(builder, {
+				kind: 'text',
+				residue: sourceResidue(
+					context.source.slice(segment.start, segment.end).trim(),
+					{ filename: context.filename, start: segment.start, end: segment.end },
+					context,
+					repeat,
+					builder.componentName,
+				),
+				raw: true,
+				// No comment anchor: `<!--` inside a script opens a JS comment.
+				coordinate: { kind: 'child-index', path: [...path, childIndex] },
+			});
+		childIndex++;
+	}
+}
+
+function scriptBodySpan(node: AnyNode): { readonly start: number; readonly end: number } | null {
+	const children = asNodes(node.children);
+	const start = children[0]?.start;
+	const end = children[children.length - 1]?.end;
+	return typeof start === 'number' && typeof end === 'number' ? { start, end } : null;
+}
+
+type ScriptBodySegment = {
+	readonly kind: 'text' | 'expression';
+	readonly start: number;
+	readonly end: number;
+};
+
+function scriptBodySegments(
+	source: string,
+	start: number,
+	end: number,
+): ReadonlyArray<ScriptBodySegment> {
+	const segments: ScriptBodySegment[] = [];
+	let literalStart = start;
+	let index = start;
+	while (index < end) {
+		if (source[index] !== '{') {
+			index++;
+			continue;
+		}
+		const close = matchingScriptBrace(source, index, end);
+		// An unterminated or empty brace run is body text, not an interpolation.
+		if (close === null || !source.slice(index + 1, close).trim()) {
+			index = close === null ? end : close + 1;
+			continue;
+		}
+		if (index > literalStart) segments.push({ kind: 'text', start: literalStart, end: index });
+		segments.push({ kind: 'expression', start: index + 1, end: close });
+		index = close + 1;
+		literalStart = index;
+	}
+	if (literalStart < end) segments.push({ kind: 'text', start: literalStart, end });
+	return segments;
+}
+
+function matchingScriptBrace(source: string, open: number, end: number): number | null {
+	let depth = 0;
+	let index = open;
+	while (index < end) {
+		const char = source[index];
+		if (char === '{') depth++;
+		else if (char === '}') {
+			depth--;
+			if (depth === 0) return index;
+		} else if (char === '"' || char === "'" || char === '`') {
+			index = skipScriptQuoted(source, index, end);
+			continue;
+		} else if (char === '/' && source[index + 1] === '/') {
+			const newline = source.indexOf('\n', index);
+			index = newline === -1 || newline >= end ? end : newline + 1;
+			continue;
+		} else if (char === '/' && source[index + 1] === '*') {
+			const commentEnd = source.indexOf('*/', index + 2);
+			index = commentEnd === -1 || commentEnd + 2 > end ? end : commentEnd + 2;
+			continue;
+		}
+		index++;
+	}
+	return null;
+}
+
+function skipScriptQuoted(source: string, open: number, end: number): number {
+	const quote = source[open];
+	let index = open + 1;
+	while (index < end) {
+		const char = source[index];
+		if (char === '\\') {
+			index += 2;
+			continue;
+		}
+		if (char === quote) return index + 1;
+		index++;
+	}
+	return end;
 }
 
 /**
@@ -851,7 +970,22 @@ function expressionResidue(
 	repeat: { readonly id: string; readonly itemName: string } | null,
 	componentName: string,
 ): SemanticMarkupResidue {
-	const source = expressionSource(expression, context.source);
+	return sourceResidue(
+		expressionSource(expression, context.source),
+		sourceSpan(expression, context.filename),
+		context,
+		repeat,
+		componentName,
+	);
+}
+
+function sourceResidue(
+	source: string,
+	span: SourceSpan | undefined,
+	context: CollectionContext,
+	repeat: { readonly id: string; readonly itemName: string } | null,
+	componentName: string,
+): SemanticMarkupResidue {
 	if (repeat && (source === repeat.itemName || source.startsWith(`${repeat.itemName}.`))) {
 		const path =
 			source === repeat.itemName ? [] : source.slice(repeat.itemName.length + 1).split('.');
@@ -873,7 +1007,6 @@ function expressionResidue(
 	if (resolved) {
 		return { kind: 'graph-read', graphNodeId: resolved.binding.id, path: resolved.path };
 	}
-	const span = sourceSpan(expression, context.filename);
 	const computedRead = context.graph.templateReads.find(
 		(read) =>
 			read.source === source &&
