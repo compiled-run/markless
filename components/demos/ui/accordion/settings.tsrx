@@ -84,23 +84,39 @@ export default function Settings() @{
 			}
 
 			.group {
-				border: 2px solid var(--code-edge);
-				border-radius: 8px;
-				background: var(--raised);
+				border: var(--card-edge);
+				border-radius: 6px;
+				background: var(--paper);
 				overflow: clip;
 			}
 
 			.group[ui-open] {
-				border-color: var(--ink);
+				box-shadow: var(--card-shadow);
 			}
 
-			.group[data-tone='danger'][ui-open] {
-				border-color: var(--pink);
+			html[data-theme='dark'] .group {
+				background: var(--raised);
+			}
+
+			html[data-variant='b'] .group[ui-open] {
+				border: var(--state-selected-edge);
+				transform: rotate(0.6deg);
+			}
+
+			html[data-variant='c'] .group {
+				border: 0;
+				border-block-end: 1px solid color-mix(in oklch, var(--ink) 30%, transparent);
+				border-radius: 0;
+				box-shadow: none;
+			}
+
+			html[data-variant='c'] .group[ui-open] {
+				border-inline-start: 4px solid var(--ink);
 			}
 
 			.group-heading {
 				margin: 0;
-				font-size: var(--step--1);
+				font-size: var(--step-0);
 			}
 
 			.group-trigger {
@@ -112,17 +128,37 @@ export default function Settings() @{
 				border: 0;
 				background: transparent;
 				color: var(--ink);
-				font: inherit;
+				font-family: 'Joy Elia', system-ui, sans-serif;
+				font-size: var(--step-0);
 				text-align: left;
 				cursor: pointer;
 			}
 
 			.group-trigger:hover {
-				background: var(--tinted-quiet);
+				background: var(--state-hover-bg);
+				color: var(--state-hover-fg);
 			}
 
 			.group-name {
+				position: relative;
+				z-index: 0;
 				font-weight: 700;
+			}
+
+			html[data-variant='a'] .group[ui-open] .group-name::before,
+			html[data-variant='c'] .group[ui-open] .group-name::before {
+				content: '';
+				position: absolute;
+				inset: 0.05em -0.2em;
+				z-index: -1;
+				background: var(--swipe);
+				transform: rotate(-1deg);
+			}
+
+			html[data-variant='c'] .group[ui-open] .group-name::before {
+				inset-block: auto 0.05em;
+				height: 0.35em;
+				background: var(--yellow);
 			}
 
 			.group-note {
@@ -148,7 +184,7 @@ export default function Settings() @{
 			.group-panel {
 				display: grid;
 				gap: 0.7em;
-				background: var(--paper);
+				background: transparent;
 			}
 
 			.group-panel[ui-open] {

@@ -735,25 +735,26 @@ html[data-theme='dark'] .theme-toggle-to-light {
 	font-size: 0.9em;
 }
 
-/* Fenced blocks are monospace; inline code inside a sentence keeps Joy Elia so
-   it still reads as part of the sentence. The block hugs its content: no
-   min-height, no reserved strip, and the highlighter strips the trailing
-   newline so there is no empty last line. */
-.prose pre {
-	background: var(--code-surface);
+/* Prose fences and demo panes share one paper-card treatment. */
+.prose pre,
+.pg-shiki {
+	background: var(--paper);
+	background-image: var(--code-surface-image);
 	margin-block: var(--space-m);
 	color: var(--ink);
 	padding: var(--space-s);
-	border: 1px solid var(--code-edge);
-	border-radius: 2px;
+	border: var(--card-edge);
+	border-radius: 6px;
+	box-shadow: var(--card-shadow);
 	overflow-x: auto;
-	font-family: var(--font-mono);
+	font-family: 'Joy Elia', system-ui, sans-serif;
 	font-size: var(--step--1);
-	line-height: 1.55;
+	line-height: 1.6;
 	tab-size: 2;
 }
 
-.prose pre code {
+.prose pre code,
+.pg-shiki code {
 	display: block;
 	background: none;
 	border: 0;
@@ -762,13 +763,15 @@ html[data-theme='dark'] .theme-toggle-to-light {
 	font-size: inherit;
 }
 
-/* `* { font-family }` above matches every token span the highlighter emits, and
-   a direct match beats a family inherited from `pre`, so the spans have to be
-   named. The hover doc is prose, not code, and keeps Joy Elia. */
 .prose pre,
 .prose pre code,
-.prose pre code span {
-	font-family: var(--font-mono);
+.prose pre code span,
+.pg-shiki,
+.pg-shiki code,
+.pg-shiki span {
+	font-family: 'Joy Elia', system-ui, sans-serif;
+	font-size: var(--step--1);
+	line-height: 1.6;
 }
 
 .prose pre .tsrx-tip,
