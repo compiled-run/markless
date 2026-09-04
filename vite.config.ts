@@ -10,6 +10,29 @@ export default defineConfig({
 	nitro: { baseURL: '/markless/' },
 	// uiDemos runs before router(): it rewrites the .mdx source router() parses.
 	// highlightMdx runs after router(): it rewrites the module router() emits.
-	optimizeDeps: { exclude: ['@markless/ui'] },
+	lint: {
+		rules: {
+			'no-restricted-imports': [
+				'error',
+				{
+					paths: [
+						{
+							name: '@markless/ui',
+							importNames: ['*'],
+							allowTypeImports: true,
+							message: "import { family } from '@markless/ui'",
+						},
+					],
+					patterns: [
+						{
+							group: ['@markless/ui/*'],
+							allowTypeImports: true,
+							message: "import { family } from '@markless/ui'",
+						},
+					],
+				},
+			],
+		},
+	},
 	plugins: [ui(), uiDemos(), markless(), router(), highlightMdx()],
 });
