@@ -1,4 +1,4 @@
-import * as select from '@markless/ui/select';
+import { select } from '@markless/ui';
 import { lucide, ph, tabler } from '@markless/ui';
 
 type Mode = 'framework' | 'ui';
