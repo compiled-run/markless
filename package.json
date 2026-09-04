@@ -15,7 +15,6 @@
 	},
 	"dependencies": {
 		"@markless/core": "file:vendor/markless-core.tgz",
-		"@markless/icons": "file:vendor/markless-icons.tgz",
 		"@markless/router": "file:vendor/markless-router.tgz",
 		"@markless/ui": "file:vendor/markless-ui.tgz",
 		"destr": "^2.0.5",
@@ -25,24 +24,26 @@
 	"devDependencies": {
 		"@markless/analyzer": "file:vendor/markless-analyzer.tgz",
 		"@markless/typescript-plugin": "file:vendor/markless-typescript-plugin.tgz",
-		"@types/node": "^26.2.0",
-		"playwright-core": "^1.56.0",
+		"@types/node": "^26.4.1",
+		"playwright-core": "^1.62.1",
 		"shiki": "^4.4.3",
 		"typescript": "^5.9.3",
-		"vite": "^8.0.16"
+		"vite": "^8.2.2"
 	},
 	"pnpm": {
 		"overrides": {
+			"@markless/analyzer": "file:vendor/markless-analyzer.tgz",
 			"@markless/bundler": "file:vendor/markless-bundler.tgz",
 			"@markless/compiler": "file:vendor/markless-compiler.tgz",
-			"@markless/serializer": "file:vendor/markless-serializer.tgz",
-			"@markless/web": "file:vendor/markless-web.tgz",
-			"@markless/runtime": "file:vendor/markless-runtime.tgz",
 			"@markless/core": "file:vendor/markless-core.tgz",
+			"@markless/icons": "file:vendor/markless-icons.tgz",
 			"@markless/router": "file:vendor/markless-router.tgz",
-			"@markless/analyzer": "file:vendor/markless-analyzer.tgz",
+			"@markless/runtime": "file:vendor/markless-runtime.tgz",
+			"@markless/serializer": "file:vendor/markless-serializer.tgz",
 			"@markless/typescript-plugin": "file:vendor/markless-typescript-plugin.tgz",
-			"@markless/ui": "file:vendor/markless-ui.tgz"
+			"@markless/ui": "file:vendor/markless-ui.tgz",
+			"@markless/ui-tools": "file:vendor/markless-ui-tools.tgz",
+			"@markless/web": "file:vendor/markless-web.tgz"
 		}
 	},
 	"overrides": {

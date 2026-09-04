@@ -1111,7 +1111,7 @@ export function playgroundModule(input: PlaygroundInput): string {
 	return `import { state } from '@markless/core';
 import { ${families.join(', ')} } from '@markless/ui';
 import { attributeText, heldList, listText, pickValue, toggled, valueText } from '../slot-text.ts';
-import { lucide, ph, tabler } from '@markless/icons';
+import { lucide, ph, tabler } from '@markless/ui';
 
 ${RUN_TYPES}
 

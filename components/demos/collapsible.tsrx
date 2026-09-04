@@ -1,5 +1,5 @@
 import Sprite from '../sprite.tsrx';
-import { lucide } from '@markless/icons';
+import { lucide } from '@markless/ui';
 
 export default function Collapsible({
 	summary,

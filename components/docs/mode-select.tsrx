@@ -1,5 +1,5 @@
 import * as select from '@markless/ui/select';
-import { lucide, ph, tabler } from '@markless/icons';
+import { lucide, ph, tabler } from '@markless/ui';
 
 type Mode = 'framework' | 'ui';
 

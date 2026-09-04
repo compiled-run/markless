@@ -6,7 +6,7 @@
 // end of the run keeps its link box, hidden, so the doodles stay centred.
 import Sprite from '../sprite.tsrx';
 import Sticker from '../sticker.tsrx';
-import { lucide } from '@markless/icons';
+import { lucide } from '@markless/ui';
 import { pagerFor } from '../../nav.ts';
 
 export default function Pager({ pathname }: { readonly pathname: string }) @{

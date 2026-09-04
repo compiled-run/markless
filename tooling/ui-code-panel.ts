@@ -86,7 +86,7 @@ export async function codePanelModule(input: {
 	});
 	const imports = [
 		"import { collapsible, tabs } from '@markless/ui';",
-		"import { lucide, ph, tabler } from '@markless/icons';",
+		"import { lucide, ph, tabler } from '@markless/ui';",
 	];
 	if (input.demo !== undefined) imports.push(`import Demo from ${JSON.stringify(input.demo)};`);
 	const stage = input.demo === undefined ? '' : `\t\t<div class="pg-stage">\n\t\t\t<Demo />\n\t\t</div>\n`;

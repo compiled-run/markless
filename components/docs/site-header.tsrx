@@ -15,7 +15,7 @@
 // is the width it is reserved here, at the end of the row, so the fixed control
 // lands on it. NOTES.md finding 19 has the detail.
 import Mascot from '../mascot.tsrx';
-import { lucide } from '@markless/icons';
+import { lucide } from '@markless/ui';
 import { breadcrumbFor } from '../../nav.ts';
 import VariantPicker from './variant-picker.tsrx';
 
