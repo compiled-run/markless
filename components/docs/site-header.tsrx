@@ -16,6 +16,7 @@
 // lands on it. NOTES.md finding 19 has the detail.
 import Mascot from '../mascot.tsrx';
 import { breadcrumbFor } from '../../nav.ts';
+import VariantPicker from './variant-picker.tsrx';
 
 export default function SiteHeader({ pathname }: { readonly pathname: string }) @{
 	const crumb = breadcrumbFor(pathname);
@@ -39,6 +40,7 @@ export default function SiteHeader({ pathname }: { readonly pathname: string }) 
 				disabled="disabled"
 			/>
 			<a class="header-link" href="https://github.com/compiled-run/markless">GitHub</a>
+			<VariantPicker pathname={pathname} />
 			<span class="theme-toggle-slot" aria-hidden="true"></span>
 		</div>
 	</header>

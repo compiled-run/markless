@@ -35,6 +35,7 @@ export default function Document({
 			<link rel="apple-touch-icon" href="/markless/mascots/markless.png" />
 			<link rel="stylesheet" href={stylesheet} />
 			<script src="/markless/theme.js"></script>
+			<script src="/markless/variant.js"></script>
 		</head>
 		<body>
 			<SiteHeader pathname={pathname} />

@@ -728,8 +728,9 @@ html[data-theme='dark'] .theme-toggle-to-light {
 }
 
 .prose code {
-	background: var(--yellow);
-	color: var(--on-accent);
+	background: var(--inline-code-bg);
+	color: var(--inline-code-fg);
+	border: var(--inline-code-edge);
 	padding: 0.1em 0.3em;
 	font-size: 0.9em;
 }
@@ -755,6 +756,7 @@ html[data-theme='dark'] .theme-toggle-to-light {
 .prose pre code {
 	display: block;
 	background: none;
+	border: 0;
 	padding: 0;
 	color: inherit;
 	font-size: inherit;
@@ -1265,16 +1267,7 @@ html.is-mac .kbd.is-other {
 	margin-top: -0.9em;
 }
 
-/* ---------------------------------------------------------------------------
-   Dark theme. The same paper design with the ground and the ink swapped: a warm
-   near-black chalkboard, off-white chalk, the same four pastel accents. Only
-   tokens move; every rule above is written against them.
-
-   Two selectors carry the same block. `data-theme` is the explicit choice, and
-   the media query is the default for a reader who has not made one. They are
-   duplicated rather than shared because a media query and an attribute cannot
-   be joined into one selector; keep them in step.
-   --------------------------------------------------------------------------- */
+/* Dark theme: warm near-black paper with off-white ink and restrained grain. */
 
 html[data-theme='dark'] {
 	--ink: oklch(93% 0.012 85);
@@ -1293,6 +1286,146 @@ html[data-theme='dark'] {
 	--grain-speck-opacity: 0.06;
 	--sprite-light: none;
 	--sprite-dark: inline-block;
+}
+
+html[data-variant='a'] {
+	--state-hover-bg: linear-gradient(
+		transparent 18%,
+		color-mix(in oklch, var(--yellow) 45%, transparent) 18% 88%,
+		transparent 88%
+	);
+	--state-hover-fg: var(--ink);
+	--state-selected-bg: linear-gradient(
+		transparent 18%,
+		color-mix(in oklch, var(--pink) 55%, transparent) 18% 88%,
+		transparent 88%
+	);
+	--state-selected-fg: var(--ink);
+	--state-selected-edge: none;
+	--state-selected-shadow: none;
+	--state-highlight-bg: color-mix(in oklch, var(--yellow) 45%, transparent);
+	--card-shadow: 3px 3px 0 var(--pink);
+	--card-edge: 2px solid var(--ink);
+	--inline-code-bg: linear-gradient(
+		transparent 18%,
+		color-mix(in oklch, var(--yellow) 55%, transparent) 18% 88%,
+		transparent 88%
+	);
+	--inline-code-fg: var(--ink);
+	--inline-code-edge: none;
+	--swipe: linear-gradient(
+		transparent 18%,
+		color-mix(in oklch, var(--pink) 55%, transparent) 18% 88%,
+		transparent 88%
+	);
+	--code-surface-image: none;
+}
+
+html[data-theme='dark'][data-variant='a'] {
+	--state-hover-bg: linear-gradient(
+		transparent 18%,
+		color-mix(in oklch, var(--yellow) 45%, transparent) 18% 88%,
+		transparent 88%
+	);
+	--state-hover-fg: var(--ink);
+	--state-selected-bg: linear-gradient(
+		transparent 18%,
+		color-mix(in oklch, var(--pink) 55%, transparent) 18% 88%,
+		transparent 88%
+	);
+	--state-selected-fg: var(--ink);
+	--state-selected-edge: none;
+	--state-selected-shadow: none;
+	--state-highlight-bg: color-mix(in oklch, var(--yellow) 45%, transparent);
+	--card-shadow: 3px 3px 0 var(--pink);
+	--card-edge: 2px solid var(--ink);
+	--inline-code-bg: linear-gradient(
+		transparent 18%,
+		color-mix(in oklch, var(--yellow) 30%, transparent) 18% 88%,
+		transparent 88%
+	);
+	--inline-code-fg: var(--ink);
+	--inline-code-edge: none;
+	--swipe: linear-gradient(
+		transparent 18%,
+		color-mix(in oklch, var(--pink) 55%, transparent) 18% 88%,
+		transparent 88%
+	);
+	--code-surface-image: none;
+}
+
+html[data-variant='b'] {
+	--state-hover-bg: var(--paper);
+	--state-hover-fg: var(--ink);
+	--state-selected-bg: var(--paper);
+	--state-selected-fg: var(--ink);
+	--state-selected-edge: 2px solid var(--ink);
+	--state-selected-shadow: 3px 3px 0 var(--purple);
+	--state-highlight-bg: var(--yellow);
+	--card-shadow: 3px 3px 0 var(--purple);
+	--card-edge: 2px solid var(--ink);
+	--inline-code-bg: var(--paper);
+	--inline-code-fg: var(--ink);
+	--inline-code-edge: 1.5px solid var(--ink);
+	--swipe: none;
+	--code-surface-image: none;
+}
+
+html[data-theme='dark'][data-variant='b'] {
+	--state-hover-bg: var(--paper);
+	--state-hover-fg: var(--ink);
+	--state-selected-bg: var(--paper);
+	--state-selected-fg: var(--ink);
+	--state-selected-edge: 2px solid var(--ink);
+	--state-selected-shadow: 3px 3px 0 var(--purple);
+	--state-highlight-bg: var(--yellow);
+	--card-shadow: 3px 3px 0 var(--purple);
+	--card-edge: 2px solid var(--ink);
+	--inline-code-bg: var(--raised);
+	--inline-code-fg: var(--ink);
+	--inline-code-edge: 1.5px solid var(--ink);
+	--swipe: none;
+	--code-surface-image: none;
+}
+
+html[data-variant='c'] {
+	--state-hover-bg: var(--paper);
+	--state-hover-fg: var(--ink);
+	--state-selected-bg: var(--ink);
+	--state-selected-fg: var(--paper);
+	--state-selected-edge: none;
+	--state-selected-shadow: none;
+	--state-highlight-bg: var(--yellow);
+	--card-shadow: none;
+	--card-edge: 2px solid var(--ink);
+	--inline-code-bg: color-mix(in oklch, var(--purple) 22%, transparent);
+	--inline-code-fg: var(--ink);
+	--inline-code-edge: none;
+	--swipe: none;
+	--code-surface-image: repeating-linear-gradient(
+		transparent 0 1.55em,
+		color-mix(in oklch, var(--ink) 8%, transparent) 1.55em calc(1.55em + 1px)
+	);
+}
+
+html[data-theme='dark'][data-variant='c'] {
+	--state-hover-bg: var(--paper);
+	--state-hover-fg: var(--ink);
+	--state-selected-bg: var(--ink);
+	--state-selected-fg: var(--paper);
+	--state-selected-edge: none;
+	--state-selected-shadow: none;
+	--state-highlight-bg: var(--yellow);
+	--card-shadow: none;
+	--card-edge: 2px solid var(--ink);
+	--inline-code-bg: color-mix(in oklch, var(--purple) 30%, transparent);
+	--inline-code-fg: var(--ink);
+	--inline-code-edge: none;
+	--swipe: none;
+	--code-surface-image: repeating-linear-gradient(
+		transparent 0 1.55em,
+		color-mix(in oklch, var(--ink) 8%, transparent) 1.55em calc(1.55em + 1px)
+	);
 }
 
 /* Token colours are inline on each span: the light one as `color`, the dark one
@@ -1586,33 +1719,12 @@ html[data-theme='dark'] .shiki span:not(.tsrx-tip):not(.tsrx-tip-title):not(.tsr
 	background: none;
 }
 
-/* Dark ground: ink-white letters with a deep muted purple offset silhouette,
-   sampled from the poster reference. Light stays as it was: ink letters,
-   pastel silhouette. */
+/* Dark headings keep the page ink without an offset silhouette. */
 html[data-theme='dark'] h1,
 html[data-theme='dark'] .prose h2,
 html[data-theme='dark'] .prose h3 {
 	color: var(--ink);
-	--shadow-color: oklch(34% 0.05 307);
-}
-
-html[data-theme='dark'] {
-	--ink: oklch(93% 0.012 85);
-	--paper: oklch(18% 0.007 70);
-	--code-surface: oklch(32% 0.011 70);
-	--code-edge: color-mix(in oklch, var(--ink) 30%, transparent);
-	--raised: oklch(26% 0.01 70);
-	--tinted: color-mix(in oklch, var(--yellow) 14%, var(--paper));
-	--tinted-quiet: color-mix(in oklch, var(--yellow) 9%, var(--paper));
-	--hover-wash: 11%;
-	--slab: oklch(11% 0.008 70);
-	--slab-ink: oklch(92% 0.012 85);
-	--grain-fiber-blend: soft-light;
-	--grain-fiber-opacity: 0.3;
-	--grain-speck-blend: screen;
-	--grain-speck-opacity: 0.06;
-	--sprite-light: none;
-	--sprite-dark: inline-block;
+	--shadow-color: transparent;
 }
 
 /* Token colours are inline on each span: the light one as `color`, the dark one
