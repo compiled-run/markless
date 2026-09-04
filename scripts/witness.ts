@@ -29,7 +29,7 @@ const themeShots: Record<string, unknown>[] = [];
  * dom update now, so the three-differences highlight is a real assertion again,
  * as are the two widgets that were under finding 14.
  */
-let knownFailingReason: string | undefined;
+let knownFailingReason: string | undefined = undefined;
 const check = (ok: boolean, label: string, detail = '') => {
 	const line = `${label}${detail ? ` — ${detail}` : ''}`;
 	if (ok) {
@@ -240,38 +240,82 @@ try {
 			'a code block at rest ends at its last line',
 			`${hug.gap.toFixed(1)}px below the last line, padding ${hug.padding}px`,
 		);
+		// Code is set in Joy Elia, the site's own hand: prose fences and the
+		// generated demo panes share that one treatment. `* { font-family }`
+		// matches the token spans directly and a direct match beats an inherited
+		// family, so the `pre` alone proves nothing about the text a reader sees —
+		// each of the three levels is measured where it is painted.
+		const startsWithJoyElia = (font: string) => /^["']?Joy Elia["']?/.test(font);
+		check(startsWithJoyElia(hug.font), 'the code block is set in Joy Elia', hug.font);
 		check(
-			/mono|Menlo|Consolas/i.test(hug.font),
-			'the code block is set in the monospace stack',
-			hug.font,
-		);
-		// `* { font-family }` matches the token spans directly, and a direct match
-		// beats an inherited family, so `pre` being monospace proves nothing about
-		// the text a reader actually sees.
-		check(
-			/mono|Menlo|Consolas/i.test(hug.codeFont),
-			'the computed font-family of `pre code` names a monospace family',
+			startsWithJoyElia(hug.codeFont),
+			'the computed font-family of `pre code` starts with Joy Elia',
 			hug.codeFont,
 		);
 		check(
-			/mono|Menlo|Consolas/i.test(hug.tokenFont),
-			'a highlighted token span is painted in the monospace stack',
+			startsWithJoyElia(hug.tokenFont),
+			'a highlighted token span is painted in Joy Elia',
 			hug.tokenFont,
 		);
 
+		// A UI family page carries both kinds at once: the prose fences the page
+		// writes and the demo pane the playground generates. One treatment means
+		// one font-family string, not two families that happen to both be Joy Elia.
+		await page.goto(`${origin}/markless/ui/accordion`, { waitUntil: 'load' });
+		const paneFonts = await page.evaluate(() => {
+			const fontOf = (selector: string) => {
+				const node = document.querySelector(selector);
+				return node ? getComputedStyle(node).fontFamily : '';
+			};
+			return { prose: fontOf('.prose pre'), pane: fontOf('.pg-shiki') };
+		});
+		check(
+			startsWithJoyElia(paneFonts.prose),
+			'/markless/ui/accordion: its prose fences are set in Joy Elia',
+			paneFonts.prose,
+		);
+		check(
+			startsWithJoyElia(paneFonts.pane),
+			'/markless/ui/accordion: the generated demo pane is set in Joy Elia',
+			paneFonts.pane,
+		);
+		check(
+			paneFonts.prose !== '' && paneFonts.prose === paneFonts.pane,
+			'a prose fence and a demo pane report one and the same font-family',
+			`${paneFonts.prose} vs ${paneFonts.pane}`,
+		);
+		await page.goto(`${origin}/markless/concepts/state`, { waitUntil: 'load' });
+
 		// --- hover docs --------------------------------------------------------
-		const hover = page.locator('pre.shiki .tsrx-hover').first();
+		// Most tokens are typed but not documented: the hover shows the type the
+		// compiler inferred and `data-doc` is empty, which is what the very first
+		// token on this page is. The two-line tooltip is what is under test, so the
+		// checks run on the first token that really carries a sentence.
+		const documented = page.locator('pre.shiki .tsrx-hover[data-doc]:not([data-doc=""])');
+		const documentedCount = await documented.count();
+		check(
+			documentedCount > 0,
+			'the page serves at least one token with a doc sentence of its own',
+			`${documentedCount} of ${await page.locator('pre.shiki .tsrx-hover').count()} hover tokens`,
+		);
+		const hover = documented.first();
 		await hover.waitFor();
 		const expectedTitle = await hover.getAttribute('data-doc-title');
 		const expectedDoc = await hover.getAttribute('data-doc');
 		check(Boolean(expectedTitle && expectedDoc), 'the token declares a title and a doc', String(expectedTitle));
 		const tip = hover.locator('.tsrx-tip');
 		check(!(await tooltipIsVisible(tip)), 'the tooltip is hidden before anything points at it');
-		const preHeightAtRest = await block.evaluate((node) => (node as HTMLElement).getBoundingClientRect().height);
+		// The block that has to hold still is the one the token sits in, which is
+		// not always the page's first fence.
+		const hoverBlockHeight = () =>
+			hover.evaluate(
+				(node) => (node as HTMLElement).closest('pre')?.getBoundingClientRect().height ?? Number.NaN,
+			);
+		const preHeightAtRest = await hoverBlockHeight();
 		await hover.hover();
 		await page.waitForTimeout(120);
 		check(await tooltipIsVisible(tip), 'the tooltip shows on hover');
-		const preHeightOnHover = await block.evaluate((node) => (node as HTMLElement).getBoundingClientRect().height);
+		const preHeightOnHover = await hoverBlockHeight();
 		check(
 			Math.abs(preHeightOnHover - preHeightAtRest) < 0.5,
 			'the code block does not change height while a token is pointed at',
@@ -422,21 +466,59 @@ try {
 			'llms.txt lists every page with a sentence about it',
 		);
 
-		// --- widget: the counter on the landing page ---------------------------
+		// --- widget: the mug card on the landing page ---------------------------
+		// The landing teaches `state` with the polaroid's heart, not a counter, so
+		// the resume proof lives there: the count is served at nought, and two
+		// clicks reach two. The run log next to it is the page's other claim, that
+		// the component body ran once — it must still read one entry afterwards.
 		await page.goto(`${origin}/markless`, { waitUntil: 'load' });
-		const landingCounter = page.getByRole('button', { name: /Clicked/ }).first();
-		await landingCounter.waitFor();
+		const mugHeart = page.locator('.mug-demo article button');
+		const mugLikes = page.locator('.mug-demo article button span').first();
+		await mugHeart.waitFor();
 		check(
-			((await landingCounter.textContent()) ?? '').trim() === 'Clicked 0 times',
-			'landing counter renders its zero state from the server',
+			((await mugLikes.textContent()) ?? '').trim() === '0',
+			'the landing mug card serves nought likes from the server',
+			((await mugLikes.textContent()) ?? '').trim(),
 		);
-		await landingCounter.click();
-		const landingAfter = await settleText(
-			landingCounter,
-			(text) => text === 'Clicked 1 times',
-			'landing counter reaches 1 after one click',
+		await mugHeart.click();
+		await settleText(mugLikes, (text) => text === '1', 'the landing mug card counts the first click');
+		check(
+			((await mugLikes.textContent()) ?? '').trim() === '1',
+			'clicking the heart adds a like, so the landing island resumed',
+			((await mugLikes.textContent()) ?? '').trim(),
 		);
-		check(landingAfter === 'Clicked 1 times', 'landing counter reaches 1 after one click');
+		await mugHeart.click();
+		await settleText(mugLikes, (text) => text === '2', 'the landing mug card counts a second click');
+		check(
+			((await mugLikes.textContent()) ?? '').trim() === '2',
+			'the likes keep adding on repeat clicks, so the island stayed awake',
+			((await mugLikes.textContent()) ?? '').trim(),
+		);
+
+		// --- widget: the run log on the landing page ----------------------------
+		const runOnceLikes = page.locator('.run-once button span').first();
+		const runOnceEntries = page.locator('.run-once .entry');
+		await runOnceLikes.waitFor();
+		const ranAt = ((await runOnceEntries.first().textContent()) ?? '').trim();
+		check(
+			(await runOnceEntries.count()) === 1 && ranAt.startsWith('#1 at '),
+			'the run log opens on one entry, stamped when the body ran',
+			ranAt,
+		);
+		await runOnceLikes.click();
+		await settleText(runOnceLikes, (text) => text === '1', 'the run-log heart counts its click');
+		check(
+			((await runOnceLikes.textContent()) ?? '').trim() === '1',
+			'the run-log heart adds a like too',
+			((await runOnceLikes.textContent()) ?? '').trim(),
+		);
+		check(
+			(await runOnceEntries.count()) === 1 &&
+				((await runOnceEntries.first().textContent()) ?? '').trim() === ranAt,
+			'the log gains no second entry, so the click ran no component body again',
+			((await runOnceEntries.first().textContent()) ?? '').trim(),
+		);
+		await page.screenshot({ path: `${shotsDir}/T004-landing-widgets-after.png`, fullPage: true });
 
 		// --- widget: two variables on the state page ---------------------------
 		await page.goto(`${origin}/markless/concepts/state`, { waitUntil: 'load' });
@@ -575,6 +657,7 @@ try {
 				return {
 					attr: document.documentElement.getAttribute('data-theme'),
 					stored: localStorage.getItem('theme'),
+					prefers: matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
 					paper: getComputedStyle(document.body).backgroundColor,
 					offered: [...document.querySelectorAll('.theme-toggle')]
 						.filter((node) => getComputedStyle(node as Element).display !== 'none')
@@ -600,7 +683,15 @@ try {
 			});
 
 		const atRest = await themeState();
-		check(atRest.attr === 'system', 'an untouched reader is on the system theme', String(atRest.attr));
+		// `data-theme` is never left on 'system': public/theme.js resolves the
+		// stored value in the head, because every dark rule hangs off
+		// [data-theme='dark'] with no prefers-color-scheme twin. So what an
+		// untouched reader is owed is no stored choice and their own OS setting.
+		check(
+			atRest.stored === null && atRest.attr === atRest.prefers,
+			'an untouched reader stores nothing and is put on their system theme',
+			`data-theme="${atRest.attr}", prefers ${atRest.prefers}, stored ${String(atRest.stored)}`,
+		);
 		check(atRest.onSlot, 'the toggle lands on the hole the header reserves for it');
 		check(
 			atRest.offered === 'dark',
@@ -878,6 +969,11 @@ try {
 							),
 							navPosition: nav ? getComputedStyle(nav).position : '',
 							navHeight: navBox ? navBox.height : 0,
+							screenful: window.innerHeight,
+							disclosureHeight:
+								document.querySelector('.sidebar-disclosure')?.getBoundingClientRect().height ?? 0,
+							summaryHeight:
+								document.querySelector('.sidebar-summary')?.getBoundingClientRect().height ?? 0,
 							navOpen: (document.querySelector('.sidebar-disclosure') as HTMLDetailsElement | null)
 								?.open,
 							navSummaryShown:
@@ -978,10 +1074,19 @@ try {
 							chrome.navSummaryShown,
 							`${at}: the collapsed nav still offers the reader a way in`,
 						);
+						// The nineteen links cost one line: the closed disclosure is
+						// exactly its own summary tall. The rail around it also carries
+						// the wordmark and the mode switch, so what it may not cost is a
+						// screenful — a third of the phone is the ceiling.
 						check(
-							chrome.navHeight < 200,
-							`${at}: the collapsed nav costs a line, not a screenful`,
-							`${chrome.navHeight.toFixed(0)}px tall`,
+							Math.abs(chrome.disclosureHeight - chrome.summaryHeight) < 1,
+							`${at}: the collapsed nav costs a line, and the links add nothing to it`,
+							`${chrome.disclosureHeight.toFixed(0)}px of disclosure over a ${chrome.summaryHeight.toFixed(0)}px summary`,
+						);
+						check(
+							chrome.navHeight < chrome.screenful / 3,
+							`${at}: the whole rail costs less than a third of the phone`,
+							`${chrome.navHeight.toFixed(0)}px of ${chrome.screenful}px`,
 						);
 						check(
 							chrome.h1Top < 844,
@@ -1146,6 +1251,18 @@ try {
 		);
 		await page.screenshot({ path: `${shotsDir}/T013-name-echo-after.png`, fullPage: true });
 
+		// Six pages ship a callout where a widget was meant to be, and the heading
+		// on it is the first thing the reader is told, so each one is checked
+		// verbatim rather than by a phrase.
+		const noBoxTitle: Record<string, string> = {
+			'/markless/concepts/conditionals': 'Why the panels on this page are files rather than boxes',
+			'/markless/concepts/lists': 'Why the rows on this page are a file rather than a box',
+			'/markless/concepts/async': 'What is missing here, and what this build actually does',
+			'/markless/concepts/styling': 'Why the two cards are not side by side on this page',
+			'/markless/build/components': 'Why that pair is not a box on this page',
+			'/markless/build/storage': 'Why that file is not a box on this page',
+		};
+
 		// The conditionals and lists pages carry no live widget on this build: a
 		// component that uses `@if` or `@for` hangs the compiler, so the pages ship
 		// their files in fences with a callout saying so (NOTES.md section 21). What
@@ -1157,7 +1274,7 @@ try {
 				.locator('.callout-title')
 				.evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()));
 			check(
-				told.some((title) => title.includes('no demo box on this page yet')),
+				told.includes(noBoxTitle[href]),
 				`${href} says out loud why it has no demo box`,
 				told.join(' | '),
 			);
@@ -1201,7 +1318,7 @@ try {
 				.locator('.callout-title')
 				.evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()));
 			check(
-				told.some((title) => title.includes('no demo box on this page yet')),
+				told.includes(noBoxTitle[href]),
 				`${href} says out loud why it has no demo box`,
 				told.join(' | '),
 			);
@@ -1214,17 +1331,20 @@ try {
 			);
 		}
 
-		// The async page's second callout is the measurement, not the plan: on this
-		// build a re-settle never commits the pending arm. It stays until that is
-		// no longer true.
+		// The page quotes the specification's deadline rules, and on this build a
+		// re-settle never commits the pending arm, so the callout has to say in so
+		// many words that those rules are quoted and not measured here. It stays
+		// until that is no longer true.
 		await page.goto(`${origin}/markless/concepts/async`, { waitUntil: 'load' });
-		const asyncCallouts = await page
-			.locator('.callout-title')
-			.evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()));
+		const asyncCalloutBody = await page
+			.locator('.callout-body')
+			.evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()).join(' '));
 		check(
-			asyncCallouts.some((title) => title.includes('instead of the deadline')),
+			asyncCalloutBody.includes(
+				'the deadline rules above are quoted from the specification, not measured on this site',
+			),
 			'the async page says which of its deadline claims are spec and not measured',
-			asyncCallouts.join(' | '),
+			asyncCalloutBody.slice(-120),
 		);
 
 		// The first-app page must carry the override a reader needs today, exactly,
@@ -1275,7 +1395,7 @@ try {
 			.locator('.callout-title')
 			.evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()));
 		check(
-			componentCallouts.some((title) => title.includes('no demo box on this page yet')),
+			componentCallouts.includes(noBoxTitle['/markless/build/components']),
 			'/markless/build/components says out loud why it has no demo box',
 			componentCallouts.join(' | '),
 		);
@@ -1291,7 +1411,6 @@ try {
 		// The claim is that the handle is the real node, so what is checked is the
 		// browser's own idea of which element has the caret.
 		await page.goto(`${origin}/markless/build/elements`, { waitUntil: 'load' });
-		const focusInput = page.locator('.playground input').first();
 		const focusButton = page.getByRole('button', { name: 'Put the cursor in the field' });
 		await focusButton.waitFor();
 		const activeIsField = () =>
@@ -1327,7 +1446,7 @@ try {
 			.locator('.callout-title')
 			.evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()));
 		check(
-			storageCallouts.some((title) => title.includes('no demo box on this page yet')),
+			storageCallouts.includes(noBoxTitle['/markless/build/storage']),
 			'/markless/build/storage says out loud why it has no demo box',
 			storageCallouts.join(' | '),
 		);
