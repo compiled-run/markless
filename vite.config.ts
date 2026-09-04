@@ -51,12 +51,13 @@ const buildToolImportPatterns = ['rolldown', 'vite', 'vitest'].map(packageImport
 
 const marklessPack = (options: {
 	packageName: string;
+	packageDirectory?: string;
 	entry: Record<string, string>;
 	platform?: 'neutral' | 'node';
 	devDependencies?: boolean;
 }): PackUserConfig => ({
 	name: `@markless/${options.packageName}`,
-	cwd: packageDir(options.packageName),
+	cwd: packageDir(options.packageDirectory ?? options.packageName),
 	entry: options.entry,
 	format: ['esm'],
 	outDir: './dist',
@@ -69,7 +70,7 @@ const marklessPack = (options: {
 	deps: {
 		neverBundle: [
 			...buildToolImportPatterns,
-			...externalPackageImports(options.packageName, {
+			...externalPackageImports(options.packageDirectory ?? options.packageName, {
 				devDependencies: options.devDependencies,
 			}),
 		],
@@ -198,9 +199,26 @@ const buildOrder: PackUserConfig[] = [
 	}),
 	marklessPack({
 		packageName: 'icons',
+		packageDirectory: 'headless/icons',
 		platform: 'node',
 		entry: {
 			index: './src/index.ts',
+			vite: './src/vite.ts',
+		},
+	}),
+	marklessPack({
+		packageName: 'ui-tools',
+		packageDirectory: 'headless/tools',
+		platform: 'node',
+		entry: {
+			vite: './src/vite.ts',
+		},
+	}),
+	marklessPack({
+		packageName: 'ui',
+		packageDirectory: 'headless/components',
+		platform: 'node',
+		entry: {
 			vite: './src/vite.ts',
 		},
 	}),

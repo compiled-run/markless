@@ -1,0 +1,28 @@
+{
+	"name": "@markless/ui-tools",
+	"version": "0.0.0",
+	"description": "Build tools for the Markless UI design system.",
+	"license": "MIT",
+	"files": [
+		"dist"
+	],
+	"type": "module",
+	"sideEffects": false,
+	"exports": {
+		".": "./src/vite.ts"
+	},
+	"publishConfig": {
+		"exports": {
+			".": {
+				"types": "./dist/vite.d.ts",
+				"default": "./dist/vite.js"
+			}
+		}
+	},
+	"dependencies": {
+		"@markless/icons": "workspace:*"
+	},
+	"peerDependencies": {
+		"vite": "^8.0.16"
+	}
+}

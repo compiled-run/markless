@@ -1,0 +1,17 @@
+{
+	"extends": "../../../../tsconfig.json",
+	"compilerOptions": {
+		"baseUrl": "../../../..",
+		"paths": {
+			"@markless/icons": ["packages/headless/icons/generated/packs.d.ts"],
+			"@markless/ui": ["packages/headless/components/src/index.ts"]
+		},
+		"types": ["node", "vite/client", "vitest"]
+	},
+	"exclude": [],
+	"include": [
+		"../../../typescript-plugin/src/markless-tsrx.d.ts",
+		"ui-plugin.test-d.ts",
+		"tsrx.d.ts"
+	]
+}

@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
 import type { IconifyJSON } from '@iconify/types';
-import { compileTsrxModule } from '../../compiler/src/index.ts';
+import { compileTsrxModule } from '../../../compiler/src/index.ts';
 import { icons } from '../src/vite.ts';
 import { lucide } from '../src/index.ts';
 
@@ -52,9 +52,15 @@ export function App() @{
 		const result = await transform(source, '/src/App.tsrx');
 
 		expect(result?.code).toContain('import { retained } from');
-		expect(result?.code).toContain('<svg class="icon" style={{ color: \'red\' }} aria-hidden data-pin onClick={() => 1} {...props} width="1em" height="1em" viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet"><path d="M1 2"/></svg>');
-		expect(result?.code).toContain('<svg width="2rem" height="1em" viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet"><title>Down</title><desc>{props.id}</desc><path d="M1 2"/></svg>');
-		expect(result?.code).toContain('<svg height={size} width="1em" viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet"><circle');
+		expect(result?.code).toContain(
+			'<svg class="icon" style={{ color: \'red\' }} aria-hidden data-pin onClick={() => 1} {...props} width="1em" height="1em" viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet"><path d="M1 2"/></svg>',
+		);
+		expect(result?.code).toContain(
+			'<svg width="2rem" height="1em" viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet"><title>Down</title><desc>{props.id}</desc><path d="M1 2"/></svg>',
+		);
+		expect(result?.code).toContain(
+			'<svg height={size} width="1em" viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet"><circle',
+		);
 		expect(result?.code).toContain('<foreign.arrowdown />');
 		expect(result?.code).toContain('<local.arrowdown />');
 		expect(result?.code).toContain('<glyphs.arrow.down />');
@@ -80,15 +86,31 @@ Text <i.downward title={"Down"} /> here.
 
 	test('loads a collection once and reports nearest unknown names', async () => {
 		const setup = transformer();
-		await setup.transform(`import { testpack } from '@markless/icons'; export function A() @{ <><testpack.arrowdown/><testpack.downward/></> }`, '/a.tsrx');
+		await setup.transform(
+			`import { testpack } from '@markless/icons'; export function A() @{ <><testpack.arrowdown/><testpack.downward/></> }`,
+			'/a.tsrx',
+		);
 		expect(setup.loadCollection).toHaveBeenCalledTimes(1);
-		await expect(setup.transform(`import { testpack } from '@markless/icons'; export function A() @{ <testpack.arrowdwn/> }`, '/bad.tsrx')).rejects.toThrow('/bad.tsrx');
-		await expect(setup.transform(`import { missing } from '@markless/icons'; export function A() @{ <missing.arrowdown/> }`, '/pack.tsrx')).rejects.toThrow(/missing.*testpack/);
+		await expect(
+			setup.transform(
+				`import { testpack } from '@markless/icons'; export function A() @{ <testpack.arrowdwn/> }`,
+				'/bad.tsrx',
+			),
+		).rejects.toThrow('/bad.tsrx');
+		await expect(
+			setup.transform(
+				`import { missing } from '@markless/icons'; export function A() @{ <missing.arrowdown/> }`,
+				'/pack.tsrx',
+			),
+		).rejects.toThrow(/missing.*testpack/);
 	});
 
 	test('the transformed TSRX compiles without an icon component runtime', async () => {
 		const { transform } = transformer();
-		const transformed = await transform(`import { testpack } from '@markless/icons'; export default function App() @{ <testpack.arrowdown aria-hidden="true"/> }`, '/App.tsrx');
+		const transformed = await transform(
+			`import { testpack } from '@markless/icons'; export default function App() @{ <testpack.arrowdown aria-hidden="true"/> }`,
+			'/App.tsrx',
+		);
 		const compiled = await compileTsrxModule({
 			filename: '/App.tsrx',
 			source: transformed!.code,
@@ -105,7 +127,7 @@ Text <i.downward title={"Down"} /> here.
 			.replace(
 				/from (['"])@markless\/web\/fns\/([^'"]+)\1/g,
 				(_match, _quote: string, helper: string) =>
-					`from '${new URL(`../../web/src/fns/${helper}.ts`, import.meta.url).href}'`,
+					`from '${new URL(`../../../web/src/fns/${helper}.ts`, import.meta.url).href}'`,
 			);
 		const module = (await import(
 			`data:text/javascript;charset=utf-8,${encodeURIComponent(moduleSource)}`

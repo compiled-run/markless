@@ -1,3 +1,4 @@
+export * from '@markless/icons';
 export * as accordion from './accordion/index.ts';
 export * as base from './base/index.ts';
 export * as buttongroup from './buttongroup/index.ts';
