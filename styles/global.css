@@ -2321,64 +2321,145 @@ html[data-theme='dark'] .shiki span:not(.tsrx-tip):not(.tsrx-tip-title):not(.tsr
    follow without a second copy of any of it.
    --------------------------------------------------------------------------- */
 
-/* A <details> drawn as a select. It is markup and CSS with nothing behind it
-   because it cannot be anything else: no state on the document path ever
-   resumes (NOTES.md finding 19), and a disclosure opens without script. */
-.mode-select {
+/* The document owns only this inert slot and its no-JS link. Every MDX page
+   appends the live select island last, so it cannot move earlier locators. */
+.mode-select-slot {
+	anchor-name: --mode-select-slot;
+	min-block-size: 2.45rem;
 	margin-bottom: var(--space-s);
 }
 
-.mode-summary {
+.mode-select-fallback,
+.mode-select-trigger {
+	box-sizing: border-box;
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: 0.5em;
+	inline-size: 100%;
+	min-block-size: 2.45rem;
 	padding: 0.35em 0.7em;
-	border: 2px solid var(--ink);
-	border-radius: 8px;
-	background: var(--raised);
 	font-size: var(--step--1);
 	font-weight: 700;
-	cursor: pointer;
-	list-style: none;
+	color: var(--ink);
+	background: var(--paper);
+	border: 2px solid var(--ink);
+	border-radius: 8px;
+	text-decoration: none;
 }
 
-.mode-summary::-webkit-details-marker {
+.mode-select-island {
+	position: fixed;
+	left: var(--space-s-l);
+	top: calc(var(--header-height) + 2 * var(--space-s) + 3.4rem + var(--space-m));
+	z-index: 35;
+	inline-size: 16rem;
+	font-size: var(--step--1);
+}
+
+@supports (position-anchor: --mode-select-slot) {
+	.mode-select-island {
+		position-anchor: --mode-select-slot;
+		left: anchor(left);
+		top: anchor(top);
+		inline-size: anchor-size(width);
+	}
+}
+
+.mode-select-control {
+	position: relative;
+}
+
+.mode-select-trigger {
+	cursor: pointer;
+}
+
+.mode-select-caret {
+	flex: none;
+	transition: transform 160ms ease;
+}
+
+.mode-select-control[ui-open] .mode-select-caret {
+	transform: rotate(180deg);
+}
+
+.mode-select-content {
+	position: absolute;
+	top: calc(100% + 0.3em);
+	left: 0;
+	box-sizing: border-box;
+	display: grid;
+	gap: 0.2em;
+	inline-size: 100%;
+	padding: 0.3em;
+	background: var(--paper);
+	border: 2px solid var(--ink);
+	border-radius: 8px;
+	box-shadow: var(--card-shadow);
+}
+
+.mode-select-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 0.3em 0.7em;
+	border-radius: 6px;
+	cursor: pointer;
+}
+
+.mode-select-item:hover {
+	color: var(--state-hover-fg);
+	background: var(--state-hover-bg);
+}
+
+.mode-select-item[ui-selected] {
+	color: var(--state-selected-fg);
+	background: var(--state-selected-bg);
+	outline: var(--state-selected-edge);
+	box-shadow: var(--state-selected-shadow);
+	font-weight: 700;
+}
+
+.mode-select-item[ui-highlighted],
+.mode-select-item:focus {
+	color: var(--ink);
+	background: var(--state-highlight-bg);
+}
+
+.mode-select-trigger:focus-visible,
+.mode-select-item:focus-visible {
+	outline: 2px solid var(--yellow);
+	outline-offset: 2px;
+}
+
+.mode-select-item[ui-disabled] {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.mode-select-item-indicator[ui-hidden] {
 	display: none;
 }
 
-.mode-summary::after {
-	content: '▾';
-	opacity: 0.65;
+.mode-select-item-label {
+	position: relative;
+	isolation: isolate;
 }
 
-.mode-select[open] .mode-summary {
-	margin-bottom: 0.3em;
+html[data-variant='a'] .mode-select-item[ui-selected] .mode-select-item-label::before {
+	content: '';
+	position: absolute;
+	inset: -0.1em -0.3em;
+	z-index: -1;
+	background: var(--swipe);
+	transform: rotate(-1deg);
 }
 
-.mode-select[open] .mode-summary::after {
-	content: '▴';
+html[data-variant='b'] .mode-select-item[ui-selected] {
+	transform: rotate(-1deg);
 }
 
-.mode-option {
-	display: block;
-	padding: 0.3em 0.7em;
-	color: var(--ink);
-	text-decoration: none;
-	font-size: var(--step--1);
-	border: 2px solid transparent;
-	border-radius: 6px;
-}
-
-.mode-option:hover {
-	background: var(--yellow);
-	color: var(--on-accent);
-}
-
-.mode-option.is-current {
-	border-color: var(--pink);
-	background: var(--tinted);
-	font-weight: 700;
+html[data-variant='c'] .mode-select-item[ui-selected] {
+	border-radius: 999px;
 }
 
 /* The stage at the top of a family page: the instruction, then the live

@@ -14,11 +14,10 @@
 // stylesheet opens it again above 70rem, where the column is beside the prose
 // rather than on top of it.
 //
-// The switch above it is a second <details>, styled as a select. It is markup
-// and CSS with no state behind it because it cannot be anything else: the
-// router serves only the document's HTML and drops the document's state
-// payload, so a cell anywhere on this path never resumes (NOTES.md finding 19).
-// A <details> needs no script to open, which is the whole reason it is one.
+// The mode-select slot is inert SSR markup. The live select is the final island
+// each MDX page renders, because the router drops state from this document path
+// (NOTES.md finding 19) and appending it cannot shift earlier island locators
+// (finding 29). The link remains useful when JavaScript is unavailable.
 import Mascot from '../mascot.tsrx';
 import { modeFor, modes, sidebarFor } from '../../nav.ts';
 
@@ -27,23 +26,16 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 	const here = modeFor(pathname);
 	const framework = modes.framework;
 	const library = modes.ui;
+	const other = here.key === 'framework' ? library : framework;
 
 	<nav class="sidebar" aria-label="Documentation">
 		<a class="site-mark" href="/markless">
 			<Mascot name="markless" size="3.4rem" variant="mark" />
 			<span class="site-name">Markless</span>
 		</a>
-		<details class="mode-select">
-			<summary class="mode-summary">{here.title}</summary>
-			<a
-				class={here.key === 'framework' ? 'mode-option is-current' : 'mode-option'}
-				href={framework.href}
-			>{framework.title}</a>
-			<a
-				class={here.key === 'ui' ? 'mode-option is-current' : 'mode-option'}
-				href={library.href}
-			>{library.title}</a>
-		</details>
+		<div class="mode-select-slot">
+			<a class="mode-select-fallback" href={other.href}>Switch to {other.title}</a>
+		</div>
 		<details class="sidebar-disclosure">
 			<summary class="sidebar-summary">All pages</summary>
 			@for (const section of sections; key section.title) {

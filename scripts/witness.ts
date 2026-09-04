@@ -155,6 +155,37 @@ try {
 	const browser = await chromium.launch({ channel: 'chrome', headless: true });
 	try {
 		const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+
+		// The mode switch is a page-owned island rendered after every other island,
+		// then visually pinned over the inert sidebar slot (NOTES.md findings 19/29).
+		for (const [href, selectedTitle, otherTitle] of [
+			['/markless', 'Framework', 'UI'],
+			['/markless/ui', 'UI', 'Framework'],
+		] as const) {
+			await page.goto(`${origin}${href}`, { waitUntil: 'load' });
+			const trigger = page.locator('.mode-select-trigger');
+			const content = page.locator('.mode-select-content');
+			await trigger.click();
+			await content.waitFor({ state: 'visible' });
+			const selected = content.locator('.mode-select-item[ui-selected]');
+			const other = content.getByRole('option', { name: otherTitle });
+			check(
+				(await content.isVisible()) && (await trigger.getAttribute('aria-expanded')) === 'true',
+				`${href}: the mode trigger opens the real select content`,
+			);
+			check(
+				((await selected.locator('.mode-select-item-label').textContent()) ?? '').trim() ===
+					selectedTitle,
+				`${href}: the selected mode matches the URL`,
+				((await selected.textContent()) ?? '').trim(),
+			);
+			check(
+				(await other.count()) === 1 && (await other.getAttribute('aria-selected')) === 'false',
+				`${href}: the other mode is a real unselected option`,
+				otherTitle,
+			);
+		}
+
 		await page.goto(`${origin}/markless/concepts/state`, { waitUntil: 'load' });
 		await mkdir(shotsDir, { recursive: true });
 
