@@ -55,6 +55,7 @@ const marklessPack = (options: {
 	entry: Record<string, string>;
 	platform?: 'neutral' | 'node';
 	devDependencies?: boolean;
+	copy?: PackUserConfig['copy'];
 }): PackUserConfig => ({
 	name: `@markless/${options.packageName}`,
 	cwd: packageDir(options.packageDirectory ?? options.packageName),
@@ -67,6 +68,7 @@ const marklessPack = (options: {
 	fixedExtension: false,
 	dts: true,
 	clean: true,
+	...(options.copy ? { copy: options.copy } : {}),
 	deps: {
 		neverBundle: [
 			...buildToolImportPatterns,
@@ -205,6 +207,9 @@ const buildOrder: PackUserConfig[] = [
 			index: './src/index.ts',
 			vite: './src/vite.ts',
 		},
+		// The per-icon declarations are generated, not compiled; clean: true would
+		// otherwise leave the published ./dist/packs.d.ts target absent after a build.
+		copy: ['./generated/packs.d.ts'],
 	}),
 	marklessPack({
 		packageName: 'ui-tools',
@@ -282,7 +287,8 @@ export default defineConfig({
 					],
 					patterns: [
 						{
-							group: ['@markless/ui/*'],
+							// The build plugin is the one sanctioned subpath; families come from the root.
+							group: ['@markless/ui/*', '!@markless/ui/vite'],
 							allowTypeImports: true,
 							message: "import { family } from '@markless/ui'",
 						},

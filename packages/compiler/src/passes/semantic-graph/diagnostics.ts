@@ -18,16 +18,20 @@ export function uiImportShapeDiagnostic(input: {
 	readonly source: string;
 	readonly importSource: string;
 	readonly name: string;
+	/** A namespace binding has no single family to name, so its fix reads differently. */
+	readonly namespace?: boolean;
 }): SemanticGraphDiagnostic {
 	const line = input.source.slice(0, input.statement.start ?? 0).split('\n').length;
-	const fix = `import { ${input.name} } from '@markless/ui'`;
+	const fix = input.namespace
+		? "import each family by name, for example `import { accordion, select } from '@markless/ui'`"
+		: `use \`import { ${input.name} } from '@markless/ui'\``;
 	return semanticGraphDiagnostic({
 		code: 'MARKLESS_UI_IMPORT_SHAPE',
 		title: '@markless/ui value imports must use named exports from the package root',
-		message: `Line ${line} imports from \`${input.importSource}\` with an unsupported shape. Line ${line} must use \`${fix}\`.`,
+		message: `Line ${line} imports from \`${input.importSource}\` with an unsupported shape; ${fix}.`,
 		why: 'Application value imports from a family subpath or a namespace can expose source files to dependency optimization instead of using the package root export surface.',
 		span: sourceSpan(input.statement, input.filename),
-		suggestion: `Replace this declaration with \`${fix};\`.`,
+		suggestion: `Replace this declaration: ${fix}.`,
 		docsUrl: 'https://markless.dev/errors/MARKLESS_UI_IMPORT_SHAPE',
 	});
 }

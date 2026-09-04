@@ -4,8 +4,9 @@
 // that every published exports target exists on disk and the core root entry
 // stays node-free after packing.
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { basename, resolve } from 'node:path';
 import { describe, expect, test } from 'vitest';
+import rootConfig from '../../vite.config.ts';
 import { releasePackages } from './release-packages.mjs';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -337,4 +338,44 @@ describe.skipIf(!packedDistExists)('packed dist output (run `vp pack` first)', (
 			}
 		}
 	});
+});
+
+// A published target no build step writes is only caught at publish time, after
+// `vp pack` has already cleaned dist. Read the pack config instead: every dist
+// target must come from an entry or a copied file.
+describe('the pack config produces every published dist target', () => {
+	const packConfigs = [rootConfig.pack ?? []].flat();
+	for (const entry of releasePackageEntries) {
+		const pack = packConfigs.find(
+			(candidate) => resolve(candidate.cwd ?? '.') === entry.packageDir,
+		);
+		// A package built by its own script (@markless/typescript-plugin ships CJS) has no pack entry.
+		if (pack === undefined) continue;
+		test(`${entry.name} builds or copies every published dist target`, () => {
+			const produced = new Set<string>();
+			for (const stem of Object.keys(pack.entry ?? {})) {
+				produced.add(`./dist/${stem}.js`);
+				produced.add(`./dist/${stem}.d.ts`);
+			}
+			for (const copied of [pack.copy ?? []].flat()) {
+				const from = typeof copied === 'string' ? copied : copied.from;
+				for (const path of [from].flat()) produced.add(`./dist/${basename(path)}`);
+			}
+			const manifest = readManifest(entry.name);
+			const published = [
+				...Object.values(manifest.publishConfig?.exports ?? {}).flatMap(targetPaths),
+				...Object.values(manifest.publishConfig?.bin ?? {}),
+				manifest.publishConfig?.types ?? '',
+			];
+			for (const path of published) {
+				// CJS targets come from a package's own build:cjs script, not from `vp pack`.
+				const packBuilt = /\.js$|\.d\.ts$/.test(path);
+				if (!path.startsWith('./dist/') || path.includes('*') || !packBuilt) continue;
+				expect(
+					produced,
+					`${entry.name} publishes ${path}, which no pack step writes`,
+				).toContain(path);
+			}
+		});
+	}
 });

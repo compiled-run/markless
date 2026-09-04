@@ -1,7 +1,14 @@
 import MagicString from 'magic-string';
 import type { CollectionLoader } from '../collection-loader.ts';
 import type { ResolvedIconsOptions } from '../options.ts';
-import { cleanImports, renderSvg, type AttributeSpan } from './shared.ts';
+import {
+	cleanImports,
+	renderSvg,
+	within,
+	type AttributeSpan,
+	type ImportDeclarationSpan,
+	type Range,
+} from './shared.ts';
 
 export async function transformMdx(
 	source: string,
@@ -10,12 +17,16 @@ export async function transformMdx(
 	loader: CollectionLoader,
 	diagnostic?: (message: string) => void,
 ): Promise<string | undefined> {
-	const { bindings, imports } = mdxImports(source, options.importSources);
-	if (bindings.size === 0) return undefined;
+	// Fenced blocks and backtick spans are documentation, not code: no import, tag or
+	// reference inside one belongs to the module.
 	const fenced = fencedRanges(source);
-	const tags = scanTags(source, fenced);
+	const code = [...fenced, ...inlineCodeRanges(source, fenced)];
+	const { bindings, imports } = mdxImports(source, options.importSources, code);
+	if (bindings.size === 0) return undefined;
+	const tags = scanTags(source, code);
 	const magic = new MagicString(source);
 	const usedLocals = new Set<string>();
+	const replaced: Array<Range & { tag: string }> = [];
 	for (const tag of tags) {
 		const parts = tag.name.split('.');
 		if (parts.length !== 2 || !bindings.has(parts[0]!)) continue;
@@ -24,6 +35,12 @@ export async function transformMdx(
 		const prefix = options.packs.get(pack);
 		// A namespace from a shared source that is not a pack is a component family; leave it.
 		if (!prefix) continue;
+		const outer = replaced.find((range) => within(tag.start, [range]));
+		if (outer) {
+			throw new Error(
+				`@markless/icons: ${file}: <${tag.name}> sits inside <${outer.tag}>; an icon tag cannot contain another icon tag`,
+			);
+		}
 		const icon = await loader.icon(prefix, parts[1]!, file, pack, diagnostic);
 		magic.overwrite(
 			tag.start,
@@ -37,36 +54,75 @@ export async function transformMdx(
 				icon,
 			}),
 		);
+		replaced.push({ start: tag.start, end: tag.end, tag: tag.name });
 		usedLocals.add(local);
 	}
 	if (usedLocals.size === 0) return undefined;
-	cleanImports(source, imports, usedLocals, magic);
+	const rewritten = [...imports, ...replaced, ...code];
+	cleanImports(
+		source,
+		imports,
+		(specifier) =>
+			usedLocals.has(specifier.local) && !referencedOutside(source, specifier.local, rewritten),
+		magic,
+	);
 	return magic.toString();
 }
 
-function mdxImports(source: string, allowed: Set<string>) {
+function referencedOutside(source: string, local: string, rewritten: readonly Range[]): boolean {
+	for (const match of source.matchAll(new RegExp(`\\b${local}\\b`, 'g'))) {
+		if (!within(match.index, rewritten)) return true;
+	}
+	return false;
+}
+
+function mdxImports(source: string, allowed: Set<string>, excluded: readonly Range[]) {
 	const bindings = new Map<string, string>();
-	const imports: Array<{ start: number; end: number; specifiers: Array<{ start: number; end: number; local: string }> }> = [];
+	const imports: ImportDeclarationSpan[] = [];
 	const pattern = /^import\s*\{([^}]*)\}\s*from\s*(['"])([^'"]+)\2\s*;?/gm;
 	for (const match of source.matchAll(pattern)) {
 		if (!allowed.has(match[3]!)) continue;
 		const declarationStart = match.index;
+		if (within(declarationStart, excluded)) continue;
 		const bodyStart = declarationStart + match[0].indexOf('{') + 1;
-		const specifiers = [...match[1]!.matchAll(/([A-Za-z_$][\w$]*)(\s+as\s+([A-Za-z_$][\w$]*))?/g)].map((part) => {
-			const start = bodyStart + part.index;
-			const local = part[3] ?? part[1]!;
-			bindings.set(local, part[1]!);
-			return { start, end: start + part[0].length, local };
-		});
+		const specifiers = [...match[1]!.matchAll(/([A-Za-z_$][\w$]*)(\s+as\s+([A-Za-z_$][\w$]*))?/g)].map(
+			(part) => {
+				const start = bodyStart + part.index;
+				const local = part[3] ?? part[1]!;
+				bindings.set(local, part[1]!);
+				return { start, end: start + part[0].length, local, removable: true };
+			},
+		);
 		imports.push({ start: declarationStart, end: declarationStart + match[0].length, specifiers });
 	}
 	return { bindings, imports };
 }
 
-function fencedRanges(source: string): Array<[number, number]> {
-	const ranges: Array<[number, number]> = [];
+function fencedRanges(source: string): Range[] {
+	const ranges: Range[] = [];
 	const pattern = /^(\s*)(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1\2\s*$/gm;
-	for (const match of source.matchAll(pattern)) ranges.push([match.index, match.index + match[0].length]);
+	for (const match of source.matchAll(pattern)) {
+		ranges.push({ start: match.index, end: match.index + match[0].length });
+	}
+	return ranges;
+}
+
+/** Backtick spans outside fenced blocks: `<lucide.check />` in prose is a sample, not a tag. */
+function inlineCodeRanges(source: string, fenced: readonly Range[]): Range[] {
+	const ranges: Range[] = [];
+	const pattern = /`+/g;
+	let open: { start: number; length: number } | undefined;
+	for (const match of source.matchAll(pattern)) {
+		if (within(match.index, fenced)) continue;
+		const length = match[0].length;
+		if (!open) {
+			open = { start: match.index, length };
+			continue;
+		}
+		if (open.length !== length) continue;
+		ranges.push({ start: open.start, end: match.index + length });
+		open = undefined;
+	}
 	return ranges;
 }
 
@@ -81,12 +137,12 @@ interface ScannedTag {
 	children: string;
 }
 
-function scanTags(source: string, excluded: Array<[number, number]>): ScannedTag[] {
+function scanTags(source: string, excluded: readonly Range[]): ScannedTag[] {
 	const tags: ScannedTag[] = [];
 	const pattern = /<([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+)/g;
 	for (const match of source.matchAll(pattern)) {
 		const start = match.index;
-		if (excluded.some(([from, to]) => start >= from && start < to)) continue;
+		if (within(start, excluded)) continue;
 		const name = match[1]!;
 		const nameEnd = start + 1 + name.length;
 		const openEnd = tagEnd(source, nameEnd);

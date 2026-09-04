@@ -22,7 +22,9 @@ test('a value import from a @markless/ui subpath is an error with the root impor
 		code: 'MARKLESS_UI_IMPORT_SHAPE',
 		severity: 'error',
 		phase: 'semantic-graph',
-		message: expect.stringContaining("Line 2 must use `import { select } from '@markless/ui'`"),
+		message: expect.stringContaining(
+			"Line 2 imports from `@markless/ui/select` with an unsupported shape; use `import { select } from '@markless/ui'`.",
+		),
 		primarySpan: { filename: 'src/App.tsrx' },
 	});
 });
@@ -33,12 +35,15 @@ test('a side-effect import from a @markless/ui subpath is an error', async () =>
 	expect(diagnostic?.code).toBe('MARKLESS_UI_IMPORT_SHAPE');
 });
 
-test('a namespace import from the @markless/ui root is an error using its local name', async () => {
+test('a namespace import from the @markless/ui root asks for named families once', async () => {
 	const [diagnostic] = await diagnostics("import * as controls from '@markless/ui';");
 
 	expect(diagnostic?.message).toContain(
-		"Line 2 must use `import { controls } from '@markless/ui'`",
+		"import each family by name, for example `import { accordion, select } from '@markless/ui'`",
 	);
+	// The local name is not an export, so the fix must not suggest importing it.
+	expect(diagnostic?.message).not.toContain('controls');
+	expect(diagnostic?.message?.match(/Line 2/g)).toHaveLength(1);
 });
 
 test('a named value import from the @markless/ui root is allowed', async () => {

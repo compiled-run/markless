@@ -2,7 +2,14 @@ import { parse, type BaseNode } from '@tsrx/yuku';
 import MagicString from 'magic-string';
 import type { CollectionLoader } from '../collection-loader.ts';
 import type { ResolvedIconsOptions } from '../options.ts';
-import { cleanImports, renderSvg, type AttributeSpan } from './shared.ts';
+import {
+	cleanImports,
+	renderSvg,
+	within,
+	type AttributeSpan,
+	type ImportDeclarationSpan,
+	type Range,
+} from './shared.ts';
 
 type Node = BaseNode & Record<string, unknown>;
 
@@ -17,25 +24,25 @@ export async function transformTsrx(
 	const fatal = result.diagnostics.find((diagnostic) => diagnostic.severity === 'error');
 	if (fatal) throw new Error(`@markless/icons: ${file}: ${fatal.message}`);
 	const program = result.program as unknown as Node;
-	const imports: Array<{
-		start: number;
-		end: number;
-		specifiers: Array<{ start: number; end: number; local: string }>;
-	}> = [];
+	const imports: ImportDeclarationSpan[] = [];
 	const bindings = new Map<string, string>();
 	for (const statement of (program.body as Node[]) ?? []) {
 		if (statement.type !== 'ImportDeclaration') continue;
 		const sourceNode = statement.source as Node;
 		if (!options.importSources.has(String(sourceNode.value))) continue;
-		const specifiers = ((statement.specifiers as Node[]) ?? [])
-			.filter((specifier) => specifier.type === 'ImportSpecifier')
-			.map((specifier) => ({
-				start: specifier.start,
-				end: specifier.end,
-				local: String((specifier.local as Node).name),
-				imported: String((specifier.imported as Node).name),
-			}));
-		for (const specifier of specifiers) bindings.set(specifier.local, specifier.imported);
+		const specifiers = ((statement.specifiers as Node[]) ?? []).map((specifier) => ({
+			start: specifier.start,
+			end: specifier.end,
+			local: String((specifier.local as Node).name),
+			removable: specifier.type === 'ImportSpecifier',
+			imported:
+				specifier.type === 'ImportSpecifier'
+					? String((specifier.imported as Node).name)
+					: undefined,
+		}));
+		for (const specifier of specifiers) {
+			if (specifier.imported !== undefined) bindings.set(specifier.local, specifier.imported);
+		}
 		imports.push({ start: statement.start, end: statement.end, specifiers });
 	}
 	if (bindings.size === 0) return undefined;
@@ -46,6 +53,7 @@ export async function transformTsrx(
 	});
 	const magic = new MagicString(source);
 	const usedLocals = new Set<string>();
+	const replaced: Array<Range & { tag: string }> = [];
 	for (const element of elements) {
 		const opening = element.openingElement as Node;
 		const member = memberName(opening.name as Node);
@@ -55,6 +63,13 @@ export async function transformTsrx(
 		const prefix = options.packs.get(pack);
 		// A namespace from a shared source that is not a pack is a component family; leave it.
 		if (!prefix) continue;
+		const tag = member.parts.join('.');
+		const outer = replaced.find((range) => within(element.start, [range]));
+		if (outer) {
+			throw new Error(
+				`@markless/icons: ${file}: <${tag}> sits inside <${outer.tag}>; an icon tag cannot contain another icon tag`,
+			);
+		}
 		const icon = await loader.icon(prefix, member.parts[1]!, file, pack, diagnostic);
 		const closing = element.closingElement as Node | null;
 		const attributes = attributeSpans((opening.attributes as Node[]) ?? []);
@@ -67,11 +82,37 @@ export async function transformTsrx(
 			icon,
 		});
 		magic.overwrite(element.start, element.end, replacement);
+		replaced.push({ start: element.start, end: element.end, tag });
 		usedLocals.add(local);
 	}
 	if (usedLocals.size === 0) return undefined;
-	cleanImports(source, imports, usedLocals, magic);
+	const referenced = referencedLocals(program, usedLocals, [...imports, ...replaced]);
+	cleanImports(
+		source,
+		imports,
+		(specifier) => usedLocals.has(specifier.local) && !referenced.has(specifier.local),
+		magic,
+	);
 	return magic.toString();
+}
+
+/**
+ * Pack locals still named somewhere the transform did not rewrite, so
+ * `const check = lucide.check` keeps the binding it reads.
+ */
+function referencedLocals(
+	program: Node,
+	locals: ReadonlySet<string>,
+	rewritten: readonly Range[],
+): Set<string> {
+	const referenced = new Set<string>();
+	walk(program, (node) => {
+		if (node.type !== 'Identifier' && node.type !== 'JSXIdentifier') return;
+		const name = String(node.name);
+		if (!locals.has(name) || within(node.start, rewritten)) return;
+		referenced.add(name);
+	});
+	return referenced;
 }
 
 function memberName(node: Node): { parts: string[] } | undefined {

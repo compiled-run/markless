@@ -16,16 +16,22 @@ const prefixes = readdirSync(collectionDirectory)
 	.map((file) => file.slice(0, -'.json'.length))
 	.sort();
 
-const declarations = [
-	"export type IconProps = __MarklessTypeService.IntrinsicElementFor<'svg'> & { readonly title?: string; readonly description?: string };",
-	'export type Icon = (props: IconProps) => __MarklessTypeService.Child;',
-	'export declare function packs(): readonly string[];',
+// The props type stays structural: these declarations are read by plain .ts consumers too,
+// where the type service's global namespace does not exist.
+const propsDeclaration = [
+	'export type IconProps = {',
+	'\treadonly title?: string;',
+	'\treadonly description?: string;',
+	'\treadonly [attribute: string]: unknown;',
+	'};',
+	'export type Icon = (props: IconProps) => unknown;',
 ];
+const declarations = [...propsDeclaration, 'export declare function packs(): readonly string[];'];
 const runtime = [
 	"import type { Icon } from './index.ts';",
 	'',
 	'const missingPlugin = (pack: string) => new Proxy({} as Record<string, Icon>, {',
-	"\tget(_target, property) { throw new Error(`@markless/icons: <${pack}.${String(property)} /> reached runtime. Add icons() from '@markless/icons/vite' before the Markless and router plugins.`); },",
+	"\tget(_target, property) { throw new Error(`@markless/icons: <${pack}.${String(property)} /> reached runtime. Add ui() from '@markless/ui/vite' before markless() in vite.config, or icons() from '@markless/icons/vite' when you use icons without @markless/ui.`); },",
 	'});',
 	'',
 ];

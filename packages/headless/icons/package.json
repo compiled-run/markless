@@ -62,8 +62,7 @@
 	"scripts": {
 		"generate": "node scripts/generate-types.ts",
 		"prepare": "node scripts/generate-types.ts",
-		"prepublishOnly": "node ../../../scripts/release/verify-publish-ready.mjs",
-		"prepack": "cp generated/packs.d.ts dist/packs.d.ts"
+		"prepublishOnly": "node ../../../scripts/release/verify-publish-ready.mjs"
 	},
 	"dependencies": {
 		"@iconify/json": "^2.2.382",

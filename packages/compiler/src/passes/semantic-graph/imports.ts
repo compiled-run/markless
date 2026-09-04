@@ -155,6 +155,7 @@ export function collectUiImportShapeDiagnostics(input: {
 				source: input.source,
 				importSource: source,
 				name,
+				namespace: true,
 			}),
 		);
 	}

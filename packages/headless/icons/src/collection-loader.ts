@@ -1,5 +1,9 @@
+import { readdirSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
+import process from 'node:process';
+import { fileURLToPath } from 'node:url';
 import type { IconifyJSON } from '@iconify/types';
 import { getIconData, iconToSVG } from '@iconify/utils';
 import { parse } from '@tsrx/yuku';
@@ -85,10 +89,82 @@ export class CollectionLoader {
 		if (injected) return injected;
 		const loaded = await this.#options.loadCollection?.(prefix);
 		if (loaded) return loaded;
-		const require = createRequire(import.meta.url);
-		const filename = require.resolve(`@iconify/json/json/${prefix}.json`);
-		return JSON.parse(await readFile(filename, 'utf8')) as IconifyJSON;
+		return JSON.parse(await readFile(resolveCollectionFile(prefix), 'utf8')) as IconifyJSON;
 	}
+}
+
+/** Where a pack's icon data can live, per-pack package first, then the whole-set bundle. */
+function collectionSpecifiers(prefix: string): string[] {
+	return [`@iconify-json/${prefix}/icons.json`, `@iconify/json/json/${prefix}.json`];
+}
+
+function packageResolve(specifier: string): string {
+	// Resolve from the app as well as from here: a per-pack package is the app's dependency,
+	// which pnpm does not expose inside this package's own node_modules.
+	return createRequire(import.meta.url).resolve(specifier, {
+		paths: [process.cwd(), fileURLToPath(new URL('.', import.meta.url))],
+	});
+}
+
+export function resolveCollectionFile(
+	prefix: string,
+	resolve: (specifier: string) => string = packageResolve,
+): string {
+	for (const specifier of collectionSpecifiers(prefix)) {
+		try {
+			return resolve(specifier);
+		} catch {
+			continue;
+		}
+	}
+	throw new Error(
+		`@markless/icons: collection ${prefix} is not installed; add @iconify-json/${prefix} for this pack alone, or @iconify/json for every pack`,
+	);
+}
+
+/** Prefixes of the installed collections: every per-pack package plus the whole-set bundle. */
+export function installedPrefixes(roots: readonly string[] = searchRoots()): string[] {
+	const prefixes = new Set<string>();
+	for (const root of roots) {
+		for (const name of directoryNames(join(root, 'node_modules', '@iconify-json'))) {
+			prefixes.add(name);
+		}
+	}
+	let bundleDirectory: string | undefined;
+	try {
+		bundleDirectory = join(dirname(packageResolve('@iconify/json/package.json')), 'json');
+	} catch {
+		bundleDirectory = undefined;
+	}
+	if (bundleDirectory) {
+		for (const file of directoryNames(bundleDirectory)) {
+			if (file.endsWith('.json')) prefixes.add(file.slice(0, -'.json'.length));
+		}
+	}
+	return [...prefixes];
+}
+
+function directoryNames(directory: string): string[] {
+	try {
+		return readdirSync(directory).filter((name) => !name.startsWith('.'));
+	} catch {
+		return [];
+	}
+}
+
+/** Every directory from the app upward, so a per-pack package hoisted anywhere is found. */
+function searchRoots(): string[] {
+	const roots = new Set<string>();
+	for (const start of [process.cwd(), fileURLToPath(new URL('.', import.meta.url))]) {
+		let current = start;
+		while (true) {
+			roots.add(current);
+			const parent = dirname(current);
+			if (parent === current) break;
+			current = parent;
+		}
+	}
+	return [...roots];
 }
 
 function sanitizeBody(body: string): { body: string; changed: boolean } {

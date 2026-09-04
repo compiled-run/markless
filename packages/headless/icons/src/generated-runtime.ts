@@ -1,7 +1,7 @@
 import type { Icon } from './index.ts';
 
 const missingPlugin = (pack: string) => new Proxy({} as Record<string, Icon>, {
-	get(_target, property) { throw new Error(`@markless/icons: <${pack}.${String(property)} /> reached runtime. Add icons() from '@markless/icons/vite' before the Markless and router plugins.`); },
+	get(_target, property) { throw new Error(`@markless/icons: <${pack}.${String(property)} /> reached runtime. Add ui() from '@markless/ui/vite' before markless() in vite.config, or icons() from '@markless/icons/vite' when you use icons without @markless/ui.`); },
 });
 
 export const academicons: Record<string, Icon> = missingPlugin("academicons");

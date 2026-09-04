@@ -212,5 +212,5 @@ Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not ed
 | `MARKLESS_TEXT_UPDATE_RECORD_MISSING` | web | fns | TODO: no builder title | TODO: no builder message |
 | `MARKLESS_TRY_BLOCK_TOGGLE_RERENDER` | compiler | public-render | Toggling this … re-renders the whole @try block | TODO: no builder message |
 | `MARKLESS_TYPE_STRIP_FAILED` | bundler | transform | TODO: no builder title | … could not have its TypeScript syntax stripped. … |
-| `MARKLESS_UI_IMPORT_SHAPE` | compiler | semantic-graph | @markless/ui value imports must use named exports from the package root | Line … imports from `…` with an unsupported shape. Line … must use `…`. |
+| `MARKLESS_UI_IMPORT_SHAPE` | compiler | semantic-graph | @markless/ui value imports must use named exports from the package root | Line … imports from `…` with an unsupported shape; …. |
 | `MARKLESS_WIDGET_INSTANCE_UNRESOLVED` | web | fns | TODO: no builder title | … was read at dispatch from a part whose widget instance no rendered widget owns, so the read would answer for no instance at all. |

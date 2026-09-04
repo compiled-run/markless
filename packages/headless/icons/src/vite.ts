@@ -1,9 +1,6 @@
-import { readdirSync } from 'node:fs';
-import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
 import type { Plugin } from 'vite';
-import { CollectionLoader } from './collection-loader.ts';
-import { nearestName, packName } from './naming.ts';
+import { CollectionLoader, installedPrefixes } from './collection-loader.ts';
+import { packName } from './naming.ts';
 import type { IconsOptions, ResolvedIconsOptions } from './options.ts';
 import { transformMdx } from './transform/mdx.ts';
 import { transformTsrx } from './transform/tsrx.ts';
@@ -41,16 +38,22 @@ function resolveOptions(input: IconsOptions): ResolvedIconsOptions {
 	if (input.collections) {
 		prefixes.push(...(input.collections instanceof Map ? input.collections.keys() : Object.keys(input.collections)));
 	}
-	const packs = new Map(prefixes.map((prefix) => [packName(prefix), prefix]));
-	for (const [name, value] of Object.entries(input.packs ?? {})) packs.set(name, value.iconifyPrefix);
-	for (const [name, prefix] of packs) {
+	const byName = new Map<string, string[]>();
+	for (const prefix of prefixes) {
+		const name = packName(prefix);
 		if (!name) throw new Error(`@markless/icons: collection prefix ${prefix} does not produce a pack name`);
-		const collision = [...packs].find(([otherName, otherPrefix]) => otherName === name && otherPrefix !== prefix);
-		if (collision) {
-			const suggestion = nearestName(prefix, prefixes);
-			throw new Error(`@markless/icons: pack name ${name} is ambiguous${suggestion ? ` near ${suggestion}` : ''}`);
-		}
+		const group = byName.get(name) ?? [];
+		if (!group.includes(prefix)) group.push(prefix);
+		byName.set(name, group);
 	}
+	for (const [name, group] of byName) {
+		if (group.length < 2) continue;
+		throw new Error(
+			`@markless/icons: pack name ${name} is ambiguous between ${group.join(' and ')}; name one explicitly, for example packs: { ${name}: { iconifyPrefix: '${group[0]!}' } }`,
+		);
+	}
+	const packs = new Map([...byName].map(([name, group]) => [name, group[0]!]));
+	for (const [name, value] of Object.entries(input.packs ?? {})) packs.set(name, value.iconifyPrefix);
 	return {
 		debug: input.debug ?? false,
 		importSources: new Set(input.importSources ?? ['@markless/icons']),
@@ -58,12 +61,4 @@ function resolveOptions(input: IconsOptions): ResolvedIconsOptions {
 		collections: input.collections,
 		loadCollection: input.loadCollection,
 	};
-}
-
-function installedPrefixes(): string[] {
-	const manifest = createRequire(import.meta.url).resolve('@iconify/json/package.json');
-	const directory = join(dirname(manifest), 'json');
-	return readdirSync(directory)
-		.filter((file) => file.endsWith('.json'))
-		.map((file) => file.slice(0, -'.json'.length));
 }

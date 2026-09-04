@@ -51,15 +51,16 @@ export function App() @{
 `;
 		const result = await transform(source, '/src/App.tsrx');
 
-		expect(result?.code).toContain('import { retained } from');
+		// `glyphs` is still named by the untouched three-part tag, so its specifier stays.
+		expect(result?.code).toContain('import { testpack as glyphs, retained } from');
 		expect(result?.code).toContain(
 			'<svg class="icon" style={{ color: \'red\' }} aria-hidden data-pin onClick={() => 1} {...props} width="1em" height="1em" viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet"><path d="M1 2"/></svg>',
 		);
 		expect(result?.code).toContain(
-			'<svg width="2rem" height="1em" viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet"><title>Down</title><desc>{props.id}</desc><path d="M1 2"/></svg>',
+			'<svg width="2rem" height="1em" viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" role="img"><title>{"Down"}</title><desc>{props.id}</desc><path d="M1 2"/></svg>',
 		);
 		expect(result?.code).toContain(
-			'<svg height={size} width="1em" viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet"><circle',
+			'<svg height={size} width="1em" viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" aria-hidden="true"><circle',
 		);
 		expect(result?.code).toContain('<foreign.arrowdown />');
 		expect(result?.code).toContain('<local.arrowdown />');
@@ -140,7 +141,9 @@ Text <i.downward title={"Down"} /> here.
 	});
 
 	test('runtime proxies fail loudly when the plugin did not transform a tag', () => {
-		expect(() => lucide.chevrondown).toThrow(/@markless\/icons.*plugin/i);
+		expect(() => lucide.chevrondown).toThrow(
+			/@markless\/icons.*ui\(\) from '@markless\/ui\/vite'.*icons\(\) from '@markless\/icons\/vite'/,
+		);
 	});
 
 	test('sanitizes unsupported body styles with a named build diagnostic', async () => {
@@ -157,5 +160,97 @@ Text <i.downward title={"Down"} /> here.
 		expect(setup.warn).toHaveBeenCalledWith(
 			expect.stringMatching(/\/unsafe\.tsrx.*testpack\.unsafe.*unsafe/),
 		);
+	});
+	test('a string title or description becomes a quoted child, an expression stays one', async () => {
+		const { transform } = transformer();
+		const result = await transform(
+			`import { testpack } from '@markless/icons'; export function A() @{ <><testpack.arrowdown title="a < b {x} & c" /><testpack.downward description={label} /></> }`,
+			'/label.tsrx',
+		);
+
+		expect(result?.code).toContain('<title>{"a < b {x} & c"}</title>');
+		expect(result?.code).toContain('<desc>{label}</desc>');
+	});
+
+	test('an authored role or aria-hidden survives the accessibility defaults', async () => {
+		const { transform } = transformer();
+		const result = await transform(
+			`import { testpack } from '@markless/icons'; export function A() @{ <><testpack.arrowdown title="Down" role="presentation" /><testpack.downward aria-hidden="false" /></> }`,
+			'/aria.tsrx',
+		);
+
+		expect(result?.code).toContain('role="presentation"');
+		expect(result?.code).not.toContain('role="img"');
+		expect(result?.code).toContain('aria-hidden="false"');
+		expect(result?.code).not.toContain('aria-hidden="true"');
+	});
+
+	test('a pack local named only by rewritten tags loses its specifier', async () => {
+		const { transform } = transformer();
+		const result = await transform(
+			`import { testpack as glyphs, retained } from '@markless/icons'; export function A() @{ <glyphs.arrowdown/> }`,
+			'/dropped.tsrx',
+		);
+
+		expect(result?.code).toContain("import { retained } from '@markless/icons'");
+		expect(result?.code).not.toContain('glyphs');
+	});
+
+	test('a pack local read outside a tag keeps its import specifier', async () => {
+		const { transform } = transformer();
+		const result = await transform(
+			`import { testpack } from '@markless/icons'; const fallback = testpack.arrowdown; export function A() @{ <testpack.arrowdown/> }`,
+			'/kept.tsrx',
+		);
+
+		expect(result?.code).toContain("import { testpack } from '@markless/icons'");
+		expect(result?.code).toContain('<svg');
+	});
+
+	test('a default specifier survives when every named pack specifier goes', async () => {
+		const { transform } = transformer();
+		const result = await transform(
+			`import shared, { testpack } from '@markless/icons'; export function A() @{ <testpack.arrowdown/> }`,
+			'/default.tsrx',
+		);
+
+		expect(result?.code).toContain("import shared from '@markless/icons'");
+	});
+
+	test('an icon tag inside another icon tag is a named error', async () => {
+		const { transform } = transformer();
+
+		await expect(
+			transform(
+				`import { testpack } from '@markless/icons'; export function A() @{ <testpack.arrowdown><testpack.downward/></testpack.arrowdown> }`,
+				'/nested.tsrx',
+			),
+		).rejects.toThrow(/\/nested\.tsrx.*<testpack\.downward> sits inside <testpack\.arrowdown>/);
+	});
+
+	test('an import shown inside a fenced block binds nothing', async () => {
+		const { transform } = transformer();
+		const source = [
+			'```mdx',
+			"import { testpack as i } from '@markless/icons';",
+			'',
+			'<i.arrowdown />',
+			'```',
+			'',
+			'<i.arrowdown />',
+			'',
+		].join('\n');
+
+		expect(await transform(source, '/docs/fenced.mdx')).toBeUndefined();
+	});
+
+	test('a tag inside a backtick span stays prose', async () => {
+		const { transform } = transformer();
+		const source = `import { testpack as i } from '@markless/icons';\n\nWrite \`<i.arrowdown />\` to draw <i.downward />.\n`;
+
+		const result = await transform(source, '/docs/prose.mdx');
+
+		expect(result?.code).toContain('`<i.arrowdown />`');
+		expect(result?.code.match(/<svg/g)).toHaveLength(1);
 	});
 });

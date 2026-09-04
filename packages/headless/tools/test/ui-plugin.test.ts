@@ -1,5 +1,7 @@
 import type { IconifyJSON } from '@iconify/types';
+import type { ResolvedConfig } from 'vite';
 import { describe, expect, test, vi } from 'vitest';
+import { compileTsrxModule } from '../../../compiler/src/index.ts';
 import { ui, type UiOptions } from '../src/vite.ts';
 
 const collection: IconifyJSON = {
@@ -56,4 +58,72 @@ describe('ui plugin', () => {
 
 		expect(await transform(source, '/src/App.tsrx')).toBeUndefined();
 	});
+	test('ui() refuses a config where the markless plugin resolves before it', () => {
+		const hook = ui().configResolved;
+		if (typeof hook !== 'function') throw new Error('Expected a configResolved hook.');
+
+		expect(() =>
+			hook.call(
+				undefined as never,
+				resolvedWith(['vite-plugin-markless', '@markless/ui-tools']),
+			),
+		).toThrow(/ui\(\) from '@markless\/ui\/vite' before markless\(\)/);
+	});
+
+	test.each([
+		['ui() first', ['@markless/ui-tools', 'vite-plugin-markless']],
+		['ui() alone', ['@markless/ui-tools']],
+	])('ui() accepts a config with %s', (_case, names) => {
+		const hook = ui().configResolved;
+		if (typeof hook !== 'function') throw new Error('Expected a configResolved hook.');
+
+		expect(() => hook.call(undefined as never, resolvedWith(names))).not.toThrow();
+	});
+
+	test('a family and a pack imported together survive as an inline svg beside untouched parts', async () => {
+		const transform = transformer({
+			icons: {
+				availableCollections: ['lucide'],
+				collections: { lucide: collection },
+			},
+		});
+		const source = [
+			"import { accordion, lucide } from '@markless/ui';",
+			'',
+			'export default function App() @{',
+			'\t<accordion.root>',
+			'\t\t<accordion.item value="one">',
+			'\t\t\t<accordion.trigger>Open <lucide.check /></accordion.trigger>',
+			'\t\t\t<accordion.content>Body</accordion.content>',
+			'\t\t</accordion.item>',
+			'\t</accordion.root>',
+			'}',
+		].join('\n');
+
+		const result = await transform(source, '/src/App.tsrx');
+		expect(result?.code).toContain("import { accordion } from '@markless/ui'");
+		expect(result?.code).toContain('<accordion.trigger>');
+
+		const compiled = await compileTsrxModule({
+			filename: '/src/App.tsrx',
+			source: result!.code,
+			symbols: [],
+		});
+		// Static markup rides JSON-encoded inside the render-data module; read it unescaped.
+		const emitted = [
+			compiled.publicRenderModule.renderDataModuleSource,
+			compiled.publicRenderModule.ssrModuleSource,
+		]
+			.join('\n')
+			.replaceAll('\\"', '"');
+
+		expect(emitted).toContain('<svg width="1em" height="1em"');
+		expect(emitted).toContain('<path d="m5 12 4 4L19 6">');
+		expect(emitted).toContain('accordion.trigger');
+		expect(emitted).not.toContain('lucide');
+	});
 });
+
+function resolvedWith(names: readonly string[]): ResolvedConfig {
+	return { plugins: names.map((name) => ({ name })) } as unknown as ResolvedConfig;
+}
