@@ -15,6 +15,7 @@
 	},
 	"dependencies": {
 		"@markless/core": "file:vendor/markless-core.tgz",
+		"@markless/icons": "file:vendor/markless-icons.tgz",
 		"@markless/router": "file:vendor/markless-router.tgz",
 		"@markless/ui": "file:vendor/markless-ui.tgz",
 		"destr": "^2.0.5",
