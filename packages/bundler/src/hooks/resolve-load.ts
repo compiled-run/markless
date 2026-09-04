@@ -12,7 +12,7 @@ import {
 import type { ImportedChild } from '../plugin-state.ts';
 import { symbolVirtualModuleSourceFile } from '../source-module.ts';
 import { marklessVirtualModuleSourceFile } from '../transform.ts';
-import type { MarklessEnvironment } from '../types.ts';
+import type { MarklessEnvironment, MarklessVirtualModule } from '../types.ts';
 import {
 	TSRX_SOURCE_FILE,
 	isRelativeImport,
@@ -147,13 +147,19 @@ export async function virtualModuleForRequest(
 	currentEnvironment: MarklessEnvironment,
 ) {
 	const { internalOptions } = ctx;
-	const { virtualModules, regeneratingVirtualModules } = ctx.state;
+	const { virtualModules, regeneratingVirtualModules, transformedClientPrimarySources } =
+		ctx.state;
 	const registered = virtualModules.get(normalizedId);
-	if (registered || internalOptions.dev !== true) return registered;
+	if (internalOptions.dev !== true) return registered;
 
 	const source = marklessVirtualModuleSourceFile(normalizedId, ctx.getRoot());
+	const awaitsClientEmission =
+		currentEnvironment === 'client' &&
+		!!source &&
+		awaitsClientRenderData(registered, source, transformedClientPrimarySources);
+	if (registered && !awaitsClientEmission) return registered;
 	if (!source || !TSRX_SOURCE_FILE.test(source) || regeneratingVirtualModules.has(normalizedId)) {
-		return undefined;
+		return registered;
 	}
 
 	regeneratingVirtualModules.add(normalizedId);
@@ -164,7 +170,22 @@ export async function virtualModuleForRequest(
 	} finally {
 		regeneratingVirtualModules.delete(normalizedId);
 	}
-	return virtualModules.get(normalizedId);
+	return virtualModules.get(normalizedId) ?? registered;
+}
+
+// Every environment shares one render-data id in dev, but only a client transform
+// emits the prerender surface a client module imports, so a server-registered
+// module is served to the browser only once the client has had its own transform.
+function awaitsClientRenderData(
+	registered: MarklessVirtualModule | undefined,
+	source: string,
+	transformedClientPrimarySources: ReadonlySet<string>,
+): boolean {
+	return (
+		registered?.type === 'render-data' &&
+		registered.canonicalRenderData !== true &&
+		!transformedClientPrimarySources.has(source)
+	);
 }
 
 export async function recoverImportedChildMetadata(
