@@ -959,6 +959,9 @@ importers:
       satteri:
         specifier: 'catalog:'
         version: 0.6.3
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
       ufo:
         specifier: 'catalog:'
         version: 1.6.4
