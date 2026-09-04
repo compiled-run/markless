@@ -746,7 +746,11 @@ type Emit = {
 
 function hintFor(control: PlaygroundControl): string {
 	return `					<tooltip.root class="pg-hint">
-						<tooltip.trigger class="pg-dot" aria-label="About ${control.prop}">?</tooltip.trigger>
+						<tooltip.trigger class="pg-dot" aria-label="About ${control.prop}">
+							<lucide.circlehelp class="ico ico-a" aria-hidden="true" />
+							<ph.question class="ico ico-b" aria-hidden="true" />
+							<tabler.helpcircle class="ico ico-c" aria-hidden="true" />
+						</tooltip.trigger>
 						<tooltip.content class="pg-tip">
 							<span class="tsrx-tip-title">${control.prop}</span>
 							<span class="tsrx-tip-body">{${quote(control.doc)}}</span>
@@ -799,6 +803,7 @@ ${writes(emit.slots, control, chosen, '\t\t\t\t\t\t\t')}
 						<select.label class="pg-name">${control.prop}</select.label>
 						<select.trigger class="pg-pick-trigger">
 							<span class="pg-pick-value">{${control.shown}}</span>
+							<lucide.chevrondown class="pg-pick-caret" aria-hidden="true" />
 						</select.trigger>
 						<select.content class="pg-pick-list">
 ${items}
@@ -976,7 +981,14 @@ ${panes}
 ${indent}\t\t\t\t</div>
 ${indent}\t\t\t</div>
 ${indent}\t\t\t<span class="pg-fade" aria-hidden="true"></span>
-${indent}\t\t\t<collapsible.trigger class="pg-expand">Expand code</collapsible.trigger>
+${indent}\t\t\t<collapsible.trigger class="pg-expand">
+${indent}\t\t\t\tExpand code
+${indent}\t\t\t\t<span class="pg-expand-icons" aria-hidden="true">
+${indent}\t\t\t\t\t<lucide.arrowright class="ico ico-a" />
+${indent}\t\t\t\t\t<ph.arrowright class="ico ico-b" />
+${indent}\t\t\t\t\t<tabler.arrowright class="ico ico-c" />
+${indent}\t\t\t\t</span>
+${indent}\t\t\t</collapsible.trigger>
 ${indent}\t\t</collapsible.root>
 ${indent}\t</tabs.root>
 ${indent}</div>`;
@@ -1040,6 +1052,7 @@ ${written}
 				<select.label class="pg-bar-name">Scenario</select.label>
 				<select.trigger class="pg-pick-trigger pg-bar-trigger">
 					<span class="pg-pick-value">{scenario}</span>
+					<lucide.chevrondown class="pg-pick-caret" aria-hidden="true" />
 				</select.trigger>
 				<select.content class="pg-pick-list pg-bar-list">
 ${items}
@@ -1098,6 +1111,7 @@ export function playgroundModule(input: PlaygroundInput): string {
 	return `import { state } from '@markless/core';
 import { ${families.join(', ')} } from '@markless/ui';
 import { attributeText, heldList, listText, pickValue, toggled, valueText } from '../slot-text.ts';
+import { lucide, ph, tabler } from '@markless/icons';
 
 ${RUN_TYPES}
 
@@ -1117,6 +1131,7 @@ ${quick}
 				<collapsible.trigger class="pg-showall">
 					<span class="pg-showall-more">Show all</span>
 					<span class="pg-showall-less">Show less</span>
+					<lucide.chevrondown class="pg-showall-caret" aria-hidden="true" />
 				</collapsible.trigger>
 			</div>
 

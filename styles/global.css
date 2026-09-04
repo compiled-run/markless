@@ -251,7 +251,23 @@ body::after {
 }
 
 .crumb-sep {
+	width: 1em;
+	height: 1em;
+	color: currentColor;
 	opacity: 0.45;
+}
+
+.ico {
+	width: 1em;
+	height: 1em;
+	color: currentColor;
+	flex: none;
+}
+
+html[data-variant='a'] .ico:not(.ico-a),
+html[data-variant='b'] .ico:not(.ico-b),
+html[data-variant='c'] .ico:not(.ico-c) {
+	display: none;
 }
 
 .header-tools {
@@ -864,14 +880,15 @@ html[data-theme='dark'] .theme-toggle-to-light {
 	font-weight: 700;
 }
 
-/* A flex summary loses the default disclosure triangle, so it is drawn back. */
-.collapsible summary::before {
-	content: '▸';
-	font-size: 0.8em;
+.collapsible-caret {
+	width: 1em;
+	height: 1em;
+	color: currentColor;
+	transition: transform 140ms ease;
 }
 
-.collapsible[open] summary::before {
-	content: '▾';
+.collapsible[open] .collapsible-caret {
+	transform: rotate(180deg);
 }
 
 .collapsible p {
@@ -1477,6 +1494,9 @@ html[data-theme='dark'] .shiki span:not(.tsrx-tip):not(.tsrx-tip-title):not(.tsr
 }
 
 .pager-dir {
+	display: inline-flex;
+	gap: 0.25em;
+	align-items: center;
 	font-size: var(--step--1);
 	text-transform: uppercase;
 	letter-spacing: 0.08em;
@@ -2377,8 +2397,15 @@ html[data-theme='dark'] .shiki span:not(.tsrx-tip):not(.tsrx-tip-title):not(.tsr
 }
 
 .mode-select-caret {
+	display: inline-flex;
 	flex: none;
 	transition: transform 160ms ease;
+}
+
+.mode-select-caret .ico,
+.mode-select-item-indicator .ico {
+	width: 1.1em;
+	height: 1.1em;
 }
 
 .mode-select-control[ui-open] .mode-select-caret {

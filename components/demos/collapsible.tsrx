@@ -1,4 +1,5 @@
 import Sprite from '../sprite.tsrx';
+import { lucide } from '@markless/icons';
 
 export default function Collapsible({
 	summary,
@@ -11,6 +12,7 @@ export default function Collapsible({
 }) @{
 	<details class="collapsible">
 		<summary>
+			<lucide.chevrondown class="collapsible-caret" aria-hidden="true" />
 			<Sprite name={sprite ?? 'thought-bubble'} size="1.4em" />
 			{summary}
 		</summary>

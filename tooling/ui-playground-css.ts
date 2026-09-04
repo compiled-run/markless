@@ -7,31 +7,6 @@
 // and only hairlines (`--code-edge`) inside. Every colour, radius and face is a
 // token from styles/global.css; the accent is `--pg-accent`, muted on dark paper.
 
-/** The crayon arrow after "Expand code", painted in the current colour through a mask. */
-const ARROW_MASK = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12.5 3.5C11.2 8 12.8 13.5 11.8 19.5'/%3E%3Cpath d='M5.5 13.5c2.4 2.2 4.6 4.3 6.3 6.3 1.6-2.5 3.9-4.7 6.7-6.6'/%3E%3C/g%3E%3C/svg%3E")`;
-
-/** A crayon chevron drawn centred in its box, so it can turn in place. Points down at rest. */
-const CARET_MASK = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='%23000' stroke-width='2.8' stroke-linecap='round' stroke-linejoin='round' d='M6 9c2.3 1.9 4.3 3.9 6 6 1.8-2.2 3.8-4.2 6-6'/%3E%3C/svg%3E")`;
-
-/** The mask box behind every caret: a square with the mark at its centre and the pivot there too. */
-function caret(): string {
-	return `content: '';
-				display: inline-block;
-				flex: none;
-				width: 1em;
-				height: 1em;
-				background: currentColor;
-				opacity: 0.65;
-				-webkit-mask-image: ${CARET_MASK};
-				mask-image: ${CARET_MASK};
-				-webkit-mask-size: 100% 100%;
-				mask-size: 100% 100%;
-				-webkit-mask-repeat: no-repeat;
-				mask-repeat: no-repeat;
-				transform-origin: center;
-				transition: transform 140ms ease;`;
-}
-
 /** The card's one accent: the site's pink, and the same pink let through thinner on dark paper (a mix with the paper would drag its hue). */
 function accent(card: string): string {
 	return `			${card} {
@@ -160,12 +135,15 @@ const PICK_CSS = `			.pg-pick-trigger {
 				cursor: pointer;
 			}
 
-			/* The caret follows the trigger's own open attribute, turning about its own centre. */
-			.pg-pick-trigger::after {
-				${caret()}
+			.pg-pick-caret {
+				width: 1em;
+				height: 1em;
+				color: currentColor;
+				opacity: 0.65;
+				transition: transform 140ms ease;
 			}
 
-			.pg-pick-trigger[ui-open]::after {
+			.pg-pick-trigger[ui-open] .pg-pick-caret {
 				transform: rotate(180deg);
 			}
 
@@ -344,7 +322,6 @@ export const CONTROLS_CSS = `${sticker('.pg')}
 				align-items: center;
 			}
 
-			/* The hint is a small circled question mark, quiet until pointed at. */
 			.pg-dot {
 				display: inline-grid;
 				place-items: center;
@@ -352,8 +329,7 @@ export const CONTROLS_CSS = `${sticker('.pg')}
 				width: 1.25em;
 				height: 1.25em;
 				padding: 0;
-				border: 1.5px solid currentColor;
-				border-radius: 999px;
+				border: 0;
 				background: transparent;
 				color: var(--ink);
 				opacity: 0.6;
@@ -422,10 +398,12 @@ ${tipLook('.pg-tip')}
 				color: var(--state-hover-fg);
 			}
 
-			/* Points along the row while closed, down once the rest of the controls are out. */
-			.pg-showall::after {
-				${caret()}
+			.pg-showall-caret {
+				width: 1em;
+				height: 1em;
+				color: currentColor;
 				transform: rotate(-90deg);
+				transition: transform 140ms ease;
 			}
 
 			.pg-showall-less,
@@ -437,7 +415,7 @@ ${tipLook('.pg-tip')}
 				display: inline;
 			}
 
-			.pg-showall[ui-open]::after {
+			.pg-showall[ui-open] .pg-showall-caret {
 				transform: rotate(0deg);
 			}
 
@@ -654,19 +632,9 @@ export const CODE_CSS = `			/* One row between the stage and the code: the file 
 				cursor: pointer;
 			}
 
-			.pg-expand::after {
-				content: '';
-				display: block;
-				width: 1em;
-				height: 1em;
+			.pg-expand-icons {
+				display: inline-flex;
 				margin-block-end: 0.1em;
-				background: currentColor;
-				-webkit-mask-image: ${ARROW_MASK};
-				mask-image: ${ARROW_MASK};
-				-webkit-mask-size: 100% 100%;
-				mask-size: 100% 100%;
-				-webkit-mask-repeat: no-repeat;
-				mask-repeat: no-repeat;
 			}
 
 			.pg-expand:hover {

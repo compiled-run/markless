@@ -6,6 +6,7 @@
 // end of the run keeps its link box, hidden, so the doodles stay centred.
 import Sprite from '../sprite.tsrx';
 import Sticker from '../sticker.tsrx';
+import { lucide } from '@markless/icons';
 import { pagerFor } from '../../nav.ts';
 
 export default function Pager({ pathname }: { readonly pathname: string }) @{
@@ -33,7 +34,7 @@ export default function Pager({ pathname }: { readonly pathname: string }) @{
 			class={steps.nextHref ? 'pager-link pager-next' : 'pager-link pager-next is-empty'}
 			href={steps.nextHref || '/markless'}
 		>
-			<span class="pager-dir">Next →</span>
+			<span class="pager-dir">Next <lucide.arrowright aria-hidden="true" /></span>
 			<span class="pager-title">{steps.nextTitle}</span>
 		</a>
 	</nav>

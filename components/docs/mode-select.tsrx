@@ -1,4 +1,5 @@
 import * as select from '@markless/ui/select';
+import { lucide, ph, tabler } from '@markless/icons';
 
 type Mode = 'framework' | 'ui';
 
@@ -20,24 +21,28 @@ export default function ModeSelect({ mode }: { readonly mode: Mode }) @{
 			>Documentation mode</select.label>
 			<select.trigger class="mode-select-trigger">
 				<span>{title}</span>
-				<svg
-					class="mode-select-caret"
-					viewBox="0 0 16 16"
-					width="16"
-					height="16"
-					aria-hidden="true"
-				>
-					<path d="m3 6 5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-				</svg>
+				<span class="mode-select-caret" aria-hidden="true">
+					<lucide.chevrondown class="ico ico-a" />
+					<ph.caretdown class="ico ico-b" />
+					<tabler.chevrondown class="ico ico-c" />
+				</span>
 			</select.trigger>
 			<select.content class="mode-select-content">
 				<select.item class="mode-select-item" value="framework">
 					<select.itemlabel class="mode-select-item-label">Framework</select.itemlabel>
-					<select.itemindicator class="mode-select-item-indicator">✓</select.itemindicator>
+					<select.itemindicator class="mode-select-item-indicator">
+						<lucide.check class="ico ico-a" aria-hidden="true" />
+						<ph.check class="ico ico-b" aria-hidden="true" />
+						<tabler.check class="ico ico-c" aria-hidden="true" />
+					</select.itemindicator>
 				</select.item>
 				<select.item class="mode-select-item" value="ui">
 					<select.itemlabel class="mode-select-item-label">UI</select.itemlabel>
-					<select.itemindicator class="mode-select-item-indicator">✓</select.itemindicator>
+					<select.itemindicator class="mode-select-item-indicator">
+						<lucide.check class="ico ico-a" aria-hidden="true" />
+						<ph.check class="ico ico-b" aria-hidden="true" />
+						<tabler.check class="ico ico-c" aria-hidden="true" />
+					</select.itemindicator>
 				</select.item>
 			</select.content>
 			<select.field />

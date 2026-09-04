@@ -1,4 +1,5 @@
 import { accordion } from '@markless/ui';
+import { lucide, ph, tabler } from '@markless/icons';
 
 export default function AccordionFind() @{
 	const questions = [
@@ -12,7 +13,14 @@ export default function AccordionFind() @{
 			@for (const q of questions; key q.value) {
 				<accordion.item class="section" value={q.value}>
 					<accordion.itemlabel class="heading">
-						<accordion.itemtrigger class="trigger">{q.question}</accordion.itemtrigger>
+						<accordion.itemtrigger class="trigger">
+							{q.question}
+							<span class="trigger-icons" aria-hidden="true">
+								<lucide.chevrondown class="ico ico-a" />
+								<ph.caretdown class="ico ico-b" />
+								<tabler.chevrondown class="ico ico-c" />
+							</span>
+						</accordion.itemtrigger>
 					</accordion.itemlabel>
 					<accordion.itemcontent class="panel">{q.answer}</accordion.itemcontent>
 				</accordion.item>
@@ -84,12 +92,12 @@ export default function AccordionFind() @{
 				cursor: pointer;
 			}
 
-			.trigger::after {
-				content: '▾';
+			.trigger-icons {
+				display: inline-flex;
 				transition: transform 140ms ease;
 			}
 
-			.trigger[ui-open]::after {
+			.trigger[ui-open] .trigger-icons {
 				transform: rotate(180deg);
 			}
 

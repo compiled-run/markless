@@ -15,6 +15,7 @@
 // is the width it is reserved here, at the end of the row, so the fixed control
 // lands on it. NOTES.md finding 19 has the detail.
 import Mascot from '../mascot.tsrx';
+import { lucide } from '@markless/icons';
 import { breadcrumbFor } from '../../nav.ts';
 import VariantPicker from './variant-picker.tsrx';
 
@@ -26,9 +27,9 @@ export default function SiteHeader({ pathname }: { readonly pathname: string }) 
 			<Mascot name="markless" size="1.7rem" variant="crumb" />
 			<span>Markless</span>
 		</a>
-		<span class="crumb-sep crumb-sep-section" aria-hidden="true">▸</span>
+		<lucide.chevronright class="crumb-sep crumb-sep-section" aria-hidden="true" />
 		<span class="crumb crumb-section">{crumb.section}</span>
-		<span class="crumb-sep" aria-hidden="true">▸</span>
+		<lucide.chevronright class="crumb-sep" aria-hidden="true" />
 		<span class="crumb crumb-page">{crumb.page}</span>
 		<div class="header-tools">
 			<input
