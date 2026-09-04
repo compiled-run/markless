@@ -17,6 +17,7 @@ import {
 import {
 	collectImports,
 	collectModuleImports,
+	collectUiImportShapeDiagnostics,
 	frameworkApiSources,
 	getFrameworkApiForCall,
 } from './imports.ts';
@@ -69,6 +70,13 @@ export async function buildSemanticGraph(
 	const statements = asNodes(ast.body);
 	const moduleId = moduleIdOf(input);
 	const graph = createMutableSemanticGraphArtifact(input.filename, moduleId);
+	graph.diagnostics.push(
+		...collectUiImportShapeDiagnostics({
+			statements,
+			source: input.source,
+			filename: input.filename,
+		}),
+	);
 	const apiSources = frameworkApiSources(input.additionalFrameworkApiSources);
 	graph.moduleImports.push(...collectModuleImports(statements, apiSources));
 	const frameworkApiImports = collectImports(statements, apiSources);

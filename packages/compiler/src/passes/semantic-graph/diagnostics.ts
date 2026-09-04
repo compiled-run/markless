@@ -12,6 +12,26 @@ import type {
 import type { FrameworkApiName } from './imports.ts';
 import type { PendingElementHandleIdref, WalkState } from './types.ts';
 
+export function uiImportShapeDiagnostic(input: {
+	readonly statement: AnyNode;
+	readonly filename: string;
+	readonly source: string;
+	readonly importSource: string;
+	readonly name: string;
+}): SemanticGraphDiagnostic {
+	const line = input.source.slice(0, input.statement.start ?? 0).split('\n').length;
+	const fix = `import { ${input.name} } from '@markless/ui'`;
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_UI_IMPORT_SHAPE',
+		title: '@markless/ui value imports must use named exports from the package root',
+		message: `Line ${line} imports from \`${input.importSource}\` with an unsupported shape. Line ${line} must use \`${fix}\`.`,
+		why: 'Application value imports from a family subpath or a namespace can expose source files to dependency optimization instead of using the package root export surface.',
+		span: sourceSpan(input.statement, input.filename),
+		suggestion: `Replace this declaration with \`${fix};\`.`,
+		docsUrl: 'https://markless.dev/errors/MARKLESS_UI_IMPORT_SHAPE',
+	});
+}
+
 export function storageKeyStaticDiagnostic(input: {
 	readonly argument: 'key' | 'fallback';
 	readonly call: AnyNode;

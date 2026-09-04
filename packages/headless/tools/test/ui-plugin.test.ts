@@ -20,6 +20,15 @@ function transformer(options: UiOptions = {}) {
 }
 
 describe('ui plugin', () => {
+	test('excludes @markless/ui from dependency optimization', () => {
+		const config = ui().config;
+		if (typeof config !== 'function') throw new Error('Expected a config hook.');
+
+		expect(config.call({} as never, {} as never, {} as never)).toEqual({
+			optimizeDeps: { exclude: ['@markless/ui'] },
+		});
+	});
+
 	test.each([
 		['@markless/ui', '/src/App.tsrx'],
 		['@markless/icons', '/src/App.tsrx'],

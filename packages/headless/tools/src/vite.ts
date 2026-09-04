@@ -11,6 +11,9 @@ export function ui(options: UiOptions = {}): Plugin {
 	return {
 		name: '@markless/ui-tools',
 		enforce: 'pre',
+		config() {
+			return { optimizeDeps: { exclude: ['@markless/ui'] } };
+		},
 		transform: {
 			order: 'pre',
 			async handler(code, id, transformOptions) {

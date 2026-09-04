@@ -1,5 +1,6 @@
 import { asNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
-import type { SemanticModuleImport } from '../../artifacts.ts';
+import type { SemanticGraphDiagnostic, SemanticModuleImport } from '../../artifacts.ts';
+import { uiImportShapeDiagnostic } from './diagnostics.ts';
 
 export type FrameworkApiName =
 	| 'state'
@@ -109,6 +110,56 @@ export function collectModuleImports(
 	}
 
 	return imports;
+}
+
+export function collectUiImportShapeDiagnostics(input: {
+	readonly statements: ReadonlyArray<AnyNode>;
+	readonly source: string;
+	readonly filename: string;
+}): ReadonlyArray<SemanticGraphDiagnostic> {
+	const diagnostics: SemanticGraphDiagnostic[] = [];
+
+	for (const statement of input.statements) {
+		if (statement.type !== 'ImportDeclaration' || statement.importKind === 'type') continue;
+		const source = importSource(statement);
+		if (!source) continue;
+		const specifiers = asNodes(statement.specifiers);
+
+		if (source.startsWith('@markless/ui/')) {
+			if (specifiers.length > 0 && specifiers.every((specifier) => specifier.importKind === 'type'))
+				continue;
+			const name = source.slice('@markless/ui/'.length).split('/')[0];
+			if (!name) continue;
+			diagnostics.push(
+				uiImportShapeDiagnostic({
+					statement,
+					filename: input.filename,
+					source: input.source,
+					importSource: source,
+					name,
+				}),
+			);
+			continue;
+		}
+
+		if (source !== '@markless/ui') continue;
+		const namespace = specifiers.find(
+			(specifier) => specifier.type === 'ImportNamespaceSpecifier',
+		);
+		const name = getIdentifierName(namespace?.local as AnyNode | undefined);
+		if (!namespace || !name) continue;
+		diagnostics.push(
+			uiImportShapeDiagnostic({
+				statement,
+				filename: input.filename,
+				source: input.source,
+				importSource: source,
+				name,
+			}),
+		);
+	}
+
+	return diagnostics;
 }
 
 /**

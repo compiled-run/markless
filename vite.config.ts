@@ -268,6 +268,28 @@ export default defineConfig({
 		// record (1253 vs 0) because it applies strict-family defaults and lints
 		// outside this tsconfig's include/exclude. Raw tsc is the type gate.
 		ignorePatterns: ['dist/**', 'node_modules/**', '.claude/**'],
+		rules: {
+			'no-restricted-imports': [
+				'error',
+				{
+					paths: [
+						{
+							name: '@markless/ui',
+							importNames: ['*'],
+							allowTypeImports: true,
+							message: "import { family } from '@markless/ui'",
+						},
+					],
+					patterns: [
+						{
+							group: ['@markless/ui/*'],
+							allowTypeImports: true,
+							message: "import { family } from '@markless/ui'",
+						},
+					],
+				},
+			],
+		},
 	},
 	fmt: {
 		useTabs: true,
