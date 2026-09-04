@@ -124,7 +124,7 @@ function hoverMarkup(rendered: string, title: string, doc: string, label: string
 		rendered,
 		'<span class="tsrx-tip" aria-hidden="true">',
 		`<span class="tsrx-tip-title">${escapeText(title)}</span>`,
-		doc ? `<span class="tsrx-tip-body">${escapeText(doc)}</span>` : '',
+		`<span class="tsrx-tip-body">${escapeText(doc)}</span>`,
 		'</span></span>',
 	].join('');
 }

@@ -1,5 +1,5 @@
 import { accordion } from '@markless/ui';
-import { lucide, ph, tabler } from '@markless/icons';
+import { lucide } from '@markless/icons';
 
 export default function Settings() @{
 	const groups = [
@@ -47,11 +47,7 @@ export default function Settings() @{
 						<accordion.itemtrigger class="group-trigger">
 							<span class="group-name">{group.name}</span>
 							<span class="group-note">{group.note}</span>
-							<span class="trigger-icons" aria-hidden="true">
-								<lucide.chevrondown class="ico ico-a" />
-								<ph.caretdown class="ico ico-b" />
-								<tabler.chevrondown class="ico ico-c" />
-							</span>
+							<lucide.chevrondown class="trigger-icon" aria-hidden="true" />
 						</accordion.itemtrigger>
 					</accordion.itemlabel>
 					<accordion.itemcontent class="group-panel">
@@ -173,15 +169,18 @@ export default function Settings() @{
 				opacity: 0.7;
 			}
 
-			.trigger-icons {
+			.trigger-icon {
 				display: inline-flex;
+				width: 1em;
+				height: 1em;
+				flex: none;
 				grid-column: 2;
 				grid-row: 1 / span 2;
 				align-self: center;
 				transition: transform 140ms ease;
 			}
 
-			.group-trigger[ui-open] .trigger-icons {
+			.group-trigger[ui-open] .trigger-icon {
 				transform: rotate(180deg);
 			}
 

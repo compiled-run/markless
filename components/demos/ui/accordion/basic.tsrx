@@ -1,5 +1,5 @@
 import { accordion } from '@markless/ui';
-import { lucide, ph, tabler } from '@markless/icons';
+import { lucide } from '@markless/icons';
 
 export default function AccordionBasic() @{
 	const questions = [
@@ -16,11 +16,7 @@ export default function AccordionBasic() @{
 					<accordion.itemlabel class="heading">
 						<accordion.itemtrigger class="trigger">
 							{q.question}
-							<span class="trigger-icons" aria-hidden="true">
-								<lucide.chevrondown class="ico ico-a" />
-								<ph.caretdown class="ico ico-b" />
-								<tabler.chevrondown class="ico ico-c" />
-							</span>
+							<lucide.chevrondown class="trigger-icon" aria-hidden="true" />
 						</accordion.itemtrigger>
 					</accordion.itemlabel>
 					<accordion.itemcontent class="panel">{q.answer}</accordion.itemcontent>
@@ -93,12 +89,15 @@ export default function AccordionBasic() @{
 				cursor: pointer;
 			}
 
-			.trigger-icons {
+			.trigger-icon {
 				display: inline-flex;
+				width: 1em;
+				height: 1em;
+				flex: none;
 				transition: transform 140ms ease;
 			}
 
-			.trigger[ui-open] .trigger-icons {
+			.trigger[ui-open] .trigger-icon {
 				transform: rotate(180deg);
 			}
 

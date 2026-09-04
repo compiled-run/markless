@@ -1408,7 +1408,7 @@ html[data-theme='dark'][data-variant='a'] {
 	--card-edge: 2px solid var(--ink);
 	--inline-code-bg: linear-gradient(
 		transparent 18%,
-		color-mix(in oklch, var(--yellow) 30%, transparent) 18% 88%,
+		color-mix(in oklch, var(--yellow) 22%, var(--raised)) 18% 88%,
 		transparent 88%
 	);
 	--inline-code-fg: var(--ink);
@@ -2504,10 +2504,15 @@ html[data-theme='dark'] :is(.mode-select-fallback, .mode-select-trigger, .mode-s
 	font-weight: 700;
 }
 
-.mode-select-item[ui-highlighted],
-.mode-select-item:focus {
+.mode-select-item[ui-highlighted]:not([ui-selected]),
+.mode-select-item:focus:not([ui-selected]) {
 	color: var(--ink);
 	background: var(--state-highlight-bg);
+}
+
+.mode-select-item[ui-selected]:is([ui-highlighted], :focus) {
+	outline: 2px solid var(--yellow);
+	outline-offset: 2px;
 }
 
 .mode-select-trigger:focus-visible,

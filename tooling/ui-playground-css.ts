@@ -216,6 +216,17 @@ const PICK_CSS = `			.pg-pick-trigger {
 				color: var(--state-selected-fg);
 				outline: var(--state-selected-edge);
 				box-shadow: var(--state-selected-shadow);
+			}
+
+			.pg-pick-item[ui-highlighted]:not([ui-selected]),
+			.pg-pick-item:focus:not([ui-selected]) {
+				background: var(--state-highlight-bg);
+				color: var(--ink);
+			}
+
+			.pg-pick-item[ui-selected]:is([ui-highlighted], :focus) {
+				outline: 2px solid var(--yellow);
+				outline-offset: 2px;
 			}`;
 
 /** One focus ring for every control the chrome draws: the site's yellow, as its hover docs use. */
