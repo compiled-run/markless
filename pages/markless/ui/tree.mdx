@@ -1,6 +1,8 @@
 import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
-import ModeSelect from '../../../components/docs/mode-select.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
 import Preview from '../../../components/ui/preview.tsrx';
+
+<Sidebar pathname="/markless/ui/tree" />
 
 # tree
 
@@ -57,5 +59,3 @@ It writes `ui-open`, `ui-closed`, `ui-leaf`, `ui-disabled` and `ui-value`.
 
 Everything a `<div>` accepts reaches the element too, `aria-label` included — which is how the tree
 is named. `tree.item` carries the rest: `open`, `leaf`, `level` and its own `onChange`.
-
-<ModeSelect mode="ui" />

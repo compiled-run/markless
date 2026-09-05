@@ -37,9 +37,14 @@ test('ordinary navigation retains the chosen design', () => {
 	assert.equal(load('', 'b').variant, 'b');
 });
 
-test('invalid choices fall back to a saved design or Poster', () => {
+test('invalid choices fall back to a saved design or Arcade', () => {
 	assert.equal(load('?variant=unknown', 'b').variant, 'b');
 	assert.equal(load('', 'unknown').variant, 'a');
+});
+
+test('the fourth preview works through shared links and ordinary navigation', () => {
+	assert.deepEqual(load('?variant=d', 'a'), { variant: 'd', stored: 'd' });
+	assert.equal(load('', 'd').variant, 'd');
 });
 
 test('shared links still work when browser storage is blocked', () => {

@@ -1,13 +1,6 @@
 :root {
-	--code-size: var(--step--2);
-	--code-leading: 1.6;
-	--marker-wash: color-mix(in oklch, var(--pink) 28%, transparent);
+	--marker-wash: color-mix(in oklch, var(--purple) 24%, transparent);
 	--quiet-fill: color-mix(in oklch, var(--ink) 6%, var(--paper));
-}
-
-html[data-theme='dark'] {
-	--marker-wash: color-mix(in oklch, var(--pink) 16%, transparent);
-	--quiet-fill: color-mix(in oklch, var(--ink) 7%, var(--paper));
 }
 
 .variant-picker {
@@ -39,9 +32,7 @@ html[data-theme='dark'] {
 .variant-picker a:hover {
 	background: var(--quiet-fill);
 }
-html[data-variant='a'] .variant-a,
-html[data-variant='b'] .variant-b,
-html[data-variant='c'] .variant-c {
+.variant-picker a[aria-current='true'] {
 	border-color: var(--ink);
 	background: var(--quiet-fill);
 }
@@ -52,68 +43,30 @@ html[data-variant='c'] .variant-c {
 html[data-variant] .site-search {
 	display: none;
 }
-html[data-variant] .prose h1 {
+
+html[data-variant] .mode-select-island {
 	position: relative;
-	width: fit-content;
-	max-width: 100%;
+	position-anchor: auto;
+	inset: auto;
+	inline-size: 100%;
+	margin-bottom: var(--space-s);
+	z-index: 25;
 }
-html[data-theme='dark'] :is(h1, h2, h3, h4, h5, h6) {
-	text-shadow: none;
-}
-html[data-variant] .prose h2,
-html[data-variant] .prose h3 {
-	text-shadow: none;
-}
-html[data-variant] .prose code:not(pre code) {
-	background: var(--marker-wash);
-	color: var(--ink);
-	padding: 0.05em 0.25em;
-	border-radius: 2px;
-	box-decoration-break: clone;
-}
-html[data-variant] .prose pre,
-html[data-variant] .pg-shiki {
-	font-family: var(--font-mono);
-	font-size: var(--code-size);
-	line-height: var(--code-leading);
-	background: var(--code-surface);
-	border: 0;
-	border-radius: 0;
-	box-shadow: none;
-	padding: 1.25rem;
-}
-html[data-variant]
-	:is(.prose pre code, .prose pre span:not([class^='tsrx-tip']), .pg-shiki, .pg-shiki span) {
-	font-family: var(--font-mono);
-}
-html[data-variant] .pg-shiki :is(.tsrx-tip, .tsrx-tip-body) {
-	font-family: 'Shantell Sans', sans-serif;
-}
-html[data-variant] .prose pre code {
-	font-size: inherit;
-	line-height: inherit;
-}
-html[data-variant] .mode-select-trigger,
-html[data-variant] .mode-select-fallback {
+html[data-variant] :is(.mode-select-trigger, .pg-bar-trigger) {
 	background: var(--paper);
 	border: 1.5px solid var(--ink);
 	border-radius: 3px;
 	min-height: 2.7rem;
+	box-shadow: 3px 3px 0 var(--marker-wash);
 }
-html[data-variant] .mode-select-slot {
-	min-height: 2.7rem;
-}
-html[data-variant] .mode-select-fallback {
-	visibility: hidden;
-}
-html[data-variant] .mode-select-content {
+html[data-variant] :is(.mode-select-content, .pg-bar-list) {
 	background: var(--paper);
 	padding: 0.4rem;
 	border: 1.5px solid var(--ink);
 	border-radius: 3px;
 	box-shadow: 3px 4px 0 var(--code-edge);
 }
-html[data-variant] .mode-select-item {
+html[data-variant] :is(.mode-select-item, .pg-bar-list .pg-pick-item) {
 	min-height: 2.25rem;
 	box-sizing: border-box;
 	border: 0;
@@ -121,91 +74,65 @@ html[data-variant] .mode-select-item {
 	background: transparent;
 	color: var(--ink);
 }
-html[data-variant] .mode-select-item[ui-selected] {
+html[data-variant] :is(.mode-select-item, .pg-bar-list .pg-pick-item)[ui-selected] {
 	background: var(--marker-wash);
 	font-weight: 700;
 }
-html[data-variant] .mode-select-item:hover,
-html[data-variant] .mode-select-item[ui-highlighted] {
+html[data-variant] :is(.mode-select-item, .pg-bar-list .pg-pick-item):is(:hover, :focus-visible),
+html[data-variant] .sidebar-link:is(:hover, :focus-visible) {
 	background: var(--quiet-fill);
 	outline: 1px dashed var(--ink);
 	outline-offset: -3px;
 }
-html[data-variant] .mode-select-item[ui-selected]:is(:hover, [ui-highlighted]) {
+html[data-variant]
+	:is(.mode-select-item, .pg-bar-list .pg-pick-item)[ui-selected]:is(:hover, :focus-visible) {
 	background: var(--marker-wash);
 }
-html[data-variant] .mode-select-trigger:focus-visible {
-	outline-color: var(--ink);
+html[data-variant] :is(.mode-select-trigger, .pg-bar-trigger):focus-visible {
+	outline: 2px dashed var(--ink);
+	outline-offset: 4px;
 }
-html[data-variant] .sidebar-link.is-active {
-	background: transparent;
+.prose .sidebar a {
+	text-decoration: none;
 }
-html[data-variant] .sidebar-link.is-active .sidebar-text {
-	background: linear-gradient(transparent 48%, var(--marker-wash) 48% 90%, transparent 90%);
+.prose .sidebar-list {
+	margin: 0;
+	padding: 0;
 }
-html[data-variant] .on-this-page-link:hover {
-	background: var(--quiet-fill);
-	color: var(--ink);
+.prose .sidebar-title {
+	margin-block: 0 0.65em;
 }
 
-/* The generated demo styles load after document styles, so shared chrome is qualified by the active design. */
+/* Generated component CSS follows the document sheet, so preview rules include the design attribute. */
 html[data-variant] :is(.pg, .cp) {
+	--play-accent: var(--pink);
 	min-width: 0;
-	border: 0;
-	border-radius: 0;
-	box-shadow: none;
-	background: transparent;
+	border: 2px solid var(--ink);
+	border-radius: 8px;
+	box-shadow: 4px 4px 0 var(--play-accent);
+	background: var(--paper);
 	overflow: visible;
 	margin: 2rem 0;
+	gap: 0;
 }
 html[data-variant] .pg-controls {
 	background: transparent;
 	border: 0;
+	border-bottom: 1px solid var(--code-edge);
 }
 html[data-variant] .pg-quick {
-	padding: 0.8rem 0;
+	padding: 0.9rem 1.1rem;
 	border: 0;
 	gap: 0.75rem 1.25rem;
 }
 html[data-variant] .pg-rest {
-	padding: 1rem 0;
+	padding: 1rem 1.1rem;
 	border: 0;
 }
 html[data-variant] .pg-log {
 	margin: 0;
-	padding: 0.25rem 0;
+	padding: 0.4rem 1.1rem;
 	background: transparent;
-}
-html[data-variant] .pg-stage {
-	box-sizing: border-box;
-	min-width: 0;
-	min-height: 0;
-	margin: 0;
-	padding: 2rem 0;
-	border: 0;
-	border-radius: 0;
-	background: transparent;
-}
-html[data-variant] .pg-bar {
-	padding: 0.6rem 0 0;
-	gap: 0.5rem;
-}
-html[data-variant] .pg-code {
-	min-width: 0;
-}
-html[data-variant] .pg-panes {
-	border: 0;
-	background: var(--code-surface);
-}
-html[data-variant] .pg-tab {
-	font-size: var(--code-size);
-	border-radius: 0;
-	padding: 0.6rem 1rem;
-}
-html[data-variant] .pg-tab[ui-selected] {
-	background: var(--code-surface);
-	border-color: transparent;
-	box-shadow: inset 0 2px var(--ink);
 }
 html[data-variant] .pg-switch[ui-checked] {
 	background: var(--ink);
@@ -218,7 +145,7 @@ html[data-variant] .pg-showall {
 	background: transparent;
 	padding: 0.3rem 0;
 }
-html[data-variant] .pg-pick-item:is(:hover, [ui-highlighted]) {
+html[data-variant] .pg-pick-item:is(:hover, :focus-visible) {
 	background: var(--quiet-fill);
 	color: var(--ink);
 }
@@ -227,47 +154,53 @@ html[data-variant] .pg-pick-item[ui-selected] {
 	color: var(--ink);
 	border-color: transparent;
 }
-html[data-variant] .pg-expand {
-	font-size: 0.9rem;
+html[data-variant] .pg-stage {
+	box-sizing: border-box;
+	min-width: 0;
+	min-height: 0;
+	margin: 0;
+	padding: 1.75rem 2.5rem;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
 }
-html[data-variant] .pg-expand-icon {
-	transform: rotate(90deg);
-}
-
 html[data-variant] [data-family='accordion'] :is(.accordion, .faq, .settings) {
 	box-sizing: border-box;
 	width: 100%;
 	max-width: 36rem;
+	margin-inline: auto;
 	padding: 0;
 	border: 0;
 	background: transparent;
+	gap: 0;
 }
 html[data-variant] [data-family='accordion'] :is(.sections, .faq-items, .groups) {
 	display: contents;
 }
 html[data-variant] [data-family='accordion'] :is(.section, .faq-item, .group) {
 	border: 0;
-	border-bottom: 1px solid var(--code-edge);
 	border-radius: 0;
 	background: transparent;
 	overflow: visible;
 }
 html[data-variant] [data-family='accordion'] :is(.heading, .faq-heading, .group-heading) {
 	margin: 0;
-	font-size: 1.2rem;
-	line-height: 1.4;
+	font-size: 1.15rem;
+	line-height: 1.45;
 	text-shadow: none;
 }
 html[data-variant] [data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger) {
 	box-sizing: border-box;
 	width: 100%;
-	min-height: 3.4rem;
-	padding: 0.85rem 0.5rem;
+	min-height: 3.5rem;
+	padding: 0.9rem 1rem;
 	border: 0;
 	background: transparent;
-	color: var(--ink);
+	color: inherit;
+	font: inherit;
 	font-weight: 700;
 	text-align: start;
+	cursor: pointer;
 }
 html[data-variant] [data-family='accordion'] :is(.trigger, .faq-trigger) {
 	display: flex;
@@ -275,21 +208,18 @@ html[data-variant] [data-family='accordion'] :is(.trigger, .faq-trigger) {
 	align-items: center;
 	gap: 1rem;
 }
-html[data-variant] [data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger):hover {
-	background: var(--quiet-fill);
-}
 html[data-variant]
 	[data-family='accordion']
 	:is(.trigger, .faq-trigger, .group-trigger):focus-visible {
-	outline: 2px solid var(--ink);
-	outline-offset: 3px;
+	outline: 2px dashed currentColor;
+	outline-offset: -5px;
 }
 html[data-variant] [data-family='accordion'] :is(.panel, .faq-panel, .group-panel)[ui-open] {
-	padding: 0 0.5rem 1.1rem;
+	padding: 0.2rem 1rem 1.2rem;
 	background: transparent;
 	font-family: 'Shantell Sans', sans-serif;
 	font-size: 0.95rem;
-	line-height: 1.7;
+	line-height: 1.8;
 }
 html[data-variant] [data-family='accordion'] :is(.panel, .faq-panel, .group-panel)[hidden] {
 	display: none;
@@ -298,246 +228,344 @@ html[data-variant] [data-family='accordion'] .trigger-icon {
 	width: 1rem;
 	height: 1rem;
 	flex: none;
+	transform: none;
+	transition: transform 140ms ease;
 }
-html[data-variant] [data-family='accordion'] [ui-open] > .trigger-icon {
+html[data-variant] [data-family='accordion'] [aria-expanded='true'] > .trigger-icon {
 	transform: rotate(180deg);
 }
+html[data-variant] [data-family='accordion'] [ui-disabled] {
+	opacity: 0.45;
+}
 html[data-variant] [data-family='accordion'] .faq-title {
-	font-size: 1.6rem;
-	margin: 0 0 1rem;
+	font-size: 1.4rem;
+	margin: 0;
+	padding: 1rem;
+	text-shadow: none;
 }
 html[data-variant] [data-family='accordion'] .faq-foot {
-	font-size: 0.9rem;
+	font-size: 0.85rem;
+	padding: 1rem;
+	margin: 0;
 }
 
-html[data-variant='a'] .prose h1 {
-	font-size: clamp(3.6rem, 5.8vw, 6rem);
-	line-height: 0.98;
-	text-transform: uppercase;
-	letter-spacing: -0.035em;
-	margin-block: 2rem 1.5rem;
-	padding: 0.1em 0.12em;
-	background: url('/markless/sprites/stroke-pink.png') center 68% / 100% 75% no-repeat;
-	--shadow-color: var(--yellow);
+html[data-variant] .pg-code {
+	min-width: 0;
+	margin: 0;
+	border-top: 1px solid var(--ink);
+	border-radius: 0 0 6px 6px;
+	background: var(--code-surface);
 }
-html[data-variant='a'] .prose h1::after {
+html[data-variant] .pg-panel {
+	overflow: visible;
+}
+html[data-variant] .pg-bar {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: end;
+	gap: 0.8rem;
+	padding: 0.65rem 1rem 0;
+	background: var(--paper);
+}
+html[data-variant] .pg-strip {
+	min-width: 0;
+	margin-bottom: -1px;
+}
+html[data-variant] .pg-strip-row {
+	gap: 0.25rem;
+}
+html[data-variant] .pg-tab {
+	position: relative;
+	min-height: 2.7rem;
+	padding: 0.65rem 0.85rem;
+	border: 1px solid transparent;
+	border-bottom: 0;
+	border-radius: 6px 6px 0 0;
+	background: transparent;
+	color: var(--ink);
+	font-family: var(--font-mono);
+	font-size: var(--step--2);
+	opacity: 0.75;
+	white-space: nowrap;
+}
+html[data-variant] .pg-tab[ui-selected] {
+	background: var(--code-surface);
+	border-color: var(--ink);
+	box-shadow: 0 1px 0 var(--code-surface);
+	font-weight: 700;
+	opacity: 1;
+}
+html[data-variant] .pg-tab[ui-selected]::before {
 	content: '';
 	position: absolute;
-	width: 3rem;
-	height: 3rem;
-	right: -2.25rem;
-	top: -1.4rem;
-	background: url('/markless/sprites/crown.png') center / contain no-repeat;
-	transform: rotate(15deg);
+	inset: 0.3rem 0.65rem auto;
+	height: 3px;
+	background: var(--play-accent);
+	transform: rotate(-1deg);
 }
-html[data-variant='a'][data-theme='dark'] .prose h1 {
-	background-image: url('/markless/sprites/stroke-pink.dark.png');
+html[data-variant] .pg-tab:is(:hover, :focus-visible) {
+	outline: 1px dashed var(--ink);
+	outline-offset: -4px;
+	opacity: 1;
 }
-html[data-variant='a'] .pg-controls {
-	border-block: 1px solid var(--ink);
+html[data-variant] .pg-tab:focus-visible {
+	outline-width: 2px;
+}
+html[data-variant] .pg-panes {
+	border-top: 1px solid var(--ink);
+}
+html[data-variant] .pg-bar-pick {
+	display: flex;
+	align-items: center;
+	gap: 0.6rem;
+	margin: 0 0 0.6rem auto;
+	padding: 0;
+}
+html[data-variant] .pg-bar-name {
+	font-size: var(--step--2);
+	text-transform: none;
+	letter-spacing: normal;
+	opacity: 0.8;
+}
+html[data-variant] .pg-bar-trigger {
+	width: 9rem;
+	min-width: 0;
+	padding: 0.35em 0.7em;
+	font-size: var(--step--1);
+	font-weight: 700;
+}
+html[data-variant] .pg-bar-trigger .pg-pick-value {
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+html[data-variant] .pg-bar-list {
+	min-width: 12rem;
+	z-index: 45;
+}
+html[data-variant] .pg-bar-list .pg-pick-item {
+	padding: 0.3em 0.7em;
+	font-size: var(--step--1);
+}
+html[data-variant] :is(.pg-shiki, .pg-shiki span) {
+	font-family: var(--font-mono);
+}
+html[data-variant] .pg-shiki :is(.tsrx-tip, .tsrx-tip-body) {
+	font-family: 'Shantell Sans', sans-serif;
+}
+html[data-variant] .pg-expand {
+	height: 2.6rem;
+	padding: 0.4rem;
+	align-items: center;
+	border-top: 1px solid var(--code-edge);
+	border-radius: 0 0 6px 6px;
+	background: var(--code-surface);
+	font-size: 0.9rem;
+}
+html[data-variant] .pg-fade {
+	bottom: 2.6rem;
+	height: 4rem;
+}
+
+html[data-variant='a'] :is(.pg, .cp) {
+	--play-accent: var(--pink);
+	border-width: 2px;
+	box-shadow: 5px 5px 0 var(--pink);
 }
 html[data-variant='a'] [data-family='accordion'] .pg-stage {
-	padding: 2.25rem 1.25rem;
+	position: relative;
+}
+html[data-variant='a'] [data-family='accordion'] .pg-stage::after {
+	content: '';
+	position: absolute;
+	right: 0.8rem;
+	top: 0.5rem;
+	width: 2rem;
+	height: 2rem;
+	background: url('/markless/sprites/crown.png') center / contain no-repeat;
+	transform: rotate(10deg);
+	pointer-events: none;
+}
+html[data-variant='a'] [data-family='accordion'] :is(.section, .faq-item, .group) {
+	border-bottom: 1px solid var(--code-edge);
+}
+html[data-variant='a'] [data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger) {
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
+	font-weight: 700;
+}
+html[data-variant='a'] [data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger):hover {
+	background: var(--quiet-fill);
 }
 html[data-variant='a']
 	[data-family='accordion']
-	:is(.trigger, .faq-trigger, .group-trigger)[ui-open] {
-	text-decoration: underline;
-	text-decoration-color: var(--pink);
-	text-decoration-thickness: 0.22em;
-	text-underline-offset: 0.1em;
-	text-decoration-skip-ink: none;
+	:is(.trigger, .faq-trigger, .group-trigger)[aria-expanded='true'] {
+	background: var(--pink);
+	color: var(--on-accent);
+	box-shadow: 0 3px 0 var(--yellow);
 }
-html[data-variant='a'] .prose h2 {
-	border-bottom: 2px solid var(--ink);
-	padding-bottom: 0.2em;
+html[data-variant='a'] [data-family='accordion'] :is(.panel, .faq-panel, .group-panel)[ui-open] {
+	padding-top: 0.8rem;
 }
-html[data-variant='a'] .prose pre {
-	border-inline-start: 3px solid var(--pink);
+html[data-variant='a'] [data-family='accordion'] .trigger-icon {
+	padding: 0.25rem;
+	box-sizing: content-box;
+	background: var(--yellow);
+	color: var(--on-accent);
+	border: 1px solid var(--on-accent);
+	border-radius: 3px;
 }
 
-html[data-variant='b'] {
-	--marker-wash: color-mix(in oklch, var(--green-soft) 23%, transparent);
-}
-html[data-variant='b'] .prose h1 {
-	font-size: clamp(2.8rem, 4vw, 4.2rem);
-	font-weight: 400;
-	text-shadow: none;
-	padding-bottom: 0.2em;
-	background: url('/markless/sprites/underline-yellow.png') center bottom / 100% 0.3em no-repeat;
-}
-html[data-variant='b'] .prose h2 {
-	font-weight: 400;
-}
-html[data-variant='b'] .pg {
-	border-block: 1px solid var(--ink);
-	padding-block: 0.8rem;
-}
-html[data-variant='b'] .pg-stage {
-	padding: 2rem 1.5rem 2rem 2.5rem;
-	background: linear-gradient(
-		90deg,
-		transparent 1.25rem,
-		var(--marker-wash) 1.25rem calc(1.25rem + 1px),
-		transparent calc(1.25rem + 1px)
-	);
+html[data-variant='b'] :is(.pg, .cp) {
+	--play-accent: var(--yellow);
+	border-radius: 12px 8px 10px 6px;
+	box-shadow: 4px 4px 0 color-mix(in oklch, var(--purple) 55%, transparent);
 }
 html[data-variant='b'] [data-family='accordion'] :is(.section, .faq-item, .group) {
-	border-bottom-style: dashed;
+	position: relative;
+	padding-inline-start: 2rem;
+	border-bottom: 1px dashed var(--code-edge);
+}
+html[data-variant='b'] [data-family='accordion'] :is(.section, .faq-item, .group)::before {
+	content: '';
+	position: absolute;
+	left: 0;
+	top: 1rem;
+	width: 1.7rem;
+	height: 1.7rem;
+	background: url('/markless/sprites/star-badge.png') center / contain no-repeat;
+	opacity: 0.45;
+	pointer-events: none;
 }
 html[data-variant='b']
 	[data-family='accordion']
-	:is(.trigger, .faq-trigger, .group-trigger)[ui-open] {
-	color: var(--ink);
-	background: var(--marker-wash);
+	:is(.section, .faq-item, .group):has([aria-expanded='true'])::before {
+	opacity: 1;
 }
-html[data-variant='b'] .mode-select-trigger {
-	border-inline: 0;
-	border-radius: 0;
+html[data-variant='b'][data-theme='dark']
+	[data-family='accordion']
+	:is(.section, .faq-item, .group)::before {
+	background-image: url('/markless/sprites/star-badge.dark.png');
 }
-html[data-variant='b'] .prose pre {
-	border-block: 1px solid var(--code-edge);
+html[data-variant='b'] [data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger) {
+	padding-inline: 0.5rem;
 }
-html[data-variant='b'] .sidebar-title.has-stroke::after {
-	opacity: 0.45;
-}
-
-html[data-variant='c'] {
-	--marker-wash: color-mix(in oklch, var(--purple) 24%, transparent);
-}
-html[data-variant='c'] .prose h1 {
-	font-size: clamp(3rem, 4.5vw, 4.8rem);
-	text-shadow: none;
-	background: var(--yellow);
-	color: var(--on-accent);
-	padding: 0.12em 0.3em;
-	transform: rotate(-1.5deg);
-	margin-block: 2rem;
-}
-html[data-variant='c'] .prose h2 {
+html[data-variant='b']
+	[data-family='accordion']
+	:is(.trigger, .faq-trigger, .group-trigger)[aria-expanded='true'] {
 	text-decoration: underline;
-	text-decoration-color: var(--purple);
-	text-underline-offset: 0.2em;
+	text-decoration-color: var(--yellow);
+	text-decoration-thickness: 0.25em;
+	text-underline-offset: 0.1em;
+	text-decoration-skip-ink: none;
 }
-html[data-variant='c'] .pg-controls {
-	padding: 0 1rem;
+html[data-variant='b'] [data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger):hover {
 	background: var(--quiet-fill);
 }
-html[data-variant='c'] .pg-stage {
-	position: relative;
-	padding: 2rem 1.4rem;
-	margin-block: 1.2rem;
-	background: var(--raised);
-	border: 1px solid var(--ink);
-	box-shadow: 5px 5px 0 var(--marker-wash);
+
+html[data-variant='c'] :is(.pg, .cp) {
+	--play-accent: var(--pink);
+	border-color: var(--code-edge);
+	border-inline-start: 3px solid var(--pink);
+	border-radius: 3px 9px 7px 3px;
+	box-shadow:
+		3px 3px 0 var(--raised),
+		4px 4px 0 var(--code-edge);
 }
-html[data-variant='c'] .pg-stage::before {
-	content: '';
-	position: absolute;
-	width: 4.5rem;
-	height: 1.25rem;
-	background: color-mix(in oklch, var(--pink) 65%, transparent);
-	left: calc(50% - 2.25rem);
-	top: -0.6rem;
-	transform: rotate(-4deg);
-	pointer-events: none;
+html[data-variant='c'] .pg-controls {
+	border-bottom-style: dashed;
+}
+html[data-variant='c'] [data-family='accordion'] :is(.section, .faq-item, .group) {
+	border-bottom: 1px solid var(--code-edge);
+}
+html[data-variant='c'] [data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger) {
+	padding-inline: 0.5rem;
+	font-weight: 400;
+	font-size: 1.2rem;
 }
 html[data-variant='c']
 	[data-family='accordion']
-	:is(.trigger, .faq-trigger, .group-trigger)[ui-open] {
-	box-shadow: inset 3px 0 var(--purple);
-	padding-inline-start: 1rem;
+	:is(.trigger, .faq-trigger, .group-trigger)[aria-expanded='true'] {
+	text-decoration: underline;
+	text-decoration-color: var(--pink);
+	text-decoration-thickness: 0.18em;
+	text-underline-offset: 0.2em;
 }
-html[data-variant='c'] .mode-select-trigger {
-	box-shadow: 3px 3px 0 var(--marker-wash);
-}
-html[data-variant='c'] .prose pre {
-	border-block-start: 3px solid var(--purple);
+html[data-variant='c'] [data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger):hover {
+	background: var(--quiet-fill);
 }
 
-@media (min-width: 70.01rem) {
-	html[data-variant] .sidebar {
-		width: 14rem;
-	}
-	html[data-variant] .site-shell {
-		padding-inline: calc(14rem + 3 * var(--space-s-l)) var(--space-s-l);
-	}
-	html[data-variant] .prose {
-		max-width: 60ch;
-	}
-	html[data-variant] .on-this-page {
-		display: none;
-	}
-	html[data-variant='b'] .pg {
-		grid-template-columns: minmax(0, 1fr) 11rem;
-		column-gap: 1rem;
-	}
-	html[data-variant='b'] .pg-controls {
-		grid-column: 2;
-		grid-row: 1 / span 2;
-		padding: 0.8rem;
-		border-inline-start: 1px solid var(--code-edge);
-	}
-	html[data-variant='b'] .pg-quick {
-		flex-direction: column;
-		align-items: stretch;
-		padding: 0;
-	}
-	html[data-variant='b'] .pg-rest {
-		grid-template-columns: 1fr;
-	}
-	html[data-variant='b'] .pg > .pg-stage {
-		grid-column: 1;
-		grid-row: 1;
-	}
-	html[data-variant='b'] .pg > .pg-log {
-		grid-column: 1;
-		grid-row: 2;
-	}
-	html[data-variant='b'] .pg > .pg-code {
-		grid-column: 1 / -1;
-	}
-	html[data-variant='c'] .pg {
-		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-		column-gap: 1.5rem;
-		align-items: start;
-	}
-	html[data-variant='c'] .pg-controls {
-		grid-column: 1 / -1;
-	}
-	html[data-variant='c'] .pg-log {
-		grid-column: 1 / -1;
-	}
-	html[data-variant='c'] .pg > .pg-stage {
-		grid-column: 1;
-	}
-	html[data-variant='c'] .pg > .pg-code {
-		grid-column: 2;
-		margin-block: 1.2rem;
-	}
-	html[data-variant='c'] .pg .pg-code-body {
-		max-height: 17rem;
-	}
+html[data-variant='d'] :is(.pg, .cp) {
+	--play-accent: var(--green-soft);
+	position: relative;
+	border-width: 1px;
+	border-radius: 4px 10px 8px 4px;
+	box-shadow: 4px 4px 0 color-mix(in oklch, var(--purple) 24%, transparent);
 }
-@media (min-width: 85rem) {
-	html[data-variant] .site-shell {
-		padding-inline-end: calc(11rem + 2 * var(--space-s-l));
-	}
-	html[data-variant] .on-this-page {
-		display: block;
-	}
+html[data-variant='d'] :is(.pg, .cp)::before {
+	content: '';
+	position: absolute;
+	width: 4.5rem;
+	height: 1.4rem;
+	left: calc(50% - 2.25rem);
+	top: -0.7rem;
+	background: url('/markless/stickers/tape.png') center / contain no-repeat;
+	transform: rotate(-3deg);
+	pointer-events: none;
 }
+html[data-variant='d'] [data-family='accordion'] :is(.section, .faq-item, .group) {
+	position: relative;
+	padding-inline-start: 1.4rem;
+	border-inline-start: 1px dashed var(--code-edge);
+}
+html[data-variant='d'] [data-family='accordion'] :is(.section, .faq-item, .group)::before {
+	content: '';
+	position: absolute;
+	width: 0.6rem;
+	height: 0.6rem;
+	border: 1.5px solid var(--ink);
+	border-radius: 50%;
+	background: var(--paper);
+	left: -0.35rem;
+	top: 1.5rem;
+}
+html[data-variant='d']
+	[data-family='accordion']
+	:is(.section, .faq-item, .group):has([aria-expanded='true'])::before {
+	background: var(--green-soft);
+}
+html[data-variant='d'] [data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger) {
+	padding-inline: 0;
+}
+html[data-variant='d']
+	[data-family='accordion']
+	:is(.trigger, .faq-trigger, .group-trigger)[aria-expanded='true'] {
+	text-decoration: underline;
+	text-decoration-color: var(--green-soft);
+	text-decoration-thickness: 0.3em;
+	text-underline-offset: 0.05em;
+	text-decoration-skip-ink: none;
+}
+html[data-variant='d'] [data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger):hover {
+	background: var(--quiet-fill);
+}
+html[data-variant='d'] [data-family='accordion'] :is(.panel, .faq-panel, .group-panel)[ui-open] {
+	padding-inline: 0;
+}
+
 @media (max-width: 70rem) {
-	html[data-variant] .prose h1 {
-		max-width: calc(100% - 1rem);
+	html[data-variant] .pg-quick {
+		display: flex;
+		flex-flow: row wrap;
 	}
-	html[data-variant='a'] .prose h1::after {
-		right: -1rem;
-		width: 2.25rem;
-		height: 2.25rem;
+	html[data-variant] .pg-quick > * {
+		flex: 0 1 auto;
+	}
+	html[data-variant] .pg-quick .pg-cell {
+		width: auto;
 	}
 }
-@media (max-width: 52rem) {
+@media (max-width: 60rem) {
 	.variant-label {
 		display: none;
 	}
@@ -553,17 +581,23 @@ html[data-variant='c'] .prose pre {
 	}
 }
 @media (max-width: 30rem) {
+	html[data-variant] :is(.crumb-section, .crumb-sep) {
+		display: none;
+	}
 	html[data-variant] .header-link {
 		display: none;
 	}
 	html[data-variant] .pg-stage {
-		padding-inline: 0.5rem;
+		padding-inline: 1.25rem;
 	}
-	html[data-variant='b'] .pg-stage {
-		padding-inline-start: 1.75rem;
+	html[data-variant='c'] [data-family='accordion'] .pg-stage {
+		padding-inline: 1.25rem;
+	}
+	html[data-variant='d'] [data-family='accordion'] .pg-stage {
+		padding-inline: 1rem;
 	}
 	html[data-variant] [data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger) {
-		font-size: 1.1rem;
+		font-size: 1rem;
 	}
 }
 @media (prefers-reduced-motion: reduce) {
@@ -573,61 +607,26 @@ html[data-variant='c'] .prose pre {
 	}
 }
 
-@media (max-width: 70rem) {
-	html[data-variant] .pg-quick {
-		display: flex;
-		flex-flow: row wrap;
+@media (max-width: 40rem) {
+	html[data-variant] .pg-bar {
+		padding-inline: 0.6rem;
+		gap: 0.6rem;
 	}
-	html[data-variant] .pg-quick > * {
-		flex: 0 1 auto;
+	html[data-variant] .pg-bar-name {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
 	}
-}
-html[data-variant] [data-family='accordion'] .trigger-icon {
-	transform: none;
-}
-html[data-variant] [data-family='accordion'] [aria-expanded='true'] > .trigger-icon {
-	transform: rotate(180deg);
-}
-@media (min-width: 70.01rem) and (max-width: 84.99rem) {
-	html[data-variant] .like-heart {
-		position: static;
-		width: auto;
-		margin-top: var(--space-l);
+	html[data-variant] .pg-bar-trigger {
+		width: 7rem;
 	}
-}
-@media (max-width: 70rem) {
-	html[data-variant] .pg-quick .pg-cell {
-		width: auto;
+	html[data-variant] .pg-tab {
+		padding-inline: 0.6rem;
 	}
-}
-
-html[data-variant='a'][data-theme='dark'] .prose h1 {
-	background-image: none;
-	text-decoration: underline;
-	text-decoration-color: var(--pink);
-	text-decoration-thickness: 0.09em;
-	text-underline-offset: 0.08em;
-}
-html[data-variant] .mode-select-item:focus-visible {
-	background: var(--quiet-fill);
-	outline: 1px dashed var(--ink);
-	outline-offset: -3px;
-}
-html[data-variant] .mode-select-item[ui-selected]:focus-visible {
-	background: var(--marker-wash);
-}
-@media (max-width: 70rem) {
-	html[data-variant] .mode-select-island {
-		z-index: 25;
+	html[data-variant] .pg-strip {
+		overflow-x: auto;
+		scrollbar-width: thin;
 	}
-}
-html[data-variant] .prose:has(.mascot.is-hero) h1 {
-	display: flow-root;
-	width: auto;
-}
-html[data-variant='a'] .prose:has(.mascot.is-hero) h1 {
-	font-size: clamp(3rem, 4.8vw, 4.8rem);
-}
-html[data-variant='a'] .prose:has(.mascot.is-hero) h1::after {
-	display: none;
 }

@@ -1,6 +1,8 @@
 import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
-import ModeSelect from '../../../components/docs/mode-select.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
 import Preview from '../../../components/ui/preview.tsrx';
+
+<Sidebar pathname="/markless/ui/pagination" />
 
 # pagination
 
@@ -55,5 +57,3 @@ It writes `ui-active` and `ui-disabled`.
 | `onChange` | `(page) => void` | Called with the new page number when a person moves to another page. |
 
 Everything a `<nav>` accepts reaches the element too. `pagination.item` takes its own `value`.
-
-<ModeSelect mode="ui" />

@@ -1,6 +1,8 @@
 import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
-import ModeSelect from '../../../components/docs/mode-select.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
 import GridListDemo from '../../../components/demos/ui/gridlist-demo.tsrx';
+
+<Sidebar pathname="/markless/ui/gridlist" />
 
 # gridlist
 
@@ -196,5 +198,3 @@ No props of its own. It renders a `<span>`, and everything a `<span>` accepts re
 | --- | --- | --- |
 | `aria-hidden` | Always | `true`. The row already carries `aria-selected`, and a second announcement of the same fact is noise. |
 | `ui-selected` | Its row is picked | Show the mark. |
-
-<ModeSelect mode="ui" />

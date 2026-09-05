@@ -1,6 +1,8 @@
 import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
-import ModeSelect from '../../../components/docs/mode-select.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
 import HovercardDemo from '../../../components/demos/ui/hovercard-demo.tsrx';
+
+<Sidebar pathname="/markless/ui/hovercard" />
 
 # hovercard
 
@@ -146,5 +148,3 @@ one description is a run-on string with none of them reachable.
 | Selector | Default | Why |
 | --- | --- | --- |
 | `[overlay]` | `--ui-anchor: --ui-hovercard; position: absolute; position-anchor: --ui-hovercard; position-area: block-end` | Places the card below the link with no script, and hands you the anchor name for `anchor()` geometry of your own. |
-
-<ModeSelect mode="ui" />

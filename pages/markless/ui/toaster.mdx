@@ -1,6 +1,8 @@
 import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
-import ModeSelect from '../../../components/docs/mode-select.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
 import Preview from '../../../components/ui/preview.tsrx';
+
+<Sidebar pathname="/markless/ui/toaster" />
 
 # toaster
 
@@ -68,5 +70,3 @@ prop, because the root renders no rows: the cap belongs to your repeat.
 `toaster.say(queue, title, options)` takes an `id`, a `tone` of `neutral`, `success`, `warning` or
 `error`, a `description`, and a `duration` in milliseconds — `Infinity` keeps the message until
 something dismisses it.
-
-<ModeSelect mode="ui" />

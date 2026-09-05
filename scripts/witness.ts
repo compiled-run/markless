@@ -142,8 +142,6 @@ try {
 	try {
 		const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 
-		// The mode switch is a page-owned island rendered after every other island,
-		// then visually pinned over the inert sidebar slot (NOTES.md findings 19/29).
 		for (const [href, selectedTitle, otherTitle] of [
 			['/markless', 'Framework', 'UI'],
 			['/markless/ui', 'UI', 'Framework'],
@@ -528,10 +526,6 @@ try {
 		);
 		await page.screenshot({ path: `${shotsDir}/T005-two-variables-after.png`, fullPage: true });
 
-		// --- widget: the cart total on the computed page -----------------------
-		// This was NOTES.md finding 14 and is a real assertion again: the router
-		// fix that prefixes deriveSymbolId through composeMdxState landed, so an
-		// island whose update derives a value resumes.
 		await page.goto(`${origin}/markless/concepts/computed`, { waitUntil: 'load' });
 		const totalLine = page.locator('.playground p').nth(2);
 		const addShirt = page.getByRole('button', { name: 'Add a shirt' });
@@ -572,8 +566,6 @@ try {
 			'three-differences lights the two body lines to start with',
 			String(await litLines.count()),
 		);
-		// Both the sentence and the highlight move on 0.3.3: the compiler emits the
-		// dom update for a `class={ternary}` binding now (NOTES.md finding 18).
 		await page.getByRole('button', { name: 'The markup' }).click();
 		await settleText(
 			explorerNote,
@@ -614,12 +606,6 @@ try {
 			fullPage: true,
 		});
 
-		// --- the theme toggle --------------------------------------------------
-		// The toggle is a `storage()` island each page renders, not part of the
-		// document (NOTES.md finding 19). What has to be true: the seed script
-		// reaches the head so there is no flash, the control lands on the hole the
-		// header reserves for it, a click actually repaints the page, and the
-		// choice survives a reload.
 		await page.goto(`${origin}/markless/concepts/state`, { waitUntil: 'load' });
 		const headSeed = await page.evaluate(() =>
 			[...document.head.querySelectorAll('script:not([src])')].some((node) =>
@@ -724,13 +710,6 @@ try {
 		check(back.paper === atRest.paper, 'light is the light it started on', back.paper);
 		await page.evaluate(() => localStorage.removeItem('theme'));
 
-		// --- navigation ---------------------------------------------------------
-		// Every internal link is a plain anchor, so a click is a document load:
-		// `<Link>` does not compile on 0.3.3 and the router's own click handler is
-		// bound to the page-body container, outside which the whole chrome sits
-		// (NOTES.md finding 40). The check is written the way the parked widgets are:
-		// it asserts what happens today, so the day a click keeps the page alive the
-		// run goes red and the note comes out with the fix.
 		await page.goto(`${origin}/markless/concepts/state`, { waitUntil: 'load' });
 		await page.evaluate(() => {
 			(window as { __beforeNavigation?: number }).__beforeNavigation = 1;
@@ -790,10 +769,6 @@ try {
 			sprites.join(' '),
 		);
 
-		// --- both themes --------------------------------------------------------
-		// The theme is `data-theme` on <html>, which is what the toggle will write
-		// when `storage()` can resume (NOTES.md finding 15). Setting it here is the
-		// same switch, so these shots are the two themes as a reader would see them.
 		for (const [label, href] of [
 			['index', '/markless'],
 			['state', '/markless/concepts/state'],
@@ -841,10 +816,6 @@ try {
 		);
 		await page.evaluate(() => document.documentElement.removeAttribute('data-theme'));
 
-		// --- T034: one hand-drawn icon per sidebar entry, in both themes --------
-		// Every entry carries both cuts and the theme picks one, so what is checked
-		// is the cut the theme actually displays: it has to have decoded, which is
-		// what `naturalWidth` says, and every entry has to have one.
 		for (const theme of ['light', 'dark'] as const) {
 			await page.goto(`${origin}/markless`, { waitUntil: 'load' });
 			await page.evaluate((wanted) => {
@@ -897,10 +868,6 @@ try {
 		}
 		await page.evaluate(() => document.documentElement.removeAttribute('data-theme'));
 
-		// --- T017: header, outline rail, and the page at 390 --------------------
-		// Two pages, both themes, both widths. The desktop pass checks the chrome
-		// the reader sees beside the prose; the 390 pass checks that nothing of it
-		// lands on top of the prose or pushes the document wider than the phone.
 		for (const [label, href] of [
 			['index', '/markless'],
 			['state', '/markless/concepts/state'],
@@ -1241,11 +1208,6 @@ try {
 			'/markless/build/storage': 'Why that file is not a box on this page',
 		};
 
-		// The conditionals and lists pages carry no live widget on this build: a
-		// component that uses `@if` or `@for` hangs the compiler, so the pages ship
-		// their files in fences with a callout saying so (NOTES.md section 21). What
-		// is checked here is that the callout is really on the page, so the day the
-		// widget returns this check fails and the note has to go with it.
 		for (const href of ['/markless/concepts/conditionals', '/markless/concepts/lists']) {
 			await page.goto(`${origin}${href}`, { waitUntil: 'load' });
 			const told = await page
@@ -1359,11 +1321,6 @@ try {
 			});
 		}
 
-		// --- the components page is the honest kind ----------------------------
-		// A button in a child component calling a callback prop does not resume
-		// inside an MDX page on 0.3.1 (NOTES.md finding 29), so the page ships the
-		// pair in fences with a callout saying so. The day it resumes, the
-		// `.playground` check here fails and the note has to come out with it.
 		await page.goto(`${origin}/markless/build/components`, { waitUntil: 'load' });
 		check(
 			(await page.locator('.playground').count()) === 0,
@@ -1410,11 +1367,6 @@ try {
 		);
 		await page.screenshot({ path: `${shotsDir}/T006-focus-field-after.png`, fullPage: true });
 
-		// --- the storage page is the honest kind -------------------------------
-		// A second `storage()` binding on a page that already carries the theme
-		// toggle repaints but never persists (NOTES.md finding 30), so the page
-		// points at the header toggle instead of shipping a box that teaches the
-		// wrong half. The day it persists, the `.playground` check fails here.
 		await page.goto(`${origin}/markless/build/storage`, { waitUntil: 'load' });
 		check(
 			(await page.locator('.playground').count()) === 0,
@@ -1436,11 +1388,6 @@ try {
 			'/markless/build/storage names the finding its missing widget is recorded under',
 		);
 
-		// --- the shared page is the honest kind ---------------------------------
-		// `shared()` across two modules stalls the production build on 0.3.1
-		// (NOTES.md finding 27), so the page ships with no widget and says so. The
-		// day the build finishes, the `.playground` check here fails and the note
-		// has to come out with the fix.
 		await page.goto(`${origin}/markless/build/shared`, { waitUntil: 'load' });
 		check(
 			(await page.locator('.playground').count()) === 0,

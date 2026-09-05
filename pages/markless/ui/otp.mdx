@@ -1,6 +1,8 @@
 import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
-import ModeSelect from '../../../components/docs/mode-select.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
 import Preview from '../../../components/ui/preview.tsrx';
+
+<Sidebar pathname="/markless/ui/otp" />
 
 # otp
 
@@ -50,5 +52,3 @@ It writes `ui-empty` and `ui-disabled`.
 | `onComplete` | `(value) => void` | Called once, the moment the code reaches `length` characters. |
 
 Everything a `<div>` accepts reaches the element too, except `style`.
-
-<ModeSelect mode="ui" />

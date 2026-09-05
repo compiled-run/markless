@@ -1,6 +1,5 @@
 import { headFor, siteOrigin } from './nav.ts';
 import Pager from './components/docs/pager.tsrx';
-import Sidebar from './components/docs/sidebar.tsrx';
 import SiteHeader from './components/docs/site-header.tsrx';
 import stylesheet from './styles/global.css?url';
 import brandStylesheet from './styles/brand.css?url';
@@ -39,7 +38,6 @@ export default function Document({
 		<body>
 			<SiteHeader pathname={pathname} />
 			<div class="site-shell">
-				<Sidebar pathname={pathname} />
 				<main class="prose">
 					{children}
 					<Pager pathname={pathname} />

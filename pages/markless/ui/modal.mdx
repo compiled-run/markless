@@ -1,6 +1,8 @@
 import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
-import ModeSelect from '../../../components/docs/mode-select.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
 import Preview from '../../../components/ui/preview.tsrx';
+
+<Sidebar pathname="/markless/ui/modal" />
 
 # modal
 
@@ -51,5 +53,3 @@ It writes `ui-open` and `ui-closed`.
 | `onChange` | `(open) => void` | Called with the new value when the dialog opens or closes, dismissals included. |
 
 Everything a `<div>` accepts reaches the element too.
-
-<ModeSelect mode="ui" />

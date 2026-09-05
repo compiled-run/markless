@@ -1,6 +1,8 @@
 import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
-import ModeSelect from '../../../components/docs/mode-select.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
 import TooltipDemo from '../../../components/demos/ui/tooltip-demo.tsrx';
+
+<Sidebar pathname="/markless/ui/tooltip" />
 
 # tooltip
 
@@ -137,5 +139,3 @@ element. Your own `onDismiss` runs after the family has hidden the tip.
 | Selector | Default | Why |
 | --- | --- | --- |
 | `[overlay]` | `--ui-anchor: --ui-tooltip; position: absolute; position-anchor: --ui-tooltip; position-area: block-start` | Places the tip above the trigger with no script, and hands you the anchor name for `anchor()` geometry of your own. |
-
-<ModeSelect mode="ui" />
