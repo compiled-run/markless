@@ -13,24 +13,24 @@ const results: unknown[] = [];
 const WHITE = 'rgb(255, 255, 255)';
 try {
 	for (const theme of ['light', 'dark']) {
-		let selectLook: unknown;
-		for (const variant of ['a', 'b']) {
+		{
 			const context = await browser.newContext({ viewport: { width: 1440, height: 1050 } });
 			await context.addInitScript((value) => localStorage.setItem('theme', value), theme);
+			// Headless Chrome will not hand the clipboard back, so the write is captured instead.
+			await context.addInitScript(() => {
+				Object.defineProperty(navigator, 'clipboard', {
+					value: { writeText: (text: string) => ((window as { copied?: string }).copied = text) },
+				});
+			});
 			const page = await context.newPage();
 			const errors: string[] = [];
 			page.on('pageerror', (error) => errors.push(error.message));
 			for (const route of ['home', 'accordion']) {
 				const path = route === 'home' ? '/markless' : '/markless/ui/accordion';
-				await page.goto(`${origin}${path}?variant=${variant}`, { waitUntil: 'networkidle' });
+				await page.goto(`${origin}${path}`, { waitUntil: 'networkidle' });
 				await page.evaluate(() => document.fonts.ready);
-				assert.equal(await page.locator('html').getAttribute('data-variant'), variant);
 				assert.equal(await page.locator('html').getAttribute('data-theme'), theme);
-				assert.equal(await page.locator('.variant-picker a').count(), 2);
-				assert.equal(
-					await page.locator('.variant-picker a[aria-current="true"]').getAttribute('data-variant'),
-					variant,
-				);
+				assert.equal(await page.locator('.variant-picker').count(), 0, 'The design picker is gone');
 				assert.equal(await page.locator('.sidebar').count(), 1);
 				await page.locator('.sidebar .site-mark').focus();
 				await page.keyboard.press('Tab');
@@ -113,22 +113,12 @@ try {
 				assert.equal(
 					await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
 					false,
-					`${variant}/${theme}/${route}: desktop fits`,
+					`${theme}/${route}: desktop fits`,
 				);
 				if (route === 'home') {
 					await page.locator('.mode-select-trigger').click();
 					await page.locator('.mode-select-content:not([hidden])').waitFor();
-					const look = await page.locator('.mode-select-trigger').evaluate((el) => {
-						const style = getComputedStyle(el);
-						return [style.backgroundColor, style.border, style.borderRadius, style.boxShadow];
-					});
-					if (selectLook)
-						assert.deepEqual(
-							look,
-							selectLook,
-							'Approved select styling stays the same across previews',
-						);
-					selectLook = look;
+					await page.locator('.mode-select-content:not([hidden])').waitFor();
 				} else {
 					const joined = await page
 						.locator('.pg')
@@ -140,7 +130,7 @@ try {
 							const touching = (a: DOMRect, b: DOMRect) =>
 								Math.min(Math.abs(b.top - a.bottom), Math.abs(b.left - a.right)) <= 2;
 							return {
-								frame: Number.parseFloat(getComputedStyle(el, '::before').borderTopWidth),
+								frame: Number.parseFloat(getComputedStyle(el).borderTopWidth),
 								controlsTouchStage: touching(controls, stage),
 								stageTouchesCode: touching(stage, code),
 								stageBackground: getComputedStyle(el.querySelector('.pg-stage')!).backgroundColor,
@@ -152,6 +142,14 @@ try {
 						'Controls, preview and code share one adjoining frame',
 					);
 					assert.equal(joined.stageBackground, WHITE, 'The component preview is pure white');
+					assert.equal(await page.locator('.pg .pg-copy').count(), 2, 'Each code pane carries a copy button');
+					await page.locator('.pg .pg-pane:not([hidden]) .pg-copy').click();
+					await page.waitForFunction(() => typeof (window as { copied?: string }).copied === 'string');
+					const copied = await page.evaluate(() => (window as { copied?: string }).copied ?? '');
+					assert.ok(
+						copied.includes('accordion.root') && copied.includes('\n\n'),
+						'Copy puts the visible pane on the clipboard, blank lines included',
+					);
 					assert.notEqual(joined.stageInk, WHITE, 'Demo text stays ink on the white preview');
 					assert.equal(
 						await page.locator('.pg .pg-tab').first().textContent(),
@@ -194,7 +192,7 @@ try {
 					);
 					await page.screenshot({
 						animations: 'disabled',
-						path: `${output}/${variant}-${theme}-scenario.png`,
+						path: `${output}/${theme}-scenario.png`,
 					});
 					await page.keyboard.press('Escape');
 					await page.locator('.pg-bar-list').waitFor({ state: 'hidden' });
@@ -217,7 +215,7 @@ try {
 					await page
 						.locator('.pg')
 						.first()
-						.screenshot({ animations: 'disabled', path: `${output}/${variant}-${theme}-tooltip.png` });
+						.screenshot({ animations: 'disabled', path: `${output}/${theme}-tooltip.png` });
 					await page.mouse.move(0, 0);
 					await tip.waitFor({ state: 'hidden' });
 					const stacked = await page.locator('.cp').evaluateAll((panels) =>
@@ -246,7 +244,7 @@ try {
 				await page.evaluate(() => window.scrollTo(0, 0));
 				await page.screenshot({
 					animations: 'disabled',
-					path: `${output}/${variant}-${theme}-${route}.png`,
+					path: `${output}/${theme}-${route}.png`,
 				});
 				if (route === 'accordion') {
 					for (const example of ['.pg', '.cp:has(.faq)', '.cp:has(.settings)']) {
@@ -260,28 +258,16 @@ try {
 							.first()
 							.screenshot({
 								animations: 'disabled',
-								path: `${output}/${variant}-${theme}-${label}.png`,
+								path: `${output}/${theme}-${label}.png`,
 							});
 					}
 				}
 			}
 			await page.setViewportSize({ width: 390, height: 844 });
 			await page.evaluate(() => window.scrollTo(0, 0));
-			assert.equal(
-				await page.locator('.variant-b').evaluate((el) => {
-					const box = el.getBoundingClientRect();
-					return (
-						document
-							.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2)
-							?.closest('a') === el
-					);
-				}),
-				true,
-				'The second preview link is reachable beside the theme button on phones',
-			);
 			await page.screenshot({
 				animations: 'disabled',
-				path: `${output}/${variant}-${theme}-phone.png`,
+				path: `${output}/${theme}-phone.png`,
 			});
 			await page.locator('.pg').first().scrollIntoViewIfNeeded();
 			await page
@@ -289,16 +275,15 @@ try {
 				.first()
 				.screenshot({
 					animations: 'disabled',
-					path: `${output}/${variant}-${theme}-phone-demo.png`,
+					path: `${output}/${theme}-phone-demo.png`,
 				});
 			assert.equal(
 				await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
 				false,
-				`${variant}/${theme}: phone fits`,
+				`${theme}: phone fits`,
 			);
 			assert.deepEqual(errors, [], 'No uncaught page errors');
 			results.push({
-				variant,
 				theme,
 				keyboard: 'pass',
 				headingRestoration: 'pass',
@@ -309,19 +294,9 @@ try {
 			await context.close();
 		}
 	}
-	const page = await browser.newPage();
-	await page.goto(`${origin}/markless/ui/accordion?variant=a`, { waitUntil: 'networkidle' });
-	await page.locator('.variant-picker .variant-b').click();
-	await page.waitForURL(/variant=b/);
-	await page.goto(`${origin}/markless/ui/accordion`, { waitUntil: 'networkidle' });
-	assert.equal(await page.locator('html').getAttribute('data-variant'), 'b');
-	await page.locator('.mode-select-trigger').click();
-	await page.locator('.mode-select-item').first().click();
-	await page.waitForURL(/\/markless\/?$/);
-	assert.equal(await page.locator('html').getAttribute('data-variant'), 'b');
 	await writeFile(`${output}/checks.json`, JSON.stringify(results, null, 2));
 	console.log(
-		`PASS: two connected playgrounds (Marker brackets, Compact sheet), both themes, desktop and phone, white preview, tooltip, sidebar tab order, keyboard code tabs, matching selects, restored headings, accordion behavior. Screenshots: ${output}`,
+		`PASS: one connected playground sheet, both themes, desktop and phone, white preview, tooltip, sidebar tab order, keyboard code tabs, matching selects, restored headings, accordion behavior. Screenshots: ${output}`,
 	);
 } finally {
 	await browser.close();

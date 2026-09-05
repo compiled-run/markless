@@ -33,7 +33,6 @@ export default function Document({
 			<link rel="stylesheet" href={stylesheet} />
 			<link rel="stylesheet" href={brandStylesheet} />
 			<script src="/markless/theme.js"></script>
-			<script src="/markless/variant.js"></script>
 		</head>
 		<body>
 			<SiteHeader pathname={pathname} />

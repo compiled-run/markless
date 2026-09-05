@@ -8,7 +8,7 @@ import {
 	runMarkup,
 } from './ui-code-runs.ts';
 import { CODE_CSS, CODE_PANEL_CSS, docRules } from './ui-playground-css.ts';
-import { GENERATED_DIR, codePanelChrome, identifier, type ChromePane } from './ui-playground.ts';
+import { COPY_HELPER, GENERATED_DIR, codePanelChrome, identifier, type ChromePane } from './ui-playground.ts';
 
 function paneMarkup(list: string, indent: string): string {
 	return `${indent}@for (const line of ${list}; key line.id) {
@@ -82,6 +82,8 @@ export async function codePanelModule(input: {
 	return `${imports.join('\n')}
 
 ${RUN_TYPES}
+
+${COPY_HELPER}
 
 ${consts.join('\n')}
 const docs: readonly Doc[] = ${JSON.stringify(registry.docs)};

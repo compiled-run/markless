@@ -1,4 +1,3 @@
-import VariantPicker from './variant-picker.tsrx';
 import Mascot from '../mascot.tsrx';
 import { lucide } from '@markless/ui';
 import { breadcrumbFor } from '../../nav.ts';
@@ -16,7 +15,6 @@ export default function SiteHeader({ pathname }: { readonly pathname: string }) 
 		<lucide.chevronright class="crumb-sep" aria-hidden="true" />
 		<span class="crumb crumb-page">{crumb.page}</span>
 		<div class="header-tools">
-			<VariantPicker pathname={pathname} />
 			<input
 				class="site-search"
 				type="search"
