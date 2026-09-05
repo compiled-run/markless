@@ -739,7 +739,7 @@ type Emit = {
 function hintFor(control: PlaygroundControl): string {
 	return `					<tooltip.root class="pg-hint">
 						<tooltip.trigger class="pg-dot" aria-label="About ${control.prop}">
-							<lucide.info class="ico" aria-hidden="true" />
+							<lucide.circlehelp class="ico" aria-hidden="true" />
 						</tooltip.trigger>
 						<tooltip.content class="pg-tip">
 							<span class="tsrx-tip-title">${control.prop}</span>
@@ -936,19 +936,6 @@ export type ChromePane = { readonly value: string; readonly label: string; reado
  * the standalone code panels so the two read as one thing. `bar` is extra
  * markup for the strip row, the playground's scenario picker.
  */
-/** The copy button's handler, emitted into every generated module beside the run types. */
-export const COPY_HELPER = `function copyPane(target: EventTarget | null): void {
-	const pane = target instanceof Element ? target.closest('.pg-pane') : null;
-	if (!pane) return;
-	const lines = Array.from(pane.querySelectorAll('.pg-line'), (line) => (line as HTMLElement).innerText);
-	void navigator.clipboard.writeText(lines.join('\\n'));
-}`;
-
-/** The tab reads as the kind of code it holds; the file name stays on the tooltip. */
-function tabName(value: string): string {
-	return value === 'css' ? 'CSS' : 'Source';
-}
-
 export function codePanelChrome(input: {
 	readonly scenario: string;
 	readonly panes: readonly ChromePane[];
@@ -957,23 +944,11 @@ export function codePanelChrome(input: {
 }): string {
 	const { indent } = input;
 	const tabs = input.panes
-		.map(
-			(pane) =>
-				`${indent}\t\t\t\t<tabs.trigger class="pg-tab" value=${quote(pane.value)} title=${quote(pane.label)}>${tabName(pane.value)}</tabs.trigger>`,
-		)
+		.map((pane) => `${indent}\t\t\t\t<tabs.trigger class="pg-tab" value=${quote(pane.value)}>${pane.label}</tabs.trigger>`)
 		.join('\n');
 	const panes = input.panes
 		.map(
 			(pane) => `${indent}\t\t\t\t<tabs.content class="pg-pane" value=${quote(pane.value)}>
-${indent}\t\t\t\t\t<button
-${indent}\t\t\t\t\t\tclass="pg-copy"
-${indent}\t\t\t\t\t\ttype="button"
-${indent}\t\t\t\t\t\taria-label="Copy code"
-${indent}\t\t\t\t\t\ttitle="Copy code"
-${indent}\t\t\t\t\t\tonClick={(event) => copyPane(event.target)}
-${indent}\t\t\t\t\t>
-${indent}\t\t\t\t\t\t<lucide.copy class="ico" aria-hidden="true" />
-${indent}\t\t\t\t\t</button>
 ${indent}\t\t\t\t\t<pre class="pg-shiki shiki">
 ${pane.markup}
 ${indent}\t\t\t\t\t</pre>
@@ -1125,8 +1100,6 @@ import { attributeText, heldList, listText, pickValue, toggled, valueText } from
 import { lucide } from '@markless/ui';
 
 ${RUN_TYPES}
-
-${COPY_HELPER}
 
 ${source.consts.join('\n')}
 ${css.consts.join('\n')}

@@ -10,18 +10,11 @@ const output = resolve(process.env.BRAND_SHOTS ?? '/private/tmp/brand-makeover-4
 await mkdir(output, { recursive: true });
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const results: unknown[] = [];
-const WHITE = 'rgb(255, 255, 255)';
 try {
 	for (const theme of ['light', 'dark']) {
 		{
 			const context = await browser.newContext({ viewport: { width: 1440, height: 1050 } });
 			await context.addInitScript((value) => localStorage.setItem('theme', value), theme);
-			// Headless Chrome will not hand the clipboard back, so the write is captured instead.
-			await context.addInitScript(() => {
-				Object.defineProperty(navigator, 'clipboard', {
-					value: { writeText: (text: string) => ((window as { copied?: string }).copied = text) },
-				});
-			});
 			const page = await context.newPage();
 			const errors: string[] = [];
 			page.on('pageerror', (error) => errors.push(error.message));
@@ -120,42 +113,12 @@ try {
 					await page.locator('.mode-select-content:not([hidden])').waitFor();
 					await page.locator('.mode-select-content:not([hidden])').waitFor();
 				} else {
-					const joined = await page
-						.locator('.pg')
-						.first()
-						.evaluate((el) => {
-							const controls = el.querySelector('.pg-controls')!.getBoundingClientRect();
-							const stage = el.querySelector('.pg-stage')!.getBoundingClientRect();
-							const code = el.querySelector('.pg-code')!.getBoundingClientRect();
-							const touching = (a: DOMRect, b: DOMRect) =>
-								Math.min(Math.abs(b.top - a.bottom), Math.abs(b.left - a.right)) <= 2;
-							return {
-								frame: Number.parseFloat(getComputedStyle(el).borderTopWidth),
-								controlsTouchStage: touching(controls, stage),
-								stageTouchesCode: touching(stage, code),
-								stageBackground: getComputedStyle(el.querySelector('.pg-stage')!).backgroundColor,
-								stageInk: getComputedStyle(el.querySelector('.pg-stage .trigger')!).color,
-							};
-						});
-					assert.ok(
-						joined.frame > 0 && joined.controlsTouchStage && joined.stageTouchesCode,
-						'Controls, preview and code share one adjoining frame',
+					const switchLook = await page.locator('.pg .pg-switch').evaluateAll((els) =>
+						els.map((el) => [el.hasAttribute('ui-checked'), getComputedStyle(el).backgroundColor]),
 					);
-					assert.equal(joined.stageBackground, WHITE, 'The component preview is pure white');
-					assert.equal(await page.locator('.pg .pg-copy').count(), 2, 'Each code pane carries a copy button');
-					await page.locator('.pg .pg-pane:not([hidden]) .pg-copy').click();
-					await page.waitForFunction(() => typeof (window as { copied?: string }).copied === 'string');
-					const copied = await page.evaluate(() => (window as { copied?: string }).copied ?? '');
-					assert.ok(
-						copied.includes('accordion.root') && copied.includes('\n\n'),
-						'Copy puts the visible pane on the clipboard, blank lines included',
-					);
-					assert.notEqual(joined.stageInk, WHITE, 'Demo text stays ink on the white preview');
-					assert.equal(
-						await page.locator('.pg .pg-tab').first().textContent(),
-						'Source',
-						'Code tabs read Source and CSS',
-					);
+					const on = switchLook.filter(([checked]) => checked).map(([, colour]) => colour);
+					const off = switchLook.filter(([checked]) => !checked).map(([, colour]) => colour);
+					assert.ok(on.length > 0 && off.length > 0 && !off.includes(on[0] as string), 'A checked switch reads differently from an unchecked one');
 					const tabs = page.locator('.pg .pg-tab');
 					await tabs.first().focus();
 					await page.keyboard.press('ArrowRight');
@@ -167,57 +130,6 @@ try {
 					await page.waitForFunction(
 						() => document.querySelector('.pg .pg-tab')?.getAttribute('aria-selected') === 'true',
 					);
-					const selectStyles = await page
-						.locator('.mode-select-trigger, .pg-bar-trigger')
-						.evaluateAll((els) =>
-							els.map((el) => {
-								const style = getComputedStyle(el);
-								return [style.backgroundColor, style.border, style.borderRadius, style.boxShadow];
-							}),
-						);
-					assert.deepEqual(
-						selectStyles[0],
-						selectStyles[1],
-						'Scenario and sidebar selects share their surface styling',
-					);
-					await page.locator('.pg-bar-trigger').click();
-					await page.locator('.pg-bar-list:not([hidden])').waitFor();
-					await page.locator('.pg-bar-list .pg-pick-item').first().hover();
-					assert.equal(
-						await page
-							.locator('.pg-bar-list .pg-pick-item')
-							.first()
-							.evaluate((el) => getComputedStyle(el).outlineStyle),
-						'dashed',
-					);
-					await page.screenshot({
-						animations: 'disabled',
-						path: `${output}/${theme}-scenario.png`,
-					});
-					await page.keyboard.press('Escape');
-					await page.locator('.pg-bar-list').waitFor({ state: 'hidden' });
-					// The control hint: hover the first dot, the slab tip shows over the card, and it leaves with the pointer.
-					await page.locator('.pg').first().scrollIntoViewIfNeeded();
-					await page.locator('.pg .pg-dot').first().hover();
-					const tip = page.locator('.pg .pg-tip').first();
-					await tip.waitFor({ state: 'visible' });
-					const tipLook = await tip.evaluate((el) => {
-						const style = getComputedStyle(el);
-						const box = el.getBoundingClientRect();
-						return {
-							background: style.backgroundColor,
-							onScreen: box.left >= 0 && box.right <= innerWidth && box.top >= 0,
-							body: el.querySelector('.tsrx-tip-body')?.textContent?.trim() ?? '',
-						};
-					});
-					assert.notEqual(tipLook.background, 'rgba(0, 0, 0, 0)', 'The tooltip has a slab behind it');
-					assert.ok(tipLook.onScreen && tipLook.body.length > 0, 'The tooltip is on screen with its text');
-					await page
-						.locator('.pg')
-						.first()
-						.screenshot({ animations: 'disabled', path: `${output}/${theme}-tooltip.png` });
-					await page.mouse.move(0, 0);
-					await tip.waitFor({ state: 'hidden' });
 					const stacked = await page.locator('.cp').evaluateAll((panels) =>
 						panels.flatMap((panel) => {
 							const stage = panel.querySelector('.pg-stage')?.getBoundingClientRect();
@@ -283,20 +195,13 @@ try {
 				`${theme}: phone fits`,
 			);
 			assert.deepEqual(errors, [], 'No uncaught page errors');
-			results.push({
-				theme,
-				keyboard: 'pass',
-				headingRestoration: 'pass',
-				whitePreview: 'pass',
-				tooltip: 'pass',
-				desktopAndPhone: 'pass',
-			});
+			results.push({ theme, keyboard: 'pass', headingRestoration: 'pass', switch: 'pass', desktopAndPhone: 'pass' });
 			await context.close();
 		}
 	}
 	await writeFile(`${output}/checks.json`, JSON.stringify(results, null, 2));
 	console.log(
-		`PASS: one connected playground sheet, both themes, desktop and phone, white preview, tooltip, sidebar tab order, keyboard code tabs, matching selects, restored headings, accordion behavior. Screenshots: ${output}`,
+		`PASS: baseline playground with the kept switch, both themes, desktop and phone, sidebar tab order, keyboard code tabs, restored headings, accordion behavior. Screenshots: ${output}`,
 	);
 } finally {
 	await browser.close();

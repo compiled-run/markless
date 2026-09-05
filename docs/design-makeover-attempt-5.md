@@ -53,3 +53,16 @@ The generated playground CSS is scoped with a hash class, so the sheet's rules c
 `html .prose` to outrank it. The dev server ships that CSS only with an island's JS, so an
 untouched dev page shows the playground unstyled until the first interaction; the review
 script targets the production serve.
+
+## Reverted
+
+The sheet was rejected the same evening (a cream band and code box inside a white sheet on
+a paper page: three tones). On the owner's instruction every playground style change is
+reverted except the switch: `tooling/ui-playground.ts` and `tooling/ui-code-panel.ts` are
+back at `a8f46dd` (file-name tabs, the help icon, no copy button), and `styles/brand.css`
+now holds only the accepted sidebar select and link treatment plus the switch (grey track,
+green when on, white thumb with an ink edge). The picker and `variant.js` stay removed.
+The playground otherwise wears the generated chrome's own look.
+
+Next, by owner decision: a styled layer over `@markless/ui` comes first, and the docs
+playground is rebuilt from it.

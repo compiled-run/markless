@@ -1,31 +1,20 @@
-/* The component playground: one calm sheet in the spirit of qwik-design-system's
-   and React Aria's playgrounds. A tinted controls band, a big white preview,
-   folder tabs standing on an inset code surface, quiet icon buttons. The site's
-   paper, ink and pastels supply every colour; nothing is drawn by hand here. */
+/* What survives the playground makeovers: the accepted sidebar select and link
+   treatment, and the playground switch. Everything else in the playground is
+   the generated chrome's own look. */
 
 :root {
 	--marker-wash: color-mix(in oklch, var(--purple) 24%, transparent);
-	--marker-fill: color-mix(in oklch, var(--purple) 55%, white);
 	--quiet-fill: color-mix(in oklch, var(--ink) 6%, var(--paper));
-	--stage-white: #ffffff;
 	--switch-on: oklch(72% 0.17 148);
 	--switch-off: oklch(64% 0.01 80);
-	--sheet-edge: 1.5px solid var(--ink);
-	--sheet-radius: 14px;
-	--hairline: 1px solid var(--code-edge);
-	/* The preview shows the component the way a consumer's page would: a plain sans, not the site's hand lettering. */
-	--demo-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
 html .site-search {
 	display: none;
 }
 
-/* ------------------------------------------------------------------------- */
-/* Sidebar select and links: the accepted treatment. The scenario select in   */
-/* the playground wears the same surface.                                     */
-/* ------------------------------------------------------------------------- */
-
+/* Sidebar select and links. Generated component CSS is scoped with a hash
+   class, so these carry html .prose to outrank it. */
 .mode-select-island {
 	position: relative;
 	position-anchor: auto;
@@ -34,21 +23,21 @@ html .site-search {
 	margin-bottom: var(--space-s);
 	z-index: 25;
 }
-html .prose :is(.mode-select-trigger, .pg-bar-trigger, .pg-pick-trigger) {
+html .prose .mode-select-trigger {
 	background: var(--paper);
-	border: var(--sheet-edge);
+	border: 1.5px solid var(--ink);
 	border-radius: 3px;
 	min-height: 2.7rem;
 	box-shadow: 3px 3px 0 var(--purple);
 }
-html .prose :is(.mode-select-content, .pg-pick-list) {
+html .prose .mode-select-content {
 	background: var(--paper);
 	padding: 0.4rem;
-	border: var(--sheet-edge);
+	border: 1.5px solid var(--ink);
 	border-radius: 3px;
 	box-shadow: 3px 4px 0 var(--purple);
 }
-html .prose :is(.mode-select-item, .pg-pick-list .pg-pick-item) {
+html .prose .mode-select-item {
 	min-height: 2.25rem;
 	box-sizing: border-box;
 	border: 0;
@@ -56,20 +45,20 @@ html .prose :is(.mode-select-item, .pg-pick-list .pg-pick-item) {
 	background: transparent;
 	color: var(--ink);
 }
-html .prose :is(.mode-select-item, .pg-pick-list .pg-pick-item)[ui-selected] {
+html .prose .mode-select-item[ui-selected] {
 	background: var(--marker-wash);
 	font-weight: 700;
 }
-html .prose :is(.mode-select-item, .pg-pick-list .pg-pick-item):is(:hover, :focus-visible),
+html .prose .mode-select-item:is(:hover, :focus-visible),
 html .prose .sidebar-link:is(:hover, :focus-visible) {
 	background: var(--quiet-fill);
 	outline: 1px dashed var(--ink);
 	outline-offset: -3px;
 }
-html .prose :is(.mode-select-item, .pg-pick-list .pg-pick-item)[ui-selected]:is(:hover, :focus-visible) {
+html .prose .mode-select-item[ui-selected]:is(:hover, :focus-visible) {
 	background: var(--marker-wash);
 }
-html .prose :is(.mode-select-trigger, .pg-bar-trigger, .pg-pick-trigger):focus-visible {
+html .prose .mode-select-trigger:focus-visible {
 	outline: 2px dashed var(--ink);
 	outline-offset: 4px;
 }
@@ -84,586 +73,37 @@ html .prose :is(.mode-select-trigger, .pg-bar-trigger, .pg-pick-trigger):focus-v
 	margin-block: 0 0.65em;
 }
 
-/* ------------------------------------------------------------------------- */
-/* The sheet. Generated component CSS follows this document sheet, so every   */
-/* rule carries html .prose to outrank it.                                    */
-/* ------------------------------------------------------------------------- */
-
-html .prose {
-	.pg,
-	.cp {
-		--play-accent: var(--purple);
-		position: relative;
-		display: grid;
-		grid-template-columns: minmax(0, 1fr);
-		min-width: 0;
-		margin: var(--space-m) 0 var(--space-l);
-		border: var(--sheet-edge);
-		border-radius: var(--sheet-radius);
-		background: var(--stage-white);
-		box-shadow: 4px 4px 0 var(--marker-wash);
-		overflow: clip;
-		gap: 0;
-	}
-
-	/* The controls band: paper over the white sheet, one hairline under it. */
-	.pg-controls {
-		display: grid;
-		gap: 0;
-		padding: 1rem 1.25rem 1.1rem;
-		border: 0;
-		border-block-end: var(--hairline);
-		background: var(--paper);
-	}
-	.pg-quick,
-	.pg-rest {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 0.75rem 2rem;
-		padding: 0;
-		border: 0;
-	}
-	.pg-rest {
-		margin-block-start: 0.9rem;
-		padding-block-start: 0.9rem;
-		border-block-start: 1px dashed var(--code-edge);
-	}
-	.pg-rest[ui-closed] {
-		display: none;
-	}
-	.pg-cell {
-		gap: 0.35rem;
-	}
-	.pg-ctl {
-		gap: 0.6rem;
-	}
-	.pg-name {
-		font-family: 'Joy Elia', system-ui, sans-serif;
-		font-size: var(--step--1);
-		font-weight: 700;
-		color: var(--ink);
-	}
-	.pg-switch {
-		flex: none;
-		width: 2.75em;
-		height: 1.65em;
-		padding: 0.06em;
-		border: 2px solid var(--ink);
-		border-radius: 999px;
-		background: var(--switch-off);
-		font-size: var(--step--1);
-		transition: background 140ms ease;
-	}
-	.pg-switch[ui-checked] {
-		background: var(--switch-on);
-	}
-	.pg-knob {
-		box-sizing: border-box;
-		flex: none;
-		width: 1.25em;
-		height: 1.25em;
-		border: 1.5px solid var(--ink);
-		background: white;
-	}
-	.pg-switch[ui-checked] .pg-knob {
-		margin-inline-start: calc(100% - 1.25em);
-	}
-	.pg-dot {
-		width: 1.15em;
-		height: 1.15em;
-		color: var(--ink);
-		opacity: 0.55;
-	}
-	.pg-dot:is(:hover, :focus-visible) {
-		opacity: 1;
-	}
-	.pg-showall {
-		margin-inline-start: auto;
-		padding: 0.3rem 0.2rem;
-		border: 0;
-		background: transparent;
-		color: var(--ink);
-		font-family: 'Joy Elia', system-ui, sans-serif;
-		font-size: var(--step--1);
-		font-weight: 700;
-		opacity: 0.7;
-	}
-	.pg-showall:is(:hover, :focus-visible) {
-		opacity: 1;
-		text-decoration: none;
-	}
-	.pg-showall-caret {
-		opacity: 1;
-	}
-	.pg-pick-trigger {
-		min-height: 2.4rem;
-		font-family: 'Joy Elia', system-ui, sans-serif;
-		font-weight: 700;
-	}
-	.pg-pick-item:is(:hover, :focus-visible) {
-		background: var(--quiet-fill);
-		color: var(--ink);
-	}
-	.pg-pick-item[ui-selected] {
-		background: var(--marker-wash);
-		color: var(--ink);
-		border-color: transparent;
-	}
-	.pg-field {
-		border: var(--sheet-edge);
-		border-radius: 3px;
-		background: var(--paper);
-	}
-	.pg-log {
-		margin: 0;
-		padding: 0.6rem 1.25rem 0;
-		background: var(--stage-white);
-		font-size: var(--step--2);
-	}
-
-	/* The tooltip: a dark speech slab with a tail. */
-	.pg-tip {
-		padding: 0.35em 0.2em;
-		border: 0;
-		border-radius: 6px;
-		background: var(--slab);
-		color: var(--slab-ink);
-		box-shadow: none;
-		font-family: 'Shantell Sans', system-ui, sans-serif;
-		font-size: var(--step--1);
-		line-height: 1.35;
-		max-width: min(16rem, calc(100vw - 2 * var(--space-s-l)));
-	}
-	.pg-tip::before {
-		content: '';
-		position: absolute;
-		top: -0.4em;
-		left: 1.1em;
-		width: 0.8em;
-		height: 0.8em;
-		border-radius: 2px;
-		background: inherit;
-		transform: rotate(45deg);
-	}
-	.pg-tip .tsrx-tip-title {
-		padding: 0.15rem 0.65rem 0;
-		font-family: 'Joy Elia', system-ui, sans-serif;
-		font-size: 0.6875rem;
-		font-weight: 700;
-		letter-spacing: 0.04em;
-		text-transform: uppercase;
-		opacity: 0.7;
-	}
-	.pg-tip .tsrx-tip-body {
-		padding: 0.2rem 0.65rem 0.35rem;
-		font-family: 'Shantell Sans', system-ui, sans-serif;
-		font-size: 0.875rem;
-		font-weight: 400;
-		line-height: 1.35;
-	}
-	.pg-tip .tsrx-tip-type {
-		padding: 0.25rem 0.65rem 0.1rem;
-		border-block-start: 1px solid color-mix(in oklch, var(--slab-ink) 25%, transparent);
-		font-family: var(--font-mono);
-		font-size: 0.6875rem;
-		opacity: 0.65;
-	}
-
-	/* The preview: white in both themes, the light palette re-declared so a demo
-	   drawn with the site's tokens stays ink-on-white when the page is dark. */
-	.pg-stage {
-		--ink: oklch(22% 0.01 90);
-		--on-accent: oklch(22% 0.01 90);
-		--paper: var(--stage-white);
-		--raised: var(--stage-white);
-		--code-surface: oklch(97% 0.01 79);
-		--code-edge: color-mix(in oklch, var(--ink) 22%, transparent);
-		--tinted: color-mix(in oklch, var(--yellow) 45%, white);
-		--tinted-quiet: color-mix(in oklch, var(--yellow) 35%, white);
-		--hover-wash: 8%;
-		--slab: var(--ink);
-		--slab-ink: white;
-		color-scheme: light;
-		display: grid;
-		place-items: center;
-		box-sizing: border-box;
-		min-width: 0;
-		min-height: 18.75rem;
-		margin: 0;
-		padding: 2.5rem;
-		border: 0;
-		border-radius: 0;
-		background: var(--stage-white);
-		color: var(--ink);
-	}
-
-	/* Code: folder tabs standing on an inset surface, the scenario select beside them. */
-	.pg-code {
-		position: relative;
-		min-width: 0;
-		margin: 0;
-		padding: 0.9rem 1.25rem 1.25rem;
-		border: 0;
-		border-block-start: var(--hairline);
-		border-radius: 0;
-		background: var(--stage-white);
-	}
-	.pg-panel {
-		overflow: visible;
-	}
-	.pg-bar {
-		display: flex;
-		flex-wrap: wrap-reverse;
-		align-items: flex-end;
-		justify-content: space-between;
-		gap: 0.75rem 1rem;
-		padding: 0;
-	}
-	.pg-strip {
-		min-width: 0;
-		margin-block-end: -1.5px;
-	}
-	.pg-strip-row {
-		gap: 0;
-		align-items: flex-end;
-	}
-	.pg-tab {
-		margin-inline-end: -1.5px;
-		padding: 0.45em 1.25em;
-		border: var(--sheet-edge);
-		border-block-end: 0;
-		border-radius: 8px 8px 0 0;
-		background: var(--paper);
-		color: var(--ink);
-		font-family: 'Joy Elia', system-ui, sans-serif;
-		font-size: var(--step--1);
-		font-weight: 700;
-		letter-spacing: 0.02em;
-		white-space: nowrap;
-		opacity: 0.85;
-	}
-	.pg-tab[ui-selected] {
-		position: relative;
-		z-index: 2;
-		background: var(--marker-fill);
-		color: var(--on-accent);
-		box-shadow: none;
-		opacity: 1;
-	}
-	.pg-tab:is(:hover, :focus-visible) {
-		outline: 1px dashed var(--ink);
-		outline-offset: -4px;
-		opacity: 1;
-	}
-	.pg-tab:focus-visible {
-		outline-width: 2px;
-	}
-	.pg-bar-pick {
-		display: flex;
-		align-items: center;
-		gap: 0.6rem;
-		margin: 0 0 0.6rem auto;
-		padding: 0;
-	}
-	.pg-bar-name {
-		font-family: 'Joy Elia', system-ui, sans-serif;
-		font-size: var(--step--1);
-		font-weight: 700;
-		text-transform: none;
-		letter-spacing: 0;
-		line-height: 1;
-		opacity: 0.7;
-	}
-	.pg-bar-trigger {
-		width: 8.5rem;
-		min-width: 0;
-		min-height: 2.5rem;
-		padding: 0.3em 0.7em;
-		font-size: var(--step--1);
-		font-weight: 400;
-	}
-	.pg-bar-trigger .pg-pick-value {
-		overflow: hidden;
-		white-space: nowrap;
-		text-overflow: ellipsis;
-	}
-	.pg-bar-trigger .pg-pick-caret {
-		width: 1.1em;
-		height: 1.1em;
-		opacity: 1;
-	}
-	.pg-bar-list {
-		min-width: 12rem;
-		z-index: 45;
-	}
-	.pg-bar-list .pg-pick-item {
-		padding: 0.3em 0.7em;
-		font-size: var(--step--1);
-	}
-	.pg-clamp {
-		border: var(--sheet-edge);
-		border-radius: 0 8px 8px 8px;
-		background: var(--paper);
-		overflow: clip;
-	}
-	.pg-panes {
-		border: 0;
-		background: transparent;
-	}
-	.pg-pane {
-		position: relative;
-	}
-	.pg-copy {
-		position: absolute;
-		z-index: 3;
-		top: 0.6rem;
-		right: 0.6rem;
-		display: inline-grid;
-		place-items: center;
-		width: 2rem;
-		height: 2rem;
-		padding: 0;
-		border: var(--hairline);
-		border-radius: 6px;
-		background: var(--paper);
-		color: var(--ink);
-		opacity: 0.7;
-		cursor: pointer;
-	}
-	.pg-copy .ico {
-		width: 1rem;
-		height: 1rem;
-	}
-	.pg-copy:is(:hover, :focus-visible) {
-		opacity: 1;
-		border-color: var(--ink);
-	}
-	.pg-copy:focus-visible {
-		outline: 2px dashed var(--ink);
-		outline-offset: 2px;
-	}
-	.pg-copy:active {
-		background: var(--marker-wash);
-	}
-	.pg-shiki {
-		padding: 1rem 3rem 1rem 1rem;
-		background: transparent;
-		font-size: var(--step--2);
-		line-height: 1.6;
-	}
-	.pg-shiki,
-	.pg-shiki span {
-		font-family: var(--font-mono);
-	}
-	.pg-shiki :is(.tsrx-tip, .tsrx-tip-body) {
-		font-family: 'Shantell Sans', system-ui, sans-serif;
-	}
-	.pg-code-body {
-		max-height: 12.5rem;
-	}
-	.pg-fade {
-		height: 4.5rem;
-		background: linear-gradient(to bottom, transparent, var(--paper) 80%);
-	}
-	/* The expand control is a quiet pill sitting on the fade, as React Aria draws it. */
-	.pg-expand {
-		isolation: isolate;
-		height: 4.5rem;
-		padding-bottom: 0.7rem;
-		font-family: 'Joy Elia', system-ui, sans-serif;
-		font-size: var(--step--1);
-		text-decoration: none;
-	}
-	.pg-expand::before {
-		content: '';
-		position: absolute;
-		z-index: -1;
-		left: 50%;
-		bottom: 0.45rem;
-		width: 9.5rem;
-		height: 2.25rem;
-		transform: translateX(-50%);
-		border: var(--hairline);
-		border-radius: 999px;
-		background: var(--raised);
-	}
-	.pg-expand:is(:hover, :focus-visible) {
-		text-decoration: none;
-	}
-	.pg-expand:is(:hover, :focus-visible)::before {
-		border-color: var(--ink);
-	}
-
-	/* The accordion demos on the white preview: one clean white list with
-	   hairlines, a bold question and a plus/minus at the end of each row. */
-	[data-family='accordion'] :is(.accordion, .faq, .settings) {
-		box-sizing: border-box;
-		width: 100%;
-		max-width: 34rem;
-		margin-inline: auto;
-		padding: 0;
-		border: 0;
-		background: transparent;
-		gap: 0;
-	}
-	[data-family='accordion'] :is(.sections, .faq-items, .groups) {
-		display: grid;
-		gap: 0;
-		border: 1px solid color-mix(in oklch, var(--ink) 28%, transparent);
-		border-radius: 8px;
-		background: var(--stage-white);
-		overflow: clip;
-	}
-	[data-family='accordion'] :is(.section, .faq-item, .group) {
-		border: 0;
-		border-block-start: 1px solid color-mix(in oklch, var(--ink) 20%, transparent);
-		border-radius: 0;
-		background: transparent;
-		overflow: visible;
-	}
-	[data-family='accordion'] :is(.section, .faq-item, .group):first-child {
-		border-block-start: 0;
-	}
-	[data-family='accordion'] :is(.heading, .faq-heading, .group-heading) {
-		margin: 0;
-		font-size: var(--step-0);
-		line-height: 1.4;
-		text-shadow: none;
-	}
-	[data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger) {
-		display: flex;
-		align-items: center;
-		justify-content: flex-start;
-		gap: 0.75rem;
-		box-sizing: border-box;
-		width: 100%;
-		min-height: 3.25rem;
-		padding: 0.8rem 1rem;
-		border: 0;
-		border-radius: 0;
-		background: transparent;
-		color: var(--ink);
-		font-family: var(--demo-sans);
-		font-size: 1.0625rem;
-		font-weight: 600;
-		line-height: 1.35;
-		text-align: start;
-		text-transform: none;
-		letter-spacing: 0;
-		cursor: pointer;
-	}
-	[data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger):hover {
-		background: color-mix(in oklch, var(--ink) 4%, transparent);
-	}
-	[data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger):focus-visible {
-		outline: 2px dashed var(--ink);
-		outline-offset: -5px;
-	}
-	[data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger)::after {
-		content: '+';
-		flex: none;
-		margin-inline-start: auto;
-		width: 1em;
-		font-family: var(--demo-sans);
-		font-size: 1.5rem;
-		font-weight: 400;
-		line-height: 1;
-		text-align: center;
-	}
-	[data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger)[aria-expanded='true']::after {
-		content: '−';
-	}
-	[data-family='accordion'] .trigger-icon {
-		display: none;
-	}
-	[data-family='accordion'] :is(.panel, .faq-panel, .group-panel)[ui-open] {
-		padding: 0 1rem 1rem;
-		background: transparent;
-		color: color-mix(in oklch, var(--ink) 80%, white);
-		font-family: var(--demo-sans);
-		font-size: var(--step--1);
-		font-weight: 400;
-		line-height: 1.5;
-	}
-	[data-family='accordion'] :is(.panel, .faq-panel, .group-panel) *,
-	[data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger) * {
-		font-family: var(--demo-sans);
-	}
-	[data-family='accordion'] :is(.panel, .faq-panel, .group-panel)[hidden] {
-		display: none;
-	}
-	[data-family='accordion'] [ui-disabled],
-	[data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger):disabled {
-		opacity: 0.45;
-		cursor: not-allowed;
-	}
-	[data-family='accordion'] .faq-title {
-		margin: 0 0 0.9rem;
-		padding: 0;
-		font-size: var(--step-1);
-		text-shadow: none;
-	}
-	[data-family='accordion'] .faq-foot {
-		margin: 0.9rem 0 0;
-		padding: 0;
-		font-family: var(--demo-sans);
-		font-size: var(--step--1);
-		opacity: 0.8;
-	}
-	[data-family='accordion'] .group-name {
-		display: block;
-	}
-	[data-family='accordion'] .group-note {
-		display: block;
-		font-weight: 400;
-		font-size: var(--step--1);
-		opacity: 0.75;
-	}
+/* The playground switch: grey track, green when on, a white thumb with an ink edge. */
+html .prose .pg-switch {
+	flex: none;
+	width: 2.75em;
+	height: 1.65em;
+	padding: 0.06em;
+	border: 2px solid var(--ink);
+	border-radius: 999px;
+	background: var(--switch-off);
+	font-size: var(--step--1);
+	transition: background 140ms ease;
 }
-
-@media (max-width: 40rem) {
-	html .prose {
-		.pg,
-		.cp {
-			margin-inline: 0;
-			border-radius: 10px;
-		}
-		.pg-controls {
-			padding: 0.9rem 1rem;
-		}
-		.pg-quick,
-		.pg-rest {
-			gap: 0.6rem 1.25rem;
-		}
-		.pg-showall {
-			margin-inline-start: 0;
-		}
-		.pg-stage {
-			min-height: 0;
-			padding: 1.5rem 1rem;
-		}
-		.pg-code {
-			padding: 0.8rem 0.75rem 0.9rem;
-		}
-		.pg-tab {
-			padding-inline: 0.9em;
-		}
-		.pg-bar-name {
-			position: absolute;
-			width: 1px;
-			height: 1px;
-			overflow: hidden;
-			clip-path: inset(50%);
-		}
-		.pg-bar-trigger {
-			width: 7.5rem;
-		}
-		[data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger) {
-			font-size: var(--step--1);
-			padding-inline: 0.85rem;
-		}
-	}
+html .prose .pg-switch[ui-checked] {
+	background: var(--switch-on);
+}
+html .prose .pg-knob {
+	box-sizing: border-box;
+	flex: none;
+	width: 1.25em;
+	height: 1.25em;
+	border: 1.5px solid var(--ink);
+	background: white;
+}
+html .prose .pg-switch[ui-checked] .pg-knob {
+	margin-inline-start: calc(100% - 1.25em);
+}
+html[data-theme='dark'] .prose .pg-switch {
+	--switch-off: oklch(42% 0.01 80);
+}
+html[data-theme='dark'] .prose .pg-knob {
+	border-color: oklch(28% 0.015 90);
 }
 
 @media (max-width: 30rem) {
@@ -672,37 +112,6 @@ html .prose {
 	}
 	html .header-link {
 		display: none;
-	}
-}
-
-/* Dark ground: the sheet's white stays, the paper parts go dark, the folder
-   outlines turn dark ink where they meet the white surround. */
-html[data-theme='dark'] .prose {
-	.pg,
-	.cp {
-		border-color: color-mix(in oklch, var(--ink) 55%, transparent);
-		background: var(--raised);
-		box-shadow: 4px 4px 0 color-mix(in oklch, var(--purple) 30%, transparent);
-	}
-	.pg-code,
-	.pg-log {
-		background: var(--raised);
-	}
-	.pg-switch {
-		--switch-off: oklch(42% 0.01 80);
-	}
-	.pg-knob {
-		border-color: oklch(28% 0.015 90);
-	}
-	.pg-tab,
-	.pg-clamp {
-		border-color: oklch(28% 0.015 90);
-	}
-	.pg-tab[ui-selected] {
-		color: var(--on-accent);
-	}
-	.pg-copy {
-		border-color: color-mix(in oklch, var(--ink) 30%, transparent);
 	}
 }
 
