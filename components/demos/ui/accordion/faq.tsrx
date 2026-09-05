@@ -52,6 +52,10 @@ export default function Faq() @{
 		<style>
 			.faq {
 				width: min(34rem, 100%);
+				padding: 1.1em 1.2em 0.9em;
+				border: 2px solid var(--code-edge);
+				border-radius: 10px;
+				background: var(--raised);
 			}
 
 			.faq-title {
@@ -63,7 +67,6 @@ export default function Faq() @{
 
 			.faq-list {
 				display: grid;
-				gap: 0.5em;
 			}
 
 			.faq-items {
@@ -71,54 +74,25 @@ export default function Faq() @{
 			}
 
 			.faq-item {
-				border: var(--card-edge);
-				border-radius: 6px;
-				background: var(--paper);
-				overflow: clip;
-			}
-
-			.faq-item[ui-open] {
-				box-shadow: var(--card-shadow);
-			}
-
-			html[data-theme='dark'] .faq-item {
-				background: var(--raised);
-			}
-
-			html[data-variant='b'] .faq-item[ui-open] {
-				border: var(--state-selected-edge);
-				transform: rotate(0.6deg);
-			}
-
-			html[data-variant='c'] .faq-item {
-				border: 0;
-				border-block-end: 1px solid color-mix(in oklch, var(--ink) 30%, transparent);
-				border-radius: 0;
-				box-shadow: none;
-			}
-
-			html[data-variant='c'] .faq-item[ui-open] {
-				border-inline-start: 4px solid var(--ink);
+				border-top: 1px solid var(--code-edge);
 			}
 
 			.faq-heading {
 				margin: 0;
-				font-size: var(--step-0);
+				font-size: var(--step--1);
 			}
 
 			.faq-trigger {
-				position: relative;
 				display: flex;
 				gap: 0.6em;
 				align-items: center;
 				justify-content: space-between;
 				width: 100%;
-				padding: 0.7em 0.8em;
+				padding: 0.7em 0;
 				border: 0;
 				background: transparent;
 				color: var(--ink);
-				font-family: 'Joy Elia', system-ui, sans-serif;
-				font-size: var(--step-0);
+				font: inherit;
 				font-weight: 700;
 				text-align: left;
 				cursor: pointer;
@@ -137,44 +111,17 @@ export default function Faq() @{
 			}
 
 			.faq-trigger:hover {
-				background: var(--state-hover-bg);
-				color: var(--state-hover-fg);
+				color: var(--pink);
 			}
 
-			html[data-variant='a'] .faq-item[ui-open] .faq-trigger::before,
-			html[data-variant='c'] .faq-item[ui-open] .faq-trigger::before {
-				content: '';
-				position: absolute;
-				inset: 0.55em 2.2em 0.55em 0.65em;
-				z-index: -1;
-				background: var(--swipe);
-				transform: rotate(-1deg);
-			}
-
-			html[data-variant='a'] .faq-item[ui-open] .faq-trigger,
-			html[data-variant='c'] .faq-item[ui-open] .faq-trigger {
-				isolation: isolate;
-			}
-
-			html[data-variant='c'] .faq-item[ui-open] .faq-trigger::before {
-				inset-block: auto 0.72em;
-				height: 0.35em;
-				background: var(--yellow);
-			}
-
-			/* A closed panel keeps its box for find-in-page, so the padding waits
-			   for ui-open or every closed question sits on empty space. */
+			/* Padding waits for ui-open because closed panels retain a box for find-in-page. */
 			.faq-panel {
 				font-size: var(--step--1);
 				line-height: 155%;
 			}
 
 			.faq-panel[ui-open] {
-				padding: 0 0.8em 0.9em;
-			}
-
-			.faq-panel[hidden] {
-				display: none;
+				padding: 0 0 0.9em;
 			}
 
 			.faq-foot {
@@ -183,6 +130,10 @@ export default function Faq() @{
 				border-top: 1px solid var(--code-edge);
 				font-size: var(--step--2);
 				opacity: 0.75;
+			}
+
+			.faq-panel[hidden] {
+				display: none;
 			}
 		</style>
 	</section>

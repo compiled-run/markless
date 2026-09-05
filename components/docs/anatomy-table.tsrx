@@ -38,7 +38,7 @@ export default function AnatomyTable({ family }: { readonly family?: string }) @
 			@for (const row of painted; key row.name) {
 				<tr>
 					<td>
-						<span class="tsrx-hover prop-name" tabindex="0" role="img" aria-label={row.label}>
+						<span class="tsrx-hover prop-name" tabindex={0} role="img" aria-label={row.label}>
 							<code class="api-prop">{row.name}</code>
 							<span class="tsrx-tip" aria-hidden="true">
 								<span class="tsrx-tip-title">{row.name}</span>

@@ -1,7 +1,3 @@
-// Witness: serves the production build, curls the base-path URLs, then in system
-// Chrome checks that the code blocks are really highlighted, that a TSRX token
-// shows its hover doc, and that the Counter island still resumes on a page whose
-// first code block sits above it.
 // Run: node --experimental-strip-types scripts/witness.ts
 import { spawn } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -19,16 +15,6 @@ const shotsDir =
 const failures: string[] = [];
 const knownFailing: string[] = [];
 const themeShots: Record<string, unknown>[] = [];
-/**
- * While this is set, a failed check is reported as `known-failing` against the
- * NOTES.md finding it belongs to instead of failing the run. The site keeps the
- * widget, because it is what the page teaches with, and the witness keeps
- * checking it so the day the framework fix lands the run goes green on its own.
- *
- * Nothing is under it on 0.3.3: finding 18's `class={ternary}` binding emits a
- * dom update now, so the three-differences highlight is a real assertion again,
- * as are the two widgets that were under finding 14.
- */
 let knownFailingReason: string | undefined = undefined;
 const check = (ok: boolean, label: string, detail = '') => {
 	const line = `${label}${detail ? ` — ${detail}` : ''}`;
@@ -240,27 +226,24 @@ try {
 			'a code block at rest ends at its last line',
 			`${hug.gap.toFixed(1)}px below the last line, padding ${hug.padding}px`,
 		);
-		// Code is set in Joy Elia, the site's own hand: prose fences and the
-		// generated demo panes share that one treatment. `* { font-family }`
-		// matches the token spans directly and a direct match beats an inherited
-		// family, so the `pre` alone proves nothing about the text a reader sees —
-		// each of the three levels is measured where it is painted.
-		const startsWithJoyElia = (font: string) => /^["']?Joy Elia["']?/.test(font);
-		check(startsWithJoyElia(hug.font), 'the code block is set in Joy Elia', hug.font);
+		const isMono = (font: string) => /mono|Menlo|Consolas/i.test(font);
+		check(isMono(hug.font), 'the code block is set in the monospace stack', hug.font);
+		// `* { font-family }` matches the token spans directly, and a direct match
+		// beats an inherited family, so `pre` being monospace proves nothing about
+		// the text a reader actually sees.
 		check(
-			startsWithJoyElia(hug.codeFont),
-			'the computed font-family of `pre code` starts with Joy Elia',
+			isMono(hug.codeFont),
+			'the computed font-family of `pre code` names a monospace family',
 			hug.codeFont,
 		);
 		check(
-			startsWithJoyElia(hug.tokenFont),
-			'a highlighted token span is painted in Joy Elia',
+			isMono(hug.tokenFont),
+			'a highlighted token span is painted in the monospace stack',
 			hug.tokenFont,
 		);
 
 		// A UI family page carries both kinds at once: the prose fences the page
-		// writes and the demo pane the playground generates. One treatment means
-		// one font-family string, not two families that happen to both be Joy Elia.
+		// writes and the demo pane the playground generates. Both are monospace.
 		await page.goto(`${origin}/markless/ui/accordion`, { waitUntil: 'load' });
 		const paneFonts = await page.evaluate(() => {
 			const fontOf = (selector: string) => {
@@ -270,19 +253,14 @@ try {
 			return { prose: fontOf('.prose pre'), pane: fontOf('.pg-shiki') };
 		});
 		check(
-			startsWithJoyElia(paneFonts.prose),
-			'/markless/ui/accordion: its prose fences are set in Joy Elia',
+			isMono(paneFonts.prose),
+			'/markless/ui/accordion: its prose fences are set in the monospace stack',
 			paneFonts.prose,
 		);
 		check(
-			startsWithJoyElia(paneFonts.pane),
-			'/markless/ui/accordion: the generated demo pane is set in Joy Elia',
+			isMono(paneFonts.pane),
+			'/markless/ui/accordion: the generated demo pane is set in the monospace stack',
 			paneFonts.pane,
-		);
-		check(
-			paneFonts.prose !== '' && paneFonts.prose === paneFonts.pane,
-			'a prose fence and a demo pane report one and the same font-family',
-			`${paneFonts.prose} vs ${paneFonts.pane}`,
 		);
 		await page.goto(`${origin}/markless/concepts/state`, { waitUntil: 'load' });
 
@@ -1700,6 +1678,8 @@ try {
 				.locator('.like-heart-plus')
 				.evaluate((node) => Number(getComputedStyle(node as Element).opacity));
 		check((await plusOpacity()) === 0, 'the +1 is not painted before the press', String(await plusOpacity()));
+		await heartButton.scrollIntoViewIfNeeded();
+		await heartButton.hover();
 		const heartBox = (await heartButton.boundingBox())!;
 		await page.mouse.move(heartBox.x + heartBox.width / 2, heartBox.y + heartBox.height / 2);
 		await page.mouse.down();

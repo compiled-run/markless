@@ -56,8 +56,8 @@ export default function HeroCard() @{
           </span>
           <span
             class={hot === "likes" ? "line hot" : "line"}
-            onMouseEnter={() => (hot = "likes")}
-            onMouseLeave={() => (hot = "")}
+            onMouseenter={() => (hot = "likes")}
+            onMouseleave={() => (hot = "")}
           >
             <span class="num">4</span>
             {"	"}
@@ -71,8 +71,8 @@ export default function HeroCard() @{
           </span>
           <span
             class={hot === "card" ? "line hot" : "line"}
-            onMouseEnter={() => (hot = "card")}
-            onMouseLeave={() => (hot = "")}
+            onMouseenter={() => (hot = "card")}
+            onMouseleave={() => (hot = "")}
           >
             <span class="num">6</span>
             {"	"}
@@ -80,8 +80,8 @@ export default function HeroCard() @{
           </span>
           <span
             class={hot === "photo" ? "line hot" : "line"}
-            onMouseEnter={() => (hot = "photo")}
-            onMouseLeave={() => (hot = "")}
+            onMouseenter={() => (hot = "photo")}
+            onMouseleave={() => (hot = "")}
           >
             <span class="num">7</span>
             {"		"}
@@ -93,8 +93,8 @@ export default function HeroCard() @{
           </span>
           <span
             class={hot === "img" ? "line hot" : "line"}
-            onMouseEnter={() => (hot = "img")}
-            onMouseLeave={() => (hot = "")}
+            onMouseenter={() => (hot = "img")}
+            onMouseleave={() => (hot = "")}
           >
             <span class="num">8</span>
             {"			"}
@@ -106,8 +106,8 @@ export default function HeroCard() @{
           </span>
           <span
             class={hot === "title" ? "line hot" : "line"}
-            onMouseEnter={() => (hot = "title")}
-            onMouseLeave={() => (hot = "")}
+            onMouseenter={() => (hot = "title")}
+            onMouseleave={() => (hot = "")}
           >
             <span class="num">9</span>
             {"			"}
@@ -116,8 +116,8 @@ export default function HeroCard() @{
           </span>
           <span
             class={hot === "desc" ? "line hot" : "line"}
-            onMouseEnter={() => (hot = "desc")}
-            onMouseLeave={() => (hot = "")}
+            onMouseenter={() => (hot = "desc")}
+            onMouseleave={() => (hot = "")}
           >
             <span class="num">10</span>
             {"			"}
@@ -126,8 +126,8 @@ export default function HeroCard() @{
           </span>
           <span
             class={hot === "photo" ? "line hot" : "line"}
-            onMouseEnter={() => (hot = "photo")}
-            onMouseLeave={() => (hot = "")}
+            onMouseenter={() => (hot = "photo")}
+            onMouseleave={() => (hot = "")}
           >
             <span class="num">11</span>
             {"		"}
@@ -135,8 +135,8 @@ export default function HeroCard() @{
           </span>
           <span
             class={hot === "button" ? "line hot" : "line"}
-            onMouseEnter={() => (hot = "button")}
-            onMouseLeave={() => (hot = "")}
+            onMouseenter={() => (hot = "button")}
+            onMouseleave={() => (hot = "")}
           >
             <span class="num">12</span>
             {"		"}
@@ -147,16 +147,16 @@ export default function HeroCard() @{
           </span>
           <span
             class={hot === "likes" ? "line hot" : "line"}
-            onMouseEnter={() => (hot = "likes")}
-            onMouseLeave={() => (hot = "")}
+            onMouseenter={() => (hot = "likes")}
+            onMouseleave={() => (hot = "")}
           >
             <span class="num">13</span>
             {"			♥ {likes}"}
           </span>
           <span
             class={hot === "button" ? "line hot" : "line"}
-            onMouseEnter={() => (hot = "button")}
-            onMouseLeave={() => (hot = "")}
+            onMouseenter={() => (hot = "button")}
+            onMouseleave={() => (hot = "")}
           >
             <span class="num">14</span>
             {"		"}
@@ -164,8 +164,8 @@ export default function HeroCard() @{
           </span>
           <span
             class={hot === "card" ? "line hot" : "line"}
-            onMouseEnter={() => (hot = "card")}
-            onMouseLeave={() => (hot = "")}
+            onMouseenter={() => (hot = "card")}
+            onMouseleave={() => (hot = "")}
           >
             <span class="num">15</span>
             {"	"}
@@ -179,33 +179,33 @@ export default function HeroCard() @{
       </div>
       <article
         class={hot === "card" ? "hot" : ""}
-        onMouseEnter={() => (hot = "card")}
-        onMouseLeave={() => (hot = "")}
+        onMouseenter={() => (hot = "card")}
+        onMouseleave={() => (hot = "")}
       >
         <span class="tape"></span>
         <div
           class={hot === "photo" ? "photo hot" : "photo"}
-          onMouseEnter={() => (hot = "photo")}
-          onMouseLeave={() => (hot = "card")}
+          onMouseenter={() => (hot = "photo")}
+          onMouseleave={() => (hot = "card")}
         >
           <img
             class={hot === "img" ? "mug hot" : "mug"}
             src="/markless/stickers/coffee-mug.png"
             alt="A hand-drawn coffee mug sticker"
-            onMouseEnter={() => (hot = "img")}
-            onMouseLeave={() => (hot = "photo")}
+            onMouseenter={() => (hot = "img")}
+            onMouseleave={() => (hot = "photo")}
           />
           <h3
             class={hot === "title" ? "hot" : ""}
-            onMouseEnter={() => (hot = "title")}
-            onMouseLeave={() => (hot = "photo")}
+            onMouseenter={() => (hot = "title")}
+            onMouseleave={() => (hot = "photo")}
           >
             The Markless mug
           </h3>
           <p
             class={hot === "desc" ? "hot" : ""}
-            onMouseEnter={() => (hot = "desc")}
-            onMouseLeave={() => (hot = "photo")}
+            onMouseenter={() => (hot = "desc")}
+            onMouseleave={() => (hot = "photo")}
           >
             Holds hot takes.
           </p>
@@ -217,8 +217,8 @@ export default function HeroCard() @{
             likes++;
             hot = "button";
           }}
-          onMouseEnter={() => (hot = "button")}
-          onMouseLeave={() => (hot = "card")}
+          onMouseenter={() => (hot = "button")}
+          onMouseleave={() => (hot = "card")}
         >
           <img src="/markless/stickers/heart.png" alt="" aria-hidden="true" />
           <span class={hot === "likes" ? "hot" : ""}>{likes}</span>

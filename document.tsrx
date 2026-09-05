@@ -3,6 +3,7 @@ import Pager from './components/docs/pager.tsrx';
 import Sidebar from './components/docs/sidebar.tsrx';
 import SiteHeader from './components/docs/site-header.tsrx';
 import stylesheet from './styles/global.css?url';
+import brandStylesheet from './styles/brand.css?url';
 
 export default function Document({
 	url,
@@ -12,9 +13,6 @@ export default function Document({
 	readonly children?: unknown;
 }) @{
 	const pathname = (url?.pathname ?? '/').replace(/\/+$/, '') || '/';
-	// One title and one sentence per page: nineteen identical tabs, bookmarks and
-	// search results are nineteen pages a reader cannot tell apart. `nav.ts` is
-	// the only place either string is written.
 	const head = headFor(pathname);
 	const canonical = `${siteOrigin}${pathname}`;
 
@@ -34,6 +32,7 @@ export default function Document({
 			<link rel="icon" href="/markless/favicon.svg" type="image/svg+xml" />
 			<link rel="apple-touch-icon" href="/markless/mascots/markless.png" />
 			<link rel="stylesheet" href={stylesheet} />
+			<link rel="stylesheet" href={brandStylesheet} />
 			<script src="/markless/theme.js"></script>
 			<script src="/markless/variant.js"></script>
 		</head>

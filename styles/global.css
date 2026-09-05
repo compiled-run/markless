@@ -264,12 +264,6 @@ body::after {
 	flex: none;
 }
 
-html[data-variant='a'] .ico:not(.ico-a),
-html[data-variant='b'] .ico:not(.ico-b),
-html[data-variant='c'] .ico:not(.ico-c) {
-	display: none;
-}
-
 .header-tools {
 	display: flex;
 	gap: 0.45em;
@@ -313,49 +307,6 @@ html[data-variant='c'] .ico:not(.ico-c) {
 	display: flex;
 	align-items: center;
 	font-size: var(--step--1);
-}
-
-.variant-picker {
-	display: inline-flex;
-	gap: 0.2rem;
-	align-items: center;
-}
-
-.variant-picker a {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	box-sizing: border-box;
-	inline-size: 1.45rem;
-	block-size: 1.45rem;
-	font-family: 'Joy Elia', system-ui, sans-serif;
-	font-size: var(--step--2);
-	line-height: 1;
-	color: var(--ink);
-	background: var(--paper);
-	border: 1.5px solid var(--code-edge);
-	border-radius: 3px;
-	text-decoration: none;
-}
-
-html[data-variant='a'] .variant-a,
-html[data-variant='b'] .variant-b,
-html[data-variant='c'] .variant-c {
-	color: var(--on-accent);
-	background: var(--yellow);
-	border-color: var(--ink);
-	box-shadow: 1.5px 1.5px 0 var(--purple);
-	transform: rotate(-1deg);
-}
-
-html[data-theme='dark'] .variant-picker a {
-	background: var(--raised);
-}
-
-html[data-theme='dark'][data-variant='a'] .variant-a,
-html[data-theme='dark'][data-variant='b'] .variant-b,
-html[data-theme='dark'][data-variant='c'] .variant-c {
-	background: var(--yellow);
 }
 
 .theme-toggle {
@@ -787,54 +738,45 @@ html[data-theme='dark'] .theme-toggle-to-light {
 }
 
 .prose code {
-	background: var(--inline-code-bg);
-	color: var(--inline-code-fg);
-	border: var(--inline-code-edge);
+	background: var(--yellow);
+	color: var(--on-accent);
 	padding: 0.1em 0.3em;
 	font-size: 0.9em;
 }
 
-/* Prose fences and demo panes share one paper-card treatment. */
-.prose pre,
-.pg-shiki {
-	background: var(--paper);
-	background-image: var(--code-surface-image);
+/* Fenced blocks are monospace; inline code inside a sentence keeps Joy Elia so
+   it still reads as part of the sentence. The block hugs its content: no
+   min-height, no reserved strip, and the highlighter strips the trailing
+   newline so there is no empty last line. */
+.prose pre {
+	background: var(--code-surface);
 	margin-block: var(--space-m);
 	color: var(--ink);
 	padding: var(--space-s);
-	border: var(--card-edge);
-	border-radius: 6px;
-	box-shadow: var(--card-shadow);
+	border: 1px solid var(--code-edge);
+	border-radius: 2px;
 	overflow-x: auto;
-	font-family: 'Joy Elia', system-ui, sans-serif;
+	font-family: var(--font-mono);
 	font-size: var(--step--1);
-	line-height: 1.6;
+	line-height: 1.55;
 	tab-size: 2;
 }
 
-html[data-theme='dark'] :is(.prose pre, .pg-shiki) {
-	background: var(--raised);
-}
-
-.prose pre code,
-.pg-shiki code {
+.prose pre code {
 	display: block;
 	background: none;
-	border: 0;
 	padding: 0;
 	color: inherit;
 	font-size: inherit;
 }
 
+/* `* { font-family }` above matches every token span the highlighter emits, and
+   a direct match beats a family inherited from `pre`, so the spans have to be
+   named. The hover doc is prose, not code, and keeps Joy Elia. */
 .prose pre,
 .prose pre code,
-.prose pre code span,
-.pg-shiki,
-.pg-shiki code,
-.pg-shiki span {
-	font-family: 'Joy Elia', system-ui, sans-serif;
-	font-size: var(--step--1);
-	line-height: 1.6;
+.prose pre code span {
+	font-family: var(--font-mono);
 }
 
 .prose pre .tsrx-tip,
@@ -1334,7 +1276,16 @@ html.is-mac .kbd.is-other {
 	margin-top: -0.9em;
 }
 
-/* Dark theme: warm near-black paper with off-white ink and restrained grain. */
+/* ---------------------------------------------------------------------------
+   Dark theme. The same paper design with the ground and the ink swapped: a warm
+   near-black chalkboard, off-white chalk, the same four pastel accents. Only
+   tokens move; every rule above is written against them.
+
+   Two selectors carry the same block. `data-theme` is the explicit choice, and
+   the media query is the default for a reader who has not made one. They are
+   duplicated rather than shared because a media query and an attribute cannot
+   be joined into one selector; keep them in step.
+   --------------------------------------------------------------------------- */
 
 html[data-theme='dark'] {
 	--ink: oklch(93% 0.012 85);
@@ -1353,146 +1304,6 @@ html[data-theme='dark'] {
 	--grain-speck-opacity: 0.06;
 	--sprite-light: none;
 	--sprite-dark: inline-block;
-}
-
-html[data-variant='a'] {
-	--state-hover-bg: linear-gradient(
-		transparent 18%,
-		color-mix(in oklch, var(--yellow) 45%, transparent) 18% 88%,
-		transparent 88%
-	);
-	--state-hover-fg: var(--ink);
-	--state-selected-bg: linear-gradient(
-		transparent 18%,
-		color-mix(in oklch, var(--pink) 55%, transparent) 18% 88%,
-		transparent 88%
-	);
-	--state-selected-fg: var(--ink);
-	--state-selected-edge: none;
-	--state-selected-shadow: none;
-	--state-highlight-bg: color-mix(in oklch, var(--yellow) 45%, transparent);
-	--card-shadow: 3px 3px 0 var(--pink);
-	--card-edge: 2px solid var(--ink);
-	--inline-code-bg: linear-gradient(
-		transparent 18%,
-		color-mix(in oklch, var(--yellow) 55%, transparent) 18% 88%,
-		transparent 88%
-	);
-	--inline-code-fg: var(--ink);
-	--inline-code-edge: none;
-	--swipe: linear-gradient(
-		transparent 18%,
-		color-mix(in oklch, var(--pink) 55%, transparent) 18% 88%,
-		transparent 88%
-	);
-	--code-surface-image: none;
-}
-
-html[data-theme='dark'][data-variant='a'] {
-	--state-hover-bg: linear-gradient(
-		transparent 18%,
-		color-mix(in oklch, var(--yellow) 30%, transparent) 18% 88%,
-		transparent 88%
-	);
-	--state-hover-fg: var(--ink);
-	--state-selected-bg: linear-gradient(
-		transparent 18%,
-		color-mix(in oklch, var(--pink) 30%, transparent) 18% 88%,
-		transparent 88%
-	);
-	--state-selected-fg: var(--ink);
-	--state-selected-edge: none;
-	--state-selected-shadow: none;
-	--state-highlight-bg: color-mix(in oklch, var(--yellow) 30%, transparent);
-	--card-shadow: 3px 3px 0 var(--pink);
-	--card-edge: 2px solid var(--ink);
-	--inline-code-bg: linear-gradient(
-		transparent 18%,
-		color-mix(in oklch, var(--yellow) 22%, var(--raised)) 18% 88%,
-		transparent 88%
-	);
-	--inline-code-fg: var(--ink);
-	--inline-code-edge: none;
-	--swipe: linear-gradient(
-		transparent 18%,
-		color-mix(in oklch, var(--pink) 30%, transparent) 18% 88%,
-		transparent 88%
-	);
-	--code-surface-image: none;
-}
-
-html[data-variant='b'] {
-	--state-hover-bg: var(--paper);
-	--state-hover-fg: var(--ink);
-	--state-selected-bg: var(--paper);
-	--state-selected-fg: var(--ink);
-	--state-selected-edge: 2px solid var(--ink);
-	--state-selected-shadow: 3px 3px 0 var(--purple);
-	--state-highlight-bg: var(--yellow);
-	--card-shadow: 3px 3px 0 var(--purple);
-	--card-edge: 2px solid var(--ink);
-	--inline-code-bg: var(--paper);
-	--inline-code-fg: var(--ink);
-	--inline-code-edge: 1.5px solid var(--ink);
-	--swipe: none;
-	--code-surface-image: none;
-}
-
-html[data-theme='dark'][data-variant='b'] {
-	--state-hover-bg: var(--raised);
-	--state-hover-fg: var(--ink);
-	--state-selected-bg: var(--raised);
-	--state-selected-fg: var(--ink);
-	--state-selected-edge: 2px solid var(--ink);
-	--state-selected-shadow: 3px 3px 0 var(--purple);
-	--state-highlight-bg: var(--yellow);
-	--card-shadow: 3px 3px 0 var(--purple);
-	--card-edge: 2px solid var(--ink);
-	--inline-code-bg: var(--raised);
-	--inline-code-fg: var(--ink);
-	--inline-code-edge: 1.5px solid var(--ink);
-	--swipe: none;
-	--code-surface-image: none;
-}
-
-html[data-variant='c'] {
-	--state-hover-bg: var(--paper);
-	--state-hover-fg: var(--ink);
-	--state-selected-bg: var(--ink);
-	--state-selected-fg: var(--paper);
-	--state-selected-edge: none;
-	--state-selected-shadow: none;
-	--state-highlight-bg: var(--yellow);
-	--card-shadow: none;
-	--card-edge: 2px solid var(--ink);
-	--inline-code-bg: color-mix(in oklch, var(--purple) 22%, transparent);
-	--inline-code-fg: var(--ink);
-	--inline-code-edge: none;
-	--swipe: none;
-	--code-surface-image: repeating-linear-gradient(
-		transparent 0 1.55em,
-		color-mix(in oklch, var(--ink) 8%, transparent) 1.55em calc(1.55em + 1px)
-	);
-}
-
-html[data-theme='dark'][data-variant='c'] {
-	--state-hover-bg: var(--raised);
-	--state-hover-fg: var(--ink);
-	--state-selected-bg: var(--ink);
-	--state-selected-fg: var(--paper);
-	--state-selected-edge: none;
-	--state-selected-shadow: none;
-	--state-highlight-bg: var(--yellow);
-	--card-shadow: none;
-	--card-edge: 2px solid var(--ink);
-	--inline-code-bg: color-mix(in oklch, var(--purple) 30%, transparent);
-	--inline-code-fg: var(--ink);
-	--inline-code-edge: none;
-	--swipe: none;
-	--code-surface-image: repeating-linear-gradient(
-		transparent 0 1.55em,
-		color-mix(in oklch, var(--ink) 8%, transparent) 1.55em calc(1.55em + 1px)
-	);
 }
 
 /* Token colours are inline on each span: the light one as `color`, the dark one
@@ -1789,12 +1600,14 @@ html[data-theme='dark'] .shiki span:not(.tsrx-tip):not(.tsrx-tip-title):not(.tsr
 	background: none;
 }
 
-/* Dark headings keep the page ink without an offset silhouette. */
+/* Dark ground: ink-white letters with a deep muted purple offset silhouette,
+   sampled from the poster reference. Light stays as it was: ink letters,
+   pastel silhouette. */
 html[data-theme='dark'] h1,
 html[data-theme='dark'] .prose h2,
 html[data-theme='dark'] .prose h3 {
 	color: var(--ink);
-	--shadow-color: transparent;
+	--shadow-color: oklch(34% 0.05 307);
 }
 
 /* Token colours are inline on each span: the light one as `color`, the dark one
@@ -2405,13 +2218,14 @@ html[data-theme='dark'] .shiki span:not(.tsrx-tip):not(.tsrx-tip-title):not(.tsr
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
+	gap: 0.5em;
 	inline-size: 100%;
 	min-block-size: 2.45rem;
 	padding: 0.35em 0.7em;
 	font-size: var(--step--1);
 	font-weight: 700;
 	color: var(--ink);
-	background: var(--paper);
+	background: var(--raised);
 	border: 2px solid var(--ink);
 	border-radius: 8px;
 	text-decoration: none;
@@ -2446,13 +2260,8 @@ html[data-theme='dark'] .shiki span:not(.tsrx-tip):not(.tsrx-tip-title):not(.tsr
 .mode-select-caret {
 	display: inline-flex;
 	flex: none;
+	opacity: 0.65;
 	transition: transform 160ms ease;
-}
-
-.mode-select-caret .ico,
-.mode-select-item-indicator .ico {
-	width: 1.1em;
-	height: 1.1em;
 }
 
 .mode-select-control[ui-open] .mode-select-caret {
@@ -2468,18 +2277,13 @@ html[data-theme='dark'] .shiki span:not(.tsrx-tip):not(.tsrx-tip-title):not(.tsr
 	gap: 0.2em;
 	inline-size: 100%;
 	padding: 0.3em;
-	background: var(--paper);
+	background: var(--raised);
 	border: 2px solid var(--ink);
 	border-radius: 8px;
-	box-shadow: var(--card-shadow);
 }
 
 .mode-select-content[hidden] {
 	display: none;
-}
-
-html[data-theme='dark'] :is(.mode-select-fallback, .mode-select-trigger, .mode-select-content) {
-	background: var(--raised);
 }
 
 .mode-select-item {
@@ -2487,32 +2291,23 @@ html[data-theme='dark'] :is(.mode-select-fallback, .mode-select-trigger, .mode-s
 	align-items: center;
 	justify-content: space-between;
 	padding: 0.3em 0.7em;
+	color: var(--ink);
+	font-size: var(--step--1);
+	border: 2px solid transparent;
 	border-radius: 6px;
 	cursor: pointer;
 }
 
-.mode-select-item:hover {
-	color: var(--state-hover-fg);
-	background: var(--state-hover-bg);
+.mode-select-item:hover,
+.mode-select-item[ui-highlighted] {
+	background: var(--yellow);
+	color: var(--on-accent);
 }
 
 .mode-select-item[ui-selected] {
-	color: var(--state-selected-fg);
-	background: var(--state-selected-bg);
-	outline: var(--state-selected-edge);
-	box-shadow: var(--state-selected-shadow);
+	border-color: var(--pink);
+	background: var(--tinted);
 	font-weight: 700;
-}
-
-.mode-select-item[ui-highlighted]:not([ui-selected]),
-.mode-select-item:focus:not([ui-selected]) {
-	color: var(--ink);
-	background: var(--state-highlight-bg);
-}
-
-.mode-select-item[ui-selected]:is([ui-highlighted], :focus) {
-	outline: 2px solid var(--yellow);
-	outline-offset: 2px;
 }
 
 .mode-select-trigger:focus-visible,
@@ -2528,28 +2323,6 @@ html[data-theme='dark'] :is(.mode-select-fallback, .mode-select-trigger, .mode-s
 
 .mode-select-item-indicator[ui-hidden] {
 	display: none;
-}
-
-.mode-select-item-label {
-	position: relative;
-	isolation: isolate;
-}
-
-html[data-variant='a'] .mode-select-item[ui-selected] .mode-select-item-label::before {
-	content: '';
-	position: absolute;
-	inset: -0.1em -0.3em;
-	z-index: -1;
-	background: var(--swipe);
-	transform: rotate(-1deg);
-}
-
-html[data-variant='b'] .mode-select-item[ui-selected] {
-	transform: rotate(-1deg);
-}
-
-html[data-variant='c'] .mode-select-item[ui-selected] {
-	border-radius: 999px;
 }
 
 /* The stage at the top of a family page: the instruction, then the live

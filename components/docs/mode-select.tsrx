@@ -1,5 +1,5 @@
 import { select } from '@markless/ui';
-import { lucide, ph, tabler } from '@markless/ui';
+import { lucide } from '@markless/ui';
 
 type Mode = 'framework' | 'ui';
 
@@ -22,26 +22,20 @@ export default function ModeSelect({ mode }: { readonly mode: Mode }) @{
 			<select.trigger class="mode-select-trigger">
 				<span>{title}</span>
 				<span class="mode-select-caret" aria-hidden="true">
-					<lucide.chevrondown class="ico ico-a" />
-					<ph.caretdown class="ico ico-b" />
-					<tabler.chevrondown class="ico ico-c" />
+					<lucide.chevrondown class="ico" />
 				</span>
 			</select.trigger>
 			<select.content class="mode-select-content">
 				<select.item class="mode-select-item" value="framework">
 					<select.itemlabel class="mode-select-item-label">Framework</select.itemlabel>
 					<select.itemindicator class="mode-select-item-indicator">
-						<lucide.check class="ico ico-a" aria-hidden="true" />
-						<ph.check class="ico ico-b" aria-hidden="true" />
-						<tabler.check class="ico ico-c" aria-hidden="true" />
+						<lucide.check class="ico" aria-hidden="true" />
 					</select.itemindicator>
 				</select.item>
 				<select.item class="mode-select-item" value="ui">
 					<select.itemlabel class="mode-select-item-label">UI</select.itemlabel>
 					<select.itemindicator class="mode-select-item-indicator">
-						<lucide.check class="ico ico-a" aria-hidden="true" />
-						<ph.check class="ico ico-b" aria-hidden="true" />
-						<tabler.check class="ico ico-c" aria-hidden="true" />
+						<lucide.check class="ico" aria-hidden="true" />
 					</select.itemindicator>
 				</select.item>
 			</select.content>

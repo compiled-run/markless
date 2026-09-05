@@ -1,18 +1,6 @@
-// Turns the plain `<pre><code class="language-…">` blocks that the router's MDX
-// plugin renders into shiki-highlighted markup, and wraps the TSRX tokens
-// inside them in hover targets.
-//
-// Colours come from shiki's built-in `github-light` and `github-dark` themes, so
-// the token palette is one somebody already balanced rather than a mapping
-// invented here. Shiki's dual-theme mode writes the light colour as the span's
-// `color` and the dark one as a `--shiki-dark` custom property on the same span,
-// so the light output is byte-for-byte what the single-theme mode produced plus
-// one extra declaration, and `styles/global.css` switches to `--shiki-dark` under
-// the dark theme. The colours each theme picks for the surface are dropped on the
-// way out: the block keeps the site's ground and body ink (see styles/global.css).
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { createHighlighter, type HighlighterGeneric } from 'shiki';
+import { createHighlighter, type LanguageRegistration, type HighlighterGeneric } from 'shiki';
 import { docForToken, knownTokens, tooltipLabel, tooltipTitle } from './tsrx-docs.ts';
 import {
 	createQuickInfoService,
@@ -49,7 +37,7 @@ export function getHighlighter(): Promise<HighlighterGeneric<string, string>> {
 	highlighterPromise ??= (async () => {
 		const grammar = JSON.parse(
 			await readFile(fileURLToPath(new URL('./tsrx.tmLanguage.json', import.meta.url)), 'utf8'),
-		) as Record<string, unknown>;
+		) as LanguageRegistration;
 		return createHighlighter({
 			themes: [LIGHT_THEME, DARK_THEME],
 			langs: [

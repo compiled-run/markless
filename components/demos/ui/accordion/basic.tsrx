@@ -36,34 +36,14 @@ export default function AccordionBasic() @{
 			}
 
 			.section {
-				border: var(--card-edge);
+				border: 2px solid var(--code-edge);
 				border-radius: 6px;
 				background: var(--paper);
 				overflow: clip;
 			}
 
 			.section[ui-open] {
-				box-shadow: var(--card-shadow);
-			}
-
-			html[data-theme='dark'] .section {
-				background: var(--raised);
-			}
-
-			html[data-variant='b'] .section[ui-open] {
-				border: var(--state-selected-edge);
-				transform: rotate(0.6deg);
-			}
-
-			html[data-variant='c'] .section {
-				border: 0;
-				border-block-end: 1px solid color-mix(in oklch, var(--ink) 30%, transparent);
-				border-radius: 0;
-				box-shadow: none;
-			}
-
-			html[data-variant='c'] .section[ui-open] {
-				border-inline-start: 4px solid var(--ink);
+				border-color: var(--pink);
 			}
 
 			.heading {
@@ -72,7 +52,6 @@ export default function AccordionBasic() @{
 			}
 
 			.trigger {
-				position: relative;
 				display: flex;
 				gap: 0.6em;
 				align-items: center;
@@ -82,8 +61,7 @@ export default function AccordionBasic() @{
 				border: 0;
 				background: transparent;
 				color: var(--ink);
-				font-family: 'Joy Elia', system-ui, sans-serif;
-				font-size: var(--step-0);
+				font: inherit;
 				font-weight: 700;
 				text-align: left;
 				cursor: pointer;
@@ -102,29 +80,7 @@ export default function AccordionBasic() @{
 			}
 
 			.trigger:hover {
-				background: var(--state-hover-bg);
-				color: var(--state-hover-fg);
-			}
-
-			html[data-variant='a'] .section[ui-open] .trigger::before,
-			html[data-variant='c'] .section[ui-open] .trigger::before {
-				content: '';
-				position: absolute;
-				inset: 0.55em 2.2em 0.55em 0.65em;
-				z-index: -1;
-				background: var(--swipe);
-				transform: rotate(-1deg);
-			}
-
-			html[data-variant='a'] .section[ui-open] .trigger,
-			html[data-variant='c'] .section[ui-open] .trigger {
-				isolation: isolate;
-			}
-
-			html[data-variant='c'] .section[ui-open] .trigger::before {
-				inset-block: auto 0.62em;
-				height: 0.35em;
-				background: var(--yellow);
+				background: var(--tinted-quiet);
 			}
 
 			.trigger:disabled {

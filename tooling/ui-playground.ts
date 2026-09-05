@@ -1,11 +1,3 @@
-// The playground a family page shows is generated, never written by hand: the
-// authored demo `components/demos/ui/<family>/<scenario>.tsrx` is parsed, the
-// manifest and `ui-meta/<family>.ts` supply the control model, and this module
-// emits one TSRX component holding the chrome, the demo and the code panel.
-//
-// Everything lands in ONE module and ONE island on purpose. A control cell that
-// crossed a module boundary would need a foreign `state()` or a cross-module
-// callback, and neither survives resume.
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
@@ -747,9 +739,7 @@ type Emit = {
 function hintFor(control: PlaygroundControl): string {
 	return `					<tooltip.root class="pg-hint">
 						<tooltip.trigger class="pg-dot" aria-label="About ${control.prop}">
-							<lucide.circlehelp class="ico ico-a" aria-hidden="true" />
-							<ph.question class="ico ico-b" aria-hidden="true" />
-							<tabler.helpcircle class="ico ico-c" aria-hidden="true" />
+							<lucide.circlehelp class="ico" aria-hidden="true" />
 						</tooltip.trigger>
 						<tooltip.content class="pg-tip">
 							<span class="tsrx-tip-title">${control.prop}</span>
@@ -983,11 +973,7 @@ ${indent}\t\t\t</div>
 ${indent}\t\t\t<span class="pg-fade" aria-hidden="true"></span>
 ${indent}\t\t\t<collapsible.trigger class="pg-expand">
 ${indent}\t\t\t\tExpand code
-${indent}\t\t\t\t<span class="pg-expand-icons" aria-hidden="true">
-${indent}\t\t\t\t\t<lucide.arrowright class="ico ico-a" />
-${indent}\t\t\t\t\t<ph.arrowright class="ico ico-b" />
-${indent}\t\t\t\t\t<tabler.arrowright class="ico ico-c" />
-${indent}\t\t\t\t</span>
+${indent}\t\t\t\t<lucide.arrowright class="pg-expand-icon" aria-hidden="true" />
 ${indent}\t\t\t</collapsible.trigger>
 ${indent}\t\t</collapsible.root>
 ${indent}\t</tabs.root>
@@ -1111,7 +1097,7 @@ export function playgroundModule(input: PlaygroundInput): string {
 	return `import { state } from '@markless/core';
 import { ${families.join(', ')} } from '@markless/ui';
 import { attributeText, heldList, listText, pickValue, toggled, valueText } from '../slot-text.ts';
-import { lucide, ph, tabler } from '@markless/ui';
+import { lucide } from '@markless/ui';
 
 ${RUN_TYPES}
 
@@ -1123,7 +1109,7 @@ ${presetTable(controls, presets)}
 export default function ${componentName(demo.family, demo.stem)}() @{
 ${cells.join('\n')}
 ${demo.prelude === '' ? '' : `\n${demo.prelude}\n`}
-	<section class="pg">
+	<section class="pg" data-family="${demo.family}">
 		<collapsible.root class="pg-controls">
 			<div class="pg-quick">
 ${quick}

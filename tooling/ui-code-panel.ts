@@ -1,14 +1,3 @@
-// A standalone code panel, and the example card that puts a demo above one,
-// are generated the way the playground card is: one TSRX module per demo,
-// written to disk, drawing the highlighter's runs from a constant table inside
-// the shared tabs-and-clamp chrome.
-//
-// The runs are data and not literal markup on purpose. A keyed repeat over a
-// module constant is server-only (no payload), and its template hosts are
-// located once; literal spans are each a located host, which measured at ~78
-// payload bytes per token. The shape is shiki's own — one span per run, no
-// wrapper — with each colour pair hoisted to a short class, and every distinct
-// hover doc written once in a registry the spans point at by key.
 import {
 	ColourTable,
 	DocRegistry,
@@ -86,7 +75,7 @@ export async function codePanelModule(input: {
 	});
 	const imports = [
 		"import { collapsible, tabs } from '@markless/ui';",
-		"import { lucide, ph, tabler } from '@markless/ui';",
+		"import { lucide } from '@markless/ui';",
 	];
 	if (input.demo !== undefined) imports.push(`import Demo from ${JSON.stringify(input.demo)};`);
 	const stage = input.demo === undefined ? '' : `\t\t<div class="pg-stage">\n\t\t\t<Demo />\n\t\t</div>\n`;
@@ -98,7 +87,7 @@ ${consts.join('\n')}
 const docs: readonly Doc[] = ${JSON.stringify(registry.docs)};
 
 export default function ${name}() @{
-	<div class="cp">
+	<div class="cp" data-family="${input.family}">
 ${stage}		<div class="pg-code">
 ${chrome}
 		</div>

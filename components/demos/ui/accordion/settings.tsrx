@@ -86,39 +86,23 @@ export default function Settings() @{
 			}
 
 			.group {
-				border: var(--card-edge);
-				border-radius: 6px;
-				background: var(--paper);
+				border: 2px solid var(--code-edge);
+				border-radius: 8px;
+				background: var(--raised);
 				overflow: clip;
 			}
 
 			.group[ui-open] {
-				box-shadow: var(--card-shadow);
+				border-color: var(--ink);
 			}
 
-			html[data-theme='dark'] .group {
-				background: var(--raised);
-			}
-
-			html[data-variant='b'] .group[ui-open] {
-				border: var(--state-selected-edge);
-				transform: rotate(0.6deg);
-			}
-
-			html[data-variant='c'] .group {
-				border: 0;
-				border-block-end: 1px solid color-mix(in oklch, var(--ink) 30%, transparent);
-				border-radius: 0;
-				box-shadow: none;
-			}
-
-			html[data-variant='c'] .group[ui-open] {
-				border-inline-start: 4px solid var(--ink);
+			.group[data-tone='danger'][ui-open] {
+				border-color: var(--pink);
 			}
 
 			.group-heading {
 				margin: 0;
-				font-size: var(--step-0);
+				font-size: var(--step--1);
 			}
 
 			.group-trigger {
@@ -130,37 +114,17 @@ export default function Settings() @{
 				border: 0;
 				background: transparent;
 				color: var(--ink);
-				font-family: 'Joy Elia', system-ui, sans-serif;
-				font-size: var(--step-0);
+				font: inherit;
 				text-align: left;
 				cursor: pointer;
 			}
 
 			.group-trigger:hover {
-				background: var(--state-hover-bg);
-				color: var(--state-hover-fg);
+				background: var(--tinted-quiet);
 			}
 
 			.group-name {
-				position: relative;
-				z-index: 0;
 				font-weight: 700;
-			}
-
-			html[data-variant='a'] .group[ui-open] .group-name::before,
-			html[data-variant='c'] .group[ui-open] .group-name::before {
-				content: '';
-				position: absolute;
-				inset: 0.05em -0.2em;
-				z-index: -1;
-				background: var(--swipe);
-				transform: rotate(-1deg);
-			}
-
-			html[data-variant='c'] .group[ui-open] .group-name::before {
-				inset-block: auto 0.05em;
-				height: 0.35em;
-				background: var(--yellow);
 			}
 
 			.group-note {
@@ -184,20 +148,15 @@ export default function Settings() @{
 				transform: rotate(180deg);
 			}
 
-			/* A closed panel keeps its box for find-in-page, so the padding waits
-			   for ui-open or every closed group carries a strip of empty paper. */
+			/* Padding waits for ui-open because closed panels retain a box for find-in-page. */
 			.group-panel {
 				display: grid;
 				gap: 0.7em;
-				background: transparent;
+				background: var(--paper);
 			}
 
 			.group-panel[ui-open] {
 				padding: 0.2em 0.9em 0.9em;
-			}
-
-			.group-panel[hidden] {
-				display: none;
 			}
 
 			.field {
@@ -253,6 +212,10 @@ export default function Settings() @{
 
 			.danger-button:hover {
 				background: var(--pink);
+			}
+
+			.group-panel[hidden] {
+				display: none;
 			}
 		</style>
 	</accordion.root>

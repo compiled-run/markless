@@ -35,7 +35,7 @@ export type Run = {
 	readonly id: string;
 	readonly text: string;
 	readonly class?: string;
-	readonly tabindex?: string;
+	readonly tabindex?: number;
 	readonly role?: string;
 	readonly labelledby?: string;
 	readonly describedby?: string;
@@ -51,7 +51,7 @@ export const RUN_TYPES = `type Run = {
 	readonly id: string;
 	readonly text: string;
 	readonly class?: string;
-	readonly tabindex?: string;
+	readonly tabindex?: number;
 	readonly role?: string;
 	readonly labelledby?: string;
 	readonly describedby?: string;
@@ -175,7 +175,7 @@ export function paneLines(html: string, registry: DocRegistry, colours: ColourTa
 				return {
 					...run,
 					class: colour === undefined ? 'tsrx-hover' : `tsrx-hover ${colour}`,
-					tabindex: '0',
+					tabindex: 0,
 					role: 'img',
 					labelledby: draft.hover.t,
 					...(draft.hover.doc === '' ? {} : { describedby: draft.hover.b }),

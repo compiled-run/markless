@@ -16,7 +16,9 @@
 			{
 				"name": "@markless/router/typescript-plugin"
 			}
-		]
+		],
+		"allowImportingTsExtensions": true,
+		"skipLibCheck": true
 	},
 	"include": [
 		"markless-router-env.d.ts",

@@ -18,7 +18,7 @@ function accent(card: string): string {
 			}`;
 }
 
-/** The outer frame shared by `.pg` and `.cp`. */
+/** The sticker itself: what `.pg` and `.cp` share. */
 function sticker(card: string): string {
 	return `			${card} {
 				position: relative;
@@ -28,23 +28,21 @@ function sticker(card: string): string {
 				margin-block: var(--space-m);
 				border: 2px solid var(--ink);
 				border-radius: 8px;
-				background: var(--paper);
-				box-shadow: var(--card-shadow);
+				background: var(--raised);
+				box-shadow: 4px 4px 0 var(--pg-accent);
 				overflow: clip;
 			}
 
 ${accent(card)}
-
-			html[data-theme='dark'] ${card} {
-				background: var(--raised);
-			}
 
 			/* Full bleed on a phone: the card runs edge to edge, so the page gutter
 			   the shell adds is taken back here. */
 			@media (max-width: 866px) {
 				${card} {
 					margin-inline: calc(-1 * var(--space-s-l));
-					box-shadow: var(--card-shadow);
+					border-inline: 0;
+					border-radius: 0;
+					box-shadow: 0 4px 0 var(--pg-accent);
 				}
 			}`;
 }
@@ -103,11 +101,6 @@ function tipLook(tip: string): string {
 				font-family: var(--font-mono);
 				font-size: var(--step--2);
 				opacity: 0.8;
-			}
-
-			html[data-theme='dark'] ${tip} {
-				background: var(--raised);
-				color: var(--ink);
 			}`;
 }
 
@@ -133,11 +126,11 @@ const PICK_CSS = `			.pg-pick-trigger {
 				min-width: 6.5em;
 				padding: 0.3em 0.7em;
 				border: 2px solid var(--ink);
-				border-radius: 8px;
+				border-radius: 6px;
 				background: var(--paper);
 				color: var(--ink);
 				font: inherit;
-				font-family: 'Joy Elia', system-ui, sans-serif;
+				font-family: var(--font-mono);
 				font-size: var(--step--1);
 				line-height: 1.3;
 				text-align: start;
@@ -156,10 +149,6 @@ const PICK_CSS = `			.pg-pick-trigger {
 				transform: rotate(180deg);
 			}
 
-			html[data-theme='dark'] .pg-pick-trigger {
-				background: var(--raised);
-			}
-
 			.pg-pick-list {
 				position: absolute;
 				inset-block-start: 100%;
@@ -171,15 +160,11 @@ const PICK_CSS = `			.pg-pick-trigger {
 				border: 2px solid var(--ink);
 				border-radius: 6px;
 				background: var(--paper);
-				box-shadow: var(--card-shadow);
+				box-shadow: 3px 3px 0 var(--pg-accent);
 			}
 
 			.pg-pick-list:is([ui-closed], [hidden]) {
 				display: none;
-			}
-
-			html[data-theme='dark'] .pg-pick-list {
-				background: var(--raised);
 			}
 
 			/* The anchor is scoped to each picker's own root, so a list never resolves another picker's trigger. */
@@ -201,32 +186,17 @@ const PICK_CSS = `			.pg-pick-trigger {
 				padding: 0.3em 0.6em;
 				border-radius: 4px;
 				color: var(--ink);
-				font-family: 'Joy Elia', system-ui, sans-serif;
+				font-family: var(--font-mono);
 				font-size: var(--step--1);
 				cursor: pointer;
 			}
 
 			.pg-pick-item:hover {
-				background: var(--state-hover-bg);
-				color: var(--state-hover-fg);
+				background: color-mix(in oklch, var(--ink) var(--hover-wash), transparent);
 			}
 
 			.pg-pick-item[ui-selected] {
-				background: var(--state-selected-bg);
-				color: var(--state-selected-fg);
-				outline: var(--state-selected-edge);
-				box-shadow: var(--state-selected-shadow);
-			}
-
-			.pg-pick-item[ui-highlighted]:not([ui-selected]),
-			.pg-pick-item:focus:not([ui-selected]) {
-				background: var(--state-highlight-bg);
-				color: var(--ink);
-			}
-
-			.pg-pick-item[ui-selected]:is([ui-highlighted], :focus) {
-				outline: 2px solid var(--yellow);
-				outline-offset: 2px;
+				background: var(--tinted);
 			}`;
 
 /** One focus ring for every control the chrome draws: the site's yellow, as its hover docs use. */
@@ -302,7 +272,7 @@ export const CONTROLS_CSS = `${sticker('.pg')}
 			}
 
 			.pg-switch[ui-checked] {
-				background: var(--state-selected-bg);
+				background: var(--yellow);
 			}
 
 			.pg-switch:disabled {
@@ -323,13 +293,6 @@ export const CONTROLS_CSS = `${sticker('.pg')}
 
 			.pg-switch[ui-checked] .pg-knob {
 				margin-inline-start: calc(100% - 0.8em);
-				background: var(--state-selected-fg);
-			}
-
-			html[data-variant='b'] .pg-knob {
-				box-sizing: border-box;
-				border: 1.5px solid var(--ink);
-				background: var(--paper);
 			}
 
 			.pg-field {
@@ -370,8 +333,6 @@ export const CONTROLS_CSS = `${sticker('.pg')}
 
 			.pg-dot:hover,
 			.pg-dot:focus-visible {
-				background: var(--state-hover-bg);
-				color: var(--state-hover-fg);
 				opacity: 1;
 			}
 
@@ -409,10 +370,9 @@ ${tipLook('.pg-tip')}
 				align-items: center;
 				gap: 0.2em;
 				margin-inline-start: auto;
-				padding: 0.3em 0.7em;
-				border: 2px solid var(--ink);
-				border-radius: 8px;
-				background: var(--paper);
+				padding: 0.2em 0.4em;
+				border: 0;
+				background: transparent;
 				color: var(--ink);
 				font: inherit;
 				font-size: var(--step--1);
@@ -422,14 +382,17 @@ ${tipLook('.pg-tip')}
 			}
 
 			.pg-showall:hover {
-				background: var(--state-hover-bg);
-				color: var(--state-hover-fg);
+				text-decoration: underline;
+				text-decoration-color: var(--pink);
+				text-underline-offset: 0.15em;
 			}
 
+			/* Points along the row while closed, down once the rest of the controls are out. */
 			.pg-showall-caret {
 				width: 1em;
 				height: 1em;
 				color: currentColor;
+				opacity: 0.65;
 				transform: rotate(-90deg);
 				transition: transform 140ms ease;
 			}
@@ -452,10 +415,6 @@ ${tipLook('.pg-tip')}
 			}
 
 ${PICK_CSS}
-
-			html[data-theme='dark'] :is(.pg-switch, .pg-field, .pg-showall) {
-				background: var(--raised);
-			}
 
 			.pg-log {
 				margin: 0;
@@ -526,16 +485,16 @@ ${FOCUS_CSS}
 				}
 			}`;
 
-/** The stage is plain breathing room inside the outer frame. */
+/** The stage is a framed, tinted sheet inside the card, so the demo reads as the exhibit rather than as more chrome. */
 export const STAGE_CSS = `			.pg-stage {
 				display: grid;
 				place-items: center;
+				min-height: 18rem;
+				margin: var(--space-s);
 				padding: var(--space-m) var(--space-s);
-				background: var(--paper);
-			}
-
-			html[data-theme='dark'] .pg-stage {
-				background: var(--raised);
+				border: 1px solid var(--code-edge);
+				border-radius: 6px;
+				background: var(--code-surface);
 			}`;
 
 export const CODE_CSS = `			/* One row between the stage and the code: the file tabs sit on the left
@@ -561,11 +520,11 @@ export const CODE_CSS = `			/* One row between the stage and the code: the file 
 				overflow: clip;
 			}
 
-			/* Sits into the pane edge so the selected tab attaches to the code. */
+			/* Sits one pixel into the pane edge so the selected tab attaches to the code. */
 			.pg-strip {
 				position: relative;
 				z-index: 1;
-				margin-block-end: -2px;
+				margin-block-end: -1px;
 				padding: 0;
 			}
 
@@ -578,13 +537,13 @@ export const CODE_CSS = `			/* One row between the stage and the code: the file 
 			/* Paper index tabs: the selected one lifted onto the code sheet, the rest quiet. */
 			.pg-tab {
 				padding: 0.45em 0.9em;
-				border: 2px solid transparent;
+				border: 1px solid transparent;
 				border-block-end: 0;
 				border-radius: 6px 6px 0 0;
 				background: transparent;
 				color: var(--ink);
-				font-family: 'Joy Elia', system-ui, sans-serif;
-				font-size: var(--step--1);
+				font-family: var(--font-mono);
+				font-size: var(--step--2);
 				line-height: 1.3;
 				opacity: 0.6;
 				cursor: pointer;
@@ -595,19 +554,16 @@ export const CODE_CSS = `			/* One row between the stage and the code: the file 
 			}
 
 			.pg-tab[ui-selected] {
-				border-color: var(--ink);
-				border-block-end-color: transparent;
-				background: var(--paper);
+				border-color: var(--code-edge);
+				background: var(--code-surface);
 				opacity: 1;
 				font-weight: 700;
 			}
 
-			html[data-theme='dark'] .pg-tab[ui-selected] {
-				background: var(--raised);
-			}
-
 			.pg-panes {
 				min-width: 0;
+				border-block-start: 1px solid var(--code-edge);
+				background: var(--code-surface);
 			}
 
 			.pg-pane {
@@ -636,6 +592,13 @@ export const CODE_CSS = `			/* One row between the stage and the code: the file 
 
 			.pg-shiki {
 				margin: 0;
+				padding: var(--space-s);
+				color: var(--ink);
+				font-family: var(--font-mono);
+				font-size: var(--step--2);
+				line-height: 1.6;
+				tab-size: 2;
+				overflow-x: auto;
 			}
 
 			.pg-line {
@@ -650,12 +613,8 @@ export const CODE_CSS = `			/* One row between the stage and the code: the file 
 				inset-inline: 0;
 				bottom: 0;
 				height: 5.5rem;
-				background: linear-gradient(to bottom, transparent, var(--paper) 75%);
+				background: linear-gradient(to bottom, transparent, var(--code-surface) 75%);
 				pointer-events: none;
-			}
-
-			html[data-theme='dark'] .pg-fade {
-				background: linear-gradient(to bottom, transparent, var(--raised) 75%);
 			}
 
 			/* The whole faded strip is the target, so a reader can click the code
@@ -680,9 +639,12 @@ export const CODE_CSS = `			/* One row between the stage and the code: the file 
 				cursor: pointer;
 			}
 
-			.pg-expand-icons {
-				display: inline-flex;
+			.pg-expand-icon {
+				display: block;
+				width: 1em;
+				height: 1em;
 				margin-block-end: 0.1em;
+				color: currentColor;
 			}
 
 			.pg-expand:hover {

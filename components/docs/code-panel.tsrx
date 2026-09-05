@@ -52,7 +52,7 @@ export default function CodePanel({
 													<span style={run.style}>{run.text}</span>
 												}
 												@for (const run of token.hover; key run.id) {
-													<span class="tsrx-hover" tabindex="0" role="img" aria-label={run.label} data-doc-title={run.title} data-doc={run.doc}><span style={run.style}>{run.text}</span><span class="tsrx-tip" aria-hidden="true"><span class="tsrx-tip-title">{run.title}</span><span class="tsrx-tip-body">{run.doc}</span></span></span>
+													<span class="tsrx-hover" tabindex={0} role="img" aria-label={run.label} data-doc-title={run.title} data-doc={run.doc}><span style={run.style}>{run.text}</span><span class="tsrx-tip" aria-hidden="true"><span class="tsrx-tip-title">{run.title}</span><span class="tsrx-tip-body">{run.doc}</span></span></span>
 												}
 											</span>
 										}
