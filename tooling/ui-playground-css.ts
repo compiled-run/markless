@@ -1,13 +1,3 @@
-// The generated chrome's own CSS behind one `pg-` namespace: a demo's authored
-// CSS lands in the same scoped block, so a demo class named `panel` or `switch`
-// must not collide with the chrome's. The playground card takes every block; an
-// example card takes the stage, the code block and the hover-doc registry.
-//
-// The look is the site's paper sticker: a 2px ink edge, one hard accent shadow,
-// and only hairlines (`--code-edge`) inside. Every colour, radius and face is a
-// token from styles/global.css; the accent is `--pg-accent`, muted on dark paper.
-
-/** The card's one accent: the site's pink, and the same pink let through thinner on dark paper (a mix with the paper would drag its hue). */
 function accent(card: string): string {
 	return `			${card} {
 				--pg-accent: var(--pink);
@@ -18,12 +8,11 @@ function accent(card: string): string {
 			}`;
 }
 
-/** The sticker itself: what `.pg` and `.cp` share. */
 function sticker(card: string): string {
 	return `			${card} {
 				position: relative;
 				display: grid;
-				/* Sized by the card, never by the widest code line: the code scrolls inside. */
+
 				grid-template-columns: minmax(0, 1fr);
 				margin-block: var(--space-m);
 				border: 2px solid var(--ink);
@@ -35,8 +24,7 @@ function sticker(card: string): string {
 
 ${accent(card)}
 
-			/* Full bleed on a phone: the card runs edge to edge, so the page gutter
-			   the shell adds is taken back here. */
+
 			@media (max-width: 866px) {
 				${card} {
 					margin-inline: calc(-1 * var(--space-s-l));
@@ -47,24 +35,19 @@ ${accent(card)}
 			}`;
 }
 
-/**
- * The one tip recipe in a card: the control hints and the hover docs share it,
- * and each caller positions its own. Title, sentence and type line are the
- * `tsrx-tip-*` classes the site's fences already use.
- */
 function tipLook(tip: string): string {
 	return `			${tip} {
 				z-index: 40;
 				width: max-content;
-				max-width: min(36ch, calc(100vw - 2 * var(--space-s-l)));
-				margin: 0;
+				max-width: min(36ch, calc(100vw - 2rem));
+				margin: 0 .5rem;
 				padding: 0.15em 0;
-				border: 0;
+				border: 1.5px solid #202023;
 				border-radius: 6px;
-				background: var(--slab);
-				box-shadow: 3px 3px 0 var(--pg-accent);
-				color: var(--slab-ink);
-				font-family: 'Joy Elia', system-ui, sans-serif;
+				background: #fffdf7;
+				box-shadow: 3px 4px 0 var(--pg-tip-accent, #e6c4fb);
+				color: #202023;
+				font-family: system-ui, sans-serif;
 				font-size: var(--step--1);
 				line-height: 1.4;
 				text-align: start;
@@ -88,6 +71,7 @@ function tipLook(tip: string): string {
 			}
 
 			${tip} .tsrx-tip-body {
+				font-family: system-ui, sans-serif;
 				padding: 0 0.75em 0.5em;
 			}
 
@@ -97,18 +81,13 @@ function tipLook(tip: string): string {
 
 			${tip} .tsrx-tip-type {
 				padding: 0.4em 0.75em;
-				border-block-start: 1px solid color-mix(in oklch, var(--slab-ink) 30%, transparent);
+				border-block-start: 1px solid #d8d3dd;
 				font-family: var(--font-mono);
 				font-size: var(--step--2);
 				opacity: 0.8;
 			}`;
 }
 
-/**
- * A tip or list pinned to its anchor by the browser, below it and flipping
- * above (and to the other side) when that would leave the viewport. Fixed, so
- * the card's clip never cuts it; the caller names the anchor.
- */
 function anchored(anchor: string, area: string): string {
 	return `position: fixed;
 				inset: auto;
@@ -117,7 +96,6 @@ function anchored(anchor: string, area: string): string {
 				position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline;`;
 }
 
-/** The site's select: a 2px ink frame, paper inside, the sidebar's caret. */
 const PICK_CSS = `			.pg-pick-trigger {
 				display: flex;
 				gap: 0.7em;
@@ -167,7 +145,7 @@ const PICK_CSS = `			.pg-pick-trigger {
 				display: none;
 			}
 
-			/* The anchor is scoped to each picker's own root, so a list never resolves another picker's trigger. */
+
 			@supports (position-area: block-end) {
 				.pg-pick {
 					anchor-scope: --pg-pick;
@@ -199,7 +177,6 @@ const PICK_CSS = `			.pg-pick-trigger {
 				background: var(--tinted);
 			}`;
 
-/** One focus ring for every control the chrome draws: the site's yellow, as its hover docs use. */
 const FOCUS_CSS = `			.pg-switch:focus-visible,
 			.pg-dot:focus-visible,
 			.pg-showall:focus-visible,
@@ -280,7 +257,7 @@ export const CONTROLS_CSS = `${sticker('.pg')}
 				opacity: 0.55;
 			}
 
-			/* The knob travels the track's own content width, so it lands flush at either end. */
+
 			.pg-knob {
 				display: block;
 				width: 0.8em;
@@ -349,7 +326,7 @@ ${tipLook('.pg-tip')}
 				display: none;
 			}
 
-			/* Named here, not left to the family's layer: the vendored tooltip ships no anchor on its trigger. */
+
 			@supports (position-area: block-end) {
 				.pg-hint {
 					anchor-scope: --pg-hint;
@@ -387,7 +364,7 @@ ${tipLook('.pg-tip')}
 				text-underline-offset: 0.15em;
 			}
 
-			/* Points along the row while closed, down once the rest of the controls are out. */
+
 			.pg-showall-caret {
 				width: 1em;
 				height: 1em;
@@ -429,7 +406,7 @@ ${PICK_CSS}
 				display: none;
 			}
 
-			/* The scenario picker: a small-caps label over the select, like a sidebar section. */
+
 			.pg-bar-pick {
 				display: grid;
 				gap: 0.3em;
@@ -485,7 +462,6 @@ ${FOCUS_CSS}
 				}
 			}`;
 
-/** The stage is a framed, tinted sheet inside the card, so the demo reads as the exhibit rather than as more chrome. */
 export const STAGE_CSS = `			.pg-stage {
 				display: grid;
 				place-items: center;
@@ -497,12 +473,10 @@ export const STAGE_CSS = `			.pg-stage {
 				background: var(--code-surface);
 			}`;
 
-export const CODE_CSS = `			/* One row between the stage and the code: the file tabs sit on the left
-			   edge, attached to the code, and the scenario picker on the right. */
+export const CODE_CSS = `
 			.pg-bar {
 				display: flex;
-				/* Reversed wrap puts the picker above the tabs on a phone; it also
-				   flips the cross axis, so flex-start here is the visual bottom. */
+
 				flex-wrap: wrap-reverse;
 				gap: 0.6em 1em;
 				align-items: flex-start;
@@ -520,7 +494,7 @@ export const CODE_CSS = `			/* One row between the stage and the code: the file 
 				overflow: clip;
 			}
 
-			/* Sits one pixel into the pane edge so the selected tab attaches to the code. */
+
 			.pg-strip {
 				position: relative;
 				z-index: 1;
@@ -534,7 +508,7 @@ export const CODE_CSS = `			/* One row between the stage and the code: the file 
 				align-items: flex-end;
 			}
 
-			/* Paper index tabs: the selected one lifted onto the code sheet, the rest quiet. */
+
 			.pg-tab {
 				padding: 0.45em 0.9em;
 				border: 1px solid transparent;
@@ -574,8 +548,7 @@ export const CODE_CSS = `			/* One row between the stage and the code: the file 
 				display: none;
 			}
 
-			/* The clamp: one per panel, round every tab, so the code always shows and
-			   opening it once lifts the ceiling for every file. */
+
 			.pg-clamp {
 				position: relative;
 			}
@@ -604,7 +577,7 @@ export const CODE_CSS = `			/* One row between the stage and the code: the file 
 			.pg-line {
 				display: block;
 				white-space: pre;
-				/* A blank line is an empty block; without a floor it has no height. */
+
 				min-height: 1lh;
 			}
 
@@ -617,8 +590,7 @@ export const CODE_CSS = `			/* One row between the stage and the code: the file 
 				pointer-events: none;
 			}
 
-			/* The whole faded strip is the target, so a reader can click the code
-			   they cannot read yet rather than hunting for a small control. */
+
 			.pg-expand {
 				position: absolute;
 				inset-inline: 0;
@@ -659,13 +631,8 @@ export const CODE_CSS = `			/* One row between the stage and the code: the file 
 			}
 `;
 
-/**
- * The hover docs of one card: every distinct doc written once in a registry
- * after the code, pinned to whichever token is hovered or focused — the only
- * one carrying the anchor name. `root` is the card's own class.
- */
 export function docCss(root: string): string {
-	return `			/* Hidden is display: none, never visibility: a hidden fixed, anchored box still costs pre-paint work on every scroll frame. */
+	return `
 			${root} .cp-doc {
 				display: none;
 				position: absolute;
@@ -688,16 +655,391 @@ ${tipLook(`${root} .cp-doc`)}
 			}`;
 }
 
-/** One rule per registry entry: the entry shows while any token naming it is hovered or focused. */
 export function docRules(keys: readonly string[], root: string): string {
 	return keys
 		.map(
-			(key) => `			${root}:has(.tsrx-hover[data-doc="${key}"]:is(:hover, :focus-visible)) .cp-doc[data-doc="${key}"] {
+			(
+				key,
+			) => `			${root}:has(.tsrx-hover[data-doc="${key}"]:is(:hover, :focus-visible)) .cp-doc[data-doc="${key}"] {
 				display: block;
 			}`,
 		)
 		.join('\n\n');
 }
+
+const DESIGN_CSS = `
+.pg,
+.cp {
+	position: relative;
+	z-index: 2;
+	min-width: 0;
+	margin: 2rem 0;
+	gap: 0;
+	border: 2px solid #202023;
+	border-radius: 10px;
+	overflow: visible;
+	background: var(--code-surface);
+	box-shadow: 5px 5px 0 #ffe05d;
+	--pg-band: #fff0a7;
+	--pg-bar-fill: #fffdf7;
+	--pg-tab-fill: #ffd0e7;
+	--pg-marker: #f34c99;
+	--pg-tip-accent: #f6abd4;
+	--pg-code-fill: #fff;
+}
+html[data-variant='b'] .pg,
+html[data-variant='b'] .cp {
+	--pg-band: #e9d9fc;
+	--pg-bar-fill: #e9d9fc;
+	--pg-tab-fill: #f7a5d1;
+	--pg-tip-accent: #ffe05d;
+	box-shadow: none;
+}
+html[data-variant='c'] .pg,
+html[data-variant='c'] .cp {
+	--pg-band: #faf7f0;
+	--pg-bar-fill: #faf7f0;
+	--pg-tab-fill: #ffe768;
+	--pg-tip-accent: #d6bbfc;
+	--pg-marker: #ffe768;
+	--pg-code-fill: #fcfaf5;
+	border-width: 1.5px;
+	border-radius: 7px;
+	box-shadow: -6px 0 0 #f7a6cf;
+}
+html[data-variant='d'] .pg,
+html[data-variant='d'] .cp {
+	--pg-band: #fff5cf;
+	--pg-bar-fill: #eee2fb;
+	--pg-tab-fill: transparent;
+	--pg-marker: #57cb83;
+	--pg-tip-accent: #ffe05d;
+	--pg-code-fill: #fcfaf5;
+	box-shadow: none;
+}
+.pg-controls {
+	padding: 0;
+	gap: 0;
+	background: var(--pg-band);
+	color: #202023;
+	border-radius: 8px 8px 0 0;
+	border-bottom: 1px solid #202023;
+}
+.pg-quick {
+	padding: 1rem 1.25rem;
+	gap: 0.75rem 1.3rem;
+}
+.pg-title {
+	font:
+		700 1.3rem/1.2 'Joy Elia',
+		system-ui,
+		sans-serif;
+	margin-right: auto;
+}
+html[data-variant='a'] .pg-title::before {
+	content: '♛';
+	margin-right: 0.5rem;
+	font-size: 1.6rem;
+}
+html[data-variant='b'] .pg-title {
+	text-shadow: 0 3px #ffe05d;
+}
+html[data-variant='c'] .pg-title {
+	text-decoration: underline #f7a6cf 4px;
+	text-underline-offset: 5px;
+}
+.pg-rest {
+	padding: 1rem 1.25rem;
+	border-top: 1px solid #c7bdcc;
+}
+.pg-name {
+	font:
+		500 0.95rem/1.35 system-ui,
+		sans-serif;
+	color: #202023;
+}
+.pg-showall {
+	color: #202023;
+	font:
+		500 0.95rem/1.35 system-ui,
+		sans-serif;
+}
+.pg-dot {
+	color: #202023;
+	opacity: 1;
+	width: 1.5rem;
+	height: 1.5rem;
+}
+.pg-switch {
+	width: 2.7rem;
+	height: 1.5rem;
+	border: 1.5px solid #202023;
+	background: #e5e5e7;
+	padding: 1px;
+}
+.pg-knob {
+	width: 1.15rem;
+	height: 1.15rem;
+	background: #fff;
+	box-shadow: 0 0 0 1px #747477;
+}
+.pg-switch[ui-checked] {
+	background: #45b773;
+}
+.pg-switch[ui-checked] .pg-knob {
+	margin-inline-start: calc(100% - 1.15rem);
+}
+html[data-variant='b'] .pg-switch[ui-checked] {
+	background: #b785ef;
+}
+.pg-stage {
+	--ink: #202023;
+	--paper: #fff;
+	--raised: #fff;
+	--code-edge: #c8c8cd;
+	--tinted-quiet: #f6f2fa;
+	color: #202023;
+	color-scheme: light;
+	background: #fff;
+	background-image: none;
+	margin: 0;
+	padding: 2rem 2.5rem;
+	min-width: 0;
+	min-height: 18rem;
+	border: 0;
+	border-radius: 0;
+	box-sizing: border-box;
+	font-family: system-ui, sans-serif;
+}
+.pg[data-family='accordion'] .pg-stage {
+	padding: 0;
+	min-height: 0;
+}
+.pg-log {
+	background: var(--pg-band);
+	color: #202023;
+	padding: 0.5rem 1.25rem;
+}
+.pg-code {
+	border-top: 1px solid #202023;
+	border-radius: 0 0 8px 8px;
+	min-width: 0;
+}
+.pg-panel {
+	overflow: visible;
+}
+.pg-bar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 0.5rem 1rem 0;
+	background: var(--pg-bar-fill);
+	color: #202023;
+}
+.pg-strip {
+	min-width: 0;
+	margin: 0;
+}
+.pg-strip-row {
+	gap: 0;
+	align-items: stretch;
+}
+.pg-tab {
+	position: relative;
+	padding: 0.8rem 1.2rem;
+	min-height: 3rem;
+	font:
+		500 1rem/1.2 system-ui,
+		sans-serif;
+	color: #202023;
+	opacity: 1;
+	border: 1px solid transparent;
+	border-bottom: 0;
+}
+.pg-tab[ui-selected] {
+	background: var(--pg-tab-fill);
+	border-color: #202023;
+	font-weight: 700;
+}
+.pg-tab[ui-selected]::after {
+	content: '';
+	position: absolute;
+	height: 4px;
+	bottom: 4px;
+	left: 0.65rem;
+	right: 0.65rem;
+	background: var(--pg-marker);
+	border-radius: 40%;
+	transform: rotate(-1deg);
+}
+.pg-tab:focus-visible,
+.pg-dot:focus-visible,
+.pg-showall:focus-visible {
+	outline: 2px dashed #202023;
+	outline-offset: -3px;
+}
+html[data-variant='b'] .pg-tab[ui-selected] {
+	clip-path: polygon(15% 0, 85% 0, 100% 100%, 0 100%);
+	border: 0;
+	padding-inline: 1.8rem;
+}
+html[data-variant='c'] .pg-tab,
+html[data-variant='d'] .pg-tab {
+	border-radius: 0;
+	border: 0;
+	border-right: 1px solid #c8bcd4;
+}
+html[data-variant='c'] .pg-tab[ui-selected] {
+	background: #ffe768;
+}
+html[data-variant='d'] .pg-tab[ui-selected] {
+	background: #e0c8f5;
+}
+.pg-bar-pick {
+	display: flex;
+	margin: 0 0 0.5rem auto;
+	padding: 0;
+}
+.pg-bar-name {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+}
+.pg-bar-trigger {
+	width: 10rem;
+	min-width: 0;
+	font-size: 0.95rem;
+}
+.pg-bar-list {
+	color: var(--ink);
+	min-width: 12rem;
+	z-index: 45;
+}
+.pg-panes {
+	border-top: 1px solid #202023;
+	border-radius: 0 0 8px 8px;
+}
+.pg-clamp {
+	background: var(--pg-code-fill);
+}
+.pg-code-body {
+	max-height: 20rem;
+	overflow: auto;
+	background: var(--pg-code-fill);
+}
+.pg-clamp[ui-open] .pg-code-body {
+	max-height: none;
+}
+.pg-shiki {
+	--ink: #202023;
+	color-scheme: light;
+	background: var(--pg-code-fill);
+	color: #202023;
+	font-size: 0.85rem;
+	line-height: 1.65;
+	padding: 1.1rem 1.25rem;
+}
+.pg-shiki,
+.pg-shiki span {
+	font-family: var(--font-mono);
+}
+.pg-fade {
+	display: none;
+}
+.pg-expand {
+	width: 100%;
+	box-sizing: border-box;
+	position: relative;
+	height: auto;
+	padding: 0.65rem;
+	border-top: 1px solid var(--code-edge);
+	background: var(--pg-code-fill);
+	color: #202023;
+	border-radius: 0 0 8px 8px;
+	font:
+		600 0.9rem/1.2 system-ui,
+		sans-serif;
+}
+.pg-tip,
+.cp-doc {
+	font-family: system-ui, sans-serif;
+}
+.pg::after {
+	content: '☆';
+	position: absolute;
+	right: -0.5rem;
+	top: -1.55rem;
+	color: #62cf89;
+	font: 700 2.5rem/1 system-ui;
+	pointer-events: none;
+	transform: rotate(10deg);
+}
+html[data-variant='b'] .pg::after {
+	top: -2rem;
+	bottom: auto;
+	right: 1rem;
+}
+html[data-variant='c'] .pg::after {
+	color: #ba84e9;
+	font-size: 1.8rem;
+}
+html[data-variant='d'] .pg::after {
+	content: '♛';
+	color: #202023;
+	text-shadow: 2px 2px #ffe05d;
+}
+@media (max-width: 866px) {
+	.pg,
+	.cp {
+		margin: 1.5rem 0;
+		border: 1.5px solid #202023;
+		border-radius: 7px;
+	}
+	.pg-quick,
+	.pg-rest {
+		flex-flow: row wrap;
+		align-items: center;
+		padding: 0.85rem;
+		gap: 0.75rem;
+	}
+	.pg-title {
+		flex-basis: 100%;
+	}
+	.pg-cell {
+		width: auto;
+	}
+	.pg-showall {
+		margin: 0;
+	}
+	.pg-stage {
+		padding: 1.5rem 1rem;
+	}
+	.pg-bar {
+		padding: 0.4rem 0.5rem 0;
+	}
+	.pg-bar-pick {
+		margin-left: auto;
+	}
+	.pg-bar-trigger {
+		width: 7rem;
+		font-size: 0.85rem;
+	}
+	.pg-tab {
+		font-size: 0.9rem;
+		padding: 0.8rem 0.65rem;
+	}
+	html[data-variant='b'] .pg-tab[ui-selected] {
+		padding-inline: 0.9rem;
+	}
+	.pg-shiki {
+		font-size: 0.75rem;
+		padding: 0.85rem;
+	}
+}
+`;
 
 export const CHROME_CSS = `${CONTROLS_CSS}
 
@@ -705,13 +1047,14 @@ ${STAGE_CSS}
 
 ${CODE_CSS}
 
-${docCss('.pg')}`;
+${docCss('.pg')}
+${DESIGN_CSS}`;
 
-/** A standalone card: the playground's sticker round a stage and a code panel. */
 export const CODE_PANEL_CSS = `${sticker('.cp')}
 
 ${STAGE_CSS}
 
 ${FOCUS_CSS}
 
-${docCss('.cp')}`;
+${docCss('.cp')}
+${DESIGN_CSS}`;

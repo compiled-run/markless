@@ -51,11 +51,13 @@ export default function Faq() @{
 
 		<style>
 			.faq {
+				color: #202023;
+				font-family: system-ui, sans-serif;
 				width: min(34rem, 100%);
 				padding: 1.1em 1.2em 0.9em;
 				border: 2px solid var(--code-edge);
 				border-radius: 10px;
-				background: var(--raised);
+				background: #fff;
 			}
 
 			.faq-title {
@@ -91,7 +93,7 @@ export default function Faq() @{
 				padding: 0.7em 0;
 				border: 0;
 				background: transparent;
-				color: var(--ink);
+				color: #202023;
 				font: inherit;
 				font-weight: 700;
 				text-align: left;
@@ -134,6 +136,10 @@ export default function Faq() @{
 
 			.faq-panel[hidden] {
 				display: none;
+			}
+			:is(.faq-heading, .group-heading, .faq-title) {
+				font-family: system-ui, sans-serif;
+				text-shadow: none;
 			}
 		</style>
 	</section>

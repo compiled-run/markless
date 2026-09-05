@@ -75,6 +75,8 @@ export default function Settings() @{
 
 		<style>
 			.settings {
+				color: #202023;
+				font-family: system-ui, sans-serif;
 				display: grid;
 				gap: 0.6em;
 				width: min(34rem, 100%);
@@ -88,12 +90,12 @@ export default function Settings() @{
 			.group {
 				border: 2px solid var(--code-edge);
 				border-radius: 8px;
-				background: var(--raised);
+				background: #fff;
 				overflow: clip;
 			}
 
 			.group[ui-open] {
-				border-color: var(--ink);
+				border-color: #202023;
 			}
 
 			.group[data-tone='danger'][ui-open] {
@@ -113,7 +115,7 @@ export default function Settings() @{
 				padding: 0.75em 0.9em;
 				border: 0;
 				background: transparent;
-				color: var(--ink);
+				color: #202023;
 				font: inherit;
 				text-align: left;
 				cursor: pointer;
@@ -152,7 +154,7 @@ export default function Settings() @{
 			.group-panel {
 				display: grid;
 				gap: 0.7em;
-				background: var(--paper);
+				background: #fff;
 			}
 
 			.group-panel[ui-open] {
@@ -173,8 +175,8 @@ export default function Settings() @{
 				padding: 0.4em 0.6em;
 				border: 2px solid var(--code-edge);
 				border-radius: 6px;
-				background: var(--raised);
-				color: var(--ink);
+				background: #fff;
+				color: #202023;
 				font: inherit;
 				font-size: var(--step--1);
 			}
@@ -203,7 +205,7 @@ export default function Settings() @{
 				border: 2px solid var(--pink);
 				border-radius: 6px;
 				background: transparent;
-				color: var(--ink);
+				color: #202023;
 				font: inherit;
 				font-size: var(--step--1);
 				font-weight: 700;
@@ -216,6 +218,10 @@ export default function Settings() @{
 
 			.group-panel[hidden] {
 				display: none;
+			}
+			:is(.faq-heading, .group-heading, .faq-title) {
+				font-family: system-ui, sans-serif;
+				text-shadow: none;
 			}
 		</style>
 	</accordion.root>

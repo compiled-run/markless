@@ -17,20 +17,11 @@ import type { FamilyMeta, FamilyPreset, PropRef } from '../components/docs/ui-me
 import { RUN_TYPES, docsMarkup, runMarkup, type Doc, type Line, type Run } from './ui-code-runs.ts';
 import { docRules } from './ui-playground-css.ts';
 
-/**
- * The generated module is written to disk rather than served from a virtual id:
- * a family island whose module has no file behind it resumes without a symbol
- * loader (`loadSymbol is not a function` on the first control write), so the
- * whole graph — compiler, symbol modules, resume — sees an ordinary .tsrx file.
- */
 export const GENERATED_DIR = 'components/docs/playground/generated';
 
-/** Where the generated module for one demo is written. */
 export function generatedPath(root: string, family: string, stem: string): string {
 	return `${root.replace(/\/$/, '')}/${GENERATED_DIR}/${family}__${stem}.tsrx`;
 }
-
-// --- the house parser -------------------------------------------------------
 
 type AstNode = { type: string; start: number; end: number; [key: string]: unknown };
 
@@ -38,13 +29,6 @@ type ParseModule = (source: string, filename: string) => AstNode & { body: AstNo
 
 let parser: ParseModule | undefined;
 
-/**
- * yuku is the compiler's declared dependency and not this site's, so the parser
- * is reached through the package that owns it — the same route
- * `packages/headless/components/api-extract/analyzer.ts` takes. `@markless/compiler`
- * is a pnpm override here rather than a direct dependency, so the walk starts at
- * `@markless/core`, which does declare it.
- */
 async function houseParser(): Promise<ParseModule> {
 	if (parser) return parser;
 	const fromHere = createRequire(import.meta.url);
@@ -85,9 +69,6 @@ function jsxName(node: AstNode): string {
 	return String((node as { name?: unknown }).name ?? '');
 }
 
-// --- what the analysis answers ---------------------------------------------
-
-/** One attribute written on the demo's family root. */
 export type RootAttribute = {
 	readonly name: string;
 	/** The attribute itself, `value="ship"` included. */
@@ -129,7 +110,6 @@ export type DemoAnalysis = {
 	readonly prelude: string;
 };
 
-/** `name` -> the array literal a body-level `const name = [...]` holds. */
 function arrayBindings(statements: readonly AstNode[]): Map<string, AstNode> {
 	const found = new Map<string, AstNode>();
 	for (const statement of statements) {
@@ -137,20 +117,25 @@ function arrayBindings(statements: readonly AstNode[]): Map<string, AstNode> {
 		for (const declarator of (statement as { declarations?: AstNode[] }).declarations ?? []) {
 			const id = declarator.id as AstNode;
 			const init = (declarator as { init?: AstNode | null }).init;
-			if (id.type === 'Identifier' && init?.type === 'ArrayExpression') found.set(String(id.name), init);
+			if (id.type === 'Identifier' && init?.type === 'ArrayExpression')
+				found.set(String(id.name), init);
 		}
 	}
 	return found;
 }
 
-/** The string each object in `array` holds under `field`. */
 function fieldLiterals(array: AstNode, field: string): string[] {
 	const out: string[] = [];
-	for (const element of ((array as { elements?: (AstNode | null)[] }).elements ?? [])) {
+	for (const element of (array as { elements?: (AstNode | null)[] }).elements ?? []) {
 		if (element?.type !== 'ObjectExpression') continue;
 		for (const property of (element as { properties?: AstNode[] }).properties ?? []) {
 			const key = property.key as AstNode | undefined;
-			const name = key?.type === 'Identifier' ? String(key.name) : key?.type === 'Literal' ? String(key.value) : '';
+			const name =
+				key?.type === 'Identifier'
+					? String(key.name)
+					: key?.type === 'Literal'
+						? String(key.value)
+						: '';
 			if (name !== field) continue;
 			const value = literalOf(property.value as AstNode);
 			if (typeof value === 'string') out.push(value);
@@ -177,7 +162,6 @@ function literalOf(node: AstNode | null | undefined): ControlValue | number | un
 function attributeOf(source: string, node: AstNode): RootAttribute {
 	const name = jsxName(node.name as AstNode);
 	const value = (node as { value?: AstNode | null }).value ?? null;
-	// A bare `multiple` is `multiple={true}` and carries no span to slot into.
 	if (value === null) return { name, start: node.start, end: node.end, literal: true };
 	if (value.type === 'JSXExpressionContainer') {
 		const expression = value.expression as AstNode;
@@ -202,7 +186,6 @@ function attributeOf(source: string, node: AstNode): RootAttribute {
 	};
 }
 
-/** Drops the common leading indentation a `<style>` block carries. */
 function dedent(css: string): string {
 	const lines = css.split('\n');
 	let indent = Number.POSITIVE_INFINITY;
@@ -217,12 +200,11 @@ function dedent(css: string): string {
 		.trim();
 }
 
-/**
- * Reads one authored demo: which family it roots, what the root is given, and
- * where its CSS lives. Nothing here knows about the playground — it answers
- * questions about consumer code.
- */
-export async function analyzeDemo(family: string, stem: string, file: string): Promise<DemoAnalysis> {
+export async function analyzeDemo(
+	family: string,
+	stem: string,
+	file: string,
+): Promise<DemoAnalysis> {
 	const parse = await houseParser();
 	const source = readFileSync(file, 'utf8');
 	const program = parse(source, `${stem}.tsrx`);
@@ -257,21 +239,26 @@ export async function analyzeDemo(family: string, stem: string, file: string): P
 	const prelude =
 		statements.length === 0
 			? ''
-			: source.slice(source.lastIndexOf('\n', statements[0].start) + 1, statements[statements.length - 1].end);
+			: source.slice(
+					source.lastIndexOf('\n', statements[0].start) + 1,
+					statements[statements.length - 1].end,
+				);
 
 	const itemValues: string[] = [];
 	const hold = (value: string) => {
 		if (!itemValues.includes(value)) itemValues.push(value);
 	};
-	// `rows` maps a repeat's row name to the array it walks, for `value={row.field}`.
 	const walk = (node: AstNode, rows: ReadonlyMap<string, AstNode>) => {
 		let scope = rows;
 		if (node.type === 'JSXForExpression') {
 			const loop = node.statement as AstNode;
-			const row = ((loop.left as AstNode).declarations as AstNode[])?.[0]?.id as AstNode | undefined;
+			const row = ((loop.left as AstNode).declarations as AstNode[])?.[0]?.id as
+				| AstNode
+				| undefined;
 			const over = loop.right as AstNode;
 			const array = over.type === 'Identifier' ? arrays.get(String(over.name)) : undefined;
-			if (row?.type === 'Identifier' && array) scope = new Map([...rows, [String(row.name), array]]);
+			if (row?.type === 'Identifier' && array)
+				scope = new Map([...rows, [String(row.name), array]]);
 		}
 		if (node.type === 'JSXElement' && node !== root) {
 			const name = jsxName((node.openingElement as AstNode).name as AstNode);
@@ -284,12 +271,16 @@ export async function analyzeDemo(family: string, stem: string, file: string): P
 						hold(read.literal);
 						continue;
 					}
-					const expression = (attribute.value as AstNode | null)?.type === 'JSXExpressionContainer' ? ((attribute.value as AstNode).expression as AstNode) : undefined;
+					const expression =
+						(attribute.value as AstNode | null)?.type === 'JSXExpressionContainer'
+							? ((attribute.value as AstNode).expression as AstNode)
+							: undefined;
 					if (expression?.type !== 'MemberExpression' || expression.computed) continue;
 					const object = expression.object as AstNode;
 					const property = expression.property as AstNode;
 					const array = object.type === 'Identifier' ? scope.get(String(object.name)) : undefined;
-					if (array && property.type === 'Identifier') for (const value of fieldLiterals(array, String(property.name))) hold(value);
+					if (array && property.type === 'Identifier')
+						for (const value of fieldLiterals(array, String(property.name))) hold(value);
 				}
 			}
 		}
@@ -328,9 +319,6 @@ export async function analyzeDemo(family: string, stem: string, file: string): P
 	};
 }
 
-// --- the control model ------------------------------------------------------
-
-/** One control the generated chrome draws, and the cells it writes. */
 export type PlaygroundControl = {
 	readonly part: string;
 	readonly prop: string;
@@ -360,12 +348,11 @@ export type PlaygroundControl = {
 	readonly parameter?: string;
 };
 
-/**
- * The manifest doc cut down to a hint: its first paragraph, the first two
- * sentences of that, and the backticks dropped since the tip is mono already.
- */
 function hintDoc(doc: string | undefined): string {
-	const paragraph = (doc ?? '').split(/\n[ \t]*\n/)[0].replace(/\s+/g, ' ').trim();
+	const paragraph = (doc ?? '')
+		.split(/\n[ \t]*\n/)[0]
+		.replace(/\s+/g, ' ')
+		.trim();
 	const sentences = paragraph.match(/[^.!?]+[.!?]+(?=\s|$)/g);
 	const cut = sentences ? sentences.slice(0, 2).join('').trim() : paragraph;
 	return cut.replaceAll('`', '');
@@ -379,7 +366,6 @@ function quote(text: string): string {
 	return JSON.stringify(text);
 }
 
-/** The parameter type of `(value: T) => void`, so the wrapper can annotate `next`. */
 function callbackParameter(type: string): string {
 	const opened = type.indexOf('(');
 	const closed = type.lastIndexOf(')');
@@ -397,17 +383,16 @@ type ManifestProp = {
 	readonly doc?: string;
 };
 type ApiManifest = Readonly<
-	Record<string, { readonly parts: readonly { readonly part: string; readonly props: readonly ManifestProp[] }[] }>
+	Record<
+		string,
+		{
+			readonly parts: readonly { readonly part: string; readonly props: readonly ManifestProp[] }[];
+		}
+	>
 >;
 
 let manifest: ApiManifest | undefined;
 
-/**
- * Read with `fs` rather than through `components/docs/api-derive`: that module
- * reaches the manifest with a `?raw` import, which only Vite answers, and this
- * one runs inside the config. The derivation itself is still api-derive's —
- * `controlFor` and `initialValue` are imported, not re-implemented.
- */
 function manifestProp(family: string, part: string, prop: string): ManifestProp {
 	if (!manifest) {
 		const fromHere = createRequire(import.meta.url);
@@ -415,7 +400,9 @@ function manifestProp(family: string, part: string, prop: string): ManifestProp 
 			readFileSync(fromHere.resolve('@markless/ui/api/manifest.json'), 'utf8'),
 		) as ApiManifest;
 	}
-	const found = manifest[family]?.parts.find((one) => one.part === part)?.props.find((one) => one.name === prop);
+	const found = manifest[family]?.parts
+		.find((one) => one.part === part)
+		?.props.find((one) => one.name === prop);
 	if (!found)
 		throw new Error(
 			`ui-playground: @markless/ui/api/manifest.json has no '${family}.${part}.${prop}', which ui-meta/${family}.ts asks the playground to draw.`,
@@ -423,7 +410,10 @@ function manifestProp(family: string, part: string, prop: string): ManifestProp 
 	return found;
 }
 
-function controlValue(holds: 'boolean' | 'string', value: ControlValue | number | undefined): ControlValue {
+function controlValue(
+	holds: 'boolean' | 'string',
+	value: ControlValue | number | undefined,
+): ControlValue {
 	if (holds === 'boolean') return value === true || value === 'true';
 	if (value === undefined) return '';
 	if (typeof value === 'boolean') return String(value);
@@ -452,8 +442,6 @@ function controlOf(
 	};
 
 	if (descriptor.kind === 'event') {
-		// A callback is edited as an on/off event log, so the cell it writes is the
-		// log's own switch rather than the prop.
 		return {
 			part: ref.part,
 			prop: ref.prop,
@@ -474,11 +462,9 @@ function controlOf(
 	const holds: 'boolean' | 'string' = descriptor.kind === 'toggle' ? 'boolean' : 'string';
 	const fallback = controlValue(holds, initialValue(prop.default));
 	const seen = controlValue(holds, authored?.literal ?? initialValue(prop.default));
-	let kind: PlaygroundControl['kind'] = descriptor.kind === 'toggle' ? 'toggle' : descriptor.kind === 'select' ? 'select' : 'textbox';
+	let kind: PlaygroundControl['kind'] =
+		descriptor.kind === 'toggle' ? 'toggle' : descriptor.kind === 'select' ? 'select' : 'textbox';
 	let options: readonly string[] = descriptor.options ?? [];
-
-	// A family's own parts name the values its root can hold, so `value` gets a
-	// closed list from the demo instead of a free-text field.
 	if (kind === 'textbox' && ref.prop === 'value' && demo.itemValues.length > 0)
 		options = [...demo.itemValues, ''];
 	if (override?.options && override.options.length > 0) options = override.options;
@@ -501,14 +487,18 @@ function controlOf(
 		options,
 		...cells,
 		holds,
-		list: holds === 'string' && descriptor.members.some((member) => /\bstring\[\]$|^Array<|^ReadonlyArray</.test(member)),
+		list:
+			holds === 'string' &&
+			descriptor.members.some((member) => /\bstring\[\]$|^Array<|^ReadonlyArray</.test(member)),
 		seen,
 		fallback: typeof fallback === 'boolean' || typeof fallback === 'string' ? fallback : '',
 	};
 }
 
-/** The controls a family's page draws: the quick row first, then "Show all". */
-export function playgroundControls(demo: DemoAnalysis, meta: FamilyMeta): readonly PlaygroundControl[] {
+export function playgroundControls(
+	demo: DemoAnalysis,
+	meta: FamilyMeta,
+): readonly PlaygroundControl[] {
 	const overrides = new Map(
 		(meta.overrides ?? []).map((one) => [`${one.part}.${one.prop}`, one] as const),
 	);
@@ -517,16 +507,9 @@ export function playgroundControls(demo: DemoAnalysis, meta: FamilyMeta): readon
 	);
 }
 
-// --- the code panel's slots -------------------------------------------------
-
 const SLOT = (index: number) => `PGSLOT${index}`;
 const SLOT_PATTERN = /(PGSLOT\d+)/;
 
-/**
- * One run of the shown source that follows a control. An authored string value
- * keeps its `value=` and the slot stands in for the quoted literal; every other
- * control's slot is the whole attribute, or nothing at its default.
- */
 export type CodeSlot = {
 	readonly control: PlaygroundControl;
 	readonly form: 'value' | 'attribute';
@@ -540,21 +523,26 @@ export type CodeSlot = {
 	readonly after: string;
 };
 
-/** Where the controls the demo never wrote are printed: just inside the root's `>`. */
 function tagEnd(demo: DemoAnalysis): number {
 	let at = demo.openingEnd - (demo.selfClosing ? 2 : 1);
 	while (at > demo.openingStart && /\s/.test(demo.source[at - 1] ?? '')) at -= 1;
 	return at;
 }
 
-/** The slot each editable control gets in the code panel, authored or not. */
-export function codeSlots(demo: DemoAnalysis, controls: readonly PlaygroundControl[]): readonly CodeSlot[] {
+export function codeSlots(
+	demo: DemoAnalysis,
+	controls: readonly PlaygroundControl[],
+): readonly CodeSlot[] {
 	return controls
 		.filter((control) => control.kind !== 'event')
 		.map((control) => {
 			const authored = demo.attributes.find((attribute) => attribute.name === control.prop);
 			if (!authored) return { control, form: 'attribute', lead: ' ', before: ' ', after: '' };
-			if (control.holds === 'string' && authored.valueStart !== undefined && authored.valueEnd !== undefined)
+			if (
+				control.holds === 'string' &&
+				authored.valueStart !== undefined &&
+				authored.valueEnd !== undefined
+			)
 				return {
 					control,
 					form: 'value',
@@ -564,7 +552,9 @@ export function codeSlots(demo: DemoAnalysis, controls: readonly PlaygroundContr
 					before: demo.source[authored.valueStart - 1] ?? '',
 					after: demo.source[authored.valueEnd] ?? '',
 				};
-			const spaced = demo.source[authored.start - 1] === ' ' && !/\s/.test(demo.source[authored.start - 2] ?? '');
+			const spaced =
+				demo.source[authored.start - 1] === ' ' &&
+				!/\s/.test(demo.source[authored.start - 2] ?? '');
 			return {
 				control,
 				form: 'attribute',
@@ -577,17 +567,18 @@ export function codeSlots(demo: DemoAnalysis, controls: readonly PlaygroundContr
 		});
 }
 
-/**
- * The demo as the code panel shows it: the authored file with each slot swapped
- * for a sentinel, and the `<style>` block lifted out into its own tab.
- */
 function displaySource(demo: DemoAnalysis, slots: readonly CodeSlot[]): string {
-	const edits: { readonly at: number; readonly to: number; readonly text: string }[] = slots.flatMap(
-		(slot, index) =>
-			slot.start === undefined || slot.end === undefined ? [] : [{ at: slot.start, to: slot.end, text: SLOT(index) }],
+	const edits: { readonly at: number; readonly to: number; readonly text: string }[] =
+		slots.flatMap((slot, index) =>
+			slot.start === undefined || slot.end === undefined
+				? []
+				: [{ at: slot.start, to: slot.end, text: SLOT(index) }],
+		);
+	const inserted = slots.flatMap((slot, index) =>
+		slot.start === undefined ? [` ${SLOT(index)}`] : [],
 	);
-	const inserted = slots.flatMap((slot, index) => (slot.start === undefined ? [` ${SLOT(index)}`] : []));
-	if (inserted.length > 0) edits.push({ at: tagEnd(demo), to: tagEnd(demo), text: inserted.join('') });
+	if (inserted.length > 0)
+		edits.push({ at: tagEnd(demo), to: tagEnd(demo), text: inserted.join('') });
 	edits.sort((left, right) => right.at - left.at);
 	let text = demo.source;
 	for (const edit of edits) text = `${text.slice(0, edit.at)}${edit.text}${text.slice(edit.to)}`;
@@ -609,7 +600,6 @@ type PanelLine =
 	| { readonly kind: 'plain'; readonly line: Line }
 	| { readonly kind: 'split'; readonly id: string; readonly segments: readonly LineSegment[] };
 
-/** Drops `char` from the edge of the neighbouring text, when it is there to drop. */
 function trimEdge(runs: readonly Run[], char: string, side: 'end' | 'start'): readonly Run[] {
 	if (char === '' || runs.length === 0) return runs;
 	const at = side === 'end' ? runs.length - 1 : 0;
@@ -623,18 +613,11 @@ function trimEdge(runs: readonly Run[], char: string, side: 'end' | 'start'): re
 	return next;
 }
 
-/** The colour class alone: a piece cut off a run keeps its colour, not its hover. */
 function colourOf(run: Run): string | undefined {
 	const kept = (run.class ?? '').replace(/\btsrx-hover\b/, '').trim();
 	return kept === '' ? undefined : kept;
 }
 
-/**
- * Splits the highlighted lines at the sentinels the display source carries, so
- * each slot becomes a text run bound to its control's text cell. The character
- * either side of a sentinel — the space before an attribute, the quotes round a
- * value — is dropped from the still text because the slot prints it itself.
- */
 function panelLines(lines: readonly Line[], slots: readonly CodeSlot[]): readonly PanelLine[] {
 	return lines.map((line) => {
 		if (slots.length === 0 || !line.runs.some((run) => SLOT_PATTERN.test(run.text)))
@@ -661,7 +644,11 @@ function panelLines(lines: readonly Line[], slots: readonly CodeSlot[]): readonl
 				}
 				if (part === '') continue;
 				serial += 1;
-				held.push({ id: `${run.id}s${serial}`, text: part, ...(colour === undefined ? {} : { class: colour }) });
+				held.push({
+					id: `${run.id}s${serial}`,
+					text: part,
+					...(colour === undefined ? {} : { class: colour }),
+				});
 			}
 		}
 		flush();
@@ -670,10 +657,16 @@ function panelLines(lines: readonly Line[], slots: readonly CodeSlot[]): readonl
 			if (segment.kind !== 'slot') continue;
 			const previous = segments[at - 1];
 			if (previous?.kind === 'runs')
-				segments[at - 1] = { kind: 'runs', runs: trimEdge(previous.runs, segment.slot.before, 'end') };
+				segments[at - 1] = {
+					kind: 'runs',
+					runs: trimEdge(previous.runs, segment.slot.before, 'end'),
+				};
 			const following = segments[at + 1];
 			if (following?.kind === 'runs')
-				segments[at + 1] = { kind: 'runs', runs: trimEdge(following.runs, segment.slot.after, 'start') };
+				segments[at + 1] = {
+					kind: 'runs',
+					runs: trimEdge(following.runs, segment.slot.after, 'start'),
+				};
 		}
 		return {
 			kind: 'split',
@@ -683,32 +676,29 @@ function panelLines(lines: readonly Line[], slots: readonly CodeSlot[]): readonl
 	});
 }
 
-// --- the generated module ---------------------------------------------------
-
 function componentName(family: string, stem: string): string {
 	return `${identifier(family)}${identifier(stem)}Playground`;
 }
 
 const CHROME_FAMILIES = ['collapsible', 'select', 'tabs', 'toggle', 'tooltip'];
 
-/** The code panel's text for a control, as a source expression over `value`. */
 function slotTextSource(slot: CodeSlot, value: string): string {
 	if (slot.form === 'value') return `valueText(${value})`;
 	return `attributeText(${quote(slot.control.prop)}, ${value}, ${sourceLiteral(slot.control.fallback)}, ${quote(slot.lead)})`;
 }
 
-/** The code panel's opening text for a control. */
 function slotText(slot: CodeSlot): string {
 	const { control } = slot;
 	if (slot.form === 'value') return valueText(control.seen as string | readonly string[]);
 	return attributeText(control.prop, control.seen, control.fallback, slot.lead);
 }
 
-/**
- * Every cell a control owns, written from one value expression. Reading the
- * value into a local first keeps each text derived from what was just written.
- */
-function writes(slots: readonly CodeSlot[], control: PlaygroundControl, value: string, indent: string): string {
+function writes(
+	slots: readonly CodeSlot[],
+	control: PlaygroundControl,
+	value: string,
+	indent: string,
+): string {
 	const slot = slots.find((one) => one.control === control);
 	const local = `next${identifier(control.prop)}`;
 	const lines = [`const ${local} = ${value};`, `${control.cell} = ${local};`];
@@ -720,12 +710,9 @@ function writes(slots: readonly CodeSlot[], control: PlaygroundControl, value: s
 	return lines.map((line) => `${indent}${line}`).join('\n');
 }
 
-/**
- * A list-capable `value` follows the `multiple` switch: on, the value becomes
- * the list it names; off, the first held entry. The code panel then prints the
- * form a consumer would write for that mode.
- */
-function listFollowsMultiple(controls: readonly PlaygroundControl[]): { readonly multiple: PlaygroundControl; readonly value: PlaygroundControl } | undefined {
+function listFollowsMultiple(
+	controls: readonly PlaygroundControl[],
+): { readonly multiple: PlaygroundControl; readonly value: PlaygroundControl } | undefined {
 	const multiple = controls.find((one) => one.prop === 'multiple' && one.kind === 'toggle');
 	const value = controls.find((one) => one.prop === 'value' && one.kind !== 'event' && one.list);
 	return multiple && value ? { multiple, value } : undefined;
@@ -774,7 +761,10 @@ ${hintFor(control)}
 
 function selectCell(emit: Emit, control: PlaygroundControl): string {
 	const paired = listFollowsMultiple(emit.controls);
-	const chosen = paired && paired.value === control ? `${paired.multiple.cell} ? toggled(${control.cell}, next) : next` : 'next';
+	const chosen =
+		paired && paired.value === control
+			? `${paired.multiple.cell} ? toggled(${control.cell}, next) : next`
+			: 'next';
 	const items = control.options
 		.map(
 			(option) => `							<select.item class="pg-pick-item" value=${quote(option)}>
@@ -831,10 +821,11 @@ function controlCell(emit: Emit, control: PlaygroundControl): string {
 	return textboxCell(emit, control);
 }
 
-/** The root's opening tag, with every controlled attribute reading a cell. */
 function openingTag(demo: DemoAnalysis, emit: Emit): string {
 	const { controls, slots } = emit;
-	const byProp = new Map(controls.filter((one) => one.kind !== 'event').map((one) => [one.prop, one]));
+	const byProp = new Map(
+		controls.filter((one) => one.kind !== 'event').map((one) => [one.prop, one]),
+	);
 	const event = controls.find((one) => one.kind === 'event' && one.prop === 'onChange');
 	const value = controls.find((one) => one.prop === 'value' && one.kind !== 'event');
 	const written: string[] = [];
@@ -856,7 +847,10 @@ function openingTag(demo: DemoAnalysis, emit: Emit): string {
 	const authored = demo.attributes.find((one) => one.name === 'onChange');
 	if (event) {
 		const lines: string[] = [];
-		if (value) lines.push(writes(slots, value, value.holds === 'boolean' ? 'next === true' : 'next', '\t\t\t\t\t\t'));
+		if (value)
+			lines.push(
+				writes(slots, value, value.holds === 'boolean' ? 'next === true' : 'next', '\t\t\t\t\t\t'),
+			);
 		lines.push('\t\t\t\t\t\tevents = logging ? events + 1 : events;');
 		if (authored?.expression) lines.push(`\t\t\t\t\t\t(${authored.expression})(next);`);
 		written.push(
@@ -868,7 +862,6 @@ function openingTag(demo: DemoAnalysis, emit: Emit): string {
 	return `<${demo.tag}${body}\n\t\t\t\t${demo.selfClosing ? '/>' : '>'}`;
 }
 
-/** The demo body as authored, minus the `<style>` block the outer card carries. */
 function demoBody(demo: DemoAnalysis): string {
 	if (demo.selfClosing) return '';
 	let inner = demo.source.slice(demo.childrenStart, demo.childrenEnd);
@@ -890,10 +883,6 @@ ${indent}}`;
 
 type PaneEmission = { readonly consts: string[]; readonly markup: string };
 
-/**
- * A pane's markup: plain lines as keyed repeats over module constants, and a
- * line holding a slot written out with the slot as a text run bound to its cell.
- */
 function paneMarkup(lines: readonly PanelLine[], prefix: string, indent: string): PaneEmission {
 	const consts: string[] = [];
 	const chunks: string[] = [];
@@ -928,14 +917,12 @@ function paneMarkup(lines: readonly PanelLine[], prefix: string, indent: string)
 	return { consts, markup: chunks.join('\n') };
 }
 
-/** One tab of the code chrome: the file name on the tab and the `<pre>` body as TSRX markup. */
-export type ChromePane = { readonly value: string; readonly label: string; readonly markup: string };
+export type ChromePane = {
+	readonly value: string;
+	readonly label: string;
+	readonly markup: string;
+};
 
-/**
- * The tabs-and-clamp chrome round highlighted code, shared by the playground and
- * the standalone code panels so the two read as one thing. `bar` is extra
- * markup for the strip row, the playground's scenario picker.
- */
 export function codePanelChrome(input: {
 	readonly scenario: string;
 	readonly panes: readonly ChromePane[];
@@ -944,12 +931,15 @@ export function codePanelChrome(input: {
 }): string {
 	const { indent } = input;
 	const tabs = input.panes
-		.map((pane) => `${indent}\t\t\t\t<tabs.trigger class="pg-tab" value=${quote(pane.value)}>${pane.label}</tabs.trigger>`)
+		.map(
+			(pane) =>
+				`${indent}\t\t\t\t<tabs.trigger class="pg-tab" value=${quote(pane.value)}>${pane.value === 'source' ? 'Source' : pane.value === 'css' ? 'CSS' : pane.label}</tabs.trigger>`,
+		)
 		.join('\n');
 	const panes = input.panes
 		.map(
 			(pane) => `${indent}\t\t\t\t<tabs.content class="pg-pane" value=${quote(pane.value)}>
-${indent}\t\t\t\t\t<pre class="pg-shiki shiki">
+${indent}\t\t\t\t\t<pre class="pg-shiki">
 ${pane.markup}
 ${indent}\t\t\t\t\t</pre>
 ${indent}\t\t\t\t</tabs.content>`,
@@ -996,13 +986,18 @@ export type PlaygroundInput = {
 	readonly chromeCss: string;
 };
 
-function presetTable(controls: readonly PlaygroundControl[], presets: readonly FamilyPreset[]): string {
+function presetTable(
+	controls: readonly PlaygroundControl[],
+	presets: readonly FamilyPreset[],
+): string {
 	const editable = controls.filter((one) => one.kind !== 'event');
 	const rows = presets.map((preset) => {
 		const fields = [`label: ${quote(preset.label)}`];
 		for (const control of editable) {
 			const written = preset.values[control.prop];
-			fields.push(`${control.cell}: ${sourceLiteral(written === undefined ? control.seen : controlValue(control.holds, written))}`);
+			fields.push(
+				`${control.cell}: ${sourceLiteral(written === undefined ? control.seen : controlValue(control.holds, written))}`,
+			);
 		}
 		return `\t${quote(preset.name)}: { ${fields.join(', ')} },`;
 	});
@@ -1010,13 +1005,24 @@ function presetTable(controls: readonly PlaygroundControl[], presets: readonly F
 }
 
 function cellType(control: PlaygroundControl): string {
-	return control.holds === 'boolean' ? 'boolean' : control.list ? 'string | readonly string[]' : 'string';
+	return control.holds === 'boolean'
+		? 'boolean'
+		: control.list
+			? 'string | readonly string[]'
+			: 'string';
 }
 
 function scenarioBar(emit: Emit, presets: readonly FamilyPreset[]): string {
 	const editable = emit.controls.filter((one) => one.kind !== 'event');
 	const written = editable
-		.map((control) => writes(emit.slots, control, `preset[${quote(control.cell)}] as ${cellType(control)}`, '\t\t\t\t\t\t'))
+		.map((control) =>
+			writes(
+				emit.slots,
+				control,
+				`preset[${quote(control.cell)}] as ${cellType(control)}`,
+				'\t\t\t\t\t\t',
+			),
+		)
 		.join('\n');
 	const items = presets
 		.map(
@@ -1046,7 +1052,6 @@ ${items}
 			</select.root>`;
 }
 
-/** The whole generated module: chrome, demo, code panel, one island. */
 export function playgroundModule(input: PlaygroundInput): string {
 	const { demo, meta, controls, slots } = input;
 	const presets = meta.presets ?? [];
@@ -1055,8 +1060,6 @@ export function playgroundModule(input: PlaygroundInput): string {
 			`ui-playground: ui-meta/${demo.family}.ts lists no presets, so the Scenario select has nothing to offer.`,
 		);
 	const emit: Emit = { controls, slots };
-
-	// A sentinel the highlighter documented becomes a slot, so its doc is never pointed at.
 	const pointed = new Set<string>();
 	for (const line of [...input.sourceLines, ...input.cssLines])
 		for (const run of line.runs)
@@ -1066,7 +1069,13 @@ export function playgroundModule(input: PlaygroundInput): string {
 	const source = paneMarkup(panelLines(input.sourceLines, slots), 'srcLines', '\t\t\t\t\t\t\t\t\t');
 	const css = paneMarkup(panelLines(input.cssLines, []), 'cssLines', '\t\t\t\t\t\t\t\t\t');
 
-	const families = [...new Set([demo.family, ...CHROME_FAMILIES, ...(controls.some((one) => one.kind === 'textbox') ? ['textbox'] : [])])].sort();
+	const families = [
+		...new Set([
+			demo.family,
+			...CHROME_FAMILIES,
+			...(controls.some((one) => one.kind === 'textbox') ? ['textbox'] : []),
+		]),
+	].sort();
 
 	const cells: string[] = [];
 	for (const control of controls) {
@@ -1075,7 +1084,9 @@ export function playgroundModule(input: PlaygroundInput): string {
 			continue;
 		}
 		const slot = slots.find((one) => one.control === control);
-		cells.push(`\tlet ${control.cell} = state<${cellType(control)}>(${sourceLiteral(control.seen)});`);
+		cells.push(
+			`\tlet ${control.cell} = state<${cellType(control)}>(${sourceLiteral(control.seen)});`,
+		);
 		if (slot) cells.push(`\tlet ${control.text} = state(${quote(slotText(slot))});`);
 		if (control.kind === 'select') {
 			const held = control.seen as string | readonly string[];
@@ -1088,11 +1099,20 @@ export function playgroundModule(input: PlaygroundInput): string {
 	cells.push(`\tlet scenario = state(${quote(presets[0].label)});`);
 	cells.push(`\tlet scenarioName = state(${quote(presets[0].name)});`);
 
-	const quick = controls.slice(0, meta.quick.length).map((control) => controlCell(emit, control)).join('\n\n');
-	const rest = controls.slice(meta.quick.length).map((control) => controlCell(emit, control)).join('\n\n');
+	const quick = controls
+		.slice(0, meta.quick.length)
+		.map((control) => controlCell(emit, control))
+		.join('\n\n');
+	const rest = controls
+		.slice(meta.quick.length)
+		.map((control) => controlCell(emit, control))
+		.join('\n\n');
 
-	const panes: ChromePane[] = [{ value: 'source', label: input.sourceLabel, markup: source.markup }];
-	if (input.cssLines.length > 0) panes.push({ value: 'css', label: input.cssLabel, markup: css.markup });
+	const panes: ChromePane[] = [
+		{ value: 'source', label: input.sourceLabel, markup: source.markup },
+	];
+	if (input.cssLines.length > 0)
+		panes.push({ value: 'css', label: input.cssLabel, markup: css.markup });
 
 	return `import { state } from '@markless/core';
 import { ${families.join(', ')} } from '@markless/ui';
@@ -1112,6 +1132,7 @@ ${demo.prelude === '' ? '' : `\n${demo.prelude}\n`}
 	<section class="pg" data-family="${demo.family}">
 		<collapsible.root class="pg-controls">
 			<div class="pg-quick">
+				<strong class="pg-title">Controls</strong>
 ${quick}
 
 				<collapsible.trigger class="pg-showall">
@@ -1142,7 +1163,10 @@ ${input.chromeCss}
 
 ${input.colourCss}
 
-${docRules(docs.map((doc) => doc.n), '.pg')}
+${docRules(
+	docs.map((doc) => doc.n),
+	'.pg',
+)}
 
 ${demo.css}
 		</style>
