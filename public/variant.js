@@ -1,5 +1,5 @@
 (() => {
-	const valid = (value) => value === 'a' || value === 'b' || value === 'c' || value === 'd';
+	const valid = (value) => value === 'a' || value === 'b';
 	const requested = new URLSearchParams(location.search).get('variant');
 	let saved;
 	try {

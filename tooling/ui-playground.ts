@@ -936,6 +936,11 @@ export type ChromePane = { readonly value: string; readonly label: string; reado
  * the standalone code panels so the two read as one thing. `bar` is extra
  * markup for the strip row, the playground's scenario picker.
  */
+/** The tab reads as the kind of code it holds; the file name stays on the tooltip. */
+function tabName(value: string): string {
+	return value === 'css' ? 'CSS' : 'Source';
+}
+
 export function codePanelChrome(input: {
 	readonly scenario: string;
 	readonly panes: readonly ChromePane[];
@@ -944,7 +949,10 @@ export function codePanelChrome(input: {
 }): string {
 	const { indent } = input;
 	const tabs = input.panes
-		.map((pane) => `${indent}\t\t\t\t<tabs.trigger class="pg-tab" value=${quote(pane.value)}>${pane.label}</tabs.trigger>`)
+		.map(
+			(pane) =>
+				`${indent}\t\t\t\t<tabs.trigger class="pg-tab" value=${quote(pane.value)} title=${quote(pane.label)}>${tabName(pane.value)}</tabs.trigger>`,
+		)
 		.join('\n');
 	const panes = input.panes
 		.map(

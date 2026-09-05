@@ -3,15 +3,18 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { chromium } from 'playwright-core';
 
+// Runs against a production serve: the dev server only ships the generated
+// playground CSS with an island's JS, so an untouched dev page is unstyled.
 const origin = process.env.BRAND_ORIGIN ?? 'http://127.0.0.1:4310';
-const output = resolve(process.env.BRAND_SHOTS ?? '/private/tmp/brand-makeover-3/shots');
+const output = resolve(process.env.BRAND_SHOTS ?? '/private/tmp/brand-makeover-4/shots');
 await mkdir(output, { recursive: true });
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const results: unknown[] = [];
+const WHITE = 'rgb(255, 255, 255)';
 try {
 	for (const theme of ['light', 'dark']) {
 		let selectLook: unknown;
-		for (const variant of ['a', 'b', 'c', 'd']) {
+		for (const variant of ['a', 'b']) {
 			const context = await browser.newContext({ viewport: { width: 1440, height: 1050 } });
 			await context.addInitScript((value) => localStorage.setItem('theme', value), theme);
 			const page = await context.newPage();
@@ -23,7 +26,7 @@ try {
 				await page.evaluate(() => document.fonts.ready);
 				assert.equal(await page.locator('html').getAttribute('data-variant'), variant);
 				assert.equal(await page.locator('html').getAttribute('data-theme'), theme);
-				assert.equal(await page.locator('.variant-picker a').count(), 4);
+				assert.equal(await page.locator('.variant-picker a').count(), 2);
 				assert.equal(
 					await page.locator('.variant-picker a[aria-current="true"]').getAttribute('data-variant'),
 					variant,
@@ -134,15 +137,26 @@ try {
 							const controls = el.querySelector('.pg-controls')!.getBoundingClientRect();
 							const stage = el.querySelector('.pg-stage')!.getBoundingClientRect();
 							const code = el.querySelector('.pg-code')!.getBoundingClientRect();
+							const touching = (a: DOMRect, b: DOMRect) =>
+								Math.min(Math.abs(b.top - a.bottom), Math.abs(b.left - a.right)) <= 2;
 							return {
-								frame: Number.parseFloat(getComputedStyle(el).borderTopWidth),
-								controlsGap: stage.top - controls.bottom,
-								codeGap: code.top - stage.bottom,
+								frame: Number.parseFloat(getComputedStyle(el, '::before').borderTopWidth),
+								controlsTouchStage: touching(controls, stage),
+								stageTouchesCode: touching(stage, code),
+								stageBackground: getComputedStyle(el.querySelector('.pg-stage')!).backgroundColor,
+								stageInk: getComputedStyle(el.querySelector('.pg-stage .trigger')!).color,
 							};
 						});
 					assert.ok(
-						joined.frame > 0 && Math.abs(joined.controlsGap) <= 1 && Math.abs(joined.codeGap) <= 1,
+						joined.frame > 0 && joined.controlsTouchStage && joined.stageTouchesCode,
 						'Controls, preview and code share one adjoining frame',
+					);
+					assert.equal(joined.stageBackground, WHITE, 'The component preview is pure white');
+					assert.notEqual(joined.stageInk, WHITE, 'Demo text stays ink on the white preview');
+					assert.equal(
+						await page.locator('.pg .pg-tab').first().textContent(),
+						'Source',
+						'Code tabs read Source and CSS',
 					);
 					const tabs = page.locator('.pg .pg-tab');
 					await tabs.first().focus();
@@ -184,6 +198,28 @@ try {
 					});
 					await page.keyboard.press('Escape');
 					await page.locator('.pg-bar-list').waitFor({ state: 'hidden' });
+					// The control hint: hover the first dot, the slab tip shows over the card, and it leaves with the pointer.
+					await page.locator('.pg').first().scrollIntoViewIfNeeded();
+					await page.locator('.pg .pg-dot').first().hover();
+					const tip = page.locator('.pg .pg-tip').first();
+					await tip.waitFor({ state: 'visible' });
+					const tipLook = await tip.evaluate((el) => {
+						const style = getComputedStyle(el);
+						const box = el.getBoundingClientRect();
+						return {
+							background: style.backgroundColor,
+							onScreen: box.left >= 0 && box.right <= innerWidth && box.top >= 0,
+							body: el.querySelector('.tsrx-tip-body')?.textContent?.trim() ?? '',
+						};
+					});
+					assert.notEqual(tipLook.background, 'rgba(0, 0, 0, 0)', 'The tooltip has a slab behind it');
+					assert.ok(tipLook.onScreen && tipLook.body.length > 0, 'The tooltip is on screen with its text');
+					await page
+						.locator('.pg')
+						.first()
+						.screenshot({ animations: 'disabled', path: `${output}/${variant}-${theme}-tooltip.png` });
+					await page.mouse.move(0, 0);
+					await tip.waitFor({ state: 'hidden' });
 					const stacked = await page.locator('.cp').evaluateAll((panels) =>
 						panels.flatMap((panel) => {
 							const stage = panel.querySelector('.pg-stage')?.getBoundingClientRect();
@@ -207,6 +243,7 @@ try {
 					);
 					assert.equal(await page.locator('.pg-stage .panel').first().isVisible(), false);
 				}
+				await page.evaluate(() => window.scrollTo(0, 0));
 				await page.screenshot({
 					animations: 'disabled',
 					path: `${output}/${variant}-${theme}-${route}.png`,
@@ -231,7 +268,7 @@ try {
 			await page.setViewportSize({ width: 390, height: 844 });
 			await page.evaluate(() => window.scrollTo(0, 0));
 			assert.equal(
-				await page.locator('.variant-d').evaluate((el) => {
+				await page.locator('.variant-b').evaluate((el) => {
 					const box = el.getBoundingClientRect();
 					return (
 						document
@@ -240,7 +277,7 @@ try {
 					);
 				}),
 				true,
-				'The fourth preview link is reachable beside the theme button on phones',
+				'The second preview link is reachable beside the theme button on phones',
 			);
 			await page.screenshot({
 				animations: 'disabled',
@@ -265,24 +302,26 @@ try {
 				theme,
 				keyboard: 'pass',
 				headingRestoration: 'pass',
+				whitePreview: 'pass',
+				tooltip: 'pass',
 				desktopAndPhone: 'pass',
 			});
 			await context.close();
 		}
 	}
 	const page = await browser.newPage();
-	await page.goto(`${origin}/markless/ui/accordion?variant=c`, { waitUntil: 'networkidle' });
-	await page.locator('.variant-picker .variant-d').click();
-	await page.waitForURL(/variant=d/);
+	await page.goto(`${origin}/markless/ui/accordion?variant=a`, { waitUntil: 'networkidle' });
+	await page.locator('.variant-picker .variant-b').click();
+	await page.waitForURL(/variant=b/);
 	await page.goto(`${origin}/markless/ui/accordion`, { waitUntil: 'networkidle' });
-	assert.equal(await page.locator('html').getAttribute('data-variant'), 'd');
+	assert.equal(await page.locator('html').getAttribute('data-variant'), 'b');
 	await page.locator('.mode-select-trigger').click();
 	await page.locator('.mode-select-item').first().click();
 	await page.waitForURL(/\/markless\/?$/);
-	assert.equal(await page.locator('html').getAttribute('data-variant'), 'd');
+	assert.equal(await page.locator('html').getAttribute('data-variant'), 'b');
 	await writeFile(`${output}/checks.json`, JSON.stringify(results, null, 2));
 	console.log(
-		`PASS: four connected playgrounds, both themes, desktop and phone, sidebar tab order, keyboard code tabs, matching selects, restored headings, accordion behavior. Screenshots: ${output}`,
+		`PASS: two connected playgrounds (Marker brackets, Compact sheet), both themes, desktop and phone, white preview, tooltip, sidebar tab order, keyboard code tabs, matching selects, restored headings, accordion behavior. Screenshots: ${output}`,
 	);
 } finally {
 	await browser.close();

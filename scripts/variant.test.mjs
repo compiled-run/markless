@@ -30,23 +30,19 @@ function load(search, saved, blocked = false) {
 }
 
 test('a shared link selects and remembers its design', () => {
-	assert.deepEqual(load('?variant=c', 'b'), { variant: 'c', stored: 'c' });
+	assert.deepEqual(load('?variant=b', 'a'), { variant: 'b', stored: 'b' });
 });
 
 test('ordinary navigation retains the chosen design', () => {
 	assert.equal(load('', 'b').variant, 'b');
 });
 
-test('invalid choices fall back to a saved design or Arcade', () => {
+test('invalid and retired choices fall back to a saved design or Brackets', () => {
 	assert.equal(load('?variant=unknown', 'b').variant, 'b');
-	assert.equal(load('', 'unknown').variant, 'a');
-});
-
-test('the fourth preview works through shared links and ordinary navigation', () => {
-	assert.deepEqual(load('?variant=d', 'a'), { variant: 'd', stored: 'd' });
-	assert.equal(load('', 'd').variant, 'd');
+	assert.equal(load('?variant=c', 'b').variant, 'b');
+	assert.equal(load('', 'd').variant, 'a');
 });
 
 test('shared links still work when browser storage is blocked', () => {
-	assert.equal(load('?variant=c', null, true).variant, 'c');
+	assert.equal(load('?variant=b', null, true).variant, 'b');
 });

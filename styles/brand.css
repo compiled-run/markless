@@ -1,7 +1,24 @@
+/* The two playground designs from the GPT Image mockups: A "Marker brackets"
+   (three columns inside one hand-drawn ink frame) and B "Compact sheet" (one
+   stacked sheet with a toolbar, a white stage and folder tabs on the code).
+   Everything here is keyed off html[data-variant], seeded by public/variant.js. */
+
 :root {
 	--marker-wash: color-mix(in oklch, var(--purple) 24%, transparent);
+	--marker-fill: color-mix(in oklch, var(--purple) 62%, white);
 	--quiet-fill: color-mix(in oklch, var(--ink) 6%, var(--paper));
+	--stage-white: #ffffff;
+	--switch-on: oklch(72% 0.17 148);
+	--switch-off: oklch(64% 0.01 80);
+	/* The preview shows the component the way a consumer's page would: a plain sans, not the site's hand lettering. */
+	--demo-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+	/* One continuous five-point stroke, the way a marker draws a star. */
+	--star-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M49 8L78 91L8 39L94 37L23 92Z' fill='none' stroke='white' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
+
+/* ------------------------------------------------------------------------- */
+/* Header picker                                                              */
+/* ------------------------------------------------------------------------- */
 
 .variant-picker {
 	display: flex;
@@ -44,6 +61,11 @@ html[data-variant] .site-search {
 	display: none;
 }
 
+/* ------------------------------------------------------------------------- */
+/* Sidebar select and links: the accepted treatment, shared by every design.  */
+/* The scenario select in the playground wears the same surface.             */
+/* ------------------------------------------------------------------------- */
+
 html[data-variant] .mode-select-island {
 	position: relative;
 	position-anchor: auto;
@@ -52,21 +74,21 @@ html[data-variant] .mode-select-island {
 	margin-bottom: var(--space-s);
 	z-index: 25;
 }
-html[data-variant] :is(.mode-select-trigger, .pg-bar-trigger) {
+html[data-variant] :is(.mode-select-trigger, .pg-bar-trigger, .pg-pick-trigger) {
 	background: var(--paper);
 	border: 1.5px solid var(--ink);
 	border-radius: 3px;
 	min-height: 2.7rem;
-	box-shadow: 3px 3px 0 var(--marker-wash);
+	box-shadow: 3px 3px 0 var(--purple);
 }
-html[data-variant] :is(.mode-select-content, .pg-bar-list) {
+html[data-variant] :is(.mode-select-content, .pg-pick-list) {
 	background: var(--paper);
 	padding: 0.4rem;
 	border: 1.5px solid var(--ink);
 	border-radius: 3px;
-	box-shadow: 3px 4px 0 var(--code-edge);
+	box-shadow: 3px 4px 0 var(--purple);
 }
-html[data-variant] :is(.mode-select-item, .pg-bar-list .pg-pick-item) {
+html[data-variant] :is(.mode-select-item, .pg-pick-list .pg-pick-item) {
 	min-height: 2.25rem;
 	box-sizing: border-box;
 	border: 0;
@@ -74,21 +96,20 @@ html[data-variant] :is(.mode-select-item, .pg-bar-list .pg-pick-item) {
 	background: transparent;
 	color: var(--ink);
 }
-html[data-variant] :is(.mode-select-item, .pg-bar-list .pg-pick-item)[ui-selected] {
+html[data-variant] :is(.mode-select-item, .pg-pick-list .pg-pick-item)[ui-selected] {
 	background: var(--marker-wash);
 	font-weight: 700;
 }
-html[data-variant] :is(.mode-select-item, .pg-bar-list .pg-pick-item):is(:hover, :focus-visible),
+html[data-variant] :is(.mode-select-item, .pg-pick-list .pg-pick-item):is(:hover, :focus-visible),
 html[data-variant] .sidebar-link:is(:hover, :focus-visible) {
 	background: var(--quiet-fill);
 	outline: 1px dashed var(--ink);
 	outline-offset: -3px;
 }
-html[data-variant]
-	:is(.mode-select-item, .pg-bar-list .pg-pick-item)[ui-selected]:is(:hover, :focus-visible) {
+html[data-variant] :is(.mode-select-item, .pg-pick-list .pg-pick-item)[ui-selected]:is(:hover, :focus-visible) {
 	background: var(--marker-wash);
 }
-html[data-variant] :is(.mode-select-trigger, .pg-bar-trigger):focus-visible {
+html[data-variant] :is(.mode-select-trigger, .pg-bar-trigger, .pg-pick-trigger):focus-visible {
 	outline: 2px dashed var(--ink);
 	outline-offset: 4px;
 }
@@ -103,468 +124,982 @@ html[data-variant] :is(.mode-select-trigger, .pg-bar-trigger):focus-visible {
 	margin-block: 0 0.65em;
 }
 
-/* Generated component CSS follows the document sheet, so preview rules include the design attribute. */
-html[data-variant] :is(.pg, .cp) {
-	--play-accent: var(--pink);
-	min-width: 0;
-	border: 2px solid var(--ink);
-	border-radius: 8px;
-	box-shadow: 4px 4px 0 var(--play-accent);
-	background: var(--paper);
-	overflow: visible;
-	margin: 2rem 0;
-	gap: 0;
-}
-html[data-variant] .pg-controls {
-	background: transparent;
-	border: 0;
-	border-bottom: 1px solid var(--code-edge);
-}
-html[data-variant] .pg-quick {
-	padding: 0.9rem 1.1rem;
-	border: 0;
-	gap: 0.75rem 1.25rem;
-}
-html[data-variant] .pg-rest {
-	padding: 1rem 1.1rem;
-	border: 0;
-}
-html[data-variant] .pg-log {
-	margin: 0;
-	padding: 0.4rem 1.1rem;
-	background: transparent;
-}
-html[data-variant] .pg-switch[ui-checked] {
-	background: var(--ink);
-}
-html[data-variant] .pg-switch[ui-checked] .pg-knob {
-	background: var(--paper);
-}
-html[data-variant] .pg-showall {
-	border: 0;
-	background: transparent;
-	padding: 0.3rem 0;
-}
-html[data-variant] .pg-pick-item:is(:hover, :focus-visible) {
-	background: var(--quiet-fill);
-	color: var(--ink);
-}
-html[data-variant] .pg-pick-item[ui-selected] {
-	background: var(--marker-wash);
-	color: var(--ink);
-	border-color: transparent;
-}
-html[data-variant] .pg-stage {
-	box-sizing: border-box;
-	min-width: 0;
-	min-height: 0;
-	margin: 0;
-	padding: 1.75rem 2.5rem;
-	border: 0;
-	border-radius: 0;
-	background: transparent;
-}
-html[data-variant] [data-family='accordion'] :is(.accordion, .faq, .settings) {
-	box-sizing: border-box;
-	width: 100%;
-	max-width: 36rem;
-	margin-inline: auto;
-	padding: 0;
-	border: 0;
-	background: transparent;
-	gap: 0;
-}
-html[data-variant] [data-family='accordion'] :is(.sections, .faq-items, .groups) {
-	display: contents;
-}
-html[data-variant] [data-family='accordion'] :is(.section, .faq-item, .group) {
-	border: 0;
-	border-radius: 0;
-	background: transparent;
-	overflow: visible;
-}
-html[data-variant] [data-family='accordion'] :is(.heading, .faq-heading, .group-heading) {
-	margin: 0;
-	font-size: 1.15rem;
-	line-height: 1.45;
-	text-shadow: none;
-}
-html[data-variant] [data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger) {
-	box-sizing: border-box;
-	width: 100%;
-	min-height: 3.5rem;
-	padding: 0.9rem 1rem;
-	border: 0;
-	background: transparent;
-	color: inherit;
-	font: inherit;
-	font-weight: 700;
-	text-align: start;
-	cursor: pointer;
-}
-html[data-variant] [data-family='accordion'] :is(.trigger, .faq-trigger) {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	gap: 1rem;
-}
-html[data-variant]
-	[data-family='accordion']
-	:is(.trigger, .faq-trigger, .group-trigger):focus-visible {
-	outline: 2px dashed currentColor;
-	outline-offset: -5px;
-}
-html[data-variant] [data-family='accordion'] :is(.panel, .faq-panel, .group-panel)[ui-open] {
-	padding: 0.2rem 1rem 1.2rem;
-	background: transparent;
-	font-family: 'Shantell Sans', sans-serif;
-	font-size: 0.95rem;
-	line-height: 1.8;
-}
-html[data-variant] [data-family='accordion'] :is(.panel, .faq-panel, .group-panel)[hidden] {
-	display: none;
-}
-html[data-variant] [data-family='accordion'] .trigger-icon {
-	width: 1rem;
-	height: 1rem;
-	flex: none;
-	transform: none;
-	transition: transform 140ms ease;
-}
-html[data-variant] [data-family='accordion'] [aria-expanded='true'] > .trigger-icon {
-	transform: rotate(180deg);
-}
-html[data-variant] [data-family='accordion'] [ui-disabled] {
-	opacity: 0.45;
-}
-html[data-variant] [data-family='accordion'] .faq-title {
-	font-size: 1.4rem;
-	margin: 0;
-	padding: 1rem;
-	text-shadow: none;
-}
-html[data-variant] [data-family='accordion'] .faq-foot {
-	font-size: 0.85rem;
-	padding: 1rem;
-	margin: 0;
-}
+/* ------------------------------------------------------------------------- */
+/* Shared playground: one connected frame, a pure white stage, chunky labels. */
+/* Generated component CSS follows this sheet, so every rule carries          */
+/* html[data-variant] .prose to outrank it.                                    */
+/* ------------------------------------------------------------------------- */
 
-html[data-variant] .pg-code {
-	min-width: 0;
-	margin: 0;
-	border-top: 1px solid var(--ink);
-	border-radius: 0 0 6px 6px;
-	background: var(--code-surface);
-}
-html[data-variant] .pg-panel {
-	overflow: visible;
-}
-html[data-variant] .pg-bar {
-	display: grid;
-	grid-template-columns: minmax(0, 1fr) auto;
-	align-items: end;
-	gap: 0.8rem;
-	padding: 0.65rem 1rem 0;
-	background: var(--paper);
-}
-html[data-variant] .pg-strip {
-	min-width: 0;
-	margin-bottom: -1px;
-}
-html[data-variant] .pg-strip-row {
-	gap: 0.25rem;
-}
-html[data-variant] .pg-tab {
-	position: relative;
-	min-height: 2.7rem;
-	padding: 0.65rem 0.85rem;
-	border: 1px solid transparent;
-	border-bottom: 0;
-	border-radius: 6px 6px 0 0;
-	background: transparent;
-	color: var(--ink);
-	font-family: var(--font-mono);
-	font-size: var(--step--2);
-	opacity: 0.75;
-	white-space: nowrap;
-}
-html[data-variant] .pg-tab[ui-selected] {
-	background: var(--code-surface);
-	border-color: var(--ink);
-	box-shadow: 0 1px 0 var(--code-surface);
-	font-weight: 700;
-	opacity: 1;
-}
-html[data-variant] .pg-tab[ui-selected]::before {
-	content: '';
-	position: absolute;
-	inset: 0.3rem 0.65rem auto;
-	height: 3px;
-	background: var(--play-accent);
-	transform: rotate(-1deg);
-}
-html[data-variant] .pg-tab:is(:hover, :focus-visible) {
-	outline: 1px dashed var(--ink);
-	outline-offset: -4px;
-	opacity: 1;
-}
-html[data-variant] .pg-tab:focus-visible {
-	outline-width: 2px;
-}
-html[data-variant] .pg-panes {
-	border-top: 1px solid var(--ink);
-}
-html[data-variant] .pg-bar-pick {
-	display: flex;
-	align-items: center;
-	gap: 0.6rem;
-	margin: 0 0 0.6rem auto;
-	padding: 0;
-}
-html[data-variant] .pg-bar-name {
-	font-size: var(--step--2);
-	text-transform: none;
-	letter-spacing: normal;
-	opacity: 0.8;
-}
-html[data-variant] .pg-bar-trigger {
-	width: 9rem;
-	min-width: 0;
-	padding: 0.35em 0.7em;
-	font-size: var(--step--1);
-	font-weight: 700;
-}
-html[data-variant] .pg-bar-trigger .pg-pick-value {
-	overflow: hidden;
-	white-space: nowrap;
-	text-overflow: ellipsis;
-}
-html[data-variant] .pg-bar-list {
-	min-width: 12rem;
-	z-index: 45;
-}
-html[data-variant] .pg-bar-list .pg-pick-item {
-	padding: 0.3em 0.7em;
-	font-size: var(--step--1);
-}
-html[data-variant] :is(.pg-shiki, .pg-shiki span) {
-	font-family: var(--font-mono);
-}
-html[data-variant] .pg-shiki :is(.tsrx-tip, .tsrx-tip-body) {
-	font-family: 'Shantell Sans', sans-serif;
-}
-html[data-variant] .pg-expand {
-	height: 2.6rem;
-	padding: 0.4rem;
-	align-items: center;
-	border-top: 1px solid var(--code-edge);
-	border-radius: 0 0 6px 6px;
-	background: var(--code-surface);
-	font-size: 0.9rem;
-}
-html[data-variant] .pg-fade {
-	bottom: 2.6rem;
-	height: 4rem;
-}
+html[data-variant] .prose {
+	.pg,
+	.cp {
+		--play-accent: var(--pink);
+		position: relative;
+		min-width: 0;
+		margin: var(--space-l) 0 var(--space-m);
+		/* The frame's own background is clear and its ink line is a pseudo-element
+		   painted over the children: the marker mass (::after, z-index -1) then
+		   sits under the children yet over the page. */
+		--frame-width: 3px;
+		isolation: isolate;
+		border: 0;
+		border-radius: 0;
+		background: transparent;
+		box-shadow: none;
+		overflow: visible;
+		gap: 0;
+	}
+	.pg::before,
+	.cp::before {
+		content: '';
+		position: absolute;
+		z-index: 5;
+		inset: 0;
+		border: var(--frame-width) solid var(--ink);
+		border-radius: inherit;
+		pointer-events: none;
+	}
+	.pg-controls,
+	.pg-log,
+	.pg-code {
+		background: var(--paper);
+	}
 
-html[data-variant='a'] :is(.pg, .cp) {
-	--play-accent: var(--pink);
-	border-width: 2px;
-	box-shadow: 5px 5px 0 var(--pink);
-}
-html[data-variant='a'] [data-family='accordion'] .pg-stage {
-	position: relative;
-}
-html[data-variant='a'] [data-family='accordion'] .pg-stage::after {
-	content: '';
-	position: absolute;
-	right: 0.8rem;
-	top: 0.5rem;
-	width: 2rem;
-	height: 2rem;
-	background: url('/markless/sprites/crown.png') center / contain no-repeat;
-	transform: rotate(10deg);
-	pointer-events: none;
-}
-html[data-variant='a'] [data-family='accordion'] :is(.section, .faq-item, .group) {
-	border-bottom: 1px solid var(--code-edge);
-}
-html[data-variant='a'] [data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger) {
-	text-transform: uppercase;
-	letter-spacing: 0.03em;
-	font-weight: 700;
-}
-html[data-variant='a'] [data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger):hover {
-	background: var(--quiet-fill);
-}
-html[data-variant='a']
-	[data-family='accordion']
-	:is(.trigger, .faq-trigger, .group-trigger)[aria-expanded='true'] {
-	background: var(--pink);
-	color: var(--on-accent);
-	box-shadow: 0 3px 0 var(--yellow);
-}
-html[data-variant='a'] [data-family='accordion'] :is(.panel, .faq-panel, .group-panel)[ui-open] {
-	padding-top: 0.8rem;
-}
-html[data-variant='a'] [data-family='accordion'] .trigger-icon {
-	padding: 0.25rem;
-	box-sizing: content-box;
-	background: var(--yellow);
-	color: var(--on-accent);
-	border: 1px solid var(--on-accent);
-	border-radius: 3px;
-}
+	/* The white canvas keeps the light palette in both themes, so a demo drawn
+	   with the site's tokens stays ink-on-white when the page is dark. */
+	.pg-stage {
+		--ink: oklch(22% 0.01 90);
+		--on-accent: oklch(22% 0.01 90);
+		--paper: var(--stage-white);
+		--raised: var(--stage-white);
+		--code-surface: oklch(97% 0.01 79);
+		--code-edge: color-mix(in oklch, var(--ink) 22%, transparent);
+		--tinted: color-mix(in oklch, var(--yellow) 45%, white);
+		--tinted-quiet: color-mix(in oklch, var(--yellow) 35%, white);
+		--hover-wash: 8%;
+		--slab: var(--ink);
+		--slab-ink: white;
+		color-scheme: light;
+		box-sizing: border-box;
+		min-width: 0;
+		min-height: 0;
+		margin: 0;
+		border: 0;
+		border-radius: 0;
+		background: var(--stage-white);
+		color: var(--ink);
+	}
 
-html[data-variant='b'] :is(.pg, .cp) {
-	--play-accent: var(--yellow);
-	border-radius: 12px 8px 10px 6px;
-	box-shadow: 4px 4px 0 color-mix(in oklch, var(--purple) 55%, transparent);
-}
-html[data-variant='b'] [data-family='accordion'] :is(.section, .faq-item, .group) {
-	position: relative;
-	padding-inline-start: 2rem;
-	border-bottom: 1px dashed var(--code-edge);
-}
-html[data-variant='b'] [data-family='accordion'] :is(.section, .faq-item, .group)::before {
-	content: '';
-	position: absolute;
-	left: 0;
-	top: 1rem;
-	width: 1.7rem;
-	height: 1.7rem;
-	background: url('/markless/sprites/star-badge.png') center / contain no-repeat;
-	opacity: 0.45;
-	pointer-events: none;
-}
-html[data-variant='b']
-	[data-family='accordion']
-	:is(.section, .faq-item, .group):has([aria-expanded='true'])::before {
-	opacity: 1;
-}
-html[data-variant='b'][data-theme='dark']
-	[data-family='accordion']
-	:is(.section, .faq-item, .group)::before {
-	background-image: url('/markless/sprites/star-badge.dark.png');
-}
-html[data-variant='b'] [data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger) {
-	padding-inline: 0.5rem;
-}
-html[data-variant='b']
-	[data-family='accordion']
-	:is(.trigger, .faq-trigger, .group-trigger)[aria-expanded='true'] {
-	text-decoration: underline;
-	text-decoration-color: var(--yellow);
-	text-decoration-thickness: 0.25em;
-	text-underline-offset: 0.1em;
-	text-decoration-skip-ink: none;
-}
-html[data-variant='b'] [data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger):hover {
-	background: var(--quiet-fill);
-}
+	/* Controls */
+	.pg-controls {
+		border: 0;
+	}
+	.pg-quick,
+	.pg-rest {
+		border: 0;
+	}
+	.pg-rest[ui-closed] {
+		display: none;
+	}
+	.pg-name {
+		font-family: 'Joy Elia', system-ui, sans-serif;
+		font-size: var(--step--1);
+		color: var(--ink);
+	}
+	.pg-switch {
+		flex: none;
+		width: 2.75em;
+		height: 1.65em;
+		padding: 0.06em;
+		border: 2px solid var(--ink);
+		border-radius: 999px;
+		background: var(--switch-off);
+		font-size: var(--step--1);
+		transition: background 140ms ease;
+	}
+	.pg-switch[ui-checked] {
+		background: var(--switch-on);
+	}
+	.pg-knob {
+		box-sizing: border-box;
+		flex: none;
+		width: 1.25em;
+		height: 1.25em;
+		border: 1.5px solid var(--ink);
+		background: white;
+	}
+	.pg-switch[ui-checked] .pg-knob {
+		margin-inline-start: calc(100% - 1.25em);
+	}
+	.pg-dot {
+		width: 1.2em;
+		height: 1.2em;
+		opacity: 0.5;
+	}
+	.pg-showall {
+		border: 0;
+		background: transparent;
+		padding: 0.3rem 0;
+		font-family: 'Joy Elia', system-ui, sans-serif;
+	}
+	.pg-showall:hover {
+		text-decoration-color: var(--purple);
+	}
+	.pg-pick-item:is(:hover, :focus-visible) {
+		background: var(--quiet-fill);
+		color: var(--ink);
+	}
+	.pg-pick-item[ui-selected] {
+		background: var(--marker-wash);
+		color: var(--ink);
+		border-color: transparent;
+	}
+	.pg-pick-trigger {
+		min-height: 2.4rem;
+		font-family: 'Joy Elia', system-ui, sans-serif;
+		font-weight: 700;
+	}
+	.pg-field {
+		border: 1.5px solid var(--ink);
+		border-radius: 3px;
+		background: var(--paper);
+	}
+	.pg-log {
+		margin: 0;
+		font-size: var(--step--2);
+	}
 
-html[data-variant='c'] :is(.pg, .cp) {
-	--play-accent: var(--pink);
-	border-color: var(--code-edge);
-	border-inline-start: 3px solid var(--pink);
-	border-radius: 3px 9px 7px 3px;
-	box-shadow:
-		3px 3px 0 var(--raised),
-		4px 4px 0 var(--code-edge);
-}
-html[data-variant='c'] .pg-controls {
-	border-bottom-style: dashed;
-}
-html[data-variant='c'] [data-family='accordion'] :is(.section, .faq-item, .group) {
-	border-bottom: 1px solid var(--code-edge);
-}
-html[data-variant='c'] [data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger) {
-	padding-inline: 0.5rem;
-	font-weight: 400;
-	font-size: 1.2rem;
-}
-html[data-variant='c']
-	[data-family='accordion']
-	:is(.trigger, .faq-trigger, .group-trigger)[aria-expanded='true'] {
-	text-decoration: underline;
-	text-decoration-color: var(--pink);
-	text-decoration-thickness: 0.18em;
-	text-underline-offset: 0.2em;
-}
-html[data-variant='c'] [data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger):hover {
-	background: var(--quiet-fill);
-}
+	/* The tooltip: a dark speech slab with a tail, like the mockups' hint. */
+	.pg-tip {
+		padding: 0.35em 0.2em;
+		border: 0;
+		border-radius: 6px;
+		background: var(--slab);
+		color: var(--slab-ink);
+		box-shadow: none;
+		font-family: 'Shantell Sans', system-ui, sans-serif;
+		font-size: var(--step--1);
+		line-height: 1.35;
+		max-width: min(16rem, calc(100vw - 2 * var(--space-s-l)));
+	}
+	.pg-tip::before {
+		content: '';
+		position: absolute;
+		top: -0.4em;
+		left: 1.1em;
+		width: 0.8em;
+		height: 0.8em;
+		border-radius: 2px;
+		background: inherit;
+		transform: rotate(45deg);
+	}
+	.pg-tip .tsrx-tip-title {
+		padding: 0.15rem 0.65rem 0;
+		font-family: 'Joy Elia', system-ui, sans-serif;
+		font-size: 0.6875rem;
+		font-weight: 700;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		opacity: 0.7;
+	}
+	.pg-tip .tsrx-tip-body {
+		padding: 0.2rem 0.65rem 0.35rem;
+		font-family: 'Shantell Sans', system-ui, sans-serif;
+		font-size: 0.875rem;
+		font-weight: 400;
+		line-height: 1.35;
+	}
+	.pg-tip .tsrx-tip-type {
+		padding: 0.25rem 0.65rem 0.1rem;
+		border-block-start: 1px solid color-mix(in oklch, var(--slab-ink) 25%, transparent);
+		font-family: var(--font-mono);
+		font-size: 0.6875rem;
+		opacity: 0.65;
+	}
 
-html[data-variant='d'] :is(.pg, .cp) {
-	--play-accent: var(--green-soft);
-	position: relative;
-	border-width: 1px;
-	border-radius: 4px 10px 8px 4px;
-	box-shadow: 4px 4px 0 color-mix(in oklch, var(--purple) 24%, transparent);
-}
-html[data-variant='d'] :is(.pg, .cp)::before {
-	content: '';
-	position: absolute;
-	width: 4.5rem;
-	height: 1.4rem;
-	left: calc(50% - 2.25rem);
-	top: -0.7rem;
-	background: url('/markless/stickers/tape.png') center / contain no-repeat;
-	transform: rotate(-3deg);
-	pointer-events: none;
-}
-html[data-variant='d'] [data-family='accordion'] :is(.section, .faq-item, .group) {
-	position: relative;
-	padding-inline-start: 1.4rem;
-	border-inline-start: 1px dashed var(--code-edge);
-}
-html[data-variant='d'] [data-family='accordion'] :is(.section, .faq-item, .group)::before {
-	content: '';
-	position: absolute;
-	width: 0.6rem;
-	height: 0.6rem;
-	border: 1.5px solid var(--ink);
-	border-radius: 50%;
-	background: var(--paper);
-	left: -0.35rem;
-	top: 1.5rem;
-}
-html[data-variant='d']
-	[data-family='accordion']
-	:is(.section, .faq-item, .group):has([aria-expanded='true'])::before {
-	background: var(--green-soft);
-}
-html[data-variant='d'] [data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger) {
-	padding-inline: 0;
-}
-html[data-variant='d']
-	[data-family='accordion']
-	:is(.trigger, .faq-trigger, .group-trigger)[aria-expanded='true'] {
-	text-decoration: underline;
-	text-decoration-color: var(--green-soft);
-	text-decoration-thickness: 0.3em;
-	text-underline-offset: 0.05em;
-	text-decoration-skip-ink: none;
-}
-html[data-variant='d'] [data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger):hover {
-	background: var(--quiet-fill);
-}
-html[data-variant='d'] [data-family='accordion'] :is(.panel, .faq-panel, .group-panel)[ui-open] {
-	padding-inline: 0;
-}
+	/* Code */
+	.pg-code {
+		position: relative;
+		min-width: 0;
+		margin: 0;
+		border: 0;
+		border-radius: 0;
+	}
+	.pg-panel {
+		overflow: visible;
+	}
+	.pg-strip {
+		min-width: 0;
+	}
+	.pg-tab {
+		font-family: 'Joy Elia', system-ui, sans-serif;
+		font-size: var(--step--1);
+		font-weight: 700;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--ink);
+		white-space: nowrap;
+	}
+	.pg-tab:is(:hover, :focus-visible) {
+		outline: 1px dashed var(--ink);
+		outline-offset: -4px;
+		opacity: 1;
+	}
+	.pg-tab:focus-visible {
+		outline-width: 2px;
+	}
+	.pg-panes {
+		border: 0;
+		background: transparent;
+	}
+	.pg-shiki {
+		background: transparent;
+		font-size: var(--step--2);
+		line-height: 1.55;
+	}
+	.pg-shiki,
+	.pg-shiki span {
+		font-family: var(--font-mono);
+	}
+	.pg-shiki :is(.tsrx-tip, .tsrx-tip-body) {
+		font-family: 'Shantell Sans', system-ui, sans-serif;
+	}
+	.pg-fade {
+		height: 2.75rem;
+		background: linear-gradient(to bottom, transparent, var(--paper) calc(100% - 1.75rem));
+	}
+	.pg-expand {
+		height: 2.75rem;
+		padding-bottom: 0.55rem;
+		font-family: 'Joy Elia', system-ui, sans-serif;
+	}
+	.pg-expand:hover {
+		text-decoration-color: var(--purple);
+	}
+	.pg-bar-name {
+		font-family: 'Joy Elia', system-ui, sans-serif;
+		font-size: var(--step--1);
+		font-weight: 700;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		opacity: 1;
+	}
+	.pg-bar-trigger {
+		width: 9.5rem;
+		min-width: 0;
+		padding: 0.3em 0.7em;
+		font-size: var(--step--1);
+		font-weight: 400;
+	}
+	.pg-bar-trigger .pg-pick-caret {
+		width: 1.1em;
+		height: 1.1em;
+		opacity: 1;
+	}
+	.pg-bar-trigger .pg-pick-value {
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+	}
+	.pg-bar-list {
+		min-width: 12rem;
+		z-index: 45;
+	}
+	.pg-bar-list .pg-pick-item {
+		padding: 0.3em 0.7em;
+		font-size: var(--step--1);
+	}
 
-@media (max-width: 70rem) {
-	html[data-variant] .pg-quick {
+	/* The accordion demos on the white stage: one clean white list with
+	   hairlines, a bold question and a plus/minus at the end of the row. */
+	[data-family='accordion'] :is(.accordion, .faq, .settings) {
+		box-sizing: border-box;
+		width: 100%;
+		max-width: 36rem;
+		margin-inline: auto;
+		padding: 0;
+		border: 0;
+		background: transparent;
+		gap: 0;
+	}
+	[data-family='accordion'] :is(.sections, .faq-items, .groups) {
+		display: grid;
+		gap: 0;
+		border: 1px solid color-mix(in oklch, var(--ink) 28%, transparent);
+		border-radius: 6px;
+		background: var(--stage-white);
+		overflow: clip;
+	}
+	[data-family='accordion'] :is(.section, .faq-item, .group) {
+		border: 0;
+		border-block-start: 1px solid color-mix(in oklch, var(--ink) 20%, transparent);
+		border-radius: 0;
+		background: transparent;
+		overflow: visible;
+	}
+	[data-family='accordion'] :is(.section, .faq-item, .group):first-child {
+		border-block-start: 0;
+	}
+	[data-family='accordion'] :is(.heading, .faq-heading, .group-heading) {
+		margin: 0;
+		font-size: var(--step-0);
+		line-height: 1.4;
+		text-shadow: none;
+	}
+	[data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger) {
 		display: flex;
-		flex-flow: row wrap;
+		align-items: center;
+		justify-content: flex-start;
+		gap: 1rem;
+		box-sizing: border-box;
+		width: 100%;
+		min-height: 3.6rem;
+		padding: 0.95rem 1.1rem;
+		border: 0;
+		border-radius: 0;
+		background: transparent;
+		color: var(--ink);
+		font-family: var(--demo-sans);
+		font-size: var(--step-0);
+		font-weight: 600;
+		line-height: 1.35;
+		text-align: start;
+		text-transform: none;
+		letter-spacing: 0;
+		cursor: pointer;
 	}
-	html[data-variant] .pg-quick > * {
-		flex: 0 1 auto;
+	[data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger):hover {
+		background: color-mix(in oklch, var(--ink) 4%, transparent);
 	}
-	html[data-variant] .pg-quick .pg-cell {
-		width: auto;
+	[data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger):focus-visible {
+		outline: 2px dashed var(--ink);
+		outline-offset: -5px;
+	}
+	[data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger)::after {
+		content: '+';
+		flex: none;
+		margin-inline-start: auto;
+		width: 1em;
+		font-family: var(--demo-sans);
+		font-size: 1.5rem;
+		font-weight: 400;
+		line-height: 1;
+		text-align: center;
+	}
+	[data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger)[aria-expanded='true']::after {
+		content: '−';
+	}
+	[data-family='accordion'] .trigger-icon {
+		width: 1rem;
+		height: 1rem;
+		flex: none;
+		order: -1;
+		transform: rotate(-90deg);
+		transition: transform 140ms ease;
+	}
+	[data-family='accordion'] [aria-expanded='true'] > .trigger-icon {
+		transform: rotate(0deg);
+	}
+	[data-family='accordion'] :is(.panel, .faq-panel, .group-panel)[ui-open] {
+		padding: 0 1.1rem 1rem;
+		background: transparent;
+		color: color-mix(in oklch, var(--ink) 80%, white);
+		font-family: var(--demo-sans);
+		font-size: var(--step--1);
+		font-weight: 400;
+		line-height: 1.5;
+	}
+	[data-family='accordion'] :is(.panel, .faq-panel, .group-panel) *,
+	[data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger) * {
+		font-family: var(--demo-sans);
+	}
+	[data-family='accordion'] :is(.panel, .faq-panel, .group-panel)[hidden] {
+		display: none;
+	}
+	[data-family='accordion'] [ui-disabled],
+	[data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger):disabled {
+		opacity: 0.45;
+		cursor: not-allowed;
+	}
+	[data-family='accordion'] .faq-title {
+		margin: 0 0 0.9rem;
+		padding: 0;
+		font-size: var(--step-1);
+		text-shadow: none;
+	}
+	[data-family='accordion'] .faq-foot {
+		margin: 0.9rem 0 0;
+		padding: 0;
+		font-family: var(--demo-sans);
+		font-size: var(--step--1);
+		opacity: 0.8;
+	}
+	[data-family='accordion'] .group-name {
+		display: block;
+	}
+	[data-family='accordion'] .group-note {
+		display: block;
+		font-weight: 400;
+		font-size: var(--step--1);
+		opacity: 0.75;
 	}
 }
+
+/* ------------------------------------------------------------------------- */
+/* A — Marker brackets: controls | white stage | code, inside one thick,      */
+/* slightly wobbly ink frame with a pink marker mass behind its lower edge.   */
+/* ------------------------------------------------------------------------- */
+
+html[data-variant='a'] .prose {
+	.pg,
+	.cp {
+		--frame-width: 3.5px;
+		border-radius: 26px 20px 24px 18px / 20px 26px 18px 24px;
+	}
+	.pg {
+		display: grid;
+		grid-template-columns: minmax(11.5rem, 0.24fr) minmax(0, 0.36fr) minmax(0, 0.4fr);
+		grid-template-rows: minmax(0, 1fr) auto;
+		grid-template-areas:
+			'controls stage code'
+			'log stage code';
+		padding: 0;
+	}
+	/* Marker brackets: heavy on the sides and bottom, a thin line across the top. */
+	.pg::before,
+	.cp::before {
+		inset: -0.3rem -0.45rem;
+		border-width: 3px 11px 9px 13px;
+		border-radius: 52px 40px 44px 56px / 60px 54px 48px 64px;
+	}
+	/* The marker mass: slanted pink strokes sitting behind the frame's right and bottom edges. */
+	.pg::after,
+	.cp::after {
+		content: '';
+		position: absolute;
+		z-index: -1;
+		inset: 14% -2rem -1.9rem 24%;
+		border-radius: 18px 26px 30px 22px;
+		background: repeating-linear-gradient(-34deg, var(--pink) 0 0.55rem, transparent 0.55rem 0.85rem);
+		opacity: 0.95;
+		transform: rotate(-0.6deg);
+		pointer-events: none;
+	}
+	.pg .pg-code::before {
+		content: '';
+		position: absolute;
+		z-index: 6;
+		top: -1.75rem;
+		right: -0.9rem;
+		width: 3.4rem;
+		height: 3.2rem;
+		background: url('/markless/sprites/crown.png') center / contain no-repeat;
+		transform: rotate(12deg);
+		pointer-events: none;
+	}
+	.pg .pg-controls {
+		grid-area: controls;
+		position: relative;
+		display: flex;
+		flex-direction: column;
+		gap: 0;
+		padding: 2.75rem 1rem 1.5rem;
+		border-inline-end: 1.5px solid var(--ink);
+		border-radius: 26px 0 0 18px / 20px 0 0 24px;
+	}
+	.pg-controls::after {
+		content: '';
+		position: absolute;
+		z-index: 6;
+		left: -2.4rem;
+		bottom: -2.6rem;
+		width: 7.5rem;
+		height: 3.8rem;
+		background: url('/markless/sprites/squiggle-yellow.png') center / contain no-repeat;
+		transform: rotate(-10deg);
+		pointer-events: none;
+	}
+	/* The green star doodled off the frame's bottom-right corner. */
+	.pg .pg-code::after {
+		content: '';
+		position: absolute;
+		z-index: 6;
+		right: -1.9rem;
+		bottom: -2.1rem;
+		width: 4.4rem;
+		height: 4.4rem;
+		background: var(--green-star);
+		mask: var(--star-mask) center / contain no-repeat;
+		transform: rotate(12deg);
+		pointer-events: none;
+	}
+	.pg-quick,
+	.pg-rest {
+		display: flex;
+		flex-direction: column;
+		align-items: stretch;
+		gap: 1.5rem;
+		padding: 0;
+	}
+	.pg-rest {
+		margin-block-start: 1.15rem;
+		padding-block-start: 1.15rem;
+		border-block-start: 1.5px dashed var(--code-edge);
+	}
+	.pg-cell {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+		width: 100%;
+	}
+	.pg-ctl {
+		flex: 1 1 auto;
+		justify-content: space-between;
+		gap: 0.35rem;
+		min-width: 0;
+	}
+	.pg-hint {
+		flex: none;
+	}
+	.pg-name {
+		font-size: var(--step--2);
+		font-weight: 700;
+		letter-spacing: 0.02em;
+		text-transform: uppercase;
+	}
+	.pg-pick .pg-name {
+		flex: none;
+	}
+	.pg-pick-trigger {
+		min-width: 0;
+		width: 7.5rem;
+	}
+	.pg-field {
+		width: 100%;
+		box-sizing: border-box;
+	}
+	.pg-showall {
+		display: flex;
+		justify-content: space-between;
+		width: 100%;
+		margin: 1.15rem 0 0;
+		padding: 0;
+		font-weight: 700;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+	}
+	.pg-showall-caret {
+		width: 1.1em;
+		height: 1.1em;
+		opacity: 1;
+	}
+	.pg .pg-log {
+		grid-area: log;
+		padding: 0 1.15rem 1rem;
+		border-inline-end: 1.5px solid var(--ink);
+		border-radius: 0 0 0 18px / 0 0 0 24px;
+	}
+	.pg .pg-stage {
+		grid-area: stage;
+		display: grid;
+		align-content: start;
+		justify-items: center;
+		min-height: 28rem;
+		padding: 3rem 0.9rem;
+	}
+	.pg [data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger) {
+		min-height: 3.4rem;
+		padding: 0.85rem 0.9rem;
+		gap: 0.5rem;
+		font-size: 1.0625rem;
+	}
+	.pg .pg-code {
+		grid-area: code;
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+		border-inline-start: 1.5px solid var(--ink);
+		border-radius: 0 20px 18px 0 / 0 26px 24px 0;
+	}
+	.pg-panel-outer,
+	.pg-panel {
+		display: flex;
+		flex-direction: column;
+		flex: 1 1 auto;
+		min-width: 0;
+	}
+	.pg-bar {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.6rem 0.75rem;
+		padding: 0.65rem 0.8rem 0.6rem;
+		border-block-end: 1.5px solid var(--ink);
+	}
+	.pg-strip {
+		margin: 0;
+	}
+	.pg-strip-row {
+		gap: 0.8rem;
+		align-items: center;
+	}
+	/* The selected tab wears a purple marker box; the other sits quietly beside it. */
+	.pg-tab {
+		position: relative;
+		padding: 0.2em 0.5em;
+		border: 0;
+		border-radius: 2px;
+		background: transparent;
+		opacity: 0.7;
+	}
+	.pg-tab[ui-selected] {
+		box-shadow: 0 0 0 3.5px var(--purple);
+		transform: rotate(-1.2deg);
+		opacity: 1;
+	}
+	.pg-bar-pick {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		margin: 0 0 0 auto;
+		padding: 0;
+	}
+	.pg-bar-name {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+	}
+	.pg-bar-trigger {
+		width: 7rem;
+		min-height: 2.4rem;
+	}
+	.pg-clamp {
+		flex: 1 1 auto;
+	}
+	.pg-code-body {
+		max-height: 26rem;
+	}
+	.pg-shiki {
+		padding: 1rem 0.9rem 1.2rem;
+	}
+	.pg-fade {
+		bottom: 0;
+	}
+
+	/* A standalone example keeps the stage over the code inside the same frame. */
+	.cp .pg-stage {
+		padding: 2.25rem 1.5rem;
+		border-block-end: 1.5px solid var(--ink);
+		border-radius: 26px 20px 0 0 / 20px 26px 0 0;
+	}
+	.cp .pg-code {
+		border-inline-start: 0;
+		border-radius: 0 0 24px 18px / 0 0 18px 24px;
+	}
+
+	[data-family='accordion'] .trigger-icon {
+		display: none;
+	}
+}
+
+@media (max-width: 72rem) {
+	html[data-variant='a'] .prose {
+		.pg {
+			grid-template-columns: minmax(0, 1fr);
+			grid-template-rows: auto;
+			grid-template-areas:
+				'controls'
+				'log'
+				'stage'
+				'code';
+		}
+		.pg .pg-controls {
+			padding: 1rem 1.15rem;
+			border-inline-end: 0;
+			border-block-end: 1.5px solid var(--ink);
+			border-radius: 26px 20px 0 0 / 20px 26px 0 0;
+		}
+		.pg::before,
+		.cp::before {
+			inset: 0;
+			border-width: 3.5px;
+			border-radius: inherit;
+		}
+		.pg::after,
+		.cp::after {
+			inset: 50% -0.9rem -0.9rem 30%;
+		}
+		.pg-controls::after,
+		.pg .pg-code::after {
+			display: none;
+		}
+		.pg .pg-code::before {
+			content: none;
+		}
+		.pg .pg-controls::before {
+			content: '';
+			position: absolute;
+			z-index: 6;
+			top: -1.6rem;
+			right: -0.7rem;
+			width: 3rem;
+			height: 2.8rem;
+			background: url('/markless/sprites/crown.png') center / contain no-repeat;
+			transform: rotate(12deg);
+			pointer-events: none;
+		}
+		.pg-quick {
+			flex-direction: row;
+			flex-wrap: wrap;
+			align-items: center;
+			gap: 0.75rem 1.6rem;
+		}
+		.pg-quick .pg-cell {
+			width: auto;
+		}
+		.pg-quick .pg-ctl {
+			gap: 0.55rem;
+		}
+		.pg-showall {
+			width: auto;
+			margin: 0 0 0 auto;
+			gap: 0.3em;
+		}
+		.pg .pg-log {
+			padding: 0 1.15rem 0.6rem;
+			border-inline-end: 0;
+			border-radius: 0;
+		}
+		.pg .pg-stage {
+			min-height: 0;
+			padding: 2rem 1.25rem;
+			border-block-end: 1.5px solid var(--ink);
+		}
+		.pg .pg-code {
+			border-inline-start: 0;
+			border-radius: 0 0 24px 18px / 0 0 18px 24px;
+		}
+		.pg-code-body {
+			max-height: 12rem;
+		}
+	}
+}
+
+/* ------------------------------------------------------------------------- */
+/* B — Compact sheet: one bordered sheet, a CONTROLS toolbar with the         */
+/* SCENARIO select at its end, the white stage, then folder tabs on the code. */
+/* ------------------------------------------------------------------------- */
+
+html[data-variant='b'] .prose {
+	.pg,
+	.cp {
+		--frame-width: 2.5px;
+		border-radius: 12px 14px 12px 10px / 14px 10px 12px 12px;
+	}
+	.pg {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr);
+		grid-template-areas:
+			'controls'
+			'log'
+			'stage'
+			'code';
+	}
+	/* The yellow marker underline running along the bottom edge. */
+	.pg::after,
+	.cp::after {
+		content: '';
+		position: absolute;
+		z-index: -1;
+		left: -0.7rem;
+		right: -0.9rem;
+		bottom: -0.6rem;
+		height: 0.8rem;
+		background: var(--yellow);
+		clip-path: polygon(0 30%, 100% 0, 99.5% 72%, 0.5% 100%);
+		pointer-events: none;
+	}
+	.pg .pg-controls {
+		grid-area: controls;
+		display: grid;
+		gap: 0;
+		padding: 0.6rem 0.9rem;
+		border-block-end: 1.5px solid var(--ink);
+		border-radius: 12px 14px 0 0 / 14px 10px 0 0;
+	}
+	.pg-quick {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.35rem 0.7rem;
+		min-height: 2.7rem;
+		padding: 0;
+		padding-inline-end: 12.5rem;
+	}
+	.pg-name,
+	.pg-showall,
+	.pg-showall :is(.pg-showall-more, .pg-showall-less) {
+		font-family: var(--demo-sans);
+		font-size: 0.9rem;
+		font-weight: 400;
+	}
+	.pg-quick::before {
+		content: 'Controls';
+		margin-inline-end: 0;
+		font-family: 'Joy Elia', system-ui, sans-serif;
+		font-size: var(--step--2);
+		font-weight: 700;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+	}
+	.pg-cell {
+		gap: 0.2rem;
+	}
+	.pg-ctl {
+		gap: 0.45rem;
+	}
+	.pg-bar-name {
+		font-size: var(--step--2);
+	}
+	.pg-rest {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.6rem 1.5rem;
+		margin-block-start: 0.7rem;
+		padding: 0.7rem 0 0.2rem;
+		border-block-start: 1.5px dashed var(--code-edge);
+	}
+	.pg-showall {
+		margin-inline-start: 0;
+		padding: 0.3rem 0;
+		gap: 0.25em;
+	}
+	.pg-showall-caret {
+		opacity: 1;
+	}
+	.pg .pg-log {
+		grid-area: log;
+		padding: 0.5rem 1.2rem 0;
+	}
+	.pg .pg-stage {
+		grid-area: stage;
+		display: grid;
+		align-content: start;
+		justify-items: center;
+		padding: 2.25rem 1.25rem 1.5rem;
+	}
+	.pg .pg-code {
+		grid-area: code;
+		position: static;
+	}
+	.pg-code {
+		padding: 0 1rem 1.1rem;
+		background: var(--stage-white);
+		border-radius: 0 0 12px 10px / 0 0 12px 12px;
+	}
+	.pg-bar {
+		display: flex;
+		align-items: flex-end;
+		padding: 0;
+	}
+	.pg-strip {
+		margin-block-end: -2.5px;
+	}
+	.pg-strip-row {
+		gap: 0;
+		align-items: flex-end;
+	}
+	/* Folder tabs standing on the code box; the open one is filled purple. */
+	.pg-tab {
+		margin-inline-end: -2.5px;
+		padding: 0.3em 1.5em;
+		border: 2.5px solid var(--ink);
+		border-block-end: 0;
+		border-radius: 5px 5px 0 0;
+		background: var(--paper);
+		opacity: 1;
+	}
+	.pg-tab[ui-selected] {
+		background: color-mix(in oklch, var(--purple) 80%, white);
+		color: var(--on-accent);
+		box-shadow: none;
+	}
+	.pg-clamp {
+		border: 2.5px solid var(--ink);
+		border-radius: 0 6px 6px 6px;
+		background: var(--paper);
+		overflow: clip;
+	}
+	/* The purple star doodled over the code box's corner. */
+	.pg .pg-clamp::after {
+		content: '';
+		position: absolute;
+		z-index: 2;
+		right: 0.3rem;
+		bottom: 0.2rem;
+		width: 3.6rem;
+		height: 3.6rem;
+		background: var(--purple);
+		mask: var(--star-mask) center / contain no-repeat;
+		transform: rotate(-12deg);
+		pointer-events: none;
+	}
+	.pg-shiki {
+		padding: 0.9rem 1rem 1rem;
+	}
+	.pg-code-body {
+		max-height: 14rem;
+	}
+	/* The select lives at the end of the toolbar row, up in the frame's corner. */
+	.pg-bar-pick {
+		position: absolute;
+		z-index: 3;
+		top: 0.6rem;
+		right: 0.9rem;
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin: 0;
+		padding: 0;
+	}
+	.pg-bar-trigger {
+		width: 7.5rem;
+		min-height: 2.6rem;
+	}
+	.pg-bar-list {
+		inset-inline-end: 0;
+	}
+
+	.cp .pg-stage {
+		padding: 2.25rem 1.5rem 2rem;
+	}
+
+	[data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger) {
+		min-height: 3.1rem;
+		padding-block: 0.7rem;
+		padding-inline-start: 0.9rem;
+	}
+	[data-family='accordion'] :is(.panel, .faq-panel, .group-panel)[ui-open] {
+		padding-block-end: 0.85rem;
+		padding-inline-start: calc(0.9rem + 1rem + 1rem);
+	}
+}
+/* Light paper carries a white code sheet, as the mockup draws it. */
+html[data-variant='b']:not([data-theme='dark']) .prose {
+	.pg-tab,
+	.pg-clamp {
+		--paper: var(--stage-white);
+		background: var(--stage-white);
+	}
+	.pg-tab[ui-selected] {
+		background: color-mix(in oklch, var(--purple) 80%, white);
+	}
+}
+
 @media (max-width: 60rem) {
 	.variant-label {
 		display: none;
@@ -579,7 +1114,97 @@ html[data-variant='d'] [data-family='accordion'] :is(.panel, .faq-panel, .group-
 	.variant-picker a span {
 		font-size: 0.9rem;
 	}
+	html[data-variant='b'] .prose {
+		.pg .pg-controls {
+			display: flex;
+			flex-direction: column;
+			padding: 1rem;
+		}
+		.pg-quick {
+			flex-direction: column;
+			align-items: stretch;
+			gap: 0.6rem;
+			padding-inline-end: 8.5rem;
+		}
+		.pg-quick::before {
+			display: none;
+		}
+		.pg-quick .pg-cell {
+			width: 100%;
+		}
+		.pg-quick .pg-ctl {
+			flex: 1;
+			justify-content: space-between;
+			gap: 0.35rem;
+		}
+		.pg-showall {
+			align-self: flex-start;
+			margin: 0;
+		}
+		.pg-bar-pick {
+			top: 1rem;
+			right: 1rem;
+			display: grid;
+			justify-items: start;
+			gap: 0.5rem;
+			width: 7.5rem;
+		}
+		.pg-bar-trigger {
+			width: 7.5rem;
+		}
+		.pg .pg-stage {
+			padding: 1.5rem 1rem;
+		}
+	}
 }
+
+@media (max-width: 40rem) {
+	html[data-variant] .prose {
+		.pg,
+		.cp {
+			margin-inline: 0;
+			border-inline-width: 2.5px;
+		}
+		.pg-stage {
+			padding-inline: 1rem;
+		}
+		[data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger) {
+			font-size: var(--step--1);
+			padding-inline: 0.85rem;
+		}
+		.pg-bar-trigger {
+			width: 7.5rem;
+		}
+	}
+	html[data-variant='a'] .prose {
+		.pg::after,
+		.cp::after {
+			inset: 50% -0.6rem -0.7rem 30%;
+		}
+		.pg .pg-code::before {
+			width: 2.6rem;
+			height: 2.4rem;
+			top: -1.4rem;
+			right: -0.4rem;
+		}
+		.pg-bar {
+			flex-wrap: wrap;
+		}
+	}
+	html[data-variant='b'] .prose {
+		.pg .pg-clamp::after {
+			width: 2.6rem;
+			height: 2.6rem;
+		}
+		.pg-quick {
+			gap: 0.5rem 1rem;
+		}
+		.pg-quick::before {
+			width: 100%;
+		}
+	}
+}
+
 @media (max-width: 30rem) {
 	html[data-variant] :is(.crumb-section, .crumb-sep) {
 		display: none;
@@ -587,46 +1212,47 @@ html[data-variant='d'] [data-family='accordion'] :is(.panel, .faq-panel, .group-
 	html[data-variant] .header-link {
 		display: none;
 	}
-	html[data-variant] .pg-stage {
-		padding-inline: 1.25rem;
+}
+
+/* Dark ground: chalk frame, the same white stage, quieter marker colour. */
+html[data-theme='dark'][data-variant] .prose {
+	.pg::after,
+	.cp::after {
+		opacity: 0.55;
 	}
-	html[data-variant='c'] [data-family='accordion'] .pg-stage {
-		padding-inline: 1.25rem;
+	.pg-switch {
+		--switch-off: oklch(42% 0.01 80);
 	}
-	html[data-variant='d'] [data-family='accordion'] .pg-stage {
-		padding-inline: 1rem;
+	.pg-knob {
+		border-color: oklch(28% 0.015 90);
 	}
-	html[data-variant] [data-family='accordion'] :is(.trigger, .faq-trigger, .group-trigger) {
-		font-size: 1rem;
+	.pg-tab[ui-selected] {
+		color: var(--on-accent);
 	}
 }
-@media (prefers-reduced-motion: reduce) {
-	html[data-variant] .mode-select-caret,
-	html[data-variant] .trigger-icon {
-		transition: none;
+html[data-theme='dark'][data-variant='b'] .prose {
+	.pg-tab,
+	.pg-clamp {
+		border-color: oklch(28% 0.015 90);
+	}
+}
+html[data-theme='dark'][data-variant='a'] .prose {
+	.pg .pg-code::before,
+	.pg .pg-controls::before {
+		background-image: url('/markless/sprites/crown.dark.png');
+	}
+	.pg-controls::after {
+		background-image: url('/markless/sprites/squiggle-yellow.dark.png');
+	}
+	.pg-tab[ui-selected] {
+		color: var(--ink);
 	}
 }
 
-@media (max-width: 40rem) {
-	html[data-variant] .pg-bar {
-		padding-inline: 0.6rem;
-		gap: 0.6rem;
-	}
-	html[data-variant] .pg-bar-name {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		overflow: hidden;
-		clip-path: inset(50%);
-	}
-	html[data-variant] .pg-bar-trigger {
-		width: 7rem;
-	}
-	html[data-variant] .pg-tab {
-		padding-inline: 0.6rem;
-	}
-	html[data-variant] .pg-strip {
-		overflow-x: auto;
-		scrollbar-width: thin;
+@media (prefers-reduced-motion: reduce) {
+	html[data-variant] .mode-select-caret,
+	html[data-variant] .trigger-icon,
+	html[data-variant] .pg-switch {
+		transition: none;
 	}
 }
