@@ -99,7 +99,7 @@ declare namespace __MarklessTypeService {
 	 * so the list form the compiler implements is legal to compile but not to
 	 * typecheck. Separating the JSX attribute type from the part-prop type -
 	 * `IntrinsicElements` reading an `OneOrMany` twin while `PropsOf` keeps the
-	 * callable spelling - was tried and does not hold: completion-matrix row M16
+	 * callable spelling - was tried and does not hold: the intrinsic attribute contract
 	 * pins `PropsOf<Tag>` and `JSX.IntrinsicElements[Tag]` MUTUALLY assignable, and
 	 * mutual assignability makes them the same type, so the array arm cannot live
 	 * in one without reaching the other and making `onClick?.(event)` uncallable.
@@ -108,9 +108,11 @@ declare namespace __MarklessTypeService {
 	 * @markless/ui change: no family edit was needed to reach the conflict.
 	 */
 	type NativeEventAttributes<E extends globalThis.Element> = {
-		[Name in keyof ElementEventMap<E> as Name extends string
-			? `on${Capitalize<Name>}`
-			: never]?: EventHandler<ElementEventMap<E>[Name], E>;
+		[
+			Name in keyof ElementEventMap<E> as Name extends string
+				? `on${Capitalize<Name>}`
+				: never
+		]?: EventHandler<ElementEventMap<E>[Name], E>;
 	};
 
 	/**
@@ -395,49 +397,61 @@ declare namespace __MarklessTypeService {
 																'http-equiv'?: string;
 																media?: string;
 																name?: string;
+																property?: string;
 															}
-														: Tag extends 'source'
+														: Tag extends 'script'
 															? {
-																	media?: string;
-																	sizes?: string;
 																	src?: string;
-																	srcset?: string;
 																	type?: string;
+																	async?: boolean;
+																	defer?: boolean;
+																	crossorigin?:
+																		| ''
+																		| 'anonymous'
+																		| 'use-credentials';
 																}
-															: Tag extends 'select'
-																? FormAttributes & {
-																		disabled?: boolean;
-																		multiple?: boolean;
-																		required?: boolean;
-																		size?: number;
-																		value?:
-																			| string
-																			| readonly string[];
+															: Tag extends 'source'
+																? {
+																		media?: string;
+																		sizes?: string;
+																		src?: string;
+																		srcset?: string;
+																		type?: string;
 																	}
-																: Tag extends 'td'
-																	? TableCellAttributes
-																	: Tag extends 'th'
-																		? TableHeaderAttributes
-																		: Tag extends 'textarea'
-																			? FormAttributes & {
-																					cols?: number;
-																					disabled?: boolean;
-																					placeholder?: string;
-																					readonly?: boolean;
-																					required?: boolean;
-																					rows?: number;
-																					value?: string;
-																				}
-																			: Tag extends 'video'
-																				? MediaAttributes & {
-																						height?: number;
-																						playsinline?: boolean;
-																						poster?: string;
-																						width?: number;
+																: Tag extends 'select'
+																	? FormAttributes & {
+																			disabled?: boolean;
+																			multiple?: boolean;
+																			required?: boolean;
+																			size?: number;
+																			value?:
+																				| string
+																				| readonly string[];
+																		}
+																	: Tag extends 'td'
+																		? TableCellAttributes
+																		: Tag extends 'th'
+																			? TableHeaderAttributes
+																			: Tag extends 'textarea'
+																				? FormAttributes & {
+																						cols?: number;
+																						disabled?: boolean;
+																						placeholder?: string;
+																						readonly?: boolean;
+																						required?: boolean;
+																						rows?: number;
+																						value?: string;
 																					}
-																				: Tag extends keyof SVGElementTagNameMap
-																					? SvgAttributes
-																					: {};
+																				: Tag extends 'video'
+																					? MediaAttributes & {
+																							height?: number;
+																							playsinline?: boolean;
+																							poster?: string;
+																							width?: number;
+																						}
+																					: Tag extends keyof SVGElementTagNameMap
+																						? SvgAttributes
+																						: {};
 
 	type IntrinsicElementFor<Tag extends PropertyKey> = Tag extends keyof HTMLElementTagNameMap
 		? Attributes<HTMLElementTagNameMap[Tag]> & TagNameSpecificAttributes<Tag>

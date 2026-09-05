@@ -66,3 +66,11 @@ test('raw tsc is green on the same projects markless-tsc fails', () => {
 	expect(runRawTsc('body-error').status).toBe(0);
 	expect(runRawTsc('prop-error').status).toBe(0);
 });
+
+test('document attributes keep their value types', () => {
+	const result = runMarklessTsc('html-attribute-errors');
+	expect(result.status).not.toBe(0);
+	expect(result.output).toContain('head.tsrx(3,9): error TS2322');
+	expect(result.output).toContain('head.tsrx(4,11): error TS2322');
+	expect(result.output).toContain('head.tsrx(4,20): error TS2322');
+});

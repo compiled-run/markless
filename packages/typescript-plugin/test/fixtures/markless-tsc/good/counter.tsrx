@@ -12,3 +12,10 @@ export function Counter({ start, label }: CounterProps) @{
 		{label}
 	</button>
 }
+
+export function DocumentHead() @{
+	<head>
+		<meta property="og:title" content="A page title" />
+		<script src="/theme.js" type="module" async defer crossorigin="anonymous"></script>
+	</head>
+}
