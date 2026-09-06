@@ -99,6 +99,192 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 		</details>
 
 		<style>
+			.site-name {
+				display: block;
+				font-size: var(--step-1);
+				font-weight: 700;
+				color: var(--ink);
+				text-decoration: none;
+				margin-bottom: var(--space-m);
+				--shadow-color: var(--yellow);
+			}
+
+			/* The nav list is inside a <details> with no `open` attribute, so a phone gets
+			   one line of navigation instead of nineteen and the article's h1 is in the
+			   first screenful. Above 70rem the column sits beside the prose, so the
+			   disclosure is opened here and its summary is not painted. */
+			.sidebar-summary {
+				display: none;
+			}
+
+			.sidebar-disclosure::details-content {
+				content-visibility: visible;
+				block-size: auto;
+				overflow: visible;
+			}
+
+			@media (max-width: 70rem) {
+				.sidebar-summary {
+					display: block;
+					padding: 0.35em 0.7em;
+					border: 2px solid var(--ink);
+					border-radius: 8px;
+					background: var(--raised);
+					font-size: var(--step--1);
+					font-weight: 700;
+					cursor: pointer;
+				}
+
+				.sidebar-disclosure[open] .sidebar-summary {
+					margin-bottom: var(--space-xs);
+				}
+
+				.sidebar-disclosure::details-content {
+					content-visibility: hidden;
+					block-size: 0;
+					overflow: hidden;
+				}
+
+				.sidebar-disclosure[open]::details-content {
+					content-visibility: visible;
+					block-size: auto;
+					overflow: visible;
+				}
+			}
+
+			/* One hand-drawn icon per sidebar entry, cut from the owner's sheet in both
+			   variants (`tooling/cut-sprites.ts sidebar`). Both are in the markup and the
+			   theme decides which one is displayed, the same trick `.sprite` uses. */
+			.nav-icon {
+				display: inline-block;
+				width: 2.6em;
+				height: 2.6em;
+				flex: none;
+				line-height: 1;
+			}
+
+			@media (max-width: 70rem) {
+				.nav-icon {
+					width: 2em;
+					height: 2em;
+				}
+
+				.sidebar-link {
+					min-height: 2.5em;
+				}
+			}
+
+			.nav-icon-ink {
+				width: 100%;
+				height: 100%;
+				object-fit: contain;
+			}
+
+			.nav-icon-light {
+				display: var(--sprite-light);
+			}
+
+			.nav-icon-dark {
+				display: var(--sprite-dark);
+			}
+
+			/* Three columns, so the sprite, the number and the title line up down the
+			   column. The resting border is transparent and the same width as the active
+			   one, so nothing shifts when an entry becomes the current page. */
+			.sidebar-link {
+				display: grid;
+				grid-template-columns: 2.6em 1.2em 1fr;
+				gap: 0.45em;
+				align-items: center;
+				min-height: 3em;
+				padding: 0.3em 0.5em;
+				color: var(--ink);
+				text-decoration: none;
+				border: 2px solid transparent;
+				border-radius: 6px;
+				line-height: 130%;
+			}
+
+			/* Hover is a wash of the page's own ink, so one rule reads right on both
+			   grounds. The current page is not a filled row: its title alone is run over
+			   with the yellow marker, dark ink on a pastel like everything else printed on
+			   an accent. */
+			.sidebar-link:hover {
+				background: color-mix(in oklch, var(--ink) var(--hover-wash), transparent);
+			}
+
+			.sidebar-link.is-active {
+				font-weight: 700;
+			}
+
+			.sidebar-link.is-active .sidebar-text {
+				justify-self: start;
+				padding: 0.02em 0.28em;
+				margin-left: -0.28em;
+				background: var(--yellow);
+				color: var(--on-accent);
+				border-radius: 3px 5px 3px 6px;
+				transform: rotate(-0.8deg);
+			}
+
+			/* The site mark: the markless mug beside the word. */
+			.site-mark {
+				display: flex;
+				gap: 0.5rem;
+				align-items: center;
+				margin-bottom: var(--space-m);
+				text-decoration: none;
+			}
+
+			.site-mark .site-name {
+				margin-bottom: 0;
+			}
+
+			.sidebar {
+				position: fixed;
+				left: var(--space-s-l);
+				top: calc(var(--header-height) + var(--space-s));
+				width: 16rem;
+				max-height: calc(100vh - var(--header-height) - var(--space-s));
+				overflow-y: auto;
+				/* The rail scrolls, but its track is not part of the drawing: the fade at the
+				   bottom (T017) is what says there is more list under the fold. */
+				scrollbar-width: none;
+				padding-block: var(--space-s);
+				font-size: var(--step--1);
+			}
+
+			.sidebar::-webkit-scrollbar {
+				display: none;
+			}
+
+			@media (min-width: 70.01rem) and (max-height: 62rem) {
+				.sidebar {
+					mask-image: linear-gradient(to bottom, #000 calc(100% - 3rem), transparent 100%);
+				}
+			}
+
+			@media (max-width: 70rem) {
+				.sidebar {
+					position: static;
+					width: auto;
+					max-height: none;
+					max-width: 68ch;
+					margin-inline: auto;
+					padding-block: var(--space-s) 0;
+				}
+			}
+
+			.prose .sidebar a {
+				text-decoration: none;
+			}
+
+			html .prose .sidebar-link:is(:hover, :focus-visible) {
+				background: var(--quiet-fill);
+				outline: 1px dashed var(--ink);
+				outline-offset: -3px;
+			}
+
 			.sidebar {
 				padding-block: 0.5rem 1rem;
 				mask-image: none;

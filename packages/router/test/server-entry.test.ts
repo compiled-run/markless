@@ -43,6 +43,71 @@ describe('server entry with async compiled artifacts', () => {
 		expect(html).toContain('<body>');
 	});
 
+	it('links the document stylesheets on every route ahead of the route’s own, once', async () => {
+		const entry = createServerEntry({
+			documentStylesheets: ['/assets/site-header.css', '/assets/document.css'],
+			routeModulePreloads: { 'pages/index.tsrx': [] },
+			routeSsrModulePreloads: { 'pages/index.tsrx': [] },
+			routeStylesheets: {
+				'pages/index.tsrx': ['/assets/document.css', '/assets/index-page.css'],
+			},
+			documentModuleLoader: async () => ({
+				default: {
+					renderSsr: async (props: { readonly children: string }) => ({
+						html: `<html><head></head><body>${props.children}</body></html>`,
+					}),
+				},
+			}),
+			pageModuleLoaders: {
+				'pages/index.tsrx': async () => ({
+					default: { renderSsr: async () => ({ html: '<main>Styled</main>' }) },
+				}),
+			},
+			routeFileIds: ['pages/index.tsrx'],
+		});
+
+		const html = await (await entry.fetch(new Request('http://localhost/'))).text();
+		const hrefs = [...html.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((m) => m[1]);
+
+		expect(hrefs).toEqual([
+			'/assets/site-header.css',
+			'/assets/document.css',
+			'/assets/index-page.css',
+		]);
+	});
+
+	it('links the document artifact’s own head injections (dev scoped styles) ahead of the page’s', async () => {
+		const link = (href: string) => ({
+			tag: 'link',
+			location: 'head' as const,
+			attributes: { rel: 'stylesheet', href },
+		});
+		const entry = createServerEntry({
+			documentModuleLoader: async () => ({
+				default: {
+					headInjections: [link('/dev/site-header.css'), link('/dev/document.css')],
+					renderSsr: async (props: { readonly children: string }) => ({
+						html: `<html><head></head><body>${props.children}</body></html>`,
+					}),
+				},
+			}),
+			pageModuleLoaders: {
+				'pages/index.tsrx': async () => ({
+					default: {
+						headInjections: [link('/dev/document.css'), link('/dev/island.css')],
+						renderSsr: async () => ({ html: '<main>Styled</main>' }),
+					},
+				}),
+			},
+			routeFileIds: ['pages/index.tsrx'],
+		});
+
+		const html = await (await entry.fetch(new Request('http://localhost/'))).text();
+		const hrefs = [...html.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((m) => m[1]);
+
+		expect(hrefs).toEqual(['/dev/site-header.css', '/dev/document.css', '/dev/island.css']);
+	});
+
 	it('logs render errors before serving the 500 status page', async () => {
 		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 		const entry = createServerEntry({

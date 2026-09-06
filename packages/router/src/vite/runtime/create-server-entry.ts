@@ -25,6 +25,8 @@ export interface ServerEntryOptions {
 	readonly routeModulePreloads?: Record<string, readonly ModulePreloadInput[]>;
 	readonly routeSsrModulePreloads?: Record<string, readonly ModulePreloadInput[]>;
 	readonly routeStylesheets?: Record<string, readonly string[]>;
+	// The document shell's scoped CSS, linked on every route ahead of the route's own.
+	readonly documentStylesheets?: readonly string[];
 	readonly documentModuleLoader: (() => Promise<unknown>) | undefined;
 	readonly pageModuleLoaders: Record<string, () => Promise<unknown>>;
 	readonly routeFileIds: readonly string[];
@@ -189,7 +191,8 @@ export function createServerEntry(options: ServerEntryOptions) {
 			pageProps,
 			file,
 			options.navigationEntryPath,
-			options.routeStylesheets?.[file],
+			pageStylesheets(options, file),
+			documentModule?.default?.headInjections ?? [],
 		);
 		const routedArtifact = options.prerenderWakeEntryPath
 			? { ...pageArtifact, prerenderWakeModuleUrl: options.prerenderWakeEntryPath }
@@ -316,6 +319,26 @@ function assertCurrentRouteAssets(options: ServerEntryOptions): void {
 // Wraps the compiled page renderSsr with the route script, the lazy Link
 // bridge, and the serialized page-prop cell, FORWARDING the render context
 // so streaming reaches the page's async boundaries (T107).
+function dedupeHeadLinks(
+	injections: ReadonlyArray<RenderHeadInjection>,
+): ReadonlyArray<RenderHeadInjection> {
+	const seen = new Set<string>();
+	return injections.filter((injection) => {
+		const href = injection.tag === 'link' ? injection.attributes?.href : undefined;
+		if (typeof href !== 'string') return true;
+		if (seen.has(href)) return false;
+		seen.add(href);
+		return true;
+	});
+}
+
+function pageStylesheets(options: ServerEntryOptions, file: string): readonly string[] | undefined {
+	const documentHrefs = options.documentStylesheets ?? [];
+	const routeHrefs = options.routeStylesheets?.[file];
+	if (documentHrefs.length === 0) return routeHrefs;
+	return [...new Set([...documentHrefs, ...(routeHrefs ?? [])])];
+}
+
 function routedPageArtifact(
 	renderSsr: SsrRender,
 	baseArtifact: SsrArtifact | undefined,
@@ -323,17 +346,18 @@ function routedPageArtifact(
 	file: string,
 	navigationEntryPath: string | undefined,
 	stylesheetHrefs: readonly string[] | undefined,
+	documentHeadInjections: ReadonlyArray<RenderHeadInjection> = [],
 ) {
-	const headInjections = [
+	// The document's own injections (dev links its scoped-style closure there) come first: the shell's CSS precedes the page's.
+	const headInjections = dedupeHeadLinks([
+		...documentHeadInjections,
 		...(baseArtifact?.headInjections ?? []),
-		...(stylesheetHrefs ?? []).map(
-			(href): RenderHeadInjection => ({
-				tag: 'link',
-				location: 'head',
-				attributes: { rel: 'stylesheet', href },
-			}),
-		),
-	];
+		...(stylesheetHrefs ?? []).map((href): RenderHeadInjection => ({
+			tag: 'link',
+			location: 'head',
+			attributes: { rel: 'stylesheet', href },
+		})),
+	]);
 	return {
 		resumeModuleUrl: baseArtifact?.resumeModuleUrl,
 		inlineResumerSources: baseArtifact?.inlineResumerSources,

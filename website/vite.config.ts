@@ -13,7 +13,6 @@ export default {
 	// uiDemos runs before router(): it rewrites the .mdx source router() parses.
 	// highlightMdx runs after router(): it rewrites the module router() emits.
 	lint: {
-		ignorePatterns: ['public/demos/**/build/**'],
 		rules: {
 			'no-restricted-imports': [
 				'error',

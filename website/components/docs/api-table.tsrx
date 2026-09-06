@@ -22,7 +22,7 @@ export default function ApiTable({
 }) @{
 	const source = rows ?? apiRows(family ?? '', part ?? '');
 
-	// `@if` hangs this build (see components/demos/callout.tsrx), so every choice
+	// `@if` hangs this build (see components/docs/callout.tsrx), so every choice
 	// here is a class picked in TypeScript rather than an element left out.
 	const painted = source.map((row) => ({
 		name: row.name,
@@ -54,6 +54,11 @@ export default function ApiTable({
 	const notes = painted.length === 0 ? [{ id: 'none', text: 'No props of its own.' }] : [];
 
 	<div class="api-part">
+		<style>
+			.api-prop.is-required {
+				font-weight: 700;
+			}
+		</style>
 		@for (const note of notes; key note.id) {
 			<p class="api-none">{note.text}</p>
 		}

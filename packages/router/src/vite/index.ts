@@ -50,6 +50,7 @@ const NAVIGATION_ENTRY_ORIGIN = '/entries/client-entry.ts';
 const NAVIGATION_ENTRY_PATH_ID = 'virtual:markless-router/navigation-entry-path';
 const ROUTE_PRELOADS_ID = 'virtual:markless-router/route-preloads';
 const ROUTE_PRELOADS_PLACEHOLDER = '__MARKLESS_ROUTER_ROUTE_PRELOADS__';
+const DOCUMENT_STYLESHEETS_PLACEHOLDER = '__MARKLESS_ROUTER_DOCUMENT_STYLESHEETS__';
 const SERVER_ENTRY_ID = 'virtual:markless-router/server-entry';
 const ROUTE_HREF_ID = 'virtual:markless-router/route-href';
 const ROUTER_OPTIONS_ID = 'virtual:markless-router/options';
@@ -273,6 +274,16 @@ function routerConfigPlugin(
 			order: 'post',
 			handler(_options, bundle) {
 				if (this.environment?.config.consumer !== 'client') {
+					if (this.environment?.config.consumer === 'server') {
+						patchDocumentStylesheetsInBundle(
+							bundle,
+							documentStylesheetsFromBundle(
+								bundle,
+								routePreloads.root,
+								routePreloads.base,
+							),
+						);
+					}
 					return;
 				}
 
@@ -517,7 +528,6 @@ function isPatternList<Pattern>(value: Pattern | readonly Pattern[]): value is r
 	return Array.isArray(value);
 }
 
-
 function withRequestFileBuildPlugin(config: unknown, root: string): Record<string, unknown> {
 	const configObject = isRecord(config) ? config : {};
 	const plugins = Array.isArray(configObject.plugins)
@@ -737,7 +747,7 @@ function serverEntrySource(root: string): string {
 		`import { resumeEntryPath } from '${RESUME_ENTRY_PATH_ID}${query}';`,
 		`import { prerenderWakeEntryPath } from '${PRERENDER_WAKE_ENTRY_PATH_ID}${query}';`,
 		`import { navigationEntryPath } from '${NAVIGATION_ENTRY_PATH_ID}${query}';`,
-		`import { routeModulePreloads, routeSsrModulePreloads, routeStylesheets } from '${ROUTE_PRELOADS_ID}${query}';`,
+		`import { documentStylesheets, routeModulePreloads, routeSsrModulePreloads, routeStylesheets } from '${ROUTE_PRELOADS_ID}${query}';`,
 		`import { pageModuleLoaders, routeFileIds } from '${ROUTE_DISCOVERY_ID}${query}';`,
 		`const documentModuleLoaders = import.meta.glob(['/document.tsrx']);`,
 		`const entry = createServerEntry({`,
@@ -748,6 +758,7 @@ function serverEntrySource(root: string): string {
 		`  routeModulePreloads,`,
 		`  routeSsrModulePreloads,`,
 		`  routeStylesheets,`,
+		`  documentStylesheets,`,
 		`  documentModuleLoader: documentModuleLoaders['/document.tsrx'],`,
 		`  pageModuleLoaders,`,
 		`  routeFileIds,`,
@@ -774,10 +785,14 @@ function routePreloadsSource(state: RoutePreloadState, client: boolean): string 
 		client || !state.persisted
 			? { navigation: state.routes.navigation, ssr: state.routes.ssr }
 			: state.routes;
+	// The document module lives only in the server build, so its stylesheet
+	// closure is patched in by that build's generateBundle, never the manifest.
 	const routeStylesheetExport = client
 		? []
 		: [
 				`export const routeStylesheets = ${state.persisted ? 'routePreloadData.styles ?? {}' : 'undefined'};`,
+				`const documentStylesheetsJson = globalThis.__marklessRouterDocumentStylesheetsJson ?? ${JSON.stringify(DOCUMENT_STYLESHEETS_PLACEHOLDER)};`,
+				`export const documentStylesheets = documentStylesheetsJson === ${JSON.stringify(DOCUMENT_STYLESHEETS_PLACEHOLDER)} ? [] : JSON.parse(documentStylesheetsJson);`,
 			];
 	return [
 		`const routePreloadsJson = globalThis.__marklessRouterRoutePreloadsJson ?? ${JSON.stringify(ROUTE_PRELOADS_PLACEHOLDER)};`,
@@ -815,6 +830,45 @@ function patchRoutePreloadsInBundle(
 	for (const chunk of outputChunks(bundle)) {
 		if (!chunk.code?.includes(ROUTE_PRELOADS_PLACEHOLDER)) continue;
 		chunk.code = chunk.code.replace(ROUTE_PRELOADS_PLACEHOLDER, replacement);
+	}
+}
+
+// The document renders the shell every page sits in, so its scoped CSS - its
+// own block and those of the components it renders - is linked on every route,
+// ahead of the route's own sheets (a module's CSS precedes its importers').
+function documentStylesheetsFromBundle(
+	bundle: Record<string, unknown>,
+	root: string,
+	base: string,
+): readonly string[] {
+	const chunks = outputChunks(bundle);
+	const chunksByFileName = new Map(chunks.map((chunk) => [chunk.fileName, chunk]));
+	const documentFile = join(root, 'document.tsrx');
+	const documentChunks = chunks.filter((chunk) =>
+		[chunk.facadeModuleId, ...(chunk.moduleIds ?? [])].some(
+			(id) =>
+				id !== null &&
+				id !== undefined &&
+				decodePath(parseURL(id).pathname) === documentFile,
+		),
+	);
+	if (documentChunks.length === 0) return [];
+	return routeStylesheetsForChunks(
+		documentChunks,
+		new Set(documentChunks.map((chunk) => chunk.fileName)),
+		chunksByFileName,
+		base,
+	);
+}
+
+function patchDocumentStylesheetsInBundle(
+	bundle: Record<string, unknown>,
+	stylesheets: readonly string[],
+): void {
+	const replacement = jsStringLiteralContent(JSON.stringify(stylesheets));
+	for (const chunk of outputChunks(bundle)) {
+		if (!chunk.code?.includes(DOCUMENT_STYLESHEETS_PLACEHOLDER)) continue;
+		chunk.code = chunk.code.replace(DOCUMENT_STYLESHEETS_PLACEHOLDER, replacement);
 	}
 }
 
@@ -901,10 +955,7 @@ function routeModulePreloadsFromBundle(input: {
 		// the first interaction must fetch ZERO framework chunks.
 		if (input.prerenderWakeChunk) {
 			includeChunk(ssrFileNames, chunksByFileName, input.prerenderWakeChunk.fileName);
-			for (const fileName of routeScopedDynamicImports(
-				input.prerenderWakeChunk,
-				routeFile,
-			)) {
+			for (const fileName of routeScopedDynamicImports(input.prerenderWakeChunk, routeFile)) {
 				includeChunk(ssrFileNames, chunksByFileName, fileName, true);
 			}
 		}

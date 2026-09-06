@@ -3,6 +3,24 @@ import Preview from '../../../ui/preview.tsrx';
 
 export default function CheckboxForm({ shows }: { readonly shows: string }) @{
 	<Preview shows={shows}>
+		<style>
+			.demo-button {
+				align-self: flex-start;
+				font-size: var(--step-0);
+				padding: 0.3em 0.9em;
+				color: var(--on-accent);
+				background: var(--green-soft);
+				border: 2px solid var(--ink);
+				border-radius: 2px;
+				box-shadow: 3px 3px 0 var(--ink);
+				cursor: pointer;
+			}
+
+			.demo-button:active {
+				transform: translate(3px, 3px);
+				box-shadow: none;
+			}
+		</style>
 		<form style="display:grid; gap:0.8em; width:min(30rem,100%);">
 			<checkbox.root required name="newsletter" value="weekly" style="display:flex; gap:0.7em; align-items:center;">
 				<checkbox.field />

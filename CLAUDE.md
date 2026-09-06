@@ -7,7 +7,7 @@
 Agent rules, skills, and MCP config for this repo are generated from `.ruler/` by [Ruler](https://github.com/intellectronica/ruler). Edit sources in `.ruler/` and run `pnpm rules` to sync; never edit generated files directly.
 
 A change known to affect a consuming application must pass that application's checks before it lands; the framework's own suite passing is not sufficient evidence.
-Every write-task verify array must include `pnpm exec tsc --noEmit -p tsconfig.json`; type red or test red blocks task completion, so never report a write task complete on a tree that does not typecheck or whose tests fail.
+Every write-task verify array must include `pnpm run typecheck`, the Markless-aware TypeScript checker; type red or test red blocks task completion, so never report a write task complete on a tree that does not typecheck or whose tests fail.
 Protocol and config facts are imported from their owning package, never restated as literals.
 The task packet or active goal card defines scope. Stay inside its named files and preserve unrelated work.
 If a required decision is missing from the packet, return blocked; do not improvise.
@@ -68,6 +68,10 @@ Family source in packages/headless/components (`*.tsrx` and helper `.ts` beside 
 ## @markless/ui CSS and recursion
 
 Family CSS defaults (anchor positioning, hidden-until-open, stacking) live in a `<style>` block inside the part's `.tsrx` under `@layer markless`, keyed off `ui-*` attributes; JS never builds CSS strings. Nesting families recurse with the same parts (`item` > `content` > `item`), each nesting `item` rooting its own instance — no second root. See `packages/headless/components/SPEC.md` "CSS defaults" and "Recursive composition".
+
+## Website CSS lives with its component
+
+A rule whose subject element is rendered by exactly one component belongs in a `<style>` block inside that component's `.tsrx` (the compiler scopes it with a per-module hash class), not in `website/styles/global.css` or `brand.css`. The global stylesheets keep only what one component cannot own: tokens on `:root`/`html`, typography for MDX prose, markup emitted by tooling or generated playground modules, and classes several components share. Before adding a global rule, name the file that renders its subject; if there is one, put the rule there.
 
 ## @markless/ui timing
 

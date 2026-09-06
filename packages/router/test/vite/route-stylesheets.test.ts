@@ -160,3 +160,54 @@ test('collects stylesheets from a route’s dynamic and symbol chunks, and only 
 		await rm(workspace, { force: true, recursive: true });
 	}
 });
+
+// The document module lives only in the server build, so its scoped CSS (its
+// own block and its rendered components') never reaches the client manifest.
+// The server build patches that closure into the route-preloads module, and
+// the server entry links it on every route ahead of the route's own sheets.
+test('the server build patches the document chunk’s stylesheet closure, dependencies first, and nothing route-owned', async () => {
+	const root = '/repo/app';
+	const resolvedConfig = {
+		base: '/app/',
+		command: 'build',
+		environments: {
+			browser: { consumer: 'client', build: { outDir: 'dist/client' } },
+			ssr: { consumer: 'server', build: { outDir: join(root, 'dist/server') } },
+		},
+		root,
+	};
+	const bundle = {
+		'index.mjs': chunk({
+			code: `const documentStylesheetsJson = "__MARKLESS_ROUTER_DOCUMENT_STYLESHEETS__";`,
+			fileName: 'index.mjs',
+			imports: ['_ssr/document.mjs', '_ssr/gallery.mjs'],
+		}),
+		'_ssr/document.mjs': chunk({
+			fileName: '_ssr/document.mjs',
+			imports: ['_ssr/site-header.mjs'],
+			moduleIds: [join(root, 'document.tsrx')],
+			viteMetadata: { importedCss: ['assets/document.css'] },
+		}),
+		'_ssr/site-header.mjs': chunk({
+			fileName: '_ssr/site-header.mjs',
+			moduleIds: [join(root, 'components/site-header.tsrx')],
+			viteMetadata: { importedCss: ['assets/site-header.css'] },
+		}),
+		'_ssr/gallery.mjs': chunk({
+			fileName: '_ssr/gallery.mjs',
+			moduleIds: [join(root, 'pages/gallery.tsrx')],
+			viteMetadata: { importedCss: ['assets/gallery-page.css'] },
+		}),
+	};
+
+	const plugins = flattenPlugins([router()]);
+	const configPlugin = plugins.find((plugin) => plugin.name === 'markless-router:vite');
+	const serverContext = { environment: { config: resolvedConfig.environments.ssr } };
+
+	configPlugin?.configResolved?.(resolvedConfig as never);
+	await hookHandler(configPlugin?.generateBundle)?.call(serverContext, {}, bundle);
+
+	expect(bundle['index.mjs'].code).toBe(
+		`const documentStylesheetsJson = "[\\"/app/assets/site-header.css\\",\\"/app/assets/document.css\\"]";`,
+	);
+});

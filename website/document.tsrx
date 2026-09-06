@@ -35,6 +35,25 @@ export default function Document({
 			<script src="/markless/theme.js"></script>
 		</head>
 		<body>
+			<style>
+				/* Unconditional rules first, the narrow-viewport media queries last: a query adds no specificity. */
+				.site-shell {
+					padding-inline: var(--space-s-l);
+				}
+
+				@media (max-width: 96rem) {
+					.site-shell {
+						padding-left: calc(16rem + 2 * var(--space-s-l));
+						padding-right: calc(11rem + 2 * var(--space-s-l));
+					}
+				}
+
+				@media (max-width: 70rem) {
+					.site-shell {
+						padding-inline: var(--space-s-l);
+					}
+				}
+			</style>
 			<SiteHeader pathname={pathname} />
 			<div class="site-shell">
 				<main class="prose">

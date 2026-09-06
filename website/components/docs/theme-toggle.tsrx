@@ -1,36 +1,52 @@
-// The light/dark control. `storage()` is the whole mechanism: assigning to it
-// writes `localStorage.theme` and stamps `data-theme` on `<html>`, which is the
-// attribute every dark rule in styles/global.css already hangs off, and the seed
-// script the router puts in the head applies the stored value before the first
-// paint, so there is no flash.
-//
-// One thing about the shape of this file is forced, not chosen.
-//
-// There are two buttons rather than one, and CSS shows whichever matches the
-// theme the page is currently painted in. A single button would have to derive
-// its label from the current value, and a derived binding does not resume
-// (NOTES.md finding 18) — and a fixed "flip it" assignment cannot know what a
-// reader on `system` is actually looking at, so the first click would do
-// nothing for half of them. Each button assigns one constant, which is the kind
-// of update the resume payload performs on its own.
-//
-// Each button carries the drawing of the theme it is standing in, not the one
-// it switches to: the reader sees the sun while the page is light and the moon
-// while it is dark, and the button's label is what says where the click goes.
-// The two `<img>`s are the same swap the two buttons already are — CSS shows
-// one of them — because CSS cannot swap an image `src`.
-//
-// The fallback is `system` rather than `light` on purpose: the seed script
-// stamps the fallback when nothing is stored, and stamping `light` there would
-// override `@media (prefers-color-scheme: dark)` for every reader who never
-// chose. `html:not([data-theme='light'])` already treats `system` as "use the
-// operating system", so the default keeps working.
 import { storage } from '@markless/core';
 
 export default function ThemeToggle() @{
 	let theme = storage('theme', 'system');
 
 	<span class="theme-toggle-island">
+		<style>
+			.theme-toggle-island {
+				position: fixed;
+				top: 0;
+				right: var(--space-s-l);
+				z-index: 40;
+				block-size: var(--header-height);
+				display: flex;
+				align-items: center;
+				font-size: var(--step--1);
+			}
+
+			/* The drawing inside the button. It is a die-cut sticker with its own white
+			   border and shadow, so it is given the button's whole box and no chrome of its
+			   own: the ring the button used to draw around a glyph would be a second edge
+			   around an edge. */
+			.theme-toggle-icon {
+				display: block;
+				inline-size: var(--theme-toggle-size);
+				block-size: var(--theme-toggle-size);
+				object-fit: contain;
+			}
+
+			/* Which of the two buttons is the one to offer is the same question as which
+			   palette is painted, so these rules are the palette's rules again, in step with
+			   the pair further down. `system` and "no attribute" both mean "ask the
+			   operating system", which is why neither is named. */
+			.theme-toggle-to-dark {
+				display: inline-flex;
+			}
+
+			.theme-toggle-to-light {
+				display: none;
+			}
+
+			html[data-theme='dark'] .theme-toggle-to-dark {
+				display: none;
+			}
+
+			html[data-theme='dark'] .theme-toggle-to-light {
+				display: inline-flex;
+			}
+		</style>
 		<button
 			class="theme-toggle theme-toggle-to-dark"
 			type="button"

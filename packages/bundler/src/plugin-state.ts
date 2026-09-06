@@ -85,7 +85,7 @@ export function createPluginState() {
 	// Only an owner's transform registers its generated modules, and Vite reuses a
 	// soft-invalidated owner's cached result, so a fetch can miss with nothing left to
 	// re-register it; without regenerating here Vite reads the id off disk as a filename.
-	const regeneratingVirtualModules = new Set<string>();
+	const regeneratingVirtualModules = new Map<string, Promise<void>>();
 	// An edit clears the child's capture metadata, and Vite can answer its re-request from cache.
 	const recoveringChildMetadata = new Set<string>();
 	const delegateModules = createDelegateModuleCache();

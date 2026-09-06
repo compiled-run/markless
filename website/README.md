@@ -148,8 +148,12 @@ screenshots into the markless repo's goal notes.
 
 - `pages/markless/**.mdx` — one file per page. Prose is markdown; interactive pieces are default
   exports of `.tsrx` files, imported at the top and used as top-level blocks.
-- `components/demos/` — the demos. `Counter.tsrx` is the teaching component shown verbatim on the
-  page; `CounterDemo.tsrx` wraps it in the playground frame, because MDX cannot nest components.
+- `components/demos/` — the demos, grouped by the docs section that shows them (`home/`,
+  `how-it-works/`, `start/`, `concepts/`, `build/`, `router/`) and, for UI families, `ui/<family>/`
+  with `basic.tsrx` as the hero and one file per further example. In a section folder
+  `counter.tsrx` is the teaching component shown verbatim on the page and `counter-demo.tsrx` wraps
+  it in the playground frame, because MDX cannot nest components. `callout.tsrx` and
+  `collapsible.tsrx` are docs chrome, not demos, and live in `components/docs/`.
 - `components/docs/sidebar.tsrx`, `document.tsrx`, `nav.ts` — the chrome. `nav.ts` is the single
   source for the page list: the sidebar loops it, and the breadcrumb, the pager and the witness read
   it. Adding a page means adding an entry there and nothing else. `document.tsrx` keeps a plain

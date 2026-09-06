@@ -26,6 +26,161 @@ export default function LikeHeart() @{
 	let likes = state(0);
 
 	<div class="like-heart">
+		<style>
+			/* Pressed-state transitions, not keyframes on a toggled class: the press snaps each piece onto the heart, release lets it travel out and fade. */
+			.like-heart {
+				display: flex;
+				justify-content: center;
+				margin-top: var(--space-l);
+			}
+
+			@media (min-width: 70.01rem) {
+				/* Beside the rail rather than in it: the rail is static HTML the build writes
+				   into the page, and an island cannot be rendered inside it. Fixed to the
+				   same column, at the foot of the strip the shell reserves for it. */
+				.like-heart {
+					position: fixed;
+					right: var(--space-s-l);
+					width: 11rem;
+					justify-content: flex-start;
+					margin: 0;
+					top: calc(var(--header-height) + var(--space-s) + 21rem);
+				}
+			}
+
+			@media (min-width: 70.01rem) {
+				@supports (position-anchor: --on-this-page) {
+					.like-heart {
+						position-anchor: --on-this-page;
+						top: calc(anchor(bottom) + var(--space-s));
+						left: anchor(left);
+						right: auto;
+					}
+				}
+			}
+
+			.like-heart-button {
+				position: relative;
+				display: inline-flex;
+				align-items: center;
+				gap: 0.15rem;
+				padding: 0.25rem 0.4rem;
+				border: 0;
+				background: none;
+				font: inherit;
+				color: var(--ink);
+				cursor: pointer;
+			}
+
+			.like-heart-face {
+				position: relative;
+				display: inline-flex;
+				flex: none;
+			}
+
+			.like-heart-image {
+				display: block;
+				width: 3.2rem;
+				height: auto;
+				rotate: -5deg;
+				transition:
+				scale 600ms cubic-bezier(0.2, 1.7, 0.45, 1),
+				rotate 600ms cubic-bezier(0.2, 1.7, 0.45, 1);
+			}
+
+			.like-heart-button:hover .like-heart-image {
+				scale: 1.07;
+			}
+
+			.like-heart-button:active .like-heart-image {
+				scale: 0.82;
+				rotate: 7deg;
+				transition-duration: 0s;
+			}
+
+			.like-burst {
+				position: absolute;
+				inset: 0;
+				pointer-events: none;
+			}
+
+			.like-burst-piece {
+				position: absolute;
+				left: 50%;
+				top: 50%;
+				width: 1.35rem;
+				height: 1.35rem;
+				margin: -0.675rem 0 0 -0.675rem;
+				opacity: 0;
+				transition:
+				translate 620ms cubic-bezier(0.15, 0.85, 0.3, 1),
+				rotate 620ms ease-out,
+				scale 620ms ease-out,
+				opacity 620ms ease-out;
+			}
+
+			.like-burst-piece-1 {
+				translate: -2.1rem -1.9rem;
+				rotate: -22deg;
+			}
+
+			.like-burst-piece-2 {
+				translate: 2rem -2.1rem;
+				rotate: 18deg;
+			}
+
+			.like-burst-piece-3 {
+				translate: -2.3rem 1.2rem;
+				rotate: -12deg;
+			}
+
+			.like-burst-piece-4 {
+				translate: 2.2rem 1.3rem;
+				rotate: 24deg;
+			}
+
+			.like-heart-button:active .like-burst-piece {
+				opacity: 1;
+				translate: 0 0;
+				rotate: 0deg;
+				scale: 0.4;
+				transition-duration: 0s;
+			}
+
+			/* The accents are pastels meant to be printed on, not printed with, so the
+			   count is the page's ink pulled towards pink rather than the pink itself. */
+			.like-heart-count {
+				font-size: var(--step-0);
+				color: color-mix(in oklch, var(--pink) 55%, var(--ink));
+				font-variant-numeric: tabular-nums;
+			}
+
+			.like-heart-plus {
+				position: absolute;
+				right: -0.35rem;
+				top: 0.1rem;
+				font-size: var(--step--2);
+				color: color-mix(in oklch, var(--pink) 55%, var(--ink));
+				opacity: 0;
+				translate: 0 -1.2rem;
+				transition:
+				translate 700ms ease-out,
+				opacity 700ms ease-out;
+				pointer-events: none;
+			}
+
+			.like-heart-button:active .like-heart-plus {
+				opacity: 1;
+				translate: 0 0;
+				transition-duration: 0s;
+			}
+
+			.like-burst-piece img {
+				width: 100%;
+				height: 100%;
+				object-fit: contain;
+			}
+		</style>
 		<button
 			class="like-heart-button"
 			type="button"

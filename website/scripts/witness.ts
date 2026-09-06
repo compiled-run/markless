@@ -628,14 +628,16 @@ try {
 			'clicking a label moves the highlight to one line',
 			String(await litLines.count()),
 		);
-		// The widget shows `components/demos/counter.tsrx` line for line, so the
+		// The widget shows `components/demos/concepts/counter.tsrx` line for line, so the
 		// page carries one counter file rather than two that differ. The counter
 		// renders a single element, so the fragment is taught from its own
 		// example further down the page and the widget has no third label.
 		const widgetFile = (await page.locator('.file-lines .file-line').allTextContents())
 			.map((line) => line.trim())
 			.filter((line) => line !== '');
-		const counterFile = (await readFile(`${root}/components/demos/counter.tsrx`, 'utf8'))
+		const counterFile = (
+			await readFile(`${root}/components/demos/concepts/counter.tsrx`, 'utf8')
+		)
 			.split('\n')
 			.map((line) => line.trim())
 			.filter((line) => line !== '');

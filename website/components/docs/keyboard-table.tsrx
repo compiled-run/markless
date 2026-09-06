@@ -61,6 +61,53 @@ export default function KeyboardTable({
 	// A script is a legal child of <table>, so the probe runs while the parser is
 	// still above the rows and no cap is ever painted in the wrong form.
 	<table class="keyboard-table">
+		<style>
+			/* The heavier bottom edge is what makes a chip read as a key rather than a bordered word. */
+			.kbd-cap {
+				display: inline-flex;
+				align-items: baseline;
+				gap: 0.35em;
+			}
+
+			.kbd-cap + .kbd-cap {
+				margin-left: 0.35em;
+			}
+
+			/* Empty on the first keycap of a row, so it reserves nothing there. */
+			.kbd-join:empty {
+				display: none;
+			}
+
+			/* Both forms of every cap are in the HTML and one is shown, because the server
+			   has no user agent to read. With no class stamped yet the plain-word form
+			   stands, since it is the one that reads on either keyboard. */
+			.kbd.is-mac {
+				display: none;
+			}
+
+			html.is-mac .kbd.is-mac {
+				display: inline-block;
+			}
+
+			html.is-mac .kbd.is-other {
+				display: none;
+			}
+
+			.kbd {
+				display: inline-block;
+				padding: 0.05em 0.5em;
+				font-family: inherit;
+				font-size: var(--step--1);
+				font-weight: 700;
+				line-height: 1.7;
+				color: var(--ink);
+				background: var(--code-surface);
+				border: 2px solid var(--code-edge);
+				border-bottom-width: 3px;
+				border-radius: 6px;
+				white-space: nowrap;
+			}
+		</style>
 		<script>{PLATFORM_PROBE}</script>
 		<thead>
 			<tr>

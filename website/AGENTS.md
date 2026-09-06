@@ -8,7 +8,7 @@ not in `styles/global.css`. Reach for `global.css` only for genuinely
 site-wide rules: tokens, the type ramp, the prose column, the paper grain,
 code-fence surfaces, and the header/sidebar chrome.
 
-`components/demos/hero-card.tsrx` and `components/docs/opener-line.tsrx` are
+`components/demos/home/hero-card.tsrx` and `components/docs/opener-line.tsrx` are
 the pattern to copy. Global tokens (`var(--ink)`, `var(--step--1)`, the space
 scale) resolve inside scoped styles as usual.
 

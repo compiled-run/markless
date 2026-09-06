@@ -12,7 +12,7 @@ import {
 import type { ImportedChild } from '../plugin-state.ts';
 import { symbolVirtualModuleSourceFile } from '../source-module.ts';
 import { marklessVirtualModuleSourceFile } from '../transform.ts';
-import type { MarklessEnvironment, MarklessVirtualModule } from '../types.ts';
+import type { MarklessEnvironment } from '../types.ts';
 import {
 	TSRX_SOURCE_FILE,
 	isRelativeImport,
@@ -126,6 +126,9 @@ export async function loadHook(ctx: MarklessHookContext, pluginContext: PluginCo
 		ctx,
 		normalizedId,
 		ctx.getEnvironment(pluginContext),
+		{
+			waitForRegeneration: true,
+		},
 	);
 	if (module?.provisional === true) {
 		throw new Error(
@@ -145,47 +148,43 @@ export async function virtualModuleForRequest(
 	ctx: MarklessHookContext,
 	normalizedId: string,
 	currentEnvironment: MarklessEnvironment,
+	options: { readonly waitForRegeneration: boolean } = { waitForRegeneration: false },
 ) {
 	const { internalOptions } = ctx;
-	const { virtualModules, regeneratingVirtualModules, transformedClientPrimarySources } =
-		ctx.state;
-	const registered = virtualModules.get(normalizedId);
-	if (internalOptions.dev !== true) return registered;
+	const { virtualModules, regeneratingVirtualModules } = ctx.state;
+	if (internalOptions.dev !== true) return virtualModules.get(normalizedId);
 
+	// A load arriving while this id regenerates waits for that pass: handing it
+	// the registration of the moment served the browser a server-flavour
+	// render-data module, which Vite then cached for the client for good. Only a
+	// load waits - a resolve needs nothing but the id, and the pass's own
+	// pipeline resolves this id re-entrantly (the module re-exports its render
+	// data), so a waiting resolve would wait on itself.
+	const inFlight = regeneratingVirtualModules.get(normalizedId);
+	if (inFlight && options.waitForRegeneration) await inFlight;
+	const registered = virtualModules.get(normalizedId);
 	const source = marklessVirtualModuleSourceFile(normalizedId, ctx.getRoot());
 	const awaitsClientEmission =
 		currentEnvironment === 'client' &&
-		!!source &&
-		awaitsClientRenderData(registered, source, transformedClientPrimarySources);
+		registered?.type === 'render-data' &&
+		registered.canonicalRenderData !== true;
 	if (registered && !awaitsClientEmission) return registered;
 	if (!source || !TSRX_SOURCE_FILE.test(source) || regeneratingVirtualModules.has(normalizedId)) {
 		return registered;
 	}
 
-	regeneratingVirtualModules.add(normalizedId);
-	try {
+	const regeneration = (async () => {
 		// Without dropping the cached result the re-request never reaches transform.
 		internalOptions.devServer?.invalidateModule?.(source, currentEnvironment);
 		await internalOptions.devServer?.transformRequest(source, currentEnvironment);
+	})();
+	regeneratingVirtualModules.set(normalizedId, regeneration);
+	try {
+		await regeneration;
 	} finally {
 		regeneratingVirtualModules.delete(normalizedId);
 	}
 	return virtualModules.get(normalizedId) ?? registered;
-}
-
-// Every environment shares one render-data id in dev, but only a client transform
-// emits the prerender surface a client module imports, so a server-registered
-// module is served to the browser only once the client has had its own transform.
-function awaitsClientRenderData(
-	registered: MarklessVirtualModule | undefined,
-	source: string,
-	transformedClientPrimarySources: ReadonlySet<string>,
-): boolean {
-	return (
-		registered?.type === 'render-data' &&
-		registered.canonicalRenderData !== true &&
-		!transformedClientPrimarySources.has(source)
-	);
 }
 
 export async function recoverImportedChildMetadata(

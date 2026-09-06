@@ -5,6 +5,57 @@ import Mascot from '../mascot.tsrx';
 
 export default function MoreFromCompiled() @{
 	<aside class="more-from">
+		<style>
+			.more-from {
+				margin-top: var(--space-xl);
+				padding-top: var(--space-m);
+				border-top: 2px dashed var(--code-edge);
+			}
+
+			.more-from-title {
+				margin: 0 0 var(--space-s);
+				font-size: var(--step-0);
+				text-transform: uppercase;
+				letter-spacing: 0.08em;
+				opacity: 0.75;
+			}
+
+			.more-from-list {
+				display: grid;
+				grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+				gap: var(--space-s);
+				margin: 0;
+				padding: 0;
+				list-style: none;
+			}
+
+			.more-from-link {
+				display: flex;
+				flex-direction: column;
+				gap: 0.2em;
+				align-items: center;
+				padding: var(--space-xs) 0.4em;
+				color: var(--ink);
+				text-align: center;
+				text-decoration: none;
+				border: 2px solid transparent;
+				border-radius: 2px;
+			}
+
+			.more-from-link:hover {
+				border-color: var(--ink);
+				background: var(--raised);
+			}
+
+			.more-from-name {
+				font-weight: 700;
+			}
+
+			.more-from-note {
+				font-size: var(--step--2);
+				opacity: 0.7;
+			}
+		</style>
 		<p class="more-from-title">More from compiled.run</p>
 		<ul class="more-from-list">
 			<li class="more-from-item">
