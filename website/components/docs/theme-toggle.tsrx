@@ -4,10 +4,7 @@
 // script the router puts in the head applies the stored value before the first
 // paint, so there is no flash.
 //
-// Two things about the shape of this file are forced, not chosen.
-//
-// `storage()` is only collected as a module-scope binding, so the declaration
-// cannot live in the component body (NOTES.md finding 15).
+// One thing about the shape of this file is forced, not chosen.
 //
 // There are two buttons rather than one, and CSS shows whichever matches the
 // theme the page is currently painted in. A single button would have to derive
@@ -30,9 +27,9 @@
 // operating system", so the default keeps working.
 import { storage } from '@markless/core';
 
-let theme = storage('theme', 'system');
-
 export default function ThemeToggle() @{
+	let theme = storage('theme', 'system');
+
 	<span class="theme-toggle-island">
 		<button
 			class="theme-toggle theme-toggle-to-dark"

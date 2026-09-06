@@ -49,6 +49,7 @@ import { ownedModuleAst } from './shared-ast.ts';
 import type { SemanticView } from '@tsrx/yuku';
 import type { WalkState } from './types.ts';
 import { collectSharedInstance, resolveSharedCall } from './collect-shared.ts';
+import { collectStorageBinding } from './collect-storage.ts';
 
 export function collectVariableDeclaration(node: AnyNode, state: WalkState): void {
 	const declarationKind = variableDeclarationKind(node);
@@ -254,6 +255,20 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 						: {}),
 			};
 			state.graph.graphBindings.push(binding);
+		}
+
+		// A storage() declared in the component body is the same persisted cell a
+		// module-scope one is: the render lowering already treats its declaration
+		// as a state initializer, so only the binding needs collecting here.
+		if (frameworkApi === 'storage') {
+			if (state.currentCreationSite) {
+				reportUnstableCreationSite(name, 'storage', init, state.currentCreationSite, state);
+				continue;
+			}
+			if (declarationKind === 'let' || declarationKind === 'const') {
+				collectStorageBinding({ name, id, init, declarationKind, state });
+			}
+			continue;
 		}
 
 		if (frameworkApi === 'computed') {
@@ -555,7 +570,7 @@ function findDirectReturnArgument(body: AnyNode | undefined): AnyNode | undefine
 
 function reportUnstableCreationSite(
 	name: string,
-	apiName: 'state' | 'computed',
+	apiName: 'state' | 'computed' | 'storage',
 	init: AnyNode,
 	site: NonNullable<WalkState['currentCreationSite']>,
 	state: WalkState,

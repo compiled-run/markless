@@ -24,12 +24,16 @@ the first paint.**
 
 ## It is `state()` that remembers
 
-Declare it at module scope, then use it exactly like a watched variable:
+Declare it inside the component, exactly where a `state()` would go, then use it like any watched
+variable:
 
 ```tsrx
 import { storage } from '@markless/core';
 
-let colour = storage('favourite-colour', 'yellow');
+export default function FavouriteColour() @{
+	let colour = storage('favourite-colour', 'yellow');
+	// ...
+}
 ```
 
 Assigning to it does three things at once. It updates the page, the way any watched variable does.
@@ -54,9 +58,9 @@ Here is a second one, in full, which is the smallest complete example of the sam
 ```tsrx
 import { storage } from '@markless/core';
 
-let colour = storage('favourite-colour', 'yellow');
-
 export default function FavouriteColour() @{
+	let colour = storage('favourite-colour', 'yellow');
+
 	<section>
 		<div class="swatch-row">
 			<span data-swatch class={colour} />
@@ -75,12 +79,6 @@ export default function FavouriteColour() @{
 	sprite="speech-bubble"
 	title="Why that file is not a box on this page"
 	text="It is real and it renders, and clicking a button really does repaint the square, so what you are missing is only the reload half. On a page that already carries this site's theme toggle, a second storage() binding updates the page but never reaches localStorage: nothing is written under the key, no data-favourite-colour attribute is stamped on the html element, and a reload comes back on the fallback. The site's own toggle, which is the first storage() binding on the page, persists correctly. It is recorded as finding 30 in this site's NOTES.md. Rather than put a box here that teaches the wrong half of the lesson, the page points you at the toggle in the header, which is the same mechanism doing the whole job."
-/>
-
-<Callout
-	sprite="cross"
-	title="Why the declaration is outside the component"
-	text="storage() is collected as a module-scope binding, so the declaration has to sit at the top of the file rather than inside the component body. That is recorded as finding 15 in this site's NOTES.md, found while building the theme toggle you can see in the header. Everything else about the binding behaves the way a state() variable inside a component body does: read it, assign to it, and the pieces of the page that read it change."
 />
 
 ## Pin the key for anything real

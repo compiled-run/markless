@@ -253,6 +253,58 @@ test('public render lowering removes executable storage calls', async () => {
 	});
 });
 
+const componentStorageSource = `
+import { storage } from '@markless/core';
+
+export function App() @{
+	let theme = storage('theme-mode', 'light');
+
+	<p>{theme}</p>
+}
+`;
+
+test('storage declared inside a component body is the same persisted cell', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/settings.tsrx',
+		source: componentStorageSource,
+	});
+	expect(graph.diagnostics).toEqual([]);
+	expect(graph.graphBindings).toEqual([
+		expect.objectContaining({
+			id: 'storage:src/settings.tsrx#theme-mode',
+			name: 'theme',
+			kind: 'state',
+			declarationKind: 'let',
+			writable: true,
+			initialValue: 'light',
+			storage: { key: 'theme-mode' },
+		}),
+	]);
+
+	const result = await compileTsrxModule({
+		filename: 'src/settings.tsrx',
+		source: componentStorageSource,
+		symbols: [],
+	});
+	expect(result.semanticGraph.diagnostics).toEqual([]);
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	for (const emitted of [result.publicRenderModule.moduleSource, result.publicRenderModule.ssrModuleSource])
+		expect(emitted).not.toContain('storage(');
+	expect(result.protocolView.domUpdates).toEqual([
+		expect.objectContaining({
+			source: 'theme',
+			graphNodeId: 'storage:src/settings.tsrx#theme-mode',
+			path: [],
+		}),
+	]);
+	expect(result.payloadArena.state.storage).toEqual([
+		{ graphNodeId: 'storage:src/settings.tsrx#theme-mode', key: 'theme-mode' },
+	]);
+	expect(result.protocolState).toMatchObject({
+		storage: [{ graphNodeId: 'storage:src/settings.tsrx#theme-mode', key: 'theme-mode' }],
+	});
+});
+
 test('payload arena drops declared storage that no component reads or writes', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/unused-settings.tsrx',

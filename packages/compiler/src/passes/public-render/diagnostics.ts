@@ -194,7 +194,7 @@ function refusalCause(
 }
 
 export function repeatRowStateScopeUnsupportedDiagnostic(input: {
-	readonly apiName: 'state' | 'computed';
+	readonly apiName: 'state' | 'computed' | 'storage';
 	readonly name: string;
 	readonly node: AnyNode;
 	readonly filename: string;

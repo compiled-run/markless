@@ -391,7 +391,7 @@ export function moduleScopeElementDiagnostic(
 
 export function unstableStateCreationSiteDiagnostic(input: {
 	readonly name: string;
-	readonly apiName: 'state' | 'computed';
+	readonly apiName: 'state' | 'computed' | 'storage';
 	readonly site: 'computed' | 'handler' | 'branch' | 'loop';
 	readonly init: AnyNode;
 	readonly filename: string;
@@ -414,7 +414,7 @@ export function unstableStateCreationSiteDiagnostic(input: {
 
 export function helperStateReturnUnsupportedDiagnostic(input: {
 	readonly name: string;
-	readonly apiName: 'state' | 'computed';
+	readonly apiName: 'state' | 'computed' | 'storage';
 	readonly init: AnyNode;
 	readonly filename: string;
 }): SemanticGraphDiagnostic {
