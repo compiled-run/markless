@@ -7,6 +7,10 @@
 	--quiet-fill: color-mix(in oklch, var(--ink) 6%, transparent);
 	--switch-on: oklch(72% 0.17 148);
 	--switch-off: oklch(64% 0.01 80);
+
+	&.dark {
+		--switch-off: oklch(42% 0.01 80);
+	}
 }
 
 /* The playground switch: grey track, green when on, a white thumb with an ink edge. */
@@ -29,17 +33,11 @@ html .prose .pg-knob {
 	flex: none;
 	width: 1.25em;
 	height: 1.25em;
-	border: 1.5px solid var(--ink);
+	border: 1.5px solid var(--on-accent);
 	background: white;
 }
 html .prose .pg-switch[ui-checked] .pg-knob {
 	margin-inline-start: calc(100% - 1.25em);
-}
-html[data-theme='dark'] .prose .pg-switch {
-	--switch-off: oklch(42% 0.01 80);
-}
-html[data-theme='dark'] .prose .pg-knob {
-	border-color: oklch(28% 0.015 90);
 }
 
 @media (prefers-reduced-motion: reduce) {

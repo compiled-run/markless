@@ -1,4 +1,4 @@
-// The vendored `@markless/ui` manifest is the only source of prop and part data
+// The workspace `@markless/ui` manifest is the only source of prop and part data
 // on this site. It is read as text rather than as a JSON module so the site
 // tsconfig needs no `resolveJsonModule`; `vite/client` already types `*?raw`.
 import manifestText from '@markless/ui/api/manifest.json?raw';

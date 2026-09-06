@@ -1,4 +1,4 @@
-// Spike witness: prove the vendored Volar layer answers quick info for a `.tsrx`
+// Spike witness: prove the plugin's Volar layer answers quick info for a `.tsrx`
 // code string that imports `@markless/ui`, with no tsconfig anywhere in the loop.
 // Run: node scripts/spike-twoslash.mjs
 import { createQuickInfoService } from '../tooling/twoslash-quickinfo.ts';

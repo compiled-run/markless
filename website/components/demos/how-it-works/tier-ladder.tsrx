@@ -2,7 +2,8 @@ import { state } from '@markless/core';
 
 // The ladder from specs/framework/12-arm-rendering.md D1, one action at a time.
 // The second line is the only claim that matters, so it is its own binding.
-// Text bindings rather than a record lookup: see NOTES.md finding 31.
+// Text bindings rather than a record lookup: a computed that reads a plain
+// object is not in the chunk the click loads.
 export default function TierLadder() @{
 	let action = state('number');
 

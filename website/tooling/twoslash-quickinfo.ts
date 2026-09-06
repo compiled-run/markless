@@ -1,7 +1,7 @@
 // Real editor types for the code fences, resolved at build time.
 //
 // `.tsrx` is not TypeScript, so `typescript` alone cannot answer a hover over
-// one. The vendored `@markless/typescript-plugin` ships the same Volar layer the
+// one. The workspace `@markless/typescript-plugin` ships the same Volar layer the
 // editor uses: `MarklessTsrxVirtualCode` compiles an authored `.tsrx` snapshot
 // into generated TSX plus source mappings, and `@volar/typescript` serves that
 // TSX to a plain TypeScript language service and maps positions back. Wiring the
@@ -9,7 +9,7 @@
 //
 // No tsconfig is read anywhere in this file: the options below are the whole
 // project, and the virtual fence file sits at the site root so bare specifiers
-// resolve through the site's own `node_modules` — which is where the vendored
+// resolve through the site's own `node_modules` — which is where the workspace
 // `@markless/ui` source (raw `.ts`/`.tsrx`, never `.d.ts`) lives.
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
 const require = createRequire(import.meta.url);
-// Volar is a dependency of the vendored plugin, not of the site, so it is
+// Volar is a dependency of the plugin, not of the site, so it is
 // required from the plugin's own location: the copy the plugin compiled against.
 const volarRequire = createRequire(require.resolve('@markless/typescript-plugin/language'));
 

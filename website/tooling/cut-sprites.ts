@@ -5,9 +5,9 @@
 //   node --experimental-strip-types tooling/cut-sprites.ts            # all three
 //   node --experimental-strip-types tooling/cut-sprites.ts stickers   # one sheet
 //
-// Needs ImageMagick 7 (`magick`) on PATH. The reference sheets live in the
-// markless repo's goal notes, not in this repo, so the script is a no-op with a
-// clear message when they are not there.
+// Needs ImageMagick 7 (`magick`) on PATH. The reference sheets live under
+// `goals/compiled-website/notes/design`, outside website/, so the script is a
+// no-op with a clear message when they are not there.
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';

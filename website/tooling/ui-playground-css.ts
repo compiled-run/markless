@@ -11,10 +11,10 @@
 function accent(card: string): string {
 	return `			${card} {
 				--pg-accent: var(--pink);
-			}
 
-			html[data-theme='dark'] ${card} {
-				--pg-accent: color-mix(in oklch, var(--pink) 60%, transparent);
+				html.dark & {
+					--pg-accent: color-mix(in oklch, var(--pink) 60%, transparent);
+				}
 			}`;
 }
 
@@ -349,7 +349,7 @@ ${tipLook('.pg-tip')}
 				display: none;
 			}
 
-			/* Named here, not left to the family's layer: the vendored tooltip ships no anchor on its trigger. */
+			/* Named here, not left to the family's layer: the tooltip family ships no anchor on its trigger. */
 			@supports (position-area: block-end) {
 				.pg-hint {
 					anchor-scope: --pg-hint;

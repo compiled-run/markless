@@ -82,7 +82,7 @@ export default function SiteHeader({ pathname }: { readonly pathname: string }) 
 			}
 
 			/* The theme toggle is an island a page renders, not part of the document, so it
-			   cannot be a child of this header (NOTES.md finding 19). `.theme-toggle-slot`
+			   cannot be a child of this header. `.theme-toggle-slot`
 			   is the hole it is reserved at the end of the row, and `.theme-toggle-island`
 			   is pinned to exactly that hole: last in the row means its right edge is the
 			   header's own inline padding, which is a number both rules can name. The

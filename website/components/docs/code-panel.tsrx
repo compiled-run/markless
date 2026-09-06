@@ -45,8 +45,7 @@ export default function CodePanel({
 								@for (const line of pane.lines; key line.id) {
 									<span class="line">
 										@for (const token of line.tokens; key token.id) {
-											{/* The two repeats need a host element over them, and only one of
-											    them has anything in it: `@if` hangs this build. */}
+											{/* Only one of the two lists has anything in it. */}
 											<span class="run">
 												@for (const run of token.plain; key run.id) {
 													<span style={run.style}>{run.text}</span>
@@ -107,10 +106,7 @@ export default function CodePanel({
 				font-weight: 700;
 			}
 
-			/* The clamp: the code always shows, and opening only lifts the ceiling.
-			   A gradient element rather than ::after — the scoped-style transform
-			   appends its class after the selector, so a pseudo-element selector
-			   would emit invalid CSS. */
+			/* The clamp: the code always shows, and opening only lifts the ceiling. */
 			.clamp {
 				position: relative;
 			}

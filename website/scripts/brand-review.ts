@@ -3,8 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { chromium } from 'playwright-core';
 
-// Runs against a production serve: the dev server only ships the generated
-// playground CSS with an island's JS, so an untouched dev page is unstyled.
+// Runs against a production serve.
 const origin = process.env.BRAND_ORIGIN ?? 'http://127.0.0.1:4310';
 const output = resolve(process.env.BRAND_SHOTS ?? '/private/tmp/brand-makeover-4/shots');
 await mkdir(output, { recursive: true });

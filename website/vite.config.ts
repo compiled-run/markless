@@ -6,11 +6,12 @@ import type { NitroConfig } from 'nitro/types';
 import type { OxlintConfig } from 'oxlint';
 import { highlightMdx } from './tooling/highlight-mdx.ts';
 import { uiDemos } from './tooling/ui-demos.ts';
+import { pageProps } from './tooling/page-props.ts';
 
 export default {
 	base: '/markless/',
 	nitro: { baseURL: '/markless/' },
-	// uiDemos runs before router(): it rewrites the .mdx source router() parses.
+	// pageProps and uiDemos run before router(): they rewrite the .mdx source router() parses.
 	// highlightMdx runs after router(): it rewrites the module router() emits.
 	lint: {
 		rules: {
@@ -36,5 +37,5 @@ export default {
 			],
 		},
 	},
-	plugins: [ui(), uiDemos(), markless(), router(), highlightMdx()],
+	plugins: [ui(), pageProps(), uiDemos(), markless(), router(), highlightMdx()],
 } satisfies UserConfig & { nitro: NitroConfig; lint: OxlintConfig };

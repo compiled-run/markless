@@ -2,7 +2,7 @@ import { state } from '@markless/core';
 
 // The answers are written inline as text bindings rather than looked up from a
 // record, because a computed that reads a plain object is not in the chunk the
-// click loads: `urls is not defined` (NOTES.md finding 31).
+// click loads: `urls is not defined`.
 export default function RouteTree() @{
 	let picked = state('index');
 

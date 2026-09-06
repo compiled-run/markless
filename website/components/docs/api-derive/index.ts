@@ -70,6 +70,25 @@ export function apiRows(family: string, part: string): readonly ApiRow[] {
 	return partOf(family, part).props.map(rowOf);
 }
 
+/** One part's props table under its own heading: what a family's API reference is a list of. */
+export type ApiSection = {
+	/** `accordion.item`, the name a consumer writes. */
+	readonly name: string;
+	/** The heading's anchor, `accordion-item`. */
+	readonly id: string;
+	readonly rows: readonly ApiRow[];
+};
+
+/** Every part of a family with its rows, in `order` when given, else root first then alphabetical. */
+export function apiSections(family: string, order?: readonly string[]): readonly ApiSection[] {
+	const parts = order && order.length > 0 ? partsInOrder(family, order) : partsOf(family);
+	return parts.map((part) => ({
+		name: `${family}.${part.part}`,
+		id: `${family}-${part.part}`,
+		rows: part.props.map(rowOf),
+	}));
+}
+
 function anatomyRowOf(family: string, part: ManifestPart): AnatomyRow {
 	return {
 		name: `${family}.${part.part}`,

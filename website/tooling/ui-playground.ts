@@ -41,9 +41,7 @@ let parser: ParseModule | undefined;
 /**
  * yuku is the compiler's declared dependency and not this site's, so the parser
  * is reached through the package that owns it — the same route
- * `packages/headless/components/api-extract/analyzer.ts` takes. `@markless/compiler`
- * is a pnpm override here rather than a direct dependency, so the walk starts at
- * `@markless/core`, which does declare it.
+ * `packages/headless/components/api-extract/analyzer.ts` takes.
  */
 async function houseParser(): Promise<ParseModule> {
 	if (parser) return parser;
@@ -1242,9 +1240,8 @@ export function playgroundModule(input: PlaygroundInput): string {
 		panes.push({ value: 'css', label: input.cssLabel, markup: css.markup });
 
 	return `import { state } from '@markless/core';
-import { ${families.join(', ')} } from '@markless/ui';
+import { ${[...families, 'lucide'].sort().join(', ')} } from '@markless/ui';
 import { attributeText, heldList, listText, pickValue, toggled, valueText } from '../slot-text.ts';
-import { lucide } from '@markless/ui';
 
 ${RUN_TYPES}
 

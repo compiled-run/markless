@@ -1,4 +1,4 @@
-// The parts a family is built from, straight out of the vendored @markless/ui
+// The parts a family is built from, straight out of the workspace @markless/ui
 // manifest: the part names, the one line each part's own doc comment opens with,
 // and the exported component behind it in the hover doc. Nothing here is
 // hand-written, so a part added to a family shows up by rebuilding.

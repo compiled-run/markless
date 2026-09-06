@@ -6,9 +6,7 @@
 // Every keycap is drawn as a symbol and labelled with the plain word, so a
 // screen reader says "Enter" where the page shows ⏎. Both platform forms ship in
 // the HTML and CSS shows one, because the server has no user agent; the probe
-// below stamps `is-mac` or `is-other` on <html>. Keycap styling lives in
-// styles/global.css, not in a block here: a component whose only styling is its
-// own style block renders unstyled on this build (NOTES.md finding 26).
+// below stamps `is-mac` or `is-other` on <html>.
 import { metaFor } from './ui-meta/index.ts';
 
 export type KeyboardRow = {

@@ -292,6 +292,11 @@ export default function HeroCard() @{
 				font-size: var(--step--2);
 				line-height: 160%;
 				overflow-x: auto;
+
+				/* The sticker-brown shadow is lighter than a dark ground, so it drops to black. */
+				html.dark & {
+					box-shadow: -4px 6px 6px rgb(0 0 0 / 0.55);
+				}
 			}
 
 			.line {
@@ -309,10 +314,7 @@ export default function HeroCard() @{
 				user-select: none;
 			}
 
-			/* The polaroid frame. The tape and the photo window are real
-			   elements: the scoped-style transform appends the scope class
-			   after the selector, so ::before/::after selectors emit invalid
-			   CSS (finding 26's little sibling). */
+			/* The polaroid frame. The tape and the photo window are real elements. */
 			article {
 				position: relative;
 				justify-self: center;
@@ -329,6 +331,12 @@ export default function HeroCard() @{
 				display: flex;
 				flex-direction: column;
 				text-align: center;
+
+				html.dark & {
+					box-shadow:
+						-5px 8px 12px rgb(0 0 0 / 0.55),
+						0 2px 4px rgb(0 0 0 / 0.45);
+				}
 			}
 
 			.tape {
@@ -450,21 +458,6 @@ export default function HeroCard() @{
 			   of flooding it translucent, so the polaroid stays a polaroid. */
 			article.hot {
 				background: color-mix(in oklch, var(--yellow) 30%, #fdfbf3);
-			}
-
-			/* Dark theme: the sticker-brown shadow (lighter than a dark
-			   ground) drops to plain black; the print itself keeps its
-			   light-mode colors. One selector is enough: the document head's
-			   theme normalizer resolves 'system' at stamp time, so
-			   data-theme is always exactly 'dark' or 'light'. */
-			html[data-theme='dark'] pre {
-				box-shadow: -4px 6px 6px rgb(0 0 0 / 0.55);
-			}
-
-			html[data-theme='dark'] article {
-				box-shadow:
-					-5px 8px 12px rgb(0 0 0 / 0.55),
-					0 2px 4px rgb(0 0 0 / 0.45);
 			}
 		</style>
   </div>;

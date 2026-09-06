@@ -1,5 +1,4 @@
-import { accordion } from '@markless/ui';
-import { lucide } from '@markless/ui';
+import { accordion, lucide } from '@markless/ui';
 
 export default function AccordionLocked() @{
 	const options = [

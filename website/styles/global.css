@@ -10,8 +10,6 @@
 	/* Code surface: paper, a shade lighter than the page, with a quiet edge. */
 	--code-surface: oklch(96% 0.02 79);
 	--code-edge: color-mix(in oklch, var(--ink) 22%, transparent);
-	/* The section-title underline: two quick crayon passes, drawn once here. */
-	--sidebar-stroke-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 12' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M3 7.5C28 4 62 9.5 116 5'/%3E%3Cpath d='M9 10.5C36 8 70 12 108 8.5' stroke-width='2' opacity='.75'/%3E%3C/g%3E%3C/svg%3E");
 
 	/* Every pastel accent is light in both themes, so anything printed on one is
 	   always the dark ink, never the page's foreground. */
@@ -35,6 +33,29 @@
 	--sprite-light: inline-block;
 	--sprite-dark: none;
 
+	/* Dark: the same paper design with the ground and the ink swapped, a warm
+	   near-black chalkboard, off-white chalk, the same four pastel accents. */
+	&.dark {
+		--ink: oklch(93% 0.012 85);
+		--paper: oklch(18% 0.007 70);
+		--code-surface: oklch(32% 0.011 70);
+		--code-edge: color-mix(in oklch, var(--ink) 30%, transparent);
+		--raised: oklch(26% 0.01 70);
+		--tinted: color-mix(in oklch, var(--yellow) 14%, var(--paper));
+		--tinted-quiet: color-mix(in oklch, var(--yellow) 9%, var(--paper));
+		--hover-wash: 11%;
+		--slab: oklch(11% 0.008 70);
+		--slab-ink: oklch(92% 0.012 85);
+		--grain-fiber-blend: soft-light;
+		--grain-fiber-opacity: 0.3;
+		--grain-speck-blend: screen;
+		--grain-speck-opacity: 0.06;
+		--sprite-light: none;
+		--sprite-dark: inline-block;
+	}
+}
+
+:root {
 	--font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 
 	/* text shadow: an offset silhouette peeking out left of the glyphs, dilated
@@ -158,6 +179,12 @@ h1 {
 	font-size: var(--step-5);
 	--shadow-color: var(--pink);
 	line-height: 115%;
+
+	/* Dark ground: a deep muted purple silhouette, sampled from the poster reference. */
+	html.dark & {
+		color: var(--ink);
+		--shadow-color: oklch(34% 0.05 307);
+	}
 }
 
 /* Paper grain over the whole page. Absolute, not fixed: a fixed layer with a
@@ -336,6 +363,11 @@ body::after {
 	--shadow-color: var(--purple);
 	margin-top: var(--space-l);
 	margin-bottom: var(--space-s);
+
+	html.dark & {
+		color: var(--ink);
+		--shadow-color: oklch(34% 0.05 307);
+	}
 }
 
 .prose h3 {
@@ -343,6 +375,11 @@ body::after {
 	--shadow-color: var(--green-soft);
 	margin-top: var(--space-m);
 	margin-bottom: var(--space-xs);
+
+	html.dark & {
+		color: var(--ink);
+		--shadow-color: oklch(34% 0.05 307);
+	}
 }
 
 .prose a {
@@ -399,6 +436,12 @@ body::after {
 	font-family: 'Joy Elia', system-ui, sans-serif;
 }
 
+/* Each span carries its light colour inline and its dark one in `--shiki-dark`;
+   only `!important` outranks an inline colour. The hover doc is not code. */
+html.dark .shiki span:not(.tsrx-tip):not(.tsrx-tip-title):not(.tsrx-tip-body) {
+	color: var(--shiki-dark) !important;
+}
+
 /* ---------------------------------------------------------------------------
    Playground: the reusable frame every interactive widget sits in. Give it a
    .playground-controls row and a .playground-output block as needed.
@@ -446,30 +489,12 @@ body::after {
 	box-shadow: none;
 }
 
+/* text note */
 .callout {
 	margin-block: var(--space-m);
 	padding: var(--space-s);
 	border-left: 4px solid var(--pink);
-	background: var(--tinted);
-}
-
-.collapsible {
-	margin-block: var(--space-m);
-	padding: var(--space-xs);
-	border-left: 4px solid var(--purple);
-	background: var(--tinted-quiet);
-}
-
-.collapsible summary {
-	display: flex;
-	gap: 0.45em;
-	align-items: center;
-	cursor: pointer;
-	font-weight: 700;
-}
-
-.collapsible p {
-	margin-bottom: 0;
+	background: color-mix(in srgb, var(--pink) 10%, transparent);
 }
 
 html {
@@ -683,46 +708,6 @@ html {
 }
 
 /* ---------------------------------------------------------------------------
-   Dark theme. The same paper design with the ground and the ink swapped: a warm
-   near-black chalkboard, off-white chalk, the same four pastel accents. Only
-   tokens move; every rule above is written against them.
-
-   Two selectors carry the same block. `data-theme` is the explicit choice, and
-   the media query is the default for a reader who has not made one. They are
-   duplicated rather than shared because a media query and an attribute cannot
-   be joined into one selector; keep them in step.
-   --------------------------------------------------------------------------- */
-
-html[data-theme='dark'] {
-	--ink: oklch(93% 0.012 85);
-	--paper: oklch(18% 0.007 70);
-	--code-surface: oklch(32% 0.011 70);
-	--code-edge: color-mix(in oklch, var(--ink) 30%, transparent);
-	--raised: oklch(26% 0.01 70);
-	--tinted: color-mix(in oklch, var(--yellow) 14%, var(--paper));
-	--tinted-quiet: color-mix(in oklch, var(--yellow) 9%, var(--paper));
-	--hover-wash: 11%;
-	--slab: oklch(11% 0.008 70);
-	--slab-ink: oklch(92% 0.012 85);
-	--grain-fiber-blend: soft-light;
-	--grain-fiber-opacity: 0.3;
-	--grain-speck-blend: screen;
-	--grain-speck-opacity: 0.06;
-	--sprite-light: none;
-	--sprite-dark: inline-block;
-}
-
-/* Token colours are inline on each span: the light one as `color`, the dark one
-   as `--shiki-dark` beside it. Swapping themes means reading the other channel.
-   The hover doc is a span inside the block but is not code, so it is excluded. */
-/* The colour is inline on the span, and only `!important` outranks that. It is
-   here rather than in the emitted markup so the light output stays exactly what
-   the single-theme highlighter produced. */
-html[data-theme='dark'] .shiki span:not(.tsrx-tip):not(.tsrx-tip-title):not(.tsrx-tip-body) {
-	color: var(--shiki-dark) !important;
-}
-
-/* ---------------------------------------------------------------------------
    Prev/next pager: the same two links on the foot of every page, driven by the
    flat entry order in nav.ts, with a strip of doodles between them. The dashed
    rule is the one already proven on .more-from.
@@ -884,16 +869,6 @@ html[data-theme='dark'] .shiki span:not(.tsrx-tip):not(.tsrx-tip-title):not(.tsr
 	border: 2px solid var(--ink);
 	border-radius: 2px;
 	min-width: 12rem;
-}
-
-/* Dark ground: ink-white letters with a deep muted purple offset silhouette,
-   sampled from the poster reference. Light stays as it was: ink letters,
-   pastel silhouette. */
-html[data-theme='dark'] h1,
-html[data-theme='dark'] .prose h2,
-html[data-theme='dark'] .prose h3 {
-	color: var(--ink);
-	--shadow-color: oklch(34% 0.05 307);
 }
 
 /* ---------------------------------------------------------------------------

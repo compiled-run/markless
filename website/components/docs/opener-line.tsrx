@@ -2,11 +2,6 @@
 // scribble has to sit inline after "frameworks.", and the MDX pipeline only
 // mounts .tsrx components as block-level elements, never inside a markdown
 // paragraph.
-//
-// The co-located <style> below is the canonical home for its styles. On the
-// 0.3.1 build this site is pinned to, scoped style CSS compiles but never
-// links (NOTES.md finding 26), so global.css carries a TEMPORARY mirror under
-// `.opener-line`; delete that shim when the fix ships.
 export default function OpenerLine() @{
 	<div class="opener-line">
 		<p>

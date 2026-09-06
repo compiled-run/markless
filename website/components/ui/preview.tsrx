@@ -6,7 +6,7 @@
 //
 // Props only, no state and no construct: a page's islands are located by
 // counting the elements before them, and every cell or arm this component added
-// would move the ones after it (NOTES.md findings 25 and 29). Every demo's state
+// would move the ones after it. Every demo's state
 // lives in the projected component, which is its own island.
 export default function Preview({
 	shows,

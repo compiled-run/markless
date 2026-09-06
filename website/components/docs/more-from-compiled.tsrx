@@ -1,6 +1,5 @@
 // The sibling projects, as their mascots. versionless has no public repository
-// yet, so its link points at the compiled-run organisation as a placeholder;
-// NOTES.md records that so the owner can swap it for the real one.
+// yet, so its link points at the compiled-run organisation as a placeholder.
 import Mascot from '../mascot.tsrx';
 
 export default function MoreFromCompiled() @{

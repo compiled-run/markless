@@ -27,24 +27,22 @@ export default function ThemeToggle() @{
 				object-fit: contain;
 			}
 
-			/* Which of the two buttons is the one to offer is the same question as which
-			   palette is painted, so these rules are the palette's rules again, in step with
-			   the pair further down. `system` and "no attribute" both mean "ask the
-			   operating system", which is why neither is named. */
+			/* The button offered is the one for the palette not painted: theme.js
+			   resolves `system` and puts the painted palette on <html> as a class. */
 			.theme-toggle-to-dark {
 				display: inline-flex;
+
+				html.dark & {
+					display: none;
+				}
 			}
 
 			.theme-toggle-to-light {
 				display: none;
-			}
 
-			html[data-theme='dark'] .theme-toggle-to-dark {
-				display: none;
-			}
-
-			html[data-theme='dark'] .theme-toggle-to-light {
-				display: inline-flex;
+				html.dark & {
+					display: inline-flex;
+				}
 			}
 		</style>
 		<button

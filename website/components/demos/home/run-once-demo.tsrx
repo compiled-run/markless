@@ -2,10 +2,6 @@
 // log that never gains a second entry. `ranAt` is captured when the component
 // body actually executes, so the frozen timestamp is evidence, not an
 // illustration: clicks run likes++, and the body never runs again.
-//
-// Styles are the co-located scoped <style> below (canonical); global.css
-// carries a TEMPORARY mirror under `.run-once` until NOTES.md finding 26 is
-// fixed.
 import { state } from '@markless/core';
 
 export default function RunOnceDemo() @{

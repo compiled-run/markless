@@ -126,7 +126,7 @@ function dedent(css: string): string {
  * Splits a demo into the file a reader should copy and the CSS behind it.
  *
  * The `<style>` block is lifted textually. yuku's TSRX parser does model it —
- * `JSXStyleElement.css` on a parsed program — but `yuku-tsrx` is a dependency of
+ * `JSXStyleElement.css` on a parsed program — but `@tsrx/yuku` is a dependency of
  * @markless/router rather than one this site declares, so it is not resolvable
  * from here without a package.json change.
  */

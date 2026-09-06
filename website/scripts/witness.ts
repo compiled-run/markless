@@ -671,6 +671,7 @@ try {
 					?.getBoundingClientRect();
 				return {
 					attr: document.documentElement.getAttribute('data-theme'),
+					painted: document.documentElement.classList.contains('dark') ? 'dark' : 'light',
 					stored: localStorage.getItem('theme'),
 					prefers: matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
 					paper: getComputedStyle(document.body).backgroundColor,
@@ -700,14 +701,13 @@ try {
 			});
 
 		const atRest = await themeState();
-		// `data-theme` is never left on 'system': public/theme.js resolves the
-		// stored value in the head, because every dark rule hangs off
-		// [data-theme='dark'] with no prefers-color-scheme twin. So what an
-		// untouched reader is owed is no stored choice and their own OS setting.
+		// public/theme.js resolves the stored choice into a `dark` or `light`
+		// class on <html>, the only thing the CSS reads. So what an untouched
+		// reader is owed is no stored choice and their own OS setting painted.
 		check(
-			atRest.stored === null && atRest.attr === atRest.prefers,
+			atRest.stored === null && atRest.painted === atRest.prefers,
 			'an untouched reader stores nothing and is put on their system theme',
-			`data-theme="${atRest.attr}", prefers ${atRest.prefers}, stored ${String(atRest.stored)}`,
+			`painted ${atRest.painted}, prefers ${atRest.prefers}, stored ${String(atRest.stored)}`,
 		);
 		check(atRest.onSlot, 'the toggle lands on the hole the header reserves for it');
 		check(
@@ -730,9 +730,9 @@ try {
 		}
 		const dark = await themeState();
 		check(
-			dark.attr === 'dark',
-			'clicking the toggle puts data-theme="dark" on <html>',
-			String(dark.attr),
+			dark.attr === 'dark' && dark.painted === 'dark',
+			'clicking the toggle puts data-theme="dark" and the dark class on <html>',
+			`data-theme="${String(dark.attr)}", painted ${dark.painted}`,
 		);
 		check(dark.stored === 'dark', 'the choice is written to localStorage', String(dark.stored));
 		check(

@@ -223,13 +223,14 @@ probes, the exact errors and the browser measurement.
 ## Themes
 
 The dark theme is the paper design with the ground and the ink swapped and the same four pastel
-accents. It is keyed off `html[data-theme='dark']`, with `@media (prefers-color-scheme: dark)` as
-the default for a reader who has not chosen.
+accents. Every dark value sits nested inside the rule that holds its light value, under an
+`html.dark &` (or `&.dark` on `:root`) selector, so the two are never apart.
 
 `components/docs/theme-toggle.tsrx` is the control, and `storage('theme', 'system')` is the whole of
 it: assigning to that binding writes `localStorage.theme` and stamps `data-theme` on `<html>`, and
-the seed script the router puts in the head applies the stored value before the first paint, so the
-theme never flashes.
+the seed script the router puts in the head applies the stored value before the first paint.
+`public/theme.js` resolves that stored choice (`system` against the OS setting) into a `dark` or
+`light` class on `<html>`, which is the only thing the CSS reads, so the theme never flashes.
 
 The toggle is an island each `.mdx` page renders rather than part of `site-header.tsrx`, because the
 router serves only the document's HTML and drops its state payload, so nothing on the document path

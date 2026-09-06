@@ -1,9 +1,8 @@
 import Sprite from '../sprite.tsrx';
 
 // `sticker` names one of the die-cut stickers to sit on the callout's corner.
-// It is a data attribute the stylesheet paints rather than an <img>, because an
-// element cannot be left out without `@if`, which hangs the build on 0.3.1
-// (NOTES.md finding 23), and a hidden <img> would still fetch its src.
+// It is a data attribute the stylesheet paints rather than an <img>, because a
+// hidden <img> would still fetch its src.
 export default function Callout({
 	title,
 	text,

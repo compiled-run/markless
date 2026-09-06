@@ -1,6 +1,7 @@
 import { state } from '@markless/core';
 
-// Text bindings rather than a record lookup: see NOTES.md finding 31.
+// Text bindings rather than a record lookup: a computed that reads a plain
+// object is not in the chunk the click loads.
 export default function LinkTypo() @{
 	let shown = state('good');
 

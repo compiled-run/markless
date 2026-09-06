@@ -2,7 +2,8 @@ import { state } from '@markless/core';
 
 // An illustration, not a measurement. Each step is one sentence about what the
 // browser is holding at that moment during a streamed server render. Text
-// bindings rather than a record lookup: see NOTES.md finding 31.
+// bindings rather than a record lookup: a computed that reads a plain object
+// is not in the chunk the click loads.
 export default function StreamSteps() @{
 	let step = state(0);
 
