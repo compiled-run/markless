@@ -33,7 +33,6 @@
 		"release:check": "node scripts/release/sync-version.mjs --check",
 		"release:notes": "node scripts/release/release-notes.mjs",
 		"release:trust": "sh scripts/release/trust-publishers.sh",
-		"state": "node scripts/state-ledger.mjs",
 		"rules": "npx -y @intellectronica/ruler apply",
 		"prepare": "git config core.hooksPath .githooks"
 	},

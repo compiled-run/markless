@@ -12,8 +12,6 @@ If that declaration is missing, or says `Workflow guidance: none` for a write ta
 Read-only scout/critique packets may declare `Workflow guidance: none`.
 For direct interactive user requests, read `.ruler/skills/markless-implementation/implementation.md` (the base) plus the matching overlay (`compiler.md`, `bundler.md`, `performance.md`, `release.md`), or `.ruler/skills/markless-spec-maintenance/spec.md` for specs.
 Merging or pushing to main, pushing any shared branch, or closing a goal requires an explicit owner directive for that specific change set. A prior directive does not carry forward to new commits, follow-up fixes, or "finishing" work. When in doubt, prepare the commit locally and ask.
-The progress ledger is CLI-managed: use `pnpm state append|status|tail|project`.
-Never read `specs/state-archive.md` or bulk history; use the CLI.
 
 ## Pull request feedback
 
