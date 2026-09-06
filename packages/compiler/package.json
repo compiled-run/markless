@@ -37,8 +37,6 @@
 	"dependencies": {
 		"@markless/serializer": "workspace:*",
 		"@tsrx/yuku": "0.2.0",
-		"postcss": "8.5.15",
-		"postcss-selector-parser": "7.1.5",
 		"yuku-analyzer": "0.9.1",
 		"yuku-codegen": "0.9.1"
 	}

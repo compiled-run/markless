@@ -31,6 +31,20 @@ function requireElement<T extends Element>(container: HTMLElement, selector: str
 	return element;
 }
 
+// Every stylesheet the page has loaded, as text. Cross-origin sheets throw on
+// `cssRules`; the fixtures only ever add same-origin ones.
+function documentCss(): string {
+	return Array.from(document.styleSheets)
+		.flatMap((sheet) => {
+			try {
+				return Array.from(sheet.cssRules).map((rule) => rule.cssText);
+			} catch {
+				return [];
+			}
+		})
+		.join('\n');
+}
+
 function elementOrder(container: HTMLElement): string[] {
 	return Array.from(container.querySelectorAll('*')).map((element) =>
 		element.tagName.toLowerCase(),
@@ -207,6 +221,14 @@ test('CSR: scoped <style> adds the mk-* scope class merged with author classes',
 	expect(heading.classList.contains(scopeClass ?? '')).toBe(true);
 	// The <style> block itself must not appear in rendered output.
 	expect(container.querySelector('style')).toBeNull();
+
+	// The browser accepted the spliced sheet: the pseudo-element and the nested
+	// @media selector are scoped, and the keyframe stops are left alone.
+	const css = documentCss();
+	expect(css).toContain(`.title.${scopeClass}::after`);
+	expect(css).toContain(`.card > .title.${scopeClass}`);
+	expect(css).not.toContain(`from.${scopeClass}`);
+	expect(getComputedStyle(heading).letterSpacing).toBe('2px');
 });
 
 test('CSR: attach={...} behavior runs against the real host element', async () => {

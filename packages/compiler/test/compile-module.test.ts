@@ -2617,6 +2617,34 @@ export function App() @{
 	]);
 });
 
+// The parser reports each scope-insertion point as a UTF-8 byte offset, so a
+// multi-byte character anywhere earlier in the sheet is where a string-index
+// splice would drift: here it would land inside `.café:` and inside `color`.
+test('compileTsrxModule places scope classes by byte offset in non-ASCII CSS', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/UnicodeCard.tsrx',
+		source: `
+export function App() @{
+	<section class="card">
+		<style>
+			.café::after { content: '→ naïve'; }
+			.card h2 { color: red; }
+		</style>
+	</section>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	const styleScope = result.publicRenderPlan.styleScopes[0];
+	const scope = styleScope!.scopeId;
+	// Author bytes are preserved exactly; only the scope classes are added.
+	expect(styleScope!.cssText).toBe(
+		`.café.${scope}::after { content: '→ naïve'; }\n\t\t\t.card h2.${scope} { color: red; }`,
+	);
+});
+
 test('compileTsrxModule renders fragment-rooted components in SSR html', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/FragmentCard.tsrx',

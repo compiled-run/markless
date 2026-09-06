@@ -1,5 +1,3 @@
-import postcss, { type AtRule, type Container, type Document, type Rule } from 'postcss';
-import selectorParser, { type Selector } from 'postcss-selector-parser';
 import { asNodes, type AnyNode } from '../../ast/nodes.ts';
 import { getComponentFunction } from '../../ast/tsrx.ts';
 import type { CompilerDiagnostic } from '../../diagnostics.ts';
@@ -113,7 +111,7 @@ function compileStyleNodes(
 
 	for (const styleNode of styleNodes) {
 		const css = typeof styleNode.css === 'string' ? styleNode.css : null;
-		const scoped = css === null ? null : scopeSelectors(css, scopeId);
+		const scoped = css === null ? null : scopeSelectors(styleNode, scopeId);
 		if (scoped === null) {
 			diagnostics.push(
 				unsupportedRenderConstructDiagnostic({
@@ -137,47 +135,59 @@ function compileStyleNodes(
 	};
 }
 
-// Inserts `.mk-<hash>` in the rightmost subject compound before pseudos.
-// PostCSS walks ordinary nested at-rules; keyframe selectors are excluded.
-function scopeSelectors(css: string, scopeId: string): string | null {
-	try {
-		const root = postcss.parse(css);
-		root.walkRules((rule) => {
-			if (isInsideKeyframes(rule)) return;
-			rule.selector = selectorParser((selectors) => {
-				selectors.each((selector) => insertScopeClass(selector, scopeId));
-			}).processSync(rule.selector);
-		});
-		return root.toString();
-	} catch {
-		return null;
+// Inserts `.mk-<hash>` in the rightmost subject compound before pseudos. The
+// parser's CSS structure scanner already located those positions, one
+// `CssSelector.scopeInsert` each, so this splices them into the author's own
+// bytes instead of reparsing and reserializing the sheet. A sheet the scanner
+// could not model reports `scanned: false`, and the caller turns that into the
+// fail-closed diagnostic.
+function scopeSelectors(styleNode: AnyNode, scopeId: string): string | null {
+	const scoped: string[] = [];
+	for (const sheet of asNodes(styleNode.children)) {
+		if (sheet.type !== 'StyleSheet') continue;
+		if (sheet.scanned !== true || typeof sheet.source !== 'string') return null;
+		const offsets: number[] = [];
+		collectScopeInserts(asNodes(sheet.children), offsets);
+		scoped.push(spliceScopeClass(sheet.source, offsets, `.${scopeId}`));
 	}
+	// No sheet at all (a self-closing `<style/>`) is empty CSS, not a bail-out.
+	return scoped.join('');
 }
 
-function insertScopeClass(selector: Selector, scopeId: string): void {
-	let compoundStart = 0;
-	for (let index = selector.nodes.length - 1; index >= 0; index -= 1) {
-		if (selector.nodes[index]?.type === 'combinator') {
-			compoundStart = index + 1;
-			break;
+function collectScopeInserts(nodes: readonly AnyNode[], offsets: number[]): void {
+	for (const node of nodes) {
+		if (node.type === 'CssRule') {
+			for (const selector of asNodes(node.prelude)) {
+				if (typeof selector.scopeInsert === 'number') offsets.push(selector.scopeInsert);
+			}
+			collectScopeInserts(asNodes(node.block), offsets);
+			continue;
+		}
+		// Keyframe selectors ("from", "50%") name timeline stops, not elements.
+		if (node.type === 'CssAtrule' && node.keyframes !== true) {
+			collectScopeInserts(asNodes(node.block), offsets);
 		}
 	}
-	const pseudoIndex = selector.nodes.findIndex(
-		(node, index) => index >= compoundStart && node.type === 'pseudo',
-	);
-	const scopeClass = selectorParser.className({ value: scopeId });
-	const insertionPoint = pseudoIndex === -1 ? undefined : selector.nodes[pseudoIndex];
-	if (insertionPoint) selector.insertBefore(insertionPoint, scopeClass);
-	else selector.append(scopeClass);
 }
 
-function isInsideKeyframes(rule: Rule): boolean {
-	let parent: Container | Document | undefined = rule.parent;
-	while (parent) {
-		if (parent.type === 'atrule' && /keyframes$/i.test((parent as AtRule).name)) return true;
-		parent = parent.parent;
+const utf8Encoder = new TextEncoder();
+const utf8Decoder = new TextDecoder();
+
+// `scopeInsert` counts UTF-8 bytes into the sheet source, so the splice runs on
+// bytes: a string index would drift once any earlier byte is non-ASCII.
+function spliceScopeClass(source: string, offsets: readonly number[], scopeClass: string): string {
+	if (offsets.length === 0) return source;
+	const insert = utf8Encoder.encode(scopeClass);
+	let bytes = utf8Encoder.encode(source);
+	for (const offset of [...offsets].sort((left, right) => right - left)) {
+		const at = Math.min(Math.max(offset, 0), bytes.length);
+		const spliced = new Uint8Array(bytes.length + insert.length);
+		spliced.set(bytes.subarray(0, at), 0);
+		spliced.set(insert, at);
+		spliced.set(bytes.subarray(at), at + insert.length);
+		bytes = spliced;
 	}
-	return false;
+	return utf8Decoder.decode(bytes);
 }
 
 // FNV-1a over the module id: stable per component module, runtime-agnostic.

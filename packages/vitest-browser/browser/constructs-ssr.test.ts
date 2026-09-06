@@ -251,6 +251,9 @@ test('SSR: scoped <style> serves the mk-* scope class merged with author classes
 	expect(scopeClass).toMatch(/^mk-[a-z0-9]+$/);
 	expect(heading.classList.contains(scopeClass ?? '')).toBe(true);
 	expect(container.querySelector('style')).toBeNull();
+	// The served page carries no stylesheet for the scope (the SSR harness does
+	// not load the emitted CSS asset), so the compiled sheet is asserted in
+	// constructs-csr.test.ts and in the compiler suite instead.
 });
 
 test('SSR: attach={...} behavior activates from the first host interaction', async () => {
