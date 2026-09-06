@@ -241,6 +241,10 @@ function createService(): {
 		readDirectory: (path, extensions, exclude, include, depth) =>
 			ts.sys.readDirectory(path, extensions, exclude, include, depth),
 		readFile: (path) => ts.sys.readFile(path),
+		// Workspace packages reach each other through pnpm symlinks; without a
+		// realpath the same source file enters the program under two paths and every
+		// program rebuild trips the document registry.
+		realpath: (path) => ts.sys.realpath?.(path) ?? path,
 		// Volar only decorates a resolver the host already has, and its `.tsrx`
 		// resolution is the whole point of this service, so a plain one is required.
 		resolveModuleNameLiterals: (literals, containingFile, redirected, options, containing) =>
