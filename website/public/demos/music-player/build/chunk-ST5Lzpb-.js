@@ -1,0 +1,1 @@
+import{t as e}from"./chunk-BlhOb42Q.js";function t(e,t){r.set(e,t)}function n(e,t){if(!(!e||t.length===0))return r.get(e)?.(t)}var r,i=e((()=>{globalThis.__mxLog?.add(`web:prerender/staged-graph`),r=new WeakMap}));export{i as n,n as r,t};

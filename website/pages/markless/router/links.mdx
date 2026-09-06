@@ -1,0 +1,111 @@
+import PageMeta from '../../../components/page-meta.tsrx';
+import LinkTypoDemo from '../../../components/demos/link-typo-demo.tsrx';
+import Collapsible from '../../../components/demos/collapsible.tsrx';
+import Callout from '../../../components/demos/callout.tsrx';
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+import LikeHeart from '../../../components/docs/like-heart.tsrx';
+
+<Sidebar pathname="/markless/router/links" />
+
+# A link is a route plus its parts, not a string you build
+
+<PageMeta level="Building" time="4 min" assumes="routes" sprite="arrow-curve" />
+
+<ThemeToggle />
+
+Six months after shipping, somebody renames a folder. The build is green, the tests are green, and
+one link in the footer now goes nowhere. Nothing was watching it, because it was a string, and a
+string is just a string.
+
+**You write the route pattern and hand it the parts, so the link is checked the same way a function
+call is checked.**
+
+## The pattern is the file, brackets and all
+
+```tsrx
+import { Link } from '@markless/router';
+
+export default function PostLink({ post }: { readonly post: { slug: string; title: string } }) @{
+	<Link href="/blog/[slug]" params={{ slug: post.slug }}>
+		{post.title}
+	</Link>
+}
+```
+
+That `href` is not the URL. It is the file, `pages/blog/[slug].tsrx`, written the way it is spelled
+on disk, and `params` fills in the one hole in it. The router builds `/blog/whatever-the-slug-is`
+for you.
+
+A catch-all works the same way, and takes a string, a number, or a readonly array of segments. The
+next two are the element on its own, to be written inside a component of your own with `Link`
+imported the same way:
+
+```tsrx
+<Link href="/docs/[...slug]" params={{ slug: ['guides', 'intro'] }}>
+	Docs
+</Link>
+```
+
+A page with no holes in it needs no `params` at all:
+
+```tsrx
+<Link href="/">Home</Link>
+```
+
+## The types come from your own `pages/` folder
+
+When the router builds, it writes two files:
+
+```txt
+markless-router-env.d.ts
+.output/markless/router/types/routes.d.ts
+```
+
+Those hold the route model for your project, under names you can read in an editor tooltip:
+
+```ts
+MarklessRouterStaticPageHref;
+MarklessRouterConcretePageHref;
+MarklessRouterRoutePattern;
+MarklessRouterRouteParams;
+MarklessRouterLinkProps;
+```
+
+Then they extend the `@markless/router` module so `Link` only accepts an `href` your project
+actually has. Import `Link` from `@markless/router`, exactly that spelling, because that is the
+module the generated types attach themselves to.
+
+## Try it: rename the folder and watch the link go red
+
+Click the second button, and read the line under the code. The first button puts it back:
+
+<LinkTypoDemo />
+
+That box is a toggle, not a compiler. It shows you the message rather than producing it, because
+nothing on this page is being type-checked while you read it. In your editor the same mistake is
+underlined in `href` before you save the file.
+
+The useful part is where the error lands. It is on the link, in the file you are editing, and it
+names the pattern that does not exist. Nobody has to remember which pages linked to the folder that
+was renamed, because every one of them stops compiling.
+
+<Callout sprite="cross" title="This site links with plain anchors" text="Every link on this documentation site is a plain <a href> rather than a Link, because importing @markless/router into app code fails this site's production build on 0.3.1. It is recorded as finding 2 in this site's NOTES.md. Nothing you read here is being demonstrated by the site's own navigation, so treat the code above as what your app should do, and this sentence as the reason the page cannot show it to you working." />
+
+## What a `Link` is at runtime
+
+It renders a real `<a>` with a real `href`, so the browser treats it as a link: middle-click opens a
+tab, right-click offers to copy the address, and a reader with JavaScript off still gets where they
+are going. On a click it navigates on the client instead, and the router owns that navigation.
+
+<Collapsible sprite="star-badge" summary="The three props you will reach for eventually" text="prefetch asks the router to start fetching the destination before the click, so the navigation begins with work already done. Its type is boolean | 'intent' | 'viewport', and the two strings are the useful part: 'intent' starts the fetch when the reader hovers or focuses the link, and 'viewport' starts it when the link scrolls into view. replace swaps the current history entry instead of adding one, which is what you want after a form submission or a redirect, so the back button does not walk the reader into the page they just left. scroll controls whether arriving at the new page moves the reader back to the top. All three are ordinary props on Link, and all three are optional." />
+
+## Try it yourself
+
+Add a `Link` to a page that exists, then change one letter of the `href` and watch the editor
+underline it before you have saved. Then pass `params` a key the pattern does not have, and read
+that error too. Both of those are the same check, and neither one runs anything.
+
+Next: [where a page gets its data](/markless/router/data).
+
+<LikeHeart />

@@ -1,0 +1,1 @@
+import{t as e}from"./chunk-BlhOb42Q.js";import{c as t,s as n}from"./chunk-Bc85LTXK.js";async function r(e){}e((()=>{t(),globalThis.__mxLoadLog||=()=>import(`./chunk-Dph1VtZt.js`).then(e=>(e.n(),e.t))}))();export{r as resumeContainerEvent};

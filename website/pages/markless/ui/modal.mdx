@@ -1,0 +1,55 @@
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+import Preview from '../../../components/ui/preview.tsrx';
+
+<Sidebar pathname="/markless/ui/modal" />
+
+# modal
+
+<ThemeToggle />
+
+<Preview shows="A button that opens a dialog over a dimmed page." />
+
+```tsrx
+import { modal } from '@markless/ui';
+
+export default function EditAddress() @{
+	<modal.root>
+		<modal.trigger>Edit address</modal.trigger>
+		<modal.backdrop>
+			<modal.content>
+				<modal.title>Edit delivery address</modal.title>
+				<modal.description>We will send your order here.</modal.description>
+				<modal.close>Cancel</modal.close>
+			</modal.content>
+		</modal.backdrop>
+	</modal.root>
+}
+```
+
+The backdrop wraps the surface rather than sitting beside it, so styling the dimming layer and the
+dialog together is ordinary nesting. Opening a dialog marks the rest of the page inert; closing it
+puts focus back on the trigger that opened it, or on whatever had focus if something else did.
+Mounting `modal.title` is what names the dialog.
+
+## Anatomy
+
+- `modal.root` — holds whether the dialog is showing.
+- `modal.trigger` — the button that opens it.
+- `modal.backdrop` — the dimming layer, and the element that is elevated.
+- `modal.content` — the dialog surface, inside the backdrop.
+- `modal.title` — the dialog's name.
+- `modal.description` — a sentence a reader announces after the name.
+- `modal.close` — a button that closes it.
+
+It writes `ui-open` and `ui-closed`.
+
+## Props on `modal.root`
+
+| Prop | Type | What it does |
+| --- | --- | --- |
+| `open` | `boolean` | Whether the dialog is showing. Omit it and it starts closed. |
+| `alert` | `boolean` | An alert dialog: it announces as `alertdialog`, refuses to close on an outside press, and puts focus on the close control. Escape still closes it. |
+| `onChange` | `(open) => void` | Called with the new value when the dialog opens or closes, dismissals included. |
+
+Everything a `<div>` accepts reaches the element too.

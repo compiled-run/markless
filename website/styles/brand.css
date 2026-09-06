@@ -1,0 +1,123 @@
+/* What survives the playground makeovers: the accepted sidebar select and link
+   treatment, and the playground switch. Everything else in the playground is
+   the generated chrome's own look. */
+
+:root {
+	--marker-wash: color-mix(in oklch, var(--purple) 24%, transparent);
+	--quiet-fill: color-mix(in oklch, var(--ink) 6%, var(--paper));
+	--switch-on: oklch(72% 0.17 148);
+	--switch-off: oklch(64% 0.01 80);
+}
+
+html .site-search {
+	display: none;
+}
+
+/* Sidebar select and links. Generated component CSS is scoped with a hash
+   class, so these carry html .prose to outrank it. */
+.mode-select-island {
+	position: relative;
+	position-anchor: auto;
+	inset: auto;
+	inline-size: 100%;
+	margin-bottom: var(--space-s);
+	z-index: 25;
+}
+html .prose .mode-select-trigger {
+	background: var(--paper);
+	border: 1.5px solid var(--ink);
+	border-radius: 3px;
+	min-height: 2.7rem;
+	box-shadow: 3px 3px 0 var(--purple);
+}
+html .prose .mode-select-content {
+	background: var(--paper);
+	padding: 0.4rem;
+	border: 1.5px solid var(--ink);
+	border-radius: 3px;
+	box-shadow: 3px 4px 0 var(--purple);
+}
+html .prose .mode-select-item {
+	min-height: 2.25rem;
+	box-sizing: border-box;
+	border: 0;
+	border-radius: 1px;
+	background: transparent;
+	color: var(--ink);
+}
+html .prose .mode-select-item[ui-selected] {
+	background: var(--marker-wash);
+	font-weight: 700;
+}
+html .prose .mode-select-item:is(:hover, :focus-visible),
+html .prose .sidebar-link:is(:hover, :focus-visible) {
+	background: var(--quiet-fill);
+	outline: 1px dashed var(--ink);
+	outline-offset: -3px;
+}
+html .prose .mode-select-item[ui-selected]:is(:hover, :focus-visible) {
+	background: var(--marker-wash);
+}
+html .prose .mode-select-trigger:focus-visible {
+	outline: 2px dashed var(--ink);
+	outline-offset: 4px;
+}
+.prose .sidebar a {
+	text-decoration: none;
+}
+.prose .sidebar-list {
+	margin: 0;
+	padding: 0;
+}
+.prose .sidebar-title {
+	margin-block: 0 0.65em;
+}
+
+/* The playground switch: grey track, green when on, a white thumb with an ink edge. */
+html .prose .pg-switch {
+	flex: none;
+	width: 2.75em;
+	height: 1.65em;
+	padding: 0.06em;
+	border: 2px solid var(--ink);
+	border-radius: 999px;
+	background: var(--switch-off);
+	font-size: var(--step--1);
+	transition: background 140ms ease;
+}
+html .prose .pg-switch[ui-checked] {
+	background: var(--switch-on);
+}
+html .prose .pg-knob {
+	box-sizing: border-box;
+	flex: none;
+	width: 1.25em;
+	height: 1.25em;
+	border: 1.5px solid var(--ink);
+	background: white;
+}
+html .prose .pg-switch[ui-checked] .pg-knob {
+	margin-inline-start: calc(100% - 1.25em);
+}
+html[data-theme='dark'] .prose .pg-switch {
+	--switch-off: oklch(42% 0.01 80);
+}
+html[data-theme='dark'] .prose .pg-knob {
+	border-color: oklch(28% 0.015 90);
+}
+
+@media (max-width: 30rem) {
+	html :is(.crumb-section, .crumb-sep) {
+		display: none;
+	}
+	html .header-link {
+		display: none;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.mode-select-caret,
+	html .prose .pg-switch {
+		transition: none;
+	}
+}

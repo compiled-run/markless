@@ -1,0 +1,59 @@
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+import Preview from '../../../components/ui/preview.tsrx';
+
+<Sidebar pathname="/markless/ui/pagination" />
+
+# pagination
+
+<ThemeToggle />
+
+<Preview shows="Five numbered pages between a back and a next." />
+
+```tsrx
+import { pagination } from '@markless/ui';
+
+export default function Pages() @{
+	<pagination.root count={5} page={1}>
+		<pagination.backtrigger>Previous</pagination.backtrigger>
+		<pagination.item value={1}>
+			<pagination.itemtrigger>1</pagination.itemtrigger>
+		</pagination.item>
+		<pagination.item value={2}>
+			<pagination.itemtrigger>2</pagination.itemtrigger>
+		</pagination.item>
+		<pagination.forwardtrigger>Next</pagination.forwardtrigger>
+	</pagination.root>
+}
+```
+
+The page number is written once, on the item, and the control inside reads it back, so the two can
+never fall out of step. `count` is pages, not rows — how many rows fit on a page is your data layer,
+and a component told about the data twice can disagree with itself. For long runs, ask the family
+which pages to draw: `pagination.entries(count, page, siblingCount)` returns the range, so how
+pages are picked can change without changing what you wrote.
+
+There is no exported state for this family yet. A consumer reaches the range through
+`pagination.entries` rather than reading the instance.
+
+## Anatomy
+
+- `pagination.root` — the `<nav>` landmark. Named "Pagination" unless you say otherwise.
+- `pagination.item` — one page's box, declaring which page it stands for.
+- `pagination.itemtrigger` — the control inside an item. It takes no page number of its own.
+- `pagination.itemlink` — the same control over an `<a>`, for pagination with real URLs.
+- `pagination.backtrigger` and `pagination.forwardtrigger` — one step either way.
+
+It writes `ui-active` and `ui-disabled`.
+
+## Props on `pagination.root`
+
+| Prop | Type | What it does |
+| --- | --- | --- |
+| `count` | `number` | How many pages there are in total. Required. |
+| `page` | `number` | Which page is showing, counting from 1. Omit it and it starts at page 1. |
+| `siblingCount` | `number` | How many pages to show on each side of the current one. Omit it and it is 1. |
+| `disabled` | `boolean` | Nothing navigates, and every control reports unavailable. |
+| `onChange` | `(page) => void` | Called with the new page number when a person moves to another page. |
+
+Everything a `<nav>` accepts reaches the element too. `pagination.item` takes its own `value`.

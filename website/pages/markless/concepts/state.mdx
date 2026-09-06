@@ -1,0 +1,137 @@
+import PageMeta from '../../../components/page-meta.tsrx';
+import CounterDemo from '../../../components/demos/counter-demo.tsrx';
+import TwoVariablesDemo from '../../../components/demos/two-variables-demo.tsrx';
+import Collapsible from '../../../components/demos/collapsible.tsrx';
+import Callout from '../../../components/demos/callout.tsrx';
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+import LikeHeart from '../../../components/docs/like-heart.tsrx';
+
+<Sidebar pathname="/markless/concepts/state" />
+
+# State is a variable the page is watching
+
+<PageMeta level="Start here" time="4 min" assumes="reading-tsrx" sprite="burst" />
+
+<ThemeToggle />
+
+You already know how to count in JavaScript.
+
+```tsrx
+let count = 0;
+count++;
+```
+
+Put `count` on the screen, run `count++`, and the screen will not change. Nothing is wrong with the
+variable. Nothing told the page to care about it.
+
+**`state()` is how you tell the page to care.**
+
+```tsrx
+let count = state(0);
+```
+
+Still a `let`. Still starts at zero. You still read it by writing `count` and change it by writing
+`count++`. The one difference is that any part of your markup that used `count` now updates when
+`count` changes.
+
+Here it is running. Click it a couple of times, with a beat between clicks:
+
+<CounterDemo />
+
+That button is this file, all of it:
+
+```tsrx
+import { state } from '@markless/core';
+
+export default function Counter() @{
+	let count = state(0);
+
+	<button onClick={() => count++}>Clicked {count} times</button>
+}
+```
+
+`count++` is the only thing the click does. No update call, no second name for the variable. The
+number inside the button is the only thing on the page that changes.
+
+## Only the parts that read it change
+
+Two numbers, side by side. The first is a state variable. The second is an ordinary number, drawn
+once with `Math.random` while the component rendered and never touched again.
+
+Click the button, and watch which one moves:
+
+<TwoVariablesDemo />
+
+The watched number went up. The drawn number did not, and it will not, however long you keep
+clicking.
+
+That is the whole lesson in one picture. Had the click re-run the component, a fresh random number
+would have appeared beside the new count. Instead it updated the one piece of text that read
+`clicks` and left the rest of the section exactly as the server sent it.
+
+Here is the whole file:
+
+```tsrx
+import { state } from '@markless/core';
+
+export default function TwoVariables() @{
+	let clicks = state(0);
+	const drawn = Math.floor(Math.random() * 900) + 100;
+
+	<section>
+		<p>A watched variable: {clicks}</p>
+		<p>An ordinary number, drawn once while this rendered: {drawn}</p>
+		<button onClick={() => clicks++}>Add one to the watched variable</button>
+	</section>
+}
+```
+
+So `state()` is not a special kind of storage, and it is not a box you have to open. It is a note to
+the compiler: someone is going to change this, so keep track of who is reading it.
+
+<Callout sprite="cross" title="So what if I change an ordinary variable instead?" text="You cannot, and the compiler says so before your app ever runs. Write to a plain local variable from a click handler while the markup also reads it, and the build stops with MARKLESS_STATE_STALE_LOCAL_WRITE: Cannot write to plain from a handler because the template reads the component local only during initial render. It then tells you the fix, which is to move the variable into state(). This is the same rule from the other side. The page can only follow what you asked it to follow, so a variable that changes and is on screen has to be state." />
+
+## What the compiler does with that note
+
+It reads your whole component, so it knows three things before your app runs: where the value is
+created, everywhere it is read, and everywhere it is written. The specification puts it plainly:
+every read of that binding compiles to a graph read and every supported write compiles to a graph
+write, and that includes reads inside click handlers, inside markup, and inside helper functions in
+the same file.
+
+Two consequences you can feel.
+
+**Your component function does not run again.** Clicking that button runs the two characters you
+wrote, `++`, and then updates the one piece of text that read `count`. Updates belong to the value,
+not to the component.
+
+**Objects update field by field.** A scalar becomes one watched cell. An object becomes one watched
+cell per path, so this only touches the part of the page that read the status:
+
+```tsrx
+let user = state({ name: 'Ada', status: 'anonymous' });
+
+user.status = 'ready';
+```
+
+## Where `state()` works
+
+Inside `.tsrx` files. That is the rule, and it is not an oversight.
+
+Calling `state()` from a plain `.ts` file throws immediately, on purpose. Reactivity here is a
+feature of the language the compiler owns, not a library you can call from anywhere, and drawing
+that line is exactly what buys you the plain `let` and the plain `count++`. You find out at once
+rather than wondering later why a number never moves.
+
+<Collapsible sprite="star-badge" summary="Coming from another framework?" text="If you have used one of the signal or hook based libraries, the thing to unlearn is the wrapper. There is no .value to read through, no setter function to call, and no character to add to the variable name. The reason Markless can do without them is that it compiles your file rather than watching your objects at runtime, so it already knows every place count is read. The tradeoff is the boundary above: this only works in .tsrx files." />
+
+## Try it yourself
+
+Open the counter file in your own project and add a second line of markup that also reads `count`,
+a paragraph above the button, say. Click once. Both places update, and you wrote nothing to connect
+them.
+
+Next: [values you never update by hand](/markless/concepts/computed).
+
+<LikeHeart />

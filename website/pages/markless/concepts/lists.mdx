@@ -1,0 +1,160 @@
+import PageMeta from '../../../components/page-meta.tsrx';
+import Collapsible from '../../../components/demos/collapsible.tsrx';
+import Callout from '../../../components/demos/callout.tsrx';
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+import LikeHeart from '../../../components/docs/like-heart.tsrx';
+
+<Sidebar pathname="/markless/concepts/lists" />
+
+# A key tells the page which row is which
+
+<PageMeta level="Start here" time="5 min" assumes="state, conditionals" sprite="dashes" />
+
+<ThemeToggle />
+
+Everybody ships this bug once. A table with a checkbox on every row. You tick one, you sort the
+table, and the tick is now on somebody else's row. Nothing threw. Nothing looked broken. The wrong
+person got the email.
+
+The page had no idea the rows were the same rows in a new order. It saw three slots, and it filled
+them again from the top.
+
+**A key is the answer to "which row is this?", and once a row has one, everything attached to that
+row moves with it.**
+
+## Tick the middle row, then sort
+
+<Callout sticker="map" sprite="cross" title="Why the rows on this page are a file rather than a box" text="The rows below are meant to be a box you can tick and sort. They are not on the page yet, because a component using @for does not compile on the framework build this site is pinned to: the compiler stops making progress and the build never finishes. The file below is real and is what you will run in your own project, and the page comes back with its widget the day the build accepts it. NOTES.md finding 23 in the site repository has the reproduction." />
+
+Three rows, one checkbox each, and a button that sorts them alphabetically. Put the file below in
+your own project, tick the middle row, Pears, then press Sort, and watch where the word "picked"
+ends up.
+
+Pears moves, and the tick moves with it. Nothing in the code copies a checkbox state from one row to
+another, because nothing needs to. The row is a thing with a name, and the name did not change when
+its position did.
+
+```tsrx
+import { state } from '@markless/core';
+
+export default function SortableRows() @{
+	let rows = state([
+		{ id: 'pears', label: 'Pears', picked: false },
+		{ id: 'apples', label: 'Apples', picked: false },
+		{ id: 'plums', label: 'Plums', picked: false },
+	]);
+
+	<section>
+		<ul class="row-list">
+			@for (const row of rows; key row.id) {
+				<li class="row">
+					<label>
+						<input
+							type="checkbox"
+							checked={row.picked}
+							onChange={() => (row.picked = !row.picked)}
+						/>
+						{row.label}
+					</label>
+					<span class="row-mark">{row.picked ? 'picked' : ''}</span>
+				</li>
+			}
+		</ul>
+		<button
+			onClick={() =>
+				(rows = [...rows].sort((left, right) => left.label.localeCompare(right.label)))
+			}
+		>
+			Sort A to Z
+		</button>
+	</section>
+}
+```
+
+The whole of the identity story is `key row.id` in the loop header.
+
+## What a key buys you
+
+The specification is specific about what travels with a keyed row: its component instances, its
+local `state()`, its derived values, its async work, its DOM updates and its event wiring all stay
+attached to the same logical item "across reorder, insert, and delete operations".
+
+So a key is not a hint for a diffing algorithm to do better. It is the identity of the row, and it
+is what makes a row a place where state can live at all.
+
+## Choosing the key
+
+Use the thing that identifies the item in your data. A database id, a slug, an order number. It has
+to be stable, meaning the same item carries the same key on every render, and unique within the
+list.
+
+Two things not to use. Not the array index by accident, because it names the slot rather than the
+item, which is the original bug in a new costume. And not a value the reader can edit, because a row
+that gets renamed becomes, as far as the page is concerned, a different row.
+
+Naming the position is sometimes genuinely what you want, and TSRX has a way to say so out loud:
+
+```tsrx
+import ProductCard from './product-card.tsrx';
+import type { Product } from './products.ts';
+
+export default function ProductGrid({ products }: { readonly products: readonly Product[] }) @{
+	<section>
+		@for (const product of products; index i; key i) {
+			<ProductCard product={product} />
+		}
+	</section>
+}
+```
+
+That reads "state follows the slot, not the item", which is right for a fixed set of positions and
+wrong for a list that reorders.
+
+<Callout sprite="cross" title="What if I just leave the key off?" text="An unkeyed loop is positional, which is fine for output that never changes and holds nothing: a list of static labels, say. The moment a row holds state or handles events, the compiler asks for a key and points at the @for header. The three diagnostics are MARKLESS_REPEAT_KEY_REQUIRED when there is no key on a stateful loop, MARKLESS_REPEAT_KEY_IS_INDEX when the key is the index and the list can reorder, and MARKLESS_REPEAT_KEY_UNSTABLE when the key is something that can change under you. You find out at build time, not from a support ticket." />
+
+## An empty list gets its own branch
+
+You do not need an `@if` around the loop to say "nothing here yet". `@empty` belongs to the loop and
+renders when it has no items:
+
+```tsrx
+import { state } from '@markless/core';
+
+export default function Updates() @{
+	let updates = state([{ id: 'markless', project: 'Markless', version: '0.3.1' }]);
+
+	<ul class="update-list">
+		@for (const update of updates; key update.id) {
+			<li>
+				<strong>{update.project}</strong>
+				<span>{update.version}</span>
+			</li>
+		} @empty {
+			<li>No local updates</li>
+		}
+	</ul>
+}
+```
+
+## Why the sort was cheap
+
+Reordering a keyed list moves existing rows. It does not rebuild them, and it does not run any
+component function again: the rows already exist, keyed, and the work is moving DOM nodes into a new
+order.
+
+That is the same promise as the previous pages, kept at a different scale. Changing a number touched
+one piece of text. Sorting a list touched the order of some rows. Neither one re-ran your code.
+
+<Collapsible sprite="star-badge" summary="Coming from another framework?" text="If you have written keys before, you have probably been told they are a performance hint, and that using the index is a small sin you can get away with in a static list. The framing here is different and stricter. A key is the identity root for the row's own graph scope, which is to say it is what makes local state inside a row possible in the first place. That is also why the compiler refuses to guess: an interactive loop without a stable key is a build error rather than a warning in a console you may never open." />
+
+## Try it yourself
+
+Give each row its own counter with a button that increases it, tick nothing, and sort. The counts
+follow their rows. Then change `key row.id` to `key i`, using an `index i` clause, and do it again.
+Watching the counts stay behind while the labels move is the clearest demonstration of what a key
+does that exists.
+
+Next: [how a page waits for data](/markless/concepts/async), without you ever writing a loading flag.
+
+<LikeHeart />

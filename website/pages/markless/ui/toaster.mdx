@@ -1,0 +1,72 @@
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+import Preview from '../../../components/ui/preview.tsrx';
+
+<Sidebar pathname="/markless/ui/toaster" />
+
+# toaster
+
+<ThemeToggle />
+
+<Preview shows="A button, and one message that appears and leaves." />
+
+```tsrx
+import { toaster } from '@markless/ui';
+
+export default function Save() @{
+	const toasts = toaster.state();
+
+	<main>
+		<button
+			type="button"
+			onClick={() => {
+				toasts.queue = toaster.say(toasts.queue, 'Saved', { id: 'save' });
+			}}
+		>Save</button>
+		<toaster.root>
+			<div role="presentation">
+				@for (const message of toasts.queue; key message.id) {
+					<toaster.item toast={message}>
+						<toaster.itemicon />
+						<toaster.itemtitle />
+						<toaster.itemdescription />
+						<toaster.itemclose aria-label="Dismiss">×</toaster.itemclose>
+					</toaster.item>
+				}
+			</div>
+		</toaster.root>
+	</main>
+}
+```
+
+The region is on the page before the first message, because a live region added at the same moment
+as its text is not announced. The root renders no rows of its own, so how many show is your own
+repeat to decide — `toaster.shown(queue, n)` is the cap to write against. A message is raised by
+assigning the queue from your handler: `toasts.queue = toaster.say(toasts.queue, ...)`. Say it
+again with the same `id` and the message already showing is updated rather than duplicated.
+
+## Anatomy
+
+- `toaster.root` — the `<ol>` live region. One per page.
+- `toaster.item` — one row, handed the message it shows.
+- `toaster.itemtitle`, `toaster.itemdescription`, `toaster.itemicon` — that row's text and mark.
+- `toaster.itemclose` — the button that dismisses the message it sits in.
+- `toaster.say`, `toaster.drop`, `toaster.shown` — the queue's arithmetic, for your own handler.
+
+It writes `ui-toast`, `ui-toaster`, `ui-tone`, `ui-front` and `ui-paused`, plus one per part.
+
+## Props on `toaster.root`
+
+`toaster.root` takes no props of its own beyond what an `<ol>` accepts. There is no `visible`
+prop, because the root renders no rows: the cap belongs to your repeat.
+
+`toaster.item` is where the data goes:
+
+| Prop | Type | What it does |
+| --- | --- | --- |
+| `toast` | `ToastRecord` | The message this row shows. Required. |
+| `index` | `number` | Where it stands in the stack. 0 is the front one. |
+
+`toaster.say(queue, title, options)` takes an `id`, a `tone` of `neutral`, `success`, `warning` or
+`error`, a `description`, and a `duration` in milliseconds — `Infinity` keeps the message until
+something dismisses it.

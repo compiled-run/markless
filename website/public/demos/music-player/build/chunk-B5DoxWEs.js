@@ -1,0 +1,1 @@
+import{t as e}from"./chunk-BlhOb42Q.js";function t(e,t){if(t){if(r(t)){e.push(...t);return}e.push(t)}}function n(e){if(typeof queueMicrotask==`function`){queueMicrotask(e);return}Promise.resolve().then(e)}function r(e){return Array.isArray(e)}var i=e((()=>{globalThis.__mxLog?.add(`runtime:graph-scheduler`)}));export{i as n,n as r,t};

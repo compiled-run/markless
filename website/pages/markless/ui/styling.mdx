@@ -1,0 +1,61 @@
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+
+<Sidebar pathname="/markless/ui/styling" />
+
+# The look is yours, the state is an attribute
+
+<ThemeToggle />
+
+Nothing in `@markless/ui` arrives with a look. What a part hands you instead is its state, written
+onto its own element as a plain attribute, so your stylesheet reaches it the way it reaches
+`:hover`. There is no class to toggle from TypeScript and nothing to keep in sync.
+
+```css
+[ui-open] {
+	border-color: rebeccapurple;
+}
+```
+
+## The attributes
+
+Every family writes `ui-*` attributes as its state changes: `ui-open` and `ui-closed` on an
+accordion section, `ui-checked` on a box, `ui-disabled` anywhere something has stopped responding.
+Most are flags with no value, present while the state holds and gone while it does not, so
+`[ui-open]` is the whole selector.
+
+A few carry a value instead, so one selector can name one element: an accordion item writes
+`ui-value="returns"`, and `[ui-value='returns']` reaches that section alone.
+
+Each family's page lists what its parts write.
+
+## Ten lines that style an accordion
+
+You give the parts your own class names and select on the attribute where the state matters:
+
+```css
+.section {
+	border: 2px solid #ddd;
+}
+
+.section[ui-open] {
+	border-color: rebeccapurple;
+}
+
+.trigger[ui-open]::after {
+	transform: rotate(180deg);
+}
+```
+
+## Your class names stay yours
+
+Write that block inside the component and the names in it belong to that file: the compiler adds a
+scope class beside each one, so a `.section` here cannot collide with a `.section` two folders away.
+The [scoping rules](/markless/concepts/styling) are the framework's, not this package's, and they
+are the same ones your own components already get.
+
+## When a family ships CSS
+
+A family that cannot work without CSS, an overlay that has to sit above the page or a panel that
+starts hidden, ships that rule inside `@layer markless`. Your own unlayered rule beats it without
+`!important`, which is the entire reason the layer is there.

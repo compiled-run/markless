@@ -1,0 +1,164 @@
+import PageMeta from '../../../components/page-meta.tsrx';
+import Collapsible from '../../../components/demos/collapsible.tsrx';
+import Callout from '../../../components/demos/callout.tsrx';
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+import LikeHeart from '../../../components/docs/like-heart.tsrx';
+
+<Sidebar pathname="/markless/concepts/conditionals" />
+
+# A hidden branch is not hidden, it is gone
+
+<PageMeta level="Start here" time="5 min" assumes="state, events" sprite="corner-bracket" />
+
+<ThemeToggle />
+
+Here is a bug you have met. A panel with a message box in it. You type half a sentence, close the
+panel by accident, open it again, and your half sentence is not there.
+
+That is not a glitch. It is the framework doing exactly what the code said, and once you can see
+why, the fix is one line and you will never write the bug again.
+
+**`@if` puts real elements into the page and takes them out again, and anything declared inside the
+branch goes out with them.**
+
+<Callout sticker="spring" sprite="cross" title="Why the panels on this page are files rather than boxes" text="Every other page here hands you something to click. This one does not, and the honest reason is that a component using @if does not compile on the framework build this site is pinned to: the compiler stops making progress and the build never finishes. Both files below are real, and both are the specification's own example, so they are what you will run in your own project. The panels come back to this page the day the build accepts them. NOTES.md finding 23 in the site repository has the reproduction." />
+
+## Type, close, open
+
+Paste the file below into your own project and run three steps. Open the panel, type something into
+the field, close the panel, then open it again.
+
+Your text is gone. The `draft` variable that was holding it lived inside the branch, so when the
+branch left the page the variable left with it. Opening the panel again did not restore anything. It
+built a new field with a new, empty `draft`.
+
+The important line is the one indented inside the `@if`:
+
+```tsrx
+import { state } from '@markless/core';
+
+export default function DraftLost() @{
+	let open = state(false);
+
+	<section>
+		<button onClick={() => (open = !open)}>Toggle the panel</button>
+
+		@if (open) {
+			let draft = state('');
+
+			<label>
+				Your message
+				<input value={draft} onInput={(event) => (draft = event.currentTarget.value)} />
+			</label>
+			<p>Draft: {draft}</p>
+		}
+	</section>
+}
+```
+
+## The fix is to move one line up
+
+Take `draft` out of the branch and put it in the component body, above the `@if`. The branch still
+comes and goes, but the value it reads does not:
+
+```tsrx
+import { state } from '@markless/core';
+
+export default function DraftKept() @{
+	let open = state(false);
+	let draft = state('');
+
+	<section>
+		<button onClick={() => (open = !open)}>Toggle the panel</button>
+
+		@if (open) {
+			<label>
+				Your message
+				<input value={draft} onInput={(event) => (draft = event.currentTarget.value)} />
+			</label>
+			<p>Draft: {draft}</p>
+		}
+	</section>
+}
+```
+
+Run the same three steps on that one and your text comes back. The only difference between the two
+components is which side of the `@if` the declaration sits on.
+
+The rule to carry away: **where you declare a value decides how long it lives.** Inside a branch
+means "for as long as this branch is on screen". Above it means "for as long as the component is".
+
+Sometimes the first one is what you want. A filter panel that should open fresh every time is better
+off declaring its own state inside the branch.
+
+<Callout sprite="speech-bubble" title="Will anything warn me?" text="Not today. The specification says the compiler should be able to explain this when local state appears inside a conditional branch, in these words: State declared inside @if is disposed when the branch is removed. Move it above the @if if it should persist. That message is a plan, not a thing you will see: the published 0.3.1 compiler carries no such diagnostic, and we checked by searching its build output for the word disposed and finding none. So this rule is one to remember rather than one you will be reminded of." />
+
+## The rest of the shapes
+
+`@else` covers the other side of the same condition:
+
+```tsrx
+import { state } from '@markless/core';
+
+export default function Either() @{
+	let open = state(false);
+
+	<section>
+		<button onClick={() => (open = !open)}>Toggle</button>
+		@if (open) {
+			<p class="open">Shown</p>
+		} @else {
+			<p class="closed">Hidden</p>
+		}
+	</section>
+}
+```
+
+Choosing between more than two reads better as `@switch` than as a chain. It renders the one `@case`
+whose value matches, and `@default` catches everything else:
+
+```tsrx
+import { state } from '@markless/core';
+
+export default function Pick() @{
+	let kind = state('alpha');
+
+	<section>
+		<button onClick={() => (kind = 'beta')}>Choose beta</button>
+		@switch (kind) {
+			@case 'alpha': {
+				<p>A</p>
+			}
+			@case 'beta': {
+				<p>B</p>
+			}
+			@default: {
+				<p>Other</p>
+			}
+		}
+	</section>
+}
+```
+
+These are part of the language, not a trick played with JavaScript expressions inside the markup.
+That is what lets the compiler treat a branch as a real thing with a beginning and an end, rather
+than as an opaque expression it has to re-evaluate.
+
+## What actually happens when the condition flips
+
+Not much, and that is the point. Flipping a branch swaps a range of real DOM nodes in or out and
+disposes the graph state that belonged to the branch. No component function runs again, not the one
+holding the `@if` and not any component inside it.
+
+<Collapsible sprite="thought-bubble" summary="Coming from another framework?" text="If you are used to writing conditions as an expression, with a ternary or a logical and inside the markup, the shape here is a statement instead, and the difference is more than cosmetic. A branch has an identity the compiler can name, so it can be given its own scope, its own disposal and its own place in the page. That is why the draft in the first file really is destroyed rather than merely hidden: there is no retained shadow copy of the tree anywhere for it to hide in." />
+
+## Try it yourself
+
+Take the second component and add a second field inside the branch, declared inside the `@if` this
+time, so one value survives the toggle and the other does not. Type into both, close, open. Seeing
+the two behaviours side by side in one panel is the fastest way to make the rule stick.
+
+Next: [rows that keep their own state when the list moves](/markless/concepts/lists).
+
+<LikeHeart />

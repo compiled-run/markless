@@ -1,0 +1,200 @@
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+import GridListDemo from '../../../components/demos/ui/gridlist-demo.tsrx';
+
+<Sidebar pathname="/markless/ui/gridlist" />
+
+# gridlist
+
+<ThemeToggle />
+
+<GridListDemo shows="Three files. Arrow down to a row, then press Enter to reach its buttons." />
+
+```tsrx
+import { gridlist } from '@markless/ui';
+
+const list = 'display: grid; gap: 0.4em; inline-size: min(30rem, 100%)';
+const cell = 'display: flex; gap: 0.6em; align-items: center; padding: 0.45em 0.7em; border: 2px solid var(--code-edge); border-radius: 6px; background: var(--paper)';
+const grow = 'flex: 1; font-weight: 700';
+const quiet = 'font-size: var(--step--2); opacity: 0.7';
+const button = 'padding: 0.15em 0.7em; border: 1px solid var(--code-edge); border-radius: 999px; background: var(--raised); color: var(--ink); font: inherit; font-size: var(--step--2); cursor: pointer';
+
+export default function Files() @{
+	<gridlist.root selectable multiple value={['moodboard']} style={list}>
+		<gridlist.label style={quiet}>Shared with the studio</gridlist.label>
+		<gridlist.item value="moodboard">
+			<gridlist.itemcontent style={cell}>
+				<gridlist.itemlabel style={grow}>moodboard.png</gridlist.itemlabel>
+				<span style={quiet}>2.4 MB</span>
+				<gridlist.itemtrigger style={button}>Rename</gridlist.itemtrigger>
+			</gridlist.itemcontent>
+		</gridlist.item>
+		<gridlist.item value="invoice">
+			<gridlist.itemcontent style={cell}>
+				<gridlist.itemlabel style={grow}>invoice-april.pdf</gridlist.itemlabel>
+				<span style={quiet}>88 KB</span>
+				<gridlist.itemtrigger style={button}>Rename</gridlist.itemtrigger>
+			</gridlist.itemcontent>
+		</gridlist.item>
+		<gridlist.item value="sardines">
+			<gridlist.itemcontent style={cell}>
+				<gridlist.itemlabel style={grow}>sardines-on-toast.jpg</gridlist.itemlabel>
+				<span style={quiet}>1.1 MB</span>
+				<gridlist.itemtrigger style={button}>Rename</gridlist.itemtrigger>
+			</gridlist.itemcontent>
+		</gridlist.item>
+	</gridlist.root>
+}
+```
+
+A row is named by its `value`, and the root's `value` is the list of rows that are picked. Focus
+rests on a row, never on anything inside it, so the list is one tab stop. That is why this family
+exists instead of a plain list: a row may hold buttons, `Enter` moves focus onto them, `Escape`
+brings it back out.
+
+## Anatomy
+
+- `gridlist.root` holds the configuration and the rows that are picked.
+- `gridlist.label` names the list, and the grid points `aria-labelledby` here.
+- `gridlist.item` is one row, named by its own `value`, and where focus rests.
+- `gridlist.itemcontent` is the cell a row's content sits in.
+- `gridlist.itemlabel` is the row's own words, and what typeahead matches against.
+- `gridlist.itemtrigger` is a button the row holds, out of the tab order.
+- `gridlist.itemindicator` is the mark showing that this row is picked.
+
+It writes `ui-selectable`, `ui-multiple`, `ui-disabled`, `ui-inside`, `ui-value` and `ui-selected`
+as its state changes.
+
+## Pick more than one
+
+Write `multiple` and several rows are picked at once. It turns selection on by itself, so
+`selectable` is only for a list that picks one at a time.
+
+```tsrx
+<gridlist.root multiple value={['moodboard', 'invoice']} onChange={keep}>
+```
+
+## A gallery that wraps
+
+Rows are walked by where their boxes sit, not by the order they were written, so wrapped cards
+move the way they look. Add `wrap` and a walk off the last row comes round to the first.
+
+```tsrx
+<gridlist.root wrap style="display: flex; flex-wrap: wrap; gap: 0.5em">
+```
+
+## Buttons a keyboard can reach
+
+`Enter` on a row moves focus onto the first `gridlist.itemtrigger` it holds. The walk knows only
+that part: a bare `<button>` in a row answers `Tab`, but `Enter` will not find it.
+
+```tsrx
+<gridlist.itemcontent>
+	<gridlist.itemlabel>moodboard.png</gridlist.itemlabel>
+	<gridlist.itemtrigger>Rename</gridlist.itemtrigger>
+</gridlist.itemcontent>
+```
+
+## Keyboard
+
+Focus rests on a row, and the walk steps over disabled rows.
+
+| Key | What it does |
+| --- | --- |
+| Down arrow or Up arrow | Focus the row whose box sits below or above this one. |
+| Left arrow or Right arrow | Focus the row to the left or the right. Once focus is inside a row, they step between the controls it holds. |
+| Home or End | Focus the first or the last row. |
+| Enter or F2 | Move focus onto the first control this row holds. |
+| Escape | Inside a row, focus goes back to the row. On a row, everything picked is let go. |
+| Space | Pick the focused row, or let it go again. |
+| Shift and an arrow | Replace what is picked with the run from the anchor row to the one arrived at. Needs `multiple`. |
+| Ctrl or Cmd and A | Pick every row. Needs `multiple`. |
+| Any letter | Focus the next row whose label starts with what you typed. |
+
+## API
+
+Every prop is optional unless its row says so, and the types are the family's own.
+
+### `gridlist.root`
+
+| Prop | Type | What it does |
+| --- | --- | --- |
+| `value` | `readonly string[]` | The rows that are picked, named by the `value` each row was written with. Omit it and nothing starts picked. |
+| `selectable` | `boolean` | Rows can be picked, one at a time. Picking a row that is already picked lets it go. |
+| `multiple` | `boolean` | Several rows can be picked at once. Writing it also makes the list selectable. |
+| `disabled` | `boolean` | No row can be reached or picked, and the list drops out of the tab order. |
+| `wrap` | `boolean` | A walk off the last row comes back round to the first. Omit it and the walk stops at the ends. |
+| `onChange` | `(value: readonly string[]) => void` | Called with the rows that are picked whenever that changes. |
+
+| Attribute | Present when | What to key styling off |
+| --- | --- | --- |
+| `role` | Always | `grid`. |
+| `tabindex` | Always | `0`, or `-1` while the list is disabled. The list is its own single tab stop until focus lands on a row. |
+| `aria-labelledby` | Always | The id of the `gridlist.label` naming this list. |
+| `aria-multiselectable` | `multiple` is set | `true`, for a screen reader rather than your stylesheet. |
+| `aria-disabled` | Always | `true` or `false`. |
+| `ui-selectable` | Rows can be picked at all | The list is doing selection. |
+| `ui-multiple` | `multiple` is set | The many-picked look. |
+| `ui-disabled` | `disabled` is set | Nothing in here responds. |
+| `ui-inside` | Focus is on a control a row holds | The arrows belong to that control for as long as this lasts. |
+
+| Selector | Default | Why |
+| --- | --- | --- |
+| `[ui-selectable]` | `user-select: none` | A Shift walk and a Shift click both paint the page's own text selection across the rows they cross, over the top of the selection the list is reporting. |
+
+Everything a `<div>` accepts reaches the element too, apart from `onChange`, which is the family's.
+
+### `gridlist.label`
+
+No props of its own. The grid's `aria-labelledby` points here, so this names the list. It renders a
+`<span>`, and everything a `<span>` accepts reaches the element.
+
+### `gridlist.item`
+
+| Prop | Type | What it does |
+| --- | --- | --- |
+| **`value`** | `string` | Required. This row's identity in the picked set. Two rows must not share one. |
+| `disabled` | `boolean` | This row cannot be reached by the walk or picked. |
+
+| Attribute | Present when | What to key styling off |
+| --- | --- | --- |
+| `role` | Always | `row`. |
+| `tabindex` | Always | `-1` as rendered. Focus arriving on a row moves the `0` here, so the list remembers where it was. |
+| `aria-selected` | The list can be picked from | `true` or `false`. Absent entirely while nothing can be picked. |
+| `aria-disabled` | Always | `true` or `false`. |
+| `ui-value` | Always | Holds this row's name, so one selector can reach one row. |
+| `ui-selected` | This row is picked | The picked look. |
+| `ui-disabled` | This row or the list is disabled | The unreachable look, and what the walk steps over. |
+
+Everything a `<div>` accepts reaches the element too.
+
+### `gridlist.itemcontent`
+
+No props of its own. A row means nothing to a reader without a cell, and a list of rich items has
+one column, so a row holds exactly one. It renders a `<div role="gridcell">`, and everything a
+`<div>` accepts reaches the element.
+
+### `gridlist.itemlabel`
+
+No props of its own. Typeahead matches this part when a row has one, and the whole row when it does
+not. It renders a `<span>`, and everything a `<span>` accepts reaches the element.
+
+### `gridlist.itemtrigger`
+
+No props of its own. It renders a `<button>`, and everything a `<button>` accepts reaches the
+element.
+
+| Attribute | Present when | What to key styling off |
+| --- | --- | --- |
+| `type` | Always | `button`, so a control inside a form does not submit it. |
+| `tabindex` | Always | `-1`: the row is the tab stop, and `Enter` on the row is what reaches this. |
+| `disabled` | This row or the list is disabled | The native disabled state. |
+
+### `gridlist.itemindicator`
+
+No props of its own. It renders a `<span>`, and everything a `<span>` accepts reaches the element.
+
+| Attribute | Present when | What to key styling off |
+| --- | --- | --- |
+| `aria-hidden` | Always | `true`. The row already carries `aria-selected`, and a second announcement of the same fact is noise. |
+| `ui-selected` | Its row is picked | Show the mark. |

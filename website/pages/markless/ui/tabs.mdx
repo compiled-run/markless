@@ -1,0 +1,53 @@
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+import Preview from '../../../components/ui/preview.tsrx';
+
+<Sidebar pathname="/markless/ui/tabs" />
+
+# tabs
+
+<ThemeToggle />
+
+<Preview shows="Three tabs over one panel, the first showing." />
+
+```tsrx
+import { tabs } from '@markless/ui';
+
+export default function Account() @{
+	<tabs.root value="overview">
+		<tabs.list>
+			<tabs.trigger value="overview">Overview</tabs.trigger>
+			<tabs.trigger value="billing">Billing</tabs.trigger>
+		</tabs.list>
+		<tabs.content value="overview">Everything that happened this month.</tabs.content>
+		<tabs.content value="billing">Your next invoice is due on the 1st.</tabs.content>
+	</tabs.root>
+}
+```
+
+A trigger and the panel with the same `value` are a pair. Every panel stays in the page — `hidden`
+decides which one shows — so focus, scroll position and anything typed inside a panel survive a tab
+change. A tab carries `role="tab"`, which makes every child of it presentational: put label text in
+there and nothing else, because a close button or a link inside a tab is stripped of its own
+semantics.
+
+## Anatomy
+
+- `tabs.root` — holds which tab is showing.
+- `tabs.list` — the row of tabs, and the element the arrow keys walk inside.
+- `tabs.trigger` — one tab, named by its required `value`. Label content only.
+- `tabs.content` — one panel, named by its required `value`.
+
+It writes `ui-selected` and `ui-vertical`.
+
+## Props on `tabs.root`
+
+| Prop | Type | What it does |
+| --- | --- | --- |
+| `value` | `string` | The tab that is showing. Omit it and no tab shows. |
+| `orientation` | `'horizontal' \| 'vertical'` | Which axis the arrow keys walk. Omit it and the tabs run left to right. |
+| `loop` | `boolean` | Arrow past the last tab and land on the first. Omit it and the ends stop. |
+| `selectOnFocus` | `boolean` | Arrowing to a tab shows it. Turn it off and arrowing only moves focus; Enter or Space shows it. |
+| `onChange` | `(value) => void` | Called with the new value when a person changes tab. |
+
+Everything a `<div>` accepts reaches the element too.

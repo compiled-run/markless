@@ -1,0 +1,109 @@
+import PageMeta from '../../../components/page-meta.tsrx';
+import ThreeDifferencesDemo from '../../../components/demos/three-differences-demo.tsrx';
+import Collapsible from '../../../components/demos/collapsible.tsrx';
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+import LikeHeart from '../../../components/docs/like-heart.tsrx';
+
+<Sidebar pathname="/markless/start/reading-tsrx" />
+
+# A component file is TypeScript with three differences
+
+<PageMeta level="Start here" time="4 min" assumes="nothing" sprite="bookmark" />
+
+_Already read a `.tsrx` file? Skip to [state](/markless/concepts/state), which is the one new
+word in it._
+
+<ThemeToggle />
+
+Open a file ending in `.tsrx` and you will recognise almost all of it. Imports are imports. A
+component is a function. Types are types, and your editor checks them the way it always did.
+
+**Three things look unfamiliar. That is the whole list, and it is not going to grow.**
+
+Here is the counter file with two of the three marked. Click each label and read the sentence
+underneath:
+
+<ThreeDifferencesDemo />
+
+The third one, the fragment, is not in that file at all, because the counter renders a single
+element. It gets its own section below.
+
+## The body is written with an at sign
+
+A component is an ordinary function, and its body is written `@{` and `}` instead of the usual
+braces. Inside it you write ordinary statements: variables, conditions, whatever the component
+needs.
+
+The at sign is how the compiler knows this function produces markup rather than just a value, which
+is what lets it read the markup structurally instead of at runtime.
+
+## The markup is a statement, not something you return
+
+You do not return an element. You write it in the body, on its own, the way you would write any
+other statement, and the compiler takes it as the component's output.
+
+```tsrx
+import { state } from '@markless/core';
+
+export default function Counter() @{
+	let count = state(0);
+
+	<button onClick={() => count++}>Clicked {count} times</button>
+}
+```
+
+That is the entire file behind the counter you have been clicking. The `<button>` line is a
+statement, like `let count = state(0)` above it. Nothing is returned, and nothing needs to be.
+
+## Two things side by side go in a fragment
+
+When a component renders more than one thing at the top level, wrap them in an empty pair of angle
+brackets rather than inventing a `<div>` nobody asked for:
+
+```tsrx
+import { state } from '@markless/core';
+
+export default function CounterWithLabel() @{
+	let count = state(0);
+
+	<>
+		<p>Clicked {count} times</p>
+		<button onClick={() => count++}>Click me</button>
+	</>
+}
+```
+
+That is the third difference, and you have now seen all three.
+
+## Everything else is HTML with holes in it
+
+Attributes are attributes. An expression in curly braces is a hole you fill with a value, in an
+attribute or in text. Spreading an object over an element works too:
+
+```tsrx
+import { state } from '@markless/core';
+
+export default function Card() @{
+	let meta = state({ id: 'hero', role: 'note', hidden: false });
+
+	<section data-kind="card" {...meta} title="Stable">
+		<p>Spread attributes</p>
+	</section>
+}
+```
+
+Markless supports exactly one authoring language, and this is it. There is no second template syntax
+waiting for you later, and no configuration deciding which files get compiled how.
+
+<Collapsible sprite="star-badge" summary="Why not JSX, which I already know?" text="Because the compiler needs to see your component structurally, and it needs a guarantee that it is seeing all of it. The overview puts the tradeoff plainly: because the framework owns the language, the compiler sees every component, every state creation site, every closure and every async boundary, which is what makes marker-free resumability, async dataflow and a plain-value state API tractable. That is the deal you are taking. In exchange for three unfamiliar characters, you get a plain let and a plain count++ with no wrapper, no setter and no marker anywhere in your code. The overview is equally plain about the cost: JSX and TSX are explicitly not supported, now or later." />
+
+## Where to go next
+
+That is the syntax. Every sample on the rest of this site is made of those pieces, so a page that
+looks dense from here is dense about an idea, never about punctuation.
+
+Next: [State](/markless/concepts/state), the one new word in the counter file above and the idea the
+whole framework is built around.
+
+<LikeHeart />

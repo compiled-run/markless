@@ -1,0 +1,50 @@
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+import Preview from '../../../components/ui/preview.tsrx';
+
+<Sidebar pathname="/markless/ui/qrcode" />
+
+# qrcode
+
+<ThemeToggle />
+
+<Preview shows="A square code in a white frame." />
+
+```tsrx
+import { qrcode } from '@markless/ui';
+
+export default function Scan() @{
+	<qrcode.root value="https://compiled.run" aria-label="Scan to open the site">
+		<qrcode.frame>
+			<qrcode.patternsvg width="160" height="160">
+				<qrcode.patternpath fill="currentColor" />
+			</qrcode.patternsvg>
+		</qrcode.frame>
+	</qrcode.root>
+}
+```
+
+The whole code is one `<path>`, so its colour is `fill` and its rendered size is CSS. Give the
+frame light-coloured padding of roughly four modules: the encoded symbol carries no margin of its
+own, and scanners need that quiet zone to find the code. Name the code for what scanning it does
+rather than for the string it holds — the root is `role="img"`, so everything inside it is
+presentational and an overlay can hold nothing a reader needs to hear.
+
+## Anatomy
+
+- `qrcode.root` — holds the text and the recovery level.
+- `qrcode.frame` — the box around the code. This is where the quiet zone goes.
+- `qrcode.patternsvg` — the `<svg>` the pattern is drawn in.
+- `qrcode.patternpath` — one `<path>` covering every dark module.
+- `qrcode.overlay` — a box centred on the code, for a logo.
+
+This family writes no `ui-` attributes: nothing about a code changes as a person uses it.
+
+## Props on `qrcode.root`
+
+| Prop | Type | What it does |
+| --- | --- | --- |
+| `value` | `string` | The text the code carries, usually a URL. Required. |
+| `recovery` | `'low' \| 'medium' \| 'quartile' \| 'high'` | How much of the code can be damaged or covered and still be read: 7%, 15%, 25%, 30%. Omit it for medium. A logo on top needs quartile or high. |
+
+Everything a `<div>` accepts reaches the element too, `aria-label` included.

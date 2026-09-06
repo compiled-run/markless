@@ -1,0 +1,48 @@
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+import Preview from '../../../components/ui/preview.tsrx';
+
+<Sidebar pathname="/markless/ui/progress" />
+
+# progress
+
+<ThemeToggle />
+
+<Preview shows="A bar a third of the way along, labelled." />
+
+```tsrx
+import { progress } from '@markless/ui';
+
+export default function Export() @{
+	<progress.root value={30}>
+		<progress.label>Export data 30%</progress.label>
+		<progress.track>
+			<progress.indicator />
+		</progress.track>
+	</progress.root>
+}
+```
+
+The track is the full length of the range and the indicator sits inside it, so the fill is a width
+your stylesheet sets from the value the family reports. Leave `value` out, or pass `null`, and the
+amount is unknown — the bar reports itself as indeterminate rather than as zero, which is a
+different thing to a screen reader.
+
+## Anatomy
+
+- `progress.root` — the bar. Holds the value and the range.
+- `progress.label` — the words beside it.
+- `progress.track` — the full length of the range.
+- `progress.indicator` — the filled part, inside the track.
+
+It writes `ui-progress`, `ui-value`, `ui-min` and `ui-max`.
+
+## Props on `progress.root`
+
+| Prop | Type | What it does |
+| --- | --- | --- |
+| `value` | `number \| null` | How far along the task is. Omit it, or pass `null`, for an unknown amount. |
+| `min` | `number` | The bottom of the range. Omit it and the range starts at 0. |
+| `max` | `number` | The top of the range. Omit it and the range ends at 100. |
+
+Everything a `<div>` accepts reaches the element too.

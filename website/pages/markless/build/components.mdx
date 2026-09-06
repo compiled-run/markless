@@ -1,0 +1,163 @@
+import PageMeta from '../../../components/page-meta.tsrx';
+import Collapsible from '../../../components/demos/collapsible.tsrx';
+import Callout from '../../../components/demos/callout.tsrx';
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+import LikeHeart from '../../../components/docs/like-heart.tsrx';
+
+<Sidebar pathname="/markless/build/components" />
+
+# A component is a function, and props are its parameters
+
+<PageMeta level="Building" time="5 min" assumes="events" sprite="crown" />
+
+_Already splitting components and passing props? Skip to [elements](/markless/build/elements)._
+
+<ThemeToggle />
+
+You have a page that works, and it is getting long. The button that adds a bike wants to live in its
+own file. The number it adds to wants to stay where it is. Every framework you have heard about has
+some machinery for this moment, and the usual worry is what you have to write to keep the two files
+in step.
+
+**Nothing. A prop is a parameter, and reading it in the child re-reads the parent's live value.**
+
+## Splitting a file is a move you already make in TypeScript
+
+The parent owns the number:
+
+```tsrx
+import { state } from '@markless/core';
+import BumpButton from './bump-button.tsrx';
+
+export default function SplitCounter() @{
+	let total = state(0);
+
+	<section>
+		<p class="playground-output">Total: {total}</p>
+		<BumpButton label="Wheel one in" onBump={() => total++} />
+	</section>
+}
+```
+
+And the child owns the button:
+
+```tsrx
+export default function BumpButton({
+	label,
+	onBump,
+}: {
+	readonly label: string;
+	readonly onBump: () => void;
+}) @{
+	<button type="button" onClick={() => onBump()}>{label}</button>
+}
+```
+
+Two ordinary exported functions, and the child's parameter list is its whole API. `label` is a string
+it prints. `onBump` is a function it calls. If you can read a function signature you can read a
+component.
+
+Press the button and the number moves, with nothing in either file subscribing one to the other. The
+click runs `onBump`, which is a function the parent wrote and handed over. That function assigns to
+`total`, which is a watched variable, so the one piece of text that reads `total` changes. The child
+never knew a number existed, and the parent never knew a button did.
+
+<Callout sprite="speech-bubble" title="Why that pair is not a box on this page" text="This site's pages are built out of the same components they show, and that pair is the one we could not put in a box here. Inside a page like this one, a click on a button that lives in a child component and calls a callback prop fails to resume: the browser asks for the handler and gets a 404, then Unknown async symbol symbol:0, and the number does not move. The same code is fine in an ordinary page under pages/, so it is this site's composition path rather than callback props themselves. It is recorded as finding 29 in this site's NOTES.md. A fake demo would teach you less than this sentence does, so the page ships without one and the check that proves it is missing stays in the site's witness until the day it can come back." />
+
+## A prop is a live read, not a copy
+
+This is the part worth slowing down for. When the parent passes `label={title}` and `title` later
+changes, the child does not need to be told. Props are getter-backed: reading a prop inside the child
+re-reads the parent's graph, so what the child renders is always the parent's current value.
+
+Destructuring in the parameter list does not break that. `const { label } = props` is an alias, so
+every later read of `label` still goes back to the parent. Write the parameter list you would write
+in any TypeScript function.
+
+<Callout sprite="cross" title="One shape the compiler rejects today" text="A destructuring default in the parameter list is a compile error: function Badge({ label = 'stable' }) fails with MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED, because the compiler cannot make a graph alias out of a value that may or may not come from the parent. Declare the prop without a default and pass it explicitly at every call site, or compute the fallback inside the component with computed()." />
+
+## Callback props are how a child talks back
+
+There is no special event system between a parent and a child. `onBump` above is a plain function
+prop, and the child calls it. That is the whole mechanism, and it is the same one a real app uses:
+
+```tsrx
+import { state } from '@markless/core';
+import Nav from './nav.tsrx';
+
+export default function Shell() @{
+	let libraryStatus = state(false);
+
+	<Nav libraryOpen={libraryStatus} onToggleLibrary={() => (libraryStatus = !libraryStatus)} />
+}
+```
+
+Name them however you like. `onBump`, `onToggleLibrary`, `commit`, `save`. The `on` prefix is a
+convention for "this one is a callback", not a rule the compiler enforces.
+
+## Nested content arrives as `children`
+
+Sometimes the thing you want to reuse is the frame, not the contents. Give the component a
+`children` prop and render it wherever the contents belong:
+
+```tsrx
+export default function Panel({
+	title,
+	children,
+}: {
+	readonly title: string;
+	readonly children?: unknown;
+}) @{
+	<section class="panel">
+		<h3 class="panel-title">{title}</h3>
+		{children}
+	</section>
+}
+```
+
+Used like this:
+
+```tsrx
+import { state } from '@markless/core';
+import BumpButton from './bump-button.tsrx';
+import Panel from './panel.tsrx';
+
+export default function Shed() @{
+	let total = state(0);
+
+	<Panel title="Bikes in the shed">
+		<p>Total: {total}</p>
+		<BumpButton label="Wheel one in" onBump={() => total++} />
+	</Panel>
+}
+```
+
+Think of `children` as a sealed envelope with an address on it. You can put the envelope somewhere,
+you can put it inside another envelope, you can hand it to someone else. You cannot open it and
+count the pages.
+
+The specification says it plainly: children is an opaque template projection, and the operations
+allowed on it are render it, wrap it, or pass it on. Inspecting it, mapping over it, counting it or
+cloning it is diagnosed at compile time rather than silently half-working.
+
+<Collapsible sprite="thought-bubble" summary="What if I need to know how many children there are?" text="Then children is the wrong shape for that job, and the fix is a prop. If a tab strip needs to know its tabs, pass the tabs as data and let the component render them: tabs={[{ id: 'one', title: 'First' }]}. You get the count, the ids and the ordering as ordinary TypeScript values you can check, and the component still projects whatever content each tab holds. There is also no Slot primitive and no named-slot syntax in v1: one children projection per component, plus as many ordinary props as the job needs." />
+
+<Collapsible sprite="star-badge" summary="Coming from another framework?" text="Three habits to unlearn. There is no children array, so no map over children, no counting them and no cloning one with extra props: the compiler rejects those instead of returning something that looks close enough. There is no memo wrapper and no dependency list on a callback prop, because passing a new function to a child does not cause the child to run again: the child function ran once, and what changes afterwards is the individual DOM update that read the value. And a prop does not need a subscription, a selector or a store: reading it in the child re-reads the parent's live value." />
+
+## Where a component can live
+
+Anywhere. A `.tsrx` file that exports a function is a component, and the file name has nothing to do
+with the component name; the default export is what an importer gets. Pages are components too, so
+the file you have been editing under `pages/` can import the components you split out of it.
+
+## Try it yourself
+
+Add a second `BumpButton` to the parent with `label="Wheel two in"` and `onBump={() => (total += 2)}`,
+and notice that the child file does not change at all. Then wrap the number in its own component
+that takes `total` as a prop, and notice that pressing the button still moves it, with no wiring
+between the two new files.
+
+Next: [the escape hatch for when you need the real DOM node](/markless/build/elements).
+
+<LikeHeart />

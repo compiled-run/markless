@@ -1,0 +1,150 @@
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+import HovercardDemo from '../../../components/demos/ui/hovercard-demo.tsrx';
+
+<Sidebar pathname="/markless/ui/hovercard" />
+
+# hovercard
+
+<ThemeToggle />
+
+<HovercardDemo shows="Rest on the link. The card is pinned open here so you can read it." />
+
+```tsrx
+import { hovercard } from '@markless/ui';
+
+const link = 'color: var(--ink); font-weight: 700; text-decoration: underline;';
+const card =
+	'display: grid; gap: 0.35em; width: min(18rem, 100%); margin-block-start: 0.45em; padding: 0.8em; border: 2px solid var(--ink); border-radius: 6px; background: var(--raised); box-shadow: 3px 3px 0 var(--ink); font-size: var(--step--1); text-align: left;';
+
+export default function Mention() @{
+	<hovercard.root open={true} style="display: grid; justify-items: center;">
+		<hovercard.trigger href="/markless/ui/accordion" style={link}>the accordion page</hovercard.trigger>
+		<hovercard.content style={card}>
+			<strong>accordion</strong>
+			<span>Sections named by value, with the closed panel left in the page.</span>
+			<a href="/markless/ui/accordion" style={link}>Read it</a>
+		</hovercard.content>
+	</hovercard.root>
+}
+```
+
+A hover card previews where a link goes. Unlike a tooltip's tip this is a surface a
+person can work in, so links, buttons and images all belong in it. That freedom comes
+with one rule: never put anything in the card that is not also behind the link. Someone
+on a touch screen, or reading with a virtual cursor, never sees the card at all. They
+follow the link, and they have to get everything.
+
+## Anatomy
+
+- `hovercard.root` holds whether the card is showing, and both waits.
+- `hovercard.trigger` is the link the card previews. It renders an `<a>` and only an `<a>`.
+- `hovercard.content` is the card, written after the trigger.
+
+It writes `ui-open` and `ui-closed` as its state changes.
+
+## Let the pointer cross the gap
+
+A card usually sits at a visible offset from its link, so the pointer crosses dead space
+belonging to neither. `closeDelay` is how long the card waits after the pointer leaves,
+300 milliseconds by default, and it is what carries the pointer over that gap.
+
+```tsrx
+<hovercard.root delay={400} closeDelay={500}>
+```
+
+## Move the card
+
+The card lands below the link. That default ships inside `@layer markless`, so one
+unlayered rule of yours replaces it, and where it goes after that is your CSS.
+
+```css
+.mention-card {
+	position-area: block-start;
+}
+```
+
+## Nothing exclusive to the card
+
+The card is a shortcut, so everything in it points somewhere the link already reaches.
+Write it after the trigger too: a CSS anchor has to be laid out before the element
+pointing at it.
+
+```tsrx
+<hovercard.trigger href="/people/ada">Ada</hovercard.trigger>
+<hovercard.content>
+	<a href="/people/ada">Ada Lovelace</a>
+	<p>Writes about analytical engines.</p>
+</hovercard.content>
+```
+
+## Keyboard
+
+Every handler sits on the root, which wraps both parts, so moving from the link into the
+card, by pointer or by Tab, never counts as leaving.
+
+| Key | What it does |
+| --- | --- |
+| Tab | Focusing the link waits the same `delay` the pointer does, then shows the card. |
+| Tab again | Moves into the card, which is the link's next sibling and back in the tab order once shown. |
+| Escape | Hides the card. Focus goes back to the link only if it was inside the card. |
+
+## API
+
+Every prop is optional, and the types below are the family's own.
+
+### `hovercard.root`
+
+| Prop | Type | What it does |
+| --- | --- | --- |
+| `open` | `boolean` | Whether the card is showing. Omit it and it starts hidden. |
+| `delay` | `number` | How long the pointer must rest on the link, or focus must stay on it, before the card shows, in milliseconds. Omit it and it is 700. |
+| `closeDelay` | `number` | How long the card stays after the pointer leaves, in milliseconds. Omit it and it is 300. |
+| `onChange` | `(open: boolean) => void` | Called with the new value when the card shows or hides, including when Escape or a press elsewhere hides it. |
+
+| Attribute | Present when | What to key styling off |
+| --- | --- | --- |
+| `ui-open` | The card is showing | The shown look. |
+| `ui-closed` | The card is not showing | The resting look. |
+
+Everything a `<div>` accepts reaches the element too, apart from `onChange`, which is
+the family's. Your own `onPointerover`, `onPointerout`, `onFocusin` and `onFocusout` run
+after the family's.
+
+| Selector | Default | Why |
+| --- | --- | --- |
+| `div:not([overlay])` | `anchor-scope: --ui-hovercard` | Keeps the anchor name inside this card, so two hover cards on a page never point at each other's link. |
+
+### `hovercard.trigger`
+
+No props of its own. It renders an `<a>`, and everything an `<a>` accepts reaches the
+element, `href` included.
+
+| Attribute | Present when | What to key styling off |
+| --- | --- | --- |
+| `aria-expanded` | Always | `true` or `false`, so a reader is told the card exists. |
+| `aria-controls` | Always | The id of the card this link previews. |
+| `ui-open` | The card is showing | The previewing look. |
+| `ui-closed` | The card is not showing | The resting look. |
+
+| Selector | Default | Why |
+| --- | --- | --- |
+| `a` | `anchor-name: --ui-hovercard` | The link is the anchor the card is placed against. |
+
+### `hovercard.content`
+
+No props of its own. It renders a `<div>`, and everything a `<div>` accepts reaches the
+element. Your own `onDismiss` runs after the family has hidden the card. It carries no
+`role` and nothing writes `aria-describedby` at it: a card full of links flattened into
+one description is a run-on string with none of them reachable.
+
+| Attribute | Present when | What to key styling off |
+| --- | --- | --- |
+| `overlay` | Always | The mark that elevates the card. Not a styling hook. |
+| `hidden` | The card is not showing | What hides it, and what keeps its links out of the tab order. The card is never detached. |
+| `ui-open` | The card is showing | The shown look. |
+| `ui-closed` | The card is not showing | The hidden look. |
+
+| Selector | Default | Why |
+| --- | --- | --- |
+| `[overlay]` | `--ui-anchor: --ui-hovercard; position: absolute; position-anchor: --ui-hovercard; position-area: block-end` | Places the card below the link with no script, and hands you the anchor name for `anchor()` geometry of your own. |

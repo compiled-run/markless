@@ -1,0 +1,221 @@
+{
+	"source": "sidebar-sprites-sheet.png",
+	"icons": [
+		{
+			"name": "what-is-markless",
+			"variant": "light",
+			"w": 102,
+			"h": 82
+		},
+		{
+			"name": "first-app",
+			"variant": "light",
+			"w": 82,
+			"h": 76
+		},
+		{
+			"name": "reading-tsrx",
+			"variant": "light",
+			"w": 70,
+			"h": 77
+		},
+		{
+			"name": "state",
+			"variant": "light",
+			"w": 81,
+			"h": 76
+		},
+		{
+			"name": "computed",
+			"variant": "light",
+			"w": 61,
+			"h": 76
+		},
+		{
+			"name": "events",
+			"variant": "light",
+			"w": 68,
+			"h": 60
+		},
+		{
+			"name": "conditionals",
+			"variant": "light",
+			"w": 68,
+			"h": 51
+		},
+		{
+			"name": "lists",
+			"variant": "light",
+			"w": 69,
+			"h": 53
+		},
+		{
+			"name": "async",
+			"variant": "light",
+			"w": 69,
+			"h": 53
+		},
+		{
+			"name": "styling",
+			"variant": "light",
+			"w": 80,
+			"h": 57
+		},
+		{
+			"name": "components",
+			"variant": "light",
+			"w": 101,
+			"h": 75
+		},
+		{
+			"name": "elements",
+			"variant": "light",
+			"w": 97,
+			"h": 66
+		},
+		{
+			"name": "storage",
+			"variant": "light",
+			"w": 87,
+			"h": 86
+		},
+		{
+			"name": "shared",
+			"variant": "light",
+			"w": 103,
+			"h": 49
+		},
+		{
+			"name": "pages",
+			"variant": "light",
+			"w": 91,
+			"h": 79
+		},
+		{
+			"name": "links",
+			"variant": "light",
+			"w": 86,
+			"h": 69
+		},
+		{
+			"name": "data",
+			"variant": "light",
+			"w": 90,
+			"h": 84
+		},
+		{
+			"name": "how-it-works",
+			"variant": "light",
+			"w": 102,
+			"h": 103
+		},
+		{
+			"name": "what-is-markless",
+			"variant": "dark",
+			"w": 82,
+			"h": 76
+		},
+		{
+			"name": "first-app",
+			"variant": "dark",
+			"w": 81,
+			"h": 68
+		},
+		{
+			"name": "reading-tsrx",
+			"variant": "dark",
+			"w": 68,
+			"h": 77
+		},
+		{
+			"name": "state",
+			"variant": "dark",
+			"w": 81,
+			"h": 79
+		},
+		{
+			"name": "computed",
+			"variant": "dark",
+			"w": 66,
+			"h": 73
+		},
+		{
+			"name": "events",
+			"variant": "dark",
+			"w": 65,
+			"h": 60
+		},
+		{
+			"name": "conditionals",
+			"variant": "dark",
+			"w": 69,
+			"h": 51
+		},
+		{
+			"name": "lists",
+			"variant": "dark",
+			"w": 70,
+			"h": 53
+		},
+		{
+			"name": "async",
+			"variant": "dark",
+			"w": 69,
+			"h": 53
+		},
+		{
+			"name": "styling",
+			"variant": "dark",
+			"w": 83,
+			"h": 54
+		},
+		{
+			"name": "components",
+			"variant": "dark",
+			"w": 106,
+			"h": 72
+		},
+		{
+			"name": "elements",
+			"variant": "dark",
+			"w": 96,
+			"h": 64
+		},
+		{
+			"name": "storage",
+			"variant": "dark",
+			"w": 87,
+			"h": 86
+		},
+		{
+			"name": "shared",
+			"variant": "dark",
+			"w": 99,
+			"h": 43
+		},
+		{
+			"name": "pages",
+			"variant": "dark",
+			"w": 92,
+			"h": 88
+		},
+		{
+			"name": "links",
+			"variant": "dark",
+			"w": 88,
+			"h": 63
+		},
+		{
+			"name": "data",
+			"variant": "dark",
+			"w": 90,
+			"h": 85
+		},
+		{
+			"name": "how-it-works",
+			"variant": "dark",
+			"w": 99,
+			"h": 96
+		}
+	]
+}

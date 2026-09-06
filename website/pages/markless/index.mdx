@@ -1,0 +1,70 @@
+import PageMeta from '../../components/page-meta.tsrx';
+import HeroCard from '../../components/demos/hero-card.tsrx';
+import RunOnceDemo from '../../components/demos/run-once-demo.tsrx';
+import Collapsible from '../../components/demos/collapsible.tsrx';
+import Mascot from '../../components/mascot.tsrx';
+import Sticker from '../../components/sticker.tsrx';
+import MoreFromCompiled from '../../components/docs/more-from-compiled.tsrx';
+import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../components/docs/sidebar.tsrx';
+import LikeHeart from '../../components/docs/like-heart.tsrx';
+import OpenerLine from '../../components/docs/opener-line.tsrx';
+
+<Sidebar pathname="/markless" />
+
+<Sticker name="shooting-star" size="6rem" spot="hero" />
+
+<Mascot name="markless" size="10rem" variant="hero" />
+
+# The compiler for user interfaces
+
+<PageMeta level="Start here" time="3 min" assumes="nothing" sprite="crown" />
+
+<ThemeToggle />
+
+<OpenerLine />
+
+The idea underneath is small. When you create a variable, create it with `state`. Whatever
+reads it stays current, and the screen is one of the things reading it.
+
+Hover a line if you don't believe it. Then click the heart:
+
+<HeroCard />
+
+You just changed a variable. The number followed, because `state` told the page to follow
+`likes`. That is the whole trick.
+
+## Nothing hidden
+
+Too simple, right? Surely something is re-running your code on every click. Good instinct,
+wrong framework. This heart keeps a log of every time your function runs:
+
+<RunOnceDemo />
+
+Your function ran once. Every click since is just `likes++`. Your AI can't hallucinate what
+doesn't exist. There's nothing hidden under the page: one run, then plain updates. And when
+code can't compile safely, the build fails and says why, which your AI can easily fix.
+
+## One language
+
+A component is a TypeScript function in a `.tsrx` file. There is no template language. Add the
+router and a file under `pages/` is a URL, with no routing config either. That is the whole
+learning curve, for you and for your agent.
+
+## Not married to the web
+
+TSRX, the language underneath, also compiles to React, Solid and Vue. Nothing about a compiled
+interface insists on a browser either. And the speed people notice is a side effect: every update
+is written in advance. [How it works](/markless/how-it-works) shows the machinery.
+
+<Collapsible sprite="star-badge" summary="Coming from another framework?" text="Three things you may be looking for are absent on purpose. There is no virtual DOM: templates compile to real DOM operations, and nothing re-renders. There is no hydration pass: a server-rendered page wakes up without re-running your components, which Markless calls resume. And there is no second syntax to hold in your head, because there is exactly one authoring language. That also means JSX and TSX are not supported, now or later." />
+
+## Where to go next
+
+[Your first app](/markless/start/first-app) is one command and four questions.
+[Reading a .tsrx file](/markless/start/reading-tsrx) is five minutes on the three unfamiliar bits.
+Already have a component? [State](/markless/concepts/state) covers updates.
+
+<MoreFromCompiled />
+
+<LikeHeart />

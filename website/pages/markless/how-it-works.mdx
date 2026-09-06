@@ -1,0 +1,169 @@
+import PageMeta from '../../components/page-meta.tsrx';
+import TierLadderDemo from '../../components/demos/tier-ladder-demo.tsrx';
+import Collapsible from '../../components/demos/collapsible.tsrx';
+import Callout from '../../components/demos/callout.tsrx';
+import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../components/docs/sidebar.tsrx';
+import LikeHeart from '../../components/docs/like-heart.tsrx';
+
+<Sidebar pathname="/markless/how-it-works" />
+
+# Follow one click all the way down
+
+<PageMeta level="Under the hood" time="6 min" assumes="state" sprite="rays" />
+
+_Only after the API? Skip to [the reference](/markless/reference); nothing on this page is needed
+to ship._
+
+<ThemeToggle />
+
+Read this because you want to know why the framework behaves the way it does, and because knowing
+where the cheap updates stop is the difference between a page that stays fast and a page that used
+to be fast.
+
+Take the counter from the first page. You click the button, the number goes up, and the screen
+changes. Something has to decide how much of the screen to change.
+
+**The compiler decides that at build time, and it picks the smallest change it can prove is
+enough.** The specification puts it like this:
+
+> The compiler always selects the SMALLEST update tier it can statically prove. Range replacement is
+> the last resort, never the default.
+
+## There are five sizes of change, and only two of them run your code
+
+The ladder is the mechanism this whole framework is built on, so here it is in full, from
+`specs/framework/12-arm-rendering.md`:
+
+```txt
+Tier 1  value slots (text/attribute graph subscriptions)   no component execution
+Tier 2  keyed row ops                                      no component execution
+Tier 3  branch range flips (static parts + slots)          no component execution
+Tier 4  arm commit                                         components execute
+Tier 5  route swap                                         components execute
+```
+
+Tier 1 is most state changes. Tier 2 is a list mutating. Tier 3 is an `@if` or a `@switch` flipping
+between branches. Tier 4 is a transition: a mount, an async boundary settling, an error block taking
+over. Tier 5 is tier 4 at the scale of a whole page.
+
+The claim underneath the first three tiers is a strong one, and it is worth quoting rather than
+paraphrasing:
+
+> Steady-state interactions run at the vanilla-JS floor (the tiers ARE the
+> textContent/replaceChildren calls a hand-writer would make, selected at compile time). Component
+> execution is paid exactly once per appearance of content.
+
+Read the second sentence twice. It is not a promise that your code never runs in the browser. It is
+a promise about how often: once per appearance of content, and not again to keep the screen in step.
+
+## Try it: pick an action, read which tier catches it
+
+Click each action below. The first line is the tier, and the second line is the one that matters:
+
+<TierLadderDemo />
+
+The two actions at the bottom of that list do execute component code in the browser, and the
+specification says why that is allowed rather than a contradiction:
+
+> Doctrine note: executing components during a tier-4/5 render is INITIAL render happening in the
+> browser, which the unified render/resume model allows. "No hydration" forbids re-executing
+> components over existing server HTML; it does not forbid rendering new content client-side.
+
+So the honest version of the headline is: new content is rendered once, wherever it appears, and
+content that is already on the screen is updated without re-running anything that produced it.
+
+## An escalation is never a surprise
+
+Sometimes the compiler cannot use a small tier. The most common reason is a branch containing a
+component, which tier 3 cannot flip because a component has to execute.
+
+When that happens, it does not quietly fall back:
+
+> If tier 3 cannot handle a flip (e.g. the @if contains a component), the compiler escalates AND
+> emits a diagnostic with a restructure suggestion.
+
+And the reason that diagnostic is mandatory rather than nice to have:
+
+> Silent failure is a defect class.
+
+The diagnostic speaks your words, not the compiler's. The specification reserves "arm", "boundary",
+"tier" and "anchor" for contributors, and requires diagnostics to say things like "this @if contains
+`<Shell>`".
+
+## What the browser gets on first load, and what it does with it
+
+On a server-rendered page, the framework's goal is stated as:
+
+> In SSR, component bodies execute during initial render and never during browser resume.
+
+What ships with the HTML is a small inline resumer. When the page loads, that resumer finds its
+container, reads the compact payload scripts, builds the locator tables, and installs
+container-scoped listeners. The specification also lists what it must not do on startup, and that
+list is the interesting half:
+
+```txt
+import app chunks
+run component bodies
+run event handlers
+run behavior symbols
+run async runner symbols
+parse build metadata
+scan event attributes
+plan symbols from DOM
+diff or reconcile DOM
+decode unused feature blocks
+```
+
+Then you click something. The resumer matches the real DOM target, resolves the ordered symbol rows,
+and imports just the symbols that click needs. After that:
+
+> Event dispatch after resume is graph-first. The handler writes graph state; the scheduler
+> invalidates graph subscribers; DOM update symbols patch concrete DOM nodes. Nothing re-renders,
+> and no component body executes in the browser resume path.
+
+The runtime itself follows the same rule as your app code. Capability modules load only when a
+page's payload declares their record kinds, so runtime execution is "proportional to what the user
+does, not to what the page contains or what the framework supports".
+
+<Callout sprite="speech-bubble" title="Does that mean the browser never runs my components?" text="No, and the page you are reading will not claim it. On a server-rendered page, the resume path never executes a component body: that is the quoted rule above. But a tier 4 or tier 5 update does execute components, because content is appearing for the first time and something has to produce it, and a client-rendered app executes every component body in the browser by definition, since it starts from an empty target. The precise claim is the one the specification makes: components are never re-executed over server HTML that already exists." />
+
+## Rendering in the browser is a normal mode, not a fallback
+
+It is easy to read all of that and conclude that client rendering is the degraded path. It is not.
+`render(App, { target })` starts from an empty target, creates the DOM and the live graph from
+scratch, and must work with no payload scripts and no resumer at all.
+
+The two modes share almost everything after setup: graph state, symbol resolution, event dispatch,
+the scheduler, the DOM journal, element locators, cleanup. The one thing client rendering does not
+share is the shortcut that skips component execution, because there is no server HTML and no
+serialized graph to skip work against.
+
+## Why some of your values are rebuilt instead of shipped
+
+The last piece is what actually travels in the payload. The rule is short:
+
+> Serialization is for durable graph state, not runtime resources.
+
+That single sentence explains two things you have already met. A `computed()` value is not
+serialized, because derived values are recreated: the payload stores the dependencies and rebuilds
+the value lazily after resume. And an `attach={...}` behaviour is not serialized either, because
+DOM-backed libraries are owned by the host node that uses them, so the payload stores only the
+behaviour's code reference and its serializable inputs.
+
+Which is why the answer to "how do I put my chart instance in state" is that you do not. A value
+that needs a live element, an observer, a socket or a cleanup belongs on the element, and a value
+you can work out again belongs in a `computed`.
+
+<Collapsible sprite="star-badge" summary="Coming from another framework?" text="Three things are missing here on purpose. There is no virtual DOM: templates compile to real DOM operations, and each dynamic update is its own subscription, which is why the tiers above are described as the textContent and replaceChildren calls a hand-writer would make. There is no hydration pass: the specification's phrase is that no hydration forbids re-executing components over existing server HTML, and what replaces it is a resumer that reads a payload and wakes only the code a click needs. And there is no marker syntax: no dollar suffixes, no .value, no tracked boxes, no special destructuring, because the compiler owns the language and can see every state creation site, every closure and every async boundary structurally. What you give up for all three is choice of authoring language. It is TSRX, and JSX is explicitly not supported, now or later." />
+
+## Try it yourself
+
+Open your own app's built output and look at the size of what loads before you touch anything. Then
+click one button and watch the network panel fetch the chunk for that handler, and only that
+handler. That fetch is the whole model made visible: the page was described, the click was the first
+thing that needed code, and the code arrived then.
+
+Next: [everything on one page, in the order you reach for it](/markless/reference).
+
+<LikeHeart />

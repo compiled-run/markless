@@ -1,0 +1,66 @@
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+import Preview from '../../../components/ui/preview.tsrx';
+
+<Sidebar pathname="/markless/ui/radiogroup" />
+
+# radiogroup
+
+<ThemeToggle />
+
+<Preview shows="Three billing periods, none chosen yet." />
+
+```tsrx
+import { radiogroup } from '@markless/ui';
+
+export default function Billing() @{
+	<radiogroup.root>
+		<radiogroup.label>Billing period</radiogroup.label>
+		<radiogroup.field name="billing" required />
+		<radiogroup.item value="monthly">
+			<radiogroup.itemfield />
+			<radiogroup.itemtrigger>
+				<radiogroup.itemindicator>Chosen</radiogroup.itemindicator>
+			</radiogroup.itemtrigger>
+			<radiogroup.itemlabel>Monthly</radiogroup.itemlabel>
+		</radiogroup.item>
+		<radiogroup.item value="annual">
+			<radiogroup.itemfield />
+			<radiogroup.itemtrigger>
+				<radiogroup.itemindicator>Chosen</radiogroup.itemindicator>
+			</radiogroup.itemtrigger>
+			<radiogroup.itemlabel>Annual</radiogroup.itemlabel>
+		</radiogroup.item>
+	</radiogroup.root>
+}
+```
+
+The group is a real `<fieldset>` and its label is a real `<legend>`, so it is named natively: no
+id, no IDREF, and better screen-reader support than `aria-labelledby` on a `role="radiogroup"`
+div. What a form receives is declared once on `radiogroup.field` rather than repeated on every
+option, and the whole group holds a single tab stop with the arrow keys walking the options.
+
+## Anatomy
+
+- `radiogroup.root` — the `<fieldset>`.
+- `radiogroup.label` — the `<legend>` that names it.
+- `radiogroup.field` — what a form receives: `name` and `required`, once for the group.
+- `radiogroup.item` — one option, named by its required `value`.
+- `radiogroup.itemfield` — the hidden native radio, and the element a person actually focuses.
+- `radiogroup.itemtrigger`, `radiogroup.itemindicator`, `radiogroup.itemlabel` — that option's parts.
+- `radiogroup.description`, `radiogroup.error` — the sentence under the group, and the one that marks it invalid.
+
+It writes `ui-selected`, `ui-horizontal`, `ui-required` and `ui-disabled`.
+
+## Props on `radiogroup.root`
+
+| Prop | Type | What it does |
+| --- | --- | --- |
+| `value` | `string` | The value of the chosen option. Omit it and nothing is chosen. |
+| `orientation` | `'horizontal' \| 'vertical'` | Which axis the arrow keys walk. Omit it and the options stack. |
+| `loop` | `boolean` | Arrow past the last option and land on the first. The ends wrap either way. |
+| `disabled` | `boolean` | Nobody can change any option. |
+| `onChange` | `(value) => void` | Called with the new value when a person picks a different option. |
+
+Everything a `<fieldset>` accepts reaches the element too. `radiogroup.item` takes its own `value`
+and `disabled`.

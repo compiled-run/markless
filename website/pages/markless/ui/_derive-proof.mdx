@@ -1,0 +1,44 @@
+import AnatomyTable from '../../../components/docs/anatomy-table.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+import KeyboardTable from '../../../components/docs/keyboard-table.tsrx';
+import ApiTable from '../../../components/docs/api-table.tsrx';
+
+<Sidebar pathname="/markless/ui/_derive-proof" />
+
+# Derived tables
+
+A scratch page proving the three docs tables draw themselves from data. Nothing below is written
+out by hand: the parts and props come from the vendored `@markless/ui` manifest, and the keyboard
+rows come from `components/docs/ui-meta/accordion.ts`, the one hand-authored file a family gets.
+
+## Anatomy
+
+<AnatomyTable family="accordion" />
+
+## Keyboard
+
+Every cap ships in both forms — what a Mac keyboard prints and what everything else prints — and
+CSS shows one, because the server has no user agent to read. A probe in the table stamps `is-mac` or
+`is-other` on the document before the rows are parsed, and with neither class the plain-word form
+stands. Each form carries its own plain word, so a screen reader says "Enter" where a Mac reader
+sees a return glyph.
+
+<KeyboardTable family="accordion" />
+
+## API reference
+
+### `accordion.root`
+
+<ApiTable family="accordion" part="root" />
+
+### `accordion.item`
+
+<ApiTable family="accordion" part="item" />
+
+### `accordion.itemcontent`
+
+The panel takes no props of its own, so its table comes back with nothing in it. That empty table is
+the point: a part with no props is drawn from the manifest like every other one, and a page carrying
+it needs no special case.
+
+<ApiTable family="accordion" part="itemcontent" />

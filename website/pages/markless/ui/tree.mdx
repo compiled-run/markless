@@ -1,0 +1,61 @@
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+import Preview from '../../../components/ui/preview.tsrx';
+
+<Sidebar pathname="/markless/ui/tree" />
+
+# tree
+
+<ThemeToggle />
+
+<Preview shows="A folder with three files under it." />
+
+```tsrx
+import { tree } from '@markless/ui';
+
+export default function Files() @{
+	<tree.root aria-label="Project files">
+		<tree.item level={1}>
+			<tree.itemtrigger>
+				<tree.itemindicator />
+				<tree.itemlabel>src</tree.itemlabel>
+			</tree.itemtrigger>
+			<tree.itemcontent>
+				<tree.item leaf level={2}>
+					<tree.itemlabel>index.ts</tree.itemlabel>
+				</tree.item>
+			</tree.itemcontent>
+		</tree.item>
+		<tree.item leaf level={1}>
+			<tree.itemlabel>README.md</tree.itemlabel>
+		</tree.item>
+	</tree.root>
+}
+```
+
+The whole tree holds one tab stop, and typing jumps to the next row whose label starts with what
+you typed. A row with no children is `leaf`, and a leaf reports no open state at all — that is the
+WAI-ARIA rule a reader needs to tell "nothing to open" apart from "closed". Depth is written on the
+row rather than counted, because a node that roots its own instance cannot read the one enclosing
+it. Name the tree with a plain `aria-label` on the root.
+
+## Anatomy
+
+- `tree.root` — the container. It owns the tab stop and the typeahead.
+- `tree.label` — the tree's own heading. It does not name the tree.
+- `tree.item` — one node, declaring its `level` and whether it is a `leaf`.
+- `tree.itemtrigger` — the control that opens and closes one node.
+- `tree.itemlabel` — the node's name. Typeahead matches on it.
+- `tree.itemindicator` — a decorative open/closed marker, hidden from a reader.
+- `tree.itemcontent` — the container of one node's children.
+
+It writes `ui-open`, `ui-closed`, `ui-leaf`, `ui-disabled` and `ui-value`.
+
+## Props on `tree.root`
+
+| Prop | Type | What it does |
+| --- | --- | --- |
+| `disabled` | `boolean` | Nobody can open or close anything. |
+
+Everything a `<div>` accepts reaches the element too, `aria-label` included — which is how the tree
+is named. `tree.item` carries the rest: `open`, `leaf`, `level` and its own `onChange`.

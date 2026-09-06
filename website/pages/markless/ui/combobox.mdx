@@ -1,0 +1,75 @@
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+import Preview from '../../../components/ui/preview.tsrx';
+
+<Sidebar pathname="/markless/ui/combobox" />
+
+# combobox
+
+<ThemeToggle />
+
+<Preview shows="A field you type in, with three fruits under it." />
+
+```tsrx
+import { combobox } from '@markless/ui';
+
+export default function Fruit() @{
+	<combobox.root name="fruit">
+		<combobox.label>Favourite fruit</combobox.label>
+		<combobox.input placeholder="Type a fruit" />
+		<combobox.trigger>Show</combobox.trigger>
+		<combobox.content>
+			<combobox.item value="apple" label="Apple">
+				<combobox.itemlabel>Apple</combobox.itemlabel>
+				<combobox.itemindicator>Chosen</combobox.itemindicator>
+			</combobox.item>
+			<combobox.item value="banana" label="Banana">
+				<combobox.itemlabel>Banana</combobox.itemlabel>
+				<combobox.itemindicator>Chosen</combobox.itemindicator>
+			</combobox.item>
+		</combobox.content>
+	</combobox.root>
+}
+```
+
+A combobox is a text field with a list attached, and it is not a select. Focus never leaves the
+input, so printable keys go where a person expects them to; the highlighted option is the family's
+own state rather than whatever the browser focused. `label` is the words the field shows once an
+option is chosen — omit it and the value is used. Filtering the list is yours: read the typed text
+and render the options you want.
+
+## Anatomy
+
+- `combobox.root` — holds the configuration. Renders `role="group"`.
+- `combobox.label` — names the field and the list.
+- `combobox.input` — the field a person types in.
+- `combobox.trigger` — a button that shows the list. Deliberately not a tab stop.
+- `combobox.content` — the list.
+- `combobox.item` — one option, named by its required `value`.
+- `combobox.itemlabel` and `combobox.itemindicator` — that option's parts.
+- `combobox.description`, `combobox.error` — the sentence under the field, and the one that marks it invalid.
+- `combobox.field` — the hidden native `<select>` that carries the choice into a form.
+
+It writes `ui-open`, `ui-closed`, `ui-highlighted`, `ui-selected`, `ui-hidden`, `ui-inline`,
+`ui-required`, `ui-disabled` and `ui-value`.
+
+## Props on `combobox.root`
+
+| Prop | Type | What it does |
+| --- | --- | --- |
+| `value` | `string \| string[]` | The chosen option. With `multiple` it is the list of chosen values. |
+| `open` | `boolean` | The list is showing. Omit it and it starts closed. |
+| `multiple` | `boolean` | More than one option can be chosen, and `value` becomes a list. |
+| `inline` | `boolean` | The list is part of the page rather than a popup: always showing, nothing dismisses it. |
+| `loop` | `boolean` | The arrow walk wraps around the ends instead of stopping. |
+| `removeOnBackspace` | `boolean` | Backspace in an empty field removes the last chosen value. `multiple` only. |
+| `disabled` | `boolean` | Nobody can choose or type. |
+| `required` | `boolean` | A choice is needed before the form submits. |
+| `invalid` | `boolean` | Reported as `aria-invalid` on the input. |
+| `name` | `string` | Submitted under this name by `combobox.field`. |
+| `placeholder` | `string` | The field's placeholder. The root's value wins over the input's own. |
+| `onChange` | `(value) => void` | Called with the new selection. |
+| `onInput` | `(value) => void` | Called with the field's new text every time a person types. |
+| `onOpenChange` | `(open) => void` | Called when the list opens or closes. |
+
+Everything a `<div>` accepts reaches the element too.

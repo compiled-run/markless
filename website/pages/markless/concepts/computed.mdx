@@ -1,0 +1,94 @@
+import PageMeta from '../../../components/page-meta.tsrx';
+import CartTotalDemo from '../../../components/demos/cart-total-demo.tsrx';
+import Collapsible from '../../../components/demos/collapsible.tsrx';
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+import LikeHeart from '../../../components/docs/like-heart.tsrx';
+
+<Sidebar pathname="/markless/concepts/computed" />
+
+# A value you work out is never out of date
+
+<PageMeta level="Start here" time="3 min" assumes="state" sprite="spiral" />
+
+<ThemeToggle />
+
+Everybody has shipped this bug. Two numbers on a screen disagree with each other, because one was
+updated and the other was supposed to be updated at the same time and was not. The cart says three
+items and the total says the price of two.
+
+The code that keeps them in step is somewhere in the file, and it is right nine times out of ten.
+
+That bug exists because the total was stored. Storing it made it a second source of truth that
+somebody has to maintain.
+
+**If a value can be worked out from other values, do not store it. Work it out.** That is what
+`computed()` is for.
+
+```tsrx
+const total = computed(() => shirts * 20 + mugs * 8);
+```
+
+You read `total` like any other variable. You never call it, you never hand it a list of the things
+it depends on, and you never tell it that something changed. The compiler read the body, so it
+already knows this value is made out of `shirts` and `mugs`.
+
+Here it is running. Add a shirt, wait a beat, then add a mug, and watch the total:
+
+<CartTotalDemo />
+
+Now read the file, and go looking for the line that updates the total:
+
+```tsrx
+import { computed, state } from '@markless/core';
+
+export default function CartTotal() @{
+	let shirts = state(1);
+	let mugs = state(0);
+	const total = computed(() => shirts * 20 + mugs * 8);
+
+	<section>
+		<p>Shirts at 20 each: {shirts}</p>
+		<p>Mugs at 8 each: {mugs}</p>
+		<p>Total: {total}</p>
+		<button onClick={() => shirts++}>Add a shirt</button>
+		<button onClick={() => mugs++}>Add a mug</button>
+	</section>
+}
+```
+
+There is not one. The two buttons change a quantity and stop there. `total` is not a thing that gets
+updated. It is a description of how to work the total out, and the only moment it is ever worked out
+is a moment when something on screen needs it.
+
+## Nothing runs until the screen asks for it
+
+That is the design, not a detail. The specification states the invariant:
+
+> The entire graph is demand-driven from the DOM. State to computed to DOM updates, where
+> compiler-generated DOM update symbols are the only effects in the system. Nothing computes unless
+> the screen needs it.
+
+Two things follow. A `computed()` costs you nothing while nothing is looking at it. And a value on
+screen cannot lag behind its inputs, because being on screen is exactly what causes it to be worked
+out.
+
+## Two rules, and then you know this
+
+**Do not write to a computed.** It is derived, so assigning to it would be claiming two different
+answers at once. Change the values it is made from instead.
+
+**Do not declare something as state if you could derive it.** Here is the tell: if you catch
+yourself writing a line whose only job is keeping one variable in agreement with another, the second
+one wanted to be a `computed()`.
+
+<Collapsible sprite="star-badge" summary="Where is the dependency list, and where is the effect hook?" text="There is no dependency list because there is nothing for you to keep accurate: the compiler reads the body of the computed and works out what it read. There is no effect primitive either, and the specification is direct that there never will be. Its reasoning is that a computed and an effect are the same node, and the only difference is that a computed runs when it is read while an effect runs because its inputs changed, with nobody asking. That second property is the one that breaks resumability, because it is code that wakes itself up. The classic uses each have a home: deriving a value from other values is computed, fetching data is an async computed, and one-off side work belongs in the event handler where the change actually originated." />
+
+## Where to go next
+
+If you take one habit from this page, take the tell. You do not have to spot it in advance. You will
+notice it the second time you write it.
+
+Next: [events](/markless/concepts/events), which is where a click turns into a change.
+
+<LikeHeart />

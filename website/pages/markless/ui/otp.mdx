@@ -1,0 +1,54 @@
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+import Preview from '../../../components/ui/preview.tsrx';
+
+<Sidebar pathname="/markless/ui/otp" />
+
+# otp
+
+<ThemeToggle />
+
+<Preview shows="Six empty boxes with a caret in the first." />
+
+```tsrx
+import { otp } from '@markless/ui';
+
+export default function Code() @{
+	<otp.root length={6}>
+		<otp.field aria-label="Verification code" />
+		<otp.item index={0}><otp.itemindicator>|</otp.itemindicator></otp.item>
+		<otp.item index={1}><otp.itemindicator>|</otp.itemindicator></otp.item>
+		<otp.item index={2}><otp.itemindicator>|</otp.itemindicator></otp.item>
+		<otp.item index={3}><otp.itemindicator>|</otp.itemindicator></otp.item>
+		<otp.item index={4}><otp.itemindicator>|</otp.itemindicator></otp.item>
+		<otp.item index={5}><otp.itemindicator>|</otp.itemindicator></otp.item>
+	</otp.root>
+}
+```
+
+There is one real input, and it is invisible and stretched over the whole row, so a click anywhere
+on the boxes lands on it. That is what makes paste, one-time-code autofill, undo and a single tab
+stop free rather than reimplemented — six separate inputs would have cost all four. Each box says
+which character of the code it shows, counting from 0.
+
+## Anatomy
+
+- `otp.root` — the box the field is stretched over. Its `style` belongs to the family.
+- `otp.field` — the one real input. Everything typed goes here.
+- `otp.item` — one box, declaring its `index`.
+- `otp.itemindicator` — the caret inside a box.
+
+It writes `ui-empty` and `ui-disabled`.
+
+## Props on `otp.root`
+
+| Prop | Type | What it does |
+| --- | --- | --- |
+| `length` | `number` | How many characters the code has. Required. |
+| `value` | `string` | The code entered so far. Omit it and the field starts empty. |
+| `disabled` | `boolean` | Nothing can be typed. |
+| `shiftPWManagers` | `boolean` | Keep a password manager's icon off the boxes. Omit it and the icon is pushed past the right edge. |
+| `onChange` | `(value) => void` | Called with the whole code every time it changes, not with the character typed. |
+| `onComplete` | `(value) => void` | Called once, the moment the code reaches `length` characters. |
+
+Everything a `<div>` accepts reaches the element too, except `style`.

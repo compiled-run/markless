@@ -1,0 +1,2383 @@
+:root {
+	/* colors */
+	--ink: oklch(28% 0.015 90);
+	--yellow: oklch(88.6% 0.14 101);
+	--pink: oklch(76% 0.15 0);
+	--purple: oklch(75.4% 0.165 310);
+	--green-soft: oklch(84% 0.1 140);
+	--green-star: oklch(80% 0.155 148);
+	--paper: oklch(91.4% 0.033 79);
+	/* Code surface: paper, a shade lighter than the page, with a quiet edge. */
+	--code-surface: oklch(96% 0.02 79);
+	--code-edge: color-mix(in oklch, var(--ink) 22%, transparent);
+	/* The section-title underline: two quick crayon passes, drawn once here. */
+	--sidebar-stroke-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 12' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M3 7.5C28 4 62 9.5 116 5'/%3E%3Cpath d='M9 10.5C36 8 70 12 108 8.5' stroke-width='2' opacity='.75'/%3E%3C/g%3E%3C/svg%3E");
+
+	/* Every pastel accent is light in both themes, so anything printed on one is
+	   always the dark ink, never the page's foreground. */
+	--on-accent: oklch(28% 0.015 90);
+	/* Raised surfaces: the playground frame, the callout, the collapsible. */
+	--raised: color-mix(in oklch, var(--paper) 80%, white);
+	--tinted: color-mix(in oklch, var(--yellow) 45%, var(--paper));
+	--tinted-quiet: color-mix(in oklch, var(--yellow) 35%, var(--paper));
+	/* The sidebar's hover wash: the page's ink at this strength over the paper. */
+	--hover-wash: 8%;
+	/* The explorer's listing slab, which is a dark block on the light theme. */
+	--slab: var(--ink);
+	--slab-ink: var(--paper);
+	/* Paper grain, tuned per theme: dark ground shows far less tooth. */
+	--grain-fiber-blend: overlay;
+	--grain-fiber-opacity: 0.55;
+	--grain-speck-blend: hard-light;
+	--grain-speck-opacity: 0.22;
+	/* Which cut of a sprite is painted. CSS cannot swap an image `src`, so both
+	   are in the markup and the theme picks one. */
+	--sprite-light: inline-block;
+	--sprite-dark: none;
+
+	--font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+	/* text shadow: an offset silhouette peeking out left of the glyphs, dilated
+	   past the glyph edges (text-shadow has no spread). Everything derives from
+	   this one base offset and growth radius; elements pick a color by setting
+	   --shadow-color (see the heading rule below). */
+	--shadow-x: -0.09em;
+	--shadow-y: -0.01em;
+	--shadow-grow: 0.02em;
+	--shadow-color: transparent;
+
+	/* The sticky header's own height, so the sidebar and the right rail can sit
+	   below it without either one guessing. */
+	--header-height: 3.1rem;
+	--theme-toggle-size: 1.9rem;
+
+	/* typography */
+	/* @link https://utopia.fyi/type/calculator?c=360,18,1.2,1240,20,1.25,5,2,&s=0.75|0.5|0.25,1.5|2|3|4|6,s-l&g=s,l,xl,12 */
+	--step--2: clamp(0.7813rem, 0.7736rem + 0.0341vw, 0.8rem);
+	--step--1: clamp(0.9375rem, 0.9119rem + 0.1136vw, 1rem);
+	--step-0: clamp(1.125rem, 1.0739rem + 0.2273vw, 1.25rem);
+	--step-1: clamp(1.35rem, 1.2631rem + 0.3864vw, 1.5625rem);
+	--step-2: clamp(1.62rem, 1.4837rem + 0.6057vw, 1.9531rem);
+	--step-3: clamp(1.944rem, 1.7405rem + 0.9044vw, 2.4414rem);
+	--step-4: clamp(2.3328rem, 2.0387rem + 1.3072vw, 3.0518rem);
+	--step-5: clamp(2.7994rem, 2.384rem + 1.8461vw, 3.8147rem);
+
+	/* spacing */
+	/* @link https://utopia.fyi/space/calculator?c=360,18,1.2,1240,20,1.25,5,2,&s=0.75,1.5|2|3|4|6,s-l|m-2xl&g=s,l,xl,12 */
+	--space-xs: clamp(0.875rem, 0.8494rem + 0.1136vw, 0.9375rem);
+	--space-s: clamp(1.125rem, 1.0739rem + 0.2273vw, 1.25rem);
+	--space-m: clamp(1.6875rem, 1.6108rem + 0.3409vw, 1.875rem);
+	--space-l: clamp(2.25rem, 2.1477rem + 0.4545vw, 2.5rem);
+	--space-xl: clamp(3.375rem, 3.2216rem + 0.6818vw, 3.75rem);
+	--space-2xl: clamp(4.5rem, 4.2955rem + 0.9091vw, 5rem);
+	--space-3xl: clamp(6.75rem, 6.4432rem + 1.3636vw, 7.5rem);
+
+	/* One-up pairs */
+	--space-xs-s: clamp(0.875rem, 0.7216rem + 0.6818vw, 1.25rem);
+	--space-s-m: clamp(1.125rem, 0.8182rem + 1.3636vw, 1.875rem);
+	--space-m-l: clamp(1.6875rem, 1.3551rem + 1.4773vw, 2.5rem);
+	--space-l-xl: clamp(2.25rem, 1.6364rem + 2.7273vw, 3.75rem);
+	--space-xl-2xl: clamp(3.375rem, 2.7102rem + 2.9545vw, 5rem);
+	--space-2xl-3xl: clamp(4.5rem, 3.2727rem + 5.4545vw, 7.5rem);
+
+	/* Custom pairs */
+	--space-s-l: clamp(1.125rem, 0.5625rem + 2.5vw, 2.5rem);
+	--space-m-2xl: clamp(1.6875rem, 0.3324rem + 6.0227vw, 5rem);
+}
+
+/* Joy Elia — self-hosted under a TypeBerka Font Studio Basic License. */
+@font-face {
+	font-family: 'Joy Elia';
+	font-style: normal;
+	font-weight: 400;
+	font-display: swap;
+	src:
+		url('/fonts/JoyElia-Regular.woff2') format('woff2'),
+		url('/fonts/JoyElia-Regular.woff') format('woff');
+}
+
+@font-face {
+	font-family: 'Joy Elia';
+	font-style: normal;
+	font-weight: 700;
+	font-display: swap;
+	src:
+		url('/fonts/JoyElia-Bold.woff2') format('woff2'),
+		url('/fonts/JoyElia-Bold.woff') format('woff');
+}
+
+/* Shantell Sans — self-hosted, SIL Open Font License. The body face: a marker
+   face designed for continuous reading, so Joy Elia decorates and Shantell
+   carries the paragraphs. One variable file covers the weight range. */
+@font-face {
+	font-family: 'Shantell Sans';
+	font-style: normal;
+	font-weight: 400 700;
+	font-display: swap;
+	src: url('/fonts/ShantellSans-latin-variable.woff2') format('woff2');
+}
+
+* {
+	font-family: 'Joy Elia';
+}
+
+/* Article prose reads in Shantell Sans; headings, sidebar, chips, buttons, and
+   code stay Joy Elia / mono. The `*` rule above beats inheritance, so inline
+   children are matched explicitly. Bold maps to the real 600 weight. */
+.prose :is(p, li, blockquote, dd, dt, td, th, figcaption, summary),
+.prose :is(p, li, blockquote, dd, dt, td, th, figcaption, summary)
+	:is(a, strong, em, b, i, mark, small, span) {
+	font-family: 'Shantell Sans', system-ui, sans-serif;
+}
+
+.prose :is(p, li, blockquote) :is(strong, b) {
+	font-weight: 600;
+}
+
+/* Body copy lands at about 20-21px on a desktop viewport: a step above the
+   default text step, well under the 25px --step-1 the page used to carry. */
+body {
+	background: var(--paper);
+	color: var(--ink);
+	font-size: calc(var(--step-0) * 1.08);
+	margin: 0;
+	line-height: 160%;
+}
+
+/* The base offset plus its four corners at --shadow-grow: a solid silhouette
+   grown outward on every side. Invisible until an element sets --shadow-color. */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+	text-shadow:
+		var(--shadow-x) var(--shadow-y) 0 var(--shadow-color),
+		calc(var(--shadow-x) - var(--shadow-grow)) calc(var(--shadow-y) - var(--shadow-grow)) 0
+			var(--shadow-color),
+		calc(var(--shadow-x) - var(--shadow-grow)) calc(var(--shadow-y) + var(--shadow-grow)) 0
+			var(--shadow-color),
+		calc(var(--shadow-x) + var(--shadow-grow)) calc(var(--shadow-y) - var(--shadow-grow)) 0
+			var(--shadow-color),
+		calc(var(--shadow-x) + var(--shadow-grow)) calc(var(--shadow-y) + var(--shadow-grow)) 0
+			var(--shadow-color);
+}
+
+h1 {
+	font-size: var(--step-5);
+	--shadow-color: var(--pink);
+	line-height: 115%;
+}
+
+/* Paper grain over the whole page. Absolute, not fixed: a fixed layer with a
+   blend mode forces the compositor to re-blend the full viewport on every
+   scrolled frame (the sidebar only felt smooth because its scroller is
+   narrow); an absolute layer scrolls with the paper as one blended unit. */
+body {
+	position: relative;
+}
+body::before,
+body::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	min-height: 100vh;
+	z-index: 999999999;
+	pointer-events: none;
+}
+
+/* Fiber layer: continuous tooth pressed into everything via overlay. */
+body::before {
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='grain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.3' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0.33 0.33 0.33 0 0 0.33 0.33 0.33 0 0 0.33 0.33 0.33 0 0 0 0 0 0 1'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='1.5' intercept='-0.25'/%3E%3CfeFuncG type='linear' slope='1.5' intercept='-0.25'/%3E%3CfeFuncB type='linear' slope='1.5' intercept='-0.25'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23grain)'/%3E%3C/svg%3E");
+	mix-blend-mode: var(--grain-fiber-blend);
+	opacity: var(--grain-fiber-opacity);
+}
+
+/* Speck layer: hard-light keys off the noise itself, so its bright flecks
+   punch through dark ink the way paper tooth shows through print. */
+body::after {
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='grain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.3' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0.33 0.33 0.33 0 0 0.33 0.33 0.33 0 0 0.33 0.33 0.33 0 0 0 0 0 0 1'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='2.6' intercept='-0.8'/%3E%3CfeFuncG type='linear' slope='2.6' intercept='-0.8'/%3E%3CfeFuncB type='linear' slope='2.6' intercept='-0.8'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23grain)'/%3E%3C/svg%3E");
+	mix-blend-mode: var(--grain-speck-blend);
+	opacity: var(--grain-speck-opacity);
+}
+/* ---------------------------------------------------------------------------
+   Docs chrome: header, sidebar, prose column. Tokens only, no new palette.
+   --------------------------------------------------------------------------- */
+
+.site-header {
+	position: sticky;
+	top: 0;
+	z-index: 30;
+	box-sizing: border-box;
+	min-height: var(--header-height);
+	display: flex;
+	align-items: center;
+	gap: 0.45em;
+	padding-inline: var(--space-s-l);
+	background: var(--paper);
+	border-bottom: 1px solid var(--code-edge);
+	font-size: var(--step--1);
+	overflow: hidden;
+}
+
+/* A phone has room for the mug, the page's own name and the two controls that
+   are not text; the section step of the trail and the search field are what get
+   dropped, in that order, before anything can push the document sideways. */
+@media (max-width: 46rem) {
+	.crumb-section,
+	.crumb-sep-section,
+	.site-search {
+		display: none;
+	}
+	.crumb-page {
+		min-width: 0;
+	}
+}
+
+.crumb {
+	display: inline-flex;
+	gap: 0.35em;
+	align-items: center;
+	color: var(--ink);
+	text-decoration: none;
+	white-space: nowrap;
+}
+
+.crumb-page {
+	font-weight: 700;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.crumb-sep {
+	width: 1em;
+	height: 1em;
+	color: currentColor;
+	opacity: 0.45;
+}
+
+.ico {
+	width: 1em;
+	height: 1em;
+	color: currentColor;
+	flex: none;
+}
+
+.header-tools {
+	display: flex;
+	gap: 0.45em;
+	align-items: center;
+	margin-left: auto;
+}
+
+/* Search is a slot: the markup is here and the behaviour is not, because there
+   is no index yet. */
+.site-search {
+	box-sizing: border-box;
+	width: 11rem;
+	max-width: 32vw;
+	padding: 0.2em 0.7em;
+	font-size: inherit;
+	color: var(--ink);
+	background: var(--code-surface);
+	border: 2px solid var(--code-edge);
+	border-radius: 999px;
+}
+
+/* The theme toggle is an island a page renders, not part of the document, so it
+   cannot be a child of this header (NOTES.md finding 19). `.theme-toggle-slot`
+   is the hole it is reserved at the end of the row, and `.theme-toggle-island`
+   is pinned to exactly that hole: last in the row means its right edge is the
+   header's own inline padding, which is a number both rules can name. The
+   witness compares the two boxes rather than trusting that. */
+.theme-toggle-slot {
+	display: inline-block;
+	inline-size: var(--theme-toggle-size);
+	block-size: var(--theme-toggle-size);
+	flex: none;
+}
+
+.theme-toggle-island {
+	position: fixed;
+	top: 0;
+	right: var(--space-s-l);
+	z-index: 40;
+	block-size: var(--header-height);
+	display: flex;
+	align-items: center;
+	font-size: var(--step--1);
+}
+
+.theme-toggle {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	inline-size: var(--theme-toggle-size);
+	block-size: var(--theme-toggle-size);
+	padding: 0;
+	font-size: 1em;
+	line-height: 1;
+	color: var(--ink);
+	background: none;
+	border: 0;
+	border-radius: 999px;
+	cursor: pointer;
+}
+
+/* The drawing inside the button. It is a die-cut sticker with its own white
+   border and shadow, so it is given the button's whole box and no chrome of its
+   own: the ring the button used to draw around a glyph would be a second edge
+   around an edge. */
+.theme-toggle-icon {
+	display: block;
+	inline-size: var(--theme-toggle-size);
+	block-size: var(--theme-toggle-size);
+	object-fit: contain;
+}
+
+/* Which of the two buttons is the one to offer is the same question as which
+   palette is painted, so these rules are the palette's rules again, in step with
+   the pair further down. `system` and "no attribute" both mean "ask the
+   operating system", which is why neither is named. */
+.theme-toggle-to-dark {
+	display: inline-flex;
+}
+
+.theme-toggle-to-light {
+	display: none;
+}
+
+html[data-theme='dark'] .theme-toggle-to-dark {
+	display: none;
+}
+
+html[data-theme='dark'] .theme-toggle-to-light {
+	display: inline-flex;
+}
+
+.header-link {
+	color: var(--ink);
+	text-decoration-color: var(--pink);
+	text-decoration-thickness: 0.12em;
+	text-underline-offset: 0.16em;
+	white-space: nowrap;
+}
+
+.site-name {
+	display: block;
+	font-size: var(--step-1);
+	font-weight: 700;
+	color: var(--ink);
+	text-decoration: none;
+	margin-bottom: var(--space-m);
+	--shadow-color: var(--yellow);
+}
+
+/* Ordering rule for this section: every unconditional block comes first and the
+   narrow-viewport media queries come last. A media query adds no specificity, so
+   a later unconditional rule beats it at every width — which is exactly how the
+   mobile sidebar used to end up `position: fixed` on top of the prose. */
+
+.site-shell {
+	padding-inline: var(--space-s-l);
+}
+
+.sidebar {
+	position: fixed;
+	left: var(--space-s-l);
+	top: calc(var(--header-height) + var(--space-s));
+	width: 16rem;
+	max-height: calc(100vh - var(--header-height) - var(--space-s));
+	overflow-y: auto;
+	/* The rail scrolls, but its track is not part of the drawing: the fade at the
+	   bottom (T017) is what says there is more list under the fold. */
+	scrollbar-width: none;
+	padding-block: var(--space-s);
+	font-size: var(--step--1);
+}
+
+.sidebar::-webkit-scrollbar {
+	display: none;
+}
+
+/* On this page: the outline of the page's own h2/h3, written into the page HTML
+   by tooling/highlight-mdx.ts. Fixed rather than a grid column, because the
+   prose column is a page module and the shell cannot reach inside it; the shell
+   reserves the strip it sits in below. */
+.on-this-page {
+	position: fixed;
+	right: var(--space-s-l);
+	top: calc(var(--header-height) + var(--space-s));
+	width: 11rem;
+	max-height: calc(100vh - var(--header-height) - 2 * var(--space-s));
+	overflow-y: auto;
+	font-size: var(--step--1);
+}
+
+.on-this-page-title {
+	margin: 0 0 0.5em;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	opacity: 0.7;
+}
+
+.on-this-page-list {
+	display: grid;
+	gap: 0.15em;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.on-this-page-link {
+	display: block;
+	padding: 0.1em 0.5em;
+	color: var(--ink);
+	text-decoration: none;
+	border-left: 2px solid var(--code-edge);
+	line-height: 135%;
+}
+
+.on-this-page-link:hover {
+	background: var(--yellow);
+	color: var(--on-accent);
+	border-left-color: var(--pink);
+}
+
+.on-this-page-item-h3 .on-this-page-link {
+	padding-left: 1.2em;
+	opacity: 0.85;
+}
+
+@media (max-width: 96rem) {
+	.site-shell {
+		padding-left: calc(16rem + 2 * var(--space-s-l));
+		padding-right: calc(11rem + 2 * var(--space-s-l));
+	}
+}
+
+/* The nav list is inside a <details> with no `open` attribute, so a phone gets
+   one line of navigation instead of nineteen and the article's h1 is in the
+   first screenful. Above 70rem the column sits beside the prose, so the
+   disclosure is opened here and its summary is not painted. */
+.sidebar-summary {
+	display: none;
+}
+
+.sidebar-disclosure::details-content {
+	content-visibility: visible;
+	block-size: auto;
+	overflow: visible;
+}
+
+/* The pinned column is about 900px of list. On anything shorter than that it
+   scrolls inside itself, and without a fade the list ends mid-Router on a hard
+   edge: How it works and Reference are invisible to a reader who never finds
+   the inner scroll. Above that height nothing is cut off, so nothing is faded. */
+@media (min-width: 70.01rem) and (max-height: 62rem) {
+	.sidebar {
+		mask-image: linear-gradient(to bottom, #000 calc(100% - 3rem), transparent 100%);
+	}
+}
+
+@media (max-width: 70rem) {
+	.site-shell {
+		padding-inline: var(--space-s-l);
+	}
+	.sidebar {
+		position: static;
+		width: auto;
+		max-height: none;
+		max-width: 68ch;
+		margin-inline: auto;
+		padding-block: var(--space-s) 0;
+	}
+	.sidebar-summary {
+		display: block;
+		padding: 0.35em 0.7em;
+		border: 2px solid var(--ink);
+		border-radius: 8px;
+		background: var(--raised);
+		font-size: var(--step--1);
+		font-weight: 700;
+		cursor: pointer;
+	}
+	.sidebar-disclosure[open] .sidebar-summary {
+		margin-bottom: var(--space-xs);
+	}
+	.sidebar-disclosure::details-content {
+		content-visibility: hidden;
+		block-size: 0;
+		overflow: hidden;
+	}
+	.sidebar-disclosure[open]::details-content {
+		content-visibility: visible;
+		block-size: auto;
+		overflow: visible;
+	}
+	/* The outline is not hidden on a phone, it is laid on its side: one strip of
+	   chips that scrolls sideways, so the reader keeps the page's shape without
+	   paying a column of it before the h1. */
+	.on-this-page {
+		position: static;
+		width: auto;
+		max-width: 68ch;
+		max-height: none;
+		margin: 0 auto var(--space-xs);
+		display: flex;
+		align-items: baseline;
+		gap: 0.6em;
+		overflow: hidden;
+	}
+	.on-this-page-title {
+		margin: 0;
+		flex: 0 0 auto;
+	}
+	.on-this-page-list {
+		display: flex;
+		gap: 0.4em;
+		overflow-x: auto;
+		scrollbar-width: thin;
+		padding-bottom: 0.2em;
+	}
+	.on-this-page-item {
+		flex: 0 0 auto;
+	}
+	.on-this-page-link {
+		white-space: nowrap;
+		border-left: none;
+		border: 2px solid var(--code-edge);
+		border-radius: 999px;
+		padding: 0.1em 0.7em;
+	}
+	.on-this-page-item-h3 .on-this-page-link {
+		padding-left: 0.7em;
+	}
+}
+
+.sidebar-section + .sidebar-section {
+	margin-top: var(--space-s);
+}
+
+.sidebar-title {
+	margin: 0 0 var(--space-xs);
+	font-size: var(--step--1);
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	opacity: 0.7;
+}
+
+/* One hand-drawn icon per sidebar entry, cut from the owner's sheet in both
+   variants (`tooling/cut-sprites.ts sidebar`). Both are in the markup and the
+   theme decides which one is displayed, the same trick `.sprite` uses. */
+.nav-icon {
+	display: inline-block;
+	width: 2.6em;
+	height: 2.6em;
+	flex: none;
+	line-height: 1;
+}
+
+/* The phone gets the whole list at once, so the icon steps down there. */
+@media (max-width: 70rem) {
+	.nav-icon {
+		width: 2em;
+		height: 2em;
+	}
+	.sidebar-link {
+		min-height: 2.5em;
+	}
+}
+
+.nav-icon-ink {
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+}
+
+.nav-icon-light {
+	display: var(--sprite-light);
+}
+
+.nav-icon-dark {
+	display: var(--sprite-dark);
+}
+
+/* The section title's underline is the reference sheet's short crayon stroke: an
+   SVG path used as a mask, so one file paints in each section's own colour. */
+.sidebar-title.has-stroke {
+	position: relative;
+	display: inline-block;
+	margin-top: var(--space-xs);
+	padding-bottom: 0.5em;
+}
+
+.sidebar-title.has-stroke::after {
+	content: '';
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	height: 0.45em;
+	background: var(--sidebar-stroke, var(--pink));
+	-webkit-mask-image: var(--sidebar-stroke-mask);
+	mask-image: var(--sidebar-stroke-mask);
+	-webkit-mask-size: 100% 100%;
+	mask-size: 100% 100%;
+	-webkit-mask-repeat: no-repeat;
+	mask-repeat: no-repeat;
+}
+
+.sidebar-title.stroke-pink {
+	--sidebar-stroke: var(--pink);
+}
+
+.sidebar-title.stroke-purple {
+	--sidebar-stroke: var(--purple);
+}
+
+.sidebar-title.stroke-yellow {
+	--sidebar-stroke: var(--yellow);
+}
+
+.sidebar-title.stroke-green {
+	--sidebar-stroke: var(--green-star);
+}
+
+.sidebar-list {
+	display: grid;
+	gap: 0.15em;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+/* Three columns, so the sprite, the number and the title line up down the
+   column. The resting border is transparent and the same width as the active
+   one, so nothing shifts when an entry becomes the current page. */
+.sidebar-link {
+	display: grid;
+	grid-template-columns: 2.6em 1.2em 1fr;
+	gap: 0.45em;
+	align-items: center;
+	min-height: 3em;
+	padding: 0.3em 0.5em;
+	color: var(--ink);
+	text-decoration: none;
+	border: 2px solid transparent;
+	border-radius: 6px;
+	line-height: 130%;
+}
+
+.sidebar-num {
+	font-weight: 700;
+	opacity: 0.55;
+}
+
+/* Hover is a wash of the page's own ink, so one rule reads right on both
+   grounds. The current page is not a filled row: its title alone is run over
+   with the yellow marker, dark ink on a pastel like everything else printed on
+   an accent. */
+.sidebar-link:hover {
+	background: color-mix(in oklch, var(--ink) var(--hover-wash), transparent);
+}
+
+.sidebar-link.is-active {
+	font-weight: 700;
+}
+
+.sidebar-link.is-active .sidebar-text {
+	justify-self: start;
+	padding: 0.02em 0.28em;
+	margin-left: -0.28em;
+	background: var(--yellow);
+	color: var(--on-accent);
+	border-radius: 3px 5px 3px 6px;
+	transform: rotate(-0.8deg);
+}
+
+.sidebar-link.is-active .sidebar-num {
+	opacity: 0.8;
+}
+
+.prose {
+	max-width: 68ch;
+	margin-inline: auto;
+	padding-block: var(--space-m) var(--space-2xl);
+	/* An inline `code` token longer than a phone's column is the one thing in the
+	   prose that can push the document sideways; a fenced block scrolls instead. */
+	overflow-wrap: break-word;
+}
+
+.prose p,
+.prose ul,
+.prose ol {
+	margin-block: var(--space-s);
+}
+
+.prose h2 {
+	font-size: var(--step-3);
+	--shadow-color: var(--purple);
+	margin-top: var(--space-l);
+	margin-bottom: var(--space-s);
+}
+
+.prose h3 {
+	font-size: var(--step-2);
+	--shadow-color: var(--green-soft);
+	margin-top: var(--space-m);
+	margin-bottom: var(--space-xs);
+}
+
+.prose a {
+	color: var(--ink);
+	text-decoration-color: var(--pink);
+	text-decoration-thickness: 0.12em;
+	text-underline-offset: 0.16em;
+}
+
+.prose code {
+	background: var(--yellow);
+	color: var(--on-accent);
+	padding: 0.1em 0.3em;
+	font-size: 0.9em;
+}
+
+/* Fenced blocks are monospace; inline code inside a sentence keeps Joy Elia so
+   it still reads as part of the sentence. The block hugs its content: no
+   min-height, no reserved strip, and the highlighter strips the trailing
+   newline so there is no empty last line. */
+.prose pre {
+	background: var(--code-surface);
+	margin-block: var(--space-m);
+	color: var(--ink);
+	padding: var(--space-s);
+	border: 1px solid var(--code-edge);
+	border-radius: 2px;
+	overflow-x: auto;
+	font-family: var(--font-mono);
+	font-size: var(--step--1);
+	line-height: 1.55;
+	tab-size: 2;
+}
+
+.prose pre code {
+	display: block;
+	background: none;
+	padding: 0;
+	color: inherit;
+	font-size: inherit;
+}
+
+/* `* { font-family }` above matches every token span the highlighter emits, and
+   a direct match beats a family inherited from `pre`, so the spans have to be
+   named. The hover doc is prose, not code, and keeps Joy Elia. */
+.prose pre,
+.prose pre code,
+.prose pre code span {
+	font-family: var(--font-mono);
+}
+
+.prose pre .tsrx-tip,
+.prose pre .tsrx-tip span {
+	font-family: 'Joy Elia', system-ui, sans-serif;
+}
+
+/* ---------------------------------------------------------------------------
+   Playground: the reusable frame every interactive widget sits in. Give it a
+   .playground-controls row and a .playground-output block as needed.
+   --------------------------------------------------------------------------- */
+
+.demo,
+.playground {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-xs);
+	margin-block: var(--space-l);
+	padding: var(--space-s);
+	border: 2px solid var(--ink);
+	border-radius: 2px;
+	background: var(--raised);
+	box-shadow: 4px 4px 0 var(--purple);
+}
+
+.playground-controls {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-xs);
+	align-items: center;
+}
+
+.playground-output,
+.playground-echo p,
+.demo-readout {
+	margin: 0;
+	font-size: var(--step-1);
+}
+
+.demo-button,
+.playground button {
+	align-self: flex-start;
+	font-size: var(--step-0);
+	padding: 0.3em 0.9em;
+	color: var(--on-accent);
+	background: var(--green-soft);
+	border: 2px solid var(--ink);
+	border-radius: 2px;
+	box-shadow: 3px 3px 0 var(--ink);
+	cursor: pointer;
+}
+
+.demo-button:active,
+.playground button:active {
+	transform: translate(3px, 3px);
+	box-shadow: none;
+}
+
+.callout {
+	margin-block: var(--space-m);
+	padding: var(--space-s);
+	border-left: 4px solid var(--pink);
+	background: var(--tinted);
+}
+
+.callout-title {
+	display: flex;
+	gap: 0.45em;
+	align-items: center;
+	margin: 0 0 0.3em;
+	font-weight: 700;
+}
+
+.callout-body {
+	margin: 0;
+}
+
+.collapsible {
+	margin-block: var(--space-m);
+	padding: var(--space-xs);
+	border-left: 4px solid var(--purple);
+	background: var(--tinted-quiet);
+}
+
+.collapsible summary {
+	display: flex;
+	gap: 0.45em;
+	align-items: center;
+	cursor: pointer;
+	font-weight: 700;
+}
+
+.collapsible-caret {
+	width: 1em;
+	height: 1em;
+	color: currentColor;
+	transition: transform 140ms ease;
+}
+
+.collapsible[open] .collapsible-caret {
+	transform: rotate(180deg);
+}
+
+.collapsible p {
+	margin-bottom: 0;
+}
+
+html {
+	background: var(--paper);
+}
+
+/* ---------------------------------------------------------------------------
+   Code blocks. Token colours are shiki's built-in github-light theme, written
+   into the markup by tooling/highlight-code.ts. Only the surface is ours: the
+   theme's white slab and its default foreground are dropped there, so the block
+   sits on paper with the page's ink and reads as part of the page.
+   --------------------------------------------------------------------------- */
+
+.prose pre.shiki {
+	position: relative;
+}
+
+/* ---------------------------------------------------------------------------
+   Hover docs on TSRX tokens. No script: the tooltip is a child of the token and
+   CSS shows it on hover and on keyboard focus. The token carries the same text
+   as an aria-label, so a screen reader gets it without the visual box.
+   --------------------------------------------------------------------------- */
+
+.tsrx-hover {
+	position: relative;
+	border-bottom: 1px dashed color-mix(in oklch, currentColor 32%, transparent);
+	cursor: help;
+	outline-offset: 2px;
+}
+
+.tsrx-hover:focus-visible {
+	outline: 2px solid var(--yellow);
+}
+
+/* The doc sits directly above the token it explains, and the block reserves no
+   room for it: a block at rest ends at its last line and does not move when one
+   is pointed at. A `<pre>` that scrolls clips its children, so where the browser
+   supports anchor positioning the box is taken out to the viewport and pinned to
+   the token; without it the box is placed against the token and a token on the
+   first line has its doc clipped by the block's top edge. */
+.tsrx-tip {
+	position: absolute;
+	left: 0;
+	bottom: calc(100% + 0.35em);
+	width: max-content;
+	max-width: min(36ch, calc(100vw - 2 * var(--space-s-l)));
+	z-index: 40;
+	background: var(--paper);
+	color: var(--ink);
+	border: 2px solid var(--ink);
+	box-shadow: 3px 3px 0 var(--purple);
+	font-family: 'Joy Elia';
+	font-size: var(--step--1);
+	line-height: 135%;
+	text-align: left;
+	white-space: normal;
+	user-select: none;
+	/* Hidden by display, not visibility: a hidden fixed anchored box still costs pre-paint on every scroll frame, and the page carries dozens. */
+	display: none;
+}
+
+.tsrx-hover:hover > .tsrx-tip,
+.tsrx-hover:focus > .tsrx-tip,
+.tsrx-hover:focus-visible > .tsrx-tip {
+	display: block;
+}
+
+@supports (anchor-scope: --tsrx-token) {
+	.tsrx-hover {
+		anchor-name: --tsrx-token;
+		/* Scoped to this token's own subtree, so every doc finds its own token
+		   rather than the last one on the page. */
+		anchor-scope: --tsrx-token;
+	}
+
+	.tsrx-tip {
+		position: fixed;
+		position-anchor: --tsrx-token;
+		left: anchor(left);
+		bottom: calc(anchor(top) + 0.35em);
+		top: auto;
+		right: auto;
+	}
+}
+
+.tsrx-tip-title {
+	display: block;
+	padding: 0.15em 0.6em;
+	background: var(--yellow);
+	color: var(--on-accent);
+	border-bottom: 2px solid var(--ink);
+	font-weight: 700;
+}
+
+.tsrx-tip-body {
+	display: block;
+	padding: 0.4em 0.6em 0.5em;
+}
+
+/* A token with no sentence gets a title-only tip rather than an empty padded
+   strip. The panel always draws the element, so the emptiness is decided here. */
+.tsrx-tip-body:empty {
+	display: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Keycaps in the keyboard tables (components/docs/keyboard-table.tsrx). A real
+   `<kbd>` drawn as a key: the heavier bottom edge is what makes a chip read as
+   something you press rather than a bordered word.
+   --------------------------------------------------------------------------- */
+
+.kbd-cap {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 0.35em;
+}
+
+.kbd-cap + .kbd-cap {
+	margin-left: 0.35em;
+}
+
+/* Empty on the first keycap of a row, so it reserves nothing there. */
+.kbd-join:empty {
+	display: none;
+}
+
+/* Both forms of every cap are in the HTML and one is shown, because the server
+   has no user agent to read. With no class stamped yet the plain-word form
+   stands, since it is the one that reads on either keyboard. */
+.kbd.is-mac {
+	display: none;
+}
+
+html.is-mac .kbd.is-mac {
+	display: inline-block;
+}
+
+html.is-mac .kbd.is-other {
+	display: none;
+}
+
+.kbd {
+	display: inline-block;
+	padding: 0.05em 0.5em;
+	font-family: inherit;
+	font-size: var(--step--1);
+	font-weight: 700;
+	line-height: 1.7;
+	color: var(--ink);
+	background: var(--code-surface);
+	border: 2px solid var(--code-edge);
+	border-bottom-width: 3px;
+	border-radius: 6px;
+	white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------------------
+   Props tables (components/docs/api-table.tsrx). The type lives in the hover doc
+   on the prop name, styled by `.tsrx-hover` further up, so only the name and the
+   inline code inside a description need saying here.
+   --------------------------------------------------------------------------- */
+
+.api-prop.is-required {
+	font-weight: 700;
+}
+
+/* A description is split on its backticks and every piece comes back as a
+   `<code>`, because the element cannot be chosen per piece without `@if`. The
+   pieces that were never in backticks give the inline-code look back here, so
+   the ones that were keep `.prose code` exactly as the rest of the page has it. */
+.prose code.api-text {
+	padding: 0;
+	background: none;
+	color: inherit;
+	font-size: inherit;
+}
+
+/* ---------------------------------------------------------------------------
+   Page meta: the level, reading time and prerequisite line that sits directly
+   under every H1. Small, quiet, and the same shape on every page.
+   --------------------------------------------------------------------------- */
+
+.page-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5em;
+	align-items: baseline;
+	margin-block: calc(var(--space-xs) * -0.5) var(--space-m);
+	font-size: var(--step--1);
+	color: color-mix(in oklch, var(--ink) 72%, var(--paper));
+}
+
+.page-meta-level {
+	padding: 0.1em 0.55em;
+	background: var(--yellow);
+	border: 2px solid var(--ink);
+	border-radius: 999px;
+	color: var(--on-accent);
+	font-weight: 700;
+}
+
+.page-meta-sep {
+	opacity: 0.5;
+}
+
+/* ---------------------------------------------------------------------------
+   Explorer: a widget where clicking a label lights up part of a listed file.
+   --------------------------------------------------------------------------- */
+
+.explorer {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-xs);
+}
+
+.playground .pick {
+	background: var(--paper);
+	font-size: var(--step--1);
+}
+
+.playground .pick.is-picked {
+	background: var(--green-star);
+	color: var(--on-accent);
+}
+
+.file-lines {
+	display: block;
+	margin: 0;
+	padding: var(--space-xs);
+	background: var(--slab);
+	color: var(--slab-ink);
+	border: 2px solid var(--slab);
+	overflow-x: auto;
+	font-size: var(--step--1);
+	line-height: 150%;
+	white-space: pre;
+}
+
+.file-line {
+	display: block;
+	padding: 0 0.3em;
+	border-left: 3px solid transparent;
+}
+
+/* The band is the yellow; the text on it has to be the ink that every other
+   pastel accent carries, not the yellow again. */
+.file-line.is-lit {
+	background: var(--yellow);
+	border-left-color: var(--yellow);
+	color: var(--on-accent);
+}
+
+.explorer-note {
+	margin: 0;
+	font-size: var(--step--1);
+	min-height: 3em;
+}
+
+/* ---------------------------------------------------------------------------
+   Sprites and mascots. The sprites are the owner's crayon doodles, cut out of
+   `sprites-sheet.png`; each ships twice, once as drawn and once with its dark
+   outline lifted to chalk, and the theme decides which one is painted. The
+   mascots carry their own white outline and read on either ground.
+   --------------------------------------------------------------------------- */
+
+.sprite {
+	display: inline-block;
+	width: var(--sprite-size);
+	height: var(--sprite-size);
+	vertical-align: -0.18em;
+	flex: none;
+	line-height: 1;
+}
+
+.sprite-ink {
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+}
+
+.sprite-ink-light {
+	display: var(--sprite-light);
+}
+
+.sprite-ink-dark {
+	display: var(--sprite-dark);
+}
+
+.mascot {
+	display: block;
+	width: var(--mascot-size);
+	height: auto;
+	flex: none;
+}
+
+.mascot.is-hero {
+	float: right;
+	width: var(--mascot-size);
+	margin: 0 0 var(--space-s) var(--space-s);
+	shape-outside: margin-box;
+}
+
+.mascot.is-mark {
+	width: var(--mascot-size);
+}
+
+/* The site mark: the markless mug beside the word. */
+.site-mark {
+	display: flex;
+	gap: 0.5rem;
+	align-items: center;
+	margin-bottom: var(--space-m);
+	text-decoration: none;
+}
+
+.site-mark .site-name {
+	margin-bottom: 0;
+}
+
+.sidebar-title {
+	display: flex;
+	gap: 0.4em;
+	align-items: center;
+}
+
+/* ---------------------------------------------------------------------------
+   The sibling projects, on the foot of the landing page.
+   --------------------------------------------------------------------------- */
+
+.more-from {
+	margin-top: var(--space-xl);
+	padding-top: var(--space-m);
+	border-top: 2px dashed var(--code-edge);
+}
+
+.more-from-title {
+	margin: 0 0 var(--space-s);
+	font-size: var(--step-0);
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	opacity: 0.75;
+}
+
+.more-from-list {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+	gap: var(--space-s);
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.more-from-link {
+	display: flex;
+	flex-direction: column;
+	gap: 0.2em;
+	align-items: center;
+	padding: var(--space-xs) 0.4em;
+	color: var(--ink);
+	text-align: center;
+	text-decoration: none;
+	border: 2px solid transparent;
+	border-radius: 2px;
+}
+
+.more-from-link:hover {
+	border-color: var(--ink);
+	background: var(--raised);
+}
+
+/* One height for every sticker, so four different silhouettes still line up. */
+.more-from-link .mascot {
+	height: var(--mascot-size);
+	width: auto;
+	object-fit: contain;
+	object-position: bottom;
+}
+
+.more-from-name {
+	font-weight: 700;
+}
+
+.more-from-note {
+	font-size: var(--step--2);
+	opacity: 0.7;
+}
+
+/* The page sprite rides in .page-meta, because MDX cannot nest a component
+   inside a markdown heading; it is lifted back up beside the H1 here. */
+.page-meta-sprite {
+	display: inline-flex;
+	margin-top: -0.9em;
+}
+
+/* ---------------------------------------------------------------------------
+   Dark theme. The same paper design with the ground and the ink swapped: a warm
+   near-black chalkboard, off-white chalk, the same four pastel accents. Only
+   tokens move; every rule above is written against them.
+
+   Two selectors carry the same block. `data-theme` is the explicit choice, and
+   the media query is the default for a reader who has not made one. They are
+   duplicated rather than shared because a media query and an attribute cannot
+   be joined into one selector; keep them in step.
+   --------------------------------------------------------------------------- */
+
+html[data-theme='dark'] {
+	--ink: oklch(93% 0.012 85);
+	--paper: oklch(18% 0.007 70);
+	--code-surface: oklch(32% 0.011 70);
+	--code-edge: color-mix(in oklch, var(--ink) 30%, transparent);
+	--raised: oklch(26% 0.01 70);
+	--tinted: color-mix(in oklch, var(--yellow) 14%, var(--paper));
+	--tinted-quiet: color-mix(in oklch, var(--yellow) 9%, var(--paper));
+	--hover-wash: 11%;
+	--slab: oklch(11% 0.008 70);
+	--slab-ink: oklch(92% 0.012 85);
+	--grain-fiber-blend: soft-light;
+	--grain-fiber-opacity: 0.3;
+	--grain-speck-blend: screen;
+	--grain-speck-opacity: 0.06;
+	--sprite-light: none;
+	--sprite-dark: inline-block;
+}
+
+/* Token colours are inline on each span: the light one as `color`, the dark one
+   as `--shiki-dark` beside it. Swapping themes means reading the other channel.
+   The hover doc is a span inside the block but is not code, so it is excluded. */
+/* The colour is inline on the span, and only `!important` outranks that. It is
+   here rather than in the emitted markup so the light output stays exactly what
+   the single-theme highlighter produced. */
+html[data-theme='dark'] .shiki span:not(.tsrx-tip):not(.tsrx-tip-title):not(.tsrx-tip-body) {
+	color: var(--shiki-dark) !important;
+}
+
+/* ---------------------------------------------------------------------------
+   Prev/next pager: the same two links on the foot of every page, driven by the
+   flat entry order in nav.ts, with a strip of doodles between them. The dashed
+   rule is the one already proven on .more-from.
+   --------------------------------------------------------------------------- */
+
+.pager {
+	display: flex;
+	gap: var(--space-s);
+	justify-content: space-between;
+	align-items: center;
+	margin-top: var(--space-xl);
+	padding-top: var(--space-m);
+	border-top: 2px dashed var(--code-edge);
+}
+
+.pager-link {
+	display: flex;
+	flex-direction: column;
+	gap: 0.1em;
+	max-width: 38%;
+	color: var(--ink);
+	text-decoration: none;
+}
+
+/* An end of the run keeps its box so the doodle strip stays put. */
+.pager-link.is-empty {
+	visibility: hidden;
+}
+
+.pager-next {
+	text-align: right;
+	align-items: flex-end;
+}
+
+.pager-dir {
+	display: inline-flex;
+	gap: 0.25em;
+	align-items: center;
+	font-size: var(--step--1);
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	opacity: 0.6;
+}
+
+.pager-title {
+	font-weight: 700;
+	line-height: 125%;
+}
+
+.pager-link:hover .pager-title {
+	text-decoration: underline;
+	text-decoration-color: var(--pink);
+	text-decoration-thickness: 0.12em;
+	text-underline-offset: 0.16em;
+}
+
+/* No gap here: it lives on each doodle as padding instead, so pointing near one
+   counts as pointing at it. See the hitbox note below. */
+.pager-doodles {
+	display: flex;
+	gap: 0;
+	align-items: center;
+	flex: none;
+	opacity: 0.9;
+}
+
+@media (max-width: 40rem) {
+	.pager-doodles {
+		display: none;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   The doodles in the pager react when they are pointed at, each one its own
+   way: a lift, a spin, a heartbeat, a wiggle, a dart and a roll. No script — a
+   hover and a keyframe on the drawing the sprite already ships. Every reaction
+   is under 400ms and stops for a reader who asked for less motion.
+   --------------------------------------------------------------------------- */
+
+/* Each doodle answers to a pointer well before it touches the drawing. The row's
+   gap moves onto the doodles as padding — half of it on each side — so the
+   drawings sit exactly where they did and the spacing looks unchanged, while the
+   box that hears the pointer is a whole gap wider. Vertically there is nothing
+   to collide with, so the ::before reaches half a line above and below. Sized in
+   em rather than px so a doodle's target grows with it. */
+.pager-doodles .sprite {
+	position: relative;
+	padding-inline: 0.225em;
+}
+
+.pager-doodles .sprite::before {
+	content: '';
+	position: absolute;
+	inset-block: -0.5em;
+	inset-inline: 0;
+}
+
+/* Yellow crayon on paper is nearly the paper, so every doodle in the strip is
+   given one line of ink under it. It is a shadow rather than an outline, so the
+   drawing keeps its own edge. */
+.pager-doodles .sprite img {
+	transition: transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+	filter: drop-shadow(0 1px 0 color-mix(in oklch, var(--ink) 35%, transparent))
+		drop-shadow(0 0 1px color-mix(in oklch, var(--ink) 20%, transparent));
+}
+
+/* 1 crown: tilts and lifts, landing with a small bounce. */
+.pager-doodles .sprite:nth-child(2):hover img {
+	transform: rotate(-12deg) translateY(-5px);
+}
+
+/* 2 sparkle: turns over and grows. */
+.pager-doodles .sprite:nth-child(3):hover img {
+	transform: rotate(180deg) scale(1.25);
+}
+
+/* 3 heart: one beat. */
+@keyframes doodle-heartbeat {
+	0% {
+		transform: scale(1);
+	}
+	25% {
+		transform: scale(1.3);
+	}
+	45% {
+		transform: scale(1);
+	}
+	65% {
+		transform: scale(1.18);
+	}
+	100% {
+		transform: scale(1);
+	}
+}
+
+.pager-doodles .sprite:nth-child(4):hover img {
+	animation: doodle-heartbeat 380ms ease-in-out;
+}
+
+/* 4 squiggle: wiggles. */
+@keyframes doodle-wiggle {
+	0%,
+	100% {
+		transform: skewX(0deg);
+	}
+	25% {
+		transform: skewX(-12deg) rotate(-3deg);
+	}
+	75% {
+		transform: skewX(12deg) rotate(3deg);
+	}
+}
+
+.pager-doodles .sprite:nth-child(5):hover img {
+	animation: doodle-wiggle 360ms ease-in-out;
+}
+
+/* 5 sun: one slow turn, growing a little as it goes round. */
+@keyframes doodle-sun-turn {
+	0% {
+		transform: rotate(0deg) scale(1);
+	}
+	50% {
+		transform: rotate(180deg) scale(1.12);
+	}
+	100% {
+		transform: rotate(360deg) scale(1);
+	}
+}
+
+.pager-doodles .sprite:nth-child(6):hover img {
+	animation: doodle-sun-turn 600ms ease-in-out;
+}
+
+/* 6 flower: half a turn and a little bigger, sprung there and sprung back. The
+   spring is the row's own transition easing, so leaving it undoes the turn. */
+.pager-doodles .sprite:nth-child(7):hover img {
+	transform: rotate(180deg) scale(1.15);
+}
+
+/* The sidebar's section marks get the same lift, since it is one more rule. */
+.sidebar-title .sprite img {
+	transition: transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.sidebar-title:hover .sprite img {
+	transform: rotate(-10deg) scale(1.15);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.pager-doodles .sprite img,
+	.sidebar-title .sprite img {
+		transition: none;
+	}
+	.pager-doodles .sprite:hover img,
+	.sidebar-title:hover .sprite img {
+		animation: none;
+		transform: none;
+		filter: none;
+	}
+}
+
+/* The assumes line: one link per concept, and the slots a page does not use. */
+.page-meta-assume-link {
+	color: inherit;
+	text-decoration-color: var(--pink);
+	text-decoration-thickness: 0.1em;
+	text-underline-offset: 0.16em;
+}
+
+.page-meta a.is-hidden,
+.page-meta span.is-hidden {
+	display: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Batch-2 demos: the name echo, the draft panels, the sortable rows. Each one
+   is inside a `.playground` frame, so these rules only dress the pieces the
+   frame does not already cover: text fields, the row list and its marker.
+   --------------------------------------------------------------------------- */
+
+/* The two teaching demos hand the frame a plain <label> and a plain <p>: the
+   site's framing classes live on the .playground-echo wrapper, not in the file
+   the page prints. */
+.playground label {
+	display: flex;
+	gap: 0.5rem;
+	align-items: center;
+	flex-wrap: wrap;
+	font-size: var(--step-0);
+}
+
+.playground input[type='text'],
+.playground input:not([type]) {
+	font: inherit;
+	font-size: var(--step-0);
+	padding: 0.25em 0.5em;
+	color: var(--ink);
+	background: var(--paper);
+	border: 2px solid var(--ink);
+	border-radius: 2px;
+	min-width: 12rem;
+}
+
+.playground input[type='checkbox'] {
+	width: 1.1em;
+	height: 1.1em;
+	accent-color: var(--green-star);
+}
+
+.playground .row-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.playground .row {
+	display: flex;
+	gap: var(--space-xs);
+	align-items: center;
+	justify-content: space-between;
+	padding: 0.3em 0.6em;
+	background: var(--paper);
+	border: 2px solid var(--ink);
+	border-radius: 2px;
+}
+
+.playground .row-mark {
+	font-size: var(--step--1);
+	color: var(--on-accent);
+	background: var(--green-star);
+	border-radius: 2px;
+	min-width: 4.5em;
+	text-align: center;
+}
+
+.playground .row-mark:empty {
+	background: none;
+}
+
+/* Dark ground: ink-white letters with a deep muted purple offset silhouette,
+   sampled from the poster reference. Light stays as it was: ink letters,
+   pastel silhouette. */
+html[data-theme='dark'] h1,
+html[data-theme='dark'] .prose h2,
+html[data-theme='dark'] .prose h3 {
+	color: var(--ink);
+	--shadow-color: oklch(34% 0.05 307);
+}
+
+/* Token colours are inline on each span: the light one as `color`, the dark one
+   as `--shiki-dark` beside it. Swapping themes means reading the other channel.
+   The hover doc is a span inside the block but is not code, so it is excluded. */
+/* The colour is inline on the span, and only `!important` outranks that. It is
+   here rather than in the emitted markup so the light output stays exactly what
+   the single-theme highlighter produced. */
+html[data-theme='dark'] .shiki span:not(.tsrx-tip):not(.tsrx-tip-title):not(.tsrx-tip-body) {
+	color: var(--shiki-dark) !important;
+}
+
+/* ---------------------------------------------------------------------------
+   Prev/next pager: the same two links on the foot of every page, driven by the
+   flat entry order in nav.ts, with a strip of doodles between them. The dashed
+   rule is the one already proven on .more-from.
+   --------------------------------------------------------------------------- */
+
+.pager {
+	display: flex;
+	gap: var(--space-s);
+	justify-content: space-between;
+	align-items: center;
+	margin-top: var(--space-xl);
+	padding-top: var(--space-m);
+	border-top: 2px dashed var(--code-edge);
+}
+
+.pager-link {
+	display: flex;
+	flex-direction: column;
+	gap: 0.1em;
+	max-width: 38%;
+	color: var(--ink);
+	text-decoration: none;
+}
+
+/* An end of the run keeps its box so the doodle strip stays put. */
+.pager-link.is-empty {
+	visibility: hidden;
+}
+
+.pager-next {
+	text-align: right;
+	align-items: flex-end;
+}
+
+.pager-dir {
+	font-size: var(--step--1);
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	opacity: 0.6;
+}
+
+.pager-title {
+	font-weight: 700;
+	line-height: 125%;
+}
+
+.pager-link:hover .pager-title {
+	text-decoration: underline;
+	text-decoration-color: var(--pink);
+	text-decoration-thickness: 0.12em;
+	text-underline-offset: 0.16em;
+}
+
+/* No gap here: it lives on each doodle as padding instead, so pointing near one
+   counts as pointing at it. See the hitbox note below. */
+.pager-doodles {
+	display: flex;
+	gap: 0;
+	align-items: center;
+	flex: none;
+	opacity: 0.9;
+}
+
+@media (max-width: 40rem) {
+	.pager-doodles {
+		display: none;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   The doodles in the pager react when they are pointed at, each one its own
+   way: a lift, a spin, a heartbeat, a wiggle, a dart and a roll. No script — a
+   hover and a keyframe on the drawing the sprite already ships. Every reaction
+   is under 400ms and stops for a reader who asked for less motion.
+   --------------------------------------------------------------------------- */
+
+/* Each doodle answers to a pointer well before it touches the drawing. The row's
+   gap moves onto the doodles as padding — half of it on each side — so the
+   drawings sit exactly where they did and the spacing looks unchanged, while the
+   box that hears the pointer is a whole gap wider. Vertically there is nothing
+   to collide with, so the ::before reaches half a line above and below. Sized in
+   em rather than px so a doodle's target grows with it. */
+.pager-doodles .sprite {
+	position: relative;
+	padding-inline: 0.225em;
+}
+
+.pager-doodles .sprite::before {
+	content: '';
+	position: absolute;
+	inset-block: -0.5em;
+	inset-inline: 0;
+}
+
+/* Yellow crayon on paper is nearly the paper, so every doodle in the strip is
+   given one line of ink under it. It is a shadow rather than an outline, so the
+   drawing keeps its own edge. */
+.pager-doodles .sprite img {
+	transition: transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+	filter: drop-shadow(0 1px 0 color-mix(in oklch, var(--ink) 35%, transparent))
+		drop-shadow(0 0 1px color-mix(in oklch, var(--ink) 20%, transparent));
+}
+
+/* 1 crown: tilts and lifts, landing with a small bounce. */
+.pager-doodles .sprite:nth-child(2):hover img {
+	transform: rotate(-12deg) translateY(-5px);
+}
+
+/* 2 sparkle: turns over and grows. */
+.pager-doodles .sprite:nth-child(3):hover img {
+	transform: rotate(180deg) scale(1.25);
+}
+
+/* 3 heart: one beat. */
+@keyframes doodle-heartbeat {
+	0% {
+		transform: scale(1);
+	}
+	25% {
+		transform: scale(1.3);
+	}
+	45% {
+		transform: scale(1);
+	}
+	65% {
+		transform: scale(1.18);
+	}
+	100% {
+		transform: scale(1);
+	}
+}
+
+.pager-doodles .sprite:nth-child(4):hover img {
+	animation: doodle-heartbeat 380ms ease-in-out;
+}
+
+/* 4 squiggle: wiggles. */
+@keyframes doodle-wiggle {
+	0%,
+	100% {
+		transform: skewX(0deg);
+	}
+	25% {
+		transform: skewX(-12deg) rotate(-3deg);
+	}
+	75% {
+		transform: skewX(12deg) rotate(3deg);
+	}
+}
+
+.pager-doodles .sprite:nth-child(5):hover img {
+	animation: doodle-wiggle 360ms ease-in-out;
+}
+
+/* 5 sun: one slow turn, growing a little as it goes round. */
+@keyframes doodle-sun-turn {
+	0% {
+		transform: rotate(0deg) scale(1);
+	}
+	50% {
+		transform: rotate(180deg) scale(1.12);
+	}
+	100% {
+		transform: rotate(360deg) scale(1);
+	}
+}
+
+.pager-doodles .sprite:nth-child(6):hover img {
+	animation: doodle-sun-turn 600ms ease-in-out;
+}
+
+/* 6 flower: half a turn and a little bigger, sprung there and sprung back. The
+   spring is the row's own transition easing, so leaving it undoes the turn. */
+.pager-doodles .sprite:nth-child(7):hover img {
+	transform: rotate(180deg) scale(1.15);
+}
+
+/* The sidebar's section marks get the same lift, since it is one more rule. */
+.sidebar-title .sprite img {
+	transition: transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.sidebar-title:hover .sprite img {
+	transform: rotate(-10deg) scale(1.15);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.pager-doodles .sprite img,
+	.sidebar-title .sprite img {
+		transition: none;
+	}
+	.pager-doodles .sprite:hover img,
+	.sidebar-title:hover .sprite img {
+		animation: none;
+		transform: none;
+		filter: none;
+	}
+}
+
+/* The assumes line: one link per concept, and the slots a page does not use. */
+.page-meta-assume-link {
+	color: inherit;
+	text-decoration-color: var(--pink);
+	text-decoration-thickness: 0.1em;
+	text-underline-offset: 0.16em;
+}
+
+.page-meta a.is-hidden,
+.page-meta span.is-hidden {
+	display: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Batch-2 demos: the name echo, the draft panels, the sortable rows. Each one
+   is inside a `.playground` frame, so these rules only dress the pieces the
+   frame does not already cover: text fields, the row list and its marker.
+   --------------------------------------------------------------------------- */
+
+/* The two teaching demos hand the frame a plain <label> and a plain <p>: the
+   site's framing classes live on the .playground-echo wrapper, not in the file
+   the page prints. */
+.playground label {
+	display: flex;
+	gap: 0.5rem;
+	align-items: center;
+	flex-wrap: wrap;
+	font-size: var(--step-0);
+}
+
+.playground input[type='text'],
+.playground input:not([type]) {
+	font: inherit;
+	font-size: var(--step-0);
+	padding: 0.25em 0.5em;
+	color: var(--ink);
+	background: var(--paper);
+	border: 2px solid var(--ink);
+	border-radius: 2px;
+	min-width: 12rem;
+}
+
+.playground input[type='checkbox'] {
+	width: 1.1em;
+	height: 1.1em;
+	accent-color: var(--green-star);
+}
+
+.playground .row-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.playground .row {
+	display: flex;
+	gap: var(--space-xs);
+	align-items: center;
+	justify-content: space-between;
+	padding: 0.3em 0.6em;
+	background: var(--paper);
+	border: 2px solid var(--ink);
+	border-radius: 2px;
+}
+
+.playground .row-mark {
+	font-size: var(--step--1);
+	color: var(--on-accent);
+	background: var(--green-star);
+	border-radius: 2px;
+	min-width: 4.5em;
+	text-align: center;
+}
+
+.playground .row-mark:empty {
+	background: none;
+}
+
+/* ---------------------------------------------------------------------------
+   T006 "Building an app" widgets: the panel a children wrapper draws, and the
+   colour swatch the storage demo repaints.
+   --------------------------------------------------------------------------- */
+
+.playground .panel {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-xs);
+	padding: var(--space-xs);
+	border: 2px dashed var(--purple);
+	border-radius: 2px;
+}
+
+.playground .panel-title {
+	margin: 0;
+	font-size: var(--step-0);
+}
+
+.swatch-row {
+	display: flex;
+	gap: var(--space-xs);
+	align-items: center;
+}
+
+[data-swatch] {
+	display: inline-block;
+	width: 2.4rem;
+	height: 2.4rem;
+	border: 2px solid var(--ink);
+	border-radius: 2px;
+	box-shadow: 3px 3px 0 var(--ink);
+	background: var(--paper);
+}
+
+[data-swatch].yellow {
+	background: var(--yellow);
+}
+
+[data-swatch].green {
+	background: var(--green-star);
+}
+
+[data-swatch].pink {
+	background: var(--pink);
+}
+
+/* ---------------------------------------------------------------------------
+   Stickers. The owner's die-cut sheet, cut by tooling/cut-sprites.ts. Each one
+   carries its own white border and printed shadow, so unlike a crayon sprite it
+   needs no dark twin. They are the accents with depth: one at the corner of the
+   landing hero, at most one on a callout, two in the footer strip, and the
+   heart under the rail.
+   --------------------------------------------------------------------------- */
+
+.sticker {
+	display: inline-block;
+	width: var(--sticker-size);
+	height: auto;
+	flex: none;
+	vertical-align: -0.25em;
+}
+
+/* Taped on above the landing title, tilted the way a sticker lands. It sits in
+   the flow rather than over a corner: the header is directly above the top of
+   the prose column and the mascot already floats into its right. */
+.sticker.is-hero {
+	display: block;
+	margin: 0 0 -0.9rem -0.5rem;
+	rotate: -9deg;
+}
+
+.callout {
+	position: relative;
+}
+
+/* A callout's corner sticker. One rule per sticker a page has asked for; a
+   callout that names none carries `data-sticker=""` and paints nothing. */
+.callout[data-sticker='spring']::after,
+.callout[data-sticker='map']::after,
+.callout[data-sticker='cloud']::after,
+.callout[data-sticker='scribble']::after {
+	content: '';
+	position: absolute;
+	right: -1rem;
+	top: -1.4rem;
+	width: 3.6rem;
+	height: 3.6rem;
+	rotate: 9deg;
+	background-repeat: no-repeat;
+	background-position: center;
+	background-size: contain;
+	pointer-events: none;
+}
+
+.callout[data-sticker='spring']::after {
+	background-image: url('/markless/stickers/spring.png');
+}
+
+.callout[data-sticker='map']::after {
+	background-image: url('/markless/stickers/map.png');
+}
+
+.callout[data-sticker='cloud']::after {
+	background-image: url('/markless/stickers/cloud.png');
+}
+
+.callout[data-sticker='scribble']::after {
+	background-image: url('/markless/stickers/scribble.png');
+}
+
+.pager-doodles .sticker {
+	transition: rotate 220ms ease-out, translate 220ms ease-out;
+}
+
+.pager-doodles .sticker:hover {
+	rotate: -7deg;
+	translate: 0 -0.25rem;
+}
+
+/* ---------------------------------------------------------------------------
+   The like heart, under the "On this page" rail.
+
+   The pop, the burst and the "+1" are all pressed-state transitions rather than
+   keyframes on a toggled class: a `class={ternary}` binding is compiled without
+   a dom update on 0.3.1 (NOTES.md finding 18), so a class the framework has to
+   write would never arrive. Under the press each piece snaps to the middle of
+   the heart with no duration; on release it transitions out to where it rests
+   and fades, which is the burst. The heart itself is the same trick: squashed
+   instantly, released along a curve that overshoots, which is the wobble.
+   --------------------------------------------------------------------------- */
+
+.like-heart {
+	display: flex;
+	justify-content: center;
+	margin-top: var(--space-l);
+}
+
+@media (min-width: 70.01rem) {
+	/* Beside the rail rather than in it: the rail is static HTML the build writes
+	   into the page, and an island cannot be rendered inside it. Fixed to the
+	   same column, at the foot of the strip the shell reserves for it. */
+	.like-heart {
+		position: fixed;
+		right: var(--space-s-l);
+		width: 11rem;
+		justify-content: flex-start;
+		margin: 0;
+		top: calc(var(--header-height) + var(--space-s) + 21rem);
+	}
+
+	@supports (position-anchor: --on-this-page) {
+		.on-this-page {
+			anchor-name: --on-this-page;
+			max-height: calc(100vh - var(--header-height) - 2 * var(--space-s) - 5rem);
+		}
+		.like-heart {
+			position-anchor: --on-this-page;
+			top: calc(anchor(bottom) + var(--space-s));
+			left: anchor(left);
+			right: auto;
+		}
+	}
+}
+
+.like-heart-button {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	gap: 0.15rem;
+	padding: 0.25rem 0.4rem;
+	border: 0;
+	background: none;
+	font: inherit;
+	color: var(--ink);
+	cursor: pointer;
+}
+
+.like-heart-face {
+	position: relative;
+	display: inline-flex;
+	flex: none;
+}
+
+.like-heart-image {
+	display: block;
+	width: 3.2rem;
+	height: auto;
+	rotate: -5deg;
+	transition: scale 600ms cubic-bezier(0.2, 1.7, 0.45, 1), rotate 600ms cubic-bezier(0.2, 1.7, 0.45, 1);
+}
+
+.like-heart-button:hover .like-heart-image {
+	scale: 1.07;
+}
+
+.like-heart-button:active .like-heart-image {
+	scale: 0.82;
+	rotate: 7deg;
+	transition-duration: 0s;
+}
+
+.like-burst {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+}
+
+.like-burst-piece {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	width: 1.35rem;
+	height: 1.35rem;
+	margin: -0.675rem 0 0 -0.675rem;
+	opacity: 0;
+	transition: translate 620ms cubic-bezier(0.15, 0.85, 0.3, 1), rotate 620ms ease-out,
+		scale 620ms ease-out, opacity 620ms ease-out;
+}
+
+.like-burst-piece img {
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+}
+
+.like-burst-piece .sprite-ink-light {
+	display: var(--sprite-light);
+}
+
+.like-burst-piece .sprite-ink-dark {
+	display: var(--sprite-dark);
+}
+
+.like-burst-piece-1 {
+	translate: -2.1rem -1.9rem;
+	rotate: -22deg;
+}
+
+.like-burst-piece-2 {
+	translate: 2rem -2.1rem;
+	rotate: 18deg;
+}
+
+.like-burst-piece-3 {
+	translate: -2.3rem 1.2rem;
+	rotate: -12deg;
+}
+
+.like-burst-piece-4 {
+	translate: 2.2rem 1.3rem;
+	rotate: 24deg;
+}
+
+.like-heart-button:active .like-burst-piece {
+	opacity: 1;
+	translate: 0 0;
+	rotate: 0deg;
+	scale: 0.4;
+	transition-duration: 0s;
+}
+
+/* The accents are pastels meant to be printed on, not printed with, so the
+   count is the page's ink pulled towards pink rather than the pink itself. */
+.like-heart-count {
+	font-size: var(--step-0);
+	color: color-mix(in oklch, var(--pink) 55%, var(--ink));
+	font-variant-numeric: tabular-nums;
+}
+
+.like-heart-plus {
+	position: absolute;
+	right: -0.35rem;
+	top: 0.1rem;
+	font-size: var(--step--2);
+	color: color-mix(in oklch, var(--pink) 55%, var(--ink));
+	opacity: 0;
+	translate: 0 -1.2rem;
+	transition: translate 700ms ease-out, opacity 700ms ease-out;
+	pointer-events: none;
+}
+
+.like-heart-button:active .like-heart-plus {
+	opacity: 1;
+	translate: 0 0;
+	transition-duration: 0s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.like-heart-image,
+	.like-burst-piece,
+	.like-heart-plus,
+	.pager-doodles .sticker {
+		transition-duration: 1ms;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   The UI section: the switch at the top of the sidebar, the stage at the top of
+   a family page, and the props table under it. Tokens only, so both themes
+   follow without a second copy of any of it.
+   --------------------------------------------------------------------------- */
+
+/* The document owns only this inert slot and its no-JS link. Every MDX page
+   appends the live select island last, so it cannot move earlier locators. */
+.mode-select-slot {
+	anchor-name: --mode-select-slot;
+	min-block-size: 2.45rem;
+	margin-bottom: var(--space-s);
+}
+
+.mode-select-fallback,
+.mode-select-trigger {
+	box-sizing: border-box;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5em;
+	inline-size: 100%;
+	min-block-size: 2.45rem;
+	padding: 0.35em 0.7em;
+	font-size: var(--step--1);
+	font-weight: 700;
+	color: var(--ink);
+	background: var(--raised);
+	border: 2px solid var(--ink);
+	border-radius: 8px;
+	text-decoration: none;
+}
+
+.mode-select-island {
+	position: fixed;
+	left: var(--space-s-l);
+	top: calc(var(--header-height) + 2 * var(--space-s) + 3.4rem + var(--space-m));
+	z-index: 35;
+	inline-size: 16rem;
+	font-size: var(--step--1);
+}
+
+@supports (position-anchor: --mode-select-slot) {
+	.mode-select-island {
+		position-anchor: --mode-select-slot;
+		left: anchor(left);
+		top: anchor(top);
+		inline-size: anchor-size(width);
+	}
+}
+
+.mode-select-control {
+	position: relative;
+}
+
+.mode-select-trigger {
+	cursor: pointer;
+}
+
+.mode-select-caret {
+	display: inline-flex;
+	flex: none;
+	opacity: 0.65;
+	transition: transform 160ms ease;
+}
+
+.mode-select-control[ui-open] .mode-select-caret {
+	transform: rotate(180deg);
+}
+
+.mode-select-content {
+	position: absolute;
+	top: calc(100% + 0.3em);
+	left: 0;
+	box-sizing: border-box;
+	display: grid;
+	gap: 0.2em;
+	inline-size: 100%;
+	padding: 0.3em;
+	background: var(--raised);
+	border: 2px solid var(--ink);
+	border-radius: 8px;
+}
+
+.mode-select-content[hidden] {
+	display: none;
+}
+
+.mode-select-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 0.3em 0.7em;
+	color: var(--ink);
+	font-size: var(--step--1);
+	border: 2px solid transparent;
+	border-radius: 6px;
+	cursor: pointer;
+}
+
+.mode-select-item:hover,
+.mode-select-item[ui-highlighted] {
+	background: var(--yellow);
+	color: var(--on-accent);
+}
+
+.mode-select-item[ui-selected] {
+	border-color: var(--pink);
+	background: var(--tinted);
+	font-weight: 700;
+}
+
+.mode-select-trigger:focus-visible,
+.mode-select-item:focus-visible {
+	outline: 2px solid var(--yellow);
+	outline-offset: 2px;
+}
+
+.mode-select-item[ui-disabled] {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.mode-select-item-indicator[ui-hidden] {
+	display: none;
+}
+
+/* The stage at the top of a family page: the instruction, then the live
+   component the page projects into it. */
+.ui-preview {
+	display: grid;
+	gap: var(--space-s);
+	place-items: center;
+	margin-block: var(--space-m);
+	padding: var(--space-m) var(--space-s);
+	border: 2px solid var(--code-edge);
+	border-radius: 4px;
+	background: var(--raised);
+	text-align: center;
+}
+
+.ui-preview-shows {
+	margin: 0;
+	font-weight: 700;
+}
+
+.ui-preview-stage {
+	display: grid;
+	place-items: center;
+	width: 100%;
+	text-align: left;
+}
+
+
+/* The props table. `display: block` is what lets a table scroll inside its own
+   column instead of pushing the whole document sideways on a phone. */
+.prose table {
+	display: block;
+	width: 100%;
+	overflow-x: auto;
+	margin-block: var(--space-m);
+	border-collapse: collapse;
+	font-size: var(--step--1);
+}
+
+.prose th,
+.prose td {
+	padding: 0.4em 0.7em;
+	border-bottom: 1px solid var(--code-edge);
+	text-align: left;
+	vertical-align: top;
+}
+
+.prose th {
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	font-size: var(--step--2);
+	opacity: 0.75;
+}
+
+.prose td:first-child {
+	white-space: nowrap;
+}

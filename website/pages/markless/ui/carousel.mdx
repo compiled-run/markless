@@ -1,0 +1,65 @@
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+import Preview from '../../../components/ui/preview.tsrx';
+
+<Sidebar pathname="/markless/ui/carousel" />
+
+# carousel
+
+<ThemeToggle />
+
+<Preview shows="Three destinations with a back and a next button." />
+
+```tsrx
+import { carousel } from '@markless/ui';
+
+export default function Destinations() @{
+	<carousel.root value="paris">
+		<carousel.title>Featured destinations</carousel.title>
+		<carousel.scrollarea>
+			<carousel.item value="paris">Paris</carousel.item>
+			<carousel.item value="oslo">Oslo</carousel.item>
+			<carousel.item value="lima">Lima</carousel.item>
+		</carousel.scrollarea>
+		<carousel.backtrigger>Back</carousel.backtrigger>
+		<carousel.forwardtrigger>Next</carousel.forwardtrigger>
+	</carousel.root>
+}
+```
+
+A slide is named by its `value`, and nothing counts positions for you, so the slide that should
+show is named rather than numbered. Mounting `carousel.title` is what names the carousel for a
+screen reader. Add a `carousel.navlist` of pickers and the slides become tab panels; leave it out
+and they stay plain groups.
+
+## Anatomy
+
+- `carousel.root` — holds the configuration and which slide is showing.
+- `carousel.title` — the carousel's heading, and what names it.
+- `carousel.scrollarea` — the window the slides move behind, and where a drag is measured.
+- `carousel.item` — one slide, named by its required `value`.
+- `carousel.navlist` and `carousel.navtrigger` — the row of slide pickers.
+- `carousel.backtrigger` and `carousel.forwardtrigger` — one step either way.
+- `carousel.playtrigger` — starts and stops autoplay. Its label says which the press will do.
+
+It writes `ui-active`, `ui-value`, `ui-align`, `ui-loop`, `ui-draggable`, `ui-vertical` and
+`ui-track`.
+
+## Props on `carousel.root`
+
+| Prop | Type | What it does |
+| --- | --- | --- |
+| `value` | `string` | The slide showing now, named by its own `value`. |
+| `orientation` | `'horizontal' \| 'vertical'` | Which axis the slides run along. Omit it and they run left to right. |
+| `align` | `'start' \| 'center' \| 'end'` | Where a slide comes to rest in the viewport. Omit it and slides rest at the start. |
+| `move` | `number \| 'view'` | How many slides a back or forward trigger moves. `"view"` moves a whole viewport's worth. |
+| `loop` | `boolean` | The slides run in an endless ring. Omit it and the ends stop. |
+| `rewind` | `boolean` | Moving past the last slide lands on the first. |
+| `draggable` | `boolean` | A drag moves the slides. Omit it and dragging is on. |
+| `mousewheel` | `boolean` | The wheel moves the slides. Omit it and the wheel scrolls the page. |
+| `autoplay` | `boolean` | Slides advance on their own. |
+| `autoplayInterval` | `number` | How long each slide is shown while autoplay runs, in milliseconds. |
+| `sensitivity` | two numbers, `mouse` and `touch` | How far the slides travel for a given drag distance, per pointer kind. |
+| `onChange` | `(value) => void` | Called with the new value whenever the showing slide changes. |
+
+Everything a `<div>` accepts reaches the element too.

@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.vite/
+.output/
+.vercel/
+.env*
+*.log
+.DS_Store
+pnpm-lock.yaml
+.claude/
+.claude/
+.fable-opus/
+.fable-codex/
+
+# written by tooling/ui-demos.ts at build time from the authored demo
+components/docs/playground/generated/

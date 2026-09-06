@@ -1,0 +1,59 @@
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+import Preview from '../../../components/ui/preview.tsrx';
+
+<Sidebar pathname="/markless/ui/navbar" />
+
+# navbar
+
+<ThemeToggle />
+
+<Preview shows="Three top-level entries, one showing its dropdown." />
+
+```tsrx
+import { navbar } from '@markless/ui';
+
+export default function Primary() @{
+	<navbar.root aria-label="Primary">
+		<navbar.item value="home">
+			<navbar.itemlink href="/" current>Home</navbar.itemlink>
+		</navbar.item>
+		<navbar.item value="products">
+			<navbar.itemtrigger>Products</navbar.itemtrigger>
+			<navbar.itemcontent>
+				<navbar.itemlink href="/products/keyboards">Keyboards</navbar.itemlink>
+				<navbar.itemlink href="/products/mice">Mice</navbar.itemlink>
+			</navbar.itemcontent>
+		</navbar.item>
+	</navbar.root>
+}
+```
+
+This is a disclosure, deliberately never a menubar. `role="menubar"` puts screen readers into
+application mode and promises desktop-menu behaviour that site navigation does not have. The
+landmark carries no name of its own, because a page can have a primary nav and a footer nav and an
+invented "Navigation" on both is two landmarks a reader cannot tell apart — write your own
+`aria-label`.
+
+## Anatomy
+
+- `navbar.root` — the `<nav>` landmark. Name it yourself.
+- `navbar.item` — one top-level entry, named by its required `value`. It is the element the pointer enters and leaves.
+- `navbar.itemtrigger` — the button that shows and hides one dropdown.
+- `navbar.itemcontent` — one dropdown. It stays in the page when closed.
+- `navbar.itemlink` — a link, at the top level or inside a dropdown. The only part that can carry `aria-current="page"`.
+
+It writes `ui-open`, `ui-closed` and `ui-active`.
+
+## Props on `navbar.root`
+
+| Prop | Type | What it does |
+| --- | --- | --- |
+| `value` | `string` | Which item's dropdown is showing. Omit it, or pass the empty string, and everything is closed. |
+| `hover` | `boolean` | Dropdowns open when the pointer rests on an item. Omit it and they do. |
+| `delay` | `number` | How long the pointer must rest before the first dropdown opens. Omit it and it is 200ms. |
+| `clickGrace` | `number` | How long after a hover-open a click on the same trigger is ignored. Omit it and it is 300ms. |
+| `onChange` | `(value) => void` | Called with the value now showing its dropdown, or the empty string when everything closed. |
+
+Everything a `<nav>` accepts reaches the element too. `navbar.item` takes its own `value` and
+`active`; `navbar.itemlink` takes `current`.

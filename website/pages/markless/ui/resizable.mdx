@@ -1,0 +1,197 @@
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+import ResizableDemo from '../../../components/demos/ui/resizable-demo.tsrx';
+
+<Sidebar pathname="/markless/ui/resizable" />
+
+# resizable
+
+<ThemeToggle />
+
+<ResizableDemo shows="Three panes. Drag a divider, or focus one and arrow it along." />
+
+```tsrx
+import { resizable } from '@markless/ui';
+
+// Nothing styles `resizable.item` from here: the family owns that element's `style`.
+const group = 'display: flex; inline-size: min(32rem, 100%); block-size: 8rem; border: 2px solid var(--code-edge); border-radius: 6px; background: var(--paper); overflow: clip';
+const divider = 'flex: none; inline-size: 6px; background: var(--code-edge); cursor: col-resize; touch-action: none';
+const pane = 'margin: 0; padding: 0.6em 0.7em; font-weight: 700';
+
+export default function Workspace() @{
+	<resizable.root defaultSizes={{ files: 28, editor: 44, notes: 28 }} style={group}>
+		<resizable.item value="files">
+			<p style={pane}>Files</p>
+		</resizable.item>
+		<resizable.thumb value="files" min={15} max={55} aria-label="Resize files" style={divider} />
+		<resizable.item value="editor">
+			<p style={pane}>Editor</p>
+		</resizable.item>
+		<resizable.thumb value="editor" min={20} max={70} aria-label="Resize editor" style={divider} />
+		<resizable.item value="notes">
+			<p style={pane}>Notes</p>
+		</resizable.item>
+	</resizable.root>
+}
+```
+
+A panel is named by its `value`, and a divider names the panel it resizes. Sizes are shares of the
+group from 0 to 100, keyed by those names, so one record covers a whole widget, nested groups
+included. A divider only ever moves one pair: the panel it names and the panel after it exchange
+the same number of points, so the group still adds up to what it added up to and nothing else on
+the row shifts under you.
+
+## Anatomy
+
+- `resizable.root` is the group, holding the sizes, the axis and the step.
+- `resizable.item` is one panel, named by its `value`, which is also its `id`.
+- `resizable.thumb` is the divider, naming the panel it resizes and carrying that panel's limits.
+
+Each panel publishes its share as a `--size` custom property, and the family lays the group out
+itself under `@layer markless`. It writes `ui-panels`, `ui-panel`, `ui-divider`, `ui-orientation`,
+`ui-value`, `ui-size`, `ui-min`, `ui-max`, `ui-collapsible`, `ui-collapsed`, `ui-dragging` and
+`ui-disabled` as its state changes.
+
+## Stack them instead
+
+Set `orientation="vertical"` and the panels sit one above the other, with the dividers running
+across. The arrows follow the group: up and down move a divider in a vertical group, left and right
+in a horizontal one.
+
+```tsrx
+<resizable.root orientation="vertical" defaultSizes={{ top: 60, bottom: 40 }}>
+```
+
+## A panel that folds away
+
+Give a divider `collapsible` and `Enter` folds the panel it names down to `collapsedSize`. The next
+`Enter` puts back the size that panel measured before it folded, not the size it started the page
+with.
+
+```tsrx
+<resizable.thumb value="files" min={15} max={55} collapsible collapsedSize={5} aria-label="Resize files" />
+```
+
+## Hold the sizes yourself
+
+Pass `sizes` and the widget is controlled: a gesture reports through `onChange` and nothing moves
+until the new record comes back in. `onChangeEnd` says the change has settled, once the pointer is
+released or the key that moved it. Leave `sizes` out, pass `defaultSizes`, and the widget keeps its
+own record.
+
+```tsrx
+<resizable.root sizes={held} onChange={setHeld} onChangeEnd={save}>
+```
+
+## Keyboard
+
+Focus sits on a divider, and every key here moves the panel that divider names. In right-to-left
+text the two horizontal arrows swap.
+
+| Key | What it does |
+| --- | --- |
+| Left arrow or Right arrow | Move the divider one step, in a group laid out side by side. |
+| Up arrow or Down arrow | Move the divider one step, in a group laid out top to bottom. |
+| Shift and an arrow | Move it ten steps at once. |
+| Home | Take the panel down to the divider's `min`. |
+| End | Take it up to the divider's `max`. |
+| Enter | Fold the panel away, then put it back. Needs `collapsible`. |
+| Escape | Abandon a drag in flight, putting back the sizes it started from. |
+
+## API
+
+Every prop is optional unless its row says otherwise, and the types below are the family's own.
+`ResizableSizes` is `Record<string, number>` and `ResizableOrientation` is
+`'horizontal' | 'vertical'`.
+
+### `resizable.root`
+
+| Prop | Type | What it does |
+| --- | --- | --- |
+| `sizes` | `ResizableSizes` | The sizes in force. Passing this makes the widget controlled: a gesture reports through `onChange` and nothing moves until the new record comes back in. |
+| `defaultSizes` | `ResizableSizes` | The sizes an uncontrolled widget starts with. A panel left out is an equal share. |
+| `orientation` | `ResizableOrientation` | Which axis the panels are laid along. Omit it and they sit side by side. |
+| `step` | `number` | How far one arrow key moves a divider, in points of the group. Defaults to 1; Shift multiplies it by ten. |
+| `disabled` | `boolean` | Nothing can be resized. |
+| `onChange` | `(sizes: ResizableSizes) => void` | Called with every panel's size each time one changes, including during a drag. |
+| `onChangeEnd` | `(sizes: ResizableSizes) => void` | Called once a change settles: the pointer released, or the key that moved it. |
+
+| Attribute | Present when | What to key styling off |
+| --- | --- | --- |
+| `ui-panels` | Always | This element is a group of panels. |
+| `ui-orientation` | Always | `horizontal` or `vertical`, the axis the panels are laid along. |
+| `ui-disabled` | `disabled` is set | Nothing in here responds. |
+| `ui-dragging` | A divider in this group is being dragged | The whole group is busy. |
+
+| Selector | Default | Why |
+| --- | --- | --- |
+| `[ui-panels]` | `display: flex; flex-direction: row` | The group lays the panels along its axis, so nothing has to be told twice. |
+| `[ui-panels][ui-orientation="vertical"]` | `flex-direction: column` | The same group, stacked. |
+
+Everything a `<div>` accepts reaches the element too, apart from `onChange`, which is the family's.
+
+### `resizable.item`
+
+| Prop | Type | What it does |
+| --- | --- | --- |
+| **`value`** | `string` | Required. This panel's name. The sizes record is keyed by it and it is minted as the panel's `id`, so it must be unique in the page. |
+| `orientation` | `ResizableOrientation` | Set it to host a nested group inside this panel, laid along that axis. |
+
+| Attribute | Present when | What to key styling off |
+| --- | --- | --- |
+| `id` | Always | The panel's `value`, so a divider's `aria-controls` reaches here. Write your own `id` and you owe yourself the matching `aria-controls`. |
+| `style` | A size is held for this panel | Carries `--size`, this panel's share of its group. The family owns this attribute, so style a panel from a stylesheet rather than a `style` prop. |
+| `ui-panel` | Always | This element is a panel. |
+| `ui-value` | Always | Holds this panel's name, so one selector can reach one panel. |
+| `ui-orientation` | This panel hosts a nested group | The axis that nested group runs along. |
+| `ui-size` | A size is held for this panel | The share, rounded to two decimals. |
+| `ui-collapsed` | This panel is folded away | The folded look. |
+
+| Selector | Default | Why |
+| --- | --- | --- |
+| `[ui-panel]` | `flex: var(--size, 1) 1 0; overflow: hidden; min-inline-size: 0; min-block-size: 0` | The share is the grow factor, so a panel nobody has sized is an equal share. |
+| `[ui-panel][ui-orientation="horizontal"]` | `display: flex; flex-direction: row` | A panel hosting a nested group lays that group out. |
+| `[ui-panel][ui-orientation="vertical"]` | `display: flex; flex-direction: column` | The same, stacked. |
+
+Everything a `<div>` accepts reaches the element too, apart from `style`.
+
+### `resizable.thumb`
+
+| Prop | Type | What it does |
+| --- | --- | --- |
+| **`value`** | `string` | Required. The name of the primary panel: the one this divider resizes and reports. |
+| `min` | `number` | The smallest the primary panel may be, as a share of the group. Defaults to 0. |
+| `max` | `number` | The largest the primary panel may be. Defaults to 100. |
+| `collapsible` | `boolean` | `Enter` collapses the primary panel and restores it. |
+| `collapsedSize` | `number` | What the primary panel measures when collapsed. Defaults to 0. |
+| `orientation` | `ResizableOrientation` | The axis of the group this divider sits in. Omit it and the root's axis is used. |
+
+| Attribute | Present when | What to key styling off |
+| --- | --- | --- |
+| `role` | Always | `separator`, which is the window splitter a screen reader announces. |
+| `tabindex` | Always | `0`, or `-1` while the group is disabled. |
+| `aria-controls` | Always | The `id` of the panel this divider resizes. |
+| `aria-orientation` | Always | The divider's own axis, which is the perpendicular of the group: panels side by side are parted by a vertical splitter. |
+| `aria-valuemin`, `aria-valuemax` | Always | The `min` and `max` this divider was written with. |
+| `aria-valuenow` | A size is held for the primary panel | That panel's share. |
+| `aria-valuetext` | A size is held for the primary panel | The same share read as a percentage, so a reader says `28%` rather than a bare decimal. |
+| `aria-disabled` | Always | `true` or `false`. |
+| `ui-divider` | Always | This element is a divider. |
+| `ui-value` | Always | The name of the panel this divider resizes. |
+| `ui-orientation` | Always | The axis of the group this divider sits in. |
+| `ui-min`, `ui-max` | Always | The limits, for a stylesheet that wants them. |
+| `ui-collapsible` | `collapsible` is set | `Enter` folds this one. |
+| `ui-collapsed` | The primary panel is folded away | The folded look. |
+| `ui-dragging` | This divider is the one being dragged | The gripped look. |
+| `ui-disabled` | The group is disabled | Nothing here responds. |
+
+| Selector | Default | Why |
+| --- | --- | --- |
+| `[ui-divider]` | `flex: none; touch-action: none` | A divider belongs to nobody's share, and a drag along it must not scroll the page. |
+| `[ui-divider][ui-orientation="horizontal"]` | `cursor: col-resize` | The pointer says which way it moves. |
+| `[ui-divider][ui-orientation="vertical"]` | `cursor: row-resize` | The same, stacked. |
+| `[ui-divider][ui-disabled]` | `cursor: default` | Nothing to grip. |
+
+It carries no name of its own, so write `aria-label` on every divider naming the panel it resizes:
+a group with several of them needs them told apart. Everything a `<div>` accepts reaches the element
+too.

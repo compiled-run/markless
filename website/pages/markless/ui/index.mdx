@@ -1,0 +1,55 @@
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+
+<Sidebar pathname="/markless/ui" />
+
+# Components you style yourself
+
+<ThemeToggle />
+
+`@markless/ui` is a set of component families, a select, a modal, a set of tabs, with the
+keyboard, the focus and the screen-reader wiring already written, and the look left entirely to
+you. There is no stylesheet in the package. Nothing arrives carrying a colour, a border, a font or
+a class name you have to argue with.
+
+```bash
+npm install @markless/ui
+```
+
+One family is one import, and its parts are properties on it:
+
+```tsrx
+import { accordion } from '@markless/ui';
+```
+
+## Styling
+
+A part writes its state onto its own element as a `ui-*` attribute, and a plain CSS selector does
+the rest: [styling](/markless/ui/styling) is the whole story.
+
+## The families
+
+Every family below has a page. New ones are added here as they land.
+
+**Forms** — [checkbox](/markless/ui/checkbox), [checklist](/markless/ui/checklist),
+[combobox](/markless/ui/combobox), [otp](/markless/ui/otp),
+[radiogroup](/markless/ui/radiogroup), [select](/markless/ui/select),
+[textbox](/markless/ui/textbox), [toggle](/markless/ui/toggle).
+
+**Show and hide** — [accordion](/markless/ui/accordion),
+[collapsible](/markless/ui/collapsible), [modal](/markless/ui/modal),
+[navbar](/markless/ui/navbar), [tabs](/markless/ui/tabs), [tree](/markless/ui/tree).
+
+**Overlays** — [drawer](/markless/ui/drawer), [hovercard](/markless/ui/hovercard),
+[popover](/markless/ui/popover), [tooltip](/markless/ui/tooltip).
+
+**Collections** — [gridlist](/markless/ui/gridlist), [table](/markless/ui/table),
+[resizable](/markless/ui/resizable).
+
+**Display** — [carousel](/markless/ui/carousel), [pagination](/markless/ui/pagination),
+[progress](/markless/ui/progress), [qrcode](/markless/ui/qrcode),
+[toaster](/markless/ui/toaster).
+
+There is one more import, `base`, holding three primitives the families are built from: a button,
+a label and a visually hidden span. It has no page of its own; you almost never reach for it
+directly.

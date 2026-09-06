@@ -1,0 +1,15 @@
+{
+	"source": "theme-icons-sheet.png",
+	"icons": [
+		{
+			"name": "sun",
+			"w": 96,
+			"h": 86
+		},
+		{
+			"name": "moon",
+			"w": 96,
+			"h": 74
+		}
+	]
+}

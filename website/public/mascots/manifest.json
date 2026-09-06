@@ -1,0 +1,45 @@
+{
+	"source": "mascots.png",
+	"mascots": [
+		{
+			"name": "markless",
+			"w": 398,
+			"h": 434
+		},
+		{
+			"name": "versionless",
+			"w": 396,
+			"h": 338
+		},
+		{
+			"name": "frameless",
+			"w": 407,
+			"h": 324
+		},
+		{
+			"name": "guessless",
+			"w": 390,
+			"h": 334
+		},
+		{
+			"name": "markless-label",
+			"w": 337,
+			"h": 140
+		},
+		{
+			"name": "versionless-label",
+			"w": 388,
+			"h": 135
+		},
+		{
+			"name": "frameless-label",
+			"w": 379,
+			"h": 138
+		},
+		{
+			"name": "guessless-label",
+			"w": 370,
+			"h": 130
+		}
+	]
+}

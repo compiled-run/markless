@@ -1,0 +1,52 @@
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  production:
+    runs-on: ubuntu-24.04
+    env:
+      VERCEL_ORG_ID: team_4TrBQsvIkFM0lYTqh08Fqxgd
+      VERCEL_PROJECT_ID: prj_rv06xPVYEu7z8GdStWatxRbjV8tm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install
+        run: npm ci
+      - name: Build the site with nitro's vercel preset
+        env:
+          NITRO_PRESET: vercel
+        run: npm run build
+      - name: Ship the built output to production
+        id: deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [ -z "${VERCEL_TOKEN}" ]; then
+            echo "::error::VERCEL_TOKEN is not set on this repository."
+            exit 1
+          fi
+          url="$(npx --yes vercel@57.0.0 deploy --prebuilt --prod --yes --token "${VERCEL_TOKEN}")"
+          echo "url=${url}" >> "${GITHUB_OUTPUT}"
+          echo "Deployed ${url}"
+      - name: Check routes on the production alias
+        run: |
+          # The per-deployment URL sits behind Vercel deployment protection and
+          # answers 302 to the SSO gate, so the check runs against the alias the
+          # deploy just promoted.
+          base="https://markless-docs.vercel.app"
+          sleep 10
+          for p in /markless /markless/concepts/state /markless/sitemap.xml; do
+            code="$(curl -s -o /dev/null -w '%{http_code}' "${base}${p}")"
+            echo "${code} ${p}"
+            [ "${code}" = "200" ] || { echo "::error::${p} returned ${code}"; exit 1; }
+          done

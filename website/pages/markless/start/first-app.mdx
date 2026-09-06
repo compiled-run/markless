@@ -1,0 +1,134 @@
+import PageMeta from '../../../components/page-meta.tsrx';
+import Collapsible from '../../../components/demos/collapsible.tsrx';
+import Callout from '../../../components/demos/callout.tsrx';
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+import LikeHeart from '../../../components/docs/like-heart.tsrx';
+
+<Sidebar pathname="/markless/start/first-app" />
+
+# One command, then three scripts
+
+<PageMeta level="Start here" time="4 min" assumes="nothing" sprite="plus" />
+
+_Already have a Markless project running? Skip to
+[reading a `.tsrx` file](/markless/start/reading-tsrx)._
+
+<ThemeToggle />
+
+There is no configuration step in here. One command, four questions, and a page open in a browser.
+
+**`npm create markless@latest` writes a working app. After that, `dev`, `build` and `preview` are
+the whole workflow.**
+
+```sh
+npm create markless@latest
+```
+
+That fetches whatever `create-markless@latest` resolves to on the day you run it; this site was
+written against `0.3.2`. Then it asks four things before it writes a single file.
+
+## Four questions
+
+**What are you building today?** Four starting points, each one a real project rather than an empty
+folder. *Learn Markless* is a small TSRX counter app, and it is the best first one. *Build an app*
+is a routed app with a `document.tsrx` shell plus 404 and 500 pages. *Write docs* is an MDX docs
+site with a layout and sidebar components. *Full-stack app* is the routed app plus `api/` and
+`middleware/` files.
+
+**What should we call it?** The folder name, which is also the package name.
+
+**Where should it run?** Node, Deno or Bun. Take Node if you are not sure.
+
+**Should I install dependencies and initialize git?** Yes or no, twice.
+
+Then it shows a `Ready to create?` summary and waits. Nothing is on disk yet, so reading that
+summary and cancelling costs you nothing.
+
+<Callout sprite="cross" title="Read this before you run npm install" text="A clean install of a new app fails today, and it is not your project's fault. @markless/compiler asks for @tsrx/core ^0.1.58, which resolves to 0.1.60, which depends on @tsrx/runtime 0.1.1, and that package is not on npm. The install stops with: npm error 404 Not Found - GET https://registry.npmjs.org/@tsrx%2fruntime. The fix is one pin in your package.json, and the site you are reading ships with exactly that pin. Add the overrides block below, delete node_modules and package-lock.json if the failed install left them behind, and run npm install again." />
+
+```json
+{
+	"overrides": {
+		"@tsrx/core": "0.1.58"
+	}
+}
+```
+
+On Bun the same pin is written as `"resolutions"`, and on pnpm as
+`"pnpm": { "overrides": { ... } }`. Pin `0.1.58`: it is the last release before the dependency on
+the missing package was added.
+
+## What you get
+
+```txt
+my-app/
+  document.tsrx           the HTML shell every page is rendered into
+  pages/                  one file per route
+  api/                    server handlers, full-stack starter only
+  middleware/             request middleware, full-stack starter only
+  public/                 files served as they are
+  components/             shared components, docs starter
+  scripts/markless-doctor.mjs
+  markless-router-env.d.ts
+  tsconfig.json
+  vite.config.ts
+  package.json
+```
+
+Two of those are worth opening straight away.
+
+`pages/` is the router. `pages/index.tsrx` is the page at `/`, and `pages/about.tsrx` is the page at
+`/about`. There is no route table to keep in step with the folder, because the folder is the route
+table.
+
+`vite.config.ts` is the entire build configuration, and it is two plugins long:
+
+```ts
+import { markless } from '@markless/core/vite';
+import { router } from '@markless/router/vite';
+import { defineConfig } from 'vite-plus';
+
+export default defineConfig({
+	plugins: [markless(), router()],
+});
+```
+
+The first plugin compiles `.tsrx` files. The second turns `pages/` into routes and owns the server.
+Nothing in that file mentions your components, so adding a page never means editing it.
+
+## The scripts are the workflow
+
+```txt
+npm run dev       development server, your changes appearing as you save
+npm run build     production build, into .output/
+npm run preview   serves that production build
+npm run check     typechecks the project, .tsrx files included
+npm run doctor    checks the environment and dependency versions, then builds
+```
+
+`dev` is where you will live.
+
+`preview` is the one people forget. It serves the real output, which is how you find anything that
+only shows up in a production build.
+
+`doctor` is for when the setup is wrong rather than the code. It checks that the `@markless/*`
+packages are present and that their versions match each other, which matters because mismatched
+versions mean the compiler and the runtime disagree about the format they pass between them. Run it
+before you start reading your own code.
+
+<Collapsible sprite="star-badge" summary="Runtimes, and scaffolding inside an existing repo" text="Where should it run? decides the shape of the project rather than the code you write. Node gives you a package.json project for npm, pnpm or yarn. Deno gives you a deno.json project with npm: imports. Bun gives you a package.json tuned for Bun. The pages you write are identical in all three. If you are scaffolding into a repository that already has a workspace, pass --workspace or --no-workspace to say whether the new app should join it; without --workspace, no file outside the new directory is ever written. The other flags are --yes, --starter, --format, --no-install and --no-git, which is how you script the whole thing with no prompts at all." />
+
+## When it is running
+
+`npm run dev` prints a local URL. Open it and you have the counter from the front page of this site,
+running on your machine.
+
+Now break it. Change the label, add a second button, save, and watch the page keep up.
+
+That is the whole setup. Everything after this point is about what goes inside `pages/`.
+
+Next: [reading a .tsrx file](/markless/start/reading-tsrx), which spends four minutes on the three
+unfamiliar bits of that counter.
+
+<LikeHeart />

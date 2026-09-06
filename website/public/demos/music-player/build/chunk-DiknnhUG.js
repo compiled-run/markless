@@ -1,0 +1,1 @@
+import{t as e}from"./chunk-BlhOb42Q.js";function t(e,t){let n=e.domUpdate?.hostNodeId??t;if(!n)throw Object.assign(Error(`MARKLESS_TEXT_UPDATE_RECORD_MISSING`),{code:`MARKLESS_TEXT_UPDATE_RECORD_MISSING`,site:`text-record`});return{type:`setText`,locator:n,value:e.value}}var n=e((()=>{globalThis.__mxLog?.add(`web:fns/update-text`)}));export{t as n,n as t};

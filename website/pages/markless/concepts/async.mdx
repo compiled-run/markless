@@ -1,0 +1,145 @@
+import PageMeta from '../../../components/page-meta.tsrx';
+import Collapsible from '../../../components/demos/collapsible.tsrx';
+import Callout from '../../../components/demos/callout.tsrx';
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+import LikeHeart from '../../../components/docs/like-heart.tsrx';
+
+<Sidebar pathname="/markless/concepts/async" />
+
+# Waiting is a block, not a flag
+
+<PageMeta level="Building" time="5 min" assumes="state, computed" sprite="arrow-loop" />
+
+<ThemeToggle />
+
+Count the variables a loading spinner usually needs. The data. A boolean for whether it is still on
+its way. An error, in case it never arrives. And the rule you keep in your head about which of the
+three wins when two of them are set at once.
+
+Four things, and only the first one is what the page is actually about. You can delete the other
+three.
+
+**You write the three outcomes as three blocks, and the framework decides which block is on the
+page.**
+
+```tsrx
+import { computed } from '@markless/core';
+
+export function AsyncBoundary() @{
+	const report = computed(async () => ({ title: 'Ready', count: 4 }));
+
+	<section>
+		@try {
+			<article>
+				<h2>{report.title}</h2>
+				<p>{report.count}</p>
+			</article>
+		} @pending {
+			<p>Loading</p>
+		} @catch {
+			<p>Failed</p>
+		}
+	</section>
+}
+```
+
+No boolean in that file, and no `if` deciding what to draw. Three blocks and a value that has not
+arrived yet.
+
+## An async computed is a computed that awaits
+
+You already know `computed(...)`: a value worked out from other values, recalculated when one of
+those inputs changes. Hand it an `async` function and nothing about that sentence changes. The value
+simply arrives later.
+
+```tsrx
+const report = computed(async () => {
+	const response = await fetch('/api/report');
+	return await response.json();
+});
+```
+
+Reading it gives you the settled value straight away. You write `report.title`, the way you would
+write it if the fetch had already finished, because the block you are reading inside is the thing
+that guarantees the value is there.
+
+That is the trade. A read of an async computed has to sit inside one of these blocks. Read one in
+markup with no block around it and the compiler stops the build, rather than shipping a page that
+reads a value which may not exist yet.
+
+## The three blocks are the whole vocabulary
+
+`@try` holds what you show once the value has arrived. `@pending` holds what you show while it is
+still coming. `@catch` holds what you show when it fails instead.
+
+That really is all of it. There is no status you can read, no `.loading`, no `.error`, no property
+on a navigation object. The specification is blunt about it: "`@try` / `@pending` / `@catch` is the
+ONLY async status vocabulary. There is no property-style status surface".
+
+The restriction pays for itself. Because the framework knows what each block is for, it never has to
+guess which parts of your markup were the waiting UI, so it can decide when to show them.
+
+## The waiting block only shows when the wait is worth showing
+
+Here is the part that surprises people. A spinner that appears for eighty milliseconds and vanishes
+is worse than no spinner: the reader sees a flash and reads nothing. So `@pending` is not shown just
+because the value is missing. It is shown when the wait is genuinely long.
+
+The specification calls this the deadline. On first load the server renders fast-settling blocks
+inline, and only "genuinely slow boundaries flush `@pending` and stream". During navigation "the
+outgoing page stays live and interactive until the destination settles or the client deadline
+passes". On a refresh the block "holds its prior settled snapshot" until the deadline passes. Two
+rules come with it: "Fast paths never show pending", and once the waiting UI is up "it stays a
+minimum duration (no blink)".
+
+You configure none of that. There is no `delay` prop and no timeout for you to pick, which is
+deliberate: the timing is "structural or latency-decided, never per-block configuration".
+
+<Callout sticker="cloud" sprite="cross" title="What is missing here, and what this build actually does" text="This page would have the best thing to click on the whole site: two buttons that make the same value settle fast or slowly, so you can watch the waiting block stay away and then show up. It is not here, and the reason is the framework build this site is pinned to. An async block living inside one of these MDX pages serves no async boundary and no locator for the nodes inside its blocks, so pressing a button changes the value and nothing on the page follows. The same component works on a plain .tsrx page, which is what you will have in your own project. And because honesty is worth more than a clean page: on a plain .tsrx page, on this same 0.3.1 build, a value that is already settled and then made to settle again keeps its previous text and swaps straight to the new one, with a six second wait and the waiting block never shown. So the deadline rules above are quoted from the specification, not measured on this site. NOTES.md finding 25 in the site repository records both." />
+
+## Read your state before you await
+
+One rule to carry into your own code. The reads you do before the first `await` are what the
+framework uses to decide when this work has to run again. Reads after the `await` are a compile
+error, not a subtle bug:
+
+```tsrx
+import { computed, state } from '@markless/core';
+
+export default function Greeting() @{
+	let user = state('ada');
+
+	const greeting = computed(async () => {
+		const name = user;
+		const response = await fetch(`/api/greeting/${name}`);
+		return await response.json();
+	});
+
+	@try {
+		<p>{greeting.text}</p>
+	} @pending {
+		<p>Saying hello</p>
+	} @catch {
+		<p>That did not work</p>
+	}
+}
+```
+
+Take the value you need into a local variable first, then await. If that feels awkward, it is
+usually a sign the work wants to be two computeds: an async one that fetches, and a plain one that
+formats what it returned.
+
+<Collapsible sprite="thought-bubble" summary="Coming from another framework?" text="There is no resource, no query hook, no suspense boundary component and no cache key to name. An async computed is the same declaration as a sync one, and the three blocks are part of the language rather than components you import. There is also no wrapper property to reach through on the way to your data: you write report.title, not report.value.title and not report.data.title. The practical difference is that nothing you write observes a status: if you find yourself wanting to read whether something is loading, the answer is to put the markup in the block that means loading." />
+
+## Try it yourself
+
+Take the boundary at the top of this page and give the async function an artificial wait of two
+seconds before it returns. Run it in a project of your own and watch what the server sends: a slow
+block streams its waiting UI, a fast one arrives settled with none at all. Then delete the `@catch`
+block and read the diagnostic, which is the shortest way to learn what the framework insists you
+handle.
+
+Next: [why two components can both call something .card](/markless/concepts/styling).
+
+<LikeHeart />

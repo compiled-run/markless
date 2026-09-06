@@ -1,0 +1,48 @@
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+import Preview from '../../../components/ui/preview.tsrx';
+
+<Sidebar pathname="/markless/ui/collapsible" />
+
+# collapsible
+
+<ThemeToggle />
+
+<Preview shows="One button with a paragraph that appears under it." />
+
+```tsrx
+import { collapsible } from '@markless/ui';
+
+export default function What() @{
+	<collapsible.root>
+		<collapsible.trigger>What is a collapsible?</collapsible.trigger>
+		<collapsible.content>
+			A button that shows and hides the content below it.
+		</collapsible.content>
+	</collapsible.root>
+}
+```
+
+One button, one panel. A closed panel stays in the page — `hidden` decides whether it shows — so
+focus, scroll position and anything typed inside survive being closed. By default a closed panel
+carries `hidden="until-found"`, which is what lets the browser's find-in-page reach the text inside
+it and open the panel on a hit.
+
+## Anatomy
+
+- `collapsible.root` — holds whether the panel is showing.
+- `collapsible.trigger` — the button.
+- `collapsible.content` — the panel.
+
+It writes `ui-open`, `ui-closed` and `ui-disabled`.
+
+## Props on `collapsible.root`
+
+| Prop | Type | What it does |
+| --- | --- | --- |
+| `open` | `boolean` | Whether the panel is showing. Omit it and it starts closed. |
+| `disabled` | `boolean` | Nothing opens or closes. |
+| `disableUntilFound` | `boolean` | The closed panel is hidden outright, so find-in-page cannot reach the text inside it. |
+| `onChange` | `(open) => void` | Called with the new value when a person opens or closes the panel. |
+
+Everything a `<div>` accepts reaches the element too.

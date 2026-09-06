@@ -1,0 +1,63 @@
+{
+	"name": "compiled-website",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "vp dev",
+		"build": "node --experimental-strip-types scripts/generate-seo.ts && vp build",
+		"preview": "vp preview",
+		"check": "vp check",
+		"doctor": "node scripts/markless-doctor.mjs",
+		"fmt": "vp fmt",
+		"test": "vp test",
+		"seo": "node --experimental-strip-types scripts/generate-seo.ts",
+		"witness": "node --experimental-strip-types scripts/witness.ts"
+	},
+	"dependencies": {
+		"@markless/core": "file:vendor/markless-core.tgz",
+		"@markless/router": "file:vendor/markless-router.tgz",
+		"@markless/ui": "file:vendor/markless-ui.tgz",
+		"destr": "^2.0.5",
+		"nitro": "3.0.260429-beta",
+		"vite-plus": "0.1.20"
+	},
+	"devDependencies": {
+		"@markless/analyzer": "file:vendor/markless-analyzer.tgz",
+		"@markless/typescript-plugin": "file:vendor/markless-typescript-plugin.tgz",
+		"@types/node": "^26.2.0",
+		"playwright-core": "^1.56.0",
+		"shiki": "^4.4.3",
+		"typescript": "^5.9.3",
+		"vite": "^8.0.16"
+	},
+	"pnpm": {
+		"overrides": {
+			"@markless/analyzer": "file:vendor/markless-analyzer.tgz",
+			"@markless/bundler": "file:vendor/markless-bundler.tgz",
+			"@markless/compiler": "file:vendor/markless-compiler.tgz",
+			"@markless/core": "file:vendor/markless-core.tgz",
+			"@markless/icons": "file:vendor/markless-icons.tgz",
+			"@markless/router": "file:vendor/markless-router.tgz",
+			"@markless/runtime": "file:vendor/markless-runtime.tgz",
+			"@markless/serializer": "file:vendor/markless-serializer.tgz",
+			"@markless/typescript-plugin": "file:vendor/markless-typescript-plugin.tgz",
+			"@markless/ui": "file:vendor/markless-ui.tgz",
+			"@markless/ui-tools": "file:vendor/markless-ui-tools.tgz",
+			"@markless/web": "file:vendor/markless-web.tgz"
+		}
+	},
+	"overrides": {
+		"@markless/bundler": "file:vendor/markless-bundler.tgz",
+		"@markless/compiler": "file:vendor/markless-compiler.tgz",
+		"@markless/serializer": "file:vendor/markless-serializer.tgz",
+		"@markless/web": "file:vendor/markless-web.tgz",
+		"@markless/runtime": "file:vendor/markless-runtime.tgz",
+		"@markless/core": "file:vendor/markless-core.tgz",
+		"@markless/router": "file:vendor/markless-router.tgz",
+		"@markless/analyzer": "file:vendor/markless-analyzer.tgz",
+		"@markless/typescript-plugin": "file:vendor/markless-typescript-plugin.tgz",
+		"@markless/ui": "file:vendor/markless-ui.tgz",
+		"@markless/icons": "file:vendor/markless-icons.tgz",
+		"@markless/ui-tools": "file:vendor/markless-ui-tools.tgz"
+	}
+}

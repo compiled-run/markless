@@ -1,0 +1,162 @@
+import PageMeta from '../../../components/page-meta.tsrx';
+import NameEchoDemo from '../../../components/demos/name-echo-demo.tsrx';
+import Collapsible from '../../../components/demos/collapsible.tsrx';
+import Callout from '../../../components/demos/callout.tsrx';
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+import LikeHeart from '../../../components/docs/like-heart.tsrx';
+
+<Sidebar pathname="/markless/concepts/events" />
+
+# Events give you the browser's own event
+
+<PageMeta level="Start here" time="4 min" assumes="state" sprite="bolt" />
+
+<ThemeToggle />
+
+You have written this before, in a plain script tag, with no framework anywhere near it:
+
+```ts
+input.addEventListener('input', (event) => {
+	console.log(event.currentTarget.value);
+});
+```
+
+Everything you know from that line still applies here. The name of the event, the object it hands
+you, the properties on it, the methods you can call on it: all the same.
+
+**An event prop is `on` plus the DOM event name, and the argument is the browser's own event
+object.**
+
+```tsrx
+<input onInput={(event) => (name = event.currentTarget.value)} />
+```
+
+There is no wrapper object in between. `event.currentTarget`, `event.key`, `event.target` and
+`event.preventDefault()` are the real ones, described by the same documentation you already read
+when you learned the DOM.
+
+## Try it: type, then press Enter
+
+Type your name into the field and watch the line under it keep up. Then, with the cursor still in
+the field, press Enter and watch the page not reload:
+
+<NameEchoDemo />
+
+The echo moved because `onInput` assigned to a watched variable. The page stayed put because the
+submit handler called `event.preventDefault()`, exactly as it would in a script tag.
+
+Here is the file, all of it:
+
+```tsrx
+import { state } from '@markless/core';
+
+export default function NameEcho() @{
+	let name = state('');
+
+	<form onSubmit={(event) => event.preventDefault()}>
+		<label>
+			Your name
+			<input value={name} onInput={(event) => (name = event.currentTarget.value)} />
+		</label>
+		<p>Hello, {name}</p>
+		<button type="submit">Say hello</button>
+	</form>
+}
+```
+
+## The name is the DOM event name in camel case
+
+`click` becomes `onClick`. `input` becomes `onInput`. `dblclick` becomes `onDblClick`. For the
+capture phase, add `Capture` to the end, as in `onClickCapture`.
+
+```tsrx
+import { state } from '@markless/core';
+
+export default function Keys() @{
+	let count = state(0);
+
+	<section>
+		<button onClick={() => count++}>Increment</button>
+		<button
+			onKeyDown={(event) => {
+				if (event.key === 'Escape') count = 0;
+			}}
+		>
+			Reset
+		</button>
+		<output>{count}</output>
+	</section>
+}
+```
+
+A prop can also take an array of handlers instead of one. They run in the order you wrote them, and
+the run stops at the first one that throws.
+
+```tsrx
+import { state } from '@markless/core';
+
+export default function SaveButton() @{
+	let note = state('nothing saved yet');
+
+	const saveDraft = () => (note = 'saved');
+	const closeDialog = () => (note = 'saved, and the dialog is closed');
+
+	<section>
+		<button onClick={[saveDraft, closeDialog]}>Save</button>
+		<output>{note}</output>
+	</section>
+}
+```
+
+## Forms are forms
+
+Nothing about a form is special here. The `input` event carries the new value, the `change` event on
+a checkbox tells you it flipped, and the `submit` event is where you stop the browser navigating.
+
+```tsrx
+import { state } from '@markless/core';
+
+export default function Signup() @{
+	let name = state('');
+	let subscribed = state(false);
+
+	<form onSubmit={(event) => event.preventDefault()}>
+		<label>
+			Name
+			<input value={name} onInput={(event) => (name = event.currentTarget.value)} />
+		</label>
+		<label>
+			<input type="checkbox" checked={subscribed} onChange={() => (subscribed = !subscribed)} />
+			Updates
+		</label>
+		<output>{name}</output>
+	</form>
+}
+```
+
+<Callout sprite="cross" title="Wait, why does the compiler care about preventDefault?" text="Because handlers arrive late on purpose. Your handler code is loaded only when the event actually fires, which is what keeps the first load small, and the browser will not wait for a download before deciding whether to navigate. So when the compiler sees event.preventDefault() or event.stopPropagation() in a handler, it lifts the smallest equivalent decision out of the handler and ships it with the page, ready to run the instant the event fires. That lifted decision may read already-resumed state, constants, props and simple event fields, and nothing else. If your condition cannot be worked out from those, compilation fails with a diagnostic instead of shipping a preventDefault that would arrive too late to matter. Your state writes stay in the handler, where they belong." />
+
+The specification puts the rule this way: only browser-critical cancellation and propagation is
+allowed to run synchronously, and if the condition cannot be proven, compilation fails "rather than
+silently emitting a handler whose default action is too late".
+
+## One thing to watch in a handler
+
+Read `event.target` rather than `event.currentTarget` if your handler does its work after an
+`await`. `currentTarget` is only populated while the browser is dispatching the event, and a handler
+that resumes later can find it empty. Everything on this page runs straight through, so
+`currentTarget` is the right one and is what the examples use.
+
+<Collapsible sprite="star-badge" summary="Coming from another framework?" text="There is no synthetic event system, so there is no pooled event object, no wrapper class, and no separate documentation to learn. The event you receive is the one the browser dispatched. There is also no attribute in the shipped HTML pointing at your handler: the compiler records the node, the event name and the handler it needs, and the runtime wires that up at the container, so the handler chunk is fetched the first time it is genuinely needed." />
+
+## Try it yourself
+
+Add a line to the echo demo showing how many characters you have typed. You only need
+`{name.length}`, and the handler does not change. Then swap `onInput` for `onChange` and notice when
+the echo updates instead: on every keystroke against on leaving the field. Both are the browser's
+own behaviour, unchanged.
+
+Next: [what happens when part of the page comes and goes](/markless/concepts/conditionals).
+
+<LikeHeart />

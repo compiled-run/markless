@@ -1,0 +1,371 @@
+import PageMeta from '../../components/page-meta.tsrx';
+import Callout from '../../components/demos/callout.tsrx';
+import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../components/docs/sidebar.tsrx';
+import LikeHeart from '../../components/docs/like-heart.tsrx';
+
+<Sidebar pathname="/markless/reference" />
+
+# Everything, in the order you reach for it
+
+<PageMeta level="Reference" time="10 min" assumes="nothing" sprite="hash" />
+
+<ThemeToggle />
+
+This page does not read front to back. It is the list you scan when you know what you want and
+cannot remember how it is spelled. Every entry links to the page that teaches it.
+
+## The five calls
+
+All five come from `@markless/core` and are used inside a component body. Each block below is the
+form, not a whole file; the linked page has a file to copy.
+
+```tsrx
+import { computed, element, shared, state, storage } from '@markless/core';
+```
+
+`state(initial)` declares a variable the page follows. Read it and assign it exactly like an
+ordinary variable. See [state](/markless/concepts/state).
+
+```tsrx
+let count = state(0);
+count++;
+```
+
+`computed(fn)` declares a value worked out from other values, recalculated when one of its inputs
+changes. Give it an `async` body and it becomes an async value, which needs a
+[`@try` boundary](/markless/concepts/async) to be read from markup. See
+[computed](/markless/concepts/computed).
+
+```tsrx
+const total = computed(() => shirts * 20 + mugs * 8);
+const feed = computed(async () => fetchFeed(url.href));
+```
+
+`storage(key, fallback)` works like `state`, and also saves the value in the browser so it survives
+a reload. Both arguments must be static strings. Omit the key and one is derived from the variable
+name. See [storage](/markless/build/storage).
+
+```tsrx
+let theme = storage('theme', 'system');
+```
+
+`element<T>()` creates a handle you bind to one node with `el`, so later code can reach the real DOM
+node. It reads `undefined` before the node exists and after it is gone, so read it with `?.` inside
+a handler. See [elements](/markless/build/elements).
+
+```tsrx
+let field = element<HTMLInputElement>();
+// <input el={field} />
+// field?.focus();
+```
+
+`shared(fn)` declares data that components resolve by calling it, instead of threading it down
+through props. Read [shared](/markless/build/shared) before you use it: on the published version
+this site is built on, a definition in one module and a reader in another stalls the production
+build, and passing the value through props is the working advice today.
+
+## The props every host element accepts
+
+```txt
+onClick={}   and every other on<Event> name: runs when this node fires that DOM event
+el={}        binds one element() handle to this node
+attach={}    installs longer-lived behaviour on this node, and may return a cleanup function
+class={}     a string, including a state variable holding a string (see the caveat below)
+style={}     a style string
+```
+
+One caveat on `class={}`, and it is the site's own. On published 0.3.1 the compiler writes no DOM
+update for a `class` binding, so a class that is an expression renders correctly from the server and
+then never changes again. [Styling](/markless/concepts/styling) has the measurement and what to
+write instead.
+
+`attach` belongs on a host element and never on a component. It may return a cleanup function, which
+runs when the element goes away, and an array of behaviours installs in order and cleans up in
+reverse.
+
+## The constructs
+
+Control flow is part of the language, written with a leading `@` inside markup. These too are forms
+rather than files, written inside a component body.
+
+```tsrx
+@if (open) { <p>Shown</p> } @else { <p>Hidden</p> }
+```
+
+```tsrx
+@switch (kind) {
+	@case 'alpha': { <p>A</p> }
+	@case 'beta': { <p>B</p> }
+	@default: { <p>Other</p> }
+}
+```
+
+```tsrx
+@for (const row of rows; index i; key row.id) {
+	<li>{i}. {row.label}</li>
+} @empty {
+	<li>Nothing here yet</li>
+}
+```
+
+```tsrx
+@try {
+	<p>{feed.channel}</p>
+} @pending {
+	<p>Checking...</p>
+} @catch {
+	<p>That did not work</p>
+}
+```
+
+The `index` and `key` clauses on `@for` are optional in syntax and not both optional in practice: an
+interactive or stateful list needs a stable `key`, and `key i` is an explicit choice meaning state
+follows the position rather than the item. `@empty` is the list's own branch for having no items.
+See [conditionals](/markless/concepts/conditionals) and [lists](/markless/concepts/lists).
+
+`@try` / `@pending` / `@catch` is the only async status vocabulary. There is no status property to
+read in a template, so everything you want to show about progress goes in a block. See
+[async](/markless/concepts/async).
+
+## The router
+
+```tsrx
+import { Html, Link } from '@markless/router';
+import type { PageProps } from '@markless/router';
+```
+
+`Html` is the root element of `document.tsrx`, the single HTML shell around every page.
+
+`Link` navigates on the client and renders a real `<a>`. Its `href` is the route pattern, spelled
+the way the file is spelled, and `params` fills the holes. Optional props: `prefetch`, `replace`,
+`scroll`. See [links](/markless/router/links).
+
+```tsrx
+<Link href="/blog/[slug]" params={{ slug: post.slug }}>{post.title}</Link>
+```
+
+`PageProps` is what a page component receives: `params` for the bracketed segments, `url` with
+`href`, `pathname` and `search`, and `status`. See [page data](/markless/router/data).
+
+File-to-URL mapping, and the two folders that are not pages:
+
+```txt
+pages/index.tsrx          -> /
+pages/about.tsrx          -> /about
+pages/blog/[slug].tsrx    -> /blog/:slug
+pages/docs/[...slug].mdx  -> /docs/**
+pages/404.tsrx or .mdx    -> unmatched page requests, status 404
+pages/500.tsrx or .mdx    -> unhandled page rendering errors, status 500
+api/                      request handlers, top level, not under pages/
+middleware/               code that runs before a request reaches a page
+```
+
+## Rendering an app yourself
+
+A router app never writes these. They are for a non-router app, and for tests.
+
+```ts
+import App from './App.tsrx';
+import { render, renderToString } from '@markless/core';
+
+render(App, { target: document.getElementById('app')! });
+const html = renderToString(App);
+```
+
+You do not write a client entry, a server entry, a render shell, or a resume entry. The render
+specification names all four as things that are not valid app-authored requirements.
+
+## Creating a project
+
+```sh
+npm create markless@latest
+```
+
+The interactive flow asks what you are building, what to call it, where it should run, and whether
+to install dependencies and start a repository, then shows a `Ready to create?` summary before
+writing anything. See [your first app](/markless/start/first-app).
+
+Four starters:
+
+```txt
+Learn Markless    minimal      one page with a counter, the best first project
+Build an app      app          document.tsrx plus 404 and 500 pages
+Write docs        docs         an MDX docs site with a layout and sidebar components
+Full-stack app    full-stack   app routes plus api/ and middleware/ files
+```
+
+Three runtimes, in this order: Node, Deno, Bun.
+
+Flags for a run with no questions:
+
+```txt
+--yes            accept the defaults for everything not given
+--starter        minimal | app | docs | full-stack
+--format         node | deno | bun
+--no-install     write the files, skip installing dependencies
+--no-git         write the files, skip the repository setup
+```
+
+## The scripts in the generated `package.json`
+
+`vp` is the `vite-plus` command line.
+
+```txt
+dev       vp dev                            development server
+build     vp build                          production build
+preview   vp preview                        serve the production build
+check     vp check                          typecheck
+fmt       vp fmt                            format
+test      vp test                           run tests
+doctor    node scripts/markless-doctor.mjs  environment, dependency and build sanity
+```
+
+Run `doctor` first for any environment, dependency or production-build failure. It checks that the
+`@markless/*` dependencies exist and that their versions are aligned, because mismatched versions
+cause protocol drift between the compiler and the runtime, and then it runs a production build.
+
+The whole build wiring is two plugins:
+
+```ts
+import { markless } from '@markless/core/vite';
+import { router } from '@markless/router/vite';
+import { defineConfig } from 'vite-plus';
+
+export default defineConfig({
+	plugins: [markless(), router()],
+});
+```
+
+## Diagnostics you can actually hit
+
+Every one of these is a compile-time message with a code, a plain-language title, and a suggestion.
+Grouped by the part of the framework that raises them.
+
+### Importing and naming
+
+`MARKLESS_FRAMEWORK_IMPORT_REQUIRED`. You called `state`, `computed`, `element`, `shared` or
+`storage` without importing it, or you have a local function with that name. Import the API from
+`@markless/core`, or rename your function.
+
+`MARKLESS_FRAMEWORK_API_ALIAS_UNSUPPORTED`. You aliased one of those calls or passed it around as a
+value. Call it directly, by its own name, at the place you want the graph node.
+
+`MARKLESS_SUBMODULE_UNSUPPORTED`. The `.tsrx` file uses a submodule feature this host does not
+support yet. Move the code into its own file.
+
+### Where state may be created
+
+`MARKLESS_STATE_MODULE_SCOPE`. A `state()` or `computed()` sits at the top of a module instead of
+inside a component body. Move it into the body of the component that owns it.
+
+`MARKLESS_ELEMENT_MODULE_SCOPE`. Same thing for `element()`. A handle belongs to one component's
+markup.
+
+`MARKLESS_STATE_CREATION_SITE_UNSTABLE`. The call is somewhere the compiler cannot give a stable
+identity, such as inside a branch or a loop body. Declare it once, in the body.
+
+`MARKLESS_STATE_CROSS_MODULE_IMPORT`. You imported module-scope state from another module, which
+cannot resume. Pass the value through props, or use `storage()` when it should be durable.
+
+`MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED`. A destructuring default was used on graph state or
+on a component's props. Declare the prop and pass the value explicitly.
+
+### Reading and writing
+
+`MARKLESS_STATE_WRITE_IN_TEMPLATE`. An expression inside markup assigns to state. Markup describes
+what is shown, so move the assignment into a handler.
+
+`MARKLESS_STATE_WRITE_IN_COMPUTED`. A `computed` body assigns to state. A derived value may only
+read. Return the new value instead.
+
+`MARKLESS_COMPUTED_DEPENDENCY_CYCLE`. A `computed` depends on itself, directly or through a chain.
+Break the loop by making one of the values plain state.
+
+`MARKLESS_TEMPLATE_AS_VALUE`. Markup was used where a value was expected, for example assigned to a
+variable. Markup is a statement, not an expression: put it where it should render.
+
+`MARKLESS_ATTRIBUTE_DUPLICATE`. The same attribute is written twice on one element. Delete one.
+
+### Async
+
+`MARKLESS_ASYNC_BOUNDARY_REQUIRED`. Markup reads an async `computed` with no `@try` around it. Wrap
+the reads in `@try`, and give it `@pending` and `@catch` blocks.
+
+`MARKLESS_ASYNC_POST_AWAIT_READ`. A reactive value is read after an `await` inside an async body,
+which cannot be resumed. Read the values you need before the `await` and use the locals.
+
+### Lists
+
+`MARKLESS_REPEAT_KEY_REQUIRED`. A `@for` whose rows carry state or handlers has no `key` clause. Add
+`key row.id`, or whatever field identifies the item.
+
+`MARKLESS_REPEAT_KEY_IS_INDEX`. The key is the loop index, so identity follows the position rather
+than the item. Fine when rows never move, wrong when they do.
+
+`MARKLESS_REPEAT_KEY_UNSTABLE`. The key expression is not stable across renders, for example a fresh
+object or a random value. Key by a field that belongs to the item.
+
+`MARKLESS_REPEAT_COLLECTION_UNREADABLE`. The compiler cannot see what the loop iterates. Give it a
+variable holding an array rather than an expression it cannot follow.
+
+### Elements and behaviours
+
+`MARKLESS_ELEMENT_HANDLE_REQUIRED`. `el={}` was given something that is not an `element()` handle.
+
+`MARKLESS_ELEMENT_HANDLE_UNBOUND`. A handle is read but never bound to an element with `el`. Bind
+it, or delete it.
+
+`MARKLESS_ELEMENT_HANDLE_DUPLICATE`. One handle is bound to more than one element. A handle names
+exactly one node, so make a second handle.
+
+`MARKLESS_ELEMENT_HANDLE_RENDER_READ`. A handle is read while rendering, when there is no node yet.
+Read it inside a handler.
+
+`MARKLESS_ATTACH_HOST_ELEMENT_REQUIRED`. `attach` was put on a component. A component is not a node,
+so there is nothing to hand the function. Move it to the host element inside.
+
+`MARKLESS_EVENT_SPREAD_UNSUPPORTED`. An event handler arrived through a spread. Write the handler
+prop on the element.
+
+`MARKLESS_SPREAD_STATIC_SNAPSHOT`. Spread attributes render once and do not update afterwards. Bind
+the attributes that change individually.
+
+`MARKLESS_STYLE_OBJECT_UNSUPPORTED`. The style object shape is not one the compiler can turn into
+attribute updates. Write `style` as a string, or move the rules into a scoped `<style>` block and
+switch a `class`.
+
+### Components, storage and shared
+
+`MARKLESS_CALLBACK_PROP_ARITY_UNSUPPORTED`. A callback prop takes more than one parameter. Pass one
+object instead.
+
+`MARKLESS_STORAGE_KEY_STATIC`. The key or the fallback given to `storage()` is not a literal string.
+Both are baked in at compile time, so both must be literals.
+
+`MARKLESS_SHARED_SCOPE_INVALID`. The scope given to `shared()` is not one it accepts.
+
+`MARKLESS_SHARED_DEFINITION_CYCLE`. Two shared definitions depend on each other in a circle.
+
+### Router and payload
+
+`Route conflict`. Two files map to the same URL. The message names both files, and the rule ignores
+extensions, so `docs.tsrx` and `docs.mdx` conflict. Delete or rename one.
+
+`MARKLESS_ROUTER_DOCUMENT_STORAGE_UNSUPPORTED`. `document.tsrx` declares `storage()` cells. The
+router serves only the document's HTML, so their state payload never reaches the browser and they
+can never resume. Declare `storage()` in a component the page renders instead.
+
+`MARKLESS_SERIALIZE_UNSUPPORTED_VALUE`. A value in the graph cannot be written into the payload,
+because it is a function, a live host object, or another runtime resource. The message names the
+path to it. Move the resource into `attach={...}`, make the value serializable, or derive it with
+`computed()`.
+
+<Callout sprite="speech-bubble" title="What is not on this page" text="A few exported names are deliberately absent. The resume helpers are diagnostic tools rather than authoring surface, and nothing you write should call them. A handful of element and styling shapes exist on the framework's development branch but not in the published version this site is built on, so documenting them here would hand you code that does not compile. When they ship, they get entries." />
+
+## Where to go next
+
+For the idea behind all of this, read [how it works](/markless/how-it-works). For the shortest path
+to something running, read [your first app](/markless/start/first-app).
+
+<LikeHeart />

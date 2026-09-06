@@ -1,0 +1,124 @@
+import PageMeta from '../../../components/page-meta.tsrx';
+import Collapsible from '../../../components/demos/collapsible.tsrx';
+import Callout from '../../../components/demos/callout.tsrx';
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+import LikeHeart from '../../../components/docs/like-heart.tsrx';
+
+<Sidebar pathname="/markless/build/storage" />
+
+# Saved state: `storage()` survives a reload
+
+<PageMeta level="Building" time="5 min" assumes="state" sprite="bookmark" />
+
+<ThemeToggle />
+
+You know the flash. A site loads white, you read half a heading, and then the whole page lurches to
+dark because it finally got around to checking what you chose last time.
+
+It happens because the choice lives in `localStorage`, and reading `localStorage` is something the
+page does after it has already painted.
+
+**`storage()` is a variable you read and write like any other, and its value is on the page before
+the first paint.**
+
+## It is `state()` that remembers
+
+Declare it at module scope, then use it exactly like a watched variable:
+
+```tsrx
+import { storage } from '@markless/core';
+
+let colour = storage('favourite-colour', 'yellow');
+```
+
+Assigning to it does three things at once. It updates the page, the way any watched variable does.
+It writes `localStorage`. And it stamps a `data-favourite-colour` attribute on `<html>`, so CSS can
+paint the right thing without asking JavaScript anything.
+
+That last part is the no-flash trick. The compiler puts a small seed script in the head, and it
+applies the stored value before the browser paints anything, so the first frame is already the frame
+you chose.
+
+## The demo is in the header
+
+The reload is the interesting part, which is an unusual thing for a demo to ask of you: the value
+has to be right in the very first painted frame, not corrected afterwards.
+
+You are looking at one right now. The light and dark control in this site's header is a `storage()`
+binding, nothing else. Switch the theme with it, then reload this page with the browser's own reload
+button, and watch the page come back in the theme you chose with no white flash on the way.
+
+Here is a second one, in full, which is the smallest complete example of the same thing:
+
+```tsrx
+import { storage } from '@markless/core';
+
+let colour = storage('favourite-colour', 'yellow');
+
+export default function FavouriteColour() @{
+	<section>
+		<div class="swatch-row">
+			<span data-swatch class={colour} />
+			<p class="playground-output">Saved: {colour}</p>
+		</div>
+		<div class="playground-controls">
+			<button type="button" onClick={() => (colour = 'yellow')}>Yellow</button>
+			<button type="button" onClick={() => (colour = 'green')}>Green</button>
+			<button type="button" onClick={() => (colour = 'pink')}>Pink</button>
+		</div>
+	</section>
+}
+```
+
+<Callout sprite="speech-bubble" title="Why that file is not a box on this page" text="It is real and it renders, and clicking a button really does repaint the square, so what you are missing is only the reload half. On a page that already carries this site's theme toggle, a second storage() binding updates the page but never reaches localStorage: nothing is written under the key, no data-favourite-colour attribute is stamped on the html element, and a reload comes back on the fallback. The site's own toggle, which is the first storage() binding on the page, persists correctly. It is recorded as finding 30 in this site's NOTES.md. Rather than put a box here that teaches the wrong half of the lesson, the page points you at the toggle in the header, which is the same mechanism doing the whole job." />
+
+<Callout sprite="cross" title="Why the declaration is outside the component" text="storage() is collected as a module-scope binding, so the declaration has to sit at the top of the file rather than inside the component body. That is recorded as finding 15 in this site's NOTES.md, found while building the theme toggle you can see in the header. Everything else about the binding behaves the way a state() variable inside a component body does: read it, assign to it, and the pieces of the page that read it change." />
+
+## Pin the key for anything real
+
+There are two forms, and the difference matters more than it looks:
+
+```tsrx
+// Pinned key. Persists under 'theme', verbatim, forever.
+let theme = storage('theme', 'light');
+```
+
+```tsrx
+// Derived key. Persists under 'markless:theme', attribute 'data-markless-theme'.
+let theme = storage('light');
+```
+
+One argument is the fallback, not the key. That reads backwards the first time, so it is worth
+saying out loud: `storage('light')` does not save under the key `light`. It falls back to the string
+`light` and works out a key from the variable name.
+
+Which is fine for a prototype and a hazard for anything shipped. The derived key is built from the
+binding's name, so **renaming the variable changes the key**, and every reader who had chosen
+something is silently handed the fallback again. Their preference is still sitting in their browser
+under the old name, and nothing will ever read it.
+
+So: derived keys while you are playing, pinned keys the moment real people are involved.
+
+<Collapsible sprite="thought-bubble" summary="What can I actually put in there?" text="Strings, in v1. localStorage holds strings and the seed script has to apply the value before any of your code runs, so there is no serializer in the path to turn an object back into itself in time. If you need more than one value, use more than one storage() binding, or keep the durable part as a string key and look the rest up. One more version note: the one-argument form's type declaration was wrong in 0.2.0 and fixed in 0.2.1, so a reader on 0.2.0 will see TypeScript complain about a call that is correct. This site runs 0.3.1." />
+
+<Collapsible sprite="star-badge" summary="Coming from another framework?" text="There is no hook, no provider and no hydration mismatch to work around here. The two usual approaches both have a cost this one does not pay: reading localStorage in an effect means the wrong thing is painted first and corrected afterwards, which is the flash, and rendering a blocking script by hand means writing and maintaining that script yourself. The compiler emits the seed for you and the binding is the same one you write to, so the persisted copy and the on-screen copy cannot drift apart." />
+
+## Where it fits
+
+Use it for a choice the reader made about how the site behaves: theme, units, whether the sidebar
+starts open, which tab they were last on.
+
+Do not use it for data the server owns, and do not use it for anything you would be unhappy to see
+in a browser's developer tools. `localStorage` is plainly readable, and it is not a place for
+anything private.
+
+## Try it yourself
+
+Change the pinned key from `'favourite-colour'` to `'colour'`, reload, and watch the square go back
+to yellow while your old choice sits untouched in `localStorage` under the old name. That is the
+rename hazard in ten seconds, on purpose, where it costs you nothing.
+
+Next: [naming a piece of data once and reading it from anywhere](/markless/build/shared).
+
+<LikeHeart />

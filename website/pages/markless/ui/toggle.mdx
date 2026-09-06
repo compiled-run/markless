@@ -1,0 +1,53 @@
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+import Preview from '../../../components/ui/preview.tsrx';
+
+<Sidebar pathname="/markless/ui/toggle" />
+
+# toggle
+
+<ThemeToggle />
+
+<Preview shows="One switch with a label, off then on." />
+
+```tsrx
+import { toggle } from '@markless/ui';
+
+export default function Notifications() @{
+	<toggle.root name="notifications">
+		<toggle.label>Enable notifications</toggle.label>
+		<toggle.trigger>
+			<toggle.thumb />
+		</toggle.trigger>
+	</toggle.root>
+}
+```
+
+A switch, not a checkbox: it reads as on or off and never as mixed. The thumb is an element and
+nothing else, there for a stylesheet to move. What a form receives is a hidden native input added
+with `toggle.field`, and `name`, `value` and `required` are declared once on the root.
+
+## Anatomy
+
+- `toggle.root` — holds the value and everything a form needs to know.
+- `toggle.trigger` — the button a person clicks.
+- `toggle.thumb` — the moving piece inside the trigger.
+- `toggle.label` — the words beside it.
+- `toggle.description` — a sentence under the label.
+- `toggle.error` — mounting it marks the control invalid.
+- `toggle.field` — the hidden native input that carries it into a form.
+
+It writes `ui-checked` and `ui-disabled`.
+
+## Props on `toggle.root`
+
+| Prop | Type | What it does |
+| --- | --- | --- |
+| `checked` | `boolean` | Whether the switch reads as on. Omit it and it starts off. |
+| `disabled` | `boolean` | Nobody can flip it. |
+| `required` | `boolean` | It must be on before the form submits. |
+| `name` | `string` | Submitted under this name by `toggle.field`. |
+| `value` | `string` | Submitted instead of the browser default `"on"`. |
+| `onChange` | `(checked) => void` | Called with the new value when a person flips the switch. |
+
+Everything a `<div>` accepts reaches the element too.

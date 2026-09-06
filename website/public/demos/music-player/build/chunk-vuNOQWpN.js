@@ -1,0 +1,1 @@
+import{t as e}from"./chunk-BlhOb42Q.js";import{c as t,s as n}from"./chunk-Bc85LTXK.js";function r(e){return i().then(t=>t.loadSymbol(e))}var i;e((()=>{t(),i=()=>import(`./chunk-g3ziGwGf2.js`),globalThis.__mxLoadLog||=()=>import(`./chunk-Dph1VtZt.js`).then(e=>(e.n(),e.t))}))();export{r as loadSymbol};

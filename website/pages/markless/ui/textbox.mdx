@@ -1,0 +1,51 @@
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+import Preview from '../../../components/ui/preview.tsrx';
+
+<Sidebar pathname="/markless/ui/textbox" />
+
+# textbox
+
+<ThemeToggle />
+
+<Preview shows="A labelled field with a sentence under it." />
+
+```tsrx
+import { textbox } from '@markless/ui';
+
+export default function Username() @{
+	<textbox.root name="username" required>
+		<textbox.label>Username</textbox.label>
+		<textbox.input />
+		<textbox.description>Letters and numbers, no spaces.</textbox.description>
+	</textbox.root>
+}
+```
+
+A labelled field over one line or many: swap `textbox.input` for `textbox.textarea` and nothing
+else changes. `disabled`, `required` and `readonly` may be set on the root or on the control, and a
+restriction set in either place stands — a part can add a restriction, never remove one.
+
+## Anatomy
+
+- `textbox.root` — holds the value and what a form is told.
+- `textbox.label` — the words above it.
+- `textbox.input` — the control a person types into.
+- `textbox.textarea` — the same control over more than one line.
+- `textbox.description` — a sentence under the field.
+- `textbox.error` — mounting it marks the control invalid.
+
+It writes `ui-empty`, `ui-required`, `ui-readonly` and `ui-disabled`.
+
+## Props on `textbox.root`
+
+| Prop | Type | What it does |
+| --- | --- | --- |
+| `value` | `string` | The text the box shows. Omit it and the box starts empty. |
+| `disabled` | `boolean` | Nobody can type in it. |
+| `required` | `boolean` | Text is needed before the form submits. |
+| `readonly` | `boolean` | The text can be read and selected but not changed. |
+| `name` | `string` | Submitted under this name by whichever control the family renders. |
+| `onChange` | `(value) => void` | Called with the new text as a person types. |
+
+Everything a `<div>` accepts reaches the element too.

@@ -1,0 +1,154 @@
+import PageMeta from '../../../components/page-meta.tsrx';
+import FocusFieldDemo from '../../../components/demos/focus-field-demo.tsrx';
+import Collapsible from '../../../components/demos/collapsible.tsrx';
+import Callout from '../../../components/demos/callout.tsrx';
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+import LikeHeart from '../../../components/docs/like-heart.tsrx';
+
+<Sidebar pathname="/markless/build/elements" />
+
+# Some things are not state, and `element()` is how you reach them
+
+<PageMeta level="Building" time="5 min" assumes="events" sprite="bolt" />
+
+<ThemeToggle />
+
+Nearly everything on a page can be a value. A name, a count, whether the drawer is open: all of
+those are variables, and the page follows them.
+
+Then you hit the first thing that is not a value at all. You want the cursor to land in a text field
+after the reader presses a button, and there is no number you can set that means "focused".
+
+**A DOM node is not state. `element()` hands you a claim ticket for one node, and you cash it in
+later, inside a handler.**
+
+## Three props, three jobs
+
+Every host element in Markless accepts the same three kinds of prop, and it helps to see them
+together before any of them makes sense on its own:
+
+```txt
+onClick={}  runs event behaviour owned by this node
+el={}       gives lazy access to this node later
+attach={}   installs longer-lived DOM behaviour owned by this node
+```
+
+`onClick` you already know from [events](/markless/concepts/events). This page is the other two.
+
+## `el` binds a handle to exactly one node
+
+Call `element()` in the component body to make a handle, hang it on one element with `el`, and read
+it inside a handler:
+
+```tsrx
+import { element, state } from '@markless/core';
+
+export default function FocusField() @{
+	let field = element<HTMLInputElement>();
+	let status = state('The cursor is somewhere else');
+
+	<section>
+		<label>
+			Your favourite word
+			<input el={field} />
+		</label>
+		<button
+			type="button"
+			onClick={() => {
+				field?.focus();
+				status = 'The cursor is in the field';
+			}}
+		>
+			Put the cursor in the field
+		</button>
+		<p>{status}</p>
+	</section>
+}
+```
+
+`field` is the real `<input>` once the browser has one, so `field.focus()` is the DOM method, called
+on the DOM node, with no wrapper in between. Give the handle the element type you expect and
+TypeScript knows the methods: `element<HTMLInputElement>()` gets you `value`, `select()` and the
+rest.
+
+## Try it: press the button, watch the cursor move
+
+Press the button below without touching the field, and watch the caret appear in the box:
+
+<FocusFieldDemo />
+
+Nothing about that click read or wrote the input's contents. The handler asked the browser to focus
+a node, which is a thing you do to a node and not a thing you store in a variable. That is exactly
+why it is not state.
+
+<Callout sprite="cross" title="Why is my handle undefined?" text="Because a handle is only a claim ticket, and there are two moments when there is nothing to claim. During the first render there is no DOM node yet, so the handle reads undefined; that is the specification's wording, and it is why you read a handle inside a handler rather than in the component body. The second moment is after the node is gone: if the element sits inside a conditional arm that is currently not rendered, or the list row it belonged to was removed, the handle reads undefined again. Write field?.focus() rather than field.focus() and both moments are handled." />
+
+## `attach` is where code that owns a node lives
+
+The other half of the same story is the library that wants a `<div>` of its own. A chart, a code
+editor, a map, a drag handler, an `IntersectionObserver`. Those all want to be handed an element,
+and they want to be told when it goes away.
+
+That is `attach`. It is a function that receives the element, and it may return a cleanup function:
+
+```tsrx
+import { state } from '@markless/core';
+
+export default function Host() @{
+	let taps = state(0);
+
+	<p
+		data-host
+		attach={(element) => {
+			element.setAttribute('data-behavior', 'on');
+		}}
+		onClick={() => taps++}
+	>
+		Host, tapped {taps} times
+	</p>
+}
+```
+
+In a real app the function usually comes from somewhere else, which keeps the markup readable:
+
+```tsrx
+import { installYouTubeController } from './youtube-controller.ts';
+
+export default function Player() @{
+	<div class="player" attach={installYouTubeController} />
+}
+```
+
+The rules are short. A behaviour may return a cleanup function, which runs when the element goes
+away. An array of behaviours installs in the order you wrote it and cleans up in reverse. And
+`attach` belongs on a host element, never on a component: putting it on a component is the
+diagnostic `MARKLESS_ATTACH_HOST_ELEMENT_REQUIRED`, because a component is not a node and there is
+nothing to hand the function.
+
+<Callout sprite="speech-bubble" title="Why there is no attach demo box on this page" text="A behaviour installs when the island wakes up, and on a server-rendered page the island wakes on the first real event. So a widget whose only job is an attach would sit there doing nothing until the reader clicked something else on the page, which teaches the wrong lesson. It is recorded as finding 9 in this site's NOTES.md, along with what it cost: the hover doc on every code token here is plain CSS for the same reason. The el widget above is honest because a click is what triggers it in the first place." />
+
+## What a behaviour costs on the wire
+
+Nothing until it is needed. A behaviour's result is never serialized: the payload stores the code
+reference and the serializable inputs, and the behaviour code is fetched when a real trigger asks
+for it. This is the same bargain as an event handler. Your chart library is not in the bytes the
+first paint waits on.
+
+It also means a behaviour must be able to rebuild whatever it owns from serializable inputs. A live
+object such as a socket or a chart instance is not something the payload can carry, and the state
+graph will tell you so rather than quietly dropping it: "Move it to a host element behavior or
+recreate it from serializable state".
+
+<Collapsible sprite="star-badge" summary="Coming from another framework?" text="A handle is not a box with a .current on it, and it is not a mutable slot you are meant to keep other values in. It is one node or nothing. It also does not fire an effect when it is populated: there is no dependency array to add it to and no lifecycle callback that hands it to you, because the moment you actually want it is inside the handler you already wrote. Behaviours are the other half of that trade. Where you might reach for an effect that runs after mount to wire up a library, you hand the library the element instead, and you return the teardown from the same function that did the setup, so the two halves cannot drift apart." />
+
+## Try it yourself
+
+Change the button so it calls `field?.select()` instead of `field?.focus()`, type something into the
+field first, and watch the whole word highlight. Then add a second `<input>` with no `el` on it and
+notice the button still knows exactly which field it means, because a handle is bound to one element
+and not to a name.
+
+Next: [state that is still there after a reload](/markless/build/storage).
+
+<LikeHeart />

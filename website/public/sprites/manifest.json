@@ -1,0 +1,240 @@
+{
+	"source": "sprites-sheet.png",
+	"sprites": [
+		{
+			"name": "crown",
+			"w": 146,
+			"h": 140
+		},
+		{
+			"name": "sparkle",
+			"w": 116,
+			"h": 145
+		},
+		{
+			"name": "burst",
+			"w": 139,
+			"h": 142
+		},
+		{
+			"name": "star-face",
+			"w": 134,
+			"h": 137
+		},
+		{
+			"name": "heart",
+			"w": 138,
+			"h": 133
+		},
+		{
+			"name": "smiley",
+			"w": 123,
+			"h": 123
+		},
+		{
+			"name": "smiley-wink",
+			"w": 115,
+			"h": 121
+		},
+		{
+			"name": "smiley-surprised",
+			"w": 119,
+			"h": 120
+		},
+		{
+			"name": "arrow-curve",
+			"w": 156,
+			"h": 86
+		},
+		{
+			"name": "arrow-loop",
+			"w": 163,
+			"h": 84
+		},
+		{
+			"name": "arrow-straight",
+			"w": 107,
+			"h": 67
+		},
+		{
+			"name": "zigzag-yellow",
+			"w": 170,
+			"h": 69
+		},
+		{
+			"name": "wave-purple",
+			"w": 208,
+			"h": 36
+		},
+		{
+			"name": "stroke-pink",
+			"w": 147,
+			"h": 103
+		},
+		{
+			"name": "scribble-green",
+			"w": 169,
+			"h": 99
+		},
+		{
+			"name": "check",
+			"w": 107,
+			"h": 108
+		},
+		{
+			"name": "cross",
+			"w": 98,
+			"h": 100
+		},
+		{
+			"name": "plus",
+			"w": 105,
+			"h": 107
+		},
+		{
+			"name": "speech-bubble",
+			"w": 139,
+			"h": 123
+		},
+		{
+			"name": "thought-bubble",
+			"w": 154,
+			"h": 174
+		},
+		{
+			"name": "pill",
+			"w": 154,
+			"h": 76
+		},
+		{
+			"name": "oval",
+			"w": 150,
+			"h": 94
+		},
+		{
+			"name": "spiral",
+			"w": 111,
+			"h": 106
+		},
+		{
+			"name": "loops-pink",
+			"w": 143,
+			"h": 106
+		},
+		{
+			"name": "corner-bracket",
+			"w": 89,
+			"h": 96
+		},
+		{
+			"name": "bookmark",
+			"w": 98,
+			"h": 115
+		},
+		{
+			"name": "rays",
+			"w": 123,
+			"h": 110
+		},
+		{
+			"name": "confetti",
+			"w": 140,
+			"h": 103
+		},
+		{
+			"name": "dots",
+			"w": 88,
+			"h": 34
+		},
+		{
+			"name": "dashes",
+			"w": 90,
+			"h": 90
+		},
+		{
+			"name": "squiggle-yellow",
+			"w": 173,
+			"h": 75
+		},
+		{
+			"name": "crown-small",
+			"w": 98,
+			"h": 87
+		},
+		{
+			"name": "ribbon",
+			"w": 246,
+			"h": 107
+		},
+		{
+			"name": "bolt",
+			"w": 83,
+			"h": 138
+		},
+		{
+			"name": "star-badge",
+			"w": 122,
+			"h": 121
+		},
+		{
+			"name": "cursor",
+			"w": 83,
+			"h": 111
+		},
+		{
+			"name": "sun",
+			"w": 133,
+			"h": 129
+		},
+		{
+			"name": "flower",
+			"w": 118,
+			"h": 117
+		},
+		{
+			"name": "sparkles",
+			"w": 85,
+			"h": 121
+		},
+		{
+			"name": "hash",
+			"w": 91,
+			"h": 89
+		},
+		{
+			"name": "zigzag-pink",
+			"w": 161,
+			"h": 63
+		},
+		{
+			"name": "loops-black",
+			"w": 182,
+			"h": 57
+		},
+		{
+			"name": "underline-yellow",
+			"w": 148,
+			"h": 79
+		},
+		{
+			"name": "scribble-purple",
+			"w": 121,
+			"h": 101
+		},
+		{
+			"name": "square",
+			"w": 112,
+			"h": 97
+		},
+		{
+			"name": "triangle",
+			"w": 99,
+			"h": 100
+		},
+		{
+			"name": "drops",
+			"w": 95,
+			"h": 94
+		}
+	]
+}

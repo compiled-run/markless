@@ -1,0 +1,169 @@
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+import PopoverDemo from '../../../components/demos/ui/popover-demo.tsrx';
+
+<Sidebar pathname="/markless/ui/popover" />
+
+# popover
+
+<ThemeToggle />
+
+<PopoverDemo shows="Pinned open here. Press Share, Escape, or outside to close it." />
+
+```tsrx
+import { popover } from '@markless/ui';
+
+const chip =
+	'padding: 0.5em 0.9em; border: 2px solid var(--ink); border-radius: 6px; background: var(--paper); color: var(--ink); font: inherit; font-weight: 700; cursor: pointer;';
+const surface =
+	'display: grid; gap: 0.5em; width: min(19rem, 100%); margin-block-start: 0.5em; padding: 0.9em; border: 2px solid var(--ink); border-radius: 6px; background: var(--raised); box-shadow: 3px 3px 0 var(--ink); text-align: left;';
+
+export default function Share() @{
+	<popover.root open={true} style="display: grid; justify-items: center;">
+		<popover.trigger style={chip}>Share</popover.trigger>
+		<popover.content style={surface}>
+			<popover.title style="margin: 0; font-size: var(--step-0);">Share this page</popover.title>
+			<popover.description style="margin: 0; font-size: var(--step--1);">
+				Anyone holding the link can read it.
+			</popover.description>
+			<popover.close style={chip}>Copy link</popover.close>
+		</popover.content>
+	</popover.root>
+}
+```
+
+A popover is a surface a button opens, over a page that carries on living. It is not
+modal: no `aria-modal` is written, nothing is made inert, and focus stays exactly where
+it was, so Tab walks into the surface and back out the other side. Where the surface
+lands is CSS anchoring rather than a prop, so it holds its place while the page scrolls
+and reflows with nothing measuring boxes.
+
+## Anatomy
+
+- `popover.root` holds whether the surface is showing.
+- `popover.trigger` is the button that opens and closes it.
+- `popover.content` is the surface, placed against the trigger.
+- `popover.title` names the surface; mounting it is what names it.
+- `popover.description` is the sentence read out after the name.
+- `popover.close` is a button inside the surface that puts it away.
+
+It writes `ui-open` and `ui-closed` as its state changes.
+
+## Put the surface somewhere else
+
+The default puts the surface directly below the trigger. That default ships inside
+`@layer markless`, so one unlayered rule of your own replaces it with no specificity
+fight, and `--ui-anchor` names the anchor for geometry of your own.
+
+```css
+.share-surface {
+	position-area: inline-end;
+}
+```
+
+## Name the surface
+
+Mounting `popover.title` is what gives the surface its name, and `popover.description`
+is the sentence read after it. Leave them out and the dialog goes unnamed.
+
+```tsrx
+<popover.content>
+	<popover.title>Share this page</popover.title>
+	<popover.description>Anyone holding the link can read it.</popover.description>
+</popover.content>
+```
+
+## Know when it closes
+
+`onChange` is called with the new value whenever the popover opens or closes, and that
+includes Escape and a press outside it.
+
+```tsrx
+<popover.root open={showing} onChange={onShowingChange}>
+```
+
+## Keyboard
+
+The trigger is a native button, so it needs nothing from the family beyond the toggle.
+
+| Key | What it does |
+| --- | --- |
+| Enter or Space | Opens or closes the popover from the trigger. |
+| Escape | Closes the surface. Focus goes back to the trigger only if it was inside the surface. |
+| Tab | Walks into the surface and out again. Nothing is trapped, because nothing is modal. |
+
+## API
+
+Every prop is optional, and the types below are the family's own.
+
+### `popover.root`
+
+| Prop | Type | What it does |
+| --- | --- | --- |
+| `open` | `boolean` | Whether the surface is showing. Omit it and the popover starts closed. |
+| `onChange` | `(open: boolean) => void` | Called with the new value when the popover opens or closes, Escape and outside presses included. Omit it and the popover still works; the call site simply does nothing. |
+
+| Attribute | Present when | What to key styling off |
+| --- | --- | --- |
+| `ui-open` | The surface is showing | The open look. |
+| `ui-closed` | The surface is not showing | The resting look. |
+
+Everything a `<div>` accepts reaches the element too, apart from `onChange`, which is
+the family's.
+
+| Selector | Default | Why |
+| --- | --- | --- |
+| `div:not([overlay])` | `anchor-scope: --ui-popover` | Keeps the anchor name inside this popover, so two popovers on a page never point at each other's trigger. |
+
+### `popover.trigger`
+
+No props of its own. It renders a `<button>`, and everything a `<button>` accepts
+reaches the element. Your own `onClick` runs after the popover has opened or closed.
+
+| Attribute | Present when | What to key styling off |
+| --- | --- | --- |
+| `aria-haspopup` | Always | `dialog`, for a screen reader rather than your stylesheet. |
+| `aria-expanded` | Always | `true` or `false`. |
+| `aria-controls` | Always | The id of the surface this button opens. |
+| `ui-open` | The surface is showing | The pressed look. |
+| `ui-closed` | The surface is not showing | The resting look. |
+
+| Selector | Default | Why |
+| --- | --- | --- |
+| `button[aria-haspopup]` | `anchor-name: --ui-popover` | The trigger is the anchor the surface is placed against. |
+
+### `popover.content`
+
+No props of its own. It renders a `<div>`, and everything a `<div>` accepts reaches the
+element. Your own `onDismiss` runs after the family has closed the popover, so a handler
+can see which way the family went.
+
+| Attribute | Present when | What to key styling off |
+| --- | --- | --- |
+| `overlay` | Always | The mark that elevates the surface. Not a styling hook. |
+| `role` | Always | `dialog`. |
+| `aria-labelledby` | Always | The id of the `popover.title`. |
+| `aria-describedby` | Always | The id of the `popover.description`. |
+| `hidden` | The popover is closed | What hides the surface. It is never detached, so ids and focus survive. |
+| `ui-open` | The surface is showing | The shown look. |
+| `ui-closed` | The surface is not showing | The hidden look. |
+
+| Selector | Default | Why |
+| --- | --- | --- |
+| `[overlay]` | `--ui-anchor: --ui-popover; position: absolute; position-anchor: --ui-popover; position-area: block-end` | Places the surface below the trigger with no script, and hands you the anchor name for `anchor()` geometry of your own. |
+
+### `popover.title`
+
+No props of its own. It renders an `<h2>`, and everything an `<h2>` accepts reaches the
+element.
+
+### `popover.description`
+
+No props of its own. It renders a `<p>`, and everything a `<p>` accepts reaches the
+element.
+
+### `popover.close`
+
+No props of its own. It renders a `<button>`, and everything a `<button>` accepts
+reaches the element. Closing from here puts focus back on the trigger, and your own
+`onClick` runs after that.

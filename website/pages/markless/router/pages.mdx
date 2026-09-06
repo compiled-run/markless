@@ -1,0 +1,125 @@
+import PageMeta from '../../../components/page-meta.tsrx';
+import RouteTreeDemo from '../../../components/demos/route-tree-demo.tsrx';
+import Collapsible from '../../../components/demos/collapsible.tsrx';
+import Callout from '../../../components/demos/callout.tsrx';
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+import LikeHeart from '../../../components/docs/like-heart.tsrx';
+
+<Sidebar pathname="/markless/router/pages" />
+
+# Make a file, get a URL
+
+<PageMeta level="Building" time="4 min" assumes="components" sprite="square" />
+
+<ThemeToggle />
+
+You have opened the folder looking for the file where the routes are declared. It is not there.
+There is no `routes.ts`, no array of path objects, no `register()` call at the bottom of a config.
+
+**A file under `pages/` is a URL, and its path on disk is the path in the address bar.** That is the
+whole routing system. You add a page by adding a file, and you move a page by moving the file.
+
+## The mapping is a table you can hold in your head
+
+This is the required mapping, copied from the router's specification:
+
+```txt
+pages/index.tsrx          -> /
+pages/index.mdx           -> / if pages/index.tsrx is absent
+pages/about.tsrx          -> /about
+pages/docs.mdx            -> /docs
+pages/blog/[slug].tsrx    -> /blog/:slug
+pages/docs/[...slug].mdx  -> /docs/**
+pages/404.tsrx or .mdx    -> unmatched page requests, status 404
+pages/500.tsrx or .mdx    -> unhandled page rendering errors, status 500
+```
+
+Two extensions become pages: `.tsrx` and `.mdx`. Two are rejected on purpose: `.tsx` and `.jsx`.
+
+Square brackets are the only piece of punctuation in the whole scheme. `[slug]` is one segment the
+page reads back at runtime, and `[...slug]` is every segment underneath, however many there are.
+
+## Try it: click a file, read its URL
+
+Click each file name below, and watch the line under it:
+
+<RouteTreeDemo />
+
+Every one of those answers came from the file's own name. Nothing registered a route, and nothing had
+to be kept in step with anything else. A wrong URL and a wrong file name are now the same mistake,
+and you can see it in the file tree.
+
+## Two files, one URL, is an error you get told about
+
+The router treats conflicts as a hard failure, and it does not care about extensions.
+`pages/docs.tsrx` and `pages/docs.mdx` both map to `/docs`, so the build stops with a message that
+names both files:
+
+```txt
+Route conflict: /docs is defined by both:
+- pages/docs.mdx
+- pages/docs.tsrx
+```
+
+That is better than the alternative, where one of the two silently wins and you find out in
+production which one it was.
+
+## `document.tsrx` is the one HTML page around all of them
+
+Pages are the inside of the document. The document itself is a single file at the root of the
+project, and it renders `{children}` where the page goes:
+
+```tsrx
+import { Html } from '@markless/router';
+
+export default function Document({ children }: { readonly children?: unknown }) @{
+	<Html>
+		<head>
+			<meta charset="utf-8" />
+			<meta name="viewport" content="width=device-width, initial-scale=1" />
+		</head>
+		<body>{children}</body>
+	</Html>
+}
+```
+
+`<Html>` is the root element, and it is a component rather than a plain `<html>` tag because the
+router puts things in the head that you should not have to write yourself: the tags for the built
+assets, and the small script that applies a stored theme before the first paint.
+
+One document, every page. There is no second shell to keep in step, and there is no `layout.tsrx`
+convention either.
+
+<Callout sprite="cross" title="This site's own document does not use Html" text="The document you are reading right now keeps a plain <html> root instead, because importing @markless/router into this site's app code fails its production build on 0.3.1. It is recorded as findings 2 and 24 in this site's NOTES.md, and it is a bug in the version, not the design. Write the Html form above in your own app: that is the shipped starter, and it is what the router expects." />
+
+## The parts of a project that are not pages
+
+Four names sit beside `pages/` at the top of the project, and each one owns exactly one job:
+
+```txt
+pages/         routes
+document.tsrx  the HTML around every route
+public/        files served as they are
+api/           request handlers
+middleware/    code that runs before a request reaches a page
+```
+
+`api/` and `middleware/` are top level, next to `pages/`, and not inside it. A folder called
+`pages/api/` is not supported, so a file there would be a page with a strange name rather than a
+handler.
+
+You do not write an entry file for any of this. A client entry, a server entry, a render shell and a
+resume entry are all named in the render specification as things that are not valid app-authored
+requirements, and the router owns every one of them.
+
+<Collapsible sprite="star-badge" summary="Where do 404 and 500 come from, and where is the layout file?" text="pages/404.tsrx answers any request that matched no other page, with status 404, and pages/500.tsrx answers a page that threw while rendering, with status 500. Both are ordinary pages: they take the same props and you write them the same way. As for layouts, there is no layout.tsrx convention at all. A layout in Markless is an ordinary component that takes children, and a page uses it by writing it, which means the thing wrapping your page is visible in the page's own file rather than implied by where the file sits." />
+
+## Try it yourself
+
+Rename one of your pages, say `pages/about.tsrx` to `pages/team.tsrx`, and reload. The old URL now
+answers with your 404 page and the new one works, and you changed nothing except the file's name.
+
+Next: [linking to a page without typing its URL](/markless/router/links).
+
+<LikeHeart />

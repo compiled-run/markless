@@ -1,0 +1,120 @@
+{
+	"source": "stickers-sheet.png",
+	"stickers": [
+		{
+			"name": "crown",
+			"w": 267,
+			"h": 224
+		},
+		{
+			"name": "shooting-star",
+			"w": 277,
+			"h": 192
+		},
+		{
+			"name": "heart",
+			"w": 210,
+			"h": 216
+		},
+		{
+			"name": "star-face",
+			"w": 245,
+			"h": 252
+		},
+		{
+			"name": "arrow",
+			"w": 251,
+			"h": 216
+		},
+		{
+			"name": "speech-bubble",
+			"w": 275,
+			"h": 218
+		},
+		{
+			"name": "sparkle",
+			"w": 168,
+			"h": 216
+		},
+		{
+			"name": "mug",
+			"w": 289,
+			"h": 319
+		},
+		{
+			"name": "bolt",
+			"w": 164,
+			"h": 238
+		},
+		{
+			"name": "spring",
+			"w": 201,
+			"h": 212
+		},
+		{
+			"name": "flag",
+			"w": 278,
+			"h": 244
+		},
+		{
+			"name": "tape",
+			"w": 286,
+			"h": 180
+		},
+		{
+			"name": "melting-smiley",
+			"w": 165,
+			"h": 191
+		},
+		{
+			"name": "map",
+			"w": 283,
+			"h": 200
+		},
+		{
+			"name": "cloud",
+			"w": 255,
+			"h": 182
+		},
+		{
+			"name": "burst",
+			"w": 221,
+			"h": 182
+		},
+		{
+			"name": "scribble",
+			"w": 187,
+			"h": 174
+		},
+		{
+			"name": "hooded-tent",
+			"w": 269,
+			"h": 237
+		},
+		{
+			"name": "stamp-frame",
+			"w": 238,
+			"h": 237
+		},
+		{
+			"name": "folder",
+			"w": 228,
+			"h": 209
+		},
+		{
+			"name": "magnifier",
+			"w": 206,
+			"h": 241
+		},
+		{
+			"name": "juice-box",
+			"w": 210,
+			"h": 246
+		},
+		{
+			"name": "tent",
+			"w": 271,
+			"h": 244
+		}
+	]
+}

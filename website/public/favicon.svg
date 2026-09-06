@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Markless">
+	<title>Markless</title>
+	<!-- The site's own paper and ink, from the colour tokens in styles/global.css.
+	     Hex rather than oklch() because a favicon is decoded outside the page. -->
+	<rect x="3" y="3" width="58" height="58" rx="13" fill="#eedc65" stroke="#2c2921" stroke-width="4" />
+	<!-- The at-sign body, which is the one mark a .tsrx file is known by. -->
+	<g fill="none" stroke="#2c2921" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+		<circle cx="26" cy="32" r="8" />
+		<path d="M34 24v14c0 3.6 2.6 5.6 5.6 5.6 3.4 0 5.4-2.4 5.4-6.4" />
+		<path d="M45 20c-3 -2.6 -7 -4 -11 -4" />
+	</g>
+</svg>

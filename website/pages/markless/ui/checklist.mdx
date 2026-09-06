@@ -1,0 +1,65 @@
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+import Preview from '../../../components/ui/preview.tsrx';
+
+<Sidebar pathname="/markless/ui/checklist" />
+
+# checklist
+
+<ThemeToggle />
+
+<Preview shows="Three condiments and a select-all that goes mixed." />
+
+```tsrx
+import { checklist } from '@markless/ui';
+
+export default function Condiments() @{
+	<checklist.root values={['lettuce', 'tomato']}>
+		<checklist.label>Sandwich condiments</checklist.label>
+		<checklist.selectall>
+			<checklist.selectallindicator>Checked</checklist.selectallindicator>
+		</checklist.selectall>
+		<checklist.item value="lettuce">
+			<checklist.itemtrigger>
+				<checklist.itemindicator>Checked</checklist.itemindicator>
+			</checklist.itemtrigger>
+			<checklist.itemlabel>Lettuce</checklist.itemlabel>
+		</checklist.item>
+		<checklist.item value="tomato">
+			<checklist.itemtrigger>
+				<checklist.itemindicator>Checked</checklist.itemindicator>
+			</checklist.itemtrigger>
+			<checklist.itemlabel>Tomato</checklist.itemlabel>
+		</checklist.item>
+	</checklist.root>
+}
+```
+
+The select-all is never told what it is. It works its own value out by comparing the ticked set
+against `values`, which is why it goes mixed on its own when some but not all of the items are on.
+The group and the select-all's own checkbox are one element: `checklist.root` is a `role="group"`
+and a checkbox root at the same time.
+
+## Anatomy
+
+- `checklist.root` — the group, and the select-all's own checkbox.
+- `checklist.label` — names the group by naming the select-all.
+- `checklist.selectall` and `checklist.selectallindicator` — the tick-everything control.
+- `checklist.item` — one row, named by its required `value`.
+- `checklist.itemtrigger`, `checklist.itemindicator`, `checklist.itemlabel`, `checklist.itemdescription` — that row's parts.
+- `checklist.error` — mounting it marks the enclosing checkbox invalid.
+- `checklist.field` — the hidden native input for one row.
+
+Every row is a checkbox, so the family writes `ui-checked`, `ui-mixed` and `ui-disabled`.
+
+## Props on `checklist.root`
+
+| Prop | Type | What it does |
+| --- | --- | --- |
+| `value` | `string[]` | The values that are ticked. Omit it and nothing is. |
+| `values` | `string[]` | Every value the list offers. Select-all compares the ticked set against this. |
+| `disabled` | `boolean` | Nobody can change any item, and the select-all is locked too. |
+| `onChange` | `(value) => void` | Called with the whole new ticked set whenever an item or the select-all changes. |
+
+Everything a `<div>` accepts reaches the element too. `checklist.item` takes its own `value`,
+`disabled` and `name`.

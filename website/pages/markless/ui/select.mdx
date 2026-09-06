@@ -1,0 +1,65 @@
+import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../../components/docs/sidebar.tsrx';
+import Preview from '../../../components/ui/preview.tsrx';
+
+<Sidebar pathname="/markless/ui/select" />
+
+# select
+
+<ThemeToggle />
+
+<Preview shows="A closed button that opens a list of three fruits." />
+
+```tsrx
+import { select } from '@markless/ui';
+
+export default function Fruit() @{
+	<select.root name="fruit">
+		<select.label>Favourite fruit</select.label>
+		<select.trigger>Choose a fruit</select.trigger>
+		<select.content>
+			<select.item value="apple">
+				<select.itemlabel>Apple</select.itemlabel>
+				<select.itemindicator>Chosen</select.itemindicator>
+			</select.item>
+			<select.item value="banana">
+				<select.itemlabel>Banana</select.itemlabel>
+				<select.itemindicator>Chosen</select.itemindicator>
+			</select.item>
+		</select.content>
+		<select.field />
+	</select.root>
+}
+```
+
+A button that opens a listbox, with typeahead over the option labels and the arrow keys walking
+them. An option is named by its required `value` — no index stands in for it — so reordering the
+list is a reorder and never a silent change of what is chosen. `multiple` is deliberately absent:
+it is the one prop that turns `value` into a union and doubles the keyboard table.
+
+## Anatomy
+
+- `select.root` — holds the configuration. It renders no role of its own.
+- `select.label` — names the trigger and the listbox.
+- `select.trigger` — the button that opens the popup.
+- `select.content` — the listbox.
+- `select.item` — one option, named by its required `value`.
+- `select.itemlabel` and `select.itemindicator` — that option's parts.
+- `select.field` — the hidden native `<select>` that carries the choice into a form.
+
+It writes `ui-open`, `ui-closed`, `ui-selected`, `ui-hidden`, `ui-required` and `ui-disabled`.
+
+## Props on `select.root`
+
+| Prop | Type | What it does |
+| --- | --- | --- |
+| `value` | `string` | The value of the chosen option. Omit it and nothing is chosen. |
+| `open` | `boolean` | The popup is showing. Omit it and it starts closed. |
+| `disabled` | `boolean` | Nobody can change the choice. |
+| `required` | `boolean` | A choice is needed before the form submits. |
+| `name` | `string` | Submitted under this name by `select.field`. |
+| `onChange` | `(value) => void` | Called with the new value when a person chooses a different option. |
+| `onOpenChange` | `(open) => void` | Called when the popup opens or closes. |
+
+Everything a `<div>` accepts reaches the element too. `select.item` takes its own `value` and
+`disabled`.
