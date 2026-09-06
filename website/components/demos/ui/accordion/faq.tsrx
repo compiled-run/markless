@@ -32,20 +32,17 @@ export default function Faq() @{
 	<section class="faq">
 		<h2 class="faq-title">Frequently asked questions</h2>
 		<accordion.root class="faq-list" multiple value={['ship']}>
-			{/* A repeat cannot open directly inside a component tag, so a host element carries it. */}
-			<div class="faq-items" role="presentation">
-				@for (const q of questions; key q.value) {
-					<accordion.item class="faq-item" value={q.value}>
-						<accordion.itemlabel class="faq-heading">
-							<accordion.itemtrigger class="faq-trigger">
-								{q.question}
-								<lucide.chevrondown class="trigger-icon" aria-hidden="true" />
-							</accordion.itemtrigger>
-						</accordion.itemlabel>
-						<accordion.itemcontent class="faq-panel">{q.answer}</accordion.itemcontent>
-					</accordion.item>
-				}
-			</div>
+			@for (const q of questions; key q.value) {
+				<accordion.item class="faq-item" value={q.value}>
+					<accordion.itemlabel class="faq-heading">
+						<accordion.itemtrigger class="faq-trigger">
+							{q.question}
+							<lucide.chevrondown class="trigger-icon" aria-hidden="true" />
+						</accordion.itemtrigger>
+					</accordion.itemlabel>
+					<accordion.itemcontent class="faq-panel">{q.answer}</accordion.itemcontent>
+				</accordion.item>
+			}
 		</accordion.root>
 		<p class="faq-foot">Still stuck? Write to the help desk and a person answers.</p>
 
@@ -69,9 +66,6 @@ export default function Faq() @{
 				display: grid;
 			}
 
-			.faq-items {
-				display: contents;
-			}
 
 			.faq-item {
 				border-top: 1px solid var(--code-edge);

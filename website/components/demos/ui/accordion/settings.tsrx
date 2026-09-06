@@ -39,39 +39,34 @@ export default function Settings() @{
 	];
 
 	<accordion.root class="settings" value="profile">
-		{/* A repeat cannot open directly inside a component tag, so a host element carries it. */}
-		<div class="groups" role="presentation">
-			@for (const group of groups; key group.value) {
-				<accordion.item class="group" value={group.value} data-tone={group.tone}>
-					<accordion.itemlabel class="group-heading">
-						<accordion.itemtrigger class="group-trigger">
-							<span class="group-name">{group.name}</span>
-							<span class="group-note">{group.note}</span>
-							<lucide.chevrondown class="trigger-icon" aria-hidden="true" />
-						</accordion.itemtrigger>
-					</accordion.itemlabel>
-					<accordion.itemcontent class="group-panel">
-						<div class="group-fields" role="presentation">
-							@for (const field of group.fields; key field.id) {
-								<div class="field">
-									<label class="field-name" for={field.id}>{field.label}</label>
-									<input class="field-input" id={field.id} name={field.name} value={field.value} placeholder={field.placeholder} />
-								</div>
-							}
-							@for (const check of group.checks; key check.name) {
-								<label class="check">
-									<input class="check-box" type="checkbox" name={check.name} checked={check.checked} />
-									<span>{check.label}</span>
-								</label>
-							}
-							@for (const action of group.actions; key action.name) {
-								<button class="danger-button" type="button">{action.label}</button>
-							}
+		@for (const group of groups; key group.value) {
+			<accordion.item class="group" value={group.value} data-tone={group.tone}>
+				<accordion.itemlabel class="group-heading">
+					<accordion.itemtrigger class="group-trigger">
+						<span class="group-name">{group.name}</span>
+						<span class="group-note">{group.note}</span>
+						<lucide.chevrondown class="trigger-icon" aria-hidden="true" />
+					</accordion.itemtrigger>
+				</accordion.itemlabel>
+				<accordion.itemcontent class="group-panel">
+					@for (const field of group.fields; key field.id) {
+						<div class="field">
+							<label class="field-name" for={field.id}>{field.label}</label>
+							<input class="field-input" id={field.id} name={field.name} value={field.value} placeholder={field.placeholder} />
 						</div>
-					</accordion.itemcontent>
-				</accordion.item>
-			}
-		</div>
+					}
+					@for (const check of group.checks; key check.name) {
+						<label class="check">
+							<input class="check-box" type="checkbox" name={check.name} checked={check.checked} />
+							<span>{check.label}</span>
+						</label>
+					}
+					@for (const action of group.actions; key action.name) {
+						<button class="danger-button" type="button">{action.label}</button>
+					}
+				</accordion.itemcontent>
+			</accordion.item>
+		}
 
 		<style>
 			.settings {
@@ -81,9 +76,6 @@ export default function Settings() @{
 			}
 
 			.groups,
-			.group-fields {
-				display: contents;
-			}
 
 			.group {
 				border: 2px solid var(--code-edge);

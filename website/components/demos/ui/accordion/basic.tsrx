@@ -9,20 +9,17 @@ export default function AccordionBasic() @{
 	];
 
 	<accordion.root class="accordion" value="ship">
-		{/* A repeat cannot open directly inside a component tag, so a host element carries it. */}
-		<div class="sections" role="presentation">
-			@for (const q of questions; key q.value) {
-				<accordion.item class="section" value={q.value}>
-					<accordion.itemlabel class="heading">
-						<accordion.itemtrigger class="trigger">
-							{q.question}
-							<lucide.chevrondown class="trigger-icon" aria-hidden="true" />
-						</accordion.itemtrigger>
-					</accordion.itemlabel>
-					<accordion.itemcontent class="panel">{q.answer}</accordion.itemcontent>
-				</accordion.item>
-			}
-		</div>
+		@for (const q of questions; key q.value) {
+			<accordion.item class="section" value={q.value}>
+				<accordion.itemlabel class="heading">
+					<accordion.itemtrigger class="trigger">
+						{q.question}
+						<lucide.chevrondown class="trigger-icon" aria-hidden="true" />
+					</accordion.itemtrigger>
+				</accordion.itemlabel>
+				<accordion.itemcontent class="panel">{q.answer}</accordion.itemcontent>
+			</accordion.item>
+		}
 
 		<style>
 			.accordion {
@@ -31,9 +28,6 @@ export default function AccordionBasic() @{
 				width: min(32rem, 100%);
 			}
 
-			.sections {
-				display: contents;
-			}
 
 			.section {
 				border: 2px solid var(--code-edge);

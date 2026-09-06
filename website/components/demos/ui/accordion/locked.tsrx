@@ -8,20 +8,17 @@ export default function AccordionLocked() @{
 	];
 
 	<accordion.root class="accordion" value="ship" collapsible={false}>
-		{/* A repeat cannot open directly inside a component tag, so a host element carries it. */}
-		<div class="sections" role="presentation">
-			@for (const option of options; key option.value) {
-				<accordion.item class="section" value={option.value}>
-					<accordion.itemlabel class="heading">
-						<accordion.itemtrigger class="trigger">
-							{option.name}
-							<lucide.chevrondown class="trigger-icon" aria-hidden="true" />
-						</accordion.itemtrigger>
-					</accordion.itemlabel>
-					<accordion.itemcontent class="panel">{option.detail}</accordion.itemcontent>
-				</accordion.item>
-			}
-		</div>
+		@for (const option of options; key option.value) {
+			<accordion.item class="section" value={option.value}>
+				<accordion.itemlabel class="heading">
+					<accordion.itemtrigger class="trigger">
+						{option.name}
+						<lucide.chevrondown class="trigger-icon" aria-hidden="true" />
+					</accordion.itemtrigger>
+				</accordion.itemlabel>
+				<accordion.itemcontent class="panel">{option.detail}</accordion.itemcontent>
+			</accordion.item>
+		}
 
 		<style>
 			.accordion {
@@ -30,9 +27,6 @@ export default function AccordionLocked() @{
 				width: min(32rem, 100%);
 			}
 
-			.sections {
-				display: contents;
-			}
 
 			.section {
 				border: 2px solid var(--code-edge);
