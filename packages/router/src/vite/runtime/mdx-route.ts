@@ -48,6 +48,7 @@ export type MdxComponentArtifact = {
 		renderContext?: unknown,
 	) => MdxRenderOutput | Promise<MdxRenderOutput>;
 	readonly renderCsr?: (props?: unknown) => MdxRenderOutput | Promise<MdxRenderOutput>;
+	readonly headInjections?: ReadonlyArray<unknown>;
 };
 
 export type MdxSymbolLoader = {

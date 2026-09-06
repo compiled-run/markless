@@ -68,9 +68,7 @@ import { emitSymbolBundleModule, planSymbolBundles } from './build/symbol-bundle
 // virtual modules) parse it as JS. Strip types at emission — Rolldown-native.
 // Loaded lazily: rolldown/experimental binds native code that must never enter
 // the browser module graph (dev client imports this file's module scope).
-let oxcExperimentalPromise:
-	| Promise<typeof import('rolldown/experimental') | undefined>
-	| undefined;
+let oxcExperimentalPromise: Promise<typeof import('rolldown/experimental') | undefined> | undefined;
 function loadOxcExperimental() {
 	oxcExperimentalPromise ??= import('rolldown/experimental').then(
 		(mod) => mod,
@@ -132,10 +130,7 @@ export async function stripEmittedTypesFromFragment(
 
 // An authored expression, not a statement: oxc prints it as one, so the
 // statement terminator has to come back off before it is spliced into a record.
-async function stripEmittedTypesFromExpression(
-	source: string,
-	moduleId: string,
-): Promise<string> {
+async function stripEmittedTypesFromExpression(source: string, moduleId: string): Promise<string> {
 	const stripped = await stripEmittedTypesFromFragment(source, moduleId);
 	return stripped.endsWith(';') ? stripped.slice(0, -1).trimEnd() : stripped;
 }
@@ -206,16 +201,16 @@ export async function transformTsrxModule(
 // The payload, render-data and style ids encode the owner's module id, which
 // reads back to a file only through `root`; the rest encode the file itself.
 // Accepts rolldown-resolved ids (leading `\0`); null when the id carries no source.
-export function marklessVirtualModuleSourceFile(
-	moduleId: string,
-	root?: string,
-): string | null {
+export function marklessVirtualModuleSourceFile(moduleId: string, root?: string): string | null {
 	const bare = moduleId.startsWith('\0') ? moduleId.slice(1) : moduleId;
 	if (!bare.startsWith(MARKLESS_VIRTUAL_PREFIX)) return null;
 	const rest = bare.slice(MARKLESS_VIRTUAL_PREFIX.length);
 	const kindEnd = rest.indexOf(':');
 	if (kindEnd <= 0) return null;
-	const encoded = rest.slice(kindEnd + 1).split(':')[0].replace(/\.css$/, '');
+	const encoded = rest
+		.slice(kindEnd + 1)
+		.split(':')[0]
+		.replace(/\.css$/, '');
 	if (!encoded) return null;
 	try {
 		return sourceForModuleId(decodeURIComponent(encoded), root);
@@ -254,7 +249,13 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		exportName: scopedSymbolExportName(input.filename, module.exportName),
 	}));
 	const linkedBoundarySymbols = linkedRenderDataBoundarySymbols(
-		linkedSymbolInput(compiled, input, renderDataId, resolverId, input.environment === 'client'),
+		linkedSymbolInput(
+			compiled,
+			input,
+			renderDataId,
+			resolverId,
+			input.environment === 'client',
+		),
 	);
 	const symbolRows = [
 		...compilerSymbolRows,
@@ -328,9 +329,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 	// Scoped <style> CSS ships through the bundler's CSS pipeline: a virtual
 	// .css module imported by the transformed module, never inline JS.
 	// Every scope in the plan ships; taking only the first would drop CSS silently.
-	const styleCss = compiled.publicRenderPlan.styleScopes
-		.map((scope) => scope.cssText)
-		.join('\n');
+	const styleCss = compiled.publicRenderPlan.styleScopes.map((scope) => scope.cssText).join('\n');
 	const styleId =
 		compiled.publicRenderPlan.styleScopes.length > 0
 			? `${MARKLESS_VIRTUAL_PREFIX}style:${encodedModuleId}.css`
@@ -546,14 +545,12 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					},
 				]
 			: []),
-		...symbolBundles.map(
-			(bundle): MarklessVirtualModule => ({
-				id: bundle.id,
-				type: 'symbol-bundle',
-				source: emitSymbolBundleModule(bundle.symbolModuleIds),
-				bundledSymbolModuleIds: bundle.symbolModuleIds,
-			}),
-		),
+		...symbolBundles.map((bundle): MarklessVirtualModule => ({
+			id: bundle.id,
+			type: 'symbol-bundle',
+			source: emitSymbolBundleModule(bundle.symbolModuleIds),
+			bundledSymbolModuleIds: bundle.symbolModuleIds,
+		})),
 		...linkedBoundarySymbols.map((symbol) => symbol.module),
 		...(await Promise.all(
 			compiled.symbolModules.modules.map(
@@ -587,16 +584,20 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					debug: input.inlineResumerDebug === true,
 					executionLog: input.executionLog ?? 'never',
 				});
+	// A dev page links its own scoped styles and its linked children's, so the
+	// server-rendered HTML is styled before any island's JS arrives.
+	const styleModuleIds = [
+		...new Set([...(styleId ? [styleId] : []), ...(input.linkedStyleModuleIds ?? [])]),
+	];
+	const styleModuleUrl = input.styleModuleUrl;
 	const headInjections = [
 		...(input.headInjections ?? []),
-		...(styleId && input.styleModuleUrl
-			? [
-					{
-						tag: 'link',
-						location: 'head' as const,
-						attributes: { rel: 'stylesheet', href: input.styleModuleUrl(styleId) },
-					},
-				]
+		...(styleModuleUrl
+			? styleModuleIds.map((id) => ({
+					tag: 'link',
+					location: 'head' as const,
+					attributes: { rel: 'stylesheet', href: styleModuleUrl(id) },
+				}))
 			: []),
 	];
 	const storageSeeds = compiled.payloadArena.state.storage.map((storage) => {
@@ -1043,8 +1044,14 @@ export function planSettleModule(input: {
 	readonly symbols: ReadonlyArray<SourceSymbolRow>;
 }):
 	| {
-			readonly runners: ReadonlyArray<{ readonly node: string; readonly symbol: SourceSymbolRow }>;
-			readonly derives: ReadonlyArray<{ readonly id: string; readonly symbol: SourceSymbolRow }>;
+			readonly runners: ReadonlyArray<{
+				readonly node: string;
+				readonly symbol: SourceSymbolRow;
+			}>;
+			readonly derives: ReadonlyArray<{
+				readonly id: string;
+				readonly symbol: SourceSymbolRow;
+			}>;
 			readonly bound: PrerenderSettleBoundMap;
 	  }
 	| undefined {

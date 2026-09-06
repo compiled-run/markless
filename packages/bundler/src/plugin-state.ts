@@ -64,6 +64,8 @@ export function createPluginState() {
 	const importedChildSources = new Set<string>();
 	const emittedClientResolverSources = new Set<string>();
 	const transformVirtualModules = new Map<string, Set<string>>();
+	// Source -> the scoped-style module ids of the source and every linked child under it.
+	const styleClosures = new Map<string, ReadonlySet<string>>();
 	const virtualModuleOwners = new Map<string, Set<string>>();
 	const clientSymbolEntrySources = new Set<string>();
 	const prerenderWakeSources = new Set<string>();
@@ -98,6 +100,7 @@ export function createPluginState() {
 		importedChildSources,
 		emittedClientResolverSources,
 		transformVirtualModules,
+		styleClosures,
 		virtualModuleOwners,
 		clientSymbolEntrySources,
 		prerenderWakeSources,

@@ -79,6 +79,8 @@ export interface TransformTsrxModuleInput {
 	settleModuleUrl?: string;
 	headInjections?: GlobalInjections[];
 	styleModuleUrl?: (virtualModuleId: string) => string;
+	/** Scoped-style modules of the linked children, so a dev page links its whole tree. */
+	linkedStyleModuleIds?: readonly string[];
 	executionLog?: MarklessExecutionLogMode;
 	executionLogModuleHooks?: boolean;
 	inlineResumerDebug?: boolean;

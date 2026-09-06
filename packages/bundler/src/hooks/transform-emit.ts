@@ -215,6 +215,17 @@ export async function emitTransformResult(
 			currentEnvironment,
 		);
 	}
+	state.styleClosures.set(
+		source,
+		new Set([
+			...transformed.virtualModules.flatMap((module) =>
+				module.type === 'style' ? [module.id] : [],
+			),
+			...resolvedChildren.flatMap((child) => [
+				...(state.styleClosures.get(child.source) ?? []),
+			]),
+		]),
+	);
 	if (currentEnvironment === 'client' && isResumeSourceRequest(id)) {
 		const resumeModule = transformed.virtualModules.find((module) => module.type === 'resume');
 		if (resumeModule) return { code: resumeModule.source, map: null };

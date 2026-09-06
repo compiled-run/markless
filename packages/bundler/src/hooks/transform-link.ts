@@ -109,8 +109,13 @@ export async function linkTransformChildren(
 ): Promise<LinkedTransformChildren> {
 	const { ctx, pluginContext, currentEnvironment, materializedRenderDataReach, plan } = request;
 	const { internalOptions, linkedChildren } = ctx;
-	const { moduleMetadata, moduleLinkArtifacts, importedChildSources, prerenderWakeCapabilities } =
-		ctx.state;
+	const {
+		moduleMetadata,
+		moduleLinkArtifacts,
+		importedChildSources,
+		prerenderWakeCapabilities,
+		styleClosures,
+	} = ctx.state;
 	const { manifestSource } = plan;
 	let transformed = result;
 	let linkedTransformInput = input;
@@ -150,7 +155,10 @@ export async function linkTransformChildren(
 			...linkedTransformInput,
 			importedModuleInterfaces: barrelLinkedInterfaces(),
 		};
-		transformed = await transformTsrxModuleWithPrerenderWakeClosure(linkedTransformInput, false);
+		transformed = await transformTsrxModuleWithPrerenderWakeClosure(
+			linkedTransformInput,
+			false,
+		);
 	}
 	const resolvedChildren = await resolveImportedChildren(
 		pluginContext,
@@ -218,6 +226,13 @@ export async function linkTransformChildren(
 			symbols,
 			importedModuleInterfaces: { ...barrelLinkedInterfaces(), ...linkedGraph.interfaces },
 			...(renderDataImportSources ? { renderDataImportSources } : {}),
+			linkedStyleModuleIds: [
+				...new Set(
+					resolvedChildren.flatMap((child) => [
+						...(styleClosures.get(child.source) ?? []),
+					]),
+				),
+			],
 		};
 		transformed = await transformTsrxModuleWithPrerenderWakeClosure(
 			linkedTransformInput,

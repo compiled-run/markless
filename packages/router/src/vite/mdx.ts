@@ -114,6 +114,7 @@ function emitComposedMdxRoute(route: MdxRoute, id: string): string {
 		`const marklessMdxSymbolLoaders = ${renderSymbolLoaders(route.components)};`,
 		`const marklessMdxRenderData = ${renderMdxRenderDataLoader(route.components, id)};`,
 		`const marklessMdxStorageSeeds = ${renderStorageSeeds(route.components)};`,
+		`const marklessMdxHeadInjections = ${renderHeadInjections(route.components)};`,
 		'',
 		// An island's own module names the overlay behaviour, but a composed page reaches it only lazily, after the runtime start has already asked once for the loader; still fetched only for a root carrying a mark.
 		"globalThis.__marklessOverlay ??= (root) => root.querySelector('[overlay]') ? import('@markless/web/fns/overlay').then((m) => m.installOverlayBehavior(root)) : undefined;",
@@ -121,6 +122,7 @@ function emitComposedMdxRoute(route: MdxRoute, id: string): string {
 		'const marklessMdxPage = {',
 		'  renderData: marklessMdxRenderData,',
 		'  storageSeeds: marklessMdxStorageSeeds,',
+		'  headInjections: marklessMdxHeadInjections,',
 		'  loadSymbol: marklessMdxLoadSymbol,',
 		'  async renderSsr(props = {}) {',
 		'    const marklessMdxChildren = [];',
@@ -446,7 +448,11 @@ function literalPropertyName(key: EstreeNode): string | undefined {
 }
 
 function isEstreeNode(value: unknown): value is EstreeNode {
-	return typeof value === 'object' && value !== null && typeof (value as EstreeNode).type === 'string';
+	return (
+		typeof value === 'object' &&
+		value !== null &&
+		typeof (value as EstreeNode).type === 'string'
+	);
 }
 
 function evaluateLiteralExpression(node: unknown, id: string): unknown {
@@ -578,6 +584,15 @@ function renderStorageSeeds(components: ReadonlyArray<MdxComponent>): string {
 		: `[${localNames.map((localName) => `...(${localName}.storageSeeds ?? [])`).join(', ')}]`;
 }
 
+// An island's artifact carries the head tags its dev render needs (its scoped
+// stylesheets); the page lists each once so the document is styled on load.
+function renderHeadInjections(components: ReadonlyArray<MdxComponent>): string {
+	const localNames = [...new Set(components.map((component) => component.localName))];
+	return localNames.length === 0
+		? '[]'
+		: `[...new Map([${localNames.map((localName) => `...(${localName}.headInjections ?? [])`).join(', ')}].map((injection) => [JSON.stringify(injection), injection])).values()]`;
+}
+
 function renderSymbolLoaders(components: ReadonlyArray<MdxComponent>): string {
 	return `[${components
 		.map(
@@ -587,10 +602,7 @@ function renderSymbolLoaders(components: ReadonlyArray<MdxComponent>): string {
 		.join(', ')}]`;
 }
 
-function renderMdxRenderDataLoader(
-	components: ReadonlyArray<MdxComponent>,
-	id: string,
-): string {
+function renderMdxRenderDataLoader(components: ReadonlyArray<MdxComponent>, id: string): string {
 	const reachedFrom = mdxMaterializedReachRoot(id);
 	const imports = components.map((component) => {
 		const source = withQuery(component.specifier, {
