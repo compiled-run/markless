@@ -135,12 +135,7 @@ function compileStyleNodes(
 	};
 }
 
-// Inserts `.mk-<hash>` in the rightmost subject compound before pseudos. The
-// parser's CSS structure scanner already located those positions, one
-// `CssSelector.scopeInsert` each, so this splices them into the author's own
-// bytes instead of reparsing and reserializing the sheet. A sheet the scanner
-// could not model reports `scanned: false`, and the caller turns that into the
-// fail-closed diagnostic.
+// The scanner already located each insertion point (`CssSelector.scopeInsert`); an unscanned sheet fails closed.
 function scopeSelectors(styleNode: AnyNode, scopeId: string): string | null {
 	const scoped: string[] = [];
 	for (const sheet of asNodes(styleNode.children)) {
@@ -173,8 +168,7 @@ function collectScopeInserts(nodes: readonly AnyNode[], offsets: number[]): void
 const utf8Encoder = new TextEncoder();
 const utf8Decoder = new TextDecoder();
 
-// `scopeInsert` counts UTF-8 bytes into the sheet source, so the splice runs on
-// bytes: a string index would drift once any earlier byte is non-ASCII.
+// `scopeInsert` counts UTF-8 bytes, so the splice runs on bytes: a string index drifts past any non-ASCII byte.
 function spliceScopeClass(source: string, offsets: readonly number[], scopeClass: string): string {
 	if (offsets.length === 0) return source;
 	const insert = utf8Encoder.encode(scopeClass);

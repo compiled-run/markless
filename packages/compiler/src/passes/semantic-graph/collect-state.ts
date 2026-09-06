@@ -257,16 +257,21 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 			state.graph.graphBindings.push(binding);
 		}
 
-		// A storage() declared in the component body is the same persisted cell a
-		// module-scope one is: the render lowering already treats its declaration
-		// as a state initializer, so only the binding needs collecting here.
+		// The render lowering already treats an in-body storage() declaration as a state initializer.
 		if (frameworkApi === 'storage') {
 			if (state.currentCreationSite) {
 				reportUnstableCreationSite(name, 'storage', init, state.currentCreationSite, state);
 				continue;
 			}
 			if (declarationKind === 'let' || declarationKind === 'const') {
-				collectStorageBinding({ name, id, init, declarationKind, state });
+				collectStorageBinding({
+					name,
+					id,
+					init,
+					declarationKind,
+					state,
+					scope: declaringComponent(state),
+				});
 			}
 			continue;
 		}
@@ -902,9 +907,10 @@ function graphBindingName(name: string, state: WalkState): string {
 // Which component declared this node. A same-module child's cells are seeded
 // and instance-qualified by that component alone, so the payload partition and
 // the SSR seeding lines both read this.
-function declaringComponent(
-	state: WalkState,
-): { readonly componentId?: string; readonly componentName?: string } {
+function declaringComponent(state: WalkState): {
+	readonly componentId?: string;
+	readonly componentName?: string;
+} {
 	return state.currentComponentName
 		? {
 				...(state.currentComponentId ? { componentId: state.currentComponentId } : {}),
@@ -1442,7 +1448,11 @@ function evaluateInitialStateValue(
 		return { ok: true, value: values };
 	}
 	if (node.type === 'UnaryExpression') {
-		const argument = evaluateInitialStateValue(node.argument as AnyNode | undefined, state, visiting);
+		const argument = evaluateInitialStateValue(
+			node.argument as AnyNode | undefined,
+			state,
+			visiting,
+		);
 		if (!argument.ok) return { ok: false };
 		if (node.operator === '-') return { ok: true, value: -Number(argument.value) };
 		if (node.operator === '+') return { ok: true, value: Number(argument.value) };
@@ -1522,7 +1532,8 @@ function evaluateGlobalMemberConstant(
 
 	const holderName = getIdentifierName(object);
 	const propertyName = getIdentifierName(property);
-	if (!holderName || !propertyName || !FOLDABLE_GLOBAL_BASES.has(holderName)) return { ok: false };
+	if (!holderName || !propertyName || !FOLDABLE_GLOBAL_BASES.has(holderName))
+		return { ok: false };
 	// A module that declares its own `Number` means that one, not the global.
 	if (typeof object.start !== 'number') return { ok: false };
 	if (resolvedSymbolAt(state.semantic(), object.start) !== null) return { ok: false };
@@ -1716,7 +1727,11 @@ function evaluateObjectExpression(
 		const key = objectPropertyKey(property.key as AnyNode | undefined);
 		if (!key) return { ok: false };
 
-		const value = evaluateInitialStateValue(property.value as AnyNode | undefined, state, visiting);
+		const value = evaluateInitialStateValue(
+			property.value as AnyNode | undefined,
+			state,
+			visiting,
+		);
 		if (!value.ok) return { ok: false };
 		output[key] = value.value;
 	}

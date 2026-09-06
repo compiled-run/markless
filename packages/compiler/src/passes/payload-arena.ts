@@ -68,17 +68,20 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 		bindings.set(binding.name, binding);
 		bindingsById.set(binding.id, binding);
 	}
+	// Resolved in the reading component's scope: two components may declare the same local name.
+	const resolveInComponent = (source: string, componentName: string | undefined) => {
+		const scope = readScopeOf(componentName);
+		return resolveGraphPath(source, scope.bindings, scope.aliases)?.binding;
+	};
 	const usedStorageBindings = new Set(
 		[
-			...input.semanticGraph.templateReads.map(
-				(read) => resolveGraphPath(read.source, bindings, aliases)?.binding,
-			),
+			...input.semanticGraph.templateReads.map((read) => resolveTemplateRead(read)?.binding),
 			...input.semanticGraph.stateReads
 				.filter((read) => read.componentName !== undefined)
-				.map((read) => resolveGraphPath(read.source, bindings, aliases)?.binding),
+				.map((read) => resolveInComponent(read.source, read.componentName)),
 			...input.semanticGraph.stateWrites
 				.filter((write) => write.componentName !== undefined)
-				.map((write) => resolveGraphPath(write.target, bindings, aliases)?.binding),
+				.map((write) => resolveInComponent(write.target, write.componentName)),
 		]
 			.filter((binding): binding is SemanticGraphBinding => binding?.storage !== undefined)
 			.map((binding) => binding.id),
@@ -138,44 +141,40 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 	// A sibling part's destructured prop shares the page's handle name, so an
 	// `el=` binding resolves in the component that authored it, not module-wide.
 	const handleScopeOf = componentGraphScopes(input.semanticGraph, { bindings, aliases });
-	const keyedRepeats = renderData.repeats.flatMap(
-		(repeat): PayloadKeyedRepeat[] => {
-			if (!repeat.collectionGraphNodeId) return [];
+	const keyedRepeats = renderData.repeats.flatMap((repeat): PayloadKeyedRepeat[] => {
+		if (!repeat.collectionGraphNodeId) return [];
 
-			const rowElementHandles = input.semanticGraph.elementHandleBindings.flatMap(
-				(binding) => {
-					if (binding.rowOwner?.repeatId !== repeat.repeatId) return [];
-					const graphBinding = resolveElementHandleBinding(binding, input, handleScopeOf);
-					if (!graphBinding || graphBinding.kind !== 'element') return [];
-					return [
-						{
-							hostNodeId: binding.hostNodeId,
-							handleId: graphBinding.id,
-							name: graphBinding.name,
-							...(graphBinding.plural ? { plural: true as const } : {}),
-						},
-					];
-				},
-			);
-			const rowBehaviors = behaviors.filter((behavior) =>
-				behavior.keyedRepeatScopeIds?.includes(repeat.repeatId),
-			);
-
+		const rowElementHandles = input.semanticGraph.elementHandleBindings.flatMap((binding) => {
+			if (binding.rowOwner?.repeatId !== repeat.repeatId) return [];
+			const graphBinding = resolveElementHandleBinding(binding, input, handleScopeOf);
+			if (!graphBinding || graphBinding.kind !== 'element') return [];
 			return [
 				{
-					id: repeat.repeatId,
-					parentHostNodeId: repeat.parentHostNodeId,
-					...(repeat.ownerHostNodeId ? { ownerHostNodeId: repeat.ownerHostNodeId } : {}),
-					...(repeat.rowHostNodeId ? { rowHostNodeId: repeat.rowHostNodeId } : {}),
-					collectionGraphNodeId: repeat.collectionGraphNodeId,
-					collectionPath: repeat.collectionPath,
-					keyPath: repeat.keyPath,
-					...(rowElementHandles.length > 0 ? { rowElementHandles } : {}),
-					...(rowBehaviors.length > 0 ? { rowBehaviors } : {}),
+					hostNodeId: binding.hostNodeId,
+					handleId: graphBinding.id,
+					name: graphBinding.name,
+					...(graphBinding.plural ? { plural: true as const } : {}),
 				},
 			];
-		},
-	);
+		});
+		const rowBehaviors = behaviors.filter((behavior) =>
+			behavior.keyedRepeatScopeIds?.includes(repeat.repeatId),
+		);
+
+		return [
+			{
+				id: repeat.repeatId,
+				parentHostNodeId: repeat.parentHostNodeId,
+				...(repeat.ownerHostNodeId ? { ownerHostNodeId: repeat.ownerHostNodeId } : {}),
+				...(repeat.rowHostNodeId ? { rowHostNodeId: repeat.rowHostNodeId } : {}),
+				collectionGraphNodeId: repeat.collectionGraphNodeId,
+				collectionPath: repeat.collectionPath,
+				keyPath: repeat.keyPath,
+				...(rowElementHandles.length > 0 ? { rowElementHandles } : {}),
+				...(rowBehaviors.length > 0 ? { rowBehaviors } : {}),
+			},
+		];
+	});
 	const viewDomUpdates = input.semanticGraph.templateReads.flatMap((read) => {
 		// A read authored directly in a branch arm has no host of its own: bound
 		// to the enclosing element it would erase the sibling arm's markers, so
@@ -249,10 +248,13 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 			...renderData.boundaries,
 		]
 			.sort((left, right) => left.anchorOrder - right.anchorOrder)
-			.map((record, rank) => [
-				'branchSiteId' in record ? record.branchSiteId : record.boundaryId,
-				rank,
-			] as const),
+			.map(
+				(record, rank) =>
+					[
+						'branchSiteId' in record ? record.branchSiteId : record.boundaryId,
+						rank,
+					] as const,
+			),
 	);
 	// D3: content inside a boundary arm lives in the boundary's own coordinate
 	// space. Each arm's locators index from 0 = first element after the start

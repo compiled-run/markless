@@ -249,13 +249,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		exportName: scopedSymbolExportName(input.filename, module.exportName),
 	}));
 	const linkedBoundarySymbols = linkedRenderDataBoundarySymbols(
-		linkedSymbolInput(
-			compiled,
-			input,
-			renderDataId,
-			resolverId,
-			input.environment === 'client',
-		),
+		linkedSymbolInput(compiled, input, renderDataId, resolverId, input.environment === 'client'),
 	);
 	const symbolRows = [
 		...compilerSymbolRows,
@@ -584,8 +578,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					debug: input.inlineResumerDebug === true,
 					executionLog: input.executionLog ?? 'never',
 				});
-	// A dev page links its own scoped styles and its linked children's, so the
-	// server-rendered HTML is styled before any island's JS arrives.
+	// Dev links the children's scoped styles too, so the SSR HTML is styled before any island's JS.
 	const styleModuleIds = [
 		...new Set([...(styleId ? [styleId] : []), ...(input.linkedStyleModuleIds ?? [])]),
 	];

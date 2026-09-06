@@ -584,8 +584,7 @@ function renderStorageSeeds(components: ReadonlyArray<MdxComponent>): string {
 		: `[${localNames.map((localName) => `...(${localName}.storageSeeds ?? [])`).join(', ')}]`;
 }
 
-// An island's artifact carries the head tags its dev render needs (its scoped
-// stylesheets); the page lists each once so the document is styled on load.
+// An island's artifact carries the head tags its dev render needs; the page lists each once.
 function renderHeadInjections(components: ReadonlyArray<MdxComponent>): string {
 	const localNames = [...new Set(components.map((component) => component.localName))];
 	return localNames.length === 0

@@ -6,6 +6,7 @@ import {
 	planEmittedClaimOwnership,
 	planRenderDataModule,
 } from '@markless/compiler';
+import type { LinkedModuleChildResolution } from '@markless/compiler';
 import type { createMarklessDevGraph } from './dev.ts';
 import { createBuildDelegateLoader } from './build/delegate-loader.ts';
 import { createDelegateModuleCache } from './link-driver.ts';
@@ -50,6 +51,8 @@ export type LinkedTransformCacheEntry = {
 	readonly input: TransformTsrxModuleInput;
 	readonly result: TransformTsrxModuleResult;
 	readonly linkedChildHasBrowserTriggers: boolean;
+	readonly resolvedChildren: ReadonlyArray<LinkedModuleChildResolution>;
+	readonly linkedStyleModuleIds: ReadonlyArray<string>;
 };
 
 export type MarklessPluginState = ReturnType<typeof createPluginState>;

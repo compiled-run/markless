@@ -288,7 +288,10 @@ test('storage declared inside a component body is the same persisted cell', asyn
 	});
 	expect(result.semanticGraph.diagnostics).toEqual([]);
 	expect(result.publicRenderPlan.diagnostics).toEqual([]);
-	for (const emitted of [result.publicRenderModule.moduleSource, result.publicRenderModule.ssrModuleSource])
+	for (const emitted of [
+		result.publicRenderModule.moduleSource,
+		result.publicRenderModule.ssrModuleSource,
+	])
 		expect(emitted).not.toContain('storage(');
 	expect(result.protocolView.domUpdates).toEqual([
 		expect.objectContaining({
@@ -303,6 +306,44 @@ test('storage declared inside a component body is the same persisted cell', asyn
 	expect(result.protocolState).toMatchObject({
 		storage: [{ graphNodeId: 'storage:src/settings.tsrx#theme-mode', key: 'theme-mode' }],
 	});
+});
+
+const siblingStorageSource = `
+import { storage } from '@markless/core';
+
+export function First() @{
+	let theme = storage('key-a', 'light');
+
+	<p>{theme}</p>
+}
+
+export function Second() @{
+	let theme = storage('key-b', 'dark');
+
+	<p>{theme}</p>
+}
+`;
+
+test('sibling components keep their own in-body storage under one local name', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/pair.tsrx',
+		source: siblingStorageSource,
+		symbols: [],
+	});
+	expect(result.semanticGraph.diagnostics).toEqual([]);
+	expect(
+		result.semanticGraph.graphBindings.map((binding) => [binding.id, binding.componentName]),
+	).toEqual([
+		['storage:src/pair.tsrx#key-a', 'First'],
+		['storage:src/pair.tsrx#key-b', 'Second'],
+	]);
+	expect(result.protocolView.domUpdates.map((update) => update.graphNodeId)).toEqual(
+		expect.arrayContaining(['storage:src/pair.tsrx#key-a', 'storage:src/pair.tsrx#key-b']),
+	);
+	expect(result.payloadArena.state.storage).toEqual([
+		{ graphNodeId: 'storage:src/pair.tsrx#key-a', key: 'key-a' },
+		{ graphNodeId: 'storage:src/pair.tsrx#key-b', key: 'key-b' },
+	]);
 });
 
 test('payload arena drops declared storage that no component reads or writes', async () => {

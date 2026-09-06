@@ -170,7 +170,7 @@ async function runFirstPassTransform(
 }> {
 	const { ctx, pluginContext, code, source, currentEnvironment, plan, transformInput } = request;
 	const { internalOptions } = ctx;
-	const { moduleMetadata, moduleLinkArtifacts, linkedTransformCache } = ctx.state;
+	const { moduleMetadata, moduleLinkArtifacts, linkedTransformCache, styleClosures } = ctx.state;
 	const { cacheKey, manifestSource } = plan;
 	const cached = linkedTransformCache.get(cacheKey);
 	let linkedTransformResult: TransformTsrxModuleResult | undefined;
@@ -185,7 +185,7 @@ async function runFirstPassTransform(
 		);
 		await forceImportedModules(
 			pluginContext,
-			cachedImports,
+			mergeLinkedModuleChildren(cachedImports, cached.resolvedChildren),
 			moduleLinkArtifacts,
 			moduleMetadata,
 			internalOptions,
@@ -196,9 +196,19 @@ async function runFirstPassTransform(
 			moduleLinkArtifacts,
 			linkedInterfaceClaims(cachedImports, moduleMetadata),
 		);
+		// A child's <style> comes and goes without touching its interface hash, so the closure is compared too.
+		const childStyleModuleIds = [
+			...new Set(
+				cached.resolvedChildren.flatMap((child) => [
+					...(styleClosures.get(child.source) ?? []),
+				]),
+			),
+		].toSorted();
 		if (
 			cached.importedInterfaceHashes === cachedLink.signature &&
-			cached.importedSymbolClaims === cachedLink.claimSignature
+			cached.importedSymbolClaims === cachedLink.claimSignature &&
+			childStyleModuleIds.join('\n') ===
+				[...cached.linkedStyleModuleIds].toSorted().join('\n')
 		) {
 			linkedTransformResult = cached.result;
 			linkedTransformInput = cached.input;

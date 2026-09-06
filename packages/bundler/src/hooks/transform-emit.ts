@@ -144,6 +144,8 @@ export function recordLinkedTransform(
 		input: linkedTransformInput,
 		result: transformed,
 		linkedChildHasBrowserTriggers,
+		resolvedChildren,
+		linkedStyleModuleIds: linkedTransformInput.linkedStyleModuleIds ?? [],
 	});
 }
 
