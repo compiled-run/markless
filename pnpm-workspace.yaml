@@ -4,7 +4,7 @@ packages:
   - packages/headless/*
   - apps/*
   - demos/*
-  - docs
+  - website
   # @tsrx/yuku is consumed through its generated self-contained host.
 
 catalogs:

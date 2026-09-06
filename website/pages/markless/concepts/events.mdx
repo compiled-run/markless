@@ -135,7 +135,11 @@ export default function Signup() @{
 }
 ```
 
-<Callout sprite="cross" title="Wait, why does the compiler care about preventDefault?" text="Because handlers arrive late on purpose. Your handler code is loaded only when the event actually fires, which is what keeps the first load small, and the browser will not wait for a download before deciding whether to navigate. So when the compiler sees event.preventDefault() or event.stopPropagation() in a handler, it lifts the smallest equivalent decision out of the handler and ships it with the page, ready to run the instant the event fires. That lifted decision may read already-resumed state, constants, props and simple event fields, and nothing else. If your condition cannot be worked out from those, compilation fails with a diagnostic instead of shipping a preventDefault that would arrive too late to matter. Your state writes stay in the handler, where they belong." />
+<Callout
+	sprite="cross"
+	title="Wait, why does the compiler care about preventDefault?"
+	text="Because handlers arrive late on purpose. Your handler code is loaded only when the event actually fires, which is what keeps the first load small, and the browser will not wait for a download before deciding whether to navigate. So when the compiler sees event.preventDefault() or event.stopPropagation() in a handler, it lifts the smallest equivalent decision out of the handler and ships it with the page, ready to run the instant the event fires. That lifted decision may read already-resumed state, constants, props and simple event fields, and nothing else. If your condition cannot be worked out from those, compilation fails with a diagnostic instead of shipping a preventDefault that would arrive too late to matter. Your state writes stay in the handler, where they belong."
+/>
 
 The specification puts the rule this way: only browser-critical cancellation and propagation is
 allowed to run synchronously, and if the condition cannot be proven, compilation fails "rather than
@@ -148,7 +152,11 @@ Read `event.target` rather than `event.currentTarget` if your handler does its w
 that resumes later can find it empty. Everything on this page runs straight through, so
 `currentTarget` is the right one and is what the examples use.
 
-<Collapsible sprite="star-badge" summary="Coming from another framework?" text="There is no synthetic event system, so there is no pooled event object, no wrapper class, and no separate documentation to learn. The event you receive is the one the browser dispatched. There is also no attribute in the shipped HTML pointing at your handler: the compiler records the node, the event name and the handler it needs, and the runtime wires that up at the container, so the handler chunk is fetched the first time it is genuinely needed." />
+<Collapsible
+	sprite="star-badge"
+	summary="Coming from another framework?"
+	text="There is no synthetic event system, so there is no pooled event object, no wrapper class, and no separate documentation to learn. The event you receive is the one the browser dispatched. There is also no attribute in the shipped HTML pointing at your handler: the compiler records the node, the event name and the handler it needs, and the runtime wires that up at the container, so the handler chunk is fetched the first time it is genuinely needed."
+/>
 
 ## Try it yourself
 

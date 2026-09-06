@@ -1,6 +1,6 @@
 {
 	"$schema": "https://openapi.vercel.sh/vercel.json",
 	"framework": "nitro",
-	"installCommand": "npm ci",
-	"buildCommand": "NITRO_PRESET=vercel npm run build"
+	"installCommand": "cd .. && pnpm install --frozen-lockfile",
+	"buildCommand": "NITRO_PRESET=vercel pnpm run build"
 }

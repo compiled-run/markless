@@ -79,10 +79,10 @@ The tip is the description, so the button still needs a name of its own. Write
 The pointer handlers sit on the root, which wraps both parts, so moving from the
 trigger onto the tip never counts as leaving.
 
-| Key | What it does |
-| --- | --- |
-| Tab | Focusing the trigger shows the tip at once, with no wait. Leaving it hides the tip. |
-| Escape | Hides the tip. Nothing moves focus, because the tip never held it. |
+| Key    | What it does                                                                        |
+| ------ | ----------------------------------------------------------------------------------- |
+| Tab    | Focusing the trigger shows the tip at once, with no wait. Leaving it hides the tip. |
+| Escape | Hides the tip. Nothing moves focus, because the tip never held it.                  |
 
 ## API
 
@@ -90,22 +90,22 @@ Every prop is optional, and the types below are the family's own.
 
 ### `tooltip.root`
 
-| Prop | Type | What it does |
-| --- | --- | --- |
-| `open` | `boolean` | Whether the tooltip is showing. Omit it and it starts hidden. |
-| `delay` | `number` | How long the pointer must rest on the trigger before the tip shows, in milliseconds. Omit it and it is 600. Focus shows it at once. |
-| `onChange` | `(open: boolean) => void` | Called with the new value when the tip shows or hides, including when Escape or a press elsewhere hides it. |
+| Prop       | Type                      | What it does                                                                                                                        |
+| ---------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `open`     | `boolean`                 | Whether the tooltip is showing. Omit it and it starts hidden.                                                                       |
+| `delay`    | `number`                  | How long the pointer must rest on the trigger before the tip shows, in milliseconds. Omit it and it is 600. Focus shows it at once. |
+| `onChange` | `(open: boolean) => void` | Called with the new value when the tip shows or hides, including when Escape or a press elsewhere hides it.                         |
 
-| Attribute | Present when | What to key styling off |
-| --- | --- | --- |
-| `ui-open` | The tip is showing | The shown look. |
-| `ui-closed` | The tip is not showing | The resting look. |
+| Attribute   | Present when           | What to key styling off |
+| ----------- | ---------------------- | ----------------------- |
+| `ui-open`   | The tip is showing     | The shown look.         |
+| `ui-closed` | The tip is not showing | The resting look.       |
 
 Everything a `<div>` accepts reaches the element too, apart from `onChange`, which is
 the family's. Your own `onPointerover` and `onPointerout` run after the family's.
 
-| Selector | Default | Why |
-| --- | --- | --- |
+| Selector             | Default                      | Why                                                                                                       |
+| -------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------- |
 | `div:not([overlay])` | `anchor-scope: --ui-tooltip` | Keeps the anchor name inside this tooltip, so two tooltips on a page never point at each other's trigger. |
 
 ### `tooltip.trigger`
@@ -113,14 +113,14 @@ the family's. Your own `onPointerover` and `onPointerout` run after the family's
 No props of its own. It renders a `<button>`, and everything a `<button>` accepts
 reaches the element. Your own `onFocus` and `onBlur` run after the family's.
 
-| Attribute | Present when | What to key styling off |
-| --- | --- | --- |
-| `aria-describedby` | Always | The id of the tip, showing or not, so Tab conveys it either way. |
-| `ui-open` | The tip is showing | The described look. |
-| `ui-closed` | The tip is not showing | The resting look. |
+| Attribute          | Present when           | What to key styling off                                          |
+| ------------------ | ---------------------- | ---------------------------------------------------------------- |
+| `aria-describedby` | Always                 | The id of the tip, showing or not, so Tab conveys it either way. |
+| `ui-open`          | The tip is showing     | The described look.                                              |
+| `ui-closed`        | The tip is not showing | The resting look.                                                |
 
-| Selector | Default | Why |
-| --- | --- | --- |
+| Selector | Default                     | Why                                                  |
+| -------- | --------------------------- | ---------------------------------------------------- |
 | `button` | `anchor-name: --ui-tooltip` | The trigger is the anchor the tip is placed against. |
 
 ### `tooltip.content`
@@ -128,14 +128,14 @@ reaches the element. Your own `onFocus` and `onBlur` run after the family's.
 No props of its own. It renders a `<div>`, and everything a `<div>` accepts reaches the
 element. Your own `onDismiss` runs after the family has hidden the tip.
 
-| Attribute | Present when | What to key styling off |
-| --- | --- | --- |
-| `overlay` | Always | The mark that elevates the tip. Not a styling hook. |
-| `role` | Always | `tooltip`. |
-| `hidden` | The tip is not showing | What hides it. The tip is never detached, so the trigger's `aria-describedby` keeps working. |
-| `ui-open` | The tip is showing | The shown look. |
-| `ui-closed` | The tip is not showing | The hidden look. |
+| Attribute   | Present when           | What to key styling off                                                                      |
+| ----------- | ---------------------- | -------------------------------------------------------------------------------------------- |
+| `overlay`   | Always                 | The mark that elevates the tip. Not a styling hook.                                          |
+| `role`      | Always                 | `tooltip`.                                                                                   |
+| `hidden`    | The tip is not showing | What hides it. The tip is never detached, so the trigger's `aria-describedby` keeps working. |
+| `ui-open`   | The tip is showing     | The shown look.                                                                              |
+| `ui-closed` | The tip is not showing | The hidden look.                                                                             |
 
-| Selector | Default | Why |
-| --- | --- | --- |
+| Selector    | Default                                                                                                    | Why                                                                                                                 |
+| ----------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | `[overlay]` | `--ui-anchor: --ui-tooltip; position: absolute; position-anchor: --ui-tooltip; position-area: block-start` | Places the tip above the trigger with no script, and hands you the anchor name for `anchor()` geometry of your own. |

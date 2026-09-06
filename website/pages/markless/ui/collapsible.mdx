@@ -38,11 +38,11 @@ It writes `ui-open`, `ui-closed` and `ui-disabled`.
 
 ## Props on `collapsible.root`
 
-| Prop | Type | What it does |
-| --- | --- | --- |
-| `open` | `boolean` | Whether the panel is showing. Omit it and it starts closed. |
-| `disabled` | `boolean` | Nothing opens or closes. |
-| `disableUntilFound` | `boolean` | The closed panel is hidden outright, so find-in-page cannot reach the text inside it. |
-| `onChange` | `(open) => void` | Called with the new value when a person opens or closes the panel. |
+| Prop                | Type             | What it does                                                                          |
+| ------------------- | ---------------- | ------------------------------------------------------------------------------------- |
+| `open`              | `boolean`        | Whether the panel is showing. Omit it and it starts closed.                           |
+| `disabled`          | `boolean`        | Nothing opens or closes.                                                              |
+| `disableUntilFound` | `boolean`        | The closed panel is hidden outright, so find-in-page cannot reach the text inside it. |
+| `onChange`          | `(open) => void` | Called with the new value when a person opens or closes the panel.                    |
 
 Everything a `<div>` accepts reaches the element too.

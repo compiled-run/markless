@@ -272,7 +272,13 @@ export default defineConfig({
 		// No lint.options.typeCheck: tsgolint disagrees with the tsc gate of
 		// record (1253 vs 0) because it applies strict-family defaults and lints
 		// outside this tsconfig's include/exclude. Raw tsc is the type gate.
-		ignorePatterns: ['dist/**', 'node_modules/**', '.claude/**'],
+		ignorePatterns: [
+			'dist/**',
+			'node_modules/**',
+			'.claude/**',
+			'website/public/**',
+			'website/components/docs/playground/generated/**',
+		],
 		rules: {
 			'no-restricted-imports': [
 				'error',
@@ -303,6 +309,12 @@ export default defineConfig({
 		printWidth: 100,
 		endOfLine: 'lf',
 		singleQuote: true,
-		ignorePatterns: ['dist/**', 'node_modules/**', '.claude/**'],
+		ignorePatterns: [
+			'dist/**',
+			'node_modules/**',
+			'.claude/**',
+			'website/public/**',
+			'website/components/docs/playground/generated/**',
+		],
 	},
 });

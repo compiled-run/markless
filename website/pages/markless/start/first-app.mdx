@@ -31,9 +31,9 @@ written against `0.3.2`. Then it asks four things before it writes a single file
 ## Four questions
 
 **What are you building today?** Four starting points, each one a real project rather than an empty
-folder. *Learn Markless* is a small TSRX counter app, and it is the best first one. *Build an app*
-is a routed app with a `document.tsrx` shell plus 404 and 500 pages. *Write docs* is an MDX docs
-site with a layout and sidebar components. *Full-stack app* is the routed app plus `api/` and
+folder. _Learn Markless_ is a small TSRX counter app, and it is the best first one. _Build an app_
+is a routed app with a `document.tsrx` shell plus 404 and 500 pages. _Write docs_ is an MDX docs
+site with a layout and sidebar components. _Full-stack app_ is the routed app plus `api/` and
 `middleware/` files.
 
 **What should we call it?** The folder name, which is also the package name.
@@ -45,7 +45,11 @@ site with a layout and sidebar components. *Full-stack app* is the routed app pl
 Then it shows a `Ready to create?` summary and waits. Nothing is on disk yet, so reading that
 summary and cancelling costs you nothing.
 
-<Callout sprite="cross" title="Read this before you run npm install" text="A clean install of a new app fails today, and it is not your project's fault. @markless/compiler asks for @tsrx/core ^0.1.58, which resolves to 0.1.60, which depends on @tsrx/runtime 0.1.1, and that package is not on npm. The install stops with: npm error 404 Not Found - GET https://registry.npmjs.org/@tsrx%2fruntime. The fix is one pin in your package.json, and the site you are reading ships with exactly that pin. Add the overrides block below, delete node_modules and package-lock.json if the failed install left them behind, and run npm install again." />
+<Callout
+	sprite="cross"
+	title="Read this before you run npm install"
+	text="A clean install of a new app fails today, and it is not your project's fault. @markless/compiler asks for @tsrx/core ^0.1.58, which resolves to 0.1.60, which depends on @tsrx/runtime 0.1.1, and that package is not on npm. The install stops with: npm error 404 Not Found - GET https://registry.npmjs.org/@tsrx%2fruntime. The fix is one pin in your package.json, and the site you are reading ships with exactly that pin. Add the overrides block below, delete node_modules and package-lock.json if the failed install left them behind, and run npm install again."
+/>
 
 ```json
 {
@@ -117,7 +121,11 @@ packages are present and that their versions match each other, which matters bec
 versions mean the compiler and the runtime disagree about the format they pass between them. Run it
 before you start reading your own code.
 
-<Collapsible sprite="star-badge" summary="Runtimes, and scaffolding inside an existing repo" text="Where should it run? decides the shape of the project rather than the code you write. Node gives you a package.json project for npm, pnpm or yarn. Deno gives you a deno.json project with npm: imports. Bun gives you a package.json tuned for Bun. The pages you write are identical in all three. If you are scaffolding into a repository that already has a workspace, pass --workspace or --no-workspace to say whether the new app should join it; without --workspace, no file outside the new directory is ever written. The other flags are --yes, --starter, --format, --no-install and --no-git, which is how you script the whole thing with no prompts at all." />
+<Collapsible
+	sprite="star-badge"
+	summary="Runtimes, and scaffolding inside an existing repo"
+	text="Where should it run? decides the shape of the project rather than the code you write. Node gives you a package.json project for npm, pnpm or yarn. Deno gives you a deno.json project with npm: imports. Bun gives you a package.json tuned for Bun. The pages you write are identical in all three. If you are scaffolding into a repository that already has a workspace, pass --workspace or --no-workspace to say whether the new app should join it; without --workspace, no file outside the new directory is ever written. The other flags are --yes, --starter, --format, --no-install and --no-git, which is how you script the whole thing with no prompts at all."
+/>
 
 ## When it is running
 

@@ -92,12 +92,12 @@ The surface itself takes focus as the drawer opens, which is what puts these arr
 in reach. They act only while the surface holds focus, so your own controls inside the
 drawer keep their arrows.
 
-| Key | What it does |
-| --- | --- |
-| Escape | Closes the drawer and hands focus back to whatever opened it. |
-| Down or Up arrow | On a vertical drawer, steps one rest position further open or further closed. |
-| Right or Left arrow | The same on a horizontal drawer. |
-| Enter or Space | Presses the focused trigger or close button, which are native buttons. |
+| Key                 | What it does                                                                  |
+| ------------------- | ----------------------------------------------------------------------------- |
+| Escape              | Closes the drawer and hands focus back to whatever opened it.                 |
+| Down or Up arrow    | On a vertical drawer, steps one rest position further open or further closed. |
+| Right or Left arrow | The same on a horizontal drawer.                                              |
+| Enter or Space      | Presses the focused trigger or close button, which are native buttons.        |
 
 ## API
 
@@ -105,26 +105,26 @@ Every prop is optional, and the types below are the family's own.
 
 ### `drawer.root`
 
-| Prop | Type | What it does |
-| --- | --- | --- |
-| `open` | `boolean` | Whether the drawer is showing. Omit it and the drawer starts closed. |
-| `modal` | `boolean` | The page behind cannot be reached, read or scrolled while the drawer shows. On by default. |
-| `orientation` | `'horizontal' \| 'vertical'` | The axis the drawer travels on. `vertical` is the bottom sheet and the default; `horizontal` is the side panel. |
-| `start` | `boolean` | Anchor the drawer at the start edge of its axis rather than the end edge. Logical, so it follows the page's direction. |
-| `snapPoints` | `readonly number[]` | The rest positions the drawer settles at, as fractions of its own size. A value above 1 is read as pixels. Defaults to `[1]`. Order does not matter. |
-| `snapPoint` | `number` | The rest position it is at now. Passing this makes the snap point controlled: a gesture reports through `onSnapPointChange` and nothing moves until the new value comes back in. |
-| `defaultSnapPoint` | `number` | The rest position an uncontrolled drawer starts at. Defaults to the largest. |
-| `closeThreshold` | `number` | How far past its lowest rest position the drawer must be pulled before letting go closes it, as a fraction of that position. Defaults to 0.25. |
-| `onChange` | `(open: boolean) => void` | Called with the new value when the drawer opens or closes, including when a dismissal or a swipe closes it. |
-| `onSnapPointChange` | `(snapPoint: number) => void` | Called with the authored snap point value once a gesture or a key settles on it. |
+| Prop                | Type                          | What it does                                                                                                                                                                     |
+| ------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `open`              | `boolean`                     | Whether the drawer is showing. Omit it and the drawer starts closed.                                                                                                             |
+| `modal`             | `boolean`                     | The page behind cannot be reached, read or scrolled while the drawer shows. On by default.                                                                                       |
+| `orientation`       | `'horizontal' \| 'vertical'`  | The axis the drawer travels on. `vertical` is the bottom sheet and the default; `horizontal` is the side panel.                                                                  |
+| `start`             | `boolean`                     | Anchor the drawer at the start edge of its axis rather than the end edge. Logical, so it follows the page's direction.                                                           |
+| `snapPoints`        | `readonly number[]`           | The rest positions the drawer settles at, as fractions of its own size. A value above 1 is read as pixels. Defaults to `[1]`. Order does not matter.                             |
+| `snapPoint`         | `number`                      | The rest position it is at now. Passing this makes the snap point controlled: a gesture reports through `onSnapPointChange` and nothing moves until the new value comes back in. |
+| `defaultSnapPoint`  | `number`                      | The rest position an uncontrolled drawer starts at. Defaults to the largest.                                                                                                     |
+| `closeThreshold`    | `number`                      | How far past its lowest rest position the drawer must be pulled before letting go closes it, as a fraction of that position. Defaults to 0.25.                                   |
+| `onChange`          | `(open: boolean) => void`     | Called with the new value when the drawer opens or closes, including when a dismissal or a swipe closes it.                                                                      |
+| `onSnapPointChange` | `(snapPoint: number) => void` | Called with the authored snap point value once a gesture or a key settles on it.                                                                                                 |
 
-| Attribute | Present when | What to key styling off |
-| --- | --- | --- |
-| `ui-open` | The drawer is showing | The open look. |
-| `ui-closed` | The drawer is not showing | The closed look. |
-| `ui-orientation` | Always | `vertical` or `horizontal`, the axis the drawer travels on. |
-| `ui-start` | `start` is set | The drawer is anchored at the start edge. |
-| `ui-dragging` | A swipe is in flight | Turn your own transition off while a finger is moving the surface. |
+| Attribute        | Present when              | What to key styling off                                            |
+| ---------------- | ------------------------- | ------------------------------------------------------------------ |
+| `ui-open`        | The drawer is showing     | The open look.                                                     |
+| `ui-closed`      | The drawer is not showing | The closed look.                                                   |
+| `ui-orientation` | Always                    | `vertical` or `horizontal`, the axis the drawer travels on.        |
+| `ui-start`       | `start` is set            | The drawer is anchored at the start edge.                          |
+| `ui-dragging`    | A swipe is in flight      | Turn your own transition off while a finger is moving the surface. |
 
 Everything a `<div>` accepts reaches the element too, apart from `onChange`, which is
 the family's.
@@ -134,11 +134,11 @@ the family's.
 No props of its own. It renders a `<button>`, and everything a `<button>` accepts
 reaches the element. Your own `onClick` runs after the drawer has opened.
 
-| Attribute | Present when | What to key styling off |
-| --- | --- | --- |
-| `aria-haspopup` | Always | `dialog`, for a screen reader rather than your stylesheet. |
-| `ui-open` | The drawer is showing | The pressed look. |
-| `ui-closed` | The drawer is not showing | The resting look. |
+| Attribute       | Present when              | What to key styling off                                    |
+| --------------- | ------------------------- | ---------------------------------------------------------- |
+| `aria-haspopup` | Always                    | `dialog`, for a screen reader rather than your stylesheet. |
+| `ui-open`       | The drawer is showing     | The pressed look.                                          |
+| `ui-closed`     | The drawer is not showing | The resting look.                                          |
 
 ### `drawer.backdrop`
 
@@ -146,18 +146,18 @@ No props of its own. It renders a `<div>` wrapping `drawer.content`, and everyth
 `<div>` accepts reaches it. Your own `onDismiss` runs after the family has applied its
 own policy.
 
-| Attribute | Present when | What to key styling off |
-| --- | --- | --- |
-| `overlay` | Always | The mark that elevates this layer. Not a styling hook. |
-| `hidden` | The drawer is closed | What takes the whole layer out of the page's reach. |
-| `ui-backdrop` | Always | The dim itself. |
-| `ui-open` | The drawer is showing | Fade the dim in. |
-| `ui-closed` | The drawer is not showing | The dim at rest. |
-| `ui-orientation` | Always | `vertical` or `horizontal`. |
-| `ui-start` | `start` is set | The drawer is anchored at the start edge. |
+| Attribute        | Present when              | What to key styling off                                |
+| ---------------- | ------------------------- | ------------------------------------------------------ |
+| `overlay`        | Always                    | The mark that elevates this layer. Not a styling hook. |
+| `hidden`         | The drawer is closed      | What takes the whole layer out of the page's reach.    |
+| `ui-backdrop`    | Always                    | The dim itself.                                        |
+| `ui-open`        | The drawer is showing     | Fade the dim in.                                       |
+| `ui-closed`      | The drawer is not showing | The dim at rest.                                       |
+| `ui-orientation` | Always                    | `vertical` or `horizontal`.                            |
+| `ui-start`       | `start` is set            | The drawer is anchored at the start edge.              |
 
-| Selector | Default | Why |
-| --- | --- | --- |
+| Selector        | Default                     | Why                                                                                       |
+| --------------- | --------------------------- | ----------------------------------------------------------------------------------------- |
 | `[ui-backdrop]` | `position: fixed; inset: 0` | The layer has to cover the page, because it is what a press outside the surface lands on. |
 
 ### `drawer.content`
@@ -166,26 +166,26 @@ No props of its own. It renders a `<div>`, and everything a `<div>` accepts reac
 apart from `style`, which the family owns to carry `--offset`. Style the surface from
 a stylesheet or from an element inside it.
 
-| Attribute | Present when | What to key styling off |
-| --- | --- | --- |
-| `role` | Always | `dialog`. |
-| `aria-modal` | `modal` is set | `true`, for a screen reader rather than your stylesheet. |
-| `aria-labelledby` | Always | The id of the `drawer.title` naming this surface. |
-| `aria-describedby` | Always | The id of the `drawer.description`. |
-| `tabindex` | Always | `-1`, so the surface can hold focus without being a tab stop. |
-| `style` | Always | Carries `--offset`, the fraction of the drawer's own size it is displaced by right now. |
-| `ui-content` | Always | The surface. |
-| `ui-open` | The drawer is showing | The open look. |
-| `ui-closed` | The drawer is not showing | The closed look. |
-| `ui-orientation` | Always | `vertical` or `horizontal`. |
-| `ui-start` | `start` is set | The drawer is anchored at the start edge. |
-| `ui-dragging` | A swipe is in flight | Turn your own transition off while a finger is moving the surface. |
+| Attribute          | Present when              | What to key styling off                                                                 |
+| ------------------ | ------------------------- | --------------------------------------------------------------------------------------- |
+| `role`             | Always                    | `dialog`.                                                                               |
+| `aria-modal`       | `modal` is set            | `true`, for a screen reader rather than your stylesheet.                                |
+| `aria-labelledby`  | Always                    | The id of the `drawer.title` naming this surface.                                       |
+| `aria-describedby` | Always                    | The id of the `drawer.description`.                                                     |
+| `tabindex`         | Always                    | `-1`, so the surface can hold focus without being a tab stop.                           |
+| `style`            | Always                    | Carries `--offset`, the fraction of the drawer's own size it is displaced by right now. |
+| `ui-content`       | Always                    | The surface.                                                                            |
+| `ui-open`          | The drawer is showing     | The open look.                                                                          |
+| `ui-closed`        | The drawer is not showing | The closed look.                                                                        |
+| `ui-orientation`   | Always                    | `vertical` or `horizontal`.                                                             |
+| `ui-start`         | `start` is set            | The drawer is anchored at the start edge.                                               |
+| `ui-dragging`      | A swipe is in flight      | Turn your own transition off while a finger is moving the surface.                      |
 
-| Selector | Default | Why |
-| --- | --- | --- |
-| `[ui-content]` | `position: fixed`, pinned to the end edge of its axis, displaced by `translate: calc(var(--offset, 0) * 100%)` | Where the surface sits, and how far along its axis it currently is. |
-| `[ui-content][ui-start]`, `[ui-content][ui-orientation=horizontal]` | The same, pinned to the other edge or run along the inline axis | `start` and `orientation` pick the edge, and a right-to-left page flips the inline case. |
-| `[ui-content]` | `touch-action: none; overscroll-behavior: contain` | The browser must not claim the pan before the family sees it, and a swipe that runs out of drawer must not drag the page behind. |
+| Selector                                                            | Default                                                                                                        | Why                                                                                                                              |
+| ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `[ui-content]`                                                      | `position: fixed`, pinned to the end edge of its axis, displaced by `translate: calc(var(--offset, 0) * 100%)` | Where the surface sits, and how far along its axis it currently is.                                                              |
+| `[ui-content][ui-start]`, `[ui-content][ui-orientation=horizontal]` | The same, pinned to the other edge or run along the inline axis                                                | `start` and `orientation` pick the edge, and a right-to-left page flips the inline case.                                         |
+| `[ui-content]`                                                      | `touch-action: none; overscroll-behavior: contain`                                                             | The browser must not claim the pan before the family sees it, and a swipe that runs out of drawer must not drag the page behind. |
 
 ### `drawer.title`
 

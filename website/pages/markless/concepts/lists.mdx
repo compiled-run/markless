@@ -25,7 +25,12 @@ row moves with it.**
 
 ## Tick the middle row, then sort
 
-<Callout sticker="map" sprite="cross" title="Why the rows on this page are a file rather than a box" text="The rows below are meant to be a box you can tick and sort. They are not on the page yet, because a component using @for does not compile on the framework build this site is pinned to: the compiler stops making progress and the build never finishes. The file below is real and is what you will run in your own project, and the page comes back with its widget the day the build accepts it. NOTES.md finding 23 in the site repository has the reproduction." />
+<Callout
+	sticker="map"
+	sprite="cross"
+	title="Why the rows on this page are a file rather than a box"
+	text="The rows below are meant to be a box you can tick and sort. They are not on the page yet, because a component using @for does not compile on the framework build this site is pinned to: the compiler stops making progress and the build never finishes. The file below is real and is what you will run in your own project, and the page comes back with its widget the day the build accepts it. NOTES.md finding 23 in the site repository has the reproduction."
+/>
 
 Three rows, one checkbox each, and a button that sorts them alphabetically. Put the file below in
 your own project, tick the middle row, Pears, then press Sort, and watch where the word "picked"
@@ -111,7 +116,11 @@ export default function ProductGrid({ products }: { readonly products: readonly 
 That reads "state follows the slot, not the item", which is right for a fixed set of positions and
 wrong for a list that reorders.
 
-<Callout sprite="cross" title="What if I just leave the key off?" text="An unkeyed loop is positional, which is fine for output that never changes and holds nothing: a list of static labels, say. The moment a row holds state or handles events, the compiler asks for a key and points at the @for header. The three diagnostics are MARKLESS_REPEAT_KEY_REQUIRED when there is no key on a stateful loop, MARKLESS_REPEAT_KEY_IS_INDEX when the key is the index and the list can reorder, and MARKLESS_REPEAT_KEY_UNSTABLE when the key is something that can change under you. You find out at build time, not from a support ticket." />
+<Callout
+	sprite="cross"
+	title="What if I just leave the key off?"
+	text="An unkeyed loop is positional, which is fine for output that never changes and holds nothing: a list of static labels, say. The moment a row holds state or handles events, the compiler asks for a key and points at the @for header. The three diagnostics are MARKLESS_REPEAT_KEY_REQUIRED when there is no key on a stateful loop, MARKLESS_REPEAT_KEY_IS_INDEX when the key is the index and the list can reorder, and MARKLESS_REPEAT_KEY_UNSTABLE when the key is something that can change under you. You find out at build time, not from a support ticket."
+/>
 
 ## An empty list gets its own branch
 
@@ -146,7 +155,11 @@ order.
 That is the same promise as the previous pages, kept at a different scale. Changing a number touched
 one piece of text. Sorting a list touched the order of some rows. Neither one re-ran your code.
 
-<Collapsible sprite="star-badge" summary="Coming from another framework?" text="If you have written keys before, you have probably been told they are a performance hint, and that using the index is a small sin you can get away with in a static list. The framing here is different and stricter. A key is the identity root for the row's own graph scope, which is to say it is what makes local state inside a row possible in the first place. That is also why the compiler refuses to guess: an interactive loop without a stable key is a build error rather than a warning in a console you may never open." />
+<Collapsible
+	sprite="star-badge"
+	summary="Coming from another framework?"
+	text="If you have written keys before, you have probably been told they are a performance hint, and that using the index is a small sin you can get away with in a static list. The framing here is different and stricter. A key is the identity root for the row's own graph scope, which is to say it is what makes local state inside a row possible in the first place. That is also why the compiler refuses to guess: an interactive loop without a stable key is a build error rather than a warning in a console you may never open."
+/>
 
 ## Try it yourself
 

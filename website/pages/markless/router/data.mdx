@@ -84,7 +84,11 @@ The last step is cheap because a streamed commit is one fragment move plus recor
 nothing else. The framework has no runtime copy of the document to reconcile the new content
 against.
 
-<Callout sprite="speech-bubble" title="Is streaming something I turn on?" text="It is the default posture for server rendering, and the specification says blocking render is the explicit opt-out. The reason it is safe as a default is that it degrades gracefully: a buffering proxy in front of your server delivers one complete document whose inert templates commit on parse, so early paint is lost and correctness never is. Structure decides the rest. An authored @pending arm is the boundary's declaration that it is willing to stream, because that arm is the waiting UI." />
+<Callout
+	sprite="speech-bubble"
+	title="Is streaming something I turn on?"
+	text="It is the default posture for server rendering, and the specification says blocking render is the explicit opt-out. The reason it is safe as a default is that it degrades gracefully: a buffering proxy in front of your server delivers one complete document whose inert templates commit on parse, so early paint is lost and correctness never is. Structure decides the rest. An authored @pending arm is the boundary's declaration that it is willing to stream, because that arm is the waiting UI."
+/>
 
 ## Navigating away does not blank the screen
 
@@ -92,7 +96,11 @@ When the reader clicks through to another page whose data is slow, the outgoing 
 interactive until the destination settles. You do not have to build that behaviour, and you do not
 have to hold a spinner over the whole layout to get it.
 
-<Collapsible sprite="star-badge" summary="What about API routes and middleware?" text="They are top-level folders beside pages/, not inside it, and each is an ordinary module with a default export. An api/health.ts exports a function returning a Response, so the whole file can be one line of work. A middleware/request.ts exports a function taking the request context, and it runs before the request reaches a page, which is where a header, a redirect or an auth check belongs. Note that pages/api/ is not supported: a file there is a page with a confusing name." />
+<Collapsible
+	sprite="star-badge"
+	summary="What about API routes and middleware?"
+	text="They are top-level folders beside pages/, not inside it, and each is an ordinary module with a default export. An api/health.ts exports a function returning a Response, so the whole file can be one line of work. A middleware/request.ts exports a function taking the request context, and it runs before the request reaches a page, which is where a header, a redirect or an auth check belongs. Note that pages/api/ is not supported: a file there is a page with a confusing name."
+/>
 
 ## Try it yourself
 

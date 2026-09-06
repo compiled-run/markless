@@ -125,7 +125,8 @@
    code stay Joy Elia / mono. The `*` rule above beats inheritance, so inline
    children are matched explicitly. Bold maps to the real 600 weight. */
 .prose :is(p, li, blockquote, dd, dt, td, th, figcaption, summary),
-.prose :is(p, li, blockquote, dd, dt, td, th, figcaption, summary)
+.prose
+	:is(p, li, blockquote, dd, dt, td, th, figcaption, summary)
 	:is(a, strong, em, b, i, mark, small, span) {
 	font-family: 'Shantell Sans', system-ui, sans-serif;
 }
@@ -2013,7 +2014,9 @@ html[data-theme='dark'] .shiki span:not(.tsrx-tip):not(.tsrx-tip-title):not(.tsr
 }
 
 .pager-doodles .sticker {
-	transition: rotate 220ms ease-out, translate 220ms ease-out;
+	transition:
+		rotate 220ms ease-out,
+		translate 220ms ease-out;
 }
 
 .pager-doodles .sticker:hover {
@@ -2090,7 +2093,9 @@ html[data-theme='dark'] .shiki span:not(.tsrx-tip):not(.tsrx-tip-title):not(.tsr
 	width: 3.2rem;
 	height: auto;
 	rotate: -5deg;
-	transition: scale 600ms cubic-bezier(0.2, 1.7, 0.45, 1), rotate 600ms cubic-bezier(0.2, 1.7, 0.45, 1);
+	transition:
+		scale 600ms cubic-bezier(0.2, 1.7, 0.45, 1),
+		rotate 600ms cubic-bezier(0.2, 1.7, 0.45, 1);
 }
 
 .like-heart-button:hover .like-heart-image {
@@ -2117,8 +2122,11 @@ html[data-theme='dark'] .shiki span:not(.tsrx-tip):not(.tsrx-tip-title):not(.tsr
 	height: 1.35rem;
 	margin: -0.675rem 0 0 -0.675rem;
 	opacity: 0;
-	transition: translate 620ms cubic-bezier(0.15, 0.85, 0.3, 1), rotate 620ms ease-out,
-		scale 620ms ease-out, opacity 620ms ease-out;
+	transition:
+		translate 620ms cubic-bezier(0.15, 0.85, 0.3, 1),
+		rotate 620ms ease-out,
+		scale 620ms ease-out,
+		opacity 620ms ease-out;
 }
 
 .like-burst-piece img {
@@ -2179,7 +2187,9 @@ html[data-theme='dark'] .shiki span:not(.tsrx-tip):not(.tsrx-tip-title):not(.tsr
 	color: color-mix(in oklch, var(--pink) 55%, var(--ink));
 	opacity: 0;
 	translate: 0 -1.2rem;
-	transition: translate 700ms ease-out, opacity 700ms ease-out;
+	transition:
+		translate 700ms ease-out,
+		opacity 700ms ease-out;
 	pointer-events: none;
 }
 
@@ -2350,7 +2360,6 @@ html[data-theme='dark'] .shiki span:not(.tsrx-tip):not(.tsrx-tip-title):not(.tsr
 	width: 100%;
 	text-align: left;
 }
-
 
 /* The props table. `display: block` is what lets a table scroll inside its own
    column instead of pushing the whole document sideways on a phone. */

@@ -692,7 +692,9 @@ ${tipLook(`${root} .cp-doc`)}
 export function docRules(keys: readonly string[], root: string): string {
 	return keys
 		.map(
-			(key) => `			${root}:has(.tsrx-hover[data-doc="${key}"]:is(:hover, :focus-visible)) .cp-doc[data-doc="${key}"] {
+			(
+				key,
+			) => `			${root}:has(.tsrx-hover[data-doc="${key}"]:is(:hover, :focus-visible)) .cp-doc[data-doc="${key}"] {
 				display: block;
 			}`,
 		)

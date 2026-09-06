@@ -1,5 +1,3 @@
 {
- "ignorePatterns": [
-  "public/demos/**"
- ]
+	"ignorePatterns": ["public/demos/**"]
 }

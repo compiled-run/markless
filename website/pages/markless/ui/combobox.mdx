@@ -55,21 +55,21 @@ It writes `ui-open`, `ui-closed`, `ui-highlighted`, `ui-selected`, `ui-hidden`, 
 
 ## Props on `combobox.root`
 
-| Prop | Type | What it does |
-| --- | --- | --- |
-| `value` | `string \| string[]` | The chosen option. With `multiple` it is the list of chosen values. |
-| `open` | `boolean` | The list is showing. Omit it and it starts closed. |
-| `multiple` | `boolean` | More than one option can be chosen, and `value` becomes a list. |
-| `inline` | `boolean` | The list is part of the page rather than a popup: always showing, nothing dismisses it. |
-| `loop` | `boolean` | The arrow walk wraps around the ends instead of stopping. |
-| `removeOnBackspace` | `boolean` | Backspace in an empty field removes the last chosen value. `multiple` only. |
-| `disabled` | `boolean` | Nobody can choose or type. |
-| `required` | `boolean` | A choice is needed before the form submits. |
-| `invalid` | `boolean` | Reported as `aria-invalid` on the input. |
-| `name` | `string` | Submitted under this name by `combobox.field`. |
-| `placeholder` | `string` | The field's placeholder. The root's value wins over the input's own. |
-| `onChange` | `(value) => void` | Called with the new selection. |
-| `onInput` | `(value) => void` | Called with the field's new text every time a person types. |
-| `onOpenChange` | `(open) => void` | Called when the list opens or closes. |
+| Prop                | Type                 | What it does                                                                            |
+| ------------------- | -------------------- | --------------------------------------------------------------------------------------- |
+| `value`             | `string \| string[]` | The chosen option. With `multiple` it is the list of chosen values.                     |
+| `open`              | `boolean`            | The list is showing. Omit it and it starts closed.                                      |
+| `multiple`          | `boolean`            | More than one option can be chosen, and `value` becomes a list.                         |
+| `inline`            | `boolean`            | The list is part of the page rather than a popup: always showing, nothing dismisses it. |
+| `loop`              | `boolean`            | The arrow walk wraps around the ends instead of stopping.                               |
+| `removeOnBackspace` | `boolean`            | Backspace in an empty field removes the last chosen value. `multiple` only.             |
+| `disabled`          | `boolean`            | Nobody can choose or type.                                                              |
+| `required`          | `boolean`            | A choice is needed before the form submits.                                             |
+| `invalid`           | `boolean`            | Reported as `aria-invalid` on the input.                                                |
+| `name`              | `string`             | Submitted under this name by `combobox.field`.                                          |
+| `placeholder`       | `string`             | The field's placeholder. The root's value wins over the input's own.                    |
+| `onChange`          | `(value) => void`    | Called with the new selection.                                                          |
+| `onInput`           | `(value) => void`    | Called with the field's new text every time a person types.                             |
+| `onOpenChange`      | `(open) => void`     | Called when the list opens or closes.                                                   |
 
 Everything a `<div>` accepts reaches the element too.

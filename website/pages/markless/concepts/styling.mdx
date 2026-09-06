@@ -129,9 +129,18 @@ export function Bar() @{
 Reach for it when the number is genuinely continuous. A dozen named states belong in classes, where
 the stylesheet can see them.
 
-<Callout sticker="scribble" sprite="cross" title="Why the two cards are not side by side on this page" text="Two cards, one of them repainting when you press a button, would say all of this in a second. They are not here, and the reason is the framework build this site is pinned to. The scoped stylesheet a component compiles to is written into the build output and then never linked from the page that needs it, so a component whose only styling is its own style block renders unstyled here. The scope class itself is real and is in the served HTML, which is the half of the story that can be checked: the static card goes out as class='card mk-1a6qykh'. The other half of the finding is that an element whose class is an expression is emitted without the scope class at all, so on this build do not mix a style block with a class expression in the same component. NOTES.md finding 26 in the site repository has both reproductions, and the cards arrive the day the stylesheet reaches the page." />
+<Callout
+	sticker="scribble"
+	sprite="cross"
+	title="Why the two cards are not side by side on this page"
+	text="Two cards, one of them repainting when you press a button, would say all of this in a second. They are not here, and the reason is the framework build this site is pinned to. The scoped stylesheet a component compiles to is written into the build output and then never linked from the page that needs it, so a component whose only styling is its own style block renders unstyled here. The scope class itself is real and is in the served HTML, which is the half of the story that can be checked: the static card goes out as class='card mk-1a6qykh'. The other half of the finding is that an element whose class is an expression is emitted without the scope class at all, so on this build do not mix a style block with a class expression in the same component. NOTES.md finding 26 in the site repository has both reproductions, and the cards arrive the day the stylesheet reaches the page."
+/>
 
-<Collapsible sprite="thought-bubble" summary="Coming from another framework?" text="This is closest to a CSS module, except that you do not import the class names and you do not rename anything: you write the plain name and the compiler adds a scope class beside it, so what you read in the file is what you read in the browser's element inspector. It is not CSS-in-JS: there is no runtime, no template literal compiled into a component, and no style element written while the page runs. Styles composed from a parent, and an escape hatch for deliberately global rules, are both named as unspecified in the host contract today, so a rule you want to be global belongs in an ordinary stylesheet you link yourself." />
+<Collapsible
+	sprite="thought-bubble"
+	summary="Coming from another framework?"
+	text="This is closest to a CSS module, except that you do not import the class names and you do not rename anything: you write the plain name and the compiler adds a scope class beside it, so what you read in the file is what you read in the browser's element inspector. It is not CSS-in-JS: there is no runtime, no template literal compiled into a component, and no style element written while the page runs. Styles composed from a parent, and an escape hatch for deliberately global rules, are both named as unspecified in the host contract today, so a rule you want to be global belongs in an ordinary stylesheet you link yourself."
+/>
 
 ## Try it yourself
 

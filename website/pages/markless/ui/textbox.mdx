@@ -39,13 +39,13 @@ It writes `ui-empty`, `ui-required`, `ui-readonly` and `ui-disabled`.
 
 ## Props on `textbox.root`
 
-| Prop | Type | What it does |
-| --- | --- | --- |
-| `value` | `string` | The text the box shows. Omit it and the box starts empty. |
-| `disabled` | `boolean` | Nobody can type in it. |
-| `required` | `boolean` | Text is needed before the form submits. |
-| `readonly` | `boolean` | The text can be read and selected but not changed. |
-| `name` | `string` | Submitted under this name by whichever control the family renders. |
-| `onChange` | `(value) => void` | Called with the new text as a person types. |
+| Prop       | Type              | What it does                                                       |
+| ---------- | ----------------- | ------------------------------------------------------------------ |
+| `value`    | `string`          | The text the box shows. Omit it and the box starts empty.          |
+| `disabled` | `boolean`         | Nobody can type in it.                                             |
+| `required` | `boolean`         | Text is needed before the form submits.                            |
+| `readonly` | `boolean`         | The text can be read and selected but not changed.                 |
+| `name`     | `string`          | Submitted under this name by whichever control the family renders. |
+| `onChange` | `(value) => void` | Called with the new text as a person types.                        |
 
 Everything a `<div>` accepts reaches the element too.

@@ -1,9 +1,0 @@
-{
-	"extends": "../tsconfig.json",
-	"compilerOptions": {
-		"allowImportingTsExtensions": true,
-		"noEmit": true,
-		"plugins": []
-	},
-	"include": ["../tooling", "../components/docs/playground/slot-text.ts"]
-}

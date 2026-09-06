@@ -77,7 +77,11 @@ factory, and a cycle between them is rejected at compile time
 than the default: `shared(factory, { scope: 'request' })`, with `request`, `container` and `page`
 the three choices.
 
-<Callout sprite="cross" title="What happened when we tried it on 0.3.1" text="The test was the smallest honest version of the thing this page would teach: one module exporting shared(() => state({ count: 0 })), a second module reading it, a third module writing to it, and an MDX page rendering the second and third together. On published @markless/* 0.3.1 the production build never finishes. It prints transforming... and then stops making progress: four minutes of wall clock for under two seconds of CPU, with no error and no diagnostic. Removing the shared() modules and rebuilding the same page with the other three widgets on this site's Building section works normally. It is recorded as finding 27 in this site's NOTES.md, with the exact files and the timings." />
+<Callout
+	sprite="cross"
+	title="What happened when we tried it on 0.3.1"
+	text="The test was the smallest honest version of the thing this page would teach: one module exporting shared(() => state({ count: 0 })), a second module reading it, a third module writing to it, and an MDX page rendering the second and third together. On published @markless/* 0.3.1 the production build never finishes. It prints transforming... and then stops making progress: four minutes of wall clock for under two seconds of CPU, with no error and no diagnostic. Removing the shared() modules and rebuilding the same page with the other three widgets on this site's Building section works normally. It is recorded as finding 27 in this site's NOTES.md, with the exact files and the timings."
+/>
 
 So there is no demo box on this page, and there will not be one until that build finishes. Every
 other widget on this site is a real component doing the real thing, and a fake one here would be
@@ -94,9 +98,17 @@ For something the whole page needs, lift it to the page component under `pages/`
 from there. For a choice that should survive a reload, [storage](/markless/build/storage) is a
 module-scope binding already, and any component in the module tree can import and read it.
 
-<Collapsible sprite="thought-bubble" summary="What we can and cannot say about it today" text="What is certain: the API exists and is exported from @markless/core, the specification describes it in detail, and the compiler carries diagnostics for its failure modes, including cycle detection and an invalid-scope error. What is not established: that a definition in one module resolves from another module. The compiler pass that resolves a shared() call looks for a definition in the same module, and no .tsrx file anywhere in the framework's own repository uses shared() at all, so there is no worked example to copy from. Our two-module test is the one attempt on record, and it did not get past the build." />
+<Collapsible
+	sprite="thought-bubble"
+	summary="What we can and cannot say about it today"
+	text="What is certain: the API exists and is exported from @markless/core, the specification describes it in detail, and the compiler carries diagnostics for its failure modes, including cycle detection and an invalid-scope error. What is not established: that a definition in one module resolves from another module. The compiler pass that resolves a shared() call looks for a definition in the same module, and no .tsrx file anywhere in the framework's own repository uses shared() at all, so there is no worked example to copy from. Our two-module test is the one attempt on record, and it did not get past the build."
+/>
 
-<Collapsible sprite="star-badge" summary="Coming from another framework?" text="Whatever you have used before, session() is not run a hook: it is a resolution of a named dataflow instance for the graph context you are already in, and there is no call-order rule attached to it. This is the slot that context and the small global stores usually fill, and the design difference is worth one paragraph. Context makes you create a boundary in the component tree, a provider, and usually a wrapper function to read it: the specification's own rationale notes that about three quarters of context call sites in public code are already hidden behind a hand-written bare-call wrapper, which is the argument for making the bare call the primitive. A store gets closer to that shape but is a separate object graph the framework does not know about, so reading from it costs a selector and a subscription. Here it is meant to be the same reactive graph as everything else, which is what makes a write to it a targeted update rather than a notification." />
+<Collapsible
+	sprite="star-badge"
+	summary="Coming from another framework?"
+	text="Whatever you have used before, session() is not run a hook: it is a resolution of a named dataflow instance for the graph context you are already in, and there is no call-order rule attached to it. This is the slot that context and the small global stores usually fill, and the design difference is worth one paragraph. Context makes you create a boundary in the component tree, a provider, and usually a wrapper function to read it: the specification's own rationale notes that about three quarters of context call sites in public code are already hidden behind a hand-written bare-call wrapper, which is the argument for making the bare call the primitive. A store gets closer to that shape but is a separate object graph the framework does not know about, so reading from it costs a selector and a subscription. Here it is meant to be the same reactive graph as everything else, which is what makes a write to it a targeted update rather than a notification."
+/>
 
 ## Try it yourself
 

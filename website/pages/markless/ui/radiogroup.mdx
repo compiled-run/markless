@@ -54,13 +54,13 @@ It writes `ui-selected`, `ui-horizontal`, `ui-required` and `ui-disabled`.
 
 ## Props on `radiogroup.root`
 
-| Prop | Type | What it does |
-| --- | --- | --- |
-| `value` | `string` | The value of the chosen option. Omit it and nothing is chosen. |
-| `orientation` | `'horizontal' \| 'vertical'` | Which axis the arrow keys walk. Omit it and the options stack. |
-| `loop` | `boolean` | Arrow past the last option and land on the first. The ends wrap either way. |
-| `disabled` | `boolean` | Nobody can change any option. |
-| `onChange` | `(value) => void` | Called with the new value when a person picks a different option. |
+| Prop          | Type                         | What it does                                                                |
+| ------------- | ---------------------------- | --------------------------------------------------------------------------- |
+| `value`       | `string`                     | The value of the chosen option. Omit it and nothing is chosen.              |
+| `orientation` | `'horizontal' \| 'vertical'` | Which axis the arrow keys walk. Omit it and the options stack.              |
+| `loop`        | `boolean`                    | Arrow past the last option and land on the first. The ends wrap either way. |
+| `disabled`    | `boolean`                    | Nobody can change any option.                                               |
+| `onChange`    | `(value) => void`            | Called with the new value when a person picks a different option.           |
 
 Everything a `<fieldset>` accepts reaches the element too. `radiogroup.item` takes its own `value`
 and `disabled`.

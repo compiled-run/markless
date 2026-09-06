@@ -74,7 +74,10 @@ export function propOf(family: string, part: string, prop: string): ManifestProp
 	const found = partOf(family, part).props.find((one) => one.name === prop);
 	if (!found)
 		throw new Error(
-			`api-derive: '${family}.${part}' has no prop '${prop}'. Its props are: ${partOf(family, part)
+			`api-derive: '${family}.${part}' has no prop '${prop}'. Its props are: ${partOf(
+				family,
+				part,
+			)
 				.props.map((one) => one.name)
 				.join(', ')}.`,
 		);

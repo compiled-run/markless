@@ -23,7 +23,11 @@ try {
 				await page.goto(`${origin}${path}`, { waitUntil: 'networkidle' });
 				await page.evaluate(() => document.fonts.ready);
 				assert.equal(await page.locator('html').getAttribute('data-theme'), theme);
-				assert.equal(await page.locator('.variant-picker').count(), 0, 'The design picker is gone');
+				assert.equal(
+					await page.locator('.variant-picker').count(),
+					0,
+					'The design picker is gone',
+				);
 				assert.equal(await page.locator('.sidebar').count(), 1);
 				await page.locator('.sidebar .site-mark').focus();
 				await page.keyboard.press('Tab');
@@ -64,7 +68,9 @@ try {
 				const headingLooks = await page.evaluate(() => {
 					const read = () =>
 						Array.from(
-							document.querySelectorAll('.prose > :not(.sidebar) h1, .prose h1, .prose h2'),
+							document.querySelectorAll(
+								'.prose > :not(.sidebar) h1, .prose h1, .prose h2',
+							),
 						)
 							.slice(0, 3)
 							.map((el) => {
@@ -113,22 +119,38 @@ try {
 					await page.locator('.mode-select-content:not([hidden])').waitFor();
 					await page.locator('.mode-select-content:not([hidden])').waitFor();
 				} else {
-					const switchLook = await page.locator('.pg .pg-switch').evaluateAll((els) =>
-						els.map((el) => [el.hasAttribute('ui-checked'), getComputedStyle(el).backgroundColor]),
+					const switchLook = await page
+						.locator('.pg .pg-switch')
+						.evaluateAll((els) =>
+							els.map((el) => [
+								el.hasAttribute('ui-checked'),
+								getComputedStyle(el).backgroundColor,
+							]),
+						);
+					const on = switchLook
+						.filter(([checked]) => checked)
+						.map(([, colour]) => colour);
+					const off = switchLook
+						.filter(([checked]) => !checked)
+						.map(([, colour]) => colour);
+					assert.ok(
+						on.length > 0 && off.length > 0 && !off.includes(on[0] as string),
+						'A checked switch reads differently from an unchecked one',
 					);
-					const on = switchLook.filter(([checked]) => checked).map(([, colour]) => colour);
-					const off = switchLook.filter(([checked]) => !checked).map(([, colour]) => colour);
-					assert.ok(on.length > 0 && off.length > 0 && !off.includes(on[0] as string), 'A checked switch reads differently from an unchecked one');
 					const tabs = page.locator('.pg .pg-tab');
 					await tabs.first().focus();
 					await page.keyboard.press('ArrowRight');
 					await page.waitForFunction(
 						() =>
-							document.querySelectorAll('.pg .pg-tab')[1]?.getAttribute('aria-selected') === 'true',
+							document
+								.querySelectorAll('.pg .pg-tab')[1]
+								?.getAttribute('aria-selected') === 'true',
 					);
 					await page.keyboard.press('ArrowLeft');
 					await page.waitForFunction(
-						() => document.querySelector('.pg .pg-tab')?.getAttribute('aria-selected') === 'true',
+						() =>
+							document.querySelector('.pg .pg-tab')?.getAttribute('aria-selected') ===
+							'true',
 					);
 					const stacked = await page.locator('.cp').evaluateAll((panels) =>
 						panels.flatMap((panel) => {
@@ -144,11 +166,15 @@ try {
 					await page.locator('.pg-stage .trigger').nth(1).click();
 					await page.waitForFunction(
 						() =>
-							document.querySelectorAll('.pg-stage .trigger')[1]?.getAttribute('aria-expanded') ===
-							'true',
+							document
+								.querySelectorAll('.pg-stage .trigger')[1]
+								?.getAttribute('aria-expanded') === 'true',
 					);
 					assert.equal(
-						await page.locator('.pg-stage .trigger').first().getAttribute('aria-expanded'),
+						await page
+							.locator('.pg-stage .trigger')
+							.first()
+							.getAttribute('aria-expanded'),
 						'false',
 					);
 					assert.equal(await page.locator('.pg-stage .panel').first().isVisible(), false);
@@ -195,7 +221,13 @@ try {
 				`${theme}: phone fits`,
 			);
 			assert.deepEqual(errors, [], 'No uncaught page errors');
-			results.push({ theme, keyboard: 'pass', headingRestoration: 'pass', switch: 'pass', desktopAndPhone: 'pass' });
+			results.push({
+				theme,
+				keyboard: 'pass',
+				headingRestoration: 'pass',
+				switch: 'pass',
+				desktopAndPhone: 'pass',
+			});
 			await context.close();
 		}
 	}

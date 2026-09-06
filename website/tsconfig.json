@@ -18,7 +18,8 @@
 			}
 		],
 		"allowImportingTsExtensions": true,
-		"skipLibCheck": true
+		"skipLibCheck": true,
+		"noEmit": true
 	},
 	"include": [
 		"markless-router-env.d.ts",

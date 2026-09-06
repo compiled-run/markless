@@ -51,15 +51,15 @@ It writes `ui-open`, `ui-closed`, `ui-selected`, `ui-hidden`, `ui-required` and 
 
 ## Props on `select.root`
 
-| Prop | Type | What it does |
-| --- | --- | --- |
-| `value` | `string` | The value of the chosen option. Omit it and nothing is chosen. |
-| `open` | `boolean` | The popup is showing. Omit it and it starts closed. |
-| `disabled` | `boolean` | Nobody can change the choice. |
-| `required` | `boolean` | A choice is needed before the form submits. |
-| `name` | `string` | Submitted under this name by `select.field`. |
-| `onChange` | `(value) => void` | Called with the new value when a person chooses a different option. |
-| `onOpenChange` | `(open) => void` | Called when the popup opens or closes. |
+| Prop           | Type              | What it does                                                        |
+| -------------- | ----------------- | ------------------------------------------------------------------- |
+| `value`        | `string`          | The value of the chosen option. Omit it and nothing is chosen.      |
+| `open`         | `boolean`         | The popup is showing. Omit it and it starts closed.                 |
+| `disabled`     | `boolean`         | Nobody can change the choice.                                       |
+| `required`     | `boolean`         | A choice is needed before the form submits.                         |
+| `name`         | `string`          | Submitted under this name by `select.field`.                        |
+| `onChange`     | `(value) => void` | Called with the new value when a person chooses a different option. |
+| `onOpenChange` | `(open) => void`  | Called when the popup opens or closes.                              |
 
 Everything a `<div>` accepts reaches the element too. `select.item` takes its own `value` and
 `disabled`.

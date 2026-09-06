@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -49,6 +49,7 @@ for (const prefix of prefixes) {
 
 runtime.push('', `const installedPacks = ${JSON.stringify(prefixes.map(normalizePack).filter((name) => name && !/^\d/.test(name)).sort())} as const;`);
 runtime.push('export function packs(): readonly string[] { return installedPacks; }', '');
+mkdirSync(generatedDirectory, { recursive: true });
 writeFileSync(resolve(generatedDirectory, 'packs.d.ts'), `${declarations.join('\n')}\n`);
 writeFileSync(resolve(sourceDirectory, 'generated-runtime.ts'), `${runtime.join('\n')}\n`);
 

@@ -150,7 +150,7 @@ like a hook with nothing to do.
 
 ### Nitro owns `plugins/`
 
-A `plugins/` directory in the project root is scanned by Nitro as *server* plugins, and the build
+A `plugins/` directory in the project root is scanned by Nitro as _server_ plugins, and the build
 dies with `"default" is not exported by "plugins/highlight-mdx.ts"`. Build-time tooling lives in
 `tooling/` for that reason.
 
@@ -194,12 +194,12 @@ the highlighter: it reproduces with `tooling/highlight-mdx.ts` short-circuited t
 
 Two widgets on this site work. Two do not:
 
-| widget | page | what it does | result |
-| --- | --- | --- | --- |
-| `counter.tsrx` | landing, state | one state, one text binding, one button | resumes, count moves |
-| `two-variables.tsrx` | state | one state, two text bindings, one button | resumes, number moves |
-| `cart-total.tsrx` | computed | two states, a `computed()`, three text bindings | never updates |
-| `three-differences.tsrx` | reading a `.tsrx` file | one state, `class={ternary}` bindings, three buttons | never updates |
+| widget                   | page                   | what it does                                         | result                |
+| ------------------------ | ---------------------- | ---------------------------------------------------- | --------------------- |
+| `counter.tsrx`           | landing, state         | one state, one text binding, one button              | resumes, count moves  |
+| `two-variables.tsrx`     | state                  | one state, two text bindings, one button             | resumes, number moves |
+| `cart-total.tsrx`        | computed               | two states, a `computed()`, three text bindings      | never updates         |
+| `three-differences.tsrx` | reading a `.tsrx` file | one state, `class={ternary}` bindings, three buttons | never updates         |
 
 On the two that fail, every click throws in the page, twice:
 
@@ -272,7 +272,7 @@ Two things that did not change on the move:
 - **Finding 11 still holds.** `cart-total` and `three-differences` still never update. Same message,
   same two symbols, thrown twice per click.
 
-`scripts/markless-doctor.mjs` compares the *installed* version of each `@markless/*` package now
+`scripts/markless-doctor.mjs` compares the _installed_ version of each `@markless/*` package now
 rather than the declared specifier. Four `file:` tarball paths are four different strings for one
 version, and two `^` ranges can resolve to two different versions, so reading the installed manifest
 is both what makes the check pass here and a stricter test than the one it replaces.
@@ -307,9 +307,8 @@ ask for a symbol, so they never hit this.
 
 An MDX page gives each imported component a prefix `m0:`, `m1:`, `m2:` (`renderSymbolLoaders` in
 `@markless/router` `src/vite/mdx.ts`). Inside a `.tsrx` component, the compiler gives each imported
-child edge a prefix `c0:`, `c1:` (`symbolPrefix: edge.importSource ? \`c${index}:\` : ''` in
-`@markless/compiler` `src/passes/public-render/`). `cart-total-demo.tsrx` is MDX component 1 and
-composes `cart-total.tsrx` as its child 0, so the fully qualified id is `m1:c0:symbol:5`.
+child edge a prefix `c0:`, `c1:` (`symbolPrefix: edge.importSource ? \`c${index}:\` : ''`in`@markless/compiler` `src/passes/public-render/`). `cart-total-demo.tsrx`is MDX component 1 and
+composes`cart-total.tsrx`as its child 0, so the fully qualified id is`m1:c0:symbol:5`.
 
 The served payload for `/markless/concepts/computed` carries both spellings:
 
@@ -327,13 +326,13 @@ functions in `@markless/router` `src/vite/runtime/mdx-route.ts`:
   `prefixMdxSymbolRecord` does the same for `domUpdates` and `behaviors`. Hence `m1:c0:h1`.
 - `composeMdxState` flattens `state.cells` and `state.computed` verbatim:
 
-  ```ts
-  cells: childStates.flatMap((state) => state.cells ?? []),
-  computed: childStates.flatMap((state) => state.computed ?? []),
-  ```
+    ```ts
+    cells: childStates.flatMap((state) => state.cells ?? []),
+    computed: childStates.flatMap((state) => state.computed ?? []),
+    ```
 
-  It never sees `child.symbolPrefix`. The `deriveSymbolId` inside a computed record therefore ships
-  in the child's own namespace, `c0:symbol:5`.
+    It never sees `child.symbolPrefix`. The `deriveSymbolId` inside a computed record therefore ships
+    in the child's own namespace, `c0:symbol:5`.
 
 At resume, `refreshSyncComputed` reads `deriveSymbolId` and calls `marklessMdxLoadSymbol`. Its
 `children` argument defaults to `[]` in the browser — the array `renderMdxChild` fills is a
@@ -500,11 +499,11 @@ the block is taken out of the scroller where the browser can do it: under
 token with `position-anchor`, which is not clipped by any ancestor. `anchor-scope` is what makes
 that safe with one shared anchor name — it limits the name to the token's own subtree, so every doc
 finds its own token instead of the last one on the page. Chrome 131 and later take that path.
-Without it the doc is placed against the token and a token on the *first* line of a block has its
+Without it the doc is placed against the token and a token on the _first_ line of a block has its
 doc clipped by the block's top edge. That is the whole of the degradation.
 
 **Fenced code was not actually monospace.** `* { font-family: 'Joy Elia' }` matches the token spans
-shiki emits *directly*, and a direct match beats a family inherited from `pre`, so every block was
+shiki emits _directly_, and a direct match beats a family inherited from `pre`, so every block was
 being painted in the display face while `getComputedStyle(pre).fontFamily` reported the monospace
 stack. The rule now names `.prose pre`, `.prose pre code` and `.prose pre code span`, and the
 witness reads the computed family off all three: `ui-monospace, "SF Mono", Menlo, Consolas, monospace`.
@@ -663,12 +662,12 @@ work being done.
 
 The bisect, one build per step, from a clean `.output`:
 
-| tree | result |
-| --- | --- |
-| `main` with no batch-2 content | builds, ~90 s |
-| plus `concepts/events.mdx` and its `name-echo` island (state, `onInput`, `onSubmit`) | builds |
-| plus `concepts/conditionals.mdx` with an island whose body has `@if (open) { … }` | hangs, killed at 5 min |
-| the same page with the `@if` island that declares no state inside the branch | hangs, killed at 5 min |
+| tree                                                                                 | result                 |
+| ------------------------------------------------------------------------------------ | ---------------------- |
+| `main` with no batch-2 content                                                       | builds, ~90 s          |
+| plus `concepts/events.mdx` and its `name-echo` island (state, `onInput`, `onSubmit`) | builds                 |
+| plus `concepts/conditionals.mdx` with an island whose body has `@if (open) { … }`    | hangs, killed at 5 min |
+| the same page with the `@if` island that declares no state inside the branch         | hangs, killed at 5 min |
 
 So the trigger is `@if` in a compiled component, not the state-inside-a-branch shape the page was
 written to teach. `@for` was not reached in the bisect and is treated as the same defect until
@@ -1039,7 +1038,7 @@ Building-an-app section with the other three widgets on it (`split-counter`, `fo
 `favourite-colour`) succeeds in the ordinary time, exit 0.
 
 So this never got as far as the question T001 actually asked. Whether cross-module resolution
-*works* is still unknown, because the build does not reach the point of telling us.
+_works_ is still unknown, because the build does not reach the point of telling us.
 
 **What it costs the docs.** `build/shared.mdx` ships prose-only: the design quoted from
 `specs/framework/03-state-graph.md`, a callout with the measurement above, "pass it through props
@@ -1064,7 +1063,6 @@ One of the three ships as a live widget on published 0.3.1. The other two are fi
 No `attach` widget shipped. Finding 9 already explains why: a behaviour installs during resume, and
 resume waits for a real event, so a widget whose only job is an `attach` would sit inert until the
 reader clicked something else. `build/elements.mdx` says that out loud in a callout instead.
-
 
 ## 29. T006: a callback prop from a child component does not resume inside an MDX page
 
@@ -1105,7 +1103,6 @@ props, callback-props and `children` sections intact, and a callout naming this 
 asserts the callout and the absence of a `.playground` frame, so the day the handler resolves the
 run goes red and this note comes out with the fix.
 
-
 ## 30. T006: a second `storage()` binding on a page repaints but never persists
 
 The storage page's widget was `storage('favourite-colour', 'yellow')` at module scope with three
@@ -1137,7 +1134,6 @@ payload.
 callout naming this finding. It does have a live demo to point at, and it points at it: the theme
 toggle in this site's header is a `storage()` binding, and flipping it then reloading is exactly the
 lesson the page teaches. The witness asserts the callout and the absence of a `.playground` frame.
-
 
 ## 31. T030: a `computed` that reads a plain object is not in the chunk the click loads
 
@@ -1204,7 +1200,6 @@ Five pages, four live widgets, no honest-kind callouts needed.
   have to be on the page verbatim, and the words "virtual DOM" may not appear anywhere in the prose
   outside the `<details>` comparison. Both are asserted from the rendered DOM, not the source.
 
-
 ## 33. T024: the like heart, and animation without a class the framework has to write
 
 The heart under the "On this page" rail is a third island on every page — `PageMeta`,
@@ -1256,7 +1251,6 @@ Where they are used, kept to accents: the landing hero, one callout corner on fo
 two in the footer doodle strip, and the like heart. A callout's corner sticker is a
 `data-sticker` attribute the stylesheet paints, not an `<img>`: an element cannot be left out
 without `@if`, and a hidden `<img>` would still fetch its src.
-
 
 ## 35. T008: the document head is per page, and a second `assumes` key still breaks the next island
 
@@ -1431,7 +1425,7 @@ composes imported child "@markless/router", but its compiled artifact has no cur
 Rebuild the child with the current Markless compiler and clear any stale build cache.
 ```
 
-This is finding 2's *second* wall, reached without the aliasing that was needed to get to it on
+This is finding 2's _second_ wall, reached without the aliasing that was needed to get to it on
 0.2.2. Resolution of `@markless/router` from app code works now; composing a component out of it
 does not.
 
@@ -1477,14 +1471,14 @@ of that were measured in Chrome against the production build:
   after it, so the navigation really was client-side. The page under it is still the old one — same
   `h1`, same breadcrumb, same `<title>` — with two errors on the console:
 
-  ```
-  RuntimeResumeError: MARKLESS_EVENT_DISPATCH_UNMATCHED: No event record matched click dispatch at a.
-  Error: MARKLESS_PRERENDER_PROP_UNDERIVABLE: name
-  ```
+    ```
+    RuntimeResumeError: MARKLESS_EVENT_DISPATCH_UNMATCHED: No event record matched click dispatch at a.
+    Error: MARKLESS_PRERENDER_PROP_UNDERIVABLE: name
+    ```
 
-  `name` is `<Sprite name={…} />`, which every page has under its `H1` through `PageMeta`, so this
-  is not one unlucky page. A client-side navigation that changes the URL and leaves the previous
-  page on screen is worse than a document load, not better.
+    `name` is `<Sprite name={…} />`, which every page has under its `H1` through `PageMeta`, so this
+    is not one unlucky page. A client-side navigation that changes the URL and leaves the previous
+    page on screen is worse than a document load, not better.
 
 **Every internal link on the site is therefore a plain `<a href>`** — the sidebar, the breadcrumb,
 the pager, the assumes line, and the markdown links in prose — and every navigation is a full

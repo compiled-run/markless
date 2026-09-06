@@ -56,7 +56,10 @@ type TsrxVirtualCode = { update(snapshot: ts.IScriptSnapshot): void };
 type MarklessLanguage = {
 	MARKLESS_TSRX_LANGUAGE_ID: string;
 	isMarklessTsrxFile(fileName: string): boolean;
-	MarklessTsrxVirtualCode: new (fileName: string, snapshot: ts.IScriptSnapshot) => TsrxVirtualCode;
+	MarklessTsrxVirtualCode: new (
+		fileName: string,
+		snapshot: ts.IScriptSnapshot,
+	) => TsrxVirtualCode;
 };
 
 /** One resolved hover, in offsets into the fence source the caller passed in. */
@@ -317,7 +320,12 @@ export function createQuickInfoService(): QuickInfoService {
 				const signature = signatureLine(info.displayParts);
 				if (!signature) continue;
 				seen.add(start);
-				found.push({ doc: flatten(displayPartsToString(info.documentation)), length, signature, start });
+				found.push({
+					doc: flatten(displayPartsToString(info.documentation)),
+					length,
+					signature,
+					start,
+				});
 			}
 			cache.set(key, found);
 			return found;

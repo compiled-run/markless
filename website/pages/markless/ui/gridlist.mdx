@@ -99,17 +99,17 @@ that part: a bare `<button>` in a row answers `Tab`, but `Enter` will not find i
 
 Focus rests on a row, and the walk steps over disabled rows.
 
-| Key | What it does |
-| --- | --- |
-| Down arrow or Up arrow | Focus the row whose box sits below or above this one. |
+| Key                       | What it does                                                                                                 |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Down arrow or Up arrow    | Focus the row whose box sits below or above this one.                                                        |
 | Left arrow or Right arrow | Focus the row to the left or the right. Once focus is inside a row, they step between the controls it holds. |
-| Home or End | Focus the first or the last row. |
-| Enter or F2 | Move focus onto the first control this row holds. |
-| Escape | Inside a row, focus goes back to the row. On a row, everything picked is let go. |
-| Space | Pick the focused row, or let it go again. |
-| Shift and an arrow | Replace what is picked with the run from the anchor row to the one arrived at. Needs `multiple`. |
-| Ctrl or Cmd and A | Pick every row. Needs `multiple`. |
-| Any letter | Focus the next row whose label starts with what you typed. |
+| Home or End               | Focus the first or the last row.                                                                             |
+| Enter or F2               | Move focus onto the first control this row holds.                                                            |
+| Escape                    | Inside a row, focus goes back to the row. On a row, everything picked is let go.                             |
+| Space                     | Pick the focused row, or let it go again.                                                                    |
+| Shift and an arrow        | Replace what is picked with the run from the anchor row to the one arrived at. Needs `multiple`.             |
+| Ctrl or Cmd and A         | Pick every row. Needs `multiple`.                                                                            |
+| Any letter                | Focus the next row whose label starts with what you typed.                                                   |
 
 ## API
 
@@ -117,29 +117,29 @@ Every prop is optional unless its row says so, and the types are the family's ow
 
 ### `gridlist.root`
 
-| Prop | Type | What it does |
-| --- | --- | --- |
-| `value` | `readonly string[]` | The rows that are picked, named by the `value` each row was written with. Omit it and nothing starts picked. |
-| `selectable` | `boolean` | Rows can be picked, one at a time. Picking a row that is already picked lets it go. |
-| `multiple` | `boolean` | Several rows can be picked at once. Writing it also makes the list selectable. |
-| `disabled` | `boolean` | No row can be reached or picked, and the list drops out of the tab order. |
-| `wrap` | `boolean` | A walk off the last row comes back round to the first. Omit it and the walk stops at the ends. |
-| `onChange` | `(value: readonly string[]) => void` | Called with the rows that are picked whenever that changes. |
+| Prop         | Type                                 | What it does                                                                                                 |
+| ------------ | ------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| `value`      | `readonly string[]`                  | The rows that are picked, named by the `value` each row was written with. Omit it and nothing starts picked. |
+| `selectable` | `boolean`                            | Rows can be picked, one at a time. Picking a row that is already picked lets it go.                          |
+| `multiple`   | `boolean`                            | Several rows can be picked at once. Writing it also makes the list selectable.                               |
+| `disabled`   | `boolean`                            | No row can be reached or picked, and the list drops out of the tab order.                                    |
+| `wrap`       | `boolean`                            | A walk off the last row comes back round to the first. Omit it and the walk stops at the ends.               |
+| `onChange`   | `(value: readonly string[]) => void` | Called with the rows that are picked whenever that changes.                                                  |
 
-| Attribute | Present when | What to key styling off |
-| --- | --- | --- |
-| `role` | Always | `grid`. |
-| `tabindex` | Always | `0`, or `-1` while the list is disabled. The list is its own single tab stop until focus lands on a row. |
-| `aria-labelledby` | Always | The id of the `gridlist.label` naming this list. |
-| `aria-multiselectable` | `multiple` is set | `true`, for a screen reader rather than your stylesheet. |
-| `aria-disabled` | Always | `true` or `false`. |
-| `ui-selectable` | Rows can be picked at all | The list is doing selection. |
-| `ui-multiple` | `multiple` is set | The many-picked look. |
-| `ui-disabled` | `disabled` is set | Nothing in here responds. |
-| `ui-inside` | Focus is on a control a row holds | The arrows belong to that control for as long as this lasts. |
+| Attribute              | Present when                      | What to key styling off                                                                                  |
+| ---------------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `role`                 | Always                            | `grid`.                                                                                                  |
+| `tabindex`             | Always                            | `0`, or `-1` while the list is disabled. The list is its own single tab stop until focus lands on a row. |
+| `aria-labelledby`      | Always                            | The id of the `gridlist.label` naming this list.                                                         |
+| `aria-multiselectable` | `multiple` is set                 | `true`, for a screen reader rather than your stylesheet.                                                 |
+| `aria-disabled`        | Always                            | `true` or `false`.                                                                                       |
+| `ui-selectable`        | Rows can be picked at all         | The list is doing selection.                                                                             |
+| `ui-multiple`          | `multiple` is set                 | The many-picked look.                                                                                    |
+| `ui-disabled`          | `disabled` is set                 | Nothing in here responds.                                                                                |
+| `ui-inside`            | Focus is on a control a row holds | The arrows belong to that control for as long as this lasts.                                             |
 
-| Selector | Default | Why |
-| --- | --- | --- |
+| Selector          | Default             | Why                                                                                                                                                      |
+| ----------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `[ui-selectable]` | `user-select: none` | A Shift walk and a Shift click both paint the page's own text selection across the rows they cross, over the top of the selection the list is reporting. |
 
 Everything a `<div>` accepts reaches the element too, apart from `onChange`, which is the family's.
@@ -151,20 +151,20 @@ No props of its own. The grid's `aria-labelledby` points here, so this names the
 
 ### `gridlist.item`
 
-| Prop | Type | What it does |
-| --- | --- | --- |
-| **`value`** | `string` | Required. This row's identity in the picked set. Two rows must not share one. |
-| `disabled` | `boolean` | This row cannot be reached by the walk or picked. |
+| Prop        | Type      | What it does                                                                  |
+| ----------- | --------- | ----------------------------------------------------------------------------- |
+| **`value`** | `string`  | Required. This row's identity in the picked set. Two rows must not share one. |
+| `disabled`  | `boolean` | This row cannot be reached by the walk or picked.                             |
 
-| Attribute | Present when | What to key styling off |
-| --- | --- | --- |
-| `role` | Always | `row`. |
-| `tabindex` | Always | `-1` as rendered. Focus arriving on a row moves the `0` here, so the list remembers where it was. |
-| `aria-selected` | The list can be picked from | `true` or `false`. Absent entirely while nothing can be picked. |
-| `aria-disabled` | Always | `true` or `false`. |
-| `ui-value` | Always | Holds this row's name, so one selector can reach one row. |
-| `ui-selected` | This row is picked | The picked look. |
-| `ui-disabled` | This row or the list is disabled | The unreachable look, and what the walk steps over. |
+| Attribute       | Present when                     | What to key styling off                                                                           |
+| --------------- | -------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `role`          | Always                           | `row`.                                                                                            |
+| `tabindex`      | Always                           | `-1` as rendered. Focus arriving on a row moves the `0` here, so the list remembers where it was. |
+| `aria-selected` | The list can be picked from      | `true` or `false`. Absent entirely while nothing can be picked.                                   |
+| `aria-disabled` | Always                           | `true` or `false`.                                                                                |
+| `ui-value`      | Always                           | Holds this row's name, so one selector can reach one row.                                         |
+| `ui-selected`   | This row is picked               | The picked look.                                                                                  |
+| `ui-disabled`   | This row or the list is disabled | The unreachable look, and what the walk steps over.                                               |
 
 Everything a `<div>` accepts reaches the element too.
 
@@ -184,17 +184,17 @@ not. It renders a `<span>`, and everything a `<span>` accepts reaches the elemen
 No props of its own. It renders a `<button>`, and everything a `<button>` accepts reaches the
 element.
 
-| Attribute | Present when | What to key styling off |
-| --- | --- | --- |
-| `type` | Always | `button`, so a control inside a form does not submit it. |
-| `tabindex` | Always | `-1`: the row is the tab stop, and `Enter` on the row is what reaches this. |
-| `disabled` | This row or the list is disabled | The native disabled state. |
+| Attribute  | Present when                     | What to key styling off                                                     |
+| ---------- | -------------------------------- | --------------------------------------------------------------------------- |
+| `type`     | Always                           | `button`, so a control inside a form does not submit it.                    |
+| `tabindex` | Always                           | `-1`: the row is the tab stop, and `Enter` on the row is what reaches this. |
+| `disabled` | This row or the list is disabled | The native disabled state.                                                  |
 
 ### `gridlist.itemindicator`
 
 No props of its own. It renders a `<span>`, and everything a `<span>` accepts reaches the element.
 
-| Attribute | Present when | What to key styling off |
-| --- | --- | --- |
-| `aria-hidden` | Always | `true`. The row already carries `aria-selected`, and a second announcement of the same fact is noise. |
-| `ui-selected` | Its row is picked | Show the mark. |
+| Attribute     | Present when      | What to key styling off                                                                               |
+| ------------- | ----------------- | ----------------------------------------------------------------------------------------------------- |
+| `aria-hidden` | Always            | `true`. The row already carries `aria-selected`, and a second announcement of the same fact is noise. |
+| `ui-selected` | Its row is picked | Show the mark.                                                                                        |

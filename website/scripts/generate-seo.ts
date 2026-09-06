@@ -64,7 +64,10 @@ ${nav
 	.map(
 		(section) =>
 			`## ${section.title}\n\n${section.entries
-				.map((entry) => `- [${entry.title}](${absolute(entry.href)}): ${entry.description ?? ''}`)
+				.map(
+					(entry) =>
+						`- [${entry.title}](${absolute(entry.href)}): ${entry.description ?? ''}`,
+				)
 				.join('\n')}`,
 	)
 	.join('\n\n')}

@@ -126,7 +126,11 @@ The runtime itself follows the same rule as your app code. Capability modules lo
 page's payload declares their record kinds, so runtime execution is "proportional to what the user
 does, not to what the page contains or what the framework supports".
 
-<Callout sprite="speech-bubble" title="Does that mean the browser never runs my components?" text="No, and the page you are reading will not claim it. On a server-rendered page, the resume path never executes a component body: that is the quoted rule above. But a tier 4 or tier 5 update does execute components, because content is appearing for the first time and something has to produce it, and a client-rendered app executes every component body in the browser by definition, since it starts from an empty target. The precise claim is the one the specification makes: components are never re-executed over server HTML that already exists." />
+<Callout
+	sprite="speech-bubble"
+	title="Does that mean the browser never runs my components?"
+	text="No, and the page you are reading will not claim it. On a server-rendered page, the resume path never executes a component body: that is the quoted rule above. But a tier 4 or tier 5 update does execute components, because content is appearing for the first time and something has to produce it, and a client-rendered app executes every component body in the browser by definition, since it starts from an empty target. The precise claim is the one the specification makes: components are never re-executed over server HTML that already exists."
+/>
 
 ## Rendering in the browser is a normal mode, not a fallback
 
@@ -155,7 +159,11 @@ Which is why the answer to "how do I put my chart instance in state" is that you
 that needs a live element, an observer, a socket or a cleanup belongs on the element, and a value
 you can work out again belongs in a `computed`.
 
-<Collapsible sprite="star-badge" summary="Coming from another framework?" text="Three things are missing here on purpose. There is no virtual DOM: templates compile to real DOM operations, and each dynamic update is its own subscription, which is why the tiers above are described as the textContent and replaceChildren calls a hand-writer would make. There is no hydration pass: the specification's phrase is that no hydration forbids re-executing components over existing server HTML, and what replaces it is a resumer that reads a payload and wakes only the code a click needs. And there is no marker syntax: no dollar suffixes, no .value, no tracked boxes, no special destructuring, because the compiler owns the language and can see every state creation site, every closure and every async boundary structurally. What you give up for all three is choice of authoring language. It is TSRX, and JSX is explicitly not supported, now or later." />
+<Collapsible
+	sprite="star-badge"
+	summary="Coming from another framework?"
+	text="Three things are missing here on purpose. There is no virtual DOM: templates compile to real DOM operations, and each dynamic update is its own subscription, which is why the tiers above are described as the textContent and replaceChildren calls a hand-writer would make. There is no hydration pass: the specification's phrase is that no hydration forbids re-executing components over existing server HTML, and what replaces it is a resumer that reads a payload and wakes only the code a click needs. And there is no marker syntax: no dollar suffixes, no .value, no tracked boxes, no special destructuring, because the compiler owns the language and can see every state creation site, every closure and every async boundary structurally. What you give up for all three is choice of authoring language. It is TSRX, and JSX is explicitly not supported, now or later."
+/>
 
 ## Try it yourself
 

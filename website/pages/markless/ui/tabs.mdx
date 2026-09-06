@@ -42,12 +42,12 @@ It writes `ui-selected` and `ui-vertical`.
 
 ## Props on `tabs.root`
 
-| Prop | Type | What it does |
-| --- | --- | --- |
-| `value` | `string` | The tab that is showing. Omit it and no tab shows. |
-| `orientation` | `'horizontal' \| 'vertical'` | Which axis the arrow keys walk. Omit it and the tabs run left to right. |
-| `loop` | `boolean` | Arrow past the last tab and land on the first. Omit it and the ends stop. |
-| `selectOnFocus` | `boolean` | Arrowing to a tab shows it. Turn it off and arrowing only moves focus; Enter or Space shows it. |
-| `onChange` | `(value) => void` | Called with the new value when a person changes tab. |
+| Prop            | Type                         | What it does                                                                                    |
+| --------------- | ---------------------------- | ----------------------------------------------------------------------------------------------- |
+| `value`         | `string`                     | The tab that is showing. Omit it and no tab shows.                                              |
+| `orientation`   | `'horizontal' \| 'vertical'` | Which axis the arrow keys walk. Omit it and the tabs run left to right.                         |
+| `loop`          | `boolean`                    | Arrow past the last tab and land on the first. Omit it and the ends stop.                       |
+| `selectOnFocus` | `boolean`                    | Arrowing to a tab shows it. Turn it off and arrowing only moves focus; Enter or Space shows it. |
+| `onChange`      | `(value) => void`            | Called with the new value when a person changes tab.                                            |
 
 Everything a `<div>` accepts reaches the element too.

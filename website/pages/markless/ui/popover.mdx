@@ -86,11 +86,11 @@ includes Escape and a press outside it.
 
 The trigger is a native button, so it needs nothing from the family beyond the toggle.
 
-| Key | What it does |
-| --- | --- |
-| Enter or Space | Opens or closes the popover from the trigger. |
-| Escape | Closes the surface. Focus goes back to the trigger only if it was inside the surface. |
-| Tab | Walks into the surface and out again. Nothing is trapped, because nothing is modal. |
+| Key            | What it does                                                                          |
+| -------------- | ------------------------------------------------------------------------------------- |
+| Enter or Space | Opens or closes the popover from the trigger.                                         |
+| Escape         | Closes the surface. Focus goes back to the trigger only if it was inside the surface. |
+| Tab            | Walks into the surface and out again. Nothing is trapped, because nothing is modal.   |
 
 ## API
 
@@ -98,21 +98,21 @@ Every prop is optional, and the types below are the family's own.
 
 ### `popover.root`
 
-| Prop | Type | What it does |
-| --- | --- | --- |
-| `open` | `boolean` | Whether the surface is showing. Omit it and the popover starts closed. |
+| Prop       | Type                      | What it does                                                                                                                                                             |
+| ---------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `open`     | `boolean`                 | Whether the surface is showing. Omit it and the popover starts closed.                                                                                                   |
 | `onChange` | `(open: boolean) => void` | Called with the new value when the popover opens or closes, Escape and outside presses included. Omit it and the popover still works; the call site simply does nothing. |
 
-| Attribute | Present when | What to key styling off |
-| --- | --- | --- |
-| `ui-open` | The surface is showing | The open look. |
-| `ui-closed` | The surface is not showing | The resting look. |
+| Attribute   | Present when               | What to key styling off |
+| ----------- | -------------------------- | ----------------------- |
+| `ui-open`   | The surface is showing     | The open look.          |
+| `ui-closed` | The surface is not showing | The resting look.       |
 
 Everything a `<div>` accepts reaches the element too, apart from `onChange`, which is
 the family's.
 
-| Selector | Default | Why |
-| --- | --- | --- |
+| Selector             | Default                      | Why                                                                                                       |
+| -------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------- |
 | `div:not([overlay])` | `anchor-scope: --ui-popover` | Keeps the anchor name inside this popover, so two popovers on a page never point at each other's trigger. |
 
 ### `popover.trigger`
@@ -120,16 +120,16 @@ the family's.
 No props of its own. It renders a `<button>`, and everything a `<button>` accepts
 reaches the element. Your own `onClick` runs after the popover has opened or closed.
 
-| Attribute | Present when | What to key styling off |
-| --- | --- | --- |
-| `aria-haspopup` | Always | `dialog`, for a screen reader rather than your stylesheet. |
-| `aria-expanded` | Always | `true` or `false`. |
-| `aria-controls` | Always | The id of the surface this button opens. |
-| `ui-open` | The surface is showing | The pressed look. |
-| `ui-closed` | The surface is not showing | The resting look. |
+| Attribute       | Present when               | What to key styling off                                    |
+| --------------- | -------------------------- | ---------------------------------------------------------- |
+| `aria-haspopup` | Always                     | `dialog`, for a screen reader rather than your stylesheet. |
+| `aria-expanded` | Always                     | `true` or `false`.                                         |
+| `aria-controls` | Always                     | The id of the surface this button opens.                   |
+| `ui-open`       | The surface is showing     | The pressed look.                                          |
+| `ui-closed`     | The surface is not showing | The resting look.                                          |
 
-| Selector | Default | Why |
-| --- | --- | --- |
+| Selector                | Default                     | Why                                                      |
+| ----------------------- | --------------------------- | -------------------------------------------------------- |
 | `button[aria-haspopup]` | `anchor-name: --ui-popover` | The trigger is the anchor the surface is placed against. |
 
 ### `popover.content`
@@ -138,18 +138,18 @@ No props of its own. It renders a `<div>`, and everything a `<div>` accepts reac
 element. Your own `onDismiss` runs after the family has closed the popover, so a handler
 can see which way the family went.
 
-| Attribute | Present when | What to key styling off |
-| --- | --- | --- |
-| `overlay` | Always | The mark that elevates the surface. Not a styling hook. |
-| `role` | Always | `dialog`. |
-| `aria-labelledby` | Always | The id of the `popover.title`. |
-| `aria-describedby` | Always | The id of the `popover.description`. |
-| `hidden` | The popover is closed | What hides the surface. It is never detached, so ids and focus survive. |
-| `ui-open` | The surface is showing | The shown look. |
-| `ui-closed` | The surface is not showing | The hidden look. |
+| Attribute          | Present when               | What to key styling off                                                 |
+| ------------------ | -------------------------- | ----------------------------------------------------------------------- |
+| `overlay`          | Always                     | The mark that elevates the surface. Not a styling hook.                 |
+| `role`             | Always                     | `dialog`.                                                               |
+| `aria-labelledby`  | Always                     | The id of the `popover.title`.                                          |
+| `aria-describedby` | Always                     | The id of the `popover.description`.                                    |
+| `hidden`           | The popover is closed      | What hides the surface. It is never detached, so ids and focus survive. |
+| `ui-open`          | The surface is showing     | The shown look.                                                         |
+| `ui-closed`        | The surface is not showing | The hidden look.                                                        |
 
-| Selector | Default | Why |
-| --- | --- | --- |
+| Selector    | Default                                                                                                  | Why                                                                                                                     |
+| ----------- | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | `[overlay]` | `--ui-anchor: --ui-popover; position: absolute; position-anchor: --ui-popover; position-area: block-end` | Places the surface below the trigger with no script, and hands you the anchor name for `anchor()` geometry of your own. |
 
 ### `popover.title`

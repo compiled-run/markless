@@ -90,7 +90,11 @@ The useful part is where the error lands. It is on the link, in the file you are
 names the pattern that does not exist. Nobody has to remember which pages linked to the folder that
 was renamed, because every one of them stops compiling.
 
-<Callout sprite="cross" title="This site links with plain anchors" text="Every link on this documentation site is a plain <a href> rather than a Link, because importing @markless/router into app code fails this site's production build on 0.3.1. It is recorded as finding 2 in this site's NOTES.md. Nothing you read here is being demonstrated by the site's own navigation, so treat the code above as what your app should do, and this sentence as the reason the page cannot show it to you working." />
+<Callout
+	sprite="cross"
+	title="This site links with plain anchors"
+	text="Every link on this documentation site is a plain <a href> rather than a Link, because importing @markless/router into app code fails this site's production build on 0.3.1. It is recorded as finding 2 in this site's NOTES.md. Nothing you read here is being demonstrated by the site's own navigation, so treat the code above as what your app should do, and this sentence as the reason the page cannot show it to you working."
+/>
 
 ## What a `Link` is at runtime
 
@@ -98,7 +102,11 @@ It renders a real `<a>` with a real `href`, so the browser treats it as a link: 
 tab, right-click offers to copy the address, and a reader with JavaScript off still gets where they
 are going. On a click it navigates on the client instead, and the router owns that navigation.
 
-<Collapsible sprite="star-badge" summary="The three props you will reach for eventually" text="prefetch asks the router to start fetching the destination before the click, so the navigation begins with work already done. Its type is boolean | 'intent' | 'viewport', and the two strings are the useful part: 'intent' starts the fetch when the reader hovers or focuses the link, and 'viewport' starts it when the link scrolls into view. replace swaps the current history entry instead of adding one, which is what you want after a form submission or a redirect, so the back button does not walk the reader into the page they just left. scroll controls whether arriving at the new page moves the reader back to the top. All three are ordinary props on Link, and all three are optional." />
+<Collapsible
+	sprite="star-badge"
+	summary="The three props you will reach for eventually"
+	text="prefetch asks the router to start fetching the destination before the click, so the navigation begins with work already done. Its type is boolean | 'intent' | 'viewport', and the two strings are the useful part: 'intent' starts the fetch when the reader hovers or focuses the link, and 'viewport' starts it when the link scrolls into view. replace swaps the current history entry instead of adding one, which is what you want after a form submission or a redirect, so the back button does not walk the reader into the page they just left. scroll controls whether arriving at the new page moves the reader back to the top. All three are ordinary props on Link, and all three are optional."
+/>
 
 ## Try it yourself
 

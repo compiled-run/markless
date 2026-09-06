@@ -96,7 +96,11 @@ export default function Card() @{
 Markless supports exactly one authoring language, and this is it. There is no second template syntax
 waiting for you later, and no configuration deciding which files get compiled how.
 
-<Collapsible sprite="star-badge" summary="Why not JSX, which I already know?" text="Because the compiler needs to see your component structurally, and it needs a guarantee that it is seeing all of it. The overview puts the tradeoff plainly: because the framework owns the language, the compiler sees every component, every state creation site, every closure and every async boundary, which is what makes marker-free resumability, async dataflow and a plain-value state API tractable. That is the deal you are taking. In exchange for three unfamiliar characters, you get a plain let and a plain count++ with no wrapper, no setter and no marker anywhere in your code. The overview is equally plain about the cost: JSX and TSX are explicitly not supported, now or later." />
+<Collapsible
+	sprite="star-badge"
+	summary="Why not JSX, which I already know?"
+	text="Because the compiler needs to see your component structurally, and it needs a guarantee that it is seeing all of it. The overview puts the tradeoff plainly: because the framework owns the language, the compiler sees every component, every state creation site, every closure and every async boundary, which is what makes marker-free resumability, async dataflow and a plain-value state API tractable. That is the deal you are taking. In exchange for three unfamiliar characters, you get a plain let and a plain count++ with no wrapper, no setter and no marker anywhere in your code. The overview is equally plain about the cost: JSX and TSX are explicitly not supported, now or later."
+/>
 
 ## Where to go next
 

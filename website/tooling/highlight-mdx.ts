@@ -126,7 +126,8 @@ async function highlightParts(code: string, id: string): Promise<string> {
 		rewritten.push(collectHeadings(await highlightFences(part.html), seen, headings));
 	}
 	const outline = outlineMarkup(headings);
-	if (outline && firstHtml >= 0) rewritten[firstHtml] = spliceOutline(rewritten[firstHtml] ?? '', outline);
+	if (outline && firstHtml >= 0)
+		rewritten[firstHtml] = spliceOutline(rewritten[firstHtml] ?? '', outline);
 	const nextParts: MdxRoutePart[] = parts.map((part, index) => {
 		const html = rewritten[index];
 		if (part.kind !== 'html' || html === undefined || html === part.html) return part;

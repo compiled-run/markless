@@ -23,7 +23,10 @@ const QUOTED = /^'([^']*)'$/;
 
 /** Collapses the manifest's wrapped type text and drops a leading union bar. */
 export function normalizeType(type: string): string {
-	return type.replace(/\s+/g, ' ').trim().replace(/^\|\s*/, '');
+	return type
+		.replace(/\s+/g, ' ')
+		.trim()
+		.replace(/^\|\s*/, '');
 }
 
 /** Splits a union at bar characters that are not inside brackets, parens or quotes. */
@@ -122,7 +125,9 @@ export function controlFor(type: string): ControlDescriptor {
  * control starts on. Anything that is not a scalar literal comes back undefined
  * and the control starts from the family's own behaviour instead.
  */
-export function initialValue(defaultText: string | undefined): string | number | boolean | undefined {
+export function initialValue(
+	defaultText: string | undefined,
+): string | number | boolean | undefined {
 	if (defaultText === undefined) return undefined;
 	const text = defaultText.trim();
 	if (text === 'true') return true;

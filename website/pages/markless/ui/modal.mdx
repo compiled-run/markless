@@ -46,10 +46,10 @@ It writes `ui-open` and `ui-closed`.
 
 ## Props on `modal.root`
 
-| Prop | Type | What it does |
-| --- | --- | --- |
-| `open` | `boolean` | Whether the dialog is showing. Omit it and it starts closed. |
-| `alert` | `boolean` | An alert dialog: it announces as `alertdialog`, refuses to close on an outside press, and puts focus on the close control. Escape still closes it. |
-| `onChange` | `(open) => void` | Called with the new value when the dialog opens or closes, dismissals included. |
+| Prop       | Type             | What it does                                                                                                                                       |
+| ---------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `open`     | `boolean`        | Whether the dialog is showing. Omit it and it starts closed.                                                                                       |
+| `alert`    | `boolean`        | An alert dialog: it announces as `alertdialog`, refuses to close on an outside press, and puts focus on the close control. Escape still closes it. |
+| `onChange` | `(open) => void` | Called with the new value when the dialog opens or closes, dismissals included.                                                                    |
 
 Everything a `<div>` accepts reaches the element too.

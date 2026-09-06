@@ -91,7 +91,11 @@ assets, and the small script that applies a stored theme before the first paint.
 One document, every page. There is no second shell to keep in step, and there is no `layout.tsrx`
 convention either.
 
-<Callout sprite="cross" title="This site's own document does not use Html" text="The document you are reading right now keeps a plain <html> root instead, because importing @markless/router into this site's app code fails its production build on 0.3.1. It is recorded as findings 2 and 24 in this site's NOTES.md, and it is a bug in the version, not the design. Write the Html form above in your own app: that is the shipped starter, and it is what the router expects." />
+<Callout
+	sprite="cross"
+	title="This site's own document does not use Html"
+	text="The document you are reading right now keeps a plain <html> root instead, because importing @markless/router into this site's app code fails its production build on 0.3.1. It is recorded as findings 2 and 24 in this site's NOTES.md, and it is a bug in the version, not the design. Write the Html form above in your own app: that is the shipped starter, and it is what the router expects."
+/>
 
 ## The parts of a project that are not pages
 
@@ -113,7 +117,11 @@ You do not write an entry file for any of this. A client entry, a server entry, 
 resume entry are all named in the render specification as things that are not valid app-authored
 requirements, and the router owns every one of them.
 
-<Collapsible sprite="star-badge" summary="Where do 404 and 500 come from, and where is the layout file?" text="pages/404.tsrx answers any request that matched no other page, with status 404, and pages/500.tsrx answers a page that threw while rendering, with status 500. Both are ordinary pages: they take the same props and you write them the same way. As for layouts, there is no layout.tsrx convention at all. A layout in Markless is an ordinary component that takes children, and a page uses it by writing it, which means the thing wrapping your page is visible in the page's own file rather than implied by where the file sits." />
+<Collapsible
+	sprite="star-badge"
+	summary="Where do 404 and 500 come from, and where is the layout file?"
+	text="pages/404.tsrx answers any request that matched no other page, with status 404, and pages/500.tsrx answers a page that threw while rendering, with status 500. Both are ordinary pages: they take the same props and you write them the same way. As for layouts, there is no layout.tsrx convention at all. A layout in Markless is an ordinary component that takes children, and a page uses it by writing it, which means the thing wrapping your page is visible in the page's own file rather than implied by where the file sits."
+/>
 
 ## Try it yourself
 

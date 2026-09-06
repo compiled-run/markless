@@ -29,9 +29,8 @@ check(
 // version; only the installed manifest answers "is this app on one Markless".
 const installedVersion = (name) => {
 	try {
-		return JSON.parse(
-			readFileSync(resolve(root, 'node_modules', name, 'package.json'), 'utf8'),
-		).version;
+		return JSON.parse(readFileSync(resolve(root, 'node_modules', name, 'package.json'), 'utf8'))
+			.version;
 	} catch {
 		return undefined;
 	}

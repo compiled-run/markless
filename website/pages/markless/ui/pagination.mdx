@@ -48,12 +48,12 @@ It writes `ui-active` and `ui-disabled`.
 
 ## Props on `pagination.root`
 
-| Prop | Type | What it does |
-| --- | --- | --- |
-| `count` | `number` | How many pages there are in total. Required. |
-| `page` | `number` | Which page is showing, counting from 1. Omit it and it starts at page 1. |
-| `siblingCount` | `number` | How many pages to show on each side of the current one. Omit it and it is 1. |
-| `disabled` | `boolean` | Nothing navigates, and every control reports unavailable. |
-| `onChange` | `(page) => void` | Called with the new page number when a person moves to another page. |
+| Prop           | Type             | What it does                                                                 |
+| -------------- | ---------------- | ---------------------------------------------------------------------------- |
+| `count`        | `number`         | How many pages there are in total. Required.                                 |
+| `page`         | `number`         | Which page is showing, counting from 1. Omit it and it starts at page 1.     |
+| `siblingCount` | `number`         | How many pages to show on each side of the current one. Omit it and it is 1. |
+| `disabled`     | `boolean`        | Nothing navigates, and every control reports unavailable.                    |
+| `onChange`     | `(page) => void` | Called with the new page number when a person moves to another page.         |
 
 Everything a `<nav>` accepts reaches the element too. `pagination.item` takes its own `value`.

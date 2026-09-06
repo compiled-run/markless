@@ -36,7 +36,10 @@ function quickInfo(): QuickInfoService {
 export function getHighlighter(): Promise<HighlighterGeneric<string, string>> {
 	highlighterPromise ??= (async () => {
 		const grammar = JSON.parse(
-			await readFile(fileURLToPath(new URL('./tsrx.tmLanguage.json', import.meta.url)), 'utf8'),
+			await readFile(
+				fileURLToPath(new URL('./tsrx.tmLanguage.json', import.meta.url)),
+				'utf8',
+			),
 		) as LanguageRegistration;
 		return createHighlighter({
 			themes: [LIGHT_THEME, DARK_THEME],
@@ -250,7 +253,10 @@ export function useSiteSurface(
 	return html
 		.replace(/(<pre class="shiki[^"]*")\s+style="[^"]*"/, '$1')
 		.replace(new RegExp(`(?<!-)color:${hex(lightForeground)}`, 'gi'), 'color:var(--ink)')
-		.replace(new RegExp(`--shiki-dark:${hex(darkForeground)}`, 'gi'), '--shiki-dark:var(--ink)');
+		.replace(
+			new RegExp(`--shiki-dark:${hex(darkForeground)}`, 'gi'),
+			'--shiki-dark:var(--ink)',
+		);
 }
 
 /**

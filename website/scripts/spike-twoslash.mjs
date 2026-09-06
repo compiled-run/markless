@@ -21,7 +21,9 @@ const at = (token) => SOURCE.indexOf(token) + token.lastIndexOf('.') + 1;
 const failures = [];
 for (const token of ['accordion.root', 'accordion.item', 'accordion.itemtrigger']) {
 	const offset = at(token);
-	const info = infos.find((entry) => entry.start <= offset && offset < entry.start + entry.length);
+	const info = infos.find(
+		(entry) => entry.start <= offset && offset < entry.start + entry.length,
+	);
 	if (!info || !info.signature || /:\s*any\b/.test(info.signature)) {
 		failures.push(token);
 		console.log(`FAIL ${token}: ${info ? info.signature : 'no quick info'}`);

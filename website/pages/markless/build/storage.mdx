@@ -71,9 +71,17 @@ export default function FavouriteColour() @{
 }
 ```
 
-<Callout sprite="speech-bubble" title="Why that file is not a box on this page" text="It is real and it renders, and clicking a button really does repaint the square, so what you are missing is only the reload half. On a page that already carries this site's theme toggle, a second storage() binding updates the page but never reaches localStorage: nothing is written under the key, no data-favourite-colour attribute is stamped on the html element, and a reload comes back on the fallback. The site's own toggle, which is the first storage() binding on the page, persists correctly. It is recorded as finding 30 in this site's NOTES.md. Rather than put a box here that teaches the wrong half of the lesson, the page points you at the toggle in the header, which is the same mechanism doing the whole job." />
+<Callout
+	sprite="speech-bubble"
+	title="Why that file is not a box on this page"
+	text="It is real and it renders, and clicking a button really does repaint the square, so what you are missing is only the reload half. On a page that already carries this site's theme toggle, a second storage() binding updates the page but never reaches localStorage: nothing is written under the key, no data-favourite-colour attribute is stamped on the html element, and a reload comes back on the fallback. The site's own toggle, which is the first storage() binding on the page, persists correctly. It is recorded as finding 30 in this site's NOTES.md. Rather than put a box here that teaches the wrong half of the lesson, the page points you at the toggle in the header, which is the same mechanism doing the whole job."
+/>
 
-<Callout sprite="cross" title="Why the declaration is outside the component" text="storage() is collected as a module-scope binding, so the declaration has to sit at the top of the file rather than inside the component body. That is recorded as finding 15 in this site's NOTES.md, found while building the theme toggle you can see in the header. Everything else about the binding behaves the way a state() variable inside a component body does: read it, assign to it, and the pieces of the page that read it change." />
+<Callout
+	sprite="cross"
+	title="Why the declaration is outside the component"
+	text="storage() is collected as a module-scope binding, so the declaration has to sit at the top of the file rather than inside the component body. That is recorded as finding 15 in this site's NOTES.md, found while building the theme toggle you can see in the header. Everything else about the binding behaves the way a state() variable inside a component body does: read it, assign to it, and the pieces of the page that read it change."
+/>
 
 ## Pin the key for anything real
 
@@ -100,9 +108,17 @@ under the old name, and nothing will ever read it.
 
 So: derived keys while you are playing, pinned keys the moment real people are involved.
 
-<Collapsible sprite="thought-bubble" summary="What can I actually put in there?" text="Strings, in v1. localStorage holds strings and the seed script has to apply the value before any of your code runs, so there is no serializer in the path to turn an object back into itself in time. If you need more than one value, use more than one storage() binding, or keep the durable part as a string key and look the rest up. One more version note: the one-argument form's type declaration was wrong in 0.2.0 and fixed in 0.2.1, so a reader on 0.2.0 will see TypeScript complain about a call that is correct. This site runs 0.3.1." />
+<Collapsible
+	sprite="thought-bubble"
+	summary="What can I actually put in there?"
+	text="Strings, in v1. localStorage holds strings and the seed script has to apply the value before any of your code runs, so there is no serializer in the path to turn an object back into itself in time. If you need more than one value, use more than one storage() binding, or keep the durable part as a string key and look the rest up. One more version note: the one-argument form's type declaration was wrong in 0.2.0 and fixed in 0.2.1, so a reader on 0.2.0 will see TypeScript complain about a call that is correct. This site runs 0.3.1."
+/>
 
-<Collapsible sprite="star-badge" summary="Coming from another framework?" text="There is no hook, no provider and no hydration mismatch to work around here. The two usual approaches both have a cost this one does not pay: reading localStorage in an effect means the wrong thing is painted first and corrected afterwards, which is the flash, and rendering a blocking script by hand means writing and maintaining that script yourself. The compiler emits the seed for you and the binding is the same one you write to, so the persisted copy and the on-screen copy cannot drift apart." />
+<Collapsible
+	sprite="star-badge"
+	summary="Coming from another framework?"
+	text="There is no hook, no provider and no hydration mismatch to work around here. The two usual approaches both have a cost this one does not pay: reading localStorage in an effect means the wrong thing is painted first and corrected afterwards, which is the flash, and rendering a blocking script by hand means writing and maintaining that script yourself. The compiler emits the seed for you and the binding is the same one you write to, so the persisted copy and the on-screen copy cannot drift apart."
+/>
 
 ## Where it fits
 

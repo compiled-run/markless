@@ -42,9 +42,9 @@ This family writes no `ui-` attributes: nothing about a code changes as a person
 
 ## Props on `qrcode.root`
 
-| Prop | Type | What it does |
-| --- | --- | --- |
-| `value` | `string` | The text the code carries, usually a URL. Required. |
+| Prop       | Type                                        | What it does                                                                                                                                   |
+| ---------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `value`    | `string`                                    | The text the code carries, usually a URL. Required.                                                                                            |
 | `recovery` | `'low' \| 'medium' \| 'quartile' \| 'high'` | How much of the code can be damaged or covered and still be read: 7%, 15%, 25%, 30%. Omit it for medium. A logo on top needs quartile or high. |
 
 Everything a `<div>` accepts reaches the element too, `aria-label` included.

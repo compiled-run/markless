@@ -1,52 +1,28 @@
-# compiled-website
+# website
 
-The Markless documentation site, served at `compiled.run/markless`. It is a real Markless app built
-on released `@markless/*` packages, so everything on it is doing what a reader's own app would do.
-
-## Where the framework comes from
-
-The site installs `@markless/*` `^0.3.3` from npm. There is no `vendor/` directory, no `@markless/*`
-override, and — since 0.3.3 — no `overrides` block at all: `@tsrx/runtime@0.1.1` is published now,
-so the `"@tsrx/core": "0.1.58"` pin that findings 1 and 22 needed is gone. Proven by deleting the
-block and running `rm -rf node_modules package-lock.json && npm install` on this `package.json`: it
-succeeds, `@tsrx/core` resolves to 0.1.60, and the build, the doctor and the witness are green on it.
-
-`scripts/markless-doctor.mjs` compares the *installed* version of each `@markless/*` package, so a
-`^` range that resolved somewhere unexpected fails the check rather than passing on the string.
-
-**To move to the next release**, say 0.3.4: change the four `^0.3.3` ranges in `dependencies` and
-`devDependencies`, then `rm -rf node_modules package-lock.json && npm install`, then
-`npm run build && npm run doctor && npm run witness`. The witness is the thing that tells you what
-the release actually changed: a check that was `known-failing` and now passes fails the run on
-purpose, so the note explaining the failure has to be removed in the same change set.
-
-**On 0.3.3 nothing is known-failing.** 0.3.1's one known failure — the `class={ternary}` binding on
-the reading-a-`.tsrx` page, `NOTES.md` finding 18 — is fixed: the highlight moves on click, the
-assertion is real again, and the honesty callout that stood over that widget is deleted. What is
-*not* re-tested on 0.3.3 is findings 25, 26, 29, 30 and 31, whose widgets are still parked and whose
-pages still describe 0.3.1 measurements; finding 23 was re-run and still holds — an `@if` inside a
-component still hangs the build, killed at 180 s on 0.3.3, which is why the sidebar picks an icon
-with an expression on `src` rather than a branch. `NOTES.md` finding 37 has the detail.
-
-## Working locally
-
-```sh
-npm install && npm run dev
-```
-
-npm is the primary: `package-lock.json` is the lockfile in the repo. pnpm works too — the site
-carries a `pnpm-workspace.yaml` naming itself, so `pnpm install` scopes to this project instead of
-walking up into whatever workspace the checkout happens to sit inside, and the `pnpm-lock.yaml` it
-writes is git-ignored rather than committed beside the npm one.
+The Markless documentation site, served at `compiled.run/markless`. It lives in the framework
+monorepo as the `website` workspace package and consumes `@markless/*` through `workspace:*`, so a
+framework change is checked against the real site in the same change set.
 
 ## Run it
 
+From the repository root:
+
 ```sh
-npm install
-npm run dev        # dev server
-npm run build      # production build into .output/
-npm run preview    # serve the production build
+pnpm install
+pnpm docs:dev        # dev server
+pnpm docs:build      # production build into website/.output/
+pnpm docs:preview    # serve the production build
 ```
+
+Inside `website/`: `pnpm typecheck`, `pnpm typecheck:tsrx`, `pnpm exec vp check`, `pnpm witness`.
+The root formatter and lint config apply here; `public/` and the generated playground modules are
+excluded from both.
+
+The dev server only ships a playground's generated CSS with its island's JS, so an untouched dev
+page shows the playground unstyled until the first interaction. Visual checks
+(`scripts/brand-review.ts`) therefore target a production serve:
+`PORT=4310 node .output/server/index.mjs`.
 
 Pages live under `pages/markless/`, which is what puts them at `/markless/…`; `vite.config.ts` sets
 the matching `base` and `nitro.baseURL`.
@@ -57,12 +33,12 @@ The site is its own Vercel project, and `compiled.run` proxies it. Nothing about
 special: the whole point of the base path is that this project genuinely serves `/markless/…`, so
 the proxy in front of it is a path-preserving rewrite and not a rewrite that has to strip anything.
 
-| | |
-| --- | --- |
-| Repo | `https://github.com/compiled-run/compiled-website` |
-| Vercel project | `markless-docs`, team `jack-shelton` (`team_4TrBQsvIkFM0lYTqh08Fqxgd`), project `prj_rv06xPVYEu7z8GdStWatxRbjV8tm` |
-| Production alias | `https://markless-docs.vercel.app/markless` |
-| Public path | `https://compiled.run/markless` once the rewrite below is merged |
+|                  |                                                                                                                    |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Repo             | `https://github.com/compiled-run/compiled-website`                                                                 |
+| Vercel project   | `markless-docs`, team `jack-shelton` (`team_4TrBQsvIkFM0lYTqh08Fqxgd`), project `prj_rv06xPVYEu7z8GdStWatxRbjV8tm` |
+| Production alias | `https://markless-docs.vercel.app/markless`                                                                        |
+| Public path      | `https://compiled.run/markless` once the rewrite below is merged                                                   |
 
 ### How a deploy happens
 

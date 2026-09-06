@@ -372,7 +372,6 @@ export function assumesFor(assumes: string): readonly AssumesItem[] {
 		});
 }
 
-
 /* ---------------------------------------------------------------------------
    The UI section. `@markless/ui` is a second set of pages under /markless/ui,
    and the switch at the top of the sidebar moves a reader between the two. What

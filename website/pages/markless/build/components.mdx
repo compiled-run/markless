@@ -63,7 +63,11 @@ click runs `onBump`, which is a function the parent wrote and handed over. That 
 `total`, which is a watched variable, so the one piece of text that reads `total` changes. The child
 never knew a number existed, and the parent never knew a button did.
 
-<Callout sprite="speech-bubble" title="Why that pair is not a box on this page" text="This site's pages are built out of the same components they show, and that pair is the one we could not put in a box here. Inside a page like this one, a click on a button that lives in a child component and calls a callback prop fails to resume: the browser asks for the handler and gets a 404, then Unknown async symbol symbol:0, and the number does not move. The same code is fine in an ordinary page under pages/, so it is this site's composition path rather than callback props themselves. It is recorded as finding 29 in this site's NOTES.md. A fake demo would teach you less than this sentence does, so the page ships without one and the check that proves it is missing stays in the site's witness until the day it can come back." />
+<Callout
+	sprite="speech-bubble"
+	title="Why that pair is not a box on this page"
+	text="This site's pages are built out of the same components they show, and that pair is the one we could not put in a box here. Inside a page like this one, a click on a button that lives in a child component and calls a callback prop fails to resume: the browser asks for the handler and gets a 404, then Unknown async symbol symbol:0, and the number does not move. The same code is fine in an ordinary page under pages/, so it is this site's composition path rather than callback props themselves. It is recorded as finding 29 in this site's NOTES.md. A fake demo would teach you less than this sentence does, so the page ships without one and the check that proves it is missing stays in the site's witness until the day it can come back."
+/>
 
 ## A prop is a live read, not a copy
 
@@ -75,7 +79,11 @@ Destructuring in the parameter list does not break that. `const { label } = prop
 every later read of `label` still goes back to the parent. Write the parameter list you would write
 in any TypeScript function.
 
-<Callout sprite="cross" title="One shape the compiler rejects today" text="A destructuring default in the parameter list is a compile error: function Badge({ label = 'stable' }) fails with MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED, because the compiler cannot make a graph alias out of a value that may or may not come from the parent. Declare the prop without a default and pass it explicitly at every call site, or compute the fallback inside the component with computed()." />
+<Callout
+	sprite="cross"
+	title="One shape the compiler rejects today"
+	text="A destructuring default in the parameter list is a compile error: function Badge({ label = 'stable' }) fails with MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED, because the compiler cannot make a graph alias out of a value that may or may not come from the parent. Declare the prop without a default and pass it explicitly at every call site, or compute the fallback inside the component with computed()."
+/>
 
 ## Callback props are how a child talks back
 
@@ -141,9 +149,17 @@ The specification says it plainly: children is an opaque template projection, an
 allowed on it are render it, wrap it, or pass it on. Inspecting it, mapping over it, counting it or
 cloning it is diagnosed at compile time rather than silently half-working.
 
-<Collapsible sprite="thought-bubble" summary="What if I need to know how many children there are?" text="Then children is the wrong shape for that job, and the fix is a prop. If a tab strip needs to know its tabs, pass the tabs as data and let the component render them: tabs={[{ id: 'one', title: 'First' }]}. You get the count, the ids and the ordering as ordinary TypeScript values you can check, and the component still projects whatever content each tab holds. There is also no Slot primitive and no named-slot syntax in v1: one children projection per component, plus as many ordinary props as the job needs." />
+<Collapsible
+	sprite="thought-bubble"
+	summary="What if I need to know how many children there are?"
+	text="Then children is the wrong shape for that job, and the fix is a prop. If a tab strip needs to know its tabs, pass the tabs as data and let the component render them: tabs={[{ id: 'one', title: 'First' }]}. You get the count, the ids and the ordering as ordinary TypeScript values you can check, and the component still projects whatever content each tab holds. There is also no Slot primitive and no named-slot syntax in v1: one children projection per component, plus as many ordinary props as the job needs."
+/>
 
-<Collapsible sprite="star-badge" summary="Coming from another framework?" text="Three habits to unlearn. There is no children array, so no map over children, no counting them and no cloning one with extra props: the compiler rejects those instead of returning something that looks close enough. There is no memo wrapper and no dependency list on a callback prop, because passing a new function to a child does not cause the child to run again: the child function ran once, and what changes afterwards is the individual DOM update that read the value. And a prop does not need a subscription, a selector or a store: reading it in the child re-reads the parent's live value." />
+<Collapsible
+	sprite="star-badge"
+	summary="Coming from another framework?"
+	text="Three habits to unlearn. There is no children array, so no map over children, no counting them and no cloning one with extra props: the compiler rejects those instead of returning something that looks close enough. There is no memo wrapper and no dependency list on a callback prop, because passing a new function to a child does not cause the child to run again: the child function ran once, and what changes afterwards is the individual DOM update that read the value. And a prop does not need a subscription, a selector or a store: reading it in the child re-reads the parent's live value."
+/>
 
 ## Where a component can live
 

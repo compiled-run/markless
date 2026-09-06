@@ -44,7 +44,14 @@ export type Run = {
 
 export type Line = { readonly id: string; readonly runs: readonly Run[] };
 
-export type Doc = { readonly id: string; readonly n: string; readonly t: string; readonly b: string; readonly title: string; readonly doc: string };
+export type Doc = {
+	readonly id: string;
+	readonly n: string;
+	readonly t: string;
+	readonly b: string;
+	readonly title: string;
+	readonly doc: string;
+};
 
 /** The `Run`, `Line` and `Doc` types as a generated module declares them. */
 export const RUN_TYPES = `type Run = {
@@ -75,7 +82,14 @@ export class DocRegistry {
 		let found = this.byText.get(key);
 		if (!found) {
 			const n = String(this.docs.length);
-			found = { id: `d${n}`, n, t: `${this.idPrefix}-${n}t`, b: `${this.idPrefix}-${n}b`, title, doc };
+			found = {
+				id: `d${n}`,
+				n,
+				t: `${this.idPrefix}-${n}t`,
+				b: `${this.idPrefix}-${n}b`,
+				title,
+				doc,
+			};
 			this.docs.push(found);
 			this.byText.set(key, found);
 		}
@@ -99,12 +113,19 @@ export class ColourTable {
 
 	css(): string {
 		return [...this.byStyle]
-			.map(([style, name]) => `			.${name} {\n				${style.split(';').filter(Boolean).join(';\n				')};\n			}`)
+			.map(
+				([style, name]) =>
+					`			.${name} {\n				${style.split(';').filter(Boolean).join(';\n				')};\n			}`,
+			)
 			.join('\n\n');
 	}
 }
 
-type Frame = { readonly kind: 'line' | 'span' | 'tip'; readonly style: string; readonly hover?: Doc };
+type Frame = {
+	readonly kind: 'line' | 'span' | 'tip';
+	readonly style: string;
+	readonly hover?: Doc;
+};
 
 type Draft = { text: string; style: string; readonly hover?: Doc };
 
@@ -171,7 +192,8 @@ export function paneLines(html: string, registry: DocRegistry, colours: ColourTa
 			.map((draft, runIndex) => {
 				const run: Run = { id: `r${runIndex}`, text: draft.text };
 				const colour = colours.classFor(draft.style);
-				if (draft.hover === undefined) return colour === undefined ? run : { ...run, class: colour };
+				if (draft.hover === undefined)
+					return colour === undefined ? run : { ...run, class: colour };
 				return {
 					...run,
 					class: colour === undefined ? 'tsrx-hover' : `tsrx-hover ${colour}`,

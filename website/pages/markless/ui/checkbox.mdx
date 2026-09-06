@@ -142,10 +142,10 @@ trigger.
 
 Focus lands on the trigger, and a disabled trigger is skipped by the browser's own tab order.
 
-| Key | What it does |
-| --- | --- |
-| Tab | Move to the trigger, or past it. |
-| Space | Toggle the checkbox. |
+| Key   | What it does                                                                |
+| ----- | --------------------------------------------------------------------------- |
+| Tab   | Move to the trigger, or past it.                                            |
+| Space | Toggle the checkbox.                                                        |
 | Enter | Nothing. The family prevents it, because a checkbox is not a submit button. |
 
 ## API reference
@@ -154,21 +154,21 @@ Every prop is optional, and the types below are the family's own.
 
 ### `checkbox.root`
 
-| Prop | Type | What it does |
-| --- | --- | --- |
-| `checked` | `boolean \| 'mixed'` | The value the checkbox shows. Omit it and the box starts off. |
-| `disabled` | `boolean` | Nobody can toggle the checkbox, and the trigger is disabled outright. |
-| `required` | `boolean` | Marks the hidden `checkbox.field` input required, so a form refuses to submit unticked. |
-| `name` | `string` | Submitted under this name by `checkbox.field`. |
-| `value` | `string` | Submitted instead of the browser default `"on"`. |
-| `onChange` | `(checked: boolean \| 'mixed') => void` | Called with the new value when a person toggles the checkbox. |
+| Prop       | Type                                    | What it does                                                                            |
+| ---------- | --------------------------------------- | --------------------------------------------------------------------------------------- |
+| `checked`  | `boolean \| 'mixed'`                    | The value the checkbox shows. Omit it and the box starts off.                           |
+| `disabled` | `boolean`                               | Nobody can toggle the checkbox, and the trigger is disabled outright.                   |
+| `required` | `boolean`                               | Marks the hidden `checkbox.field` input required, so a form refuses to submit unticked. |
+| `name`     | `string`                                | Submitted under this name by `checkbox.field`.                                          |
+| `value`    | `string`                                | Submitted instead of the browser default `"on"`.                                        |
+| `onChange` | `(checked: boolean \| 'mixed') => void` | Called with the new value when a person toggles the checkbox.                           |
 
-| Attribute | Present when | What to key styling off |
-| --- | --- | --- |
-| `ui-checked` | The value is `true` | The ticked look. |
-| `ui-mixed` | The value is `'mixed'` | The part-ticked look. |
-| `ui-disabled` | `disabled` is set | The unreachable look. |
-| `aria-disabled` | Always | `true` or `false`, for a screen reader rather than your stylesheet. |
+| Attribute       | Present when           | What to key styling off                                             |
+| --------------- | ---------------------- | ------------------------------------------------------------------- |
+| `ui-checked`    | The value is `true`    | The ticked look.                                                    |
+| `ui-mixed`      | The value is `'mixed'` | The part-ticked look.                                               |
+| `ui-disabled`   | `disabled` is set      | The unreachable look.                                               |
+| `aria-disabled` | Always                 | `true` or `false`, for a screen reader rather than your stylesheet. |
 
 Everything a `<div>` accepts reaches the element too, apart from `onChange`, which is the family's.
 
@@ -178,15 +178,15 @@ No props of its own. It renders a `<button type="button" role="checkbox">`, and 
 `<button>` accepts reaches the element. Your own `onClick` and `onKeydown` run after the checkbox
 has toggled.
 
-| Attribute | Present when | What to key styling off |
-| --- | --- | --- |
-| `ui-checked` | The value is `true` | The ticked look. |
-| `ui-mixed` | The value is `'mixed'` | The part-ticked look. |
-| `ui-disabled` | `disabled` is set | The unreachable look. |
-| `aria-checked` | Always | `true`, `false` or `mixed`. |
-| `aria-invalid` | Always | `true` while a `checkbox.error` is mounted. |
-| `aria-describedby` | Always | The ids of the error and the description, error first. |
-| `disabled` | The root is disabled | The native disabled state, so the browser skips the button. |
+| Attribute          | Present when           | What to key styling off                                     |
+| ------------------ | ---------------------- | ----------------------------------------------------------- |
+| `ui-checked`       | The value is `true`    | The ticked look.                                            |
+| `ui-mixed`         | The value is `'mixed'` | The part-ticked look.                                       |
+| `ui-disabled`      | `disabled` is set      | The unreachable look.                                       |
+| `aria-checked`     | Always                 | `true`, `false` or `mixed`.                                 |
+| `aria-invalid`     | Always                 | `true` while a `checkbox.error` is mounted.                 |
+| `aria-describedby` | Always                 | The ids of the error and the description, error first.      |
+| `disabled`         | The root is disabled   | The native disabled state, so the browser skips the button. |
 
 ### `checkbox.indicator`
 

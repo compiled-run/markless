@@ -40,7 +40,18 @@ const PAPER = [240 / 255, 224 / 255, 200 / 255] as const;
 type Box = { readonly x: number; readonly y: number; readonly w: number; readonly h: number };
 
 function buildMask(source: string, out: string): void {
-	magick([source, '-alpha', 'off', '-colorspace', 'sRGB', '-fx', ALPHA_FX, '-colorspace', 'gray', out]);
+	magick([
+		source,
+		'-alpha',
+		'off',
+		'-colorspace',
+		'sRGB',
+		'-fx',
+		ALPHA_FX,
+		'-colorspace',
+		'gray',
+		out,
+	]);
 }
 
 function readGray(png: string, width: number, height: number): Uint8Array {
@@ -53,7 +64,10 @@ function readGray(png: string, width: number, height: number): Uint8Array {
 }
 
 function sizeOf(source: string): { width: number; height: number } {
-	const [width, height] = magick([source, '-format', '%w %h', 'info:']).trim().split(/\s+/).map(Number);
+	const [width, height] = magick([source, '-format', '%w %h', 'info:'])
+		.trim()
+		.split(/\s+/)
+		.map(Number);
 	return { width: width!, height: height! };
 }
 
@@ -177,7 +191,8 @@ function intoRows(boxes: readonly Box[], rowCount: number): Box[][] {
 		for (const box of sorted) {
 			let best = 0;
 			for (let line = 1; line < lines.length; line += 1)
-				if (Math.abs(centre(box) - lines[line]!) < Math.abs(centre(box) - lines[best]!)) best = line;
+				if (Math.abs(centre(box) - lines[line]!) < Math.abs(centre(box) - lines[best]!))
+					best = line;
 			next[best]!.push(box);
 		}
 		rows = next;
@@ -203,11 +218,14 @@ function segment(
 	// spacing does not. See SPRITE_MERGES.
 	const seeded = [...found, ...(options.merges ?? [])];
 	const boxes = cluster(seeded, options.gap, options.splits);
-	if (process.env.CUT_DEBUG) console.log(`  ${found.length} components -> ${boxes.length} doodles`);
+	if (process.env.CUT_DEBUG)
+		console.log(`  ${found.length} components -> ${boxes.length} doodles`);
 	const rows = intoRows(boxes, options.rowCount);
 	if (process.env.CUT_DEBUG)
 		rows.forEach((row, index) =>
-			console.log(`  line ${index}: ${row.map((b) => `${b.x},${b.y} ${b.w}x${b.h}`).join(' | ')}`),
+			console.log(
+				`  line ${index}: ${row.map((b) => `${b.x},${b.y} ${b.w}x${b.h}`).join(' | ')}`,
+			),
 		);
 	return rows;
 }
@@ -217,17 +235,32 @@ function segment(
  * has to go with it, or every stroke keeps a pale halo that only shows up on the
  * dark theme. This is the standard un-matte: c = (mixed - (1-a)*paper) / a.
  */
-const unmatte = (channel: 0 | 1 | 2) =>
-	`(a>0.004)?min(1,max(0,(u-(1-a)*${PAPER[channel]})/a)):u`;
+const unmatte = (channel: 0 | 1 | 2) => `(a>0.004)?min(1,max(0,(u-(1-a)*${PAPER[channel]})/a)):u`;
 
 /** Cuts one box out of the sheet as a transparent PNG at `targetLong` px on its long side. */
-function cutSprite(source: string, box: Box, targetLong: number, out: string): { w: number; h: number } {
+function cutSprite(
+	source: string,
+	box: Box,
+	targetLong: number,
+	out: string,
+): { w: number; h: number } {
 	const pad = 6;
 	const crop = `${box.w + pad * 2}x${box.h + pad * 2}+${box.x - pad}+${box.y - pad}`;
 	const maskPath = resolve(work, 'piece-mask.png');
 	const piecePath = resolve(work, 'piece.png');
 	magick([source, '-crop', crop, '+repage', piecePath]);
-	magick([piecePath, '-alpha', 'off', '-colorspace', 'sRGB', '-fx', ALPHA_FX, '-colorspace', 'gray', maskPath]);
+	magick([
+		piecePath,
+		'-alpha',
+		'off',
+		'-colorspace',
+		'sRGB',
+		'-fx',
+		ALPHA_FX,
+		'-colorspace',
+		'gray',
+		maskPath,
+	]);
 	magick([
 		piecePath,
 		'-alpha',
@@ -279,12 +312,44 @@ const CHALK = '#f2ead9';
 
 function makeDarkTwin(light: string, out: string): void {
 	magick([
-		'(', light, '-alpha', 'off', ')',
-		'(', light, '-alpha', 'off', '-fill', CHALK, '-colorize', '100', ')',
-		'(', light, '-alpha', 'off', '-colorspace', 'sRGB', '-fx', GREYNESS_FX, '-colorspace', 'gray', ')',
-		'-compose', 'Over', '-composite',
-		'(', light, '-alpha', 'extract', ')',
-		'-alpha', 'off', '-compose', 'CopyOpacity', '-composite',
+		'(',
+		light,
+		'-alpha',
+		'off',
+		')',
+		'(',
+		light,
+		'-alpha',
+		'off',
+		'-fill',
+		CHALK,
+		'-colorize',
+		'100',
+		')',
+		'(',
+		light,
+		'-alpha',
+		'off',
+		'-colorspace',
+		'sRGB',
+		'-fx',
+		GREYNESS_FX,
+		'-colorspace',
+		'gray',
+		')',
+		'-compose',
+		'Over',
+		'-composite',
+		'(',
+		light,
+		'-alpha',
+		'extract',
+		')',
+		'-alpha',
+		'off',
+		'-compose',
+		'CopyOpacity',
+		'-composite',
 		'-strip',
 		`PNG32:${out}`,
 	]);
@@ -311,12 +376,47 @@ const SPRITE_SPLITS: readonly Box[] = [{ x: 700, y: 590, w: 180, h: 3 }];
 
 /** Row-major names for `sprites-sheet.png`. A row that runs short is reported. */
 const SPRITE_NAMES: readonly (readonly string[])[] = [
-	['crown', 'sparkle', 'burst', 'star-face', 'heart', 'smiley', 'smiley-wink', 'smiley-surprised'],
-	['arrow-curve', 'arrow-loop', 'arrow-straight', 'zigzag-yellow', 'wave-purple', 'stroke-pink', 'scribble-green'],
+	[
+		'crown',
+		'sparkle',
+		'burst',
+		'star-face',
+		'heart',
+		'smiley',
+		'smiley-wink',
+		'smiley-surprised',
+	],
+	[
+		'arrow-curve',
+		'arrow-loop',
+		'arrow-straight',
+		'zigzag-yellow',
+		'wave-purple',
+		'stroke-pink',
+		'scribble-green',
+	],
 	['check', 'cross', 'plus', 'speech-bubble', 'thought-bubble', 'pill', 'oval', 'spiral'],
-	['loops-pink', 'corner-bracket', 'bookmark', 'rays', 'confetti', 'dots', 'dashes', 'squiggle-yellow'],
+	[
+		'loops-pink',
+		'corner-bracket',
+		'bookmark',
+		'rays',
+		'confetti',
+		'dots',
+		'dashes',
+		'squiggle-yellow',
+	],
 	['crown-small', 'ribbon', 'bolt', 'star-badge', 'cursor', 'sun', 'flower', 'sparkles'],
-	['hash', 'zigzag-pink', 'loops-black', 'underline-yellow', 'scribble-purple', 'square', 'triangle', 'drops'],
+	[
+		'hash',
+		'zigzag-pink',
+		'loops-black',
+		'underline-yellow',
+		'scribble-purple',
+		'square',
+		'triangle',
+		'drops',
+	],
 ];
 
 /** Draws the cut boxes back over the sheet, so a bad cut is visible rather than inferred. */
@@ -363,7 +463,9 @@ function cutSpriteSheet(): { name: string; w: number; h: number }[] {
 		row.forEach((box, columnIndex) => {
 			const name = names[columnIndex];
 			if (!name) {
-				console.warn(`row ${rowIndex} piece ${columnIndex} at ${box.x},${box.y} has no name — skipped`);
+				console.warn(
+					`row ${rowIndex} piece ${columnIndex} at ${box.x},${box.y} has no name — skipped`,
+				);
 				return;
 			}
 			const light = resolve(outDir, `${name}.png`);
@@ -388,14 +490,25 @@ function fillHoles(maskPath: string, out: string): void {
 	// reach is enclosed by an outline, so it is body. Body = that plus the ink.
 	magick([
 		maskPath,
-		'-threshold', '18%',
-		'-write', 'mpr:ink',
-		'-bordercolor', 'black', '-border', '1',
-		'-fill', 'white', '-draw', 'color 0,0 floodfill',
-		'-shave', '1x1',
+		'-threshold',
+		'18%',
+		'-write',
+		'mpr:ink',
+		'-bordercolor',
+		'black',
+		'-border',
+		'1',
+		'-fill',
+		'white',
+		'-draw',
+		'color 0,0 floodfill',
+		'-shave',
+		'1x1',
 		'-negate',
 		'mpr:ink',
-		'-compose', 'Lighten', '-composite',
+		'-compose',
+		'Lighten',
+		'-composite',
 		out,
 	]);
 }
@@ -408,11 +521,18 @@ function fillHoles(maskPath: string, out: string): void {
 function stickerBorder(bodyPath: string, out: string): void {
 	magick([
 		bodyPath,
-		'-morphology', 'Erode', 'Disk:4',
-		'-morphology', 'Dilate', 'Disk:10',
+		'-morphology',
+		'Erode',
+		'Disk:4',
+		'-morphology',
+		'Dilate',
+		'Disk:10',
 		bodyPath,
-		'-compose', 'Lighten', '-composite',
-		'-blur', '0x1.2',
+		'-compose',
+		'Lighten',
+		'-composite',
+		'-blur',
+		'0x1.2',
 		out,
 	]);
 }
@@ -449,7 +569,8 @@ function cutMascots(): { name: string; w: number; h: number }[] {
 		rowCount: 2,
 		splits: MASCOT_SPLITS,
 	});
-	if (process.env.CUT_DEBUG) writePreview(sheet, grid, resolve(root, ".sprite-cut-preview-mascots.png"));
+	if (process.env.CUT_DEBUG)
+		writePreview(sheet, grid, resolve(root, '.sprite-cut-preview-mascots.png'));
 	const outDir = resolve(root, 'public/mascots');
 	mkdirSync(outDir, { recursive: true });
 
@@ -457,7 +578,9 @@ function cutMascots(): { name: string; w: number; h: number }[] {
 	grid.forEach((row, rowIndex) => {
 		const suffix = rowIndex === 0 ? '' : '-label';
 		if (row.length !== MASCOT_NAMES.length)
-			console.warn(`mascot row ${rowIndex}: cut ${row.length} pieces, expected ${MASCOT_NAMES.length}`);
+			console.warn(
+				`mascot row ${rowIndex}: cut ${row.length} pieces, expected ${MASCOT_NAMES.length}`,
+			);
 		row.forEach((box, columnIndex) => {
 			const name = MASCOT_NAMES[columnIndex];
 			if (!name) return;
@@ -474,12 +597,39 @@ function cutMascots(): { name: string; w: number; h: number }[] {
 			const out = resolve(outDir, `${name}${suffix}.png`);
 			magick([
 				// Cream sticker border under the drawing, the pair clipped by the border mask.
-				'(', piece, '-alpha', 'off', '-fill', '#faf5ec', '-colorize', '100', ')',
-				'(', piece, '-alpha', 'off', solid, '-alpha', 'off', '-compose', 'CopyOpacity', '-composite', ')',
-				'-compose', 'Over', '-composite',
-				halo, '-alpha', 'off', '-compose', 'CopyOpacity', '-composite',
-				'-trim', '+repage',
-				'-resize', `${rowIndex === 0 ? 520 : 640}x520>`,
+				'(',
+				piece,
+				'-alpha',
+				'off',
+				'-fill',
+				'#faf5ec',
+				'-colorize',
+				'100',
+				')',
+				'(',
+				piece,
+				'-alpha',
+				'off',
+				solid,
+				'-alpha',
+				'off',
+				'-compose',
+				'CopyOpacity',
+				'-composite',
+				')',
+				'-compose',
+				'Over',
+				'-composite',
+				halo,
+				'-alpha',
+				'off',
+				'-compose',
+				'CopyOpacity',
+				'-composite',
+				'-trim',
+				'+repage',
+				'-resize',
+				`${rowIndex === 0 ? 520 : 640}x520>`,
 				'-strip',
 				`PNG32:${out}`,
 			]);
@@ -526,14 +676,19 @@ function segmentGrid(
 			for (let column = 0; column < columnCount; column += 1) {
 				const left = column === 0 ? -Infinity : fences[column - 1]!;
 				const right = column === columnCount - 1 ? Infinity : fences[column]!;
-				const group = sorted.filter((box) => box.x + box.w / 2 >= left && box.x + box.w / 2 < right);
+				const group = sorted.filter(
+					(box) => box.x + box.w / 2 >= left && box.x + box.w / 2 < right,
+				);
 				if (group.length > 0) cells.push(group.reduce((box, next) => union(box, next)));
 			}
 			return cells;
 		}
 		const cuts = sorted
 			.slice(1)
-			.map((box, index) => ({ index: index + 1, gap: box.x - (sorted[index]!.x + sorted[index]!.w) }))
+			.map((box, index) => ({
+				index: index + 1,
+				gap: box.x - (sorted[index]!.x + sorted[index]!.w),
+			}))
 			.sort((a, b) => b.gap - a.gap)
 			.slice(0, columnCount - 1)
 			.map((entry) => entry.index)
@@ -585,9 +740,12 @@ function cutStickers(): { name: string; w: number; h: number }[] {
 	});
 	if (process.env.CUT_DEBUG)
 		grid.forEach((row, index) =>
-			console.log(`  line ${index}: ${row.map((b) => `${b.x},${b.y} ${b.w}x${b.h}`).join(' | ')}`),
+			console.log(
+				`  line ${index}: ${row.map((b) => `${b.x},${b.y} ${b.w}x${b.h}`).join(' | ')}`,
+			),
 		);
-	if (process.env.CUT_DEBUG) writePreview(sheet, grid, resolve(root, '.sprite-cut-preview-stickers.png'));
+	if (process.env.CUT_DEBUG)
+		writePreview(sheet, grid, resolve(root, '.sprite-cut-preview-stickers.png'));
 	const outDir = resolve(root, 'public/stickers');
 	mkdirSync(outDir, { recursive: true });
 
@@ -595,11 +753,15 @@ function cutStickers(): { name: string; w: number; h: number }[] {
 	grid.forEach((row, rowIndex) => {
 		const names = STICKER_NAMES[rowIndex] ?? [];
 		if (row.length !== names.length)
-			console.warn(`sticker row ${rowIndex}: cut ${row.length} pieces, named ${names.length}`);
+			console.warn(
+				`sticker row ${rowIndex}: cut ${row.length} pieces, named ${names.length}`,
+			);
 		row.forEach((box, columnIndex) => {
 			const name = names[columnIndex];
 			if (!name) {
-				console.warn(`sticker row ${rowIndex} piece ${columnIndex} at ${box.x},${box.y} has no name — skipped`);
+				console.warn(
+					`sticker row ${rowIndex} piece ${columnIndex} at ${box.x},${box.y} has no name — skipped`,
+				);
 				return;
 			}
 			const pad = 10;
@@ -614,12 +776,39 @@ function cutStickers(): { name: string; w: number; h: number }[] {
 			stickerBorder(solid, halo);
 			const out = resolve(outDir, `${name}.png`);
 			magick([
-				'(', piece, '-alpha', 'off', '-fill', '#faf5ec', '-colorize', '100', ')',
-				'(', piece, '-alpha', 'off', solid, '-alpha', 'off', '-compose', 'CopyOpacity', '-composite', ')',
-				'-compose', 'Over', '-composite',
-				halo, '-alpha', 'off', '-compose', 'CopyOpacity', '-composite',
-				'-trim', '+repage',
-				'-resize', '360x360>',
+				'(',
+				piece,
+				'-alpha',
+				'off',
+				'-fill',
+				'#faf5ec',
+				'-colorize',
+				'100',
+				')',
+				'(',
+				piece,
+				'-alpha',
+				'off',
+				solid,
+				'-alpha',
+				'off',
+				'-compose',
+				'CopyOpacity',
+				'-composite',
+				')',
+				'-compose',
+				'Over',
+				'-composite',
+				halo,
+				'-alpha',
+				'off',
+				'-compose',
+				'CopyOpacity',
+				'-composite',
+				'-trim',
+				'+repage',
+				'-resize',
+				'360x360>',
 				'-strip',
 				`PNG32:${out}`,
 			]);
@@ -695,7 +884,9 @@ function cutThemeIcons(): { name: string; w: number; h: number }[] {
 		}
 		const box = side.boxes.reduce((a, b) => union(a, b));
 		if (process.env.CUT_DEBUG)
-			console.log(`  ${side.name}: ${side.boxes.length} components -> ${box.x},${box.y} ${box.w}x${box.h}`);
+			console.log(
+				`  ${side.name}: ${side.boxes.length} components -> ${box.x},${box.y} ${box.w}x${box.h}`,
+			);
 		const pad = 10;
 		const crop = `${box.w + pad * 2}x${box.h + pad * 2}+${box.x - pad}+${box.y - pad}`;
 		const piece = resolve(work, 'theme-piece.png');
@@ -708,12 +899,39 @@ function cutThemeIcons(): { name: string; w: number; h: number }[] {
 		stickerBorder(solid, halo);
 		const out = resolve(outDir, `${side.name}.png`);
 		magick([
-			'(', piece, '-alpha', 'off', '-fill', '#faf5ec', '-colorize', '100', ')',
-			'(', piece, '-alpha', 'off', solid, '-alpha', 'off', '-compose', 'CopyOpacity', '-composite', ')',
-			'-compose', 'Over', '-composite',
-			halo, '-alpha', 'off', '-compose', 'CopyOpacity', '-composite',
-			'-trim', '+repage',
-			'-resize', `${THEME_SIZE}x${THEME_SIZE}>`,
+			'(',
+			piece,
+			'-alpha',
+			'off',
+			'-fill',
+			'#faf5ec',
+			'-colorize',
+			'100',
+			')',
+			'(',
+			piece,
+			'-alpha',
+			'off',
+			solid,
+			'-alpha',
+			'off',
+			'-compose',
+			'CopyOpacity',
+			'-composite',
+			')',
+			'-compose',
+			'Over',
+			'-composite',
+			halo,
+			'-alpha',
+			'off',
+			'-compose',
+			'CopyOpacity',
+			'-composite',
+			'-trim',
+			'+repage',
+			'-resize',
+			`${THEME_SIZE}x${THEME_SIZE}>`,
 			'-strip',
 			`PNG32:${out}`,
 		]);
@@ -735,7 +953,18 @@ const SIDEBAR_SHEET = 'sidebar-sprites-sheet.png';
 
 /** Row-major slugs: nav entry href last segment, column A then column B. */
 const SIDEBAR_NAMES = {
-	A: ['what-is-markless', 'first-app', 'reading-tsrx', 'state', 'computed', 'events', 'conditionals', 'lists', 'async', 'styling'],
+	A: [
+		'what-is-markless',
+		'first-app',
+		'reading-tsrx',
+		'state',
+		'computed',
+		'events',
+		'conditionals',
+		'lists',
+		'async',
+		'styling',
+	],
 	B: ['components', 'elements', 'storage', 'shared', 'pages', 'links', 'data', 'how-it-works'],
 } as const;
 
@@ -752,15 +981,28 @@ const SIDEBAR_WIDEN: Record<string, number> = { async: 7, storage: 7 };
  * splits the pair evenly, clipping both. Measured off the light half; the dark
  * half shares the layout.
  */
-const SIDEBAR_BAND_OVERRIDE: Record<string, [number, number]> = { lists: [666, 709], async: [714, 759] };
+const SIDEBAR_BAND_OVERRIDE: Record<string, [number, number]> = {
+	lists: [666, 709],
+	async: [714, 759],
+};
 
 /** How many icons sit in each titled group of a column, top to bottom. */
 const SIDEBAR_GROUPS = { A: [3, 7], B: [4, 3, 1] } as const;
 
 /** The x window each column's icons live in, per half, measured off the sheet. */
 const SIDEBAR_COLUMNS = {
-	light: { offset: 0, background: [233, 215, 194] as const, A: [38, 150] as const, B: [458, 580] as const },
-	dark: { offset: 836, background: [15, 20, 22] as const, A: [46, 156] as const, B: [472, 594] as const },
+	light: {
+		offset: 0,
+		background: [233, 215, 194] as const,
+		A: [38, 150] as const,
+		B: [458, 580] as const,
+	},
+	dark: {
+		offset: 836,
+		background: [15, 20, 22] as const,
+		A: [46, 156] as const,
+		B: [472, 594] as const,
+	},
 } as const;
 
 const distanceFx = (background: readonly number[]) =>
@@ -768,7 +1010,13 @@ const distanceFx = (background: readonly number[]) =>
 	' dd=sqrt(xr*xr+xg*xg+xb*xb); ';
 
 /** Rows of the mask that carry ink inside one column window. */
-function inkProfile(mask: Uint8Array, width: number, height: number, x0: number, x1: number): number[] {
+function inkProfile(
+	mask: Uint8Array,
+	width: number,
+	height: number,
+	x0: number,
+	x1: number,
+): number[] {
 	const out: number[] = [];
 	for (let y = 0; y < height; y += 1) {
 		let count = 0;
@@ -802,13 +1050,21 @@ function inkSpans(profile: readonly number[], minHeight: number): [number, numbe
 }
 
 /** Cuts one inked span into `count` pieces at its quietest rows. */
-function splitSpan(profile: readonly number[], span: [number, number], count: number): [number, number][] {
+function splitSpan(
+	profile: readonly number[],
+	span: [number, number],
+	count: number,
+): [number, number][] {
 	if (count === 1) return [span];
 	const [start, end] = span;
 	const separation = Math.floor(((end - start + 1) / count) * 0.55);
 	const rows = [];
 	for (let y = start + separation; y <= end - separation; y += 1) rows.push(y);
-	rows.sort((a, b) => profile[a]! - profile[b]! || Math.abs(a - (start + end) / 2) - Math.abs(b - (start + end) / 2));
+	rows.sort(
+		(a, b) =>
+			profile[a]! - profile[b]! ||
+			Math.abs(a - (start + end) / 2) - Math.abs(b - (start + end) / 2),
+	);
 	const cuts: number[] = [];
 	for (const row of rows) {
 		if (cuts.length === count - 1) break;
@@ -874,31 +1130,72 @@ function sidebarRows(
 function trimSidebarEdges(file: string, size: { w: number; h: number }): void {
 	magick([
 		file,
-		'(', '+clone', '-alpha', 'extract',
-		'(', '-size', `${size.w}x${size.h}`, 'xc:white', '-fill', 'black',
-		'-draw', `rectangle 0,0 ${size.w},1`, '-draw', `rectangle 0,${size.h - 2} ${size.w},${size.h}`, ')',
-		'-compose', 'multiply', '-composite', ')',
-		'-alpha', 'off', '-compose', 'copy_opacity', '-composite', file,
+		'(',
+		'+clone',
+		'-alpha',
+		'extract',
+		'(',
+		'-size',
+		`${size.w}x${size.h}`,
+		'xc:white',
+		'-fill',
+		'black',
+		'-draw',
+		`rectangle 0,0 ${size.w},1`,
+		'-draw',
+		`rectangle 0,${size.h - 2} ${size.w},${size.h}`,
+		')',
+		'-compose',
+		'multiply',
+		'-composite',
+		')',
+		'-alpha',
+		'off',
+		'-compose',
+		'copy_opacity',
+		'-composite',
+		file,
 	]);
 }
 
-function cutSidebarPiece(sheet: string, crop: string, background: readonly number[], out: string): { w: number; h: number } {
+function cutSidebarPiece(
+	sheet: string,
+	crop: string,
+	background: readonly number[],
+	out: string,
+): { w: number; h: number } {
 	const piece = resolve(work, 'sidebar-piece.png');
 	const pieceMask = resolve(work, 'sidebar-piece-mask.png');
 	const keptMask = resolve(work, 'sidebar-piece-kept.png');
 	magick([sheet, '-crop', crop, '+repage', piece]);
 	magick([
-		piece, '-alpha', 'off', '-colorspace', 'sRGB',
-		'-fx', `${distanceFx(background)}max(0,min(1,(dd-0.055)/0.075))`,
-		'-colorspace', 'gray', pieceMask,
+		piece,
+		'-alpha',
+		'off',
+		'-colorspace',
+		'sRGB',
+		'-fx',
+		`${distanceFx(background)}max(0,min(1,(dd-0.055)/0.075))`,
+		'-colorspace',
+		'gray',
+		pieceMask,
 	]);
 	const { width, height } = sizeOf(pieceMask);
 	keepSticker(pieceMask, width, height, keptMask);
 	magick([
-		piece, '-alpha', 'off',
-		keptMask, '-alpha', 'off', '-compose', 'CopyOpacity', '-composite',
-		'-trim', '+repage',
-		'-resize', '320x320>',
+		piece,
+		'-alpha',
+		'off',
+		keptMask,
+		'-alpha',
+		'off',
+		'-compose',
+		'CopyOpacity',
+		'-composite',
+		'-trim',
+		'+repage',
+		'-resize',
+		'320x320>',
 		'-strip',
 		`PNG32:${out}`,
 	]);
@@ -960,7 +1257,10 @@ function keepSticker(maskPath: string, width: number, height: number, out: strin
 	const keep = runs.map(
 		(run) =>
 			run === biggest ||
-			(!run.top && !run.bottom && run.area >= biggest.area * 0.015 && gapBetween(run.box, biggest.box) <= 8),
+			(!run.top &&
+				!run.bottom &&
+				run.area >= biggest.area * 0.015 &&
+				gapBetween(run.box, biggest.box) <= 8),
 	);
 	const kept = new Uint8Array(width * height);
 	for (let index = 0; index < gray.length; index += 1) {
@@ -990,9 +1290,16 @@ function cutSidebar(): { name: string; variant: string; w: number; h: number }[]
 		magick([sheet, '-crop', `${half}x${height}+${column.offset}+0`, '+repage', halfPath]);
 		const maskPath = resolve(work, `sidebar-${variant}-mask.png`);
 		magick([
-			halfPath, '-alpha', 'off', '-colorspace', 'sRGB',
-			'-fx', `${distanceFx(column.background)}(dd>0.13)?1:0`,
-			'-colorspace', 'gray', maskPath,
+			halfPath,
+			'-alpha',
+			'off',
+			'-colorspace',
+			'sRGB',
+			'-fx',
+			`${distanceFx(column.background)}(dd>0.13)?1:0`,
+			'-colorspace',
+			'gray',
+			maskPath,
 		]);
 		const mask = readGray(maskPath, half, height);
 		// The two halves share a baseline grid, so the light half's rows are the
@@ -1006,7 +1313,9 @@ function cutSidebar(): { name: string; variant: string; w: number; h: number }[]
 			const names = SIDEBAR_NAMES[key];
 			const bands = rows[key];
 			if (bands.length !== names.length)
-				console.warn(`sidebar column ${key}: found ${bands.length} rows, named ${names.length}`);
+				console.warn(
+					`sidebar column ${key}: found ${bands.length} rows, named ${names.length}`,
+				);
 			bands.forEach((detected, index) => {
 				let band = detected;
 				const name = names[index];

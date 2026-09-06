@@ -83,11 +83,11 @@ pointing at it.
 Every handler sits on the root, which wraps both parts, so moving from the link into the
 card, by pointer or by Tab, never counts as leaving.
 
-| Key | What it does |
-| --- | --- |
-| Tab | Focusing the link waits the same `delay` the pointer does, then shows the card. |
+| Key       | What it does                                                                                |
+| --------- | ------------------------------------------------------------------------------------------- |
+| Tab       | Focusing the link waits the same `delay` the pointer does, then shows the card.             |
 | Tab again | Moves into the card, which is the link's next sibling and back in the tab order once shown. |
-| Escape | Hides the card. Focus goes back to the link only if it was inside the card. |
+| Escape    | Hides the card. Focus goes back to the link only if it was inside the card.                 |
 
 ## API
 
@@ -95,24 +95,24 @@ Every prop is optional, and the types below are the family's own.
 
 ### `hovercard.root`
 
-| Prop | Type | What it does |
-| --- | --- | --- |
-| `open` | `boolean` | Whether the card is showing. Omit it and it starts hidden. |
-| `delay` | `number` | How long the pointer must rest on the link, or focus must stay on it, before the card shows, in milliseconds. Omit it and it is 700. |
-| `closeDelay` | `number` | How long the card stays after the pointer leaves, in milliseconds. Omit it and it is 300. |
-| `onChange` | `(open: boolean) => void` | Called with the new value when the card shows or hides, including when Escape or a press elsewhere hides it. |
+| Prop         | Type                      | What it does                                                                                                                         |
+| ------------ | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `open`       | `boolean`                 | Whether the card is showing. Omit it and it starts hidden.                                                                           |
+| `delay`      | `number`                  | How long the pointer must rest on the link, or focus must stay on it, before the card shows, in milliseconds. Omit it and it is 700. |
+| `closeDelay` | `number`                  | How long the card stays after the pointer leaves, in milliseconds. Omit it and it is 300.                                            |
+| `onChange`   | `(open: boolean) => void` | Called with the new value when the card shows or hides, including when Escape or a press elsewhere hides it.                         |
 
-| Attribute | Present when | What to key styling off |
-| --- | --- | --- |
-| `ui-open` | The card is showing | The shown look. |
-| `ui-closed` | The card is not showing | The resting look. |
+| Attribute   | Present when            | What to key styling off |
+| ----------- | ----------------------- | ----------------------- |
+| `ui-open`   | The card is showing     | The shown look.         |
+| `ui-closed` | The card is not showing | The resting look.       |
 
 Everything a `<div>` accepts reaches the element too, apart from `onChange`, which is
 the family's. Your own `onPointerover`, `onPointerout`, `onFocusin` and `onFocusout` run
 after the family's.
 
-| Selector | Default | Why |
-| --- | --- | --- |
+| Selector             | Default                        | Why                                                                                                    |
+| -------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------ |
 | `div:not([overlay])` | `anchor-scope: --ui-hovercard` | Keeps the anchor name inside this card, so two hover cards on a page never point at each other's link. |
 
 ### `hovercard.trigger`
@@ -120,16 +120,16 @@ after the family's.
 No props of its own. It renders an `<a>`, and everything an `<a>` accepts reaches the
 element, `href` included.
 
-| Attribute | Present when | What to key styling off |
-| --- | --- | --- |
-| `aria-expanded` | Always | `true` or `false`, so a reader is told the card exists. |
-| `aria-controls` | Always | The id of the card this link previews. |
-| `ui-open` | The card is showing | The previewing look. |
-| `ui-closed` | The card is not showing | The resting look. |
+| Attribute       | Present when            | What to key styling off                                 |
+| --------------- | ----------------------- | ------------------------------------------------------- |
+| `aria-expanded` | Always                  | `true` or `false`, so a reader is told the card exists. |
+| `aria-controls` | Always                  | The id of the card this link previews.                  |
+| `ui-open`       | The card is showing     | The previewing look.                                    |
+| `ui-closed`     | The card is not showing | The resting look.                                       |
 
-| Selector | Default | Why |
-| --- | --- | --- |
-| `a` | `anchor-name: --ui-hovercard` | The link is the anchor the card is placed against. |
+| Selector | Default                       | Why                                                |
+| -------- | ----------------------------- | -------------------------------------------------- |
+| `a`      | `anchor-name: --ui-hovercard` | The link is the anchor the card is placed against. |
 
 ### `hovercard.content`
 
@@ -138,13 +138,13 @@ element. Your own `onDismiss` runs after the family has hidden the card. It carr
 `role` and nothing writes `aria-describedby` at it: a card full of links flattened into
 one description is a run-on string with none of them reachable.
 
-| Attribute | Present when | What to key styling off |
-| --- | --- | --- |
-| `overlay` | Always | The mark that elevates the card. Not a styling hook. |
-| `hidden` | The card is not showing | What hides it, and what keeps its links out of the tab order. The card is never detached. |
-| `ui-open` | The card is showing | The shown look. |
-| `ui-closed` | The card is not showing | The hidden look. |
+| Attribute   | Present when            | What to key styling off                                                                   |
+| ----------- | ----------------------- | ----------------------------------------------------------------------------------------- |
+| `overlay`   | Always                  | The mark that elevates the card. Not a styling hook.                                      |
+| `hidden`    | The card is not showing | What hides it, and what keeps its links out of the tab order. The card is never detached. |
+| `ui-open`   | The card is showing     | The shown look.                                                                           |
+| `ui-closed` | The card is not showing | The hidden look.                                                                          |
 
-| Selector | Default | Why |
-| --- | --- | --- |
+| Selector    | Default                                                                                                      | Why                                                                                                               |
+| ----------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
 | `[overlay]` | `--ui-anchor: --ui-hovercard; position: absolute; position-anchor: --ui-hovercard; position-area: block-end` | Places the card below the link with no script, and hands you the anchor name for `anchor()` geometry of your own. |

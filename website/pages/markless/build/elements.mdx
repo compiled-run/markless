@@ -82,7 +82,11 @@ Nothing about that click read or wrote the input's contents. The handler asked t
 a node, which is a thing you do to a node and not a thing you store in a variable. That is exactly
 why it is not state.
 
-<Callout sprite="cross" title="Why is my handle undefined?" text="Because a handle is only a claim ticket, and there are two moments when there is nothing to claim. During the first render there is no DOM node yet, so the handle reads undefined; that is the specification's wording, and it is why you read a handle inside a handler rather than in the component body. The second moment is after the node is gone: if the element sits inside a conditional arm that is currently not rendered, or the list row it belonged to was removed, the handle reads undefined again. Write field?.focus() rather than field.focus() and both moments are handled." />
+<Callout
+	sprite="cross"
+	title="Why is my handle undefined?"
+	text="Because a handle is only a claim ticket, and there are two moments when there is nothing to claim. During the first render there is no DOM node yet, so the handle reads undefined; that is the specification's wording, and it is why you read a handle inside a handler rather than in the component body. The second moment is after the node is gone: if the element sits inside a conditional arm that is currently not rendered, or the list row it belonged to was removed, the handle reads undefined again. Write field?.focus() rather than field.focus() and both moments are handled."
+/>
 
 ## `attach` is where code that owns a node lives
 
@@ -126,7 +130,11 @@ away. An array of behaviours installs in the order you wrote it and cleans up in
 diagnostic `MARKLESS_ATTACH_HOST_ELEMENT_REQUIRED`, because a component is not a node and there is
 nothing to hand the function.
 
-<Callout sprite="speech-bubble" title="Why there is no attach demo box on this page" text="A behaviour installs when the island wakes up, and on a server-rendered page the island wakes on the first real event. So a widget whose only job is an attach would sit there doing nothing until the reader clicked something else on the page, which teaches the wrong lesson. It is recorded as finding 9 in this site's NOTES.md, along with what it cost: the hover doc on every code token here is plain CSS for the same reason. The el widget above is honest because a click is what triggers it in the first place." />
+<Callout
+	sprite="speech-bubble"
+	title="Why there is no attach demo box on this page"
+	text="A behaviour installs when the island wakes up, and on a server-rendered page the island wakes on the first real event. So a widget whose only job is an attach would sit there doing nothing until the reader clicked something else on the page, which teaches the wrong lesson. It is recorded as finding 9 in this site's NOTES.md, along with what it cost: the hover doc on every code token here is plain CSS for the same reason. The el widget above is honest because a click is what triggers it in the first place."
+/>
 
 ## What a behaviour costs on the wire
 
@@ -140,7 +148,11 @@ object such as a socket or a chart instance is not something the payload can car
 graph will tell you so rather than quietly dropping it: "Move it to a host element behavior or
 recreate it from serializable state".
 
-<Collapsible sprite="star-badge" summary="Coming from another framework?" text="A handle is not a box with a .current on it, and it is not a mutable slot you are meant to keep other values in. It is one node or nothing. It also does not fire an effect when it is populated: there is no dependency array to add it to and no lifecycle callback that hands it to you, because the moment you actually want it is inside the handler you already wrote. Behaviours are the other half of that trade. Where you might reach for an effect that runs after mount to wire up a library, you hand the library the element instead, and you return the teardown from the same function that did the setup, so the two halves cannot drift apart." />
+<Collapsible
+	sprite="star-badge"
+	summary="Coming from another framework?"
+	text="A handle is not a box with a .current on it, and it is not a mutable slot you are meant to keep other values in. It is one node or nothing. It also does not fire an effect when it is populated: there is no dependency array to add it to and no lifecycle callback that hands it to you, because the moment you actually want it is inside the handler you already wrote. Behaviours are the other half of that trade. Where you might reach for an effect that runs after mount to wire up a library, you hand the library the element instead, and you return the teardown from the same function that did the setup, so the two halves cannot drift apart."
+/>
 
 ## Try it yourself
 

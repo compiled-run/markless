@@ -119,13 +119,18 @@ try {
 	const statePage = await fetch(`${origin}/markless/concepts/state`);
 	check(statePage.status === 200, 'GET /markless/concepts/state', String(statePage.status));
 	const stateHtml = await statePage.text();
-	check(stateHtml.includes('State is a variable the page is watching'), 'state page carries its prose');
+	check(
+		stateHtml.includes('State is a variable the page is watching'),
+		'state page carries its prose',
+	);
 	check(
 		!stateHtml.includes('<pre><code class="language-tsrx">'),
 		'no code fence was left unhighlighted in the served HTML',
 	);
 
-	const assetPath = landingHtml.match(/(?:href|src)="(\/markless\/(?:assets|build)\/[^"]+)"/)?.[1];
+	const assetPath = landingHtml.match(
+		/(?:href|src)="(\/markless\/(?:assets|build)\/[^"]+)"/,
+	)?.[1];
 	check(Boolean(assetPath), 'built asset URL found in served HTML', assetPath ?? 'none');
 	if (assetPath) {
 		const asset = await fetch(`${origin}${assetPath}`);
@@ -154,7 +159,8 @@ try {
 			const selected = content.locator('.mode-select-item[ui-selected]');
 			const other = content.getByRole('option', { name: otherTitle });
 			check(
-				(await content.isVisible()) && (await trigger.getAttribute('aria-expanded')) === 'true',
+				(await content.isVisible()) &&
+					(await trigger.getAttribute('aria-expanded')) === 'true',
 				`${href}: the mode trigger opens the real select content`,
 			);
 			check(
@@ -164,7 +170,8 @@ try {
 				((await selected.textContent()) ?? '').trim(),
 			);
 			check(
-				(await other.count()) === 1 && (await other.getAttribute('aria-selected')) === 'false',
+				(await other.count()) === 1 &&
+					(await other.getAttribute('aria-selected')) === 'false',
 				`${href}: the other mode is a real unselected option`,
 				otherTitle,
 			);
@@ -182,7 +189,11 @@ try {
 				nodes.map((node) => getComputedStyle(node as Element).color),
 			),
 		).size;
-		check(paletteSize >= 4, 'the block paints at least four token colours', `${paletteSize} colours`);
+		check(
+			paletteSize >= 4,
+			'the block paints at least four token colours',
+			`${paletteSize} colours`,
+		);
 		const tokenColour = await tokens
 			.first()
 			.evaluate((node) => getComputedStyle(node as Element).color);
@@ -278,14 +289,20 @@ try {
 		await hover.waitFor();
 		const expectedTitle = await hover.getAttribute('data-doc-title');
 		const expectedDoc = await hover.getAttribute('data-doc');
-		check(Boolean(expectedTitle && expectedDoc), 'the token declares a title and a doc', String(expectedTitle));
+		check(
+			Boolean(expectedTitle && expectedDoc),
+			'the token declares a title and a doc',
+			String(expectedTitle),
+		);
 		const tip = hover.locator('.tsrx-tip');
 		check(!(await tooltipIsVisible(tip)), 'the tooltip is hidden before anything points at it');
 		// The block that has to hold still is the one the token sits in, which is
 		// not always the page's first fence.
 		const hoverBlockHeight = () =>
 			hover.evaluate(
-				(node) => (node as HTMLElement).closest('pre')?.getBoundingClientRect().height ?? Number.NaN,
+				(node) =>
+					(node as HTMLElement).closest('pre')?.getBoundingClientRect().height ??
+					Number.NaN,
 			);
 		const preHeightAtRest = await hoverBlockHeight();
 		await hover.hover();
@@ -304,7 +321,11 @@ try {
 			return doc ? { above: doc.bottom <= token.top + 1, width: doc.width } : undefined;
 		});
 		check(Boolean(anchored?.above), 'the tooltip is anchored above the token it explains');
-		check((anchored?.width ?? 0) > 0, 'the tooltip has a painted box', `${anchored?.width ?? 0}px wide`);
+		check(
+			(anchored?.width ?? 0) > 0,
+			'the tooltip has a painted box',
+			`${anchored?.width ?? 0}px wide`,
+		);
 		check(
 			(await tip.locator('.tsrx-tip-title').textContent())?.trim() === expectedTitle,
 			'the tooltip shows the expected title',
@@ -368,7 +389,8 @@ try {
 					`${entry.href} carries its level, reading time and prerequisite line`,
 				);
 				const title = html.match(/<title>([^<]*)<\/title>/)?.[1] ?? '';
-				const description = html.match(/<meta name="description" content="([^"]*)"/)?.[1] ?? '';
+				const description =
+					html.match(/<meta name="description" content="([^"]*)"/)?.[1] ?? '';
 				const wanted = headFor(entry.href);
 				check(title === wanted.title, `${entry.href} serves its own <title>`, title);
 				check(
@@ -432,7 +454,9 @@ try {
 		}
 		const sitemapBody = await (await fetch(`${origin}/markless/sitemap.xml`)).text();
 		check(
-			flatNav.every((entry) => sitemapBody.includes(`<loc>https://compiled.run${entry.href}</loc>`)),
+			flatNav.every((entry) =>
+				sitemapBody.includes(`<loc>https://compiled.run${entry.href}</loc>`),
+			),
 			'the sitemap lists every page in the nav',
 			`${(sitemapBody.match(/<loc>/g) ?? []).length} urls for ${flatNav.length} pages`,
 		);
@@ -457,14 +481,22 @@ try {
 			((await mugLikes.textContent()) ?? '').trim(),
 		);
 		await mugHeart.click();
-		await settleText(mugLikes, (text) => text === '1', 'the landing mug card counts the first click');
+		await settleText(
+			mugLikes,
+			(text) => text === '1',
+			'the landing mug card counts the first click',
+		);
 		check(
 			((await mugLikes.textContent()) ?? '').trim() === '1',
 			'clicking the heart adds a like, so the landing island resumed',
 			((await mugLikes.textContent()) ?? '').trim(),
 		);
 		await mugHeart.click();
-		await settleText(mugLikes, (text) => text === '2', 'the landing mug card counts a second click');
+		await settleText(
+			mugLikes,
+			(text) => text === '2',
+			'the landing mug card counts a second click',
+		);
 		check(
 			((await mugLikes.textContent()) ?? '').trim() === '2',
 			'the likes keep adding on repeat clicks, so the island stayed awake',
@@ -482,7 +514,11 @@ try {
 			ranAt,
 		);
 		await runOnceLikes.click();
-		await settleText(runOnceLikes, (text) => text === '1', 'the run-log heart counts its click');
+		await settleText(
+			runOnceLikes,
+			(text) => text === '1',
+			'the run-log heart counts its click',
+		);
 		check(
 			((await runOnceLikes.textContent()) ?? '').trim() === '1',
 			'the run-log heart adds a like too',
@@ -494,7 +530,10 @@ try {
 			'the log gains no second entry, so the click ran no component body again',
 			((await runOnceEntries.first().textContent()) ?? '').trim(),
 		);
-		await page.screenshot({ path: `${shotsDir}/T004-landing-widgets-after.png`, fullPage: true });
+		await page.screenshot({
+			path: `${shotsDir}/T004-landing-widgets-after.png`,
+			fullPage: true,
+		});
 
 		// --- widget: two variables on the state page ---------------------------
 		await page.goto(`${origin}/markless/concepts/state`, { waitUntil: 'load' });
@@ -505,7 +544,11 @@ try {
 		const addWatched = page.getByRole('button', { name: 'Add one to the watched variable' });
 		await addWatched.waitFor();
 		const [watchedBefore, drawnBefore] = await twoNumbers();
-		check(watchedBefore === 0, 'two-variables watched number starts at 0', String(watchedBefore));
+		check(
+			watchedBefore === 0,
+			'two-variables watched number starts at 0',
+			String(watchedBefore),
+		);
 		check(
 			Number.isFinite(drawnBefore) && drawnBefore >= 100,
 			'two-variables drew a number during render',
@@ -518,7 +561,11 @@ try {
 			'two-variables watched number reaches 1',
 		);
 		const [watchedAfter, drawnAfter] = await twoNumbers();
-		check(watchedAfter === 1, 'two-variables watched number moved on click', String(watchedAfter));
+		check(
+			watchedAfter === 1,
+			'two-variables watched number moved on click',
+			String(watchedAfter),
+		);
 		check(
 			drawnAfter === drawnBefore,
 			'two-variables drawn number did not move, so the component did not run again',
@@ -617,7 +664,9 @@ try {
 		const themeState = () =>
 			page.evaluate(() => {
 				const slot = document.querySelector('.theme-toggle-slot')?.getBoundingClientRect();
-				const island = document.querySelector('.theme-toggle-island')?.getBoundingClientRect();
+				const island = document
+					.querySelector('.theme-toggle-island')
+					?.getBoundingClientRect();
 				return {
 					attr: document.documentElement.getAttribute('data-theme'),
 					stored: localStorage.getItem('theme'),
@@ -637,7 +686,9 @@ try {
 						const shown = [...document.querySelectorAll('.theme-toggle')].find(
 							(node) => getComputedStyle(node as Element).display !== 'none',
 						);
-						const image = shown?.querySelector('img.theme-toggle-icon') as HTMLImageElement | null;
+						const image = shown?.querySelector(
+							'img.theme-toggle-icon',
+						) as HTMLImageElement | null;
 						return {
 							src: image?.getAttribute('src') ?? '',
 							decoded: (image?.naturalWidth ?? 0) > 0,
@@ -671,11 +722,16 @@ try {
 
 		await page.locator('.theme-toggle-to-dark').click();
 		for (let attempt = 0; attempt < 40; attempt += 1) {
-			if ((await page.evaluate(() => document.documentElement.dataset.theme)) === 'dark') break;
+			if ((await page.evaluate(() => document.documentElement.dataset.theme)) === 'dark')
+				break;
 			await new Promise((done) => setTimeout(done, 100));
 		}
 		const dark = await themeState();
-		check(dark.attr === 'dark', 'clicking the toggle puts data-theme="dark" on <html>', String(dark.attr));
+		check(
+			dark.attr === 'dark',
+			'clicking the toggle puts data-theme="dark" on <html>',
+			String(dark.attr),
+		);
 		check(dark.stored === 'dark', 'the choice is written to localStorage', String(dark.stored));
 		check(
 			dark.paper !== atRest.paper,
@@ -702,7 +758,8 @@ try {
 
 		await page.locator('.theme-toggle-to-light').click();
 		for (let attempt = 0; attempt < 40; attempt += 1) {
-			if ((await page.evaluate(() => document.documentElement.dataset.theme)) === 'light') break;
+			if ((await page.evaluate(() => document.documentElement.dataset.theme)) === 'light')
+				break;
 			await new Promise((done) => setTimeout(done, 100));
 		}
 		const back = await themeState();
@@ -729,7 +786,9 @@ try {
 		check(
 			!landed.survived,
 			'that click is a document load, which is what finding 40 says it has to be',
-			landed.survived ? 'the window survived the click — client-side navigation works now' : '',
+			landed.survived
+				? 'the window survived the click — client-side navigation works now'
+				: '',
 		);
 
 		// --- sprites and mascots ------------------------------------------------
@@ -742,16 +801,20 @@ try {
 			'the landing hero is the markless mascot',
 			String(heroSrc),
 		);
-		const heroWidth = await heroMascot.evaluate((node) => (node as HTMLImageElement).naturalWidth);
-		check(heroWidth > 0, 'the markless mascot on the landing decodes', `naturalWidth ${heroWidth}`);
-		const siblingMascots = await page
-			.locator('.more-from img.mascot')
-			.evaluateAll((nodes) =>
-				nodes.map((node) => ({
-					src: (node as HTMLImageElement).getAttribute('src'),
-					width: (node as HTMLImageElement).naturalWidth,
-				})),
-			);
+		const heroWidth = await heroMascot.evaluate(
+			(node) => (node as HTMLImageElement).naturalWidth,
+		);
+		check(
+			heroWidth > 0,
+			'the markless mascot on the landing decodes',
+			`naturalWidth ${heroWidth}`,
+		);
+		const siblingMascots = await page.locator('.more-from img.mascot').evaluateAll((nodes) =>
+			nodes.map((node) => ({
+				src: (node as HTMLImageElement).getAttribute('src'),
+				width: (node as HTMLImageElement).naturalWidth,
+			})),
+		);
 		check(
 			siblingMascots.length === 4 && siblingMascots.every((one) => one.width > 0),
 			'the More from compiled.run strip shows four mascots that decode',
@@ -759,9 +822,7 @@ try {
 		);
 		const sprites = await page
 			.locator('.sprite img.sprite-ink-light')
-			.evaluateAll((nodes) =>
-				nodes.map((node) => (node as HTMLImageElement).naturalWidth),
-			);
+			.evaluateAll((nodes) => nodes.map((node) => (node as HTMLImageElement).naturalWidth));
 		check(sprites.length > 0, 'the landing paints sprites', `${sprites.length} sprites`);
 		check(
 			sprites.length > 0 && sprites.every((width) => width > 0),
@@ -788,10 +849,16 @@ try {
 						ground: body.backgroundColor,
 						ink: body.color,
 						token: token ? getComputedStyle(token).color : '',
-						darkSpriteShown: sprite ? getComputedStyle(sprite).display !== 'none' : false,
+						darkSpriteShown: sprite
+							? getComputedStyle(sprite).display !== 'none'
+							: false,
 					};
 				});
-				check(painted.attr === theme, `${href} takes data-theme="${theme}"`, String(painted.attr));
+				check(
+					painted.attr === theme,
+					`${href} takes data-theme="${theme}"`,
+					String(painted.attr),
+				);
 				check(
 					painted.darkSpriteShown === (theme === 'dark'),
 					`${href} paints the ${theme} cut of its sprites`,
@@ -805,9 +872,17 @@ try {
 			}
 		}
 		const groundsDiffer = new Set(themeShots.map((shot) => shot.ground)).size > 1;
-		check(groundsDiffer, 'the two themes paint different grounds', [...new Set(themeShots.map((shot) => shot.ground))].join(' vs '));
+		check(
+			groundsDiffer,
+			'the two themes paint different grounds',
+			[...new Set(themeShots.map((shot) => shot.ground))].join(' vs '),
+		);
 		const inksDiffer = new Set(themeShots.map((shot) => shot.ink)).size > 1;
-		check(inksDiffer, 'the two themes paint different ink', [...new Set(themeShots.map((shot) => shot.ink))].join(' vs '));
+		check(
+			inksDiffer,
+			'the two themes paint different ink',
+			[...new Set(themeShots.map((shot) => shot.ink))].join(' vs '),
+		);
 		const tokensDiffer = new Set(themeShots.map((shot) => shot.token)).size > 1;
 		check(
 			tokensDiffer,
@@ -826,12 +901,20 @@ try {
 			const icons = await page.evaluate(async () => {
 				const links = [...document.querySelectorAll('.sidebar-link')];
 				const shown = links.map((link) => {
-					const images = [...link.querySelectorAll('img.nav-icon-ink')] as HTMLImageElement[];
-					const visible = images.filter((image) => getComputedStyle(image).display !== 'none');
+					const images = [
+						...link.querySelectorAll('img.nav-icon-ink'),
+					] as HTMLImageElement[];
+					const visible = images.filter(
+						(image) => getComputedStyle(image).display !== 'none',
+					);
 					return { count: images.length, visible: visible.length, image: visible[0] };
 				});
 				await Promise.all(
-					shown.map((entry) => (entry.image && !entry.image.complete ? entry.image.decode().catch(() => {}) : undefined)),
+					shown.map((entry) =>
+						entry.image && !entry.image.complete
+							? entry.image.decode().catch(() => {})
+							: undefined,
+					),
 				);
 				return {
 					links: links.length,
@@ -858,7 +941,9 @@ try {
 				`${icons.loaded} decoded — e.g. ${icons.sources[0]}`,
 			);
 			check(
-				icons.sources.filter((source) => source.includes(`/sidebar/`) && source.endsWith(`-${theme}.png`)).length ===
+				icons.sources.filter(
+					(source) => source.includes(`/sidebar/`) && source.endsWith(`-${theme}.png`),
+				).length ===
 					icons.links - 1,
 				`the ${theme} theme asks for the ${theme} cut of eighteen sheet icons and one doodle`,
 				icons.sources[1] ?? '',
@@ -872,7 +957,9 @@ try {
 			['index', '/markless'],
 			['state', '/markless/concepts/state'],
 		] as const) {
-			const entry = nav.flatMap((section) => section.entries).find((one) => one.href === href);
+			const entry = nav
+				.flatMap((section) => section.entries)
+				.find((one) => one.href === href);
 			const section = nav.find((one) => one.entries.some((one) => one.href === href));
 			for (const theme of ['light', 'dark'] as const) {
 				for (const width of [1440, 390] as const) {
@@ -886,7 +973,9 @@ try {
 					const chrome = await page.evaluate(() => {
 						const header = document.querySelector('.site-header');
 						const rail = document.querySelector('.on-this-page');
-						const railVisible = rail ? getComputedStyle(rail).display !== 'none' : false;
+						const railVisible = rail
+							? getComputedStyle(rail).display !== 'none'
+							: false;
 						const nav = document.querySelector('.sidebar');
 						const h1 = document.querySelector('.prose h1');
 						const navBox = nav?.getBoundingClientRect();
@@ -894,21 +983,29 @@ try {
 						return {
 							header: Boolean(header),
 							headerSticky: header ? getComputedStyle(header).position : '',
-							crumbSection: document.querySelector('.crumb-section')?.textContent?.trim() ?? '',
-							crumbPage: document.querySelector('.crumb-page')?.textContent?.trim() ?? '',
+							crumbSection:
+								document.querySelector('.crumb-section')?.textContent?.trim() ?? '',
+							crumbPage:
+								document.querySelector('.crumb-page')?.textContent?.trim() ?? '',
 							search: Boolean(document.querySelector('.site-search')),
 							themeToggle: Boolean(document.querySelector('[data-theme-toggle]')),
 							github: Boolean(
-								document.querySelector('a.header-link[href*="github.com/compiled-run/markless"]'),
+								document.querySelector(
+									'a.header-link[href*="github.com/compiled-run/markless"]',
+								),
 							),
 							railVisible,
-							railItems: [...document.querySelectorAll('.on-this-page-item-h2 .on-this-page-link')].map(
-								(node) => (node.textContent ?? '').trim(),
+							railItems: [
+								...document.querySelectorAll(
+									'.on-this-page-item-h2 .on-this-page-link',
+								),
+							].map((node) => (node.textContent ?? '').trim()),
+							railTargets: [...document.querySelectorAll('.on-this-page-link')].every(
+								(node) => {
+									const id = (node.getAttribute('href') ?? '').slice(1);
+									return id !== '' && document.getElementById(id) !== null;
+								},
 							),
-							railTargets: [...document.querySelectorAll('.on-this-page-link')].every((node) => {
-								const id = (node.getAttribute('href') ?? '').slice(1);
-								return id !== '' && document.getElementById(id) !== null;
-							}),
 							pageH2s: [...document.querySelectorAll('.prose h2')].map((node) =>
 								(node.textContent ?? '').trim(),
 							),
@@ -916,11 +1013,17 @@ try {
 							navHeight: navBox ? navBox.height : 0,
 							screenful: window.innerHeight,
 							disclosureHeight:
-								document.querySelector('.sidebar-disclosure')?.getBoundingClientRect().height ?? 0,
+								document
+									.querySelector('.sidebar-disclosure')
+									?.getBoundingClientRect().height ?? 0,
 							summaryHeight:
-								document.querySelector('.sidebar-summary')?.getBoundingClientRect().height ?? 0,
-							navOpen: (document.querySelector('.sidebar-disclosure') as HTMLDetailsElement | null)
-								?.open,
+								document.querySelector('.sidebar-summary')?.getBoundingClientRect()
+									.height ?? 0,
+							navOpen: (
+								document.querySelector(
+									'.sidebar-disclosure',
+								) as HTMLDetailsElement | null
+							)?.open,
 							navSummaryShown:
 								getComputedStyle(
 									document.querySelector('.sidebar-summary') as Element,
@@ -933,32 +1036,38 @@ try {
 								const list = document.querySelector('.sidebar-list');
 								return Boolean(
 									list &&
-										list.checkVisibility({
-											contentVisibilityAuto: true,
-											opacityProperty: true,
-											visibilityProperty: true,
-										}),
+									list.checkVisibility({
+										contentVisibilityAuto: true,
+										opacityProperty: true,
+										visibilityProperty: true,
+									}),
 								);
 							})(),
 							h1Top: h1Box ? h1Box.top + window.scrollY : Number.NaN,
 							overlap: Boolean(
 								navBox &&
-									h1Box &&
-									navBox.right > h1Box.left &&
-									navBox.left < h1Box.right &&
-									navBox.bottom > h1Box.top &&
-									navBox.top < h1Box.bottom,
+								h1Box &&
+								navBox.right > h1Box.left &&
+								navBox.left < h1Box.right &&
+								navBox.bottom > h1Box.top &&
+								navBox.top < h1Box.bottom,
 							),
 							scrollX: document.documentElement.scrollWidth > window.innerWidth + 1,
 							bodyFont: Number.parseFloat(getComputedStyle(document.body).fontSize),
-							prosePosition: document.querySelector('.prose')?.getBoundingClientRect().width ?? 0,
+							prosePosition:
+								document.querySelector('.prose')?.getBoundingClientRect().width ??
+								0,
 							pager: Boolean(document.querySelector('.pager .pager-title')),
 						};
 					});
 
 					const at = `${label} ${theme} ${width}`;
 					check(chrome.header, `${at}: the header is on the page`);
-					check(chrome.headerSticky === 'sticky', `${at}: the header is sticky`, chrome.headerSticky);
+					check(
+						chrome.headerSticky === 'sticky',
+						`${at}: the header is sticky`,
+						chrome.headerSticky,
+					);
 					check(
 						chrome.crumbPage === (entry?.title ?? ''),
 						`${at}: the breadcrumb names this page`,
@@ -987,12 +1096,15 @@ try {
 							`links shown: ${chrome.navLinksShown}, summary shown: ${chrome.navSummaryShown}`,
 						);
 						check(
-							chrome.railItems.length === chrome.pageH2s.length && chrome.railItems.length > 1,
+							chrome.railItems.length === chrome.pageH2s.length &&
+								chrome.railItems.length > 1,
 							`${at}: the rail lists every h2 on the page`,
 							`${chrome.railItems.length} rail items, ${chrome.pageH2s.length} h2s`,
 						);
 						check(
-							chrome.railItems.every((title, index) => title === chrome.pageH2s[index]),
+							chrome.railItems.every(
+								(title, index) => title === chrome.pageH2s[index],
+							),
 							`${at}: the rail's titles are this page's h2 titles`,
 							chrome.railItems.join(' | '),
 						);
@@ -1057,7 +1169,11 @@ try {
 		await page.evaluate(() => document.documentElement.removeAttribute('data-theme'));
 
 		// --- the assumes line links the pages it names -------------------------
-		for (const href of ['/markless', '/markless/concepts/state', '/markless/concepts/computed']) {
+		for (const href of [
+			'/markless',
+			'/markless/concepts/state',
+			'/markless/concepts/computed',
+		]) {
 			await page.goto(`${origin}${href}`, { waitUntil: 'load' });
 			const assumed = await page
 				.locator('.page-meta a.page-meta-assume-link:not(.is-hidden)')
@@ -1086,7 +1202,11 @@ try {
 		await page.goto(`${origin}/markless/concepts/state`, { waitUntil: 'load' });
 		const doodles = page.locator('.pager-doodles .sprite');
 		await doodles.first().waitFor();
-		check((await doodles.count()) === 6, 'the pager carries its six doodles', String(await doodles.count()));
+		check(
+			(await doodles.count()) === 6,
+			'the pager carries its six doodles',
+			String(await doodles.count()),
+		);
 		const doodleImage = (index: number) => doodles.nth(index).locator('img.sprite-ink-light');
 		const doodleMotion = (index: number) =>
 			doodleImage(index).evaluate((node) => {
@@ -1106,13 +1226,15 @@ try {
 		// the reaction is that an animation is running on the image the reader is
 		// looking at, not that its src changed. The flower turns on the row's own
 		// spring transition instead, so it is read as a transform.
-		for (const [index, name] of [
-			[4, 'doodle-sun-turn'],
-		] as const) {
+		for (const [index, name] of [[4, 'doodle-sun-turn']] as const) {
 			await page.mouse.move(0, 0);
 			await page.waitForTimeout(80);
 			const resting = await doodleMotion(index);
-			check(resting.animation === 'none', `doodle ${index + 1} is still at rest`, resting.animation);
+			check(
+				resting.animation === 'none',
+				`doodle ${index + 1} is still at rest`,
+				resting.animation,
+			);
 			await doodles.nth(index).hover();
 			await page.waitForTimeout(60);
 			const hovered = await doodleMotion(index);
@@ -1127,9 +1249,14 @@ try {
 		// The strip on paper: the doodles are the low-contrast end of the palette,
 		// so both themes are shot for a look rather than only measured.
 		for (const theme of ['light', 'dark'] as const) {
-			await page.evaluate((wanted) => document.documentElement.setAttribute('data-theme', wanted), theme);
+			await page.evaluate(
+				(wanted) => document.documentElement.setAttribute('data-theme', wanted),
+				theme,
+			);
 			await page.waitForTimeout(120);
-			await page.locator('.pager').screenshot({ path: `${shotsDir}/T034-pager-${theme}.png` });
+			await page
+				.locator('.pager')
+				.screenshot({ path: `${shotsDir}/T034-pager-${theme}.png` });
 		}
 		await page.evaluate(() => document.documentElement.removeAttribute('data-theme'));
 		await page.waitForTimeout(80);
@@ -1138,7 +1265,8 @@ try {
 		await page.waitForTimeout(360);
 		const hoveredFlower = await doodleMotion(5);
 		check(
-			restingFlower.transform !== hoveredFlower.transform && hoveredFlower.transform !== 'none',
+			restingFlower.transform !== hoveredFlower.transform &&
+				hoveredFlower.transform !== 'none',
 			'the flower turns when it is pointed at',
 			`${restingFlower.transform} then ${hoveredFlower.transform}`,
 		);
@@ -1176,7 +1304,11 @@ try {
 		);
 		await echoField.click();
 		await echoField.pressSequentially('Ada', { delay: 40 });
-		await settleText(echoLine, (text) => text === 'Hello, Ada', 'name echo follows the keystrokes');
+		await settleText(
+			echoLine,
+			(text) => text === 'Hello, Ada',
+			'name echo follows the keystrokes',
+		);
 		check(
 			((await echoLine.textContent()) ?? '').trim() === 'Hello, Ada',
 			'typing into the field moves the echo under it',
@@ -1200,7 +1332,8 @@ try {
 		// on it is the first thing the reader is told, so each one is checked
 		// verbatim rather than by a phrase.
 		const noBoxTitle: Record<string, string> = {
-			'/markless/concepts/conditionals': 'Why the panels on this page are files rather than boxes',
+			'/markless/concepts/conditionals':
+				'Why the panels on this page are files rather than boxes',
 			'/markless/concepts/lists': 'Why the rows on this page are a file rather than a box',
 			'/markless/concepts/async': 'What is missing here, and what this build actually does',
 			'/markless/concepts/styling': 'Why the two cards are not side by side on this page',
@@ -1264,7 +1397,9 @@ try {
 			);
 			const body = await page
 				.locator('.callout-body')
-				.evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()).join(' '));
+				.evaluateAll((nodes) =>
+					nodes.map((node) => (node.textContent ?? '').trim()).join(' '),
+				);
 			check(
 				body.includes('NOTES.md finding 25') || body.includes('NOTES.md finding 26'),
 				`${href} names the finding its missing widget is recorded under`,
@@ -1290,7 +1425,10 @@ try {
 		// The first-app page must carry the override a reader needs today, exactly,
 		// and must not fake a terminal.
 		await page.goto(`${origin}/markless/start/first-app`, { waitUntil: 'load' });
-		const firstAppText = (await page.locator('.prose').first().innerText()).replace(/\s+/g, ' ');
+		const firstAppText = (await page.locator('.prose').first().innerText()).replace(
+			/\s+/g,
+			' ',
+		);
 		check(
 			firstAppText.includes('"@tsrx/core": "0.1.58"'),
 			'the first-app page carries the @tsrx/core override a clean install needs',
@@ -1425,7 +1563,10 @@ try {
 			await page.goto(`${origin}${href}`, { waitUntil: 'load' });
 			const heading = ((await page.locator('h1').first().textContent()) ?? '').trim();
 			check(heading.length > 0, `${href} renders its h1 in the browser`, heading);
-			await page.screenshot({ path: `${shotsDir}/T030-${slugFor(href)}.png`, fullPage: true });
+			await page.screenshot({
+				path: `${shotsDir}/T030-${slugFor(href)}.png`,
+				fullPage: true,
+			});
 		}
 
 		// --- widget: the route tree on the pages page ---------------------------
@@ -1514,7 +1655,11 @@ try {
 			((await stepNote.textContent()) ?? '').slice(0, 60),
 		);
 		await page.getByRole('button', { name: 'Back to the start' }).click();
-		await settleText(stepMark, (text) => text === 'Request', 'the illustration can be replayed');
+		await settleText(
+			stepMark,
+			(text) => text === 'Request',
+			'the illustration can be replayed',
+		);
 		await page.screenshot({ path: `${shotsDir}/T030-stream-steps-after.png`, fullPage: true });
 
 		// --- widget: the tier ladder on the how-it-works page -------------------
@@ -1561,7 +1706,10 @@ try {
 		// The how-it-works page is the most over-claimable on the site, so the
 		// quoted doctrine sentence has to be on it verbatim, and the comparison
 		// words may only appear inside the closed collapsible.
-		const howItWorksText = (await page.locator('.prose').first().innerText()).replace(/\s+/g, ' ');
+		const howItWorksText = (await page.locator('.prose').first().innerText()).replace(
+			/\s+/g,
+			' ',
+		);
 		check(
 			howItWorksText.includes(
 				'"No hydration" forbids re-executing components over existing server HTML; it does not forbid rendering new content client-side',
@@ -1569,7 +1717,9 @@ try {
 			'how-it-works quotes the doctrine sentence rather than upgrading it',
 		);
 		check(
-			howItWorksText.includes('Component execution is paid exactly once per appearance of content'),
+			howItWorksText.includes(
+				'Component execution is paid exactly once per appearance of content',
+			),
 			'how-it-works quotes the vanilla-JS floor paragraph',
 		);
 		const virtualDomOutsideCollapsible = await page.evaluate(() => {
@@ -1586,7 +1736,10 @@ try {
 
 		// --- the reference page names the surface it promises -------------------
 		await page.goto(`${origin}/markless/reference`, { waitUntil: 'load' });
-		const referenceText = (await page.locator('.prose').first().innerText()).replace(/\s+/g, ' ');
+		const referenceText = (await page.locator('.prose').first().innerText()).replace(
+			/\s+/g,
+			' ',
+		);
 		for (const name of [
 			'state',
 			'computed',
@@ -1624,7 +1777,11 @@ try {
 			page
 				.locator('.like-heart-plus')
 				.evaluate((node) => Number(getComputedStyle(node as Element).opacity));
-		check((await plusOpacity()) === 0, 'the +1 is not painted before the press', String(await plusOpacity()));
+		check(
+			(await plusOpacity()) === 0,
+			'the +1 is not painted before the press',
+			String(await plusOpacity()),
+		);
 		await heartButton.scrollIntoViewIfNeeded();
 		await heartButton.hover();
 		const heartBox = (await heartButton.boundingBox())!;
@@ -1641,15 +1798,27 @@ try {
 		await page.waitForTimeout(180);
 		await page.screenshot({ path: `${shotsDir}/T024-heart.png`, fullPage: false });
 		check(pressedPlus > 0.5, 'the +1 is painted under the press', String(pressedPlus));
-		check(pressedBurst > 0.5, 'the burst doodles are painted under the press', String(pressedBurst));
-		await settleText(heartCount, (text) => text === '1', 'the like heart counts the first click');
+		check(
+			pressedBurst > 0.5,
+			'the burst doodles are painted under the press',
+			String(pressedBurst),
+		);
+		await settleText(
+			heartCount,
+			(text) => text === '1',
+			'the like heart counts the first click',
+		);
 		check(
 			((await heartCount.textContent()) ?? '').trim() === '1',
 			'clicking the heart adds a like',
 			((await heartCount.textContent()) ?? '').trim(),
 		);
 		await heartButton.click();
-		await settleText(heartCount, (text) => text === '2', 'the like heart counts a second click');
+		await settleText(
+			heartCount,
+			(text) => text === '2',
+			'the like heart counts a second click',
+		);
 		check(
 			((await heartCount.textContent()) ?? '').trim() === '2',
 			'the likes keep adding on repeat clicks',

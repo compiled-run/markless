@@ -60,7 +60,8 @@ function readFamily(root: string, family: string): Demo[] {
 			const stem = basename(entry, '.tsrx');
 			return { stem, name: exportName(stem), file: join(dir, entry) };
 		});
-	if (demos.length === 0) throw new Error(`ui-demos: ${DEMOS_DIR}/${family}/ holds no .tsrx demos.`);
+	if (demos.length === 0)
+		throw new Error(`ui-demos: ${DEMOS_DIR}/${family}/ holds no .tsrx demos.`);
 	return demos;
 }
 
@@ -115,7 +116,10 @@ function dedent(css: string): string {
 		indent = Math.min(indent, line.length - line.trimStart().length);
 	}
 	if (!Number.isFinite(indent) || indent === 0) return css.trimEnd();
-	return lines.map((line) => line.slice(indent)).join('\n').trimEnd();
+	return lines
+		.map((line) => line.slice(indent))
+		.join('\n')
+		.trimEnd();
 }
 
 /**
@@ -150,7 +154,10 @@ function moduleSource(demos: readonly Demo[]): string {
 	// the graph instead of two.
 	lines.push(
 		`export const source = {${demos
-			.map((demo) => `${JSON.stringify(demo.stem)}: ${JSON.stringify(readFileSync(demo.file, 'utf8'))}`)
+			.map(
+				(demo) =>
+					`${JSON.stringify(demo.stem)}: ${JSON.stringify(readFileSync(demo.file, 'utf8'))}`,
+			)
 			.join(', ')}};`,
 	);
 	return `${lines.join('\n')}\n`;
@@ -165,7 +172,12 @@ function moduleSource(demos: readonly Demo[]): string {
  * accepts default imports from `.tsrx` specifiers only — a named import from a
  * bare specifier is refused before Vite resolution is ever reached.
  */
-function expandMdxImports(code: string, id: string, root: string, watch: (file: string) => void): string | undefined {
+function expandMdxImports(
+	code: string,
+	id: string,
+	root: string,
+	watch: (file: string) => void,
+): string | undefined {
 	const pattern = /^import\s*\{([^}]*)\}\s*from\s*['"]ui-demos:([^'"]+)['"];?[ \t]*$/gm;
 	let changed = false;
 	const next = code.replace(pattern, (whole, names: string, family: string) => {
@@ -230,14 +242,20 @@ function specifierFrom(id: string, file: string): string {
 /** Drops `import Name from '…'` once the page no longer renders `<Name`. */
 function dropUnusedImport(code: string, name: string): string {
 	if (new RegExp(`<${name}\\b`).test(code)) return code;
-	return code.replace(new RegExp(`^import\\s+${name}\\s+from\\s+['"][^'"]+['"];?[ \\t]*\\n`, 'm'), '');
+	return code.replace(
+		new RegExp(`^import\\s+${name}\\s+from\\s+['"][^'"]+['"];?[ \\t]*\\n`, 'm'),
+		'',
+	);
 }
 
 /** The two files a demo is made of, as the code chrome tabs them. */
 function panesOf(family: string, demo: Demo): PanelPane[] {
 	const { code, css } = splitDemo(readFileSync(demo.file, 'utf8'));
-	const panes: PanelPane[] = [{ value: 'source', label: `${demo.stem}.tsrx`, code, language: 'tsrx' }];
-	if (css !== '') panes.push({ value: 'css', label: `${family}.css`, code: css, language: 'css' });
+	const panes: PanelPane[] = [
+		{ value: 'source', label: `${demo.stem}.tsrx`, code, language: 'tsrx' },
+	];
+	if (css !== '')
+		panes.push({ value: 'css', label: `${family}.css`, code: css, language: 'css' });
 	return panes;
 }
 
@@ -269,7 +287,9 @@ async function injectScenarioTags(
 		if (swaps.has(whole)) continue;
 		const demo = readFamily(root, family).find((entry) => entry.stem === stem);
 		if (!demo)
-			throw new Error(`ui-demos: ${DEMOS_DIR}/${family}/ has no '${stem}.tsrx' for the <${tag}> in ${id}.`);
+			throw new Error(
+				`ui-demos: ${DEMOS_DIR}/${family}/ has no '${stem}.tsrx' for the <${tag}> in ${id}.`,
+			);
 		watch(demo.file);
 		let file: string;
 		let local: string;
@@ -280,12 +300,23 @@ async function injectScenarioTags(
 		} else if (tag === 'Example') {
 			file = examplePath(root, family, stem);
 			local = exampleName(family, stem);
-			writeGenerated(file, await codePanelModule({ family, stem, panes: panesOf(family, demo), demo: specifierFrom(file, demo.file) }));
+			writeGenerated(
+				file,
+				await codePanelModule({
+					family,
+					stem,
+					panes: panesOf(family, demo),
+					demo: specifierFrom(file, demo.file),
+				}),
+			);
 		} else {
 			tags.add(tag);
 			file = codePanelPath(root, family, stem);
 			local = codePanelName(family, stem);
-			writeGenerated(file, await codePanelModule({ family, stem, panes: panesOf(family, demo) }));
+			writeGenerated(
+				file,
+				await codePanelModule({ family, stem, panes: panesOf(family, demo) }),
+			);
 		}
 		imports.set(local, specifierFrom(id, file));
 		swaps.set(whole, `<${local} />`);
@@ -301,10 +332,17 @@ async function injectScenarioTags(
 }
 
 /** The generated module's text: chrome, demo and code panel in one island. */
-async function playgroundSource(root: string, family: string, stem: string, watch: (file: string) => void): Promise<string> {
+async function playgroundSource(
+	root: string,
+	family: string,
+	stem: string,
+	watch: (file: string) => void,
+): Promise<string> {
 	const demo = readFamily(root, family).find((entry) => entry.stem === stem);
 	if (!demo)
-		throw new Error(`ui-playground: ${DEMOS_DIR}/${family}/ has no '${stem}.tsrx' to build a playground from.`);
+		throw new Error(
+			`ui-playground: ${DEMOS_DIR}/${family}/ has no '${stem}.tsrx' to build a playground from.`,
+		);
 	watch(demo.file);
 	const analysis = await analyzeDemo(family, stem, demo.file);
 	const meta = metaFor(family);
@@ -312,8 +350,15 @@ async function playgroundSource(root: string, family: string, stem: string, watc
 	const slots = codeSlots(analysis, controls);
 	const registry = new DocRegistry(`pg-${family}-${stem}`);
 	const colours = new ColourTable();
-	const sourceLines = paneLines(await highlightHtml(displaySource(analysis, slots), 'tsrx'), registry, colours);
-	const cssLines = analysis.css === '' ? [] : paneLines(await highlightHtml(analysis.css, 'css'), registry, colours);
+	const sourceLines = paneLines(
+		await highlightHtml(displaySource(analysis, slots), 'tsrx'),
+		registry,
+		colours,
+	);
+	const cssLines =
+		analysis.css === ''
+			? []
+			: paneLines(await highlightHtml(analysis.css, 'css'), registry, colours);
 	return playgroundModule({
 		demo: analysis,
 		meta,
@@ -350,7 +395,8 @@ export function uiDemos(): Plugin {
 				// A page's expanded import list is baked into its transform result,
 				// so adding or removing a demo has to re-run that transform too.
 				for (const module of server.moduleGraph.getModulesByFile(file) ?? [])
-					for (const importer of module.importers) server.moduleGraph.invalidateModule(importer);
+					for (const importer of module.importers)
+						server.moduleGraph.invalidateModule(importer);
 			};
 			server.watcher.on('add', invalidate);
 			server.watcher.on('unlink', invalidate);
@@ -358,7 +404,8 @@ export function uiDemos(): Plugin {
 		resolveId(source) {
 			if (!source.startsWith(PREFIX)) return;
 			const family = source.slice(PREFIX.length);
-			if (!FAMILY.test(family)) throw new Error(`ui-demos: '${family}' is not a family folder name.`);
+			if (!FAMILY.test(family))
+				throw new Error(`ui-demos: '${family}' is not a family folder name.`);
 			return VIRTUAL + family;
 		},
 		load(id) {
@@ -376,7 +423,8 @@ export function uiDemos(): Plugin {
 				const expanded = code.includes(PREFIX)
 					? expandMdxImports(code, id, root, watch)
 					: undefined;
-				const result = (await injectScenarioTags(expanded ?? code, id, root, watch)) ?? expanded;
+				const result =
+					(await injectScenarioTags(expanded ?? code, id, root, watch)) ?? expanded;
 				return result === undefined ? undefined : { code: result, map: null };
 			},
 		},

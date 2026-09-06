@@ -54,11 +54,11 @@ Every row is a checkbox, so the family writes `ui-checked`, `ui-mixed` and `ui-d
 
 ## Props on `checklist.root`
 
-| Prop | Type | What it does |
-| --- | --- | --- |
-| `value` | `string[]` | The values that are ticked. Omit it and nothing is. |
-| `values` | `string[]` | Every value the list offers. Select-all compares the ticked set against this. |
-| `disabled` | `boolean` | Nobody can change any item, and the select-all is locked too. |
+| Prop       | Type              | What it does                                                                     |
+| ---------- | ----------------- | -------------------------------------------------------------------------------- |
+| `value`    | `string[]`        | The values that are ticked. Omit it and nothing is.                              |
+| `values`   | `string[]`        | Every value the list offers. Select-all compares the ticked set against this.    |
+| `disabled` | `boolean`         | Nobody can change any item, and the select-all is locked too.                    |
 | `onChange` | `(value) => void` | Called with the whole new ticked set whenever an item or the select-all changes. |
 
 Everything a `<div>` accepts reaches the element too. `checklist.item` takes its own `value`,

@@ -48,7 +48,9 @@ let parser: ParseModule | undefined;
 async function houseParser(): Promise<ParseModule> {
 	if (parser) return parser;
 	const fromHere = createRequire(import.meta.url);
-	const compiler = createRequire(fromHere.resolve('@markless/core')).resolve('@markless/compiler');
+	const compiler = createRequire(fromHere.resolve('@markless/core')).resolve(
+		'@markless/compiler',
+	);
 	const loaded = (await import(pathToFileURL(compiler).href)) as {
 		parseJavaScriptModule?: ParseModule;
 	};
@@ -137,7 +139,8 @@ function arrayBindings(statements: readonly AstNode[]): Map<string, AstNode> {
 		for (const declarator of (statement as { declarations?: AstNode[] }).declarations ?? []) {
 			const id = declarator.id as AstNode;
 			const init = (declarator as { init?: AstNode | null }).init;
-			if (id.type === 'Identifier' && init?.type === 'ArrayExpression') found.set(String(id.name), init);
+			if (id.type === 'Identifier' && init?.type === 'ArrayExpression')
+				found.set(String(id.name), init);
 		}
 	}
 	return found;
@@ -146,11 +149,16 @@ function arrayBindings(statements: readonly AstNode[]): Map<string, AstNode> {
 /** The string each object in `array` holds under `field`. */
 function fieldLiterals(array: AstNode, field: string): string[] {
 	const out: string[] = [];
-	for (const element of ((array as { elements?: (AstNode | null)[] }).elements ?? [])) {
+	for (const element of (array as { elements?: (AstNode | null)[] }).elements ?? []) {
 		if (element?.type !== 'ObjectExpression') continue;
 		for (const property of (element as { properties?: AstNode[] }).properties ?? []) {
 			const key = property.key as AstNode | undefined;
-			const name = key?.type === 'Identifier' ? String(key.name) : key?.type === 'Literal' ? String(key.value) : '';
+			const name =
+				key?.type === 'Identifier'
+					? String(key.name)
+					: key?.type === 'Literal'
+						? String(key.value)
+						: '';
 			if (name !== field) continue;
 			const value = literalOf(property.value as AstNode);
 			if (typeof value === 'string') out.push(value);
@@ -222,7 +230,11 @@ function dedent(css: string): string {
  * where its CSS lives. Nothing here knows about the playground — it answers
  * questions about consumer code.
  */
-export async function analyzeDemo(family: string, stem: string, file: string): Promise<DemoAnalysis> {
+export async function analyzeDemo(
+	family: string,
+	stem: string,
+	file: string,
+): Promise<DemoAnalysis> {
 	const parse = await houseParser();
 	const source = readFileSync(file, 'utf8');
 	const program = parse(source, `${stem}.tsrx`);
@@ -257,7 +269,10 @@ export async function analyzeDemo(family: string, stem: string, file: string): P
 	const prelude =
 		statements.length === 0
 			? ''
-			: source.slice(source.lastIndexOf('\n', statements[0].start) + 1, statements[statements.length - 1].end);
+			: source.slice(
+					source.lastIndexOf('\n', statements[0].start) + 1,
+					statements[statements.length - 1].end,
+				);
 
 	const itemValues: string[] = [];
 	const hold = (value: string) => {
@@ -268,15 +283,19 @@ export async function analyzeDemo(family: string, stem: string, file: string): P
 		let scope = rows;
 		if (node.type === 'JSXForExpression') {
 			const loop = node.statement as AstNode;
-			const row = ((loop.left as AstNode).declarations as AstNode[])?.[0]?.id as AstNode | undefined;
+			const row = ((loop.left as AstNode).declarations as AstNode[])?.[0]?.id as
+				| AstNode
+				| undefined;
 			const over = loop.right as AstNode;
 			const array = over.type === 'Identifier' ? arrays.get(String(over.name)) : undefined;
-			if (row?.type === 'Identifier' && array) scope = new Map([...rows, [String(row.name), array]]);
+			if (row?.type === 'Identifier' && array)
+				scope = new Map([...rows, [String(row.name), array]]);
 		}
 		if (node.type === 'JSXElement' && node !== root) {
 			const name = jsxName((node.openingElement as AstNode).name as AstNode);
 			if (name.startsWith(`${family}.`)) {
-				for (const attribute of ((node.openingElement as AstNode).attributes as AstNode[]) ?? []) {
+				for (const attribute of ((node.openingElement as AstNode)
+					.attributes as AstNode[]) ?? []) {
 					if (attribute.type !== 'JSXAttribute') continue;
 					const read = attributeOf(source, attribute);
 					if (read.name !== 'value') continue;
@@ -284,12 +303,18 @@ export async function analyzeDemo(family: string, stem: string, file: string): P
 						hold(read.literal);
 						continue;
 					}
-					const expression = (attribute.value as AstNode | null)?.type === 'JSXExpressionContainer' ? ((attribute.value as AstNode).expression as AstNode) : undefined;
+					const expression =
+						(attribute.value as AstNode | null)?.type === 'JSXExpressionContainer'
+							? ((attribute.value as AstNode).expression as AstNode)
+							: undefined;
 					if (expression?.type !== 'MemberExpression' || expression.computed) continue;
 					const object = expression.object as AstNode;
 					const property = expression.property as AstNode;
-					const array = object.type === 'Identifier' ? scope.get(String(object.name)) : undefined;
-					if (array && property.type === 'Identifier') for (const value of fieldLiterals(array, String(property.name))) hold(value);
+					const array =
+						object.type === 'Identifier' ? scope.get(String(object.name)) : undefined;
+					if (array && property.type === 'Identifier')
+						for (const value of fieldLiterals(array, String(property.name)))
+							hold(value);
 				}
 			}
 		}
@@ -365,7 +390,10 @@ export type PlaygroundControl = {
  * sentences of that, and the backticks dropped since the tip is mono already.
  */
 function hintDoc(doc: string | undefined): string {
-	const paragraph = (doc ?? '').split(/\n[ \t]*\n/)[0].replace(/\s+/g, ' ').trim();
+	const paragraph = (doc ?? '')
+		.split(/\n[ \t]*\n/)[0]
+		.replace(/\s+/g, ' ')
+		.trim();
 	const sentences = paragraph.match(/[^.!?]+[.!?]+(?=\s|$)/g);
 	const cut = sentences ? sentences.slice(0, 2).join('').trim() : paragraph;
 	return cut.replaceAll('`', '');
@@ -397,7 +425,15 @@ type ManifestProp = {
 	readonly doc?: string;
 };
 type ApiManifest = Readonly<
-	Record<string, { readonly parts: readonly { readonly part: string; readonly props: readonly ManifestProp[] }[] }>
+	Record<
+		string,
+		{
+			readonly parts: readonly {
+				readonly part: string;
+				readonly props: readonly ManifestProp[];
+			}[];
+		}
+	>
 >;
 
 let manifest: ApiManifest | undefined;
@@ -415,7 +451,9 @@ function manifestProp(family: string, part: string, prop: string): ManifestProp 
 			readFileSync(fromHere.resolve('@markless/ui/api/manifest.json'), 'utf8'),
 		) as ApiManifest;
 	}
-	const found = manifest[family]?.parts.find((one) => one.part === part)?.props.find((one) => one.name === prop);
+	const found = manifest[family]?.parts
+		.find((one) => one.part === part)
+		?.props.find((one) => one.name === prop);
 	if (!found)
 		throw new Error(
 			`ui-playground: @markless/ui/api/manifest.json has no '${family}.${part}.${prop}', which ui-meta/${family}.ts asks the playground to draw.`,
@@ -423,7 +461,10 @@ function manifestProp(family: string, part: string, prop: string): ManifestProp 
 	return found;
 }
 
-function controlValue(holds: 'boolean' | 'string', value: ControlValue | number | undefined): ControlValue {
+function controlValue(
+	holds: 'boolean' | 'string',
+	value: ControlValue | number | undefined,
+): ControlValue {
 	if (holds === 'boolean') return value === true || value === 'true';
 	if (value === undefined) return '';
 	if (typeof value === 'boolean') return String(value);
@@ -474,7 +515,12 @@ function controlOf(
 	const holds: 'boolean' | 'string' = descriptor.kind === 'toggle' ? 'boolean' : 'string';
 	const fallback = controlValue(holds, initialValue(prop.default));
 	const seen = controlValue(holds, authored?.literal ?? initialValue(prop.default));
-	let kind: PlaygroundControl['kind'] = descriptor.kind === 'toggle' ? 'toggle' : descriptor.kind === 'select' ? 'select' : 'textbox';
+	let kind: PlaygroundControl['kind'] =
+		descriptor.kind === 'toggle'
+			? 'toggle'
+			: descriptor.kind === 'select'
+				? 'select'
+				: 'textbox';
 	let options: readonly string[] = descriptor.options ?? [];
 
 	// A family's own parts name the values its root can hold, so `value` gets a
@@ -501,14 +547,21 @@ function controlOf(
 		options,
 		...cells,
 		holds,
-		list: holds === 'string' && descriptor.members.some((member) => /\bstring\[\]$|^Array<|^ReadonlyArray</.test(member)),
+		list:
+			holds === 'string' &&
+			descriptor.members.some((member) =>
+				/\bstring\[\]$|^Array<|^ReadonlyArray</.test(member),
+			),
 		seen,
 		fallback: typeof fallback === 'boolean' || typeof fallback === 'string' ? fallback : '',
 	};
 }
 
 /** The controls a family's page draws: the quick row first, then "Show all". */
-export function playgroundControls(demo: DemoAnalysis, meta: FamilyMeta): readonly PlaygroundControl[] {
+export function playgroundControls(
+	demo: DemoAnalysis,
+	meta: FamilyMeta,
+): readonly PlaygroundControl[] {
 	const overrides = new Map(
 		(meta.overrides ?? []).map((one) => [`${one.part}.${one.prop}`, one] as const),
 	);
@@ -548,13 +601,20 @@ function tagEnd(demo: DemoAnalysis): number {
 }
 
 /** The slot each editable control gets in the code panel, authored or not. */
-export function codeSlots(demo: DemoAnalysis, controls: readonly PlaygroundControl[]): readonly CodeSlot[] {
+export function codeSlots(
+	demo: DemoAnalysis,
+	controls: readonly PlaygroundControl[],
+): readonly CodeSlot[] {
 	return controls
 		.filter((control) => control.kind !== 'event')
 		.map((control) => {
 			const authored = demo.attributes.find((attribute) => attribute.name === control.prop);
 			if (!authored) return { control, form: 'attribute', lead: ' ', before: ' ', after: '' };
-			if (control.holds === 'string' && authored.valueStart !== undefined && authored.valueEnd !== undefined)
+			if (
+				control.holds === 'string' &&
+				authored.valueStart !== undefined &&
+				authored.valueEnd !== undefined
+			)
 				return {
 					control,
 					form: 'value',
@@ -564,7 +624,9 @@ export function codeSlots(demo: DemoAnalysis, controls: readonly PlaygroundContr
 					before: demo.source[authored.valueStart - 1] ?? '',
 					after: demo.source[authored.valueEnd] ?? '',
 				};
-			const spaced = demo.source[authored.start - 1] === ' ' && !/\s/.test(demo.source[authored.start - 2] ?? '');
+			const spaced =
+				demo.source[authored.start - 1] === ' ' &&
+				!/\s/.test(demo.source[authored.start - 2] ?? '');
 			return {
 				control,
 				form: 'attribute',
@@ -582,12 +644,17 @@ export function codeSlots(demo: DemoAnalysis, controls: readonly PlaygroundContr
  * for a sentinel, and the `<style>` block lifted out into its own tab.
  */
 function displaySource(demo: DemoAnalysis, slots: readonly CodeSlot[]): string {
-	const edits: { readonly at: number; readonly to: number; readonly text: string }[] = slots.flatMap(
-		(slot, index) =>
-			slot.start === undefined || slot.end === undefined ? [] : [{ at: slot.start, to: slot.end, text: SLOT(index) }],
+	const edits: { readonly at: number; readonly to: number; readonly text: string }[] =
+		slots.flatMap((slot, index) =>
+			slot.start === undefined || slot.end === undefined
+				? []
+				: [{ at: slot.start, to: slot.end, text: SLOT(index) }],
+		);
+	const inserted = slots.flatMap((slot, index) =>
+		slot.start === undefined ? [` ${SLOT(index)}`] : [],
 	);
-	const inserted = slots.flatMap((slot, index) => (slot.start === undefined ? [` ${SLOT(index)}`] : []));
-	if (inserted.length > 0) edits.push({ at: tagEnd(demo), to: tagEnd(demo), text: inserted.join('') });
+	if (inserted.length > 0)
+		edits.push({ at: tagEnd(demo), to: tagEnd(demo), text: inserted.join('') });
 	edits.sort((left, right) => right.at - left.at);
 	let text = demo.source;
 	for (const edit of edits) text = `${text.slice(0, edit.at)}${edit.text}${text.slice(edit.to)}`;
@@ -661,7 +728,11 @@ function panelLines(lines: readonly Line[], slots: readonly CodeSlot[]): readonl
 				}
 				if (part === '') continue;
 				serial += 1;
-				held.push({ id: `${run.id}s${serial}`, text: part, ...(colour === undefined ? {} : { class: colour }) });
+				held.push({
+					id: `${run.id}s${serial}`,
+					text: part,
+					...(colour === undefined ? {} : { class: colour }),
+				});
 			}
 		}
 		flush();
@@ -670,15 +741,23 @@ function panelLines(lines: readonly Line[], slots: readonly CodeSlot[]): readonl
 			if (segment.kind !== 'slot') continue;
 			const previous = segments[at - 1];
 			if (previous?.kind === 'runs')
-				segments[at - 1] = { kind: 'runs', runs: trimEdge(previous.runs, segment.slot.before, 'end') };
+				segments[at - 1] = {
+					kind: 'runs',
+					runs: trimEdge(previous.runs, segment.slot.before, 'end'),
+				};
 			const following = segments[at + 1];
 			if (following?.kind === 'runs')
-				segments[at + 1] = { kind: 'runs', runs: trimEdge(following.runs, segment.slot.after, 'start') };
+				segments[at + 1] = {
+					kind: 'runs',
+					runs: trimEdge(following.runs, segment.slot.after, 'start'),
+				};
 		}
 		return {
 			kind: 'split',
 			id: line.id,
-			segments: segments.filter((segment) => segment.kind === 'slot' || segment.runs.length > 0),
+			segments: segments.filter(
+				(segment) => segment.kind === 'slot' || segment.runs.length > 0,
+			),
 		};
 	});
 }
@@ -708,7 +787,12 @@ function slotText(slot: CodeSlot): string {
  * Every cell a control owns, written from one value expression. Reading the
  * value into a local first keeps each text derived from what was just written.
  */
-function writes(slots: readonly CodeSlot[], control: PlaygroundControl, value: string, indent: string): string {
+function writes(
+	slots: readonly CodeSlot[],
+	control: PlaygroundControl,
+	value: string,
+	indent: string,
+): string {
 	const slot = slots.find((one) => one.control === control);
 	const local = `next${identifier(control.prop)}`;
 	const lines = [`const ${local} = ${value};`, `${control.cell} = ${local};`];
@@ -725,7 +809,9 @@ function writes(slots: readonly CodeSlot[], control: PlaygroundControl, value: s
  * the list it names; off, the first held entry. The code panel then prints the
  * form a consumer would write for that mode.
  */
-function listFollowsMultiple(controls: readonly PlaygroundControl[]): { readonly multiple: PlaygroundControl; readonly value: PlaygroundControl } | undefined {
+function listFollowsMultiple(
+	controls: readonly PlaygroundControl[],
+): { readonly multiple: PlaygroundControl; readonly value: PlaygroundControl } | undefined {
 	const multiple = controls.find((one) => one.prop === 'multiple' && one.kind === 'toggle');
 	const value = controls.find((one) => one.prop === 'value' && one.kind !== 'event' && one.list);
 	return multiple && value ? { multiple, value } : undefined;
@@ -774,10 +860,15 @@ ${hintFor(control)}
 
 function selectCell(emit: Emit, control: PlaygroundControl): string {
 	const paired = listFollowsMultiple(emit.controls);
-	const chosen = paired && paired.value === control ? `${paired.multiple.cell} ? toggled(${control.cell}, next) : next` : 'next';
+	const chosen =
+		paired && paired.value === control
+			? `${paired.multiple.cell} ? toggled(${control.cell}, next) : next`
+			: 'next';
 	const items = control.options
 		.map(
-			(option) => `							<select.item class="pg-pick-item" value=${quote(option)}>
+			(
+				option,
+			) => `							<select.item class="pg-pick-item" value=${quote(option)}>
 								<select.itemlabel>${option === '' ? '(none)' : option}</select.itemlabel>
 							</select.item>`,
 		)
@@ -834,7 +925,9 @@ function controlCell(emit: Emit, control: PlaygroundControl): string {
 /** The root's opening tag, with every controlled attribute reading a cell. */
 function openingTag(demo: DemoAnalysis, emit: Emit): string {
 	const { controls, slots } = emit;
-	const byProp = new Map(controls.filter((one) => one.kind !== 'event').map((one) => [one.prop, one]));
+	const byProp = new Map(
+		controls.filter((one) => one.kind !== 'event').map((one) => [one.prop, one]),
+	);
 	const event = controls.find((one) => one.kind === 'event' && one.prop === 'onChange');
 	const value = controls.find((one) => one.prop === 'value' && one.kind !== 'event');
 	const written: string[] = [];
@@ -856,7 +949,15 @@ function openingTag(demo: DemoAnalysis, emit: Emit): string {
 	const authored = demo.attributes.find((one) => one.name === 'onChange');
 	if (event) {
 		const lines: string[] = [];
-		if (value) lines.push(writes(slots, value, value.holds === 'boolean' ? 'next === true' : 'next', '\t\t\t\t\t\t'));
+		if (value)
+			lines.push(
+				writes(
+					slots,
+					value,
+					value.holds === 'boolean' ? 'next === true' : 'next',
+					'\t\t\t\t\t\t',
+				),
+			);
 		lines.push('\t\t\t\t\t\tevents = logging ? events + 1 : events;');
 		if (authored?.expression) lines.push(`\t\t\t\t\t\t(${authored.expression})(next);`);
 		written.push(
@@ -929,7 +1030,11 @@ function paneMarkup(lines: readonly PanelLine[], prefix: string, indent: string)
 }
 
 /** One tab of the code chrome: the file name on the tab and the `<pre>` body as TSRX markup. */
-export type ChromePane = { readonly value: string; readonly label: string; readonly markup: string };
+export type ChromePane = {
+	readonly value: string;
+	readonly label: string;
+	readonly markup: string;
+};
 
 /**
  * The tabs-and-clamp chrome round highlighted code, shared by the playground and
@@ -944,7 +1049,10 @@ export function codePanelChrome(input: {
 }): string {
 	const { indent } = input;
 	const tabs = input.panes
-		.map((pane) => `${indent}\t\t\t\t<tabs.trigger class="pg-tab" value=${quote(pane.value)}>${pane.label}</tabs.trigger>`)
+		.map(
+			(pane) =>
+				`${indent}\t\t\t\t<tabs.trigger class="pg-tab" value=${quote(pane.value)}>${pane.label}</tabs.trigger>`,
+		)
 		.join('\n');
 	const panes = input.panes
 		.map(
@@ -996,13 +1104,18 @@ export type PlaygroundInput = {
 	readonly chromeCss: string;
 };
 
-function presetTable(controls: readonly PlaygroundControl[], presets: readonly FamilyPreset[]): string {
+function presetTable(
+	controls: readonly PlaygroundControl[],
+	presets: readonly FamilyPreset[],
+): string {
 	const editable = controls.filter((one) => one.kind !== 'event');
 	const rows = presets.map((preset) => {
 		const fields = [`label: ${quote(preset.label)}`];
 		for (const control of editable) {
 			const written = preset.values[control.prop];
-			fields.push(`${control.cell}: ${sourceLiteral(written === undefined ? control.seen : controlValue(control.holds, written))}`);
+			fields.push(
+				`${control.cell}: ${sourceLiteral(written === undefined ? control.seen : controlValue(control.holds, written))}`,
+			);
 		}
 		return `\t${quote(preset.name)}: { ${fields.join(', ')} },`;
 	});
@@ -1010,17 +1123,30 @@ function presetTable(controls: readonly PlaygroundControl[], presets: readonly F
 }
 
 function cellType(control: PlaygroundControl): string {
-	return control.holds === 'boolean' ? 'boolean' : control.list ? 'string | readonly string[]' : 'string';
+	return control.holds === 'boolean'
+		? 'boolean'
+		: control.list
+			? 'string | readonly string[]'
+			: 'string';
 }
 
 function scenarioBar(emit: Emit, presets: readonly FamilyPreset[]): string {
 	const editable = emit.controls.filter((one) => one.kind !== 'event');
 	const written = editable
-		.map((control) => writes(emit.slots, control, `preset[${quote(control.cell)}] as ${cellType(control)}`, '\t\t\t\t\t\t'))
+		.map((control) =>
+			writes(
+				emit.slots,
+				control,
+				`preset[${quote(control.cell)}] as ${cellType(control)}`,
+				'\t\t\t\t\t\t',
+			),
+		)
 		.join('\n');
 	const items = presets
 		.map(
-			(preset) => `						<select.item class="pg-pick-item" value=${quote(preset.name)}>
+			(
+				preset,
+			) => `						<select.item class="pg-pick-item" value=${quote(preset.name)}>
 							<select.itemlabel>${preset.label}</select.itemlabel>
 						</select.item>`,
 		)
@@ -1063,10 +1189,20 @@ export function playgroundModule(input: PlaygroundInput): string {
 			if (run.doc !== undefined && !SLOT_PATTERN.test(run.text)) pointed.add(run.doc);
 	const docs = input.docs.filter((doc) => pointed.has(doc.n));
 
-	const source = paneMarkup(panelLines(input.sourceLines, slots), 'srcLines', '\t\t\t\t\t\t\t\t\t');
+	const source = paneMarkup(
+		panelLines(input.sourceLines, slots),
+		'srcLines',
+		'\t\t\t\t\t\t\t\t\t',
+	);
 	const css = paneMarkup(panelLines(input.cssLines, []), 'cssLines', '\t\t\t\t\t\t\t\t\t');
 
-	const families = [...new Set([demo.family, ...CHROME_FAMILIES, ...(controls.some((one) => one.kind === 'textbox') ? ['textbox'] : [])])].sort();
+	const families = [
+		...new Set([
+			demo.family,
+			...CHROME_FAMILIES,
+			...(controls.some((one) => one.kind === 'textbox') ? ['textbox'] : []),
+		]),
+	].sort();
 
 	const cells: string[] = [];
 	for (const control of controls) {
@@ -1075,7 +1211,9 @@ export function playgroundModule(input: PlaygroundInput): string {
 			continue;
 		}
 		const slot = slots.find((one) => one.control === control);
-		cells.push(`\tlet ${control.cell} = state<${cellType(control)}>(${sourceLiteral(control.seen)});`);
+		cells.push(
+			`\tlet ${control.cell} = state<${cellType(control)}>(${sourceLiteral(control.seen)});`,
+		);
 		if (slot) cells.push(`\tlet ${control.text} = state(${quote(slotText(slot))});`);
 		if (control.kind === 'select') {
 			const held = control.seen as string | readonly string[];
@@ -1088,11 +1226,20 @@ export function playgroundModule(input: PlaygroundInput): string {
 	cells.push(`\tlet scenario = state(${quote(presets[0].label)});`);
 	cells.push(`\tlet scenarioName = state(${quote(presets[0].name)});`);
 
-	const quick = controls.slice(0, meta.quick.length).map((control) => controlCell(emit, control)).join('\n\n');
-	const rest = controls.slice(meta.quick.length).map((control) => controlCell(emit, control)).join('\n\n');
+	const quick = controls
+		.slice(0, meta.quick.length)
+		.map((control) => controlCell(emit, control))
+		.join('\n\n');
+	const rest = controls
+		.slice(meta.quick.length)
+		.map((control) => controlCell(emit, control))
+		.join('\n\n');
 
-	const panes: ChromePane[] = [{ value: 'source', label: input.sourceLabel, markup: source.markup }];
-	if (input.cssLines.length > 0) panes.push({ value: 'css', label: input.cssLabel, markup: css.markup });
+	const panes: ChromePane[] = [
+		{ value: 'source', label: input.sourceLabel, markup: source.markup },
+	];
+	if (input.cssLines.length > 0)
+		panes.push({ value: 'css', label: input.cssLabel, markup: css.markup });
 
 	return `import { state } from '@markless/core';
 import { ${families.join(', ')} } from '@markless/ui';
@@ -1142,7 +1289,10 @@ ${input.chromeCss}
 
 ${input.colourCss}
 
-${docRules(docs.map((doc) => doc.n), '.pg')}
+${docRules(
+	docs.map((doc) => doc.n),
+	'.pg',
+)}
 
 ${demo.css}
 		</style>

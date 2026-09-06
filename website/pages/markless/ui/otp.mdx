@@ -42,13 +42,13 @@ It writes `ui-empty` and `ui-disabled`.
 
 ## Props on `otp.root`
 
-| Prop | Type | What it does |
-| --- | --- | --- |
-| `length` | `number` | How many characters the code has. Required. |
-| `value` | `string` | The code entered so far. Omit it and the field starts empty. |
-| `disabled` | `boolean` | Nothing can be typed. |
-| `shiftPWManagers` | `boolean` | Keep a password manager's icon off the boxes. Omit it and the icon is pushed past the right edge. |
-| `onChange` | `(value) => void` | Called with the whole code every time it changes, not with the character typed. |
-| `onComplete` | `(value) => void` | Called once, the moment the code reaches `length` characters. |
+| Prop              | Type              | What it does                                                                                      |
+| ----------------- | ----------------- | ------------------------------------------------------------------------------------------------- |
+| `length`          | `number`          | How many characters the code has. Required.                                                       |
+| `value`           | `string`          | The code entered so far. Omit it and the field starts empty.                                      |
+| `disabled`        | `boolean`         | Nothing can be typed.                                                                             |
+| `shiftPWManagers` | `boolean`         | Keep a password manager's icon off the boxes. Omit it and the icon is pushed past the right edge. |
+| `onChange`        | `(value) => void` | Called with the whole code every time it changes, not with the character typed.                   |
+| `onComplete`      | `(value) => void` | Called once, the moment the code reaches `length` characters.                                     |
 
 Everything a `<div>` accepts reaches the element too, except `style`.

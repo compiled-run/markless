@@ -41,7 +41,8 @@ export function attributeText(
 		return value ? `${lead}${name}` : `${lead}${name}={false}`;
 	}
 	const list = heldList(value);
-	if (typeof value === 'string' ? value === fallback : list.length === 0 && fallback === '') return '';
+	if (typeof value === 'string' ? value === fallback : list.length === 0 && fallback === '')
+		return '';
 	return `${lead}${name}=${valueText(value)}`;
 }
 

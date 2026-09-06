@@ -57,8 +57,13 @@ export async function codePanelModule(input: {
 	/** The demo module, as the generated file imports it. Absent for a bare code panel. */
 	readonly demo?: string;
 }): Promise<string> {
-	const name = input.demo === undefined ? codePanelName(input.family, input.stem) : exampleName(input.family, input.stem);
-	const registry = new DocRegistry(`${input.demo === undefined ? 'cp' : 'ex'}-${input.family}-${input.stem}`);
+	const name =
+		input.demo === undefined
+			? codePanelName(input.family, input.stem)
+			: exampleName(input.family, input.stem);
+	const registry = new DocRegistry(
+		`${input.demo === undefined ? 'cp' : 'ex'}-${input.family}-${input.stem}`,
+	);
 	const colours = new ColourTable();
 	const consts: string[] = [];
 	const panes: ChromePane[] = [];
@@ -66,7 +71,11 @@ export async function codePanelModule(input: {
 		const list = `${pane.value}Lines`;
 		const lines = paneLines(await highlightHtml(pane.code, pane.language), registry, colours);
 		consts.push(`const ${list}: readonly Line[] = ${JSON.stringify(lines)};`);
-		panes.push({ value: pane.value, label: pane.label, markup: paneMarkup(list, '\t\t\t\t\t\t\t\t\t') });
+		panes.push({
+			value: pane.value,
+			label: pane.label,
+			markup: paneMarkup(list, '\t\t\t\t\t\t\t\t\t'),
+		});
 	}
 	const chrome = codePanelChrome({
 		scenario: `${input.family}/${input.stem}`,
@@ -78,7 +87,8 @@ export async function codePanelModule(input: {
 		"import { lucide } from '@markless/ui';",
 	];
 	if (input.demo !== undefined) imports.push(`import Demo from ${JSON.stringify(input.demo)};`);
-	const stage = input.demo === undefined ? '' : `\t\t<div class="pg-stage">\n\t\t\t<Demo />\n\t\t</div>\n`;
+	const stage =
+		input.demo === undefined ? '' : `\t\t<div class="pg-stage">\n\t\t\t<Demo />\n\t\t</div>\n`;
 	return `${imports.join('\n')}
 
 ${RUN_TYPES}
@@ -99,7 +109,10 @@ ${CODE_PANEL_CSS}
 
 ${colours.css()}
 
-${docRules(registry.docs.map((doc) => doc.n), '.cp')}
+${docRules(
+	registry.docs.map((doc) => doc.n),
+	'.cp',
+)}
 		</style>
 	</div>
 }

@@ -41,13 +41,13 @@ It writes `ui-checked` and `ui-disabled`.
 
 ## Props on `toggle.root`
 
-| Prop | Type | What it does |
-| --- | --- | --- |
-| `checked` | `boolean` | Whether the switch reads as on. Omit it and it starts off. |
-| `disabled` | `boolean` | Nobody can flip it. |
-| `required` | `boolean` | It must be on before the form submits. |
-| `name` | `string` | Submitted under this name by `toggle.field`. |
-| `value` | `string` | Submitted instead of the browser default `"on"`. |
-| `onChange` | `(checked) => void` | Called with the new value when a person flips the switch. |
+| Prop       | Type                | What it does                                               |
+| ---------- | ------------------- | ---------------------------------------------------------- |
+| `checked`  | `boolean`           | Whether the switch reads as on. Omit it and it starts off. |
+| `disabled` | `boolean`           | Nobody can flip it.                                        |
+| `required` | `boolean`           | It must be on before the form submits.                     |
+| `name`     | `string`            | Submitted under this name by `toggle.field`.               |
+| `value`    | `string`            | Submitted instead of the browser default `"on"`.           |
+| `onChange` | `(checked) => void` | Called with the new value when a person flips the switch.  |
 
 Everything a `<div>` accepts reaches the element too.

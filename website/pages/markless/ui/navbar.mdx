@@ -47,13 +47,13 @@ It writes `ui-open`, `ui-closed` and `ui-active`.
 
 ## Props on `navbar.root`
 
-| Prop | Type | What it does |
-| --- | --- | --- |
-| `value` | `string` | Which item's dropdown is showing. Omit it, or pass the empty string, and everything is closed. |
-| `hover` | `boolean` | Dropdowns open when the pointer rests on an item. Omit it and they do. |
-| `delay` | `number` | How long the pointer must rest before the first dropdown opens. Omit it and it is 200ms. |
-| `clickGrace` | `number` | How long after a hover-open a click on the same trigger is ignored. Omit it and it is 300ms. |
-| `onChange` | `(value) => void` | Called with the value now showing its dropdown, or the empty string when everything closed. |
+| Prop         | Type              | What it does                                                                                   |
+| ------------ | ----------------- | ---------------------------------------------------------------------------------------------- |
+| `value`      | `string`          | Which item's dropdown is showing. Omit it, or pass the empty string, and everything is closed. |
+| `hover`      | `boolean`         | Dropdowns open when the pointer rests on an item. Omit it and they do.                         |
+| `delay`      | `number`          | How long the pointer must rest before the first dropdown opens. Omit it and it is 200ms.       |
+| `clickGrace` | `number`          | How long after a hover-open a click on the same trigger is ignored. Omit it and it is 300ms.   |
+| `onChange`   | `(value) => void` | Called with the value now showing its dropdown, or the empty string when everything closed.    |
 
 Everything a `<nav>` accepts reaches the element too. `navbar.item` takes its own `value` and
 `active`; `navbar.itemlink` takes `current`.

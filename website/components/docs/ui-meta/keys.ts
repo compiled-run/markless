@@ -22,8 +22,16 @@ function same(symbol: string, label: string): KeyCap {
 	return { mac: form, other: form };
 }
 
-function split(macSymbol: string, macLabel: string, otherSymbol: string, otherLabel: string): KeyCap {
-	return { mac: { symbol: macSymbol, label: macLabel }, other: { symbol: otherSymbol, label: otherLabel } };
+function split(
+	macSymbol: string,
+	macLabel: string,
+	otherSymbol: string,
+	otherLabel: string,
+): KeyCap {
+	return {
+		mac: { symbol: macSymbol, label: macLabel },
+		other: { symbol: otherSymbol, label: otherLabel },
+	};
 }
 
 export const keys = {

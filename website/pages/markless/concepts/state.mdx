@@ -90,7 +90,11 @@ export default function TwoVariables() @{
 So `state()` is not a special kind of storage, and it is not a box you have to open. It is a note to
 the compiler: someone is going to change this, so keep track of who is reading it.
 
-<Callout sprite="cross" title="So what if I change an ordinary variable instead?" text="You cannot, and the compiler says so before your app ever runs. Write to a plain local variable from a click handler while the markup also reads it, and the build stops with MARKLESS_STATE_STALE_LOCAL_WRITE: Cannot write to plain from a handler because the template reads the component local only during initial render. It then tells you the fix, which is to move the variable into state(). This is the same rule from the other side. The page can only follow what you asked it to follow, so a variable that changes and is on screen has to be state." />
+<Callout
+	sprite="cross"
+	title="So what if I change an ordinary variable instead?"
+	text="You cannot, and the compiler says so before your app ever runs. Write to a plain local variable from a click handler while the markup also reads it, and the build stops with MARKLESS_STATE_STALE_LOCAL_WRITE: Cannot write to plain from a handler because the template reads the component local only during initial render. It then tells you the fix, which is to move the variable into state(). This is the same rule from the other side. The page can only follow what you asked it to follow, so a variable that changes and is on screen has to be state."
+/>
 
 ## What the compiler does with that note
 
@@ -124,7 +128,11 @@ feature of the language the compiler owns, not a library you can call from anywh
 that line is exactly what buys you the plain `let` and the plain `count++`. You find out at once
 rather than wondering later why a number never moves.
 
-<Collapsible sprite="star-badge" summary="Coming from another framework?" text="If you have used one of the signal or hook based libraries, the thing to unlearn is the wrapper. There is no .value to read through, no setter function to call, and no character to add to the variable name. The reason Markless can do without them is that it compiles your file rather than watching your objects at runtime, so it already knows every place count is read. The tradeoff is the boundary above: this only works in .tsrx files." />
+<Collapsible
+	sprite="star-badge"
+	summary="Coming from another framework?"
+	text="If you have used one of the signal or hook based libraries, the thing to unlearn is the wrapper. There is no .value to read through, no setter function to call, and no character to add to the variable name. The reason Markless can do without them is that it compiles your file rather than watching your objects at runtime, so it already knows every place count is read. The tradeoff is the boundary above: this only works in .tsrx files."
+/>
 
 ## Try it yourself
 

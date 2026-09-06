@@ -96,7 +96,12 @@ minimum duration (no blink)".
 You configure none of that. There is no `delay` prop and no timeout for you to pick, which is
 deliberate: the timing is "structural or latency-decided, never per-block configuration".
 
-<Callout sticker="cloud" sprite="cross" title="What is missing here, and what this build actually does" text="This page would have the best thing to click on the whole site: two buttons that make the same value settle fast or slowly, so you can watch the waiting block stay away and then show up. It is not here, and the reason is the framework build this site is pinned to. An async block living inside one of these MDX pages serves no async boundary and no locator for the nodes inside its blocks, so pressing a button changes the value and nothing on the page follows. The same component works on a plain .tsrx page, which is what you will have in your own project. And because honesty is worth more than a clean page: on a plain .tsrx page, on this same 0.3.1 build, a value that is already settled and then made to settle again keeps its previous text and swaps straight to the new one, with a six second wait and the waiting block never shown. So the deadline rules above are quoted from the specification, not measured on this site. NOTES.md finding 25 in the site repository records both." />
+<Callout
+	sticker="cloud"
+	sprite="cross"
+	title="What is missing here, and what this build actually does"
+	text="This page would have the best thing to click on the whole site: two buttons that make the same value settle fast or slowly, so you can watch the waiting block stay away and then show up. It is not here, and the reason is the framework build this site is pinned to. An async block living inside one of these MDX pages serves no async boundary and no locator for the nodes inside its blocks, so pressing a button changes the value and nothing on the page follows. The same component works on a plain .tsrx page, which is what you will have in your own project. And because honesty is worth more than a clean page: on a plain .tsrx page, on this same 0.3.1 build, a value that is already settled and then made to settle again keeps its previous text and swaps straight to the new one, with a six second wait and the waiting block never shown. So the deadline rules above are quoted from the specification, not measured on this site. NOTES.md finding 25 in the site repository records both."
+/>
 
 ## Read your state before you await
 
@@ -130,7 +135,11 @@ Take the value you need into a local variable first, then await. If that feels a
 usually a sign the work wants to be two computeds: an async one that fetches, and a plain one that
 formats what it returned.
 
-<Collapsible sprite="thought-bubble" summary="Coming from another framework?" text="There is no resource, no query hook, no suspense boundary component and no cache key to name. An async computed is the same declaration as a sync one, and the three blocks are part of the language rather than components you import. There is also no wrapper property to reach through on the way to your data: you write report.title, not report.value.title and not report.data.title. The practical difference is that nothing you write observes a status: if you find yourself wanting to read whether something is loading, the answer is to put the markup in the block that means loading." />
+<Collapsible
+	sprite="thought-bubble"
+	summary="Coming from another framework?"
+	text="There is no resource, no query hook, no suspense boundary component and no cache key to name. An async computed is the same declaration as a sync one, and the three blocks are part of the language rather than components you import. There is also no wrapper property to reach through on the way to your data: you write report.title, not report.value.title and not report.data.title. The practical difference is that nothing you write observes a status: if you find yourself wanting to read whether something is loading, the answer is to put the markup in the block that means loading."
+/>
 
 ## Try it yourself
 
