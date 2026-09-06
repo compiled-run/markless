@@ -1,0 +1,25 @@
+Use case: stylized-concept
+Asset type: production sprite sheet for tiny documentation sidebar illustrations.
+Primary request: Draw EXACTLY SIXTEEN distinct hand-drawn sticker icons in a STRICT 4 column by 4 row square grid. Each cell is equal size. One entire icon centered in each cell, occupying about 65% of its cell. Generous completely empty gutters so the icons can be cropped apart. Large 2048 by 2048 square canvas.
+Input images: reference 1 is the owner's prior light/dark sidebar icon sheet, used only for its icon style; reference 2 is the Joy Elia brand artwork, used only for crayon texture and palette. Create new subjects; do not reproduce the reference layout, lettering, logos or watermark.
+Style: bold wobbly black hand-ink outlines, warm cream cut-paper interiors, a narrow ivory die-cut sticker rim, subtle wax-crayon grain and rough hatch fills. Whimsical and tactile but extremely readable at 40px. Compact clear silhouettes, little detail, no photorealism, no glossy 3D, no vector-perfect geometry. Small loose crayon strokes peek out behind each sticker in its specified accent. Palette is exactly the references: pink, lavender-purple, mustard yellow and leafy green, plus cream and ink.
+Background: perfectly flat, uniform vivid chroma-key BLUE #0055ff outside each sticker, including the gutters. This blue is a technical cutting background and MUST NOT occur anywhere inside an icon. NO gradients, shadows into the blue, checkerboard, paper rectangle, or grain outside icons. Texture only inside each icon. No grid lines, cell borders, captions, headings or icon names. Avoid unrelated stars/sparkles that could be mistaken for an extra icon.
+Theme: LIGHT VARIANT. Black ink linework, cream faces and ivory sticker edging; accent-colored crayon fills. Designed to sit on a warm cream webpage.
+Exact cell contents, left to right, top to bottom:
+Row 1, column 1: Three chunky interlocking puzzle blocks with a tiny jaunty crown. PINK decoration. (Meaning: overview; do not print this name.)
+Row 1, column 2: Broad paintbrush making a short swash beside three crayon color swatches. PINK decoration. (Meaning: styling; do not print this name.)
+Row 1, column 3: Square table grid, colored header row and one clear downward sort arrow. PURPLE decoration. (Meaning: table; do not print this name.)
+Row 1, column 4: Three overlapping photo slides with central mountain picture and arrows at sides. GREEN decoration. (Meaning: carousel; do not print this name.)
+Row 2, column 1: Three small page buttons between chevrons, center selected, simple 1 2 3 digits. GREEN decoration. (Meaning: pagination; do not print this name.)
+Row 2, column 2: Rounded progress bar two-thirds filled, three tiny activity rays above. GREEN decoration. (Meaning: progress; do not print this name.)
+Row 2, column 3: Simplified square QR symbol with three bold finder squares and chunky blocks. GREEN decoration. (Meaning: qrcode; do not print this name.)
+Row 2, column 4: Two stacked notification cards, front card has a check circle and tiny close cross. GREEN decoration. (Meaning: toaster; do not print this name.)
+Row 3, column 1: Small toy building blocks: a pushbutton, label tag and separator stroke. YELLOW decoration. (Meaning: base; do not print this name.)
+Row 3, column 2: Ring-bound calendar page with a small day grid and two adjoining highlighted days. PURPLE decoration. (Meaning: calendar; do not print this name.)
+Row 3, column 3: Color-picker square with a target ring, short hue rail and three colored swatches. PURPLE decoration. (Meaning: colorpicker; do not print this name.)
+Row 3, column 4: Overlapping bold crop corners around a small mountain picture. PURPLE decoration. (Meaning: crop; do not print this name.)
+Row 4, column 1: Short handwritten line with a diagonal pencil and small confirm check. PURPLE decoration. (Meaning: editable; do not print this name.)
+Row 4, column 2: Dog-eared file rising above an inbox tray with a chunky upward arrow. PURPLE decoration. (Meaning: fileupload; do not print this name.)
+Row 4, column 3: Fountain-pen nib drawing a bold loose looping ink stroke. PURPLE decoration. (Meaning: ink; do not print this name.)
+Row 4, column 4: Square XY pad with crosshair axes, an off-center round handle and short arrows. PURPLE decoration. (Meaning: pad; do not print this name.)
+Count the cells: four columns, four rows, sixteen icons. Keep every illustration entirely inside its cell with at least 15% blank padding on each side. This is a cuttable asset sheet, not a sidebar mockup.

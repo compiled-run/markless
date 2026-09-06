@@ -11,6 +11,7 @@ export {
 	prerenderWakeVirtualModuleSourceFile,
 	symbolVirtualModuleSourceFile,
 } from './source-module.ts';
+export { optimizedDepsToInclude } from './optimized-deps.ts';
 export {
 	preloadLazySymbolModules,
 	type AppendedModulePreloads,

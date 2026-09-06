@@ -7,8 +7,7 @@ export default function SiteHeader({ pathname }: { readonly pathname: string }) 
 
 	<header class="site-header">
 		<a class="crumb crumb-home" href="/markless">
-			<Mascot name="markless" size="1.7rem" variant="crumb" />
-			<span>Markless</span>
+			<span>Home</span>
 		</a>
 		<lucide.chevronright class="crumb-sep crumb-sep-section" aria-hidden="true" />
 		<span class="crumb crumb-section">{crumb.section}</span>

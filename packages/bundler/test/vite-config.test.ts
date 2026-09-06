@@ -1,5 +1,8 @@
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import type { EnvironmentOptions, UserConfig } from 'vite';
-import { describe, expect, test } from 'vitest';
+import { join } from 'pathe';
+import { afterAll, describe, expect, test } from 'vitest';
 import {
 	RESUME_ENTRY_SPECIFIER,
 	STORAGE_FREE_RESUME_ENTRY_SPECIFIER,
@@ -44,7 +47,7 @@ describe('Vite config integration', () => {
 
 	test('pre-bundles the resume entries emitted code imports on the dev server', () => {
 		const plugin = getMarklessPlugin();
-		const config: UserConfig = {};
+		const config: UserConfig = { root: installedCoreRoot('installed') };
 		callConfig(plugin, config, { command: 'serve' });
 
 		expect(config.optimizeDeps?.include).toEqual([
@@ -56,6 +59,7 @@ describe('Vite config integration', () => {
 	test('keeps a consumer optimizeDeps include and does not duplicate an entry', () => {
 		const plugin = getMarklessPlugin();
 		const config: UserConfig = {
+			root: installedCoreRoot('installed-consumer'),
 			optimizeDeps: { include: ['some-dep', RESUME_ENTRY_SPECIFIER] },
 		};
 		callConfig(plugin, config, { command: 'serve' });
@@ -67,9 +71,31 @@ describe('Vite config integration', () => {
 		]);
 	});
 
+	test('serves a linked @markless/core from source instead of pre-bundling it', () => {
+		const plugin = getMarklessPlugin();
+		const config: UserConfig = { root: linkedCoreRoot('linked') };
+		callConfig(plugin, config, { command: 'serve' });
+
+		expect(config.optimizeDeps).toBeUndefined();
+	});
+
+	test('pre-bundles a linked @markless/core when the consumer preserves symlinks', () => {
+		const plugin = getMarklessPlugin();
+		const config: UserConfig = {
+			root: linkedCoreRoot('linked-preserve'),
+			resolve: { preserveSymlinks: true },
+		};
+		callConfig(plugin, config, { command: 'serve' });
+
+		expect(config.optimizeDeps?.include).toEqual([
+			RESUME_ENTRY_SPECIFIER,
+			STORAGE_FREE_RESUME_ENTRY_SPECIFIER,
+		]);
+	});
+
 	test('leaves the dependency optimizer alone for production builds', () => {
 		const plugin = getMarklessPlugin();
-		const config: UserConfig = {};
+		const config: UserConfig = { root: installedCoreRoot('installed-build') };
 		callConfig(plugin, config, { command: 'build' });
 
 		expect(config.optimizeDeps?.include).toBeUndefined();
@@ -295,6 +321,24 @@ describe('Vite config integration', () => {
 		});
 	});
 });
+
+const fixtureRoot = mkdtempSync(join(tmpdir(), 'markless-vite-config-'));
+afterAll(() => rmSync(fixtureRoot, { recursive: true, force: true }));
+
+function installedCoreRoot(name: string) {
+	const root = join(fixtureRoot, name);
+	mkdirSync(join(root, 'node_modules', '@markless', 'core'), { recursive: true });
+	return root;
+}
+
+function linkedCoreRoot(name: string) {
+	const root = join(fixtureRoot, name, 'app');
+	const source = join(fixtureRoot, name, 'packages', 'core');
+	mkdirSync(source, { recursive: true });
+	mkdirSync(join(root, 'node_modules', '@markless'), { recursive: true });
+	symlinkSync(source, join(root, 'node_modules', '@markless', 'core'), 'dir');
+	return root;
+}
 
 function callTransformIndexHtml(plugin: ReturnType<typeof getMarklessPlugin>) {
 	if (typeof plugin.transformIndexHtml !== 'function') {

@@ -1,20 +1,80 @@
-import { describe, expect, it } from 'vitest';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'pathe';
+import { afterAll, describe, expect, it } from 'vitest';
 import {
 	MDX_ROUTE_RUNTIME_SPECIFIER,
 	mdxTransformPlugin,
 	transformMdxRoute,
 } from '../../src/vite/mdx.ts';
 
+const fixtureRoot = mkdtempSync(join(tmpdir(), 'markless-mdx-config-'));
+afterAll(() => rmSync(fixtureRoot, { recursive: true, force: true }));
+
+function installedRouterRoot(name: string) {
+	const root = join(fixtureRoot, name);
+	mkdirSync(join(root, 'node_modules', '@markless', 'router'), { recursive: true });
+	return root;
+}
+
+function linkedRouterRoot(name: string) {
+	const root = join(fixtureRoot, name, 'app');
+	const source = join(fixtureRoot, name, 'packages', 'router');
+	mkdirSync(source, { recursive: true });
+	mkdirSync(join(root, 'node_modules', '@markless'), { recursive: true });
+	symlinkSync(source, join(root, 'node_modules', '@markless', 'router'), 'dir');
+	return root;
+}
+
+function callConfig(
+	config: {
+		root: string;
+		resolve?: { preserveSymlinks?: boolean; alias?: Record<string, string> };
+	},
+	env: { command: 'serve' | 'build' },
+) {
+	const hook = mdxTransformPlugin().config;
+	const handler = typeof hook === 'function' ? hook : hook?.handler;
+	return handler?.call({} as never, config, {
+		...env,
+		mode: env.command === 'serve' ? 'development' : 'production',
+	});
+}
+
 describe('Markless Router MDX transform', () => {
 	it('pre-bundles its runtime entry on the dev server and not for a build', () => {
-		const config = mdxTransformPlugin().config;
-		const hook = typeof config === 'function' ? config : config?.handler;
+		const root = installedRouterRoot('installed');
 
-		expect(hook?.call({} as never, {}, { command: 'serve', mode: 'development' })).toEqual({
+		expect(callConfig({ root }, { command: 'serve' })).toEqual({
 			optimizeDeps: { include: [MDX_ROUTE_RUNTIME_SPECIFIER] },
 		});
+		expect(callConfig({ root }, { command: 'build' })).toBeUndefined();
+	});
+
+	it('serves a linked @markless/router from source instead of pre-bundling it', () => {
 		expect(
-			hook?.call({} as never, {}, { command: 'build', mode: 'production' }),
+			callConfig({ root: linkedRouterRoot('linked') }, { command: 'serve' }),
+		).toBeUndefined();
+	});
+
+	it('pre-bundles a linked @markless/router when the consumer preserves symlinks', () => {
+		expect(
+			callConfig(
+				{ root: linkedRouterRoot('linked-preserve'), resolve: { preserveSymlinks: true } },
+				{ command: 'serve' },
+			),
+		).toEqual({ optimizeDeps: { include: [MDX_ROUTE_RUNTIME_SPECIFIER] } });
+	});
+
+	it('serves an aliased @markless/router source instead of pre-bundling it', () => {
+		const root = installedRouterRoot('aliased');
+		const source = join(fixtureRoot, 'aliased-src', 'router');
+		mkdirSync(source, { recursive: true });
+		expect(
+			callConfig(
+				{ root, resolve: { alias: { '@markless/router': source } } },
+				{ command: 'serve' },
+			),
 		).toBeUndefined();
 	});
 
@@ -41,7 +101,9 @@ This page is static markdown.
 		expect(code).toContain('storageSeeds: []');
 		expect(code).not.toContain('marklessMdxStorageSeeds');
 		// The emitted module must evaluate.
-		const { default: page } = await import(`data:text/javascript;base64,${Buffer.from(code.replace(/^import .*$/m, 'const createMdxRenderDataSurface = () => ({});')).toString('base64')}`);
+		const { default: page } = await import(
+			`data:text/javascript;base64,${Buffer.from(code.replace(/^import .*$/m, 'const createMdxRenderDataSurface = () => ({});')).toString('base64')}`
+		);
 		expect(page.storageSeeds).toEqual([]);
 		expect(page.renderSsr().html).toContain('<h1>Docs</h1>');
 	});

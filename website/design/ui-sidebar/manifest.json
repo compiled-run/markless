@@ -1,0 +1,486 @@
+{
+	"columns": 4,
+	"rows": 4,
+	"icons": [
+		{
+			"name": "checkbox",
+			"sheet": "forms",
+			"row": 0,
+			"column": 0,
+			"color": "purple",
+			"behavior": "Three-state checkbox with native form field",
+			"subject": "One large checked square, bold check mark, tiny offset empty square",
+			"source": "packages/headless/components/src/checkbox/checkbox.tsrx"
+		},
+		{
+			"name": "checklist",
+			"sheet": "forms",
+			"row": 0,
+			"column": 1,
+			"color": "purple",
+			"behavior": "Checkbox items with derived select-all and mixed state",
+			"subject": "A clipboard with three checkboxes and short lines, two checked and one empty",
+			"source": "packages/headless/components/src/checklist/checklist.tsrx"
+		},
+		{
+			"name": "combobox",
+			"sheet": "forms",
+			"row": 0,
+			"column": 2,
+			"color": "purple",
+			"behavior": "Editable input opening a listbox of options",
+			"subject": "A text input with an I-beam caret above a suggestion list, small magnifying glass",
+			"source": "packages/headless/components/src/combobox/combobox.tsrx"
+		},
+		{
+			"name": "otp",
+			"sheet": "forms",
+			"row": 0,
+			"column": 3,
+			"color": "purple",
+			"behavior": "One native one-time-code input displayed across item boxes",
+			"subject": "Four separate code-entry boxes in one row; first three contain round dots, last a caret",
+			"source": "packages/headless/components/src/otp/otp.tsrx"
+		},
+		{
+			"name": "radiogroup",
+			"sheet": "forms",
+			"row": 1,
+			"column": 0,
+			"color": "purple",
+			"behavior": "Native radio inputs in a named group, one chosen value",
+			"subject": "Three round radio circles vertically, middle filled, short strokes beside them",
+			"source": "packages/headless/components/src/radio-group/radio-group.tsrx"
+		},
+		{
+			"name": "select",
+			"sheet": "forms",
+			"row": 1,
+			"column": 1,
+			"color": "purple",
+			"behavior": "Button-triggered listbox with chosen option and native select field",
+			"subject": "Dropdown button with down chevron above a three-row choice list, one row checked",
+			"source": "packages/headless/components/src/select/select.tsrx"
+		},
+		{
+			"name": "textbox",
+			"sheet": "forms",
+			"row": 1,
+			"column": 2,
+			"color": "purple",
+			"behavior": "Labelled native input or textarea with shared value",
+			"subject": "Wide writing field with two short text strokes and a tall I-beam caret",
+			"source": "packages/headless/components/src/textbox/textbox.tsrx"
+		},
+		{
+			"name": "toggle",
+			"sheet": "forms",
+			"row": 1,
+			"column": 3,
+			"color": "purple",
+			"behavior": "Binary switch with movable thumb and native form field",
+			"subject": "Chunky pill switch with one large round thumb moved to the right",
+			"source": "packages/headless/components/src/toggle/toggle.tsrx"
+		},
+		{
+			"name": "buttongroup",
+			"sheet": "forms",
+			"row": 2,
+			"column": 0,
+			"color": "purple",
+			"behavior": "Pressed button choices with single or multiple selection",
+			"subject": "Three connected segmented square buttons, middle pressed and colored",
+			"source": "packages/headless/components/src/buttongroup/buttongroup.tsrx"
+		},
+		{
+			"name": "numberbox",
+			"sheet": "forms",
+			"row": 2,
+			"column": 1,
+			"color": "purple",
+			"behavior": "Numeric text field with decrement/increment and press repeat",
+			"subject": "Number field with a hand-drawn 7 between a minus button and plus button",
+			"source": "packages/headless/components/src/numberbox/numberbox.tsrx"
+		},
+		{
+			"name": "slider",
+			"sheet": "forms",
+			"row": 2,
+			"column": 2,
+			"color": "purple",
+			"behavior": "Draggable and keyboard-adjustable one- or two-thumb range",
+			"subject": "Horizontal track with two round handles and colored interval between",
+			"source": "packages/headless/components/src/slider/slider.tsrx"
+		},
+		{
+			"name": "rating",
+			"sheet": "forms",
+			"row": 2,
+			"column": 3,
+			"color": "purple",
+			"behavior": "Radio-style rating with optional half steps and pointer preview",
+			"subject": "Three chunky stars in a row, two colored and one outlined",
+			"source": "packages/headless/components/src/rating/rating.tsrx"
+		},
+		{
+			"name": "datebox",
+			"sheet": "forms",
+			"row": 3,
+			"column": 0,
+			"color": "purple",
+			"behavior": "Separate day, month, year spinbutton segments",
+			"subject": "Three date segments separated by slashes and a tiny calendar corner tab",
+			"source": "packages/headless/components/src/datebox/datebox.tsrx"
+		},
+		{
+			"name": "timebox",
+			"sheet": "forms",
+			"row": 3,
+			"column": 1,
+			"color": "purple",
+			"behavior": "Hour, minute, optional seconds and day-period segments",
+			"subject": "Two time segments separated by a colon beside a tiny clock face",
+			"source": "packages/headless/components/src/timebox/timebox.tsrx"
+		},
+		{
+			"name": "taglist",
+			"sheet": "forms",
+			"row": 3,
+			"column": 2,
+			"color": "purple",
+			"behavior": "Delimited editable values with removable item controls",
+			"subject": "Two overlapping rounded tags, each with a small close cross",
+			"source": "packages/headless/components/src/taglist/taglist.tsrx"
+		},
+		{
+			"name": "tokenbox",
+			"sheet": "forms",
+			"row": 3,
+			"column": 3,
+			"color": "purple",
+			"behavior": "Text editor with atomic inline tokens and trigger-based insertion",
+			"subject": "A writing field with two text strokes, an inline colored @ mention chip and caret",
+			"source": "packages/headless/components/src/tokenbox/tokenbox.tsrx"
+		},
+		{
+			"name": "accordion",
+			"sheet": "surfaces",
+			"row": 0,
+			"column": 0,
+			"color": "yellow",
+			"behavior": "Multiple sections, value selection and persistent expandable panels",
+			"subject": "Three stacked disclosure strips, middle expanded into a panel, right chevrons",
+			"source": "packages/headless/components/src/accordion/accordion.tsrx"
+		},
+		{
+			"name": "collapsible",
+			"sheet": "surfaces",
+			"row": 0,
+			"column": 1,
+			"color": "yellow",
+			"behavior": "One trigger showing and hiding one persistent panel",
+			"subject": "One hinged disclosure panel opening downward from a single header, down arrow",
+			"source": "packages/headless/components/src/collapsible/collapsible.tsrx"
+		},
+		{
+			"name": "modal",
+			"sheet": "surfaces",
+			"row": 0,
+			"column": 2,
+			"color": "yellow",
+			"behavior": "Dialog or alertdialog over a backdrop with focus restoration",
+			"subject": "Centered dialog window over a larger dimmed window, small X and confirmation button",
+			"source": "packages/headless/components/src/modal/modal.tsrx"
+		},
+		{
+			"name": "navbar",
+			"sheet": "surfaces",
+			"row": 0,
+			"column": 3,
+			"color": "yellow",
+			"behavior": "Navigation links and disclosure dropdowns",
+			"subject": "Website top navigation bar with three link marks, one short dropdown underneath",
+			"source": "packages/headless/components/src/navbar/navbar.tsrx"
+		},
+		{
+			"name": "tabs",
+			"sheet": "surfaces",
+			"row": 1,
+			"column": 0,
+			"color": "yellow",
+			"behavior": "Tablist selecting one persistent tabpanel",
+			"subject": "Three folder tabs along one panel, first tab raised and colored",
+			"source": "packages/headless/components/src/tabs/tabs.tsrx"
+		},
+		{
+			"name": "tree",
+			"sheet": "surfaces",
+			"row": 1,
+			"column": 1,
+			"color": "yellow",
+			"behavior": "Recursive expanding treeitems with keyboard traversal",
+			"subject": "Branching vertical folder tree, one parent folder and two indented child folders",
+			"source": "packages/headless/components/src/tree/tree.tsrx"
+		},
+		{
+			"name": "drawer",
+			"sheet": "surfaces",
+			"row": 1,
+			"column": 2,
+			"color": "pink",
+			"behavior": "Edge surface with swipe, snap points, and modal option",
+			"subject": "Window with a thick side panel sliding inward from the right, inward motion arrow",
+			"source": "packages/headless/components/src/drawer/drawer.tsrx"
+		},
+		{
+			"name": "hovercard",
+			"sheet": "surfaces",
+			"row": 1,
+			"column": 3,
+			"color": "pink",
+			"behavior": "Delayed preview at a link, with pointer/focus transfer into content",
+			"subject": "Small rich profile preview card with avatar circle and two lines, hovering over a link and pointer",
+			"source": "packages/headless/components/src/hovercard/hovercard.tsrx"
+		},
+		{
+			"name": "popover",
+			"sheet": "surfaces",
+			"row": 2,
+			"column": 0,
+			"color": "pink",
+			"behavior": "Trigger-anchored dialog with dismiss and close behavior",
+			"subject": "Small floating action panel pointing to a separate round trigger button below",
+			"source": "packages/headless/components/src/popover/popover.tsrx"
+		},
+		{
+			"name": "tooltip",
+			"sheet": "surfaces",
+			"row": 2,
+			"column": 1,
+			"color": "pink",
+			"behavior": "Brief tooltip appearing on hover or keyboard focus",
+			"subject": "Tiny single-line speech label with a point aimed at an information circle",
+			"source": "packages/headless/components/src/tooltip/tooltip.tsrx"
+		},
+		{
+			"name": "menu",
+			"sheet": "surfaces",
+			"row": 2,
+			"column": 2,
+			"color": "pink",
+			"behavior": "Command menu with recursive submenus and checked/radio items",
+			"subject": "Vertical command list with three rows and a right-facing submenu arrow",
+			"source": "packages/headless/components/src/menu/menu.tsrx"
+		},
+		{
+			"name": "menubar",
+			"sheet": "surfaces",
+			"row": 2,
+			"column": 3,
+			"color": "pink",
+			"behavior": "Horizontal command menubar with nested menu surfaces",
+			"subject": "Three small command tabs across a thin bar and a cascading side submenu",
+			"source": "packages/headless/components/src/menubar/menubar.tsrx"
+		},
+		{
+			"name": "toolbar",
+			"sheet": "surfaces",
+			"row": 3,
+			"column": 0,
+			"color": "yellow",
+			"behavior": "Roving-focus collection of action buttons",
+			"subject": "Compact horizontal tool strip with bold pencil, scissors and paintbrush silhouettes",
+			"source": "packages/headless/components/src/toolbar/toolbar.tsrx"
+		},
+		{
+			"name": "tour",
+			"sheet": "surfaces",
+			"row": 3,
+			"column": 1,
+			"color": "pink",
+			"behavior": "Step-by-step dialog moving among target elements",
+			"subject": "Three stepping stones joined by a dotted path ending in a little spotlight flag",
+			"source": "packages/headless/components/src/tour/tour.tsrx"
+		},
+		{
+			"name": "resizable",
+			"sheet": "surfaces",
+			"row": 3,
+			"column": 2,
+			"color": "purple",
+			"behavior": "Adjacent panels separated by movable value-reporting dividers",
+			"subject": "Two unequal panels with a dotted grip between them and left-right arrows",
+			"source": "packages/headless/components/src/resizable/resizable.tsrx"
+		},
+		{
+			"name": "gridlist",
+			"sheet": "surfaces",
+			"row": 3,
+			"column": 3,
+			"color": "purple",
+			"behavior": "Selectable rich rows with gridcells and keyboard navigation",
+			"subject": "Two rich-content cards stacked, each has a square thumbnail and short lines",
+			"source": "packages/headless/components/src/gridlist/gridlist.tsrx"
+		},
+		{
+			"name": "overview",
+			"sheet": "display",
+			"row": 0,
+			"column": 0,
+			"color": "pink",
+			"behavior": "Overview of composable headless component families",
+			"subject": "Three chunky interlocking puzzle blocks with a tiny jaunty crown",
+			"source": "website/pages/markless/ui/index.mdx"
+		},
+		{
+			"name": "styling",
+			"sheet": "display",
+			"row": 0,
+			"column": 1,
+			"color": "pink",
+			"behavior": "CSS styles target family ui-state attributes",
+			"subject": "Broad paintbrush making a short swash beside three crayon color swatches",
+			"source": "website/pages/markless/ui/styling.mdx"
+		},
+		{
+			"name": "table",
+			"sheet": "display",
+			"row": 0,
+			"column": 2,
+			"color": "purple",
+			"behavior": "Native table with sorting and optional selectable grid behavior",
+			"subject": "Square table grid, colored header row and one clear downward sort arrow",
+			"source": "packages/headless/components/src/table/table.tsrx"
+		},
+		{
+			"name": "carousel",
+			"sheet": "display",
+			"row": 0,
+			"column": 3,
+			"color": "green",
+			"behavior": "Value-named slides with stepping, dragging, and optional autoplay",
+			"subject": "Three overlapping photo slides with central mountain picture and arrows at sides",
+			"source": "packages/headless/components/src/carousel/carousel.tsrx"
+		},
+		{
+			"name": "pagination",
+			"sheet": "display",
+			"row": 1,
+			"column": 0,
+			"color": "green",
+			"behavior": "Page navigation controls tracking current page",
+			"subject": "Three small page buttons between chevrons, center selected, simple 1 2 3 digits",
+			"source": "packages/headless/components/src/pagination/pagination.tsrx"
+		},
+		{
+			"name": "progress",
+			"sheet": "display",
+			"row": 1,
+			"column": 1,
+			"color": "green",
+			"behavior": "Read-only determinate or indeterminate range progressbar",
+			"subject": "Rounded progress bar two-thirds filled, three tiny activity rays above",
+			"source": "packages/headless/components/src/progress/progress.tsrx"
+		},
+		{
+			"name": "qrcode",
+			"sheet": "display",
+			"row": 1,
+			"column": 2,
+			"color": "green",
+			"behavior": "Encoded SVG path with quiet zone and optional logo overlay",
+			"subject": "Simplified square QR symbol with three bold finder squares and chunky blocks",
+			"source": "packages/headless/components/src/qr-code/qr-code.tsrx"
+		},
+		{
+			"name": "toaster",
+			"sheet": "display",
+			"row": 1,
+			"column": 3,
+			"color": "green",
+			"behavior": "Notification queue with dismiss controls and paused timers",
+			"subject": "Two stacked notification cards, front card has a check circle and tiny close cross",
+			"source": "packages/headless/components/src/toaster/toaster.tsrx"
+		},
+		{
+			"name": "base",
+			"sheet": "display",
+			"row": 2,
+			"column": 0,
+			"color": "yellow",
+			"behavior": "Native button, label, display separator, visually-hidden primitive",
+			"subject": "Small toy building blocks: a pushbutton, label tag and separator stroke",
+			"source": "packages/headless/components/src/base/"
+		},
+		{
+			"name": "calendar",
+			"sheet": "display",
+			"row": 2,
+			"column": 1,
+			"color": "purple",
+			"behavior": "Single, multiple, or range day selection with month navigation",
+			"subject": "Ring-bound calendar page with a small day grid and two adjoining highlighted days",
+			"source": "packages/headless/components/src/calendar/calendar.tsrx"
+		},
+		{
+			"name": "colorpicker",
+			"sheet": "display",
+			"row": 2,
+			"column": 2,
+			"color": "purple",
+			"behavior": "Two-dimensional color area, channel sliders, and swatches",
+			"subject": "Color-picker square with a target ring, short hue rail and three colored swatches",
+			"source": "packages/headless/components/src/colorpicker/colorpicker.tsrx"
+		},
+		{
+			"name": "crop",
+			"sheet": "display",
+			"row": 2,
+			"column": 3,
+			"color": "purple",
+			"behavior": "Moveable and resizable bounded crop rectangle",
+			"subject": "Overlapping bold crop corners around a small mountain picture",
+			"source": "packages/headless/components/src/crop/crop.tsrx"
+		},
+		{
+			"name": "editable",
+			"sheet": "display",
+			"row": 3,
+			"column": 0,
+			"color": "purple",
+			"behavior": "Preview control opens an input, then commits or cancels edits",
+			"subject": "Short handwritten line with a diagonal pencil and small confirm check",
+			"source": "packages/headless/components/src/editable/editable.tsrx"
+		},
+		{
+			"name": "fileupload",
+			"sheet": "display",
+			"row": 3,
+			"column": 1,
+			"color": "purple",
+			"behavior": "Native file picker plus drop area, file list, and removal",
+			"subject": "Dog-eared file rising above an inbox tray with a chunky upward arrow",
+			"source": "packages/headless/components/src/fileupload/fileupload.tsrx"
+		},
+		{
+			"name": "ink",
+			"sheet": "display",
+			"row": 3,
+			"column": 2,
+			"color": "purple",
+			"behavior": "Pressure-aware freehand SVG strokes with undo and form data",
+			"subject": "Fountain-pen nib drawing a bold loose looping ink stroke",
+			"source": "packages/headless/components/src/ink/ink.tsrx"
+		},
+		{
+			"name": "pad",
+			"sheet": "display",
+			"row": 3,
+			"column": 3,
+			"color": "purple",
+			"behavior": "Two-dimensional draggable points with keyboard-adjustable axes",
+			"subject": "Square XY pad with crosshair axes, an off-center round handle and short arrows",
+			"source": "packages/headless/components/src/pad/pad.tsrx"
+		}
+	]
+}

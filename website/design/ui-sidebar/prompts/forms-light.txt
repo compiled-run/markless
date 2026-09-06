@@ -1,0 +1,25 @@
+Use case: stylized-concept
+Asset type: production sprite sheet for tiny documentation sidebar illustrations.
+Primary request: Draw EXACTLY SIXTEEN distinct hand-drawn sticker icons in a STRICT 4 column by 4 row square grid. Each cell is equal size. One entire icon centered in each cell, occupying about 65% of its cell. Generous completely empty gutters so the icons can be cropped apart. Large 2048 by 2048 square canvas.
+Input images: reference 1 is the owner's prior light/dark sidebar icon sheet, used only for its icon style; reference 2 is the Joy Elia brand artwork, used only for crayon texture and palette. Create new subjects; do not reproduce the reference layout, lettering, logos or watermark.
+Style: bold wobbly black hand-ink outlines, warm cream cut-paper interiors, a narrow ivory die-cut sticker rim, subtle wax-crayon grain and rough hatch fills. Whimsical and tactile but extremely readable at 40px. Compact clear silhouettes, little detail, no photorealism, no glossy 3D, no vector-perfect geometry. Small loose crayon strokes peek out behind each sticker in its specified accent. Palette is exactly the references: pink, lavender-purple, mustard yellow and leafy green, plus cream and ink.
+Background: genuinely transparent alpha outside each sticker including gutters. NO checkerboard painted in, NO paper rectangle or paper texture over the sheet. Texture only inside each icon. No grid lines, cell borders, captions, headings or icon names. Avoid unrelated stars/sparkles that could be mistaken for an extra icon.
+Theme: LIGHT VARIANT. Black ink linework, cream faces and ivory sticker edging; accent-colored crayon fills. Designed to sit on a warm cream webpage.
+Exact cell contents, left to right, top to bottom:
+Row 1, column 1: One large checked square, bold check mark, tiny offset empty square. PURPLE decoration. (Meaning: checkbox; do not print this name.)
+Row 1, column 2: A clipboard with three checkboxes and short lines, two checked and one empty. PURPLE decoration. (Meaning: checklist; do not print this name.)
+Row 1, column 3: A text input with an I-beam caret above a suggestion list, small magnifying glass. PURPLE decoration. (Meaning: combobox; do not print this name.)
+Row 1, column 4: Four separate code-entry boxes in one row; first three contain round dots, last a caret. PURPLE decoration. (Meaning: otp; do not print this name.)
+Row 2, column 1: Three round radio circles vertically, middle filled, short strokes beside them. PURPLE decoration. (Meaning: radiogroup; do not print this name.)
+Row 2, column 2: Dropdown button with down chevron above a three-row choice list, one row checked. PURPLE decoration. (Meaning: select; do not print this name.)
+Row 2, column 3: Wide writing field with two short text strokes and a tall I-beam caret. PURPLE decoration. (Meaning: textbox; do not print this name.)
+Row 2, column 4: Chunky pill switch with one large round thumb moved to the right. PURPLE decoration. (Meaning: toggle; do not print this name.)
+Row 3, column 1: Three connected segmented square buttons, middle pressed and colored. PURPLE decoration. (Meaning: buttongroup; do not print this name.)
+Row 3, column 2: Number field with a hand-drawn 7 between a minus button and plus button. PURPLE decoration. (Meaning: numberbox; do not print this name.)
+Row 3, column 3: Horizontal track with two round handles and colored interval between. PURPLE decoration. (Meaning: slider; do not print this name.)
+Row 3, column 4: Three chunky stars in a row, two colored and one outlined. PURPLE decoration. (Meaning: rating; do not print this name.)
+Row 4, column 1: Three date segments separated by slashes and a tiny calendar corner tab. PURPLE decoration. (Meaning: datebox; do not print this name.)
+Row 4, column 2: Two time segments separated by a colon beside a tiny clock face. PURPLE decoration. (Meaning: timebox; do not print this name.)
+Row 4, column 3: Two overlapping rounded tags, each with a small close cross. PURPLE decoration. (Meaning: taglist; do not print this name.)
+Row 4, column 4: A writing field with two text strokes, an inline colored @ mention chip and caret. PURPLE decoration. (Meaning: tokenbox; do not print this name.)
+Count the cells: four columns, four rows, sixteen icons. Keep every illustration entirely inside its cell with at least 15% blank padding on each side. This is a cuttable asset sheet, not a sidebar mockup.

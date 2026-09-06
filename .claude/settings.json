@@ -72,7 +72,13 @@
       "Bash(pnpm test:react)",
       "Bash(pnpm test:react *)",
       "Bash(npx witness run)",
-      "Bash(npx witness run *)"
+      "Bash(npx witness run *)",
+      "Bash(npm run trust:verify)",
+      "Bash(npm run trust:verify *)",
+      "Bash(pnpm test:headless)",
+      "Bash(pnpm test:headless *)",
+      "Bash(pnpm test:sr)",
+      "Bash(pnpm test:sr *)"
     ],
     "ask": [
       "Bash(npm add:*)",

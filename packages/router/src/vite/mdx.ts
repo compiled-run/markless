@@ -1,3 +1,4 @@
+import { optimizedDepsToInclude } from '@markless/bundler/preload';
 import { toHtml } from 'hast-util-to-html';
 import type { Plugin } from 'vite';
 import { extname } from 'pathe';
@@ -24,9 +25,10 @@ export function mdxTransformPlugin(): Plugin {
 	return {
 		name: 'markless-router:mdx',
 		enforce: 'pre',
-		config(_config, env) {
+		config(config, env) {
 			if (env.command !== 'serve') return undefined;
-			return { optimizeDeps: { include: [MDX_ROUTE_RUNTIME_SPECIFIER] } };
+			const include = optimizedDepsToInclude([MDX_ROUTE_RUNTIME_SPECIFIER], config);
+			return include.length > 0 ? { optimizeDeps: { include } } : undefined;
 		},
 		transform: {
 			order: 'pre',
