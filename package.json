@@ -48,9 +48,9 @@
 		"bumpp": "^10.4.1",
 		"changelogen": "^0.6.2",
 		"create-markless": "workspace:*",
-		"rolldown": "1.0.3",
+		"rolldown": "1.2.7",
 		"typescript": "5.9.3",
-		"vite": "8.0.16",
+		"vite": "8.2.2",
 		"vite-plus": "0.3.0",
 		"vitest": "4.1.11",
 		"yaml": "2.9.0"

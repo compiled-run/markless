@@ -9,7 +9,7 @@
 		"@markless/bundler": "workspace:*"
 	},
 	"devDependencies": {
-		"rolldown": "1.0.3",
+		"rolldown": "1.2.7",
 		"typescript": "catalog:"
 	}
 }
