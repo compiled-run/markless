@@ -1,8 +1,5 @@
-/* What survives the playground makeovers: the accepted sidebar select and link
-   treatment, and the playground switch. Everything else in the playground is
-   the generated chrome's own look. */
-
 :root {
+	--muted-ink: color-mix(in oklch, var(--ink) 38%, var(--paper));
 	--marker-wash: color-mix(in oklch, var(--purple) 24%, transparent);
 	--quiet-fill: color-mix(in oklch, var(--ink) 6%, transparent);
 	--switch-on: oklch(72% 0.17 148);
@@ -10,39 +7,5 @@
 
 	&.dark {
 		--switch-off: oklch(42% 0.01 80);
-	}
-}
-
-/* The playground switch: grey track, green when on, a white thumb with an ink edge. */
-html .prose .pg-switch {
-	flex: none;
-	width: 2.75em;
-	height: 1.65em;
-	padding: 0.06em;
-	border: 2px solid var(--ink);
-	border-radius: 999px;
-	background: var(--switch-off);
-	font-size: var(--step--1);
-	transition: background 140ms ease;
-}
-html .prose .pg-switch[ui-checked] {
-	background: var(--switch-on);
-}
-html .prose .pg-knob {
-	box-sizing: border-box;
-	flex: none;
-	width: 1.25em;
-	height: 1.25em;
-	border: 1.5px solid var(--on-accent);
-	background: white;
-}
-html .prose .pg-switch[ui-checked] .pg-knob {
-	margin-inline-start: calc(100% - 1.25em);
-}
-
-@media (prefers-reduced-motion: reduce) {
-	.mode-select-caret,
-	html .prose .pg-switch {
-		transition: none;
 	}
 }

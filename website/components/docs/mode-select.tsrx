@@ -7,45 +7,55 @@ export default function ModeSelect({ mode }: { readonly mode: Mode }) @{
 
 	<div class="mode-select-island">
 		<style>
+			.mode-select-island {
+				position: relative;
+				box-sizing: border-box;
+				inline-size: 100%;
+				padding-inline-end: 0.5rem;
+				margin-bottom: var(--space-s);
+				z-index: 25;
+				--select-wash: color-mix(in srgb, var(--purple) 22%, var(--paper));
+			}
+
+			.mode-select-control {
+				position: relative;
+				--select-shadow: var(--muted-ink);
+			}
+
+			.mode-select-control[ui-open] {
+				--select-shadow: var(--purple);
+			}
+
 			.mode-select-trigger {
 				box-sizing: border-box;
 				display: flex;
 				align-items: center;
 				justify-content: space-between;
-				gap: 0.5em;
+				gap: 0.8em;
 				inline-size: 100%;
-				min-block-size: 2.45rem;
-				padding: 0.35em 0.7em;
-				font-size: var(--step--1);
-				font-weight: 700;
+				min-block-size: 3rem;
+				padding: 0.5em 0.8em;
+				font-family: 'Shantell Sans', system-ui, sans-serif;
+				font-size: var(--step-0);
+				font-weight: 400;
+				line-height: 1.4;
 				color: var(--ink);
-				background: var(--raised);
-				border: 2px solid var(--ink);
-				border-radius: 8px;
-				text-decoration: none;
-			}
-
-			.mode-select-island {
-				position: fixed;
-				left: var(--space-s-l);
-				top: calc(var(--header-height) + 2 * var(--space-s) + 3.4rem + var(--space-m));
-				z-index: 35;
-				inline-size: 16rem;
-				font-size: var(--step--1);
-			}
-
-			.mode-select-control {
-				position: relative;
-			}
-
-			.mode-select-trigger {
+				background: var(--paper);
+				border: 1.5px solid var(--ink);
+				border-radius: 6px;
+				box-shadow: 4px 4px 0 var(--select-shadow);
 				cursor: pointer;
+				transition: box-shadow 160ms ease;
+			}
+
+			.mode-select-trigger span,
+			.mode-select-item-label {
+				font-family: 'Shantell Sans', system-ui, sans-serif;
 			}
 
 			.mode-select-caret {
 				display: inline-flex;
 				flex: none;
-				opacity: 0.65;
 				transition: transform 160ms ease;
 			}
 
@@ -55,16 +65,17 @@ export default function ModeSelect({ mode }: { readonly mode: Mode }) @{
 
 			.mode-select-content {
 				position: absolute;
-				top: calc(100% + 0.3em);
+				top: calc(100% + 0.5em);
 				left: 0;
 				box-sizing: border-box;
 				display: grid;
 				gap: 0.2em;
 				inline-size: 100%;
-				padding: 0.3em;
-				background: var(--raised);
-				border: 2px solid var(--ink);
-				border-radius: 8px;
+				padding: 0.4rem;
+				background: var(--paper);
+				border: 1.5px solid var(--ink);
+				border-radius: 6px;
+				box-shadow: 4px 4px 0 var(--select-shadow);
 			}
 
 			.mode-select-content[hidden] {
@@ -75,29 +86,35 @@ export default function ModeSelect({ mode }: { readonly mode: Mode }) @{
 				display: flex;
 				align-items: center;
 				justify-content: space-between;
+				box-sizing: border-box;
+				min-block-size: 2.5rem;
 				padding: 0.3em 0.7em;
 				color: var(--ink);
 				font-size: var(--step--1);
-				border: 2px solid transparent;
-				border-radius: 6px;
+				border: 0;
+				border-radius: 3px;
+				background: transparent;
 				cursor: pointer;
 			}
 
-			.mode-select-item:hover {
-				background: var(--yellow);
-				color: var(--on-accent);
-			}
-
 			.mode-select-item[ui-selected] {
-				border-color: var(--pink);
-				background: var(--tinted);
-				font-weight: 700;
+				background: var(--select-wash);
+				font-weight: 600;
 			}
 
-			.mode-select-trigger:focus-visible,
-			.mode-select-item:focus-visible {
-				outline: 2px solid var(--yellow);
-				outline-offset: 2px;
+			.mode-select-trigger:focus-visible {
+				outline: 2px dashed var(--ink);
+				outline-offset: 6px;
+			}
+
+			.mode-select-item:is(:hover, :focus-visible) {
+				background: var(--quiet-fill);
+				outline: 1px dashed var(--ink);
+				outline-offset: -3px;
+			}
+
+			.mode-select-item[ui-selected]:is(:hover, :focus-visible) {
+				background: var(--select-wash);
 			}
 
 			.mode-select-item[ui-disabled] {
@@ -109,60 +126,11 @@ export default function ModeSelect({ mode }: { readonly mode: Mode }) @{
 				display: none;
 			}
 
-			/* Sidebar select and links. Generated component CSS is scoped with a hash
-			   class, so these carry html .prose to outrank it. */
-			.mode-select-island {
-				position: relative;
-				position-anchor: auto;
-				inset: auto;
-				inline-size: 100%;
-				margin-bottom: var(--space-s);
-				z-index: 25;
-			}
-
-			html .prose .mode-select-trigger {
-				background: var(--paper);
-				border: 1.5px solid var(--ink);
-				border-radius: 3px;
-				min-height: 2.7rem;
-				box-shadow: 3px 3px 0 var(--purple);
-			}
-
-			html .prose .mode-select-content {
-				background: var(--paper);
-				padding: 0.4rem;
-				border: 1.5px solid var(--ink);
-				border-radius: 3px;
-				box-shadow: 3px 4px 0 var(--purple);
-			}
-
-			html .prose .mode-select-item {
-				min-height: 2.25rem;
-				box-sizing: border-box;
-				border: 0;
-				border-radius: 1px;
-				background: transparent;
-				color: var(--ink);
-			}
-
-			html .prose .mode-select-item[ui-selected] {
-				background: var(--marker-wash);
-				font-weight: 700;
-			}
-
-			html .prose .mode-select-item[ui-selected]:is(:hover, :focus-visible) {
-				background: var(--marker-wash);
-			}
-
-			html .prose .mode-select-trigger:focus-visible {
-				outline: 2px dashed var(--ink);
-				outline-offset: 4px;
-			}
-
-			html .prose .mode-select-item:is(:hover, :focus-visible) {
-				background: var(--quiet-fill);
-				outline: 1px dashed var(--ink);
-				outline-offset: -3px;
+			@media (prefers-reduced-motion: reduce) {
+				.mode-select-trigger,
+				.mode-select-caret {
+					transition: none;
+				}
 			}
 		</style>
 		<select.root
@@ -174,9 +142,9 @@ export default function ModeSelect({ mode }: { readonly mode: Mode }) @{
 				if (value === 'ui') location.assign('/markless/ui');
 			}}
 		>
-			<select.label
-				style="clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px;"
-			>Documentation mode</select.label>
+			<select.label style="clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px;">
+				Documentation mode
+			</select.label>
 			<select.trigger class="mode-select-trigger">
 				<span>{title}</span>
 				<span class="mode-select-caret" aria-hidden="true">
@@ -199,5 +167,5 @@ export default function ModeSelect({ mode }: { readonly mode: Mode }) @{
 			</select.content>
 			<select.field />
 		</select.root>
-	</div>
+	</div>;
 }

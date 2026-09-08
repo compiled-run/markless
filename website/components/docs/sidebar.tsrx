@@ -297,7 +297,7 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 			.page-tree {
 				--branch-height: 2.75rem;
 				--page-height: 2.5rem;
-				--path-ink: color-mix(in oklch, var(--ink) 38%, var(--paper));
+				--path-ink: var(--muted-ink);
 				font-size: 1rem;
 				padding: 0.2rem;
 			}

@@ -847,12 +847,12 @@ function toggleCell(emit: Emit, control: PlaygroundControl, extra: string): stri
 ${writes(emit.slots, control, 'next', '\t\t\t\t\t\t\t')}${extra}${follow}
 						}}
 					>
-						<toggle.label class="pg-name">${control.prop}</toggle.label>
+						<toggle.label class="pg-name">${control.prop.charAt(0).toUpperCase() + control.prop.slice(1)}</toggle.label>
+${hintFor(control)}
 						<toggle.trigger class="pg-switch">
 							<toggle.thumb class="pg-knob" />
 						</toggle.trigger>
 					</toggle.root>
-${hintFor(control)}
 				</div>`;
 }
 
@@ -1061,25 +1061,25 @@ ${indent}\t\t\t\t\t</pre>
 ${indent}\t\t\t\t</tabs.content>`,
 		)
 		.join('\n');
-	return `${indent}<div class="pg-panel-outer" data-scenario=${quote(input.scenario)}>
+	return `${indent}<div class="pg-panel-outer" data-scenario=${quote(input.scenario)}>${input.bar === undefined ? '' : `\n${input.bar}`}
 ${indent}\t<tabs.root class="pg-panel" value=${quote(input.panes[0].value)}>
 ${indent}\t\t<div class="pg-bar">
-${indent}\t\t\t<tabs.list class="pg-strip">
+${indent}\t\t\t<tabs.list class="pg-strip" aria-label="Example files">
 ${indent}\t\t\t\t<div class="pg-strip-row" role="presentation">
 ${tabs}
 ${indent}\t\t\t\t</div>
-${indent}\t\t\t</tabs.list>${input.bar === undefined ? '' : `\n${input.bar}`}
+${indent}\t\t\t</tabs.list>
 ${indent}\t\t</div>
 ${indent}\t\t<collapsible.root class="pg-clamp">
 ${indent}\t\t\t<div class="pg-code-body">
 ${indent}\t\t\t\t<div class="pg-panes">
 ${panes}
 ${indent}\t\t\t\t</div>
+${indent}\t\t\t\t<span class="pg-fade" aria-hidden="true"></span>
 ${indent}\t\t\t</div>
-${indent}\t\t\t<span class="pg-fade" aria-hidden="true"></span>
 ${indent}\t\t\t<collapsible.trigger class="pg-expand">
 ${indent}\t\t\t\tExpand code
-${indent}\t\t\t\t<lucide.arrowright class="pg-expand-icon" aria-hidden="true" />
+${indent}\t\t\t\t<lucide.chevrondown class="pg-expand-icon" aria-hidden="true" />
 ${indent}\t\t\t</collapsible.trigger>
 ${indent}\t\t</collapsible.root>
 ${indent}\t</tabs.root>
@@ -1187,11 +1187,10 @@ export function playgroundModule(input: PlaygroundInput): string {
 			if (run.doc !== undefined && !SLOT_PATTERN.test(run.text)) pointed.add(run.doc);
 	const docs = input.docs.filter((doc) => pointed.has(doc.n));
 
-	const source = paneMarkup(
-		panelLines(input.sourceLines, slots),
-		'srcLines',
-		'\t\t\t\t\t\t\t\t\t',
-	);
+	const lines = panelLines(input.sourceLines, slots);
+	const rootLine = demo.source.slice(0, demo.openingStart).split('\n').length - 1;
+	const context = paneMarkup(lines.slice(0, rootLine), 'srcContext', '\t\t\t\t\t\t\t\t\t');
+	const source = paneMarkup(lines.slice(rootLine), 'srcLines', '\t\t\t\t\t\t\t\t\t');
 	const css = paneMarkup(panelLines(input.cssLines, []), 'cssLines', '\t\t\t\t\t\t\t\t\t');
 
 	const families = [
@@ -1234,7 +1233,11 @@ export function playgroundModule(input: PlaygroundInput): string {
 		.join('\n\n');
 
 	const panes: ChromePane[] = [
-		{ value: 'source', label: input.sourceLabel, markup: source.markup },
+		{
+			value: 'source',
+			label: input.sourceLabel,
+			markup: `<span class="pg-source-context">\n${context.markup}\n</span>\n${source.markup}`,
+		},
 	];
 	if (input.cssLines.length > 0)
 		panes.push({ value: 'css', label: input.cssLabel, markup: css.markup });
@@ -1245,6 +1248,7 @@ import { attributeText, heldList, listText, pickValue, toggled, valueText } from
 
 ${RUN_TYPES}
 
+${context.consts.join('\n')}
 ${source.consts.join('\n')}
 ${css.consts.join('\n')}
 const docs: readonly Doc[] = ${JSON.stringify(docs)};

@@ -2,9 +2,21 @@ import { accordion, lucide } from '@markless/ui';
 
 export default function AccordionBasic() @{
 	const questions = [
-		{ value: 'ship', question: 'When does my order ship?', answer: 'Orders leave within two working days.' },
-		{ value: 'returns', question: 'How do I return something?', answer: 'Start a return from your orders page.' },
-		{ value: 'overseas', question: 'Do you ship overseas?', answer: 'Everywhere but Antarctica.' },
+		{
+			value: 'ship',
+			question: 'When does my order ship?',
+			answer: 'Orders leave within two working days.',
+		},
+		{
+			value: 'returns',
+			question: 'How do I return something?',
+			answer: 'Start a return from your orders page.',
+		},
+		{
+			value: 'overseas',
+			question: 'Do you ship overseas?',
+			answer: 'Everywhere but Antarctica.',
+		},
 	];
 
 	<accordion.root class="accordion" value="ship">
@@ -12,55 +24,58 @@ export default function AccordionBasic() @{
 			<accordion.item class="section" value={q.value}>
 				<accordion.itemlabel class="heading">
 					<accordion.itemtrigger class="trigger">
+						<lucide.chevronright class="trigger-icon" aria-hidden="true" />
 						{q.question}
-						<lucide.chevrondown class="trigger-icon" aria-hidden="true" />
+						<lucide.plus class="trigger-plus" aria-hidden="true" />
+						<lucide.minus class="trigger-minus" aria-hidden="true" />
 					</accordion.itemtrigger>
 				</accordion.itemlabel>
 				<accordion.itemcontent class="panel">{q.answer}</accordion.itemcontent>
-			</accordion.item>
+			</accordion.item>;
 		}
 
 		<style>
 			.accordion {
 				display: grid;
-				gap: 0.5em;
-				width: min(32rem, 100%);
+				gap: 0.7em;
+				width: min(31rem, 100%);
+				font-family: 'Shantell Sans', system-ui, sans-serif;
+				font-size: var(--step--1);
+				line-height: 1.5;
 			}
-
 
 			.section {
-				border: 2px solid var(--code-edge);
+				border: 1px solid var(--ink);
 				border-radius: 6px;
-				background: var(--paper);
 				overflow: clip;
-			}
-
-			.section[ui-open] {
-				border-color: var(--pink);
 			}
 
 			.heading {
 				margin: 0;
-				font-size: var(--step-0);
+				font-size: inherit;
+				font-weight: 400;
+				line-height: inherit;
+				text-shadow: none;
 			}
 
 			.trigger {
 				display: flex;
-				gap: 0.6em;
+				gap: 0.75em;
 				align-items: center;
-				justify-content: space-between;
 				width: 100%;
-				padding: 0.6em 0.8em;
+				padding: 0.85em 1em;
 				border: 0;
 				background: transparent;
 				color: var(--ink);
 				font: inherit;
-				font-weight: 700;
+				font-family: 'Shantell Sans', system-ui, sans-serif;
 				text-align: left;
 				cursor: pointer;
 			}
 
-			.trigger-icon {
+			.trigger-icon,
+			.trigger-plus,
+			.trigger-minus {
 				display: inline-flex;
 				width: 1em;
 				height: 1em;
@@ -69,11 +84,34 @@ export default function AccordionBasic() @{
 			}
 
 			.trigger[ui-open] .trigger-icon {
-				transform: rotate(180deg);
+				transform: rotate(90deg);
+			}
+
+			.trigger-plus,
+			.trigger-minus {
+				margin-inline-start: auto;
+			}
+
+			.trigger-minus,
+			.trigger[ui-open] .trigger-plus {
+				display: none;
+			}
+
+			.trigger[ui-open] .trigger-minus {
+				display: inline-flex;
+			}
+
+			.trigger[ui-open] {
+				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
 			}
 
 			.trigger:hover {
-				background: var(--tinted-quiet);
+				background: color-mix(in srgb, var(--purple) 16%, var(--paper));
+			}
+
+			.trigger:focus-visible {
+				outline: 2px solid var(--ink);
+				outline-offset: -5px;
 			}
 
 			.trigger:disabled {
@@ -82,13 +120,20 @@ export default function AccordionBasic() @{
 			}
 
 			.section[ui-open] .panel {
-				padding: 0 0.8em 0.7em;
-				font-size: var(--step--1);
+				padding: 1em;
+				border-block-start: 1px solid var(--ink);
+				font-family: 'Shantell Sans', system-ui, sans-serif;
 			}
 
 			.panel[hidden] {
 				display: none;
 			}
+
+			@media (prefers-reduced-motion: reduce) {
+				.trigger-icon {
+					transition: none;
+				}
+			}
 		</style>
-	</accordion.root>
+	</accordion.root>;
 }
