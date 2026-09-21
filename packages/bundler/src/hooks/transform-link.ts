@@ -52,15 +52,20 @@ export async function materializeOwnDelegateChildren(
 ): Promise<{
 	readonly transformed: TransformTsrxModuleResult;
 	readonly input: TransformTsrxModuleInput;
+	readonly barrelComponents?: Awaited<ReturnType<typeof linkBarrelComponentInterfaces>>;
 }> {
 	const { ctx, source, currentEnvironment } = request;
 	const { clientRouteArtifactMaterializations } = ctx.state;
 	let transformed = result;
 	let linkedTransformInput = input;
-	const artifactChildMaterializations =
+	const scoped =
 		currentEnvironment === 'client' && clientRouteArtifactMaterializations.has(source)
-			? clientRouteArtifactMaterializations.get(source)!
+			? {
+					materializations: clientRouteArtifactMaterializations.get(source)!,
+					barrelComponents: undefined,
+				}
 			: await scopedDelegateMaterializations(request, transformed);
+	const artifactChildMaterializations = scoped.materializations;
 	if (Object.keys(artifactChildMaterializations).length > 0) {
 		linkedTransformInput = {
 			...linkedTransformInput,
@@ -71,13 +76,16 @@ export async function materializeOwnDelegateChildren(
 			false,
 		);
 	}
-	return { transformed, input: linkedTransformInput };
+	return { transformed, input: linkedTransformInput, barrelComponents: scoped.barrelComponents };
 }
 
 async function scopedDelegateMaterializations(
 	request: TransformRequest,
 	transformed: TransformTsrxModuleResult,
-): Promise<Readonly<Record<string, ArtifactChildMaterialization>>> {
+): Promise<{
+	readonly materializations: Readonly<Record<string, ArtifactChildMaterialization>>;
+	readonly barrelComponents?: Awaited<ReturnType<typeof linkBarrelComponentInterfaces>>;
+}> {
 	const { ctx, pluginContext, id, source, currentEnvironment, materializedRenderDataReach } =
 		request;
 	if (
@@ -88,17 +96,32 @@ async function scopedDelegateMaterializations(
 			renderDataReached: materializedRenderDataReach !== undefined,
 		})
 	) {
-		return {};
+		return { materializations: {} };
 	}
+	const barrelComponents = await sourceBarrelComponents(request, transformed);
 	const delegates = await materializeDelegateChildren(
 		pluginContext,
 		source,
 		transformed.artifactChildren,
-		delegateLoadOptions(ctx, pluginContext),
+		{ ...delegateLoadOptions(ctx, pluginContext), interfaces: barrelComponents.interfaces },
 	);
 	// A delegate whose import rejected is reported, not swallowed; the edge still skips.
 	warnDelegateImportFailures(pluginContext, delegates);
-	return delegates.materializations;
+	return { materializations: delegates.materializations, barrelComponents };
+}
+
+export function sourceBarrelComponents(
+	request: TransformRequest,
+	transformed: TransformTsrxModuleResult,
+) {
+	return linkBarrelComponentInterfaces(
+		request.pluginContext,
+		request.plan.manifestSource,
+		transformed.moduleImports,
+		request.ctx.state.moduleLinkArtifacts,
+		request.ctx.internalOptions.buildId,
+		request.ctx.getRoot(),
+	);
 }
 
 export async function linkTransformChildren(
@@ -106,6 +129,7 @@ export async function linkTransformChildren(
 	result: TransformTsrxModuleResult,
 	input: TransformTsrxModuleInput,
 	reusedLinkedTransform: boolean,
+	resolvedBarrels?: Awaited<ReturnType<typeof linkBarrelComponentInterfaces>>,
 ): Promise<LinkedTransformChildren> {
 	const { ctx, pluginContext, currentEnvironment, materializedRenderDataReach, plan } = request;
 	const { internalOptions, linkedChildren } = ctx;
@@ -125,14 +149,16 @@ export async function linkTransformChildren(
 		transformed.moduleImports,
 		fallbackImportedSource,
 	);
-	const barrelComponents = await linkBarrelComponentInterfaces(
-		pluginContext,
-		manifestSource,
-		transformed.moduleImports,
-		moduleLinkArtifacts,
-		internalOptions.buildId,
-		ctx.getRoot(),
-	);
+	const barrelComponents =
+		resolvedBarrels ??
+		(await linkBarrelComponentInterfaces(
+			pluginContext,
+			manifestSource,
+			transformed.moduleImports,
+			moduleLinkArtifacts,
+			internalOptions.buildId,
+			ctx.getRoot(),
+		));
 	// The interfaces this module links: the barrel's synthetic entry first, so a
 	// real compiled interface for the same specifier always wins.
 	const barrelLinkedInterfaces = () => ({

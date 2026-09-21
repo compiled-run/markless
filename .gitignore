@@ -13,6 +13,9 @@ coverage/
 markless-router-env.d.ts
 playwright-report/
 test-results/
+.vitest-attachments/
+scripts/experiments/**/results/
+scripts/experiments/**/node_modules
 *.tsbuildinfo
 
 # Local/editor files
@@ -21,6 +24,7 @@ test-results/
 
 # Local planning output
 goals/
+/output/
 
 # Local Claude Code state (worktree copies pollute fmt/lint scans). The
 # generated agent files stay tracked so the ruler drift check still sees them.
@@ -45,4 +49,5 @@ CLAUDE.md.bak
 
 # goal boards are session-local working state
 goals/
+/output/
 docs/goals/

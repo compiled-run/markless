@@ -92,8 +92,8 @@ was renamed, because every one of them stops compiling.
 
 <Callout
 	sprite="cross"
-	title="This site links with plain anchors"
-	text="Every link on this documentation site is a plain <a href> rather than a Link, because importing @markless/router into app code fails this site's production build on 0.3.1. It is recorded as finding 2 in this site's NOTES.md. Nothing you read here is being demonstrated by the site's own navigation, so treat the code above as what your app should do, and this sentence as the reason the page cannot show it to you working."
+	title="The sidebar uses Link"
+	text="The documentation sidebar uses Link from @markless/core/router. Clicking a sidebar page loads its client render data and replaces the route content without reloading the document. Ordinary Markdown links still render as native anchors."
 />
 
 ## What a `Link` is at runtime

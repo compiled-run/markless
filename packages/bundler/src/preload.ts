@@ -19,3 +19,9 @@ export {
 	type PreloadLazySymbolModulesInput,
 } from './build/module-preload-dom.ts';
 export type { MarklessBundleGraph } from './types.ts';
+export {
+	isClientPrimarySourceRequest,
+	isRenderDataSourceRequest,
+	isResumeSourceRequest,
+	isSymbolOnlySourceRequest,
+} from './virtual-ids.ts';

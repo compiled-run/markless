@@ -1,3 +1,4 @@
+import AnatomyTable from '../../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../../components/docs/sidebar.tsrx';
 import Preview from '../../../components/ui/preview.tsrx';
@@ -34,13 +35,7 @@ and they stay plain groups.
 
 ## Anatomy
 
-- `carousel.root` — holds the configuration and which slide is showing.
-- `carousel.title` — the carousel's heading, and what names it.
-- `carousel.scrollarea` — the window the slides move behind, and where a drag is measured.
-- `carousel.item` — one slide, named by its required `value`.
-- `carousel.navlist` and `carousel.navtrigger` — the row of slide pickers.
-- `carousel.backtrigger` and `carousel.forwardtrigger` — one step either way.
-- `carousel.playtrigger` — starts and stops autoplay. Its label says which the press will do.
+<AnatomyTable />
 
 It writes `ui-active`, `ui-value`, `ui-align`, `ui-loop`, `ui-draggable`, `ui-vertical` and
 `ui-track`.

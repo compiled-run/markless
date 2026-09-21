@@ -2611,6 +2611,7 @@ export type LinkedModuleGraphArtifact = {
 // work and is never a delegate. The rendering itself is an input, because a
 // compiler pass never imports user code.
 export type LinkedDelegateChild = {
+	readonly componentTarget?: ModuleGraphInterfaceLinkedComponent;
 	readonly edgeId: string;
 	readonly componentName: string;
 	readonly specifier: string;

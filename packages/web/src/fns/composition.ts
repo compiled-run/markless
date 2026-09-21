@@ -12,6 +12,8 @@ import {
 } from './instance-scope.ts';
 import type { MarklessRowTemplate, MarklessWidgetRegistry } from './instance-scope.ts';
 import type { ResumeSymbol, ResumeSymbolContext } from '../resume-types.ts';
+import type { ProtocolStatePayload } from '@markless/serializer';
+import { protocolStateVersion } from '../../../serializer/src/protocol-constants.ts';
 
 // Composition works on the DRAFT payload the compiled render modules build:
 // mutable, partially populated, and carrying producer fields composition itself
@@ -67,9 +69,7 @@ export type ComposeStateComputed = ComposeStateNode & {
 export type ComposeSharedSeed = {
 	readonly graphNodeId: string;
 	readonly deriveSymbolId: string;
-	readonly dependencies: ReadonlyArray<
-		ComposeGraphRead & { readonly reads: ComposeGraphRead }
-	>;
+	readonly dependencies: ReadonlyArray<ComposeGraphRead & { readonly reads: ComposeGraphRead }>;
 };
 export type ComposeSharedDefinition = {
 	readonly id: string;
@@ -84,6 +84,7 @@ export type ComposeSharedDefinition = {
 	readonly [key: string]: unknown;
 };
 export type ComposeStateDraft = {
+	storage?: ProtocolStatePayload['storage'];
 	cells?: ReadonlyArray<ComposeStateNode>;
 	computed?: ReadonlyArray<ComposeStateComputed>;
 	sharedSeeds?: ReadonlyArray<ComposeSharedSeed>;
@@ -121,9 +122,7 @@ export type ComposeChild = {
 // ids. Keeping them the same string is what lets browser resume recover the
 // instance a symbol belongs to from the symbol id it was loaded with; a child
 // whose symbols do not carry the path cannot be graph-qualified either.
-export function marklessComposedInstancePath(child: {
-	readonly symbolPrefix?: string;
-}): string {
+export function marklessComposedInstancePath(child: { readonly symbolPrefix?: string }): string {
 	return marklessInstancePath(child.symbolPrefix);
 }
 
@@ -228,9 +227,7 @@ function marklessRegisterWidgetInstanceIds(ids: Iterable<string>): void {
 // A part is a SIBLING of the root composition placed it in (`c0:p1:` beside
 // `c0:c0:`), so the root walk cannot reach that root from the part's own path;
 // the composing child declared where its children land and this is that answer.
-function marklessRegisterWidgetProjections(
-	entries: Iterable<readonly [string, string]>,
-): void {
+function marklessRegisterWidgetProjections(entries: Iterable<readonly [string, string]>): void {
 	for (const [id, rootPath] of entries) marklessRegisterWidgetRoot(id, rootPath);
 }
 
@@ -283,7 +280,10 @@ export function marklessQualifyChildState(
 				? [
 						{
 							...seed,
-							graphNodeId: marklessComposedGraphNodeId(seed.graphNodeId, instancePath),
+							graphNodeId: marklessComposedGraphNodeId(
+								seed.graphNodeId,
+								instancePath,
+							),
 							dependencies,
 						},
 					]
@@ -575,8 +575,16 @@ function marklessComposedState<T extends ComposeStateDraft>(
 			})),
 		),
 	];
+	const storage = [
+		...new Map(
+			[state, ...childStates]
+				.flatMap((state) => state.storage ?? [])
+				.map((record) => [record.graphNodeId, record]),
+		).values(),
+	];
 	return {
 		...state,
+		...(storage.length ? { storage, version: protocolStateVersion(storage) } : {}),
 		cells,
 		computed: [
 			...(state.computed ?? []),
@@ -825,7 +833,10 @@ export function marklessComposedSyncPolicy<T>(
 	) as T;
 }
 
-export function marklessCsrChildReadIsStatic(record: ComposeGraphRead, graphProps: ComposeGraphProps) {
+export function marklessCsrChildReadIsStatic(
+	record: ComposeGraphRead,
+	graphProps: ComposeGraphProps,
+) {
 	const propName = marklessCompositionPropName(record.graphNodeId, record.path);
 	if (propName === null) return false;
 	const binding = (graphProps ?? []).find((prop) => prop.name === propName);
@@ -922,7 +933,9 @@ function composedRowTemplate(
 	const textSlots = rowTemplate.textSlots?.map(remap);
 	const attributeSlots = rowTemplate.attributeSlots?.map(remap);
 	if (dropped) {
-		console.warn(`markless: ${repeatId} drops its row template - ${dropped} reads an unpassed prop`);
+		console.warn(
+			`markless: ${repeatId} drops its row template - ${dropped} reads an unpassed prop`,
+		);
 		return undefined;
 	}
 	return {

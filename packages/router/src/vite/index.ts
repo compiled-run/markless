@@ -19,9 +19,13 @@ import {
 	stringifyQuery,
 	withoutLeadingSlash,
 } from 'ufo';
-// Build-time-only dependency: the bundler owns the symbol virtual module id
-// shape (single source of truth); browser entries must never reach this file.
-import { symbolVirtualModuleSourceFile } from '@markless/bundler/preload';
+import {
+	isClientPrimarySourceRequest,
+	isRenderDataSourceRequest,
+	isResumeSourceRequest,
+	isSymbolOnlySourceRequest,
+	symbolVirtualModuleSourceFile,
+} from '@markless/bundler/preload';
 import { transformRequestFileSource } from '../request-files.ts';
 import { anchorTransformPlugin } from './anchor-transform.ts';
 import {
@@ -35,6 +39,7 @@ import {
 } from './client-assets-manifest.ts';
 import { htmlTransformPlugin } from './html-transform.ts';
 import { mdxTransformPlugin } from './mdx.ts';
+import { compactRoutePreloadData, routePreloadDecoderSource } from './route-preload-data.ts';
 import { routeTypegenPlugin } from './route-typegen.ts';
 
 const ROUTE_DISCOVERY_ID = 'virtual:markless-router/routes';
@@ -796,7 +801,8 @@ function routePreloadsSource(state: RoutePreloadState, client: boolean): string 
 			];
 	return [
 		`const routePreloadsJson = globalThis.__marklessRouterRoutePreloadsJson ?? ${JSON.stringify(ROUTE_PRELOADS_PLACEHOLDER)};`,
-		`const routePreloadData = routePreloadsJson === ${JSON.stringify(ROUTE_PRELOADS_PLACEHOLDER)} ? ${JSON.stringify(routes)} : JSON.parse(routePreloadsJson);`,
+		`let routePreloadData = routePreloadsJson === ${JSON.stringify(ROUTE_PRELOADS_PLACEHOLDER)} ? ${JSON.stringify(routes)} : JSON.parse(routePreloadsJson);`,
+		routePreloadDecoderSource,
 		`export const routeModulePreloads = routePreloadData.navigation ?? {};`,
 		`export const routeSsrModulePreloads = routePreloadData.ssr ?? {};`,
 		...routeStylesheetExport,
@@ -825,7 +831,7 @@ function patchRoutePreloadsInBundle(
 	routes: RoutePreloadMaps,
 ): void {
 	const replacement = jsStringLiteralContent(
-		JSON.stringify({ navigation: routes.navigation, ssr: routes.ssr }),
+		JSON.stringify(compactRoutePreloadData(routes)),
 	);
 	for (const chunk of outputChunks(bundle)) {
 		if (!chunk.code?.includes(ROUTE_PRELOADS_PLACEHOLDER)) continue;
@@ -1233,32 +1239,32 @@ function primaryRouteChunk(
 	routeFile: string,
 	chunks: readonly OutputChunkLike[],
 ): OutputChunkLike {
-	// The same route source can produce full, resume, and symbols-only chunks.
-	// Prefer the unqueried authored module, then resume, then symbols-only.
-	// Replace only for a strictly higher rank so bundle order breaks ties.
-	let selected = chunks[0]!;
-	let selectedRank = routeChunkRank(root, routeFile, selected);
-	for (const chunk of chunks.slice(1)) {
-		const rank = routeChunkRank(root, routeFile, chunk);
-		if (rank <= selectedRank) continue;
-		selected = chunk;
-		selectedRank = rank;
+	const ranked = chunks.map((chunk) => ({ chunk, rank: routeChunkRank(root, routeFile, chunk) }));
+	const highestRank = Math.max(...ranked.map(({ rank }) => rank));
+	const candidates = ranked.filter(({ rank }) => rank === highestRank);
+	if (candidates.length !== 1) {
+		throw new Error(
+			`Markless Router found ambiguous primary chunks for ${routeFile}: ${candidates.map(({ chunk }) => chunk.fileName).sort().join(', ')}`,
+		);
 	}
-	return selected;
+	return candidates[0]!.chunk;
 }
 
 function routeChunkRank(root: string, routeFile: string, chunk: OutputChunkLike): number {
 	let rank = 0;
 	for (const moduleId of [chunk.facadeModuleId, ...(chunk.moduleIds ?? [])]) {
-		if (routeFileForModuleId(root, moduleId) !== routeFile) continue;
-		const search = parsePath(moduleId!).search;
-		if (/(?:^|[?&])markless-symbols(?:[=&]|$)/.test(search)) {
-			rank = Math.max(rank, 1);
-		} else if (/(?:^|[?&])markless-resume(?:[=&]|$)/.test(search)) {
-			rank = Math.max(rank, 2);
-		} else {
-			return 3;
-		}
+		if (!moduleId || routeFileForModuleId(root, moduleId) !== routeFile) continue;
+		const role = isClientPrimarySourceRequest(moduleId)
+			? 5
+			: isRenderDataSourceRequest(moduleId)
+				? 4
+				: isSymbolOnlySourceRequest(moduleId)
+					? 1
+					: isResumeSourceRequest(moduleId)
+						? 2
+						: 3;
+		const ownsModule = chunk.moduleIds?.includes(moduleId) ? 1 : 0;
+		rank = Math.max(rank, role * 2 + ownsModule);
 	}
 	return rank;
 }

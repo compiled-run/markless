@@ -1,3 +1,4 @@
+import AnatomyTable from '../../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../../components/docs/sidebar.tsrx';
 import GridListDemo from '../../../components/demos/ui/gridlist/basic.tsrx';
@@ -54,13 +55,7 @@ brings it back out.
 
 ## Anatomy
 
-- `gridlist.root` holds the configuration and the rows that are picked.
-- `gridlist.label` names the list, and the grid points `aria-labelledby` here.
-- `gridlist.item` is one row, named by its own `value`, and where focus rests.
-- `gridlist.itemcontent` is the cell a row's content sits in.
-- `gridlist.itemlabel` is the row's own words, and what typeahead matches against.
-- `gridlist.itemtrigger` is a button the row holds, out of the tab order.
-- `gridlist.itemindicator` is the mark showing that this row is picked.
+<AnatomyTable />
 
 It writes `ui-selectable`, `ui-multiple`, `ui-disabled`, `ui-inside`, `ui-value` and `ui-selected`
 as its state changes.

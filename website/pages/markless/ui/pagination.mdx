@@ -1,3 +1,4 @@
+import AnatomyTable from '../../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../../components/docs/sidebar.tsrx';
 import Preview from '../../../components/ui/preview.tsrx';
@@ -38,11 +39,7 @@ There is no exported state for this family yet. A consumer reaches the range thr
 
 ## Anatomy
 
-- `pagination.root` — the `<nav>` landmark. Named "Pagination" unless you say otherwise.
-- `pagination.item` — one page's box, declaring which page it stands for.
-- `pagination.itemtrigger` — the control inside an item. It takes no page number of its own.
-- `pagination.itemlink` — the same control over an `<a>`, for pagination with real URLs.
-- `pagination.backtrigger` and `pagination.forwardtrigger` — one step either way.
+<AnatomyTable />
 
 It writes `ui-active` and `ui-disabled`.
 

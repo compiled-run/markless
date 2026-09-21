@@ -197,6 +197,45 @@ This page is static markdown.
 		expect(code).not.toContain('modules[0].marklessRenderData');
 	});
 
+	it('navigation modules load render data without server-rendering component imports', async () => {
+		const code = await transformMdxRoute(
+			`import Summary from '../../components/Summary.tsrx';
+import Choices from '../../components/Choices.tsrx';
+
+# Options
+
+<Choices label="Pick one" />
+<Summary count={3} />
+`,
+			'/project/pages/options.mdx?markless-route',
+		);
+
+		expect(code).not.toContain('import Summary from');
+		expect(code).not.toContain('import Choices from');
+		expect(code).not.toContain('@markless/core/web/resume');
+		expect(code).not.toContain('renderSsr');
+		expect(code).toContain('renderData: marklessMdxRenderData');
+		expect(code).toContain('loadSymbol: marklessMdxLoadSymbol');
+		expect(code).toContain('Choices.tsrx?markless-symbols');
+		expect(code).toContain('Summary.tsrx?markless-render-data');
+		expect(code).toContain('"label": "Pick one"');
+		expect(code).toContain('"count": 3');
+		expect(code).toContain('globalThis.__marklessOverlay ??=');
+	});
+
+	it('resume modules leave component render data lazy and omit server rendering', async () => {
+		const code = await transformMdxRoute(
+			`import Meter from './Meter.tsrx';\n\n<Meter value={8} />`,
+			'/project/pages/meter.mdx?markless-resume',
+		);
+		expect(code).not.toContain('import Meter from');
+		expect(code).not.toContain('renderSsr');
+		expect(code).toContain('export async function resumeContainerEvent(input)');
+		expect(code).toContain('renderData: marklessMdxRenderData');
+		expect(code).toContain('() => Promise.all([import("./Meter.tsrx?markless-render-data")])');
+		expect(code).toContain('modules[0].marklessRenderData');
+	});
+
 	// The host reads storage seeds off the page artifact, which for an MDX route is
 	// the composed module, not the .tsrx child that declared the cell.
 	it('gathers each TSRX child storage seed onto the MDX page artifact', async () => {

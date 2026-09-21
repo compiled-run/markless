@@ -1,3 +1,4 @@
+import AnatomyTable from '../../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../../components/docs/sidebar.tsrx';
 import Preview from '../../../components/ui/preview.tsrx';
@@ -37,11 +38,7 @@ invented "Navigation" on both is two landmarks a reader cannot tell apart — wr
 
 ## Anatomy
 
-- `navbar.root` — the `<nav>` landmark. Name it yourself.
-- `navbar.item` — one top-level entry, named by its required `value`. It is the element the pointer enters and leaves.
-- `navbar.itemtrigger` — the button that shows and hides one dropdown.
-- `navbar.itemcontent` — one dropdown. It stays in the page when closed.
-- `navbar.itemlink` — a link, at the top level or inside a dropdown. The only part that can carry `aria-current="page"`.
+<AnatomyTable />
 
 It writes `ui-open`, `ui-closed` and `ui-active`.
 

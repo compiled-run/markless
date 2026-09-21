@@ -1,0 +1,356 @@
+{
+  "label": "before",
+  "errors": [],
+  "documents": [
+    "http://127.0.0.1:4488/markless/ui/select"
+  ],
+  "samples": [
+    {
+      "index": 0,
+      "route": "combobox",
+      "marks": [
+        {
+          "name": "click",
+          "at": 0
+        },
+        {
+          "name": "route-ready",
+          "at": 421.6
+        },
+        {
+          "name": "html-start",
+          "at": 807.4
+        },
+        {
+          "name": "html-end",
+          "at": 808.1
+        },
+        {
+          "name": "mount-start",
+          "at": 815
+        },
+        {
+          "name": "mount-end",
+          "at": 816.4
+        },
+        {
+          "name": "frame",
+          "at": 841.1
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "route": "select",
+      "marks": [
+        {
+          "name": "click",
+          "at": 0
+        },
+        {
+          "name": "route-ready",
+          "at": 39.9
+        },
+        {
+          "name": "html-start",
+          "at": 166.8
+        },
+        {
+          "name": "html-end",
+          "at": 167.5
+        },
+        {
+          "name": "mount-start",
+          "at": 171.4
+        },
+        {
+          "name": "mount-end",
+          "at": 172.4
+        },
+        {
+          "name": "frame",
+          "at": 172.4
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "route": "combobox",
+      "marks": [
+        {
+          "name": "click",
+          "at": 0
+        },
+        {
+          "name": "route-ready",
+          "at": 7.9
+        },
+        {
+          "name": "html-start",
+          "at": 73.2
+        },
+        {
+          "name": "html-end",
+          "at": 74.1
+        },
+        {
+          "name": "mount-start",
+          "at": 77.5
+        },
+        {
+          "name": "mount-end",
+          "at": 78.3
+        },
+        {
+          "name": "frame",
+          "at": 78.3
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "route": "select",
+      "marks": [
+        {
+          "name": "click",
+          "at": 0
+        },
+        {
+          "name": "route-ready",
+          "at": 6.4
+        },
+        {
+          "name": "html-start",
+          "at": 66.4
+        },
+        {
+          "name": "html-end",
+          "at": 67.2
+        },
+        {
+          "name": "mount-start",
+          "at": 69.9
+        },
+        {
+          "name": "mount-end",
+          "at": 70.6
+        },
+        {
+          "name": "frame",
+          "at": 70.7
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "route": "combobox",
+      "marks": [
+        {
+          "name": "click",
+          "at": 0
+        },
+        {
+          "name": "route-ready",
+          "at": 8.8
+        },
+        {
+          "name": "html-start",
+          "at": 72.6
+        },
+        {
+          "name": "html-end",
+          "at": 73.5
+        },
+        {
+          "name": "mount-start",
+          "at": 76.6
+        },
+        {
+          "name": "mount-end",
+          "at": 77.5
+        },
+        {
+          "name": "frame",
+          "at": 77.6
+        }
+      ]
+    },
+    {
+      "index": 5,
+      "route": "select",
+      "marks": [
+        {
+          "name": "click",
+          "at": 0
+        },
+        {
+          "name": "route-ready",
+          "at": 6.1
+        },
+        {
+          "name": "html-start",
+          "at": 66.9
+        },
+        {
+          "name": "html-end",
+          "at": 67.6
+        },
+        {
+          "name": "mount-start",
+          "at": 69.8
+        },
+        {
+          "name": "mount-end",
+          "at": 70.5
+        },
+        {
+          "name": "frame",
+          "at": 70.6
+        }
+      ]
+    },
+    {
+      "index": 6,
+      "route": "combobox",
+      "marks": [
+        {
+          "name": "click",
+          "at": 0
+        },
+        {
+          "name": "route-ready",
+          "at": 6.4
+        },
+        {
+          "name": "html-start",
+          "at": 69.1
+        },
+        {
+          "name": "html-end",
+          "at": 70
+        },
+        {
+          "name": "mount-start",
+          "at": 72.7
+        },
+        {
+          "name": "mount-end",
+          "at": 73.9
+        },
+        {
+          "name": "frame",
+          "at": 74
+        }
+      ]
+    },
+    {
+      "index": 7,
+      "route": "select",
+      "marks": [
+        {
+          "name": "click",
+          "at": 0
+        },
+        {
+          "name": "route-ready",
+          "at": 6
+        },
+        {
+          "name": "html-start",
+          "at": 65
+        },
+        {
+          "name": "html-end",
+          "at": 65.6
+        },
+        {
+          "name": "mount-start",
+          "at": 67.9
+        },
+        {
+          "name": "mount-end",
+          "at": 68.7
+        },
+        {
+          "name": "frame",
+          "at": 68.8
+        }
+      ]
+    },
+    {
+      "index": 8,
+      "route": "combobox",
+      "marks": [
+        {
+          "name": "click",
+          "at": 0
+        },
+        {
+          "name": "route-ready",
+          "at": 7.4
+        },
+        {
+          "name": "html-start",
+          "at": 67.7
+        },
+        {
+          "name": "html-end",
+          "at": 68.5
+        },
+        {
+          "name": "mount-start",
+          "at": 70.9
+        },
+        {
+          "name": "mount-end",
+          "at": 71.7
+        },
+        {
+          "name": "frame",
+          "at": 71.7
+        }
+      ]
+    },
+    {
+      "index": 9,
+      "route": "select",
+      "marks": [
+        {
+          "name": "click",
+          "at": 0
+        },
+        {
+          "name": "route-ready",
+          "at": 5.5
+        },
+        {
+          "name": "html-start",
+          "at": 66.9
+        },
+        {
+          "name": "html-end",
+          "at": 67.6
+        },
+        {
+          "name": "mount-start",
+          "at": 70.3
+        },
+        {
+          "name": "mount-end",
+          "at": 71.3
+        },
+        {
+          "name": "frame",
+          "at": 71.4
+        }
+      ]
+    }
+  ],
+  "startupScripts": [
+    "http://127.0.0.1:4488/markless/theme.js",
+    "http://127.0.0.1:4488/markless/mascot.js",
+    "http://127.0.0.1:4488/markless/@vite/client",
+    "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:dev-error-client",
+    "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/node_modules/.pnpm/@voidzero-dev+vite-plus-core@0.3.0_@types+node@24.12.2_jiti@2.7.0_typescript@5.9.3_yaml@2.9.0/node_modules/@voidzero-dev/vite-plus-core/dist/vite/client/env.mjs"
+  ]
+}

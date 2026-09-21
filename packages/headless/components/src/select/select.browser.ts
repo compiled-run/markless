@@ -257,7 +257,6 @@ async function expectARealClickOutsideDismissesTheList() {
 	expect(el(Value).textContent).toBe('');
 }
 
-// Without the grace window the press closes the list and the click it becomes re-opens it.
 async function expectPressingTheTriggerOfAnOpenListClosesItAndLeavesItClosed() {
 	await userEvent.click(Trigger);
 	await expect.poll(() => el<HTMLElement>(Content).hidden).toBe(false);
@@ -412,6 +411,16 @@ for (const mode of MODES) {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
 		await expectPressingTheTriggerOfAnOpenListClosesItAndLeavesItClosed();
+	});
+
+	test(`${mode}: successive trigger clicks toggle without a cooldown`, async () => {
+		if (mode === 'CSR') await render(WithOnChange);
+		else await renderSSR(WithOnChange);
+		for (let click = 0; click < 6; click++) {
+			await userEvent.click(Trigger);
+			await expect.poll(() => el<HTMLElement>(Content).hidden).toBe(click % 2 === 1);
+		}
+		expect(el(Opens).textContent).toBe('ocococ');
 	});
 
 	test(`${mode}: Escape closes the listbox without choosing and hands focus back to the trigger`, async () => {

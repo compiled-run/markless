@@ -1,0 +1,21 @@
+{
+  "extends": "../../../../../tsconfig.json",
+  "include": [
+    "document.tsrx",
+    "pages/**/*.tsrx",
+    "components/**/*.tsrx",
+    "vite.config.ts",
+    "../../../../../packages/router/src/navigation-api.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".output"
+  ],
+  "compilerOptions": {
+    "types": [
+      "node",
+      "vite/client"
+    ]
+  }
+}

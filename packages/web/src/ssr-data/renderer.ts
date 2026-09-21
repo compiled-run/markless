@@ -118,6 +118,7 @@ export type SsrRenderData = {
 	readonly repeats: ReadonlyArray<{
 		readonly repeatId: string;
 		readonly collectionGraphNodeId?: string;
+		readonly collectionSource?: string;
 		readonly collectionPath?: ReadonlyArray<string>;
 		readonly keyPath?: ReadonlyArray<string>;
 		// Set only for `key row`: read the item itself as the key.
@@ -659,7 +660,9 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 									graphNodeId: record.collectionGraphNodeId,
 									path: record.collectionPath ?? [],
 								}, context)
-							: [],
+							: record?.collectionSource
+								? input.read({ kind: 'authored-expression', source: record.collectionSource }, context)
+								: [],
 					(items): Awaitable<RenderedPart> => {
 						if (!Array.isArray(items) || items.length === 0)
 							return slot.emptyTemplateId ? renderChunk(slot.emptyTemplateId, {}) : { html: '', tokens: [] };

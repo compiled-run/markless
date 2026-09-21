@@ -1,0 +1,10 @@
+import { createServer } from 'vite';
+import { resolve } from 'node:path';
+import { mkdirSync, writeFileSync } from 'node:fs';
+const root = resolve('scripts/experiments/jev/advanced/app');
+const server = await createServer({ root, configFile: resolve(root, 'vite.config.ts'), server: { host: '127.0.0.1', port: 4391, strictPort: true, watch: null } });
+await server.listen();
+mkdirSync('/tmp/jev-advanced', { recursive: true });
+writeFileSync('/tmp/jev-advanced/server.json', JSON.stringify({ url: server.resolvedUrls.local[0], pid: process.pid }));
+server.printUrls();
+for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, async () => { await server.close(); process.exit(0); });

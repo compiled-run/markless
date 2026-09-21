@@ -1,3 +1,4 @@
+import AnatomyTable from '../../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../../components/docs/sidebar.tsrx';
 import Preview from '../../../components/ui/preview.tsrx';
@@ -39,13 +40,7 @@ it is the one prop that turns `value` into a union and doubles the keyboard tabl
 
 ## Anatomy
 
-- `select.root` — holds the configuration. It renders no role of its own.
-- `select.label` — names the trigger and the listbox.
-- `select.trigger` — the button that opens the popup.
-- `select.content` — the listbox.
-- `select.item` — one option, named by its required `value`.
-- `select.itemlabel` and `select.itemindicator` — that option's parts.
-- `select.field` — the hidden native `<select>` that carries the choice into a form.
+<AnatomyTable />
 
 It writes `ui-open`, `ui-closed`, `ui-selected`, `ui-hidden`, `ui-required` and `ui-disabled`.
 

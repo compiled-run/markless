@@ -373,10 +373,6 @@ try {
 		);
 		await page.screenshot({ path: `${shotsDir}/T004-state-after.png`, fullPage: true });
 
-		// --- every page in the nav: 200, an h1, a head of its own, a screenshot -
-		// Nineteen identical titles are nineteen pages a reader, a bookmark and a
-		// search result cannot tell apart, so the title and the description are
-		// asserted per page and then asserted to be all different.
 		const heads: { href: string; title: string; description: string }[] = [];
 		for (const section of nav) {
 			for (const entry of section.entries) {
@@ -384,13 +380,19 @@ try {
 				check(response.status === 200, `GET ${entry.href}`, String(response.status));
 				const html = await response.text();
 				check(/<h1[^>]*>[^<]/.test(html), `${entry.href} serves an h1`);
-				check(
-					html.includes('class="page-meta"'),
-					`${entry.href} carries its level, reading time and prerequisite line`,
-				);
-				const title = html.match(/<title>([^<]*)<\/title>/)?.[1] ?? '';
-				const description =
-					html.match(/<meta name="description" content="([^"]*)"/)?.[1] ?? '';
+				const parsed = await page.evaluate((source) => {
+					const document = new DOMParser().parseFromString(source, 'text/html');
+					return {
+						title: document.title,
+						description:
+							document
+								.querySelector('meta[name="description"]')
+								?.getAttribute('content') ?? '',
+						meta: document.querySelector('.page-meta') !== null,
+					};
+				}, html);
+				check(parsed.meta, `${entry.href} serves its page information`);
+				const { title, description } = parsed;
 				const wanted = headFor(entry.href);
 				check(title === wanted.title, `${entry.href} serves its own <title>`, title);
 				check(
@@ -419,6 +421,17 @@ try {
 				);
 				heads.push({ href: entry.href, title, description });
 				await page.goto(`${origin}${entry.href}`, { waitUntil: 'load' });
+				const meta = page.locator('.page-meta');
+				const metaText = await meta.innerText();
+				const readingTime = await meta.locator(':scope > span').nth(3).innerText();
+				check(
+					(await meta.isVisible()) &&
+						(await meta.locator('.page-meta-level').innerText()).trim().length > 0 &&
+						/(?:\d+\s*(?:min|hour)|\bbreak\b)/i.test(readingTime) &&
+						/Assumes:\s*\S/.test(metaText),
+					`${entry.href} renders readable level, reading time and prerequisites`,
+					metaText.replace(/\s+/g, ' '),
+				);
 				const heading = ((await page.locator('h1').first().textContent()) ?? '').trim();
 				check(heading.length > 0, `${entry.href} renders its h1 in the browser`, heading);
 				await page.screenshot({
@@ -909,7 +922,13 @@ try {
 					const visible = images.filter(
 						(image) => getComputedStyle(image).display !== 'none',
 					);
-					return { count: images.length, visible: visible.length, image: visible[0] };
+					return {
+						href: link.getAttribute('href'),
+						sources: images.map((image) => image.getAttribute('src')),
+						count: images.length,
+						visible: visible.length,
+						image: visible[0],
+					};
 				});
 				await Promise.all(
 					shown.map((entry) =>
@@ -920,13 +939,35 @@ try {
 				);
 				return {
 					links: links.length,
+					entries: shown.map((entry) => ({ href: entry.href, sources: entry.sources })),
 					pairs: shown.filter((entry) => entry.count === 2).length,
 					oneVisible: shown.filter((entry) => entry.visible === 1).length,
 					loaded: shown.filter((entry) => (entry.image?.naturalWidth ?? 0) > 0).length,
 					sources: shown.map((entry) => entry.image?.getAttribute('src') ?? ''),
 				};
 			});
-			check(icons.links === 19, 'the sidebar lists every page', String(icons.links));
+			const expected = nav.flatMap((section) => section.entries);
+			check(
+				icons.links === expected.length &&
+					new Set(icons.entries.map((entry) => entry.href)).size === expected.length &&
+					expected.every((entry) =>
+						icons.entries.some((actual) => actual.href === entry.href),
+					),
+				'the sidebar contains each navigation destination exactly once',
+				String(icons.links),
+			);
+			for (const entry of expected) {
+				const actual = icons.entries.find((actual) => actual.href === entry.href);
+				const cuts = ['light', 'dark'].map((cut) =>
+					entry.icon
+						? `/markless/sidebar/${entry.icon}-${cut}.png`
+						: `/markless/sprites/${entry.sprite ?? 'sparkle'}${cut === 'dark' ? '.dark' : ''}.png`,
+				);
+				check(
+					cuts.every((src) => actual?.sources.includes(src)),
+					`${entry.href} carries the navigation data's paired assets`,
+				);
+			}
 			check(
 				icons.pairs === icons.links,
 				'every sidebar entry carries both cuts of its icon',
@@ -943,12 +984,14 @@ try {
 				`${icons.loaded} decoded — e.g. ${icons.sources[0]}`,
 			);
 			check(
-				icons.sources.filter(
-					(source) => source.includes(`/sidebar/`) && source.endsWith(`-${theme}.png`),
-				).length ===
-					icons.links - 1,
-				`the ${theme} theme asks for the ${theme} cut of eighteen sheet icons and one doodle`,
-				icons.sources[1] ?? '',
+				expected.every(
+					(entry, index) =>
+						icons.sources[index] ===
+						(entry.icon
+							? `/markless/sidebar/${entry.icon}-${theme}.png`
+							: `/markless/sprites/${entry.sprite ?? 'sparkle'}${theme === 'dark' ? '.dark' : ''}.png`),
+				),
+				`the ${theme} theme selects the matching navigation asset`,
 			);
 			const rail = page.locator('nav.sidebar');
 			await rail.screenshot({ path: `${shotsDir}/T034-sidebar-${theme}.png` });
@@ -1035,7 +1078,7 @@ try {
 							// is the content-visibility skip that decides whether a reader
 							// can see it.
 							navLinksShown: (() => {
-								const list = document.querySelector('.sidebar-list');
+								const list = document.querySelector('.page-tree');
 								return Boolean(
 									list &&
 									list.checkVisibility({
@@ -1094,7 +1137,7 @@ try {
 						check(chrome.railVisible, `${at}: the On this page rail is shown`);
 						check(
 							chrome.navLinksShown && !chrome.navSummaryShown,
-							`${at}: the whole nav is open beside the prose, with no disclosure to press`,
+							`${at}: the page tree is visible beside the prose without the mobile disclosure`,
 							`links shown: ${chrome.navLinksShown}, summary shown: ${chrome.navSummaryShown}`,
 						);
 						check(
@@ -1127,7 +1170,7 @@ try {
 						);
 						check(
 							!chrome.navLinksShown,
-							`${at}: the nineteen nav links are collapsed, not stacked above the article`,
+							`${at}: the page tree starts collapsed above the article`,
 						);
 						check(
 							chrome.navSummaryShown,
@@ -1157,6 +1200,31 @@ try {
 						check(
 							chrome.railVisible,
 							`${at}: the in-page outline is still offered, inline`,
+						);
+					}
+
+					if (width === 390) await page.locator('.sidebar-summary').click();
+					const currentLink = page.locator(`.page-tree a[href="${href}"]`);
+					check(
+						await currentLink.isVisible(),
+						`${at}: the current destination is reachable in the open navigation`,
+					);
+					for (const branch of await page.locator('.page-tree .branch').all()) {
+						const firstLink = branch.locator('a').first();
+						if (!(await firstLink.isVisible())) {
+							await branch.locator('.branch-trigger').click();
+							await firstLink.waitFor({ state: 'visible' });
+							check(
+								await firstLink.isVisible(),
+								`${at}: activating a collapsed branch exposes its destination`,
+							);
+						}
+					}
+					if (width === 390) {
+						await page.locator('.sidebar-summary').click();
+						check(
+							!(await currentLink.isVisible()),
+							`${at}: mobile navigation closes again`,
 						);
 					}
 
@@ -1724,11 +1792,43 @@ try {
 			),
 			'how-it-works quotes the vanilla-JS floor paragraph',
 		);
+		const comparison = page
+			.locator('.collapsible')
+			.filter({ has: page.getByRole('button', { name: 'Coming from another framework?' }) });
+		const comparisonTrigger = comparison.getByRole('button', {
+			name: 'Coming from another framework?',
+		});
+		const comparisonText = comparison.locator('p');
+		check(
+			(await comparisonTrigger.getAttribute('aria-expanded')) === 'false' &&
+				!(await comparisonText.isVisible()),
+			'the framework comparison starts closed with its text hidden',
+		);
+		await comparisonTrigger.click();
+		await comparisonText.waitFor({ state: 'visible' });
+		check(
+			(await comparisonTrigger.getAttribute('aria-expanded')) === 'true' &&
+				/virtual DOM/i.test(await comparisonText.innerText()),
+			'opening the comparison exposes its actual text',
+		);
+		await comparisonTrigger.click();
+		await comparisonText.waitFor({ state: 'hidden' });
+		check(
+			(await comparisonTrigger.getAttribute('aria-expanded')) === 'false' &&
+				!(await comparisonText.isVisible()),
+			'closing the comparison hides its text again',
+		);
 		const virtualDomOutsideCollapsible = await page.evaluate(() => {
 			const prose = document.querySelector('.prose');
 			if (!prose) return true;
 			const clone = prose.cloneNode(true) as HTMLElement;
-			for (const details of clone.querySelectorAll('details')) details.remove();
+			for (const comparison of clone.querySelectorAll('.collapsible')) {
+				if (
+					comparison.querySelector('.collapsible-trigger')?.textContent?.trim() ===
+					'Coming from another framework?'
+				)
+					comparison.remove();
+			}
 			return /virtual DOM/i.test(clone.textContent ?? '');
 		});
 		check(
@@ -1763,69 +1863,40 @@ try {
 			check(referenceText.includes(code), `the reference diagnostics table carries ${code}`);
 		}
 
-		// --- the like heart under the rail -------------------------------------
-		// The pop, the burst and the "+1" are pressed-state transitions, so what
-		// proves the "+1" arrives is that it is painted while the button is held.
 		await page.goto(`${origin}/markless/concepts/state`, { waitUntil: 'load' });
-		const heartButton = page.locator('.like-heart-button');
-		const heartCount = page.locator('.like-heart-count');
-		await heartButton.waitFor();
+		const mugButton = page.getByRole('button', { name: 'Say hello to the mug' });
+		const mug = page.locator('[data-docs-mug]');
+		await mugButton.waitFor();
 		check(
-			((await heartCount.textContent()) ?? '').trim() === '0',
-			'the like heart opens on nought likes',
-			((await heartCount.textContent()) ?? '').trim(),
+			(await page.getByRole('button', { name: 'Like this page', exact: true }).count()) ===
+				0 &&
+				(await page
+					.locator('.like-heart-count,.thanks,.bean-flight,.coffee-bean')
+					.count()) === 0,
+			'the standalone mug has no like UI or flying beans',
 		);
-		const plusOpacity = () =>
-			page
-				.locator('.like-heart-plus')
-				.evaluate((node) => Number(getComputedStyle(node as Element).opacity));
+		await page.mouse.move(300, 200);
+		await page.waitForTimeout(150);
 		check(
-			(await plusOpacity()) === 0,
-			'the +1 is not painted before the press',
-			String(await plusOpacity()),
+			(await mug.getAttribute('style'))?.includes('--gaze-x') === true,
+			'the mug follows movement before activation',
 		);
-		await heartButton.scrollIntoViewIfNeeded();
-		await heartButton.hover();
-		const heartBox = (await heartButton.boundingBox())!;
-		await page.mouse.move(heartBox.x + heartBox.width / 2, heartBox.y + heartBox.height / 2);
-		await page.mouse.down();
-		await page.waitForTimeout(60);
-		const pressedPlus = await plusOpacity();
-		const pressedBurst = await page
-			.locator('.like-burst-piece-1')
-			.evaluate((node) => Number(getComputedStyle(node as Element).opacity));
-		await page.mouse.up();
-		// The burst is only in the air on the way out, so the shot is of the
-		// release rather than the press.
-		await page.waitForTimeout(180);
-		await page.screenshot({ path: `${shotsDir}/T024-heart.png`, fullPage: false });
-		check(pressedPlus > 0.5, 'the +1 is painted under the press', String(pressedPlus));
-		check(
-			pressedBurst > 0.5,
-			'the burst doodles are painted under the press',
-			String(pressedBurst),
-		);
-		await settleText(
-			heartCount,
-			(text) => text === '1',
-			'the like heart counts the first click',
-		);
-		check(
-			((await heartCount.textContent()) ?? '').trim() === '1',
-			'clicking the heart adds a like',
-			((await heartCount.textContent()) ?? '').trim(),
-		);
-		await heartButton.click();
-		await settleText(
-			heartCount,
-			(text) => text === '2',
-			'the like heart counts a second click',
-		);
-		check(
-			((await heartCount.textContent()) ?? '').trim() === '2',
-			'the likes keep adding on repeat clicks',
-			((await heartCount.textContent()) ?? '').trim(),
-		);
+		for (const activation of ['mouse', 'Enter', 'Space']) {
+			if (activation === 'mouse') await mugButton.click();
+			else {
+				await mugButton.focus();
+				await page.keyboard.press(activation);
+			}
+			await page.waitForTimeout(50);
+			const response = await page.locator('.greeting-eyes').evaluate((node) => {
+				const animation = node.getAnimations()[0];
+				animation?.pause();
+				if (animation) animation.currentTime = 100;
+				return new DOMMatrix(getComputedStyle(node).transform).d;
+			});
+			check(response < 0.9, `${activation} greeting produces a visible blink`);
+		}
+		await page.screenshot({ path: `${shotsDir}/mug-greeting.png`, fullPage: false });
 
 		// --- the stickers are on the pages that ask for them --------------------
 		await page.goto(`${origin}/markless`, { waitUntil: 'load' });

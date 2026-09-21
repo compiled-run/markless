@@ -104,3 +104,133 @@ export function App() @{
 }`),
 	).rejects.toThrow(/MARKLESS_COMPONENT_BARREL_UNRESOLVED.*missing-part\.tsrx/s);
 });
+
+test.each([
+	[
+		'namespace',
+		`import * as ui from './throwing-barrel.ts';`,
+		'<ui.controls.checkbox.root checked={true} />',
+		'CheckboxRoot',
+	],
+	[
+		'alias',
+		`import { Notice as Message } from './throwing-barrel.ts';`,
+		'<Message label="Ready" />',
+		'StatusBadge',
+	],
+])(
+	'proven %s barrel components bypass delegate execution for route and reached requests',
+	async (_name, imported, markup, declared) => {
+		for (const query of [
+			'?markless-route',
+			'?markless-render-data&markless-reached-from=' + encodeURIComponent(appFilename),
+		]) {
+			const importModule = vi.fn(async () => {
+				throw new Error('MARKLESS_DEV_MODULE_RUNNER_UNAVAILABLE: ssr');
+			});
+			const plugin = marklessClient({
+				dev: true,
+				devServer: { importModule, transformRequest: vi.fn(async () => null) },
+			});
+			callBuildStart(plugin, { cwd: fixtures });
+			const resolveId = fileResolve();
+			for (const child of children)
+				await callTransform(
+					plugin,
+					readFileSync(`${fixtures}/${child}`, 'utf8'),
+					`${fixtures}/${child}`,
+					{ resolve: resolveId },
+				);
+			const warn = vi.fn();
+			const addWatchFile = vi.fn();
+			const result = await callTransform(
+				plugin,
+				`${imported}\nexport function App() @{\n<main>${markup}</main>\n}`,
+				appFilename + query,
+				{ resolve: resolveId, warn, addWatchFile },
+			);
+			expect(importModule).not.toHaveBeenCalled();
+			expect(addWatchFile).toHaveBeenCalledWith(`${fixtures}/throwing-barrel.ts`);
+			expect(warn).not.toHaveBeenCalled();
+			if (query.includes('markless-render-data')) {
+				expect(result.code).toContain(declared);
+				expect(result.code).not.toContain('throwing-barrel.ts');
+			}
+		}
+	},
+);
+
+test('a mixed barrel retains genuine delegate rendering beside a compiled component', async () => {
+	const importModule = vi.fn(async () => ({
+		ExternalFrame: {
+			renderSsr: () => ({ html: '<aside>External frame</aside>', elementCount: 1 }),
+		},
+	}));
+	const plugin = marklessClient({
+		dev: true,
+		devServer: { importModule, transformRequest: vi.fn(async () => null) },
+	});
+	callBuildStart(plugin, { cwd: fixtures });
+	const resolveId = fileResolve();
+	const filename = `${fixtures}/status-badge.tsrx`;
+	await callTransform(plugin, readFileSync(filename, 'utf8'), filename, { resolve: resolveId });
+	const warn = vi.fn();
+	const result = await callTransform(
+		plugin,
+		`import { Notice as Caption, ExternalFrame } from './mixed-barrel.ts';
+export function App() @{
+<main><Caption label="Ready" /><ExternalFrame /></main>
+}`,
+		appFilename +
+			'?markless-render-data&markless-reached-from=' +
+			encodeURIComponent(appFilename),
+		{ resolve: resolveId, warn },
+	);
+	expect(importModule).toHaveBeenCalledExactlyOnceWith(`${fixtures}/mixed-barrel.ts`);
+	expect(result.code).toContain('External frame</aside>');
+	expect(result.code).toContain('"StatusBadge"');
+	expect(result.code).toContain('status-badge.tsrx');
+	expect(warn).not.toHaveBeenCalled();
+});
+
+test('static barrel reads are watched per importing transform including cached leaf interfaces', async () => {
+	const { linkBarrelComponentInterfaces } = await import('../src/link-driver.ts');
+	const { compileTsrxModuleLinkArtifact } = await import('@markless/compiler');
+	const leaf = `${fixtures}/checkbox/checkbox-root.tsrx`;
+	const artifact = await compileTsrxModuleLinkArtifact({
+		filename: leaf,
+		moduleId: 'checkbox/checkbox-root.tsrx',
+		source: readFileSync(leaf, 'utf8'),
+	});
+	const artifacts = new Map([[leaf, artifact]]);
+	const addWatchFile = vi.fn();
+	const context = { resolve: fileResolve(), addWatchFile };
+	const result = await linkBarrelComponentInterfaces(
+		context,
+		appFilename,
+		[{ source: './throwing-barrel.ts' }],
+		artifacts,
+		undefined,
+		fixtures,
+	);
+	expect(result.children.some((child) => child.source === leaf)).toBe(true);
+	for (const dependency of [
+		'throwing-barrel.ts',
+		'ui.ts',
+		'checkbox/index.ts',
+		'checkbox/checkbox-root.tsrx',
+	])
+		expect(addWatchFile).toHaveBeenCalledWith(`${fixtures}/${dependency}`);
+	addWatchFile.mockClear();
+	await linkBarrelComponentInterfaces(
+		context,
+		appFilename,
+		[{ source: './mixed-barrel.ts' }],
+		artifacts,
+		undefined,
+		fixtures,
+	);
+	expect(addWatchFile).toHaveBeenCalledWith(`${fixtures}/mixed-barrel.ts`);
+	expect(addWatchFile).not.toHaveBeenCalledWith(`${fixtures}/throwing-barrel.ts`);
+	expect(addWatchFile).not.toHaveBeenCalledWith(leaf);
+});

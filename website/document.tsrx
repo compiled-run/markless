@@ -14,11 +14,16 @@ export default function Document({
 	const pathname = (url?.pathname ?? '/').replace(/\/+$/, '') || '/';
 	const head = headFor(pathname);
 	const canonical = `${siteOrigin}${pathname}`;
+	const examplePage = pathname.startsWith('/markless/examples/accordion/');
+	const previewTheme = examplePage ? 'light' : undefined;
 
-	<html lang="en">
+	<html lang="en" data-theme={previewTheme} class={previewTheme}>
 		<head>
 			<meta charset="utf-8" />
 			<meta name="viewport" content="width=device-width, initial-scale=1" />
+			@if (previewTheme) {
+				<meta name="color-scheme" content="light" />;
+			}
 			<title>{head.title}</title>
 			<meta name="description" content={head.description} />
 			<link rel="canonical" href={canonical} />
@@ -33,6 +38,11 @@ export default function Document({
 			<link rel="stylesheet" href={stylesheet} />
 			<link rel="stylesheet" href={brandStylesheet} />
 			<script src="/markless/theme.js"></script>
+			<script src="/markless/mascot.js"></script>
+			<script type="module" src="/markless/outline.js"></script>
+			@if (examplePage) {
+				<script type="module" src="/markless/accordion-preview.js"></script>;
+			}
 		</head>
 		<body>
 			<style>
@@ -40,6 +50,7 @@ export default function Document({
 				.site-shell {
 					padding-inline: var(--space-s-l);
 				}
+				.example-shell { width:100%; margin:0; padding:0; }
 
 				@media (max-width: 96rem) {
 					.site-shell {
@@ -54,13 +65,19 @@ export default function Document({
 					}
 				}
 			</style>
-			<SiteHeader pathname={pathname} />
-			<div class="site-shell">
-				<main class="prose">
-					{children}
-					<Pager pathname={pathname} />
-				</main>
-			</div>
+			@if (examplePage) {
+				<main class="example-shell">{children}</main>;
+			} @else {
+				<div class="docs-shell">
+					<SiteHeader pathname={pathname} />
+					<div class="site-shell">
+						<main class="prose">
+							{children}
+							<Pager pathname={pathname} />
+						</main>
+					</div>
+				</div>;
+			}
 		</body>
-	</html>
+	</html>;
 }

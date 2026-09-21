@@ -1,4 +1,5 @@
 import { tree } from '@markless/ui';
+import { Link } from '@markless/core/router';
 import Mascot from '../mascot.tsrx';
 import ModeSelect from './mode-select.tsrx';
 import { modeFor, sidebarFor } from '../../nav.ts';
@@ -25,10 +26,10 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 			if (row.hasAttribute('data-page-href')) row.querySelector<HTMLAnchorElement>('a')?.click();
 		}}
 	>
-		<a class="site-mark" href="/markless">
+		<Link class="site-mark" href="/markless">
 			<Mascot name="markless" size="2.5rem" variant="mark" />
 			<span class="site-name">Markless</span>
-		</a>
+		</Link>
 		<ModeSelect mode={here.key} />
 		<details class="sidebar-disclosure">
 			<summary class="sidebar-summary">Browse pages</summary>
@@ -63,7 +64,7 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 											<svg class="page-connector path-line" viewBox="0 0 24 24" preserveAspectRatio="none" aria-hidden="true">
 												<path d="M12 1 V23" />
 											</svg>
-											<a
+											<Link
 												class={entry.active ? 'sidebar-link page-link is-active' : 'sidebar-link page-link'}
 												href={entry.href}
 												tabindex={-1}
@@ -84,7 +85,7 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 													/>
 												</span>
 												<tree.itemlabel class="sidebar-text">{entry.title}</tree.itemlabel>
-											</a>
+											</Link>
 										</tree.item>
 									}
 								</div>

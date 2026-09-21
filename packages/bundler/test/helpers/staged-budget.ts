@@ -1,5 +1,5 @@
 import { execFile, spawn, type ChildProcess } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { promisify } from 'node:util';
@@ -53,6 +53,11 @@ export function stageReport(input: {
 	readonly anchors: Record<string, StageAnchor>;
 	readonly aggregateNote: string;
 }): string {
+	const evidence = process.env.MARKLESS_BUDGET_EVIDENCE_DIR;
+	if (evidence) {
+		mkdirSync(evidence, { recursive: true });
+		writeFileSync(resolve(evidence, input.title.replace(/[^a-zA-Z0-9-]/g, '_') + '.json'), JSON.stringify(input, null, 2));
+	}
 	const lines = input.budget.stages.map((stage) => {
 		const anchor = input.anchors[stage.stage];
 		return `  ${stage.stage}: ${stage.gzipBytes} gzip bytes across ${stage.chunks.length} chunks (anchor ${anchor?.gzipBytes ?? '-'} +${anchor?.margin ?? '-'}) - ${stage.what}`;
@@ -224,7 +229,13 @@ export async function renderServedPage(demo: string): Promise<string> {
 	server.stderr?.on('data', collect);
 	try {
 		const response = await servedPageResponse(server, port, () => output);
-		return await response.text();
+		const html = await response.text();
+		const evidence = process.env.MARKLESS_BUDGET_EVIDENCE_DIR;
+		if (evidence) {
+			mkdirSync(evidence, { recursive: true });
+			writeFileSync(resolve(evidence, 'served-ssr.html'), html);
+		}
+		return html;
 	} finally {
 		server.kill('SIGKILL');
 	}

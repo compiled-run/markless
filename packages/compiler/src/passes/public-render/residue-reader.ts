@@ -1,7 +1,9 @@
 import { parseModule } from '../../js-ast.ts';
+import { createResidueDependencyReader, residueReferences } from './residue-dependencies.ts';
 import { COUNT_VALUE_PARAMETER } from '../semantic-graph/roster-count.ts';
 import type { PublicRenderModuleInput, SemanticMarkupResidue } from '../../artifacts.ts';
-import type { AnyNode } from '../../ast/nodes.ts';
+import { asNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
+import { expressionSource } from '../../ast/source.ts';
 import { sharedInstanceVisibleFrom } from '../semantic-graph/collect-shared.ts';
 import {
 	componentEdgesFor,
@@ -98,8 +100,22 @@ export function renderDecisionSources(
 		),
 	);
 	const sources = new Set<string>();
+	const repeatIds = new Set(
+		chunks.flatMap((chunk) =>
+			chunk.slots.flatMap((slot) => (slot.kind === 'repeat' ? [slot.repeatId] : [])),
+		),
+	);
+	for (const repeat of input.renderData.repeats)
+		if (repeatIds.has(repeat.repeatId) && repeat.collectionSource)
+			sources.add(repeat.collectionSource);
+	for (const source of Object.values(componentInitializerResidues(input, componentName)))
+		sources.add(source);
 	for (const branch of input.renderData.branches)
-		if (branchIds.has(branch.branchSiteId) && branch.testReads.length !== 1 && branch.testSource)
+		if (
+			branchIds.has(branch.branchSiteId) &&
+			branch.testReads.length !== 1 &&
+			branch.testSource
+		)
 			sources.add(branch.testSource);
 	for (const edge of componentEdgesFor(input, componentName))
 		for (const prop of edge.props)
@@ -204,10 +220,12 @@ export function armBoundIdrefHandles(
 	for (const branch of branches)
 		for (const [armIndex, chunkId] of branch.armChunkIds.entries())
 			for (const slot of chunks.find((candidate) => candidate.id === chunkId)?.slots ?? []) {
-				if (slot.kind !== 'attribute' || slot.residue.kind !== 'element-handle-id') continue;
+				if (slot.kind !== 'attribute' || slot.residue.kind !== 'element-handle-id')
+					continue;
 				const handleGraphNodeId = slot.residue.handleGraphNodeId;
 				if (slot.residue.idref === true || !named.has(handleGraphNodeId)) continue;
-				if (entries.some((entry) => entry.handleGraphNodeId === handleGraphNodeId)) continue;
+				if (entries.some((entry) => entry.handleGraphNodeId === handleGraphNodeId))
+					continue;
 				entries.push({ handleGraphNodeId, branchSiteId: branch.branchSiteId, armIndex });
 			}
 	return entries;
@@ -286,8 +304,7 @@ export function elementHandleIdReadCase(input: {
 
 /** Whether a chunk set writes any IDREF list, so its reader needs the branch. */
 export function hasElementHandleIdList(chunks: RenderChunks): boolean {
-	const isList = (residue: SemanticMarkupResidue) =>
-		residue.kind === 'element-handle-id-list';
+	const isList = (residue: SemanticMarkupResidue) => residue.kind === 'element-handle-id-list';
 	return chunks.some((chunk) =>
 		chunk.slots.some(
 			(slot) =>
@@ -416,6 +433,99 @@ export function sharedInstanceReadGraphNodeIds(
 }
 
 const CONTEXT = 'marklessResidueContext';
+const initializerResidueCache = new WeakMap<
+	PublicRenderModuleInput,
+	Map<string, Record<string, string>>
+>();
+
+export function componentInitializerResidues(
+	input: PublicRenderModuleInput,
+	componentName: string,
+): Record<string, string> {
+	let cache = initializerResidueCache.get(input);
+	if (!cache) initializerResidueCache.set(input, (cache = new Map()));
+	const held = cache.get(componentName);
+	if (held) return held;
+	const ast = componentAstsForResidueReaders(input.source.source, input.source.filename).get(
+		componentName,
+	);
+	const readDependencies = createResidueDependencyReader();
+	const residues = Object.fromEntries(
+		input.symbolResolver.symbols.flatMap((symbol) => {
+			if (symbol.kind !== 'state-initializer') return [];
+			const binding = input.semanticGraph.graphBindings.find(
+				(binding) =>
+					binding.id === symbol.graphNodeId &&
+					binding.name === symbol.name &&
+					binding.initializerSource === symbol.source &&
+					binding.componentName === componentName,
+			);
+			if (!binding) return [];
+			return componentResidueLocals(input, ast, [symbol.source], readDependencies)
+				.declarations.length
+				? [[symbol.id, symbol.source]]
+				: [];
+		}),
+	);
+	cache.set(componentName, residues);
+	return residues;
+}
+
+function componentResidueLocals(
+	input: PublicRenderModuleInput,
+	componentAst: AnyNode | undefined,
+	sources: ReadonlyArray<string>,
+	readDependencies: ReturnType<typeof createResidueDependencyReader>,
+) {
+	const dependencies = sources.map((source) => readDependencies(source, 'expression'));
+	const reads = (name: string) => dependencies.some((entry) => residueReferences(entry, name));
+	const componentName = getIdentifierName(componentAst?.id as AnyNode | undefined);
+	const graphNames = new Set(
+		input.semanticGraph.graphBindings
+			.filter((binding) => binding.componentName === componentName || !binding.componentName)
+			.map((binding) => binding.name),
+	);
+	const sharedNames = new Set(
+		input.semanticGraph.sharedInstances
+			?.filter((instance) => sharedInstanceVisibleFrom(instance, componentName))
+			.map((instance) => instance.localName),
+	);
+	const candidates = asNodes((componentAst?.body as AnyNode | undefined)?.body).flatMap(
+		(statement) => {
+			if (statement.type !== 'VariableDeclaration' || statement.kind !== 'const') return [];
+			return asNodes(statement.declarations).flatMap((declaration) => {
+				const name = getIdentifierName(declaration.id as AnyNode | undefined);
+				const init = declaration.init as AnyNode | undefined;
+				return name && init && !graphNames.has(name) && !sharedNames.has(name)
+					? [{ name, source: expressionSource(init, input.source.source) }]
+					: [];
+			});
+		},
+	);
+	const needed = new Set<string>();
+	let changed = true;
+	while (changed) {
+		changed = false;
+		for (const declaration of candidates) {
+			if (needed.has(declaration.name) || !reads(declaration.name)) continue;
+			needed.add(declaration.name);
+			dependencies.push(readDependencies(declaration.source, 'expression'));
+			changed = true;
+		}
+	}
+	const declarations = candidates.filter((declaration) => needed.has(declaration.name));
+	return {
+		declarations,
+		reads,
+		text: [...sources, ...declarations.map((declaration) => declaration.source)].join('\n'),
+		boundNames: new Set([
+			...graphNames,
+			...sharedNames,
+			...componentPropNames(componentAst),
+			...candidates.map((declaration) => declaration.name),
+		]),
+	};
+}
 
 // The client reader is the same compiled switch the server module emits; only
 // its prelude differs, because the browser has no render body to stand in for
@@ -437,24 +547,25 @@ export function emitClientResidueReader(
 	];
 	const handles = elementHandleIdSources(componentChunks);
 	if (sources.length === 0 && handles.length === 0) return null;
-	const text = sources.join('\n');
+	const readDependencies = createResidueDependencyReader();
+	const {
+		declarations: locals,
+		text,
+		reads,
+	} = componentResidueLocals(input, componentAst, sources, readDependencies);
 	const bound = new Set<string>();
 	const lines: string[] = [];
 	for (const repeat of input.semanticGraph.keyedRepeats) {
-		if (references(text, repeat.itemName) && !bound.has(repeat.itemName)) {
+		if (reads(repeat.itemName) && !bound.has(repeat.itemName)) {
 			bound.add(repeat.itemName);
 			lines.push(`const ${repeat.itemName}=${CONTEXT}.repeatItem;`);
 		}
-		if (
-			repeat.indexName &&
-			references(text, repeat.indexName) &&
-			!bound.has(repeat.indexName)
-		) {
+		if (repeat.indexName && reads(repeat.indexName) && !bound.has(repeat.indexName)) {
 			bound.add(repeat.indexName);
 			lines.push(`const ${repeat.indexName}=${CONTEXT}.repeatIndex;`);
 		}
 	}
-	if (references(text, 'error') && !bound.has('error')) {
+	if (reads('error') && !bound.has('error')) {
 		bound.add('error');
 		lines.push(`const error=${CONTEXT}.asyncError;`);
 	}
@@ -462,12 +573,12 @@ export function emitClientResidueReader(
 		const owned =
 			binding.componentName === componentName ||
 			(!binding.componentName && componentName === rootComponentName);
-		if (!owned || bound.has(binding.name) || !references(text, binding.name)) continue;
+		if (!owned || bound.has(binding.name) || !reads(binding.name)) continue;
 		bound.add(binding.name);
 		lines.push(`const ${binding.name}=${CONTEXT}.read(${JSON.stringify(binding.id)});`);
 	}
 	for (const propName of componentPropNames(componentAst)) {
-		if (bound.has(propName) || !references(text, propName)) continue;
+		if (bound.has(propName) || !reads(propName)) continue;
 		bound.add(propName);
 		lines.push(`const ${propName}=${CONTEXT}.read(${JSON.stringify(`prop:${propName}`)});`);
 	}
@@ -481,6 +592,12 @@ export function emitClientResidueReader(
 				`${CONTEXT}.read(${JSON.stringify(graphNodeId)}, ${JSON.stringify(path)})`,
 		),
 	);
+	if (locals.length > 0) {
+		lines.push(`let marklessLocalValues=marklessLocalCache.get(${CONTEXT}.read);`);
+		lines.push(
+			`if(!marklessLocalValues){marklessLocalValues=new Map();marklessLocalCache.set(${CONTEXT}.read,marklessLocalValues);}`,
+		);
+	}
 	// The browser has no render body, so only a test the graph answers on its own
 	// can decide an arm here; any other keeps the roster's answer.
 	const armBoundRead = armBoundHandleReadSource(
@@ -515,6 +632,7 @@ export function emitClientResidueReader(
 				})
 			: '';
 	return [
+		...(locals.length ? ['(()=>{const marklessLocalCache=new WeakMap();return '] : []),
 		`(residue,${CONTEXT})=>{`,
 		mintCase,
 		lines.join(''),
@@ -529,8 +647,26 @@ export function emitClientResidueReader(
 				componentName,
 				`(${CONTEXT}.deferCount??((marklessThunk)=>marklessThunk((marklessHeld)=>{if(typeof marklessHeld!=='number')throw new Error('MARKLESS_ROSTER_COUNT_UNRESOLVED');return marklessHeld;})))`,
 			),
-		).join(''),
+		)
+			.map((entry, index) => {
+				const needed = componentResidueLocals(
+					input,
+					componentAst,
+					[sources[index]!],
+					readDependencies,
+				).declarations;
+				if (!needed.length) return entry;
+				const declarations = needed
+					.map(
+						(local) =>
+							`const ${local.name}=marklessLocalValues.has(${JSON.stringify(local.name)})?marklessLocalValues.get(${JSON.stringify(local.name)}):marklessLocalValues.set(${JSON.stringify(local.name)},(${local.source})).get(${JSON.stringify(local.name)});`,
+					)
+					.join('');
+				return entry.replace(':return ', `:{${declarations}return `) + '}';
+			})
+			.join(''),
 		`default:throw new Error('MARKLESS_PRERENDER_RESIDUE_MISSING: '+residue.source);}}`,
+		...(locals.length ? [';})()'] : []),
 	].join('');
 }
 
@@ -544,13 +680,27 @@ export function emitClientResidueReaderPrelude(
 	readonly imports: ReadonlyArray<{ readonly source: string; readonly line: string }>;
 	readonly declarations: ReadonlyArray<string>;
 } {
-	const sources = componentNames.flatMap((componentName) => [
-		...authoredResidueSources(
-			input.renderData.chunks.filter((chunk) => chunk.componentName === componentName),
-		),
-		...renderDecisionSources(input, componentName),
-	]);
-	if (sources.length === 0) return { imports: [], declarations: [] };
+	const componentAsts = componentAstsForResidueReaders(
+		input.source.source,
+		input.source.filename,
+	);
+	const readDependencies = createResidueDependencyReader();
+	const componentReads = componentNames.map((componentName) => {
+		const chunks = input.renderData.chunks.filter(
+			(chunk) => chunk.componentName === componentName,
+		);
+		const sources = [
+			...authoredResidueSources(chunks),
+			...renderDecisionSources(input, componentName),
+		];
+		const locals = componentResidueLocals(
+			input,
+			componentAsts.get(componentName),
+			sources,
+			readDependencies,
+		);
+		return (name: string) => !locals.boundNames.has(name) && locals.reads(name);
+	});
 	const declarations = moduleScopeDeclarations(input.source.source, input.source.filename);
 	const moduleImports = publicRenderValueImports(
 		input.semanticGraph.moduleImports,
@@ -558,23 +708,23 @@ export function emitClientResidueReaderPrelude(
 	).filter((moduleImport) => moduleImport.source !== '@markless/core');
 	const kept: string[] = [];
 	const keptImports: Array<{ readonly source: string; readonly line: string }> = [];
-	let text = sources.join('\n');
+	const dependencies: ReturnType<typeof readDependencies>[] = [];
+	const reads = (name: string) =>
+		componentReads.some((read) => read(name)) ||
+		dependencies.some((entry) => residueReferences(entry, name));
 	let changed = true;
 	while (changed) {
 		changed = false;
 		for (const declaration of declarations) {
 			if (kept.includes(declaration.source)) continue;
-			if (!declaration.names.some((name) => references(text, name))) continue;
+			if (!declaration.names.some((name) => reads(name))) continue;
 			kept.push(declaration.source);
-			text += `\n${declaration.source}`;
+			dependencies.push(readDependencies(declaration.source, 'declaration'));
 			changed = true;
 		}
 		for (const moduleImport of moduleImports) {
 			const line = emitValueImport(moduleImport);
-			if (
-				keptImports.some((entry) => entry.line === line) ||
-				!references(text, moduleImport.localName)
-			)
+			if (keptImports.some((entry) => entry.line === line) || !reads(moduleImport.localName))
 				continue;
 			keptImports.push({ source: moduleImport.source, line });
 			changed = true;

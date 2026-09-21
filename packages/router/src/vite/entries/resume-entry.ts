@@ -1,4 +1,6 @@
-const mdxPageModuleLoaders = import.meta.glob('/pages/**/*.mdx');
+const mdxPageModuleLoaders = import.meta.glob('/pages/**/*.mdx', {
+	query: '?markless-resume',
+});
 const tsrxResumeModuleLoaders = import.meta.glob('/pages/**/*.tsrx', {
 	query: '?markless-resume',
 });

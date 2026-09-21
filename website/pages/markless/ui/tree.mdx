@@ -1,3 +1,4 @@
+import AnatomyTable from '../../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../../components/docs/sidebar.tsrx';
 import Preview from '../../../components/ui/preview.tsrx';
@@ -41,13 +42,7 @@ it. Name the tree with a plain `aria-label` on the root.
 
 ## Anatomy
 
-- `tree.root` — the container. It owns the tab stop and the typeahead.
-- `tree.label` — the tree's own heading. It does not name the tree.
-- `tree.item` — one node, declaring its `level` and whether it is a `leaf`.
-- `tree.itemtrigger` — the control that opens and closes one node.
-- `tree.itemlabel` — the node's name. Typeahead matches on it.
-- `tree.itemindicator` — a decorative open/closed marker, hidden from a reader.
-- `tree.itemcontent` — the container of one node's children.
+<AnatomyTable />
 
 It writes `ui-open`, `ui-closed`, `ui-leaf`, `ui-disabled` and `ui-value`.
 

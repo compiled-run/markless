@@ -3001,7 +3001,12 @@ test('renderToString selects the policy-capable resumer for a row-borne sync pol
 			html: '<section><article><h2>Alpha</h2><button>Choose</button></article></section>',
 			state: createProtocolStatePayload({
 				cells: [
-					{ graphNodeId: 'state:menu', name: 'menu', valueKind: 'object', value: { open: true } },
+					{
+						graphNodeId: 'state:menu',
+						name: 'menu',
+						valueKind: 'object',
+						value: { open: true },
+					},
 				],
 			}),
 			view: {
@@ -3032,7 +3037,11 @@ test('renderToString selects the policy-capable resumer for a row-borne sync pol
 									when: {
 										type: 'and',
 										conditions: [
-											{ type: 'graph-truthy', graphNodeId: 'state:menu', path: ['open'] },
+											{
+												type: 'graph-truthy',
+												graphNodeId: 'state:menu',
+												path: ['open'],
+											},
 											{ type: 'event-equals', field: 'button', value: 0 },
 										],
 									},

@@ -1,0 +1,10 @@
+{
+  "scriptsBeforeInteraction": [
+    "http://127.0.0.1:4488/markless/theme.js",
+    "http://127.0.0.1:4488/markless/mascot.js",
+    "http://127.0.0.1:4488/markless/@vite/client",
+    "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:dev-error-client",
+    "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/node_modules/.pnpm/@voidzero-dev+vite-plus-core@0.3.0_@types+node@24.12.2_jiti@2.7.0_typescript@5.9.3_yaml@2.9.0/node_modules/@voidzero-dev/vite-plus-core/dist/vite/client/env.mjs"
+  ],
+  "theme": "system"
+}

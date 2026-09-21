@@ -14,6 +14,7 @@ export function IntrinsicContract() @{
 	>
 		text {1} {null} {[<span>nested</span>]}
 	</div>
+	<svg opacity={0.75}><g opacity="0.5"><path opacity={1} d="M0 0" /><circle opacity="1" r={2} /></g></svg>
 	<img src="cover.jpg" alt="Cover" />
 	<input value="query" type="search" />
 	<a href="/library">Library</a>
@@ -48,7 +49,7 @@ export function IntrinsicContract() @{
 	<div
 		overlay
 		onDismiss={(event) => {
-			const reason: 'escape' | 'outside-press' = event.detail.reason;
+			const reason = event.detail.reason;
 			const concreteTarget: HTMLDivElement = event.currentTarget;
 			concreteTarget.hidden = reason === 'escape';
 		}}

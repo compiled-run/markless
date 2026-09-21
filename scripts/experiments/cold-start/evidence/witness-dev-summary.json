@@ -1,0 +1,79 @@
+{
+  "sourceReceipt": "/tmp/markless-cold-start/witness-dev/2026-09-19T18-42-13.949Z/receipt.json",
+  "sha256": "6ad5f637d880f0e634d0b0c7de50b1cb2b7e233de405bdd3b5adfb527e6cb0bc",
+  "createdAt": "2026-09-19T18:42:14.859Z",
+  "summary": {
+    "status": "passed",
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "contested": 0,
+    "invalidBoxFiles": 0
+  },
+  "boxes": [
+    {
+      "name": "ssr dev browser: server shell resumes counter click",
+      "file": "boxes/ssr-dev-browser.box.ts",
+      "status": "passed",
+      "error": null,
+      "durationMs": 907,
+      "assertions": [
+        {
+          "name": "page.text",
+          "environment": "client",
+          "editId": null,
+          "status": "passed",
+          "message": null,
+          "witness": "client"
+        },
+        {
+          "name": "page.text",
+          "environment": "client",
+          "editId": null,
+          "status": "passed",
+          "message": null,
+          "witness": "client"
+        },
+        {
+          "name": "page.text",
+          "environment": "client",
+          "editId": null,
+          "status": "passed",
+          "message": null,
+          "witness": "client"
+        },
+        {
+          "name": "page.outcome",
+          "environment": "client",
+          "editId": null,
+          "status": "passed",
+          "message": null,
+          "expected": {
+            "consoleErrors": 0,
+            "failedRequests": 0
+          },
+          "witness": "client"
+        }
+      ],
+      "summary": {
+        "status": "passed",
+        "assertions": {
+          "passed": 4,
+          "failed": 0
+        },
+        "edits": 0,
+        "builds": 0,
+        "previews": 0,
+        "pages": 1,
+        "restorationFailed": false,
+        "witnesses": {
+          "pipeline": "corroborates",
+          "client": "corroborates",
+          "driver": "corroborates",
+          "box": "corroborates"
+        },
+        "contested": false
+      }
+    }
+  ]
+}

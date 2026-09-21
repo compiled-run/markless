@@ -7,6 +7,7 @@ import type {
 } from '../src/artifacts.ts';
 import { linkCompilerPasses } from '../src/pass-registry.ts';
 import {
+	type BarrelComponentLinkInput,
 	linkBarrelComponents,
 	linkImportedModules,
 	linkedImportedClaimsMissing,
@@ -321,7 +322,6 @@ test('a child with no component edge never blocks the imported-claims seal', () 
 	expect(missing([child('edge-1')], symbolInputs([child('edge-1')]))).toBe(false);
 });
 
-
 // The barrel walk is a pass step: it resolves nothing and reads no file. Every
 // specifier it reaches comes back as a pending request the driver fills, so the
 // walk below runs the same fixpoint the driver runs.
@@ -361,7 +361,7 @@ const joinResolve = (specifier: string, importer: string): string | null => {
 
 function walkBarrels(input: {
 	readonly parent: string;
-	readonly moduleImports: ReadonlyArray<{ readonly source: string }>;
+	readonly moduleImports: BarrelComponentLinkInput['moduleImports'];
 	readonly resolve: (specifier: string, importer: string) => string | null;
 	readonly interfaces: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 }) {
@@ -378,7 +378,7 @@ function walkBarrels(input: {
 			rebase: (target) => `./${target.slice('/app/'.length)}`,
 		});
 	let artifact = call();
-	for (let round = 0; artifact.pendingResolutions.length + artifact.pendingInterfaces.length; ) {
+	for (let round = 0; artifact.pendingResolutions.length + artifact.pendingInterfaces.length;) {
 		expect(round).toBeLessThan(8);
 		round += 1;
 		for (const request of artifact.pendingResolutions) {
@@ -405,7 +405,11 @@ test('linkBarrelComponents follows an export * as chain to the .tsrx components 
 				{ exportName: 'checkbox', source: './checkbox/index.ts', importedName: '*' },
 			]),
 			'/app/checkbox/index.ts': barrelInterface('/app/checkbox/index.ts', [
-				{ exportName: 'root', source: './checkbox-root.tsrx', importedName: 'CheckboxRoot' },
+				{
+					exportName: 'root',
+					source: './checkbox-root.tsrx',
+					importedName: 'CheckboxRoot',
+				},
 				{
 					exportName: 'trigger',
 					source: './checkbox-trigger.tsrx',
@@ -482,4 +486,84 @@ test('linkBarrelComponents reports a re-export that resolves to no module', () =
 	expect(artifact.diagnostics[0]?.code).toBe('MARKLESS_COMPONENT_BARREL_UNRESOLVED');
 	expect(artifact.diagnostics[0]?.passId).toBe('module-link');
 	expect(artifact.diagnostics[0]?.message).toMatch(/missing-part\.tsrx/);
+});
+
+test.each(['disclosure', 'navigation'])(
+	'named %s imports do not resolve unrelated barrel exports',
+	(name) => {
+		const requested: string[] = [];
+		const artifact = walkBarrels({
+			parent: '/app/Consumer.tsrx',
+			moduleImports: [{ source: './library.ts', kind: 'named', importedName: name }],
+			resolve: (source, parent) => {
+				requested.push(source);
+				return joinResolve(source, parent);
+			},
+			interfaces: {
+				'/app/library.ts': barrelInterface('/app/library.ts', [
+					{ exportName: 'unused', source: './unrelated.ts', importedName: '*' },
+					{ exportName: name, source: './parts.ts', importedName: '*' },
+				]),
+				'/app/parts.ts': barrelInterface('/app/parts.ts', [
+					{ exportName: 'root', source: './Panel.tsrx', importedName: 'Panel' },
+				]),
+				'/app/Panel.tsrx': componentInterface('/app/Panel.tsrx', 'Panel', 'Panel'),
+			},
+		});
+		expect(requested).not.toContain('./unrelated.ts');
+		expect(artifact.diagnostics).toEqual([]);
+		expect(artifact.children.map((child) => child.source)).toEqual(['/app/Panel.tsrx']);
+		expect(artifact.interfaces['./library.ts']?.linkedComponents?.[0]?.exportPath).toEqual([
+			name,
+			'root',
+		]);
+	},
+);
+
+test.each([
+	{ kind: 'default' as const, expected: ['Main'] },
+	{ kind: 'namespace' as const, expected: ['Main', 'Extra'] },
+	{ kind: 'named' as const, importedName: 'extra', expected: ['Extra'] },
+	{ kind: 'named' as const, importedName: 'extra', typeOnly: true, expected: [] },
+])('barrel imports preserve $kind selection and type-only erasure', ({ expected, ...binding }) => {
+	const artifact = walkBarrels({
+		parent: '/app/Consumer.tsrx',
+		moduleImports: [{ source: './library.ts', ...binding }],
+		resolve: joinResolve,
+		interfaces: {
+			'/app/library.ts': barrelInterface('/app/library.ts', [
+				{ exportName: 'default', source: './Main.tsrx', importedName: 'Main' },
+				{ exportName: 'extra', source: './Extra.tsrx', importedName: 'Extra' },
+			]),
+			'/app/Main.tsrx': componentInterface('/app/Main.tsrx', 'Main', 'Main'),
+			'/app/Extra.tsrx': componentInterface('/app/Extra.tsrx', 'Extra', 'Extra'),
+		},
+	});
+	expect(artifact.diagnostics).toEqual([]);
+	expect(artifact.children.map((child) => child.source)).toEqual(
+		expected.map((name) => `/app/${name}.tsrx`),
+	);
+});
+
+test('separate named imports retain both component branches from one barrel', () => {
+	const artifact = walkBarrels({
+		parent: '/app/Consumer.tsrx',
+		moduleImports: [
+			{ source: './library.ts', kind: 'named', importedName: 'second' },
+			{ source: './library.ts', kind: 'named', importedName: 'first' },
+		],
+		resolve: joinResolve,
+		interfaces: {
+			'/app/library.ts': barrelInterface('/app/library.ts', [
+				{ exportName: 'first', source: './First.tsrx', importedName: 'First' },
+				{ exportName: 'second', source: './Second.tsrx', importedName: 'Second' },
+			]),
+			'/app/First.tsrx': componentInterface('/app/First.tsrx', 'First', 'First'),
+			'/app/Second.tsrx': componentInterface('/app/Second.tsrx', 'Second', 'Second'),
+		},
+	});
+	expect(artifact.diagnostics).toEqual([]);
+	expect(
+		artifact.interfaces['./library.ts']?.linkedComponents?.map((part) => part.exportPath),
+	).toEqual([['second'], ['first']]);
 });

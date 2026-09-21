@@ -1,0 +1,148 @@
+import { chromium } from 'playwright-core';
+import assert from 'node:assert/strict';
+
+const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true });
+try {
+ const page = await browser.newPage({ viewport: { width: 1440, height: 1100 } });
+ page.setDefaultTimeout(10000);
+ const errors = [];
+ page.on('pageerror', error => errors.push(error.message));
+ await page.goto((process.env.PREVIEW_URL || 'http://127.0.0.1:4324') + '/markless/ui/accordion#keyboard');
+ const study = page.locator('.keyboard-study');
+ const game = page.locator('[data-keyboard-practice]');
+ await study.evaluate(el => el.scrollIntoView({ block: 'center' }));
+ console.log('Page loaded');
+ const entry = study.getByRole('button', { name: 'Start keyboard practice (K)', exact: true });
+ assert.equal(await entry.isVisible(), true);
+ assert.equal(await study.locator('.trick-announcement').isVisible(), false);
+ assert.equal(await study.getAttribute('data-playing'), null);
+ const entrySize = await entry.boundingBox();
+ assert.ok(entrySize.width >= 80 && entrySize.height >= 80, 'The entry key must be prominent');
+ assert.equal(await study.getByRole('button', { name: /Try it/ }).count(), 0);
+ assert.equal(await study.locator('details').count(), 0);
+ await study.locator('.phone-preview').waitFor({ state: 'visible' });
+ assert.equal(await study.locator('.keyboard-actions').isVisible(), false);
+ const idleColors = await study.locator('.keyboard-layout:visible').evaluate(el => {
+  const fill = code => getComputedStyle(el.querySelector('[data-code="' + code + '"] .key-face')).fill;
+  return { start: fill('KeyK'), down: fill('ArrowDown'), normal: fill('KeyA') };
+ });
+ assert.equal(idleColors.down, idleColors.normal, 'Practice keys stay neutral before opting in');
+ assert.notEqual(idleColors.start, idleColors.normal, 'The start key is the idle accent');
+ assert.equal(await page.locator('h2#examples, h2#real-world-examples, a[href="#examples"], a[href="#real-world-examples"]').count(), 0);
+ const headingBox = await page.locator('#keyboard').boundingBox();
+ const layoutBox = await study.locator('.platform-trigger').boundingBox();
+ assert.ok(Math.abs(headingBox.y + headingBox.height / 2 - layoutBox.y - layoutBox.height / 2) < 6, 'Keyboard heading and layout select must share a row');
+ const idleShadow = await study.locator('.platform-trigger').evaluate(el => getComputedStyle(el).boxShadow);
+ const sidebarShadow = await page.locator('.mode-select-trigger').evaluate(el => getComputedStyle(el).boxShadow);
+ assert.equal(idleShadow, sidebarShadow, 'The layout select must match the sidebar select shadow');
+ const closedPreview = await study.locator('.phone-preview').boundingBox();
+ const closedStudy = await study.boundingBox();
+ await study.locator('.platform-trigger').click();
+ await study.locator('.platform-menu').waitFor({ state: 'visible' });
+ const openPreview = await study.locator('.phone-preview').boundingBox();
+ const openStudy = await study.boundingBox();
+ assert.ok(Math.abs(closedPreview.y - openPreview.y) < 1, 'Opening the layout menu must not move the phone');
+ assert.ok(Math.abs(closedStudy.height - openStudy.height) < 1, 'Opening the layout menu must not resize the section');
+ assert.match(await study.locator('.platform-menu').evaluate(el => getComputedStyle(el).position), /^(absolute|fixed)$/);
+ const triggerBox = await study.locator('.platform-trigger').boundingBox();
+ const menuBox = await study.locator('.platform-menu').boundingBox();
+ assert.ok(Math.abs(triggerBox.width - menuBox.width) < 1, 'The menu must match the trigger width');
+ const shadows = await study.evaluate(el => [getComputedStyle(el.querySelector('.platform-trigger')).boxShadow, getComputedStyle(el.querySelector('.platform-menu')).boxShadow]);
+ assert.equal(shadows[0], shadows[1], 'Trigger and menu must share the same shadow');
+ assert.notEqual(shadows[0], 'none');
+ await study.screenshot({ path: '/private/tmp/keyboard-picker-open.png' });
+ await page.keyboard.press('Escape');
+ await study.locator('.platform-menu').waitFor({ state: 'hidden' });
+ const drawing = await study.locator('.keyboard-drawing').boundingBox();
+ assert.ok(drawing.x + drawing.width <= closedPreview.x, 'The keyboard must be left of the phone preview');
+ const keysBox = await study.locator('.keyboard-layout:visible .physical-keyboard').boundingBox();
+ assert.ok(Math.abs(keysBox.y + keysBox.height / 2 - closedPreview.y - closedPreview.height / 2) < 40, 'The phone must sit beside the keyboard, not beside its heading');
+ const closedRows = await study.locator('.practice-item').evaluateAll(items => items.map(item => ({ item: item.getBoundingClientRect().height, trigger: item.querySelector('.practice-trigger').getBoundingClientRect().height })));
+ for (const row of closedRows) assert.ok(Math.abs(row.item - row.trigger - 2) < 1, 'Closed accordion items must contain only the trigger and border');
+ const pickerStyle = await study.locator('.platform-trigger').evaluate(el => { const style = getComputedStyle(el); return [style.fontFamily, style.fontSize, style.borderRadius, style.borderTopColor]; });
+ const scenarioStyle = await page.locator('.pg-bar-trigger').first().evaluate(el => { const style = getComputedStyle(el); return [style.fontFamily, style.fontSize, style.borderRadius, style.borderTopColor]; });
+ assert.deepEqual(pickerStyle, scenarioStyle, 'Layout picker styling must match the Scenario picker');
+ await page.evaluate(() => document.activeElement?.blur());
+ const beforeStart = await study.locator('.phone-preview').boundingBox();
+ await page.keyboard.press('k');
+ await page.waitForFunction(() => document.activeElement?.getAttribute('data-practice-index') === '0');
+ await page.waitForFunction(() => document.querySelector('.keyboard-study')?.hasAttribute('data-playing'));
+ assert.equal(await entry.isVisible(), false);
+ assert.equal(await study.locator('.trick-announcement').isVisible(), true);
+ const afterStart = await study.locator('.phone-preview').boundingBox();
+ assert.ok(Math.abs(beforeStart.y - afterStart.y) < 1, 'Starting practice must not shift the phone');
+ assert.equal(await study.getByText('Your turn', { exact: true }).count(), 0);
+ console.log('K activated practice');
+ await page.keyboard.press('x');
+ assert.equal(await game.getAttribute('data-challenge'), '0', 'An unrelated key must not advance practice');
+ for (const [round, command] of ['ArrowDown', 'ArrowUp', 'End', 'Enter', 'Space', 'Home'].entries()) {
+  await page.keyboard.press(command);
+  await page.waitForFunction(round => document.querySelector('[data-keyboard-practice]')?.dataset.challenge === String((round + 1) % 6), round);
+  const duringPractice = await study.locator('.phone-preview').boundingBox();
+  assert.ok(Math.abs(afterStart.y - duringPractice.y) < 1, 'Advancing automatically must not shift the phone');
+  console.log('Automatically advanced after action', round + 1);
+ }
+ await page.keyboard.press('n');
+ assert.equal(await game.getAttribute('data-challenge'), '0', 'N must not advance practice');
+ await page.keyboard.press('ArrowDown');
+ await page.waitForFunction(() => document.querySelector('[data-keyboard-practice]')?.dataset.challenge === '1');
+ await page.keyboard.press('Escape');
+ await page.waitForFunction(() => !document.activeElement?.hasAttribute('data-practice-index'));
+ await entry.waitFor({ state: 'visible' });
+ assert.equal(await study.getAttribute('data-playing'), null);
+ await entry.click();
+ await page.waitForFunction(() => document.querySelector('[data-keyboard-practice]')?.dataset.challenge === '0');
+ assert.equal(await game.getAttribute('data-challenge'), '0', 'Opting in again starts from the first action');
+ await page.waitForFunction(() => document.activeElement?.getAttribute('data-practice-index') === '0');
+ await page.keyboard.press('Escape');
+ await entry.waitFor({ state: 'visible' });
+ await page.keyboard.press('Control+k');
+ assert.equal(await page.locator('[data-practice-index]:focus').count(), 0);
+ await study.locator('.platform-trigger').click();
+ await page.getByRole('option', { name: 'Windows', exact: true }).click();
+ await page.waitForFunction(() => document.querySelector('.keyboard-study')?.dataset.platform === 'windows');
+ await study.screenshot({ path: '/private/tmp/keyboard-phone-desktop.png' });
+ for (const platform of ['Windows', 'Linux']) {
+  if (platform === 'Linux') { await study.locator('.platform-trigger').click(); await page.getByRole('option', {name: platform, exact: true}).click(); }
+  await page.waitForFunction(platform => document.querySelector('.keyboard-study')?.dataset.platform === platform.toLowerCase(), platform);
+  const overflow = await study.locator('.keyboard-layout:visible .keyboard-key').evaluateAll(keys => keys.flatMap(key => {
+   const face = key.querySelector('.key-face').getBoundingClientRect();
+   return [...key.querySelectorAll('text')].filter(text => { const box = text.getBoundingClientRect(); return box.left < face.left + 1 || box.right > face.right - 1 || box.top < face.top || box.bottom > face.bottom; }).map(() => key.getAttribute('data-code'));
+  }));
+  assert.deepEqual(overflow, [], platform + ' key labels must stay inside their keycaps');
+ }
+ await study.locator('.platform-trigger').click(); await page.getByRole('option', {name: 'Windows', exact: true}).click();
+ await page.evaluate(() => { document.activeElement?.blur(); window.scrollTo(0, 0); });
+ await page.keyboard.press('k');
+ assert.equal(await page.locator('[data-practice-index]:focus').count(), 0);
+ await page.setViewportSize({ width: 390, height: 844 });
+ await study.scrollIntoViewIfNeeded();
+ const mobileHeadingBox = await page.locator('#keyboard').boundingBox();
+ const mobileLayoutBox = await study.locator('.platform-trigger').boundingBox();
+ assert.ok(Math.abs(mobileHeadingBox.y + mobileHeadingBox.height / 2 - mobileLayoutBox.y - mobileLayoutBox.height / 2) < 6, 'Mobile heading and layout select must share a row');
+ assert.equal(await study.locator('.phone-preview').isVisible(), false);
+ assert.equal(await study.locator('.keyboard-drawing').isVisible(), false);
+ assert.equal(await study.locator('.keyboard-actions').isVisible(), true);
+ assert.match(await study.locator('.keyboard-actions').innerText(), /End/);
+ assert.equal(await study.getByRole('button', { name: /Next trick|Try it/ }).isVisible(), false);
+ const closedActions = await study.locator('.keyboard-actions').boundingBox();
+ await study.locator('.platform-trigger').click();
+ await study.locator('.platform-menu').waitFor({ state: 'visible' });
+ const openActions = await study.locator('.keyboard-actions').boundingBox();
+ const mobileTrigger = await study.locator('.platform-trigger').boundingBox();
+ const mobileMenu = await study.locator('.platform-menu').boundingBox();
+ assert.ok(Math.abs(mobileTrigger.width - mobileMenu.width) < 1, 'Mobile menu must match the trigger width');
+ assert.ok(Math.abs(closedActions.y - openActions.y) < 1, 'The mobile menu must not push shortcut rows down');
+ await page.getByRole('option', { name: 'macOS', exact: true }).click();
+ await page.waitForFunction(() => document.querySelector('.keyboard-study')?.dataset.platform === 'mac');
+ await study.screenshot({ path: '/private/tmp/keyboard-phone-mobile.png' });
+ assert.deepEqual(errors, []);
+ console.log('PASS: phone preview, K entry, six automatic steps, continuous replay, Escape, shortcut guards, mobile combinations, platform select');
+} catch (error) {
+ const page = browser.contexts()[0]?.pages()[0];
+ if (page) {
+  console.log(await page.evaluate(() => ({ focus: document.activeElement?.tagName, practice: document.querySelector('[data-keyboard-practice]')?.textContent, phone: document.querySelector('.phone-preview')?.getBoundingClientRect().toJSON(), explain: window.__MARKLESS_DEBUG__?.explainInteraction(document.querySelector('[data-keyboard-practice]'), 'keydown') })));
+  await page.locator('.keyboard-study').screenshot({ path: '/private/tmp/keyboard-phone-failure.png' });
+ }
+ throw error;
+} finally { await browser.close(); }

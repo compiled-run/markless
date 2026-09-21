@@ -1,3 +1,4 @@
+import AnatomyTable from '../../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../../components/docs/sidebar.tsrx';
 import PopoverDemo from '../../../components/demos/ui/popover/basic.tsrx';
@@ -40,12 +41,7 @@ and reflows with nothing measuring boxes.
 
 ## Anatomy
 
-- `popover.root` holds whether the surface is showing.
-- `popover.trigger` is the button that opens and closes it.
-- `popover.content` is the surface, placed against the trigger.
-- `popover.title` names the surface; mounting it is what names it.
-- `popover.description` is the sentence read out after the name.
-- `popover.close` is a button inside the surface that puts it away.
+<AnatomyTable />
 
 It writes `ui-open` and `ui-closed` as its state changes.
 

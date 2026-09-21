@@ -33,7 +33,7 @@ function resolveDependency(specifier: string, importer?: string) {
 	return undefined;
 }
 
-test('a production delegate links a dependency sibling interface before compiling its importer', async () => {
+test('a source-declared package links its component and sibling state before final composition', async () => {
 	const plugin = marklessClient({ rootDir: directory });
 	const warn = vi.fn();
 	callBuildStart(plugin, { cwd: directory });
@@ -52,7 +52,28 @@ test('a production delegate links a dependency sibling interface before compilin
 	const renderData =
 		typeof loaded === 'string' ? loaded : ((loaded as { code?: string } | null)?.code ?? '');
 
-	expect(renderData).toContain('<button data-linked-option=\\"\\">Linked option</button>');
+	const childDataId =
+		'\0virtual:markless:render-data:' +
+		encodeURIComponent(moduleIdFor(selectSource, directory));
+	expect(renderData).toContain(JSON.stringify(childDataId.slice(1)));
+	expect(renderData).toContain('"childComponentName":"SelectRoot"');
+	const resolveId = vi.fn(async (specifier: string, importer?: string) => {
+		const id = resolveDependency(specifier, importer);
+		return id ? { id } : null;
+	});
+	await callTransform(plugin, readFileSync(toolbarSource, 'utf8'), toolbarSource, {
+		resolve: resolveId,
+	});
+	await callTransform(plugin, readFileSync(selectSource, 'utf8'), selectSource, {
+		resolve: resolveId,
+	});
+	const child = await callLoad(plugin, childDataId);
+	const childCode = typeof child === 'string' ? child : (child as { code: string }).code;
+	expect(childCode).toContain('Linked option</button>');
+	expect(childCode).toContain('data-linked-option');
+	expect(childCode).toContain(
+		'shared:node_modules/@fixture/delegate-linked-ui/src/toolbar/toolbar.tsrx#toolbarState/element:itemEls',
+	);
 	expect(warn.mock.calls.flat().join('\n')).not.toMatch(
 		/MARKLESS_(?:STATE_HELPER_RETURN_UNSUPPORTED|DELEGATE_ARTIFACT_MISSING)/,
 	);

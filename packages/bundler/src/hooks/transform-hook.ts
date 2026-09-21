@@ -84,6 +84,7 @@ async function runTransformSteps(request: TransformRequest) {
 	if (currentEnvironment === 'client' && clientRouteArtifact) {
 		return await emitClientRouteArtifact(request, transformed);
 	}
+	let barrelComponents: Awaited<ReturnType<typeof linkBarrelComponentInterfaces>> | undefined;
 	if (!reusedLinkedTransform) {
 		const rerun = await materializeOwnDelegateChildren(
 			request,
@@ -92,6 +93,7 @@ async function runTransformSteps(request: TransformRequest) {
 		);
 		transformed = rerun.transformed;
 		linkedTransformInput = rerun.input;
+		barrelComponents = rerun.barrelComponents;
 	}
 	registerFirstPassArtifacts(request, transformed);
 	const linked = await linkTransformChildren(
@@ -99,6 +101,7 @@ async function runTransformSteps(request: TransformRequest) {
 		transformed,
 		linkedTransformInput,
 		reusedLinkedTransform,
+		barrelComponents,
 	);
 	transformed = linked.transformed;
 	linkedTransformInput = linked.input;

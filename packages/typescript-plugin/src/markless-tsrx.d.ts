@@ -289,6 +289,7 @@ declare namespace __MarklessTypeService {
 		d?: string;
 		fill?: string;
 		fillOpacity?: string | number;
+		opacity?: string | number;
 		height?: string | number;
 		markerEnd?: string;
 		markerMid?: string;

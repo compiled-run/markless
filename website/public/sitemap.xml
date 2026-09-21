@@ -77,4 +77,8 @@
 		<loc>https://compiled.run/markless/reference</loc>
 		<changefreq>weekly</changefreq>
 	</url>
+	<url>
+		<loc>https://compiled.run/markless/mascot</loc>
+		<changefreq>weekly</changefreq>
+	</url>
 </urlset>

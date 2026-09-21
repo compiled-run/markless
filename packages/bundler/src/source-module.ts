@@ -474,7 +474,7 @@ function payloadHasComputed(payloadState: unknown): boolean {
  * for the same reason - a slot module is bytes every app pays for a capability
  * most of them do not have. Nothing is fetched until the runtime calls it.
  */
-function emitOverlayLoaderInstall(): string {
+export function emitOverlayLoaderInstall(): string {
 	return [
 		'globalThis.__marklessOverlay = (root) =>',
 		"\troot.querySelector('[overlay]')",
@@ -589,7 +589,7 @@ const ROW_MINT_RUNTIME_MODULE_ID = 'web/fns/row-mint';
 const ROW_COMPONENT_MINT_RUNTIME_MODULE_ID = 'web/fns/row-component-mint';
 
 /** True when the compiler recorded an `overlay` mark for this module. */
-function demandsOverlay(runtimeDemandMap: unknown): boolean {
+export function demandsOverlay(runtimeDemandMap: unknown): boolean {
 	const records = (
 		runtimeDemandMap as {
 			readonly payloadRecords?: ReadonlyArray<{ readonly kind?: string }>;

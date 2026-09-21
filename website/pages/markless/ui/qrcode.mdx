@@ -1,3 +1,4 @@
+import AnatomyTable from '../../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../../components/docs/sidebar.tsrx';
 import Preview from '../../../components/ui/preview.tsrx';
@@ -32,11 +33,7 @@ presentational and an overlay can hold nothing a reader needs to hear.
 
 ## Anatomy
 
-- `qrcode.root` — holds the text and the recovery level.
-- `qrcode.frame` — the box around the code. This is where the quiet zone goes.
-- `qrcode.patternsvg` — the `<svg>` the pattern is drawn in.
-- `qrcode.patternpath` — one `<path>` covering every dark module.
-- `qrcode.overlay` — a box centred on the code, for a logo.
+<AnatomyTable />
 
 This family writes no `ui-` attributes: nothing about a code changes as a person uses it.
 

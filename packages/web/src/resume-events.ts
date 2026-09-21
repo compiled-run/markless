@@ -4,6 +4,8 @@ import {
 	marklessInstancePath,
 	marklessRecordRowScope,
 	marklessRowScopedGraph,
+	type MarklessRowScope,
+	type MarklessScopedGraph,
 } from './fns/instance-scope.ts';
 import { marklessNoteControlEdits } from './control-edit-hold.ts';
 import type { OverlayFocusOriginHost } from './overlay-handoff.ts';
@@ -550,17 +552,12 @@ export function createEventWiring(input: {
 			// spell the same node as the handler for row A - the write lands
 			// nowhere, or worse, on the wrong row.
 			const rowScope = marklessRecordRowScope(eventRecord.hostNodeId, input.graph);
-			// Element handles need no answer here. A bound symbol's own resolver
-			// spells them against the bound edge's instance path, exactly as it
-			// already spells that symbol's graph nodes, so the widget a handle read
-			// belongs to is decided by the same fact for both halves. Reading it off
-			// this record's host instead only ever answered when the dispatching part
-			// happened to bind a handle of its own.
+			// A widget rooted inside this row files its handles under the row, which only the row-scoped qualifier reaches.
 			const runSymbol = async (symbolId: string, context: DispatchSymbolContext) =>
 				(await input.loadSymbol(symbolId))({
 					...context,
 					...(rowScope && isBoundSymbolId(symbolId)
-						? { graph: marklessRowScopedGraph(context.graph, rowScope) }
+						? rowScopedSymbolContext(context, rowScope)
 						: {}),
 					invokeCallback,
 					invokeSymbol,
@@ -742,6 +739,18 @@ export function createEventWiring(input: {
 // taken past any instance path.
 function isBoundSymbolId(symbolId: string): boolean {
 	return symbolId.slice(marklessInstancePath(symbolId).length).startsWith('bound:');
+}
+
+function rowScopedSymbolContext(
+	context: DispatchSymbolContext,
+	rowScope: MarklessRowScope,
+): Pick<DispatchSymbolContext, 'graph'> &
+	Partial<Pick<DispatchSymbolContext, 'getElementHandle'>> {
+	const graph = marklessRowScopedGraph(context.graph, rowScope) as MarklessScopedGraph;
+	const qualify = graph.marklessQualifyGraphNodeId;
+	const read = context.getElementHandle;
+	if (!qualify || typeof read !== 'function') return { graph };
+	return { graph, getElementHandle: (handleIdOrName) => read(qualify(handleIdOrName)) };
 }
 
 function recordDebugInteraction(root: Element, element: Element, eventName: string, record: any) {

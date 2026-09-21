@@ -5720,6 +5720,7 @@ type EventHandlerRewrite = {
 	readonly localNames: ReadonlySet<string>;
 	readonly claimedWrites: Set<LoweredStateWrite>;
 	readonly claimedHandleCalls: Set<EventElementHandleCall>;
+	readonly boundHandleNames: ReadonlySet<string>;
 };
 
 function eventHandlerRewrite(
@@ -5758,6 +5759,7 @@ function eventHandlerRewrite(
 		localNames: input.localNames,
 		claimedWrites: new Set(),
 		claimedHandleCalls: new Set(),
+		boundHandleNames: new Set(),
 	};
 }
 
@@ -5771,31 +5773,24 @@ function isFunctionLikeNode(node: AnyNode): boolean {
 	return FUNCTION_LIKE_NODE_TYPES.has(String(node.type));
 }
 
-/**
- * The same rewrite, with the row locals one function body actually sees.
- *
- * A `@for` row local is a name, not a span, so the only thing that separates the
- * row's item from an unrelated binding of the same name is scope. Inside
- * `[1].map((row) => measure(row))` the authored `row` is the callback's own
- * parameter and lowering it to `context.locals?.row` would hand the row's item
- * to code that asked for the callback's argument — a wrong read that reads like
- * a correct one. Dropping the name here instead leaves it authored, which is the
- * fail-closed side: the emitted module names something it does not bind, and the
- * unresolved-reference guard is what decides whether that ships.
- *
- * The mutable claim sets are shared with the parent rewrite on purpose: a write
- * claimed inside a nested function is still claimed for the handler.
- */
+// Nested bindings shadow component handles without changing the shared claim sets.
 function scopedEventHandlerRewrite(
 	fn: AnyNode,
 	rewrite: EventHandlerRewrite,
 ): EventHandlerRewrite {
 	const localNames = localNamesVisibleIn(fn, rewrite.localNames);
-	if (localNames === rewrite.localNames) return rewrite;
+	const boundHandleNames = new Set(rewrite.boundHandleNames);
+	for (const parameter of asNodes(fn.params)) collectPatternNames(parameter, boundHandleNames);
+	if (isNode(fn.body)) collectOwnScopeBindingNames(fn.body, boundHandleNames);
+	if (
+		localNames === rewrite.localNames &&
+		boundHandleNames.size === rewrite.boundHandleNames.size
+	) return rewrite;
 
 	return {
 		...rewrite,
 		localNames,
+		boundHandleNames,
 		writeValueInput: { ...rewrite.writeValueInput, localNames },
 	};
 }
@@ -6686,15 +6681,7 @@ function elementHandleCallNode(
 	return null;
 }
 
-/**
- * The authored argument nodes, when `emitElementHandleCall` would accept them.
- *
- * The nodes are reused rather than rebuilt, so a string argument keeps the quote
- * the author wrote under `quotes: 'preserve'`, matching what splicing did. `null`
- * means the call is unsupported on both paths — the string path then emits no
- * replacement lines at all, and this band leaves the authored call standing
- * rather than silently deleting it.
- */
+// Optional calls keep rewritten argument effects inside their short-circuit boundary.
 function elementHandleArgumentNodes(
 	node: AnyNode,
 	call: EventElementHandleCall,
@@ -6705,13 +6692,21 @@ function elementHandleArgumentNodes(
 			EVENT_HANDLE_ARGUMENT_LITERAL.test(argument) ||
 			rewrite.eventParameters.includes(argument),
 	);
-	if (!supported) return null;
+	const callee = isNode(node.callee) ? node.callee : undefined;
+	const optionalMember =
+		callee?.type === 'MemberExpression' &&
+		callee.optional === true &&
+		callee.computed !== true &&
+		node.optional !== true;
+	if (!supported && (!optionalMember || rewrite.boundHandleNames.has(call.handleName))) return null;
 
 	const args = Array.isArray(node.arguments) ? node.arguments : [];
 	if (args.length !== call.argumentSources.length) return null;
 	if (!args.every((argument) => isNode(argument))) return null;
 
-	return args as unknown as EmissionNode[];
+	return supported
+		? (args as unknown as EmissionNode[])
+		: args.map((argument) => rewriteEventHandlerNode(argument, node, rewrite));
 }
 
 /**

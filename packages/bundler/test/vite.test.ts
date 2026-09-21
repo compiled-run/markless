@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { EventEmitter } from 'node:events';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -382,8 +382,7 @@ describe('Vite adapter structure', () => {
 	test('dev transforms reject imported compiled children without capture metadata', async () => {
 		const childFilename = '/workspace/app/components/Child.tsrx';
 		const parentFilename = '/workspace/app/pages/App.tsrx';
-		const childSource =
-			'export default function Child() @{ <button>Child</button> }';
+		const childSource = 'export default function Child() @{ <button>Child</button> }';
 		const parentSource = `import Child from '../components/Child.tsrx';
 export default function App() @{ <main><Child /></main> }`;
 		const validPlugin = getAsyncPlugin();
@@ -394,12 +393,7 @@ export default function App() @{ <main><Child /></main> }`;
 			root: '/workspace/app',
 		});
 		const transformRequest = vi.fn((url: string) =>
-			callTransform(
-				validPlugin,
-				childSource,
-				url,
-				createViteHookContext('server'),
-			),
+			callTransform(validPlugin, childSource, url, createViteHookContext('server')),
 		);
 		callConfigureServer(validPlugin, {
 			config: { root: '/workspace/app' },
@@ -433,12 +427,7 @@ export default function App() @{ <main><Child /></main> }`;
 		delete staleChild.manifest.captureMetadata;
 
 		await expect(
-			callTransform(
-				plugin,
-				parentSource,
-				parentFilename,
-				createViteHookContext('server'),
-			),
+			callTransform(plugin, parentSource, parentFilename, createViteHookContext('server')),
 		).rejects.toThrow(
 			'MARKLESS_CAPTURE_METADATA_MISSING: Parent module "/workspace/app/pages/App.tsrx" composes imported child "../components/Child.tsrx", but its compiled artifact has no current capture metadata. Rebuild the child with the current Markless compiler and clear any stale build cache.',
 		);
@@ -803,10 +792,7 @@ export function App() @{
 		expect(invalidatePrerenderSnapshots).toHaveBeenCalledExactlyOnceWith([
 			'\0virtual:markless:render-data:App',
 		]);
-		expect(order).toEqual([
-			'snapshot:\0virtual:markless:render-data:App',
-			'reload',
-		]);
+		expect(order).toEqual(['snapshot:\0virtual:markless:render-data:App', 'reload']);
 	});
 
 	test('rechecks invalid files on disk when the restoring watcher event is swallowed', async () => {
@@ -1264,3 +1250,131 @@ function getAsyncPlugin() {
 		sharedDuringBuild?: boolean;
 	};
 }
+
+test('delegate runner distinguishes absent and incompatible environments without changing the guard', async () => {
+	const { serverModuleRunner } = await import('../src/vite/environment.ts');
+	for (const environments of [{}, { ssr: { name: 'ssr', hot: {}, dispatchFetch() {} } }]) {
+		expect(() => serverModuleRunner({ environments } as never, 'ssr')).toThrow(
+			'MARKLESS_DEV_MODULE_RUNNER_UNAVAILABLE: ssr',
+		);
+	}
+});
+
+test('watched barrel edits invalidate canonical importers across environments without compiling the barrel', async () => {
+	const file = '/workspace/app/src/parts/index.ts';
+	const first = {
+		type: 'js',
+		id: '/workspace/app/src/One.tsrx?markless-render-data',
+		url: '/base/src/One.tsrx?markless-render-data',
+		importers: new Set(),
+	};
+	const second = {
+		type: 'js',
+		id: '/workspace/app/src/Two.tsrx?markless-route',
+		url: '/base/src/Two.tsrx?markless-route',
+		importers: new Set(),
+	};
+	const barrel = {
+		type: 'js',
+		id: file,
+		url: '/src/parts/index.ts',
+		importers: new Set([first, second]),
+	};
+	const invalidateGeneratedModules = vi.fn(
+		async (_source: string, _environment?: unknown, _nextSource?: string) => [],
+	);
+	const send = vi.fn();
+	const graph = {
+		getModulesByFile: vi.fn((name: string) => (name === file ? new Set([barrel]) : new Set())),
+		invalidateModule: vi.fn(),
+		getModuleById: vi.fn(),
+	};
+	const client = {
+		name: 'client',
+		config: { consumer: 'client' },
+		hot: { send },
+		moduleGraph: graph,
+	};
+	const ssr = {
+		name: 'ssr',
+		config: { consumer: 'server' },
+		hot: { send: vi.fn() },
+		moduleGraph: graph,
+	};
+	const hmr = createViteHmr({
+		base: '/base/',
+		clientEnvironment: 'client',
+		enabled: true,
+		invalidateGeneratedModules,
+	});
+	hmr.configureServer({
+		config: { root: '/workspace/app' },
+		environments: { client, ssr },
+	} as never);
+	const read = vi.fn(async () => 'throw new Error("not TSRX")');
+	await hmr.hotUpdate(client as never, { file, modules: [barrel], timestamp: 1, read } as never);
+	for (const source of ['/workspace/app/src/One.tsrx', '/workspace/app/src/Two.tsrx'])
+		for (const environment of ['client', 'server'])
+			expect(invalidateGeneratedModules).toHaveBeenCalledWith(source, environment, undefined);
+	expect(invalidateGeneratedModules.mock.calls.some((args) => args[0] === file)).toBe(false);
+	expect(read).not.toHaveBeenCalled();
+	expect(send).toHaveBeenCalledWith({
+		type: 'full-reload',
+		path: '/base/src/One.tsrx',
+		triggeredBy: file,
+	});
+	invalidateGeneratedModules.mockClear();
+	send.mockClear();
+	barrel.importers.clear();
+	await hmr.hotUpdate(client as never, { file, modules: [barrel], timestamp: 2, read } as never);
+	expect(invalidateGeneratedModules).not.toHaveBeenCalled();
+	expect(send).not.toHaveBeenCalled();
+	await hmr.hotUpdate(
+		client as never,
+		{ file: '/workspace/app/unrelated.ts', modules: [], timestamp: 3, read } as never,
+	);
+	expect(invalidateGeneratedModules).not.toHaveBeenCalled();
+});
+
+test('Vite replaces watched transform dependencies without executable imports or stale owners', async () => {
+	const { createServer } = await import('vite');
+	const root = await realpath(await mkdtemp(join(tmpdir(), 'markless-watched-imports-')));
+	const entry = join(root, 'entry.js');
+	const first = join(root, 'first.ts');
+	const second = join(root, 'second.ts');
+	await writeFile(entry, 'export const value = 1;');
+	await writeFile(first, 'throw new Error("first must not execute");');
+	await writeFile(second, 'throw new Error("second must not execute");');
+	let dependency = first;
+	const server = await createServer({
+		root,
+		configFile: false,
+		server: { middlewareMode: true, watch: null },
+		optimizeDeps: { noDiscovery: true, include: [] },
+		plugins: [
+			{
+				name: 'watched-static-read',
+				transform(_code, id) {
+					if (id === entry) this.addWatchFile(dependency);
+				},
+			},
+		],
+	});
+	try {
+		const environment = server.environments.client!;
+		const initial = await environment.transformRequest('/entry.js');
+		const importer = environment.moduleGraph.getModuleById(entry)!;
+		const oldDependency = environment.moduleGraph.getModuleById(first)!;
+		expect(oldDependency.importers.has(importer)).toBe(true);
+		expect(initial?.code).not.toContain('first.ts');
+		dependency = second;
+		environment.moduleGraph.invalidateModule(importer);
+		const next = await environment.transformRequest('/entry.js');
+		expect(environment.moduleGraph.getModuleById(second)!.importers.has(importer)).toBe(true);
+		expect(oldDependency.importers.has(importer)).toBe(false);
+		expect(next?.code).toBe(initial?.code);
+	} finally {
+		await server.close();
+		await rm(root, { recursive: true, force: true });
+	}
+});

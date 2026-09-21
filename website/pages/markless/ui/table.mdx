@@ -1,3 +1,4 @@
+import AnatomyTable from '../../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../../components/docs/sidebar.tsrx';
 import TableDemo from '../../../components/demos/ui/table/basic.tsrx';
@@ -58,11 +59,7 @@ or `onChange` makes the rows pickable, which earns the grid roles.
 
 ## Anatomy
 
-- `table.root` renders the `<table>` and holds the sort and the rows that are picked.
-- `table.item` is one body row, named by its own `value`.
-- `table.itemcontent` is one cell, and a focus stop once the table walks two ways.
-- `table.coltrigger` is a sortable column header, the `<th>` itself rather than a button in one.
-- `table.itemfield` carries one row's picked state into a form.
+<AnatomyTable />
 
 `<caption>`, `<thead>`, `<tbody>`, `<tfoot>` and the header row need no parts: they are your own
 elements and already say what they are.

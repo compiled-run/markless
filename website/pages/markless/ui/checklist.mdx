@@ -1,3 +1,4 @@
+import AnatomyTable from '../../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../../components/docs/sidebar.tsrx';
 import Preview from '../../../components/ui/preview.tsrx';
@@ -42,13 +43,7 @@ and a checkbox root at the same time.
 
 ## Anatomy
 
-- `checklist.root` — the group, and the select-all's own checkbox.
-- `checklist.label` — names the group by naming the select-all.
-- `checklist.selectall` and `checklist.selectallindicator` — the tick-everything control.
-- `checklist.item` — one row, named by its required `value`.
-- `checklist.itemtrigger`, `checklist.itemindicator`, `checklist.itemlabel`, `checklist.itemdescription` — that row's parts.
-- `checklist.error` — mounting it marks the enclosing checkbox invalid.
-- `checklist.field` — the hidden native input for one row.
+<AnatomyTable />
 
 Every row is a checkbox, so the family writes `ui-checked`, `ui-mixed` and `ui-disabled`.
 

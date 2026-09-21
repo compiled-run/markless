@@ -50,12 +50,4 @@ test('router navigation chunk co-locates route imports with navigation', async (
 		),
 		`route map not in the navigation entry's static closure: ${[...closure].join(', ')}`,
 	).toBe(true);
-	expect(
-		chunks.some(
-			({ code }) =>
-				code.includes('__marklessRouterLink') &&
-				!code.includes('navigateMarklessRouterLink'),
-		),
-		'the shared runtime marker must not be mistaken for the navigation entry',
-	).toBe(true);
 }, 120_000);

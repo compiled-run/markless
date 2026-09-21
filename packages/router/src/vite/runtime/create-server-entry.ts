@@ -1,4 +1,6 @@
 import type { PageProps } from '../../index.ts';
+import { LINK_ATTRIBUTE, REPLACE_ATTRIBUTE, SCROLL_ATTRIBUTE } from '../../link-attributes.ts';
+import { ROUTE_SCRIPT_TYPE } from '../../route-dom.ts';
 import {
 	buildRouteManifestFromFileIds,
 	matchRouteManifest,
@@ -352,11 +354,13 @@ function routedPageArtifact(
 	const headInjections = dedupeHeadLinks([
 		...documentHeadInjections,
 		...(baseArtifact?.headInjections ?? []),
-		...(stylesheetHrefs ?? []).map((href): RenderHeadInjection => ({
-			tag: 'link',
-			location: 'head',
-			attributes: { rel: 'stylesheet', href },
-		})),
+		...(stylesheetHrefs ?? []).map(
+			(href): RenderHeadInjection => ({
+				tag: 'link',
+				location: 'head',
+				attributes: { rel: 'stylesheet', href },
+			}),
+		),
 	]);
 	return {
 		resumeModuleUrl: baseArtifact?.resumeModuleUrl,
@@ -565,7 +569,7 @@ function insertHeadHtml(documentHtml: string, headHtml: string): string {
 }
 
 function renderRouteScript(file: string): string {
-	return `<script type="@markless/core/route">${escapeScriptJson({ file })}</script>`;
+	return `<script type="${ROUTE_SCRIPT_TYPE}">${escapeScriptJson({ file })}</script>`;
 }
 
 function renderLinkBridgeScript(resumeEntryPath: string): string {
@@ -594,9 +598,9 @@ function renderLinkBridgeScript(resumeEntryPath: string): string {
 	const r = s && s.closest('[data-async-container]');
 	if (!r || r.__marklessRouterLinkResumerStarted) return;
 	r.__marklessRouterLinkResumerStarted = true;
-	const linkAttr = 'data-markless-router-link';
-	const replaceAttr = 'data-markless-router-replace';
-	const scrollAttr = 'data-markless-router-scroll';
+	const linkAttr = ${JSON.stringify(LINK_ATTRIBUTE)};
+	const replaceAttr = ${JSON.stringify(REPLACE_ATTRIBUTE)};
+	const scrollAttr = ${JSON.stringify(SCROLL_ATTRIBUTE)};
 	const anchorFrom = (event) => {
 		const target = event.composedPath && event.composedPath()[0] || event.target;
 		return target && target.closest ? target.closest('a[href]') : target && target.parentElement && target.parentElement.closest ? target.parentElement.closest('a[href]') : null;

@@ -1,3 +1,4 @@
+import { docsData } from './tooling/docs-data.ts';
 import { markless } from '@markless/core/vite';
 import { ui } from '@markless/ui/vite';
 import { router } from '@markless/router/vite';
@@ -7,6 +8,8 @@ import type { OxlintConfig } from 'oxlint';
 import { highlightMdx } from './tooling/highlight-mdx.ts';
 import { uiDemos } from './tooling/ui-demos.ts';
 import { pageProps } from './tooling/page-props.ts';
+import { anatomy } from './tooling/anatomy.ts';
+import { keyboard } from './tooling/keyboard.ts';
 
 export default {
 	base: '/markless/',
@@ -37,5 +40,5 @@ export default {
 			],
 		},
 	},
-	plugins: [ui(), pageProps(), uiDemos(), markless(), router(), highlightMdx()],
+	plugins: [ui(), pageProps(), docsData(), uiDemos(), anatomy(), keyboard(), markless(), router(), highlightMdx()],
 } satisfies UserConfig & { nitro: NitroConfig; lint: OxlintConfig };

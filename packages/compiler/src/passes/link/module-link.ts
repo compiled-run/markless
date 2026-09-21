@@ -21,6 +21,7 @@ import type {
 	ModuleLinkRequest,
 	ModuleLinkResolutionTable,
 	RenderDataReachRecord,
+	SemanticModuleImport,
 	SymbolResolverModuleInput,
 } from '../../artifacts.ts';
 import { computeLinkedInterfaces } from './interface-link.ts';
@@ -421,7 +422,10 @@ export function linkedManifestHasBrowserTriggers(manifest: LinkedSymbolClaimMani
  */
 export type BarrelComponentLinkInput = {
 	readonly parent: string;
-	readonly moduleImports: ReadonlyArray<{ readonly source: string }>;
+	readonly moduleImports: ReadonlyArray<
+		Pick<SemanticModuleImport, 'source'> &
+			Partial<Pick<SemanticModuleImport, 'kind' | 'importedName' | 'typeOnly'>>
+	>;
 	/**
 	 * `specifier@importer` (see `moduleLinkResolutionKey`) to the module id it
 	 * resolves to, or `null` when the resolver answered with nothing. An absent
@@ -505,12 +509,19 @@ export function linkBarrelComponents(
 		filename: string,
 		prefix: ReadonlyArray<string>,
 		seen: ReadonlySet<string>,
+		selectedExport?: string,
 	): BarrelWalk => {
 		if (seen.has(filename)) return { linkedComponents: [], sharedReexports: [] };
 		const reexports = readInterface(filename)?.reexports ?? [];
 		const linkedComponents: ModuleGraphInterfaceLinkedComponent[] = [];
 		const sharedReexports: ModuleGraphInterfaceReexport[] = [];
 		for (const reexport of reexports) {
+			if (
+				selectedExport !== undefined &&
+				reexport.exportName !== selectedExport &&
+				reexport.exportName !== '*'
+			)
+				continue;
 			const target = resolveId(reexport.source, filename);
 			if (target === undefined) continue;
 			if (target === null) {
@@ -578,12 +589,24 @@ export function linkBarrelComponents(
 	};
 
 	for (const moduleImport of input.moduleImports) {
+		if (moduleImport.typeOnly) continue;
 		if (TSRX_SOURCE_FILE.test(moduleImport.source)) continue;
 		if (!moduleImport.source.startsWith('.')) continue;
 		const barrel = resolveId(moduleImport.source, input.parent);
 		// An import that names no module in this build is not a barrel to follow.
 		if (barrel === undefined || barrel === null) continue;
-		const { linkedComponents, sharedReexports } = walkBarrel(barrel, [], new Set());
+		const selectedExport =
+			moduleImport.kind === 'default'
+				? 'default'
+				: moduleImport.kind === 'named'
+					? moduleImport.importedName
+					: undefined;
+		const { linkedComponents, sharedReexports } = walkBarrel(
+			barrel,
+			[],
+			new Set(),
+			selectedExport,
+		);
 		if (linkedComponents.length === 0 && sharedReexports.length === 0) continue;
 		publishInterface(moduleImport.source, {
 			passId: 'module-graph-interface',

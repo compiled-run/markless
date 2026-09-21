@@ -1,3 +1,4 @@
+import AnatomyTable from '../../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../../components/docs/sidebar.tsrx';
 import Preview from '../../../components/ui/preview.tsrx';
@@ -29,13 +30,7 @@ with `toggle.field`, and `name`, `value` and `required` are declared once on the
 
 ## Anatomy
 
-- `toggle.root` — holds the value and everything a form needs to know.
-- `toggle.trigger` — the button a person clicks.
-- `toggle.thumb` — the moving piece inside the trigger.
-- `toggle.label` — the words beside it.
-- `toggle.description` — a sentence under the label.
-- `toggle.error` — mounting it marks the control invalid.
-- `toggle.field` — the hidden native input that carries it into a form.
+<AnatomyTable />
 
 It writes `ui-checked` and `ui-disabled`.
 

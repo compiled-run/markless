@@ -1,0 +1,2241 @@
+{
+  "label": "before-repeat-2",
+  "errors": [],
+  "documents": [
+    "http://127.0.0.1:4488/markless/ui/select"
+  ],
+  "samples": [
+    {
+      "index": 0,
+      "route": "combobox",
+      "marks": [
+        {
+          "name": "click",
+          "at": 0
+        },
+        {
+          "name": "route-ready",
+          "at": 107.1
+        },
+        {
+          "name": "html-start",
+          "at": 251.8
+        },
+        {
+          "name": "html-end",
+          "at": 252.7
+        },
+        {
+          "name": "mount-start",
+          "at": 257.4
+        },
+        {
+          "name": "mount-end",
+          "at": 258.3
+        },
+        {
+          "name": "frame",
+          "at": 280.2
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "route": "select",
+      "marks": [
+        {
+          "name": "click",
+          "at": 0
+        },
+        {
+          "name": "route-ready",
+          "at": 7.3
+        },
+        {
+          "name": "html-start",
+          "at": 78.8
+        },
+        {
+          "name": "html-end",
+          "at": 79.5
+        },
+        {
+          "name": "mount-start",
+          "at": 82.7
+        },
+        {
+          "name": "mount-end",
+          "at": 83.6
+        },
+        {
+          "name": "frame",
+          "at": 83.6
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "route": "combobox",
+      "marks": [
+        {
+          "name": "click",
+          "at": 0
+        },
+        {
+          "name": "route-ready",
+          "at": 7.2
+        },
+        {
+          "name": "html-start",
+          "at": 78.9
+        },
+        {
+          "name": "html-end",
+          "at": 79.8
+        },
+        {
+          "name": "mount-start",
+          "at": 82.6
+        },
+        {
+          "name": "mount-end",
+          "at": 83.4
+        },
+        {
+          "name": "frame",
+          "at": 83.5
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "route": "select",
+      "marks": [
+        {
+          "name": "click",
+          "at": 0
+        },
+        {
+          "name": "route-ready",
+          "at": 7.6
+        },
+        {
+          "name": "html-start",
+          "at": 65.9
+        },
+        {
+          "name": "html-end",
+          "at": 66.6
+        },
+        {
+          "name": "mount-start",
+          "at": 69.3
+        },
+        {
+          "name": "mount-end",
+          "at": 70.1
+        },
+        {
+          "name": "frame",
+          "at": 70.2
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "route": "combobox",
+      "marks": [
+        {
+          "name": "click",
+          "at": 0
+        },
+        {
+          "name": "route-ready",
+          "at": 7.5
+        },
+        {
+          "name": "html-start",
+          "at": 74.8
+        },
+        {
+          "name": "html-end",
+          "at": 76
+        },
+        {
+          "name": "mount-start",
+          "at": 79.2
+        },
+        {
+          "name": "mount-end",
+          "at": 80
+        },
+        {
+          "name": "frame",
+          "at": 83.4
+        }
+      ]
+    },
+    {
+      "index": 5,
+      "route": "select",
+      "marks": [
+        {
+          "name": "click",
+          "at": 0
+        },
+        {
+          "name": "route-ready",
+          "at": 7.9
+        },
+        {
+          "name": "html-start",
+          "at": 67.6
+        },
+        {
+          "name": "html-end",
+          "at": 68.4
+        },
+        {
+          "name": "mount-start",
+          "at": 70.7
+        },
+        {
+          "name": "mount-end",
+          "at": 71.7
+        },
+        {
+          "name": "frame",
+          "at": 71.7
+        }
+      ]
+    },
+    {
+      "index": 6,
+      "route": "combobox",
+      "marks": [
+        {
+          "name": "click",
+          "at": 0
+        },
+        {
+          "name": "route-ready",
+          "at": 7.7
+        },
+        {
+          "name": "html-start",
+          "at": 69.4
+        },
+        {
+          "name": "html-end",
+          "at": 70.2
+        },
+        {
+          "name": "mount-start",
+          "at": 72.9
+        },
+        {
+          "name": "mount-end",
+          "at": 74
+        },
+        {
+          "name": "frame",
+          "at": 77.6
+        }
+      ]
+    },
+    {
+      "index": 7,
+      "route": "select",
+      "marks": [
+        {
+          "name": "click",
+          "at": 0
+        },
+        {
+          "name": "route-ready",
+          "at": 8.2
+        },
+        {
+          "name": "html-start",
+          "at": 66.7
+        },
+        {
+          "name": "html-end",
+          "at": 67.4
+        },
+        {
+          "name": "mount-start",
+          "at": 70
+        },
+        {
+          "name": "mount-end",
+          "at": 71
+        },
+        {
+          "name": "frame",
+          "at": 71
+        }
+      ]
+    },
+    {
+      "index": 8,
+      "route": "combobox",
+      "marks": [
+        {
+          "name": "click",
+          "at": 0
+        },
+        {
+          "name": "route-ready",
+          "at": 8.8
+        },
+        {
+          "name": "html-start",
+          "at": 69.9
+        },
+        {
+          "name": "html-end",
+          "at": 70.6
+        },
+        {
+          "name": "mount-start",
+          "at": 73.2
+        },
+        {
+          "name": "mount-end",
+          "at": 74.2
+        },
+        {
+          "name": "frame",
+          "at": 74.3
+        }
+      ]
+    },
+    {
+      "index": 9,
+      "route": "select",
+      "marks": [
+        {
+          "name": "click",
+          "at": 0
+        },
+        {
+          "name": "route-ready",
+          "at": 6.9
+        },
+        {
+          "name": "html-start",
+          "at": 70.3
+        },
+        {
+          "name": "html-end",
+          "at": 71.4
+        },
+        {
+          "name": "mount-start",
+          "at": 74.3
+        },
+        {
+          "name": "mount-end",
+          "at": 75
+        },
+        {
+          "name": "frame",
+          "at": 75.1
+        }
+      ]
+    }
+  ],
+  "startupScripts": [
+    "http://127.0.0.1:4488/markless/theme.js",
+    "http://127.0.0.1:4488/markless/mascot.js",
+    "http://127.0.0.1:4488/markless/@vite/client",
+    "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:dev-error-client",
+    "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/node_modules/.pnpm/@voidzero-dev+vite-plus-core@0.3.0_@types+node@24.12.2_jiti@2.7.0_typescript@5.9.3_yaml@2.9.0/node_modules/@voidzero-dev/vite-plus-core/dist/vite/client/env.mjs"
+  ],
+  "firstResources": [
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/virtual:markless-router/navigation-entry?markless-router-root=%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fwebsite&lang.ts",
+      "start": 0.09999990463256836,
+      "duration": 0.9000000953674316,
+      "bytes": 12946,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/pages/markless/ui/select.mdx?t=1789847882085",
+      "start": 8.5,
+      "duration": 14.299999952316284,
+      "bytes": 283989,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/router/src/vite/runtime/create-route-discovery.ts",
+      "start": 8.599999904632568,
+      "duration": 0.8000000715255737,
+      "bytes": 2067,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/router/src/index.ts",
+      "start": 8.599999904632568,
+      "duration": 1,
+      "bytes": 18209,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless-router/route-preloads?markless-router-root=%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fwebsite&lang.ts",
+      "start": 8.599999904632568,
+      "duration": 1.7000000476837158,
+      "bytes": 5665,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/router/src/route-manifest.ts",
+      "start": 9.599999904632568,
+      "duration": 0.7000000476837158,
+      "bytes": 27236,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/fns/external-delegate.ts",
+      "start": 9.899999976158142,
+      "duration": 0.6000000238418579,
+      "bytes": 3889,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/router/src/link-attributes.ts",
+      "start": 9.899999976158142,
+      "duration": 0.8999999761581421,
+      "bytes": 1006,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/router/src/request-files.ts",
+      "start": 9.899999976158142,
+      "duration": 1.2999999523162842,
+      "bytes": 34812,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/router/src/route-renderer.ts",
+      "start": 9.899999976158142,
+      "duration": 1.6999999284744263,
+      "bytes": 7074,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/router/src/spa-navigation.ts",
+      "start": 9.899999976158142,
+      "duration": 2.1999999284744263,
+      "bytes": 31056,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/router/src/route-state.ts",
+      "start": 9.899999976158142,
+      "duration": 2.299999952316284,
+      "bytes": 3940,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/node_modules/.vite/deps/pathe.js?v=7f89a3ca",
+      "start": 10.5,
+      "duration": 0.8999999761581421,
+      "bytes": 51432,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/node_modules/.vite/deps/ufo.js?v=7f89a3ca",
+      "start": 10.599999904632568,
+      "duration": 2.4000000953674316,
+      "bytes": 65348,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/serializer/src/protocol.ts",
+      "start": 10.699999928474426,
+      "duration": 1.899999976158142,
+      "bytes": 38156,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/render.ts",
+      "start": 11.799999952316284,
+      "duration": 1,
+      "bytes": 20867,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/router/src/route-dom.ts",
+      "start": 11.799999952316284,
+      "duration": 1.7000000476837158,
+      "bytes": 1741,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/router/src/navigation-hold.ts",
+      "start": 11.799999952316284,
+      "duration": 1.899999976158142,
+      "bytes": 5468,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/serializer/src/protocol-constants.ts",
+      "start": 12.799999952316284,
+      "duration": 0.5,
+      "bytes": 10469,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/serializer/src/async-boundary-arm.ts",
+      "start": 12.799999952316284,
+      "duration": 0.6000000238418579,
+      "bytes": 1371,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/index.ts",
+      "start": 13.799999952316284,
+      "duration": 1.100000023841858,
+      "bytes": 2818,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/router/src/navigation-timing.ts",
+      "start": 13.799999952316284,
+      "duration": 1.100000023841858,
+      "bytes": 3249,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/dom-journal.ts",
+      "start": 15.099999904632568,
+      "duration": 2.3000000715255737,
+      "bytes": 32638,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/dom-update.ts",
+      "start": 15.099999904632568,
+      "duration": 2.4000000953674316,
+      "bytes": 7134,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/event-only-resume.ts",
+      "start": 15.099999904632568,
+      "duration": 2.600000023841858,
+      "bytes": 8125,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/payload-document.ts",
+      "start": 15.199999928474426,
+      "duration": 2.899999976158142,
+      "bytes": 2886,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/event-resume.ts",
+      "start": 15.199999928474426,
+      "duration": 2.899999976158142,
+      "bytes": 68529,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/payload-full.ts",
+      "start": 15.299999952316284,
+      "duration": 3.399999976158142,
+      "bytes": 9068,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/pending-timing.ts",
+      "start": 15.299999952316284,
+      "duration": 3.600000023841858,
+      "bytes": 5661,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/resume.ts",
+      "start": 15.299999952316284,
+      "duration": 4,
+      "bytes": 14409,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/render-to-string.ts",
+      "start": 15.299999952316284,
+      "duration": 3.899999976158142,
+      "bytes": 75626,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/settle-kernel.ts",
+      "start": 15.299999952316284,
+      "duration": 4.399999976158142,
+      "bytes": 55426,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/dom-attribute.ts",
+      "start": 17.799999952316284,
+      "duration": 5,
+      "bytes": 2101,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/control-edit-hold.ts",
+      "start": 17.799999952316284,
+      "duration": 5.299999952316284,
+      "bytes": 8041,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/resume-census.ts",
+      "start": 17.799999952316284,
+      "duration": 5.5,
+      "bytes": 5988,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/payload-document-common.ts",
+      "start": 18.199999928474426,
+      "duration": 5.399999976158142,
+      "bytes": 11812,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/serializer/src/protocol-client-storage.ts",
+      "start": 18.899999976158142,
+      "duration": 4.899999976158142,
+      "bytes": 2475,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/payload-graph-construct.ts",
+      "start": 19,
+      "duration": 5.599999904632568,
+      "bytes": 18302,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/payload-resume-registry.ts",
+      "start": 19,
+      "duration": 6,
+      "bytes": 9566,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/resume-anchor-census.ts",
+      "start": 19.59999990463257,
+      "duration": 4.900000095367432,
+      "bytes": 1720,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/inline/resume-errors.ts",
+      "start": 19.59999990463257,
+      "duration": 5,
+      "bytes": 6498,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/resume-locators.ts",
+      "start": 19.59999990463257,
+      "duration": 5.200000047683716,
+      "bytes": 28979,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/debug-channel.ts",
+      "start": 19.699999928474426,
+      "duration": 5.700000047683716,
+      "bytes": 46907,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/serializer/src/resume-record-delta.ts",
+      "start": 19.699999928474426,
+      "duration": 6.5,
+      "bytes": 22247,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/prerender/records.ts",
+      "start": 19.699999928474426,
+      "duration": 6.700000047683716,
+      "bytes": 4637,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/inline/resumer.ts",
+      "start": 19.699999928474426,
+      "duration": 6.300000071525574,
+      "bytes": 124828,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/serializer/src/index.ts",
+      "start": 19.699999928474426,
+      "duration": 6.899999976158142,
+      "bytes": 1763,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/prerender/shared-seed-slot.ts",
+      "start": 19.799999952316284,
+      "duration": 7.200000047683716,
+      "bytes": 26977,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/prerender/evaluator.ts",
+      "start": 19.799999952316284,
+      "duration": 8,
+      "bytes": 164787,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/fns/roster-position.ts",
+      "start": 19.799999952316284,
+      "duration": 8.600000023841858,
+      "bytes": 5588,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/core/src/web/resume.ts",
+      "start": 23.799999952316284,
+      "duration": 4,
+      "bytes": 931,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/router/src/vite/runtime/mdx-route.ts",
+      "start": 23.799999952316284,
+      "duration": 4.399999976158142,
+      "bytes": 81135,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/components/docs/theme-toggle.tsrx?import",
+      "start": 23.799999952316284,
+      "duration": 5.200000047683716,
+      "bytes": 24898,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/components/ui/preview.tsrx?import",
+      "start": 23.799999952316284,
+      "duration": 7,
+      "bytes": 23815,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/components/docs/sidebar.tsrx?import&t=1789847882085",
+      "start": 23.799999952316284,
+      "duration": 6.799999952316284,
+      "bytes": 248342,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/components/docs/anatomy-table.tsrx?import",
+      "start": 23.799999952316284,
+      "duration": 8.799999952316284,
+      "bytes": 200888,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/serializer/src/protocol-client.ts",
+      "start": 23.899999976158142,
+      "duration": 7,
+      "bytes": 26236,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/serializer/src/storage-record-client.ts",
+      "start": 24,
+      "duration": 9.199999928474426,
+      "bytes": 3121,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/reconcile-plane-slot.ts",
+      "start": 24.699999928474426,
+      "duration": 7.800000071525574,
+      "bytes": 2130,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/resume-handle-qualifier.ts",
+      "start": 25.09999990463257,
+      "duration": 7.600000023841858,
+      "bytes": 2243,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/serializer/src/value.ts",
+      "start": 26.399999976158142,
+      "duration": 6.600000023841858,
+      "bytes": 38137,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/serializer/src/resume-record-merge.ts",
+      "start": 26.5,
+      "duration": 6.599999904632568,
+      "bytes": 12345,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/repeat-runtime.ts",
+      "start": 26.59999990463257,
+      "duration": 7.5,
+      "bytes": 10599,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/serializer/src/payload-scripts.ts",
+      "start": 26.699999928474426,
+      "duration": 7.5,
+      "bytes": 2701,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/serializer/src/protocol-state.ts",
+      "start": 26.699999928474426,
+      "duration": 7.5,
+      "bytes": 21785,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/serializer/src/protocol-validation-storage.ts",
+      "start": 26.799999952316284,
+      "duration": 7.600000023841858,
+      "bytes": 6304,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/serializer/src/storage-slot.ts",
+      "start": 26.799999952316284,
+      "duration": 7.600000023841858,
+      "bytes": 5260,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/ssr-data/awaitable.ts",
+      "start": 27.09999990463257,
+      "duration": 7.400000095367432,
+      "bytes": 5102,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/ssr-data/deferred-count.ts",
+      "start": 27.199999928474426,
+      "duration": 7.5,
+      "bytes": 3451,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/serializer/src/value-constants.ts",
+      "start": 28.399999976158142,
+      "duration": 6.899999976158142,
+      "bytes": 1712,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/ssr-data/renderer.ts",
+      "start": 28.399999976158142,
+      "duration": 6.799999952316284,
+      "bytes": 98652,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/fns/bound-symbol.ts",
+      "start": 28.399999976158142,
+      "duration": 8.399999976158142,
+      "bytes": 7357,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/fns/ssr.ts",
+      "start": 28.399999976158142,
+      "duration": 7.799999952316284,
+      "bytes": 195170,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/fns/composition.ts",
+      "start": 28.399999976158142,
+      "duration": 8.299999952316284,
+      "bytes": 99495,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/prerender/branch-arm.ts",
+      "start": 28.399999976158142,
+      "duration": 8.600000023841858,
+      "bytes": 7655,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/prerender/staged-graph.ts",
+      "start": 28.399999976158142,
+      "duration": 8.799999952316284,
+      "bytes": 2375,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/fns/instance-scope.ts",
+      "start": 28.399999976158142,
+      "duration": 9.799999952316284,
+      "bytes": 132379,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/ssr-data/branch-arm-idrefs.ts",
+      "start": 28.5,
+      "duration": 9,
+      "bytes": 8400,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/prerender/island-roster.ts",
+      "start": 28.699999928474426,
+      "duration": 10.800000071525574,
+      "bytes": 4189,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:render-data:components%2Fdocs%2Ftheme-toggle.tsrx?import",
+      "start": 29.199999928474426,
+      "duration": 9.399999976158142,
+      "bytes": 24593,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:payload:components%2Fdocs%2Ftheme-toggle.tsrx?import",
+      "start": 29.199999928474426,
+      "duration": 10,
+      "bytes": 30248,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:resume:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fwebsite%2Fcomponents%2Fdocs%2Ftheme-toggle.tsrx?import",
+      "start": 29.199999928474426,
+      "duration": 10.200000047683716,
+      "bytes": 11531,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:style:components%2Fdocs%2Ftheme-toggle.tsrx.css",
+      "start": 29.199999928474426,
+      "duration": 10.5,
+      "bytes": 2102,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/fns/state.ts",
+      "start": 29.199999928474426,
+      "duration": 10.600000023841858,
+      "bytes": 1850,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/fns/html.ts",
+      "start": 29.199999928474426,
+      "duration": 10.800000071525574,
+      "bytes": 13105,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/fns/ssr-data.ts",
+      "start": 29.199999928474426,
+      "duration": 11.399999976158142,
+      "bytes": 739,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:style:components%2Fui%2Fpreview.tsrx.css",
+      "start": 31,
+      "duration": 9.299999952316284,
+      "bytes": 1571,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:render-data:components%2Fui%2Fpreview.tsrx?import",
+      "start": 31,
+      "duration": 9.5,
+      "bytes": 19194,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:resume:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fwebsite%2Fcomponents%2Fui%2Fpreview.tsrx?import",
+      "start": 31,
+      "duration": 12.599999904632568,
+      "bytes": 11487,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:payload:components%2Fui%2Fpreview.tsrx?import",
+      "start": 31,
+      "duration": 14.5,
+      "bytes": 17551,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:style:components%2Fdocs%2Fsidebar.tsrx.css",
+      "start": 31.5,
+      "duration": 12.199999928474426,
+      "bytes": 11412,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:payload:components%2Fdocs%2Fsidebar.tsrx?import",
+      "start": 31.5,
+      "duration": 13.399999976158142,
+      "bytes": 30726,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:render-data:components%2Fdocs%2Fsidebar.tsrx?import",
+      "start": 31.5,
+      "duration": 13.099999904632568,
+      "bytes": 178163,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:resume:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fwebsite%2Fcomponents%2Fdocs%2Fsidebar.tsrx?import",
+      "start": 31.5,
+      "duration": 13.799999952316284,
+      "bytes": 28088,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/components/mascot.tsrx?import&t=1789847882085",
+      "start": 31.5,
+      "duration": 14.299999952316284,
+      "bytes": 23884,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/components/docs/mode-select.tsrx?import",
+      "start": 31.59999990463257,
+      "duration": 15.800000071525574,
+      "bytes": 287693,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/nav.ts",
+      "start": 31.59999990463257,
+      "duration": 17.600000023841858,
+      "bytes": 63448,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/headless/components/src/tree/tree.tsrx?import",
+      "start": 31.59999990463257,
+      "duration": 17.40000009536743,
+      "bytes": 183004,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:style:components%2Fdocs%2Fanatomy-table.tsrx.css",
+      "start": 33.199999928474426,
+      "duration": 16.100000023841858,
+      "bytes": 72584,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/fns/reconcile-plane.ts",
+      "start": 33.199999928474426,
+      "duration": 17,
+      "bytes": 2174,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:payload:components%2Fdocs%2Fanatomy-table.tsrx?import",
+      "start": 33.199999928474426,
+      "duration": 16.899999976158142,
+      "bytes": 106165,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:render-data:components%2Fdocs%2Fanatomy-table.tsrx?import",
+      "start": 33.199999928474426,
+      "duration": 18.600000023841858,
+      "bytes": 248103,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:resume:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fwebsite%2Fcomponents%2Fdocs%2Fanatomy-table.tsrx?import",
+      "start": 33.199999928474426,
+      "duration": 19.399999976158142,
+      "bytes": 23336,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/components/docs/ui-meta/index.ts",
+      "start": 33.299999952316284,
+      "duration": 18.600000023841858,
+      "bytes": 3273,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/components/docs/api-derive/manifest.ts",
+      "start": 33.299999952316284,
+      "duration": 18.600000023841858,
+      "bytes": 8659,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/headless/components/src/slider/slider.tsrx?import",
+      "start": 33.299999952316284,
+      "duration": 21.5,
+      "bytes": 270729,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/components/docs/anatomy/branch.tsrx?import",
+      "start": 33.299999952316284,
+      "duration": 22.700000047683716,
+      "bytes": 137412,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/components/docs/anatomy/model.ts",
+      "start": 33.299999952316284,
+      "duration": 23.100000023841858,
+      "bytes": 12392,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/components/docs/anatomy/scenes.ts",
+      "start": 33.299999952316284,
+      "duration": 23.700000047683716,
+      "bytes": 42507,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/serializer/src/value-decode.ts",
+      "start": 33.5,
+      "duration": 22.699999928474426,
+      "bytes": 11498,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/serializer/src/storage-key.ts",
+      "start": 33.5,
+      "duration": 22.799999952316284,
+      "bytes": 3161,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/serializer/src/value-decode-client.ts",
+      "start": 34.199999928474426,
+      "duration": 22.399999976158142,
+      "bytes": 12921,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/serializer/src/protocol-validation.ts",
+      "start": 34.59999990463257,
+      "duration": 24.100000023841858,
+      "bytes": 156029,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/fns/state-serialize.ts",
+      "start": 37.299999952316284,
+      "duration": 19.799999952316284,
+      "bytes": 1519,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/fns/element-handle-prop.ts",
+      "start": 37.5,
+      "duration": 20.09999990463257,
+      "bytes": 4574,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/resume-arm-records.ts",
+      "start": 38.89999997615814,
+      "duration": 18.600000023841858,
+      "bytes": 32867,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/fns/state-clone.ts",
+      "start": 40,
+      "duration": 17.699999928474426,
+      "bytes": 4274,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/fns/state-payload.ts",
+      "start": 40.09999990463257,
+      "duration": 18.800000071525574,
+      "bytes": 4210,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/fns/state-slot.ts",
+      "start": 40.09999990463257,
+      "duration": 19,
+      "bytes": 8681,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/fns/state-value.ts",
+      "start": 40.09999990463257,
+      "duration": 20.200000047683716,
+      "bytes": 2023,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:render-data:components%2Fmascot.tsrx?import",
+      "start": 45.299999952316284,
+      "duration": 14.200000047683716,
+      "bytes": 26187,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:render-data:components%2Fdocs%2Fmode-select.tsrx?import",
+      "start": 45.39999997615814,
+      "duration": 15,
+      "bytes": 137078,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:render-data:node_modules%2F%40markless%2Fui%2Fsrc%2Ftree%2Ftree.tsrx?import",
+      "start": 45.39999997615814,
+      "duration": 24.5,
+      "bytes": 745138,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:payload:components%2Fmascot.tsrx?import",
+      "start": 46.09999990463257,
+      "duration": 14.600000023841858,
+      "bytes": 9856,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:resume:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fwebsite%2Fcomponents%2Fmascot.tsrx?import",
+      "start": 46.09999990463257,
+      "duration": 14.800000071525574,
+      "bytes": 9302,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:style:components%2Fdocs%2Fmode-select.tsrx.css",
+      "start": 48.299999952316284,
+      "duration": 12.700000047683716,
+      "bytes": 4398,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/headless/components/src/select/select.tsrx?import",
+      "start": 48.299999952316284,
+      "duration": 19.200000047683716,
+      "bytes": 242776,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:payload:components%2Fdocs%2Fmode-select.tsrx?import",
+      "start": 48.299999952316284,
+      "duration": 21,
+      "bytes": 15512,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:resume:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fwebsite%2Fcomponents%2Fdocs%2Fmode-select.tsrx?import",
+      "start": 48.299999952316284,
+      "duration": 21.5,
+      "bytes": 30465,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:payload:node_modules%2F%40markless%2Fui%2Fsrc%2Ftree%2Ftree.tsrx?import",
+      "start": 49.699999928474426,
+      "duration": 19.100000023841858,
+      "bytes": 202331,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:resume:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Ftree%2Ftree.tsrx?import",
+      "start": 49.799999952316284,
+      "duration": 19.200000047683716,
+      "bytes": 11020,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/runtime/src/graph-reconcile.ts",
+      "start": 50.299999952316284,
+      "duration": 20,
+      "bytes": 59054,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/components/docs/ui-meta/accordion.ts",
+      "start": 52.199999928474426,
+      "duration": 18.200000047683716,
+      "bytes": 6513,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/components/docs/ui-meta/keys.ts",
+      "start": 52.199999928474426,
+      "duration": 18.399999976158142,
+      "bytes": 6231,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/components/docs/ui-meta/types.ts",
+      "start": 52.299999952316284,
+      "duration": 18.399999976158142,
+      "bytes": 311,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/headless/components/api/manifest.json?import&raw",
+      "start": 52.299999952316284,
+      "duration": 24.100000023841858,
+      "bytes": 236495,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:render-data:components%2Fdocs%2Fanatomy%2Fbranch.tsrx?import",
+      "start": 52.59999990463257,
+      "duration": 20.600000023841858,
+      "bytes": 95100,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:render-data:node_modules%2F%40markless%2Fui%2Fsrc%2Fslider%2Fslider.tsrx?import",
+      "start": 52.59999990463257,
+      "duration": 30.100000023841858,
+      "bytes": 1131570,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:resume:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fslider%2Fslider.tsrx?import",
+      "start": 55.89999997615814,
+      "duration": 19.399999976158142,
+      "bytes": 13448,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/headless/components/src/slider/slider-math.ts",
+      "start": 55.89999997615814,
+      "duration": 19.699999928474426,
+      "bytes": 15049,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:payload:node_modules%2F%40markless%2Fui%2Fsrc%2Fslider%2Fslider.tsrx?import",
+      "start": 55.89999997615814,
+      "duration": 19.299999952316284,
+      "bytes": 312395,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:style:components%2Fdocs%2Fanatomy%2Fbranch.tsrx.css",
+      "start": 56.59999990463257,
+      "duration": 25.600000023841858,
+      "bytes": 38425,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:payload:components%2Fdocs%2Fanatomy%2Fbranch.tsrx?import",
+      "start": 56.59999990463257,
+      "duration": 26.200000047683716,
+      "bytes": 33695,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:resume:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fwebsite%2Fcomponents%2Fdocs%2Fanatomy%2Fbranch.tsrx?import",
+      "start": 56.59999990463257,
+      "duration": 26.300000071525574,
+      "bytes": 24632,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/components/docs/anatomy/callouts.ts",
+      "start": 56.799999952316284,
+      "duration": 26.299999952316284,
+      "bytes": 5780,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/components/docs/anatomy/layers.ts",
+      "start": 56.799999952316284,
+      "duration": 26.5,
+      "bytes": 11523,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/components/docs/anatomy/hierarchy.ts",
+      "start": 56.799999952316284,
+      "duration": 26.600000023841858,
+      "bytes": 13246,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/pages/markless/ui/combobox.mdx?t=1789847882085&markless-route",
+      "start": 66.19999992847443,
+      "duration": 36.10000002384186,
+      "bytes": 338211,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:render-data:node_modules%2F%40markless%2Fui%2Fsrc%2Fselect%2Fselect.tsrx?import",
+      "start": 66.79999995231628,
+      "duration": 23.100000023841858,
+      "bytes": 1121646,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:resume:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fselect%2Fselect.tsrx?import",
+      "start": 68.59999990463257,
+      "duration": 23,
+      "bytes": 15288,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:payload:node_modules%2F%40markless%2Fui%2Fsrc%2Fselect%2Fselect.tsrx?import",
+      "start": 68.59999990463257,
+      "duration": 22.700000047683716,
+      "bytes": 276786,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/headless/components/src/base/visually-hidden.tsrx?import",
+      "start": 68.59999990463257,
+      "duration": 24.700000047683716,
+      "bytes": 22726,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/runtime/src/graph-async.ts",
+      "start": 71.09999990463257,
+      "duration": 21.40000009536743,
+      "bytes": 20305,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/fns/shared-seed.ts",
+      "start": 71.09999990463257,
+      "duration": 21.200000047683716,
+      "bytes": 86208,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/runtime/src/graph-core.ts",
+      "start": 71.09999990463257,
+      "duration": 21.600000023841858,
+      "bytes": 9305,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:render-data:node_modules%2F%40markless%2Fui%2Fsrc%2Fbase%2Fvisually-hidden.tsrx?import",
+      "start": 93,
+      "duration": 0.5,
+      "bytes": 13234,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/prerender/children-projection.ts",
+      "start": 93,
+      "duration": 0.8999999761581421,
+      "bytes": 33193,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/fns/element-handle-roster.ts",
+      "start": 93,
+      "duration": 1,
+      "bytes": 17096,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:payload:node_modules%2F%40markless%2Fui%2Fsrc%2Fbase%2Fvisually-hidden.tsrx?import",
+      "start": 93.5,
+      "duration": 0.8999999761581421,
+      "bytes": 13143,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:resume:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fbase%2Fvisually-hidden.tsrx?import",
+      "start": 93.5,
+      "duration": 1.1999999284744263,
+      "bytes": 10536,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/payload-resume.ts",
+      "start": 101.89999997615814,
+      "duration": 0.6999999284744263,
+      "bytes": 18088,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/runtime/src/index.ts",
+      "start": 106.39999997615814,
+      "duration": 0.7999999523162842,
+      "bytes": 660,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/render-canonical.ts",
+      "start": 107.39999997615814,
+      "duration": 0.6000000238418579,
+      "bytes": 6916,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/runtime/src/graph.ts",
+      "start": 108.39999997615814,
+      "duration": 0.7999999523162842,
+      "bytes": 47251,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/components/docs/theme-toggle.tsrx?import&markless-render-data&markless-reached-from=%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fwebsite%2Fpages%2Fmarkless%2Fui%2Fcombobox.mdx",
+      "start": 108.69999992847443,
+      "duration": 1.899999976158142,
+      "bytes": 25125,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/components/docs/sidebar.tsrx?import&markless-render-data&markless-reached-from=%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fwebsite%2Fpages%2Fmarkless%2Fui%2Fcombobox.mdx",
+      "start": 108.69999992847443,
+      "duration": 1.7000000476837158,
+      "bytes": 179494,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/components/ui/preview.tsrx?import&markless-render-data&markless-reached-from=%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fwebsite%2Fpages%2Fmarkless%2Fui%2Fcombobox.mdx",
+      "start": 108.79999995231628,
+      "duration": 2.100000023841858,
+      "bytes": 19699,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/components/docs/anatomy-table.tsrx?import&markless-render-data&markless-reached-from=%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fwebsite%2Fpages%2Fmarkless%2Fui%2Fcombobox.mdx",
+      "start": 108.79999995231628,
+      "duration": 3.799999952316284,
+      "bytes": 249047,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/runtime/src/graph-collections.ts",
+      "start": 109.5,
+      "duration": 3.6999999284744263,
+      "bytes": 16176,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/runtime/src/graph-scheduler.ts",
+      "start": 109.59999990463257,
+      "duration": 2.9000000953674316,
+      "bytes": 2449,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/runtime/src/graph-computed.ts",
+      "start": 109.59999990463257,
+      "duration": 3.8000000715255737,
+      "bytes": 11797,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/runtime/src/graph-shared.ts",
+      "start": 109.69999992847443,
+      "duration": 3,
+      "bytes": 14269,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/components/mascot.tsrx?import&markless-render-data&markless-reached-from=%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fwebsite%2Fpages%2Fmarkless%2Fui%2Fcombobox.mdx",
+      "start": 111.09999990463257,
+      "duration": 2,
+      "bytes": 26315,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/components/docs/mode-select.tsrx?import&markless-render-data&markless-reached-from=%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fwebsite%2Fpages%2Fmarkless%2Fui%2Fcombobox.mdx",
+      "start": 111.09999990463257,
+      "duration": 3.200000047683716,
+      "bytes": 137613,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/components/docs/anatomy/branch.tsrx?import&markless-render-data&markless-reached-from=%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fwebsite%2Fpages%2Fmarkless%2Fui%2Fcombobox.mdx",
+      "start": 113.39999997615814,
+      "duration": 1.5,
+      "bytes": 95632,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/storage-plane.ts",
+      "start": 114,
+      "duration": 1.0999999046325684,
+      "bytes": 12485,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/resume-runtime.ts",
+      "start": 117.29999995231628,
+      "duration": 0.3999999761581421,
+      "bytes": 63975,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/components/docs/sidebar.tsrx?import&markless-symbols",
+      "start": 120.39999997615814,
+      "duration": 0.7999999523162842,
+      "bytes": 21347,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/resume-sync-demand.ts",
+      "start": 122.29999995231628,
+      "duration": 0.5,
+      "bytes": 6174,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/components/docs/mode-select.tsrx?import&markless-symbols",
+      "start": 122.39999997615814,
+      "duration": 0.7999999523162842,
+      "bytes": 23744,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/resume-commit-arm.ts",
+      "start": 123.39999997615814,
+      "duration": 0.6999999284744263,
+      "bytes": 42612,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/headless/components/src/select/select.tsrx?import&markless-symbols",
+      "start": 123.69999992847443,
+      "duration": 0.6000000238418579,
+      "bytes": 9243,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/resume-runtime-start.ts",
+      "start": 124.5,
+      "duration": 0.6999999284744263,
+      "bytes": 40270,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:resolver:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fselect%2Fselect.tsrx?import",
+      "start": 124.69999992847443,
+      "duration": 1,
+      "bytes": 56708,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/resume-events.ts",
+      "start": 125.89999997615814,
+      "duration": 0.5,
+      "bytes": 94389,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fselect%2Fselect.tsrx:symbol%3A45?import",
+      "start": 126.09999990463257,
+      "duration": 0.5,
+      "bytes": 3223,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/inline/sync-policy-core.ts",
+      "start": 127.5,
+      "duration": 0.5999999046325684,
+      "bytes": 5092,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fselect%2Fselect.tsrx:symbol%3A46?import",
+      "start": 127.89999997615814,
+      "duration": 0.5,
+      "bytes": 3203,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/resume-keyed-repeats.ts",
+      "start": 128.19999992847443,
+      "duration": 0.5,
+      "bytes": 56547,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fselect%2Fselect.tsrx:symbol%3A47?import",
+      "start": 128.69999992847443,
+      "duration": 0.30000007152557373,
+      "bytes": 3267,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/resume-branches.ts",
+      "start": 129.29999995231628,
+      "duration": 0.3999999761581421,
+      "bytes": 60641,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fselect%2Fselect.tsrx:symbol%3A48?import",
+      "start": 129.5,
+      "duration": 0.5,
+      "bytes": 3267,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/fns/overlay.ts",
+      "start": 131.19999992847443,
+      "duration": 0.5,
+      "bytes": 49759,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fselect%2Fselect.tsrx:symbol%3A49?import",
+      "start": 131.29999995231628,
+      "duration": 0.5,
+      "bytes": 3204,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:dev-log",
+      "start": 132.5,
+      "duration": 3.1999999284744263,
+      "bytes": 332529,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/resume-runtime-shared.ts",
+      "start": 132.79999995231628,
+      "duration": 3,
+      "bytes": 7512,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:resolver:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fwebsite%2Fcomponents%2Fdocs%2Fsidebar.tsrx?import",
+      "start": 132.89999997615814,
+      "duration": 3.600000023841858,
+      "bytes": 76789,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fwebsite%2Fcomponents%2Fdocs%2Fsidebar.tsrx:symbol%3A0?import",
+      "start": 133,
+      "duration": 3.5999999046325684,
+      "bytes": 2396,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fselect%2Fselect.tsrx:symbol%3A52?import",
+      "start": 133.19999992847443,
+      "duration": 3.5,
+      "bytes": 1997,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/runtime-error-reporting.ts",
+      "start": 136.09999990463257,
+      "duration": 0.8000000715255737,
+      "bytes": 8912,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Ftree%2Ftree.tsrx:symbol%3A1?import",
+      "start": 138.39999997615814,
+      "duration": 0.6999999284744263,
+      "bytes": 30067,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Ftree%2Ftree.tsrx:symbol%3A0?import",
+      "start": 138.5,
+      "duration": 0.5999999046325684,
+      "bytes": 11357,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fselect%2Fselect.tsrx:symbol%3A53?import",
+      "start": 138.5,
+      "duration": 0.8999999761581421,
+      "bytes": 2005,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/headless/components/src/tree/tree-walk.ts",
+      "start": 139.29999995231628,
+      "duration": 0.3999999761581421,
+      "bytes": 5735,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/headless/components/src/tree/tree.tsrx?import&markless-symbols",
+      "start": 142.59999990463257,
+      "duration": 0.5,
+      "bytes": 5897,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fselect%2Fselect.tsrx:symbol%3A50?import",
+      "start": 142.69999992847443,
+      "duration": 0.3999999761581421,
+      "bytes": 2845,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fselect%2Fselect.tsrx:symbol%3A51?import",
+      "start": 143.5,
+      "duration": 0.5999999046325684,
+      "bytes": 3273,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:resolver:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Ftree%2Ftree.tsrx?import",
+      "start": 143.5,
+      "duration": 0.5999999046325684,
+      "bytes": 44585,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Ftree%2Ftree.tsrx:symbol%3A4?import",
+      "start": 144.39999997615814,
+      "duration": 0.2999999523162842,
+      "bytes": 2271,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fselect%2Fselect.tsrx:symbol%3A34?import",
+      "start": 146.5,
+      "duration": 0.2999999523162842,
+      "bytes": 2801,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fselect%2Fselect.tsrx:symbol%3A35?import",
+      "start": 147.19999992847443,
+      "duration": 0.20000004768371582,
+      "bytes": 2690,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fselect%2Fselect.tsrx:symbol%3A36?import",
+      "start": 147.59999990463257,
+      "duration": 0.30000007152557373,
+      "bytes": 2558,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fselect%2Fselect.tsrx:symbol%3A43?import",
+      "start": 149.29999995231628,
+      "duration": 0.2999999523162842,
+      "bytes": 3101,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fselect%2Fselect.tsrx:symbol%3A44?import",
+      "start": 149.79999995231628,
+      "duration": 0.2999999523162842,
+      "bytes": 2254,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fselect%2Fselect.tsrx:symbol%3A39?import",
+      "start": 150.59999990463257,
+      "duration": 0.20000004768371582,
+      "bytes": 3101,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fselect%2Fselect.tsrx:symbol%3A40?import",
+      "start": 151.09999990463257,
+      "duration": 0.30000007152557373,
+      "bytes": 3111,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fselect%2Fselect.tsrx:symbol%3A41?import",
+      "start": 151.69999992847443,
+      "duration": 0.30000007152557373,
+      "bytes": 2361,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fselect%2Fselect.tsrx:symbol%3A42?import",
+      "start": 152.19999992847443,
+      "duration": 0.30000007152557373,
+      "bytes": 2322,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fselect%2Fselect.tsrx:symbol%3A37?import",
+      "start": 154.39999997615814,
+      "duration": 0.5,
+      "bytes": 2558,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fselect%2Fselect.tsrx:symbol%3A38?import",
+      "start": 155.19999992847443,
+      "duration": 0.3999999761581421,
+      "bytes": 2558,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fselect%2Fselect.tsrx:symbol%3A33?import",
+      "start": 157.29999995231628,
+      "duration": 0.5,
+      "bytes": 2558,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Ftree%2Ftree.tsrx:symbol%3A37?import",
+      "start": 158.89999997615814,
+      "duration": 0.3999999761581421,
+      "bytes": 3234,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Ftree%2Ftree.tsrx:symbol%3A38?import",
+      "start": 160,
+      "duration": 0.2999999523162842,
+      "bytes": 3178,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Ftree%2Ftree.tsrx:symbol%3A39?import",
+      "start": 160.59999990463257,
+      "duration": 0.30000007152557373,
+      "bytes": 3178,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Ftree%2Ftree.tsrx:symbol%3A40?import",
+      "start": 161.29999995231628,
+      "duration": 0.3999999761581421,
+      "bytes": 3185,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Ftree%2Ftree.tsrx:symbol%3A41?import",
+      "start": 162.09999990463257,
+      "duration": 0.40000009536743164,
+      "bytes": 3242,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Ftree%2Ftree.tsrx:symbol%3A42?import",
+      "start": 163,
+      "duration": 0.19999992847442627,
+      "bytes": 1980,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Ftree%2Ftree.tsrx:symbol%3A36?import",
+      "start": 164.39999997615814,
+      "duration": 0.19999992847442627,
+      "bytes": 2527,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Ftree%2Ftree.tsrx:symbol%3A31?import",
+      "start": 166.19999992847443,
+      "duration": 0.30000007152557373,
+      "bytes": 3302,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Ftree%2Ftree.tsrx:symbol%3A32?import",
+      "start": 166.79999995231628,
+      "duration": 0.3999999761581421,
+      "bytes": 2527,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Ftree%2Ftree.tsrx:symbol%3A27?import",
+      "start": 184.09999990463257,
+      "duration": 0.6000000238418579,
+      "bytes": 3274,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Ftree%2Ftree.tsrx:symbol%3A28?import",
+      "start": 186,
+      "duration": 0.5,
+      "bytes": 3274,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Ftree%2Ftree.tsrx:symbol%3A29?import",
+      "start": 187.69999992847443,
+      "duration": 0.6000000238418579,
+      "bytes": 3627,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Ftree%2Ftree.tsrx:symbol%3A30?import",
+      "start": 189.39999997615814,
+      "duration": 0.6000000238418579,
+      "bytes": 2773,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Ftree%2Ftree.tsrx:symbol%3A33?import",
+      "start": 192.79999995231628,
+      "duration": 0.6000000238418579,
+      "bytes": 2527,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Ftree%2Ftree.tsrx:symbol%3A34?import",
+      "start": 193.79999995231628,
+      "duration": 0.3999999761581421,
+      "bytes": 2231,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Ftree%2Ftree.tsrx:symbol%3A35?import",
+      "start": 194.5,
+      "duration": 0.2999999523162842,
+      "bytes": 2231,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/components/docs/anatomy-table.tsrx?import&markless-symbols",
+      "start": 203.09999990463257,
+      "duration": 0.8000000715255737,
+      "bytes": 15886,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:resolver:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fwebsite%2Fcomponents%2Fdocs%2Fanatomy-table.tsrx?import",
+      "start": 204.39999997615814,
+      "duration": 1.7999999523162842,
+      "bytes": 242113,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/fns/callback-slot.ts",
+      "start": 207,
+      "duration": 0.7999999523162842,
+      "bytes": 17146,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fwebsite%2Fcomponents%2Fdocs%2Fanatomy-table.tsrx:symbol%3A16?import",
+      "start": 208.09999990463257,
+      "duration": 0.30000007152557373,
+      "bytes": 2232,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fwebsite%2Fcomponents%2Fdocs%2Fanatomy-table.tsrx:symbol%3A17?import",
+      "start": 208.69999992847443,
+      "duration": 0.30000007152557373,
+      "bytes": 2232,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fwebsite%2Fcomponents%2Fdocs%2Fanatomy-table.tsrx:symbol%3A18?import",
+      "start": 209.19999992847443,
+      "duration": 0.30000007152557373,
+      "bytes": 2252,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fwebsite%2Fcomponents%2Fdocs%2Fanatomy-table.tsrx:symbol%3A19?import",
+      "start": 209.69999992847443,
+      "duration": 0.5,
+      "bytes": 2254,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/headless/components/src/slider/slider.tsrx?import&markless-symbols",
+      "start": 210.5,
+      "duration": 0.3999999761581421,
+      "bytes": 6464,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:resolver:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fslider%2Fslider.tsrx?import",
+      "start": 211.19999992847443,
+      "duration": 0.5,
+      "bytes": 70034,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fslider%2Fslider.tsrx:symbol%3A61?import",
+      "start": 212.09999990463257,
+      "duration": 0.30000007152557373,
+      "bytes": 2838,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fslider%2Fslider.tsrx:symbol%3A62?import",
+      "start": 212.69999992847443,
+      "duration": 0.3999999761581421,
+      "bytes": 3176,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fslider%2Fslider.tsrx:symbol%3A63?import",
+      "start": 213.29999995231628,
+      "duration": 0.20000004768371582,
+      "bytes": 3182,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fslider%2Fslider.tsrx:symbol%3A64?import",
+      "start": 213.69999992847443,
+      "duration": 0.30000007152557373,
+      "bytes": 3195,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fslider%2Fslider.tsrx:symbol%3A65?import",
+      "start": 214.29999995231628,
+      "duration": 0.20000004768371582,
+      "bytes": 3351,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fslider%2Fslider.tsrx:symbol%3A66?import",
+      "start": 214.79999995231628,
+      "duration": 0.2999999523162842,
+      "bytes": 3267,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fslider%2Fslider.tsrx:symbol%3A67?import",
+      "start": 215.29999995231628,
+      "duration": 0.20000004768371582,
+      "bytes": 1997,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fslider%2Fslider.tsrx:symbol%3A68?import",
+      "start": 215.69999992847443,
+      "duration": 0.30000007152557373,
+      "bytes": 2004,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fslider%2Fslider.tsrx:symbol%3A46?import",
+      "start": 216.39999997615814,
+      "duration": 0.2999999523162842,
+      "bytes": 4401,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fslider%2Fslider.tsrx:symbol%3A47?import",
+      "start": 217,
+      "duration": 0.2999999523162842,
+      "bytes": 4375,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fslider%2Fslider.tsrx:symbol%3A60?import",
+      "start": 217.79999995231628,
+      "duration": 0.3999999761581421,
+      "bytes": 2633,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fslider%2Fslider.tsrx:symbol%3A51?import",
+      "start": 218.39999997615814,
+      "duration": 0.2999999523162842,
+      "bytes": 3428,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fslider%2Fslider.tsrx:symbol%3A52?import",
+      "start": 218.79999995231628,
+      "duration": 0.20000004768371582,
+      "bytes": 4275,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fslider%2Fslider.tsrx:symbol%3A53?import",
+      "start": 219.29999995231628,
+      "duration": 0.3999999761581421,
+      "bytes": 4275,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fslider%2Fslider.tsrx:symbol%3A54?import",
+      "start": 219.89999997615814,
+      "duration": 0.2999999523162842,
+      "bytes": 5400,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fslider%2Fslider.tsrx:symbol%3A55?import",
+      "start": 220.39999997615814,
+      "duration": 0.2999999523162842,
+      "bytes": 3031,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fslider%2Fslider.tsrx:symbol%3A56?import",
+      "start": 220.89999997615814,
+      "duration": 0.2999999523162842,
+      "bytes": 3486,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fslider%2Fslider.tsrx:symbol%3A57?import",
+      "start": 221.5,
+      "duration": 0.2999999523162842,
+      "bytes": 2636,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fslider%2Fslider.tsrx:symbol%3A58?import",
+      "start": 222,
+      "duration": 0.2999999523162842,
+      "bytes": 2728,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/components/docs/anatomy/branch.tsrx?import&markless-symbols",
+      "start": 223.5,
+      "duration": 0.6999999284744263,
+      "bytes": 17808,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fslider%2Fslider.tsrx:symbol%3A48?import",
+      "start": 246.5,
+      "duration": 0.5999999046325684,
+      "bytes": 2574,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@id/__x00__virtual:markless:symbol:%2FUsers%2Fjacksm5pro%2Fdev%2Fopen-source%2Fmarkless%2Fpackages%2Fheadless%2Fcomponents%2Fsrc%2Fslider%2Fslider.tsrx:symbol%3A49?import",
+      "start": 247.69999992847443,
+      "duration": 0.5,
+      "bytes": 4880,
+      "type": "script"
+    },
+    {
+      "url": "http://127.0.0.1:4488/markless/@fs/Users/jacksm5pro/dev/open-source/markless/packages/web/src/render-csr.ts",
+      "start": 253.5,
+      "duration": 0.6999999284744263,
+      "bytes": 68467,
+      "type": "script"
+    }
+  ]
+}

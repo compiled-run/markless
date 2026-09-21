@@ -1,5 +1,6 @@
 import { transformSync } from 'rolldown/experimental';
 import { expect, test } from 'vitest';
+import { parseModule } from '../../compiler/src/js-ast.ts';
 import {
 	stripEmittedTypes,
 	stripEmittedTypesFromFragment,
@@ -92,6 +93,48 @@ async function renderDataSource(name: string, source: string): Promise<string> {
 	return renderData.source;
 }
 
+test.each([
+	{ name: 'Caption', tag: 'aside', unused: 'phantom', live: 'format', reverse: false },
+	{ name: 'Summary', tag: 'footer', unused: 'specter', live: 'decorate', reverse: true },
+])(
+	'render-data imports only executable residue dependencies for $name',
+	async ({ name, tag, unused, live, reverse }) => {
+		const declarations = [
+			`const unused = ${unused}();`,
+			`const example = 'import { ${unused} } from "library"; unused';`,
+			`function caption(value) { return ${live}(value); }`,
+		];
+		if (reverse) declarations.reverse();
+		const source = await renderDataSource(
+			name,
+			`import { ${unused}, ${live} } from './helpers';
+	${declarations.join('\n')}
+	export function ${name}({ label }) @{
+		const text = caption(label) + example + '[data-${unused}]';
+		<${tag} title={text} />
+	}`,
+		);
+		const ast = parseModule(source, 'render-data.js');
+		const imports = ast.body.flatMap((node) =>
+			node.type === 'ImportDeclaration'
+				? node.specifiers.map((entry) => entry.local.name)
+				: [],
+		);
+		expect(imports).toContain(live);
+		expect(imports).not.toContain(unused);
+		const variables = ast.body.flatMap((node) =>
+			node.type === 'VariableDeclaration'
+				? node.declarations.map((entry) =>
+						entry.id.type === 'Identifier' ? entry.id.name : null,
+					)
+				: [],
+		);
+		expect(variables).toContain('example');
+		expect(variables).not.toContain('unused');
+		expect(javaScriptParseErrors(source)).toEqual([]);
+	},
+);
+
 async function virtualModules(name: string, source: string) {
 	const result = await transformTsrxModule({
 		filename: `/workspace/app/src/${name}.tsrx`,
@@ -128,7 +171,7 @@ test('a residue reader with no TypeScript keeps the exact bytes the compiler emi
 
 	// The compiler emits the reader without spaces; oxc's printer would add them.
 	expect(source).toContain('readResidue:(residue,marklessResidueContext)=>{');
-	expect(source).toContain('const TONES = { calm: \'Calm\', loud: \'Loud\' };');
+	expect(source).toContain("const TONES = { calm: 'Calm', loud: 'Loud' };");
 	expect(javaScriptParseErrors(source)).toEqual([]);
 });
 

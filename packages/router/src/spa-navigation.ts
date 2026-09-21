@@ -1,3 +1,4 @@
+/// <reference path="./navigation-api.d.ts" />
 import {
 	buildRouteManifestFromFileIds,
 	matchRouteManifest,
@@ -9,11 +10,9 @@ import {
 	type RouteDocumentModule,
 	type RouteUpdate,
 } from './route-state.ts';
+import { LINK_ATTRIBUTE, REPLACE_ATTRIBUTE, SCROLL_ATTRIBUTE } from './link-attributes.ts';
 
 const STARTED = '__marklessRouterSpaNavigationStarted';
-const LINK_ATTRIBUTE = 'data-markless-router-link';
-const REPLACE_ATTRIBUTE = 'data-markless-router-replace';
-const SCROLL_ATTRIBUTE = 'data-markless-router-scroll';
 const LINK_INFO = '__marklessRouterLink';
 
 export type MarklessRouterNavigationRuntime = Pick<Navigation, 'addEventListener' | 'navigate'>;

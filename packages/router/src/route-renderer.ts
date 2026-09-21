@@ -1,5 +1,6 @@
 import { render } from '@markless/web/render';
 import type { CsrRenderArtifact, RenderTarget } from '@markless/web/render';
+import { routeMountTarget } from './route-dom.ts';
 import { holdNavigationSwapUntilSettled, type NavigationHoldRuntime } from './navigation-hold.ts';
 import {
 	MARKLESS_ROUTER_RENDERER_STARTED,
@@ -36,10 +37,10 @@ async function renderRouteUpdate(document: Document, update: RouteUpdate): Promi
 		}
 
 		const props = routePageProps(update.route);
-		// D8 navigation transition: the destination evaluates its build-known
-		// render-data closure fully live but unmounted. The outgoing authority
-		// remains interactive until the hold approves the exact swap boundary.
 		const state = document as unknown as Record<string, unknown>;
+		const outgoing = state[CURRENT_ROUTE_CONTAINER] as
+			| { readonly root?: Element; readonly runtime?: { readonly dispose?: () => void } }
+			| undefined;
 		const container = await render(
 			{
 				renderData: artifact.renderData,
@@ -47,20 +48,13 @@ async function renderRouteUpdate(document: Document, update: RouteUpdate): Promi
 				props,
 			},
 			{
-				// A real element mounts through the same replaceChildren/appendChild pair
-				// the mount target describes; only its stand-in child type differs.
-				target: document.body as RenderTarget,
-				// The D8 hold/deadline/min-duration state machine lives in
-				// navigation-hold.ts (pure, fake-clock property-tested).
+				target: routeMountTarget(document, outgoing?.root) as RenderTarget,
 				beforeMount: async (incoming) => {
 					const commit = await holdNavigationSwapUntilSettled({
 						runtime: incoming.runtime as NavigationHoldRuntime,
 						signal: update.signal,
 					});
 					if (commit === false) return false;
-					const outgoing = state[CURRENT_ROUTE_CONTAINER] as
-						| { readonly runtime?: { readonly dispose?: () => void } }
-						| undefined;
 					outgoing?.runtime?.dispose?.();
 					return true;
 				},

@@ -4,6 +4,7 @@ import { buildRouteManifestFromFileIds } from '../route-manifest.ts';
 import type { Plugin } from 'vite';
 import { __marklessRouteHref } from './entries/route-href.ts';
 import { discoverPageFiles, type RouteTypegenFileSystem } from './route-typegen.ts';
+import { LINK_ATTRIBUTE, REPLACE_ATTRIBUTE, SCROLL_ATTRIBUTE } from '../link-attributes.ts';
 
 const ROUTE_HREF_HELPER_ID = 'virtual:markless-router/route-href';
 const JSX_FILE_FILTER = /\.(?:[jt]sx|tsrx)(?:$|\?)/;
@@ -57,7 +58,16 @@ export function anchorTransformPlugin(): Plugin {
 				const ast = parseTransformAst(code, id, (source, options) =>
 					this.parse(source, options),
 				);
-				const transformed = transformAnchorSource(code, ast, routePatterns);
+				let transformed = transformAnchorSource(code, ast, routePatterns);
+				if (id.includes('.tsrx')) {
+					const linkedAst =
+						transformed === code
+							? ast
+							: parseTransformAst(transformed, id, (source, options) =>
+									this.parse(source, options),
+								);
+					transformed = lowerRouterLinks(transformed, linkedAst);
+				}
 
 				return transformed === code ? undefined : { code: transformed, map: null };
 			},
@@ -72,6 +82,41 @@ export function anchorTransformPlugin(): Plugin {
 			await refreshRoutes(this.fs);
 		},
 	};
+}
+
+function lowerRouterLinks(code: string, ast: Node): string {
+	const linkNames = marklessRouterLinkImportNames(ast);
+	const edits: Edit[] = [];
+	walk(ast, (current) => {
+		if (current.type !== 'JSXElement') return;
+		const opening = node(current.openingElement);
+		const name = opening && node(opening.name);
+		if (!name || !linkNames.has(jsxName(name) ?? '')) return;
+		const attributes = nodes(opening?.attributes);
+		if (attributes.some((attribute) => attribute.type === 'JSXSpreadAttribute')) return;
+		if (!findJsxAttribute(attributes, 'href') || findJsxAttribute(attributes, 'children'))
+			return;
+		edits.push({ ...rangeOf(name), text: `a ${LINK_ATTRIBUTE}` });
+		const closingName = node(node(current.closingElement)?.name);
+		if (closingName) edits.push({ ...rangeOf(closingName), text: 'a' });
+		for (const attribute of attributes) {
+			const attributeName = jsxName(node(attribute.name));
+			if (attributeName === 'prefetch' || attributeName === 'params') {
+				edits.push({ ...attributeRemovalRange(code, attribute), text: '' });
+			} else if (attributeName === 'replace' || attributeName === 'scroll') {
+				const value = node(attribute.value);
+				const expression = value ? slice(code, jsxExpression(value) ?? value) : 'true';
+				edits.push({
+					...rangeOf(attribute),
+					text:
+						attributeName === 'replace'
+							? `${REPLACE_ATTRIBUTE}={(${expression}) ? '' : undefined}`
+							: `${SCROLL_ATTRIBUTE}={(${expression}) === false ? 'manual' : undefined}`,
+				});
+			}
+		}
+	});
+	return applyEdits(code, edits);
 }
 
 function parseTransformAst(

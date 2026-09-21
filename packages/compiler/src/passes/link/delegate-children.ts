@@ -1,3 +1,4 @@
+import { linkedComponentTarget } from './component-target.ts';
 // Pass `delegate-children`: decides which of a module's artifact-child edges
 // are delegates a linker may render at build time, and turns the renderings the
 // linker handed back into materializations. The classification is a typed kind
@@ -6,6 +7,7 @@
 // pass has no `resolve`, no `import()` and no filesystem, so a dependency's
 // compiled JavaScript is an input artifact here and never something it loads.
 import type {
+	ModuleGraphInterfaceArtifact,
 	ArtifactChildMaterialization,
 	CompilerDiagnostic,
 	DelegateChildRenderPlan,
@@ -37,14 +39,27 @@ export function delegateChildResolutionRequests(
 export function planDelegateChildren(
 	candidates: ReadonlyArray<LinkedArtifactChild>,
 	resolution: Readonly<Record<string, string>>,
+	interfaces: Readonly<Record<string, ModuleGraphInterfaceArtifact>> = {},
 ): LinkedDelegateChild[] {
 	return candidates.map((candidate) => {
 		const source = resolution[candidate.edgeId];
-		const kind = delegateChildKind(candidate.importSource, source);
+		const componentTarget = linkedComponentTarget(
+			candidate.componentName,
+			candidate,
+			interfaces[candidate.importSource],
+		);
+		const compiledTarget =
+			componentTarget && TSRX_SOURCE_FILE.test(componentTarget.source)
+				? componentTarget
+				: undefined;
+		const kind = compiledTarget
+			? 'compiled-tsrx'
+			: delegateChildKind(candidate.importSource, source);
 		return {
 			edgeId: candidate.edgeId,
 			componentName: candidate.componentName,
 			specifier: candidate.importSource,
+			...(compiledTarget ? { componentTarget: compiledTarget } : {}),
 			...(source === undefined ? {} : { source }),
 			kind,
 			loadable: kind === 'external-delegate',
@@ -57,10 +72,7 @@ export function planDelegateChildren(
 // a delegate. Every other resolved child is a delegate candidate, and whether it
 // materializes is settled by whether it handed back a rendering rather than by
 // where its file happens to sit relative to the app root.
-function delegateChildKind(
-	specifier: string,
-	source: string | undefined,
-): LinkedModuleChildKind {
+function delegateChildKind(specifier: string, source: string | undefined): LinkedModuleChildKind {
 	if (TSRX_SOURCE_FILE.test(specifier)) return 'compiled-tsrx';
 	if (source === undefined) return 'unresolved';
 	return TSRX_SOURCE_FILE.test(source) ? 'compiled-tsrx' : 'external-delegate';
@@ -76,9 +88,7 @@ export function delegateChildMaterializable(
 	return child.kind === 'external-delegate' && renderings[child.edgeId] !== undefined;
 }
 
-export function linkDelegateChildren(
-	input: DelegateChildrenInput,
-): LinkedDelegateChildrenArtifact {
+export function linkDelegateChildren(input: DelegateChildrenInput): LinkedDelegateChildrenArtifact {
 	const materializations: Record<string, ArtifactChildMaterialization> = {};
 	const diagnostics: CompilerDiagnostic[] = [];
 	for (const child of input.children) {
@@ -88,9 +98,7 @@ export function linkDelegateChildren(
 			diagnostics.push(
 				delegateArtifactMissingDiagnostic(
 					child,
-					input.importFailures?.find((failure) =>
-						failure.edgeIds.includes(child.edgeId),
-					),
+					input.importFailures?.find((failure) => failure.edgeIds.includes(child.edgeId)),
 				),
 			);
 		}
@@ -230,9 +238,7 @@ function delegateRenderInvalidDiagnostic(candidate: LinkedArtifactChild): Compil
 		why: 'The materialized edge is the delegate rendered output, so an output without HTML leaves nothing to inline.',
 		passId: DELEGATE_CHILDREN_PASS_ID,
 		artifactKeys: ['delegateChildren'],
-		suggestions: [
-			{ message: 'Return an object with a string `html` field from renderSsr.' },
-		],
+		suggestions: [{ message: 'Return an object with a string `html` field from renderSsr.' }],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_ARTIFACT_CHILD_RENDER_INVALID',
 	};
 }

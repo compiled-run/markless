@@ -14,6 +14,10 @@
 	/* Every pastel accent is light in both themes, so anything printed on one is
 	   always the dark ink, never the page's foreground. */
 	--on-accent: oklch(28% 0.015 90);
+	/* The highlighter pen behind inline code: solid on paper, a translucent
+	   wash on the chalkboard. */
+	--mark: var(--yellow);
+	--on-mark: var(--on-accent);
 	/* Raised surfaces: the playground frame, the callout, the collapsible. */
 	--raised: color-mix(in oklch, var(--paper) 80%, white);
 	--tinted: color-mix(in oklch, var(--yellow) 45%, var(--paper));
@@ -41,6 +45,8 @@
 		--code-surface: oklch(32% 0.011 70);
 		--code-edge: color-mix(in oklch, var(--ink) 30%, transparent);
 		--raised: oklch(26% 0.01 70);
+		--mark: color-mix(in oklch, var(--yellow) 26%, transparent);
+		--on-mark: var(--yellow);
 		--tinted: color-mix(in oklch, var(--yellow) 14%, var(--paper));
 		--tinted-quiet: color-mix(in oklch, var(--yellow) 9%, var(--paper));
 		--hover-wash: 11%;
@@ -246,64 +252,110 @@ body::after {
 	cursor: pointer;
 }
 
-/* On this page: the outline of the page's own h2/h3, written into the page HTML
-   by tooling/highlight-mdx.ts. Fixed rather than a grid column, because the
-   prose column is a page module and the shell cannot reach inside it; the shell
-   reserves the strip it sits in below. */
+/* The outline markup is emitted by tooling/highlight-mdx.ts. */
+markless-outline { display: contents; }
+
 .on-this-page {
 	position: fixed;
 	right: var(--space-s-l);
 	top: calc(var(--header-height) + var(--space-s));
 	width: 11rem;
-	max-height: calc(100vh - var(--header-height) - 2 * var(--space-s));
+	max-height: calc(100dvh - var(--header-height) - 2 * var(--space-s));
 	overflow-y: auto;
-	font-size: var(--step--1);
+	overscroll-behavior: contain;
+	scrollbar-width: thin;
+	font-size: 0.875rem;
+	z-index: 10;
 }
 
-.on-this-page-title {
-	margin: 0 0 0.5em;
+.prose .on-this-page-title {
+	margin: 0 0 0.75rem;
+	font-size: 0.65rem;
+	font-weight: 600;
 	text-transform: uppercase;
-	letter-spacing: 0.08em;
-	opacity: 0.7;
+	letter-spacing: 0.12em;
+	color: color-mix(in srgb, var(--ink) 60%, var(--paper));
 }
 
-.on-this-page-list {
+.prose .on-this-page-list {
 	display: grid;
-	gap: 0.15em;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 0;
 	margin: 0;
 	padding: 0;
 	list-style: none;
 }
 
 .on-this-page-link {
-	display: block;
-	padding: 0.1em 0.5em;
-	color: var(--ink);
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	min-height: 2rem;
+	padding: 0.35rem 0.25rem;
+	border-radius: 0.25rem;
+	color: color-mix(in srgb, var(--ink) 70%, var(--paper));
 	text-decoration: none;
-	border-left: 2px solid var(--code-edge);
-	line-height: 135%;
+	line-height: 1.4;
 }
 
-.on-this-page-link:hover {
-	background: var(--yellow);
-	color: var(--on-accent);
-	border-left-color: var(--pink);
+.on-this-page-link::before {
+	content: '';
+	flex: none;
+	width: 1rem;
+	height: 2px;
+	border-radius: 2px;
+	background: currentColor;
+	opacity: 0.45;
+	transition: width 280ms ease, opacity 280ms ease;
 }
 
-.on-this-page-item-h3 .on-this-page-link {
-	padding-left: 1.2em;
-	opacity: 0.85;
+.on-this-page-item-h3 .on-this-page-link::before { width: 0.5rem; }
+.on-this-page-item-h3 .on-this-page-link { padding-left: 0.75rem; }
+
+.on-this-page-label {
+	min-width: 0;
+	white-space: normal;
+	overflow-wrap: anywhere;
 }
 
-/* The pinned column is about 900px of list. On anything shorter than that it
-   scrolls inside itself, and without a fade the list ends mid-Router on a hard
-   edge: How it works and Reference are invisible to a reader who never finds
-   the inner scroll. Above that height nothing is cut off, so nothing is faded. */
+.on-this-page .on-this-page-label code { font: inherit; background: none; padding: 0; }
+
+.on-this-page-link:hover,
+.on-this-page-link[aria-current='location'] { color: var(--ink); }
+.on-this-page-link:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
+.on-this-page-link[aria-current='location']::before { width: 1.5rem; opacity: 1; }
+.on-this-page-link:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+
+.prose :is(h2, h3)[id] { scroll-margin-top: calc(var(--header-height) + var(--space-s)); }
+
+@media (min-width: 70.01rem) and (hover: hover) and (pointer: fine) {
+	.on-this-page[data-outline-ready] .on-this-page-link {
+		min-height: 1.5rem;
+		padding-block: 0;
+		transition: min-height 320ms cubic-bezier(0.2, 0.8, 0.2, 1), gap 280ms ease, padding-block 280ms ease;
+	}
+	.on-this-page[data-outline-ready] .on-this-page-label {
+		height: 0;
+		overflow: hidden;
+		opacity: 0;
+		filter: blur(4px);
+		transform: translateX(-0.35rem);
+		transition: opacity 160ms ease, filter 200ms ease, transform 240ms ease;
+	}
+	.on-this-page[data-outline-ready]:is(:hover, :has(:focus-visible)) .on-this-page-link { min-height: 2rem; gap: 0; padding-block: 0.35rem; }
+	.on-this-page[data-outline-ready]:is(:hover, :has(:focus-visible)) .on-this-page-link::before { width: 0; opacity: 0; }
+	.on-this-page[data-outline-ready]:is(:hover, :has(:focus-visible)) .on-this-page-label {
+		height: auto;
+		overflow: visible;
+		opacity: 1;
+		filter: blur(0);
+		transform: translateX(0);
+		transition-duration: 280ms;
+		transition-delay: min(calc(var(--outline-order) * 18ms), 180ms);
+	}
+}
 
 @media (max-width: 70rem) {
-	/* The outline is not hidden on a phone, it is laid on its side: one strip of
-	   chips that scrolls sideways, so the reader keeps the page's shape without
-	   paying a column of it before the h1. */
 	.on-this-page {
 		position: static;
 		width: auto;
@@ -311,33 +363,45 @@ body::after {
 		max-height: none;
 		margin: 0 auto var(--space-xs);
 		display: flex;
-		align-items: baseline;
+		align-items: center;
 		gap: 0.6em;
 		overflow: hidden;
 	}
-	.on-this-page-title {
-		margin: 0;
-		flex: 0 0 auto;
-	}
-	.on-this-page-list {
+	.prose .on-this-page-title { margin: 0; flex: 0 0 auto; }
+	.prose .on-this-page-list {
 		display: flex;
 		gap: 0.4em;
 		overflow-x: auto;
 		scrollbar-width: thin;
-		padding-bottom: 0.2em;
+		padding: 2px 2px 0.3rem;
 	}
-	.on-this-page-item {
-		flex: 0 0 auto;
-	}
-	.on-this-page-link {
-		white-space: nowrap;
-		border-left: none;
-		border: 2px solid var(--code-edge);
-		border-radius: 999px;
-		padding: 0.1em 0.7em;
-	}
+	.on-this-page-item { flex: 0 0 auto; max-width: 100%; }
+	.on-this-page-link,
 	.on-this-page-item-h3 .on-this-page-link {
-		padding-left: 0.7em;
+		min-height: 2.75rem;
+		border: 1px solid var(--code-edge);
+		border-radius: 999px;
+		padding: 0 0.75rem;
+	}
+	.on-this-page-link::before { display: none; }
+	.on-this-page-link[aria-current='location'] {
+		background: var(--yellow);
+		color: var(--on-accent);
+		border-color: currentColor;
+	}
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	html:has(markless-outline) { scroll-behavior: smooth; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.on-this-page .on-this-page-link,
+	.on-this-page .on-this-page-link::before,
+	.on-this-page[data-outline-ready] .on-this-page-link,
+	.on-this-page[data-outline-ready] .on-this-page-label,
+	.on-this-page[data-outline-ready]:is(:hover, :has(:focus-visible)) .on-this-page-label {
+		transition: none;
 	}
 }
 
@@ -370,6 +434,12 @@ body::after {
 	}
 }
 
+.prose h2:has(+ .keyboard-study) {
+	float: inline-start;
+	margin-block: 0;
+	line-height: 1.3;
+}
+
 .prose h3 {
 	font-size: var(--step-2);
 	--shadow-color: var(--green-soft);
@@ -390,10 +460,16 @@ body::after {
 }
 
 .prose code {
-	background: var(--yellow);
-	color: var(--on-accent);
-	padding: 0.1em 0.3em;
+	display: inline-block;
+	background: var(--mark);
+	color: var(--on-mark);
+	padding: 0 0.3em;
 	font-size: 0.9em;
+	/* Its own line-height, not the prose's, so the chip hugs the word and
+	   neighbouring lines keep their gap. */
+	line-height: 1.3;
+	border-radius: 3px 5px 3px 6px;
+	transform: rotate(-0.8deg);
 }
 
 /* Fenced blocks are monospace; inline code inside a sentence keeps Joy Elia so
@@ -420,6 +496,8 @@ body::after {
 	padding: 0;
 	color: inherit;
 	font-size: inherit;
+	border-radius: 0;
+	transform: none;
 }
 
 /* `* { font-family }` above matches every token span the highlighter emits, and
@@ -605,10 +683,13 @@ html {
    pieces that were never in backticks give the inline-code look back here, so
    the ones that were keep `.prose code` exactly as the rest of the page has it. */
 .prose code.api-text {
+	display: inline;
 	padding: 0;
 	background: none;
 	color: inherit;
 	font-size: inherit;
+	border-radius: 0;
+	transform: none;
 }
 
 /* ---------------------------------------------------------------------------
@@ -950,7 +1031,7 @@ html {
 	@supports (position-anchor: --on-this-page) {
 		.on-this-page {
 			anchor-name: --on-this-page;
-			max-height: calc(100vh - var(--header-height) - 2 * var(--space-s) - 5rem);
+			max-height: calc(100vh - var(--header-height) - 2 * var(--space-s) - 12rem);
 		}
 	}
 }

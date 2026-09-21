@@ -1,3 +1,5 @@
+import type { LinkProps } from '@markless/core/router';
+
 /**
  * One page. `sprite` and `number` are what the sidebar paints beside the title;
  * they are optional because the `concepts` map below reuses this type for links
@@ -5,7 +7,7 @@
  */
 export type NavEntry = {
 	readonly title: string;
-	readonly href: string;
+	readonly href: NonNullable<Extract<LinkProps, { readonly params?: never }>['href']>;
 	readonly sprite?: string;
 	/**
 	 * The hand-drawn icon the sidebar paints for this entry, cut in a light and a
@@ -242,6 +244,21 @@ export const nav: readonly NavSection[] = [
 				number: '1',
 				description:
 					'Every authoring call, TSRX construct, router export and MARKLESS_ diagnostic on published 0.3.1, in the order you reach for them.',
+			},
+		],
+	},
+	{
+		title: 'Extras',
+		stroke: 'purple',
+		sprite: 'smiley',
+		entries: [
+			{
+				title: 'The mug',
+				href: '/markless/mascot',
+				sprite: 'smiley',
+				number: '1',
+				description:
+					'Meet the Markless coffee mug: explore its expressions, choose a glaze, and try its playful animations.',
 			},
 		],
 	},

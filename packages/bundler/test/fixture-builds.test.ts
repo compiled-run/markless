@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { readFile, readdir, rm } from 'node:fs/promises';
+import { mkdir, writeFile, readFile, readdir, rm } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { resolve } from 'pathe';
 import { describe, expect, test } from 'vitest';
@@ -221,6 +221,11 @@ describe('fixture builds', () => {
 				const emittedReport = await runtimeSizeReport({
 					dist: resolve(root, fixture.runtimeBudget.dist),
 				});
+				const evidence = process.env.MARKLESS_BUDGET_EVIDENCE_DIR;
+				if (evidence) {
+					await mkdir(evidence, { recursive: true });
+					await writeFile(resolve(evidence, fixture.filter.replace(/[^a-zA-Z0-9-]/g, '_') + '.json'), JSON.stringify({ fixture: fixture.filter, budget: fixture.runtimeBudget, emittedReport }, null, 2));
+				}
 				assertRuntimeBudget({ budget: fixture.runtimeBudget, emittedReport });
 			}
 		}, 120_000);

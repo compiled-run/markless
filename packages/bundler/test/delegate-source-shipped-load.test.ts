@@ -1,10 +1,14 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'pathe';
 import { afterAll, expect, test, vi } from 'vitest';
 import type { LinkedArtifactChild } from '@markless/compiler';
 import { createBuildDelegateLoader } from '../src/build/delegate-loader.ts';
-import { createDelegateModuleCache, materializeDelegateChildren } from '../src/link-driver.ts';
+import {
+	createDelegateModuleCache,
+	linkBarrelComponentInterfaces,
+	materializeDelegateChildren,
+} from '../src/link-driver.ts';
 import { marklessClient } from '../src/rolldown.ts';
 import { moduleIdFor } from '../src/module-id.ts';
 import { callBuildStart, callLoad, callTransform } from './helpers.ts';
@@ -12,7 +16,8 @@ import { callBuildStart, callLoad, callTransform } from './helpers.ts';
 const directory = mkdtempSync(join(tmpdir(), 'markless-source-delegate-'));
 afterAll(() => rmSync(directory, { recursive: true, force: true }));
 
-const AUTHORED_FRAME = 'export function Frame({ label }) @{\n\t<div class="frame">{label}</div>\n}\n';
+const AUTHORED_FRAME =
+	'export function Frame({ label }) @{\n\t<div class="frame">{label}</div>\n}\n';
 
 // The shape a source-shipped package has on a consumer's disk: a TypeScript
 // barrel under node_modules re-exporting the authored component module.
@@ -127,9 +132,7 @@ test('a delegate no loader can execute keeps the fail-closed diagnostic', async 
 		{ modules, importModule },
 	);
 	expect(retried.materializations).toEqual({});
-	expect(retried.importFailures[0]?.message).toContain(
-		'MARKLESS_DEV_MODULE_RUNNER_UNAVAILABLE',
-	);
+	expect(retried.importFailures[0]?.message).toContain('MARKLESS_DEV_MODULE_RUNNER_UNAVAILABLE');
 });
 
 test('the build-mode loader executes a source-shipped delegate with no dev server', async () => {
@@ -230,4 +233,98 @@ test('a delegate the build loader cannot compile keeps the fail-closed diagnosti
 		'MARKLESS_DELEGATE_ARTIFACT_MISSING',
 	]);
 	expect(result.importFailures[0]?.source).toBe(source);
+});
+
+test.each([true, false])(
+	'entry host respects source declaration %s without consulting a delegate for a proven component',
+	async (shipsSource) => {
+		const name = shipsSource ? '@acme/compiled-entry' : '@acme/delegate-entry';
+		const barrel = installSourceShippedPackage(name);
+		if (shipsSource)
+			writeFileSync(
+				join(dirname(barrel), 'package.json'),
+				JSON.stringify({
+					name,
+					type: 'module',
+					exports: './index.ts',
+					publishConfig: { marklessShipsSource: true },
+				}),
+			);
+		const page = join(directory, shipsSource ? 'Compiled.tsrx' : 'Delegate.tsrx');
+		const resolveId = vi.fn(async (specifier: string, importer?: string) =>
+			specifier === name
+				? { id: barrel }
+				: specifier.startsWith('.') && importer
+					? { id: resolve(dirname(importer), specifier) }
+					: null,
+		);
+		const importModule = vi.fn(async () => ({
+			Frame: {
+				renderSsr: () => ({ html: '<aside>External entry</aside>', elementCount: 1 }),
+			},
+		}));
+		let plugin: ReturnType<typeof marklessClient>;
+		const transformRequest = vi.fn(async (id: string) =>
+			callTransform(plugin, readFileSync(id.split('?')[0]!, 'utf8'), id, {
+				resolve: resolveId,
+			}),
+		);
+		plugin = marklessClient({
+			dev: true,
+			rootDir: directory,
+			devServer: { importModule, transformRequest },
+		});
+		callBuildStart(plugin, { cwd: directory });
+		const addWatchFile = vi.fn();
+		const source = `import { Frame as Panel } from '${name}';\nexport default function Page() @{ <main><Panel label="Entry" /></main> }`;
+		const context = {
+			resolve: resolveId,
+			getModuleInfo: (id: string) => ({ isEntry: id === page }),
+			addWatchFile,
+		};
+		await callTransform(plugin, source, page, context);
+		const data = await callLoad(
+			plugin,
+			'\0virtual:markless:render-data:' + encodeURIComponent(moduleIdFor(page, directory)),
+		);
+		const code = typeof data === 'string' ? data : (data as { code: string }).code;
+		if (shipsSource) {
+			expect(importModule).not.toHaveBeenCalled();
+			expect(code).toContain('"Frame"');
+			expect(code).toContain('frame.tsrx');
+			expect(addWatchFile).toHaveBeenCalledWith(barrel);
+			addWatchFile.mockClear();
+			await callTransform(plugin, source, page, context);
+			expect(addWatchFile).toHaveBeenCalledWith(barrel);
+		} else {
+			expect(importModule).toHaveBeenCalledExactlyOnceWith(barrel);
+			expect(code).toContain('External entry</aside>');
+		}
+	},
+);
+
+test('an externalized source-declared package does not publish compiled barrel targets or watched reads', async () => {
+	const name = '@acme/externalized-entry';
+	const barrel = installSourceShippedPackage(name);
+	writeFileSync(
+		join(dirname(barrel), 'package.json'),
+		JSON.stringify({
+			name,
+			type: 'module',
+			exports: './index.ts',
+			publishConfig: { marklessShipsSource: true },
+		}),
+	);
+	const addWatchFile = vi.fn();
+	const result = await linkBarrelComponentInterfaces(
+		{ resolve: async () => ({ id: barrel, external: true }), addWatchFile },
+		join(directory, 'App.tsrx'),
+		[{ source: name }],
+		new Map(),
+		undefined,
+		directory,
+	);
+	expect(result.interfaces).toEqual({});
+	expect(result.children).toEqual([]);
+	expect(addWatchFile).not.toHaveBeenCalled();
 });

@@ -1,0 +1,13 @@
+import {createBuilder,preview} from 'vite';
+import {resolve,relative} from 'node:path';
+import {existsSync,symlinkSync,writeFileSync,mkdirSync} from 'node:fs';
+const root=resolve('scripts/experiments/jev/advanced/production-app');
+const dependencies=resolve('packages/router/fixtures/router/node_modules');
+if(!existsSync(resolve(root,'node_modules')))symlinkSync(relative(root,dependencies),resolve(root,'node_modules'),'dir');
+const artifact=resolve('/tmp/jev-advanced/production');
+mkdirSync(artifact,{recursive:true});
+const config={root,configFile:resolve('scripts/experiments/jev/advanced/app/vite.config.ts'),cacheDir:resolve('/tmp/jev-advanced/production-cache'),build:{outDir:resolve('/tmp/jev-advanced/production-dist'),emptyOutDir:true},nitro:{buildDir:resolve('/tmp/jev-advanced/nitro-production'),output:{dir:artifact,publicDir:resolve(artifact,'public'),serverDir:resolve(artifact,'server')}},preview:{host:'127.0.0.1',port:4394,strictPort:true}};
+if(!process.argv.includes('--serve'))await (await createBuilder(config)).buildApp();
+const server=await preview(config);
+writeFileSync('/tmp/jev-advanced/production-server.json',JSON.stringify({url:server.resolvedUrls.local[0],pid:process.pid}));server.printUrls();
+for(const signal of ['SIGINT','SIGTERM'])process.on(signal,()=>server.httpServer.close(()=>process.exit(0)));

@@ -1,3 +1,4 @@
+import AnatomyTable from '../../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../../components/docs/sidebar.tsrx';
 import Preview from '../../../components/ui/preview.tsrx';
@@ -42,13 +43,7 @@ option, and the whole group holds a single tab stop with the arrow keys walking 
 
 ## Anatomy
 
-- `radiogroup.root` — the `<fieldset>`.
-- `radiogroup.label` — the `<legend>` that names it.
-- `radiogroup.field` — what a form receives: `name` and `required`, once for the group.
-- `radiogroup.item` — one option, named by its required `value`.
-- `radiogroup.itemfield` — the hidden native radio, and the element a person actually focuses.
-- `radiogroup.itemtrigger`, `radiogroup.itemindicator`, `radiogroup.itemlabel` — that option's parts.
-- `radiogroup.description`, `radiogroup.error` — the sentence under the group, and the one that marks it invalid.
+<AnatomyTable />
 
 It writes `ui-selected`, `ui-horizontal`, `ui-required` and `ui-disabled`.
 

@@ -1,3 +1,4 @@
+import AnatomyTable from '../../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../../components/docs/sidebar.tsrx';
 import DrawerDemo from '../../../components/demos/ui/drawer/basic.tsrx';
@@ -44,13 +45,7 @@ position and anything typed inside survive being put away.
 
 ## Anatomy
 
-- `drawer.root` holds the open state, the axis and the rest positions.
-- `drawer.trigger` is the button that opens the drawer.
-- `drawer.backdrop` is the dimming layer, and the element that is elevated.
-- `drawer.content` is the surface, and the thing a swipe moves.
-- `drawer.title` names the surface; mounting it is what names it.
-- `drawer.description` is the sentence read out after the name.
-- `drawer.close` is the button that puts the drawer away.
+<AnatomyTable />
 
 It writes `ui-open`, `ui-closed`, `ui-orientation`, `ui-start`, `ui-dragging`,
 `ui-backdrop` and `ui-content` as its state changes.

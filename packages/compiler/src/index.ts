@@ -41,10 +41,7 @@ export {
 	prerenderInterfacesComplete,
 } from './passes/link/interface-link.ts';
 export type { ComponentEdgeSymbolRoute } from './component-edge-instance.ts';
-export {
-	componentEdgeSymbolRoutes,
-	importedSymbolRoutes,
-} from './component-edge-instance.ts';
+export { componentEdgeSymbolRoutes, importedSymbolRoutes } from './component-edge-instance.ts';
 export type {
 	BarrelComponentLinkArtifact,
 	BarrelComponentLinkInput,
@@ -100,3 +97,5 @@ export {
 	emitSymbolResolverModule,
 } from './passes/symbol-resolver-module.ts';
 export { planSymbolResolver } from './passes/symbol-resolver.ts';
+
+export { componentExportPath, linkedComponentTarget } from './passes/link/component-target.ts';

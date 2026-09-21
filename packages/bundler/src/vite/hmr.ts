@@ -326,11 +326,19 @@ export function createViteHmr(options: ViteHmrOptions) {
 			return [];
 		}
 
-		const files = changedFiles(ctx.modules ?? []);
+		const modules = new Set(ctx.modules ?? []);
+		if (ctx.file) {
+			for (const target of targets.keys()) {
+				for (const module of target.moduleGraph?.getModulesByFile?.(ctx.file) ?? [])
+					modules.add(module);
+			}
+		}
+		const files = changedFiles([...modules]);
 		const root = server?.config?.root;
 		if (ctx.file && SOURCE_FILE_EXTENSION.test(ctx.file)) {
 			const prefix = root && `${root}/`;
-			files.add(
+			files.set(
+				parsePath(ctx.file).pathname,
 				prefix && ctx.file.startsWith(prefix)
 					? `/${ctx.file.slice(prefix.length)}`
 					: ctx.file,
@@ -384,11 +392,14 @@ export function createViteHmr(options: ViteHmrOptions) {
 		const invalidationEnvironments = [...targets.keys()];
 		const invalidationScopes = generatedModuleScopes(targets);
 		const invalidatedGeneratedIds = new Set<string>();
-		for (const file of files) {
+		for (const [sourceId] of files) {
 			const candidates =
 				editedSource !== undefined && ctx.file
 					? [ctx.file]
-					: hmrCandidates(file, ctx.file);
+					: hmrCandidates(
+							sourceId,
+							ctx.file && SOURCE_FILE_EXTENSION.test(ctx.file) ? ctx.file : undefined,
+						);
 			for (const candidate of candidates) {
 				for (const scope of invalidationScopes) {
 					const invalidatedIds = await options.invalidateGeneratedModules?.(
@@ -423,9 +434,8 @@ export function createViteHmr(options: ViteHmrOptions) {
 		// runners too, not just the generated modules linked off them.
 		if (ctx.file) {
 			for (const targetEnvironment of invalidationEnvironments) {
-				for (const module of targetEnvironment.moduleGraph?.getModulesByFile?.(
-					ctx.file,
-				) ?? []) {
+				for (const module of targetEnvironment.moduleGraph?.getModulesByFile?.(ctx.file) ??
+					[]) {
 					const invalidated = new Set<EnvironmentModuleNode>();
 					targetEnvironment.moduleGraph?.invalidateModule?.(
 						module,
@@ -575,11 +585,11 @@ function moduleRunnerHots(
 }
 
 function changedFiles(modules: EnvironmentModuleNode[]) {
-	const files = new Set<string>();
+	const files = new Map<string, string>();
 	for (const module of modules) {
 		for (const item of [module, ...(module.importers ?? [])]) {
 			const url = sourceUrl(item);
-			if (url) files.add(url);
+			if (url) files.set(parsePath(item.id ?? item.file ?? url).pathname, url);
 		}
 	}
 
@@ -601,8 +611,8 @@ function hmrCandidates(file: string, absoluteFile: string | undefined) {
 	return candidates;
 }
 
-function firstChangedFile(files: Set<string>) {
-	for (const file of files) {
+function firstChangedFile(files: Map<string, string>) {
+	for (const file of files.values()) {
 		return file;
 	}
 

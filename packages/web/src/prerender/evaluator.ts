@@ -90,6 +90,8 @@ export type PrerenderDataDefinition = {
 	readonly servedComputedIndexes?: ReadonlyArray<number>;
 	readonly initialValues?: PrerenderRenderData['initialValues'];
 	readonly initialValueKinds?: Readonly<Record<string, string>>;
+	readonly initializerResidues?: Readonly<Record<string, string>>;
+	readonly initializers?: Readonly<Record<string, unknown>>;
 	readonly branches?: PrerenderRenderData['branches'];
 	readonly boundaries?: PrerenderRenderData['boundaries'];
 	readonly edges?: ReadonlyArray<{
@@ -649,12 +651,26 @@ function evaluatePrerenderDataComponent(input: {
 		if (!marklessOwnsDerivedNode(input.surface, input.componentName, initial.graphNodeId))
 			return undefined;
 		const symbolId = symbolValue.symbolId;
-		// This component's reads are already the row's, so the loader answers row-free.
+		const initializer = definition.initializerResidues?.[symbolId];
+		if (initializer && definition.readResidue) {
+			values.set(initial.graphNodeId, definition.readResidue(
+				{ kind: 'authored-expression', source: initializer },
+				{ read },
+			));
+			return undefined;
+		}
+
+		// Live graphs and bound captures require the loader's instance scoping.
+		const linkedInitializer =
+			!input.graph && !input.boundSymbols?.[symbolId]
+				? definition.initializers?.[symbolId]
+				: undefined;
 		return marklessThen(
-			input.loadSymbol(
-				input.boundSymbols?.[symbolId] ??
-					marklessRowFreeSymbolId(input.symbolPrefix + symbolId, input.symbolPrefix),
-			) as Awaitable<unknown>,
+			linkedInitializer ??
+				(input.loadSymbol(
+					input.boundSymbols?.[symbolId] ??
+						marklessRowFreeSymbolId(input.symbolPrefix + symbolId, input.symbolPrefix),
+				) as Awaitable<unknown>),
 			(loaded) => {
 				if (typeof loaded !== 'function') {
 					throw new Error(`MARKLESS_PRERENDER_DATA_SYMBOL_MISSING: ${symbolId}`);

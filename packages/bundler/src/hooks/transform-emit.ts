@@ -4,6 +4,7 @@ import {
 	type LinkedModuleChildResolution,
 	linkedRouteArtifactRegistration,
 	planRenderDataModule,
+	parseJavaScriptModule,
 	renderDataClaimManifest,
 } from '@markless/compiler';
 import { invalidateAllGeneratedModules } from '../dev-invalidation.ts';
@@ -22,7 +23,7 @@ import {
 	isClientPrimarySourceRequest,
 	isResumeSourceRequest,
 } from '../virtual-ids.ts';
-import type { LinkedTransformChildren } from './transform-link.ts';
+import { sourceBarrelComponents, type LinkedTransformChildren } from './transform-link.ts';
 import type { TransformRequest } from './transform-request.ts';
 
 // A route artifact never ships its own module: the client imports the reference
@@ -33,11 +34,12 @@ export async function emitClientRouteArtifact(
 ) {
 	const { ctx, pluginContext, source } = request;
 	const { clientRouteArtifactMaterializations } = ctx.state;
+	const barrelComponents = await sourceBarrelComponents(request, transformed);
 	const delegates = await materializeDelegateChildren(
 		pluginContext,
 		source,
 		transformed.artifactChildren,
-		delegateLoadOptions(ctx, pluginContext),
+		{ ...delegateLoadOptions(ctx, pluginContext), interfaces: barrelComponents.interfaces },
 	);
 	warnDelegateImportFailures(pluginContext, delegates);
 	const artifactChildMaterializations = delegates.materializations;
@@ -181,6 +183,21 @@ export async function emitTransformResult(
 			(module) => module.type === 'render-data',
 		);
 		if (renderDataModule) {
+			const nativeModules = renderDataNativeDependencies(
+				transformed,
+				renderDataModule.source,
+			);
+			if (nativeModules.length > 0)
+				registerTransformArtifacts(state, {
+					owner: cacheKey,
+					source,
+					manifestSource,
+					result: { ...transformed, virtualModules: nativeModules },
+					dev,
+					environment: currentEnvironment,
+					finalPublication: false,
+					tracksSourceClaimPublication: false,
+				});
 			const styleModules = transformed.virtualModules.filter(
 				(module) => module.type === 'style',
 			);
@@ -321,4 +338,33 @@ function throwIfRenderDataUnlinked(renderData: {
 }) {
 	const unlinked = renderData.diagnostics[0];
 	if (unlinked) throw new Error(unlinked.message);
+}
+
+function renderDataNativeDependencies(
+	transformed: TransformTsrxModuleResult,
+	source: string,
+): TransformTsrxModuleResult['virtualModules'] {
+	const modules = new Map(transformed.virtualModules.map((module) => [module.id, module]));
+	const selected = new Map<string, TransformTsrxModuleResult['virtualModules'][number]>();
+	const visit = (code: string) => {
+		const program = parseJavaScriptModule(code) as unknown as {
+			body: Array<{ type: string; source?: { value?: unknown } }>;
+		};
+		for (const statement of program.body) {
+			if (
+				statement.type !== 'ImportDeclaration' &&
+				statement.type !== 'ExportNamedDeclaration' &&
+				statement.type !== 'ExportAllDeclaration'
+			)
+				continue;
+			const id = statement.source?.value;
+			if (typeof id !== 'string' || selected.has(id)) continue;
+			const module = modules.get(id);
+			if (!module || (module.type !== 'symbol' && module.type !== 'symbol-bundle')) continue;
+			selected.set(id, module);
+			visit(module.source);
+		}
+	};
+	visit(source);
+	return [...selected.values()];
 }

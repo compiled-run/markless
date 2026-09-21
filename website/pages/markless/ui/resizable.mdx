@@ -1,3 +1,4 @@
+import AnatomyTable from '../../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../../components/docs/sidebar.tsrx';
 import ResizableDemo from '../../../components/demos/ui/resizable/basic.tsrx';
@@ -43,9 +44,7 @@ the row shifts under you.
 
 ## Anatomy
 
-- `resizable.root` is the group, holding the sizes, the axis and the step.
-- `resizable.item` is one panel, named by its `value`, which is also its `id`.
-- `resizable.thumb` is the divider, naming the panel it resizes and carrying that panel's limits.
+<AnatomyTable />
 
 Each panel publishes its share as a `--size` custom property, and the family lays the group out
 itself under `@layer markless`. It writes `ui-panels`, `ui-panel`, `ui-divider`, `ui-orientation`,

@@ -1,4 +1,5 @@
 import { box } from '@async/witness';
+import { readClientAssetsManifest } from '../src/vite/client-assets-manifest.ts';
 
 const FIXTURE = 'fixtures/router';
 const BUNDLE_GRAPH_REQUEST = '/build/bundle-graph.json';
@@ -38,6 +39,8 @@ type Request = {
 };
 type Page = {
 	allowedLazyHrefs?: readonly string[];
+	demandHrefs?: readonly string[];
+	settledRequests?: readonly Request[];
 	click(selector: string, wait?: typeof WAIT): Promise<void>;
 	networkRequests(): Promise<Request[]>;
 	clearNetworkEmulation(): Promise<void>;
@@ -48,7 +51,7 @@ type Receipt = {
 
 export default box(
 	{
-		name: 'router preload strategy: exact modulepreloads avoid slow-network CSR waterfalls',
+		name: 'router preload strategy: explicit preloads and route-owned demand loading',
 		tags: ['router', 'build', 'preview', 'browser', 'preload', 'network', 'waterfall'],
 		modes: ['build', 'preview'],
 	},
@@ -103,26 +106,21 @@ export default box(
 					`Expected current route and docs Link preloads to exclude unrelated sibling route chunks, saw:\n${timeline(forbiddenPreloads)}`,
 				);
 			}
-			// Client-side route swaps (D7): the destination page's chunks are part
-			// of the startup preload plan (visible Link targets), so Link
-			// navigation renders client-side with ZERO new JS fetches and no
-			// server document round trip. The former one-fetch destination-resume
-			// allowance (owner-ruled descope 2026-07-06) closed when entry chunks
-			// started rooting preload plans through the dynamic-only edge kind.
-			await expectNoNewBuildJs(page, receipt, 'post-Link-click JS', async () => {
+			page.demandHrefs = plan.docsDemandHrefs;
+			await expectRouteDemandJs(page, receipt, 'post-Link-click JS', async () => {
 				await page.click(DOCS_LINK, WAIT);
 				await expect.page.text(page, 'h1', 'Docs', WAIT);
 				await expect.page.text(page, MDX_COUNTER, 'MDX Count 0', WAIT);
 			});
-			await expectNoNewBuildJs(page, receipt, 'post-MDX-counter JS', async () => {
+			await expectRouteDemandJs(page, receipt, 'post-MDX-counter JS', async () => {
 				await page.click(MDX_COUNTER, WAIT);
 				await expect.page.text(page, MDX_COUNTER, 'MDX Count 1', WAIT);
 			});
-			await expectNoNewBuildJs(page, receipt, 'post-MDX-input JS', async () => {
+			await expectRouteDemandJs(page, receipt, 'post-MDX-input JS', async () => {
 				await page.click(MDX_INPUT, WAIT);
 				await expect.page.text(page, MDX_INPUT_STATE, 'MDX Input on', WAIT);
 			});
-			await expectNoNewBuildJs(page, receipt, 'post-MDX-boost JS', async () => {
+			await expectRouteDemandJs(page, receipt, 'post-MDX-boost JS', async () => {
 				await page.click(MDX_BOOST, WAIT);
 				await expect.page.text(page, MDX_BOOST, 'MDX Boost 1', WAIT);
 			});
@@ -148,6 +146,7 @@ export default box(
 				networkConditions: SLOW_3G,
 			})) as Page;
 			directPage.allowedLazyHrefs = plan.observabilityHrefs;
+			directPage.demandHrefs = plan.docsDemandHrefs;
 			await expect.page.text(directPage, 'h1', 'Docs', WAIT);
 			await expect.page.text(directPage, MDX_COUNTER, 'MDX Count 0', WAIT);
 			await expect.page.text(directPage, HOME_LINK, 'Home', WAIT);
@@ -166,7 +165,7 @@ export default box(
 					`Expected direct docs startup JS to be only current route and visible Link modulepreloads, saw:\n${timeline(unexpectedDirectJs)}`,
 				);
 			}
-			await expectNoNewBuildJs(
+			await expectRouteDemandJs(
 				directPage,
 				receipt,
 				'direct docs post-counter JS',
@@ -175,11 +174,17 @@ export default box(
 					await expect.page.text(directPage, MDX_COUNTER, 'MDX Count 1', WAIT);
 				},
 			);
-			await expectNoNewBuildJs(directPage, receipt, 'direct docs post-input JS', async () => {
-				await directPage.click(MDX_INPUT, WAIT);
-				await expect.page.text(directPage, MDX_INPUT_STATE, 'MDX Input on', WAIT);
-			});
-			await expectNoNewBuildJs(
+			await expectRouteDemandJs(
+				directPage,
+				receipt,
+				'direct docs post-input JS',
+				async () => {
+					await directPage.click(MDX_INPUT, WAIT);
+					await expect.page.text(directPage, MDX_INPUT_STATE, 'MDX Input on', WAIT);
+				},
+			);
+			directPage.demandHrefs = plan.homeDemandHrefs;
+			await expectRouteDemandJs(
 				directPage,
 				receipt,
 				'direct docs-to-home Link JS',
@@ -189,7 +194,7 @@ export default box(
 					await expect.page.text(directPage, HOME_COUNTER, 'Button 0', WAIT);
 				},
 			);
-			await expectNoNewBuildJs(
+			await expectRouteDemandJs(
 				directPage,
 				receipt,
 				'direct docs routed-home counter JS',
@@ -198,7 +203,7 @@ export default box(
 					await expect.page.text(directPage, HOME_COUNTER, 'Button 1', WAIT);
 				},
 			);
-			await expectNoNewBuildJs(
+			await expectRouteDemandJs(
 				directPage,
 				receipt,
 				'direct docs routed-home input JS',
@@ -207,7 +212,7 @@ export default box(
 					await expect.page.text(directPage, HOME_INPUT_STATE, 'Home Input on', WAIT);
 				},
 			);
-			await expectNoNewBuildJs(
+			await expectRouteDemandJs(
 				directPage,
 				receipt,
 				'direct docs routed-home boost JS',
@@ -241,6 +246,8 @@ export default box(
 );
 
 type RouteCandidatePlan = {
+	readonly docsDemandHrefs: readonly string[];
+	readonly homeDemandHrefs: readonly string[];
 	readonly directDocsHrefs: readonly string[];
 	readonly directDocsRequiredHrefs: readonly string[];
 	readonly expectedHrefs: readonly string[];
@@ -250,6 +257,11 @@ type RouteCandidatePlan = {
 };
 
 async function routeCandidatePlan(build: Build, preview: Preview): Promise<RouteCandidatePlan> {
+	const manifest = await readClientAssetsManifest(`${FIXTURE}/.output/public`, '/');
+	const docsDemandHrefs = manifest.routes.ssr['pages/docs/[...slug].mdx'];
+	const homeDemandHrefs = manifest.routes.ssr['pages/index.tsrx'];
+	if (!docsDemandHrefs?.length || !homeDemandHrefs?.length)
+		throw new Error('Missing fixture route SSR ownership plans.');
 	const chunks = new Map<string, string>();
 	for (const artifact of build.artifacts) {
 		const path = publicBuildPath(artifact.path);
@@ -342,6 +354,20 @@ async function routeCandidatePlan(build: Build, preview: Preview): Promise<Route
 		);
 	}
 	return {
+		docsDemandHrefs: routeDemandHrefs(
+			chunks,
+			docsDemandHrefs,
+			navigationPath,
+			docsRoutePath,
+			routeImportPaths,
+		),
+		homeDemandHrefs: routeDemandHrefs(
+			chunks,
+			homeDemandHrefs,
+			navigationPath,
+			indexRoutePath,
+			routeImportPaths,
+		),
 		directDocsHrefs: directDocsPreloads.hrefs,
 		directDocsRequiredHrefs,
 		expectedHrefs,
@@ -352,6 +378,34 @@ async function routeCandidatePlan(build: Build, preview: Preview): Promise<Route
 			.sort()
 			.map((path) => `/${path}`),
 	};
+}
+
+function routeDemandHrefs(
+	chunks: ReadonlyMap<string, string>,
+	ssrHrefs: readonly string[],
+	navigationPath: string,
+	routePath: string,
+	routeImportPaths: ReadonlySet<string>,
+): string[] {
+	const paths = new Set([
+		...ssrHrefs.map((href) => pathOf(href).slice(1)),
+		navigationPath,
+		routePath,
+	]);
+	for (const path of paths) {
+		const code = chunks.get(path);
+		if (!code) continue;
+		addStaticImports(paths, code);
+		addDynamicImports(
+			paths,
+			code,
+			(candidate) => candidate === routePath || !routeImportPaths.has(candidate),
+		);
+	}
+	for (const path of paths)
+		if (routeImportPaths.has(path) && path !== routePath)
+			throw new Error(`Foreign route entered demand closure: ${path}`);
+	return [...paths].map((path) => '/' + path);
 }
 
 function publicBuildPath(path: string): string | undefined {
@@ -413,9 +467,6 @@ function isObservabilityChunk(
 }
 
 function isRouterNavigationChunk(code: string): boolean {
-	// The shared navigation runtime also contains the __marklessRouterLink
-	// protocol key. Only the exported entry function identifies the chunk that
-	// owns the route-import map; bundle iteration order is platform-dependent.
 	return code.includes('navigateMarklessRouterLink');
 }
 
@@ -519,7 +570,7 @@ function addTransitiveImports(
 function addStaticImports(matches: Set<string>, code: string): boolean {
 	return addPaths(
 		matches,
-		[...code.matchAll(/import[^(`]*from[`"']\.\/(chunk-[^`"']+\.js)[`"']/g)].map(
+		[...code.matchAll(/(?:import|export)[^;]*?from[`"']\.\/(chunk-[^`"']+\.js)[`"']/g)].map(
 			(match) => `build/${match[1]}`,
 		),
 	);
@@ -561,24 +612,39 @@ function bundleGraphRequests(requests: readonly Request[]): Request[] {
 	return requests.filter((request) => pathOf(request.url) === BUNDLE_GRAPH_REQUEST);
 }
 
-async function expectNoNewBuildJs(
+async function expectRouteDemandJs(
 	page: Page,
 	receipt: Receipt,
 	label: string,
 	action: () => Promise<void>,
 ): Promise<void> {
+	await waitForSettledNetwork(page);
 	const before = await page.networkRequests();
-	await action();
-	const allowedLazyPaths = new Set((page.allowedLazyHrefs ?? []).map((href) => pathOf(href)));
-	// The dev execution log wakes from runtime predicates, so preloading it would
-	// overstate the route plan. Keep the post-click exactness check for app chunks.
-	const requests = jsBuildRequests((await page.networkRequests()).slice(before.length)).filter(
-		(request) => !allowedLazyPaths.has(pathOf(request.url)),
-	);
-	receipt.note(`${label}:\n${timeline(requests)}`);
-	if (requests.length > 0) {
-		throw new Error(`Expected preloaded JS to avoid ${label}, saw:\n${timeline(requests)}`);
+	const observability = new Set((page.allowedLazyHrefs ?? []).map(pathOf));
+	if (page.settledRequests) {
+		const previous = new Set(page.settledRequests.map((request) => request.url));
+		const background = jsBuildRequests(before).filter(
+			(request) => !previous.has(request.url) && !observability.has(pathOf(request.url)),
+		);
+		if (background.length)
+			throw new Error(
+				`Unexpected application requests between actions:\n${timeline(background)}`,
+			);
 	}
+	await action();
+	await waitForSettledNetwork(page);
+	const after = await page.networkRequests();
+	const allowed = new Set(
+		[...(page.demandHrefs ?? []), ...(page.allowedLazyHrefs ?? [])].map(pathOf),
+	);
+	const requests = jsBuildRequests(after.slice(before.length));
+	receipt.note(`${label} demand phase:\n${timeline(requests)}`);
+	const unexpected = requests.filter((request) => !allowed.has(pathOf(request.url)));
+	if (unexpected.length)
+		throw new Error(
+			`Expected only destination SSR/native dependency closure or observability requests during ${label}:\n${timeline(unexpected)}`,
+		);
+	page.settledRequests = after;
 }
 
 function pathOf(url: string): string {

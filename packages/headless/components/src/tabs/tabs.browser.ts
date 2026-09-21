@@ -633,6 +633,44 @@ test('SSR: the keyboard walk works on a resumed page', async () => {
 	await expect.poll(() => el(UsageTrigger).getAttribute('aria-selected')).toBe('true');
 });
 
+// The docs code panel mints its triggers in a repeat, one panel per demo: the arrow walk must land on the minted trigger and leave sibling panels put.
+test('SSR, several panels: ArrowRight walks in the first repeat-minted docs code panel', async () => {
+	await renderSSRIslands([CodePanel, CodePanel]);
+	const triggers = panelTriggers();
+	expect(triggers.length).toBe(4);
+	triggers[0]!.focus();
+
+	await userEvent.keyboard('{ArrowRight}');
+	await expect.poll(() => document.activeElement).toBe(triggers[1]);
+	await expect.poll(() => triggers[1]!.getAttribute('aria-selected')).toBe('true');
+	expect(triggers[0]!.getAttribute('aria-selected')).toBe('false');
+	expect(triggers[2]!.getAttribute('aria-selected')).toBe('true');
+	expect(triggers[3]!.getAttribute('aria-selected')).toBe('false');
+});
+
+test('CSR, several panels: ArrowRight walks in the first repeat-minted docs code panel', async () => {
+	await renderCsrIslands([CodePanel, CodePanel]);
+	const triggers = panelTriggers();
+	expect(triggers.length).toBe(4);
+	triggers[0]!.focus();
+
+	await userEvent.keyboard('{ArrowRight}');
+	await expect.poll(() => document.activeElement).toBe(triggers[1]);
+	await expect.poll(() => triggers[1]!.getAttribute('aria-selected')).toBe('true');
+	expect(triggers[2]!.getAttribute('aria-selected')).toBe('true');
+});
+
+test('SSR: ArrowRight walks in a single repeat-minted docs code panel', async () => {
+	await renderSSR(CodePanel);
+	const triggers = panelTriggers();
+	expect(triggers.length).toBe(2);
+	triggers[0]!.focus();
+
+	await userEvent.keyboard('{ArrowRight}');
+	await expect.poll(() => document.activeElement).toBe(triggers[1]);
+	await expect.poll(() => triggers[1]!.getAttribute('aria-selected')).toBe('true');
+});
+
 test('CSR: the panel a consumer opened keeps its control reachable', async () => {
 	await render(SettingsPanels);
 	el(DangerTrigger).click();

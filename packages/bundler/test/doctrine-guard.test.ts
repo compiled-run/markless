@@ -20,6 +20,8 @@ const EMITTED_DOM_ORDER_WALK_ALLOWLIST: Readonly<Record<string, string>> = {
 // Exact conditional sites are intentional: adding another environment decision
 // requires adding its reason beside the guard instead of quietly distributing posture.
 const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
+	"packages/bundler/src/transform.ts :: ...(environment === 'client' && demandsOverlay(compiled.runtimeDemandMap)":
+		'Client render-data registers the lazy overlay capability before CSR mount; server output excludes browser capability registration.',
 	"packages/bundler/src/build/chunking.ts :: if (environment === 'server') {":
 		'Build output naming is selected once from the resolved bundler environment.',
 	"packages/bundler/src/dev-invalidation.ts :: currentEnvironment === 'client' ||":

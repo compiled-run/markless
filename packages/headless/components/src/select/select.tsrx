@@ -20,13 +20,8 @@ import type {
 	SelectTriggerProps,
 } from './select-types.ts';
 
-// One computed() cell per comparison - a comparison written inline in an attribute renders once and then goes stale.
 
-/** How long a typeahead buffer stays open, in milliseconds. */
 const TYPEAHEAD_WINDOW = 750;
-
-/** How long a press that dismissed the list keeps the trigger's own click from re-opening it, in milliseconds. */
-const PRESS_GRACE = 300;
 
 export const selectState = shared(
 	() => {
@@ -38,12 +33,10 @@ export const selectState = shared(
 			name: '',
 			search: '',
 			searchAt: 0,
-			pressGraceUntil: 0,
 		});
 		const labelEl = element<HTMLLabelElement>();
 		const contentEl = element<HTMLDivElement>();
 		const triggerEl = element<HTMLButtonElement>();
-		// The array type argument makes the handle plural: bound on every option, read back as the live options in document order.
 		const optionEls = element<HTMLDivElement[]>();
 		const optionLabelEls = element<HTMLSpanElement[]>();
 
@@ -118,9 +111,6 @@ export function SelectLabel({ children, ...rest }: SelectLabelProps) @{
 
 export function SelectTrigger({ children, onClick, onKeydown, ...rest }: SelectTriggerProps) @{
 	const select = selectState();
-	// Mixed into an enclosing toolbar: the trigger registers as one of the bar's
-	// stops and hands its tabindex over. Outside every toolbar this resolves to no
-	// bar instance, so `mounted` is the seed and nothing changes.
 	const toolbar = toolbarState();
 	const stop = computed(() => (toolbar.mounted === true ? -1 : undefined));
 
@@ -138,11 +128,8 @@ export function SelectTrigger({ children, onClick, onKeydown, ...rest }: SelectT
 		ui-closed={select.open !== true}
 		onClick={(event) => {
 			const isOpening = select.open !== true;
-			// Without the grace the press closes an open list and the click it becomes re-opens it; armed by identity in the listbox's `onDismiss`.
-			const isGraced = select.pressGraceUntil > Date.now();
-			if (isGraced !== true) select.setOpen(isOpening);
-			// A click synthesised from Enter or Space carries no click count, and this is the dispatch that opens: asked for from the keydown before it, the landing would want a box the listbox does not have yet.
-			if (isGraced !== true && isOpening && event.detail === 0 && select.disabled !== true) {
+			select.setOpen(isOpening);
+			if (isOpening && event.detail === 0 && select.disabled !== true) {
 				focusOpeningOption(select.optionEls, select.optionLabelEls, '', false);
 			}
 			onClick?.(event);
@@ -161,8 +148,6 @@ export function SelectTrigger({ children, onClick, onKeydown, ...rest }: SelectT
 			const key = event.key;
 			const isOpenAtFirstKey = key === 'ArrowDown' || key === 'Home';
 			const isOpenAtLastKey = key === 'ArrowUp' || key === 'End';
-			// Enter and Space stay the button's own activation - a lazy handler's preventDefault lands after the native dispatch, so also opening here would toggle straight back shut - and the click they synthesise carries the landing.
-			// A chord is the page's own shortcut, never a search: Cmd+A must not open the list and hunt for "a".
 			const isTypeaheadChar =
 				key.length === 1 &&
 				key !== ' ' &&
@@ -175,14 +160,12 @@ export function SelectTrigger({ children, onClick, onKeydown, ...rest }: SelectT
 				const search = isTypeaheadChar
 					? (isSearchStale ? '' : select.search) + key.toLowerCase()
 					: '';
-				// Two cell assignments rather than one method taking both: a shared method of arity two aborts the handler.
 				if (isTypeaheadChar) {
 					select.search = search;
 					select.searchAt = now;
 				}
 				select.setOpen(true);
 
-				// Alt+ArrowDown opens the popup and leaves focus on the combobox.
 				if (!event.altKey) {
 					focusOpeningOption(select.optionEls, select.optionLabelEls, search, isOpenAtLastKey);
 				}
@@ -192,8 +175,6 @@ export function SelectTrigger({ children, onClick, onKeydown, ...rest }: SelectT
 	>{children}</button>
 }
 
-// Closed hides the listbox, never detaches it: the trigger points at this element's minted id, and an enlisted element removed from the document leaves the overlay stack's marks behind.
-// `overlay` is a bare attribute the primitive reads; while enlisted it reports Escape and outside presses as `dismiss`, closing nothing and moving no focus itself.
 export function SelectContent({ children, onDismiss, onKeydown, ...rest }: SelectContentProps) @{
 	const select = selectState();
 
@@ -209,16 +190,14 @@ export function SelectContent({ children, onDismiss, onKeydown, ...rest }: Selec
 		onDismiss={(event) => {
 			const pressed = event.detail.pressTarget;
 			const trigger = select.triggerEl;
-			// `contains` rather than `===`: a consumer may put an icon inside the trigger, and the press lands on that.
 			const isOwnTrigger = pressed !== undefined && trigger !== undefined && trigger.contains(pressed);
+			// The trigger's click owns this gesture; closing on pointerdown would toggle twice.
+			if (isOwnTrigger) return;
 			select.setOpen(false);
-			if (isOwnTrigger) select.pressGraceUntil = Date.now() + PRESS_GRACE;
-			// A press elsewhere is a person choosing where to be, so only Escape hands focus back.
 			if (event.detail.reason === 'escape') trigger?.focus();
 			onDismiss?.(event);
 		}}
 		onKeydown={(event) => {
-			// Escape is prevented too: a listbox inside a dialog must not close both.
 			if (
 				event.key === 'ArrowDown' ||
 				event.key === 'ArrowUp' ||
@@ -258,14 +237,11 @@ export function SelectContent({ children, onDismiss, onKeydown, ...rest }: Selec
 				select.searchAt = now;
 				focusMatchingOption(select.optionEls, select.optionLabelEls, search);
 			} else if (isNavigationKey) {
-				// Moving is not choosing: the walk is focus only, or a reader says "selected" on every arrow.
 				focusNeighbourOption(select.optionEls, here, key);
 			} else if (isSelectionKey) {
-				// Routed through the option's own click rule, so one place in this family reads a value.
 				commitFocusedOption(select.optionEls, here);
 				select.triggerEl?.focus();
 			} else if (key === 'Tab') {
-				// Tab never chooses; it closes and keeps its native move.
 				select.setOpen(false);
 			} else if (key === 'Escape') {
 				select.setOpen(false);
@@ -286,7 +262,6 @@ export function SelectItem({
 	const select = selectState();
 	const item = selectItemState();
 	item.value = value;
-	// Own prop only: a seed is built from this component's props, so the select's own `disabled` is added at every read site.
 	item.disabled = disabled;
 	const isChosen = computed(() => select.value === item.value);
 	const isLocked = computed(() => item.disabled || select.disabled);
@@ -305,7 +280,6 @@ export function SelectItem({
 			if (item.disabled !== true && select.disabled !== true) {
 				select.choose(item.value);
 				select.setOpen(false);
-				// Closing hides the option the pointer focused; the keyboard path's synthesised click (detail 0) hands focus back itself, Tab excepted.
 				if (event.detail !== 0) select.triggerEl?.focus({ preventScroll: true });
 			}
 			onClick?.(event);
@@ -327,7 +301,6 @@ export function SelectItemIndicator({ children, ...rest }: SelectItemIndicatorPr
 	<span {...rest} aria-hidden="true" ui-hidden={isChosen !== true}>{children}</span>
 }
 
-// A single-option `<select>` submits the same name/value pair a rebuilt list would; the value rides as text because the option element's attribute type does not yet take one.
 export function SelectField({ ...rest }: SelectFieldProps) @{
 	const select = selectState();
 

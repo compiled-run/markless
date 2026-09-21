@@ -39,10 +39,9 @@ test('delegate-children is registered as a link pass with its artifact boundary'
 
 test('a node_modules child with an external-delegate artifact is materializable', () => {
 	const child = candidate('edge-1', '@acme/frame');
-	const children = planDelegateChildren(
-		[child],
-		{ 'edge-1': '/workspace/app/node_modules/@acme/frame/dist/index.js' },
-	);
+	const children = planDelegateChildren([child], {
+		'edge-1': '/workspace/app/node_modules/@acme/frame/dist/index.js',
+	});
 	expect(children[0]).toMatchObject({ kind: 'external-delegate', loadable: true });
 
 	const artifact = linkDelegateChildren({
@@ -181,9 +180,7 @@ test('a prop the compiler cannot read at build time refuses instead of deferring
 });
 
 test('unprojected children are as unreadable at build time as a runtime prop', () => {
-	const plan = delegateChildRenderPlan(
-		candidate('edge-1', '@acme/frame', { hasChildren: true }),
-	);
+	const plan = delegateChildRenderPlan(candidate('edge-1', '@acme/frame', { hasChildren: true }));
 	expect(plan.ok === false && plan.diagnostic.message).toContain('prop "children"');
 });
 
@@ -225,3 +222,67 @@ test('a delegate output without static HTML is a refusal, and a full output keep
 		},
 	});
 });
+
+test('exact linked barrel members retain their compiled target before delegate classification', () => {
+	const target = {
+		exportPath: ['parts', 'label'],
+		source: './Leaf.tsrx',
+		componentName: 'Caption',
+		importKind: 'named' as const,
+		importedName: 'Caption',
+	};
+	const children = [
+		candidate('linked', './barrel.ts', {
+			componentName: 'ui.parts.label',
+			importKind: 'namespace',
+		}),
+		candidate('other', './barrel.ts', { componentName: 'ui.other', importKind: 'namespace' }),
+	];
+	const interfaces = { './barrel.ts': { linkedComponents: [target] } };
+	const planned = planDelegateChildren(
+		children,
+		{ linked: '/barrel.ts', other: '/barrel.ts' },
+		interfaces as never,
+	);
+	expect(planned[0]).toMatchObject({
+		edgeId: 'linked',
+		specifier: './barrel.ts',
+		kind: 'compiled-tsrx',
+		loadable: false,
+		componentTarget: target,
+	});
+	expect(planned[1]).toMatchObject({ kind: 'external-delegate', loadable: true });
+});
+
+test.each([
+	['named', 'Notice', 'Renamed', ['Renamed']],
+	['default', 'Panel.label', undefined, ['default', 'label']],
+	['namespace', 'all.deep.part', undefined, ['deep', 'part']],
+] as const)(
+	'linked %s targets use exact export paths without masking an unresolved member',
+	(importKind, componentName, importedName, exportPath) => {
+		const target = {
+			exportPath,
+			source: './Different.tsrx',
+			componentName: 'Actual',
+			importKind: 'named' as const,
+			importedName: 'Actual',
+		};
+		const interfaces = {
+			'./barrel.ts': { linkedComponents: [{ ...target, exportPath: ['unrelated'] }, target] },
+		};
+		const child = candidate('edge', './barrel.ts', {
+			componentName,
+			importKind,
+			...(importedName ? { importedName } : {}),
+		});
+		expect(
+			planDelegateChildren([child], { edge: '/barrel.ts' }, interfaces as never)[0],
+		).toMatchObject({ componentTarget: target, kind: 'compiled-tsrx' });
+		expect(
+			planDelegateChildren([child], { edge: '/barrel.ts' }, {
+				'./barrel.ts': { linkedComponents: [{ ...target, source: './external.js' }] },
+			} as never)[0],
+		).toMatchObject({ kind: 'external-delegate', loadable: true });
+	},
+);

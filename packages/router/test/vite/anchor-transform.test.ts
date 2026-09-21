@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseAst } from 'vite';
+import { parseModule } from '@tsrx/yuku';
 import { __marklessRouteHref } from '../../src/vite/entries/route-href.ts';
 import { anchorTransformPlugin, transformAnchorSource } from '../../src/vite/anchor-transform.ts';
 import type { RouteTypegenFileSystem } from '../../src/vite/route-typegen.ts';
@@ -10,6 +11,36 @@ const routePatterns = new Map([
 ]);
 
 describe('anchor transform', () => {
+	it.each(['@markless/router', '@markless/core/router'])(
+		'compiles data-driven Link anchors from %s',
+		async (entry) => {
+			const source = `import { Link as RouteLink } from '${entry}';
+export default function Menu({ pages, replace, scroll }) @{
+	@for (const page of pages; key page.href) {
+		<RouteLink href={page.href} class={page.active ? 'active' : 'link'} replace={replace} scroll={scroll} prefetch="intent"><span>{page.title}</span></RouteLink>
+	}
+}`;
+			const plugin = anchorTransformPlugin();
+			const handler = (plugin.transform as { handler: Function }).handler;
+			(plugin.configResolved as Function)({ root: '/project' });
+			const result = await handler.call(
+				{ fs: routeTypegenFs(), parse: parseModule },
+				source,
+				'/project/menu.tsrx',
+			);
+			expect(result?.code).toContain('<a data-markless-router-link');
+			expect(result?.code).toContain('href={page.href}');
+			expect(result?.code).toContain("class={page.active ? 'active' : 'link'}");
+			expect(result?.code).toContain(
+				"data-markless-router-replace={(replace) ? '' : undefined}",
+			);
+			expect(result?.code).toContain(
+				"data-markless-router-scroll={(scroll) === false ? 'manual' : undefined}",
+			);
+			expect(result?.code).toContain('<span>{page.title}</span></a>');
+			expect(result?.code).not.toContain('prefetch=');
+		},
+	);
 	it('lowers native route-pattern anchors and preserves normal props', () => {
 		const source = `export default () => {
   const slug = "hello";
@@ -138,9 +169,7 @@ export default function Home() {
 			id,
 		);
 
-		expect(result?.code).toContain(
-			'href="/blog/hello"',
-		);
+		expect(result?.code).toContain('href="/blog/hello"');
 		expect(result?.code).not.toContain('virtual:markless-router/route-href');
 		expect(result?.code).not.toContain('params=');
 	});

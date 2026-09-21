@@ -880,7 +880,12 @@ test('M10 intrinsic contract rejects className, bogus and tag-wrong attributes, 
 	expectDiagnosticSpan(fixture.source, diagnosticMatching(diagnostics, /outside-press/), 'only');
 	// `scope` belongs to <th> alone, so a global widening of the table attributes would pass silently.
 	expectDiagnosticSpan(fixture.source, diagnosticMatching(diagnostics, /scope/), 'scope');
-	expect(diagnostics).toHaveLength(6);
+	const opacityDiagnostics = diagnostics.filter((diagnostic) => {
+		const line = fixture.source.split('\n')[diagnostic.start.line - 1];
+		return line.slice(diagnostic.start.offset - 1, diagnostic.end.offset - 1) === 'opacity';
+	});
+	expect(opacityDiagnostics).toHaveLength(3);
+	expect(diagnostics).toHaveLength(9);
 }, 20_000);
 
 test('M16 PropsOf and Children from @markless/core type a component and its children in .tsrx', async () => {
@@ -1340,15 +1345,10 @@ test('M7a plugin-resolution check still catches a plugin that cannot be resolved
 	}
 }, 20_000);
 
-// M7b' replaces M7b. M7b read the VS Code extension manifest, because that manifest was
-// where a Markless app declared "load these two plugins". In an app that uses the upstream
-// TSRX extension the same declaration lives in the app's own tsconfig.json, so the successor
-// pins it in both places a real app gets it from: the create-markless scaffold template and
-// the reference app (docs). It also proves the declaration resolves to loadable code.
 test("M7b' scaffold and reference-app tsconfigs declare both plugins and a loadable tsrx compiler", () => {
 	for (const relativePath of [
 		'packages/cli/templates/common/tsconfig.json',
-		'docs/tsconfig.json',
+		'website/tsconfig.json',
 	]) {
 		const tsconfigPath = resolve(workspaceRoot, relativePath);
 		expect(

@@ -1,3 +1,4 @@
+import AnatomyTable from '../../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../../components/docs/sidebar.tsrx';
 import Preview from '../../../components/ui/preview.tsrx';
@@ -28,12 +29,7 @@ restriction set in either place stands — a part can add a restriction, never r
 
 ## Anatomy
 
-- `textbox.root` — holds the value and what a form is told.
-- `textbox.label` — the words above it.
-- `textbox.input` — the control a person types into.
-- `textbox.textarea` — the same control over more than one line.
-- `textbox.description` — a sentence under the field.
-- `textbox.error` — mounting it marks the control invalid.
+<AnatomyTable />
 
 It writes `ui-empty`, `ui-required`, `ui-readonly` and `ui-disabled`.
 

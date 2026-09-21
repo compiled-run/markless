@@ -34,3 +34,8 @@ catalogs:
     ufo: ^1.6.4
     vscode-languageserver-types: ^3.17.5
     zimmerframe: ^1.1.2
+
+overrides:
+  "@types/node": 24.12.2
+patchedDependencies:
+  '@async/witness@0.7.0': patches/witness-0.7.0-pointer-actionability.patch

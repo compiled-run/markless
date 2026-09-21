@@ -66,6 +66,10 @@ export async function transformMdxRoute(source: string, id: string) {
 		].join('\n');
 	}
 
+	const query = new URLSearchParams(parsePath(id).search);
+	if (query.has('markless-route') || query.has('markless-resume')) {
+		return emitMdxClientRoute(route, id, query.has('markless-resume'));
+	}
 	return emitComposedMdxRoute(route, id);
 }
 
@@ -106,6 +110,33 @@ type MdxPart =
 			readonly componentIndex: number;
 	  };
 
+function emitMdxClientRoute(route: MdxRoute, id: string, resume: boolean): string {
+	return [
+		...(resume
+			? [`import { resumeFromPayloadDocument } from '@markless/core/web/resume';`]
+			: []),
+		`import { createMdxRenderDataSurface, loadMdxSymbol } from '${MDX_ROUTE_RUNTIME_SPECIFIER}';`,
+		`const marklessMdxParts = ${JSON.stringify(route.parts)};`,
+		`const marklessMdxSymbolLoaders = ${renderSymbolLoaders(route.components)};`,
+		`const marklessMdxRenderData = ${renderMdxRenderDataLoader(route.components, id)};`,
+		renderOverlayLoader(),
+		'const marklessMdxPage = {',
+		'  renderData: marklessMdxRenderData,',
+		'  loadSymbol: marklessMdxLoadSymbol,',
+		'};',
+		'export default marklessMdxPage;',
+		...(resume ? renderMdxResumeHandler() : []),
+		'function marklessMdxLoadSymbol(symbolId, children = []) {',
+		'  return loadMdxSymbol(symbolId, children, marklessMdxSymbolLoaders);',
+		'}',
+		'',
+	].join('\n');
+}
+
+function renderOverlayLoader(): string {
+	return "globalThis.__marklessOverlay ??= (root) => root.querySelector('[overlay]') ? import('@markless/web/fns/overlay').then((m) => m.installOverlayBehavior(root)) : undefined;";
+}
+
 function emitComposedMdxRoute(route: MdxRoute, id: string): string {
 	return [
 		`import { resumeFromPayloadDocument } from '@markless/core/web/resume';`,
@@ -118,8 +149,7 @@ function emitComposedMdxRoute(route: MdxRoute, id: string): string {
 		`const marklessMdxStorageSeeds = ${renderStorageSeeds(route.components)};`,
 		`const marklessMdxHeadInjections = ${renderHeadInjections(route.components)};`,
 		'',
-		// An island's own module names the overlay behaviour, but a composed page reaches it only lazily, after the runtime start has already asked once for the loader; still fetched only for a root carrying a mark.
-		"globalThis.__marklessOverlay ??= (root) => root.querySelector('[overlay]') ? import('@markless/web/fns/overlay').then((m) => m.installOverlayBehavior(root)) : undefined;",
+		renderOverlayLoader(),
 		'',
 		'const marklessMdxPage = {',
 		'  renderData: marklessMdxRenderData,',
@@ -137,25 +167,28 @@ function emitComposedMdxRoute(route: MdxRoute, id: string): string {
 		'};',
 		'export default marklessMdxPage;',
 		'',
-		'export async function resumeContainerEvent(input) {',
-		'  input.root.__asyncResumeRuntimeStarted = true;',
-		'  const { runtime } = await resumeFromPayloadDocument({',
-		'    document: input.root,',
-		'    root: input.root,',
-		'    loadSymbol: marklessMdxLoadSymbol,',
-		// Lazy, so a page that never mints a component row never fetches a
-		// child's render-data chunk.
-		'    renderData: marklessMdxRenderData,',
-		'  });',
-		// A crossing the inline resumer forwarded with no record is not a routing defect on a page that mints component rows.
-		'  await runtime.dispatch(input.event, { syncPolicyAlreadyApplied: true, ignoreUnmatched: input.eventRecord == null });',
-		'}',
+		...renderMdxResumeHandler(),
 		'',
 		'function marklessMdxLoadSymbol(symbolId, children = []) {',
 		'  return loadMdxSymbol(symbolId, children, marklessMdxSymbolLoaders);',
 		'}',
 		'',
 	].join('\n');
+}
+
+function renderMdxResumeHandler(): string[] {
+	return [
+		'export async function resumeContainerEvent(input) {',
+		'  input.root.__asyncResumeRuntimeStarted = true;',
+		'  const { runtime } = await resumeFromPayloadDocument({',
+		'    document: input.root,',
+		'    root: input.root,',
+		'    loadSymbol: marklessMdxLoadSymbol,',
+		'    renderData: marklessMdxRenderData,',
+		'  });',
+		'  await runtime.dispatch(input.event, { syncPolicyAlreadyApplied: true, ignoreUnmatched: input.eventRecord == null });',
+		'}',
+	];
 }
 
 function renderMdxPreload(components: ReadonlyArray<MdxComponent>): string[] {

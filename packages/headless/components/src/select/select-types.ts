@@ -42,8 +42,6 @@ export type SelectInstanceState = Seeded<
 > & {
 	search: string;
 	searchAt: number;
-	/** Until when a press that dismissed the list keeps the trigger's own click from re-opening it. */
-	pressGraceUntil: number;
 	onChange?: SelectRootProps['onChange'];
 	onOpenChange?: SelectRootProps['onOpenChange'];
 };

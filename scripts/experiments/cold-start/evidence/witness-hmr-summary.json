@@ -1,0 +1,88 @@
+{
+  "sourceReceipt": "/tmp/markless-cold-start/witness-hmr/2026-09-19T18-43-12.672Z/receipt.json",
+  "sha256": "ee8030150ca32c033a24d5ca198d498a6682df4118d71e8f6b9b0c107e8a696e",
+  "createdAt": "2026-09-19T18:43:16.118Z",
+  "summary": {
+    "status": "passed",
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "contested": 0,
+    "invalidBoxFiles": 0
+  },
+  "boxes": [
+    {
+      "name": "ssr browser hmr: repeated tsrx edits keep reloading",
+      "file": "boxes/ssr-browser-hmr.box.ts",
+      "status": "passed",
+      "error": null,
+      "durationMs": 3440,
+      "assertions": [
+        {
+          "name": "page.text",
+          "environment": "client",
+          "editId": null,
+          "status": "passed",
+          "message": null,
+          "witness": "client"
+        },
+        {
+          "name": "edit",
+          "environment": null,
+          "editId": "edit-1",
+          "status": "passed",
+          "message": null,
+          "expected": {
+            "client": {
+              "hmr": "full-reload"
+            }
+          },
+          "witness": "pipeline"
+        },
+        {
+          "name": "edit",
+          "environment": null,
+          "editId": "edit-2",
+          "status": "passed",
+          "message": null,
+          "expected": {
+            "client": {
+              "hmr": "full-reload"
+            }
+          },
+          "witness": "pipeline"
+        },
+        {
+          "name": "page.outcome",
+          "environment": "client",
+          "editId": null,
+          "status": "passed",
+          "message": null,
+          "expected": {
+            "navigations": 2
+          },
+          "witness": "client"
+        }
+      ],
+      "summary": {
+        "status": "passed",
+        "assertions": {
+          "passed": 4,
+          "failed": 0
+        },
+        "edits": 2,
+        "builds": 0,
+        "previews": 0,
+        "pages": 1,
+        "restorationFailed": false,
+        "witnesses": {
+          "pipeline": "corroborates",
+          "client": "corroborates",
+          "driver": "corroborates",
+          "box": "corroborates"
+        },
+        "contested": false
+      }
+    }
+  ]
+}

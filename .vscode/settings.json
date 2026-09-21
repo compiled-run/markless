@@ -1,4 +1,5 @@
 {
+	"oxc.path.oxlint": "node_modules/@tsrx/oxc/bin/oxlint",
 	"emmet.includeLanguages": {
 		"ripple": "html"
 	},

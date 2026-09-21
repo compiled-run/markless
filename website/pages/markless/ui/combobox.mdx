@@ -1,3 +1,4 @@
+import AnatomyTable from '../../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../../components/docs/sidebar.tsrx';
 import Preview from '../../../components/ui/preview.tsrx';
@@ -40,15 +41,7 @@ and render the options you want.
 
 ## Anatomy
 
-- `combobox.root` — holds the configuration. Renders `role="group"`.
-- `combobox.label` — names the field and the list.
-- `combobox.input` — the field a person types in.
-- `combobox.trigger` — a button that shows the list. Deliberately not a tab stop.
-- `combobox.content` — the list.
-- `combobox.item` — one option, named by its required `value`.
-- `combobox.itemlabel` and `combobox.itemindicator` — that option's parts.
-- `combobox.description`, `combobox.error` — the sentence under the field, and the one that marks it invalid.
-- `combobox.field` — the hidden native `<select>` that carries the choice into a form.
+<AnatomyTable />
 
 It writes `ui-open`, `ui-closed`, `ui-highlighted`, `ui-selected`, `ui-hidden`, `ui-inline`,
 `ui-required`, `ui-disabled` and `ui-value`.

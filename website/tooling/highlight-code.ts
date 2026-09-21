@@ -68,7 +68,11 @@ const FENCE = /<pre><code class="language-([\w+#-]+)">([\s\S]*?)<\/code><\/pre>/
  * islands on the page start, so it has to stay exact.
  */
 export function countElements(html: string): number {
-	return (html.match(/<[a-zA-Z][^\s/>]*/g) ?? []).length;
+	return elementTags(html).length;
+}
+
+export function elementTags(html: string): string[] {
+	return [...html.matchAll(/<([a-zA-Z][^\s/>]*)/g)].map((match) => match[1]);
 }
 
 const NAMED_ENTITIES: Readonly<Record<string, string>> = {

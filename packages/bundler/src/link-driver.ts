@@ -57,6 +57,7 @@ import { TSRX_SOURCE_FILE, isRelativeImport, pathname } from './virtual-ids.ts';
 type ResolvedImport = { readonly id: string; readonly external?: unknown } | string | null;
 
 export type LinkResolveContext = {
+	addWatchFile?: (filename: string) => void;
 	resolve(
 		source: string,
 		importer?: string,
@@ -245,7 +246,9 @@ export async function linkBarrelComponentInterfaces(
 			artifact.pendingInterfaces.map(async (filename) => {
 				interfacesByFile.set(
 					filename,
-					await barrelModuleInterface(filename, artifacts, buildId, root),
+					await barrelModuleInterface(filename, artifacts, buildId, root, (file) =>
+						context.addWatchFile?.(file),
+					),
 				);
 			}),
 		);
@@ -299,7 +302,9 @@ async function packageBarrelSpecifiers(
 	moduleImports: ReadonlyArray<{ readonly source: string }>,
 	rebase: (target: string) => string,
 ): Promise<ReadonlyMap<string, PackageBarrel>> {
-	const specifiers = [...new Set(moduleImports.map((moduleImport) => moduleImport.source))].filter(
+	const specifiers = [
+		...new Set(moduleImports.map((moduleImport) => moduleImport.source)),
+	].filter(
 		(source) =>
 			!isRelativeImport(source) &&
 			!isAbsolute(source) &&
@@ -355,10 +360,15 @@ async function barrelModuleInterface(
 	artifacts: ReadonlyMap<string, MarklessModuleLinkArtifact>,
 	buildId: string | undefined,
 	root: string | undefined,
+	watchFile?: (filename: string) => void,
 ): Promise<ModuleGraphInterfaceArtifact | null> {
 	const known = artifacts.get(filename)?.moduleGraphInterface;
-	if (known) return known;
+	if (known) {
+		watchFile?.(filename);
+		return known;
+	}
 	if (!existsSync(filename) || !statSync(filename).isFile()) return null;
+	watchFile?.(filename);
 	await yieldToEventLoop();
 	const linked = await compileTsrxModuleLinkArtifact({
 		filename,
@@ -629,6 +639,7 @@ export async function materializeDelegateChildren(
 	parent: string,
 	candidates: ReadonlyArray<LinkedArtifactChild>,
 	options: {
+		readonly interfaces?: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 		readonly modules?: DelegateModuleCache;
 		readonly importModule?: DelegateModuleImport;
 	} = {},
@@ -639,7 +650,7 @@ export async function materializeDelegateChildren(
 		const id = typeof resolved === 'string' ? resolved : resolved?.id;
 		if (id) resolution[candidate.edgeId] = pathname(id);
 	}
-	const children = planDelegateChildren(candidates, resolution);
+	const children = planDelegateChildren(candidates, resolution, options.interfaces);
 	const byEdge = new Map(candidates.map((candidate) => [candidate.edgeId, candidate]));
 	const modules = options.modules ?? createDelegateModuleCache();
 	const unloadable = new Map<string, { readonly message: string; readonly edgeIds: string[] }>();

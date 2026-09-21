@@ -1,16 +1,4 @@
-// Real editor types for the code fences, resolved at build time.
-//
-// `.tsrx` is not TypeScript, so `typescript` alone cannot answer a hover over
-// one. The workspace `@markless/typescript-plugin` ships the same Volar layer the
-// editor uses: `MarklessTsrxVirtualCode` compiles an authored `.tsrx` snapshot
-// into generated TSX plus source mappings, and `@volar/typescript` serves that
-// TSX to a plain TypeScript language service and maps positions back. Wiring the
-// two here gives quick info in authored coordinates.
-//
-// No tsconfig is read anywhere in this file: the options below are the whole
-// project, and the virtual fence file sits at the site root so bare specifiers
-// resolve through the site's own `node_modules` — which is where the workspace
-// `@markless/ui` source (raw `.ts`/`.tsrx`, never `.d.ts`) lives.
+// Each fence resolves editor types at the site root through the installed Volar service.
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
@@ -18,8 +6,6 @@ import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
 const require = createRequire(import.meta.url);
-// Volar is a dependency of the plugin, not of the site, so it is
-// required from the plugin's own location: the copy the plugin compiled against.
 const volarRequire = createRequire(require.resolve('@markless/typescript-plugin/language'));
 
 type VolarLanguage = {
@@ -89,8 +75,7 @@ export function hasQuickInfo(language: string): boolean {
 
 const COMPILER_OPTIONS: ts.CompilerOptions = {
 	allowImportingTsExtensions: true,
-	// `.tsrx` is none of TypeScript's own extensions, so without this the program
-	// drops the fence file, and every family `.tsrx` it imports, before Volar is asked.
+	// Volar supplies the parser for the non-TypeScript extension.
 	allowNonTsExtensions: true,
 	jsx: ts.JsxEmit.Preserve,
 	lib: ['lib.es2023.d.ts', 'lib.dom.d.ts', 'lib.dom.iterable.d.ts'],
@@ -168,9 +153,7 @@ function marklessLanguagePlugin(): unknown {
 			extraFileExtensions: [
 				{ extension: 'tsrx', isMixedContent: true, scriptKind: ts.ScriptKind.Deferred },
 			],
-			// `preventLeadingOffset` is left off on purpose: the plugin's mapping
-			// helpers assume Volar serves the generated TSX behind a blanked copy of
-			// the authored source, and opting out would shift every mapped position.
+			// Mapping offsets include Volar’s blanked authored-source prefix.
 			getServiceScript(root: unknown) {
 				return { code: root, extension: '.tsx', scriptKind: ts.ScriptKind.TSX };
 			},
@@ -178,28 +161,29 @@ function marklessLanguagePlugin(): unknown {
 	};
 }
 
-type FenceFile = { readonly fileName: string; text: string; version: number };
+type FenceFile = { readonly fileName: string; readonly text: string; readonly version: number };
 
 function createService(): {
 	readonly proxy: ts.LanguageService;
-	readonly files: ReadonlyMap<string, FenceFile>;
+	selectFence(key: string, extension: string, text: string): FenceFile;
 } {
 	const core = volarRequire('@volar/language-core') as VolarCore;
 	const volarTs = volarRequire('@volar/typescript') as VolarTypeScript;
 
-	const files = new Map<string, FenceFile>();
-	for (const extension of new Set(Object.values(FENCE_EXTENSION)))
-		files.set(extension, {
-			fileName: join(SITE_ROOT, `__twoslash_fence__${extension}`),
-			text: '',
-			version: 0,
-		});
-
-	const fenceByName = new Map([...files.values()].map((file) => [file.fileName, file] as const));
+	const fenceByName = new Map<string, FenceFile>();
+	let activeFence: FenceFile | undefined;
+	const selectFence = (key: string, extension: string, text: string): FenceFile => {
+		const fileName = join(SITE_ROOT, `__twoslash_fence__${key}${extension}`);
+		let file = fenceByName.get(fileName);
+		if (!file) {
+			file = { fileName, text, version: 1 };
+			fenceByName.set(fileName, file);
+		}
+		activeFence = file;
+		return file;
+	};
 	const diskVersions = new Map<string, string>();
-	// Volar recompiles a `.tsrx` whenever the snapshot object changes identity, so
-	// a version keeps its one snapshot: without this every lookup recompiles the
-	// whole family tree the fence imports.
+	// Stable snapshots let Volar reuse unchanged imported family documents.
 	const snapshots = new Map<string, { version: string; snapshot: ts.IScriptSnapshot }>();
 
 	const versionOf = (fileName: string): string => {
@@ -232,18 +216,14 @@ function createService(): {
 		getCurrentDirectory: () => SITE_ROOT,
 		getDefaultLibFileName: (options) => ts.getDefaultLibFilePath(options),
 		getDirectories: (path) => ts.sys.getDirectories(path),
-		getScriptFileNames: () => [...fenceByName.keys()],
-		// Volar only decorates a `getScriptKind` the host already has, and without
-		// one TypeScript hands the fence to the wrong parser.
+		getScriptFileNames: () => (activeFence ? [activeFence.fileName] : []),
 		getScriptKind: (fileName) => SCRIPT_KINDS[extensionOf(fileName)] ?? ts.ScriptKind.TS,
 		getScriptSnapshot: readSnapshot,
 		getScriptVersion: versionOf,
 		readDirectory: (path, extensions, exclude, include, depth) =>
 			ts.sys.readDirectory(path, extensions, exclude, include, depth),
 		readFile: (path) => ts.sys.readFile(path),
-		// Workspace packages reach each other through pnpm symlinks; without a
-		// realpath the same source file enters the program under two paths and every
-		// program rebuild trips the document registry.
+		// Resolve pnpm aliases to one document-registry identity.
 		realpath: (path) => ts.sys.realpath?.(path) ?? path,
 		// Volar only decorates a resolver the host already has, and its `.tsrx`
 		// resolution is the whole point of this service, so a plain one is required.
@@ -277,32 +257,28 @@ function createService(): {
 		ts.createLanguageService(host, ts.createDocumentRegistry()),
 	);
 	initialize(language);
-	return { files, proxy };
+	return { selectFence, proxy };
 }
 
 let shared: ReturnType<typeof createService> | undefined;
 
-/**
- * The build gets one language service and one cache, both keyed off the fence
- * text: a page repeats the same demo source across tabs and sections, and the
- * program is only cheap once it is warm.
- */
 export function createQuickInfoService(): QuickInfoService {
 	shared ??= createService();
-	const { files, proxy } = shared;
+	const { selectFence, proxy } = shared;
 	const cache = new Map<string, readonly QuickInfo[]>();
 
 	return {
 		queryFence(code: string, language: string): readonly QuickInfo[] {
 			const extension = FENCE_EXTENSION[language];
-			const file = extension === undefined ? undefined : files.get(extension);
-			if (!file) return [];
-			const key = `${extension}\0${createHash('sha256').update(code).digest('hex')}`;
+			if (extension === undefined) return [];
+			const key = createHash('sha256')
+				.update(language)
+				.update('\0')
+				.update(code)
+				.digest('hex');
+			const file = selectFence(key, extension, code);
 			const cached = cache.get(key);
 			if (cached) return cached;
-
-			file.text = code;
-			file.version += 1;
 
 			const seen = new Set<number>();
 			const found: QuickInfo[] = [];
@@ -312,12 +288,9 @@ export function createQuickInfoService(): QuickInfoService {
 				try {
 					info = proxy.getQuickInfoAtPosition(file.fileName, match.index);
 				} catch {
-					// A half-typed fence leaves the checker without a symbol here; the
-					// rest of the fence still answers, so one dead position is skipped.
 					info = undefined;
 				}
-				// A module hover is the resolved file's absolute path: a build machine's
-				// directory layout, which has no business in the shipped HTML.
+				// Module hovers expose build-machine paths.
 				if (!info || info.kind === ts.ScriptElementKind.moduleElement) continue;
 				const { length, start } = info.textSpan;
 				if (length <= 0 || start + length > code.length || seen.has(start)) continue;

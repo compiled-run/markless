@@ -275,9 +275,12 @@ export default defineConfig({
 		ignorePatterns: [
 			'dist/**',
 			'node_modules/**',
+			'scripts/experiments/**/results/**',
 			'.claude/**',
 			'website/public/**',
 			'website/components/docs/playground/generated/**',
+			// Editor-completion probes and deliberately unparsable inputs, not source.
+			'packages/typescript-plugin/test/fixtures/**',
 		],
 		rules: {
 			'no-restricted-imports': [
@@ -312,9 +315,12 @@ export default defineConfig({
 		ignorePatterns: [
 			'dist/**',
 			'node_modules/**',
+			'scripts/experiments/**/results/**',
 			'.claude/**',
 			'website/public/**',
 			'website/components/docs/playground/generated/**',
+			// Editor-completion probes and deliberately unparsable inputs, not source.
+			'packages/typescript-plugin/test/fixtures/**',
 		],
 	},
 });

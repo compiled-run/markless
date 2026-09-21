@@ -3,7 +3,11 @@ import type { PublicRenderModuleInput } from '../../artifacts.ts';
 import { asNodes, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import { firstComponentRoot } from './plan.ts';
 import { sharedCallbackSlotGraphNodeId } from '../semantic-graph/collect-shared.ts';
-import { emitClientResidueReader, emitClientResidueReaderPrelude } from './residue-reader.ts';
+import {
+	componentInitializerResidues,
+	emitClientResidueReader,
+	emitClientResidueReaderPrelude,
+} from './residue-reader.ts';
 import { handlerReadGraphNodeIds } from './derive-set.ts';
 import {
 	adoptedWidgetDefinitionIds,
@@ -76,7 +80,10 @@ export function collectPublicRenderComponentDefinitions(
 				childComponentName: edge.childComponentName,
 				...(edge.asyncBoundaryId ? { asyncBoundaryId: edge.asyncBoundaryId } : {}),
 				hostPrefix: `c${index}:`,
-				symbolPrefix: componentEdgeInstanceSegment(edge, input.semanticGraph.componentEdges),
+				symbolPrefix: componentEdgeInstanceSegment(
+					edge,
+					input.semanticGraph.componentEdges,
+				),
 				boundSymbols: Object.fromEntries(
 					[...callbacks].flatMap(([key, value]) => {
 						const prefix = `bound:${edge.id}:`;
@@ -222,6 +229,7 @@ export function collectPublicRenderComponentDefinitions(
 			...chunk,
 			nativeTemplateId: `markless-render-data:${encodeURIComponent(input.source.filename)}:${encodeURIComponent(componentName)}:template:${encodeURIComponent(chunk.id)}`,
 		}));
+		const initializerResidues = componentInitializerResidues(input, componentName);
 		// Positions resolve a state name two components of one module both
 		// declare; a single-component module needs no partition at all, unless it
 		// adopted a widget family - those nodes belong to the enclosing instance
@@ -263,6 +271,7 @@ export function collectPublicRenderComponentDefinitions(
 				repeatIds: [...repeatIds],
 				initialValues,
 				initialValueKinds,
+				...(Object.keys(initializerResidues).length ? { initializerResidues } : {}),
 				// A set: every component binds its props under one id, so a module
 				// with several of them offers the same node more than once.
 				stateGraphNodeIds: [...new Set([...stateGraphNodeIds, ...slotGraphNodeIds])],
@@ -356,15 +365,12 @@ function withComponentSharedSeeds(
 		),
 	);
 	const firstDerive = initialValues.findIndex(
-		(initial) => initial.value.kind === 'symbol-function' && deriveIds.has(initial.value.symbolId),
+		(initial) =>
+			initial.value.kind === 'symbol-function' && deriveIds.has(initial.value.symbolId),
 	);
 	return firstDerive === -1
 		? [...initialValues, ...seeds]
-		: [
-				...initialValues.slice(0, firstDerive),
-				...seeds,
-				...initialValues.slice(firstDerive),
-			];
+		: [...initialValues.slice(0, firstDerive), ...seeds, ...initialValues.slice(firstDerive)];
 }
 
 function childComponentInputs(

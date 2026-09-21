@@ -1,3 +1,4 @@
+import { componentExportPath, linkedComponentTarget } from '../link/component-target.ts';
 import { isEventAttribute } from '@tsrx/yuku';
 import { asNodes, getIdentifierName, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, expressionSourceOrFallback, sourceSpan } from '../../ast/source.ts';
@@ -9,7 +10,6 @@ import {
 	isIgnorableJsxTextNode,
 	isMemberTagName,
 	isSpreadAttribute,
-	memberTagPropertyPath,
 	memberTagRootName,
 	unwrapExpressionContainer,
 } from '../../ast/tsrx.ts';
@@ -279,7 +279,9 @@ function componentPropBindings(
 			}
 			const strayCancel = syncPolicy ? uncoveredSyncPolicyCall(callback, state) : null;
 			if (strayCancel && spreadForwardsProp(name, link, state, childComponentName)) {
-				state.graph.diagnostics.push(secondSyncPolicyCancelDiagnostic(name, strayCancel, state));
+				state.graph.diagnostics.push(
+					secondSyncPolicyCancelDiagnostic(name, strayCancel, state),
+				);
 			}
 
 			props.push({
@@ -568,20 +570,8 @@ function resolveImportedChildComponent(
 	const moduleInterface = state.importedModuleInterfaces[importSource.importSource];
 	if (!moduleInterface) return unresolved;
 
-	const exportPath = [
-		...(importSource.importKind === 'namespace'
-			? []
-			: importSource.importKind === 'default'
-				? ['default']
-				: [importSource.importedName ?? memberTagRootName(localTarget)]),
-		...memberTagPropertyPath(localTarget),
-	];
-
-	const linked = moduleInterface.linkedComponents?.find(
-		(candidate) =>
-			candidate.exportPath.length === exportPath.length &&
-			candidate.exportPath.every((part, index) => part === exportPath[index]),
-	);
+	const exportPath = componentExportPath(localTarget, importSource);
+	const linked = linkedComponentTarget(localTarget, importSource, moduleInterface);
 	if (linked) {
 		return {
 			childComponentName: linked.componentName,
@@ -644,9 +634,8 @@ function spreadForwardsProp(
 	if (!moduleInterface) return false;
 	const childName = link.childComponentName || fallbackChildName;
 	const spreadHosts =
-		moduleInterface.render.components.find(
-			(component) => component.componentName === childName,
-		)?.spreadHosts ?? [];
+		moduleInterface.render.components.find((component) => component.componentName === childName)
+			?.spreadHosts ?? [];
 
 	return spreadHosts.some(
 		(spread) =>

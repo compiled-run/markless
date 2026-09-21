@@ -6,7 +6,11 @@ import {
 	protocolProjectionSegment,
 	protocolRowSegment,
 } from '../../serializer/src/protocol.ts';
-import { protocolIslandSegment } from '../../serializer/src/protocol-constants.ts';
+import {
+	protocolIslandSegment,
+	ASYNC_PROTOCOL_VERSION,
+	STORAGE_PROTOCOL_VERSION,
+} from '../../serializer/src/protocol-constants.ts';
 import {
 	marklessComposedGraphNodeId,
 	marklessComposedInstancePath,
@@ -19,6 +23,22 @@ import {
 	marklessRecordRowScope,
 	marklessRowScopedGraph,
 } from '../src/fns/instance-scope.ts';
+
+test('composition carries child storage subscriptions and their protocol version', () => {
+	const storage = [{ graphNodeId: 'storage:settings.tsrx#theme', key: 'theme' }];
+	const child = {
+		output: { state: { version: STORAGE_PROTOCOL_VERSION, cells: [], computed: [], storage } },
+		hostPrefix: 'c0:',
+		symbolPrefix: 'c0:',
+		graphProps: [],
+	};
+	const composed = marklessComposeState(
+		{ version: ASYNC_PROTOCOL_VERSION, cells: [], computed: [] },
+		[child, child],
+	);
+	expect(composed.storage).toEqual(storage);
+	expect(composed.version).toBe(STORAGE_PROTOCOL_VERSION);
+});
 
 // The browser copy of composition restates the page-space families and the
 // instance-path grammar as literals so the resume bundle never imports the
@@ -122,9 +142,9 @@ test('an island segment is an instance path and a foreign prefix is not', () => 
 	const island = protocolIslandSegment(0);
 	expect(protocolInstancePath(island)).toBe(island);
 	expect(marklessComposedInstancePath({ symbolPrefix: island })).toBe(island);
-	expect(marklessComposedInstancePath({ symbolPrefix: `${island}${protocolInstanceSegment(3)}` })).toBe(
-		`${island}${protocolInstanceSegment(3)}`,
-	);
+	expect(
+		marklessComposedInstancePath({ symbolPrefix: `${island}${protocolInstanceSegment(3)}` }),
+	).toBe(`${island}${protocolInstanceSegment(3)}`);
 	expect(marklessComposedInstancePath({ symbolPrefix: protocolInstanceSegment(3) })).toBe(
 		protocolInstanceSegment(3),
 	);
@@ -186,10 +206,7 @@ test('a scoped symbol reads page space through context.read as well as through t
 	const read = (graphNodeId: string) => graphNodeId;
 	symbol({ graph: { read }, read });
 
-	expect(reads).toEqual([
-		`${path}state:count`,
-		`${PROTOCOL_PAGE_SPACE_ID_PREFIXES[0]}lib#thing`,
-	]);
+	expect(reads).toEqual([`${path}state:count`, `${PROTOCOL_PAGE_SPACE_ID_PREFIXES[0]}lib#thing`]);
 });
 
 // A composed child's own loader marks its symbols composed, so the scoped
@@ -199,20 +216,24 @@ test('a composed symbol remaps context.read through the same child route as its 
 	const reads: string[] = [];
 	const output = {
 		state: { cells: [], computed: [] },
-		loadSymbol: () => (context: {
-			readonly graph: { readonly read: (graphNodeId: string) => unknown };
-			readonly read?: (graphNodeId: string) => unknown;
-		}) => {
-			reads.push(String(context.graph.read('state:count')));
-			reads.push(String(context.read?.('state:count')));
-			return null;
-		},
+		loadSymbol:
+			() =>
+			(context: {
+				readonly graph: { readonly read: (graphNodeId: string) => unknown };
+				readonly read?: (graphNodeId: string) => unknown;
+			}) => {
+				reads.push(String(context.graph.read('state:count')));
+				reads.push(String(context.read?.('state:count')));
+				return null;
+			},
 	};
 	marklessCsrRemapGraphOutput(output as never, [], instancePath);
 
-	const symbol = (await (output as unknown as {
-		loadSymbol: (symbolId: string) => Promise<(context: unknown) => unknown>;
-	}).loadSymbol(`${instancePath}symbol:0`)) as (context: unknown) => unknown;
+	const symbol = (await (
+		output as unknown as {
+			loadSymbol: (symbolId: string) => Promise<(context: unknown) => unknown>;
+		}
+	).loadSymbol(`${instancePath}symbol:0`)) as (context: unknown) => unknown;
 	const read = (graphNodeId: string) => graphNodeId;
 	symbol({ graph: { read }, read });
 
@@ -267,7 +288,11 @@ test('a row widget resolves to its own row root behind an island segment', () =>
 		const scope = marklessRecordRowScope(`${island}${row}c2:h2`, graph);
 		expect(scope).toBeDefined();
 		const scoped = marklessRowScopedGraph(graph, scope!);
-		expect(scoped.read(`${island}c0:p1:${part}/state:part`)).toBe(`${rowRoot}${part}/state:part`);
-		expect(scoped.read(`${island}c0:${tabs}/state:tabs`)).toBe(`${island}c0:${tabs}/state:tabs`);
+		expect(scoped.read(`${island}c0:p1:${part}/state:part`)).toBe(
+			`${rowRoot}${part}/state:part`,
+		);
+		expect(scoped.read(`${island}c0:${tabs}/state:tabs`)).toBe(
+			`${island}c0:${tabs}/state:tabs`,
+		);
 	}
 });

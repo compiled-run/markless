@@ -2,6 +2,7 @@ import {
 	createExternalDelegateStructureTokens,
 	createExternalDelegateView,
 } from '@markless/web/fns/external-delegate';
+import { LINK_ATTRIBUTE, REPLACE_ATTRIBUTE, SCROLL_ATTRIBUTE } from './link-attributes.ts';
 
 export {
 	buildRouteManifestFromFileIds,
@@ -75,7 +76,10 @@ export type DefaultLinkProps = {
 } & LinkNavigationProps;
 
 export type LinkProps = MarklessRouterGeneratedRoutes extends { readonly link: infer Props }
-	? Props
+	? Props &
+			Pick<DefaultLinkProps, 'children' | 'class' | 'id' | 'target' | 'rel'> & {
+				readonly [prop: string]: unknown;
+			}
 	: DefaultLinkProps;
 
 export interface AppLocals {}
@@ -212,9 +216,9 @@ function linkAnchorAttributes(props: LinkProps): Array<readonly [string, string]
 	}
 
 	attributes.set('href', typeof props.href === 'string' ? props.href : '#');
-	attributes.set('data-markless-router-link', '');
-	if (props.replace) attributes.set('data-markless-router-replace', '');
-	if (props.scroll === false) attributes.set('data-markless-router-scroll', 'manual');
+	attributes.set(LINK_ATTRIBUTE, '');
+	if (props.replace) attributes.set(REPLACE_ATTRIBUTE, '');
+	if (props.scroll === false) attributes.set(SCROLL_ATTRIBUTE, 'manual');
 	return [...attributes];
 }
 

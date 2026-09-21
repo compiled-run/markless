@@ -1,3 +1,4 @@
+import { runInNewContext } from 'node:vm';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'pathe';
@@ -530,6 +531,8 @@ test('persists client assets for a fresh server plugin instance', async () => {
 		expect(preloadsSource).toContain('/docs/assets/page-E5.css');
 		expect(preloadsSource).toContain('/docs/assets/child-F6.css');
 		expect(preloadsSource).not.toContain('/@id/');
+		const evaluated = runInNewContext(preloadsSource.replace(/export (const|function) /g, '$1 ') + ';({navigation:routeModulePreloads,ssr:routeSsrModulePreloads,styles:routeStylesheets,documentStylesheets})');
+		expect(evaluated).toEqual({...persisted.routes,documentStylesheets:[]});
 
 		await hookHandler(clientConfigPlugin?.buildStart)?.call({
 			environment: { config: resolvedConfig.environments.browser },
@@ -851,7 +854,9 @@ test('emits exact route modulepreload maps from client build chunks', () => {
 	expect(clientSource).not.toContain('routeStylesheets');
 	expect(clientSource).not.toContain('assets/docs.css');
 	expect(navigationChunk.code).toContain('pages/docs/[...slug].mdx');
-	expect(Object.keys(patchedRoutePreloads)).toEqual(['navigation', 'ssr']);
+	expect(Array.isArray(patchedRoutePreloads)).toBe(true);
+	const decoded = runInNewContext(clientSource!.replace(/export (const|function) /g, '$1 ') + ';({navigation:routeModulePreloads,ssr:routeSsrModulePreloads})', {__marklessRouterRoutePreloadsJson:JSON.stringify(patchedRoutePreloads)});
+	expect(decoded).toEqual({navigation:routePreloads,ssr:ssrPreloads});
 	expect(patchedRoutePreloads).not.toHaveProperty('styles');
 	expect(navigationChunk.code).toContain('const __vite__mapDeps = () => ["assets/docs.css"]');
 	expect(navigationChunk.code.match(/__MARKLESS_ROUTER_ROUTE_PRELOADS__/g)).toHaveLength(1);
@@ -1217,3 +1222,277 @@ function chunk(overrides: {
 		viteMetadata: overrides.viteMetadata,
 	};
 }
+
+test.each(['tsrx', 'mdx'])(
+	'selects semantic primary %s roots independently of chunk order and hashes',
+	async (extension) => {
+		const source = `/project/pages/study.${extension}`;
+		const plan = async (
+			roles: string[],
+			reverse: boolean,
+			suffix: string,
+			connected = false,
+		) => {
+			const outDir = await mkdtemp(join(tmpdir(), 'router-role-plan-'));
+			onTestFinished(() => rm(outDir, { recursive: true, force: true }));
+			const plugins = flattenPlugins([router()]);
+			const config = plugins.find((plugin) => plugin.name === 'markless-router:vite')!;
+			const routes = plugins.find((plugin) => plugin.name === 'markless-router:routes')!;
+			config.configResolved?.({
+				root: '/project',
+				base: '/app/',
+				command: 'build',
+				environments: { browser: { consumer: 'client', build: { outDir } } },
+			} as never);
+			routes.configResolved?.({ root: '/project', base: '/app/' } as never);
+			const file = (role: string) => `build/${role}-${suffix}.js`;
+			const query: Record<string, string> = {
+				authored: '',
+				render: '?markless-render-data',
+				route: '?markless-route',
+				resume: '?markless-resume',
+				symbols: '?markless-symbols',
+			};
+			const chunks = roles.map((role) =>
+				chunk({
+					fileName: file(role),
+					moduleIds: [source + query[role], '/project/lib/shared.ts'],
+					imports:
+						connected && role === 'authored'
+							? ['render', 'route', 'resume', 'symbols', 'authored-dependency'].map(
+									file,
+								)
+							: [file(`${role}-dependency`)],
+					viteMetadata: {
+						importedCss: [
+							`assets/${role}.css`,
+							...(connected ? [`assets/${role}-extra.css`] : []),
+						],
+					},
+				}),
+			);
+			chunks.push(
+				...roles.map((role) =>
+					chunk({
+						fileName: file(`${role}-dependency`),
+						viteMetadata: {
+							importedCss: [
+								`assets/${role}-dependency.css`,
+								...(connected ? ['assets/shared.css'] : []),
+							],
+						},
+					}),
+				),
+			);
+			for (const role of roles)
+				chunks.push({
+					...chunk({ fileName: file(`${role}-forwarder`), imports: [file(role)] }),
+					facadeModuleId: source + query[role],
+				});
+			chunks.push(
+				chunk({ fileName: file('foreign'), moduleIds: ['/project/pages/foreign.tsrx'] }),
+			);
+			chunks.push(
+				chunk({
+					fileName: file('navigation'),
+					moduleIds: ['/repo/packages/router/src/vite/entries/client-entry.ts'],
+					dynamicImports: roles.includes('route')
+						? [file('route'), file('foreign')]
+						: [file('foreign')],
+					code: roles.includes('route')
+						? `const loaders={"/pages/study.${extension}":()=>import("./route-${suffix}.js"),"/pages/foreign.tsrx":()=>import("./foreign-${suffix}.js")};`
+						: '',
+				}),
+			);
+			for (const channel of ['resume', 'prerender-wake']) {
+				chunks.push(
+					chunk({
+						fileName: file(channel + '-entry'),
+						moduleIds: [`/repo/packages/router/src/vite/entries/${channel}-entry.ts`],
+						dynamicImports: [file(channel + '-current'), file('foreign')],
+						code: `const loaders={"/pages/study.${extension}":()=>import("./${channel}-current-${suffix}.js"),"/pages/foreign.tsrx":()=>import("./foreign-${suffix}.js")};`,
+					}),
+				);
+				chunks.push(
+					chunk({
+						fileName: file(channel + '-current'),
+						imports: [file(channel + '-leaf')],
+						viteMetadata: { importedCss: [`assets/${channel}-current.css`] },
+					}),
+				);
+				chunks.push(chunk({ fileName: file(channel + '-leaf') }));
+			}
+			chunks.push(
+				chunk({
+					fileName: file('handler'),
+					moduleIds: [`virtual:markless:symbol:${encodeURIComponent(source)}:symbol%3A0`],
+					imports: [file('handler-leaf')],
+					viteMetadata: { importedCss: ['assets/handler.css'] },
+				}),
+			);
+			chunks.push(chunk({ fileName: file('handler-leaf') }));
+			chunks.push(
+				chunk({
+					fileName: file('foreign-handler'),
+					moduleIds: [
+						`virtual:markless:symbol:${encodeURIComponent('/project/pages/foreign.tsrx')}:symbol%3A0`,
+					],
+					viteMetadata: { importedCss: ['assets/foreign.css'] },
+				}),
+			);
+			if (reverse) chunks.reverse();
+			hookHandler(config.generateBundle)!.call(
+				{ environment: { config: { consumer: 'client' } } },
+				{},
+				Object.fromEntries(chunks.map((entry) => [entry.fileName, entry])),
+			);
+			const emitted = hookHandler(routes.load)!.call(
+				{ environment: { config: { consumer: 'server' } } },
+				'\0virtual:markless-router/route-preloads',
+			);
+			const plans = JSON.parse(
+				emitted.match(/routePreloadData = routePreloadsJson === .* \? (\{.*\}) :/)[1],
+			);
+			for (const entry of chunks) {
+				for (const fileName of [
+					entry.fileName,
+					...(entry.viteMetadata?.importedCss ?? []),
+				]) {
+					await mkdir(join(outDir, fileName, '..'), { recursive: true });
+					await writeFile(join(outDir, fileName), '');
+				}
+			}
+			await hookHandler(config.writeBundle)!.call({ environment: { name: 'browser' } });
+			const manifest = await readClientAssetsManifest(outDir, '/app/');
+			plans.styles = manifest.routes.styles;
+			return Object.fromEntries(
+				['navigation', 'ssr', 'styles'].map((mode) => [
+					mode,
+					plans[mode][`pages/study.${extension}`].map((url: string) =>
+						url.replaceAll(`-${suffix}`, ''),
+					),
+				]),
+			);
+		};
+		for (const roles of [
+			['route', 'render', 'resume', 'symbols', 'authored'],
+			['route', 'render', 'resume', 'symbols'],
+			['resume', 'route', 'symbols'],
+			['symbols', 'resume'],
+			['symbols'],
+		]) {
+			const first = await plan(roles, false, 'a19');
+			const reversed = await plan(roles, true, 'z83');
+			expect(reversed.navigation).toEqual(first.navigation);
+			expect(reversed.ssr).toEqual(first.ssr);
+			for (const styles of [first.styles, reversed.styles]) {
+				const expected = [
+					...roles.flatMap((role) => [
+						`/app/assets/${role}-dependency.css`,
+						`/app/assets/${role}.css`,
+					]),
+					'/app/assets/handler.css',
+					'/app/assets/resume-current.css',
+					'/app/assets/prerender-wake-current.css',
+				];
+				expect(new Set(styles)).toEqual(new Set(expected));
+				expect(styles).toHaveLength(expected.length);
+				for (const role of roles)
+					expect(styles.indexOf(`/app/assets/${role}-dependency.css`)).toBeLessThan(
+						styles.indexOf(`/app/assets/${role}.css`),
+					);
+			}
+			const preferred = roles.includes('authored')
+				? 'authored'
+				: roles.includes('render')
+					? 'render'
+					: roles.includes('route')
+						? 'route'
+						: roles.includes('resume')
+							? 'resume'
+							: 'symbols';
+			expect(first.ssr).toContain(`/app/build/${preferred}.js`);
+			expect(first.ssr).not.toContain('/app/build/foreign.js');
+			for (const dependency of [
+				'resume-current',
+				'resume-leaf',
+				'prerender-wake-current',
+				'prerender-wake-leaf',
+				'handler',
+				'handler-leaf',
+			])
+				expect(first.ssr).toContain(`/app/build/${dependency}.js`);
+			for (const mode of ['navigation', 'ssr']) {
+				expect(first[mode]).toContain('/app/build/handler-leaf.js');
+				expect(first[mode]).not.toContain('/app/build/foreign-handler.js');
+			}
+
+			if (roles.includes('route')) expect(first.navigation).toContain('/app/build/route.js');
+		}
+		const connected = await plan(
+			['route', 'render', 'resume', 'symbols', 'authored'],
+			false,
+			'p40',
+			true,
+		);
+		const permuted = await plan(
+			['route', 'render', 'resume', 'symbols', 'authored'],
+			true,
+			'q91',
+			true,
+		);
+		expect(permuted).toEqual(connected);
+		expect(connected.styles).toEqual([
+			'/app/assets/render-dependency.css',
+			'/app/assets/shared.css',
+			'/app/assets/render.css',
+			'/app/assets/render-extra.css',
+			'/app/assets/route-dependency.css',
+			'/app/assets/route.css',
+			'/app/assets/route-extra.css',
+			'/app/assets/resume-dependency.css',
+			'/app/assets/resume.css',
+			'/app/assets/resume-extra.css',
+			'/app/assets/symbols-dependency.css',
+			'/app/assets/symbols.css',
+			'/app/assets/symbols-extra.css',
+			'/app/assets/authored-dependency.css',
+			'/app/assets/authored.css',
+			'/app/assets/authored-extra.css',
+			'/app/assets/handler.css',
+			'/app/assets/resume-current.css',
+			'/app/assets/prerender-wake-current.css',
+		]);
+	},
+);
+
+test.each(['', '&variant=alternate'])(
+	'diagnoses ambiguous canonical implementation ownership %s',
+	(variant) => {
+		const plugins = flattenPlugins([router()]);
+		const config = plugins.find((plugin) => plugin.name === 'markless-router:vite')!;
+		config.configResolved?.({ root: '/project', base: '/app/' } as never);
+		const first = chunk({
+			fileName: 'build/first.js',
+			moduleIds: ['/project/pages/study.mdx?markless-render-data'],
+		});
+		const second = chunk({
+			fileName: 'build/second.js',
+			moduleIds: [`/project/pages/study.mdx?markless-render-data${variant}`],
+		});
+		for (const entries of [
+			[first, second],
+			[second, first],
+		]) {
+			expect(() =>
+				hookHandler(config.generateBundle)!.call(
+					{ environment: { config: { consumer: 'client' } } },
+					{},
+					Object.fromEntries(entries.map((entry) => [entry.fileName, entry])),
+				),
+			).toThrow(
+				'ambiguous primary chunks for pages/study.mdx: build/first.js, build/second.js',
+			);
+		}
+	},
+);

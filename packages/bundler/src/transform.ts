@@ -1,3 +1,4 @@
+import { factorRenderDataLiterals } from './render-data-literals.ts';
 import { dirname, isAbsolute, resolve } from 'pathe';
 import { sourceForModuleId } from './module-id.ts';
 import {
@@ -33,6 +34,8 @@ import type {
 import {
 	MARKLESS_VIRTUAL_PREFIX,
 	SMALL_SYMBOL_DIRECT_LOAD_LIMIT,
+	demandsOverlay,
+	emitOverlayLoaderInstall,
 	emitResumeModule,
 	emitSettleModule,
 	emitSourceModule,
@@ -410,6 +413,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 						source: canonicalRenderData
 							? await prerenderDataModuleSource(
 									compiled,
+									input.environment,
 									input.importedModuleInterfaces,
 									input.renderDataImportSources,
 									input.artifactChildMaterializations,
@@ -682,6 +686,7 @@ function resolveAuthoredSpecifier(specifier: string, sourceFilename: string): st
 
 async function prerenderDataModuleSource(
 	compiled: CompileTsrxModuleResult,
+	environment: TransformTsrxModuleInput['environment'],
 	importedModuleInterfaces: TransformTsrxModuleInput['importedModuleInterfaces'],
 	renderDataImportSources: TransformTsrxModuleInput['renderDataImportSources'],
 	artifactChildMaterializations: TransformTsrxModuleInput['artifactChildMaterializations'],
@@ -719,7 +724,13 @@ async function prerenderDataModuleSource(
 	const renderDataId = `${MARKLESS_VIRTUAL_PREFIX}render-data:${encodeURIComponent(moduleId)}`;
 	const readerImports = new Map<string, string>();
 	const readerDeclarations = new Map<string, string>();
-	const componentEntries: string[] = [];
+	const initializerImports = new Map<string, { readonly local: string; readonly line: string }>();
+	const initializerModules = new Map(
+		compiled.symbolModules.modules
+			.filter((module) => module.kind === 'state-initializer' || module.kind === 'sync-computed-derive')
+			.map((module) => [module.symbolId, module]),
+	);
+	const componentEntries: Array<{ name: string; data: string; functions: string[] }> = [];
 	for (const definition of compiled.publicRenderModule.componentDefinitions) {
 		const {
 			residueReaderSource,
@@ -737,7 +748,27 @@ async function prerenderDataModuleSource(
 			}>;
 			readonly residueReaderDeclarations?: ReadonlyArray<string>;
 			readonly rootsWidget?: boolean;
+			readonly initialValues?: RenderDataArtifact['initialValues'];
+			readonly initializerResidues?: Readonly<Record<string, string>>;
 		};
+		const initializers = new Map<string, string>();
+		for (const initial of record.initialValues ?? []) {
+			if (initial.value.kind !== 'symbol-function') continue;
+			const symbolId = initial.value.symbolId;
+			if (record.initializerResidues?.[symbolId]) continue;
+			const module = initializerModules.get(symbolId);
+			if (!module) continue;
+			let imported = initializerImports.get(symbolId);
+			if (!imported) {
+				const local = `marklessRenderInitializer${initializerImports.size}`;
+				imported = {
+					local,
+					line: `import { ${scopedSymbolExportName(sourceFilename, module.exportName)} as ${local} } from ${JSON.stringify(symbolVirtualModuleId(sourceFilename, symbolId))};`,
+				};
+				initializerImports.set(symbolId, imported);
+			}
+			initializers.set(symbolId, imported.local);
+		}
 		for (const entry of residueReaderImports ?? []) {
 			if (readerImports.has(entry.line)) continue;
 			const rebound = entry.line.replace(
@@ -765,13 +796,27 @@ async function prerenderDataModuleSource(
 					`${renderDataId}:reader:${String(definition.name)}`,
 				)
 			: undefined;
-		componentEntries.push(
-			`${JSON.stringify(String(definition.name))}:${
-				reader ? `{...${data},readResidue:${reader}}` : data
-			}`,
-		);
+		const functions = [
+			...(reader ? [`readResidue:${reader}`] : []),
+			...(initializers.size
+				? [`initializers:{${[...initializers].map(([id, local]) => `${JSON.stringify(id)}:${local}`).join(',')}}`]
+				: []),
+		];
+		componentEntries.push({ name: JSON.stringify(String(definition.name)), data, functions });
 	}
-	const preludes = [...readerImports.values(), ...readerDeclarations.values()];
+	const preludes = [...initializerImports.values()]
+		.map((entry) => entry.line)
+		.concat([...readerImports.values(), ...readerDeclarations.values()]);
+	const factored = factorRenderDataLiterals(
+		componentEntries.map((entry) => entry.data),
+		preludes
+			.concat(
+				componentEntries.map(
+					(entry) => `const marklessLiteralReaderScope = {${entry.functions.join(',')}};`,
+				),
+			)
+			.join('\n'),
+	);
 	// Pay-per-use gate: this module's render data is loaded by exactly the pages
 	// that compose it, so a build that needs nothing from the pass never loads it.
 	//
@@ -797,6 +842,9 @@ async function prerenderDataModuleSource(
 		);
 	});
 	return [
+		...(environment === 'client' && demandsOverlay(compiled.runtimeDemandMap)
+			? [emitOverlayLoaderInstall()]
+			: []),
 		...(seedsShared
 			? [
 					"import { installMarklessSharedSeedPass } from '@markless/web/fns/shared-seed';",
@@ -809,7 +857,13 @@ async function prerenderDataModuleSource(
 		),
 		...preludes,
 		compiled.publicRenderModule.renderDataModuleSource,
-		`const marklessPrerenderComponents = {${componentEntries.join(',')}};`,
+		...factored.factories,
+		`const marklessPrerenderComponents = {${componentEntries
+			.map(
+				(entry, index) =>
+					`${entry.name}:${entry.functions.length ? `{...${factored.records[index]},${entry.functions.join(',')}}` : factored.records[index]}`,
+			)
+			.join(',')}};`,
 		'export const marklessPrerenderData = {',
 		`\trootComponentName: ${JSON.stringify(compiled.renderData.root?.componentName ?? null)},`,
 		'\trenderData: marklessRenderData,',
