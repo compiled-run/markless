@@ -7,7 +7,13 @@ import {
 	type RuntimePayloadErrorCode,
 	type RuntimePayloadType,
 } from '../../serializer/src/protocol-client-storage.ts';
-import type { ResumeDomElement, ResumeRuntime, ResumeRuntimeInput } from './resume.ts';
+import type {
+	ResumeDispatchOptions,
+	ResumeDomElement,
+	ResumeDomEvent,
+	ResumeRuntime,
+	ResumeRuntimeInput,
+} from './resume.ts';
 import {
 	deleteResumedPayload,
 	type ResumeAlreadyResumedWarning,
@@ -39,7 +45,22 @@ export type ResumePayloadScriptsInput = EncodedPayloadScripts &
 		| 'renderBranchHtml'
 		| 'renderAsyncBoundary'
 		| 'renderData'
-	> & { readonly root: ResumeDomElement };
+	> & {
+		readonly root: ResumeDomElement;
+		/**
+		 * How a later event forwarded through the container's dispatch queue is
+		 * dispatched on this live runtime. Defaults to the generated route handoff's
+		 * options: sync policy as forwarded, unmatched events ignored.
+		 */
+		readonly handoffDispatchOptions?: (handoff: ResumeHandoff) => ResumeDispatchOptions;
+	};
+
+export type ResumeHandoff = {
+	readonly event: ResumeDomEvent;
+	readonly eventRecord?: unknown;
+	readonly syncPolicyAlreadyApplied?: boolean;
+	readonly propagationStopped?: boolean;
+};
 
 export type ResumePayloadScriptsResult = {
 	readonly decoded: DecodedPayloadScripts;

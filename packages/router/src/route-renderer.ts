@@ -3,6 +3,7 @@ import type { CsrRenderArtifact, RenderTarget } from '@markless/web/render';
 import { routeMountTarget } from './route-dom.ts';
 import { holdNavigationSwapUntilSettled, type NavigationHoldRuntime } from './navigation-hold.ts';
 import {
+	MARKLESS_ROUTER_RENDERED_EVENT,
 	MARKLESS_ROUTER_RENDERER_STARTED,
 	MARKLESS_ROUTER_ROUTE_EVENT,
 	routePageProps,
@@ -60,7 +61,10 @@ async function renderRouteUpdate(document: Document, update: RouteUpdate): Promi
 				},
 			},
 		);
-		if (!update.signal?.aborted) state[CURRENT_ROUTE_CONTAINER] = container;
+		if (!update.signal?.aborted) {
+			state[CURRENT_ROUTE_CONTAINER] = container;
+			document.dispatchEvent(new CustomEvent(MARKLESS_ROUTER_RENDERED_EVENT));
+		}
 	} finally {
 		update.onRendered?.();
 	}

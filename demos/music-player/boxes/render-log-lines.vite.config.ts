@@ -10,7 +10,7 @@ const RENDER_LOG_LINE_COUNTER = [
 	'\tvar lines = 0;',
 	'\tvar log = console.log;',
 	'\tconsole.log = function () {',
-	"\t\tvar first = arguments[0];",
+	'\t\tvar first = arguments[0];',
 	// Render turns are the only ledger lines that reach console.log: interaction
 	// turns open a collapsed group instead, so this still counts render turns
 	// only, exactly as the 'markless: rendered' prefix did before the ledger.

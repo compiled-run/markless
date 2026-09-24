@@ -53,11 +53,14 @@ export function runtimeGraphReadPath(
 	binding: SemanticGraphBinding,
 	path: ReadonlyArray<string>,
 ): ReadonlyArray<string> {
-	return binding.kind === 'computed' &&
-		binding.async === true &&
-		(path.length === 0 || asyncSnapshotKeys.has(path[0]))
-		? runtimeGraphDependencyPath(binding, path)
+	return binding.kind === 'computed' && binding.async === true
+		? asyncComputedReadPath(path)
 		: path;
+}
+
+// `x.value` / `x.status` are resolved-value fields; the runtime unwraps only non-meta heads itself.
+export function asyncComputedReadPath(path: ReadonlyArray<string>): ReadonlyArray<string> {
+	return path.length === 0 || asyncSnapshotKeys.has(path[0]) ? ['value', ...path] : path;
 }
 
 // A computed runner needs the upstream resolved object before its authored

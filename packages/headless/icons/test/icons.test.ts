@@ -3,6 +3,7 @@ import type { IconifyJSON } from '@iconify/types';
 import { compileTsrxModule } from '../../../compiler/src/index.ts';
 import { icons } from '../src/vite.ts';
 import { lucide } from '../src/index.ts';
+import { mayContainIconTags } from '../src/transform/tsrx.ts';
 
 const collection: IconifyJSON = {
 	prefix: 'test-pack',
@@ -226,6 +227,54 @@ Text <i.downward title={"Down"} /> here.
 				'/nested.tsrx',
 			),
 		).rejects.toThrow(/\/nested\.tsrx.*<testpack\.downward> sits inside <testpack\.arrowdown>/);
+	});
+
+	test('the pre-check skips only sources no parse could rewrite', async () => {
+		const options = {
+			debug: false,
+			importSources: new Set(['@markless/icons']),
+			packs: new Map([['testpack', 'test-pack']]),
+		};
+		const tag = 'export function A() @{ <testpack.arrowdown/> }';
+		expect(
+			mayContainIconTags(`import { testpack } from '@markless/icons'; ${tag}`, options),
+		).toBe(true);
+		expect(mayContainIconTags(`import { testpack } from 'elsewhere'; ${tag}`, options)).toBe(
+			false,
+		);
+		expect(
+			mayContainIconTags(
+				`import { other } from '@markless/icons'; ${tag.replaceAll('testpack', 'other')}`,
+				options,
+			),
+		).toBe(false);
+		expect(
+			mayContainIconTags(
+				"import { testpack } from '@markless/icons'; export const a = testpack;",
+				options,
+			),
+		).toBe(false);
+		expect(
+			mayContainIconTags(`import { testpack } from '\\u0040markless/icons'; ${tag}`, options),
+		).toBe(true);
+		expect(
+			mayContainIconTags(
+				"import { testpack as t } from '@markless/icons'; <\n  t /* x */ .arrowdown/>",
+				options,
+			),
+		).toBe(true);
+		expect(
+			mayContainIconTags(
+				"import { testpacks } from '@markless/icons'; <testpacks.arrowdown/>",
+				options,
+			),
+		).toBe(false);
+	});
+
+	test('a source that fails the pre-check is not parsed', async () => {
+		const { transform, loadCollection } = transformer();
+		expect(await transform('export const broken = (;', '/broken.tsrx')).toBeUndefined();
+		expect(loadCollection).not.toHaveBeenCalled();
 	});
 
 	test('an import shown inside a fenced block binds nothing', async () => {

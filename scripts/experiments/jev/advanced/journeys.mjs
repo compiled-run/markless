@@ -1,4 +1,4 @@
-import { launch, session, observe, selector, settled, journeyKey, baseChecks, save, read, sleep } from './common.mjs';
+import { launch, session, observe, selector, settled, journeyKey, baseChecks, save, read } from './common.mjs';
 import { perform as editorAction, checks as editorChecks } from './composition.mjs';
 
 export const blank = () => ({ todos: [], filter: 'all', nextId: 1, count: 0 });

@@ -220,13 +220,29 @@ function resolvedSharedDefinitionName(
 
 function declaredNames(declaration: AnyNode): ReadonlyArray<string> {
 	if (declaration.type === 'VariableDeclaration') {
-		return asNodes(declaration.declarations).flatMap((declarator) => {
-			const name = getIdentifierName(declarator.id as AnyNode | undefined);
-			return name ? [name] : [];
-		});
+		return asNodes(declaration.declarations).flatMap((declarator) =>
+			patternNames(declarator.id as AnyNode | undefined),
+		);
 	}
 	const name = getIdentifierName(declaration.id as AnyNode | undefined);
 	return name ? [name] : [];
+}
+
+function patternNames(pattern: AnyNode | undefined): string[] {
+	if (!pattern) return [];
+	if (pattern.type === 'Identifier') {
+		const name = getIdentifierName(pattern);
+		return name ? [name] : [];
+	}
+	if (pattern.type === 'AssignmentPattern') return patternNames(pattern.left as AnyNode);
+	if (pattern.type === 'RestElement') return patternNames(pattern.argument as AnyNode);
+	if (pattern.type === 'ArrayPattern') return asNodes(pattern.elements).flatMap(patternNames);
+	if (pattern.type === 'ObjectPattern') {
+		return asNodes(pattern.properties).flatMap((property) =>
+			patternNames((property.type === 'RestElement' ? property.argument : property.value) as AnyNode),
+		);
+	}
+	return [];
 }
 
 function frameworkApiImportNames(ast: AnyNode, apiName: string): ReadonlySet<string> {
@@ -962,4 +978,64 @@ function resolvePayloadNodeOwners(
 		cells: resolveOwners(input.protocolState.cells.map((cell) => cell.graphNodeId)),
 		computed: resolveOwners(input.protocolState.computed.map((computed) => computed.graphNodeId)),
 	};
+}
+
+type RenderDataChunk = PublicRenderModuleInput['renderData']['chunks'][number];
+
+// A keyed row renders its projected elements under the row's segment, so the owner's records for them are filed per row.
+export function projectsElementsIntoRows(chunks: ReadonlyArray<RenderDataChunk>): boolean {
+	const byId = new Map(chunks.map((chunk) => [chunk.id, chunk]));
+	const nestedIds = (slot: RenderDataChunk['slots'][number]): ReadonlyArray<string> => {
+		switch (slot.kind) {
+			case 'repeat':
+				return [slot.rowTemplateId, ...(slot.emptyTemplateId ? [slot.emptyTemplateId] : [])];
+			case 'branch':
+				return slot.armTemplateIds;
+			case 'async':
+				return Object.values(slot.armTemplateIds).filter((id): id is string => !!id);
+			case 'dynamic-host':
+				return [slot.childChunkId];
+			case 'child-component':
+				return slot.projectionChunkId ? [slot.projectionChunkId] : [];
+			default:
+				return [];
+		}
+	};
+	const placesElements = (chunkId: string, seen: Set<string>): boolean => {
+		const chunk = byId.get(chunkId);
+		if (!chunk || seen.has(chunkId)) return false;
+		seen.add(chunkId);
+		return (
+			chunk.hosts.length > 0 ||
+			chunk.slots.some(
+				(slot) =>
+					slot.kind === 'dynamic-host' ||
+					nestedIds(slot).some((id) => placesElements(id, seen)),
+			)
+		);
+	};
+	const projectsInRow = (chunkId: string, seen: Set<string>): boolean => {
+		const chunk = byId.get(chunkId);
+		if (!chunk || seen.has(chunkId)) return false;
+		seen.add(chunkId);
+		return chunk.slots.some((slot) =>
+			slot.kind === 'child-component' && slot.projectionChunkId
+				? placesElements(slot.projectionChunkId, new Set())
+				: nestedIds(slot).some((id) => projectsInRow(id, seen)),
+		);
+	};
+	return chunks.some((chunk) =>
+		chunk.slots.some(
+			(slot) => slot.kind === 'repeat' && projectsInRow(slot.rowTemplateId, new Set()),
+		),
+	);
+}
+
+/** The view a component's SSR composition starts from: per-row copies only where its rows project elements. */
+export function ssrComposedPayloadView(input: PublicRenderModuleInput, componentName: string): string {
+	return projectsElementsIntoRows(
+		input.renderData.chunks.filter((chunk) => chunk.componentName === componentName),
+	)
+		? 'marklessSsrRowQualifiedView(marklessSsrRendered.structure, payloadView, marklessSsrIdPrefix)'
+		: 'payloadView';
 }

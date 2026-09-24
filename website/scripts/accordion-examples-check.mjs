@@ -43,7 +43,7 @@ try {
  assert.equal(await scene.locator('[data-read-stamp]').count(), 4);
  await culprit.click();
  await scene.getByRole('button', { name: 'Choose Bruno' }).click();
- await scene.getByText(/Case closed/).waitFor();
+ await scene.getByText(/Case closed/).filter({ visible: true }).waitFor();
  });
  await check('Rulebook: browser reveal integration', async () => {
  await page.locator('[data-select-scenario="rulebook"]').click();

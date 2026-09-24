@@ -27,10 +27,7 @@
 			"name": "client",
 			"gates": {
 				"passed": true,
-				"checks": [
-					"14 corpus hashes recorded",
-					"compiler diagnostics empty"
-				]
+				"checks": ["14 corpus hashes recorded", "compiler diagnostics empty"]
 			},
 			"bodyBytes": 41657,
 			"timing": {
@@ -310,10 +307,7 @@
 			"name": "ssr",
 			"gates": {
 				"passed": true,
-				"checks": [
-					"14 corpus hashes recorded",
-					"compiler diagnostics empty"
-				]
+				"checks": ["14 corpus hashes recorded", "compiler diagnostics empty"]
 			},
 			"bodyBytes": 30283,
 			"timing": {

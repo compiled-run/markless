@@ -1,0 +1,31 @@
+{
+  "name": "interaction-bench-octane",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "scripts": {
+    "dev": "vite --port 4430 --strictPort",
+    "build": "pnpm run sync && vite build",
+    "preview": "octane-preview --port 4431 --strictPort",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json",
+    "smoke": "node scripts/smoke.mjs",
+    "sync": "node ../../shared/sync.mjs . src/shared",
+    "sync:check": "node ../../shared/sync.mjs . src/shared --check",
+    "start": "octane-preview --port 4431 --strictPort"
+  },
+  "dependencies": {
+    "@octanejs/adapter-vercel": "0.0.55",
+    "@octanejs/app-core": "0.0.54",
+    "@octanejs/vite-plugin": "0.1.58",
+    "octane": "0.4.2"
+  },
+  "devDependencies": {
+    "@tsrx/typescript-plugin": "0.4.7",
+    "@types/node": "24.13.3",
+    "typescript": "5.9.3",
+    "vite": "8.3.0"
+  }
+}

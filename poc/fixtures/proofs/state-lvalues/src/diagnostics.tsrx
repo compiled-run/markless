@@ -32,7 +32,7 @@ export function InvalidComputedWrites() @{
 }
 
 export function InvalidPropWrites(props: DiagnosticsProps) @{
-  let { count: propCount, settings, items } = props;
+  let { count: propCount, settings, items } = props; // oxlint-disable-line no-unused-vars -- written illegally below
 
   <section>
     <button
@@ -66,9 +66,9 @@ export function InvalidStateAliases() @{
     items: ["alpha", "beta"],
   });
   let key = state("x");
-  let { x: xAlias } = obj;
-  let { [key]: dynamicAlias } = obj;
-  let [firstItem] = obj.items;
+  let { x: xAlias } = obj; // oxlint-disable-line no-unused-vars -- written illegally below
+  let { [key]: dynamicAlias } = obj; // oxlint-disable-line no-unused-vars -- written illegally below
+  let [firstItem] = obj.items; // oxlint-disable-line no-unused-vars -- written illegally below
 
   <section>
     <button

@@ -2,6 +2,7 @@ import { storage } from '@markless/core';
 import AccordionGallery from '../../../components/demos/ui/accordion/examples/gallery.tsrx';
 
 export default function AccordionExamples() @{
+ // oxlint-disable-next-line no-unused-vars -- the write persists the choice
  let theme = storage('theme', 'system');
 
  <div>

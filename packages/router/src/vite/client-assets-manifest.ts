@@ -23,6 +23,8 @@ export interface MarklessRouterClientAssetsManifest {
 		readonly navigation: string;
 	};
 	readonly routes: MarklessRouterClientAssetRoutes;
+	// Maps the chunk specifiers chunks import each other by to their hashed URLs; every document carries it.
+	readonly importMap?: { readonly imports: Readonly<Record<string, string>> };
 }
 
 export function createClientAssetsManifest(input: {
@@ -46,6 +48,33 @@ export function createClientAssetsManifest(input: {
 			styles: sortRouteMap(input.routes.styles),
 		},
 	};
+}
+
+// The bundler renames chunks to the hash of their final bytes after the router captured its names.
+export function renameClientAssetChunks<Manifest extends { readonly base: string }>(
+	manifest: Manifest,
+	renames: ReadonlyMap<string, string>,
+): Manifest {
+	const urls = new Map(
+		[...renames].map(([previous, next]) => [
+			joinURL(manifest.base, previous),
+			joinURL(manifest.base, next),
+		]),
+	);
+	return renameUrls(manifest, (url) => urls.get(url) ?? url);
+}
+
+function renameUrls<Value>(value: Value, rename: (url: string) => string): Value {
+	if (typeof value === 'string') return rename(value) as Value;
+	if (Array.isArray(value)) return value.map((item) => renameUrls(item, rename)) as Value;
+	if (value && typeof value === 'object')
+		return Object.fromEntries(
+			Object.entries(value).map(([key, item]) => [
+				key,
+				key === 'base' ? item : renameUrls(item, rename),
+			]),
+		) as Value;
+	return value;
 }
 
 export async function removeClientAssetsManifest(clientOutDir: string): Promise<void> {
@@ -208,6 +237,7 @@ async function validateClientAssetsManifest(
 		styles: routeMap(input.routes.styles, 'routes.styles'),
 	};
 	assertMatchingRouteKeys(routes);
+	const importMap = input.importMap === undefined ? undefined : importMapImports(input.importMap);
 
 	const hrefs = new Set([
 		entries.resume,
@@ -216,6 +246,7 @@ async function validateClientAssetsManifest(
 		...Object.values(routes.navigation).flat(),
 		...Object.values(routes.ssr).flat(),
 		...Object.values(routes.styles).flat(),
+		...Object.values(importMap?.imports ?? {}),
 	]);
 	for (const href of hrefs) {
 		const fileName = clientAssetFileName(href, base);
@@ -245,6 +276,7 @@ async function validateClientAssetsManifest(
 		base,
 		entries,
 		routes,
+		...(importMap ? { importMap } : {}),
 	};
 }
 
@@ -328,4 +360,11 @@ function isRecord(input: unknown): input is Record<string, unknown> {
 
 function clientAssetsManifestError(message: string, cause?: unknown): Error {
 	return new Error(`Markless Router client-assets manifest ${message}.`, { cause });
+}
+
+function importMapImports(input: unknown): { readonly imports: Record<string, string> } {
+	const imports = isRecord(input) ? input.imports : undefined;
+	if (!isRecord(imports) || !Object.values(imports).every((href) => typeof href === 'string'))
+		throw clientAssetsManifestError('has an invalid import map');
+	return { imports: imports as Record<string, string> };
 }

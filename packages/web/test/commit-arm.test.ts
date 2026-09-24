@@ -141,7 +141,7 @@ test('commitArm replaces exactly the anchor range and disposes before re-registe
 		html: '<section><button></button></section>',
 		armRecords: emptyArmRecords({
 			locators: [
-				{ hostNodeId: 'h-new', strategy: 'arm-relative', index: 1, tagName: 'button' },
+				{ hostNodeId: 'h-new', index: 1, tagName: 'button' },
 			],
 			events: [{ hostNodeId: 'h-new', eventName: 'click', symbolIds: ['sym:click'] }],
 			elementHandles: [{ hostNodeId: 'h-new', handleId: 'handle-1', name: 'field' }],
@@ -205,7 +205,7 @@ test('commitArm routes settled-arm computed refreshes through the shared registr
 		],
 		armRecords: emptyArmRecords({
 			locators: [
-				{ hostNodeId: 'h-count', strategy: 'arm-relative', index: 1, tagName: 'output' },
+				{ hostNodeId: 'h-count', index: 1, tagName: 'output' },
 			],
 			domUpdates: [
 				{
@@ -338,7 +338,7 @@ test('commitArm restores focus and selection onto the surviving hostNodeId', asy
 		html: '<section><input></section>',
 		armRecords: emptyArmRecords({
 			locators: [
-				{ hostNodeId: 'h-field', strategy: 'arm-relative', index: 1, tagName: 'input' },
+				{ hostNodeId: 'h-field', index: 1, tagName: 'input' },
 			],
 		}),
 	});

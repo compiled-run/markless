@@ -1,0 +1,613 @@
+{
+  "status": "Verified metadata demand boundary; larger goal incomplete",
+  "output": "/private/tmp/markless-docs-scalar-consumer-final-CyhBha/.output",
+  "preview": "http://localhost:3000/markless/concepts/state",
+  "serverSession": 62741,
+  "paths": {
+    "before": "/private/tmp/markless-docs-cold-vNOgjK/results.json",
+    "after": "/private/tmp/markless-docs-cold-N4qadl/results.json",
+    "coverage": "/private/tmp/markless-docs-execution-qcG5X8/results.json",
+    "attribution": "/private/tmp/markless-scalar-consumer-final-attribution.json",
+    "navigation": "/private/tmp/markless-docs-navigation-uLrsyO/results.json"
+  },
+  "builds": {
+    "before": {
+      "startedAt": "2026-09-22T07:17:59.918Z",
+      "siteEntry": "/private/tmp/markless-docs-scalar-verified-Ybhwa3/.output/server/index.mjs",
+      "serverEntrySha256": "ce1706cd0472cac162e8eaf0c30d92a48b7e476c398f31fdecd3bdae647072e3",
+      "options": {
+        "brotli": true,
+        "brotliHtml": true,
+        "http2": false,
+        "samples": 10,
+        "conditions": [
+          "normal",
+          "constrained"
+        ]
+      },
+      "cache": "CDP Network.setCacheDisabled true; fresh browser context per first interaction",
+      "serviceWorkers": "blocked",
+      "timing": "captured click event to expected DOM mutation; not compositor paint",
+      "localTransport": "Generated Nitro docs through a Brotli quality 5 JS proxy; localhost HTTP/1.1; HTML stream compressed with Brotli quality 5",
+      "preciseCoverage": false,
+      "cases": [
+        "state-counter"
+      ],
+      "servedThemeSha256": "7404f79754fffc3b8ec86d66ad2872b9f46a568416c067d653843af25849c742",
+      "expectedThemeSha256": "7404f79754fffc3b8ec86d66ad2872b9f46a568416c067d653843af25849c742",
+      "browserVersion": "153.0.8010.53",
+      "playwrightVersion": "1.58.2",
+      "finishedAt": "2026-09-22T07:18:58.535Z"
+    },
+    "after": {
+      "startedAt": "2026-09-22T07:18:59.834Z",
+      "siteEntry": "/private/tmp/markless-docs-scalar-consumer-final-CyhBha/.output/server/index.mjs",
+      "serverEntrySha256": "c16f4b56b216de17f5b5f17d4e23ccdf63a9fe3ee08139f4b4be05d9c085bc24",
+      "options": {
+        "brotli": true,
+        "brotliHtml": true,
+        "http2": false,
+        "samples": 10,
+        "conditions": [
+          "normal",
+          "constrained"
+        ]
+      },
+      "cache": "CDP Network.setCacheDisabled true; fresh browser context per first interaction",
+      "serviceWorkers": "blocked",
+      "timing": "captured click event to expected DOM mutation; not compositor paint",
+      "localTransport": "Generated Nitro docs through a Brotli quality 5 JS proxy; localhost HTTP/1.1; HTML stream compressed with Brotli quality 5",
+      "preciseCoverage": false,
+      "cases": [
+        "state-counter"
+      ],
+      "servedThemeSha256": "7404f79754fffc3b8ec86d66ad2872b9f46a568416c067d653843af25849c742",
+      "expectedThemeSha256": "7404f79754fffc3b8ec86d66ad2872b9f46a568416c067d653843af25849c742",
+      "browserVersion": "153.0.8010.53",
+      "playwrightVersion": "1.58.2",
+      "finishedAt": "2026-09-22T07:19:58.179Z"
+    }
+  },
+  "timing": [
+    {
+      "condition": "normal",
+      "actions": [
+        {
+          "action": 1,
+          "before": {
+            "medianMs": 33.65000009536743,
+            "madMs": 0.6000000238418579
+          },
+          "after": {
+            "medianMs": 33.89999997615814,
+            "madMs": 1.25
+          },
+          "thresholdMs": 10,
+          "meaningfulRegression": false
+        },
+        {
+          "action": 2,
+          "before": {
+            "medianMs": 15.099999904632568,
+            "madMs": 0.19999992847442627
+          },
+          "after": {
+            "medianMs": 15.149999976158142,
+            "madMs": 0.7000000476837158
+          },
+          "thresholdMs": 10,
+          "meaningfulRegression": false
+        },
+        {
+          "action": 3,
+          "before": {
+            "medianMs": 15.299999952316284,
+            "madMs": 0.1499999761581421
+          },
+          "after": {
+            "medianMs": 15.00000011920929,
+            "madMs": 0.35000014305114746
+          },
+          "thresholdMs": 10,
+          "meaningfulRegression": false
+        }
+      ]
+    },
+    {
+      "condition": "constrained",
+      "actions": [
+        {
+          "action": 1,
+          "before": {
+            "medianMs": 67.15000009536743,
+            "madMs": 6.999999761581421
+          },
+          "after": {
+            "medianMs": 67.5,
+            "madMs": 4.449999928474426
+          },
+          "thresholdMs": 13.999999523162842,
+          "meaningfulRegression": false
+        },
+        {
+          "action": 2,
+          "before": {
+            "medianMs": 11.549999952316284,
+            "madMs": 0.6499999761581421
+          },
+          "after": {
+            "medianMs": 11.100000023841858,
+            "madMs": 0.5499998331069946
+          },
+          "thresholdMs": 10,
+          "meaningfulRegression": false
+        },
+        {
+          "action": 3,
+          "before": {
+            "medianMs": 12.349999904632568,
+            "madMs": 0.8500000238418579
+          },
+          "after": {
+            "medianMs": 11.299999952316284,
+            "madMs": 1.5
+          },
+          "thresholdMs": 10,
+          "meaningfulRegression": false
+        }
+      ]
+    }
+  ],
+  "delivery": {
+    "before": {
+      "visits": 20,
+      "actions": 60,
+      "errors": [],
+      "failedActions": 0,
+      "frameworkRequestCounts": [
+        5
+      ],
+      "httpCacheHits": 0,
+      "frameworkEncodedBytes": 234479,
+      "firstClicksWithScriptsPending": 7
+    },
+    "after": {
+      "visits": 20,
+      "actions": 60,
+      "errors": [],
+      "failedActions": 0,
+      "frameworkRequestCounts": [
+        5
+      ],
+      "httpCacheHits": 0,
+      "frameworkEncodedBytes": 234975,
+      "firstClicksWithScriptsPending": 8
+    }
+  },
+  "initializers": [
+    {
+      "test": "state-counter",
+      "sample": 0,
+      "phases": [
+        {
+          "name": "before-input",
+          "count": 0
+        },
+        {
+          "name": "first-action",
+          "count": 15
+        },
+        {
+          "name": "repeat-1",
+          "count": 0
+        },
+        {
+          "name": "repeat-2",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "test": "state-independent-controls",
+      "sample": 0,
+      "phases": [
+        {
+          "name": "before-input",
+          "count": 0
+        },
+        {
+          "name": "first-action",
+          "count": 15
+        },
+        {
+          "name": "second-control",
+          "count": 3
+        },
+        {
+          "name": "return-first",
+          "count": 0
+        },
+        {
+          "name": "repeat-second",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "test": "computed-total",
+      "sample": 0,
+      "phases": [
+        {
+          "name": "before-input",
+          "count": 0
+        },
+        {
+          "name": "first-action",
+          "count": 56
+        },
+        {
+          "name": "repeat-1",
+          "count": 0
+        },
+        {
+          "name": "repeat-2",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "test": "mode-select",
+      "sample": 0,
+      "phases": [
+        {
+          "name": "before-input",
+          "count": 0
+        },
+        {
+          "name": "first-action",
+          "count": 72
+        },
+        {
+          "name": "repeat-1",
+          "count": 1
+        },
+        {
+          "name": "repeat-2",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "test": "accordion",
+      "sample": 0,
+      "phases": [
+        {
+          "name": "before-input",
+          "count": 0
+        },
+        {
+          "name": "first-action",
+          "count": 117
+        },
+        {
+          "name": "repeat-1",
+          "count": 0
+        },
+        {
+          "name": "repeat-2",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "test": "state-counter",
+      "sample": 1,
+      "phases": [
+        {
+          "name": "before-input",
+          "count": 0
+        },
+        {
+          "name": "first-action",
+          "count": 15
+        },
+        {
+          "name": "repeat-1",
+          "count": 0
+        },
+        {
+          "name": "repeat-2",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "test": "state-independent-controls",
+      "sample": 1,
+      "phases": [
+        {
+          "name": "before-input",
+          "count": 0
+        },
+        {
+          "name": "first-action",
+          "count": 15
+        },
+        {
+          "name": "second-control",
+          "count": 3
+        },
+        {
+          "name": "return-first",
+          "count": 0
+        },
+        {
+          "name": "repeat-second",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "test": "computed-total",
+      "sample": 1,
+      "phases": [
+        {
+          "name": "before-input",
+          "count": 0
+        },
+        {
+          "name": "first-action",
+          "count": 56
+        },
+        {
+          "name": "repeat-1",
+          "count": 0
+        },
+        {
+          "name": "repeat-2",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "test": "mode-select",
+      "sample": 1,
+      "phases": [
+        {
+          "name": "before-input",
+          "count": 0
+        },
+        {
+          "name": "first-action",
+          "count": 72
+        },
+        {
+          "name": "repeat-1",
+          "count": 1
+        },
+        {
+          "name": "repeat-2",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "test": "accordion",
+      "sample": 1,
+      "phases": [
+        {
+          "name": "before-input",
+          "count": 0
+        },
+        {
+          "name": "first-action",
+          "count": 117
+        },
+        {
+          "name": "repeat-1",
+          "count": 0
+        },
+        {
+          "name": "repeat-2",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "test": "state-counter",
+      "sample": 2,
+      "phases": [
+        {
+          "name": "before-input",
+          "count": 0
+        },
+        {
+          "name": "first-action",
+          "count": 15
+        },
+        {
+          "name": "repeat-1",
+          "count": 0
+        },
+        {
+          "name": "repeat-2",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "test": "state-independent-controls",
+      "sample": 2,
+      "phases": [
+        {
+          "name": "before-input",
+          "count": 0
+        },
+        {
+          "name": "first-action",
+          "count": 15
+        },
+        {
+          "name": "second-control",
+          "count": 3
+        },
+        {
+          "name": "return-first",
+          "count": 0
+        },
+        {
+          "name": "repeat-second",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "test": "computed-total",
+      "sample": 2,
+      "phases": [
+        {
+          "name": "before-input",
+          "count": 0
+        },
+        {
+          "name": "first-action",
+          "count": 56
+        },
+        {
+          "name": "repeat-1",
+          "count": 0
+        },
+        {
+          "name": "repeat-2",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "test": "mode-select",
+      "sample": 2,
+      "phases": [
+        {
+          "name": "before-input",
+          "count": 0
+        },
+        {
+          "name": "first-action",
+          "count": 72
+        },
+        {
+          "name": "repeat-1",
+          "count": 1
+        },
+        {
+          "name": "repeat-2",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "test": "accordion",
+      "sample": 2,
+      "phases": [
+        {
+          "name": "before-input",
+          "count": 0
+        },
+        {
+          "name": "first-action",
+          "count": 117
+        },
+        {
+          "name": "repeat-1",
+          "count": 0
+        },
+        {
+          "name": "repeat-2",
+          "count": 0
+        }
+      ]
+    }
+  ],
+  "navigation": [
+    {
+      "name": "scalar clicks hand live state to a complex control and continue afterward",
+      "passed": true,
+      "expectedErrors": []
+    },
+    {
+      "name": "keyboard priming and queued scalar clicks preserve each update",
+      "passed": true,
+      "expectedErrors": []
+    },
+    {
+      "name": "intent, SPA navigation, history and offline controls",
+      "passed": true,
+      "expectedErrors": []
+    },
+    {
+      "name": "delayed shared pack keeps controls visible and retains the click",
+      "passed": true,
+      "expectedErrors": []
+    },
+    {
+      "name": "failed shared pack remains an observable failure",
+      "passed": true,
+      "expectedErrors": [
+        "TypeError: Failed to fetch dynamically imported module: http://127.0.0.1:58889/markless/build/chunk-C1HSgega.js",
+        "TypeError: Failed to fetch dynamically imported module: http://127.0.0.1:58889/markless/build/chunk-C1HSgega.js",
+        "TypeError: Failed to fetch dynamically imported module: http://127.0.0.1:58889/markless/build/chunk-C1HSgega.js"
+      ]
+    }
+  ],
+  "bytes": {
+    "csr": {
+      "before": {
+        "download": 140969,
+        "execute": 14915
+      },
+      "after": {
+        "download": 140827,
+        "execute": 14916
+      },
+      "limits": {
+        "download": 140187,
+        "execute": 14696
+      }
+    },
+    "ssr": {
+      "before": {
+        "download": 85026,
+        "execute": 4329,
+        "navigation": 25815
+      },
+      "after": {
+        "download": 84882,
+        "execute": 4327,
+        "navigation": 25717
+      },
+      "limits": {
+        "download": 84771,
+        "execute": 4327,
+        "navigation": 25502
+      }
+    }
+  },
+  "verification": {
+    "rootTypecheck": "passed",
+    "focusedTests": 185,
+    "docsTests": 64,
+    "docsTypecheck": "passed",
+    "docsDoctor": "passed, including production build",
+    "musicPlayerBudgetTests": "4 failures remain; no ceilings changed"
+  },
+  "remaining": [
+    "Ordinary app and fixture byte-budget gates remain red",
+    "Static unmatched header click starts full MDX runtime",
+    "Complex controls still use broader runtime capabilities",
+    "Execution ledger still uses whole-chunk accounting"
+  ],
+  "manualCheck": {
+    "freshContext": "counter 2, watched variable 1, two live cells, full runtime false",
+    "restoredTab": "initial counter tool clicks hit fixed header at counter center; moving target into unobscured view produced Clicked 1 times; no module-fetch failure"
+  }
+}

@@ -216,16 +216,18 @@ interaction is the only work that interaction pays for.
 Load-time invariant: **the only code that executes at load is the inline
 resumer** (the bootstrap tier below, ~600 B class). Every external runtime
 module may be `modulepreload`ed — fetching is cheap and explicitly not the
-cost metric; fetched-but-unexecuted code costs no main-thread work. The cost
-metric for this contract is **executed bytes per action**.
+execution metric. A preload may fetch, parse, and compile code; it must not
+evaluate application modules or invoke their handlers. Network bytes and
+preparation time are measured separately from **executed bytes per action**.
 
 Three gates, in order:
 
 1. **Declared.** The payload's record inventory is the runtime capability
    manifest. A runtime capability module (keyed-repeat identity, async
    boundaries, sync-computed derivation, and future record
-   kinds) may load only when the container's payload declares records of that
-   kind. Pages without a record kind ship and load none of its runtime.
+   kinds) may initialize only when the container's payload declares records of
+   that kind. A shared transport pack may contain additional dormant modules;
+   their presence must not declare demand for or initialize those capabilities.
 2. **Demanded.** A loaded capability executes only when demanded: an
    interaction dispatches a symbol, a graph write wakes subscribers of the
    touched paths, a visible boundary needs its async value. Loading a module
@@ -242,9 +244,13 @@ Three gates, in order:
    single moment unless one action genuinely touches every capability on the
    page.
 
-Per-action execution granularity is a chunking requirement, not just a gating
-requirement: the runtime chunk graph must place dynamic-import boundaries
-between capabilities AND between sub-capability paths, finely enough that a
+Per-action execution granularity is a build requirement, not just a gating
+requirement: the runtime graph must preserve lazy initialization boundaries
+between capabilities AND between sub-capability paths. These may be native
+dynamic-import boundaries or independently demanded module initializers inside
+a shared native-ESM pack. Fetching a pack or initializing one of its modules
+must not initialize unrelated modules in that pack. The boundaries remain fine
+enough that a
 simple action executes only a few-hundred-byte slice of runtime (a scalar
 counter click is the canonical case: event dispatch, one scalar write, one
 text update — a ~400 B-class execution set, never the whole event tier, never
@@ -271,11 +277,15 @@ static, per-route truth.
 
 Verification contract:
 
-- Emitted-runtime size walls and per-chunk caps in the bundler fixture tests
-  guard total bloat regardless of chunking; chunk splitting must never be used
-  to hide runtime growth. Preloaded-bytes caps are not part of this contract:
-  budgets on fetch measure the wrong axis and must not be added or enforced as
-  execution proxies.
+- Emitted-runtime size walls guard total bloat regardless of packing; splitting
+  or grouping files must never hide runtime growth. A physical pack's size is
+  a transport measurement, not the execution charge for every module it
+  contains. Packed execution accounting must retain logical module identities
+  and attribute emitted initializer code and shared initialization work to the
+  actions that actually demand them, without double-counting shared work.
+  Existing whole-chunk measurements must identify their unit explicitly and
+  cannot establish this finer execution claim. Preloaded bytes and request
+  counts are measured separately, never used as execution proxies.
 - Per-action executed-bytes budgets in browser-mode tests are the primary
   progressive-execution guard: after load, only the inline resumer has
   executed; after one action, the executed runtime module set and its byte
@@ -284,6 +294,11 @@ Verification contract:
   capability module has executed; after one interaction, only the touched
   capability executed. Run-distribution (N-of-M) evidence is required for
   runtime timing claims.
+- Packed-output tests additionally cover independent initialization, shared
+  dependency initialization, live exports, stable namespace identity, cached
+  initialization failures, content hashes, and source maps. Unsupported native
+  module shapes retain their original loading boundary rather than receiving
+  an unverified namespace replacement.
 - With function-exact emission, an emitted-equals-required assertion (the
   function set in a route's output matches the set its constructs demand)
   becomes the primary guard, and the size walls tighten to match.

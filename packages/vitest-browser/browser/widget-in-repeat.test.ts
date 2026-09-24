@@ -228,17 +228,13 @@ test('CSR: a row gesture reaches the widget at all', async () => {
 	await expect.poll(() => displays(container).includes('true')).toBe(true);
 });
 
-// ---------------------------------------------------------------------------
-// Separate defect, found while building the fixtures above and pinned here so
-// it is not re-discovered: a `@for` whose collection is a plain const array,
-// with no widget and no component in the row, renders NOTHING on CSR. Wrapping
-// the same array in state() renders all three rows. SSR renders it either way.
-// Every fixture above therefore uses state() so this cannot confound it.
-// ---------------------------------------------------------------------------
-
-test.fails('CSR: a @for over a plain const array renders its rows', async () => {
+// A `@for` over a plain const array (no state(), no widget) renders on both
+// paths; the fixtures above use state() so this cannot confound them.
+test('CSR: a @for over a plain const array renders its rows', async () => {
 	const screen = await render(Control);
-	expect((screen.container as HTMLElement).querySelectorAll('[data-row]').length).toBe(3);
+	const container = screen.container as HTMLElement;
+	expect(container.querySelectorAll('[data-row]').length).toBe(3);
+	expect(container.querySelector('[data-row="r3"]')?.textContent).toBe('gamma');
 });
 
 test('SSR: the same plain const array renders its rows', async () => {

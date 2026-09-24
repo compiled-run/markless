@@ -1,3 +1,4 @@
+import { PROTOCOL_VISIBLE_EVENT_NAME } from '../../serializer/src/protocol-event-names.ts';
 import type { RuntimeGraph } from '@markless/runtime';
 import type {
 	ElementHandleRegistry,
@@ -158,7 +159,7 @@ export function createBehaviorRuntime(input: {
 	function installVisibilityObserver(): void {
 		const visible = input.view.events.flatMap((eventRecord) => {
 			const element =
-				eventRecord.eventName === 'visible'
+				eventRecord.eventName === PROTOCOL_VISIBLE_EVENT_NAME
 					? input.elementsByHostId.get(eventRecord.hostNodeId)
 					: undefined;
 			return element ? [{ element, eventRecord }] : [];
@@ -169,7 +170,9 @@ export function createBehaviorRuntime(input: {
 				ResumeDomElement,
 				import('./resume-types.ts').ResumeEventRecord
 			>(),
-			fired = new WeakSet<ResumeDomElement>();
+			fired = ((
+				input.root as { __marklessVisibleFired?: WeakSet<ResumeDomElement> }
+			).__marklessVisibleFired ||= new WeakSet());
 		for (const entry of visible) records.set(entry.element, entry.eventRecord);
 		visibilityObserver = createObserver((entries) => {
 			for (const entry of entries) {

@@ -1,0 +1,122 @@
+{
+  "status": "Compiler callback-state dependency fix retained; incremental MDX activation remains incomplete",
+  "compilerPass": "trigger-groups",
+  "consumedArtifactAdded": "captureAnalysis",
+  "producedArtifact": "triggerGroups",
+  "reproduction": {
+    "source": "import { state } from '@markless/core'; export default function Page() @{ let hidden = state(0); <Row onPress={() => hidden++}/> } function Row({onPress}) @{ <button onClick={(event) => onPress?.(event)}>Change</button> }",
+    "beforeGraphNodeIds": [],
+    "after": [
+      {
+        "id": "h0:click",
+        "hostNodeId": "h0",
+        "eventName": "click",
+        "graphNodeIds": [
+          "state:hidden"
+        ],
+        "payloadRecordIds": [
+          "event:h0:click"
+        ],
+        "symbolIds": [
+          "bound:symbol%3A0:component-edge%3A0",
+          "symbol:1"
+        ]
+      }
+    ],
+    "diagnostics": []
+  },
+  "actualDocsOwnership": {
+    "htmlPath": "/private/tmp/markless-safe-resume-accordion.html",
+    "htmlSha256": "1108ca10884e9271b272aaed701b771266369ec3db6c029bb34808f14c9fa256",
+    "prefix": "m3:",
+    "counts": {
+      "cells": 68,
+      "computed": 153,
+      "sharedSeeds": 16,
+      "sharedDefinitions": 34,
+      "events": 81,
+      "handles": 73
+    },
+    "candidateGroups": [],
+    "refusals": [
+      {
+        "prefix": "m3:",
+        "reason": "opaque-cell-captures",
+        "ids": [
+          "m3:c0:p1:p3:shared:node_modules/@markless/ui/src/tooltip/tooltip.tsrx#tooltipState/slot:onChange",
+          "m3:c0:p1:shared:node_modules/@markless/ui/src/toggle/toggle.tsrx#toggleState/slot:onChange",
+          "m3:c0:p8:p10:shared:node_modules/@markless/ui/src/tooltip/tooltip.tsrx#tooltipState/slot:onChange",
+          "m3:c0:p8:shared:node_modules/@markless/ui/src/toggle/toggle.tsrx#toggleState/slot:onChange",
+          "m3:c0:p15:p17:shared:node_modules/@markless/ui/src/tooltip/tooltip.tsrx#tooltipState/slot:onChange",
+          "m3:c0:p15:shared:node_modules/@markless/ui/src/toggle/toggle.tsrx#toggleState/slot:onChange",
+          "m3:c0:p23:p24:p26:shared:node_modules/@markless/ui/src/tooltip/tooltip.tsrx#tooltipState/slot:onChange",
+          "m3:c0:p23:p24:shared:node_modules/@markless/ui/src/toggle/toggle.tsrx#toggleState/slot:onChange",
+          "m3:c0:p23:p31:shared:node_modules/@markless/ui/src/select/select.tsrx#selectState/slot:onChange",
+          "m3:c0:p23:p31:shared:node_modules/@markless/ui/src/select/select.tsrx#selectState/slot:onOpenChange",
+          "m3:c0:p23:p43:shared:node_modules/@markless/ui/src/tooltip/tooltip.tsrx#tooltipState/slot:onChange",
+          "m3:c0:p23:p46:p48:shared:node_modules/@markless/ui/src/tooltip/tooltip.tsrx#tooltipState/slot:onChange",
+          "m3:c0:p23:p46:shared:node_modules/@markless/ui/src/toggle/toggle.tsrx#toggleState/slot:onChange",
+          "m3:c0:shared:node_modules/@markless/ui/src/collapsible/collapsible.tsrx#collapsibleState/slot:onChange",
+          "m3:c53:shared:node_modules/@markless/ui/src/accordion/accordion.tsrx#accordionState/slot:onChange",
+          "m3:c58:shared:node_modules/@markless/ui/src/select/select.tsrx#selectState/slot:onChange",
+          "m3:c58:shared:node_modules/@markless/ui/src/select/select.tsrx#selectState/slot:onOpenChange",
+          "m3:c70:p74:shared:node_modules/@markless/ui/src/collapsible/collapsible.tsrx#collapsibleState/slot:onChange",
+          "m3:c70:shared:node_modules/@markless/ui/src/tabs/tabs.tsrx#tabsState/slot:onChange"
+        ]
+      }
+    ],
+    "compilerCaptureProof": "not established by payload records",
+    "productionReady": false
+  },
+  "docsClientComparison": {
+    "roots": [
+      "/private/tmp/markless-docs-combined-demand-GSbudh/.output",
+      "website/.output"
+    ],
+    "beforeFiles": 63,
+    "afterFiles": 63,
+    "beforeBytes": 19274342,
+    "afterBytes": 19274342,
+    "changed": [],
+    "missing": []
+  },
+  "sources": [
+    {
+      "file": "packages/compiler/src/passes/trigger-groups.ts",
+      "sha256": "d0e91abda160d90d0eb58ab60bc5a5f884fdd9437b946875cda5158038476a37"
+    },
+    {
+      "file": "packages/compiler/src/compile-module.ts",
+      "sha256": "e88c109cbd241772bbaef220ad1e5d5a39b29efa3b2fa18789c8b191fe4b4451"
+    },
+    {
+      "file": "packages/compiler/src/pass-registry.ts",
+      "sha256": "6c57daac3635167ba3bd52ff3df33effeb147c0d51c633211a9a4ee841deb1ca"
+    },
+    {
+      "file": "packages/compiler/test/trigger-groups.test.ts",
+      "sha256": "a0277b3482743918c89b20ab45f957a9f9b9c3a30931330840fb4e9c15453974"
+    },
+    {
+      "file": "packages/compiler/test/pass-pipeline.test.ts",
+      "sha256": "449ae4452fcc16fae067abdbc46d06b920443e863e83410c13cafe8b1ca421a5"
+    },
+    {
+      "file": "scripts/experiments/packed-delivery/mdx-resume-groups.ts",
+      "sha256": "535147285159f70ea5da5ad93d2e2e28ed03d8c1ec0a85140ef12a4af3af9140"
+    }
+  ],
+  "verification": {
+    "compilerAndPrerender": "2106 passed, 2 expected failures, 262 files",
+    "docs": "64 tests; root/docs Markless-aware typechecks; doctor production build",
+    "experiment": "43 tests",
+    "firstRegressions": "15 ownership cases failed before the experimental guards; 4 callback cases failed before compiler change; forwarded write-only sibling case also failed before writes were included"
+  },
+  "limitations": [
+    "Payload grouping cannot prove callback/capture closure from IDs alone. Actual m3 group remains refused on 19 unknown-valued callback cells.",
+    "This compiler correction has no claimed interaction latency gain; rebuilt docs JS is unchanged.",
+    "Six earlier fixture budget failures remain unresolved.",
+    "Incremental activation, event propagation, shared state and lifecycle integration are not implemented."
+  ],
+  "receipts": "scripts/experiments/packed-delivery/results/resume-ownership-2026-09-22"
+}

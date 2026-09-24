@@ -1,7 +1,8 @@
 import { buildRouteManifestFromFileIds } from '../src/route-manifest.ts';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
 	__marklessRouterStartSpaNavigation,
+	ensureNavigationRuntime,
 	handleNavigateEvent,
 	type MarklessRouterNavigationWindow,
 } from '../src/spa-navigation.ts';
@@ -50,6 +51,26 @@ describe('SPA navigation', () => {
 		});
 		expect(update?.page.default()).toBe('about');
 		expect(update?.document.default()).toBe('document');
+	});
+
+	it('loads the destination as a document when its page chunk does not load', async () => {
+		const gone = new TypeError(
+			'Failed to fetch dynamically imported module: http://marklessrouter.test/build/chunk-x.js',
+		);
+		const assign = vi.fn();
+		const route = aboutRouteContext();
+		const context = {
+			...route,
+			pageModuleLoaders: { 'pages/about.tsrx': () => Promise.reject(gone) },
+			window: { ...route.window, location: { href: 'http://marklessrouter.test/', assign } },
+		};
+		const event = navigateEvent('http://marklessrouter.test/about', {
+			info: { __marklessRouterLink: true },
+		});
+
+		expect(handleNavigateEvent(event, context as never)).toBe(true);
+		await expect(event.intercepted!.handler()).rejects.toBe(gone);
+		expect(assign).toHaveBeenCalledExactlyOnceWith('http://marklessrouter.test/about');
 	});
 
 	it('does not intercept routes outside the page manifest', () => {
@@ -367,6 +388,45 @@ describe('SPA navigation', () => {
 				url: 'http://marklessrouter.test/about',
 			},
 		]);
+	});
+
+	it('leaves route Links to a full document load when the document renders from the URL', async () => {
+		const runtime = clickNavigationRuntime();
+		await __marklessRouterStartSpaNavigation({
+			documentNavigation: 'document',
+			pageModuleLoaders: {
+				'pages/about.tsrx': async () => ({ default: component('about') }),
+			},
+			routeFileIds: ['/pages/about.tsrx'],
+			window: runtime.runtimeWindow,
+		});
+
+		const event = clickEvent(testAnchor('http://marklessrouter.test/about', { link: true }));
+		runtime.clickListener()?.(event as never);
+
+		expect(event.prevented).toBe(false);
+		expect(runtime.navigatedUrls).toEqual([]);
+	});
+
+	it('does not intercept route navigations when the document renders from the URL', () => {
+		const context = { ...aboutRouteContext(), documentNavigation: 'document' };
+		const linkEvent = navigateEvent('http://marklessrouter.test/about', {
+			info: { __marklessRouterLink: true },
+		});
+		const traverseEvent = navigateEvent('http://marklessrouter.test/about', {
+			navigationType: 'traverse',
+		});
+
+		expect(handleNavigateEvent(linkEvent, context as never)).toBe(false);
+		expect(handleNavigateEvent(traverseEvent, context as never)).toBe(false);
+		expect(linkEvent.intercepted).toBeUndefined();
+	});
+
+	it('keeps hash routes client-side when the document renders from the URL', () => {
+		const context = { ...aboutRouteContext(), documentNavigation: 'document' };
+		const event = navigateEvent('http://marklessrouter.test/#/about', { hashChange: true });
+
+		expect(handleNavigateEvent(event, context as never)).toBe(true);
 	});
 
 	it('enhances back and forward traverse events for known routes', async () => {
@@ -834,4 +894,21 @@ describe('hash mode', () => {
 		});
 		expect(handleNavigateEvent(event, context as never)).toBe(false);
 	});
+});
+
+it('a lazily fetched navigation polyfill is applied once for concurrent callers', async () => {
+	let release!: () => void;
+	const fetched = new Promise<void>((resolve) => (release = resolve));
+	let applied = 0;
+	const loadPolyfill = async () => {
+		await fetched;
+		return { applyPolyfill: () => ({ instance: ++applied }) };
+	};
+	const runtimeWindow = {} as Parameters<typeof ensureNavigationRuntime>[0];
+	const first = ensureNavigationRuntime(runtimeWindow, loadPolyfill as never);
+	const second = ensureNavigationRuntime(runtimeWindow);
+	release();
+	expect(await first).toBe(await second);
+	expect(applied).toBe(1);
+	expect(await ensureNavigationRuntime(runtimeWindow)).toBe(await first);
 });

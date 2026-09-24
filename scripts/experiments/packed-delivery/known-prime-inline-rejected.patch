@@ -1,0 +1,368 @@
+--- /private/tmp/markless-known-prime-inline-before.ts	2026-09-22 08:11:13
++++ packages/web/src/inline/resumer.ts	2026-09-22 08:18:07
+@@ -115,8 +115,6 @@
+ 		__marklessSettledArms?: Array<MarklessSettledArmHandoff>;
+ 		__marklessEventOnlyGraph?: Map<string, unknown>;
+ 		__marklessEventOnlyGraphInitialized?: boolean;
+-		// The control a crossing woke this page on. A resting pointer sends no
+-		// second crossing, so the runtime's own preload would otherwise miss it.
+ 		__marklessPrimedHover?: Element;
+ 	};
+ type InlineDispatchInput = {
+@@ -166,8 +164,6 @@
+ 	}
+ 	const debugBootstrap = options.debug ? options.debugBootstrapSource : 'undefined';
+ 	const debugRegistration = options.debug ? options.debugRegistrationSource : 'undefined';
+-	// Composed in, not runtime-gated: a `never` document must not carry the
+-	// logging text at all, which is what the prerender variant already does.
+ 	const logging = options.executionLog !== 'never';
+ 	return `{
+ const __MARKLESS_INLINE_SYNC_POLICY__=${JSON.stringify(options.syncPolicy)};
+@@ -204,12 +200,6 @@
+ ): string {
+ 	return `;(${runInlineResumerOverlayPrimer.toString()})(${JSON.stringify(resumeModuleUrl)},(url) => import(/* @vite-ignore */ url));`;
+ }
+-
+-// The page's event names vary, so a precompiled boot cannot bake them in. The
+-// compiled source leaves this identifier unresolved and the emitter substitutes
+-// the page's names; the bundler's compile step fails closed if a minifier ever
+-// folded it away. Owned here because both producers of the boot source live in
+-// this module.
+ export const PRERENDER_INLINE_EVENT_NAMES_TOKEN = '__MARKLESS_PRERENDER_EVENT_NAMES__';
+ 
+ export function renderPrerenderInlineResumerSource(
+@@ -218,10 +208,6 @@
+ ): string {
+ 	return compiled.replace(PRERENDER_INLINE_EVENT_NAMES_TOKEN, JSON.stringify(eventNames));
+ }
+-
+-// Prerendered CSR already carries its rendered DOM, while its resume records
+-// stay in demand-loaded chunks. Delegate only the compiler-known event names;
+-// the demanded resume module derives records and performs exact target matching.
+ export function createPrerenderInlineResumerSource(
+ 	eventNames: ReadonlyArray<string>,
+ 	resumeModuleUrl: string | undefined,
+@@ -239,10 +225,6 @@
+ ${plain}
+ }`;
+ }
+-
+-// The settle boot: emitted only for a prerendered page that ships a fill plan
+-// AND a settle module. It replaces the self-wake boot — nothing on this path
+-// imports the resume module, so the runtime stays unloaded until a gesture.
+ export function createPrerenderSettleInlineResumerSource(
+ 	eventNames: ReadonlyArray<string>,
+ 	resumeModuleUrl: string | undefined,
+@@ -262,8 +244,6 @@
+ };
+ 
+ type SettleModule = {
+-	// The DOM filler, the boundary runners by graph node, and the derive symbols
+-	// by bound-symbol id. Data and import targets only: the module has no logic.
+ 	readonly f: (input: unknown) => void;
+ 	readonly r: Record<string, (input: { readonly key: unknown }) => Promise<unknown>>;
+ 	readonly d: Record<string, (input: unknown) => unknown>;
+@@ -283,15 +263,7 @@
+ 	const planScript = root.querySelector('script[type="markless/fill-plan"]');
+ 	const filled: Array<readonly [Node, Node]> = [];
+ 	let replayed = false;
+-	// Resolves when this page's arms are filled (or the fallback has taken the
+-	// boundary). Gestures queue behind it, so the runtime a gesture boots always
+-	// sees a settled arm it can adopt.
+ 	let ready: Promise<unknown> = Promise.resolve();
+-	// Safety net for a pre-boot gesture on a filled arm. The wake normally adopts
+-	// the filled arm and matches the event directly; if it cannot (the settle
+-	// kernel refuses that arm, so the runtime re-renders it instead), the event
+-	// would be dropped. Re-deliver it once, on the element that took the
+-	// target's place, so a click landing before the runtime is never lost.
+ 	const replay = (target: Element) => {
+ 		if (replayed) return;
+ 		if (
+@@ -304,7 +276,6 @@
+ 			return;
+ 		replayed = true;
+ 		const elements = root.getElementsByTagName('*');
+-		// HTMLCollection is array-like, not an Array; borrowing indexOf avoids a copy.
+ 		const index = ([] as Element[]).indexOf.call(elements as unknown as Element[], target);
+ 		const observer = new MutationObserver(() => {
+ 			const next = elements[index];
+@@ -314,8 +285,6 @@
+ 		});
+ 		observer.observe(root, { childList: true, subtree: true });
+ 	};
+-	// Same one-promise rule as the classic resumer's `forward`: reusing this
+-	// root's import promise is what keeps queued gestures arriving FIFO.
+ 	let loaded: Promise<InlineResumeModule & SettleModule> | undefined;
+ 	const resume = (
+ 		input: InlineDispatchInput | { readonly root: InlineRoot; readonly event: 0 },
+@@ -329,10 +298,6 @@
+ 			(event) => {
+ 				root.__marklessDelegatedDispatch = true;
+ 				replay(event.target as Element);
+-				// Queued, not dropped: a gesture arriving before the arm settles
+-				// waits for the fill. Dispatching it first would boot a runtime whose
+-				// records still describe @pending — and whichever trigger group
+-				// covered the gesture would leave the boundary unowned.
+ 				return ready.then(() =>
+ 					resume({ root, event, element: event.target, eventRecord: null }),
+ 				);
+@@ -340,8 +305,6 @@
+ 			true,
+ 		);
+ 	}
+-	// Only the failure paths reach the runtime without a gesture: no plan, no
+-	// settle module, a rejected runner, or a filler that refused to place a hole.
+ 	const wake = () => {
+ 		if (root.__marklessDelegatedDispatch) return;
+ 		root.__marklessDelegatedDispatch = true;
+@@ -362,11 +325,6 @@
+ 				comments[(node as Comment).data] = node;
+ 			for (const boundary of plan.boundaries) {
+ 				const value = await settle.r[boundary.node]!({ key: boundary.key ?? null });
+-				// A gesture already landed: its own state change (a weight bump, say)
+-				// is newer than anything this fill could place, so hand the boundary
+-				// to the runtime and let it render the arm from the live graph. The
+-				// event-less wake is what owns a boundary — the trigger group the
+-				// gesture matched does not.
+ 				if (root.__marklessDelegatedDispatch) return resume({ root, event: 0 });
+ 				const anchors = [
+ 					comments[`markless:async:${boundary.id}`]!,
+@@ -391,9 +349,6 @@
+ 					value,
+ 					anchors,
+ 					read,
+-					// The plan names a compiled derive symbol; the descriptor answers
+-					// that symbol's own legacy graph reads with this page's routes.
+-					// Nothing here evaluates an expression.
+ 					derive: (symbolId: string) => {
+ 						const slots = plan.bound![boundary.id]![symbolId]!;
+ 						return settle.d[symbolId]!({
+@@ -408,9 +363,6 @@
+ 					},
+ 				});
+ 				filled.push(anchors);
+-				// The wake reads the boundary's own node with an empty path to get a
+-				// SNAPSHOT (that is the graph's shape for an async computed); every
+-				// other read is a plain value walk.
+ 				(root.__marklessSettledArms ??= []).push({
+ 					boundaryId: boundary.id,
+ 					read: (node, path) =>
+@@ -425,14 +377,8 @@
+ 				});
+ 			}
+ 		})
+-		// The fallback owns the boundary from here: nothing else on this page
+-		// will settle it, so this wake runs even after a gesture set the flag.
+ 		.catch(() => resume({ root, event: 0 }));
+ }
+-
+-// Log builds only, composed into both inline boots: the empty-delta page
+-// executes nothing at load, so the truthful summary and byte mirrors are
+-// written inline. Never mode composes it out, so it costs a `never` page zero.
+ type MarklessInlineLedger = {
+ 	unit: string;
+ 	load: { app: number; framework: number; instrument: number; inline: number; modules: string[] };
+@@ -446,10 +392,6 @@
+ 	incomplete: null | { reason: string; ids: string[] };
+ 	loadClosed?: boolean;
+ };
+-
+-// These bodies are serialized with Function.prototype.toString and inlined into
+-// the document, so every one of them has to carry its own ledger arithmetic: a
+-// module-scope helper would not survive the trip.
+ function runPrerenderInlineResumerLogSummary(mode: 'always' | 'auto'): void {
+ 	const shouldLog = (() => {
+ 		if (mode === 'always') return true;
+@@ -470,8 +412,6 @@
+ 		__mxLog?: Set<string>;
+ 		__marklessExecutionLedger?: MarklessInlineLedger;
+ 	};
+-	// The one figure an inline script can back without a size map: its own
+-	// shipped bytes — which for an SSR page is 100% of the JS executed at load.
+ 	const ledger = (globalScope.__marklessExecutionLedger ||= {
+ 		unit: 'chunk-raw-bytes',
+ 		load: { app: 0, framework: 0, instrument: 0, inline: 0, modules: [] },
+@@ -482,9 +422,6 @@
+ 	const ownBytes = (document.currentScript as HTMLScriptElement | null)?.textContent?.length ?? 0;
+ 	ledger.total.inline += ownBytes;
+ 	if (!ledger.loadClosed) ledger.load.inline += ownBytes;
+-	// Load ends at the first user gesture, and an inline document script is the
+-	// only observer early enough to see it. A module-scope helper cannot be used:
+-	// these bodies are serialized with toString and would lose the reference.
+ 	for (const type of ['pointerdown', 'touchstart', 'keydown'])
+ 		addEventListener(
+ 			type,
+@@ -502,9 +439,6 @@
+ 	const preloaded = document.querySelectorAll('link[rel=modulepreload]').length;
+ 	const loadBytes = ledger.load.app + ledger.load.framework + ledger.load.inline;
+ 	const totalBytes = ledger.total.app + ledger.total.framework + ledger.total.inline;
+-	// Zero executed modules is the honest whole story for a resumed SSR page, so
+-	// that arm keeps its exact sentence and its exact zero mirrors; anything else
+-	// has to come from the ledger, which is the only thing that can back it.
+ 	const summary =
+ 		executed.length === 0
+ 			? `markless: resumed — 0.0 KB app executed, ${preloaded} modules preloaded (0 app executed) · 0.0 KB instrument`
+@@ -523,10 +457,6 @@
+ 		}
+ 	}
+ }
+-
+-// The general resumer's copy of the same summary. It was inline in
+-// runInlineResumer and gated on a baked-in const, which shipped its text into
+-// `never` documents; composed in here, a consumer page carries none of it.
+ function runGeneralInlineLogSummary(mode: 'always' | 'auto'): void {
+ 	const shouldLog = (() => {
+ 		if (mode === 'always') return true;
+@@ -550,7 +480,6 @@
+ 		__marklessExecutionLedger?: MarklessInlineLedger;
+ 	};
+ 	const executionLog = (globalScope.__mxLog ||= new Set());
+-	// Same ledger, same one figure this script can back: its own bytes.
+ 	const ledger = (globalScope.__marklessExecutionLedger ||= {
+ 		unit: 'chunk-raw-bytes',
+ 		load: { app: 0, framework: 0, instrument: 0, inline: 0, modules: [] },
+@@ -561,9 +490,6 @@
+ 	const ownBytes = currentScript?.textContent?.length ?? 0;
+ 	ledger.total.inline += ownBytes;
+ 	if (!ledger.loadClosed) ledger.load.inline += ownBytes;
+-	// Load ends at the first user gesture, and an inline document script is the
+-	// only observer early enough to see it. A module-scope helper cannot be used:
+-	// these bodies are serialized with toString and would lose the reference.
+ 	for (const type of ['pointerdown', 'touchstart', 'keydown'])
+ 		addEventListener(
+ 			type,
+@@ -600,9 +526,6 @@
+ 		}
+ 	}
+ }
+-
+-// Flagged builds only: publish the debug channel and register the delegated
+-// event names so explainInteraction answers before per-element records exist.
+ function runPrerenderInlineResumerDebugSetup(eventNames: ReadonlyArray<string>): void {
+ 	const currentScript = document.currentScript as HTMLScriptElement | null;
+ 	const root = currentScript?.closest('[data-async-container]');
+@@ -624,8 +547,6 @@
+ 	const resumeModuleUrl =
+ 		currentScript?.getAttribute?.('data-markless-resume-module') ?? fallbackResumeModuleUrl;
+ 	if (!root || !resumeModuleUrl) return;
+-	// One import promise for this root, not one per event: same FIFO rule the
+-	// classic resumer's `forward` follows.
+ 	let loaded: Promise<InlineResumeModule> | undefined;
+ 	for (const eventName of eventNames) {
+ 		root.addEventListener(
+@@ -645,18 +566,12 @@
+ 		);
+ 	}
+ }
+-
+-// Serialized only into documents whose payload has an unsettled async runner.
+-// Keeping this outside runInlineResumer leaves event-only documents on the
+-// smaller interaction-triggered bootstrap.
+ function runInlineResumerSelfWake(fallbackResumeModuleUrl: string | undefined): void {
+ 	const currentScript = document.currentScript as HTMLScriptElement | null;
+ 	const root = currentScript?.closest<InlineRoot>('[data-async-container]');
+ 	const resumeModuleUrl =
+ 		currentScript?.getAttribute?.('data-markless-resume-module') ?? fallbackResumeModuleUrl;
+ 	if (!root || !resumeModuleUrl) return;
+-	// A streamed arm schedules its reveal while the response is still parsing.
+-	// Let that earlier frame commit before event-less resume adopts the DOM.
+ 	const wake = () =>
+ 		requestAnimationFrame(() => {
+ 			queueMicrotask(async () => {
+@@ -675,8 +590,6 @@
+ 		wake();
+ 	}
+ }
+-
+-// Retain Escape until installation; defer the wake so authored dispatch can claim it.
+ function runInlineResumerOverlayPrimer(
+ 	fallbackResumeModuleUrl: string | undefined,
+ 	loadModule: (url: string) => Promise<InlineResumeModule>,
+@@ -731,19 +644,14 @@
+ 		}
+ 	}
+ }
+-
+-// This function is serialized as the classic inline bootstrap. Keep every
+-// runtime dependency inside its body; type-only declarations above disappear
+-// before serialization and Rolldown/OXC owns production identifier mangling.
+ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModule>): void {
+ 	const currentDocument = document;
+ 	const currentScript = currentDocument.currentScript as HTMLScriptElement | null;
+ 	const root = currentScript?.closest<InlineRoot>('[data-async-container]');
+ 	const resumeModuleUrl =
+-		currentScript?.getAttribute?.('data-markless-resume-module') ??
++		currentScript?.getAttribute('data-markless-resume-module') ??
+ 		__MARKLESS_INLINE_RESUME_MODULE_URL__;
+ 	if (!root || !resumeModuleUrl) return;
+-	// Reuse the import promise to preserve native event arrival order.
+ 	let loaded: Promise<InlineResumeModule> | undefined;
+ 	const forward = (input: Omit<InlineDispatchInput, 'root'>) => {
+ 		root.__marklessDelegatedDispatch = true;
+@@ -946,8 +854,6 @@
+ 			debugControls = __MARKLESS_INLINE_DEBUG_BOOTSTRAP__?.(root, 'ssr-inline', false);
+ 		} catch {}
+ 	}
+-
+-	// Array.isArray cannot narrow the readonly per-arm plan out of the union.
+ 	const armRecordSets = view.asyncBoundaries.flatMap((boundary) => {
+ 		const armRecords = boundary.armRecords as ProtocolArmRecordSet | undefined;
+ 		return armRecords && !Array.isArray(armRecords) ? [armRecords] : [];
+@@ -967,7 +873,6 @@
+ 		),
+ 		...armRecordSets.flatMap((arm) => (arm.events ?? []).map((event) => event.eventName)),
+ 	]);
+-	// New component rows and escalating arms have no initial DOM locator.
+ 	const mintsComponentRows =
+ 		keyedRepeats.some((repeat) => repeat.rowComponent !== undefined) ||
+ 		branches.some((branch) => branch.escalates);
+@@ -975,7 +880,6 @@
+ 		...view.events.map((event) => event.eventName),
+ 		...nestedEventNames,
+ 	]);
+-	// This serialized function cannot import the shared event-name constants.
+ 	const pressPreloadEventNames = ['click', 'pointerdown', 'pointerup'];
+ 	const focusWakeEventNames = [
+ 		'keydown',
+@@ -993,11 +897,12 @@
+ 			eventNames.has(eventName),
+ 		),
+ 	);
+-	if (primeEventNames.length > 0) {
++	if (primeEventNames.length) {
+ 		const prime = (event: Event) => {
+ 			if (root.__marklessDelegatedDispatch) return;
+ 			const hover = event.type === 'pointerover';
+-			let primed: Element | undefined;
++			let primed: Element = root;
++			let eventRecord: InlineEventRecord | undefined;
+ 			for (
+ 				let element = event.target as Element | null;
+ 				element;
+@@ -1014,7 +919,7 @@
+ 					(hover ? pressPreloadEventNames : focusWakeEventNames).some(
+ 						(eventName) =>
+ 							(editable || (eventName !== 'beforeinput' && eventName !== 'input')) &&
+-							events.has(`${hostNodeId}\n${eventName}`),
++							(eventRecord = events.get(`${hostNodeId}\n${eventName}`)),
+ 					)
+ 				) {
+ 					primed = element;
+@@ -1022,15 +927,11 @@
+ 				}
+ 				if (element === root) break;
+ 			}
+-			if (!primed) {
+-				if (hover || !wakeOnUnknownElement) return;
+-				primed = root;
+-			}
+-			// Retain the hovered control because a resting pointer sends no second crossing.
++			if (!eventRecord && (hover || !wakeOnUnknownElement)) return;
+ 			if (hover) root.__marklessPrimedHover = primed;
+ 			for (const primeEventName of primeEventNames)
+ 				root.removeEventListener(primeEventName, prime, true);
+-			forward({ event: 0, element: primed });
++			forward({ event: 0, element: primed, eventRecord });
+ 		};
+ 		for (const primeEventName of primeEventNames)
+ 			root.addEventListener(primeEventName, prime, true);

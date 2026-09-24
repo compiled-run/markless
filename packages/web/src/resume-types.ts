@@ -18,6 +18,7 @@ export type ResumeDomElement = ResumeDomNode & {
 	readonly id?: string;
 	readonly childNodes?: ReadonlyArray<ResumeDomNode>;
 	readonly parentElement?: ResumeDomElement | null;
+	readonly contains?: (node: ResumeDomElement) => boolean;
 	readonly addEventListener?: (
 		type: string,
 		listener: (event: ResumeDomEvent) => void | Promise<void>,
@@ -125,6 +126,18 @@ export type ResumeAsyncBoundaryRecord = {
 export type ResumeArmRange = Pick<ResumeAsyncBoundaryRecord, 'id' | 'startAnchor' | 'endAnchor'>;
 export type ResumeBehaviorRecord = ProtocolViewPayload['behaviors'][number];
 export type ResumeKeyedRepeatRecord = NonNullable<ProtocolViewPayload['keyedRepeats']>[number];
+/** Wires the nested repeats inside one row a keyed repeat registered. */
+export type ResumeRepeatRowHook = (
+	repeat: ResumeKeyedRepeatRecord,
+	rowRoot: ResumeDomElement,
+	rowKey: unknown,
+) => void;
+/** The app's own module installs this only when a repeat nests inside another's rows. */
+export type ResumeNestedRepeatsHost = {
+	readonly __marklessNestedRepeats?: (
+		...input: Parameters<typeof import('./fns/nested-repeats.ts').wireNestedRepeats>
+	) => Promise<void>;
+};
 export type ResumeKeyedRepeatRowEvent = ResumeKeyedRepeatRecord['rowEvents'][number];
 export type ResumeBranchArmRecordSet = NonNullable<
 	NonNullable<ProtocolViewPayload['branches']>[number]['armRecords']
@@ -175,7 +188,6 @@ export type ResumeBranchUpdate = {
 // Async-arm records use indexes relative to the boundary's start anchor.
 export type ResumeArmLocator = {
 	readonly hostNodeId: string;
-	readonly strategy: 'arm-relative';
 	readonly index: number;
 	readonly tagName: string;
 };
@@ -211,6 +223,18 @@ export type ResumeArmBranchRecord = {
 	readonly composedInstancePath?: ResumeBranchRecord['composedInstancePath'];
 	readonly composedGraphProps?: ResumeBranchRecord['composedGraphProps'];
 };
+export type ElementHandleQualifier = (
+	handleId: string,
+	ownerRecordId: string,
+	graph?: unknown,
+) => string;
+
+export type ComposedArmRecordQualifier = (
+	boundaryId: string,
+	set: ResumeArmRecordSet,
+	graph?: RuntimeGraph,
+) => ResumeArmRecordSet;
+
 export type ResumeArmRecordSet = {
 	readonly locators: ReadonlyArray<ResumeArmLocator>;
 	readonly events: ProtocolViewPayload['events'];
@@ -250,10 +274,7 @@ export type ResumeSymbolContext = {
 	readonly element: ResumeDomElement;
 	readonly getElementHandle: (handleIdOrName: string) => ResumeElementHandleValue;
 	/** Where the part this symbol derives for stands in its family's roster. */
-	readonly rosterPosition?: (
-		rosterGraphNodeId: string,
-		handleGraphNodeId: string,
-	) => number;
+	readonly rosterPosition?: (rosterGraphNodeId: string, handleGraphNodeId: string) => number;
 	/** How many parts this symbol's family instance has in that roster. */
 	readonly rosterCount?: (rosterGraphNodeId: string) => number;
 	readonly locals?: Readonly<Record<string, unknown>>;
@@ -326,10 +347,7 @@ export type ResumeRuntimeInput = {
 		readonly nodes?: ReadonlyArray<ResumeDomNode>;
 		readonly armRecords: ResumeArmRecordSet;
 		readonly elementsByHostId?: ReadonlyMap<string, ResumeDomElement>;
-		readonly eventElementsByHostId?: ReadonlyMap<
-			string,
-			ReadonlyArray<ResumeDomElement>
-		>;
+		readonly eventElementsByHostId?: ReadonlyMap<string, ReadonlyArray<ResumeDomElement>>;
 		readonly computed?: ProtocolStatePayload['computed'];
 	}>;
 	readonly createVisibilityObserver?: ResumeVisibilityObserverFactory;
@@ -338,16 +356,21 @@ export type ResumeRuntimeInput = {
 		entries: ReadonlyArray<import('@markless/runtime').DomJournalEntry>,
 	) => void | Promise<void>;
 	readonly dispatchSharedPatch?: ResumeSharedPatchDispatcher;
-	readonly registerDelegatedEventRecord?: (
-		element: ResumeDomElement,
-		record: ProtocolViewPayload['events'][number],
-	) => void;
+	// The container's one capture listener; rows registered after mount, e.g. in a settled @try arm, name events it may not hear yet.
+	readonly delegatedTriggers?: {
+		readonly registerEventRecord: (
+			element: ResumeDomElement,
+			record: ProtocolViewPayload['events'][number],
+		) => void;
+		readonly registerRowEventName: (eventName: string) => void;
+	};
 	readonly onError?: ResumeRuntimeErrorHook;
 	readonly demandAsyncBoundaries?: boolean;
 	readonly renderData?: ResumeRenderDataThunk;
 };
 export type ResumeDispatchOptions = {
 	readonly syncPolicyAlreadyApplied?: boolean;
+	readonly propagationStopped?: boolean;
 	readonly ignoreUnmatched?: boolean;
 };
 // whenAsyncBoundariesSettled/holdPendingSettleCommits: D8 navigation

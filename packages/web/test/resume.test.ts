@@ -1,6 +1,10 @@
 import { expect, test, vi } from 'vitest';
 import { createRuntimeGraph } from '@markless/runtime';
-import { ASYNC_BOUNDARY_ARM, createProtocolStatePayload } from '@markless/serializer';
+import {
+	ASYNC_BOUNDARY_ARM,
+	createProtocolStatePayload,
+	PROTOCOL_VISIBLE_EVENT_NAME,
+} from '@markless/serializer';
 import {
 	applyDomJournalEntries,
 	createResumeRuntime,
@@ -1631,6 +1635,54 @@ test('resume runtime wires onVisible through a shared observer and runs cleanup 
 	resume.disposeHost('h1');
 
 	expect(cleanups).toEqual(['symbol:second', 'symbol:first']);
+});
+
+test('a host the inline observer already fired does not fire again when the runtime starts', async () => {
+	const early = element('IMG');
+	const late = element('IMG');
+	const root = element('SECTION', [early, late]) as FakeElement & {
+		__marklessVisibleFired?: WeakSet<FakeElement>;
+	};
+	root.__marklessVisibleFired = new WeakSet([early]);
+	const loadedSymbols: string[] = [];
+	let visibilityCallback:
+		| ((entries: ReadonlyArray<{ target: FakeElement; isIntersecting: boolean }>) => void)
+		| undefined;
+	const resume = createResumeRuntime({
+		root,
+		graph: createRuntimeGraph({ cells: [] }),
+		view: {
+			locators: [
+				{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' },
+				{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'img' },
+				{ hostNodeId: 'h2', strategy: 'dom-order', index: 2, tagName: 'img' },
+			],
+			events: [
+				{ hostNodeId: 'h1', eventName: PROTOCOL_VISIBLE_EVENT_NAME, symbolIds: ['symbol:early'] },
+				{ hostNodeId: 'h2', eventName: PROTOCOL_VISIBLE_EVENT_NAME, symbolIds: ['symbol:late'] },
+			],
+			domUpdates: [],
+			behaviors: [],
+			elementHandles: [],
+			asyncBoundaries: [],
+		},
+		createVisibilityObserver(callback) {
+			visibilityCallback = callback;
+			return { observe() {}, unobserve() {} };
+		},
+		loadSymbol(symbolId) {
+			loadedSymbols.push(symbolId);
+			return () => undefined;
+		},
+	});
+	await resume.start();
+	visibilityCallback?.([
+		{ target: early, isIntersecting: true },
+		{ target: late, isIntersecting: true },
+	]);
+	await settleMicrotasks();
+	expect(loadedSymbols).toEqual(['symbol:late']);
+	expect(root.__marklessVisibleFired.has(late)).toBe(true);
 });
 
 test('resume runtime visible symbols read current graph values without subscribing', async () => {
@@ -3876,7 +3928,6 @@ test('resume runtime installs settled arm event listeners before exposing range 
 					locators: [
 						{
 							hostNodeId: 'h-arm',
-							strategy: 'arm-relative',
 							index: 0,
 							tagName: 'button',
 						},
@@ -4256,9 +4307,12 @@ test('resume runtime rewires arm records across branch flips', async () => {
 	await graph.flush();
 	await resume.dispatch(event('click', reopenedButton, ''));
 	expect(loadedSymbols.filter((id) => id === 'symbol:arm-click')).toHaveLength(1);
+	// A flipped-in arm evaluates its update modules up front; the live subscription loads again on write.
+	const armTextLoads = () => loadedSymbols.filter((id) => id === 'symbol:arm-text').length;
+	expect(armTextLoads()).toBe(1);
 	graph.write({ graphNodeId: 'state:label', value: 'c' });
 	await graph.flush();
-	expect(loadedSymbols.filter((id) => id === 'symbol:arm-text')).toHaveLength(1);
+	expect(armTextLoads()).toBe(2);
 });
 
 test('resume runtime activates arm behaviors and handles on materialize and disposes them on flip-out', async () => {

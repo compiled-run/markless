@@ -163,6 +163,68 @@ function marklessLanguagePlugin(): unknown {
 
 type FenceFile = { readonly fileName: string; readonly text: string; readonly version: number };
 
+function createReusableDocumentRegistry(isFence: (path: string) => boolean): ts.DocumentRegistry {
+	const registry = ts.createDocumentRegistry(ts.sys.useCaseSensitiveFileNames, SITE_ROOT);
+	const released = new Map<string, () => void>();
+	const keyOf = (
+		path: string,
+		key: string,
+		kind: ts.ScriptKind | undefined,
+		mode: ts.ResolutionMode,
+	) => JSON.stringify([path, key, kind, mode]);
+	return {
+		...registry,
+		acquireDocumentWithKey(...args) {
+			const document = registry.acquireDocumentWithKey(...args);
+			const key = keyOf(args[1], args[3], args[6], document.impliedNodeFormat);
+			released.get(key)?.();
+			released.delete(key);
+			return document;
+		},
+		releaseDocumentWithKey(path, bucket, kind, mode?: ts.ResolutionMode) {
+			const release = () => registry.releaseDocumentWithKey(path, bucket, kind!, mode);
+			const key = keyOf(path, bucket, kind, mode);
+			if (isFence(path) || released.has(key)) {
+				release();
+				return;
+			}
+			// Retain parsed imports across isolated fence programs, with bounded inactive storage.
+			released.set(key, release);
+			if (released.size > 512) {
+				const [oldest, evict] = released.entries().next().value!;
+				evict();
+				released.delete(oldest);
+			}
+		},
+	};
+}
+
+function memoize<T>(read: (path: string) => T): (path: string) => T {
+	const seen = new Map<string, T>();
+	return (path) => {
+		if (seen.has(path)) return seen.get(path)!;
+		const value = read(path);
+		seen.set(path, value);
+		return value;
+	};
+}
+
+// Disk is treated as fixed for the service's lifetime, as the snapshot versions already are.
+function createDiskCache(): ts.ModuleResolutionHost & {
+	getDirectories(path: string): string[];
+	realpath(path: string): string;
+} {
+	return {
+		directoryExists: memoize((path) => ts.sys.directoryExists(path)),
+		fileExists: memoize((path) => ts.sys.fileExists(path)),
+		getCurrentDirectory: () => SITE_ROOT,
+		getDirectories: memoize((path) => ts.sys.getDirectories(path)),
+		readFile: memoize((path) => ts.sys.readFile(path)),
+		realpath: memoize((path) => ts.sys.realpath?.(path) ?? path),
+		useCaseSensitiveFileNames: ts.sys.useCaseSensitiveFileNames,
+	};
+}
+
 function createService(): {
 	readonly proxy: ts.LanguageService;
 	selectFence(key: string, extension: string, text: string): FenceFile;
@@ -172,6 +234,7 @@ function createService(): {
 
 	const fenceByName = new Map<string, FenceFile>();
 	let activeFence: FenceFile | undefined;
+	let projectVersion = 0;
 	const selectFence = (key: string, extension: string, text: string): FenceFile => {
 		const fileName = join(SITE_ROOT, `__twoslash_fence__${key}${extension}`);
 		let file = fenceByName.get(fileName);
@@ -179,9 +242,18 @@ function createService(): {
 			file = { fileName, text, version: 1 };
 			fenceByName.set(fileName, file);
 		}
-		activeFence = file;
+		if (activeFence !== file) {
+			activeFence = file;
+			projectVersion += 1;
+		}
 		return file;
 	};
+	const disk = createDiskCache();
+	const resolutionCache = ts.createModuleResolutionCache(
+		SITE_ROOT,
+		(fileName) => (ts.sys.useCaseSensitiveFileNames ? fileName : fileName.toLowerCase()),
+		COMPILER_OPTIONS,
+	);
 	const diskVersions = new Map<string, string>();
 	// Stable snapshots let Volar reuse unchanged imported family documents.
 	const snapshots = new Map<string, { version: string; snapshot: ts.IScriptSnapshot }>();
@@ -210,21 +282,22 @@ function createService(): {
 	};
 
 	const host: ts.LanguageServiceHost = {
-		directoryExists: (path) => ts.sys.directoryExists(path),
-		fileExists: (path) => fenceByName.has(path) || ts.sys.fileExists(path),
+		directoryExists: disk.directoryExists,
+		fileExists: (path) => fenceByName.has(path) || disk.fileExists(path),
 		getCompilationSettings: () => COMPILER_OPTIONS,
 		getCurrentDirectory: () => SITE_ROOT,
 		getDefaultLibFileName: (options) => ts.getDefaultLibFilePath(options),
-		getDirectories: (path) => ts.sys.getDirectories(path),
+		getDirectories: disk.getDirectories,
 		getScriptFileNames: () => (activeFence ? [activeFence.fileName] : []),
+		getProjectVersion: () => String(projectVersion),
 		getScriptKind: (fileName) => SCRIPT_KINDS[extensionOf(fileName)] ?? ts.ScriptKind.TS,
 		getScriptSnapshot: readSnapshot,
 		getScriptVersion: versionOf,
 		readDirectory: (path, extensions, exclude, include, depth) =>
 			ts.sys.readDirectory(path, extensions, exclude, include, depth),
-		readFile: (path) => ts.sys.readFile(path),
+		readFile: disk.readFile,
 		// Resolve pnpm aliases to one document-registry identity.
-		realpath: (path) => ts.sys.realpath?.(path) ?? path,
+		realpath: disk.realpath,
 		// Volar only decorates a resolver the host already has, and its `.tsrx`
 		// resolution is the whole point of this service, so a plain one is required.
 		resolveModuleNameLiterals: (literals, containingFile, redirected, options, containing) =>
@@ -233,8 +306,8 @@ function createService(): {
 					literal.text,
 					containingFile,
 					options,
-					ts.sys,
-					undefined,
+					disk,
+					resolutionCache,
 					redirected,
 					ts.getModeForUsageLocation(containing, literal, options),
 				),
@@ -254,7 +327,10 @@ function createService(): {
 
 	volarTs.decorateLanguageServiceHost(ts, language, host);
 	const { proxy, initialize } = volarTs.createProxyLanguageService(
-		ts.createLanguageService(host, ts.createDocumentRegistry()),
+		ts.createLanguageService(
+			host,
+			createReusableDocumentRegistry((path) => fenceByName.has(path)),
+		),
 	);
 	initialize(language);
 	return { selectFence, proxy };

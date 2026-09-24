@@ -131,7 +131,7 @@ test.each([
 // per-arm plan array both cross the wire and round-trip payload scripts.
 test('async boundary armRecords round-trip payload scripts in both protocol shapes', () => {
 	const armized: ProtocolArmRecordSet = {
-		locators: [{ hostNodeId: 'h3', strategy: 'arm-relative', index: 0, tagName: 'button' }],
+		locators: [{ hostNodeId: 'h3', index: 0, tagName: 'button' }],
 		events: [{ hostNodeId: 'h3', eventName: 'click', symbolIds: ['symbol:3'] }],
 		behaviors: [],
 		elementHandles: [],
@@ -261,6 +261,58 @@ test('served state payloads reject live directValue cells', () => {
 // A keyed repeat's `@empty` arm markup crosses the wire on the repeat record,
 // and a malformed one is refused where every other malformed record is: at the
 // payload boundary, before resume can act on it.
+// A nested repeat's enclosing row crosses the wire on its record and is refused malformed.
+test('keyed repeat enclosing row round-trips and refuses a malformed shape', () => {
+	const outer = {
+		id: 'repeat:0',
+		parentHostNodeId: 'h0',
+		collectionGraphNodeId: 'state:groups',
+		collectionPath: [],
+		keyPath: ['id'],
+		itemName: 'group',
+		rowElementCount: 2,
+		rowEvents: [],
+	};
+	const inner = {
+		id: 'repeat:1',
+		parentHostNodeId: 'h2',
+		enclosingRow: { repeatId: 'repeat:0', parentHostPath: [1], itemPath: ['items'] },
+		collectionPath: [],
+		keyPath: ['id'],
+		itemName: 'item',
+		rowElementCount: 1,
+		rowEvents: [{ hostPath: [0], eventName: 'click', symbolIds: ['symbol:0'] }],
+	};
+	const view: ProtocolViewPayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		keyedRepeats: [outer, inner],
+		asyncBoundaries: [],
+	};
+	const state: ProtocolStatePayload = { version: ASYNC_PROTOCOL_VERSION, cells: [], computed: [] };
+
+	const decoded = decodePayloadScripts(renderPayloadScripts({ state, view }));
+	expect(decoded.view.keyedRepeats?.[1]?.enclosingRow).toEqual(inner.enclosingRow);
+
+	for (const enclosingRow of [
+		{ repeatId: 7, parentHostPath: [1] },
+		{ repeatId: 'repeat:0', parentHostPath: [-1] },
+		{ repeatId: 'repeat:0', parentHostPath: [1], itemPath: [3] },
+	])
+		expect(() =>
+			decodePayloadScripts(
+				renderPayloadScripts({
+					state,
+					view: { ...view, keyedRepeats: [outer, { ...inner, enclosingRow }] } as never,
+				}),
+			),
+		).toThrow(/keyedRepeat\[1\]\.enclosingRow/);
+});
+
 test('keyed repeat @empty arm markup round-trips and refuses a malformed shape', () => {
 	const repeat = {
 		id: 'repeat:rows',
@@ -560,7 +612,7 @@ test('branch content reads round-trip and refuse a malformed shape', () => {
 test('served arm records need the escalates mark and arm-relative locators', () => {
 	const armRecords = {
 		locators: [
-			{ hostNodeId: 'h0', tagName: 'EM', strategy: 'arm-relative' as const, index: 0 },
+			{ hostNodeId: 'h0', tagName: 'EM', index: 0 },
 		],
 		events: [],
 		behaviors: [],
@@ -627,7 +679,7 @@ test('served arm records need the escalates mark and arm-relative locators', () 
 				} as never,
 			}),
 		),
-	).toThrow(/servedArmRecords\.locators\[0\]: expected arm-relative strategy/);
+	).toThrow(/servedArmRecords\.locators\[0\]: an arm-relative locator carries no strategy/);
 });
 
 // The repeat's own instance path is what tells two renderings of one `@for`
@@ -680,4 +732,83 @@ test('keyed repeat instance path round-trips and refuses a malformed shape', () 
 			}),
 		),
 	).toThrow(/keyedRepeat\[0\]/);
+});
+
+test('the visible event name is one protocol fact on both entry points', async () => {
+	const root = await import('../src/index.ts');
+	const protocol = await import('../src/protocol.ts');
+	expect(typeof root.PROTOCOL_VISIBLE_EVENT_NAME).toBe('string');
+	expect(protocol.PROTOCOL_VISIBLE_EVENT_NAME).toBe(root.PROTOCOL_VISIBLE_EVENT_NAME);
+});
+
+// An authored-expression slot names the reader that answers it and the outside
+// graph nodes it reads; the reader's component rides on the template exactly
+// when some slot needs it.
+test('a row slot may carry an authored expression, with its component and reads', () => {
+	const rowTemplate = {
+		html: '<li><!--markless-slot:0--></li>',
+		componentName: 'Rows',
+		textSlots: [
+			{
+				path: [0, 0],
+				source: 'format(row.at, zone)',
+				reads: [{ graphNodeId: 'state:zone', path: [] }],
+			},
+		],
+		attributeSlots: [{ path: [0], name: 'title', source: '`Row ${row.name}`' }],
+	};
+	const repeat = {
+		id: 'repeat:rows',
+		parentHostNodeId: 'h0',
+		collectionGraphNodeId: 'state:rows',
+		collectionPath: [],
+		keyPath: ['id'],
+		itemName: 'row',
+		rowElementCount: 1,
+		rowTemplate,
+		rowEvents: [],
+	};
+	const view: ProtocolViewPayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		keyedRepeats: [repeat],
+		asyncBoundaries: [],
+	};
+	const state: ProtocolStatePayload = { version: ASYNC_PROTOCOL_VERSION, cells: [], computed: [] };
+	const withTemplate = (template: unknown) =>
+		decodePayloadScripts(
+			renderPayloadScripts({
+				state,
+				view: { ...view, keyedRepeats: [{ ...repeat, rowTemplate: template }] } as never,
+			}),
+		);
+
+	expect(withTemplate(rowTemplate).view.keyedRepeats?.[0]?.rowTemplate).toEqual(rowTemplate);
+	const { componentName: _dropped, ...withoutComponent } = rowTemplate;
+	expect(() => withTemplate(withoutComponent)).toThrow(/keyedRepeat\[0\]\.rowTemplate/);
+	expect(() =>
+		withTemplate({ html: '<li></li>', componentName: 'Rows', textSlots: [] }),
+	).toThrow(/keyedRepeat\[0\]\.rowTemplate/);
+	expect(() =>
+		withTemplate({
+			...rowTemplate,
+			textSlots: [{ path: [0, 0], source: 'x', itemPath: ['x'] }],
+		}),
+	).toThrow(/keyedRepeat\[0\]\.rowTemplate\.textSlots\[0\]/);
+	expect(() =>
+		withTemplate({
+			...rowTemplate,
+			textSlots: [{ path: [0, 0], itemPath: ['x'], reads: [] }],
+		}),
+	).toThrow(/keyedRepeat\[0\]\.rowTemplate\.textSlots\[0\]/);
+	expect(() =>
+		withTemplate({
+			...rowTemplate,
+			textSlots: [{ path: [0, 0], source: 'x', reads: [{ graphNodeId: 7, path: [] }] }],
+		}),
+	).toThrow(/keyedRepeat\[0\]\.rowTemplate\.textSlots\[0\]\.reads\[0\]/);
 });

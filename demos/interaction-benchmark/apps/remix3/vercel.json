@@ -1,0 +1,19 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "pnpm install --frozen-lockfile --prod --config.node-linker=hoisted",
+  "buildCommand": "pnpm run build:vercel",
+  "outputDirectory": "public",
+  "functions": {
+    "api/index.mjs": {
+      "includeFiles": "{app/**,build-info.json,tsconfig.json,package.json,node_modules/**}",
+      "excludeFiles": "node_modules/.bin/**"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/api/index"
+    }
+  ]
+}

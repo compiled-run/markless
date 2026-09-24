@@ -1,0 +1,174 @@
+{
+  "inline": {
+    "beforeGzip": 1117,
+    "afterGzip": 1089,
+    "limit": 1090
+  },
+  "candidate": "/private/tmp/markless-docs-inline-3bKoIN/.output",
+  "files": {
+    "before": "/private/tmp/markless-docs-cold-aEC2FX/results.json",
+    "after": "/private/tmp/markless-docs-cold-g2pJGQ/results.json",
+    "execution": "/private/tmp/markless-docs-execution-UlOAKa/results.json",
+    "attribution": "/private/tmp/markless-inline-attribution.json",
+    "navigation": "/private/tmp/markless-docs-navigation-lE2RTR/results.json",
+    "scalar": "/private/tmp/markless-scalar-path-app-n0ETIM/results.json"
+  },
+  "protocol": {
+    "samplesPerBuildCondition": 10,
+    "browser": "153.0.8010.53",
+    "transport": "Generated Nitro docs through a Brotli quality 5 JS proxy; localhost HTTP/1.1; HTML stream compressed with Brotli quality 5",
+    "cache": "CDP Network.setCacheDisabled true; fresh browser context per first interaction",
+    "conditions": "normal; constrained 150 ms RTT, 5 Mbps, 4× CPU",
+    "metric": "captured click event to expected DOM mutation; not compositor paint",
+    "order": "previous build then candidate; no overlapping owned test/build/profiling jobs",
+    "limitation": "Other desktop applications remained active; process snapshots included Chrome, Cursor, and WindowServer CPU activity. These are local measurements, not a device-independent latency guarantee."
+  },
+  "timings": [
+    {
+      "condition": "normal",
+      "phases": [
+        {
+          "phase": "first",
+          "before": {
+            "median": 32.89999985694885,
+            "mad": 0.1499999761581421,
+            "min": 32.299999952316284,
+            "max": 34.200000047683716
+          },
+          "after": {
+            "median": 32.800000071525574,
+            "mad": 0.4500000476837158,
+            "min": 31.09999990463257,
+            "max": 33.90000009536743
+          },
+          "threshold": 10,
+          "meaningful": false
+        },
+        {
+          "phase": "second",
+          "before": {
+            "median": 15.049999952316284,
+            "mad": 0.19999992847442627,
+            "min": 12.899999856948853,
+            "max": 15.700000047683716
+          },
+          "after": {
+            "median": 14.850000023841858,
+            "mad": 0.3500000238418579,
+            "min": 13.400000095367432,
+            "max": 15.399999856948853
+          },
+          "threshold": 10,
+          "meaningful": false
+        },
+        {
+          "phase": "third",
+          "before": {
+            "median": 15.149999976158142,
+            "mad": 0.24999988079071045,
+            "min": 14,
+            "max": 15.699999809265137
+          },
+          "after": {
+            "median": 15.25000011920929,
+            "mad": 0.45000016689300537,
+            "min": 14,
+            "max": 16.799999952316284
+          },
+          "threshold": 10,
+          "meaningful": false
+        }
+      ]
+    },
+    {
+      "condition": "constrained",
+      "phases": [
+        {
+          "phase": "first",
+          "before": {
+            "median": 74.60000002384186,
+            "mad": 2.850000023841858,
+            "min": 46.80000019073486,
+            "max": 80.29999995231628
+          },
+          "after": {
+            "median": 76.80000007152557,
+            "mad": 1.8000000715255737,
+            "min": 46.09999990463257,
+            "max": 82.59999990463257
+          },
+          "threshold": 10,
+          "meaningful": false
+        },
+        {
+          "phase": "second",
+          "before": {
+            "median": 10.450000047683716,
+            "mad": 0.3999999761581421,
+            "min": 8.700000047683716,
+            "max": 12.399999856948853
+          },
+          "after": {
+            "median": 10.699999928474426,
+            "mad": 0.7000000476837158,
+            "min": 9.5,
+            "max": 12.700000047683716
+          },
+          "threshold": 10,
+          "meaningful": false
+        },
+        {
+          "phase": "third",
+          "before": {
+            "median": 10.350000023841858,
+            "mad": 1.0500000715255737,
+            "min": 7.3999998569488525,
+            "max": 14.200000047683716
+          },
+          "after": {
+            "median": 11.399999856948853,
+            "mad": 1.649999976158142,
+            "min": 6.599999904632568,
+            "max": 14.600000143051147
+          },
+          "threshold": 10,
+          "meaningful": false
+        }
+      ]
+    }
+  ],
+  "before": {
+    "visits": 20,
+    "errors": [],
+    "failedActions": 0,
+    "frameworkCounts": [
+      5
+    ],
+    "frameworkEncodedBytes": [
+      235035
+    ],
+    "httpCacheHits": 0,
+    "actionsStartingScriptRequests": 0,
+    "pendingFirstByCondition": {
+      "normal": 0,
+      "constrained": 9
+    }
+  },
+  "after": {
+    "visits": 20,
+    "errors": [],
+    "failedActions": 0,
+    "frameworkCounts": [
+      5
+    ],
+    "frameworkEncodedBytes": [
+      235035
+    ],
+    "httpCacheHits": 0,
+    "actionsStartingScriptRequests": 0,
+    "pendingFirstByCondition": {
+      "normal": 0,
+      "constrained": 9
+    }
+  }
+}

@@ -39,7 +39,7 @@ export async function createRuntimeGraphFromResumePayload(
 	graph = createRuntimeGraph({
 		cells: [
 			...(await decodeStateCells(input.state, input.root.__marklessEventOnlyGraph)),
-			...(await decodeServedComputedValues(input.state)),
+			...(await decodeServedComputedValues(input.state, input.root.__marklessEventOnlyGraph)),
 		],
 		computed: input.state.computed.map((computed) => ({
 			...computed,
@@ -84,7 +84,10 @@ async function decodeStateCells(
 
 // A sync computed has no compute node here — `readGraph` answers it from the cells
 // map — so a served value belongs there for a handler's first read to see it.
-async function decodeServedComputedValues(payload: ProtocolStatePayload) {
+async function decodeServedComputedValues(
+	payload: ProtocolStatePayload,
+	eventOnlyValues?: ReadonlyMap<string, unknown>,
+) {
 	const served = payload.computed.filter(
 		(computed) => computed.value !== undefined || computed.directValue !== undefined,
 	);
@@ -92,8 +95,10 @@ async function decodeServedComputedValues(payload: ProtocolStatePayload) {
 	return await Promise.all(
 		served.map(async (computed) => ({
 			graphNodeId: computed.graphNodeId,
-			value:
-				computed.directValue !== undefined
+			// A compiled closure re-derived it after the page was served.
+			value: eventOnlyValues?.has(computed.graphNodeId)
+				? eventOnlyValues.get(computed.graphNodeId)
+				: computed.directValue !== undefined
 					? computed.directValue
 					: await deserializeGraphValue(computed.value as SerializedGraphPayload),
 		})),

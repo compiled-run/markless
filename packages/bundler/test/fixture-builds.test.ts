@@ -4,7 +4,13 @@ import { promisify } from 'node:util';
 import { resolve } from 'pathe';
 import { describe, expect, test } from 'vitest';
 import { runtimeSizeReport } from '../test-support/runtime-size.ts';
-import { assertRuntimeBudget } from './fixture-budget.ts';
+import {
+	acceptFixtureRuntime,
+	assertRuntimeBudget,
+	fixtureRuntimeModules,
+	readFixtureRuntimeAnchors,
+	runtimeModuleOverruns,
+} from './fixture-budget.ts';
 
 const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../..');
@@ -226,6 +232,17 @@ describe('fixture builds', () => {
 					await mkdir(evidence, { recursive: true });
 					await writeFile(resolve(evidence, fixture.filter.replace(/[^a-zA-Z0-9-]/g, '_') + '.json'), JSON.stringify({ fixture: fixture.filter, budget: fixture.runtimeBudget, emittedReport }, null, 2));
 				}
+				const runtimeModules = fixtureRuntimeModules(
+					resolve(root, fixture.runtimeBudget.dist),
+				);
+				if (!acceptFixtureRuntime(fixture.filter, runtimeModules))
+					expect(
+						runtimeModuleOverruns(
+							fixture.filter,
+							runtimeModules,
+							readFixtureRuntimeAnchors()[fixture.filter],
+						),
+					).toEqual([]);
 				assertRuntimeBudget({ budget: fixture.runtimeBudget, emittedReport });
 			}
 		}, 120_000);

@@ -228,25 +228,19 @@ test('planPayloadArena separates graph state from view wiring metadata', async (
 			initiallyServedArm: ASYNC_BOUNDARY_ARM.pending,
 			armRecords: [
 				{
-					locators: [
-						{ hostNodeId: 'h4', strategy: 'arm-relative', index: 0, tagName: 'p' },
-					],
+					locators: [{ hostNodeId: 'h4', index: 0, tagName: 'p' }],
 					events: [],
 					behaviors: [],
 					elementHandles: [],
 				},
 				{
-					locators: [
-						{ hostNodeId: 'h6', strategy: 'arm-relative', index: 0, tagName: 'p' },
-					],
+					locators: [{ hostNodeId: 'h6', index: 0, tagName: 'p' }],
 					events: [],
 					behaviors: [],
 					elementHandles: [],
 				},
 				{
-					locators: [
-						{ hostNodeId: 'h5', strategy: 'arm-relative', index: 0, tagName: 'p' },
-					],
+					locators: [{ hostNodeId: 'h5', index: 0, tagName: 'p' }],
 					events: [],
 					behaviors: [],
 					elementHandles: [],
@@ -568,10 +562,10 @@ export function App() @{
 	expect(payload.view.asyncBoundaries[0]?.armRecords).toEqual([
 		{
 			locators: [
-				{ hostNodeId: 'h2', strategy: 'arm-relative', index: 0, tagName: 'article' },
-				{ hostNodeId: 'h3', strategy: 'arm-relative', index: 1, tagName: 'h2' },
-				{ hostNodeId: 'h4', strategy: 'arm-relative', index: 2, tagName: 'button' },
-				{ hostNodeId: 'h5', strategy: 'arm-relative', index: 3, tagName: 'span' },
+				{ hostNodeId: 'h2', index: 0, tagName: 'article' },
+				{ hostNodeId: 'h3', index: 1, tagName: 'h2' },
+				{ hostNodeId: 'h4', index: 2, tagName: 'button' },
+				{ hostNodeId: 'h5', index: 3, tagName: 'span' },
 			],
 			events: [expect.objectContaining({ hostNodeId: 'h4', eventName: 'click' })],
 			behaviors: [expect.objectContaining({ hostNodeId: 'h2', functionSource: 'panel' })],
@@ -580,13 +574,13 @@ export function App() @{
 		{
 			// Host ids follow the collector's walk order (@catch walks before
 			// @pending), so the @pending arm's <p> is h7 here.
-			locators: [{ hostNodeId: 'h7', strategy: 'arm-relative', index: 0, tagName: 'p' }],
+			locators: [{ hostNodeId: 'h7', index: 0, tagName: 'p' }],
 			events: [],
 			behaviors: [],
 			elementHandles: [],
 		},
 		{
-			locators: [{ hostNodeId: 'h6', strategy: 'arm-relative', index: 0, tagName: 'p' }],
+			locators: [{ hostNodeId: 'h6', index: 0, tagName: 'p' }],
 			events: [],
 			behaviors: [],
 			elementHandles: [],

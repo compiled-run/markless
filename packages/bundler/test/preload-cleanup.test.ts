@@ -62,10 +62,25 @@ describe('Vite preload cleanup', () => {
 			'import{__esmMin as e}from"./shared.js";async function load(){return import("./chunk.js")}var m,h=e((()=>{f(),m=()=>import("./symbols.js")}));e((()=>{h()}))();',
 		);
 	});
+	test('keeps other bindings imported beside a removed Vite preload helper', () => {
+		const code =
+			'import{__vitePreload as t,init_pending as r,init_preload_helper as n,settle as s}from"./shared.js";import{__esmMin as e}from"./runtime.js";async function load(){return import("./chunk.js")}var A=e((()=>{n(),r()}));async function hold(v){return s(v)}e((()=>{A()}))();';
+
+		expect(stripEmptyVitePreloadWrappers(code)).toBe(
+			'import{init_pending as r,settle as s}from"./shared.js";import{__esmMin as e}from"./runtime.js";async function load(){return import("./chunk.js")}var A=e((()=>{r()}));async function hold(v){return s(v)}e((()=>{A()}))();',
+		);
+	});
 
 	test('keeps an imported Vite preload helper when the preload function is still called', () => {
 		const code =
 			'import{__esmMin as e}from"./shared.js";import{init_preload_helper as n,__vitePreload as t}from"./preload.js";async function load(){return t(()=>import("./chunk.js"),["chunk.css"],import.meta.url)}var A=e((()=>{n()}));e((()=>{A()}))();';
+
+		expect(stripEmptyVitePreloadWrappers(code)).toBe(code);
+	});
+
+	test('keeps an imported Vite preload helper that its removal would join into a call', () => {
+		const code =
+			'var q=t\nimport{__vitePreload as t,init_preload_helper as n}from"./preload.js"\n(0);n();';
 
 		expect(stripEmptyVitePreloadWrappers(code)).toBe(code);
 	});

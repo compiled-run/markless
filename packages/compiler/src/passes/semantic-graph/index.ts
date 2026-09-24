@@ -87,6 +87,7 @@ export async function buildSemanticGraph(
 		graph,
 		frameworkApiImports,
 		importedModuleInterfaces: input.importedModuleInterfaces,
+		importedModuleConstants: input.importedModuleConstants,
 	});
 	state.walk = walk;
 	collectMemberTagTargets(statements, state);
@@ -472,7 +473,12 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 		case 'JSXForExpression':
 			const repeatIndex = collectKeyedRepeat(node, state);
 			const repeat = repeatIndex === null ? null : state.graph.keyedRepeats[repeatIndex];
-			if (repeat) state.currentKeyedRepeatScopeIds.push(repeat.id);
+			if (repeat) {
+				state.currentKeyedRepeatScopeIds.push(repeat.id);
+				const left = node.left as AnyNode | undefined;
+				if (typeof left?.start === 'number' && typeof left.end === 'number')
+					state.keyedRepeatItemSpans.set(repeat.id, { start: left.start, end: left.end });
+			}
 			// A row's reads belong to the row template, not to any arm around it.
 			withArmScope(state, null, () => {
 				for (const child of childNodes(node)) {

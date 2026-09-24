@@ -25,6 +25,7 @@ function renderDataScript(type: 'markless/state' | 'markless/view', payload: unk
 	return `<script type="${type}">${escapeScriptJson(JSON.stringify(payload))}</script>`;
 }
 
+// Only `</` and `<!` can end or escape a script's raw text; any other `<` is inert there.
 function escapeScriptJson(value: string): string {
-	return value.replace(/</g, '\\u003C');
+	return value.replace(/<(?=[/!])/g, '\\u003C');
 }

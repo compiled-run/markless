@@ -1,0 +1,120 @@
+{
+	"date": "2026-09-24",
+	"repo": "/private/tmp/mlwt-holdout149",
+	"revision": "c8da68b3",
+	"dirty": false,
+	"playwright": "1.58.2",
+	"node": "v24.15.0",
+	"browsers": [
+		"webkit"
+	],
+	"profiles": [
+		"normal",
+		"constrained"
+	],
+	"variants": {
+		"default": null,
+		"packed": {
+			"experimentalNativePacking": true
+		}
+	},
+	"options": {
+		"lanes": [
+			"sr-app",
+			"live-feed-ssr",
+			"router-app"
+		],
+		"variants": [
+			"default",
+			"packed"
+		],
+		"browsers": [
+			"webkit"
+		],
+		"profiles": [
+			"normal",
+			"constrained"
+		],
+		"loadVisits": 1,
+		"maxControls": 0,
+		"maxLinks": 4,
+		"quietMs": 500,
+		"settleTimeoutMs": 20000,
+		"actionTimeoutMs": 15000,
+		"responseWaitMs": 300,
+		"coverage": false,
+		"lock": "/private/tmp/mlbench-timing.lock",
+		"build": true,
+		"label": "baseline-webkit-rounds"
+	},
+	"lanes": {
+		"sr-app": {
+			"root": "packages/headless/sr-app",
+			"rendering": "client-only (render() into #app), every shipped @markless/ui family",
+			"routes": [
+				"/"
+			]
+		},
+		"live-feed-ssr": {
+			"root": "demos/live-feed-ssr",
+			"rendering": "SSR + router, async computed feed behind @try/@pending, keyed list",
+			"routes": [
+				"/"
+			]
+		},
+		"router-app": {
+			"root": "packages/router/fixtures/router",
+			"rendering": "SSR + router multi-route: TSRX pages, MDX catch-all with an interactive island, streamed @pending page, Link navigation",
+			"routes": [
+				"/",
+				"/harbor",
+				"/docs/getting-started"
+			]
+		}
+	},
+	"builds": {
+		"sr-app/default": {
+			"event": "built",
+			"ms": 8812,
+			"marklessCalls": 0,
+			"options": null,
+			"log": "/var/folders/pt/xbq_fv915rx9wtnmww8npc0w0000gn/T/holdout-sr-app-default-build-98985.log"
+		},
+		"sr-app/packed": {
+			"event": "built",
+			"ms": 10474,
+			"marklessCalls": 2,
+			"options": "{\"experimentalNativePacking\":true}",
+			"log": "/var/folders/pt/xbq_fv915rx9wtnmww8npc0w0000gn/T/holdout-sr-app-packed-build-98985.log"
+		},
+		"live-feed-ssr/default": {
+			"event": "built",
+			"ms": 614,
+			"marklessCalls": 0,
+			"options": null,
+			"log": "/var/folders/pt/xbq_fv915rx9wtnmww8npc0w0000gn/T/holdout-live-feed-ssr-default-build-98985.log"
+		},
+		"live-feed-ssr/packed": {
+			"event": "built",
+			"ms": 642,
+			"marklessCalls": 1,
+			"options": "{\"experimentalNativePacking\":true}",
+			"log": "/var/folders/pt/xbq_fv915rx9wtnmww8npc0w0000gn/T/holdout-live-feed-ssr-packed-build-98985.log"
+		},
+		"router-app/default": {
+			"event": "built",
+			"ms": 603,
+			"marklessCalls": 0,
+			"options": null,
+			"log": "/var/folders/pt/xbq_fv915rx9wtnmww8npc0w0000gn/T/holdout-router-app-default-build-98985.log"
+		},
+		"router-app/packed": {
+			"event": "built",
+			"ms": 655,
+			"marklessCalls": 1,
+			"options": "{\"experimentalNativePacking\":true}",
+			"log": "/var/folders/pt/xbq_fv915rx9wtnmww8npc0w0000gn/T/holdout-router-app-packed-build-98985.log"
+		}
+	},
+	"notes": []
+}

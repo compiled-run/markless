@@ -2,7 +2,7 @@ import { state } from '@markless/core';
 
 export function App() @{
 	let items = state([]);
-	let chosen = state('');
+	let _chosen = state('');
 
 	<main>
 		<ul>
@@ -12,6 +12,6 @@ export function App() @{
 				<li class="empty">No items yet</li>
 			}
 		</ul>
-		<button type="button" data-add onClick={() => chosen = 'x'}>Add</button>
+		<button type="button" data-add onClick={() => _chosen = 'x'}>Add</button>
 	</main>
 }

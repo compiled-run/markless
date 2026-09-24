@@ -13,6 +13,33 @@ import {
 
 type Node = BaseNode & Record<string, unknown>;
 
+const GAP = String.raw`(?:\s|/\*[\s\S]*?\*/|//[^\n]*\n)*`;
+const MEMBER_TAG = new RegExp(
+	`<${GAP}[\\p{ID_Start}$_][\\p{ID_Continue}$\\u200C\\u200D]*${GAP}\\.`,
+	'u',
+);
+const packNamePatterns = new WeakMap<ReadonlyMap<string, string>, RegExp>();
+
+/** False only when no parse could find a pack tag; escapes in names or specifiers force the parse. */
+export function mayContainIconTags(source: string, options: ResolvedIconsOptions): boolean {
+	if (!MEMBER_TAG.test(source)) return false;
+	if (source.includes('\\')) return true;
+	if (![...options.importSources].some((importSource) => source.includes(importSource)))
+		return false;
+	let packNames = packNamePatterns.get(options.packs);
+	if (!packNames) {
+		const names = [...options.packs.keys()].map((name) =>
+			name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+		);
+		packNames = new RegExp(
+			`(?<![\\p{ID_Continue}$])(?:${names.join('|')})(?![\\p{ID_Continue}$])`,
+			'u',
+		);
+		packNamePatterns.set(options.packs, packNames);
+	}
+	return packNames.test(source);
+}
+
 export async function transformTsrx(
 	source: string,
 	file: string,
@@ -20,6 +47,7 @@ export async function transformTsrx(
 	loader: CollectionLoader,
 	diagnostic?: (message: string) => void,
 ): Promise<string | undefined> {
+	if (!mayContainIconTags(source, options)) return undefined;
 	const result = parse(source, { lang: 'tsx', sourceType: 'module' });
 	const fatal = result.diagnostics.find((diagnostic) => diagnostic.severity === 'error');
 	if (fatal) throw new Error(`@markless/icons: ${file}: ${fatal.message}`);
@@ -130,7 +158,8 @@ function memberName(node: Node): { parts: string[] } | undefined {
 
 function attributeSpans(attributes: Node[]): AttributeSpan[] {
 	return attributes.map((attribute) => {
-		if (attribute.type === 'JSXSpreadAttribute') return { start: attribute.start, end: attribute.end };
+		if (attribute.type === 'JSXSpreadAttribute')
+			return { start: attribute.start, end: attribute.end };
 		const value = attribute.value as Node | null;
 		return {
 			name: String((attribute.name as Node).name),
@@ -152,5 +181,7 @@ function walk(node: Node, visitor: (node: Node) => void): void {
 }
 
 function isNode(value: unknown): value is Node {
-	return Boolean(value && typeof value === 'object' && 'type' in value && 'start' in value && 'end' in value);
+	return Boolean(
+		value && typeof value === 'object' && 'type' in value && 'start' in value && 'end' in value,
+	);
 }

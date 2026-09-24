@@ -11,24 +11,10 @@ import {
 	protocolRowSegment,
 } from '../../serializer/src/protocol-constants.ts';
 import { marklessRowComponentMint } from '../src/fns/row-component-mint.ts';
-import {
-	marklessOwningSurface,
-	renderRepeatRowComponent,
-	type PrerenderDataSurface,
-} from '../src/prerender/evaluator.ts';
+import type { PrerenderDataSurface } from '../src/prerender/evaluator.ts';
+import { renderRepeatRowComponent } from '../src/prerender/row-component-render.ts';
+import { marklessOwningSurface } from '../src/prerender/owning-surface.ts';
 import type { ResumeDomElement, ResumeKeyedRepeatRecord } from '../src/resume-types.ts';
-
-/**
- * A component row on a page composed out of ISLANDS.
- *
- * The `@for` is authored inside an island, so two things the single-module path
- * never had to answer come up at once: the container has to be resumed with a
- * render-data surface at all - the composed route's resume entry is the only
- * place one exists - and the surface it hands over is the PAGE's, whose own
- * components map holds the route and nothing else. The component that owns the
- * row lives one import down, under the island's prefix, and the row's symbols
- * have to be spelled in that prefix or the island's loader never answers them.
- */
 
 const ISLAND = protocolIslandSegment(0);
 
@@ -37,9 +23,9 @@ test('a composed route resumes its container with the page render-data surface',
 		'import Island from "./island.tsrx";\n\n<Island />\n',
 		'/src/pages/demo.mdx',
 	);
-	const resumeEntry = route.slice(route.indexOf('export async function resumeContainerEvent'));
-
-	expect(resumeEntry).toContain('renderData: marklessMdxRenderData');
+	expect(route).toMatch(
+		/resumeFromPayloadDocument\(\{[^}]*\brenderData: marklessMdxRenderData\s*,?\s*\}\)/,
+	);
 });
 
 test('a row component owned by an island is reached through the composed page surface', async () => {
@@ -62,13 +48,14 @@ test('a row component owned by an island is reached through the composed page su
 	expect(rendered.html).toBe('<li>alpha<button>x</button></li>');
 });
 
+// The island prefix leads the row's ids, as it does on a served row, and is not spelled again inside the key.
 test("a minted island row spells its symbols in the island's own prefix", async () => {
 	const page = fixture();
 
 	await page.rows(['a']);
 
 	expect(page.symbolIds()).toEqual([
-		`${ISLAND}${protocolRowSegment(`${ISLAND}a`)}c0:symbol:toggle`,
+		`${ISLAND}${protocolRowSegment('a')}c0:symbol:toggle`,
 	]);
 });
 
@@ -89,11 +76,6 @@ const ITEMS: Readonly<Record<string, Item>> = {
 	b: { id: 'b', label: 'bravo' },
 };
 
-/**
- * The mint as the resume runtime holds it: bound to one container's graph, page
- * and registrar, driven the way `wireKeyedRepeats` drives it - build every
- * unserved key, then place what came back.
- */
 function fixture() {
 	const list = el('UL');
 	list.ownerDocument = { createElement: () => templateElement() };
@@ -150,7 +132,6 @@ const REPEAT = {
 	rowEvents: [],
 } as unknown as ResumeKeyedRepeatRecord;
 
-/** The page an MDX route composes from one island child - the shape resume hands the mint. */
 function composedPage(): PrerenderDataSurface {
 	const parts: ReadonlyArray<MdxRoutePart> = [{ kind: 'component', componentIndex: 0 }];
 	return createMdxRenderDataSurface(parts, [
@@ -302,7 +283,6 @@ function textOf(node: Node | undefined): string {
 	return node.nodeType === 3 ? (node.data ?? '') : node.childNodes.map(textOf).join('');
 }
 
-// The one DOM service the mint asks for: a template whose innerHTML parses.
 function templateElement() {
 	let content: { childNodes: Node[] } = { childNodes: [] };
 	return {

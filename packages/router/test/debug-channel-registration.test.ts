@@ -174,7 +174,14 @@ describe('router debug registration', () => {
 			'data-markless-router-link': '',
 		});
 		const previousDocument = (globalThis as any).document;
-		(globalThis as any).document = { currentScript: { closest: () => root } };
+		const bridgeDocument: any = {
+			currentScript: { closest: () => root },
+			listeners: new Map(),
+			addEventListener(name: string, listener: unknown) {
+				this.listeners.set(name, listener);
+			},
+		};
+		(globalThis as any).document = bridgeDocument;
 		(globalThis as any).location = {
 			href: 'http://router.test/',
 			origin: 'http://router.test',
@@ -187,7 +194,7 @@ describe('router debug registration', () => {
 		} finally {
 			(globalThis as any).document = previousDocument;
 		}
-		expect(root.listeners.has('click')).toBe(true);
+		expect(bridgeDocument.listeners.has('click')).toBe(true);
 		expect(debugChannel()?.explainInteraction(link as never, 'click')).toMatchObject({
 			kind: 'router-delegation',
 			source: 'ssr-link-bridge',
@@ -249,7 +256,14 @@ describe('router debug registration', () => {
 			'data-markless-router-link': '',
 		});
 		const previousDocument = (globalThis as any).document;
-		(globalThis as any).document = { currentScript: { closest: () => root } };
+		const bridgeDocument: any = {
+			currentScript: { closest: () => root },
+			listeners: new Map(),
+			addEventListener(name: string, listener: unknown) {
+				this.listeners.set(name, listener);
+			},
+		};
+		(globalThis as any).document = bridgeDocument;
 		(globalThis as any).location = {
 			href: 'http://router.test/',
 			origin: 'http://router.test',
@@ -264,7 +278,7 @@ describe('router debug registration', () => {
 			(globalThis as any).document = previousDocument;
 		}
 
-		expect(root.listeners.has('click')).toBe(true);
+		expect(bridgeDocument.listeners.has('click')).toBe(true);
 		expect(debugChannel()?.explainInteraction(link as never, 'click')).toMatchObject({
 			kind: 'router-delegation',
 			source: 'ssr-link-bridge',
@@ -307,15 +321,20 @@ describe('router debug registration', () => {
 				},
 			};
 			const previousDocument = (globalThis as { document?: unknown }).document;
-			(globalThis as { document?: unknown }).document = {
+			const bridgeDocument = {
 				currentScript: { closest: () => root },
+				listeners: new Map<string, unknown>(),
+				addEventListener(name: string, listener: unknown) {
+					this.listeners.set(name, listener);
+				},
 			};
+			(globalThis as { document?: unknown }).document = bridgeDocument;
 			try {
 				expect(() => new Function(source)()).not.toThrow();
 			} finally {
 				(globalThis as { document?: unknown }).document = previousDocument;
 			}
-			expect(root.listeners.has('click')).toBe(true);
+			expect(bridgeDocument.listeners.has('click')).toBe(true);
 		},
 	);
 });

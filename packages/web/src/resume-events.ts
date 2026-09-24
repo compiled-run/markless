@@ -7,7 +7,8 @@ import {
 	type MarklessRowScope,
 	type MarklessScopedGraph,
 } from './fns/instance-scope.ts';
-import { marklessNoteControlEdits } from './control-edit-hold.ts';
+import { marklessCodedError } from './coded-error.ts';
+import { marklessEditableControl, marklessNoteControlEdits } from './control-edit-hold.ts';
 import type { OverlayFocusOriginHost } from './overlay-handoff.ts';
 import type {
 	ElementHandleRegistry,
@@ -74,6 +75,10 @@ type ExecutionLogGlobal = typeof globalThis & {
  * resets the page to `<body>`. Such a hold lands only if the document fell back
  * to its body - focus that some other element claimed is left alone.
  *
+ * A field, though, is not focused while the dispatch still has writes waiting
+ * on its commit: the call is made once that commit lands, so the value and
+ * caret the field is focused with are the ones the handler wrote.
+ *
  * Only elements a handler reached through the runtime get this.
  *
  * Reaching through the runtime has two spellings, because an overlay's closing
@@ -117,6 +122,7 @@ const pendingFocus = new Map<
 		readonly took: boolean;
 	}
 >();
+let openCommitPending: (() => boolean) | undefined;
 
 function installFocusShim(target: HandleElement | undefined): void {
 	if (!target || typeof target.focus !== 'function' || target[NATIVE_FOCUS]) return;
@@ -127,7 +133,9 @@ function installFocusShim(target: HandleElement | undefined): void {
 			configurable: true,
 			writable: true,
 			value(options?: FocusOptions) {
-				native(options);
+				// Uncommitted writes land first, so focus never arrives on text about to change.
+				const held = openCommitPending?.() && marklessEditableControl(target);
+				if (!held) native(options);
 				// A call outside a dispatch has no commit to wait for. Inside one, the
 				// last call is the one the handler meant, whether the target refused it
 				// or took it: the commit can undo either.
@@ -161,17 +169,17 @@ export function marklessHandleFocusReader(
 ): (handleIdOrName: string) => ResumeElementHandleValue {
 	return (handleIdOrName) => {
 		const value = read(handleIdOrName);
-		if (Array.isArray(value)) for (const item of value) reachThroughRuntime(item as HandleElement);
+		if (Array.isArray(value))
+			for (const item of value) reachThroughRuntime(item as HandleElement);
 		else reachThroughRuntime(value as HandleElement | undefined);
 		return value;
 	};
 }
 
-/** Opens the window in which this dispatch's refused `focus()` is held for its commit. */
-export function marklessBeginFocusCommit(): number {
-	nextFocusDispatch += 1;
-	openFocusDispatch = nextFocusDispatch;
-	return openFocusDispatch;
+/** Opens the window in which this dispatch's `focus()` is held for its commit; `commitPending` says writes still await it. */
+export function marklessBeginFocusCommit(commitPending?: () => boolean): number {
+	openCommitPending = commitPending;
+	return (openFocusDispatch = ++nextFocusDispatch);
 }
 
 /**
@@ -181,17 +189,17 @@ export function marklessBeginFocusCommit(): number {
  * already fired, and the rows a keyed repeat re-inserted are back in place.
  */
 export function marklessEndFocusCommit(dispatch: number): void {
-	if (openFocusDispatch === dispatch) openFocusDispatch = 0;
+	if (openFocusDispatch === dispatch) {
+		openFocusDispatch = 0;
+		openCommitPending = undefined;
+	}
 	const held = pendingFocus.get(dispatch);
 	if (!held) return;
 	pendingFocus.delete(dispatch);
 	if (held.target.isConnected === false) return;
 	// A hold whose call took is landed only when the commit dropped focus to the
 	// body: an element that claimed focus in the meantime keeps it.
-	if (
-		held.took &&
-		held.target.ownerDocument?.activeElement !== held.target.ownerDocument?.body
-	)
+	if (held.took && held.target.ownerDocument?.activeElement !== held.target.ownerDocument?.body)
 		return;
 	held.target[NATIVE_FOCUS]?.call(held.target, held.options);
 }
@@ -220,20 +228,14 @@ const EDITABLE_PRELOAD_EVENT_NAMES = [
 	'keypress',
 	'beforeinput',
 	'input',
+	'change',
 	'click',
 	'pointerdown',
 	'pointerup',
 ];
 
-function focusPreloadEventNames(element: {
-	readonly tagName?: unknown;
-	readonly isContentEditable?: unknown;
-}): ReadonlyArray<string> {
-	const tagName = typeof element.tagName === 'string' ? element.tagName.toUpperCase() : '';
-	return element.isContentEditable === true ||
-		tagName === 'INPUT' ||
-		tagName === 'TEXTAREA' ||
-		tagName === 'SELECT'
+function focusPreloadEventNames(element: object): ReadonlyArray<string> {
+	return marklessEditableControl(element)
 		? EDITABLE_PRELOAD_EVENT_NAMES
 		: FOCUS_PRELOAD_EVENT_NAMES;
 }
@@ -260,7 +262,7 @@ export function createEventWiring(input: {
 	) => Promise<void>;
 	readonly activateBehaviorsFromTrigger: (hostNodeId: string) => Promise<void> | undefined;
 	readonly behaviorHostIdsForAncestors: (element: ResumeDomElement | undefined) => string[];
-	readonly registerDelegatedEventRecord?: ResumeRuntimeInput['registerDelegatedEventRecord'];
+	readonly delegatedTriggers?: ResumeRuntimeInput['delegatedTriggers'];
 }) {
 	const readHandle = marklessHandleFocusReader(input.elementHandles.get);
 	const eventRecords = new WeakMap<ResumeDomElement, Map<string, ResumeEventRecord>>();
@@ -305,20 +307,18 @@ export function createEventWiring(input: {
 		const added = held
 			? record.symbolIds.filter((symbolId) => !held.symbolIds.includes(symbolId))
 			: [];
-		if (held && held !== record && added.length > 0) {
-			byName.set(record.eventName, {
-				...held,
-				...(held.syncPolicy ? {} : record.syncPolicy ? { syncPolicy: record.syncPolicy } : {}),
-				symbolIds: [...held.symbolIds, ...added],
-			});
-			input.eventTypes.add(record.eventName);
-			input.registerDelegatedEventRecord?.(element, record);
-			wantPreload(record.eventName);
-			return;
-		}
-		byName.set(record.eventName, record);
+		byName.set(
+			record.eventName,
+			held && held !== record && added.length > 0
+				? {
+						...held,
+						syncPolicy: held.syncPolicy ?? record.syncPolicy,
+						symbolIds: [...held.symbolIds, ...added],
+					}
+				: record,
+		);
 		input.eventTypes.add(record.eventName);
-		input.registerDelegatedEventRecord?.(element, record);
+		input.delegatedTriggers?.registerEventRecord(element, record);
 		wantPreload(record.eventName);
 		if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
 			trackDebug(
@@ -420,6 +420,7 @@ export function createEventWiring(input: {
 		}
 		byName.set(match.rowEvent.eventName, match);
 		input.eventTypes.add(match.rowEvent.eventName);
+		input.delegatedTriggers?.registerRowEventName(match.rowEvent.eventName);
 		if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
 			trackDebug(
 				recordDebugInteraction(
@@ -458,7 +459,13 @@ export function createEventWiring(input: {
 		if (!attached && !ignoredDisposed && !rowAnchor)
 			throw unmatchedDispatchError(event, selector);
 		const bubbles = event.bubbles !== false;
-		const path = collectDispatchPath(target, event.type, eventRecords, rowEventRecords, bubbles);
+		const path = collectDispatchPath(
+			target,
+			event.type,
+			eventRecords,
+			rowEventRecords,
+			bubbles,
+		);
 		if (path.length === 0) {
 			if (ignoredDisposed) return;
 			// A capture listener on the container receives a non-bubbling event from
@@ -484,7 +491,7 @@ export function createEventWiring(input: {
 			if (rowAnchor) return;
 			throw unmatchedDispatchError(event, selector);
 		}
-		const propagation = trackPropagationStops(event);
+		const propagation = trackPropagationStops(event, options.propagationStopped);
 		let stopAfterElement: ResumeDomElement | undefined;
 		const releaseControlEdits = marklessNoteControlEdits(target);
 		try {
@@ -527,31 +534,110 @@ export function createEventWiring(input: {
 		selector: string,
 		stopsImmediately?: () => boolean,
 	): Promise<void> {
+		await runRecordSymbols(
+			element,
+			eventRecord,
+			eventRecord.hostNodeId,
+			event,
+			options,
+			selector,
+			marklessExecutionLogSnapshot(),
+			stopsImmediately,
+			async () => {
+				for (const hostNodeId of [
+					...input.behaviorHostIdsForAncestors(element),
+					eventRecord.hostNodeId,
+				]) {
+					const activation = input.activateBehaviorsFromTrigger(hostNodeId);
+					if (activation) await activation;
+				}
+				await settleWriteObservers();
+				// Which rendered row this record belongs to. A bound symbol's id names
+				// only the component edge, so without this the handler for row B would
+				// spell the same node as the handler for row A - the write lands
+				// nowhere, or worse, on the wrong row.
+				return { rowScope: marklessRecordRowScope(eventRecord.hostNodeId, input.graph) };
+			},
+		);
+	}
+	async function dispatchRowEvent(
+		element: ResumeDomElement,
+		match: ResumeRowEventMatch,
+		event: ResumeDomEvent,
+		options: ResumeDispatchOptions,
+		stopsImmediately?: () => boolean,
+	): Promise<void> {
 		const beforeExecution = marklessExecutionLogSnapshot();
-		if (eventRecord.syncPolicy && !options.syncPolicyAlreadyApplied)
-			runPolicy?.(eventRecord.syncPolicy, input.graph, event);
+		const repeats = await import('./resume-keyed-repeats.ts');
+		const { repeat, rowKey, rowEvent } = match;
+		const item = () => repeats.findRepeatItemByKey(input.graph, repeat, rowKey);
+		// The row is out of the document AND its item is out of the collection, so
+		// this record has no item left to act on. The walk carries on, so an
+		// enclosing record still answers the gesture rather than it being dropped.
+		if (!match.rowRoot.parentElement && item() === undefined) return;
+		await runRecordSymbols(
+			element,
+			rowEvent,
+			repeat.parentHostNodeId,
+			event,
+			options,
+			describeResumeEventTarget(element),
+			beforeExecution,
+			stopsImmediately,
+			async () => {
+				await settleWriteObservers();
+				repeats.validateOneRepeat(input.graph, repeat);
+				// A nested row's instance also names the items of the rows enclosing it.
+				return {
+					locals: {
+						...(repeat as { readonly locals?: () => object }).locals?.(),
+						[repeat.itemName]: item(),
+					},
+				};
+			},
+		);
+	}
+	// What the graph's write observers are already loading. A handler's write
+	// is answered synchronously only by an observer whose module has arrived,
+	// so a gesture that got here first would read its own write stale.
+	async function settleWriteObservers(): Promise<void> {
+		const settling = input.graph.settleWriteObservers?.();
+		if (settling) await settling;
+	}
+	// A view record and a row record run one listener list the same way; only what
+	// is prepared before the first symbol, and which host reports a failure, differ.
+	async function runRecordSymbols(
+		element: ResumeDomElement,
+		record: ResumeEventRecord | ResumeKeyedRepeatRowEvent,
+		hostNodeId: string,
+		event: ResumeDomEvent,
+		options: ResumeDispatchOptions,
+		selector: string,
+		beforeExecution: Set<string> | undefined,
+		stopsImmediately: (() => boolean) | undefined,
+		prepare: () => Promise<{
+			readonly rowScope?: MarklessRowScope | undefined;
+			readonly locals?: Record<string, unknown>;
+		}>,
+	): Promise<void> {
+		if (record.syncPolicy && !options.syncPolicyAlreadyApplied)
+			runPolicy?.(record.syncPolicy, input.graph, event);
 		let activeSymbolId: string | undefined;
+		const report = (error: unknown, symbolId: string | undefined) =>
+			input.reportRuntimeError(error, {
+				phase: 'event',
+				hostNodeId,
+				eventName: record.eventName,
+				symbolId,
+				event,
+				element,
+			});
 		// Opened before the try: beginning the window cannot throw, and the finally
 		// that closes it then needs no guard.
-		const focusCommit = marklessBeginFocusCommit();
+		const focusCommit = marklessBeginFocusCommit(input.graph.hasPendingFlush);
 		try {
 			await input.prepareRuntimeShared();
-			for (const hostNodeId of input.behaviorHostIdsForAncestors(element)) {
-				const activation = input.activateBehaviorsFromTrigger(hostNodeId);
-				if (activation) await activation;
-			}
-			const activation = input.activateBehaviorsFromTrigger(eventRecord.hostNodeId);
-			if (activation) await activation;
-			// What the graph's write observers are already loading. A handler's write
-			// is answered synchronously only by an observer whose module has arrived,
-			// so a gesture that got here first would read its own write stale.
-			const settling = input.graph.settleWriteObservers?.();
-			if (settling) await settling;
-			// Which rendered row this record belongs to. A bound symbol's id names
-			// only the component edge, so without this the handler for row B would
-			// spell the same node as the handler for row A - the write lands
-			// nowhere, or worse, on the wrong row.
-			const rowScope = marklessRecordRowScope(eventRecord.hostNodeId, input.graph);
+			const { rowScope, locals } = await prepare();
 			// A widget rooted inside this row files its handles under the row, which only the row-scoped qualifier reaches.
 			const runSymbol = async (symbolId: string, context: DispatchSymbolContext) =>
 				(await input.loadSymbol(symbolId))({
@@ -569,16 +655,12 @@ export function createEventWiring(input: {
 				try {
 					// The callback channel belongs to this dispatch, so a context that
 					// arrived without one runs on the dispatch's own graph.
-					return await runSymbol(symbolId, { ...context, graph: context.graph ?? input.graph });
-				} catch (error) {
-					await input.reportRuntimeError(error, {
-						phase: 'event',
-						hostNodeId: eventRecord.hostNodeId,
-						eventName: eventRecord.eventName,
-						symbolId,
-						event,
-						element,
+					return await runSymbol(symbolId, {
+						...context,
+						graph: context.graph ?? input.graph,
 					});
+				} catch (error) {
+					await report(error, symbolId);
 					return undefined;
 				}
 			};
@@ -587,132 +669,30 @@ export function createEventWiring(input: {
 				event,
 				element,
 				getElementHandle: readHandle,
+				...(locals ? { locals } : {}),
 			} as DispatchSymbolContext;
 			const invokeCallback = (symbolId: string, args: ReadonlyArray<unknown>) =>
 				invokeSymbol(symbolId, { ...baseContext, args, invokeCallback, invokeSymbol });
-			for (const symbolId of eventRecord.symbolIds) {
+			for (const symbolId of record.symbolIds) {
 				activeSymbolId = symbolId;
 				await runSymbol(symbolId, baseContext);
 				// One element's handlers are one listener list: a handler that calls
-				// stopImmediatePropagation ends it here, before the next one runs.
+				// stopImmediatePropagation ends it here, before the next one runs. The
+				// stopping entry's own writes still commit - the `finally` flushes them.
 				if (stopsImmediately?.()) return;
 			}
 		} catch (error) {
-			await input.reportRuntimeError(error, {
-				phase: 'event',
-				hostNodeId: eventRecord.hostNodeId,
-				eventName: eventRecord.eventName,
-				symbolId: activeSymbolId,
-				event,
-				element,
-			});
+			await report(error, activeSymbolId);
 			throw error;
 		} finally {
 			await input.flushRuntimeGraph();
 			marklessEndFocusCommit(focusCommit);
 			await marklessLogInteraction({
 				eventName: event.type,
-				eventRecord,
+				eventRecord: record,
 				before: beforeExecution,
 				view: input.view,
 				selector,
-				dispatchModuleId: 'web:resume-events',
-			});
-		}
-	}
-	async function dispatchRowEvent(
-		element: ResumeDomElement,
-		match: ResumeRowEventMatch,
-		event: ResumeDomEvent,
-		options: ResumeDispatchOptions,
-		stopsImmediately?: () => boolean,
-	): Promise<void> {
-		const beforeExecution = marklessExecutionLogSnapshot();
-		const { findRepeatItemByKey, readKeyedRepeatCollection, validateOneRepeat } =
-			await import('./resume-keyed-repeats.ts');
-		const { repeat, rowKey, rowEvent } = match;
-		// The row is out of the document AND its item is out of the collection, so
-		// this record has no item left to act on. The walk carries on, so an
-		// enclosing record still answers the gesture rather than it being dropped.
-		if (
-			!match.rowRoot.parentElement &&
-			findRepeatItemByKey(readKeyedRepeatCollection(input.graph, repeat), repeat, rowKey) ===
-				undefined
-		)
-			return;
-		if (rowEvent.syncPolicy && !options.syncPolicyAlreadyApplied)
-			runPolicy?.(rowEvent.syncPolicy, input.graph, event);
-		let activeSymbolId: string | undefined;
-		const focusCommit = marklessBeginFocusCommit();
-		try {
-			await input.prepareRuntimeShared();
-			const settling = input.graph.settleWriteObservers?.();
-			if (settling) await settling;
-			validateOneRepeat(input.graph, repeat);
-			const locals = {
-				[repeat.itemName]: findRepeatItemByKey(
-					readKeyedRepeatCollection(input.graph, repeat),
-					repeat,
-					rowKey,
-				),
-			};
-			// A row's symbol dispatches through the same callback channel a view
-			// event's does; the row's own item locals travel with it.
-			const runSymbol = async (symbolId: string, context: DispatchSymbolContext) =>
-				(await input.loadSymbol(symbolId))({ ...context, invokeCallback, invokeSymbol });
-			const invokeSymbol = async (symbolId: string, context: ResumeSymbolContext) => {
-				try {
-					// The callback channel belongs to this dispatch, so a context that
-					// arrived without one runs on the dispatch's own graph.
-					return await runSymbol(symbolId, { ...context, graph: context.graph ?? input.graph });
-				} catch (error) {
-					await input.reportRuntimeError(error, {
-						phase: 'event',
-						hostNodeId: repeat.parentHostNodeId,
-						eventName: rowEvent.eventName,
-						symbolId,
-						event,
-						element,
-					});
-					return undefined;
-				}
-			};
-			const baseContext = {
-				graph: input.graph,
-				event,
-				element,
-				getElementHandle: readHandle,
-				locals,
-			} as DispatchSymbolContext;
-			const invokeCallback = (symbolId: string, args: ReadonlyArray<unknown>) =>
-				invokeSymbol(symbolId, { ...baseContext, args, invokeCallback, invokeSymbol });
-			for (const symbolId of rowEvent.symbolIds) {
-				activeSymbolId = symbolId;
-				await runSymbol(symbolId, baseContext);
-				// A row host's entries are one listener list too: the entry that calls
-				// stopImmediatePropagation is the last one to run. The stopping entry's
-				// own writes still commit - the `finally` below flushes them.
-				if (stopsImmediately?.()) return;
-			}
-		} catch (error) {
-			await input.reportRuntimeError(error, {
-				phase: 'event',
-				hostNodeId: repeat.parentHostNodeId,
-				eventName: rowEvent.eventName,
-				symbolId: activeSymbolId,
-				event,
-				element,
-			});
-			throw error;
-		} finally {
-			await input.flushRuntimeGraph();
-			marklessEndFocusCommit(focusCommit);
-			await marklessLogInteraction({
-				eventName: event.type,
-				eventRecord: rowEvent,
-				before: beforeExecution,
-				view: input.view,
-				selector: describeResumeEventTarget(element),
 				dispatchModuleId: 'web:resume-events',
 			});
 		}
@@ -744,8 +724,7 @@ function isBoundSymbolId(symbolId: string): boolean {
 function rowScopedSymbolContext(
 	context: DispatchSymbolContext,
 	rowScope: MarklessRowScope,
-): Pick<DispatchSymbolContext, 'graph'> &
-	Partial<Pick<DispatchSymbolContext, 'getElementHandle'>> {
+): Pick<DispatchSymbolContext, 'graph'> & Partial<Pick<DispatchSymbolContext, 'getElementHandle'>> {
 	const graph = marklessRowScopedGraph(context.graph, rowScope) as MarklessScopedGraph;
 	const qualify = graph.marklessQualifyGraphNodeId;
 	const read = context.getElementHandle;
@@ -787,13 +766,10 @@ async function marklessLogInteraction(input: {
 }): Promise<void> {
 	const global = globalThis as ExecutionLogGlobal;
 	if (!global.__mxLog) return;
-	if (global.__mxLogInteraction) {
-		await global.__mxLogInteraction({ ...input, after: new Set(global.__mxLog) });
-		return;
-	}
 	try {
-		const log = await global.__mxLoadLog?.();
-		await log?.logMarklessInteraction?.({ ...input, after: new Set(global.__mxLog) });
+		await (
+			global.__mxLogInteraction ?? (await global.__mxLoadLog?.())?.logMarklessInteraction
+		)?.({ ...input, after: new Set(global.__mxLog) });
 	} catch {
 		// Execution logging is observability only; app dispatch must not depend on it.
 	}
@@ -847,15 +823,17 @@ function collectDispatchPath(
 // ordered symbolIds list, so there IS a same-element listener left for it to
 // drop that stopPropagation alone would not stop. Row hosts and view hosts read
 // the same flag.
-function trackPropagationStops(event: ResumeDomEvent): {
+function trackPropagationStops(
+	event: ResumeDomEvent,
+	initiallyStopped = false,
+): {
 	readonly stopped: () => boolean;
 	readonly stoppedImmediate: () => boolean;
 	readonly release: () => void;
 } {
 	const host = event as unknown as Record<string, unknown>;
-	// An entry capture may have applied the innermost record's stopPropagation
-	// policy before this walk started; the DOM flag is the only trace it leaves.
-	let stopped = host.cancelBubble === true;
+	// Native dispatch can clear cancelBubble before the lazy handoff resumes.
+	let stopped = initiallyStopped || host.cancelBubble === true;
 	// stopImmediatePropagation is the DOM's own answer for several listeners on
 	// ONE element, which is what a handler array and a merged spread handler are:
 	// the rest of this element's list is skipped, not only the ancestors'.
@@ -897,26 +875,24 @@ function trackPropagationStops(event: ResumeDomEvent): {
 		},
 	};
 }
-// Local copy of the resume-locators containsElement: importing that module
-// here regroups the wall-counted chunk graph, which costs more than the
-// duplication saves (T120 measurement; re-confirmed on this tree).
+// Keep locator materialization outside the dispatch module's eager imports.
 function containsElement(root: ResumeDomElement, target: ResumeDomElement): boolean {
 	if (root === target) return true;
+	if (root.contains) return root.contains(target);
 	for (const child of root.childNodes ?? [])
 		if (child.nodeType === 1 && containsElement(child as ResumeDomElement, target)) return true;
 	return false;
 }
 function unmatchedDispatchError(event: ResumeDomEvent, selector: string | undefined): Error {
-	const code = 'MARKLESS_EVENT_DISPATCH_UNMATCHED';
-	const error = new Error(
-		`${code}: No event record matched ${event.type} dispatch${selector ? ` at ${selector}` : ''}.`,
-	) as Error & Record<string, unknown>;
-	error.name = 'RuntimeResumeError';
-	error.code = code;
-	error.phase = 'event';
-	error.eventName = event.type;
-	error.selector = selector;
-	error.dispatchModuleId = 'web:resume-events';
-	error.docsUrl = `https://markless.dev/errors/${code}`;
-	return error;
+	return marklessCodedError(
+		'RuntimeResumeError',
+		'MARKLESS_EVENT_DISPATCH_UNMATCHED',
+		`No event record matched ${event.type} dispatch${selector ? ` at ${selector}` : ''}.`,
+		{
+			phase: 'event',
+			eventName: event.type,
+			selector,
+			dispatchModuleId: 'web:resume-events',
+		},
+	);
 }

@@ -1,0 +1,2488 @@
+{
+  "input": "/private/tmp/markless-docs-execution-Hb6vaU/results.json",
+  "metadata": {
+    "output": "/private/tmp/markless-docs-computed-guard-Lo2aYh/.output",
+    "serverEntrySha256": "8b1bc5e4722a8ea178cf1bf3ba3a774bb301085e79fbe6eed0f26b8d0c2145e3",
+    "metric": "Chrome timeline with captured click and expected DOM mutation marks",
+    "limitation": "Profiling changes execution. Samples can miss short calls and the window includes browser automation and idle time. Coverage describes source regions, not CPU time. Do not use these visits for latency comparisons.",
+    "samples": 1,
+    "cpuRate": 4,
+    "cache": "fresh context per route, CDP HTTP cache disabled, service workers blocked",
+    "browserVersion": "153.0.8010.48"
+  },
+  "limitation": "Instrumented diagnosis, one visit per scenario; not a latency comparison. Nested trace durations must not be summed.",
+  "records": [
+    {
+      "test": "state-counter",
+      "phase": "first-action",
+      "traceFile": "/private/tmp/markless-docs-execution-Hb6vaU/state-counter-0-first-action.trace.json",
+      "windowMs": 89.771,
+      "moduleEvaluation": [
+        {
+          "offsetMs": 30.18,
+          "durationMs": 0.951
+        },
+        {
+          "offsetMs": 74.707,
+          "durationMs": 0.24
+        },
+        {
+          "offsetMs": 42.522,
+          "durationMs": 0.002
+        },
+        {
+          "offsetMs": 31.704,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 33.604,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 45.21,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 56.939,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 60.579,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 60.589,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 62.881,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 71.023,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 81.275,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 81.377,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 87.532,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 88.625,
+          "durationMs": 0.001
+        }
+      ],
+      "compile": 355
+    },
+    {
+      "test": "state-counter",
+      "phase": "repeat-1",
+      "traceFile": "/private/tmp/markless-docs-execution-Hb6vaU/state-counter-0-repeat-1.trace.json",
+      "windowMs": 12.223,
+      "moduleEvaluation": [
+        {
+          "offsetMs": 10.71,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 12.022,
+          "durationMs": 0.001
+        }
+      ],
+      "compile": 1
+    },
+    {
+      "test": "state-counter",
+      "phase": "repeat-2",
+      "traceFile": "/private/tmp/markless-docs-execution-Hb6vaU/state-counter-0-repeat-2.trace.json",
+      "windowMs": 14.194,
+      "moduleEvaluation": [
+        {
+          "offsetMs": 12.626,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 12.668,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 13.546,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 13.87,
+          "durationMs": 0.001
+        }
+      ],
+      "compile": 1
+    },
+    {
+      "test": "state-independent-controls",
+      "phase": "first-action",
+      "traceFile": "/private/tmp/markless-docs-execution-Hb6vaU/state-independent-controls-0-first-action.trace.json",
+      "windowMs": 81.176,
+      "moduleEvaluation": [
+        {
+          "offsetMs": 29.236,
+          "durationMs": 1.03
+        },
+        {
+          "offsetMs": 30.451,
+          "durationMs": 0.002
+        },
+        {
+          "offsetMs": 44.136,
+          "durationMs": 0.002
+        },
+        {
+          "offsetMs": 32.588,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 46.943,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 54.342,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 54.365,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 57.091,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 76.125,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 76.211,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 77.493,
+          "durationMs": 0.001
+        }
+      ],
+      "compile": 355
+    },
+    {
+      "test": "state-independent-controls",
+      "phase": "second-control",
+      "traceFile": "/private/tmp/markless-docs-execution-Hb6vaU/state-independent-controls-0-second-control.trace.json",
+      "windowMs": 19.237,
+      "moduleEvaluation": [
+        {
+          "offsetMs": 17.411,
+          "durationMs": 0.009
+        },
+        {
+          "offsetMs": 16.434,
+          "durationMs": 0.002
+        },
+        {
+          "offsetMs": 17.397,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 19.201,
+          "durationMs": 0.001
+        }
+      ],
+      "compile": 28
+    },
+    {
+      "test": "state-independent-controls",
+      "phase": "return-first",
+      "traceFile": "/private/tmp/markless-docs-execution-Hb6vaU/state-independent-controls-0-return-first.trace.json",
+      "windowMs": 12.948,
+      "moduleEvaluation": [
+        {
+          "offsetMs": 11.228,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 11.276,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 12.08,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 12.091,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 12.868,
+          "durationMs": 0.001
+        }
+      ],
+      "compile": 1
+    },
+    {
+      "test": "state-independent-controls",
+      "phase": "repeat-second",
+      "traceFile": "/private/tmp/markless-docs-execution-Hb6vaU/state-independent-controls-0-repeat-second.trace.json",
+      "windowMs": 16.315,
+      "moduleEvaluation": [
+        {
+          "offsetMs": 15.083,
+          "durationMs": 0.002
+        },
+        {
+          "offsetMs": 15.138,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 16.223,
+          "durationMs": 0.001
+        }
+      ],
+      "compile": 1
+    },
+    {
+      "test": "computed-total",
+      "phase": "first-action",
+      "traceFile": "/private/tmp/markless-docs-execution-Hb6vaU/computed-total-0-first-action.trace.json",
+      "windowMs": 84.659,
+      "moduleEvaluation": [
+        {
+          "offsetMs": 29.592,
+          "durationMs": 0.931
+        },
+        {
+          "offsetMs": 57.284,
+          "durationMs": 0.419
+        },
+        {
+          "offsetMs": 44.552,
+          "durationMs": 0.003
+        },
+        {
+          "offsetMs": 46.176,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 65.85,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 71.647,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 72.399,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 75.036,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 79.235,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 81.055,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 81.069,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 82.979,
+          "durationMs": 0.001
+        }
+      ],
+      "compile": 385
+    },
+    {
+      "test": "computed-total",
+      "phase": "repeat-1",
+      "traceFile": "/private/tmp/markless-docs-execution-Hb6vaU/computed-total-0-repeat-1.trace.json",
+      "windowMs": 16.242,
+      "moduleEvaluation": [
+        {
+          "offsetMs": 14.194,
+          "durationMs": 0.572
+        },
+        {
+          "offsetMs": 14.045,
+          "durationMs": 0.003
+        },
+        {
+          "offsetMs": 14.097,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 15.04,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 15.082,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 15.688,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 16.026,
+          "durationMs": 0.001
+        }
+      ],
+      "compile": 1
+    },
+    {
+      "test": "computed-total",
+      "phase": "repeat-2",
+      "traceFile": "/private/tmp/markless-docs-execution-Hb6vaU/computed-total-0-repeat-2.trace.json",
+      "windowMs": 17.253,
+      "moduleEvaluation": [
+        {
+          "offsetMs": 14.617,
+          "durationMs": 0.002
+        },
+        {
+          "offsetMs": 15.49,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 16.022,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 16.029,
+          "durationMs": 0.001
+        }
+      ],
+      "compile": 1
+    },
+    {
+      "test": "mode-select",
+      "phase": "first-action",
+      "traceFile": "/private/tmp/markless-docs-execution-Hb6vaU/mode-select-0-first-action.trace.json",
+      "windowMs": 84.055,
+      "moduleEvaluation": [
+        {
+          "offsetMs": 31.907,
+          "durationMs": 0.598
+        },
+        {
+          "offsetMs": 34.805,
+          "durationMs": 0.002
+        },
+        {
+          "offsetMs": 36.348,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 36.357,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 36.372,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 36.411,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 41.673,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 41.706,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 41.729,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 41.749,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 48.016,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 48.032,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 49.046,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 58.596,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 61.057,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 62.464,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 68.068,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 68.074,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 69.355,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 69.908,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 70.597,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 76.742,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 76.749,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 76.756,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 77.037,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 77.552,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 78.421,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 78.448,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 78.593,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 79.418,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 79.512,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 80.074,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 81.145,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 81.209,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 81.233,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 81.282,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 81.295,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 82.099,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 82.107,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 82.129,
+          "durationMs": 0.001
+        }
+      ],
+      "compile": 492
+    },
+    {
+      "test": "mode-select",
+      "phase": "repeat-1",
+      "traceFile": "/private/tmp/markless-docs-execution-Hb6vaU/mode-select-0-repeat-1.trace.json",
+      "windowMs": 17.668,
+      "moduleEvaluation": [
+        {
+          "offsetMs": 10.914,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 11.827,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 11.84,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 12.501,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 12.513,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 13.863,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 13.869,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 13.937,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 14.816,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 14.906,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 15.379,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 15.531,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 16.204,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 16.239,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 16.246,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 16.262,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 16.287,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 16.323,
+          "durationMs": 0.001
+        }
+      ],
+      "compile": 17
+    },
+    {
+      "test": "mode-select",
+      "phase": "repeat-2",
+      "traceFile": "/private/tmp/markless-docs-execution-Hb6vaU/mode-select-0-repeat-2.trace.json",
+      "windowMs": 13.534,
+      "moduleEvaluation": [
+        {
+          "offsetMs": 9.785,
+          "durationMs": 0.002
+        },
+        {
+          "offsetMs": 9.825,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 10.527,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 10.537,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 10.545,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 10.552,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 10.656,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 10.668,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 10.755,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 10.772,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 11.786,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 11.81,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 11.831,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 11.837,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 11.848,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 11.889,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 11.91,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 11.915,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 11.925,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 11.959,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 11.965,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 12.82,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 12.825,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 12.882,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 12.901,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 12.911,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 12.916,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 13.332,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 13.373,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 13.378,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 13.425,
+          "durationMs": 0.001
+        }
+      ],
+      "compile": 1
+    },
+    {
+      "test": "accordion",
+      "phase": "first-action",
+      "traceFile": "/private/tmp/markless-docs-execution-Hb6vaU/accordion-0-first-action.trace.json",
+      "windowMs": 171.484,
+      "moduleEvaluation": [
+        {
+          "offsetMs": 33.598,
+          "durationMs": 1.036
+        },
+        {
+          "offsetMs": 128.987,
+          "durationMs": 0.914
+        },
+        {
+          "offsetMs": 165.859,
+          "durationMs": 0.59
+        },
+        {
+          "offsetMs": 152.429,
+          "durationMs": 0.42
+        },
+        {
+          "offsetMs": 124.939,
+          "durationMs": 0.006
+        },
+        {
+          "offsetMs": 36.473,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 38.219,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 38.229,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 38.245,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 38.26,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 43.984,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 50.754,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 50.776,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 52.234,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 68.843,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 71.156,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 76.179,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 77.63,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 77.746,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 80.172,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 94.852,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 96.733,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 100.32,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 101.603,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 101.612,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 112.762,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 113.697,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 113.826,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 116.269,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 116.926,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 119.482,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 120.826,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 120.849,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 120.903,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 120.999,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 124.77,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 124.795,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 124.8,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 124.805,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 126.119,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 127.407,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 127.412,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 127.629,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 128.303,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 128.312,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 128.351,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 128.874,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 128.959,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 130.045,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 130.05,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 130.135,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 130.14,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 130.197,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 131.255,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 131.26,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 131.305,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 132.335,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 132.493,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 132.53,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 132.546,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 132.628,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 133.441,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 133.448,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 134.43,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 134.737,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 135.206,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 136.362,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 136.506,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 138.621,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 138.637,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 138.65,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 139.553,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 140.043,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 140.108,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 140.875,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 140.992,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 141.009,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 141.973,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 141.979,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 141.984,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 142.537,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 142.581,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 142.587,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 143.148,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 143.158,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 143.248,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 143.584,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 143.613,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 143.623,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 143.664,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 143.669,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 143.825,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 144.731,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 144.736,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 144.741,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 145.015,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 145.023,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 145.558,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 145.588,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 146.41,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 146.425,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 146.436,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 146.591,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 146.597,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 147.373,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 147.422,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 148.269,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 148.285,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 148.296,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 148.381,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 149.973,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 150.408,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 150.511,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 150.536,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 151.328,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 151.397,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 151.402,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 151.418,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 152.398,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 152.867,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 152.955,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 152.965,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 153.735,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 153.746,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 153.778,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 153.784,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 153.8,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 153.864,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 153.925,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 154.695,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 154.7,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 154.721,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 154.768,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 154.82,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 154.85,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 155.573,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 155.578,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 155.634,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 155.768,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 157.289,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 157.668,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 157.679,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 157.705,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 157.71,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 157.726,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 157.743,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 157.854,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 157.901,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 157.908,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 157.918,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 158.824,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 159.27,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 159.32,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 159.359,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 159.388,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 159.393,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 159.428,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 159.45,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 160.269,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 160.285,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 160.351,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 160.916,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 161.998,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 162.046,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 163.204,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 163.209,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 164.781,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 164.84,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 164.855,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 164.924,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 164.93,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 165.714,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 165.751,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 166.539,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 166.549,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 166.573,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 166.649,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 166.659,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 166.713,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 167.582,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 167.592,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 167.604,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 167.653,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 168.462,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 168.467,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 168.494,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 168.504,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 168.589,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 169.309,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 170.275,
+          "durationMs": 0.001
+        }
+      ],
+      "compile": 863
+    },
+    {
+      "test": "accordion",
+      "phase": "repeat-1",
+      "traceFile": "/private/tmp/markless-docs-execution-Hb6vaU/accordion-0-repeat-1.trace.json",
+      "windowMs": 38.522,
+      "moduleEvaluation": [
+        {
+          "offsetMs": 11.443,
+          "durationMs": 0.677
+        },
+        {
+          "offsetMs": 34.108,
+          "durationMs": 0.032
+        },
+        {
+          "offsetMs": 18.181,
+          "durationMs": 0.002
+        },
+        {
+          "offsetMs": 11.337,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 11.366,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 11.403,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 12.22,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 12.235,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 12.252,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 13.795,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 13.846,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 13.91,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 14.83,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 15.288,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 15.381,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 15.41,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 16.208,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 16.245,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 16.279,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 16.342,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 16.347,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 16.97,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 17.151,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 17.167,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 17.176,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 17.206,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 17.242,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 17.84,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 18.188,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 18.193,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 18.199,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 18.478,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 18.502,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 18.776,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 19.252,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 19.257,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 19.285,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 19.315,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 19.336,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 19.397,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 19.409,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 20.028,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 20.222,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 20.238,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 20.308,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 21.096,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 21.164,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 21.234,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 21.96,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 21.971,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 22.075,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 22.132,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 22.16,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 22.168,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 23.011,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 23.053,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 23.058,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 23.104,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 23.85,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 23.865,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 23.991,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 24.755,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 24.787,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 24.83,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 24.88,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 25.521,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 25.839,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 26.442,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 26.447,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 26.694,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 26.738,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 27.101,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 27.171,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 27.264,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 27.272,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 27.304,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 27.37,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 28.378,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 28.392,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 28.442,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 28.447,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 28.491,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 28.533,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 28.554,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 28.566,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 28.571,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 28.576,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 28.596,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 29.623,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 29.666,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 29.678,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 29.725,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 29.737,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 29.742,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 29.761,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 29.766,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 29.8,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 29.819,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 29.824,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 30.937,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 30.973,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 31.035,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 31.04,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 31.558,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 31.58,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 31.587,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 31.632,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 31.657,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 32.086,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 33.063,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 33.102,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 34.223,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 34.32,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 35.302,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 35.311,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 35.32,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 35.566,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 35.988,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 36.063,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 36.068,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 36.092,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 36.17,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 36.223,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 37.064,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 37.12,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 37.145,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 37.52,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 37.531,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 37.578,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 37.594,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 37.622,
+          "durationMs": 0.001
+        }
+      ],
+      "compile": 1
+    },
+    {
+      "test": "accordion",
+      "phase": "repeat-2",
+      "traceFile": "/private/tmp/markless-docs-execution-Hb6vaU/accordion-0-repeat-2.trace.json",
+      "windowMs": 33.879,
+      "moduleEvaluation": [
+        {
+          "offsetMs": 29.396,
+          "durationMs": 0.362
+        },
+        {
+          "offsetMs": 16.853,
+          "durationMs": 0.324
+        },
+        {
+          "offsetMs": 11.797,
+          "durationMs": 0.009
+        },
+        {
+          "offsetMs": 23.271,
+          "durationMs": 0.004
+        },
+        {
+          "offsetMs": 9.185,
+          "durationMs": 0.002
+        },
+        {
+          "offsetMs": 9.404,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 9.919,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 10.845,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 10.944,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 11.725,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 11.852,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 12.777,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 13.246,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 13.27,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 13.347,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 13.372,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 13.388,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 13.459,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 14.809,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 14.847,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 14.974,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 15.765,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 15.791,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 15.86,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 15.865,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 16.804,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 16.847,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 17.206,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 17.212,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 17.343,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 17.445,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 18.381,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 18.532,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 18.543,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 18.619,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 18.638,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 18.675,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 18.685,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 19.357,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 19.362,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 19.401,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 19.406,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 19.439,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 19.446,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 19.451,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 19.5,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 19.581,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 20.86,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 20.939,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 20.95,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 20.993,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 22.319,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 22.958,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 23.246,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 23.688,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 23.804,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 23.827,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 23.886,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 24.613,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 24.667,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 24.717,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 24.726,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 24.781,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 25.649,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 25.678,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 25.683,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 26.028,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 26.14,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 26.172,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 26.225,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 26.261,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 26.282,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 27.08,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 27.153,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 27.201,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 27.248,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 27.831,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 27.841,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 28.049,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 28.631,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 28.759,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 29.327,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 29.334,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 29.388,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 29.762,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 29.767,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 29.895,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 30.869,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 30.874,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 30.89,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 31.432,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 31.471,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 31.494,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 31.524,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 32.024,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 32.144,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 32.149,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 32.917,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 32.939,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 32.949,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 32.955,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 33.004,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 33.063,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 33.726,
+          "durationMs": 0.001
+        },
+        {
+          "offsetMs": 33.736,
+          "durationMs": 0.001
+        }
+      ],
+      "compile": 1
+    }
+  ]
+}

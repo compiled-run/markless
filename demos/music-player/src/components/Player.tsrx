@@ -13,7 +13,14 @@ export function Player({ currentSong, isPlaying, onPlayToggle, onPrevious, onNex
 			<p class="time-duration">0:00</p>
 		</div>
 		<div class="play-control">
-			<button type="button" class="skip-back" aria-label="Previous track" onClick={onPrevious}>‹</button>
+			<button
+				type="button"
+				class="skip-back"
+				aria-label="Previous track"
+				onClick={onPrevious}
+			>
+				‹
+			</button>
 			<button
 				type="button"
 				class={isPlaying ? 'play active' : 'play'}
@@ -21,12 +28,14 @@ export function Player({ currentSong, isPlaying, onPlayToggle, onPrevious, onNex
 				onClick={onPlayToggle}
 			>
 				@if (isPlaying) {
-					<span class="play-icon">❚❚</span>
+					<span class="play-icon">❚❚</span>;
 				} @else {
-					<span class="play-icon">▶</span>
+					<span class="play-icon">▶</span>;
 				}
 			</button>
-			<button type="button" class="skip-forward" aria-label="Next track" onClick={onNext}>›</button>
+			<button type="button" class="skip-forward" aria-label="Next track" onClick={onNext}>
+				›
+			</button>
 		</div>
-	</div>
+	</div>;
 }

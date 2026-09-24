@@ -27,6 +27,7 @@ import {
 } from '../component-edge-instance.ts';
 import { asNodes, getIdentifierName, walkNode, type AnyNode } from '../ast/nodes.ts';
 import { parseJavaScriptModule } from '../js-ast.ts';
+import { createSourceMemo } from './semantic-graph/shared-ast.ts';
 import {
 	createSymbolSourceSemanticsReader,
 	type SymbolSourceSemanticsReader,
@@ -91,7 +92,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 		);
 		const reads = eventReads(
 			input.stateLowering?.reads,
-			[sourceSpan, ...inlined.spans],
+			[sourceSpan, ...inlined.spans, ...(event.handlerDefinitionSpans ?? [])],
 			source,
 			semanticsReader,
 		);
@@ -138,7 +139,11 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 			);
 			const reads = eventReads(
 				input.stateLowering?.reads,
-				[prop.sourceSpan, ...inlined.spans],
+				[
+					prop.sourceSpan,
+					...inlined.spans,
+					...('definitionSpans' in prop ? (prop.definitionSpans ?? []) : []),
+				],
 				source,
 				semanticsReader,
 			);
@@ -454,10 +459,9 @@ export function planBoundSymbolResolver(
 					branchScopeIds: edge.branchScopeIds,
 					keyedRepeatScopeIds: edge.keyedRepeatScopeIds,
 				}));
-				const instancePath = componentEdgeInstancePath(
-					path,
-					input.semanticGraph.componentEdges,
-				);
+				const instancePath =
+					componentEdgeInstancePath(path, input.semanticGraph.componentEdges) +
+					(symbol.innerInstancePath ?? '');
 				rows.push({
 					id: boundSymbolId(symbol.symbolId, ancestry),
 					// Imported symbols keep the child-local ID in the bound record ID,
@@ -682,7 +686,15 @@ function sharedMethodSource(
  * answers the question exactly, and a source it cannot read falls back to a
  * delimiter scan, which is still right wherever the old first-`)` scan was.
  */
+const sharedMethodParameterEndMemo = createSourceMemo<number>(2048);
+
 function sharedMethodParameterEnd(propertySource: string, open: number): number {
+	return sharedMethodParameterEndMemo(String(open), propertySource, () =>
+		scanSharedMethodParameterEnd(propertySource, open),
+	);
+}
+
+function scanSharedMethodParameterEnd(propertySource: string, open: number): number {
 	const moduleSource = `const __marklessSharedMethod = { ${propertySource} };`;
 	const offset = moduleSource.indexOf(propertySource);
 	try {
@@ -1126,18 +1138,33 @@ function elementHandleReads(
 // survive into the emitted symbol (the runtime resolves the handle by name).
 // Walks the handler AST so optional calls, nested callbacks, and lookalike
 // string/comment text keep authored source semantics.
-function collectElementHandleCalls(
-	source: string,
-	elementHandles: ReadonlyArray<{ readonly name: string }>,
-): ReadonlyArray<{
+type ElementHandleCall = {
 	readonly handleName: string;
 	readonly method: string;
 	readonly source: string;
 	readonly argumentSources: ReadonlyArray<string>;
 	readonly offset: number;
 	readonly endOffset: number;
-}> {
+};
+
+const elementHandleCallsMemo = createSourceMemo<ReadonlyArray<ElementHandleCall>>(2048);
+
+function collectElementHandleCalls(
+	source: string,
+	elementHandles: ReadonlyArray<{ readonly name: string }>,
+): ReadonlyArray<ElementHandleCall> {
 	if (elementHandles.length === 0) return [];
+	return elementHandleCallsMemo(
+		elementHandles.map((handle) => handle.name).join(','),
+		source,
+		() => scanElementHandleCalls(source, elementHandles),
+	);
+}
+
+function scanElementHandleCalls(
+	source: string,
+	elementHandles: ReadonlyArray<{ readonly name: string }>,
+): ReadonlyArray<ElementHandleCall> {
 	const names = new Set(elementHandles.map((handle) => handle.name));
 	const calls: Array<{
 		handleName: string;

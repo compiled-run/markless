@@ -118,7 +118,7 @@ export default function ${shape.name}() @{
 				environment: 'client',
 			});
 			const ids = files.flatMap((item) =>
-				item.type === 'chunk' ? item.moduleIds.map((id) => id.replace(/^\0/, '')) : [],
+				item.type === 'chunk' ? item.moduleIds.map((id) => (id.startsWith('\0') ? id.slice(1) : id)) : [],
 			);
 			for (const symbol of compiled.manifest.symbols.filter(
 				(symbol) => symbol.kind === 'event-handler',

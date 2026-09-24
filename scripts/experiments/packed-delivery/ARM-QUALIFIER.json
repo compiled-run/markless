@@ -1,0 +1,559 @@
+{
+  "candidate": "/private/tmp/markless-docs-arm-final-3G2uAA/.output",
+  "stablePreview": "/private/tmp/markless-docs-inline-3bKoIN/.output",
+  "files": {
+    "before": "/private/tmp/markless-docs-cold-zmj2gt/results.json",
+    "after": "/private/tmp/markless-docs-cold-0zr46S/results.json",
+    "execution": "/private/tmp/markless-docs-execution-uDH0B9/results.json",
+    "attribution": "/private/tmp/markless-arm-qualifier-final-attribution.json",
+    "navigation": "/private/tmp/markless-docs-navigation-sWBJdD/results.json",
+    "scalar": "/private/tmp/markless-scalar-path-app-wB1O8P/results.json",
+    "typeErasure": "/private/tmp/markless-arm-types-erasure.json"
+  },
+  "protocol": {
+    "samplesPerBuildCondition": 10,
+    "browser": "153.0.8010.53",
+    "transport": "Generated Nitro docs through a Brotli quality 5 JS proxy; localhost HTTP/1.1; HTML stream compressed with Brotli quality 5",
+    "cache": "CDP Network.setCacheDisabled true; fresh browser context per first interaction",
+    "serviceWorkers": "blocked",
+    "conditions": "normal; constrained 150ms, 5Mbps, 4x CPU",
+    "metric": "captured click event to expected DOM mutation; not compositor paint",
+    "order": "previous build then candidate; no owned build/test/profiling jobs overlapped",
+    "limitation": "Other desktop applications and idle preexisting processes remained open; not a device-independent timing guarantee."
+  },
+  "timings": [
+    {
+      "condition": "normal",
+      "phases": [
+        {
+          "phase": "first",
+          "before": {
+            "median": 32.75,
+            "mad": 0.5999999046325684,
+            "min": 31.40000009536743,
+            "max": 34.10000014305115
+          },
+          "after": {
+            "median": 32.90000009536743,
+            "mad": 0.49999988079071045,
+            "min": 32.299999952316284,
+            "max": 35.59999990463257
+          },
+          "threshold": 10,
+          "meaningful": false
+        },
+        {
+          "phase": "second",
+          "before": {
+            "median": 14.75,
+            "mad": 0.25,
+            "min": 14.200000047683716,
+            "max": 16.399999856948853
+          },
+          "after": {
+            "median": 14.899999976158142,
+            "mad": 0.1499999761581421,
+            "min": 14.200000047683716,
+            "max": 15.899999856948853
+          },
+          "threshold": 10,
+          "meaningful": false
+        },
+        {
+          "phase": "third",
+          "before": {
+            "median": 15,
+            "mad": 0.10000002384185791,
+            "min": 13.399999856948853,
+            "max": 15.300000190734863
+          },
+          "after": {
+            "median": 14.950000047683716,
+            "mad": 0.1499999761581421,
+            "min": 14.700000047683716,
+            "max": 17
+          },
+          "threshold": 10,
+          "meaningful": false
+        }
+      ]
+    },
+    {
+      "condition": "constrained",
+      "phases": [
+        {
+          "phase": "first",
+          "before": {
+            "median": 78.45000004768372,
+            "mad": 1.6500000953674316,
+            "min": 48,
+            "max": 83.10000014305115
+          },
+          "after": {
+            "median": 79.44999992847443,
+            "mad": 3.4000000953674316,
+            "min": 71.59999990463257,
+            "max": 92.70000004768372
+          },
+          "threshold": 10,
+          "meaningful": false
+        },
+        {
+          "phase": "second",
+          "before": {
+            "median": 10.549999952316284,
+            "mad": 0.7999999523162842,
+            "min": 6.3999998569488525,
+            "max": 13.200000047683716
+          },
+          "after": {
+            "median": 9.700000047683716,
+            "mad": 1,
+            "min": 7.900000095367432,
+            "max": 11.900000095367432
+          },
+          "threshold": 10,
+          "meaningful": false
+        },
+        {
+          "phase": "third",
+          "before": {
+            "median": 9.549999952316284,
+            "mad": 1.1999999284744263,
+            "min": 7,
+            "max": 13.799999952316284
+          },
+          "after": {
+            "median": 10.649999976158142,
+            "mad": 1.1500000953674316,
+            "min": 7,
+            "max": 13.099999904632568
+          },
+          "threshold": 10,
+          "meaningful": false
+        }
+      ]
+    }
+  ],
+  "delivery": {
+    "before": {
+      "visits": 20,
+      "actions": 60,
+      "failedActions": 0,
+      "errors": [],
+      "frameworkRequestCounts": [
+        5
+      ],
+      "frameworkTransferBytes": {
+        "median": 235035,
+        "mad": 0,
+        "min": 235035,
+        "max": 235035
+      },
+      "httpCacheHits": 0,
+      "actionStartedScripts": 0,
+      "pendingAtFirstClick": [
+        {
+          "condition": "normal",
+          "count": 0
+        },
+        {
+          "condition": "constrained",
+          "count": 9
+        }
+      ]
+    },
+    "after": {
+      "visits": 20,
+      "actions": 60,
+      "failedActions": 0,
+      "errors": [],
+      "frameworkRequestCounts": [
+        5
+      ],
+      "frameworkTransferBytes": {
+        "median": 235506,
+        "mad": 0,
+        "min": 235506,
+        "max": 235506
+      },
+      "httpCacheHits": 0,
+      "actionStartedScripts": 0,
+      "pendingAtFirstClick": [
+        {
+          "condition": "normal",
+          "count": 0
+        },
+        {
+          "condition": "constrained",
+          "count": 10
+        }
+      ]
+    }
+  },
+  "initializers": [
+    {
+      "test": "state-counter",
+      "before": [
+        {
+          "phase": "before-input",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "phase": "first-action",
+          "initializers": 15,
+          "exportDeclarationBytes": 99078
+        },
+        {
+          "phase": "repeat-1",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "phase": "repeat-2",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        }
+      ],
+      "after": [
+        {
+          "phase": "before-input",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "phase": "first-action",
+          "initializers": 13,
+          "exportDeclarationBytes": 99145
+        },
+        {
+          "phase": "repeat-1",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "phase": "repeat-2",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "state-header-then-counter",
+      "before": [
+        {
+          "phase": "before-input",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "phase": "static-header",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "phase": "first-action",
+          "initializers": 15,
+          "exportDeclarationBytes": 99078
+        },
+        {
+          "phase": "repeat-1",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "phase": "repeat-2",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        }
+      ],
+      "after": [
+        {
+          "phase": "before-input",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "phase": "static-header",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "phase": "first-action",
+          "initializers": 13,
+          "exportDeclarationBytes": 99145
+        },
+        {
+          "phase": "repeat-1",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "phase": "repeat-2",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "state-independent-controls",
+      "before": [
+        {
+          "phase": "before-input",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "phase": "first-action",
+          "initializers": 15,
+          "exportDeclarationBytes": 99078
+        },
+        {
+          "phase": "second-control",
+          "initializers": 3,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "phase": "return-first",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "phase": "repeat-second",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        }
+      ],
+      "after": [
+        {
+          "phase": "before-input",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "phase": "first-action",
+          "initializers": 13,
+          "exportDeclarationBytes": 99145
+        },
+        {
+          "phase": "second-control",
+          "initializers": 3,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "phase": "return-first",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "phase": "repeat-second",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "computed-total",
+      "before": [
+        {
+          "phase": "before-input",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "phase": "first-action",
+          "initializers": 56,
+          "exportDeclarationBytes": 98539
+        },
+        {
+          "phase": "repeat-1",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "phase": "repeat-2",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        }
+      ],
+      "after": [
+        {
+          "phase": "before-input",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "phase": "first-action",
+          "initializers": 56,
+          "exportDeclarationBytes": 98606
+        },
+        {
+          "phase": "repeat-1",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "phase": "repeat-2",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "mode-select",
+      "before": [
+        {
+          "phase": "before-input",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "phase": "first-action",
+          "initializers": 72,
+          "exportDeclarationBytes": 104934
+        },
+        {
+          "phase": "repeat-1",
+          "initializers": 1,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "phase": "repeat-2",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        }
+      ],
+      "after": [
+        {
+          "phase": "before-input",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "phase": "first-action",
+          "initializers": 72,
+          "exportDeclarationBytes": 105001
+        },
+        {
+          "phase": "repeat-1",
+          "initializers": 1,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "phase": "repeat-2",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "accordion",
+      "before": [
+        {
+          "phase": "before-input",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "phase": "first-action",
+          "initializers": 117,
+          "exportDeclarationBytes": 99871
+        },
+        {
+          "phase": "repeat-1",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "phase": "repeat-2",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        }
+      ],
+      "after": [
+        {
+          "phase": "before-input",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "phase": "first-action",
+          "initializers": 117,
+          "exportDeclarationBytes": 99938
+        },
+        {
+          "phase": "repeat-1",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "phase": "repeat-2",
+          "initializers": 0,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    }
+  ],
+  "tests": {
+    "focused": 22,
+    "closureAndDependency": 13,
+    "rootTypes": "pass",
+    "docsTypes": "pass",
+    "docsTests": 64,
+    "docsDoctor": "pass",
+    "affectedSuite": {
+      "pass": 1562,
+      "fail": 6,
+      "remaining": "existing byte-budget/negative-budget tests"
+    },
+    "coverageVisits": 18,
+    "navigationScenarios": 6,
+    "nativePropagationRoutes": 5,
+    "packageBuild": "pass"
+  },
+  "budgets": {
+    "largestRuntimeChunk": {
+      "before": 5714,
+      "after": 5676,
+      "limits": [
+        5403,
+        5435
+      ]
+    },
+    "csrDownload": {
+      "before": 140900,
+      "after": 140854,
+      "limit": 140187
+    },
+    "csrStartup": {
+      "before": 14930,
+      "after": 14927,
+      "limit": 14696
+    },
+    "ssrDownload": {
+      "before": 84822,
+      "after": 84855,
+      "limit": 84771
+    },
+    "ssrStartup": {
+      "before": 4319,
+      "after": 4318,
+      "limit": 4327
+    },
+    "ssrNavigation": {
+      "before": 25711,
+      "after": 25702,
+      "limit": 25502
+    }
+  },
+  "typeErasure": {
+    "module": "packages/web/src/resume-handle-qualifier.ts",
+    "equal": true,
+    "beforeBytes": 255,
+    "afterBytes": 255,
+    "sha256": "ba00ae001b23b7555d327bb994d580112b16780c438d9edda1c4780f8a7ab500",
+    "limitation": "Single registration module compilation; whole-docs hashes differ, including generated route preload table order."
+  },
+  "wholeDocsHashEquivalence": false
+}

@@ -4,6 +4,6 @@ Fetch arrival times in milliseconds from each run epoch:
 
 | Lane | Session | Recommendations | Catalog | Reviews |
 | --- | ---: | ---: | ---: | ---: |
-| markless | 42.6 | 105.6 | 43.0 | 43.0 |
-| query | 97.1 | 161.1 | 161.4 | 161.8 |
-| loader | 36.9 | 99.1 | 36.9 | 36.9 |
+| markless | 37.1 | 99.9 | 37.4 | 37.5 |
+| query | 77.2 | 141.8 | 142.3 | 142.4 |
+| loader | 31.4 | 93.1 | 31.4 | 31.5 |

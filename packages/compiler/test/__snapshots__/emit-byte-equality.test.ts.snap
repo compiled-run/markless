@@ -93,7 +93,6 @@ exports[`compileTsrxModule emitted artifacts stay byte-equal across public-rende
             "locators": [
               {
                 "hostNodeId": "h1",
-                "strategy": "arm-relative",
                 "index": 0,
                 "tagName": "p"
               }
@@ -106,7 +105,6 @@ exports[`compileTsrxModule emitted artifacts stay byte-equal across public-rende
             "locators": [
               {
                 "hostNodeId": "h3",
-                "strategy": "arm-relative",
                 "index": 0,
                 "tagName": "p"
               }
@@ -119,7 +117,6 @@ exports[`compileTsrxModule emitted artifacts stay byte-equal across public-rende
             "locators": [
               {
                 "hostNodeId": "h2",
-                "strategy": "arm-relative",
                 "index": 0,
                 "tagName": "p"
               }
@@ -134,7 +131,7 @@ exports[`compileTsrxModule emitted artifacts stay byte-equal across public-rende
     ]
   },
   "stateScript": "<script type=\\"markless/state\\">{\\"version\\":1,\\"cells\\":[{\\"graphNodeId\\":\\"state:query\\",\\"name\\":\\"query\\",\\"valueKind\\":\\"scalar\\",\\"value\\":{\\"version\\":1,\\"root\\":\\"Ada\\",\\"records\\":[]}}],\\"computed\\":[{\\"graphNodeId\\":\\"computed:details\\",\\"name\\":\\"details\\",\\"async\\":true,\\"dependencies\\":[{\\"graphNodeId\\":\\"state:query\\",\\"path\\":[]}]}],\\"sharedDefinitions\\":[]}</script>",
-  "viewScript": "<script type=\\"markless/view\\">{\\"version\\":1,\\"asyncRunners\\":{\\"computed:details\\":\\"symbol:1\\"},\\"locators\\":[{\\"hostNodeId\\":\\"h0\\",\\"strategy\\":\\"dom-order\\",\\"index\\":0,\\"tagName\\":\\"main\\"}],\\"events\\":[],\\"domUpdates\\":[{\\"hostNodeId\\":\\"h1\\",\\"source\\":\\"details.title\\",\\"graphNodeId\\":\\"computed:details\\",\\"path\\":[\\"title\\"],\\"target\\":{\\"kind\\":\\"text\\"},\\"symbolId\\":\\"symbol:0\\"}],\\"behaviors\\":[],\\"elementHandles\\":[],\\"keyedRepeats\\":[],\\"branches\\":[],\\"asyncBoundaries\\":[{\\"id\\":\\"boundary:0\\",\\"runnerGraphNodeId\\":\\"computed:details\\",\\"initiallyServedArm\\":1,\\"startAnchor\\":{\\"strategy\\":\\"dom-order-comment\\",\\"index\\":0},\\"endAnchor\\":{\\"strategy\\":\\"dom-order-comment\\",\\"index\\":1},\\"asyncReads\\":[{\\"source\\":\\"details.title\\",\\"graphNodeId\\":\\"computed:details\\",\\"path\\":[\\"title\\"],\\"runnerSymbolId\\":\\"symbol:1\\"}],\\"armRecords\\":[{\\"locators\\":[{\\"hostNodeId\\":\\"h1\\",\\"strategy\\":\\"arm-relative\\",\\"index\\":0,\\"tagName\\":\\"p\\"}],\\"events\\":[],\\"behaviors\\":[],\\"elementHandles\\":[]},{\\"locators\\":[{\\"hostNodeId\\":\\"h3\\",\\"strategy\\":\\"arm-relative\\",\\"index\\":0,\\"tagName\\":\\"p\\"}],\\"events\\":[],\\"behaviors\\":[],\\"elementHandles\\":[]},{\\"locators\\":[{\\"hostNodeId\\":\\"h2\\",\\"strategy\\":\\"arm-relative\\",\\"index\\":0,\\"tagName\\":\\"p\\"}],\\"events\\":[],\\"behaviors\\":[],\\"elementHandles\\":[]}],\\"updateSymbolId\\":\\"symbol:2\\"}]}</script>"
+  "viewScript": "<script type=\\"markless/view\\">{\\"version\\":1,\\"asyncRunners\\":{\\"computed:details\\":\\"symbol:1\\"},\\"locators\\":[{\\"hostNodeId\\":\\"h0\\",\\"strategy\\":\\"dom-order\\",\\"index\\":0,\\"tagName\\":\\"main\\"}],\\"events\\":[],\\"domUpdates\\":[{\\"hostNodeId\\":\\"h1\\",\\"source\\":\\"details.title\\",\\"graphNodeId\\":\\"computed:details\\",\\"path\\":[\\"title\\"],\\"target\\":{\\"kind\\":\\"text\\"},\\"symbolId\\":\\"symbol:0\\"}],\\"behaviors\\":[],\\"elementHandles\\":[],\\"keyedRepeats\\":[],\\"branches\\":[],\\"asyncBoundaries\\":[{\\"id\\":\\"boundary:0\\",\\"runnerGraphNodeId\\":\\"computed:details\\",\\"initiallyServedArm\\":1,\\"startAnchor\\":{\\"strategy\\":\\"dom-order-comment\\",\\"index\\":0},\\"endAnchor\\":{\\"strategy\\":\\"dom-order-comment\\",\\"index\\":1},\\"asyncReads\\":[{\\"source\\":\\"details.title\\",\\"graphNodeId\\":\\"computed:details\\",\\"path\\":[\\"title\\"],\\"runnerSymbolId\\":\\"symbol:1\\"}],\\"armRecords\\":[{\\"locators\\":[{\\"hostNodeId\\":\\"h1\\",\\"index\\":0,\\"tagName\\":\\"p\\"}],\\"events\\":[],\\"behaviors\\":[],\\"elementHandles\\":[]},{\\"locators\\":[{\\"hostNodeId\\":\\"h3\\",\\"index\\":0,\\"tagName\\":\\"p\\"}],\\"events\\":[],\\"behaviors\\":[],\\"elementHandles\\":[]},{\\"locators\\":[{\\"hostNodeId\\":\\"h2\\",\\"index\\":0,\\"tagName\\":\\"p\\"}],\\"events\\":[],\\"behaviors\\":[],\\"elementHandles\\":[]}],\\"updateSymbolId\\":\\"symbol:2\\"}]}</script>"
 }",
     "protocolState": "{
   "version": 1,
@@ -225,7 +222,6 @@ exports[`compileTsrxModule emitted artifacts stay byte-equal across public-rende
           "locators": [
             {
               "hostNodeId": "h1",
-              "strategy": "arm-relative",
               "index": 0,
               "tagName": "p"
             }
@@ -238,7 +234,6 @@ exports[`compileTsrxModule emitted artifacts stay byte-equal across public-rende
           "locators": [
             {
               "hostNodeId": "h3",
-              "strategy": "arm-relative",
               "index": 0,
               "tagName": "p"
             }
@@ -251,7 +246,6 @@ exports[`compileTsrxModule emitted artifacts stay byte-equal across public-rende
           "locators": [
             {
               "hostNodeId": "h2",
-              "strategy": "arm-relative",
               "index": 0,
               "tagName": "p"
             }
@@ -272,7 +266,7 @@ exports[`compileTsrxModule emitted artifacts stay byte-equal across public-rende
 }",
     "renderDataModuleSource": "export const marklessRenderData = {"passId":"render-data","filename":"src/AsyncBoundary.tsrx","root":{"componentName":"App","templateId":"template:App"},"chunks":[{"id":"async:boundary:0:arm:try","kind":"async-arm","componentName":"App","statics":["<p><!--markless-slot:0-->","</p>"],"hosts":[{"hostNodeId":"h1","tagName":"p","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"text","residue":{"kind":"graph-read","graphNodeId":"computed:details","path":["title"]},"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]},{"id":"async:boundary:0:arm:pending","kind":"async-arm","componentName":"App","statics":["<p>Loading</p>"],"hosts":[{"hostNodeId":"h3","tagName":"p","coordinate":{"kind":"child-index","path":[0]}}],"slots":[]},{"id":"async:boundary:0:arm:catch","kind":"async-arm","componentName":"App","statics":["<p>Broken</p>"],"hosts":[{"hostNodeId":"h2","tagName":"p","coordinate":{"kind":"child-index","path":[0]}}],"slots":[]},{"id":"template:App","kind":"template","componentName":"App","statics":["<main><!--markless-slot:0-->","</main>"],"hosts":[{"hostNodeId":"h0","tagName":"main","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"async","boundaryId":"boundary:0","armTemplateIds":{"try":"async:boundary:0:arm:try","pending":"async:boundary:0:arm:pending","catch":"async:boundary:0:arm:catch"},"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]}],"hosts":[{"id":"h0","tagName":"main","hostNodeId":"h0"},{"id":"h1","tagName":"p","asyncBoundaryId":"boundary:0","asyncBoundaryArm":0,"hostNodeId":"h1"},{"id":"h2","tagName":"p","asyncBoundaryId":"boundary:0","asyncBoundaryArm":2,"hostNodeId":"h2"},{"id":"h3","tagName":"p","asyncBoundaryId":"boundary:0","asyncBoundaryArm":1,"hostNodeId":"h3"}],"initialValues":[{"graphNodeId":"state:query","value":{"kind":"constant","value":"Ada"}}],"branches":[],"repeats":[],"boundaries":[{"boundaryId":"boundary:0","anchorOrder":0,"runnerGraphNodeId":"computed:details","initiallyServedArm":1,"reads":[{"source":"details.title","graphNodeId":"computed:details","path":["title"]}],"unresolvedSources":[],"armChunkIds":{"try":"async:boundary:0:arm:try","pending":"async:boundary:0:arm:pending","catch":"async:boundary:0:arm:catch"},"protocolSupported":true}],"interactions":[]};",
     "ssrModuleSource": "import { renderSsrData } from '@markless/web/fns/ssr-data';
-import { marklessSsrRunAsyncComputed, marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrAsyncArm, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+import { marklessSsrRunAsyncComputed, marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessSsrAsyncArm, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView, marklessSsrHandedDown } from '@markless/web/fns/ssr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
 import { marklessSsrReadPublicPath } from '@markless/web/fns/html';
 const marklessSsrPropEvents = [];
@@ -302,7 +296,7 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 		view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) },
 		elementCount: marklessSsrComposition.elementCount,
 		propEvents: marklessSsrPropEvents,
-		externalSymbolIds: marklessSsrComposition.externalSymbolIds,
+		externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, props),
 		structure: marklessSsrRendered.structure,
 		structureTokens: marklessSsrRendered.structureTokens,
 	};
@@ -528,7 +522,7 @@ function createUnknownSymbolError(id) {
 }",
     "renderDataModuleSource": "export const marklessRenderData = {"passId":"render-data","filename":"src/BehaviorElement.tsrx","root":{"componentName":"App","templateId":"template:App"},"chunks":[{"id":"template:App","kind":"template","componentName":"App","statics":["<section><!--markless-slot:0-->","</section>"],"hosts":[{"hostNodeId":"h0","tagName":"section","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"text","residue":{"kind":"graph-read","graphNodeId":"state:label","path":[]},"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]}],"hosts":[{"id":"h0","tagName":"section","hostNodeId":"h0"}],"initialValues":[{"graphNodeId":"state:label","value":{"kind":"constant","value":"ready"}}],"branches":[],"repeats":[],"boundaries":[],"interactions":[]};",
     "ssrModuleSource": "import { renderSsrData } from '@markless/web/fns/ssr-data';
-import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView, marklessSsrHandedDown } from '@markless/web/fns/ssr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
 import { marklessSsrReadPublicPath } from '@markless/web/fns/html';
 const install = (label) => (host) => { host.dataset.label = label; };
@@ -558,7 +552,7 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 		view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) },
 		elementCount: marklessSsrComposition.elementCount,
 		propEvents: marklessSsrPropEvents,
-		externalSymbolIds: marklessSsrComposition.externalSymbolIds,
+		externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, props),
 		structure: marklessSsrRendered.structure,
 		structureTokens: marklessSsrRendered.structureTokens,
 	};
@@ -819,7 +813,7 @@ function createUnknownSymbolError(id) {
 }",
     "renderDataModuleSource": "export const marklessRenderData = {"passId":"render-data","filename":"src/Branches.tsrx","root":{"componentName":"App","templateId":"template:App"},"chunks":[{"id":"branch:branch-site:0:arm:0","kind":"branch-arm","componentName":"App","statics":["<p>Shown</p>"],"hosts":[{"hostNodeId":"h1","tagName":"p","coordinate":{"kind":"child-index","path":[0]}}],"slots":[]},{"id":"branch:branch-site:0:arm:1","kind":"branch-arm","componentName":"App","statics":["<p>Hidden</p>"],"hosts":[{"hostNodeId":"h2","tagName":"p","coordinate":{"kind":"child-index","path":[0]}}],"slots":[]},{"id":"template:App","kind":"template","componentName":"App","statics":["<section><!--markless-slot:0-->","</section>"],"hosts":[{"hostNodeId":"h0","tagName":"section","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"branch","branchSiteId":"branch-site:0","armTemplateIds":["branch:branch-site:0:arm:0","branch:branch-site:0:arm:1"],"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]}],"hosts":[{"id":"h0","tagName":"section","hostNodeId":"h0"},{"id":"h1","tagName":"p","hostNodeId":"h1"},{"id":"h2","tagName":"p","hostNodeId":"h2"}],"initialValues":[{"graphNodeId":"state:open","value":{"kind":"constant","value":true}}],"branches":[{"branchSiteId":"branch-site:0","kind":"if","testSource":"open","testReads":[{"graphNodeId":"state:open","path":[]}],"armChunkIds":["branch:branch-site:0:arm:0","branch:branch-site:0:arm:1"],"anchorOrder":0,"update":"range"}],"repeats":[],"boundaries":[],"interactions":[]};",
     "ssrModuleSource": "import { renderSsrData } from '@markless/web/fns/ssr-data';
-import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView, marklessSsrHandedDown } from '@markless/web/fns/ssr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
 import { marklessSsrReadPublicPath } from '@markless/web/fns/html';
 const marklessSsrPropEvents = [];
@@ -847,7 +841,7 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 		view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) },
 		elementCount: marklessSsrComposition.elementCount,
 		propEvents: marklessSsrPropEvents,
-		externalSymbolIds: marklessSsrComposition.externalSymbolIds,
+		externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, props),
 		structure: marklessSsrRendered.structure,
 		structureTokens: marklessSsrRendered.structureTokens,
 	};
@@ -1031,7 +1025,7 @@ function createUnknownSymbolError(id) {
 }",
     "renderDataModuleSource": "export const marklessRenderData = {"passId":"render-data","filename":"src/GuardClauses.tsrx","root":{"componentName":"App","templateId":"template:App"},"chunks":[{"id":"template:App","kind":"template","componentName":"App","statics":["<button><!--markless-slot:0-->","</button>"],"hosts":[{"hostNodeId":"h0","tagName":"button","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"text","residue":{"kind":"graph-read","graphNodeId":"state:count","path":[]},"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]}],"hosts":[{"id":"h0","tagName":"button","hostNodeId":"h0"}],"initialValues":[{"graphNodeId":"state:count","value":{"kind":"constant","value":0}}],"branches":[],"repeats":[],"boundaries":[],"interactions":[{"eventId":"event:0","hostNodeId":"h0","eventName":"click","symbolIds":["symbol:0"]}]};",
     "ssrModuleSource": "import { renderSsrData } from '@markless/web/fns/ssr-data';
-import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView, marklessSsrHandedDown } from '@markless/web/fns/ssr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
 import { marklessSsrReadPublicPath } from '@markless/web/fns/html';
 const marklessSsrPropEvents = [];
@@ -1059,7 +1053,7 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 		view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) },
 		elementCount: marklessSsrComposition.elementCount,
 		propEvents: marklessSsrPropEvents,
-		externalSymbolIds: marklessSsrComposition.externalSymbolIds,
+		externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, props),
 		structure: marklessSsrRendered.structure,
 		structureTokens: marklessSsrRendered.structureTokens,
 	};
@@ -1234,7 +1228,7 @@ function createUnknownSymbolError(id) {
 }",
     "renderDataModuleSource": "export const marklessRenderData = {"passId":"render-data","filename":"src/HelperState.tsrx","root":{"componentName":"App","templateId":"template:App"},"chunks":[{"id":"template:App","kind":"template","componentName":"App","statics":["<button><!--markless-slot:0-->","</button>"],"hosts":[{"hostNodeId":"h0","tagName":"button","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"text","residue":{"kind":"graph-read","graphNodeId":"state:App.count.createCount.count","path":[]},"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]}],"hosts":[{"id":"h0","tagName":"button","hostNodeId":"h0"}],"initialValues":[{"graphNodeId":"state:App.count.createCount.count","value":{"kind":"constant","value":5}}],"branches":[],"repeats":[],"boundaries":[],"interactions":[{"eventId":"event:0","hostNodeId":"h0","eventName":"click","symbolIds":["symbol:0"]}]};",
     "ssrModuleSource": "import { renderSsrData } from '@markless/web/fns/ssr-data';
-import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView, marklessSsrHandedDown } from '@markless/web/fns/ssr';
 import { marklessCloneState } from '@markless/web/fns/state';
 import { marklessSsrReadPublicPath } from '@markless/web/fns/html';
 function createCount() { const count = state(5); return count; }
@@ -1263,7 +1257,7 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 		view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) },
 		elementCount: marklessSsrComposition.elementCount,
 		propEvents: marklessSsrPropEvents,
-		externalSymbolIds: marklessSsrComposition.externalSymbolIds,
+		externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, props),
 		structure: marklessSsrRendered.structure,
 		structureTokens: marklessSsrRendered.structureTokens,
 	};
@@ -1402,7 +1396,7 @@ function createUnknownSymbolError(id) {
     "renderDataModuleSource": "export const marklessRenderData = {"passId":"render-data","filename":"src/ImportedParent.tsrx","root":{"componentName":"App","templateId":"template:App"},"chunks":[{"id":"template:App","kind":"template","componentName":"App","statics":["<main><!--markless-slot:0-->","</main>"],"hosts":[{"hostNodeId":"h0","tagName":"main","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"child-component","componentEdgeId":"component-edge:0","childComponentName":"Child","childTemplateId":"template:Child","coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]}],"hosts":[{"id":"h0","tagName":"main","hostNodeId":"h0"}],"initialValues":[{"graphNodeId":"state:active","value":{"kind":"constant","value":true}}],"branches":[],"repeats":[],"boundaries":[],"interactions":[]};",
     "ssrModuleSource": "import __marklessSsrComponent0 from "./ImportedChild.tsrx";
 import { renderSsrData } from '@markless/web/fns/ssr-data';
-import { marklessSsrComponentPart, marklessAssertPresentationalRowChild, marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+import { marklessSsrComponentPart, marklessAssertPresentationalRowChild, marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView, marklessSsrHandedDown } from '@markless/web/fns/ssr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
 import { marklessSsrReadPublicPath } from '@markless/web/fns/html';
 const marklessSsrPropEvents = [];
@@ -1430,7 +1424,7 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 		view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) },
 		elementCount: marklessSsrComposition.elementCount,
 		propEvents: marklessSsrPropEvents,
-		externalSymbolIds: marklessSsrComposition.externalSymbolIds,
+		externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, props),
 		structure: marklessSsrRendered.structure,
 		structureTokens: marklessSsrRendered.structureTokens,
 	};
@@ -1677,7 +1671,7 @@ function createUnknownSymbolError(id) {
 }",
     "renderDataModuleSource": "export const marklessRenderData = {"passId":"render-data","filename":"src/ImportedChild.tsrx","root":{"componentName":"Child","templateId":"template:Child"},"chunks":[{"id":"branch:branch-site:0:arm:0","kind":"branch-arm","componentName":"Child","statics":["<em>Live</em>"],"hosts":[{"hostNodeId":"h1","tagName":"em","coordinate":{"kind":"child-index","path":[0]}}],"slots":[]},{"id":"branch:branch-site:0:arm:1","kind":"branch-arm","componentName":"Child","statics":["<em>Idle</em>"],"hosts":[{"hostNodeId":"h2","tagName":"em","coordinate":{"kind":"child-index","path":[0]}}],"slots":[]},{"id":"template:Child","kind":"template","componentName":"Child","statics":["<span><!--markless-slot:0-->","</span>"],"hosts":[{"hostNodeId":"h0","tagName":"span","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"branch","branchSiteId":"branch-site:0","armTemplateIds":["branch:branch-site:0:arm:0","branch:branch-site:0:arm:1"],"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]}],"hosts":[{"id":"h0","tagName":"span","hostNodeId":"h0"},{"id":"h1","tagName":"em","hostNodeId":"h1"},{"id":"h2","tagName":"em","hostNodeId":"h2"}],"initialValues":[],"branches":[{"branchSiteId":"branch-site:0","kind":"if","testSource":"active","testReads":[{"graphNodeId":"prop:props","path":["active"]}],"armChunkIds":["branch:branch-site:0:arm:0","branch:branch-site:0:arm:1"],"anchorOrder":0,"update":"range"}],"repeats":[],"boundaries":[],"interactions":[]};",
     "ssrModuleSource": "import { renderSsrData } from '@markless/web/fns/ssr-data';
-import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView, marklessSsrHandedDown } from '@markless/web/fns/ssr';
 import { marklessCloneState } from '@markless/web/fns/state';
 import { marklessSsrReadPublicPath } from '@markless/web/fns/html';
 const marklessSsrPropEvents = [];
@@ -1704,7 +1698,7 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 		view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) },
 		elementCount: marklessSsrComposition.elementCount,
 		propEvents: marklessSsrPropEvents,
-		externalSymbolIds: marklessSsrComposition.externalSymbolIds,
+		externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, props),
 		structure: marklessSsrRendered.structure,
 		structureTokens: marklessSsrRendered.structureTokens,
 	};
@@ -2056,7 +2050,7 @@ function createUnknownSymbolError(id) {
 }",
     "renderDataModuleSource": "export const marklessRenderData = {"passId":"render-data","filename":"src/KeyedRepeat.tsrx","root":{"componentName":"App","templateId":"template:App"},"chunks":[{"id":"repeat:repeat:0:row","kind":"repeat-row","componentName":"App","statics":["<article class=\\"","\\"><h2><!--markless-slot:1-->","</h2><button>Choose</button></article>"],"hosts":[{"hostNodeId":"h2","tagName":"article","coordinate":{"kind":"child-index","path":[0]}},{"hostNodeId":"h3","tagName":"h2","coordinate":{"kind":"child-index","path":[0,0]}},{"hostNodeId":"h4","tagName":"button","coordinate":{"kind":"child-index","path":[0,1]}}],"slots":[{"kind":"attribute","name":"class","coordinate":{"kind":"child-index","path":[0]},"residue":{"kind":"authored-expression","source":"chosen === entry.code ? 'picked' : 'plain'"},"alwaysPresent":true,"directClassMatch":{"stateGraphNodeId":"state:chosen","statePath":[],"itemPath":["code"],"trueClass":"picked","falseClass":"plain"},"staticIndex":0},{"kind":"text","residue":{"kind":"repeat-item","repeatId":"repeat:0","path":["title"]},"coordinate":{"kind":"comment-anchor","path":[0,0,0]},"staticIndex":1}]},{"id":"template:App","kind":"template","componentName":"App","statics":["<main><section><!--markless-slot:0-->","</section></main>"],"hosts":[{"hostNodeId":"h0","tagName":"main","coordinate":{"kind":"child-index","path":[0]}},{"hostNodeId":"h1","tagName":"section","coordinate":{"kind":"child-index","path":[0,0]}}],"slots":[{"kind":"repeat","repeatId":"repeat:0","rowTemplateId":"repeat:repeat:0:row","coordinate":{"kind":"comment-anchor","path":[0,0,0]},"staticIndex":0}]}],"hosts":[{"id":"h0","tagName":"main","hostNodeId":"h0"},{"id":"h1","tagName":"section","hostNodeId":"h1"},{"id":"h2","tagName":"article","hostNodeId":"h2"},{"id":"h3","tagName":"h2","hostNodeId":"h3"},{"id":"h4","tagName":"button","hostNodeId":"h4"}],"initialValues":[{"graphNodeId":"state:entries","value":{"kind":"constant","value":[{"code":"a","title":"Alpha"}]}},{"graphNodeId":"state:chosen","value":{"kind":"constant","value":"a"}}],"branches":[],"repeats":[{"repeatId":"repeat:0","parentHostNodeId":"h1","rowHostNodeId":"h2","itemName":"entry","collectionGraphNodeId":"state:entries","collectionPath":[],"keyPath":["code"],"rowChunkId":"repeat:repeat:0:row","rowElementCount":3,"parentPath":[0],"classWrites":[{"source":"chosen === entry.code ? 'picked' : 'plain'","hostPath":[],"stateGraphNodeId":"state:chosen","statePath":[],"itemPath":["code"],"trueClass":"picked","falseClass":"plain"}],"eventControls":[{"eventName":"click","hostPath":[1],"handlerSource":"() => chosen = entry.code","symbolId":"symbol:0","itemContext":{"kind":"keyed-repeat-item","repeatId":"repeat:0","itemName":"entry","keyPath":["code"]}}],"directSupported":true}],"boundaries":[],"interactions":[{"eventId":"event:0","hostNodeId":"h4","eventName":"click","symbolIds":["symbol:0"]}]};",
     "ssrModuleSource": "import { renderSsrData } from '@markless/web/fns/ssr-data';
-import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView, marklessSsrHandedDown } from '@markless/web/fns/ssr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
 import { marklessSsrReadPublicPath } from '@markless/web/fns/html';
 const marklessSsrPropEvents = [];
@@ -2087,7 +2081,7 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 		view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) },
 		elementCount: marklessSsrComposition.elementCount,
 		propEvents: marklessSsrPropEvents,
-		externalSymbolIds: marklessSsrComposition.externalSymbolIds,
+		externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, props),
 		structure: marklessSsrRendered.structure,
 		structureTokens: marklessSsrRendered.structureTokens,
 	};
@@ -2194,7 +2188,7 @@ function createUnknownSymbolError(id) {
 }",
     "renderDataModuleSource": "export const marklessRenderData = {"passId":"render-data","filename":"src/ModuleScopeConstants.tsrx","root":{"componentName":"App","templateId":"template:App"},"chunks":[{"id":"template:App","kind":"template","componentName":"App","statics":["<section","><!--markless-slot:1-->","</section>"],"hosts":[{"hostNodeId":"h0","tagName":"section","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"attribute","name":"data-mode","coordinate":{"kind":"child-index","path":[0]},"residue":{"kind":"authored-expression","source":"labels.mode"},"staticIndex":0},{"kind":"text","residue":{"kind":"authored-expression","source":"labels.title"},"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":1}]}],"hosts":[{"id":"h0","tagName":"section","hostNodeId":"h0"}],"initialValues":[],"branches":[],"repeats":[],"boundaries":[],"interactions":[]};",
     "ssrModuleSource": "import { renderSsrData } from '@markless/web/fns/ssr-data';
-import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView, marklessSsrHandedDown } from '@markless/web/fns/ssr';
 import { marklessCloneState } from '@markless/web/fns/state';
 import { marklessSsrReadPublicPath } from '@markless/web/fns/html';
 const labels = { title: 'Hello', mode: 'compact' };
@@ -2220,7 +2214,7 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 		view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) },
 		elementCount: marklessSsrComposition.elementCount,
 		propEvents: marklessSsrPropEvents,
-		externalSymbolIds: marklessSsrComposition.externalSymbolIds,
+		externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, props),
 		structure: marklessSsrRendered.structure,
 		structureTokens: marklessSsrRendered.structureTokens,
 	};
@@ -2400,7 +2394,7 @@ function createUnknownSymbolError(id) {
 }",
     "renderDataModuleSource": "export const marklessRenderData = {"passId":"render-data","filename":"src/PositionalRepeat.tsrx","root":{"componentName":"App","templateId":"template:App"},"chunks":[{"id":"repeat:repeat:0:row","kind":"repeat-row","componentName":"App","statics":["<li><!--markless-slot:0-->","</li>"],"hosts":[{"hostNodeId":"h1","tagName":"li","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"text","residue":{"kind":"repeat-item","repeatId":"repeat:0","path":["label"]},"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]},{"id":"template:App","kind":"template","componentName":"App","statics":["<ol><!--markless-slot:0-->","</ol>"],"hosts":[{"hostNodeId":"h0","tagName":"ol","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"repeat","repeatId":"repeat:0","rowTemplateId":"repeat:repeat:0:row","coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]}],"hosts":[{"id":"h0","tagName":"ol","hostNodeId":"h0"},{"id":"h1","tagName":"li","hostNodeId":"h1"}],"initialValues":[{"graphNodeId":"state:records","value":{"kind":"constant","value":[{"label":"Zero"}]}}],"branches":[],"repeats":[{"repeatId":"repeat:0","parentHostNodeId":"h0","rowHostNodeId":"h1","itemName":"record","collectionGraphNodeId":"state:records","collectionPath":[],"keyPath":[],"rowChunkId":"repeat:repeat:0:row","rowElementCount":1,"parentPath":[],"directSupported":false}],"boundaries":[],"interactions":[]};",
     "ssrModuleSource": "import { renderSsrData } from '@markless/web/fns/ssr-data';
-import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView, marklessSsrHandedDown } from '@markless/web/fns/ssr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
 import { marklessSsrReadPublicPath } from '@markless/web/fns/html';
 const marklessSsrPropEvents = [];
@@ -2428,7 +2422,7 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 		view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) },
 		elementCount: marklessSsrComposition.elementCount,
 		propEvents: marklessSsrPropEvents,
-		externalSymbolIds: marklessSsrComposition.externalSymbolIds,
+		externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, props),
 		structure: marklessSsrRendered.structure,
 		structureTokens: marklessSsrRendered.structureTokens,
 	};
@@ -2708,7 +2702,7 @@ function createUnknownSymbolError(id) {
 }",
     "renderDataModuleSource": "export const marklessRenderData = {"passId":"render-data","filename":"src/SameModuleChild.tsrx","root":{"componentName":"App","templateId":"template:App"},"chunks":[{"id":"branch:branch-site:0:arm:0","kind":"branch-arm","componentName":"Badge","statics":["<em>Live</em>"],"hosts":[{"hostNodeId":"h1","tagName":"em","coordinate":{"kind":"child-index","path":[0]}}],"slots":[]},{"id":"branch:branch-site:0:arm:1","kind":"branch-arm","componentName":"Badge","statics":["<em>Idle</em>"],"hosts":[{"hostNodeId":"h2","tagName":"em","coordinate":{"kind":"child-index","path":[0]}}],"slots":[]},{"id":"template:Badge","kind":"template","componentName":"Badge","statics":["<span><!--markless-slot:0-->","</span>"],"hosts":[{"hostNodeId":"h0","tagName":"span","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"branch","branchSiteId":"branch-site:0","armTemplateIds":["branch:branch-site:0:arm:0","branch:branch-site:0:arm:1"],"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]},{"id":"template:App","kind":"template","componentName":"App","statics":["<main><!--markless-slot:0-->","</main>"],"hosts":[{"hostNodeId":"h3","tagName":"main","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"child-component","componentEdgeId":"component-edge:0","childComponentName":"Badge","childTemplateId":"template:Badge","coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]}],"hosts":[{"id":"h0","tagName":"span","hostNodeId":"h0"},{"id":"h1","tagName":"em","hostNodeId":"h1"},{"id":"h2","tagName":"em","hostNodeId":"h2"},{"id":"h3","tagName":"main","hostNodeId":"h3"}],"initialValues":[{"graphNodeId":"state:active","value":{"kind":"constant","value":true}}],"branches":[{"branchSiteId":"branch-site:0","kind":"if","testSource":"active","testReads":[{"graphNodeId":"prop:props","path":["active"]}],"armChunkIds":["branch:branch-site:0:arm:0","branch:branch-site:0:arm:1"],"anchorOrder":0,"update":"range"}],"repeats":[],"boundaries":[],"interactions":[]};",
     "ssrModuleSource": "import { renderSsrData } from '@markless/web/fns/ssr-data';
-import { marklessAssertPresentationalRowChild, marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+import { marklessAssertPresentationalRowChild, marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView, marklessSsrHandedDown } from '@markless/web/fns/ssr';
 import { marklessCloneState, marklessSelectStateNodes, marklessStateValue } from '@markless/web/fns/state';
 import { marklessSsrReadPublicPath } from '@markless/web/fns/html';
 const marklessSsrStateValuesBadge = new Map([
@@ -2729,7 +2723,7 @@ async function marklessRenderSsrBadge(props = {}, marklessSsrRenderContext) {
 	const html = marklessSsrRendered.html;
 	const marklessSsrComposition = marklessSsrComposeView(marklessSsrRendered.structure, payloadView, marklessSsrChildren, marklessSsrAsyncSnapshots, marklessSsrIdPrefix);
 	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);
-	return { html, state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots), view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) }, elementCount: marklessSsrComposition.elementCount, propEvents: [], externalSymbolIds: marklessSsrComposition.externalSymbolIds, structure: marklessSsrRendered.structure, structureTokens: marklessSsrRendered.structureTokens };
+	return { html, state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots), view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) }, elementCount: marklessSsrComposition.elementCount, propEvents: [], externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, props), structure: marklessSsrRendered.structure, structureTokens: marklessSsrRendered.structureTokens };
 }
 const marklessSsrPropEvents = [];
 const marklessSsrStateValues = new Map([
@@ -2756,7 +2750,7 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 		view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) },
 		elementCount: marklessSsrComposition.elementCount,
 		propEvents: marklessSsrPropEvents,
-		externalSymbolIds: marklessSsrComposition.externalSymbolIds,
+		externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, props),
 		structure: marklessSsrRendered.structure,
 		structureTokens: marklessSsrRendered.structureTokens,
 	};
@@ -2880,7 +2874,7 @@ function createUnknownSymbolError(id) {
 }",
     "renderDataModuleSource": "export const marklessRenderData = {"passId":"render-data","filename":"src/SpreadAttributes.tsrx","root":{"componentName":"App","templateId":"template:App"},"chunks":[{"id":"template:App","kind":"template","componentName":"App","statics":["<section"," title=\\"Final\\">Hi</section>"],"hosts":[{"hostNodeId":"h0","tagName":"section","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"spread-attributes","coordinate":{"kind":"child-index","path":[0]},"residue":{"kind":"authored-expression","source":"meta"},"excludeNames":["title"],"staticIndex":0}]}],"hosts":[{"id":"h0","tagName":"section","hostNodeId":"h0"}],"initialValues":[],"branches":[],"repeats":[],"boundaries":[],"interactions":[]};",
     "ssrModuleSource": "import { renderSsrData } from '@markless/web/fns/ssr-data';
-import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView, marklessSsrHandedDown } from '@markless/web/fns/ssr';
 import { marklessCloneState } from '@markless/web/fns/state';
 import { marklessSsrReadPublicPath } from '@markless/web/fns/html';
 const marklessSsrPropEvents = [];
@@ -2906,7 +2900,7 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 		view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) },
 		elementCount: marklessSsrComposition.elementCount,
 		propEvents: marklessSsrPropEvents,
-		externalSymbolIds: marklessSsrComposition.externalSymbolIds,
+		externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, props),
 		structure: marklessSsrRendered.structure,
 		structureTokens: marklessSsrRendered.structureTokens,
 	};
@@ -3086,7 +3080,7 @@ function createUnknownSymbolError(id) {
 }",
     "renderDataModuleSource": "export const marklessRenderData = {"passId":"render-data","filename":"src/StateHandlers.tsrx","root":{"componentName":"App","templateId":"template:App"},"chunks":[{"id":"template:App","kind":"template","componentName":"App","statics":["<button><!--markless-slot:0-->","</button>"],"hosts":[{"hostNodeId":"h0","tagName":"button","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"text","residue":{"kind":"graph-read","graphNodeId":"state:count","path":[]},"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]}],"hosts":[{"id":"h0","tagName":"button","hostNodeId":"h0"}],"initialValues":[{"graphNodeId":"state:count","value":{"kind":"constant","value":0}}],"branches":[],"repeats":[],"boundaries":[],"interactions":[{"eventId":"event:0","hostNodeId":"h0","eventName":"click","symbolIds":["symbol:0"]}]};",
     "ssrModuleSource": "import { renderSsrData } from '@markless/web/fns/ssr-data';
-import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView, marklessSsrHandedDown } from '@markless/web/fns/ssr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
 import { marklessSsrReadPublicPath } from '@markless/web/fns/html';
 const marklessSsrPropEvents = [];
@@ -3114,7 +3108,7 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 		view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) },
 		elementCount: marklessSsrComposition.elementCount,
 		propEvents: marklessSsrPropEvents,
-		externalSymbolIds: marklessSsrComposition.externalSymbolIds,
+		externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, props),
 		structure: marklessSsrRendered.structure,
 		structureTokens: marklessSsrRendered.structureTokens,
 	};
@@ -3300,7 +3294,7 @@ function createUnknownSymbolError(id) {
 }",
     "renderDataModuleSource": "export const marklessRenderData = {"passId":"render-data","filename":"src/SyncComputed.tsrx","root":{"componentName":"App","templateId":"template:App"},"chunks":[{"id":"template:App","kind":"template","componentName":"App","statics":["<output><!--markless-slot:0-->","</output>"],"hosts":[{"hostNodeId":"h0","tagName":"output","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"text","residue":{"kind":"graph-read","graphNodeId":"computed:doubled","path":[]},"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]}],"hosts":[{"id":"h0","tagName":"output","hostNodeId":"h0"}],"initialValues":[{"graphNodeId":"state:count","value":{"kind":"constant","value":2}},{"graphNodeId":"computed:doubled","value":{"kind":"symbol-function","symbolId":"symbol:1"}}],"branches":[],"repeats":[],"boundaries":[],"interactions":[]};",
     "ssrModuleSource": "import { renderSsrData } from '@markless/web/fns/ssr-data';
-import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView } from '@markless/web/fns/ssr';
+import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView, marklessSsrHandedDown } from '@markless/web/fns/ssr';
 import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
 import { marklessSsrReadPublicPath } from '@markless/web/fns/html';
 const marklessSsrPropEvents = [];
@@ -3330,7 +3324,7 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 		view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) },
 		elementCount: marklessSsrComposition.elementCount,
 		propEvents: marklessSsrPropEvents,
-		externalSymbolIds: marklessSsrComposition.externalSymbolIds,
+		externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, props),
 		structure: marklessSsrRendered.structure,
 		structureTokens: marklessSsrRendered.structureTokens,
 	};

@@ -1,4 +1,6 @@
-import { parseJavaScriptModule, type JavaScriptAstNode } from '@markless/compiler';
+import type { JavaScriptAstNode } from '@markless/compiler';
+import { parseSync } from 'rolldown/experimental';
+import { calleeOffsets, parseChunkCode, spansAnyOffset } from './chunk-ast.ts';
 
 export function stripEmptyVitePreloadWrappers(code: string): string {
 	const withoutDirectImports = stripDirectEmptyPreloadWrappers(code);
@@ -9,8 +11,10 @@ export function stripEmptyVitePreloadWrappers(code: string): string {
 type ImportedVitePreloadHelper = {
 	readonly importStart: number;
 	readonly importEnd: number;
+	readonly keptImport: string;
 	readonly preloadFunction: string;
 	readonly initFunction: string;
+	readonly keptSpecifiers: ReadonlySet<number>;
 };
 
 const IMPORT_DECLARATION_CANDIDATE_RE = /\bimport\s*\{[\s\S]*?\}\s*from\s*["'][^"']+["'];?/g;
@@ -146,8 +150,9 @@ function stripImportedVitePreloadHelper(code: string): string {
 	const helper = findImportedVitePreloadHelper(code);
 	if (!helper) return code;
 
-	const withoutImport = code.slice(0, helper.importStart) + code.slice(helper.importEnd);
-	if (hasCallableReference(withoutImport, helper.preloadFunction)) {
+	const withoutImport =
+		code.slice(0, helper.importStart) + helper.keptImport + code.slice(helper.importEnd);
+	if (preloadStillCalled(code, withoutImport, helper)) {
 		return code;
 	}
 
@@ -161,6 +166,7 @@ function stripImportedVitePreloadHelper(code: string): string {
 }
 
 function findImportedVitePreloadHelper(code: string): ImportedVitePreloadHelper | undefined {
+	if (!code.includes('__vitePreload') || !code.includes('init_preload_helper')) return undefined;
 	for (const match of code.matchAll(IMPORT_DECLARATION_CANDIDATE_RE)) {
 		const importStart = match.index ?? -1;
 		if (importStart < 0) continue;
@@ -172,23 +178,35 @@ function findImportedVitePreloadHelper(code: string): ImportedVitePreloadHelper 
 
 		let preloadFunction: string | undefined;
 		let initFunction: string | undefined;
-		for (const specifier of asNodes(declaration.specifiers)) {
-			if (specifier.type !== 'ImportSpecifier') continue;
+		const kept: string[] = [];
+		const keptSpecifiers = new Set<number>();
+		for (const [index, specifier] of asNodes(declaration.specifiers).entries()) {
+			if (specifier.type !== 'ImportSpecifier') return undefined;
 
 			const imported = identifierName(specifier.imported as JavaScriptAstNode | undefined);
 			const local = identifierName(specifier.local as JavaScriptAstNode | undefined);
 			if (!imported || !local) continue;
 
 			if (imported === '__vitePreload') preloadFunction = local;
-			if (imported === 'init_preload_helper') initFunction = local;
+			else if (imported === 'init_preload_helper') initFunction = local;
+			else {
+				kept.push(sourceText(statement, specifier));
+				keptSpecifiers.add(index);
+			}
 		}
+		const source = declaration.source as JavaScriptAstNode | undefined;
 
 		if (preloadFunction && initFunction) {
 			return {
 				importStart,
 				importEnd: importStart + statement.length,
+				keptImport:
+					kept.length && source
+						? `import{${kept.join(',')}}from${sourceText(statement, source)};`
+						: '',
 				preloadFunction,
 				initFunction,
+				keptSpecifiers,
 			};
 		}
 	}
@@ -328,12 +346,75 @@ function escapeRegExp(value: string): string {
 	return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+// hasCallableReference(withoutImport), read off the chunk's own tree when the import is a whole top-level statement.
+function preloadStillCalled(
+	code: string,
+	withoutImport: string,
+	helper: ImportedVitePreloadHelper,
+): boolean {
+	// No call-shaped mention before or after the removal answers without materializing either tree.
+	if (
+		calleeOffsets(code, helper.preloadFunction).length === 0 &&
+		calleeOffsets(withoutImport, helper.preloadFunction).length === 0 &&
+		parsesCleanly(code) &&
+		parsesCleanly(withoutImport)
+	)
+		return false;
+	const program = tryParseChunk(code);
+	const body = asNodes(program?.body);
+	const index = body.findIndex(
+		(node) =>
+			(node as { start?: unknown }).start === helper.importStart &&
+			(node as { end?: unknown }).end === helper.importEnd,
+	);
+	const declaration = body[index];
+	const previous = body[index - 1] as { end?: number } | undefined;
+	if (
+		!program ||
+		declaration?.type !== 'ImportDeclaration' ||
+		(previous !== undefined && code[(previous.end ?? 0) - 1] !== ';')
+	)
+		return hasCallableReference(withoutImport, helper.preloadFunction);
+	const specifiers = asNodes(declaration.specifiers);
+	const removed = new Set(
+		specifiers.filter(
+			(_, index) => helper.keptImport === '' || !helper.keptSpecifiers.has(index),
+		),
+	);
+	return callsFreeName(code, program, helper.preloadFunction, removed);
+}
+
+function parsesCleanly(code: string): boolean {
+	try {
+		return parseChunkCode('chunk.js', code).errors.length === 0;
+	} catch {
+		return false;
+	}
+}
+
+function tryParseChunk(code: string): JavaScriptAstNode | undefined {
+	try {
+		const parsed = parseChunkCode('chunk.js', code);
+		return parsed.errors.length ? undefined : (parsed.program as unknown as JavaScriptAstNode);
+	} catch {
+		return undefined;
+	}
+}
+
 function hasCallableReference(code: string, name: string): boolean {
 	const ast = tryParseJavaScriptModule(code);
-	if (!ast) return true;
+	return ast ? callsFreeName(code, ast, name, new Set()) : true;
+}
 
+function callsFreeName(
+	code: string,
+	ast: JavaScriptAstNode,
+	name: string,
+	removedImports: ReadonlySet<JavaScriptAstNode>,
+): boolean {
 	let found = false;
-	walkReferenceScopes(ast, [], (node, scopes) => {
+	const offsets = calleeOffsets(code, name);
+	walkReferenceScopes(ast, [], { removedImports, offsets }, (node, scopes) => {
 		if (node.type !== 'CallExpression') return;
 		const callee = node.callee as JavaScriptAstNode | undefined;
 		if (identifierName(callee) !== name) return;
@@ -343,18 +424,26 @@ function hasCallableReference(code: string, name: string): boolean {
 	return found;
 }
 
+// Only subtrees whose source holds a call of the name can hold a free call to it.
+type ReferenceScan = {
+	readonly removedImports: ReadonlySet<JavaScriptAstNode>;
+	readonly offsets: readonly number[];
+};
+
 function walkReferenceScopes(
 	node: JavaScriptAstNode | null | undefined,
 	scopes: ReadonlyArray<ReadonlySet<string>>,
+	scan: ReferenceScan,
 	visit: (node: JavaScriptAstNode, scopes: ReadonlyArray<ReadonlySet<string>>) => void,
 ): void {
 	if (!node || typeof node !== 'object') return;
 
 	if (node.type === 'Program') {
-		const scope = collectScopeDeclarations(asNodes(node.body));
+		const scope = collectScopeDeclarations(asNodes(node.body), scan.removedImports);
 		visit(node, [scope]);
 		for (const child of asNodes(node.body)) {
-			walkReferenceScopes(child, [scope], visit);
+			if (spansAnyOffset(scan.offsets, child))
+				walkReferenceScopes(child, [scope], scan, visit);
 		}
 		return;
 	}
@@ -367,7 +456,7 @@ function walkReferenceScopes(
 		}
 		const nextScopes = [...scopes, scope];
 		visit(node, nextScopes);
-		walkReferenceScopes(node.body as JavaScriptAstNode | undefined, nextScopes, visit);
+		walkReferenceScopes(node.body as JavaScriptAstNode | undefined, nextScopes, scan, visit);
 		return;
 	}
 
@@ -376,18 +465,22 @@ function walkReferenceScopes(
 		const nextScopes = [...scopes, scope];
 		visit(node, nextScopes);
 		for (const child of asNodes(node.body)) {
-			walkReferenceScopes(child, nextScopes, visit);
+			if (spansAnyOffset(scan.offsets, child))
+				walkReferenceScopes(child, nextScopes, scan, visit);
 		}
 		return;
 	}
 
 	visit(node, scopes);
 	for (const child of childNodes(node)) {
-		walkReferenceScopes(child, scopes, visit);
+		if (spansAnyOffset(scan.offsets, child)) walkReferenceScopes(child, scopes, scan, visit);
 	}
 }
 
-function collectScopeDeclarations(nodes: readonly JavaScriptAstNode[]): Set<string> {
+function collectScopeDeclarations(
+	nodes: readonly JavaScriptAstNode[],
+	removedImports: ReadonlySet<JavaScriptAstNode> = new Set(),
+): Set<string> {
 	const declarations = new Set<string>();
 	for (const node of nodes) {
 		if (node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration') {
@@ -396,6 +489,7 @@ function collectScopeDeclarations(nodes: readonly JavaScriptAstNode[]): Set<stri
 		}
 		if (node.type === 'ImportDeclaration') {
 			for (const specifier of asNodes(node.specifiers)) {
+				if (removedImports.has(specifier)) continue;
 				collectBindingNames(specifier.local as JavaScriptAstNode | undefined, declarations);
 			}
 			continue;
@@ -433,9 +527,15 @@ function isFunctionNode(node: JavaScriptAstNode): boolean {
 	);
 }
 
+function sourceText(code: string, node: JavaScriptAstNode): string {
+	const { start, end } = node as unknown as { start: number; end: number };
+	return code.slice(start, end);
+}
+
 function tryParseJavaScriptModule(code: string): JavaScriptAstNode | undefined {
 	try {
-		return parseJavaScriptModule(code);
+		const parsed = parseSync('chunk.js', code);
+		return parsed.errors.length ? undefined : (parsed.program as unknown as JavaScriptAstNode);
 	} catch {
 		return undefined;
 	}

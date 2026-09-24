@@ -30,7 +30,7 @@ export function adaptImportedCaptureResolver(source: string, hasImportedRows: bo
 		'\t\t\tconst slot = legacySlots.get(JSON.stringify([graphNodeId, path]));',
 		'\t\t\tif (!slot) return context.graph.read(graphNodeId, path);',
 		'\t\t\tif (slot.route.kind === callbackRoute) return (...args) => {',
-		'\t\t\t\tconst pending = lastCallback.then(() => context.invokeSymbol(slot.route.callbackSymbolId, { ...context, event: context.event, args }));',
+		'\t\t\t\tconst pending = lastCallback.then(() => capture.invoke(slot.slotId, args));',
 		'\t\t\t\tlastCallback = pending.catch(() => {});',
 		'\t\t\t\tpendingCallbacks.push(pending);',
 		'\t\t\t\treturn pending;',

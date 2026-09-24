@@ -225,6 +225,30 @@ Preloading never adds `<script>` tags and never executes app modules. It only
 warms the browser module cache for later `import()` calls. App code still runs
 only through CSR render, the inline SSR resumer, or lazy symbol resolution.
 
+Native module packing separates the download boundary from the initialization
+boundary. A build may group route-owned lazy modules and shared dependencies
+into fewer ESM files while preserving each logical module's demand-driven
+initialization. Preload metadata names the emitted packs; symbol resolution
+retains the logical export and initialization behavior. Pack selection follows
+the module dependency graph and route ownership, not fixture names or authored
+handler names. Modules whose loading semantics cannot be preserved by a pack
+rewrite keep their original native import boundary.
+
+Packing must not introduce parser-blocking scripts, require a service worker,
+or hide or disable controls while code arrives. Native modulepreload does not
+guarantee that a fetch finishes before the first input. Input arriving before
+the required code is ready must remain observable and be dispatched in the
+correct order when loading succeeds; loading failures must remain observable.
+Request counts, transferred bytes, initialization work, and cold interaction
+latency are separate acceptance measurements. A measured five-request route
+does not impose a fixed request count on arbitrary applications.
+
+Destination intent preloading may begin on pointer or keyboard intent without
+evaluating the destination's modules. This is independent of packing: a
+packing comparison must keep destination preloading policy and event handling
+constant. Current-route hints continue to follow that route's interaction
+dependencies, including statically known controls that its actions can reveal.
+
 Preload support must be feature-paid. Static SSR must not grow a browser startup
 script just because preload metadata exists, event-only SSR must not pull the
 full CSR runtime into startup code to produce preload hints, and CSR must not

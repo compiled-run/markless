@@ -101,7 +101,7 @@ describe('fixture framework boundaries', () => {
 			scripts?: Record<string, string>;
 		};
 
-		expect(packageJson.scripts?.dev).toBe('vite --mode ssr');
+		expect(packageJson.scripts?.dev).toBe('vp dev --mode ssr');
 	});
 
 	test('SSR fixture advertises the real Vite app build command', async () => {
@@ -109,7 +109,7 @@ describe('fixture framework boundaries', () => {
 			scripts?: Record<string, string>;
 		};
 
-		expect(packageJson.scripts?.build).toBe('vite build --app');
+		expect(packageJson.scripts?.build).toBe('vp build --app');
 	});
 
 	test('SSR preview box uses built app output without rewriting preview HTML', async () => {

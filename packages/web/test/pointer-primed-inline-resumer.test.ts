@@ -1,5 +1,8 @@
 import { expect, test } from 'vitest';
-import { createInlineResumerSource } from '../src/inline/resumer.ts';
+import {
+	createInlineResumerSource,
+	createInlineResumerVisiblePrimerSource,
+} from '../src/inline/resumer.ts';
 
 // The served boot is the only layer that can spend a crossing on the import,
 // because on a cold page nothing else is running yet. These pin that a hover
@@ -17,7 +20,10 @@ type Listener = (event: { readonly type: string; readonly target: FakeElement })
 
 type ViewEventRecord = { readonly hostNodeId: string; readonly eventName: string };
 
-function bootResumer(options: { readonly events: ReadonlyArray<ViewEventRecord> }) {
+function bootResumer(options: {
+	readonly events: ReadonlyArray<ViewEventRecord>;
+	readonly locators?: ReadonlyArray<{ hostNodeId: string; index: number }>;
+}) {
 	const source = createInlineResumerSource({
 		debug: false,
 		executionLog: 'never',
@@ -29,9 +35,14 @@ function bootResumer(options: { readonly events: ReadonlyArray<ViewEventRecord> 
 	expect(source).toContain(LOADER_TAIL);
 
 	const arrivals: Array<string | 'wake'> = [];
+	const primingElements: Array<unknown> = [];
 	const module = {
-		resumeContainerEvent: (input: { readonly event: { readonly type: string } | 0 }) => {
+		resumeContainerEvent: (input: {
+			readonly event: { readonly type: string } | 0;
+			readonly element?: unknown;
+		}) => {
 			arrivals.push(input.event === 0 ? 'wake' : input.event.type);
+			if (input.event === 0) primingElements.push(input.element);
 		},
 	};
 	let loads = 0;
@@ -48,7 +59,7 @@ function bootResumer(options: { readonly events: ReadonlyArray<ViewEventRecord> 
 	const view = {
 		asyncBoundaries: [],
 		events: options.events,
-		locators: [{ hostNodeId: 'h1', index: 1 }],
+		locators: options.locators ?? [{ hostNodeId: 'h1', index: 1 }],
 	};
 	const root: Record<string, unknown> = {
 		addEventListener: (type: string, listener: Listener) => listeners.set(type, listener),
@@ -84,19 +95,66 @@ function bootResumer(options: { readonly events: ReadonlyArray<ViewEventRecord> 
 
 	return {
 		arrivals,
+		primingElements,
 		host,
-		fire: (type: string, target: FakeElement = host) =>
-			listeners.get(type)?.({ type, target }),
+		fire: (type: string, target: FakeElement = host) => listeners.get(type)?.({ type, target }),
 		hasListener: (type: string) => listeners.has(type),
 		loadCount: () => loads,
 		finishLoad: () => resolveLoad?.(),
 		primedHover: () => root.__marklessPrimedHover,
+		fakeDocument,
+		root,
 	};
 }
 
 async function settle(hops = 8): Promise<void> {
 	for (let hop = 0; hop < hops; hop++) await Promise.resolve();
 }
+
+test.each(['click', 'keyup'])(
+	'%s ignores missing locators while retaining the matching control',
+	async (eventName) => {
+		const missing = bootResumer({
+			events: [{ hostNodeId: 'detached-control', eventName }],
+			locators: [{ hostNodeId: 'detached-control', index: 30 }],
+		});
+		missing.fire(eventName);
+		expect(missing.loadCount()).toBe(0);
+
+		const present = bootResumer({
+			events: [{ hostNodeId: 'remaining-control', eventName }],
+			locators: [
+				{ hostNodeId: 'detached-control', index: 30 },
+				{ hostNodeId: 'remaining-control', index: 1 },
+			],
+		});
+		present.fire(eventName);
+		present.finishLoad();
+		await settle();
+		expect(present.arrivals).toEqual([eventName]);
+	},
+);
+
+test('visible-only records install no input listeners and load no module', () => {
+	const resumer = bootResumer({ events: [{ hostNodeId: 'h1', eventName: 'visible' }] });
+	for (const eventName of ['visible', 'click', 'focusin', 'pointerover']) {
+		expect(resumer.hasListener(eventName)).toBe(false);
+		resumer.fire(eventName);
+	}
+	expect(resumer.loadCount()).toBe(0);
+});
+
+test.each(['pointerover', 'focusin'])(
+	'%s identifies the primed control without dispatching its action',
+	async (eventName) => {
+		const resumer = bootResumer({ events: [{ hostNodeId: 'h1', eventName: 'click' }] });
+		resumer.fire(eventName);
+		resumer.finishLoad();
+		await settle();
+		expect(resumer.primingElements).toEqual([resumer.host]);
+		expect(resumer.arrivals).toEqual(['wake']);
+	},
+);
 
 test('a crossing onto an element with a press record wakes the runtime before the press', async () => {
 	const resumer = bootResumer({ events: [{ hostNodeId: 'h1', eventName: 'pointerdown' }] });
@@ -159,4 +217,54 @@ test('a crossing that lands after the page already woke stays quiet', async () =
 
 	expect(resumer.arrivals).toEqual(['click']);
 	expect(resumer.loadCount()).toBe(1);
+});
+
+test('a visibility forward leaves the crossing primer armed', async () => {
+	const resumer = bootResumer({
+		events: [
+			{ hostNodeId: 'h1', eventName: 'visible' },
+			{ hostNodeId: 'h1', eventName: 'click' },
+		],
+	});
+	let intersect: ((entries: unknown[]) => void) | undefined;
+	class FakeObserver {
+		constructor(callback: (entries: unknown[]) => void) {
+			intersect = callback;
+		}
+		observe() {}
+		unobserve() {}
+	}
+	const visibleArrivals: string[] = [];
+	const loadVisible = async () => ({
+		resumeContainerEvent: (input: { readonly event: { readonly type: string } }) => {
+			visibleArrivals.push(input.event.type);
+		},
+	});
+	const primer = createInlineResumerVisiblePrimerSource('/build/resume-C3d4.js')
+		.replace('(url) => import(/* @vite-ignore */ url)', 'load')
+		.slice(1);
+	// eslint-disable-next-line @typescript-eslint/no-implied-eval
+	new Function('document', 'IntersectionObserver', 'load', primer)(
+		resumer.fakeDocument,
+		FakeObserver,
+		loadVisible,
+	);
+	intersect?.([{ target: resumer.host, isIntersecting: true }]);
+	await settle();
+	expect(visibleArrivals).toEqual(['visible']);
+
+	resumer.fire('pointerover');
+	expect(resumer.loadCount()).toBe(1);
+	resumer.finishLoad();
+	await settle();
+	expect(resumer.arrivals).toEqual(['wake']);
+	expect(resumer.primedHover()).toBe(resumer.host);
+
+	resumer.fire('click');
+	await settle();
+	expect(resumer.arrivals).toEqual(['wake', 'click']);
+	resumer.fire('pointerover');
+	await settle();
+	expect(resumer.loadCount()).toBe(1);
+	expect(resumer.arrivals).toEqual(['wake', 'click']);
 });

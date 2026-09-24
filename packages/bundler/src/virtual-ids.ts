@@ -6,13 +6,16 @@ import { MARKLESS_BUILD_PREFIX } from './build/chunking.ts';
 import { symbolVirtualModuleSourceFile } from './source-module.ts';
 import { MARKLESS_VIRTUAL_PREFIX } from './transform.ts';
 import { triggerGroupVirtualModuleSourceFile } from './trigger-groups.ts';
-import type { MarklessVirtualModule } from './types.ts';
+import type { MarklessEnvironment, MarklessVirtualModule } from './types.ts';
+import { MARKLESS_SCALAR_PLAN_SOURCE_QUERY } from './scalar-plan-source.ts';
 
 export const TSRX_SOURCE_FILE = /\.tsrx(?:[?#].*)?$/;
 const MARKLESS_SYMBOL_SOURCE_QUERY_RE = /[?&]markless-symbols(?:[&#]|$)/;
 const MARKLESS_RESUME_SOURCE_QUERY_RE = /[?&]markless-resume(?:[&#]|$)/;
 const MARKLESS_RENDER_DATA_SOURCE_QUERY_RE = /[?&]markless-render-data(?:[&#]|$)/;
 const MARKLESS_REACHED_FROM_SOURCE_QUERY = 'markless-reached-from';
+// Reached render data does not depend on which route reached it, so every route shares one id.
+const MARKLESS_REACHED_FROM_ROUTE = 'route';
 const MARKLESS_PRERENDER_WAKE_SOURCE_QUERY_RE = /[?&]markless-prerender-wake(?:[&#]|$)/;
 export const MARKLESS_ROUTE_SOURCE_QUERY_RE = /[?&]markless-route(?:[&#]|$)/;
 const RESUME_VIRTUAL_ID_RE = /^virtual:markless:resume:([^:]+)$/;
@@ -95,6 +98,13 @@ export function isSymbolOnlySourceRequest(id: string): boolean {
 	return MARKLESS_SYMBOL_SOURCE_QUERY_RE.test(id);
 }
 
+export function isScalarPlanSourceRequest(id: string): boolean {
+	return (
+		isSymbolOnlySourceRequest(id) &&
+		new URLSearchParams(parsePath(id).search).has(MARKLESS_SCALAR_PLAN_SOURCE_QUERY)
+	);
+}
+
 export function isResumeSourceRequest(id: string): boolean {
 	return MARKLESS_RESUME_SOURCE_QUERY_RE.test(id);
 }
@@ -113,11 +123,29 @@ export function renderDataReachedFromQuery(id: string): string | undefined {
 	);
 }
 
-export function materializedReachedRenderDataSource(source: string, routeRoot: string): string {
+// A route's client-navigation facade or its own render data: only navigating to the route runs it.
+export function isRouteNavigationSourceRequest(id: string): boolean {
+	return (
+		MARKLESS_ROUTE_SOURCE_QUERY_RE.test(id) ||
+		(isRenderDataSourceRequest(id) && renderDataReachedFromQuery(id) === undefined)
+	);
+}
+
+export function materializedReachedRenderDataSource(source: string): string {
 	return withQuery(source, {
 		'markless-render-data': null,
-		[MARKLESS_REACHED_FROM_SOURCE_QUERY]: routeRoot,
+		[MARKLESS_REACHED_FROM_SOURCE_QUERY]: MARKLESS_REACHED_FROM_ROUTE,
 	});
+}
+
+// The shared spelling of a reached render-data request that names its route root, or
+// undefined when the request is already shared or is not reached render data.
+export function sharedReachedRenderDataRequest(id: string): string | undefined {
+	if (!isRenderDataSourceRequest(id)) return undefined;
+	const reachedFrom = renderDataReachedFromQuery(id);
+	return reachedFrom === undefined || reachedFrom === MARKLESS_REACHED_FROM_ROUTE
+		? undefined
+		: withQuery(id, { [MARKLESS_REACHED_FROM_SOURCE_QUERY]: MARKLESS_REACHED_FROM_ROUTE });
 }
 
 export function isPrerenderWakeSourceRequest(id: string): boolean {
@@ -262,4 +290,26 @@ export function resolveVirtualId(id: string) {
 
 export function pathname(id: string) {
 	return parsePath(id).pathname;
+}
+
+// Queries that only shape client output: the server compiles each to the plain source module.
+const CLIENT_ONLY_SOURCE_QUERY_KEYS = new Set([
+	'markless-render-data',
+	'markless-reached-from',
+	'markless-symbols',
+	'markless-scalar-plans',
+]);
+
+// The plain source a server request only re-exports, so each source ships one server copy.
+export function serverSharedSourceRequest(
+	id: string,
+	environment: MarklessEnvironment,
+): string | undefined {
+	if (environment !== 'server') return undefined;
+	const { pathname: path, search } = parsePath(id);
+	if (!search || !TSRX_SOURCE_FILE.test(path)) return undefined;
+	const keys = [...new URLSearchParams(search).keys()];
+	return keys.length > 0 && keys.every((key) => CLIENT_ONLY_SOURCE_QUERY_KEYS.has(key))
+		? path
+		: undefined;
 }

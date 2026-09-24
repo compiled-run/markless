@@ -1,28 +1,28 @@
 {
 	"schemaVersion": 1,
 	"lane": "query",
-	"run": "query-1784395218723-f309b127eaed38",
-	"pageStartMs": 31.542,
+	"run": "query-1790187667937-f62b19124bca68",
+	"pageStartMs": 26.833,
 	"events": [
 		{
 			"name": "session",
-			"startMs": 97.125,
-			"settledMs": 157.319
+			"startMs": 77.195,
+			"settledMs": 139.367
 		},
 		{
 			"name": "recommendations",
-			"startMs": 161.126,
-			"settledMs": 253.12
+			"startMs": 141.809,
+			"settledMs": 233.121
 		},
 		{
 			"name": "catalog",
-			"startMs": 161.368,
-			"settledMs": 242.328
+			"startMs": 142.279,
+			"settledMs": 222.568
 		},
 		{
 			"name": "reviews",
-			"startMs": 161.767,
-			"settledMs": 232.425
+			"startMs": 142.38,
+			"settledMs": 212.702
 		}
 	]
 }

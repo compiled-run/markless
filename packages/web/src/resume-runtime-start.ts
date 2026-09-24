@@ -1,3 +1,4 @@
+import { PROTOCOL_VISIBLE_EVENT_NAME } from '../../serializer/src/protocol-event-names.ts';
 import type { DomJournalEntry, DomJournalResult } from '@markless/runtime';
 import type { AsyncBoundarySettleTracker } from './resume-async-wiring.ts';
 import type { ArmCommitUpdate } from './resume-commit-arm.ts';
@@ -145,7 +146,7 @@ export async function startResumeRuntime(input: {
 			loadSymbol: runtimeInput.loadSymbol,
 			elementHandles: prepared.elementHandles,
 		});
-		keyedRepeats.wireKeyedRepeats(
+		await keyedRepeats.wireKeyedRepeats(
 			{
 				graph: runtimeInput.graph,
 				view: runtimeInput.view,
@@ -260,7 +261,7 @@ export async function startResumeRuntime(input: {
 				boundary.asyncReads.some((read) => read.graphNodeId === graphNodeId),
 			),
 	});
-	if (runtimeInput.view.events.some((event) => event.eventName === 'visible')) {
+	if (runtimeInput.view.events.some((event) => event.eventName === PROTOCOL_VISIBLE_EVENT_NAME)) {
 		const behaviors = await loadBehaviorRuntime();
 		behaviors.installVisibilityObserver();
 		behaviors.installRemovalObserver();

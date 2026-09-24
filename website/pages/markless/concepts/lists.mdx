@@ -23,17 +23,10 @@ them again from the top.
 **A key is the answer to "which row is this?", and once a row has one, everything attached to that
 row moves with it.**
 
-## Tick the middle row, then sort
-
-<Callout
-	sticker="map"
-	sprite="cross"
-	title="Why the rows on this page are a file rather than a box"
-	text="The rows below are meant to be a box you can tick and sort. They are not on the page yet, because a component using @for does not compile on the framework build this site is pinned to: the compiler stops making progress and the build never finishes. The file below is real and is what you will run in your own project, and the page comes back with its widget the day the build accepts it. NOTES.md finding 23 in the site repository has the reproduction."
-/>
+## Tick a row, then sort
 
 Three rows, one checkbox each, and a button that sorts them alphabetically. Put the file below in
-your own project, tick the middle row, Pears, then press Sort, and watch where the word "picked"
+your own project, tick the first row, Pears, then press Sort, and watch where the word "picked"
 ends up.
 
 Pears moves, and the tick moves with it. Nothing in the code copies a checkbox state from one row to

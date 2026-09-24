@@ -250,7 +250,8 @@ class YouTubeController {
 			try {
 				const message = JSON.parse(event.data);
 				if (message?.event !== 'infoDelivery' || !message.info) return;
-				if (typeof message.info.currentTime === 'number') this.infoTime = message.info.currentTime;
+				if (typeof message.info.currentTime === 'number')
+					this.infoTime = message.info.currentTime;
 				if (typeof message.info.duration === 'number' && message.info.duration > 0)
 					this.infoDuration = message.info.duration;
 			} catch {

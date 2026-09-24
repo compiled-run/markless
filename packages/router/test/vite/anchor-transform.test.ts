@@ -38,9 +38,40 @@ export default function Menu({ pages, replace, scroll }) @{
 				"data-markless-router-scroll={(scroll) === false ? 'manual' : undefined}",
 			);
 			expect(result?.code).toContain('<span>{page.title}</span></a>');
-			expect(result?.code).not.toContain('prefetch=');
+			expect(result?.code).toContain('data-markless-router-prefetch="intent"');
+			expect(result?.code).not.toMatch(/\sprefetch=/);
 		},
 	);
+	it('lowers per-link prefetch choices to a data attribute', async () => {
+		const source = `import { Link } from '@markless/router';
+export default function Nav({ mode }) @{
+	<nav>
+		<Link href="/a" prefetch="viewport">A</Link>
+		<Link href="/b" prefetch={false}>B</Link>
+		<Link href="/c" prefetch>C</Link>
+		<Link href="/d" prefetch={mode}>D</Link>
+	</nav>
+}`;
+		const plugin = anchorTransformPlugin();
+		const handler = (plugin.transform as { handler: Function }).handler;
+		(plugin.configResolved as Function)({ root: '/project' });
+		const result = await handler.call(
+			{ fs: routeTypegenFs(), parse: parseModule },
+			source,
+			'/project/nav.tsrx',
+		);
+		expect(result?.code).toContain(
+			'<a data-markless-router-link href="/a" data-markless-router-prefetch="viewport">A</a>',
+		);
+		expect(result?.code).toContain(
+			'<a data-markless-router-link href="/b" data-markless-router-prefetch="none">B</a>',
+		);
+		expect(result?.code).toContain('<a data-markless-router-link href="/c">C</a>');
+		expect(result?.code).toContain(
+			"data-markless-router-prefetch={(mode) === false ? 'none' : (mode) === 'intent' || (mode) === 'viewport' ? (mode) : undefined}",
+		);
+	});
+
 	it('lowers native route-pattern anchors and preserves normal props', () => {
 		const source = `export default () => {
   const slug = "hello";

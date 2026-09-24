@@ -28,6 +28,7 @@ vi.mock('@markless/compiler', async (importOriginal) => {
 	return {
 		artifactChildCandidates: actual.artifactChildCandidates,
 		componentEdgeSymbolRoutes: actual.componentEdgeSymbolRoutes,
+		importedRowSlotReaders: actual.importedRowSlotReaders,
 		importedSymbolRoutes: actual.importedSymbolRoutes,
 		linkedRenderDataBoundarySymbols: actual.linkedRenderDataBoundarySymbols,
 		moduleInterfaceHash: actual.moduleInterfaceHash,
@@ -85,7 +86,9 @@ test('transform selects the explicit demand map for each build class', async () 
 });
 
 test('payload tier selection does not escalate on component edges alone', async () => {
-	compiler.componentEdges = [{ childComponentName: 'Child', importSource: './Child.tsrx' }];
+	compiler.componentEdges = [
+		{ childComponentName: 'Child', importSource: './Child.tsrx', props: [] },
+	];
 	compiler.protocolView = {
 		branches: [],
 		keyedRepeats: [],

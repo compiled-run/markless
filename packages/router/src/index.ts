@@ -2,7 +2,12 @@ import {
 	createExternalDelegateStructureTokens,
 	createExternalDelegateView,
 } from '@markless/web/fns/external-delegate';
-import { LINK_ATTRIBUTE, REPLACE_ATTRIBUTE, SCROLL_ATTRIBUTE } from './link-attributes.ts';
+import {
+	LINK_ATTRIBUTE,
+	PREFETCH_ATTRIBUTE,
+	REPLACE_ATTRIBUTE,
+	SCROLL_ATTRIBUTE,
+} from './link-attributes.ts';
 
 export {
 	buildRouteManifestFromFileIds,
@@ -38,7 +43,12 @@ export { startRouteUpdateRenderer } from './route-renderer.ts';
 // client-entry.ts), which can only reach this module through the package's
 // root export once installed from npm.
 export { __marklessRouterStartSpaNavigation, ensureNavigationRuntime } from './spa-navigation.ts';
-export { MARKLESS_ROUTER_ROUTE_EVENT, dispatchRouteUpdate, routePageProps } from './route-state.ts';
+export {
+	MARKLESS_ROUTER_RENDERED_EVENT,
+	MARKLESS_ROUTER_ROUTE_EVENT,
+	dispatchRouteUpdate,
+	routePageProps,
+} from './route-state.ts';
 export type {
 	RouteDocumentModule,
 	RoutePageModule,
@@ -218,8 +228,17 @@ function linkAnchorAttributes(props: LinkProps): Array<readonly [string, string]
 	attributes.set('href', typeof props.href === 'string' ? props.href : '#');
 	attributes.set(LINK_ATTRIBUTE, '');
 	if (props.replace) attributes.set(REPLACE_ATTRIBUTE, '');
+	const prefetch = linkPrefetchAttribute(props.prefetch);
+	if (prefetch) attributes.set(PREFETCH_ATTRIBUTE, prefetch);
 	if (props.scroll === false) attributes.set(SCROLL_ATTRIBUTE, 'manual');
 	return [...attributes];
+}
+
+function linkPrefetchAttribute(
+	prefetch: LinkNavigationProps['prefetch'],
+): 'intent' | 'viewport' | 'none' | undefined {
+	if (prefetch === false) return 'none';
+	return prefetch === 'intent' || prefetch === 'viewport' ? prefetch : undefined;
 }
 
 function isLinkInternalProp(name: string): boolean {

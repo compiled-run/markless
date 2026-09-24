@@ -74,3 +74,18 @@ test('document attributes keep their value types', () => {
 	expect(result.output).toContain('head.tsrx(4,11): error TS2322');
 	expect(result.output).toContain('head.tsrx(4,20): error TS2322');
 });
+
+// The compiler lowercases the name after `on`, so both casings bind one listener.
+test('standard event casing and numeric attribute strings typecheck', () => {
+	const result = runMarklessTsc('standard-attribute-spellings');
+	expect(result.output).toBe('');
+	expect(result.status).toBe(0);
+});
+
+test('non-numeric strings in numeric attributes and misspelled events still fail', () => {
+	const result = runMarklessTsc('attribute-spelling-errors');
+	expect(result.status).not.toBe(0);
+	expect(result.output).toContain('grid.tsrx(4,8): error TS2322');
+	expect(result.output).toContain('grid.tsrx(5,10): error TS2322');
+	expect(result.output).toContain("Property 'onKeyDwn' does not exist");
+});

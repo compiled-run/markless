@@ -1,0 +1,9 @@
+{
+	"$comment": "Upstream observations from the goal board's PM rulings. Reported as observations, not diagnosed bugs, unless a minimal reproduction exists (reproduced: false).",
+	"observations": [
+		{ "entrant": "octane", "reproducedMinimally": false, "text": "Keyboard activation with Space pressed before the Octane runtime has loaded was sometimes dropped, while pointer clicks at the same moment were replayed.", "source": "demos/interaction-benchmark/apps/octane/BENCH.md" },
+		{ "entrant": "solidstart", "reproducedMinimally": false, "text": "The SolidStart production build links a stylesheet that contains dev-toolbar styles; the toolbar script itself is not shipped.", "source": "demos/interaction-benchmark/apps/solidstart/BENCH.md" },
+		{ "entrant": "ripple", "reproducedMinimally": false, "text": "The Ripple Vercel function measured about 18 MB on disk for a three-route app, because build tooling was traced into it.", "source": "demos/interaction-benchmark/apps/ripple/BENCH.md" },
+		{ "entrant": "sveltekit", "reproducedMinimally": false, "text": "Svelte does not replay input that arrives before hydration, so an early click on server-rendered markup can go unanswered on a slow network.", "source": "demos/interaction-benchmark/apps/sveltekit/BENCH.md" }
+	]
+}

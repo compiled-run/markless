@@ -31,9 +31,26 @@ type ResumeSyncComputedRecord = {
  * the roster module imports instance-scope STATICALLY, so it links the chunk
  * the dispatch core already carries instead of forcing a re-export shim.
  */
+type RosterResumeModule = typeof import('./fns/roster-resume.ts');
 type RosterResumeHost = {
-	readonly __marklessRosterResume?: () => Promise<typeof import('./fns/roster-resume.ts')>;
+	readonly __marklessRosterResume?: () => Promise<RosterResumeModule>;
 };
+
+// One import per loader: every import() of an evaluated module still resolves a task later.
+const rosterLoads = new WeakMap<() => Promise<RosterResumeModule>, Promise<RosterResumeModule>>();
+function loadRosterResume(): Promise<RosterResumeModule> | undefined {
+	const load = (globalThis as RosterResumeHost).__marklessRosterResume;
+	if (!load) return undefined;
+	let pending = rosterLoads.get(load);
+	if (!pending) {
+		pending = load().catch((error: unknown) => {
+			rosterLoads.delete(load);
+			throw error;
+		});
+		rosterLoads.set(load, pending);
+	}
+	return pending;
+}
 
 export async function refreshSyncComputed(input: {
 	readonly computed: ResumeSyncComputedRecord;
@@ -43,7 +60,7 @@ export async function refreshSyncComputed(input: {
 	readonly elementHandles: ElementHandleRegistry;
 }): Promise<void> {
 	const graph = seedSourceGraph(input.graph, input.computed);
-	const roster = await (globalThis as RosterResumeHost).__marklessRosterResume?.();
+	const roster = await loadRosterResume();
 	const result = (await input.loadSymbol(input.computed.deriveSymbolId))({
 		graph,
 		read: graph.read,

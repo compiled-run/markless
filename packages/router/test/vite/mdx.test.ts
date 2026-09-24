@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'pathe';
 import { afterAll, describe, expect, it } from 'vitest';
+import { parseSync } from 'rolldown/experimental';
 import {
 	MDX_ROUTE_RUNTIME_SPECIFIER,
 	mdxTransformPlugin,
@@ -42,6 +43,29 @@ function callConfig(
 }
 
 describe('Markless Router MDX transform', () => {
+	it.each(['markless-resume', 'markless-route'])(
+		'defers static page data until rendering is demanded in %s',
+		async (query) => {
+			const marker = 'Static prose must stay dormant during a counter click';
+			const code = await transformMdxRoute(
+				`import Control from './Control.tsrx';\n\n# ${marker}\n\n<Control value={8} />`,
+				`/project/pages/interaction.mdx?${query}`,
+			);
+			const parsed = parseSync('interaction.js', code);
+			expect(parsed.errors).toEqual([]);
+			const data = parsed.program.body
+				.flatMap((node) => (node.type === 'VariableDeclaration' ? node.declarations : []))
+				.find(
+					(node) =>
+						node.id.type === 'Identifier' && node.id.name === 'marklessMdxRenderData',
+				)?.init;
+			if (!data || data.type !== 'ArrowFunctionExpression')
+				throw new Error('render data must remain a lazy factory');
+			expect(code.indexOf(marker)).toBeGreaterThan(data.start);
+			expect(code.indexOf(marker)).toBeLessThan(data.end);
+		},
+	);
+
 	it('pre-bundles its runtime entry on the dev server and not for a build', () => {
 		const root = installedRouterRoot('installed');
 
@@ -63,7 +87,9 @@ describe('Markless Router MDX transform', () => {
 				{ root: linkedRouterRoot('linked-preserve'), resolve: { preserveSymlinks: true } },
 				{ command: 'serve' },
 			),
-		).toEqual({ optimizeDeps: { include: [MDX_ROUTE_RUNTIME_SPECIFIER] } });
+		).toEqual({
+			optimizeDeps: { include: [MDX_ROUTE_RUNTIME_SPECIFIER] },
+		});
 	});
 
 	it('serves an aliased @markless/router source instead of pre-bundling it', () => {
@@ -172,7 +198,7 @@ This page is static markdown.
 		expect(code).toContain('globalThis.__marklessOverlay ??=');
 		expect(code).toContain(`import('@markless/web/fns/overlay')`);
 		expect(code.indexOf('globalThis.__marklessOverlay ??=')).toBeLessThan(
-			code.indexOf('export async function resumeContainerEvent'),
+			code.indexOf('export function resumeContainerEvent'),
 		);
 	});
 
@@ -230,9 +256,16 @@ import Choices from '../../components/Choices.tsrx';
 		);
 		expect(code).not.toContain('import Meter from');
 		expect(code).not.toContain('renderSsr');
-		expect(code).toContain('export async function resumeContainerEvent(input)');
+		expect(code).toContain('export function resumeContainerEvent(input)');
+		expect(code).not.toContain('import { resumeFromPayloadDocument }');
+		expect(code).toContain("import('@markless/core/web/resume')");
+		expect(code).toContain(
+			'tryResumeMdxScalar(input, marklessMdxLoadScalarPlan, marklessMdxLoadSymbol)',
+		);
+		expect(code).toContain('loadScalarActionPlan');
+		expect(code).toContain('./Meter.tsrx?markless-symbols&markless-scalar-plans');
 		expect(code).toContain('renderData: marklessMdxRenderData');
-		expect(code).toContain('() => Promise.all([import("./Meter.tsrx?markless-render-data")])');
+		expect(code).toContain('return Promise.all([import("./Meter.tsrx?markless-render-data")])');
 		expect(code).toContain('modules[0].marklessRenderData');
 	});
 
@@ -372,5 +405,31 @@ Count: {2}
 				'/project/pages/docs/[...slug].mdx',
 			),
 		).rejects.toThrow('default imports from .tsrx files only');
+	});
+
+	it('tells the author the default import to write for a named .tsrx import', async () => {
+		await expect(
+			transformMdxRoute(
+				`import { Sidebar as DocsNav } from '../../components/docs/Sidebar.tsrx';
+
+<DocsNav />
+`,
+				'/project/pages/docs/[...slug].mdx',
+			),
+		).rejects.toThrow(
+			"Write `import DocsNav from '../../components/docs/Sidebar.tsrx';` and make Sidebar the file's `export default`",
+		);
+	});
+
+	it('tells the author to split a .tsrx import that names more than one binding', async () => {
+		await expect(
+			transformMdxRoute(
+				`import Callout, { tones } from '../../components/Callout.tsrx';
+
+<Callout />
+`,
+				'/project/pages/docs/[...slug].mdx',
+			),
+		).rejects.toThrow("Write `import Callout from '../../components/Callout.tsrx';` alone");
 	});
 });

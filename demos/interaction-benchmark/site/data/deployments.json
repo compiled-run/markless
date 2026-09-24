@@ -1,0 +1,701 @@
+{
+	"$comment": "Public production deployments, one Vercel project per entrant (team jack-shelton). runtime/region are what Vercel used. smoke = plain unauthenticated curl; correctness = shared runner against the public URL. Early-phase failures on the real network are framework results unless noted.",
+	"deployments": {
+		"markless": {
+			"url": "https://mlbench-markless.vercel.app",
+			"deploymentId": "dpl_6zrZWzgxj9iRUhXh1WbjxWAzfrPD",
+			"project": "mlbench-markless",
+			"target": "production",
+			"runtime": "nodejs24.x",
+			"region": "iad1",
+			"buildId": "vercel-markless-3c755f6b",
+			"buildIdMethod": "vercel-<entrant>-<first 8 hex of sha256 over sorted relative path + NUL + bytes + NUL of every file in the app dir, skipping dirs node_modules .output .vercel dist build .svelte-kit .react-router tmp .nitro .vscode and files BENCH.md build-info.json .DS_Store *.tsbuildinfo>",
+			"frameworkSourceHash": {
+				"value": "0a62e352bc3e",
+				"method": "sha256 (first 12 hex) over sorted path + bytes of packages/{core,router,bundler,compiler,web,runtime,serializer,analyzer}/src/** at deploy time; working tree at HEAD d5107ae0 plus uncommitted changes, including the router fix that bundles the nitro import for the endpoint wrapper"
+			},
+			"build": "NITRO_PRESET=vercel pnpm run build (router Nitro vercel preset, working-tree @markless packages), then vercel deploy --prebuilt --prod",
+			"deployedAt": "2026-09-23T03:28:06.011Z",
+			"protection": "Vercel standard: production domain public, per-deployment URLs behind Vercel SSO (302)",
+			"smoke": {
+				"pass": true,
+				"checkedAt": "2026-09-23T03:30:00.432Z",
+				"routes": {
+					"/": {
+						"status": 200,
+						"title": "Overview",
+						"entrantMeta": "markless",
+						"buildMeta": "vercel-markless-3c755f6b"
+					},
+					"/records": {
+						"status": 200,
+						"title": "Records",
+						"entrantMeta": "markless",
+						"buildMeta": "vercel-markless-3c755f6b"
+					},
+					"/settings": {
+						"status": 200,
+						"title": "Settings",
+						"entrantMeta": "markless",
+						"buildMeta": "vercel-markless-3c755f6b"
+					}
+				},
+				"settings": {
+					"validPost": 200,
+					"failName422": 422,
+					"get": 405,
+					"put": 405,
+					"allow": "POST",
+					"postCacheControl": "no-store",
+					"validWallMs": 467
+				},
+				"failures": []
+			},
+			"correctness": {
+				"passed": 33,
+				"total": 33,
+				"summary": "33/33",
+				"runner": "runner/correctness.mjs --target-url <url> --transport direct (Chromium, normal profile, no proxy)",
+				"failed": []
+			},
+			"headers": {
+				"protocol": "HTTP/2",
+				"documentContentEncoding": "gzip (br when offered)",
+				"documentCacheControl": "public, max-age=0, must-revalidate",
+				"documentXVercelCache": "MISS",
+				"hashedJs": {
+					"path": "/build/chunk-Be9glhDm.js",
+					"status": 200,
+					"protocol": "HTTP/2",
+					"cacheControl": "public, max-age=31536000, immutable",
+					"xVercelCacheFirst": "MISS",
+					"xVercelCache": "HIT"
+				}
+			}
+		},
+		"qwik": {
+			"url": "https://mlbench-qwik.vercel.app",
+			"deploymentId": "dpl_53gMZd7MCreUjzdBVpVjdm7V6LmJ",
+			"project": "mlbench-qwik",
+			"target": "production",
+			"runtime": "edge",
+			"region": "edge (global; served from cle1 for the smoke host)",
+			"buildId": "vercel-qwik-8120cad8",
+			"buildIdMethod": "vercel-<entrant>-<first 8 hex of sha256 over sorted relative path + NUL + bytes + NUL of every file in the app dir, skipping dirs node_modules .output .vercel dist build .svelte-kit .react-router tmp .nitro .vscode and files BENCH.md build-info.json .DS_Store *.tsbuildinfo>",
+			"build": "pnpm run build (vercelEdgeAdapter), vercel.json headers mirrored into .vercel/output/config.json, then vercel deploy --prebuilt --prod",
+			"deployedAt": "2026-09-23T03:07:27.735Z",
+			"protection": "Vercel standard: production domain public, per-deployment URLs behind Vercel SSO (302)",
+			"smoke": {
+				"pass": true,
+				"checkedAt": "2026-09-23T03:21:13.144Z",
+				"routes": {
+					"/": {
+						"status": 200,
+						"title": "Overview",
+						"entrantMeta": "qwik",
+						"buildMeta": "vercel-qwik-8120cad8"
+					},
+					"/records": {
+						"status": 200,
+						"title": "Records",
+						"entrantMeta": "qwik",
+						"buildMeta": "vercel-qwik-8120cad8"
+					},
+					"/settings": {
+						"status": 200,
+						"title": "Settings",
+						"entrantMeta": "qwik",
+						"buildMeta": "vercel-qwik-8120cad8"
+					}
+				},
+				"settings": {
+					"validPost": 200,
+					"failName422": 422,
+					"get": 405,
+					"put": 405,
+					"validWallMs": 467
+				},
+				"failures": []
+			},
+			"correctness": {
+				"passed": 22,
+				"total": 33,
+				"summary": "22/33",
+				"runner": "runner/correctness.mjs --target-url <url> --transport direct (Chromium, normal profile, no proxy)",
+				"failed": [
+					"overview-counter-first [early] timeout",
+					"overview-counter-repeat-x10 [early] timeout",
+					"overview-toggle [early] timeout",
+					"overview-disclosure [early] timeout",
+					"overview-tab [early] timeout",
+					"overview-filter [early] timeout",
+					"records-search [early] timeout",
+					"records-sort [early] timeout",
+					"records-select [early] timeout",
+					"records-dialog-open [early] timeout",
+					"settings-derived [early] timeout"
+				]
+			},
+			"headers": {
+				"protocol": "HTTP/2",
+				"documentContentEncoding": "gzip",
+				"documentCacheControl": "public, max-age=0, must-revalidate",
+				"documentXVercelCache": "MISS",
+				"hashedJs": {
+					"path": "/build/q-B2AkDwbb.js",
+					"status": 200,
+					"protocol": "HTTP/2",
+					"contentEncoding": "gzip",
+					"cacheControl": "public, max-age=31536000, s-maxage=31536000, immutable",
+					"xVercelCacheFirst": "MISS",
+					"xVercelCache": "HIT"
+				},
+				"jsContentEncodings": {
+					"gzip": 3
+				}
+			},
+			"note": "Qwik v2 has only the Vercel Edge adapter. The adapter output config.json drops the vercel.json immutable-cache headers for /build and /assets; they were copied into config.json after the build (what `vercel build` does)."
+		},
+		"qwik-tuned": {
+			"url": "https://mlbench-qwik-tuned.vercel.app",
+			"entrant": "qwik",
+			"variant": "tuned",
+			"deploymentId": "dpl_DgG6146xKdDkBMkgLGJaiVwxH964",
+			"project": "mlbench-qwik-tuned",
+			"target": "production",
+			"runtime": "edge",
+			"region": "edge (global; served from cle1 for the smoke host)",
+			"buildId": "vercel-qwik-tuned-fce8506b",
+			"buildIdMethod": "vercel-<entrant>-<first 8 hex of sha256 over sorted relative path + NUL + bytes + NUL of every file in the app dir, skipping dirs node_modules .output .vercel dist build .svelte-kit .react-router tmp .nitro .vscode and files BENCH.md build-info.json .DS_Store *.tsbuildinfo>",
+			"build": "pnpm run build in apps/qwik-tuned (vercelEdgeAdapter), vercel.json headers mirrored into .vercel/output/config.json, then vercel deploy --prebuilt --prod",
+			"deployedAt": "2026-09-23T03:38:09Z",
+			"protection": "Vercel standard: production domain public, per-deployment URLs behind Vercel SSO (302)",
+			"smoke": {
+				"pass": true,
+				"checkedAt": "2026-09-23T03:38:43.389Z",
+				"routes": {
+					"/": {
+						"status": 200,
+						"title": "Overview | Interaction benchmark",
+						"entrantMeta": "qwik",
+						"buildMeta": "vercel-qwik-tuned-fce8506b"
+					},
+					"/records": {
+						"status": 200,
+						"title": "Records | Interaction benchmark",
+						"entrantMeta": "qwik",
+						"buildMeta": "vercel-qwik-tuned-fce8506b"
+					},
+					"/settings": {
+						"status": 200,
+						"title": "Settings | Interaction benchmark",
+						"entrantMeta": "qwik",
+						"buildMeta": "vercel-qwik-tuned-fce8506b"
+					}
+				},
+				"settings": {
+					"validPost": 200,
+					"failName422": 422,
+					"get": 405,
+					"put": 405,
+					"postCacheControl": "no-store",
+					"validWallMs": 394
+				},
+				"inlineQwikloader": true,
+				"failures": []
+			},
+			"correctness": {
+				"passed": 33,
+				"total": 33,
+				"summary": "33/33",
+				"runner": "runner/correctness.mjs --target-url <url> --transport direct (Chromium, normal profile, no proxy)",
+				"failed": [],
+				"repeat": "second run, early phase only: 12/12"
+			},
+			"headers": {
+				"protocol": "HTTP/2",
+				"documentContentEncoding": "br",
+				"documentCacheControl": "public, max-age=0, must-revalidate",
+				"documentXVercelCache": "MISS",
+				"hashedJs": {
+					"path": "/build/q-CmBO-mIk.js",
+					"status": 200,
+					"contentEncoding": "br",
+					"cacheControl": "public, max-age=31536000, s-maxage=31536000, immutable",
+					"xVercelCacheFirst": "HIT",
+					"xVercelCache": "HIT",
+					"protocol": "HTTP/2"
+				}
+			},
+			"note": "Tuned variant of the qwik entrant (inline Qwik loader, route bundles, ssrPreloads 8); see apps/qwik-tuned/BENCH.md. Same header-route copy as qwik."
+		},
+		"octane": {
+			"url": "https://mlbench-octane.vercel.app",
+			"deploymentId": "dpl_9sSZS6GLHEezBubMeULjfXTbEuV9",
+			"project": "mlbench-octane",
+			"target": "production",
+			"runtime": "nodejs24.x",
+			"region": "iad1",
+			"buildId": "vercel-octane-2d441bfe",
+			"buildIdMethod": "vercel-<entrant>-<first 8 hex of sha256 over sorted relative path + NUL + bytes + NUL of every file in the app dir, skipping dirs node_modules .output .vercel dist build .svelte-kit .react-router tmp .nitro .vscode and files BENCH.md build-info.json .DS_Store *.tsbuildinfo>",
+			"build": "pnpm run build (@octanejs/adapter-vercel), .vc-config.json runtime nodejs22.x patched to nodejs24.x, then vercel deploy --prebuilt --prod",
+			"deployedAt": "2026-09-23T03:04:30.419Z",
+			"protection": "Vercel standard: production domain public, per-deployment URLs behind Vercel SSO (302)",
+			"smoke": {
+				"pass": true,
+				"checkedAt": "2026-09-23T03:21:13.145Z",
+				"routes": {
+					"/": {
+						"status": 200,
+						"title": "Overview",
+						"entrantMeta": "octane",
+						"buildMeta": "vercel-octane-2d441bfe"
+					},
+					"/records": {
+						"status": 200,
+						"title": "Records",
+						"entrantMeta": "octane",
+						"buildMeta": "vercel-octane-2d441bfe"
+					},
+					"/settings": {
+						"status": 200,
+						"title": "Settings",
+						"entrantMeta": "octane",
+						"buildMeta": "vercel-octane-2d441bfe"
+					}
+				},
+				"settings": {
+					"validPost": 200,
+					"failName422": 422,
+					"get": 405,
+					"put": 405,
+					"validWallMs": 477
+				},
+				"failures": []
+			},
+			"correctness": {
+				"passed": 22,
+				"total": 33,
+				"summary": "22/33",
+				"runner": "runner/correctness.mjs --target-url <url> --transport direct (Chromium, normal profile, no proxy)",
+				"failed": [
+					"overview-counter-first [early] timeout",
+					"overview-counter-repeat-x10 [early] timeout",
+					"overview-toggle [early] timeout",
+					"overview-disclosure [early] timeout",
+					"overview-tab [early] timeout",
+					"overview-filter [early] timeout",
+					"records-search [early] timeout",
+					"records-sort [early] timeout",
+					"records-select [early] timeout",
+					"records-dialog-open [early] timeout",
+					"settings-derived [early] timeout"
+				]
+			},
+			"headers": {
+				"protocol": "HTTP/2",
+				"documentContentEncoding": "gzip",
+				"documentCacheControl": "public, max-age=0, must-revalidate",
+				"documentXVercelCache": "MISS",
+				"hashedJs": {
+					"path": "/assets/App-BuoH97f9.js",
+					"status": 200,
+					"protocol": "HTTP/2",
+					"contentEncoding": "gzip",
+					"cacheControl": "public, max-age=31536000, immutable",
+					"xVercelCacheFirst": "MISS",
+					"xVercelCache": "HIT"
+				},
+				"jsContentEncodings": {
+					"gzip": 2
+				}
+			}
+		},
+		"react-router": {
+			"url": "https://mlbench-react-router.vercel.app",
+			"deploymentId": "dpl_GtFhavhyY8V38W9F3D4zfEbGCJ8c",
+			"project": "mlbench-react-router",
+			"target": "production",
+			"runtime": "nodejs24.x",
+			"region": "iad1",
+			"buildId": "vercel-react-router-da72e418",
+			"buildIdMethod": "vercel-<entrant>-<first 8 hex of sha256 over sorted relative path + NUL + bytes + NUL of every file in the app dir, skipping dirs node_modules .output .vercel dist build .svelte-kit .react-router tmp .nitro .vscode and files BENCH.md build-info.json .DS_Store *.tsbuildinfo>",
+			"build": "project framework preset react-router; vercel build --prod (vercelPreset), region pinned to iad1 in .vc-config.json, then vercel deploy --prebuilt --prod",
+			"deployedAt": "2026-09-23T03:08:27.345Z",
+			"protection": "Vercel standard: production domain public, per-deployment URLs behind Vercel SSO (302)",
+			"smoke": {
+				"pass": true,
+				"checkedAt": "2026-09-23T03:21:13.145Z",
+				"routes": {
+					"/": {
+						"status": 200,
+						"title": "Overview",
+						"entrantMeta": "react-router",
+						"buildMeta": "vercel-react-router-da72e418"
+					},
+					"/records": {
+						"status": 200,
+						"title": "Records",
+						"entrantMeta": "react-router",
+						"buildMeta": "vercel-react-router-da72e418"
+					},
+					"/settings": {
+						"status": 200,
+						"title": "Settings",
+						"entrantMeta": "react-router",
+						"buildMeta": "vercel-react-router-da72e418"
+					}
+				},
+				"settings": {
+					"validPost": 200,
+					"failName422": 422,
+					"get": 405,
+					"put": 405,
+					"validWallMs": 492
+				},
+				"failures": []
+			},
+			"correctness": {
+				"passed": 30,
+				"total": 33,
+				"summary": "30/33",
+				"runner": "runner/correctness.mjs --target-url <url> --transport direct (Chromium, normal profile, no proxy)",
+				"failed": [
+					"overview-counter-repeat-x10 [early] timeout",
+					"overview-toggle [early] timeout",
+					"records-search [early] timeout"
+				]
+			},
+			"headers": {
+				"protocol": "HTTP/2",
+				"documentContentEncoding": "gzip",
+				"documentCacheControl": "public, max-age=0, must-revalidate",
+				"documentXVercelCache": "MISS",
+				"hashedJs": {
+					"path": "/assets/entry.client-pT2057XF.js",
+					"status": 200,
+					"protocol": "HTTP/2",
+					"contentEncoding": "gzip",
+					"cacheControl": "public, max-age=31536000, immutable",
+					"xVercelCacheFirst": "MISS",
+					"xVercelCache": "HIT"
+				},
+				"jsContentEncodings": {
+					"gzip": 10,
+					"none": 1
+				}
+			}
+		},
+		"remix3": {
+			"url": "https://mlbench-remix3.vercel.app",
+			"deploymentId": "dpl_5Rw2oJhmk6L6K88cEEUXRMs3nXea",
+			"project": "mlbench-remix3",
+			"target": "production",
+			"runtime": "nodejs24.x",
+			"region": "iad1",
+			"buildId": "vercel-remix3-7fa817d6",
+			"buildIdMethod": "vercel-<entrant>-<first 8 hex of sha256 over sorted relative path + NUL + bytes + NUL of every file in the app dir, skipping dirs node_modules .output .vercel dist build .svelte-kit .react-router tmp .nitro .vscode and files BENCH.md build-info.json .DS_Store *.tsbuildinfo>",
+			"build": "remote Vercel build: pnpm install --frozen-lockfile --prod --config.node-linker=hoisted; pnpm run build:vercel (writes build-info.json from BENCHMARK_BUILD_ID via --build-env)",
+			"deployedAt": "2026-09-23T03:11:34.140Z",
+			"protection": "Vercel standard: production domain public, per-deployment URLs behind Vercel SSO (302)",
+			"smoke": {
+				"pass": true,
+				"checkedAt": "2026-09-23T03:21:13.145Z",
+				"routes": {
+					"/": {
+						"status": 200,
+						"title": "Overview",
+						"entrantMeta": "remix3",
+						"buildMeta": "vercel-remix3-7fa817d6"
+					},
+					"/records": {
+						"status": 200,
+						"title": "Records",
+						"entrantMeta": "remix3",
+						"buildMeta": "vercel-remix3-7fa817d6"
+					},
+					"/settings": {
+						"status": 200,
+						"title": "Settings",
+						"entrantMeta": "remix3",
+						"buildMeta": "vercel-remix3-7fa817d6"
+					}
+				},
+				"settings": {
+					"validPost": 200,
+					"failName422": 422,
+					"get": 405,
+					"put": 405,
+					"validWallMs": 473
+				},
+				"failures": []
+			},
+			"correctness": {
+				"passed": 24,
+				"total": 33,
+				"summary": "24/33",
+				"runner": "runner/correctness.mjs --target-url <url> --transport direct (Chromium, normal profile, no proxy)",
+				"failed": [
+					"overview-counter-first [early] timeout",
+					"overview-counter-repeat-x10 [early] timeout",
+					"overview-tab [early] timeout",
+					"overview-filter [early] timeout",
+					"records-search [early] timeout",
+					"records-sort [early] timeout",
+					"records-select [early] timeout",
+					"records-dialog-open [early] timeout",
+					"settings-derived [early] timeout"
+				]
+			},
+			"headers": {
+				"protocol": "HTTP/2",
+				"documentContentEncoding": "gzip",
+				"documentCacheControl": "public, max-age=0, must-revalidate",
+				"documentXVercelCache": "MISS",
+				"hashedJs": {
+					"path": "/assets/npm/.pnpm/remix%403.0.0-rc.3_%40emnapi%2Bcore%401.11.2_%40emnapi%2Bruntime%401.11.2/node_modules/remix/dist/multiple-import-maps-polyfill.js",
+					"status": 200,
+					"protocol": "HTTP/2",
+					"contentEncoding": "gzip",
+					"cacheControl": "no-cache",
+					"xVercelCacheFirst": "MISS",
+					"xVercelCache": "MISS"
+				},
+				"jsContentEncodings": {
+					"gzip": 25
+				}
+			},
+			"note": "Assets are served by the function with cache-control no-cache (template default, no CDN caching); a fingerprinted/CDN-cached variant is a separate tuned variant."
+		},
+		"solidstart": {
+			"url": "https://mlbench-solidstart.vercel.app",
+			"deploymentId": "dpl_JBqjUmqNuXNab8eLouJRWSVusyvp",
+			"project": "mlbench-solidstart",
+			"target": "production",
+			"runtime": "nodejs24.x",
+			"region": "iad1",
+			"buildId": "vercel-solidstart-d0be8cf5",
+			"buildIdMethod": "vercel-<entrant>-<first 8 hex of sha256 over sorted relative path + NUL + bytes + NUL of every file in the app dir, skipping dirs node_modules .output .vercel dist build .svelte-kit .react-router tmp .nitro .vscode and files BENCH.md build-info.json .DS_Store *.tsbuildinfo>",
+			"build": "NITRO_PRESET=vercel pnpm run build, then vercel deploy --prebuilt --prod",
+			"deployedAt": "2026-09-23T03:04:54.882Z",
+			"protection": "Vercel standard: production domain public, per-deployment URLs behind Vercel SSO (302)",
+			"smoke": {
+				"pass": true,
+				"checkedAt": "2026-09-23T03:21:13.146Z",
+				"routes": {
+					"/": {
+						"status": 200,
+						"title": "Overview",
+						"entrantMeta": "solidstart",
+						"buildMeta": "vercel-solidstart-d0be8cf5"
+					},
+					"/records": {
+						"status": 200,
+						"title": "Records",
+						"entrantMeta": "solidstart",
+						"buildMeta": "vercel-solidstart-d0be8cf5"
+					},
+					"/settings": {
+						"status": 200,
+						"title": "Settings",
+						"entrantMeta": "solidstart",
+						"buildMeta": "vercel-solidstart-d0be8cf5"
+					}
+				},
+				"settings": {
+					"validPost": 200,
+					"failName422": 422,
+					"get": 405,
+					"put": 405,
+					"validWallMs": 491
+				},
+				"failures": []
+			},
+			"correctness": {
+				"passed": 33,
+				"total": 33,
+				"summary": "33/33",
+				"runner": "runner/correctness.mjs --target-url <url> --transport direct (Chromium, normal profile, no proxy)",
+				"failed": []
+			},
+			"headers": {
+				"protocol": "HTTP/2",
+				"documentContentEncoding": "gzip",
+				"documentCacheControl": "public, max-age=0, must-revalidate",
+				"documentXVercelCache": "MISS",
+				"hashedJs": {
+					"path": "/assets/index-MtiADJaM.js",
+					"status": 200,
+					"protocol": "HTTP/2",
+					"contentEncoding": "gzip",
+					"cacheControl": "public, max-age=31536000, immutable",
+					"xVercelCacheFirst": "MISS",
+					"xVercelCache": "HIT"
+				},
+				"jsContentEncodings": {
+					"gzip": 6
+				}
+			},
+			"note": "The first smoke seconds after deploy got status 404 with the correct page HTML on all three routes; every later request (18+) answered 200. Not reproduced."
+		},
+		"sveltekit": {
+			"url": "https://mlbench-sveltekit.vercel.app",
+			"deploymentId": "dpl_C2gS1Hv4PLnEqKMJ9YmNnmZPxtvK",
+			"project": "mlbench-sveltekit",
+			"target": "production",
+			"runtime": "nodejs24.x",
+			"region": "iad1",
+			"buildId": "vercel-sveltekit-5fd0b338",
+			"buildIdMethod": "vercel-<entrant>-<first 8 hex of sha256 over sorted relative path + NUL + bytes + NUL of every file in the app dir, skipping dirs node_modules .output .vercel dist build .svelte-kit .react-router tmp .nitro .vscode and files BENCH.md build-info.json .DS_Store *.tsbuildinfo>",
+			"build": "pnpm run build (adapter-vercel), .vc-config.json runtime nodejs22.x patched to nodejs24.x, then vercel deploy --prebuilt --prod",
+			"deployedAt": "2026-09-23T03:01:53.865Z",
+			"protection": "Vercel standard: production domain public, per-deployment URLs behind Vercel SSO (302)",
+			"smoke": {
+				"pass": true,
+				"checkedAt": "2026-09-23T03:21:13.146Z",
+				"routes": {
+					"/": {
+						"status": 200,
+						"title": "Overview",
+						"entrantMeta": "sveltekit",
+						"buildMeta": "vercel-sveltekit-5fd0b338"
+					},
+					"/records": {
+						"status": 200,
+						"title": "Records",
+						"entrantMeta": "sveltekit",
+						"buildMeta": "vercel-sveltekit-5fd0b338"
+					},
+					"/settings": {
+						"status": 200,
+						"title": "Settings",
+						"entrantMeta": "sveltekit",
+						"buildMeta": "vercel-sveltekit-5fd0b338"
+					}
+				},
+				"settings": {
+					"validPost": 200,
+					"failName422": 422,
+					"get": 405,
+					"put": 405,
+					"validWallMs": 483
+				},
+				"failures": []
+			},
+			"correctness": {
+				"passed": 28,
+				"total": 33,
+				"summary": "28/33",
+				"runner": "runner/correctness.mjs --target-url <url> --transport direct (Chromium, normal profile, no proxy)",
+				"failed": [
+					"overview-toggle [early] timeout",
+					"overview-disclosure [early] timeout",
+					"overview-tab [early] timeout",
+					"records-sort [early] timeout",
+					"records-select [early] timeout"
+				]
+			},
+			"headers": {
+				"protocol": "HTTP/2",
+				"documentContentEncoding": "gzip",
+				"documentCacheControl": "public, max-age=0, must-revalidate",
+				"documentXVercelCache": "MISS",
+				"hashedJs": {
+					"path": "/_app/immutable/entry/start.zfeMyOvz.js",
+					"status": 200,
+					"protocol": "HTTP/2",
+					"contentEncoding": null,
+					"cacheControl": "public, immutable, max-age=31536000",
+					"xVercelCacheFirst": "HIT",
+					"xVercelCache": "HIT"
+				},
+				"jsContentEncodings": {
+					"none": 3,
+					"gzip": 8
+				}
+			}
+		},
+		"ripple": {
+			"url": "https://mlbench-ripple.vercel.app",
+			"deploymentId": "dpl_EAP2885MHacwJHuL64PxsKqRix4B",
+			"project": "mlbench-ripple",
+			"target": "production",
+			"runtime": "nodejs24.x",
+			"region": "iad1",
+			"buildId": "vercel-ripple-5e6ef143",
+			"buildIdMethod": "vercel-<entrant>-<first 8 hex of sha256 over sorted relative path + NUL + bytes + NUL of every file in the app dir, skipping dirs node_modules .output .vercel dist build .svelte-kit .react-router tmp .nitro .vscode and files BENCH.md build-info.json .DS_Store *.tsbuildinfo>",
+			"build": "pnpm run build:vercel (@ripple-ts/adapter-vercel), region pinned to iad1 in .vc-config.json, then vercel deploy --prebuilt --prod",
+			"deployedAt": "2026-09-23T03:06:00.926Z",
+			"protection": "Vercel standard: production domain public, per-deployment URLs behind Vercel SSO (302)",
+			"smoke": {
+				"pass": true,
+				"checkedAt": "2026-09-23T03:21:13.147Z",
+				"routes": {
+					"/": {
+						"status": 200,
+						"title": "Overview",
+						"entrantMeta": "ripple",
+						"buildMeta": "vercel-ripple-5e6ef143"
+					},
+					"/records": {
+						"status": 200,
+						"title": "Records",
+						"entrantMeta": "ripple",
+						"buildMeta": "vercel-ripple-5e6ef143"
+					},
+					"/settings": {
+						"status": 200,
+						"title": "Settings",
+						"entrantMeta": "ripple",
+						"buildMeta": "vercel-ripple-5e6ef143"
+					}
+				},
+				"settings": {
+					"validPost": 200,
+					"failName422": 422,
+					"get": 405,
+					"put": 405,
+					"validWallMs": 467
+				},
+				"failures": []
+			},
+			"correctness": {
+				"passed": 22,
+				"total": 33,
+				"summary": "22/33",
+				"runner": "runner/correctness.mjs --target-url <url> --transport direct (Chromium, normal profile, no proxy)",
+				"failed": [
+					"overview-counter-first [early] timeout",
+					"overview-counter-repeat-x10 [early] timeout",
+					"overview-toggle [early] timeout",
+					"overview-disclosure [early] timeout",
+					"overview-tab [early] timeout",
+					"overview-filter [early] timeout",
+					"records-search [early] timeout",
+					"records-sort [early] timeout",
+					"records-select [early] timeout",
+					"records-dialog-open [early] timeout",
+					"settings-derived [early] timeout"
+				]
+			},
+			"headers": {
+				"protocol": "HTTP/2",
+				"documentContentEncoding": "gzip",
+				"documentCacheControl": "public, max-age=0, must-revalidate",
+				"documentXVercelCache": "MISS",
+				"hashedJs": {
+					"path": "/assets/src/pages/overview.tsrx-CBZKTekT.js",
+					"status": 200,
+					"protocol": "HTTP/2",
+					"contentEncoding": "gzip",
+					"cacheControl": "public, max-age=31536000, immutable",
+					"xVercelCacheFirst": "HIT",
+					"xVercelCache": "HIT"
+				},
+				"jsContentEncodings": {
+					"gzip": 5
+				}
+			}
+		}
+	}
+}

@@ -9,7 +9,6 @@ function initialWeight() {
 	return 2;
 }
 
-
 export function App({ url }: PageProps) @{
 	let selectedKey = state('none');
 	let weight = state(initialWeight());
@@ -23,30 +22,49 @@ export function App({ url }: PageProps) @{
 		</header>
 
 		<section class="controls" aria-label="Feed controls">
-			<button type="button" data-increase-weight onClick={() => weight++}>Increase weight</button>
+			<button type="button" data-increase-weight onClick={() => weight++}>
+				Increase weight
+			</button>
 			<output data-selected-key>Selected {selectedKey}</output>
 		</section>
 
 		@try {
 			<section class="settled" data-feed-settled>
-				<p class="channel" data-feed-channel>{feed.channel}</p>
+				<p class="channel" data-feed-channel>
+					{feed.channel}
+				</p>
 				<UpdateSummary updates={feed.updates} weight={weight} />
-				<ul class="update-list" data-update-list data-row-count={feed.updates.length}>
+				<ul
+					class="update-list"
+					data-update-list
+					data-row-count={feed.updates.length}
+				>
 					@for (const update of feed.updates; key update.id) {
-						<li data-row-key={update.id} onClick={() => selectedKey = update.id}>
+						<li
+							data-row-key={update.id}
+							onClick={() =>
+								(selectedKey = update.id)
+							}
+						>
 							<strong>{update.project}</strong>
-							<span data-version>{update.version}</span>
+							<span data-version>
+								{update.version}
+							</span>
 							<span>{update.stage}</span>
-						</li>
+						</li>;
 					} @empty {
-						<li data-feed-empty>No local updates</li>
+						<li data-feed-empty>No local updates</li>;
 					}
 				</ul>
-			</section>
+			</section>;
 		} @pending {
-			<p class="pending" data-feed-pending>Checking local updates…</p>
+			<p class="pending" data-feed-pending>
+				Checking local updates…
+			</p>;
 		} @catch {
-			<p class="error" data-feed-error>Local updates unavailable</p>
+			<p class="error" data-feed-error>
+				Local updates unavailable
+			</p>;
 		}
-	</main>
+	</main>;
 }

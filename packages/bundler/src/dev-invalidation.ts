@@ -22,12 +22,14 @@ export function invalidateAllGeneratedModules(
 		virtualModules,
 		moduleMetadata,
 		prerenderWakeCapabilities,
-		moduleLinkArtifacts,
+		moduleLinkArtifactsByEnvironment,
 		linkedTransformCache,
 		prerenderWakeSources,
 	} = state;
 	const changedSource = pathname(parent);
-	moduleLinkArtifacts.delete(changedSource);
+	for (const artifacts of moduleLinkArtifactsByEnvironment.values()) {
+		artifacts.delete(changedSource);
+	}
 	moduleMetadata.deleteCaptureMetadata(changedSource);
 	moduleMetadata.invalidateSourceSymbolClaims(changedSource, changedSource);
 	prerenderWakeCapabilities.delete(changedSource);
@@ -66,13 +68,8 @@ export async function invalidateEditedGeneratedModules(
 	nextSource: string,
 ) {
 	const { state } = ctx;
-	const {
-		virtualModules,
-		moduleMetadata,
-		prerenderWakeCapabilities,
-		moduleLinkArtifacts,
-		linkedTransformCache,
-	} = state;
+	const { virtualModules, moduleMetadata, prerenderWakeCapabilities, linkedTransformCache } =
+		state;
 	const changedSource = pathname(parent);
 	const cachedEntries = [...linkedTransformCache].filter(
 		([key, cached]) =>
@@ -119,11 +116,13 @@ export async function invalidateEditedGeneratedModules(
 		nextEntries.findLast(([, , , next]) => captured(next))?.[3].manifest ??
 		foldEntries.findLast(({ result }) => captured(result))?.result.manifest ??
 		linkResult.manifest;
-	moduleLinkArtifacts.set(changedSource, {
-		moduleGraphInterface: linkResult.moduleGraphInterface,
-		interfaceHash: linkResult.interfaceHash,
-		moduleImports: linkResult.moduleImports,
-	});
+	for (const [, cached] of nextEntries) {
+		state.moduleLinkArtifacts(cached.input.environment ?? 'client').set(changedSource, {
+			moduleGraphInterface: linkResult.moduleGraphInterface,
+			interfaceHash: linkResult.interfaceHash,
+			moduleImports: linkResult.moduleImports,
+		});
+	}
 	moduleMetadata.recordCaptureMetadata(changedSource, captureManifest);
 	prerenderWakeCapabilities.set(
 		changedSource,

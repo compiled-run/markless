@@ -11,6 +11,8 @@ declare namespace __MarklessTypeService {
 
 	type Child = Element | string | number | null | undefined | readonly Child[];
 	type AttributeValue = string | number | boolean | undefined;
+	/** An HTML integer attribute: a number, or the numeric string markup writes (`tabindex="0"`). */
+	type NumericAttributeValue = number | `${number}`;
 	/**
 	 * An IDREF position that names exactly one element by id. An element() handle
 	 * is valid here: the compiler resolves the relationship and the emitter mints
@@ -113,6 +115,88 @@ declare namespace __MarklessTypeService {
 				? `on${Capitalize<Name>}`
 				: never
 		]?: EventHandler<ElementEventMap<E>[Name], E>;
+	} & {
+		[
+			Name in keyof ElementEventMap<E> & keyof EventNameWords as `on${EventNameWords[Name]}`
+		]?: EventHandler<ElementEventMap<E>[Name], E>;
+	};
+
+	/**
+	 * The compiler lowercases the name after `on`, so `onKeyDown` binds `keydown`
+	 * exactly as `onKeydown` does. Word boundaries are not derivable from the DOM
+	 * event name, so the multi-word spellings are listed.
+	 */
+	type EventNameWords = {
+		animationcancel: 'AnimationCancel';
+		animationend: 'AnimationEnd';
+		animationiteration: 'AnimationIteration';
+		animationstart: 'AnimationStart';
+		auxclick: 'AuxClick';
+		beforeinput: 'BeforeInput';
+		beforematch: 'BeforeMatch';
+		beforetoggle: 'BeforeToggle';
+		canplay: 'CanPlay';
+		canplaythrough: 'CanPlayThrough';
+		compositionend: 'CompositionEnd';
+		compositionstart: 'CompositionStart';
+		compositionupdate: 'CompositionUpdate';
+		contextlost: 'ContextLost';
+		contextmenu: 'ContextMenu';
+		contextrestored: 'ContextRestored';
+		cuechange: 'CueChange';
+		dblclick: 'DblClick';
+		dragend: 'DragEnd';
+		dragenter: 'DragEnter';
+		dragleave: 'DragLeave';
+		dragover: 'DragOver';
+		dragstart: 'DragStart';
+		durationchange: 'DurationChange';
+		enterpictureinpicture: 'EnterPictureInPicture';
+		focusin: 'FocusIn';
+		focusout: 'FocusOut';
+		formdata: 'FormData';
+		gotpointercapture: 'GotPointerCapture';
+		keydown: 'KeyDown';
+		keypress: 'KeyPress';
+		keyup: 'KeyUp';
+		leavepictureinpicture: 'LeavePictureInPicture';
+		loadeddata: 'LoadedData';
+		loadedmetadata: 'LoadedMetadata';
+		loadstart: 'LoadStart';
+		lostpointercapture: 'LostPointerCapture';
+		mousedown: 'MouseDown';
+		mouseenter: 'MouseEnter';
+		mouseleave: 'MouseLeave';
+		mousemove: 'MouseMove';
+		mouseout: 'MouseOut';
+		mouseover: 'MouseOver';
+		mouseup: 'MouseUp';
+		pointercancel: 'PointerCancel';
+		pointerdown: 'PointerDown';
+		pointerenter: 'PointerEnter';
+		pointerleave: 'PointerLeave';
+		pointermove: 'PointerMove';
+		pointerout: 'PointerOut';
+		pointerover: 'PointerOver';
+		pointerrawupdate: 'PointerRawUpdate';
+		pointerup: 'PointerUp';
+		ratechange: 'RateChange';
+		scrollend: 'ScrollEnd';
+		securitypolicyviolation: 'SecurityPolicyViolation';
+		selectionchange: 'SelectionChange';
+		selectstart: 'SelectStart';
+		slotchange: 'SlotChange';
+		timeupdate: 'TimeUpdate';
+		touchcancel: 'TouchCancel';
+		touchend: 'TouchEnd';
+		touchmove: 'TouchMove';
+		touchstart: 'TouchStart';
+		transitioncancel: 'TransitionCancel';
+		transitionend: 'TransitionEnd';
+		transitionrun: 'TransitionRun';
+		transitionstart: 'TransitionStart';
+		volumechange: 'VolumeChange';
+		waitingforkey: 'WaitingForKey';
 	};
 
 	/**
@@ -188,7 +272,7 @@ declare namespace __MarklessTypeService {
 		slot?: string;
 		spellcheck?: boolean | 'true' | 'false';
 		style?: string | StyleObject;
-		tabindex?: number;
+		tabindex?: NumericAttributeValue;
 		title?: string;
 		translate?: 'yes' | 'no';
 		[key: `data-${string}`]: AttributeValue;
@@ -229,7 +313,7 @@ declare namespace __MarklessTypeService {
 		crossorigin?: 'anonymous' | 'use-credentials' | '';
 		decoding?: 'async' | 'auto' | 'sync';
 		fetchpriority?: 'high' | 'low' | 'auto';
-		height?: number;
+		height?: NumericAttributeValue;
 		ismap?: boolean;
 		loading?: 'eager' | 'lazy';
 		referrerpolicy?: ReferrerPolicy;
@@ -237,7 +321,7 @@ declare namespace __MarklessTypeService {
 		src?: string;
 		srcset?: string;
 		usemap?: string;
-		width?: number;
+		width?: NumericAttributeValue;
 	};
 
 	type InputAttributes = FormAttributes & {
@@ -248,15 +332,15 @@ declare namespace __MarklessTypeService {
 		checked?: boolean;
 		dirname?: string;
 		disabled?: boolean;
-		height?: number;
+		height?: NumericAttributeValue;
 		// The third checkbox state. It is an IDL property rather than a content
 		// attribute, so no HTML attribute list carries it.
 		indeterminate?: boolean;
 		list?: string;
 		max?: string | number;
-		maxlength?: number;
+		maxlength?: NumericAttributeValue;
 		min?: string | number;
-		minlength?: number;
+		minlength?: NumericAttributeValue;
 		multiple?: boolean;
 		pattern?: string;
 		placeholder?: string;
@@ -264,12 +348,12 @@ declare namespace __MarklessTypeService {
 		popovertargetaction?: 'hide' | 'show' | 'toggle';
 		readonly?: boolean;
 		required?: boolean;
-		size?: number;
+		size?: NumericAttributeValue;
 		src?: string;
 		step?: string | number;
 		type?: string;
 		value?: string | number | readonly string[];
-		width?: number;
+		width?: NumericAttributeValue;
 	};
 
 	type MediaAttributes = {
@@ -318,14 +402,14 @@ declare namespace __MarklessTypeService {
 	};
 
 	type TableCellAttributes = {
-		colspan?: number;
+		colspan?: NumericAttributeValue;
 		/**
 		 * A space-separated list of header cell ids. It stays a plain string rather
 		 * than IdrefValue because the compiler's IDREF_ATTRIBUTES set does not carry
 		 * it, so an element() handle written here would never resolve.
 		 */
 		headers?: string;
-		rowspan?: number;
+		rowspan?: NumericAttributeValue;
 	};
 
 	type TableHeaderAttributes = TableCellAttributes & {
@@ -352,7 +436,7 @@ declare namespace __MarklessTypeService {
 							value?: string;
 						}
 					: Tag extends 'canvas'
-						? { height?: number; width?: number }
+						? { height?: NumericAttributeValue; width?: NumericAttributeValue }
 						: Tag extends 'fieldset'
 							? // `disabled` is what the native "disable every control inside" cascade reads.
 								{ disabled?: boolean; form?: string; name?: string }
@@ -424,7 +508,7 @@ declare namespace __MarklessTypeService {
 																			disabled?: boolean;
 																			multiple?: boolean;
 																			required?: boolean;
-																			size?: number;
+																			size?: NumericAttributeValue;
 																			value?:
 																				| string
 																				| readonly string[];
@@ -435,20 +519,20 @@ declare namespace __MarklessTypeService {
 																			? TableHeaderAttributes
 																			: Tag extends 'textarea'
 																				? FormAttributes & {
-																						cols?: number;
+																						cols?: NumericAttributeValue;
 																						disabled?: boolean;
 																						placeholder?: string;
 																						readonly?: boolean;
 																						required?: boolean;
-																						rows?: number;
+																						rows?: NumericAttributeValue;
 																						value?: string;
 																					}
 																				: Tag extends 'video'
 																					? MediaAttributes & {
-																							height?: number;
+																							height?: NumericAttributeValue;
 																							playsinline?: boolean;
 																							poster?: string;
-																							width?: number;
+																							width?: NumericAttributeValue;
 																						}
 																					: Tag extends keyof SVGElementTagNameMap
 																						? SvgAttributes

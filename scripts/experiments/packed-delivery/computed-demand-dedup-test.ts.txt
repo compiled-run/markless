@@ -1,0 +1,152 @@
+import { expect, test } from 'vitest';
+import { createRuntimeGraph, type RuntimeGraph } from '@markless/runtime';
+import { wireSyncComputedDemandRecordsWithoutLoadingCapability } from '../src/resume-sync-demand.ts';
+import type { ResumeSymbol, ElementHandleRegistry } from '../src/resume-types.ts';
+
+function wire(
+	graph: RuntimeGraph,
+	records: { id: string; dependencies: { graphNodeId: string; path: string[] }[] }[],
+	load: (id: string) => ResumeSymbol,
+) {
+	const releases: (() => void)[] = [];
+	wireSyncComputedDemandRecordsWithoutLoadingCapability({
+		graph,
+		computed: records.map((record) => ({
+			graphNodeId: record.id,
+			name: record.id,
+			async: false,
+			deriveSymbolId: record.id,
+			dependencies: record.dependencies,
+		})),
+		root: { nodeType: 1 } as never,
+		loadSymbol: load,
+		elementHandles: {
+			get: () => undefined,
+			register() {},
+			deleteHost() {},
+		} satisfies ElementHandleRegistry,
+		storeContainerSubscription: (release) => releases.push(release),
+	});
+	return () => {
+		for (const release of releases) release();
+	};
+}
+
+test.each([
+	['state:invoice', 'computed:total', ['tax', 'amount']],
+	['state:reading', 'computed:progress', ['remaining', 'done', 'pending']],
+] as const)(
+	'one write to %s refreshes its dependent once per batch',
+	async (source, target, fields) => {
+		const graph = createRuntimeGraph({
+			cells: [
+				{
+					graphNodeId: source,
+					value: Object.fromEntries(fields.map((field) => [field, 0])),
+				},
+			],
+		});
+		const calls: string[] = [];
+		const dispose = wire(
+			graph,
+			[
+				{
+					id: target,
+					dependencies: fields.map((field) => ({ graphNodeId: source, path: [field] })),
+				},
+			],
+			(id) =>
+				({ graph }) => {
+					calls.push(id);
+					return fields.reduce(
+						(sum, field) => sum + Number(graph.read(source, [field])),
+						0,
+					);
+				},
+		);
+		expect(calls).toEqual([]);
+		graph.write({
+			graphNodeId: source,
+			value: Object.fromEntries(fields.map((field, index) => [field, index + 1])),
+		});
+		await graph.flush();
+		expect(graph.read(target)).toBe((fields.length * (fields.length + 1)) / 2);
+		expect(calls).toEqual([target]);
+		graph.write({ graphNodeId: source, path: [fields[0]], value: 10 });
+		await graph.flush();
+		expect(graph.read(target)).toBe(9 + (fields.length * (fields.length + 1)) / 2);
+		expect(calls).toEqual([target, target]);
+		dispose();
+		graph.write({ graphNodeId: source, path: [fields[0]], value: 20 });
+		await graph.flush();
+		expect(calls).toEqual([target, target]);
+	},
+);
+
+test('separate computed targets still refresh for the same dependency writes', async () => {
+	const graph = createRuntimeGraph({
+		cells: [{ graphNodeId: 'state:input', value: { left: 0, right: 0 } }],
+	});
+	const calls: string[] = [];
+	wire(
+		graph,
+		['computed:sum', 'computed:product'].map((id) => ({
+			id,
+			dependencies: ['left', 'right'].map((field) => ({
+				graphNodeId: 'state:input',
+				path: [field],
+			})),
+		})),
+		(id) =>
+			({ graph }) => {
+				calls.push(id);
+				const left = Number(graph.read('state:input', ['left'])),
+					right = Number(graph.read('state:input', ['right']));
+				return id === 'computed:sum' ? left + right : left * right;
+			},
+	);
+	graph.write({ graphNodeId: 'state:input', value: { left: 3, right: 4 } });
+	await graph.flush();
+	expect(graph.read('computed:sum')).toBe(7);
+	expect(graph.read('computed:product')).toBe(12);
+	expect(calls).toEqual(['computed:sum', 'computed:product']);
+});
+
+test('a dependency changed by a later subscription refreshes the computed in the next batch', async () => {
+	const graph = createRuntimeGraph({
+		cells: [{ graphNodeId: 'state:input', value: { left: 0, right: 0 } }],
+	});
+	const values: number[] = [];
+	wire(
+		graph,
+		[
+			{
+				id: 'computed:sum',
+				dependencies: ['left', 'right'].map((field) => ({
+					graphNodeId: 'state:input',
+					path: [field],
+				})),
+			},
+		],
+		() =>
+			({ graph }) => {
+				const value =
+					Number(graph.read('state:input', ['left'])) +
+					Number(graph.read('state:input', ['right']));
+				values.push(value);
+				return value;
+			},
+	);
+	graph.subscribe({
+		id: 'adjust-right',
+		graphNodeId: 'state:input',
+		path: ['left'],
+		run() {
+			graph.write({ graphNodeId: 'state:input', path: ['right'], value: 9 });
+		},
+	});
+	graph.write({ graphNodeId: 'state:input', value: { left: 3, right: 4 } });
+	await graph.flush();
+	expect(graph.read('computed:sum')).toBe(12);
+	expect(values).toEqual([7, 12]);
+});

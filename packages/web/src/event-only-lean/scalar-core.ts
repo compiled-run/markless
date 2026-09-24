@@ -15,7 +15,8 @@ import type { ProtocolSyncPolicyCondition } from '../../../serializer/src/protoc
 export async function resumeScalarCoreEventFromPayloadDocument(
 	input: ResumeEventOnlyFromPayloadDocumentInput,
 ): Promise<EventOnlyResumeContainer> {
-	if (!input.eventRecord) return resumeFullEventOnly(input);
+	if (!input.eventRecord || input.root.__asyncResumeRuntimeStarted)
+		return resumeFullEventOnly(input);
 	// The guard above narrows the property, not the input object.
 	const withRecord = input as ResumeEventOnlyFromPayloadDocumentInput & {
 		readonly eventRecord: EventOnlyResumeRecord;

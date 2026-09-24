@@ -1,0 +1,5 @@
+{
+  "sample": true,
+  "label": "SAMPLE: runner selftest fixture",
+  "note": "Produced by site/scripts/sample-run.mjs: the benchmark runner measuring its own plain-JS selftest fixture (runner/selftest/fixture.html). The records carry entrant \"markless\" only because the schema requires an entrant name. These are NOT Markless results and NOT results for any framework. They exist to exercise the site layout."
+}

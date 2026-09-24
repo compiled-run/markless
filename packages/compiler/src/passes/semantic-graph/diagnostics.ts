@@ -10,6 +10,7 @@ import type {
 	SourceSpan,
 } from '../../artifacts.ts';
 import type { FrameworkApiName } from './imports.ts';
+import type { UnwiredReason } from './static-repeat-lift.ts';
 import type { PendingElementHandleIdref, WalkState } from './types.ts';
 
 export function uiImportShapeDiagnostic(input: {
@@ -165,6 +166,40 @@ export function computedDependencyCycleDiagnostic(input: {
 	});
 }
 
+export function computedReadsRenderLocalDiagnostic(input: {
+	readonly name: string;
+	readonly localName: string;
+	readonly init: AnyNode;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_COMPUTED_READS_RENDER_LOCAL',
+		title: 'A computed reads a component-body local the browser cannot recompute',
+		message: `\`${input.name}\` reads \`${input.localName}\`, a local of the component body. The body runs only during the initial render, so the browser's copy of this computed would name a variable that does not exist there.`,
+		why: 'A computed re-derives in the browser from graph reads, props, and module values. A `const` local built only from those is recomputed in place; any other local has no value the browser can reach.',
+		span: sourceSpan(input.init, input.filename),
+		suggestion: `Declare \`${input.localName}\` as \`const ${input.localName} = ...\` built only from module values, props, and state; move it to module scope; or make it state: \`const ${input.localName} = state(...)\`.`,
+		docsUrl: 'https://markless.dev/errors/MARKLESS_COMPUTED_READS_RENDER_LOCAL',
+	});
+}
+
+export function handlerReadsRenderLocalDiagnostic(input: {
+	readonly handlerLabel: string;
+	readonly localName: string;
+	readonly handler: AnyNode;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_HANDLER_READS_RENDER_LOCAL',
+		title: 'A handler reads a component-body local the browser cannot recompute',
+		message: `The \`${input.handlerLabel}\` handler reads \`${input.localName}\`, a local of the component body. The body runs only during the initial render, so the browser copy of this handler would name a variable that does not exist there.`,
+		why: 'A handler runs in the browser from graph reads, props, and module values. A `const` local built only from those is recomputed in place; any other local has no value the browser can reach.',
+		span: sourceSpan(input.handler, input.filename),
+		suggestion: `Declare \`${input.localName}\` as \`const ${input.localName} = ...\` built only from module values, props, and state; move it to module scope; or make it state: \`const ${input.localName} = state(...)\`.`,
+		docsUrl: 'https://markless.dev/errors/MARKLESS_HANDLER_READS_RENDER_LOCAL',
+	});
+}
+
 export function callbackPropArityUnsupportedDiagnostic(input: {
 	readonly propName: string;
 	readonly parameterCount: number;
@@ -200,6 +235,24 @@ export function componentPropExpressionUnsupportedDiagnostic(input: {
 		suggestion:
 			'Pass a value the compiler can follow: a plain read (`group.value`), or an expression built only from reads, operators and method calls on those reads (`group.value.includes(item.value)`). If the value needs a function of your own, put that function inside a `computed()` and pass the computed.',
 		docsUrl: 'https://markless.dev/errors/MARKLESS_COMPONENT_PROP_EXPRESSION_UNSUPPORTED',
+	});
+}
+
+export function templateExpressionUnsupportedDiagnostic(input: {
+	readonly target: string;
+	readonly source: string;
+	readonly node: AnyNode;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED',
+		title: 'A markup expression that reads state needs a route the page can follow',
+		message: `${input.target} is written as \`${input.source}\`, which reads state but is not an expression this compiler can keep current.`,
+		why: 'An expression with no graph node behind it renders once, from whatever the value was at render, and a later write never reaches it - so the page would show a stale value and nothing would say so.',
+		span: sourceSpan(input.node, input.filename),
+		suggestion:
+			'Write a plain read (`group.value`), or an expression built only from reads, operators and method calls on those reads. If the value needs a function of your own, put that function inside a `computed()` and read the computed here.',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED',
 	});
 }
 
@@ -1324,12 +1377,13 @@ export function duplicateElementHandleDiagnostic(
 export function unsupportedRowElementHandleDiagnostic(
 	binding: SemanticElementHandleBinding,
 ): SemanticGraphDiagnostic {
+	const nested = binding.keyedRepeatScopeIds.length > 1;
 	return {
 		code: 'MARKLESS_ROW_ELEMENT_HANDLE_UNSUPPORTED',
 		severity: 'error',
 		phase: 'semantic-graph',
 		title: 'This is not a row-ownable element() handle',
-		message: `Cannot bind el={${binding.handleName}} inside a keyed repeat. A row host takes a declared element() handle, named directly (el={row}) or as one member off a shared() instance (el={select.optionEls}). markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package`,
+		message: `Cannot bind el={${binding.handleName}} inside ${nested ? 'a @for nested in another @for row: nested rows own no element() handle slot yet' : 'a keyed repeat'}. A row host takes a declared element() handle, named directly (el={row}) or as one member off a shared() instance (el={select.optionEls}). markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package`,
 		why: 'The keyed row record owns one host slot per authored handle and repeat key. Forwarded props, deeper paths, and nested repeat scopes do not identify one compiler-proven row-owned slot.',
 		primarySpan: binding.sourceSpan,
 		passId: 'tsrx-semantic-graph',
@@ -1792,4 +1846,40 @@ export function fallbackSpan(filename: string): SourceSpan {
 		start: 0,
 		end: 0,
 	};
+}
+
+export function repeatRowHandlersUnwiredDiagnostic(input: {
+	readonly node: AnyNode;
+	readonly itemName: string;
+	readonly collectionSource: string;
+	readonly handlerName: string;
+	readonly reason: UnwiredReason;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	const loop = `@for (const ${input.itemName} of ${input.collectionSource})`;
+	const { reason } = input;
+	const detail =
+		reason.kind === 'nested'
+			? {
+					message: `${loop} sits inside the rows of an enclosing \`@for (const ${reason.enclosingItemName} of ...)\` and renders rows with an ${input.handlerName} handler, but the browser cannot find these rows again inside each enclosing row. That needs a collection on the graph or a plain property path on \`${reason.enclosingItemName}\`, inside an enclosing @for keyed by its data rather than by position.`,
+					suggestion: `Loop over a property of the enclosing row item, such as \`@for (const ${input.itemName} of ${reason.enclosingItemName}.items; key ...)\`, and key the enclosing @for by its data; or move the inner rows into their own component and render it in the enclosing row.`,
+				}
+			: reason.kind === 'render-local'
+				? {
+						message: `${loop} renders rows with an ${input.handlerName} handler, and \`${input.collectionSource}\` reads \`${reason.name}\`, a component-body local the browser cannot recompute. Only the first row's handler would be wired, and it would run without its \`${input.itemName}\`.`,
+						suggestion: `Declare \`${reason.name}\` as \`const ${reason.name} = ...\` built only from module values, props, and state, so the compiler can recompute it; or put the rows on the graph: \`const rows = state(${input.collectionSource})\`, then loop over \`rows\`.`,
+					}
+				: {
+						message: `${loop} renders rows with an ${input.handlerName} handler, but \`${input.collectionSource}\` is neither a graph read nor recomputable from module values, props, and state, so the browser cannot rebuild the rows. Only the first row's handler would be wired.`,
+						suggestion: `Put the collection on the graph - \`const rows = state(${input.collectionSource})\` inside the component - and loop over \`rows\`.`,
+					};
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_REPEAT_ROW_HANDLERS_UNWIRED',
+		title: 'This @for row has an event handler the browser cannot wire',
+		message: detail.message,
+		why: 'A row handler receives its item from a collection the browser can read again: one on the graph, or a property path on the item of an enclosing keyed row.',
+		span: sourceSpan(input.node, input.filename),
+		suggestion: detail.suggestion,
+		docsUrl: 'https://markless.dev/errors/MARKLESS_REPEAT_ROW_HANDLERS_UNWIRED',
+	});
 }

@@ -1,0 +1,101 @@
+diff --git a/packages/runtime/src/graph.ts b/packages/runtime/src/graph.ts
+index c0b4222b..04ec939d 100644
+--- a/packages/runtime/src/graph.ts
++++ b/packages/runtime/src/graph.ts
+@@ -279,6 +279,11 @@ export type RuntimeGraph = {
+ };
+ 
+ type RuntimeSharedDefinition = NonNullable<ProtocolStatePayload['sharedDefinitions']>[number];
++type SubscriptionEntry = {
++	readonly subscription: RuntimeGraphSubscription;
++	readonly order: number;
++	active: boolean;
++};
+ 
+ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
+ 	const cells = new Map<string, unknown>();
+@@ -286,6 +291,11 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
+ 	const computedNodes = createRuntimeComputedNodes(input.computed);
+ 	const asyncComputedNodes = createRuntimeAsyncComputedNodes(input.asyncComputed);
+ 	const subscriptions: RuntimeGraphSubscription[] = [];
++	const subscriptionsByNode = new Map<string, Set<SubscriptionEntry>>();
++	let subscriptionOrder = 0;
++	let subscriptionPass:
++		| { paths: Map<string, ReadonlyArray<string>[]>; entries: SubscriptionEntry[] }
++		| undefined;
+ 	const writeObservers: RuntimeGraphWriteObserver[] = [];
+ 	const journalListeners: DomJournalListener[] = [];
+ 	const dirtyPaths: DirtyPath[] = [];
+@@ -456,24 +466,37 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
+ 					plane?.recomputeSubscribed();
+ 					const pending = dirtyPaths.splice(0);
+ 					const ranSubscriptions = new Set<string>();
+-
+-					for (const subscription of subscriptions) {
+-						const subscriptionPath = subscription.path ?? [];
+-						const dirty = pending.some(
+-							(path) =>
+-								path.graphNodeId === subscription.graphNodeId &&
+-								pathsIntersect(path.path, subscriptionPath),
+-						);
+-						if (!dirty || ranSubscriptions.has(subscription.id)) continue;
++					const paths = new Map<string, ReadonlyArray<string>[]>();
++					for (const dirty of pending) {
++						const nodePaths = paths.get(dirty.graphNodeId) ?? [];
++						nodePaths.push(dirty.path);
++						paths.set(dirty.graphNodeId, nodePaths);
++					}
++					const entries: SubscriptionEntry[] = [];
++					for (const [node, nodePaths] of paths)
++						for (const entry of subscriptionsByNode.get(node) ?? [])
++							if (
++								nodePaths.some((path) =>
++									pathsIntersect(path, entry.subscription.path ?? []),
++								)
++							)
++								entries.push(entry);
++					entries.sort((left, right) => left.order - right.order);
++					subscriptionPass = { paths, entries };
++					for (const entry of entries) {
++						const subscription = entry.subscription;
++						if (!entry.active || ranSubscriptions.has(subscription.id)) continue;
+ 
+ 						ranSubscriptions.add(subscription.id);
+ 						const entries = await subscription.run(
+-							readGraph(subscription.graphNodeId, subscriptionPath),
++							readGraph(subscription.graphNodeId, subscription.path ?? []),
+ 						);
+ 						appendJournalResult(journal, entries);
+ 					}
++					subscriptionPass = undefined;
+ 				}
+ 			} finally {
++				subscriptionPass = undefined;
+ 				plane?.settleBaselines();
+ 				flushing = false;
+ 			}
+@@ -566,9 +589,22 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
+ 		},
+ 		subscribe(subscription) {
+ 			subscriptions.push(subscription);
+-			// Disposal contract: removed scopes unsubscribe their graph wiring
+-			// (spec 01-tsrx-host-contract "branch scope disposal").
++			const node = subscription.graphNodeId;
++			const entries = subscriptionsByNode.get(node) ?? new Set<SubscriptionEntry>();
++			const entry = { subscription, order: subscriptionOrder++, active: true };
++			entries.add(entry);
++			subscriptionsByNode.set(node, entries);
++			if (
++				subscriptionPass?.paths
++					.get(node)
++					?.some((path) => pathsIntersect(path, subscription.path ?? []))
++			)
++				subscriptionPass.entries.push(entry);
+ 			return () => {
++				if (!entry.active) return;
++				entry.active = false;
++				entries.delete(entry);
++				if (entries.size === 0) subscriptionsByNode.delete(node);
+ 				const index = subscriptions.indexOf(subscription);
+ 				if (index >= 0) subscriptions.splice(index, 1);
+ 			};

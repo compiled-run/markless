@@ -16,6 +16,7 @@
  */
 import { generate } from 'yuku-codegen';
 import { parseModule } from '../../js-ast.ts';
+import { createSourceMemo } from '../semantic-graph/shared-ast.ts';
 import { EMISSION_PARSE_OPTIONS, EMISSION_PRINT_OPTIONS } from '../emit-codegen.ts';
 import type { AnyNode } from '../../ast/nodes.ts';
 
@@ -76,7 +77,14 @@ type StripSite = {
 	readonly what: string;
 };
 
+const strippedMemo = createSourceMemo<string | null>(4096);
+
+// A refusal is not memoized: its message names the site that asked.
 function printStripped(wrapped: string, site: StripSite, span: string): string | null {
+	return strippedMemo(site.filename, wrapped, () => printStrippedUncached(wrapped, site, span));
+}
+
+function printStrippedUncached(wrapped: string, site: StripSite, span: string): string | null {
 	const errors: Array<{ message: string }> = [];
 	// `collect` keeps a parse failure a value rather than a throw: a span that
 	// does not stand alone is answered with null, not an aborted compile.

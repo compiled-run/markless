@@ -6,8 +6,8 @@
 	"scripts": {
 		"build": "pnpm run build:markless && pnpm run build:query && pnpm run build:loader",
 		"build:markless": "node build-markless.mjs",
-		"build:query": "vite build --config tanstack-query/vite.config.js",
-		"build:loader": "vite build --config tanstack-loader/vite.config.js",
+		"build:query": "vp build --config tanstack-query/vite.config.js",
+		"build:loader": "vp build --config tanstack-loader/vite.config.js",
 		"check": "vp check",
 		"test": "node --test run.test.mjs"
 	},

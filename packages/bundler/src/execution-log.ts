@@ -3,6 +3,7 @@ import type { MarklessExecutionLogMode } from './types.ts';
 import type { GlobalInjections } from './types.ts';
 
 export const MARKLESS_EXECUTION_LOG_MODULE_ID = 'virtual:markless:dev-log';
+export const MARKLESS_EXECUTION_LOG_GLOBAL = '__mxLog';
 
 // The runtime names these on dispatch records, so the size map must key them
 // even though no hook injects them; a new dispatch site must be declared here
@@ -148,7 +149,7 @@ function accounting(items, sizes) {
 	const ids = [...new Set(items.map((id) => canonicalId(id, sizes)))];
 	if (!sizes) return { appBytes: ids.length ? null : 0, instrumentBytes: 0, appModules: ids.length, instrumentModules: 0, estimated: { app: false, instrument: false }, unmappedIds: [] };
 	let appBytes = 0, instrumentBytes = 0, appModules = 0, instrumentModules = 0, appEstimated = false, instrumentEstimated = false; const unmappedIds = [];
-	for (const id of ids) { const record = sizes.get(id); if (!record) { appModules++; unmappedIds.push(id); continue; } const bytes = record.raw; if (record.instrument) { instrumentModules++; instrumentBytes += bytes; instrumentEstimated ||= !!record.estimated; } else { appModules++; appBytes += bytes; appEstimated ||= !!record.estimated; } }
+	for (const id of ids) { const record = sizes.get(id); if (!record) { appModules++; unmappedIds.push(id); continue; } const bytes = record.raw; instrumentBytes += record.instrumentRaw || 0; if (record.instrument) { instrumentModules++; instrumentBytes += bytes; instrumentEstimated ||= !!record.estimated; } else { appModules++; appBytes += bytes; appEstimated ||= !!record.estimated; } }
 	return { appBytes: unmappedIds.length ? null : appBytes, instrumentBytes, appModules, instrumentModules, estimated: { app: appEstimated, instrument: instrumentEstimated }, unmappedIds };
 }
 function rowKb(items, sizes) { const a = accounting(items, sizes); if (a.unmappedIds.length) return 'bytes unknown'; const total = (a.appBytes || 0) + (a.instrumentBytes || 0); return (total / 1024).toFixed(1) + ' KB' + (a.estimated.app || a.estimated.instrument ? ' est. source' : ''); }
@@ -173,7 +174,7 @@ function ledgerCharge(l, ids, sizes) {
 		if (chunk) seenChunks.add(chunk); else seen.add(id);
 		if (!record) { delta.unmapped.push(id); continue; }
 		if (record.estimated) l.unit = 'estimated-source-bytes';
-		delta[ledgerCategory(id, record)] += record.raw; delta.gzip += record.gzip || 0; delta.modules.push(id);
+		delta[ledgerCategory(id, record)] += record.raw; delta.instrument += record.instrumentRaw || 0; delta.gzip += record.gzip || 0; delta.modules.push(id);
 	}
 	if (delta.unmapped.length) l.incomplete = { reason: 'unmapped-id', ids: [...new Set([...(l.incomplete ? l.incomplete.ids : []), ...delta.unmapped])] };
 	return delta;
@@ -237,9 +238,9 @@ function warmIds(event) { return [...new Set([event.dispatchModuleId, ...((event
 function causeRows(input) {
 	const before = input.before || new Set(); const after = input.after || new Set(); const woken = [...after].filter((id) => !before.has(id)); const record = input.eventRecord;
 	const cause = record ? input.eventName + ' matched event record ' + record.hostNodeId : input.eventName + ' matched runtime records';
-	const label = (id) => displayObservedId(id, input.moduleSizes);
-	const rows = woken.map((id) => 'woke ' + label(id) + (input.moduleSizes ? ' (' + rowKb([id], input.moduleSizes) + (input.moduleSizes.get(canonicalId(id, input.moduleSizes))?.instrument ? ' instrument' : '') + ')' : '') + ' <- ' + cause);
-	if (record) for (const id of warmIds(input)) rows.push('ran warm ' + label(id) + (input.moduleSizes ? ' (' + rowKb([id], input.moduleSizes) + (input.moduleSizes.get(canonicalId(id, input.moduleSizes))?.instrument ? ' instrument' : '') + ')' : '') + ' <- ' + cause);
+	const label = (id) => displayObservedId(id, input.moduleSizes) + (input.moduleSizes ? ' (' + rowKb([id], input.moduleSizes) + (input.moduleSizes.get(canonicalId(id, input.moduleSizes))?.instrument ? ' instrument' : '') + ')' : '');
+	const rows = woken.map((id) => 'woke ' + label(id) + ' <- ' + cause);
+	if (record) for (const id of warmIds(input)) rows.push('ran warm ' + label(id) + ' <- ' + cause);
 	if (record && !(input.view?.behaviors || []).some((b) => b.hostNodeId === record.hostNodeId)) rows.push('skip behavior — no matching record touched');
 	return rows;
 }

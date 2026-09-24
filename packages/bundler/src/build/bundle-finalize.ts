@@ -1,10 +1,26 @@
 // Post-processes the emitted bundle: chunk removal, preload wrapper stripping, symbol tables,
 // facade cleanup, build metadata.
 import { type MarklessBuildMetadataBundle, createBuildMetadata } from './build-metadata.ts';
-import { MARKLESS_BUILD_PREFIX, MARKLESS_BUNDLE_GRAPH } from './chunking.ts';
+import { MARKLESS_BUNDLE_GRAPH, MARKLESS_EXECUTION_DEMAND } from './chunking.ts';
 import { createExecutionSizesAsset } from './execution-sizes.ts';
+import { collectRenderedModules, createByteAttributionAsset } from './byte-attribution.ts';
+import { clearParsedChunkCode } from './chunk-ast.ts';
+import { unwrapAsyncImportWrappers } from './async-import-wrappers.ts';
+import { collapseInitFacadeImports } from './init-facade-imports.ts';
+import {
+	type HashCharacters,
+	MARKLESS_IMPORT_MAP_ASSET,
+	importMapScript,
+	insertImportMapScript,
+	renameChunksToContentHashes,
+	specifyChunkReferences,
+} from './content-hash-names.ts';
 import { collectModulePreloadInjections, injectHeadLinks } from './head-links.ts';
 import { stripEmptyVitePreloadWrappers } from './preload-cleanup.ts';
+import {
+	type PreloadHelperChunk,
+	stripUnusedVitePreloadHelperFromBundle,
+} from './preload-helper-removal.ts';
 import {
 	compactGeneratedDirectSymbolLoaders,
 	rewriteGeneratedSymbolFacadeImports,
@@ -16,6 +32,7 @@ import {
 	executionLogActivationInjection,
 } from '../execution-log.ts';
 import type { ModuleMetadataRegistry } from '../module-metadata-registry.ts';
+import { withoutFirstUse } from '../source-module.ts';
 import type { MarklessRolldownOptions, MarklessTransformManifest } from '../types.ts';
 import {
 	emittedBundleModuleIds,
@@ -35,6 +52,8 @@ export type FinalizeBundleOptions = {
 	bundleGraphAdders?: MarklessRolldownOptions['bundleGraphAdders'];
 	devInjections?: MarklessRolldownOptions['devInjections'];
 	executionLog?: MarklessRolldownOptions['executionLog'];
+	experimentalPackPlanner?: MarklessRolldownOptions['experimentalPackPlanner'];
+	experimentalNativePacking?: boolean;
 };
 
 export type FinalizeBundleContext = {
@@ -57,29 +76,16 @@ export async function finalizeBundle(
 		readonly executionAttributionTables: (
 			manifests: Iterable<MarklessTransformManifest>,
 		) => ExecutionAttributionTables;
+		readonly hashCharacters?: HashCharacters | undefined;
 	},
 ): Promise<void> {
 	const { options, moduleMetadata } = input;
 
-recordProductionResumeModuleUrls(
-	bundle,
-	options.productionResumeModuleUrls,
-	options.publicPath,
-);
-if (options.prerenderWakeChannel === true) {
-	recordProductionPrerenderWakeModuleUrls(
-		bundle,
-		options.productionPrerenderWakeModuleUrls,
-		options.publicPath,
-	);
-	recordProductionSettleModuleUrls(
-		bundle,
-		(options.productionSettleModuleUrls ??= new Map()),
-		options.publicPath,
-	);
-}
+const renderedModules = collectRenderedModules(bundle);
 stripEmptyPreloadWrappersFromChunks(bundle);
-const removedSymbolFacades = rewriteGeneratedSymbolFacadeImports(bundle);
+const removedSymbolFacades = new Set(rewriteGeneratedSymbolFacadeImports(bundle));
+for (const fileName of collapseInitFacadeImports(bundle)) removedSymbolFacades.add(fileName);
+unwrapAsyncImportWrappers(bundle);
 rewriteGeneratedSymbolInitExports(bundle);
 compactGeneratedDirectSymbolLoaders(bundle);
 const manifestBundle = bundleWithoutRemovedChunks(bundle, removedSymbolFacades);
@@ -110,6 +116,41 @@ if (tableIntegrity.errors.length > 0) {
 	);
 }
 
+const specifiers =
+	options.experimentalNativePacking === true
+		? await specifyChunkReferences(manifestBundle, {
+				publicPath: options.publicPath ?? ((fileName) => `/${fileName}`),
+				root: input.root,
+			})
+		: undefined;
+await renameChunksToContentHashes(manifestBundle, { hashCharacters: input.hashCharacters });
+const importMap = specifiers?.importMap();
+if (importMap && Object.keys(importMap.imports).length > 0) {
+	injectImportMap(bundle, importMapScript(importMap));
+	context.emitFile({
+		type: 'asset',
+		fileName: MARKLESS_IMPORT_MAP_ASSET,
+		source: JSON.stringify(importMap),
+	});
+}
+recordProductionResumeModuleUrls(
+	bundle,
+	options.productionResumeModuleUrls,
+	options.publicPath,
+);
+if (options.prerenderWakeChannel === true) {
+	recordProductionPrerenderWakeModuleUrls(
+		bundle,
+		options.productionPrerenderWakeModuleUrls,
+		options.publicPath,
+	);
+	recordProductionSettleModuleUrls(
+		bundle,
+		(options.productionSettleModuleUrls ??= new Map()),
+		options.publicPath,
+	);
+}
+
 const clientManifest = createBuildMetadata(
 	manifestBundle,
 	emittedSymbolClaims.values(),
@@ -122,6 +163,7 @@ const clientManifest = createBuildMetadata(
 		injections: options.devInjections,
 	},
 );
+clearParsedChunkCode();
 
 const executionLogInjection = executionLogActivationInjection(
 	options.executionLog,
@@ -166,20 +208,29 @@ context.emitFile(
 		{
 			executionLogActive: executionLogInjection !== null,
 			hookedIds: input.executionLogEmittedIds,
+			root: input.root,
 		},
 	),
+);
+context.emitFile(
+	createByteAttributionAsset(manifestBundle, renderedModules, input.root, stripBuildPrefix),
 );
 // The demand map lives in payload-module exports (tree-shaken from built
 // pages by design); ship it as a build asset so witness boxes and tooling
 // can derive allowed execution sets against real builds.
 context.emitFile({
 	type: 'asset',
-	fileName: `${MARKLESS_BUILD_PREFIX}execution-demand.json`,
+	fileName: MARKLESS_EXECUTION_DEMAND,
 	source: JSON.stringify(
 		Object.fromEntries(
 			clientManifest.modules
 				.filter((module) => module.runtimeDemandMap)
-				.map((module) => [module.source, module.runtimeDemandMap]),
+				.map((module) => [
+					module.source,
+					options.experimentalPackPlanner
+						? module.runtimeDemandMap
+						: withoutFirstUse(module.runtimeDemandMap),
+				]),
 		),
 	),
 });
@@ -208,6 +259,11 @@ function stripEmptyPreloadWrappersFromChunks(bundle: Record<string, unknown>) {
 			output.code = nextCode;
 		}
 	}
+	stripUnusedVitePreloadHelperFromBundle(
+		Object.values(bundle).filter(
+			(output): output is PreloadHelperChunk => isChunkWithCode(output) && isChunkFile(output),
+		),
+	);
 }
 
 function isChunkFile(output: unknown): output is {
@@ -326,4 +382,19 @@ function productionWakeModuleChunks(bundle: Record<string, unknown>): string[] {
 		}
 	}
 	return chunks;
+}
+
+function injectImportMap(bundle: Record<string, unknown>, script: string): void {
+	for (const output of Object.values(bundle)) {
+		if (!output || typeof output !== 'object') continue;
+		const asset = output as { type?: unknown; fileName?: unknown; source?: unknown };
+		if (
+			asset.type !== 'asset' ||
+			typeof asset.fileName !== 'string' ||
+			!asset.fileName.endsWith('.html') ||
+			typeof asset.source !== 'string'
+		)
+			continue;
+		asset.source = insertImportMapScript(asset.source, script);
+	}
 }

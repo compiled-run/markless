@@ -102,12 +102,16 @@ function resolverVirtualModuleId(source: string): string {
 
 // Runs the `claim-manifest` pass over the registry once the barrier says every
 // requested source has finished publishing. Waiting is the driver's; deciding
-// who owns what is the pass's.
+// who owns what is the pass's. An `unawaited` source is a cycle, read as it stands.
 export function linkedClaims(
 	metadata: ModuleMetadataRegistry,
 	sources: ReadonlyArray<string>,
+	environment: MarklessEnvironment,
+	unawaited: ReadonlySet<string> = new Set(),
 ): LinkedClaimsArtifact<MarklessTransformManifest> {
-	for (const source of sources) metadata.assertSourceClaimsSealed(source);
+	for (const source of sources) {
+		if (!unawaited.has(source)) metadata.assertSourceClaimsSealed(environment, source);
+	}
 	return linkClaimManifests({
 		byEmittedModule: metadata.symbolClaimMap(),
 		sources: sources.map((source) => ({
@@ -120,8 +124,10 @@ export function linkedClaims(
 export function sourceSymbolManifest(
 	metadata: ModuleMetadataRegistry,
 	source: string,
+	environment: MarklessEnvironment,
+	unawaited?: ReadonlySet<string>,
 ): MarklessTransformManifest | undefined {
-	const artifact = linkedClaims(metadata, [source]);
+	const artifact = linkedClaims(metadata, [source], environment, unawaited);
 	const contradiction = artifact.diagnostics[0];
 	if (contradiction) throw new Error(contradiction.message);
 	return artifact.bySource[source];
@@ -394,7 +400,8 @@ export async function resolveImportedChildren(
 
 // Loads every child the pass says still needs one, publishes the claim sources
 // it named, and awaits sealing. An externalized child yields no load source, so
-// a bare external id can never reach `this.load`.
+// a bare external id can never reach `this.load`. Returns the children the
+// barrier could not wait on because they are blocked on this module.
 export async function forceImportedModules(
 	context: LinkLoadContext,
 	children: ReadonlyArray<LinkedModuleChildResolution>,
@@ -402,15 +409,17 @@ export async function forceImportedModules(
 	metadata: ModuleMetadataRegistry,
 	options: LinkForceOptions,
 	environment: MarklessEnvironment,
-): Promise<void> {
+): Promise<Set<string>> {
 	for (const child of children) {
 		const loadSource = linkedModuleLoadSource(child, moduleArtifacts.has(child.source));
 		if (loadSource !== undefined) {
-			if (options.dev === true) {
-				await options.devServer?.transformRequest(loadSource, environment);
-			} else if (typeof context.load === 'function') {
-				await context.load({ id: loadSource });
-			}
+			await metadata.whileWaiting(environment, pathname(child.parent), child.source, async () => {
+				if (options.dev === true) {
+					await options.devServer?.transformRequest(loadSource, environment);
+				} else if (typeof context.load === 'function') {
+					await context.load({ id: loadSource });
+				}
+			});
 		}
 		// Read the child's metadata only once it has been forced: the claim plan
 		// is a fact about the loaded module, not about the request for it.
@@ -424,7 +433,7 @@ export async function forceImportedModules(
 			wakeSource: (source) => withQuery(source, { 'markless-prerender-wake': null }),
 		});
 		if (plan.expectClaims && typeof context.getModuleInfo === 'function') {
-			metadata.expectSourceSymbolClaims(child.source, plan.claimSources);
+			metadata.expectSourceSymbolClaims(environment, child.source, plan.claimSources);
 		}
 		if (plan.claimSources.length > 0) {
 			if (options.dev === true) {
@@ -440,23 +449,33 @@ export async function forceImportedModules(
 				for (const id of plan.claimSources) await context.load({ id });
 			}
 		}
-		if (plan.seal) await metadata.sealSourceSymbolClaims(child.source);
+		if (plan.seal) await metadata.sealSourceSymbolClaims(environment, child.source);
 	}
-	await awaitChildClaimPublications(metadata, children);
+	return await awaitChildClaimPublications(metadata, children, environment);
 }
 
 /**
- * Re-enters the publication barrier immediately before claims are read. A server
- * transform publishes no client claims, so it has no seal of its own, and any
+ * Re-enters the publication barrier immediately before claims are read. Any
  * await between forcing a child and reading it reopens the window a sibling can
  * start compiling in. Callers must invoke this with no further await before the
- * read: the registry state it settles is the state the read sees.
+ * read: the registry state it settles is the state the read sees. Returns the
+ * child sources that could not be awaited because they are blocked on the parent.
  */
 export async function awaitChildClaimPublications(
 	metadata: ModuleMetadataRegistry,
 	children: ReadonlyArray<LinkedModuleChildResolution>,
-): Promise<void> {
-	for (const child of children) await metadata.awaitSourceClaimsPublished(child.source);
+	environment: MarklessEnvironment,
+): Promise<Set<string>> {
+	const unawaited = new Set<string>();
+	for (const child of children) {
+		const awaited = await metadata.awaitSourceClaimsPublished(
+			environment,
+			child.source,
+			pathname(child.parent),
+		);
+		if (!awaited) unawaited.add(child.source);
+	}
+	return unawaited;
 }
 
 export function mergeLinkedModuleChildren(
@@ -732,10 +751,12 @@ export function linkedInterfaces(
 export function linkedInterfaceClaims(
 	imports: ReadonlyArray<LinkedModuleChildResolution>,
 	metadata: ModuleMetadataRegistry,
+	environment: MarklessEnvironment,
+	unawaited?: ReadonlySet<string>,
 ): LinkedInterfaceClaim[] {
 	return imports.map((imported) => ({
 		source: imported.source,
-		symbols: sourceSymbolManifest(metadata, imported.source)?.symbols ?? [],
+		symbols: sourceSymbolManifest(metadata, imported.source, environment, unawaited)?.symbols ?? [],
 	}));
 }
 

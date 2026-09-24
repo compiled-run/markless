@@ -47,10 +47,14 @@ async function measureLane({ browser, origin, lane }) {
 	if (!reset.ok) throw new Error(`${lane} timeline reset failed with ${reset.status}`);
 	const context = await browser.newContext();
 	const page = await context.newPage();
+	const pageErrors = [];
+	page.on('pageerror', (error) => pageErrors.push(error.message));
 	try {
 		await page.goto(`${origin}/${lane}/?run=${encodeURIComponent(run)}`, { waitUntil: 'load' });
 		await page.waitForSelector('[data-reviews]', { timeout: 10_000 });
 		await assertRenderedData(page, lane);
+		if (pageErrors.length)
+			throw new Error(`${lane} raised page errors: ${pageErrors.join('; ')}`);
 		const response = await fetch(`${origin}/api/_timeline?run=${encodeURIComponent(run)}`);
 		if (!response.ok) throw new Error(`${lane} timeline read failed with ${response.status}`);
 		const timeline = { schemaVersion: 1, lane, ...(await response.json()) };

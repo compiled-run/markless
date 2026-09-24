@@ -229,10 +229,23 @@ async function* streamArmAppends(input: {
 						: [];
 				}),
 			);
+			// A sync derive gating a boundary carries no snapshot; the arm this wave took is its settle.
+			const armTakenInWave = new Set(
+				(output.view?.asyncBoundaries ?? []).flatMap((boundary) =>
+					boundary.initiallyServedArm === ASYNC_BOUNDARY_ARM.try ||
+					boundary.initiallyServedArm === ASYNC_BOUNDARY_ARM.catch
+						? [boundary.id]
+						: [],
+				),
+			);
 			const parts: string[] = [];
 			// Deleting the visited entry during Map iteration is safe in JS.
 			for (const arm of remaining.values()) {
-				if (!settledInWave.has(arm.graphNodeId)) continue;
+				if (
+					!settledInWave.has(arm.graphNodeId) &&
+					!(arm.entry.async === false && armTakenInWave.has(arm.boundaryId))
+				)
+					continue;
 				remaining.delete(arm.graphNodeId);
 				if (!executorEmitted) {
 					parts.push(armExecutorScript(input.resumeModuleUrl, input.options.nonce));
@@ -245,6 +258,25 @@ async function* streamArmAppends(input: {
 	} finally {
 		signal.removeEventListener('abort', onCancel);
 	}
+}
+
+// A sync derive gating the arm reads upstream values the shell served as pending, so they ride its patch.
+function armDependencyClosure(output: SsrRenderOutput, graphNodeId: string): ReadonlySet<string> {
+	const definitions = new Map(
+		(output.state?.computed ?? []).map((definition) => [definition.graphNodeId, definition]),
+	);
+	const closure = new Set([graphNodeId]);
+	for (const id of closure) {
+		const definition = definitions.get(id) as
+			| {
+					readonly async?: boolean;
+					readonly dependencies?: ReadonlyArray<{ readonly graphNodeId: string }>;
+			  }
+			| undefined;
+		if (!definition || (id !== graphNodeId && definition.async === true)) continue;
+		for (const dependency of definition.dependencies ?? []) closure.add(dependency.graphNodeId);
+	}
+	return closure;
 }
 
 function renderArmAppend(
@@ -278,11 +310,12 @@ function renderArmAppend(
 	const cells = serializeRuntimeStateCells(
 		(output.state?.cells ?? []).filter((cell) => !shellGraphNodeIds.has(cell.graphNodeId)),
 	);
+	const armGraphNodeIds = armDependencyClosure(output, arm.graphNodeId);
 	const computedById = new Map(
 		(output.state?.computed ?? [])
 			.filter(
 				(definition) =>
-					definition.graphNodeId === arm.graphNodeId ||
+					armGraphNodeIds.has(definition.graphNodeId) ||
 					!shellGraphNodeIds.has(definition.graphNodeId),
 			)
 			.map((definition) => [definition.graphNodeId, definition]),
@@ -323,6 +356,7 @@ function renderArmAppend(
 // edges the server passed to __mArm), never blind arrival order. A commit
 // failure fails loudly in its own task and neither wedges the train nor
 // holds dependents hostage — boundaries stay independent (D2).
+// `__mArm.idle(f)` runs f once no scheduled train is left, so an event-less wake adopts every held commit.
 function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | undefined): string {
 	const debugEnabled =
 		typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__;
@@ -370,6 +404,7 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 	const done = new Set();
 	let last = -1 / 0;
 	let scheduled = false;
+	const idle = [];
 	const commit = (id) => {
 	const tpl = d.querySelector('template[m\\\\:arm="' + id + '"]');
 	if (!tpl) throw new Error('MARKLESS_STREAM_ARM_TEMPLATE_MISSING: ' + id);
@@ -400,6 +435,7 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 				try { commit(id); } catch (error) { setTimeout(() => { throw error; }); }
 			}
 		}
+		for (const f of idle.splice(0)) f();
 	};
 	const schedule = () => {
 		if (scheduled || !queue.length) return;
@@ -408,7 +444,9 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 		if (!paint) return void requestAnimationFrame(flush);
 		setTimeout(flush, Math.max(paint.startTime + ${String(MARKLESS_PENDING_MIN_VISIBLE_MS)}, last + ${String(MARKLESS_REVEAL_TRAIN_CADENCE_MS)}) - performance.now());
 	};
-	return (id, deps) => { queue.push([id, deps || []]); schedule(); };
+	const arm = (id, deps) => { queue.push([id, deps || []]); schedule(); };
+	arm.idle = (f) => (scheduled ? idle.push(f) : f());
+	return arm;
 })();`;
 	const nonceAttribute = nonce ? ` nonce="${escapeAttribute(nonce)}"` : '';
 	return `<script data-markless-stream-executor${nonceAttribute}>${escapeInlineScript(source)}</script>`;
@@ -429,8 +467,9 @@ function escapeAttribute(value: string): string {
 	return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
 
+// Only `</` and `<!` can end or escape a script's raw text; any other `<` is inert there.
 function escapeScriptJson(value: string): string {
-	return value.replace(/</g, '\\u003C');
+	return value.replace(/<(?=[/!])/g, '\\u003C');
 }
 
 function escapeInlineScript(value: string): string {

@@ -864,6 +864,20 @@ test('M10 intrinsic contract accepts Markless spellings, native events, element 
 	).toEqual([]);
 }, 20_000);
 
+test('M10 intrinsic attributes complete both event casings the compiler binds', async () => {
+	const fixture = openFixture('intrinsic-event-completions.tsrx');
+	const names = completionNames(
+		await server.completionInfo(
+			fixture.file,
+			positionAfterMarker(fixture.marked, '/*M10_EVENT_ATTRIBUTES*/'),
+		),
+	);
+
+	expect(names).toEqual(
+		expect.arrayContaining(['onKeyDown', 'onKeydown', 'onPointerDown', 'onClick', 'tabindex']),
+	);
+}, 20_000);
+
 test('M10 intrinsic contract rejects className, bogus and tag-wrong attributes, and object children at authored tokens', async () => {
 	const fixture = openFixture('intrinsic-contract-errors.tsrx');
 	const diagnostics = await server.semanticDiagnosticsSync(fixture.file);

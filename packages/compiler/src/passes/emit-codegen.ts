@@ -910,6 +910,8 @@ export type GraphWriteCallInput = {
 	readonly callee?: string;
 	readonly graphNodeId: string;
 	readonly path: ReadonlyArray<string>;
+	/** Replaces `path` when the path is computed at dispatch. */
+	readonly pathNode?: EmissionNode;
 	readonly value: EmissionNode;
 };
 
@@ -918,7 +920,7 @@ export function graphWriteCall(input: GraphWriteCallInput): EmissionNode {
 	return callNode(memberChainNode(input.callee ?? 'context.graph.write'), [
 		objectNode([
 			propertyNode('graphNodeId', literalNode(input.graphNodeId)),
-			propertyNode('path', stringArrayNode(input.path)),
+			propertyNode('path', input.pathNode ?? stringArrayNode(input.path)),
 			propertyNode('value', input.value),
 		]),
 	]);
@@ -928,6 +930,8 @@ export type GraphUpdateCallInput = {
 	readonly callee?: string;
 	readonly graphNodeId: string;
 	readonly path: ReadonlyArray<string>;
+	/** Replaces `path` when the path is computed at dispatch. */
+	readonly pathNode?: EmissionNode;
 	readonly returnValue: string;
 	/** The updater parameter name; `symbol-modules.ts` uses `value`. */
 	readonly parameterName?: string;
@@ -943,7 +947,7 @@ export function graphUpdateCall(input: GraphUpdateCallInput): EmissionNode {
 	return callNode(memberChainNode(input.callee ?? 'context.graph.update'), [
 		objectNode([
 			propertyNode('graphNodeId', literalNode(input.graphNodeId)),
-			propertyNode('path', stringArrayNode(input.path)),
+			propertyNode('path', input.pathNode ?? stringArrayNode(input.path)),
 			propertyNode('returnValue', literalNode(input.returnValue)),
 			methodPropertyNode(
 				'update',
@@ -958,6 +962,8 @@ export type GraphDeleteCallInput = {
 	readonly callee?: string;
 	readonly graphNodeId: string;
 	readonly path: ReadonlyArray<string>;
+	/** Replaces `path` when the path is computed at dispatch. */
+	readonly pathNode?: EmissionNode;
 };
 
 /** `context.graph.delete({ graphNodeId, path })`. */
@@ -965,7 +971,7 @@ export function graphDeleteCall(input: GraphDeleteCallInput): EmissionNode {
 	return callNode(memberChainNode(input.callee ?? 'context.graph.delete'), [
 		objectNode([
 			propertyNode('graphNodeId', literalNode(input.graphNodeId)),
-			propertyNode('path', stringArrayNode(input.path)),
+			propertyNode('path', input.pathNode ?? stringArrayNode(input.path)),
 		]),
 	]);
 }
@@ -974,6 +980,8 @@ export type GraphMethodCallInput = {
 	readonly callee?: string;
 	readonly graphNodeId: string;
 	readonly path: ReadonlyArray<string>;
+	/** Replaces `path` when the path is computed at dispatch. */
+	readonly pathNode?: EmissionNode;
 	readonly method: string;
 	readonly args: ReadonlyArray<EmissionNode>;
 };
@@ -983,7 +991,7 @@ export function graphMethodCall(input: GraphMethodCallInput): EmissionNode {
 	return callNode(memberChainNode(input.callee ?? 'context.graph.call'), [
 		objectNode([
 			propertyNode('graphNodeId', literalNode(input.graphNodeId)),
-			propertyNode('path', stringArrayNode(input.path)),
+			propertyNode('path', input.pathNode ?? stringArrayNode(input.path)),
 			propertyNode('method', literalNode(input.method)),
 			propertyNode('args', arrayNode(input.args)),
 		]),

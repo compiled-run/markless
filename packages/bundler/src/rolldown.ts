@@ -1,12 +1,19 @@
 import type { InputOptions, Plugin } from 'rolldown';
 import { computeExecutionAttribution, type LinkedModuleChildResolution } from '@markless/compiler';
+import { clearParsedChunkCode } from './build/chunk-ast.ts';
 import { outputDefaults } from './build/chunking.ts';
+import { nativePackingPlugins } from './build/native-packing.ts';
 import { createMarklessDevGraph } from './dev.ts';
 import {
 	invalidateAllGeneratedModules,
 	invalidateEditedGeneratedModules,
 } from './dev-invalidation.ts';
 import { generateBundleHook } from './hooks/generate-bundle.ts';
+import {
+	staleChunkNamesMessage,
+	staleContentHashNames,
+	unmappedChunkSpecifiers,
+} from './build/content-hash-names.ts';
 import type {
 	Environment,
 	InternalMarklessRolldownOptions,
@@ -17,6 +24,7 @@ import { transformHook } from './hooks/transform-hook.ts';
 import { fallbackImportedSource } from './link-driver.ts';
 import { createPluginState } from './plugin-state.ts';
 import { encodedSymbolSource } from './source-module.ts';
+import { moduleIdFor } from './module-id.ts';
 import type {
 	MarklessEnvironment,
 	MarklessRolldownOptions,
@@ -83,6 +91,31 @@ export function createMarklessRolldownPlugin(input: {
 	function getRoot() {
 		return root ?? internalOptions.rootDir;
 	}
+	const [packing, facades] =
+		environment === 'client' &&
+		internalOptions.experimentalNativePacking &&
+		!internalOptions.dev
+			? nativePackingPlugins(
+					() => getRoot() ?? '',
+					runtimeDemandMaps,
+					internalOptions.experimentalPackPlanner
+						? {
+								mode: internalOptions.experimentalPackPlanner,
+								demandSources: runtimeDemandSources,
+							}
+						: undefined,
+				)
+			: [];
+
+	function* runtimeDemandMaps() {
+		for (const manifest of state.moduleMetadata.symbolClaimManifests())
+			yield manifest.runtimeDemandMap;
+	}
+
+	function* runtimeDemandSources() {
+		for (const manifest of state.moduleMetadata.symbolClaimManifests())
+			yield { source: manifest.source, map: manifest.runtimeDemandMap };
+	}
 
 	// `resolveSpecifier`/`encodeSource` are the bundler's; the compiler pass owns
 	// only the graph flattening.
@@ -92,7 +125,7 @@ export function createMarklessRolldownPlugin(input: {
 			childTable: importedChildren.values(),
 			root: getRoot(),
 			resolveSpecifier: fallbackImportedSource,
-			encodeSource: encodedSymbolSource,
+			encodeSource: (source) => encodedSymbolSource(moduleIdFor(source, getRoot())),
 		}).tables;
 	}
 
@@ -125,6 +158,10 @@ export function createMarklessRolldownPlugin(input: {
 				}
 				return invalidateAllGeneratedModules(context, parent, currentEnvironment);
 			},
+			runtimeDemandMaps,
+			runtimeDemandSources,
+			chunkImportMap: () =>
+				internalOptions.experimentalNativePacking === true && !internalOptions.dev,
 		},
 		name,
 		options(input: InputOptions) {
@@ -135,7 +172,9 @@ export function createMarklessRolldownPlugin(input: {
 
 			return {
 				...input,
-				preserveEntrySignatures: input.preserveEntrySignatures ?? 'allow-extension',
+				preserveEntrySignatures: packing
+					? 'allow-extension'
+					: (input.preserveEntrySignatures ?? 'allow-extension'),
 			};
 		},
 		async buildStart(input) {
@@ -144,6 +183,7 @@ export function createMarklessRolldownPlugin(input: {
 			}
 			state.reset();
 			dev.reset();
+			clearParsedChunkCode();
 
 			const currentRoot = getRoot();
 			if (getEnvironment(this) === 'client') {
@@ -152,8 +192,15 @@ export function createMarklessRolldownPlugin(input: {
 				}
 			}
 		},
+		buildEnd: packing?.buildEnd,
+		renderStart: facades?.renderStart,
+		renderChunk: facades?.renderChunk,
+		renderError: facades?.renderError,
 		outputOptions(output) {
-			return outputDefaults(output, getEnvironment(this));
+			const defaults = outputDefaults(output, getEnvironment(this));
+			const hook = packing?.outputOptions;
+			const handler = typeof hook === 'function' ? hook : hook?.handler;
+			return handler?.call(this, defaults) ?? defaults;
 		},
 		async resolveId(source, importer) {
 			return await resolveIdHook(context, this, source, importer);
@@ -166,9 +213,24 @@ export function createMarklessRolldownPlugin(input: {
 		},
 		generateBundle: {
 			order: 'post',
-			async handler(_, bundle) {
-				await generateBundleHook(context, this, bundle);
+			async handler(output, bundle, isWrite) {
+				const hook = facades?.generateBundle;
+				const handler = typeof hook === 'function' ? hook : hook?.handler;
+				await handler?.call(this, output, bundle, isWrite);
+				await generateBundleHook(context, this, bundle, output.hashCharacters);
 			},
+		},
+		async writeBundle(output, bundle) {
+			if (getEnvironment(this) !== 'client') return;
+			const stale = await staleContentHashNames(bundle, {
+				hashCharacters: output.hashCharacters,
+			});
+			if (stale.length > 0) this.error(staleChunkNamesMessage(stale));
+			const unmapped = unmappedChunkSpecifiers(bundle);
+			if (unmapped.length > 0)
+				this.error(
+					`Markless emitted chunks that import specifiers its import map does not resolve to an emitted chunk: ${unmapped.join(', ')}. A plugin changed chunk code or file names after the Markless finalize pass. markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package`,
+				);
 		},
 	} satisfies Plugin & { api: MarklessRolldownPluginApi };
 
@@ -183,10 +245,21 @@ function pluginName(environment: Environment) {
 	return `markless:rolldown:${environment}`;
 }
 
-export { MARKLESS_BUNDLE_GRAPH, MARKLESS_BUILD_PREFIX, outputDefaults } from './build/chunking.ts';
+export {
+	MARKLESS_BUILD_METADATA_FILES,
+	MARKLESS_BUNDLE_GRAPH,
+	MARKLESS_BUILD_PREFIX,
+	outputDefaults,
+} from './build/chunking.ts';
 export { createBuildMetadata } from './build/build-metadata.ts';
 export { convertManifestToBundleGraph, createPreloadGraphAdder } from './build/bundle-graph.ts';
 export { collectHeadLinkInjections } from './build/head-links.ts';
+export {
+	MARKLESS_CHUNK_SPECIFIER_PREFIX,
+	MARKLESS_IMPORT_MAP_ASSET,
+	importMapScript,
+	insertImportMapScript,
+} from './build/content-hash-names.ts';
 export {
 	MARKLESS_VIRTUAL_PREFIX,
 	prerenderWakeVirtualModuleId,

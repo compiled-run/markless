@@ -685,6 +685,10 @@ export function sharedCallbackSlotGraphNodeId(definitionId: string, slotName: st
 	return `${definitionId}/slot:${slotName}`;
 }
 
+export function isSharedCallbackSlotGraphNodeId(graphNodeId: string): boolean {
+	return graphNodeId.startsWith('shared:') && /\/slot:[^/]+$/.test(graphNodeId);
+}
+
 export function sharedCallbackSlotNames(
 	definition: SemanticSharedDefinition,
 ): ReadonlyArray<string> {

@@ -72,3 +72,24 @@ test('a settled graph schedules no further flush passes', async () => {
 	expect(runs).toBe(1);
 	scheduled.mockRestore();
 });
+
+test('a write reports a pending flush until its entries reach the journal', async () => {
+	const graph = createRuntimeGraph({ cells: [{ graphNodeId: 'state:draft', value: '' }] });
+	graph.subscribe({
+		id: 'dom-update:draft',
+		graphNodeId: 'state:draft',
+		run: (value) => ({ type: 'setProp', locator: 'el:draft', name: 'value', value }),
+	});
+	const pendingWhenJournaled: boolean[] = [];
+	graph.subscribeJournal(() => {
+		pendingWhenJournaled.push(graph.hasPendingFlush!());
+	});
+
+	expect(graph.hasPendingFlush!()).toBe(false);
+	graph.write({ graphNodeId: 'state:draft', value: 'Katherine' });
+	expect(graph.hasPendingFlush!()).toBe(true);
+
+	await graph.flush();
+	expect(pendingWhenJournaled).toEqual([true]);
+	expect(graph.hasPendingFlush!()).toBe(false);
+});

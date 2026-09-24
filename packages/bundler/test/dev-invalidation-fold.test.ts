@@ -55,7 +55,8 @@ test('two cache entries for one source fold instead of overwriting each other', 
 	await invalidateEditedGeneratedModules(hookContext(state), source, undefined, code);
 
 	expect(state.prerenderWakeCapabilities.get(source)).toBe(true);
-	expect(state.moduleLinkArtifacts.has(source)).toBe(true);
+	expect(state.moduleLinkArtifacts('client').has(source)).toBe(true);
+	expect(state.moduleLinkArtifacts('server').has(source)).toBe(true);
 });
 
 // The client entry is not refreshed here: only the server environment re-ran,

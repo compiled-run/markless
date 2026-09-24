@@ -1,0 +1,115 @@
+{
+  "runId": "2026-09-22T22-58-05-717Z-ed4fb6",
+  "contractVersion": 1,
+  "schemaVersion": 1,
+  "started": "2026-09-22T22:58:05.718Z",
+  "finished": "2026-09-22T23:05:21.410Z",
+  "playwright": "1.58.2",
+  "browserVersions": {
+    "chromium": "145.0.7632.6",
+    "webkit": "26.0"
+  },
+  "config": {
+    "visits": 5,
+    "warmup": 0,
+    "cases": [
+      "overview-counter-first",
+      "overview-counter-repeat-x10",
+      "overview-toggle",
+      "overview-filter",
+      "records-select",
+      "nav-overview-to-records",
+      "history-back",
+      "settings-derived",
+      "settings-submit"
+    ],
+    "phases": [
+      "early",
+      "settled"
+    ],
+    "profiles": [
+      {
+        "name": "normal",
+        "network": {
+          "name": "unthrottled",
+          "downloadKbps": null,
+          "uploadKbps": null,
+          "latencyMs": null
+        },
+        "cpu": {
+          "name": "unthrottled",
+          "slowdown": 1
+        }
+      },
+      {
+        "name": "constrained",
+        "network": {
+          "name": "rtt150-down5mbps-up1mbps",
+          "downloadKbps": 5000,
+          "uploadKbps": 1000,
+          "latencyMs": 150
+        },
+        "cpu": {
+          "name": "4x-slowdown",
+          "slowdown": 4
+        }
+      }
+    ],
+    "browsers": [
+      "chromium",
+      "webkit"
+    ],
+    "actionTimeoutMs": 10000,
+    "settleTimeoutMs": 30000,
+    "order": "targets rotate by one position per visit index"
+  },
+  "targets": [
+    {
+      "name": "markless",
+      "url": "https://127.0.0.1:4496",
+      "upstream": "http://127.0.0.1:4495",
+      "host": "controlled",
+      "transport": "proxy",
+      "proxyProtocol": "h2 (TLS, self-signed; HTTP/1.1 fallback via ALPN)",
+      "proxyCompression": "brotli q5 for uncompressed text/js/css/html/json/svg; upstream-encoded responses passed through",
+      "proxyStats": {
+        "responses": 528,
+        "compressedByProxy": 528,
+        "passedThroughEncoded": 0,
+        "uncompressedPassThrough": 0,
+        "upstreamErrors": 0
+      },
+      "buildId": "selftest-fixture-1",
+      "sourceRevision": "selftest-fixture",
+      "versions": {
+        "@markless/core": "0.4.0",
+        "@markless/router": "0.4.0",
+        "@markless/typescript-plugin": "0.4.0",
+        "nitro": "3.0.260429-beta",
+        "vite-plus": "0.3.1"
+      },
+      "ready": true,
+      "setupError": null
+    }
+  ],
+  "labels": {
+    "inputToResponseMs": "input event.timeStamp -> presentation estimate: start of the first animation frame after the assertion holds, then the next rAF callback (not a paint timestamp)",
+    "inputToDomMs": "input event.timeStamp -> first moment the assertion holds (MutationObserver callback or per-frame check)",
+    "navToResponseMs": "performance.timeOrigin of the first document -> presentation estimate (early phase only; null for settled, where the runner wait dominates)",
+    "pendingMs": "input -> presentation estimate of the pending assertion",
+    "serverMs": "Resource Timing responseEnd - requestStart of the server request",
+    "eventDurationMs": "Chromium Event Timing: max duration over the input interaction; null when no entry reached the 16 ms reporting threshold or the browser lacks Event Timing",
+    "bytes": "responses whose request started before the presentation estimate, counted in full after in-flight requests finish (drain, max drainTimeoutMs); compressed = encoded body (Resource Timing encodedBodySize when non-zero, else CDP total minus header bytes / WebKit request.sizes().responseBodySize); decoded = CDP dataReceived sum / WebKit Resource Timing decodedBodySize",
+    "requests": "main-frame requests; initial = started before the input; perAction = input to presentation estimate"
+  },
+  "validation": {
+    "schema": "demos/interaction-benchmark/shared/result.schema.json",
+    "checked": 256,
+    "invalid": 0,
+    "examples": []
+  },
+  "correctness": {
+    "passed": 16,
+    "failed": 0
+  }
+}

@@ -1,0 +1,32 @@
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { parseSync } from 'rolldown/experimental';
+
+const original = '/private/tmp/markless-docs-combined-demand-GSbudh/.output';
+const filename = '/public/build/chunk-DbCThnyc.js';
+const source = readFileSync(original + filename, 'utf8');
+const sha256 = value => createHash('sha256').update(value).digest('hex');
+assert.equal(sha256(source), '481e0c5a3b8ca158d735087e52a65ba388ebf6bb88b5c883a09d893fba426b80');
+const needle = 'async function ed(e,t){let n=mn(e.loadSymbol),r=await lt({state:t.state,view:t.view,root:e.root,loadSymbol:n});';
+assert.equal(source.split(needle).length, 2);
+const insertion = `{const select=(records,key)=>records?.filter(record=>record[key].startsWith('m3:'));t={...t,state:{...t.state},view:{...t.view}};for(const key of ['cells','computed','sharedSeeds','storage'])t.state[key]=select(t.state[key],'graphNodeId');t.state.sharedDefinitions=select(t.state.sharedDefinitions,'id');for(const key of ['locators','events','domUpdates','behaviors','elementHandles'])t.view[key]=select(t.view[key],'hostNodeId');for(const key of ['asyncBoundaries','branches','keyedRepeats'])t.view[key]=select(t.view[key],'id');if(t.view.asyncRunners)t.view.asyncRunners=Object.fromEntries(Object.entries(t.view.asyncRunners).filter(([id])=>id.startsWith('m3:')));}`;
+const changed = source.replace(needle, 'async function ed(e,t){' + insertion + needle.slice('async function ed(e,t){'.length));
+assert.deepEqual(parseSync(filename, changed).errors, []);
+const directory = mkdtempSync('/private/tmp/markless-docs-owned-resume-');
+cpSync(original, directory + '/.output', { recursive: true });
+writeFileSync(directory + '/.output' + filename, changed);
+const server = readFileSync(original + '/server/index.mjs', 'utf8');
+const assetPattern = /("\/markless\/build\/chunk-DbCThnyc\.js": )({[^}]+})/g;
+assert.equal([...server.matchAll(assetPattern)].length, 1);
+const updatedServer = server.replace(assetPattern, (_match, key, json) => {
+  const asset = JSON.parse(json);
+  assert.equal(asset.size, Buffer.byteLength(source));
+  asset.size = Buffer.byteLength(changed);
+  asset.etag = '"diagnostic-' + sha256(changed) + '"';
+  return key + JSON.stringify(asset);
+});
+writeFileSync(directory + '/.output/server/index.mjs', updatedServer);
+const receipt = { original, output: directory + '/.output', filename, beforeSha256: sha256(source), afterSha256: sha256(changed), serverBeforeSha256: sha256(server), serverAfterSha256: sha256(updatedServer), needle, insertion, addedBytes: Buffer.byteLength(changed) - Buffer.byteLength(source), limitation: 'Nonshipping diagnostic. Fixed, observed accordion boundary only. Filters decoded records before graph creation; other controls lose support. HTML rendering and module delivery are unchanged; Nitro static metadata for the changed pack has the matching size/etag.' };
+writeFileSync(directory + '/transform.json', JSON.stringify(receipt, null, 2) + '\n');
+console.log(JSON.stringify(receipt));

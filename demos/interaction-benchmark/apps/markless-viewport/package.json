@@ -1,0 +1,28 @@
+{
+	"name": "markless-viewport-interaction-bench",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"sync": "node ../../shared/sync.mjs . src/shared",
+		"sync:check": "node ../../shared/sync.mjs . src/shared --check",
+		"dev": "vp dev",
+		"build": "pnpm run sync:check && vp build",
+		"build:vercel": "pnpm run sync:check && NITRO_PRESET=vercel vp build",
+		"start": "PORT=4415 node .output/server/index.mjs",
+		"smoke": "node scripts/smoke.mjs",
+		"typecheck": "node ../../../../packages/typescript-plugin/src/tsc.ts -p tsconfig.json"
+	},
+	"dependencies": {
+		"@markless/core": "workspace:*",
+		"@markless/router": "workspace:*",
+		"nitro": "catalog:",
+		"vite-plus": "0.3.1"
+	},
+	"devDependencies": {
+		"@markless/typescript-plugin": "workspace:*",
+		"@types/node": "24.12.2",
+		"typescript": "^5.9.3",
+		"vite": "npm:@voidzero-dev/vite-plus-core@0.3.1"
+	}
+}

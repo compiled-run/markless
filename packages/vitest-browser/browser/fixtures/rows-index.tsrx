@@ -5,7 +5,7 @@ export function App() @{
 		{ id: 'a', name: 'Alpha' },
 		{ id: 'b', name: 'Beta' },
 	]);
-	let chosen = state('');
+	let _chosen = state('');
 
 	<main>
 		<ul>
@@ -13,6 +13,6 @@ export function App() @{
 				<li>{i}{item.name}</li>
 			}
 		</ul>
-		<button type="button" data-go onClick={() => chosen = 'x'}>Go</button>
+		<button type="button" data-go onClick={() => _chosen = 'x'}>Go</button>
 	</main>
 }

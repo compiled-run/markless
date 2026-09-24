@@ -55,6 +55,7 @@ const marklessPack = (options: {
 	entry: Record<string, string>;
 	platform?: 'neutral' | 'node';
 	devDependencies?: boolean;
+	dts?: PackUserConfig['dts'];
 	copy?: PackUserConfig['copy'];
 }): PackUserConfig => ({
 	name: `@markless/${options.packageName}`,
@@ -66,7 +67,7 @@ const marklessPack = (options: {
 	// ESM-only output: keep plain .js/.d.ts extensions even for the node
 	// platform (cli) so publishConfig.exports stays uniform across packages.
 	fixedExtension: false,
-	dts: true,
+	dts: options.dts ?? true,
 	clean: true,
 	...(options.copy ? { copy: options.copy } : {}),
 	deps: {
@@ -153,6 +154,7 @@ const buildOrder: PackUserConfig[] = [
 	}),
 	marklessPack({
 		packageName: 'router',
+		dts: { eager: true },
 		entry: {
 			index: './src/index.ts',
 			vite: './src/vite/index.ts',
@@ -258,7 +260,10 @@ export default defineConfig({
 						'packages/headless/*/test/**/*.test.ts',
 						'scripts/**/*.test.ts',
 					],
-					exclude: ['packages/typescript-plugin/test/completion-matrix.test.ts'],
+					exclude: [
+						'packages/typescript-plugin/test/completion-matrix.test.ts',
+						'scripts/experiments/**/results/**',
+					],
 					// One id per run: the typescript-plugin test files build the same
 					// dist/ from separate workers and lock on it to build it once.
 					env: { MARKLESS_TSPLUGIN_CJS_BUILD_RUN: randomUUID() },
@@ -281,6 +286,7 @@ export default defineConfig({
 			'website/components/docs/playground/generated/**',
 			// Editor-completion probes and deliberately unparsable inputs, not source.
 			'packages/typescript-plugin/test/fixtures/**',
+			'demos/chained-async-comparison/**/routeTree.gen.ts',
 		],
 		rules: {
 			'no-restricted-imports': [
@@ -321,6 +327,10 @@ export default defineConfig({
 			'website/components/docs/playground/generated/**',
 			// Editor-completion probes and deliberately unparsable inputs, not source.
 			'packages/typescript-plugin/test/fixtures/**',
+			// Tool-written: TanStack's route tree and the bench baselines are regenerated, not authored.
+			'demos/chained-async-comparison/**/routeTree.gen.ts',
+			'demos/benchmarks/baselines/**/*.json',
+			'demos/chained-async-comparison/results/**',
 		],
 	},
 });

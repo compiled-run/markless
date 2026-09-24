@@ -275,6 +275,7 @@ export function collectGraphDependencies(
 				return;
 			}
 
+			visit(candidate.object as AnyNode | undefined);
 			if (candidate.computed === true) {
 				visit(candidate.property as AnyNode | undefined);
 			}
@@ -390,6 +391,12 @@ function postAwaitGraphReads(
 
 	const visit = (candidate: AnyNode | undefined): void => {
 		if (!candidate) return;
+
+		if (candidate.type === 'Property') {
+			if (candidate.computed === true) visit(candidate.key as AnyNode | undefined);
+			visit(candidate.value as AnyNode | undefined);
+			return;
+		}
 
 		if (candidate.type === 'MemberExpression') {
 			const read = postAwaitRead(candidate, firstAwaitEnd, state, bindings, aliases, bodyRegion);

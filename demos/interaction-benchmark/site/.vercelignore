@@ -1,0 +1,4 @@
+# Upload only the prebuilt site: build.mjs reads ../runner and repo docs, which a Vercel-side build cannot see.
+/*
+!/dist
+!/vercel.json

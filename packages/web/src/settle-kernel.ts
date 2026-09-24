@@ -171,6 +171,15 @@ export function renderSettledArm(input: SettleKernelInput): SettleKernelOutput {
 			? readPath(constants.get(graphNodeId), path)
 			: input.read(graphNodeId, path);
 
+	const asyncComputedIds = new Set(
+		(definition.state.computed ?? []).flatMap((computed) =>
+			computed.async === true ? [String(computed.graphNodeId)] : [],
+		),
+	);
+	// Render data carries authored paths; an async computed's graph node is its snapshot.
+	const readAuthored = (graphNodeId: string, path: ReadonlyArray<string>): unknown =>
+		read(graphNodeId, asyncComputedIds.has(graphNodeId) ? ['value', ...path] : path);
+
 	const hosts: Array<{ readonly hostNodeId: string; readonly tagName: string }> = [];
 	const edges = new Map((definition.edges ?? []).map((edge) => [edge.id, edge]));
 	const html = renderChunk(armChunkId, undefined);
@@ -195,8 +204,7 @@ export function renderSettledArm(input: SettleKernelInput): SettleKernelOutput {
 		const rendered = lastByHostId.get(locator.hostNodeId);
 		if (!rendered) continue;
 		movedLocators.push({
-			...locator,
-			strategy: 'arm-relative',
+			hostNodeId: locator.hostNodeId,
 			index: rendered.index,
 			tagName: rendered.tagName,
 		});
@@ -211,8 +219,7 @@ export function renderSettledArm(input: SettleKernelInput): SettleKernelOutput {
 		if (!rendered) continue;
 		if (movedHostIds.has(locator.hostNodeId)) continue;
 		armLocators.push({
-			...locator,
-			strategy: 'arm-relative',
+			hostNodeId: locator.hostNodeId,
 			index: rendered.index,
 			tagName: rendered.tagName,
 		});
@@ -331,7 +338,7 @@ export function renderSettledArm(input: SettleKernelInput): SettleKernelOutput {
 			);
 			if (!record?.collectionGraphNodeId)
 				throw new SettleKernelUnsupportedError(`repeat collection missing: ${slot.repeatId}`);
-			const items = read(record.collectionGraphNodeId, record.collectionPath ?? []);
+			const items = readAuthored(record.collectionGraphNodeId, record.collectionPath ?? []);
 			if (!Array.isArray(items) || items.length === 0)
 				return slot.emptyTemplateId ? renderChunk(slot.emptyTemplateId, undefined) : '';
 			return items.map((value) => renderChunk(slot.rowTemplateId, { value })).join('');
@@ -374,7 +381,7 @@ export function renderSettledArm(input: SettleKernelInput): SettleKernelOutput {
 			if (!item) throw new SettleKernelUnsupportedError('repeat residue outside a row');
 			return readPath(item.value, residue.path);
 		}
-		if (residue.kind === 'graph-read') return read(residue.graphNodeId, residue.path);
+		if (residue.kind === 'graph-read') return readAuthored(residue.graphNodeId, residue.path);
 		throw new SettleKernelUnsupportedError(`${residue.kind} residue`);
 	}
 }

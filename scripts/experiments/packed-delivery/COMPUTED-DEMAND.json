@@ -1,0 +1,641 @@
+{
+  "decision": "Rejected and production source restored: no timing difference clears the predeclared threshold.",
+  "files": {
+    "before": "/private/tmp/markless-docs-cold-S2q7tP/results.json",
+    "after": "/private/tmp/markless-docs-cold-20m8Q8/results.json",
+    "traceBefore": "/private/tmp/markless-symbol-demand-VW2n76/results.json",
+    "traceAfter": "/private/tmp/markless-symbol-demand-HrQgN7/results.json",
+    "coverage": "/private/tmp/markless-docs-execution-lEW85g/results.json",
+    "attribution": "/private/tmp/markless-computed-dedup-attribution.json",
+    "navigation": "/private/tmp/markless-docs-navigation-Ne5yKr/results.json"
+  },
+  "protocol": {
+    "startedAt": "2026-09-22T11:40:05.919Z",
+    "siteEntry": "/private/tmp/markless-docs-computed-dedup-ZU5arf/.output/server/index.mjs",
+    "serverEntrySha256": "a4af1f3508e21634ff31399191d8ba6bd3ab634c60ddb3d1c1f14f7fab5dc0df",
+    "options": {
+      "brotli": true,
+      "brotliHtml": true,
+      "http2": false,
+      "samples": 10,
+      "conditions": [
+        "normal",
+        "constrained"
+      ]
+    },
+    "cache": "CDP Network.setCacheDisabled true; fresh browser context per first interaction",
+    "serviceWorkers": "blocked",
+    "timing": "captured click event to expected DOM mutation; not compositor paint",
+    "localTransport": "Generated Nitro docs through a Brotli quality 5 JS proxy; localhost HTTP/1.1; HTML stream compressed with Brotli quality 5",
+    "preciseCoverage": false,
+    "cases": [
+      "accordion"
+    ],
+    "servedThemeSha256": "7404f79754fffc3b8ec86d66ad2872b9f46a568416c067d653843af25849c742",
+    "expectedThemeSha256": "7404f79754fffc3b8ec86d66ad2872b9f46a568416c067d653843af25849c742",
+    "browserVersion": "153.0.8010.53",
+    "playwrightVersion": "1.58.2",
+    "finishedAt": "2026-09-22T11:41:16.005Z",
+    "order": "Before then after, no owned heavy work overlapping timing; other desktop applications remained open",
+    "threshold": "max(10 ms, 10% before median, twice larger MAD)"
+  },
+  "timings": [
+    {
+      "condition": "normal",
+      "action": 1,
+      "before": {
+        "median": 59.699999928474426,
+        "mad": 0.2999999523162842,
+        "min": 59.200000047683716,
+        "max": 61,
+        "samples": [
+          59.40000009536743,
+          61,
+          59.799999952316284,
+          59.40000009536743,
+          60,
+          60,
+          59.59999990463257,
+          59.200000047683716,
+          59.80000019073486,
+          59.200000047683716
+        ]
+      },
+      "after": {
+        "median": 58.64999997615814,
+        "mad": 0.30000007152557373,
+        "min": 58.299999952316284,
+        "max": 60.40000009536743,
+        "samples": [
+          58.39999985694885,
+          58.69999980926514,
+          59.90000009536743,
+          59,
+          58.60000014305115,
+          60.40000009536743,
+          58.40000009536743,
+          58.5,
+          59.10000014305115,
+          58.299999952316284
+        ]
+      },
+      "threshold": 10,
+      "meaningful": false
+    },
+    {
+      "condition": "normal",
+      "action": 2,
+      "before": {
+        "median": 21.49999988079071,
+        "mad": 0.20000004768371582,
+        "min": 19.200000047683716,
+        "max": 22.799999952316284,
+        "samples": [
+          21.299999952316284,
+          19.200000047683716,
+          20.5,
+          21.600000143051147,
+          21.700000047683716,
+          21.59999990463257,
+          21.399999856948853,
+          22.799999952316284,
+          21.09999990463257,
+          21.59999990463257
+        ]
+      },
+      "after": {
+        "median": 21.25,
+        "mad": 0.10000002384185791,
+        "min": 21.09999990463257,
+        "max": 21.799999952316284,
+        "samples": [
+          21.799999952316284,
+          21.5,
+          21.200000047683716,
+          21.200000047683716,
+          21.09999990463257,
+          21.299999952316284,
+          21.200000047683716,
+          21.40000009536743,
+          21.5,
+          21.200000047683716
+        ]
+      },
+      "threshold": 10,
+      "meaningful": false
+    },
+    {
+      "condition": "normal",
+      "action": 3,
+      "before": {
+        "median": 21.75,
+        "mad": 0.15000009536743164,
+        "min": 21.5,
+        "max": 22,
+        "samples": [
+          21.799999952316284,
+          22,
+          21.700000047683716,
+          21.799999952316284,
+          21.59999990463257,
+          21.90000009536743,
+          21.59999990463257,
+          21.5,
+          21.5,
+          21.800000190734863
+        ]
+      },
+      "after": {
+        "median": 21.350000023841858,
+        "mad": 0.1499999761581421,
+        "min": 20.700000047683716,
+        "max": 21.700000047683716,
+        "samples": [
+          21.300000190734863,
+          21.700000047683716,
+          21.5,
+          20.700000047683716,
+          21.40000009536743,
+          21.399999856948853,
+          21.199999809265137,
+          21.200000047683716,
+          21.40000009536743,
+          21.100000143051147
+        ]
+      },
+      "threshold": 10,
+      "meaningful": false
+    },
+    {
+      "condition": "constrained",
+      "action": 1,
+      "before": {
+        "median": 248.10000002384186,
+        "mad": 50.200000047683716,
+        "min": 185.20000004768372,
+        "max": 311.7000000476837,
+        "samples": [
+          198.5,
+          308.10000014305115,
+          283.2000000476837,
+          296.5,
+          185.20000004768372,
+          198.40000009536743,
+          311.7000000476837,
+          300.2999999523163,
+          213,
+          197.39999985694885
+        ]
+      },
+      "after": {
+        "median": 286.5500000715256,
+        "mad": 12.699999928474426,
+        "min": 184.29999995231628,
+        "max": 304,
+        "samples": [
+          184.29999995231628,
+          292.80000019073486,
+          284.5,
+          203.09999990463257,
+          288.60000014305115,
+          200.79999995231628,
+          294.5,
+          199.79999995231628,
+          289.19999980926514,
+          304
+        ]
+      },
+      "threshold": 100.40000009536743,
+      "meaningful": false
+    },
+    {
+      "condition": "constrained",
+      "action": 2,
+      "before": {
+        "median": 44.85000002384186,
+        "mad": 1.8000000715255737,
+        "min": 42.09999990463257,
+        "max": 62.60000014305115,
+        "samples": [
+          62.60000014305115,
+          44.5,
+          47.5,
+          45.200000047683716,
+          42.5,
+          43.59999990463257,
+          46,
+          47.200000047683716,
+          42.09999990463257,
+          44.09999990463257
+        ]
+      },
+      "after": {
+        "median": 41.800000071525574,
+        "mad": 2.350000023841858,
+        "min": 38.799999952316284,
+        "max": 45.40000009536743,
+        "samples": [
+          44.40000009536743,
+          40.90000009536743,
+          42.5,
+          43.90000009536743,
+          39.700000047683716,
+          44.59999990463257,
+          41.10000014305115,
+          38.799999952316284,
+          45.40000009536743,
+          39.200000047683716
+        ]
+      },
+      "threshold": 10,
+      "meaningful": false
+    },
+    {
+      "condition": "constrained",
+      "action": 3,
+      "before": {
+        "median": 41.09999990463257,
+        "mad": 1.5499999523162842,
+        "min": 37.59999990463257,
+        "max": 45.40000009536743,
+        "samples": [
+          44,
+          41.39999985694885,
+          40.799999952316284,
+          39.799999952316284,
+          41.60000014305115,
+          45.40000009536743,
+          42.30000019073486,
+          39.299999952316284,
+          37.59999990463257,
+          38.69999980926514
+        ]
+      },
+      "after": {
+        "median": 38.85000002384186,
+        "mad": 1.7000000476837158,
+        "min": 34.200000047683716,
+        "max": 47.700000047683716,
+        "samples": [
+          38.90000009536743,
+          36.200000047683716,
+          39,
+          38.799999952316284,
+          34.200000047683716,
+          36.799999952316284,
+          37.40000009536743,
+          47.700000047683716,
+          40.700000047683716,
+          40.40000009536743
+        ]
+      },
+      "threshold": 10,
+      "meaningful": false
+    }
+  ],
+  "network": {
+    "before": {
+      "visits": 20,
+      "clicks": 60,
+      "frameworkRequests": [
+        5
+      ],
+      "siteAndFrameworkScripts": [
+        8
+      ],
+      "frameworkEncodedBytes": [
+        234988
+      ],
+      "httpCacheHits": 0,
+      "swResponses": 0,
+      "errors": [],
+      "failedRequests": [],
+      "failedActions": [],
+      "actionStartedRequests": [],
+      "pendingAtFirst": 5
+    },
+    "after": {
+      "visits": 20,
+      "clicks": 60,
+      "frameworkRequests": [
+        5
+      ],
+      "siteAndFrameworkScripts": [
+        8
+      ],
+      "frameworkEncodedBytes": [
+        234775
+      ],
+      "httpCacheHits": 0,
+      "swResponses": 0,
+      "errors": [],
+      "failedRequests": [],
+      "failedActions": [],
+      "actionStartedRequests": [],
+      "pendingAtFirst": 6
+    }
+  },
+  "trace": {
+    "before": [
+      {
+        "name": "menu",
+        "passed": true,
+        "phases": [
+          {
+            "action": 1,
+            "memberLoadCalls": 99,
+            "computedRefreshes": 5
+          },
+          {
+            "action": 2,
+            "memberLoadCalls": 90,
+            "computedRefreshes": 5
+          },
+          {
+            "action": 3,
+            "memberLoadCalls": 84,
+            "computedRefreshes": 5
+          }
+        ]
+      },
+      {
+        "name": "accordion",
+        "passed": true,
+        "phases": [
+          {
+            "action": 1,
+            "memberLoadCalls": 729,
+            "computedRefreshes": 82
+          },
+          {
+            "action": 2,
+            "memberLoadCalls": 431,
+            "computedRefreshes": 63
+          },
+          {
+            "action": 3,
+            "memberLoadCalls": 431,
+            "computedRefreshes": 63
+          }
+        ]
+      }
+    ],
+    "after": [
+      {
+        "name": "menu",
+        "passed": true,
+        "phases": [
+          {
+            "action": 1,
+            "memberLoadCalls": 99,
+            "computedRefreshes": 5
+          },
+          {
+            "action": 2,
+            "memberLoadCalls": 90,
+            "computedRefreshes": 5
+          },
+          {
+            "action": 3,
+            "memberLoadCalls": 84,
+            "computedRefreshes": 5
+          }
+        ]
+      },
+      {
+        "name": "accordion",
+        "passed": true,
+        "phases": [
+          {
+            "action": 1,
+            "memberLoadCalls": 714,
+            "computedRefreshes": 79
+          },
+          {
+            "action": 2,
+            "memberLoadCalls": 416,
+            "computedRefreshes": 60
+          },
+          {
+            "action": 3,
+            "memberLoadCalls": 416,
+            "computedRefreshes": 60
+          }
+        ]
+      }
+    ]
+  },
+  "coverage": {
+    "visits": 18,
+    "passed": true,
+    "initializers": [
+      {
+        "test": "state-counter",
+        "phases": [
+          {
+            "name": "before-input",
+            "initialized": 0
+          },
+          {
+            "name": "first-action",
+            "initialized": 13
+          },
+          {
+            "name": "repeat-1",
+            "initialized": 0
+          },
+          {
+            "name": "repeat-2",
+            "initialized": 0
+          }
+        ]
+      },
+      {
+        "test": "state-header-then-counter",
+        "phases": [
+          {
+            "name": "before-input",
+            "initialized": 0
+          },
+          {
+            "name": "static-header",
+            "initialized": 0
+          },
+          {
+            "name": "first-action",
+            "initialized": 13
+          },
+          {
+            "name": "repeat-1",
+            "initialized": 0
+          },
+          {
+            "name": "repeat-2",
+            "initialized": 0
+          }
+        ]
+      },
+      {
+        "test": "state-independent-controls",
+        "phases": [
+          {
+            "name": "before-input",
+            "initialized": 0
+          },
+          {
+            "name": "first-action",
+            "initialized": 13
+          },
+          {
+            "name": "second-control",
+            "initialized": 3
+          },
+          {
+            "name": "return-first",
+            "initialized": 0
+          },
+          {
+            "name": "repeat-second",
+            "initialized": 0
+          }
+        ]
+      },
+      {
+        "test": "computed-total",
+        "phases": [
+          {
+            "name": "before-input",
+            "initialized": 0
+          },
+          {
+            "name": "first-action",
+            "initialized": 56
+          },
+          {
+            "name": "repeat-1",
+            "initialized": 0
+          },
+          {
+            "name": "repeat-2",
+            "initialized": 0
+          }
+        ]
+      },
+      {
+        "test": "mode-select",
+        "phases": [
+          {
+            "name": "before-input",
+            "initialized": 0
+          },
+          {
+            "name": "first-action",
+            "initialized": 72
+          },
+          {
+            "name": "repeat-1",
+            "initialized": 1
+          },
+          {
+            "name": "repeat-2",
+            "initialized": 0
+          }
+        ]
+      },
+      {
+        "test": "accordion",
+        "phases": [
+          {
+            "name": "before-input",
+            "initialized": 0
+          },
+          {
+            "name": "first-action",
+            "initialized": 117
+          },
+          {
+            "name": "repeat-1",
+            "initialized": 0
+          },
+          {
+            "name": "repeat-2",
+            "initialized": 0
+          }
+        ]
+      }
+    ]
+  },
+  "navigation": [
+    {
+      "name": "closed menu ignores header input, then opens and dismisses normally",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "name": "scalar clicks hand live state to a complex control and continue afterward",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "name": "keyboard priming and queued scalar clicks preserve each update",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "name": "intent, SPA navigation, history and offline controls",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "name": "delayed shared pack keeps controls visible and retains the click",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "name": "failed shared pack remains an observable failure",
+      "passed": true,
+      "errors": [
+        "TypeError: Failed to fetch dynamically imported module: http://127.0.0.1:55565/markless/build/chunk-DGokgezz.js",
+        "TypeError: Failed to fetch dynamically imported module: http://127.0.0.1:55565/markless/build/chunk-DGokgezz.js",
+        "TypeError: Failed to fetch dynamically imported module: http://127.0.0.1:55565/markless/build/chunk-DGokgezz.js"
+      ]
+    }
+  ],
+  "restoration": {
+    "sameClientFiles": true,
+    "count": 63,
+    "bytes": 19292124
+  },
+  "checks": {
+    "redRegression": "Four expected failures before the candidate change",
+    "focused": 23,
+    "webRuntime": 802,
+    "docs": 64,
+    "rootTypecheck": "passed",
+    "docsTypecheck": "passed",
+    "docsDoctor": "passed",
+    "restoredRootTypecheck": "passed",
+    "restoredFocused": 19,
+    "restoredDoctor": "passed",
+    "budget": {
+      "passed": 4,
+      "failed": 6,
+      "unchangedLimits": true,
+      "candidate": {
+        "largestChunk": 5676,
+        "csrDownload": 140841,
+        "csrStartup": 14928,
+        "ssrDownload": 84843,
+        "ssrStartup": 4319,
+        "ssrNavigation": 25701
+      }
+    }
+  },
+  "limitations": [
+    "Member loadSymbol calls only, not an exhaustive call graph.",
+    "Trace and precise coverage are separate from uninstrumented timing.",
+    "Source coverage and initializer counts are not CPU time.",
+    "No proof of exact minimum necessary execution or zero network wait.",
+    "Controlled playground value updates can legitimately refresh another control that reads the same value."
+  ]
+}

@@ -55,9 +55,9 @@ export function prerenderBranchArm(input: BranchRangeInput): {
 	const locators = input.view.locators
 		.filter((locator) => locator.index >= elementStart && locator.index < elementEnd)
 		.map((locator) => ({
-			...locator,
-			strategy: 'arm-relative' as const,
+			hostNodeId: locator.hostNodeId,
 			index: locator.index - elementStart,
+			tagName: locator.tagName,
 		}))
 		.sort((left, right) => left.index - right.index);
 	const armHostIds = new Set(locators.map((locator) => locator.hostNodeId));

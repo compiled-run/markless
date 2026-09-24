@@ -222,6 +222,14 @@ function emitNode(
 	context: CollectionContext,
 	repeat: { readonly id: string; readonly itemName: string } | null,
 ): number {
+	// The parser wraps the first of several sibling elements in a block as a statement.
+	if (node.type === 'ExpressionStatement') {
+		const expression = node.expression as AnyNode | undefined;
+		return expression?.type?.startsWith('JSX')
+			? emitNode(expression, path, builder, context, repeat)
+			: 0;
+	}
+
 	if (isStaticTextNode(node)) {
 		const text = staticTextValue(node);
 		if (!text) return 0;

@@ -18,9 +18,13 @@ import {
 } from '../build/prerender.ts';
 import { executionLogActivationInjection } from '../execution-log.ts';
 import { outputDefaults } from '../build/chunking.ts';
+import { unwrapAsyncImportWrappers } from '../build/async-import-wrappers.ts';
+import { collapseInitFacadeImports } from '../build/init-facade-imports.ts';
+import { nativePackingPlugins } from '../build/native-packing.ts';
 import { includeOptimizedDeps } from '../optimized-deps.ts';
 import { RESUME_ENTRY_SPECIFIER, STORAGE_FREE_RESUME_ENTRY_SPECIFIER } from '../source-module.ts';
 import { createMarklessRolldownPlugin } from '../rolldown.ts';
+import { sharedReachedRenderDataRequest } from '../virtual-ids.ts';
 import {
 	type BundleGraphAdder,
 	type GlobalInjections,
@@ -116,7 +120,11 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 		options: rolldownOptions,
 		prerenderRecordsBySource,
 	}) as Plugin & {
-		api: { invalidateGeneratedModules: typeof hmrOptions.invalidateGeneratedModules };
+		api: {
+			invalidateGeneratedModules: typeof hmrOptions.invalidateGeneratedModules;
+			runtimeDemandMaps: MarklessRolldownPluginApi['runtimeDemandMaps'];
+			runtimeDemandSources: MarklessRolldownPluginApi['runtimeDemandSources'];
+		};
 	};
 	const hmr = createViteHmr(hmrOptions);
 
@@ -356,7 +364,56 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 		},
 	} satisfies Plugin & { api: MarklessVitePluginApi };
 
-	return [marklessPlugin];
+	return [
+		marklessPlugin,
+		{
+			name: 'markless:shared-render-data-reach',
+			// Ahead of Vite's own resolver, which would otherwise keep the route root in the id.
+			enforce: 'pre',
+			resolveId: {
+				filter: { id: /[?&]markless-reached-from=/ },
+				async handler(source, importer) {
+					const shared = sharedReachedRenderDataRequest(source);
+					return shared ? await this.resolve(shared, importer, { skipSelf: true }) : null;
+				},
+			},
+		} satisfies Plugin,
+		{
+			name: 'markless:init-facade-imports',
+			apply: 'build',
+			// Ahead of every plugin that lists the bundle's chunks, the router's preloads among them.
+			enforce: 'pre',
+			applyToEnvironment(environment) {
+				return environment.config.consumer === 'client';
+			},
+			generateBundle: {
+				order: 'post',
+				handler(_options, bundle) {
+					collapseInitFacadeImports(bundle);
+					unwrapAsyncImportWrappers(bundle);
+				},
+			},
+		} satisfies Plugin,
+		...(options.experimentalNativePacking
+			? nativePackingPlugins(
+					() => resolvedRoot,
+					() => basePlugin.api.runtimeDemandMaps(),
+					options.experimentalPackPlanner
+						? {
+								mode: options.experimentalPackPlanner,
+								demandSources: () => basePlugin.api.runtimeDemandSources(),
+							}
+						: undefined,
+				).map((plugin): Plugin => ({
+					...(plugin as Plugin),
+					apply: 'build' as const,
+					enforce: 'post' as const,
+					applyToEnvironment(environment) {
+						return environment.config.consumer === 'client';
+					},
+				}))
+			: []),
+	];
 }
 
 async function buildMarklessEnvironments(builder: ViteBuilder, options: MarklessViteOptions) {
@@ -577,6 +634,8 @@ function runHook(hook: unknown, context: unknown, ...args: unknown[]) {
 
 type MarklessVitePluginApi = {
 	invalidateGeneratedModules: MarklessRolldownPluginApi['invalidateGeneratedModules'];
+	runtimeDemandMaps: MarklessRolldownPluginApi['runtimeDemandMaps'];
+	runtimeDemandSources: MarklessRolldownPluginApi['runtimeDemandSources'];
 	registerBundleGraphAdder?: (adder: BundleGraphAdder) => void;
 	registerDevInjection?: (injection: GlobalInjections) => void;
 	registerPreloadGraphEntries?: (adder: PreloadGraphEntriesAdder) => void;

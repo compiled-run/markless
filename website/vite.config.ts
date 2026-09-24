@@ -40,5 +40,15 @@ export default {
 			],
 		},
 	},
-	plugins: [ui(), pageProps(), docsData(), uiDemos(), anatomy(), keyboard(), markless(), router(), highlightMdx()],
+	plugins: [
+		ui(),
+		pageProps(),
+		docsData(),
+		uiDemos(),
+		anatomy(),
+		keyboard(),
+		markless({ experimentalNativePacking: true }),
+		router({ linkPreloading: 'intent' }),
+		highlightMdx(),
+	],
 } satisfies UserConfig & { nitro: NitroConfig; lint: OxlintConfig };

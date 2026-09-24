@@ -1,0 +1,35 @@
+{
+  "name": "interaction-bench-react-router",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync": "node ../../shared/sync.mjs . app/shared",
+    "sync:check": "node ../../shared/sync.mjs . app/shared --check",
+    "build": "pnpm run sync:check && react-router build",
+    "dev": "react-router dev",
+    "start": "node scripts/start.mjs",
+    "typecheck": "react-router typegen && tsc",
+    "smoke": "node scripts/smoke.mjs",
+    "bytes": "node scripts/bytes.mjs"
+  },
+  "dependencies": {
+    "@react-router/node": "8.4.0",
+    "@react-router/serve": "8.4.0",
+    "isbot": "5.2.2",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-router": "8.4.0"
+  },
+  "devDependencies": {
+    "@react-router/dev": "8.4.0",
+    "@types/node": "^22",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@vercel/react-router": "1.3.6",
+    "typescript": "^5.9.3",
+    "vite": "8.3.0"
+  },
+  "engines": {
+    "node": ">=22.22.0"
+  }
+}

@@ -20,6 +20,8 @@ const EMITTED_DOM_ORDER_WALK_ALLOWLIST: Readonly<Record<string, string>> = {
 // Exact conditional sites are intentional: adding another environment decision
 // requires adding its reason beside the guard instead of quietly distributing posture.
 const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
+	"packages/bundler/src/virtual-ids.ts :: if (environment !== 'server') return undefined;":
+		'A server build compiles client-only query variants to the plain source module, so it re-exports that module instead of shipping a second copy.',
 	"packages/bundler/src/transform.ts :: ...(environment === 'client' && demandsOverlay(compiled.runtimeDemandMap)":
 		'Client render-data registers the lazy overlay capability before CSR mount; server output excludes browser capability registration.',
 	"packages/bundler/src/build/chunking.ts :: if (environment === 'server') {":
@@ -30,6 +32,8 @@ const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Environment-less invalidation falls back to the already resolved client environment.',
 	"packages/bundler/src/rolldown.ts :: if (currentEnvironment !== 'client') {":
 		'Rolldown entry signatures are adjusted only for its resolved client build.',
+	"packages/bundler/src/rolldown.ts :: environment === 'client' &&":
+		'Native module packing applies only to the resolved production client build; server modules retain their existing delivery.',
 	"packages/bundler/src/link-driver.ts :: clientEnvironment: environment === 'client',":
 		'The link driver reports the already resolved build environment to the module-link pass.',
 	"packages/bundler/src/hooks/transform-link.ts :: clientEnvironment: currentEnvironment === 'client',":
@@ -42,6 +46,10 @@ const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Rolldown transform hooks project the resolved environment into client-only build behavior.',
 	"packages/bundler/src/hooks/transform-request.ts :: currentEnvironment === 'client' && renderDataRequest":
 		'Reached-from lookup is limited to client render-data requests before materialized-route propagation is selected.',
+	"packages/bundler/src/hooks/transform-request.ts :: servedScalarPlans: currentEnvironment === 'client' && !prerenderRecords,":
+		'Only client resume modules dispatch events; served-locator scalar plans apply to client pages served as payload documents.',
+	"packages/bundler/src/hooks/transform-request.ts :: includeScalarActionPlans: currentEnvironment === 'client' && isScalarPlanSourceRequest(id),":
+		'Only an explicit client symbol-source request includes metadata for scalar dispatch; server and ordinary symbol output omit it.',
 	"packages/bundler/src/hooks/transform-request.ts :: currentEnvironment === 'client' ? ctx.prerenderRecordsBySource?.get(source) : undefined,":
 		'Prerender records are supplied only to the resolved client compilation that emits staged wake modules.',
 	"packages/bundler/src/hooks/transform-hook.ts :: if (currentEnvironment === 'client' && clientRouteArtifact) {":
@@ -112,8 +120,8 @@ const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Same reason for the live roster: a CSR mount reaches the runtime start through client output, so the roster loader is named there or a row added after mount is never renumbered.',
 	"packages/bundler/src/source-module.ts :: input.environment === 'client' && input.hasOverlayMarks === true":
 		'Same reason for elevation: a CSR mount reaches the runtime start without a resume module, and the overlay behaviour must be named by client output or its chunk is never emitted.',
-	"packages/bundler/src/source-module.ts :: input.environment === 'client' && demandsRowComponentMint(input.runtimeDemandMap)":
-		'Same reason again for the component-row mint: a CSR mount reaches the resume runtime through client output and never evaluates a resume module, so the mint loader is installed there or its rows never build.',
+	"packages/bundler/src/source-module.ts :: input.environment === 'client' ? clientRowMintLoader(input) : null,":
+		'Same reason again for the row mints: a CSR mount reaches the resume runtime through client output and never evaluates a resume module, so the mint loader is installed there or its rows never build or rebuild.',
 	"packages/bundler/src/transform.ts :: const linkedClientRenderData = input.environment === 'client' && !input.prerenderRecords;":
 		'Build-time source emission recursively links ordinary client render-data modules while prerender records use their separately resolved shape.',
 	"packages/bundler/src/transform.ts :: input.environment === 'server' ? await compilePrerenderInlineResumerSources() : undefined;":

@@ -10,14 +10,12 @@ export default function MultiEmbed() @{
 			<menu.trigger data-testid="trigger">View</menu.trigger>
 			<menu.content data-testid="content">
 				<menu.item value="share" submenu data-testid="share-item">
-					Share
-					<menu.itemcontent data-testid="share-content">
+					Share <menu.itemcontent data-testid="share-content">
 						<menu.item value="email" data-testid="email-item">Email</menu.item>
 					</menu.itemcontent>
 				</menu.item>
 				<menu.item value="export" submenu disabled data-testid="export-item">
-					Export
-					<menu.itemcontent data-testid="export-content">
+					Export <menu.itemcontent data-testid="export-content">
 						<menu.item value="pdf" data-testid="pdf-item">PDF</menu.item>
 					</menu.itemcontent>
 				</menu.item>

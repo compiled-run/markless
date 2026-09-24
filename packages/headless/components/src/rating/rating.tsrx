@@ -126,7 +126,7 @@ export const ratingState = shared(
 			},
 
 			/** A key moves the rating, and focus follows it onto the mark it reaches. */
-			stepTo(key: string, shiftKey: boolean) {
+			stepTo(key: string) {
 				if (rating.disabled || rating.readonly) return;
 
 				const total = rating.count;
@@ -347,7 +347,7 @@ export function RatingItem({
 				return;
 			}
 
-			rating.stepTo(event.key, event.shiftKey);
+			rating.stepTo(event.key);
 			onKeydown?.(event);
 		}}
 	>

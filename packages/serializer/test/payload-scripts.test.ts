@@ -50,3 +50,28 @@ test('renderPayloadScripts emits canonical markless/state and markless/view data
 	expect(decodedMenu.author).toBe(decodedMenu.assignee);
 	expect(scripts.view.events[0].symbolIds).toEqual(['symbol:0']);
 });
+
+test('payload scripts escape only the `<` that could close or comment-escape the script', () => {
+	const hostile = '<li>row</li></script><script>alert(1)</script><!--<script>';
+	const state = createProtocolStatePayload({
+		cells: [{ graphNodeId: 'state:html', name: 'html', valueKind: 'scalar', value: hostile }],
+		computed: [],
+	});
+	const view: ProtocolViewPayload = {
+		version: 1,
+		locators: [],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+
+	const { stateScript } = renderPayloadScripts({ state, view });
+	const body = stateScript.slice('<script type="markless/state">'.length, -'</script>'.length);
+
+	expect(body).not.toMatch(/<[/!]/);
+	expect(body).toContain('<li>row\\u003C/li>');
+	expect(body).toContain('\\u003C!--<script>');
+	expect(JSON.parse(body)).toEqual(JSON.parse(JSON.stringify(state)));
+});

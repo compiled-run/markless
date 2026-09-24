@@ -2,6 +2,7 @@
 // first-pass transform, then drives the link and emit steps in order.
 import { compileTsrxModuleLinkArtifact } from '@markless/compiler';
 import type { TransformPluginContext } from 'rolldown';
+import { importedModuleConstants, missingConstantSources } from './module-constants.ts';
 import {
 	MARKLESS_EXECUTION_LOG_MODULE_ID,
 	injectExecutionLogModuleHook,
@@ -15,6 +16,7 @@ import {
 	linkedInterfaceClaims,
 	linkedInterfaces,
 	mergeLinkedModuleChildren,
+	moduleIsEntry,
 	resolveImportedModuleInterfaces,
 } from '../link-driver.ts';
 import { yieldToEventLoop } from '../event-loop.ts';
@@ -30,6 +32,7 @@ import {
 	isMarklessRuntimeModule,
 	normalizeVirtualId,
 	pathname,
+	serverSharedSourceRequest,
 } from '../virtual-ids.ts';
 import type { MarklessHookContext } from './hook-context.ts';
 import {
@@ -44,7 +47,11 @@ import {
 	materializeOwnDelegateChildren,
 	sealWakeAggregate,
 } from './transform-link.ts';
-import { type TransformRequest, planTransformHookRequest } from './transform-request.ts';
+import {
+	type TransformRequest,
+	planTransformHookRequest,
+	tracksSourcePublication,
+} from './transform-request.ts';
 
 export async function transformHook(
 	ctx: MarklessHookContext,
@@ -60,17 +67,31 @@ export async function transformHook(
 	if (virtualId.startsWith(MARKLESS_VIRTUAL_PREFIX)) {
 		return null;
 	}
+	const sharedServerSource =
+		ctx.internalOptions.dev === true ? undefined : serverSharedSourceRequest(id, currentEnvironment);
+	// Importers read named exports only; a second compile would ship the module twice.
+	if (sharedServerSource && !moduleIsEntry(pluginContext, id))
+		return { code: `export * from ${JSON.stringify(sharedServerSource)};`, map: null };
 	const request = planTransformHookRequest(ctx, pluginContext, code, id, currentEnvironment);
 	const { plan, source } = request;
-	const { manifestSource, publishesClientClaims } = plan;
-	if (publishesClientClaims) {
-		ctx.state.moduleMetadata.beginSourceSymbolClaims(source, manifestSource);
+	const { manifestSource } = plan;
+	if (tracksSourcePublication(request)) {
+		ctx.state.moduleMetadata.beginSourceSymbolClaims(
+			currentEnvironment,
+			source,
+			manifestSource,
+		);
 	}
 	try {
 		return await runTransformSteps(request);
 	} catch (error) {
 		// A compile that threw publishes nothing; release it so readers stop waiting.
-		ctx.state.moduleMetadata.releaseSourceSymbolClaims(source, manifestSource);
+		ctx.state.moduleMetadata.releaseSourceSymbolClaims(
+			currentEnvironment,
+			source,
+			manifestSource,
+			error,
+		);
 		throw error;
 	}
 }
@@ -173,7 +194,8 @@ async function runFirstPassTransform(
 }> {
 	const { ctx, pluginContext, code, source, currentEnvironment, plan, transformInput } = request;
 	const { internalOptions } = ctx;
-	const { moduleMetadata, moduleLinkArtifacts, linkedTransformCache, styleClosures } = ctx.state;
+	const { moduleMetadata, linkedTransformCache, styleClosures } = ctx.state;
+	const moduleLinkArtifacts = ctx.state.moduleLinkArtifacts(currentEnvironment);
 	const { cacheKey, manifestSource } = plan;
 	const cached = linkedTransformCache.get(cacheKey);
 	let linkedTransformResult: TransformTsrxModuleResult | undefined;
@@ -186,7 +208,7 @@ async function runFirstPassTransform(
 			cached.result.moduleImports,
 			fallbackImportedSource,
 		);
-		await forceImportedModules(
+		const unawaited = await forceImportedModules(
 			pluginContext,
 			mergeLinkedModuleChildren(cachedImports, cached.resolvedChildren),
 			moduleLinkArtifacts,
@@ -197,7 +219,7 @@ async function runFirstPassTransform(
 		const cachedLink = linkedInterfaces(
 			cachedImports,
 			moduleLinkArtifacts,
-			linkedInterfaceClaims(cachedImports, moduleMetadata),
+			linkedInterfaceClaims(cachedImports, moduleMetadata, currentEnvironment, unawaited),
 		);
 		// A child's <style> comes and goes without touching its interface hash, so the closure is compared too.
 		const childStyleModuleIds = [
@@ -210,6 +232,7 @@ async function runFirstPassTransform(
 		if (
 			cached.importedInterfaceHashes === cachedLink.signature &&
 			cached.importedSymbolClaims === cachedLink.claimSignature &&
+			(await importedConstantsUnchanged(pluginContext, manifestSource, cached.input)) &&
 			childStyleModuleIds.join('\n') ===
 				[...cached.linkedStyleModuleIds].toSorted().join('\n')
 		) {
@@ -292,9 +315,37 @@ async function runFirstPassTransform(
 			linkedTransformResult = await transformTsrxModule(linkedTransformInput);
 		}
 	}
+	if (!reusedLinkedTransform) {
+		const missing = missingConstantSources(
+			linkedTransformResult.importedConstantRequests,
+			linkedTransformInput.importedModuleConstants,
+		);
+		if (missing.length > 0) {
+			linkedTransformInput = {
+				...linkedTransformInput,
+				importedModuleConstants: {
+					...linkedTransformInput.importedModuleConstants,
+					...(await importedModuleConstants(pluginContext, manifestSource, missing)),
+				},
+			};
+			linkedTransformResult = await transformTsrxModule(linkedTransformInput);
+		}
+	}
 	return {
 		result: linkedTransformResult,
 		input: linkedTransformInput,
 		reused: reusedLinkedTransform,
 	};
+}
+
+// A constant module edited under an unchanged importer changes what its props send.
+async function importedConstantsUnchanged(
+	pluginContext: TransformPluginContext,
+	importer: string,
+	input: TransformTsrxModuleInput,
+): Promise<boolean> {
+	const known = input.importedModuleConstants;
+	if (!known || Object.keys(known).length === 0) return true;
+	const current = await importedModuleConstants(pluginContext, importer, Object.keys(known));
+	return JSON.stringify(current) === JSON.stringify(known);
 }

@@ -1,6 +1,7 @@
-import { analyze, isEventAttribute } from '@tsrx/yuku';
+import { isEventAttribute } from '@tsrx/yuku';
 import { asNodes, childNodes, getIdentifierName, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource } from '../../ast/source.ts';
+import { moduleSemantics } from '../semantic-graph/shared-ast.ts';
 import {
 	getComponentFunction,
 	getDynamicTagExpression,
@@ -26,6 +27,8 @@ import type { PublicRenderPlanArtifact } from '../../artifacts.ts';
 import {
 	firstComponentRoot,
 	describeUnsupportedFragmentContent,
+	implicitFragmentRoot,
+	isRootStatement,
 	supportedFragmentRoot,
 } from './template.ts';
 
@@ -178,7 +181,7 @@ export function componentRootDiagnostics(ast: AnyNode, filename: string) {
 
 		// Direct fragments and `return <>...</>` both need the multi-root
 		// story; single-element returns are supported by firstComponentRoot.
-		const fragment = childNodes(body).find(
+		const fragment = implicitFragmentRoot(componentFunction?.node) ?? childNodes(body).find(
 			(child) =>
 				child.type === 'Fragment' ||
 				child.type === 'JSXFragment' ||
@@ -260,7 +263,7 @@ export function componentUnsupportedBodyDiagnostics(
 
 		for (const bodyStatement of childNodes(body)) {
 			if (isIgnorableTextNode(bodyStatement)) continue;
-			if (bodyStatement === root || returnArgument(bodyStatement) === root) continue;
+			if (root && isRootStatement(componentFunction.node, root, bodyStatement)) continue;
 			const message = unsupportedBodyStatementMessage(bodyStatement, source);
 			if (!message) continue;
 			return [
@@ -373,7 +376,7 @@ function unresolvedValueReferences(
 	source: string,
 	filename: string,
 ): Array<{ readonly name: string; readonly start: number; readonly end: number }> {
-	const view = analyze(source, filename).semantic;
+	const view = moduleSemantics(source, filename);
 	const references: Array<{ readonly name: string; readonly start: number; readonly end: number }> =
 		[];
 	for (let id = 0; id < view.reference.count; id++) {

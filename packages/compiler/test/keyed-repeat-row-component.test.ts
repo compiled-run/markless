@@ -233,7 +233,8 @@ export function App() @{
 	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowTemplate');
 });
 
-test('a wrapper around a projecting component ships neither half', async () => {
+// Projected elements take their row's segment, so a projecting row rebuilds like any other.
+test('a wrapper around a projecting component ships both halves', async () => {
 	const view = await viewOf(`import { state } from '@markless/core';
 function Row({ children }) @{
 	<span>{children}</span>
@@ -243,8 +244,8 @@ export function App() @{
 	<ul>@for (const row of rows; key row.id) { <li data-row={row.id}><Row><b>{row.label}</b></Row></li> }</ul>
 }
 `);
-	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowComponent');
-	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowTemplate');
+	expect(view.keyedRepeats?.[0]?.rowComponent?.componentName).toBe('App');
+	expect(view.keyedRepeats?.[0]?.rowTemplate?.html).toContain('<li');
 });
 
 // Pay-per-use inside the field: a row whose props are all derived carries no
@@ -284,9 +285,7 @@ test('a component row whose module published no interface ships no identity', as
 	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowComponent');
 });
 
-// Fail closed for the second phased reason: a row whose component is written
-// around projected children needs the parent's own markup to rebuild too.
-test('a projecting component row ships no identity', async () => {
+test('a component row projecting elements ships its identity', async () => {
 	const view = await viewOf(`import { state } from '@markless/core';
 function Row({ children }) @{
 	let open = state(false);
@@ -295,6 +294,24 @@ function Row({ children }) @{
 export function App() @{
 	let rows = state([{ id: 'a', label: 'A' }]);
 	<ul>@for (const row of rows; key row.id) { <Row><b>{row.label}</b></Row> }</ul>
+}
+`);
+	expect(view.keyedRepeats?.[0]?.rowComponent?.componentName).toBe('App');
+});
+
+// Fail closed where nothing keeps a projected value current: it reads page state
+// through a call no record follows, and the row's own rebuild never re-reads it.
+test('a component row projecting a stale page read ships no identity', async () => {
+	const view = await viewOf(`import { state } from '@markless/core';
+function shout(value) { return String(value).toUpperCase(); }
+function Row({ children }) @{
+	let open = state(false);
+	<li onClick={() => open = !open}>{children}</li>
+}
+export function App() @{
+	let rows = state([{ id: 'a', label: 'A' }]);
+	const tone = state('calm');
+	<ul>@for (const row of rows; key row.id) { <Row>{shout(tone)}</Row> }</ul>
 }
 `);
 	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowComponent');

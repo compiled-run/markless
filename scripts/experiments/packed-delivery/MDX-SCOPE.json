@@ -1,0 +1,666 @@
+{
+  "input": "/private/tmp/markless-docs-cold-usQwYR/results.json",
+  "metadata": {
+    "startedAt": "2026-09-22T05:57:23.872Z",
+    "siteEntry": "/private/tmp/markless-docs-computed-guard-Lo2aYh/.output/server/index.mjs",
+    "serverEntrySha256": "8b1bc5e4722a8ea178cf1bf3ba3a774bb301085e79fbe6eed0f26b8d0c2145e3",
+    "options": {
+      "brotli": true,
+      "brotliHtml": true,
+      "http2": true,
+      "samples": 10,
+      "conditions": [
+        "normal",
+        "constrained"
+      ]
+    },
+    "cache": "CDP Network.setCacheDisabled true; fresh browser context per first interaction",
+    "serviceWorkers": "blocked",
+    "timing": "captured click event to expected DOM mutation; not compositor paint",
+    "localTransport": "Generated Nitro docs through Brotli quality 5 JS and HTML proxy; localhost HTTP/2 TLS; both HTML variants buffered before compression. Raw metadata has an inherited streaming label; scopeProbe metadata correctly states the actual buffering.",
+    "preciseCoverage": false,
+    "scopeProbe": {
+      "variants": [
+        "full",
+        "isolated"
+      ],
+      "order": "alternates within each sample",
+      "limitation": "Diagnostic counter-only payload projection. Other controls intentionally lose their records; this is not a shipping implementation or navigation test. Both HTML variants are buffered before compression; JS and markup are identical."
+    },
+    "servedThemeSha256": "7404f79754fffc3b8ec86d66ad2872b9f46a568416c067d653843af25849c742",
+    "expectedThemeSha256": "7404f79754fffc3b8ec86d66ad2872b9f46a568416c067d653843af25849c742",
+    "browserVersion": "153.0.8010.48",
+    "playwrightVersion": "1.58.2",
+    "finishedAt": "2026-09-22T05:59:16.391Z"
+  },
+  "comparisons": [
+    {
+      "condition": "normal",
+      "phase": "first",
+      "full": {
+        "n": 10,
+        "median": 36.89999997615814,
+        "p95": 39.90000009536743,
+        "mad": 0.7499998807907104
+      },
+      "isolated": {
+        "n": 10,
+        "median": 35.75,
+        "p95": 38,
+        "mad": 0.7999999523162842
+      },
+      "improvement": 1.149999976158142,
+      "threshold": 10,
+      "clearsThreshold": false
+    },
+    {
+      "condition": "normal",
+      "phase": "repeat",
+      "full": {
+        "n": 20,
+        "median": 15,
+        "p95": 16.699999809265137,
+        "mad": 0.6499999761581421
+      },
+      "isolated": {
+        "n": 20,
+        "median": 15.049999952316284,
+        "p95": 16.09999990463257,
+        "mad": 0.5
+      },
+      "improvement": -0.04999995231628418,
+      "threshold": 10,
+      "clearsThreshold": false
+    },
+    {
+      "condition": "constrained",
+      "phase": "first",
+      "full": {
+        "n": 10,
+        "median": 65.34999990463257,
+        "p95": 66.89999985694885,
+        "mad": 0.2999999523162842
+      },
+      "isolated": {
+        "n": 10,
+        "median": 53.049999952316284,
+        "p95": 62.19999980926514,
+        "mad": 1.0499999523162842
+      },
+      "improvement": 12.299999952316284,
+      "threshold": 10,
+      "clearsThreshold": true
+    },
+    {
+      "condition": "constrained",
+      "phase": "repeat",
+      "full": {
+        "n": 20,
+        "median": 15.099999904632568,
+        "p95": 16.90000009536743,
+        "mad": 0.9499999284744263
+      },
+      "isolated": {
+        "n": 20,
+        "median": 14.549999952316284,
+        "p95": 16,
+        "mad": 0.6499999761581421
+      },
+      "improvement": 0.5499999523162842,
+      "threshold": 10,
+      "clearsThreshold": false
+    }
+  ],
+  "counts": {
+    "visits": 40,
+    "actions": 120,
+    "failures": 0,
+    "frameworkRequests": [
+      5
+    ],
+    "httpCacheHits": 0,
+    "dataUrlCacheEvents": 80,
+    "actionsWithPendingJs": 0,
+    "actionsWithNewJs": 0
+  },
+  "ownership": {
+    "limitation": "Read-only ownership proof: child records come from fresh SSR and page records from the stable preview; not a browser timing or an integrated runtime change.",
+    "before": {
+      "cells": 72,
+      "computed": 177,
+      "locators": 481,
+      "events": 23,
+      "domUpdates": 299
+    },
+    "groups": [
+      {
+        "id": "m3:",
+        "graphNodeIds": [
+          "m3:c0:state:count"
+        ],
+        "cells": 1,
+        "computed": 0,
+        "locators": 2,
+        "events": 1,
+        "domUpdates": 1
+      },
+      {
+        "id": "m4:",
+        "graphNodeIds": [
+          "m4:c0:state:clicks"
+        ],
+        "cells": 1,
+        "computed": 0,
+        "locators": 5,
+        "events": 1,
+        "domUpdates": 1
+      }
+    ],
+    "remainder": {
+      "cells": 70,
+      "computed": 177,
+      "locators": 474,
+      "events": 21,
+      "domUpdates": 297
+    }
+  },
+  "coverage": {
+    "input": "/private/tmp/markless-docs-execution-2VsHVe/results.json",
+    "limitation": "Rolldown __esmMin callback inventory and lexical export declarations, not CPU time. Containment counts use the emitted helper shape; verify their source before interpreting them.",
+    "records": [
+      {
+        "test": "state-counter",
+        "sample": 0,
+        "variant": "full",
+        "phases": [
+          {
+            "name": "before-input",
+            "initialized": 0,
+            "executedSourceBytes": 0,
+            "exportDeclarationBytes": 0,
+            "initializerNames": []
+          },
+          {
+            "name": "first-action",
+            "initialized": 48,
+            "executedSourceBytes": 161326,
+            "exportDeclarationBytes": 98176,
+            "initializerNames": [
+              "init__virtual_markless_symbol$1",
+              "init__virtual_markless_symbol",
+              "init_counter_demo",
+              "init_counter",
+              "init_state$1",
+              "init_preload_helper",
+              "init_resume_entry_ts_markless_router_root__2FUsers_2Fjacksm5pro_2Fdev_2Fopen_source_2Fmarkless_2Fwebsite_lang_ts_lang",
+              "Oe",
+              "Ae",
+              "je",
+              "Le",
+              "init_dom_journal",
+              "tt",
+              "ite",
+              "ote",
+              "cte",
+              "st",
+              "pte",
+              "init_payload_graph_construct",
+              "init_payload_full",
+              "init_payload_document_common",
+              "init_payload_document",
+              "nne",
+              "init_value_decode_client",
+              "init_resume_errors",
+              "init_resume_arm_records",
+              "yn",
+              "init_instance_scope",
+              "init_resume_locators",
+              "init_resume$1",
+              "init_payload_resume",
+              "init_resume",
+              "fge",
+              "_ge",
+              "Sge",
+              "init_graph",
+              "init_src",
+              "init_overlay",
+              "init_sync_policy_core",
+              "Rx",
+              "init_resume_commit_arm",
+              "init_resume_events",
+              "init_resume_runtime_shared",
+              "init_resume_runtime_start",
+              "init_resume_runtime",
+              "init_resume_sync_demand",
+              "init_storage_plane",
+              "init_mdx_route"
+            ]
+          },
+          {
+            "name": "repeat-1",
+            "initialized": 0,
+            "executedSourceBytes": 16513,
+            "exportDeclarationBytes": 0,
+            "initializerNames": []
+          },
+          {
+            "name": "repeat-2",
+            "initialized": 0,
+            "executedSourceBytes": 16513,
+            "exportDeclarationBytes": 0,
+            "initializerNames": []
+          }
+        ]
+      },
+      {
+        "test": "state-counter",
+        "sample": 0,
+        "variant": "isolated",
+        "phases": [
+          {
+            "name": "before-input",
+            "initialized": 0,
+            "executedSourceBytes": 0,
+            "exportDeclarationBytes": 0,
+            "initializerNames": []
+          },
+          {
+            "name": "first-action",
+            "initialized": 44,
+            "executedSourceBytes": 156489,
+            "exportDeclarationBytes": 98176,
+            "initializerNames": [
+              "init__virtual_markless_symbol$1",
+              "init__virtual_markless_symbol",
+              "init_counter_demo",
+              "init_counter",
+              "init_state$1",
+              "init_preload_helper",
+              "init_resume_entry_ts_markless_router_root__2FUsers_2Fjacksm5pro_2Fdev_2Fopen_source_2Fmarkless_2Fwebsite_lang_ts_lang",
+              "Oe",
+              "Ae",
+              "je",
+              "Le",
+              "init_dom_journal",
+              "tt",
+              "ite",
+              "ote",
+              "cte",
+              "st",
+              "pte",
+              "init_payload_graph_construct",
+              "init_payload_full",
+              "init_payload_document_common",
+              "init_payload_document",
+              "init_value_decode_client",
+              "init_resume_errors",
+              "init_resume_arm_records",
+              "yn",
+              "init_instance_scope",
+              "init_resume_locators",
+              "init_resume$1",
+              "init_payload_resume",
+              "init_resume",
+              "fge",
+              "_ge",
+              "Sge",
+              "init_graph",
+              "init_src",
+              "init_overlay",
+              "Rx",
+              "init_resume_commit_arm",
+              "init_resume_events",
+              "init_resume_runtime_shared",
+              "init_resume_runtime_start",
+              "init_resume_runtime",
+              "init_mdx_route"
+            ]
+          },
+          {
+            "name": "repeat-1",
+            "initialized": 0,
+            "executedSourceBytes": 16352,
+            "exportDeclarationBytes": 0,
+            "initializerNames": []
+          },
+          {
+            "name": "repeat-2",
+            "initialized": 0,
+            "executedSourceBytes": 16352,
+            "exportDeclarationBytes": 0,
+            "initializerNames": []
+          }
+        ]
+      },
+      {
+        "test": "state-counter",
+        "sample": 1,
+        "variant": "full",
+        "phases": [
+          {
+            "name": "before-input",
+            "initialized": 0,
+            "executedSourceBytes": 0,
+            "exportDeclarationBytes": 0,
+            "initializerNames": []
+          },
+          {
+            "name": "first-action",
+            "initialized": 48,
+            "executedSourceBytes": 161326,
+            "exportDeclarationBytes": 98176,
+            "initializerNames": [
+              "init__virtual_markless_symbol$1",
+              "init__virtual_markless_symbol",
+              "init_counter_demo",
+              "init_counter",
+              "init_state$1",
+              "init_preload_helper",
+              "init_resume_entry_ts_markless_router_root__2FUsers_2Fjacksm5pro_2Fdev_2Fopen_source_2Fmarkless_2Fwebsite_lang_ts_lang",
+              "Oe",
+              "Ae",
+              "je",
+              "Le",
+              "init_dom_journal",
+              "tt",
+              "ite",
+              "ote",
+              "cte",
+              "st",
+              "pte",
+              "init_payload_graph_construct",
+              "init_payload_full",
+              "init_payload_document_common",
+              "init_payload_document",
+              "nne",
+              "init_value_decode_client",
+              "init_resume_errors",
+              "init_resume_arm_records",
+              "yn",
+              "init_instance_scope",
+              "init_resume_locators",
+              "init_resume$1",
+              "init_payload_resume",
+              "init_resume",
+              "fge",
+              "_ge",
+              "Sge",
+              "init_graph",
+              "init_src",
+              "init_overlay",
+              "init_sync_policy_core",
+              "Rx",
+              "init_resume_commit_arm",
+              "init_resume_events",
+              "init_resume_runtime_shared",
+              "init_resume_runtime_start",
+              "init_resume_runtime",
+              "init_resume_sync_demand",
+              "init_storage_plane",
+              "init_mdx_route"
+            ]
+          },
+          {
+            "name": "repeat-1",
+            "initialized": 0,
+            "executedSourceBytes": 16513,
+            "exportDeclarationBytes": 0,
+            "initializerNames": []
+          },
+          {
+            "name": "repeat-2",
+            "initialized": 0,
+            "executedSourceBytes": 16513,
+            "exportDeclarationBytes": 0,
+            "initializerNames": []
+          }
+        ]
+      },
+      {
+        "test": "state-counter",
+        "sample": 1,
+        "variant": "isolated",
+        "phases": [
+          {
+            "name": "before-input",
+            "initialized": 0,
+            "executedSourceBytes": 0,
+            "exportDeclarationBytes": 0,
+            "initializerNames": []
+          },
+          {
+            "name": "first-action",
+            "initialized": 44,
+            "executedSourceBytes": 156489,
+            "exportDeclarationBytes": 98176,
+            "initializerNames": [
+              "init__virtual_markless_symbol$1",
+              "init__virtual_markless_symbol",
+              "init_counter_demo",
+              "init_counter",
+              "init_state$1",
+              "init_preload_helper",
+              "init_resume_entry_ts_markless_router_root__2FUsers_2Fjacksm5pro_2Fdev_2Fopen_source_2Fmarkless_2Fwebsite_lang_ts_lang",
+              "Oe",
+              "Ae",
+              "je",
+              "Le",
+              "init_dom_journal",
+              "tt",
+              "ite",
+              "ote",
+              "cte",
+              "st",
+              "pte",
+              "init_payload_graph_construct",
+              "init_payload_full",
+              "init_payload_document_common",
+              "init_payload_document",
+              "init_value_decode_client",
+              "init_resume_errors",
+              "init_resume_arm_records",
+              "yn",
+              "init_instance_scope",
+              "init_resume_locators",
+              "init_resume$1",
+              "init_payload_resume",
+              "init_resume",
+              "fge",
+              "_ge",
+              "Sge",
+              "init_graph",
+              "init_src",
+              "init_overlay",
+              "Rx",
+              "init_resume_commit_arm",
+              "init_resume_events",
+              "init_resume_runtime_shared",
+              "init_resume_runtime_start",
+              "init_resume_runtime",
+              "init_mdx_route"
+            ]
+          },
+          {
+            "name": "repeat-1",
+            "initialized": 0,
+            "executedSourceBytes": 16352,
+            "exportDeclarationBytes": 0,
+            "initializerNames": []
+          },
+          {
+            "name": "repeat-2",
+            "initialized": 0,
+            "executedSourceBytes": 16352,
+            "exportDeclarationBytes": 0,
+            "initializerNames": []
+          }
+        ]
+      },
+      {
+        "test": "state-counter",
+        "sample": 2,
+        "variant": "full",
+        "phases": [
+          {
+            "name": "before-input",
+            "initialized": 0,
+            "executedSourceBytes": 0,
+            "exportDeclarationBytes": 0,
+            "initializerNames": []
+          },
+          {
+            "name": "first-action",
+            "initialized": 48,
+            "executedSourceBytes": 161326,
+            "exportDeclarationBytes": 98176,
+            "initializerNames": [
+              "init__virtual_markless_symbol$1",
+              "init__virtual_markless_symbol",
+              "init_counter_demo",
+              "init_counter",
+              "init_state$1",
+              "init_preload_helper",
+              "init_resume_entry_ts_markless_router_root__2FUsers_2Fjacksm5pro_2Fdev_2Fopen_source_2Fmarkless_2Fwebsite_lang_ts_lang",
+              "Oe",
+              "Ae",
+              "je",
+              "Le",
+              "init_dom_journal",
+              "tt",
+              "ite",
+              "ote",
+              "cte",
+              "st",
+              "pte",
+              "init_payload_graph_construct",
+              "init_payload_full",
+              "init_payload_document_common",
+              "init_payload_document",
+              "nne",
+              "init_value_decode_client",
+              "init_resume_errors",
+              "init_resume_arm_records",
+              "yn",
+              "init_instance_scope",
+              "init_resume_locators",
+              "init_resume$1",
+              "init_payload_resume",
+              "init_resume",
+              "fge",
+              "_ge",
+              "Sge",
+              "init_graph",
+              "init_src",
+              "init_overlay",
+              "init_sync_policy_core",
+              "Rx",
+              "init_resume_commit_arm",
+              "init_resume_events",
+              "init_resume_runtime_shared",
+              "init_resume_runtime_start",
+              "init_resume_runtime",
+              "init_resume_sync_demand",
+              "init_storage_plane",
+              "init_mdx_route"
+            ]
+          },
+          {
+            "name": "repeat-1",
+            "initialized": 0,
+            "executedSourceBytes": 16513,
+            "exportDeclarationBytes": 0,
+            "initializerNames": []
+          },
+          {
+            "name": "repeat-2",
+            "initialized": 0,
+            "executedSourceBytes": 16513,
+            "exportDeclarationBytes": 0,
+            "initializerNames": []
+          }
+        ]
+      },
+      {
+        "test": "state-counter",
+        "sample": 2,
+        "variant": "isolated",
+        "phases": [
+          {
+            "name": "before-input",
+            "initialized": 0,
+            "executedSourceBytes": 0,
+            "exportDeclarationBytes": 0,
+            "initializerNames": []
+          },
+          {
+            "name": "first-action",
+            "initialized": 44,
+            "executedSourceBytes": 156489,
+            "exportDeclarationBytes": 98176,
+            "initializerNames": [
+              "init__virtual_markless_symbol$1",
+              "init__virtual_markless_symbol",
+              "init_counter_demo",
+              "init_counter",
+              "init_state$1",
+              "init_preload_helper",
+              "init_resume_entry_ts_markless_router_root__2FUsers_2Fjacksm5pro_2Fdev_2Fopen_source_2Fmarkless_2Fwebsite_lang_ts_lang",
+              "Oe",
+              "Ae",
+              "je",
+              "Le",
+              "init_dom_journal",
+              "tt",
+              "ite",
+              "ote",
+              "cte",
+              "st",
+              "pte",
+              "init_payload_graph_construct",
+              "init_payload_full",
+              "init_payload_document_common",
+              "init_payload_document",
+              "init_value_decode_client",
+              "init_resume_errors",
+              "init_resume_arm_records",
+              "yn",
+              "init_instance_scope",
+              "init_resume_locators",
+              "init_resume$1",
+              "init_payload_resume",
+              "init_resume",
+              "fge",
+              "_ge",
+              "Sge",
+              "init_graph",
+              "init_src",
+              "init_overlay",
+              "Rx",
+              "init_resume_commit_arm",
+              "init_resume_events",
+              "init_resume_runtime_shared",
+              "init_resume_runtime_start",
+              "init_resume_runtime",
+              "init_mdx_route"
+            ]
+          },
+          {
+            "name": "repeat-1",
+            "initialized": 0,
+            "executedSourceBytes": 16352,
+            "exportDeclarationBytes": 0,
+            "initializerNames": []
+          },
+          {
+            "name": "repeat-2",
+            "initialized": 0,
+            "executedSourceBytes": 16352,
+            "exportDeclarationBytes": 0,
+            "initializerNames": []
+          }
+        ]
+      }
+    ]
+  },
+  "environmentCaveat": "No owned build or test overlapped timing. A process snapshot during timing showed the user's Cursor renderer using 35.7% CPU; the browser samples alternate variants to limit order drift. This was not an otherwise-idle machine."
+}

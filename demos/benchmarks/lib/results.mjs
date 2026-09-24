@@ -44,7 +44,9 @@ function assertNoForbiddenMetricNames(value, path = 'result') {
 	if (!value || typeof value !== 'object') return;
 	for (const [key, child] of Object.entries(value)) {
 		if (key.toLowerCase().includes(['hyd', 'rate'].join(''))) {
-			throw new TypeError(`${path}.${key} uses a forbidden metric name; use resume_first_dispatch_ms`);
+			throw new TypeError(
+				`${path}.${key} uses a forbidden metric name; use resume_first_dispatch_ms`,
+			);
 		}
 		assertNoForbiddenMetricNames(child, `${path}.${key}`);
 	}
@@ -119,7 +121,10 @@ function assertCase(benchmarkCase, index) {
 	assertObject(benchmarkCase, label);
 	assertString(benchmarkCase.name, `${label}.name`);
 	assertObject(benchmarkCase.gates, `${label}.gates`);
-	if (typeof benchmarkCase.gates.passed !== 'boolean' || !Array.isArray(benchmarkCase.gates.checks)) {
+	if (
+		typeof benchmarkCase.gates.passed !== 'boolean' ||
+		!Array.isArray(benchmarkCase.gates.checks)
+	) {
 		throw new TypeError(`${label}.gates must contain passed and checks`);
 	}
 	if (!benchmarkCase.gates.passed && 'timing' in benchmarkCase) {
@@ -156,12 +161,15 @@ function assertObject(value, label) {
 }
 
 function assertString(value, label) {
-	if (typeof value !== 'string' || value.length === 0) throw new TypeError(`${label} must be a string`);
+	if (typeof value !== 'string' || value.length === 0)
+		throw new TypeError(`${label} must be a string`);
 }
 
 function assertFiniteNumber(value, label, allowNegative = false) {
 	if (!Number.isFinite(value) || (!allowNegative && value < 0)) {
-		throw new TypeError(`${label} must be a finite ${allowNegative ? '' : 'non-negative '}number`);
+		throw new TypeError(
+			`${label} must be a finite ${allowNegative ? '' : 'non-negative '}number`,
+		);
 	}
 }
 

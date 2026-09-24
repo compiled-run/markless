@@ -3,8 +3,8 @@
 exports[`every virtual module a TypeScript-free source emits stays byte-identical > virtual modules for a source that carries no TypeScript 1`] = `
 "--- render-data ---
 const TONES = { calm: 'Calm', loud: 'Loud' };
-export const marklessRenderData = {"passId":"render-data","filename":"/workspace/app/src/untypedTone.tsrx","root":{"componentName":"UntypedTonePage","templateId":"template:UntypedTonePage"},"chunks":[{"id":"template:UntypedTonePage","kind":"template","componentName":"UntypedTonePage","statics":["<main","><!--markless-slot:1-->","</main>"],"hosts":[{"hostNodeId":"h0","tagName":"main","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"attribute","name":"data-label","coordinate":{"kind":"child-index","path":[0]},"residue":{"kind":"authored-expression","source":"TONES[view.tone]"},"staticIndex":0},{"kind":"text","residue":{"kind":"graph-read","graphNodeId":"state:view","path":["tone"]},"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":1}]}],"hosts":[{"id":"h0","tagName":"main","hostNodeId":"h0"}],"initialValues":[{"graphNodeId":"state:view","value":{"kind":"constant","value":{"tone":"calm"}}}],"branches":[],"repeats":[],"boundaries":[],"interactions":[]};
-const marklessPrerenderComponents = {"UntypedTonePage":{...{"name":"UntypedTonePage","state":{"version":1,"cells":[{"graphNodeId":"state:view","name":"view","valueKind":"object","value":{"version":1,"root":{"$ref":0},"records":[{"id":0,"type":"object","fields":[["tone","calm"]]}]}}],"computed":[],"sharedDefinitions":[]},"view":{"version":1,"locators":[{"hostNodeId":"h0","strategy":"dom-order","index":0,"tagName":"main"}],"events":[],"domUpdates":[{"hostNodeId":"h0","source":"view.tone","graphNodeId":"state:view","path":["tone"],"target":{"kind":"text"},"symbolId":"symbol:0"}],"behaviors":[],"elementHandles":[],"keyedRepeats":[],"branches":[],"asyncBoundaries":[]},"rootChunkId":"template:UntypedTonePage","chunks":[{"id":"template:UntypedTonePage","kind":"template","componentName":"UntypedTonePage","hosts":[{"hostNodeId":"h0","tagName":"main","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"attribute","name":"data-label","coordinate":{"kind":"child-index","path":[0]},"residue":{"kind":"authored-expression","source":"TONES[view.tone]"},"staticIndex":0},{"kind":"text","residue":{"kind":"graph-read","graphNodeId":"state:view","path":["tone"]},"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":1}],"nativeTemplateId":"markless-render-data:%2Fworkspace%2Fapp%2Fsrc%2FuntypedTone.tsrx:UntypedTonePage:template:template%3AUntypedTonePage"}],"hostNodeIds":["h0"],"branchIds":[],"boundaryIds":[],"repeatIds":[],"initialValues":[{"graphNodeId":"state:view","value":{"kind":"constant","value":{"tone":"calm"}}}],"initialValueKinds":{},"stateGraphNodeIds":["state:view"],"branches":[],"repeats":[],"boundaries":[],"edges":[],"propCellId":null,"ownsModuleData":true},readResidue:(residue,marklessResidueContext)=>{const view=marklessResidueContext.read("state:view");switch(residue.source){case "TONES[view.tone]":return (TONES[view.tone]);default:throw new Error('MARKLESS_PRERENDER_RESIDUE_MISSING: '+residue.source);}}}};
+export const marklessRenderData = {"passId":"render-data","filename":"/workspace/app/src/untypedTone.tsrx","root":{"componentName":"UntypedTonePage","templateId":"template:UntypedTonePage"},"chunks":[{"id":"template:UntypedTonePage","kind":"template","componentName":"UntypedTonePage","statics":["<main","><!--markless-slot:1-->","</main>"],"hosts":[{"hostNodeId":"h0","tagName":"main","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"attribute","name":"data-label","coordinate":{"kind":"child-index","path":[0]},"residue":{"kind":"authored-expression","source":"TONES[tone]"},"staticIndex":0},{"kind":"text","residue":{"kind":"graph-read","graphNodeId":"state:view","path":["count"]},"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":1}]}],"hosts":[{"id":"h0","tagName":"main","hostNodeId":"h0"}],"initialValues":[{"graphNodeId":"state:view","value":{"kind":"constant","value":{"count":0}}}],"branches":[],"repeats":[],"boundaries":[],"interactions":[]};
+const marklessPrerenderComponents = {"UntypedTonePage":{...{"name":"UntypedTonePage","state":{"version":1,"cells":[{"graphNodeId":"state:view","name":"view","valueKind":"object","value":{"version":1,"root":{"$ref":0},"records":[{"id":0,"type":"object","fields":[["count",0]]}]}}],"computed":[],"sharedDefinitions":[]},"view":{"version":1,"locators":[{"hostNodeId":"h0","strategy":"dom-order","index":0,"tagName":"main"}],"events":[],"domUpdates":[{"hostNodeId":"h0","source":"view.count","graphNodeId":"state:view","path":["count"],"target":{"kind":"text"},"symbolId":"symbol:0"}],"behaviors":[],"elementHandles":[],"keyedRepeats":[],"branches":[],"asyncBoundaries":[]},"rootChunkId":"template:UntypedTonePage","chunks":[{"id":"template:UntypedTonePage","kind":"template","componentName":"UntypedTonePage","hosts":[{"hostNodeId":"h0","tagName":"main","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"attribute","name":"data-label","coordinate":{"kind":"child-index","path":[0]},"residue":{"kind":"authored-expression","source":"TONES[tone]"},"staticIndex":0},{"kind":"text","residue":{"kind":"graph-read","graphNodeId":"state:view","path":["count"]},"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":1}],"nativeTemplateId":"markless-render-data:%2Fworkspace%2Fapp%2Fsrc%2FuntypedTone.tsrx:UntypedTonePage:template:template%3AUntypedTonePage"}],"hostNodeIds":["h0"],"branchIds":[],"boundaryIds":[],"repeatIds":[],"initialValues":[{"graphNodeId":"state:view","value":{"kind":"constant","value":{"count":0}}}],"initialValueKinds":{},"stateGraphNodeIds":["prop:props","state:view"],"branches":[],"repeats":[],"boundaries":[],"edges":[],"propCellId":"prop:props","ownsModuleData":true},readResidue:(residue,marklessResidueContext)=>{const tone=marklessResidueContext.read("prop:tone");switch(residue.source){case "TONES[tone]":return (TONES[tone]);default:throw new Error('MARKLESS_PRERENDER_RESIDUE_MISSING: '+residue.source);}}}};
 export const marklessPrerenderData = {
 	rootComponentName: "UntypedTonePage",
 	renderData: marklessRenderData,
@@ -30,8 +30,8 @@ export const state = {
 						"type": "object",
 						"fields": [
 							[
-								"tone",
-								"calm"
+								"count",
+								0
 							]
 						]
 					}
@@ -106,6 +106,7 @@ export const runtimeDemandMap = {
 		}
 	],
 	"actions": [],
+	"capabilityModuleIds": [],
 	"unknownRecordModuleIds": [
 		"core/web/resume-storage-free",
 		"web/dom-journal",
@@ -122,9 +123,11 @@ export const runtimeDemandMap = {
 		"web/resume-events",
 		"web/resume-keyed-repeats",
 		"web/resume-locators",
+		"web/resume-resettle-hold",
 		"web/resume-runtime",
 		"web/resume-runtime-shared",
 		"web/resume-runtime-start",
+		"web/resume-stream-patches",
 		"web/runtime-error-reporting"
 	]
 };
@@ -142,10 +145,10 @@ export const view = {
 	"domUpdates": [
 		{
 			"hostNodeId": "h0",
-			"source": "view.tone",
+			"source": "view.count",
 			"graphNodeId": "state:view",
 			"path": [
-				"tone"
+				"count"
 			],
 			"target": {
 				"kind": "text"

@@ -51,13 +51,11 @@ function relayArtifact(input: {
 							locators: [
 								{
 									hostNodeId: 'h2',
-									strategy: 'arm-relative',
 									index: 0,
 									tagName: 'article',
 								},
 								{
 									hostNodeId: 'h3',
-									strategy: 'arm-relative',
 									index: 2,
 									tagName: 'button',
 								},
@@ -795,7 +793,6 @@ function composedGroveArtifact() {
 								locators: [
 									{
 										hostNodeId: 'c0:h2',
-										strategy: 'arm-relative',
 										index: 0,
 										tagName: 'p',
 									},

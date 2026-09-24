@@ -7,7 +7,9 @@ const marklessPlugins = (() => {
 	const previousPrerender = process.env.MARKLESS_PRERENDER;
 	process.env.MARKLESS_PRERENDER = '1';
 	try {
-		return markless();
+		return markless({
+			experimentalNativePacking: process.env.MARKLESS_FIXTURE_NATIVE_PACKING === '1',
+		});
 	} finally {
 		if (previousPrerender === undefined) delete process.env.MARKLESS_PRERENDER;
 		else process.env.MARKLESS_PRERENDER = previousPrerender;

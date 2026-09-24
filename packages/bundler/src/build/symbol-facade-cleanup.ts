@@ -89,7 +89,7 @@ export function rewriteGeneratedSymbolInitExports(bundle: Record<string, unknown
 	readonly renamed: number;
 } {
 	const chunks = collectChunks(bundle);
-	const rewrites = findSymbolInitExportRewrites(chunks);
+	const rewrites = consistentInitExportRewrites(chunks, findSymbolInitExportRewrites(chunks));
 	if (rewrites.length === 0) return { renamed: 0 };
 
 	const replacements = new Map<string, string>();
@@ -156,6 +156,28 @@ function findSymbolInitExportRewrites(
 		if (rewrite) rewrites.push(rewrite);
 	}
 	return rewrites;
+}
+
+// Renames apply to every chunk's code by name, so a name other chunks also export must map the same way everywhere.
+function consistentInitExportRewrites(
+	chunks: ReadonlyMap<string, GeneratedChunk>,
+	rewrites: SymbolInitExportRewrite[],
+): SymbolInitExportRewrite[] {
+	const exporters = new Map<string, GeneratedChunk[]>();
+	for (const chunk of chunks.values())
+		for (const name of chunk.exports)
+			exporters.set(name, [...(exporters.get(name) ?? []), chunk]);
+	let kept = rewrites;
+	for (;;) {
+		const names = new Map(kept.map((rewrite) => [rewrite.chunk, rewrite.names]));
+		const next = kept.filter((rewrite) =>
+			[...rewrite.names].every(([from, to]) =>
+				(exporters.get(from) ?? []).every((chunk) => names.get(chunk)?.get(from) === to),
+			),
+		);
+		if (next.length === kept.length) return kept;
+		kept = next;
+	}
 }
 
 function findSymbolInitExportRewrite(chunk: GeneratedChunk): SymbolInitExportRewrite | undefined {
@@ -342,14 +364,15 @@ function compactDirectSymbolLoadersInCode(code: string): {
 		if (bodyEnd < 0) continue;
 
 		const body = code.slice(bodyStart, bodyEnd);
-		const mapName = uniqueIdentifier('$s', `${code}${next}`);
-		const moduleCacheName = uniqueIdentifier('$m', `${code}${next}${mapName}`);
 		const replacement = compactDirectSymbolLoaderFunction({
 			functionName: match[1]!,
 			parameterName: match[2]!,
 			body,
-			mapName,
-			moduleCacheName,
+			identifiers() {
+				const source = `${code}${next}`;
+				const mapName = uniqueIdentifier('$s', source);
+				return { mapName, moduleCacheName: uniqueIdentifier('$m', `${source}${mapName}`) };
+			},
 		});
 		if (!replacement) {
 			FUNCTION_DECLARATION_RE.lastIndex = bodyEnd + 1;
@@ -371,8 +394,7 @@ function compactDirectSymbolLoaderFunction(input: {
 	readonly functionName: string;
 	readonly parameterName: string;
 	readonly body: string;
-	readonly mapName: string;
-	readonly moduleCacheName: string;
+	identifiers(): { mapName: string; moduleCacheName: string };
 }): string | undefined {
 	const returnSource = input.body.trim();
 	if (!returnSource.startsWith('return ')) return undefined;
@@ -394,16 +416,17 @@ function compactDirectSymbolLoaderFunction(input: {
 		return undefined;
 	}
 
+	const { mapName, moduleCacheName } = input.identifiers();
 	const generatedCount = generatedSymbolRangeCount(parsed.branches);
 	if (generatedCount !== undefined) {
 		return [
-			`let ${input.moduleCacheName};`,
+			`let ${moduleCacheName};`,
 			`function ${input.functionName}(${input.parameterName}){`,
 			`let t=+${input.parameterName}.slice(7);`,
 			`if(${input.parameterName}===\`symbol:${'${t}'}\`&&t>=0&&t<${generatedCount}){`,
-			`if(${input.moduleCacheName})return ${first.helperName}(${input.moduleCacheName},\`symbol_${'${t}'}\`);`,
+			`if(${moduleCacheName})return ${first.helperName}(${moduleCacheName},\`symbol_${'${t}'}\`);`,
 			`return import(${JSON.stringify(first.importSpecifier)})`,
-			`.then(${first.moduleParameter}=>(${input.moduleCacheName}=${first.moduleParameter},${first.helperName}(${first.moduleParameter},\`symbol_${'${t}'}\`)))`,
+			`.then(${first.moduleParameter}=>(${moduleCacheName}=${first.moduleParameter},${first.helperName}(${first.moduleParameter},\`symbol_${'${t}'}\`)))`,
 			`}`,
 			`return ${parsed.fallback}`,
 			'}',
@@ -415,14 +438,14 @@ function compactDirectSymbolLoaderFunction(input: {
 		.map((branch) => `${JSON.stringify(branch.symbolId)}:${JSON.stringify(branch.exportName)}`)
 		.join(',');
 	return [
-		`const ${input.mapName}={${mapEntries}};`,
-		`let ${input.moduleCacheName};`,
+		`const ${mapName}={${mapEntries}};`,
+		`let ${moduleCacheName};`,
 		`function ${input.functionName}(${input.parameterName}){`,
-		`let ${exportVariable}=${input.mapName}[${input.parameterName}];`,
+		`let ${exportVariable}=${mapName}[${input.parameterName}];`,
 		`if(${exportVariable}){`,
-		`if(${input.moduleCacheName})return ${first.helperName}(${input.moduleCacheName},${exportVariable});`,
+		`if(${moduleCacheName})return ${first.helperName}(${moduleCacheName},${exportVariable});`,
 		`return import(${JSON.stringify(first.importSpecifier)})`,
-		`.then(${first.moduleParameter}=>(${input.moduleCacheName}=${first.moduleParameter},${first.helperName}(${first.moduleParameter},${exportVariable})))`,
+		`.then(${first.moduleParameter}=>(${moduleCacheName}=${first.moduleParameter},${first.helperName}(${first.moduleParameter},${exportVariable})))`,
 		`}`,
 		`return ${parsed.fallback}`,
 		'}',
@@ -585,11 +608,12 @@ function unique(values: readonly string[]): string[] {
 
 function replaceIdentifierNames(code: string, replacements: ReadonlyMap<string, string>): string {
 	const names = [...replacements.keys()].sort((a, b) => b.length - a.length);
-	let next = code;
-	for (const name of names) {
-		next = next.replace(identifierNameRE(name), replacements.get(name)!);
+	const resolved = new Map<string, string>();
+	for (const name of names.reverse()) {
+		const replacement = replacements.get(name)!;
+		resolved.set(name, resolved.get(replacement) ?? replacement);
 	}
-	return next;
+	return code.replace(/(?<![$\w])[$A-Z_a-z][$\w]*/g, (name) => resolved.get(name) ?? name);
 }
 
 function identifierNameRE(name: string): RegExp {

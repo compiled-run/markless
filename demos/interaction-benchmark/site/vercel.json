@@ -1,0 +1,27 @@
+{
+	"$schema": "https://openapi.vercel.sh/vercel.json",
+	"framework": null,
+	"outputDirectory": "dist",
+	"cleanUrls": false,
+	"trailingSlash": false,
+	"headers": [
+		{
+			"source": "/runs/(.*)\\.jsonl",
+			"headers": [
+				{
+					"key": "content-type",
+					"value": "application/x-ndjson; charset=utf-8"
+				}
+			]
+		},
+		{
+			"source": "/runs/(.*)\\.md",
+			"headers": [
+				{
+					"key": "content-type",
+					"value": "text/markdown; charset=utf-8"
+				}
+			]
+		}
+	]
+}

@@ -1,0 +1,67 @@
+{
+  "productionReady": false,
+  "changes": [
+    "Rejected group activations release their cached promise for retry.",
+    "Failed startup disposes runtime resources and removes its graph/registration while restoring previous computed ownership.",
+    "Group activations serialize per container; duplicate requests share their activation promise.",
+    "Inline scalar values remain available until their group activates, then policy reads follow live graph values.",
+    "An explicitly supplied renderData thunk reaches the staged runtime and component-row bridge."
+  ],
+  "verification": {
+    "failingBeforeCases": 7,
+    "newCases": 9,
+    "runtimeAndRelevantBundler": {
+      "files": 110,
+      "passed": 730,
+      "exitCode": 0,
+      "sandboxAttempt": "729 passed; Chrome/local HTTP case failed because sandbox denied listening on 127.0.0.1; identical complete command outside sandbox passed."
+    },
+    "rootTypecheck": "passed",
+    "docsTypecheck": "passed",
+    "docsTests": {
+      "files": 15,
+      "passed": 64,
+      "exitCode": 0,
+      "warning": "Nonfatal Vite 10-second shutdown timeout"
+    },
+    "docsDoctorBuild": "passed",
+    "client": {
+      "dirs": [
+        "/private/tmp/markless-docs-combined-demand-GSbudh/.output/public/build",
+        "website/.output/public/build"
+      ],
+      "counts": [
+        63,
+        63
+      ],
+      "bytes": [
+        19274342,
+        19274342
+      ],
+      "differences": []
+    }
+  },
+  "sourceHashes": [
+    {
+      "path": "packages/web/src/fns/prerender-trigger-resume.ts",
+      "sha256": "47b5ef23397551c2d9a253f8fa0a8498fa1b528673ca993e0cd3bd5073227f12"
+    },
+    {
+      "path": "packages/web/test/prerender-trigger-recovery.test.ts",
+      "sha256": "99e226f83b0e1da06054075170cd61a6a104e2144ebfa3e0827335586c6355a4"
+    },
+    {
+      "path": "packages/web/test/keyed-repeat-row-component.test.ts",
+      "sha256": "26a8d566b5ae20f318f368e9f7c755d0ee172f3acaf30a9356c2a34b627718e6"
+    }
+  ],
+  "remaining": [
+    "Linked/rendered MDX dependency proof and production selective activation.",
+    "Ancestor dispatch, full/staged handoff, disposal and navigation lifecycle.",
+    "Existing eager row bridge, render-data, evaluator and instance-scope preparation on repeat activation.",
+    "Integrated cold browser comparison and earliest interaction testing.",
+    "Six earlier fixture size/negative-budget failures."
+  ],
+  "noNewTimingClaim": true,
+  "receiptsDirectory": "scripts/experiments/packed-delivery/results/staged-recovery-2026-09-22"
+}

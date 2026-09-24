@@ -1,0 +1,141 @@
+import { createRuntimeGraph } from '@markless/runtime';
+import { protocolInstanceSegment, protocolRowSegment } from '@markless/serializer/protocol';
+import { expect, test, vi } from 'vitest';
+import { createEventWiring } from '../src/resume-events.ts';
+import type { ResumeDomElement, ResumeSymbol, ResumeSymbolContext } from '../src/resume-types.ts';
+
+function fixture(hostNodeId: string, symbols: Record<string, ResumeSymbol>, entry: string) {
+	const child = protocolInstanceSegment(3);
+	const graph = createRuntimeGraph({
+		cells: ['pear', 'plum'].map((key) => ({
+			graphNodeId: `${protocolRowSegment(key)}${child}state:value`,
+			value: key,
+		})),
+	});
+	const definitions = vi.spyOn(graph, 'listSharedDefinitions');
+	const children: ResumeDomElement[] = [];
+	const root: ResumeDomElement = { nodeType: 1, tagName: 'SECTION', childNodes: children };
+	const button: ResumeDomElement = { nodeType: 1, tagName: 'BUTTON', parentElement: root };
+	children.push(button);
+	const getHandle = vi.fn(() => undefined);
+	const reportError = vi.fn(async () => {});
+	const wiring = createEventWiring({
+		root,
+		graph,
+		loadSymbol: (id) => {
+			if (!symbols[id]) throw Error(`Unknown test symbol: ${id}`);
+			return symbols[id]!;
+		},
+		elementsByHostId: new Map([[hostNodeId, button]]),
+		elementHandles: { get: getHandle, register() {}, deleteHost() {} },
+		view: {
+			locators: [],
+			events: [],
+			domUpdates: [],
+			behaviors: [],
+			elementHandles: [],
+			asyncBoundaries: [],
+		},
+		eventTypes: new Set(),
+		disposedHosts: new Set(),
+		ignoredDisposedEventTargets: new WeakSet(),
+		prepareRuntimeShared: async () => {},
+		flushRuntimeGraph: async () => {},
+		reportRuntimeError: reportError,
+		activateBehaviorsFromTrigger: () => undefined,
+		behaviorHostIdsForAncestors: () => [],
+	});
+	wiring.addEventRecord(button, { hostNodeId, eventName: 'click', symbolIds: [entry] });
+	return {
+		graph,
+		definitions,
+		getHandle,
+		reportError,
+		click: () => wiring.dispatch({ type: 'click', target: button }),
+	};
+}
+
+test.each(['symbol:press', 'm8:c2:symbol:other'])(
+	'ordinary handler %s does not prepare row or widget scope',
+	async (entry) => {
+		const seen: ResumeSymbolContext[] = [];
+		const app = fixture(
+			'host',
+			{
+				[entry]: (context) => {
+					seen.push(context);
+				},
+			},
+			entry,
+		);
+		await app.click();
+		await app.click();
+		expect(seen).toHaveLength(2);
+		expect(seen.map((context) => context.graph)).toEqual([app.graph, app.graph]);
+		expect(app.definitions).not.toHaveBeenCalled();
+		expect(app.reportError).not.toHaveBeenCalled();
+	},
+);
+
+test('an ordinary callback stays on the page graph without a registry scan', async () => {
+	const seen: unknown[] = [];
+	const app = fixture(
+		'host',
+		{
+			'symbol:press': (context) => context.invokeSymbol!('symbol:callback', context),
+			'symbol:callback': (context) => {
+				seen.push(context.graph);
+			},
+		},
+		'symbol:press',
+	);
+	await app.click();
+	expect(seen).toEqual([app.graph]);
+	expect(app.definitions).not.toHaveBeenCalled();
+});
+
+test.each(['pear', 'plum'])(
+	'a bound callback reached through an ordinary handler qualifies %s graph and handle reads',
+	async (key) => {
+		const child = protocolInstanceSegment(3);
+		const bound = `${child}bound:callback:owner`;
+		const values: unknown[] = [];
+		const app = fixture(
+			`${protocolRowSegment(key)}${child}host`,
+			{
+				'symbol:press': (context) => context.invokeSymbol!(bound, context),
+				[bound]: (context) => {
+					values.push(context.graph.read(`${child}state:value`));
+					context.getElementHandle!(`${child}element:target`);
+				},
+			},
+			'symbol:press',
+		);
+		await app.click();
+		await app.click();
+		expect(values).toEqual([key, key]);
+		expect(app.getHandle).toHaveBeenLastCalledWith(
+			`${protocolRowSegment(key)}${child}element:target`,
+		);
+		expect(app.reportError).not.toHaveBeenCalled();
+	},
+);
+
+test('a direct bound handler retains dispatch error reporting', async () => {
+	const error = Error('handler failed');
+	const entry = 'bound:handler:owner';
+	const app = fixture(
+		'host',
+		{
+			[entry]: () => {
+				throw error;
+			},
+		},
+		entry,
+	);
+	await expect(app.click()).rejects.toBe(error);
+	expect(app.reportError).toHaveBeenCalledWith(
+		error,
+		expect.objectContaining({ symbolId: entry, phase: 'event' }),
+	);
+});

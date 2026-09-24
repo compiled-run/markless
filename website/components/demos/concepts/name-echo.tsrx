@@ -9,8 +9,7 @@ export default function NameEcho() @{
 
 	<form onSubmit={(event) => event.preventDefault()}>
 		<label>
-			Your name
-			<input value={name} onInput={(event) => (name = event.currentTarget.value)} />
+			Your name <input value={name} onInput={(event) => (name = event.currentTarget.value)} />
 		</label>
 		<p>Hello, {name}</p>
 		<button type="submit">Say hello</button>

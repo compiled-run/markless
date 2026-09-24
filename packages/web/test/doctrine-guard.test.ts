@@ -30,6 +30,8 @@ const RUNTIME_MOUNT_SCAN_ALLOWLIST: Readonly<Record<string, string>> = {
 		'The prerender log summary counts module-preload links and does not locate components.',
 	'packages/web/src/inline/resumer.ts :: const walker = currentDocument.createTreeWalker(root, 1);':
 		'The inline resumer materializes compiler-recorded element locators in DOM order.',
+	'packages/web/src/inline/resumer.ts :: const walker = document.createTreeWalker(root, 1);':
+		'The visibility primer materializes compiler-recorded visible-event host locators in DOM order.',
 	'packages/web/src/inline/resumer.ts :: const walker = document.createTreeWalker(root, 128);':
 		'The settle boot censuses the build-emitted boundary comment anchors it fills between.',
 	'packages/web/src/payload-document-common.ts :: const text = element.textContent ?? element.text ?? element.innerHTML;':
@@ -50,6 +52,8 @@ const RUNTIME_MOUNT_SCAN_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Branch adoption validates that a supplied live anchor is a comment node.',
 	'packages/web/src/resume-branches.ts :: if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))':
 		'Branch adoption maps serialized indexes to compiler-emitted comment anchors.',
+	'packages/web/src/resume-census.ts :: const walker = (node as Node).ownerDocument?.createTreeWalker?.(node as Node, 1);':
+		'The pinned locator census walks elements in the compiler-recorded DOM order fns/dom-order shares.',
 	'packages/web/src/resume-stream-patches.ts :: const query = root.ownerDocument?.querySelectorAll?.bind(root.ownerDocument);':
 		'Streamed-patch adoption selects inert patch scripts emitted by the server.',
 	'packages/web/src/resume-types.ts :: readonly querySelectorAll?: (selector: string) => Iterable<ResumeDomHostElement>;':

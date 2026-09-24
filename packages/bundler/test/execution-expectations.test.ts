@@ -5,6 +5,7 @@ import {
 	forbiddenExecutedModules,
 } from '../test-support/execution-expectations.ts';
 import { transformTsrxModule } from '../src/transform.ts';
+import { withoutFirstUse } from '../src/source-module.ts';
 
 test('expectations derive allowed runtime modules from the generated demand map', async () => {
 	const result = await transformTsrxModule({
@@ -182,6 +183,41 @@ test('wrapped scalar action preserves served locators for generic dispatch', asy
 	expect(resumeSource).not.toContain('marklessFindElementAtDomOrderIndex');
 });
 
+test('a conservatively classed payload page runs its scalar action lean and demands both paths', async () => {
+	const source = `
+		import { state } from '@markless/core';
+		export function Panel() @{
+			let taps = state(0);
+			let open = state(false);
+			<main>
+				<button onClick={() => taps++}>{taps}</button>
+				<button onClick={() => (open = !open)}>Toggle</button>
+				@if (open) { <p>Shown</p> }
+			</main>
+		}
+	`;
+	const served = await transformTsrxModule({
+		filename: '/workspace/app/Panel.tsrx',
+		source,
+		servedScalarPlans: true,
+	});
+	const plain = await transformTsrxModule({ filename: '/workspace/app/Panel.tsrx', source });
+	const resume = (result: typeof served) =>
+		result.virtualModules.find((module) => module.type === 'resume')?.source ?? '';
+	const tap = payloadView(
+		served.virtualModules.find((module) => module.type === 'payload')?.source,
+	).runtimeDemandMap.payloadRecords.find((record: any) => record.recordId === 'event:h1:click');
+
+	expect(resume(served)).toContain(
+		'marklessScalarServedOwner(input.root, input.event, marklessScalarOwners)',
+	);
+	expect(resume(served)).toContain('async function marklessFullResumeHandoff');
+	expect(tap.runtimeModuleIds).toEqual(
+		expect.arrayContaining(['web/fns/scalar-served', 'web/resume-runtime']),
+	);
+	expect(resume(plain)).not.toContain('marklessRunScalar');
+});
+
 test('scalar-looking actions with extra authored work stay on the full dispatch path', async () => {
 	const result = await transformTsrxModule({
 		filename: '/workspace/app/SideEffect.tsrx',
@@ -280,7 +316,8 @@ test('payload virtual module keeps runtime demand metadata out of the resumable 
 
 	expect(view.runtimeDemandMap).toBeUndefined();
 	expect(projectedClick?.symbolIds).toEqual(['symbol:0']);
-	expect(demandMap).toEqual(result.manifest.runtimeDemandMap);
+	expect(demandMap).toEqual(withoutFirstUse(result.manifest.runtimeDemandMap));
+	expect(JSON.stringify(demandMap)).not.toContain('firstUse');
 });
 
 test('mixed action kinds allow the structurally derived interpreter chain', async () => {

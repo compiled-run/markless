@@ -23,7 +23,7 @@ export const boxState = shared(
 );
 
 export function BoxRoot({ children }) @{
-	const box = boxState();
+	const _box = boxState();
 
 	<div data-ocwf-root>{children}</div>
 }

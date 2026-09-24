@@ -141,6 +141,8 @@ function fixture(
 		readonly rowTemplate?: boolean;
 		readonly emptyArm?: boolean;
 		readonly served?: ReadonlyArray<{ readonly id: string; readonly label: string }>;
+		readonly template?: Record<string, unknown>;
+		readonly cells?: ReadonlyArray<{ readonly graphNodeId: string; readonly value: unknown }>;
 	} = {},
 ) {
 	const served = options.served ?? [
@@ -176,13 +178,17 @@ function fixture(
 				itemName: 'row',
 				rowElementCount: 3,
 				rowStartOffset: 1,
-				...(options.rowTemplate === false ? {} : { rowTemplate: ROW_TEMPLATE }),
+				...(options.rowTemplate === false
+					? {}
+					: { rowTemplate: options.template ?? ROW_TEMPLATE }),
 				...(options.emptyArm ? { emptyArm: { html: ARM_HTML } } : {}),
 				rowEvents,
 			},
 		],
 	} as unknown as ResumeViewRecord;
-	const graph = createRuntimeGraph({ cells: [{ graphNodeId: 'state:rows', value: served }] });
+	const graph = createRuntimeGraph({
+		cells: [{ graphNodeId: 'state:rows', value: served }, ...(options.cells ?? [])],
+	});
 	const registered: Array<{ readonly host: Node; readonly rowKey: unknown }> = [];
 	wireKeyedRepeats({
 		graph,
@@ -382,4 +388,115 @@ test('a page served empty with no @empty arm mints its first row', async () => {
 	await write([{ id: 'c', label: 'charlie' }]);
 
 	expect(labels()).toEqual(['header', 'charlie', 'footer']);
+});
+
+test('an item replaced under a served key rebuilds that row alone', async () => {
+	const { builds, rows, write, list, labels, census, root, registered } = fixture();
+
+	await write([
+		{ id: 'a', label: 'alpha two' },
+		{ id: 'b', label: 'bravo' },
+	]);
+
+	expect(labels()).toEqual(['header', 'alpha two', 'bravo', 'footer']);
+	expect(builds.count).toBe(1);
+	expect(list.childNodes[1]).not.toBe(rows[0]);
+	expect(list.childNodes[2]).toBe(rows[1]);
+	expect(census()).toEqual(elementsUnder(root));
+	expect(registered.at(-1)).toMatchObject({
+		rowKey: 'a',
+		host: list.childNodes[1]!.childNodes[1],
+	});
+});
+
+test('a new key at a served row position replaces that row', async () => {
+	const { write, labels, census, root } = fixture();
+
+	await write([
+		{ id: 'c', label: 'charlie' },
+		{ id: 'b', label: 'bravo' },
+	]);
+
+	expect(labels()).toEqual(['header', 'charlie', 'bravo', 'footer']);
+	expect(census()).toEqual(elementsUnder(root));
+});
+
+test('an item mutated in place rebuilds its row, and a minted row rebuilds again', async () => {
+	const { graph, write, labels } = fixture();
+
+	graph.write({ graphNodeId: 'state:rows', path: ['1', 'label'], value: 'bravo two' });
+	await graph.flush();
+	expect(labels()).toEqual(['header', 'alpha', 'bravo two', 'footer']);
+
+	await write([
+		{ id: 'a', label: 'alpha' },
+		{ id: 'b', label: 'bravo three' },
+	]);
+	expect(labels()).toEqual(['header', 'alpha', 'bravo three', 'footer']);
+});
+
+test('a row reading page state rebuilds when that state moves', async () => {
+	const { graph, labels, rows, list } = fixture({
+		template: {
+			html: ROW_HTML,
+			textSlots: [{ path: [0, 0, 0], graphNodeId: 'state:mark', graphPath: [] }],
+		},
+		cells: [{ graphNodeId: 'state:mark', value: 'alpha' }],
+	});
+	await graph.flush();
+
+	graph.write({ graphNodeId: 'state:mark', value: 'marked' });
+	await graph.flush();
+
+	expect(labels()).toEqual(['header', 'marked', 'marked', 'footer']);
+	expect(list.childNodes[1]).not.toBe(rows[0]);
+});
+
+test('an expression slot reads through the page reader, and rebuilds on its outside read', async () => {
+	const reads: Array<[string, unknown, number]> = [];
+	const rowMint = await import('../src/fns/row-mint.ts');
+	const host = globalThis as { __marklessRowMint?: () => Promise<unknown> };
+	const previous = host.__marklessRowMint;
+	host.__marklessRowMint = async () => ({
+		...rowMint,
+		slotReader: (_repeat: unknown, graph: { read(id: string): unknown }) =>
+			(source: string, item: { label: string }, index: number) => {
+				reads.push([source, item.label, index]);
+				return `${item.label}${graph.read('state:mark')}`;
+			},
+	});
+	try {
+		const { graph, labels, write } = fixture({
+			template: {
+				html: ROW_HTML,
+				componentName: 'Rows',
+				textSlots: [
+					{
+						path: [0, 0, 0],
+						source: 'row.label + mark',
+						reads: [{ graphNodeId: 'state:mark', path: [] }],
+					},
+				],
+			},
+			cells: [{ graphNodeId: 'state:mark', value: '' }],
+		});
+		await graph.flush();
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		expect(reads.slice(0, 2)).toEqual([
+			['row.label + mark', 'alpha', 0],
+			['row.label + mark', 'bravo', 1],
+		]);
+
+		graph.write({ graphNodeId: 'state:mark', value: '!' });
+		await graph.flush();
+		expect(labels()).toEqual(['header', 'alpha!', 'bravo!', 'footer']);
+
+		await write([
+			{ id: 'b', label: 'bravo' },
+			{ id: 'c', label: 'charlie' },
+		]);
+		expect(labels()).toEqual(['header', 'bravo!', 'charlie!', 'footer']);
+	} finally {
+		host.__marklessRowMint = previous;
+	}
 });

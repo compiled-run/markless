@@ -173,6 +173,22 @@ function spliceScopeClass(source: string, offsets: readonly number[], scopeClass
 	if (offsets.length === 0) return source;
 	const insert = utf8Encoder.encode(scopeClass);
 	let bytes = utf8Encoder.encode(source);
+	const length = bytes.length;
+	if (offsets.every((offset) => offset >= 0 && offset <= length)) {
+		const ascending = [...offsets].sort((left, right) => left - right);
+		const spliced = new Uint8Array(length + insert.length * ascending.length);
+		let from = 0;
+		let to = 0;
+		for (const at of ascending) {
+			spliced.set(bytes.subarray(from, at), to);
+			to += at - from;
+			spliced.set(insert, to);
+			to += insert.length;
+			from = at;
+		}
+		spliced.set(bytes.subarray(from), to);
+		return utf8Decoder.decode(spliced);
+	}
 	for (const offset of [...offsets].sort((left, right) => right - left)) {
 		const at = Math.min(Math.max(offset, 0), bytes.length);
 		const spliced = new Uint8Array(bytes.length + insert.length);

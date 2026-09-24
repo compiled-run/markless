@@ -57,6 +57,7 @@ test('Link renders router anchors while preserving user attributes', () => {
 	expect(root.hasAttribute('onClick')).toBe(false);
 	expect(root.hasAttribute('params')).toBe(false);
 	expect(root.hasAttribute('prefetch')).toBe(false);
+	expect(root.getAttribute('data-markless-router-prefetch')).toBe('intent');
 	expect(root.innerHTML).toBe('Docs <strong>now</strong>');
 	expect(output.view).toMatchObject({
 		locators: [expect.objectContaining({ hostNodeId: 'router:link', index: 0 })],
@@ -86,7 +87,8 @@ test('Link renders router anchors while preserving user attributes', () => {
 	expect(ssr).toContain('data-markless-router-scroll="manual"');
 	expect(ssr).toContain('>Docs <strong>now</strong></a>');
 	expect(ssr).not.toContain('params=');
-	expect(ssr).not.toContain('prefetch=');
+	expect(ssr).not.toMatch(/\sprefetch=/);
+	expect(ssr).toContain('data-markless-router-prefetch="intent"');
 	expect(ssr).not.toContain('onClick=');
 	expect(ssrOutput.view).toEqual(output.view);
 	expect(ssrOutput.structureTokens).toEqual([

@@ -41,6 +41,7 @@ export type LinkedTransformChildren = {
 	readonly resolvedChildren: ReadonlyArray<LinkedModuleChildResolution>;
 	readonly resolvedInterfaceImports: ReadonlyArray<LinkedModuleChildResolution>;
 	readonly linkedChildHasBrowserTriggers: boolean;
+	readonly unawaitedSources: ReadonlySet<string>;
 };
 
 // A delegate child renders at build time only where the `delegate-children`
@@ -118,7 +119,7 @@ export function sourceBarrelComponents(
 		request.pluginContext,
 		request.plan.manifestSource,
 		transformed.moduleImports,
-		request.ctx.state.moduleLinkArtifacts,
+		request.ctx.state.moduleLinkArtifacts(request.currentEnvironment),
 		request.ctx.internalOptions.buildId,
 		request.ctx.getRoot(),
 	);
@@ -133,14 +134,11 @@ export async function linkTransformChildren(
 ): Promise<LinkedTransformChildren> {
 	const { ctx, pluginContext, currentEnvironment, materializedRenderDataReach, plan } = request;
 	const { internalOptions, linkedChildren } = ctx;
-	const {
-		moduleMetadata,
-		moduleLinkArtifacts,
-		importedChildSources,
-		prerenderWakeCapabilities,
-		styleClosures,
-	} = ctx.state;
+	const { moduleMetadata, importedChildSources, prerenderWakeCapabilities, styleClosures } =
+		ctx.state;
+	const moduleLinkArtifacts = ctx.state.moduleLinkArtifacts(currentEnvironment);
 	const { manifestSource } = plan;
+	const unawaitedSources = new Set<string>();
 	let transformed = result;
 	let linkedTransformInput = input;
 	const resolvedInterfaceImports = await resolveImportedModuleInterfaces(
@@ -169,7 +167,7 @@ export async function linkTransformChildren(
 	// below must already point at the `.tsrx` files, so the link runs before
 	// children are resolved from the manifest.
 	if (!reusedLinkedTransform && barrelComponents.children.length > 0) {
-		await forceImportedModules(
+		const unawaited = await forceImportedModules(
 			pluginContext,
 			mergeLinkedModuleChildren(barrelComponents.children),
 			moduleLinkArtifacts,
@@ -177,6 +175,7 @@ export async function linkTransformChildren(
 			internalOptions,
 			currentEnvironment,
 		);
+		for (const source of unawaited) unawaitedSources.add(source);
 		linkedTransformInput = {
 			...linkedTransformInput,
 			importedModuleInterfaces: barrelLinkedInterfaces(),
@@ -196,7 +195,7 @@ export async function linkTransformChildren(
 		linkedChildren.set(linkedModuleChildKey(child), child);
 		importedChildSources.add(child.source);
 	}
-	await forceImportedModules(
+	const forcedUnawaited = await forceImportedModules(
 		pluginContext,
 		mergeLinkedModuleChildren(
 			resolvedInterfaceImports,
@@ -208,6 +207,7 @@ export async function linkTransformChildren(
 		internalOptions,
 		currentEnvironment,
 	);
+	for (const source of forcedUnawaited) unawaitedSources.add(source);
 	for (const child of resolvedChildren) {
 		if (internalOptions.dev === true) {
 			await recoverImportedChildMetadata(ctx, child, currentEnvironment);
@@ -216,10 +216,18 @@ export async function linkTransformChildren(
 	}
 	// Last await before the claim reads below; a sibling must not start compiling
 	// between the barrier and the read.
-	await awaitChildClaimPublications(moduleMetadata, resolvedChildren);
+	for (const source of await awaitChildClaimPublications(
+		moduleMetadata,
+		resolvedChildren,
+		currentEnvironment,
+	)) {
+		unawaitedSources.add(source);
+	}
+	const symbolClaimsForSource = (source: string) =>
+		sourceSymbolManifest(moduleMetadata, source, currentEnvironment, unawaitedSources);
 	const linkedChildHasBrowserTriggers = linkedChildrenHaveBrowserTriggers({
 		children: resolvedChildren,
-		symbolClaimsForSource: (source) => sourceSymbolManifest(moduleMetadata, source),
+		symbolClaimsForSource,
 		browserTriggerCapability: (source) => prerenderWakeCapabilities.get(source),
 	});
 	if (
@@ -228,11 +236,17 @@ export async function linkTransformChildren(
 			resolvedInterfaceImports.length > 0 ||
 			barrelComponents.children.length > 0)
 	) {
-		const symbols = linkedImportedSymbolInputs({
+		const linkedSymbols = linkedImportedSymbolInputs({
 			children: resolvedChildren,
 			captureMetadataForSource: (source) => moduleMetadata.captureMetadataForSource(source),
-			symbolClaimsForSource: (source) => sourceSymbolManifest(moduleMetadata, source),
+			symbolClaimsForSource,
+			claimsPublished: (source) =>
+				moduleMetadata.sourceClaimsPublished(currentEnvironment, source),
+			unawaitedSources,
 		});
+		const [missing] = linkedSymbols.diagnostics;
+		if (missing) throw new Error(missing.message);
+		const { symbols } = linkedSymbols;
 		const linkedGraph = linkModuleGraph(resolvedInterfaceImports, {
 			moduleArtifacts: moduleLinkArtifacts,
 			metadata: moduleMetadata,
@@ -271,6 +285,7 @@ export async function linkTransformChildren(
 		resolvedChildren,
 		resolvedInterfaceImports,
 		linkedChildHasBrowserTriggers,
+		unawaitedSources,
 	};
 }
 
@@ -284,7 +299,8 @@ export async function sealWakeAggregate(
 ): Promise<TransformTsrxModuleResult> {
 	const { ctx, pluginContext, source, currentEnvironment, plan } = request;
 	const { internalOptions } = ctx;
-	const { moduleMetadata, moduleLinkArtifacts, prerenderWakeCapabilities } = ctx.state;
+	const { moduleMetadata, prerenderWakeCapabilities } = ctx.state;
+	const moduleLinkArtifacts = ctx.state.moduleLinkArtifacts(currentEnvironment);
 	let transformed = result;
 	prerenderWakeCapabilities.set(
 		source,
@@ -310,7 +326,7 @@ export async function sealWakeAggregate(
 			aggregate.manifest,
 			fallbackImportedSource,
 		);
-		await forceImportedModules(
+		const unawaited = await forceImportedModules(
 			pluginContext,
 			aggregateChildren,
 			moduleLinkArtifacts,
@@ -322,9 +338,14 @@ export async function sealWakeAggregate(
 			linkedImportedSymbolInputs({
 				children: aggregateChildren,
 				captureMetadataForSource: (child) => moduleMetadata.captureMetadataForSource(child),
-				symbolClaimsForSource: (child) => sourceSymbolManifest(moduleMetadata, child),
+				symbolClaimsForSource: (child) =>
+					sourceSymbolManifest(moduleMetadata, child, currentEnvironment, unawaited),
+				claimsPublished: (child) =>
+					moduleMetadata.sourceClaimsPublished(currentEnvironment, child),
+				unawaitedSources: unawaited,
 			});
-		let aggregateSymbols = aggregateSymbolInputs();
+		let aggregateLink = aggregateSymbolInputs();
+		let aggregateSymbols = aggregateLink.symbols;
 		for (
 			let attempt = 0;
 			linkedImportedClaimsMissing({
@@ -341,10 +362,13 @@ export async function sealWakeAggregate(
 			}
 			await new Promise<void>((resolve) => setTimeout(resolve, 0));
 			for (const child of aggregateChildren) {
-				await moduleMetadata.sealSourceSymbolClaims(child.source);
+				await moduleMetadata.sealSourceSymbolClaims(currentEnvironment, child.source);
 			}
-			aggregateSymbols = aggregateSymbolInputs();
+			aggregateLink = aggregateSymbolInputs();
+			aggregateSymbols = aggregateLink.symbols;
 		}
+		const [missing] = aggregateLink.diagnostics;
+		if (missing) throw new Error(missing.message);
 		aggregate = await transformTsrxModuleWithPrerenderWakeClosure(
 			{
 				...aggregateInput,

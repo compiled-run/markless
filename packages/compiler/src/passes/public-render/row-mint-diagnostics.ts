@@ -7,7 +7,7 @@ import type {
 	SemanticMarkupArtifact,
 	SemanticMarkupSlot,
 } from '../../artifacts.ts';
-import { mintableSlotValue, resolveRowComponentMint } from '../row-mint.ts';
+import { expressionSlotValue, mintableSlotValue, resolveRowComponentMint } from '../row-mint.ts';
 import {
 	keyedRepeatRowMintUnsupportedDiagnostic,
 	type KeyedRepeatRowMintRefusal,
@@ -28,6 +28,8 @@ export function collectKeyedRepeatRowMintDiagnostics(input: {
 	readonly filename: string;
 	readonly source: string;
 	readonly importedModuleInterfaces?: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
+	readonly recordHostIds?: ReadonlySet<string>;
+	readonly liveHostIds?: ReadonlySet<string>;
 }): ReadonlyArray<CompilerDiagnostic> {
 	if (input.semanticGraph.keyedRepeats.length === 0) return [];
 	const componentNames = input.semanticGraph.components.map((component) => component.name);
@@ -46,8 +48,14 @@ export function collectKeyedRepeatRowMintDiagnostics(input: {
 			...(input.importedModuleInterfaces
 				? { importedModuleInterfaces: input.importedModuleInterfaces }
 				: {}),
+			...(input.recordHostIds ? { recordHostIds: input.recordHostIds } : {}),
+			...(input.liveHostIds ? { liveHostIds: input.liveHostIds } : {}),
 			repeatId: repeat.id,
 			itemName: repeat.itemName,
+			graph: input.semanticGraph,
+			rowNames: new Set(
+				[repeat.itemName, repeat.indexName].filter((name): name is string => name !== undefined),
+			),
 		});
 		if (!refusal) return;
 		diagnostics.push(
@@ -88,8 +96,12 @@ function rowMintRefusal(input: {
 	readonly componentNames: ReadonlyArray<string>;
 	readonly branchSites: SemanticGraphArtifact['branchSites'];
 	readonly importedModuleInterfaces?: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
+	readonly recordHostIds?: ReadonlySet<string>;
+	readonly liveHostIds?: ReadonlySet<string>;
 	readonly repeatId: string;
 	readonly itemName: string;
+	readonly graph: SemanticGraphArtifact;
+	readonly rowNames: ReadonlySet<string>;
 }): KeyedRepeatRowMintRefusal | null {
 	const rowChunkId = `repeat:${input.repeatId}:row`;
 	const chunk = input.chunks.find((candidate) => candidate.id === rowChunkId);
@@ -97,6 +109,9 @@ function rowMintRefusal(input: {
 	const componentSlot = chunk.slots.find((slot) => slot.kind === 'child-component');
 	if (componentSlot?.kind === 'child-component') {
 		const mint = resolveRowComponentMint({
+			...(input.recordHostIds ? { recordHostIds: input.recordHostIds } : {}),
+			...(input.liveHostIds ? { liveHostIds: input.liveHostIds } : {}),
+			semanticGraph: input.graph,
 			chunks: input.chunks,
 			componentEdges: input.componentEdges,
 			componentNames: input.componentNames,
@@ -114,15 +129,46 @@ function rowMintRefusal(input: {
 			// The mint fills a text or attribute slot from the item or from the page's
 			// graph, so what is left is a value only the render can produce.
 			if (mintableSlotValue(slot)) continue;
+			if (
+				!componentSlot &&
+				chunk.componentName &&
+				expressionSlotValue(slot, input.graph, chunk.componentName, input.rowNames)
+			)
+				continue;
 			return {
 				kind: 'unfillable-read',
 				read: unfillableReadLabel(slot),
 				...(slot.kind === 'attribute' ? { attributeName: slot.name } : {}),
 			};
 		}
+		if (slot.kind === 'repeat' && nestedRepeatMints(input, slot.repeatId)) continue;
 		return { kind: 'nested-construct', label: nestedConstructLabel(slot, input.branchSites) };
 	}
 	return null;
+}
+
+// A nested @for builds its own rows inside a minted row when it could build them anywhere.
+function nestedRepeatMints(
+	input: Parameters<typeof rowMintRefusal>[0],
+	repeatId: string,
+): boolean {
+	const nested = input.graph.keyedRepeats.find(
+		(candidate) => candidate.id === repeatId && candidate.enclosingRepeatId === input.repeatId,
+	);
+	if (!nested || nested.indexKey) return false;
+	if (!nested.collectionGraphNodeId && !nested.enclosingItemPath) return false;
+	const chunk = input.chunks.find((candidate) => candidate.id === `repeat:${repeatId}:row`);
+	if (!chunk || chunk.slots.some((slot) => slot.kind === 'child-component')) return false;
+	return (
+		rowMintRefusal({
+			...input,
+			repeatId,
+			itemName: nested.itemName,
+			rowNames: new Set(
+				[nested.itemName, nested.indexName].filter((name): name is string => name !== undefined),
+			),
+		}) === null
+	);
 }
 
 // The author's own words for the value the mint cannot carry, so the diagnostic

@@ -12,7 +12,7 @@
 		"test": "vp test",
 		"seo": "node --experimental-strip-types scripts/generate-seo.ts",
 		"witness": "node --experimental-strip-types scripts/witness.ts",
-		"typecheck": "tsc -p tsconfig.json",
+		"typecheck": "pnpm run typecheck:tsrx",
 		"typecheck:tsrx": "node ../packages/typescript-plugin/src/tsc.ts -p tsconfig.json"
 	},
 	"dependencies": {
@@ -21,7 +21,7 @@
 		"@markless/ui": "workspace:*",
 		"destr": "^2.0.5",
 		"nitro": "catalog:",
-		"vite-plus": "0.3.0"
+		"vite-plus": "0.3.1"
 	},
 	"devDependencies": {
 		"@markless/analyzer": "workspace:*",
@@ -31,6 +31,6 @@
 		"playwright-core": "^1.56.0",
 		"shiki": "^4.4.3",
 		"typescript": "^5.9.3",
-		"vite": "8.2.2"
+		"vite": "npm:@voidzero-dev/vite-plus-core@0.3.1"
 	}
 }

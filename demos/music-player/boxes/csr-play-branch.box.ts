@@ -53,7 +53,9 @@ export default box(
 				`[${firstPlay.modules.join(', ')}]`,
 		);
 		if (firstPlay.modules.length === 0) {
-			throw new Error('The first Play click charged no modules; the ledger mirrored nothing.');
+			throw new Error(
+				'The first Play click charged no modules; the ledger mirrored nothing.',
+			);
 		}
 		// Exactness contract: no chunk may load post-click that was not in the
 		// startup preloaded set.
@@ -141,7 +143,9 @@ async function waitForLogSummaryAttribute(
 				/data-markless-log-load-bytes="([^"]*)"/.exec(html)?.[1] ?? Number.NaN,
 			);
 			if (!Number.isInteger(loadBytes)) {
-				throw new Error(`The load line printed ${summary[1]} KB with no byte mirror behind it.`);
+				throw new Error(
+					`The load line printed ${summary[1]} KB with no byte mirror behind it.`,
+				);
 			}
 			if ((loadBytes / 1024).toFixed(1) === summary[1]) return;
 		}

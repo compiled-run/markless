@@ -4,6 +4,7 @@ const mdxPageModuleLoaders = import.meta.glob('/pages/**/*.mdx', {
 const tsrxResumeModuleLoaders = import.meta.glob('/pages/**/*.tsrx', {
 	query: '?markless-resume',
 });
+const routeResumeModules = new WeakMap<() => Promise<unknown>, Promise<unknown>>();
 
 export async function resumeContainerEvent(input: {
 	readonly root: ParentNode;
@@ -11,7 +12,9 @@ export async function resumeContainerEvent(input: {
 }) {
 	const file = routeFileFromRoot(input.root);
 	const loadRouteResumeModule = file && routeResumeModuleLoader(file);
-	const routeResumeModule = loadRouteResumeModule ? await loadRouteResumeModule() : undefined;
+	const routeResumeModule = loadRouteResumeModule
+		? await loadRouteModuleOnce(loadRouteResumeModule)
+		: undefined;
 	const resume = (routeResumeModule as RouteResumeModule | undefined)?.resumeContainerEvent;
 	if (typeof resume !== 'function') {
 		throw new Error(`Markless Router could not resume route module: ${file ?? '<unknown>'}`);
@@ -21,6 +24,18 @@ export async function resumeContainerEvent(input: {
 
 interface RouteResumeModule {
 	readonly resumeContainerEvent?: (input: unknown) => unknown;
+}
+
+function loadRouteModuleOnce(load: () => Promise<unknown>): Promise<unknown> {
+	let pending = routeResumeModules.get(load);
+	if (!pending) {
+		pending = load().catch((error: unknown) => {
+			routeResumeModules.delete(load);
+			throw error;
+		});
+		routeResumeModules.set(load, pending);
+	}
+	return pending;
 }
 
 function routeResumeModuleLoader(file: string): (() => Promise<unknown>) | undefined {

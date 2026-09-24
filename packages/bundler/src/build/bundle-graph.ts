@@ -21,15 +21,7 @@ export function convertManifestToBundleGraph(
 	bundleGraphAdders?: Set<BundleGraphAdder>,
 ): MarklessBundleGraph {
 	const graph = bundleGraphRecords(manifest, bundleGraphAdders);
-	const dag = defDGraph(bundleGraphEdges(graph));
-	const reduced = dag.copy();
-	for (const name of dag.nodes()) {
-		for (const dep of dag.immediateDependencies(name)) {
-			for (const transitive of dag.transitiveDependencies(dep)) {
-				reduced.removeEdge(name, transitive);
-			}
-		}
-	}
+	const staticDependencies = reducedStaticDependencies(graph);
 
 	const nodes = Object.keys(graph)
 		.sort()
@@ -38,7 +30,7 @@ export function convertManifestToBundleGraph(
 			const dynamicImports = (bundle?.dynamicImports ?? [])
 				.map((dep) => [dep, dynamicImportMarker(bundle, graph[dep])] as const)
 				.sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0]));
-			const deps: Array<string | number> = [...reduced.immediateDependencies(name)].sort();
+			const deps: Array<string | number> = [...staticDependencies.get(name)!].sort();
 			let lastMarker: number | undefined;
 			for (const [dep, marker] of dynamicImports) {
 				if (marker !== lastMarker) {
@@ -65,6 +57,37 @@ export function convertManifestToBundleGraph(
 			return indexes.get(dep)!;
 		}),
 	]);
+}
+
+function reducedStaticDependencies(graph: Record<string, BundleGraphRecord>) {
+	const dependencies = new Map(
+		Object.entries(graph).map(([name, bundle]) => [name, new Set(bundle.imports)] as const),
+	);
+	const incoming = new Map([...dependencies.keys()].map((name) => [name, 0]));
+	for (const imports of dependencies.values()) {
+		for (const name of imports) incoming.set(name, incoming.get(name)! + 1);
+	}
+	const queue = [...incoming.keys()].filter((name) => incoming.get(name) === 0);
+	for (let index = 0; index < queue.length; index++) {
+		for (const name of dependencies.get(queue[index]!)!) {
+			const remaining = incoming.get(name)! - 1;
+			incoming.set(name, remaining);
+			if (remaining === 0) queue.push(name);
+		}
+	}
+	// Cyclic ESM is valid; retain its edges instead of applying DAG-only reduction.
+	if (queue.length !== dependencies.size) return dependencies;
+	const dag = defDGraph(bundleGraphEdges(graph));
+	const reduced = dag.copy();
+	for (const name of dag.nodes()) {
+		for (const dep of dag.immediateDependencies(name)) {
+			for (const transitive of dag.transitiveDependencies(dep)) {
+				reduced.removeEdge(name, transitive);
+			}
+		}
+		dependencies.set(name, reduced.immediateDependencies(name));
+	}
+	return dependencies;
 }
 
 export function createPreloadGraphAdder(addEntries: PreloadGraphEntriesAdder): BundleGraphAdder {
@@ -183,7 +206,7 @@ function runtimeBundleNamesByModuleId(
 	return entries;
 }
 
-function runtimeModuleIdFromOrigin(origin: string): string | undefined {
+export function runtimeModuleIdFromOrigin(origin: string): string | undefined {
 	const normalized = normalizeManifestOrigin(origin);
 	for (const [prefix, marker] of [
 		['web', 'packages/web/src/'],

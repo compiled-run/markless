@@ -1,0 +1,28 @@
+{
+  "name": "bench-interaction-ripple",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.15.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "sync": "node ../../shared/sync.mjs . src/shared",
+    "build": "node ../../shared/sync.mjs . src/shared --check && vite build",
+    "build:vercel": "pnpm run build && ripple-adapt-vercel",
+    "start": "PORT=${PORT:-4480} ripple-preview",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "@ripple-ts/adapter-vercel": "0.4.7",
+    "ripple": "0.4.7"
+  },
+  "devDependencies": {
+    "@ripple-ts/vite-plugin": "0.4.7",
+    "@tsrx/typescript-plugin": "0.4.7",
+    "@types/node": "^22.20.4",
+    "typescript": "5.9.3",
+    "vite": "8.3.0"
+  }
+}

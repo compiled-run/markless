@@ -1,5 +1,6 @@
 import { ASYNC_PROTOCOL_VERSION, type ProtocolViewPayload } from '@markless/serializer';
 import type {
+	PayloadKeyedRepeat,
 	PlannedSymbol,
 	ProtocolViewArmRecordSet,
 	ProtocolViewPayloadInput,
@@ -9,7 +10,13 @@ import type {
 	SemanticMarkupSlot,
 } from '../artifacts.ts';
 import { armChildRead, armHostPaths, type ArmHostPlacement } from './arm-child-content.ts';
-import { mintableSlotValue, resolveRowComponentMint, type RowComponentMint } from './row-mint.ts';
+import {
+	expressionSlotValue,
+	mintableSlotValue,
+	payloadRecordHosts,
+	resolveRowComponentMint,
+	type RowComponentMint,
+} from './row-mint.ts';
 import { forwardedSpreadViewRecords } from './spread-forwarding.ts';
 import { armEscalationCandidateSiteIds } from './symbol-modules.ts';
 
@@ -359,8 +366,12 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 			repeat.indexKey === true ? [repeat.id] : [],
 		),
 	);
+	const emitted = new Set<string>();
 	return (input.payloadArena.view.keyedRepeats ?? []).flatMap((repeat) => {
 		const render = renderEntries.get(repeat.id);
+		const enclosingRow = repeat.enclosingRepeatId
+			? enclosingRowField(input, repeat, renderEntries.get(repeat.enclosingRepeatId), emitted)
+			: undefined;
 		// A row whose only child is a component owns NO element host of its own -
 		// the component's elements belong to the component's chunk - so
 		// rowElementCount is 0 and this gate used to drop the record entirely.
@@ -378,8 +389,10 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 			!render ||
 			indexKeyed.has(repeat.id) ||
 			render.rowStartOffset === 'unknown' ||
-			!rowRootsOneElement(input, render)
+			!rowRootsOneElement(input, render) ||
+			enclosingRow === null
 		) return [];
+		emitted.add(repeat.id);
 		const rowHostPaths = hostPathsForChunk(input, render.rowChunkId, true);
 		// Row-owned handles ride the repeat, in row-relative coordinates, for the
 		// same reason row events do: the resumed set is whatever the parent's live
@@ -399,9 +412,11 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 		return [
 			{
 				id: repeat.id,
-				...(rowElementHandles.length > 0 ? { rowElementHandles } : {}),
-				parentHostNodeId: repeat.parentHostNodeId,
+				// Row handles walk the parent's rows, and a nested repeat's rows have no one parent.
+				...(rowElementHandles.length > 0 && !enclosingRow ? { rowElementHandles } : {}),
+				parentHostNodeId: outermostParentHostNodeId(input, repeat),
 				...(repeat.ownerHostNodeId ? { ownerHostNodeId: repeat.ownerHostNodeId } : {}),
+				...(enclosingRow ? { enclosingRow } : {}),
 				collectionGraphNodeId: repeat.collectionGraphNodeId,
 				collectionPath: repeat.collectionPath,
 				keyPath: repeat.keyPath,
@@ -412,8 +427,8 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 					? { rowStartOffset: render.rowStartOffset }
 					: {}),
 				...mintableEmptyArm(input, render),
-				...mintableRowTemplate(input, render, rowComponentMint(input, render)),
-				...mintableRowComponent(input, render),
+				...mintableRowTemplate(input, render, liveRowComponentMint(input, repeat, render)),
+				...mintableRowComponent(liveRowComponentMint(input, repeat, render)),
 				rowEvents: oneRecordPerEvent(input.payloadArena.view.events)
 					.filter((event) => rowHostPaths.has(event.hostNodeId))
 					.map((event) => ({
@@ -430,6 +445,37 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 			},
 		];
 	});
+}
+
+// A nested record's own parent renders once per enclosing row, so it names the outermost
+// enclosing repeat's parent instead: every host-keyed record filter then moves it with its rows.
+function outermostParentHostNodeId(
+	input: ProtocolViewPayloadInput,
+	repeat: PayloadKeyedRepeat,
+): string {
+	const enclosing = input.payloadArena.view.keyedRepeats.find(
+		(candidate) => candidate.id === repeat.enclosingRepeatId,
+	);
+	return enclosing ? outermostParentHostNodeId(input, enclosing) : repeat.parentHostNodeId;
+}
+
+// `null` drops the record: an enclosing repeat that ships none has no rows to wire this in.
+function enclosingRowField(
+	input: ProtocolViewPayloadInput,
+	repeat: PayloadKeyedRepeat,
+	enclosing: RenderDataArtifact['repeats'][number] | undefined,
+	emitted: ReadonlySet<string>,
+): NonNullable<NonNullable<ProtocolViewPayload['keyedRepeats']>[number]['enclosingRow']> | null {
+	if (!enclosing || !emitted.has(enclosing.repeatId)) return null;
+	const parentHostPath = hostPathsForChunk(input, enclosing.rowChunkId, true).get(
+		repeat.parentHostNodeId,
+	);
+	if (!parentHostPath) return null;
+	return {
+		repeatId: enclosing.repeatId,
+		parentHostPath,
+		...(repeat.enclosingItemPath ? { itemPath: repeat.enclosingItemPath } : {}),
+	};
 }
 
 /**
@@ -527,13 +573,42 @@ function mintableRowTemplate(
 		return {};
 	const textSlots: Array<RowTemplateTextSlot> = [];
 	const attributeSlots: Array<RowTemplateAttributeSlot> = [];
+	// An expression slot is answered by the owning component's reader, so a row
+	// wrapping a component - rebuilt by that component's render - never takes one.
+	const semanticRepeat = input.semanticGraph?.keyedRepeats.find(
+		(candidate) => candidate.id === render.repeatId,
+	);
+	const expressionScope =
+		!mint && chunk.componentName && input.semanticGraph && semanticRepeat
+			? {
+					graph: input.semanticGraph,
+					componentName: chunk.componentName,
+					rowNames: new Set(
+						[semanticRepeat.itemName, semanticRepeat.indexName].filter(
+							(name): name is string => name !== undefined,
+						),
+					),
+				}
+			: undefined;
+	let readsExpressions = false;
 	for (const slot of chunk.slots) {
 		if (slot === wrappedComponentSlot) continue;
+		if (slot.kind === 'repeat' && nestedRepeatMints(input, render, slot.repeatId)) continue;
 		// Every slot that is neither text nor an attribute is wiring the mint does
 		// not do, and a value only the render can produce has no channel at all.
 		if (slot.kind !== 'text' && slot.kind !== 'attribute') return {};
-		const value = mintableSlotValue(slot);
+		const value =
+			mintableSlotValue(slot) ??
+			(expressionScope
+				? expressionSlotValue(
+						slot,
+						expressionScope.graph,
+						expressionScope.componentName,
+						expressionScope.rowNames,
+					)
+				: null);
 		if (!value) return {};
+		if ('source' in value) readsExpressions = true;
 		if (slot.kind === 'text') textSlots.push({ path: slot.coordinate.path, ...value });
 		else attributeSlots.push({ path: slot.coordinate.path, name: slot.name, ...value });
 	}
@@ -542,17 +617,51 @@ function mintableRowTemplate(
 	return {
 		rowTemplate: {
 			html,
+			...(readsExpressions ? { componentName: chunk.componentName! } : {}),
 			...(textSlots.length > 0 ? { textSlots } : {}),
 			...(attributeSlots.length > 0 ? { attributeSlots } : {}),
 		},
 	};
 }
 
-// A refusal emits no field at all, so the record stays byte-identical.
-function mintableRowComponent(
+// A nested repeat in a minted row builds its own rows once the row is wired, so the row
+// needs only the repeat's marker - when the nested record ships and can mint every row.
+function nestedRepeatMints(
 	input: ProtocolViewPayloadInput,
+	enclosing: RenderDataArtifact['repeats'][number],
+	repeatId: string,
+): boolean {
+	const nested = input.payloadArena.view.keyedRepeats.find(
+		(candidate) => candidate.id === repeatId && candidate.enclosingRepeatId === enclosing.repeatId,
+	);
+	const render = renderDataOf(input).repeats.find((candidate) => candidate.repeatId === repeatId);
+	if (!nested || !render || render.rowStartOffset === 'unknown' || render.rowElementCount < 1)
+		return false;
+	if (
+		input.semanticGraph?.keyedRepeats.some(
+			(candidate) => candidate.id === repeatId && candidate.indexKey,
+		)
+	)
+		return false;
+	if (!hostPathsForChunk(input, enclosing.rowChunkId, true).has(nested.parentHostNodeId))
+		return false;
+	if (render.emptyChunkId && !mintableEmptyArm(input, render).emptyArm) return false;
+	if (rowComponentMint(input, render)) return false;
+	const template = mintableRowTemplate(input, render, null).rowTemplate;
+	return template !== undefined && template.componentName === undefined;
+}
+
+// A collection no graph node holds never changes after load, so its rows are never built again.
+function liveRowComponentMint(
+	input: ProtocolViewPayloadInput,
+	repeat: PayloadKeyedRepeat,
 	render: RenderDataArtifact['repeats'][number],
-): {
+): RowComponentMint | null {
+	return repeat.collectionGraphNodeId ? rowComponentMint(input, render) : null;
+}
+
+// A refusal emits no field at all, so the record stays byte-identical.
+function mintableRowComponent(rowComponent: RowComponentMint | null): {
 	readonly rowComponent?: {
 		readonly componentEdgeId: string;
 		readonly componentName: string;
@@ -560,7 +669,6 @@ function mintableRowComponent(
 		readonly slotPath?: ReadonlyArray<number>;
 	};
 } {
-	const rowComponent = rowComponentMint(input, render);
 	return rowComponent ? { rowComponent } : {};
 }
 
@@ -571,6 +679,8 @@ function rowComponentMint(
 	render: RenderDataArtifact['repeats'][number],
 ): RowComponentMint | null {
 	return resolveRowComponentMint({
+		...payloadRecordHosts(input.payloadArena.view),
+		...(input.semanticGraph ? { semanticGraph: input.semanticGraph } : {}),
 		chunks: renderDataOf(input).chunks,
 		componentEdges: input.semanticGraph?.componentEdges ?? [],
 		componentNames: (input.semanticGraph?.components ?? []).map((component) => component.name),

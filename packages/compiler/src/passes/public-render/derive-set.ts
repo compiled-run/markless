@@ -13,7 +13,7 @@ import {
 	type ForeignCopiedBody,
 } from '../foreign-scope.ts';
 import { PUBLIC_RENDER_PLAN_PASS_ID, serverDeriveUnreachableDiagnostic } from './diagnostics.ts';
-import { collectSsrSharedComputedSources } from './html.ts';
+import { collectSsrSharedComputedSources, TEMPLATE_EXPRESSION_GRAPH_NODE_PREFIX } from './html.ts';
 import {
 	authoredResidueSources,
 	renderDecisionSources,
@@ -84,7 +84,16 @@ function authoredHandlerReads(
  * has to travel in the payload for the handler's first read to answer.
  */
 export function handlerReadGraphNodeIds(input: PublicRenderModuleInput): ReadonlySet<string> {
-	return new Set(input.symbolResolver.symbols.flatMap(authoredHandlerReads));
+	return new Set([
+		...input.symbolResolver.symbols.flatMap(authoredHandlerReads),
+		// A lifted collection's row handler reads its item out of it, and its derive
+		// can read a constant prop no browser graph holds, so its value is served.
+		...input.semanticGraph.keyedRepeats.flatMap((repeat) =>
+			repeat.collectionGraphNodeId?.startsWith(TEMPLATE_EXPRESSION_GRAPH_NODE_PREFIX)
+				? [repeat.collectionGraphNodeId]
+				: [],
+		),
+	]);
 }
 
 /**

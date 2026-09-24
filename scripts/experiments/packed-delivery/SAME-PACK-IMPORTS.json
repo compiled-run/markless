@@ -1,0 +1,640 @@
+{
+  "paths": [
+    "/private/tmp/markless-docs-cold-Ul9QGB/results.json",
+    "/private/tmp/markless-docs-cold-fge01m/results.json"
+  ],
+  "metadata": [
+    {
+      "startedAt": "2026-09-22T05:21:45.947Z",
+      "siteEntry": "/private/tmp/markless-docs-computed-guard-Lo2aYh/.output/server/index.mjs",
+      "serverEntrySha256": "8b1bc5e4722a8ea178cf1bf3ba3a774bb301085e79fbe6eed0f26b8d0c2145e3",
+      "options": {
+        "brotli": true,
+        "brotliHtml": true,
+        "http2": true,
+        "samples": 10,
+        "conditions": [
+          "normal",
+          "constrained"
+        ]
+      },
+      "cache": "CDP Network.setCacheDisabled true; fresh browser context per first interaction",
+      "serviceWorkers": "blocked",
+      "timing": "captured click event to expected DOM mutation; not compositor paint",
+      "localTransport": "Generated Nitro docs through a Brotli quality 5 JS proxy; localhost HTTP/2 TLS; HTML stream compressed with Brotli quality 5",
+      "preciseCoverage": false,
+      "servedThemeSha256": "7404f79754fffc3b8ec86d66ad2872b9f46a568416c067d653843af25849c742",
+      "expectedThemeSha256": "7404f79754fffc3b8ec86d66ad2872b9f46a568416c067d653843af25849c742",
+      "browserVersion": "153.0.8010.48",
+      "playwrightVersion": "1.58.2",
+      "finishedAt": "2026-09-22T05:25:44.607Z"
+    },
+    {
+      "startedAt": "2026-09-22T05:17:02.763Z",
+      "siteEntry": "/private/tmp/markless-docs-internal-import-ejwxmP/.output/server/index.mjs",
+      "serverEntrySha256": "80b84e90b4f3b31f077d7f923f88e51e17884b5afa83c181b47e6c4f052b4307",
+      "options": {
+        "brotli": true,
+        "brotliHtml": true,
+        "http2": true,
+        "samples": 10,
+        "conditions": [
+          "normal",
+          "constrained"
+        ]
+      },
+      "cache": "CDP Network.setCacheDisabled true; fresh browser context per first interaction",
+      "serviceWorkers": "blocked",
+      "timing": "captured click event to expected DOM mutation; not compositor paint",
+      "localTransport": "Generated Nitro docs through a Brotli quality 5 JS proxy; localhost HTTP/2 TLS; HTML stream compressed with Brotli quality 5",
+      "preciseCoverage": false,
+      "servedThemeSha256": "7404f79754fffc3b8ec86d66ad2872b9f46a568416c067d653843af25849c742",
+      "expectedThemeSha256": "7404f79754fffc3b8ec86d66ad2872b9f46a568416c067d653843af25849c742",
+      "browserVersion": "153.0.8010.48",
+      "playwrightVersion": "1.58.2",
+      "finishedAt": "2026-09-22T05:21:01.374Z"
+    }
+  ],
+  "evidence": [
+    {
+      "visits": 80,
+      "actions": 240,
+      "failures": 0,
+      "errors": [],
+      "frameworkRequestCounts": [
+        5
+      ],
+      "httpCacheHits": 0,
+      "newScriptRequests": 0,
+      "pendingScripts": 0
+    },
+    {
+      "visits": 80,
+      "actions": 240,
+      "failures": 0,
+      "errors": [],
+      "frameworkRequestCounts": [
+        5
+      ],
+      "httpCacheHits": 0,
+      "newScriptRequests": 0,
+      "pendingScripts": 0
+    }
+  ],
+  "groups": [
+    {
+      "key": "state-counter/normal",
+      "phases": {
+        "first": {
+          "before": {
+            "n": 10,
+            "median": 37.949999928474426,
+            "mad": 0.6500000953674316
+          },
+          "after": {
+            "n": 10,
+            "median": 37.450000047683716,
+            "mad": 0.5499999523162842
+          },
+          "threshold": 10,
+          "change": -0.49999988079071045,
+          "noRegression": true,
+          "improved": false
+        },
+        "second": {
+          "before": {
+            "n": 10,
+            "median": 15.099999904632568,
+            "mad": 0.4500000476837158
+          },
+          "after": {
+            "n": 10,
+            "median": 15.949999928474426,
+            "mad": 0.8999999761581421
+          },
+          "threshold": 10,
+          "change": 0.8500000238418579,
+          "noRegression": true,
+          "improved": false
+        },
+        "third": {
+          "before": {
+            "n": 10,
+            "median": 14.899999976158142,
+            "mad": 0.29999983310699463
+          },
+          "after": {
+            "n": 10,
+            "median": 16.299999952316284,
+            "mad": 0.8999999761581421
+          },
+          "threshold": 10,
+          "change": 1.399999976158142,
+          "noRegression": true,
+          "improved": false
+        },
+        "repeats": {
+          "before": {
+            "n": 20,
+            "median": 14.950000047683716,
+            "mad": 0.40000009536743164
+          },
+          "after": {
+            "n": 20,
+            "median": 16.100000023841858,
+            "mad": 0.9499999284744263
+          },
+          "threshold": 10,
+          "change": 1.149999976158142,
+          "noRegression": true,
+          "improved": false
+        }
+      }
+    },
+    {
+      "key": "computed-total/normal",
+      "phases": {
+        "first": {
+          "before": {
+            "n": 10,
+            "median": 37.40000009536743,
+            "mad": 0.8499999046325684
+          },
+          "after": {
+            "n": 10,
+            "median": 37.09999990463257,
+            "mad": 0.7499998807907104
+          },
+          "threshold": 10,
+          "change": -0.3000001907348633,
+          "noRegression": true,
+          "improved": false
+        },
+        "second": {
+          "before": {
+            "n": 10,
+            "median": 15.949999928474426,
+            "mad": 0.4500000476837158
+          },
+          "after": {
+            "n": 10,
+            "median": 15.399999976158142,
+            "mad": 0.6999999284744263
+          },
+          "threshold": 10,
+          "change": -0.5499999523162842,
+          "noRegression": true,
+          "improved": false
+        },
+        "third": {
+          "before": {
+            "n": 10,
+            "median": 14.899999976158142,
+            "mad": 0.44999992847442627
+          },
+          "after": {
+            "n": 10,
+            "median": 15.550000071525574,
+            "mad": 0.2999999523162842
+          },
+          "threshold": 10,
+          "change": 0.6500000953674316,
+          "noRegression": true,
+          "improved": false
+        },
+        "repeats": {
+          "before": {
+            "n": 20,
+            "median": 15.25,
+            "mad": 0.6999999284744263
+          },
+          "after": {
+            "n": 20,
+            "median": 15.450000047683716,
+            "mad": 0.3500000238418579
+          },
+          "threshold": 10,
+          "change": 0.20000004768371582,
+          "noRegression": true,
+          "improved": false
+        }
+      }
+    },
+    {
+      "key": "mode-select/normal",
+      "phases": {
+        "first": {
+          "before": {
+            "n": 10,
+            "median": 40.35000002384186,
+            "mad": 0.6499999761581421
+          },
+          "after": {
+            "n": 10,
+            "median": 40.40000009536743,
+            "mad": 1.25
+          },
+          "threshold": 10,
+          "change": 0.05000007152557373,
+          "noRegression": true,
+          "improved": false
+        },
+        "second": {
+          "before": {
+            "n": 10,
+            "median": 16.700000047683716,
+            "mad": 1.100000023841858
+          },
+          "after": {
+            "n": 10,
+            "median": 16.299999952316284,
+            "mad": 0.8499999046325684
+          },
+          "threshold": 10,
+          "change": -0.40000009536743164,
+          "noRegression": true,
+          "improved": false
+        },
+        "third": {
+          "before": {
+            "n": 10,
+            "median": 16.25,
+            "mad": 0.3500000238418579
+          },
+          "after": {
+            "n": 10,
+            "median": 15.899999856948853,
+            "mad": 1.1499998569488525
+          },
+          "threshold": 10,
+          "change": -0.35000014305114746,
+          "noRegression": true,
+          "improved": false
+        },
+        "repeats": {
+          "before": {
+            "n": 20,
+            "median": 16.5,
+            "mad": 0.8000000715255737
+          },
+          "after": {
+            "n": 20,
+            "median": 15.99999988079071,
+            "mad": 1.0999999046325684
+          },
+          "threshold": 10,
+          "change": -0.5000001192092896,
+          "noRegression": true,
+          "improved": false
+        }
+      }
+    },
+    {
+      "key": "accordion/normal",
+      "phases": {
+        "first": {
+          "before": {
+            "n": 10,
+            "median": 56.10000002384186,
+            "mad": 0.5
+          },
+          "after": {
+            "n": 10,
+            "median": 55.450000047683716,
+            "mad": 1.5
+          },
+          "threshold": 10,
+          "change": -0.6499999761581421,
+          "noRegression": true,
+          "improved": false
+        },
+        "second": {
+          "before": {
+            "n": 10,
+            "median": 22.050000071525574,
+            "mad": 0.8500000238418579
+          },
+          "after": {
+            "n": 10,
+            "median": 19.399999856948853,
+            "mad": 0.34999990463256836
+          },
+          "threshold": 10,
+          "change": -2.650000214576721,
+          "noRegression": true,
+          "improved": false
+        },
+        "third": {
+          "before": {
+            "n": 10,
+            "median": 22.299999952316284,
+            "mad": 0.75
+          },
+          "after": {
+            "n": 10,
+            "median": 19.649999976158142,
+            "mad": 0.5500000715255737
+          },
+          "threshold": 10,
+          "change": -2.649999976158142,
+          "noRegression": true,
+          "improved": false
+        },
+        "repeats": {
+          "before": {
+            "n": 20,
+            "median": 22.15000009536743,
+            "mad": 0.6000001430511475
+          },
+          "after": {
+            "n": 20,
+            "median": 19.59999990463257,
+            "mad": 0.5
+          },
+          "threshold": 10,
+          "change": -2.5500001907348633,
+          "noRegression": true,
+          "improved": false
+        }
+      }
+    },
+    {
+      "key": "state-counter/constrained",
+      "phases": {
+        "first": {
+          "before": {
+            "n": 10,
+            "median": 64.20000004768372,
+            "mad": 0.5000001192092896
+          },
+          "after": {
+            "n": 10,
+            "median": 60.89999997615814,
+            "mad": 0.8999999761581421
+          },
+          "threshold": 10,
+          "change": -3.3000000715255737,
+          "noRegression": true,
+          "improved": false
+        },
+        "second": {
+          "before": {
+            "n": 10,
+            "median": 15.350000023841858,
+            "mad": 0.5499999523162842
+          },
+          "after": {
+            "n": 10,
+            "median": 14.949999928474426,
+            "mad": 0.5000001192092896
+          },
+          "threshold": 10,
+          "change": -0.40000009536743164,
+          "noRegression": true,
+          "improved": false
+        },
+        "third": {
+          "before": {
+            "n": 10,
+            "median": 14.949999928474426,
+            "mad": 0.44999992847442627
+          },
+          "after": {
+            "n": 10,
+            "median": 15.299999952316284,
+            "mad": 0.5499998331069946
+          },
+          "threshold": 10,
+          "change": 0.3500000238418579,
+          "noRegression": true,
+          "improved": false
+        },
+        "repeats": {
+          "before": {
+            "n": 20,
+            "median": 15.049999952316284,
+            "mad": 0.5
+          },
+          "after": {
+            "n": 20,
+            "median": 15.25,
+            "mad": 0.3999999761581421
+          },
+          "threshold": 10,
+          "change": 0.20000004768371582,
+          "noRegression": true,
+          "improved": false
+        }
+      }
+    },
+    {
+      "key": "computed-total/constrained",
+      "phases": {
+        "first": {
+          "before": {
+            "n": 10,
+            "median": 66.15000009536743,
+            "mad": 1.75
+          },
+          "after": {
+            "n": 10,
+            "median": 65.65000009536743,
+            "mad": 0.8999998569488525
+          },
+          "threshold": 10,
+          "change": -0.5,
+          "noRegression": true,
+          "improved": false
+        },
+        "second": {
+          "before": {
+            "n": 10,
+            "median": 15.649999856948853,
+            "mad": 0.7999999523162842
+          },
+          "after": {
+            "n": 10,
+            "median": 15.150000095367432,
+            "mad": 0.7000000476837158
+          },
+          "threshold": 10,
+          "change": -0.4999997615814209,
+          "noRegression": true,
+          "improved": false
+        },
+        "third": {
+          "before": {
+            "n": 10,
+            "median": 16.049999952316284,
+            "mad": 0.3000001907348633
+          },
+          "after": {
+            "n": 10,
+            "median": 15.200000047683716,
+            "mad": 0.8500000238418579
+          },
+          "threshold": 10,
+          "change": -0.8499999046325684,
+          "noRegression": true,
+          "improved": false
+        },
+        "repeats": {
+          "before": {
+            "n": 20,
+            "median": 15.949999928474426,
+            "mad": 0.5000001192092896
+          },
+          "after": {
+            "n": 20,
+            "median": 15.200000047683716,
+            "mad": 0.7999999523162842
+          },
+          "threshold": 10,
+          "change": -0.7499998807907104,
+          "noRegression": true,
+          "improved": false
+        }
+      }
+    },
+    {
+      "key": "mode-select/constrained",
+      "phases": {
+        "first": {
+          "before": {
+            "n": 10,
+            "median": 74.950000166893,
+            "mad": 0.6000000238418579
+          },
+          "after": {
+            "n": 10,
+            "median": 72.85000002384186,
+            "mad": 1
+          },
+          "threshold": 10,
+          "change": -2.1000001430511475,
+          "noRegression": true,
+          "improved": false
+        },
+        "second": {
+          "before": {
+            "n": 10,
+            "median": 17.699999928474426,
+            "mad": 0.7000000476837158
+          },
+          "after": {
+            "n": 10,
+            "median": 17.5,
+            "mad": 1.100000023841858
+          },
+          "threshold": 10,
+          "change": -0.19999992847442627,
+          "noRegression": true,
+          "improved": false
+        },
+        "third": {
+          "before": {
+            "n": 10,
+            "median": 17.799999952316284,
+            "mad": 0.3999999761581421
+          },
+          "after": {
+            "n": 10,
+            "median": 16.699999928474426,
+            "mad": 0.8999999761581421
+          },
+          "threshold": 10,
+          "change": -1.100000023841858,
+          "noRegression": true,
+          "improved": false
+        },
+        "repeats": {
+          "before": {
+            "n": 20,
+            "median": 17.799999952316284,
+            "mad": 0.5
+          },
+          "after": {
+            "n": 20,
+            "median": 17.149999976158142,
+            "mad": 0.8000000715255737
+          },
+          "threshold": 10,
+          "change": -0.6499999761581421,
+          "noRegression": true,
+          "improved": false
+        }
+      }
+    },
+    {
+      "key": "accordion/constrained",
+      "phases": {
+        "first": {
+          "before": {
+            "n": 10,
+            "median": 147.64999997615814,
+            "mad": 1.2999998331069946
+          },
+          "after": {
+            "n": 10,
+            "median": 140.60000002384186,
+            "mad": 1.5499999523162842
+          },
+          "threshold": 14.764999997615815,
+          "change": -7.049999952316284,
+          "noRegression": true,
+          "improved": false
+        },
+        "second": {
+          "before": {
+            "n": 10,
+            "median": 39.5,
+            "mad": 0.35000014305114746
+          },
+          "after": {
+            "n": 10,
+            "median": 30.75,
+            "mad": 0.39999985694885254
+          },
+          "threshold": 10,
+          "change": -8.75,
+          "noRegression": true,
+          "improved": false
+        },
+        "third": {
+          "before": {
+            "n": 10,
+            "median": 37.14999997615814,
+            "mad": 1.2499998807907104
+          },
+          "after": {
+            "n": 10,
+            "median": 28.100000023841858,
+            "mad": 0.8999999761581421
+          },
+          "threshold": 10,
+          "change": -9.049999952316284,
+          "noRegression": true,
+          "improved": false
+        },
+        "repeats": {
+          "before": {
+            "n": 20,
+            "median": 38.99999988079071,
+            "mad": 1.100000023841858
+          },
+          "after": {
+            "n": 20,
+            "median": 29.799999833106995,
+            "mad": 1.1999999284744263
+          },
+          "threshold": 10,
+          "change": -9.200000047683716,
+          "noRegression": true,
+          "improved": false
+        }
+      }
+    }
+  ],
+  "decision": "Set aside the same-pack direct initializer optimization: no first or repeat median gain clears the predeclared threshold. The constrained accordion repeat median improves by 9.2 ms against a 10 ms threshold. Correctness and request-count checks pass. Retain asynchronous lazy-initialization tests; do not claim a latency improvement or roll this candidate into preview.",
+  "excluded": "/private/tmp/markless-docs-cold-B9REn5/results.json overlapped an orphan CPU-bound process and is excluded from timing."
+}

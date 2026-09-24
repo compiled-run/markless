@@ -1,3 +1,4 @@
+// oxlint-disable-next-line typescript/triple-slash-reference -- the source ships to consumers, who need these globals
 /// <reference path="./navigation-api.d.ts" />
 import {
 	buildRouteManifestFromFileIds,
@@ -37,6 +38,8 @@ export interface MarklessRouterNavigationPolyfillModule {
 
 export interface StartSpaNavigationOptions {
 	readonly documentModuleLoader?: () => Promise<unknown>;
+	// 'document' when document.tsrx renders from the request URL: route changes load a fresh document.
+	readonly documentNavigation?: 'client' | 'document';
 	readonly loadPolyfill?: () => Promise<MarklessRouterNavigationPolyfillModule>;
 	readonly pageModuleLoaders: Record<string, () => Promise<unknown>>;
 	readonly preloadRouteModule?: (file: string) => unknown;
@@ -46,6 +49,7 @@ export interface StartSpaNavigationOptions {
 
 interface NavigationContext {
 	readonly documentModuleLoader?: () => Promise<unknown>;
+	readonly documentNavigation?: 'client' | 'document';
 	readonly manifest: RouteManifest;
 	readonly pageModuleLoaders: Record<string, () => Promise<unknown>>;
 	readonly preloadRouteModule?: (file: string) => unknown;
@@ -74,6 +78,7 @@ export async function __marklessRouterStartSpaNavigation(options: StartSpaNaviga
 
 	const context: NavigationContext = {
 		documentModuleLoader: options.documentModuleLoader,
+		documentNavigation: options.documentNavigation,
 		manifest: buildRouteManifestFromFileIds(options.routeFileIds),
 		pageModuleLoaders: options.pageModuleLoaders,
 		preloadRouteModule: options.preloadRouteModule,
@@ -112,20 +117,27 @@ export async function __marklessRouterStartSpaNavigation(options: StartSpaNaviga
 	}
 }
 
+const pendingPolyfills = new WeakMap<object, Promise<MarklessRouterNavigationRuntime>>();
+
 export async function ensureNavigationRuntime(
 	runtimeWindow: MarklessRouterNavigationWindow = browserWindow(),
 	loadPolyfill?: () => Promise<MarklessRouterNavigationPolyfillModule>,
 ) {
-	if (!runtimeWindow.navigation) {
-		const { applyPolyfill } = (await (loadPolyfill?.() ??
-			import('@virtualstate/navigation'))) as MarklessRouterNavigationPolyfillModule;
-		runtimeWindow.navigation = applyPolyfill({
-			interceptEvents: false,
-			window: runtimeWindow,
-		}) as MarklessRouterNavigationRuntime;
+	if (runtimeWindow.navigation) return runtimeWindow.navigation;
+	let pending = pendingPolyfills.get(runtimeWindow);
+	if (!pending) {
+		pending = (async () => {
+			const { applyPolyfill } = (await (loadPolyfill?.() ??
+				import('@virtualstate/navigation'))) as MarklessRouterNavigationPolyfillModule;
+			return (runtimeWindow.navigation ??= applyPolyfill({
+				interceptEvents: false,
+				window: runtimeWindow,
+			}) as MarklessRouterNavigationRuntime);
+		})();
+		pendingPolyfills.set(runtimeWindow, pending);
+		pending.catch(() => pendingPolyfills.delete(runtimeWindow));
 	}
-
-	return runtimeWindow.navigation;
+	return pending;
 }
 
 export function handleNavigateEvent(event: NavigateEvent, context: NavigationContext) {
@@ -164,7 +176,11 @@ async function renderRoute(url: URL, context: NavigationContext, signal?: AbortS
 	const [page, document] = await Promise.all([
 		loadPageModule(),
 		context.documentModuleLoader?.(),
-	]);
+	]).catch((error: unknown) => {
+		// The destination's chunks did not load (a deploy removed them): the server still renders it as a document.
+		context.window.location.assign(url.href);
+		throw error;
+	});
 	if (signal?.aborted) {
 		return;
 	}
@@ -234,7 +250,7 @@ function handleLinkClick(
 
 	const url = parseSameOriginUrl(anchor.href, context.window.location.href);
 	const match = url && matchRouteManifest(routePathname(url, context), context.manifest);
-	if (!match) {
+	if (!url || !match || (context.documentNavigation === 'document' && !hashRoutePath(url))) {
 		return;
 	}
 
@@ -266,6 +282,7 @@ function routeUrl(event: NavigateEvent, context: NavigationContext) {
 		event.hashChange === true && !!destination && hashRoutePath(destination) !== undefined;
 	if (
 		(!isMarklessRouterNavigation(event) && !hashRouteNavigation) ||
+		(context.documentNavigation === 'document' && !hashRouteNavigation) ||
 		event.canIntercept === false ||
 		event.navigationType === 'reload' ||
 		(event.hashChange && !hashRouteNavigation) ||

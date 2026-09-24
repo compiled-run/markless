@@ -2,6 +2,10 @@ import { readdir, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { renderToString, type SsrRenderable } from '@markless/core';
+import {
+	MARKLESS_IMPORT_MAP_ASSET,
+	importMapScript,
+} from '../../../src/build/content-hash-names.ts';
 import { planModulePreloads, type ModulePreloadRoot } from '../../../src/build/preload-plan.ts';
 import type { MarklessBundleGraph } from '../../../src/types.ts';
 import {
@@ -190,7 +194,11 @@ async function renderPreviewRequest(root: string, outDir: string, renderEntry?: 
 	const html = renderEntry
 		? await entry.render!(renderOptions)
 		: await renderToString(entry.default, renderOptions);
-	return new Response(html, {
+	// A packed build's chunks import each other by specifier; the host serves the map ahead of every module.
+	const importMap = await readFile(resolve(dist, MARKLESS_IMPORT_MAP_ASSET), 'utf8').catch(
+		() => undefined,
+	);
+	return new Response(importMap ? importMapScript(JSON.parse(importMap)) + html : html, {
 		headers: { 'Content-Type': 'text/html;charset=utf-8' },
 	});
 }
@@ -209,14 +217,26 @@ function preloadRootsFromArtifact(artifact: SsrEntry['default']): ModulePreloadR
 
 async function readClientResumeModuleUrl(dist: string) {
 	const buildDir = resolve(dist, 'build');
+	const candidates: string[] = [];
+	const imported = new Set<string>();
+	const imports = JSON.parse(
+		await readFile(resolve(dist, MARKLESS_IMPORT_MAP_ASSET), 'utf8').catch(() => '{}'),
+	) as { imports?: Record<string, string> };
 	for (const fileName of await readdir(buildDir)) {
 		if (!fileName.endsWith('.js')) continue;
 
 		const source = await readFile(resolve(buildDir, fileName), 'utf8');
-		if (source.includes('resumeContainerEvent')) {
-			return `/build/${fileName}`;
+		if (source.includes('resumeContainerEvent')) candidates.push(fileName);
+		for (const match of source.matchAll(/\bfrom\s*["']\.\/([^"']+\.js)["']/g))
+			imported.add(match[1]!);
+		for (const match of source.matchAll(/\bfrom\s*["']([^"'./][^"']*)["']/g)) {
+			const url = imports.imports?.[match[1]!];
+			if (url) imported.add(url.slice(url.lastIndexOf('/') + 1));
 		}
 	}
+	// A packed build also exports the event handler from the chunk its entry facade initializes first.
+	const fileName = candidates.find((name) => !imported.has(name)) ?? candidates[0];
+	if (fileName) return `/build/${fileName}`;
 	throw new Error('Expected built client resume module exporting resumeContainerEvent.');
 }
 

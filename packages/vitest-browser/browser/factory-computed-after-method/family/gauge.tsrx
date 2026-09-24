@@ -26,7 +26,7 @@ export const gaugeState = shared(
 );
 
 export function GaugeRoot({ children }: { children?: Children }) @{
-	const gauge = gaugeState();
+	const _gauge = gaugeState();
 
 	<div data-gauge-root>{children}</div>
 }

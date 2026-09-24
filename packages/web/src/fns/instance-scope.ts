@@ -1,7 +1,10 @@
 import type { RuntimeGraph } from '@markless/runtime';
-import { installComposedArmRecordQualifier } from '../resume-arm-records.ts';
-import { installElementHandleQualifier } from '../resume-handle-qualifier.ts';
-import { marklessSettled, type Awaitable } from '../ssr-data/awaitable.ts';
+import {
+	installComposedArmRecordQualifier,
+	installElementHandleQualifier,
+} from '../resume-handle-qualifier.ts';
+import { marklessCodedError } from '../coded-error.ts';
+import { marklessSettled, marklessThen, type Awaitable } from '../ssr-data/awaitable.ts';
 import type {
 	ResumeArmBranchRecord,
 	ResumeArmRecordSet,
@@ -123,9 +126,16 @@ export function marklessRowScopedGraphNodeId(
 	scope: MarklessRowScope,
 	registry: MarklessWidgetRegistry,
 ): string {
-	const widget = marklessRowWidgetGraphNodeId(graphNodeId, scope, registry);
-	if (widget !== undefined) return widget;
-	assertWidgetReadResolved(graphNodeId, registry);
+	const pageSpace = PAGE_SPACE_ID.exec(graphNodeId);
+	// A prefix already carrying a row is either resolved or a re-entrant pass
+	// over an id this same adapter wrote; the graph tag catches the common case.
+	if (pageSpace && pageSpace[2] === 'shared' && pageSpace[1] && !pageSpace[1].includes('r:')) {
+		const edgePath = pageSpace[1];
+		const sharedId = graphNodeId.slice(edgePath.length);
+		const widget = marklessRowWidgetGraphNodeId(sharedId, edgePath, scope, registry);
+		if (widget !== undefined) return widget;
+		assertWidgetReadResolved(graphNodeId, sharedId, registry);
+	}
 	for (const { rowFree, withRows, rowBoundary } of scope)
 		if (!rowBoundary && graphNodeId.startsWith(rowFree))
 			return withRows + graphNodeId.slice(rowFree.length);
@@ -141,27 +151,22 @@ export function marklessRowScopedGraphNodeId(
  * this page files as a widget, is that: page-scoped `shared()` and storage ids
  * are page space on purpose, and a bare widget id claims no instance.
  */
-function assertWidgetReadResolved(graphNodeId: string, registry: MarklessWidgetRegistry): void {
-	const pageSpace = PAGE_SPACE_ID.exec(graphNodeId);
-	if (!pageSpace || pageSpace[2] !== 'shared' || !pageSpace[1] || pageSpace[1].includes('r:'))
-		return;
-	const sharedId = graphNodeId.slice(pageSpace[1].length);
+function assertWidgetReadResolved(
+	graphNodeId: string,
+	sharedId: string,
+	registry: MarklessWidgetRegistry,
+): void {
 	const slash = sharedId.lastIndexOf('/');
 	const definitionId = slash > 0 ? sharedId.slice(0, slash) : sharedId;
 	// The registry files every widget-scoped definition the graph lists, rendered
 	// or not, so membership here is what says "widget-scoped" rather than a guess.
 	if (!registry.rootPaths.has(definitionId) && !registry.rowRooted.has(definitionId)) return;
-	const error = new Error(
-		`MARKLESS_WIDGET_INSTANCE_UNRESOLVED: ${graphNodeId} was read at dispatch from a part whose widget instance no rendered widget owns, so the read would answer for no instance at all.`,
-	) as Error & Record<string, unknown>;
-	error.name = 'WidgetInstanceRuntimeError';
-	error.code = 'MARKLESS_WIDGET_INSTANCE_UNRESOLVED';
-	error.severity = 'error';
-	error.phase = 'runtime';
-	error.graphNodeId = graphNodeId;
-	error.definitionId = definitionId;
-	error.docsUrl = 'https://markless.dev/errors/MARKLESS_WIDGET_INSTANCE_UNRESOLVED';
-	throw error;
+	throw marklessCodedError(
+		'WidgetInstanceRuntimeError',
+		'MARKLESS_WIDGET_INSTANCE_UNRESOLVED',
+		`${graphNodeId} was read at dispatch from a part whose widget instance no rendered widget owns, so the read would answer for no instance at all.`,
+		{ severity: 'error', phase: 'runtime', graphNodeId, definitionId },
+	);
 }
 
 /**
@@ -181,26 +186,20 @@ function assertWidgetReadResolved(graphNodeId: string, registry: MarklessWidgetR
  * one of them: no row can answer it, so the projection site answers it below.
  */
 function marklessRowWidgetGraphNodeId(
-	graphNodeId: string,
+	sharedId: string,
+	edgePath: string,
 	scope: MarklessRowScope,
 	registry: MarklessWidgetRegistry,
 ): string | undefined {
-	const pageSpace = PAGE_SPACE_ID.exec(graphNodeId);
-	// A prefix already carrying a row is either resolved or a re-entrant pass
-	// over an id this same adapter wrote; the graph tag catches the common case.
-	if (!pageSpace || pageSpace[2] !== 'shared' || !pageSpace[1] || pageSpace[1].includes('r:'))
-		return undefined;
-	const edgePath = pageSpace[1];
-	const sharedId = graphNodeId.slice(edgePath.length);
 	// A row's reading answers only with a root inside that row; an island segment ahead of the row would otherwise let the walk chop past it.
 	for (const { rowFree, withRows } of scope) {
 		if (!withRows.includes('r:') || !edgePath.startsWith(rowFree)) continue;
-		const rootPath = marklessWidgetRootPath(
+		const rootPath = widgetRootPathFor(
 			sharedId,
 			withRows + edgePath.slice(rowFree.length),
 			registry,
 		);
-		if (rootPath.startsWith(withRows)) return rootPath + sharedId;
+		if (rootPath?.startsWith(withRows)) return rootPath + sharedId;
 	}
 	// The prefix walk above can only CHOP segments, so it never crosses a root
 	// that stands deeper than the reading edge path; a widget rooted inside this
@@ -243,15 +242,9 @@ function marklessRowRootedGraphNodeId(
 	registry: MarklessWidgetRegistry,
 ): string | undefined {
 	if (registry.rowRooted.size === 0) return undefined;
-	// `sharedId` is either a definition id or one of its nodes, and the module
-	// path inside it carries separators of its own - so ask both ways rather than
-	// guess which separator splits them.
-	const slash = sharedId.lastIndexOf('/');
-	const definitionId = registry.rowRooted.has(sharedId)
-		? sharedId
-		: slash > 0 && registry.rowRooted.has(sharedId.slice(0, slash))
-			? sharedId.slice(0, slash)
-			: undefined;
+	const definitionId = byDefinition(sharedId, (key) =>
+		registry.rowRooted.has(key) ? key : undefined,
+	);
 	if (definitionId === undefined) return undefined;
 	for (const { rowFree, withRows } of scope) {
 		if (!withRows.includes('r:') || !edgePath.startsWith(rowFree)) continue;
@@ -284,40 +277,54 @@ type MarklessRowScopedGraph = MarklessScopedGraph & {
 	readonly marklessWidgetHostGraph?: object;
 };
 
-export function marklessRowScopedGraph(
-	graph: RuntimeGraph,
-	scope: MarklessRowScope,
-): RuntimeGraph {
+export function marklessRowScopedGraph(graph: RuntimeGraph, scope: MarklessRowScope): RuntimeGraph {
 	const tag = scope.map((pair) => pair.withRows).join('|');
 	if ((graph as MarklessRowScopedGraph).marklessRowScope === tag) return graph;
 	const registry = marklessGraphWidgetRegistry(graph);
-	const qualify = (graphNodeId: string) =>
-		marklessRowScopedGraphNodeId(graphNodeId, scope, registry);
-	const outerQualify = (graph as MarklessRowScopedGraph).marklessQualifyGraphNodeId;
-	const scoped = {
-		...graph,
-		marklessRowScope: tag,
-		marklessQualifyGraphNodeId: (graphNodeId: string) =>
-			outerQualify ? outerQualify(qualify(graphNodeId)) : qualify(graphNodeId),
-		// An own field, not the WeakMap alone: this graph is spread again on its way
-		// to the symbol (the imported-capture adapter builds its own reader over it),
-		// and a copy the map has never seen mints a registry of its own - one that
-		// never heard of a row minted after boot, so the row's parts resolve to
-		// nothing.
-		marklessWidgetHostGraph: marklessRegistryHolder(graph),
-		read: (graphNodeId, path) => graph.read(qualify(graphNodeId), path),
-		write: (write) => graph.write({ ...write, graphNodeId: qualify(write.graphNodeId) }),
-		update: (update) => graph.update({ ...update, graphNodeId: qualify(update.graphNodeId) }),
-		call: (call) => graph.call({ ...call, graphNodeId: qualify(call.graphNodeId) }),
-		delete: (deletion) =>
-			graph.delete({ ...deletion, graphNodeId: qualify(deletion.graphNodeId) }),
-		subscribe: (subscription) =>
-			graph.subscribe({ ...subscription, graphNodeId: qualify(subscription.graphNodeId) }),
-	} as MarklessRowScopedGraph;
+	const scoped = qualifyingGraph(
+		{
+			...graph,
+			marklessRowScope: tag,
+			// An own field, not the WeakMap alone: this graph is spread again on its way
+			// to the symbol (the imported-capture adapter builds its own reader over it),
+			// and a copy the map has never seen mints a registry of its own - one that
+			// never heard of a row minted after boot, so the row's parts resolve to
+			// nothing.
+			marklessWidgetHostGraph: marklessRegistryHolder(graph),
+		} as MarklessRowScopedGraph,
+		graph,
+		(graphNodeId) => marklessRowScopedGraphNodeId(graphNodeId, scope, registry),
+	);
 	// A wrapper is a new object, so it would otherwise mint a registry of its own
 	// and re-read every definition. File it against the one its base already has.
 	marklessShareWidgetRegistry(scoped, registry);
 	return scoped;
+}
+
+function qualifyingGraph<T extends MarklessScopedGraph>(
+	scoped: T,
+	graph: RuntimeGraph,
+	qualify: (graphNodeId: string) => string,
+): T {
+	const outerQualify = (graph as MarklessScopedGraph).marklessQualifyGraphNodeId;
+	const qualified =
+		<K extends 'write' | 'update' | 'call' | 'delete' | 'subscribe'>(method: K) =>
+		(operation: { readonly graphNodeId: string }) =>
+			(graph[method] as (operation: object) => unknown).call(graph, {
+				...operation,
+				graphNodeId: qualify(operation.graphNodeId),
+			});
+	return Object.assign(scoped, {
+		marklessQualifyGraphNodeId: (graphNodeId: string) =>
+			outerQualify ? outerQualify(qualify(graphNodeId)) : qualify(graphNodeId),
+		read: (graphNodeId: string, path?: ReadonlyArray<string>) =>
+			graph.read(qualify(graphNodeId), path),
+		write: qualified('write'),
+		update: qualified('update'),
+		call: qualified('call'),
+		delete: qualified('delete'),
+		subscribe: qualified('subscribe'),
+	}) as T;
 }
 
 // A symbol loaded through the child's own composed loader already answers in
@@ -329,6 +336,38 @@ export function marklessMarkComposedSymbol<T extends object>(symbol: T): T {
 	return symbol;
 }
 
+const ISLAND_SEGMENT = /^m\d+:/;
+
+/**
+ * An island's symbol invokes callbacks by ids spelled in the island's own module
+ * space, but the page loader that answers them only knows page-space ids, so an
+ * id without an island segment is sent back with this island's.
+ */
+export function marklessIslandSpacedSymbol(
+	symbol: ResumeSymbol,
+	symbolPrefix: string,
+): ResumeSymbol {
+	const island = ISLAND_SEGMENT.exec(symbolPrefix)?.[0];
+	if (!island) return symbol;
+	const spaced: ResumeSymbol = (context: ResumeSymbolContext) => {
+		const invokeSymbol = context.invokeSymbol;
+		return symbol(
+			invokeSymbol
+				? {
+						...context,
+						invokeSymbol: (symbolId, invokeContext) =>
+							invokeSymbol(
+								ISLAND_SEGMENT.test(symbolId) ? symbolId : island + symbolId,
+								invokeContext,
+							),
+					}
+				: context,
+		);
+	};
+	if (composedSymbols.has(symbol)) composedSymbols.add(spaced);
+	return spaced;
+}
+
 export function marklessInstanceScopedLoadSymbol(
 	loadSymbol: (symbolId: string) => ResumeSymbol | Promise<ResumeSymbol>,
 ): (symbolId: string) => ResumeSymbol | Promise<ResumeSymbol> {
@@ -337,9 +376,7 @@ export function marklessInstanceScopedLoadSymbol(
 		if (!instancePath) return loadSymbol(symbolId);
 		// The row is consumed here and re-applied below as graph scope.
 		const loaded = loadSymbol(marklessRowFreeSymbolId(symbolId, instancePath));
-		return typeof (loaded as Promise<ResumeSymbol>)?.then === 'function'
-			? (loaded as Promise<ResumeSymbol>).then((symbol) => scopeSymbol(symbol, instancePath))
-			: scopeSymbol(loaded as ResumeSymbol, instancePath);
+		return marklessThen(loaded, (symbol) => scopeSymbol(symbol, instancePath));
 	};
 }
 
@@ -501,10 +538,6 @@ export function marklessInstanceScopedGraph(
 	// composed view files roots in a descendant's local space, where a page-space
 	// definition id names a different place.
 	if (!composedRegistryViews.has(registry)) marklessNoteGraphWidgetRoots(registry, graph);
-	// Page-space families (shared, storage) keep their page ids through every adapter.
-	const qualify = (graphNodeId: string) =>
-		marklessComposedGraphNodeId(graphNodeId, instancePath, registry);
-	const outerQualify = (graph as MarklessScopedGraph).marklessQualifyGraphNodeId;
 	// A registry that is ALREADY a composed view is spelled in the very local space
 	// this adapter's parts read in; deriving a second view from it asks for its
 	// keys under a page-space prefix they never carry and answers nothing.
@@ -513,31 +546,23 @@ export function marklessInstanceScopedGraph(
 			? registry
 			: composedWidgetRegistryView(registry, instancePath);
 	let widgetView = takeWidgetView();
-	const scoped: MarklessScopedGraph = {
-		...graph,
-		marklessPageGraph: (graph as MarklessScopedGraph).marklessPageGraph ?? graph,
-		marklessInstancePath: instancePath,
-		// Written unconditionally: the spread above would otherwise hand a nested
-		// scope the enclosing one's view, which is a different local space. Re-taken
-		// while empty because the page registry fills from the payload AFTER this
-		// adapter is built, and cached emptiness reads as "owns no widget" forever.
-		get marklessComposedWidgets() {
-			return (widgetView ??= takeWidgetView());
-		},
-		marklessQualifyGraphNodeId: (graphNodeId: string) =>
-			outerQualify ? outerQualify(qualify(graphNodeId)) : qualify(graphNodeId),
-		read: (graphNodeId, path) => graph.read(qualify(graphNodeId), path),
-		write: (write) => graph.write({ ...write, graphNodeId: qualify(write.graphNodeId) }),
-		update: (update) => graph.update({ ...update, graphNodeId: qualify(update.graphNodeId) }),
-		call: (call) => graph.call({ ...call, graphNodeId: qualify(call.graphNodeId) }),
-		delete: (deletion) =>
-			graph.delete({ ...deletion, graphNodeId: qualify(deletion.graphNodeId) }),
-		subscribe: (subscription) =>
-			graph.subscribe({
-				...subscription,
-				graphNodeId: qualify(subscription.graphNodeId),
-			}),
-	};
+	const scoped = qualifyingGraph(
+		{
+			...graph,
+			marklessPageGraph: (graph as MarklessScopedGraph).marklessPageGraph ?? graph,
+			marklessInstancePath: instancePath,
+			// Written unconditionally: the spread above would otherwise hand a nested
+			// scope the enclosing one's view, which is a different local space. Re-taken
+			// while empty because the page registry fills from the payload AFTER this
+			// adapter is built, and cached emptiness reads as "owns no widget" forever.
+			get marklessComposedWidgets() {
+				return (widgetView ??= takeWidgetView());
+			},
+		} as MarklessScopedGraph,
+		graph,
+		// Page-space families (shared, storage) keep their page ids through every adapter.
+		(graphNodeId) => marklessComposedGraphNodeId(graphNodeId, instancePath, registry),
+	);
 	if (widgetView) marklessShareWidgetRegistry(scoped, widgetView);
 	return scoped;
 }
@@ -676,7 +701,8 @@ export function marklessGraphWidgetRegistry(graph?: RuntimeGraph): MarklessWidge
 	// An adapter may hold a registry of its OWN - the local-space view an instance
 	// scope files for the parts reading through it - which its page graph's
 	// registry cannot answer for. Ask the object itself before its holder.
-	const own = (graph as MarklessScopedGraph).marklessComposedWidgets ?? graphRegistries.get(graph);
+	const own =
+		(graph as MarklessScopedGraph).marklessComposedWidgets ?? graphRegistries.get(graph);
 	if (own) return marklessScopeWidgetsTo(own);
 	const holder = marklessRegistryHolder(graph);
 	const held = graphRegistries.get(holder);
@@ -709,8 +735,7 @@ export function marklessNoteWidgetRoot(
 	rootPath: string,
 ): void {
 	registry.rootPaths.set(id, rootPath);
-	if (rootPath.includes('r:'))
-		registry.rowRooted.add(id.slice(marklessInstancePath(id).length));
+	if (rootPath.includes('r:')) registry.rowRooted.add(id.slice(marklessInstancePath(id).length));
 }
 
 /**
@@ -828,21 +853,7 @@ function enclosingRootPathFor(
 	graphNodeId: string,
 	roots: ReadonlyMap<string, string>,
 ): string | undefined {
-	const slash = graphNodeId.lastIndexOf('/');
-	return (
-		roots.get(graphNodeId) ??
-		(slash > 0 ? roots.get(graphNodeId.slice(0, slash)) : undefined)
-	);
-}
-
-// The widget this child-local `shared:` id belongs to: the answer registered for
-// the longest prefix of the reading instance's path.
-function marklessWidgetRootPath(
-	graphNodeId: string,
-	instancePath: string,
-	registry: MarklessWidgetRegistry,
-): string {
-	return widgetRootPathFor(graphNodeId, instancePath, registry) ?? '';
+	return byDefinition(graphNodeId, (key) => roots.get(key));
 }
 
 /**
@@ -897,13 +908,11 @@ function marklessUnresolvedWidgetGraphNodeId(
 	instancePath: string,
 	registry: MarklessWidgetRegistry,
 ): string {
-	const rowRootedDefinitions = registry.rowRooted;
-	if (instancePath.includes('r:') || rowRootedDefinitions.size === 0) return graphNodeId;
-	const slash = graphNodeId.lastIndexOf('/');
-	const rowRooted =
-		rowRootedDefinitions.has(graphNodeId) ||
-		(slash > 0 && rowRootedDefinitions.has(graphNodeId.slice(0, slash)));
-	return rowRooted ? instancePath + graphNodeId : graphNodeId;
+	const rowRooted = registry.rowRooted;
+	if (instancePath.includes('r:') || rowRooted.size === 0) return graphNodeId;
+	return byDefinition(graphNodeId, (key) => rowRooted.has(key) || undefined)
+		? instancePath + graphNodeId
+		: graphNodeId;
 }
 
 // `undefined` is "no widget claims this id from here", which is not the same
@@ -915,20 +924,22 @@ function widgetRootPathFor(
 ): string | undefined {
 	const widgetRootPaths = registry.rootPaths;
 	if (widgetRootPaths.size === 0) return undefined;
-	// The id is either a definition id (`shared:<file>#<export>`) or one of its
-	// nodes (`<definitionId>/<kind>:<name>`). The definition id carries the module
-	// path, which has separators of its own, so ask the registry both ways instead
-	// of guessing which separator splits them.
-	const slash = graphNodeId.lastIndexOf('/');
 	for (let end = instancePath.length; end > 0; end--) {
 		if (instancePath[end - 1] !== ':') continue;
 		const prefix = instancePath.slice(0, end);
-		const rootPath =
-			widgetRootPaths.get(prefix + graphNodeId) ??
-			(slash > 0 ? widgetRootPaths.get(prefix + graphNodeId.slice(0, slash)) : undefined);
+		const rootPath = byDefinition(graphNodeId, (key) => widgetRootPaths.get(prefix + key));
 		if (rootPath !== undefined) return rootPath;
 	}
 	return undefined;
+}
+
+// The id is either a definition id (`shared:<file>#<export>`) or one of its
+// nodes (`<definitionId>/<kind>:<name>`). The definition id carries the module
+// path, which has separators of its own, so ask both ways instead of guessing
+// which separator splits them.
+function byDefinition<T>(id: string, lookup: (key: string) => T | undefined): T | undefined {
+	const slash = id.lastIndexOf('/');
+	return lookup(id) ?? (slash > 0 ? lookup(id.slice(0, slash)) : undefined);
 }
 
 // Every id family a component owns is instance-local; a page-scoped shared()
@@ -1049,9 +1060,7 @@ function composedBoundaryArmRecords(
 			...repeat,
 			id: prefix + repeat.id,
 			parentHostNodeId: prefix + repeat.parentHostNodeId,
-			...(repeat.ownerHostNodeId
-				? { ownerHostNodeId: prefix + repeat.ownerHostNodeId }
-				: {}),
+			...(repeat.ownerHostNodeId ? { ownerHostNodeId: prefix + repeat.ownerHostNodeId } : {}),
 			...(repeat.collectionGraphNodeId
 				? {
 						collectionGraphNodeId: marklessComposedGraphNodeId(

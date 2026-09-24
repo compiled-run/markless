@@ -27,9 +27,7 @@
 			"name": "news-50",
 			"gates": {
 				"passed": true,
-				"checks": [
-					"rendered exactly 50 articles"
-				]
+				"checks": ["rendered exactly 50 articles"]
 			},
 			"bodyBytes": 39572,
 			"timing": {
@@ -53,9 +51,7 @@
 			"name": "news-500",
 			"gates": {
 				"passed": true,
-				"checks": [
-					"rendered exactly 500 articles"
-				]
+				"checks": ["rendered exactly 500 articles"]
 			},
 			"bodyBytes": 399080,
 			"timing": {
@@ -105,9 +101,7 @@
 			"name": "nested-waterfall",
 			"gates": {
 				"passed": true,
-				"checks": [
-					"async content settled: level 4 = 404"
-				]
+				"checks": ["async content settled: level 4 = 404"]
 			},
 			"bodyBytes": 1454,
 			"timing": {

@@ -1,0 +1,1477 @@
+diff --git a/packages/bundler/src/build/build-metadata.ts b/packages/bundler/src/build/build-metadata.ts
+index 7c09222a..dad8042e 100644
+--- a/packages/bundler/src/build/build-metadata.ts
++++ b/packages/bundler/src/build/build-metadata.ts
+@@ -141,6 +141,7 @@ export function createBuildMetadata(
+ 
+ function cloneTransformManifest(manifest: MarklessTransformManifest): MarklessTransformManifest {
+ 	return {
++		...(manifest.symbolRegistry ? { symbolRegistry: { scope: manifest.symbolRegistry.scope, symbols: manifest.symbolRegistry.symbols.map((symbol) => ({ ...symbol })) } } : {}),
+ 		source: manifest.source,
+ 		payload: { ...manifest.payload },
+ 		resolver: { ...manifest.resolver },
+@@ -165,7 +166,7 @@ function finalizeVirtualModuleReferences(
+ 				reference.fileName = bundleFileName;
+ 			}
+ 		}
+-		for (const symbol of module.symbols) {
++		for (const symbol of [...module.symbols, ...(module.symbolRegistry?.symbols ?? [])]) {
+ 			if (ids.has(normalizeVirtualModuleId(symbol.virtualModuleId))) {
+ 				symbol.fileName = bundleFileName;
+ 			}
+diff --git a/packages/bundler/src/build/bundle-finalize.ts b/packages/bundler/src/build/bundle-finalize.ts
+index ec2ac9b1..0f011b67 100644
+--- a/packages/bundler/src/build/bundle-finalize.ts
++++ b/packages/bundler/src/build/bundle-finalize.ts
+@@ -16,7 +16,7 @@ import {
+ 	executionLogActivationInjection,
+ } from '../execution-log.ts';
+ import type { ModuleMetadataRegistry } from '../module-metadata-registry.ts';
+-import type { MarklessRolldownOptions, MarklessTransformManifest } from '../types.ts';
++import type { MarklessRolldownOptions, MarklessTransformManifest, MarklessPackedDeliveryFinalizer } from '../types.ts';
+ import {
+ 	emittedBundleModuleIds,
+ 	sourceForPrerenderWakeVirtualImporter,
+@@ -26,6 +26,7 @@ import {
+ } from '../virtual-ids.ts';
+ 
+ export type FinalizeBundleOptions = {
++	packedDeliveryFinalizers?: ReadonlySet<MarklessPackedDeliveryFinalizer>;
+ 	productionResumeModuleUrls?: Map<string, string>;
+ 	productionPrerenderWakeModuleUrls?: Map<string, string>;
+ 	productionSettleModuleUrls?: Map<string, string>;
+@@ -183,6 +184,13 @@ context.emitFile({
+ 		),
+ 	),
+ });
++	for (const finalize of options.packedDeliveryFinalizers ?? []) {
++		await finalize({
++			bundle: manifestBundle,
++			metadata: clientManifest,
++			emitAsset(fileName, source) { context.emitFile({ type: 'asset', fileName, source }); },
++		});
++	}
+ }
+ 
+ function bundleWithoutRemovedChunks(
+diff --git a/packages/bundler/src/hooks/hook-context.ts b/packages/bundler/src/hooks/hook-context.ts
+index 9c3ea39c..d9a4418a 100644
+--- a/packages/bundler/src/hooks/hook-context.ts
++++ b/packages/bundler/src/hooks/hook-context.ts
+@@ -10,11 +10,14 @@ import type {
+ 	MarklessEnvironment,
+ 	MarklessRolldownOptions,
+ 	MarklessTransformManifest,
++	MarklessPackedDeliveryFinalizer,
+ } from '../types.ts';
+ 
+ export type Environment = MarklessEnvironment | ((context: unknown) => MarklessEnvironment);
+ 
+ export type InternalMarklessRolldownOptions = MarklessRolldownOptions & {
++	packedDelivery?: boolean;
++	packedDeliveryFinalizers?: Set<MarklessPackedDeliveryFinalizer>;
+ 	emitResumeModules?: boolean;
+ 	inlineResumerDebug?: boolean;
+ 	prerender?: boolean;
+diff --git a/packages/bundler/src/hooks/transform-request.ts b/packages/bundler/src/hooks/transform-request.ts
+index 0d8c375b..08ae9a40 100644
+--- a/packages/bundler/src/hooks/transform-request.ts
++++ b/packages/bundler/src/hooks/transform-request.ts
+@@ -102,6 +102,7 @@ export function planTransformHookRequest(
+ 	});
+ 	const { prerenderRecords } = plan;
+ 	const transformInput: TransformTsrxModuleInput = {
++		symbolLoading: internalOptions.packedDelivery && currentEnvironment === 'client' && !plan.dev ? 'registry' : undefined,
+ 		filename: source,
+ 		moduleId: moduleIdFor(source, ctx.getRoot()),
+ 		source: code,
+diff --git a/packages/bundler/src/rolldown.ts b/packages/bundler/src/rolldown.ts
+index 50d7c532..bce58e13 100644
+--- a/packages/bundler/src/rolldown.ts
++++ b/packages/bundler/src/rolldown.ts
+@@ -110,6 +110,10 @@ export function createMarklessRolldownPlugin(input: {
+ 
+ 	const plugin = {
+ 		api: {
++			registerPackedDelivery(finalizer) {
++				internalOptions.packedDelivery = true;
++				(internalOptions.packedDeliveryFinalizers ??= new Set()).add(finalizer);
++			},
+ 			invalidateGeneratedModules(
+ 				parent: string,
+ 				currentEnvironment?: MarklessEnvironment,
+diff --git a/packages/bundler/src/transform.ts b/packages/bundler/src/transform.ts
+index bb538eee..91bcc814 100644
+--- a/packages/bundler/src/transform.ts
++++ b/packages/bundler/src/transform.ts
+@@ -274,6 +274,8 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
+ 	const resolverSymbols = uniqueSymbolsById([...(input.symbols ?? []), ...symbolRows]);
+ 	const resolverSource = adaptImportedCaptureResolver(
+ 		emitSymbolResolverModule({
++			loading: input.symbolLoading,
++			resolverId: input.symbolLoading === 'registry' ? resolverId : undefined,
+ 			buildId: input.buildId,
+ 			symbols: resolverSymbols,
+ 			boundSymbols: importedBoundRows,
+@@ -355,6 +357,12 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
+ 		input.preserveWakeSiblingClaims === true ||
+ 		emitsPrerenderWakeFacade;
+ 	const manifest: MarklessTransformManifest = {
++		...(input.symbolLoading === 'registry' ? {
++			symbolRegistry: {
++				scope: resolverId,
++				symbols: resolverSymbols.map((symbol) => ({ symbolId: symbol.id, virtualModuleId: symbol.chunk, exportName: symbol.exportName })),
++			},
++		} : {}),
+ 		source: input.filename,
+ 		captureMetadata: compiled.captureAnalysis,
+ 		symbolRoutes: importedSymbolRoutes(symbolRoutes),
+diff --git a/packages/bundler/src/types.ts b/packages/bundler/src/types.ts
+index 5b726ead..66f86cdd 100644
+--- a/packages/bundler/src/types.ts
++++ b/packages/bundler/src/types.ts
+@@ -61,6 +61,7 @@ export interface MarklessVirtualModule {
+ }
+ 
+ export interface TransformTsrxModuleInput {
++	symbolLoading?: 'import' | 'registry';
+ 	filename: string;
+ 	/** Root-relative id the compiler spells every minted id from; defaults to `filename`. */
+ 	moduleId?: string;
+@@ -130,6 +131,10 @@ export type MarklessModuleLinkArtifact = Pick<
+ >;
+ 
+ export interface MarklessTransformManifest {
++	symbolRegistry?: {
++		readonly scope: string;
++		readonly symbols: Array<MarklessBuildModuleReference & { symbolId: string; exportName: string }>;
++	};
+ 	source: string;
+ 	captureMetadata?: import('@markless/compiler').CaptureAnalysisArtifact;
+ 	symbolRoutes?: ReadonlyArray<{
+@@ -209,9 +214,16 @@ export type PreloadGraphEntriesAdder = (
+ export type BundleGraphAdder = (manifest: MarklessBuildMetadata) => PreloadGraphEntries | undefined;
+ 
+ export type MarklessRolldownPluginApi = {
++	registerPackedDelivery(finalizer: MarklessPackedDeliveryFinalizer): void;
+ 	invalidateGeneratedModules: (
+ 		parent: string,
+ 		environment?: MarklessEnvironment,
+ 		nextSource?: string,
+ 	) => string[] | Promise<string[]>;
+ };
++
++export type MarklessPackedDeliveryFinalizer = (input: {
++	readonly bundle: import('./build/build-metadata.ts').MarklessBuildMetadataBundle;
++	readonly metadata: MarklessBuildMetadata;
++	emitAsset(fileName: string, source: string): void;
++}) => void | Promise<void>;
+diff --git a/packages/compiler/src/artifacts.ts b/packages/compiler/src/artifacts.ts
+index b3225687..03986386 100644
+--- a/packages/compiler/src/artifacts.ts
++++ b/packages/compiler/src/artifacts.ts
+@@ -1944,6 +1944,7 @@ export type TriggerGroupArtifact = {
+ };
+ 
+ export type SymbolResolverModuleInput = {
++	readonly loading?: 'import' | 'registry';
+ 	readonly buildId?: string;
+ 	readonly resolverId?: string;
+ 	readonly symbols: ReadonlyArray<{
+diff --git a/packages/compiler/src/passes/symbol-resolver-module.ts b/packages/compiler/src/passes/symbol-resolver-module.ts
+index d4020d01..58fa9dbb 100644
+--- a/packages/compiler/src/passes/symbol-resolver-module.ts
++++ b/packages/compiler/src/passes/symbol-resolver-module.ts
+@@ -1,4 +1,5 @@
+ import { ASYNC_PROTOCOL_VERSION, protocolInstanceQualifies } from '@markless/serializer';
++import { PACKED_MODULE_REGISTRY_KEY } from '@markless/serializer/protocol';
+ import type { SymbolResolverModuleInput, SymbolResolverModuleManifest } from '../artifacts.ts';
+ 
+ const SMALL_SYMBOL_SWITCH_LIMIT = 3;
+@@ -30,7 +31,10 @@ export function createSymbolResolverModuleManifest(
+ 
+ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): string {
+ 	const manifest = createSymbolResolverModuleManifest(input);
++	const packed = input.loading === 'registry';
++	const registryLoad = `globalThis[${JSON.stringify(PACKED_MODULE_REGISTRY_KEY)}].symbol(id,${JSON.stringify(input.resolverId)})`;
+ 	if ((input.boundSymbols?.length ?? 0) === 0) {
++		if (packed) return `export const symbolManifest = ${JSON.stringify(manifest)};\nexport function loadSymbol(id) { return ${registryLoad}; }\n`;
+ 		return input.symbols.length > 0 && input.symbols.length <= SMALL_SYMBOL_SWITCH_LIMIT
+ 			? emitSmallSymbolResolverModule(input)
+ 			: emitTableSymbolResolverModule(manifest);
+@@ -78,9 +82,10 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
+ 		`const boundRows = ${serializeBoundRows(input.boundSymbols ?? [])};`,
+ 		'const callbackRoute = "callback-route";',
+ 		'',
+-		'export async function loadSymbol(id) {',
++		`export ${packed ? '' : 'async '}function loadSymbol(id) {`,
+ 		'	const bound = boundRows[id];',
+ 		'	if (bound) return loadBoundSymbol(bound);',
++		...(packed ? [`\treturn ${registryLoad};`] : [
+ 		'	const row = symbolRows[id];',
+ 		'	if (!row) throw createUnknownSymbolError(id);',
+ 		'	return import(/* @vite-ignore */ moduleUrls[row[0]])',
+@@ -88,12 +93,13 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
+ 		'			runGeneratedSymbolChunkInitializers(mod);',
+ 		'			return mod[exportNames[row[1]]];',
+ 		'		});',
++		]),
+ 		'}',
+ 		'',
+-		'async function loadBoundSymbol(bound) {',
++		`${packed ? '' : 'async '}function loadBoundSymbol(bound) {`,
+ 		scopesInstances
+-			? '	const base = instanceScopedBase(await loadSymbol(bound.baseSymbolId), bound);'
+-			: '	const base = await loadSymbol(bound.baseSymbolId);',
++			? `\tconst base = instanceScopedBase(${packed ? '' : 'await '}loadSymbol(bound.baseSymbolId), bound);`
++			: `\tconst base = ${packed ? '' : 'await '}loadSymbol(bound.baseSymbolId);`,
+ 		// The bundler's imported-capture adapter rewrites the next line verbatim.
+ 		'	return (context) => base({ ...context, capture: createCaptureContext(context, bound) });',
+ 		'}',
+diff --git a/packages/router/src/vite/client-assets-manifest.ts b/packages/router/src/vite/client-assets-manifest.ts
+index 838e86fa..d28e47e5 100644
+--- a/packages/router/src/vite/client-assets-manifest.ts
++++ b/packages/router/src/vite/client-assets-manifest.ts
+@@ -9,6 +9,7 @@ const VALID_ROUTE_FILE = /^pages\/.+\.(?:tsrx|mdx)$/;
+ const ABSOLUTE_OR_PROTOCOL_RELATIVE_URL = /^(?:[a-z][a-z\d+.-]*:|\/\/)/i;
+ 
+ export interface MarklessRouterClientAssetRoutes {
++	readonly packs?: Record<string, readonly string[]>;
+ 	readonly navigation: Record<string, readonly string[]>;
+ 	readonly ssr: Record<string, readonly string[]>;
+ 	readonly styles: Record<string, readonly string[]>;
+@@ -41,6 +42,7 @@ export function createClientAssetsManifest(input: {
+ 			navigation: input.navigationEntry,
+ 		},
+ 		routes: {
++			...(input.routes.packs ? { packs: sortRouteMap(input.routes.packs) } : {}),
+ 			navigation: sortRouteMap(input.routes.navigation),
+ 			ssr: sortRouteMap(input.routes.ssr),
+ 			styles: sortRouteMap(input.routes.styles),
+@@ -203,6 +205,7 @@ async function validateClientAssetsManifest(
+ 		navigation: requiredString(input.entries.navigation, 'entries.navigation'),
+ 	};
+ 	const routes = {
++		...(input.routes.packs !== undefined ? { packs: routeMap(input.routes.packs, 'routes.packs') } : {}),
+ 		navigation: routeMap(input.routes.navigation, 'routes.navigation'),
+ 		ssr: routeMap(input.routes.ssr, 'routes.ssr'),
+ 		styles: routeMap(input.routes.styles, 'routes.styles'),
+@@ -216,6 +219,7 @@ async function validateClientAssetsManifest(
+ 		...Object.values(routes.navigation).flat(),
+ 		...Object.values(routes.ssr).flat(),
+ 		...Object.values(routes.styles).flat(),
++		...Object.values(routes.packs ?? {}).flat(),
+ 	]);
+ 	for (const href of hrefs) {
+ 		const fileName = clientAssetFileName(href, base);
+@@ -287,6 +291,7 @@ function assertMatchingRouteKeys(routes: MarklessRouterClientAssetRoutes): void
+ 	for (const [label, routeMap] of [
+ 		['SSR', routes.ssr],
+ 		['style', routes.styles],
++		...(routes.packs ? [['pack', routes.packs] as const] : []),
+ 	] as const) {
+ 		const keys = Object.keys(routeMap).toSorted();
+ 		if (JSON.stringify(keys) !== JSON.stringify(navigationKeys)) {
+diff --git a/packages/router/src/vite/entries/server-entry.ts b/packages/router/src/vite/entries/server-entry.ts
+index 8490bbce..7e32381e 100644
+--- a/packages/router/src/vite/entries/server-entry.ts
++++ b/packages/router/src/vite/entries/server-entry.ts
+@@ -5,6 +5,7 @@ import { navigationEntryPath } from 'virtual:markless-router/navigation-entry-pa
+ import {
+ 	routeModulePreloads,
+ 	routeSsrModulePreloads,
++	routeScriptPacks,
+ 	routeStylesheets,
+ } from 'virtual:markless-router/route-preloads';
+ import { pageModuleLoaders, routeFileIds } from 'virtual:markless-router/routes';
+@@ -17,6 +18,7 @@ const entry = createServerEntry({
+ 	navigationEntryPath,
+ 	routeModulePreloads,
+ 	routeSsrModulePreloads,
++	routeScriptPacks,
+ 	routeStylesheets,
+ 	documentModuleLoader: documentModuleLoaders['/document.tsrx'],
+ 	pageModuleLoaders,
+diff --git a/packages/router/src/vite/route-preload-data.ts b/packages/router/src/vite/route-preload-data.ts
+index de649252..db6676b6 100644
+--- a/packages/router/src/vite/route-preload-data.ts
++++ b/packages/router/src/vite/route-preload-data.ts
+@@ -1,11 +1,11 @@
+ import type { MarklessRouterClientAssetRoutes } from './client-assets-manifest.ts';
+ 
+-type RoutePreloadData = Pick<MarklessRouterClientAssetRoutes, 'navigation' | 'ssr'>;
++type RoutePreloadData = Pick<MarklessRouterClientAssetRoutes, 'navigation' | 'ssr' | 'packs'>;
+ type IndexedRoutes = Record<string, number[]>;
+ 
+ export function compactRoutePreloadData(
+ 	data: RoutePreloadData,
+-): [string[], IndexedRoutes, IndexedRoutes] {
++): [string[], IndexedRoutes, IndexedRoutes, IndexedRoutes?] {
+ 	const urls: string[] = [];
+ 	const indices = new Map<string, number>();
+ 	const encode = (routes: RoutePreloadData['navigation']): IndexedRoutes =>
+@@ -18,13 +18,15 @@ export function compactRoutePreloadData(
+ 			}
+ 			return index;
+ 		})]));
+-	return [urls, encode(data.navigation), encode(data.ssr)];
++	const encoded: [string[], IndexedRoutes, IndexedRoutes, IndexedRoutes?] = [urls, encode(data.navigation), encode(data.ssr)];
++	if (data.packs) encoded.push(encode(data.packs));
++	return encoded;
+ }
+ 
+ export const routePreloadDecoderSource = [
+ 	'if (Array.isArray(routePreloadData)) {',
+-	'  const [urls, navigation, ssr] = routePreloadData;',
++	'  const [urls, navigation, ssr, packs] = routePreloadData;',
+ 	'  const decode = (routes) => Object.fromEntries(Object.entries(routes).map(([file, indices]) => [file, indices.map((index) => urls[index])]));',
+-	'  routePreloadData = { navigation: decode(navigation), ssr: decode(ssr) };',
++	'  routePreloadData = { navigation: decode(navigation), ssr: decode(ssr), ...(packs ? { packs: decode(packs) } : {}) };',
+ 	'}',
+ ].join('\n');
+diff --git a/packages/router/src/vite/runtime/create-server-entry.ts b/packages/router/src/vite/runtime/create-server-entry.ts
+index c9de8bb7..2f832aab 100644
+--- a/packages/router/src/vite/runtime/create-server-entry.ts
++++ b/packages/router/src/vite/runtime/create-server-entry.ts
+@@ -20,6 +20,7 @@ import {
+ import { __marklessDebugBootstrapSource } from '../../../../web/src/debug-channel.ts';
+ 
+ export interface ServerEntryOptions {
++	readonly routeScriptPacks?: Record<string, readonly string[]>;
+ 	readonly dev?: boolean;
+ 	readonly navigationEntryPath?: string;
+ 	readonly resumeEntryPath?: string;
+@@ -200,6 +201,7 @@ export function createServerEntry(options: ServerEntryOptions) {
+ 			? { ...pageArtifact, prerenderWakeModuleUrl: options.prerenderWakeEntryPath }
+ 			: pageArtifact;
+ 		const renderOptions = {
++			scriptPacks: options.routeScriptPacks?.[file],
+ 			props: pageProps,
+ 			resumeModuleUrl: options.resumeEntryPath ?? baseArtifact?.resumeModuleUrl,
+ 			// Preloads read Link targets from the rendered shell html.
+diff --git a/packages/router/src/vite/virtual-modules.d.ts b/packages/router/src/vite/virtual-modules.d.ts
+index e99a0323..f210a129 100644
+--- a/packages/router/src/vite/virtual-modules.d.ts
++++ b/packages/router/src/vite/virtual-modules.d.ts
+@@ -24,6 +24,7 @@ declare module 'virtual:markless-router/route-preloads' {
+ 
+ 	export const routeModulePreloads: AssetRoutes['navigation'];
+ 	export const routeSsrModulePreloads: AssetRoutes['ssr'];
++	export const routeScriptPacks: AssetRoutes['packs'];
+ 
+ 	// Server lane only: the client build omits this export, and the server
+ 	// emits `undefined` when preloads were not persisted.
+diff --git a/packages/serializer/src/protocol.ts b/packages/serializer/src/protocol.ts
+index a4ca26e1..c126a2df 100644
+--- a/packages/serializer/src/protocol.ts
++++ b/packages/serializer/src/protocol.ts
+@@ -1,4 +1,12 @@
+ import { ASYNC_BOUNDARY_ARM } from './async-boundary-arm.ts';
++export {
++	PACKED_MODULE_REGISTRY_KEY,
++	packedSymbolKey,
++	type PackedModuleExports,
++	type PackedModuleFactory,
++	type PackedModuleRegistry,
++	type PackedSymbolRoute,
++} from './packed-modules.ts';
+ import {
+ 	ASYNC_PROTOCOL_VERSION,
+ 	PROTOCOL_EVENT_ACTION_KIND,
+diff --git a/packages/web/src/inline/resumer.ts b/packages/web/src/inline/resumer.ts
+index 29501dfa..587dc831 100644
+--- a/packages/web/src/inline/resumer.ts
++++ b/packages/web/src/inline/resumer.ts
+@@ -6,7 +6,7 @@ import type {
+ 	ProtocolSyncPolicyCondition,
+ 	ProtocolViewPayload,
+ } from '@markless/serializer/protocol';
+-import { PROTOCOL_EVENT_ACTION_KIND } from '@markless/serializer/protocol';
++import { PACKED_MODULE_REGISTRY_KEY, PROTOCOL_EVENT_ACTION_KIND } from '@markless/serializer/protocol';
+ import type { MarklessExecutionLogMode } from '../dev-log.ts';
+ import type { OverlayInstalledRoot, OverlayPrimedDismissalHost } from '../overlay-handoff.ts';
+ 
+@@ -47,6 +47,7 @@ declare const __MARKLESS_INLINE_DEBUG_REGISTER__:
+ 	| undefined;
+ 
+ export type InlineResumerBuildOptions = {
++	readonly loading?: 'import' | 'registry';
+ 	readonly debug: boolean;
+ 	readonly debugBootstrapSource?: string;
+ 	readonly debugRegistrationSource?: string;
+@@ -175,7 +176,7 @@ const __MARKLESS_INLINE_EXECUTION_LOG__=${JSON.stringify(options.executionLog)};
+ const __MARKLESS_INLINE_RESUME_MODULE_URL__=${JSON.stringify(options.resumeModuleUrl)};
+ const __MARKLESS_INLINE_DEBUG_BOOTSTRAP__=${debugBootstrap};
+ const __MARKLESS_INLINE_DEBUG_REGISTER__=${debugRegistration};
+-${logging ? `(${runGeneralInlineLogSummary.toString()})(${JSON.stringify(options.executionLog)});\n` : ''}(${runInlineResumer.toString()})((url) => import(/* @vite-ignore */ url));
++${logging ? `(${runGeneralInlineLogSummary.toString()})(${JSON.stringify(options.executionLog)});\n` : ''}(${runInlineResumer.toString()})(${inlineModuleLoaderSource(options.loading)});
+ }`;
+ }
+ 
+@@ -183,8 +184,8 @@ export function createInlineResumerDebugRegistrationSource(): string {
+ 	return `(${registerInlineResumerDebug.toString()})`;
+ }
+ 
+-export function createInlineResumerSelfWakeSource(resumeModuleUrl: string | undefined): string {
+-	return `;(${runInlineResumerSelfWake.toString()})(${JSON.stringify(resumeModuleUrl)});`;
++export function createInlineResumerSelfWakeSource(resumeModuleUrl: string | undefined, loading?: 'import' | 'registry'): string {
++	return `;(${runInlineResumerSelfWake.toString()})(${JSON.stringify(resumeModuleUrl)},${inlineModuleLoaderSource(loading)});`;
+ }
+ 
+ /**
+@@ -198,8 +199,9 @@ export function createInlineResumerSelfWakeSource(resumeModuleUrl: string | unde
+  */
+ export function createInlineResumerOverlayPrimerSource(
+ 	resumeModuleUrl: string | undefined,
++	loading?: 'import' | 'registry',
+ ): string {
+-	return `;(${runInlineResumerOverlayPrimer.toString()})(${JSON.stringify(resumeModuleUrl)},(url) => import(/* @vite-ignore */ url));`;
++	return `;(${runInlineResumerOverlayPrimer.toString()})(${JSON.stringify(resumeModuleUrl)},${inlineModuleLoaderSource(loading)});`;
+ }
+ 
+ // The page's event names vary, so a precompiled boot cannot bake them in. The
+@@ -223,11 +225,12 @@ export function createPrerenderInlineResumerSource(
+ 	eventNames: ReadonlyArray<string>,
+ 	resumeModuleUrl: string | undefined,
+ 	options?: {
++		readonly loading?: 'import' | 'registry';
+ 		readonly debug?: { readonly bootstrapSource: string };
+ 		readonly executionLog?: MarklessExecutionLogMode;
+ 	},
+ ): string {
+-	const plain = `(${runPrerenderInlineResumer.toString()})(${JSON.stringify(eventNames)},${JSON.stringify(resumeModuleUrl)},u=>import(u));`;
++	const plain = `(${runPrerenderInlineResumer.toString()})(${JSON.stringify(eventNames)},${JSON.stringify(resumeModuleUrl)},${inlineModuleLoaderSource(options?.loading)});`;
+ 	const logging = options?.executionLog !== undefined && options.executionLog !== 'never';
+ 	if (!options?.debug && !logging) return plain;
+ 	return `{
+@@ -243,8 +246,15 @@ ${plain}
+ export function createPrerenderSettleInlineResumerSource(
+ 	eventNames: ReadonlyArray<string>,
+ 	resumeModuleUrl: string | undefined,
++	loading?: 'import' | 'registry',
+ ): string {
+-	return `(${runPrerenderSettleBoot.toString()})(${JSON.stringify(eventNames)},${JSON.stringify(resumeModuleUrl)},u=>import(u));`;
++	return `(${runPrerenderSettleBoot.toString()})(${JSON.stringify(eventNames)},${JSON.stringify(resumeModuleUrl)},${inlineModuleLoaderSource(loading)});`;
++}
++
++function inlineModuleLoaderSource(loading: 'import' | 'registry' | undefined): string {
++	return loading === 'registry'
++		? `(url)=>Promise.resolve(globalThis[${JSON.stringify(PACKED_MODULE_REGISTRY_KEY)}].load(url))`
++		: '(url) => import(/* @vite-ignore */ url)';
+ }
+ 
+ type SettlePlanDocument = {
+@@ -634,7 +644,10 @@ function runPrerenderInlineResumer(
+ // Serialized only into documents whose payload has an unsettled async runner.
+ // Keeping this outside runInlineResumer leaves event-only documents on the
+ // smaller interaction-triggered bootstrap.
+-function runInlineResumerSelfWake(fallbackResumeModuleUrl: string | undefined): void {
++function runInlineResumerSelfWake(
++	fallbackResumeModuleUrl: string | undefined,
++	loadModule: (url: string) => Promise<InlineResumeModule>,
++): void {
+ 	const currentScript = document.currentScript as HTMLScriptElement | null;
+ 	const root = currentScript?.closest<InlineRoot>('[data-async-container]');
+ 	const resumeModuleUrl =
+@@ -647,9 +660,7 @@ function runInlineResumerSelfWake(fallbackResumeModuleUrl: string | undefined):
+ 			queueMicrotask(async () => {
+ 				if (!root.__asyncResumeRuntimeStarted) {
+ 					root.__marklessDelegatedDispatch = true;
+-					const module = (await import(
+-						/* @vite-ignore */ resumeModuleUrl
+-					)) as InlineResumeModule;
++					const module = await loadModule(resumeModuleUrl);
+ 					await module.resumeContainerEvent({ root, event: 0 });
+ 				}
+ 			});
+diff --git a/packages/web/src/render-to-string.ts b/packages/web/src/render-to-string.ts
+index f1a7e936..7026b641 100644
+--- a/packages/web/src/render-to-string.ts
++++ b/packages/web/src/render-to-string.ts
+@@ -20,6 +20,7 @@ import {
+ 	createInlineResumerDebugRegistrationSource,
+ 	createInlineResumerOverlayPrimerSource,
+ 	createPrerenderInlineResumerSource,
++	createPrerenderSettleInlineResumerSource,
+ 	createInlineResumerSelfWakeSource,
+ 	createInlineResumerSource,
+ 	renderPrerenderInlineResumerSource,
+@@ -75,6 +76,7 @@ export type SsrRenderArtifact = {
+ export type SsrRenderable = (() => SsrRenderOutput) | SsrRenderArtifact;
+ 
+ export type RenderToStringOptions = {
++	readonly scriptPacks?: readonly string[];
+ 	readonly nonce?: string;
+ 	readonly resumeModuleUrl?: string;
+ 	readonly prerenderWakeModuleUrl?: string;
+@@ -166,7 +168,8 @@ export async function assembleSsrContainer(
+ 			: options.modulePreloads;
+ 	const modulePreloads =
+ 		optionPreloads ?? (browserTriggers ? artifactModulePreloads(component) : undefined);
+-	const sourceMatchesRenderMode = artifactSources?.executionLog === executionLog;
++	const packed = options.scriptPacks !== undefined;
++	const sourceMatchesRenderMode = !packed && artifactSources?.executionLog === executionLog;
+ 	const syncPolicy = hasSyncPolicies(view);
+ 	const graphSyncPolicy = hasGraphSyncPolicies(view);
+ 	const sharedGraphPolicy =
+@@ -181,6 +184,7 @@ export async function assembleSsrContainer(
+ 					? artifactSources.syncPolicy
+ 					: artifactSources.event
+ 			: defaultInlineResumerSource({
++					loading: packed ? 'registry' : undefined,
+ 					executionLog,
+ 					graphSyncPolicy,
+ 					resumeModuleUrl,
+@@ -196,6 +200,7 @@ export async function assembleSsrContainer(
+ 								browserEventNames(view),
+ 								selectedResumeModuleUrl,
+ 								{
++									loading: packed ? 'registry' : undefined,
+ 									...(typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' &&
+ 									__MARKLESS_DEBUG_ENABLED__
+ 										? {
+@@ -215,6 +220,7 @@ export async function assembleSsrContainer(
+ 					undefined,
+ 					true,
+ 					overlayPrimer,
++					packed ? 'registry' : undefined,
+ 				)
+ 			: '';
+ 	const storageSeedScript = renderStorageSeedScript(
+@@ -223,9 +229,10 @@ export async function assembleSsrContainer(
+ 	);
+ 
+ 	return [
++		renderScriptPacks(options.scriptPacks, options.nonce),
+ 		storageSeedScript,
+-		renderHeadInjections(artifactHeadInjections(component), options.nonce),
+-		renderModulePreloadLinks(modulePreloads, options.nonce),
++		renderHeadInjections(artifactHeadInjections(component), options.nonce, packed),
++		packed ? '' : renderModulePreloadLinks(modulePreloads, options.nonce),
+ 		`<div${renderContainerAttributes(options.containerId)}>`,
+ 		output.html,
+ 		payloadScripts?.stateScript,
+@@ -253,6 +260,7 @@ export async function assemblePrerenderPageParts(
+ 	output: SsrRenderOutput,
+ 	options: RenderToStringOptions,
+ ): Promise<{ readonly head: string; readonly container: string }> {
++	const packed = options.scriptPacks !== undefined;
+ 	const { state, view } = await prepareSsrResumeRecords(output);
+ 	const browserTriggers = hasBrowserTriggers(view, state);
+ 	const resumeModuleUrl =
+@@ -276,7 +284,11 @@ export async function assemblePrerenderPageParts(
+ 	const resumerScript =
+ 		browserTriggers && resumeModuleUrl
+ 			? renderInlineResumerScript(
+-					settle
++					packed
++						? settle
++							? createPrerenderSettleInlineResumerSource(eventNames, resumeModuleUrl, 'registry')
++							: createPrerenderInlineResumerSource(eventNames, resumeModuleUrl, { loading: 'registry' })
++						: settle
+ 						? renderPrerenderInlineResumerSource(settle.boot, eventNames)
+ 						: boot
+ 							? renderPrerenderInlineResumerSource(
+@@ -290,14 +302,17 @@ export async function assemblePrerenderPageParts(
+ 					settle?.moduleUrl,
+ 					// The precompiled self-wake variant already carries the self-wake
+ 					// body; only the authored fallback appends it separately.
+-					!boot,
++					packed || !boot,
++					false,
++					packed ? 'registry' : undefined,
+ 				)
+ 			: '';
+ 
+ 	const head = [
++		renderScriptPacks(options.scriptPacks, options.nonce),
+ 		renderStorageSeedScript(artifactStorageSeeds(component), options.nonce),
+-		renderHeadInjections(artifactHeadInjections(component), options.nonce),
+-		renderModulePreloadLinks(modulePreloads, options.nonce),
++		renderHeadInjections(artifactHeadInjections(component), options.nonce, packed),
++		packed ? '' : renderModulePreloadLinks(modulePreloads, options.nonce),
+ 	]
+ 		.filter(Boolean)
+ 		.join('');
+@@ -443,10 +458,12 @@ function artifactInlineResumerSources(
+ function renderHeadInjections(
+ 	injections: ReadonlyArray<RenderHeadInjection> | undefined,
+ 	nonce: string | undefined,
++	packed = false,
+ ): string {
+ 	if (!injections?.length) return '';
+ 	return injections
+ 		.filter((injection) => injection.location === 'head')
++		.filter((injection) => !packed || injection.attributes?.rel !== 'modulepreload')
+ 		.map((injection) => renderHeadInjection(injection, nonce))
+ 		.join('');
+ }
+@@ -504,6 +521,13 @@ function renderModulePreloadLinks(
+ 	return links.join('');
+ }
+ 
++function renderScriptPacks(packs: readonly string[] | undefined, nonce: string | undefined): string {
++	const nonceAttribute = nonce ? ` nonce="${escapeAttribute(nonce)}"` : '';
++	return [...new Set(packs ?? [])]
++		.map((src) => `<script src="${escapeAttribute(src)}"${nonceAttribute}></script>`)
++		.join('');
++}
++
+ function hasBrowserTriggers(view: ProtocolViewPayload, state: ProtocolStatePayload): boolean {
+ 	return (
+ 		(state.storage?.length ?? 0) > 0 ||
+@@ -652,6 +676,7 @@ function renderInlineResumerScript(
+ 	settleModuleUrl?: string,
+ 	appendSelfWakeSource = true,
+ 	overlayPrimer = false,
++	loading?: 'import' | 'registry',
+ ): string {
+ 	const nonceAttribute = nonce ? ` nonce="${escapeAttribute(nonce)}"` : '';
+ 	const resumeModuleAttribute = resumeModuleUrl
+@@ -662,9 +687,9 @@ function renderInlineResumerScript(
+ 		: '';
+ 	const selfWakeAttribute = selfWake ? ' data-markless-self-wake' : '';
+ 	const selfWakeSource =
+-		selfWake && appendSelfWakeSource ? createInlineResumerSelfWakeSource(resumeModuleUrl) : '';
++		selfWake && appendSelfWakeSource ? createInlineResumerSelfWakeSource(resumeModuleUrl, loading) : '';
+ 	const overlayPrimerSource = overlayPrimer
+-		? createInlineResumerOverlayPrimerSource(resumeModuleUrl)
++		? createInlineResumerOverlayPrimerSource(resumeModuleUrl, loading)
+ 		: '';
+ 	return `<script data-async-resumer${nonceAttribute}${resumeModuleAttribute}${settleModuleAttribute}${selfWakeAttribute}>${escapeInlineScript(source + selfWakeSource + overlayPrimerSource)}</script>`;
+ }
+@@ -718,6 +743,7 @@ function shouldEmitInlineRuntime(registry: Set<string> | undefined, key: string)
+ }
+ 
+ function defaultInlineResumerSource(options: {
++	readonly loading?: 'import' | 'registry';
+ 	readonly executionLog: MarklessExecutionLogMode;
+ 	readonly graphSyncPolicy: boolean;
+ 	readonly resumeModuleUrl: string | undefined;
+diff --git a/packages/router/src/vite/index.ts b/packages/router/src/vite/index.ts
+index 83c162d6..c9ccced1 100644
+--- a/packages/router/src/vite/index.ts
++++ b/packages/router/src/vite/index.ts
+@@ -752,7 +752,7 @@ function serverEntrySource(root: string): string {
+ 		`import { resumeEntryPath } from '${RESUME_ENTRY_PATH_ID}${query}';`,
+ 		`import { prerenderWakeEntryPath } from '${PRERENDER_WAKE_ENTRY_PATH_ID}${query}';`,
+ 		`import { navigationEntryPath } from '${NAVIGATION_ENTRY_PATH_ID}${query}';`,
+-		`import { documentStylesheets, routeModulePreloads, routeSsrModulePreloads, routeStylesheets } from '${ROUTE_PRELOADS_ID}${query}';`,
++		`import { documentStylesheets, routeModulePreloads, routeSsrModulePreloads, routeStylesheets, routeScriptPacks } from '${ROUTE_PRELOADS_ID}${query}';`,
+ 		`import { pageModuleLoaders, routeFileIds } from '${ROUTE_DISCOVERY_ID}${query}';`,
+ 		`const documentModuleLoaders = import.meta.glob(['/document.tsrx']);`,
+ 		`const entry = createServerEntry({`,
+@@ -762,6 +762,7 @@ function serverEntrySource(root: string): string {
+ 		`  navigationEntryPath,`,
+ 		`  routeModulePreloads,`,
+ 		`  routeSsrModulePreloads,`,
++		`  routeScriptPacks,`,
+ 		`  routeStylesheets,`,
+ 		`  documentStylesheets,`,
+ 		`  documentModuleLoader: documentModuleLoaders['/document.tsrx'],`,
+@@ -788,7 +789,7 @@ function rootScopeQuery(root: string, id = ''): string {
+ function routePreloadsSource(state: RoutePreloadState, client: boolean): string {
+ 	const routes =
+ 		client || !state.persisted
+-			? { navigation: state.routes.navigation, ssr: state.routes.ssr }
++			? { navigation: state.routes.navigation, ssr: state.routes.ssr, ...(state.routes.packs ? { packs: state.routes.packs } : {}) }
+ 			: state.routes;
+ 	// The document module lives only in the server build, so its stylesheet
+ 	// closure is patched in by that build's generateBundle, never the manifest.
+@@ -805,6 +806,7 @@ function routePreloadsSource(state: RoutePreloadState, client: boolean): string
+ 		routePreloadDecoderSource,
+ 		`export const routeModulePreloads = routePreloadData.navigation ?? {};`,
+ 		`export const routeSsrModulePreloads = routePreloadData.ssr ?? {};`,
++		`export const routeScriptPacks = routePreloadData.packs;`,
+ 		...routeStylesheetExport,
+ 		`export function preloadRouteModule(file, document = globalThis.document) {`,
+ 		`  const hrefs = routeModulePreloads[file];`,
+diff --git a/packages/bundler/src/build/pack-plan.ts b/packages/bundler/src/build/pack-plan.ts
+new file mode 100644
+index 00000000..782d6694
+--- /dev/null
++++ b/packages/bundler/src/build/pack-plan.ts
+@@ -0,0 +1,28 @@
++import type { MarklessBundleGraph } from '../types.ts';
++import { parseBundleGraph, planModulePreloads } from './preload-plan.ts';
++
++export function planModulePack(input: {
++	readonly graph: MarklessBundleGraph;
++	readonly roots: readonly string[];
++}): string[] {
++	for (const entry of input.graph) {
++		if (typeof entry !== 'number') continue;
++		if (
++			!Number.isFinite(entry) ||
++			(entry >= 0 && (!Number.isInteger(entry) || typeof input.graph[entry] !== 'string'))
++		) {
++			throw new Error(`Markless pack graph contains unresolved dependency index ${entry}.`);
++		}
++	}
++	const graph = parseBundleGraph(input.graph);
++	for (const root of input.roots) {
++		if (!graph.has(root))
++			throw new Error(`Markless pack root was not statically resolved: ${root}.`);
++	}
++	return planModulePreloads({
++		bundleGraph: input.graph,
++		roots: input.roots,
++		minProbability: 0,
++		maxPreloads: Number.POSITIVE_INFINITY,
++	}).map((module) => module.name);
++}
+diff --git a/packages/bundler/src/build/packed-modules.ts b/packages/bundler/src/build/packed-modules.ts
+new file mode 100644
+index 00000000..2a1b6e71
+--- /dev/null
++++ b/packages/bundler/src/build/packed-modules.ts
+@@ -0,0 +1,174 @@
++import { dirname, join, normalize, relative } from 'pathe';
++import { rolldown } from 'rolldown';
++import { PACKED_MODULE_REGISTRY_KEY, packedSymbolKey, type PackedSymbolRoute } from '@markless/serializer/protocol';
++import { createPackedModuleRegistry } from './packed-registry.ts';
++
++const PACKED_ENTRY_PREFIX = '\0markless:packed-entry:';
++
++export type PackedModulesInput = {
++	readonly modules: ReadonlyMap<string, string>;
++	readonly packs: ReadonlyMap<string, readonly string[]>;
++	readonly symbols: Readonly<Record<string, PackedSymbolRoute>>;
++};
++
++export async function emitPackedModules(input: PackedModulesInput): Promise<{
++	readonly packs: ReadonlyMap<string, string>;
++}> {
++	const build = await rolldown({
++		input: [...input.modules.keys()].map((id) => PACKED_ENTRY_PREFIX + id),
++		preserveEntrySignatures: 'strict',
++		makeAbsoluteExternalsRelative: false,
++		treeshake: false,
++		plugins: [
++			{
++				name: 'markless-packed-modules',
++				resolveId(source, importer) {
++					if (source.startsWith(PACKED_ENTRY_PREFIX)) return source;
++					const id =
++						importer && source.startsWith('.')
++							? normalize(
++									join(
++										dirname(importer.slice(PACKED_ENTRY_PREFIX.length)),
++										source,
++									),
++								)
++							: source;
++					if (!input.modules.has(id)) {
++						this.error(
++							`Markless packed module ${importer ?? '<entry>'} depends on missing module ${source}.`,
++						);
++					}
++					return { id, external: 'absolute' };
++				},
++				load(entry) {
++					const id = entry.slice(PACKED_ENTRY_PREFIX.length);
++					const code = input.modules.get(id);
++					if (code === undefined) return null;
++					const replacements: { start: number; end: number; value: string }[] = [];
++					visitSyntax(this.parse(code), (node) => {
++						if (
++							![
++								'ImportExpression',
++								'ImportDeclaration',
++								'ExportNamedDeclaration',
++								'ExportAllDeclaration',
++							].includes(String(node.type))
++						)
++							return;
++						const source = node.source as
++							| { type?: string; value?: unknown; start: number; end: number }
++							| undefined;
++						if (!source && node.type === 'ExportNamedDeclaration') return;
++						if (source?.type !== 'Literal' || typeof source.value !== 'string') {
++							this.error(
++								`Markless packed module ${id} contains an import that cannot be statically resolved.`,
++							);
++						}
++						const dependency = source.value.startsWith('.')
++							? normalize(join(dirname(id), source.value))
++							: source.value;
++						if (!input.modules.has(dependency))
++							this.error(
++								`Markless packed module ${id} depends on missing module ${source.value}.`,
++							);
++						replacements.push({
++							start: source.start,
++							end: source.end,
++							value: JSON.stringify(dependency),
++						});
++					});
++					let rewritten = code;
++					for (const replacement of replacements.toSorted((a, b) => b.start - a.start)) {
++						rewritten =
++							rewritten.slice(0, replacement.start) +
++							replacement.value +
++							rewritten.slice(replacement.end);
++					}
++					return rewritten;
++				},
++			},
++		],
++	});
++	try {
++		const output = await build.generate({
++			format: 'cjs',
++			dynamicImportInCjs: false,
++			externalLiveBindings: true,
++			minify: false,
++			exports: 'named',
++			paths: (id) => id,
++		});
++		const chunks = output.output.filter((item) => item.type === 'chunk');
++		const idsByFile = new Map(
++			chunks.map((chunk) => [
++				chunk.fileName,
++				chunk.facadeModuleId?.startsWith(PACKED_ENTRY_PREFIX)
++					? chunk.facadeModuleId.slice(PACKED_ENTRY_PREFIX.length)
++					: PACKED_ENTRY_PREFIX + chunk.fileName,
++			]),
++		);
++		const support = chunks
++			.filter((chunk) => !chunk.facadeModuleId)
++			.map((chunk) => idsByFile.get(chunk.fileName)!);
++		const factories = new Map<string, string>();
++		const exportsById = new Map<string, readonly string[]>();
++		for (const chunk of chunks) {
++			exportsById.set(idsByFile.get(chunk.fileName)!, chunk.exports);
++			const aliases: Record<string, string> = {};
++			for (const dependency of chunk.imports) {
++				const target = idsByFile.get(dependency);
++				if (!target) continue;
++				const path = relative(dirname(chunk.fileName), dependency);
++				aliases[path.startsWith('.') ? path : `./${path}`] = target;
++			}
++			const requireSource =
++				Object.keys(aliases).length > 0
++					? `const imports=${JSON.stringify(aliases)};const require=id=>load(imports[id]??id);`
++					: 'const require=load;';
++			factories.set(
++				idsByFile.get(chunk.fileName)!,
++				`function(module,exports,load){${requireSource}\n${chunk.code}\n}`,
++			);
++		}
++		const delivered = new Set([...input.packs.values()].flat());
++		for (const [symbol, [id, name]] of Object.entries(input.symbols)) {
++			if (!delivered.has(id))
++				throw new Error(`Markless packed symbol ${symbol} has no delivery for ${id}.`);
++			if (!exportsById.get(id)?.includes(name))
++				throw new Error(
++					`Markless packed symbol ${symbol} references missing export ${name} in ${id}.`,
++				);
++		}
++		const packs = new Map<string, string>();
++		const key = JSON.stringify(PACKED_MODULE_REGISTRY_KEY);
++		for (const [name, ids] of input.packs) {
++			const entries = [...new Set([...support, ...ids])].map((id) => {
++				const factory = factories.get(id);
++				if (!factory) throw new Error(`Markless pack ${name} has no factory for ${id}.`);
++				return `${JSON.stringify(id)}:${factory}`;
++			});
++			const members = new Set(ids);
++			const symbols = Object.fromEntries(
++				Object.entries(input.symbols).filter(([, route]) => members.has(route[0])),
++			);
++			packs.set(
++				name,
++				`(()=>{const registry=globalThis[${key}]??=( ${createPackedModuleRegistry.toString()} )(${packedSymbolKey.toString()});registry.register({${entries.join(',\n')}},${JSON.stringify(symbols)});})();`,
++			);
++		}
++		return { packs };
++	} finally {
++		await build.close();
++	}
++}
++
++function visitSyntax(value: unknown, visit: (node: Record<string, unknown>) => void): void {
++	if (!value || typeof value !== 'object') return;
++	if (Array.isArray(value)) {
++		for (const child of value) visitSyntax(child, visit);
++		return;
++	}
++	const node = value as Record<string, unknown>;
++	if (typeof node.type === 'string') visit(node);
++	for (const child of Object.values(node)) visitSyntax(child, visit);
++}
+diff --git a/packages/bundler/src/build/packed-registry.ts b/packages/bundler/src/build/packed-registry.ts
+new file mode 100644
+index 00000000..93054cd5
+--- /dev/null
++++ b/packages/bundler/src/build/packed-registry.ts
+@@ -0,0 +1,53 @@
++import type {
++	PackedModuleExports,
++	PackedModuleFactory,
++	PackedModuleRegistry,
++	PackedSymbolRoute,
++} from '@markless/serializer/protocol';
++
++export function createPackedModuleRegistry(symbolKey: (scope: string, id: string) => string): PackedModuleRegistry {
++	const factories = new Map<string, PackedModuleFactory>();
++	const symbols = new Map<string, PackedSymbolRoute>();
++	const modules = new Map<string, { exports: PackedModuleExports }>();
++	const failures = new Map<string, unknown>();
++	const load = (id: string): PackedModuleExports => {
++		if (failures.has(id)) throw failures.get(id);
++		const previous = modules.get(id);
++		if (previous) return previous.exports;
++		const factory = factories.get(id);
++		if (!factory) throw new Error(`Markless packed module is missing: ${id}`);
++		const module = { exports: {} };
++		modules.set(id, module);
++		try {
++			factory(module, module.exports, load);
++		} catch (error) {
++			failures.set(id, error);
++			throw error;
++		}
++		return module.exports;
++	};
++	return {
++		register(nextFactories, nextSymbols) {
++			for (const [id, factory] of Object.entries(nextFactories)) {
++				if (!factories.has(id)) factories.set(id, factory);
++			}
++			for (const [id, route] of Object.entries(nextSymbols)) {
++				const previous = symbols.get(id);
++				if (previous && (previous[0] !== route[0] || previous[1] !== route[1])) {
++					throw new Error(`Markless packed symbol has conflicting routes: ${id}`);
++				}
++				symbols.set(id, route);
++			}
++		},
++		load,
++		symbol(id, scope) {
++			const route = symbols.get(scope === undefined ? id : symbolKey(scope, id));
++			if (!route) throw new Error(`Markless packed symbol is missing: ${id}`);
++			const exports = load(route[0]);
++			if (!Object.hasOwn(exports, route[1])) {
++				throw new Error(`Markless packed symbol export is missing: ${id}`);
++			}
++			return exports[route[1]];
++		},
++	};
++}
+diff --git a/packages/bundler/test/pack-plan.test.ts b/packages/bundler/test/pack-plan.test.ts
+new file mode 100644
+index 00000000..53aeb240
+--- /dev/null
++++ b/packages/bundler/test/pack-plan.test.ts
+@@ -0,0 +1,43 @@
++import { describe, expect, test } from 'vitest';
++import { planModulePack } from '../src/build/pack-plan.ts';
++
++describe('module pack membership', () => {
++	test('keeps static and dynamic dependencies regardless of probability', () => {
++		expect(
++			planModulePack({
++				graph: [
++					'click',
++					2,
++					'handler.js',
++					6,
++					-1,
++					7,
++					'shared.js',
++					'revealed.js',
++					-1,
++					10,
++					'nested.js',
++				],
++				roots: ['click'],
++			}),
++		).toEqual(['shared.js', 'handler.js', 'revealed.js', 'nested.js']);
++	});
++
++	test('rejects a root the build did not resolve', () => {
++		expect(() => planModulePack({ graph: ['other.js'], roots: ['missing.js'] })).toThrow(
++			/missing\.js/,
++		);
++	});
++
++	test('rejects malformed dependency indexes instead of silently omitting code', () => {
++		expect(() => planModulePack({ graph: ['handler.js', 9], roots: ['handler.js'] })).toThrow(
++			/dependency index 9/,
++		);
++	});
++
++	test('retains cyclic dependencies once and excludes unrelated route roots', () => {
++		expect(
++			planModulePack({ graph: ['a.js', 2, 'b.js', 0, 'other.js'], roots: ['a.js'] }),
++		).toEqual(['b.js', 'a.js']);
++	});
++});
+diff --git a/packages/bundler/test/packed-finalization.test.ts b/packages/bundler/test/packed-finalization.test.ts
+new file mode 100644
+index 00000000..e52ffa75
+--- /dev/null
++++ b/packages/bundler/test/packed-finalization.test.ts
+@@ -0,0 +1,20 @@
++import { expect, test } from 'vitest';
++import { marklessClient } from '../src/rolldown.ts';
++import { callGenerateBundle } from './helpers.ts';
++
++test('packed delivery receives finalized graph metadata and can emit pack assets', async () => {
++	const plugin = marklessClient();
++	let finalized = false;
++	plugin.api.registerPackedDelivery(({ bundle, metadata, emitAsset }) => {
++		finalized = true;
++		expect(bundle['build/entry.js']).toMatchObject({ code: 'export const value = 1;' });
++		expect(metadata.bundles['entry.js']).toBeDefined();
++		emitAsset('build/route.js', '(()=>{})();');
++	});
++	const assets: { fileName: string; source: string }[] = [];
++	await callGenerateBundle(plugin, {
++		'build/entry.js': { type: 'chunk', name: 'entry', fileName: 'build/entry.js', code: 'export const value = 1;', exports: ['value'], imports: [], dynamicImports: [], moduleIds: [] },
++	}, undefined, { emitFile(asset: { fileName: string; source: string }) { assets.push(asset); return asset.fileName; } });
++		expect(finalized).toBe(true);
++		expect(assets).toContainEqual({ type: 'asset', fileName: 'build/route.js', source: '(()=>{})();' });
++});
+diff --git a/packages/bundler/test/packed-modules.test.ts b/packages/bundler/test/packed-modules.test.ts
+new file mode 100644
+index 00000000..7a510dc3
+--- /dev/null
++++ b/packages/bundler/test/packed-modules.test.ts
+@@ -0,0 +1,182 @@
++import { runInNewContext } from 'node:vm';
++import { describe, expect, test } from 'vitest';
++import {
++	PACKED_MODULE_REGISTRY_KEY,
++	packedSymbolKey,
++	type PackedModuleRegistry,
++} from '@markless/serializer/protocol';
++import { emitPackedModules } from '../src/build/packed-modules.ts';
++
++describe('packed module delivery', () => {
++	test('keeps identical local symbol IDs from separate source modules distinct', async () => {
++		const output = await emitPackedModules({
++			modules: new Map([
++				['/build/first.js', 'export const value = 1;'],
++				['/build/second.js', 'export const value = 2;'],
++			]),
++			packs: new Map([['route', ['/build/first.js', '/build/second.js']]]),
++			symbols: {
++				[packedSymbolKey('first', 'symbol:0')]: ['/build/first.js', 'value'],
++				[packedSymbolKey('second', 'symbol:0')]: ['/build/second.js', 'value'],
++			},
++		});
++		const context = {};
++		runInNewContext(output.packs.get('route')!, context);
++		expect(packedRegistry(context).symbol('symbol:0', 'first')).toBe(1);
++		expect(packedRegistry(context).symbol('symbol:0', 'second')).toBe(2);
++	});
++
++	for (const name of ['counter', 'inventory']) {
++		test(`${name}: registration is lazy and shared live bindings survive separate packs`, async () => {
++			const runtime = '/build/shared.js';
++			const first = `/build/${name}-first.js`;
++			const second = `/build/${name}-second.js`;
++			const output = await emitPackedModules({
++				modules: new Map([
++					[
++						runtime,
++						'globalThis.runs.push("shared"); export let value = 0; export function increment() { value++; }',
++					],
++					[
++						first,
++						'import { value, increment } from "./shared.js"; globalThis.runs.push("first"); export function activate() { increment(); return value; }',
++					],
++					[
++						second,
++						'import { value } from "./shared.js"; globalThis.runs.push("second"); export function read() { return value; }',
++					],
++				]),
++				packs: new Map([
++					['runtime', [runtime]],
++					['route', [first, second]],
++				]),
++				symbols: { click: [first, 'activate'], read: [second, 'read'] },
++			});
++			const context = { runs: [] as string[] };
++			runInNewContext(output.packs.get('runtime')!, context);
++			runInNewContext(output.packs.get('route')!, context);
++			expect(context.runs).toEqual([]);
++			const registry = packedRegistry(context);
++			expect((registry.symbol('click') as () => number)()).toBe(1);
++			expect(context.runs).toEqual(['shared', 'first']);
++			expect((registry.symbol('read') as () => number)()).toBe(1);
++			expect((registry.symbol('click') as () => number)()).toBe(2);
++			expect((registry.symbol('read') as () => number)()).toBe(2);
++			expect(context.runs).toEqual(['shared', 'first', 'second']);
++			runInNewContext(output.packs.get('route')!, context);
++			expect((registry.symbol('read') as () => number)()).toBe(2);
++		});
++	}
++
++	test('lowered dynamic imports initialize locally and need no host module loader', async () => {
++		const output = await emitPackedModules({
++			modules: new Map([
++				[
++					'/build/root.js',
++					'export const activate = async () => (await import("./lazy.js")).value;',
++				],
++				['/build/lazy.js', 'globalThis.runs.push("lazy"); export const value = 42;'],
++			]),
++			packs: new Map([['route', ['/build/root.js', '/build/lazy.js']]]),
++			symbols: { click: ['/build/root.js', 'activate'] },
++		});
++		const context = { runs: [] as string[] };
++		runInNewContext(output.packs.get('route')!, context);
++		expect(context.runs).toEqual([]);
++		expect(await (packedRegistry(context).symbol('click') as () => Promise<number>)()).toBe(42);
++		expect(context.runs).toEqual(['lazy']);
++	});
++
++	test('fails the build for an unknown static dependency', async () => {
++		await expect(
++			emitPackedModules({
++				modules: new Map([['/build/root.js', 'export { value } from "./missing.js";']]),
++				packs: new Map([['route', ['/build/root.js']]]),
++				symbols: {},
++			}),
++		).rejects.toThrow(/root\.js.*missing\.js/);
++	});
++
++	test('supports namespace exports, default exports, re-exports, and circular functions', async () => {
++		const modules = new Map([
++			[
++				'/build/a.js',
++				'import { b } from "./b.js"; export function a() { return b(); } export default 5;',
++			],
++			['/build/b.js', 'import { a } from "./a.js"; export function b() { return typeof a; }'],
++			[
++				'/build/barrel.js',
++				'export * as namespace from "./a.js"; export { default } from "./a.js";',
++			],
++			['/build/other.js', 'export * as namespace from "./b.js";'],
++		]);
++		const output = await emitPackedModules({
++			modules,
++			packs: new Map([['route', [...modules.keys()]]]),
++			symbols: {
++				click: ['/build/barrel.js', 'namespace'],
++				default: ['/build/barrel.js', 'default'],
++			},
++		});
++		const context = {};
++		runInNewContext(output.packs.get('route')!, context);
++		expect(packedRegistry(context).symbol('default')).toBe(5);
++		const namespace = packedRegistry(context).symbol('click') as { a(): string };
++		expect(namespace.a()).toBe('function');
++	});
++
++	test('initialization failures remain failures and do not return partial modules later', async () => {
++		const output = await emitPackedModules({
++			modules: new Map([
++				[
++					'/build/broken.js',
++					'globalThis.runs.push("broken"); throw new Error("initialization failed"); export const value = 1;',
++				],
++			]),
++			packs: new Map([['route', ['/build/broken.js']]]),
++			symbols: { click: ['/build/broken.js', 'value'] },
++		});
++		const context = { runs: [] as string[] };
++		runInNewContext(output.packs.get('route')!, context);
++		for (let attempt = 0; attempt < 2; attempt++) {
++			expect(() => packedRegistry(context).symbol('click')).toThrow('initialization failed');
++		}
++		expect(context.runs).toEqual(['broken']);
++	});
++
++	test('fails the build for a computed import instead of retaining a network fallback', async () => {
++		await expect(
++			emitPackedModules({
++				modules: new Map([
++					['/build/root.js', 'export const activate = (path) => import(path);'],
++				]),
++				packs: new Map([['route', ['/build/root.js']]]),
++				symbols: {},
++			}),
++		).rejects.toThrow(/root\.js.*statically resolved/);
++	});
++
++	test('fails the build for a symbol with a missing export', async () => {
++		await expect(
++			emitPackedModules({
++				modules: new Map([['/build/root.js', 'export const value = 1;']]),
++				packs: new Map([['route', ['/build/root.js']]]),
++				symbols: { click: ['/build/root.js', 'absent'] },
++			}),
++		).rejects.toThrow(/click.*absent/);
++	});
++
++	test('fails the build for a symbol whose module was left out of delivery', async () => {
++		await expect(
++			emitPackedModules({
++				modules: new Map([['/build/root.js', 'export const value = 1;']]),
++				packs: new Map([['route', []]]),
++				symbols: { click: ['/build/root.js', 'value'] },
++			}),
++		).rejects.toThrow(/click.*delivery/);
++	});
++});
++
++function packedRegistry(context: object): PackedModuleRegistry {
++	return (context as Record<string, PackedModuleRegistry>)[PACKED_MODULE_REGISTRY_KEY]!;
++}
+diff --git a/packages/compiler/test/packed-symbol-resolver.test.ts b/packages/compiler/test/packed-symbol-resolver.test.ts
+new file mode 100644
+index 00000000..151aefe6
+--- /dev/null
++++ b/packages/compiler/test/packed-symbol-resolver.test.ts
+@@ -0,0 +1,84 @@
++import { describe, expect, test } from 'vitest';
++import { PACKED_MODULE_REGISTRY_KEY } from '@markless/serializer/protocol';
++import { emitSymbolResolverModule } from '../src/passes/symbol-resolver-module.ts';
++
++describe('packed symbol resolver', () => {
++	test('binds captured arguments synchronously through the registered base handler', async () => {
++		const source = emitSymbolResolverModule({
++			loading: 'registry',
++			symbols: [{ id: 'base', chunk: '/base.js', exportName: 'activate' }],
++			boundSymbols: [
++				{
++					id: 'bound',
++					baseSymbolId: 'base',
++					componentEdgePath: ['edge:button'],
++					ancestry: [
++						{
++							componentEdgeId: 'edge:button',
++							branchScopeIds: [],
++							keyedRepeatScopeIds: [],
++						},
++					],
++					captureSlots: [
++						{
++							slotId: 'label',
++							path: [],
++							route: {
++								kind: 'compiler-known-constant',
++								componentEdgeId: 'edge:button',
++								value: 'Save',
++							},
++						},
++					],
++				},
++			],
++		});
++		const globals = globalThis as unknown as Record<string, unknown>;
++		const previous = globals[PACKED_MODULE_REGISTRY_KEY];
++		globals[PACKED_MODULE_REGISTRY_KEY] = {
++			symbol(id: string) {
++				expect(id).toBe('base');
++				return (context: { capture: { read(id: string): unknown } }) =>
++					context.capture.read('label');
++			},
++		};
++		try {
++			const resolver = await import(`data:text/javascript,${encodeURIComponent(source)}`);
++			const handler = resolver.loadSymbol('bound');
++			expect(typeof handler).toBe('function');
++			expect(handler({})).toBe('Save');
++		} finally {
++			if (previous === undefined) delete globals[PACKED_MODULE_REGISTRY_KEY];
++			else globals[PACKED_MODULE_REGISTRY_KEY] = previous;
++		}
++	});
++
++	test('returns a registered handler synchronously without initializing other symbols', async () => {
++		const source = emitSymbolResolverModule({
++			loading: 'registry',
++			symbols: [
++				{ id: 'increment', chunk: '/counter.js', exportName: 'increment' },
++				{ id: 'reset', chunk: '/reset.js', exportName: 'reset' },
++			],
++		});
++		const loaded: string[] = [];
++		const handler = () => 42;
++		const globals = globalThis as unknown as Record<string, unknown>;
++		const previous = globals[PACKED_MODULE_REGISTRY_KEY];
++		globals[PACKED_MODULE_REGISTRY_KEY] = {
++			symbol(id: string) {
++				loaded.push(id);
++				return handler;
++			},
++		};
++		try {
++			const resolver = await import(`data:text/javascript,${encodeURIComponent(source)}`);
++			expect(loaded).toEqual([]);
++			expect(resolver.loadSymbol('increment')).toBe(handler);
++			expect(loaded).toEqual(['increment']);
++		} finally {
++			if (previous === undefined) delete globals[PACKED_MODULE_REGISTRY_KEY];
++			else globals[PACKED_MODULE_REGISTRY_KEY] = previous;
++		}
++	});
++});
+diff --git a/packages/router/test/vite/packed-assets.test.ts b/packages/router/test/vite/packed-assets.test.ts
+new file mode 100644
+index 00000000..5dc2a64b
+--- /dev/null
++++ b/packages/router/test/vite/packed-assets.test.ts
+@@ -0,0 +1,39 @@
++import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
++import { tmpdir } from 'node:os';
++import { join } from 'pathe';
++import { expect, test } from 'vitest';
++import { createClientAssetsManifest, readClientAssetsManifest, writeClientAssetsManifest } from '../../src/vite/client-assets-manifest.ts';
++import { createServerEntry } from '../../src/vite/runtime/create-server-entry.ts';
++
++test('persists ordered route pack URLs with the built client assets', async () => {
++	const directory = await mkdtemp(join(tmpdir(), 'markless-packed-assets-'));
++	try {
++		await mkdir(join(directory, 'build'));
++		for (const name of ['entry', 'runtime', 'route']) await writeFile(join(directory, 'build', `${name}.js`), '');
++		const manifest = createClientAssetsManifest({
++			base: '/', resumeEntry: '/build/entry.js', navigationEntry: '/build/entry.js',
++			routes: {
++				navigation: { 'pages/index.tsrx': [] }, ssr: { 'pages/index.tsrx': [] }, styles: { 'pages/index.tsrx': [] },
++				packs: { 'pages/index.tsrx': ['/build/runtime.js', '/build/route.js'] },
++			},
++		});
++		await writeClientAssetsManifest(directory, manifest);
++		expect((await readClientAssetsManifest(directory, '/')).routes.packs).toEqual({ 'pages/index.tsrx': ['/build/runtime.js', '/build/route.js'] });
++	} finally {
++		await rm(directory, { recursive: true, force: true });
++	}
++});
++
++test('the server places route packs in the head before a docs-style control', async () => {
++	const entry = createServerEntry({
++		documentModuleLoader: undefined,
++		pageModuleLoaders: { 'pages/index.tsrx': async () => ({ default: { renderSsr: () => ({ html: '<button>Open documentation menu</button>' }) } }) },
++		routeFileIds: ['/pages/index.tsrx'],
++		routeScriptPacks: { 'pages/index.tsrx': ['/build/runtime.js', '/build/route.js'] },
++	});
++	const html = await (await entry.fetch(new Request('https://docs.example/'))).text();
++	const head = html.slice(0, html.indexOf('</head>'));
++	const tags = '<script src="/build/runtime.js"></script><script src="/build/route.js"></script>';
++		expect(head).toContain(tags);
++		expect(html.indexOf(tags)).toBeLessThan(html.indexOf('<button>'));
++});
+diff --git a/packages/serializer/src/packed-modules.ts b/packages/serializer/src/packed-modules.ts
+new file mode 100644
+index 00000000..45fa517f
+--- /dev/null
++++ b/packages/serializer/src/packed-modules.ts
+@@ -0,0 +1,21 @@
++export const PACKED_MODULE_REGISTRY_KEY = '__markless_modules__';
++
++export function packedSymbolKey(scope: string, id: string): string {
++	return JSON.stringify([scope, id]);
++}
++
++export type PackedModuleExports = Record<string, unknown>;
++export type PackedModuleFactory = (
++	module: { exports: PackedModuleExports },
++	exports: PackedModuleExports,
++	require: (id: string) => PackedModuleExports,
++) => void;
++export type PackedSymbolRoute = readonly [moduleId: string, exportName: string];
++export type PackedModuleRegistry = {
++	register(
++		factories: Record<string, PackedModuleFactory>,
++		symbols: Record<string, PackedSymbolRoute>,
++	): void;
++	load(id: string): PackedModuleExports;
++	symbol(id: string, scope?: string): unknown;
++};
+diff --git a/packages/web/test/packed-delivery.test.ts b/packages/web/test/packed-delivery.test.ts
+new file mode 100644
+index 00000000..44e7cb6b
+--- /dev/null
++++ b/packages/web/test/packed-delivery.test.ts
+@@ -0,0 +1,85 @@
++import { parseSync } from 'rolldown/experimental';
++import { describe, expect, test } from 'vitest';
++import {
++	createInlineResumerSource,
++	createInlineResumerSelfWakeSource,
++	createInlineResumerOverlayPrimerSource,
++	createPrerenderInlineResumerSource,
++	createPrerenderSettleInlineResumerSource,
++} from '../src/inline/resumer.ts';
++import { assemblePrerenderPageParts, renderToString } from '../src/render-to-string.ts';
++
++describe('packed delivery HTML', () => {
++	test('prerendered pages place the same ordered scripts in their head fragment', async () => {
++		const output = { html: '<button>Open</button>' };
++		const parts = await assemblePrerenderPageParts({ renderSsr: () => output }, output, {
++			scriptPacks: ['/runtime.js', '/route.js'],
++		});
++		expect(parts.head).toBe(
++			'<script src="/runtime.js"></script><script src="/route.js"></script>',
++		);
++		expect(parts.container).toContain('<button>Open</button>');
++	});
++
++	test('emits ordered classic scripts before the container and suppresses module preloads', async () => {
++		const html = await renderToString(
++			{
++				renderSsr: () => ({ html: '<button>Open</button>' }),
++				modulePreloads: ['/old-handler.js'],
++			},
++			{
++				scriptPacks: ['/runtime.js', '/route.js'],
++				nonce: 'nonce',
++			},
++		);
++		expect(html).toMatch(
++			/^<script src="\/runtime\.js" nonce="nonce"><\/script><script src="\/route\.js" nonce="nonce"><\/script><div/,
++		);
++		expect(html).not.toContain('modulepreload');
++		expect(html).toContain('<button>Open</button>');
++	});
++
++	for (const [name, source] of [
++		[
++			'event',
++			() =>
++				createInlineResumerSource({
++					debug: false,
++					executionLog: 'never',
++					graphSyncPolicy: false,
++					sharedGraphPolicy: false,
++					syncPolicy: false,
++					loading: 'registry',
++				}),
++		],
++		['self-wake', () => createInlineResumerSelfWakeSource('/resume.js', 'registry')],
++		['overlay', () => createInlineResumerOverlayPrimerSource('/resume.js', 'registry')],
++		[
++			'prerender',
++			() =>
++				createPrerenderInlineResumerSource(['click'], '/resume.js', {
++					loading: 'registry',
++				}),
++		],
++		[
++			'settle',
++			() => createPrerenderSettleInlineResumerSource(['click'], '/resume.js', 'registry'),
++		],
++	] as const) {
++		test(`${name} boot has no import expression`, () => {
++			const parsed = parseSync('boot.js', source(), { sourceType: 'script' });
++			expect(parsed.errors).toEqual([]);
++			expect(importExpressions(parsed.program)).toBe(0);
++		});
++	}
++});
++
++function importExpressions(value: unknown): number {
++	if (!value || typeof value !== 'object') return 0;
++	if (Array.isArray(value)) return value.reduce((sum, item) => sum + importExpressions(item), 0);
++	const node = value as Record<string, unknown>;
++	return (
++		(node.type === 'ImportExpression' ? 1 : 0) +
++		Object.values(node).reduce<number>((sum, item) => sum + importExpressions(item), 0)
++	);
++}

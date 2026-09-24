@@ -19,5 +19,5 @@ export function Library({
 			<LibrarySong song={songThree} selected={songThree.active} onSelect={onSelectThree} />
 			<LibrarySong song={songFour} selected={songFour.active} onSelect={onSelectFour} />
 		</div>
-	</div>
+	</div>;
 }

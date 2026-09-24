@@ -7,6 +7,7 @@ import {
 	parseJavaScriptModule,
 	renderDataClaimManifest,
 } from '@markless/compiler';
+import { parseSync } from 'rolldown/experimental';
 import { invalidateAllGeneratedModules } from '../dev-invalidation.ts';
 import {
 	delegateLoadOptions,
@@ -22,9 +23,10 @@ import {
 	clientRouteArtifactReference,
 	isClientPrimarySourceRequest,
 	isResumeSourceRequest,
+	renderDataReachedFromQuery,
 } from '../virtual-ids.ts';
 import { sourceBarrelComponents, type LinkedTransformChildren } from './transform-link.ts';
-import type { TransformRequest } from './transform-request.ts';
+import { type TransformRequest, tracksSourcePublication } from './transform-request.ts';
 
 // A route artifact never ships its own module: the client imports the reference
 // the router resolves, so this request stops at registration.
@@ -61,11 +63,13 @@ export function registerFirstPassArtifacts(
 ) {
 	const { ctx, source, currentEnvironment, renderDataRequest, plan } = request;
 	const { internalOptions, dev, state } = ctx;
-	const { moduleMetadata, moduleLinkArtifacts } = state;
+	const { moduleMetadata } = state;
+	const moduleLinkArtifacts = state.moduleLinkArtifacts(currentEnvironment);
 	const { cacheKey, manifestSource } = plan;
 	if (!renderDataRequest) {
 		registerTransformArtifacts(state, {
 			owner: cacheKey,
+			root: ctx.getRoot(),
 			source,
 			manifestSource,
 			result: transformed,
@@ -96,17 +100,18 @@ export function registerFinalTransformArtifacts(
 	const { ctx, source, currentEnvironment, renderDataRequest, plan } = request;
 	const { internalOptions, dev, state } = ctx;
 	const { moduleMetadata } = state;
-	const { cacheKey, manifestSource, publishesClientClaims } = plan;
+	const { cacheKey, manifestSource } = plan;
 	if (!renderDataRequest)
 		registerTransformArtifacts(state, {
 			owner: cacheKey,
+			root: ctx.getRoot(),
 			source,
 			manifestSource,
 			result: transformed,
 			dev,
 			environment: currentEnvironment,
 			finalPublication: true,
-			tracksSourceClaimPublication: publishesClientClaims,
+			tracksSourceClaimPublication: tracksSourcePublication(request),
 			replaceOwnedArtifacts: true,
 			updateDevPrerenderHashes: internalOptions.updateDevPrerenderHashes,
 		});
@@ -125,10 +130,16 @@ export function recordLinkedTransform(
 	linkedTransformInput: TransformTsrxModuleInput,
 	linked: LinkedTransformChildren,
 ) {
-	const { ctx, code, source, plan } = request;
-	const { moduleMetadata, moduleLinkArtifacts, linkedTransformCache } = ctx.state;
+	const { ctx, code, source, plan, currentEnvironment } = request;
+	const { moduleMetadata, linkedTransformCache } = ctx.state;
+	const moduleLinkArtifacts = ctx.state.moduleLinkArtifacts(currentEnvironment);
 	const { cacheKey, manifestSource } = plan;
-	const { resolvedInterfaceImports, resolvedChildren, linkedChildHasBrowserTriggers } = linked;
+	const {
+		resolvedInterfaceImports,
+		resolvedChildren,
+		linkedChildHasBrowserTriggers,
+		unawaitedSources,
+	} = linked;
 	linkedTransformCache.set(cacheKey, {
 		source,
 		manifestSource,
@@ -141,6 +152,8 @@ export function recordLinkedTransform(
 			linkedInterfaceClaims(
 				mergeLinkedModuleChildren(resolvedInterfaceImports, resolvedChildren),
 				moduleMetadata,
+				currentEnvironment,
+				unawaitedSources,
 			),
 		).claimSignature,
 		input: linkedTransformInput,
@@ -190,12 +203,14 @@ export async function emitTransformResult(
 			if (nativeModules.length > 0)
 				registerTransformArtifacts(state, {
 					owner: cacheKey,
+					root: ctx.getRoot(),
 					source,
 					manifestSource,
 					result: { ...transformed, virtualModules: nativeModules },
 					dev,
 					environment: currentEnvironment,
-					finalPublication: false,
+					finalPublication: true,
+					recordSymbolClaims: false,
 					tracksSourceClaimPublication: false,
 				});
 			const styleModules = transformed.virtualModules.filter(
@@ -216,15 +231,31 @@ export async function emitTransformResult(
 				linkedModules: virtualModules.keys(),
 			});
 			throwIfRenderDataUnlinked(renderData);
-			return {
-				code: [
-					...renderData.styleModules.map(
-						(styleModule) => `import ${JSON.stringify(styleModule)};`,
-					),
-					renderDataModule.source,
-				].join('\n'),
-				map: null,
-			};
+			const styleImports = renderData.styleModules.map(
+				(styleModule) => `import ${JSON.stringify(styleModule)};`,
+			);
+			if (sharesCanonicalRenderData(request, renderDataModule)) {
+				registerTransformArtifacts(state, {
+					owner: cacheKey,
+					root: ctx.getRoot(),
+					source,
+					manifestSource,
+					result: { ...transformed, virtualModules: [renderDataModule] },
+					dev,
+					environment: currentEnvironment,
+					finalPublication: true,
+					recordSymbolClaims: false,
+					tracksSourceClaimPublication: false,
+				});
+				return {
+					code: [
+						...styleImports,
+						`export * from ${JSON.stringify(renderDataModule.id)};`,
+					].join('\n'),
+					map: null,
+				};
+			}
+			return { code: [...styleImports, renderDataModule.source].join('\n'), map: null };
 		}
 	}
 	for (const child of resolvedChildren) {
@@ -277,6 +308,13 @@ export async function emitTransformResult(
 			),
 		);
 		for (const module of transformed.virtualModules.filter((item) => {
+			if (
+				internalOptions.experimentalNativePacking &&
+				(item.type === 'symbol' ||
+					item.type === 'symbol-bundle' ||
+					item.type === 'resolver')
+			)
+				return false;
 			if (item.type === 'symbol') return !bundledSymbolModuleIds.has(item.id);
 			if (item.type === 'symbol-bundle') return true;
 			if (item.type === 'trigger-group') return true;
@@ -298,7 +336,9 @@ export async function emitTransformResult(
 			pluginContext.emitFile({
 				type: 'chunk',
 				id: module.id,
-				preserveSignature: 'strict',
+				preserveSignature: internalOptions.experimentalNativePacking
+					? 'allow-extension'
+					: 'strict',
 			});
 			if (module.type === 'resolver') {
 				emittedClientResolverSources.add(source);
@@ -307,6 +347,23 @@ export async function emitTransformResult(
 	}
 
 	return transformed;
+}
+
+// An unmaterialized render-data request is its source's canonical render-data module under a
+// second name; re-exporting it keeps a page that loads both from shipping the data twice.
+function sharesCanonicalRenderData(
+	request: TransformRequest,
+	renderDataModule: TransformTsrxModuleResult['virtualModules'][number],
+): boolean {
+	if (request.ctx.internalOptions.dev === true || request.materializedRenderDataReach)
+		return false;
+	if (renderDataReachedFromQuery(request.id) !== undefined) return false;
+	if (renderDataModule.type !== 'render-data' || renderDataModule.canonicalRenderData !== true)
+		return false;
+	const registered = request.ctx.state.virtualModules.get(renderDataModule.id);
+	return (
+		registered?.canonicalRenderData !== true || registered.source === renderDataModule.source
+	);
 }
 
 // Applies the `claim-manifest` route-artifact verdict: the pass decides whether
@@ -347,18 +404,8 @@ function renderDataNativeDependencies(
 	const modules = new Map(transformed.virtualModules.map((module) => [module.id, module]));
 	const selected = new Map<string, TransformTsrxModuleResult['virtualModules'][number]>();
 	const visit = (code: string) => {
-		const program = parseJavaScriptModule(code) as unknown as {
-			body: Array<{ type: string; source?: { value?: unknown } }>;
-		};
-		for (const statement of program.body) {
-			if (
-				statement.type !== 'ImportDeclaration' &&
-				statement.type !== 'ExportNamedDeclaration' &&
-				statement.type !== 'ExportAllDeclaration'
-			)
-				continue;
-			const id = statement.source?.value;
-			if (typeof id !== 'string' || selected.has(id)) continue;
+		for (const id of moduleSpecifiers(code)) {
+			if (selected.has(id)) continue;
 			const module = modules.get(id);
 			if (!module || (module.type !== 'symbol' && module.type !== 'symbol-bundle')) continue;
 			selected.set(id, module);
@@ -367,4 +414,47 @@ function renderDataNativeDependencies(
 	};
 	visit(source);
 	return [...selected.values()];
+}
+
+// Symbol modules recur across a source's render-data variants; scan each text once.
+const specifiersByCode = new Map<string, readonly string[]>();
+const SPECIFIERS_LIMIT = 2048;
+
+export function moduleSpecifiers(code: string): readonly string[] {
+	let specifiers = specifiersByCode.get(code);
+	if (specifiers) return specifiers;
+	specifiers = recordedModuleSpecifiers(code) ?? treeModuleSpecifiers(code);
+	if (specifiersByCode.size >= SPECIFIERS_LIMIT)
+		specifiersByCode.delete(specifiersByCode.keys().next().value!);
+	specifiersByCode.set(code, specifiers);
+	return specifiers;
+}
+
+// The parser's module record lists import and re-export sources without building the data literals' tree.
+function recordedModuleSpecifiers(code: string): string[] | undefined {
+	const { module, errors } = parseSync('module.js', code);
+	if (errors.length) return undefined;
+	const statements: Array<{ readonly start: number; readonly source: string }> = [];
+	for (const statement of module.staticImports)
+		statements.push({ start: statement.start, source: statement.moduleRequest.value });
+	for (const statement of module.staticExports) {
+		if (statement.entries.length === 0) return undefined;
+		const request = statement.entries[0]!.moduleRequest;
+		if (request) statements.push({ start: statement.start, source: request.value });
+	}
+	return statements.sort((a, b) => a.start - b.start).map((statement) => statement.source);
+}
+
+function treeModuleSpecifiers(code: string): string[] {
+	const program = parseJavaScriptModule(code) as unknown as {
+		body: Array<{ type: string; source?: { value?: unknown } }>;
+	};
+	return program.body.flatMap((statement) =>
+		(statement.type === 'ImportDeclaration' ||
+			statement.type === 'ExportNamedDeclaration' ||
+			statement.type === 'ExportAllDeclaration') &&
+		typeof statement.source?.value === 'string'
+			? [statement.source.value]
+			: [],
+	);
 }

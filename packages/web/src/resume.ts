@@ -106,8 +106,6 @@ function materializeAsyncBoundaryLocators(
 	if (boundaries.length === 0) return byId;
 	const comments = walkComments(root);
 	for (const boundary of boundaries) {
-		// CSR and prerender wake hand live comments in where a decoded payload
-		// carries a dom-order index; the nodeType check picks which field applies.
 		const start = boundary.startAnchor as typeof boundary.startAnchor & ResumeDomComment;
 		const end = boundary.endAnchor as typeof boundary.endAnchor & ResumeDomComment;
 		const live = start?.nodeType === 8 && end?.nodeType === 8;

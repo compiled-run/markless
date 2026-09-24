@@ -1,4 +1,4 @@
-import { asNodes, type AnyNode } from '../../ast/nodes.ts';
+import { asNodes, childNodes, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource } from '../../ast/source.ts';
 import type {
 	SemanticGraphAlias,
@@ -10,6 +10,11 @@ import {
 	resolveGraphPath,
 	semanticAliasMap,
 } from '../../artifact-helpers/graph-paths.ts';
+import {
+	rootBindsInsideRegion,
+	rootIdentifierOffset,
+	resolvedSymbolAt,
+} from './collect-expressions.ts';
 import { repeatRowBindsName } from './collect-repeat.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import type { WalkState } from './types.ts';
@@ -60,6 +65,9 @@ export function isCompositeTemplateExpression(
 		node.type === 'BinaryExpression' ||
 		node.type === 'LogicalExpression' ||
 		node.type === 'TemplateLiteral' ||
+		(node.type === 'MemberExpression' &&
+			node.computed === true &&
+			!isLiteralExpression(node.property as AnyNode | undefined)) ||
 		(options.methodCalls === true && isMethodCallExpression(node)) ||
 		// `delete` mutates rather than reads; the read collector already refuses it,
 		// so an operator that is not a pure value still reaches the loud refusal.
@@ -90,7 +98,7 @@ export function pureCompositeReadSources(
 		// `undefined` is an Identifier to the parser but a value here, like false
 		// or null; reporting it as a read source kills the computed mint.
 		const source = expressionSource(node, state.source);
-		return source === 'undefined' ? [] : [source];
+		return source === 'undefined' || readsModuleValue(node, source, state) ? [] : [source];
 	}
 	if (node.type === 'MemberExpression') return memberReadSources(node, state);
 	if (node.type === 'CallExpression') {
@@ -144,12 +152,38 @@ function methodCallReadSources(
 
 function memberReadSources(node: AnyNode, state: WalkState): ReadonlyArray<string> | null {
 	if (node.computed === true && !isLiteralExpression(node.property as AnyNode | undefined)) {
-		return null;
+		// `LABELS[tone]` over a module value reads only its key.
+		const object = node.object as AnyNode;
+		const objectSource = expressionSource(object, state.source);
+		if (object?.type !== 'Identifier' || !objectSource || !readsModuleValue(object, objectSource, state))
+			return null;
+		return pureCompositeReadSources(node.property as AnyNode, state);
 	}
 	const object = node.object as AnyNode | undefined;
 	if (object?.type === 'CallExpression' || object?.type === 'NewExpression') return null;
 	const source = expressionSource(node, state.source);
-	return source ? [source] : null;
+	if (!source) return null;
+	return readsModuleValue(node, source, state) ? [] : [source];
+}
+
+// A module binding or a global is the same value for every render: the derive
+// symbol imports it, and no write moves it. Graph bindings declared at module
+// scope - a `shared()` definition - still resolve as reads.
+function readsModuleValue(node: AnyNode, source: string, state: WalkState): boolean {
+	const offset = rootIdentifierOffset(node, state.source);
+	if (offset === null) return false;
+	const semantic = state.semantic();
+	const symbolId = resolvedSymbolAt(semantic, offset);
+	if (symbolId !== null && semantic.scope.kind(semantic.symbol.scopeId(symbolId)) !== 'module')
+		return false;
+	if (repeatRowBindsName(source, state)) return false;
+	return (
+		!resolveGraphPath(
+			source,
+			graphBindingMap(state.graph, state.currentSharedDefinitionId),
+			semanticAliasMap(state.graph, state.currentSharedDefinitionId),
+		) && !resolveSharedInstanceGraphPath(source, state.graph, state.currentComponentName)
+	);
 }
 
 export function joinReadSources(
@@ -205,6 +239,8 @@ export function mintTemplateExpressionComputed(
 	state: WalkState,
 	requireWritableRead = false,
 	scope?: GraphReadScope,
+	// A collection lifted for its row handlers is a graph node even when nothing moves it.
+	allowConstant = false,
 ): { readonly graphNodeId: string } | null {
 	const bindings = scope?.bindings ?? graphBindingMap(state.graph, state.currentSharedDefinitionId);
 	const aliases = scope?.aliases ?? semanticAliasMap(state.graph, state.currentSharedDefinitionId);
@@ -230,7 +266,7 @@ export function mintTemplateExpressionComputed(
 		if (resolved.binding.kind !== 'prop') readsGraphCell = true;
 		dependencies.push({ source, graphNodeId: resolved.binding.id, path: resolved.path });
 	}
-	if (dependencies.length === 0) return null;
+	if (dependencies.length === 0 && !allowConstant) return null;
 	// No write can move a prop after the render that read it, so props-only owes no record.
 	if (requireWritableRead && !readsGraphCell) return null;
 
@@ -282,4 +318,43 @@ function uniqueDependencies(
 		unique.push(dependency);
 	}
 	return unique;
+}
+
+/**
+ * True when an expression reads a state cell or a computed value but no reactive
+ * route was built for it: rendered once, it would never move again.
+ */
+export function readsUnroutedGraphCell(
+	expression: AnyNode,
+	state: WalkState,
+	scope: GraphReadScope,
+	options: CompositeReadOptions = { methodCalls: true },
+	// Bare names count too; a component prop has only ever refused on member paths.
+	identifiers = false,
+): boolean {
+	const readSources = pureCompositeReadSources(expression, state, options);
+	if (readSources) return readsWritableGraphCell(readSources, state, scope);
+	const region =
+		typeof expression.start === 'number' && typeof expression.end === 'number'
+			? { start: expression.start, end: expression.end }
+			: null;
+	const sources: string[] = [];
+	const visit = (node: AnyNode, parent: AnyNode | null): void => {
+		const isName =
+			parent &&
+			((parent.type === 'MemberExpression' && parent.property === node && parent.computed !== true) ||
+				((parent.type === 'Property' || parent.type === 'ObjectProperty') &&
+					parent.key === node &&
+					parent.computed !== true));
+		if (
+			!isName &&
+			(node.type === 'MemberExpression' || (identifiers && node.type === 'Identifier'))
+		) {
+			if (!rootBindsInsideRegion(node, state, region))
+				sources.push(expressionSource(node, state.source));
+		}
+		for (const child of childNodes(node)) visit(child, node);
+	};
+	visit(expression, null);
+	return readsWritableGraphCell(sources, state, scope);
 }

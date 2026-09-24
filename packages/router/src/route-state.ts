@@ -1,6 +1,8 @@
 import type { PageProps } from './index.ts';
 
 export const MARKLESS_ROUTER_ROUTE_EVENT = 'marklessrouternavigate';
+// Dispatched on the document once a navigated route committed to the DOM.
+export const MARKLESS_ROUTER_RENDERED_EVENT = 'marklessrouterrendered';
 
 // Set on the document by startRouteUpdateRenderer: navigation code awaits the
 // renderer's onRendered callback only when a renderer is actually listening.

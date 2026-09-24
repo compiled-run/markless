@@ -1,0 +1,25 @@
+{
+  "name": "bench-interaction-sveltekit",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "packageManager": "pnpm@10.33.2",
+  "scripts": {
+    "sync": "node ../../shared/sync.mjs . src/lib/shared",
+    "sync:check": "node ../../shared/sync.mjs . src/lib/shared --check",
+    "build": "pnpm run sync:check && vite build",
+    "preview": "vite preview --port 4470 --strictPort --host 127.0.0.1",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "smoke": "node scripts/smoke.mjs",
+    "bytes": "node scripts/bytes.mjs"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-vercel": "6.3.4",
+    "@sveltejs/kit": "2.70.3",
+    "@sveltejs/vite-plugin-svelte": "7.3.0",
+    "svelte": "5.57.1",
+    "svelte-check": "4.7.6",
+    "typescript": "6.0.3",
+    "vite": "8.3.0"
+  }
+}

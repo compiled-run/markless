@@ -1,0 +1,31 @@
+{
+  "name": "bench-interaction-solidstart",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev --port 4460",
+    "build": "node ../../shared/sync.mjs . src/shared --check && vite build",
+    "start": "PORT=4461 node .output/server/index.mjs",
+    "preview": "vite preview --port 4462",
+    "typecheck": "tsc --noEmit",
+    "smoke": "node scripts/smoke.mjs",
+    "sync": "node ../../shared/sync.mjs . src/shared"
+  },
+  "dependencies": {
+    "@solidjs/meta": "1.0.0-next.2",
+    "@solidjs/router": "2.0.0-next.26",
+    "@solidjs/web": "2.0.0-rc.9",
+    "solid-js": "2.0.0-rc.9"
+  },
+  "devDependencies": {
+    "@solidjs/vite-plugin": "3.0.0-next.44",
+    "filesystem-routing": "0.3.1",
+    "nitro": "3.0.260903-beta",
+    "typescript": "5.9.3",
+    "vite": "8.3.0"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@10.33.2"
+}

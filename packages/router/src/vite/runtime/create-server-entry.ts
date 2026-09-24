@@ -1,5 +1,10 @@
 import type { PageProps } from '../../index.ts';
-import { LINK_ATTRIBUTE, REPLACE_ATTRIBUTE, SCROLL_ATTRIBUTE } from '../../link-attributes.ts';
+import {
+	LINK_ATTRIBUTE,
+	PREFETCH_ATTRIBUTE,
+	REPLACE_ATTRIBUTE,
+	SCROLL_ATTRIBUTE,
+} from '../../link-attributes.ts';
 import { ROUTE_SCRIPT_TYPE } from '../../route-dom.ts';
 import {
 	buildRouteManifestFromFileIds,
@@ -18,10 +23,17 @@ import {
 	renderMarklessDevErrorDocument,
 } from '@markless/bundler/dev-error';
 import { __marklessDebugBootstrapSource } from '../../../../web/src/debug-channel.ts';
+import {
+	appendModulePreloads,
+	listenForLinkIntent,
+	startViewportPrefetch,
+} from '../link-intent.ts';
 
 export interface ServerEntryOptions {
 	readonly dev?: boolean;
 	readonly navigationEntryPath?: string;
+	// 'viewport' adds to 'intent': once the page is idle, links on screen download (never run) their destination's navigation plan.
+	readonly linkPreloading?: 'render' | 'intent' | 'viewport';
 	readonly resumeEntryPath?: string;
 	readonly prerenderWakeEntryPath?: string;
 	readonly routeModulePreloads?: Record<string, readonly ModulePreloadInput[]>;
@@ -29,7 +41,11 @@ export interface ServerEntryOptions {
 	readonly routeStylesheets?: Record<string, readonly string[]>;
 	// The document shell's scoped CSS, linked on every route ahead of the route's own.
 	readonly documentStylesheets?: readonly string[];
+	// `<script type="importmap">` resolving the chunk specifiers built chunks import each other by.
+	readonly importMap?: string;
 	readonly documentModuleLoader: (() => Promise<unknown>) | undefined;
+	// 'document' when document.tsrx renders from the request URL: Links then load a fresh document.
+	readonly documentNavigation?: 'client' | 'document';
 	readonly pageModuleLoaders: Record<string, () => Promise<unknown>>;
 	readonly routeFileIds: readonly string[];
 	// Out-of-order streaming IS the default (owner ruling 2026-07-07): pages
@@ -187,6 +203,13 @@ export function createServerEntry(options: ServerEntryOptions) {
 			const message = `Page module must export an Markless compiled artifact: ${escapeHtml(file)}`;
 			return new Response(fillDocumentChildren(shell, message), { status, headers });
 		}
+		const documentLoads = options.documentNavigation === 'document';
+		const linkIntent =
+			options.linkPreloading === 'intent' || options.linkPreloading === 'viewport';
+		// A full document load runs the destination's SSR preloads, not its client-navigation modules.
+		const destinationPreloads = documentLoads
+			? options.routeSsrModulePreloads
+			: options.routeModulePreloads;
 		const pageArtifact = routedPageArtifact(
 			renderSsr,
 			baseArtifact,
@@ -195,6 +218,12 @@ export function createServerEntry(options: ServerEntryOptions) {
 			options.navigationEntryPath,
 			pageStylesheets(options, file),
 			documentModule?.default?.headInjections ?? [],
+			linkIntent
+				? (html: string) =>
+						linkIntentPreloads(html, pageProps.url.href, manifest, destinationPreloads)
+				: undefined,
+			documentLoads,
+			options.linkPreloading === 'viewport',
 		);
 		const routedArtifact = options.prerenderWakeEntryPath
 			? { ...pageArtifact, prerenderWakeModuleUrl: options.prerenderWakeEntryPath }
@@ -209,7 +238,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 					html,
 					pageProps.url.href,
 					manifest,
-					options.routeModulePreloads,
+					linkIntent || documentLoads ? undefined : options.routeModulePreloads,
 					options.routeSsrModulePreloads,
 				),
 		};
@@ -219,7 +248,12 @@ export function createServerEntry(options: ServerEntryOptions) {
 			const pageHtml = splitLeadingHeadHtml(
 				await renderToString(routedArtifact as never, renderOptions),
 			);
-			const shell = await renderDocumentShell(documentModule, pageProps, pageHtml.headHtml);
+			const shell = await renderDocumentShell(
+				documentModule,
+				pageProps,
+				pageHtml.headHtml,
+				options.importMap,
+			);
 			return new Response(fillDocumentChildren(shell, pageHtml.bodyHtml), {
 				status,
 				headers,
@@ -232,7 +266,12 @@ export function createServerEntry(options: ServerEntryOptions) {
 		// same open response.
 		const stream = await renderToStream(routedArtifact as never, renderOptions);
 		const pageHtml = splitLeadingHeadHtml(stream.shell);
-		const shell = await renderDocumentShell(documentModule, pageProps, pageHtml.headHtml);
+		const shell = await renderDocumentShell(
+			documentModule,
+			pageProps,
+			pageHtml.headHtml,
+			options.importMap,
+		);
 		if (stream.pendingArmCount === 0) {
 			return new Response(fillDocumentChildren(shell, pageHtml.bodyHtml), {
 				status,
@@ -349,18 +388,19 @@ function routedPageArtifact(
 	navigationEntryPath: string | undefined,
 	stylesheetHrefs: readonly string[] | undefined,
 	documentHeadInjections: ReadonlyArray<RenderHeadInjection> = [],
+	intentPreloads?: (html: string) => Record<string, readonly ModulePreloadInput[]>,
+	documentLoads = false,
+	visiblePrefetch = false,
 ) {
 	// The document's own injections (dev links its scoped-style closure there) come first: the shell's CSS precedes the page's.
 	const headInjections = dedupeHeadLinks([
 		...documentHeadInjections,
 		...(baseArtifact?.headInjections ?? []),
-		...(stylesheetHrefs ?? []).map(
-			(href): RenderHeadInjection => ({
-				tag: 'link',
-				location: 'head',
-				attributes: { rel: 'stylesheet', href },
-			}),
-		),
+		...(stylesheetHrefs ?? []).map((href): RenderHeadInjection => ({
+			tag: 'link',
+			location: 'head',
+			attributes: { rel: 'stylesheet', href },
+		})),
 	]);
 	return {
 		resumeModuleUrl: baseArtifact?.resumeModuleUrl,
@@ -377,7 +417,13 @@ function routedPageArtifact(
 			// runtime only on Link/'#/' anchor interaction, or at load when a
 			// '#/' deep-link hash is actually present. No eager imports, no modes.
 			const linkBridge = navigationEntryPath
-				? renderLinkBridgeScript(navigationEntryPath)
+				? renderLinkBridgeScript(
+						navigationEntryPath,
+						intentPreloads?.(output.html),
+						documentLoads,
+						visiblePrefetch,
+						output.html.includes(`${PREFETCH_ATTRIBUTE}="viewport"`),
+					)
 				: '';
 			const stateWithProps = withPagePropsCell(output.state, pageProps);
 			return routeScript || linkBridge || stateWithProps !== output.state
@@ -445,6 +491,22 @@ function routerLinkHrefs(html: string): string[] {
 	].map((match) => unescapeHtmlAttribute(match[1] ?? ''));
 }
 
+function linkIntentPreloads(
+	html: string,
+	baseHref: string,
+	manifest: ReturnType<typeof buildRouteManifestFromFileIds>,
+	routes: ServerEntryOptions['routeModulePreloads'],
+): Record<string, readonly ModulePreloadInput[]> {
+	const destinations: Record<string, readonly ModulePreloadInput[]> = Object.create(null);
+	for (const href of routerLinkHrefs(html)) {
+		const url = parseSameOriginUrl(href, baseHref);
+		const match = url && matchRouteManifest(url.pathname, manifest);
+		const preloads = match && routes?.[match.route.file];
+		if (url && preloads?.length) destinations[url.pathname] = preloads;
+	}
+	return destinations;
+}
+
 function parseSameOriginUrl(href: string, base: string): URL | undefined {
 	try {
 		const current = new URL(base);
@@ -492,6 +554,7 @@ async function renderDocumentShell(
 	documentModule: DocumentModule | undefined,
 	pageProps: PageComponentProps,
 	headHtml: string,
+	importMap = '',
 ): Promise<string> {
 	const attributes = htmlAttributes(documentModule, pageProps);
 	const documentHtml = await renderDocumentModule(documentModule, {
@@ -502,7 +565,7 @@ async function renderDocumentShell(
 		return [
 			'<!doctype html>',
 			`<html${renderAttributes(attributes)}>`,
-			insertHeadHtml(documentHtml, headHtml),
+			insertImportMap(insertHeadHtml(documentHtml, headHtml), importMap),
 			'</html>',
 		].join('');
 	}
@@ -512,6 +575,7 @@ async function renderDocumentShell(
 		`<html${renderAttributes(attributes)}>`,
 		'<head>',
 		'<meta charset="utf-8">',
+		importMap,
 		'<meta name="viewport" content="width=device-width, initial-scale=1">',
 		headHtml,
 		'</head>',
@@ -572,7 +636,26 @@ function renderRouteScript(file: string): string {
 	return `<script type="${ROUTE_SCRIPT_TYPE}">${escapeScriptJson({ file })}</script>`;
 }
 
-function renderLinkBridgeScript(resumeEntryPath: string): string {
+function renderLinkBridgeScript(
+	resumeEntryPath: string,
+	intentPreloads?: Record<string, readonly ModulePreloadInput[]>,
+	documentLoads = false,
+	visiblePrefetch = false,
+	perLinkViewport = false,
+): string {
+	const visibleSource =
+		visiblePrefetch || perLinkViewport
+			? `
+	(${startViewportPrefetch.toString()})(d, linkAttr, prefetchAttr, ${visiblePrefetch}, (url) => destinations[url.pathname]);`
+			: '';
+	const intentSource = intentPreloads
+		? `
+	const destinations = ${escapeScriptJson(intentPreloads)};
+	const append = (${appendModulePreloads.toString()});
+	(${listenForLinkIntent.toString()})(d, linkAttr, (url) => {
+		append(d, destinations[url.pathname]);
+	}, prefetchAttr);${visibleSource}`
+		: '';
 	const debugBootstrap =
 		typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
 			? `<script data-markless-router-debug-bootstrap>${escapeInlineScript(`(() => {
@@ -596,11 +679,13 @@ function renderLinkBridgeScript(resumeEntryPath: string): string {
 	const d = document;
 	const s = d.currentScript;
 	const r = s && s.closest('[data-async-container]');
-	if (!r || r.__marklessRouterLinkResumerStarted) return;
-	r.__marklessRouterLinkResumerStarted = true;
+	if (!r || d.__marklessRouterLinkResumerStarted) return;
+	d.__marklessRouterLinkResumerStarted = true;
 	const linkAttr = ${JSON.stringify(LINK_ATTRIBUTE)};
+	const prefetchAttr = ${JSON.stringify(PREFETCH_ATTRIBUTE)};
 	const replaceAttr = ${JSON.stringify(REPLACE_ATTRIBUTE)};
 	const scrollAttr = ${JSON.stringify(SCROLL_ATTRIBUTE)};
+	const documentLoads = ${documentLoads};${intentSource}
 	const anchorFrom = (event) => {
 		const target = event.composedPath && event.composedPath()[0] || event.target;
 		return target && target.closest ? target.closest('a[href]') : target && target.parentElement && target.parentElement.closest ? target.parentElement.closest('a[href]') : null;
@@ -616,7 +701,7 @@ function renderLinkBridgeScript(resumeEntryPath: string): string {
 	if (location.hash && location.hash.startsWith('#/')) {
 		import(${JSON.stringify(resumeEntryPath)}).catch(() => {});
 	}
-	r.addEventListener('click', async (event) => {
+	d.addEventListener('click', async (event) => {
 		if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.altKey || event.ctrlKey || event.shiftKey) return;
 		const anchor = anchorFrom(event);
 		if (!anchor || !anchor.hasAttribute(linkAttr) || anchor.hasAttribute('download')) return;
@@ -624,7 +709,7 @@ function renderLinkBridgeScript(resumeEntryPath: string): string {
 		if (target && target !== '_self') return;
 		if (anchor.relList && anchor.relList.contains('external')) return;
 		const url = sameOrigin(anchor.href);
-		if (!url) return;
+		if (!url || (documentLoads && !url.hash.startsWith('#/'))) return;
 		event.preventDefault();
 		try {
 			const mod = await import(${JSON.stringify(resumeEntryPath)});
@@ -687,4 +772,19 @@ function escapeInlineScript(value: string): string {
 
 function isNitroApiPathname(pathname: string) {
 	return pathname === '/api' || pathname.startsWith('/api/');
+}
+
+// Ahead of every module script and modulepreload, after <meta charset> so the charset stays in the first 1024 bytes.
+function insertImportMap(html: string, importMap: string): string {
+	if (!importMap) return html;
+	const head = /<head(?:\s[^>]*)?>/i.exec(html);
+	if (!head) return `${importMap}${html}`;
+	const afterHead = head.index + head[0].length;
+	const headEnd = html.indexOf('</head>', afterHead);
+	const charset = /<meta\s[^>]*charset[^>]*>(?:<\/meta>)?/i.exec(html.slice(afterHead));
+	const at =
+		charset && (headEnd === -1 || afterHead + charset.index < headEnd)
+			? afterHead + charset.index + charset[0].length
+			: afterHead;
+	return `${html.slice(0, at)}${importMap}${html.slice(at)}`;
 }

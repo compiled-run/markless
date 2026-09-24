@@ -30,6 +30,7 @@ const ARRIVAL = '[data-harbor-arrival]';
 const LOG_BUTTON = '[data-harbor-log]';
 const TALLY = '[data-harbor-logged]';
 const MIN_SETTLE_GAP_MS = 150;
+const BUFFERED_DOCUMENT_PATH = '/harbor-buffered';
 
 export default box(
 	{
@@ -127,7 +128,7 @@ export default box(
 			// (6) Graceful degradation: the fully buffered document (as a
 			// buffering proxy would deliver it) still renders settled content —
 			// the executor commits on parse.
-			const buffered = await serveBufferedCopy(text);
+			const buffered = await serveBufferedCopy(text, new URL(preview.url));
 			try {
 				const bufferedPage = await preview.browser.visit(buffered.url);
 				await expect.page.text(bufferedPage, ARRIVAL, 'Petrel at berth 7Log arrival', WAIT);
@@ -135,6 +136,11 @@ export default box(
 				if (bufferedDom.includes('data-harbor-waiting')) {
 					throw new Error('Buffered streamed document must still show settled content.');
 				}
+				await expect.page.outcome(
+					bufferedPage,
+					{ consoleErrors: 0, failedRequests: 0 },
+					WAIT,
+				);
 				receipt.note(
 					'buffered single-write copy rendered settled content (executor commits on parse)',
 				);
@@ -447,12 +453,26 @@ async function serveRevealTrainPage(): Promise<{ url: string; close: () => void 
 	};
 }
 
-// A one-route static server delivering the captured document in a single
-// write: exactly what a buffering proxy in front of the app would serve.
-async function serveBufferedCopy(text: string): Promise<{ url: string; close: () => void }> {
-	const server = createServer((_request, response) => {
-		response.writeHead(200, { 'content-type': 'text/html;charset=utf-8' });
-		response.end(text);
+// A buffering proxy in front of the app: the captured document arrives in a
+// single write, every other request passes through to the app unchanged.
+async function serveBufferedCopy(
+	text: string,
+	app: URL,
+): Promise<{ url: string; close: () => void }> {
+	const server = createServer((request, response) => {
+		if (request.url === BUFFERED_DOCUMENT_PATH) {
+			response.writeHead(200, { 'content-type': 'text/html;charset=utf-8' });
+			response.end(text);
+			return;
+		}
+		void (async () => {
+			const upstream = await fetch(new URL(request.url ?? '/', app));
+			const contentType = upstream.headers.get('content-type');
+			response.writeHead(upstream.status, contentType ? { 'content-type': contentType } : {});
+			response.end(Buffer.from(await upstream.arrayBuffer()));
+		})().catch((error: unknown) => {
+			response.destroy(error instanceof Error ? error : new Error(String(error)));
+		});
 	});
 	await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
 	const address = server.address();
@@ -460,7 +480,7 @@ async function serveBufferedCopy(text: string): Promise<{ url: string; close: ()
 		throw new Error('Buffered-copy server did not report a port.');
 	}
 	return {
-		url: `http://127.0.0.1:${String(address.port)}/harbor-buffered`,
+		url: `http://127.0.0.1:${String(address.port)}${BUFFERED_DOCUMENT_PATH}`,
 		close: () => server.close(),
 	};
 }

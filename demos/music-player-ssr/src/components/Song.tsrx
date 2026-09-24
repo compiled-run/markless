@@ -21,5 +21,5 @@ export function Song({ currentSong, isPlaying, playerCommand, playerCommandVersi
 		</div>
 		<h2 class="song-title">{currentSong.name}</h2>
 		<h3 class="song-artist">{currentSong.artist}</h3>
-	</div>
+	</div>;
 }

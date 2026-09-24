@@ -1,4 +1,4 @@
-import {launch,session,observe,save,sleep,read,url} from './common.mjs';
+import {launch,observe,save,sleep,read,url} from './common.mjs';
 import {resolve} from 'node:path';
 const browser=await launch();const rows=[],modals=[];
 for(let repeat=0;repeat<3;repeat++){

@@ -81,10 +81,11 @@ export function markComputedDirty(input: {
 	else input.dirtyPaths.push({ graphNodeId: input.graphNodeId, path: [] });
 
 	for (const dependent of input.computedNodes.values()) {
+		if (!dependent.compute) continue;
 		const dirty = dependent.dependencies.some(
 			(dependency) => dependency.graphNodeId === input.graphNodeId,
 		);
-		if (dirty && dependent.compute) {
+		if (dirty) {
 			markComputedDirty({
 				...input,
 				graphNodeId: dependent.graphNodeId,
@@ -110,12 +111,13 @@ export function markDirtyComputedDependencies(input: {
 	readonly invalidateAsyncComputed: (node: RuntimeAsyncComputedNode) => void;
 }): void {
 	for (const computed of input.computedNodes.values()) {
+		if (!computed.compute) continue;
 		const dirty = computed.dependencies.some(
 			(dependency) =>
 				dependency.graphNodeId === input.graphNodeId &&
 				pathsIntersect(input.path, dependency.path ?? []),
 		);
-		if (dirty && computed.compute) {
+		if (dirty) {
 			markComputedDirty({
 				...input,
 				graphNodeId: computed.graphNodeId,

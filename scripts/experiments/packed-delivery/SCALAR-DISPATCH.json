@@ -1,0 +1,635 @@
+{
+  "status": "measured candidate; goal incomplete; fixture byte gates remain red",
+  "sourcePaths": {
+    "before": "/private/tmp/markless-docs-cold-4b83lW/results.json",
+    "after": "/private/tmp/markless-docs-cold-D5PaDN/results.json",
+    "coverage": "/private/tmp/markless-docs-execution-rcJrc5/results.json",
+    "attribution": "/private/tmp/markless-scalar-final-attribution.json",
+    "navigation": "/private/tmp/markless-docs-navigation-rwW3YR/results.json"
+  },
+  "output": "/private/tmp/markless-docs-scalar-verified-Ybhwa3/.output",
+  "preview": "http://localhost:3000/markless/concepts/state",
+  "protocol": {
+    "samplesPerConditionPerBuild": 10,
+    "sequence": "previous build then candidate; not randomized or interleaved",
+    "cache": "fresh Chrome context and CDP cache disabled",
+    "serviceWorkers": "blocked",
+    "transport": "same local HTTP/1.1 proxy with Brotli quality 5 for JS and streamed HTML",
+    "constrained": {
+      "latencyMs": 150,
+      "downloadBytesPerSecond": 625000,
+      "uploadBytesPerSecond": 125000,
+      "cpuSlowdown": 4
+    },
+    "metric": "trusted click event to expected DOM mutation, not paint",
+    "threshold": "max(10 ms, 10% prior median, 2x larger MAD)",
+    "profiling": "separate runs; no coverage or CPU instrumentation in timing visits",
+    "limitations": [
+      "ordinary developer laptop with other apps open",
+      "normal and repeated-action changes did not clear the threshold",
+      "network transfers remained pending at some constrained first clicks",
+      "module initializer counts are not CPU time or total executed bytes"
+    ]
+  },
+  "conditions": [
+    {
+      "condition": "normal",
+      "before": {
+        "first": {
+          "samples": 10,
+          "medianMs": 36.050000071525574,
+          "madMs": 1,
+          "minMs": 30.700000047683716,
+          "maxMs": 39
+        },
+        "second": {
+          "samples": 10,
+          "medianMs": 15.75,
+          "madMs": 0.6499999761581421,
+          "minMs": 13.399999856948853,
+          "maxMs": 17.40000009536743
+        },
+        "third": {
+          "samples": 10,
+          "medianMs": 14.350000023841858,
+          "madMs": 0.34999990463256836,
+          "minMs": 13.5,
+          "maxMs": 16.299999952316284
+        },
+        "frameworkRequests": [
+          5
+        ],
+        "firstActionsWithPendingScript": 0,
+        "httpCacheHits": 0,
+        "newFrameworkRequestsAfterClicks": 0,
+        "failures": []
+      },
+      "after": {
+        "first": {
+          "samples": 10,
+          "medianMs": 33.199999928474426,
+          "madMs": 0.5000001192092896,
+          "minMs": 31.700000047683716,
+          "maxMs": 35.09999990463257
+        },
+        "second": {
+          "samples": 10,
+          "medianMs": 14.850000023841858,
+          "madMs": 0.8000000715255737,
+          "minMs": 13.700000047683716,
+          "maxMs": 16.600000143051147
+        },
+        "third": {
+          "samples": 10,
+          "medianMs": 14.600000023841858,
+          "madMs": 0.8000000715255737,
+          "minMs": 13,
+          "maxMs": 17.300000190734863
+        },
+        "frameworkRequests": [
+          5
+        ],
+        "firstActionsWithPendingScript": 0,
+        "httpCacheHits": 0,
+        "newFrameworkRequestsAfterClicks": 0,
+        "failures": []
+      },
+      "thresholdMs": 10,
+      "improvementMs": 2.8500001430511475,
+      "meaningful": false
+    },
+    {
+      "condition": "constrained",
+      "before": {
+        "first": {
+          "samples": 10,
+          "medianMs": 94.50000011920929,
+          "madMs": 0.7499998807907104,
+          "minMs": 92.40000009536743,
+          "maxMs": 101.79999995231628
+        },
+        "second": {
+          "samples": 10,
+          "medianMs": 11.800000071525574,
+          "madMs": 0.45000016689300537,
+          "minMs": 9.5,
+          "maxMs": 13.599999904632568
+        },
+        "third": {
+          "samples": 10,
+          "medianMs": 13.649999976158142,
+          "madMs": 0.5,
+          "minMs": 11.099999904632568,
+          "maxMs": 14.700000047683716
+        },
+        "frameworkRequests": [
+          5
+        ],
+        "firstActionsWithPendingScript": 8,
+        "httpCacheHits": 0,
+        "newFrameworkRequestsAfterClicks": 0,
+        "failures": []
+      },
+      "after": {
+        "first": {
+          "samples": 10,
+          "medianMs": 75.95000004768372,
+          "madMs": 2.549999952316284,
+          "minMs": 43.40000009536743,
+          "maxMs": 79
+        },
+        "second": {
+          "samples": 10,
+          "medianMs": 11.700000047683716,
+          "madMs": 1,
+          "minMs": 8.200000047683716,
+          "maxMs": 13.900000095367432
+        },
+        "third": {
+          "samples": 10,
+          "medianMs": 12.25,
+          "madMs": 1.9499999284744263,
+          "minMs": 9,
+          "maxMs": 17.399999856948853
+        },
+        "frameworkRequests": [
+          5
+        ],
+        "firstActionsWithPendingScript": 9,
+        "httpCacheHits": 0,
+        "newFrameworkRequestsAfterClicks": 0,
+        "failures": []
+      },
+      "thresholdMs": 10,
+      "improvementMs": 18.550000071525574,
+      "meaningful": true
+    }
+  ],
+  "coverage": [
+    {
+      "test": "state-counter",
+      "sample": 0,
+      "phases": [
+        {
+          "name": "before-input",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "first-action",
+          "moduleInitializers": 15,
+          "exportDeclarationBytes": 98790
+        },
+        {
+          "name": "repeat-1",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "repeat-2",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "state-independent-controls",
+      "sample": 0,
+      "phases": [
+        {
+          "name": "before-input",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "first-action",
+          "moduleInitializers": 15,
+          "exportDeclarationBytes": 98790
+        },
+        {
+          "name": "second-control",
+          "moduleInitializers": 3,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "return-first",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "repeat-second",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "computed-total",
+      "sample": 0,
+      "phases": [
+        {
+          "name": "before-input",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "first-action",
+          "moduleInitializers": 56,
+          "exportDeclarationBytes": 98251
+        },
+        {
+          "name": "repeat-1",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "repeat-2",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "mode-select",
+      "sample": 0,
+      "phases": [
+        {
+          "name": "before-input",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "first-action",
+          "moduleInitializers": 72,
+          "exportDeclarationBytes": 104646
+        },
+        {
+          "name": "repeat-1",
+          "moduleInitializers": 1,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "repeat-2",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "accordion",
+      "sample": 0,
+      "phases": [
+        {
+          "name": "before-input",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "first-action",
+          "moduleInitializers": 117,
+          "exportDeclarationBytes": 99583
+        },
+        {
+          "name": "repeat-1",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "repeat-2",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "state-counter",
+      "sample": 1,
+      "phases": [
+        {
+          "name": "before-input",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "first-action",
+          "moduleInitializers": 15,
+          "exportDeclarationBytes": 98790
+        },
+        {
+          "name": "repeat-1",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "repeat-2",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "state-independent-controls",
+      "sample": 1,
+      "phases": [
+        {
+          "name": "before-input",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "first-action",
+          "moduleInitializers": 15,
+          "exportDeclarationBytes": 98790
+        },
+        {
+          "name": "second-control",
+          "moduleInitializers": 3,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "return-first",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "repeat-second",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "computed-total",
+      "sample": 1,
+      "phases": [
+        {
+          "name": "before-input",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "first-action",
+          "moduleInitializers": 56,
+          "exportDeclarationBytes": 98251
+        },
+        {
+          "name": "repeat-1",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "repeat-2",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "mode-select",
+      "sample": 1,
+      "phases": [
+        {
+          "name": "before-input",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "first-action",
+          "moduleInitializers": 72,
+          "exportDeclarationBytes": 104646
+        },
+        {
+          "name": "repeat-1",
+          "moduleInitializers": 1,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "repeat-2",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "accordion",
+      "sample": 1,
+      "phases": [
+        {
+          "name": "before-input",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "first-action",
+          "moduleInitializers": 117,
+          "exportDeclarationBytes": 99583
+        },
+        {
+          "name": "repeat-1",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "repeat-2",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "state-counter",
+      "sample": 2,
+      "phases": [
+        {
+          "name": "before-input",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "first-action",
+          "moduleInitializers": 15,
+          "exportDeclarationBytes": 98790
+        },
+        {
+          "name": "repeat-1",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "repeat-2",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "state-independent-controls",
+      "sample": 2,
+      "phases": [
+        {
+          "name": "before-input",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "first-action",
+          "moduleInitializers": 15,
+          "exportDeclarationBytes": 98790
+        },
+        {
+          "name": "second-control",
+          "moduleInitializers": 3,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "return-first",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "repeat-second",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "computed-total",
+      "sample": 2,
+      "phases": [
+        {
+          "name": "before-input",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "first-action",
+          "moduleInitializers": 56,
+          "exportDeclarationBytes": 98251
+        },
+        {
+          "name": "repeat-1",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "repeat-2",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "mode-select",
+      "sample": 2,
+      "phases": [
+        {
+          "name": "before-input",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "first-action",
+          "moduleInitializers": 72,
+          "exportDeclarationBytes": 104646
+        },
+        {
+          "name": "repeat-1",
+          "moduleInitializers": 1,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "repeat-2",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "accordion",
+      "sample": 2,
+      "phases": [
+        {
+          "name": "before-input",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "first-action",
+          "moduleInitializers": 117,
+          "exportDeclarationBytes": 99583
+        },
+        {
+          "name": "repeat-1",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "repeat-2",
+          "moduleInitializers": 0,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    }
+  ],
+  "coveragePassed": true,
+  "navigation": [
+    {
+      "name": "scalar clicks hand live state to a complex control and continue afterward",
+      "passed": true,
+      "expectedNetworkFailure": false,
+      "beforeFull": {
+        "started": false,
+        "values": [
+          [
+            "m3:c0:state:count",
+            2
+          ],
+          [
+            "m4:c0:state:clicks",
+            1
+          ]
+        ]
+      }
+    },
+    {
+      "name": "keyboard priming and queued scalar clicks preserve each update",
+      "passed": true,
+      "expectedNetworkFailure": false
+    },
+    {
+      "name": "intent, SPA navigation, history and offline controls",
+      "passed": true,
+      "expectedNetworkFailure": false
+    },
+    {
+      "name": "delayed shared pack keeps controls visible and retains the click",
+      "passed": true,
+      "expectedNetworkFailure": false
+    },
+    {
+      "name": "failed shared pack remains an observable failure",
+      "passed": true,
+      "expectedNetworkFailure": true
+    }
+  ],
+  "verification": {
+    "rootTypecheck": "passed",
+    "focusedTests": 143,
+    "docsTests": 64,
+    "docsTypecheck": "passed",
+    "docsDoctor": "actual run doctor script passed, including production build",
+    "broad": {
+      "passed": 2853,
+      "expectedFail": 2,
+      "failures": 7,
+      "note": "six fixture byte-budget failures and one exact-line doctrine guard failure; doctrine subsequently corrected and passed"
+    },
+    "budgetFollowup": "music-player CSR/SSR byte gates still fail; added empty-loader omission reduced their new overhead but did not remove it"
+  },
+  "remaining": [
+    "remove ordinary app byte-budget regressions before completion",
+    "complex controls still use the general runtime",
+    "exact symbol execution accounting remains separate open work"
+  ]
+}

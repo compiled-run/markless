@@ -1,0 +1,26 @@
+{
+  "name": "interaction-bench-remix3",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync": "node ../../shared/sync.mjs . app/shared",
+    "build": "node scripts/build.mjs",
+    "build:vercel": "node -e \"const id=process.env.BENCHMARK_BUILD_ID;if(!id)throw new Error('BENCHMARK_BUILD_ID is required');require('fs').writeFileSync('build-info.json',JSON.stringify({buildId:id})+'\\\\n')\"",
+    "dev": "NODE_ENV=development node --watch --import remix/node-tsx server.ts",
+    "start": "NODE_ENV=production PORT=${PORT:-4450} node --import remix/node-tsx server.ts",
+    "typecheck": "tsc --noEmit",
+    "smoke": "node scripts/smoke.mjs",
+    "bytes": "node scripts/client-bytes.mjs"
+  },
+  "engines": {
+    "node": "24.x"
+  },
+  "packageManager": "pnpm@10.33.2",
+  "dependencies": {
+    "remix": "3.0.0-rc.3"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.2",
+    "typescript": "7.0.2"
+  }
+}

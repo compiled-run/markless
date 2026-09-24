@@ -1,0 +1,125 @@
+--- /private/tmp/markless-known-prime-pointer-test-before.ts	2026-09-22 08:11:13
++++ packages/web/test/pointer-primed-inline-resumer.test.ts	2026-09-22 08:18:08
+@@ -1,11 +1,6 @@
+ import { expect, test } from 'vitest';
+ import { createInlineResumerSource } from '../src/inline/resumer.ts';
+ 
+-// The served boot is the only layer that can spend a crossing on the import,
+-// because on a cold page nothing else is running yet. These pin that a hover
+-// over a control wakes the runtime, that a hover over anything else does not,
+-// and that the wake never turns into a second dispatcher.
+-
+ const LOADER_TAIL = '((url) => import(/* @vite-ignore */ url));';
+ 
+ type FakeElement = {
+@@ -20,6 +15,7 @@
+ function bootResumer(options: {
+ 	readonly events: ReadonlyArray<ViewEventRecord>;
+ 	readonly locators?: ReadonlyArray<{ hostNodeId: string; index: number }>;
++	readonly mintedRows?: boolean;
+ }) {
+ 	const source = createInlineResumerSource({
+ 		debug: false,
+@@ -33,13 +29,18 @@
+ 
+ 	const arrivals: Array<string | 'wake'> = [];
+ 	const primingElements: Array<unknown> = [];
++	const primingRecords: Array<unknown> = [];
+ 	const module = {
+ 		resumeContainerEvent: (input: {
+ 			readonly event: { readonly type: string } | 0;
+ 			readonly element?: unknown;
++			readonly eventRecord?: unknown;
+ 		}) => {
+ 			arrivals.push(input.event === 0 ? 'wake' : input.event.type);
+-			if (input.event === 0) primingElements.push(input.element);
++			if (input.event === 0) {
++				primingElements.push(input.element);
++				primingRecords.push(input.eventRecord);
++			}
+ 		},
+ 	};
+ 	let loads = 0;
+@@ -57,6 +58,9 @@
+ 		asyncBoundaries: [],
+ 		events: options.events,
+ 		locators: options.locators ?? [{ hostNodeId: 'h1', index: 1 }],
++		keyedRepeats: options.mintedRows
++			? [{ rowComponent: {}, rowEvents: [{ eventName: 'click' }] }]
++			: [],
+ 	};
+ 	const root: Record<string, unknown> = {
+ 		addEventListener: (type: string, listener: Listener) => listeners.set(type, listener),
+@@ -83,8 +87,6 @@
+ 			};
+ 		},
+ 	};
+-
+-	// eslint-disable-next-line @typescript-eslint/no-implied-eval
+ 	new Function('document', '__load', source.replace(LOADER_TAIL, '(__load);'))(
+ 		fakeDocument,
+ 		loadModule,
+@@ -93,6 +95,8 @@
+ 	return {
+ 		arrivals,
+ 		primingElements,
++		primingRecords,
++		root,
+ 		host,
+ 		fire: (type: string, target: FakeElement = host) => listeners.get(type)?.({ type, target }),
+ 		hasListener: (type: string) => listeners.has(type),
+@@ -151,6 +155,37 @@
+ 	},
+ );
+ 
++test.each(['pointerover', 'focusin'])(
++	'%s forwards the matching priming record for the known host',
++	async (eventName) => {
++		const record = { hostNodeId: 'm8:c2:button', eventName: 'click' };
++		const resumer = bootResumer({
++			events: [
++				{ hostNodeId: 'other', eventName: 'click' },
++				{ hostNodeId: record.hostNodeId, eventName: 'visible' },
++				{ hostNodeId: record.hostNodeId, eventName: 'pointerup' },
++				record,
++			],
++			locators: [{ hostNodeId: record.hostNodeId, index: 1 }],
++		});
++		resumer.fire(eventName);
++		resumer.finishLoad();
++		await settle();
++		expect(resumer.primingRecords).toEqual([record]);
++		expect(resumer.arrivals).toEqual(['wake']);
++	},
++);
++
++test('unknown focus targets retain the minted-row fallback without inventing a record', async () => {
++	const resumer = bootResumer({ events: [], mintedRows: true, locators: [] });
++	resumer.fire('focusin');
++	resumer.finishLoad();
++	await settle();
++	expect(resumer.primingElements).toEqual([resumer.root]);
++	expect(resumer.primingRecords).toEqual([undefined]);
++	expect(resumer.arrivals).toEqual(['wake']);
++});
++
+ test('a crossing onto an element with a press record wakes the runtime before the press', async () => {
+ 	const resumer = bootResumer({ events: [{ hostNodeId: 'h1', eventName: 'pointerdown' }] });
+ 
+@@ -160,8 +195,6 @@
+ 	resumer.finishLoad();
+ 	await settle();
+ 	expect(resumer.arrivals).toEqual(['wake']);
+-	// A resting pointer sends no second crossing, so the control is left here for
+-	// the runtime's own preload to read once its wiring exists.
+ 	expect(resumer.primedHover()).toBe(resumer.host);
+ });
+ 
+@@ -185,7 +218,6 @@
+ 	await settle();
+ 
+ 	expect(resumer.arrivals).toEqual(['wake', 'pointerdown']);
+-	// One import promise per root is what keeps the wake ahead of the gesture.
+ 	expect(resumer.loadCount()).toBe(1);
+ });
+ 

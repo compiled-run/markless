@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
+import ts from 'typescript';
 import { createQuickInfoService } from './twoslash-quickinfo.ts';
 
 const fences = (file: string) =>
@@ -67,4 +68,45 @@ test('a previous synthetic root cannot supply a global to another fence', () => 
 	const infos = second.queryFence('priorFenceOnly;', 'tsrx');
 	expect(infos.some((info) => info.signature.includes('73'))).toBe(false);
 	expect(infos.some((info) => info.signature.includes('const priorFenceOnly'))).toBe(false);
+});
+
+test('explicit global declarations remain isolated to their fence', () => {
+	const service = createQuickInfoService();
+	const original = service.queryFence(
+		'export {}; declare global { var declaredFenceValue: "fence-only"; } declaredFenceValue;',
+		'tsrx',
+	);
+	expect(original.some((info) => info.signature.includes('fence-only'))).toBe(true);
+	const next = service.queryFence('declaredFenceValue;', 'tsrx');
+	expect(next.some((info) => info.signature.includes('fence-only'))).toBe(false);
+});
+
+test('switching fences retains parsed imported type documents', () => {
+	const timing = (
+		ts as typeof ts & {
+			performance: {
+				enable(): void;
+				disable(): void;
+				getCount(mark: string): number;
+			};
+		}
+	).performance;
+	const service = createQuickInfoService();
+	timing.enable();
+	try {
+		service.queryFence(
+			"import { state } from '@markless/core';\nexport const score = state(2);",
+			'tsrx',
+		);
+		service.queryFence('const unrelatedValue = 10;', 'tsrx');
+		const before = timing.getCount('beforeParse');
+		const infos = service.queryFence(
+			"import { state } from '@markless/core';\nexport const temperature = state(3);",
+			'tsrx',
+		);
+		expect(infos.some((info) => info.signature.includes('temperature'))).toBe(true);
+		expect(timing.getCount('beforeParse') - before).toBeLessThan(10);
+	} finally {
+		timing.disable();
+	}
 });

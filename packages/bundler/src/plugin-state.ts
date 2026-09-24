@@ -12,6 +12,7 @@ import { createBuildDelegateLoader } from './build/delegate-loader.ts';
 import { createDelegateModuleCache } from './link-driver.ts';
 import { hasExecutionLogModuleHook, requalifyExecutionLogModuleHook } from './execution-log.ts';
 import { ModuleMetadataRegistry } from './module-metadata-registry.ts';
+import { symbolExecutionLogId } from './module-id.ts';
 import type {
 	MarklessEnvironment,
 	MarklessModuleLinkArtifact,
@@ -61,7 +62,18 @@ export function createPluginState() {
 	const virtualModules = new Map<string, MarklessVirtualModule>();
 	const moduleMetadata = new ModuleMetadataRegistry();
 	const prerenderWakeCapabilities = new Map<string, boolean>();
-	const moduleLinkArtifacts = new Map<string, MarklessModuleLinkArtifact>();
+	// Per environment: whether a source is linked is a fact about this environment's compile of it.
+	const moduleLinkArtifactsByEnvironment = new Map<
+		MarklessEnvironment,
+		Map<string, MarklessModuleLinkArtifact>
+	>();
+	const moduleLinkArtifacts = (environment: MarklessEnvironment) => {
+		const existing = moduleLinkArtifactsByEnvironment.get(environment);
+		if (existing) return existing;
+		const created = new Map<string, MarklessModuleLinkArtifact>();
+		moduleLinkArtifactsByEnvironment.set(environment, created);
+		return created;
+	};
 	const linkedTransformCache = new Map<string, LinkedTransformCacheEntry>();
 	const importedChildren = new Map<string, ImportedChild>();
 	const importedChildSources = new Set<string>();
@@ -98,6 +110,7 @@ export function createPluginState() {
 		moduleMetadata,
 		prerenderWakeCapabilities,
 		moduleLinkArtifacts,
+		moduleLinkArtifactsByEnvironment,
 		linkedTransformCache,
 		importedChildren,
 		importedChildSources,
@@ -125,7 +138,7 @@ export function createPluginState() {
 			transformedClientPrimarySources.clear();
 			virtualModules.clear();
 			moduleMetadata.clear();
-			moduleLinkArtifacts.clear();
+			moduleLinkArtifactsByEnvironment.clear();
 			linkedTransformCache.clear();
 			importedChildren.clear();
 			importedChildSources.clear();
@@ -151,6 +164,8 @@ export function registerTransformArtifacts(
 		dev: ReturnType<typeof createMarklessDevGraph>;
 		environment: MarklessEnvironment;
 		finalPublication?: boolean;
+		recordSymbolClaims?: boolean;
+		root?: string;
 		tracksSourceClaimPublication?: boolean;
 		replaceOwnedArtifacts?: boolean;
 		updateDevPrerenderHashes?: (hashes: ReadonlyMap<string, string>) => void;
@@ -160,15 +175,19 @@ export function registerTransformArtifacts(
 	const renderDataHashes = new Map<string, string>();
 	for (const module of input.result.virtualModules) {
 		const isClientSymbol = input.environment === 'client' && module.type === 'symbol';
-		// The symbol virtual module id embeds the source filename, so it is the
-		// collision-free execution-log id: re-key the injected hook (dev builds)
-		// and the size estimate to that same id so the join always resolves.
-		const stored = isClientSymbol
-			? { ...module, source: requalifyExecutionLogModuleHook(module.source, module.id) }
-			: input.finalPublication === false && module.type === 'resolver'
-				? { ...module, provisional: true }
-				: module;
-		if (publishesVirtualModule(stored, state.virtualModules.get(module.id))) {
+		const logId = isClientSymbol ? symbolExecutionLogId(module.id, input.root) : module.id;
+		const stored = {
+			...module,
+			...(isClientSymbol
+				? { source: requalifyExecutionLogModuleHook(module.source, logId) }
+				: {}),
+			...(input.finalPublication === false &&
+			(module.type === 'resolver' || module.type === 'symbol')
+				? { provisional: true }
+				: {}),
+		};
+		const published = publishesVirtualModule(stored, state.virtualModules.get(module.id));
+		if (published) {
 			state.virtualModules.set(module.id, stored);
 		}
 		ids.add(module.id);
@@ -189,14 +208,14 @@ export function registerTransformArtifacts(
 			});
 			renderDataHashes.set(resolveVirtualId(module.id), renderData.contentHash);
 		}
-		if (isClientSymbol) {
-			state.executionLogEstimatedSizes.set(module.id, stored.source.length);
+		if (isClientSymbol && published) {
+			state.executionLogEstimatedSizes.set(logId, stored.source.length);
 			if (hasExecutionLogModuleHook(stored.source))
-				state.executionLogEmittedIds.set(module.id, module.id);
+				state.executionLogEmittedIds.set(logId, module.id);
 		}
 	}
 	state.moduleMetadata.recordCaptureMetadata(input.source, input.result.manifest);
-	if (input.finalPublication !== false) {
+	if (input.finalPublication !== false && input.recordSymbolClaims !== false) {
 		recordEmittedClaimOwnership(state, {
 			source: input.source,
 			emittedModule: input.manifestSource,
@@ -204,10 +223,14 @@ export function registerTransformArtifacts(
 			virtualModules: input.result.virtualModules,
 		});
 		if (input.tracksSourceClaimPublication === true) {
-			state.moduleMetadata.finishSourceSymbolClaims(input.source, input.manifestSource);
+			state.moduleMetadata.finishSourceSymbolClaims(
+				input.environment,
+				input.source,
+				input.manifestSource,
+			);
 		}
 	}
-	state.moduleLinkArtifacts.set(input.source, {
+	state.moduleLinkArtifacts(input.environment).set(input.source, {
 		moduleGraphInterface: input.result.moduleGraphInterface,
 		interfaceHash: input.result.interfaceHash,
 		moduleImports: input.result.moduleImports,
@@ -231,15 +254,14 @@ export function registerTransformArtifacts(
 	if (renderDataHashes.size > 0) input.updateDevPrerenderHashes?.(renderDataHashes);
 }
 
-// A first pass publishes the resolver into an empty slot only: the artifacts it publishes
-// import that id, so it must resolve while the owner still links; any final publication replaces it.
+// First-pass ids must resolve during linking, but cannot replace finalized code.
 function publishesVirtualModule(
 	next: MarklessVirtualModule,
 	current: MarklessVirtualModule | undefined,
 ): boolean {
 	if (!current) return true;
+	if (next.provisional === true) return false;
 	if (next.type === 'resolver' && current.type === 'resolver') {
-		if (next.provisional === true) return false;
 		if (current.provisional === true) return true;
 		const verdict = linkedResolverClaimVerdict({
 			resolverId: next.id,

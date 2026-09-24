@@ -6,6 +6,7 @@ export { collectTsrxModuleDiagnostics } from './collect-diagnostics.ts';
 export { compileTsrxModule } from './compile-module.ts';
 export { compileTsrxForTypeService, compile_to_volar_mappings } from './type-service.ts';
 export { parseJavaScriptModule, type JavaScriptAstNode } from './js-ast.ts';
+export { LEAN_DISPATCH_MARKER_MODULES } from './lean-dispatch-modules.ts';
 export { CompilerPassGraphError, validateCompilerPassGraph } from './pass-graph.ts';
 export { formatCompilerArtifactDump, runCompilerPassPipeline } from './pass-pipeline.ts';
 export { defaultCompilerPasses } from './pass-registry.ts';
@@ -87,9 +88,13 @@ export {
 	renderDataClaimManifest,
 	renderDataContentHash,
 } from './passes/render-data/manifest.ts';
-export { createRuntimeDemandMap } from './passes/runtime-demand-map.ts';
+export {
+	createRuntimeDemandMap,
+	RUNTIME_CAPABILITY_MODULE_IDS,
+} from './passes/runtime-demand-map.ts';
 export { createTriggerGroups } from './passes/trigger-groups.ts';
 export { buildSemanticGraph } from './passes/semantic-graph/index.ts';
+export { evaluateModuleConstants } from './passes/semantic-graph/constant-values.ts';
 export { lowerStateAccess } from './passes/state-lowering.ts';
 export { emitSymbolModules } from './passes/symbol-modules.ts';
 export {
@@ -99,3 +104,4 @@ export {
 export { planSymbolResolver } from './passes/symbol-resolver.ts';
 
 export { componentExportPath, linkedComponentTarget } from './passes/link/component-target.ts';
+export { importedRowSlotReaders, rowSlotReaderComponents } from './passes/link/row-slot-readers.ts';

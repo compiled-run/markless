@@ -54,7 +54,7 @@ function feedSurface(options: { readonly liveChildEdge?: boolean } = {}) {
 							name: 'data-source',
 							staticIndex: 0,
 							coordinate: { kind: 'child-index', path: [0] },
-							residue: { kind: 'graph-read', graphNodeId: 'computed:feed', path: ['value', 'source'] },
+							residue: { kind: 'graph-read', graphNodeId: 'computed:feed', path: ['source'] },
 						},
 						{
 							kind: 'repeat',
@@ -140,7 +140,7 @@ function feedSurface(options: { readonly liveChildEdge?: boolean } = {}) {
 				{
 					repeatId: 'repeat:0',
 					collectionGraphNodeId: 'computed:feed',
-					collectionPath: ['value', 'updates'],
+					collectionPath: ['updates'],
 					rowChunkId: 'arm:row',
 					emptyChunkId: 'arm:empty',
 				},
@@ -225,7 +225,7 @@ function feedSurface(options: { readonly liveChildEdge?: boolean } = {}) {
 										name: 'updates',
 										kind: 'graph-reference',
 										graphNodeId: 'computed:feed',
-										path: ['value', 'updates'],
+										path: ['updates'],
 									},
 								],
 							},
@@ -262,12 +262,13 @@ function feedSurface(options: { readonly liveChildEdge?: boolean } = {}) {
 	};
 }
 
+// Reads like the runtime graph: a snapshot-key head addresses the snapshot, any other head the value.
 function fulfilledGraph(value: unknown) {
 	const snapshot = { status: 'fulfilled', version: 1, key: null, value };
 	return {
 		read(graphNodeId: string, path: ReadonlyArray<string> = []) {
 			if (graphNodeId !== 'computed:feed') return undefined;
-			let current: unknown = snapshot;
+			let current: unknown = path.length === 0 || path[0]! in snapshot ? snapshot : value;
 			for (const segment of path)
 				current = (current as Record<string, unknown> | undefined)?.[segment];
 			return current;
@@ -308,6 +309,16 @@ test('record parity: three rows', async () => {
 	expect(kernel.html).toBe(full.html);
 	expect(kernel.armRecords).toEqual(full.armRecords);
 	expect(kernel.computed).toEqual(full.computed);
+});
+
+test('record parity: a resolved field named like a snapshot key reads the resolved value', async () => {
+	const surface = feedSurface();
+	const arm = surface.renderData.chunks.find((chunk) => chunk.id === 'arm:try')!;
+	(arm.slots[0] as { residue: { path: string[] } }).residue.path = ['status'];
+	const { kernel, full } = await bothPaths(surface, fulfilledGraph({ status: 'live', updates: [] }));
+
+	expect(kernel.html).toContain('data-source="live"');
+	expect(kernel.html).toBe(full.html);
 });
 
 test('record parity: zero rows renders the empty template', async () => {
@@ -422,7 +433,7 @@ test('a live child edge makes the kernel throw its named error', () => {
 			surface: feedSurface({ liveChildEdge: true }) as never,
 			boundaryId: 'boundary:feed',
 			status: 'fulfilled',
-			read: fulfilledGraph({ source: 'live', updates: [{ id: 1, label: 'one' }] }).read,
+		read: fulfilledGraph({ source: 'live', updates: [{ id: 1, label: 'one' }] }).read,
 		});
 	} catch (error) {
 		thrown = error;
@@ -504,7 +515,7 @@ test('a hole-bearing materialized child is accepted, and its derived hole is fil
 			surface: holeBearingChildSurface() as never,
 			boundaryId: 'boundary:feed',
 			status: 'fulfilled',
-			read: fulfilledGraph({ source: 'live', updates }).read,
+		read: fulfilledGraph({ source: 'live', updates }).read,
 			fillHole: weightedCountFiller(2) as never,
 		});
 
@@ -529,7 +540,7 @@ test('a hole-bearing materialized child without a filler fails closed', () => {
 			surface: holeBearingChildSurface() as never,
 			boundaryId: 'boundary:feed',
 			status: 'fulfilled',
-			read: fulfilledGraph({ source: 'live', updates: [{ id: 1, label: 'one' }] }).read,
+		read: fulfilledGraph({ source: 'live', updates: [{ id: 1, label: 'one' }] }).read,
 		});
 	} catch (error) {
 		thrown = error;

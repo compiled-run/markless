@@ -273,6 +273,8 @@ export type RuntimeGraph = {
 	 * it is answered synchronously. `undefined` when nothing is in flight.
 	 */
 	readonly settleWriteObservers?: () => Promise<void> | undefined;
+	/** Whether a write is waiting on a flush that has not yet reached the journal. */
+	readonly hasPendingFlush?: () => boolean;
 	readonly subscribeJournal: (listener: DomJournalListener) => () => void;
 	readonly flush: () => Promise<void>;
 	readonly takeJournal: () => DomJournalEntry[];
@@ -580,6 +582,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 				if (index >= 0) writeObservers.splice(index, 1);
 			};
 		},
+		hasPendingFlush: () => flushScheduled || dirtyPaths.length > 0 || activeFlush !== undefined,
 		settleWriteObservers() {
 			let pending: Promise<unknown>[] | undefined;
 			for (const observer of writeObservers) {

@@ -31,8 +31,10 @@ export function walkNode(node: AnyNode | null | undefined, visit: (node: AnyNode
 export function childNodes(node: AnyNode): AnyNode[] {
 	const children: AnyNode[] = [];
 
-	for (const [key, value] of Object.entries(node)) {
+	// for-in over these plain parser objects skips the entry-pair arrays Object.entries allocates.
+	for (const key in node) {
 		if (ignoredWalkKeys.has(key)) continue;
+		const value = node[key];
 
 		if (Array.isArray(value)) {
 			for (const item of value) {

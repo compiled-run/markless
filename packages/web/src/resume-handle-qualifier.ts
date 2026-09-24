@@ -1,15 +1,7 @@
-/**
- * Re-spells a handle id in the rendered widget's own key space, given the id of
- * the record that filed it. Its own module and it must stay one: the dispatch
- * core reaches fns/instance-scope.ts, which installs this slot, so whatever
- * module hosts it is loaded on every page.
- */
-export type ElementHandleQualifier = (
-	handleId: string,
-	ownerRecordId: string,
-	graph?: unknown,
-) => string;
+import type { ElementHandleQualifier, ComposedArmRecordQualifier } from './resume-types.ts';
+export type { ElementHandleQualifier, ComposedArmRecordQualifier } from './resume-types.ts';
 
+// Registration stays independent of the materialization and instance-scoping implementations.
 let elementHandleQualifier: ElementHandleQualifier | undefined;
 
 export function installElementHandleQualifier(qualifier: ElementHandleQualifier): void {
@@ -24,4 +16,14 @@ export function qualifiedElementHandleId(
 	return ownerRecordId && elementHandleQualifier
 		? elementHandleQualifier(handleId, ownerRecordId, graph)
 		: handleId;
+}
+
+let installedQualifier: ComposedArmRecordQualifier | undefined;
+
+export function installComposedArmRecordQualifier(qualifier: ComposedArmRecordQualifier): void {
+	installedQualifier = qualifier;
+}
+
+export function composedArmRecordQualifier(): ComposedArmRecordQualifier | undefined {
+	return installedQualifier;
 }

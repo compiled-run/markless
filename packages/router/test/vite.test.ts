@@ -11,7 +11,10 @@ import {
 	readClientAssetsManifest,
 	writeClientAssetsManifest,
 } from '../src/vite/client-assets-manifest.ts';
+import { MARKLESS_DEFERRED_PACK, MARKLESS_NAVIGATION_PACK_PREFIX } from '@markless/bundler/preload';
+import { MARKLESS_BUILD_METADATA_FILES, MARKLESS_BUILD_PREFIX } from '@markless/bundler/rolldown';
 import { router } from '../src/vite/index.ts';
+import { NAVIGATION_POLYFILL_MODULE } from '../src/navigation-polyfill.ts';
 
 const flattenPlugins = (plugins: unknown[]): Plugin[] =>
 	plugins.flatMap((plugin) =>
@@ -204,6 +207,38 @@ test('preserves user Nitro config while adding Markless request scanning default
 	).toContain('defineHandler');
 });
 
+test('production Nitro config serves hashed Markless chunks immutable and fixed-name build metadata revalidated', () => {
+	const buildRoute = `/${MARKLESS_BUILD_PREFIX}**`;
+	const immutable = { headers: { 'cache-control': 'public, max-age=31536000, immutable' } };
+	const revalidate = { headers: { 'cache-control': 'public, max-age=0, must-revalidate' } };
+	const metadata = Object.fromEntries(
+		MARKLESS_BUILD_METADATA_FILES.map((file) => [`/${file}`, revalidate]),
+	);
+	const nitroFor = (command: 'build' | 'serve', nitro: Record<string, unknown> = {}) => {
+		const [plugin] = flattenPlugins([router()]);
+		const result = hookHandler(plugin.config)?.(
+			{ nitro, root: '/project' },
+			{ command, mode: 'production', isSsrBuild: false, isPreview: false },
+		) as { nitro?: { routeRules?: Record<string, unknown> } } | undefined;
+		return result?.nitro;
+	};
+
+	expect(nitroFor('build')?.routeRules).toEqual({ [buildRoute]: immutable, ...metadata });
+	expect(
+		nitroFor('build', { routeRules: { '/health': { headers: { 'x-health': 'ok' } } } })?.routeRules,
+	).toEqual({
+		[buildRoute]: immutable,
+		...metadata,
+		'/health': { headers: { 'x-health': 'ok' } },
+	});
+	const userRule = { headers: { 'cache-control': 'no-store' } };
+	expect(nitroFor('build', { routeRules: { [buildRoute]: userRule } })?.routeRules).toEqual({
+		[buildRoute]: userRule,
+		...metadata,
+	});
+	expect(nitroFor('serve')?.routeRules?.[buildRoute]).toBeUndefined();
+});
+
 test('throws when users add nitro directly alongside router', () => {
 	const [plugin] = flattenPlugins([router()]);
 	const userConfig = {
@@ -241,6 +276,18 @@ test('preserves router resume entry exports for preview resume', () => {
 	expect(input[0]).toContain('virtual:markless-router/resume-entry');
 	expect(input.join('\n')).toContain('virtual:markless-router/navigation-entry');
 	expect(clientConfig.build.rolldownOptions.preserveEntrySignatures).toBe('exports-only');
+});
+
+test('leaves nitro bundled in server environments so request-file handlers deploy without node_modules', () => {
+	const plugin = flattenPlugins([router()]).find(
+		(plugin) => plugin.name === 'markless-router:vite',
+	);
+	for (const name of ['nitro', 'ssr']) {
+		const serverConfig: { consumer: string; build: { rolldownOptions: { external?: unknown } } } =
+			{ consumer: 'server', build: { rolldownOptions: {} } };
+		plugin?.configEnvironment?.(name, serverConfig as never);
+		expect([serverConfig.build.rolldownOptions.external].flat()).not.toContain('nitro');
+	}
 });
 
 test('wires the routed prerender-wake entry path through the server entry', async () => {
@@ -992,6 +1039,429 @@ for (const [thin, heavy] of [
 	});
 }
 
+// Engines with a native Navigation API never load the polyfill, so no preload
+// list may name it; the chunk is found by the module the polyfill import
+// resolves to, and here it is both thin and generically named.
+test('leaves the navigation polyfill out of navigation and landing preloads', async () => {
+	const plugins = flattenPlugins([router()]);
+	const configPlugin = plugins.find((plugin) => plugin.name === 'markless-router:vite');
+	const routePlugin = plugins.find((plugin) => plugin.name === 'markless-router:routes');
+	const routeLoad = hookHandler(routePlugin?.load) as
+		| ((id: string) => string | undefined)
+		| undefined;
+	const polyfillModuleId = '/repo/node_modules/.pnpm/shim/dist/index.js';
+	const resolved = await (
+		hookHandler(configPlugin?.resolveId) as (
+			this: { resolve: () => Promise<{ id: string }> },
+			source: string,
+			importer: string,
+			options: object,
+		) => Promise<{ id: string } | null | undefined>
+	).call(
+		{ resolve: async () => ({ id: polyfillModuleId }) },
+		NAVIGATION_POLYFILL_MODULE,
+		'/repo/packages/router/src/spa-navigation.ts',
+		{},
+	);
+	expect(resolved?.id).toBe(polyfillModuleId);
+	const navigationChunk = chunk({
+		code: `const routePreloadsJson = "__MARKLESS_ROUTER_ROUTE_PRELOADS__";${'/* navigation entry body */'.repeat(20)}`,
+		dynamicImports: ['build/chunk-7f3a.js', 'build/chunk-c21d.js', 'build/home.js'],
+		fileName: 'build/navigation.js',
+		imports: ['build/nav-shared.js'],
+		moduleIds: ['/repo/packages/router/src/vite/entries/client-entry.ts'],
+	});
+
+	routePlugin?.configResolved?.({ base: '/app/', root: '/project' } as never);
+	configPlugin?.configResolved?.({ base: '/app/', root: '/project' } as never);
+	hookHandler(configPlugin?.generateBundle)?.call(
+		{ environment: { config: { consumer: 'client' } } },
+		{},
+		{
+			'build/navigation.js': navigationChunk,
+			'build/resume.js': chunk({
+				code: `tsrxResumeModuleLoaders = Object.assign({"/pages/index.tsrx":()=>import("./home-resume.js")});`,
+				dynamicImports: ['build/home-resume.js'],
+				fileName: 'build/resume.js',
+				imports: ['build/runtime.js'],
+				moduleIds: ['/repo/packages/router/src/vite/entries/resume-entry.ts'],
+			}),
+			'build/home.js': chunk({ fileName: 'build/home.js', moduleIds: ['/project/pages/index.tsrx'] }),
+			'build/home-resume.js': chunk({ fileName: 'build/home-resume.js' }),
+			'build/runtime.js': chunk({ code: 'export const run = 1;', fileName: 'build/runtime.js' }),
+			'build/nav-shared.js': chunk({ code: 'export const shared = 1;', fileName: 'build/nav-shared.js' }),
+			'build/chunk-7f3a.js': chunk({
+				code: 'export { applyPolyfill } from "./chunk-9e01.js";',
+				facadeModuleId: polyfillModuleId,
+				fileName: 'build/chunk-7f3a.js',
+				imports: ['build/chunk-9e01.js'],
+				moduleIds: [polyfillModuleId],
+			}),
+			'build/chunk-9e01.js': chunk({ code: 'export const shim = 1;', fileName: 'build/chunk-9e01.js' }),
+			'build/chunk-c21d.js': chunk({
+				code: 'export { render } from "./runtime.js";',
+				facadeModuleId: '/repo/packages/web/src/render-csr.ts',
+				fileName: 'build/chunk-c21d.js',
+				imports: ['build/runtime.js'],
+				moduleIds: ['/repo/packages/web/src/render-csr.ts'],
+			}),
+		},
+	);
+
+	const serverSource = routeLoad?.call(
+		{ environment: { config: { consumer: 'server' } } },
+		'\0virtual:markless-router/route-preloads',
+	);
+	const routePreloadData = JSON.parse(
+		serverSource?.match(/routePreloadData = routePreloadsJson === .* \? (\{.*\}) :/)?.[1] ??
+			'{}',
+	) as {
+		readonly navigation?: Record<string, string[]>;
+		readonly ssr?: Record<string, string[]>;
+	};
+	const navigationPreloads = routePreloadData.navigation?.['pages/index.tsrx'];
+	const landingPreloads = routePreloadData.ssr?.['pages/index.tsrx'];
+	expect(navigationPreloads).toEqual([
+		'/app/build/navigation.js',
+		'/app/build/nav-shared.js',
+		'/app/build/chunk-c21d.js',
+		'/app/build/runtime.js',
+		'/app/build/home.js',
+	]);
+	expect(landingPreloads).toContain('/app/build/navigation.js');
+	expect(landingPreloads).toContain('/app/build/chunk-c21d.js');
+	expect(landingPreloads).not.toContain('/app/build/chunk-7f3a.js');
+	expect(landingPreloads).not.toContain('/app/build/chunk-9e01.js');
+});
+
+function planIntentFixture(
+	options: Parameters<typeof router>[0],
+	deferredName: string,
+	runtimeLoadsCapability = false,
+	planned?: { readonly firstUse: readonly string[]; readonly fallback?: string },
+) {
+	const plugins = flattenPlugins([router(options)]);
+	const configPlugin = plugins.find((plugin) => plugin.name === 'markless-router:vite');
+	const routePlugin = plugins.find((plugin) => plugin.name === 'markless-router:routes');
+	const routeLoad = hookHandler(routePlugin?.load) as
+		| ((id: string) => string | undefined)
+		| undefined;
+	routePlugin?.configResolved?.({ base: '/app/', root: '/project' } as never);
+	configPlugin?.configResolved?.({ base: '/app/', root: '/project' } as never);
+	hookHandler(configPlugin?.generateBundle)?.call(
+		{ environment: { config: { consumer: 'client' } } },
+		{},
+		{
+			'build/navigation.js': chunk({
+				code: `const routePreloadsJson = "__MARKLESS_ROUTER_ROUTE_PRELOADS__";${'/* navigation entry body */'.repeat(20)}`,
+				dynamicImports: ['build/client-render.js', 'build/landing.js'],
+				fileName: 'build/navigation.js',
+				imports: ['build/nav-shared.js'],
+				moduleIds: ['/repo/packages/router/src/vite/entries/client-entry.ts'],
+			}),
+			'build/resume.js': chunk({
+				code: `tsrxResumeModuleLoaders = Object.assign({"/pages/landing.tsrx":()=>import("./landing-resume.js")});`,
+				dynamicImports: ['build/landing-resume.js'],
+				fileName: 'build/resume.js',
+				imports: ['build/runtime.js'],
+				moduleIds: ['/repo/packages/router/src/vite/entries/resume-entry.ts'],
+			}),
+			'build/landing.js': chunk({
+				dynamicImports: ['build/capability.js', 'build/wiring.js'],
+				fileName: 'build/landing.js',
+				imports: ['build/runtime.js'],
+				moduleIds: ['/project/pages/landing.tsrx'],
+			}),
+			'build/landing-resume.js': chunk({
+				code: 'export const wake = () => import("./capability.js");',
+				dynamicImports: ['build/capability.js', 'build/wiring.js'],
+				fileName: 'build/landing-resume.js',
+				imports: ['build/runtime.js'],
+			}),
+			'build/runtime.js': chunk({
+				code: runtimeLoadsCapability
+					? 'export const run = () => import("./capability.js");'
+					: 'export const run = 1;',
+				dynamicImports: runtimeLoadsCapability ? ['build/capability.js'] : [],
+				fileName: 'build/runtime.js',
+			}),
+			'build/wiring.js': chunk({
+				code: 'export const wire = 1;',
+				fileName: 'build/wiring.js',
+			}),
+			'build/capability.js': chunk({
+				code: 'export const capability = 1;',
+				fileName: 'build/capability.js',
+				imports: ['build/capability-helper.js'],
+				name: deferredName,
+			}),
+			'build/capability-helper.js': chunk({
+				code: 'export const helper = 1;',
+				fileName: 'build/capability-helper.js',
+			}),
+			'build/nav-shared.js': chunk({
+				code: 'export const shared = 1;',
+				fileName: 'build/nav-shared.js',
+			}),
+			'build/client-render.js': chunk({
+				code: 'export { run } from "./runtime.js"; export const evaluate = () => import("./render-evaluator.js");',
+				dynamicImports: ['build/render-evaluator.js'],
+				fileName: 'build/client-render.js',
+				imports: ['build/runtime.js'],
+			}),
+			'build/render-evaluator.js': chunk({
+				code: 'export { helper } from "./evaluator-helper.js";',
+				fileName: 'build/render-evaluator.js',
+				imports: ['build/evaluator-helper.js'],
+				name: deferredName,
+			}),
+			'build/evaluator-helper.js': chunk({
+				code: 'export const helper = 1;',
+				fileName: 'build/evaluator-helper.js',
+			}),
+			...(planned
+				? {
+					'build/interaction-closures.json': {
+						type: 'asset',
+						fileName: 'build/interaction-closures.json',
+						source: JSON.stringify({
+							routes: [
+								{
+									route: 'pages/landing.tsrx',
+									...(planned.fallback ? { fallback: planned.fallback } : {}),
+									files: { firstUse: planned.firstUse, render: [] },
+								},
+							],
+						}),
+					},
+				}
+				: {}),
+		},
+	);
+	const serverSource = routeLoad?.call(
+		{ environment: { config: { consumer: 'server' } } },
+		'\0virtual:markless-router/route-preloads',
+	);
+	const data = JSON.parse(
+		serverSource?.match(/routePreloadData = routePreloadsJson === .* \? (\{.*\}) :/)?.[1] ??
+			'{}',
+	) as {
+		readonly navigation?: Record<string, string[]>;
+		readonly ssr?: Record<string, string[]>;
+	};
+	return {
+		navigation: data.navigation?.['pages/landing.tsrx'] ?? [],
+		ssr: data.ssr?.['pages/landing.tsrx'] ?? [],
+	};
+}
+
+// Link intent fetches the navigation closure on pointer/focus, so the landing
+// page keeps only what resume can reach.
+test('link intent leaves the navigation entry out of the landing preload', () => {
+	const intent = planIntentFixture({ linkPreloading: 'intent' }, 'rest');
+	expect(intent.ssr).toEqual([
+		'/app/build/resume.js',
+		'/app/build/runtime.js',
+		'/app/build/landing-resume.js',
+		'/app/build/capability.js',
+		'/app/build/capability-helper.js',
+		'/app/build/wiring.js',
+		'/app/build/landing.js',
+	]);
+	expect(intent.navigation).toContain('/app/build/navigation.js');
+	expect(intent.navigation).toContain('/app/build/client-render.js');
+	expect(intent.navigation).toContain('/app/build/nav-shared.js');
+
+	const render = planIntentFixture({}, 'rest');
+	expect(render.ssr).toContain('/app/build/navigation.js');
+	expect(render.ssr).toContain('/app/build/nav-shared.js');
+	expect(render.ssr).toContain('/app/build/client-render.js');
+});
+
+test('a deferred runtime pack is reached on demand, never preloaded', () => {
+	for (const options of [{ linkPreloading: 'intent' as const }, {}]) {
+		const plan = planIntentFixture(options, MARKLESS_DEFERRED_PACK);
+		expect(plan.ssr).toContain('/app/build/landing-resume.js');
+		for (const list of [plan.ssr, plan.navigation]) {
+			expect(list).not.toContain('/app/build/capability.js');
+			expect(list).not.toContain('/app/build/capability-helper.js');
+			expect(list).toContain('/app/build/wiring.js');
+		}
+	}
+});
+
+test('a navigation-only pack rides navigation, never the landing preload', () => {
+	for (const options of [{ linkPreloading: 'intent' as const }, {}]) {
+		const plan = planIntentFixture(options, `${MARKLESS_NAVIGATION_PACK_PREFIX}shared`);
+		expect(plan.ssr).toContain('/app/build/landing-resume.js');
+		expect(plan.ssr).toContain('/app/build/wiring.js');
+		expect(plan.ssr).not.toContain('/app/build/capability.js');
+		expect(plan.ssr).not.toContain('/app/build/capability-helper.js');
+		expect(plan.navigation).toContain('/app/build/capability.js');
+		expect(plan.navigation).toContain('/app/build/capability-helper.js');
+	}
+});
+
+test('a planned landing preloads its first-use files and what they statically import, nothing more', () => {
+	for (const options of [{ linkPreloading: 'intent' as const }, {}]) {
+		const unplanned = planIntentFixture(options, 'rest');
+		const plan = planIntentFixture(options, 'rest', false, {
+			firstUse: ['build/landing-resume.js', 'build/landing.js'],
+		});
+		for (const fileName of ['resume', 'runtime', 'landing-resume', 'landing'])
+			expect(plan.ssr).toContain(`/app/build/${fileName}.js`);
+		// Reached only through a dynamic import no first use on this route needs.
+		for (const fileName of ['capability', 'capability-helper', 'wiring'])
+			expect(plan.ssr).not.toContain(`/app/build/${fileName}.js`);
+		expect(plan.navigation).toEqual(unplanned.navigation);
+		// A route the planner could not bound keeps the unplanned landing.
+		expect(
+			planIntentFixture(options, 'rest', false, {
+				firstUse: [],
+				fallback: 'missing-demand-map:pages/landing.tsrx',
+			}).ssr,
+		).toEqual(unplanned.ssr);
+	}
+});
+
+test('a route-set deferred pack is reached on demand, never preloaded', () => {
+	const plan = planIntentFixture({}, `${MARKLESS_DEFERRED_PACK}-abc`);
+	for (const list of [plan.ssr, plan.navigation])
+		expect(list).not.toContain('/app/build/capability.js');
+});
+
+test('a deferred pack the resume runtime loads on demand stays off the navigation plan', () => {
+	for (const options of [{ linkPreloading: 'intent' as const }, {}]) {
+		const plan = planIntentFixture(options, MARKLESS_DEFERRED_PACK, true);
+		expect(plan.navigation).toContain('/app/build/runtime.js');
+		expect(plan.navigation).toContain('/app/build/render-evaluator.js');
+		for (const list of [plan.ssr, plan.navigation]) {
+			expect(list).not.toContain('/app/build/capability.js');
+			expect(list).not.toContain('/app/build/capability-helper.js');
+		}
+	}
+});
+
+// Client rendering demands its evaluator on every navigation, so its whole
+// closure rides the navigation plan instead of trailing it by two round trips.
+test('a navigation plan carries the client render path, deferred pack included', () => {
+	for (const options of [{ linkPreloading: 'intent' as const }, {}]) {
+		for (const deferredName of [MARKLESS_DEFERRED_PACK, 'rest']) {
+			const plan = planIntentFixture(options, deferredName);
+			expect(plan.navigation).toContain('/app/build/render-evaluator.js');
+			expect(plan.navigation).toContain('/app/build/evaluator-helper.js');
+			expect(plan.ssr).not.toContain('/app/build/render-evaluator.js');
+			expect(plan.ssr).not.toContain('/app/build/evaluator-helper.js');
+		}
+	}
+});
+
+// A listed chunk that statically imports another route's pack cannot run without it,
+// so leaving the pack out only moves its fetch one round trip later.
+test('a navigation plan carries every static import of what it lists, another route pack included', () => {
+	const plugins = flattenPlugins([router({ linkPreloading: 'intent' })]);
+	const configPlugin = plugins.find((plugin) => plugin.name === 'markless-router:vite');
+	const routePlugin = plugins.find((plugin) => plugin.name === 'markless-router:routes');
+	const routeLoad = hookHandler(routePlugin?.load) as
+		| ((id: string) => string | undefined)
+		| undefined;
+	routePlugin?.configResolved?.({ base: '/app/', root: '/project' } as never);
+	configPlugin?.configResolved?.({ base: '/app/', root: '/project' } as never);
+	hookHandler(configPlugin?.generateBundle)?.call(
+		{ environment: { config: { consumer: 'client' } } },
+		{},
+		{
+			'build/navigation.js': chunk({
+				code: `const routePreloadsJson = "__MARKLESS_ROUTER_ROUTE_PRELOADS__"; export const go = () => [import("./render.js"), import("./alpha.js"), import("./beta.js")];`,
+				dynamicImports: ['build/render.js', 'build/alpha.js', 'build/beta.js'],
+				fileName: 'build/navigation.js',
+				moduleIds: ['/repo/packages/router/src/vite/entries/client-entry.ts'],
+			}),
+			'build/render.js': chunk({
+				code: 'import "./beta.js"; export const render = 1;',
+				fileName: 'build/render.js',
+				imports: ['build/beta.js'],
+			}),
+			'build/alpha.js': chunk({
+				code: 'export const alpha = 1;',
+				fileName: 'build/alpha.js',
+				moduleIds: ['/project/pages/alpha.tsrx'],
+			}),
+			'build/beta.js': chunk({
+				code: 'import "./beta-helper.js"; export const beta = 1;',
+				fileName: 'build/beta.js',
+				imports: ['build/beta-helper.js'],
+				moduleIds: ['/project/pages/beta.tsrx'],
+			}),
+			'build/beta-helper.js': chunk({
+				code: 'export const helper = 1;',
+				fileName: 'build/beta-helper.js',
+			}),
+		},
+	);
+	const serverSource = routeLoad?.call(
+		{ environment: { config: { consumer: 'server' } } },
+		'\0virtual:markless-router/route-preloads',
+	);
+	const navigation = (
+		JSON.parse(
+			serverSource?.match(/routePreloadData = routePreloadsJson === .* \? (\{.*\}) :/)?.[1] ??
+				'{}',
+		) as { readonly navigation?: Record<string, string[]> }
+	).navigation?.['pages/alpha.tsrx'];
+	expect(navigation).toContain('/app/build/render.js');
+	expect(navigation).toContain('/app/build/beta.js');
+	expect(navigation).toContain('/app/build/beta-helper.js');
+	expect(navigation).toContain('/app/build/alpha.js');
+});
+
+// Only static edges cross into another route: a dynamic import of its pack stays on demand.
+test('a navigation plan leaves another route pack out when only a dynamic import reaches it', () => {
+	const plugins = flattenPlugins([router({ linkPreloading: 'intent' })]);
+	const configPlugin = plugins.find((plugin) => plugin.name === 'markless-router:vite');
+	const routePlugin = plugins.find((plugin) => plugin.name === 'markless-router:routes');
+	const routeLoad = hookHandler(routePlugin?.load) as
+		| ((id: string) => string | undefined)
+		| undefined;
+	routePlugin?.configResolved?.({ base: '/app/', root: '/project' } as never);
+	configPlugin?.configResolved?.({ base: '/app/', root: '/project' } as never);
+	hookHandler(configPlugin?.generateBundle)?.call(
+		{ environment: { config: { consumer: 'client' } } },
+		{},
+		{
+			'build/navigation.js': chunk({
+				code: `const routePreloadsJson = "__MARKLESS_ROUTER_ROUTE_PRELOADS__"; export const go = () => [import("./alpha.js"), import("./beta.js")];`,
+				dynamicImports: ['build/alpha.js', 'build/beta.js'],
+				fileName: 'build/navigation.js',
+				moduleIds: ['/repo/packages/router/src/vite/entries/client-entry.ts'],
+			}),
+			'build/alpha.js': chunk({
+				code: 'export const later = () => import("./beta.js");',
+				dynamicImports: ['build/beta.js'],
+				fileName: 'build/alpha.js',
+				moduleIds: ['/project/pages/alpha.tsrx'],
+			}),
+			'build/beta.js': chunk({
+				code: 'export const beta = 1;',
+				fileName: 'build/beta.js',
+				moduleIds: ['/project/pages/beta.tsrx'],
+			}),
+		},
+	);
+	const serverSource = routeLoad?.call(
+		{ environment: { config: { consumer: 'server' } } },
+		'\0virtual:markless-router/route-preloads',
+	);
+	const navigation = (
+		JSON.parse(
+			serverSource?.match(/routePreloadData = routePreloadsJson === .* \? (\{.*\}) :/)?.[1] ??
+				'{}',
+		) as { readonly navigation?: Record<string, string[]> }
+	).navigation?.['pages/alpha.tsrx'];
+	expect(navigation).toContain('/app/build/alpha.js');
+	expect(navigation).not.toContain('/app/build/beta.js');
+});
+
 test('includes destination route resume chunks reached from the navigation route table', () => {
 	const plugins = flattenPlugins([router()]);
 	const configPlugin = plugins.find((plugin) => plugin.name === 'markless-router:vite');
@@ -1103,7 +1573,7 @@ test('includes the current route resume module closure in ssr modulepreloads', (
 	expect(ssrPreloads['pages/index.tsrx']).not.toContain('/app/build/docs-resume.js');
 });
 
-test('includes route-scoped symbol-module chunks in ssr and navigation modulepreloads', () => {
+test('includes route-scoped symbol-module and symbol facade chunks in ssr and navigation modulepreloads', () => {
 	const plugins = flattenPlugins([router()]);
 	const configPlugin = plugins.find((plugin) => plugin.name === 'markless-router:vite');
 	const routePlugin = plugins.find((plugin) => plugin.name === 'markless-router:routes');
@@ -1162,6 +1632,17 @@ test('includes route-scoped symbol-module chunks in ssr and navigation modulepre
 				moduleIds: [symbolModuleId('/project/pages/journal.tsrx', 'symbol:0')],
 			}),
 			'build/lens-runtime.js': chunk({ fileName: 'build/lens-runtime.js' }),
+			// A symbol whose module was hoisted into a shared chunk: its entry chunk is a facade that renders no module.
+			'build/gallery-submit-facade.js': chunk({
+				facadeModuleId: `\0${symbolModuleId('/project/pages/gallery.tsrx', 'symbol:2')}`,
+				fileName: 'build/gallery-submit-facade.js',
+				imports: ['build/gallery-shared.js'],
+			}),
+			'build/gallery-shared.js': chunk({ fileName: 'build/gallery-shared.js' }),
+			'build/journal-submit-facade.js': chunk({
+				facadeModuleId: symbolModuleId('/project/pages/journal.tsrx', 'symbol:1'),
+				fileName: 'build/journal-submit-facade.js',
+			}),
 		},
 	);
 
@@ -1182,6 +1663,19 @@ test('includes route-scoped symbol-module chunks in ssr and navigation modulepre
 		);
 		expect(preloads['pages/gallery.tsrx'], label).toContain('/app/build/lens-runtime.js');
 		expect(preloads['pages/gallery.tsrx'], label).toContain('/app/build/light-table-symbol.js');
+		expect(preloads['pages/gallery.tsrx'], label).toContain(
+			'/app/build/gallery-submit-facade.js',
+		);
+		expect(preloads['pages/gallery.tsrx'], label).toContain('/app/build/gallery-shared.js');
+		expect(preloads['pages/gallery.tsrx'], label).not.toContain(
+			'/app/build/journal-submit-facade.js',
+		);
+		expect(preloads['pages/journal.tsrx'], label).toContain(
+			'/app/build/journal-submit-facade.js',
+		);
+		expect(preloads['pages/journal.tsrx'], label).not.toContain(
+			'/app/build/gallery-submit-facade.js',
+		);
 		// Cross-route exclusion: the other route's symbol chunks never preload.
 		expect(preloads['pages/gallery.tsrx'], label).not.toContain(
 			'/app/build/journal-save-symbol.js',
@@ -1204,8 +1698,10 @@ test('includes route-scoped symbol-module chunks in ssr and navigation modulepre
 function chunk(overrides: {
 	readonly code?: string;
 	readonly dynamicImports?: readonly string[];
+	readonly facadeModuleId?: string;
 	readonly fileName: string;
 	readonly imports?: readonly string[];
+	readonly name?: string;
 	readonly moduleIds?: readonly string[];
 	readonly viteMetadata?: {
 		readonly importedCss?: ReadonlySet<string> | readonly string[];
@@ -1215,10 +1711,11 @@ function chunk(overrides: {
 		code: overrides.code,
 		type: 'chunk',
 		dynamicImports: [...(overrides.dynamicImports ?? [])],
-		facadeModuleId: null,
+		facadeModuleId: overrides.facadeModuleId ?? null,
 		fileName: overrides.fileName,
 		imports: [...(overrides.imports ?? [])],
 		moduleIds: [...(overrides.moduleIds ?? [])],
+		name: overrides.name,
 		viteMetadata: overrides.viteMetadata,
 	};
 }
@@ -1411,7 +1908,16 @@ test.each(['tsrx', 'mdx'])(
 						: roles.includes('resume')
 							? 'resume'
 							: 'symbols';
-			expect(first.ssr).toContain(`/app/build/${preferred}.js`);
+			expect(first.navigation).toContain(`/app/build/${preferred}.js`);
+			// The route facade and the route's own render data run only on navigation to it.
+			const landing = roles.includes('authored')
+				? 'authored'
+				: roles.includes('resume')
+					? 'resume'
+					: 'symbols';
+			expect(first.ssr).toContain(`/app/build/${landing}.js`);
+			for (const role of ['render', 'route'])
+				if (roles.includes(role)) expect(first.ssr).not.toContain(`/app/build/${role}.js`);
 			expect(first.ssr).not.toContain('/app/build/foreign.js');
 			for (const dependency of [
 				'resume-current',

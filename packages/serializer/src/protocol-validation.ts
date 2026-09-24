@@ -497,6 +497,7 @@ function assertOptionalKeyedRepeats(record: Record<string, unknown>): void {
 		assertStringField(repeat, 'parentHostNodeId', context);
 		assertOptionalStringField(repeat, 'ownerHostNodeId', context);
 		assertOptionalStringField(repeat, 'instancePath', context);
+		assertOptionalEnclosingRow(repeat, `${context}.enclosingRow`);
 		assertOptionalStringField(repeat, 'collectionGraphNodeId', context);
 		assertStringArrayField(repeat, 'collectionPath', context);
 		assertStringArrayField(repeat, 'keyPath', context);
@@ -510,6 +511,15 @@ function assertOptionalKeyedRepeats(record: Record<string, unknown>): void {
 		assertOptionalRowTemplate(repeat, `${context}.rowTemplate`);
 		assertOptionalRowComponent(repeat, `${context}.rowComponent`);
 	}
+}
+
+function assertOptionalEnclosingRow(record: Record<string, unknown>, context: string): void {
+	const enclosingRow = record.enclosingRow;
+	if (enclosingRow === undefined) return;
+	assertRecordShape(enclosingRow, context);
+	assertStringField(enclosingRow, 'repeatId', context);
+	assertNonNegativeIntegerArrayField(enclosingRow, 'parentHostPath', context);
+	assertOptionalStringArrayField(enclosingRow, 'itemPath', context);
 }
 
 function assertOptionalRowComponent(record: Record<string, unknown>, context: string): void {
@@ -528,8 +538,19 @@ function assertOptionalRowTemplate(record: Record<string, unknown>, context: str
 	if (template === undefined) return;
 	assertRecordShape(template, context);
 	assertStringField(template, 'html', context);
+	assertOptionalStringField(template, 'componentName', context);
 	assertOptionalRowTemplateSlots(template.textSlots, `${context}.textSlots`);
 	assertOptionalRowTemplateSlots(template.attributeSlots, `${context}.attributeSlots`, true);
+	const expressionSlots = [
+		...((template.textSlots as ReadonlyArray<Record<string, unknown>> | undefined) ?? []),
+		...((template.attributeSlots as ReadonlyArray<Record<string, unknown>> | undefined) ?? []),
+	].some((slot) => slot.source !== undefined);
+	if (expressionSlots !== (template.componentName !== undefined)) {
+		throw invalidPayloadShapeError(
+			contextPayloadType(context),
+			`Invalid ${context}: expected componentName exactly when a slot carries source.`,
+		);
+	}
 }
 
 function assertOptionalRowTemplateSlots(
@@ -558,15 +579,38 @@ function assertOptionalRowTemplateSlots(
 // neither would write undefined where the server wrote a value.
 function assertRowTemplateSlotValue(slot: Record<string, unknown>, context: string): void {
 	const fromItem = slot.itemPath !== undefined,
-		fromGraph = slot.graphNodeId !== undefined || slot.graphPath !== undefined;
-	if (fromItem === fromGraph) {
+		fromGraph = slot.graphNodeId !== undefined || slot.graphPath !== undefined,
+		fromSource = slot.source !== undefined;
+	if (Number(fromItem) + Number(fromGraph) + Number(fromSource) !== 1) {
 		throw invalidPayloadShapeError(
 			contextPayloadType(context),
-			`Invalid ${context}: expected exactly one of itemPath or graphNodeId with graphPath.`,
+			`Invalid ${context}: expected exactly one of itemPath, graphNodeId with graphPath, or source.`,
+		);
+	}
+	if (slot.reads !== undefined && !fromSource) {
+		throw invalidPayloadShapeError(
+			contextPayloadType(context),
+			`Invalid ${context}: reads belongs to a source slot.`,
 		);
 	}
 	if (fromItem) {
 		assertStringArrayField(slot, 'itemPath', context);
+		return;
+	}
+	if (fromSource) {
+		assertStringField(slot, 'source', context);
+		if (slot.reads === undefined) return;
+		if (!Array.isArray(slot.reads)) {
+			throw invalidPayloadShapeError(
+				contextPayloadType(context),
+				`Invalid ${context}.reads: expected array.`,
+			);
+		}
+		for (const [index, read] of slot.reads.entries()) {
+			assertRecordShape(read, `${context}.reads[${index}]`);
+			assertStringField(read, 'graphNodeId', `${context}.reads[${index}]`);
+			assertStringArrayField(read, 'path', `${context}.reads[${index}]`);
+		}
 		return;
 	}
 	assertStringField(slot, 'graphNodeId', context);
@@ -670,10 +714,10 @@ function assertOptionalServedArmRecords(record: Record<string, unknown>, context
 		const entry = locator as Record<string, unknown>;
 		assertStringField(entry, 'hostNodeId', locatorContext);
 		assertStringField(entry, 'tagName', locatorContext);
-		if (entry.strategy !== 'arm-relative') {
+		if ('strategy' in entry) {
 			throw invalidPayloadShapeError(
 				contextPayloadType(locatorContext),
-				`Invalid ${locatorContext}: expected arm-relative strategy.`,
+				`Invalid ${locatorContext}: an arm-relative locator carries no strategy.`,
 			);
 		}
 		assertNonNegativeIntegerField(entry, 'index', locatorContext);

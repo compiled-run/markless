@@ -23,8 +23,11 @@ import {
 	componentEdgesFor,
 	componentOwnedInitialValues,
 	componentOwnedStateNodes,
+	projectsElementsIntoRows,
 	sameModuleComponentMap,
+	staticHostLocators,
 } from './shared.ts';
+import { collectSsrPropEvents } from './component-wiring.ts';
 import type { PublicRenderRoot } from './types.ts';
 
 // Component definitions are compiler data consumed by the linked prerender
@@ -300,6 +303,9 @@ export function collectPublicRenderComponentDefinitions(
 				...(widgetRootDefinitionIds(input, componentName).length > 0
 					? { rootsWidget: true }
 					: {}),
+				// A build-time gate: the render-data module attaches the per-row record qualifier only here.
+				...(projectsElementsIntoRows(chunks) ? { projectsIntoRows: true } : {}),
+				...rootPropEvents(componentName),
 				// This component carries these families' cells so a page that renders
 				// no designated root still has them, but composes as a part of the
 				// widget rather than the start of one. Only an unseeded family has
@@ -317,6 +323,21 @@ export function collectPublicRenderComponentDefinitions(
 				...residueReaderFields(),
 			},
 		];
+
+		// A handler that is the prop itself takes its composer's callback in a client render too; a wrapping one runs through its bound claim.
+		function rootPropEvents(name: string): { readonly propEvents?: ReturnType<typeof collectSsrPropEvents> } {
+			if (name !== rootInfo.componentName) return {};
+			const events = collectSsrPropEvents(
+				rootInfo.root,
+				rootInfo.propNames,
+				input.source.source,
+				staticHostLocators(input),
+				input.semanticGraph.events.filter((event) =>
+					chunks.some((chunk) => chunk.hosts.some((host) => host.hostNodeId === event.hostNodeId)),
+				),
+			).filter((event) => !event.wraps);
+			return events.length ? { propEvents: events } : {};
+		}
 
 		function residueReaderFields(): Record<string, unknown> {
 			const readerSource = emitClientResidueReader(

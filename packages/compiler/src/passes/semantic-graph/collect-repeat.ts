@@ -16,8 +16,15 @@ import {
 	repeatKeyIsIndexDiagnostic,
 	repeatKeyRequiredDiagnostic,
 	repeatKeyUnstableDiagnostic,
+	repeatRowHandlersUnwiredDiagnostic,
 } from './diagnostics.ts';
 import { firstReactiveRowRead, repeatRowNames } from './repeat-reactivity.ts';
+import {
+	enclosingKeyedRepeat,
+	enclosingRowItemPath,
+	liftRowHandlerCollection,
+	nestedRowHandlers,
+} from './static-repeat-lift.ts';
 import type { WalkState } from './types.ts';
 
 export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | null {
@@ -137,10 +144,37 @@ export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | nu
 		return null;
 	}
 
+	const enclosing = enclosingKeyedRepeat(state);
+	const enclosingItemPath =
+		enclosing && !resolvedCollection ? enclosingRowItemPath(collectionSource, enclosing) : null;
+	const rowHandlerCollection =
+		(enclosing ? nestedRowHandlers(node, enclosing) : null) ??
+		(resolvedCollection || enclosingItemPath
+			? null
+			: liftRowHandlerCollection(node, collectionNode, itemName, state));
+	if (rowHandlerCollection?.kind === 'unliftable') {
+		state.graph.diagnostics.push(
+			repeatRowHandlersUnwiredDiagnostic({
+				node,
+				itemName,
+				collectionSource,
+				handlerName: rowHandlerCollection.handlerName,
+				reason: rowHandlerCollection.reason,
+				filename: state.filename,
+			}),
+		);
+		return null;
+	}
+	const collection = resolvedCollection
+		? { graphNodeId: resolvedCollection.binding.id, path: resolvedCollection.path }
+		: rowHandlerCollection?.kind === 'lifted'
+			? { graphNodeId: rowHandlerCollection.graphNodeId, path: [] }
+			: null;
+
 	// An off-graph collection is a designed server-only path, correct while the
 	// rows are static. It is a defect only once a row reads something a later
 	// write can move: those rows never reconcile, so the read silently freezes.
-	if (!resolvedCollection) {
+	if (!collection && !enclosingItemPath) {
 		const reactiveRead = firstReactiveRowRead(node, state, repeatRowNames(itemName, indexName));
 		if (reactiveRead) {
 			state.graph.diagnostics.push(
@@ -165,10 +199,10 @@ export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | nu
 		itemName,
 		...(indexName ? { indexName } : {}),
 		collectionSource,
-		...(resolvedCollection
+		...(collection
 			? {
-					collectionGraphNodeId: resolvedCollection.binding.id,
-					collectionPath: resolvedCollection.path,
+					collectionGraphNodeId: collection.graphNodeId,
+					collectionPath: collection.path,
 				}
 			: {
 					collectionPath: [],
@@ -176,6 +210,8 @@ export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | nu
 		keySource,
 		keyPath: keyPath ?? [],
 		...(isIndexKey ? { indexKey: true as const } : {}),
+		...(enclosing ? { enclosingRepeatId: enclosing.id } : {}),
+		...(enclosingItemPath ? { enclosingItemPath } : {}),
 	});
 	return repeatIndex;
 }

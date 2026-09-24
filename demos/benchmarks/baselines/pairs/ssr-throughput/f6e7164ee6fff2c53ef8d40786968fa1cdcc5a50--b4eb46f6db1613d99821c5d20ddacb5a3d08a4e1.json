@@ -17,16 +17,8 @@
 	},
 	"deltas": {
 		"news-50": {
-			"opsPerSecBaseRuns": [
-				11437.191717879197,
-				11126.095260178132,
-				11063.729802594133
-			],
-			"opsPerSecCandidateRuns": [
-				16174.484994792147,
-				16059.269522261337,
-				16217.14264719332
-			],
+			"opsPerSecBaseRuns": [11437.191717879197, 11126.095260178132, 11063.729802594133],
+			"opsPerSecCandidateRuns": [16174.484994792147, 16059.269522261337, 16217.14264719332],
 			"opsPerSecBaseMedian": 11126.095260178132,
 			"opsPerSecCandidateMedian": 16174.484994792147,
 			"opsPerSecDeltaPercent": 45.37431701383068,
@@ -36,16 +28,8 @@
 			"regressesBeyondThreshold": false
 		},
 		"news-500": {
-			"opsPerSecBaseRuns": [
-				1037.8945229268147,
-				1013.6475524367031,
-				1011.9630114960447
-			],
-			"opsPerSecCandidateRuns": [
-				1479.3040072020328,
-				1489.536486196244,
-				1492.0008969735818
-			],
+			"opsPerSecBaseRuns": [1037.8945229268147, 1013.6475524367031, 1011.9630114960447],
+			"opsPerSecCandidateRuns": [1479.3040072020328, 1489.536486196244, 1492.0008969735818],
 			"opsPerSecBaseMedian": 1013.6475524367031,
 			"opsPerSecCandidateMedian": 1489.536486196244,
 			"opsPerSecDeltaPercent": 46.94816582110354,
@@ -55,16 +39,8 @@
 			"regressesBeyondThreshold": false
 		},
 		"parallel-async": {
-			"opsPerSecBaseRuns": [
-				88524.5488752254,
-				89003.20745664513,
-				87522.33629101448
-			],
-			"opsPerSecCandidateRuns": [
-				87515.91593986643,
-				89302.37320489612,
-				87419.34433949176
-			],
+			"opsPerSecBaseRuns": [88524.5488752254, 89003.20745664513, 87522.33629101448],
+			"opsPerSecCandidateRuns": [87515.91593986643, 89302.37320489612, 87419.34433949176],
 			"opsPerSecBaseMedian": 88524.5488752254,
 			"opsPerSecCandidateMedian": 87515.91593986643,
 			"opsPerSecDeltaPercent": -1.13938218062046,
@@ -74,16 +50,8 @@
 			"regressesBeyondThreshold": false
 		},
 		"nested-waterfall": {
-			"opsPerSecBaseRuns": [
-				265329.4120898857,
-				265046.1908654835,
-				257002.35656079042
-			],
-			"opsPerSecCandidateRuns": [
-				263894.3032485591,
-				266497.5370254237,
-				261346.94506949667
-			],
+			"opsPerSecBaseRuns": [265329.4120898857, 265046.1908654835, 257002.35656079042],
+			"opsPerSecCandidateRuns": [263894.3032485591, 266497.5370254237, 261346.94506949667],
 			"opsPerSecBaseMedian": 265046.1908654835,
 			"opsPerSecCandidateMedian": 263894.3032485591,
 			"opsPerSecDeltaPercent": -0.4345988196106416,
@@ -93,16 +61,8 @@
 			"regressesBeyondThreshold": false
 		},
 		"escape-heavy": {
-			"opsPerSecBaseRuns": [
-				114.84088066110213,
-				114.16482024764068,
-				113.28147004017941
-			],
-			"opsPerSecCandidateRuns": [
-				146.7068277113869,
-				147.94637686529384,
-				143.127923110908
-			],
+			"opsPerSecBaseRuns": [114.84088066110213, 114.16482024764068, 113.28147004017941],
+			"opsPerSecCandidateRuns": [146.7068277113869, 147.94637686529384, 143.127923110908],
 			"opsPerSecBaseMedian": 114.16482024764068,
 			"opsPerSecCandidateMedian": 146.7068277113869,
 			"opsPerSecDeltaPercent": 28.504409145617455,
@@ -142,9 +102,7 @@
 					"name": "news-50",
 					"gates": {
 						"passed": true,
-						"checks": [
-							"rendered exactly 50 articles"
-						]
+						"checks": ["rendered exactly 50 articles"]
 					},
 					"bodyBytes": 80446,
 					"timing": {
@@ -168,9 +126,7 @@
 					"name": "news-500",
 					"gates": {
 						"passed": true,
-						"checks": [
-							"rendered exactly 500 articles"
-						]
+						"checks": ["rendered exactly 500 articles"]
 					},
 					"bodyBytes": 806564,
 					"timing": {
@@ -220,9 +176,7 @@
 					"name": "nested-waterfall",
 					"gates": {
 						"passed": true,
-						"checks": [
-							"async content settled: level 4 = 404"
-						]
+						"checks": ["async content settled: level 4 = 404"]
 					},
 					"bodyBytes": 1454,
 					"timing": {
@@ -300,9 +254,7 @@
 					"name": "news-50",
 					"gates": {
 						"passed": true,
-						"checks": [
-							"rendered exactly 50 articles"
-						]
+						"checks": ["rendered exactly 50 articles"]
 					},
 					"bodyBytes": 80446,
 					"timing": {
@@ -326,9 +278,7 @@
 					"name": "news-500",
 					"gates": {
 						"passed": true,
-						"checks": [
-							"rendered exactly 500 articles"
-						]
+						"checks": ["rendered exactly 500 articles"]
 					},
 					"bodyBytes": 806564,
 					"timing": {
@@ -378,9 +328,7 @@
 					"name": "nested-waterfall",
 					"gates": {
 						"passed": true,
-						"checks": [
-							"async content settled: level 4 = 404"
-						]
+						"checks": ["async content settled: level 4 = 404"]
 					},
 					"bodyBytes": 1454,
 					"timing": {
@@ -458,9 +406,7 @@
 					"name": "news-50",
 					"gates": {
 						"passed": true,
-						"checks": [
-							"rendered exactly 50 articles"
-						]
+						"checks": ["rendered exactly 50 articles"]
 					},
 					"bodyBytes": 80446,
 					"timing": {
@@ -484,9 +430,7 @@
 					"name": "news-500",
 					"gates": {
 						"passed": true,
-						"checks": [
-							"rendered exactly 500 articles"
-						]
+						"checks": ["rendered exactly 500 articles"]
 					},
 					"bodyBytes": 806564,
 					"timing": {
@@ -536,9 +480,7 @@
 					"name": "nested-waterfall",
 					"gates": {
 						"passed": true,
-						"checks": [
-							"async content settled: level 4 = 404"
-						]
+						"checks": ["async content settled: level 4 = 404"]
 					},
 					"bodyBytes": 1454,
 					"timing": {
@@ -618,9 +560,7 @@
 					"name": "news-50",
 					"gates": {
 						"passed": true,
-						"checks": [
-							"rendered exactly 50 articles"
-						]
+						"checks": ["rendered exactly 50 articles"]
 					},
 					"bodyBytes": 39572,
 					"timing": {
@@ -644,9 +584,7 @@
 					"name": "news-500",
 					"gates": {
 						"passed": true,
-						"checks": [
-							"rendered exactly 500 articles"
-						]
+						"checks": ["rendered exactly 500 articles"]
 					},
 					"bodyBytes": 399080,
 					"timing": {
@@ -696,9 +634,7 @@
 					"name": "nested-waterfall",
 					"gates": {
 						"passed": true,
-						"checks": [
-							"async content settled: level 4 = 404"
-						]
+						"checks": ["async content settled: level 4 = 404"]
 					},
 					"bodyBytes": 1454,
 					"timing": {
@@ -776,9 +712,7 @@
 					"name": "news-50",
 					"gates": {
 						"passed": true,
-						"checks": [
-							"rendered exactly 50 articles"
-						]
+						"checks": ["rendered exactly 50 articles"]
 					},
 					"bodyBytes": 39572,
 					"timing": {
@@ -802,9 +736,7 @@
 					"name": "news-500",
 					"gates": {
 						"passed": true,
-						"checks": [
-							"rendered exactly 500 articles"
-						]
+						"checks": ["rendered exactly 500 articles"]
 					},
 					"bodyBytes": 399080,
 					"timing": {
@@ -854,9 +786,7 @@
 					"name": "nested-waterfall",
 					"gates": {
 						"passed": true,
-						"checks": [
-							"async content settled: level 4 = 404"
-						]
+						"checks": ["async content settled: level 4 = 404"]
 					},
 					"bodyBytes": 1454,
 					"timing": {
@@ -934,9 +864,7 @@
 					"name": "news-50",
 					"gates": {
 						"passed": true,
-						"checks": [
-							"rendered exactly 50 articles"
-						]
+						"checks": ["rendered exactly 50 articles"]
 					},
 					"bodyBytes": 39572,
 					"timing": {
@@ -960,9 +888,7 @@
 					"name": "news-500",
 					"gates": {
 						"passed": true,
-						"checks": [
-							"rendered exactly 500 articles"
-						]
+						"checks": ["rendered exactly 500 articles"]
 					},
 					"bodyBytes": 399080,
 					"timing": {
@@ -1012,9 +938,7 @@
 					"name": "nested-waterfall",
 					"gates": {
 						"passed": true,
-						"checks": [
-							"async content settled: level 4 = 404"
-						]
+						"checks": ["async content settled: level 4 = 404"]
 					},
 					"bodyBytes": 1454,
 					"timing": {

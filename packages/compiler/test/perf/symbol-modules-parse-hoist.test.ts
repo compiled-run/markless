@@ -38,24 +38,30 @@ vi.mock('../../src/js-ast.ts', async (importOriginal) => {
 const { compileTsrxModule } = await import('../../src/index.ts');
 
 /** Each row mints an event-handler module — the kind both readers ask about. */
-function rowsSource(rows: number): string {
+function rowsSource(rows: number, salt: number): string {
 	const lines = ["import { state } from '@markless/core';", '', 'export function App() @{'];
 	lines.push('\tlet count = state(0);');
 	lines.push('\t<main>');
 	for (let row = 0; row < rows; row += 1) {
 		lines.push(
-			`\t\t<button onClick={(event) => { event.preventDefault(); count = count + ${row}; }}>{count}</button>`,
+			`\t\t<button onClick={(event) => { event.preventDefault(); count = count + ${row} + ${salt}; }}>{count}</button>`,
 		);
 	}
 	lines.push('\t</main>', '}');
 	return `${lines.join('\n')}\n`;
 }
 
-async function printedModuleParses(rows: number): Promise<{ parses: number; modules: number }> {
+// Salted so each call prints modules no earlier compile has already read.
+let nextSalt = 0;
+
+async function printedModuleParses(
+	rows: number,
+	salt = (nextSalt += 1),
+): Promise<{ parses: number; modules: number }> {
 	parses.bySource.clear();
 	const result = await compileTsrxModule({
 		filename: `src/Rows${rows}.tsrx`,
-		source: rowsSource(rows),
+		source: rowsSource(rows, salt),
 		symbols: [],
 	});
 	const emitted = result.symbolModules?.modules ?? [];
@@ -83,4 +89,13 @@ test('the parses per printed module stay flat as the page grows', async () => {
 
 	expect(large.modules).toBeGreaterThan(small.modules);
 	expect(large.parses / large.modules).toBe(small.parses / small.modules);
+});
+
+test('recompiling the same module reads none of its printed modules again', async () => {
+	const first = await printedModuleParses(4, 1_000);
+	const again = await printedModuleParses(4, 1_000);
+
+	expect(first.parses).toBe(first.modules);
+	expect(again.modules).toBe(first.modules);
+	expect(again.parses).toBe(0);
 });

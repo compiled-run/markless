@@ -1,25 +1,35 @@
-import { parseJavaScriptModule, type JavaScriptAstNode } from '@markless/compiler';
+import type { JavaScriptAstNode } from '@markless/compiler';
+import { chunkDynamicImports, parseChunkCode, spansAnyOffset, textOffsets } from './chunk-ast.ts';
 import { dirname, join } from 'pathe';
 
-// The bundle graph's dynamic edges must match the SHIPPED code: generateBundle
-// rewrites (preload-wrapper stripping, facade splits) leave real dynamic
-// imports — including template-literal specifiers — that rolldown's
-// chunk.dynamicImports metadata never carried, producing zero-incoming-edge
-// chunks that execute post-interaction without ever being preloaded. This
-// scans a chunk's final emitted code for statically-analyzable dynamic-import
-// specifiers so metadata can UNION them in. Interpolated specifiers stay
-// unscannable by design (covered by symbol roots).
+// Code rewrites can add import edges absent from Rolldown's chunk metadata.
 export function scanEmittedDynamicImports(code: string, chunkFileName: string): string[] {
 	if (!code.includes('import(')) return [];
 
+	let recorded;
+	try {
+		recorded = chunkDynamicImports(chunkFileName, code);
+	} catch {
+		return [];
+	}
+	if (recorded) {
+		const specifiers = new Set<string>();
+		for (const { specifier } of recorded)
+			if (specifier?.startsWith('.')) specifiers.add(join(dirname(chunkFileName), specifier));
+		return [...specifiers];
+	}
+
 	let ast: JavaScriptAstNode;
 	try {
-		ast = parseJavaScriptModule(code) as JavaScriptAstNode;
+		const parsed = parseChunkCode(chunkFileName, code);
+		if (parsed.errors.length) return [];
+		ast = parsed.program as unknown as JavaScriptAstNode;
 	} catch {
 		return [];
 	}
 
 	const specifiers = new Set<string>();
+	const offsets = textOffsets(code, 'import');
 	const visit = (node: JavaScriptAstNode | null | undefined): void => {
 		if (!node || typeof node !== 'object') return;
 		if (node.type === 'ImportExpression') {
@@ -31,7 +41,7 @@ export function scanEmittedDynamicImports(code: string, chunkFileName: string): 
 				specifiers.add(join(dirname(chunkFileName), specifier));
 			}
 		}
-		for (const child of childNodes(node)) visit(child);
+		for (const child of childNodes(node)) if (spansAnyOffset(offsets, child)) visit(child);
 	};
 	visit(ast);
 	return [...specifiers];
@@ -48,7 +58,6 @@ function staticSpecifier(source: unknown): string | undefined {
 	if (astNode.type === 'Literal' || astNode.type === 'StringLiteral') {
 		return typeof astNode.value === 'string' ? astNode.value : undefined;
 	}
-	// Substitution-free template literals only: `./chunk-x.js`.
 	if (astNode.type === 'TemplateLiteral' && (astNode.expressions ?? []).length === 0) {
 		const quasi = astNode.quasis?.[0];
 		return quasi?.value?.cooked ?? quasi?.cooked;

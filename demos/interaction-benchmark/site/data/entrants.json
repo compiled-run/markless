@@ -1,0 +1,528 @@
+{
+	"$comment": "Hand-checked extract of demos/interaction-benchmark/apps/<id>/BENCH.md as of 2026-09-22. Every entry cites its source file. Deployed URLs and the runtime actually used on Vercel live in deployments.json, not here.",
+	"checkedAt": "2026-09-22",
+	"contractVersion": "v1 (v1.1 styles: sticky .app-header)",
+	"entrants": [
+		{
+			"id": "markless",
+			"name": "Markless",
+			"source": "demos/interaction-benchmark/apps/markless",
+			"benchMd": "demos/interaction-benchmark/apps/markless/BENCH.md",
+			"versions": [
+				{
+					"package": "@markless/core, @markless/router, @markless/typescript-plugin",
+					"version": "0.4.0 (workspace:*, working tree)",
+					"prerelease": false,
+					"note": "Built from this repository's working tree, not a published release; the measured source revision is recorded per run."
+				},
+				{
+					"package": "nitro",
+					"version": "3.0.260429-beta",
+					"prerelease": true
+				},
+				{
+					"package": "vite-plus",
+					"version": "0.3.1",
+					"prerelease": false
+				},
+				{
+					"package": "typescript",
+					"version": "5.9.3",
+					"prerelease": false
+				}
+			],
+			"prereleaseSummary": "Unreleased working tree; Nitro v3 beta",
+			"renderMode": "ssr",
+			"renderingNote": "SSR on every request through Nitro; the router plugin renders each page.",
+			"activation": "Resume: the browser continues the server's work instead of hydrating; components do not re-run in the browser. Built with experimentalNativePacking and intent link preloading.",
+			"delivery": "About 71.7 KB gzip JS over 6 scripts on / at scaffold time; one ~68 KB chunk is modulepreloaded on every page (BENCH.md, 'Client JS on /').",
+			"navigation": "client",
+			"navigationNote": "Client navigation through Link from @markless/router.",
+			"vercelRuntime": "Node (Nitro vercel preset; BENCH.md records nodejs24.x chosen by the preset)",
+			"variants": [
+				{
+					"label": "default",
+					"note": "experimentalNativePacking + linkPreloading: intent, same as the docs site."
+				},
+				{
+					"label": "viewport",
+					"note": "Same app with viewport link preloading: after the page settles, on-screen links download (never run) their destination files at low priority. Source apps/markless-viewport, runner target markless-viewport.",
+					"source": "demos/interaction-benchmark/apps/markless-viewport",
+					"benchMd": "demos/interaction-benchmark/apps/markless-viewport/BENCH.md",
+					"runnerTarget": "markless-viewport",
+					"tunings": [
+						{
+							"setting": "router({ linkPreloading: \"viewport\" }) (vite.config.ts)",
+							"default": "\"intent\" (destination files download on hover, focus or pointerdown)",
+							"why": "Navigation files for links on screen are already downloaded when the user clicks, so a client navigation needs no network round. Starts only after the page's own modulepreloads finished (after load or the first input) and the browser is idle; two downloads at a time, fetchpriority low, paused by each new input; skipped for Save-Data and 2g.",
+							"source": "packages/router/src/vite/link-intent.ts (startViewportPrefetch); LinkNavigationProps.prefetch in @markless/router"
+						}
+					]
+				}
+			],
+			"deviations": [
+				"BENCH.md was written before the contract existed; its route and test-id notes are from the scaffold packet.",
+				"Findings at scaffold time: a page with several sibling root elements failed the build; a Link in document.tsrx caused a full reload; hashed /build/* chunks were not marked immutable by the Nitro preset. Later framework fixes are tracked on the goal board, not in this file."
+			],
+			"observations": [],
+			"activationShort": "Resume (no hydration)",
+			"earlyInput": "Not stated in BENCH.md; see early-phase failure counts"
+		},
+		{
+			"id": "qwik",
+			"name": "Qwik v2 + Qwik Router",
+			"source": "demos/interaction-benchmark/apps/qwik",
+			"benchMd": "demos/interaction-benchmark/apps/qwik/BENCH.md",
+			"versions": [
+				{
+					"package": "@qwik.dev/core",
+					"version": "2.0.0-beta.45",
+					"prerelease": true
+				},
+				{
+					"package": "@qwik.dev/router",
+					"version": "2.0.0-beta.45",
+					"prerelease": true
+				},
+				{
+					"package": "vite",
+					"version": "8.2.1",
+					"prerelease": false
+				},
+				{
+					"package": "typescript",
+					"version": "5.9.3",
+					"prerelease": false
+				}
+			],
+			"prereleaseSummary": "Qwik v2 beta (npm latest points at the beta)",
+			"renderMode": "ssr",
+			"renderingNote": "SSR on every request through the Qwik Router Vercel Edge adapter; nothing prerendered.",
+			"activation": "Resume: server state is serialized, no hydration; event handlers load lazily through the Qwik loader, and a preloader fetches bundles by probability after load.",
+			"delivery": "Default smart entry strategy. 42.4 KB gzip modulepreloaded in the SSR head; about 72 KB after load plus 3 s idle on / (BENCH.md, 'Client JS per route').",
+			"navigation": "client",
+			"navigationNote": "Client navigation through Qwik Router Link.",
+			"vercelRuntime": "Edge (Qwik v2 ships only a Vercel Edge adapter; PM ruling: disclosed, and the local controlled-host runs are the like-for-like check)",
+			"variants": [
+				{
+					"label": "default",
+					"note": "Default production settings (external async Qwik loader module, smart bundling, default preloader)."
+				},
+				{
+					"label": "tuned",
+					"note": "Same app with three documented Qwik settings: inline Qwik loader, one bundle per route plus a shared-chrome bundle, ssrPreloads 8. Source apps/qwik-tuned, runner target qwik-tuned, deployed as mlbench-qwik-tuned.",
+					"source": "demos/interaction-benchmark/apps/qwik-tuned",
+					"benchMd": "demos/interaction-benchmark/apps/qwik-tuned/BENCH.md",
+					"runnerTarget": "qwik-tuned",
+					"deployment": "qwik-tuned",
+					"tunings": [
+						{
+							"setting": "qwikLoader: \"inline\" (src/entry.ssr.tsx)",
+							"default": "\"module\" (external async <script type=\"module\">)",
+							"why": "Removes the request before listeners exist; clicks after first paint are captured.",
+							"source": "https://qwik.dev/docs/advanced/qwikloader/ (\"we recommend delivering Qwikloader in an inlined <script> tag\"); RenderOptions.qwikLoader JSDoc in @qwik.dev/core"
+						},
+						{
+							"setting": "entryStrategy: { type: \"smart\", manual: <route bundles> } (vite.config.ts)",
+							"default": "{ type: \"smart\" } with no manual map",
+							"why": "One bundle per route (overview, records, settings) and one for root/layout/tree; 60 client JS files become 41. useComputed$ segments stay separate (Qwik skips them in the manual map).",
+							"source": "https://qwik.dev/docs/guides/bundle/ (qwikVite() plugin, manual entryStrategy with the bundle() helper)"
+						},
+						{
+							"setting": "preloader: { ssrPreloads: 8, maxIdlePreloads: 25 } (src/entry.ssr.tsx)",
+							"default": "ssrPreloads 5, maxIdlePreloads 25",
+							"why": "The route and chrome bundles are modulepreloaded from the SSR HTML.",
+							"source": "PreloaderOptions JSDoc in @qwik.dev/core/dist/server.d.ts; https://qwik.dev/docs/advanced/modules-prefetching/#preloader"
+						}
+					]
+				}
+			],
+			"deviations": [
+				"Qwik Router's CSRF origin check answers 403 instead of 405 to a non-GET /api/settings request without an Origin header; the JSON POST is unaffected.",
+				"edit-name uses autoFocus so showModal() focuses it; Chromium logs an autofocus warning. No behavior change."
+			],
+			"observations": [],
+			"activationShort": "Resume (no hydration); lazy handlers via Qwik loader",
+			"earlyInput": "Qwik loader (async module in head) dispatches to lazily loaded handlers"
+		},
+		{
+			"id": "octane",
+			"name": "Octane",
+			"source": "demos/interaction-benchmark/apps/octane",
+			"benchMd": "demos/interaction-benchmark/apps/octane/BENCH.md",
+			"versions": [
+				{
+					"package": "octane",
+					"version": "0.4.2",
+					"prerelease": true,
+					"note": "npm latest; README says status: beta; pre-1.0"
+				},
+				{
+					"package": "@octanejs/vite-plugin",
+					"version": "0.1.58",
+					"prerelease": true,
+					"note": "pre-1.0"
+				},
+				{
+					"package": "@octanejs/app-core",
+					"version": "0.0.54",
+					"prerelease": true,
+					"note": "pre-1.0"
+				},
+				{
+					"package": "@octanejs/adapter-vercel",
+					"version": "0.0.55",
+					"prerelease": true,
+					"note": "pre-1.0"
+				},
+				{
+					"package": "vite",
+					"version": "8.3.0",
+					"prerelease": false
+				},
+				{
+					"package": "typescript",
+					"version": "5.9.3",
+					"prerelease": false
+				}
+			],
+			"prereleaseSummary": "Beta / pre-1.0 packages",
+			"renderMode": "ssr",
+			"renderingNote": "SSR at request time from the Vite plugin's app layer (Octane's own fullstack scaffold).",
+			"activation": "Hydration with hydrateRoot; early pointer clicks are captured and replayed.",
+			"delivery": "The same 7 chunks load on every route, 103.7 KB gzip, runtime about 85 KB (BENCH.md, 'Client JavaScript per route').",
+			"navigation": "client",
+			"navigationNote": "App pushState single-App pattern from Octane's own examples (PM ruling: its idiomatic client navigation; labeled).",
+			"vercelRuntime": "Node 22.x, iad1 (adapter-vercel serverless config)",
+			"variants": [
+				{
+					"label": "default",
+					"note": "Scaffold defaults."
+				}
+			],
+			"deviations": [
+				"Navigation uses history.pushState plus a popstate re-render, following Octane's app-layer examples; the app layer does not provide a client router.",
+				"The app stores scroll position in history.state and restores it after the popstate render.",
+				"The app smoke listed overview-toggle early as a known intermittent framework failure (see observations)."
+			],
+			"observations": [
+				"Keyboard activation (Space) pressed before the runtime loads was lost in about half of local attempts, while pointer clicks at the same moment were replayed."
+			],
+			"activationShort": "Hydration (hydrateRoot)",
+			"earlyInput": "Clicks replayed; Space sometimes lost (observation)"
+		},
+		{
+			"id": "react-router",
+			"name": "React Router (framework mode)",
+			"source": "demos/interaction-benchmark/apps/react-router",
+			"benchMd": "demos/interaction-benchmark/apps/react-router/BENCH.md",
+			"versions": [
+				{
+					"package": "react-router, @react-router/dev, @react-router/node, @react-router/serve",
+					"version": "8.4.0",
+					"prerelease": false
+				},
+				{
+					"package": "react, react-dom",
+					"version": "19.3.0",
+					"prerelease": false
+				},
+				{
+					"package": "@vercel/react-router",
+					"version": "1.3.6",
+					"prerelease": false,
+					"note": "declares React Router 7 peers"
+				},
+				{
+					"package": "vite",
+					"version": "8.3.0",
+					"prerelease": false
+				},
+				{
+					"package": "typescript",
+					"version": "5.9.3",
+					"prerelease": false
+				}
+			],
+			"prereleaseSummary": "All stable",
+			"renderMode": "ssr",
+			"renderingNote": "ssr: true; each route rendered per request, route modules split per route.",
+			"activation": "React hydration of the whole document; the router then takes over navigation. React Compiler off (template default).",
+			"delivery": "7 JS files, about 115 KB gzip on / (BENCH.md, 'Client JS and CSS on initial load'). Lazy route discovery fetches /__manifest once after hydration.",
+			"navigation": "client",
+			"navigationNote": "NavLink client navigation with ScrollRestoration.",
+			"vercelRuntime": "Node (Vercel React Router preset; Node 22 or 24 per BENCH.md)",
+			"variants": [
+				{
+					"label": "default",
+					"note": "Official default template choices."
+				}
+			],
+			"deviations": [
+				"Settings submit goes through useFetcher().submit to a clientAction that sends the contract's single JSON POST; flushSync: true commits the pending UI in the submit event.",
+				"NavLink adds framework-owned class and data-discover attributes."
+			],
+			"observations": [],
+			"activationShort": "Hydration (React 19)",
+			"earlyInput": "Not stated in BENCH.md; see early-phase failure counts"
+		},
+		{
+			"id": "remix3",
+			"name": "Remix 3",
+			"source": "demos/interaction-benchmark/apps/remix3",
+			"benchMd": "demos/interaction-benchmark/apps/remix3/BENCH.md",
+			"versions": [
+				{
+					"package": "remix",
+					"version": "3.0.0-rc.3",
+					"prerelease": true,
+					"note": "release candidate (npm tag next)"
+				},
+				{
+					"package": "@remix-run/ui",
+					"version": "0.10.0",
+					"prerelease": true,
+					"note": "pre-1.0"
+				},
+				{
+					"package": "@remix-run/assets",
+					"version": "0.7.1",
+					"prerelease": true,
+					"note": "pre-1.0"
+				},
+				{
+					"package": "@remix-run/fetch-router",
+					"version": "0.22.1",
+					"prerelease": true,
+					"note": "pre-1.0"
+				},
+				{
+					"package": "@remix-run/node-fetch-server",
+					"version": "0.14.1",
+					"prerelease": true,
+					"note": "pre-1.0"
+				},
+				{
+					"package": "typescript",
+					"version": "7.0.2",
+					"prerelease": false
+				}
+			],
+			"prereleaseSummary": "Release candidate",
+			"renderMode": "ssr",
+			"renderingNote": "SSR at request time; no bundling build. The asset server transforms and minifies each browser module on request (unbundled ESM, import map, modulepreload links).",
+			"activation": "Each clientEntry component hydrates after its modules load; no capture or replay of earlier input.",
+			"delivery": "About 67 unbundled modules, 54 KB gzip on / (BENCH.md, 'Client JS on initial load'). The app server sends uncompressed responses; the controlled local host adds the shared compressing proxy.",
+			"navigation": "client",
+			"navigationNote": "The runtime intercepts same-origin navigations through the Navigation API and fetches the destination's server-rendered HTML.",
+			"vercelRuntime": "Node 24.x (own configuration; Remix 3 has no official Vercel adapter)",
+			"variants": [
+				{
+					"label": "default",
+					"note": "Scaffold defaults: no fingerprinting, no compression middleware. A fingerprinted/compressed tuned variant is documented, not built."
+				}
+			],
+			"deviations": [
+				"No build step exists; pnpm build writes build-info.json with the build id.",
+				"settings-form keeps action/method for progressive enhancement; the measured path is always the JSON fetch.",
+				"Framework hydration markers, an import map and about 60 modulepreload links are in the HTML (counted)."
+			],
+			"observations": [
+				"Early inputs that arrive before a clientEntry hydrates were lost in local runs (overview-toggle early every run; other early cases occasionally)."
+			],
+			"activationShort": "Per-component hydration (clientEntry)",
+			"earlyInput": "Not captured; lost in local runs"
+		},
+		{
+			"id": "solidstart",
+			"name": "SolidStart v2",
+			"source": "demos/interaction-benchmark/apps/solidstart",
+			"benchMd": "demos/interaction-benchmark/apps/solidstart/BENCH.md",
+			"versions": [
+				{
+					"package": "@solidjs/start",
+					"version": "2.0.5",
+					"prerelease": false
+				},
+				{
+					"package": "solid-js",
+					"version": "1.9.15",
+					"prerelease": false,
+					"note": "Solid v1 runtime; not Solid 2"
+				},
+				{
+					"package": "@solidjs/router",
+					"version": "1.0.0",
+					"prerelease": false
+				},
+				{
+					"package": "@solidjs/meta",
+					"version": "0.29.4",
+					"prerelease": false
+				},
+				{
+					"package": "nitro",
+					"version": "3.0.260903-beta",
+					"prerelease": true
+				},
+				{
+					"package": "vite",
+					"version": "8.3.0",
+					"prerelease": false
+				}
+			],
+			"prereleaseSummary": "Stable framework; Nitro v3 beta",
+			"renderMode": "ssr",
+			"renderingNote": "Streaming SSR by default; the client hydrates.",
+			"activation": "Hydration; captured click and input events that arrive before hydration are replayed.",
+			"delivery": "About 24 KB gzip JS on /, plus a 4.5 KB gzip stylesheet that includes unused dev-toolbar CSS (BENCH.md, 'Client bytes per route').",
+			"navigation": "client",
+			"navigationNote": "Client navigation through <A> from @solidjs/router.",
+			"vercelRuntime": "Node (Nitro vercel preset, nodejs24.x at scaffold time; region not yet configured)",
+			"variants": [
+				{
+					"label": "default",
+					"note": "Official solid-start-v2/basic template setup."
+				}
+			],
+			"deviations": [
+				"<Router scrollRestoration> (documented, non-default) is enabled; without it Back lands at scrollY 0.",
+				"@solidjs/meta is added for <Title> as in the official template (bytes counted).",
+				"<A> adds framework-owned class and link attributes."
+			],
+			"observations": [
+				"Production builds ship SolidStart dev-toolbar CSS as a render-blocking stylesheet (the toolbar JS itself is removed)."
+			],
+			"activationShort": "Hydration",
+			"earlyInput": "click/input replayed"
+		},
+		{
+			"id": "sveltekit",
+			"name": "SvelteKit (Svelte 5)",
+			"source": "demos/interaction-benchmark/apps/sveltekit",
+			"benchMd": "demos/interaction-benchmark/apps/sveltekit/BENCH.md",
+			"versions": [
+				{
+					"package": "svelte",
+					"version": "5.57.1",
+					"prerelease": false
+				},
+				{
+					"package": "@sveltejs/kit",
+					"version": "2.70.3",
+					"prerelease": false
+				},
+				{
+					"package": "@sveltejs/adapter-vercel",
+					"version": "6.3.4",
+					"prerelease": false
+				},
+				{
+					"package": "@sveltejs/vite-plugin-svelte",
+					"version": "7.3.0",
+					"prerelease": false
+				},
+				{
+					"package": "vite",
+					"version": "8.3.0",
+					"prerelease": false
+				},
+				{
+					"package": "typescript",
+					"version": "6.0.3",
+					"prerelease": false,
+					"note": "newest release inside Kit's peer range"
+				}
+			],
+			"prereleaseSummary": "All stable",
+			"renderMode": "ssr",
+			"renderingNote": "SvelteKit default SSR; nothing prerendered.",
+			"activation": "Hydration (Svelte 5 runes); no replay of events that arrive before hydration.",
+			"delivery": "10 JS files, about 34.6 KB gzip on / (BENCH.md, 'Client bytes on initial load'). Preload hints are sent as an HTTP Link header.",
+			"navigation": "client",
+			"navigationNote": "SvelteKit client router; data-sveltekit-preload-data=\"hover\" kept from the default template.",
+			"vercelRuntime": "Node 22.x, iad1 (adapter-vercel config)",
+			"variants": [
+				{
+					"label": "default",
+					"note": "Default project template configuration."
+				}
+			],
+			"deviations": [
+				"Disclosure state lives in the layout, which stays mounted across client navigation (allowed by the contract).",
+				"Hover preloading of route code is the default template's setting."
+			],
+			"observations": [
+				"No replay of input that arrives before hydration; early clicks on slow networks can be lost."
+			],
+			"activationShort": "Hydration (Svelte 5)",
+			"earlyInput": "Not replayed"
+		},
+		{
+			"id": "ripple",
+			"name": "Ripple",
+			"source": "demos/interaction-benchmark/apps/ripple",
+			"benchMd": "demos/interaction-benchmark/apps/ripple/BENCH.md",
+			"versions": [
+				{
+					"package": "ripple",
+					"version": "0.4.7",
+					"prerelease": true,
+					"note": "pre-1.0"
+				},
+				{
+					"package": "@ripple-ts/vite-plugin",
+					"version": "0.4.7",
+					"prerelease": true,
+					"note": "pre-1.0"
+				},
+				{
+					"package": "@ripple-ts/adapter-vercel",
+					"version": "0.4.7",
+					"prerelease": true,
+					"note": "pre-1.0"
+				},
+				{
+					"package": "@tsrx/ripple, @tsrx/core",
+					"version": "0.2.4",
+					"prerelease": true,
+					"note": "pre-1.0"
+				},
+				{
+					"package": "vite",
+					"version": "8.3.0",
+					"prerelease": false
+				},
+				{
+					"package": "typescript",
+					"version": "5.9.3",
+					"prerelease": false
+				}
+			],
+			"prereleaseSummary": "Pre-1.0",
+			"renderMode": "ssr",
+			"renderingNote": "Buffered SSR from the plugin's production entry; the generated client entry hydrates.",
+			"activation": "Hydration; no queue or replay of events that arrive before the client entry runs.",
+			"delivery": "About 21.3 KB gzip JS on /; AppShell chunk is not in the modulepreload list and is discovered late (BENCH.md, 'Client JS and CSS on initial load').",
+			"navigation": "document",
+			"navigationNote": "Ripple 0.4.7 has no client router, so header links are document navigations (PM ruling). Navigation cases are labeled document navigation and never compared as client-navigation latency.",
+			"vercelRuntime": "Node (adapter-vercel; runtime auto-detected from local Node at scaffold time, must be set to 22.x before deploy)",
+			"variants": [
+				{
+					"label": "default",
+					"note": "Plugin defaults."
+				}
+			],
+			"deviations": [
+				"Navigation is document navigation (see above).",
+				"Each page renders <AppShell route=...> instead of a RenderRoute layout, which cannot see the matched route during SSR.",
+				"Dialog Escape uses onCancel with delegated: false; selection uses track(new Set()) instead of RippleSet."
+			],
+			"observations": [
+				"The Vercel function traced to about 18 MB on disk for a three-route app (build tooling traced into the function)."
+			],
+			"activationShort": "Hydration",
+			"earlyInput": "Not replayed"
+		}
+	]
+}

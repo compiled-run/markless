@@ -185,6 +185,38 @@ test('execution size asset covers the dev-log module id that logs itself', async
 	expect(sizes).not.toHaveProperty('attribution');
 });
 
+test('execution size asset charges hook calls in an app chunk as instrument, not app', async () => {
+	const app = 'function t(e){return e}function n(){return(n=e((()=>{})))()}n();export{t as symbol_1};';
+	const code = app.replace('()=>{}', '()=>{globalThis.__mxLog?.add(`web:render`)}');
+	const asset = await createExecutionSizesAsset(
+		{
+			'build/chunk-app.js': {
+				type: 'chunk',
+				fileName: 'build/chunk-app.js',
+				name: 'chunk-app',
+				code,
+				exports: [],
+				imports: [],
+				dynamicImports: [],
+				moduleIds: ['/repo/packages/web/src/render.ts'],
+				facadeModuleId: null,
+			},
+		},
+		{ version: 1, modules: [], bundles: {} },
+		(fileName) => fileName.replace(/^build\//, ''),
+	);
+	const sizes = JSON.parse(String(asset.source)) as Record<
+		string,
+		{ raw: number; instrumentRaw?: number; instrument?: true }
+	>;
+
+	expect(sizes['web:render']).toMatchObject({
+		raw: app.length,
+		instrumentRaw: code.length - app.length,
+	});
+	expect(sizes['web:render']).not.toHaveProperty('instrument');
+});
+
 test('execution size asset rejects a dev-log chunk shared with app log ids', async () => {
 	const create = createExecutionSizesAsset(
 		{
@@ -436,6 +468,38 @@ test('interaction rows resolve qualified symbol ids and display them short', asy
 	).toBe(true);
 	expect(attributes.get('data-markless-log-app-bytes')).toBe('1024');
 	expect(attributes.get('data-markless-log-instrument-bytes')).toBe('0');
+});
+
+test('interaction rows label woken and warm ids with size and instrument category', async () => {
+	stubExecutionLogDom();
+	const appSymbol = `virtual:markless:symbol:${encodeURIComponent('/workspace/src/Deck.tsrx')}:${encodeURIComponent('symbol:4')}`;
+	(globalThis as ExecutionLogGlobal).__mxLog = new Set([appSymbol, MARKLESS_EXECUTION_LOG_MODULE_ID]);
+	const rows: string[] = [];
+	vi.spyOn(console, 'log').mockImplementation((line: unknown) => rows.push(String(line)));
+	vi.spyOn(console, 'groupCollapsed').mockImplementation(() => {});
+	vi.spyOn(console, 'groupEnd').mockImplementation(() => {});
+
+	const mod = await importExecutionLogModule(
+		executionLogVirtualModuleSource({ moduleSizes: new Map([[appSymbol, 2048]]) }),
+	);
+	await mod.logMarklessInteraction({
+		eventName: 'input',
+		selector: 'input.deck',
+		eventRecord: { hostNodeId: 'c1:h4', symbolIds: ['symbol:4'] },
+		before: new Set<string>(),
+		view: { behaviors: [{ hostNodeId: 'c1:h4' }] },
+	});
+
+	const cause = ' <- input matched event record c1:h4';
+	expect(rows).toContain(`woke symbol:4 (Deck.tsrx) (2.0 KB est. source)${cause}`);
+	expect(rows).toContain(`ran warm symbol:4 (Deck.tsrx) (2.0 KB est. source)${cause}`);
+	expect(
+		rows.some((row) =>
+			new RegExp(
+				`^woke ${MARKLESS_EXECUTION_LOG_MODULE_ID} \\(\\d+\\.\\d KB est\\. source instrument\\)${cause}$`,
+			).test(row),
+		),
+	).toBe(true);
 });
 
 test('pull attribution resolves both first-call lazy and direct installed-hook paths', async () => {

@@ -34,6 +34,7 @@ import {
 } from './collect-expressions.ts';
 import {
 	computedDependencyCycleDiagnostic,
+	computedReadsRenderLocalDiagnostic,
 	crossModuleHelperStateReturnUnsupportedDiagnostic,
 	crossModuleStateImportDiagnostic,
 	frameworkApiAliasUnsupportedDiagnostic,
@@ -45,6 +46,7 @@ import {
 	templateAsValueDiagnostic,
 	unstableStateCreationSiteDiagnostic,
 } from './diagnostics.ts';
+import { inlineRenderLocals } from './render-local-inline.ts';
 import { ownedModuleAst } from './shared-ast.ts';
 import type { SemanticView } from '@tsrx/yuku';
 import type { WalkState } from './types.ts';
@@ -374,8 +376,27 @@ export function collectComputedBinding(input: {
 		markTemplateValueHandled(templateValue, state);
 		return null;
 	}
+	// A shared() factory's locals are carried by the factory scope, not recomputed here.
+	const inlined =
+		body && !state.currentSharedDefinitionId
+			? inlineRenderLocals(body, state, { leaveCaptureOwned: true })
+			: null;
+	if (inlined && inlined.kind !== 'inlined') {
+		state.graph.diagnostics.push(
+			computedReadsRenderLocalDiagnostic({
+				name,
+				localName: inlined.name,
+				init,
+				filename: state.filename,
+			}),
+		);
+		return null;
+	}
+	const definitions = inlined?.definitions ?? [];
 	const isAsync = body?.async === true;
-	const dependencies = collectGraphDependencies(body, state);
+	const dependencies = [body, ...definitions].flatMap((node) =>
+		collectGraphDependencies(node, state),
+	);
 	const binding: SemanticGraphBinding = {
 		id: graphBindingId('computed', name, state),
 		name: graphBindingName(name, state),
@@ -387,14 +408,16 @@ export function collectComputedBinding(input: {
 		async: isAsync,
 		asyncCapable: isAsync,
 		dependencies,
-		functionSource: body ? expressionSource(body, state.source) : undefined,
+		functionSource:
+			inlined?.source ?? (body ? expressionSource(body, state.source) : undefined),
 	};
 	state.graph.graphBindings.push(binding);
-	state.pendingComputedDependencies.push({
-		graphNodeId: binding.id,
-		body,
-		sharedDefinitionId: state.currentSharedDefinitionId,
-	});
+	for (const read of [body, ...definitions])
+		state.pendingComputedDependencies.push({
+			graphNodeId: binding.id,
+			body: read,
+			sharedDefinitionId: state.currentSharedDefinitionId,
+		});
 	collectExpressionReads(body, state);
 	if (isAsync) collectAsyncComputedPostAwaitReads(name, body, state);
 	return binding;
@@ -1562,7 +1585,7 @@ function evaluateNamedConstant(
 }
 
 /** The initializer of a module-scope `const` this identifier actually resolves to. */
-function moduleConstantInitializer(
+export function moduleConstantInitializer(
 	name: string,
 	symbolId: number,
 	state: WalkState,

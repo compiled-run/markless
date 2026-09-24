@@ -1,0 +1,156 @@
+import { expect, test } from 'vitest';
+import { createRuntimeGraph } from '../src/graph.ts';
+
+test('dependency-only computed records do not scan dependencies during invalidation', async () => {
+	let reads = 0;
+	const graph = createRuntimeGraph({
+		cells: [{ graphNodeId: 'counter', value: 0 }],
+		computed: Array.from({ length: 100 }, (_, index) => ({
+			graphNodeId: `served:${index}`,
+			dependencies: [
+				{
+					get graphNodeId() {
+						reads++;
+						return 'counter';
+					},
+				},
+			],
+		})),
+	});
+	for (let value = 1; value <= 3; value++) {
+		reads = 0;
+		graph.write({ graphNodeId: 'counter', value });
+		await graph.flush();
+		expect(reads).toBe(0);
+	}
+});
+
+test.each(['quantity', 'expanded'])(
+	'flush skips subscriptions for state unrelated to %s',
+	async (node) => {
+		const graph = createRuntimeGraph({ cells: [{ graphNodeId: node, value: 0 }] });
+		let unrelatedReads = 0;
+		for (let index = 0; index < 100; index++) {
+			graph.subscribe({
+				id: `unrelated:${index}`,
+				get graphNodeId() {
+					unrelatedReads++;
+					return `other:${index}`;
+				},
+				run() {
+					throw new Error('Unrelated subscription ran');
+				},
+			});
+		}
+		const observed: unknown[] = [];
+		graph.subscribe({
+			id: 'affected',
+			graphNodeId: node,
+			run: (value) => {
+				observed.push(value);
+			},
+		});
+		for (let value = 1; value <= 3; value++) {
+			unrelatedReads = 0;
+			graph.write({ graphNodeId: node, value });
+			await graph.flush();
+			expect(observed).toEqual(Array.from({ length: value }, (_, index) => index + 1));
+			expect(unrelatedReads).toBe(0);
+		}
+	},
+);
+
+test('affected subscriptions keep registration order across state nodes and paths', async () => {
+	const graph = createRuntimeGraph({
+		cells: [
+			{ graphNodeId: 'alpha', value: { count: 0, other: 0 } },
+			{ graphNodeId: 'beta', value: 0 },
+		],
+	});
+	const observed: string[] = [];
+	for (const [id, node, path] of [
+		['first', 'alpha', ['count']],
+		['second', 'beta', []],
+		['untouched', 'alpha', ['other']],
+		['third', 'alpha', []],
+	] as const)
+		graph.subscribe({
+			id,
+			graphNodeId: node,
+			path,
+			run() {
+				observed.push(id);
+			},
+		});
+	graph.write({ graphNodeId: 'beta', value: 1 });
+	graph.write({ graphNodeId: 'alpha', path: ['count'], value: 1 });
+	await graph.flush();
+	expect(observed).toEqual(['first', 'second', 'third']);
+});
+
+test('flush honors removal and registration while an affected callback awaits', async () => {
+	const graph = createRuntimeGraph({ cells: [{ graphNodeId: 'value', value: 0 }] });
+	const observed: string[] = [];
+	let releaseLater = () => {};
+	graph.subscribe({
+		id: 'first',
+		graphNodeId: 'value',
+		async run() {
+			observed.push('first');
+			await Promise.resolve();
+			releaseLater();
+			graph.subscribe({
+				id: 'new',
+				graphNodeId: 'value',
+				run() {
+					observed.push('new');
+				},
+			});
+		},
+	});
+	releaseLater = graph.subscribe({
+		id: 'removed',
+		graphNodeId: 'value',
+		run() {
+			observed.push('removed');
+		},
+	});
+	graph.subscribe({
+		id: 'last',
+		graphNodeId: 'value',
+		run() {
+			observed.push('last');
+		},
+	});
+	graph.write({ graphNodeId: 'value', value: 1 });
+	await graph.flush();
+	expect(observed).toEqual(['first', 'last', 'new']);
+});
+
+test('duplicate IDs are deduplicated in registration order within a dirty batch', async () => {
+	const graph = createRuntimeGraph({
+		cells: [
+			{ graphNodeId: 'a', value: 0 },
+			{ graphNodeId: 'b', value: 0 },
+		],
+	});
+	const observed: string[] = [];
+	graph.subscribe({
+		id: 'same',
+		graphNodeId: 'a',
+		run() {
+			observed.push('a');
+		},
+	});
+	graph.subscribe({
+		id: 'same',
+		graphNodeId: 'b',
+		run() {
+			observed.push('b');
+		},
+	});
+	graph.write({ graphNodeId: 'b', value: 1 });
+	graph.write({ graphNodeId: 'a', value: 1 });
+	await graph.flush();
+	expect(observed).toEqual(['a']);
+});

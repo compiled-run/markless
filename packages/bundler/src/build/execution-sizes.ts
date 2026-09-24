@@ -5,16 +5,28 @@ import {
 	type ExecutionAttributionTables,
 } from '../execution-log.ts';
 import type { MarklessBuildMetadataBundle, MarklessBuildMetadataChunk } from './build-metadata.ts';
-import { MARKLESS_BUILD_PREFIX } from './chunking.ts';
+import { MARKLESS_EXECUTION_SIZES } from './chunking.ts';
+import { symbolExecutionLogId } from '../module-id.ts';
+import { symbolVirtualModuleSourceFile } from '../source-module.ts';
 
-export const MARKLESS_EXECUTION_SIZES = `${MARKLESS_BUILD_PREFIX}execution-sizes.json`;
+export { MARKLESS_EXECUTION_SIZES };
 
 export type ExecutionSizeEntry = {
 	readonly raw: number;
 	readonly gzip: number;
 	readonly chunk: string;
 	readonly instrument?: true;
+	/** Bytes of execution-log hook calls inside this chunk; `raw` and `gzip` exclude them. */
+	readonly instrumentRaw?: number;
 };
+
+const HOOK_CALL = String.raw`globalThis\.__mxLog\?\.add\((?:\x60[^\x60]*\x60|"(?:[^"\\]|\\.)*")\)`;
+const HOOK_CALLS = new RegExp(`${HOOK_CALL}(?:;\\n?|,)|,${HOOK_CALL}|${HOOK_CALL}`, 'g');
+
+/** The chunk code without its execution-log hook calls: what the log itself adds is instrument bytes. */
+export function stripExecutionLogHookCalls(code: string): string {
+	return code.replace(HOOK_CALLS, '');
+}
 
 const CONTENT_HASH_MODULE_SPECIFIER = /chunk-[A-Za-z0-9_-]+\.js/g;
 const CONTENT_HASH_PLACEHOLDER = 'chunk-________.js';
@@ -33,6 +45,7 @@ export type ExecutionSizesCompletenessOptions = {
 	// log id -> the resolved module id the hook was injected into. The module id
 	// is what decides whether the hook shipped; the log id is only its name.
 	readonly hookedIds?: ReadonlyMap<string, string>;
+	readonly root?: string;
 };
 
 export async function createExecutionSizesAsset(
@@ -47,10 +60,17 @@ export async function createExecutionSizesAsset(
 	const chunkSize = async (item: MarklessBuildMetadataChunk, chunk: string) => {
 		const cached = sizeByChunk.get(chunk);
 		if (cached) return cached;
+		const code = item.moduleIds.some(
+			(id) => stripResolvedIdMarker(id) === MARKLESS_EXECUTION_LOG_MODULE_ID,
+		)
+			? item.code
+			: stripExecutionLogHookCalls(item.code);
+		const instrumentRaw = item.code.length - code.length;
 		const size = {
-			raw: item.code.length,
-			gzip: await gzipByteLength(canonicalizeContentHashSpecifiers(item.code)),
+			raw: code.length,
+			gzip: await gzipByteLength(canonicalizeContentHashSpecifiers(code)),
 			chunk,
+			...(instrumentRaw > 0 ? { instrumentRaw } : {}),
 		};
 		sizeByChunk.set(chunk, size);
 		return size;
@@ -63,7 +83,7 @@ export async function createExecutionSizesAsset(
 			// Key symbols by their virtual module id (it embeds the source
 			// filename): same-numbered symbols from two source files must not
 			// overwrite each other in this flat map.
-			chunk.push(stripResolvedIdMarker(symbol.virtualModuleId));
+			chunk.push(symbolExecutionLogId(symbol.virtualModuleId, options.root));
 			symbolLogIdsByChunk.set(symbol.fileName, chunk);
 		}
 	}
@@ -100,9 +120,14 @@ export async function createExecutionSizesAsset(
 	if (options.executionLogActive === true) {
 		const absorbing = absorbingChunkIndex(bundle);
 		const unmappable: string[] = [];
-		for (const required of requiredExecutionLogIds(metadata, options.hookedIds, absorbing)) {
+		for (const required of requiredExecutionLogIds(
+			metadata,
+			options.hookedIds,
+			absorbing,
+			options.root,
+		)) {
 			if (entries[required.id]) continue;
-			const item = absorbing.get(required.id);
+			const item = absorbing.get(required.moduleId ?? required.id);
 			if (!item) {
 				// A shipped producer that joins nothing is the hole this asset
 				// exists to deny. A hooked module no client chunk carries cannot
@@ -148,6 +173,7 @@ export const UNSHIPPED_HOOK_REASON =
 
 type RequiredExecutionLogId = {
 	readonly id: string;
+	readonly moduleId?: string;
 	readonly shipped: boolean;
 	readonly hooked?: boolean;
 };
@@ -159,22 +185,34 @@ function requiredExecutionLogIds(
 	metadata: MarklessBuildMetadata,
 	hookedIds: ReadonlyMap<string, string> = new Map(),
 	absorbing: ReadonlyMap<string, MarklessBuildMetadataChunk> = new Map(),
+	root?: string,
 ): RequiredExecutionLogId[] {
 	const required = new Map<string, RequiredExecutionLogId>();
-	const add = (id: string, shipped: boolean, hooked = false) => {
+	const add = (id: string, shipped: boolean, hooked = false, moduleId = id) => {
 		const current = required.get(id);
 		if (!current || (shipped && !current.shipped))
-			required.set(id, { id, shipped, hooked: hooked || current?.hooked });
+			required.set(id, { id, moduleId, shipped, hooked: hooked || current?.hooked });
 	};
 	// A hook's module id, not its log id, decides whether it shipped: the bundle
 	// either carries that module or it does not. Deriving "shipped" from the log
 	// id instead would exempt exactly the ids whose derivation is broken.
-	for (const [id, moduleId] of hookedIds) add(id, absorbing.has(moduleId), true);
+	for (const [id, moduleId] of hookedIds)
+		add(
+			id,
+			absorbing.has(moduleId),
+			true,
+			symbolVirtualModuleSourceFile(moduleId) === null ? id : moduleId,
+		);
 	add(MARKLESS_EXECUTION_LOG_MODULE_ID, false);
 	for (const id of EXECUTION_LOG_DISPATCH_MODULE_IDS) add(id, false);
 	for (const module of metadata.modules)
 		for (const symbol of module.symbols)
-			add(stripResolvedIdMarker(symbol.virtualModuleId), !!symbol.fileName);
+			add(
+				symbolExecutionLogId(symbol.virtualModuleId, root),
+				!!symbol.fileName,
+				false,
+				stripResolvedIdMarker(symbol.virtualModuleId),
+			);
 	return [...required.values()];
 }
 

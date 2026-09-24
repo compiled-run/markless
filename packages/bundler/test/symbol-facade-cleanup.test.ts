@@ -226,6 +226,32 @@ describe('generated symbol facade cleanup', () => {
 		);
 	});
 
+	test('keeps init export names when chunks sharing a generated name would shorten it differently', () => {
+		const first = 'init__virtual_markless_symbol__2Fworkspace_2Fsrc_2Ffirst_2Etsrx$1';
+		const second = 'init__virtual_markless_symbol__2Fworkspace_2Fsrc_2Fsecond_2Etsrx$1';
+		const chunk = (fileName: string, names: string[]) => ({
+			type: 'chunk',
+			fileName,
+			code: `export{${names.map((name, index) => `l${index} as ${name}`).join(',')}};${names.map((_, index) => `function l${index}(){}`).join('')}`,
+			exports: names,
+			imports: [],
+			dynamicImports: [],
+			moduleIds: ['\0virtual:markless:symbol:%2Fworkspace%2Fsrc%2Ffirst.tsrx:symbol%3A0'],
+		});
+		const bundle: Record<string, ReturnType<typeof chunk>> = {
+			'build/both.js': chunk('build/both.js', [first, second]),
+			'build/second.js': chunk('build/second.js', [second]),
+		};
+
+		rewriteGeneratedSymbolInitExports(bundle);
+
+		for (const output of Object.values(bundle)) {
+			const exported = [...output.code.matchAll(/ as ([$\w]+)/g)].map((match) => match[1]);
+			expect(new Set(exported).size).toBe(exported.length);
+			expect(exported).toEqual(output.exports);
+		}
+	});
+
 	test('collapses generated symbol init exports into one stable chunk initializer', () => {
 		const symbolVirtualId =
 			'\0virtual:markless:symbol:%2Fworkspace%2Fsrc%2Froot.tsrx:symbol%3A0';

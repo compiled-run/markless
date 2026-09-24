@@ -19,6 +19,13 @@ export type SemanticGraphInput = {
 	readonly moduleId?: string;
 	readonly source: string;
 	readonly importedModuleInterfaces?: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
+	/**
+	 * Build-time values of plain-data `const` exports, by import specifier and
+	 * export name. A component prop that reads one (`node={TREE[0]}`) reaches the
+	 * browser as that value. The bundler fills this for the specifiers named by
+	 * `importedConstants` on this module's props.
+	 */
+	readonly importedModuleConstants?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 	readonly artifactChildMaterializations?: Readonly<Record<string, ArtifactChildMaterialization>>;
 	readonly additionalFrameworkApiSources?: readonly string[];
 };
@@ -71,6 +78,17 @@ export type SemanticComponentPropBinding =
 			readonly parameters?: ReadonlyArray<string>;
 			readonly value?: unknown;
 			readonly sourceSpan?: SourceSpan;
+			// Body-local definitions spliced into a callback `source`; their reads are its too.
+			readonly definitionSpans?: ReadonlyArray<SourceSpan>;
+			// An opaque prop that is plain constant data: the render still runs the
+			// expression, and browser code reads this value instead.
+			readonly buildTimeValue?: { readonly value: unknown };
+			// Imported `const` values an opaque prop reads that this compile was not
+			// given; the bundler evaluates those modules and compiles again.
+			readonly importedConstants?: ReadonlyArray<{
+				readonly source: string;
+				readonly exportName: string;
+			}>;
 			// A consumer's event callback becomes a real event record on whatever
 			// element the child spreads it onto, so its browser-critical policy has
 			// to cross the edge with it or the default action wins.
@@ -217,6 +235,18 @@ export type ModuleGraphInterfaceLinkedComponent = {
 	readonly componentName: string;
 };
 
+export type ModuleGraphInterfaceFirstUseReach = {
+	readonly props: ReadonlyArray<{
+		readonly name: string;
+		readonly reach: RuntimeDemandMapFirstUseReach;
+	}>;
+	// Every prop name the list above does not carry.
+	readonly otherProps: RuntimeDemandMapFirstUseReach;
+	readonly mount: RuntimeDemandMapFirstUseReach;
+	// What resume start runs in this module and every module it composes, whichever action wakes it.
+	readonly resume: RuntimeDemandMapFirstUseReach;
+};
+
 /**
  * A `shared()` definition this module exports, published whole: the definition
  * record its own parts resolve, plus the factory graph nodes its returned
@@ -265,6 +295,23 @@ export type ModuleGraphInterfaceArtifact = {
 			readonly armMaterial?: ModuleGraphInterfaceArmMaterial;
 			readonly seedsFromProps?: ReadonlyArray<ModuleGraphInterfaceSeedFromProp>;
 			readonly propSpends?: ReadonlyArray<ModuleGraphInterfacePropSpend>;
+			/**
+			 * Present when this component's tree holds a keyed repeat whose rows fill
+			 * expression slots through a render-data reader, so a page placing it
+			 * must hand its resumed runtime the render-data surface.
+			 */
+			readonly rowSlotReader?: true;
+			/**
+			 * Present when this component's tree holds an action compiled as a
+			 * closure plan, so a composing page routes plan lookups toward it.
+			 */
+			readonly closureActions?: true;
+			/**
+			 * What runs in the browser when a composing module changes one of this
+			 * component's props or creates an instance of it. Read by the build-time
+			 * pack planner only.
+			 */
+			readonly firstUseReach?: ModuleGraphInterfaceFirstUseReach;
 		}>;
 	};
 };
@@ -543,6 +590,10 @@ export type SemanticKeyedRepeat = {
 	// is; `indexKey` is what says a row has no data identity at all.
 	readonly keyPath: ReadonlyArray<string>;
 	readonly indexKey?: true;
+	// A @for inside another @for's row renders once per enclosing row.
+	readonly enclosingRepeatId?: string;
+	// Set when the collection is a path on the enclosing row item (`group.items`).
+	readonly enclosingItemPath?: ReadonlyArray<string>;
 };
 
 // A reactive branch site (@if or @switch) sharing the unified document-order
@@ -618,6 +669,8 @@ export type SemanticEvent = {
 	// One handler per event attribute; absent when the attribute carries no value.
 	readonly handlerSource?: string;
 	readonly handlerSpan?: SourceSpan;
+	// Body-local definitions spliced into `handlerSource`; their reads are the handler's too.
+	readonly handlerDefinitionSpans?: ReadonlyArray<SourceSpan>;
 	readonly handlerParameters: ReadonlyArray<string>;
 	readonly hasSyncPolicyCandidate: boolean;
 	readonly syncPolicy?: SemanticSyncPolicy;
@@ -636,6 +689,8 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_STATE_CROSS_MODULE_IMPORT'
 		| 'MARKLESS_STATE_NESTED_CREATION'
 		| 'MARKLESS_COMPUTED_DEPENDENCY_CYCLE'
+		| 'MARKLESS_COMPUTED_READS_RENDER_LOCAL'
+		| 'MARKLESS_HANDLER_READS_RENDER_LOCAL'
 		| 'MARKLESS_ASYNC_POST_AWAIT_READ'
 		| 'MARKLESS_ASYNC_BOUNDARY_REQUIRED'
 		| 'MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED'
@@ -671,6 +726,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_EVENT_HANDLER_NOT_A_FUNCTION'
 		| 'MARKLESS_CALLBACK_PROP_ARITY_UNSUPPORTED'
 		| 'MARKLESS_COMPONENT_PROP_EXPRESSION_UNSUPPORTED'
+		| 'MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED'
 		| 'MARKLESS_COMPONENT_SPREAD_UNSUPPORTED'
 		| 'MARKLESS_CALLBACK_SLOT_SOURCE_UNSUPPORTED'
 		| 'MARKLESS_CALLBACK_SLOT_UNBOUND'
@@ -686,6 +742,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_REPEAT_KEY_UNSTABLE'
 		| 'MARKLESS_REPEAT_COLLECTION_UNREADABLE'
 		| 'MARKLESS_REPEAT_ROWS_FROZEN'
+		| 'MARKLESS_REPEAT_ROW_HANDLERS_UNWIRED'
 		| 'MARKLESS_BRANCH_ELSE_SPELLING'
 		| 'MARKLESS_BARE_ARM_INTERPOLATION'
 		| 'MARKLESS_TEMPLATE_AS_VALUE'
@@ -714,6 +771,8 @@ export type SemanticStateWrite = {
 	readonly updateOperator?: '++' | '--';
 	readonly method?: string;
 	readonly argumentSources?: ReadonlyArray<string>;
+	/** Set when the target is rooted in the item of an enclosing keyed `@for`; names that repeat. */
+	readonly rowRepeatId?: string;
 };
 
 export type SemanticStateRead = {
@@ -1246,6 +1305,7 @@ export type StateLoweringDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_STATE_OPTIONAL_CHAIN_WRITE'
 		| 'MARKLESS_STATE_REST_ALIAS_EXCLUDED_PATH'
 		| 'MARKLESS_STATE_READ_ONLY_WRITE'
+		| 'MARKLESS_COMPUTED_ROW_WRITE'
 		| 'MARKLESS_STATE_CONST_REASSIGNMENT'
 		| 'MARKLESS_STATE_STALE_LOCAL_WRITE'
 		| 'MARKLESS_STATE_MODULE_ESCAPE'
@@ -1305,6 +1365,20 @@ export type LoweredStateWrite = {
 	readonly updateOperator?: SemanticStateWrite['updateOperator'];
 	readonly method?: string;
 	readonly argumentSources?: ReadonlyArray<string>;
+	/**
+	 * A write through a keyed `@for` row item. `graphNodeId`/`path` name the
+	 * collection; the element is located at dispatch from `context.locals`, and
+	 * `itemPath` is the path inside that element.
+	 */
+	readonly row?: LoweredRowItem;
+};
+
+/** A nested row's `enclosing` finds the collection inside the enclosing row's item. */
+export type LoweredRowItem = {
+	readonly itemName: string;
+	readonly keyPath: ReadonlyArray<string> | null;
+	readonly itemPath: ReadonlyArray<string>;
+	readonly enclosing?: LoweredRowItem;
 };
 
 export type StateLoweringArtifact = {
@@ -1329,7 +1403,6 @@ export type PayloadArenaDiagnostic = StateLoweringDiagnostic;
 export type PayloadArmRecordSet = {
 	readonly locators: ReadonlyArray<{
 		readonly hostNodeId: string;
-		readonly strategy: 'arm-relative';
 		readonly index: number;
 		readonly tagName: string;
 	}>;
@@ -1384,6 +1457,9 @@ export type PayloadKeyedRepeat = {
 	readonly collectionGraphNodeId: string;
 	readonly collectionPath: ReadonlyArray<string>;
 	readonly keyPath: ReadonlyArray<string>;
+	// See SemanticKeyedRepeat: set only for a repeat inside another repeat's row.
+	readonly enclosingRepeatId?: string;
+	readonly enclosingItemPath?: ReadonlyArray<string>;
 	readonly rowElementHandles?: ReadonlyArray<{
 		readonly hostNodeId: string;
 		readonly handleId: string;
@@ -1716,6 +1792,8 @@ export type CaptureSlotRoute =
 			readonly componentEdgeId: string;
 			readonly componentEdgePath?: ReadonlyArray<string>;
 			readonly callbackSymbolId: string;
+			/** The instance path of the component whose callback this is, when it is not the module root. */
+			readonly composerPath?: string;
 	  }
 	| {
 			// A widget part invokes a callback slot on its shared instance. The family
@@ -1781,6 +1859,8 @@ export type CaptureSlot = {
 	};
 	readonly propName?: string;
 	readonly path: ReadonlyArray<string>;
+	// Every field path of the prop this symbol reaches; a constant route keeps only these.
+	readonly fieldPaths?: ReadonlyArray<ReadonlyArray<string>>;
 	readonly routes: ReadonlyArray<CaptureSlotRoute>;
 };
 
@@ -1789,6 +1869,10 @@ export type ExtractedCaptureSymbol = {
 	readonly loaderSymbolId?: string;
 	readonly kind: PlannedSymbol['kind'];
 	readonly source: string;
+	readonly graphWrites?: ReadonlyArray<{
+		readonly graphNodeId: string;
+		readonly path: ReadonlyArray<string>;
+	}>;
 	readonly owner?: {
 		readonly componentId?: string;
 		readonly componentName?: string;
@@ -1797,6 +1881,8 @@ export type ExtractedCaptureSymbol = {
 	// storage slot). A composing module that instance-scopes it must ask the
 	// runtime which space an id belongs to instead of prefixing the path.
 	readonly touchesPageSpaceGraph?: true;
+	/** Where the symbol's component sits below the edge that binds it, for a claim a child republished from its own child. */
+	readonly innerInstancePath?: string;
 	readonly captureSlots: ReadonlyArray<CaptureSlot>;
 };
 
@@ -1885,7 +1971,66 @@ export type RuntimeDemandMapAction = {
 	readonly recordKinds: ReadonlyArray<RuntimeDemandMapRecordKind>;
 	readonly payloadRecordIds: ReadonlyArray<string>;
 	readonly runtimeModuleIds: ReadonlyArray<string>;
-	readonly plan?: RuntimeDemandMapActionPlan;
+	readonly plan?: RuntimeDemandMapActionPlan | RuntimeDemandMapClosurePlan;
+	/**
+	 * Every symbol and runtime module this action's first use can load: its handlers,
+	 * the computeds, updates, arms, rows and async settles its writes reach, the
+	 * handlers those arms and rows wire, and the same in every child module its
+	 * writes re-render. Complete once joined with every page module's `firstUsePage`
+	 * for its page-space writes and calls. `'unknown'` when any consequence could
+	 * not be classified.
+	 */
+	readonly firstUse?: RuntimeDemandMapFirstUseReach;
+};
+
+export type RuntimeDemandMapFirstUse = {
+	readonly symbolIds: ReadonlyArray<string>;
+	readonly runtimeModuleIds: ReadonlyArray<string>;
+	// Symbols of other modules, by the compiled file that owns them.
+	readonly foreign?: ReadonlyArray<{
+		readonly file: string;
+		readonly symbolIds: ReadonlyArray<string>;
+	}>;
+	// Page-space cells (`shared:`, `storage:`) this use changes; readers may live in any page module.
+	readonly pageSpaceWrites?: ReadonlyArray<string>;
+	// Values this use may call that a composing module supplies.
+	readonly calls?: ReadonlyArray<RuntimeDemandMapFirstUseCall>;
+};
+
+export type RuntimeDemandMapFirstUseReach = RuntimeDemandMapFirstUse | 'unknown';
+
+export type RuntimeDemandMapFirstUseCall =
+	// A prop of a component compiled in `file`, or in the module that owns the use when absent.
+	| { readonly file?: string; readonly prop: string }
+	// A widget callback slot node, answered by the root prop a page module binds into it.
+	| { readonly slot: string };
+
+/**
+ * What one module contributes to the first use of every action on a page it is
+ * part of. Read by the build-time pack planner only.
+ */
+export type RuntimeDemandMapFirstUsePage = {
+	// What resume start runs in this module and its composed children, whichever action wakes the page.
+	readonly resume: RuntimeDemandMapFirstUseReach;
+	// What re-runs here when another module changes a page-space cell this module reads.
+	readonly pageSpaceReaders: ReadonlyArray<{
+		readonly graphNodeId: string;
+		readonly reach: RuntimeDemandMapFirstUseReach;
+	}>;
+	// Props this module passes that a child may call. A passed prop missing here holds no code.
+	readonly passedProps: ReadonlyArray<RuntimeDemandMapPassedProp>;
+	// The root prop each widget callback slot this module binds is answered by.
+	readonly callbackSlots: ReadonlyArray<{ readonly slot: string; readonly prop: string }>;
+};
+
+export type RuntimeDemandMapPassedProp = {
+	// The receiving component's compiled file: this module when absent, any file when `null`.
+	readonly file?: string | null;
+	// Absent for a spread, which passes every name but `excludeNames`.
+	readonly prop?: string;
+	readonly excludeNames?: ReadonlyArray<string>;
+	// What calling the value runs; `'same-prop'` when it is this module's own prop of the same name.
+	readonly reach: RuntimeDemandMapFirstUseReach | 'same-prop';
 };
 
 export type RuntimeDemandMapActionPlan = {
@@ -1905,9 +2050,34 @@ export type RuntimeDemandMapActionPlan = {
 		readonly graphNodeId: string;
 		readonly symbolId: string;
 		readonly prefix?: string;
+		readonly suffix?: string;
 	}>;
 	readonly repeatId?: string;
 	readonly fullDecodeCells?: ReadonlyArray<string>;
+};
+
+/**
+ * An action whose whole write closure is synchronous and page-local: its real
+ * handler runs against a store holding only `cells`, the `computed` it reaches
+ * re-derive in the listed (dependency-first) order, and `updates` are the text
+ * and attribute updates reading anything the handler may change. Ids are the
+ * module's own; a composed instance qualifies them with its instance path.
+ */
+export type RuntimeDemandMapClosurePlan = {
+	readonly version: 1;
+	readonly kind: 'closure';
+	readonly symbolId: string;
+	readonly cells: ReadonlyArray<string>;
+	readonly computed: ReadonlyArray<{
+		readonly graphNodeId: string;
+		readonly deriveSymbolId: string;
+	}>;
+	readonly updates: ReadonlyArray<{
+		readonly hostNodeId: string;
+		readonly graphNodeId: string;
+		readonly path: ReadonlyArray<string>;
+		readonly symbolId: string;
+	}>;
 };
 
 export type RuntimeDemandClass = 'plain-ssr' | 'prerender';
@@ -1926,7 +2096,10 @@ export type RuntimeDemandMapArtifact = {
 	}>;
 	readonly payloadRecords: ReadonlyArray<RuntimeDemandMapRecord>;
 	readonly actions: ReadonlyArray<RuntimeDemandMapAction>;
+	/** Capability runtime modules some record of this module can demand, arms and rows included; complete for `RUNTIME_CAPABILITY_MODULE_IDS`. */
+	readonly capabilityModuleIds?: ReadonlyArray<string>;
 	readonly unknownRecordModuleIds: ReadonlyArray<string>;
+	readonly firstUsePage?: RuntimeDemandMapFirstUsePage;
 };
 
 export type RuntimeDemandMapsArtifact = Record<RuntimeDemandClass, RuntimeDemandMapArtifact>;
@@ -1944,6 +2117,9 @@ export type TriggerGroupArtifact = {
 };
 
 export type SymbolResolverModuleInput = {
+	readonly literalImports?: boolean;
+	// Small resolvers too: trigger-group resolvers set it so a packed build reaches every symbol it loads.
+	readonly bundlerVisibleImports?: boolean;
 	readonly buildId?: string;
 	readonly resolverId?: string;
 	readonly symbols: ReadonlyArray<{
@@ -2186,6 +2362,18 @@ export type PublicRenderPlanBranchArmPart =
 					  }
 					| { readonly itemPath: ReadonlyArray<string> }
 				>;
+			};
+	  }
+	// An attribute whose value reads the graph at flip time; `alwaysPresent`
+	// means the name and quotes are already in the neighbouring text parts.
+	| {
+			readonly attribute: {
+				readonly name: string;
+				readonly read: {
+					readonly graphNodeId: string;
+					readonly path: ReadonlyArray<string>;
+				};
+				readonly alwaysPresent?: true;
 			};
 	  };
 

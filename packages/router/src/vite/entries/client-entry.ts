@@ -3,13 +3,19 @@
 // against the app root) — relative paths into src/ would escape the package.
 import { createRouteDiscovery } from '@markless/router/vite/runtime/create-route-discovery';
 import {
+	MARKLESS_ROUTER_RENDERED_EVENT,
 	__marklessRouterStartSpaNavigation,
 	buildRouteManifestFromFileIds,
 	ensureNavigationRuntime,
 	matchRouteManifest,
 	startRouteUpdateRenderer,
 } from '@markless/router';
-import { preloadRouteModule } from 'virtual:markless-router/route-preloads';
+import { preloadRouteModule, routeModulePreloads } from 'virtual:markless-router/route-preloads';
+import {
+	documentNavigation,
+	startLinkIntentPreloading,
+	startViewportPrefetching,
+} from 'virtual:markless-router/options';
 
 const routeDiscovery = createRouteDiscovery(
 	import.meta.glob(['/pages/**/*.tsrx', '/pages/**/*.mdx'], {
@@ -20,8 +26,22 @@ const routeDiscovery = createRouteDiscovery(
 export const pageModules = routeDiscovery.pageModuleLoaders;
 export const routeFileIds = routeDiscovery.routeFileIds;
 const routeManifest = buildRouteManifestFromFileIds(routeFileIds);
+if (__MARKLESS_ROUTER_LINK_INTENT__ && documentNavigation === 'client') {
+	startLinkIntentPreloading(document, (url) => {
+		const match = matchRouteManifest(url.pathname, routeManifest);
+		if (match) preloadRouteModule(match.route.file);
+	});
+	const destinations = (url: URL) => {
+		const match = matchRouteManifest(url.pathname, routeManifest);
+		return match ? routeModulePreloads[match.route.file] : undefined;
+	};
+	document.addEventListener(MARKLESS_ROUTER_RENDERED_EVENT, () =>
+		startViewportPrefetching(document, destinations),
+	);
+}
 
 void __marklessRouterStartSpaNavigation({
+	documentNavigation,
 	pageModuleLoaders: pageModules,
 	preloadRouteModule,
 	routeFileIds,
@@ -35,7 +55,7 @@ export async function navigateMarklessRouterLink(input: {
 }) {
 	const url = parseSameOriginUrl(input.href, window.location.href);
 	const match = url && matchRouteManifest(url.pathname, routeManifest);
-	if (!url || !match) {
+	if (!url || !match || (documentNavigation === 'document' && !url.hash.startsWith('#/'))) {
 		window.location.assign(input.href);
 		return;
 	}
@@ -43,6 +63,7 @@ export async function navigateMarklessRouterLink(input: {
 	startRouteUpdateRenderer(document);
 	preloadRouteModule(match.route.file);
 	await __marklessRouterStartSpaNavigation({
+		documentNavigation,
 		pageModuleLoaders: pageModules,
 		preloadRouteModule,
 		routeFileIds,

@@ -320,19 +320,50 @@ export function linkedClaimOwnerComponentName(
 	);
 }
 
+export type LinkedImportedSymbolInputs = {
+	readonly passId: typeof MODULE_LINK_PASS_ID;
+	readonly symbols: SymbolResolverModuleInput['symbols'];
+	readonly diagnostics: CompilerDiagnostic[];
+};
+
 // The parent-bound symbol rows a composed child contributes. A child only
 // contributes rows once its claims and its capture metadata agree on a symbol
 // the parent has to bind — through a prop, or through a widget callback slot.
+// A child whose metadata says the parent must bind a symbol but which has not
+// published its claims in this environment is a diagnostic, never an empty row
+// set, unless the linker names it in `unawaitedSources` (a cycle). A child with
+// no metadata at all is reported by `linkedModuleChildDiagnostics`.
 export function linkedImportedSymbolInputs(input: {
 	readonly children: ReadonlyArray<LinkedModuleChildResolution>;
 	readonly captureMetadataForSource: (source: string) => CaptureAnalysisArtifact | undefined;
 	readonly symbolClaimsForSource: (source: string) => LinkedSymbolClaimManifest | undefined;
-}): SymbolResolverModuleInput['symbols'] {
-	return input.children.flatMap((child) => {
+	readonly claimsPublished: (source: string) => boolean;
+	readonly unawaitedSources?: ReadonlySet<string>;
+}): LinkedImportedSymbolInputs {
+	const diagnostics: CompilerDiagnostic[] = [];
+	const symbols = input.children.flatMap((child) => {
+		if (!child.componentEdgeId) return [];
 		const captureMetadata = input.captureMetadataForSource(child.source);
 		const claimManifest = input.symbolClaimsForSource(child.source);
-		if (!captureMetadata || !claimManifest || !child.componentEdgeId) return [];
-		return claimManifest.symbols.flatMap((symbol) => {
+		const republished = captureMetadata
+			? republishedClaimInputs(child, captureMetadata, input)
+			: [];
+		if (!captureMetadata || !claimManifest) {
+			if (
+				captureMetadata &&
+				!child.externalized &&
+				!input.unawaitedSources?.has(child.source) &&
+				!input.claimsPublished(child.source) &&
+				captureMetadata.extractedSymbols.some(
+					(symbol: ExtractedCaptureSymbol) => linkedImportedClaimKind(symbol) !== undefined,
+				)
+			) {
+				diagnostics.push(linkedImportedClaimsMissingDiagnostic(child));
+			}
+			// A child with no symbols of its own publishes no manifest, yet may still pass its child's claims up.
+			return input.claimsPublished(child.source) ? republished : [];
+		}
+		const own = claimManifest.symbols.flatMap((symbol): LinkedSymbolInput[] => {
 			const captureSymbol = captureMetadata.extractedSymbols.find(
 				(candidate: ExtractedCaptureSymbol) => candidate.symbolId === symbol.symbolId,
 			);
@@ -355,7 +386,132 @@ export function linkedImportedSymbolInputs(input: {
 				},
 			];
 		});
+		return [...own, ...republished];
 	});
+	return { passId: MODULE_LINK_PASS_ID, symbols, diagnostics };
+}
+
+type LinkedSymbolInput = SymbolResolverModuleInput['symbols'][number];
+
+/**
+ * The claims a child could not bind itself because they route through its own
+ * props: its composer binds them, the way it binds the child's own claims.
+ *
+ * A row with a slot naming the child's own symbols stays behind: those ids
+ * resolve only in the child's module.
+ */
+function republishedClaimInputs(
+	child: LinkedModuleChildResolution,
+	captureMetadata: CaptureAnalysisArtifact,
+	input: {
+		readonly captureMetadataForSource: (source: string) => CaptureAnalysisArtifact | undefined;
+		readonly symbolClaimsForSource: (source: string) => LinkedSymbolClaimManifest | undefined;
+	},
+): LinkedSymbolInput[] {
+	return (captureMetadata.boundResolverRows ?? []).flatMap((row): LinkedSymbolInput[] => {
+		if (!row.loaderSymbolId) return [];
+		const kinds = row.captureSlots.map((slot) => slot.route.kind);
+		if (
+			!kinds.includes('passthrough-route') ||
+			kinds.some(
+				(kind) =>
+					kind !== 'passthrough-route' &&
+					kind !== 'compiler-known-constant' &&
+					kind !== 'graph-reference',
+			)
+		)
+			return [];
+		const onRow = (route: { readonly componentEdgePath?: ReadonlyArray<string> }) =>
+			route.componentEdgePath?.join('/') === row.componentEdgePath.join('/');
+		const rowSlots = (symbol: ExtractedCaptureSymbol) =>
+			symbol.captureSlots.flatMap((slot) => {
+				const routes = slot.routes.filter(onRow);
+				return routes.length ? [{ ...slot, routes }] : [];
+			});
+		// A render symbol's forwarded prop reads compose through the edge's graph props already.
+		const extracted = captureMetadata.extractedSymbols.find(
+			(symbol) =>
+				symbol.kind === 'event-handler' &&
+				symbol.loaderSymbolId === row.loaderSymbolId &&
+				rowSlots(symbol).length === row.captureSlots.length,
+		);
+		// A handler that IS the forwarded prop dispatches as its composer's callback, which composition stands in.
+		if (!extracted || isForwardedPropItself(extracted)) return [];
+		const chunk = claimedSymbolChunk(row.baseSymbolId, input, new Set());
+		if (!chunk) return [];
+		const captureSymbol: ExtractedCaptureSymbol = {
+			...extracted,
+			symbolId: row.id,
+			...(row.instancePath ? { innerInstancePath: row.instancePath } : {}),
+			captureSlots: rowSlots(extracted),
+		};
+		const claimKind = linkedImportedClaimKind(captureSymbol);
+		if (!claimKind) return [];
+		const ownerComponentName = linkedClaimOwnerComponentName(captureSymbol);
+		return [
+			{
+				id: `imported:${encodeURIComponent(child.source)}:${row.id}`,
+				chunk: chunk.virtualModuleId,
+				exportName: chunk.exportName,
+				componentEdgeId: child.componentEdgeId!,
+				...(ownerComponentName ? { ownerComponentName } : {}),
+				claimKind,
+				captureSymbol,
+			},
+		];
+	});
+}
+
+function isForwardedPropItself(symbol: ExtractedCaptureSymbol): boolean {
+	const [slot, ...rest] = symbol.captureSlots;
+	return !!slot && rest.length === 0 && symbol.source.trim() === slot.source.trim();
+}
+
+// The emitted chunk behind a linked claim id, through as many republishing children as named it.
+function claimedSymbolChunk(
+	loaderSymbolId: string,
+	input: {
+		readonly captureMetadataForSource: (source: string) => CaptureAnalysisArtifact | undefined;
+		readonly symbolClaimsForSource: (source: string) => LinkedSymbolClaimManifest | undefined;
+	},
+	seen: Set<string>,
+): { readonly virtualModuleId: string; readonly exportName: string } | undefined {
+	const match = /^imported:([^:]*):(.*)$/.exec(loaderSymbolId);
+	if (!match || seen.has(loaderSymbolId)) return undefined;
+	seen.add(loaderSymbolId);
+	const source = decodeURIComponent(match[1]!),
+		symbolId = match[2]!;
+	const own = input.symbolClaimsForSource(source)?.symbols.find(
+		(symbol) => symbol.symbolId === symbolId,
+	);
+	if (own) return own;
+	const row = input
+		.captureMetadataForSource(source)
+		?.boundResolverRows?.find((candidate) => candidate.id === symbolId);
+	return row ? claimedSymbolChunk(row.baseSymbolId, input, seen) : undefined;
+}
+
+function linkedImportedClaimsMissingDiagnostic(
+	child: LinkedModuleChildResolution,
+): CompilerDiagnostic {
+	return {
+		code: 'MARKLESS_IMPORTED_SYMBOL_CLAIMS_MISSING',
+		severity: 'error',
+		phase: 'capture-analysis',
+		title: 'Imported child has no published symbol claims',
+		message: `MARKLESS_IMPORTED_SYMBOL_CLAIMS_MISSING: Parent module ${JSON.stringify(child.parent)} composes imported child ${JSON.stringify(child.specifier)}, whose symbols must be bound by the parent, but the child's symbol claims were not published when the parent linked it.`,
+		why: 'Linking without the child claims silently drops the parent-bound symbol rows, so the child handlers would not resolve after resume.',
+		passId: MODULE_LINK_PASS_ID,
+		artifactKeys: ['linkedModuleGraph'],
+		source: child.source,
+		suggestions: [
+			{
+				message:
+					'This is a linker ordering defect: the child must finish compiling in this environment before its parent links it.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_IMPORTED_SYMBOL_CLAIMS_MISSING',
+	};
 }
 
 // A child that expects prop-bound claims but contributed no row has not

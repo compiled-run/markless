@@ -1,0 +1,74 @@
+--- /private/tmp/markless-known-prime-inline-resumer.test.ts-before	2026-09-22 08:22:50
++++ packages/bundler/test/inline-resumer.test.ts	2026-09-22 08:22:51
+@@ -14,7 +14,6 @@
+ 	renderPrerenderInlineResumerSource,
+ } from '../src/inline-resumer.ts';
+ 
+-// Paired OXC builds measured 1,058 → 1,090 gzip bytes for early event replay.
+ const EARLY_EVENT_REPLAY_BYTES = 32;
+ 
+ test('Rolldown OXC deterministically minifies the typed event-only resumer', async () => {
+@@ -85,12 +84,6 @@
+ 	expect(graphPolicyOwner.length).toBeGreaterThan(graphPolicyConsumer.length);
+ });
+ 
+-// ---------------------------------------------------------------------------
+-// T012 / S4a: the prerender + self-wake boot compiles the same way the classic
+-// resumer does. Equivalence is proved by BOOTING both, unminified and
+-// minified, against the same fake document and comparing what each did.
+-// ---------------------------------------------------------------------------
+-
+ function bootScript(source: string) {
+ 	const listeners: Array<{ type: string; capture: unknown }> = [];
+ 	const imported: string[] = [];
+@@ -116,16 +109,14 @@
+ 		},
+ 		requestAnimationFrame: (callback: () => void) => frames.push(callback),
+ 		queueMicrotask: (callback: () => void) => frames.push(callback),
+-		// The self-wake body calls `import()` directly, which Vite's SSR
+-		// transform rewrites; supplying both names keeps the harness honest
+-		// about which module URL the boot demands.
++
+ 		__vite_ssr_dynamic_import__: async (url: string) => {
+ 			imported.push(url);
+ 			return { resumeContainerEvent: (input: unknown) => dispatched.push(input) };
+ 		},
+ 	};
+ 	const keys = Object.keys(scope);
+-	// eslint-disable-next-line @typescript-eslint/no-implied-eval
++
+ 	new Function(...keys, source)(...keys.map((key) => scope[key as keyof typeof scope]));
+ 	return { listeners, imported, dispatched, frames, documentListeners };
+ }
+@@ -148,7 +139,7 @@
+ 		{ type: 'click', capture: true },
+ 		{ type: 'input', capture: true },
+ 	]);
+-	// The self-wake schedule is the same shape: one frame, then a microtask.
++
+ 	expect(fromMinified.frames).toHaveLength(fromAuthored.frames.length);
+ 	expect(fromMinified.frames).toHaveLength(1);
+ 	expect(fromMinified.documentListeners).toEqual(fromAuthored.documentListeners);
+@@ -165,20 +156,13 @@
+ 	expect(booted.imported).toEqual([]);
+ });
+ 
+-test('the prerender boot compiles deterministically and costs far less than its source', async () => {
++test('the prerender boot compiles deterministically within its emitted byte budget', async () => {
+ 	const first = await compilePrerenderInlineResumerSources();
+ 	const second = await compilePrerenderInlineResumerSources();
+ 	expect(first).toEqual(second);
+ 
+ 	const eventNames = ['click'];
+-	const url = '/build/prerender-wake-A1b2.js';
+-	const authored =
+-		createPrerenderInlineResumerSource(eventNames, url) +
+-		createInlineResumerSelfWakeSource(url);
+ 	const minified = renderPrerenderInlineResumerSource(first.prerenderSelfWake, eventNames);
+-	// Reported as INLINE_MIN_BYTES in the T012 checkpoint.
+-	expect(Buffer.byteLength(minified, 'utf8')).toBeLessThan(
+-		Buffer.byteLength(authored, 'utf8') / 2,
+-	);
++	expect(Buffer.byteLength(minified, 'utf8')).toBeLessThanOrEqual(839);
+ 	expect(minified).not.toContain(PRERENDER_INLINE_EVENT_NAMES_TOKEN);
+ });

@@ -1,0 +1,874 @@
+{
+  "candidate": "/private/tmp/markless-docs-determinism-aLMMJZ/build-2/.output",
+  "stablePreview": "/private/tmp/markless-docs-inline-3bKoIN/.output",
+  "files": {
+    "before": "/private/tmp/markless-docs-cold-ZAOtnt/results.json",
+    "after": "/private/tmp/markless-docs-cold-oq5618/results.json",
+    "execution": "/private/tmp/markless-docs-execution-VqWbvh/results.json",
+    "attribution": "/private/tmp/markless-symbol-publication-attribution.json",
+    "navigation": "/private/tmp/markless-docs-navigation-76oGXh/results.json",
+    "buildsBefore": "/private/tmp/markless-docs-determinism-U9Mv5X/results.json",
+    "buildsAfter": "/private/tmp/markless-docs-determinism-aLMMJZ/results.json"
+  },
+  "protocol": {
+    "startedAt": "2026-09-22T10:52:46.886Z",
+    "siteEntry": "/private/tmp/markless-docs-determinism-aLMMJZ/build-2/.output/server/index.mjs",
+    "serverEntrySha256": "efa7722c564f5a41487a8c9e16b2caced6b889b922b3c9932d9d08205529d79d",
+    "options": {
+      "brotli": true,
+      "brotliHtml": true,
+      "http2": false,
+      "samples": 10,
+      "conditions": [
+        "normal",
+        "constrained"
+      ]
+    },
+    "cache": "CDP Network.setCacheDisabled true; fresh browser context per first interaction",
+    "serviceWorkers": "blocked",
+    "timing": "captured click event to expected DOM mutation; not compositor paint",
+    "localTransport": "Generated Nitro docs through a Brotli quality 5 JS proxy; localhost HTTP/1.1; HTML stream compressed with Brotli quality 5",
+    "preciseCoverage": false,
+    "cases": [
+      "state-counter"
+    ],
+    "servedThemeSha256": "7404f79754fffc3b8ec86d66ad2872b9f46a568416c067d653843af25849c742",
+    "expectedThemeSha256": "7404f79754fffc3b8ec86d66ad2872b9f46a568416c067d653843af25849c742",
+    "browserVersion": "153.0.8010.53",
+    "playwrightVersion": "1.58.2",
+    "finishedAt": "2026-09-22T10:53:45.505Z",
+    "order": "Before then after, with no owned build/test/profiling overlap; other desktop applications remained open.",
+    "constrained": "150 ms latency, 5 Mbps, 4x CPU",
+    "threshold": "max(10 ms, 10% previous median, twice larger MAD)"
+  },
+  "timings": [
+    {
+      "condition": "normal",
+      "phases": [
+        {
+          "phase": "first",
+          "before": {
+            "median": 32.84999990463257,
+            "mad": 0.3500000238418579,
+            "min": 31.200000047683716,
+            "max": 33.30000019073486
+          },
+          "after": {
+            "median": 32.75000011920929,
+            "mad": 0.4500000476837158,
+            "min": 31.09999990463257,
+            "max": 34
+          },
+          "threshold": 10,
+          "meaningful": false
+        },
+        {
+          "phase": "second",
+          "before": {
+            "median": 15.099999904632568,
+            "mad": 0.09999990463256836,
+            "min": 14.899999856948853,
+            "max": 15.299999952316284
+          },
+          "after": {
+            "median": 15.150000095367432,
+            "mad": 0.10000014305114746,
+            "min": 13.200000047683716,
+            "max": 15.799999952316284
+          },
+          "threshold": 10,
+          "meaningful": false
+        },
+        {
+          "phase": "third",
+          "before": {
+            "median": 15.150000095367432,
+            "mad": 0.25000011920928955,
+            "min": 14.700000047683716,
+            "max": 15.599999904632568
+          },
+          "after": {
+            "median": 15.149999976158142,
+            "mad": 0.10000002384185791,
+            "min": 14.200000047683716,
+            "max": 15.700000047683716
+          },
+          "threshold": 10,
+          "meaningful": false
+        }
+      ]
+    },
+    {
+      "condition": "constrained",
+      "phases": [
+        {
+          "phase": "first",
+          "before": {
+            "median": 79.35000014305115,
+            "mad": 3.0500000715255737,
+            "min": 47,
+            "max": 88.79999995231628
+          },
+          "after": {
+            "median": 73.5,
+            "mad": 3.4499998092651367,
+            "min": 43,
+            "max": 77.69999980926514
+          },
+          "threshold": 10,
+          "meaningful": false
+        },
+        {
+          "phase": "second",
+          "before": {
+            "median": 9.449999928474426,
+            "mad": 0.6500000953674316,
+            "min": 8.400000095367432,
+            "max": 10.700000047683716
+          },
+          "after": {
+            "median": 10.649999976158142,
+            "mad": 0.9499999284744263,
+            "min": 8.099999904632568,
+            "max": 11.799999952316284
+          },
+          "threshold": 10,
+          "meaningful": false
+        },
+        {
+          "phase": "third",
+          "before": {
+            "median": 13.00000011920929,
+            "mad": 1.100000023841858,
+            "min": 8.700000047683716,
+            "max": 15
+          },
+          "after": {
+            "median": 11.149999976158142,
+            "mad": 1.5000001192092896,
+            "min": 9.599999904632568,
+            "max": 14.700000047683716
+          },
+          "threshold": 10,
+          "meaningful": false
+        }
+      ]
+    }
+  ],
+  "delivery": {
+    "before": {
+      "visits": 20,
+      "actions": 60,
+      "errors": [],
+      "failures": [],
+      "httpCacheHits": 0,
+      "frameworkRequests": [
+        5
+      ],
+      "totalScriptRequests": [
+        8
+      ],
+      "frameworkEncodedBytes": [
+        235485
+      ],
+      "actionStartedScriptRequests": 0,
+      "pendingFirstClick": {
+        "normal": 0,
+        "constrained": 9
+      }
+    },
+    "after": {
+      "visits": 20,
+      "actions": 60,
+      "errors": [],
+      "failures": [],
+      "httpCacheHits": 0,
+      "frameworkRequests": [
+        5
+      ],
+      "totalScriptRequests": [
+        8
+      ],
+      "frameworkEncodedBytes": [
+        235695
+      ],
+      "actionStartedScriptRequests": 0,
+      "pendingFirstClick": {
+        "normal": 0,
+        "constrained": 7
+      }
+    }
+  },
+  "execution": [
+    {
+      "test": "state-counter",
+      "sample": 0,
+      "phases": [
+        {
+          "name": "before-input",
+          "initializers": 0,
+          "executedBytes": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "first-action",
+          "initializers": 13,
+          "executedBytes": 139114,
+          "exportDeclarationBytes": 99145
+        },
+        {
+          "name": "repeat-1",
+          "initializers": 0,
+          "executedBytes": 8275,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "repeat-2",
+          "initializers": 0,
+          "executedBytes": 8275,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "state-header-then-counter",
+      "sample": 0,
+      "phases": [
+        {
+          "name": "before-input",
+          "initializers": 0,
+          "executedBytes": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "static-header",
+          "initializers": 0,
+          "executedBytes": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "first-action",
+          "initializers": 13,
+          "executedBytes": 139114,
+          "exportDeclarationBytes": 99145
+        },
+        {
+          "name": "repeat-1",
+          "initializers": 0,
+          "executedBytes": 8275,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "repeat-2",
+          "initializers": 0,
+          "executedBytes": 8275,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "state-independent-controls",
+      "sample": 0,
+      "phases": [
+        {
+          "name": "before-input",
+          "initializers": 0,
+          "executedBytes": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "first-action",
+          "initializers": 13,
+          "executedBytes": 139114,
+          "exportDeclarationBytes": 99145
+        },
+        {
+          "name": "second-control",
+          "initializers": 3,
+          "executedBytes": 11362,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "return-first",
+          "initializers": 0,
+          "executedBytes": 8430,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "repeat-second",
+          "initializers": 0,
+          "executedBytes": 8433,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "computed-total",
+      "sample": 0,
+      "phases": [
+        {
+          "name": "before-input",
+          "initializers": 0,
+          "executedBytes": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "first-action",
+          "initializers": 56,
+          "executedBytes": 168331,
+          "exportDeclarationBytes": 98606
+        },
+        {
+          "name": "repeat-1",
+          "initializers": 0,
+          "executedBytes": 22494,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "repeat-2",
+          "initializers": 0,
+          "executedBytes": 22494,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "mode-select",
+      "sample": 0,
+      "phases": [
+        {
+          "name": "before-input",
+          "initializers": 0,
+          "executedBytes": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "first-action",
+          "initializers": 72,
+          "executedBytes": 188608,
+          "exportDeclarationBytes": 105001
+        },
+        {
+          "name": "repeat-1",
+          "initializers": 1,
+          "executedBytes": 33252,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "repeat-2",
+          "initializers": 0,
+          "executedBytes": 31688,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "accordion",
+      "sample": 0,
+      "phases": [
+        {
+          "name": "before-input",
+          "initializers": 0,
+          "executedBytes": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "first-action",
+          "initializers": 117,
+          "executedBytes": 384984,
+          "exportDeclarationBytes": 99938
+        },
+        {
+          "name": "repeat-1",
+          "initializers": 0,
+          "executedBytes": 55699,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "repeat-2",
+          "initializers": 0,
+          "executedBytes": 55469,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "state-counter",
+      "sample": 1,
+      "phases": [
+        {
+          "name": "before-input",
+          "initializers": 0,
+          "executedBytes": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "first-action",
+          "initializers": 13,
+          "executedBytes": 139114,
+          "exportDeclarationBytes": 99145
+        },
+        {
+          "name": "repeat-1",
+          "initializers": 0,
+          "executedBytes": 8275,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "repeat-2",
+          "initializers": 0,
+          "executedBytes": 8275,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "state-header-then-counter",
+      "sample": 1,
+      "phases": [
+        {
+          "name": "before-input",
+          "initializers": 0,
+          "executedBytes": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "static-header",
+          "initializers": 0,
+          "executedBytes": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "first-action",
+          "initializers": 13,
+          "executedBytes": 139114,
+          "exportDeclarationBytes": 99145
+        },
+        {
+          "name": "repeat-1",
+          "initializers": 0,
+          "executedBytes": 8275,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "repeat-2",
+          "initializers": 0,
+          "executedBytes": 8275,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "state-independent-controls",
+      "sample": 1,
+      "phases": [
+        {
+          "name": "before-input",
+          "initializers": 0,
+          "executedBytes": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "first-action",
+          "initializers": 13,
+          "executedBytes": 139114,
+          "exportDeclarationBytes": 99145
+        },
+        {
+          "name": "second-control",
+          "initializers": 3,
+          "executedBytes": 11362,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "return-first",
+          "initializers": 0,
+          "executedBytes": 8430,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "repeat-second",
+          "initializers": 0,
+          "executedBytes": 8433,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "computed-total",
+      "sample": 1,
+      "phases": [
+        {
+          "name": "before-input",
+          "initializers": 0,
+          "executedBytes": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "first-action",
+          "initializers": 56,
+          "executedBytes": 168331,
+          "exportDeclarationBytes": 98606
+        },
+        {
+          "name": "repeat-1",
+          "initializers": 0,
+          "executedBytes": 22494,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "repeat-2",
+          "initializers": 0,
+          "executedBytes": 22494,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "mode-select",
+      "sample": 1,
+      "phases": [
+        {
+          "name": "before-input",
+          "initializers": 0,
+          "executedBytes": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "first-action",
+          "initializers": 72,
+          "executedBytes": 188608,
+          "exportDeclarationBytes": 105001
+        },
+        {
+          "name": "repeat-1",
+          "initializers": 1,
+          "executedBytes": 33252,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "repeat-2",
+          "initializers": 0,
+          "executedBytes": 31688,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "accordion",
+      "sample": 1,
+      "phases": [
+        {
+          "name": "before-input",
+          "initializers": 0,
+          "executedBytes": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "first-action",
+          "initializers": 117,
+          "executedBytes": 384984,
+          "exportDeclarationBytes": 99938
+        },
+        {
+          "name": "repeat-1",
+          "initializers": 0,
+          "executedBytes": 55699,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "repeat-2",
+          "initializers": 0,
+          "executedBytes": 55469,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "state-counter",
+      "sample": 2,
+      "phases": [
+        {
+          "name": "before-input",
+          "initializers": 0,
+          "executedBytes": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "first-action",
+          "initializers": 13,
+          "executedBytes": 139114,
+          "exportDeclarationBytes": 99145
+        },
+        {
+          "name": "repeat-1",
+          "initializers": 0,
+          "executedBytes": 8275,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "repeat-2",
+          "initializers": 0,
+          "executedBytes": 8275,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "state-header-then-counter",
+      "sample": 2,
+      "phases": [
+        {
+          "name": "before-input",
+          "initializers": 0,
+          "executedBytes": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "static-header",
+          "initializers": 0,
+          "executedBytes": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "first-action",
+          "initializers": 13,
+          "executedBytes": 139114,
+          "exportDeclarationBytes": 99145
+        },
+        {
+          "name": "repeat-1",
+          "initializers": 0,
+          "executedBytes": 8275,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "repeat-2",
+          "initializers": 0,
+          "executedBytes": 8275,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "state-independent-controls",
+      "sample": 2,
+      "phases": [
+        {
+          "name": "before-input",
+          "initializers": 0,
+          "executedBytes": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "first-action",
+          "initializers": 13,
+          "executedBytes": 139114,
+          "exportDeclarationBytes": 99145
+        },
+        {
+          "name": "second-control",
+          "initializers": 3,
+          "executedBytes": 11362,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "return-first",
+          "initializers": 0,
+          "executedBytes": 8430,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "repeat-second",
+          "initializers": 0,
+          "executedBytes": 8433,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "computed-total",
+      "sample": 2,
+      "phases": [
+        {
+          "name": "before-input",
+          "initializers": 0,
+          "executedBytes": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "first-action",
+          "initializers": 56,
+          "executedBytes": 168331,
+          "exportDeclarationBytes": 98606
+        },
+        {
+          "name": "repeat-1",
+          "initializers": 0,
+          "executedBytes": 22494,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "repeat-2",
+          "initializers": 0,
+          "executedBytes": 22494,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "mode-select",
+      "sample": 2,
+      "phases": [
+        {
+          "name": "before-input",
+          "initializers": 0,
+          "executedBytes": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "first-action",
+          "initializers": 72,
+          "executedBytes": 188608,
+          "exportDeclarationBytes": 105001
+        },
+        {
+          "name": "repeat-1",
+          "initializers": 1,
+          "executedBytes": 33252,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "repeat-2",
+          "initializers": 0,
+          "executedBytes": 31688,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    },
+    {
+      "test": "accordion",
+      "sample": 2,
+      "phases": [
+        {
+          "name": "before-input",
+          "initializers": 0,
+          "executedBytes": 0,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "first-action",
+          "initializers": 117,
+          "executedBytes": 384984,
+          "exportDeclarationBytes": 99938
+        },
+        {
+          "name": "repeat-1",
+          "initializers": 0,
+          "executedBytes": 55699,
+          "exportDeclarationBytes": 0
+        },
+        {
+          "name": "repeat-2",
+          "initializers": 0,
+          "executedBytes": 55469,
+          "exportDeclarationBytes": 0
+        }
+      ]
+    }
+  ],
+  "navigation": [
+    {
+      "name": "closed menu ignores header input, then opens and dismisses normally",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "name": "scalar clicks hand live state to a complex control and continue afterward",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "name": "keyboard priming and queued scalar clicks preserve each update",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "name": "intent, SPA navigation, history and offline controls",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "name": "delayed shared pack keeps controls visible and retains the click",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "name": "failed shared pack remains an observable failure",
+      "passed": true,
+      "errors": [
+        "TypeError: Failed to fetch dynamically imported module: http://127.0.0.1:56987/markless/build/chunk-Spz25RZT.js",
+        "TypeError: Failed to fetch dynamically imported module: http://127.0.0.1:56987/markless/build/chunk-Spz25RZT.js",
+        "TypeError: Failed to fetch dynamically imported module: http://127.0.0.1:56987/markless/build/chunk-Spz25RZT.js"
+      ]
+    }
+  ],
+  "builds": {
+    "before": [
+      {
+        "index": 0,
+        "sameAsFirst": true,
+        "files": 63,
+        "bytes": 19292139,
+        "elapsedMs": 35361.048125
+      },
+      {
+        "index": 1,
+        "sameAsFirst": false,
+        "files": 63,
+        "bytes": 19292124,
+        "elapsedMs": 30517.462499999994
+      },
+      {
+        "index": 2,
+        "sameAsFirst": false,
+        "files": 63,
+        "bytes": 19292139,
+        "elapsedMs": 30883.237416999997
+      }
+    ],
+    "after": [
+      {
+        "index": 0,
+        "sameAsFirst": true,
+        "files": 63,
+        "bytes": 19292124,
+        "elapsedMs": 31176.572625
+      },
+      {
+        "index": 1,
+        "sameAsFirst": true,
+        "files": 63,
+        "bytes": 19292124,
+        "elapsedMs": 31416.661041000003
+      },
+      {
+        "index": 2,
+        "sameAsFirst": true,
+        "files": 63,
+        "bytes": 19292124,
+        "elapsedMs": 31291.205791999993
+      }
+    ]
+  },
+  "verification": {
+    "focused": 49,
+    "renderData": 10,
+    "docsTests": 64,
+    "rootTypecheck": "pass",
+    "docsTypecheck": "pass",
+    "sharedPass": 859,
+    "sharedFail": 6,
+    "limits": "Six unchanged size/negative-budget failures; no goal completion or new commit/push."
+  }
+}

@@ -35,6 +35,7 @@ import {
 	joinReadSources,
 	mintTemplateExpressionComputed,
 	pureCompositeReadSources,
+	readsUnroutedGraphCell,
 } from './composite-reads.ts';
 import { collectExpressionReads, resolvedSymbolAt } from './collect-expressions.ts';
 import {
@@ -67,9 +68,11 @@ import {
 	widgetRootIdrefElementHandleDiagnostic,
 	unboundIdrefElementHandleDiagnostic,
 	cssAnchorAttributeDiagnostic,
+	templateExpressionUnsupportedDiagnostic,
 } from './diagnostics.ts';
 import { acceptsIdrefList, isCssAnchorAttribute, isIdrefAttribute } from './idref-attributes.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
+import { inlineHandlerRenderLocals } from './render-local-inline.ts';
 import {
 	createStyleConstResolver,
 	lowerStyleObject,
@@ -141,6 +144,7 @@ export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGr
 		);
 	}
 
+	if (isHostElement) joinHostText(node, state);
 	const previousTextTarget = state.currentTextTarget;
 	const previousProjectionScope = state.currentProjectionScope;
 	if (componentEdgeId)
@@ -166,11 +170,16 @@ export function collectTemplateExpression(
 	// Same bound the attribute branch already takes: no write can move a prop after
 	// the render that read it, so a props-only text read owes no record - and with
 	// method calls lifted, minting one would demand a capture slot for the receiver.
-	const composite = collectCompositeTemplateExpression(expression, state, {
-		...TEMPLATE_READ_OPTIONS,
-		requireWritableRead: true,
-	});
+	const joined = joinedTextExpressions.get(expression);
+	if (joined === null) return;
+	const composite =
+		joined ??
+		collectCompositeTemplateExpression(expression, state, {
+			...TEMPLATE_READ_OPTIONS,
+			requireWritableRead: true,
+		});
 
+	if (!composite && refuseUnroutedExpression(expression, 'This text', state)) return;
 	const armScoped =
 		!!state.currentArmScope && state.currentArmScope.hostNodeId === state.currentHostNodeId;
 	// An arm re-renders its whole range, child edges included, so the arm wins.
@@ -181,7 +190,7 @@ export function collectTemplateExpression(
 
 	state.graph.templateReads.push({
 		hostNodeId: state.currentHostNodeId,
-		source: expressionSource(expression, state.source),
+		source: joined?.source ?? expressionSource(expression, state.source),
 		sourceSpan: sourceSpan(expression, state.filename),
 		target: state.currentTextTarget ?? { kind: 'text' },
 		asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
@@ -192,6 +201,79 @@ export function collectTemplateExpression(
 		computedGraphNodeId: composite?.graphNodeId,
 		componentName: state.currentComponentName ?? undefined,
 	});
+}
+
+// The first interpolation carries the joined text's computed; the rest carry null and ship nothing.
+const joinedTextExpressions = new WeakMap<
+	AnyNode,
+	{ readonly graphNodeId: string; readonly source: string } | null
+>();
+
+// A text write replaces the host's whole text, so several interpolations update as one joined derive.
+function joinHostText(host: AnyNode, state: WalkState): void {
+	const children = asNodes(host.children).filter((child) => !isIgnorableJsxTextNode(child));
+	const values = children
+		.filter(isTemplateExpressionChild)
+		.map((child) => child.expression as AnyNode | undefined);
+	if (values.length < 2) return;
+	if (!children.every((child) => isTemplateExpressionChild(child) || isStaticTextPart(child)))
+		return;
+	if (values.some((value) => !value || value.type === 'JSXEmptyExpression')) return;
+	const readSources = joinReadSources(
+		values.map((value) => pureCompositeReadSources(value, state, TEMPLATE_READ_OPTIONS)),
+	);
+	if (!readSources || readSources.some((source) => readsAsyncComputed(source, state))) return;
+	const parts = children.map((child) =>
+		isTemplateExpressionChild(child)
+			? `\${(${expressionSource(child.expression as AnyNode, state.source)}) ?? ''}`
+			: staticTextValue(child).replace(/[\\`]|\$\{/g, (match) => `\\${match}`),
+	);
+	const source = `\`${parts.join('')}\``;
+	const composite = mintTemplateExpressionComputed(`() => ${source}`, readSources, state, true);
+	if (!composite) return;
+	const [first, ...rest] = values as AnyNode[];
+	joinedTextExpressions.set(first!, { graphNodeId: composite.graphNodeId, source });
+	for (const value of rest) joinedTextExpressions.set(value, null);
+}
+
+// An async value is read directly by its boundary's runner, never through a derive.
+function readsAsyncComputed(source: string, state: WalkState): boolean {
+	return (
+		resolveGraphPath(
+			source,
+			graphBindingMap(state.graph, state.currentSharedDefinitionId),
+			semanticAliasMap(state.graph, state.currentSharedDefinitionId),
+		)?.binding.asyncCapable === true
+	);
+}
+
+// Fail-closed: a state read no route can follow would render once and go stale silently.
+function refuseUnroutedExpression(expression: AnyNode, target: string, state: WalkState): boolean {
+	if (state.currentKeyedRepeatScopeIds.length > 0) return false;
+	if (expression.type === 'Identifier') return false;
+	if (expression.type === 'MemberExpression' && pureCompositeReadSources(expression, state))
+		return false;
+	let owned = false;
+	walkNode(expression, (node) => {
+		// Markup values and writes each have their own diagnostic.
+		if (/^(?:JSX|Element$|Fragment$|TSRX|AssignmentExpression$|UpdateExpression$)/.test(String(node.type)))
+			owned = true;
+	});
+	if (owned) return false;
+	const scope = {
+		bindings: graphBindingMap(state.graph, state.currentSharedDefinitionId),
+		aliases: semanticAliasMap(state.graph, state.currentSharedDefinitionId),
+	};
+	if (!readsUnroutedGraphCell(expression, state, scope, TEMPLATE_READ_OPTIONS, true)) return false;
+	state.graph.diagnostics.push(
+		templateExpressionUnsupportedDiagnostic({
+			target,
+			source: expressionSource(expression, state.source),
+			node: expression,
+			filename: state.filename,
+		}),
+	);
+	return true;
 }
 
 function isTemplateExpressionChild(node: AnyNode): boolean {
@@ -690,11 +772,22 @@ function collectAttribute(
 					secondSyncPolicyCancelDiagnostic(attributeName, strayCancel, state),
 				);
 			}
+			const inlined = handler
+				? inlineHandlerRenderLocals(handler.node, state, attributeName)
+				: null;
 			state.graph.events.push({
 				id: `event:${state.nextEventId++}`,
 				hostNodeId,
 				eventName: normalizeEventName(attributeName),
-				...(handler ? { handlerSource: handler.source, handlerSpan: handler.span } : {}),
+				...(handler
+					? {
+							handlerSource: inlined?.source ?? handler.source,
+							handlerSpan: handler.span,
+						}
+					: {}),
+				...(inlined?.definitionSpans.length
+					? { handlerDefinitionSpans: inlined.definitionSpans }
+					: {}),
 				handlerParameters: handler ? handlerParameterNames(handler.node) : [],
 				hasSyncPolicyCandidate,
 				syncPolicy,
@@ -853,6 +946,10 @@ function collectAttribute(
 			...TEMPLATE_READ_OPTIONS,
 			requireWritableRead: true,
 		});
+		if (!composite && refuseUnroutedExpression(expressionValue, `Attribute \`${attributeName}\``, state)) {
+			walk(expressionValue, state);
+			return;
+		}
 		state.graph.templateReads.push({
 			hostNodeId,
 			source: expressionSource(expressionValue, state.source),

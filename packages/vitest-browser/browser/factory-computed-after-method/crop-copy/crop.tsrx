@@ -42,7 +42,6 @@ import type {
 	CropIndicatorProps,
 	CropInstanceState,
 	CropLabelProps,
-	CropRect,
 	CropRootProps,
 	CropSelectionProps,
 	CropThumbInstanceState,

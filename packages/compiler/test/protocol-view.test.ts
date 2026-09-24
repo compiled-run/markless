@@ -264,25 +264,19 @@ test('createProtocolViewPayload links async boundary reads to runner symbols', a
 			initiallyServedArm: ASYNC_BOUNDARY_ARM.pending,
 			armRecords: [
 				{
-					locators: [
-						{ hostNodeId: 'h1', strategy: 'arm-relative', index: 0, tagName: 'p' },
-					],
+					locators: [{ hostNodeId: 'h1', index: 0, tagName: 'p' }],
 					events: [],
 					behaviors: [],
 					elementHandles: [],
 				},
 				{
-					locators: [
-						{ hostNodeId: 'h3', strategy: 'arm-relative', index: 0, tagName: 'p' },
-					],
+					locators: [{ hostNodeId: 'h3', index: 0, tagName: 'p' }],
 					events: [],
 					behaviors: [],
 					elementHandles: [],
 				},
 				{
-					locators: [
-						{ hostNodeId: 'h2', strategy: 'arm-relative', index: 0, tagName: 'p' },
-					],
+					locators: [{ hostNodeId: 'h2', index: 0, tagName: 'p' }],
 					events: [],
 					behaviors: [],
 					elementHandles: [],
@@ -359,8 +353,8 @@ export function App() @{
 	expect(view.asyncBoundaries[0]?.armRecords).toEqual([
 		{
 			locators: [
-				{ hostNodeId: 'h2', strategy: 'arm-relative', index: 0, tagName: 'div' },
-				{ hostNodeId: 'h3', strategy: 'arm-relative', index: 1, tagName: 'button' },
+				{ hostNodeId: 'h2', index: 0, tagName: 'div' },
+				{ hostNodeId: 'h3', index: 1, tagName: 'button' },
 			],
 			events: [
 				expect.objectContaining({
@@ -375,13 +369,13 @@ export function App() @{
 		{
 			// Host ids follow the collector's walk order (@catch walks before
 			// @pending), so the @pending arm's <p> is h5 here.
-			locators: [{ hostNodeId: 'h5', strategy: 'arm-relative', index: 0, tagName: 'p' }],
+			locators: [{ hostNodeId: 'h5', index: 0, tagName: 'p' }],
 			events: [],
 			behaviors: [],
 			elementHandles: [],
 		},
 		{
-			locators: [{ hostNodeId: 'h4', strategy: 'arm-relative', index: 0, tagName: 'p' }],
+			locators: [{ hostNodeId: 'h4', index: 0, tagName: 'p' }],
 			events: [],
 			behaviors: [],
 			elementHandles: [],

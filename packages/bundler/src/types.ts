@@ -19,6 +19,13 @@ export interface MarklessDevServer {
 }
 
 export interface MarklessRolldownOptions {
+	experimentalNativePacking?: boolean;
+	/**
+	 * Experimental, requires `experimentalNativePacking`: `'closures'` splits each critical pack by
+	 * which route boot, render path and compiled controls need each module, and emits
+	 * `interaction-closures.json`.
+	 */
+	experimentalPackPlanner?: 'closures';
 	dev?: boolean;
 	devInjections?: GlobalInjections[];
 	devServer?: MarklessDevServer;
@@ -56,17 +63,19 @@ export interface MarklessVirtualModule {
 	symbolClaims?: ReadonlyArray<string>;
 	/** `symbol-bundle` only: the symbol module ids this bundle ships as one chunk. */
 	bundledSymbolModuleIds?: ReadonlyArray<string>;
-	/** `resolver` only: published by a first pass so the id resolves; never served as content. */
+	/** Symbols and resolvers may resolve during linking, but never serve first-pass code. */
 	provisional?: boolean;
 }
 
 export interface TransformTsrxModuleInput {
+	experimentalNativePacking?: boolean;
 	filename: string;
 	/** Root-relative id the compiler spells every minted id from; defaults to `filename`. */
 	moduleId?: string;
 	source: string;
 	dev?: boolean;
 	importedModuleInterfaces?: SemanticGraphInput['importedModuleInterfaces'];
+	importedModuleConstants?: SemanticGraphInput['importedModuleConstants'];
 	renderDataImportSources?: Readonly<Record<string, string>>;
 	artifactChildMaterializations?: Readonly<Record<string, ArtifactChildMaterialization>>;
 	symbols?: import('@markless/compiler').SymbolResolverModuleInput['symbols'];
@@ -74,6 +83,7 @@ export interface TransformTsrxModuleInput {
 	buildId?: string;
 	environment?: MarklessEnvironment;
 	clientOutput?: MarklessClientOutput;
+	includeScalarActionPlans?: boolean;
 	resumeModuleUrl?: string;
 	prerenderWakeModuleUrl?: string;
 	settleModuleUrl?: string;
@@ -91,6 +101,9 @@ export interface TransformTsrxModuleInput {
 	preserveWakeSiblingClaims?: boolean;
 	prerenderRecordData?: BuiltPrerenderRecords;
 	runtimeDemandClass?: import('@markless/compiler').RuntimeDemandClass;
+	// A client module served as a payload document: a conservative demand class still runs
+	// plain-ssr scalar plans, resolved only through served locators.
+	servedScalarPlans?: boolean;
 }
 
 export interface TransformTsrxModuleResult {
@@ -102,6 +115,11 @@ export interface TransformTsrxModuleResult {
 	interfaceHash: string;
 	moduleImports: SemanticGraphArtifact['moduleImports'];
 	artifactChildren: ReadonlyArray<ArtifactChildCandidate>;
+	/** Imported constants a prop reads that this compile was not given. */
+	importedConstantRequests?: ReadonlyArray<{
+		readonly source: string;
+		readonly exportName: string;
+	}>;
 }
 
 export type ArtifactChildCandidate = {
@@ -209,9 +227,16 @@ export type PreloadGraphEntriesAdder = (
 export type BundleGraphAdder = (manifest: MarklessBuildMetadata) => PreloadGraphEntries | undefined;
 
 export type MarklessRolldownPluginApi = {
+	/** Whether client chunks import each other through specifiers that the document's import map resolves. */
+	chunkImportMap: () => boolean;
 	invalidateGeneratedModules: (
 		parent: string,
 		environment?: MarklessEnvironment,
 		nextSource?: string,
 	) => string[] | Promise<string[]>;
+	runtimeDemandMaps: () => Iterable<RuntimeDemandMapManifest | undefined>;
+	runtimeDemandSources: () => Iterable<{
+		readonly source: string;
+		readonly map: RuntimeDemandMapManifest | undefined;
+	}>;
 };

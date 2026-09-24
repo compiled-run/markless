@@ -311,8 +311,7 @@ export function Gallery() @{
 				<fileupload.root name="attachment">
 					<fileupload.label>Attachments</fileupload.label>
 					<fileupload.droparea>
-						Drop a file here
-						<fileupload.trigger>Browse</fileupload.trigger>
+						Drop a file here <fileupload.trigger>Browse</fileupload.trigger>
 					</fileupload.droparea>
 					<fileupload.field />
 					<FileRows />
@@ -373,12 +372,10 @@ export function Gallery() @{
 				<menubar.root>
 					<menubar.label>Application</menubar.label>
 					<menubar.item>
-						File
-						<menubar.itemcontent class="menu-surface">
+						File <menubar.itemcontent class="menu-surface">
 							<menu.item value="new">New</menu.item>
 							<menu.item value="recent" submenu>
-								Open Recent
-								<menu.itemcontent class="menu-surface">
+								Open Recent <menu.itemcontent class="menu-surface">
 									<menu.item value="draft">draft.md</menu.item>
 									<menu.item value="notes">notes.md</menu.item>
 								</menu.itemcontent>
@@ -386,15 +383,13 @@ export function Gallery() @{
 						</menubar.itemcontent>
 					</menubar.item>
 					<menubar.item>
-						Edit
-						<menubar.itemcontent class="menu-surface">
+						Edit <menubar.itemcontent class="menu-surface">
 							<menu.item value="undo">Undo</menu.item>
 							<menu.item value="redo">Redo</menu.item>
 						</menubar.itemcontent>
 					</menubar.item>
 					<menubar.item checked={['wrap']}>
-						View
-						<menubar.itemcontent class="menu-surface">
+						View <menubar.itemcontent class="menu-surface">
 							<menu.item value="wrap" checked>Word wrap</menu.item>
 							<menu.item value="zoom">Zoom in</menu.item>
 						</menubar.itemcontent>

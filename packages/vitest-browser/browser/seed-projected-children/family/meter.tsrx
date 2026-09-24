@@ -13,7 +13,7 @@ export const meterState = shared(
 );
 
 export function MeterRoot({ children }) @{
-	const meter = meterState();
+	const _meter = meterState();
 
 	<div data-meter-root>{children}</div>
 }

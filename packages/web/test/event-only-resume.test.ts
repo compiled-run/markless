@@ -589,3 +589,132 @@ test('event-only resume routes non-lean served view records to the full runtime'
 		expect(loadSymbol).not.toHaveBeenCalled();
 	}
 });
+
+// A wake with no event starts the full runtime, which then owns the cells: a lean
+// route answering a later event would write a detached copy and repaint the old value.
+test('lean routes hand every event to the full runtime once it has started', async () => {
+	const rowButton = element('BUTTON');
+	const rowOutput = element('OUTPUT');
+	const rowRoot = element('DIV', [
+		element('SECTION', [element('ARTICLE', [rowButton])]),
+		rowOutput,
+	]);
+	const rowDomUpdate = {
+		hostNodeId: 'hOutput',
+		source: 'chosen',
+		graphNodeId: 'state:chosen',
+		path: [],
+		target: { kind: 'text' as const },
+		symbolId: 'symbol:text',
+	};
+	const repeat = {
+		id: 'repeat:0',
+		parentHostNodeId: 'hParent',
+		collectionGraphNodeId: 'state:cards',
+		collectionPath: [],
+		keyPath: ['key'],
+		itemName: 'card',
+		rowElementCount: 1,
+		rowEvents: [{ hostPath: [0], eventName: 'click', symbolIds: ['symbol:row'] }],
+	};
+	const rowScripts = renderPayloadScripts({
+		state: createProtocolStatePayload({
+			cells: [
+				{ graphNodeId: 'state:chosen', name: 'chosen', valueKind: 'scalar', value: 'none' },
+				{
+					graphNodeId: 'state:cards',
+					name: 'cards',
+					valueKind: 'array',
+					value: [{ key: 'north' }],
+				},
+			],
+		}),
+		view: {
+			version: 1,
+			locators: [
+				{ hostNodeId: 'hParent', strategy: 'dom-order', index: 1, tagName: 'section' },
+				{ hostNodeId: 'hOutput', strategy: 'dom-order', index: 4, tagName: 'output' },
+			],
+			events: [],
+			domUpdates: [rowDomUpdate],
+			behaviors: [],
+			elementHandles: [],
+			keyedRepeats: [repeat],
+			branches: [],
+			asyncBoundaries: [],
+		},
+	});
+
+	const scalarButton = element('BUTTON');
+	const scalarOutput = element('OUTPUT');
+	const scalarRoot = element('DIV', [scalarButton, scalarOutput]);
+	const eventRecord = { hostNodeId: 'hButton', eventName: 'click', symbolIds: ['symbol:event'] };
+	const scalarDomUpdate = { ...rowDomUpdate, source: 'count', graphNodeId: 'state:count' };
+	const scalarScripts = renderPayloadScripts({
+		state: createProtocolStatePayload({
+			cells: [{ graphNodeId: 'state:count', name: 'count', valueKind: 'scalar', value: 0 }],
+		}),
+		view: {
+			version: 1,
+			locators: [
+				{ hostNodeId: 'hButton', strategy: 'dom-order', index: 1, tagName: 'button' },
+				{ hostNodeId: 'hOutput', strategy: 'dom-order', index: 2, tagName: 'output' },
+			],
+			events: [eventRecord],
+			domUpdates: [scalarDomUpdate],
+			behaviors: [],
+			elementHandles: [],
+			asyncBoundaries: [],
+		},
+	});
+
+	for (const route of [
+		{
+			root: rowRoot,
+			output: rowOutput,
+			target: rowButton,
+			scripts: rowScripts,
+			runtimeDemandMap: rowRuntimeDemandMap({
+				repeat,
+				rowEvent: repeat.rowEvents[0],
+				domUpdate: rowDomUpdate,
+			}),
+		},
+		{
+			root: scalarRoot,
+			output: scalarOutput,
+			target: scalarButton,
+			scripts: scalarScripts,
+			eventRecord,
+			runtimeDemandMap: scalarRuntimeDemandMap({ eventRecord, domUpdate: scalarDomUpdate }),
+		},
+	]) {
+		const liveCells = new Map<string, unknown>();
+		liveCells.get = () => 'live';
+		Object.assign(route.root, {
+			__asyncResumeRuntimeStarted: true,
+			__marklessEventOnlyGraph: liveCells,
+		});
+		const fullResume = vi.fn(async () => undefined);
+		const loadSymbol = vi.fn(() => () => undefined);
+		const event = { type: 'click', target: route.target };
+
+		await resumeScalarEventFromPayloadDocument({
+			document: payloadDocument(route.scripts.stateScript, route.scripts.viewScript),
+			root: route.root,
+			event,
+			...(route.eventRecord ? { eventRecord: route.eventRecord } : {}),
+			runtimeDemandMap: route.runtimeDemandMap,
+			loadSymbol,
+			loadFullResume: fullResume,
+		} as Parameters<typeof resumeScalarEventFromPayloadDocument>[0] & {
+			readonly loadFullResume: typeof fullResume;
+		});
+
+		expect(fullResume).toHaveBeenCalledWith(
+			expect.objectContaining({ root: route.root, event }),
+		);
+		expect(loadSymbol).not.toHaveBeenCalled();
+		expect(route.output.textContent).toBeNull();
+	}
+});

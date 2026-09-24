@@ -283,7 +283,7 @@ export function App() @{
       </aside>
     } @pending {
       <p>Loading preview for {selected.title}</p>
-    } @catch (error) {
+    } @catch (_error) {
       <p>Preview failed for {selected.title}</p>
     }
 

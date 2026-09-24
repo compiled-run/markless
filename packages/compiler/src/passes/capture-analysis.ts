@@ -21,7 +21,8 @@ import {
 	semanticAliasMap,
 } from '../artifact-helpers/graph-paths.ts';
 import { protocolInstanceQualifies } from '@markless/serializer';
-import { asNodes, childNodes, type AnyNode } from '../ast/nodes.ts';
+import { componentEdgeInstancePath } from '../component-edge-instance.ts';
+import { asNodes, childNodes, unwrapTypeAssertion, type AnyNode } from '../ast/nodes.ts';
 import { parseJavaScriptModule } from '../js-ast.ts';
 import { isClassInstanceValue } from './semantic-graph/collect-state.ts';
 import {
@@ -29,6 +30,7 @@ import {
 	type SymbolSourceSemanticsReader,
 } from './capture-semantics.ts';
 import { sharedCallbackSlotGraphNodeId } from './semantic-graph/collect-shared.ts';
+import { createSourceMemo } from './semantic-graph/shared-ast.ts';
 
 // Capture analysis owns these diagnostic contract values. Tests and any other
 // reader import them from here rather than restating the strings, so the
@@ -60,6 +62,14 @@ export function analyzeCaptures(input: CaptureAnalysisInput): CaptureAnalysisArt
 			symbolId: symbol.id,
 			kind: symbol.kind,
 			source: symbolSource(symbol),
+			...('writes' in symbol && symbol.writes?.length
+				? {
+						graphWrites: symbol.writes.map(({ graphNodeId, path }) => ({
+							graphNodeId,
+							path,
+						})),
+					}
+				: {}),
 			...(firstOwner?.componentId || firstOwner?.componentName
 				? {
 						owner: {
@@ -186,6 +196,10 @@ function importedCaptureSymbols(
 		if (!edge) return [];
 		if (!claimBelongsToEdge(symbol.ownerComponentName, edge, input)) return [];
 		const captureSymbol = symbol.captureSymbol;
+		// A child's own claim it could not bind: its slots already name the child's routes, save the props it forwards.
+		const republished = captureSymbol.innerInstancePath !== undefined;
+		// One route per ancestry the edge is rendered under, as a local symbol's routes are.
+		const edgePaths = componentEdgePathsEndingAt(edge, input.semanticGraph.componentEdges);
 		// Absent callback props fold to undefined only at optional/guarded call sites.
 		const absentPropIsUndefined = (slot: CaptureSlot) =>
 			captureSymbol.kind !== 'event-handler' && captureSymbol.kind !== 'callback-prop'
@@ -219,6 +233,8 @@ function importedCaptureSymbols(
 		return [
 			{
 				...symbol.captureSymbol,
+				// Republished to this module's composers, the claim belongs to the component that composes its owner here.
+				owner: { componentName: edge.parentComponentName },
 				loaderSymbolId: symbol.id,
 				captureSlots: symbol.captureSymbol.captureSlots
 					.map((slot) => ({
@@ -230,43 +246,66 @@ function importedCaptureSymbols(
 										: route,
 								)
 							: slot.routes.some((route) => route.kind === 'passthrough-route')
-							? slot.routes.flatMap((route) =>
-									route.kind === 'passthrough-route'
-										? [
+								? slot.routes.flatMap((route) =>
+										route.kind === 'passthrough-route'
+											? edgePaths.map((path) =>
+													propCaptureRoute(
+														path,
+														route.propName,
+														[...route.path, ...slot.path],
+														input,
+														absentPropIsUndefined(slot),
+													),
+												)
+											: [],
+									)
+								: slot.propName && !republished
+									? keepConstantFields(
+											edgePaths.map((path) =>
 												propCaptureRoute(
-													[edge],
-													route.propName,
-													[...route.path, ...slot.path],
+													path,
+													slot.propName as string,
+													slot.path,
 													input,
 													absentPropIsUndefined(slot),
 												),
-											]
-										: [],
-								)
-							: slot.propName
-								? [
-										propCaptureRoute(
-											[edge],
-											slot.propName,
-											slot.path,
-											input,
-											absentPropIsUndefined(slot),
+											),
+											slot.fieldPaths ?? [slot.path],
+										)
+									: slot.routes.flatMap((route): CaptureSlotRoute[] =>
+											route.kind === 'graph-reference' ||
+											(republished && route.kind === 'compiler-known-constant')
+												? edgePaths.map((path) => ({
+														...route,
+														...(route.kind === 'graph-reference' && republished
+															? republishedGraphNodeId(route.graphNodeId, path, input)
+															: {}),
+														componentEdgeId: edge.id,
+														componentEdgePath: path.map((step) => step.id),
+													}))
+												: [route],
 										),
-									]
-								: slot.routes.map((route) =>
-										route.kind === 'graph-reference'
-											? {
-													...route,
-													componentEdgeId: edge.id,
-													componentEdgePath: [edge.id],
-												}
-											: route,
-									),
 					}))
-					.filter((slot) => !wasProjectedThroughComponentEdge(slot.propName, edge)),
+					.filter(
+						(slot) => republished || !wasProjectedThroughComponentEdge(slot.propName, edge),
+					),
 			},
 		];
 	});
+}
+
+// A republished claim's graph reads name the child module's nodes, which this module holds under the edge's instance.
+function republishedGraphNodeId(
+	graphNodeId: string,
+	path: ReadonlyArray<SemanticComponentEdge>,
+	input: CaptureAnalysisInput,
+): { readonly graphNodeId?: string } {
+	return protocolInstanceQualifies(graphNodeId) === true
+		? {
+				graphNodeId:
+					componentEdgeInstancePath(path, input.semanticGraph.componentEdges) + graphNodeId,
+			}
+		: {};
 }
 
 /**
@@ -737,6 +776,8 @@ function captureSlot(
 				: route,
 		);
 	}
+	const fieldPaths = constantFieldPaths(symbol, declaration);
+	if (fieldPaths) routes = keepConstantFields(routes, fieldPaths);
 	// Two reads of the same thing in one symbol stay distinct by arrival order.
 	const identity = captureSlotIdentity(read, declaration, componentName, propName, routePath);
 	const ordinal = ordinals.get(identity) ?? 0;
@@ -755,7 +796,19 @@ function captureSlot(
 		...(propName ? { propName } : {}),
 		path: routePath,
 		routes,
+		...(fieldPaths ? { fieldPaths } : {}),
 	};
+}
+
+function keepConstantFields(
+	routes: ReadonlyArray<CaptureSlotRoute>,
+	fieldPaths: ReadonlyArray<ReadonlyArray<string>>,
+): CaptureSlotRoute[] {
+	return routes.map((route) =>
+		route.kind === 'compiler-known-constant'
+			? { ...route, value: valueAlongPaths(route.value, fieldPaths) }
+			: route,
+	);
 }
 
 function propCaptureRoutes(
@@ -891,6 +944,13 @@ function resolvePropCaptureRoute(
 			valueAtPath(prop.value, forwardedPath),
 		);
 	}
+	if (prop.kind === 'opaque' && prop.buildTimeValue) {
+		return createCompilerKnownConstantCaptureRoute(
+			terminalEdgeId,
+			edgePathIds,
+			valueAtPath(prop.buildTimeValue.value, forwardedPath),
+		);
+	}
 	if (prop.kind === 'callback' && forwardedPath.length === 0 && readPath.length === 0) {
 		const callbackSymbol = input.symbolResolver.symbols.find(
 			(symbol) =>
@@ -899,11 +959,16 @@ function resolvePropCaptureRoute(
 				symbol.propName === propName,
 		);
 		if (callbackSymbol) {
+			const composerPath = componentEdgeInstancePath(
+				componentEdgePath.slice(0, edgeIndex),
+				input.semanticGraph.componentEdges,
+			);
 			return {
 				kind: 'callback-route',
 				componentEdgeId: terminalEdgeId,
 				componentEdgePath: edgePathIds,
 				callbackSymbolId: callbackSymbol.id,
+				...(composerPath ? { composerPath } : {}),
 			};
 		}
 	}
@@ -969,6 +1034,129 @@ function componentEdgePathsEndingAt(
 	);
 }
 
+/**
+ * The fields of a destructured prop a symbol reaches: one path per use of the
+ * prop in the symbol's source, following static member and index reads
+ * (`node.children![0]!.id` reaches `children.0.id`, a method call stops before
+ * the method). Null when that cannot be said, and the whole value is kept.
+ */
+function constantFieldPaths(
+	symbol: PlannedSymbol,
+	declaration: SemanticComponentPropDeclaration | undefined,
+): ReadonlyArray<ReadonlyArray<string>> | null {
+	if (!declaration || declaration.propPath.length !== 1) return null;
+	const source = symbolSource(symbol);
+	if (!source) return null;
+	const paths = propFieldPathsMemo(declaration.localName, source, () =>
+		propFieldPaths(source, declaration.localName),
+	);
+	return paths && paths.length > 0 ? paths : null;
+}
+
+const propFieldPathsMemo = createSourceMemo<ReadonlyArray<ReadonlyArray<string>> | null>(2048);
+
+function propFieldPaths(
+	source: string,
+	localName: string,
+): ReadonlyArray<ReadonlyArray<string>> | null {
+	let ast: AnyNode;
+	try {
+		ast = parseJavaScriptModule(`(${source});`, CAPTURE_SOURCE_PARSE_FILENAME) as AnyNode;
+	} catch {
+		return null;
+	}
+	const paths: string[][] = [];
+	const visit = (node: AnyNode, ancestors: AnyNode[]): void => {
+		if (
+			node.type === 'Identifier' &&
+			node.name === localName &&
+			!isNonReadName(node, ancestors.at(-1))
+		) {
+			paths.push(memberPathAbove(node, ancestors));
+		}
+		const next = [...ancestors, node];
+		for (const child of childNodes(node)) visit(child, next);
+	};
+	visit(ast, []);
+	return paths;
+}
+
+// A member name or object key spelled like the prop is not a read of it.
+function isNonReadName(identifier: AnyNode, parent: AnyNode | undefined): boolean {
+	if (parent?.type === 'MemberExpression')
+		return parent.property === identifier && parent.computed !== true;
+	if (parent?.type === 'Property')
+		return parent.key === identifier && parent.computed !== true && parent.shorthand !== true;
+	return false;
+}
+
+function memberPathAbove(identifier: AnyNode, ancestors: ReadonlyArray<AnyNode>): string[] {
+	const path: string[] = [];
+	let current = identifier;
+	for (let index = ancestors.length - 1; index >= 0; index -= 1) {
+		const parent = ancestors[index]!;
+		if (unwrapTypeAssertion(parent) !== parent || parent.type === 'ChainExpression') {
+			current = parent;
+			continue;
+		}
+		if (parent.type !== 'MemberExpression' || parent.object !== current) break;
+		const property = parent.property as AnyNode | undefined;
+		const key =
+			parent.computed === true
+				? property?.type === 'Literal' &&
+					(typeof property.value === 'string' || typeof property.value === 'number')
+					? String(property.value)
+					: null
+				: typeof property?.name === 'string'
+					? property.name
+					: null;
+		if (key === null) break;
+		const grandparent = ancestors[index - 1];
+		if (grandparent?.type === 'CallExpression' && grandparent.callee === parent) break;
+		path.push(key);
+		current = parent;
+	}
+	return path;
+}
+
+// The value with only what `paths` reach kept, so the page ships the fields
+// browser code reads and not the whole constant.
+function valueAlongPaths(value: unknown, paths: ReadonlyArray<ReadonlyArray<string>>): unknown {
+	if (value === null || typeof value !== 'object' || paths.some((path) => path.length === 0))
+		return value;
+	const rests = new Map<string, Array<ReadonlyArray<string>>>();
+	for (const [key, ...rest] of paths) {
+		if (key === undefined) continue;
+		const known = rests.get(key) ?? [];
+		known.push(rest);
+		rests.set(key, known);
+	}
+	if (Array.isArray(value)) {
+		const indices = [...rests.keys()]
+			.map(Number)
+			.filter((index) => Number.isInteger(index) && index >= 0 && index < value.length);
+		const length = rests.has('length')
+			? value.length
+			: indices.length > 0
+				? Math.max(...indices) + 1
+				: 0;
+		const kept: unknown[] = Array.from({ length }, () => null);
+		for (const index of indices)
+			kept[index] = valueAlongPaths(value[index], rests.get(String(index)) ?? []);
+		return kept;
+	}
+	const kept: Record<string, unknown> = {};
+	for (const [key, rest] of rests)
+		if (Object.hasOwn(value, key))
+			Object.defineProperty(kept, key, {
+				value: valueAlongPaths((value as Record<string, unknown>)[key], rest),
+				enumerable: true,
+				writable: true,
+				configurable: true,
+			});
+	return kept;
+}
+
 function valueAtPath(value: unknown, path: ReadonlyArray<string>): unknown {
 	return path.reduce<unknown>((current, key) => {
 		if ((typeof current !== 'object' && typeof current !== 'function') || current === null) {
@@ -978,8 +1166,16 @@ function valueAtPath(value: unknown, path: ReadonlyArray<string>): unknown {
 	}, value);
 }
 
+const absentSafeMemo = createSourceMemo<boolean>(2048);
+
 // True when every call of `reference` in source already no-ops on a missing value (?.(), if/&&/?: guards).
 function referenceInvocationIsAbsentSafe(source: string, reference: string): boolean {
+	return absentSafeMemo(reference, source, () =>
+		computeReferenceInvocationIsAbsentSafe(source, reference),
+	);
+}
+
+function computeReferenceInvocationIsAbsentSafe(source: string, reference: string): boolean {
 	const moduleSource = `const __marklessCaptureSource = ${source};`;
 	let ast: AnyNode;
 	try {
@@ -1111,6 +1307,13 @@ function referenceInvocationIsAbsentSafe(source: string, reference: string): boo
 	return invoked && !unguarded;
 }
 
+function lazySymbolRole(kind: string | undefined): string {
+	if (kind === 'event-handler') return 'an event handler';
+	if (kind === 'dom-update') return 'a DOM update';
+	if (kind === 'sync-computed-derive') return 'a computed';
+	return 'a lazy symbol';
+}
+
 function asNode(value: unknown): AnyNode | undefined {
 	return typeof value === 'object' && value !== null && typeof (value as AnyNode).type === 'string'
 		? (value as AnyNode)
@@ -1119,6 +1322,7 @@ function asNode(value: unknown): AnyNode | undefined {
 
 function opaqueSlotDiagnostics(symbol: {
 	readonly symbolId: string;
+	readonly kind?: string;
 	readonly captureSlots: ReadonlyArray<CaptureSlot>;
 }): ReadonlyArray<CaptureAnalysisDiagnostic> {
 	const reportedRoutes = new Set<string>();
@@ -1138,10 +1342,10 @@ function opaqueSlotDiagnostics(symbol: {
 					title: 'Lazy handler prop capture is not resumable',
 					message: route.absentProp
 						? `Cannot bind lazy symbol "${symbol.symbolId}" on component edge "${route.componentEdgeId}" because prop "${propName}" is not passed by the parent that renders "${componentName}", and this call site invokes it unconditionally.`
-						: `Cannot bind lazy symbol "${symbol.symbolId}" on component edge "${route.componentEdgeId}" because prop "${propName}" for "${componentName}" is the runtime expression "${route.expression}".`,
+						: `Cannot bind lazy symbol "${symbol.symbolId}" on component edge "${route.componentEdgeId}" because prop "${propName}" for "${componentName}" is the runtime expression "${route.expression}". "${componentName}" reads it as \`${slot.source}\` in ${lazySymbolRole(symbol.kind)}, which runs in the browser after resume, and this value has no route there.`,
 					why: route.absentProp
 						? 'An absent prop has no value to route at this component edge. An optional or guarded call folds to undefined; an unconditional call would throw after resume, so it stays a build error.'
-						: 'A demanded capture slot must route to a graph node, a compiler-known constant, or a callback symbol. This opaque runtime value cannot be reduced without adding a serialized capture protocol.',
+						: 'A demanded capture slot must route to a graph node, a compiler-known constant, or a callback symbol. Constant data reaches the browser as its build-time value: literals, object and array literals, and static member or index reads of a module `const` in this file or of a plain-data `const` export of an imported module that no statement there writes through. This expression is none of those - a function call, a `let`, a class instance, a namespace import, or a constant its module mutates - so its value exists only when the render runs.',
 					...(route.sourceSpan ? { primarySpan: route.sourceSpan } : {}),
 					passId: CAPTURE_ANALYSIS_PASS_ID,
 					artifactKeys: ['semanticGraph', 'symbolResolver', 'captureAnalysis'],
@@ -1154,7 +1358,7 @@ function opaqueSlotDiagnostics(symbol: {
 						{
 							message: route.absentProp
 								? `Call it optionally as ${propName}?.(…), guard it with if (${propName}), or pass ${propName} where "${componentName}" is rendered.`
-								: 'Pass state()/computed() data, a literal value, or a callback prop to the lazy handler instead.',
+								: `Pass plain constant data (such as TREE[0] from a module that only declares it), pass a string, number or boolean literal (such as an id) and look the value up inside "${componentName}", or hold the value in state() in the component that renders "${componentName}".`,
 						},
 					],
 					docsUrl: 'https://markless.dev/errors/MARKLESS_CAPTURE_OPAQUE_PROP',

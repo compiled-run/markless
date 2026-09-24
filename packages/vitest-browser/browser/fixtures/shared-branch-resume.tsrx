@@ -16,7 +16,7 @@ export const gate = shared(
 );
 
 export function Root({ children }) @{
-	const g = gate();
+	const _g = gate();
 	<div data-gate>{children}</div>
 }
 

@@ -1,0 +1,23 @@
+diff --git a/packages/web/src/resume-sync-demand.ts b/packages/web/src/resume-sync-demand.ts
+index b57ace39..8689ddcd 100644
+--- a/packages/web/src/resume-sync-demand.ts
++++ b/packages/web/src/resume-sync-demand.ts
+@@ -1,8 +1,5 @@
+ import type { ResumePreparedCore, ResumeRuntimeInput } from './resume-types.ts';
+ 
+-// Both record kinds answer the same two questions: which node to write, and
+-// which symbol derives it. A sync computed derives its own value; a shared seed
+-// re-runs the component's own seed expression over the props it reads.
+ type DemandRecord = {
+ 	readonly graphNodeId: string;
+ 	readonly deriveSymbolId: string;
+@@ -46,7 +43,8 @@ export function wireSyncComputedDemandRecordsWithoutLoadingCapability(input: {
+ 		for (const dependency of computed.dependencies ?? []) {
+ 			input.storeContainerSubscription(
+ 				input.graph.subscribe({
+-					id: `sync-computed-demand:${computed.graphNodeId}:${computed.deriveSymbolId}:${dependency.graphNodeId}:${dependency.path.join('.')}`,
++					// Dependencies share one refresh identity within each pending-write batch.
++					id: `sync-computed-demand:${computed.graphNodeId}:${computed.deriveSymbolId}`,
+ 					graphNodeId: dependency.graphNodeId,
+ 					path: dependency.path,
+ 					async run() {

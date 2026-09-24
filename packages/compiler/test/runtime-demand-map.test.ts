@@ -1,5 +1,8 @@
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { expect, test } from 'vitest';
-import { PROTOCOL_EVENT_ACTION_KIND } from '@markless/serializer';
+import { PROTOCOL_EVENT_ACTION_KIND, PROTOCOL_VISIBLE_EVENT_NAME } from '@markless/serializer';
+import { LEAN_DISPATCH_MARKER_MODULES } from '../src/lean-dispatch-modules.ts';
 import { createRuntimeDemandMap } from '../src/passes/runtime-demand-map.ts';
 
 test('external delegation is an explicit runtime-demand no-op', () => {
@@ -399,4 +402,309 @@ test('the row mint reaches a row action through its own repeat record', () => {
 	const action = map.actions.find((candidate) => candidate.recordKind === 'keyed-repeat-row');
 	expect(action?.payloadRecordIds).toContain('keyed-repeat:repeat:0');
 	expect(action?.runtimeModuleIds).toContain('web/fns/row-mint');
+});
+
+test('a visible event demands the behavior runtime the resume runtime installs at startup', async () => {
+	const { compileTsrxModule } = await import('../src/index.ts');
+	const result = await compileTsrxModule({
+		filename: '/workspace/src/Reveal.tsrx',
+		symbols: [],
+		source: `
+		import { state } from '@markless/core';
+		export default function Reveal() @{
+			let seen = state(0);
+			<aside><p onVisible={() => seen++}>{seen}</p><em onClick={() => seen++}>x</em></aside>
+		}
+	`,
+	});
+	for (const map of Object.values(result.runtimeDemandMaps)) {
+		const records = map.payloadRecords;
+		expect(
+			records.find((record) => record.eventName === PROTOCOL_VISIBLE_EVENT_NAME)
+				?.runtimeModuleIds,
+		).toContain('web/resume-behaviors');
+		expect(
+			records.find((record) => record.eventName === 'click')?.runtimeModuleIds,
+		).not.toContain('web/resume-behaviors');
+	}
+});
+
+async function panelDemandMap(source: string) {
+	const { compileTsrxModule } = await import('../src/index.ts');
+	const result = await compileTsrxModule({
+		filename: '/workspace/src/Panel.tsrx',
+		symbols: [],
+		source,
+	});
+	const map = result.runtimeDemandMaps.prerender;
+	const kindOf = new Map(map.symbols.map((symbol) => [symbol.symbolId, symbol.kind]));
+	const action = (hostNodeId: string, eventName: string) =>
+		map.actions.find(
+			(candidate) => candidate.hostNodeId === hostNodeId && candidate.eventName === eventName,
+		)!;
+	const kinds = (symbolIds: ReadonlyArray<string> | undefined) =>
+		(symbolIds ?? []).map((symbolId) => kindOf.get(symbolId)).sort();
+	return { map, action, kinds };
+}
+
+const PANEL = `
+	import { computed, state } from '@markless/core';
+	export default function Panel() @{
+		let query = state('');
+		let count = state(0);
+		let items = state(['a']);
+		const empty = computed(() => query === '');
+		<section>
+			<input value={query} onInput={(event) => (query = (event.target as HTMLInputElement).value)} />
+			<button onClick={() => count++}>{count}</button>
+			<button onClick={() => (items = [...items, 'b'])}>add</button>
+			<ul>
+				@for (const item of items; key item) {
+					<li><button onClick={() => (count = 0)}>{item}</button></li>
+				}
+			</ul>
+			@if (empty) {
+				<p><button onClick={() => (query = 'x')}>fill</button></p>
+			}
+		</section>
+	}
+`;
+
+test('a control that flips a branch through a computed reaches the flip, its derive and the arm handlers', async () => {
+	const { action, kinds } = await panelDemandMap(PANEL);
+	const input = action('h1', 'input');
+	expect(input.recordKinds).toContain('branch');
+	expect(kinds(input.firstUse?.symbolIds)).toEqual([
+		'branch-update',
+		'dom-update',
+		'event-handler',
+		'event-handler',
+		'sync-computed-derive',
+	]);
+	expect(input.firstUse?.runtimeModuleIds).toContain('web/resume-branches');
+});
+
+test('a control whose writes reach no branch leaves the branch symbols out', async () => {
+	const { action, kinds } = await panelDemandMap(PANEL);
+	const click = action('h2', 'click');
+	expect(click.recordKinds).toContain('branch');
+	expect(kinds(click.firstUse?.symbolIds)).toEqual(['dom-update', 'event-handler']);
+});
+
+test('a control that grows a keyed repeat reaches the row handlers and the row mint', async () => {
+	const { map, action, kinds } = await panelDemandMap(PANEL);
+	const add = action('h3', 'click');
+	expect(kinds(add.firstUse?.symbolIds)).toEqual(['event-handler', 'event-handler']);
+	expect(add.firstUse?.runtimeModuleIds).toContain('web/fns/row-mint');
+	const row = map.actions.find((candidate) => candidate.recordKind === 'keyed-repeat-row')!;
+	expect(kinds(row.firstUse?.symbolIds)).toEqual(['dom-update', 'event-handler']);
+	expect(row.firstUse?.runtimeModuleIds).toContain('web/resume-keyed-repeats');
+});
+
+test('a write after an await reaches the arm it flips, so the arm preloads with its control', async () => {
+	const { map, kinds } = await panelDemandMap(`
+		import { computed, state } from '@markless/core';
+		export default function Save() @{
+			let failure = state('');
+			let note = state('');
+			const failed = computed(() => failure !== '');
+			const noted = computed(() => note !== '');
+			<form onSubmit={async (event) => {
+				event.preventDefault();
+				const response = await fetch('/save', { method: 'POST' });
+				failure = response.ok ? '' : 'rejected';
+			}}>
+				<button type="submit">Save</button>
+				@if (failed) {
+					<p role="alert">{failure}</p>
+				}
+				@if (noted) {
+					<p>{note}</p>
+				}
+			</form>
+		}
+	`);
+	const submit = map.actions.find((candidate) => candidate.eventName === 'submit')!;
+	const branchSymbols = map.payloadRecords
+		.filter((record) => record.kind === 'branch')
+		.map((record) => record.symbolIds ?? []);
+	expect(branchSymbols).toHaveLength(2);
+	const [flipped, untouched] = branchSymbols;
+	expect(submit.firstUse?.symbolIds).toEqual(expect.arrayContaining([...flipped!]));
+	expect(submit.firstUse?.symbolIds).not.toEqual(expect.arrayContaining([...untouched!]));
+	expect(kinds(submit.firstUse?.symbolIds)).toContain('branch-update');
+	expect(submit.firstUse?.runtimeModuleIds).toContain('web/resume-branches');
+});
+
+test('an arm no control can flip stays out of every first use', async () => {
+	const { map } = await panelDemandMap(`
+		import { state } from '@markless/core';
+		export default function Fixed() @{
+			let count = state(0);
+			let shown = state(true);
+			<div>
+				<button onClick={() => count++}>{count}</button>
+				@if (shown) {
+					<p>always</p>
+				}
+			</div>
+		}
+	`);
+	const branchSymbols = map.payloadRecords
+		.filter((record) => record.kind === 'branch')
+		.flatMap((record) => record.symbolIds ?? []);
+	expect(branchSymbols.length).toBeGreaterThan(0);
+	for (const action of map.actions)
+		for (const symbolId of branchSymbols) expect(action.firstUse?.symbolIds).not.toContain(symbolId);
+});
+
+test('a control that picks a @switch case reaches the switch flip', async () => {
+	const { map, kinds } = await panelDemandMap(`
+		import { state } from '@markless/core';
+		export default function Modes() @{
+			let mode = state('list');
+			<div>
+				<button onClick={() => (mode = mode === 'list' ? 'grid' : 'list')}>Mode</button>
+				@switch (mode) {
+					@case 'grid': {
+						<p>grid</p>
+					}
+					@default: {
+						<p>list</p>
+					}
+				}
+			</div>
+		}
+	`);
+	const click = map.actions.find((candidate) => candidate.eventName === 'click')!;
+	expect(kinds(click.firstUse?.symbolIds)).toContain('branch-update');
+	expect(click.firstUse?.runtimeModuleIds).toContain('web/resume-branches');
+});
+
+test('an escalating branch the control reaches leaves its first use unbounded', () => {
+	const view = {
+		version: 1,
+		locators: [],
+		events: [{ hostNodeId: 'h1', eventName: 'click', symbolIds: ['symbol:0'] }],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		keyedRepeats: [],
+		asyncBoundaries: [],
+		branches: [
+			{
+				id: 'branch-site:0',
+				startAnchor: { strategy: 'dom-order-comment', index: 0 },
+				endAnchor: { strategy: 'dom-order-comment', index: 1 },
+				symbolId: 'symbol:1',
+				testReads: [{ source: 'open', graphNodeId: 'state:open', path: [] }],
+				escalates: true,
+			},
+		],
+	};
+	const input = (writes: string) =>
+		({
+			symbolResolver: {
+				passId: 'symbol-resolver',
+				dynamicImportOwner: 'generated-symbol-resolver',
+				syncPolicies: [],
+				diagnostics: [],
+				symbols: [
+					{
+						id: 'symbol:0',
+						kind: 'event-handler',
+						source: '() => (open = true)',
+						parameters: [],
+						reads: [],
+						writes: [
+							{
+								source: writes,
+								graphNodeId: `state:${writes}`,
+								path: [],
+								operation: 'assign',
+							},
+						],
+					},
+					{ id: 'symbol:1', kind: 'branch-update' },
+				],
+			},
+			symbolModules: { passId: 'symbol-modules', modules: [], diagnostics: [] },
+			publicRenderModule: {
+				passId: 'public-render-module',
+				moduleSource: '',
+				ssrModuleSource: '',
+				rootExportName: null,
+				ssrExportName: null,
+				diagnostics: [],
+			},
+			protocolView: view,
+			protocolState: { version: 1, cells: [], computed: [] },
+		}) as never;
+	expect(createRuntimeDemandMap(input('open'), 'prerender').actions[0]?.firstUse).toBe('unknown');
+	expect(createRuntimeDemandMap(input('other'), 'prerender').actions[0]?.firstUse).toEqual({
+		symbolIds: ['symbol:0'],
+		runtimeModuleIds: expect.arrayContaining(['web/resume-branches']),
+	});
+});
+
+test('a handler write to a page-space cell is named for the page join; a callback slot write is unknown', () => {
+	const input = (graphNodeId: string) =>
+		({
+			symbolResolver: {
+				passId: 'symbol-resolver',
+				dynamicImportOwner: 'generated-symbol-resolver',
+				syncPolicies: [],
+				diagnostics: [],
+				symbols: [
+					{
+						id: 'symbol:0',
+						kind: 'event-handler',
+						source: '() => (cell = 1)',
+						parameters: [],
+						reads: [],
+						writes: [{ source: 'cell', graphNodeId, path: [], operation: 'assign' }],
+					},
+				],
+			},
+			symbolModules: { passId: 'symbol-modules', modules: [], diagnostics: [] },
+			publicRenderModule: {
+				passId: 'public-render-module',
+				moduleSource: '',
+				ssrModuleSource: '',
+				rootExportName: null,
+				ssrExportName: null,
+				diagnostics: [],
+			},
+			protocolView: {
+				version: 1,
+				locators: [],
+				events: [{ hostNodeId: 'h1', eventName: 'click', symbolIds: ['symbol:0'] }],
+				domUpdates: [],
+				behaviors: [],
+				elementHandles: [],
+				keyedRepeats: [],
+				asyncBoundaries: [],
+			},
+			protocolState: { version: 1, cells: [], computed: [] },
+		}) as never;
+	const cell = 'shared:widgets/dial.tsrx#dialState/state:box';
+	const map = createRuntimeDemandMap(input(cell), 'prerender');
+	expect(map.actions[0]?.firstUse).toMatchObject({ pageSpaceWrites: [cell] });
+	expect(map.firstUsePage?.resume).toEqual({ symbolIds: [], runtimeModuleIds: expect.any(Array) });
+	const slot = 'shared:widgets/dial.tsrx#dialState/slot:onTurn';
+	expect(createRuntimeDemandMap(input(slot), 'prerender').actions[0]?.firstUse).toBe('unknown');
+});
+
+// Tools read these ids to tell lean dispatch from full resume; each must still name a web runtime module.
+test('lean dispatch marker modules name existing web runtime sources', () => {
+	for (const id of Object.values(LEAN_DISPATCH_MARKER_MODULES).flat()) {
+		expect(id).toMatch(/^web\//);
+		expect(
+			existsSync(
+				fileURLToPath(
+					new URL(`../../web/src/${id.slice('web/'.length)}.ts`, import.meta.url),
+				),
+			),
+		).toBe(true);
+	}
 });

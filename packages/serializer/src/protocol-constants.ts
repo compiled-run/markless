@@ -17,6 +17,9 @@ export const PROTOCOL_EVENT_ACTION_KIND = {
 	externalDelegate: 'external-delegate',
 } as const;
 
+// Served by an IntersectionObserver, not a DOM listener; own module so browser resume imports only it.
+export { PROTOCOL_VISIBLE_EVENT_NAME } from './protocol-event-names.ts';
+
 export const ASYNC_BOUNDARY_ARM_MIN = 0;
 export const ASYNC_BOUNDARY_ARM_PENDING = 1;
 export const ASYNC_BOUNDARY_ARM_MAX = 2;

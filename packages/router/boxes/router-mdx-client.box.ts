@@ -2,6 +2,9 @@ import { box } from '@async/witness';
 import type { UserConfig } from 'vite';
 
 const WAIT = { timeoutMs: 10_000 };
+const NITRO_BUILD_DIR = 'node_modules/.nitro-router-mdx-client';
+// Nitro previews import the server entry in-process, so each box needs its own entry path.
+const NITRO_OUTPUT_DIR = '.output/router-mdx-client';
 
 export default box(
 	{
@@ -14,6 +17,14 @@ export default box(
 			...config,
 			root: `${config.root}/fixtures/router`,
 			configFile: `${config.root}/fixtures/router/vite.config.ts`,
+			nitro: {
+				buildDir: NITRO_BUILD_DIR,
+				output: {
+					dir: NITRO_OUTPUT_DIR,
+					publicDir: `${NITRO_OUTPUT_DIR}/public`,
+					serverDir: `${NITRO_OUTPUT_DIR}/server`,
+				},
+			},
 		});
 		const build = await pipeline.build({ config });
 		const preview = await pipeline.preview(build, { config });

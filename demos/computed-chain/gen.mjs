@@ -46,7 +46,7 @@ export function generateFixtureFiles(options = {}) {
 	for (const level of OWNER_LEVELS) {
 		app += `\t\t\t<button type='button' data-owner='${level}' onClick={() => owner${level}++}>write ${level}</button>\n`;
 	}
-	app += `\t\t\t<button type='button' data-equal='1' onClick={() => owner1 = owner1}>equal</button>\n`;
+	app += `\t\t\t<button type='button' data-equal='1' onClick={() => { const same = owner1; owner1 = same; }}>equal</button>\n`;
 	app += `\t\t\t<button type='button' data-batch='forward' onClick={() => { ${OWNER_LEVELS.map((l) => `owner${l}++`).join('; ')}; }}>batch forward</button>\n`;
 	app += `\t\t\t<button type='button' data-batch='reverse' onClick={() => { ${[...OWNER_LEVELS].reverse().map((l) => `owner${l}++`).join('; ')}; }}>batch reverse</button>\n`;
 	app += `\t\t</div>\n\t\t<C1 ${ownerList.map((name) => `${name}={${name}}`).join(' ')} />\n\t</main>\n}\n`;
@@ -65,7 +65,8 @@ export function generateFixtureFiles(options = {}) {
 		for (let level = end; level >= start; level--) {
 			const node = model[level - 1];
 			const owners = OWNER_LEVELS.map((ownerLevel) => `owner${ownerLevel}`);
-			const parameter = level === 1 ? `{ ${owners.join(', ')} }` : `{ input${level}, ${owners.join(', ')} }`;
+			const passed = level === LEVEL_COUNT ? owners.map((name) => `${name}: _${name}`) : owners;
+			const parameter = level === 1 ? `{ ${passed.join(', ')} }` : `{ input${level}, ${passed.join(', ')} }`;
 			const exported = level === start ? 'export default ' : '';
 			source += `${exported}function C${level}(${parameter}) @{\n`;
 			const predecessor = node.predecessor === null

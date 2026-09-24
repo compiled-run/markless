@@ -130,7 +130,8 @@ export function moduleInterfaceHash(value: ModuleGraphInterfaceArtifact | undefi
  * The interface as the hash reads it: the component's published arm markup is
  * left out, so an edit inside a child's own markup keeps reusing the parent the
  * way it always has. A parent that inlined that markup into an `@if` flip picks
- * the new markup up when it next compiles.
+ * the new markup up when it next compiles. The first-use reach is planner-only
+ * build data, so it is left out for the same reason.
  */
 function hashedInterface(value: ModuleGraphInterfaceArtifact | undefined): unknown {
 	if (!value) return null;
@@ -138,7 +139,9 @@ function hashedInterface(value: ModuleGraphInterfaceArtifact | undefined): unkno
 		...value,
 		render: {
 			...value.render,
-			components: value.render.components.map(({ armMaterial: _armMaterial, ...rest }) => rest),
+			components: value.render.components.map(
+				({ armMaterial: _armMaterial, firstUseReach: _firstUseReach, ...rest }) => rest,
+			),
 		},
 	};
 }
@@ -319,7 +322,8 @@ function linkedRenderDataSymbolPreamble(
 ): ReadonlyArray<string> {
 	return [
 		`import { marklessPrerenderData } from ${JSON.stringify(input.renderDataId)};`,
-		`import { loadSymbol as marklessLoadLocalSymbol } from ${JSON.stringify(input.resolverId)};`,
+		// Dynamic: the resolver loads this module, so a static edge back would defeat its lazy import.
+		`const marklessLoadLocalSymbol = (symbolId) => import(${JSON.stringify(input.resolverId)}).then((resolver) => resolver.loadSymbol(symbolId));`,
 		`import { ${entry} } from '@markless/web/fns/prerender-resume';`,
 		'function marklessLoadLinkedSymbol(symbolId) {',
 		...input.routes.flatMap((route) => [

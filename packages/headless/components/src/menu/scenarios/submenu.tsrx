@@ -20,8 +20,7 @@ export default function Submenu() @{
 			<menu.content data-testid="content">
 				<menu.item value="new" data-testid="item-new">New</menu.item>
 				<menu.item value="share" submenu data-testid="sub-item">
-					Share
-					<menu.itemcontent data-testid="sub-content">
+					Share <menu.itemcontent data-testid="sub-content">
 						<menu.item value="email" data-testid="sub-email">Email</menu.item>
 						<menu.item value="link" data-testid="sub-link">Copy link</menu.item>
 					</menu.itemcontent>

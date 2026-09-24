@@ -1,0 +1,622 @@
+{
+  "preview": "http://localhost:3000/markless/concepts/state",
+  "output": "/private/tmp/markless-docs-scalar-path-final-1Bv7ML/.output",
+  "files": {
+    "coverage": "/private/tmp/markless-docs-execution-gLueTk/results.json",
+    "attribution": "/private/tmp/markless-scalar-path-attribution.json",
+    "navigation": "/private/tmp/markless-docs-navigation-hLsIvj/results.json",
+    "before": "/private/tmp/markless-docs-cold-rJeogh/results.json",
+    "after": "/private/tmp/markless-docs-cold-mJoNNY/results.json",
+    "fixture": "/private/tmp/markless-scalar-path-app-p3jtRz/results.json",
+    "nitroFailure": "/private/tmp/markless-scalar-path-app-k9yQPu/results.json"
+  },
+  "checks": {
+    "typecheck": "/private/tmp/markless-scalar-path-types4.log",
+    "sharedSuite": "/private/tmp/markless-scalar-path-suite2.log",
+    "scalarTests": "/private/tmp/markless-scalar-shared-test.log",
+    "docsTests": "/private/tmp/markless-scalar-path-docs-tests2.log",
+    "docsTypes": "/private/tmp/markless-scalar-path-docs-types2.log",
+    "docsDoctor": "/private/tmp/markless-scalar-path-doctor3.log",
+    "budgets": "/private/tmp/markless-scalar-path-budgets.log",
+    "symbolRed": "/private/tmp/markless-local-symbol-red.log",
+    "scalarRed": "/private/tmp/markless-scalar-path-red.log",
+    "stopRed": "/private/tmp/markless-captured-stop-red.log",
+    "captureRed": "/private/tmp/markless-inline-stop-red.log"
+  },
+  "coverageVisits": 18,
+  "counts": [
+    {
+      "test": "state-counter",
+      "sample": 0,
+      "phases": [
+        {
+          "name": "before-input",
+          "initialized": 0
+        },
+        {
+          "name": "first-action",
+          "initialized": 15
+        },
+        {
+          "name": "repeat-1",
+          "initialized": 0
+        },
+        {
+          "name": "repeat-2",
+          "initialized": 0
+        }
+      ]
+    },
+    {
+      "test": "state-header-then-counter",
+      "sample": 0,
+      "phases": [
+        {
+          "name": "before-input",
+          "initialized": 0
+        },
+        {
+          "name": "static-header",
+          "initialized": 0
+        },
+        {
+          "name": "first-action",
+          "initialized": 15
+        },
+        {
+          "name": "repeat-1",
+          "initialized": 0
+        },
+        {
+          "name": "repeat-2",
+          "initialized": 0
+        }
+      ]
+    },
+    {
+      "test": "state-independent-controls",
+      "sample": 0,
+      "phases": [
+        {
+          "name": "before-input",
+          "initialized": 0
+        },
+        {
+          "name": "first-action",
+          "initialized": 15
+        },
+        {
+          "name": "second-control",
+          "initialized": 3
+        },
+        {
+          "name": "return-first",
+          "initialized": 0
+        },
+        {
+          "name": "repeat-second",
+          "initialized": 0
+        }
+      ]
+    },
+    {
+      "test": "computed-total",
+      "sample": 0,
+      "phases": [
+        {
+          "name": "before-input",
+          "initialized": 0
+        },
+        {
+          "name": "first-action",
+          "initialized": 56
+        },
+        {
+          "name": "repeat-1",
+          "initialized": 0
+        },
+        {
+          "name": "repeat-2",
+          "initialized": 0
+        }
+      ]
+    },
+    {
+      "test": "mode-select",
+      "sample": 0,
+      "phases": [
+        {
+          "name": "before-input",
+          "initialized": 0
+        },
+        {
+          "name": "first-action",
+          "initialized": 72
+        },
+        {
+          "name": "repeat-1",
+          "initialized": 1
+        },
+        {
+          "name": "repeat-2",
+          "initialized": 0
+        }
+      ]
+    },
+    {
+      "test": "accordion",
+      "sample": 0,
+      "phases": [
+        {
+          "name": "before-input",
+          "initialized": 0
+        },
+        {
+          "name": "first-action",
+          "initialized": 117
+        },
+        {
+          "name": "repeat-1",
+          "initialized": 0
+        },
+        {
+          "name": "repeat-2",
+          "initialized": 0
+        }
+      ]
+    },
+    {
+      "test": "state-counter",
+      "sample": 1,
+      "phases": [
+        {
+          "name": "before-input",
+          "initialized": 0
+        },
+        {
+          "name": "first-action",
+          "initialized": 15
+        },
+        {
+          "name": "repeat-1",
+          "initialized": 0
+        },
+        {
+          "name": "repeat-2",
+          "initialized": 0
+        }
+      ]
+    },
+    {
+      "test": "state-header-then-counter",
+      "sample": 1,
+      "phases": [
+        {
+          "name": "before-input",
+          "initialized": 0
+        },
+        {
+          "name": "static-header",
+          "initialized": 0
+        },
+        {
+          "name": "first-action",
+          "initialized": 15
+        },
+        {
+          "name": "repeat-1",
+          "initialized": 0
+        },
+        {
+          "name": "repeat-2",
+          "initialized": 0
+        }
+      ]
+    },
+    {
+      "test": "state-independent-controls",
+      "sample": 1,
+      "phases": [
+        {
+          "name": "before-input",
+          "initialized": 0
+        },
+        {
+          "name": "first-action",
+          "initialized": 15
+        },
+        {
+          "name": "second-control",
+          "initialized": 3
+        },
+        {
+          "name": "return-first",
+          "initialized": 0
+        },
+        {
+          "name": "repeat-second",
+          "initialized": 0
+        }
+      ]
+    },
+    {
+      "test": "computed-total",
+      "sample": 1,
+      "phases": [
+        {
+          "name": "before-input",
+          "initialized": 0
+        },
+        {
+          "name": "first-action",
+          "initialized": 56
+        },
+        {
+          "name": "repeat-1",
+          "initialized": 0
+        },
+        {
+          "name": "repeat-2",
+          "initialized": 0
+        }
+      ]
+    },
+    {
+      "test": "mode-select",
+      "sample": 1,
+      "phases": [
+        {
+          "name": "before-input",
+          "initialized": 0
+        },
+        {
+          "name": "first-action",
+          "initialized": 72
+        },
+        {
+          "name": "repeat-1",
+          "initialized": 1
+        },
+        {
+          "name": "repeat-2",
+          "initialized": 0
+        }
+      ]
+    },
+    {
+      "test": "accordion",
+      "sample": 1,
+      "phases": [
+        {
+          "name": "before-input",
+          "initialized": 0
+        },
+        {
+          "name": "first-action",
+          "initialized": 117
+        },
+        {
+          "name": "repeat-1",
+          "initialized": 0
+        },
+        {
+          "name": "repeat-2",
+          "initialized": 0
+        }
+      ]
+    },
+    {
+      "test": "state-counter",
+      "sample": 2,
+      "phases": [
+        {
+          "name": "before-input",
+          "initialized": 0
+        },
+        {
+          "name": "first-action",
+          "initialized": 15
+        },
+        {
+          "name": "repeat-1",
+          "initialized": 0
+        },
+        {
+          "name": "repeat-2",
+          "initialized": 0
+        }
+      ]
+    },
+    {
+      "test": "state-header-then-counter",
+      "sample": 2,
+      "phases": [
+        {
+          "name": "before-input",
+          "initialized": 0
+        },
+        {
+          "name": "static-header",
+          "initialized": 0
+        },
+        {
+          "name": "first-action",
+          "initialized": 15
+        },
+        {
+          "name": "repeat-1",
+          "initialized": 0
+        },
+        {
+          "name": "repeat-2",
+          "initialized": 0
+        }
+      ]
+    },
+    {
+      "test": "state-independent-controls",
+      "sample": 2,
+      "phases": [
+        {
+          "name": "before-input",
+          "initialized": 0
+        },
+        {
+          "name": "first-action",
+          "initialized": 15
+        },
+        {
+          "name": "second-control",
+          "initialized": 3
+        },
+        {
+          "name": "return-first",
+          "initialized": 0
+        },
+        {
+          "name": "repeat-second",
+          "initialized": 0
+        }
+      ]
+    },
+    {
+      "test": "computed-total",
+      "sample": 2,
+      "phases": [
+        {
+          "name": "before-input",
+          "initialized": 0
+        },
+        {
+          "name": "first-action",
+          "initialized": 56
+        },
+        {
+          "name": "repeat-1",
+          "initialized": 0
+        },
+        {
+          "name": "repeat-2",
+          "initialized": 0
+        }
+      ]
+    },
+    {
+      "test": "mode-select",
+      "sample": 2,
+      "phases": [
+        {
+          "name": "before-input",
+          "initialized": 0
+        },
+        {
+          "name": "first-action",
+          "initialized": 72
+        },
+        {
+          "name": "repeat-1",
+          "initialized": 1
+        },
+        {
+          "name": "repeat-2",
+          "initialized": 0
+        }
+      ]
+    },
+    {
+      "test": "accordion",
+      "sample": 2,
+      "phases": [
+        {
+          "name": "before-input",
+          "initialized": 0
+        },
+        {
+          "name": "first-action",
+          "initialized": 117
+        },
+        {
+          "name": "repeat-1",
+          "initialized": 0
+        },
+        {
+          "name": "repeat-2",
+          "initialized": 0
+        }
+      ]
+    }
+  ],
+  "navigation": [
+    {
+      "name": "closed menu ignores header input, then opens and dismisses normally",
+      "passed": true
+    },
+    {
+      "name": "scalar clicks hand live state to a complex control and continue afterward",
+      "passed": true
+    },
+    {
+      "name": "keyboard priming and queued scalar clicks preserve each update",
+      "passed": true
+    },
+    {
+      "name": "intent, SPA navigation, history and offline controls",
+      "passed": true
+    },
+    {
+      "name": "delayed shared pack keeps controls visible and retains the click",
+      "passed": true
+    },
+    {
+      "name": "failed shared pack remains an observable failure",
+      "passed": true
+    }
+  ],
+  "fixture": [
+    {
+      "name": "bubble",
+      "passed": true,
+      "fullRuntime": false,
+      "scripts": 5,
+      "errors": []
+    },
+    {
+      "name": "alternate",
+      "passed": true,
+      "fullRuntime": false,
+      "scripts": 5,
+      "errors": []
+    },
+    {
+      "name": "stop",
+      "passed": true,
+      "fullRuntime": false,
+      "scripts": 5,
+      "errors": []
+    },
+    {
+      "name": "complex",
+      "passed": true,
+      "fullRuntime": true,
+      "scripts": 5,
+      "errors": []
+    },
+    {
+      "name": "complex-stop",
+      "passed": true,
+      "fullRuntime": true,
+      "scripts": 5,
+      "errors": []
+    }
+  ],
+  "fixtureHost": "Production Vite SSR entry with static emitted client files; default Nitro rebundle still fails",
+  "timing": [
+    {
+      "condition": "normal",
+      "action": 1,
+      "before": {
+        "median": 32.5,
+        "mad": 0.6000000238418579
+      },
+      "after": {
+        "median": 32.800000071525574,
+        "mad": 0.5
+      },
+      "delta": 0.30000007152557373,
+      "threshold": 10
+    },
+    {
+      "condition": "normal",
+      "action": 2,
+      "before": {
+        "median": 14.950000047683716,
+        "mad": 0.10000002384185791
+      },
+      "after": {
+        "median": 14.75000011920929,
+        "mad": 0.4499998092651367
+      },
+      "delta": -0.19999992847442627,
+      "threshold": 10
+    },
+    {
+      "condition": "normal",
+      "action": 3,
+      "before": {
+        "median": 15,
+        "mad": 0.20000004768371582
+      },
+      "after": {
+        "median": 15.049999952316284,
+        "mad": 0.8999999761581421
+      },
+      "delta": 0.04999995231628418,
+      "threshold": 10
+    },
+    {
+      "condition": "constrained",
+      "action": 1,
+      "before": {
+        "median": 76.34999990463257,
+        "mad": 5.300000071525574
+      },
+      "after": {
+        "median": 70.45000004768372,
+        "mad": 3.100000023841858
+      },
+      "delta": -5.8999998569488525,
+      "threshold": 10.600000143051147
+    },
+    {
+      "condition": "constrained",
+      "action": 2,
+      "before": {
+        "median": 11.350000023841858,
+        "mad": 0.5
+      },
+      "after": {
+        "median": 9.949999928474426,
+        "mad": 0.8999999761581421
+      },
+      "delta": -1.4000000953674316,
+      "threshold": 10
+    },
+    {
+      "condition": "constrained",
+      "action": 3,
+      "before": {
+        "median": 11.199999928474426,
+        "mad": 0.8500000238418579
+      },
+      "after": {
+        "median": 10.699999928474426,
+        "mad": 0.6000000238418579
+      },
+      "delta": -0.5,
+      "threshold": 10
+    }
+  ],
+  "budgetBytes": {
+    "csrDownload": 140841,
+    "csrStartup": 14931,
+    "ssrDownload": 84909,
+    "ssrStartup": 4328,
+    "ssrNavigation": 25720
+  },
+  "remaining": [
+    "Four byte-budget tests fail; five stages exceed limits.",
+    "Small app default Nitro rebundle exports undefined ssr_exports.",
+    "Computed/menu/accordion first execution is not minimized.",
+    "Exact per-module execution byte accounting remains open."
+  ],
+  "serverSession": 9132,
+  "manualChrome": {
+    "page": 14,
+    "context": "scalar-propagation-preview-check",
+    "counter": 2,
+    "fullRuntime": false,
+    "frameworkRequests": 5,
+    "siteScripts": 3,
+    "statuses": 200
+  }
+}

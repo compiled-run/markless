@@ -22,13 +22,17 @@ export default box(
 		const html = await preview.request('/');
 		const preloadHrefs = modulePreloadHrefs(html);
 		if (!/\brel="?modulepreload"?/.test(html))
-			throw new Error('Expected CSR music player HTML to carry modulepreload links (quoted or compact).');
+			throw new Error(
+				'Expected CSR music player HTML to carry modulepreload links (quoted or compact).',
+			);
 		if (preloadHrefs.length === 0) {
 			throw new Error('Expected CSR music player HTML to render modulepreload links.');
 		}
 		assertModulePreloadsInHead(html);
 		if (/type=["']markless\/(?:state|view)["']/.test(html)) {
-			throw new Error('Prerendered music player HTML must not include state/view payload scripts.');
+			throw new Error(
+				'Prerendered music player HTML must not include state/view payload scripts.',
+			);
 		}
 		if (!/<script\b[^>]*\btype="module"[^>]*\bsrc=/.test(html)) {
 			throw new Error(
@@ -98,7 +102,8 @@ export default box(
 				// player internals are I2's jurisdiction (network rules below).
 				observedRequests: requests
 					.map((request, index) => ({
-						phase: index < actionStartIndex ? ('bootstrap' as const) : ('action' as const),
+						phase:
+							index < actionStartIndex ? ('bootstrap' as const) : ('action' as const),
 						...(index < actionStartIndex ? {} : { actionId: 'play-or-next-track' }),
 						url: request.url,
 					}))
@@ -124,9 +129,9 @@ export default box(
 
 function modulePreloadHrefs(html: string): readonly string[] {
 	// The post-build compactor may emit unquoted attribute values; accept both.
-	return [...html.matchAll(/<link\b(?=[^>]*\brel="?modulepreload"?)[^>]*\bhref="?([^"\s>]+)"?/g)].map(
-		(match) => match[1]!,
-	);
+	return [
+		...html.matchAll(/<link\b(?=[^>]*\brel="?modulepreload"?)[^>]*\bhref="?([^"\s>]+)"?/g),
+	].map((match) => match[1]!);
 }
 
 function assertModulePreloadsInHead(html: string): void {

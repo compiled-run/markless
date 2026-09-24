@@ -1,0 +1,252 @@
+{
+  "before": {
+    "raw": "/private/tmp/markless-docs-execution-QAPzdl/results.json",
+    "metadata": {
+      "output": "/private/tmp/markless-docs-unpacked-intent-current-PPbj4M/.output",
+      "serverEntrySha256": "abdf67c8558c5f8130e1b51d98097513baaf6c04ccb28b9b72e5bb4b29b057fb",
+      "metric": "UTF-8 bytes of disjoint executed source ranges reported by Chrome precise JS coverage, per observation window",
+      "limitation": "Coverage describes executed source regions, not CPU time or per-module initialization byte attribution. Profiling changes optimization; do not use these visits for latency comparisons.",
+      "cache": "fresh context per route, CDP HTTP cache disabled, service workers blocked",
+      "browserVersion": "153.0.8010.48"
+    },
+    "records": [
+      {
+        "route": "state-counter",
+        "passed": true,
+        "errors": [],
+        "httpCacheHits": [],
+        "phases": [
+          {
+            "name": "before-input",
+            "executedBytes": 0,
+            "representedSourceBytes": 0
+          },
+          {
+            "name": "first-action",
+            "executedBytes": 69081,
+            "representedSourceBytes": 150943
+          },
+          {
+            "name": "repeat-1",
+            "executedBytes": 14743,
+            "representedSourceBytes": 103513
+          },
+          {
+            "name": "repeat-2",
+            "executedBytes": 14743,
+            "representedSourceBytes": 103513
+          }
+        ]
+      },
+      {
+        "route": "computed-total",
+        "passed": true,
+        "errors": [],
+        "httpCacheHits": [],
+        "phases": [
+          {
+            "name": "before-input",
+            "executedBytes": 0,
+            "representedSourceBytes": 0
+          },
+          {
+            "name": "first-action",
+            "executedBytes": 67693,
+            "representedSourceBytes": 151604
+          },
+          {
+            "name": "repeat-1",
+            "executedBytes": 16506,
+            "representedSourceBytes": 103593
+          },
+          {
+            "name": "repeat-2",
+            "executedBytes": 16506,
+            "representedSourceBytes": 103593
+          }
+        ]
+      },
+      {
+        "route": "mode-select",
+        "passed": true,
+        "errors": [],
+        "httpCacheHits": [],
+        "phases": [
+          {
+            "name": "before-input",
+            "executedBytes": 0,
+            "representedSourceBytes": 0
+          },
+          {
+            "name": "first-action",
+            "executedBytes": 55878,
+            "representedSourceBytes": 143719
+          },
+          {
+            "name": "repeat-1",
+            "executedBytes": 24541,
+            "representedSourceBytes": 109985
+          },
+          {
+            "name": "repeat-2",
+            "executedBytes": 23280,
+            "representedSourceBytes": 105793
+          }
+        ]
+      },
+      {
+        "route": "accordion",
+        "passed": true,
+        "errors": [],
+        "httpCacheHits": [],
+        "phases": [
+          {
+            "name": "before-input",
+            "executedBytes": 0,
+            "representedSourceBytes": 0
+          },
+          {
+            "name": "first-action",
+            "executedBytes": 244725,
+            "representedSourceBytes": 327194
+          },
+          {
+            "name": "repeat-1",
+            "executedBytes": 38484,
+            "representedSourceBytes": 296701
+          },
+          {
+            "name": "repeat-2",
+            "executedBytes": 38255,
+            "representedSourceBytes": 296701
+          }
+        ]
+      }
+    ]
+  },
+  "after": {
+    "raw": "/private/tmp/markless-docs-execution-ik7aLs/results.json",
+    "metadata": {
+      "output": "/private/tmp/markless-docs-identity-final-UiOvAJ/.output",
+      "serverEntrySha256": "39db4b5423b5ceaa0387ad7cd4bbdd0002fcba9a540dac3e7dbcd62513bfe1eb",
+      "metric": "UTF-8 bytes of disjoint executed source ranges reported by Chrome precise JS coverage, per observation window",
+      "limitation": "Coverage describes executed source regions, not CPU time or per-module initialization byte attribution. Profiling changes optimization; do not use these visits for latency comparisons.",
+      "cache": "fresh context per route, CDP HTTP cache disabled, service workers blocked",
+      "browserVersion": "153.0.8010.48"
+    },
+    "records": [
+      {
+        "route": "state-counter",
+        "passed": true,
+        "errors": [],
+        "httpCacheHits": [],
+        "phases": [
+          {
+            "name": "before-input",
+            "executedBytes": 0,
+            "representedSourceBytes": 0
+          },
+          {
+            "name": "first-action",
+            "executedBytes": 193067,
+            "representedSourceBytes": 10898109
+          },
+          {
+            "name": "repeat-1",
+            "executedBytes": 16498,
+            "representedSourceBytes": 10897779
+          },
+          {
+            "name": "repeat-2",
+            "executedBytes": 16498,
+            "representedSourceBytes": 10897779
+          }
+        ]
+      },
+      {
+        "route": "computed-total",
+        "passed": true,
+        "errors": [],
+        "httpCacheHits": [],
+        "phases": [
+          {
+            "name": "before-input",
+            "executedBytes": 0,
+            "representedSourceBytes": 0
+          },
+          {
+            "name": "first-action",
+            "executedBytes": 190919,
+            "representedSourceBytes": 10880569
+          },
+          {
+            "name": "repeat-1",
+            "executedBytes": 20129,
+            "representedSourceBytes": 10880239
+          },
+          {
+            "name": "repeat-2",
+            "executedBytes": 20129,
+            "representedSourceBytes": 10880239
+          }
+        ]
+      },
+      {
+        "route": "mode-select",
+        "passed": true,
+        "errors": [],
+        "httpCacheHits": [],
+        "phases": [
+          {
+            "name": "before-input",
+            "executedBytes": 0,
+            "representedSourceBytes": 0
+          },
+          {
+            "name": "first-action",
+            "executedBytes": 188312,
+            "representedSourceBytes": 11038637
+          },
+          {
+            "name": "repeat-1",
+            "executedBytes": 30930,
+            "representedSourceBytes": 11038417
+          },
+          {
+            "name": "repeat-2",
+            "executedBytes": 29323,
+            "representedSourceBytes": 11038307
+          }
+        ]
+      },
+      {
+        "route": "accordion",
+        "passed": true,
+        "errors": [],
+        "httpCacheHits": [],
+        "phases": [
+          {
+            "name": "before-input",
+            "executedBytes": 0,
+            "representedSourceBytes": 0
+          },
+          {
+            "name": "first-action",
+            "executedBytes": 380848,
+            "representedSourceBytes": 10868068
+          },
+          {
+            "name": "repeat-1",
+            "executedBytes": 53347,
+            "representedSourceBytes": 10867738
+          },
+          {
+            "name": "repeat-2",
+            "executedBytes": 53117,
+            "representedSourceBytes": 10867738
+          }
+        ]
+      }
+    ]
+  }
+}

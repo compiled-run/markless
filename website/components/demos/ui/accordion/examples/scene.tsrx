@@ -57,7 +57,7 @@ export default function AccordionScene({ scenario }: { readonly scenario: Scenar
          </div>
          <div class="postcard" hidden={story.id !== 'road-trip' || entry.art === undefined}><span class="art" data-sheet="roadtrip-art" data-index={entry.art} aria-hidden="true"></span></div>
         </div>
-<div class="panel-inner verdict-panel" hidden={entry.value !== 'culprit'}><p>Who moved the starter?</p><div class="suspect-choices">@for (const suspect of story.entries; key suspect.value) { <button class="paper-button" type="button" aria-label={'Choose ' + suspect.title.split(',')[0]} onClick={() => { answer = suspect.value === 'bruno' ? 'Case closed! Bruno moved the starter behind the warm oven. Mystery solved; bread saved.' : 'A good theory, but the alibis point to someone with a black-and-white tail. Try again.'; }}>{suspect.title.split(',')[0]}</button> }</div><p role="status">{answer}</p></div>
+<div class="panel-inner verdict-panel" hidden={entry.value !== 'culprit'}><p>Who moved the starter?</p><div class="suspect-choices" onClick={(event: MouseEvent) => { const choice = (event.target as Element).closest('button')?.value; if (choice) answer = choice === 'bruno' ? 'Case closed! Bruno moved the starter behind the warm oven. Mystery solved; bread saved.' : 'A good theory, but the alibis point to someone with a black-and-white tail. Try again.'; }}>@for (const suspect of story.entries; key suspect.value) { <button class="paper-button" type="button" value={suspect.value} aria-label={'Choose ' + suspect.title.split(',')[0]}>{suspect.title.split(',')[0]}</button> }</div><p role="status">{answer}</p></div>
        </accordion.itemcontent>
       </accordion.item>
      }

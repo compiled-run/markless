@@ -61,7 +61,7 @@ describe('module metadata identity registry', () => {
 			manifest(`${source}?markless-symbols`, resolver, [event, boundaryUpdate]),
 		);
 
-		expect(sourceSymbolManifest(registry, source)?.symbols).toEqual([
+		expect(sourceSymbolManifest(registry, source, 'client')?.symbols).toEqual([
 			event,
 			boundaryUpdate,
 		]);
@@ -77,12 +77,12 @@ describe('module metadata identity registry', () => {
 		const imported = symbol(source, 'symbol:1', 'async-boundary-update');
 
 		for (const emitted of [wake, resume, symbols]) {
-			registry.beginSourceSymbolClaims(source, emitted);
+			registry.beginSourceSymbolClaims('client', source, emitted);
 		}
-		registry.expectSourceSymbolClaims(source, [source, wake, resume, symbols]);
+		registry.expectSourceSymbolClaims('client', source, [source, wake, resume, symbols]);
 		registry.recordSymbolClaims(wake, manifest(wake, resolver, []));
-		registry.finishSourceSymbolClaims(source, wake);
-		const sealing = registry.sealSourceSymbolClaims(source);
+		registry.finishSourceSymbolClaims('client', source, wake);
+		const sealing = registry.sealSourceSymbolClaims('client', source);
 		let sealed = false;
 		void sealing.then(() => {
 			sealed = true;
@@ -91,20 +91,20 @@ describe('module metadata identity registry', () => {
 		expect(sealed).toBe(false);
 
 		registry.recordSymbolClaims(resume, manifest(resume, resolver, [imported]));
-		registry.finishSourceSymbolClaims(source, resume);
+		registry.finishSourceSymbolClaims('client', source, resume);
 		registry.recordSymbolClaims(symbols, manifest(symbols, resolver, [imported]));
-		registry.finishSourceSymbolClaims(source, symbols);
-		registry.beginSourceSymbolClaims(source, source);
+		registry.finishSourceSymbolClaims('client', source, symbols);
+		registry.beginSourceSymbolClaims('client', source, source);
 		await Promise.resolve();
 		expect(sealed).toBe(false);
 		registry.recordSymbolClaims(source, manifest(source, resolver, [imported]));
-		registry.finishSourceSymbolClaims(source, source);
+		registry.finishSourceSymbolClaims('client', source, source);
 		await sealing;
 
-		expect(sourceSymbolManifest(registry, source)?.symbols).toContainEqual(imported);
+		expect(sourceSymbolManifest(registry, source, 'client')?.symbols).toContainEqual(imported);
 	});
 
-	test('a reader outside the publishing environment waits for the variant in flight', async () => {
+	test('a reader waits for the variant in flight in its own environment', async () => {
 		const source = '/workspace/app/components/Checkbox.tsrx';
 		const symbols = `${source}?markless-symbols`;
 		const resolver = `virtual:markless:resolver:${encodeURIComponent(source)}`;
@@ -112,14 +112,13 @@ describe('module metadata identity registry', () => {
 		const imported = symbol(source, 'symbol:1', 'event-handler');
 
 		// The client publishes the plain module, then starts the symbols sibling.
-		registry.beginSourceSymbolClaims(source, source);
+		registry.beginSourceSymbolClaims('client', source, source);
 		registry.recordSymbolClaims(source, manifest(source, resolver, []));
-		registry.finishSourceSymbolClaims(source, source);
-		registry.expectSourceSymbolClaims(source, [symbols]);
-		registry.beginSourceSymbolClaims(source, symbols);
+		registry.finishSourceSymbolClaims('client', source, source);
+		registry.expectSourceSymbolClaims('client', source, [symbols]);
+		registry.beginSourceSymbolClaims('client', source, symbols);
 
-		// The server reader has no seal of its own; it waits on the publication.
-		const waiting = registry.awaitSourceClaimsPublished(source);
+		const waiting = registry.awaitSourceClaimsPublished('client', source);
 		let resolved = false;
 		void waiting.then(() => {
 			resolved = true;
@@ -128,10 +127,77 @@ describe('module metadata identity registry', () => {
 		expect(resolved).toBe(false);
 
 		registry.recordSymbolClaims(symbols, manifest(symbols, resolver, [imported]));
-		registry.finishSourceSymbolClaims(source, symbols);
+		registry.finishSourceSymbolClaims('client', source, symbols);
 		await waiting;
 
-		expect(sourceSymbolManifest(registry, source)?.symbols).toContainEqual(imported);
+		expect(sourceSymbolManifest(registry, source, 'client')?.symbols).toContainEqual(imported);
+	});
+
+	test('the publication ledger is per environment', async () => {
+		const source = '/workspace/app/components/Checkbox.tsrx';
+		const registry = new ModuleMetadataRegistry();
+		registry.beginSourceSymbolClaims('client', source, source);
+		registry.finishSourceSymbolClaims('client', source, source);
+
+		// A client publication says nothing about the server compile of the same source.
+		expect(registry.sourceClaimsPublished('client', source)).toBe(true);
+		expect(registry.sourceClaimsPublished('server', source)).toBe(false);
+
+		registry.beginSourceSymbolClaims('server', source, source);
+		let resolved = false;
+		const waiting = registry.awaitSourceClaimsPublished('server', source).then(() => {
+			resolved = true;
+		});
+		await Promise.resolve();
+		expect(resolved).toBe(false);
+		expect(() => sourceSymbolManifest(registry, source, 'server')).toThrow(
+			'MARKLESS_SOURCE_SYMBOL_CLAIMS_UNSEALED',
+		);
+		expect(() => sourceSymbolManifest(registry, source, 'client')).not.toThrow();
+
+		registry.finishSourceSymbolClaims('server', source, source);
+		await waiting;
+		expect(resolved).toBe(true);
+
+		registry.invalidateSourceSymbolClaims(source, source);
+		expect(registry.sourceClaimsPublished('client', source)).toBe(false);
+		expect(registry.sourceClaimsPublished('server', source)).toBe(false);
+	});
+
+	test('a source blocked on its reader is reported instead of deadlocking', async () => {
+		const parent = '/workspace/app/components/Tree.tsrx';
+		const child = '/workspace/app/components/Branch.tsrx';
+		const registry = new ModuleMetadataRegistry();
+		registry.beginSourceSymbolClaims('server', parent, parent);
+		registry.beginSourceSymbolClaims('server', child, child);
+
+		// The parent is loading the child; the child then reads the parent back.
+		let release!: () => void;
+		const loading = registry.whileWaiting(
+			'server',
+			parent,
+			child,
+			() => new Promise<void>((resolve) => (release = resolve)),
+		);
+		await expect(registry.awaitSourceClaimsPublished('server', parent, child)).resolves.toBe(
+			false,
+		);
+		await expect(registry.awaitSourceClaimsPublished('server', parent, parent)).resolves.toBe(
+			false,
+		);
+		release();
+		await loading;
+
+		// Once the load edge is gone, the same read waits for the parent like any other.
+		let resolved = false;
+		const waiting = registry.awaitSourceClaimsPublished('server', parent, child).then((awaited) => {
+			resolved = awaited;
+		});
+		await Promise.resolve();
+		expect(resolved).toBe(false);
+		registry.finishSourceSymbolClaims('server', parent, parent);
+		await waiting;
+		expect(resolved).toBe(true);
 	});
 
 	test('a republication of an already published variant does not fail a concurrent read', () => {
@@ -142,18 +208,18 @@ describe('module metadata identity registry', () => {
 		const imported = symbol(source, 'symbol:1', 'event-handler');
 
 		for (const emitted of [source, symbols]) {
-			registry.beginSourceSymbolClaims(source, emitted);
+			registry.beginSourceSymbolClaims('client', source, emitted);
 			registry.recordSymbolClaims(
 				emitted,
 				manifest(emitted, resolver, emitted === symbols ? [imported] : []),
 			);
-			registry.finishSourceSymbolClaims(source, emitted);
+			registry.finishSourceSymbolClaims('client', source, emitted);
 		}
 		// A second importer forces the symbols sibling again while this read runs.
-		registry.expectSourceSymbolClaims(source, [symbols]);
-		registry.beginSourceSymbolClaims(source, symbols);
+		registry.expectSourceSymbolClaims('client', source, [symbols]);
+		registry.beginSourceSymbolClaims('client', source, symbols);
 
-		expect(sourceSymbolManifest(registry, source)?.symbols).toContainEqual(imported);
+		expect(sourceSymbolManifest(registry, source, 'client')?.symbols).toContainEqual(imported);
 	});
 
 	test('a variant compiling for the first time still fails closed', () => {
@@ -162,12 +228,12 @@ describe('module metadata identity registry', () => {
 		const resolver = `virtual:markless:resolver:${encodeURIComponent(source)}`;
 		const registry = new ModuleMetadataRegistry();
 
-		registry.beginSourceSymbolClaims(source, source);
+		registry.beginSourceSymbolClaims('client', source, source);
 		registry.recordSymbolClaims(source, manifest(source, resolver, []));
-		registry.finishSourceSymbolClaims(source, source);
-		registry.beginSourceSymbolClaims(source, symbols);
+		registry.finishSourceSymbolClaims('client', source, source);
+		registry.beginSourceSymbolClaims('client', source, symbols);
 
-		expect(() => sourceSymbolManifest(registry, source)).toThrow(
+		expect(() => sourceSymbolManifest(registry, source, 'client')).toThrow(
 			'MARKLESS_SOURCE_SYMBOL_CLAIMS_UNSEALED',
 		);
 	});
@@ -179,14 +245,14 @@ describe('module metadata identity registry', () => {
 		const registry = new ModuleMetadataRegistry();
 		const imported = symbol(source, 'symbol:1', 'event-handler');
 
-		registry.beginSourceSymbolClaims(source, source);
+		registry.beginSourceSymbolClaims('client', source, source);
 		registry.recordSymbolClaims(source, manifest(source, resolver, [imported]));
-		registry.finishSourceSymbolClaims(source, source);
+		registry.finishSourceSymbolClaims('client', source, source);
 		// A client importer names the routes it is about to force; that is its own
 		// seal's wait list, and a reader in another environment must not inherit it.
-		registry.expectSourceSymbolClaims(source, [symbols]);
+		registry.expectSourceSymbolClaims('client', source, [symbols]);
 
-		expect(sourceSymbolManifest(registry, source)?.symbols).toContainEqual(imported);
+		expect(sourceSymbolManifest(registry, source, 'client')?.symbols).toContainEqual(imported);
 	});
 
 	test('an invalidated variant recompiling is a first publication again', () => {
@@ -194,16 +260,16 @@ describe('module metadata identity registry', () => {
 		const resolver = `virtual:markless:resolver:${encodeURIComponent(source)}`;
 		const registry = new ModuleMetadataRegistry();
 
-		registry.beginSourceSymbolClaims(source, source);
+		registry.beginSourceSymbolClaims('client', source, source);
 		registry.recordSymbolClaims(source, manifest(source, resolver, []));
-		registry.finishSourceSymbolClaims(source, source);
+		registry.finishSourceSymbolClaims('client', source, source);
 		// The edit drops the claims, so remembering the publication would wave a
 		// reader past a variant whose claims are no longer in the registry.
 		registry.invalidateSourceSymbolClaims(source, source);
-		expect(() => sourceSymbolManifest(registry, source)).not.toThrow();
+		expect(() => sourceSymbolManifest(registry, source, 'client')).not.toThrow();
 
-		registry.beginSourceSymbolClaims(source, source);
-		expect(() => sourceSymbolManifest(registry, source)).toThrow(
+		registry.beginSourceSymbolClaims('client', source, source);
+		expect(() => sourceSymbolManifest(registry, source, 'client')).toThrow(
 			'MARKLESS_SOURCE_SYMBOL_CLAIMS_UNSEALED',
 		);
 	});
@@ -213,15 +279,65 @@ describe('module metadata identity registry', () => {
 		const symbols = `${source}?markless-symbols`;
 		const registry = new ModuleMetadataRegistry();
 
-		registry.expectSourceSymbolClaims(source, [symbols]);
-		registry.beginSourceSymbolClaims(source, symbols);
-		const waiting = registry.awaitSourceClaimsPublished(source);
-		registry.releaseSourceSymbolClaims(source, symbols);
+		registry.expectSourceSymbolClaims('client', source, [symbols]);
+		registry.beginSourceSymbolClaims('client', source, symbols);
+		const waiting = registry.awaitSourceClaimsPublished('client', source);
+		registry.releaseSourceSymbolClaims('client', source, symbols);
 		await waiting;
 
-		expect(() => sourceSymbolManifest(registry, source)).toThrow(
+		expect(() => sourceSymbolManifest(registry, source, 'client')).toThrow(
 			'MARKLESS_SOURCE_SYMBOL_CLAIMS_UNSEALED',
 		);
+	});
+
+	test('a failed variant an importer still expects rejects its seal with the compile error', async () => {
+		const source = '/workspace/app/components/Shell.tsrx';
+		const symbols = `${source}?markless-symbols`;
+		const registry = new ModuleMetadataRegistry();
+		const failure = new Error('MARKLESS_CAPTURE_OPAQUE_PROP: child failed');
+
+		registry.beginSourceSymbolClaims('client', source, symbols);
+		registry.releaseSourceSymbolClaims('client', source, symbols, failure);
+		// The loader serves the cached failure without re-running the transform,
+		// so nothing will ever begin or finish this variant again.
+		registry.expectSourceSymbolClaims('client', source, [symbols]);
+
+		await expect(registry.sealSourceSymbolClaims('client', source)).rejects.toBe(failure);
+		await expect(registry.awaitSourceClaimsPublished('client', source)).resolves.toBe(true);
+	});
+
+	test('a seal already waiting on a variant rejects when that variant fails', async () => {
+		const source = '/workspace/app/components/Shell.tsrx';
+		const symbols = `${source}?markless-symbols`;
+		const registry = new ModuleMetadataRegistry();
+		const failure = new Error('child failed');
+
+		registry.expectSourceSymbolClaims('client', source, [symbols]);
+		registry.beginSourceSymbolClaims('client', source, symbols);
+		const sealing = registry.sealSourceSymbolClaims('client', source);
+		const awaiting = registry.awaitSourceClaimsPublished('client', source);
+		registry.releaseSourceSymbolClaims('client', source, symbols, failure);
+
+		await expect(sealing).rejects.toBe(failure);
+		// The shared barrier only stops waiting; the claim read stays the fail-closed judge.
+		await expect(awaiting).resolves.toBe(true);
+	});
+
+	test('a variant that recompiles and publishes after a failure clears it', async () => {
+		const source = '/workspace/app/components/Shell.tsrx';
+		const symbols = `${source}?markless-symbols`;
+		const resolver = `virtual:markless:resolver:${encodeURIComponent(source)}`;
+		const registry = new ModuleMetadataRegistry();
+
+		registry.expectSourceSymbolClaims('client', source, [symbols]);
+		registry.beginSourceSymbolClaims('client', source, symbols);
+		registry.releaseSourceSymbolClaims('client', source, symbols, new Error('child failed'));
+		registry.beginSourceSymbolClaims('client', source, symbols);
+		registry.recordSymbolClaims(symbols, manifest(source, resolver, []));
+		registry.finishSourceSymbolClaims('client', source, symbols);
+
+		await expect(registry.sealSourceSymbolClaims('client', source)).resolves.toBeUndefined();
+		await expect(registry.awaitSourceClaimsPublished('client', source)).resolves.toBe(true);
 	});
 
 	test('refuses incompatible claims for the same source symbol', () => {
@@ -239,7 +355,7 @@ describe('module metadata identity registry', () => {
 			]),
 		);
 
-		expect(() => sourceSymbolManifest(registry, source)).toThrow(
+		expect(() => sourceSymbolManifest(registry, source, 'client')).toThrow(
 			'MARKLESS_SOURCE_SYMBOL_CLAIMS_DIVERGED',
 		);
 	});

@@ -1,25 +1,49 @@
 import type {
 	CaptureAnalysisArtifact,
 	GeneratedSymbolModule,
+	ModuleGraphInterfaceArtifact,
+	ModuleGraphInterfaceFirstUseReach,
 	PublicRenderModuleArtifact,
 	PlannedSymbol,
 	RuntimeDemandMapActionPlan,
 	RuntimeDemandMapAction,
 	RuntimeDemandMapArtifact,
+	RuntimeDemandMapClosurePlan,
+	RuntimeDemandMapFirstUse,
+	RuntimeDemandMapFirstUseCall,
+	RuntimeDemandMapFirstUsePage,
+	RuntimeDemandMapFirstUseReach,
+	RuntimeDemandMapPassedProp,
 	RuntimeDemandMapRecord,
 	RuntimeDemandMapRecordKind,
 	RuntimeDemandClass,
+	SemanticComponent,
+	SemanticComponentEdge,
+	SemanticComponentPropBinding,
+	SemanticGraphBinding,
+	SemanticSharedCallbackBinding,
 	SymbolModulesArtifact,
 	SymbolResolverPlan,
 } from '../artifacts.ts';
 import {
 	ASYNC_PROTOCOL_VERSION,
 	PROTOCOL_EVENT_ACTION_KIND,
+	PROTOCOL_PAGE_SPACE_ID_PREFIXES,
+	PROTOCOL_VISIBLE_EVENT_NAME,
 	protocolEventActionKind,
+	type ProtocolArmBranchRecord,
+	type ProtocolArmRecordSet,
 	type ProtocolEventActionKind,
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
 } from '@markless/serializer';
+import { LEAN_DISPATCH_MARKER_MODULES } from '../lean-dispatch-modules.ts';
+import { closureActionPlan } from './closure-action-plan.ts';
+import { PROJECTION_PROP_NAME } from './public-render/shared-seed-pass.ts';
+import {
+	isSharedCallbackSlotGraphNodeId,
+	sharedCallbackSlotGraphNodeId,
+} from './semantic-graph/collect-shared.ts';
 
 const DISPATCH_CORE_COMMON = [
 	'web/resume-runtime',
@@ -29,10 +53,11 @@ const DISPATCH_CORE_COMMON = [
 	'web/resume-locators',
 	'web/payload-resume',
 	'web/payload-graph-construct',
-	'web/resume-async-wiring',
 	// Error enrichment is dispatch infrastructure (T012): loaded by the shared
 	// runtime on any dispatch path, not a capability.
 	'web/runtime-error-reporting',
+	// Payload resume applies every dispatch's DOM writes through the journal.
+	'web/dom-journal',
 ];
 const SCALAR_LEAN_DISPATCH_CORE = [
 	'web/fns/dom-order',
@@ -41,15 +66,30 @@ const SCALAR_LEAN_DISPATCH_CORE = [
 	'web/runtime-error-reporting',
 	// Tiny generic helpers for emitted scalar dispatchers: DOM-order lookup,
 	// scalar-cell decode/validation, and fail-closed error creation.
-	'web/fns/scalar-specialized',
+	...LEAN_DISPATCH_MARKER_MODULES.scalar,
 ];
-const ROW_LEAN_DISPATCH_CORE = ['web/event-only-lean/row', 'web/event-only-lean/lean-shared'];
+const ROW_LEAN_DISPATCH_CORE = [
+	...LEAN_DISPATCH_MARKER_MODULES.row,
+	'web/event-only-lean/lean-shared',
+];
+const CLOSURE_DISPATCH_CORE = [...SCALAR_LEAN_DISPATCH_CORE, 'web/fns/closure-action'];
 const SYNC_POLICY = ['web/inline/sync-policy-core'];
 const DOM_UPDATE: string[] = [];
 const KEYED_REPEAT = ['web/repeat-runtime', 'web/resume-keyed-repeats'];
 const BRANCH = ['web/resume-branches'];
-const ASYNC_BOUNDARY = ['web/resume-async-boundaries'];
+// Settle tracking, the re-settle hold and streamed-arm adoption load only for async boundaries.
+const ASYNC_BOUNDARY = [
+	'web/resume-async-boundaries',
+	'web/resume-async-wiring',
+	'web/resume-resettle-hold',
+	'web/resume-stream-patches',
+];
 const BEHAVIOR = ['web/resume-behaviors'];
+// Capabilities whose demand `capabilityModuleIds` enumerates for the whole module, arms and rows included.
+export const RUNTIME_CAPABILITY_MODULE_IDS: ReadonlyArray<string> = [
+	...BEHAVIOR,
+	...ASYNC_BOUNDARY,
+];
 // The overlay behaviour. Recording the demand here is what makes it emittable at
 // all: no module the runtime always loads may write the `import()` specifier, or
 // every app would ship the chunk, so the app's own emitted module writes it and
@@ -64,6 +104,10 @@ const ROW_MINT = ['web/fns/row-mint'];
 // closure, so it is folded per record for the same reason: an app whose rows
 // root no component never names it and never emits its chunk.
 const ROW_COMPONENT_MINT = ['web/fns/row-component-mint'];
+// The template mint plus the page's render-data reader, for a row with expression slots.
+const ROW_SLOT_MINT = ['web/fns/row-slot-mint'];
+// Per-enclosing-row wiring, folded only into a repeat written inside another's rows.
+const NESTED_REPEATS = ['web/fns/nested-repeats'];
 const FULL_RESUME_CORE = ['web/resume-locators'];
 const FULL_TIER_COMMON = [
 	'web/resume-runtime',
@@ -72,7 +116,7 @@ const FULL_TIER_COMMON = [
 	'web/resume-events',
 	'web/payload-resume',
 	'web/payload-graph-construct',
-	'web/resume-async-wiring',
+	'web/dom-journal',
 ];
 
 function payloadResumeModules(storageFree: boolean): string[] {
@@ -111,18 +155,29 @@ const EVENT_ACTION_PHASES = {
 	[PROTOCOL_EVENT_ACTION_KIND.externalDelegate]: { payloadRuntime: false },
 } as const satisfies Record<ProtocolEventActionKind, { readonly payloadRuntime: boolean }>;
 
-export function createRuntimeDemandMap(input: {
-	readonly symbolResolver: SymbolResolverPlan;
-	readonly captureAnalysis?: CaptureAnalysisArtifact;
-	readonly symbolModules: SymbolModulesArtifact;
-	readonly publicRenderModule: PublicRenderModuleArtifact;
-	readonly protocolView: ProtocolViewPayload;
-	readonly protocolState: ProtocolStatePayload;
-	// Elevation is a compile-time fact about the emitted markup, not a runtime
-	// record: the behaviour reads the mark off the DOM, so the payload carries no
-	// overlay record and this is the only place the demand can come from.
-	readonly overlays?: ReadonlyArray<{ readonly hostNodeId: string }>;
-}, demandClass: RuntimeDemandClass): RuntimeDemandMapArtifact {
+export function createRuntimeDemandMap(
+	input: {
+		readonly symbolResolver: SymbolResolverPlan;
+		readonly captureAnalysis?: CaptureAnalysisArtifact;
+		readonly symbolModules: SymbolModulesArtifact;
+		readonly publicRenderModule: PublicRenderModuleArtifact;
+		readonly protocolView: ProtocolViewPayload;
+		readonly protocolState: ProtocolStatePayload;
+		// Elevation is a compile-time fact about the emitted markup, not a runtime
+		// record: the behaviour reads the mark off the DOM, so the payload carries no
+		// overlay record and this is the only place the demand can come from.
+		readonly overlays?: ReadonlyArray<{ readonly hostNodeId: string }>;
+		// Props cross into a child's own records, which this file's view cannot see.
+		readonly componentEdges?: unknown;
+		readonly graphBindings?: ReadonlyArray<SemanticGraphBinding>;
+		// The composed children's interfaces, keyed by import source.
+		readonly importedModuleInterfaces?: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
+		// This module's own components, so a same-module edge can name its child.
+		readonly components?: ReadonlyArray<SemanticComponent>;
+		readonly sharedCallbackBindings?: ReadonlyArray<SemanticSharedCallbackBinding>;
+	},
+	demandClass: RuntimeDemandClass,
+): RuntimeDemandMapArtifact {
 	const storageRequiresFullResume = (input.protocolState.storage?.length ?? 0) > 0;
 	const storageFreePayload = input.protocolState.version === ASYNC_PROTOCOL_VERSION;
 	const dispatchCore = [...payloadResumeModules(storageFreePayload), ...DISPATCH_CORE_COMMON];
@@ -146,11 +201,22 @@ export function createRuntimeDemandMap(input: {
 	const scalarEventKeys = scalarCoreEventKeys(
 		input.symbolResolver,
 		input.protocolView,
+		input.protocolState,
+		input.componentEdges,
 		input.captureAnalysis,
 	);
 	const classRouting = RUNTIME_DEMAND_CLASSIFIER[demandClass];
+	// The overlay behaviour installs only from full resume's start, which a closure never reaches.
+	const closurePlans =
+		classRouting.scalarEvents &&
+		!storageRequiresFullResume &&
+		(input.overlays ?? []).length === 0
+			? closureEventPlans(input, scalarEventKeys, emittedModules)
+			: new Map<string, RuntimeDemandMapClosurePlan>();
 	const scalarEvents =
-		classRouting.scalarEvents && !storageRequiresFullResume && scalarEventKeys.size > 0;
+		classRouting.scalarEvents &&
+		!storageRequiresFullResume &&
+		(scalarEventKeys.size > 0 || closurePlans.size > 0);
 	const scalarRows =
 		classRouting.scalarRows &&
 		!storageRequiresFullResume &&
@@ -161,12 +227,22 @@ export function createRuntimeDemandMap(input: {
 		renderRuntimeModuleIds,
 		{
 			scalarEventKeys: scalarEvents ? scalarEventKeys : new Set(),
+			closureEventKeys: new Set(closurePlans.keys()),
 			scalarRows,
 		},
 		dispatchCore,
 		fullTier,
 		input.overlays ?? [],
 	);
+	const scope: FirstUseScope = {
+		resolver: input.symbolResolver,
+		view: input.protocolView,
+		state: input.protocolState,
+		records: payloadRecords,
+		symbolDemand: closedSymbolDemand,
+		captureAnalysis: input.captureAnalysis,
+		...firstUseComposition(input),
+	};
 	return {
 		passId: 'runtime-demand-map',
 		version: 1,
@@ -174,17 +250,15 @@ export function createRuntimeDemandMap(input: {
 		symbols,
 		payloadRecords,
 		actions: actionDemandRecords(
-			input.symbolResolver,
-			input.protocolView,
-			payloadRecords,
-			closedSymbolDemand,
-			scalarEvents,
+			scope,
+			scalarEvents ? scalarEventKeys : new Set(),
 			scalarRows,
-			input.captureAnalysis,
+			closurePlans,
 		),
+		capabilityModuleIds: capabilityModuleIds(input.symbolResolver, input.protocolView),
 		unknownRecordModuleIds: unique([
 			...dispatchCore,
-			...(classRouting.scalarEvents ? SCALAR_LEAN_DISPATCH_CORE : []),
+			...(classRouting.scalarEvents ? CLOSURE_DISPATCH_CORE : []),
 			...(classRouting.scalarRows ? ROW_LEAN_DISPATCH_CORE : []),
 			...SYNC_POLICY,
 			...DOM_UPDATE,
@@ -201,7 +275,105 @@ export function createRuntimeDemandMap(input: {
 			...FULL_RESUME_CORE,
 			...fullTier,
 		]),
+		firstUsePage: firstUsePage(scope),
 	};
+}
+
+function firstUseComposition(
+	input: Parameters<typeof createRuntimeDemandMap>[0],
+): Pick<
+	FirstUseScope,
+	| 'componentEdges'
+	| 'graphBindings'
+	| 'importedModuleInterfaces'
+	| 'components'
+	| 'sharedCallbackBindings'
+> {
+	return {
+		componentEdges: Array.isArray(input.componentEdges)
+			? (input.componentEdges as ReadonlyArray<SemanticComponentEdge>)
+			: [],
+		graphBindings: input.graphBindings ?? [],
+		importedModuleInterfaces: input.importedModuleInterfaces,
+		components: input.components ?? [],
+		sharedCallbackBindings: input.sharedCallbackBindings ?? [],
+	};
+}
+
+/** The scope a module's own first-use answers are computed in, for publishing on its interface. */
+export function firstUseScope(
+	input: Parameters<typeof createRuntimeDemandMap>[0],
+	map: RuntimeDemandMapArtifact,
+): FirstUseScope {
+	return {
+		resolver: input.symbolResolver,
+		view: input.protocolView,
+		state: input.protocolState,
+		records: map.payloadRecords,
+		symbolDemand: transitiveSymbolDemand(
+			new Map(map.symbols.map((symbol) => [symbol.symbolId, symbol.runtimeModuleIds])),
+			input.captureAnalysis,
+		),
+		captureAnalysis: input.captureAnalysis,
+		...firstUseComposition(input),
+	};
+}
+
+// Actions the scalar leaf cannot take whose whole closure still compiles.
+function closureEventPlans(
+	input: Parameters<typeof createRuntimeDemandMap>[0],
+	scalarEventKeys: ReadonlySet<string>,
+	symbolModules: ReadonlyMap<string, GeneratedSymbolModule>,
+): Map<string, RuntimeDemandMapClosurePlan> {
+	const plans = new Map<string, RuntimeDemandMapClosurePlan>();
+	const view = input.protocolView;
+	const rowSymbolIds = new Set(
+		(view.keyedRepeats ?? []).flatMap((repeat) =>
+			repeat.rowEvents.flatMap((event) => event.symbolIds ?? []),
+		),
+	);
+	for (const event of view.events ?? []) {
+		const key = eventKey(event.hostNodeId, event.eventName);
+		if (scalarEventKeys.has(key)) continue;
+		const plan = closureActionPlan(
+			{
+				resolver: input.symbolResolver,
+				view,
+				state: input.protocolState,
+				componentEdges: input.componentEdges,
+				symbolModules,
+				...(input.graphBindings ? { graphBindings: input.graphBindings } : {}),
+				rowSymbolIds,
+				transitiveSymbolIds: (symbolIds) =>
+					transitiveSymbolIds(symbolIds, input.captureAnalysis),
+			},
+			event,
+		);
+		if (plan) plans.set(key, plan);
+	}
+	return plans;
+}
+
+// Arm and row records ride outside the flat payload streams, but every one of them is planned as a symbol.
+function capabilityModuleIds(
+	resolver: SymbolResolverPlan,
+	view: ProtocolViewPayload,
+): ReadonlyArray<string> {
+	const symbols = resolver.symbols;
+	const behavior =
+		symbols.some(
+			(symbol) =>
+				symbol.kind === 'behavior' ||
+				(symbol.kind === 'event-handler' &&
+					symbol.eventName === PROTOCOL_VISIBLE_EVENT_NAME),
+		) || (view.events ?? []).some((event) => event.eventName === PROTOCOL_VISIBLE_EVENT_NAME);
+	const asyncBoundary =
+		(view.asyncBoundaries?.length ?? 0) > 0 ||
+		symbols.some(
+			(symbol) =>
+				symbol.kind === 'async-computed-runner' || symbol.kind === 'async-boundary-update',
+		);
+	return [...(behavior ? BEHAVIOR : []), ...(asyncBoundary ? ASYNC_BOUNDARY : [])];
 }
 
 function recordKindPhases(input: {
@@ -216,16 +388,15 @@ function recordKindPhases(input: {
 	}));
 }
 
+// Eligibility is per action: the rest of the page keeps full resume, which adopts the live cell.
 function scalarCoreEventKeys(
 	resolver: SymbolResolverPlan,
 	view: ProtocolViewPayload,
+	state: ProtocolStatePayload,
+	componentEdges: unknown,
 	captureAnalysis?: CaptureAnalysisArtifact,
 ): ReadonlySet<string> {
 	if ((view.events?.length ?? 0) === 0 || (view.domUpdates?.length ?? 0) === 0) return new Set();
-	if ((view.branches?.length ?? 0) > 0) return new Set();
-	if ((view.asyncBoundaries?.length ?? 0) > 0) return new Set();
-	if ((view.behaviors?.length ?? 0) > 0) return new Set();
-	if ((view.elementHandles?.length ?? 0) > 0) return new Set();
 
 	const symbolsById = new Map(resolver.symbols.map((symbol) => [symbol.id, symbol]));
 	const rowSymbolIds = new Set(
@@ -247,6 +418,13 @@ function scalarCoreEventKeys(
 						return (
 							symbol?.kind === 'event-handler' &&
 							isScalarWriteOnlyEventSymbol(symbol) &&
+							!hostCarriesRuntimeRecords(event.hostNodeId, view) &&
+							!cellReadOutsideTextUpdates(
+								symbol.writes?.[0]?.graphNodeId,
+								view,
+								state,
+								componentEdges,
+							) &&
 							syncPolicyGraphNodeIds(event.syncPolicy).every(
 								(graphNodeId) => graphNodeId === symbol.writes?.[0]?.graphNodeId,
 							) &&
@@ -267,6 +445,36 @@ function scalarCoreEventKeys(
 	);
 }
 
+function hostCarriesRuntimeRecords(hostNodeId: string, view: ProtocolViewPayload): boolean {
+	return (
+		(view.elementHandles ?? []).some((handle) => handle.hostNodeId === hostNodeId) ||
+		(view.behaviors ?? []).some((behavior) => behavior.hostNodeId === hostNodeId)
+	);
+}
+
+// Fail closed: any reader of the cell besides its top-level text updates needs the full graph.
+function cellReadOutsideTextUpdates(
+	graphNodeId: string | undefined,
+	view: ProtocolViewPayload,
+	state: ProtocolStatePayload,
+	componentEdges: unknown,
+): boolean {
+	if (!graphNodeId) return true;
+	const { cells: _cells, ...stateReaders } = state;
+	const { events: _events, domUpdates: _domUpdates, locators: _locators, ...viewReaders } = view;
+	return (
+		referencesValue(stateReaders, graphNodeId) ||
+		referencesValue(viewReaders, graphNodeId) ||
+		referencesValue(componentEdges, graphNodeId)
+	);
+}
+
+function referencesValue(value: unknown, id: string): boolean {
+	if (value === id) return true;
+	if (!value || typeof value !== 'object') return false;
+	return Object.values(value).some((child) => referencesValue(child, id));
+}
+
 function isScalarOnlyKeyedRepeatModule(
 	resolver: SymbolResolverPlan,
 	view: ProtocolViewPayload,
@@ -283,6 +491,7 @@ function isScalarOnlyKeyedRepeatModule(
 	);
 	if (rowEvents.length === 0) return false;
 	for (const { repeat, event } of rowEvents) {
+		if (repeat.enclosingRow) return false;
 		const eventSymbols = (event.symbolIds ?? []).map((symbolId) => symbolsById.get(symbolId));
 		if (eventSymbols.length !== 1) return false;
 		if (
@@ -330,7 +539,7 @@ function isScalarWriteOnlyEventSymbol(
 	)
 		return false;
 	const write = symbol.writes?.[0];
-	if (!write || write.path.length !== 0) return false;
+	if (!write || write.row || write.path.length !== 0) return false;
 	if (write.operation === 'update')
 		return !!write.updateOperator && eventHandlerBodyAllowsScalarLeaf(symbol, write);
 	if (write.operation !== 'assign' || write.assignmentOperator) return false;
@@ -349,7 +558,6 @@ function isScalarTextUpdateSymbol(
 	const target = symbol.target;
 	return (
 		target?.kind === 'text' &&
-		target.suffix === undefined &&
 		target.trueValue === undefined &&
 		target.falseValue === undefined
 	);
@@ -571,7 +779,11 @@ function payloadDemandRecords(
 	view: ProtocolViewPayload,
 	symbolDemand: ReadonlyMap<string, ReadonlyArray<string>>,
 	renderRuntimeModuleIds: ReadonlyArray<string>,
-	replacement: { readonly scalarEventKeys: ReadonlySet<string>; readonly scalarRows: boolean },
+	replacement: {
+		readonly scalarEventKeys: ReadonlySet<string>;
+		readonly closureEventKeys: ReadonlySet<string>;
+		readonly scalarRows: boolean;
+	},
 	dispatchCore: ReadonlyArray<string>,
 	fullTier: ReadonlyArray<string>,
 	overlays: ReadonlyArray<{ readonly hostNodeId: string }>,
@@ -593,8 +805,14 @@ function payloadDemandRecords(
 								eventKey(event.hostNodeId, event.eventName),
 							)
 								? SCALAR_LEAN_DISPATCH_CORE
-								: dispatchCore),
+								: replacement.closureEventKeys.has(
+											eventKey(event.hostNodeId, event.eventName),
+									  )
+									? CLOSURE_DISPATCH_CORE
+									: dispatchCore),
 							...(event.syncPolicy ? SYNC_POLICY : []),
+							// The resume runtime installs the visibility observer at startup.
+							...(event.eventName === PROTOCOL_VISIBLE_EVENT_NAME ? BEHAVIOR : []),
 							...symbolIdsDemand(event.symbolIds ?? [], symbolDemand),
 						])
 					: [],
@@ -619,6 +837,8 @@ function payloadDemandRecords(
 				...KEYED_REPEAT,
 				...(record.rowTemplate ?? record.emptyArm ? ROW_MINT : []),
 				...(record.rowComponent ? ROW_COMPONENT_MINT : []),
+				...(!record.rowComponent && record.rowTemplate?.componentName ? ROW_SLOT_MINT : []),
+				...(record.enclosingRow ? NESTED_REPEATS : []),
 				...(replacement.scalarRows ? [] : renderRuntimeModuleIds),
 			]),
 		})),
@@ -681,14 +901,14 @@ function payloadDemandRecords(
 }
 
 function actionDemandRecords(
-	resolver: SymbolResolverPlan,
-	view: ProtocolViewPayload,
-	records: RuntimeDemandMapArtifact['payloadRecords'],
-	symbolDemand: ReadonlyMap<string, ReadonlyArray<string>>,
-	scalarEvents: boolean,
+	scope: FirstUseScope,
+	scalarEventKeys: ReadonlySet<string>,
 	scalarRows: boolean,
-	captureAnalysis?: CaptureAnalysisArtifact,
+	closurePlans: ReadonlyMap<string, RuntimeDemandMapClosurePlan>,
 ): RuntimeDemandMapArtifact['actions'] {
+	const { resolver, view, records, symbolDemand, captureAnalysis } = scope;
+	const firstUse = (symbolIds: ReadonlyArray<string>, ownRecordIds: ReadonlyArray<string>) =>
+		firstUseDemand(scope, symbolIds, ownRecordIds);
 	const branchDemand = view.branches?.length ? modulesForKind(records, 'branch') : [];
 	const branchKinds: RuntimeDemandMapRecordKind[] = view.branches?.length ? ['branch'] : [];
 	return [
@@ -710,9 +930,12 @@ function actionDemandRecords(
 				view,
 				records,
 			);
-			const plan = scalarEvents
+			const plan = scalarEventKeys.has(eventKey(event.hostNodeId, event.eventName))
 				? scalarActionPlan(resolver, event, view, subscriberRecords)
-				: undefined;
+				: closurePlans.get(eventKey(event.hostNodeId, event.eventName));
+			const reach = firstUse(event.symbolIds ?? [], [
+				`${PROTOCOL_EVENT_ACTION_KIND.event}:${event.hostNodeId}:${event.eventName}`,
+			]);
 			return {
 				hostNodeId: event.hostNodeId,
 				eventName: event.eventName,
@@ -735,6 +958,7 @@ function actionDemandRecords(
 					...subscriberRecords.flatMap((record) => record.runtimeModuleIds),
 				]),
 				...(plan ? { plan } : {}),
+				firstUse: reach,
 			};
 		}),
 		...(view.keyedRepeats ?? []).flatMap((repeat) =>
@@ -750,6 +974,7 @@ function actionDemandRecords(
 				const plan = scalarRows
 					? rowActionPlan(resolver, repeat, event, view, subscriberRecords)
 					: undefined;
+				const reach = firstUse(event.symbolIds ?? [], [`keyed-repeat:${repeat.id}`]);
 				return {
 					hostNodeId: repeat.parentHostNodeId,
 					eventName: event.eventName,
@@ -771,6 +996,7 @@ function actionDemandRecords(
 						...subscriberRecords.flatMap((record) => record.runtimeModuleIds),
 					]),
 					...(plan ? { plan } : {}),
+					firstUse: reach,
 				};
 			}),
 		),
@@ -854,6 +1080,7 @@ function planTextUpdates(
 				graphNodeId: update.graphNodeId,
 				symbolId: update.symbolId,
 				...(update.target.prefix ? { prefix: update.target.prefix } : {}),
+				...(update.target.suffix ? { suffix: update.target.suffix } : {}),
 			},
 		];
 	});
@@ -935,6 +1162,697 @@ function writeSubscriberRecords(
 				),
 		),
 	];
+}
+
+type AffectedRead = { readonly graphNodeId: string; readonly path?: ReadonlyArray<string> };
+
+type ArmRecordSetLike = {
+	readonly events?: ReadonlyArray<{ readonly symbolIds?: ReadonlyArray<string> }>;
+	readonly domUpdates?: ReadonlyArray<unknown>;
+	readonly behaviors?: ReadonlyArray<unknown>;
+	readonly keyedRepeats?: ProtocolArmRecordSet['keyedRepeats'];
+	readonly branches?: ReadonlyArray<ProtocolArmBranchRecord>;
+};
+
+// Resume start wires every record kind the page holds, whichever action dispatches first.
+const RESUME_WIRING = {
+	branch: BRANCH,
+	'async-boundary': ASYNC_BOUNDARY,
+	behavior: BEHAVIOR,
+	'element-handle': FULL_RESUME_CORE,
+	'keyed-repeat': KEYED_REPEAT,
+} as const;
+
+// What one compiled module can see of an action's browser consequences: its own records and the
+// interfaces of the components it composes.
+export type FirstUseScope = {
+	readonly resolver: SymbolResolverPlan;
+	readonly view: ProtocolViewPayload;
+	readonly state: ProtocolStatePayload;
+	readonly records: RuntimeDemandMapArtifact['payloadRecords'];
+	readonly symbolDemand: ReadonlyMap<string, ReadonlyArray<string>>;
+	readonly captureAnalysis: CaptureAnalysisArtifact | undefined;
+	readonly componentEdges: ReadonlyArray<SemanticComponentEdge>;
+	readonly graphBindings: ReadonlyArray<SemanticGraphBinding>;
+	readonly importedModuleInterfaces:
+		| Readonly<Record<string, ModuleGraphInterfaceArtifact>>
+		| undefined;
+	readonly components: ReadonlyArray<SemanticComponent>;
+	readonly sharedCallbackBindings: ReadonlyArray<SemanticSharedCallbackBinding>;
+};
+
+// Written paths per graph node; null when the whole node may have changed.
+type Affected = Map<string, Array<ReadonlyArray<string>> | null>;
+
+function affect(affected: Affected, graphNodeId: string, path: ReadonlyArray<string> | null) {
+	const paths = affected.get(graphNodeId);
+	if (paths === null) return false;
+	if (path === null) {
+		affected.set(graphNodeId, null);
+		return true;
+	}
+	if (paths === undefined) {
+		affected.set(graphNodeId, [path]);
+		return true;
+	}
+	if (paths.some((written) => startsWithPath(path, written))) return false;
+	paths.push(path);
+	return true;
+}
+
+function firstUseDemand(
+	scope: FirstUseScope,
+	handlerSymbolIds: ReadonlyArray<string>,
+	ownRecordIds: ReadonlyArray<string>,
+): RuntimeDemandMapFirstUseReach {
+	const symbolsById = new Map(scope.resolver.symbols.map((symbol) => [symbol.id, symbol]));
+	const symbolIds = new Set<string>();
+	const affected: Affected = new Map();
+	const calls: RuntimeDemandMapFirstUseCall[] = [];
+	for (const symbolId of transitiveSymbolIds(handlerSymbolIds, scope.captureAnalysis)) {
+		const symbol = symbolsById.get(symbolId);
+		if (!symbol) return 'unknown';
+		symbolIds.add(symbolId);
+		if (symbol.kind !== 'event-handler' && symbol.kind !== 'callback-prop') continue;
+		// A foreign body's writes land in another module's graph this map cannot see.
+		if (symbol.crossModuleInline) return 'unknown';
+		// A prop may hold a composing module's callback: the page's composers answer what it runs.
+		for (const read of symbol.reads ?? []) {
+			if (!read.graphNodeId.startsWith('prop:')) continue;
+			const prop = read.path[0];
+			if (prop === undefined) return 'unknown';
+			calls.push({ prop });
+		}
+		const slots = composerSlotCalls(symbolId, scope.captureAnalysis);
+		if (slots === 'unknown') return 'unknown';
+		calls.push(...slots);
+		for (const write of symbol.writes ?? []) {
+			// Only a root's seed fills a callback slot; code stored by a handler is unpublished.
+			if (isSharedCallbackSlotGraphNodeId(write.graphNodeId)) return 'unknown';
+			affect(affected, write.graphNodeId, write.path);
+		}
+	}
+	return consequenceReach(scope, symbolIds, new Set(ownRecordIds), affected, calls);
+}
+
+// Resume start derives every served repeat's unserved computed collection, whichever action woke
+// it, and whatever reads those collections runs with it.
+function resumeStartReach(scope: FirstUseScope): RuntimeDemandMapFirstUseReach {
+	const derives = new Set<string>();
+	const affected: Affected = new Map();
+	for (const repeat of scope.view.keyedRepeats ?? []) {
+		const computed = scope.state.computed.find(
+			(node) => node.graphNodeId === repeat.collectionGraphNodeId,
+		);
+		if (computed?.async !== false || !computed.deriveSymbolId) continue;
+		derives.add(computed.deriveSymbolId);
+		affect(affected, computed.graphNodeId, null);
+	}
+	const own =
+		derives.size === 0
+			? { symbolIds: [], runtimeModuleIds: [] }
+			: consequenceReach(scope, derives, new Set(), affected);
+	if (own === 'unknown') return 'unknown';
+	const children = emptyParts();
+	for (const edge of scope.componentEdges) {
+		if (edge.importSource === undefined) continue;
+		const child = importedChildReach(scope, edge);
+		if (!child || !mergeChildReach(children, child.reach.resume, child.file)) return 'unknown';
+	}
+	return unionReach([
+		own,
+		{
+			symbolIds: [],
+			runtimeModuleIds: [...children.runtimeModuleIds],
+			foreign: [...children.foreign].map(([file, ids]) => ({ file, symbolIds: [...ids] })),
+			...linkedParts(children.pageSpaceWrites, children.calls.values()),
+		},
+	]);
+}
+
+// The widget callback slots a symbol invokes; 'unknown' when a capture route reaches composing
+// code no page module publishes.
+function composerSlotCalls(
+	symbolId: string,
+	captureAnalysis: CaptureAnalysisArtifact | undefined,
+): RuntimeDemandMapFirstUseCall[] | 'unknown' {
+	const extracted = captureAnalysis?.extractedSymbols.find(
+		(symbol) => symbol.symbolId === symbolId,
+	);
+	const calls: RuntimeDemandMapFirstUseCall[] = [];
+	for (const slot of extracted?.captureSlots ?? [])
+		for (const route of slot.routes) {
+			if (route.kind === 'widget-callback-route')
+				calls.push({
+					slot: sharedCallbackSlotGraphNodeId(route.sharedDefinitionId, route.slotName),
+				});
+			else if (route.kind === 'callback-slot-route') calls.push({ slot: route.graphNodeId });
+			else if (route.kind === 'passthrough-route' || route.kind === 'unsupported-opaque')
+				return 'unknown';
+		}
+	return calls;
+}
+
+function isPageSpaceGraphNodeId(graphNodeId: string): boolean {
+	return PROTOCOL_PAGE_SPACE_ID_PREFIXES.some((prefix) => graphNodeId.startsWith(prefix));
+}
+
+type ReachParts = {
+	readonly symbolIds: Set<string>;
+	readonly recordIds: Set<string>;
+	readonly runtimeModuleIds: Set<string>;
+	readonly foreign: Map<string, Set<string>>;
+	readonly pageSpaceWrites: Set<string>;
+	readonly calls: Map<string, RuntimeDemandMapFirstUseCall>;
+};
+
+function emptyParts(symbolIds = new Set<string>(), recordIds = new Set<string>()): ReachParts {
+	return {
+		symbolIds,
+		recordIds,
+		runtimeModuleIds: new Set(),
+		foreign: new Map(),
+		pageSpaceWrites: new Set(),
+		calls: new Map(),
+	};
+}
+
+function addCall(
+	calls: Map<string, RuntimeDemandMapFirstUseCall>,
+	call: RuntimeDemandMapFirstUseCall,
+) {
+	const key = 'slot' in call ? `slot\0${call.slot}` : `prop\0${call.file ?? ''}\0${call.prop}`;
+	calls.set(key, call);
+}
+
+// Folds a composed child's reach in: its own symbols belong to its file.
+function mergeChildReach(
+	parts: ReachParts,
+	reach: RuntimeDemandMapFirstUseReach,
+	file: string,
+): boolean {
+	if (reach === 'unknown') return false;
+	for (const id of reach.runtimeModuleIds) parts.runtimeModuleIds.add(id);
+	for (const entry of [{ file, symbolIds: reach.symbolIds }, ...(reach.foreign ?? [])]) {
+		if (entry.symbolIds.length === 0) continue;
+		const ids = parts.foreign.get(entry.file) ?? new Set<string>();
+		for (const id of entry.symbolIds) ids.add(id);
+		parts.foreign.set(entry.file, ids);
+	}
+	for (const id of reach.pageSpaceWrites ?? []) parts.pageSpaceWrites.add(id);
+	for (const call of reach.calls ?? [])
+		addCall(parts.calls, 'slot' in call ? call : { file: call.file ?? file, prop: call.prop });
+	return true;
+}
+
+// Everything a change to `affected` runs in this module and in the components it composes:
+// computeds and shared seeds it invalidates, the updates, arms, rows and async settles that read
+// them, and each composed child whose props, arm or row it touches.
+function consequenceReach(
+	scope: FirstUseScope,
+	symbolIds: Set<string>,
+	recordIds: Set<string>,
+	affected: Affected,
+	calls: ReadonlyArray<RuntimeDemandMapFirstUseCall> = [],
+): RuntimeDemandMapFirstUseReach {
+	const { view, state } = scope;
+	const reads = (entries: ReadonlyArray<AffectedRead> | undefined) =>
+		(entries ?? []).some((entry) => {
+			const paths = affected.get(entry.graphNodeId);
+			if (paths === undefined) return false;
+			if (paths === null || entry.path === undefined) return true;
+			const path = entry.path;
+			return paths.some(
+				(written) => startsWithPath(path, written) || startsWithPath(written, path),
+			);
+		});
+	const branchFlips = (branch: NonNullable<ProtocolViewPayload['branches']>[number]) =>
+		reads(branch.testReads) || reads(branch.contentReads);
+	const repeatMoves = (repeat: NonNullable<ProtocolViewPayload['keyedRepeats']>[number]) => {
+		const slotReads = [
+			...(repeat.rowTemplate?.textSlots ?? []),
+			...(repeat.rowTemplate?.attributeSlots ?? []),
+		].flatMap((slot): ReadonlyArray<AffectedRead> =>
+			'graphNodeId' in slot
+				? [{ graphNodeId: slot.graphNodeId, path: slot.graphPath }]
+				: 'reads' in slot
+					? (slot.reads ?? [])
+					: [],
+		);
+		return (
+			!repeat.collectionGraphNodeId ||
+			reads([{ graphNodeId: repeat.collectionGraphNodeId, path: repeat.collectionPath }]) ||
+			reads(slotReads)
+		);
+	};
+	const edgeMounts = (edge: SemanticComponentEdge) =>
+		edge.branchScopeIds.some((id) => {
+			const branch = view.branches?.find((candidate) => candidate.id === id);
+			return !branch || branchFlips(branch);
+		}) ||
+		edge.keyedRepeatScopeIds.some((id) => {
+			const repeat = view.keyedRepeats?.find((candidate) => candidate.id === id);
+			return !repeat || repeatMoves(repeat);
+		}) ||
+		(edge.asyncBoundaryId !== undefined &&
+			(view.asyncBoundaries ?? []).some(
+				(boundary) => boundary.id === edge.asyncBoundaryId && reads(boundary.asyncReads),
+			));
+	let mountsLocalChild = false;
+	if (affected.size > 0) {
+		for (let grew = true; grew;) {
+			grew = false;
+			for (const node of [...state.computed, ...(state.sharedSeeds ?? [])]) {
+				if (affected.has(node.graphNodeId)) continue;
+				if (node.dependencies !== undefined && !reads(node.dependencies)) continue;
+				affected.set(node.graphNodeId, null);
+				grew = true;
+			}
+			for (const edge of scope.componentEdges) {
+				if (edge.importSource !== undefined) continue;
+				if (edgeMounts(edge)) {
+					mountsLocalChild = true;
+					continue;
+				}
+				const names = changedPropNames(edge, affected, reads);
+				if (names.size === 0) continue;
+				for (const binding of scope.graphBindings) {
+					if (
+						binding.kind !== 'prop' ||
+						binding.componentName !== edge.childComponentName
+					)
+						continue;
+					for (const name of names)
+						if (affect(affected, binding.id, name === ALL_PROPS ? null : [name]))
+							grew = true;
+				}
+			}
+		}
+		for (const node of [...state.computed, ...(state.sharedSeeds ?? [])])
+			if (affected.has(node.graphNodeId) && node.deriveSymbolId)
+				symbolIds.add(node.deriveSymbolId);
+	}
+	const parts = emptyParts(symbolIds, recordIds);
+	for (const call of calls) addCall(parts.calls, call);
+	for (const graphNodeId of affected.keys())
+		if (isPageSpaceGraphNodeId(graphNodeId)) parts.pageSpaceWrites.add(graphNodeId);
+	if (mountsLocalChild) return moduleMountReach(scope, parts);
+	for (const edge of scope.componentEdges) {
+		if (edge.importSource === undefined) continue;
+		const mounts = edgeMounts(edge);
+		const names = mounts ? new Set<string>() : changedPropNames(edge, affected, reads);
+		if (!mounts && names.size === 0) continue;
+		const child = importedChildReach(scope, edge);
+		if (!child) return 'unknown';
+		const { reach, file } = child;
+		const picked = mounts
+			? [reach.mount]
+			: names.has(ALL_PROPS)
+				? [reach.otherProps, ...reach.props.map((entry) => entry.reach)]
+				: [...names].map(
+						(name) =>
+							reach.props.find((entry) => entry.name === name)?.reach ??
+							reach.otherProps,
+					);
+		for (const entry of picked) if (!mergeChildReach(parts, entry, file)) return 'unknown';
+	}
+	for (const update of view.domUpdates ?? [])
+		if (reads([update])) {
+			recordIds.add(`dom-update:${update.hostNodeId}:${update.symbolId ?? ''}`);
+			if (update.symbolId) symbolIds.add(update.symbolId);
+		}
+	for (const behavior of view.behaviors ?? []) {
+		recordIds.add(`behavior:${behavior.hostNodeId}:${behavior.symbolId ?? ''}`);
+		if (behavior.symbolId) symbolIds.add(behavior.symbolId);
+	}
+	const armSymbols = (set: ArmRecordSetLike | undefined): boolean => {
+		if (!set) return true;
+		for (const event of set.events ?? [])
+			for (const id of event.symbolIds ?? []) symbolIds.add(id);
+		for (const record of [...(set.domUpdates ?? []), ...(set.behaviors ?? [])]) {
+			const symbolId = (record as { readonly symbolId?: unknown }).symbolId;
+			if (typeof symbolId === 'string') symbolIds.add(symbolId);
+		}
+		for (const repeat of set.keyedRepeats ?? [])
+			for (const event of repeat.rowEvents)
+				for (const id of event.symbolIds ?? []) symbolIds.add(id);
+		for (const branch of set.branches ?? []) {
+			if (!branch.symbolId) return false;
+			symbolIds.add(branch.symbolId);
+			for (const arm of branch.armRecords ?? []) if (!armSymbols(arm)) return false;
+		}
+		return true;
+	};
+	for (const branch of view.branches ?? []) {
+		// Every served arm's behaviors install when resume wires the branch.
+		for (const arm of branch.armRecords ?? [])
+			for (const behavior of arm.behaviors) {
+				const symbolId = (behavior as { readonly symbolId?: unknown }).symbolId;
+				if (typeof symbolId === 'string') symbolIds.add(symbolId);
+			}
+		if (!branchFlips(branch)) continue;
+		if (branch.escalates || !branch.symbolId) return 'unknown';
+		recordIds.add(`branch:${branch.id}`);
+		symbolIds.add(branch.symbolId);
+		for (const arm of branch.armRecords ?? []) if (!armSymbols(arm)) return 'unknown';
+		if (!armSymbols(branch.servedArmRecords)) return 'unknown';
+	}
+	for (const repeat of view.keyedRepeats ?? []) {
+		if (!recordIds.has(`keyed-repeat:${repeat.id}`) && !repeatMoves(repeat)) continue;
+		recordIds.add(`keyed-repeat:${repeat.id}`);
+		for (const event of repeat.rowEvents)
+			for (const id of event.symbolIds ?? []) symbolIds.add(id);
+	}
+	for (const boundary of view.asyncBoundaries ?? []) {
+		if (!reads(boundary.asyncReads)) continue;
+		recordIds.add(`async-boundary:${boundary.id}`);
+		if (boundary.updateSymbolId) symbolIds.add(boundary.updateSymbolId);
+		for (const read of boundary.asyncReads)
+			if (read.runnerSymbolId) symbolIds.add(read.runnerSymbolId);
+		const arms = boundary.armRecords;
+		for (const arm of Array.isArray(arms) ? arms : arms ? [arms] : [])
+			if (!armSymbols(arm as ArmRecordSetLike)) return 'unknown';
+	}
+	return finishReach(scope, parts);
+}
+
+function finishReach(scope: FirstUseScope, parts: ReachParts): RuntimeDemandMapFirstUse {
+	const closedSymbolIds = transitiveSymbolIds([...parts.symbolIds], scope.captureAnalysis);
+	const wiring = (Object.keys(RESUME_WIRING) as Array<keyof typeof RESUME_WIRING>).flatMap(
+		(kind) => (scope.records.some((record) => record.kind === kind) ? RESUME_WIRING[kind] : []),
+	);
+	const foreign = [...parts.foreign]
+		.map(([file, ids]) => ({ file, symbolIds: [...ids].sort() }))
+		.sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0));
+	return {
+		symbolIds: unique(closedSymbolIds),
+		runtimeModuleIds: unique([
+			...wiring,
+			...parts.runtimeModuleIds,
+			...[...parts.recordIds].flatMap((recordId) => recordModules(scope.records, recordId)),
+			...symbolIdsDemand(closedSymbolIds, scope.symbolDemand),
+		]),
+		...(foreign.length > 0 ? { foreign } : {}),
+		...linkedParts(parts.pageSpaceWrites, parts.calls.values()),
+	};
+}
+
+function linkedParts(
+	pageSpaceWrites: Iterable<string>,
+	calls: Iterable<RuntimeDemandMapFirstUseCall>,
+): Pick<RuntimeDemandMapFirstUse, 'pageSpaceWrites' | 'calls'> {
+	const writes = [...new Set(pageSpaceWrites)].sort();
+	const byKey = new Map<string, RuntimeDemandMapFirstUseCall>();
+	for (const call of calls) addCall(byKey, call);
+	const sorted = [...byKey]
+		.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+		.map(([, call]) => call);
+	return {
+		...(writes.length > 0 ? { pageSpaceWrites: writes } : {}),
+		...(sorted.length > 0 ? { calls: sorted } : {}),
+	};
+}
+
+// Every symbol and record this module holds, plus every composed child's own instance creation:
+// what a new instance of any component here can run in the browser.
+function moduleMountReach(
+	scope: FirstUseScope,
+	parts: ReachParts = emptyParts(),
+): RuntimeDemandMapFirstUseReach {
+	for (const symbol of scope.resolver.symbols) parts.symbolIds.add(symbol.id);
+	for (const record of scope.records) parts.recordIds.add(record.recordId);
+	// A new instance seeds its shared state, which every reader of those cells sees.
+	for (const seed of scope.state.sharedSeeds ?? [])
+		if (isPageSpaceGraphNodeId(seed.graphNodeId)) parts.pageSpaceWrites.add(seed.graphNodeId);
+	for (const edge of scope.componentEdges) {
+		if (edge.importSource === undefined) continue;
+		const child = importedChildReach(scope, edge);
+		if (!child || !mergeChildReach(parts, child.reach.mount, child.file)) return 'unknown';
+	}
+	return finishReach(scope, parts);
+}
+
+const ALL_PROPS = '\0all';
+
+// The child's prop names this change can give a new value; ALL_PROPS when it cannot name them.
+function changedPropNames(
+	edge: SemanticComponentEdge,
+	affected: Affected,
+	reads: (entries: ReadonlyArray<AffectedRead> | undefined) => boolean,
+): Set<string> {
+	const names = new Set<string>();
+	if (affected.size === 0) return names;
+	if (edge.children.childCount > 0) names.add(PROJECTION_PROP_NAME);
+	for (const prop of edge.props) {
+		switch (prop.kind) {
+			case 'graph-reference':
+				if (reads([{ graphNodeId: prop.graphNodeId, path: prop.path }]))
+					names.add(prop.name);
+				break;
+			case 'opaque':
+				if (!prop.buildTimeValue) names.add(prop.name);
+				break;
+			case 'spread': {
+				const paths = affected.get(prop.graphNodeId);
+				if (paths === undefined) break;
+				if (paths === null) return new Set([ALL_PROPS]);
+				for (const written of paths) {
+					if (!startsWithPath(written, prop.path)) {
+						if (startsWithPath(prop.path, written)) return new Set([ALL_PROPS]);
+						continue;
+					}
+					const name = written[prop.path.length];
+					if (name === undefined) return new Set([ALL_PROPS]);
+					if (!prop.excludeNames.includes(name)) names.add(name);
+				}
+				break;
+			}
+			case 'callback':
+			case 'serializable':
+			case 'element-handle-id':
+				break;
+			default:
+				return new Set([ALL_PROPS]);
+		}
+	}
+	return names;
+}
+
+function importedChildReach(
+	scope: FirstUseScope,
+	edge: SemanticComponentEdge,
+): { readonly reach: ModuleGraphInterfaceFirstUseReach; readonly file: string } | undefined {
+	const moduleInterface =
+		edge.importSource === undefined
+			? undefined
+			: scope.importedModuleInterfaces?.[edge.importSource];
+	const reach = moduleInterface?.render.components.find(
+		(component) => component.componentName === edge.childComponentName,
+	)?.firstUseReach;
+	return reach && moduleInterface ? { reach, file: moduleInterface.filename } : undefined;
+}
+
+/**
+ * What changing each prop of this module's components, or creating an instance of one, runs in
+ * the browser. Components of one module share their prop graph nodes, so each answer covers all.
+ */
+export function componentFirstUseReach(scope: FirstUseScope): ModuleGraphInterfaceFirstUseReach {
+	const propBindings = scope.graphBindings.filter((binding) => binding.kind === 'prop');
+	const reachFor = (name: string) => {
+		const affected: Affected = new Map();
+		for (const binding of propBindings) affect(affected, binding.id, [name]);
+		return consequenceReach(scope, new Set(), new Set(), affected);
+	};
+	const names = new Set<string>();
+	const collect = (entries: ReadonlyArray<AffectedRead> | undefined) => {
+		for (const entry of entries ?? [])
+			if (propBindings.some((binding) => binding.id === entry.graphNodeId) && entry.path?.[0])
+				names.add(entry.path[0]);
+	};
+	for (const update of scope.view.domUpdates ?? []) collect([update]);
+	for (const branch of scope.view.branches ?? []) {
+		collect(branch.testReads);
+		collect(branch.contentReads);
+	}
+	for (const repeat of scope.view.keyedRepeats ?? [])
+		if (repeat.collectionGraphNodeId)
+			collect([{ graphNodeId: repeat.collectionGraphNodeId, path: repeat.collectionPath }]);
+	for (const boundary of scope.view.asyncBoundaries ?? []) collect(boundary.asyncReads);
+	for (const node of [...scope.state.computed, ...(scope.state.sharedSeeds ?? [])])
+		collect(node.dependencies);
+	for (const edge of scope.componentEdges)
+		for (const prop of edge.props)
+			if (prop.kind === 'graph-reference' || prop.kind === 'spread')
+				collect([{ graphNodeId: prop.graphNodeId, path: prop.path }]);
+	return {
+		props: [...names].sort().map((name) => ({ name, reach: reachFor(name) })),
+		// No record names this prop, so only whole-props readers (spreads, rest) can see it.
+		otherProps: reachFor(ALL_PROPS),
+		mount: moduleMountReach(scope),
+		resume: resumeStartReach(scope),
+	};
+}
+
+// What this module adds to every action's first use on a page it is part of.
+function firstUsePage(scope: FirstUseScope): RuntimeDemandMapFirstUsePage {
+	const slots = new Map<string, { readonly slot: string; readonly prop: string }>();
+	for (const binding of scope.sharedCallbackBindings) {
+		const slot = sharedCallbackSlotGraphNodeId(binding.definitionId, binding.slotName);
+		slots.set(`${slot}\0${binding.propName}`, { slot, prop: binding.propName });
+	}
+	return {
+		resume: resumeStartReach(scope),
+		pageSpaceReaders: [...pageSpaceReads(scope)].sort().map((graphNodeId) => ({
+			graphNodeId,
+			reach: consequenceReach(scope, new Set(), new Set(), new Map([[graphNodeId, null]])),
+		})),
+		passedProps: passedProps(scope),
+		callbackSlots: [...slots.values()],
+	};
+}
+
+// Every page-space cell this module's records, state or composed props name.
+function pageSpaceReads(scope: FirstUseScope): Set<string> {
+	const found = new Set<string>();
+	const walk = (value: unknown, key?: string): void => {
+		if (typeof value === 'string') {
+			if (key !== undefined && /graphNodeId$/i.test(key) && isPageSpaceGraphNodeId(value))
+				found.add(value);
+			return;
+		}
+		if (Array.isArray(value)) {
+			for (const entry of value) walk(entry, key);
+			return;
+		}
+		if (value && typeof value === 'object')
+			for (const [name, entry] of Object.entries(value)) walk(entry, name);
+	};
+	walk(scope.view);
+	walk(scope.state);
+	walk(scope.componentEdges);
+	return found;
+}
+
+// Each prop this module passes that a child could call, with what calling it runs.
+function passedProps(scope: FirstUseScope): RuntimeDemandMapPassedProp[] {
+	const localComponents = new Set(scope.components.map((component) => component.name));
+	const passed: RuntimeDemandMapPassedProp[] = [];
+	for (const edge of scope.componentEdges) {
+		const file = receivingFile(scope, edge, localComponents);
+		const at = file === undefined ? {} : { file };
+		for (const prop of edge.props) {
+			const reach = passedPropReach(scope, edge, prop);
+			if (reach === undefined) continue;
+			passed.push(
+				prop.kind === 'spread'
+					? { ...at, excludeNames: [...prop.excludeNames].sort(), reach }
+					: { ...at, prop: prop.name, reach },
+			);
+		}
+	}
+	return passed;
+}
+
+// The compiled file an edge's component lives in: undefined for this module, null when unnamed.
+function receivingFile(
+	scope: FirstUseScope,
+	edge: SemanticComponentEdge,
+	localComponents: ReadonlySet<string>,
+): string | null | undefined {
+	if (edge.importSource === undefined)
+		return localComponents.has(edge.childComponentName) ? undefined : null;
+	const moduleInterface = scope.importedModuleInterfaces?.[edge.importSource];
+	const known = moduleInterface?.render.components.some(
+		(component) => component.componentName === edge.childComponentName,
+	);
+	return known ? moduleInterface!.filename : null;
+}
+
+// Undefined when the passed value can hold no code.
+function passedPropReach(
+	scope: FirstUseScope,
+	edge: SemanticComponentEdge,
+	prop: SemanticComponentPropBinding,
+): RuntimeDemandMapPassedProp['reach'] | undefined {
+	switch (prop.kind) {
+		case 'callback': {
+			const symbol = scope.resolver.symbols.find(
+				(candidate) =>
+					candidate.kind === 'callback-prop' &&
+					candidate.componentEdgeId === edge.id &&
+					candidate.propName === prop.name,
+			);
+			return symbol ? firstUseDemand(scope, [symbol.id], []) : 'unknown';
+		}
+		case 'graph-reference':
+			if (prop.graphBindingKind === 'element') return undefined;
+			if (!prop.graphNodeId.startsWith('prop:') || prop.path[0] === undefined)
+				return 'unknown';
+			return { symbolIds: [], runtimeModuleIds: [], calls: [{ prop: prop.path[0] }] };
+		case 'spread':
+			return prop.graphNodeId.startsWith('prop:') && prop.path.length === 0
+				? 'same-prop'
+				: 'unknown';
+		case 'opaque':
+			return prop.buildTimeValue ? undefined : 'unknown';
+		case 'serializable':
+		case 'element-handle-id':
+			return undefined;
+		default:
+			return 'unknown';
+	}
+}
+
+export function mergeFirstUseReach(
+	reaches: ReadonlyArray<ModuleGraphInterfaceFirstUseReach>,
+): ModuleGraphInterfaceFirstUseReach {
+	const union = (entries: ReadonlyArray<RuntimeDemandMapFirstUseReach>) =>
+		entries.includes('unknown')
+			? ('unknown' as const)
+			: unionReach(entries as ReadonlyArray<RuntimeDemandMapFirstUse>);
+	const names = [...new Set(reaches.flatMap((reach) => reach.props.map((entry) => entry.name)))];
+	return {
+		props: names.sort().map((name) => ({
+			name,
+			reach: union(
+				reaches.map(
+					(reach) =>
+						reach.props.find((entry) => entry.name === name)?.reach ?? reach.otherProps,
+				),
+			),
+		})),
+		otherProps: union(reaches.map((reach) => reach.otherProps)),
+		mount: union(reaches.map((reach) => reach.mount)),
+		resume: union(reaches.map((reach) => reach.resume)),
+	};
+}
+
+function unionReach(entries: ReadonlyArray<RuntimeDemandMapFirstUse>): RuntimeDemandMapFirstUse {
+	const symbolIds = new Set<string>();
+	const runtimeModuleIds = new Set<string>();
+	const byFile = new Map<string, Set<string>>();
+	const pageSpaceWrites: string[] = [];
+	const calls: RuntimeDemandMapFirstUseCall[] = [];
+	for (const entry of entries) {
+		for (const id of entry.symbolIds) symbolIds.add(id);
+		for (const id of entry.runtimeModuleIds) runtimeModuleIds.add(id);
+		pageSpaceWrites.push(...(entry.pageSpaceWrites ?? []));
+		calls.push(...(entry.calls ?? []));
+		for (const foreign of entry.foreign ?? []) {
+			const ids = byFile.get(foreign.file) ?? new Set<string>();
+			for (const id of foreign.symbolIds) ids.add(id);
+			byFile.set(foreign.file, ids);
+		}
+	}
+	const foreign = [...byFile]
+		.map(([file, ids]) => ({ file, symbolIds: [...ids].sort() }))
+		.sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0));
+	return {
+		symbolIds: [...symbolIds].sort(),
+		runtimeModuleIds: [...runtimeModuleIds].sort(),
+		...(foreign.length > 0 ? { foreign } : {}),
+		...linkedParts(pageSpaceWrites, calls),
+	};
 }
 
 function startsWithPath(path: ReadonlyArray<string>, prefix: ReadonlyArray<string>): boolean {

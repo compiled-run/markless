@@ -8,5 +8,5 @@ export function Nav({ libraryOpen, onToggleLibrary }) @{
 		>
 			Library ♪
 		</button>
-	</nav>
+	</nav>;
 }

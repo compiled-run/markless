@@ -1,0 +1,34 @@
+--- /private/tmp/markless-known-prime-debug-channel-registration.test.ts-before	2026-09-22 08:22:50
++++ packages/web/test/debug-channel-registration.test.ts	2026-09-22 08:22:51
+@@ -102,7 +102,7 @@
+ 	const prior = (globalThis as any).document;
+ 	let index = 0;
+ 	(globalThis as any).document = {
+-		currentScript: { closest: () => root },
++		currentScript: { closest: () => root, getAttribute: () => null },
+ 		createTreeWalker: () => ({ nextNode: () => nodes[index++] }),
+ 	};
+ 	try {
+@@ -155,13 +155,15 @@
+ 			return {
+ 				html: `<main><!--markless:async:stream-->${settled ? '<article><span>quiet</span><button>Wake</button></article>' : '<p>Waiting</p>'}<!--/markless:async:stream--></main>`,
+ 				structure: {
+-					anchors: [{
+-						kind: 'async',
+-						id: 'stream',
+-						html: settled
+-							? '<article><span>quiet</span><button>Wake</button></article>'
+-							: '<p>Waiting</p>',
+-					}],
++					anchors: [
++						{
++							kind: 'async',
++							id: 'stream',
++							html: settled
++								? '<article><span>quiet</span><button>Wake</button></article>'
++								: '<p>Waiting</p>',
++						},
++					],
+ 				},
+ 				state: {
+ 					version: 1,

@@ -34,11 +34,21 @@ for (const [mode, mount] of [
 		expect(keysOf(second!)).toEqual(['north', 'south']);
 	});
 
-	// Known gap: the minted row's callback prop resolves through a bound symbol
-	// spelled in the island module's own space, so the page loader is asked for
-	// `bound:…` (and, once prefixed, for its base `symbol:N`) without the island
-	// segment and answers neither.
-	test.fails(`${mode}: a minted island row dispatches its own handler inside its island`, async () => {
+	// A row's callback prop is spelled in the island module's own symbol space;
+	// the page loader answers it only once the island segment is put back.
+	test(`${mode}: a served island row dispatches its callback inside its island`, async () => {
+		const { container } = await mount();
+		const [first, second] = islands(container);
+
+		(second!.querySelector('[data-card="south"]') as HTMLElement).click();
+
+		await expect
+			.poll(() => second!.querySelector('[data-chosen]')?.textContent)
+			.toBe('south');
+		expect(first!.querySelector('[data-chosen]')?.textContent).toBe('none');
+	});
+
+	test(`${mode}: a minted island row dispatches its own handler inside its island`, async () => {
 		const { container } = await mount();
 		const [first, second] = islands(container);
 

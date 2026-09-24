@@ -1,3 +1,7 @@
+import { readFileSync, writeFileSync } from 'node:fs';
+import { resolve } from 'pathe';
+import { runtimeModuleSizes } from '../../../scripts/benchmarks/perf-guards/attribution.mjs';
+import { BUDGETS } from '../../../scripts/benchmarks/perf-guards/config.mjs';
 import type { RuntimeSizeReport } from '../test-support/runtime-size.ts';
 
 export type RuntimeBudget = {
@@ -39,6 +43,64 @@ export function assertRuntimeBudget(input: {
 			`runtime chunks retained Vite preload helper: ${chunksWithVitePreloadHelper.join(', ')}\n${emittedReport.summary}`,
 		);
 	}
+}
+
+export type RuntimeModuleAnchors = Record<string, Record<string, number>>;
+
+export const FIXTURE_RUNTIME_ANCHORS = resolve(import.meta.dirname, 'fixture-runtime-anchors.json');
+const ACCEPT_ENV = 'MARKLESS_ACCEPT_FIXTURE_RUNTIME';
+const ACCEPT_COMMAND = `${ACCEPT_ENV}=1 pnpm exec vp test --run packages/bundler/test/fixture-builds.test.ts`;
+
+/** Per-feature framework weight on a minimal fixture: each runtime module's rendered bytes against its anchor. */
+export function runtimeModuleOverruns(
+	fixture: string,
+	measured: Record<string, number>,
+	anchors: Record<string, number> | undefined,
+): string[] {
+	const overruns: string[] = [];
+	if (!anchors)
+		return [
+			`${fixture}: no runtime module anchors recorded. Record them with ${ACCEPT_COMMAND}`,
+		];
+	for (const [id, bytes] of Object.entries(measured)) {
+		const anchor = anchors[id];
+		if (anchor === undefined) {
+			overruns.push(
+				`${fixture}: new runtime module ${id} ships ${bytes} B (rendered) with no anchor. If intended, record it with ${ACCEPT_COMMAND}`,
+			);
+			continue;
+		}
+		const delta = bytes - anchor;
+		if (delta > BUDGETS.runtimeModuleGrowthBytes)
+			overruns.push(
+				`${fixture}: runtime module ${id} got heavier: ${anchor} -> ${bytes} B (+${delta} B rendered, budget +${BUDGETS.runtimeModuleGrowthBytes} B). If intended, re-anchor with ${ACCEPT_COMMAND}`,
+			);
+	}
+	return overruns;
+}
+
+export function fixtureRuntimeModules(dist: string): Record<string, number> {
+	return runtimeModuleSizes(
+		JSON.parse(readFileSync(resolve(dist, 'build/byte-attribution.json'), 'utf8')),
+	);
+}
+
+export function readFixtureRuntimeAnchors(): RuntimeModuleAnchors {
+	return JSON.parse(readFileSync(FIXTURE_RUNTIME_ANCHORS, 'utf8')) as RuntimeModuleAnchors;
+}
+
+/** With the accept variable set, records this fixture's measured sizes instead of checking them. */
+export function acceptFixtureRuntime(fixture: string, measured: Record<string, number>): boolean {
+	if (process.env[ACCEPT_ENV] !== '1') return false;
+	const anchors = readFixtureRuntimeAnchors();
+	anchors[fixture] = measured;
+	const sorted = Object.fromEntries(
+		Object.keys(anchors)
+			.sort()
+			.map((key) => [key, anchors[key]!]),
+	);
+	writeFileSync(FIXTURE_RUNTIME_ANCHORS, `${JSON.stringify(sorted, null, '\t')}\n`);
+	return true;
 }
 
 export function pageFetchScriptsFromHtml(html: string): string[] {

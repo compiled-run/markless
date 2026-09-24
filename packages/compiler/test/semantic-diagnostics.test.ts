@@ -1506,3 +1506,64 @@ test('a repeat with neither a graph node nor a readable collection expression fa
 		}),
 	]);
 });
+
+test('buildSemanticGraph does not read an async result key named like a module-mate prop', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/Kiosk.tsrx',
+		source: `
+import { state, computed } from '@markless/core';
+
+function Plaque({ caption, tone }) @{
+	<i data-tone={tone}>{caption}</i>
+}
+
+export function App() @{
+	let shift = state(1);
+	const roster = computed(async () => {
+		const current = shift;
+		await Promise.resolve();
+		return { caption: 'Roster ' + current, detail: { tone: 'calm' } };
+	});
+
+	<main>
+		<button onClick={() => shift = shift + 1}>Next</button>
+		@try {
+			<h2>{roster.caption}</h2>
+			<Plaque caption="plaque" tone={roster.detail.tone} />
+		} @pending {
+			<p>Waiting</p>
+		}
+	</main>
+}
+`,
+	});
+
+	expect(graph.diagnostics).toEqual([]);
+});
+
+test('buildSemanticGraph still reports a graph read in a computed object key after the await', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/KioskKey.tsrx',
+		source: `
+import { state, computed } from '@markless/core';
+
+export function App() @{
+	let slot = state('am');
+	const roster = computed(async () => {
+		await Promise.resolve();
+		return { [slot]: 'open' };
+	});
+
+	@try {
+		<p>{roster.am}</p>
+	} @pending {
+		<p>Waiting</p>
+	}
+}
+`,
+	});
+
+	expect(graph.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+		'MARKLESS_ASYNC_POST_AWAIT_READ',
+	]);
+});

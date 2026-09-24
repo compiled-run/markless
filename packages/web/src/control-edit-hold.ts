@@ -14,23 +14,20 @@ const EDITED_PROPERTIES = ['value', 'checked'] as const;
 
 type ControlLike = Record<string, unknown>;
 
+const EDITABLE_TAG = /^(?:input|textarea|select)$/i;
+
 const noted = new WeakMap<ControlLike, Map<string, unknown>>();
 
-function editableControl(target: unknown): ControlLike | undefined {
+export function marklessEditableControl(target: unknown): ControlLike | undefined {
 	if (!target || typeof target !== 'object') return undefined;
 	const element = target as ControlLike & {
 		readonly tagName?: unknown;
 		readonly isContentEditable?: unknown;
 	};
-	const tagName = typeof element.tagName === 'string' ? element.tagName.toUpperCase() : '';
-	if (
-		element.isContentEditable !== true &&
-		tagName !== 'INPUT' &&
-		tagName !== 'TEXTAREA' &&
-		tagName !== 'SELECT'
-	)
-		return undefined;
-	return element;
+	return element.isContentEditable === true ||
+		(typeof element.tagName === 'string' && EDITABLE_TAG.test(element.tagName))
+		? element
+		: undefined;
 }
 
 /**
@@ -39,7 +36,7 @@ function editableControl(target: unknown): ControlLike | undefined {
  * release only what they noted, so one ending does not drop another's note.
  */
 export function marklessNoteControlEdits(target: unknown): () => void {
-	const element = editableControl(target);
+	const element = marklessEditableControl(target);
 	if (!element) return noRelease;
 	let properties: Map<string, unknown> | undefined;
 	for (const name of EDITED_PROPERTIES) {

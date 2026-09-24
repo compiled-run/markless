@@ -155,6 +155,8 @@ export type SsrDataReadContext = {
 	readonly asyncError?: unknown;
 	readonly projectionHtml?: string;
 	readonly sharedSeeds?: ReadonlyMap<string, unknown>;
+	// The row segment a keyed row's projected elements carry, so each row locates its own.
+	readonly hostSegment?: string;
 	// Inside an arm this render is bringing into the DOM for the first time, so
 	// the components it holds are new instances rather than live ones.
 	readonly freshInstances?: true;
@@ -197,6 +199,8 @@ export type SsrDataCoordinates = {
 
 export type RenderSsrDataInput = {
 	readonly renderData: SsrRenderData;
+	// Only an owner whose keyed rows project elements passes it: the row segment those elements take.
+	readonly projectionSegment?: (context: SsrDataReadContext) => { readonly hostSegment?: string };
 	readonly idPrefix?: string;
 	// The repeat row the root chunk renders inside, for a caller that starts the
 	// render partway down a component's tree: a `@for` row's projection chunk.
@@ -204,6 +208,7 @@ export type RenderSsrDataInput = {
 		readonly item?: unknown;
 		readonly index?: number;
 		readonly key?: unknown;
+		readonly hostSegment?: string;
 	};
 	// The branch whose arm this render is bringing into the DOM: everything
 	// inside it is a new instance, so its own state starts from its declaration.
@@ -432,10 +437,11 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 	): Awaitable<RenderedPart> {
 		const chunk = chunks.get(chunkId);
 		if (!chunk) throw new Error(`MARKLESS_SSR_DATA_CHUNK_MISSING: ${chunkId}`);
+		const hostPrefix = idPrefix + (repeat.hostSegment ?? '');
 		for (const host of chunk.hosts) locators.push({
 			chunkId: `${idPrefix}${chunkId}`,
 			...host,
-			hostNodeId: `${idPrefix}${host.hostNodeId}`,
+			hostNodeId: `${hostPrefix}${host.hostNodeId}`,
 		});
 
 		const slotsByStatic = new Map<number, SsrDataSlot[]>();
@@ -451,6 +457,7 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 			...(repeat.index !== undefined ? { repeatIndex: repeat.index } : {}),
 			...(repeat.key !== undefined ? { repeatKey: repeat.key } : {}),
 			...(repeat.freshInstances ? { freshInstances: repeat.freshInstances } : {}),
+			hostSegment: repeat.hostSegment,
 			sharedSeeds: repeat.sharedSeeds,
 		};
 		// Statics and slots as one ordered stream, so a slot that answers with a
@@ -491,7 +498,7 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 				...chunk.hosts.map((host) => ({
 					path: host.coordinate.path,
 					order: 0,
-					tokens: [{ kind: 'element', hostNodeId: `${idPrefix}${host.hostNodeId}`, tagName: host.tagName }] as StructureToken[],
+					tokens: [{ kind: 'element', hostNodeId: `${hostPrefix}${host.hostNodeId}`, tagName: host.tagName }] as StructureToken[],
 				})),
 				...chunk.slots.flatMap((slot, order) => {
 					const tokens = renderedSlots.get(slot)?.tokens ?? [];
@@ -543,6 +550,7 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 									index: context.repeatIndex,
 									key: context.repeatKey,
 									sharedSeeds: childSeeds,
+									...input.projectionSegment?.(context),
 								})
 							: undefined,
 						(projection): Awaitable<RenderedPart> => {
@@ -732,9 +740,10 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 				return marklessThen(input.read(slot.tag, context), (tagValue): Awaitable<RenderedPart> => {
 					const tag = dynamicTag(tagValue);
 					if (tag === null) return { html: '', tokens: [] };
+					const hostNodeId = `${idPrefix}${context.hostSegment ?? ''}${slot.hostNodeId}`;
 					locators.push({
 						chunkId: `${idPrefix}${context.chunkId}`,
-						hostNodeId: `${idPrefix}${slot.hostNodeId}`,
+						hostNodeId,
 						tagName: tag,
 						coordinate: slot.coordinate,
 					});
@@ -772,7 +781,7 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 						(body): RenderedPart => ({
 							html: `<${tag}${attributes}>${body.html}</${tag}>`,
 							tokens: [
-								{ kind: 'element', hostNodeId: `${idPrefix}${slot.hostNodeId}`, tagName: tag },
+								{ kind: 'element', hostNodeId, tagName: tag },
 								...body.tokens,
 							],
 						}),

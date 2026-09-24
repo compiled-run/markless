@@ -1,0 +1,104 @@
+import { readFileSync } from 'node:fs';
+import { transformSync } from 'rolldown/experimental';
+import { expect, test, vi } from 'vitest';
+
+type Input = { root: ParentNode; value?: unknown };
+type RouteModule = { resumeContainerEvent(input: Input): unknown };
+type Loader = () => Promise<RouteModule>;
+
+function entry(mdx: Record<string, Loader>, tsrx: Record<string, Loader> = {}) {
+	const source = readFileSync(
+		new URL('../../src/vite/entries/resume-entry.ts', import.meta.url),
+		'utf8',
+	);
+	const code = transformSync('resume-entry.ts', source)
+		.code.replaceAll('import.meta.glob', 'glob')
+		.replace('export async function', 'async function');
+	return new Function('glob', `${code}; return resumeContainerEvent;`)((pattern: string) =>
+		pattern.endsWith('.mdx') ? mdx : tsrx,
+	) as (input: Input) => Promise<void>;
+}
+
+function root(file: string) {
+	const route = { file };
+	return {
+		route,
+		element: {
+			querySelector: () => ({ textContent: JSON.stringify(route) }),
+		} as unknown as ParentNode,
+	};
+}
+
+test.each(['mdx', 'tsrx'])(
+	'reuses the %s module for concurrent and repeat events',
+	async (extension) => {
+		let resolve!: (module: RouteModule) => void;
+		const load = vi.fn(
+			() =>
+				new Promise<RouteModule>((ready) => {
+					resolve = ready;
+				}),
+		);
+		const modules = { [`/pages/example.${extension}`]: load };
+		const resume = extension === 'mdx' ? entry(modules) : entry({}, modules);
+		const first = root(`pages/example.${extension}`);
+		const second = root(`/pages/example.${extension}`);
+		const handler = vi.fn();
+		expect(load).not.toHaveBeenCalled();
+		const pending = [
+			resume({ root: first.element, value: 1 }),
+			resume({ root: second.element, value: 2 }),
+		];
+		expect(load).toHaveBeenCalledTimes(1);
+		resolve({ resumeContainerEvent: handler });
+		await Promise.all(pending);
+		await resume({ root: first.element, value: 3 });
+		expect(load).toHaveBeenCalledTimes(1);
+		expect(handler.mock.calls.map(([input]) => input.value)).toEqual([1, 2, 3]);
+		expect(handler.mock.calls.map(([input]) => input.root)).toEqual([
+			first.element,
+			second.element,
+			first.element,
+		]);
+	},
+);
+
+test('retries a rejected route import and retains successful module loading after a handler error', async () => {
+	const unavailable = new Error('route unavailable');
+	const handlerError = new Error('handler failed');
+	const handler = vi.fn().mockRejectedValueOnce(handlerError).mockResolvedValue(undefined);
+	const load = vi
+		.fn<Loader>()
+		.mockRejectedValueOnce(unavailable)
+		.mockResolvedValue({ resumeContainerEvent: handler });
+	const resume = entry({ '/pages/retry.mdx': load });
+	const input = { root: root('pages/retry.mdx').element };
+	const failures = await Promise.allSettled([resume(input), resume(input)]);
+	expect(failures).toEqual([
+		{ status: 'rejected', reason: unavailable },
+		{ status: 'rejected', reason: unavailable },
+	]);
+	expect(load).toHaveBeenCalledTimes(1);
+	await expect(resume(input)).rejects.toBe(handlerError);
+	await resume(input);
+	expect(load).toHaveBeenCalledTimes(2);
+	expect(handler).toHaveBeenCalledTimes(2);
+});
+
+test('reads the current route on navigation without retaining an old route handler', async () => {
+	const firstHandler = vi.fn();
+	const secondHandler = vi.fn();
+	const firstLoad = vi.fn<Loader>().mockResolvedValue({ resumeContainerEvent: firstHandler });
+	const secondLoad = vi.fn<Loader>().mockResolvedValue({ resumeContainerEvent: secondHandler });
+	const resume = entry({ '/pages/first.mdx': firstLoad }, { '/pages/second.tsrx': secondLoad });
+	const current = root('pages/first.mdx');
+	await resume({ root: current.element, value: 1 });
+	current.route.file = 'pages/second.tsrx';
+	await resume({ root: current.element, value: 2 });
+	current.route.file = 'pages/first.mdx';
+	await resume({ root: current.element, value: 3 });
+	expect(firstLoad).toHaveBeenCalledTimes(1);
+	expect(secondLoad).toHaveBeenCalledTimes(1);
+	expect(firstHandler.mock.calls.map(([input]) => input.value)).toEqual([1, 3]);
+	expect(secondHandler.mock.calls.map(([input]) => input.value)).toEqual([2]);
+});

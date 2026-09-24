@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { nitro } from 'nitro/vite';
 import { dirname, isAbsolute, join, normalize, relative, resolve } from 'pathe';
 import {
@@ -21,11 +22,21 @@ import {
 } from 'ufo';
 import {
 	isClientPrimarySourceRequest,
+	isMarklessDeferredPack,
+	isMarklessNavigationPack,
 	isRenderDataSourceRequest,
 	isResumeSourceRequest,
+	isRouteNavigationSourceRequest,
 	isSymbolOnlySourceRequest,
+	plannedLandingFiles,
 	symbolVirtualModuleSourceFile,
 } from '@markless/bundler/preload';
+import {
+	MARKLESS_BUILD_METADATA_FILES,
+	MARKLESS_BUILD_PREFIX,
+	MARKLESS_IMPORT_MAP_ASSET,
+	importMapScript,
+} from '@markless/bundler/rolldown';
 import { transformRequestFileSource } from '../request-files.ts';
 import { anchorTransformPlugin } from './anchor-transform.ts';
 import {
@@ -35,12 +46,18 @@ import {
 	type MarklessRouterClientAssetsManifest,
 	readClientAssetsManifest,
 	removeClientAssetsManifest,
+	renameClientAssetChunks,
 	writeClientAssetsManifest,
 } from './client-assets-manifest.ts';
 import { htmlTransformPlugin } from './html-transform.ts';
 import { mdxTransformPlugin } from './mdx.ts';
 import { compactRoutePreloadData, routePreloadDecoderSource } from './route-preload-data.ts';
 import { routeTypegenPlugin } from './route-typegen.ts';
+import type { ServerEntryOptions } from './runtime/create-server-entry.ts';
+import { LINK_ATTRIBUTE, PREFETCH_ATTRIBUTE } from '../link-attributes.ts';
+import { NAVIGATION_POLYFILL_MODULE } from '../navigation-polyfill.ts';
+import { listenForLinkIntent, startViewportPrefetch } from './link-intent.ts';
+import { documentNavigationFor } from './document-navigation.ts';
 
 const ROUTE_DISCOVERY_ID = 'virtual:markless-router/routes';
 const CLIENT_ENTRY_ID = 'virtual:markless-router/client-entry';
@@ -90,6 +107,7 @@ export interface MarklessRouterOptions {
 	// URLs live in the fragment; 'path' (default) routes by pathname.
 	mode?: 'path' | 'hash';
 	nitro?: boolean;
+	linkPreloading?: ServerEntryOptions['linkPreloading'];
 }
 
 export function router(options: MarklessRouterOptions = {}): PluginOption[] {
@@ -103,7 +121,7 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 			routeTypegenPlugin(),
 			anchorTransformPlugin(),
 			htmlTransformPlugin(),
-			virtualModulesPlugin(),
+			virtualModulesPlugin(undefined, undefined, undefined, undefined, options),
 		];
 	}
 
@@ -112,6 +130,7 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 	const prerenderWakeEntry = resumeEntryState();
 	const navigationEntry = resumeEntryState();
 	const routePreloads = routePreloadState();
+	routePreloads.navigationOnIntent = linkIntentEnabled(options);
 
 	return [
 		routerConfigPlugin(
@@ -127,7 +146,13 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 		routeTypegenPlugin(),
 		anchorTransformPlugin(),
 		htmlTransformPlugin(),
-		virtualModulesPlugin(resumeEntry, prerenderWakeEntry, navigationEntry, routePreloads),
+		virtualModulesPlugin(
+			resumeEntry,
+			prerenderWakeEntry,
+			navigationEntry,
+			routePreloads,
+			options,
+		),
 		nitroPlugins,
 	];
 }
@@ -181,12 +206,26 @@ function routerConfigPlugin(
 	let serverEnvironmentConfig: object | undefined;
 	let productionBuild = false;
 	let pendingClientAssets: MarklessRouterClientAssetsManifest | undefined;
+	let capturedChunkNames = new Map<string, string | undefined>();
+	const navigationPolyfillIds = new Set<string>();
 
 	return {
 		name: 'markless-router:vite',
 		enforce: 'pre',
 		sharedDuringBuild: true,
-		config(config: UserConfig) {
+		resolveId: {
+			filter: { id: new RegExp(`^${escapeRegExp(NAVIGATION_POLYFILL_MODULE)}$`) },
+			async handler(source, importer, options) {
+				if (source !== NAVIGATION_POLYFILL_MODULE) return null;
+				const resolved = await this.resolve(source, importer, {
+					...options,
+					skipSelf: true,
+				});
+				if (resolved) navigationPolyfillIds.add(resolved.id);
+				return resolved;
+			},
+		},
+		config(config: UserConfig, env) {
 			throwIfUserAddedNitro(config.plugins, nitroPluginsFromRouter);
 			config.environments ??= {};
 			const ssrEnvironment = (config.environments.ssr ??= {}) as {
@@ -202,7 +241,12 @@ function routerConfigPlugin(
 			const serverWatch = withWatchIgnores(config.server?.watch);
 
 			return {
-				nitro: createNitroConfig(config.nitro, config.root, serverWatch.ignored),
+				nitro: createNitroConfig(
+					config.nitro,
+					config.root,
+					serverWatch.ignored,
+					env?.command === 'build',
+				),
 				server: {
 					...config.server,
 					watch: serverWatch,
@@ -230,6 +274,12 @@ function routerConfigPlugin(
 				entry.base = config.base;
 			}
 			routePreloads.root = config.root;
+			routePreloads.chunkSpecifiers = (config.plugins ?? []).some(
+				(plugin) =>
+					(
+						plugin as { api?: { chunkImportMap?: () => boolean } }
+					).api?.chunkImportMap?.() === true,
+			);
 		},
 		configEnvironment(_name, config) {
 			configureRouteInputs(config);
@@ -257,6 +307,7 @@ function routerConfigPlugin(
 				navigationEntry.fileName = undefined;
 				routePreloads.routes = { navigation: {}, ssr: {}, styles: {} };
 				routePreloads.persisted = false;
+				routePreloads.importMap = undefined;
 				await removeClientAssetsManifest(clientOutDir);
 				return;
 			}
@@ -273,6 +324,7 @@ function routerConfigPlugin(
 			);
 			routePreloads.routes = manifest.routes;
 			routePreloads.persisted = true;
+			routePreloads.importMap = manifest.importMap;
 		},
 		generateBundle: {
 			// Vite finalizes and propagates importedCss in vite:css-post.
@@ -318,11 +370,19 @@ function routerConfigPlugin(
 					base: routePreloads.base,
 					bundle,
 					navigationChunk,
+					navigationPolyfillIds,
+					navigationOnIntent: routePreloads.navigationOnIntent,
 					prerenderWakeChunk,
 					resumeChunk,
 					root: routePreloads.root,
 				});
 				patchRoutePreloadsInBundle(bundle, routePreloads.routes);
+				capturedChunkNames = new Map(
+					outputChunks(bundle).map((chunk) => [
+						chunk.fileName,
+						chunk.preliminaryFileName,
+					]),
+				);
 				if (productionBuild) {
 					const wakeRequired = prerenderWakeChannelEnabled();
 					if (
@@ -353,7 +413,7 @@ function routerConfigPlugin(
 				}
 			},
 		},
-		async writeBundle() {
+		async writeBundle(_options, bundle) {
 			const environment = this.environment;
 			const isClientEnvironment = environment?.name
 				? environment.name === clientEnvironmentName
@@ -364,6 +424,22 @@ function routerConfigPlugin(
 					'Markless Router client build finished without a client-assets manifest.',
 				);
 			}
+			const renames = bundle
+				? chunkRenamesSince(capturedChunkNames, bundle)
+				: new Map<string, string>();
+			if (renames.size > 0) {
+				pendingClientAssets = renameClientAssetChunks(pendingClientAssets, renames);
+				routePreloads.routes = pendingClientAssets.routes;
+				for (const entry of [resumeEntry, prerenderWakeEntry, navigationEntry])
+					if (entry.fileName)
+						entry.fileName = renames.get(entry.fileName) ?? entry.fileName;
+			}
+			const importMap = bundle?.[MARKLESS_IMPORT_MAP_ASSET];
+			if (importMap?.type === 'asset')
+				pendingClientAssets = {
+					...pendingClientAssets,
+					importMap: JSON.parse(String(importMap.source)),
+				};
 			await writeClientAssetsManifest(clientOutDir, pendingClientAssets);
 		},
 	};
@@ -383,28 +459,7 @@ function configureRouteInputs(config: EnvironmentOptions): void {
 			SERVER_ENTRY_ID,
 			configRoot(config),
 		);
-		config.build.rolldownOptions.external = withExternal(
-			config.build.rolldownOptions.external,
-			'nitro',
-		);
 	}
-}
-
-type RolldownExternal = NonNullable<
-	NonNullable<NonNullable<EnvironmentOptions['build']>['rolldownOptions']>['external']
->;
-
-function withExternal(external: RolldownExternal | undefined, id: string): RolldownExternal {
-	if (Array.isArray(external)) {
-		return external.includes(id) ? external : [...external, id];
-	}
-	if (typeof external === 'string') {
-		return external === id ? external : [external, id];
-	}
-	if (external === undefined) {
-		return [id];
-	}
-	return external;
 }
 
 function requestFileTransformPlugin(): Plugin {
@@ -467,6 +522,7 @@ function createNitroConfig(
 	nitroConfig: UserConfig['nitro'] | undefined,
 	root = '.',
 	serverWatchIgnored: readonly WatchIgnorePattern[] = [],
+	isBuild = false,
 ): NonNullable<UserConfig['nitro']> {
 	const scanDirs = Array.isArray(nitroConfig?.scanDirs)
 		? nitroConfig.scanDirs.filter((dir): dir is string => typeof dir === 'string')
@@ -490,6 +546,20 @@ function createNitroConfig(
 			...publicAssets,
 		],
 		routesDir: nitroConfig?.routesDir ?? '.output/markless/router/nitro-routes',
+		...(isBuild && {
+			routeRules: {
+				[`/${MARKLESS_BUILD_PREFIX}**`]: {
+					headers: { 'cache-control': 'public, max-age=31536000, immutable' },
+				},
+				...Object.fromEntries(
+					MARKLESS_BUILD_METADATA_FILES.map((file) => [
+						`/${file}`,
+						{ headers: { 'cache-control': 'public, max-age=0, must-revalidate' } },
+					]),
+				),
+				...nitroConfig?.routeRules,
+			},
+		}),
 		rolldownConfig: withRequestFileBuildPlugin(nitroConfig?.rolldownConfig, root),
 		rollupConfig: withRequestFileBuildPlugin(nitroConfig?.rollupConfig, root),
 		scanDirs: [...new Set(['.', ...scanDirs])],
@@ -580,6 +650,9 @@ interface ResumeEntryState {
 
 interface RoutePreloadState {
 	base: string;
+	chunkSpecifiers: boolean;
+	importMap?: { readonly imports: Record<string, string> } | undefined;
+	navigationOnIntent: boolean;
 	persisted: boolean;
 	root: string;
 	routes: RoutePreloadMaps;
@@ -594,6 +667,8 @@ function resumeEntryState(): ResumeEntryState {
 function routePreloadState(): RoutePreloadState {
 	return {
 		base: '/',
+		chunkSpecifiers: false,
+		navigationOnIntent: false,
 		persisted: false,
 		root: '.',
 		routes: { navigation: {}, ssr: {}, styles: {} },
@@ -658,11 +733,19 @@ function virtualModulesPlugin(
 	prerenderWakeEntry: ResumeEntryState = resumeEntryState(),
 	navigationEntry: ResumeEntryState = resumeEntryState(),
 	routePreloads: RoutePreloadState = routePreloadState(),
+	options: MarklessRouterOptions = {},
 ): Plugin {
 	let root = '';
 
 	return {
 		name: 'markless-router:routes',
+		config() {
+			return {
+				define: {
+					__MARKLESS_ROUTER_LINK_INTENT__: JSON.stringify(linkIntentEnabled(options)),
+				},
+			};
+		},
 		sharedDuringBuild: true,
 		configResolved(config) {
 			root = config.root;
@@ -673,13 +756,18 @@ function virtualModulesPlugin(
 			},
 			handler(id) {
 				const baseId = virtualModuleBaseId(id);
+				if (baseId === ROUTER_OPTIONS_ID) {
+					return {
+						id: `\0${baseId}${rootScopeQuery(root, id)}`,
+						moduleSideEffects: false,
+					};
+				}
 				if (
 					baseId === SERVER_ENTRY_ID ||
 					baseId === RESUME_ENTRY_PATH_ID ||
 					baseId === PRERENDER_WAKE_ENTRY_PATH_ID ||
 					baseId === NAVIGATION_ENTRY_PATH_ID ||
-					baseId === ROUTE_PRELOADS_ID ||
-					baseId === ROUTER_OPTIONS_ID
+					baseId === ROUTE_PRELOADS_ID
 				) {
 					return `\0${baseId}${rootScopeQuery(root, id)}`;
 				}
@@ -693,7 +781,7 @@ function virtualModulesPlugin(
 		},
 		load(id) {
 			if (id.startsWith(`\0${SERVER_ENTRY_ID}`)) {
-				return serverEntrySource(root);
+				return serverEntrySource(root, options);
 			}
 			if (id.startsWith(`\0${RESUME_ENTRY_PATH_ID}`)) {
 				return entryPathSource('resumeEntryPath', resumeEntry, RESUME_ENTRY_ID, root);
@@ -727,10 +815,34 @@ function virtualModulesPlugin(
 				);
 			}
 			if (id.startsWith(`\0${ROUTER_OPTIONS_ID}`)) {
-				return 'export const routerMode = "path"; // retained for compat; hash paths are always first-class';
+				const documentFile = join(root, 'document.tsrx');
+				this?.addWatchFile?.(documentFile);
+				return routerOptionsSource(options, documentFile);
 			}
 		},
 	};
+}
+
+async function routerOptionsSource(
+	options: MarklessRouterOptions,
+	documentFile: string,
+): Promise<string> {
+	const documentSource = await readFile(documentFile, 'utf8').catch(() => undefined);
+	return [
+		'export const routerMode = "path";',
+		`export const documentNavigation = ${JSON.stringify(documentNavigationFor(documentSource, documentFile))};`,
+		`export const linkPreloading = ${JSON.stringify(options.linkPreloading ?? 'render')};`,
+		linkIntentEnabled(options)
+			? `export const startLinkIntentPreloading = (root, preload) => (${listenForLinkIntent.toString()})(root, ${JSON.stringify(LINK_ATTRIBUTE)}, preload, ${JSON.stringify(PREFETCH_ATTRIBUTE)});`
+			: 'export const startLinkIntentPreloading = () => () => {};',
+		linkIntentEnabled(options)
+			? `export const startViewportPrefetching = (document, destinations) => (${startViewportPrefetch.toString()})(document, ${JSON.stringify(LINK_ATTRIBUTE)}, ${JSON.stringify(PREFETCH_ATTRIBUTE)}, ${options.linkPreloading === 'viewport'}, destinations);`
+			: 'export const startViewportPrefetching = () => {};',
+	].join('\n');
+}
+
+function linkIntentEnabled(options: MarklessRouterOptions): boolean {
+	return options.linkPreloading === 'intent' || options.linkPreloading === 'viewport';
 }
 
 function entryPathSource(
@@ -745,26 +857,30 @@ function entryPathSource(
 	return `export const ${exportName} = ${JSON.stringify(path)};`;
 }
 
-function serverEntrySource(root: string): string {
+function serverEntrySource(root: string, options: MarklessRouterOptions): string {
 	const query = rootScopeQuery(root);
 	return [
 		`import { createServerEntry } from '@markless/router/vite/runtime/create-server-entry';`,
 		`import { resumeEntryPath } from '${RESUME_ENTRY_PATH_ID}${query}';`,
 		`import { prerenderWakeEntryPath } from '${PRERENDER_WAKE_ENTRY_PATH_ID}${query}';`,
 		`import { navigationEntryPath } from '${NAVIGATION_ENTRY_PATH_ID}${query}';`,
-		`import { documentStylesheets, routeModulePreloads, routeSsrModulePreloads, routeStylesheets } from '${ROUTE_PRELOADS_ID}${query}';`,
+		`import { documentStylesheets, routeModulePreloads, routeSsrModulePreloads, routeStylesheets, documentImportMap } from '${ROUTE_PRELOADS_ID}${query}';`,
 		`import { pageModuleLoaders, routeFileIds } from '${ROUTE_DISCOVERY_ID}${query}';`,
+		`import { documentNavigation } from '${ROUTER_OPTIONS_ID}${query}';`,
 		`const documentModuleLoaders = import.meta.glob(['/document.tsrx']);`,
 		`const entry = createServerEntry({`,
 		`  dev: import.meta.env.DEV,`,
 		`  resumeEntryPath,`,
 		`  prerenderWakeEntryPath,`,
 		`  navigationEntryPath,`,
+		`  linkPreloading: ${JSON.stringify(options.linkPreloading ?? 'render')},`,
 		`  routeModulePreloads,`,
 		`  routeSsrModulePreloads,`,
 		`  routeStylesheets,`,
 		`  documentStylesheets,`,
+		`  importMap: documentImportMap,`,
 		`  documentModuleLoader: documentModuleLoaders['/document.tsrx'],`,
+		`  documentNavigation,`,
 		`  pageModuleLoaders,`,
 		`  routeFileIds,`,
 		`});`,
@@ -798,11 +914,12 @@ function routePreloadsSource(state: RoutePreloadState, client: boolean): string 
 				`export const routeStylesheets = ${state.persisted ? 'routePreloadData.styles ?? {}' : 'undefined'};`,
 				`const documentStylesheetsJson = globalThis.__marklessRouterDocumentStylesheetsJson ?? ${JSON.stringify(DOCUMENT_STYLESHEETS_PLACEHOLDER)};`,
 				`export const documentStylesheets = documentStylesheetsJson === ${JSON.stringify(DOCUMENT_STYLESHEETS_PLACEHOLDER)} ? [] : JSON.parse(documentStylesheetsJson);`,
+				`export const documentImportMap = ${JSON.stringify(state.persisted && state.importMap ? importMapScript(state.importMap) : '')};`,
 			];
 	return [
 		`const routePreloadsJson = globalThis.__marklessRouterRoutePreloadsJson ?? ${JSON.stringify(ROUTE_PRELOADS_PLACEHOLDER)};`,
 		`let routePreloadData = routePreloadsJson === ${JSON.stringify(ROUTE_PRELOADS_PLACEHOLDER)} ? ${JSON.stringify(routes)} : JSON.parse(routePreloadsJson);`,
-		routePreloadDecoderSource,
+		routePreloadDecoderSource(client && state.chunkSpecifiers),
 		`export const routeModulePreloads = routePreloadData.navigation ?? {};`,
 		`export const routeSsrModulePreloads = routePreloadData.ssr ?? {};`,
 		...routeStylesheetExport,
@@ -830,9 +947,7 @@ function patchRoutePreloadsInBundle(
 	bundle: Record<string, unknown>,
 	routes: RoutePreloadMaps,
 ): void {
-	const replacement = jsStringLiteralContent(
-		JSON.stringify(compactRoutePreloadData(routes)),
-	);
+	const replacement = jsStringLiteralContent(JSON.stringify(compactRoutePreloadData(routes)));
 	for (const chunk of outputChunks(bundle)) {
 		if (!chunk.code?.includes(ROUTE_PRELOADS_PLACEHOLDER)) continue;
 		chunk.code = chunk.code.replace(ROUTE_PRELOADS_PLACEHOLDER, replacement);
@@ -895,6 +1010,8 @@ interface OutputChunkLike {
 	readonly fileName: string;
 	readonly imports: readonly string[];
 	readonly moduleIds?: readonly string[];
+	readonly name?: string;
+	readonly preliminaryFileName?: string;
 	readonly viteMetadata?: {
 		readonly importedCss?: ReadonlySet<string> | readonly string[];
 	};
@@ -904,12 +1021,28 @@ function routeModulePreloadsFromBundle(input: {
 	readonly base: string;
 	readonly bundle: Record<string, unknown>;
 	readonly navigationChunk: OutputChunkLike | undefined;
+	readonly navigationPolyfillIds?: ReadonlySet<string>;
+	readonly navigationOnIntent: boolean;
 	readonly prerenderWakeChunk: OutputChunkLike | undefined;
 	readonly resumeChunk: OutputChunkLike | undefined;
 	readonly root: string;
 }): RoutePreloadMaps {
-	const chunks = outputChunks(input.bundle);
-	const chunksByFileName = new Map(chunks.map((chunk) => [chunk.fileName, chunk]));
+	// The bundler packs runtime no page's payload demands into this chunk; it loads on first import().
+	const allChunks = outputChunks(input.bundle);
+	const chunks = allChunks.filter((chunk) => !isMarklessDeferredPack(chunk.name));
+	const deferredChunks = allChunks.filter((chunk) => isMarklessDeferredPack(chunk.name));
+	const everyChunk = new Map(allChunks.map((chunk) => [chunk.fileName, chunk]));
+	// With the pack planner on: each route's landing files, from its first-use closures.
+	const plannedLanding = plannedLandingFiles(input.bundle);
+	const deferredFileNames = new Set(deferredChunks.map((chunk) => chunk.fileName));
+	const resumeRuntimeFileNames = new Set<string>();
+	for (const entry of [input.resumeChunk, input.prerenderWakeChunk])
+		if (entry)
+			includeChunk(
+				resumeRuntimeFileNames,
+				{ chunks: everyChunk, everyChunk },
+				entry.fileName,
+			);
 	const routeChunks = new Map<string, OutputChunkLike[]>();
 	const routeChunkFileNames = new Set<string>();
 	for (const chunk of chunks) {
@@ -922,50 +1055,103 @@ function routeModulePreloadsFromBundle(input: {
 	}
 
 	const symbolChunks = symbolChunksBySourceFile(chunks);
+	// Loaded at runtime only where window.navigation is missing, so no plan names it.
+	const polyfillFileNames = new Set(
+		chunks
+			.filter(
+				(chunk) =>
+					chunk.facadeModuleId && input.navigationPolyfillIds?.has(chunk.facadeModuleId),
+			)
+			.map((chunk) => chunk.fileName),
+	);
 	const navigation: Record<string, readonly string[]> = {};
 	const ssr: Record<string, readonly string[]> = {};
 	const styles: Record<string, readonly string[]> = {};
 	for (const [routeFile, routeFileChunks] of routeChunks) {
+		const currentRouteFiles = new Set(routeFileChunks.map((chunk) => chunk.fileName));
+		const chunksByFileName = new Map(
+			chunks
+				.filter(
+					(chunk) =>
+						!routeChunkFileNames.has(chunk.fileName) ||
+						currentRouteFiles.has(chunk.fileName),
+				)
+				.map((chunk) => [chunk.fileName, chunk]),
+		);
+		const scope: ChunkScope = { chunks: chunksByFileName, everyChunk };
+		// A landing page does not preload navigation-only packs unless landing code statically imports them.
+		const landingScope: ChunkScope = {
+			chunks: new Map(
+				[...chunksByFileName].filter(([, chunk]) => !isMarklessNavigationPack(chunk.name)),
+			),
+			everyChunk,
+		};
 		const routeChunk = primaryRouteChunk(input.root, routeFile, routeFileChunks);
+		const landingChunks = routeFileChunks.filter(
+			(chunk) =>
+				!isMarklessNavigationPack(chunk.name) &&
+				!isNavigationOnlyRouteChunk(input.root, routeFile, chunk),
+		);
+		const landingChunk = landingChunks.length
+			? primaryRouteChunk(input.root, routeFile, landingChunks)
+			: routeChunk;
 		const navigationFileNames = new Set<string>();
 		if (input.navigationChunk) {
-			includeChunk(navigationFileNames, chunksByFileName, input.navigationChunk.fileName);
+			includeChunk(navigationFileNames, scope, input.navigationChunk.fileName);
+			// Client rendering imports its evaluator on every navigation; unplanned, it trails by two round trips.
+			const renderPathChunks = new Map(chunksByFileName);
+			for (const chunk of deferredChunks) renderPathChunks.set(chunk.fileName, chunk);
+			const renderPath = new Set<string>();
 			for (const fileName of input.navigationChunk.dynamicImports) {
-				if (!routeChunkFileNames.has(fileName)) {
-					includeChunk(navigationFileNames, chunksByFileName, fileName);
+				if (!routeChunkFileNames.has(fileName) && !polyfillFileNames.has(fileName)) {
+					includeChunk(renderPath, scope, fileName, true);
 				}
 			}
+			for (const fileName of renderPath) {
+				navigationFileNames.add(fileName);
+				// The resume runtime loads its deferred capabilities on demand, on every page alike.
+				if (resumeRuntimeFileNames.has(fileName)) continue;
+				const chunk = everyChunk.get(fileName)!;
+				for (const target of [...chunk.dynamicImports, ...codeDynamicImports(chunk)])
+					if (deferredFileNames.has(target))
+						includeChunk(
+							navigationFileNames,
+							{ chunks: renderPathChunks, everyChunk },
+							target,
+							true,
+						);
+			}
 		}
-		includeChunk(navigationFileNames, chunksByFileName, routeChunk.fileName);
-		includeChunk(navigationFileNames, chunksByFileName, routeChunk.fileName, true);
+		includeChunk(navigationFileNames, scope, routeChunk.fileName);
+		includeChunk(navigationFileNames, scope, routeChunk.fileName, true);
 		if (input.navigationChunk) {
 			for (const fileName of routeScopedDynamicImports(input.navigationChunk, routeFile)) {
-				includeChunk(navigationFileNames, chunksByFileName, fileName, true);
+				includeChunk(navigationFileNames, scope, fileName, true);
 			}
 		}
 
 		const ssrFileNames = new Set<string>();
 		if (input.resumeChunk) {
-			includeChunk(ssrFileNames, chunksByFileName, input.resumeChunk.fileName);
+			includeChunk(ssrFileNames, landingScope, input.resumeChunk.fileName);
 			// The resume entry dynamically imports every route's resume module, so
 			// only walk the CURRENT route's resume module (plus its full static and
 			// dynamic closure); other routes' resume modules must stay excluded.
 			// Missing this walk makes the first interaction pay a serial waterfall
 			// fetch on slow networks (the preload-strategy box catches this).
 			for (const fileName of routeScopedDynamicImports(input.resumeChunk, routeFile)) {
-				includeChunk(ssrFileNames, chunksByFileName, fileName, true);
+				includeChunk(ssrFileNames, landingScope, fileName, true);
 			}
 		}
 		// Empty-delta pages boot through the prerender-wake entry instead of the
 		// resume module; its route-scoped closure obeys the same preload law —
 		// the first interaction must fetch ZERO framework chunks.
 		if (input.prerenderWakeChunk) {
-			includeChunk(ssrFileNames, chunksByFileName, input.prerenderWakeChunk.fileName);
+			includeChunk(ssrFileNames, landingScope, input.prerenderWakeChunk.fileName);
 			for (const fileName of routeScopedDynamicImports(input.prerenderWakeChunk, routeFile)) {
-				includeChunk(ssrFileNames, chunksByFileName, fileName, true);
+				includeChunk(ssrFileNames, landingScope, fileName, true);
 			}
 		}
-		includeChunk(ssrFileNames, chunksByFileName, routeChunk.fileName, true);
+		includeChunk(ssrFileNames, landingScope, landingChunk.fileName, true);
 
 		// Symbol modules (event handlers, attach behaviors, async runs) are
 		// demanded through the symbol resolver's computed import table, so the
@@ -983,28 +1169,35 @@ function routeModulePreloadsFromBundle(input: {
 		for (const [sourceFile, symbolFileNames] of symbolChunks) {
 			if (!routeSourceFiles.has(sourceFile)) continue;
 			for (const fileName of symbolFileNames) {
-				includeChunk(navigationFileNames, chunksByFileName, fileName, true);
-				includeChunk(ssrFileNames, chunksByFileName, fileName, true);
+				includeChunk(navigationFileNames, scope, fileName, true);
+				includeChunk(ssrFileNames, landingScope, fileName, true);
 			}
 		}
 
 		// Snapshot before the navigation-entry additions below: those reach
 		// foreign routes' edges, and a page must link only its own CSS.
 		const styleFileNames = new Set([...navigationFileNames, ...ssrFileNames]);
+		const planned = plannedLanding?.get(routeFile);
+		if (planned) narrowToPlanned(ssrFileNames, planned, landingScope, [
+			input.resumeChunk,
+			input.prerenderWakeChunk,
+		]);
 
 		// The served page never names the navigation entry, so a first navigation
 		// starts its fetch only once the reader clicks — a second waterfall hop
 		// after the page has finished loading. Preload the entry, and the demand
-		// edges of it that cost nothing but themselves.
-		if (input.navigationChunk) {
-			includeChunk(ssrFileNames, chunksByFileName, input.navigationChunk.fileName);
+		// edges of it that cost nothing but themselves — unless link intent
+		// fetches them before the click.
+		if (input.navigationChunk && !input.navigationOnIntent) {
+			includeChunk(ssrFileNames, scope, input.navigationChunk.fileName);
 			for (const fileName of navigationEdgesWorthPreloading(
 				input.navigationChunk,
-				chunksByFileName,
+				scope,
 				ssrFileNames,
 				routeChunkFileNames,
+				polyfillFileNames,
 			)) {
-				includeChunk(ssrFileNames, chunksByFileName, fileName);
+				includeChunk(ssrFileNames, scope, fileName);
 			}
 		}
 
@@ -1034,19 +1227,26 @@ function routeModulePreloadsFromBundle(input: {
 //     on demand while thin render-path adapters ride along.
 function navigationEdgesWorthPreloading(
 	navigationChunk: OutputChunkLike,
-	chunksByFileName: ReadonlyMap<string, OutputChunkLike>,
+	scope: ChunkScope,
 	planned: ReadonlySet<string>,
 	routeChunkFileNames: ReadonlySet<string>,
+	polyfillFileNames: ReadonlySet<string>,
 ): string[] {
 	const budget = renderedByteLength(navigationChunk);
 	if (budget === 0) return [];
 	const edges: string[] = [];
 	for (const fileName of navigationChunk.dynamicImports) {
-		const edge = chunksByFileName.get(fileName);
-		if (!edge || planned.has(fileName) || routeChunkFileNames.has(fileName)) continue;
+		const edge = scope.chunks.get(fileName);
+		if (
+			!edge ||
+			planned.has(fileName) ||
+			routeChunkFileNames.has(fileName) ||
+			polyfillFileNames.has(fileName)
+		)
+			continue;
 		if (renderedByteLength(edge) >= budget) continue;
 		const closure = new Set<string>();
-		includeChunk(closure, chunksByFileName, fileName);
+		includeChunk(closure, scope, fileName);
 		closure.delete(fileName);
 		if ([...closure].every((name) => planned.has(name))) edges.push(fileName);
 	}
@@ -1098,7 +1298,11 @@ function symbolChunksBySourceFile(
 ): Map<string, readonly string[]> {
 	const bySourceFile = new Map<string, string[]>();
 	for (const chunk of chunks) {
-		for (const moduleId of chunk.moduleIds ?? []) {
+		// A facade chunk holds no module of its own; its symbol id lives only in facadeModuleId.
+		const moduleIds = chunk.facadeModuleId
+			? [...(chunk.moduleIds ?? []), chunk.facadeModuleId]
+			: (chunk.moduleIds ?? []);
+		for (const moduleId of moduleIds) {
 			const sourceFile = symbolVirtualModuleSourceFile(moduleId);
 			if (!sourceFile) continue;
 			const key = sourceModulePathname(sourceFile);
@@ -1132,34 +1336,52 @@ function sourceModulePathname(moduleId: string): string {
 	return decodePath(parseURL(moduleId).pathname);
 }
 
+// `chunks` bounds where a walk may start and which dynamic edges it follows; a static
+// import runs with its importer, so static edges resolve against `everyChunk`.
+interface ChunkScope {
+	readonly chunks: ReadonlyMap<string, OutputChunkLike>;
+	readonly everyChunk: ReadonlyMap<string, OutputChunkLike>;
+}
+
 function includeChunk(
 	fileNames: Set<string>,
-	chunksByFileName: ReadonlyMap<string, OutputChunkLike>,
+	scope: ChunkScope,
 	fileName: string,
 	includeDynamic = false,
-	visitedDynamic: Set<string> = new Set(),
+	visited: Set<string> = new Set(),
+	requiredByStaticImport = false,
 ): void {
-	if (!fileNames.has(fileName)) fileNames.add(fileName);
-	const chunk = chunksByFileName.get(fileName);
+	if (visited.has(fileName)) return;
+	const chunk = (requiredByStaticImport ? scope.everyChunk : scope.chunks).get(fileName);
 	if (!chunk) return;
-	for (const imported of chunk.imports) {
-		includeChunk(fileNames, chunksByFileName, imported, includeDynamic, visitedDynamic);
+	visited.add(fileName);
+	fileNames.add(fileName);
+	for (const imported of new Set([...chunk.imports, ...codeStaticImports(chunk)])) {
+		includeChunk(fileNames, scope, imported, includeDynamic, visited, true);
 	}
-	for (const imported of codeStaticImports(chunk)) {
-		if (!chunksByFileName.has(imported)) continue;
-		includeChunk(fileNames, chunksByFileName, imported, includeDynamic, visitedDynamic);
-	}
-	if (!includeDynamic || visitedDynamic.has(fileName)) {
+	if (!includeDynamic) {
 		return;
 	}
-	visitedDynamic.add(fileName);
-	for (const imported of chunk.dynamicImports) {
-		includeChunk(fileNames, chunksByFileName, imported, true, visitedDynamic);
+	for (const imported of new Set([...chunk.dynamicImports, ...codeDynamicImports(chunk)])) {
+		includeChunk(fileNames, scope, imported, true, visited);
 	}
-	for (const imported of codeDynamicImports(chunk)) {
-		if (!chunksByFileName.has(imported)) continue;
-		includeChunk(fileNames, chunksByFileName, imported, true, visitedDynamic);
-	}
+}
+
+// Keeps the boot entries, the planned files, and what either statically imports; a dynamic
+// edge into code no first use on this route needs is left to load on demand.
+function narrowToPlanned(
+	fileNames: Set<string>,
+	planned: ReadonlySet<string>,
+	scope: ChunkScope,
+	entries: ReadonlyArray<OutputChunkLike | undefined>,
+): void {
+	const kept = new Set<string>();
+	for (const entry of entries) if (entry) includeChunk(kept, scope, entry.fileName);
+	for (const fileName of fileNames)
+		if (planned.has(fileName)) includeChunk(kept, scope, fileName, false, new Set(), true);
+	const ordered = [...fileNames].filter((fileName) => kept.has(fileName));
+	fileNames.clear();
+	for (const fileName of [...ordered, ...kept]) fileNames.add(fileName);
 }
 
 function routeScopedDynamicImports(chunk: OutputChunkLike, routeFile: string): string[] {
@@ -1184,16 +1406,39 @@ function routeScopedDynamicImports(chunk: OutputChunkLike, routeFile: string): s
 }
 
 function codeStaticImports(chunk: OutputChunkLike): string[] {
-	return codeImportSpecifiers(
-		chunk,
-		/(?:import\s*(?:[^('"`]*?\bfrom\s*)?|export\s*[^('"`]*?\bfrom\s*)["'](\.\/[^"']+\.js)["']/g,
-	);
+	return cachedCodeImports(chunk).static;
 }
 
 function codeDynamicImports(chunk: OutputChunkLike): string[] {
-	return codeDynamicImportSpecifiers(chunk.code ?? '').map((specifier) =>
-		normalize(join(dirname(chunk.fileName), specifier)),
-	);
+	return cachedCodeImports(chunk).dynamic;
+}
+
+const chunkCodeImports = new WeakMap<
+	OutputChunkLike,
+	{
+		code: string | undefined;
+		fileName: string;
+		static: string[];
+		dynamic: string[];
+	}
+>();
+
+function cachedCodeImports(chunk: OutputChunkLike) {
+	const cached = chunkCodeImports.get(chunk);
+	if (cached?.code === chunk.code && cached?.fileName === chunk.fileName) return cached;
+	const imports = {
+		code: chunk.code,
+		fileName: chunk.fileName,
+		static: codeImportSpecifiers(
+			chunk,
+			/(?:import\s*(?:[^('"`]*?\bfrom\s*)?|export\s*[^('"`]*?\bfrom\s*)["'](\.\/[^"']+\.js)["']/g,
+		),
+		dynamic: codeDynamicImportSpecifiers(chunk.code ?? '').map((specifier) =>
+			normalize(join(dirname(chunk.fileName), specifier)),
+		),
+	};
+	chunkCodeImports.set(chunk, imports);
+	return imports;
 }
 
 function codeDynamicImportSpecifiers(code: string): string[] {
@@ -1213,6 +1458,21 @@ function codeImportSpecifiers(chunk: OutputChunkLike, pattern: RegExp): string[]
 		if (specifier) imports.add(normalize(join(dirname(chunk.fileName), specifier)));
 	}
 	return [...imports];
+}
+
+function chunkRenamesSince(
+	captured: ReadonlyMap<string, string | undefined>,
+	bundle: Record<string, unknown>,
+): Map<string, string> {
+	const finalNames = new Map(
+		outputChunks(bundle).map((chunk) => [chunk.preliminaryFileName, chunk.fileName]),
+	);
+	const renames = new Map<string, string>();
+	for (const [fileName, preliminary] of captured) {
+		const next = preliminary === undefined ? undefined : finalNames.get(preliminary);
+		if (next !== undefined && next !== fileName) renames.set(fileName, next);
+	}
+	return renames;
 }
 
 function outputChunks(bundle: Record<string, unknown>): OutputChunkLike[] {
@@ -1244,10 +1504,26 @@ function primaryRouteChunk(
 	const candidates = ranked.filter(({ rank }) => rank === highestRank);
 	if (candidates.length !== 1) {
 		throw new Error(
-			`Markless Router found ambiguous primary chunks for ${routeFile}: ${candidates.map(({ chunk }) => chunk.fileName).sort().join(', ')}`,
+			`Markless Router found ambiguous primary chunks for ${routeFile}: ${candidates
+				.map(({ chunk }) => chunk.fileName)
+				.sort()
+				.join(', ')}`,
 		);
 	}
 	return candidates[0]!.chunk;
+}
+
+// Holds nothing of its route but code only a client navigation to it runs.
+function isNavigationOnlyRouteChunk(
+	root: string,
+	routeFile: string,
+	chunk: OutputChunkLike,
+): boolean {
+	const owned = [chunk.facadeModuleId, ...(chunk.moduleIds ?? [])].filter(
+		(moduleId): moduleId is string =>
+			!!moduleId && routeFileForModuleId(root, moduleId) === routeFile,
+	);
+	return owned.length > 0 && owned.every(isRouteNavigationSourceRequest);
 }
 
 function routeChunkRank(root: string, routeFile: string, chunk: OutputChunkLike): number {
@@ -1291,4 +1567,8 @@ function virtualModuleBaseId(id: string): string {
 function configRoot(config: EnvironmentOptions): string {
 	const root = (config as { readonly root?: unknown }).root;
 	return typeof root === 'string' ? root : '.';
+}
+
+function escapeRegExp(value: string): string {
+	return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

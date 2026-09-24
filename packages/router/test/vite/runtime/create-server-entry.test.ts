@@ -392,6 +392,190 @@ describe('server entry rendering', () => {
 		expect(html).toContain("location.hash.startsWith('#/')");
 	});
 
+	it('bridge client-navigates a document-rendered Link outside the page container', async () => {
+		const entry = createServerEntry({
+			navigationEntryPath: '/build/navigation.js',
+			linkPreloading: 'intent',
+			routeModulePreloads: { 'pages/about.tsrx': ['/build/about.js'] },
+			documentModuleLoader: async () => ({
+				default: {
+					renderSsr(props: { readonly children?: __MarklessTypeService.Child }) {
+						return {
+							html: `<head></head><body><nav><a href="/about" data-markless-router-link>About</a></nav>${String(props.children ?? '')}</body>`,
+						};
+					},
+				},
+			}),
+			pageModuleLoaders: {
+				'pages/index.tsrx': async () => ({
+					default: page(
+						'<main><a href="/about" data-markless-router-link>Also about</a></main>',
+					),
+				}),
+				'pages/about.tsrx': async () => ({ default: page('<main>About</main>') }),
+			},
+			routeFileIds: ['/pages/index.tsrx', '/pages/about.tsrx'],
+		});
+		const html = await (await entry.fetch(new Request('http://markless-router.test/'))).text();
+		const bridge = /<script data-markless-router-link-resumer>([\s\S]*?)<\/script>/.exec(
+			html,
+		)?.[1];
+		expect(bridge).toBeDefined();
+
+		class FakeElement {
+			parentElement: FakeElement | null = null;
+			readonly attributes: Record<string, string>;
+			constructor(attributes: Record<string, string> = {}) {
+				this.attributes = attributes;
+			}
+			get href() {
+				return new URL(this.attributes.href ?? '', 'http://markless-router.test/').href;
+			}
+			get target() {
+				return this.attributes.target ?? '';
+			}
+			get relList() {
+				return {
+					contains: (value: string) =>
+						(this.attributes.rel ?? '').split(' ').includes(value),
+				};
+			}
+			get ownerDocument() {
+				return {
+					baseURI: 'http://markless-router.test/',
+					URL: 'http://markless-router.test/',
+				};
+			}
+			hasAttribute(name: string) {
+				return name in this.attributes;
+			}
+			getAttribute(name: string) {
+				return this.attributes[name] ?? null;
+			}
+			closest(selector: string): FakeElement | null {
+				if (selector === 'a[href]' && 'href' in this.attributes) return this;
+				if (
+					selector === '[data-async-container]' &&
+					'data-async-container' in this.attributes
+				)
+					return this;
+				return this.parentElement?.closest(selector) ?? null;
+			}
+		}
+		const container = new FakeElement({ 'data-async-container': '' });
+		const containerListeners = new Map<string, unknown>();
+		Object.assign(container, {
+			addEventListener: (name: string, listener: unknown) =>
+				containerListeners.set(name, listener),
+		});
+		const nav = new FakeElement();
+		const documentLink = new FakeElement({ href: '/about', 'data-markless-router-link': '' });
+		documentLink.parentElement = nav;
+		const script = new FakeElement();
+		script.parentElement = container;
+		const documentListeners = new Map<string, (event: unknown) => unknown>();
+		const preloads: string[] = [];
+		const fakeDocument = {
+			currentScript: script,
+			head: {
+				appendChild: (link: { href: string }) => preloads.push(link.href),
+			},
+			baseURI: 'http://markless-router.test/',
+			querySelectorAll: () => [],
+			createElement: () => ({}),
+			addEventListener: (name: string, listener: (event: unknown) => unknown) =>
+				documentListeners.set(name, listener),
+		};
+		const assigned: string[] = [];
+		const scope = globalThis as Record<string, unknown>;
+		const previous = {
+			document: scope.document,
+			location: scope.location,
+			Element: scope.Element,
+		};
+		scope.document = fakeDocument;
+		scope.location = {
+			href: 'http://markless-router.test/',
+			origin: 'http://markless-router.test',
+			hash: '',
+			assign: (href: string) => assigned.push(href),
+		};
+		scope.Element = FakeElement;
+		scope.__bridgeWindowMarker = 'kept';
+		try {
+			const imported: string[] = [];
+			const navigations: unknown[] = [];
+			// A Function body has no module loader, so the bridge's dynamic import is handed in.
+			new Function('importNavigation', bridge!.replaceAll('import(', 'importNavigation('))(
+				async (path: string) => {
+					imported.push(path);
+					return {
+						navigateMarklessRouterLink: (options: unknown) => navigations.push(options),
+					};
+				},
+			);
+			expect(containerListeners.size).toBe(0);
+			const click = (target: FakeElement, init: Record<string, unknown> = {}) => {
+				let prevented = false;
+				const event = {
+					button: 0,
+					defaultPrevented: false,
+					composedPath: () => [target],
+					target,
+					preventDefault: () => {
+						prevented = true;
+					},
+					...init,
+				};
+				return Promise.resolve(documentListeners.get('click')?.(event)).then(
+					() => prevented,
+				);
+			};
+
+			documentListeners.get('pointerover')?.({
+				defaultPrevented: false,
+				composedPath: () => [documentLink],
+				target: documentLink,
+			});
+			expect(preloads).toEqual(['/build/about.js']);
+
+			expect(await click(documentLink, { metaKey: true })).toBe(false);
+			expect(
+				await click(
+					new FakeElement({
+						href: '/about',
+						target: '_blank',
+						'data-markless-router-link': '',
+					}),
+				),
+			).toBe(false);
+			expect(await click(new FakeElement({ href: '/about' }))).toBe(false);
+			expect(
+				await click(
+					new FakeElement({
+						href: 'https://elsewhere.test/',
+						'data-markless-router-link': '',
+					}),
+				),
+			).toBe(false);
+			expect(await click(documentLink, { defaultPrevented: true })).toBe(false);
+			expect(navigations).toEqual([]);
+
+			expect(await click(documentLink)).toBe(true);
+			expect(imported).toEqual(['/build/navigation.js']);
+			expect(navigations).toEqual([
+				{ href: 'http://markless-router.test/about', replace: false, scroll: undefined },
+			]);
+			expect(assigned).toEqual([]);
+			expect(scope.__bridgeWindowMarker).toBe('kept');
+		} finally {
+			scope.document = previous.document;
+			scope.location = previous.location;
+			scope.Element = previous.Element;
+			delete scope.__bridgeWindowMarker;
+		}
+	});
+
 	it('emits exact route modulepreloads for visible Link targets', async () => {
 		const entry = createServerEntry({
 			navigationEntryPath: '/build/navigation.js',

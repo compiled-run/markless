@@ -6,6 +6,7 @@ import type {
 	PublicRenderPlanAsyncBoundaryArms,
 	PublicRenderPlanBranchArms,
 	LoweredElementHandleRead,
+	LoweredRowItem,
 	LoweredStateRead,
 	LoweredStateWrite,
 	PlannedSymbol,
@@ -34,6 +35,7 @@ import {
 } from './arm-child-content.ts';
 import { asNodes, isNode, type AnyNode } from '../ast/nodes.ts';
 import { parseJavaScriptModule } from '../js-ast.ts';
+import { asyncComputedReadPath } from '../artifact-helpers/graph-paths.ts';
 import { moduleIdOf } from '../module-id.ts';
 import {
 	bindingOrigins,
@@ -45,7 +47,7 @@ import {
 	type ForeignScopeRefusal,
 } from './foreign-scope.ts';
 import { isClassInstanceValue } from './semantic-graph/collect-state.ts';
-import { ownedModuleAstOrNull } from './semantic-graph/shared-ast.ts';
+import { createSourceMemo, ownedModuleAstOrNull } from './semantic-graph/shared-ast.ts';
 import { valueModuleImports } from './semantic-graph/imports.ts';
 import {
 	arrayNode,
@@ -243,6 +245,7 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 
 	const foreignScope = foreignFactoryScopeCarry(input, emittedModules, captureSlotsBySymbol);
 	const modules = foreignScope.modules;
+	const refusedRowItemNames = readOnlyRowWriteNames(input.semanticGraph);
 
 	return {
 		passId: 'symbol-modules',
@@ -270,9 +273,29 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 						(moduleImport) => moduleImport.localName,
 					),
 				),
-			).map(unresolvedGraphReferenceDiagnostic),
+			)
+				.filter(
+					(reference) =>
+						!(reference.rowLocal === true && refusedRowItemNames.has(reference.name)),
+				)
+				.map(unresolvedGraphReferenceDiagnostic),
 		],
 	};
+}
+
+// State lowering already refused these writes by name, so the free row item they leave is not reported twice.
+function readOnlyRowWriteNames(graph: SemanticGraphArtifact | undefined): ReadonlySet<string> {
+	const names = new Set<string>();
+	for (const write of graph?.stateWrites ?? []) {
+		const repeat = write.rowRepeatId
+			? graph?.keyedRepeats.find((candidate) => candidate.id === write.rowRepeatId)
+			: undefined;
+		const binding = repeat?.collectionGraphNodeId
+			? graph?.graphBindings.find((candidate) => candidate.id === repeat.collectionGraphNodeId)
+			: undefined;
+		if (repeat && binding && !binding.writable) names.add(repeat.itemName);
+	}
+	return names;
 }
 
 // ---------------------------------------------------------------------------
@@ -461,8 +484,16 @@ function printedModuleAst(emitted: GeneratedSymbolModule): AnyNode | null {
 	return ownedModuleAstOrNull(emitted, emitted.source, 'generated.js');
 }
 
+const moduleScopeInstanceNamesMemo = createSourceMemo<ReadonlyArray<string>>(2048);
+
 /** Module-scope bindings this emitted module initializes with a class instance. */
 function moduleScopeInstanceNames(emitted: GeneratedSymbolModule): ReadonlyArray<string> {
+	return moduleScopeInstanceNamesMemo('', emitted.source, () =>
+		collectModuleScopeInstanceNames(emitted),
+	);
+}
+
+function collectModuleScopeInstanceNames(emitted: GeneratedSymbolModule): ReadonlyArray<string> {
 	// A module the compiler just printed and cannot reparse is a different
 	// defect; it is not evidence that this one is absent, so claim nothing.
 	const ast = printedModuleAst(emitted);
@@ -882,7 +913,13 @@ function identifierRootNames(valueSource: string): ReadonlySet<string> {
  * that throw as "nothing to report" took this whole check out for exactly the
  * modules an inlined method could break.
  */
+const freeIdentifierNamesMemo = createSourceMemo<ReadonlySet<string>>(2048);
+
 function freeIdentifierNames(emitted: GeneratedSymbolModule): ReadonlySet<string> {
+	return freeIdentifierNamesMemo('', emitted.source, () => collectFreeIdentifierNames(emitted));
+}
+
+function collectFreeIdentifierNames(emitted: GeneratedSymbolModule): ReadonlySet<string> {
 	let ast = printedModuleAst(emitted);
 	if (!ast) {
 		try {
@@ -1260,8 +1297,6 @@ function sourceModuleScopeLines(source: SymbolModulesInput['source']): string[] 
 	}
 }
 
-// A bare read of an async computed lands on the snapshot root, not the awaited
-// result; lower it the way the view-record producer already does.
 function asyncComputedGraphNodeIds(
 	semanticGraph: SymbolModulesInput['semanticGraph'],
 ): ReadonlySet<string> {
@@ -1277,7 +1312,7 @@ function armPartReadPath(
 	path: ReadonlyArray<string>,
 	asyncComputedNodeIds: ReadonlySet<string>,
 ): ReadonlyArray<string> {
-	return path.length === 0 && asyncComputedNodeIds.has(graphNodeId) ? ['value'] : path;
+	return asyncComputedNodeIds.has(graphNodeId) ? asyncComputedReadPath(path) : path;
 }
 
 // The first refusal recorded for a branch is the one its diagnostic reports.
@@ -1509,7 +1544,14 @@ function renderChunkParts(
 					}
 				}
 				parts.push({ repeat: {
-					read: { graphNodeId: repeat.collectionGraphNodeId, path: repeat.collectionPath },
+					read: {
+						graphNodeId: repeat.collectionGraphNodeId,
+						path: armPartReadPath(
+							repeat.collectionGraphNodeId,
+							repeat.collectionPath,
+							asyncComputedNodeIds,
+						),
+					},
 					rowParts,
 				} });
 				continue;
@@ -1528,6 +1570,33 @@ function renderChunkParts(
 				parts.push({ read: {
 					graphNodeId: protocolElementHandleReadId(slot.residue.handleGraphNodeId),
 					path: [],
+				} });
+				continue;
+			}
+			if (
+				context.inline &&
+				slot.kind === 'attribute' &&
+				slot.residue.kind === 'graph-read' &&
+				!slot.directClassMatch &&
+				!child?.imported
+			) {
+				const scoped = scopedPropPart(scope, slot.residue.graphNodeId, slot.residue.path);
+				if (scoped !== null && (scoped === 'unsupported' || !('read' in scoped)))
+					return refuse('an attribute it sets comes from a prop the flip cannot recompute');
+				const read = scoped ?? {
+					read: {
+						graphNodeId: slot.residue.graphNodeId,
+						path: armPartReadPath(
+							slot.residue.graphNodeId,
+							slot.residue.path,
+							asyncComputedNodeIds,
+						),
+					},
+				};
+				parts.push({ attribute: {
+					name: slot.name,
+					read: read.read,
+					...(slot.alwaysPresent ? { alwaysPresent: true as const } : {}),
 				} });
 				continue;
 			}
@@ -2892,14 +2961,10 @@ function referencedModuleDeclarations(
 	filename: string,
 ): string[] {
 	const references = new Set(seedReferences);
-	const remaining = declarations.map((declaration) => {
-		const parsed = parseEmissionSource(declaration, filename, 'ts').program as unknown as AnyNode;
-		return {
-			declaration,
-			names: declaredStatementNames(parsed),
-			references: referencedIdentifierNames(parsed),
-		};
-	});
+	const remaining = declarations.map((declaration) => ({
+		declaration,
+		...moduleDeclarationNames(declaration, filename),
+	}));
 
 	const selected: string[] = [];
 	let changed = true;
@@ -2918,10 +2983,34 @@ function referencedModuleDeclarations(
 	return selected;
 }
 
-function initializerReferencedNames(initializerSource: string, filename: string): Set<string> {
-	const parsed = parseEmissionSource(`(${initializerSource});`, filename, 'ts')
-		.program as unknown as AnyNode;
-	return referencedIdentifierNames(parsed);
+const moduleDeclarationNamesMemo = createSourceMemo<{
+	readonly names: ReadonlyArray<string>;
+	readonly references: ReadonlySet<string>;
+}>(2048);
+
+function moduleDeclarationNames(declaration: string, filename: string) {
+	return moduleDeclarationNamesMemo(filename, declaration, () => {
+		const parsed = parseEmissionSource(declaration, filename, 'ts')
+			.program as unknown as AnyNode;
+		return {
+			names: declaredStatementNames(parsed),
+			references: referencedIdentifierNames(parsed),
+		};
+	});
+}
+
+const initializerReferencedNamesMemo = createSourceMemo<ReadonlySet<string>>(2048);
+
+function initializerReferencedNames(
+	initializerSource: string,
+	filename: string,
+): ReadonlySet<string> {
+	return initializerReferencedNamesMemo(filename, initializerSource, () =>
+		referencedIdentifierNames(
+			parseEmissionSource(`(${initializerSource});`, filename, 'ts')
+				.program as unknown as AnyNode,
+		),
+	);
 }
 
 /**
@@ -2955,12 +3044,11 @@ function splicedSourceReferencedNames(
 function declaredStatementNames(program: AnyNode): string[] {
 	return asNodes(program.body).flatMap((statement) => {
 		if (statement.type === 'VariableDeclaration') {
-			return asNodes(statement.declarations).flatMap((declarator) => {
-				const id = declarator.id;
-				return isNode(id) && id.type === 'Identifier' && typeof id.name === 'string'
-					? [id.name]
-					: [];
-			});
+			const names = new Set<string>();
+			for (const declarator of asNodes(statement.declarations)) {
+				collectPatternNames(declarator.id, names);
+			}
+			return [...names];
 		}
 		const id = statement.id;
 		return isNode(id) && id.type === 'Identifier' && typeof id.name === 'string' ? [id.name] : [];
@@ -4059,8 +4147,18 @@ export function buildBranchUpdateEmission(input: BranchUpdateEmissionInput): Emi
 	// Arm-scoped flips may carry repeat parts: rows rebuild from a live graph
 	// read of the collection at flip time (still no component execution).
 	const hasRepeatParts = arms.arms.some((arm) => arm.some((part) => 'repeat' in part));
+	const hasAttributeParts = arms.arms.some((arm) => arm.some((part) => 'attribute' in part));
 
 	const body: EmissionNode[] = [
+		...(hasAttributeParts
+			? [
+					moduleImportNode({
+						kind: 'named',
+						localName: 'marklessAttributeHtml',
+						source: '@markless/web/fns/attribute-html',
+					}),
+				]
+			: []),
 		constDeclarationNode('marklessBranchArms', jsonValueNode(arms.arms)),
 		...(arms.armTests ? [switchArmSelectorFunctionNode()] : []),
 		exportNamedDeclarationNode(
@@ -4084,7 +4182,7 @@ export function buildBranchUpdateEmission(input: BranchUpdateEmissionInput): Emi
 				),
 				constDeclarationNode(
 					'html',
-					armPartsHtmlExpression('marklessBranchText', hasRepeatParts),
+					armPartsHtmlExpression('marklessBranchText', hasRepeatParts, hasAttributeParts),
 				),
 				returnStatementNode(
 					objectNode([
@@ -4139,6 +4237,7 @@ export function buildAsyncBoundaryUpdateEmission(
 		symbolId: input.symbol.id,
 	};
 
+	const hasRepeatParts = input.arms.arms.some((arm) => arm.some((part) => 'repeat' in part));
 	const body: EmissionNode[] = [
 		constDeclarationNode('marklessBoundaryArms', jsonValueNode(input.arms.arms)),
 		exportNamedDeclarationNode(
@@ -4160,13 +4259,17 @@ export function buildAsyncBoundaryUpdateEmission(
 						arrayNode([]),
 					),
 				),
-				constDeclarationNode('html', armPartsHtmlExpression('marklessBoundaryText', false)),
+				constDeclarationNode(
+					'html',
+					armPartsHtmlExpression('marklessBoundaryText', hasRepeatParts),
+				),
 				returnStatementNode(
 					objectNode([shorthandPropertyNode('arm'), shorthandPropertyNode('html')]),
 				),
 			]),
 		),
 		armTextEscaperFunctionNode('marklessBoundaryText'),
+		...(hasRepeatParts ? [branchRowsFunctionNode('marklessBoundaryText')] : []),
 	];
 
 	return {
@@ -4193,7 +4296,11 @@ export function emitAsyncBoundaryUpdateModuleNodes(
  * paths are already character-identical apart from the escaper name; a shared
  * builder means a future change cannot drift them apart silently.
  */
-function armPartsHtmlExpression(escaperName: string, hasRepeatParts: boolean): EmissionNode {
+function armPartsHtmlExpression(
+	escaperName: string,
+	hasRepeatParts: boolean,
+	hasAttributeParts = false,
+): EmissionNode {
 	const escapedRead = callNode(identifierNode(escaperName), [
 		callNode(memberChainNode('context.graph.read'), [
 			memberChainNode('part.read.graphNodeId'),
@@ -4201,7 +4308,7 @@ function armPartsHtmlExpression(escaperName: string, hasRepeatParts: boolean): E
 		]),
 	]);
 
-	const nonTextPart = hasRepeatParts
+	const readOrRows = hasRepeatParts
 		? conditionalNode(
 				binaryNode('!==', memberChainNode('part.repeat'), identifierNode('undefined')),
 				callNode(identifierNode('marklessBranchRows'), [
@@ -4211,6 +4318,21 @@ function armPartsHtmlExpression(escaperName: string, hasRepeatParts: boolean): E
 				escapedRead,
 			)
 		: escapedRead;
+
+	const nonTextPart = hasAttributeParts
+		? conditionalNode(
+				binaryNode('!==', memberChainNode('part.attribute'), identifierNode('undefined')),
+				callNode(identifierNode('marklessAttributeHtml'), [
+					memberChainNode('part.attribute.name'),
+					callNode(memberChainNode('context.graph.read'), [
+						memberChainNode('part.attribute.read.graphNodeId'),
+						memberChainNode('part.attribute.read.path'),
+					]),
+					memberChainNode('part.attribute.alwaysPresent'),
+				]),
+				readOrRows,
+			)
+		: readOrRows;
 
 	return callNode(
 		memberNode(
@@ -4306,13 +4428,13 @@ function switchArmSelectorFunctionNode(): EmissionNode {
  * against the row's own item, or a graph read. The walk is a `reduce` that
  * short-circuits on a nullish intermediate, exactly as the text path writes it.
  */
-function branchRowsFunctionNode(): EmissionNode {
+function branchRowsFunctionNode(escaperName = 'marklessBranchText'): EmissionNode {
 	const rowExpression = conditionalNode(
 		binaryNode('!==', memberChainNode('row.text'), identifierNode('undefined')),
 		memberChainNode('row.text'),
 		conditionalNode(
 			binaryNode('!==', memberChainNode('row.itemPath'), identifierNode('undefined')),
-			callNode(identifierNode('marklessBranchText'), [
+			callNode(identifierNode(escaperName), [
 				callNode(memberChainNode('row.itemPath.reduce'), [
 					arrowFunctionNode(
 						['value', 'key'],
@@ -4325,7 +4447,7 @@ function branchRowsFunctionNode(): EmissionNode {
 					identifierNode('item'),
 				]),
 			]),
-			callNode(identifierNode('marklessBranchText'), [
+			callNode(identifierNode(escaperName), [
 				callNode(memberChainNode('graph.read'), [
 					memberChainNode('row.read.graphNodeId'),
 					memberChainNode('row.read.path'),
@@ -5246,6 +5368,15 @@ export function buildEventHandlerEmission(
 		program: moduleProgramNode([
 			// Only a symbol that dispatches through a slot its own module resolved
 			// carries this import, so no other page pays for it.
+			...(referenced.has(ROW_ITEM_PATH_FN)
+				? [
+						moduleImportNode({
+							kind: 'named' as const,
+							localName: ROW_ITEM_PATH_FN,
+							source: '@markless/web/fns/row-item-path',
+						}),
+					]
+				: []),
 			...(referenced.has(CALLBACK_SLOT_FN)
 				? [
 						moduleImportNode({
@@ -6408,12 +6539,18 @@ function loweredEventWriteNode(
 	write: LoweredStateWrite,
 	rewrite: EventHandlerRewrite,
 ): EmissionNode | null {
+	const pathNode = rowItemPathNode(write);
 	if (write.operation === 'assign') {
 		const value = isNode(node.right) ? eventWriteValueNode(node.right, rewrite) : null;
 		if (!value) return null;
 
 		if (!write.assignmentOperator) {
-			return graphWriteCall({ graphNodeId: write.graphNodeId, path: write.path, value });
+			return graphWriteCall({
+				graphNodeId: write.graphNodeId,
+				path: write.path,
+				pathNode,
+				value,
+			});
 		}
 
 		const operator = EVENT_COMPOUND_ASSIGNMENT_OPERATORS.get(write.assignmentOperator);
@@ -6422,6 +6559,7 @@ function loweredEventWriteNode(
 		return graphUpdateCall({
 			graphNodeId: write.graphNodeId,
 			path: write.path,
+			pathNode,
 			returnValue: 'next',
 			updateExpression:
 				operator === '&&' || operator === '||' || operator === '??'
@@ -6434,13 +6572,14 @@ function loweredEventWriteNode(
 		return graphUpdateCall({
 			graphNodeId: write.graphNodeId,
 			path: write.path,
+			pathNode,
 			returnValue: 'next',
 			updateExpression: numberStepNode(write.updateOperator),
 		});
 	}
 
 	if (write.operation === 'delete') {
-		return graphDeleteCall({ graphNodeId: write.graphNodeId, path: write.path });
+		return graphDeleteCall({ graphNodeId: write.graphNodeId, path: write.path, pathNode });
 	}
 
 	if (write.operation === 'call' && write.method) {
@@ -6450,12 +6589,32 @@ function loweredEventWriteNode(
 		return graphMethodCall({
 			graphNodeId: write.graphNodeId,
 			path: write.path,
+			pathNode,
 			method: write.method,
 			args,
 		});
 	}
 
 	return null;
+}
+
+const ROW_ITEM_PATH_FN = 'marklessRowItemPath';
+
+// The row element's path is found at dispatch from the item the row was dispatched with.
+function rowItemPathNode(write: LoweredStateWrite): EmissionNode | undefined {
+	return write.row ? rowItemPathCall(write, write.row) : undefined;
+}
+
+// A nested row's collection path is the enclosing row's own path call.
+function rowItemPathCall(write: LoweredStateWrite, row: LoweredRowItem): EmissionNode {
+	return callNode(identifierNode(ROW_ITEM_PATH_FN), [
+		identifierNode('context'),
+		literalNode(write.graphNodeId),
+		row.enclosing ? rowItemPathCall(write, row.enclosing) : stringArrayNode(write.path),
+		literalNode(row.itemName),
+		row.keyPath ? stringArrayNode(row.keyPath) : literalNode(null),
+		stringArrayNode(row.itemPath),
+	]);
 }
 
 /** `Number(value) + 1` / `Number(value) - 1`, the updater both step forms emit. */
@@ -6738,7 +6897,7 @@ function eventHandlerScalarLeafStatements(
 	}
 
 	const write = writes[0];
-	if (!write || write.path.length !== 0) return null;
+	if (!write || write.row || write.path.length !== 0) return null;
 	if (!projection) return null;
 
 	const fn = eventHandlerFunctionExpression(projection);

@@ -7,6 +7,7 @@ import {
 	compileTsrxModule,
 	componentEdgeSymbolRoutes,
 	emitSymbolResolverModule,
+	importedRowSlotReaders,
 	importedSymbolRoutes,
 	linkedRenderDataBoundarySymbols,
 	moduleInterfaceHash,
@@ -84,12 +85,37 @@ async function loadOxcTransformSync() {
 	return (await loadOxcExperimental())?.transformSync;
 }
 
-// Returning the raw code on failure ships TypeScript to a JS parser, so every
-// exit here is loud: a silent pass-through is the defect this guards.
+// Each module is compiled once per query variant, so the same emitted code is stripped many times.
+const STRIPPED_CODE_LIMIT = 4096;
+const strippedCode = new Map<string, string>();
+
 export async function stripEmittedTypes(
 	code: string,
 	moduleId: string,
 	onlyRemoveTypeImports = false,
+): Promise<string> {
+	const key = `${onlyRemoveTypeImports ? 1 : 0}${code}`;
+	const cached = strippedCode.get(key);
+	if (cached !== undefined) {
+		strippedCode.delete(key);
+		strippedCode.set(key, cached);
+		return cached;
+	}
+	const stripped = await stripEmittedTypesUncached(code, moduleId, onlyRemoveTypeImports);
+	strippedCode.set(key, stripped);
+	if (strippedCode.size > STRIPPED_CODE_LIMIT) {
+		const oldest = strippedCode.keys().next();
+		if (!oldest.done) strippedCode.delete(oldest.value);
+	}
+	return stripped;
+}
+
+// Returning the raw code on failure ships TypeScript to a JS parser, so every
+// exit here is loud: a silent pass-through is the defect this guards.
+async function stripEmittedTypesUncached(
+	code: string,
+	moduleId: string,
+	onlyRemoveTypeImports: boolean,
 ): Promise<string> {
 	const oxcTransformSync = await loadOxcTransformSync();
 	if (!oxcTransformSync) {
@@ -138,9 +164,23 @@ async function stripEmittedTypesFromExpression(source: string, moduleId: string)
 	return stripped.endsWith(';') ? stripped.slice(0, -1).trimEnd() : stripped;
 }
 
+// Every render-data variant of a source splices the same fragments, so each text is judged once.
+const fragmentVerdicts = new Map<string, boolean>();
+const FRAGMENT_VERDICT_LIMIT = 4096;
+
+async function fragmentCarriesTypeScript(code: string): Promise<boolean> {
+	const known = fragmentVerdicts.get(code);
+	if (known !== undefined) return known;
+	const verdict = await fragmentCarriesTypeScriptUncached(code);
+	if (fragmentVerdicts.size >= FRAGMENT_VERDICT_LIMIT)
+		fragmentVerdicts.delete(fragmentVerdicts.keys().next().value!);
+	fragmentVerdicts.set(code, verdict);
+	return verdict;
+}
+
 // A tree that will not parse as TypeScript is answered `true`, not `false`: the
 // verdict then belongs to the fail-closed strip, never to a silent pass-through.
-async function fragmentCarriesTypeScript(code: string): Promise<boolean> {
+async function fragmentCarriesTypeScriptUncached(code: string): Promise<boolean> {
 	const parseSync = (await loadOxcExperimental())?.parseSync;
 	if (!parseSync) return true;
 	try {
@@ -240,11 +280,18 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		await compileWithBlockingDiagnostics(input, resolverId);
 	throwIfBlocked(input, blockingDiagnostics);
 	const runtimeDemandClass = input.runtimeDemandClass ?? 'prerender';
+	const servedScalarPlans =
+		input.servedScalarPlans === true && runtimeDemandClass === 'prerender' && !input.prerenderRecords
+			? compiledForAllClasses.runtimeDemandMaps?.['plain-ssr']
+			: undefined;
+	const classDemandMap =
+		compiledForAllClasses.runtimeDemandMaps?.[runtimeDemandClass] ??
+		compiledForAllClasses.runtimeDemandMap;
 	const compiled = {
 		...compiledForAllClasses,
-		runtimeDemandMap:
-			compiledForAllClasses.runtimeDemandMaps?.[runtimeDemandClass] ??
-			compiledForAllClasses.runtimeDemandMap,
+		runtimeDemandMap: servedScalarPlans
+			? withServedScalarDemand(classDemandMap, servedScalarPlans)
+			: classDemandMap,
 	};
 	const compilerSymbolRows = compiled.symbolModules.modules.map((module) => ({
 		id: module.symbolId,
@@ -274,6 +321,8 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 	const resolverSymbols = uniqueSymbolsById([...(input.symbols ?? []), ...symbolRows]);
 	const resolverSource = adaptImportedCaptureResolver(
 		emitSymbolResolverModule({
+			literalImports: input.experimentalNativePacking,
+			resolverId: input.experimentalNativePacking ? resolverId : undefined,
 			buildId: input.buildId,
 			symbols: resolverSymbols,
 			boundSymbols: importedBoundRows,
@@ -281,6 +330,16 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		importedBoundRows.some((row) => row.loaderSymbolId !== undefined),
 	);
 	const symbolRoutes = componentEdgeSymbolRoutes(compiled, input.artifactChildMaterializations);
+	// Plan lookups follow only the edges whose module can answer one.
+	const closurePlanRoutes = symbolRoutes.filter(
+		(route) =>
+			!('importSource' in route) ||
+			answersClosurePlans(
+				'selfRecursive' in route && route.selfRecursive
+					? compiled.moduleGraphInterface
+					: input.importedModuleInterfaces?.[route.importSource],
+			),
+	);
 	const executionLogModuleHookMode =
 		input.executionLogModuleHooks === false ? 'never' : input.executionLog;
 	const symbolManifestEntries = [
@@ -310,13 +369,16 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 	// The prerender wake closure is the richer wake set when a page has one; the
 	// compiler's trigger groups answer for every other page.
 	const symbolBundles =
-		symbolRows.length > SMALL_SYMBOL_DIRECT_LOAD_LIMIT
+		!input.experimentalNativePacking && symbolRows.length > SMALL_SYMBOL_DIRECT_LOAD_LIMIT
 			? planSymbolBundles({
 					filename: input.filename,
-					symbols: compiled.symbolModules.modules.map((module) => ({
-						symbolId: module.symbolId,
-						moduleId: symbolVirtualModuleId(input.filename, module.symbolId),
-					})),
+					// Render data imports derives statically, so no interaction set owns them alone.
+					symbols: compiled.symbolModules.modules
+						.filter((module) => module.kind !== 'sync-computed-derive')
+						.map((module) => ({
+							symbolId: module.symbolId,
+							moduleId: symbolVirtualModuleId(input.filename, module.symbolId),
+						})),
 					interactions:
 						prerenderTriggerGroups.length > 0
 							? prerenderTriggerGroups
@@ -453,6 +515,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 				payloadState: compiled.payloadScripts.state,
 				payloadView: containerScopedResumeView(compiled.payloadScripts.view),
 				runtimeDemandMap: compiled.runtimeDemandMap,
+				servedScalarPlans,
 				executionLog: input.executionLog,
 				// The capability closure (page + linked children) decides the wake;
 				// the variant is ADDITIVE: CSR prerender pages boot through this
@@ -474,10 +537,12 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					canonicalRenderData && compiled.publicRenderModule.renderDataModuleSource
 						? renderDataId
 						: undefined,
+				linkedRowSlotReaders: importedRowSlotReaders(input.importedModuleInterfaces),
 				hasBoundSymbols: compiled.boundSymbolResolver.rows.length > 0,
 				boundSymbolDescriptors,
 				symbols: symbolRows,
 				symbolRoutes,
+				closurePlanRoutes,
 			}),
 		},
 		...(emitsPrerenderWakeVariant
@@ -531,6 +596,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					symbolRoutes,
 					armRendererModuleId:
 						group.id === 'self-wake' ? selfWakeArmRendererId : undefined,
+					literalImports: input.experimentalNativePacking,
 				}),
 			}),
 		),
@@ -543,12 +609,14 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					},
 				]
 			: []),
-		...symbolBundles.map((bundle): MarklessVirtualModule => ({
-			id: bundle.id,
-			type: 'symbol-bundle',
-			source: emitSymbolBundleModule(bundle.symbolModuleIds),
-			bundledSymbolModuleIds: bundle.symbolModuleIds,
-		})),
+		...symbolBundles.map(
+			(bundle): MarklessVirtualModule => ({
+				id: bundle.id,
+				type: 'symbol-bundle',
+				source: emitSymbolBundleModule(bundle.symbolModuleIds),
+				bundledSymbolModuleIds: bundle.symbolModuleIds,
+			}),
+		),
 		...linkedBoundarySymbols.map((symbol) => symbol.module),
 		...(await Promise.all(
 			compiled.symbolModules.modules.map(
@@ -623,6 +691,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					resolverId,
 					renderDataId,
 					environment: input.environment ?? 'lib',
+					linkedRowSlotReaders: importedRowSlotReaders(input.importedModuleInterfaces),
 					clientOutput: input.clientOutput ?? 'full',
 					executionLog: input.executionLog,
 					headInjections: headInjections.length > 0 ? headInjections : undefined,
@@ -641,6 +710,12 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					),
 					runtimeDemandMap: compiled.runtimeDemandMap,
 					resumeModuleUrl: input.resumeModuleUrl,
+					scalarActions: input.includeScalarActionPlans
+						? compiled.runtimeDemandMaps?.['plain-ssr'].actions
+						: undefined,
+					closureActions: (
+						servedScalarPlans ?? (runtimeDemandClass === 'plain-ssr' ? classDemandMap : undefined)
+					)?.actions,
 					prerenderWakeModuleUrl: input.prerenderWakeModuleUrl,
 					publicRenderModuleSource: compiled.publicRenderModule.moduleSource,
 					publicRenderRootExportName: compiled.publicRenderModule.rootExportName,
@@ -659,6 +734,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					symbols: symbolRows,
 					behaviorSymbols,
 					symbolRoutes,
+					closurePlanRoutes,
 				}),
 				input.filename,
 			)),
@@ -669,6 +745,11 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		interfaceHash: moduleInterfaceHash(compiled.moduleGraphInterface),
 		moduleImports: compiled.semanticGraph.moduleImports,
 		artifactChildren: artifactChildCandidates(compiled),
+		importedConstantRequests: compiled.semanticGraph.componentEdges.flatMap((edge) =>
+			edge.props.flatMap((prop) =>
+				'importedConstants' in prop ? (prop.importedConstants ?? []) : [],
+			),
+		),
 	};
 }
 
@@ -727,10 +808,14 @@ async function prerenderDataModuleSource(
 	const initializerImports = new Map<string, { readonly local: string; readonly line: string }>();
 	const initializerModules = new Map(
 		compiled.symbolModules.modules
-			.filter((module) => module.kind === 'state-initializer' || module.kind === 'sync-computed-derive')
+			.filter(
+				(module) =>
+					module.kind === 'state-initializer' || module.kind === 'sync-computed-derive',
+			)
 			.map((module) => [module.symbolId, module]),
 	);
 	const componentEntries: Array<{ name: string; data: string; functions: string[] }> = [];
+	let qualifiesRows = false;
 	for (const definition of compiled.publicRenderModule.componentDefinitions) {
 		const {
 			residueReaderSource,
@@ -739,8 +824,10 @@ async function prerenderDataModuleSource(
 			// A build-time gate answer, not render data: stripped here so widening the
 			// gate adds no payload byte to the modules it turns the pass on for.
 			rootsWidget: _rootsWidget,
+			projectsIntoRows,
 			...record
 		} = definition as Readonly<Record<string, unknown>> & {
+			readonly projectsIntoRows?: boolean;
 			readonly residueReaderSource?: string;
 			readonly residueReaderImports?: ReadonlyArray<{
 				readonly source: string;
@@ -796,10 +883,14 @@ async function prerenderDataModuleSource(
 					`${renderDataId}:reader:${String(definition.name)}`,
 				)
 			: undefined;
+		if (projectsIntoRows) qualifiesRows = true;
 		const functions = [
 			...(reader ? [`readResidue:${reader}`] : []),
+			...(projectsIntoRows ? ['rowHosts:marklessRowHosts'] : []),
 			...(initializers.size
-				? [`initializers:{${[...initializers].map(([id, local]) => `${JSON.stringify(id)}:${local}`).join(',')}}`]
+				? [
+						`initializers:{${[...initializers].map(([id, local]) => `${JSON.stringify(id)}:${local}`).join(',')}}`,
+					]
 				: []),
 		];
 		componentEntries.push({ name: JSON.stringify(String(definition.name)), data, functions });
@@ -855,6 +946,9 @@ async function prerenderDataModuleSource(
 			(entry) =>
 				`import { marklessPrerenderData as ${entry.local} } from ${JSON.stringify(entry.source)};`,
 		),
+		...(qualifiesRows
+			? ["import { marklessRowHosts } from '@markless/web/fns/row-qualified-view';"]
+			: []),
 		...preludes,
 		compiled.publicRenderModule.renderDataModuleSource,
 		...factored.factories,
@@ -937,6 +1031,7 @@ async function compileWithBlockingDiagnostics(
 		| 'buildId'
 		| 'symbols'
 		| 'importedModuleInterfaces'
+		| 'importedModuleConstants'
 		| 'artifactChildMaterializations'
 		| 'executionLog'
 	>,
@@ -950,6 +1045,7 @@ async function compileWithBlockingDiagnostics(
 		resolverId,
 		symbols: input.symbols ?? [],
 		importedModuleInterfaces: input.importedModuleInterfaces,
+		importedModuleConstants: input.importedModuleConstants,
 		artifactChildMaterializations: input.artifactChildMaterializations,
 		// 'never' is the consumer posture (MARKLESS_CONSUMER_BUILD); the lab
 		// default 'auto' keeps the authored-source strings for dev tooling.
@@ -958,7 +1054,7 @@ async function compileWithBlockingDiagnostics(
 	const fulfilled = fulfilledEscalationSymbolIds(compiled, input, resolverId);
 	return {
 		compiled,
-		blockingDiagnostics: collectTsrxModuleDiagnostics(compiled).filter(
+		blockingDiagnostics: moduleDiagnostics(compiled).filter(
 			(diagnostic) =>
 				diagnostic.severity === 'error' &&
 				!(
@@ -968,6 +1064,15 @@ async function compileWithBlockingDiagnostics(
 				),
 		),
 	};
+}
+
+// A memoized compile hands every request the same result; walking its whole graph again finds nothing new.
+const diagnosticsByCompile = new WeakMap<object, readonly CompilerDiagnostic[]>();
+
+function moduleDiagnostics(compiled: Parameters<typeof collectTsrxModuleDiagnostics>[0]) {
+	let diagnostics = diagnosticsByCompile.get(compiled);
+	if (!diagnostics) diagnosticsByCompile.set(compiled, (diagnostics = collectTsrxModuleDiagnostics(compiled)));
+	return diagnostics;
 }
 
 function throwIfBlocked(
@@ -1037,6 +1142,52 @@ function containerScopedResumeView(view: ProtocolViewPayload): ProtocolViewPaylo
 			...locator,
 			index: locator.index + 1,
 		})),
+	};
+}
+
+// Planned actions may run lean or fall back to full resume, so their records demand both.
+function answersClosurePlans(
+	moduleInterface: CompileTsrxModuleResult['moduleGraphInterface'] | undefined,
+): boolean {
+	return !!moduleInterface?.render.components.some((component) => component.closureActions);
+}
+
+function withServedScalarDemand(
+	map: RuntimeDemandMapArtifact,
+	served: RuntimeDemandMapArtifact,
+): RuntimeDemandMapArtifact {
+	const planned = served.actions.filter(
+		(action) => action.plan?.kind === 'scalar' || action.plan?.kind === 'closure',
+	);
+	if (planned.length === 0) return map;
+	const union = (left: ReadonlyArray<string>, right: ReadonlyArray<string>) =>
+		[...new Set([...left, ...right])].sort();
+	const servedRecords = new Map(served.payloadRecords.map((record) => [record.recordId, record]));
+	const plannedRecordIds = new Set(planned.flatMap((action) => action.payloadRecordIds));
+	return {
+		...map,
+		payloadRecords: map.payloadRecords.map((record) => {
+			const lean = plannedRecordIds.has(record.recordId)
+				? servedRecords.get(record.recordId)
+				: undefined;
+			return lean
+				? { ...record, runtimeModuleIds: union(record.runtimeModuleIds, lean.runtimeModuleIds) }
+				: record;
+		}),
+		actions: map.actions.map((action) => {
+			const lean = planned.find(
+				(candidate) =>
+					candidate.hostNodeId === action.hostNodeId &&
+					candidate.eventName === action.eventName &&
+					candidate.recordKind === action.recordKind,
+			);
+			if (!lean) return action;
+			return {
+				...action,
+				runtimeModuleIds: union(action.runtimeModuleIds, lean.runtimeModuleIds),
+				...(lean.plan?.kind === 'closure' ? { plan: lean.plan } : {}),
+			};
+		}),
 	};
 }
 

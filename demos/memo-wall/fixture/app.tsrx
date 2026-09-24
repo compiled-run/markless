@@ -20,8 +20,8 @@ export function App() @{
 		<div class="actions">
 			<button type="button" id="fill-a" onClick={() => { rowsA = makeRows(); }}>fill A</button>
 			<button type="button" id="fill-b" onClick={() => { rowsB = makeRows(); }}>fill B</button>
-			<button type="button" id="equal-a" onClick={() => { tickA = tickA; }}>equal A</button>
-			<button type="button" id="equal-b" onClick={() => { tickB = tickB; }}>equal B</button>
+			<button type="button" id="equal-a" onClick={() => { const same = tickA; tickA = same; }}>equal A</button>
+			<button type="button" id="equal-b" onClick={() => { const same = tickB; tickB = same; }}>equal B</button>
 			<button type="button" id="one-a" onClick={() => { rowsA = changeMiddle(rowsA); }}>one A</button>
 			<button type="button" id="one-b" onClick={() => { rowsB = changeMiddle(rowsB); }}>one B</button>
 			<button type="button" id="theme-a" onClick={() => { rowsA = bumpTheme(rowsA); }}>theme A</button>

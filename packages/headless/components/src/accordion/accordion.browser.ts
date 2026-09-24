@@ -1,6 +1,7 @@
 import { render, renderCsrIslands, renderSSR, renderSSRIslands } from '@markless/vitest-browser';
 import { page, userEvent } from 'vite-plus/test/browser';
 import { expect, test } from 'vitest';
+import Alibis from './scenarios/alibis.tsrx';
 import Basic from './scenarios/basic.tsrx';
 import ConstructsInChildren from './scenarios/constructs-in-children.tsrx';
 import Controlled from './scenarios/controlled.tsrx';
@@ -11,6 +12,7 @@ import HoleUnderIf from './scenarios/hole-under-if.tsrx';
 import Locked from './scenarios/locked.tsrx';
 import Multiple from './scenarios/multiple.tsrx';
 import RowsAtTheComponentRoot from './scenarios/rows-at-the-component-root.tsrx';
+import Tally from './scenarios/tally.tsrx';
 import TwoAccordions from './scenarios/two-accordions.tsrx';
 import WithOnChange from './scenarios/with-onchange.tsrx';
 import WithoutFindInPage from './scenarios/without-find-in-page.tsrx';
@@ -743,12 +745,12 @@ async function pinMintedRowOpens(index: number) {
 	await expect.poll(() => triggers()[2]!.getAttribute('aria-expanded')).toBe('true');
 }
 
-test.fails('CSR islands: a row minted after mount opens in its own island', async () => {
+test('CSR islands: a row minted after mount opens in its own island', async () => {
 	await renderCsrIslands([ConstructsInChildren, ConstructsInChildren]);
 	await pinMintedRowOpens(1);
 });
 
-test.fails('SSR islands: a row minted after mount opens in its own island', async () => {
+test('SSR islands: a row minted after mount opens in its own island', async () => {
 	await renderSSRIslands([ConstructsInChildren, ConstructsInChildren]);
 	await pinMintedRowOpens(1);
 });
@@ -886,3 +888,69 @@ test('SSR islands: every island serves its rows and drives them after resume', a
 	expect(embed('root', 0).querySelectorAll('[data-testid="row"]')).toHaveLength(3);
 	expect(embed('row-trigger', 1).getAttribute('aria-expanded')).toBe('false');
 });
+
+for (const mode of MODES) {
+	test(`${mode}: an onChange that appends to page state lands every write`, async () => {
+		if (mode === 'CSR') await render(Tally);
+		else await renderSSR(Tally);
+
+		const tally = page.getByTestId('tally');
+		expect(el(tally).textContent).toBe('1 of 3');
+		await userEvent.click(el(page.getByTestId('ben-trigger')));
+		await expect.poll(() => el(tally).textContent).toBe('2 of 3');
+		expect(el(page.getByTestId('selected')).getAttribute('data-value')).toBe('ben');
+		await userEvent.click(el(page.getByTestId('cleo-trigger')));
+		await expect.poll(() => el(tally).textContent).toBe('3 of 3');
+	});
+
+	// Component rows keep their served props and projected markup when the collection re-derives under the same keys.
+	test(`${mode}: rows re-derived from that state unlock the last section`, async () => {
+		if (mode === 'CSR') await render(Tally);
+		else await renderSSR(Tally);
+
+		const verdict = page.getByTestId('verdict-trigger');
+		expect(el<HTMLButtonElement>(verdict).disabled).toBe(true);
+		await userEvent.click(el(page.getByTestId('ben-trigger')));
+		await userEvent.click(el(page.getByTestId('cleo-trigger')));
+		await expect.poll(() => el(page.getByTestId('tally')).textContent).toBe('3 of 3');
+		await expect
+			.poll(() => el<HTMLButtonElement>(verdict).disabled, { timeout: 1000 })
+			.toBe(false);
+		expect(el(page.getByTestId('ben-seen')).hasAttribute('hidden')).toBe(false);
+	});
+}
+
+async function pinAlibisUnlockTheCulprit() {
+	const trigger = (value: string) =>
+		document.querySelector<HTMLButtonElement>(`[data-alibi="${value}"]`)!;
+	const stamps = () =>
+		Array.from(document.querySelectorAll<HTMLElement>('[data-stamp]'))
+			.filter((stamp) => !stamp.hidden)
+			.map((stamp) => stamp.dataset.stamp);
+	expect(trigger('culprit').disabled).toBe(true);
+	for (const value of ['ada', 'ben', 'cleo']) await userEvent.click(trigger(value));
+	await expect.poll(() => trigger('culprit').disabled).toBe(false);
+	// A row rebuilt at the write can land before a sibling row's own update.
+	await expect.poll(() => stamps()).toEqual(['ada', 'ben', 'cleo']);
+	await expect.poll(() => document.querySelector('.count')?.textContent).toBe('3 of 3 read');
+	await userEvent.click(trigger('culprit'));
+	const choice = () =>
+		Array.from(document.querySelectorAll<HTMLElement>('[data-choose="ben"]')).find(
+			(button) => button.offsetParent !== null,
+		);
+	await expect.poll(() => choice()).toBeDefined();
+	await userEvent.click(choice()!);
+	await expect
+		.poll(() => Array.from(document.querySelectorAll('[data-answer]')).map((answer) => answer.textContent))
+		.toContain('Case closed');
+}
+
+for (const mode of MODES) {
+	// Each row's projected markup follows its own item and the page state it reads,
+	// and a row whose item unlocks it takes clicks in its projected panel.
+	test(`${mode}: rows re-derived from page state unlock the row their items name`, async () => {
+		if (mode === 'CSR') await render(Alibis);
+		else await renderSSR(Alibis);
+		await pinAlibisUnlockTheCulprit();
+	});
+}

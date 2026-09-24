@@ -1,20 +1,15 @@
 import { expect, test } from 'vitest';
 import { createRuntimeGraph } from '@markless/runtime';
+import {
+	ASYNC_PROTOCOL_VERSION,
+	createProtocolStatePayload,
+	renderPayloadScripts,
+} from '@markless/serializer';
+import { decodePayloadScripts } from '../../serializer/src/protocol-client-storage.ts';
+import { resumePrerenderTriggerGroup } from '../src/fns/prerender-trigger-resume.ts';
 import { marklessRowComponentMint } from '../src/fns/row-component-mint.ts';
 import { wireKeyedRepeats } from '../src/resume-keyed-repeats.ts';
 import type { ResumeDomElement, ResumeViewRecord } from '../src/resume-types.ts';
-
-/**
- * Where a record naming a row COMPONENT goes at the refusal point.
- *
- * The bridge that renders such a row reaches the page's render-data surface, so
- * it is loaded through the global the app's own resume module writes, exactly as
- * the template mint is. Standing in for that emit is the loader below; what this
- * file pins is the repeat runtime's half - that an unserved key routes to the
- * bridge, that the row lands in its own span and in the pinned census, that its
- * registration runs after it is attached, and that a page handed no bridge does
- * exactly what it did before component rows existed.
- */
 
 type Node = {
 	nodeType: number;
@@ -75,11 +70,6 @@ type MintCall = {
 	readonly page: unknown;
 };
 
-// The bridge, standing in for `@markless/web/fns/row-component-mint` bound to a
-// page's render-data surface: the same shape the emitted loader hands over. It
-// is installed once and loaded once per container, and every instance binds the
-// graph, registrar and recorder of the container that loaded it - which is what
-// keeps a second container off the first one's wiring.
 let bridge: { readonly mints: MintCall[]; readonly commits: unknown[] } = {
 	mints: [],
 	commits: [],
@@ -220,6 +210,69 @@ const GROWN = [
 	{ id: 'c', label: 'charlie' },
 ];
 
+test('a staged group supplies its own render data when an interaction creates a row', async () => {
+	const list = el('UL');
+	const root = el('SECTION', [list]);
+	const mints: MintCall[] = [];
+	const commits: unknown[] = [];
+	bridge = { mints, commits };
+	wiredBridge = true;
+	const page = { page: 'staged-collection' };
+	let renderDataCalls = 0;
+	const records = decodePayloadScripts(
+		renderPayloadScripts({
+			state: createProtocolStatePayload({
+				cells: [{ graphNodeId: 'state:rows', name: 'rows', valueKind: 'array', value: [] }],
+			}),
+			view: {
+				version: ASYNC_PROTOCOL_VERSION,
+				locators: [{ hostNodeId: 'list', strategy: 'dom-order', index: 1, tagName: 'ul' }],
+				events: [],
+				domUpdates: [],
+				behaviors: [],
+				elementHandles: [],
+				asyncBoundaries: [],
+				keyedRepeats: [
+					{
+						id: 'repeat:rows',
+						parentHostNodeId: 'list',
+						collectionGraphNodeId: 'state:rows',
+						collectionPath: [],
+						keyPath: ['id'],
+						itemName: 'item',
+						rowElementCount: 3,
+						rowComponent: {
+							componentEdgeId: 'edge:row',
+							componentName: 'Page',
+							itemPropName: 'item',
+						},
+						rowEvents: [],
+					},
+				],
+			},
+		}),
+	);
+	const resumed = await resumePrerenderTriggerGroup({
+		...records,
+		root: root as ResumeDomElement,
+		groupId: 'rows',
+		graphNodeIds: ['state:rows'],
+		loadSymbol: () => () => undefined,
+		renderData: (() => {
+			renderDataCalls++;
+			return page;
+		}) as never,
+	});
+	expect(renderDataCalls).toBe(1);
+	resumed.graph.write({ graphNodeId: 'state:rows', value: [GROWN[0]] });
+	await resumed.graph.flush();
+	expect(list.childNodes.map(textOf)).toEqual(['alpha']);
+	expect(mints).toHaveLength(1);
+	expect(mints[0]!.page).toBe(page);
+	expect(renderDataCalls).toBe(1);
+	expect(commits).toEqual([{ rowKey: 'a', attached: true }]);
+});
+
 test('an unserved key routes to the component bridge and lands in the row span', async () => {
 	const { labels, write, list, footer, mints } = fixture();
 	expect(labels()).toEqual(['header', 'alpha', 'bravo', 'footer']);
@@ -241,8 +294,6 @@ test('a minted component row enters the pinned census in document order', async 
 	expect(census()).toEqual(elementsUnder(root));
 });
 
-// Registration is what makes the row's own events, handles and DOM updates live,
-// and it can only resolve hosts once the row is where the page census counts it.
 test('a minted component row registers after it is attached', async () => {
 	const { write, commits } = fixture();
 
@@ -264,8 +315,6 @@ test('a minted component row is wired for the same row events a served row is', 
 	expect(last.host.tagName).toBe('BUTTON');
 });
 
-// A key that leaves parks its row instead of releasing its wiring: releasing it
-// would splice the graph's subscription list while the flush is walking it.
 test('a component key that comes back reuses its parked row and never mints twice', async () => {
 	const { write, mints, commits, list, labels } = fixture();
 
@@ -283,10 +332,6 @@ test('a component key that comes back reuses its parked row and never mints twic
 	expect(labels()).toEqual(['header', 'alpha', 'bravo', 'charlie', 'footer']);
 });
 
-// Two containers in one document each load the bridge with their OWN graph and
-// registrar. A single module-wide memo handed the second container the first
-// one's bridge, so its minted row registered its events on a roster the second
-// container's dispatch never reads and the row rendered dead.
 test('a second container mints through its own registrar', async () => {
 	const first = fixture({ host: { id: 'first' } });
 	const second = fixture({ host: { id: 'second' } });
@@ -300,9 +345,6 @@ test('a second container mints through its own registrar', async () => {
 	expect(second.labels()).toEqual(['header', 'alpha', 'bravo', 'charlie', 'footer']);
 });
 
-// The loader is one page-agnostic line every page writes, so the page a row is
-// rendered against has to arrive per container. Two pages sharing one global is
-// exactly the bug: the last module evaluated owned every other page's rows.
 test('each container mints against the page it was wired with', async () => {
 	const first = fixture({ host: { id: 'first' }, page: { page: 'first' } });
 	const second = fixture({ host: { id: 'second' }, page: { page: 'second' } });
@@ -314,8 +356,6 @@ test('each container mints against the page it was wired with', async () => {
 	expect(second.mints.map((mint) => mint.page)).toEqual([{ page: 'second' }]);
 });
 
-// Pay-per-use, and fail-closed: a page whose resume module wrote no bridge has
-// no surface to render a row against, so the list stays exactly as served.
 test('a record naming a row component with no bridge wired leaves the key unrendered', async () => {
 	const { write, labels, mints } = fixture({ wired: false });
 
@@ -325,8 +365,6 @@ test('a record naming a row component with no bridge wired leaves the key unrend
 	expect(labels()).toEqual(['header', 'alpha', 'bravo', 'footer']);
 });
 
-// Loud, not silent: the record names a component and the container carries no
-// page to render it from, which no amount of retrying can turn into a row.
 test('the real bridge refuses a component row when no page reached the container', async () => {
 	const mint = marklessRowComponentMint(undefined, { read: () => [] } as never, {} as never);
 

@@ -88,6 +88,8 @@ const resumeOnDemandEntries = [
 // single-file closure nothing here touches. Every governed entry re-measured.
 // The chunk anchors that justified the move are unchanged: the dispatch core still
 // never reaches resume-locators, so the locator registry stays demand-loaded.
+// 2026-09-22: importing the visible event name from serializer cost 153 chars; resume-runtime.ts's
+// two missing-snapshot records now share one builder, so it measures 20,909 under the unchanged wall.
 const sourceByteLimit = 20970;
 
 const forbiddenClosureFiles = [

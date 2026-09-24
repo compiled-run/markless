@@ -9,5 +9,5 @@ export function LibrarySong({ song, selected, onSelect }) @{
 			<h3>{song.name}</h3>
 			<h4>{song.artist} - YouTube</h4>
 		</span>
-	</button>
+	</button>;
 }

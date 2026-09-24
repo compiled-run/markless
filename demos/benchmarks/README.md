@@ -150,4 +150,3 @@ hosts per key, attach exactly once per creation, zero lifecycle on reuse and reo
 exactly-once ordered cleanups); if row behaviors gain real application usage, a timing
 benchmark at 1,000-row scale is a small follow-up, and correctness is guarded by the contract
 test meanwhile.
-

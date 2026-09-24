@@ -136,7 +136,6 @@ function streamArtifact() {
 						locators: [
 							{
 								hostNodeId: 'stream-button',
-								strategy: 'arm-relative',
 								index: 2,
 								tagName: 'button',
 							},

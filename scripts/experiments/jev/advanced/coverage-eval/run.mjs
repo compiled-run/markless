@@ -49,7 +49,7 @@ try{
     let before=state(await stableObservation(page),model);
     if(before.editor?.outer&&(!before.editor.contained||!before.documentFocused)){
      await page.getByTestId(before.editor.inner?'inner-content':'outer-content').click({position:{x:2,y:2}});
-     recovery={...(recovery??{}),focusRestoredBy:'trusted_click_inside_current_dialog'};before=state(await stableObservation(page),model);
+     recovery={...recovery,focusRestoredBy:'trusted_click_inside_current_dialog'};before=state(await stableObservation(page),model);
     }
     const available=options(before,model,initialIndex);
     for(const id of Object.keys(available))if(id.startsWith('nav_'))available[id]+={nav_home:'; exercise the home counter',nav_workspace:'; explore project selection and nested confirmation dialogs',nav_todos:'; explore editable task rows and filters',nav_slow:'; exercise the asynchronous report and route counter'}[id];
@@ -70,7 +70,7 @@ try{
      failureKind=['edit_first','cancel_edit'].includes(selected.action)&&error.message.includes('waitForFunction')?'editing_did_not_start':'action_exception';
      result={after:await stableObservation(page),violations:[failureKind]};
     }
-    if(page.experimentRecovery){recovery={...(recovery??{}),navigation:page.experimentRecovery};if(page.experimentRecovery.kind==='document_reload_after_stalled_spa')result.violations.push('spa_route_stalled');}
+    if(page.experimentRecovery){recovery={...recovery,navigation:page.experimentRecovery};if(page.experimentRecovery.kind==='document_reload_after_stalled_spa')result.violations.push('spa_route_stalled');}
     if(failureKind)pendingRecovery={route:before.page,reason:actionError??result.violations.join(', '),failedAction:selected.action};
     const step={index,before,action:selected.action,source:selected.source,...result,after:state(result.after,model),expectedModel:structuredClone(model),actionError,failureKind,recovery,recoveryPlanned:pendingRecovery,originalMenu:shuffled,permittedMenu:menu.options,excluded:menu.excluded,intervention:menu.intervention,errors:errors.slice(errorStart),decisionMilliseconds,actionMilliseconds:performance.now()-actionStart};
     coverage.record(step);steps.push(step);

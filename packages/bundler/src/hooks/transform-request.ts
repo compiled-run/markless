@@ -15,6 +15,7 @@ import {
 	isPrerenderWakeSourceRequest,
 	isRenderDataSourceRequest,
 	isResumeSourceRequest,
+	isScalarPlanSourceRequest,
 	isSymbolOnlySourceRequest,
 	pathname,
 	renderDataReachedFromQuery,
@@ -102,6 +103,11 @@ export function planTransformHookRequest(
 	});
 	const { prerenderRecords } = plan;
 	const transformInput: TransformTsrxModuleInput = {
+		// Must match the emit gate: a packed build emits no symbol chunks, so every published resolver needs literal imports.
+		experimentalNativePacking:
+			internalOptions.experimentalNativePacking === true &&
+			currentEnvironment === 'client' &&
+			internalOptions.dev !== true,
 		filename: source,
 		moduleId: moduleIdFor(source, ctx.getRoot()),
 		source: code,
@@ -129,6 +135,7 @@ export function planTransformHookRequest(
 			!clientRouteArtifactSources.has(source)
 				? 'plain-ssr'
 				: 'prerender',
+		servedScalarPlans: currentEnvironment === 'client' && !prerenderRecords,
 		prerenderWakeVariant:
 			internalOptions.prerenderWakeChannel === true &&
 			(prerenderWakeRequest ||
@@ -139,12 +146,8 @@ export function planTransformHookRequest(
 			(isResumeSourceRequest(id) || isSymbolOnlySourceRequest(id)),
 		environment: currentEnvironment,
 		clientOutput,
-		// Dev resume URL points at the SOURCE module (not the virtual resume
-		// module): loading the .tsrx keeps it in the client module graph, which
-		// is what lets Vite's own no-accepting-boundary full-reload fire on
-		// edits (commit e3c5bcc's design). The source client module re-exports
-		// resumeContainerEvent from the virtual resume module in dev only;
-		// production builds keep the split (CSR emits no resume code).
+		includeScalarActionPlans: currentEnvironment === 'client' && isScalarPlanSourceRequest(id),
+		// The dev source URL keeps resume inside Vite's invalidation graph.
 		resumeModuleUrl:
 			internalOptions.dev === true && currentEnvironment === 'server'
 				? devBrowserSourceModuleUrl(source, ctx.getRoot(), internalOptions.publicPath)
@@ -191,4 +194,9 @@ export function planTransformHookRequest(
 		plan,
 		transformInput,
 	};
+}
+
+// Render data and route artifacts are facades that never publish the source's claims.
+export function tracksSourcePublication(request: TransformRequest): boolean {
+	return !request.renderDataRequest && !request.clientRouteArtifact;
 }

@@ -8,8 +8,7 @@ export default function Basic() @{
 		<fileupload.root data-testid="root" name="attachment">
 			<fileupload.label data-testid="label">Attachments</fileupload.label>
 			<fileupload.droparea data-testid="droparea">
-				Drop a file here
-				<fileupload.trigger data-testid="trigger">Browse</fileupload.trigger>
+				Drop a file here <fileupload.trigger data-testid="trigger">Browse</fileupload.trigger>
 			</fileupload.droparea>
 			<fileupload.field data-testid="field" />
 			<Rows />

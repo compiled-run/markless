@@ -1,15 +1,7 @@
-import { Sidebar } from '../../components/docs/Sidebar.tsrx';
-import { DocsLayout } from '../../components/layouts/DocsLayout.tsrx';
+import DocsLayout from '../../components/layouts/DocsLayout.tsrx';
 
-<DocsLayout>
-	<Sidebar active="getting-started" />
-	<main>
-		<Content />
-	</main>
-</DocsLayout>
+<DocsLayout title="Guide" active="getting-started" />
 
---- content
+This catch-all MDX route renders markdown under a TSRX layout component.
 
-# Guide
-
-This catch-all MDX route is ready for future TSRX component imports.
+Import a `.tsrx` component with a default import, then place it on its own line with literal props.

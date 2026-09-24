@@ -88,18 +88,15 @@ test('a data-only child facade cannot hide the symbol-emitting sibling from pare
 	await callTransform(plugin, childSource, `${childFilename}?markless-render-data`, {
 		resolve: resolveImport,
 	});
-	const first = (await callTransform(
-		plugin,
-		parentSource,
-		`${parentFilename}?markless-resume`,
-		{
+	// A loader that never compiles the symbols sibling leaves no claims to bind: that fails the link.
+	await expect(
+		callTransform(plugin, parentSource, `${parentFilename}?markless-resume`, {
 			resolve: resolveImport,
 			load: vi.fn(async ({ id }: { readonly id: string }) => {
 				loaded.push(id);
 			}),
-		},
-	)) as { readonly code: string };
-	expect(first.code).not.toContain('marklessSymbolResolverModule');
+		}),
+	).rejects.toThrow('MARKLESS_IMPORTED_SYMBOL_CLAIMS_MISSING');
 	loaded.length = 0;
 	const parent = (await callTransform(
 		plugin,

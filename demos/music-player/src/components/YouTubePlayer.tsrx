@@ -1,9 +1,4 @@
-export function YouTubePlayer({
-	isPlaying,
-	playerCommand,
-	playerCommandVersion,
-	track,
-}) @{
+export function YouTubePlayer({ isPlaying, playerCommand, playerCommandVersion, track }) @{
 	<div class="youtube-player">
 		<div
 			class="youtube-frame-host"
@@ -14,5 +9,5 @@ export function YouTubePlayer({
 		>
 			<div class="youtube-player-target"></div>
 		</div>
-	</div>
+	</div>;
 }

@@ -1,5 +1,8 @@
 import type { ResumePreparedCore, ResumeRuntimeInput } from './resume-types.ts';
 
+// Held once loaded: every import() of an evaluated module still resolves a task later.
+let syncComputedModule: typeof import('./resume-sync-computed.ts') | undefined;
+
 // Both record kinds answer the same two questions: which node to write, and
 // which symbol derives it. A sync computed derives its own value; a shared seed
 // re-runs the component's own seed expression over the props it reads.
@@ -50,9 +53,8 @@ export function wireSyncComputedDemandRecordsWithoutLoadingCapability(input: {
 					graphNodeId: dependency.graphNodeId,
 					path: dependency.path,
 					async run() {
-						await (
-							await import('./resume-sync-computed.ts')
-						).refreshSyncComputed({
+						await (syncComputedModule ??=
+							await import('./resume-sync-computed.ts')).refreshSyncComputed({
 							computed,
 							graph: input.graph,
 							root: input.root,

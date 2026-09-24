@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="benchmark:entrant" content="markless">
+<meta name="benchmark:build" content="selftest-fixture-1">
+<link rel="icon" href="data:,">
+<link rel="modulepreload" href="/slow.js">
+<title>Overview | Interaction benchmark</title>
+<script type="module" src="/slow.js"></script>
+<style>body{font:16px system-ui;margin:0}.app-header{position:sticky;top:0;background:#fff}.app-nav a{margin-right:12px}.app-nav a[aria-current=page]{font-weight:bold}td{padding:4px 8px}</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+(() => {
+	const STEP = __STEP__;
+	const IGNORE_CLICKS_MS = __IGNORE_CLICKS_MS__;
+	const FRUIT = ['Apple', 'Apricot', 'Banana', 'Blueberry', 'Cherry', 'Date', 'Elderberry', 'Fig', 'Grape', 'Kiwi', 'Lemon', 'Mango'];
+	const TITLES = { '/': 'Overview', '/records': 'Records', '/settings': 'Settings' };
+	const h = (tag, attrs = {}, ...children) => {
+		const el = document.createElement(tag);
+		for (const [k, v] of Object.entries(attrs)) k.startsWith('on') ? el.addEventListener(k.slice(2), v) : el.setAttribute(k, v);
+		el.append(...children);
+		return el;
+	};
+	const app = document.getElementById('app');
+	const main = h('main', { class: 'main' });
+	const navLink = (path, id) => h('a', { href: path, 'data-testid': id, onclick: (e) => { e.preventDefault(); go(path); } }, TITLES[path]);
+	const nav = h('nav', { class: 'app-nav', 'aria-label': 'Main' }, navLink('/', 'nav-overview'), navLink('/records', 'nav-records'), navLink('/settings', 'nav-settings'));
+	app.append(h('header', { class: 'app-header' }, nav), main);
+
+	function overview() {
+		let count = 0;
+		const value = h('output', { 'data-testid': 'counter-value' }, '0');
+		const inc = h('button', { type: 'button', 'data-testid': 'counter-increment', onclick: () => { if (performance.now() < IGNORE_CLICKS_MS) return; count += STEP; value.textContent = String(count); } }, 'Increment');
+		let pressed = false;
+		const status = h('output', { 'data-testid': 'toggle-status' }, 'Off');
+		const toggle = h('button', { type: 'button', 'aria-pressed': 'false', 'data-testid': 'toggle-button', onclick: () => { pressed = !pressed; toggle.setAttribute('aria-pressed', String(pressed)); status.textContent = pressed ? 'On' : 'Off'; } }, 'Notifications');
+		const list = h('ul', { 'data-testid': 'filter-list' });
+		const countText = h('p', { 'data-testid': 'filter-count' });
+		const render = (q) => {
+			const items = FRUIT.filter((f) => f.toLowerCase().includes(q.trim().toLowerCase()));
+			list.replaceChildren(...items.map((f) => h('li', { 'data-testid': 'filter-item' }, f)));
+			countText.textContent = `${items.length} items`;
+		};
+		const input = h('input', { type: 'search', 'data-testid': 'filter-input', autocomplete: 'off', oninput: () => render(input.value) });
+		render('');
+		return [h('section', {}, value, inc), h('section', {}, toggle, status), h('section', { class: 'filter' }, input, countText, list)];
+	}
+	function records() {
+		const selected = new Set();
+		const summary = h('p', { 'data-testid': 'selection-summary', role: 'status' }, '0 selected');
+		const rows = Array.from({ length: 200 }, (_, i) => {
+			const id = 'r' + String(i + 1).padStart(3, '0');
+			const box = h('input', { type: 'checkbox', 'data-testid': 'record-select', onchange: () => { box.checked ? selected.add(id) : selected.delete(id); summary.textContent = `${selected.size} selected`; } });
+			return h('tr', { 'data-testid': 'record-row', 'data-id': id }, h('td', {}, box), h('td', { 'data-testid': 'record-name' }, 'Person ' + id));
+		});
+		return [summary, h('table', { 'data-testid': 'records-table' }, h('tbody', {}, ...rows))];
+	}
+	function settings() {
+		const field = (id, value) => h('input', { type: 'text', 'data-testid': id, value });
+		const name = field('settings-name', 'Ada Lovelace');
+		const qty = field('settings-quantity', '2');
+		const price = field('settings-unit-price', '12.50');
+		const total = h('p', { 'data-testid': 'settings-total' });
+		const update = () => {
+			const q = Number(qty.value), p = Number(price.value);
+			total.textContent = Number.isInteger(q) && q >= 1 && q <= 99 && Number.isFinite(p) ? `Total: $${(q * p).toFixed(2)}` : 'Total: n/a';
+		};
+		qty.addEventListener('input', update);
+		update();
+		const status = h('p', { 'data-testid': 'settings-status', role: 'status' });
+		const submit = h('button', { type: 'submit', 'data-testid': 'settings-submit' }, 'Save');
+		const form = h('form', { 'data-testid': 'settings-form', novalidate: '', onsubmit: async (e) => {
+			e.preventDefault();
+			submit.disabled = true;
+			submit.textContent = 'Saving…';
+			status.textContent = 'Saving…';
+			form.querySelector('[data-testid="settings-error"]')?.remove();
+			const res = await fetch('/api/settings', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: name.value, quantity: qty.value, unitPrice: price.value }) });
+			const body = await res.json();
+			status.textContent = res.ok ? body.message : '';
+			if (!res.ok) form.append(h('p', { class: 'alert', 'data-testid': 'settings-error', role: 'alert' }, body.error));
+			submit.disabled = false;
+			submit.textContent = 'Save';
+		} }, name, qty, price, total, submit, status);
+		return [form];
+	}
+	const views = { '/': overview, '/records': records, '/settings': settings };
+	function render() {
+		const path = location.pathname.replace(/\/+$/, '') || '/';
+		main.replaceChildren(h('h1', { 'data-testid': 'page-title' }, TITLES[path] ?? 'Not found'), ...(views[path] ?? (() => []))());
+		for (const a of nav.querySelectorAll('a')) a.getAttribute('href') === path ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current');
+		document.title = `${TITLES[path]} | Interaction benchmark`;
+	}
+	function go(path) {
+		history.replaceState({ scrollY: window.scrollY }, '');
+		history.pushState({ scrollY: 0 }, '', path);
+		render();
+		window.scrollTo(0, 0);
+	}
+	history.scrollRestoration = 'manual';
+	addEventListener('popstate', (e) => {
+		render();
+		window.scrollTo(0, e.state?.scrollY ?? 0);
+	});
+	render();
+})();
+</script>
+</body>
+</html>

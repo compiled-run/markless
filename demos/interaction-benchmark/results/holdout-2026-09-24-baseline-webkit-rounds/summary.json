@@ -1,0 +1,566 @@
+[
+	{
+		"lane": "sr-app",
+		"variant": "default",
+		"browser": "webkit",
+		"profile": "normal",
+		"load": {
+			"visits": 1,
+			"requests": 2398,
+			"wireKB": 918.2216796875,
+			"jsFiles": 2381,
+			"jsKB": 895.4072265625,
+			"preloaded": 2380,
+			"preloadedUnused": null,
+			"executedChars": null,
+			"executedFunctions": null,
+			"rounds": 17,
+			"fcpMs": 4645.000000000001,
+			"settledMs": 5427
+		},
+		"early": {
+			"controls": 0,
+			"survived": 0,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 0,
+			"inert": 0,
+			"indeterminate": 0,
+			"inputToResponseMs": null
+		},
+		"firstClick": {
+			"controls": 0,
+			"responded": 0,
+			"inputToResponseMs": null,
+			"p95Ms": null,
+			"clicksFetchingJs": 0,
+			"clickJsKB": 0,
+			"clickJsRequests": 0
+		},
+		"nav": {
+			"links": 1,
+			"ok": 1,
+			"documentLoads": 1,
+			"rounds": 230,
+			"latencyMs": 285.999755859375,
+			"wireKB": 19.212890625
+		}
+	},
+	{
+		"lane": "sr-app",
+		"variant": "default",
+		"browser": "webkit",
+		"profile": "constrained",
+		"load": {
+			"visits": 1,
+			"requests": 2398,
+			"wireKB": 918.23046875,
+			"jsFiles": 2381,
+			"jsKB": 895.416015625,
+			"preloaded": 2380,
+			"preloadedUnused": null,
+			"executedChars": null,
+			"executedFunctions": null,
+			"rounds": 17,
+			"fcpMs": 6328,
+			"settledMs": 7311
+		},
+		"early": {
+			"controls": 0,
+			"survived": 0,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 0,
+			"inert": 0,
+			"indeterminate": 0,
+			"inputToResponseMs": null
+		},
+		"firstClick": {
+			"controls": 0,
+			"responded": 0,
+			"inputToResponseMs": null,
+			"p95Ms": null,
+			"clicksFetchingJs": 0,
+			"clickJsKB": 0,
+			"clickJsRequests": 0
+		},
+		"nav": {
+			"links": 1,
+			"ok": 1,
+			"documentLoads": 1,
+			"rounds": 224,
+			"latencyMs": 455,
+			"wireKB": 19.212890625
+		}
+	},
+	{
+		"lane": "sr-app",
+		"variant": "packed",
+		"browser": "webkit",
+		"profile": "normal",
+		"load": {
+			"visits": 1,
+			"requests": 4,
+			"wireKB": 550.5947265625,
+			"jsFiles": 2,
+			"jsKB": 548.03515625,
+			"preloaded": 1,
+			"preloadedUnused": null,
+			"executedChars": null,
+			"executedFunctions": null,
+			"rounds": 2,
+			"fcpMs": 390,
+			"settledMs": 1455
+		},
+		"early": {
+			"controls": 0,
+			"survived": 0,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 0,
+			"inert": 0,
+			"indeterminate": 0,
+			"inputToResponseMs": null
+		},
+		"firstClick": {
+			"controls": 0,
+			"responded": 0,
+			"inputToResponseMs": null,
+			"p95Ms": null,
+			"clicksFetchingJs": 0,
+			"clickJsKB": 0,
+			"clickJsRequests": 0
+		},
+		"nav": {
+			"links": 1,
+			"ok": 1,
+			"documentLoads": 1,
+			"rounds": 3,
+			"latencyMs": 42,
+			"wireKB": 0.2509765625
+		}
+	},
+	{
+		"lane": "sr-app",
+		"variant": "packed",
+		"browser": "webkit",
+		"profile": "constrained",
+		"load": {
+			"visits": 1,
+			"requests": 4,
+			"wireKB": 550.5947265625,
+			"jsFiles": 2,
+			"jsKB": 548.03515625,
+			"preloaded": 1,
+			"preloadedUnused": null,
+			"executedChars": null,
+			"executedFunctions": null,
+			"rounds": 2,
+			"fcpMs": 1909,
+			"settledMs": 2965
+		},
+		"early": {
+			"controls": 0,
+			"survived": 0,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 0,
+			"inert": 0,
+			"indeterminate": 0,
+			"inputToResponseMs": null
+		},
+		"firstClick": {
+			"controls": 0,
+			"responded": 0,
+			"inputToResponseMs": null,
+			"p95Ms": null,
+			"clicksFetchingJs": 0,
+			"clickJsKB": 0,
+			"clickJsRequests": 0
+		},
+		"nav": {
+			"links": 1,
+			"ok": 1,
+			"documentLoads": 1,
+			"rounds": 2,
+			"latencyMs": 366,
+			"wireKB": 0.2509765625
+		}
+	},
+	{
+		"lane": "live-feed-ssr",
+		"variant": "default",
+		"browser": "webkit",
+		"profile": "normal",
+		"load": {
+			"visits": 1,
+			"requests": 73,
+			"wireKB": 92.5087890625,
+			"jsFiles": 71,
+			"jsKB": 85.8076171875,
+			"preloaded": 71,
+			"preloadedUnused": null,
+			"executedChars": null,
+			"executedFunctions": null,
+			"rounds": 1,
+			"fcpMs": 263,
+			"settledMs": 1392
+		},
+		"early": {
+			"controls": 0,
+			"survived": 0,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 0,
+			"inert": 0,
+			"indeterminate": 0,
+			"inputToResponseMs": null
+		},
+		"firstClick": {
+			"controls": 0,
+			"responded": 0,
+			"inputToResponseMs": null,
+			"p95Ms": null,
+			"clicksFetchingJs": 0,
+			"clickJsKB": 0,
+			"clickJsRequests": 0
+		},
+		"nav": {
+			"links": 0,
+			"ok": 0,
+			"documentLoads": 0,
+			"rounds": null,
+			"latencyMs": null,
+			"wireKB": null
+		}
+	},
+	{
+		"lane": "live-feed-ssr",
+		"variant": "default",
+		"browser": "webkit",
+		"profile": "constrained",
+		"load": {
+			"visits": 1,
+			"requests": 73,
+			"wireKB": 92.5087890625,
+			"jsFiles": 71,
+			"jsKB": 85.8076171875,
+			"preloaded": 71,
+			"preloadedUnused": null,
+			"executedChars": null,
+			"executedFunctions": null,
+			"rounds": 1,
+			"fcpMs": 807,
+			"settledMs": 1892
+		},
+		"early": {
+			"controls": 0,
+			"survived": 0,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 0,
+			"inert": 0,
+			"indeterminate": 0,
+			"inputToResponseMs": null
+		},
+		"firstClick": {
+			"controls": 0,
+			"responded": 0,
+			"inputToResponseMs": null,
+			"p95Ms": null,
+			"clicksFetchingJs": 0,
+			"clickJsKB": 0,
+			"clickJsRequests": 0
+		},
+		"nav": {
+			"links": 0,
+			"ok": 0,
+			"documentLoads": 0,
+			"rounds": null,
+			"latencyMs": null,
+			"wireKB": null
+		}
+	},
+	{
+		"lane": "live-feed-ssr",
+		"variant": "packed",
+		"browser": "webkit",
+		"profile": "normal",
+		"load": {
+			"visits": 1,
+			"requests": 20,
+			"wireKB": 80.72265625,
+			"jsFiles": 18,
+			"jsKB": 74.5029296875,
+			"preloaded": 18,
+			"preloadedUnused": null,
+			"executedChars": null,
+			"executedFunctions": null,
+			"rounds": 1,
+			"fcpMs": 261,
+			"settledMs": 1378
+		},
+		"early": {
+			"controls": 0,
+			"survived": 0,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 0,
+			"inert": 0,
+			"indeterminate": 0,
+			"inputToResponseMs": null
+		},
+		"firstClick": {
+			"controls": 0,
+			"responded": 0,
+			"inputToResponseMs": null,
+			"p95Ms": null,
+			"clicksFetchingJs": 0,
+			"clickJsKB": 0,
+			"clickJsRequests": 0
+		},
+		"nav": {
+			"links": 0,
+			"ok": 0,
+			"documentLoads": 0,
+			"rounds": null,
+			"latencyMs": null,
+			"wireKB": null
+		}
+	},
+	{
+		"lane": "live-feed-ssr",
+		"variant": "packed",
+		"browser": "webkit",
+		"profile": "constrained",
+		"load": {
+			"visits": 1,
+			"requests": 20,
+			"wireKB": 80.72265625,
+			"jsFiles": 18,
+			"jsKB": 74.5029296875,
+			"preloaded": 18,
+			"preloadedUnused": null,
+			"executedChars": null,
+			"executedFunctions": null,
+			"rounds": 1,
+			"fcpMs": 761,
+			"settledMs": 1861
+		},
+		"early": {
+			"controls": 0,
+			"survived": 0,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 0,
+			"inert": 0,
+			"indeterminate": 0,
+			"inputToResponseMs": null
+		},
+		"firstClick": {
+			"controls": 0,
+			"responded": 0,
+			"inputToResponseMs": null,
+			"p95Ms": null,
+			"clicksFetchingJs": 0,
+			"clickJsKB": 0,
+			"clickJsRequests": 0
+		},
+		"nav": {
+			"links": 0,
+			"ok": 0,
+			"documentLoads": 0,
+			"rounds": null,
+			"latencyMs": null,
+			"wireKB": null
+		}
+	},
+	{
+		"lane": "router-app",
+		"variant": "default",
+		"browser": "webkit",
+		"profile": "normal",
+		"load": {
+			"visits": 3,
+			"requests": 77,
+			"wireKB": 81.6875,
+			"jsFiles": 76,
+			"jsKB": 75.615234375,
+			"preloaded": 76,
+			"preloadedUnused": null,
+			"executedChars": null,
+			"executedFunctions": null,
+			"rounds": 2,
+			"fcpMs": 17,
+			"settledMs": 648
+		},
+		"early": {
+			"controls": 0,
+			"survived": 0,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 0,
+			"inert": 0,
+			"indeterminate": 0,
+			"inputToResponseMs": null
+		},
+		"firstClick": {
+			"controls": 0,
+			"responded": 0,
+			"inputToResponseMs": null,
+			"p95Ms": null,
+			"clicksFetchingJs": 0,
+			"clickJsKB": 0,
+			"clickJsRequests": 0
+		},
+		"nav": {
+			"links": 2,
+			"ok": 2,
+			"documentLoads": 0,
+			"rounds": 0,
+			"latencyMs": 47.5,
+			"wireKB": 0
+		}
+	},
+	{
+		"lane": "router-app",
+		"variant": "default",
+		"browser": "webkit",
+		"profile": "constrained",
+		"load": {
+			"visits": 3,
+			"requests": 77,
+			"wireKB": 81.6875,
+			"jsFiles": 76,
+			"jsKB": 75.615234375,
+			"preloaded": 76,
+			"preloadedUnused": null,
+			"executedChars": null,
+			"executedFunctions": null,
+			"rounds": 2,
+			"fcpMs": 503,
+			"settledMs": 1331
+		},
+		"early": {
+			"controls": 0,
+			"survived": 0,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 0,
+			"inert": 0,
+			"indeterminate": 0,
+			"inputToResponseMs": null
+		},
+		"firstClick": {
+			"controls": 0,
+			"responded": 0,
+			"inputToResponseMs": null,
+			"p95Ms": null,
+			"clicksFetchingJs": 0,
+			"clickJsKB": 0,
+			"clickJsRequests": 0
+		},
+		"nav": {
+			"links": 2,
+			"ok": 2,
+			"documentLoads": 0,
+			"rounds": 0,
+			"latencyMs": 47.5,
+			"wireKB": 0
+		}
+	},
+	{
+		"lane": "router-app",
+		"variant": "packed",
+		"browser": "webkit",
+		"profile": "normal",
+		"load": {
+			"visits": 3,
+			"requests": 16,
+			"wireKB": 68.1611328125,
+			"jsFiles": 15,
+			"jsKB": 65.025390625,
+			"preloaded": 15,
+			"preloadedUnused": null,
+			"executedChars": null,
+			"executedFunctions": null,
+			"rounds": 2,
+			"fcpMs": 17,
+			"settledMs": 682
+		},
+		"early": {
+			"controls": 0,
+			"survived": 0,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 0,
+			"inert": 0,
+			"indeterminate": 0,
+			"inputToResponseMs": null
+		},
+		"firstClick": {
+			"controls": 0,
+			"responded": 0,
+			"inputToResponseMs": null,
+			"p95Ms": null,
+			"clicksFetchingJs": 0,
+			"clickJsKB": 0,
+			"clickJsRequests": 0
+		},
+		"nav": {
+			"links": 2,
+			"ok": 2,
+			"documentLoads": 0,
+			"rounds": 0,
+			"latencyMs": 39.5,
+			"wireKB": 0
+		}
+	},
+	{
+		"lane": "router-app",
+		"variant": "packed",
+		"browser": "webkit",
+		"profile": "constrained",
+		"load": {
+			"visits": 3,
+			"requests": 16,
+			"wireKB": 68.1611328125,
+			"jsFiles": 15,
+			"jsKB": 65.025390625,
+			"preloaded": 15,
+			"preloadedUnused": null,
+			"executedChars": null,
+			"executedFunctions": null,
+			"rounds": 2,
+			"fcpMs": 501,
+			"settledMs": 1305
+		},
+		"early": {
+			"controls": 0,
+			"survived": 0,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 0,
+			"inert": 0,
+			"indeterminate": 0,
+			"inputToResponseMs": null
+		},
+		"firstClick": {
+			"controls": 0,
+			"responded": 0,
+			"inputToResponseMs": null,
+			"p95Ms": null,
+			"clicksFetchingJs": 0,
+			"clickJsKB": 0,
+			"clickJsRequests": 0
+		},
+		"nav": {
+			"links": 2,
+			"ok": 2,
+			"documentLoads": 0,
+			"rounds": 0,
+			"latencyMs": 39,
+			"wireKB": 0
+		}
+	}
+]

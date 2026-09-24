@@ -24,8 +24,7 @@ export default function UnavailableKinds() @{
 				<menu.item value="wrap" checked data-testid="item-wrap">Word wrap</menu.item>
 				<menu.item value="minimap" checked disabled data-testid="item-minimap">Minimap</menu.item>
 				<menu.item value="share" submenu disabled data-testid="sub-item">
-					Share
-					<menu.itemcontent data-testid="sub-content">
+					Share <menu.itemcontent data-testid="sub-content">
 						<menu.item value="email" data-testid="sub-email">Email</menu.item>
 					</menu.itemcontent>
 				</menu.item>

@@ -1,3 +1,4 @@
+import { PROTOCOL_VISIBLE_EVENT_NAME } from '../../../serializer/src/protocol-event-names.ts';
 import type { RuntimeGraph, RuntimeGraphUpdate } from '@markless/runtime';
 import type { ArmCommitUpdate } from '../resume-commit-arm.ts';
 import type { DecodedPayloadScripts } from '../../../serializer/src/protocol-client-storage.ts';
@@ -36,6 +37,8 @@ import {
 	type PrerenderBoundaryArmRegistration,
 } from '../prerender/staged-boundary-authority.ts';
 
+let journal: typeof import('../dom-journal.ts') | undefined;
+
 type TriggerGroupInput = Omit<ResumePayloadScriptsInput, 'stateScript' | 'viewScript'> &
 	DecodedPayloadScripts & {
 		readonly groupId: string;
@@ -56,12 +59,14 @@ type TriggerGroupInput = Omit<ResumePayloadScriptsInput, 'stateScript' | 'viewSc
 
 type GraphSegment = {
 	readonly graph: RuntimeGraph;
-	// Segments grow as later trigger groups register their computed nodes.
+
 	readonly graphNodeIds: Set<string>;
 	readonly sharedDefinitionIds: ReadonlySet<string>;
 };
 
 type StagedContainer = {
+	activation: Promise<void>;
+	readonly scalarValues: Map<string, unknown>;
 	readonly groups: Map<string, Promise<ResumePayloadScriptsResult>>;
 	readonly segments: GraphSegment[];
 	readonly runtimes: Array<{
@@ -100,6 +105,8 @@ export function resumePrerenderTriggerGroup(
 	let container = stagedContainers.get(input.root);
 	if (!container) {
 		container = {
+			activation: Promise.resolve(),
+			scalarValues: input.root.__marklessEventOnlyGraph ?? new Map(),
 			groups: new Map(),
 			segments: [],
 			runtimes: [],
@@ -111,8 +118,18 @@ export function resumePrerenderTriggerGroup(
 	}
 	const existing = container.groups.get(input.groupId);
 	if (existing) return existing;
-	const started = startTriggerGroup(input, container);
-	container.groups.set(input.groupId, started);
+	const owner = container;
+	const started = owner.activation
+		.then(() => startTriggerGroup(input, owner))
+		.catch((error) => {
+			owner.groups.delete(input.groupId);
+			throw error;
+		});
+	owner.activation = started.then(
+		() => undefined,
+		() => undefined,
+	);
+	owner.groups.set(input.groupId, started);
 	return started;
 }
 
@@ -120,10 +137,6 @@ async function startTriggerGroup(
 	input: TriggerGroupInput,
 	container: StagedContainer,
 ): Promise<ResumePayloadScriptsResult> {
-	// A page the settle boot already filled must hand its arm to whichever group
-	// wakes first, not only to the ungrouped fallback: without this the first
-	// group resumes with @pending records and a state change it owns cannot move
-	// a binding that lives inside the settled arm.
 	const adopted = await adoptFilledArms(
 		await adoptStreamedForWake({
 			...input,
@@ -142,9 +155,19 @@ async function startTriggerGroup(
 				...adopted.state,
 				cells: adopted.state.cells.map((cell) =>
 					container.segments.some((segment) => segment.graphNodeIds.has(cell.graphNodeId))
-						? // Live graph reads bypass the serialized-value envelope.
-							{ ...cell, value: undefined, directValue: prior.read(cell.graphNodeId) }
+						? { ...cell, value: undefined, directValue: prior.read(cell.graphNodeId) }
 						: cell,
+				),
+				computed: adopted.state.computed.map((computed) =>
+					container.segments.some((segment) =>
+						segment.graphNodeIds.has(computed.graphNodeId),
+					)
+						? {
+								...computed,
+								value: undefined,
+								directValue: prior.read(computed.graphNodeId),
+							}
+						: computed,
 				),
 			}
 		: adopted.state;
@@ -161,158 +184,185 @@ async function startTriggerGroup(
 			(adopted.state.sharedDefinitions ?? []).map((definition) => definition.id),
 		),
 	};
-	container.segments.push(segment);
-	const graph = createStagedGraph(container, segment);
-	await registerPrerenderStagedComputeds(
-		graph,
-		(state.computed ?? [])
-			.filter(
-				(record) => record.async === false && typeof record.deriveSymbolId === 'string',
-			)
-			.map((record) => ({
-				...record,
-				value: graph.read(record.graphNodeId),
-			})),
-	);
+	const previousComputed = new Map(container.computed);
 	const boundaryClaims: PrerenderBoundaryArmRegistration[] = [];
-	// The decoded view is rewritten in place so every later reader sees the
-	// authority's canonical boundary.
-	const asyncBoundaries = adopted.view.asyncBoundaries as ResumeAsyncBoundaryPayload[];
-	for (const [index, boundary] of asyncBoundaries.entries()) {
-		const canonical = resolvePrerenderBoundaryAuthority(adopted.root, boundary);
-		const claim = await claimPrerenderBoundaryArmRegistration(adopted.root, canonical);
-		if (claim) boundaryClaims.push(claim);
-		asyncBoundaries[index] = claim ? canonical : { ...canonical, armRecords: [] };
-	}
-	const renderAsyncBoundary = adopted.renderBoundaryArm
-		? async (
-				boundaryId: string,
-				status: 'fulfilled' | 'rejected',
-				renderGraph: RuntimeGraph,
-			) => {
-				await adopted.prepareBoundaryArm?.(boundaryId, status, renderGraph);
-				const rendered = adopted.renderBoundaryArm!(boundaryId, status, renderGraph);
-				const boundary = adopted.view.asyncBoundaries.find(
-					(candidate) => candidate.id === boundaryId,
-				);
-				if (boundary) {
-					const claim = beginPrerenderBoundaryArmCommit(
-						adopted.root,
-						boundary,
-						rendered.armRecords,
-					);
-					if (claim) completePrerenderBoundaryArmRegistration(adopted.root, claim, true);
-				}
-				return rendered;
-			}
-		: adopted.renderAsyncBoundary;
 	let runtime: ResumeRuntime | undefined;
-	const applyDomJournal =
-		adopted.applyDomJournal ??
-		(async (entries) => {
-			const { applyDomJournalEntries } = await import('../dom-journal.ts');
-			applyDomJournalEntries(entries, {
-				resolveTarget(locator) {
-					const rangeAnchor = /^(branch|async-boundary):(.+?):(start|end)$/.exec(
-						String(locator),
-					);
-					if (rangeAnchor) {
-						const record =
-							rangeAnchor[1] === 'branch'
-								? runtime?.getBranch(rangeAnchor[2]!)
-								: runtime?.getAsyncBoundary(rangeAnchor[2]!);
-						return rangeAnchor[3] === 'end' ? record?.endAnchor : record?.startAnchor;
-					}
-					return runtime?.getElement(String(locator));
-				},
-			});
-		});
-	let registerComputedRefreshes:
-		| ((records: ProtocolStatePayload['computed']) => Promise<void>)
-		| undefined;
-	runtime = createResumeRuntime(
-		{
-			root: adopted.root,
-			graph,
-			state: adopted.state,
-			view: adopted.view,
-			loadSymbol: adopted.loadSymbol,
-			createVisibilityObserver: adopted.createVisibilityObserver,
-			createRemovalObserver: adopted.createRemovalObserver,
-			applyDomJournal,
-			renderBranchHtml: adopted.renderBranchHtml,
-			renderAsyncBoundary,
-		},
-		(register) => {
-			registerComputedRefreshes = register;
-		},
-	);
-	const eventTypes = new Set(
-		adopted.view.events
-			.filter((event) => event.eventName !== 'visible')
-			.map((event) => event.eventName),
-	);
 	let started = false;
+	container.segments.push(segment);
 	try {
+		const graph = createStagedGraph(container, segment);
+		await registerPrerenderStagedComputeds(
+			graph,
+			(state.computed ?? [])
+				.filter(
+					(record) => record.async === false && typeof record.deriveSymbolId === 'string',
+				)
+				.map((record) => ({
+					...record,
+					value: graph.read(record.graphNodeId),
+				})),
+		);
+
+		const asyncBoundaries = adopted.view.asyncBoundaries as ResumeAsyncBoundaryPayload[];
+		for (const [index, boundary] of asyncBoundaries.entries()) {
+			const canonical = resolvePrerenderBoundaryAuthority(adopted.root, boundary);
+			const claim = await claimPrerenderBoundaryArmRegistration(adopted.root, canonical);
+			if (claim) boundaryClaims.push(claim);
+			asyncBoundaries[index] = claim ? canonical : { ...canonical, armRecords: [] };
+		}
+		const renderAsyncBoundary = adopted.renderBoundaryArm
+			? async (
+					boundaryId: string,
+					status: 'fulfilled' | 'rejected',
+					renderGraph: RuntimeGraph,
+				) => {
+					await adopted.prepareBoundaryArm?.(boundaryId, status, renderGraph);
+					const rendered = adopted.renderBoundaryArm!(boundaryId, status, renderGraph);
+					const boundary = adopted.view.asyncBoundaries.find(
+						(candidate) => candidate.id === boundaryId,
+					);
+					if (boundary) {
+						const claim = beginPrerenderBoundaryArmCommit(
+							adopted.root,
+							boundary,
+							rendered.armRecords,
+						);
+						if (claim)
+							completePrerenderBoundaryArmRegistration(adopted.root, claim, true);
+					}
+					return rendered;
+				}
+			: adopted.renderAsyncBoundary;
+		const applyDomJournal =
+			adopted.applyDomJournal ??
+			(async (entries) => {
+				const { applyDomJournalEntries } = (journal ??= await import('../dom-journal.ts'));
+				applyDomJournalEntries(entries, {
+					resolveTarget(locator) {
+						const rangeAnchor = /^(branch|async-boundary):(.+?):(start|end)$/.exec(
+							String(locator),
+						);
+						if (rangeAnchor) {
+							const record =
+								rangeAnchor[1] === 'branch'
+									? runtime?.getBranch(rangeAnchor[2]!)
+									: runtime?.getAsyncBoundary(rangeAnchor[2]!);
+							return rangeAnchor[3] === 'end'
+								? record?.endAnchor
+								: record?.startAnchor;
+						}
+						return runtime?.getElement(String(locator));
+					},
+				});
+			});
+		let registerComputedRefreshes:
+			| ((records: ProtocolStatePayload['computed']) => Promise<void>)
+			| undefined;
+		runtime = createResumeRuntime(
+			{
+				root: adopted.root,
+				graph,
+				state: adopted.state,
+				view: adopted.view,
+				loadSymbol: adopted.loadSymbol,
+				createVisibilityObserver: adopted.createVisibilityObserver,
+				createRemovalObserver: adopted.createRemovalObserver,
+				applyDomJournal,
+				renderBranchHtml: adopted.renderBranchHtml,
+				renderAsyncBoundary,
+				renderData: adopted.renderData,
+			},
+			(register) => {
+				registerComputedRefreshes = register;
+			},
+		);
+		const eventTypes = new Set(
+			adopted.view.events
+				.filter((event) => event.eventName !== PROTOCOL_VISIBLE_EVENT_NAME)
+				.map((event) => event.eventName),
+		);
 		await withoutCaptureListeners(adopted.root, eventTypes, () => runtime!.start());
-		// Backfill settled-arm computeds onto their owning runtime.
+
 		await registerComputedRefreshes?.(
 			[...container.computed.values()]
 				.filter((computed) => computed.owner === segment)
 				.map((computed) => computed.record),
 		);
+
+		const stagedRuntime: ResumeRuntime = {
+			...runtime,
+			dispatch: (event, options) =>
+				withoutCaptureListeners(adopted.root, eventTypes, () =>
+					runtime!.dispatch(event, options),
+				),
+		};
+		container.runtimes.push({
+			segment,
+			runtime: stagedRuntime,
+			registerComputedRefreshes: (records) => registerComputedRefreshes?.(records),
+		});
+		if (!container.dispatchRegistered) {
+			type Handoff = {
+				readonly event: ResumeDomEvent;
+				readonly syncPolicyAlreadyApplied?: boolean;
+			};
+			(
+				adopted.root as typeof adopted.root & {
+					__marklessRegisterDispatch?: (
+						dispatch: (
+							handoff: Handoff,
+							fallback: (handoff: Handoff) => Promise<void> | void,
+						) => Promise<void> | void,
+					) => void;
+				}
+			).__marklessRegisterDispatch?.(async (handoff, fallback) => {
+				let matched = false;
+				for (const candidate of container.runtimes) {
+					try {
+						await candidate.runtime.dispatch(handoff.event, {
+							syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true,
+						});
+						matched = true;
+					} catch (error) {
+						if (!isUnmatchedDispatchError(error)) throw error;
+					}
+				}
+				if (!matched) await fallback(handoff);
+			});
+			container.dispatchRegistered = true;
+		}
+		(
+			adopted.root as typeof adopted.root & { __asyncResumeRuntimeStarted?: boolean }
+		).__asyncResumeRuntimeStarted = true;
+		const cells = container.scalarValues;
+		cells.get = (id) => {
+			const owner = container.segments.find((candidate) => candidate.graphNodeIds.has(id));
+			return owner ? owner.graph.read(id) : Map.prototype.get.call(cells, id);
+		};
+		cells.has = (id) =>
+			container.segments.some((candidate) => candidate.graphNodeIds.has(id)) ||
+			Map.prototype.has.call(cells, id);
+		adopted.root.__marklessEventOnlyGraph = cells;
 		started = true;
+		return { decoded: adopted, graph, runtime: stagedRuntime };
 	} finally {
 		for (const claim of boundaryClaims)
 			completePrerenderBoundaryArmRegistration(adopted.root, claim, started);
-	}
-	// Keep each staged computed with the runtime owning its derive route.
-	const stagedRuntime: ResumeRuntime = {
-		...runtime,
-		dispatch: (event, options) =>
-			withoutCaptureListeners(adopted.root, eventTypes, () =>
-				runtime!.dispatch(event, options),
-			),
-	};
-	container.runtimes.push({
-		segment,
-		runtime: stagedRuntime,
-		registerComputedRefreshes: (records) => registerComputedRefreshes?.(records),
-	});
-	if (!container.dispatchRegistered) {
-		type Handoff = {
-			readonly event: ResumeDomEvent;
-			readonly syncPolicyAlreadyApplied?: boolean;
-		};
-		(
-			adopted.root as typeof adopted.root & {
-				__marklessRegisterDispatch?: (
-					dispatch: (
-						handoff: Handoff,
-						fallback: (handoff: Handoff) => Promise<void> | void,
-					) => Promise<void> | void,
-				) => void;
+		if (!started) {
+			runtime?.dispose();
+			container.segments.splice(container.segments.indexOf(segment), 1);
+			const registration = container.runtimes.findIndex(
+				(candidate) => candidate.segment === segment,
+			);
+			if (registration !== -1) container.runtimes.splice(registration, 1);
+			for (const [id, computed] of container.computed) {
+				if (computed.owner !== segment) continue;
+				const previous = previousComputed.get(id);
+				if (previous) container.computed.set(id, previous);
+				else container.computed.delete(id);
 			}
-		).__marklessRegisterDispatch?.(async (handoff, fallback) => {
-			let matched = false;
-			for (const candidate of container.runtimes) {
-				try {
-					await candidate.runtime.dispatch(handoff.event, {
-						syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true,
-					});
-					matched = true;
-				} catch (error) {
-					if (!isUnmatchedDispatchError(error)) throw error;
-				}
-			}
-			if (!matched) await fallback(handoff);
-		});
-		container.dispatchRegistered = true;
+		}
 	}
-	(
-		adopted.root as typeof adopted.root & { __asyncResumeRuntimeStarted?: boolean }
-	).__asyncResumeRuntimeStarted = true;
-	return { decoded: adopted, graph, runtime: stagedRuntime };
 }
 
 function isUnmatchedDispatchError(error: unknown): boolean {
@@ -436,7 +486,7 @@ function registerStagedComputedClosure(
 		local.graphNodeIds.add(record.graphNodeId);
 		local.graph.write({ graphNodeId: record.graphNodeId, value: record.value });
 	}
-	// A subscribing segment must claim dependencies to receive broadcasts.
+
 	for (const graphNodeId of graphNodeIds) local.graphNodeIds.add(graphNodeId);
 }
 

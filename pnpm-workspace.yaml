@@ -5,6 +5,8 @@ packages:
   - apps/*
   - demos/*
   - website
+  - demos/interaction-benchmark/apps/markless
+  - demos/interaction-benchmark/apps/markless-viewport
   # @tsrx/yuku is consumed through its generated self-contained host.
 
 catalogs:
@@ -37,5 +39,7 @@ catalogs:
 
 overrides:
   "@types/node": 24.12.2
+  vite: npm:@voidzero-dev/vite-plus-core@0.3.1
+  vitest: 4.1.11
 patchedDependencies:
   '@async/witness@0.7.0': patches/witness-0.7.0-pointer-actionability.patch

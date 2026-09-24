@@ -8,9 +8,11 @@ import type { CompileTsrxModuleInput, CompileTsrxModuleResult } from './artifact
 
 // Eviction only costs a recompile, so this bounds a long dev session's memory
 // rather than deciding correctness.
-const MAX_ENTRIES = 128;
+const MAX_ENTRIES = 512;
 
-const compiles = new Map<string, Promise<CompileTsrxModuleResult>>();
+// Outer key is the source text itself: stringifying it into every key cost more than the compiles the memo saved.
+const compiles = new Map<string, Map<string, Promise<CompileTsrxModuleResult>>>();
+let entries = 0;
 
 // Sorted, because the two requests for one module build their interface records
 // in whatever order they resolved imports; the values are compiler artifacts,
@@ -22,20 +24,20 @@ function sortedRecordEntries(record: Readonly<Record<string, unknown>> | undefin
 		.map((key) => [key, record[key]]);
 }
 
-// Every field `compileTsrxModule` reads. A field left out here would serve one
+// Every field `compileTsrxModule` reads besides `source`, the outer key. A field left out here would serve one
 // request's output to a different request, so this list must track the input type.
 export function compileCacheKey(input: CompileTsrxModuleInput): string | null {
 	try {
 		return JSON.stringify([
 			input.filename,
 			input.moduleId ?? null,
-			input.source,
 			input.buildId ?? null,
 			input.resolverId ?? null,
 			input.omitAuthoredSource === true,
 			input.additionalFrameworkApiSources ?? null,
 			input.symbols,
 			sortedRecordEntries(input.importedModuleInterfaces),
+			sortedRecordEntries(input.importedModuleConstants),
 			sortedRecordEntries(input.artifactChildMaterializations),
 		]);
 	} catch {
@@ -49,31 +51,41 @@ export function memoizedCompile(
 ): Promise<CompileTsrxModuleResult> {
 	const key = compileCacheKey(input);
 	if (key === null) return compile();
-	const cached = compiles.get(key);
+	let bySource = compiles.get(input.source);
+	const cached = bySource?.get(key);
 	if (cached) {
-		compiles.delete(key);
-		compiles.set(key, cached);
+		compiles.delete(input.source);
+		compiles.set(input.source, bySource!);
 		return cached;
 	}
 	const pending = compile();
-	compiles.set(key, pending);
+	if (!bySource) compiles.set(input.source, (bySource = new Map()));
+	bySource.set(key, pending);
+	entries++;
 	// A throwing compile is not remembered: the transform hook answers one by
 	// recompiling against a wider link input, and a stored rejection nobody
 	// awaits again would also surface as an unhandled rejection.
+	const owner = bySource;
 	pending.catch(() => {
-		if (compiles.get(key) === pending) compiles.delete(key);
+		if (owner.get(key) === pending) {
+			owner.delete(key);
+			entries--;
+			if (owner.size === 0 && compiles.get(input.source) === owner) compiles.delete(input.source);
+		}
 	});
-	for (const oldest of compiles.keys()) {
-		if (compiles.size <= MAX_ENTRIES) break;
-		compiles.delete(oldest);
+	for (const [source, oldest] of compiles) {
+		if (entries <= MAX_ENTRIES || oldest === owner) break;
+		compiles.delete(source);
+		entries -= oldest.size;
 	}
 	return pending;
 }
 
 export function clearCompileCache(): void {
 	compiles.clear();
+	entries = 0;
 }
 
 export function compileCacheSize(): number {
-	return compiles.size;
+	return entries;
 }

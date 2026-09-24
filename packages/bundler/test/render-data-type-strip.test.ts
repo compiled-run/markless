@@ -43,10 +43,10 @@ import { state } from '@markless/core';
 
 const TONES = { calm: 'Calm', loud: 'Loud' };
 
-export default function UntypedTonePage() @{
-	const view = state({ tone: 'calm' });
+export default function UntypedTonePage({ tone }) @{
+	const view = state({ count: 0 });
 
-	<main data-label={TONES[view.tone]}>{view.tone}</main>
+	<main data-label={TONES[tone]}>{view.count}</main>
 }
 `;
 
@@ -67,7 +67,7 @@ const FORCED = BOX.n!;
 export default function AmbiguousTonePage() @{
 	const view = state({ tone: 'calm' });
 
-	<main data-label={\`\${CAP}-\${LOUD}-\${FORCED}-\${view.tone}\`}>{view.tone}</main>
+	<main data-label={\`\${CAP}-\${LOUD}-\${FORCED}\`}>{view.tone}</main>
 }
 `;
 
@@ -198,6 +198,20 @@ test('a fragment the stripper cannot parse fails loudly and names the module', a
 	await expect(
 		stripEmittedTypes('const = ;', 'virtual:markless:render-data:probe'),
 	).rejects.toThrow(/MARKLESS_TYPE_STRIP_FAILED: virtual:markless:render-data:probe/);
+	await expect(stripEmittedTypes('const = ;', 'second-asker')).rejects.toThrow(
+		/MARKLESS_TYPE_STRIP_FAILED: second-asker/,
+	);
+});
+
+test('stripping the same code again returns the same bytes, per strip mode', async () => {
+	const code = 'import type { Limit } from "./limit";\nexport const cap = (8 as Limit) + 1;\n';
+	const stripped = await stripEmittedTypes(code, 'first-asker');
+	expect(stripped).not.toContain('as Limit');
+	expect(await stripEmittedTypes(code, 'second-asker')).toBe(stripped);
+	expect(await stripEmittedTypes(code, 'imports-only', true)).toBe(
+		transformSync('markless-emitted.ts', code, { typescript: { onlyRemoveTypeImports: true } })
+			.code,
+	);
 });
 
 // A generic call is TypeScript that is also valid JavaScript with a different
@@ -250,3 +264,33 @@ test('a fragment with no TypeScript comes back byte-identical, spacing and all',
 		'import { pick } from "./pick.js";',
 	);
 });
+
+const SIBLING_ROOTS_SOURCE = `
+import { state } from '@markless/core';
+
+export default function SiblingRootsPage() @{
+	let count = state(0);
+
+	<h1>Count</h1>
+	<button onClick={() => count++}>Add</button>
+	<output>{count}</output>
+}
+`;
+
+test.each(['server', 'client'] as const)(
+	'sibling top-level elements build as an implicit fragment in the %s environment',
+	async (environment) => {
+		const result = await transformTsrxModule({
+			filename: '/workspace/app/src/siblingRoots.tsrx',
+			source: SIBLING_ROOTS_SOURCE,
+			environment,
+		});
+
+		for (const module of result.virtualModules) {
+			if (module.type === 'style') continue;
+			expect(module.source).not.toContain('onClick={');
+			expect(javaScriptParseErrors(module.source)).toEqual([]);
+		}
+		expect(javaScriptParseErrors(result.code)).toEqual([]);
+	},
+);

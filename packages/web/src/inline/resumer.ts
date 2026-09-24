@@ -6,9 +6,13 @@ import type {
 	ProtocolSyncPolicyCondition,
 	ProtocolViewPayload,
 } from '@markless/serializer/protocol';
-import { PROTOCOL_EVENT_ACTION_KIND } from '@markless/serializer/protocol';
+import {
+	PROTOCOL_EVENT_ACTION_KIND,
+	PROTOCOL_VISIBLE_EVENT_NAME,
+} from '@markless/serializer/protocol';
 import type { MarklessExecutionLogMode } from '../dev-log.ts';
 import type { OverlayInstalledRoot, OverlayPrimedDismissalHost } from '../overlay-handoff.ts';
+import type { EarlyEventRoot } from './early-events.ts';
 
 type InlineDebugControls = {
 	record(
@@ -34,6 +38,7 @@ declare const __MARKLESS_INLINE_SHARED_GRAPH_POLICY__: boolean;
 declare const __MARKLESS_INLINE_DEBUG__: boolean;
 declare const __MARKLESS_INLINE_EXECUTION_LOG__: MarklessExecutionLogMode;
 declare const __MARKLESS_INLINE_RESUME_MODULE_URL__: string | undefined;
+declare const __MARKLESS_INLINE_VISIBLE_EVENT__: typeof PROTOCOL_VISIBLE_EVENT_NAME;
 declare const __MARKLESS_INLINE_DEBUG_BOOTSTRAP__:
 	| ((root: Element, phase: 'ssr-inline', active: false) => InlineDebugControls)
 	| undefined;
@@ -106,13 +111,15 @@ export type MarklessSettledArmHandoff = {
 };
 
 type InlineRoot = HTMLElement &
+	EarlyEventRoot &
 	OverlayInstalledRoot &
 	OverlayPrimedDismissalHost & {
 		__asyncResumeRuntimeStarted?: boolean;
-		__marklessDelegatedDispatch?: boolean;
+		__marklessDelegatedDispatch?: boolean | string;
 		__marklessSettledArms?: Array<MarklessSettledArmHandoff>;
 		__marklessEventOnlyGraph?: Map<string, unknown>;
 		__marklessEventOnlyGraphInitialized?: boolean;
+		__marklessVisibleFired?: WeakSet<Element>;
 		// The control a crossing woke this page on. A resting pointer sends no
 		// second crossing, so the runtime's own preload would otherwise miss it.
 		__marklessPrimedHover?: Element;
@@ -123,6 +130,7 @@ type InlineDispatchInput = {
 	readonly element?: Element | EventTarget | null;
 	readonly eventRecord?: InlineEventRecord | null;
 	readonly syncPolicyAlreadyApplied?: boolean;
+	readonly propagationStopped?: boolean;
 };
 type InlineResumeModule = {
 	resumeContainerEvent(input: InlineDispatchInput): Promise<void> | void;
@@ -173,6 +181,7 @@ const __MARKLESS_INLINE_SHARED_GRAPH_POLICY__=${JSON.stringify(options.sharedGra
 const __MARKLESS_INLINE_DEBUG__=${JSON.stringify(options.debug)};
 const __MARKLESS_INLINE_EXECUTION_LOG__=${JSON.stringify(options.executionLog)};
 const __MARKLESS_INLINE_RESUME_MODULE_URL__=${JSON.stringify(options.resumeModuleUrl)};
+const __MARKLESS_INLINE_VISIBLE_EVENT__=${JSON.stringify(PROTOCOL_VISIBLE_EVENT_NAME)};
 const __MARKLESS_INLINE_DEBUG_BOOTSTRAP__=${debugBootstrap};
 const __MARKLESS_INLINE_DEBUG_REGISTER__=${debugRegistration};
 ${logging ? `(${runGeneralInlineLogSummary.toString()})(${JSON.stringify(options.executionLog)});\n` : ''}(${runInlineResumer.toString()})((url) => import(/* @vite-ignore */ url));
@@ -483,7 +492,13 @@ function runPrerenderInlineResumerLogSummary(mode: 'always' | 'auto'): void {
 	// only observer early enough to see it. A module-scope helper cannot be used:
 	// these bodies are serialized with toString and would lose the reference.
 	for (const type of ['pointerdown', 'touchstart', 'keydown'])
-		addEventListener(type, (event) => { if (event.isTrusted) ledger.loadClosed = true; }, { capture: true, passive: true });
+		addEventListener(
+			type,
+			(event) => {
+				if (event.isTrusted) ledger.loadClosed = true;
+			},
+			{ capture: true, passive: true },
+		);
 	ledger.turns.push({
 		kind: 'resume',
 		delta: { app: 0, framework: 0, instrument: 0 },
@@ -556,7 +571,13 @@ function runGeneralInlineLogSummary(mode: 'always' | 'auto'): void {
 	// only observer early enough to see it. A module-scope helper cannot be used:
 	// these bodies are serialized with toString and would lose the reference.
 	for (const type of ['pointerdown', 'touchstart', 'keydown'])
-		addEventListener(type, (event) => { if (event.isTrusted) ledger.loadClosed = true; }, { capture: true, passive: true });
+		addEventListener(
+			type,
+			(event) => {
+				if (event.isTrusted) ledger.loadClosed = true;
+			},
+			{ capture: true, passive: true },
+		);
 	ledger.turns.push({
 		kind: 'resume',
 		delta: { app: 0, framework: 0, instrument: 0 },
@@ -640,19 +661,22 @@ function runInlineResumerSelfWake(fallbackResumeModuleUrl: string | undefined): 
 	const resumeModuleUrl =
 		currentScript?.getAttribute?.('data-markless-resume-module') ?? fallbackResumeModuleUrl;
 	if (!root || !resumeModuleUrl) return;
-	// A streamed arm schedules its reveal while the response is still parsing.
-	// Let that earlier frame commit before event-less resume adopts the DOM.
+	// Streamed reveal trains may still hold commits (pre-paint frame or post-paint timer); adopt only after they land.
 	const wake = () =>
 		requestAnimationFrame(() => {
-			queueMicrotask(async () => {
-				if (!root.__asyncResumeRuntimeStarted) {
-					root.__marklessDelegatedDispatch = true;
-					const module = (await import(
-						/* @vite-ignore */ resumeModuleUrl
-					)) as InlineResumeModule;
-					await module.resumeContainerEvent({ root, event: 0 });
-				}
-			});
+			const start = () =>
+				queueMicrotask(async () => {
+					if (!root.__asyncResumeRuntimeStarted) {
+						root.__marklessDelegatedDispatch = true;
+						const module = (await import(
+							/* @vite-ignore */ resumeModuleUrl
+						)) as InlineResumeModule;
+						await module.resumeContainerEvent({ root, event: 0 });
+					}
+				});
+			const arms = (globalThis as { __mArm?: { idle?: (run: () => void) => void } }).__mArm;
+			if (arms?.idle) arms.idle(start);
+			else start();
 		});
 	if (document.readyState === 'loading') {
 		document.addEventListener('DOMContentLoaded', wake, { once: true });
@@ -661,29 +685,7 @@ function runInlineResumerSelfWake(fallbackResumeModuleUrl: string | undefined): 
 	}
 }
 
-/**
- * One window-level listen, from first paint, on a page that elevates something.
- *
- * Two facts make it necessary. A page served with an open overlay is on the
- * stack the moment the behaviour installs, but nothing installs until the
- * runtime wakes; and Escape is the one gesture with no route into the page -
- * every other one reaches an authored handler through the container's own
- * listener, while a dismissal is reported by a document listener that does not
- * exist yet. So the first Escape on such a page would be spent waking and
- * dismiss nothing. This listens above the container, leaves the reason where the
- * behaviour's installer takes it, and lets the wake finish the job.
- *
- * It stays armed until that installer runs, because a wake that has STARTED is
- * not a behaviour that is LISTENING - the installer is an import away, and an
- * earlier gesture (a focus arriving on a control the page has a record for is
- * enough) starts the wake without covering the keyboard. An Escape landing in
- * that window is silently lost unless this still takes it.
- *
- * Deliberately not the waker of first resort. The container's own capture
- * listener runs after this one and wakes the runtime for any event the page has
- * a record for; waking here as well would start a second runtime for one
- * gesture. Deciding a task later is what tells the two apart.
- */
+// Retain Escape until installation; defer the wake so authored dispatch (`true`, never a visible forward) can claim it.
 function runInlineResumerOverlayPrimer(
 	fallbackResumeModuleUrl: string | undefined,
 	loadModule: (url: string) => Promise<InlineResumeModule>,
@@ -694,23 +696,18 @@ function runInlineResumerOverlayPrimer(
 		currentScript?.getAttribute?.('data-markless-resume-module') ?? fallbackResumeModuleUrl;
 	if (!root || !resumeModuleUrl) return;
 	const prime = (event: Event) => {
-		// Installed is the only state that means something else owns the keyboard;
-		// a reason left behind after that would dismiss something twice.
 		if (root.__marklessOverlayInstalled) {
 			removeEventListener('keydown', prime, true);
 			removeEventListener('pointerdown', prime, true);
 			return;
 		}
+		if (!root.querySelector('[overlay]:not([hidden])')) return;
 		if ((event as KeyboardEvent).key === 'Escape')
 			root.__marklessOverlayPrimedDismissal = 'escape';
-		if (root.__marklessDelegatedDispatch) return;
+		if (root.__marklessDelegatedDispatch === true) return;
 		setTimeout(() => {
-			if (root.__marklessDelegatedDispatch) return;
+			if (root.__marklessDelegatedDispatch === true) return;
 			root.__marklessDelegatedDispatch = true;
-			// A wake, not a dispatch: `0` is the same no-event shape the self-wake
-			// sends. Forwarding the real event instead would ask the runtime to
-			// match a record for a key no page has one for, and being unmatched is
-			// a reported defect, correctly.
 			loadModule(resumeModuleUrl).then((module) =>
 				module.resumeContainerEvent({ root, event: 0 }),
 			);
@@ -720,6 +717,118 @@ function runInlineResumerOverlayPrimer(
 	addEventListener('pointerdown', prime, true);
 }
 
+/**
+ * The visibility observer, appended only to a page whose view carries a
+ * visible event, so every other page ships a byte-identical resumer. It runs
+ * at load with no gesture and forwards each host's first intersection to the
+ * resume module. A started runtime observes hosts itself, so a host is marked
+ * fired only when a lean path ran its handler.
+ */
+export function createInlineResumerVisiblePrimerSource(
+	resumeModuleUrl: string | undefined,
+): string {
+	return `;(${runInlineResumerVisiblePrimer.toString()})(${JSON.stringify(PROTOCOL_VISIBLE_EVENT_NAME)},${JSON.stringify(resumeModuleUrl)},(url) => import(/* @vite-ignore */ url));`;
+}
+
+function runInlineResumerVisiblePrimer(
+	visibleEventName: string,
+	fallbackResumeModuleUrl: string | undefined,
+	loadModule: (url: string) => Promise<InlineResumeModule>,
+): void {
+	const currentScript = document.currentScript as HTMLScriptElement | null;
+	const root = currentScript?.closest<InlineRoot>('[data-async-container]');
+	const resumeModuleUrl =
+		currentScript?.getAttribute?.('data-markless-resume-module') ?? fallbackResumeModuleUrl;
+	const viewScript = root?.querySelector('script[type="markless/view"]');
+	if (!root || !resumeModuleUrl || !viewScript || typeof IntersectionObserver !== 'function')
+		return;
+	const view = JSON.parse(viewScript.textContent || 'null') as InlineView;
+	const walker = document.createTreeWalker(root, 1);
+	const elements: Node[] = [root];
+	let next: Node | null;
+	while ((next = walker.nextNode())) elements.push(next);
+	const records = new Map<Element, InlineEventRecord>();
+	const fired = (root.__marklessVisibleFired ||= new WeakSet());
+	let pending = 0;
+	const observer = new IntersectionObserver((entries) => {
+		for (const entry of entries) {
+			const element = entry.target;
+			const eventRecord = records.get(element);
+			if (!entry.isIntersecting || !eventRecord) continue;
+			observer.unobserve(element);
+			records.delete(element);
+			if (fired.has(element) || root.__asyncResumeRuntimeStarted) continue;
+			root.__marklessDelegatedDispatch ||= visibleEventName;
+			pending++;
+			loadModule(resumeModuleUrl)
+				.then((module) =>
+					module.resumeContainerEvent({
+						root,
+						event: { type: visibleEventName, target: element } as unknown as Event,
+						element,
+						eventRecord,
+					}),
+				)
+				.then(() => {
+					if (root.__asyncResumeRuntimeStarted) return;
+					fired.add(element);
+					// A lean run leaves no runtime behind, so the hover/focus primer re-arms.
+					if (!--pending && root.__marklessDelegatedDispatch === visibleEventName)
+						root.__marklessDelegatedDispatch = undefined;
+				});
+		}
+	});
+	for (const eventRecord of view.events) {
+		const locator = view.locators.find((item) => item.hostNodeId === eventRecord.hostNodeId);
+		const element = locator && (elements[locator.index] as Element | undefined);
+		if (eventRecord.eventName !== visibleEventName || !element) continue;
+		records.set(element, eventRecord);
+		observer.observe(element);
+	}
+}
+
+/**
+ * The visibility observer for a page served without a view script (wake
+ * channel, prerender). The page's boot delegates the visible event name like
+ * any other, so each host's first intersection is dispatched on the host and
+ * reaches the resume module through the boot's own queue, where it takes that
+ * host's trigger group.
+ */
+export function createPrerenderInlineVisiblePrimerSource(
+	hostIndexes: ReadonlyArray<number>,
+): string {
+	return `;(${runPrerenderInlineVisiblePrimer.toString()})(${JSON.stringify(PROTOCOL_VISIBLE_EVENT_NAME)},${JSON.stringify(hostIndexes)});`;
+}
+
+function runPrerenderInlineVisiblePrimer(
+	visibleEventName: string,
+	hostIndexes: ReadonlyArray<number>,
+): void {
+	const root = (document.currentScript as HTMLScriptElement | null)?.closest<InlineRoot>(
+		'[data-async-container]',
+	);
+	if (!root || typeof IntersectionObserver !== 'function') return;
+	const walker = document.createTreeWalker(root, 1);
+	const elements: Node[] = [root];
+	let next: Node | null;
+	while ((next = walker.nextNode())) elements.push(next);
+	const fired = (root.__marklessVisibleFired ||= new WeakSet());
+	const observer = new IntersectionObserver((entries) => {
+		for (const entry of entries) {
+			if (!entry.isIntersecting) continue;
+			observer.unobserve(entry.target);
+			if (fired.has(entry.target)) continue;
+			const claimed = root.__marklessDelegatedDispatch;
+			entry.target.dispatchEvent(new Event(visibleEventName, { bubbles: true }));
+			root.__marklessDelegatedDispatch = claimed || visibleEventName;
+		}
+	});
+	for (const index of hostIndexes) {
+		const element = elements[index] as Element | undefined;
+		if (element) observer.observe(element);
+	}
+}
+
 function registerInlineResumerDebug(input: {
 	readonly controls: InlineDebugControls | undefined;
 	readonly elements: ReadonlyArray<Element>;
@@ -727,7 +836,11 @@ function registerInlineResumerDebug(input: {
 	readonly view: InlineView;
 }): void {
 	for (const candidate of input.view.events) {
-		if (candidate.eventName !== input.eventName || candidate.eventName === 'visible') continue;
+		if (
+			candidate.eventName !== input.eventName ||
+			candidate.eventName === __MARKLESS_INLINE_VISIBLE_EVENT__
+		)
+			continue;
 		const locator = input.view.locators.find(
 			(item) => item.hostNodeId === candidate.hostNodeId,
 		);
@@ -755,10 +868,7 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 		currentScript?.getAttribute?.('data-markless-resume-module') ??
 		__MARKLESS_INLINE_RESUME_MODULE_URL__;
 	if (!root || !resumeModuleUrl) return;
-	// One import promise per root, reused: `.then` callbacks on the SAME promise
-	// run in registration order, so events reach the dispatch queue in the order
-	// they fired. A fresh import() per event resolves in no guaranteed order, and
-	// the queue then faithfully serializes the scrambled arrivals.
+	// Reuse the import promise to preserve native event arrival order.
 	let loaded: Promise<InlineResumeModule> | undefined;
 	const forward = (input: Omit<InlineDispatchInput, 'root'>) => {
 		root.__marklessDelegatedDispatch = true;
@@ -775,17 +885,11 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 	let nextElement: Node | null;
 	while ((nextElement = walker.nextNode())) elements.push(nextElement as Element);
 	const hostIds = new Map(
-		view.locators.flatMap((locator) => {
-			const element = elements[locator.index];
-			return element ? ([[element, locator.hostNodeId]] as const) : [];
-		}),
+		view.locators.map((locator) => [elements[locator.index], locator.hostNodeId] as const),
 	);
-	const events = new Map<string, InlineEventRecord>();
-	for (const event of view.events) {
-		if (event.eventName !== 'visible') {
-			events.set(`${event.hostNodeId}\n${event.eventName}`, event);
-		}
-	}
+	const events = new Map(
+		view.events.map((event) => [`${event.hostNodeId}\n${event.eventName}`, event] as const),
+	);
 
 	const globalScope = globalThis as typeof globalThis & {
 		__marklessInlineSyncPolicy?: InlineSyncPolicyRuntime;
@@ -980,33 +1084,23 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 	];
 	const nestedEventNames = new Set([
 		...keyedRepeats.flatMap((repeat) => repeat.rowEvents.map((event) => event.eventName)),
-		// An escalating branch serves one arm record set instead of a per-arm plan,
-		// and a flip brings in elements no payload record names.
 		...branches.flatMap((branch) =>
-			[...(branch.armRecords ?? []), ...(branch.servedArmRecords ? [branch.servedArmRecords] : [])]
-				.flatMap((arm) => arm.events.map((event) => event.eventName)),
+			[
+				...(branch.armRecords ?? []),
+				...(branch.servedArmRecords ? [branch.servedArmRecords] : []),
+			].flatMap((arm) => arm.events.map((event) => event.eventName)),
 		),
 		...armRecordSets.flatMap((arm) => (arm.events ?? []).map((event) => event.eventName)),
 	]);
-	// A row that IS a component owns no element of the row chunk, so its gestures
-	// ride the child's own records and `rowEvents` is empty by construction: the
-	// unknown-element hatch below has to open on the record that says the list can
-	// mint such a row, or a row born after boot is never forwarded at all.
-	// An escalating branch replaces its arm from a fresh render, so a flip brings
-	// in elements this payload names no record for: same hatch, same reason.
+	// New component rows and escalating arms have no initial DOM locator.
 	const mintsComponentRows =
 		keyedRepeats.some((repeat) => repeat.rowComponent !== undefined) ||
-		branches.some((branch) => branch.escalates === true);
+		branches.some((branch) => branch.escalates);
 	const eventNames = new Set([
 		...view.events.map((event) => event.eventName),
 		...nestedEventNames,
 	]);
-	// A key event only reaches an element that already holds focus, and a pointer
-	// crosses a control before pressing it (Safari focuses no button on click), so
-	// focus and hover are what precede a first gesture. A wake, not a dispatch: the
-	// real event arrives through the capture listener below, queued behind this
-	// same import promise. Names are restated because this body ships by toString();
-	// pointerenter is unusable here because it does not bubble.
+	// This serialized function cannot import the shared event-name constants.
 	const pressPreloadEventNames = ['click', 'pointerdown', 'pointerup'];
 	const focusWakeEventNames = [
 		'keydown',
@@ -1016,8 +1110,6 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 		'input',
 		...pressPreloadEventNames,
 	];
-	// Same hatch the dispatch listener opens on: a row minted after boot owns no
-	// element this payload names a record for.
 	const wakeOnUnknownElement =
 		mintsComponentRows ||
 		focusWakeEventNames.some((eventName) => nestedEventNames.has(eventName));
@@ -1033,12 +1125,12 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 			let primed: Element | undefined;
 			for (
 				let element = event.target as Element | null;
-				element && !primed;
+				element;
 				element = element.parentElement
 			) {
 				const hostNodeId = hostIds.get(element);
 				const editable =
-					(element as HTMLElement).isContentEditable === true ||
+					(element as HTMLElement).isContentEditable ||
 					element.tagName === 'INPUT' ||
 					element.tagName === 'TEXTAREA' ||
 					element.tagName === 'SELECT';
@@ -1046,70 +1138,67 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 					hostNodeId &&
 					(hover ? pressPreloadEventNames : focusWakeEventNames).some(
 						(eventName) =>
-							(editable ||
-								(eventName !== 'beforeinput' && eventName !== 'input')) &&
+							(editable || (eventName !== 'beforeinput' && eventName !== 'input')) &&
 							events.has(`${hostNodeId}\n${eventName}`),
 					)
-				)
+				) {
 					primed = element;
+					break;
+				}
 				if (element === root) break;
 			}
-			if (!primed && !hover && wakeOnUnknownElement) primed = root;
-			if (!primed) return;
-			// A resting pointer sends no second crossing, so the control the wake was
-			// spent on is left where the runtime's own preload can read it.
+			if (!primed) {
+				if (hover || !wakeOnUnknownElement) return;
+				primed = root;
+			}
+			// Retain the hovered control because a resting pointer sends no second crossing.
 			if (hover) root.__marklessPrimedHover = primed;
 			for (const primeEventName of primeEventNames)
 				root.removeEventListener(primeEventName, prime, true);
-			forward({ event: 0 });
+			forward({ event: 0, element: primed });
 		};
 		for (const primeEventName of primeEventNames)
 			root.addEventListener(primeEventName, prime, true);
 	}
+	const dispatch = (event: Event) => {
+		for (
+			let element = event.target as Element | null;
+			element;
+			element = element.parentElement
+		) {
+			const hostNodeId = hostIds.get(element);
+			const eventRecord = hostNodeId ? events.get(`${hostNodeId}\n${event.type}`) : undefined;
+			if (eventRecord) {
+				if (eventRecord.action) return;
+				let syncPolicyAlreadyApplied = false;
+				if (__MARKLESS_INLINE_SYNC_POLICY__ && eventRecord.syncPolicy) {
+					runSyncPolicy!(eventRecord.syncPolicy, event);
+					syncPolicyAlreadyApplied = true;
+				}
+				const input: Omit<InlineDispatchInput, 'root'> = {
+					event,
+					element,
+					eventRecord,
+					propagationStopped: event.cancelBubble,
+				};
+				if (__MARKLESS_INLINE_SYNC_POLICY__) {
+					(input as { syncPolicyAlreadyApplied?: boolean }).syncPolicyAlreadyApplied =
+						syncPolicyAlreadyApplied;
+				}
+				return forward(input);
+			}
+			if (element === root) break;
+		}
+		if (mintsComponentRows || nestedEventNames.has(event.type)) {
+			return forward({ event, element: event.target, eventRecord: null });
+		}
+		if (__MARKLESS_INLINE_EXECUTION_LOG__ !== 'never' && globalScope.__mxLog) {
+			return forward({ event, element: event.target, eventRecord: null });
+		}
+	};
 	for (const eventName of eventNames) {
-		if (eventName === 'visible') continue;
-		root.addEventListener(
-			eventName,
-			(event) => {
-				for (
-					let element = event.target as Element | null;
-					element;
-					element = element.parentElement
-				) {
-					const hostNodeId = hostIds.get(element);
-					const eventRecord = hostNodeId
-						? events.get(`${hostNodeId}\n${event.type}`)
-						: undefined;
-					if (eventRecord) {
-						if (eventRecord.action) return;
-						let syncPolicyAlreadyApplied = false;
-						if (__MARKLESS_INLINE_SYNC_POLICY__ && eventRecord.syncPolicy) {
-							runSyncPolicy!(eventRecord.syncPolicy, event);
-							syncPolicyAlreadyApplied = true;
-						}
-						const input: Omit<InlineDispatchInput, 'root'> = {
-							event,
-							element,
-							eventRecord,
-						};
-						if (__MARKLESS_INLINE_SYNC_POLICY__) {
-							(
-								input as { syncPolicyAlreadyApplied?: boolean }
-							).syncPolicyAlreadyApplied = syncPolicyAlreadyApplied;
-						}
-						return forward(input);
-					}
-					if (element === root) break;
-				}
-				if (mintsComponentRows || nestedEventNames.has(event.type)) {
-					return forward({ event, element: event.target, eventRecord: null });
-				}
-				if (__MARKLESS_INLINE_EXECUTION_LOG__ !== 'never' && globalScope.__mxLog) {
-					return forward({ event, element: event.target, eventRecord: null });
-				}
-			},
-			true,
-		);
+		if (eventName === __MARKLESS_INLINE_VISIBLE_EVENT__) continue;
+		root.addEventListener(eventName, dispatch, true);
 		if (__MARKLESS_INLINE_DEBUG__) {
 			__MARKLESS_INLINE_DEBUG_REGISTER__?.({
 				controls: debugControls,
@@ -1119,6 +1208,9 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 			});
 		}
 	}
+	const earlyEvents = root.__marklessEarlyEvents;
+	root.__marklessEarlyEvents = 0;
+	if (earlyEvents) for (const event of earlyEvents) dispatch(event);
 	if (__MARKLESS_INLINE_DEBUG__) {
 		try {
 			debugControls?.activate();

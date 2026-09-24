@@ -2,7 +2,7 @@ import { box } from '@async/witness';
 
 // Owner report: "open the library and spam click around and I'm unable to select
 // a song." The cause is not spam. ONE click on a spot with no event record — the
-// nav heading, the library heading, any gap — used to hand the page to the
+// artist heading, the library heading, any gap — used to hand the page to the
 // ungrouped full-prerender resume, which registered itself as the outermost
 // dispatch handler with a one-parameter function. Registered handlers are
 // `(handoff, fallback)` and must pass unhandled events down; dropping `fallback`
@@ -12,7 +12,8 @@ import { box } from '@async/witness';
 // This box drives that exact 3-click sequence and then pins the second half of
 // the same family: a recordless click must not roll the visible track back to
 // the payload's initial state.
-const NAV_HEADING = 'nav h1';
+// Not the nav heading: the fixed video shell covers it at 800x600 and 1280x720.
+const ARTIST_HEADING = '.song-container h3';
 const LIBRARY_HEADING = '.library h2';
 const LIBRARY_BUTTON = '.library-button';
 const NEXT_TRACK = '[aria-label="Next track"]';
@@ -42,13 +43,13 @@ export default box(
 
 		await expect.page.text(page, '.song-container h2', TRACK_ONE, WAIT);
 
-		// Click 1: the nav heading carries no event record, so it takes the
+		// Click 1: the artist heading carries no event record, so it takes the
 		// ungrouped fallback. Nothing visible should change here — the point is
 		// what the page can still do afterwards.
-		await page.click(NAV_HEADING, WAIT);
+		await page.click(ARTIST_HEADING, WAIT);
 		await new Promise((resolve) => setTimeout(resolve, FALLBACK_SETTLE));
 		await expect.page.text(page, '.song-container h2', TRACK_ONE, WAIT);
-		receipt.note('recordless nav-heading click dispatched before any trigger group woke');
+		receipt.note('recordless artist-heading click dispatched before any trigger group woke');
 
 		// Click 2: the nav toggle has a trigger group, and it must still reach it.
 		await page.click(LIBRARY_BUTTON, WAIT);

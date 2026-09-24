@@ -1,0 +1,11 @@
+--- a/packages/router/src/vite/mdx.ts
++++ b/packages/router/src/vite/mdx.ts
+@@ -637,7 +637,7 @@
+ 	return `[${components
+ 		.map(
+ 			(component) =>
+-				`{ prefix: ${JSON.stringify(component.prefix)}, loadSymbol(symbolId) { return import(${JSON.stringify(scalarPlanSourceReference(component.specifier))}).then((mod) => mod.loadSymbol(symbolId.slice(${component.prefix.length}))); }, loadScalarActionPlan(symbolId) { return import(${JSON.stringify(scalarPlanSourceReference(component.specifier))}).then(mod => mod.loadScalarActionPlan?.(symbolId.slice(${component.prefix.length}))).then(action => action && ({ ...action, scope: ${JSON.stringify(component.prefix)} + action.scope })); } }`,
++				`(() => { let module; const loadModule = () => module ??= import(${JSON.stringify(scalarPlanSourceReference(component.specifier))}).catch(error => { module = undefined; throw error; }); return { prefix: ${JSON.stringify(component.prefix)}, loadSymbol(symbolId) { return loadModule().then((mod) => mod.loadSymbol(symbolId.slice(${component.prefix.length}))); }, loadScalarActionPlan(symbolId) { return loadModule().then(mod => mod.loadScalarActionPlan?.(symbolId.slice(${component.prefix.length}))).then(action => action && ({ ...action, scope: ${JSON.stringify(component.prefix)} + action.scope })); } }; })()`,
+ 		)
+ 		.join(', ')}]`;
+ }

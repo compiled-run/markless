@@ -15,9 +15,84 @@ export type PublicRenderRootSelection = {
 	readonly root: AnyNode;
 };
 
+const templateNodeTypes = new Set([
+	'Element',
+	'JSXElement',
+	'JSXScriptElement',
+	'Fragment',
+	'JSXFragment',
+	'JSXIfExpression',
+	'JSXSwitchExpression',
+	'JSXForExpression',
+	'JSXTryExpression',
+]);
+
+type ImplicitFragment = { readonly fragment: AnyNode; readonly statements: ReadonlySet<AnyNode> };
+const implicitFragments = new WeakMap<AnyNode, ImplicitFragment | null>();
+
+function topLevelTemplateNode(statement: AnyNode): AnyNode | null {
+	if (templateNodeTypes.has(statement.type ?? '')) return statement;
+	const expression = statement.type === 'ExpressionStatement'
+		? (statement.expression as AnyNode | undefined)
+		: undefined;
+	return expression && templateNodeTypes.has(expression.type ?? '') ? expression : null;
+}
+
+// Two or more top-level template statements are one root: the fragment the author left implicit.
+function implicitFragment(body: AnyNode): ImplicitFragment | null {
+	const cached = implicitFragments.get(body);
+	if (cached !== undefined) return cached;
+	const statements = new Set<AnyNode>();
+	const children: AnyNode[] = [];
+	for (const statement of childNodes(body)) {
+		const template = topLevelTemplateNode(statement);
+		if (!template) continue;
+		statements.add(statement);
+		children.push(template);
+	}
+	const first = children[0];
+	const last = children[children.length - 1];
+	const found = first && last && children.length > 1
+		? {
+				fragment: {
+					type: first.type?.startsWith('JSX') ? 'JSXFragment' : 'Fragment',
+					start: first.start,
+					end: last.end,
+					...(first.loc && last.loc
+						? { loc: { start: (first.loc as AnyNode).start, end: (last.loc as AnyNode).end } }
+						: {}),
+					children,
+				} as AnyNode,
+				statements,
+			}
+		: null;
+	implicitFragments.set(body, found);
+	return found;
+}
+
+export function implicitFragmentRoot(component: AnyNode | undefined): AnyNode | null {
+	const body = component?.body as AnyNode | undefined;
+	return body ? (implicitFragment(body)?.fragment ?? null) : null;
+}
+
+// True when the body statement is (or returns, or is part of) the component's render root.
+export function isRootStatement(
+	component: AnyNode,
+	root: AnyNode,
+	statement: AnyNode,
+): boolean {
+	if (statement === root) return true;
+	if (statement.type === 'ReturnStatement' && statement.argument === root) return true;
+	const body = component.body as AnyNode | undefined;
+	const implicit = body ? implicitFragment(body) : null;
+	return implicit?.fragment === root && implicit.statements.has(statement);
+}
+
 export function firstComponentRoot(component: AnyNode | undefined): AnyNode | null {
 	const body = component?.body as AnyNode | undefined;
 	if (!body) return null;
+	const implicit = implicitFragment(body);
+	if (implicit) return supportedFragmentRoot(implicit.fragment);
 	for (const child of childNodes(body)) {
 		if (child.type === 'Element' || child.type === 'JSXElement') return child;
 		if (child.type === 'Fragment' || child.type === 'JSXFragment') {

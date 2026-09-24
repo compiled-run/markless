@@ -3,7 +3,11 @@
 // that loads this module. The chunk groups keep resume core in its own chunk.
 import type { RuntimeGraph } from '@markless/runtime';
 import { createResumeRuntime, type ResumeRuntime } from './resume.ts';
-import { type ResumePayloadScriptsInput, type ResumePayloadScriptsResult } from './payload-full.ts';
+import {
+	type ResumeHandoff,
+	type ResumePayloadScriptsInput,
+	type ResumePayloadScriptsResult,
+} from './payload-full.ts';
 import type { decodePayloadScripts } from '../../serializer/src/protocol-client.ts';
 import type { DecodedPayloadScripts } from '../../serializer/src/protocol-client-storage.ts';
 import { createRuntimeGraphFromResumePayload } from './payload-graph-construct.ts';
@@ -108,7 +112,65 @@ async function startPayloadResume(
 	// Streamed settles left records + snapshot patches in the document; adopt
 	// them before graph construction so the settled DOM resumes interactive.
 	const decoded = await adoptStreamedPatchesIfPresent(decode(input), input.root);
-	return startDecodedResume(input, decoded);
+	const result = await startDecodedResume(input, decoded);
+	registerLiveDispatch(input, result.runtime);
+	return result;
+}
+
+type SymbolLoader = ResumePayloadScriptsInput['loadSymbol'];
+let journal: typeof import('./dom-journal.ts') | undefined;
+type LoadedSymbol = ReturnType<SymbolLoader>;
+
+// An evaluated symbol module never changes, and a repeat import() of it still costs a task.
+function heldSymbolLoader(load: SymbolLoader): SymbolLoader {
+	const held = new Map<string, LoadedSymbol>();
+	return (symbolId) => {
+		const loaded = held.get(symbolId);
+		if (loaded) return loaded;
+		const result = load(symbolId);
+		if (typeof result === 'function') held.set(symbolId, result);
+		else if (typeof (result as PromiseLike<unknown> | undefined)?.then === 'function') {
+			const pending = Promise.resolve(result).then(
+				(symbol) => {
+					held.set(symbolId, symbol);
+					return symbol;
+				},
+				(error: unknown) => {
+					held.delete(symbolId);
+					throw error;
+				},
+			);
+			held.set(symbolId, pending);
+			return pending;
+		}
+		return result;
+	};
+}
+
+type DispatchQueueRoot = {
+	readonly __marklessRegisterDispatch?: (
+		dispatch: (
+			handoff: ResumeHandoff,
+			fallback: (handoff: ResumeHandoff) => Promise<void> | void,
+		) => Promise<void> | void,
+	) => void;
+};
+
+// Later events queued behind this boot reach the live runtime directly: the route
+// handoff re-imports the resume entry per event, and that import is a task hop.
+function registerLiveDispatch(input: ResumePayloadScriptsInput, runtime: ResumeRuntime): void {
+	const root = input.root;
+	const options =
+		input.handoffDispatchOptions ??
+		((handoff: ResumeHandoff) => ({
+			syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true,
+			ignoreUnmatched: true,
+		}));
+	(root as DispatchQueueRoot).__marklessRegisterDispatch?.((handoff, fallback) =>
+		getAlreadyResumedPayload(root)?.runtime === runtime
+			? runtime.dispatch(handoff.event, options(handoff))
+			: fallback(handoff),
+	);
 }
 
 async function startDecodedResume(
@@ -116,7 +178,7 @@ async function startDecodedResume(
 	decoded: DecodedPayloadScripts,
 ): Promise<ResumePayloadScriptsResult> {
 	// Composed children's symbols answer on their own instance's graph nodes.
-	const loadSymbol = marklessInstanceScopedLoadSymbol(input.loadSymbol);
+	const loadSymbol = heldSymbolLoader(marklessInstanceScopedLoadSymbol(input.loadSymbol));
 	const graph = await createRuntimeGraphFromResumePayload({
 		state: decoded.state,
 		view: decoded.view,
@@ -128,7 +190,7 @@ async function startDecodedResume(
 	const applyDomJournal =
 		input.applyDomJournal ??
 		(async (entries) => {
-			const { applyDomJournalEntries } = await import('./dom-journal.ts');
+			const { applyDomJournalEntries } = (journal ??= await import('./dom-journal.ts'));
 			applyDomJournalEntries(entries, {
 				resolveTarget(locator) {
 					const rangeAnchor = /^(branch|async-boundary):(.+?):(start|end)$/.exec(

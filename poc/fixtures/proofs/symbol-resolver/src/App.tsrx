@@ -174,7 +174,7 @@ export function App() @{
       </article>
     } @pending {
       <p>Loading {selected.title}</p>
-    } @catch (error) {
+    } @catch (_error) {
       <p>Could not load {selected.title}</p>
     }
 

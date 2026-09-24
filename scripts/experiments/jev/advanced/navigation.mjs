@@ -1,4 +1,4 @@
-import { launch,session,observe,save,read,sleep,url } from './common.mjs';
+import { launch,observe,save,read,sleep,url } from './common.mjs';
 import { createJev,choice } from '../client.mjs';
 
 const patterns={held_supersede:'Hold destination module loading, click outgoing counter twice, supersede navigation, release stale loading',held_back:'Hold destination module loading, go Back before release, verify stale destination never commits',pending_leave:'Navigate into a pending async boundary, interact, leave before settlement, verify no stale DOM',ssr_pending_leave:'Start on a streamed SSR pending page, interact and navigate away while the response is unfinished',ssr_rapid_pair:'Send two trusted clicks during SSR pending work, then verify exactly two effects',history_roundtrip:'Mutate route state, visit async route, go Back and Forward and verify fresh route state'};

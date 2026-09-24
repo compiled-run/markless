@@ -8,8 +8,7 @@ export default function FocusField() @{
 
 	<section>
 		<label>
-			Your favourite word
-			<input el={field} />
+			Your favourite word <input el={field} />
 		</label>
 		<button
 			type="button"

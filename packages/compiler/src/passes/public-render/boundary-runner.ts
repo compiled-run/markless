@@ -30,7 +30,11 @@ export function resolveBoundaryRunners(
 		semanticGraph.graphBindings.map((binding) => [binding.id, binding]),
 	);
 	const aliases = semanticAliasMap(semanticGraph);
-	const boundaryReads = [
+	const boundaryReads: ReadonlyArray<{
+		readonly source: string;
+		readonly asyncBoundaryId?: string | undefined;
+		readonly computedGraphNodeId?: string | undefined;
+	}> = [
 		...semanticGraph.templateReads,
 		...semanticGraph.keyedRepeats.map((repeat) => ({
 			source: repeat.collectionSource,
@@ -52,7 +56,12 @@ export function resolveBoundaryRunners(
 			const seenGraphNodeIds = new Set<string>();
 			for (const read of boundaryReads) {
 				if (read.asyncBoundaryId !== boundary.id) continue;
-				const resolved = resolveGraphPath(read.source, bindings, aliases);
+				const composite = read.computedGraphNodeId
+					? bindingsById.get(read.computedGraphNodeId)
+					: undefined;
+				const resolved = composite
+					? { binding: composite, path: [] }
+					: resolveGraphPath(read.source, bindings, aliases);
 				if (!resolved) {
 					unresolvedSources.push(read.source);
 					continue;

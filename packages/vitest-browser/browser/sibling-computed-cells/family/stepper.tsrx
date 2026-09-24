@@ -23,7 +23,7 @@ export const stepperState = shared(
 );
 
 export function StepperRoot({ children }: { children?: Children }) @{
-	const stepper = stepperState();
+	const _stepper = stepperState();
 
 	<div data-stepper-root>{children}</div>
 }

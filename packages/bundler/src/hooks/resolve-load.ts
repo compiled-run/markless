@@ -19,6 +19,7 @@ import {
 	normalizeVirtualId,
 	resolveVirtualId,
 	resolverVirtualModuleSourceFile,
+	sharedReachedRenderDataRequest,
 	sourceForPrerenderWakeVirtualImporter,
 	sourceForResumeVirtualImporter,
 	sourceForSymbolVirtualImporter,
@@ -65,6 +66,9 @@ export async function resolveIdHook(
 		);
 	}
 
+	const sharedReach = sharedReachedRenderDataRequest(source);
+	if (sharedReach) return await pluginContext.resolve(sharedReach, importer, { skipSelf: true });
+
 	const symbolSource = sourceForSymbolVirtualImporter(importer);
 	if (symbolSource && isRelativeImport(source)) {
 		return await pluginContext.resolve(source, symbolSource, { skipSelf: true });
@@ -102,8 +106,15 @@ export async function loadHook(ctx: MarklessHookContext, pluginContext: PluginCo
 	}
 	const normalizedId = normalizeVirtualId(id);
 	const resolverSource = resolverVirtualModuleSourceFile(normalizedId);
+	const symbolSource = symbolVirtualModuleSourceFile(normalizedId);
+	const ownerSource = resolverSource ?? symbolSource;
 	// The id resolves from its owner's first pass; only a final publication ships.
-	if (resolverSource) await moduleMetadata.awaitSourceClaimsPublished(resolverSource);
+	if (ownerSource) {
+		await moduleMetadata.awaitSourceClaimsPublished(
+			ctx.getEnvironment(pluginContext),
+			ownerSource,
+		);
+	}
 	if (
 		resolverSource &&
 		ctx.getEnvironment(pluginContext) === 'client' &&
@@ -117,10 +128,11 @@ export async function loadHook(ctx: MarklessHookContext, pluginContext: PluginCo
 			withQuery(resolverSource, { 'markless-symbols': null }),
 		];
 		moduleMetadata.expectSourceSymbolClaims(
+			'client',
 			resolverSource,
 			queryClaimSources.filter((source) => pluginContext.getModuleInfo(source) != null),
 		);
-		await moduleMetadata.sealSourceSymbolClaims(resolverSource);
+		await moduleMetadata.sealSourceSymbolClaims('client', resolverSource);
 	}
 	const module = await virtualModuleForRequest(
 		ctx,
@@ -131,8 +143,9 @@ export async function loadHook(ctx: MarklessHookContext, pluginContext: PluginCo
 		},
 	);
 	if (module?.provisional === true) {
+		const kind = module.type === 'symbol' ? 'SYMBOL' : 'RESOLVER';
 		throw new Error(
-			`MARKLESS_RESOLVER_UNPUBLISHED: Resolver ${JSON.stringify(normalizedId)} was loaded before its owner ${JSON.stringify(resolverSource)} published a final compile.`,
+			`MARKLESS_${kind}_UNPUBLISHED: ${module.type} ${JSON.stringify(normalizedId)} was loaded before its owner ${JSON.stringify(ownerSource)} published a final compile.`,
 		);
 	}
 	if (module) {

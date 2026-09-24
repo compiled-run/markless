@@ -124,6 +124,23 @@ export function renderDecisionSources(
 }
 
 /**
+ * Child props that are constant data, by authored source, as the literal the
+ * browser reader answers with. Evaluating the source there would import the
+ * module that declares it; the literal is the same value.
+ */
+export function constantPropLiterals(
+	input: PublicRenderModuleInput,
+	componentName: string,
+): ReadonlyMap<string, string> {
+	const literals = new Map<string, string>();
+	for (const edge of componentEdgesFor(input, componentName))
+		for (const prop of edge.props)
+			if (prop.kind === 'opaque' && prop.buildTimeValue && prop.source)
+				literals.set(prop.source, JSON.stringify(prop.buildTimeValue.value) ?? 'undefined');
+	return literals;
+}
+
+/**
  * The seed-map key a widget root's instance token travels under. It is not a
  * graph node id: it names WHICH rendered widget the parts seeded from this map
  * belong to, which is what a shared() handle's minted id has to carry.
@@ -547,12 +564,14 @@ export function emitClientResidueReader(
 	];
 	const handles = elementHandleIdSources(componentChunks);
 	if (sources.length === 0 && handles.length === 0) return null;
+	const literals = constantPropLiterals(input, componentName);
+	const evaluatedSources = sources.filter((source) => !literals.has(source));
 	const readDependencies = createResidueDependencyReader();
 	const {
 		declarations: locals,
 		text,
 		reads,
-	} = componentResidueLocals(input, componentAst, sources, readDependencies);
+	} = componentResidueLocals(input, componentAst, evaluatedSources, readDependencies);
 	const bound = new Set<string>();
 	const lines: string[] = [];
 	for (const repeat of input.semanticGraph.keyedRepeats) {
@@ -638,7 +657,7 @@ export function emitClientResidueReader(
 		lines.join(''),
 		`switch(residue.source){`,
 		authoredResidueReadCases(
-			sources,
+			evaluatedSources,
 			undefined,
 			// A render with no defer registry has already resolved its counts, so the
 			// thunk is due now; a placeholder reaching that reader is a bug, not a value.
@@ -652,7 +671,7 @@ export function emitClientResidueReader(
 				const needed = componentResidueLocals(
 					input,
 					componentAst,
-					[sources[index]!],
+					[evaluatedSources[index]!],
 					readDependencies,
 				).declarations;
 				if (!needed.length) return entry;
@@ -663,6 +682,14 @@ export function emitClientResidueReader(
 					)
 					.join('');
 				return entry.replace(':return ', `:{${declarations}return `) + '}';
+			})
+			.join(''),
+		sources
+			.flatMap((source) => {
+				const literal = literals.get(source);
+				return literal === undefined
+					? []
+					: [`case ${JSON.stringify(source)}:return (${literal});`];
 			})
 			.join(''),
 		`default:throw new Error('MARKLESS_PRERENDER_RESIDUE_MISSING: '+residue.source);}}`,
@@ -689,10 +716,11 @@ export function emitClientResidueReaderPrelude(
 		const chunks = input.renderData.chunks.filter(
 			(chunk) => chunk.componentName === componentName,
 		);
+		const literals = constantPropLiterals(input, componentName);
 		const sources = [
 			...authoredResidueSources(chunks),
 			...renderDecisionSources(input, componentName),
-		];
+		].filter((source) => !literals.has(source));
 		const locals = componentResidueLocals(
 			input,
 			componentAsts.get(componentName),

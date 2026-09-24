@@ -872,6 +872,7 @@ export default function LiveFeed() @{
 		const filename = '/workspace/app/src/App.tsrx';
 		const frameworkModule = '/workspace/app/packages/web/src/event-only-resume.ts';
 		const symbolId = `virtual:markless:symbol:${encodeURIComponent(filename)}:${encodeURIComponent('symbol:0')}`;
+		const loggedId = `virtual:markless:symbol:${encodeURIComponent('src/App.tsrx')}:${encodeURIComponent('symbol:0')}`;
 
 		// `never` is the consumer posture: nothing is rewritten, so no
 		// hash-bearing module moves and no byte is added.
@@ -897,7 +898,7 @@ export default function LiveFeed() @{
 		expect(framework?.code).toContain('globalThis.__mxLog?.add("web:event-only-resume");');
 		await callTransform(instrumented, source, filename);
 		expect((await callLoad(instrumented, `\0${symbolId}`)) as string).toContain(
-			`globalThis.__mxLog?.add(${JSON.stringify(symbolId)});`,
+			`globalThis.__mxLog?.add(${JSON.stringify(loggedId)});`,
 		);
 	});
 
@@ -910,12 +911,13 @@ export default function LiveFeed() @{
 		const symbolId = `virtual:markless:symbol:${encodeURIComponent(filename)}:${encodeURIComponent('symbol:0')}`;
 		const symbolSource = (await callLoad(plugin, `\0${symbolId}`)) as string;
 		const logSource = (await callLoad(plugin, '\0virtual:markless:dev-log')) as string;
+		const loggedId = `virtual:markless:symbol:${encodeURIComponent('src/App.tsrx')}:${encodeURIComponent('symbol:0')}`;
 
 		// The executed id the hook adds must be the size-map key: qualified by
 		// the source module so symbol:0 from two files cannot collide.
-		expect(symbolSource).toContain(`globalThis.__mxLog?.add(${JSON.stringify(symbolId)});`);
+		expect(symbolSource).toContain(`globalThis.__mxLog?.add(${JSON.stringify(loggedId)});`);
 		expect(symbolSource).not.toContain('__mxLog?.add("symbol:');
-		expect(logSource).toContain(JSON.stringify(symbolId));
+		expect(logSource).toContain(JSON.stringify(loggedId));
 		expect(logSource).not.toContain('"symbol:symbol:0"');
 	});
 
@@ -959,9 +961,9 @@ export default function LiveFeed() @{
 		const panelPrefix = panel.manifest.symbolRoutes![0]!.prefix;
 		expect(await embeddedAttribution()).toEqual({
 			'routes/dashboard.tsrx': {
-				'': encodeURIComponent(routeFile),
-				[routePrefix]: encodeURIComponent(panelFile),
-				[routePrefix + panelPrefix]: encodeURIComponent(gaugeFile),
+				'': encodeURIComponent('routes/dashboard.tsrx'),
+				[routePrefix]: encodeURIComponent('components/MetricPanel.tsrx'),
+				[routePrefix + panelPrefix]: encodeURIComponent('components/GaugeButton.tsrx'),
 			},
 		});
 
@@ -977,8 +979,8 @@ export default function LiveFeed() @{
 
 		const refreshed = await embeddedAttribution();
 		expect(refreshed['routes/dashboard.tsrx']).toEqual({
-			'': encodeURIComponent(routeFile),
-			[routePrefix]: encodeURIComponent(replacementFile),
+			'': encodeURIComponent('routes/dashboard.tsrx'),
+			[routePrefix]: encodeURIComponent('components/TrendCard.tsrx'),
 		});
 		expect(JSON.stringify(refreshed['routes/dashboard.tsrx'])).not.toContain(
 			encodeURIComponent(panelFile),
@@ -1088,8 +1090,8 @@ export default function LiveFeed() @{
 		expect(Object.keys(payload.attribution)).toEqual(['pages/a.tsrx']);
 		expect(JSON.stringify(payload.attribution)).not.toContain('markless-symbols');
 		expect(payload.attribution['pages/a.tsrx']).toMatchObject({
-			'': encodeURIComponent('/workspace/app/pages/a.tsrx'),
-			'c0:': encodeURIComponent('/workspace/app/components/Branch.tsrx'),
+			'': encodeURIComponent('pages/a.tsrx'),
+			'c0:': encodeURIComponent('components/Branch.tsrx'),
 		});
 	});
 
@@ -1166,8 +1168,8 @@ export default function Branch() @{ <Leaf /> }`,
 		};
 		expect(Object.keys(payload.attribution)).toEqual(['pages/a.tsrx']);
 		expect(payload.attribution['pages/a.tsrx']).toMatchObject({
-			'c0:': encodeURIComponent(branchFilename),
-			'c0:c0:': encodeURIComponent(leafFilename),
+			'c0:': encodeURIComponent('../packages/branch/index.tsrx'),
+			'c0:c0:': encodeURIComponent('../packages/branch/Leaf.tsrx'),
 		});
 	});
 
@@ -1400,6 +1402,35 @@ export default function Page() @{ <main><StaticFrame /></main> }`;
 		}
 	});
 
+	test("a route's own render data request re-exports the page's canonical render-data module", async () => {
+		const fixtureRoot = await mkdtemp(resolve(import.meta.dirname, '.route-render-data-once-'));
+		const appRoot = resolve(fixtureRoot, 'app');
+		const pageFilename = resolve(appRoot, 'pages/list.tsrx');
+		await mkdir(resolve(appRoot, 'pages'), { recursive: true });
+		const plugin = marklessClient({ rootDir: appRoot });
+		const pageSource = `export default function List() @{ <ul><li>One</li><li>Two</li></ul> }`;
+		try {
+			callBuildStart(plugin, { cwd: appRoot });
+			await callTransform(plugin, pageSource, `${pageFilename}?markless-route`, {
+				getModuleInfo: () => ({ isEntry: true }),
+			});
+			const request = (await callTransform(
+				plugin,
+				pageSource,
+				`${pageFilename}?markless-render-data`,
+				{ getModuleInfo: () => ({ isEntry: false }) },
+			)) as { code: string };
+			const canonicalId = `virtual:markless:render-data:${encodeURIComponent(moduleIdFor(pageFilename, appRoot))}`;
+			const canonical = (await callLoad(plugin, `\0${canonicalId}`)) as string;
+
+			expect(request.code).toContain(`export * from ${JSON.stringify(canonicalId)}`);
+			expect(request.code).not.toContain('marklessRenderData =');
+			expect(canonical).toContain('export const marklessPrerenderData');
+		} finally {
+			await rm(fixtureRoot, { recursive: true, force: true });
+		}
+	});
+
 	test('materialized route render data links only TSRX descendants reached from that route', async () => {
 		const fixtureRoot = await mkdtemp(resolve(import.meta.dirname, '.artifact-child-reach-'));
 		const appRoot = resolve(fixtureRoot, 'app');
@@ -1447,7 +1478,7 @@ export default function Page() @{ <main><StaticFrame /><StyledChild /></main> }`
 					getModuleInfo: () => ({ isEntry: false }),
 				},
 			)) as { code: string };
-			const reachedChildId = `${childFilename}?markless-render-data&markless-reached-from=${encodeURIComponent(pageFilename)}`;
+			const reachedChildId = `${childFilename}?markless-render-data&markless-reached-from=route`;
 			const reachedChild = (await callTransform(plugin, childSource, reachedChildId, {
 				resolve: resolveImport,
 				getModuleInfo: () => ({ isEntry: false }),
@@ -1463,6 +1494,118 @@ export default function Page() @{ <main><StaticFrame /><StyledChild /></main> }`
 		} finally {
 			await rm(fixtureRoot, { recursive: true, force: true });
 		}
+	});
+
+	test('render data reached from different route roots is one module per source', async () => {
+		const fixtureRoot = await mkdtemp(resolve(import.meta.dirname, '.reach-shared-'));
+		const appRoot = resolve(fixtureRoot, 'app');
+		const leftFilename = resolve(appRoot, 'pages/left.tsrx');
+		const rightFilename = resolve(appRoot, 'pages/right.tsrx');
+		const panelFilename = resolve(appRoot, 'components/Panel.tsrx');
+		const badgeFilename = resolve(appRoot, 'components/Badge.tsrx');
+		const packageFilename = resolve(fixtureRoot, 'packages/StaticFrame.mjs');
+		await mkdir(resolve(fixtureRoot, 'packages'), { recursive: true });
+		await writeFile(
+			packageFilename,
+			`export const StaticFrame = { renderSsr() { return { html: '<aside>Frame</aside>', elementCount: 1 }; } };`,
+		);
+		const plugin = marklessClient({ rootDir: appRoot });
+		const pageSource = (tag: string) => `import { StaticFrame } from '@fixtures/static-frame';
+import Panel from '../components/Panel.tsrx';
+export default function Page() @{ <${tag}><StaticFrame /><Panel /></${tag}> }`;
+		const panelSource = `import Badge from './Badge.tsrx';
+export default function Panel() @{ <section><Badge /></section> }`;
+		const badgeSource = `export default function Badge() @{ <b>Badge</b> }`;
+		const sources = new Map([
+			[panelFilename, panelSource],
+			[badgeFilename, badgeSource],
+		]);
+		const resolveImport = vi.fn(async (specifier: string) =>
+			specifier === '@fixtures/static-frame'
+				? { id: packageFilename }
+				: specifier === '../components/Panel.tsrx'
+					? { id: panelFilename }
+					: specifier === './Badge.tsrx'
+						? { id: badgeFilename }
+						: null,
+		);
+		const load = vi.fn(async ({ id }: { readonly id: string }) => {
+			const code = sources.get(id);
+			if (code === undefined) return null;
+			return await callTransform(plugin, code, id, {
+				resolve: resolveImport,
+				getModuleInfo: () => ({ isEntry: false }),
+			});
+		});
+		const transformRoute = async (filename: string, tag: string) => {
+			await callTransform(plugin, pageSource(tag), `${filename}?markless-route`, {
+				resolve: resolveImport,
+				getModuleInfo: () => ({ isEntry: true }),
+			});
+			return (
+				(await callTransform(plugin, pageSource(tag), `${filename}?markless-render-data`, {
+					resolve: resolveImport,
+					load,
+					getModuleInfo: () => ({ isEntry: false }),
+				})) as { code: string }
+			).code;
+		};
+		const reachedImports = (code: string) =>
+			[...code.matchAll(/from "([^"]*markless-reached-from[^"]*)"/g)].map(
+				(match) => match[1],
+			);
+
+		try {
+			callBuildStart(plugin, { cwd: appRoot });
+			const left = await transformRoute(leftFilename, 'main');
+			const right = await transformRoute(rightFilename, 'article');
+			const [leftPanel] = reachedImports(left);
+			expect(leftPanel).toMatch(/^[^?]*Panel\.tsrx\?/);
+			expect(reachedImports(right)).toEqual([leftPanel]);
+
+			const panelCode = (
+				(await callTransform(plugin, panelSource, leftPanel!, {
+					resolve: resolveImport,
+					load,
+					getModuleInfo: () => ({ isEntry: false }),
+				})) as { code: string }
+			).code;
+			const [badge] = reachedImports(panelCode);
+			expect(badge).toMatch(/^[^?]*Badge\.tsrx\?/);
+			expect(badge).not.toContain(encodeURIComponent(leftFilename));
+			expect(panelCode).toContain('export const marklessPrerenderData');
+		} finally {
+			await rm(fixtureRoot, { recursive: true, force: true });
+		}
+	});
+
+	test('reached render data requested with a route root in its id resolves to the shared module', async () => {
+		const plugin = marklessClient();
+		const importer = '/workspace/app/pages/docs.mdx';
+		const resolve = vi.fn(async (specifier: string) => ({
+			id: `/workspace/app/components/Card.tsrx${specifier.slice(specifier.indexOf('?'))}`,
+		}));
+		const shared = (await callResolveId(
+			plugin,
+			`../components/Card.tsrx?markless-render-data&markless-reached-from=${encodeURIComponent(importer)}`,
+			importer,
+			{ resolve },
+		)) as { id: string };
+		const other = (await callResolveId(
+			plugin,
+			`../components/Card.tsrx?markless-render-data&markless-reached-from=${encodeURIComponent('/workspace/app/pages/other.mdx')}`,
+			'/workspace/app/pages/other.mdx',
+			{ resolve },
+		)) as { id: string };
+
+		expect(shared.id).toContain('markless-reached-from=');
+		expect(shared.id).not.toContain(encodeURIComponent(importer));
+		expect(other).toEqual(shared);
+		expect(
+			await callResolveId(plugin, '../components/Card.tsrx?markless-render-data', importer, {
+				resolve,
+			}),
+		).toBeNull();
 	});
 
 	test('reached child render data materializes artifact-shaped descendants into its linked surface', async () => {
@@ -1577,8 +1720,11 @@ export default function Page() @{ <main><Child /></main> }`;
 				(item) =>
 					item.type === 'chunk' && item.moduleIds.includes(controlRenderDataFilename),
 			);
+			// The route request re-exports the page's canonical render-data module, which carries the bytes.
 			const renderDataChunk = routeChunks.find((chunk) =>
-				chunk.moduleIds.includes(`${pageFilename}?markless-render-data`),
+				chunk.moduleIds.includes(
+					`\0virtual:markless:render-data:${encodeURIComponent(moduleIdFor(pageFilename, appRoot))}`,
+				),
 			);
 
 			const renderDataBytes = (code: string | undefined) => {
@@ -1905,6 +2051,54 @@ export function App() @{
 		const emittedCode = chunks.map((chunk) => chunk.code).join('\n');
 		expect(emittedCode).toMatch(/bound:[^"']+:component-edge%3A0/);
 		expect(emittedCode).toMatch(/bound:[^"']+:component-edge%3A1/);
+	});
+
+	test('execution-log symbol identities are spelled root-relative in hooks, sizes and attribution', async () => {
+		const plugin = marklessClient({ executionLog: 'always', rootDir: '/workspace/app' });
+		const emitFile = vi.fn();
+		callBuildStart(plugin, { cwd: '/workspace/app' });
+		await callTransform(plugin, source, '/workspace/app/src/Deck.tsrx');
+		const transformed = await transformTsrxModule({
+			filename: '/workspace/app/src/Deck.tsrx',
+			source,
+			environment: 'client',
+		});
+		const machineRoot = encodeURIComponent('/workspace/app');
+		const relativeSource = encodeURIComponent('src/Deck.tsrx');
+		const symbols = transformed.manifest.symbols;
+		expect(symbols.length).toBeGreaterThan(0);
+		for (const symbol of symbols) {
+			const code = (await callLoad(plugin, `\0${symbol.virtualModuleId}`)) as string;
+			expect(code).toMatch(/^globalThis\.__mxLog\?\.add\(/);
+			expect(code).not.toContain(machineRoot);
+			expect(code).toContain(`"virtual:markless:symbol:${relativeSource}:`);
+		}
+		const bundle = Object.fromEntries(
+			symbols.map((symbol, index) => [
+				`build/chunk-${index}.js`,
+				{
+					type: 'chunk',
+					fileName: `build/chunk-${index}.js`,
+					name: `chunk-${index}`,
+					code: `export function ${symbol.exportName}() {}`,
+					exports: [symbol.exportName],
+					imports: [],
+					dynamicImports: [],
+					moduleIds: [`\0${symbol.virtualModuleId}`],
+					facadeModuleId: `\0${symbol.virtualModuleId}`,
+				},
+			]),
+		);
+		await callGenerateBundle(plugin, bundle, emitFile);
+		const sizes = JSON.parse(
+			String(emittedAsset(emitFile, 'build/execution-sizes.json')?.source),
+		) as Record<string, unknown> & { attribution?: Record<string, Record<string, string>> };
+		expect(JSON.stringify(sizes)).not.toContain(machineRoot);
+		for (const symbol of symbols)
+			expect(sizes).toHaveProperty([
+				`virtual:markless:symbol:${relativeSource}:${encodeURIComponent(symbol.symbolId)}`,
+			]);
+		expect(sizes.attribution?.['src/Deck.tsrx']?.['']).toBe(relativeSource);
 	});
 
 	test('execution-log never mode emits no attribution section or size entries', async () => {

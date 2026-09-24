@@ -144,10 +144,27 @@ export function isStaticTextNode(node: AnyNode): boolean {
 	return node.type === 'JSXText' || node.type === 'Literal';
 }
 
+// JSX text rule, as Babel's cleanJSXElementLiteralChild: whitespace holding a line break is layout, same-line whitespace is content.
+export function jsxTextValue(value: string): string {
+	const lines = value.split(/\r\n|\n|\r/);
+	let lastNonEmptyLine = 0;
+	for (let index = 0; index < lines.length; index += 1) {
+		if (/[^ \t]/.test(lines[index]!)) lastNonEmptyLine = index;
+	}
+	let text = '';
+	for (let index = 0; index < lines.length; index += 1) {
+		let line = lines[index]!.replace(/\t/g, ' ');
+		if (index > 0) line = line.replace(/^ +/, '');
+		if (index < lines.length - 1) line = line.replace(/ +$/, '');
+		if (!line) continue;
+		text += index === lastNonEmptyLine ? line : `${line} `;
+	}
+	return text;
+}
+
 export function staticTextValue(node: AnyNode): string {
-	const value = typeof node.value === 'string' ? node.value : '';
-	const normalized = value.replace(/\s+/g, ' ');
-	return normalized.trim() ? normalized : '';
+	if (typeof node.value !== 'string') return '';
+	return node.type === 'JSXText' ? jsxTextValue(node.value) : node.value;
 }
 
 export function trimmedStaticTextValue(node: AnyNode): string {
@@ -159,7 +176,7 @@ export function isIgnorableStaticTextNode(node: AnyNode): boolean {
 }
 
 export function isIgnorableJsxTextNode(node: AnyNode): boolean {
-	return node.type === 'JSXText' && typeof node.value === 'string' && node.value.trim() === '';
+	return node.type === 'JSXText' && staticTextValue(node) === '';
 }
 
 export function escapeHtml(value: string): string {

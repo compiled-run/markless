@@ -1,6 +1,4 @@
-// The pinned element census, spliced by exactly what a range mutation moved:
-// re-deriving it from the live tree would renumber around foreign nodes the
-// framework does not own. Chunked with resume-locators, which pins the census.
+// Spliced by what a range mutation moved: re-deriving would renumber around foreign nodes.
 type CensusNode = {
 	readonly nodeType?: number;
 	readonly childNodes?: ArrayLike<CensusNode>;
@@ -21,14 +19,15 @@ export function spliceCensus(
 		census.splice(insertionSlot(census, inserted[0]!), 0, ...censusElements(inserted));
 }
 
-// Pushed one at a time, never spread: this walks a whole container when the
-// census is first pinned, and a spread of that many elements blows the stack.
+// fns/dom-order's element order, pushed one at a time: a spread blows the stack.
 export function censusElements(nodes: ArrayLike<CensusNode>): CensusNode[] {
 	const elements: CensusNode[] = [];
 	(function visit(list: ArrayLike<CensusNode>): void {
 		for (const node of Array.from(list)) {
 			if (node.nodeType === 1) elements.push(node);
-			if (node.childNodes) visit(node.childNodes);
+			const walker = (node as Node).ownerDocument?.createTreeWalker?.(node as Node, 1);
+			if (walker) for (let next; (next = walker.nextNode());) elements.push(next);
+			else if (node.childNodes) visit(node.childNodes);
 		}
 	})(nodes);
 	return elements;

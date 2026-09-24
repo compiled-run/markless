@@ -1,7 +1,14 @@
 import { expect, test } from 'vitest';
-import { createProtocolStatePayload, renderPayloadScripts } from '@markless/serializer';
+import {
+	createProtocolStatePayload,
+	PROTOCOL_VISIBLE_EVENT_NAME,
+	renderPayloadScripts,
+} from '@markless/serializer';
 import { classifyResumeRecordDelta } from '@markless/serializer/resume-record-delta';
-import { createPrerenderInlineResumerSource } from '../src/inline/resumer.ts';
+import {
+	createPrerenderInlineResumerSource,
+	createPrerenderInlineVisiblePrimerSource,
+} from '../src/inline/resumer.ts';
 import {
 	derivePrerenderResumeRecords,
 	evaluateBuiltPageClosure,
@@ -430,6 +437,57 @@ test('assembles a prerendered container with delegated triggers and zero payload
 	expect(html).toContain('addEventListener');
 	expect(parts.head).toContain('<link rel="modulepreload" href="/build/resume.js"');
 	expect(parts.container).not.toContain('rel="modulepreload"');
+});
+
+test('a prerendered page with a visible event delegates it and observes only its hosts', async () => {
+	const artifact: SsrRenderArtifact = {
+		resumeModuleUrl: '/build/resume.js',
+		renderSsr: () => ({ html: '' }),
+	};
+	const container = (visible: boolean) => ({
+		html: '<main><h1>Top</h1><button>Ready</button></main>',
+		state: { version: 1, cells: [], computed: [], sharedDefinitions: [] },
+		view: {
+			version: 1,
+			locators: [
+				{ hostNodeId: 'h1', strategy: 'dom-order' as const, index: 1, tagName: 'h1' },
+				{ hostNodeId: 'h2', strategy: 'dom-order' as const, index: 2, tagName: 'button' },
+			],
+			events: [
+				...(visible
+					? [
+							{
+								hostNodeId: 'h1',
+								eventName: PROTOCOL_VISIBLE_EVENT_NAME,
+								symbolIds: ['symbol:1'],
+							},
+						]
+					: []),
+				{ hostNodeId: 'h2', eventName: 'click', symbolIds: ['symbol:0'] },
+			],
+			domUpdates: [],
+			behaviors: [],
+			elementHandles: [],
+			keyedRepeats: [],
+			branches: [],
+			asyncBoundaries: [],
+		},
+	});
+	const withVisible = await assemblePrerenderContainer(artifact, container(true), {});
+	const clickOnly = await assemblePrerenderContainer(artifact, container(false), {});
+	const primer = createPrerenderInlineVisiblePrimerSource([2]);
+
+	expect(withVisible).not.toContain('type="markless/view"');
+	expect(primer).toContain(`(${JSON.stringify(PROTOCOL_VISIBLE_EVENT_NAME)},[2]);`);
+	expect(withVisible).toContain(`(${JSON.stringify(PROTOCOL_VISIBLE_EVENT_NAME)},[2]);`);
+	expect(withVisible).toContain(
+		createPrerenderInlineResumerSource(
+			['click', PROTOCOL_VISIBLE_EVENT_NAME],
+			'/build/resume.js',
+		),
+	);
+	expect(clickOnly).toContain(createPrerenderInlineResumerSource(['click'], '/build/resume.js'));
+	expect(clickOnly).not.toContain('IntersectionObserver');
 });
 
 test('self-wakes an unsettled prerendered async boundary without payload scripts', async () => {
@@ -872,12 +930,10 @@ test('linked boundary evaluation carries a composed child computed into settled 
 			if (graphNodeId === 'state:weight') return 2;
 			if (graphNodeId !== 'computed:status') return undefined;
 			const value = { active: true, updates: [1, 2, 3] };
-			if (path.length === 0) {
-				return { status: 'fulfilled', version: 1, key: null, value };
-			}
+			const snapshot = { status: 'fulfilled', version: 1, key: null, value };
 			return path.reduce<unknown>(
 				(current, part) => (current as Record<string, unknown> | undefined)?.[part],
-				value,
+				path.length === 0 || path[0]! in snapshot ? snapshot : value,
 			);
 		},
 	};

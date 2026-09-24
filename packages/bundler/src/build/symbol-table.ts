@@ -1,6 +1,7 @@
 import { dirname, join, normalize, relative } from 'pathe';
 import { MARKLESS_VIRTUAL_PREFIX } from '../transform.ts';
 import type { MarklessSymbolManifestEntry, MarklessTransformManifest } from '../types.ts';
+import { executionLogIdentityOffsets } from './execution-log-hooks.ts';
 
 type GeneratedChunk = {
 	readonly type: 'chunk';
@@ -11,6 +12,7 @@ type GeneratedChunk = {
 	readonly exports?: readonly string[];
 	readonly imports?: readonly string[];
 	readonly dynamicImports?: readonly string[];
+	readonly modules?: Readonly<Record<string, { readonly renderedExports: readonly string[] }>>;
 };
 
 export type SymbolTableUrlRewriteResult = {
@@ -30,8 +32,7 @@ export type SymbolTableIntegrityResult = {
 };
 
 const SYMBOL_VIRTUAL_PREFIX = `${MARKLESS_VIRTUAL_PREFIX}symbol:`;
-// OXC packs sufficiently long string arrays as "a,b,c".split(","). Recover
-// that emitted representation before resolving each compiler-owned URL.
+// OXC can emit long string arrays as comma-separated strings followed by split().
 const PACKED_SYMBOL_VIRTUAL_LIST_RE =
 	/(["'`])((?:virtual:markless:symbol:)[^"'`]+)\1\.split\(\s*(["'`]),\3\s*\)/g;
 const SYMBOL_VIRTUAL_STRING_RE = /(["'`])((?:virtual:markless:symbol:)[^"'`]+)\1/g;
@@ -63,15 +64,8 @@ export function rewriteGeneratedSymbolTableUrls(
 	return { rewritten, unresolved: [...unresolved].sort() };
 }
 
-/**
- * Returns the final chunk routes encoded in generated symbol tables. These
- * routes feed computed import() calls, so bundler dynamic-import metadata and
- * a plain import-expression scan cannot observe them.
- */
-export function scanGeneratedSymbolTableImports(
-	code: string,
-	chunkFileName: string,
-): string[] {
+// Computed table imports are absent from the bundler's dynamic-import metadata.
+export function scanGeneratedSymbolTableImports(code: string, chunkFileName: string): string[] {
 	const imports = new Set<string>();
 	for (const match of code.matchAll(SYMBOL_MANIFEST_TUPLE_RE)) {
 		for (const specifier of parseStringList(match[2]!) ?? []) {
@@ -83,11 +77,6 @@ export function scanGeneratedSymbolTableImports(
 	return [...imports];
 }
 
-/**
- * Checks emitted resolver routes against compiler manifests and Rolldown's
- * chunk ownership/export metadata. Table source is read only to recover each
- * claimed file; termination evidence stays structural.
- */
 export function verifyGeneratedSymbolTableRoutes(
 	bundle: Record<string, unknown>,
 	manifests: Iterable<MarklessTransformManifest>,
@@ -103,7 +92,7 @@ export function verifyGeneratedSymbolTableRoutes(
 			manifest.resolver.virtualModuleId,
 			manifest.symbols,
 		);
-		const routeChunk = resolverChunk ?? findChunkForVirtualId(chunks, manifest.source);
+		const routeChunk = resolverChunk ?? findSourceChunk(chunks, manifest.source);
 		if (!routeChunk) {
 			for (const symbol of manifest.symbols) {
 				errors.push({
@@ -116,7 +105,7 @@ export function verifyGeneratedSymbolTableRoutes(
 		}
 
 		const table = resolverChunk
-			? findSymbolTable(routeChunk.code, manifest.symbols)
+			? findSymbolTable(routeChunk.code, manifest.symbols, manifest.resolver.virtualModuleId)
 			: undefined;
 		for (const symbol of manifest.symbols) {
 			if (!table) {
@@ -139,7 +128,10 @@ export function verifyGeneratedSymbolTableRoutes(
 			}
 
 			const claimedChunk = resolveChunkSpecifier(routeChunk.fileName, specifier);
-			const reason = routeTerminationError(chunks, claimedChunk, symbol);
+			const reason =
+				table.literalLoads && literalLoadReaches(chunks, routeChunk, claimedChunk, symbol)
+					? undefined
+					: routeTerminationError(chunks, claimedChunk, symbol);
 			if (reason) {
 				errors.push({ symbolId: symbol.symbolId, claimedChunk, reason });
 			} else {
@@ -163,11 +155,7 @@ function collectGeneratedSymbolFiles(
 	chunks: ReadonlyMap<string, GeneratedChunk>,
 ): Map<string, string> {
 	const symbolFiles = new Map<string, string>();
-	// A retained emitted entry facade is the module the runtime can import: its
-	// public exports can differ from the internal aliases on the chunk that also
-	// lists the virtual module in moduleIds. Facade cleanup copies the facade ID
-	// to its surviving target, so moduleIds remain the fallback when no facade
-	// survives.
+	// Retained entry facades own public names that can differ from internal chunk aliases.
 	for (const chunk of chunks.values()) {
 		const facadeId = chunk.facadeModuleId
 			? normalizeVirtualId(chunk.facadeModuleId)
@@ -177,6 +165,12 @@ function collectGeneratedSymbolFiles(
 		}
 	}
 	for (const chunk of chunks.values()) {
+		for (const [rawId, module] of Object.entries(chunk.modules ?? {})) {
+			const id = normalizeVirtualId(rawId);
+			if (!id.startsWith(SYMBOL_VIRTUAL_PREFIX) || symbolFiles.has(id)) continue;
+			const exporter = aliasedSymbolExporter(chunks, chunk, module.renderedExports);
+			if (exporter) symbolFiles.set(id, exporter.fileName);
+		}
 		for (const id of chunk.moduleIds.map(normalizeVirtualId)) {
 			if (id.startsWith(SYMBOL_VIRTUAL_PREFIX) && !symbolFiles.has(id)) {
 				symbolFiles.set(id, chunk.fileName);
@@ -186,7 +180,25 @@ function collectGeneratedSymbolFiles(
 	return symbolFiles;
 }
 
+// A bundled symbol Rolldown moved into a shared chunk is exported there under an
+// internal alias; its public name lives on the chunk that imports and re-exports it.
+function aliasedSymbolExporter(
+	chunks: ReadonlyMap<string, GeneratedChunk>,
+	holder: GeneratedChunk,
+	renderedExports: readonly string[],
+): GeneratedChunk | undefined {
+	if (renderedExports.every((name) => (holder.exports ?? []).includes(name))) return undefined;
+	return [...chunks.values()].find(
+		(candidate) =>
+			candidate !== holder &&
+			(candidate.imports ?? []).includes(holder.fileName) &&
+			renderedExports.every((name) => (candidate.exports ?? []).includes(name)),
+	);
+}
+
 type ParsedSymbolTable = {
+	// Only packed resolvers name themselves in the table, and they load every row through a literal import.
+	readonly literalLoads: boolean;
 	readonly moduleUrls: readonly string[];
 	readonly exportNames: readonly string[];
 	readonly rows: ReadonlyMap<string, readonly [moduleIndex: number, exportIndex: number]>;
@@ -195,10 +207,18 @@ type ParsedSymbolTable = {
 function findSymbolTable(
 	code: string,
 	symbols: readonly MarklessSymbolManifestEntry[],
+	resolverId?: string,
 ): ParsedSymbolTable | undefined {
 	let bestMatch: ParsedSymbolTable | undefined;
 	let bestScore = -1;
 	for (const match of code.matchAll(SYMBOL_MANIFEST_TUPLE_RE)) {
+		const identity = match[1]!.match(/,(null|(["'`])([^"'`]*)\2),$/)?.[3];
+		if (
+			identity !== undefined &&
+			resolverId !== undefined &&
+			normalizeVirtualId(identity) !== normalizeVirtualId(resolverId)
+		)
+			continue;
 		const moduleUrls = parseStringList(match[2]!);
 		const exportNames = parseStringList(match[3]!);
 		if (!moduleUrls || !exportNames) continue;
@@ -209,8 +229,8 @@ function findSymbolTable(
 		}
 		if (rows.size === 0) continue;
 		const score = symbols.filter((symbol) => exportNames.includes(symbol.exportName)).length;
-		if (score > bestScore) {
-			bestMatch = { moduleUrls, exportNames, rows };
+		if (score > 0 && score > bestScore) {
+			bestMatch = { literalLoads: identity !== undefined, moduleUrls, exportNames, rows };
 			bestScore = score;
 		}
 	}
@@ -266,6 +286,15 @@ function verifyDirectRoute(
 			reason: `generated symbol module ${symbol.virtualModuleId} was not emitted`,
 		};
 	}
+	if (
+		target.fileName === routeChunk.fileName &&
+		Object.entries(target.modules ?? {}).some(
+			([id, module]) =>
+				normalizeVirtualId(id) === normalizeVirtualId(symbol.virtualModuleId) &&
+				module.renderedExports.includes(symbol.exportName),
+		)
+	)
+		return { claimedChunk: target.fileName };
 	if (!(target.exports ?? []).includes(symbol.exportName)) {
 		return {
 			claimedChunk: target.fileName,
@@ -356,10 +385,61 @@ function chunkOrReexportChainContainsSymbol(
 		if (!(chunk.exports ?? []).includes(exportName)) continue;
 		for (const importedFileName of chunk.imports ?? []) {
 			const imported = chunks.get(importedFileName);
-			if (imported && (imported.exports ?? []).includes(exportName)) pending.push(imported);
+			if (!imported) continue;
+			if (
+				aliasedSymbolExporter(
+					chunks,
+					imported,
+					symbolRenderedExports(imported, virtualId),
+				) === chunk
+			)
+				return true;
+			if ((imported.exports ?? []).includes(exportName)) pending.push(imported);
 		}
 	}
 	return false;
+}
+
+function symbolRenderedExports(chunk: GeneratedChunk, virtualId: string): readonly string[] {
+	for (const [rawId, module] of Object.entries(chunk.modules ?? {}))
+		if (normalizeVirtualId(rawId) === virtualId) return module.renderedExports;
+	return [];
+}
+
+// Rolldown leaves a pure re-export facade for an entry it packed into another chunk; the route is the chunk holding it.
+function findSourceChunk(
+	chunks: ReadonlyMap<string, GeneratedChunk>,
+	source: string,
+): GeneratedChunk | undefined {
+	const chunk = findChunkForVirtualId(chunks, source);
+	const normalized = normalizeVirtualId(source);
+	if (!chunk || chunk.moduleIds.map(normalizeVirtualId).includes(normalized)) return chunk;
+	return (
+		[...chunks.values()].find((candidate) =>
+			candidate.moduleIds.map(normalizeVirtualId).includes(normalized),
+		) ?? chunk
+	);
+}
+
+function literalLoadReaches(
+	chunks: ReadonlyMap<string, GeneratedChunk>,
+	resolverChunk: GeneratedChunk,
+	claimedChunk: string,
+	symbol: MarklessSymbolManifestEntry,
+): boolean {
+	const target = chunks.get(claimedChunk);
+	if (!target || !hasLiteralLoader(resolverChunk.code, symbol.symbolId)) return false;
+	return (
+		symbolRenderedExports(target, normalizeVirtualId(symbol.virtualModuleId)).includes(
+			symbol.exportName,
+		) &&
+		(target === resolverChunk || dynamicRouteReachesChunk(chunks, resolverChunk, claimedChunk))
+	);
+}
+
+function hasLiteralLoader(code: string, symbolId: string): boolean {
+	const key = symbolId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	return new RegExp(`(["'])${key}\\1\\s*:\\s*\\(\\s*\\)\\s*=>`).test(code);
 }
 
 function findChunkForVirtualId(
@@ -388,7 +468,7 @@ function findResolverRouteChunk(
 		virtualIds(chunk).includes(normalized),
 	);
 	return (
-		candidates.find((chunk) => !!findSymbolTable(chunk.code, symbols)) ??
+		candidates.find((chunk) => !!findSymbolTable(chunk.code, symbols, virtualId)) ??
 		candidates.find((chunk) => chunk.moduleIds.map(normalizeVirtualId).includes(normalized)) ??
 		candidates[0]
 	);
@@ -415,30 +495,21 @@ function rewriteSymbolVirtualStrings(
 } {
 	let rewritten = 0;
 	const unresolved = new Set<string>();
+	const expanded = chunk.code.replace(
+		PACKED_SYMBOL_VIRTUAL_LIST_RE,
+		(match, _quote: string, packedVirtualIds: string) => {
+			const ids = packedVirtualIds.split(',');
+			if (ids.length < 2 || ids.some((id) => !id.startsWith(SYMBOL_VIRTUAL_PREFIX)))
+				return match;
+			return JSON.stringify(ids);
+		},
+	);
+	const executionIdentities = executionLogIdentityOffsets(expanded, chunk.fileName);
 	const code = compactSymbolManifestTables(
-		chunk.code
-			.replace(
-				PACKED_SYMBOL_VIRTUAL_LIST_RE,
-				(match, _quote: string, packedVirtualIds: string) => {
-					const virtualIds = packedVirtualIds.split(',');
-					if (
-						virtualIds.length < 2 ||
-						virtualIds.some((id) => !id.startsWith(SYMBOL_VIRTUAL_PREFIX))
-					) {
-						return match;
-					}
-
-					return JSON.stringify(
-						virtualIds.map((virtualId) => {
-							const fileName = symbolFiles.get(virtualId);
-							if (!fileName) return virtualId;
-							rewritten++;
-							return relativeChunkSpecifier(chunk.fileName, fileName);
-						}),
-					);
-				},
-			)
-			.replace(SYMBOL_VIRTUAL_STRING_RE, (match, _quote: string, virtualId: string) => {
+		expanded.replace(
+			SYMBOL_VIRTUAL_STRING_RE,
+			(match, _quote: string, virtualId: string, offset: number) => {
+				if (executionIdentities.has(offset)) return match;
 				const fileName = symbolFiles.get(virtualId);
 				if (!fileName) {
 					unresolved.add(virtualId);
@@ -447,7 +518,8 @@ function rewriteSymbolVirtualStrings(
 
 				rewritten++;
 				return JSON.stringify(relativeChunkSpecifier(chunk.fileName, fileName));
-			}),
+			},
+		),
 	);
 
 	return { code, rewritten, unresolved: [...unresolved] };

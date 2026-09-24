@@ -115,6 +115,8 @@ test('default compiler passes declare stable artifact boundaries', () => {
 				passId: 'runtime-demand-map',
 				description: expect.stringContaining('runtime module demands'),
 				consumes: [
+					// The composed children's interfaces carry what their props re-render.
+					'source',
 					// Elevation is a fact about the emitted markup, not a payload
 					// record, so the overlay demand can only come from the graph.
 					'semanticGraph',
@@ -130,7 +132,13 @@ test('default compiler passes declare stable artifact boundaries', () => {
 			expect.objectContaining({
 				passId: 'trigger-groups',
 				description: expect.stringContaining('delegated trigger'),
-				consumes: ['symbolResolver', 'protocolState', 'protocolView', 'runtimeDemandMap'],
+				consumes: [
+					'symbolResolver',
+					'captureAnalysis',
+					'protocolState',
+					'protocolView',
+					'runtimeDemandMap',
+				],
 				produces: ['triggerGroups'],
 			}),
 		]),

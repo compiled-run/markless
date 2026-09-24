@@ -1,0 +1,50 @@
+--- /private/tmp/markless-known-prime-scalar-before.ts	2026-09-22 08:11:13
++++ packages/router/src/vite/runtime/mdx-scalar.ts	2026-09-22 08:11:52
+@@ -53,6 +53,20 @@
+ 	)
+ 		return false;
+ 	let payload = payloads.get(root);
++	let selectedPlan: MdxScalarAction | undefined;
++	if (!payload && input.eventRecord) {
++		const record = input.eventRecord;
++		if (
++			record.action ||
++			record.symbolIds.length !== 1 ||
++			(event !== 0 &&
++				(record.eventName !== event.type ||
++					(record.syncPolicy && !input.syncPolicyAlreadyApplied)))
++		)
++			return false;
++		selectedPlan = await loadPlan(record.symbolIds[0]!);
++		if (!selectedPlan || root.__asyncResumeRuntimeStarted || isDetached(root)) return false;
++	}
+ 	if (!payload) {
+ 		const state = readScript<ProtocolStatePayload>(root, 'markless/state');
+ 		const view = readScript<ProtocolViewPayload>(root, 'markless/view');
+@@ -85,11 +99,12 @@
+ 					((event as KeyboardEvent).key === 'Enter' ||
+ 						(event as KeyboardEvent).key === ' '))));
+ 	const record = priming
+-		? payload.view.events.find(
++		? (input.eventRecord ??
++			payload.view.events.find(
+ 				(record) =>
+ 					record.eventName !== 'visible' &&
+ 					locate(root, payload.view, record.hostNodeId) === element,
+-			)
++			))
+ 		: input.eventRecord;
+ 	if (!record) return false;
+ 	if (!priming && event.type !== record.eventName) return false;
+@@ -134,7 +149,10 @@
+ 		const key = record.hostNodeId + '\n' + record.eventName + '\n' + symbolId;
+ 		let prepared = payload.plans.get(key);
+ 		if (prepared === undefined) {
+-			const action = await loadPlan(symbolId);
++			const action =
++				selectedPlan && record === input.eventRecord
++					? selectedPlan
++					: await loadPlan(symbolId);
+ 			prepared = action ? prepare(root, payload, action, record) : null;
+ 			payload.plans.set(key, prepared);
+ 		}

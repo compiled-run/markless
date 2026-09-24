@@ -59,6 +59,7 @@ export function emitPrerenderTriggerGroupModule(input: {
 	readonly boundRows: ReadonlyArray<BoundSymbolResolverRow>;
 	readonly symbolRoutes?: ReadonlyArray<SourceLazySymbolRoute>;
 	readonly armRendererModuleId?: string;
+	readonly literalImports?: boolean;
 }): string {
 	const armRendererModuleId = input.armRendererModuleId ?? input.group.armRendererModuleId;
 	const ids = new Set(input.group.symbolIds);
@@ -66,6 +67,8 @@ export function emitPrerenderTriggerGroupModule(input: {
 	let source = emitSymbolResolverModule({
 		symbols: input.symbols.filter((symbol) => ids.has(symbol.id)),
 		boundSymbols: boundRows,
+		literalImports: input.literalImports,
+		bundlerVisibleImports: input.literalImports,
 	});
 	// Keep routes exhaustive while demand-loading only their symbols.
 	const routes = input.symbolRoutes ?? [];
@@ -201,7 +204,6 @@ export function planPrerenderTriggerGroups(input: {
 	const groups: Array<PrerenderTriggerGroup & { adoptsSettledArm?: true }> = routes.flatMap(
 		({ event, branch, branchIndex, hostPath, selfWakeBoundaries }) => {
 		const closureView = selfWakeBoundaries ? completeView : input.view;
-		if (event.eventName === 'visible') return [];
 		const host = branch
 			? undefined
 			: input.view.locators.find((locator) => locator.hostNodeId === event.hostNodeId);
@@ -295,6 +297,9 @@ export function planPrerenderTriggerGroups(input: {
 						});
 			}
 			closeComputedGraph(graphNodeIds, input.state);
+			for (const computed of input.state.computed)
+				if (computed.deriveSymbolId && graphNodeIds.has(computed.graphNodeId))
+					symbolIds.add(computed.deriveSymbolId);
 			for (const graphNodeId of graphNodeIds) {
 				const runnerSymbolId = closureView.asyncRunners?.[graphNodeId];
 				if (runnerSymbolId) symbolIds.add(runnerSymbolId);

@@ -1,7 +1,7 @@
 import { element } from '@markless/core';
 import { SpotListIndexed } from './spot-indexed.tsrx';
 
-// The same array, read one entry at a time. This one compiles.
+// Loaded through fetch inside the test: the array literal is refused at this edge.
 export default function TourIndexedArrayPage() @{
 	const target = element<HTMLButtonElement>();
 

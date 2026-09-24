@@ -357,16 +357,21 @@ test('buildSemanticGraph creates the first production compiler artifact', async 
 	expect(graph.templateReads).toEqual(
 		expect.arrayContaining([
 			expect.objectContaining({ source: 'menu.title' }),
-			expect.objectContaining({ source: 'label' }),
-			expect.objectContaining({ source: 'count' }),
-			expect.objectContaining({ source: 'doubled' }),
-			expect.objectContaining({ source: 'menuTitle' }),
-			expect.objectContaining({ source: 'menuLabel' }),
-			expect.objectContaining({ source: 'menuRest.meta.label' }),
+			expect.objectContaining({
+				source: expect.stringContaining("${(menuRest.meta.label) ?? ''}"),
+				computedGraphNodeId: 'computed:templateExpression:0',
+			}),
 			expect.objectContaining({ source: 'details.title' }),
 			expect.objectContaining({ source: 'error.message' }),
 		]),
 	);
+
+	// The button's six interpolations share one text, so they update as one joined derive.
+	expect(
+		graph.graphBindings
+			.find((binding) => binding.id === 'computed:templateExpression:0')
+			?.dependencies?.map((dependency) => dependency.source),
+	).toEqual(['label', 'count', 'doubled', 'menuTitle', 'menuLabel', 'menuRest.meta.label']);
 
 	expect(graph.stateWrites).toEqual(
 		expect.arrayContaining([
@@ -446,6 +451,7 @@ test('buildSemanticGraph keeps stable component-body and module-scope creation a
 	expect(semanticGraph.graphBindings).toEqual([
 		expect.objectContaining({ id: 'state:count', name: 'count', kind: 'state' }),
 		expect.objectContaining({ id: 'computed:label', name: 'label', kind: 'computed' }),
+		expect.objectContaining({ id: 'computed:templateExpression:0', kind: 'computed' }),
 	]);
 	expect(semanticGraph.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
 		'MARKLESS_STATE_MODULE_SCOPE',

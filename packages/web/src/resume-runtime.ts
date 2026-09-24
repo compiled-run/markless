@@ -1,3 +1,4 @@
+import { PROTOCOL_VISIBLE_EVENT_NAME } from '../../serializer/src/protocol-event-names.ts';
 import type { DomJournalResult } from '@markless/runtime';
 import type { ProtocolStatePayload } from '@markless/serializer';
 import type { AsyncBoundarySettleTracker } from './resume-async-wiring.ts';
@@ -99,8 +100,6 @@ export function createResumeRuntime(
 				typeof record.deriveSymbolId === 'string' &&
 				!registeredComputedRefreshIds.has(record.graphNodeId),
 		);
-		// Seeds arrive once, with the page's own state, so they need no fresh check:
-		// one node carries a seed per property, which the node id cannot tell apart.
 		if (fresh.length === 0 && !sharedSeeds?.length) return;
 		for (const record of fresh) {
 			registeredComputedRefreshIds.add(record.graphNodeId);
@@ -142,10 +141,10 @@ export function createResumeRuntime(
 			behaviorHostIdsForAncestors: (element) =>
 				behaviorRuntime?.behaviorHostIdsForAncestors(element) ??
 				pendingBehaviorHostIdsForAncestors(element),
-			registerDelegatedEventRecord: input.registerDelegatedEventRecord,
+			delegatedTriggers: input.delegatedTriggers,
 		});
 		for (const eventRecord of input.view.events) {
-			if (eventRecord.eventName === 'visible') continue;
+			if (eventRecord.eventName === PROTOCOL_VISIBLE_EVENT_NAME) continue;
 			const element = elementsByHostId.get(eventRecord.hostNodeId);
 			if (element) events.addEventRecord(element, eventRecord);
 			else if (
@@ -168,7 +167,6 @@ export function createResumeRuntime(
 		storeHostSubscription(
 			domUpdate.hostNodeId,
 			input.graph.subscribe({
-				// Target in the id: one graph node can drive two attributes on a host.
 				id: `view-dom-update:${domUpdate.hostNodeId}:${domUpdate.target?.kind ?? ''}:${domUpdate.target && 'name' in domUpdate.target ? domUpdate.target.name : ''}:${domUpdate.graphNodeId}:${domUpdate.path.join('.')}`,
 				graphNodeId: domUpdate.graphNodeId,
 				path: domUpdate.path,
@@ -287,9 +285,9 @@ export function createResumeRuntime(
 				);
 				const { wireKeyedRepeats } = await import('./resume-keyed-repeats.ts');
 				for (const record of records)
-					wireKeyedRepeats({
+					await wireKeyedRepeats({
 						graph: input.graph,
-						view: { ...input.view, keyedRepeats: [record] },
+						view: { ...input.view, keyedRepeats: [record, ...records.filter((each) => each.enclosingRow)] },
 						elementsByHostId,
 						events: eventWiring,
 						storeContainerSubscription: (release) =>
@@ -332,7 +330,6 @@ export function createResumeRuntime(
 	async function registerServedBoundaryArms(): Promise<void> {
 		const { registerArmRecordSet } = await import('./resume-commit-arm.ts');
 		for (const boundary of asyncBoundariesById.values()) {
-			// Array.isArray cannot narrow the readonly per-arm plan out of the union.
 			const armRecords = boundary.armRecords as ResumeArmRecordSet | undefined;
 			if (!armRecords || Array.isArray(armRecords)) continue;
 			await registerArmRecordSet(
@@ -377,7 +374,6 @@ export function createResumeRuntime(
 			capture: true,
 		});
 		behaviorRuntime?.disconnect();
-		// A dispatch after container teardown is never an unmatched defect.
 		for (const hostNodeId of Array.from(elementsByHostId.keys()))
 			disposeHost(hostNodeId, { ignoreFutureEvents: true });
 		for (const release of containerSubscriptionReleases.splice(0)) release();
@@ -468,39 +464,30 @@ export function createResumeRuntime(
 	function debugBoundarySnapshots(): import('./debug-channel.ts').MarklessDebugBoundarySnapshot[] {
 		return [...asyncBoundariesById.values()].flatMap((boundary) =>
 			boundary.asyncReads.map((read, readIndex) => {
+				const missing = (missingReason: 'graph-read-missing' | 'snapshot-invalid') => ({
+					boundaryId: boundary.id,
+					readIndex,
+					graphNodeId: read.graphNodeId,
+					status: 'missing' as const,
+					runVersion: null,
+					pendingSince: null,
+					hasSettledContent: settleTracker?.hasSettledContent(boundary.id) === true,
+					missingReason,
+				});
 				let snapshot: { readonly status?: unknown; readonly version?: unknown } | undefined;
 				try {
 					snapshot = input.graph.peekAsyncSnapshot?.(read.graphNodeId);
 					if (!snapshot) throw new Error('missing async snapshot');
 				} catch {
-					return {
-						boundaryId: boundary.id,
-						readIndex,
-						graphNodeId: read.graphNodeId,
-						status: 'missing' as const,
-						runVersion: null,
-						pendingSince: null,
-						hasSettledContent: settleTracker?.hasSettledContent(boundary.id) === true,
-						missingReason: 'graph-read-missing' as const,
-					};
+					return missing('graph-read-missing');
 				}
 				const status = snapshot?.status;
 				const version = snapshot?.version;
 				if (
 					(status !== 'pending' && status !== 'fulfilled' && status !== 'rejected') ||
 					typeof version !== 'number'
-				) {
-					return {
-						boundaryId: boundary.id,
-						readIndex,
-						graphNodeId: read.graphNodeId,
-						status: 'missing' as const,
-						runVersion: null,
-						pendingSince: null,
-						hasSettledContent: settleTracker?.hasSettledContent(boundary.id) === true,
-						missingReason: 'snapshot-invalid' as const,
-					};
-				}
+				)
+					return missing('snapshot-invalid');
 				const key = `${boundary.id}:${readIndex}`;
 				if (status === 'pending' && pendingRuns.get(key)?.version !== version)
 					pendingRuns.set(key, { version, since: Date.now() });
@@ -530,7 +517,6 @@ export function createResumeRuntime(
 		},
 		activateBehaviors: async (hostNodeId: string) =>
 			(await loadBehaviorRuntime()).activateBehaviors(hostNodeId),
-		// Settled = every boundary committed AND the flush that carried it applied.
 		whenAsyncBoundariesSettled: async () => {
 			if (!settleTracker) return;
 			await settleTracker.whenAllSettled();
@@ -556,8 +542,7 @@ export function registrationGraphNodeCensus(state: ResumeRuntimeInput['state']):
 	return ids;
 }
 
-// Local copies of the resume-locators helpers: importing that module regroups
-// the wall-counted chunk graph, which costs more than the duplication saves.
+// Avoid an eager locator-module import.
 function connectedElement(
 	root: ResumeDomElement,
 	element: ResumeDomElement | undefined,
@@ -566,6 +551,7 @@ function connectedElement(
 }
 function containsElement(root: ResumeDomElement, target: ResumeDomElement): boolean {
 	if (root === target) return true;
+	if (root.contains) return root.contains(target);
 	for (const child of root.childNodes ?? [])
 		if (child.nodeType === 1 && containsElement(child as ResumeDomElement, target)) return true;
 	return false;

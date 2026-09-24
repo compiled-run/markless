@@ -1,6 +1,6 @@
 import type { AnyNode } from '../../ast/nodes.ts';
 import type { SourceSpan } from '../../diagnostics.ts';
-import { analyze, type SemanticView } from '@tsrx/yuku';
+import type { SemanticView } from '@tsrx/yuku';
 import type {
 	SemanticComponent,
 	SemanticComponentPropDeclaration,
@@ -35,6 +35,7 @@ import type {
 } from '../../artifacts.ts';
 import type { FrameworkApiName } from './imports.ts';
 import type { StyleConstResolver } from './style-object.ts';
+import { moduleSemantics } from './shared-ast.ts';
 
 export type MutableSemanticGraphArtifact = {
 	passId: 'tsrx-semantic-graph';
@@ -108,6 +109,7 @@ export type WalkState = {
 	readonly graph: MutableSemanticGraphArtifact;
 	readonly frameworkApiImports: ReadonlyMap<string, FrameworkApiName>;
 	readonly importedModuleInterfaces: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
+	readonly importedModuleConstants: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 	readonly hostIds: WeakMap<object, string>;
 	/** Template values already refused at their use site; the walk must not treat them as markup again. */
 	readonly handledTemplateValues: WeakSet<object>;
@@ -117,6 +119,8 @@ export type WalkState = {
 	currentStyleScopeClass: string | null;
 	currentBranchScopeIds: string[];
 	currentKeyedRepeatScopeIds: string[];
+	/** Source span of each keyed repeat's item declaration, by repeat id. */
+	readonly keyedRepeatItemSpans: Map<string, { readonly start: number; readonly end: number }>;
 	currentHostNodeId: string | null;
 	// Set while walking a branch arm's own body. `hostNodeId` is the enclosing
 	// host at arm entry: a read still seeing it has no host of its own inside
@@ -238,11 +242,11 @@ export function createWalkState(input: {
 	readonly graph: MutableSemanticGraphArtifact;
 	readonly frameworkApiImports: ReadonlyMap<string, FrameworkApiName>;
 	readonly importedModuleInterfaces?: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
+	readonly importedModuleConstants?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 	/** Overridable so a test can observe when analysis is requested. */
 	readonly analyzeSemantics?: (source: string, filename: string) => SemanticView;
 }): WalkState {
-	const analyzeSemantics =
-		input.analyzeSemantics ?? ((source, filename) => analyze(source, filename).semantic);
+	const analyzeSemantics = input.analyzeSemantics ?? moduleSemantics;
 	let semanticView: SemanticView | undefined;
 	return {
 		filename: input.filename,
@@ -252,6 +256,7 @@ export function createWalkState(input: {
 		graph: input.graph,
 		frameworkApiImports: input.frameworkApiImports,
 		importedModuleInterfaces: input.importedModuleInterfaces ?? {},
+		importedModuleConstants: input.importedModuleConstants ?? {},
 		hostIds: new WeakMap<object, string>(),
 		handledTemplateValues: new WeakSet<object>(),
 		currentComponentName: null,
@@ -259,6 +264,7 @@ export function createWalkState(input: {
 		currentStyleScopeClass: null,
 		currentBranchScopeIds: [],
 		currentKeyedRepeatScopeIds: [],
+		keyedRepeatItemSpans: new Map(),
 		currentHostNodeId: null,
 		currentArmScope: null,
 		currentProjectionScope: null,

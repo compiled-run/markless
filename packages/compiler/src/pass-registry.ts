@@ -101,6 +101,7 @@ export const defaultCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 		passId: 'runtime-demand-map',
 		description: 'Map emitted symbols and payload records to exact runtime module demands.',
 		consumes: [
+			'source',
 			'semanticGraph',
 			'symbolResolver',
 			'captureAnalysis',
@@ -114,7 +115,13 @@ export const defaultCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 	{
 		passId: 'trigger-groups',
 		description: 'Close each delegated trigger over its exact state, record, and symbol group.',
-		consumes: ['symbolResolver', 'protocolState', 'protocolView', 'runtimeDemandMap'],
+		consumes: [
+			'symbolResolver',
+			'captureAnalysis',
+			'protocolState',
+			'protocolView',
+			'runtimeDemandMap',
+		],
 		produces: ['triggerGroups'],
 	},
 	{

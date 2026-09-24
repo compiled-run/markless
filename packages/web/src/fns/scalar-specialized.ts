@@ -43,13 +43,15 @@ export const marklessDecodeScalarCell = (
 	g: string,
 	s: string,
 ) => {
+	// A cell the compiler could not type decodes only when its served value is a scalar.
+	const u = c?.valueKind === 'unknown';
 	try {
 		const v = c?.value,
 			r = v?.root;
 		if (
 			!c ||
 			c.graphNodeId !== g ||
-			c.valueKind !== 'scalar' ||
+			(c.valueKind !== 'scalar' && !u) ||
 			v?.version !== 1 ||
 			v.records?.length !== 0
 		)
@@ -63,6 +65,6 @@ export const marklessDecodeScalarCell = (
 			if (!Number.isNaN(d.getTime())) return d;
 		}
 	} catch {}
-	e('MARKLESS_PAYLOAD_INVALID', s);
+	e(u ? 'MARKLESS_SCALAR_SPECIALIZED_ESCALATE' : 'MARKLESS_PAYLOAD_INVALID', s);
 };
 export { e as marklessScalarSpecializedError };

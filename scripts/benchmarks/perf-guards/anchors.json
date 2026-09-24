@@ -1,0 +1,522 @@
+{
+	"version": 2,
+	"execution": {
+		"counter": {
+			"executedChars": 24843,
+			"functions": 113,
+			"modules": 18
+		},
+		"toggle": {
+			"executedChars": 13547,
+			"functions": 193,
+			"modules": 6
+		},
+		"tab": {
+			"executedChars": 66542,
+			"functions": 689,
+			"modules": 78
+		},
+		"search": {
+			"executedChars": 16156,
+			"functions": 207,
+			"modules": 3
+		},
+		"dialog": {
+			"executedChars": 109120,
+			"functions": 570,
+			"modules": 64
+		},
+		"settings": {
+			"executedChars": 21595,
+			"functions": 341,
+			"modules": 27
+		}
+	},
+	"lean": {
+		"/": ["click@counter-increment"],
+		"/records": [],
+		"/settings": []
+	},
+	"allowFullResume": [],
+	"knownViolations": [],
+	"history": [
+		{
+			"date": "2026-09-23",
+			"guard": "preload",
+			"subject": "bench /",
+			"from": null,
+			"to": 59328,
+			"reason": "initial anchors: measured on bb53b203 (packed-delivery-performance tree) when the guards were introduced"
+		},
+		{
+			"date": "2026-09-23",
+			"guard": "waste",
+			"subject": "bench /",
+			"from": null,
+			"to": 39227,
+			"reason": "initial anchors: measured on bb53b203 (packed-delivery-performance tree) when the guards were introduced"
+		},
+		{
+			"date": "2026-09-23",
+			"guard": "preload",
+			"subject": "bench /records",
+			"from": null,
+			"to": 58212,
+			"reason": "initial anchors: measured on bb53b203 (packed-delivery-performance tree) when the guards were introduced"
+		},
+		{
+			"date": "2026-09-23",
+			"guard": "waste",
+			"subject": "bench /records",
+			"from": null,
+			"to": 30065,
+			"reason": "initial anchors: measured on bb53b203 (packed-delivery-performance tree) when the guards were introduced"
+		},
+		{
+			"date": "2026-09-23",
+			"guard": "preload",
+			"subject": "bench /settings",
+			"from": null,
+			"to": 56250,
+			"reason": "initial anchors: measured on bb53b203 (packed-delivery-performance tree) when the guards were introduced"
+		},
+		{
+			"date": "2026-09-23",
+			"guard": "waste",
+			"subject": "bench /settings",
+			"from": null,
+			"to": 39360,
+			"reason": "initial anchors: measured on bb53b203 (packed-delivery-performance tree) when the guards were introduced"
+		},
+		{
+			"date": "2026-09-23",
+			"guard": "execution",
+			"subject": "counter",
+			"from": null,
+			"to": {
+				"executedChars": 24843,
+				"functions": 113,
+				"modules": 18
+			},
+			"reason": "initial anchors: measured on bb53b203 (packed-delivery-performance tree) when the guards were introduced"
+		},
+		{
+			"date": "2026-09-23",
+			"guard": "execution",
+			"subject": "toggle",
+			"from": null,
+			"to": {
+				"executedChars": 13547,
+				"functions": 193,
+				"modules": 6
+			},
+			"reason": "initial anchors: measured on bb53b203 (packed-delivery-performance tree) when the guards were introduced"
+		},
+		{
+			"date": "2026-09-23",
+			"guard": "execution",
+			"subject": "tab",
+			"from": null,
+			"to": {
+				"executedChars": 66542,
+				"functions": 689,
+				"modules": 78
+			},
+			"reason": "initial anchors: measured on bb53b203 (packed-delivery-performance tree) when the guards were introduced"
+		},
+		{
+			"date": "2026-09-23",
+			"guard": "execution",
+			"subject": "search",
+			"from": null,
+			"to": {
+				"executedChars": 16156,
+				"functions": 207,
+				"modules": 3
+			},
+			"reason": "initial anchors: measured on bb53b203 (packed-delivery-performance tree) when the guards were introduced"
+		},
+		{
+			"date": "2026-09-23",
+			"guard": "execution",
+			"subject": "dialog",
+			"from": null,
+			"to": {
+				"executedChars": 109120,
+				"functions": 570,
+				"modules": 64
+			},
+			"reason": "initial anchors: measured on bb53b203 (packed-delivery-performance tree) when the guards were introduced"
+		},
+		{
+			"date": "2026-09-23",
+			"guard": "execution",
+			"subject": "settings",
+			"from": null,
+			"to": {
+				"executedChars": 21595,
+				"functions": 341,
+				"modules": 27
+			},
+			"reason": "initial anchors: measured on bb53b203 (packed-delivery-performance tree) when the guards were introduced"
+		},
+		{
+			"date": "2026-09-23",
+			"guard": "lean",
+			"subject": "/",
+			"from": null,
+			"to": ["click@counter-increment"],
+			"reason": "initial anchors: measured on bb53b203 (packed-delivery-performance tree) when the guards were introduced"
+		},
+		{
+			"date": "2026-09-23",
+			"guard": "lean",
+			"subject": "/records",
+			"from": null,
+			"to": [],
+			"reason": "initial anchors: measured on bb53b203 (packed-delivery-performance tree) when the guards were introduced"
+		},
+		{
+			"date": "2026-09-23",
+			"guard": "lean",
+			"subject": "/settings",
+			"from": null,
+			"to": [],
+			"reason": "initial anchors: measured on bb53b203 (packed-delivery-performance tree) when the guards were introduced"
+		},
+		{
+			"date": "2026-09-23",
+			"guard": "preload",
+			"subject": "docs /markless/",
+			"from": null,
+			"to": 311291,
+			"reason": "initial anchors: measured on bb53b203 (packed-delivery-performance tree) when the guards were introduced"
+		},
+		{
+			"date": "2026-09-23",
+			"guard": "preload",
+			"subject": "docs /markless/concepts/state",
+			"from": null,
+			"to": 299040,
+			"reason": "initial anchors: measured on bb53b203 (packed-delivery-performance tree) when the guards were introduced"
+		},
+		{
+			"date": "2026-09-23",
+			"guard": "preload",
+			"subject": "docs /markless/ui/accordion",
+			"from": null,
+			"to": 311689,
+			"reason": "initial anchors: measured on bb53b203 (packed-delivery-performance tree) when the guards were introduced"
+		},
+		{
+			"date": "2026-09-23",
+			"guard": "preload",
+			"subject": "bench /",
+			"from": 59328,
+			"to": 53806,
+			"reason": "T114b: route render data and facade leave the landing preload (navigation-intent pack; a page that also resumes keeps one render-data module), and behavior/async runtime is deferred unless a compiled record demands it"
+		},
+		{
+			"date": "2026-09-23",
+			"guard": "preload",
+			"subject": "bench /records",
+			"from": 58212,
+			"to": 52363,
+			"reason": "T114b: route render data and facade leave the landing preload (navigation-intent pack; a page that also resumes keeps one render-data module), and behavior/async runtime is deferred unless a compiled record demands it"
+		},
+		{
+			"date": "2026-09-23",
+			"guard": "preload",
+			"subject": "bench /settings",
+			"from": 56250,
+			"to": 49297,
+			"reason": "T114b: route render data and facade leave the landing preload (navigation-intent pack; a page that also resumes keeps one render-data module), and behavior/async runtime is deferred unless a compiled record demands it"
+		},
+		{
+			"date": "2026-09-23",
+			"guard": "preload",
+			"subject": "docs /markless/",
+			"from": 311291,
+			"to": 269015,
+			"reason": "T114b: route render data and facade leave the landing preload (navigation-intent pack; a page that also resumes keeps one render-data module), and behavior/async runtime is deferred unless a compiled record demands it"
+		},
+		{
+			"date": "2026-09-23",
+			"guard": "preload",
+			"subject": "docs /markless/concepts/state",
+			"from": 299040,
+			"to": 256446,
+			"reason": "T114b: route render data and facade leave the landing preload (navigation-intent pack; a page that also resumes keeps one render-data module), and behavior/async runtime is deferred unless a compiled record demands it"
+		},
+		{
+			"date": "2026-09-23",
+			"guard": "preload",
+			"subject": "docs /markless/ui/accordion",
+			"from": 311689,
+			"to": 255635,
+			"reason": "T114b: route render data and facade leave the landing preload (navigation-intent pack; a page that also resumes keeps one render-data module), and behavior/async runtime is deferred unless a compiled record demands it"
+		},
+		{
+			"date": "2026-09-23",
+			"guard": "waste",
+			"subject": "bench /",
+			"from": 39227,
+			"to": 30844,
+			"reason": "T114b: route render data and facade leave the landing preload (navigation-intent pack; a page that also resumes keeps one render-data module), and behavior/async runtime is deferred unless a compiled record demands it"
+		},
+		{
+			"date": "2026-09-23",
+			"guard": "waste",
+			"subject": "bench /records",
+			"from": 30065,
+			"to": 22711,
+			"reason": "T114b: route render data and facade leave the landing preload (navigation-intent pack; a page that also resumes keeps one render-data module), and behavior/async runtime is deferred unless a compiled record demands it"
+		},
+		{
+			"date": "2026-09-23",
+			"guard": "waste",
+			"subject": "bench /settings",
+			"from": 39360,
+			"to": 31243,
+			"reason": "T114b: route render data and facade leave the landing preload (navigation-intent pack; a page that also resumes keeps one render-data module), and behavior/async runtime is deferred unless a compiled record demands it"
+		},
+		{
+			"date": "2026-09-24",
+			"guard": "preload",
+			"subject": "docs /markless/",
+			"from": 269015,
+			"to": 167190,
+			"reason": "code only some routes reach leaves the shared pack when the cost model says it pays; render data no longer shares a pack with code"
+		},
+		{
+			"date": "2026-09-24",
+			"guard": "preload",
+			"subject": "docs /markless/concepts/state",
+			"from": 256446,
+			"to": 156809,
+			"reason": "code only some routes reach leaves the shared pack when the cost model says it pays; render data no longer shares a pack with code"
+		},
+		{
+			"date": "2026-09-24",
+			"guard": "preload",
+			"subject": "bench /",
+			"from": 53806,
+			"to": null,
+			"reason": "retired: whole-app byte total, now informational (owner ruling 2026-09-24: app code must not move a framework gate)"
+		},
+		{
+			"date": "2026-09-24",
+			"guard": "preload",
+			"subject": "bench /records",
+			"from": 52363,
+			"to": null,
+			"reason": "retired: whole-app byte total, now informational (owner ruling 2026-09-24: app code must not move a framework gate)"
+		},
+		{
+			"date": "2026-09-24",
+			"guard": "preload",
+			"subject": "bench /settings",
+			"from": 49297,
+			"to": null,
+			"reason": "retired: whole-app byte total, now informational (owner ruling 2026-09-24: app code must not move a framework gate)"
+		},
+		{
+			"date": "2026-09-24",
+			"guard": "preload",
+			"subject": "docs /markless/",
+			"from": 167190,
+			"to": null,
+			"reason": "retired: whole-app byte total, now informational (owner ruling 2026-09-24: app code must not move a framework gate)"
+		},
+		{
+			"date": "2026-09-24",
+			"guard": "preload",
+			"subject": "docs /markless/concepts/state",
+			"from": 156809,
+			"to": null,
+			"reason": "retired: whole-app byte total, now informational (owner ruling 2026-09-24: app code must not move a framework gate)"
+		},
+		{
+			"date": "2026-09-24",
+			"guard": "preload",
+			"subject": "docs /markless/ui/accordion",
+			"from": 255635,
+			"to": null,
+			"reason": "retired: whole-app byte total, now informational (owner ruling 2026-09-24: app code must not move a framework gate)"
+		},
+		{
+			"date": "2026-09-24",
+			"guard": "waste",
+			"subject": "bench /",
+			"from": 30844,
+			"to": null,
+			"reason": "retired: whole-app byte total, now informational (owner ruling 2026-09-24: app code must not move a framework gate)"
+		},
+		{
+			"date": "2026-09-24",
+			"guard": "waste",
+			"subject": "bench /records",
+			"from": 22711,
+			"to": null,
+			"reason": "retired: whole-app byte total, now informational (owner ruling 2026-09-24: app code must not move a framework gate)"
+		},
+		{
+			"date": "2026-09-24",
+			"guard": "waste",
+			"subject": "bench /settings",
+			"from": 31243,
+			"to": null,
+			"reason": "retired: whole-app byte total, now informational (owner ruling 2026-09-24: app code must not move a framework gate)"
+		},
+		{
+			"date": "2026-09-24",
+			"guard": "construct",
+			"subject": "event handler",
+			"from": null,
+			"to": 2951,
+			"reason": "initial per-construct glue anchors: marginal emitted bytes per instance on minimal fixtures (framework-overhead model, owner ruling 2026-09-24)"
+		},
+		{
+			"date": "2026-09-24",
+			"guard": "construct",
+			"subject": "text binding",
+			"from": null,
+			"to": 3779,
+			"reason": "initial per-construct glue anchors: marginal emitted bytes per instance on minimal fixtures (framework-overhead model, owner ruling 2026-09-24)"
+		},
+		{
+			"date": "2026-09-24",
+			"guard": "construct",
+			"subject": "@if",
+			"from": null,
+			"to": 6106,
+			"reason": "initial per-construct glue anchors: marginal emitted bytes per instance on minimal fixtures (framework-overhead model, owner ruling 2026-09-24)"
+		},
+		{
+			"date": "2026-09-24",
+			"guard": "construct",
+			"subject": "keyed @for",
+			"from": null,
+			"to": 5343,
+			"reason": "initial per-construct glue anchors: marginal emitted bytes per instance on minimal fixtures (framework-overhead model, owner ruling 2026-09-24)"
+		},
+		{
+			"date": "2026-09-24",
+			"guard": "construct",
+			"subject": "async boundary",
+			"from": null,
+			"to": 7778,
+			"reason": "initial per-construct glue anchors: marginal emitted bytes per instance on minimal fixtures (framework-overhead model, owner ruling 2026-09-24)"
+		},
+		{
+			"date": "2026-09-24",
+			"guard": "runtime",
+			"subject": "*",
+			"from": null,
+			"to": "93 runtime modules anchored",
+			"reason": "initial per-feature runtime anchors: rendered bytes of each framework runtime module on the bench build (framework-overhead model, owner ruling 2026-09-24)"
+		}
+	],
+	"runtimeModules": {
+		"core/web/resume-storage-free": 219,
+		"router/link-attributes": 380,
+		"router/navigation-hold": 508,
+		"router/route-dom": 531,
+		"router/route-manifest": 7039,
+		"router/route-renderer": 1735,
+		"router/route-state": 805,
+		"router/spa-navigation": 6391,
+		"router/vite/entries/client-entry": 3161,
+		"router/vite/entries/resume-entry": 2255,
+		"router/vite/runtime/create-route-discovery": 527,
+		"runtime/graph": 8422,
+		"runtime/graph-async": 4122,
+		"runtime/graph-collections": 4282,
+		"runtime/graph-computed": 2313,
+		"runtime/graph-core": 2231,
+		"runtime/graph-reconcile": 8625,
+		"runtime/graph-scheduler": 579,
+		"runtime/graph-shared": 3658,
+		"runtime/index": 152,
+		"serializer/async-boundary-arm": 303,
+		"serializer/payload-scripts": 611,
+		"serializer/protocol": 570,
+		"serializer/protocol-client": 6652,
+		"serializer/protocol-constants": 542,
+		"serializer/protocol-event-names": 264,
+		"serializer/storage-slot": 487,
+		"serializer/value-constants": 360,
+		"serializer/value-decode-client": 3580,
+		"serializer/value-decode-extensions": 1720,
+		"web/coded-error": 368,
+		"web/control-edit-hold": 1479,
+		"web/dom-attribute": 352,
+		"web/dom-journal": 7373,
+		"web/fns/bound-symbol": 1497,
+		"web/fns/closure-action": 7401,
+		"web/fns/composition": 18711,
+		"web/fns/dom-order": 464,
+		"web/fns/element-handle-prop": 751,
+		"web/fns/instance-scope": 16966,
+		"web/fns/reconcile-plane": 334,
+		"web/fns/roster-resume": 5123,
+		"web/fns/row-mint": 4502,
+		"web/fns/row-slot-mint": 1707,
+		"web/fns/scalar-served": 3982,
+		"web/fns/scalar-specialized": 1426,
+		"web/fns/ssr": 29668,
+		"web/fns/update-text": 531,
+		"web/fns/write-scalar": 983,
+		"web/inline/resume-errors": 1437,
+		"web/inline/sync-policy-core": 1255,
+		"web/payload-document-common": 2608,
+		"web/payload-full-storage-free": 773,
+		"web/payload-graph-construct": 4384,
+		"web/payload-resume": 4884,
+		"web/payload-resume-registry": 1629,
+		"web/pending-timing": 521,
+		"web/prerender/evaluator": 18097,
+		"web/prerender/owning-surface": 1212,
+		"web/prerender/shared-seed-slot": 2836,
+		"web/prerender/staged-graph": 411,
+		"web/reconcile-plane-slot": 344,
+		"web/render": 4003,
+		"web/render-canonical": 2017,
+		"web/render-csr": 15653,
+		"web/render-route-holder": 753,
+		"web/repeat-runtime": 2594,
+		"web/resume": 3419,
+		"web/resume-anchor-census": 376,
+		"web/resume-arm-records": 6276,
+		"web/resume-async-wiring": 6615,
+		"web/resume-behaviors": 8547,
+		"web/resume-branches": 15012,
+		"web/resume-census": 1471,
+		"web/resume-commit-arm": 9080,
+		"web/resume-events": 15312,
+		"web/resume-handle-qualifier": 685,
+		"web/resume-handoff": 1360,
+		"web/resume-keyed-repeats": 14376,
+		"web/resume-locators": 5483,
+		"web/resume-resettle-hold": 2572,
+		"web/resume-runtime": 14847,
+		"web/resume-runtime-shared": 2089,
+		"web/resume-runtime-start": 8576,
+		"web/resume-shared-patch": 1200,
+		"web/resume-stream-patches": 2260,
+		"web/resume-sync-computed": 1538,
+		"web/resume-sync-demand": 1099,
+		"web/runtime-error-reporting": 1876,
+		"web/ssr-data/awaitable": 856,
+		"web/ssr-data/branch-arm-idrefs": 1766,
+		"web/ssr-data/renderer": 19189,
+		"web/storage-plane": 1659
+	},
+	"constructGlue": {
+		"event handler": 2951,
+		"text binding": 3779,
+		"@if": 6106,
+		"keyed @for": 5343,
+		"async boundary": 7778
+	}
+}

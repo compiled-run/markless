@@ -138,7 +138,7 @@ test('a client-rendered focus onto a press-only element fetches the press handle
 });
 
 test('a client-rendered container with neither key nor press record installs no focus listener', async () => {
-	const page = await mount({ eventName: 'change' });
+	const page = await mount({ eventName: 'dblclick' });
 
 	expect(page.focusIn()).toBe(false);
 	expect(page.loadedSymbols).toEqual([]);
@@ -162,6 +162,18 @@ test('the input pair is preloaded for an editable host only', async () => {
 	editable.dispose();
 
 	const plain = await mount({ eventName: 'input', tagName: 'div' });
+	plain.focusIn();
+	expect(plain.loadedSymbols).toEqual([]);
+	plain.dispose();
+});
+
+test('a change record is preloaded for a form control only', async () => {
+	const select = await mount({ eventName: 'change', tagName: 'select' });
+	select.focusIn();
+	expect(select.loadedSymbols).toEqual(['symbol:key']);
+	select.dispose();
+
+	const plain = await mount({ eventName: 'change', tagName: 'div' });
 	plain.focusIn();
 	expect(plain.loadedSymbols).toEqual([]);
 	plain.dispose();

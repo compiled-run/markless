@@ -209,8 +209,7 @@ export default function MugStudio() @{
 							<path d="M27 15c9-2 9 10 0 8" />
 							<path d="M15 18v3m7-3v3" />
 							<path d="M15 6q-2-2 0-4m7 4q-2-2 0-4" />
-						</svg>
-						Idle
+						</svg> Idle
 					</button>
 					<button
 						type="button"
@@ -230,8 +229,7 @@ export default function MugStudio() @{
 							<circle cx="12" cy="16" r="1.4" fill="currentColor" />
 							<circle cx="20" cy="16" r="1.4" fill="currentColor" />
 							<circle cx="28" cy="16" r="1.4" fill="currentColor" />
-						</svg>
-						Thinking
+						</svg> Thinking
 					</button>
 					<button
 						type="button"
@@ -257,8 +255,7 @@ export default function MugStudio() @{
 								stroke="none"
 							/>
 							<path d="m23 14 6 4-6 4" />
-						</svg>
-						Wink
+						</svg> Wink
 					</button>
 					<button
 						type="button"
@@ -277,8 +274,7 @@ export default function MugStudio() @{
 							<ellipse cx="12" cy="17" rx="5" ry="8" />
 							<ellipse cx="27" cy="17" rx="5" ry="8" />
 							<path d="M13 12v3m15-3v3" />
-						</svg>
-						Wide eyes
+						</svg> Wide eyes
 					</button>
 					<button
 						type="button"
@@ -296,8 +292,7 @@ export default function MugStudio() @{
 						<svg class="motion-icon" viewBox="0 0 40 34" aria-hidden="true">
 							<path d="M9 24h21c-3-3-3-5-3-10 0-10-15-10-15 0 0 5 0 7-3 10Zm8 4q3 3 6 0" />
 							<circle cx="29" cy="7" r="4" fill="var(--pink, #efa3bd)" />
-						</svg>
-						Notification
+						</svg> Notification
 					</button>
 					<button
 						type="button"
@@ -314,8 +309,7 @@ export default function MugStudio() @{
 					>
 						<svg class="motion-icon" viewBox="0 0 40 34" aria-hidden="true">
 							<path d="M8 20q4 4 8 0m6 0q4 4 8 0M28 4c-7 0-7 11 0 11-3-4-3-7 0-11Z" />
-						</svg>
-						Sleep
+						</svg> Sleep
 					</button>
 					<button
 						type="button"
@@ -338,8 +332,7 @@ export default function MugStudio() @{
 								<path d="M15 18v3m7-3v3" />
 							</g>
 							<path d="M32 5q4 2 3 6m-1-10q6 3 5 9" />
-						</svg>
-						Hello
+						</svg> Hello
 					</button>
 					<button
 						type="button"
@@ -362,8 +355,7 @@ export default function MugStudio() @{
 								<path d="m14 19 3-2m4 0 3 2" />
 							</g>
 							<path d="m4 13-2 5m33 4 2-5M12 31l5-1m7 0 5-1" />
-						</svg>
-						Happy wiggle
+						</svg> Happy wiggle
 					</button>
 					<button
 						type="button"
@@ -380,8 +372,7 @@ export default function MugStudio() @{
 					>
 						<svg class="motion-icon" viewBox="0 0 40 34" aria-hidden="true">
 							<path d="M16 29c-13-8 15-11 6-19-7-6-15 3-8 7 11 5 18-8 11-15" />
-						</svg>
-						Warm sigh
+						</svg> Warm sigh
 					</button>
 					<button
 						type="button"
@@ -404,8 +395,7 @@ export default function MugStudio() @{
 								<path d="M14 22h3m4 0h3" />
 							</g>
 							<path d="M9 5q5-2 9 0m-7-4q5-1 8 2" />
-						</svg>
-						Little bow
+						</svg> Little bow
 					</button>
 					<button
 						type="button"
@@ -423,8 +413,7 @@ export default function MugStudio() @{
 						<svg class="motion-icon" viewBox="0 0 40 34" aria-hidden="true">
 							<ellipse cx="20" cy="22" rx="14" ry="7" />
 							<path d="M11 23c-2-8 19-8 19-1 0 6-14 5-13 0 0-2 6-2 6 0M12 10q-3-3 0-6m8 7q-3-4 0-8m8 7q-3-3 0-6" />
-						</svg>
-						Fresh brew
+						</svg> Fresh brew
 					</button>
 					<button
 						type="button"
@@ -450,8 +439,7 @@ export default function MugStudio() @{
 								<ellipse cx="29.5" cy="10" rx="6.5" ry="2" />
 							</g>
 							<path d="M20 5V1m-5 5-3-3m13 3 3-3" />
-						</svg>
-						Cheers
+						</svg> Cheers
 					</button>
 				</div>
 				<div class="playback">

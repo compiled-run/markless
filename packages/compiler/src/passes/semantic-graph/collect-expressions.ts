@@ -27,6 +27,7 @@ export function collectAssignment(node: AnyNode, state: WalkState): void {
 		...sharedScope(state),
 		...writeScope(state),
 		targetSpan: sourceSpan(target, state.filename),
+		...rowWriteScope(target, state),
 		operation: 'assign',
 		assignmentOperator: operator === '=' ? undefined : operator,
 		valueSource: value ? expressionSource(value, state.source) : undefined,
@@ -44,6 +45,7 @@ export function collectUpdate(node: AnyNode, state: WalkState): void {
 		...sharedScope(state),
 		...writeScope(state),
 		targetSpan: sourceSpan(target, state.filename),
+		...rowWriteScope(target, state),
 		operation: 'update',
 		prefix: node.prefix === true,
 		updateOperator: node.operator === '--' ? '--' : '++',
@@ -79,6 +81,7 @@ export function collectCollectionCall(node: AnyNode, state: WalkState): void {
 		...sharedScope(state),
 		...writeScope(state),
 		targetSpan: sourceSpan(target, state.filename),
+		...rowWriteScope(target, state),
 		operation: 'call',
 		method,
 		argumentSources: asNodes(node.arguments).map((argument) =>
@@ -134,6 +137,7 @@ export function collectDelete(node: AnyNode, state: WalkState): void {
 		...sharedScope(state),
 		...writeScope(state),
 		targetSpan: sourceSpan(originalTarget ?? target, state.filename),
+		...rowWriteScope(target, state),
 		operation: 'delete',
 		optional: target.optional === true || isChainExpression(originalTarget),
 	});
@@ -302,6 +306,17 @@ function collectReadsIn(
 				return;
 			}
 		}
+		// An optional method callee stays one read: the handle-call and callback-slot paths match it whole.
+		if (callee?.type === 'MemberExpression' && hasOptionalLink(callee) && namesABinding(callee)) {
+			addStateRead(callee, state, region);
+			if (callee.computed === true) {
+				collectReadsIn(callee.property as AnyNode | undefined, state, region);
+			}
+			for (const argument of asNodes(node.arguments)) {
+				collectReadsIn(argument, state, region);
+			}
+			return;
+		}
 	}
 
 	if (node.type === 'ChainExpression') {
@@ -325,7 +340,8 @@ function collectReadsIn(
 		// A member path standing on a computed value - `(a ? b : c).length`, a
 		// template literal, a call result - names no binding, so recording the
 		// whole spelling as one read hides the graph reads inside the receiver.
-		if (!namesABinding(node)) {
+		// An optional link can short-circuit, so the read stops at the value before it.
+		if (!namesABinding(node) || hasOptionalLink(node)) {
 			collectReadsIn(node.object as AnyNode | undefined, state, region);
 			if (node.computed === true) {
 				collectReadsIn(node.property as AnyNode | undefined, state, region);
@@ -538,6 +554,17 @@ function namesABinding(node: AnyNode): boolean {
 	return false;
 }
 
+function hasOptionalLink(node: AnyNode): boolean {
+	let current: AnyNode | undefined = node;
+	while (current) {
+		current = unwrapValueWrappers(current);
+		if (current?.type !== 'MemberExpression') return false;
+		if (current.optional === true) return true;
+		current = current.object as AnyNode | undefined;
+	}
+	return false;
+}
+
 function isChainExpression(node: unknown): boolean {
 	return isNode(node) && node.type === 'ChainExpression';
 }
@@ -634,6 +661,49 @@ export function resolvedSymbolAt(semantic: SemanticView, offset: number): number
 	}
 
 	return symbolsByOffset.get(offset) ?? null;
+}
+
+/**
+ * The keyed repeat whose row item this write target is rooted in. Decided by the
+ * binding the root identifier resolves to, so a handler local that shadows the
+ * item name is not mistaken for the row.
+ */
+function rowWriteScope(target: AnyNode, state: WalkState): { readonly rowRepeatId?: string } {
+	if (state.currentKeyedRepeatScopeIds.length === 0) return {};
+	const root = writeTargetRootIdentifier(target);
+	if (!root || typeof root.start !== 'number') return {};
+
+	for (let index = state.currentKeyedRepeatScopeIds.length - 1; index >= 0; index -= 1) {
+		const repeatId = state.currentKeyedRepeatScopeIds[index]!;
+		const repeat = state.graph.keyedRepeats.find((candidate) => candidate.id === repeatId);
+		if (repeat?.itemName !== root.name) continue;
+
+		const span = state.keyedRepeatItemSpans.get(repeatId);
+		const semantic = state.semantic();
+		const symbolId = resolvedSymbolAt(semantic, root.start);
+		if (!span || symbolId === null) return {};
+		const declaration = semantic.symbol.declNode(symbolId, 0);
+		return declaration.start >= span.start && declaration.end <= span.end
+			? { rowRepeatId: repeatId }
+			: {};
+	}
+
+	return {};
+}
+
+function writeTargetRootIdentifier(target: AnyNode): (AnyNode & { readonly name: string }) | null {
+	let cursor: AnyNode | undefined = target;
+	while (cursor) {
+		if (cursor.type === 'Identifier' && typeof cursor.name === 'string')
+			return cursor as AnyNode & { readonly name: string };
+		if (cursor.type === 'MemberExpression') cursor = cursor.object as AnyNode | undefined;
+		else if (cursor.type === 'ChainExpression')
+			cursor = cursor.expression as AnyNode | undefined;
+		else if (cursor.type === 'TSNonNullExpression')
+			cursor = cursor.expression as AnyNode | undefined;
+		else return null;
+	}
+	return null;
 }
 
 function sharedScope(state: WalkState): { readonly sharedDefinitionId?: string } {

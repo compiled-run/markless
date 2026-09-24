@@ -17,10 +17,7 @@ export function materializeDomLocators(
 	root: ResumeDomElement,
 	locators: ResumeViewRecord['locators'],
 ): Map<string, ResumeDomElement> {
-	// Taken once per container, before any authored symbol can run, and held by
-	// element reference: a foreign node swap cannot renumber a pinned census.
-	// The slot lives on the root, not a module WeakMap, so the wake chunk
-	// (fns/dom-order.ts) shares it without a chunk-regrouping import edge.
+	// The root shares a pinned census with wake chunks without adding an import edge.
 	const elements = (root.__marklessCensus ??= censusElements([root]) as ResumeDomElement[]),
 		byHostId = new Map<string, ResumeDomElement>();
 	for (const locator of locators) {
@@ -207,6 +204,7 @@ export function connectedElement(
 }
 export function containsElement(root: ResumeDomElement, target: ResumeDomElement): boolean {
 	if (root === target) return true;
+	if (root.contains) return root.contains(target);
 	for (const child of root.childNodes ?? [])
 		if (child.nodeType === 1 && containsElement(child as ResumeDomElement, target)) return true;
 	return false;

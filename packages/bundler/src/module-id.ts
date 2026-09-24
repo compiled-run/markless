@@ -4,6 +4,7 @@
 // through that link, so the store spelling does not leak either.
 import { readdirSync, realpathSync } from 'node:fs';
 import { isAbsolute, join, normalize, relative, resolve } from 'pathe';
+import { symbolVirtualModuleId, symbolVirtualModuleSourceFile } from './source-module.ts';
 
 type LinkedPackage = { readonly id: string; readonly real: string };
 
@@ -73,4 +74,13 @@ function realpathOf(path: string): string {
 	} catch {
 		return normalize(path);
 	}
+}
+
+/** A symbol module's execution-log identity: its virtual id with the source spelled root-relative. */
+export function symbolExecutionLogId(virtualModuleId: string, root: string | undefined): string {
+	const bare = virtualModuleId.startsWith('\0') ? virtualModuleId.slice(1) : virtualModuleId;
+	const source = symbolVirtualModuleSourceFile(bare);
+	if (source === null) return bare;
+	const encodedSymbolId = bare.slice(bare.lastIndexOf(':') + 1);
+	return symbolVirtualModuleId(moduleIdFor(source, root), decodeURIComponent(encodedSymbolId));
 }

@@ -1,0 +1,1130 @@
+[
+	{
+		"lane": "sr-app",
+		"variant": "default",
+		"browser": "chromium",
+		"profile": "normal",
+		"load": {
+			"visits": 4,
+			"requests": 2398,
+			"wireKB": 1004.09765625,
+			"jsFiles": 2381,
+			"jsKB": 980.56982421875,
+			"preloaded": 2380,
+			"preloadedUnused": 1384,
+			"executedChars": 3902601,
+			"executedFunctions": 3199,
+			"rounds": 20,
+			"fcpMs": 2704,
+			"settledMs": 3605
+		},
+		"early": {
+			"controls": 12,
+			"survived": 6,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 6,
+			"inert": 4,
+			"indeterminate": 2,
+			"inputToResponseMs": 62.699951171875
+		},
+		"firstClick": {
+			"controls": 12,
+			"responded": 6,
+			"inputToResponseMs": 66.949951171875,
+			"p95Ms": 83.050048828125,
+			"clicksFetchingJs": 0,
+			"clickJsKB": 0,
+			"clickJsRequests": 0
+		},
+		"nav": {
+			"links": 1,
+			"ok": 1,
+			"documentLoads": 1,
+			"rounds": 19,
+			"latencyMs": 124.10009765625,
+			"wireKB": 1003.9599609375
+		}
+	},
+	{
+		"lane": "sr-app",
+		"variant": "default",
+		"browser": "chromium",
+		"profile": "constrained",
+		"load": {
+			"visits": 4,
+			"requests": 2398,
+			"wireKB": 1004.2744140625,
+			"jsFiles": 2381,
+			"jsKB": 980.693359375,
+			"preloaded": 2380,
+			"preloadedUnused": 1384,
+			"executedChars": 3902601,
+			"executedFunctions": 3199,
+			"rounds": 19,
+			"fcpMs": 9860,
+			"settledMs": 10764
+		},
+		"early": {
+			"controls": 12,
+			"survived": 6,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 6,
+			"inert": 4,
+			"indeterminate": 2,
+			"inputToResponseMs": 163.0999755859375
+		},
+		"firstClick": {
+			"controls": 12,
+			"responded": 6,
+			"inputToResponseMs": 159.4000244140625,
+			"p95Ms": 242.12493896484375,
+			"clicksFetchingJs": 0,
+			"clickJsKB": 0,
+			"clickJsRequests": 0
+		},
+		"nav": {
+			"links": 1,
+			"ok": 1,
+			"documentLoads": 1,
+			"rounds": 19,
+			"latencyMs": 562.89990234375,
+			"wireKB": 1004.138671875
+		}
+	},
+	{
+		"lane": "sr-app",
+		"variant": "default",
+		"browser": "webkit",
+		"profile": "normal",
+		"load": {
+			"visits": 3,
+			"requests": 2398,
+			"wireKB": 918.1953125,
+			"jsFiles": 2381,
+			"jsKB": 895.3720703125,
+			"preloaded": 2380,
+			"preloadedUnused": null,
+			"executedChars": null,
+			"executedFunctions": null,
+			"rounds": null,
+			"fcpMs": 2827,
+			"settledMs": 3750
+		},
+		"early": {
+			"controls": 12,
+			"survived": 7,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 7,
+			"inert": 3,
+			"indeterminate": 2,
+			"inputToResponseMs": 48
+		},
+		"firstClick": {
+			"controls": 12,
+			"responded": 7,
+			"inputToResponseMs": 53,
+			"p95Ms": 91.7,
+			"clicksFetchingJs": 0,
+			"clickJsKB": 0,
+			"clickJsRequests": 0
+		},
+		"nav": {
+			"links": 1,
+			"ok": 1,
+			"documentLoads": 1,
+			"rounds": null,
+			"latencyMs": 292,
+			"wireKB": 19.212890625
+		}
+	},
+	{
+		"lane": "sr-app",
+		"variant": "default",
+		"browser": "webkit",
+		"profile": "constrained",
+		"load": {
+			"visits": 3,
+			"requests": 2398,
+			"wireKB": 918.23046875,
+			"jsFiles": 2381,
+			"jsKB": 895.4072265625,
+			"preloaded": 2380,
+			"preloadedUnused": null,
+			"executedChars": null,
+			"executedFunctions": null,
+			"rounds": null,
+			"fcpMs": 6437,
+			"settledMs": 7435
+		},
+		"early": {
+			"controls": 12,
+			"survived": 6,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 6,
+			"inert": 4,
+			"indeterminate": 2,
+			"inputToResponseMs": 46.5
+		},
+		"firstClick": {
+			"controls": 12,
+			"responded": 6,
+			"inputToResponseMs": 39,
+			"p95Ms": 89.75,
+			"clicksFetchingJs": 0,
+			"clickJsKB": 0,
+			"clickJsRequests": 0
+		},
+		"nav": {
+			"links": 1,
+			"ok": 1,
+			"documentLoads": 1,
+			"rounds": null,
+			"latencyMs": 466,
+			"wireKB": 19.212890625
+		}
+	},
+	{
+		"lane": "sr-app",
+		"variant": "packed",
+		"browser": "chromium",
+		"profile": "normal",
+		"load": {
+			"visits": 4,
+			"requests": 4,
+			"wireKB": 550.90087890625,
+			"jsFiles": 2,
+			"jsKB": 548.1689453125,
+			"preloaded": 1,
+			"preloadedUnused": 0,
+			"executedChars": 4072585,
+			"executedFunctions": 5711,
+			"rounds": 2,
+			"fcpMs": 268,
+			"settledMs": 1321
+		},
+		"early": {
+			"controls": 12,
+			"survived": 6,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 6,
+			"inert": 4,
+			"indeterminate": 2,
+			"inputToResponseMs": 42.9500732421875
+		},
+		"firstClick": {
+			"controls": 12,
+			"responded": 6,
+			"inputToResponseMs": 46,
+			"p95Ms": 70.7501220703125,
+			"clicksFetchingJs": 0,
+			"clickJsKB": 0,
+			"clickJsRequests": 0
+		},
+		"nav": {
+			"links": 1,
+			"ok": 1,
+			"documentLoads": 1,
+			"rounds": 2,
+			"latencyMs": 60.39990234375,
+			"wireKB": 550.7861328125
+		}
+	},
+	{
+		"lane": "sr-app",
+		"variant": "packed",
+		"browser": "chromium",
+		"profile": "constrained",
+		"load": {
+			"visits": 4,
+			"requests": 4,
+			"wireKB": 550.861328125,
+			"jsFiles": 2,
+			"jsKB": 548.142578125,
+			"preloaded": 1,
+			"preloadedUnused": 0,
+			"executedChars": 4072585,
+			"executedFunctions": 5711,
+			"rounds": 2,
+			"fcpMs": 2664,
+			"settledMs": 3735
+		},
+		"early": {
+			"controls": 12,
+			"survived": 6,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 6,
+			"inert": 4,
+			"indeterminate": 2,
+			"inputToResponseMs": 122.4500732421875
+		},
+		"firstClick": {
+			"controls": 12,
+			"responded": 6,
+			"inputToResponseMs": 101.0999755859375,
+			"p95Ms": 179.12493896484375,
+			"clicksFetchingJs": 0,
+			"clickJsKB": 0,
+			"clickJsRequests": 0
+		},
+		"nav": {
+			"links": 1,
+			"ok": 1,
+			"documentLoads": 1,
+			"rounds": 2,
+			"latencyMs": 416.7998046875,
+			"wireKB": 550.7548828125
+		}
+	},
+	{
+		"lane": "sr-app",
+		"variant": "packed",
+		"browser": "webkit",
+		"profile": "normal",
+		"load": {
+			"visits": 3,
+			"requests": 4,
+			"wireKB": 550.5771484375,
+			"jsFiles": 2,
+			"jsKB": 548.017578125,
+			"preloaded": 1,
+			"preloadedUnused": null,
+			"executedChars": null,
+			"executedFunctions": null,
+			"rounds": null,
+			"fcpMs": 383,
+			"settledMs": 1443
+		},
+		"early": {
+			"controls": 12,
+			"survived": 7,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 7,
+			"inert": 3,
+			"indeterminate": 2,
+			"inputToResponseMs": 31
+		},
+		"firstClick": {
+			"controls": 12,
+			"responded": 7,
+			"inputToResponseMs": 35,
+			"p95Ms": 82.19999999999999,
+			"clicksFetchingJs": 0,
+			"clickJsKB": 0,
+			"clickJsRequests": 0
+		},
+		"nav": {
+			"links": 1,
+			"ok": 1,
+			"documentLoads": 1,
+			"rounds": null,
+			"latencyMs": 45.000244140625,
+			"wireKB": 0.2509765625
+		}
+	},
+	{
+		"lane": "sr-app",
+		"variant": "packed",
+		"browser": "webkit",
+		"profile": "constrained",
+		"load": {
+			"visits": 3,
+			"requests": 4,
+			"wireKB": 550.5771484375,
+			"jsFiles": 2,
+			"jsKB": 548.017578125,
+			"preloaded": 1,
+			"preloadedUnused": null,
+			"executedChars": null,
+			"executedFunctions": null,
+			"rounds": null,
+			"fcpMs": 1912.0000000000002,
+			"settledMs": 2969
+		},
+		"early": {
+			"controls": 12,
+			"survived": 7,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 7,
+			"inert": 3,
+			"indeterminate": 2,
+			"inputToResponseMs": 33
+		},
+		"firstClick": {
+			"controls": 12,
+			"responded": 7,
+			"inputToResponseMs": 32,
+			"p95Ms": 82.69999999999999,
+			"clicksFetchingJs": 0,
+			"clickJsKB": 0,
+			"clickJsRequests": 0
+		},
+		"nav": {
+			"links": 1,
+			"ok": 1,
+			"documentLoads": 1,
+			"rounds": null,
+			"latencyMs": 374.999755859375,
+			"wireKB": 0.2509765625
+		}
+	},
+	{
+		"lane": "live-feed-ssr",
+		"variant": "default",
+		"browser": "chromium",
+		"profile": "normal",
+		"load": {
+			"visits": 4,
+			"requests": 73,
+			"wireKB": 93.6875,
+			"jsFiles": 71,
+			"jsKB": 86.876953125,
+			"preloaded": 71,
+			"preloadedUnused": 37,
+			"executedChars": 41954,
+			"executedFunctions": 317,
+			"rounds": 1,
+			"fcpMs": 44,
+			"settledMs": 1316
+		},
+		"early": {
+			"controls": 1,
+			"survived": 1,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 1,
+			"inert": 0,
+			"indeterminate": 0,
+			"inputToResponseMs": 25.60009765625
+		},
+		"firstClick": {
+			"controls": 1,
+			"responded": 1,
+			"inputToResponseMs": 43.300048828125,
+			"p95Ms": 43.300048828125,
+			"clicksFetchingJs": 1,
+			"clickJsKB": 0.693359375,
+			"clickJsRequests": 3
+		},
+		"nav": {
+			"links": 0,
+			"ok": 0,
+			"documentLoads": 0,
+			"rounds": null,
+			"latencyMs": null,
+			"wireKB": null
+		}
+	},
+	{
+		"lane": "live-feed-ssr",
+		"variant": "default",
+		"browser": "chromium",
+		"profile": "constrained",
+		"load": {
+			"visits": 4,
+			"requests": 73,
+			"wireKB": 93.6875,
+			"jsFiles": 71,
+			"jsKB": 86.876953125,
+			"preloaded": 71,
+			"preloadedUnused": 37,
+			"executedChars": 41967,
+			"executedFunctions": 317,
+			"rounds": 1,
+			"fcpMs": 1008,
+			"settledMs": 2201
+		},
+		"early": {
+			"controls": 1,
+			"survived": 1,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 1,
+			"inert": 0,
+			"indeterminate": 0,
+			"inputToResponseMs": 62.900146484375
+		},
+		"firstClick": {
+			"controls": 1,
+			"responded": 1,
+			"inputToResponseMs": 508.900146484375,
+			"p95Ms": 508.900146484375,
+			"clicksFetchingJs": 1,
+			"clickJsKB": 0.693359375,
+			"clickJsRequests": 3
+		},
+		"nav": {
+			"links": 0,
+			"ok": 0,
+			"documentLoads": 0,
+			"rounds": null,
+			"latencyMs": null,
+			"wireKB": null
+		}
+	},
+	{
+		"lane": "live-feed-ssr",
+		"variant": "default",
+		"browser": "webkit",
+		"profile": "normal",
+		"load": {
+			"visits": 3,
+			"requests": 73,
+			"wireKB": 92.5087890625,
+			"jsFiles": 71,
+			"jsKB": 85.8076171875,
+			"preloaded": 71,
+			"preloadedUnused": null,
+			"executedChars": null,
+			"executedFunctions": null,
+			"rounds": null,
+			"fcpMs": 261,
+			"settledMs": 1315
+		},
+		"early": {
+			"controls": 1,
+			"survived": 1,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 1,
+			"inert": 0,
+			"indeterminate": 0,
+			"inputToResponseMs": 29
+		},
+		"firstClick": {
+			"controls": 1,
+			"responded": 1,
+			"inputToResponseMs": 44,
+			"p95Ms": 44,
+			"clicksFetchingJs": 1,
+			"clickJsKB": 0.626953125,
+			"clickJsRequests": 3
+		},
+		"nav": {
+			"links": 0,
+			"ok": 0,
+			"documentLoads": 0,
+			"rounds": null,
+			"latencyMs": null,
+			"wireKB": null
+		}
+	},
+	{
+		"lane": "live-feed-ssr",
+		"variant": "default",
+		"browser": "webkit",
+		"profile": "constrained",
+		"load": {
+			"visits": 3,
+			"requests": 73,
+			"wireKB": 92.5087890625,
+			"jsFiles": 71,
+			"jsKB": 85.8076171875,
+			"preloaded": 71,
+			"preloadedUnused": null,
+			"executedChars": null,
+			"executedFunctions": null,
+			"rounds": null,
+			"fcpMs": 777,
+			"settledMs": 1878
+		},
+		"early": {
+			"controls": 1,
+			"survived": 1,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 1,
+			"inert": 0,
+			"indeterminate": 0,
+			"inputToResponseMs": 523
+		},
+		"firstClick": {
+			"controls": 1,
+			"responded": 1,
+			"inputToResponseMs": 500,
+			"p95Ms": 500,
+			"clicksFetchingJs": 1,
+			"clickJsKB": 0.626953125,
+			"clickJsRequests": 3
+		},
+		"nav": {
+			"links": 0,
+			"ok": 0,
+			"documentLoads": 0,
+			"rounds": null,
+			"latencyMs": null,
+			"wireKB": null
+		}
+	},
+	{
+		"lane": "live-feed-ssr",
+		"variant": "packed",
+		"browser": "chromium",
+		"profile": "normal",
+		"load": {
+			"visits": 4,
+			"requests": 20,
+			"wireKB": 81.1259765625,
+			"jsFiles": 18,
+			"jsKB": 74.7958984375,
+			"preloaded": 18,
+			"preloadedUnused": 8,
+			"executedChars": 49701,
+			"executedFunctions": 369,
+			"rounds": 1,
+			"fcpMs": 32,
+			"settledMs": 1300
+		},
+		"early": {
+			"controls": 1,
+			"survived": 1,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 1,
+			"inert": 0,
+			"indeterminate": 0,
+			"inputToResponseMs": 82.300048828125
+		},
+		"firstClick": {
+			"controls": 1,
+			"responded": 1,
+			"inputToResponseMs": 40.5,
+			"p95Ms": 40.5,
+			"clicksFetchingJs": 0,
+			"clickJsKB": 0,
+			"clickJsRequests": 0
+		},
+		"nav": {
+			"links": 0,
+			"ok": 0,
+			"documentLoads": 0,
+			"rounds": null,
+			"latencyMs": null,
+			"wireKB": null
+		}
+	},
+	{
+		"lane": "live-feed-ssr",
+		"variant": "packed",
+		"browser": "chromium",
+		"profile": "constrained",
+		"load": {
+			"visits": 4,
+			"requests": 20,
+			"wireKB": 81.1259765625,
+			"jsFiles": 18,
+			"jsKB": 74.7958984375,
+			"preloaded": 18,
+			"preloadedUnused": 8,
+			"executedChars": 49714,
+			"executedFunctions": 369,
+			"rounds": 1,
+			"fcpMs": 1008,
+			"settledMs": 2194
+		},
+		"early": {
+			"controls": 1,
+			"survived": 1,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 1,
+			"inert": 0,
+			"indeterminate": 0,
+			"inputToResponseMs": 49.199951171875
+		},
+		"firstClick": {
+			"controls": 1,
+			"responded": 1,
+			"inputToResponseMs": 38.5,
+			"p95Ms": 38.5,
+			"clicksFetchingJs": 0,
+			"clickJsKB": 0,
+			"clickJsRequests": 0
+		},
+		"nav": {
+			"links": 0,
+			"ok": 0,
+			"documentLoads": 0,
+			"rounds": null,
+			"latencyMs": null,
+			"wireKB": null
+		}
+	},
+	{
+		"lane": "live-feed-ssr",
+		"variant": "packed",
+		"browser": "webkit",
+		"profile": "normal",
+		"load": {
+			"visits": 3,
+			"requests": 20,
+			"wireKB": 80.7236328125,
+			"jsFiles": 18,
+			"jsKB": 74.5029296875,
+			"preloaded": 18,
+			"preloadedUnused": null,
+			"executedChars": null,
+			"executedFunctions": null,
+			"rounds": null,
+			"fcpMs": 260,
+			"settledMs": 1312
+		},
+		"early": {
+			"controls": 1,
+			"survived": 1,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 1,
+			"inert": 0,
+			"indeterminate": 0,
+			"inputToResponseMs": 28
+		},
+		"firstClick": {
+			"controls": 1,
+			"responded": 1,
+			"inputToResponseMs": 29,
+			"p95Ms": 29,
+			"clicksFetchingJs": 0,
+			"clickJsKB": 0,
+			"clickJsRequests": 0
+		},
+		"nav": {
+			"links": 0,
+			"ok": 0,
+			"documentLoads": 0,
+			"rounds": null,
+			"latencyMs": null,
+			"wireKB": null
+		}
+	},
+	{
+		"lane": "live-feed-ssr",
+		"variant": "packed",
+		"browser": "webkit",
+		"profile": "constrained",
+		"load": {
+			"visits": 3,
+			"requests": 20,
+			"wireKB": 80.7236328125,
+			"jsFiles": 18,
+			"jsKB": 74.5029296875,
+			"preloaded": 18,
+			"preloadedUnused": null,
+			"executedChars": null,
+			"executedFunctions": null,
+			"rounds": null,
+			"fcpMs": 746,
+			"settledMs": 1855
+		},
+		"early": {
+			"controls": 1,
+			"survived": 1,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 1,
+			"inert": 0,
+			"indeterminate": 0,
+			"inputToResponseMs": 65
+		},
+		"firstClick": {
+			"controls": 1,
+			"responded": 1,
+			"inputToResponseMs": 26,
+			"p95Ms": 26,
+			"clicksFetchingJs": 0,
+			"clickJsKB": 0,
+			"clickJsRequests": 0
+		},
+		"nav": {
+			"links": 0,
+			"ok": 0,
+			"documentLoads": 0,
+			"rounds": null,
+			"latencyMs": null,
+			"wireKB": null
+		}
+	},
+	{
+		"lane": "router-app",
+		"variant": "default",
+		"browser": "chromium",
+		"profile": "normal",
+		"load": {
+			"visits": 12,
+			"requests": 77,
+			"wireKB": 82.9189453125,
+			"jsFiles": 76,
+			"jsKB": 76.76953125,
+			"preloaded": 76,
+			"preloadedUnused": 76,
+			"executedChars": 6463,
+			"executedFunctions": 12,
+			"rounds": 2,
+			"fcpMs": 24,
+			"settledMs": 594
+		},
+		"early": {
+			"controls": 7,
+			"survived": 7,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 7,
+			"inert": 0,
+			"indeterminate": 0,
+			"inputToResponseMs": 39.400146484375
+		},
+		"firstClick": {
+			"controls": 7,
+			"responded": 7,
+			"inputToResponseMs": 45.7998046875,
+			"p95Ms": 48.7199462890625,
+			"clicksFetchingJs": 0,
+			"clickJsKB": 0,
+			"clickJsRequests": 0
+		},
+		"nav": {
+			"links": 2,
+			"ok": 2,
+			"documentLoads": 0,
+			"rounds": 0,
+			"latencyMs": 48.300048828125,
+			"wireKB": 0
+		}
+	},
+	{
+		"lane": "router-app",
+		"variant": "default",
+		"browser": "chromium",
+		"profile": "constrained",
+		"load": {
+			"visits": 12,
+			"requests": 77,
+			"wireKB": 82.9189453125,
+			"jsFiles": 76,
+			"jsKB": 76.76953125,
+			"preloaded": 76,
+			"preloadedUnused": 76,
+			"executedChars": 6463,
+			"executedFunctions": 12,
+			"rounds": 2,
+			"fcpMs": 848,
+			"settledMs": 1633
+		},
+		"early": {
+			"controls": 7,
+			"survived": 7,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 7,
+			"inert": 0,
+			"indeterminate": 0,
+			"inputToResponseMs": 167.10009765625
+		},
+		"firstClick": {
+			"controls": 7,
+			"responded": 7,
+			"inputToResponseMs": 39.800048828125,
+			"p95Ms": 40.880029296875,
+			"clicksFetchingJs": 0,
+			"clickJsKB": 0,
+			"clickJsRequests": 0
+		},
+		"nav": {
+			"links": 2,
+			"ok": 2,
+			"documentLoads": 0,
+			"rounds": 0,
+			"latencyMs": 34.8499755859375,
+			"wireKB": 0
+		}
+	},
+	{
+		"lane": "router-app",
+		"variant": "default",
+		"browser": "webkit",
+		"profile": "normal",
+		"load": {
+			"visits": 9,
+			"requests": 77,
+			"wireKB": 81.6875,
+			"jsFiles": 76,
+			"jsKB": 75.615234375,
+			"preloaded": 76,
+			"preloadedUnused": null,
+			"executedChars": null,
+			"executedFunctions": null,
+			"rounds": null,
+			"fcpMs": 16,
+			"settledMs": 582
+		},
+		"early": {
+			"controls": 7,
+			"survived": 7,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 7,
+			"inert": 0,
+			"indeterminate": 0,
+			"inputToResponseMs": 29
+		},
+		"firstClick": {
+			"controls": 7,
+			"responded": 7,
+			"inputToResponseMs": 27,
+			"p95Ms": 28.7,
+			"clicksFetchingJs": 0,
+			"clickJsKB": 0,
+			"clickJsRequests": 0
+		},
+		"nav": {
+			"links": 2,
+			"ok": 2,
+			"documentLoads": 0,
+			"rounds": null,
+			"latencyMs": 47,
+			"wireKB": 0
+		}
+	},
+	{
+		"lane": "router-app",
+		"variant": "default",
+		"browser": "webkit",
+		"profile": "constrained",
+		"load": {
+			"visits": 9,
+			"requests": 77,
+			"wireKB": 81.6875,
+			"jsFiles": 76,
+			"jsKB": 75.615234375,
+			"preloaded": 76,
+			"preloadedUnused": null,
+			"executedChars": null,
+			"executedFunctions": null,
+			"rounds": null,
+			"fcpMs": 515,
+			"settledMs": 1327
+		},
+		"early": {
+			"controls": 7,
+			"survived": 7,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 7,
+			"inert": 0,
+			"indeterminate": 0,
+			"inputToResponseMs": 211
+		},
+		"firstClick": {
+			"controls": 7,
+			"responded": 7,
+			"inputToResponseMs": 27,
+			"p95Ms": 28,
+			"clicksFetchingJs": 0,
+			"clickJsKB": 0,
+			"clickJsRequests": 0
+		},
+		"nav": {
+			"links": 2,
+			"ok": 2,
+			"documentLoads": 0,
+			"rounds": null,
+			"latencyMs": 47.5,
+			"wireKB": 0
+		}
+	},
+	{
+		"lane": "router-app",
+		"variant": "packed",
+		"browser": "chromium",
+		"profile": "normal",
+		"load": {
+			"visits": 12,
+			"requests": 16,
+			"wireKB": 68.498046875,
+			"jsFiles": 15,
+			"jsKB": 65.30078125,
+			"preloaded": 15,
+			"preloadedUnused": 15,
+			"executedChars": 6463,
+			"executedFunctions": 12,
+			"rounds": 2,
+			"fcpMs": 20,
+			"settledMs": 613
+		},
+		"early": {
+			"controls": 7,
+			"survived": 7,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 7,
+			"inert": 0,
+			"indeterminate": 0,
+			"inputToResponseMs": 80.699951171875
+		},
+		"firstClick": {
+			"controls": 7,
+			"responded": 7,
+			"inputToResponseMs": 43,
+			"p95Ms": 46.20986328125,
+			"clicksFetchingJs": 0,
+			"clickJsKB": 0,
+			"clickJsRequests": 0
+		},
+		"nav": {
+			"links": 2,
+			"ok": 2,
+			"documentLoads": 0,
+			"rounds": 0,
+			"latencyMs": 45.39990234375,
+			"wireKB": 0
+		}
+	},
+	{
+		"lane": "router-app",
+		"variant": "packed",
+		"browser": "chromium",
+		"profile": "constrained",
+		"load": {
+			"visits": 12,
+			"requests": 16,
+			"wireKB": 68.498046875,
+			"jsFiles": 15,
+			"jsKB": 65.30078125,
+			"preloaded": 15,
+			"preloadedUnused": 15,
+			"executedChars": 6463,
+			"executedFunctions": 12,
+			"rounds": 2,
+			"fcpMs": 840,
+			"settledMs": 1618
+		},
+		"early": {
+			"controls": 7,
+			"survived": 7,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 7,
+			"inert": 0,
+			"indeterminate": 0,
+			"inputToResponseMs": 268.5
+		},
+		"firstClick": {
+			"controls": 7,
+			"responded": 7,
+			"inputToResponseMs": 39.699951171875,
+			"p95Ms": 40.2400634765625,
+			"clicksFetchingJs": 0,
+			"clickJsKB": 0,
+			"clickJsRequests": 0
+		},
+		"nav": {
+			"links": 2,
+			"ok": 2,
+			"documentLoads": 0,
+			"rounds": 0,
+			"latencyMs": 33.89990234375,
+			"wireKB": 0
+		}
+	},
+	{
+		"lane": "router-app",
+		"variant": "packed",
+		"browser": "webkit",
+		"profile": "normal",
+		"load": {
+			"visits": 9,
+			"requests": 16,
+			"wireKB": 68.16015625,
+			"jsFiles": 15,
+			"jsKB": 65.025390625,
+			"preloaded": 15,
+			"preloadedUnused": null,
+			"executedChars": null,
+			"executedFunctions": null,
+			"rounds": null,
+			"fcpMs": 15,
+			"settledMs": 617
+		},
+		"early": {
+			"controls": 7,
+			"survived": 7,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 7,
+			"inert": 0,
+			"indeterminate": 0,
+			"inputToResponseMs": 63
+		},
+		"firstClick": {
+			"controls": 7,
+			"responded": 7,
+			"inputToResponseMs": 27,
+			"p95Ms": 29.4,
+			"clicksFetchingJs": 0,
+			"clickJsKB": 0,
+			"clickJsRequests": 0
+		},
+		"nav": {
+			"links": 2,
+			"ok": 2,
+			"documentLoads": 0,
+			"rounds": null,
+			"latencyMs": 47,
+			"wireKB": 0
+		}
+	},
+	{
+		"lane": "router-app",
+		"variant": "packed",
+		"browser": "webkit",
+		"profile": "constrained",
+		"load": {
+			"visits": 9,
+			"requests": 16,
+			"wireKB": 68.16015625,
+			"jsFiles": 15,
+			"jsKB": 65.025390625,
+			"preloaded": 15,
+			"preloadedUnused": null,
+			"executedChars": null,
+			"executedFunctions": null,
+			"rounds": null,
+			"fcpMs": 513,
+			"settledMs": 1324
+		},
+		"early": {
+			"controls": 7,
+			"survived": 7,
+			"lost": 0,
+			"diverged": 0,
+			"counted": 7,
+			"inert": 0,
+			"indeterminate": 0,
+			"inputToResponseMs": 287
+		},
+		"firstClick": {
+			"controls": 7,
+			"responded": 7,
+			"inputToResponseMs": 28,
+			"p95Ms": 29,
+			"clicksFetchingJs": 0,
+			"clickJsKB": 0,
+			"clickJsRequests": 0
+		},
+		"nav": {
+			"links": 2,
+			"ok": 2,
+			"documentLoads": 0,
+			"rounds": null,
+			"latencyMs": 39.5,
+			"wireKB": 0
+		}
+	}
+]

@@ -11,7 +11,7 @@
 		"@markless/analyzer": "workspace:*",
 		"@markless/bundler": "workspace:*",
 		"playwright": "1.58.2",
-		"vite-plus": "0.3.0"
+		"vite-plus": "0.3.1"
 	},
 	"packageManager": "pnpm@10.33.2"
 }

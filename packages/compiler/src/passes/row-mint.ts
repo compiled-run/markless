@@ -1,6 +1,17 @@
 import type { ProtocolRowTemplateSlotValue } from '@markless/serializer';
-import type { SemanticComponentEdge, SemanticMarkupSlot } from '../artifacts.ts';
+import type {
+	SemanticComponentEdge,
+	SemanticGraphArtifact,
+	SemanticMarkupChunk,
+	SemanticMarkupSlot,
+} from '../artifacts.ts';
+import {
+	graphBindingMap,
+	resolveGraphPath,
+	semanticAliasMap,
+} from '../artifact-helpers/graph-paths.ts';
 import { childConstructReach, type ConstructReachInput } from './construct-reach.ts';
+import { createResidueDependencyReader } from './public-render/residue-dependencies.ts';
 
 export type RowComponentMint = {
 	readonly componentEdgeId: string;
@@ -53,7 +64,7 @@ export type RowComponentMint = {
  * that cannot grow deserves a diagnostic, so the answer lives here once.
  */
 export function resolveRowComponentMint(
-	input: ConstructReachInput & {
+	input: RowMintInput & {
 		readonly rowChunkId: string;
 		readonly rowElementCount: number;
 		readonly itemName: string;
@@ -80,7 +91,7 @@ export function resolveRowComponentMint(
 	if (edge.children.childCount > 0 && slot.projectionChunkId === undefined) return null;
 	if (
 		slot.projectionChunkId !== undefined &&
-		!projectionIsMintable(input, slot.projectionChunkId, new Set())
+		!projectionIsMintable(input, slot.projectionChunkId, new Set(), [input.itemName])
 	)
 		return null;
 	if (!childIsMintable(input, edge, slot.childTemplateId, new Set())) return null;
@@ -93,35 +104,87 @@ export function resolveRowComponentMint(
 	};
 }
 
+export type RowMintInput = ConstructReachInput & {
+	/** Hosts a record names; absent, every host in a projection's nested row is refused. */
+	readonly recordHostIds?: ReadonlySet<string>;
+	/** Hosts a DOM update keeps current. */
+	readonly liveHostIds?: ReadonlySet<string>;
+	/** Answers which names a projected expression reads; absent, only live hosts admit one. */
+	readonly semanticGraph?: SemanticGraphArtifact;
+};
+
+type PayloadRecordView = {
+	readonly events: ReadonlyArray<{ readonly hostNodeId: string }>;
+	readonly domUpdates: ReadonlyArray<{ readonly hostNodeId: string }>;
+	readonly behaviors: ReadonlyArray<{ readonly hostNodeId: string }>;
+	readonly elementHandles: ReadonlyArray<{ readonly hostNodeId: string }>;
+};
+
+/** The record facts `RowMintInput` reads, off the module's payload. */
+export function payloadRecordHosts(
+	view: PayloadRecordView,
+): Pick<RowMintInput, 'recordHostIds' | 'liveHostIds'> {
+	return {
+		recordHostIds: new Set(
+			[...view.events, ...view.domUpdates, ...view.behaviors, ...view.elementHandles].map(
+				(record) => record.hostNodeId,
+			),
+		),
+		liveHostIds: new Set(view.domUpdates.map((update) => update.hostNodeId)),
+	};
+}
+
 /**
  * Whether what a row PROJECTS into its component is content the mint can rebuild.
  *
- * The projection is the owner's own markup rendered inside the row, so anything
- * in it that needs a record - an element to locate, a value to refresh, an arm to
- * flip - would need that record filed against a row the page never counted. What
- * the mint CAN rebuild is a projection made of components: each one renders in
- * the row's own identity and composes its whole record set beside the row's, the
- * same crossing the row's own child already makes. So the shape admitted here is
- * component parts, a value the row template itself could fill, and the static
- * text between them; each part answers the same reach question the row's own
- * child answers. Such a value needs no record at all - the row render fills it
- * from the item it was handed and the live graph, as a row template does.
+ * The projection is the owner's own markup rendered inside the row, in the row's
+ * identity: every element it places takes the row's segment, so a record the
+ * owner compiled for it is filed per row, served or minted. Admitted are elements,
+ * text and attribute values the owner's reader answers, component parts that pass
+ * the reach question the row's own child answers, and a nested @for whose rows
+ * carry no record - its rows are rendered once, with the row, and never wired.
+ * An arm to flip or a boundary to settle is still refused.
  */
 function projectionIsMintable(
-	input: ConstructReachInput,
+	input: RowMintInput,
 	projectionChunkId: string,
 	seen: Set<string>,
+	rowNames: ReadonlyArray<string>,
+	insideNestedRow = false,
 ): boolean {
 	if (seen.has(projectionChunkId)) return false;
 	seen.add(projectionChunkId);
 	const chunk = input.chunks.find((candidate) => candidate.id === projectionChunkId);
-	if (!chunk || chunk.hosts.length > 0) return false;
+	if (!chunk) return false;
+	if (
+		insideNestedRow &&
+		chunk.hosts.some((host) => input.recordHostIds?.has(host.hostNodeId) ?? true)
+	)
+		return false;
 	return chunk.slots.every((slot) => {
 		if (mintableSlotValue(slot)) return true;
-		if (slot.kind !== 'child-component') return false;
+		if (
+			(slot.kind === 'text' || slot.kind === 'attribute') &&
+			slot.residue.kind === 'authored-expression'
+		)
+			return projectedExpressionStaysCurrent(input, chunk, slot, rowNames);
+		if (slot.kind === 'repeat') {
+			const nested = input.semanticGraph?.keyedRepeats.find(
+				(candidate) => candidate.id === slot.repeatId,
+			);
+			const nestedNames = [
+				...rowNames,
+				...[nested?.itemName, nested?.indexName].filter((name): name is string => !!name),
+			];
+			return [slot.rowTemplateId, ...(slot.emptyTemplateId ? [slot.emptyTemplateId] : [])].every(
+				(chunkId) => projectionIsMintable(input, chunkId, seen, nestedNames, true),
+			);
+		}
+		// A part in a nested row would be one instance for every nested row.
+		if (slot.kind !== 'child-component' || insideNestedRow) return false;
 		if (
 			slot.projectionChunkId !== undefined &&
-			!projectionIsMintable(input, slot.projectionChunkId, seen)
+			!projectionIsMintable(input, slot.projectionChunkId, seen, rowNames)
 		)
 			return false;
 		const edge = input.componentEdges.find(
@@ -129,6 +192,33 @@ function projectionIsMintable(
 		);
 		return edge !== undefined && childIsMintable(input, edge, slot.childTemplateId, new Set());
 	});
+}
+
+// A projected expression is rebuilt with its row, so it stays current when it reads only the row or a live host keeps it.
+function projectedExpressionStaysCurrent(
+	input: RowMintInput,
+	chunk: SemanticMarkupChunk,
+	slot: SemanticMarkupSlot,
+	rowNames: ReadonlyArray<string>,
+): boolean {
+	const hostPath =
+		slot.coordinate.kind === 'comment-anchor'
+			? slot.coordinate.path.slice(0, -1)
+			: slot.coordinate.path;
+	const host = chunk.hosts.find(
+		(candidate) =>
+			candidate.coordinate.path.length === hostPath.length &&
+			candidate.coordinate.path.every((step, at) => step === hostPath[at]),
+	);
+	if (host && input.liveHostIds?.has(host.hostNodeId)) return true;
+	if (!input.semanticGraph || !chunk.componentName) return false;
+	const value = expressionSlotValue(
+		slot,
+		input.semanticGraph,
+		chunk.componentName,
+		new Set(rowNames),
+	);
+	return value !== null && !('reads' in value && value.reads?.length);
 }
 
 /**
@@ -145,6 +235,50 @@ export function mintableSlotValue(slot: SemanticMarkupSlot): ProtocolRowTemplate
 	return slot.residue.kind === 'graph-read'
 		? { graphNodeId: slot.residue.graphNodeId, graphPath: slot.residue.path }
 		: null;
+}
+
+const readResidueNames = createResidueDependencyReader();
+
+/**
+ * An authored-expression slot the owning component's render-data reader answers,
+ * with the graph nodes outside the row it reads. A read the page cannot follow -
+ * an element handle, a name the analyzer cannot resolve - refuses the slot.
+ */
+export function expressionSlotValue(
+	slot: SemanticMarkupSlot,
+	graph: SemanticGraphArtifact,
+	componentName: string,
+	rowNames: ReadonlySet<string>,
+): ProtocolRowTemplateSlotValue | null {
+	if (slot.kind !== 'text' && slot.kind !== 'attribute') return null;
+	if (slot.residue.kind !== 'authored-expression') return null;
+	// A class or style value is composed with scope classes and statics the mint does not see.
+	if (slot.kind === 'attribute' && (slot.name === 'class' || slot.name === 'style')) return null;
+	const names = readResidueNames(slot.residue.source, 'expression');
+	if (names.analysisFailed) return null;
+	const bindings = graphBindingMap(graph, null, componentName);
+	const aliases = semanticAliasMap(graph, null, componentName);
+	const reads: Array<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }> = [];
+	for (const name of names.names) {
+		if (rowNames.has(name)) continue;
+		const resolved = resolveGraphPath(name, bindings, aliases);
+		// A shared instance or a prop reads ids this page does not spell as its own.
+		if (!resolved) {
+			if (
+				graph.sharedInstances.some(
+					(instance) =>
+						instance.localName === name &&
+						(instance.componentName ?? componentName) === componentName,
+				)
+			)
+				return null;
+			continue;
+		}
+		if (resolved.binding.kind !== 'state' && resolved.binding.kind !== 'computed') return null;
+		if (resolved.binding.sharedDefinitionId !== undefined) return null;
+		reads.push({ graphNodeId: resolved.binding.id, path: resolved.path });
+	}
+	return { source: slot.residue.source, ...(reads.length > 0 ? { reads } : {}) };
 }
 
 /**

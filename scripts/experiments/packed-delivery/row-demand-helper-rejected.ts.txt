@@ -1,0 +1,25 @@
+import type { RuntimeGraph } from '@markless/runtime';
+import {
+	marklessRecordRowScope,
+	marklessRowScopedGraph,
+	type MarklessScopedGraph,
+} from './fns/instance-scope.ts';
+import type { ResumeSymbolContext } from './resume-types.ts';
+
+export function createRowScopedSymbolContext(hostNodeId: string, graph: RuntimeGraph) {
+	const scope = marklessRecordRowScope(hostNodeId, graph);
+	return (
+		context: ResumeSymbolContext & { readonly graph: RuntimeGraph },
+	): Partial<Pick<ResumeSymbolContext, 'graph' | 'getElementHandle'>> => {
+		if (!scope) return {};
+		const scoped = marklessRowScopedGraph(context.graph, scope) as MarklessScopedGraph;
+		const qualify = scoped.marklessQualifyGraphNodeId;
+		const read = context.getElementHandle;
+		return {
+			graph: scoped,
+			...(qualify && typeof read === 'function'
+				? { getElementHandle: (id: string) => read(qualify(id)) }
+				: {}),
+		};
+	};
+}

@@ -11,5 +11,5 @@ export default function Document({ children }: { readonly children?: Children })
 			<link rel="stylesheet" href={stylesheetHref} />
 		</head>
 		<body>{children}</body>
-	</Html>
+	</Html>;
 }

@@ -9,66 +9,149 @@ import { MARKLESS_BUILD_PREFIX, MARKLESS_BUNDLE_GRAPH } from '../../src/build/ch
 import { MARKLESS_EXECUTION_SIZES } from '../../src/build/execution-sizes.ts';
 import { parseBundleGraph, type ParsedBundleGraphRecord } from '../../src/build/preload-plan.ts';
 import type { MarklessBundleGraph } from '../../src/types.ts';
+import {
+	attributeFiles,
+	readAttribution,
+	readDemand,
+	undemandedRuntimeModules,
+} from '../../../../scripts/benchmarks/perf-guards/attribution.mjs';
 
 const exec = promisify(execFile);
 
-export type StageAnchor = { readonly gzipBytes: number; readonly margin: number };
+export type ByteBreakdown = Record<string, number>;
 
 export type StageMeasurement = {
 	readonly stage: string;
 	readonly what: string;
 	readonly chunks: readonly string[];
 	readonly gzipBytes: number;
+	readonly attribution: ByteBreakdown;
+};
+
+export type PayPerUse = {
+	readonly pageMaps: readonly string[];
+	readonly shipped: number;
+	readonly judged: string;
+	readonly demandedFeatures: readonly string[];
+	readonly undemanded: readonly string[];
 };
 
 export type BudgetMeasurement = {
 	readonly stages: readonly StageMeasurement[];
 	readonly aggregate: { readonly chunks: number; readonly gzipBytes: number };
 	readonly instrumented: readonly unknown[];
+	readonly payPerUse: PayPerUse;
 };
 
-export function stageOverruns(
-	stages: readonly StageMeasurement[],
-	anchors: Record<string, StageAnchor>,
-): string[] {
-	const overruns: string[] = [];
-	for (const stage of stages) {
-		const anchor = anchors[stage.stage];
-		if (!anchor) {
-			overruns.push(`${stage.stage}: measured ${stage.gzipBytes} gzip bytes with no anchor`);
-			continue;
-		}
-		const ceiling = anchor.gzipBytes + anchor.margin;
-		if (stage.gzipBytes <= ceiling) continue;
-		overruns.push(
-			`${stage.stage}: measured ${stage.gzipBytes} gzip bytes across ${stage.chunks.length} chunks, over anchor ${anchor.gzipBytes} (+${anchor.margin} margin) = ${ceiling}`,
-		);
-	}
-	return overruns;
+export type OverheadArtifacts = {
+	readonly attribution: unknown;
+	readonly demand: unknown;
+	readonly appDir: string;
+	readonly gzip: (name: string) => number;
+};
+
+const chunkPath = (chunk: string) => `/${MARKLESS_BUILD_PREFIX}${chunk}`;
+
+export function readOverheadArtifacts(publicDir: string, appDir: string): OverheadArtifacts {
+	const attribution = readAttribution(publicDir);
+	if (!attribution) throw new Error(`${publicDir} carries no byte attribution`);
+	return {
+		attribution,
+		demand: readDemand(publicDir),
+		appDir,
+		gzip: gzipByChunk(resolve(publicDir, MARKLESS_BUILD_PREFIX)),
+	};
 }
 
+/** Splits a chunk set's gzip bytes into framework runtime / compiler glue / author / third-party. */
+export function stageBreakdown(
+	artifacts: OverheadArtifacts,
+	chunks: Iterable<string>,
+): ByteBreakdown {
+	return attributeFiles(
+		[...chunks].map(chunkPath),
+		artifacts.attribution,
+		(path: string) => ({ gzipBytes: artifacts.gzip(path.slice(chunkPath('').length)) }),
+		'/',
+	).byCategory;
+}
+
+/** Runtime feature modules in a page's download that no demand map of the page's own modules names. */
+export function payPerUse(
+	artifacts: OverheadArtifacts,
+	chunks: Iterable<string>,
+	demand: unknown = artifacts.demand,
+): PayPerUse {
+	return undemandedRuntimeModules({
+		paths: [...chunks].map(chunkPath),
+		attribution: artifacts.attribution,
+		demand,
+		appDir: artifacts.appDir,
+		base: '/',
+	});
+}
+
+// Pay-per-use violations that already existed when the gate arrived; each is reported on every run.
+export const KNOWN_UNDEMANDED: Readonly<Record<string, string>> = Object.fromEntries(
+	['web/resume-async-wiring', 'web/resume-resettle-hold', 'web/resume-stream-patches'].map(
+		(id) => [
+			id,
+			"pre-existing (found 2026-09-24): the page's modulepreload plan follows the runtime's dynamic import() of the async-boundary capability although no compiled demand of the page names it",
+		],
+	),
+);
+
+export function unexpectedUndemanded(result: PayPerUse): string[] {
+	const known = result.undemanded.filter((id) => KNOWN_UNDEMANDED[id]);
+	if (known.length > 0)
+		console.info(
+			known
+				.map((id) => `KNOWN pay-per-use violation ${id}: ${KNOWN_UNDEMANDED[id]}`)
+				.join('\n'),
+		);
+	return result.undemanded.filter((id) => !KNOWN_UNDEMANDED[id]);
+}
+
+export function payPerUseReport(title: string, result: PayPerUse): string {
+	return result.undemanded
+		.map(
+			(id) =>
+				`${title}: runtime feature module ${id} ships in the page-load download, but no compiled demand of the page's own modules (${result.pageMaps.join(', ') || 'none found'}) names it`,
+		)
+		.join('\n');
+}
+
+// Whole-app bytes are informational: app code grows them without touching the framework.
 export function stageReport(input: {
 	readonly title: string;
 	readonly budget: BudgetMeasurement;
-	readonly anchors: Record<string, StageAnchor>;
 	readonly aggregateNote: string;
 }): string {
 	const evidence = process.env.MARKLESS_BUDGET_EVIDENCE_DIR;
 	if (evidence) {
 		mkdirSync(evidence, { recursive: true });
-		writeFileSync(resolve(evidence, input.title.replace(/[^a-zA-Z0-9-]/g, '_') + '.json'), JSON.stringify(input, null, 2));
+		writeFileSync(
+			resolve(evidence, input.title.replace(/[^a-zA-Z0-9-]/g, '_') + '.json'),
+			JSON.stringify(input, null, 2),
+		);
 	}
 	const lines = input.budget.stages.map((stage) => {
-		const anchor = input.anchors[stage.stage];
-		return `  ${stage.stage}: ${stage.gzipBytes} gzip bytes across ${stage.chunks.length} chunks (anchor ${anchor?.gzipBytes ?? '-'} +${anchor?.margin ?? '-'}) - ${stage.what}`;
+		const split = Object.entries(stage.attribution)
+			.filter(([, bytes]) => bytes > 0)
+			.map(([category, bytes]) => `${category} ${bytes}`)
+			.join(', ');
+		return `  ${stage.stage}: ${stage.gzipBytes} gzip bytes across ${stage.chunks.length} chunks (${split}) - ${stage.what}`;
 	});
-	return [input.title, ...lines, `  ${input.aggregateNote}`].join('\n');
+	return [`${input.title} (informational)`, ...lines, `  ${input.aggregateNote}`].join('\n');
 }
 
 // The ladder is cumulative: a marginal stage is charged only for the chunks no
 // earlier stage already pulled in. A standalone stage is measured whole and
 // leaves the cumulative set untouched.
-export function createStageLadder(sum: (chunks: Iterable<string>) => number): {
+export function createStageLadder(
+	sum: (chunks: Iterable<string>) => number,
+	split: (chunks: Iterable<string>) => ByteBreakdown,
+): {
 	readonly stages: StageMeasurement[];
 	standalone(stage: string, what: string, chunks: Iterable<string>): void;
 	marginal(stage: string, what: string, chunks: Iterable<string>): void;
@@ -78,12 +161,19 @@ export function createStageLadder(sum: (chunks: Iterable<string>) => number): {
 	return {
 		stages,
 		standalone(stage, what, chunks) {
-			stages.push({ stage, what, chunks: [...chunks].sort(), gzipBytes: sum(chunks) });
+			const all = [...chunks].sort();
+			stages.push({ stage, what, chunks: all, gzipBytes: sum(all), attribution: split(all) });
 		},
 		marginal(stage, what, chunks) {
 			const marginal = [...chunks].filter((chunk) => !pulled.has(chunk)).sort();
 			for (const chunk of marginal) pulled.add(chunk);
-			stages.push({ stage, what, chunks: marginal, gzipBytes: sum(marginal) });
+			stages.push({
+				stage,
+				what,
+				chunks: marginal,
+				gzipBytes: sum(marginal),
+				attribution: split(marginal),
+			});
 		},
 	};
 }

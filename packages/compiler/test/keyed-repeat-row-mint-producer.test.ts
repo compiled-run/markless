@@ -53,17 +53,21 @@ test('a row reading a cell outside the item mints and stays silent', async () =>
 	]);
 });
 
-// What no record can name: a value only rendering produces. The clause names the
-// read itself rather than its category.
-test('a row whose value only rendering produces warns, naming the read', async () => {
+// A value only rendering produces rides as its authored source, answered by the
+// page's render-data reader, with the cell outside the row it reads.
+test('a row whose value only rendering produces mints from its source and stays silent', async () => {
 	const compiled = await compilePage(
 		`<ul>@for (const row of rows; key row.id) { <li>{shout(chosen)}{row.label}</li> }</ul>`,
 	);
 
-	expect(rowMintWarnings(compiled)).toEqual([
-		['warning', expect.stringContaining('This @for row over row renders shout(chosen)')],
-	]);
-	expect(rowRecord(compiled)?.rowTemplate).toBeUndefined();
+	expect(rowMintWarnings(compiled)).toEqual([]);
+	expect(rowRecord(compiled)?.rowTemplate).toMatchObject({
+		componentName: 'App',
+		textSlots: [
+			{ path: [0, 0], source: 'shout(chosen)', reads: [{ graphNodeId: 'state:chosen', path: [] }] },
+			{ path: [0, 1], itemPath: ['label'] },
+		],
+	});
 });
 
 // The same cell through a method call is a different answer, and the silence is

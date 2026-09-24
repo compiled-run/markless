@@ -17,17 +17,14 @@ export default function Basic() @{
 		>
 			<menubar.label data-testid="label">Application</menubar.label>
 			<menubar.item data-testid="bar-file" delay={40} closeDelay={40}>
-				File
-				<menubar.itemcontent data-testid="panel-file">
+				File <menubar.itemcontent data-testid="panel-file">
 					<menu.item value="new" data-testid="item-new">New</menu.item>
 					<menu.item value="recent" submenu data-testid="level-recent">
-						Open Recent
-						<menu.itemcontent data-testid="panel-recent">
+						Open Recent <menu.itemcontent data-testid="panel-recent">
 							<menu.item value="draft" data-testid="item-draft">draft.md</menu.item>
 							<menu.item value="notes" data-testid="item-notes">notes.md</menu.item>
 							<menu.item value="archive" submenu data-testid="level-archive">
-								Archive
-								<menu.itemcontent data-testid="panel-archive">
+								Archive <menu.itemcontent data-testid="panel-archive">
 									<menu.item value="old" data-testid="item-old">old.md</menu.item>
 								</menu.itemcontent>
 							</menu.item>
@@ -36,15 +33,13 @@ export default function Basic() @{
 				</menubar.itemcontent>
 			</menubar.item>
 			<menubar.item data-testid="bar-edit">
-				Edit
-				<menubar.itemcontent data-testid="panel-edit">
+				Edit <menubar.itemcontent data-testid="panel-edit">
 					<menu.item value="undo" data-testid="item-undo">Undo</menu.item>
 					<menu.item value="redo" data-testid="item-redo">Redo</menu.item>
 				</menubar.itemcontent>
 			</menubar.item>
 			<menubar.item data-testid="bar-view" checked={['wrap']}>
-				View
-				<menubar.itemcontent data-testid="panel-view">
+				View <menubar.itemcontent data-testid="panel-view">
 					<menu.item value="wrap" checked data-testid="item-wrap">Word wrap</menu.item>
 					<menu.item value="zoom" data-testid="item-zoom">Zoom in</menu.item>
 				</menubar.itemcontent>

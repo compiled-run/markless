@@ -73,6 +73,8 @@ import {
 	staticHostLocators,
 	moduleScopeLines,
 	objectPropertyName,
+	ssrComposedPayloadView,
+	projectsElementsIntoRows,
 } from './shared.ts';
 import { ssrComposeStateExpression } from './prop-cell-seed.ts';
 import {
@@ -308,7 +310,7 @@ export function emitPublicSsrRenderModule(
 		),
 		...rootDataLines.serveComputed,
 		'	const html = marklessSsrRendered.html;',
-		'	const marklessSsrComposition = marklessSsrComposeView(marklessSsrRendered.structure, payloadView, marklessSsrChildren, marklessSsrAsyncSnapshots, marklessSsrIdPrefix);',
+		`	const marklessSsrComposition = marklessSsrComposeView(marklessSsrRendered.structure, ${ssrComposedPayloadView(input, rootInfo.componentName)}, marklessSsrChildren, marklessSsrAsyncSnapshots, marklessSsrIdPrefix);`,
 		`	const marklessSsrState = ${ssrComposeStateExpression(input, rootInfo.component, rootInfo.componentName)};`,
 		remapsInternalGraphProps ? '	const marklessSsrOutput = {' : '	return {',
 		'		html,',
@@ -319,7 +321,7 @@ export function emitPublicSsrRenderModule(
 			? ['		m(graphProps, instancePath) { marklessSsrRemapGraphOutput(this, graphProps, instancePath); },']
 			: []),
 		'		propEvents: marklessSsrPropEvents,',
-		'		externalSymbolIds: marklessSsrComposition.externalSymbolIds,',
+		'		externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, props),',
 		'		structure: marklessSsrRendered.structure,',
 		'		structureTokens: marklessSsrRendered.structureTokens,',
 		...(widgetFallbacksOutputField(input, rootInfo.componentName)
@@ -377,6 +379,10 @@ export function emitPublicSsrRenderModule(
 		...emitCatalogHelperImports(helperReferenceSource, [
 			{ module: 'ssr-data', names: ['renderSsrData'] },
 			{
+				module: 'row-qualified-view',
+				names: ['marklessSsrRowQualifiedView', 'marklessRowProjectionSegment'],
+			},
+			{
 				module: 'ssr',
 				names: [
 					'marklessSsrRenderChild',
@@ -406,6 +412,7 @@ export function emitPublicSsrRenderModule(
 					'marklessSsrRemapGraphOutput',
 					'marklessSsrSeedPropCells',
 					'marklessSsrComposeView',
+					'marklessSsrHandedDown',
 					'marklessSsrPrefixAnchorHtml',
 				],
 			},
@@ -1251,11 +1258,18 @@ function emitSsrDataLines(
 	const hoistsSharedComputed = bodyComputedReadsSharedInstance(input, componentName);
 	const sharedComputedLines = hoistsSharedComputed ? [] : allSharedComputedLines;
 	const templateComputedSharedSources = collectSsrTemplateComputedSources(input);
+	// An expression over an async value is derived by its @try boundary's runner once the value settles.
+	const asyncSettledGraphNodeIds = new Set(
+		input.semanticGraph.graphBindings.flatMap((binding) =>
+			binding.kind === 'computed' && binding.asyncCapable === true ? [binding.id] : [],
+		),
+	);
 	const templateComputedLines = input.renderData.initialValues.flatMap((initial) => {
 		// Held in a const so the discriminated narrowing survives into the callback.
 		const value = initial.value;
 		if (
 			!componentGraphNodeIds.has(initial.graphNodeId) ||
+			asyncSettledGraphNodeIds.has(initial.graphNodeId) ||
 			!initial.graphNodeId.startsWith(TEMPLATE_EXPRESSION_GRAPH_NODE_PREFIX) ||
 			value.kind !== 'symbol-function'
 		)
@@ -1343,7 +1357,7 @@ function emitSsrDataLines(
 		// its own template, and their seed pass reads this context, not the values map.
 		`const marklessSsrRendered=await renderSsrData({renderData:{...marklessRenderData,root:{componentName:${JSON.stringify(componentName)},templateId:${JSON.stringify(`template:${componentName}`)}}},idPrefix:marklessSsrIdPrefix,${
 			childCases.length > 0 ? 'sharedSeeds:marklessSsrRenderContext?.sharedSeeds,' : ''
-		}read:marklessSsrReadData,selectBranchArm:(marklessSsrDataSlot,marklessSsrDataContext)=>{${localLines.join('')}switch(marklessSsrDataSlot.branchSiteId){${branchCases.join('')}default:throw new Error('MARKLESS_SSR_DATA_BRANCH_MISSING: '+marklessSsrDataSlot.branchSiteId);}},${
+		}${projectsElementsIntoRows(chunks) ? 'projectionSegment:marklessRowProjectionSegment,' : ''}read:marklessSsrReadData,selectBranchArm:(marklessSsrDataSlot,marklessSsrDataContext)=>{${localLines.join('')}switch(marklessSsrDataSlot.branchSiteId){${branchCases.join('')}default:throw new Error('MARKLESS_SSR_DATA_BRANCH_MISSING: '+marklessSsrDataSlot.branchSiteId);}},${
 			repeatCases.length > 0
 				? `repeatItems:(marklessSsrDataSlot,marklessSsrDataContext)=>{${localLines.join('')}switch(marklessSsrDataSlot.repeatId){${repeatCases.join('')}default:throw new Error('MARKLESS_SSR_DATA_REPEAT_MISSING: '+marklessSsrDataSlot.repeatId);}},`
 				: ''

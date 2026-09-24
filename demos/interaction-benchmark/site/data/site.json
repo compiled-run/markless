@@ -1,0 +1,5 @@
+{
+	"title": "Interaction benchmark results",
+	"sourceBaseUrl": "https://github.com/compiled-run/markless/tree/main/",
+	"defaultRuns": ["sample-runs/selftest-fixture"]
+}

@@ -1,5 +1,14 @@
-import type { Children } from '@markless/core';
+import Sidebar from '../docs/Sidebar.tsrx';
 
-export function DocsLayout({ children }: { readonly children?: Children }) @{
-	<div class="docs-layout">{children}</div>
+export default function DocsLayout({
+	title,
+	active,
+}: {
+	readonly title: string;
+	readonly active: string;
+}) @{
+	<header class="docs-layout">
+		<Sidebar active={active} />
+		<h1>{title}</h1>
+	</header>
 }

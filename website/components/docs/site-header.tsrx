@@ -1,4 +1,3 @@
-import Mascot from '../mascot.tsrx';
 import { lucide } from '@markless/ui';
 import { breadcrumbFor } from '../../nav.ts';
 

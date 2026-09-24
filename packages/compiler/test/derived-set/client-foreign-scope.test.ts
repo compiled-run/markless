@@ -171,7 +171,7 @@ test('two cells needing different imports of one file each get their own', async
 
 test('an import the reading file already has from the same file is not carried twice', async () => {
 	const compiled = await compilePage(
-		pageReading('b.loud + shout("here")', `import { shout } from '../family/helpers.ts';`),
+		pageReading('b.loud + shout.name', `import { shout } from '../family/helpers.ts';`),
 	);
 	const emitted = deriveModule(compiled.page, '() => shout(s.label)');
 

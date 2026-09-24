@@ -8,6 +8,9 @@ import type {
 import { MARKLESS_COMPONENT_PART_BRAND } from '@markless/web/render-to-string';
 import type { StorageSeedMetadata } from '@markless/serializer';
 import { ASYNC_PROTOCOL_VERSION } from '@markless/serializer';
+import type { RuntimeDemandMapArtifact } from '@markless/compiler';
+import { emitScalarPlanLoader } from './scalar-plan-loader.ts';
+import { scalarPlanSourceReference } from './scalar-plan-source.ts';
 
 export const MARKLESS_VIRTUAL_PREFIX = 'virtual:markless:';
 
@@ -119,7 +122,9 @@ export function emitSettleModule(input: {
 }): string {
 	const imports = [...input.runners, ...input.derives].map((entry) => entry.symbol);
 	const seen = new Map<string, string>();
-	const lines: string[] = ["export { marklessApplySettlePlan as f } from '@markless/web/fns/settle-plan';"];
+	const lines: string[] = [
+		"export { marklessApplySettlePlan as f } from '@markless/web/fns/settle-plan';",
+	];
 	for (const symbol of imports) {
 		if (seen.has(symbol.id)) continue;
 		seen.set(symbol.id, symbol.exportName);
@@ -172,10 +177,33 @@ export function payloadModule(payload: {
 }) {
 	return [
 		`export const state = ${JSON.stringify(payload.state, null, '\t')};`,
-		`export const runtimeDemandMap = ${JSON.stringify(payload.runtimeDemandMap, null, '\t')};`,
+		`export const runtimeDemandMap = ${JSON.stringify(withoutFirstUse(payload.runtimeDemandMap), null, '\t')};`,
 		`export const view = ${JSON.stringify(payload.view, null, '\t')};`,
 		'',
 	].join('\n');
+}
+
+// Only the build-time pack planner reads first-use demand; no runtime path does.
+export function withoutFirstUse(runtimeDemandMap: unknown): unknown {
+	const map = runtimeDemandMap as
+		| { readonly actions?: ReadonlyArray<object>; readonly firstUsePage?: unknown }
+		| undefined;
+	if (!map?.actions?.some((action) => 'firstUse' in action) && !(map && 'firstUsePage' in map))
+		return runtimeDemandMap;
+	const { firstUsePage: _firstUsePage, ...rest } = map;
+	return {
+		...rest,
+		...(map.actions
+			? {
+					actions: map.actions.map((action) => {
+						const { firstUse: _firstUse, ...fields } = action as {
+							readonly firstUse?: unknown;
+						};
+						return fields;
+					}),
+				}
+			: {}),
+	};
 }
 
 /** The module-local name a direct-CSR module's root renders under. */
@@ -243,6 +271,8 @@ export function emitSourceModule(input: {
 		readonly ssrFunctionName: string;
 	}>;
 	readonly renderDataId?: string;
+	// An imported component fills rows through its render-data reader.
+	readonly linkedRowSlotReaders?: boolean;
 	readonly canonicalRenderData?: boolean;
 	readonly symbols: ReadonlyArray<SourceSymbolRow>;
 	readonly behaviorSymbols?: ReadonlyArray<SourceSymbolRow>;
@@ -261,6 +291,11 @@ export function emitSourceModule(input: {
 	readonly hasComputedState?: boolean;
 	readonly hasOverlayMarks?: boolean;
 	readonly runtimeDemandMap?: unknown;
+	readonly scalarActions?: RuntimeDemandMapArtifact['actions'];
+	// Plain-SSR actions whose closure plans a composing page may route to.
+	readonly closureActions?: RuntimeDemandMapArtifact['actions'];
+	// The symbol routes toward children that compiled closure plans.
+	readonly closurePlanRoutes?: ReadonlyArray<SourceLazySymbolRoute>;
 }) {
 	if (input.directCsr && input.prerenderRecords) input = { ...input, prerenderRecords: false };
 	const symbolsOnly = input.environment === 'client' && input.clientOutput === 'symbols-only';
@@ -331,17 +366,33 @@ export function emitSourceModule(input: {
 		input.environment === 'client' && input.hasOverlayMarks === true
 			? emitOverlayLoaderInstall()
 			: null,
-		// And the same split again for the component-row mint. A CSR mount reaches
+		// And the same split again for the row mints. A CSR mount reaches
 		// the resume runtime through THIS module and never evaluates a resume
 		// module, so without the loader here its rows silently never build in
 		// production - dev only worked because the dev-only resume re-export below
 		// dragged the resume module in. The line is page-agnostic, so installing it
 		// twice on a resumed page is the same assignment, not a second page's.
-		input.environment === 'client' && demandsRowComponentMint(input.runtimeDemandMap)
-			? emitRowComponentMintLoaderInstall()
-			: null,
+		input.environment === 'client' ? clientRowMintLoader(input) : null,
 		'',
 		emitLoadSymbol(input),
+		symbolsOnly && input.scalarActions
+			? emitScalarPlanLoader(
+					input.scalarActions,
+					input.symbolRoutes.map((route) =>
+						'importSource' in route
+							? {
+									...route,
+									importSource: scalarPlanSourceReference(route.importSource),
+								}
+							: route,
+					),
+				)
+			: '',
+		symbolsOnly &&
+		input.closureActions &&
+		emitsClosurePlanLoader(input.closureActions, input.closurePlanRoutes ?? [])
+			? `${emitClosurePlanRoute(input.closurePlanRoutes ?? [], 'loadClosureActionPlan', input.closureActions)}\nexport { loadClosureActionPlan };`
+			: null,
 		input.behaviorSymbols?.length
 			? emitDirectSourceSymbolLoader(
 					input.behaviorSymbols,
@@ -379,6 +430,7 @@ export function emitSourceModule(input: {
 					input.symbolRoutes,
 					'marklessSsrLoadSymbolRoute',
 					'marklessLoadLocalSymbol',
+					input.scalarActions !== undefined,
 				)
 			: '',
 		routeSymbols && !symbolsOnly && input.directCsr === true
@@ -509,6 +561,19 @@ function emitRowMintLoaderInstall(): string {
 }
 
 /**
+ * The same one line for per-enclosing-row wiring: only a page holding a `@for`
+ * inside another `@for`'s rows names the module, so no other app emits its chunk.
+ */
+function nestedRepeatsLoader(runtimeDemandMap: unknown): string | null {
+	return demandsKeyedRepeatModule(runtimeDemandMap, NESTED_REPEATS_RUNTIME_MODULE_ID)
+		? [
+				'globalThis.__marklessNestedRepeats ??= (...input) =>',
+				"\timport('@markless/web/fns/nested-repeats').then((nested) => nested.wireNestedRepeats(...input));",
+			].join('\n')
+		: null;
+}
+
+/**
  * True when the compiler folded the mint into a keyed-repeat record - which it
  * does exactly for a record carrying `rowTemplate` or `emptyArm`, the two fields
  * that make a repeat able to build nodes.
@@ -556,10 +621,38 @@ function emitRowComponentMintLoaderInstall(): string {
 function componentRowLoader(input: {
 	readonly renderDataId?: string;
 	readonly runtimeDemandMap?: unknown;
+	readonly linkedRowSlotReaders?: boolean;
 }): string | undefined {
-	return input.renderDataId && demandsRowComponentMint(input.runtimeDemandMap)
-		? emitRowComponentMintLoaderInstall()
+	if (!input.renderDataId) return undefined;
+	if (demandsKeyedRepeatModule(input.runtimeDemandMap, ROW_COMPONENT_MINT_RUNTIME_MODULE_ID))
+		return emitRowComponentMintLoaderInstall();
+	return input.linkedRowSlotReaders ||
+		demandsKeyedRepeatModule(input.runtimeDemandMap, ROW_SLOT_MINT_RUNTIME_MODULE_ID)
+		? emitRowSlotMintLoaderInstall()
 		: undefined;
+}
+
+// Whichever mint this page's repeats demand, for client output that has no resume module.
+function clientRowMintLoader(input: {
+	readonly renderDataId?: string;
+	readonly runtimeDemandMap?: unknown;
+	readonly linkedRowSlotReaders?: boolean;
+}): string | null {
+	const mint = demandsRowComponentMint(input.runtimeDemandMap)
+		? emitRowComponentMintLoaderInstall()
+		: (componentRowLoader(input) ??
+			(demandsRowMint(input.runtimeDemandMap) ? emitRowMintLoaderInstall() : null));
+	// Nested repeats wire through the same client module, for the same reason.
+	const nested = nestedRepeatsLoader(input.runtimeDemandMap);
+	return mint && nested ? `${mint}\n${nested}` : (mint ?? nested);
+}
+
+// Assigned, not defaulted: a page whose rows read expressions must not inherit a plain mint.
+function emitRowSlotMintLoaderInstall(): string {
+	return [
+		'globalThis.__marklessRowMint = (...input) =>',
+		"\timport('@markless/web/fns/row-slot-mint').then((mint) => mint.marklessRowSlotMint(...input));",
+	].join('\n');
 }
 
 /**
@@ -567,6 +660,10 @@ function componentRowLoader(input: {
  * which it does exactly for a record carrying `rowComponent`.
  */
 function demandsRowComponentMint(runtimeDemandMap: unknown): boolean {
+	return demandsKeyedRepeatModule(runtimeDemandMap, ROW_COMPONENT_MINT_RUNTIME_MODULE_ID);
+}
+
+function demandsKeyedRepeatModule(runtimeDemandMap: unknown, moduleId: string): boolean {
 	const records = (
 		runtimeDemandMap as {
 			readonly payloadRecords?: ReadonlyArray<{
@@ -580,13 +677,15 @@ function demandsRowComponentMint(runtimeDemandMap: unknown): boolean {
 		records.some(
 			(record) =>
 				record.kind === 'keyed-repeat' &&
-				record.runtimeModuleIds?.includes(ROW_COMPONENT_MINT_RUNTIME_MODULE_ID) === true,
+				record.runtimeModuleIds?.includes(moduleId) === true,
 		)
 	);
 }
 
 const ROW_MINT_RUNTIME_MODULE_ID = 'web/fns/row-mint';
+const NESTED_REPEATS_RUNTIME_MODULE_ID = 'web/fns/nested-repeats';
 const ROW_COMPONENT_MINT_RUNTIME_MODULE_ID = 'web/fns/row-component-mint';
+const ROW_SLOT_MINT_RUNTIME_MODULE_ID = 'web/fns/row-slot-mint';
 
 /** True when the compiler recorded an `overlay` mark for this module. */
 export function demandsOverlay(runtimeDemandMap: unknown): boolean {
@@ -604,9 +703,12 @@ export function emitResumeModule(input: {
 	readonly payloadState?: unknown;
 	readonly payloadView?: unknown;
 	readonly runtimeDemandMap?: unknown;
+	// Scalar plans of a module compiled for the conservative demand class, for payload-document containers.
+	readonly servedScalarPlans?: unknown;
 	readonly needsFullResume?: boolean;
 	readonly symbols: ReadonlyArray<SourceSymbolRow>;
 	readonly symbolRoutes: ReadonlyArray<SourceLazySymbolRoute>;
+	readonly closurePlanRoutes?: ReadonlyArray<SourceLazySymbolRoute>;
 	readonly executionLog?: MarklessExecutionLogMode;
 	readonly hasBoundSymbols?: boolean;
 	// Boundary-sized bound-symbol facts for the narrow settle path. Data only:
@@ -618,6 +720,7 @@ export function emitResumeModule(input: {
 	// `prerenderDataId` is gated on prerendered records, so a plain resumed page
 	// has none - and a component row still has to reach the surface.
 	readonly renderDataId?: string;
+	readonly linkedRowSlotReaders?: boolean;
 	readonly installResumeSummary?: boolean;
 	// The wake variant serves pages whose container carries no payload
 	// scripts; lean routes read the payload document and must never emit.
@@ -636,7 +739,13 @@ export function emitResumeModule(input: {
 }) {
 	const routeSymbols = input.symbolRoutes.length > 0;
 	const resumeSymbolLoader = routeSymbols ? 'marklessSsrLoadSymbolRoute' : 'loadSymbol';
-	const scalarSpecializations = scalarDispatcherSpecializations(input);
+	// Served-only plans answer only where the container serves its view, so they never reach the static dispatcher.
+	const servedPlansOnly =
+		leanResumeMode(input.runtimeDemandMap) === 'none' &&
+		leanResumeMode(input.servedScalarPlans) !== 'none';
+	const scalarSpecializations = scalarDispatcherSpecializations(
+		servedPlansOnly ? { ...input, runtimeDemandMap: input.servedScalarPlans } : input,
+	);
 	const stagedPrerender = (input.prerenderTriggerGroups?.length ?? 0) > 0;
 	// Every resume module owns dispatch through the same queue. Staged modules
 	// may replace the active handler, while ordinary modules remain the fallback
@@ -650,15 +759,29 @@ export function emitResumeModule(input: {
 			input.needsFullResume ?? false,
 			(input.payloadState as { readonly version?: unknown } | undefined)?.version ===
 				ASYNC_PROTOCOL_VERSION,
-			input.symbolRoutes.length > 0 ? 'none' : leanResumeMode(input.runtimeDemandMap),
+			servedPlansOnly
+				? 'scalar'
+				: composedLeanMode(input.symbolRoutes.length > 0, leanResumeMode(input.runtimeDemandMap)),
 			scalarSpecializations,
 			input.runtimeDemandMap,
 			input.executionLog !== 'never',
 			input.prerenderDataId,
 			stagedPrerender,
 			componentRowLoader(input) ? input.renderDataId : undefined,
+			input.symbolRoutes.length > 0 || servedPlansOnly,
+			// A composed child's own closure plan is asked for only where this page already dispatches lean.
+			(input.closurePlanRoutes ?? []).some((route) => 'importSource' in route) &&
+				scalarSpecializations.length > 0 &&
+				!input.prerenderDataId,
 		),
 	);
+	const closureImports = [
+		'marklessClosureRouted',
+		'marklessPrimeClosure',
+		'marklessPrimeRoutedClosure',
+		'marklessRunClosureAction',
+		'marklessRunRoutedClosure',
+	].filter((name) => resumeContainerEvent.includes(name));
 	return [
 		input.boundSymbolDescriptors
 			? `export const ${MARKLESS_BOUND_SYMBOLS_EXPORT} = ${emitBoundSymbolDescriptors(input.boundSymbolDescriptors)};`
@@ -699,9 +822,16 @@ export function emitResumeModule(input: {
 		// re-exports the template mint instead of a second loader beside it.
 		componentRowLoader(input) ??
 			(demandsRowMint(input.runtimeDemandMap) ? emitRowMintLoaderInstall() : null),
+		nestedRepeatsLoader(input.runtimeDemandMap),
 		scalarSpecializations.length > 0
 			? [
 					"import { marklessDecodeScalarCell, marklessReadScalarCell, marklessScalarSpecializedError } from '@markless/web/fns/scalar-specialized';",
+					resumeContainerEvent.includes('marklessScalarServedOwner')
+						? `import { marklessScalarLocate, marklessScalarServedOwner, marklessScalarServedPrime${resumeContainerEvent.includes('marklessScalarServedRecord') ? ', marklessScalarServedRecord' : ''} } from '@markless/web/fns/scalar-served';`
+						: '',
+					...(closureImports.length > 0
+						? [`import { ${closureImports.join(', ')} } from '@markless/web/fns/closure-action';`]
+						: []),
 					"import { marklessWriteScalar } from '@markless/web/fns/write-scalar';",
 					"import { marklessUpdateText } from '@markless/web/fns/update-text';",
 				].join('\n')
@@ -727,6 +857,9 @@ export function emitResumeModule(input: {
 		routeSymbols ? 'export { marklessSsrLoadSymbolRoute as loadSymbol };' : '',
 		routeSymbols ? emitComposedArmRecordsInstall() : null,
 		stagedPrerender ? emitPrerenderTriggerGroupLoader(input.prerenderTriggerGroups ?? []) : '',
+		resumeContainerEvent.includes('marklessClosurePlanRoute')
+			? emitClosurePlanRoute(input.closurePlanRoutes ?? [], 'marklessClosurePlanRoute', [])
+			: null,
 		resumeContainerEvent,
 		'',
 	]
@@ -795,6 +928,7 @@ function emitLazySymbolRouteFunction(
 	routes: ReadonlyArray<SourceLazySymbolRoute>,
 	functionName: string,
 	fallbackName = 'loadSymbol',
+	includeScalarActionPlans = false,
 ): string {
 	if (routes.length === 0) return '';
 	// A projected child's path nests under the component it was projected into,
@@ -805,7 +939,7 @@ function emitLazySymbolRouteFunction(
 		...ordered.flatMap((route) => [
 			`	if (symbolId.startsWith(${JSON.stringify(route.prefix)})) {`,
 			'importSource' in route
-				? `		return import(${JSON.stringify(symbolRouteImportSource(route.importSource))}).then((mod) => mod.loadSymbol ? mod.loadSymbol(symbolId.slice(${route.prefix.length})) : Promise.reject(new Error(\`Unknown child async symbol \${symbolId}\`)));`
+				? `		return import(${JSON.stringify(symbolRouteImportSource(route.importSource, includeScalarActionPlans))}).then((mod) => mod.loadSymbol ? mod.loadSymbol(symbolId.slice(${route.prefix.length})) : Promise.reject(new Error(\`Unknown child async symbol \${symbolId}\`)));`
 				: // Re-enter the table: what is left after one strip can itself carry
 					// another composed child's path. Each hop is strictly shorter, and an
 					// unmatched tail still reaches the closing fallback.
@@ -817,7 +951,64 @@ function emitLazySymbolRouteFunction(
 	].join('\n');
 }
 
-function symbolRouteImportSource(importSource: string): string {
+function emitsClosurePlanLoader(
+	actions: RuntimeDemandMapArtifact['actions'],
+	routes: ReadonlyArray<SourceLazySymbolRoute>,
+): boolean {
+	return (
+		routes.some((route) => 'importSource' in route) ||
+		actions.some((action) => action.plan?.kind === 'closure')
+	);
+}
+
+// Closure plans answer from the module that compiled them, reached through the same routes as its symbols.
+function emitClosurePlanRoute(
+	routes: ReadonlyArray<SourceLazySymbolRoute>,
+	functionName: string,
+	actions: ReadonlyArray<unknown>,
+): string {
+	const shapes: string[] = [];
+	const local = (actions as ReadonlyArray<{ readonly recordKind?: unknown; readonly plan?: any }>)
+		.filter((action) => action.recordKind === 'event' && action.plan?.kind === 'closure')
+		.map((action) => {
+			const { symbolId, cells, computed, updates } = action.plan;
+			const shape = JSON.stringify({ cells, computed, updates });
+			if (!shapes.includes(shape)) shapes.push(shape);
+			return `\t${JSON.stringify(symbolId)}: { symbolId: ${JSON.stringify(symbolId)}, ...marklessLocalClosureShapes[${shapes.indexOf(shape)}] },`;
+		});
+	const ordered = [...routes].sort((left, right) => right.prefix.length - left.prefix.length);
+	const localLookup =
+		local.length > 0
+			? 'Object.hasOwn(marklessLocalClosurePlans, symbolId) ? marklessLocalClosurePlans[symbolId] : undefined'
+			: 'undefined';
+	return [
+		local.length > 0
+			? [
+					`const marklessLocalClosureShapes = [${shapes.join(', ')}];`,
+					'const marklessLocalClosurePlans = {',
+					...local,
+					'};',
+				].join('\n')
+			: '',
+		`function ${functionName}(symbolId) {`,
+		...ordered.flatMap((route) => [
+			`	if (symbolId.startsWith(${JSON.stringify(route.prefix)})) {`,
+			'importSource' in route
+				? `		return import(${JSON.stringify(symbolRouteImportSource(route.importSource))}).then((mod) => mod.loadClosureActionPlan?.(symbolId.slice(${route.prefix.length})));`
+				: route.prefix.length > 0
+					? `		return ${functionName}(symbolId.slice(${route.prefix.length}));`
+					: `		return ${localLookup};`,
+			'	}',
+		]),
+		`	return ${localLookup};`,
+		'}',
+	]
+		.filter(Boolean)
+		.join('\n');
+}
+
+function symbolRouteImportSource(importSource: string, includeScalarActionPlans = false): string {
+	if (includeScalarActionPlans) return scalarPlanSourceReference(importSource);
 	return importSource.includes('?')
 		? `${importSource}&markless-symbols`
 		: `${importSource}?markless-symbols`;
@@ -957,9 +1148,13 @@ function emitCompiledAppDefault(input: {
 // a module that throws `SyntaxError` at load.
 const RESERVED_MODULE_BINDINGS: ReadonlySet<string> = new Set([
 	'loadBehaviorSymbol',
+	'loadClosureActionPlan',
+	'loadScalarActionPlan',
 	'loadSymbol',
 	'marklessCompiledApp',
 	'marklessLoadLocalSymbol',
+	'marklessLocalClosurePlans',
+	'marklessLocalClosureShapes',
 	'marklessPrerenderData',
 	'marklessRenderData',
 	'marklessRenderSsr',
@@ -1032,6 +1227,8 @@ function emitResumeContainerEvent(
 	prerenderDataId?: string,
 	stagedPrerender = false,
 	componentRowRenderDataId?: string,
+	servedOnly = false,
+	routedClosures = false,
 ): string {
 	const resumeEntry = storageFreePayload
 		? STORAGE_FREE_RESUME_ENTRY_SPECIFIER
@@ -1119,6 +1316,8 @@ function emitResumeContainerEvent(
 	const scalarOnlySpecialized =
 		leanMode === 'scalar' &&
 		scalarSpecializations.length > 0 &&
+		!needsFullResume &&
+		!servedOnly &&
 		allEventActionsHaveScalarPlan(runtimeDemandMap);
 	const scalarDispatcher =
 		scalarSpecializations.length > 0
@@ -1126,10 +1325,16 @@ function emitResumeContainerEvent(
 					scalarSpecializations,
 					loadSymbolName,
 					scalarOnlySpecialized ? 'fail' : 'full',
+					scalarOnlySpecialized ? 'static' : servedOnly ? 'served-only' : 'served',
+					!scalarOnlySpecialized && routedClosures,
 				)
-			: emitSpecializedScalarDispatcher([], loadSymbolName, 'full');
+			: emitSpecializedScalarDispatcher([], loadSymbolName, 'full', 'static');
+	// Per-action lean: a page whose other records need the full runtime still
+	// runs its scalar-planned actions lean and hands everything else to full resume.
+	const actionScopedLean =
+		leanMode === 'scalar' && scalarSpecializations.length > 0 && !prerenderDataId;
 
-	if (needsFullResume) {
+	if (needsFullResume && !actionScopedLean) {
 		// Branch flips need graph subscriptions and range replacement: start the
 		// full resume runtime once, mark the container so the inline resumer
 		// steps aside, and dispatch the pending event through the runtime.
@@ -1247,7 +1452,28 @@ function emitPrerenderTriggerGroupLoader(
 	].join('\n');
 }
 
-type ScalarSpecialization = {
+type ClosurePlanShape = {
+	readonly cells: ReadonlyArray<string>;
+	readonly computed: ReadonlyArray<unknown>;
+	readonly updates: ReadonlyArray<unknown>;
+};
+
+type ClosureSpecialization = {
+	readonly kind: 'closure';
+	readonly name: string;
+	readonly hostNodeId: string;
+	readonly eventName: string;
+	readonly symbolId: string;
+	readonly hostIndex: number;
+	readonly hostTagName: string;
+	readonly syncPolicy: unknown;
+	readonly plan: ClosurePlanShape;
+};
+
+type ScalarSpecialization = ScalarLeafSpecialization | ClosureSpecialization;
+
+type ScalarLeafSpecialization = {
+	readonly kind: 'scalar';
 	readonly name: string;
 	readonly hostNodeId: string;
 	readonly eventName: string;
@@ -1269,6 +1495,7 @@ type ScalarSpecialization = {
 		readonly index: number;
 		readonly tagName: string;
 		readonly prefix?: string;
+		readonly suffix?: string;
 	}>;
 };
 
@@ -1297,17 +1524,13 @@ function scalarDispatcherSpecializations(input: {
 		  }
 		| undefined;
 	const map = input.runtimeDemandMap as { readonly actions?: ReadonlyArray<any> } | undefined;
-	// Composed pages (child symbol routes) are excluded from specialization until
-	// child-coordinate routing is emitted into the dispatcher: their host/symbol
-	// constants live in caller coordinates and a wrong constant here becomes a
-	// dead click. They fall back to the full path, which handles routing.
-	if ((input.symbolRoutes?.length ?? 0) > 0) return [];
 	const cells = state?.cells ?? [];
 	const locators = view?.locators ?? [];
-	return (map?.actions ?? []).flatMap((action, index) => {
+	return (map?.actions ?? []).flatMap((action, index): ReadonlyArray<ScalarSpecialization> => {
 		const plan = action?.plan;
-		if (action?.recordKind !== 'event' || plan?.version !== 1 || plan?.kind !== 'scalar')
-			return [];
+		if (action?.recordKind !== 'event' || plan?.version !== 1) return [];
+		if (plan.kind === 'closure') return closureSpecialization(action, plan, index, view, input);
+		if (plan.kind !== 'scalar') return [];
 		const cellIndex = cells.findIndex((cell) => cell?.graphNodeId === plan.cell);
 		const initialCell = cells[cellIndex];
 		const host = locators.find((locator) => locator?.hostNodeId === action.hostNodeId);
@@ -1337,6 +1560,7 @@ function scalarDispatcherSpecializations(input: {
 							index: locator.index,
 							tagName: String(locator.tagName ?? '*'),
 							...(update.prefix ? { prefix: update.prefix } : {}),
+							...(update.suffix ? { suffix: update.suffix } : {}),
 						},
 					]
 				: [];
@@ -1344,6 +1568,7 @@ function scalarDispatcherSpecializations(input: {
 		if (textUpdates.length !== (plan.textUpdates ?? []).length) return [];
 		return [
 			{
+				kind: 'scalar' as const,
 				name: `marklessRunScalar${index}`,
 				hostNodeId: action.hostNodeId,
 				eventName: action.eventName,
@@ -1359,6 +1584,59 @@ function scalarDispatcherSpecializations(input: {
 			},
 		];
 	});
+}
+
+function closureSpecialization(
+	action: { readonly hostNodeId: string; readonly eventName: string },
+	plan: { readonly symbolId?: unknown } & Partial<ClosurePlanShape>,
+	index: number,
+	view:
+		| {
+				readonly events?: ReadonlyArray<{
+					readonly hostNodeId?: unknown;
+					readonly eventName?: unknown;
+					readonly symbolIds?: unknown;
+					readonly syncPolicy?: unknown;
+				}>;
+				readonly locators?: ReadonlyArray<{
+					readonly hostNodeId?: unknown;
+					readonly index?: unknown;
+					readonly tagName?: unknown;
+				}>;
+		  }
+		| undefined,
+	input: { readonly symbolRoutes?: ReadonlyArray<SourceLazySymbolRoute> },
+): ReadonlyArray<ClosureSpecialization> {
+	const host = view?.locators?.find((locator) => locator?.hostNodeId === action.hostNodeId);
+	const event = view?.events?.find(
+		(candidate) =>
+			candidate?.hostNodeId === action.hostNodeId && candidate?.eventName === action.eventName,
+	);
+	// The closure runs the planned symbol under its own id, so a routed or bound id keeps full resume.
+	const symbolId = scalarActionSymbolId(plan.symbolId, event, input.symbolRoutes ?? []);
+	if (
+		symbolId === null ||
+		symbolId !== plan.symbolId ||
+		!host ||
+		typeof host.index !== 'number' ||
+		!plan.cells ||
+		!plan.computed ||
+		!plan.updates
+	)
+		return [];
+	return [
+		{
+			kind: 'closure',
+			name: `marklessRunClosure${index}`,
+			hostNodeId: action.hostNodeId,
+			eventName: action.eventName,
+			symbolId,
+			hostIndex: host.index,
+			hostTagName: String(host.tagName ?? '*'),
+			syncPolicy: event?.syncPolicy ?? null,
+			plan: { cells: plan.cells, computed: plan.computed, updates: plan.updates },
+		},
+	];
 }
 
 function scalarActionSymbolId(
@@ -1400,7 +1678,10 @@ function emitSpecializedScalarDispatcher(
 	actions: ReadonlyArray<ScalarSpecialization>,
 	loadSymbolName: string,
 	fallback: 'full' | 'fail',
+	resolution: ScalarHostResolution,
+	routedClosures = false,
 ): string {
+	const shapes = closureShapes(actions);
 	const fallbackName =
 		fallback === 'fail'
 			? 'marklessScalarSpecializedHostMiss'
@@ -1416,6 +1697,12 @@ function emitSpecializedScalarDispatcher(
 			: [];
 	return [
 		'async function marklessResumeSpecializedScalarEvent(input) {',
+		// A started runtime owns the cells; the specialized path would write a detached copy.
+		...(fallback === 'full'
+			? [
+					'	if (input.root.__asyncResumeRuntimeStarted) return marklessFullResumeHandoff({ ...input, document: input.root });',
+				]
+			: []),
 		'	const action = marklessScalarSpecializedAction(input);',
 		'	if (action) {',
 		'		try {',
@@ -1433,12 +1720,13 @@ function emitSpecializedScalarDispatcher(
 		fallback === 'fail'
 			? 'function marklessScalarSpecializedHostMiss(_input, site) { return marklessScalarSpecializedError("MARKLESS_SCALAR_SPECIALIZED_HOST_MISS", site); }'
 			: 'function marklessScalarSpecializedHostMiss(input, site) { return marklessScalarSpecializedFallback(input, site); }',
-		'function marklessScalarSpecializedAction(input) {',
-		...actions.map(
-			(action) =>
-				`	if (marklessScalarEventMatches(input, marklessFindElementAtDomOrderIndex(input.root, ${action.hostIndex}), ${JSON.stringify(action.hostTagName.toLowerCase())}, ${JSON.stringify(action.eventName)}, ${JSON.stringify(action.hostNodeId)})) return ${action.name};`,
-		),
-		'}',
+		...(resolution === 'static'
+			? [
+					'function marklessScalarSpecializedAction(input) {',
+					...emitStaticScalarMatches(actions),
+					'}',
+				]
+			: emitServedScalarMatches(actions, loadSymbolName, resolution, shapes, routedClosures)),
 		'function marklessScalarEventMatches(input, host, tagName, eventName, hostNodeId) {',
 		'	const eventTypeMatches = input.event?.type === eventName;',
 		'	if (!eventTypeMatches) return false;',
@@ -1446,25 +1734,137 @@ function emitSpecializedScalarDispatcher(
 		'	const eventTarget = input.event?.target;',
 		'	return host === eventTarget || (!!eventTarget?.nodeType && typeof host.contains === "function" && host.contains(eventTarget));',
 		'}',
-		...actions.map((action) => emitScalarAction(action, loadSymbolName)),
+		...(shapes.length > 0 ? [`const marklessClosureShapes = [${shapes.join(', ')}];`] : []),
+		...actions.map((action) =>
+			action.kind === 'closure'
+				? emitClosureAction(action, loadSymbolName, shapes)
+				: emitScalarAction(action, loadSymbolName, resolution),
+		),
 		...fallbackBody,
 	].join('\n');
 }
 
-function emitScalarAction(action: ScalarSpecialization, loadSymbolName: string): string {
+type ScalarHostResolution = 'static' | 'served' | 'served-only';
+
+// Closure actions resolve their updates through the served view, so a static match never names one.
+function emitStaticScalarMatches(actions: ReadonlyArray<ScalarSpecialization>): string[] {
+	return actions.filter((action) => action.kind === 'scalar').map(
+		(action) =>
+			`	if (marklessScalarEventMatches(input, marklessFindElementAtDomOrderIndex(input.root, ${action.hostIndex}), ${JSON.stringify(action.hostTagName.toLowerCase())}, ${JSON.stringify(action.eventName)}, ${JSON.stringify(action.hostNodeId)})) return ${action.name};`,
+	);
+}
+
+// Ownership comes from the served view, so ancestors, handles, behaviors and open overlays on the path escalate.
+function emitServedScalarMatches(
+	actions: ReadonlyArray<ScalarSpecialization>,
+	loadSymbolName: string,
+	resolution: ScalarHostResolution,
+	shapes: ReadonlyArray<string>,
+	routedClosures: boolean,
+): string[] {
+	const closures = routedClosures || actions.some((action) => action.kind === 'closure');
+	return [
+		`const marklessScalarOwners = ${JSON.stringify(actions.map((action) => [action.hostNodeId, action.eventName, action.symbolId]))};`,
+		`const marklessScalarRuns = [${actions.map((action) => action.name).join(', ')}];`,
+		...(closures
+			? [
+					`const marklessScalarPrimes = [${actions
+						.map((action) =>
+							action.kind === 'closure'
+								? `() => marklessPrimeClosure(${emitClosurePlan(action, shapes)}, "", ${loadSymbolName})`
+								: `() => ${loadSymbolName}(${JSON.stringify(action.symbolId)})`,
+						)
+						.join(', ')}];`,
+				]
+			: []),
+		'function marklessScalarSpecializedAction(input) {',
+		'	if (input.event === 0) {',
+		...(closures
+			? [
+					`		const primed = marklessScalarServedPrime(input.root, input.element, marklessScalarOwners${routedClosures ? ', marklessClosureRouted' : ''});`,
+					`		return primed && (() => Promise.all(primed.map((owner) => typeof owner === "number" ? marklessScalarPrimes[owner]() : marklessPrimeRoutedClosure(owner, marklessClosurePlanRoute, ${loadSymbolName}))).then(() => undefined));`,
+				]
+			: [
+					'		const primed = marklessScalarServedPrime(input.root, input.element, marklessScalarOwners);',
+					`		return primed && (() => Promise.all(primed.map((index) => ${loadSymbolName}(marklessScalarOwners[index][2]))).then(() => undefined));`,
+				]),
+		'	}',
+		'	const owner = input.event && marklessScalarServedOwner(input.root, input.event, marklessScalarOwners);',
+		...(routedClosures
+			? [
+					'	if (owner === -1) {',
+					'		const record = marklessScalarServedRecord(input.root, input.event);',
+					`		if (record && record !== -1 && marklessClosureRouted(record)) return (input) => marklessRunRoutedClosure(input, record, marklessClosurePlanRoute, ${loadSymbolName});`,
+					'	}',
+				]
+			: []),
+		...(resolution === 'served'
+			? [
+					'	if (owner === undefined) {',
+					...emitStaticScalarMatches(actions).map((line) => `\t${line}`),
+					'		return;',
+					'	}',
+				]
+			: []),
+		'	return owner >= 0 ? marklessScalarRuns[owner] : undefined;',
+		'}',
+	];
+}
+
+function emitScalarHostLookup(
+	resolution: ScalarHostResolution,
+	hostNodeId: string,
+	index: number,
+	tagName: string,
+): string {
+	return resolution === 'static'
+		? `marklessFindElementAtDomOrderIndex(input.root, ${index})`
+		: `marklessScalarLocate(input.root, ${JSON.stringify(hostNodeId)}, ${resolution === 'served' ? index : -1}, ${JSON.stringify(tagName.toLowerCase())})`;
+}
+
+// Plans sharing one closure (every tab of a tablist) ship its cells, derives and updates once.
+function closureShapes(actions: ReadonlyArray<ScalarSpecialization>): string[] {
+	return [
+		...new Set(
+			actions.flatMap((action) => (action.kind === 'closure' ? [JSON.stringify(action.plan)] : [])),
+		),
+	];
+}
+
+function emitClosurePlan(action: ClosureSpecialization, shapes: ReadonlyArray<string>): string {
+	return `{ symbolId: ${JSON.stringify(action.symbolId)}, ...marklessClosureShapes[${shapes.indexOf(JSON.stringify(action.plan))}] }`;
+}
+
+function emitClosureAction(
+	action: ClosureSpecialization,
+	loadSymbolName: string,
+	shapes: ReadonlyArray<string>,
+): string {
+	return [
+		`function ${action.name}(input) {`,
+		`	return marklessRunClosureAction(input, ${emitClosurePlan(action, shapes)}, "", ${JSON.stringify(action.hostNodeId)}, ${loadSymbolName}${action.syncPolicy ? `, ${JSON.stringify(action.syncPolicy)}` : ''});`,
+		'}',
+	].join('\n');
+}
+
+function emitScalarAction(
+	action: ScalarLeafSpecialization,
+	loadSymbolName: string,
+	resolution: ScalarHostResolution,
+): string {
 	return [
 		`async function ${action.name}(input) {`,
 		'	let syncPolicyAlreadyApplied = input.syncPolicyAlreadyApplied === true;',
 		'	const values = input.root.__marklessEventOnlyGraph || new Map();',
 		'	input.root.__marklessEventOnlyGraph = values;',
-		`	if (!values.has(${JSON.stringify(action.cell)})) values.set(${JSON.stringify(action.cell)}, marklessDecodeScalarCell(marklessReadScalarCell(input.root, ${JSON.stringify(action.cell)}) ?? ${JSON.stringify(action.initialCell)}, ${JSON.stringify(action.cell)}, ${JSON.stringify(`markless/state cell ${action.cell}`)}));`,
+		`	if (!values.has(${JSON.stringify(action.cell)})) values.set(${JSON.stringify(action.cell)}, marklessDecodeScalarCell(marklessReadScalarCell(input.root, ${JSON.stringify(action.cell)})${resolution === 'served-only' ? '' : ` ?? ${JSON.stringify(action.initialCell)}`}, ${JSON.stringify(action.cell)}, ${JSON.stringify(`markless/state cell ${action.cell}`)}));`,
 		`	const state = { value: values.get(${JSON.stringify(action.cell)}), dirty: false };`,
 		'	try {',
-		`	const host = marklessFindElementAtDomOrderIndex(input.root, ${action.hostIndex});`,
+		`	const host = ${emitScalarHostLookup(resolution, action.hostNodeId, action.hostIndex, action.hostTagName)};`,
 		`	if (!host || (${JSON.stringify(action.hostTagName.toLowerCase())} !== "*" && host.tagName.toLowerCase() !== ${JSON.stringify(action.hostTagName.toLowerCase())})) return marklessScalarSpecializedHostMiss(input, "host");`,
 		...action.textUpdates.map(
 			(update, index) =>
-				`	const textTarget${index} = marklessFindElementAtDomOrderIndex(input.root, ${update.index});`,
+				`	const textTarget${index} = ${emitScalarHostLookup(resolution, update.hostNodeId, update.index, update.tagName)};`,
 		),
 		...action.textUpdates.map(
 			(update, index) =>
@@ -1495,7 +1895,7 @@ function emitScalarAction(action: ScalarSpecialization, loadSymbolName: string):
 		'		state.dirty = false;',
 		...action.textUpdates.map(
 			(update, index) =>
-				`		textTarget${index}.textContent = marklessUpdateText({ domUpdate: { hostNodeId: ${JSON.stringify(update.hostNodeId)} }, value: ${JSON.stringify(update.prefix ?? '')} + (state.value == null ? '' : String(state.value)) }, ${JSON.stringify(update.hostNodeId)}).value;`,
+				`		textTarget${index}.textContent = marklessUpdateText({ domUpdate: { hostNodeId: ${JSON.stringify(update.hostNodeId)} }, value: ${JSON.stringify(update.prefix ?? '')} + (state.value == null ? '' : String(state.value))${update.suffix ? ` + ${JSON.stringify(update.suffix)}` : ''} }, ${JSON.stringify(update.hostNodeId)}).value;`,
 		),
 		'	}',
 		'	} catch (error) {',
@@ -1506,14 +1906,14 @@ function emitScalarAction(action: ScalarSpecialization, loadSymbolName: string):
 	].join('\n');
 }
 
-function emitScalarWrite(action: ScalarSpecialization): string[] {
+function emitScalarWrite(action: ScalarLeafSpecialization): string[] {
 	if (action.write.kind === 'update') {
 		return [
 			'	marklessWriteScalar({ graph }, {',
 			`		graphNodeId: ${JSON.stringify(action.cell)},`,
 			'		returnValue: "next",',
 			'		update(value) {',
-			`			return Number(value) ${action.write.updateOperator === '--' ? '-' : '+'} 1;`,
+			`			return typeof value === "bigint" ? value ${action.write.updateOperator === '--' ? '-' : '+'} BigInt(1) : Number(value) ${action.write.updateOperator === '--' ? '-' : '+'} 1;`,
 			'		},',
 			'	});',
 		];
@@ -1552,6 +1952,11 @@ function conditionGraphNodeIds(condition: unknown): string[] {
 }
 
 type LeanResumeMode = 'none' | 'scalar' | 'row' | 'mixed';
+
+// Composed pages resolve scalar hosts through served locators; the row lean entry has no such path.
+function composedLeanMode(composed: boolean, mode: LeanResumeMode): LeanResumeMode {
+	return composed && mode !== 'scalar' ? 'none' : mode;
+}
 
 function leanResumeMode(runtimeDemandMap: unknown): LeanResumeMode {
 	const recordKinds = (

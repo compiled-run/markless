@@ -35,6 +35,7 @@ export default defineConfig(({ command, mode }) => ({
 		markless({
 			debug: mode === 'debug-channel',
 			executionLog: mode === 'ssr' ? 'auto' : undefined,
+			experimentalNativePacking: process.env.MARKLESS_FIXTURE_NATIVE_PACKING === '1',
 		}),
 		fixtureSsrHost({
 			devRenderEntry: '/src/server.ts',

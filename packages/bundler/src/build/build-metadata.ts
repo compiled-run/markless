@@ -56,6 +56,7 @@ export function createBuildMetadata(
 	const canonPath = options.canonPath ?? ((fileName: string) => fileName);
 	const publicPath = options.publicPath ?? ((fileName: string) => fileName);
 	const modules = [...transformManifests].map(cloneTransformManifest);
+	const references = indexVirtualModuleReferences(modules);
 	const metadata: MarklessBuildMetadata = {
 		version: 1,
 		modules,
@@ -111,12 +112,10 @@ export function createBuildMetadata(
 		if (origins.length > 0) {
 			asyncBundle.origins = origins;
 		}
-		finalizeVirtualModuleReferences(modules, item, bundleFileName);
-		const symbols = modules.flatMap((module) =>
-			module.symbols
-				.filter((symbol) => symbol.fileName === bundleFileName)
-				.map((symbol) => symbol.symbolId),
-		);
+		finalizeVirtualModuleReferences(references, item, bundleFileName);
+		const symbols = [...(references.symbolsByFile.get(bundleFileName) ?? [])]
+			.sort((left, right) => left.order - right.order)
+			.map(({ symbol }) => symbol.symbolId);
 		if (symbols.length > 0) {
 			asyncBundle.symbols = symbols;
 		}
@@ -149,8 +148,46 @@ function cloneTransformManifest(manifest: MarklessTransformManifest): MarklessTr
 	};
 }
 
+type SymbolReference = {
+	readonly symbol: MarklessTransformManifest['symbols'][number];
+	readonly order: number;
+};
+
+type VirtualModuleReferences = {
+	readonly byId: Map<string, Array<{ fileName?: string } | SymbolReference>>;
+	// Symbols by the file they currently name, kept in step with every reassignment.
+	readonly symbolsByFile: Map<string | undefined, Set<SymbolReference>>;
+};
+
+// One pass over the manifests instead of one per chunk: the bundle has hundreds of each.
+function indexVirtualModuleReferences(
+	modules: readonly MarklessTransformManifest[],
+): VirtualModuleReferences {
+	const byId: VirtualModuleReferences['byId'] = new Map();
+	const symbolsByFile: VirtualModuleReferences['symbolsByFile'] = new Map();
+	const add = (id: string, reference: { fileName?: string } | SymbolReference) => {
+		const key = normalizeVirtualModuleId(id);
+		const list = byId.get(key);
+		if (list) list.push(reference);
+		else byId.set(key, [reference]);
+	};
+	let order = 0;
+	for (const module of modules) {
+		for (const reference of [module.payload, module.resolver])
+			add(reference.virtualModuleId, reference);
+		for (const symbol of module.symbols) {
+			const reference = { symbol, order: order++ };
+			add(symbol.virtualModuleId, reference);
+			const bucket = symbolsByFile.get(symbol.fileName);
+			if (bucket) bucket.add(reference);
+			else symbolsByFile.set(symbol.fileName, new Set([reference]));
+		}
+	}
+	return { byId, symbolsByFile };
+}
+
 function finalizeVirtualModuleReferences(
-	modules: MarklessTransformManifest[],
+	references: VirtualModuleReferences,
 	item: MarklessBuildMetadataChunk,
 	bundleFileName: string,
 ) {
@@ -159,16 +196,17 @@ function finalizeVirtualModuleReferences(
 			.filter((id): id is string => !!id)
 			.map(normalizeVirtualModuleId),
 	);
-	for (const module of modules) {
-		for (const reference of [module.payload, module.resolver]) {
-			if (ids.has(normalizeVirtualModuleId(reference.virtualModuleId))) {
+	for (const id of ids) {
+		for (const reference of references.byId.get(id) ?? []) {
+			if (!('symbol' in reference)) {
 				reference.fileName = bundleFileName;
+				continue;
 			}
-		}
-		for (const symbol of module.symbols) {
-			if (ids.has(normalizeVirtualModuleId(symbol.virtualModuleId))) {
-				symbol.fileName = bundleFileName;
-			}
+			references.symbolsByFile.get(reference.symbol.fileName)?.delete(reference);
+			reference.symbol.fileName = bundleFileName;
+			const bucket = references.symbolsByFile.get(bundleFileName);
+			if (bucket) bucket.add(reference);
+			else references.symbolsByFile.set(bundleFileName, new Set([reference]));
 		}
 	}
 }
@@ -227,11 +265,14 @@ function computeTotals(bundles: Record<string, MarklessBundle>) {
 	}
 }
 
+// The collator `localeCompare` builds on every call, built once.
+const localeOrder = new Intl.Collator().compare;
+
 function sortBuildMetadata(metadata: MarklessBuildMetadata) {
-	metadata.modules = metadata.modules.sort((a, b) => a.source.localeCompare(b.source));
+	metadata.modules = metadata.modules.sort((a, b) => localeOrder(a.source, b.source));
 	metadata.bundles = sortRecord(metadata.bundles);
 	metadata.assets = sortRecord(metadata.assets ?? {});
-	metadata.injections?.sort((a, b) => injectionKey(a).localeCompare(injectionKey(b)));
+	metadata.injections?.sort((a, b) => localeOrder(injectionKey(a), injectionKey(b)));
 	for (const bundle of Object.values(metadata.bundles)) {
 		bundle.imports?.sort();
 		bundle.dynamicImports?.sort();
@@ -239,7 +280,7 @@ function sortBuildMetadata(metadata: MarklessBuildMetadata) {
 		bundle.symbols?.sort();
 	}
 	for (const module of metadata.modules) {
-		module.symbols.sort((a, b) => a.symbolId.localeCompare(b.symbolId));
+		module.symbols.sort((a, b) => localeOrder(a.symbolId, b.symbolId));
 	}
 }
 

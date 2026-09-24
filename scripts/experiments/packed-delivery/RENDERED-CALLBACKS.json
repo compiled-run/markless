@@ -1,0 +1,536 @@
+{
+  "original": "/private/tmp/markless-docs-combined-demand-GSbudh/.output",
+  "directory": "/private/tmp/markless-rendered-callbacks-pT3BNt",
+  "url": "http://localhost:3020/markless/ui/accordion/",
+  "planning": {
+    "candidateGroups": [
+      {
+        "id": "m3:",
+        "cells": 68,
+        "computed": 153,
+        "events": 81
+      }
+    ],
+    "refusals": [
+      {
+        "prefix": "m0:",
+        "reason": "graph-dependency",
+        "ids": [
+          "c2:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeState/state:tree"
+        ]
+      },
+      {
+        "prefix": "m1:",
+        "reason": "graph-dependency",
+        "ids": []
+      },
+      {
+        "prefix": "m2:",
+        "reason": "unsupported-activation",
+        "ids": []
+      },
+      {
+        "prefix": "m4:",
+        "reason": "unsupported-activation",
+        "ids": []
+      },
+      {
+        "prefix": "m5:",
+        "reason": "unsupported-activation",
+        "ids": []
+      },
+      {
+        "prefix": "m6:",
+        "reason": "unsupported-activation",
+        "ids": []
+      },
+      {
+        "prefix": "m7:",
+        "reason": "unsupported-activation",
+        "ids": []
+      }
+    ]
+  },
+  "htmlSha256": "cae5f755f80532afeed4af32c9821cb223e7f238390df768314e1223ac881ca9",
+  "htmlBytes": 968542,
+  "identicalHtml": true,
+  "transforms": [
+    {
+      "filename": "chunk-CW78-AB8.mjs",
+      "instrumented": [
+        "composeMdxState"
+      ],
+      "beforeSha256": "3040fee112233831b4ce6f068573e5f62eefba3764a3d5ec66aab58b12985653",
+      "afterSha256": "856bda405179671c85e9fb4d2b785fd48ccce98c11ba7ebd4e813b7aa1c8e0a3"
+    },
+    {
+      "filename": "ssr.mjs",
+      "instrumented": [
+        "marklessSsrCallbackSlot"
+      ],
+      "beforeSha256": "e97facb389743eafc1bfb1523f6761d9d4da50966b4efc277a57375aa97264ab",
+      "afterSha256": "13ad9f59479998f5ef6883dbecad6b867e24a57fa307d3e27dd2b17e0c3d8c6c"
+    }
+  ],
+  "renders": [
+    {
+      "callbacks": [
+        {
+          "graphNodeId": "m0:c1:c0:shared:node_modules/@markless/ui/src/select/select.tsrx#selectState/slot:onChange",
+          "symbolId": "symbol:0",
+          "bound": true,
+          "resolvedSymbolId": "m0:c1:symbol:0",
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m0:c1:c0:shared:node_modules/@markless/ui/src/select/select.tsrx#selectState/slot:onOpenChange",
+          "bound": false,
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m0:r:%2Fmarkless%2Fui:c2:p3:p7:p8:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m0:r:%2Fmarkless%2Fui%2Fstyling:c2:p3:p7:p8:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m0:r:%2Fmarkless%2Fui%2Fcheckbox:c2:p3:p7:p8:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m0:r:%2Fmarkless%2Fui%2Fchecklist:c2:p3:p7:p8:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m0:r:%2Fmarkless%2Fui%2Fcombobox:c2:p3:p7:p8:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m0:r:%2Fmarkless%2Fui%2Fotp:c2:p3:p7:p8:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m0:r:%2Fmarkless%2Fui%2Fradiogroup:c2:p3:p7:p8:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m0:r:%2Fmarkless%2Fui%2Fselect:c2:p3:p7:p8:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m0:r:%2Fmarkless%2Fui%2Ftextbox:c2:p3:p7:p8:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m0:r:%2Fmarkless%2Fui%2Ftoggle:c2:p3:p7:p8:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m0:r:%2Fmarkless%2Fui%2Faccordion:c2:p3:p7:p8:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m0:r:%2Fmarkless%2Fui%2Fcollapsible:c2:p3:p7:p8:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m0:r:%2Fmarkless%2Fui%2Fmodal:c2:p3:p7:p8:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m0:r:%2Fmarkless%2Fui%2Fnavbar:c2:p3:p7:p8:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m0:r:%2Fmarkless%2Fui%2Ftabs:c2:p3:p7:p8:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m0:r:%2Fmarkless%2Fui%2Ftree:c2:p3:p7:p8:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m0:r:%2Fmarkless%2Fui%2Fdrawer:c2:p3:p7:p8:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m0:r:%2Fmarkless%2Fui%2Fhovercard:c2:p3:p7:p8:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m0:r:%2Fmarkless%2Fui%2Fpopover:c2:p3:p7:p8:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m0:r:%2Fmarkless%2Fui%2Ftooltip:c2:p3:p7:p8:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m0:r:%2Fmarkless%2Fui%2Fgridlist:c2:p3:p7:p8:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m0:r:%2Fmarkless%2Fui%2Ftable:c2:p3:p7:p8:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m0:r:%2Fmarkless%2Fui%2Fresizable:c2:p3:p7:p8:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m0:r:%2Fmarkless%2Fui%2Fcarousel:c2:p3:p7:p8:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m0:r:%2Fmarkless%2Fui%2Fpagination:c2:p3:p7:p8:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m0:r:%2Fmarkless%2Fui%2Fprogress:c2:p3:p7:p8:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m0:r:%2Fmarkless%2Fui%2Fqrcode:c2:p3:p7:p8:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m0:r:%2Fmarkless%2Fui%2Ftoaster:c2:p3:p7:p8:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m0:r:Start%20here:c2:p3:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m0:r:Forms:c2:p3:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m0:r:Show%20and%20hide:c2:p3:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m0:r:Overlays:c2:p3:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m0:r:Collections:c2:p3:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m0:r:Display:c2:p3:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m0:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m3:c0:p1:p3:shared:node_modules/@markless/ui/src/tooltip/tooltip.tsrx#tooltipState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m3:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m3:c0:p1:shared:node_modules/@markless/ui/src/toggle/toggle.tsrx#toggleState/slot:onChange",
+          "symbolId": "symbol:0",
+          "bound": true,
+          "resolvedSymbolId": "m3:symbol:0",
+          "ownerPrefix": "m3:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m3:c0:p8:p10:shared:node_modules/@markless/ui/src/tooltip/tooltip.tsrx#tooltipState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m3:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m3:c0:p8:shared:node_modules/@markless/ui/src/toggle/toggle.tsrx#toggleState/slot:onChange",
+          "symbolId": "symbol:1",
+          "bound": true,
+          "resolvedSymbolId": "m3:symbol:1",
+          "ownerPrefix": "m3:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m3:c0:p15:p17:shared:node_modules/@markless/ui/src/tooltip/tooltip.tsrx#tooltipState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m3:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m3:c0:p15:shared:node_modules/@markless/ui/src/toggle/toggle.tsrx#toggleState/slot:onChange",
+          "symbolId": "symbol:2",
+          "bound": true,
+          "resolvedSymbolId": "m3:symbol:2",
+          "ownerPrefix": "m3:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m3:c0:p23:p24:p26:shared:node_modules/@markless/ui/src/tooltip/tooltip.tsrx#tooltipState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m3:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m3:c0:p23:p24:shared:node_modules/@markless/ui/src/toggle/toggle.tsrx#toggleState/slot:onChange",
+          "symbolId": "symbol:3",
+          "bound": true,
+          "resolvedSymbolId": "m3:symbol:3",
+          "ownerPrefix": "m3:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m3:c0:p23:p31:shared:node_modules/@markless/ui/src/select/select.tsrx#selectState/slot:onChange",
+          "symbolId": "symbol:4",
+          "bound": true,
+          "resolvedSymbolId": "m3:symbol:4",
+          "ownerPrefix": "m3:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m3:c0:p23:p31:shared:node_modules/@markless/ui/src/select/select.tsrx#selectState/slot:onOpenChange",
+          "bound": false,
+          "ownerPrefix": "m3:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m3:c0:p23:p43:shared:node_modules/@markless/ui/src/tooltip/tooltip.tsrx#tooltipState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m3:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m3:c0:p23:p46:p48:shared:node_modules/@markless/ui/src/tooltip/tooltip.tsrx#tooltipState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m3:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m3:c0:p23:p46:shared:node_modules/@markless/ui/src/toggle/toggle.tsrx#toggleState/slot:onChange",
+          "symbolId": "symbol:5",
+          "bound": true,
+          "resolvedSymbolId": "m3:symbol:5",
+          "ownerPrefix": "m3:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m3:c0:shared:node_modules/@markless/ui/src/collapsible/collapsible.tsrx#collapsibleState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m3:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m3:c53:shared:node_modules/@markless/ui/src/accordion/accordion.tsrx#accordionState/slot:onChange",
+          "symbolId": "symbol:6",
+          "bound": true,
+          "resolvedSymbolId": "m3:symbol:6",
+          "ownerPrefix": "m3:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m3:c58:shared:node_modules/@markless/ui/src/select/select.tsrx#selectState/slot:onChange",
+          "symbolId": "symbol:7",
+          "bound": true,
+          "resolvedSymbolId": "m3:symbol:7",
+          "ownerPrefix": "m3:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m3:c58:shared:node_modules/@markless/ui/src/select/select.tsrx#selectState/slot:onOpenChange",
+          "bound": false,
+          "ownerPrefix": "m3:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m3:c70:p74:shared:node_modules/@markless/ui/src/collapsible/collapsible.tsrx#collapsibleState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m3:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m3:c70:shared:node_modules/@markless/ui/src/tabs/tabs.tsrx#tabsState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m3:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m5:c0:c0:p4:p6:r:accordion-node-1:c0:p3:p4:r:accordion-node-4:c0:p3:p4:c0:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m5:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m5:c0:c0:p4:p6:r:accordion-node-1:c0:p3:p4:r:accordion-node-2:c0:p3:p4:r:accordion-node-3:c0:p3:p4:c0:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m5:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m5:c0:c0:p4:p6:r:accordion-node-1:c0:p3:p4:r:accordion-node-2:c0:p3:p4:c0:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m5:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m5:c0:c0:p4:p6:r:accordion-node-1:c0:p3:p4:c0:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m5:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m5:c0:c0:p4:p6:c0:shared:node_modules/@markless/ui/src/tree/tree.tsrx#treeItemState/slot:onChange",
+          "bound": false,
+          "ownerPrefix": "m5:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m5:c0:c0:shared:node_modules/@markless/ui/src/slider/slider.tsrx#sliderState/slot:onChange",
+          "symbolId": "symbol:4",
+          "bound": true,
+          "resolvedSymbolId": "m5:c0:symbol:4",
+          "ownerPrefix": "m5:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m5:c0:c0:shared:node_modules/@markless/ui/src/slider/slider.tsrx#sliderState/slot:onChangeEnd",
+          "bound": false,
+          "ownerPrefix": "m5:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m6:c0:shared:node_modules/@markless/ui/src/select/select.tsrx#selectState/slot:onChange",
+          "symbolId": "symbol:8",
+          "bound": true,
+          "resolvedSymbolId": "m6:symbol:8",
+          "ownerPrefix": "m6:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m6:c0:shared:node_modules/@markless/ui/src/select/select.tsrx#selectState/slot:onOpenChange",
+          "bound": false,
+          "ownerPrefix": "m6:",
+          "staysWithinOwner": true
+        },
+        {
+          "graphNodeId": "m6:c17:c0:shared:node_modules/@markless/ui/src/accordion/accordion.tsrx#accordionState/slot:onChange",
+          "symbolId": "symbol:3",
+          "bound": true,
+          "resolvedSymbolId": "m6:c17:symbol:3",
+          "ownerPrefix": "m6:",
+          "staysWithinOwner": true
+        }
+      ],
+      "unknownCells": [],
+      "prefixes": [
+        "m0:",
+        "m1:",
+        "m2:",
+        "m3:",
+        "m4:",
+        "m5:",
+        "m6:",
+        "m7:"
+      ]
+    }
+  ],
+  "productionReady": false,
+  "limitation": "Rendered slot provenance and callback dispatch resolution only. No linked symbol dependency closure, incremental runtime activation or timing claim.",
+  "counts": {
+    "pageCallbacks": 65,
+    "pageBoundCallbacks": 12,
+    "accordionCallbacks": 19,
+    "accordionBoundCallbacks": 8,
+    "unmarkedUnknownCells": 0
+  },
+  "clientVerification": {
+    "files": 63,
+    "bytes": 19274342,
+    "identical": true,
+    "manifest": "scripts/experiments/packed-delivery/results/rendered-callbacks-2026-09-22/client-files.json"
+  },
+  "tests": {
+    "probeRed": 5,
+    "plannerRed": 9,
+    "focusedPassed": 62,
+    "typecheck": "passed"
+  },
+  "productionChangesThisStep": [],
+  "remaining": [
+    "Linked compiler symbol/capture closure, including hidden shared state",
+    "Staged runtime render-data forwarding and ancestor dispatch",
+    "Live scalar-state adoption, retry, disposal and navigation",
+    "Integrated cold docs comparison against GSbudh",
+    "Six earlier fixture budget failures"
+  ],
+  "receiptsDirectory": "scripts/experiments/packed-delivery/results/rendered-callbacks-2026-09-22"
+}

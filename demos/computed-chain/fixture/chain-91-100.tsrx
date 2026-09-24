@@ -1,7 +1,7 @@
 import { computed } from '@markless/core';
 import { counted } from './counted.ts';
 
-function C100({ input100, owner1, owner11, owner21, owner31, owner41, owner51, owner61, owner71, owner81, owner91 }) @{
+function C100({ input100, owner1: _owner1, owner11: _owner11, owner21: _owner21, owner31: _owner31, owner41: _owner41, owner51: _owner51, owner61: _owner61, owner71: _owner71, owner81: _owner81, owner91: _owner91 }) @{
 	const value100 = computed(() => counted(100, input100));
 	<div class='c' data-level='100'><output data-value='100'>{value100}</output></div>
 }

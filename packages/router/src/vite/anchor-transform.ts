@@ -4,10 +4,16 @@ import { buildRouteManifestFromFileIds } from '../route-manifest.ts';
 import type { Plugin } from 'vite';
 import { __marklessRouteHref } from './entries/route-href.ts';
 import { discoverPageFiles, type RouteTypegenFileSystem } from './route-typegen.ts';
-import { LINK_ATTRIBUTE, REPLACE_ATTRIBUTE, SCROLL_ATTRIBUTE } from '../link-attributes.ts';
+import {
+	LINK_ATTRIBUTE,
+	PREFETCH_ATTRIBUTE,
+	REPLACE_ATTRIBUTE,
+	SCROLL_ATTRIBUTE,
+} from '../link-attributes.ts';
 
 const ROUTE_HREF_HELPER_ID = 'virtual:markless-router/route-href';
 const JSX_FILE_FILTER = /\.(?:[jt]sx|tsrx)(?:$|\?)/;
+const REWRITE_CACHE_LIMIT = 2048;
 const ROUTER_IMPORT_SOURCES = new Set(['@markless/router', '@markless/core/router']);
 
 type RouteParam = RouteManifestRoute['params'][number];
@@ -31,12 +37,18 @@ export function anchorTransformPlugin(): Plugin {
 	let root = '';
 	let routePatterns: RoutePatternMap = new Map();
 	let routesLoaded = false;
+	let routeFingerprint = '';
+	// Query variants and both environments hand the same text through here; the rewrite is pure in it.
+	const rewrites = new Map<string, string>();
 
 	const refreshRoutes = async (fs: RouteTypegenFileSystem) => {
 		routePatterns = routePatternMap(
 			buildRouteManifestFromFileIds(await discoverPageFiles(fs, root)),
 		);
 		routesLoaded = true;
+		const fingerprint = JSON.stringify([...routePatterns]);
+		if (fingerprint !== routeFingerprint) rewrites.clear();
+		routeFingerprint = fingerprint;
 	};
 
 	return {
@@ -55,18 +67,24 @@ export function anchorTransformPlugin(): Plugin {
 					await refreshRoutes(this.fs);
 				}
 
-				const ast = parseTransformAst(code, id, (source, options) =>
-					this.parse(source, options),
-				);
-				let transformed = transformAnchorSource(code, ast, routePatterns);
-				if (id.includes('.tsrx')) {
-					const linkedAst =
-						transformed === code
-							? ast
-							: parseTransformAst(transformed, id, (source, options) =>
-									this.parse(source, options),
-								);
-					transformed = lowerRouterLinks(transformed, linkedAst);
+				const key = `${id.includes('.tsrx') ? 'tsrx' : id.includes('.jsx') ? 'jsx' : 'tsx'}\0${code}`;
+				let transformed = rewrites.get(key);
+				if (transformed === undefined) {
+					const ast = parseTransformAst(code, id, (source, options) =>
+						this.parse(source, options),
+					);
+					transformed = transformAnchorSource(code, ast, routePatterns);
+					if (id.includes('.tsrx')) {
+						const linkedAst =
+							transformed === code
+								? ast
+								: parseTransformAst(transformed, id, (source, options) =>
+										this.parse(source, options),
+									);
+						transformed = lowerRouterLinks(transformed, linkedAst);
+					}
+					if (rewrites.size >= REWRITE_CACHE_LIMIT) rewrites.delete(rewrites.keys().next().value!);
+					rewrites.set(key, transformed);
 				}
 
 				return transformed === code ? undefined : { code: transformed, map: null };
@@ -101,8 +119,28 @@ function lowerRouterLinks(code: string, ast: Node): string {
 		if (closingName) edits.push({ ...rangeOf(closingName), text: 'a' });
 		for (const attribute of attributes) {
 			const attributeName = jsxName(node(attribute.name));
-			if (attributeName === 'prefetch' || attributeName === 'params') {
+			if (attributeName === 'params' || (attributeName === 'prefetch' && !attribute.value)) {
 				edits.push({ ...attributeRemovalRange(code, attribute), text: '' });
+			} else if (attributeName === 'prefetch') {
+				const value = node(attribute.value)!;
+				const literal = jsxExpression(value) ?? value;
+				if (['Literal', 'StringLiteral', 'BooleanLiteral'].includes(literal.type ?? '')) {
+					const choice = literal.value;
+					edits.push(
+						choice === false || choice === 'intent' || choice === 'viewport'
+							? {
+									...rangeOf(attribute),
+									text: `${PREFETCH_ATTRIBUTE}="${choice === false ? 'none' : choice}"`,
+								}
+							: { ...attributeRemovalRange(code, attribute), text: '' },
+					);
+					continue;
+				}
+				const expression = `(${slice(code, jsxExpression(value) ?? value)})`;
+				edits.push({
+					...rangeOf(attribute),
+					text: `${PREFETCH_ATTRIBUTE}={${expression} === false ? 'none' : ${expression} === 'intent' || ${expression} === 'viewport' ? ${expression} : undefined}`,
+				});
 			} else if (attributeName === 'replace' || attributeName === 'scroll') {
 				const value = node(attribute.value);
 				const expression = value ? slice(code, jsxExpression(value) ?? value) : 'true';

@@ -165,15 +165,35 @@ test('a declaration of the row local name inside the handler is that declaration
 	expect(source).not.toContain('context.locals');
 });
 
-test('assigning to a row local fails the build instead of shipping a free name', async () => {
-	const result = await compile(
-		rowsPage(`\t\t\t<button onClick={() => { row.hit = 1; }}>row</button>`),
-	);
+test('assigning to a field of a row over state writes that element of the list', async () => {
+	const source = await handlerSource(`\t\t\t<button onClick={() => { row.hit = 1; }}>row</button>`);
 
-	// `context.locals?.row.hit = 1` is not a legal assignment target, so the
-	// authored name stands — and a module naming something it never binds must
-	// not ship. The message has to say row item, not state binding: hoisting the
-	// read into a local, which is the state advice, reads the same missing name.
+	expect(source).toContain(
+		'path: marklessRowItemPath(context, "state:rows", [], "row", ["id"], ["hit"])',
+	);
+	expect(source).not.toMatch(/\brow\.hit\s*=/);
+});
+
+test('assigning to a row local over a plain array fails the build instead of shipping a free name', async () => {
+	const result = await compile(`
+import { state } from '@markless/core';
+
+const ROWS = [{ id: 'a' }];
+
+export function Page() @{
+	let picked = state('none');
+
+	<div>
+		<p>{picked}</p>
+		@for (const row of ROWS; key row.id) {
+			<button onClick={() => { row.hit = 1; }}>row</button>
+		}
+	</div>
+}
+`);
+
+	// A plain array is not in the graph, so there is no element to write; the
+	// authored name stands and a module naming something it never binds must not ship.
 	const diagnostics = result.symbolModules.diagnostics;
 	expect(diagnostics.map((diagnostic) => diagnostic.code)).toContain(
 		SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE,

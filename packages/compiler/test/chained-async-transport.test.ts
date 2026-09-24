@@ -218,3 +218,63 @@ export function SignalCard() @{
 		),
 	).toBe(true);
 });
+
+test.each([
+	{
+		name: 'chained upstream',
+		source: `
+import { computed } from '@markless/core';
+import { loadVoyage, loadManifest } from './port.ts';
+
+export function Harbor() @{
+	const voyage = computed(async ({ signal }) => loadVoyage(signal));
+	const manifest = computed(async ({ signal }) => loadManifest(voyage.vessel, signal));
+
+	<section>@try {
+		<em>Cargo: {manifest.crates.join(' / ')}</em>
+	} @pending { <em>Loading</em> } @catch { <em>Failed</em> }</section>
+}
+`,
+	},
+	{
+		name: 'single async value',
+		source: `
+import { computed } from '@markless/core';
+import { loadOrchard } from './grove.ts';
+
+export function Grove() @{
+	const orchard = computed(async () => loadOrchard());
+
+	<div>
+		@try {
+			<span>{orchard.trees.join(' + ')}</span>
+		} @pending { <span>Planting</span> } @catch { <span>Blighted</span> }
+	</div>
+}
+`,
+	},
+])(
+	'a @try content call expression on an async value settles through its template computed ($name)',
+	async ({ source }) => {
+		const result = await compileTsrxModule({ filename: 'src/Scene.tsrx', source, symbols: [] });
+
+		expect(
+			result.publicRenderPlan.diagnostics.map((diagnostic) => diagnostic.code),
+		).not.toContain('MARKLESS_PUBLIC_RENDER_GATE_PLAN_DISAGREEMENT');
+		const read = result.semanticGraph.templateReads.find((item) => item.computedGraphNodeId);
+		if (!read?.computedGraphNodeId)
+			throw new Error('Expected the call expression to mint a computed.');
+		const runners = new Map(
+			result.symbolResolver.symbols.flatMap((symbol) =>
+				symbol.kind === 'async-computed-runner'
+					? [[symbol.graphNodeId, symbol.id] as const]
+					: [],
+			),
+		);
+		const asyncReads = result.protocolView.asyncBoundaries[0]?.asyncReads ?? [];
+		expect(asyncReads.map((item) => item.graphNodeId)).toContain(read.computedGraphNodeId);
+		const upstream = asyncReads.filter((item) => runners.has(item.graphNodeId));
+		expect(upstream).toHaveLength(1);
+		expect(upstream[0]?.runnerSymbolId).toBe(runners.get(upstream[0]?.graphNodeId ?? ''));
+	},
+);

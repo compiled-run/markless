@@ -56,14 +56,8 @@ export function App() @{
 	let playerCommand = state('cue');
 	let playerCommandVersion = state(0);
 
-	<div
-		class={libraryStatus ? 'App library-active' : 'App'}
-		attach={installYouTubeController}
-	>
-		<Nav
-			libraryOpen={libraryStatus}
-			onToggleLibrary={() => libraryStatus = !libraryStatus}
-		/>
+	<div class={libraryStatus ? 'App library-active' : 'App'} attach={installYouTubeController}>
+		<Nav libraryOpen={libraryStatus} onToggleLibrary={() => (libraryStatus = !libraryStatus)} />
 		<Song
 			currentSong={currentSong}
 			isPlaying={isPlaying}
@@ -71,8 +65,16 @@ export function App() @{
 			playerCommandVersion={playerCommandVersion}
 		/>
 		<div class="youtube-state-sync">
-			<button type="button" class="youtube-sync-playing" onClick={() => isPlaying = true}></button>
-			<button type="button" class="youtube-sync-paused" onClick={() => isPlaying = false}></button>
+			<button
+				type="button"
+				class="youtube-sync-playing"
+				onClick={() => (isPlaying = true)}
+			></button>
+			<button
+				type="button"
+				class="youtube-sync-paused"
+				onClick={() => (isPlaying = false)}
+			></button>
 		</div>
 		<Player
 			currentSong={currentSong}
@@ -89,7 +91,14 @@ export function App() @{
 				songTwo.active = currentSong.id === 'track-three';
 				songThree.active = currentSong.id === 'track-four';
 				songFour.active = currentSong.id === 'track-one';
-				currentSong = currentSong.id === 'track-one' ? songFour : currentSong.id === 'track-two' ? songOne : currentSong.id === 'track-three' ? songTwo : songThree;
+				currentSong =
+					currentSong.id === 'track-one'
+						? songFour
+						: currentSong.id === 'track-two'
+							? songOne
+							: currentSong.id === 'track-three'
+								? songTwo
+								: songThree;
 			}}
 			onNext={() => {
 				playerCommand = isPlaying ? 'load' : 'cue';
@@ -98,7 +107,14 @@ export function App() @{
 				songTwo.active = currentSong.id === 'track-one';
 				songThree.active = currentSong.id === 'track-two';
 				songFour.active = currentSong.id === 'track-three';
-				currentSong = currentSong.id === 'track-one' ? songTwo : currentSong.id === 'track-two' ? songThree : currentSong.id === 'track-three' ? songFour : songOne;
+				currentSong =
+					currentSong.id === 'track-one'
+						? songTwo
+						: currentSong.id === 'track-two'
+							? songThree
+							: currentSong.id === 'track-three'
+								? songFour
+								: songOne;
 			}}
 		/>
 		<Library
@@ -145,9 +161,16 @@ export function App() @{
 			}}
 		/>
 		<div class="youtube-disclosure">
-			<span>Demo music streams from the visible YouTube embed. This app does not bundle, download, or redistribute audio.</span>
-			<a href="https://www.youtube.com/t/terms" rel="noreferrer" target="_blank">YouTube Terms</a>
-			<a href="https://policies.google.com/privacy" rel="noreferrer" target="_blank">Google Privacy</a>
+			<span>
+				Demo music streams from the visible YouTube embed. This app does not bundle,
+				download, or redistribute audio.
+			</span>
+			<a href="https://www.youtube.com/t/terms" rel="noreferrer" target="_blank">
+				YouTube Terms
+			</a>
+			<a href="https://policies.google.com/privacy" rel="noreferrer" target="_blank">
+				Google Privacy
+			</a>
 		</div>
-	</div>
+	</div>;
 }

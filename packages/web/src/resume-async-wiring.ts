@@ -259,7 +259,10 @@ export async function settleAsyncBoundaryRange(
 			boundaryArmRecordSet(rawArmRecords) ?? boundaryArmRecordSet(plannedArmRecords);
 		if (rawArmRecords !== undefined && !armRecords) throw emptySettleRenderError(boundary.id);
 		if (armRecords) {
+			const { computed, cells } = update as Pick<ArmCommitUpdate, 'computed' | 'cells'>;
 			await input.commitArm(boundary, {
+				...(computed && { computed }),
+				...(cells && { cells }),
 				html: update.html,
 				armRecords: (composedArmRecordQualifier()?.(boundary.id, armRecords, input.graph) ?? armRecords),
 			});

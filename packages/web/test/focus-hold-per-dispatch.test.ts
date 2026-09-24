@@ -198,3 +198,61 @@ test('a focus the commit dropped is not re-landed onto a node the commit removed
 
 	expect(owner.activeElement).toBe(body);
 });
+
+// A handler that writes a bound value and then focuses the field must not hand
+// the user a focused field still showing the old text.
+function makeField(name: string, owner: FakeDocument, hidden = false): FakeElement {
+	return Object.assign(makeElement(name, owner, hidden), { tagName: 'INPUT' });
+}
+
+test('a field focused while the dispatch has uncommitted writes is focused only after the commit', () => {
+	const body = { name: 'body' };
+	const owner: FakeDocument = { activeElement: body, body };
+	const field = makeField('field', owner);
+	let pending = true;
+
+	const dispatch = marklessBeginFocusCommit(() => pending);
+	handOut(field).focus();
+	expect(owner.activeElement).toBe(body);
+
+	pending = false;
+	marklessEndFocusCommit(dispatch);
+	expect(owner.activeElement).toBe(field);
+});
+
+test('a field focused with nothing waiting on the commit is focused at once', () => {
+	const body = { name: 'body' };
+	const owner: FakeDocument = { activeElement: body, body };
+	const field = makeField('field', owner);
+
+	const dispatch = marklessBeginFocusCommit(() => false);
+	handOut(field).focus();
+	expect(owner.activeElement).toBe(field);
+	marklessEndFocusCommit(dispatch);
+	expect(owner.activeElement).toBe(field);
+});
+
+test('a control with no text of its own is focused at once even with writes waiting', () => {
+	const body = { name: 'body' };
+	const owner: FakeDocument = { activeElement: body, body };
+	const button = makeElement('button', owner, false);
+
+	const dispatch = marklessBeginFocusCommit(() => true);
+	handOut(button).focus();
+	expect(owner.activeElement).toBe(button);
+	marklessEndFocusCommit(dispatch);
+	expect(owner.activeElement).toBe(button);
+});
+
+test('a held focus onto a field the commit unhid lands', () => {
+	const body = { name: 'body' };
+	const owner: FakeDocument = { activeElement: body, body };
+	const field = makeField('field', owner, true);
+
+	const dispatch = marklessBeginFocusCommit(() => true);
+	handOut(field).focus();
+	field.hidden = false;
+	marklessEndFocusCommit(dispatch);
+
+	expect(owner.activeElement).toBe(field);
+});

@@ -788,22 +788,34 @@ try {
 		});
 		await page.locator('a.sidebar-link[href="/markless/concepts/computed"]').click();
 		await page.waitForURL('**/markless/concepts/computed');
+		await page
+			.waitForFunction(
+				() =>
+					document.querySelector('.sidebar-link.is-active')?.getAttribute('href') ===
+					'/markless/concepts/computed',
+				undefined,
+				{ timeout: 10_000 },
+			)
+			.catch(() => {});
 		const landed = await page.evaluate(() => ({
 			heading: document.querySelector('h1')?.textContent ?? '',
 			crumb: document.querySelector('.crumb-page')?.textContent ?? '',
+			title: document.title,
+			canonical: document.querySelector('link[rel="canonical"]')?.getAttribute('href') ?? '',
 			survived: (window as { __beforeNavigation?: number }).__beforeNavigation === 1,
 		}));
 		check(
-			landed.crumb === 'Computed',
+			landed.crumb === 'Computed' &&
+				landed.title.startsWith('Computed') &&
+				landed.canonical.endsWith('/markless/concepts/computed'),
 			'a sidebar click lands on the page it names, chrome and all',
-			`${landed.crumb} / ${landed.heading}`,
+			`${landed.crumb} / ${landed.title} / ${landed.canonical} / ${landed.heading}`,
 		);
+		// document.tsrx renders the title, crumb and pager from the URL, so the router must load a fresh document.
 		check(
 			!landed.survived,
-			'that click is a document load, which is what finding 40 says it has to be',
-			landed.survived
-				? 'the window survived the click — client-side navigation works now'
-				: '',
+			'that click is a document load, because this site renders its chrome from the URL',
+			landed.survived ? 'the window survived the click, so the chrome can be stale' : '',
 		);
 
 		// --- sprites and mascots ------------------------------------------------
@@ -1398,32 +1410,36 @@ try {
 		);
 		await page.screenshot({ path: `${shotsDir}/T013-name-echo-after.png`, fullPage: true });
 
-		// Six pages ship a callout where a widget was meant to be, and the heading
+		// Four pages ship a callout where a widget was meant to be, and the heading
 		// on it is the first thing the reader is told, so each one is checked
 		// verbatim rather than by a phrase.
 		const noBoxTitle: Record<string, string> = {
-			'/markless/concepts/conditionals':
-				'Why the panels on this page are files rather than boxes',
-			'/markless/concepts/lists': 'Why the rows on this page are a file rather than a box',
 			'/markless/concepts/async': 'What is missing here, and what this build actually does',
 			'/markless/concepts/styling': 'Why the two cards are not side by side on this page',
 			'/markless/build/components': 'Why that pair is not a box on this page',
 			'/markless/build/storage': 'Why that file is not a box on this page',
 		};
 
+		await page.goto(`${origin}/markless/concepts/conditionals`, { waitUntil: 'load' });
+		const refusedTitles = await page
+			.locator('.callout-title')
+			.evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()));
+		check(
+			refusedTitles.includes('This first file does not build, on purpose'),
+			'/markless/concepts/conditionals marks its first file as refused by the build',
+			refusedTitles.join(' | '),
+		);
+		const conditionalsText = (await page.locator('body').textContent()) ?? '';
+		check(
+			conditionalsText.includes('MARKLESS_STATE_CREATION_SITE_UNSTABLE'),
+			'/markless/concepts/conditionals names the error the build stops with',
+		);
+
 		for (const href of ['/markless/concepts/conditionals', '/markless/concepts/lists']) {
 			await page.goto(`${origin}${href}`, { waitUntil: 'load' });
-			const told = await page
-				.locator('.callout-title')
-				.evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()));
-			check(
-				told.includes(noBoxTitle[href]),
-				`${href} says out loud why it has no demo box`,
-				told.join(' | '),
-			);
 			check(
 				(await page.locator('.playground').count()) === 0,
-				`${href} really has no playground frame to mislead the reader`,
+				`${href} has no playground frame trying to build its files`,
 			);
 		}
 
@@ -1911,12 +1927,12 @@ try {
 			'the footer strip mixes two stickers in with the doodles',
 		);
 		await page.screenshot({ path: `${shotsDir}/T024-stickers-landing.png`, fullPage: true });
-		await page.goto(`${origin}/markless/concepts/lists`, { waitUntil: 'load' });
+		await page.goto(`${origin}/markless/concepts/conditionals`, { waitUntil: 'load' });
 		const cornerSticker = await page
-			.locator('.callout[data-sticker="map"]')
+			.locator('.callout[data-sticker="spring"]')
 			.evaluate((node) => getComputedStyle(node as Element, '::after').backgroundImage);
 		check(
-			cornerSticker.includes('/markless/stickers/map.png'),
+			cornerSticker.includes('/markless/stickers/spring.png'),
 			'a concept page callout paints its corner sticker',
 			cornerSticker.slice(0, 60),
 		);

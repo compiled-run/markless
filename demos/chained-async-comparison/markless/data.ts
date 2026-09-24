@@ -7,8 +7,10 @@ export function configureData(origin: string, run: string): void {
 }
 
 async function request(pathname: string, signal: AbortSignal): Promise<any> {
-	const url = new URL(pathname, apiOrigin);
-	url.searchParams.set('run', runToken);
+	// Browser fallbacks keep a client-side re-run visible as an extra timeline request.
+	const page = globalThis.location ? new URL(globalThis.location.href) : undefined;
+	const url = new URL(pathname, apiOrigin || page?.origin);
+	url.searchParams.set('run', runToken || page?.searchParams.get('run') || '');
 	const response = await fetch(url, { signal });
 	if (!response.ok) throw new Error(`${pathname} returned ${response.status}`);
 	return response.json();

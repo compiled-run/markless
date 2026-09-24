@@ -21,6 +21,7 @@ import {
 import { splitStaticGraphPath } from '../../artifact-helpers/graph-paths.ts';
 import { sharedInstancePreludeLines } from './residue-reader.ts';
 import type { PublicRenderRoot } from './types.ts';
+import { isRootStatement } from './template.ts';
 
 type GraphBinding = PublicRenderModuleInput['semanticGraph']['graphBindings'][number];
 const loweredFrameworkCalls = new Set(['computed', 'element', 'handler', 'storage']);
@@ -59,9 +60,13 @@ export function renderBodyLines(
 	const lines: string[] = [];
 	let emittedRoot = false;
 	let derivedSharedComputed = bodySharedComputedLines.length === 0;
+	const rootStatements = childNodes(body).filter((statement) =>
+		isRootStatement(rootInfo.component, rootInfo.root, statement),
+	);
 	for (const statement of childNodes(body)) {
 		if (isIgnorableTextNode(statement)) continue;
-		if (statement === rootInfo.root || returnArgument(statement) === rootInfo.root) {
+		if (rootStatements.includes(statement)) {
+			if (statement !== rootStatements.at(-1)) continue;
 			if (!derivedSharedComputed) {
 				lines.push(...bodySharedComputedLines);
 				derivedSharedComputed = true;
@@ -469,12 +474,6 @@ function frameworkCallName(node: AnyNode | null | undefined): string | null {
 		: null;
 }
 
-function returnArgument(statement: AnyNode): AnyNode | undefined {
-	return statement.type === 'ReturnStatement'
-		? (statement.argument as AnyNode | undefined)
-		: undefined;
-}
-
 function indentLines(lines: ReadonlyArray<string>): string[] {
 	return lines.flatMap((line) => line.split('\n').map((part) => `	${part}`));
 }
@@ -489,7 +488,7 @@ export function hasExecutableBodyStatements(
 	if (!body) return false;
 	for (const statement of childNodes(body)) {
 		if (isIgnorableTextNode(statement)) continue;
-		if (statement === root || returnArgument(statement) === root) continue;
+		if (isRootStatement(component, root, statement)) continue;
 		if (isStateDeclaration(statement) || isLoweredFrameworkDeclaration(statement)) continue;
 		if (isSharedInstanceDeclaration(statement, sharedInstanceNames)) continue;
 		if (expressionSource(statement, source)) return true;
@@ -513,7 +512,7 @@ export function renderValuePreludeLines(
 	const sharedInstanceNames = sharedInstanceLocalNames(input.semanticGraph, rootInfo.componentName);
 	const statements = childNodes(body).filter((statement) => {
 		if (isIgnorableTextNode(statement)) return false;
-		return statement !== rootInfo.root && returnArgument(statement) !== rootInfo.root;
+		return !isRootStatement(rootInfo.component, rootInfo.root, statement);
 	});
 	const demandedText = new Set(demandedSources);
 	const demandedNames = new Set<string>();

@@ -9,7 +9,10 @@ import {
 	type StorageSeedMetadata,
 } from '@markless/serializer';
 import { renderPayloadScripts } from '@markless/serializer';
-import { protocolEventDispatchesMarkless } from '@markless/serializer/protocol';
+import {
+	protocolEventDispatchesMarkless,
+	PROTOCOL_VISIBLE_EVENT_NAME,
+} from '@markless/serializer/protocol';
 import {
 	classifyResumeRecordDelta,
 	mergeResumeRecordDelta,
@@ -19,7 +22,9 @@ import type { MarklessExecutionLogMode } from './dev-log.ts';
 import {
 	createInlineResumerDebugRegistrationSource,
 	createInlineResumerOverlayPrimerSource,
+	createInlineResumerVisiblePrimerSource,
 	createPrerenderInlineResumerSource,
+	createPrerenderInlineVisiblePrimerSource,
 	createInlineResumerSelfWakeSource,
 	createInlineResumerSource,
 	renderPrerenderInlineResumerSource,
@@ -33,6 +38,7 @@ import {
 } from './fns/roster-position.ts';
 import { marklessRosterPositions } from './prerender/shared-seed-slot.ts';
 import { derivePrerenderResumeRecords } from './prerender/evaluator.ts';
+import { createEarlyEventCaptureSource } from './inline/early-events.ts';
 
 export { prepareSsrResumeRecords } from './prerender/records.ts';
 
@@ -188,12 +194,15 @@ export async function assembleSsrContainer(
 					syncPolicy,
 				});
 	const overlayPrimer = hasOverlayMark(output.html);
+	const hasVisibleEvents = view.events.some(
+		(event) => event.eventName === PROTOCOL_VISIBLE_EVENT_NAME,
+	);
 	const resumerScript =
 		hasPayload && browserTriggers
 			? renderInlineResumerScript(
 					wakeChannelEnabled
 						? createPrerenderInlineResumerSource(
-								browserEventNames(view),
+								prerenderBootEventNames(view),
 								selectedResumeModuleUrl,
 								{
 									...(typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' &&
@@ -215,6 +224,8 @@ export async function assembleSsrContainer(
 					undefined,
 					true,
 					overlayPrimer,
+					!wakeChannelEnabled && hasVisibleEvents,
+					wakeChannelEnabled ? prerenderVisiblePrimerSource(view) : '',
 				)
 			: '';
 	const storageSeedScript = renderStorageSeedScript(
@@ -226,6 +237,9 @@ export async function assembleSsrContainer(
 		storageSeedScript,
 		renderHeadInjections(artifactHeadInjections(component), options.nonce),
 		renderModulePreloadLinks(modulePreloads, options.nonce),
+		resumerScript && selectedResumeModuleUrl && !wakeChannelEnabled && !options.resumerSource
+			? `<script${options.nonce ? ` nonce="${escapeAttribute(options.nonce)}"` : ''}>${escapeInlineScript(createEarlyEventCaptureSource(browserEventNames(view)))}</script>`
+			: '',
 		`<div${renderContainerAttributes(options.containerId)}>`,
 		output.html,
 		payloadScripts?.stateScript,
@@ -266,7 +280,7 @@ export async function assemblePrerenderPageParts(
 			: options.modulePreloads;
 	const modulePreloads =
 		optionPreloads ?? (browserTriggers ? artifactModulePreloads(component) : undefined);
-	const eventNames = browserEventNames(view);
+	const eventNames = prerenderBootEventNames(view);
 	const selfWake = hasUnsettledAsyncBoundaryRunner(view, state);
 	const boot = artifactPrerenderBoot(component);
 	// The settle path replaces the self-wake: it fills the arm from the plan and
@@ -291,6 +305,9 @@ export async function assemblePrerenderPageParts(
 					// The precompiled self-wake variant already carries the self-wake
 					// body; only the authored fallback appends it separately.
 					!boot,
+					false,
+					false,
+					prerenderVisiblePrimerSource(view),
 				)
 			: '';
 
@@ -346,7 +363,10 @@ export async function renderSsrOutput(
 			await marklessSsrDeferredCounted(
 				context,
 				await (
-					component.renderSsr as (props?: unknown, renderContext?: unknown) => SsrRenderOutput
+					component.renderSsr as (
+						props?: unknown,
+						renderContext?: unknown,
+					) => SsrRenderOutput
 				)(props, context),
 			),
 		);
@@ -595,11 +615,37 @@ function branchServedArmEventNames(
 	const armRecords = branch.servedArmRecords;
 	if (!armRecords) return [];
 	return [
-		...armRecords.events.filter(protocolEventDispatchesMarkless).map((event) => event.eventName),
+		...armRecords.events
+			.filter(protocolEventDispatchesMarkless)
+			.map((event) => event.eventName),
 		...(armRecords.keyedRepeats ?? []).flatMap((repeat) =>
 			repeat.rowEvents.map((event) => event.eventName),
 		),
 	];
+}
+
+function visibleHostIndexes(view: ProtocolViewPayload): ReadonlyArray<number> {
+	const hosts = new Set(
+		view.events
+			.filter((event) => event.eventName === PROTOCOL_VISIBLE_EVENT_NAME)
+			.map((event) => event.hostNodeId),
+	);
+	return view.locators
+		.filter((locator) => hosts.has(locator.hostNodeId))
+		.map((locator) => locator.index);
+}
+
+// A page served without a view script delegates the visible event like any other.
+function prerenderBootEventNames(view: ProtocolViewPayload): ReadonlyArray<string> {
+	const eventNames = browserEventNames(view);
+	return visibleHostIndexes(view).length > 0
+		? [...eventNames, PROTOCOL_VISIBLE_EVENT_NAME]
+		: eventNames;
+}
+
+function prerenderVisiblePrimerSource(view: ProtocolViewPayload): string {
+	const hostIndexes = visibleHostIndexes(view);
+	return hostIndexes.length > 0 ? createPrerenderInlineVisiblePrimerSource(hostIndexes) : '';
 }
 
 function browserEventNames(view: ProtocolViewPayload): ReadonlyArray<string> {
@@ -611,13 +657,15 @@ function browserEventNames(view: ProtocolViewPayload): ReadonlyArray<string> {
 			),
 			...(view.branches ?? []).flatMap((branch) => [
 				...(branch.armRecords ?? []).flatMap((arm) =>
-					arm.events.filter(protocolEventDispatchesMarkless).map((event) => event.eventName),
+					arm.events
+						.filter(protocolEventDispatchesMarkless)
+						.map((event) => event.eventName),
 				),
 				...branchServedArmEventNames(branch),
 			]),
 			...view.asyncBoundaries.flatMap(boundaryArmEventNames),
 		]),
-	].filter((eventName) => eventName !== 'visible');
+	].filter((eventName) => eventName !== PROTOCOL_VISIBLE_EVENT_NAME);
 }
 
 function renderContainerAttributes(containerId: string | undefined): string {
@@ -652,6 +700,8 @@ function renderInlineResumerScript(
 	settleModuleUrl?: string,
 	appendSelfWakeSource = true,
 	overlayPrimer = false,
+	visiblePrimer = false,
+	appendedSource = '',
 ): string {
 	const nonceAttribute = nonce ? ` nonce="${escapeAttribute(nonce)}"` : '';
 	const resumeModuleAttribute = resumeModuleUrl
@@ -666,7 +716,10 @@ function renderInlineResumerScript(
 	const overlayPrimerSource = overlayPrimer
 		? createInlineResumerOverlayPrimerSource(resumeModuleUrl)
 		: '';
-	return `<script data-async-resumer${nonceAttribute}${resumeModuleAttribute}${settleModuleAttribute}${selfWakeAttribute}>${escapeInlineScript(source + selfWakeSource + overlayPrimerSource)}</script>`;
+	const visiblePrimerSource = visiblePrimer
+		? createInlineResumerVisiblePrimerSource(resumeModuleUrl)
+		: '';
+	return `<script data-async-resumer${nonceAttribute}${resumeModuleAttribute}${settleModuleAttribute}${selfWakeAttribute}>${escapeInlineScript(source + selfWakeSource + overlayPrimerSource + visiblePrimerSource + appendedSource)}</script>`;
 }
 
 /**

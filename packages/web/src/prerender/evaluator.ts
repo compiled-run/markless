@@ -1,11 +1,10 @@
 import {
-	projectionNotRenderedError,
 	renderSsrData,
-	withProjectionSpan,
 	type RenderSsrDataOutput,
 	type SsrDataReadContext,
 	type SsrDataResidue,
 	type SsrDataSlot,
+	type RenderSsrDataInput,
 	type SsrDataStructure,
 	type SsrRenderData,
 	type StructureToken,
@@ -25,16 +24,13 @@ import {
 	marklessSsrSpreadProps,
 	type MarklessSsrComposedChild,
 } from '../fns/ssr.ts';
-import { ASYNC_PROTOCOL_VERSION } from '@markless/serializer';
 import type { ComposeGraphProps } from '../fns/composition.ts';
 import { marklessCsrRemapChildGraph } from '../fns/composition.ts';
 import { marklessBoundSymbolId } from '../fns/bound-symbol.ts';
 import {
-	marklessEnclosingWidgetGraphNodeId,
 	marklessInstancePath,
 	marklessRowFreeSymbolId,
 	marklessRowSegment,
-	marklessWithEnclosingWidgetRoots,
 } from '../fns/instance-scope.ts';
 import { prerenderBranchArm } from './branch-arm.ts';
 import { registerPrerenderStagedComputeds } from './staged-graph.ts';
@@ -52,8 +48,8 @@ import { branchArmIdrefResolution } from '../ssr-data/branch-arm-idrefs.ts';
 // mutable draft the SSR composer works on. They describe the same records; the
 // protocol types arm record sets coarsely (opaque bags), so the two shapes do
 // not line up structurally and the seam names the crossing explicitly.
-type SsrComposableView = Parameters<typeof marklessSsrComposeView>[1];
-type SsrComposableChildOutput = NonNullable<MarklessSsrComposedChild['output']>;
+export type SsrComposableView = Parameters<typeof marklessSsrComposeView>[1];
+export type SsrComposableChildOutput = NonNullable<MarklessSsrComposedChild['output']>;
 
 type GraphValues = ReadonlyMap<string, unknown>;
 
@@ -64,7 +60,7 @@ export type PrerenderEvaluationContext = {
 	readonly read: PrerenderRead;
 };
 
-type PrerenderRenderData = SsrRenderData & {
+export type PrerenderRenderData = SsrRenderData & {
 	readonly initialValues?: ReadonlyArray<{
 		readonly graphNodeId: string;
 		readonly value:
@@ -127,6 +123,21 @@ export type PrerenderDataDefinition = {
 	// part of somebody else's widget, holding the cells only so a page that
 	// renders no designated root still has them.
 	readonly widgetFallbacks?: ReadonlyArray<string>;
+	// The root's elements whose handler is a callback prop itself: composition stands its composer's callback in.
+	readonly propEvents?: ReadonlyArray<{
+		readonly hostNodeId: string;
+		readonly eventName: string;
+		readonly propName: string;
+	}>;
+	// Attached only to a component whose keyed rows project elements.
+	readonly rowHosts?: {
+		readonly qualify: <V extends SsrComposableView>(
+			structure: SsrDataStructure,
+			view: V,
+			idPrefix?: string,
+		) => V;
+		readonly segment: NonNullable<RenderSsrDataInput['projectionSegment']>;
+	};
 	// Compiled by the same producer as the server module's reader; the browser
 	// never parses or evaluates authored source itself.
 	readonly readResidue?: (
@@ -165,7 +176,7 @@ export type PrerenderDataSurface = {
 	readonly imports: Readonly<Record<string, PrerenderDataSurface>>;
 };
 
-type PrerenderLoadSymbol = (symbolId: string) => unknown | Promise<unknown>;
+export type PrerenderLoadSymbol = (symbolId: string) => unknown | Promise<unknown>;
 
 function isPrerenderLoadSymbol(value: unknown): value is PrerenderLoadSymbol {
 	return typeof value === 'function';
@@ -316,13 +327,19 @@ export async function renderPrerenderBoundary(
 	readonly html: string;
 	readonly armRecords: ResumeArmRecordSet;
 	readonly computed: ProtocolStatePayload['computed'];
+	readonly cells?: ReadonlyArray<{ readonly graphNodeId: string; readonly value: unknown }>;
 }> {
 	if (isPrerenderDataSurface(page)) {
 		if (!isPrerenderLoadSymbol(propsOrLoadSymbol)) {
 			throw new TypeError('Prerender render data requires a symbol loader.');
 		}
-		const output = await evaluatePrerenderDataSurface(page, propsOrLoadSymbol, graph, true);
-		return settledBoundaryResult(output, boundaryId);
+		const freshCellIds = new Set<string>();
+		const output = await evaluatePrerenderDataSurface(page, propsOrLoadSymbol, graph, true, {}, {
+			cellIds: freshCellIds,
+		});
+		const settled = await settledBoundaryResult(output, boundaryId);
+		const cells = freshArmCells(output, freshCellIds);
+		return cells.length > 0 ? { ...settled, cells } : settled;
 	}
 	const output = await renderBuiltPage(page, propsOrLoadSymbol, { prerenderSettle: { graph } });
 	return settledBoundaryResult(output, boundaryId);
@@ -379,19 +396,25 @@ export async function renderPrerenderBranch(
 		...arm,
 		...(served ? { armRecords: served } : {}),
 		computed: records.state.computed,
-		// The arm's own cells, taken before serialization: nothing in the live
-		// graph answers for a component this render is creating.
-		cells: (output.state?.cells ?? []).flatMap((cell) =>
-			freshCellIds.has(cell.graphNodeId)
-				? [
-						{
-							graphNodeId: cell.graphNodeId,
-							value: (cell as { readonly directValue?: unknown }).directValue,
-						},
-					]
-				: [],
-		),
+		cells: freshArmCells(output, freshCellIds),
 	};
+}
+
+// Taken before serialization: nothing in the live graph answers for a component this render is creating.
+function freshArmCells(
+	output: SsrRenderOutput,
+	freshCellIds: ReadonlySet<string>,
+): ReadonlyArray<{ readonly graphNodeId: string; readonly value: unknown }> {
+	return (output.state?.cells ?? []).flatMap((cell) =>
+		freshCellIds.has(cell.graphNodeId)
+			? [
+					{
+						graphNodeId: cell.graphNodeId,
+						value: (cell as { readonly directValue?: unknown }).directValue,
+					},
+				]
+			: [],
+	);
 }
 
 function isPrerenderDataSurface(value: unknown): value is PrerenderDataSurface {
@@ -404,11 +427,12 @@ async function evaluatePrerenderDataSurface(
 	graph: RuntimeGraph | undefined,
 	requireHtml: boolean,
 	props: Readonly<Record<string, unknown>> = {},
-	fresh?: { readonly branchSiteId: string; readonly cellIds: Set<string> },
+	fresh?: { readonly branchSiteId?: string; readonly cellIds: Set<string> },
 ): Promise<SsrRenderOutput & { readonly structure?: SsrDataStructure }> {
 	const rootName = surface.rootComponentName;
 	if (!rootName) throw new Error('MARKLESS_PRERENDER_DATA_ROOT_MISSING');
 	const sharedSeeds = marklessRosterPositionSeeds();
+	const mountedNow = new Set<string>();
 	const rendered = await evaluatePrerenderDataComponent({
 		surface,
 		componentName: rootName,
@@ -419,8 +443,10 @@ async function evaluatePrerenderDataSurface(
 		graph,
 		requireHtml,
 		sharedSeeds,
-		...(fresh ? { freshBranchSiteId: fresh.branchSiteId, freshCellIds: fresh.cellIds } : {}),
+		...(fresh?.branchSiteId ? { freshBranchSiteId: fresh.branchSiteId } : {}),
+		...(fresh ? { freshCellIds: fresh.cellIds, mountedInstances: mountedNow } : {}),
 	});
+	if (fresh && graph) mountedInstances.set(graph, mountedNow);
 	// A count is asked before the members it counts have rendered, so the page
 	// this render produced is where it becomes a number.
 	const positions = marklessRosterPositions(sharedSeeds);
@@ -494,7 +520,7 @@ function marklessSurfaceDeclaresGraphNode(
 // with, so the derive used to paint `undefined` on the first client paint.
 // Carrying the routed values down closes that, and only for ids foreign to the
 // child.
-function marklessBoundGraphValues(
+export function marklessBoundGraphValues(
 	inherited: ReadonlyMap<string, unknown> | undefined,
 	childSurface: PrerenderDataSurface,
 	props: NonNullable<PrerenderDataDefinition['edges']>[number]['props'],
@@ -513,6 +539,25 @@ function marklessBoundGraphValues(
 	return routed.size > 0 ? routed : undefined;
 }
 
+// Per live graph, the component instances its last re-render placed on the page.
+const mountedInstances = new WeakMap<RuntimeGraph, Set<string>>();
+
+// An instance the last re-render did not place (or, before any, whose cells the graph holds nothing for) starts fresh.
+function marklessChildNotYetLive(
+	graph: RuntimeGraph | undefined | false,
+	definition: PrerenderDataDefinition | undefined,
+	instancePrefix: string,
+): boolean {
+	if (!graph || !definition) return false;
+	const mounted = mountedInstances.get(graph);
+	if (mounted) return !mounted.has(instancePrefix);
+	const ids = [
+		...ownedStateCells(definition).map((cell) => cell.graphNodeId),
+		...(definition.propCellId ? [definition.propCellId] : []),
+	];
+	return ids.length > 0 && ids.every((id) => graph.read(instancePrefix + id) === undefined);
+}
+
 // The cells this component declares, as against the module's whole list: the
 // producer hands every component in a module all of them.
 function ownedStateCells(
@@ -527,7 +572,7 @@ function ownedStateCells(
 	return definition.state.cells.filter((cell) => owned.size === 0 || owned.has(cell.graphNodeId));
 }
 
-function evaluatePrerenderDataComponent(input: {
+export function evaluatePrerenderDataComponent(input: {
 	readonly surface: PrerenderDataSurface;
 	readonly componentName: string;
 	readonly props: Readonly<Record<string, unknown>>;
@@ -553,6 +598,7 @@ function evaluatePrerenderDataComponent(input: {
 	// state starts from its declaration, and the commit seeds it into the graph.
 	readonly freshInstance?: true;
 	readonly freshCellIds?: Set<string>;
+	readonly mountedInstances?: Set<string>;
 	// The branch site whose arm this render brings in, forwarded to the renderer
 	// so it can mark that arm's subtree.
 	readonly freshBranchSiteId?: string;
@@ -588,6 +634,9 @@ function evaluatePrerenderDataComponent(input: {
 	// prefix its symbols already carry; the commit writes composed ids.
 	for (const graphNodeId of freshOwnCellIds ?? [])
 		input.freshCellIds?.add(input.symbolPrefix + graphNodeId);
+	// Its derives read props off the graph, where nothing has written them yet.
+	if (input.freshInstance && definition.propCellId)
+		input.freshCellIds?.add(input.symbolPrefix + definition.propCellId);
 	const liveCellIds = input.graph
 		? new Set(
 				definition.state.cells
@@ -595,6 +644,11 @@ function evaluatePrerenderDataComponent(input: {
 					.filter((graphNodeId) => !freshOwnCellIds?.has(graphNodeId)),
 			)
 		: undefined;
+	// The live graph holds a composed instance's own cells under its instance path.
+	const instanceCellIds =
+		input.graph && input.symbolPrefix
+			? new Set(ownedStateCells(definition).map((cell) => cell.graphNodeId))
+			: undefined;
 	const read = (graphNodeId: string, path: ReadonlyArray<string> = []): unknown => {
 		// A minted row loads its symbols through the resume loader, which scopes a
 		// symbol's reads by prepending the instance path. With no live graph to
@@ -615,16 +669,17 @@ function evaluatePrerenderDataComponent(input: {
 		// to the staged graph for later refreshes.
 		if (values.has(graphNodeId) && !liveCellIds?.has(graphNodeId))
 			return readPath(values.get(graphNodeId), path);
-		// A bare read of an async computed means its settled value, not the
-		// snapshot object — the same lowering the branch-update producer emits.
-		const graphPath =
-			path.length === 0 &&
-			definition.state.computed.some(
-				(computed) => computed.graphNodeId === graphNodeId && computed.async === true,
-			)
-				? ['value']
-				: path;
-		if (input.graph) return input.graph.read(graphNodeId, graphPath);
+		// Render data carries authored paths; an async computed's graph node is its snapshot.
+		const graphPath = definition.state.computed.some(
+			(computed) => computed.graphNodeId === graphNodeId && computed.async === true,
+		)
+			? ['value', ...path]
+			: path;
+		if (input.graph)
+			return input.graph.read(
+				instanceCellIds?.has(graphNodeId) ? input.symbolPrefix + graphNodeId : graphNodeId,
+				graphPath,
+			);
 		if (input.boundGraphValues?.has(graphNodeId))
 			return readPath(input.boundGraphValues.get(graphNodeId), path);
 		return readPath(values.get(graphNodeId), path);
@@ -798,6 +853,7 @@ function evaluatePrerenderDataComponent(input: {
 				renderSsrData({
 					renderData,
 					idPrefix: input.idPrefix,
+					projectionSegment: definition.rowHosts?.segment,
 					...(input.freshBranchSiteId ? { freshBranchSiteId: input.freshBranchSiteId } : {}),
 					sharedSeeds: input.sharedSeeds,
 					read: (residue, context) => {
@@ -913,6 +969,13 @@ function evaluatePrerenderDataComponent(input: {
 								);
 							} else if (prop.kind === 'graph-reference' && prop.graphNodeId) {
 								childProps[prop.name] = read(prop.graphNodeId, prop.path ?? []);
+								const forwarded = forwardedCallback(
+									input.props,
+									definition.propCellId,
+									prop.graphNodeId,
+									prop.path,
+								);
+								if (forwarded) callbacks[prop.name] = forwarded;
 							} else if (
 								prop.kind === 'element-handle-id' &&
 								prop.graphNodeId &&
@@ -951,6 +1014,7 @@ function evaluatePrerenderDataComponent(input: {
 								`MARKLESS_PRERENDER_DATA_COMPONENT_MISSING: ${edge.childComponentName}`,
 							);
 						}
+						input.mountedInstances?.add(input.symbolPrefix + symbolPrefix);
 						return marklessThen(
 							evaluatePrerenderDataComponent({
 								surface: childSurface,
@@ -970,10 +1034,17 @@ function evaluatePrerenderDataComponent(input: {
 									edge.props,
 									read,
 								),
-								...(input.freshInstance || context.freshInstances
+								...(input.freshInstance ||
+								context.freshInstances ||
+								marklessChildNotYetLive(
+									input.freshCellIds && input.graph,
+									childSurface.components[edge.childComponentName],
+									input.symbolPrefix + symbolPrefix,
+								)
 									? { freshInstance: true as const }
 									: {}),
 								...(input.freshCellIds ? { freshCellIds: input.freshCellIds } : {}),
+								...(input.mountedInstances ? { mountedInstances: input.mountedInstances } : {}),
 							}),
 							(output) => {
 								children.push({
@@ -1001,9 +1072,10 @@ function evaluatePrerenderDataComponent(input: {
 					},
 				}),
 				(rendered) => {
+					const view = structuredClone(definition.view) as SsrComposableView;
 					const composition = marklessSsrComposeView(
 						rendered.structure,
-						structuredClone(definition.view) as SsrComposableView,
+						definition.rowHosts?.qualify(rendered.structure, view, input.idPrefix) ?? view,
 						children,
 						asyncSnapshots,
 						input.idPrefix,
@@ -1018,7 +1090,7 @@ function evaluatePrerenderDataComponent(input: {
 						structure: rendered.structure,
 						structureTokens: rendered.structureTokens,
 						elementCount: composition.elementCount,
-						propEvents: [],
+						propEvents: definition.propEvents ?? [],
 						externalSymbolIds: composition.externalSymbolIds,
 						m(graphProps: ComposeGraphProps, instancePath?: string) {
 							marklessSsrRemapGraphOutput(output, graphProps, instancePath);
@@ -1030,493 +1102,6 @@ function evaluatePrerenderDataComponent(input: {
 			},
 		),
 	);
-}
-
-export type RepeatRowComponentRender = {
-	readonly html: string;
-	readonly state: ProtocolStatePayload;
-	readonly view: import('@markless/serializer').ProtocolViewPayload;
-};
-
-// The graph-node grammar for a shared() instance, restating public-render's
-// spelling for the reason INSTANCE_PATH in fns/instance-scope restates its own.
-const SHARED_INSTANCE_NODE = /^(?:shared|storage):/;
-
-/**
- * The page's own shared instances, read live for a row born after the page was.
- *
- * A minted row renders without the live graph because its own cells do not exist
- * in it yet, but a page-scoped `shared()` instance is not the row's - it is state
- * the page has been writing since load. Left to its compile-time factory the row
- * paints from an empty queue and joins the DOM wrong, with a follow-up refresh to
- * correct it. A widget-scoped id is instance-prefixed in page space, so only a
- * page-scoped instance answers here; what the graph lacks keeps its factory.
- */
-function liveSharedInstanceSeeds(
-	surface: PrerenderDataSurface,
-	componentName: string,
-	read: PrerenderRead,
-	seeded: ReadonlyMap<string, unknown> | undefined,
-): ReadonlyMap<string, unknown> | undefined {
-	let merged: Map<string, unknown> | undefined;
-	for (const initial of surface.components[componentName]?.initialValues ?? []) {
-		const graphNodeId = initial.graphNodeId;
-		if (!SHARED_INSTANCE_NODE.test(graphNodeId)) continue;
-		if (seeded?.has(graphNodeId) || merged?.has(graphNodeId)) continue;
-		const live = read(graphNodeId, []);
-		if (live === undefined) continue;
-		merged ??= new Map(seeded ?? []);
-		merged.set(graphNodeId, live);
-	}
-	return merged ?? seeded;
-}
-
-/**
- * One component edge, rendered for one keyed `@for` row, in page space.
- *
- * This is the same per-row work `renderChild` does - row segment, props off the
- * item, the seed pass, then composition - carved out for a client that has to
- * build a row the server never sent. The row's records are produced here rather
- * than shipped: a component row is one instance per rendered row, so markup
- * could never finish it.
- *
- * The child is evaluated WITHOUT the live graph on purpose. A minted row's cells
- * do not exist in it yet, so reading through it would answer `undefined` for
- * every one of them; the compile-time initial values are what the server's own
- * first render of that row would have used. Values the OWNER holds still cross
- * as props, read live.
- */
-export type RepeatRowComponentInput = {
-	readonly surface: PrerenderDataSurface;
-	readonly ownerComponentName: string;
-	readonly componentEdgeId: string;
-	readonly itemPropName?: string;
-	readonly item: unknown;
-	readonly rowKey: unknown;
-	readonly rowIndex: number;
-	readonly loadSymbol: PrerenderLoadSymbol;
-	readonly read: PrerenderRead;
-	readonly idPrefix?: string;
-	readonly symbolPrefix?: string;
-	/**
-	 * The live page's widget instances this row is being minted inside, by the
-	 * definition id its parts spell. Without them a part reading a widget rooted
-	 * outside the row resolves to a fresh instance of its own.
-	 */
-	readonly enclosingWidgetRoots?: ReadonlyMap<string, string>;
-	/**
-	 * The live instance path the repeat host stands at. It rides the row's own
-	 * segment, because a key is only unique WITHIN one rendered repeat: two
-	 * instances of one widget can each mint a row called `file-1`, and ids that
-	 * said only `r:file-1:` would be one row to every reader on the page.
-	 */
-	readonly enclosingInstancePath?: string;
-};
-
-export function renderRepeatRowComponent(
-	input: RepeatRowComponentInput,
-): Awaitable<RepeatRowComponentRender> {
-	// A refusal still answers as a rejection, so only a warm render skips the wait.
-	try {
-		if (!input.enclosingWidgetRoots?.size) return renderRowComponentEdge(input);
-		// The row's graph ids compose behind the owner's symbol prefix (an island
-		// segment, a composed child's edge), so the held segment carries it too.
-		return marklessWithEnclosingWidgetRoots(
-			marklessInstancePath((input.symbolPrefix ?? '') + rowSegmentOf(input)),
-			input.enclosingWidgetRoots,
-			() => renderRowComponentEdge(input),
-		);
-	} catch (error) {
-		return Promise.reject(error);
-	}
-}
-
-export function rowSegmentOf(input: {
-	readonly rowKey: unknown;
-	readonly enclosingInstancePath?: string;
-}): string {
-	return marklessRowSegment((input.enclosingInstancePath ?? '') + String(input.rowKey));
-}
-
-export type OwningSurfaceReach = {
-	readonly surface: PrerenderDataSurface;
-	readonly hostPrefix: string;
-	readonly symbolPrefix: string;
-};
-
-/** The surface whose own components hold `componentName`, and the prefixes the page reaches it under. */
-export function marklessOwningSurface(
-	surface: PrerenderDataSurface,
-	componentName: string,
-): OwningSurfaceReach | undefined {
-	const seen = new Set<PrerenderDataSurface>();
-	// Breadth-first: the shortest composition path is the one the page rendered.
-	let frontier: ReadonlyArray<OwningSurfaceReach> = [
-		{ surface, hostPrefix: '', symbolPrefix: '' },
-	];
-	while (frontier.length > 0) {
-		const next: OwningSurfaceReach[] = [];
-		for (const reach of frontier) {
-			if (seen.has(reach.surface)) continue;
-			seen.add(reach.surface);
-			if (reach.surface.components[componentName]) return reach;
-			for (const definition of Object.values(reach.surface.components))
-				for (const edge of definition.edges ?? []) {
-					const imported = reach.surface.components[edge.childComponentName]
-						? undefined
-						: reach.surface.imports[edge.childComponentName];
-					if (imported)
-						next.push({
-							surface: imported,
-							hostPrefix: reach.hostPrefix + edge.hostPrefix,
-							symbolPrefix: reach.symbolPrefix + edge.symbolPrefix,
-						});
-				}
-		}
-		frontier = next;
-	}
-	return undefined;
-}
-
-function renderRowComponentEdge(
-	input: RepeatRowComponentInput,
-): Awaitable<RepeatRowComponentRender> {
-	const definition = input.surface.components[input.ownerComponentName];
-	if (!definition)
-		throw new Error(`MARKLESS_PRERENDER_DATA_COMPONENT_MISSING: ${input.ownerComponentName}`);
-	const edge = (definition.edges ?? []).find(
-		(candidate) => candidate.id === input.componentEdgeId,
-	);
-	if (!edge) throw new Error(`MARKLESS_PRERENDER_CHILD_MISSING: ${input.componentEdgeId}`);
-	const ownerIdPrefix = input.idPrefix ?? '',
-		ownerSymbolPrefix = input.symbolPrefix ?? '',
-		rowSegment = rowSegmentOf(input),
-		hostPrefix = rowSegment + edge.hostPrefix,
-		symbolPrefix = rowSegment + edge.symbolPrefix,
-		// The seed pass asks for a widget's nodes by the bare id the module spells,
-		// which names no instance at all; the enclosing root is what turns it into
-		// the live widget's node rather than a page-space one nothing ever wrote.
-		enclosingRoots = input.enclosingWidgetRoots,
-		read: PrerenderRead = enclosingRoots?.size
-			? (graphNodeId, path) =>
-					input.read(marklessEnclosingWidgetGraphNodeId(graphNodeId, enclosingRoots), path)
-			: input.read;
-	const readDecision = (source: string | undefined, context: SsrDataReadContext | undefined) =>
-		source &&
-		definition.readResidue?.(
-			{ kind: 'authored-expression', source },
-			{
-				repeatItem: context?.repeatItem ?? input.item,
-				repeatIndex: context?.repeatIndex ?? input.rowIndex,
-				read,
-				idPrefix: ownerIdPrefix,
-			},
-		);
-	const ownerChunks = input.surface.renderData.chunks.filter(
-		(chunk) => chunk.componentName === input.ownerComponentName,
-	);
-	// The projection chunk is a fact of the owner's own markup, so the row record
-	// names the edge and this render reads the chunk off the surface.
-	const projectionChunkId = ownerChunks.flatMap((chunk) =>
-		chunk.slots.flatMap((slot) =>
-			slot.kind === 'child-component' &&
-			slot.componentEdgeId === input.componentEdgeId &&
-			slot.projectionChunkId
-				? [slot.projectionChunkId]
-				: [],
-		),
-	)[0];
-	const rowEdgeChildProps = (
-		forEdge: NonNullable<PrerenderDataDefinition['edges']>[number],
-		context: SsrDataReadContext | undefined,
-		itemPropName: string | undefined,
-	): { readonly props: Record<string, unknown>; readonly callbacks: Record<string, string> } => {
-		const childProps: Record<string, unknown> = {};
-		const callbacks: Record<string, string> = {};
-		for (const prop of forEdge.props) {
-			if (prop.name === itemPropName) {
-				childProps[prop.name] = input.item;
-			} else if (prop.kind === 'spread' && prop.graphNodeId) {
-				Object.assign(
-					childProps,
-					marklessSsrSpreadProps(read(prop.graphNodeId, prop.path ?? []), prop.excludeNames),
-				);
-			} else if (prop.kind === 'graph-reference' && prop.graphNodeId) {
-				childProps[prop.name] = read(prop.graphNodeId, prop.path ?? []);
-			} else if (
-				prop.kind === 'element-handle-id' &&
-				prop.graphNodeId &&
-				definition.readResidue
-			) {
-				childProps[prop.name] = definition.readResidue(
-					{ kind: 'element-handle-id', handleGraphNodeId: prop.graphNodeId },
-					{ read, idPrefix: ownerIdPrefix },
-				);
-			} else if (prop.kind === 'absent') {
-				childProps[prop.name] = undefined;
-			} else if (prop.kind === 'serializable' && 'value' in prop) {
-				childProps[prop.name] = prop.value;
-			} else if (prop.kind === 'callback') {
-				const symbolId = forEdge.boundSymbols?.[prop.name] ?? prop.symbolId;
-				if (symbolId) callbacks[prop.name] = ownerSymbolPrefix + symbolId;
-			} else if (prop.source !== undefined && definition.readResidue) {
-				childProps[prop.name] = readDecision(prop.source, context);
-			} else {
-				throw new Error(`MARKLESS_PRERENDER_PROP_UNDERIVABLE: ${prop.name}`);
-			}
-		}
-		if (Object.keys(callbacks).length > 0) childProps.__marklessSsrCallbacks = callbacks;
-		return { props: childProps, callbacks };
-	};
-	const { props: childProps, callbacks } = rowEdgeChildProps(
-		edge,
-		undefined,
-		input.itemPropName,
-	);
-	const childSurface = input.surface.components[edge.childComponentName]
-		? input.surface
-		: input.surface.imports[edge.childComponentName];
-	if (!childSurface)
-		throw new Error(`MARKLESS_PRERENDER_DATA_COMPONENT_MISSING: ${edge.childComponentName}`);
-	return marklessThen(
-		sharedSeedPass()?.(
-			{
-				surface: input.surface,
-				idPrefix: ownerIdPrefix,
-				loadSymbol: input.loadSymbol,
-				symbolPrefix: marklessRowFreeSymbolId(ownerSymbolPrefix, ownerSymbolPrefix),
-				rowSegment,
-				readEdgeProp: (prop) => readDecision(prop.source, undefined),
-			},
-			definition,
-			{ componentEdgeId: edge.id, ...(projectionChunkId ? { projectionChunkId } : {}) },
-			read,
-			undefined,
-		),
-		(sharedSeeds) => {
-			// The projected children are the OWNER's markup rendered inside this row, so
-			// they render here - in the row's identity - and compose beside the row's own
-			// child exactly as the served path composes them.
-			const projected: Array<MarklessSsrComposedChild> = [];
-			const projectedOutputs: Array<
-				Awaited<ReturnType<typeof evaluatePrerenderDataComponent>>
-			> = [];
-			const projecting = projectionChunkId
-				? renderSsrData({
-						renderData: {
-							...input.surface.renderData,
-							root: {
-								componentName: input.ownerComponentName,
-								templateId: projectionChunkId,
-							},
-							chunks: ownerChunks,
-							branches: definition.branches ?? [],
-							boundaries: definition.boundaries ?? [],
-						},
-						idPrefix: ownerIdPrefix,
-						...(sharedSeeds ? { sharedSeeds } : {}),
-						rootContext: { item: input.item, index: input.rowIndex, key: input.rowKey },
-						read: (residue, context) => {
-							if (residue.kind === 'repeat-item') return readPath(context.repeatItem, residue.path);
-							if (residue.kind === 'graph-read') return read(residue.graphNodeId, residue.path);
-							if (definition.readResidue)
-								return definition.readResidue(residue, {
-									repeatItem: context.repeatItem,
-									repeatIndex: context.repeatIndex,
-									read,
-									idPrefix: ownerIdPrefix,
-								});
-							throw new Error('MARKLESS_PRERENDER_RESIDUE_MISSING');
-						},
-						seedChild: (slot, context) =>
-							marklessRosterSeedPass(context.sharedSeeds, () =>
-								sharedSeedPass()?.(
-									{
-										surface: input.surface,
-										idPrefix: ownerIdPrefix,
-										loadSymbol: input.loadSymbol,
-										symbolPrefix: marklessRowFreeSymbolId(ownerSymbolPrefix, ownerSymbolPrefix),
-										rowSegment,
-										readEdgeProp: (prop) => readDecision(prop.source, context),
-									},
-									definition,
-									slot,
-									read,
-									context.sharedSeeds,
-								),
-							),
-						renderChild: (slot, context) => {
-							const projectedEdge = (definition.edges ?? []).find(
-								(candidate) => candidate.id === slot.componentEdgeId,
-							);
-							if (!projectedEdge)
-								throw new Error(`MARKLESS_PRERENDER_CHILD_MISSING: ${slot.componentEdgeId}`);
-							const partSurface = input.surface.components[projectedEdge.childComponentName]
-								? input.surface
-								: input.surface.imports[projectedEdge.childComponentName];
-							if (!partSurface)
-								throw new Error(
-									`MARKLESS_PRERENDER_DATA_COMPONENT_MISSING: ${projectedEdge.childComponentName}`,
-								);
-							const part = rowEdgeChildProps(projectedEdge, context, undefined);
-							const partSeeds = liveSharedInstanceSeeds(
-								partSurface,
-								projectedEdge.childComponentName,
-								read,
-								context.sharedSeeds,
-							);
-							return marklessThen(
-								evaluatePrerenderDataComponent({
-									surface: partSurface,
-									componentName: projectedEdge.childComponentName,
-									props:
-										context.projectionHtml === undefined
-											? part.props
-											: { ...part.props, children: context.projectionHtml },
-									idPrefix: ownerIdPrefix + rowSegment + projectedEdge.hostPrefix,
-									symbolPrefix: ownerSymbolPrefix + rowSegment + projectedEdge.symbolPrefix,
-									boundSymbols: projectedEdge.boundSymbols,
-									graphProps: projectedEdge.props,
-									loadSymbol: input.loadSymbol,
-									graph: undefined,
-									requireHtml: true,
-									...(partSeeds ? { sharedSeeds: partSeeds } : {}),
-									boundGraphValues: marklessBoundGraphValues(
-										undefined,
-										partSurface,
-										projectedEdge.props,
-										read,
-									),
-								}),
-								(partOutput) => {
-									projectedOutputs.push(partOutput);
-									projected.push({
-										output: partOutput as SsrComposableChildOutput,
-										hostPrefix: rowSegment + projectedEdge.hostPrefix,
-										symbolPrefix:
-											ownerSymbolPrefix + rowSegment + projectedEdge.symbolPrefix,
-										graphProps: projectedEdge.props,
-										asyncBoundaryId: projectedEdge.asyncBoundaryId,
-										boundSymbols: projectedEdge.boundSymbols ?? {},
-										callbackProps: part.callbacks,
-										childrenWidgetRoot: sharedSeedPass()?.childrenWidgetRoot?.(
-											partSurface,
-											projectedEdge.childComponentName,
-										),
-										widgetFallbacks: sharedSeedPass()?.widgetFallbacks?.(
-											partSurface,
-											projectedEdge.childComponentName,
-										),
-									});
-									return partOutput;
-								},
-							);
-						},
-					})
-				: undefined;
-			const renderRowChild = (children?: string) =>
-				evaluatePrerenderDataComponent({
-					surface: childSurface,
-					componentName: edge.childComponentName,
-					props: children === undefined ? childProps : { ...childProps, children },
-					idPrefix: ownerIdPrefix + hostPrefix,
-					symbolPrefix: ownerSymbolPrefix + symbolPrefix,
-					boundSymbols: edge.boundSymbols,
-					graphProps: edge.props,
-					loadSymbol: input.loadSymbol,
-					graph: undefined,
-					requireHtml: true,
-					sharedSeeds: liveSharedInstanceSeeds(
-						childSurface,
-						edge.childComponentName,
-						read,
-						sharedSeeds,
-					),
-					boundGraphValues: marklessBoundGraphValues(undefined, childSurface, edge.props, read),
-				});
-			return marklessThen(projecting, (projection) =>
-				marklessThen(
-					projection
-						? marklessThen(
-								withProjectionSpan(projection.structureTokens, (mark) =>
-									renderRowChild(mark + projection.html),
-								),
-								(placed) => {
-									if (!placed.consumed)
-										throw projectionNotRenderedError(edge.childComponentName, edge.id);
-									return placed.result;
-								},
-							)
-						: renderRowChild(),
-					(output) => {
-					const child: MarklessSsrComposedChild = {
-						output: output as SsrComposableChildOutput,
-						hostPrefix,
-						// Host ids take the owner's prefix through composition's own
-						// argument; symbol ids have no such channel and take it here.
-						symbolPrefix: ownerSymbolPrefix + symbolPrefix,
-						graphProps: edge.props,
-						asyncBoundaryId: edge.asyncBoundaryId,
-						boundSymbols: edge.boundSymbols ?? {},
-						callbackProps: callbacks,
-						childrenWidgetRoot: sharedSeedPass()?.childrenWidgetRoot?.(
-							childSurface,
-							edge.childComponentName,
-						),
-						widgetFallbacks: sharedSeedPass()?.widgetFallbacks?.(
-							childSurface,
-							edge.childComponentName,
-						),
-					};
-					// Projected first, the order the served path pushes them in: the projection
-					// renders before the component it is written into.
-					const children = [...projected, child];
-					const asyncSnapshots = [...projectedOutputs, output].flatMap((composed) =>
-						(composed.state?.computed ?? []).flatMap((computed) =>
-							computed.async && computed.snapshot
-								? [{ graphNodeId: computed.graphNodeId, snapshot: computed.snapshot }]
-								: [],
-						),
-					);
-					// The row chunk is nothing but this edge, so the child's own structure IS the
-					// row's: view composition first, then state, the order composition requires.
-					const composition = marklessSsrComposeView(
-						output.structure!,
-						emptyRowView() as SsrComposableView,
-						children,
-						asyncSnapshots,
-						ownerIdPrefix,
-					);
-					const state = marklessSsrAttachSnapshots(
-						marklessComposeState(emptyRowState(), children),
-						asyncSnapshots,
-					);
-					return {
-						html: output.html,
-						state: state as unknown as ProtocolStatePayload,
-						view: composition.view as unknown as import('@markless/serializer').ProtocolViewPayload,
-					};
-					},
-				),
-			);
-		},
-	);
-}
-
-function emptyRowState(): ProtocolStatePayload {
-	return { version: ASYNC_PROTOCOL_VERSION, cells: [], computed: [] };
-}
-
-function emptyRowView(): import('@markless/serializer').ProtocolViewPayload {
-	return {
-		version: ASYNC_PROTOCOL_VERSION,
-		locators: [],
-		events: [],
-		domUpdates: [],
-		behaviors: [],
-		elementHandles: [],
-		asyncBoundaries: [],
-	};
 }
 
 async function settledBoundaryResult(output: SsrRenderOutput, boundaryId: string) {
@@ -1551,7 +1136,24 @@ function renderBuiltPage(
 	throw new TypeError('Prerender resume requires a compiled TSRX artifact.');
 }
 
-function readPath(value: unknown, path: ReadonlyArray<string>): unknown {
+// A callback the composer handed this component, passed on under the id the composer gave it.
+function forwardedCallback(
+	props: Readonly<Record<string, unknown>>,
+	propCellId: string | null | undefined,
+	graphNodeId: string,
+	path: ReadonlyArray<string> = [],
+): string | undefined {
+	const names =
+		graphNodeId === 'prop:props' || graphNodeId === propCellId
+			? path
+			: graphNodeId.startsWith('prop:')
+				? [graphNodeId.slice(5), ...path]
+				: undefined;
+	const symbolId = names && readPath(props.__marklessSsrCallbacks, names);
+	return typeof symbolId === 'string' ? symbolId : undefined;
+}
+
+export function readPath(value: unknown, path: ReadonlyArray<string>): unknown {
 	let current = value;
 	for (const segment of path) {
 		if (current === null || current === undefined) return undefined;

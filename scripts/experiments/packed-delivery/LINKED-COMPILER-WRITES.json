@@ -1,0 +1,188 @@
+{
+  "productionReady": false,
+  "change": {
+    "passIds": [
+      "capture-analysis",
+      "trigger-groups"
+    ],
+    "input": "SymbolResolverPlan planned writes and bound capture routes",
+    "output": "ExtractedCaptureSymbol.graphWrites and trigger group graphNodeIds",
+    "mechanism": "Retain graph writes during imported capture composition; resolve capture identity by loader symbol; qualify local writes for the requested bound instance and keep page shared IDs unchanged.",
+    "runtimeChanged": false
+  },
+  "captures": [
+    {
+      "name": "before",
+      "directory": "/private/tmp/markless-linked-compiler-20260922",
+      "records": 322,
+      "archive": "before-compiler-records.json.gz",
+      "bytes": 1540798,
+      "sha256": "3f76b38b8a62a980c080a535d1b5cd3eade6fe3cf31191b39b734f748ebad364",
+      "accordionVariants": [
+        {
+          "recordFile": "0658a4cde321ee7ca87a0a5ad042a3fcfeadbac338c57ee4772273e6c7ff6701.json",
+          "filename": "/Users/jacksm5pro/dev/open-source/markless/website/components/docs/playground/generated/accordion__basic.tsrx",
+          "sourceSha256": "19b55507af1e54c100fd95f5404cc3e850bffcd6094e7b47428212b0eba2805d",
+          "inputSymbols": 721,
+          "boundRows": 75,
+          "captures": 235,
+          "importedWriteCaptures": 0,
+          "triggerGroups": 0
+        },
+        {
+          "recordFile": "7256c0d3e700951365108715c6e7c3e3931b650afe2fd9df94260c23ae1354ef.json",
+          "filename": "/Users/jacksm5pro/dev/open-source/markless/website/components/docs/playground/generated/accordion__basic.tsrx",
+          "sourceSha256": "19b55507af1e54c100fd95f5404cc3e850bffcd6094e7b47428212b0eba2805d",
+          "inputSymbols": 0,
+          "boundRows": 0,
+          "captures": 17,
+          "importedWriteCaptures": 0,
+          "triggerGroups": 0
+        },
+        {
+          "recordFile": "d621e8677e0f35265def95553494c6bbb5f08115b2effa7272a0280010fef26a.json",
+          "filename": "/Users/jacksm5pro/dev/open-source/markless/website/components/docs/playground/generated/accordion__basic.tsrx",
+          "sourceSha256": "19b55507af1e54c100fd95f5404cc3e850bffcd6094e7b47428212b0eba2805d",
+          "inputSymbols": 0,
+          "boundRows": 0,
+          "captures": 17,
+          "importedWriteCaptures": 0,
+          "triggerGroups": 0
+        }
+      ]
+    },
+    {
+      "name": "after",
+      "directory": "/private/tmp/markless-linked-compiler-writes-after-20260922",
+      "records": 309,
+      "archive": "after-compiler-records.json.gz",
+      "bytes": 1563985,
+      "sha256": "ff0168be373f6b4541a932a061bea5a977a789a4f6bdbef3fca6353e063f1c75",
+      "accordionVariants": [
+        {
+          "recordFile": "03e36d08e90b7161a583fb0605d10dd488eae4e889a625083883074e5d7e8974.json",
+          "filename": "/Users/jacksm5pro/dev/open-source/markless/website/components/docs/playground/generated/accordion__basic.tsrx",
+          "sourceSha256": "19b55507af1e54c100fd95f5404cc3e850bffcd6094e7b47428212b0eba2805d",
+          "inputSymbols": 0,
+          "boundRows": 0,
+          "captures": 17,
+          "importedWriteCaptures": 0,
+          "triggerGroups": 0
+        },
+        {
+          "recordFile": "764f3d8ac0d4a139189c5f1a17e452d25ad478c36162cde8b8ea74f30687ddbb.json",
+          "filename": "/Users/jacksm5pro/dev/open-source/markless/website/components/docs/playground/generated/accordion__basic.tsrx",
+          "sourceSha256": "19b55507af1e54c100fd95f5404cc3e850bffcd6094e7b47428212b0eba2805d",
+          "inputSymbols": 0,
+          "boundRows": 0,
+          "captures": 17,
+          "importedWriteCaptures": 0,
+          "triggerGroups": 0
+        },
+        {
+          "recordFile": "a0bebe25e814b36390310c0e252bc18abf269912af35483b034cb80f84cdab1b.json",
+          "filename": "/Users/jacksm5pro/dev/open-source/markless/website/components/docs/playground/generated/accordion__basic.tsrx",
+          "sourceSha256": "19b55507af1e54c100fd95f5404cc3e850bffcd6094e7b47428212b0eba2805d",
+          "inputSymbols": 721,
+          "boundRows": 75,
+          "captures": 235,
+          "importedWriteCaptures": 72,
+          "triggerGroups": 0
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "redRegressionCases": 3,
+    "focusedPassed": 10,
+    "compilerAndBundler": {
+      "files": 263,
+      "passed": 2109,
+      "expectedFailures": 2
+    },
+    "experiments": {
+      "files": 6,
+      "passed": 65
+    },
+    "rootTypecheck": "passed",
+    "docsTypecheck": "passed",
+    "docsDoctorBuild": "passed",
+    "docsTests": {
+      "files": 15,
+      "passed": 64,
+      "exitCode": 0,
+      "environment": "outside sandbox; identical --run command",
+      "sandboxFailure": "EMFILE before test execution, including polling retry",
+      "warning": "Nonfatal 10-second Vite server teardown timeout"
+    },
+    "client": {
+      "dirs": [
+        "/private/tmp/markless-docs-combined-demand-GSbudh/.output/public/build",
+        "website/.output/public/build"
+      ],
+      "counts": [
+        63,
+        63
+      ],
+      "bytes": [
+        19274342,
+        19274342
+      ],
+      "differences": []
+    }
+  },
+  "previewCheck": {
+    "url": "http://localhost:3000/markless/",
+    "reload": "ignoreCache",
+    "staleUrl": "http://localhost:3000/markless/build/chunk-DOTqkIfD.js",
+    "staleStatus": 404,
+    "likeStates": [
+      0,
+      1,
+      2
+    ],
+    "frameworkScripts": 5,
+    "otherSiteScripts": 3,
+    "scriptStatuses": 200,
+    "consoleErrors": 0,
+    "serviceWorkerRegistrations": 0
+  },
+  "limitations": [
+    "Linked metadata is retained, but the full rendered MDX dependency proof remains incomplete.",
+    "Widget/shared physical qualification and alias closure require the owning composition semantics.",
+    "The generated accordion compiler records contain zero trigger groups; no MDX runtime grouping has been enabled.",
+    "Unchanged browser code means no new latency gain is claimed.",
+    "Six previously documented fixture size/negative-budget failures remain open."
+  ],
+  "sourceHashes": [
+    {
+      "path": "packages/compiler/src/artifacts.ts",
+      "sha256": "daed1b3e1498c381c5cde5f58cc5f6551ab1a65d51d185ab55ea2f7bfb2a4645"
+    },
+    {
+      "path": "packages/compiler/src/passes/capture-analysis.ts",
+      "sha256": "94c464e820df9403c85e5052f374ddf5d6b9f9d90747ffde65c30d6731d1d3d5"
+    },
+    {
+      "path": "packages/compiler/src/passes/trigger-groups.ts",
+      "sha256": "d9d71c1af2a78e3312b824062890037dd8419b242c394a17b41e5d3dbc312d6c"
+    },
+    {
+      "path": "packages/compiler/test/trigger-group-imported-writes.test.ts",
+      "sha256": "183a471bb084d68c49ae034a9a2fc175c29d032b867e1a5593049dcd77531c71"
+    },
+    {
+      "path": "scripts/experiments/packed-delivery/compiler-probe-source.mjs",
+      "sha256": "b1fbaa7458b165441a6ef4d749d39e7603cdd8da2e5c0cc78aba094fc45b94b9"
+    },
+    {
+      "path": "scripts/experiments/packed-delivery/compiler-probe-source.test.ts",
+      "sha256": "ea0300fbbd4bf78555b2489a8a4cdd9bc765bd905d72f48de9780680c0256a3a"
+    },
+    {
+      "path": "scripts/experiments/packed-delivery/capture-compiler-results.mjs",
+      "sha256": "6e370e1f76c848a9c2d211ba533758f0d8ea0d073a41562562d3962568aa42a8"
+    }
+  ],
+  "receiptsDirectory": "scripts/experiments/packed-delivery/results/linked-compiler-writes-2026-09-22"
+}

@@ -108,7 +108,7 @@ test('two cells needing the same import carry it once', async () => {
 
 test('an import the reading module already has from the same file is not carried twice', async () => {
 	const page = await compilePage(
-		pageReading('b.loud + shout("here")', `import { shout } from '../family/helpers.ts';`),
+		pageReading('b.loud + shout.name', `import { shout } from '../family/helpers.ts';`),
 	);
 	const ssr = page.publicRenderModule.ssrModuleSource;
 

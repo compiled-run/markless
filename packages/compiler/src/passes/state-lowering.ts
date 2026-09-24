@@ -1,9 +1,11 @@
 import type {
+	LoweredRowItem,
 	LoweredStateRead,
 	LoweredStateWrite,
 	SemanticGraphAlias,
 	SemanticGraphArtifact,
 	SemanticGraphBinding,
+	SemanticKeyedRepeat,
 	SemanticLocalDeclaration,
 	SemanticStateWrite,
 	SourceSpan,
@@ -169,6 +171,13 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 			continue;
 		}
 
+		const rowWrite = write.rowRepeatId ? lowerRowItemWrite(write, input) : null;
+		if (rowWrite) {
+			if (rowWrite.kind === 'write') writes.push(rowWrite.write);
+			else diagnostics.push(rowWrite.diagnostic);
+			continue;
+		}
+
 		const resolved = resolveStateGraphPath(
 			input,
 			write.target,
@@ -301,6 +310,155 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 		),
 		writes,
 		diagnostics,
+	};
+}
+
+type RowItemWriteLowering =
+	| { readonly kind: 'write'; readonly write: LoweredStateWrite }
+	| { readonly kind: 'diagnostic'; readonly diagnostic: StateLoweringDiagnostic };
+
+/**
+ * A write through a keyed `@for` row item: `row.done = true` writes the element
+ * of the repeated collection that row renders. The graph path stops at the
+ * collection; which element is decided at dispatch from the row item itself.
+ * `null` leaves the write to the general rules.
+ */
+function lowerRowItemWrite(
+	write: SemanticStateWrite,
+	input: StateLoweringInput,
+): RowItemWriteLowering | null {
+	const repeat = input.semanticGraph.keyedRepeats.find(
+		(candidate) => candidate.id === write.rowRepeatId,
+	);
+	if (!repeat) return null;
+	const collection = rowCollectionOf(repeat, input.semanticGraph);
+	if (!collection) return null;
+	const binding = input.semanticGraph.graphBindings.find(
+		(candidate) => candidate.id === collection.graphNodeId,
+	);
+	if (!binding) return null;
+
+	const segments = splitStaticGraphPath(write.target);
+	if (segments[0] !== repeat.itemName) {
+		return {
+			kind: 'diagnostic',
+			diagnostic: dynamicGraphPathWriteDiagnostic(write, input.semanticGraph.filename),
+		};
+	}
+	const itemPath = segments.slice(1);
+	if (itemPath.length === 0 && write.operation !== 'call') return null;
+
+	if (binding.kind === 'computed') {
+		return {
+			kind: 'diagnostic',
+			diagnostic: computedRowWriteDiagnostic(
+				write,
+				repeat.itemName,
+				binding,
+				input.semanticGraph,
+			),
+		};
+	}
+	if (!binding.writable) {
+		return { kind: 'diagnostic', diagnostic: readOnlyWriteDiagnostic(write, binding) };
+	}
+
+	return {
+		kind: 'write',
+		write: {
+			source: write.target,
+			sourceSpan: write.targetSpan,
+			graphNodeId: binding.id,
+			path: collection.path,
+			operation: write.operation,
+			assignmentOperator: write.assignmentOperator,
+			valueSource: write.valueSource,
+			prefix: write.prefix,
+			updateOperator: write.updateOperator,
+			method: write.method,
+			argumentSources: write.argumentSources,
+			row: {
+				itemName: repeat.itemName,
+				keyPath: repeat.indexKey ? null : repeat.keyPath,
+				itemPath,
+				...(collection.enclosing ? { enclosing: collection.enclosing } : {}),
+			},
+		},
+	};
+}
+
+type RowCollection = {
+	readonly graphNodeId: string;
+	readonly path: ReadonlyArray<string>;
+	readonly enclosing?: LoweredRowItem;
+};
+
+// A nested repeat over `group.items` reaches the graph through each enclosing row's item.
+function rowCollectionOf(
+	repeat: SemanticKeyedRepeat,
+	graph: SemanticGraphArtifact,
+): RowCollection | null {
+	if (repeat.collectionGraphNodeId)
+		return { graphNodeId: repeat.collectionGraphNodeId, path: repeat.collectionPath };
+	const enclosing = repeat.enclosingItemPath
+		? graph.keyedRepeats.find((candidate) => candidate.id === repeat.enclosingRepeatId)
+		: undefined;
+	if (!enclosing || enclosing.indexKey) return null;
+	const outer = rowCollectionOf(enclosing, graph);
+	if (!outer) return null;
+	return {
+		graphNodeId: outer.graphNodeId,
+		path: outer.path,
+		enclosing: {
+			itemName: enclosing.itemName,
+			keyPath: enclosing.keyPath,
+			itemPath: repeat.enclosingItemPath ?? [],
+			...(outer.enclosing ? { enclosing: outer.enclosing } : {}),
+		},
+	};
+}
+
+function computedRowWriteDiagnostic(
+	write: SemanticStateWrite,
+	itemName: string,
+	computed: SemanticGraphBinding,
+	graph: SemanticGraphArtifact,
+): StateLoweringDiagnostic {
+	const sources = uniqueBy(
+		(computed.dependencies ?? []).flatMap((dependency) => {
+			const source = graph.graphBindings.find(
+				(candidate) => candidate.id === dependency.graphNodeId,
+			);
+			return source && source.kind !== 'computed' && source.writable ? [source.name] : [];
+		}),
+		(name) => name,
+	);
+	const list = sources[0] ?? 'items';
+	const sourceHint =
+		sources.length > 0
+			? `the state it derives from (${sources.map((name) => `"${name}"`).join(', ')})`
+			: 'the state it derives from';
+	return {
+		code: 'MARKLESS_COMPUTED_ROW_WRITE',
+		severity: 'error',
+		phase: 'state-lowering',
+		title: 'Rows of a computed() list are read-only',
+		message: `Cannot write to "${write.target}" because "${itemName}" is a row of "${computed.name}", which is a computed() value, and computed() values are read-only.`,
+		why: 'A computed() value is derived from other state every time that state changes, so a change written into one of its rows would have no owner: the next recompute would replace it, and the serialized graph could not say where it belongs after resume.',
+		primarySpan: write.targetSpan ?? fallbackSpan(graph.filename),
+		passId: 'state-lowering',
+		artifactKeys: ['semanticGraph', 'stateLowering'],
+		statePath: write.target,
+		source: write.target,
+		suggestions: [
+			{
+				message: `Write the change to ${sourceHint} instead, for example by mapping it to a new array: \`${list} = ${list}.map((item) => (item.id === ${itemName}.id ? { ...item, field: value } : item))\`. "${computed.name}" recomputes and the row updates.`,
+			},
+			{
+				message: `Or loop over the state array itself (\`@for (const ${itemName} of ${list}; key ...)\`) so the row item is writable directly.`,
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_COMPUTED_ROW_WRITE',
 	};
 }
 

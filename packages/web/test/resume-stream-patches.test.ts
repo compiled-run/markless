@@ -59,7 +59,7 @@ const decoded = {
 
 test('adoptStreamedArmPatches overlays streamed snapshots and arm records before wake', () => {
 	const settledRecords = {
-		locators: [{ hostNodeId: 'h3', strategy: 'arm-relative', index: 2, tagName: 'button' }],
+		locators: [{ hostNodeId: 'h3', index: 2, tagName: 'button' }],
 		events: [{ hostNodeId: 'h3', eventName: 'click', symbolIds: ['symbol:relay-tap'] }],
 		behaviors: [],
 		elementHandles: [],
@@ -135,7 +135,7 @@ test('adoptStreamedArmPatches is identity without streamed scripts or a document
 // settle path owns the boundary; the queued commit no-ops at flush.
 test('adoptStreamedArmPatches skips boundaries whose streamed template is still uncommitted', () => {
 	const settledRecords = {
-		locators: [{ hostNodeId: 'h3', strategy: 'arm-relative', index: 2, tagName: 'button' }],
+		locators: [{ hostNodeId: 'h3', index: 2, tagName: 'button' }],
 		events: [{ hostNodeId: 'h3', eventName: 'click', symbolIds: ['symbol:relay-tap'] }],
 		behaviors: [],
 		elementHandles: [],

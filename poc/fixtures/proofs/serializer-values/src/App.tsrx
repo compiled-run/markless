@@ -48,7 +48,7 @@ export class CustomerSnapshot {
 }
 
 class RuntimeBox {
-  #cleanup: (() => void) | null = null;
+  #cleanup: (() => void) | null = null; // oxlint-disable-line no-unused-private-class-members -- the resource the serializer must reject
   label: string;
 
   constructor(label: string, cleanup: () => void) {

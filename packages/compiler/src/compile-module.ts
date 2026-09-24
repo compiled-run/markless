@@ -26,6 +26,8 @@ import {
 	childrenSeedPathsByComponent,
 	type ChildrenSeedPathsInput,
 } from './passes/link/children-seed-paths.ts';
+import { withClosureActionOwners } from './passes/link/closure-action-owners.ts';
+import { withRowSlotReaders } from './passes/link/row-slot-readers.ts';
 import { PROJECTION_PROP_NAME } from './passes/public-render/shared-seed-pass.ts';
 import { defaultCompilerPasses } from './pass-registry.ts';
 import { analyzeCaptures } from './passes/capture-analysis.ts';
@@ -36,7 +38,12 @@ import { planPublicRender } from './passes/public-render/plan.ts';
 import { createProtocolStatePayloadFromArena } from './passes/protocol-state.ts';
 import { createProtocolViewPayload } from './passes/protocol-view.ts';
 import { createRenderData } from './passes/render-data/index.ts';
-import { createRuntimeDemandMap } from './passes/runtime-demand-map.ts';
+import {
+	componentFirstUseReach,
+	createRuntimeDemandMap,
+	firstUseScope,
+	mergeFirstUseReach,
+} from './passes/runtime-demand-map.ts';
 import { createTriggerGroups } from './passes/trigger-groups.ts';
 import { buildSemanticGraph } from './passes/semantic-graph/index.ts';
 import { createMutableSemanticGraphArtifact } from './passes/semantic-graph/types.ts';
@@ -50,9 +57,7 @@ import {
 import { planBoundSymbolResolver, planSymbolResolver } from './passes/symbol-resolver.ts';
 import { stripExtractedSyncPolicyCalls } from './passes/semantic-graph/strip-sync-policy-calls.ts';
 
-export function compileTsrxModule(
-	input: CompileTsrxModuleInput,
-): Promise<CompileTsrxModuleResult> {
+export function compileTsrxModule(input: CompileTsrxModuleInput): Promise<CompileTsrxModuleResult> {
 	return memoizedCompile(input, () => runCompile(input));
 }
 
@@ -95,10 +100,42 @@ async function runCompile(input: CompileTsrxModuleInput): Promise<CompileTsrxMod
 	return {
 		passGraph: pipeline.passGraph,
 		semanticGraph: artifacts.semanticGraph,
-		moduleGraphInterface: withSeedsFromProps(artifacts.semanticGraph.moduleGraphInterface, {
-			symbolResolver: artifacts.symbolResolver,
-			protocolState: artifacts.protocolState,
-		}),
+		moduleGraphInterface: withFirstUseReach(
+			withClosureActionOwners(
+				withRowSlotReaders(
+					withSeedsFromProps(artifacts.semanticGraph.moduleGraphInterface, {
+						symbolResolver: artifacts.symbolResolver,
+						protocolState: artifacts.protocolState,
+					}),
+					{
+						componentEdges: artifacts.semanticGraph.componentEdges,
+						protocolView: artifacts.protocolView,
+						importedModuleInterfaces: input.importedModuleInterfaces,
+					},
+				),
+				{
+					componentEdges: artifacts.semanticGraph.componentEdges,
+					planned: artifacts.runtimeDemandMaps['plain-ssr'].actions.some(
+						(action) => action.plan?.kind === 'closure',
+					),
+					importedModuleInterfaces: input.importedModuleInterfaces,
+				},
+			),
+			{
+				symbolResolver: artifacts.symbolResolver,
+				captureAnalysis: artifacts.captureAnalysis,
+				symbolModules: artifacts.symbolModules,
+				publicRenderModule: artifacts.publicRenderModule,
+				protocolView: artifacts.protocolView,
+				protocolState: artifacts.protocolState,
+				componentEdges: artifacts.semanticGraph.componentEdges,
+				graphBindings: artifacts.semanticGraph.graphBindings,
+				importedModuleInterfaces: input.importedModuleInterfaces,
+				components: artifacts.semanticGraph.components,
+				sharedCallbackBindings: artifacts.semanticGraph.sharedCallbackBindings,
+			},
+			artifacts.runtimeDemandMaps,
+		),
 		stateLowering: artifacts.stateLowering,
 		payloadArena: artifacts.payloadArena,
 		symbolResolver: artifacts.symbolResolver,
@@ -120,6 +157,28 @@ async function runCompile(input: CompileTsrxModuleInput): Promise<CompileTsrxMod
 		triggerGroups: artifacts.triggerGroups,
 		symbolResolverModule: artifacts.symbolResolverModule,
 		symbolResolverModuleManifest: artifacts.symbolResolverModuleManifest,
+	};
+}
+
+// Planner-only: what a composing module's prop changes and instance creations run in this one.
+function withFirstUseReach(
+	moduleGraphInterface: ModuleGraphInterfaceArtifact,
+	demandInput: Parameters<typeof createRuntimeDemandMap>[0],
+	maps: RuntimeDemandMapsArtifact,
+): ModuleGraphInterfaceArtifact {
+	if (moduleGraphInterface.render.components.length === 0) return moduleGraphInterface;
+	const firstUseReach = mergeFirstUseReach(
+		Object.values(maps).map((map) => componentFirstUseReach(firstUseScope(demandInput, map))),
+	);
+	return {
+		...moduleGraphInterface,
+		render: {
+			...moduleGraphInterface.render,
+			components: moduleGraphInterface.render.components.map((component) => ({
+				...component,
+				firstUseReach,
+			})),
+		},
 	};
 }
 
@@ -388,6 +447,15 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 						protocolState:
 							inputs.protocolState as CompileTsrxModuleResult['protocolState'],
 						overlays: (inputs.semanticGraph as SemanticGraphArtifact).overlays,
+						componentEdges: (inputs.semanticGraph as SemanticGraphArtifact)
+							.componentEdges,
+						graphBindings: (inputs.semanticGraph as SemanticGraphArtifact)
+							.graphBindings,
+						importedModuleInterfaces: (inputs.source as CompileTsrxModuleInput)
+							.importedModuleInterfaces,
+						components: (inputs.semanticGraph as SemanticGraphArtifact).components,
+						sharedCallbackBindings: (inputs.semanticGraph as SemanticGraphArtifact)
+							.sharedCallbackBindings,
 					};
 					const runtimeDemandMaps = {
 						'plain-ssr': createRuntimeDemandMap(demandInput, 'plain-ssr'),
@@ -408,6 +476,7 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 					return {
 						triggerGroups: createTriggerGroups({
 							symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
+							captureAnalysis: inputs.captureAnalysis as CaptureAnalysisArtifact,
 							protocolState:
 								inputs.protocolState as CompileTsrxModuleResult['protocolState'],
 							protocolView:

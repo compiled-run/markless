@@ -121,7 +121,7 @@ test('focus onto a press-only element preloads it: Enter and Space reach a press
 test('focus onto an element whose only record is neither key nor press loads nothing', async () => {
 	const host = element('DIV');
 	const root = element('SECTION', [host]);
-	const page = boot({ host, root, eventName: 'change' });
+	const page = boot({ host, root, eventName: 'dblclick' });
 	await page.runtime.start();
 
 	// Nothing focus can lead to means no focus listener at all.
@@ -162,6 +162,30 @@ test('the input pair preloads for an editable host only', async () => {
 		host: plainHost,
 		root: element('SECTION', [plainHost]),
 		eventName: 'input',
+	});
+	await plainPage.runtime.start();
+	plainPage.focusIn();
+	expect(plainPage.loadedSymbols).toEqual([]);
+	plainPage.runtime.dispose();
+});
+
+test('a change record preloads on focus for a form control only', async () => {
+	const selectHost = element('SELECT');
+	const selectPage = boot({
+		host: selectHost,
+		root: element('SECTION', [selectHost]),
+		eventName: 'change',
+	});
+	await selectPage.runtime.start();
+	selectPage.focusIn();
+	expect(selectPage.loadedSymbols).toEqual(['symbol:key']);
+	selectPage.runtime.dispose();
+
+	const plainHost = element('DIV');
+	const plainPage = boot({
+		host: plainHost,
+		root: element('SECTION', [plainHost]),
+		eventName: 'change',
 	});
 	await plainPage.runtime.start();
 	plainPage.focusIn();

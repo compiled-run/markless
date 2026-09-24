@@ -1,6 +1,7 @@
 import { storage } from '@markless/core';
 
 export default function ThemeToggle() @{
+	// oxlint-disable-next-line no-unused-vars -- the write persists the choice
 	let theme = storage('theme', 'system');
 
 	<span class="theme-toggle-island">

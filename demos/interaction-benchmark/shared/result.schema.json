@@ -1,0 +1,240 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://markless.dev/demos/interaction-benchmark/result.schema.json",
+	"title": "Interaction benchmark result record",
+	"description": "One record per measured visit of one case. Failed visits are records too (failure non-null); they are never dropped. See CONTRACT.md for case ids and timing definitions.",
+	"type": "object",
+	"additionalProperties": false,
+	"required": [
+		"schemaVersion",
+		"runId",
+		"framework",
+		"build",
+		"deployment",
+		"browser",
+		"profile",
+		"caseId",
+		"phase",
+		"visitIndex",
+		"order",
+		"timings",
+		"bytes",
+		"requests",
+		"failure",
+		"timestamp"
+	],
+	"properties": {
+		"schemaVersion": { "const": 1 },
+		"runId": { "type": "string", "minLength": 1, "description": "Identifies one runner invocation; shared by every record it produced." },
+		"framework": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["entrant", "variant", "renderMode", "versions"],
+			"properties": {
+				"entrant": {
+					"enum": ["markless", "qwik", "octane", "react-router", "remix3", "solidstart", "sveltekit", "ripple"]
+				},
+				"variant": { "type": "string", "minLength": 1, "description": "Configuration label, e.g. default, tuned, packed, unpacked." },
+				"renderMode": { "enum": ["ssr", "prerender", "csr"] },
+				"versions": {
+					"type": "object",
+					"description": "Exact installed package versions keyed by package name (framework, router, runtime, compiler, adapter, bundler).",
+					"minProperties": 1,
+					"additionalProperties": { "type": "string", "minLength": 1 }
+				}
+			}
+		},
+		"build": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["id", "sourceRevision"],
+			"properties": {
+				"id": { "type": "string", "minLength": 1, "description": "Value of <meta name=\"benchmark:build\"> observed in the response body." },
+				"sourceRevision": { "type": "string", "minLength": 1, "description": "Git commit (plus -dirty marker when applicable) the build was produced from." }
+			}
+		},
+		"deployment": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["url", "host"],
+			"properties": {
+				"url": { "type": "string", "format": "uri" },
+				"host": { "enum": ["vercel", "local", "controlled"] },
+				"region": { "type": ["string", "null"] },
+				"cacheState": {
+					"enum": ["cold-browser", "warm-origin", "unknown"],
+					"description": "Browser/CDN cache posture of the visit. A cold browser is not a cold CDN or function."
+				},
+				"responseEvidence": {
+					"type": ["object", "null"],
+					"description": "Document response evidence: HTTP protocol, content-encoding, cache headers (e.g. x-vercel-cache), status.",
+					"additionalProperties": { "type": ["string", "number", "null"] }
+				}
+			}
+		},
+		"browser": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["name", "version"],
+			"properties": {
+				"name": { "enum": ["chromium", "webkit", "firefox"] },
+				"version": { "type": "string", "minLength": 1 },
+				"playwright": { "type": "string" },
+				"viewport": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": ["width", "height"],
+					"properties": {
+						"width": { "type": "integer", "minimum": 1 },
+						"height": { "type": "integer", "minimum": 1 }
+					}
+				}
+			}
+		},
+		"profile": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["network", "cpu"],
+			"properties": {
+				"network": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": ["name"],
+					"properties": {
+						"name": { "type": "string", "minLength": 1, "description": "e.g. unthrottled, fast-4g, slow-4g." },
+						"downloadKbps": { "type": ["number", "null"], "minimum": 0 },
+						"uploadKbps": { "type": ["number", "null"], "minimum": 0 },
+						"latencyMs": { "type": ["number", "null"], "minimum": 0 }
+					}
+				},
+				"cpu": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": ["name", "slowdown"],
+					"properties": {
+						"name": { "type": "string", "minLength": 1 },
+						"slowdown": { "type": "number", "minimum": 1, "description": "CPU throttling rate; 1 means unthrottled. WebKit cannot throttle and records 1." }
+					}
+				}
+			}
+		},
+		"caseId": {
+			"enum": [
+				"overview-counter-first",
+				"overview-counter-repeat-x10",
+				"overview-independent-panel",
+				"overview-toggle",
+				"overview-disclosure",
+				"overview-disclosure-nested",
+				"overview-tab",
+				"overview-filter",
+				"records-search",
+				"records-sort",
+				"records-select",
+				"records-dialog-open",
+				"records-dialog-save",
+				"settings-derived",
+				"settings-submit",
+				"settings-submit-error",
+				"nav-overview-to-records",
+				"history-back"
+			]
+		},
+		"phase": {
+			"enum": ["early", "settled"],
+			"description": "early: input issued as soon as the target is hittable, downloads may be pending. settled: input after the load-settle rule in CONTRACT.md."
+		},
+		"visitIndex": { "type": "integer", "minimum": 0, "description": "0-based fresh-visit index within this (entrant, variant, case, phase, browser, profile) cell." },
+		"order": { "type": "integer", "minimum": 0, "description": "Global 0-based execution order within the run, used to audit alternation between entrants." },
+		"timings": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["navToResponseMs", "inputToResponseMs", "inputToDomMs", "eventDurationMs", "fcp", "lcp", "longTasks"],
+			"properties": {
+				"navToResponseMs": { "$ref": "#/$defs/msOrNull", "description": "Navigation start to the presentation estimate of the correct response." },
+				"inputToResponseMs": { "$ref": "#/$defs/msOrNull", "description": "Measured input event timeStamp to the presentation estimate (first rAF+paint after the assertion holds). Labeled presentation estimate." },
+				"inputToDomMs": { "$ref": "#/$defs/msOrNull", "description": "Measured input event timeStamp to the first observed DOM state satisfying the assertion (DOM mutation diagnostic)." },
+				"eventDurationMs": { "$ref": "#/$defs/msOrNull", "description": "Browser-observed Event Timing duration for the measured input, when the browser supports it; null otherwise." },
+				"pendingMs": { "$ref": "#/$defs/msOrNull", "description": "settings-submit*: input to pending UI visible (local update only)." },
+				"serverMs": { "$ref": "#/$defs/msOrNull", "description": "settings-submit*: requestStart to responseEnd of POST /api/settings (server round trip, includes the fixed 300 ms delay)." },
+				"fcp": { "$ref": "#/$defs/msOrNull" },
+				"lcp": { "$ref": "#/$defs/msOrNull" },
+				"ttfb": { "$ref": "#/$defs/msOrNull" },
+				"longTasks": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": ["count", "totalMs"],
+					"properties": {
+						"count": { "type": ["integer", "null"], "minimum": 0 },
+						"totalMs": { "$ref": "#/$defs/msOrNull" },
+						"window": { "enum": ["navigation-to-response", "input-to-response"] }
+					}
+				}
+			}
+		},
+		"bytes": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["compressedJs", "decodedJs", "html"],
+			"properties": {
+				"compressedJs": { "type": "integer", "minimum": 0, "description": "Transfer (encoded body) bytes of JS responses up to the response." },
+				"decodedJs": { "type": "integer", "minimum": 0 },
+				"html": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": ["compressed", "decoded"],
+					"properties": {
+						"compressed": { "type": "integer", "minimum": 0 },
+						"decoded": { "type": "integer", "minimum": 0 }
+					}
+				},
+				"compressedCss": { "type": "integer", "minimum": 0 },
+				"decodedCss": { "type": "integer", "minimum": 0 },
+				"other": { "type": "integer", "minimum": 0, "description": "Encoded bytes of all remaining responses (data, fonts, framework payloads)." }
+			}
+		},
+		"requests": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["initial", "perAction"],
+			"properties": {
+				"initial": { "type": "integer", "minimum": 0, "description": "Requests started from navigation until the measured input." },
+				"perAction": { "type": "integer", "minimum": 0, "description": "Requests started from the measured input until the response (including the settings API call)." },
+				"perActionDocument": { "type": "integer", "minimum": 0, "description": "Document (full page) requests started by the measured input; nonzero on a navigation case means no client-side navigation." },
+				"failed": { "type": "integer", "minimum": 0 }
+			}
+		},
+		"failure": {
+			"oneOf": [
+				{ "type": "null" },
+				{
+					"type": "object",
+					"additionalProperties": false,
+					"required": ["kind", "message"],
+					"properties": {
+						"kind": {
+							"enum": [
+								"timeout",
+								"input-lost",
+								"wrong-response",
+								"precondition",
+								"navigation-error",
+								"request-failed",
+								"page-error",
+								"unsupported",
+								"deployment-protection",
+								"build-mismatch",
+								"runner-error"
+							]
+						},
+						"message": { "type": "string" }
+					}
+				}
+			]
+		},
+		"timestamp": { "type": "string", "format": "date-time" }
+	},
+	"$defs": {
+		"msOrNull": { "type": ["number", "null"], "minimum": 0 }
+	}
+}

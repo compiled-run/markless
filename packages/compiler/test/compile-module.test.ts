@@ -1,7 +1,6 @@
 import { expect, test, vi } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
 import {
-	KEYED_REPEAT_ROW_MINT_UNSUPPORTED_CODE,
 	PUBLIC_RENDER_PHASE,
 	PUBLIC_RENDER_PLAN_PASS_ID,
 	PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT_CODE,
@@ -2112,11 +2111,12 @@ export function App() @{
 		symbols: [],
 	});
 
-	// The row reads the index, which is not on the item, so no row template ships
-	// and the list can serve and reorder its rows but never grow.
-	expect(
-		result.publicRenderPlan.diagnostics.map((entry) => [entry.code, entry.severity]),
-	).toEqual([[KEYED_REPEAT_ROW_MINT_UNSUPPORTED_CODE, 'warning']]);
+	// The index is read through the page's render-data reader, so the row still mints.
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	expect(result.protocolView.keyedRepeats?.[0]?.rowTemplate?.textSlots).toEqual([
+		expect.objectContaining({ source: 'i' }),
+		expect.objectContaining({ itemPath: ['name'] }),
+	]);
 	// Index-reading rows stay off the direct-DOM runtime, which cannot rewrite
 	// index text on reorder yet.
 	expect(result.renderData.repeats[0]).toEqual(
@@ -2684,6 +2684,158 @@ export function App() @{
 		expect.objectContaining({ tagName: 'button', index: 1 }),
 	]);
 	expect(output.view.events).toEqual([expect.objectContaining({ eventName: 'click' })]);
+});
+
+// The implicit source blanks `<>`/`</>` to spaces so every source offset matches.
+const siblingRootsBody = (open: string, close: string) => `
+import { state } from '@markless/core';
+
+export function Tally() @{
+	let count = state(0);
+
+	${open}
+		<h1>Tally</h1>
+		<button onClick={() => count++}>Add</button>
+		<output>{count}</output>
+	${close}
+}
+`;
+
+async function renderAndResumeSiblingRoots(source: string) {
+	const result = await compileTsrxModule({ filename: 'src/Tally.tsrx', source, symbols: [] });
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = await (
+		ssrModule.marklessRenderSsr as () => Promise<{
+			readonly html: string;
+			readonly state: ProtocolStatePayload;
+			readonly view: ProtocolViewPayload;
+		}>
+	)();
+	const heading = new PublicRenderTestElement('h1');
+	heading.textContent = 'Tally';
+	const button = new PublicRenderTestElement('button');
+	button.textContent = 'Add';
+	const outputElement = new PublicRenderTestElement('output');
+	outputElement.textContent = '0';
+	const root = new PublicRenderTestFragment();
+	root.appendChild(heading);
+	root.appendChild(button);
+	root.appendChild(outputElement);
+	const symbolModules = new Map(
+		result.symbolModules.modules.map((module) => [module.symbolId, module]),
+	);
+	const symbolExports = new Map<string, Record<string, unknown>>();
+	for (const module of result.symbolModules.modules) {
+		symbolExports.set(module.symbolId, await importPublicRenderTestModule(module.source));
+	}
+	const { graph, runtime } = await resumeFromPayloadScripts({
+		...renderPayloadScripts({ state: output.state, view: output.view }),
+		root: root as never,
+		loadSymbol(symbolId) {
+			const module = symbolModules.get(symbolId);
+			if (!module) throw new Error(`Unexpected symbol ${symbolId}`);
+			return symbolExports.get(symbolId)?.[module.exportName] as never;
+		},
+	});
+	await runtime.dispatch({ type: 'click', target: button as never });
+	await runtime.dispatch({ type: 'click', target: button as never });
+	return {
+		result,
+		html: output.html,
+		state: output.state,
+		view: output.view,
+		count: graph.read('state:count'),
+		outputText: outputElement.textContent,
+	};
+}
+
+test('compileTsrxModule renders sibling top-level elements as an implicit fragment root', async () => {
+	const explicit = await renderAndResumeSiblingRoots(siblingRootsBody('<>', '</>'));
+	const implicit = await renderAndResumeSiblingRoots(siblingRootsBody('  ', '   '));
+
+	expect(implicit.result.diagnostics ?? []).toEqual([]);
+	expect(implicit.result.publicRenderModule.ssrModuleSource).not.toContain('<h1');
+	expect(implicit.result.publicRenderModule.ssrModuleSource).not.toContain('<button');
+	expect(implicit.html).toBe('<h1>Tally</h1><button>Add</button><output>0</output>');
+	expect(implicit.count).toBe(2);
+	expect(implicit.outputText).toBe('2');
+
+	expect(implicit.html).toBe(explicit.html);
+	expect(implicit.state).toEqual(explicit.state);
+	expect(implicit.view).toEqual(explicit.view);
+	expect(implicit.count).toBe(explicit.count);
+	expect(implicit.outputText).toBe(explicit.outputText);
+	expect(implicit.result.renderData).toEqual(explicit.result.renderData);
+	expect(implicit.result.protocolView).toEqual(explicit.result.protocolView);
+	expect(implicit.result.publicRenderModule.ssrModuleSource).toBe(
+		explicit.result.publicRenderModule.ssrModuleSource,
+	);
+	expect(implicit.result.symbolModules.modules.map((module) => module.source)).toEqual(
+		explicit.result.symbolModules.modules.map((module) => module.source),
+	);
+});
+
+test('compileTsrxModule gives implicit sibling roots the explicit fragment diagnostics', async () => {
+	const withComponent = (open: string, close: string) => `
+import { Widget } from './widget.tsrx';
+
+export function App() @{
+	${open}
+		<h1>Title</h1>
+		<Widget />
+	${close}
+}
+`;
+	const explicit = await compileTsrxModule({
+		filename: 'src/App.tsrx',
+		source: withComponent('<>', '</>'),
+		symbols: [],
+	});
+	const implicit = await compileTsrxModule({
+		filename: 'src/App.tsrx',
+		source: withComponent('  ', '   '),
+		symbols: [],
+	});
+	const rootDiagnostic = (result: typeof explicit) =>
+		result.publicRenderModule.diagnostics.find(
+			(entry) => entry.code === 'MARKLESS_PUBLIC_RENDER_ROOT_UNSUPPORTED',
+		);
+
+	expect(rootDiagnostic(explicit)?.message).toContain('the <Widget> component');
+	const { primarySpan: explicitSpan, ...explicitRest } = rootDiagnostic(explicit)!;
+	const { primarySpan: implicitSpan, ...implicitRest } = rootDiagnostic(implicit)!;
+	expect(implicitRest).toEqual(explicitRest);
+	expect(implicitSpan?.start).toBeGreaterThan(explicitSpan!.start);
+	expect(implicitSpan?.end).toBeLessThan(explicitSpan!.end);
+});
+
+test('compileTsrxModule renders a top-level @if beside sibling elements as an implicit fragment', async () => {
+	const withBranch = (open: string, close: string) => `
+import { state } from '@markless/core';
+
+export function Panel() @{
+	let open = state(true);
+
+	${open}
+		<h1>Panel</h1>
+		@if (open) { <p>Shown</p> } @else { <p>Hidden</p> }
+	${close}
+}
+`;
+	const render = async (source: string) => {
+		const result = await compileTsrxModule({ filename: 'src/Panel.tsrx', source, symbols: [] });
+		const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+		const output = await (
+			ssrModule.marklessRenderSsr as () => Promise<{ readonly html: string }>
+		)();
+		return { result, html: output.html };
+	};
+	const explicit = await render(withBranch('<>', '</>'));
+	const implicit = await render(withBranch('  ', '   '));
+
+	expect(implicit.result.diagnostics ?? []).toEqual([]);
+	expect(implicit.html).toBe(explicit.html);
+	expect(implicit.result.renderData).toEqual(explicit.result.renderData);
 });
 
 test('compileTsrxModule places children as raw template projection', async () => {
@@ -5554,15 +5706,21 @@ export default function List() @{
 	expect(result.publicRenderModule.ssrModuleSource).toContain("'#/r/' + r.id");
 	expect(result.publicRenderModule.ssrModuleSource).toContain("'repo-link-' + r.id");
 
-	// The same attributes read straight off the item are also a row the client can
-	// build after resume: the payload carries the element path and the name. The
-	// concatenated pair above is not, because the mint reads paths off the item and
-	// evaluates no expression - so that row ships no template at all.
+	// Both rows can be built after resume: item paths ride as paths, and the
+	// concatenated pair rides as the authored source the page's reader answers.
 	const view = result.protocolView as {
 		readonly keyedRepeats?: ReadonlyArray<Record<string, unknown>>;
 	};
 	expect(view.keyedRepeats).toHaveLength(2);
-	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowTemplate');
+	expect(view.keyedRepeats?.[0]?.rowTemplate).toEqual({
+		html: '<a class="row-title"><!--markless-slot:2--></a>',
+		componentName: 'List',
+		textSlots: [{ path: [0, 0], itemPath: ['id'] }],
+		attributeSlots: [
+			{ path: [0], name: 'href', source: "'#/r/' + r.id" },
+			{ path: [0], name: 'data-testid', source: "'repo-link-' + r.id" },
+		],
+	});
 	expect(view.keyedRepeats?.[1]?.rowTemplate).toEqual({
 		html: '<a class="row-plain"><!--markless-slot:2--></a>',
 		textSlots: [{ path: [0, 0], itemPath: ['id'] }],

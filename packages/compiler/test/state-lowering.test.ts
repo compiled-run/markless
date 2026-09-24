@@ -1179,7 +1179,7 @@ export function App() @{
 	]);
 });
 
-test('T005 effectful composite template expressions stay behind the static gate', async () => {
+test('T005 effectful composite template expressions are refused or stay behind the static gate', async () => {
 	const source = `import { state } from '@markless/core';
 function label(value) { return value ? 'on' : 'off'; }
 export function App() @{
@@ -1199,24 +1199,20 @@ export function App() @{
 
 	const lowered = lowerStateAccess({ semanticGraph });
 
+	// A read no route can follow is refused where it is collected; the write keeps its own warning.
+	const refused = semanticGraph.diagnostics.filter(
+		(diagnostic) => diagnostic.code === 'MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED',
+	);
+	expect(refused.map((diagnostic) => diagnostic.severity)).toEqual(['error', 'error', 'error']);
+	expect(refused.map((diagnostic) => diagnostic.message)).toEqual([
+		expect.stringContaining("`(() => flag ? 'on' : 'off')()`"),
+		expect.stringContaining('`label(flag)`'),
+		expect.stringContaining('`flag && local`'),
+	]);
 	expect(lowered.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
 		'MARKLESS_TEMPLATE_EXPRESSION_STATIC',
-		'MARKLESS_TEMPLATE_EXPRESSION_STATIC',
-		'MARKLESS_TEMPLATE_EXPRESSION_STATIC',
-		'MARKLESS_TEMPLATE_EXPRESSION_STATIC',
 	]);
-	expect(lowered.diagnostics.map((diagnostic) => diagnostic.severity)).toEqual([
-		'warning',
-		'warning',
-		'warning',
-		'warning',
-	]);
-	expect(lowered.diagnostics.map((diagnostic) => diagnostic.source)).toEqual([
-		"(() => flag ? 'on' : 'off')()",
-		'label(flag)',
-		'local = flag',
-		'flag && local',
-	]);
+	expect(lowered.diagnostics.map((diagnostic) => diagnostic.source)).toEqual(['local = flag']);
 });
 
 test('lowerStateAccess reports a structured diagnostic for const graph binding reassignment', async () => {

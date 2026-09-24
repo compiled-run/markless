@@ -1,0 +1,78 @@
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { rolldown } from 'rolldown';
+import { expect, test } from 'vitest';
+import { nativePackingPlugins } from '../src/build/native-packing.ts';
+
+test.each([
+	['screens/reader.tsrx', 'tools/editor.mdx', 'incrementSharedReadingCount', 2],
+	['panels/settings.mdx', 'reports/summary.tsrx', 'advanceSharedReportRevision', 7],
+] as const)(
+	'packed internal exports stay short while %s retains lazy namespaces',
+	async (first, second, increment, step) => {
+		const root = '/workspace';
+		const directory = await mkdtemp(join(tmpdir(), 'markless-pack-exports-'));
+		const trace: string[] = [];
+		const host = globalThis as typeof globalThis & Record<string, unknown>;
+		host[directory] = trace;
+		const record = (name: string) =>
+			`globalThis[${JSON.stringify(directory)}].push(${JSON.stringify(name)});`;
+		const alpha = `${root}/${first}?markless-route`;
+		const beta = `${root}/${second}?markless-route`;
+		const shared = `${root}/shared.js`;
+		const sources: Record<string, string> = {
+			[`${root}/entry.js`]: `export const first=()=>import(${JSON.stringify(alpha)});export const second=()=>import(${JSON.stringify(beta)});`,
+			[alpha]: `export const load=()=>import("/workspace/first-action.js");`,
+			[beta]: `export const load=()=>import("/workspace/second-action.js");`,
+			[`${root}/first-action.js`]: `${record('first')}export {${increment} as run, sharedRevision as value} from "/workspace/shared.js";`,
+			[`${root}/second-action.js`]: `${record('second')}export {${increment} as run, sharedRevision as value} from "/workspace/shared.js";`,
+			[shared]: `${record('shared')}export let sharedRevision=0;export function ${increment}(){return sharedRevision+=${step}}`,
+		};
+		const build = await rolldown({
+			input: `${root}/entry.js`,
+			plugins: [
+				{
+					name: 'memory',
+					resolveId: (id) => (id in sources ? id : null),
+					load: (id) => sources[id],
+				},
+				...nativePackingPlugins(() => root),
+			],
+		});
+		try {
+			const { output } = await build.write({
+				format: 'es',
+				dir: directory,
+				entryFileNames: '[name].mjs',
+				chunkFileNames: '[name]-[hash].mjs',
+			});
+			const chunks = output.filter((chunk) => chunk.type === 'chunk');
+			const entry = chunks.find((chunk) => chunk.isEntry)!;
+			const sharedChunk = chunks.find((chunk) => chunk.moduleIds.includes(shared))!;
+			const module = await import(pathToFileURL(join(directory, entry.fileName)).href);
+			expect(trace).toEqual([]);
+			const firstRoute = await module.first();
+			expect(trace).toEqual([]);
+			const action = await firstRoute.load();
+			expect(trace).toEqual(['shared', 'first']);
+			expect(action.value).toBe(0);
+			expect(action.run()).toBe(step);
+			expect(action.value).toBe(step);
+			expect(await firstRoute.load()).toBe(action);
+			expect(action.run()).toBe(Number(step) * 2);
+			const other = await (await module.second()).load();
+			expect(trace).toEqual(['shared', 'first', 'second']);
+			expect(other.value).toBe(Number(step) * 2);
+			expect(other.run()).toBe(Number(step) * 3);
+			expect(action.value).toBe(Number(step) * 3);
+			expect(sharedChunk.exports.length).toBeGreaterThan(0);
+			expect(sharedChunk.exports).not.toContain(increment);
+		} finally {
+			await build.close();
+			delete host[directory];
+			await rm(directory, { recursive: true, force: true });
+		}
+	},
+);

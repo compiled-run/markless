@@ -41,29 +41,8 @@ const MAX_HEAD_LINKS = 128;
 // Permanent execution walls: owner ratification 2026-07-12, T006.
 const LOAD_APP_BYTES = 0;
 const LOAD_INSTRUMENT_BYTES = 0;
-// 1,906 -> 7,523 (re-derived 2026-08-06, execution-clarity ledger U7). The old
-// number is not comparable with the new one, for three reasons the slice itself
-// created: the unit is now raw chunk bytes rather than gzip; `web:resume-events`
-// moved into the framework category and left the app number; and the turn now
-// charges every module the click actually executed, not the two the event record
-// names. Measured on the box build, summing the served execution-sizes.json over
-// the ten app chunks this click wakes:
-//   4860 + 205 + 466 + 259 + 240 + 239 + 247 + 254 + 523 + 230 = 7,523 B
-// The box re-derives this every run rather than trusting the literal: it sums the
-// size map over data-markless-log-turn-modules and fails unless the mirrored app
-// delta equals that sum, so a newly waking module moves both sides.
-// 7,523 -> 7,524 (interim re-anchor 2026-08-17): no chunk above grew. This tree
-// still measures 7,523 with the ten listed sizes byte-identical; the extra byte
-// appears only on the linux CI runner, in run 32047847197, the first CI run to
-// reach this box since the boxes step went skipped behind a red unit step. Origin
-// unexplained; covers the measured linux actual with no headroom, tighten-only
-// policy unchanged.
-// 7,524 -> 7,551 (2026-08-30): +28 B in the Player branch-arm renderer chunk
-// (523 -> 551 B) from the branch-only-component SSR emit fix — components whose
-// body is only a branch now get their own server render function. Correctness
-// cost, attributed; the other nine chunks match the prior sizes within 1 B.
-// Covers the measured local actual (7,550) plus the known 1 B linux delta.
-const FIRST_PLAY_APP_BYTES_MAX = 7_551;
+// App bytes per interaction grow with app code, so they are receipt notes, not walls (owner ruling
+// 2026-09-24). The accounting itself stays exact: the mirrored app delta must equal the size-map sum.
 // 2,400 -> 2,520 (owner receipt 2026-07-12): the wiring repair relocated
 // ~111 B of accounting from the app chunk into the lazy logger - app bytes
 // unchanged, never-mode byte-identical; instrument growth stays visible.
@@ -78,7 +57,9 @@ const FIRST_PLAY_APP_BYTES_MAX = 7_551;
 // wake (the inline resumer's primer/self-wake, event: 0) to a resume turn instead
 // of counting it as an interaction; the +255 is that wake-classification branch in
 // the specialized wrapper. Instrument bytes only - app bytes unmoved.
-const FIRST_PLAY_INSTRUMENT_BYTES_MAX = 9_792;
+// The wall prices the dev-log module itself; a turn's instrument total also counts the log hook in
+// every app module it wakes, which grows with app code, so that total is a receipt note.
+const DEV_LOG_BYTES_MAX = 9_792;
 
 export default box(
 	{
@@ -152,14 +133,9 @@ export default box(
 		const sizes = await servedExecutionSizes(preview);
 		const firstPlay = await waitForLogInteractionAttribute(page, 1, sizes, WAIT);
 		receipt.note(
-			`first-Play charge: app ${firstPlay.app} B, framework ${firstPlay.framework} B over ` +
+			`first-Play charge: app ${firstPlay.app} B, framework ${firstPlay.framework} B, instrument ${firstPlay.instrument} B over ` +
 				`[${firstPlay.modules.join(', ')}]`,
 		);
-		if (firstPlay.app > FIRST_PLAY_APP_BYTES_MAX) {
-			throw new Error(
-				`Expected first-Play app bytes to stay <= ${FIRST_PLAY_APP_BYTES_MAX}, got ${firstPlay.app}.`,
-			);
-		}
 		const afterClickScripts = await waitForQuietBuildJs(page);
 		const lazyChunks = afterClickScripts.filter((path) => !startupScripts.includes(path));
 		receipt.note(
@@ -194,11 +170,7 @@ export default box(
 		// the tree (also absorbed from the retired tmp-ssr box).
 		await page.click('[aria-label="Next track"]', WAIT);
 		await expect.page.bodyText(page, { contains: 'Empty Crown' }, WAIT);
-		// Next-track app-execution wall. 1,906 -> 3,301 (re-derived 2026-08-06, U7):
-		// same unit and coverage change as the first-Play wall above — raw chunk
-		// bytes over the 11 modules this turn actually executed, measured on the box
-		// build (turn delta app 3,301 B, framework 358 B).
-		await waitForAppBytesCeiling(page, 3_301, WAIT);
+		receipt.note(`next-track charge: app ${await appBytesMirror(page, WAIT)} B`);
 		// Paused next-track cues the new video (playing next-track loads it);
 		// the video id change proves the composed dom updates flowed.
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-command', 'cue', WAIT);
@@ -444,15 +416,16 @@ async function waitForLogInteractionAttribute(
 			);
 		}
 		const instrumentBytes = Number(read('instrument-bytes'));
-		if (
-			!Number.isInteger(instrumentBytes) ||
-			instrumentBytes > FIRST_PLAY_INSTRUMENT_BYTES_MAX
-		) {
+		if (!Number.isInteger(instrumentBytes)) {
+			throw new Error(`Expected interaction ${count} instrument bytes to be an integer.`);
+		}
+		const devLog = Object.values(sizes).find((entry) => entry?.instrument === true);
+		if (!devLog?.raw || devLog.raw > DEV_LOG_BYTES_MAX) {
 			throw new Error(
-				`Expected first-Play instrument bytes to be an integer <= ${FIRST_PLAY_INSTRUMENT_BYTES_MAX}, got ${instrumentBytes}.`,
+				`Expected the dev-log module to stay <= ${DEV_LOG_BYTES_MAX} raw bytes, got ${devLog?.raw}.`,
 			);
 		}
-		return { app, framework, modules };
+		return { app, framework, instrument: instrumentBytes, modules };
 	}
 	throw new Error(`Expected interaction ${count} to mirror the owner-worded ledger line.`);
 }
@@ -489,23 +462,15 @@ function formatPaths(paths: readonly string[]): string {
 	return paths.length === 0 ? '(none)' : paths.join(', ');
 }
 
-async function waitForAppBytesCeiling(
+async function appBytesMirror(
 	page: ContentPage,
-	ceilingBytes: number,
 	options: { readonly timeoutMs: number },
-): Promise<void> {
+): Promise<number> {
 	const started = Date.now();
-	let lastSeen: string | null = null;
 	while (Date.now() - started < options.timeoutMs) {
-		const html = await page.content();
-		const raw = /data-markless-log-app-bytes="(\d+)"/.exec(html)?.[1];
-		if (raw !== undefined) {
-			lastSeen = raw;
-			if (Number(raw) <= ceilingBytes) return;
-		}
+		const raw = /data-markless-log-app-bytes="(\d+)"/.exec(await page.content())?.[1];
+		if (raw !== undefined) return Number(raw);
 		await new Promise((resolve) => setTimeout(resolve, 25));
 	}
-	throw new Error(
-		`Expected app-bytes mirror within the ${ceilingBytes} B wall, saw ${lastSeen ?? '(absent)'}.`,
-	);
+	throw new Error('Expected the execution log to mirror app bytes.');
 }

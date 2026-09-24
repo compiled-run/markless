@@ -3,8 +3,8 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"dev": "vite --mode ssr",
-		"build": "vite build --app"
+		"dev": "vp dev --mode ssr",
+		"build": "vp build --app"
 	},
 	"dependencies": {
 		"@markless/bundler": "workspace:*",

@@ -18,6 +18,8 @@ export const EVENT_ONLY_RESUMER_ATTRIBUTION = {
 	// One import promise per root, so resumed gestures reach the dispatch queue
 	// in the order they fired.
 	fireOrderImportPromise: 7,
+	// Paired OXC builds measured 1,058 -> 1,090: gestures fired before boot are replayed.
+	earlyEventReplay: 32,
 	gzipCrossTerm: 3,
 };
 

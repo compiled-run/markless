@@ -3,7 +3,7 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"build": "vite build"
+		"build": "vp build"
 	},
 	"dependencies": {
 		"@markless/bundler": "workspace:*",

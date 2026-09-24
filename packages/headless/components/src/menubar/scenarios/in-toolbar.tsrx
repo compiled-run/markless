@@ -11,15 +11,13 @@ export default function InToolbar() @{
 			<toolbar.item data-testid="print">Print</toolbar.item>
 			<menubar.root aria-label="Application" data-testid="bar">
 				<menubar.item data-testid="bar-file">
-					File
-					<menubar.itemcontent data-testid="panel-file">
+					File <menubar.itemcontent data-testid="panel-file">
 						<menu.item value="new" data-testid="item-new">New</menu.item>
 						<menu.item value="open" data-testid="item-open">Open</menu.item>
 					</menubar.itemcontent>
 				</menubar.item>
 				<menubar.item data-testid="bar-edit">
-					Edit
-					<menubar.itemcontent data-testid="panel-edit">
+					Edit <menubar.itemcontent data-testid="panel-edit">
 						<menu.item value="undo" data-testid="item-undo">Undo</menu.item>
 					</menubar.itemcontent>
 				</menubar.item>

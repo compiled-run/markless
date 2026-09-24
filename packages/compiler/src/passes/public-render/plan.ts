@@ -22,6 +22,7 @@ import {
 	sameModuleChildBoundaryDiagnostics,
 } from './validation.ts';
 import { collectKeyedRepeatRowMintDiagnostics } from './row-mint-diagnostics.ts';
+import { payloadRecordHosts } from '../row-mint.ts';
 import { selectPublicRenderRoot } from './template.ts';
 
 // The compatibility plan now owns only fail-closed diagnostics and style
@@ -124,6 +125,7 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 		];
 	});
 	const rowMintDiagnostics = collectKeyedRepeatRowMintDiagnostics({
+		...payloadRecordHosts(input.payloadArena.view),
 		root: ast,
 		semanticGraph: input.semanticGraph,
 		filename: input.source.filename,

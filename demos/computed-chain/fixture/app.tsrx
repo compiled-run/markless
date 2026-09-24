@@ -25,7 +25,7 @@ export default function App() @{
 			<button type='button' data-owner='71' onClick={() => owner71++}>write 71</button>
 			<button type='button' data-owner='81' onClick={() => owner81++}>write 81</button>
 			<button type='button' data-owner='91' onClick={() => owner91++}>write 91</button>
-			<button type='button' data-equal='1' onClick={() => owner1 = owner1}>equal</button>
+			<button type='button' data-equal='1' onClick={() => { const same = owner1; owner1 = same; }}>equal</button>
 			<button type='button' data-batch='forward' onClick={() => { owner1++; owner11++; owner21++; owner31++; owner41++; owner51++; owner61++; owner71++; owner81++; owner91++; }}>batch forward</button>
 			<button type='button' data-batch='reverse' onClick={() => { owner91++; owner81++; owner71++; owner61++; owner51++; owner41++; owner31++; owner21++; owner11++; owner1++; }}>batch reverse</button>
 		</div>

@@ -5,6 +5,7 @@ import { state } from '@markless/core';
 // guards preventDefault by event fields alone. The guarded call is
 // browser-critical, so it has to be cancelled at capture, before the handler
 // symbol has loaded.
+// oxlint-disable-next-line no-unused-vars -- destructured to keep it out of rest
 export function Field({ onKeydown, ...rest }) @{
 	let moves = state(0);
 

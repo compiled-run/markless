@@ -228,6 +228,10 @@ export async function resumeFullEventOnly(
 		document: input.document,
 		root: input.root,
 		loadSymbol: input.loadSymbol,
+		handoffDispatchOptions: (handoff) => ({
+			syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true,
+			ignoreUnmatched: handoff.eventRecord == null,
+		}),
 	});
 	await runtime.dispatch(input.event, {
 		syncPolicyAlreadyApplied: input.syncPolicyAlreadyApplied === true,

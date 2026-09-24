@@ -2,6 +2,7 @@ import { ASYNC_BOUNDARY_ARM } from './async-boundary-arm.ts';
 import {
 	ASYNC_PROTOCOL_VERSION,
 	PROTOCOL_EVENT_ACTION_KIND,
+	PROTOCOL_VISIBLE_EVENT_NAME,
 	protocolStateVersion,
 	STORAGE_PROTOCOL_VERSION,
 } from './protocol-constants.ts';
@@ -10,6 +11,7 @@ export {
 	ASYNC_BOUNDARY_ARM,
 	ASYNC_PROTOCOL_VERSION,
 	PROTOCOL_EVENT_ACTION_KIND,
+	PROTOCOL_VISIBLE_EVENT_NAME,
 	protocolStateVersion,
 	STORAGE_PROTOCOL_VERSION,
 };
@@ -201,6 +203,7 @@ export type ProtocolStatePayload = {
 // D3 arm-relative coordinates: records inside an async boundary arm index
 // from the boundary's start anchor (locator index 0 names the first element
 // after it), so arms stay closed, movable, replaceable, streamable units.
+// An arm locator carries no `strategy`: its record set already says arm-relative.
 // Arm-scoped branch records resolve their anchors in the arm's own
 // arm-branch comment census; escalated records carry no anchors.
 export type ProtocolBranchContentRead = {
@@ -280,7 +283,6 @@ export type ProtocolArmBranchRecord = {
 export type ProtocolArmRecordSet = {
 	readonly locators: ReadonlyArray<{
 		readonly hostNodeId: string;
-		readonly strategy: 'arm-relative';
 		readonly index: number;
 		readonly tagName: string;
 	}>;
@@ -300,20 +302,29 @@ export type ProtocolStreamedArmPatch = readonly [
 ];
 
 /**
- * Where one row-template slot's value comes from: the repeated item, or a graph
- * node the page already holds.
+ * Where one row-template slot's value comes from: the repeated item, a graph
+ * node the page already holds, or an authored expression.
  *
- * Exactly one of the two, never both and never neither. `itemPath` is a property
- * path off the item the mint was handed. The `graphNodeId`/`graphPath` pair is a
- * read of the page's own state - a row spelling `name={list.name}` - and the mint
- * takes it ONCE, when it builds the row: a served row's outside read does not
- * refresh either (a row host carries no per-instance locator, so the repeat ships
- * no `domUpdates` for it), and a minted row that kept itself current would
- * disagree with the rows beside it.
+ * Exactly one of the three. `itemPath` is a property path off the item the mint
+ * was handed. The `graphNodeId`/`graphPath` pair is a read of the page's own
+ * state - a row spelling `name={list.name}`. `source` is an authored expression
+ * - `\`Edit ${row.name}\``, `format(row.at)` - that the owning component's
+ * render-data reader answers for the row, under the same key the server render
+ * used; `reads` names the graph nodes outside the row it reads, omitted when none.
+ *
+ * A row rebuilds when any slot value moves: its item changed under its key, or a
+ * graph node a slot reads was written.
  */
 export type ProtocolRowTemplateSlotValue =
 	| { readonly itemPath: ReadonlyArray<string> }
-	| { readonly graphNodeId: string; readonly graphPath: ReadonlyArray<string> };
+	| { readonly graphNodeId: string; readonly graphPath: ReadonlyArray<string> }
+	| {
+			readonly source: string;
+			readonly reads?: ReadonlyArray<{
+				readonly graphNodeId: string;
+				readonly path: ReadonlyArray<string>;
+			}>;
+	  };
 
 export type ProtocolViewPayload = {
 	readonly version: typeof ASYNC_PROTOCOL_VERSION;
@@ -410,6 +421,30 @@ export type ProtocolViewPayload = {
 		 * was before this existed. Only composition writes it.
 		 */
 		readonly instancePath?: string;
+		/**
+		 * Present on a `@for` written inside another `@for`'s row. Its rows render
+		 * once per enclosing row, so the browser wires one instance of this record in
+		 * each enclosing row. Its own parent has no single host, so `parentHostNodeId`
+		 * names the outermost enclosing repeat's parent: whatever keeps or moves that
+		 * repeat's record by host keeps or moves this one with it.
+		 *
+		 * `parentHostPath` walks from an enclosing row's root to this repeat's parent,
+		 * ROW-ROOT-relative like `rowEvents[].hostPath`. `itemPath` is present when
+		 * the collection is a path on the enclosing row's item (`group.items`); the
+		 * collection then reads the outermost enclosing collection with a `'*'`
+		 * segment for each enclosing row (`['*', 'items']`), which reads nothing on
+		 * its own and which each instance replaces with its enclosing row's index.
+		 * `repeatId` is spelled as the authoring module spells it: composition
+		 * prefixes a record's `id` but not this, so it resolves under the record's
+		 * own prefix.
+		 *
+		 * Pay-per-use: a repeat inside no other repeat omits the field.
+		 */
+		readonly enclosingRow?: {
+			readonly repeatId: string;
+			readonly parentHostPath: ReadonlyArray<number>;
+			readonly itemPath?: ReadonlyArray<string>;
+		};
 		readonly collectionGraphNodeId?: string;
 		readonly collectionPath: ReadonlyArray<string>;
 		readonly keyPath: ReadonlyArray<string>;
@@ -464,6 +499,8 @@ export type ProtocolViewPayload = {
 		 */
 		readonly rowTemplate?: {
 			readonly html: string;
+			/** The component whose render-data reader answers `source` slots; present exactly when one is. */
+			readonly componentName?: string;
 			readonly textSlots?: ReadonlyArray<
 				{ readonly path: ReadonlyArray<number> } & ProtocolRowTemplateSlotValue
 			>;

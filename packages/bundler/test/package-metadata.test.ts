@@ -251,7 +251,7 @@ describe('package metadata', () => {
 		expect(bundler.scripts?.['test:boxes']).toBe('witness run');
 		expect(router.scripts?.['test:boxes']).toBe('witness run');
 		expect(workspace.scripts?.test).toBe(
-			'pnpm --dir packages/typescript-plugin test:completion-matrix && vp test && pnpm bench:jsfb:guard && pnpm --dir packages/bundler test:boxes && pnpm --dir packages/router test:boxes && pnpm --dir demos/music-player test:boxes && pnpm --dir demos/music-player-ssr test:boxes',
+			'pnpm --dir packages/typescript-plugin test:completion-matrix && vp test && pnpm bench:jsfb:guard && pnpm --dir packages/bundler test:boxes && pnpm --dir packages/router test:boxes && pnpm --dir demos/music-player test:boxes && pnpm --dir demos/music-player-ssr test:boxes && pnpm perf:guard',
 		);
 	});
 

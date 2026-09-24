@@ -2,7 +2,6 @@ import { state } from '@markless/core';
 import {
 	addTodo,
 	applyFilter,
-	cancelEditing,
 	clearCompleted,
 	destroyTodo,
 	editTodoFromKeyboard,
@@ -21,6 +20,7 @@ export function App() @{
 	let filter = state<TodoFilter>('all');
 	let nextId = state(1);
 	let remaining = state(0);
+	// oxlint-disable-next-line no-unused-vars -- the write stays as measured handler work
 	let completed = state(0);
 
 	<section class="todoapp">

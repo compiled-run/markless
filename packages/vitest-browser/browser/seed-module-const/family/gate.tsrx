@@ -44,7 +44,7 @@ export const gateState = shared(
 );
 
 export function GateRoot({ children }: { children?: Children }) @{
-	const gate = gateState();
+	const _gate = gateState();
 
 	<div data-gate-root>{children}</div>
 }

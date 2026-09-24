@@ -461,7 +461,7 @@ test('generates docs with MDX routes and component layouts only', async () => {
 	await expect(exists(join(appRoot, 'components/layouts/DocsLayout.tsrx'))).resolves.toBe(true);
 	expect(indexMdx).toContain('# Markless Router Docs');
 	expect(catchAllMdx).toContain('<DocsLayout');
-	expect(catchAllMdx).toContain('<Content />');
+	expect(catchAllMdx).toContain("import DocsLayout from '../../components/layouts/DocsLayout.tsrx';");
 	expect(viteConfig).not.toContain('mdx');
 
 	await expect(exists(join(appRoot, 'content'))).resolves.toBe(false);

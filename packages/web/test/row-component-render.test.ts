@@ -1,9 +1,7 @@
 import { expect, test } from 'vitest';
 import { ASYNC_PROTOCOL_VERSION } from '@markless/serializer';
-import {
-	renderRepeatRowComponent,
-	type PrerenderDataSurface,
-} from '../src/prerender/evaluator.ts';
+import type { PrerenderDataSurface } from '../src/prerender/evaluator.ts';
+import { renderRepeatRowComponent } from '../src/prerender/row-component-render.ts';
 
 /**
  * The one-edge render behind a minted component row.

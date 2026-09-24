@@ -1,28 +1,28 @@
 {
 	"schemaVersion": 1,
 	"lane": "loader",
-	"run": "loader-1784395219012-ec0f6de84b9f",
-	"pageStartMs": 32.521,
+	"run": "loader-1790187668203-bdc9db688dbc08",
+	"pageStartMs": 28.14,
 	"events": [
 		{
 			"name": "session",
-			"startMs": 36.864,
-			"settledMs": 98.161
+			"startMs": 31.41,
+			"settledMs": 92.421
 		},
 		{
 			"name": "catalog",
-			"startMs": 36.908,
-			"settledMs": 118.606
+			"startMs": 31.447,
+			"settledMs": 111.96
 		},
 		{
 			"name": "reviews",
-			"startMs": 36.931,
-			"settledMs": 108.199
+			"startMs": 31.472,
+			"settledMs": 104.169
 		},
 		{
 			"name": "recommendations",
-			"startMs": 99.109,
-			"settledMs": 190.424
+			"startMs": 93.125,
+			"settledMs": 182.636
 		}
 	]
 }

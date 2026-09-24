@@ -1,4 +1,8 @@
-import { marklessInstanceScopedLoadSymbol } from '../../../../web/src/fns/instance-scope.ts';
+import {
+	marklessInstanceScopedLoadSymbol,
+	marklessIslandSpacedSymbol,
+} from '../../../../web/src/fns/instance-scope.ts';
+import { marklessThen } from '../../../../web/src/ssr-data/awaitable.ts';
 import { marklessSsrRosterPositionContext } from '../../../../web/src/fns/roster-position.ts';
 import { marklessSsrIslandRosterAnswered } from '../../../../web/src/prerender/island-roster.ts';
 import {
@@ -8,6 +12,7 @@ import {
 } from '../../../../serializer/src/protocol-constants.ts';
 import { isArmBranchAnchorComment } from '../../../../web/src/resume-anchor-census.ts';
 import type { ProtocolViewPayload } from '../../../../serializer/src/protocol.ts';
+export { tryResumeMdxScalar } from './mdx-scalar.ts';
 
 export type MdxRoutePart =
 	| {
@@ -704,7 +709,10 @@ function loadScopedMdxSymbol(
 	load: (symbolId: string) => unknown,
 ): unknown {
 	const loadChildLocal = ((childSymbolId: string) =>
-		load(childSymbolId.slice(prefix.length))) as MdxInstanceScopedLoad;
+		marklessThen(
+			load(childSymbolId.slice(prefix.length)) as ReturnType<MdxInstanceScopedLoad>,
+			(symbol) => marklessIslandSpacedSymbol(symbol, prefix),
+		)) as MdxInstanceScopedLoad;
 	return marklessInstanceScopedLoadSymbol(loadChildLocal)(symbolId);
 }
 

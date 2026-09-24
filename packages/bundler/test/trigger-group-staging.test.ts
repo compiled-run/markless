@@ -318,6 +318,44 @@ test('keeps symbol route tables exhaustive while the routed symbols stay lazy', 
 	expect(source).toContain('symbolId.startsWith("c1:")');
 });
 
+test('a packed trigger group loads its symbols through imports the bundler can see', () => {
+	const symbols = ['a', 'b', 'c', 'd'].map((name) => ({
+		id: `symbol:${name}`,
+		chunk: `virtual:markless:symbol:lamp:${name}`,
+		exportName: `run_${name}`,
+	}));
+	const emit = (literalImports: boolean) =>
+		emitPrerenderTriggerGroupModule({
+			group: {
+				id: 'h0:click',
+				hostNodeId: 'h0',
+				eventName: 'click',
+				hostIndex: 0,
+				hostTagName: 'button',
+				graphNodeIds: [],
+				symbolIds: symbols.map((symbol) => symbol.id),
+				state: { version: 1, cells: [], computed: [] },
+				view: {
+					version: 1,
+					locators: [],
+					events: [],
+					domUpdates: [],
+					behaviors: [],
+					elementHandles: [],
+					asyncBoundaries: [],
+				},
+			},
+			symbols,
+			boundRows: [],
+			literalImports,
+		});
+
+	expect(emit(false)).toContain('@vite-ignore');
+	const packed = emit(true);
+	expect(packed).not.toContain('@vite-ignore');
+	for (const symbol of symbols) expect(packed).toContain(`import(${JSON.stringify(symbol.chunk)})`);
+});
+
 test('self-wake groups render settled arms through their demand-loaded update symbol', () => {
 	const source = emitPrerenderTriggerGroupModule({
 		group: {
@@ -615,19 +653,16 @@ function settledArmPageInput(withWeightButton: boolean) {
 							locators: [
 								{
 									hostNodeId: 'h:summary',
-									strategy: 'arm-relative',
 									index: 0,
 									tagName: 'p',
 								},
 								{
 									hostNodeId: 'h:list',
-									strategy: 'arm-relative',
 									index: 1,
 									tagName: 'ul',
 								},
 								{
 									hostNodeId: 'h:row',
-									strategy: 'arm-relative',
 									index: 2,
 									tagName: 'li',
 								},
@@ -880,7 +915,6 @@ test('plans event-less async settlement as a complete self-wake trigger group', 
 							locators: [
 								{
 									hostNodeId: 'h:row',
-									strategy: 'arm-relative',
 									index: 0,
 									tagName: 'li',
 								},
@@ -1049,4 +1083,105 @@ test('plans event-less async settlement as a complete self-wake trigger group', 
 	expect(Array.isArray(groups[0]?.view.asyncBoundaries[0]?.armRecords)).toBe(true);
 	expect(groups[0]?.view.domUpdates.map((record) => record.hostNodeId)).toEqual(['h:selected']);
 	expect(groups[0]?.view.asyncRunners).toEqual({ 'computed:feed': 'symbol:runner' });
+});
+
+test('a group that selects a sync computed carries its derive symbol and the derives it depends on', () => {
+	const plan = (withComputed: boolean) =>
+		planPrerenderTriggerGroups({
+			filename: '/workspace/src/Counter.tsrx',
+			state: {
+				version: 1,
+				cells: [
+					{ graphNodeId: 'state:count', name: 'count', valueKind: 'scalar', value: 0 },
+					{ graphNodeId: 'state:other', name: 'other', valueKind: 'scalar', value: 0 },
+				],
+				computed: withComputed
+					? [
+							{
+								graphNodeId: 'computed:big',
+								name: 'big',
+								async: false,
+								deriveSymbolId: 'symbol:derive-big',
+								dependencies: [{ graphNodeId: 'computed:doubled', path: [] }],
+							},
+							{
+								graphNodeId: 'computed:doubled',
+								name: 'doubled',
+								async: false,
+								deriveSymbolId: 'symbol:derive-doubled',
+								dependencies: [{ graphNodeId: 'state:count', path: [] }],
+							},
+							{
+								graphNodeId: 'computed:unrelated',
+								name: 'unrelated',
+								async: false,
+								deriveSymbolId: 'symbol:derive-unrelated',
+								dependencies: [{ graphNodeId: 'state:other', path: [] }],
+							},
+						]
+					: [],
+			},
+			view: {
+				version: 1,
+				locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 1, tagName: 'button' }],
+				events: [{ hostNodeId: 'h0', eventName: 'click', symbolIds: ['symbol:click'] }],
+				domUpdates: [],
+				behaviors: [],
+				elementHandles: [],
+				keyedRepeats: [],
+				branches: [
+					{
+						id: 'branch-site:0',
+						startAnchor: { strategy: 'dom-order-comment', index: 0 },
+						endAnchor: { strategy: 'dom-order-comment', index: 1 },
+						symbolId: 'symbol:branch',
+						testReads: [
+							{
+								source: 'big',
+								graphNodeId: withComputed ? 'computed:big' : 'state:count',
+								path: [],
+							},
+						],
+						armRecords: [
+							{ events: [], domUpdates: [], behaviors: [], elementHandles: [] },
+							{ events: [], domUpdates: [], behaviors: [], elementHandles: [] },
+						],
+						takenArm: 1,
+					},
+				],
+				asyncBoundaries: [],
+			},
+			triggerGroups: { passId: 'trigger-groups', groups: [] },
+			symbolResolver: {
+				passId: 'symbol-resolver',
+				dynamicImportOwner: 'generated-symbol-resolver',
+				syncPolicies: [],
+				diagnostics: [],
+				symbols: [
+					{
+						id: 'symbol:click',
+						kind: 'event-handler',
+						hostNodeId: 'h0',
+						eventName: 'click',
+						source: '() => count++',
+						reads: [{ source: 'count', graphNodeId: 'state:count', path: [] }],
+						writes: [{ source: 'count', graphNodeId: 'state:count', path: [] }],
+					},
+				],
+			},
+			boundRows: [],
+		});
+
+	const [group] = plan(true);
+	expect(group?.symbolIds).toEqual([
+		'symbol:branch',
+		'symbol:click',
+		'symbol:derive-big',
+		'symbol:derive-doubled',
+	]);
+	expect(group?.state.computed.map((record) => record.graphNodeId)).toEqual([
+		'computed:big',
+		'computed:doubled',
+	]);
+	expect(plan(false)[0]?.symbolIds).toEqual(['symbol:branch', 'symbol:click']);
 });

@@ -1,0 +1,495 @@
+--- /private/tmp/markless-row-demand-events-before.ts	2026-09-22 08:01:34
++++ packages/web/src/resume-events.ts	2026-09-22 08:01:44
+@@ -1,12 +1,8 @@
+ import type { RuntimeGraph } from '@markless/runtime';
+-import { protocolEventDispatchesMarkless } from '@markless/serializer/protocol';
+ import {
+-	marklessInstancePath,
+-	marklessRecordRowScope,
+-	marklessRowScopedGraph,
+-	type MarklessRowScope,
+-	type MarklessScopedGraph,
+-} from './fns/instance-scope.ts';
++	protocolEventDispatchesMarkless,
++	protocolInstancePath,
++} from '@markless/serializer/protocol';
+ import { marklessNoteControlEdits } from './control-edit-hold.ts';
+ import type { OverlayFocusOriginHost } from './overlay-handoff.ts';
+ import type {
+@@ -22,10 +18,6 @@
+ 	ResumeRuntimeInput,
+ 	ResumeSymbolContext,
+ } from './resume-types.ts';
+-
+-// Only the CSR activation seam is graph-less, and it never reaches dispatch:
+-// every context built here carries `input.graph`. Dispatch declares that shape
+-// for itself rather than re-checking a graph it is holding.
+ type DispatchSymbolContext = Omit<ResumeSymbolContext, 'graph'> & {
+ 	readonly graph: RuntimeGraph;
+ };
+@@ -58,35 +50,6 @@
+ 	}) => void | Promise<void>;
+ };
+ 
+-/**
+- * Focus asked for inside a handler lands after that handler's writes reach the
+- * DOM.
+- *
+- * A handler writes `open = true` and focuses the surface on the next line, but
+- * the surface is still `hidden` there: the commit is a microtask behind, because
+- * a binding's DOM-update symbol is demand-loaded (`resume-runtime.ts`) and the
+- * graph flush that awaits it is scheduled, not inline. Native `focus()` on a
+- * hidden or inert target is a silent no-op, so a call the target REFUSED is
+- * remembered and replayed once the commit the same dispatch performs has landed.
+- *
+- * A call the target TOOK is held too, because a commit can undo it: a keyed
+- * repeat re-inserts the rows it keeps, and moving or removing the focused node
+- * resets the page to `<body>`. Such a hold lands only if the document fell back
+- * to its body - focus that some other element claimed is left alone.
+- *
+- * Only elements a handler reached through the runtime get this.
+- *
+- * Reaching through the runtime has two spellings, because an overlay's closing
+- * handler has no handle for where focus was. It reads the element the overlay
+- * behaviour captured at enlist off the surface, and that surface IS a handle
+- * read - so handing out a surface hands out its captured origin too, or the one
+- * focus that most needs holding is the one nothing is watching.
+- *
+- * It lives in the dispatch module rather than beside the handle helpers because
+- * progressive execution lets a plain click execute the dispatch core path and
+- * nothing else; a module of its own would load on every press that reads no
+- * handle at all.
+- */
+ type FocusOptions = { readonly preventScroll?: boolean };
+ type FocusCall = (options?: FocusOptions) => void;
+ type HandleElement = {
+@@ -100,13 +63,6 @@
+ };
+ 
+ const NATIVE_FOCUS = '__marklessNativeFocus';
+-
+-// The dispatch currently holding uncommitted writes, or 0 for none. A record is
+-// held under the dispatch that made it and is landed only by that same dispatch:
+-// a focus refused inside an abandoned or superseded dispatch must never be
+-// replayed onto a page some later gesture has moved on, and dispatches overlap -
+-// a handler that dispatches a synthetic event opens a second window inside the
+-// first - so one ending must not take the other's hold with it.
+ let openFocusDispatch = 0;
+ let nextFocusDispatch = 0;
+ const pendingFocus = new Map<
+@@ -128,9 +84,6 @@
+ 			writable: true,
+ 			value(options?: FocusOptions) {
+ 				native(options);
+-				// A call outside a dispatch has no commit to wait for. Inside one, the
+-				// last call is the one the handler meant, whether the target refused it
+-				// or took it: the commit can undo either.
+ 				if (openFocusDispatch !== 0)
+ 					pendingFocus.set(openFocusDispatch, {
+ 						target,
+@@ -139,18 +92,11 @@
+ 					});
+ 			},
+ 		});
+-	} catch {
+-		// An element that refuses the shim keeps native focus; the family's own
+-		// landing is what it was before.
+-	}
++	} catch {}
+ }
+ 
+ function reachThroughRuntime(target: HandleElement | undefined): void {
+ 	installFocusShim(target);
+-	// An enlisted surface carries the focus the page had when it enlisted, and
+-	// that reading is a raw node the behaviour stored, not a handle. It is done on
+-	// every read, not once with the shim, because the capture happens at enlist
+-	// and the surface's handle is usually read long before that.
+ 	const captured = (target as OverlayFocusOriginHost | undefined)?.__marklessOverlayFocusOrigin;
+ 	if (captured) installFocusShim(captured as HandleElement);
+ }
+@@ -161,7 +107,8 @@
+ ): (handleIdOrName: string) => ResumeElementHandleValue {
+ 	return (handleIdOrName) => {
+ 		const value = read(handleIdOrName);
+-		if (Array.isArray(value)) for (const item of value) reachThroughRuntime(item as HandleElement);
++		if (Array.isArray(value))
++			for (const item of value) reachThroughRuntime(item as HandleElement);
+ 		else reachThroughRuntime(value as HandleElement | undefined);
+ 		return value;
+ 	};
+@@ -186,26 +133,11 @@
+ 	if (!held) return;
+ 	pendingFocus.delete(dispatch);
+ 	if (held.target.isConnected === false) return;
+-	// A hold whose call took is landed only when the commit dropped focus to the
+-	// body: an element that claimed focus in the meantime keeps it.
+-	if (
+-		held.took &&
+-		held.target.ownerDocument?.activeElement !== held.target.ownerDocument?.body
+-	)
++	if (held.took && held.target.ownerDocument?.activeElement !== held.target.ownerDocument?.body)
+ 		return;
+ 	held.target[NATIVE_FOCUS]?.call(held.target, held.options);
+ }
+-
+-// Focus reaches an element before any key event can. These are the names a
+-// focused element can still receive, so a record naming one is a handler the
+-// page is about to need. Restated in render-csr and in the serialized inline
+-// boot: neither can reach a shared module without paying a chunk for it.
+-// A pointer crosses onto a control before it presses it, and Safari focuses no
+-// button on click - so hover, not focus, is what reliably precedes a first
+-// press. A focused control still reaches these through Enter and Space.
+ const PRESS_EVENT_NAMES = ['click', 'pointerdown', 'pointerup'];
+-// The two lists are written out rather than spread together: they are read on
+-// every focusin, so they are built once, and the caller only ever iterates them.
+ const FOCUS_PRELOAD_EVENT_NAMES = [
+ 	'keydown',
+ 	'keyup',
+@@ -265,9 +197,6 @@
+ 	const readHandle = marklessHandleFocusReader(input.elementHandles.get);
+ 	const eventRecords = new WeakMap<ResumeDomElement, Map<string, ResumeEventRecord>>();
+ 	const rowEventRecords: ResumeRowEventRecords = new WeakMap();
+-	// The detached subtree's own top is the row the repeat took out, and it carries
+-	// where it hung. That is what lets a dispatch several microtasks behind its
+-	// press finish the walk the DOM would have given it at press time.
+ 	const detachedRowAnchor = (target: ResumeDomElement): ResumeDomElement | undefined => {
+ 		let current: ResumeDomElement = target;
+ 		for (;;) {
+@@ -294,13 +223,6 @@
+ 			byName = new Map();
+ 			eventRecords.set(element, byName);
+ 		}
+-		// One element, one listener list. A part's own record and a record the
+-		// consumer's `{...rest}` forwarded onto the same element arrive as two
+-		// records - they are compiled by two different modules and only meet here -
+-		// so the second MERGES into the first instead of replacing it. The part's
+-		// own symbols stay first: the consumer is adding to the part's behavior,
+-		// not taking it over. (React's last-writer-wins is the deliberate
+-		// divergence; this is what two DOM listeners do.)
+ 		const held = byName.get(record.eventName);
+ 		const added = held
+ 			? record.symbolIds.filter((symbolId) => !held.symbolIds.includes(symbolId))
+@@ -308,7 +230,11 @@
+ 		if (held && held !== record && added.length > 0) {
+ 			byName.set(record.eventName, {
+ 				...held,
+-				...(held.syncPolicy ? {} : record.syncPolicy ? { syncPolicy: record.syncPolicy } : {}),
++				...(held.syncPolicy
++					? {}
++					: record.syncPolicy
++						? { syncPolicy: record.syncPolicy }
++						: {}),
+ 				symbolIds: [...held.symbolIds, ...added],
+ 			});
+ 			input.eventTypes.add(record.eventName);
+@@ -334,8 +260,6 @@
+ 				),
+ 			);
+ 	};
+-	// Fetch only, never a dispatch: a rejection is left for the dispatch that
+-	// actually needs the symbol to report.
+ 	const preloadedSymbolIds = new Set<string>();
+ 	let preloadArmed = false;
+ 	const preloadSymbolsFor = (
+@@ -361,8 +285,6 @@
+ 			if (element === input.root) break;
+ 		}
+ 	};
+-	// Armed by startup, after the container's dispatch listeners: these only
+-	// fetch modules and must never sit ahead of the authority that dispatches.
+ 	const preloadTrigger = (
+ 		triggerName: string,
+ 		namesFor: (element: ResumeDomElement) => ReadonlyArray<string>,
+@@ -387,8 +309,6 @@
+ 		};
+ 	};
+ 	const focusPreload = preloadTrigger('focusin', focusPreloadEventNames);
+-	// pointerenter does not bubble, so a delegated listener would only ever see
+-	// the container's own crossing.
+ 	const pressPreload = preloadTrigger('pointerover', () => PRESS_EVENT_NAMES);
+ 	const wantPreload = (eventName: string): void => {
+ 		if (isFocusPreloadEventName(eventName)) focusPreload.want();
+@@ -398,8 +318,6 @@
+ 		preloadArmed = true;
+ 		focusPreload.wire();
+ 		pressPreload.wire();
+-		// The crossing that woke this runtime happened before the wiring existed,
+-		// and a resting pointer sends no second one; the boot leaves it here.
+ 		preloadSymbolsFor(
+ 			(input.root as unknown as { readonly __marklessPrimedHover?: ResumeDomElement })
+ 				.__marklessPrimedHover,
+@@ -449,22 +367,21 @@
+ 		if (!target) throw unmatchedDispatchError(event, undefined);
+ 		const selector = describeResumeEventTarget(target);
+ 		const ignoredDisposed = input.ignoredDisposedEventTargets.has(target);
+-		// The browser aimed this event at a page where the row was still there; a
+-		// keyed repeat has taken the row out since. The parent it left stands in for
+-		// the link the walk would have crossed at press time.
+ 		const attached = containsElement(input.root, target);
+ 		const anchor = attached ? undefined : detachedRowAnchor(target);
+ 		const rowAnchor = anchor && containsElement(input.root, anchor) ? anchor : undefined;
+ 		if (!attached && !ignoredDisposed && !rowAnchor)
+ 			throw unmatchedDispatchError(event, selector);
+ 		const bubbles = event.bubbles !== false;
+-		const path = collectDispatchPath(target, event.type, eventRecords, rowEventRecords, bubbles);
++		const path = collectDispatchPath(
++			target,
++			event.type,
++			eventRecords,
++			rowEventRecords,
++			bubbles,
++		);
+ 		if (path.length === 0) {
+ 			if (ignoredDisposed) return;
+-			// A capture listener on the container receives a non-bubbling event from
+-			// every descendant in turn, so "the target itself carries no record" is the
+-			// ordinary case rather than a routing defect: the element that does carry
+-			// one gets its own event when the pointer enters it.
+ 			if (!bubbles) return;
+ 			await marklessLogInteraction({
+ 				eventName: event.type,
+@@ -475,12 +392,7 @@
+ 				noMatch: true,
+ 				dispatchModuleId: 'web:resume-events',
+ 			});
+-			// Broad entry capture (inline resumer / specialized-wrapper fallback)
+-			// forwards every captured event; non-markless clicks (e.g. router
+-			// links) must pass through silently rather than throw.
+ 			if (options.ignoreUnmatched === true) return;
+-			// Reported above before it is let go: a row the app itself removed is
+-			// not a routing defect, but the no-match still belongs in the log.
+ 			if (rowAnchor) return;
+ 			throw unmatchedDispatchError(event, selector);
+ 		}
+@@ -499,8 +411,6 @@
+ 						propagation.stoppedImmediate,
+ 					);
+ 				else {
+-					// A record owned by another system (a router link) ends the markless
+-					// walk, exactly as it did when only the innermost record ever ran.
+ 					if (!protocolEventDispatchesMarkless(matched.eventRecord)) return;
+ 					await dispatchViewEvent(
+ 						matched.element,
+@@ -531,8 +441,6 @@
+ 		if (eventRecord.syncPolicy && !options.syncPolicyAlreadyApplied)
+ 			runPolicy?.(eventRecord.syncPolicy, input.graph, event);
+ 		let activeSymbolId: string | undefined;
+-		// Opened before the try: beginning the window cannot throw, and the finally
+-		// that closes it then needs no guard.
+ 		const focusCommit = marklessBeginFocusCommit();
+ 		try {
+ 			await input.prepareRuntimeShared();
+@@ -542,34 +450,32 @@
+ 			}
+ 			const activation = input.activateBehaviorsFromTrigger(eventRecord.hostNodeId);
+ 			if (activation) await activation;
+-			// What the graph's write observers are already loading. A handler's write
+-			// is answered synchronously only by an observer whose module has arrived,
+-			// so a gesture that got here first would read its own write stale.
+ 			const settling = input.graph.settleWriteObservers?.();
+ 			if (settling) await settling;
+-			// Which rendered row this record belongs to. A bound symbol's id names
+-			// only the component edge, so without this the handler for row B would
+-			// spell the same node as the handler for row A - the write lands
+-			// nowhere, or worse, on the wrong row.
+-			const rowScope = marklessRecordRowScope(eventRecord.hostNodeId, input.graph);
+-			// A widget rooted inside this row files its handles under the row, which only the row-scoped qualifier reaches.
+-			const runSymbol = async (symbolId: string, context: DispatchSymbolContext) =>
+-				(await input.loadSymbol(symbolId))({
++			let rowContext:
++				| ReturnType<
++						(typeof import('./resume-row-scope.ts'))['createRowScopedSymbolContext']
++				  >
++				| undefined;
++			const runSymbol = async (symbolId: string, context: DispatchSymbolContext) => {
++				const bound = isBoundSymbolId(symbolId);
++				if (bound)
++					rowContext ??= (
++						await import('./resume-row-scope.ts')
++					).createRowScopedSymbolContext(eventRecord.hostNodeId, input.graph);
++				return (await input.loadSymbol(symbolId))({
+ 					...context,
+-					...(rowScope && isBoundSymbolId(symbolId)
+-						? rowScopedSymbolContext(context, rowScope)
+-						: {}),
++					...(bound ? rowContext!(context) : {}),
+ 					invokeCallback,
+ 					invokeSymbol,
+ 				});
+-			// A symbol reached through a callback slot runs inside a dispatching
+-			// body no caller awaits, so its failure is reported here rather than
+-			// escaping the dispatch as an unhandled rejection.
++			};
+ 			const invokeSymbol = async (symbolId: string, context: ResumeSymbolContext) => {
+ 				try {
+-					// The callback channel belongs to this dispatch, so a context that
+-					// arrived without one runs on the dispatch's own graph.
+-					return await runSymbol(symbolId, { ...context, graph: context.graph ?? input.graph });
++					return await runSymbol(symbolId, {
++						...context,
++						graph: context.graph ?? input.graph,
++					});
+ 				} catch (error) {
+ 					await input.reportRuntimeError(error, {
+ 						phase: 'event',
+@@ -593,8 +499,6 @@
+ 			for (const symbolId of eventRecord.symbolIds) {
+ 				activeSymbolId = symbolId;
+ 				await runSymbol(symbolId, baseContext);
+-				// One element's handlers are one listener list: a handler that calls
+-				// stopImmediatePropagation ends it here, before the next one runs.
+ 				if (stopsImmediately?.()) return;
+ 			}
+ 		} catch (error) {
+@@ -631,9 +535,6 @@
+ 		const { findRepeatItemByKey, readKeyedRepeatCollection, validateOneRepeat } =
+ 			await import('./resume-keyed-repeats.ts');
+ 		const { repeat, rowKey, rowEvent } = match;
+-		// The row is out of the document AND its item is out of the collection, so
+-		// this record has no item left to act on. The walk carries on, so an
+-		// enclosing record still answers the gesture rather than it being dropped.
+ 		if (
+ 			!match.rowRoot.parentElement &&
+ 			findRepeatItemByKey(readKeyedRepeatCollection(input.graph, repeat), repeat, rowKey) ===
+@@ -656,15 +557,14 @@
+ 					rowKey,
+ 				),
+ 			};
+-			// A row's symbol dispatches through the same callback channel a view
+-			// event's does; the row's own item locals travel with it.
+ 			const runSymbol = async (symbolId: string, context: DispatchSymbolContext) =>
+ 				(await input.loadSymbol(symbolId))({ ...context, invokeCallback, invokeSymbol });
+ 			const invokeSymbol = async (symbolId: string, context: ResumeSymbolContext) => {
+ 				try {
+-					// The callback channel belongs to this dispatch, so a context that
+-					// arrived without one runs on the dispatch's own graph.
+-					return await runSymbol(symbolId, { ...context, graph: context.graph ?? input.graph });
++					return await runSymbol(symbolId, {
++						...context,
++						graph: context.graph ?? input.graph,
++					});
+ 				} catch (error) {
+ 					await input.reportRuntimeError(error, {
+ 						phase: 'event',
+@@ -689,9 +589,6 @@
+ 			for (const symbolId of rowEvent.symbolIds) {
+ 				activeSymbolId = symbolId;
+ 				await runSymbol(symbolId, baseContext);
+-				// A row host's entries are one listener list too: the entry that calls
+-				// stopImmediatePropagation is the last one to run. The stopping entry's
+-				// own writes still commit - the `finally` below flushes them.
+ 				if (stopsImmediately?.()) return;
+ 			}
+ 		} catch (error) {
+@@ -732,27 +629,10 @@
+ 		dispatch,
+ 	};
+ }
+-
+-// Only a bound symbol needs the row threaded in: every other id reaches its
+-// instance through the path it already carries, which the loader boundary
+-// consumes. A nested compose may have prefixed the bound id, so the reading is
+-// taken past any instance path.
+ function isBoundSymbolId(symbolId: string): boolean {
+-	return symbolId.slice(marklessInstancePath(symbolId).length).startsWith('bound:');
++	return symbolId.slice(protocolInstancePath(symbolId).length).startsWith('bound:');
+ }
+ 
+-function rowScopedSymbolContext(
+-	context: DispatchSymbolContext,
+-	rowScope: MarklessRowScope,
+-): Pick<DispatchSymbolContext, 'graph'> &
+-	Partial<Pick<DispatchSymbolContext, 'getElementHandle'>> {
+-	const graph = marklessRowScopedGraph(context.graph, rowScope) as MarklessScopedGraph;
+-	const qualify = graph.marklessQualifyGraphNodeId;
+-	const read = context.getElementHandle;
+-	if (!qualify || typeof read !== 'function') return { graph };
+-	return { graph, getElementHandle: (handleIdOrName) => read(qualify(handleIdOrName)) };
+-}
+-
+ function recordDebugInteraction(root: Element, element: Element, eventName: string, record: any) {
+ 	const rootRef = new WeakRef(root),
+ 		elementRef = new WeakRef(element);
+@@ -794,26 +674,12 @@
+ 	try {
+ 		const log = await global.__mxLoadLog?.();
+ 		await log?.logMarklessInteraction?.({ ...input, after: new Set(global.__mxLog) });
+-	} catch {
+-		// Execution logging is observability only; app dispatch must not depend on it.
+-	}
++	} catch {}
+ }
+ 
+ type ResumeDispatchMatch =
+ 	| { readonly element: ResumeDomElement; readonly rowMatch: ResumeRowEventMatch }
+ 	| { readonly element: ResumeDomElement; readonly eventRecord: ResumeEventRecord };
+-
+-// The DOM runs every listener on the target-to-root chain, innermost first, each
+-// on the element it was declared on. A nested widget root and the widget that
+-// encloses it both answer for the same key, so the walk collects the whole path
+-// rather than the first record it finds. One record per element, row before
+-// view, is the precedence this match already had.
+-//
+-// A non-bubbling event is the exception the DOM itself makes: only the target's
+-// own listeners run. Dispatch reaches this walk from a capture listener on the
+-// container, which sees such an event too, so the walk has to make the same cut
+-// or `focus`, `blur`, and the runtime's own `dismiss` would run on every
+-// ancestor that declared the same handler.
+ function collectDispatchPath(
+ 	target: ResumeDomElement,
+ 	eventName: string,
+@@ -830,34 +696,22 @@
+ 			const eventRecord = eventRecords.get(current)?.get(eventName);
+ 			if (eventRecord) path.push({ element: current, eventRecord });
+ 		}
+-		// A detached row root has no parent left, so the walk crosses on the parent
+-		// it was removed from - the same link the DOM would have handed it had the
+-		// removal not beaten this dispatch to it.
+ 		current = bubbles
+ 			? (current.parentElement ?? (current as DisposedRepeatRow).__marklessRowParent ?? null)
+ 			: null;
+ 	}
+ 	return path;
+ }
+-
+-// Dispatch runs from one capture listener on the container root, so the DOM's
+-// own propagation flags never see this synthetic walk: a handler's
+-// stopPropagation call has to be observed here.
+-// stopImmediatePropagation is read separately: one element's record carries an
+-// ordered symbolIds list, so there IS a same-element listener left for it to
+-// drop that stopPropagation alone would not stop. Row hosts and view hosts read
+-// the same flag.
+-function trackPropagationStops(event: ResumeDomEvent, initiallyStopped = false): {
++function trackPropagationStops(
++	event: ResumeDomEvent,
++	initiallyStopped = false,
++): {
+ 	readonly stopped: () => boolean;
+ 	readonly stoppedImmediate: () => boolean;
+ 	readonly release: () => void;
+ } {
+ 	const host = event as unknown as Record<string, unknown>;
+-	// Native dispatch can clear cancelBubble before the lazy handoff resumes.
+ 	let stopped = initiallyStopped || host.cancelBubble === true;
+-	// stopImmediatePropagation is the DOM's own answer for several listeners on
+-	// ONE element, which is what a handler array and a merged spread handler are:
+-	// the rest of this element's list is skipped, not only the ancestors'.
+ 	let immediate = false;
+ 	const restore: Array<() => void> = [];
+ 	let patched = false;
+@@ -872,7 +726,6 @@
+ 					: undefined;
+ 			};
+ 		} catch {
+-			// A frozen event still reports through cancelBubble.
+ 			return;
+ 		}
+ 		patched = true;
+@@ -896,7 +749,6 @@
+ 		},
+ 	};
+ }
+-// Keep locator materialization outside the dispatch module's eager imports.
+ function containsElement(root: ResumeDomElement, target: ResumeDomElement): boolean {
+ 	if (root === target) return true;
+ 	if (root.contains) return root.contains(target);

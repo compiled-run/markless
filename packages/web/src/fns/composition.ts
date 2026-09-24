@@ -919,6 +919,22 @@ function composedRowTemplate(
 ): ComposeRowTemplate | undefined {
 	let dropped = '';
 	const remap = <S extends RowTemplateSlot>(slot: S): S => {
+		if ('source' in slot) {
+			if (!slot.reads) return slot;
+			const reads = slot.reads.map((read) =>
+				marklessCsrRemapChildGraph(read, graphProps, instancePath),
+			);
+			if (reads.every((read) => read !== null))
+				return {
+					...slot,
+					reads: reads.map((read) => ({
+						graphNodeId: read.graphNodeId,
+						path: read.path,
+					})),
+				};
+			dropped ||= 'name' in slot ? slot.name : 'its text';
+			return slot;
+		}
 		if (!('graphNodeId' in slot)) return slot;
 		const mapped = marklessCsrRemapChildGraph(
 			{ graphNodeId: slot.graphNodeId, path: slot.graphPath },

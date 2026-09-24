@@ -34,7 +34,7 @@ function GaugeBar({ children }) @{
 
 // The same projection with no arm around it, as the control for the caption.
 export function GaugeNote({ children }) @{
-	const gauge = gaugeState();
+	const _gauge = gaugeState();
 
 	<span data-gauge-note>{children}</span>
 }

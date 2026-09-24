@@ -1,6 +1,6 @@
 import { componentExportPath, linkedComponentTarget } from '../link/component-target.ts';
 import { isEventAttribute } from '@tsrx/yuku';
-import { asNodes, getIdentifierName, walkNode, type AnyNode } from '../../ast/nodes.ts';
+import { asNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, expressionSourceOrFallback, sourceSpan } from '../../ast/source.ts';
 import type { SemanticComponentEdge, SemanticComponentPropBinding } from '../../artifacts.ts';
 import {
@@ -20,6 +20,7 @@ import {
 } from '../../artifact-helpers/graph-paths.ts';
 import { collectExpressionReads } from './collect-expressions.ts';
 import { collectObjectPatternAliases } from './collect-aliases.ts';
+import { constantPropValue } from './constant-props.ts';
 import { repeatRowBindsName } from './collect-repeat.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import {
@@ -27,7 +28,7 @@ import {
 	collectCompositeTemplateExpression,
 	mintTemplateExpressionComputed,
 	pureCompositeReadSources,
-	readsWritableGraphCell,
+	readsUnroutedGraphCell,
 } from './composite-reads.ts';
 import { scopedClassValue } from './collect-elements.ts';
 import {
@@ -40,6 +41,7 @@ import {
 } from './diagnostics.ts';
 import type { SemanticGraphWalk, WalkState } from './types.ts';
 import { isIdrefAttribute } from './idref-attributes.ts';
+import { inlineHandlerRenderLocals } from './render-local-inline.ts';
 import {
 	extractSyncPolicy,
 	firstDetachedSyncPolicyReference,
@@ -284,10 +286,14 @@ function componentPropBindings(
 				);
 			}
 
+			const inlined = inlineHandlerRenderLocals(callback, state, name);
 			props.push({
 				name,
-				source: expressionSource(callback, state.source),
+				source: inlined?.source ?? expressionSource(callback, state.source),
 				kind: 'callback',
+				...(inlined?.definitionSpans.length
+					? { definitionSpans: inlined.definitionSpans }
+					: {}),
 				parameters: parameterNodes.map((parameter) =>
 					expressionSource(parameter, state.source),
 				),
@@ -399,11 +405,28 @@ function componentPropBindings(
 			name === 'class' && state.currentStyleScopeClass
 				? scopedClassSource(source, state.currentStyleScopeClass)
 				: source;
-		props.push(
-			literal.known
-				? { name, source, kind: 'serializable', value: literal.value, sourceSpan: span }
-				: { name, source: opaqueSource, kind: 'opaque', sourceSpan: span },
-		);
+		if (literal.known) {
+			props.push({
+				name,
+				source,
+				kind: 'serializable',
+				value: literal.value,
+				sourceSpan: span,
+			});
+			continue;
+		}
+		const constant =
+			expression && opaqueSource === source ? constantPropValue(expression, state) : null;
+		props.push({
+			name,
+			source: opaqueSource,
+			kind: 'opaque',
+			sourceSpan: span,
+			...(constant?.value.ok ? { buildTimeValue: { value: constant.value.value } } : {}),
+			...(constant && constant.importedConstants.length > 0
+				? { importedConstants: constant.importedConstants }
+				: {}),
+		});
 	}
 
 	return props;
@@ -501,30 +524,6 @@ function spreadPropBinding(
 		),
 		...(span ? { sourceSpan: span } : {}),
 	};
-}
-
-/**
- * True when a prop expression reads a state cell or a computed value but this
- * pass could not build a reactive route for it. Seeding the child from a value
- * like that renders the placeholder the shared factory was declared with and
- * never moves again, so the compiler refuses instead of shipping it.
- */
-function readsUnroutedGraphCell(
-	expression: AnyNode,
-	state: WalkState,
-	scope: GraphReadScope,
-): boolean {
-	const readSources = pureCompositeReadSources(expression, state, { methodCalls: true });
-	if (readSources) return readsWritableGraphCell(readSources, state, scope);
-	// An expression this pass cannot decompose still fails closed when any member
-	// path inside it names a graph cell.
-	const sources: string[] = [];
-	walkNode(expression, (inner) => {
-		if (inner.type === 'MemberExpression' && inner.computed !== true) {
-			sources.push(expressionSource(inner, state.source));
-		}
-	});
-	return readsWritableGraphCell(sources, state, scope);
 }
 
 function componentImportSource(

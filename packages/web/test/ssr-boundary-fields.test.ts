@@ -152,13 +152,11 @@ test('SSR composition keeps a rendered async-arm keyed repeat in the served arm 
 							locators: [
 								{
 									hostNodeId: 'h-list',
-									strategy: 'arm-relative',
 									index: 0,
 									tagName: 'ul',
 								},
 								{
 									hostNodeId: 'h-row',
-									strategy: 'arm-relative',
 									index: 1,
 									tagName: 'li',
 								},
@@ -180,8 +178,8 @@ test('SSR composition keeps a rendered async-arm keyed repeat in the served arm 
 	expect(composed.view.keyedRepeats).toEqual([]);
 	expect(composed.view.asyncBoundaries[0]!.armRecords).toMatchObject({
 		locators: [
-			{ hostNodeId: 'h-list', strategy: 'arm-relative', index: 0 },
-			{ hostNodeId: 'h-row', strategy: 'arm-relative', index: 1 },
+			{ hostNodeId: 'h-list', index: 0 },
+			{ hostNodeId: 'h-row', index: 1 },
 		],
 		keyedRepeats: [repeat],
 	});
@@ -219,7 +217,7 @@ test('registration-only boot uses the shared arm core for keyed repeats', async 
 		{
 			armRecords: {
 				locators: [
-					{ hostNodeId: 'h-list', strategy: 'arm-relative', index: 0, tagName: 'ul' },
+					{ hostNodeId: 'h-list', index: 0, tagName: 'ul' },
 				],
 				events: [],
 				behaviors: [],

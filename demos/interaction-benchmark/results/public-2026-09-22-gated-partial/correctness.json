@@ -1,0 +1,3201 @@
+[
+  {
+    "target": "markless",
+    "caseId": "overview-counter-first",
+    "phase": "early",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "markless",
+    "caseId": "overview-counter-first",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "markless",
+    "caseId": "overview-disclosure",
+    "phase": "early",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "markless",
+    "caseId": "overview-disclosure",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "markless",
+    "caseId": "overview-tab",
+    "phase": "early",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "markless",
+    "caseId": "overview-tab",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "markless",
+    "caseId": "records-search",
+    "phase": "early",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "markless",
+    "caseId": "records-search",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "markless",
+    "caseId": "records-dialog-open",
+    "phase": "early",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "markless",
+    "caseId": "records-dialog-open",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "markless",
+    "caseId": "settings-submit",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "markless",
+    "caseId": "nav-overview-to-records",
+    "phase": "early",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "markless",
+    "caseId": "nav-overview-to-records",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "qwik",
+    "caseId": "overview-counter-first",
+    "phase": "early",
+    "pass": false,
+    "failure": {
+      "kind": "input-lost",
+      "message": "input observed by the page, but the DOM never changed within 10000 ms"
+    },
+    "allFailures": [
+      {
+        "kind": "input-lost",
+        "message": "input observed by the page, but the DOM never changed within 10000 ms",
+        "observed": {
+          "observed": [
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"counter-value\"]"
+                },
+                "text": "1"
+              },
+              "holds": false,
+              "pathname": "/",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": true,
+              "text": "0",
+              "value": "0",
+              "focused": false,
+              "attr": null
+            }
+          ],
+          "transitions": [
+            {
+              "epoch": 1790138891969.1,
+              "text": "0"
+            }
+          ],
+          "stages": [
+            {
+              "name": "response",
+              "expect": [
+                {
+                  "target": {
+                    "selector": "[data-testid=\"counter-value\"]"
+                  },
+                  "text": "1"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "qwik",
+    "caseId": "overview-counter-first",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "qwik",
+    "caseId": "overview-disclosure",
+    "phase": "early",
+    "pass": false,
+    "failure": {
+      "kind": "input-lost",
+      "message": "input observed by the page, but the DOM never changed within 10000 ms"
+    },
+    "allFailures": [
+      {
+        "kind": "input-lost",
+        "message": "input observed by the page, but the DOM never changed within 10000 ms",
+        "observed": {
+          "observed": [
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"disclosure-guides\"]"
+                },
+                "attr": {
+                  "aria-expanded": "true"
+                }
+              },
+              "holds": false,
+              "pathname": "/",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": true,
+              "text": "Guides",
+              "value": "",
+              "focused": true,
+              "attr": {
+                "aria-expanded": "false"
+              }
+            },
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"tree-leaf-getting-started\"]"
+                }
+              },
+              "holds": false,
+              "pathname": "/",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": false,
+              "text": "Getting started",
+              "value": null,
+              "focused": false,
+              "attr": null
+            }
+          ],
+          "transitions": [
+            {
+              "epoch": 1790138904226.7,
+              "text": "Guides"
+            }
+          ],
+          "stages": [
+            {
+              "name": "response",
+              "expect": [
+                {
+                  "target": {
+                    "selector": "[data-testid=\"disclosure-guides\"]"
+                  },
+                  "attr": {
+                    "aria-expanded": "true"
+                  }
+                },
+                {
+                  "target": {
+                    "selector": "[data-testid=\"tree-leaf-getting-started\"]"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "qwik",
+    "caseId": "overview-disclosure",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "qwik",
+    "caseId": "overview-tab",
+    "phase": "early",
+    "pass": false,
+    "failure": {
+      "kind": "input-lost",
+      "message": "input observed by the page, but the DOM never changed within 10000 ms"
+    },
+    "allFailures": [
+      {
+        "kind": "input-lost",
+        "message": "input observed by the page, but the DOM never changed within 10000 ms",
+        "observed": {
+          "observed": [
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"tab-activity\"]"
+                },
+                "attr": {
+                  "aria-selected": "true"
+                }
+              },
+              "holds": false,
+              "pathname": "/",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": true,
+              "text": "Activity",
+              "value": "",
+              "focused": true,
+              "attr": {
+                "aria-selected": "false"
+              }
+            },
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"tab-summary\"]"
+                },
+                "attr": {
+                  "aria-selected": "false"
+                }
+              },
+              "holds": false,
+              "pathname": "/",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": true,
+              "text": "Summary",
+              "value": "",
+              "focused": false,
+              "attr": {
+                "aria-selected": "true"
+              }
+            },
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"tab-panel\"]"
+                },
+                "text": "Activity: 12 updates in the last 24 hours."
+              },
+              "holds": false,
+              "pathname": "/",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": true,
+              "text": "Summary: 200 records across 5 teams.",
+              "value": null,
+              "focused": false,
+              "attr": null
+            }
+          ],
+          "transitions": [
+            {
+              "epoch": 1790138916423.4,
+              "text": "Activity"
+            }
+          ],
+          "stages": [
+            {
+              "name": "response",
+              "expect": [
+                {
+                  "target": {
+                    "selector": "[data-testid=\"tab-activity\"]"
+                  },
+                  "attr": {
+                    "aria-selected": "true"
+                  }
+                },
+                {
+                  "target": {
+                    "selector": "[data-testid=\"tab-summary\"]"
+                  },
+                  "attr": {
+                    "aria-selected": "false"
+                  }
+                },
+                {
+                  "target": {
+                    "selector": "[data-testid=\"tab-panel\"]"
+                  },
+                  "text": "Activity: 12 updates in the last 24 hours."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "qwik",
+    "caseId": "overview-tab",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "qwik",
+    "caseId": "records-search",
+    "phase": "early",
+    "pass": false,
+    "failure": {
+      "kind": "input-lost",
+      "message": "input observed by the page, but the DOM never changed within 10000 ms"
+    },
+    "allFailures": [
+      {
+        "kind": "input-lost",
+        "message": "input observed by the page, but the DOM never changed within 10000 ms",
+        "observed": {
+          "observed": [
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"records-count\"]"
+                },
+                "text": "Showing 15 of 200"
+              },
+              "holds": false,
+              "pathname": "/records",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": true,
+              "text": "Showing 200 of 200",
+              "value": null,
+              "focused": false,
+              "attr": null
+            },
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"record-row\"]"
+                },
+                "count": 15
+              },
+              "holds": false,
+              "pathname": "/records",
+              "scrollY": 0,
+              "matches": 200,
+              "visible": true,
+              "text": "Katherine Hopperkatherine.hopper.1@example.testSupport672025-10-29Edit",
+              "value": null,
+              "focused": false,
+              "attr": null
+            },
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"record-row\"]",
+                  "nth": 0
+                },
+                "attr": {
+                  "data-id": "r016"
+                }
+              },
+              "holds": false,
+              "pathname": "/records",
+              "scrollY": 0,
+              "matches": 200,
+              "visible": true,
+              "text": "Katherine Hopperkatherine.hopper.1@example.testSupport672025-10-29Edit",
+              "value": null,
+              "focused": false,
+              "attr": {
+                "data-id": "r001"
+              }
+            }
+          ],
+          "transitions": [
+            {
+              "epoch": 1790138928885.8,
+              "text": "Showing 200 of 200"
+            }
+          ],
+          "stages": [
+            {
+              "name": "response",
+              "expect": [
+                {
+                  "target": {
+                    "selector": "[data-testid=\"records-count\"]"
+                  },
+                  "text": "Showing 15 of 200"
+                },
+                {
+                  "target": {
+                    "selector": "[data-testid=\"record-row\"]"
+                  },
+                  "count": 15
+                },
+                {
+                  "target": {
+                    "selector": "[data-testid=\"record-row\"]",
+                    "nth": 0
+                  },
+                  "attr": {
+                    "data-id": "r016"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "qwik",
+    "caseId": "records-search",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "qwik",
+    "caseId": "records-dialog-open",
+    "phase": "early",
+    "pass": false,
+    "failure": {
+      "kind": "input-lost",
+      "message": "input observed by the page, but the DOM never changed within 10000 ms"
+    },
+    "allFailures": [
+      {
+        "kind": "input-lost",
+        "message": "input observed by the page, but the DOM never changed within 10000 ms",
+        "observed": {
+          "observed": [
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"edit-dialog\"]"
+                }
+              },
+              "holds": false,
+              "pathname": "/records",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": false,
+              "text": "Edit recordNameCancelSave",
+              "value": null,
+              "focused": false,
+              "attr": null
+            },
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"edit-name\"]"
+                },
+                "value": "Katherine Hopper",
+                "focused": true
+              },
+              "holds": false,
+              "pathname": "/records",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": false,
+              "text": "",
+              "value": "",
+              "focused": false,
+              "attr": null
+            }
+          ],
+          "transitions": [
+            {
+              "epoch": 1790138941218.9,
+              "text": "Edit recordNameCancelSave"
+            }
+          ],
+          "stages": [
+            {
+              "name": "response",
+              "expect": [
+                {
+                  "target": {
+                    "selector": "[data-testid=\"edit-dialog\"]"
+                  }
+                },
+                {
+                  "target": {
+                    "selector": "[data-testid=\"edit-name\"]"
+                  },
+                  "value": "Katherine Hopper",
+                  "focused": true
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "qwik",
+    "caseId": "records-dialog-open",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "qwik",
+    "caseId": "settings-submit",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "qwik",
+    "caseId": "nav-overview-to-records",
+    "phase": "early",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 1,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "qwik",
+    "caseId": "nav-overview-to-records",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "qwik-tuned",
+    "caseId": "overview-counter-first",
+    "phase": "early",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "qwik-tuned",
+    "caseId": "overview-counter-first",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "qwik-tuned",
+    "caseId": "overview-disclosure",
+    "phase": "early",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "qwik-tuned",
+    "caseId": "overview-disclosure",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "qwik-tuned",
+    "caseId": "overview-tab",
+    "phase": "early",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "qwik-tuned",
+    "caseId": "overview-tab",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "qwik-tuned",
+    "caseId": "records-search",
+    "phase": "early",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "qwik-tuned",
+    "caseId": "records-search",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "qwik-tuned",
+    "caseId": "records-dialog-open",
+    "phase": "early",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "qwik-tuned",
+    "caseId": "records-dialog-open",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "qwik-tuned",
+    "caseId": "settings-submit",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "qwik-tuned",
+    "caseId": "nav-overview-to-records",
+    "phase": "early",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "qwik-tuned",
+    "caseId": "nav-overview-to-records",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "octane",
+    "caseId": "overview-counter-first",
+    "phase": "early",
+    "pass": false,
+    "failure": {
+      "kind": "input-lost",
+      "message": "input observed by the page, but the DOM never changed within 10000 ms"
+    },
+    "allFailures": [
+      {
+        "kind": "input-lost",
+        "message": "input observed by the page, but the DOM never changed within 10000 ms",
+        "observed": {
+          "observed": [
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"counter-value\"]"
+                },
+                "text": "1"
+              },
+              "holds": false,
+              "pathname": "/",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": true,
+              "text": "0",
+              "value": "0",
+              "focused": false,
+              "attr": null
+            }
+          ],
+          "transitions": [
+            {
+              "epoch": 1790138975708,
+              "text": "0"
+            }
+          ],
+          "stages": [
+            {
+              "name": "response",
+              "expect": [
+                {
+                  "target": {
+                    "selector": "[data-testid=\"counter-value\"]"
+                  },
+                  "text": "1"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "octane",
+    "caseId": "overview-counter-first",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "octane",
+    "caseId": "overview-disclosure",
+    "phase": "early",
+    "pass": false,
+    "failure": {
+      "kind": "input-lost",
+      "message": "input observed by the page, but the DOM never changed within 10000 ms"
+    },
+    "allFailures": [
+      {
+        "kind": "input-lost",
+        "message": "input observed by the page, but the DOM never changed within 10000 ms",
+        "observed": {
+          "observed": [
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"disclosure-guides\"]"
+                },
+                "attr": {
+                  "aria-expanded": "true"
+                }
+              },
+              "holds": false,
+              "pathname": "/",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": true,
+              "text": "Guides",
+              "value": "",
+              "focused": true,
+              "attr": {
+                "aria-expanded": "false"
+              }
+            },
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"tree-leaf-getting-started\"]"
+                }
+              },
+              "holds": false,
+              "pathname": "/",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": false,
+              "text": "Getting started",
+              "value": null,
+              "focused": false,
+              "attr": null
+            }
+          ],
+          "transitions": [
+            {
+              "epoch": 1790138987942.5,
+              "text": "Guides"
+            }
+          ],
+          "stages": [
+            {
+              "name": "response",
+              "expect": [
+                {
+                  "target": {
+                    "selector": "[data-testid=\"disclosure-guides\"]"
+                  },
+                  "attr": {
+                    "aria-expanded": "true"
+                  }
+                },
+                {
+                  "target": {
+                    "selector": "[data-testid=\"tree-leaf-getting-started\"]"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "octane",
+    "caseId": "overview-disclosure",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "octane",
+    "caseId": "overview-tab",
+    "phase": "early",
+    "pass": false,
+    "failure": {
+      "kind": "input-lost",
+      "message": "input observed by the page, but the DOM never changed within 10000 ms"
+    },
+    "allFailures": [
+      {
+        "kind": "input-lost",
+        "message": "input observed by the page, but the DOM never changed within 10000 ms",
+        "observed": {
+          "observed": [
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"tab-activity\"]"
+                },
+                "attr": {
+                  "aria-selected": "true"
+                }
+              },
+              "holds": false,
+              "pathname": "/",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": true,
+              "text": "Activity",
+              "value": "",
+              "focused": true,
+              "attr": {
+                "aria-selected": "false"
+              }
+            },
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"tab-summary\"]"
+                },
+                "attr": {
+                  "aria-selected": "false"
+                }
+              },
+              "holds": false,
+              "pathname": "/",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": true,
+              "text": "Summary",
+              "value": "",
+              "focused": false,
+              "attr": {
+                "aria-selected": "true"
+              }
+            },
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"tab-panel\"]"
+                },
+                "text": "Activity: 12 updates in the last 24 hours."
+              },
+              "holds": false,
+              "pathname": "/",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": true,
+              "text": "Summary: 200 records across 5 teams.",
+              "value": null,
+              "focused": false,
+              "attr": null
+            }
+          ],
+          "transitions": [
+            {
+              "epoch": 1790139000183.6,
+              "text": "Activity"
+            }
+          ],
+          "stages": [
+            {
+              "name": "response",
+              "expect": [
+                {
+                  "target": {
+                    "selector": "[data-testid=\"tab-activity\"]"
+                  },
+                  "attr": {
+                    "aria-selected": "true"
+                  }
+                },
+                {
+                  "target": {
+                    "selector": "[data-testid=\"tab-summary\"]"
+                  },
+                  "attr": {
+                    "aria-selected": "false"
+                  }
+                },
+                {
+                  "target": {
+                    "selector": "[data-testid=\"tab-panel\"]"
+                  },
+                  "text": "Activity: 12 updates in the last 24 hours."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "octane",
+    "caseId": "overview-tab",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "octane",
+    "caseId": "records-search",
+    "phase": "early",
+    "pass": false,
+    "failure": {
+      "kind": "input-lost",
+      "message": "input observed by the page, but the DOM never changed within 10000 ms"
+    },
+    "allFailures": [
+      {
+        "kind": "input-lost",
+        "message": "input observed by the page, but the DOM never changed within 10000 ms",
+        "observed": {
+          "observed": [
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"records-count\"]"
+                },
+                "text": "Showing 15 of 200"
+              },
+              "holds": false,
+              "pathname": "/records",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": true,
+              "text": "Showing 200 of 200",
+              "value": null,
+              "focused": false,
+              "attr": null
+            },
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"record-row\"]"
+                },
+                "count": 15
+              },
+              "holds": false,
+              "pathname": "/records",
+              "scrollY": 0,
+              "matches": 200,
+              "visible": true,
+              "text": "Katherine Hopperkatherine.hopper.1@example.testSupport672025-10-29Edit",
+              "value": null,
+              "focused": false,
+              "attr": null
+            },
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"record-row\"]",
+                  "nth": 0
+                },
+                "attr": {
+                  "data-id": "r016"
+                }
+              },
+              "holds": false,
+              "pathname": "/records",
+              "scrollY": 0,
+              "matches": 200,
+              "visible": true,
+              "text": "Katherine Hopperkatherine.hopper.1@example.testSupport672025-10-29Edit",
+              "value": null,
+              "focused": false,
+              "attr": {
+                "data-id": "r001"
+              }
+            }
+          ],
+          "transitions": [
+            {
+              "epoch": 1790139012594.4,
+              "text": "Showing 200 of 200"
+            }
+          ],
+          "stages": [
+            {
+              "name": "response",
+              "expect": [
+                {
+                  "target": {
+                    "selector": "[data-testid=\"records-count\"]"
+                  },
+                  "text": "Showing 15 of 200"
+                },
+                {
+                  "target": {
+                    "selector": "[data-testid=\"record-row\"]"
+                  },
+                  "count": 15
+                },
+                {
+                  "target": {
+                    "selector": "[data-testid=\"record-row\"]",
+                    "nth": 0
+                  },
+                  "attr": {
+                    "data-id": "r016"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "octane",
+    "caseId": "records-search",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "octane",
+    "caseId": "records-dialog-open",
+    "phase": "early",
+    "pass": false,
+    "failure": {
+      "kind": "input-lost",
+      "message": "input observed by the page, but the DOM never changed within 10000 ms"
+    },
+    "allFailures": [
+      {
+        "kind": "input-lost",
+        "message": "input observed by the page, but the DOM never changed within 10000 ms",
+        "observed": {
+          "observed": [
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"edit-dialog\"]"
+                }
+              },
+              "holds": false,
+              "pathname": "/records",
+              "scrollY": 0,
+              "matches": 0,
+              "visible": false,
+              "text": null,
+              "value": null,
+              "focused": null,
+              "attr": null
+            },
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"edit-name\"]"
+                },
+                "value": "Katherine Hopper",
+                "focused": true
+              },
+              "holds": false,
+              "pathname": "/records",
+              "scrollY": 0,
+              "matches": 0,
+              "visible": false,
+              "text": null,
+              "value": null,
+              "focused": null,
+              "attr": null
+            }
+          ],
+          "transitions": [
+            {
+              "epoch": 1790139024844.7,
+              "text": null
+            }
+          ],
+          "stages": [
+            {
+              "name": "response",
+              "expect": [
+                {
+                  "target": {
+                    "selector": "[data-testid=\"edit-dialog\"]"
+                  }
+                },
+                {
+                  "target": {
+                    "selector": "[data-testid=\"edit-name\"]"
+                  },
+                  "value": "Katherine Hopper",
+                  "focused": true
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "octane",
+    "caseId": "records-dialog-open",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "octane",
+    "caseId": "settings-submit",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "octane",
+    "caseId": "nav-overview-to-records",
+    "phase": "early",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 1,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "octane",
+    "caseId": "nav-overview-to-records",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "react-router",
+    "caseId": "overview-counter-first",
+    "phase": "early",
+    "pass": false,
+    "failure": {
+      "kind": "input-lost",
+      "message": "input observed by the page, but the DOM never changed within 10000 ms"
+    },
+    "allFailures": [
+      {
+        "kind": "input-lost",
+        "message": "input observed by the page, but the DOM never changed within 10000 ms",
+        "observed": {
+          "observed": [
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"counter-value\"]"
+                },
+                "text": "1"
+              },
+              "holds": false,
+              "pathname": "/",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": true,
+              "text": "0",
+              "value": "0",
+              "focused": false,
+              "attr": null
+            }
+          ],
+          "transitions": [
+            {
+              "epoch": 1790139042038.2,
+              "text": "0"
+            }
+          ],
+          "stages": [
+            {
+              "name": "response",
+              "expect": [
+                {
+                  "target": {
+                    "selector": "[data-testid=\"counter-value\"]"
+                  },
+                  "text": "1"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "react-router",
+    "caseId": "overview-counter-first",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "react-router",
+    "caseId": "overview-disclosure",
+    "phase": "early",
+    "pass": false,
+    "failure": {
+      "kind": "input-lost",
+      "message": "input observed by the page, but the DOM never changed within 10000 ms"
+    },
+    "allFailures": [
+      {
+        "kind": "input-lost",
+        "message": "input observed by the page, but the DOM never changed within 10000 ms",
+        "observed": {
+          "observed": [
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"disclosure-guides\"]"
+                },
+                "attr": {
+                  "aria-expanded": "true"
+                }
+              },
+              "holds": false,
+              "pathname": "/",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": true,
+              "text": "Guides",
+              "value": "",
+              "focused": true,
+              "attr": {
+                "aria-expanded": "false"
+              }
+            },
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"tree-leaf-getting-started\"]"
+                }
+              },
+              "holds": false,
+              "pathname": "/",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": false,
+              "text": "Getting started",
+              "value": null,
+              "focused": false,
+              "attr": null
+            }
+          ],
+          "transitions": [
+            {
+              "epoch": 1790139054240.8,
+              "text": "Guides"
+            }
+          ],
+          "stages": [
+            {
+              "name": "response",
+              "expect": [
+                {
+                  "target": {
+                    "selector": "[data-testid=\"disclosure-guides\"]"
+                  },
+                  "attr": {
+                    "aria-expanded": "true"
+                  }
+                },
+                {
+                  "target": {
+                    "selector": "[data-testid=\"tree-leaf-getting-started\"]"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "react-router",
+    "caseId": "overview-disclosure",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "react-router",
+    "caseId": "overview-tab",
+    "phase": "early",
+    "pass": false,
+    "failure": {
+      "kind": "input-lost",
+      "message": "input observed by the page, but the DOM never changed within 10000 ms"
+    },
+    "allFailures": [
+      {
+        "kind": "input-lost",
+        "message": "input observed by the page, but the DOM never changed within 10000 ms",
+        "observed": {
+          "observed": [
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"tab-activity\"]"
+                },
+                "attr": {
+                  "aria-selected": "true"
+                }
+              },
+              "holds": false,
+              "pathname": "/",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": true,
+              "text": "Activity",
+              "value": "",
+              "focused": true,
+              "attr": {
+                "aria-selected": "false"
+              }
+            },
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"tab-summary\"]"
+                },
+                "attr": {
+                  "aria-selected": "false"
+                }
+              },
+              "holds": false,
+              "pathname": "/",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": true,
+              "text": "Summary",
+              "value": "",
+              "focused": false,
+              "attr": {
+                "aria-selected": "true"
+              }
+            },
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"tab-panel\"]"
+                },
+                "text": "Activity: 12 updates in the last 24 hours."
+              },
+              "holds": false,
+              "pathname": "/",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": true,
+              "text": "Summary: 200 records across 5 teams.",
+              "value": null,
+              "focused": false,
+              "attr": null
+            }
+          ],
+          "transitions": [
+            {
+              "epoch": 1790139066440.7002,
+              "text": "Activity"
+            }
+          ],
+          "stages": [
+            {
+              "name": "response",
+              "expect": [
+                {
+                  "target": {
+                    "selector": "[data-testid=\"tab-activity\"]"
+                  },
+                  "attr": {
+                    "aria-selected": "true"
+                  }
+                },
+                {
+                  "target": {
+                    "selector": "[data-testid=\"tab-summary\"]"
+                  },
+                  "attr": {
+                    "aria-selected": "false"
+                  }
+                },
+                {
+                  "target": {
+                    "selector": "[data-testid=\"tab-panel\"]"
+                  },
+                  "text": "Activity: 12 updates in the last 24 hours."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "react-router",
+    "caseId": "overview-tab",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "react-router",
+    "caseId": "records-search",
+    "phase": "early",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "react-router",
+    "caseId": "records-search",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "react-router",
+    "caseId": "records-dialog-open",
+    "phase": "early",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "react-router",
+    "caseId": "records-dialog-open",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "react-router",
+    "caseId": "settings-submit",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "react-router",
+    "caseId": "nav-overview-to-records",
+    "phase": "early",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 1,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "react-router",
+    "caseId": "nav-overview-to-records",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "remix3",
+    "caseId": "overview-counter-first",
+    "phase": "early",
+    "pass": false,
+    "failure": {
+      "kind": "input-lost",
+      "message": "input observed by the page, but the DOM never changed within 10000 ms"
+    },
+    "allFailures": [
+      {
+        "kind": "input-lost",
+        "message": "input observed by the page, but the DOM never changed within 10000 ms",
+        "observed": {
+          "observed": [
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"counter-value\"]"
+                },
+                "text": "1"
+              },
+              "holds": false,
+              "pathname": "/",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": true,
+              "text": "0",
+              "value": "0",
+              "focused": false,
+              "attr": null
+            }
+          ],
+          "transitions": [
+            {
+              "epoch": 1790139089974.3,
+              "text": "0"
+            }
+          ],
+          "stages": [
+            {
+              "name": "response",
+              "expect": [
+                {
+                  "target": {
+                    "selector": "[data-testid=\"counter-value\"]"
+                  },
+                  "text": "1"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "remix3",
+    "caseId": "overview-counter-first",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "remix3",
+    "caseId": "overview-disclosure",
+    "phase": "early",
+    "pass": false,
+    "failure": {
+      "kind": "input-lost",
+      "message": "input observed by the page, but the DOM never changed within 10000 ms"
+    },
+    "allFailures": [
+      {
+        "kind": "input-lost",
+        "message": "input observed by the page, but the DOM never changed within 10000 ms",
+        "observed": {
+          "observed": [
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"disclosure-guides\"]"
+                },
+                "attr": {
+                  "aria-expanded": "true"
+                }
+              },
+              "holds": false,
+              "pathname": "/",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": true,
+              "text": "Guides",
+              "value": "",
+              "focused": true,
+              "attr": {
+                "aria-expanded": "false"
+              }
+            },
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"tree-leaf-getting-started\"]"
+                }
+              },
+              "holds": false,
+              "pathname": "/",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": false,
+              "text": "Getting started",
+              "value": null,
+              "focused": false,
+              "attr": null
+            }
+          ],
+          "transitions": [
+            {
+              "epoch": 1790139102597,
+              "text": "Guides"
+            }
+          ],
+          "stages": [
+            {
+              "name": "response",
+              "expect": [
+                {
+                  "target": {
+                    "selector": "[data-testid=\"disclosure-guides\"]"
+                  },
+                  "attr": {
+                    "aria-expanded": "true"
+                  }
+                },
+                {
+                  "target": {
+                    "selector": "[data-testid=\"tree-leaf-getting-started\"]"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "remix3",
+    "caseId": "overview-disclosure",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "remix3",
+    "caseId": "overview-tab",
+    "phase": "early",
+    "pass": false,
+    "failure": {
+      "kind": "input-lost",
+      "message": "input observed by the page, but the DOM never changed within 10000 ms"
+    },
+    "allFailures": [
+      {
+        "kind": "input-lost",
+        "message": "input observed by the page, but the DOM never changed within 10000 ms",
+        "observed": {
+          "observed": [
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"tab-activity\"]"
+                },
+                "attr": {
+                  "aria-selected": "true"
+                }
+              },
+              "holds": false,
+              "pathname": "/",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": true,
+              "text": "Activity",
+              "value": "",
+              "focused": true,
+              "attr": {
+                "aria-selected": "false"
+              }
+            },
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"tab-summary\"]"
+                },
+                "attr": {
+                  "aria-selected": "false"
+                }
+              },
+              "holds": false,
+              "pathname": "/",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": true,
+              "text": "Summary",
+              "value": "",
+              "focused": false,
+              "attr": {
+                "aria-selected": "true"
+              }
+            },
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"tab-panel\"]"
+                },
+                "text": "Activity: 12 updates in the last 24 hours."
+              },
+              "holds": false,
+              "pathname": "/",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": true,
+              "text": "Summary: 200 records across 5 teams.",
+              "value": null,
+              "focused": false,
+              "attr": null
+            }
+          ],
+          "transitions": [
+            {
+              "epoch": 1790139115232.5999,
+              "text": "Activity"
+            }
+          ],
+          "stages": [
+            {
+              "name": "response",
+              "expect": [
+                {
+                  "target": {
+                    "selector": "[data-testid=\"tab-activity\"]"
+                  },
+                  "attr": {
+                    "aria-selected": "true"
+                  }
+                },
+                {
+                  "target": {
+                    "selector": "[data-testid=\"tab-summary\"]"
+                  },
+                  "attr": {
+                    "aria-selected": "false"
+                  }
+                },
+                {
+                  "target": {
+                    "selector": "[data-testid=\"tab-panel\"]"
+                  },
+                  "text": "Activity: 12 updates in the last 24 hours."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "remix3",
+    "caseId": "overview-tab",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "remix3",
+    "caseId": "records-search",
+    "phase": "early",
+    "pass": false,
+    "failure": {
+      "kind": "input-lost",
+      "message": "input observed by the page, but the DOM never changed within 10000 ms"
+    },
+    "allFailures": [
+      {
+        "kind": "input-lost",
+        "message": "input observed by the page, but the DOM never changed within 10000 ms",
+        "observed": {
+          "observed": [
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"records-count\"]"
+                },
+                "text": "Showing 15 of 200"
+              },
+              "holds": false,
+              "pathname": "/records",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": true,
+              "text": "Showing 200 of 200",
+              "value": null,
+              "focused": false,
+              "attr": null
+            },
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"record-row\"]"
+                },
+                "count": 15
+              },
+              "holds": false,
+              "pathname": "/records",
+              "scrollY": 0,
+              "matches": 200,
+              "visible": true,
+              "text": "Katherine Hopperkatherine.hopper.1@example.testSupport672025-10-29Edit",
+              "value": null,
+              "focused": false,
+              "attr": null
+            },
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"record-row\"]",
+                  "nth": 0
+                },
+                "attr": {
+                  "data-id": "r016"
+                }
+              },
+              "holds": false,
+              "pathname": "/records",
+              "scrollY": 0,
+              "matches": 200,
+              "visible": true,
+              "text": "Katherine Hopperkatherine.hopper.1@example.testSupport672025-10-29Edit",
+              "value": null,
+              "focused": false,
+              "attr": {
+                "data-id": "r001"
+              }
+            }
+          ],
+          "transitions": [
+            {
+              "epoch": 1790139127661.7,
+              "text": "Showing 200 of 200"
+            }
+          ],
+          "stages": [
+            {
+              "name": "response",
+              "expect": [
+                {
+                  "target": {
+                    "selector": "[data-testid=\"records-count\"]"
+                  },
+                  "text": "Showing 15 of 200"
+                },
+                {
+                  "target": {
+                    "selector": "[data-testid=\"record-row\"]"
+                  },
+                  "count": 15
+                },
+                {
+                  "target": {
+                    "selector": "[data-testid=\"record-row\"]",
+                    "nth": 0
+                  },
+                  "attr": {
+                    "data-id": "r016"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "remix3",
+    "caseId": "records-search",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "remix3",
+    "caseId": "records-dialog-open",
+    "phase": "early",
+    "pass": false,
+    "failure": {
+      "kind": "input-lost",
+      "message": "input observed by the page, but the DOM never changed within 10000 ms"
+    },
+    "allFailures": [
+      {
+        "kind": "input-lost",
+        "message": "input observed by the page, but the DOM never changed within 10000 ms",
+        "observed": {
+          "observed": [
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"edit-dialog\"]"
+                }
+              },
+              "holds": false,
+              "pathname": "/records",
+              "scrollY": 0,
+              "matches": 0,
+              "visible": false,
+              "text": null,
+              "value": null,
+              "focused": null,
+              "attr": null
+            },
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"edit-name\"]"
+                },
+                "value": "Katherine Hopper",
+                "focused": true
+              },
+              "holds": false,
+              "pathname": "/records",
+              "scrollY": 0,
+              "matches": 0,
+              "visible": false,
+              "text": null,
+              "value": null,
+              "focused": null,
+              "attr": null
+            }
+          ],
+          "transitions": [
+            {
+              "epoch": 1790139140271.7,
+              "text": null
+            }
+          ],
+          "stages": [
+            {
+              "name": "response",
+              "expect": [
+                {
+                  "target": {
+                    "selector": "[data-testid=\"edit-dialog\"]"
+                  }
+                },
+                {
+                  "target": {
+                    "selector": "[data-testid=\"edit-name\"]"
+                  },
+                  "value": "Katherine Hopper",
+                  "focused": true
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "remix3",
+    "caseId": "records-dialog-open",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "remix3",
+    "caseId": "settings-submit",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "remix3",
+    "caseId": "nav-overview-to-records",
+    "phase": "early",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 1,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "remix3",
+    "caseId": "nav-overview-to-records",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "solidstart",
+    "caseId": "overview-counter-first",
+    "phase": "early",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "solidstart",
+    "caseId": "overview-counter-first",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "solidstart",
+    "caseId": "overview-disclosure",
+    "phase": "early",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "solidstart",
+    "caseId": "overview-disclosure",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "solidstart",
+    "caseId": "overview-tab",
+    "phase": "early",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "solidstart",
+    "caseId": "overview-tab",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "solidstart",
+    "caseId": "records-search",
+    "phase": "early",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "solidstart",
+    "caseId": "records-search",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "solidstart",
+    "caseId": "records-dialog-open",
+    "phase": "early",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "solidstart",
+    "caseId": "records-dialog-open",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "solidstart",
+    "caseId": "settings-submit",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "solidstart",
+    "caseId": "nav-overview-to-records",
+    "phase": "early",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 1,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "solidstart",
+    "caseId": "nav-overview-to-records",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "sveltekit",
+    "caseId": "overview-counter-first",
+    "phase": "early",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "sveltekit",
+    "caseId": "overview-counter-first",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "sveltekit",
+    "caseId": "overview-disclosure",
+    "phase": "early",
+    "pass": false,
+    "failure": {
+      "kind": "input-lost",
+      "message": "input observed by the page, but the DOM never changed within 10000 ms"
+    },
+    "allFailures": [
+      {
+        "kind": "input-lost",
+        "message": "input observed by the page, but the DOM never changed within 10000 ms",
+        "observed": {
+          "observed": [
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"disclosure-guides\"]"
+                },
+                "attr": {
+                  "aria-expanded": "true"
+                }
+              },
+              "holds": false,
+              "pathname": "/",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": true,
+              "text": "Guides",
+              "value": "",
+              "focused": true,
+              "attr": {
+                "aria-expanded": "false"
+              }
+            },
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"tree-leaf-getting-started\"]"
+                }
+              },
+              "holds": false,
+              "pathname": "/",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": false,
+              "text": "Getting started",
+              "value": null,
+              "focused": false,
+              "attr": null
+            }
+          ],
+          "transitions": [
+            {
+              "epoch": 1790139176593.2,
+              "text": "Guides"
+            }
+          ],
+          "stages": [
+            {
+              "name": "response",
+              "expect": [
+                {
+                  "target": {
+                    "selector": "[data-testid=\"disclosure-guides\"]"
+                  },
+                  "attr": {
+                    "aria-expanded": "true"
+                  }
+                },
+                {
+                  "target": {
+                    "selector": "[data-testid=\"tree-leaf-getting-started\"]"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "sveltekit",
+    "caseId": "overview-disclosure",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "sveltekit",
+    "caseId": "overview-tab",
+    "phase": "early",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "sveltekit",
+    "caseId": "overview-tab",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "sveltekit",
+    "caseId": "records-search",
+    "phase": "early",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "sveltekit",
+    "caseId": "records-search",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "sveltekit",
+    "caseId": "records-dialog-open",
+    "phase": "early",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "sveltekit",
+    "caseId": "records-dialog-open",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "sveltekit",
+    "caseId": "settings-submit",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "sveltekit",
+    "caseId": "nav-overview-to-records",
+    "phase": "early",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 1,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "sveltekit",
+    "caseId": "nav-overview-to-records",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "ripple",
+    "caseId": "overview-counter-first",
+    "phase": "early",
+    "pass": false,
+    "failure": {
+      "kind": "input-lost",
+      "message": "input observed by the page, but the DOM never changed within 10000 ms"
+    },
+    "allFailures": [
+      {
+        "kind": "input-lost",
+        "message": "input observed by the page, but the DOM never changed within 10000 ms",
+        "observed": {
+          "observed": [
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"counter-value\"]"
+                },
+                "text": "1"
+              },
+              "holds": false,
+              "pathname": "/",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": true,
+              "text": "0",
+              "value": "0",
+              "focused": false,
+              "attr": null
+            }
+          ],
+          "transitions": [
+            {
+              "epoch": 1790139200445.7,
+              "text": "0"
+            }
+          ],
+          "stages": [
+            {
+              "name": "response",
+              "expect": [
+                {
+                  "target": {
+                    "selector": "[data-testid=\"counter-value\"]"
+                  },
+                  "text": "1"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "ripple",
+    "caseId": "overview-counter-first",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "ripple",
+    "caseId": "overview-disclosure",
+    "phase": "early",
+    "pass": false,
+    "failure": {
+      "kind": "input-lost",
+      "message": "input observed by the page, but the DOM never changed within 10000 ms"
+    },
+    "allFailures": [
+      {
+        "kind": "input-lost",
+        "message": "input observed by the page, but the DOM never changed within 10000 ms",
+        "observed": {
+          "observed": [
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"disclosure-guides\"]"
+                },
+                "attr": {
+                  "aria-expanded": "true"
+                }
+              },
+              "holds": false,
+              "pathname": "/",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": true,
+              "text": "Guides",
+              "value": "",
+              "focused": true,
+              "attr": {
+                "aria-expanded": "false"
+              }
+            },
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"tree-leaf-getting-started\"]"
+                }
+              },
+              "holds": false,
+              "pathname": "/",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": false,
+              "text": "Getting started",
+              "value": null,
+              "focused": false,
+              "attr": null
+            }
+          ],
+          "transitions": [
+            {
+              "epoch": 1790139212645.6,
+              "text": "Guides"
+            }
+          ],
+          "stages": [
+            {
+              "name": "response",
+              "expect": [
+                {
+                  "target": {
+                    "selector": "[data-testid=\"disclosure-guides\"]"
+                  },
+                  "attr": {
+                    "aria-expanded": "true"
+                  }
+                },
+                {
+                  "target": {
+                    "selector": "[data-testid=\"tree-leaf-getting-started\"]"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "ripple",
+    "caseId": "overview-disclosure",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "ripple",
+    "caseId": "overview-tab",
+    "phase": "early",
+    "pass": false,
+    "failure": {
+      "kind": "input-lost",
+      "message": "input observed by the page, but the DOM never changed within 10000 ms"
+    },
+    "allFailures": [
+      {
+        "kind": "input-lost",
+        "message": "input observed by the page, but the DOM never changed within 10000 ms",
+        "observed": {
+          "observed": [
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"tab-activity\"]"
+                },
+                "attr": {
+                  "aria-selected": "true"
+                }
+              },
+              "holds": false,
+              "pathname": "/",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": true,
+              "text": "Activity",
+              "value": "",
+              "focused": true,
+              "attr": {
+                "aria-selected": "false"
+              }
+            },
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"tab-summary\"]"
+                },
+                "attr": {
+                  "aria-selected": "false"
+                }
+              },
+              "holds": false,
+              "pathname": "/",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": true,
+              "text": "Summary",
+              "value": "",
+              "focused": false,
+              "attr": {
+                "aria-selected": "true"
+              }
+            },
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"tab-panel\"]"
+                },
+                "text": "Activity: 12 updates in the last 24 hours."
+              },
+              "holds": false,
+              "pathname": "/",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": true,
+              "text": "Summary: 200 records across 5 teams.",
+              "value": null,
+              "focused": false,
+              "attr": null
+            }
+          ],
+          "transitions": [
+            {
+              "epoch": 1790139224883.0999,
+              "text": "Activity"
+            }
+          ],
+          "stages": [
+            {
+              "name": "response",
+              "expect": [
+                {
+                  "target": {
+                    "selector": "[data-testid=\"tab-activity\"]"
+                  },
+                  "attr": {
+                    "aria-selected": "true"
+                  }
+                },
+                {
+                  "target": {
+                    "selector": "[data-testid=\"tab-summary\"]"
+                  },
+                  "attr": {
+                    "aria-selected": "false"
+                  }
+                },
+                {
+                  "target": {
+                    "selector": "[data-testid=\"tab-panel\"]"
+                  },
+                  "text": "Activity: 12 updates in the last 24 hours."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "ripple",
+    "caseId": "overview-tab",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "ripple",
+    "caseId": "records-search",
+    "phase": "early",
+    "pass": false,
+    "failure": {
+      "kind": "input-lost",
+      "message": "input observed by the page, but the DOM never changed within 10000 ms"
+    },
+    "allFailures": [
+      {
+        "kind": "input-lost",
+        "message": "input observed by the page, but the DOM never changed within 10000 ms",
+        "observed": {
+          "observed": [
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"records-count\"]"
+                },
+                "text": "Showing 15 of 200"
+              },
+              "holds": false,
+              "pathname": "/records",
+              "scrollY": 0,
+              "matches": 1,
+              "visible": true,
+              "text": "Showing 200 of 200",
+              "value": null,
+              "focused": false,
+              "attr": null
+            },
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"record-row\"]"
+                },
+                "count": 15
+              },
+              "holds": false,
+              "pathname": "/records",
+              "scrollY": 0,
+              "matches": 200,
+              "visible": true,
+              "text": "Katherine Hopperkatherine.hopper.1@example.testSupport672025-10-29Edit",
+              "value": null,
+              "focused": false,
+              "attr": null
+            },
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"record-row\"]",
+                  "nth": 0
+                },
+                "attr": {
+                  "data-id": "r016"
+                }
+              },
+              "holds": false,
+              "pathname": "/records",
+              "scrollY": 0,
+              "matches": 200,
+              "visible": true,
+              "text": "Katherine Hopperkatherine.hopper.1@example.testSupport672025-10-29Edit",
+              "value": null,
+              "focused": false,
+              "attr": {
+                "data-id": "r001"
+              }
+            }
+          ],
+          "transitions": [
+            {
+              "epoch": 1790139237122.7,
+              "text": "Showing 200 of 200"
+            }
+          ],
+          "stages": [
+            {
+              "name": "response",
+              "expect": [
+                {
+                  "target": {
+                    "selector": "[data-testid=\"records-count\"]"
+                  },
+                  "text": "Showing 15 of 200"
+                },
+                {
+                  "target": {
+                    "selector": "[data-testid=\"record-row\"]"
+                  },
+                  "count": 15
+                },
+                {
+                  "target": {
+                    "selector": "[data-testid=\"record-row\"]",
+                    "nth": 0
+                  },
+                  "attr": {
+                    "data-id": "r016"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "ripple",
+    "caseId": "records-search",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "ripple",
+    "caseId": "records-dialog-open",
+    "phase": "early",
+    "pass": false,
+    "failure": {
+      "kind": "input-lost",
+      "message": "input observed by the page, but the DOM never changed within 10000 ms"
+    },
+    "allFailures": [
+      {
+        "kind": "input-lost",
+        "message": "input observed by the page, but the DOM never changed within 10000 ms",
+        "observed": {
+          "observed": [
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"edit-dialog\"]"
+                }
+              },
+              "holds": false,
+              "pathname": "/records",
+              "scrollY": 0,
+              "matches": 0,
+              "visible": false,
+              "text": null,
+              "value": null,
+              "focused": null,
+              "attr": null
+            },
+            {
+              "predicate": {
+                "target": {
+                  "selector": "[data-testid=\"edit-name\"]"
+                },
+                "value": "Katherine Hopper",
+                "focused": true
+              },
+              "holds": false,
+              "pathname": "/records",
+              "scrollY": 0,
+              "matches": 0,
+              "visible": false,
+              "text": null,
+              "value": null,
+              "focused": null,
+              "attr": null
+            }
+          ],
+          "transitions": [
+            {
+              "epoch": 1790139249352.4,
+              "text": null
+            }
+          ],
+          "stages": [
+            {
+              "name": "response",
+              "expect": [
+                {
+                  "target": {
+                    "selector": "[data-testid=\"edit-dialog\"]"
+                  }
+                },
+                {
+                  "target": {
+                    "selector": "[data-testid=\"edit-name\"]"
+                  },
+                  "value": "Katherine Hopper",
+                  "focused": true
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "ripple",
+    "caseId": "records-dialog-open",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "ripple",
+    "caseId": "settings-submit",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 0,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "ripple",
+    "caseId": "nav-overview-to-records",
+    "phase": "early",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 1,
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  {
+    "target": "ripple",
+    "caseId": "nav-overview-to-records",
+    "phase": "settled",
+    "pass": true,
+    "failure": null,
+    "allFailures": [],
+    "documentRequestsDuringAction": 1,
+    "consoleErrors": [],
+    "pageErrors": []
+  }
+]

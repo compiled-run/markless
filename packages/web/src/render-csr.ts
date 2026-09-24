@@ -1,5 +1,6 @@
 import {
 	PROTOCOL_EVENT_ACTION_KIND,
+	PROTOCOL_VISIBLE_EVENT_NAME,
 	protocolEventActionKind,
 	type ProtocolEventActionKind,
 	type ProtocolEventRecord,
@@ -25,6 +26,9 @@ import type {
 } from './resume-types.ts';
 import type { ResumeRuntime, ResumeRuntimeInput, ResumeSymbol } from './resume.ts';
 import { reportRuntimeErrorToHost } from './runtime-error-reporting.ts';
+
+// Even an evaluated module's import() costs a task.
+let journal: typeof import('./dom-journal.ts') | undefined;
 
 declare const __MARKLESS_DEV_ENABLED__: boolean;
 
@@ -54,8 +58,10 @@ export async function renderCsrRuntime(input: {
 	const state = output.state ?? emptyStatePayload();
 	const view = output.view ?? emptyViewPayload();
 	const loadSymbol = withCsrCallbackSymbols(
-		marklessInstanceScopedLoadSymbol(
-			output.loadSymbol ?? options.loadSymbol ?? missingLoadSymbol,
+		heldSymbolLoader(
+			marklessInstanceScopedLoadSymbol(
+				output.loadSymbol ?? options.loadSymbol ?? missingLoadSymbol,
+			),
 		),
 		view,
 	);
@@ -118,7 +124,7 @@ export async function renderCsrRuntime(input: {
 					applyDomJournal,
 					renderBranchHtml: options.renderBranchHtml ?? globalDocumentBranchHtml(),
 					demandAsyncBoundaries: true,
-					registerDelegatedEventRecord: delegatedTriggers.registerEventRecord,
+					delegatedTriggers,
 					renderData: output.renderData,
 				});
 				await runtime.start();
@@ -214,7 +220,7 @@ async function registerDelegatedTriggerDebug(
 	const debug = await import('./debug-channel.ts');
 	debug.__marklessDebugStartContainer(output.root as unknown as Element, 'csr', false);
 	for (const record of view.events) {
-		if (record.eventName === 'visible') continue;
+		if (record.eventName === PROTOCOL_VISIBLE_EVENT_NAME) continue;
 		const element =
 			output.liveHostNodes?.get(record.hostNodeId) ??
 			(view.locators.length === 1 && view.locators[0]?.hostNodeId === record.hostNodeId
@@ -293,6 +299,7 @@ const EDITABLE_PRELOAD_EVENT_NAMES = [
 	'keypress',
 	'beforeinput',
 	'input',
+	'change',
 	'click',
 	'pointerdown',
 	'pointerup',
@@ -326,6 +333,7 @@ function installDelegatedTriggers(
 	loadSymbol: ResumeRuntimeInput['loadSymbol'],
 ): {
 	readonly registerEventRecord: (element: object, record: ProtocolEventRecord) => void;
+	readonly registerRowEventName: (eventName: string) => void;
 	readonly dispose: () => void;
 } {
 	// One capture listener remains the container's dispatch authority.
@@ -348,7 +356,7 @@ function installDelegatedTriggers(
 		[PROTOCOL_EVENT_ACTION_KIND.externalDelegate]: async () => {},
 	} satisfies Record<ProtocolEventActionKind, DelegatedRoute>;
 	const installEventListener = (eventName: string) => {
-		if (eventName === 'visible' || installedEventNames.has(eventName)) return;
+		if (eventName === PROTOCOL_VISIBLE_EVENT_NAME || installedEventNames.has(eventName)) return;
 		installedEventNames.add(eventName);
 		const route = async (event: DelegatedEvent) => {
 			// A row event name is listened for on behalf of rows that may not exist
@@ -465,7 +473,7 @@ function installDelegatedTriggers(
 			installPreloadTrigger('pointerover', () => PRESS_EVENT_NAMES);
 	};
 	for (const record of view.events) {
-		if (record.eventName === 'visible') continue;
+		if (record.eventName === PROTOCOL_VISIBLE_EVENT_NAME) continue;
 		const element =
 			output.liveHostNodes?.get(record.hostNodeId) ??
 			(view.locators.length === 1 && view.locators[0]?.hostNodeId === record.hostNodeId
@@ -477,6 +485,10 @@ function installDelegatedTriggers(
 	for (const eventName of rowEventNames) installEventListener(eventName);
 	return {
 		registerEventRecord,
+		registerRowEventName(eventName) {
+			rowEventNames.add(eventName);
+			installEventListener(eventName);
+		},
 		dispose() {
 			for (const release of releases.splice(0)) release();
 		},
@@ -574,7 +586,7 @@ async function applyDefaultCsrDomJournal(
 	}
 
 	if (deferred.length === 0) return;
-	const { applyDomJournalEntries } = await import('./dom-journal.ts');
+	const { applyDomJournalEntries } = (journal ??= await import('./dom-journal.ts'));
 	applyDomJournalEntries(deferred, {
 		resolveTarget(locator) {
 			const rangeAnchor = /^(branch|async-boundary):(.+?):(start|end)$/.exec(String(locator));
@@ -590,6 +602,34 @@ async function applyDefaultCsrDomJournal(
 			return runtime.getElement(String(locator));
 		},
 	});
+}
+
+// An evaluated symbol module never changes, and a repeat import() of it still costs a task.
+function heldSymbolLoader(
+	load: ResumeRuntimeInput['loadSymbol'],
+): ResumeRuntimeInput['loadSymbol'] {
+	const held = new Map<string, ReturnType<ResumeRuntimeInput['loadSymbol']>>();
+	return (symbolId) => {
+		const loaded = held.get(symbolId);
+		if (loaded) return loaded;
+		const result = load(symbolId);
+		if (typeof result === 'function') held.set(symbolId, result);
+		else if (isPromiseLike(result)) {
+			const pending = Promise.resolve(result).then(
+				(symbol) => {
+					held.set(symbolId, symbol);
+					return symbol;
+				},
+				(error: unknown) => {
+					held.delete(symbolId);
+					throw error;
+				},
+			);
+			held.set(symbolId, pending);
+			return pending;
+		}
+		return result;
+	};
 }
 
 function withCsrCallbackSymbols(

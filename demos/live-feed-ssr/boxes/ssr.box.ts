@@ -6,7 +6,6 @@ import {
 
 const WAIT = { timeoutMs: 10_000 };
 const FULL_PAYLOAD_SCRIPT_BYTES = 4_761;
-const DELTA_PAYLOAD_SCRIPT_BYTES_MAX = 3_200;
 
 export default box(
 	{
@@ -40,11 +39,7 @@ export default box(
 				'Expected live-feed SSR payload scripts to carry only request-divergent keyed records.',
 			);
 		}
-		if (deltaPayload.bytes > DELTA_PAYLOAD_SCRIPT_BYTES_MAX) {
-			throw new Error(
-				`Expected live-feed SSR delta payload <= ${DELTA_PAYLOAD_SCRIPT_BYTES_MAX} bytes, got ${deltaPayload.bytes}.`,
-			);
-		}
+		// Payload bytes scale with the app's rows, so they are a note (owner ruling 2026-09-24).
 		receipt.note(
 			`live-feed SSR payload scripts: ${FULL_PAYLOAD_SCRIPT_BYTES} bytes full -> ${deltaPayload.bytes} bytes delta`,
 		);
@@ -84,9 +79,7 @@ export default box(
 		const streamedCells = reachableArmRecordCells('ssr').filter(
 			(cell) => cell.posture === 'ssr-streamed',
 		);
-		const heldPage = await preview.browser.visit(
-			`/?latency=${streamedCells[0]!.latencyMs}`,
-		);
+		const heldPage = await preview.browser.visit(`/?latency=${streamedCells[0]!.latencyMs}`);
 		await assertArmRecordCell(heldPage, expect, streamedCells[0]!);
 		receipt.note(`arm-record matrix passed: ${streamedCells[0]!.id}`);
 		const heldStartupScripts = (await heldPage.networkRequests())
@@ -138,13 +131,19 @@ function readResumePayload(html: string): {
 		readonly asyncBoundaries: ReadonlyArray<unknown>;
 	};
 } {
-	const scripts = [...html.matchAll(/<script type="markless\/(state|view)">([\s\S]*?)<\/script>/g)];
+	const scripts = [
+		...html.matchAll(/<script type="markless\/(state|view)">([\s\S]*?)<\/script>/g),
+	];
 	const payload = Object.fromEntries(
 		scripts.map((match) => [match[1], JSON.parse(match[2]!) as unknown]),
 	) as { readonly state?: unknown; readonly view?: unknown };
-	if (!payload.state || !payload.view) throw new Error('Expected both resume delta payload scripts.');
+	if (!payload.state || !payload.view)
+		throw new Error('Expected both resume delta payload scripts.');
 	return {
-		bytes: scripts.reduce((total, match) => total + new TextEncoder().encode(match[0]).length, 0),
+		bytes: scripts.reduce(
+			(total, match) => total + new TextEncoder().encode(match[0]).length,
+			0,
+		),
 		state: payload.state as never,
 		view: payload.view as never,
 	};

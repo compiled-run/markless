@@ -1,0 +1,317 @@
+{
+  "runId": "2026-09-23T05-07-29-037Z-91aefc",
+  "contractVersion": 1,
+  "schemaVersion": 1,
+  "started": "2026-09-23T05:07:29.185Z",
+  "finished": "2026-09-23T07:29:13.274Z",
+  "playwright": "1.58.2",
+  "browserVersions": {
+    "chromium": "145.0.7632.6"
+  },
+  "config": {
+    "visits": 10,
+    "warmup": 0,
+    "cases": [
+      "overview-counter-first",
+      "overview-disclosure",
+      "overview-tab",
+      "records-search",
+      "records-dialog-open",
+      "settings-submit",
+      "nav-overview-to-records"
+    ],
+    "phases": [
+      "early",
+      "settled"
+    ],
+    "networkShaping": "cdp",
+    "profiles": [
+      {
+        "name": "normal",
+        "network": {
+          "name": "unthrottled",
+          "downloadKbps": null,
+          "uploadKbps": null,
+          "latencyMs": null
+        },
+        "cpu": {
+          "name": "unthrottled",
+          "slowdown": 1
+        },
+        "applied": {
+          "chromium": {
+            "name": "normal",
+            "networkMethod": null,
+            "network": {
+              "name": "unthrottled",
+              "downloadKbps": null,
+              "uploadKbps": null,
+              "latencyMs": null
+            },
+            "cpu": {
+              "name": "unthrottled",
+              "slowdown": 1
+            },
+            "cpuNotApplied": null
+          }
+        }
+      },
+      {
+        "name": "constrained",
+        "network": {
+          "name": "rtt150-down5mbps-up1mbps",
+          "downloadKbps": 5000,
+          "uploadKbps": 1000,
+          "latencyMs": 150
+        },
+        "cpu": {
+          "name": "4x-slowdown",
+          "slowdown": 4
+        },
+        "applied": {
+          "chromium": {
+            "name": "constrained",
+            "networkMethod": "cdp",
+            "network": {
+              "name": "rtt150-down5mbps-up1mbps@cdp",
+              "downloadKbps": 5000,
+              "uploadKbps": 1000,
+              "latencyMs": 150
+            },
+            "cpu": {
+              "name": "4x-slowdown",
+              "slowdown": 4
+            },
+            "cpuNotApplied": null
+          }
+        }
+      }
+    ],
+    "browsers": [
+      "chromium"
+    ],
+    "actionTimeoutMs": 10000,
+    "settleTimeoutMs": 30000,
+    "order": "targets rotate by one position per visit index"
+  },
+  "targets": [
+    {
+      "name": "markless",
+      "url": "https://mlbench-markless.vercel.app",
+      "upstream": null,
+      "host": "vercel",
+      "transport": "direct",
+      "proxyProtocol": null,
+      "proxyCompression": null,
+      "proxyStats": null,
+      "shapedUrls": null,
+      "proxyShaping": null,
+      "buildId": "vercel-markless-3c755f6b",
+      "sourceRevision": "d5107ae06c7b-dirty",
+      "versions": {
+        "@markless/core": "0.4.0",
+        "@markless/router": "0.4.0",
+        "@markless/typescript-plugin": "0.4.0",
+        "nitro": "3.0.260429-beta",
+        "vite-plus": "0.3.1"
+      },
+      "ready": true,
+      "setupError": null
+    },
+    {
+      "name": "qwik",
+      "url": "https://mlbench-qwik.vercel.app",
+      "upstream": null,
+      "host": "vercel",
+      "transport": "direct",
+      "proxyProtocol": null,
+      "proxyCompression": null,
+      "proxyStats": null,
+      "shapedUrls": null,
+      "proxyShaping": null,
+      "buildId": "vercel-qwik-8120cad8",
+      "sourceRevision": "d5107ae06c7b-dirty",
+      "versions": {
+        "@qwik.dev/core": "2.0.0-beta.45",
+        "@qwik.dev/router": "2.0.0-beta.45",
+        "vite": "8.2.1"
+      },
+      "ready": true,
+      "setupError": null
+    },
+    {
+      "name": "qwik-tuned",
+      "url": "https://mlbench-qwik-tuned.vercel.app",
+      "upstream": null,
+      "host": "vercel",
+      "transport": "direct",
+      "proxyProtocol": null,
+      "proxyCompression": null,
+      "proxyStats": null,
+      "shapedUrls": null,
+      "proxyShaping": null,
+      "buildId": "vercel-qwik-tuned-fce8506b",
+      "sourceRevision": "d5107ae06c7b-dirty",
+      "versions": {
+        "@qwik.dev/core": "2.0.0-beta.45",
+        "@qwik.dev/router": "2.0.0-beta.45",
+        "vite": "8.2.1"
+      },
+      "ready": true,
+      "setupError": null
+    },
+    {
+      "name": "octane",
+      "url": "https://mlbench-octane.vercel.app",
+      "upstream": null,
+      "host": "vercel",
+      "transport": "direct",
+      "proxyProtocol": null,
+      "proxyCompression": null,
+      "proxyStats": null,
+      "shapedUrls": null,
+      "proxyShaping": null,
+      "buildId": "vercel-octane-2d441bfe",
+      "sourceRevision": "d5107ae06c7b-dirty",
+      "versions": {
+        "octane": "0.4.2",
+        "@octanejs/vite-plugin": "0.1.58",
+        "@octanejs/app-core": "0.0.54",
+        "@octanejs/adapter-vercel": "0.0.55",
+        "vite": "8.3.0"
+      },
+      "ready": true,
+      "setupError": null
+    },
+    {
+      "name": "react-router",
+      "url": "https://mlbench-react-router.vercel.app",
+      "upstream": null,
+      "host": "vercel",
+      "transport": "direct",
+      "proxyProtocol": null,
+      "proxyCompression": null,
+      "proxyStats": null,
+      "shapedUrls": null,
+      "proxyShaping": null,
+      "buildId": "vercel-react-router-da72e418",
+      "sourceRevision": "d5107ae06c7b-dirty",
+      "versions": {
+        "react-router": "8.4.0",
+        "@react-router/dev": "8.4.0",
+        "@react-router/node": "8.4.0",
+        "@react-router/serve": "8.4.0",
+        "react": "19.3.0",
+        "react-dom": "19.3.0",
+        "vite": "8.3.0",
+        "@vercel/react-router": "1.3.6"
+      },
+      "ready": true,
+      "setupError": null
+    },
+    {
+      "name": "remix3",
+      "url": "https://mlbench-remix3.vercel.app",
+      "upstream": null,
+      "host": "vercel",
+      "transport": "direct",
+      "proxyProtocol": null,
+      "proxyCompression": null,
+      "proxyStats": null,
+      "shapedUrls": null,
+      "proxyShaping": null,
+      "buildId": "vercel-remix3-7fa817d6",
+      "sourceRevision": "d5107ae06c7b-dirty",
+      "versions": {
+        "remix": "3.0.0-rc.3"
+      },
+      "ready": true,
+      "setupError": null
+    },
+    {
+      "name": "solidstart",
+      "url": "https://mlbench-solidstart.vercel.app",
+      "upstream": null,
+      "host": "vercel",
+      "transport": "direct",
+      "proxyProtocol": null,
+      "proxyCompression": null,
+      "proxyStats": null,
+      "shapedUrls": null,
+      "proxyShaping": null,
+      "buildId": "vercel-solidstart-d0be8cf5",
+      "sourceRevision": "d5107ae06c7b-dirty",
+      "versions": {
+        "solid-js": "2.0.0-rc.9",
+        "@solidjs/web": "2.0.0-rc.9",
+        "@solidjs/router": "2.0.0-next.26",
+        "@solidjs/vite-plugin": "3.0.0-next.44",
+        "nitro": "3.0.260903-beta",
+        "vite": "8.3.0"
+      },
+      "ready": true,
+      "setupError": null
+    },
+    {
+      "name": "sveltekit",
+      "url": "https://mlbench-sveltekit.vercel.app",
+      "upstream": null,
+      "host": "vercel",
+      "transport": "direct",
+      "proxyProtocol": null,
+      "proxyCompression": null,
+      "proxyStats": null,
+      "shapedUrls": null,
+      "proxyShaping": null,
+      "buildId": "vercel-sveltekit-5fd0b338",
+      "sourceRevision": "d5107ae06c7b-dirty",
+      "versions": {
+        "svelte": "5.57.1",
+        "@sveltejs/kit": "2.70.3",
+        "@sveltejs/adapter-vercel": "6.3.4",
+        "vite": "8.3.0"
+      },
+      "ready": true,
+      "setupError": null
+    },
+    {
+      "name": "ripple",
+      "url": "https://mlbench-ripple.vercel.app",
+      "upstream": null,
+      "host": "vercel",
+      "transport": "direct",
+      "proxyProtocol": null,
+      "proxyCompression": null,
+      "proxyStats": null,
+      "shapedUrls": null,
+      "proxyShaping": null,
+      "buildId": "vercel-ripple-5e6ef143",
+      "sourceRevision": "d5107ae06c7b-dirty",
+      "versions": {
+        "ripple": "0.4.7",
+        "@ripple-ts/vite-plugin": "0.4.7",
+        "@ripple-ts/adapter-vercel": "0.4.7",
+        "vite": "8.3.0"
+      },
+      "ready": true,
+      "setupError": null
+    }
+  ],
+  "labels": {
+    "inputToResponseMs": "input event.timeStamp -> presentation estimate: start of the first animation frame after the assertion holds, then the next rAF callback (not a paint timestamp)",
+    "inputToDomMs": "input event.timeStamp -> first moment the assertion holds (MutationObserver callback or per-frame check)",
+    "navToResponseMs": "performance.timeOrigin of the first document -> presentation estimate (early phase only; null for settled, where the runner wait dominates)",
+    "pendingMs": "input -> presentation estimate of the pending assertion",
+    "serverMs": "Resource Timing responseEnd - requestStart of the server request",
+    "eventDurationMs": "Chromium Event Timing: max duration over the input interaction; null when no entry reached the 16 ms reporting threshold or the browser lacks Event Timing",
+    "bytes": "responses whose request started before the presentation estimate, counted in full after in-flight requests finish (drain, max drainTimeoutMs); compressed = encoded body (Resource Timing encodedBodySize when non-zero, else CDP total minus header bytes / WebKit request.sizes().responseBodySize); decoded = CDP dataReceived sum / WebKit Resource Timing decodedBodySize",
+    "requests": "main-frame requests; initial = started before the input; perAction = input to presentation estimate"
+  },
+  "validation": {
+    "schema": "demos/interaction-benchmark/shared/result.schema.json",
+    "checked": 2340,
+    "invalid": 0,
+    "examples": []
+  },
+  "correctness": "skipped"
+}

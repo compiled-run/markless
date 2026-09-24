@@ -1,7 +1,15 @@
 import { expect, test } from 'vitest';
 import { ASYNC_PROTOCOL_VERSION, STORAGE_PROTOCOL_VERSION } from '@markless/serializer';
+import { marklessWriteScalar } from '../../web/src/fns/write-scalar.ts';
+import { marklessUpdateText } from '../../web/src/fns/update-text.ts';
+import {
+	marklessDecodeScalarCell,
+	marklessReadScalarCell,
+	marklessScalarSpecializedError,
+} from '../../web/src/fns/scalar-specialized.ts';
 import {
 	emitResumeModule,
+	payloadModule,
 	emitSourceModule,
 	rewriteSymbolModuleExport,
 	symbolVirtualModuleId,
@@ -362,6 +370,51 @@ test('emitResumeModule emits a specialized scalar dispatcher with resolved const
 	expect(resumeCode).toContain('marklessScalarSpecializedHostMiss');
 });
 
+test('specialized scalar dispatch preserves a suffix on first and repeated writes', async () => {
+	const input = scalarResumeInput();
+	const plan = input.runtimeDemandMap.actions[0]!.plan!;
+	(plan.textUpdates[0] as { suffix?: string }).suffix = ' units';
+	const source = emitResumeModule({
+		...input,
+		executionLog: 'never',
+		symbols: [
+			{
+				id: 'symbol:click',
+				chunk: 'data:text/javascript,export function onClick({graph}){graph.update({graphNodeId:"state:count",update:value=>Number(value)+1})}',
+				exportName: 'onClick',
+			},
+		],
+	})
+		.replace(/^import .*;$/gm, '')
+		.replace(/export /g, '')
+		.replace(/\bimport\(/g, 'loadModule(');
+	const host = { tagName: 'BUTTON' };
+	const label = { tagName: 'OUTPUT', textContent: 'Count: 0 units' };
+	const root = { querySelector: () => null };
+	const resume = new Function(
+		'marklessWriteScalar',
+		'marklessUpdateText',
+		'marklessDecodeScalarCell',
+		'marklessReadScalarCell',
+		'marklessScalarSpecializedError',
+		'marklessFindElementAtDomOrderIndex',
+		'loadModule',
+		source + '\nreturn resumeContainerEvent;',
+	)(
+		marklessWriteScalar,
+		marklessUpdateText,
+		marklessDecodeScalarCell,
+		marklessReadScalarCell,
+		marklessScalarSpecializedError,
+		(_root: unknown, index: number) => (index === 3 ? host : label),
+		async () => ({ onClick: () => undefined }),
+	);
+	for (let value = 1; value <= 2; value++) {
+		await resume({ root, event: { type: 'click', target: host } });
+		expect(label.textContent).toBe(`Count: ${value} units`);
+	}
+});
+
 test('scalar dispatch and staged wake share one neutral DOM-order helper import', () => {
 	const resumeCode = emitResumeModule({
 		...scalarResumeInput(),
@@ -411,16 +464,60 @@ test('emitSourceModule carries compiled inline variants only on server artifacts
 	expect(client).not.toContain('inlineResumerSources:');
 });
 
-test('composed pages are excluded from scalar specialization (deferred projection design)', () => {
+test('composed pages resolve scalar hosts only through served locators', () => {
 	const input = scalarResumeInput();
 	(input as { symbolRoutes: unknown }).symbolRoutes = [
 		{ prefix: 'c0:', importSource: './child.tsrx' },
 	];
 	const resumeCode = emitResumeModule(input as Parameters<typeof emitResumeModule>[0]);
-	// Child-composed hosts keep caller-coordinate locators; until the
-	// projection-metadata design lands, composed pages emit NO specialized
-	// actions (the wrapper falls straight through to the full path).
-	expect(resumeCode).not.toContain('hostNodeId===');
+	// Compiled indices live in the page's own coordinates, not the composed container's.
+	expect(resumeCode).toContain(
+		'marklessScalarServedOwner(input.root, input.event, marklessScalarOwners)',
+	);
+	expect(resumeCode).toContain('marklessScalarLocate(input.root, "host:button", -1, "button")');
+	expect(resumeCode).not.toContain('marklessFindElementAtDomOrderIndex(input.root, 3)');
+	expect(resumeCode).toContain("import('@markless/core/web/resume')");
+	expect(resumeCode).toContain('return marklessScalarSpecializedFallback(input, "event-match");');
+});
+
+test('a page that needs full resume keeps its scalar actions lean behind a full fallback', () => {
+	const resumeCode = emitResumeModule({ ...scalarResumeInput(), needsFullResume: true });
+	expect(resumeCode).toContain('async function marklessRunScalar0');
+	expect(resumeCode).toContain(
+		'if (input.root.__asyncResumeRuntimeStarted) return marklessFullResumeHandoff',
+	);
+	expect(resumeCode).toContain(
+		'marklessScalarServedPrime(input.root, input.element, marklessScalarOwners)',
+	);
+	expect(resumeCode).toContain('marklessScalarLocate(input.root, "host:button", 3, "button")');
+	expect(resumeCode).toContain("import('@markless/core/web/resume')");
+	expect(emitResumeModule(scalarResumeInput())).not.toContain('marklessScalarServedOwner');
+});
+
+test('a conservatively classed module runs plain-ssr scalar plans only through served locators', () => {
+	const input = scalarResumeInput();
+	const resumeCode = emitResumeModule({
+		...input,
+		runtimeDemandMap: {
+			recordKinds: [{ kind: 'event', replaced: false }],
+			actions: input.runtimeDemandMap.actions.map(({ plan: _plan, ...action }) => action),
+		},
+		servedScalarPlans: input.runtimeDemandMap,
+		needsFullResume: true,
+	});
+	expect(resumeCode).toContain('async function marklessRunScalar0');
+	expect(resumeCode).toContain('marklessScalarLocate(input.root, "host:button", -1, "button")');
+	expect(resumeCode).not.toContain(
+		'marklessScalarEventMatches(input, marklessFindElementAtDomOrderIndex',
+	);
+	expect(resumeCode).toContain("import('@markless/core/web/resume')");
+	expect(
+		emitResumeModule({
+			...input,
+			runtimeDemandMap: { recordKinds: [] },
+			needsFullResume: true,
+		}),
+	).not.toContain('marklessRunScalar0');
 });
 
 test('specialized scalar dispatcher excludes composed child symbols without a route', () => {
@@ -736,7 +833,9 @@ test('records-only wake uses generic staged resume without payload documents', (
 		],
 	});
 	expect(wakeCode).toContain("import('@markless/web/fns/prerender-trigger-resume')");
-	expect(wakeCode).toContain('mergePrerenderPayloadRecords({ state: group.state, view: group.view }');
+	expect(wakeCode).toContain(
+		'mergePrerenderPayloadRecords({ state: group.state, view: group.view }',
+	);
 	expect(wakeCode).toContain('resumePrerenderTriggerGroup');
 	expect(wakeCode).not.toContain('resumeFromPayloadDocument');
 	expect(wakeCode).not.toContain('resumeScalarRowEventFromPayloadDocument');
@@ -827,7 +926,9 @@ test('the live-roster loader is named only where a roster derivation can exist',
 			payloadState: { cells: [{ graphNodeId: 'state:count' }], computed: [] },
 		}),
 	).not.toContain('roster-resume');
-	expect(emitResumeModule({ ...baseInput, needsFullResume: true })).not.toContain('roster-resume');
+	expect(emitResumeModule({ ...baseInput, needsFullResume: true })).not.toContain(
+		'roster-resume',
+	);
 
 	// A CSR mount evaluates no resume module, so its rows would never be
 	// renumbered without the same line on the client source module.
@@ -868,6 +969,25 @@ test('emitResumeModule writes the row-mint loader only for a repeat that can bui
 			]),
 		}),
 	).toContain("globalThis.__marklessRowMint ??= () => import('@markless/web/fns/row-mint');");
+});
+
+test('only a repeat nested in another repeat\'s rows installs the nested-repeat loader', () => {
+	const loader = "import('@markless/web/fns/nested-repeats')";
+	const nested = repeatDemandMap([
+		'web/repeat-runtime',
+		'web/resume-keyed-repeats',
+		'web/fns/nested-repeats',
+	]);
+	expect(emitResumeModule({ ...baseInput, runtimeDemandMap: nested })).toContain(loader);
+	expect(
+		emitSourceModule({ ...baseInput, environment: 'client', runtimeDemandMap: nested }),
+	).toContain(loader);
+	expect(
+		emitResumeModule({
+			...baseInput,
+			runtimeDemandMap: repeatDemandMap(['web/repeat-runtime', 'web/resume-keyed-repeats']),
+		}),
+	).not.toContain('nested-repeats');
 });
 
 test('emitResumeModule leaves a reorder-only repeat with no row-mint specifier', () => {
@@ -956,7 +1076,9 @@ test('a prerendered page hands its already-bound surface over', () => {
 	});
 
 	expect(emitted).toContain('renderData: () => marklessPrerenderData,');
-	expect(emitted).toContain("import { marklessPrerenderData } from '\0markless:render-data:page.tsrx';");
+	expect(emitted).toContain(
+		"import { marklessPrerenderData } from '\0markless:render-data:page.tsrx';",
+	);
 });
 
 test('a page with no component row carries no render-data handoff field', () => {
@@ -1076,4 +1198,37 @@ test('emitResumeModule leaves a page with no component row byte-identical', () =
 		}),
 	);
 	expect(reorderOnly).not.toContain('row-component-mint');
+});
+
+test('the payload module ships the demand map without the pack planner first-use sets', () => {
+	const action = { hostNodeId: 'h1', eventName: 'click', runtimeModuleIds: [] };
+	const withFirstUse = payloadModule({
+		state: {},
+		view: {},
+		runtimeDemandMap: {
+			actions: [{ ...action, firstUse: { symbolIds: ['symbol:0'], runtimeModuleIds: [] } }],
+			firstUsePage: {
+				resume: { symbolIds: [], runtimeModuleIds: [] },
+				pageSpaceReaders: [],
+				passedProps: [],
+				callbackSlots: [],
+			},
+		},
+	});
+	expect(withFirstUse).toBe(
+		payloadModule({ state: {}, view: {}, runtimeDemandMap: { actions: [action] } }),
+	);
+	expect(withFirstUse).not.toContain('firstUse');
+});
+
+test('served-only scalar dispatch never substitutes the compiled initial value for a missing served cell', () => {
+	const input = scalarResumeInput();
+	(input as { symbolRoutes: unknown }).symbolRoutes = [
+		{ prefix: 'c0:', importSource: './child.tsrx' },
+	];
+	const resumeCode = emitResumeModule(input as Parameters<typeof emitResumeModule>[0]);
+	expect(resumeCode).toContain(
+		'marklessDecodeScalarCell(marklessReadScalarCell(input.root, "state:count"), ',
+	);
+	expect(resumeCode).not.toContain('?? {"graphNodeId":"state:count"');
 });

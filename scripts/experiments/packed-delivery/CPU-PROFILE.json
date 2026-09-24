@@ -1,0 +1,1762 @@
+{
+  "input": "/private/tmp/markless-docs-execution-kqfZDj/results.json",
+  "metadata": {
+    "output": "/private/tmp/markless-docs-computed-guard-Lo2aYh/.output",
+    "serverEntrySha256": "8b1bc5e4722a8ea178cf1bf3ba3a774bb301085e79fbe6eed0f26b8d0c2145e3",
+    "metric": "Chrome sampled CPU profile, 100 microsecond requested interval",
+    "limitation": "Profiling changes execution. Samples can miss short calls and the window includes browser automation and idle time. Coverage describes source regions, not CPU time. Do not use these visits for latency comparisons.",
+    "samples": 3,
+    "cpuRate": 4,
+    "cache": "fresh context per route, CDP HTTP cache disabled, service workers blocked",
+    "browserVersion": "153.0.8010.48"
+  },
+  "visits": 15,
+  "actions": 48,
+  "failures": [],
+  "groups": [
+    {
+      "key": "state-counter/before-input",
+      "visits": 3,
+      "totalSamples": 2699,
+      "frameworkSamples": 0,
+      "frameworkFrames": []
+    },
+    {
+      "key": "state-counter/first-action",
+      "visits": 3,
+      "totalSamples": 1730,
+      "frameworkSamples": 239,
+      "frameworkFrames": [
+        {
+          "name": "e",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 5026,
+          "samples": 19,
+          "microseconds": 7275,
+          "source": "turn(function e(n){for(let r of Array.from(n))r.nodeType===1&&t.push(r),r.childNodes&&e(r.childNodes)})(e),t}function Aee(e,t){let n=new Set(Re([e[t]]"
+        },
+        {
+          "name": "qee",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 9140,
+          "samples": 10,
+          "microseconds": 3318,
+          "source": "r}}function qee(e,t){let n=`<script type=\"${t}\">`;if(!e.startsWith(n)||!e.endsWith(`<\\/script>`))throw $e(t,`Expected ${t} payload script.`);try{retur"
+        },
+        {
+          "name": "Kee",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 8941,
+          "samples": 8,
+          "microseconds": 2787,
+          "source": "1)}function Kee(e,t){let n=qee(e.stateScript,`markless/state`),r=qee(e.viewScript,`markless/view`);return Jee(n),Yee(r),$ee(n.version,`markless/state`"
+        },
+        {
+          "name": "rne",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 26628,
+          "samples": 5,
+          "microseconds": 2754,
+          "source": "0)}function rne(e,t){let n=new Map;for(let r of e.records){r.type===`object`&&n.set(r.id,{}),r.type===`array`&&n.set(r.id,[]),r.type===`map`&&n.set(r."
+        },
+        {
+          "name": "xe",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 113380,
+          "samples": 7,
+          "microseconds": 2627,
+          "source": "ync function xe(){s&&!o&&(o=(await (async()=>{let{createStoragePlane:e}=await import(`./chunk-DndtSUC4.js`).then(e=>e.__marklessPacked1204());return{c"
+        },
+        {
+          "name": "__marklessPacked1688",
+          "url": "/markless/build/chunk-BDWZvQyH.js",
+          "line": 161,
+          "column": 8134,
+          "samples": 5,
+          "microseconds": 2379,
+          "source": "klessPacked1688(){if(jt)throw At;if(Z)return Z;try{return M(),Z=F({__proto__:null,get default(){return j},get resumeContainerEvent(){return Ze}})}catc"
+        },
+        {
+          "name": "Eye",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 117320,
+          "samples": 5,
+          "microseconds": 2297,
+          "source": "()}function Eye(e){let t=[...e.computed.filter(e=>e.async===!1&&typeof e.deriveSymbolId==`string`),...e.sharedSeeds??[]];for(let n of t)for(let t of n"
+        },
+        {
+          "name": "le",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 107996,
+          "samples": 3,
+          "microseconds": 2169,
+          "source": "ync function le(){if(y)return y;let{createEventWiring:t}=await (async()=>{let{createEventWiring:e}=await import(`./chunk-DndtSUC4.js`).then(e=>e.__mar"
+        },
+        {
+          "name": "b",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 87057,
+          "samples": 6,
+          "microseconds": 1982,
+          "source": "sync function b(t,i={}){let o=t.target;if(!o)throw oS(t,void 0);let s=Ive(o),c=e.ignoredDisposedEventTargets.has(o),l=aS(e.root,o),u=l?void 0:a(o),d=u"
+        },
+        {
+          "name": "o",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 688233,
+          "samples": 4,
+          "microseconds": 1854,
+          "source": "lyDomJournal??(async e=>{let{applyDomJournalEntries:t}=await (async()=>{let{applyDomJournalEntries:e}=await import(`./chunk-DndtSUC4.js`).then(e=>e.__"
+        },
+        {
+          "name": "yr",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 99691,
+          "samples": 3,
+          "microseconds": 1747,
+          "source": ")()}function yr(e,t){let n=e.view.asyncBoundaries,r=Nie(e.root,n),a=e,o=a.liveHostNodes?new Map(a.liveHostNodes):ur(a.root,a.view.locators),s=dr(a.roo"
+        },
+        {
+          "name": "get",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 3005,
+          "column": 158068,
+          "samples": 3,
+          "microseconds": 1734,
+          "source": "ew Proxy(n,{get(t,n){return n in e?Reflect.get(e,n):Reflect.get(t,n)},getOwnPropertyDescriptor(t,n){let r=Reflect.getOwnPropertyDescriptor(t,n);return"
+        }
+      ]
+    },
+    {
+      "key": "state-counter/repeat-1",
+      "visits": 3,
+      "totalSamples": 1439,
+      "frameworkSamples": 10,
+      "frameworkFrames": [
+        {
+          "name": "Ive",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 90925,
+          "samples": 1,
+          "microseconds": 988,
+          "source": " 0}function Ive(e){return`${typeof e.tagName==`string`?e.tagName.toLowerCase():`element`}${typeof e.id==`string`&&e.id?`#${e.id}`:``}`}async function "
+        },
+        {
+          "name": "c",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 1,
+          "column": 1710,
+          "samples": 1,
+          "microseconds": 965,
+          "source": "e}`]}function c(e){let t=e.querySelector?.(`script[type=\"@markless/core/route\"]`)?.textContent;if(t)try{let e=JSON.parse(t);return typeof e.file==`str"
+        },
+        {
+          "name": "Nee",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 6470,
+          "samples": 1,
+          "microseconds": 924,
+          "source": ":e}function Nee(e,t){let n=e,r=Wee(t);n.textContent!==r&&(n.textContent=r)}function Pee(e,t,n){let r=e,i=Fe(t,n);if(i===null){r.removeAttribute?.(t);r"
+        },
+        {
+          "name": "aDe",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 3005,
+          "column": 5706,
+          "samples": 1,
+          "microseconds": 807,
+          "source": ")}}function aDe(e,t,n){for(let n of t){if(!e.startsWith(n.symbolPrefix))continue;let t=n.output?.loadSymbol?.bind(n.output);if(t)return oDe(e,n.symbol"
+        },
+        {
+          "name": "_e",
+          "url": "/markless/build/chunk-BDWZvQyH.js",
+          "line": 1,
+          "column": 1753,
+          "samples": 1,
+          "microseconds": 789,
+          "source": ")()}function _e(e){return{type:`setText`,locator:e.domUpdate?.hostNodeId??`h0`,value:`Clicked `+(e.value==null?``:String(e.value))+` times`}}function "
+        },
+        {
+          "name": "C",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 46468,
+          "samples": 1,
+          "microseconds": 489,
+          "source": "))()}function C(e){return e&&An.exec(e)?.[0]||``}function bn(e){return`r:${encodeURIComponent(String(e))}:`}function xn(e,t){let n=t??An.exec(e)?.[0]?"
+        },
+        {
+          "name": "ee",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 87830,
+          "samples": 1,
+          "microseconds": 129,
+          "source": "ync function ee(n,r,i,a,s,c){let l=rS();r.syncPolicy&&!a.syncPolicyAlreadyApplied&&o?.(r.syncPolicy,e.graph,i);let u,d=tS();try{await e.prepareRuntime"
+        },
+        {
+          "name": "re",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 43658,
+          "samples": 1,
+          "microseconds": 121,
+          "source": "leFlush:v}),re=()=>p||(p=x(),p),x=async()=>{u=!1,d=!0;try{try{for(;c.length>0;){y?.recomputeSubscribed();let e=c.splice(0),t=new Set;for(let n of a){l"
+        },
+        {
+          "name": "ire",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 51352,
+          "samples": 1,
+          "microseconds": 115,
+          "source": "t)}function ire(e,t){for(let n of t.listSharedDefinitions?.()??[])if(n.scope===`widget`){let t=C(n.id);On(e,n.id,t);for(let r of n.projectionIds??[])O"
+        },
+        {
+          "name": "Cn.Object.assign.marklessScopedBase",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 49625,
+          "samples": 1,
+          "microseconds": 61,
+          "source": ":Object.assign(n=>{let r=n.graph;return e({...n,...r?{graph:En(r,t)}:{},getElementHandle:Tn(n.getElementHandle,t,r),...n.read&&r?{read:(e,n)=>r.read(T"
+        }
+      ]
+    },
+    {
+      "key": "state-counter/repeat-2",
+      "visits": 3,
+      "totalSamples": 1392,
+      "frameworkSamples": 10,
+      "frameworkFrames": [
+        {
+          "name": "x",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 43677,
+          "samples": 1,
+          "microseconds": 932,
+          "source": "p||(p=x(),p),x=async()=>{u=!1,d=!0;try{try{for(;c.length>0;){y?.recomputeSubscribed();let e=c.splice(0),t=new Set;for(let n of a){let r=n.path??[];if("
+        },
+        {
+          "name": "ee",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 87830,
+          "samples": 2,
+          "microseconds": 764,
+          "source": "ync function ee(n,r,i,a,s,c){let l=rS();r.syncPolicy&&!a.syncPolicyAlreadyApplied&&o?.(r.syncPolicy,e.graph,i);let u,d=tS();try{await e.prepareRuntime"
+        },
+        {
+          "name": "iS",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 91062,
+          "samples": 1,
+          "microseconds": 584,
+          "source": "ync function iS(e){let t=globalThis;if(t.__mxLog){if(t.__mxLogInteraction){await t.__mxLogInteraction({...e,after:new Set(t.__mxLog)});return}try{awai"
+        },
+        {
+          "name": "s",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 1,
+          "column": 1643,
+          "samples": 1,
+          "microseconds": 487,
+          "source": "r(e)}function s(e){let t=e.endsWith(`.mdx`)?l:u;return t[e]??t[`/${e}`]}function c(e){let t=e.querySelector?.(`script[type=\"@markless/core/route\"]`)?."
+        },
+        {
+          "name": "/pages/markless/concepts/state.mdx",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 1,
+          "column": 2929,
+          "samples": 2,
+          "microseconds": 352,
+          "source": "pts/state.mdx\":()=>import(`./chunk-BDWZvQyH.js`).then(e=>e.__marklessPacked1688()),\"/pages/markless/concepts/styling.mdx\":()=>import(`./chunk-CHDM7QEO"
+        },
+        {
+          "name": "c",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 1,
+          "column": 1710,
+          "samples": 1,
+          "microseconds": 178,
+          "source": "e}`]}function c(e){let t=e.querySelector?.(`script[type=\"@markless/core/route\"]`)?.textContent;if(t)try{let e=JSON.parse(t);return typeof e.file==`str"
+        },
+        {
+          "name": "",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 49454,
+          "samples": 1,
+          "microseconds": 153,
+          "source": "nction`?r.then(e=>Cn(e,n)):Cn(r,n)}}function Cn(e,t){if(Nn.has(e))return e;let{marklessScopedBase:n,marklessScopedPath:r}=e;return n&&(r===t||r===t.re"
+        },
+        {
+          "name": "re",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 43658,
+          "samples": 1,
+          "microseconds": 97,
+          "source": "leFlush:v}),re=()=>p||(p=x(),p),x=async()=>{u=!1,d=!0;try{try{for(;c.length>0;){y?.recomputeSubscribed();let e=c.splice(0),t=new Set;for(let n of a){l"
+        }
+      ]
+    },
+    {
+      "key": "state-independent-controls/before-input",
+      "visits": 3,
+      "totalSamples": 2614,
+      "frameworkSamples": 0,
+      "frameworkFrames": []
+    },
+    {
+      "key": "state-independent-controls/first-action",
+      "visits": 3,
+      "totalSamples": 1728,
+      "frameworkSamples": 231,
+      "frameworkFrames": [
+        {
+          "name": "e",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 5026,
+          "samples": 17,
+          "microseconds": 6378,
+          "source": "turn(function e(n){for(let r of Array.from(n))r.nodeType===1&&t.push(r),r.childNodes&&e(r.childNodes)})(e),t}function Aee(e,t){let n=new Set(Re([e[t]]"
+        },
+        {
+          "name": "qee",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 9140,
+          "samples": 11,
+          "microseconds": 4316,
+          "source": "r}}function qee(e,t){let n=`<script type=\"${t}\">`;if(!e.startsWith(n)||!e.endsWith(`<\\/script>`))throw $e(t,`Expected ${t} payload script.`);try{retur"
+        },
+        {
+          "name": "yr",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 99691,
+          "samples": 7,
+          "microseconds": 3466,
+          "source": ")()}function yr(e,t){let n=e.view.asyncBoundaries,r=Nie(e.root,n),a=e,o=a.liveHostNodes?new Map(a.liveHostNodes):ur(a.root,a.view.locators),s=dr(a.roo"
+        },
+        {
+          "name": "xe",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 113380,
+          "samples": 4,
+          "microseconds": 2521,
+          "source": "ync function xe(){s&&!o&&(o=(await (async()=>{let{createStoragePlane:e}=await import(`./chunk-DndtSUC4.js`).then(e=>e.__marklessPacked1204());return{c"
+        },
+        {
+          "name": "",
+          "url": "/markless/build/chunk-jNFbnHUH.js",
+          "line": -1,
+          "column": -1,
+          "samples": 3,
+          "microseconds": 2224
+        },
+        {
+          "name": "__marklessPacked1688",
+          "url": "/markless/build/chunk-BDWZvQyH.js",
+          "line": 161,
+          "column": 8134,
+          "samples": 6,
+          "microseconds": 2070,
+          "source": "klessPacked1688(){if(jt)throw At;if(Z)return Z;try{return M(),Z=F({__proto__:null,get default(){return j},get resumeContainerEvent(){return Ze}})}catc"
+        },
+        {
+          "name": "ct",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 14489,
+          "samples": 5,
+          "microseconds": 1984,
+          "source": "ync function ct(e){let{createRuntimeGraph:t}=await yte(),n,r=await gte(e,()=>n);return n=t({cells:[...await mte(e.state,e.root.__marklessEventOnlyGrap"
+        },
+        {
+          "name": "le",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 107996,
+          "samples": 5,
+          "microseconds": 1858,
+          "source": "ync function le(){if(y)return y;let{createEventWiring:t}=await (async()=>{let{createEventWiring:e}=await import(`./chunk-DndtSUC4.js`).then(e=>e.__mar"
+        },
+        {
+          "name": "Kee",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 8941,
+          "samples": 4,
+          "microseconds": 1787,
+          "source": "1)}function Kee(e,t){let n=qee(e.stateScript,`markless/state`),r=qee(e.viewScript,`markless/view`);return Jee(n),Yee(r),$ee(n.version,`markless/state`"
+        },
+        {
+          "name": "dr",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 97537,
+          "samples": 6,
+          "microseconds": 1755,
+          "source": "n r}function dr(e,t,n,r=[]){let i=new Map,a=new Map;function o(e){for(let t of e.keys){let n=i.get(t);if(!n)continue;let r=n.indexOf(e.element);r>=0&&"
+        },
+        {
+          "name": "lt",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 16500,
+          "samples": 2,
+          "microseconds": 1671,
+          "source": "ync function lt(e){xte??=import(`./chunk-DndtSUC4.js`).then(e=>e.__marklessPacked5());let{deserializeGraphValueForClient:t}=await xte;return t(e)}var "
+        },
+        {
+          "name": "x",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 43677,
+          "samples": 4,
+          "microseconds": 1539,
+          "source": "p||(p=x(),p),x=async()=>{u=!1,d=!0;try{try{for(;c.length>0;){y?.recomputeSubscribed();let e=c.splice(0),t=new Set;for(let n of a){let r=n.path??[];if("
+        }
+      ]
+    },
+    {
+      "key": "state-independent-controls/second-control",
+      "visits": 3,
+      "totalSamples": 1653,
+      "frameworkSamples": 18,
+      "frameworkFrames": [
+        {
+          "name": "C",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 46468,
+          "samples": 1,
+          "microseconds": 977,
+          "source": "))()}function C(e){return e&&An.exec(e)?.[0]||``}function bn(e){return`r:${encodeURIComponent(String(e))}:`}function xn(e,t){let n=t??An.exec(e)?.[0]?"
+        },
+        {
+          "name": "__marklessPacked1237",
+          "url": "/markless/build/chunk-BDWZvQyH.js",
+          "line": 161,
+          "column": 7780,
+          "samples": 1,
+          "microseconds": 897,
+          "source": "klessPacked1237(){if(Dt)throw Et;if(Y)return Y;try{return O(),Y=F({__proto__:null,get loadSymbol(){return Ke}})}catch(e){throw Dt=!0,Et=e,e}}let X,Ot,"
+        },
+        {
+          "name": "",
+          "url": "/markless/build/chunk-BDWZvQyH.js",
+          "line": 1,
+          "column": 23575,
+          "samples": 1,
+          "microseconds": 882,
+          "source": "ed1238()).then(e=>e.loadSymbol?e.loadSymbol(t.slice(3)):Promise.reject(Error(`Unknown child async symbol ${t}`))):Je(t)}var qe,Je;function O(){return("
+        },
+        {
+          "name": "",
+          "url": "/markless/build/chunk-BDWZvQyH.js",
+          "line": 1,
+          "column": 23877,
+          "samples": 1,
+          "microseconds": 849,
+          "source": "vQyH.js`).then(e=>e.__marklessPacked777()).then(e=>Xe(e,`symbol_0_1id3q82`)):t===`symbol:1`?import(`./chunk-BDWZvQyH.js`).then(e=>e.__marklessPacked77"
+        },
+        {
+          "name": "Cte",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 16843,
+          "samples": 2,
+          "microseconds": 740,
+          "source": "nc function Cte(e){return(await import(`./chunk-DndtSUC4.js`).then(e=>e.__marklessPacked4())).resumeFromPayloadDocument(e)}var dt;function ft(){return"
+        },
+        {
+          "name": "On",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 51508,
+          "samples": 1,
+          "microseconds": 684,
+          "source": "t)}}function On(e,t,n){e.rootPaths.set(t,n),n.includes(`r:`)&&e.rowRooted.add(t.slice(C(t).length))}function are(e,t,n){if(!t?.size)return n();let r=R"
+        },
+        {
+          "name": "Cn.Object.assign.marklessScopedBase",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 49625,
+          "samples": 2,
+          "microseconds": 465,
+          "source": ":Object.assign(n=>{let r=n.graph;return e({...n,...r?{graph:En(r,t)}:{},getElementHandle:Tn(n.getElementHandle,t,r),...n.read&&r?{read:(e,n)=>r.read(T"
+        },
+        {
+          "name": "re",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 43658,
+          "samples": 1,
+          "microseconds": 353,
+          "source": "leFlush:v}),re=()=>p||(p=x(),p),x=async()=>{u=!1,d=!0;try{try{for(;c.length>0;){y?.recomputeSubscribed();let e=c.splice(0),t=new Set;for(let n of a){l"
+        },
+        {
+          "name": "/pages/markless/concepts/state.mdx",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 1,
+          "column": 2929,
+          "samples": 2,
+          "microseconds": 320,
+          "source": "pts/state.mdx\":()=>import(`./chunk-BDWZvQyH.js`).then(e=>e.__marklessPacked1688()),\"/pages/markless/concepts/styling.mdx\":()=>import(`./chunk-CHDM7QEO"
+        },
+        {
+          "name": "",
+          "url": "/markless/build/chunk-BDWZvQyH.js",
+          "line": 1,
+          "column": 25230,
+          "samples": 2,
+          "microseconds": 247,
+          "source": "vQyH.js`).then(e=>e.__marklessPacked1237()).then(e=>e.loadSymbol(t.slice(3)))}},{prefix:`m5:`,loadSymbol(t){return e(()=>import(`./chunk-DndtSUC4.js`)"
+        },
+        {
+          "name": "Nee",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 6470,
+          "samples": 1,
+          "microseconds": 140,
+          "source": ":e}function Nee(e,t){let n=e,r=Wee(t);n.textContent!==r&&(n.textContent=r)}function Pee(e,t,n){let r=e,i=Fe(t,n);if(i===null){r.removeAttribute?.(t);r"
+        },
+        {
+          "name": "u",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 86049,
+          "samples": 1,
+          "microseconds": 132,
+          "source": "new Set,l=!1,u=(t,r)=>{for(let i=t;i;i=i.parentElement){let t=n.get(i);if(t)for(let n of r(i)){let r=t.get(n);if(r)for(let t of r.symbolIds)c.has(t)||"
+        }
+      ]
+    },
+    {
+      "key": "state-independent-controls/return-first",
+      "visits": 3,
+      "totalSamples": 1385,
+      "frameworkSamples": 12,
+      "frameworkFrames": [
+        {
+          "name": "je",
+          "url": "/markless/build/chunk-BDWZvQyH.js",
+          "line": 1,
+          "column": 10833,
+          "samples": 1,
+          "microseconds": 864,
+          "source": "e))}function je(t){return t.startsWith(`c0:`)?import(`./chunk-BDWZvQyH.js`).then(e=>e.__marklessPacked1228()).then(e=>e.loadSymbol?e.loadSymbol(t.slic"
+        },
+        {
+          "name": "",
+          "url": "/markless/build/chunk-BDWZvQyH.js",
+          "line": 1,
+          "column": 11345,
+          "samples": 1,
+          "microseconds": 707,
+          "source": "vQyH.js`).then(e=>e.__marklessPacked769()).then(e=>Pe(e,`symbol_1_e6o3zc`)):Promise.reject(Error(`Unknown async symbol ${t}`))}function Pe(e,t){return"
+        },
+        {
+          "name": "Cte",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 16843,
+          "samples": 1,
+          "microseconds": 689,
+          "source": "nc function Cte(e){return(await import(`./chunk-DndtSUC4.js`).then(e=>e.__marklessPacked4())).resumeFromPayloadDocument(e)}var dt;function ft(){return"
+        },
+        {
+          "name": "Ive",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 90925,
+          "samples": 1,
+          "microseconds": 582,
+          "source": " 0}function Ive(e){return`${typeof e.tagName==`string`?e.tagName.toLowerCase():`element`}${typeof e.id==`string`&&e.id?`#${e.id}`:``}`}async function "
+        },
+        {
+          "name": "b",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 87057,
+          "samples": 2,
+          "microseconds": 198,
+          "source": "sync function b(t,i={}){let o=t.target;if(!o)throw oS(t,void 0);let s=Ive(o),c=e.ignoredDisposedEventTargets.has(o),l=aS(e.root,o),u=l?void 0:a(o),d=u"
+        },
+        {
+          "name": "Nee",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 6470,
+          "samples": 1,
+          "microseconds": 197,
+          "source": ":e}function Nee(e,t){let n=e,r=Wee(t);n.textContent!==r&&(n.textContent=r)}function Pee(e,t,n){let r=e,i=Fe(t,n);if(i===null){r.removeAttribute?.(t);r"
+        },
+        {
+          "name": "",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 91743,
+          "samples": 1,
+          "microseconds": 112,
+          "source": "rn}a=!0,i.push(()=>{o?t[n]=s:delete t[n]})};return o(`stopPropagation`,()=>{n=!0}),o(`stopImmediatePropagation`,()=>{n=!0,r=!0}),{stopped:()=>n||!a&&t"
+        },
+        {
+          "name": "ee",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 87830,
+          "samples": 1,
+          "microseconds": 92,
+          "source": "ync function ee(n,r,i,a,s,c){let l=rS();r.syncPolicy&&!a.syncPolicyAlreadyApplied&&o?.(r.syncPolicy,e.graph,i);let u,d=tS();try{await e.prepareRuntime"
+        },
+        {
+          "name": "b",
+          "url": "/markless/build/chunk-BDWZvQyH.js",
+          "line": 1,
+          "column": 11173,
+          "samples": 1,
+          "microseconds": 66,
+          "source": "))()}function b(t){return t===`symbol:0`?import(`./chunk-BDWZvQyH.js`).then(e=>e.__marklessPacked767()).then(e=>Pe(e,`symbol_0_e6o3zc`)):t===`symbol:1"
+        },
+        {
+          "name": "ne",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 106893,
+          "samples": 1,
+          "microseconds": 40,
+          "source": ",te=new Set,ne=async()=>b??=(await (async()=>{let{createResumeRuntimeShared:e}=await import(`./chunk-DndtSUC4.js`).then(e=>e.__marklessPacked1190());r"
+        },
+        {
+          "name": "ze",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 5466,
+          "samples": 1,
+          "microseconds": 20,
+          "source": "gth}function ze(e,t){for(let n of e){if(n.type===`runCleanup`){t.runCleanup?.(n.locator,n);continue}if(n.type===`insertRange`){t.insertRange?t.insertR"
+        }
+      ]
+    },
+    {
+      "key": "state-independent-controls/repeat-second",
+      "visits": 3,
+      "totalSamples": 1477,
+      "frameworkSamples": 10,
+      "frameworkFrames": [
+        {
+          "name": "x",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 43677,
+          "samples": 4,
+          "microseconds": 1240,
+          "source": "p||(p=x(),p),x=async()=>{u=!1,d=!0;try{try{for(;c.length>0;){y?.recomputeSubscribed();let e=c.splice(0),t=new Set;for(let n of a){let r=n.path??[];if("
+        },
+        {
+          "name": "dispatch",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 114197,
+          "samples": 2,
+          "microseconds": 1082,
+          "source": "rt:xe,dispatch:async(e,t)=>{if(c)return;let n=await le();c||await n.dispatch(e,t)},activateBehaviors:async e=>(await ue()).activateBehaviors(e),whenAs"
+        },
+        {
+          "name": "Ze",
+          "url": "/markless/build/chunk-BDWZvQyH.js",
+          "line": 1,
+          "column": 24224,
+          "samples": 1,
+          "microseconds": 864,
+          "source": "ync function Ze(e){e.root.__asyncResumeRuntimeStarted=!0;let{runtime:t}=await re({document:e.root,root:e.root,loadSymbol:Qe,renderData:A});await t.dis"
+        },
+        {
+          "name": "Nee",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 6470,
+          "samples": 1,
+          "microseconds": 777,
+          "source": ":e}function Nee(e,t){let n=e,r=Wee(t);n.textContent!==r&&(n.textContent=r)}function Pee(e,t,n){let r=e,i=Fe(t,n);if(i===null){r.removeAttribute?.(t);r"
+        },
+        {
+          "name": "En",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 50109,
+          "samples": 1,
+          "microseconds": 149,
+          "source": "t,r}function En(e,t){if(!t||e.marklessInstancePath===t)return e;let n=w(e);In.has(n)||ire(n,e);let r=e=>T(e,t,n),i=e.marklessQualifyGraphNodeId,a=()=>"
+        },
+        {
+          "name": "wee",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 4235,
+          "samples": 1,
+          "microseconds": 128,
+          "source": "t)}function wee(e){if(!e||typeof e!=`object`)return;let t=e,n=typeof t.tagName==`string`?t.tagName.toUpperCase():``;if(t.isContentEditable===!0||n===`"
+        }
+      ]
+    },
+    {
+      "key": "computed-total/before-input",
+      "visits": 3,
+      "totalSamples": 2431,
+      "frameworkSamples": 0,
+      "frameworkFrames": []
+    },
+    {
+      "key": "computed-total/first-action",
+      "visits": 3,
+      "totalSamples": 1710,
+      "frameworkSamples": 240,
+      "frameworkFrames": [
+        {
+          "name": "e",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 5026,
+          "samples": 18,
+          "microseconds": 6060,
+          "source": "turn(function e(n){for(let r of Array.from(n))r.nodeType===1&&t.push(r),r.childNodes&&e(r.childNodes)})(e),t}function Aee(e,t){let n=new Set(Re([e[t]]"
+        },
+        {
+          "name": "qee",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 9140,
+          "samples": 10,
+          "microseconds": 3754,
+          "source": "r}}function qee(e,t){let n=`<script type=\"${t}\">`;if(!e.startsWith(n)||!e.endsWith(`<\\/script>`))throw $e(t,`Expected ${t} payload script.`);try{retur"
+        },
+        {
+          "name": "ur",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 97305,
+          "samples": 4,
+          "microseconds": 2554,
+          "source": ")()}function ur(e,t){let n=e.__marklessCensus??=Re([e]),r=new Map;for(let e of t){let t=n[e.index];if(!t)throw ln(e);let i=e.tagName.toLowerCase(),a=t"
+        },
+        {
+          "name": "ct",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 14489,
+          "samples": 5,
+          "microseconds": 2424,
+          "source": "ync function ct(e){let{createRuntimeGraph:t}=await yte(),n,r=await gte(e,()=>n);return n=t({cells:[...await mte(e.state,e.root.__marklessEventOnlyGrap"
+        },
+        {
+          "name": "dr",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 97537,
+          "samples": 5,
+          "microseconds": 2409,
+          "source": "n r}function dr(e,t,n,r=[]){let i=new Map,a=new Map;function o(e){for(let t of e.keys){let n=i.get(t);if(!n)continue;let r=n.indexOf(e.element);r>=0&&"
+        },
+        {
+          "name": "Jee",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 9370,
+          "samples": 4,
+          "microseconds": 1963,
+          "source": ")}}function Jee(e){let t=Zee(e,`markless/state`),n=Xe(t,`cells`,`markless/state`);Xe(t,`computed`,`markless/state`);for(let[e,t]of n.entries()){let n="
+        },
+        {
+          "name": "xe",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 113380,
+          "samples": 5,
+          "microseconds": 1840,
+          "source": "ync function xe(){s&&!o&&(o=(await (async()=>{let{createStoragePlane:e}=await import(`./chunk-DndtSUC4.js`).then(e=>e.__marklessPacked1204());return{c"
+        },
+        {
+          "name": "",
+          "url": "/markless/build/chunk-jNFbnHUH.js",
+          "line": -1,
+          "column": -1,
+          "samples": 3,
+          "microseconds": 1745
+        },
+        {
+          "name": "Kee",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 8941,
+          "samples": 4,
+          "microseconds": 1623,
+          "source": "1)}function Kee(e,t){let n=qee(e.stateScript,`markless/state`),r=qee(e.viewScript,`markless/view`);return Jee(n),Yee(r),$ee(n.version,`markless/state`"
+        },
+        {
+          "name": "",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 1,
+          "column": 727,
+          "samples": 2,
+          "microseconds": 1571,
+          "source": "href}o=l(i.map(i=>{if(i=n(i,a),i=u(i),i in r)return;r[i]=!0;let o=i.endsWith(`.css`);for(let t=e.length-1;t>=0;t--){let n=e[t];if(n.href===i&&(!o||n.r"
+        },
+        {
+          "name": "a",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 50240,
+          "samples": 3,
+          "microseconds": 1522,
+          "source": "yGraphNodeId,a=()=>In.has(n)?n:tre(n,t),o=a(),s={...e,marklessPageGraph:e.marklessPageGraph??e,marklessInstancePath:t,get marklessComposedWidgets(){re"
+        },
+        {
+          "name": "Cge",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 42156,
+          "samples": 5,
+          "microseconds": 1435,
+          "source": "()}function Cge(e){let t=new Map,n=new Map,r=pge(e.computed),i=ige(e.asyncComputed),a=[],o=[],s=[],c=[],l=[],u=!1,d=!1,f=!1,p;for(let r of e.cells)t.s"
+        }
+      ]
+    },
+    {
+      "key": "computed-total/repeat-1",
+      "visits": 3,
+      "totalSamples": 1531,
+      "frameworkSamples": 11,
+      "frameworkFrames": [
+        {
+          "name": "x",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 43677,
+          "samples": 3,
+          "microseconds": 2032,
+          "source": "p||(p=x(),p),x=async()=>{u=!1,d=!0;try{try{for(;c.length>0;){y?.recomputeSubscribed();let e=c.splice(0),t=new Set;for(let n of a){let r=n.path??[];if("
+        },
+        {
+          "name": "ee",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 87830,
+          "samples": 1,
+          "microseconds": 1070,
+          "source": "ync function ee(n,r,i,a,s,c){let l=rS();r.syncPolicy&&!a.syncPolicyAlreadyApplied&&o?.(r.syncPolicy,e.graph,i);let u,d=tS();try{await e.prepareRuntime"
+        },
+        {
+          "name": "",
+          "url": "/markless/build/chunk-DD9ENzN8.js",
+          "line": 1,
+          "column": 18841,
+          "samples": 1,
+          "microseconds": 946,
+          "source": "NzN8.js`).then(e=>e.__marklessPacked1218()).then(e=>e.loadSymbol(t.slice(3)))}},{prefix:`m4:`,loadSymbol(t){return e(()=>import(`./chunk-DndtSUC4.js`)"
+        },
+        {
+          "name": "c",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 1,
+          "column": 1710,
+          "samples": 1,
+          "microseconds": 668,
+          "source": "e}`]}function c(e){let t=e.querySelector?.(`script[type=\"@markless/core/route\"]`)?.textContent;if(t)try{let e=JSON.parse(t);return typeof e.file==`str"
+        },
+        {
+          "name": "ze",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 5466,
+          "samples": 1,
+          "microseconds": 476,
+          "source": "gth}function ze(e,t){for(let n of e){if(n.type===`runCleanup`){t.runCleanup?.(n.locator,n);continue}if(n.type===`insertRange`){t.insertRange?t.insertR"
+        },
+        {
+          "name": "re",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 43658,
+          "samples": 1,
+          "microseconds": 148,
+          "source": "leFlush:v}),re=()=>p||(p=x(),p),x=async()=>{u=!1,d=!0;try{try{for(;c.length>0;){y?.recomputeSubscribed();let e=c.splice(0),t=new Set;for(let n of a){l"
+        },
+        {
+          "name": "En",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 50109,
+          "samples": 1,
+          "microseconds": 135,
+          "source": "t,r}function En(e,t){if(!t||e.marklessInstancePath===t)return e;let n=w(e);In.has(n)||ire(n,e);let r=e=>T(e,t,n),i=e.marklessQualifyGraphNodeId,a=()=>"
+        },
+        {
+          "name": "",
+          "url": "/markless/build/chunk-DD9ENzN8.js",
+          "line": 1,
+          "column": 18875,
+          "samples": 1,
+          "microseconds": 122,
+          "source": "ed1218()).then(e=>e.loadSymbol(t.slice(3)))}},{prefix:`m4:`,loadSymbol(t){return e(()=>import(`./chunk-DndtSUC4.js`).then(e=>e.__marklessPacked1354())"
+        },
+        {
+          "name": "Cte",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 16843,
+          "samples": 1,
+          "microseconds": 110,
+          "source": "nc function Cte(e){return(await import(`./chunk-DndtSUC4.js`).then(e=>e.__marklessPacked4())).resumeFromPayloadDocument(e)}var dt;function ft(){return"
+        }
+      ]
+    },
+    {
+      "key": "computed-total/repeat-2",
+      "visits": 3,
+      "totalSamples": 1467,
+      "frameworkSamples": 16,
+      "frameworkFrames": [
+        {
+          "name": "Nee",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 6470,
+          "samples": 3,
+          "microseconds": 1605,
+          "source": ":e}function Nee(e,t){let n=e,r=Wee(t);n.textContent!==r&&(n.textContent=r)}function Pee(e,t,n){let r=e,i=Fe(t,n);if(i===null){r.removeAttribute?.(t);r"
+        },
+        {
+          "name": "loadSymbol",
+          "url": "/markless/build/chunk-DD9ENzN8.js",
+          "line": 1,
+          "column": 18795,
+          "samples": 2,
+          "microseconds": 989,
+          "source": "m3:`,loadSymbol(t){return import(`./chunk-DD9ENzN8.js`).then(e=>e.__marklessPacked1218()).then(e=>e.loadSymbol(t.slice(3)))}},{prefix:`m4:`,loadSymbol"
+        },
+        {
+          "name": "ee",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 87830,
+          "samples": 1,
+          "microseconds": 960,
+          "source": "ync function ee(n,r,i,a,s,c){let l=rS();r.syncPolicy&&!a.syncPolicyAlreadyApplied&&o?.(r.syncPolicy,e.graph,i);let u,d=tS();try{await e.prepareRuntime"
+        },
+        {
+          "name": "w",
+          "url": "/markless/build/chunk-DD9ENzN8.js",
+          "line": 1,
+          "column": 16660,
+          "samples": 1,
+          "microseconds": 661,
+          "source": "(e))}function w(t){return t.startsWith(`c0:`)?import(`./chunk-DD9ENzN8.js`).then(e=>e.__marklessPacked1220()).then(e=>e.loadSymbol?e.loadSymbol(t.slic"
+        },
+        {
+          "name": "On",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 51508,
+          "samples": 1,
+          "microseconds": 490,
+          "source": "t)}}function On(e,t,n){e.rootPaths.set(t,n),n.includes(`r:`)&&e.rowRooted.add(t.slice(C(t).length))}function are(e,t,n){if(!t?.size)return n();let r=R"
+        },
+        {
+          "name": "T",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 52525,
+          "samples": 1,
+          "microseconds": 397,
+          "source": "n o}}function T(e,t,n=Ln.active){if(!t)return e;let r=Pn.exec(e);if(!r)return t+e;if(r[2]===`storage`)return e;if(r[1])return t+e;let i=lre(e,t,n);if("
+        },
+        {
+          "name": "/pages/markless/concepts/computed.mdx",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 1,
+          "column": 2501,
+          "samples": 1,
+          "microseconds": 368,
+          "source": "/computed.mdx\":()=>import(`./chunk-DD9ENzN8.js`).then(e=>e.__marklessPacked1679()),\"/pages/markless/concepts/conditionals.mdx\":()=>import(`./chunk-C6d"
+        },
+        {
+          "name": "x",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 43677,
+          "samples": 1,
+          "microseconds": 342,
+          "source": "p||(p=x(),p),x=async()=>{u=!1,d=!0;try{try{for(;c.length>0;){y?.recomputeSubscribed();let e=c.splice(0),t=new Set;for(let n of a){let r=n.path??[];if("
+        },
+        {
+          "name": "Tn",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 49935,
+          "samples": 1,
+          "microseconds": 318,
+          "source": ",n)}function Tn(e,t,n){if(typeof e!=`function`||e.marklessHandleScope===t)return e;let r=r=>{let i=wn(r,t,n?w(n):Ln.active);return e(i===r?r:i)};retur"
+        },
+        {
+          "name": "O",
+          "url": "/markless/build/chunk-DD9ENzN8.js",
+          "line": 1,
+          "column": 16995,
+          "samples": 1,
+          "microseconds": 268,
+          "source": "))()}function O(t){return t===`symbol:0`?import(`./chunk-DD9ENzN8.js`).then(e=>e.__marklessPacked755()).then(e=>k(e,`symbol_0_1foxd45`)):t===`symbol:1"
+        },
+        {
+          "name": "Cn.Object.assign.marklessScopedBase",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 49625,
+          "samples": 1,
+          "microseconds": 155,
+          "source": ":Object.assign(n=>{let r=n.graph;return e({...n,...r?{graph:En(r,t)}:{},getElementHandle:Tn(n.getElementHandle,t,r),...n.read&&r?{read:(e,n)=>r.read(T"
+        },
+        {
+          "name": "C",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 46468,
+          "samples": 1,
+          "microseconds": 150,
+          "source": "))()}function C(e){return e&&An.exec(e)?.[0]||``}function bn(e){return`r:${encodeURIComponent(String(e))}:`}function xn(e,t){let n=t??An.exec(e)?.[0]?"
+        }
+      ]
+    },
+    {
+      "key": "mode-select/before-input",
+      "visits": 3,
+      "totalSamples": 2501,
+      "frameworkSamples": 0,
+      "frameworkFrames": []
+    },
+    {
+      "key": "mode-select/first-action",
+      "visits": 3,
+      "totalSamples": 1572,
+      "frameworkSamples": 286,
+      "frameworkFrames": [
+        {
+          "name": "e",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 5026,
+          "samples": 12,
+          "microseconds": 5325,
+          "source": "turn(function e(n){for(let r of Array.from(n))r.nodeType===1&&t.push(r),r.childNodes&&e(r.childNodes)})(e),t}function Aee(e,t){let n=new Set(Re([e[t]]"
+        },
+        {
+          "name": "qee",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 9140,
+          "samples": 8,
+          "microseconds": 3141,
+          "source": "r}}function qee(e,t){let n=`<script type=\"${t}\">`;if(!e.startsWith(n)||!e.endsWith(`<\\/script>`))throw $e(t,`Expected ${t} payload script.`);try{retur"
+        },
+        {
+          "name": "Kee",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 8941,
+          "samples": 6,
+          "microseconds": 2578,
+          "source": "1)}function Kee(e,t){let n=qee(e.stateScript,`markless/state`),r=qee(e.viewScript,`markless/view`);return Jee(n),Yee(r),$ee(n.version,`markless/state`"
+        },
+        {
+          "name": "b",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 87057,
+          "samples": 7,
+          "microseconds": 2572,
+          "source": "sync function b(t,i={}){let o=t.target;if(!o)throw oS(t,void 0);let s=Ive(o),c=e.ignoredDisposedEventTargets.has(o),l=aS(e.root,o),u=l?void 0:a(o),d=u"
+        },
+        {
+          "name": "dr",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 97537,
+          "samples": 7,
+          "microseconds": 2394,
+          "source": "n r}function dr(e,t,n,r=[]){let i=new Map,a=new Map;function o(e){for(let t of e.keys){let n=i.get(t);if(!n)continue;let r=n.indexOf(e.element);r>=0&&"
+        },
+        {
+          "name": "x",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 43677,
+          "samples": 5,
+          "microseconds": 2360,
+          "source": "p||(p=x(),p),x=async()=>{u=!1,d=!0;try{try{for(;c.length>0;){y?.recomputeSubscribed();let e=c.splice(0),t=new Set;for(let n of a){let r=n.path??[];if("
+        },
+        {
+          "name": "vye",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 106649,
+          "samples": 5,
+          "microseconds": 2290,
+          "source": "()}function vye(e,t,n){let{elementsByHostId:r,elementHandles:a}=t,o,s=(e.state?.storage?.length??0)>0,c=!1,l=new Set,u=new Set,d=!1,f=new WeakSet,p=ne"
+        },
+        {
+          "name": "__marklessPacked28",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 3005,
+          "column": 161762,
+          "samples": 4,
+          "microseconds": 2277,
+          "source": "arklessPacked28(){if(FDe)throw PDe;if(OX)return OX;try{return Xr(),OX=$({__proto__:null,get loadSymbol(){return Gr},get symbolManifest(){return Kr}})}"
+        },
+        {
+          "name": "",
+          "url": "/markless/build/chunk-jNFbnHUH.js",
+          "line": -1,
+          "column": -1,
+          "samples": 7,
+          "microseconds": 2198
+        },
+        {
+          "name": "mye",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 101617,
+          "samples": 5,
+          "microseconds": 2118,
+          "source": "nc function mye(e){let{runtimeInput:t,prepared:n,eventTypes:r,getEvents:a,loadBehaviorRuntime:o,loadBranchRuntime:s,storeContainerSubscription:c,dispo"
+        },
+        {
+          "name": "__marklessPacked1708",
+          "url": "/markless/build/chunk-CKDVhYSg.js",
+          "line": 71,
+          "column": 29133,
+          "samples": 3,
+          "microseconds": 1878,
+          "source": "klessPacked1708(){if(ul)throw ll;if(cl)return cl;try{return qr(),cl=Q({__proto__:null,get default(){return Kr},get resumeContainerEvent(){return Hr}})"
+        },
+        {
+          "name": "ze",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 5466,
+          "samples": 2,
+          "microseconds": 1856,
+          "source": "gth}function ze(e,t){for(let n of e){if(n.type===`runCleanup`){t.runCleanup?.(n.locator,n);continue}if(n.type===`insertRange`){t.insertRange?t.insertR"
+        }
+      ]
+    },
+    {
+      "key": "mode-select/repeat-1",
+      "visits": 3,
+      "totalSamples": 1370,
+      "frameworkSamples": 44,
+      "frameworkFrames": [
+        {
+          "name": "Cn.Object.assign.marklessScopedBase",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 49625,
+          "samples": 3,
+          "microseconds": 1769,
+          "source": ":Object.assign(n=>{let r=n.graph;return e({...n,...r?{graph:En(r,t)}:{},getElementHandle:Tn(n.getElementHandle,t,r),...n.read&&r?{read:(e,n)=>r.read(T"
+        },
+        {
+          "name": "o",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 91591,
+          "samples": 1,
+          "microseconds": 988,
+          "source": "!1,i=[],a=!1,o=(n,r)=>{let o=Object.prototype.hasOwnProperty.call(t,n),s=t[n];try{t[n]=(...t)=>(r(),typeof s==`function`?s.apply(e,t):void 0)}catch{re"
+        },
+        {
+          "name": "symbol:19",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 135243,
+          "samples": 2,
+          "microseconds": 972,
+          "source": ")),\"symbol:19\":()=>import(`./chunk-DndtSUC4.js`).then(e=>e.__marklessPacked420()),\"symbol:20\":()=>import(`./chunk-DndtSUC4.js`).then(e=>e.__marklessPa"
+        },
+        {
+          "name": "C",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 46468,
+          "samples": 2,
+          "microseconds": 960,
+          "source": "))()}function C(e){return e&&An.exec(e)?.[0]||``}function bn(e){return`r:${encodeURIComponent(String(e))}:`}function xn(e,t){let n=t??An.exec(e)?.[0]?"
+        },
+        {
+          "name": "tee",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 113261,
+          "samples": 1,
+          "microseconds": 960,
+          "source": "))}function tee(e){let t=[];for(let n=e;n;n=n.parentElement??void 0)for(let e of ee)r.get(e)===n&&t.push(e);return t}async function xe(){s&&!o&&(o=(aw"
+        },
+        {
+          "name": "nt",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 13558,
+          "samples": 1,
+          "microseconds": 926,
+          "source": ")()}function nt(e){let t=it.get(e);return t&&{...t,warnings:[ute]}}function rt(e){if(e.isConnected!==!1)return;let t=at.get(e);return t?{...t,runtime:"
+        },
+        {
+          "name": "_x",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 48344,
+          "samples": 1,
+          "microseconds": 835,
+          "source": "(t)}function _x(e){let t=Nge(e);if(!t)return;let n=Cx.indexOf(t);n>=0&&Cx.splice(n,1);for(let e of t.undo.reverse())e();t.undo.length=0,Cx.length===0&"
+        },
+        {
+          "name": "h",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 42648,
+          "samples": 1,
+          "microseconds": 791,
+          "source": "t.get(e),a)},h=(e,t)=>{c.push({graphNodeId:e,path:t}),y?.recordWrite(e,t),gge({graphNodeId:e,path:t,computedNodes:r,asyncComputedNodes:i,dirtyPaths:c,"
+        },
+        {
+          "name": "__marklessPacked422",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 3005,
+          "column": 180451,
+          "samples": 1,
+          "microseconds": 788,
+          "source": "rklessPacked422(){if(sje)throw oje;if(mQ)return mQ;try{return Us(),mQ=$({__proto__:null,get symbol_2_1nm0gwx(){return ble}})}catch(e){throw sje=!0,oje"
+        },
+        {
+          "name": "symbol:36",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 136586,
+          "samples": 1,
+          "microseconds": 778,
+          "source": ")),\"symbol:36\":()=>import(`./chunk-DndtSUC4.js`).then(e=>e.__marklessPacked458()),\"symbol:37\":()=>import(`./chunk-DndtSUC4.js`).then(e=>e.__marklessPa"
+        },
+        {
+          "name": "x",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 43677,
+          "samples": 4,
+          "microseconds": 692,
+          "source": "p||(p=x(),p),x=async()=>{u=!1,d=!0;try{try{for(;c.length>0;){y?.recomputeSubscribed();let e=c.splice(0),t=new Set;for(let n of a){let r=n.path??[];if("
+        },
+        {
+          "name": "i",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 1,
+          "column": 300,
+          "samples": 1,
+          "microseconds": 621,
+          "source": "r={},i=function(e,i,a){let o=Promise.resolve();if(i&&i.length>0){let e=document.getElementsByTagName(`link`),s=document.querySelector(`meta[property=c"
+        }
+      ]
+    },
+    {
+      "key": "mode-select/repeat-2",
+      "visits": 3,
+      "totalSamples": 1309,
+      "frameworkSamples": 21,
+      "frameworkFrames": [
+        {
+          "name": "C",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 46468,
+          "samples": 2,
+          "microseconds": 1802,
+          "source": "))()}function C(e){return e&&An.exec(e)?.[0]||``}function bn(e){return`r:${encodeURIComponent(String(e))}:`}function xn(e,t){let n=t??An.exec(e)?.[0]?"
+        },
+        {
+          "name": "Fee",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 6659,
+          "samples": 1,
+          "microseconds": 1048,
+          "source": "i)}function Fee(e,t){let n=e.getAttribute;return typeof n==`function`?n.call(e,t):void 0}function Iee(e,t,n){Dee(e,t,n)||(e[t]=n)}function Lee(e,t){if"
+        },
+        {
+          "name": "",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 992,
+          "column": 3009117,
+          "samples": 1,
+          "microseconds": 938,
+          "source": "SUC4.js`).then(e=>e.__marklessPacked1195()).then(t=>t.loadSymbol?t.loadSymbol(e.slice(3)):Promise.reject(Error(`Unknown child async symbol ${e}`))):jF"
+        },
+        {
+          "name": "s",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 1,
+          "column": 1643,
+          "samples": 1,
+          "microseconds": 769,
+          "source": "r(e)}function s(e){let t=e.endsWith(`.mdx`)?l:u;return t[e]??t[`/${e}`]}function c(e){let t=e.querySelector?.(`script[type=\"@markless/core/route\"]`)?."
+        },
+        {
+          "name": "read",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 50439,
+          "samples": 1,
+          "microseconds": 652,
+          "source": "(e)):r(e),read:(t,n)=>e.read(r(t),n),write:t=>e.write({...t,graphNodeId:r(t.graphNodeId)}),update:t=>e.update({...t,graphNodeId:r(t.graphNodeId)}),cal"
+        },
+        {
+          "name": "kF",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 992,
+          "column": 3008111,
+          "samples": 1,
+          "microseconds": 633,
+          "source": "[t]}function kF(e){return e.startsWith(`c0:p3:p4:p5:`)||e.startsWith(`c0:p3:p4:p6:`)||e.startsWith(`c0:p3:p7:p8:`)||e.startsWith(`c0:p3:p7:p9:`)?impor"
+        },
+        {
+          "name": "Zb.globalThis.__marklessRosterResume",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 31646,
+          "samples": 1,
+          "microseconds": 596,
+          "source": "RosterResume??=()=>import(`./chunk-DndtSUC4.js`).then(e=>e.__marklessPacked1215()),globalThis.__marklessOverlay=e=>e.querySelector(`[overlay]`)?import"
+        },
+        {
+          "name": "",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 117684,
+          "samples": 1,
+          "microseconds": 501,
+          "source": "){await(await (async()=>{let{refreshSyncComputed:e}=await import(`./chunk-DndtSUC4.js`).then(e=>e.__marklessPacked1200());return{refreshSyncComputed:e"
+        },
+        {
+          "name": "Cn",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 49486,
+          "samples": 1,
+          "microseconds": 412,
+          "source": "n)}}function Cn(e,t){if(Nn.has(e))return e;let{marklessScopedBase:n,marklessScopedPath:r}=e;return n&&(r===t||r===t.replace(jn,``))?Cn(n,t):Object.ass"
+        },
+        {
+          "name": "Cte",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 16843,
+          "samples": 1,
+          "microseconds": 381,
+          "source": "nc function Cte(e){return(await import(`./chunk-DndtSUC4.js`).then(e=>e.__marklessPacked4())).resumeFromPayloadDocument(e)}var dt;function ft(){return"
+        },
+        {
+          "name": "nt",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 13558,
+          "samples": 1,
+          "microseconds": 334,
+          "source": ")()}function nt(e){let t=it.get(e);return t&&{...t,warnings:[ute]}}function rt(e){if(e.isConnected!==!1)return;let t=at.get(e);return t?{...t,runtime:"
+        },
+        {
+          "name": "loadSymbol",
+          "url": "/markless/build/chunk-CKDVhYSg.js",
+          "line": 1,
+          "column": 198310,
+          "samples": 1,
+          "microseconds": 204,
+          "source": "m0:`,loadSymbol(t){return e(()=>import(`./chunk-DndtSUC4.js`).then(e=>e.__marklessPacked1558()).then(e=>e.loadSymbol(t.slice(3))),__vite__mapDeps([0])"
+        }
+      ]
+    },
+    {
+      "key": "accordion/before-input",
+      "visits": 3,
+      "totalSamples": 3127,
+      "frameworkSamples": 0,
+      "frameworkFrames": []
+    },
+    {
+      "key": "accordion/first-action",
+      "visits": 3,
+      "totalSamples": 3604,
+      "frameworkSamples": 734,
+      "frameworkFrames": [
+        {
+          "name": "e",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 5026,
+          "samples": 44,
+          "microseconds": 16170,
+          "source": "turn(function e(n){for(let r of Array.from(n))r.nodeType===1&&t.push(r),r.childNodes&&e(r.childNodes)})(e),t}function Aee(e,t){let n=new Set(Re([e[t]]"
+        },
+        {
+          "name": "qee",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 9140,
+          "samples": 30,
+          "microseconds": 12787,
+          "source": "r}}function qee(e,t){let n=`<script type=\"${t}\">`;if(!e.startsWith(n)||!e.endsWith(`<\\/script>`))throw $e(t,`Expected ${t} payload script.`);try{retur"
+        },
+        {
+          "name": "__marklessPacked106",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 3005,
+          "column": 165784,
+          "samples": 24,
+          "microseconds": 9143,
+          "source": "rklessPacked106(){if(yOe)throw vOe;if(qX)return qX;try{return Pa(),qX=$({__proto__:null,get loadSymbol(){return ja},get symbolManifest(){return Ma}})}"
+        },
+        {
+          "name": "e",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 78515,
+          "samples": 26,
+          "microseconds": 8637,
+          "source": "turn(function e(n){n.nodeType===8&&!pn(n)&&t.push(n);for(let t of n.childNodes??[])e(t)})(e),t}function pve(e,t,n){return mve(`Resume locator ${e} ${t"
+        },
+        {
+          "name": "AI",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 1232,
+          "column": 3331,
+          "samples": 17,
+          "microseconds": 6627,
+          "source": "e))}function AI(e){return e.startsWith(`c0:p23:p31:p34:p35:p36:`)||e.startsWith(`c0:p23:p31:p34:p37:p38:`)||e.startsWith(`c0:p23:p31:p34:p39:p40:`)||e"
+        },
+        {
+          "name": "e",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 45738,
+          "samples": 18,
+          "microseconds": 6099,
+          "source": "turn(function e(i){i===t&&r===-1&&(r=n.length),i.nodeType===1&&n.push(i);for(let t of i.childNodes??[])e(t)})(e),{elements:n,offset:r===-1?n.length:r}"
+        },
+        {
+          "name": "x",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 43677,
+          "samples": 19,
+          "microseconds": 5762,
+          "source": "p||(p=x(),p),x=async()=>{u=!1,d=!0;try{try{for(;c.length>0;){y?.recomputeSubscribed();let e=c.splice(0),t=new Set;for(let n of a){let r=n.path??[];if("
+        },
+        {
+          "name": "",
+          "url": "/markless/build/chunk-CLcd5tD5.js",
+          "line": 1,
+          "column": 55433,
+          "samples": 15,
+          "microseconds": 5072,
+          "source": "ol(t){return e(()=>import(`./chunk-DndtSUC4.js`).then(e=>e.__marklessPacked1426()).then(e=>e.loadSymbol(t.slice(3))),__vite__mapDeps([0]))}},{prefix:`"
+        },
+        {
+          "name": "On",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 51508,
+          "samples": 9,
+          "microseconds": 4748,
+          "source": "t)}}function On(e,t,n){e.rootPaths.set(t,n),n.includes(`r:`)&&e.rowRooted.add(t.slice(C(t).length))}function are(e,t,n){if(!t?.size)return n();let r=R"
+        },
+        {
+          "name": "i",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 78126,
+          "samples": 14,
+          "microseconds": 3862,
+          "source": "r=[];function i(e){let a=!1;for(let o of e.childNodes??[]){if(o===t){a=!0;continue}if(o===n)return!0;if(a)r.push(o);else if(i(o))return!0}return a}ret"
+        },
+        {
+          "name": "tre",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 50775,
+          "samples": 12,
+          "microseconds": 3737,
+          "source": ",s}function tre(e,t){let n;for(let[r,i]of e.rootPaths)!r.startsWith(t)||!i.startsWith(t)||(n??={rootPaths:new Map,rowRooted:new Set},On(n,r.slice(t.le"
+        },
+        {
+          "name": "b",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 87057,
+          "samples": 9,
+          "microseconds": 3672,
+          "source": "sync function b(t,i={}){let o=t.target;if(!o)throw oS(t,void 0);let s=Ive(o),c=e.ignoredDisposedEventTargets.has(o),l=aS(e.root,o),u=l?void 0:a(o),d=u"
+        }
+      ]
+    },
+    {
+      "key": "accordion/repeat-1",
+      "visits": 3,
+      "totalSamples": 1354,
+      "frameworkSamples": 117,
+      "frameworkFrames": [
+        {
+          "name": "C",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 46468,
+          "samples": 16,
+          "microseconds": 6098,
+          "source": "))()}function C(e){return e&&An.exec(e)?.[0]||``}function bn(e){return`r:${encodeURIComponent(String(e))}:`}function xn(e,t){let n=t??An.exec(e)?.[0]?"
+        },
+        {
+          "name": "x",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 43677,
+          "samples": 13,
+          "microseconds": 4828,
+          "source": "p||(p=x(),p),x=async()=>{u=!1,d=!0;try{try{for(;c.length>0;){y?.recomputeSubscribed();let e=c.splice(0),t=new Set;for(let n of a){let r=n.path??[];if("
+        },
+        {
+          "name": "tre",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 50775,
+          "samples": 7,
+          "microseconds": 4642,
+          "source": ",s}function tre(e,t){let n;for(let[r,i]of e.rootPaths)!r.startsWith(t)||!i.startsWith(t)||(n??={rootPaths:new Map,rowRooted:new Set},On(n,r.slice(t.le"
+        },
+        {
+          "name": "AI",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 1232,
+          "column": 3331,
+          "samples": 11,
+          "microseconds": 4222,
+          "source": "e))}function AI(e){return e.startsWith(`c0:p23:p31:p34:p35:p36:`)||e.startsWith(`c0:p23:p31:p34:p37:p38:`)||e.startsWith(`c0:p23:p31:p34:p39:p40:`)||e"
+        },
+        {
+          "name": "",
+          "url": "/markless/build/chunk-CLcd5tD5.js",
+          "line": 1,
+          "column": 55433,
+          "samples": 5,
+          "microseconds": 2316,
+          "source": "ol(t){return e(()=>import(`./chunk-DndtSUC4.js`).then(e=>e.__marklessPacked1426()).then(e=>e.loadSymbol(t.slice(3))),__vite__mapDeps([0]))}},{prefix:`"
+        },
+        {
+          "name": "On",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 51508,
+          "samples": 5,
+          "microseconds": 1877,
+          "source": "t)}}function On(e,t,n){e.rootPaths.set(t,n),n.includes(`r:`)&&e.rowRooted.add(t.slice(C(t).length))}function are(e,t,n){if(!t?.size)return n();let r=R"
+        },
+        {
+          "name": "whe",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 30646,
+          "samples": 6,
+          "microseconds": 1694,
+          "source": "ked1215()),whe=()=>import(`./chunk-DndtSUC4.js`).then(e=>e.__marklessPacked12())})))()}function The(e){return e===`symbol:0`?import(`./chunk-DndtSUC4."
+        },
+        {
+          "name": "m",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 42381,
+          "samples": 2,
+          "microseconds": 1250,
+          "source": "ializer);let m=(e,a=[])=>{let o=r.get(e);if(o?.compute)return mge(o,m,a,y?.reconcileComputed);let s=i.get(e);if(s)return age(s,a,()=>ee(s));let c=n.ge"
+        },
+        {
+          "name": "",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 117684,
+          "samples": 4,
+          "microseconds": 1152,
+          "source": "){await(await (async()=>{let{refreshSyncComputed:e}=await import(`./chunk-DndtSUC4.js`).then(e=>e.__marklessPacked1200());return{refreshSyncComputed:e"
+        },
+        {
+          "name": "ire",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 51352,
+          "samples": 4,
+          "microseconds": 1143,
+          "source": "t)}function ire(e,t){for(let n of t.listSharedDefinitions?.()??[])if(n.scope===`widget`){let t=C(n.id);On(e,n.id,t);for(let r of n.projectionIds??[])O"
+        },
+        {
+          "name": "kn",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 52298,
+          "samples": 2,
+          "microseconds": 1090,
+          "source": "e:e}function kn(e,t,n){let r=n.rootPaths;if(r.size===0)return;let i=e.lastIndexOf(`/`);for(let n=t.length;n>0;n--){if(t[n-1]!==`:`)continue;let a=t.sl"
+        },
+        {
+          "name": "",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 531718,
+          "samples": 1,
+          "microseconds": 1068,
+          "source": "cked`)||(await(async t=>{if(e.graph.read(`shared:node_modules/@markless/ui/src/accordion/accordion.tsrx#accordionState/state:accordion`,[`disabled`]))"
+        }
+      ]
+    },
+    {
+      "key": "accordion/repeat-2",
+      "visits": 3,
+      "totalSamples": 1389,
+      "frameworkSamples": 109,
+      "frameworkFrames": [
+        {
+          "name": "On",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 51508,
+          "samples": 11,
+          "microseconds": 4901,
+          "source": "t)}}function On(e,t,n){e.rootPaths.set(t,n),n.includes(`r:`)&&e.rowRooted.add(t.slice(C(t).length))}function are(e,t,n){if(!t?.size)return n();let r=R"
+        },
+        {
+          "name": "",
+          "url": "/markless/build/chunk-CLcd5tD5.js",
+          "line": 1,
+          "column": 55433,
+          "samples": 7,
+          "microseconds": 4034,
+          "source": "ol(t){return e(()=>import(`./chunk-DndtSUC4.js`).then(e=>e.__marklessPacked1426()).then(e=>e.loadSymbol(t.slice(3))),__vite__mapDeps([0]))}},{prefix:`"
+        },
+        {
+          "name": "tre",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 50775,
+          "samples": 9,
+          "microseconds": 3408,
+          "source": ",s}function tre(e,t){let n;for(let[r,i]of e.rootPaths)!r.startsWith(t)||!i.startsWith(t)||(n??={rootPaths:new Map,rowRooted:new Set},On(n,r.slice(t.le"
+        },
+        {
+          "name": "AI",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 1232,
+          "column": 3331,
+          "samples": 4,
+          "microseconds": 2983,
+          "source": "e))}function AI(e){return e.startsWith(`c0:p23:p31:p34:p35:p36:`)||e.startsWith(`c0:p23:p31:p34:p37:p38:`)||e.startsWith(`c0:p23:p31:p34:p39:p40:`)||e"
+        },
+        {
+          "name": "C",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 46468,
+          "samples": 11,
+          "microseconds": 2972,
+          "source": "))()}function C(e){return e&&An.exec(e)?.[0]||``}function bn(e){return`r:${encodeURIComponent(String(e))}:`}function xn(e,t){let n=t??An.exec(e)?.[0]?"
+        },
+        {
+          "name": "whe",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 30646,
+          "samples": 4,
+          "microseconds": 2680,
+          "source": "ked1215()),whe=()=>import(`./chunk-DndtSUC4.js`).then(e=>e.__marklessPacked12())})))()}function The(e){return e===`symbol:0`?import(`./chunk-DndtSUC4."
+        },
+        {
+          "name": "En",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 50109,
+          "samples": 3,
+          "microseconds": 1797,
+          "source": "t,r}function En(e,t){if(!t||e.marklessInstancePath===t)return e;let n=w(e);In.has(n)||ire(n,e);let r=e=>T(e,t,n),i=e.marklessQualifyGraphNodeId,a=()=>"
+        },
+        {
+          "name": "kn",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 52298,
+          "samples": 5,
+          "microseconds": 1728,
+          "source": "e:e}function kn(e,t,n){let r=n.rootPaths;if(r.size===0)return;let i=e.lastIndexOf(`/`);for(let n=t.length;n>0;n--){if(t[n-1]!==`:`)continue;let a=t.sl"
+        },
+        {
+          "name": "",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 30474,
+          "samples": 2,
+          "microseconds": 1508,
+          "source": "urn whe().then(t=>t.loadSymbol(e))}var whe;function Jb(){return(Jb=e((()=>{a(),globalThis.__marklessRosterResume??=()=>import(`./chunk-DndtSUC4.js`).t"
+        },
+        {
+          "name": "x",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 7,
+          "column": 43677,
+          "samples": 5,
+          "microseconds": 1425,
+          "source": "p||(p=x(),p),x=async()=>{u=!1,d=!0;try{try{for(;c.length>0;){y?.recomputeSubscribed();let e=c.splice(0),t=new Set;for(let n of a){let r=n.path??[];if("
+        },
+        {
+          "name": "ire",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 51352,
+          "samples": 5,
+          "microseconds": 1310,
+          "source": "t)}function ire(e,t){for(let n of t.listSharedDefinitions?.()??[])if(n.scope===`widget`){let t=C(n.id);On(e,n.id,t);for(let r of n.projectionIds??[])O"
+        },
+        {
+          "name": "Xoe",
+          "url": "/markless/build/chunk-DndtSUC4.js",
+          "line": 2,
+          "column": 341609,
+          "samples": 1,
+          "microseconds": 1043,
+          "source": "}}}function Xoe(e,t){let n={};for(let e of t.captureSlots)n[e.slotId]=e;return{read(t){let r=Qoe(n,t),i=r.route;if(i.kind===`compiler-known-constant`)"
+        }
+      ]
+    }
+  ]
+}

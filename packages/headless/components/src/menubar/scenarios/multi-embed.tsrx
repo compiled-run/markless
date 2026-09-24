@@ -7,20 +7,17 @@ export default function MultiEmbed() @{
 	<section data-testid="frame">
 		<menubar.root aria-label="Document" data-testid="root">
 			<menubar.item data-testid="file-item">
-				File
-				<menubar.itemcontent data-testid="file-panel">
+				File <menubar.itemcontent data-testid="file-panel">
 					<menu.item value="new" data-testid="new-item">New</menu.item>
 				</menubar.itemcontent>
 			</menubar.item>
 			<menubar.item disabled data-testid="locked-item">
-				Tools
-				<menubar.itemcontent data-testid="locked-panel">
+				Tools <menubar.itemcontent data-testid="locked-panel">
 					<menu.item value="build" data-testid="build-item">Build</menu.item>
 				</menubar.itemcontent>
 			</menubar.item>
 			<menubar.item data-testid="view-item">
-				View
-				<menubar.itemcontent data-testid="view-panel">
+				View <menubar.itemcontent data-testid="view-panel">
 					<menu.item value="zoom" data-testid="zoom-item">Zoom in</menu.item>
 				</menubar.itemcontent>
 			</menubar.item>

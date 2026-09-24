@@ -47,6 +47,23 @@ export function IntrinsicContract() @{
 		</tbody>
 	</table>
 	<div
+		tabindex="0"
+		onKeyDown={(event) => {
+			const keyboardEvent: KeyboardEvent = event;
+			event.currentTarget.hidden = keyboardEvent.key === 'Escape';
+		}}
+		onPointerDown={(event) => event.pointerType}
+	>
+		Standard event casing
+	</div>
+	<table>
+		<tbody>
+			<tr>
+				<td colspan="2" rowspan="1">Numeric strings</td>
+			</tr>
+		</tbody>
+	</table>
+	<div
 		overlay
 		onDismiss={(event) => {
 			const reason = event.detail.reason;

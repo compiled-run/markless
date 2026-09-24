@@ -238,10 +238,14 @@ can resume. The header reserves `.theme-toggle-slot` at the end of its tools row
 pinned to it. `NOTES.md` finding 19 has the reasoning, including why the component has two buttons
 instead of one.
 
-Four pages ship without a live widget, each for a reason the page states out loud and the witness
-asserts. `concepts/conditionals.mdx` and `concepts/lists.mdx`: a component whose body uses `@if`
-makes the production build stop making progress on 0.3.1, and the transform that never returns is
-named in `NOTES.md` finding 23. `concepts/async.mdx`: `@try` blocks build fine, but an async
+`concepts/conditionals.mdx` and `concepts/lists.mdx` show their examples as plain files to paste
+into a project, with no live widget. Every example on both pages compiles, except the first file on
+the conditionals page: it is shown on purpose as the code the compiler refuses
+(`MARKLESS_STATE_CREATION_SITE_UNSTABLE`, state created inside an `@if`), and the callout above it
+says so. The witness asserts that callout and that neither page has a demo frame.
+
+Two more pages ship without a live widget, each for a reason the page states out loud and the
+witness asserts. `concepts/async.mdx`: `@try` blocks build fine, but an async
 boundary inside an MDX page serves no `asyncBoundaries` entry and no locator for the nodes in its
 arms, so nothing on the page can move (finding 25). `concepts/styling.mdx`: the scoped stylesheet a
 component compiles to is written into the build output and never linked from the page, and an

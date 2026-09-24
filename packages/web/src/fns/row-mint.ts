@@ -66,8 +66,9 @@ export function mintRow(
 	repeat: ResumeKeyedRepeatRecord,
 	item: unknown,
 	graph?: RowMintGraph,
+	values?: ReadonlyArray<unknown>,
 ): ResumeDomElement {
-	return mintRowNodes(parent, repeat, item, graph).rowRoot;
+	return mintRowNodes(parent, repeat, item, graph, values).rowRoot;
 }
 
 /**
@@ -82,6 +83,8 @@ export function mintRowNodes(
 	repeat: ResumeKeyedRepeatRecord,
 	item: unknown,
 	graph?: RowMintGraph,
+	// Text slots first, then attribute slots, as the repeat runtime reads them.
+	values?: ReadonlyArray<unknown>,
 ): { readonly rowRoot: ResumeDomElement; readonly nodes: ReadonlyArray<ResumeDomNode> } {
 	const rowTemplate = repeat.rowTemplate!,
 		host = parent.ownerDocument as MintingDocument | undefined,
@@ -113,14 +116,61 @@ export function mintRowNodes(
 			'MARKLESS_REPEAT_ROW_MINT_EMPTY',
 			'built no row from its markup, and half a row is worse than none.',
 		);
+	const valueAt = (at: number, slot: ProtocolRowTemplateSlotValue) =>
+		values ? values[at] : slotValue(slot, item, graph);
 	for (const [at, slot] of attributeSlots.entries()) {
-		const value = marklessAttributeValue(slot.name, slotValue(slot, item, graph));
+		const value = marklessAttributeValue(slot.name, valueAt(slots.length + at, slot));
 		if (value === null) hosts[at]!.removeAttribute?.(slot.name);
 		else hosts[at]!.setAttribute!(slot.name, value);
 	}
 	for (const [at, slot] of slots.entries())
-		anchors[at]!.replaceWith!(host.createTextNode(String(slotValue(slot, item, graph) ?? '')));
+		anchors[at]!.replaceWith!(host.createTextNode(String(valueAt(at, slot) ?? '')));
 	return { rowRoot, nodes };
+}
+
+/** Where focus sits inside a row about to be rebuilt, as element indexes under the row root. */
+export function focusPath(row: ResumeDomElement): number[] | undefined {
+	let node: ResumeDomElement | null | undefined = (
+		row.ownerDocument as { readonly activeElement?: ResumeDomElement } | undefined
+	)?.activeElement;
+	if (!node || !row.contains?.(node)) return;
+	const path: number[] = [];
+	for (; node && node !== row; node = node.parentElement)
+		path.unshift(childElements(node.parentElement).indexOf(node));
+	return path;
+}
+
+// Element indexes, since a served row and a minted one differ in the text and comments between.
+function childElements(node: ResumeDomNode | null | undefined): ResumeDomNode[] {
+	return Array.from(node?.childNodes ?? []).filter((child) => child.nodeType === 1);
+}
+
+const awaitingFocus = new WeakMap<ResumeDomElement, ReadonlyArray<number>>();
+
+/** Focuses where each rebuilt row held it, or once that row's own later-minted rows are placed. */
+export function refocus(
+	parent: ResumeDomElement,
+	focused: ReadonlyArray<readonly [ResumeDomElement, ReadonlyArray<number>]>,
+): void {
+	for (const [row, path] of focused) if (!focusAt(row, path)) awaitingFocus.set(row, path);
+	for (let node: ResumeDomElement | null | undefined = parent; node; node = node.parentElement) {
+		const path = awaitingFocus.get(node);
+		if (!path) continue;
+		const document = node.ownerDocument as
+			| { readonly activeElement?: unknown; readonly body?: unknown }
+			| undefined;
+		// Focus the user moved in the meantime is theirs to keep.
+		const moved = document?.activeElement && document.activeElement !== document.body;
+		if (moved || focusAt(node, path)) awaitingFocus.delete(node);
+		return;
+	}
+}
+
+function focusAt(row: ResumeDomElement, path: ReadonlyArray<number>): boolean {
+	let node: ResumeDomNode | undefined = row;
+	for (const index of path) node = childElements(node)[index];
+	(node as { readonly focus?: () => void } | undefined)?.focus?.();
+	return (node as { readonly focus?: () => void } | undefined)?.focus !== undefined;
 }
 
 /**
@@ -137,7 +187,9 @@ function slotValue(
 ): unknown {
 	return 'itemPath' in slot
 		? readPath(item, slot.itemPath)
-		: graph?.read(slot.graphNodeId, slot.graphPath);
+		: 'graphNodeId' in slot
+			? graph?.read(slot.graphNodeId, slot.graphPath)
+			: undefined;
 }
 
 // A local copy of fns/direct's walk, for the reason this whole module is local:

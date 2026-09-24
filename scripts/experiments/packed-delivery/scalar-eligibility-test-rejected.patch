@@ -1,0 +1,60 @@
+--- a/packages/router/test/vite/mdx-scalar.test.ts
++++ b/packages/router/test/vite/mdx-scalar.test.ts
+@@ -343,7 +343,57 @@
+ 		]);
+ 	},
+ );
++
++test.each([
++	['m3:c0:', 'count'],
++	['m8:c4:p1:', 'level'],
++])(
++	'skips payload decoding when the matched symbol has no scalar plan in %s',
++	async (scope, cell) => {
++		const f = fixture(scope, cell);
++		const query = vi.spyOn(f.root, 'querySelector');
++		const loadPlan = vi.fn(async () => undefined);
++		expect(await tryResumeMdxScalar(f.input(), loadPlan, f.loadSymbol)).toBe(false);
++		expect(loadPlan).toHaveBeenCalledExactlyOnceWith(scope + 'handler');
++		expect(
++			query.mock.calls.filter(([selector]) => selector.startsWith('script[type="markless/')),
++		).toEqual([]);
++		expect(f.loadSymbol).not.toHaveBeenCalled();
++		expect(f.output.textContent).toBe('Value: 2 units');
++	},
++);
++
++test('checks scalar eligibility before reading payloads and reuses the selected plan', async () => {
++	const f = fixture();
++	const steps: string[] = [];
++	const query = f.root.querySelector.bind(f.root);
++	vi.spyOn(f.root, 'querySelector').mockImplementation((selector) => {
++		if (selector.startsWith('script[type="markless/')) steps.push(selector);
++		return query(selector);
++	});
++	f.loadPlan.mockImplementation(async () => {
++		steps.push('plan');
++		return f.action;
++	});
++	for (let index = 0; index < 3; index++)
++		expect(await tryResumeMdxScalar(f.input(), f.loadPlan, f.loadSymbol)).toBe(true);
++	expect(steps).toEqual([
++		'plan',
++		'script[type="markless/state"]',
++		'script[type="markless/view"]',
++	]);
++	expect(f.loadPlan).toHaveBeenCalledExactlyOnceWith(f.scope + 'handler');
++	expect(f.handler).toHaveBeenCalledTimes(3);
++	expect(f.output.textContent).toBe('Value: 5 units');
++});
+ 
++test.each(['state', 'view'])('a supported plan still validates the %s payload', async (kind) => {
++	const f = fixture();
++	Object.assign(kind === 'state' ? f.state : f.view, { version: -1 });
++	expect(await tryResumeMdxScalar(f.input(), f.loadPlan, f.loadSymbol)).toBe(false);
++	expect(f.loadSymbol).not.toHaveBeenCalled();
++});
++
+ test('priming prepares metadata without running the handler or writing state', async () => {
+ 	const f = fixture();
+ 	expect(

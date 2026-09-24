@@ -301,7 +301,8 @@ test('a child with no component edge never blocks the imported-claims seal', () 
 			children,
 			captureMetadataForSource: () => propBound,
 			symbolClaimsForSource: () => claims,
-		});
+			claimsPublished: () => true,
+		}).symbols;
 	const missing = (
 		children: ReadonlyArray<LinkedModuleChildResolution>,
 		symbols: ReturnType<typeof symbolInputs>,
@@ -320,6 +321,61 @@ test('a child with no component edge never blocks the imported-claims seal', () 
 	expect(symbolInputs([child('edge-1')])).toHaveLength(1);
 	expect(missing([child('edge-1')], [])).toBe(true);
 	expect(missing([child('edge-1')], symbolInputs([child('edge-1')]))).toBe(false);
+});
+
+test('a composed child whose claims are missing is a diagnostic, not an empty row set', () => {
+	const propBound = {
+		passId: 'capture-analysis',
+		extractedSymbols: [{ symbolId: 's0', captureSlots: [{ propName: 'onSelect' }] }],
+		diagnostics: [],
+	} as unknown as CaptureAnalysisArtifact;
+	const unbound = {
+		passId: 'capture-analysis',
+		extractedSymbols: [{ symbolId: 's0', captureSlots: [] }],
+		diagnostics: [],
+	} as unknown as CaptureAnalysisArtifact;
+	const child = (source: string, extra: Partial<LinkedModuleChildResolution> = {}) =>
+		({
+			parent: '/app/pages/index.tsrx',
+			specifier: source.replace('/app/pages/', './'),
+			source,
+			externalized: false,
+			componentEdgeId: 'component-edge:0',
+			...extra,
+		}) satisfies LinkedModuleChildResolution;
+	const link = (
+		children: ReadonlyArray<LinkedModuleChildResolution>,
+		metadata: CaptureAnalysisArtifact | undefined,
+		unawaitedSources?: ReadonlySet<string>,
+		published = false,
+	) =>
+		linkedImportedSymbolInputs({
+			children,
+			captureMetadataForSource: () => metadata,
+			symbolClaimsForSource: () => undefined,
+			claimsPublished: () => published,
+			...(unawaitedSources ? { unawaitedSources } : {}),
+		});
+
+	const unpublished = link([child('/app/pages/card.tsrx')], propBound);
+	expect(unpublished.symbols).toEqual([]);
+	expect(
+		unpublished.diagnostics.map((diagnostic) => [diagnostic.code, diagnostic.severity]),
+	).toEqual([['MARKLESS_IMPORTED_SYMBOL_CLAIMS_MISSING', 'error']]);
+
+	// Nothing to bind, a publication with no claimed symbols, an external delegate,
+	// and a cycle the linker named are not defects here.
+	expect(link([child('/app/pages/card.tsrx')], unbound).diagnostics).toEqual([]);
+	expect(link([child('/app/pages/card.tsrx')], propBound, undefined, true).diagnostics).toEqual(
+		[],
+	);
+	expect(link([child('@scope/widgets', { externalized: true })], propBound).diagnostics).toEqual(
+		[],
+	);
+	expect(
+		link([child('/app/pages/card.tsrx')], propBound, new Set(['/app/pages/card.tsrx']))
+			.diagnostics,
+	).toEqual([]);
 });
 
 // The barrel walk is a pass step: it resolves nothing and reads no file. Every

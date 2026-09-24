@@ -14,6 +14,11 @@ import type {
 	ResumeDomElement,
 	ResumeDomNode,
 } from './resume-types.ts';
+export {
+	composedArmRecordQualifier,
+	installComposedArmRecordQualifier,
+	type ComposedArmRecordQualifier,
+} from './resume-handle-qualifier.ts';
 
 export function boundaryArmRecordSet(value: unknown): ResumeArmRecordSet | null {
 	if (!value || Array.isArray(value)) return null;
@@ -242,31 +247,6 @@ function elementsAndAnchorOffset(
 	})(root);
 	// Missing anchor: past-the-end offset makes locator lookups fail loud.
 	return { elements, offset: offset === -1 ? elements.length : offset };
-}
-
-// A composed child's arm records are minted in the child module's own id space,
-// so the settle commit has to re-spell them in page space before registration.
-// Only a page with component edges can hold such a boundary, so the table that
-// does the re-spelling lives in fns/composition.ts and the bundler emits its
-// install call for those pages alone; a non-composing page leaves this slot
-// empty and its settle path registers arm records untouched.
-export type ComposedArmRecordQualifier = (
-	boundaryId: string,
-	set: ResumeArmRecordSet,
-	// The settling page's own graph: widget-scoped ids in a composed arm belong to
-	// a rendered widget of THIS container, and the registry that names them is
-	// filed against this graph.
-	graph?: RuntimeGraph,
-) => ResumeArmRecordSet;
-
-let installedQualifier: ComposedArmRecordQualifier | undefined;
-
-export function installComposedArmRecordQualifier(qualifier: ComposedArmRecordQualifier): void {
-	installedQualifier = qualifier;
-}
-
-export function composedArmRecordQualifier(): ComposedArmRecordQualifier | undefined {
-	return installedQualifier;
 }
 
 /**

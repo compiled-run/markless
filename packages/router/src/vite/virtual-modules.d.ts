@@ -19,8 +19,7 @@ declare module 'virtual:markless-router/navigation-entry-path' {
 }
 
 declare module 'virtual:markless-router/route-preloads' {
-	type AssetRoutes =
-		import('./client-assets-manifest.ts').MarklessRouterClientAssetRoutes;
+	type AssetRoutes = import('./client-assets-manifest.ts').MarklessRouterClientAssetRoutes;
 
 	export const routeModulePreloads: AssetRoutes['navigation'];
 	export const routeSsrModulePreloads: AssetRoutes['ssr'];
@@ -28,6 +27,7 @@ declare module 'virtual:markless-router/route-preloads' {
 	// Server lane only: the client build omits this export, and the server
 	// emits `undefined` when preloads were not persisted.
 	export const routeStylesheets: AssetRoutes['styles'] | undefined;
+	export const documentImportMap: string;
 
 	// Appends missing `<link rel="modulepreload">` tags, returning the hrefs added.
 	export function preloadRouteModule(file: string, document?: Document): string[];
@@ -39,3 +39,19 @@ declare module 'virtual:markless-router/routes' {
 	export const pageModuleLoaders: RouteDiscovery['pageModuleLoaders'];
 	export const routeFileIds: RouteDiscovery['routeFileIds'];
 }
+
+declare module 'virtual:markless-router/options' {
+	export const linkPreloading: import('./runtime/create-server-entry.ts').ServerEntryOptions['linkPreloading'];
+	export const documentNavigation: import('./document-navigation.ts').DocumentNavigation;
+	export function startLinkIntentPreloading(
+		root: Document | Element,
+		preload: (url: URL) => void,
+	): () => void;
+	export function startViewportPrefetching(
+		document: Document,
+		destinations: (
+			url: URL,
+		) => readonly import('@markless/web/render-to-string').ModulePreloadInput[] | undefined,
+	): void;
+}
+declare const __MARKLESS_ROUTER_LINK_INTENT__: boolean;

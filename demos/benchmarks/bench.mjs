@@ -74,12 +74,20 @@ const smoke = flags.has('--smoke');
 const protocol = benchmarkDefinition.protocol(smoke);
 const environment = collectEnvironment();
 let fixture;
-const csrBrowserBenchmarks = ['computed-chain', 'memo-wall', 'dbmon', 'todomvc', 'chat-stream'].includes(benchmark);
+const csrBrowserBenchmarks = [
+	'computed-chain',
+	'memo-wall',
+	'dbmon',
+	'todomvc',
+	'chat-stream',
+].includes(benchmark);
 if (!nodeOnlyBenchmark && !csrBrowserBenchmarks) {
 	const entryPath = path.join(
 		fixtureRoot,
 		'dist',
-		...(['news', 'async-waterfall'].includes(benchmark) ? ['server', 'entry-server.js'] : ['entry-server.js']),
+		...(['news', 'async-waterfall'].includes(benchmark)
+			? ['server', 'entry-server.js']
+			: ['entry-server.js']),
 	);
 	fixture = await import(`${pathToFileURL(entryPath).href}?built=${Date.now()}`);
 }
@@ -88,11 +96,7 @@ const outcome = await benchmarkDefinition.run({
 	protocol,
 	environment,
 	ssrOnly: flags.has('--ssr-only'),
-	clientDirectory: path.join(
-		fixtureRoot,
-		'dist',
-		...(csrBrowserBenchmarks ? [] : ['client']),
-	),
+	clientDirectory: path.join(fixtureRoot, 'dist', ...(csrBrowserBenchmarks ? [] : ['client'])),
 	receiptPath: path.join(root, 'dist', 'results', `${benchmark}-analyzer-verdict.json`),
 });
 assertResult(outcome.result);
@@ -238,19 +242,33 @@ function memoWallProtocol(smoke) {
 
 function dbmonProtocol(smoke) {
 	return {
-		mode: smoke ? 'smoke' : 'full', timedSeconds: 0, warmupMinimumRenders: 10,
-		warmupSeconds: 0, maxSamples: smoke ? 1 : 30, memoryMaxRenders: 0,
-		forcedGc: false, browserForcedGc: true, operationWarmups: smoke ? 1 : 10,
-		operationSamples: smoke ? 1 : 30, sampleYieldMs: 5,
+		mode: smoke ? 'smoke' : 'full',
+		timedSeconds: 0,
+		warmupMinimumRenders: 10,
+		warmupSeconds: 0,
+		maxSamples: smoke ? 1 : 30,
+		memoryMaxRenders: 0,
+		forcedGc: false,
+		browserForcedGc: true,
+		operationWarmups: smoke ? 1 : 10,
+		operationSamples: smoke ? 1 : 30,
+		sampleYieldMs: 5,
 	};
 }
 
 function interactionProtocol(smoke) {
 	return {
-		mode: smoke ? 'smoke' : 'full', timedSeconds: 0, warmupMinimumRenders: 1,
-		warmupSeconds: 0, maxSamples: smoke ? 1 : 8, memoryMaxRenders: 0,
-		forcedGc: false, browserForcedGc: true, operationWarmups: 1,
-		operationSamples: smoke ? 1 : 8, sampleYieldMs: 40,
+		mode: smoke ? 'smoke' : 'full',
+		timedSeconds: 0,
+		warmupMinimumRenders: 1,
+		warmupSeconds: 0,
+		maxSamples: smoke ? 1 : 8,
+		memoryMaxRenders: 0,
+		forcedGc: false,
+		browserForcedGc: true,
+		operationWarmups: 1,
+		operationSamples: smoke ? 1 : 8,
+		sampleYieldMs: 40,
 	};
 }
 
@@ -307,9 +325,15 @@ function printSummary(result, resultPath) {
 		}
 	} else if (result.benchmark === 'async-waterfall') {
 		const metrics = result.cases[0].metrics;
-		console.log(`SSR + resume + first dispatch p50: ${metrics.ssr_resume_first_dispatch_ms.p50Ms.toFixed(3)} ms`);
-		console.log(`root-state update p50: ${metrics.update_deepest_boundary_ms.p50Ms.toFixed(3)} ms`);
-		console.log(`waterfall factor against ${metrics.serial_floor_ms} ms floor: ${metrics.waterfall_factor.toFixed(2)}x`);
+		console.log(
+			`SSR + resume + first dispatch p50: ${metrics.ssr_resume_first_dispatch_ms.p50Ms.toFixed(3)} ms`,
+		);
+		console.log(
+			`root-state update p50: ${metrics.update_deepest_boundary_ms.p50Ms.toFixed(3)} ms`,
+		);
+		console.log(
+			`waterfall factor against ${metrics.serial_floor_ms} ms floor: ${metrics.waterfall_factor.toFixed(2)}x`,
+		);
 	} else if (result.benchmark === 'computed-chain') {
 		console.log('operation                 p50 ms    p95 ms   computeds   DOM nodes   batches');
 		for (const benchmarkCase of result.cases) {
@@ -341,7 +365,9 @@ function printSummary(result, resultPath) {
 	} else if (['dbmon', 'todomvc', 'chat-stream'].includes(result.benchmark)) {
 		console.log('operation                      p50 ms    p95 ms   samples');
 		for (const benchmarkCase of result.cases) {
-			console.log(`${benchmarkCase.name.padEnd(30)} ${benchmarkCase.timing.p50Ms.toFixed(3).padStart(8)} ${benchmarkCase.timing.p95Ms.toFixed(3).padStart(9)} ${String(benchmarkCase.timing.samples).padStart(9)}`);
+			console.log(
+				`${benchmarkCase.name.padEnd(30)} ${benchmarkCase.timing.p50Ms.toFixed(3).padStart(8)} ${benchmarkCase.timing.p95Ms.toFixed(3).padStart(9)} ${String(benchmarkCase.timing.samples).padStart(9)}`,
+			);
 		}
 		console.log(`timed ${result.benchmark} windows allow zero requests`);
 	} else if (result.benchmark === 'bundle-size') {
@@ -368,7 +394,9 @@ function printSummary(result, resultPath) {
 				`${benchmarkCase.name.padEnd(25)} ${String(metrics.size).padStart(6)} ${String(metrics.reChecks).padStart(11)} ${String(metrics.expectedReChecks).padStart(12)} ${String(metrics.collectionRuns).padStart(17)}`,
 			);
 		}
-		console.log('re-checks are `view-dom-update:*` subscription runs; milliseconds are never a gate here');
+		console.log(
+			're-checks are `view-dom-update:*` subscription runs; milliseconds are never a gate here',
+		);
 	} else if (result.benchmark === 'streaming-ssr') {
 		console.log(
 			'scenario       shell p50 ms   total p50 ms   chunks   total bytes   renders/sec',

@@ -3,7 +3,7 @@ import { compileTsrxModule } from '../../src/index.ts';
 import { CAPTURE_OPAQUE_PROP_CODE } from '../../src/passes/capture-analysis.ts';
 
 /**
- * A prop path state lowering cannot reduce (`steps[0].target`) produced no read
+ * A prop path state lowering cannot reduce (`entries[pick].caption`) produced no read
  * at all, so the prop name survived into the emitted handler module as a free
  * identifier: the build passed and the first press threw `ReferenceError`.
  * Capture analysis refuses it instead.
@@ -17,7 +17,7 @@ function symbolSources(result: Awaited<ReturnType<typeof compile>>) {
 	return result.symbolModules.modules.map((module) => module.source).join('\n');
 }
 
-test('an indexed prop path in a handler is refused rather than emitted unbound', async () => {
+test('an optional link after an indexed prop path reads the path before it', async () => {
 	const result = await compile(
 		'src/Steps.tsrx',
 		`
@@ -34,11 +34,9 @@ export function StepList({ steps }) @{
 `,
 	);
 
-	const [diagnostic] = result.captureAnalysis.diagnostics;
-	expect(diagnostic?.code).toBe(CAPTURE_OPAQUE_PROP_CODE);
-	expect(diagnostic?.propName).toBe('steps');
-	expect(diagnostic?.message).toContain('"steps" for "StepList"');
-	expect(diagnostic?.message).toContain('would reach the browser unbound');
+	expect(result.captureAnalysis.diagnostics).toEqual([]);
+	expect(result.symbolModules.diagnostics).toEqual([]);
+	expect(symbolSources(result)).toContain('context.graph.read("prop:props", ["steps", "0"])?.target');
 });
 
 // Alternate shape: different component, prop, element and index spelling, and

@@ -151,15 +151,18 @@ test('an array of objects carrying the handle is refused when the handler reads 
 	);
 });
 
-// ...and when it reads one entry at a time. `steps[0]` reduced to no route at
-// all, so the prop name reached the browser unbound and the first press threw a
-// ReferenceError. A build that passes and then crashes is refused instead.
+// ...and when it reads one entry at a time: `steps[0]?.target` lowers to a
+// capture read of `steps[0]`, so the part compiles and the page that hands it
+// an array literal is refused at that edge.
 test('the same array read one entry at a time is refused too', async () => {
-	const { status, body } = await moduleStatus('./spot-indexed.tsrx?import');
+	const part = await moduleStatus('./spot-indexed.tsrx?import');
+	expect(part.status).toBe(200);
+
+	const { status, body } = await moduleStatus('./indexed-array-page.tsrx?import');
 	expect(status).toBe(500);
 	expect(body).toContain('MARKLESS_CAPTURE_OPAQUE_PROP');
 	expect(body).toContain(
-		'because prop \\"steps\\" for \\"SpotListIndexed\\" is read through a path the compiler cannot reduce',
+		'because prop \\"steps\\" for \\"SpotListIndexed\\" is the runtime expression',
 	);
-	expect(body).toContain('would reach the browser unbound');
+	expect(body).toContain('reads it as `steps[0]` in an event handler');
 });

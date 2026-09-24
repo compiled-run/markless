@@ -5,9 +5,7 @@
 export default function OpenerLine() @{
 	<div class="opener-line">
 		<p>
-			You have learned enough frameworks.
-			<span>(even if the number is zero)</span>
-			This one is mostly subtraction: TypeScript functions and one word you already know, <code>state</code>.
+			You have learned enough frameworks. <span>(even if the number is zero)</span> This one is mostly subtraction: TypeScript functions and one word you already know, <code>state</code>.
 		</p>
 
 		<style>

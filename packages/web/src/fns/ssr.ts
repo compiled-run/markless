@@ -125,6 +125,7 @@ type SsrPropEvent = {
 	readonly hostNodeId: string;
 	readonly eventName: string;
 	readonly propName: string;
+	readonly wraps?: true;
 };
 type SsrChildOutput = ComposeChildOutput & {
 	readonly html?: string;
@@ -247,7 +248,20 @@ export type MarklessSsrHostLocators = Array<MarklessSsrHostLocator> & {
 
 export { marklessComposeState };
 export const marklessSsrRemapChildGraph = marklessCsrRemapChildGraph;
-export const marklessSsrRemapGraphOutput = marklessCsrRemapGraphOutput;
+export function marklessSsrRemapGraphOutput(
+	output: Parameters<typeof marklessCsrRemapGraphOutput>[0],
+	graphProps: ComposeGraphProps,
+	instancePath = '',
+) {
+	output.state.cells = output.state.cells.flatMap(
+		(cell) => marklessSsrRoutedPropCell.get(cell)?.(graphProps) ?? [cell],
+	);
+	marklessCsrRemapGraphOutput(output, graphProps, instancePath);
+}
+
+// The composer's bound derive reads a live-routed prop off its own node, so the
+// child's seeded copy of that key is never read after resume.
+const marklessSsrRoutedPropCell = new WeakMap<object, (graphProps: ComposeGraphProps) => never[]>();
 
 // The compiled module a composed child was imported from may serve several
 // components. The child names the one it declared, so its own SSR entry
@@ -834,14 +848,35 @@ export function marklessSsrSeedPropCells(
 		const value = cell.keys
 			? Object.fromEntries(present.map((key) => [key, props?.[key]]))
 			: props?.[name];
-		return [
-			{
-				graphNodeId: cell.graphNodeId,
-				name,
-				valueKind: marklessSsrValueKind(value),
-				value: marklessSerializeGraphValue(value),
-			},
-		];
+		const seededCell = {
+			graphNodeId: cell.graphNodeId,
+			name,
+			valueKind: marklessSsrValueKind(value),
+			value: marklessSerializeGraphValue(value),
+		};
+		if (cell.keys && cell.scalarKeys && cell.graphNodeId === 'prop:props')
+			marklessSsrRoutedPropCell.set(seededCell, (graphProps) => {
+				const kept = Object.fromEntries(
+					present.flatMap((key) =>
+						cell.keys?.includes(key) ||
+						!marklessLiveBoundGraphRoute(graphProps?.find((prop) => prop.name === key))
+							? [[key, props?.[key]]]
+							: [],
+					),
+				);
+				return (
+					Object.keys(kept).length
+						? [
+								{
+									...seededCell,
+									valueKind: marklessSsrValueKind(kept),
+									value: marklessSerializeGraphValue(kept),
+								},
+							]
+						: []
+				) as never[];
+			});
+		return [seededCell];
 	});
 	if (seeded.length === 0) return state;
 	return marklessCarryWidgetRegistry(state, {
@@ -935,6 +970,15 @@ export function marklessSsrComposeView(
 	);
 }
 
+/** Of the ids composition kept verbatim, the callbacks this render was handed; the rest are its own and take its prefix. */
+export function marklessSsrHandedDown(
+	externalSymbolIds: ReadonlyArray<string>,
+	props: SsrChildProps | undefined,
+): string[] {
+	const received = new Set(Object.values(props?.__marklessSsrCallbacks ?? {}));
+	return externalSymbolIds.filter((symbolId) => received.has(symbolId));
+}
+
 function marklessSsrComposedView(
 	structure: SsrDataStructure,
 	view: SsrViewDraft,
@@ -1015,7 +1059,14 @@ function marklessSsrComposedView(
 		if (rendered) Object.assign(locator, { index: rendered.index, tagName: rendered.tagName });
 	}
 	locators.sort((a, b) => a.index - b.index);
-	const boundariesWithComposedBranches = asyncBoundaries.map((boundary) => {
+	// Every component of a module carries the module's whole view, so a boundary counts only where this render placed it.
+	const renderedBoundaryIds = new Set(
+		structure.anchors.filter((anchor) => anchor.kind === 'async').map((anchor) => anchor.id),
+	);
+	const renderedBoundaries = asyncBoundaries.filter((boundary) =>
+		renderedBoundaryIds.has(idPrefix + boundary.id),
+	);
+	const boundariesWithComposedBranches = renderedBoundaries.map((boundary) => {
 		const composed = boundaryArmBranches.get(boundary.id);
 		if (!composed?.length || !Array.isArray(boundary.armRecords)) return boundary;
 		return {
@@ -1068,6 +1119,7 @@ function marklessSsrComposedView(
 		externalSymbolIds: [...externalSymbolIds],
 	};
 }
+
 // D3 arm-relative coordinates: renderData structure is the truth for which arm
 // a boundary served and where its elements sit. The structural element range
 // at the anchor gives the arm's page offset; every flat record in that range
@@ -1117,9 +1169,9 @@ export function marklessSsrArmizeBoundaries(
 			const locator = streams.locators[i];
 			if (locator.index < opensStart || locator.index >= opensEnd) continue;
 			armLocators.unshift({
-				...locator,
-				strategy: 'arm-relative',
+				hostNodeId: locator.hostNodeId,
 				index: locator.index - opensStart,
+				tagName: locator.tagName,
 			});
 			streams.locators.splice(i, 1);
 		}
@@ -1172,8 +1224,7 @@ export function marklessSsrArmizeBoundaries(
 			if (armLocators.some((candidate) => candidate.hostNodeId === locator.hostNodeId))
 				continue;
 			armLocators.push({
-				...locator,
-				strategy: 'arm-relative',
+				hostNodeId: locator.hostNodeId,
 				index: rendered.index - opensStart,
 				tagName: rendered.tagName,
 			});
@@ -1264,7 +1315,6 @@ function marklessSsrMoveServedBranchRepeats(
 		if (!rendered) continue;
 		locators.unshift({
 			hostNodeId: repeat.parentHostNodeId,
-			strategy: 'arm-relative',
 			index: rendered.index - anchor.elementStart,
 			tagName: rendered.tagName,
 		});
@@ -1298,9 +1348,9 @@ function marklessSsrMoveArmRange(
 		const locator = streams.locators[i];
 		if (locator.index < anchor.elementStart || locator.index >= anchor.elementEnd) continue;
 		armLocators.unshift({
-			...locator,
-			strategy: 'arm-relative',
+			hostNodeId: locator.hostNodeId,
 			index: locator.index - anchor.elementStart,
+			tagName: locator.tagName,
 		});
 		streams.locators.splice(i, 1);
 	}
@@ -1361,11 +1411,19 @@ export function marklessSsrAppendChildView(context: {
 	const propEvents = context.child.output?.propEvents ?? [];
 	const callbackProps = context.child.callbackProps ?? {};
 	const callbackSymbolIds = new Map<string, string>();
-	for (const event of childView.events) {
+	// A wrapping handler runs through its bound route, arguments and all; standing in this render's own callback would drop them.
+	const standInCallback = (event: SsrEventRecord): string | undefined => {
 		const propEvent = propEvents.find(
 			(item) => item.hostNodeId === event.hostNodeId && item.eventName === event.eventName,
 		);
-		const callbackSymbolId = propEvent ? callbackProps[propEvent.propName] : undefined;
+		const callback = propEvent ? callbackProps[propEvent.propName] : undefined;
+		if (!callback || !propEvent?.wraps) return callback;
+		return event.symbolIds.some((symbolId) => context.child.boundSymbols?.[symbolId])
+			? undefined
+			: callback;
+	};
+	for (const event of childView.events) {
+		const callbackSymbolId = standInCallback(event);
 		if (callbackSymbolId)
 			for (const symbolId of event.symbolIds)
 				callbackSymbolIds.set(symbolId, callbackSymbolId);
@@ -1389,10 +1447,7 @@ export function marklessSsrAppendChildView(context: {
 			index: context.baseIndex + locator.index,
 		});
 	for (const event of childView.events) {
-		const propEvent = propEvents.find(
-			(item) => item.hostNodeId === event.hostNodeId && item.eventName === event.eventName,
-		);
-		const callbackSymbolId = propEvent ? callbackProps[propEvent.propName] : undefined;
+		const callbackSymbolId = standInCallback(event);
 		const symbolIds = callbackSymbolId
 			? [callbackSymbolId]
 			: event.symbolIds.map((symbolId) =>

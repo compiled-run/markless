@@ -23,5 +23,13 @@ export {
 	isClientPrimarySourceRequest,
 	isRenderDataSourceRequest,
 	isResumeSourceRequest,
+	isRouteNavigationSourceRequest,
 	isSymbolOnlySourceRequest,
 } from './virtual-ids.ts';
+export { plannedLandingFiles } from './build/planned-landing.ts';
+export {
+	isMarklessDeferredPack,
+	isMarklessNavigationPack,
+	MARKLESS_DEFERRED_PACK,
+	MARKLESS_NAVIGATION_PACK_PREFIX,
+} from './build/route-pack-groups.ts';

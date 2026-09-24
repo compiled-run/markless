@@ -11,6 +11,8 @@ import type {
 } from './resume-types.ts';
 
 type Hosted<T> = T & { readonly hostPath: ReadonlyArray<number> };
+// Even an evaluated module's import() costs a task.
+let journal: typeof import('./dom-journal.ts') | undefined;
 type RegisteredResumeBranch = ResumeBranchRecord & {
 	readonly armBoundaryId?: string;
 };
@@ -19,8 +21,7 @@ export function wireBranches(input: any) {
 	const branchesById = new Map<string, ResumeBranchRecord>(),
 		currentArmByBranchId = new Map<string, number>(),
 		startupArmBehaviorHostIds: string[] = [];
-	// Arm-scoped flips rewire on every commit (anchors are replaced); escalated
-	// records wire once per site.
+	// Arm-scoped flips rewire per commit (fresh anchors); escalated records wire once per site.
 	const armFlipReleasesByBoundary = new Map<string, Array<() => void>>(),
 		wiredEscalationIds = new Set<string>();
 	const { registerArmBranches, wireBranchRecord, wireEscalatedRecord } = createBranchRegistration(
@@ -61,6 +62,9 @@ export function wireBranches(input: any) {
 				branch = branchesById.get(branchId),
 				arm = currentArmByBranchId.get(branchId);
 			if (!branch || arm === undefined || !branch.armRecords?.[arm]) continue;
+			// Preloaded by the flip; evaluate now so the arm's next update needs no import task.
+			for (const { symbolId } of branch.armRecords[arm].domUpdates)
+				if (symbolId) void Promise.resolve(input.loadSymbol(symbolId)).catch(() => {});
 			for (const hostNodeId of materializeBranchArmRecords(input, branch, arm))
 				await activate(hostNodeId);
 			if (branch.takenArm === arm && branch.servedArmRecords)
@@ -79,7 +83,7 @@ export function wireBranches(input: any) {
 		>,
 	): Promise<void> {
 		if (!entries.some((entry) => entry.type === 'removeRange')) return;
-		const { hostIdsInsideRange } = await import('./dom-journal.ts');
+		const { hostIdsInsideRange } = (journal ??= await import('./dom-journal.ts'));
 		for (const entry of entries) {
 			if (entry.type !== 'removeRange') continue;
 			const branch = entry.locator.startsWith('branch:')
@@ -124,8 +128,7 @@ function createBranchRegistration(
 		branchesById.set(branch.id, branch);
 		for (const armRecordSet of branch.armRecords ?? [])
 			for (const armEvent of armRecordSet.events) input.eventTypes.add(armEvent.eventName);
-		// An IDREF outside the arms follows the PAINTED arm, and the served arm never
-		// materializes, so every paint answers it.
+		// IDREFs outside the arms follow the PAINTED arm; the served arm never materializes.
 		const paintArm = (arm: number) => {
 			currentArmByBranchId.set(branch.id, arm);
 			if (branch.idrefSites?.length)
@@ -166,10 +169,9 @@ function createBranchRegistration(
 				!branch.declaredEmptyArms?.includes(update.arm)
 			)
 				throw branchArmEmptyError(branch, update.arm);
-			// A replay putting this arm back as it stands moves nothing, so nothing
-			// splices and nothing announces.
+			// Replaying the arm already in place splices and announces nothing.
 			if (update.arm === painted) {
-				const { domRangeMatchesFragment } = await import('./dom-journal.ts');
+				const { domRangeMatchesFragment } = (journal ??= await import('./dom-journal.ts'));
 				if (domRangeMatchesFragment(branch.startAnchor, branch.endAnchor, fragment)) return;
 			}
 			return [
@@ -184,9 +186,7 @@ function createBranchRegistration(
 					graphNodeId: read.graphNodeId,
 					path: read.path,
 					async run() {
-						// While the deciding read's async computed re-runs, the flip holds
-						// its prior arm; one test read per branch, so this subscription IS
-						// the decider readBranchArm uses.
+						// Hold the prior arm while the deciding async computed re-runs (the branch's only test read).
 						if (kind === 'test' && input.holdPendingFlip?.(read.graphNodeId)) return;
 						const arm = branch.testReads.length
 							? readBranchArm(input.graph, branch)
@@ -229,8 +229,7 @@ function createBranchRegistration(
 			);
 	}
 
-	// A fresh arm brings fresh anchors, so prior flip subscriptions leak unless
-	// they release first.
+	// Release prior flip subscriptions first: a fresh arm brings fresh anchors.
 	function registerArmBranches(
 		boundaryId: string,
 		records: ReadonlyArray<RegisteredResumeBranch>,
@@ -261,10 +260,7 @@ function createBranchRegistration(
 	return { registerArmBranches, wireBranchRecord, wireEscalatedRecord };
 }
 
-// An arm symbol rebuilds from the part-local prop ids its own module spells, which
-// the record's rewritten reads never touch. Reading the served table here rather than
-// through fns/composition.ts keeps the compose path out of resume's static closure;
-// composed-arm-projection.test.ts pins the two ends together.
+// Read local prop IDs without importing the composition runtime into resume.
 export function composedBranchGraph(graph: RuntimeGraph, branch: ResumeBranchRecord): RuntimeGraph {
 	const routes = branch.composedGraphProps;
 	if (!routes?.length) return graph;
@@ -294,9 +290,7 @@ function onceRelease(release: () => void): () => void {
 	};
 }
 
-// The PAINTED arm wins: a minted condition computed holds no value until its first
-// demand refresh, so the graph would answer the else arm and the first real update
-// would be discarded as a no-change.
+// The PAINTED arm wins: a minted condition is empty until its first refresh, so the graph would answer else.
 function wiredBranchArm(graph: RuntimeGraph, branch: ResumeBranchRecord): number {
 	return typeof branch.takenArm === 'number' ? branch.takenArm : readBranchArm(graph, branch);
 }

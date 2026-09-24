@@ -1,7 +1,12 @@
 import { box } from '@async/witness';
+import type { Plugin } from 'vite';
+import { NAVIGATION_POLYFILL_MODULE } from '../src/navigation-polyfill.ts';
 import { readClientAssetsManifest } from '../src/vite/client-assets-manifest.ts';
 
 const FIXTURE = 'fixtures/router';
+const NITRO_BUILD_DIR = 'node_modules/.nitro-router-preload-strategy';
+// Nitro previews import the server entry in-process, so each box needs its own entry path.
+const NITRO_OUTPUT_DIR = '.output/router-preload-strategy';
 const BUNDLE_GRAPH_REQUEST = '/build/bundle-graph.json';
 const EXECUTION_SIZES_REQUEST = '/build/execution-sizes.json';
 const DOCS_LINK = 'a[data-markless-router-link]';
@@ -56,12 +61,15 @@ export default box(
 		modes: ['build', 'preview'],
 	},
 	async ({ pipeline, expect, receipt }) => {
+		const polyfill = navigationPolyfillChunkRecorder();
 		const build = await pipeline.build({
 			config: (config) => ({
 				...config,
 				root: `${config.root}/${FIXTURE}`,
 				configFile: `${config.root}/${FIXTURE}/vite.config.ts`,
 				mode: 'execution-measurement',
+				nitro: isolatedNitroOutput(),
+				plugins: [...(config.plugins ?? []), polyfill.plugin],
 			}),
 		});
 		const preview = await pipeline.preview(build, {
@@ -69,13 +77,21 @@ export default box(
 				...config,
 				root: `${config.root}/${FIXTURE}`,
 				configFile: `${config.root}/${FIXTURE}/vite.config.ts`,
+				nitro: isolatedNitroOutput(),
 			}),
 		});
-		const plan = await routeCandidatePlan(build as Build, preview as Preview);
+		const plan = await routeCandidatePlan(
+			build as Build,
+			preview as Preview,
+			polyfill.chunkPaths(),
+		);
 		receipt.note(`expected startup modulepreloads: ${plan.expectedHrefs.join(', ')}`);
 		receipt.note(`direct docs modulepreloads: ${plan.directDocsHrefs.join(', ')}`);
 		receipt.note(`required docs route/nav chain: ${plan.requiredHrefs.join(', ')}`);
 		receipt.note(`required home route/nav chain: ${plan.directDocsRequiredHrefs.join(', ')}`);
+		receipt.note(
+			`navigation polyfill chunks kept out of preloads: ${plan.polyfillHrefs.join(', ')}`,
+		);
 		receipt.note(
 			`forbidden sibling route preloads: ${plan.forbiddenRouteHrefs.join(', ') || '(none)'}`,
 		);
@@ -254,10 +270,15 @@ type RouteCandidatePlan = {
 	readonly observabilityHrefs: readonly string[];
 	readonly requiredHrefs: readonly string[];
 	readonly forbiddenRouteHrefs: readonly string[];
+	readonly polyfillHrefs: readonly string[];
 };
 
-async function routeCandidatePlan(build: Build, preview: Preview): Promise<RouteCandidatePlan> {
-	const manifest = await readClientAssetsManifest(`${FIXTURE}/.output/public`, '/');
+async function routeCandidatePlan(
+	build: Build,
+	preview: Preview,
+	polyfillPaths: ReadonlySet<string>,
+): Promise<RouteCandidatePlan> {
+	const manifest = await readClientAssetsManifest(`${FIXTURE}/${NITRO_OUTPUT_DIR}/public`, '/');
 	const docsDemandHrefs = manifest.routes.ssr['pages/docs/[...slug].mdx'];
 	const homeDemandHrefs = manifest.routes.ssr['pages/index.tsrx'];
 	if (!docsDemandHrefs?.length || !homeDemandHrefs?.length)
@@ -267,6 +288,12 @@ async function routeCandidatePlan(build: Build, preview: Preview): Promise<Route
 		const path = publicBuildPath(artifact.path);
 		if (!path) continue;
 		chunks.set(path, await preview.request(`/${path}`));
+	}
+	const missingPolyfill = [...polyfillPaths].filter((path) => !chunks.has(path));
+	if (polyfillPaths.size === 0 || missingPolyfill.length > 0) {
+		throw new Error(
+			`Expected the build to emit the navigation polyfill as its own chunk, saw: ${[...polyfillPaths].join(', ') || '(none)'}`,
+		);
 	}
 	const navigation = [...chunks].find(([, code]) => isRouterNavigationChunk(code));
 	if (!navigation) {
@@ -335,8 +362,24 @@ async function routeCandidatePlan(build: Build, preview: Preview): Promise<Route
 	}
 	const expectedHrefs = indexPreloads.hrefs;
 	const observabilityHrefs = await observabilityChunkHrefs(chunks, preview);
-	const requiredHrefs = [...matches].sort().map((path) => `/${path}`);
-	const directDocsRequiredHrefs = [...homeMatches].sort().map((path) => `/${path}`);
+	// Loaded only where window.navigation is missing, so no preload plan names it.
+	const requiredHrefs = [...matches]
+		.filter((path) => !polyfillPaths.has(path))
+		.sort()
+		.map((path) => `/${path}`);
+	const directDocsRequiredHrefs = [...homeMatches]
+		.filter((path) => !polyfillPaths.has(path))
+		.sort()
+		.map((path) => `/${path}`);
+	const polyfillHrefs = [...polyfillPaths].sort().map((path) => `/${path}`);
+	const preloadedPolyfill = [...indexPreloads.hrefs, ...directDocsPreloads.hrefs].filter((href) =>
+		polyfillPaths.has(pathOf(href).slice(1)),
+	);
+	if (preloadedPolyfill.length > 0) {
+		throw new Error(
+			`Expected SSR modulepreloads to leave out the navigation polyfill, saw: ${preloadedPolyfill.join(', ')}`,
+		);
+	}
 	const expectedPaths = new Set(expectedHrefs.map((href) => pathOf(href)));
 	const missingRequired = requiredHrefs.filter((href) => !expectedPaths.has(pathOf(href)));
 	if (missingRequired.length > 0) {
@@ -373,6 +416,7 @@ async function routeCandidatePlan(build: Build, preview: Preview): Promise<Route
 		expectedHrefs,
 		observabilityHrefs,
 		requiredHrefs,
+		polyfillHrefs,
 		forbiddenRouteHrefs: [...routeImportPaths]
 			.filter((path) => path !== docsRoutePath && path !== indexRoutePath)
 			.sort()
@@ -406,6 +450,52 @@ function routeDemandHrefs(
 		if (routeImportPaths.has(path) && path !== routePath)
 			throw new Error(`Foreign route entered demand closure: ${path}`);
 	return [...paths].map((path) => '/' + path);
+}
+
+function isolatedNitroOutput() {
+	return {
+		buildDir: NITRO_BUILD_DIR,
+		output: {
+			dir: NITRO_OUTPUT_DIR,
+			publicDir: `${NITRO_OUTPUT_DIR}/public`,
+			serverDir: `${NITRO_OUTPUT_DIR}/server`,
+		},
+	};
+}
+
+function navigationPolyfillChunkRecorder(): {
+	readonly plugin: Plugin;
+	chunkPaths(): ReadonlySet<string>;
+} {
+	const polyfillIds = new Set<string>();
+	const chunkPaths = new Set<string>();
+	return {
+		plugin: {
+			name: 'box:navigation-polyfill-chunks',
+			enforce: 'pre',
+			async resolveId(source, importer, options) {
+				if (source !== NAVIGATION_POLYFILL_MODULE) return null;
+				const resolved = await this.resolve(source, importer, {
+					...options,
+					skipSelf: true,
+				});
+				if (resolved) polyfillIds.add(resolved.id);
+				return null;
+			},
+			generateBundle(_options, bundle) {
+				if (this.environment?.name !== 'client') return;
+				for (const output of Object.values(bundle)) {
+					if (
+						output.type === 'chunk' &&
+						output.facadeModuleId &&
+						polyfillIds.has(output.facadeModuleId)
+					)
+						chunkPaths.add(publicBuildPath(output.fileName) ?? output.fileName);
+				}
+			},
+		},
+		chunkPaths: () => chunkPaths,
+	};
 }
 
 function publicBuildPath(path: string): string | undefined {

@@ -1,0 +1,4118 @@
+{
+  "before": {
+    "input": "/private/tmp/markless-docs-execution-ik7aLs/results.json",
+    "build": "/private/tmp/markless-docs-identity-final-UiOvAJ/.output",
+    "records": [
+      {
+        "test": "state-counter",
+        "phases": [
+          {
+            "name": "before-input",
+            "executedSourceBytes": 0,
+            "exportDeclarationBytes": 0,
+            "initializerBodiesInLoadedFiles": 0,
+            "initializersCalled": [],
+            "containmentCalls": 0
+          },
+          {
+            "name": "first-action",
+            "executedSourceBytes": 193067,
+            "exportDeclarationBytes": 98176,
+            "initializerBodiesInLoadedFiles": 1111,
+            "initializersCalled": [
+              {
+                "name": "init__virtual_markless_symbol$1",
+                "start": 1837,
+                "end": 1843,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol",
+                "start": 2011,
+                "end": 2017,
+                "count": 1
+              },
+              {
+                "name": "init_counter_demo",
+                "start": 11180,
+                "end": 11264,
+                "count": 1
+              },
+              {
+                "name": "init_counter",
+                "start": 11654,
+                "end": 11663,
+                "count": 1
+              },
+              {
+                "name": "init_state$1",
+                "start": 24624,
+                "end": 60436,
+                "count": 1
+              },
+              {
+                "name": "init_preload_helper",
+                "start": 1025,
+                "end": 2362,
+                "count": 1
+              },
+              {
+                "name": "init_resume_entry_ts_markless_router_root__2FUsers_2Fjacksm5pro_2Fdev_2Fopen_source_2Fmarkless_2Fwebsite_lang_ts_lang",
+                "start": 2852,
+                "end": 8974,
+                "count": 1
+              },
+              {
+                "name": "Oe",
+                "start": 15250,
+                "end": 15311,
+                "count": 1
+              },
+              {
+                "name": "Ae",
+                "start": 15351,
+                "end": 15390,
+                "count": 1
+              },
+              {
+                "name": "je",
+                "start": 15568,
+                "end": 15583,
+                "count": 1
+              },
+              {
+                "name": "Le",
+                "start": 18715,
+                "end": 18759,
+                "count": 1
+              },
+              {
+                "name": "init_dom_journal",
+                "start": 22787,
+                "end": 22797,
+                "count": 1
+              },
+              {
+                "name": "tt",
+                "start": 26586,
+                "end": 26819,
+                "count": 1
+              },
+              {
+                "name": "ite",
+                "start": 26897,
+                "end": 26928,
+                "count": 1
+              },
+              {
+                "name": "ote",
+                "start": 27324,
+                "end": 27340,
+                "count": 1
+              },
+              {
+                "name": "cte",
+                "start": 27432,
+                "end": 27448,
+                "count": 1
+              },
+              {
+                "name": "st",
+                "start": 27774,
+                "end": 28298,
+                "count": 1
+              },
+              {
+                "name": "pte",
+                "start": 28367,
+                "end": 28373,
+                "count": 1
+              },
+              {
+                "name": "init_payload_graph_construct",
+                "start": 30577,
+                "end": 30592,
+                "count": 1
+              },
+              {
+                "name": "init_payload_full",
+                "start": 30892,
+                "end": 30919,
+                "count": 1
+              },
+              {
+                "name": "init_payload_document_common",
+                "start": 32325,
+                "end": 32340,
+                "count": 1
+              },
+              {
+                "name": "init_payload_document",
+                "start": 32440,
+                "end": 32455,
+                "count": 1
+              },
+              {
+                "name": "nne",
+                "start": 40266,
+                "end": 40292,
+                "count": 1
+              },
+              {
+                "name": "init_value_decode_client",
+                "start": 42029,
+                "end": 42038,
+                "count": 1
+              },
+              {
+                "name": "init_resume_errors",
+                "start": 56751,
+                "end": 56897,
+                "count": 1
+              },
+              {
+                "name": "init_resume_arm_records",
+                "start": 60237,
+                "end": 60247,
+                "count": 1
+              },
+              {
+                "name": "yn",
+                "start": 60353,
+                "end": 60359,
+                "count": 1
+              },
+              {
+                "name": "init_instance_scope",
+                "start": 68450,
+                "end": 68739,
+                "count": 1
+              },
+              {
+                "name": "init_resume_locators",
+                "start": 113466,
+                "end": 113546,
+                "count": 1
+              },
+              {
+                "name": "init_resume$1",
+                "start": 115148,
+                "end": 115167,
+                "count": 1
+              },
+              {
+                "name": "init_payload_resume",
+                "start": 703098,
+                "end": 703126,
+                "count": 1
+              },
+              {
+                "name": "init_resume",
+                "start": 814916,
+                "end": 814926,
+                "count": 1
+              },
+              {
+                "name": "fge",
+                "start": 823697,
+                "end": 823758,
+                "count": 1
+              },
+              {
+                "name": "_ge",
+                "start": 824892,
+                "end": 824898,
+                "count": 1
+              },
+              {
+                "name": "Sge",
+                "start": 826624,
+                "end": 826630,
+                "count": 1
+              },
+              {
+                "name": "init_graph",
+                "start": 830034,
+                "end": 830057,
+                "count": 1
+              },
+              {
+                "name": "init_src",
+                "start": 830090,
+                "end": 830100,
+                "count": 1
+              },
+              {
+                "name": "init_overlay",
+                "start": 834958,
+                "end": 835187,
+                "count": 1
+              },
+              {
+                "name": "init_sync_policy_core",
+                "start": 838251,
+                "end": 838257,
+                "count": 1
+              },
+              {
+                "name": "Rx",
+                "start": 840270,
+                "end": 840311,
+                "count": 1
+              },
+              {
+                "name": "init_resume_commit_arm",
+                "start": 868945,
+                "end": 868960,
+                "count": 1
+              },
+              {
+                "name": "init_resume_events",
+                "start": 876925,
+                "end": 877194,
+                "count": 1
+              },
+              {
+                "name": "init_resume_runtime_shared",
+                "start": 885867,
+                "end": 885881,
+                "count": 1
+              },
+              {
+                "name": "init_resume_runtime_start",
+                "start": 891063,
+                "end": 891088,
+                "count": 1
+              },
+              {
+                "name": "init_resume_runtime",
+                "start": 899279,
+                "end": 899312,
+                "count": 1
+              },
+              {
+                "name": "init_resume_sync_demand",
+                "start": 902395,
+                "end": 902404,
+                "count": 1
+              },
+              {
+                "name": "init_storage_plane",
+                "start": 903231,
+                "end": 903242,
+                "count": 1
+              },
+              {
+                "name": "init_mdx_route",
+                "start": 10488442,
+                "end": 10488451,
+                "count": 1
+              }
+            ],
+            "containmentCalls": 1161
+          },
+          {
+            "name": "repeat-1",
+            "executedSourceBytes": 16498,
+            "exportDeclarationBytes": 0,
+            "initializerBodiesInLoadedFiles": 1111,
+            "initializersCalled": [],
+            "containmentCalls": 774
+          },
+          {
+            "name": "repeat-2",
+            "executedSourceBytes": 16498,
+            "exportDeclarationBytes": 0,
+            "initializerBodiesInLoadedFiles": 1111,
+            "initializersCalled": [],
+            "containmentCalls": 774
+          }
+        ]
+      },
+      {
+        "test": "computed-total",
+        "phases": [
+          {
+            "name": "before-input",
+            "executedSourceBytes": 0,
+            "exportDeclarationBytes": 0,
+            "initializerBodiesInLoadedFiles": 0,
+            "initializersCalled": [],
+            "containmentCalls": 0
+          },
+          {
+            "name": "first-action",
+            "executedSourceBytes": 190919,
+            "exportDeclarationBytes": 97696,
+            "initializerBodiesInLoadedFiles": 1106,
+            "initializersCalled": [
+              {
+                "name": "init__virtual_markless_symbol$5",
+                "start": 1174,
+                "end": 1180,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$3",
+                "start": 1489,
+                "end": 1495,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$1",
+                "start": 1826,
+                "end": 1832,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol",
+                "start": 1945,
+                "end": 1951,
+                "count": 1
+              },
+              {
+                "name": "init_cart_total_demo",
+                "start": 17007,
+                "end": 17089,
+                "count": 1
+              },
+              {
+                "name": "init_cart_total",
+                "start": 17922,
+                "end": 18063,
+                "count": 1
+              },
+              {
+                "name": "init_computed$1",
+                "start": 18373,
+                "end": 49104,
+                "count": 1
+              },
+              {
+                "name": "init_preload_helper",
+                "start": 1025,
+                "end": 2362,
+                "count": 1
+              },
+              {
+                "name": "init_resume_entry_ts_markless_router_root__2FUsers_2Fjacksm5pro_2Fdev_2Fopen_source_2Fmarkless_2Fwebsite_lang_ts_lang",
+                "start": 2852,
+                "end": 8974,
+                "count": 1
+              },
+              {
+                "name": "Oe",
+                "start": 15250,
+                "end": 15311,
+                "count": 1
+              },
+              {
+                "name": "Ae",
+                "start": 15351,
+                "end": 15390,
+                "count": 1
+              },
+              {
+                "name": "je",
+                "start": 15568,
+                "end": 15583,
+                "count": 1
+              },
+              {
+                "name": "Le",
+                "start": 18715,
+                "end": 18759,
+                "count": 1
+              },
+              {
+                "name": "init_dom_journal",
+                "start": 22787,
+                "end": 22797,
+                "count": 1
+              },
+              {
+                "name": "tt",
+                "start": 26586,
+                "end": 26819,
+                "count": 1
+              },
+              {
+                "name": "ite",
+                "start": 26897,
+                "end": 26928,
+                "count": 1
+              },
+              {
+                "name": "ote",
+                "start": 27324,
+                "end": 27340,
+                "count": 1
+              },
+              {
+                "name": "cte",
+                "start": 27432,
+                "end": 27448,
+                "count": 1
+              },
+              {
+                "name": "st",
+                "start": 27774,
+                "end": 28298,
+                "count": 1
+              },
+              {
+                "name": "pte",
+                "start": 28367,
+                "end": 28373,
+                "count": 1
+              },
+              {
+                "name": "init_payload_graph_construct",
+                "start": 30577,
+                "end": 30592,
+                "count": 1
+              },
+              {
+                "name": "init_payload_full",
+                "start": 30892,
+                "end": 30919,
+                "count": 1
+              },
+              {
+                "name": "init_payload_document_common",
+                "start": 32325,
+                "end": 32340,
+                "count": 1
+              },
+              {
+                "name": "init_payload_document",
+                "start": 32440,
+                "end": 32455,
+                "count": 1
+              },
+              {
+                "name": "nne",
+                "start": 40266,
+                "end": 40292,
+                "count": 1
+              },
+              {
+                "name": "init_value_decode_client",
+                "start": 42029,
+                "end": 42038,
+                "count": 1
+              },
+              {
+                "name": "Jt",
+                "start": 45180,
+                "end": 45246,
+                "count": 1
+              },
+              {
+                "name": "init_resume_errors",
+                "start": 56751,
+                "end": 56897,
+                "count": 1
+              },
+              {
+                "name": "init_resume_arm_records",
+                "start": 60237,
+                "end": 60247,
+                "count": 1
+              },
+              {
+                "name": "yn",
+                "start": 60353,
+                "end": 60359,
+                "count": 1
+              },
+              {
+                "name": "init_instance_scope",
+                "start": 68450,
+                "end": 68739,
+                "count": 1
+              },
+              {
+                "name": "init_resume_locators",
+                "start": 113466,
+                "end": 113546,
+                "count": 1
+              },
+              {
+                "name": "init_resume$1",
+                "start": 115148,
+                "end": 115167,
+                "count": 1
+              },
+              {
+                "name": "init_payload_resume",
+                "start": 703098,
+                "end": 703126,
+                "count": 1
+              },
+              {
+                "name": "init_resume",
+                "start": 814916,
+                "end": 814926,
+                "count": 1
+              },
+              {
+                "name": "fge",
+                "start": 823697,
+                "end": 823758,
+                "count": 1
+              },
+              {
+                "name": "_ge",
+                "start": 824892,
+                "end": 824898,
+                "count": 1
+              },
+              {
+                "name": "Sge",
+                "start": 826624,
+                "end": 826630,
+                "count": 1
+              },
+              {
+                "name": "init_graph",
+                "start": 830034,
+                "end": 830057,
+                "count": 1
+              },
+              {
+                "name": "init_src",
+                "start": 830090,
+                "end": 830100,
+                "count": 1
+              },
+              {
+                "name": "init_overlay",
+                "start": 834958,
+                "end": 835187,
+                "count": 1
+              },
+              {
+                "name": "init_roster_resume",
+                "start": 837575,
+                "end": 837725,
+                "count": 1
+              },
+              {
+                "name": "init_sync_policy_core",
+                "start": 838251,
+                "end": 838257,
+                "count": 1
+              },
+              {
+                "name": "Rx",
+                "start": 840270,
+                "end": 840311,
+                "count": 1
+              },
+              {
+                "name": "init_resume_commit_arm",
+                "start": 868945,
+                "end": 868960,
+                "count": 1
+              },
+              {
+                "name": "init_resume_events",
+                "start": 876925,
+                "end": 877194,
+                "count": 1
+              },
+              {
+                "name": "init_resume_runtime_shared",
+                "start": 885867,
+                "end": 885881,
+                "count": 1
+              },
+              {
+                "name": "init_resume_runtime_start",
+                "start": 891063,
+                "end": 891088,
+                "count": 1
+              },
+              {
+                "name": "init_resume_runtime",
+                "start": 899279,
+                "end": 899312,
+                "count": 1
+              },
+              {
+                "name": "init_resume_sync_computed",
+                "start": 901718,
+                "end": 901724,
+                "count": 1
+              },
+              {
+                "name": "init_resume_sync_demand",
+                "start": 902395,
+                "end": 902404,
+                "count": 1
+              },
+              {
+                "name": "init_storage_plane",
+                "start": 903231,
+                "end": 903242,
+                "count": 1
+              },
+              {
+                "name": "init_mdx_route",
+                "start": 10488442,
+                "end": 10488451,
+                "count": 1
+              }
+            ],
+            "containmentCalls": 1512
+          },
+          {
+            "name": "repeat-1",
+            "executedSourceBytes": 20129,
+            "exportDeclarationBytes": 0,
+            "initializerBodiesInLoadedFiles": 1106,
+            "initializersCalled": [],
+            "containmentCalls": 1028
+          },
+          {
+            "name": "repeat-2",
+            "executedSourceBytes": 20129,
+            "exportDeclarationBytes": 0,
+            "initializerBodiesInLoadedFiles": 1106,
+            "initializersCalled": [],
+            "containmentCalls": 1133
+          }
+        ]
+      },
+      {
+        "test": "mode-select",
+        "phases": [
+          {
+            "name": "before-input",
+            "executedSourceBytes": 0,
+            "exportDeclarationBytes": 0,
+            "initializerBodiesInLoadedFiles": 0,
+            "initializersCalled": [],
+            "containmentCalls": 0
+          },
+          {
+            "name": "first-action",
+            "executedSourceBytes": 188312,
+            "exportDeclarationBytes": 104090,
+            "initializerBodiesInLoadedFiles": 1190,
+            "initializersCalled": [
+              {
+                "name": "init_markless$1",
+                "start": 198373,
+                "end": 207025,
+                "count": 1
+              },
+              {
+                "name": "init_preload_helper",
+                "start": 1025,
+                "end": 2362,
+                "count": 1
+              },
+              {
+                "name": "init_resume_entry_ts_markless_router_root__2FUsers_2Fjacksm5pro_2Fdev_2Fopen_source_2Fmarkless_2Fwebsite_lang_ts_lang",
+                "start": 2852,
+                "end": 8974,
+                "count": 1
+              },
+              {
+                "name": "Oe",
+                "start": 15250,
+                "end": 15311,
+                "count": 1
+              },
+              {
+                "name": "Ae",
+                "start": 15351,
+                "end": 15390,
+                "count": 1
+              },
+              {
+                "name": "je",
+                "start": 15568,
+                "end": 15583,
+                "count": 1
+              },
+              {
+                "name": "Le",
+                "start": 18715,
+                "end": 18759,
+                "count": 1
+              },
+              {
+                "name": "init_dom_journal",
+                "start": 22787,
+                "end": 22797,
+                "count": 1
+              },
+              {
+                "name": "tt",
+                "start": 26586,
+                "end": 26819,
+                "count": 1
+              },
+              {
+                "name": "ite",
+                "start": 26897,
+                "end": 26928,
+                "count": 1
+              },
+              {
+                "name": "ote",
+                "start": 27324,
+                "end": 27340,
+                "count": 1
+              },
+              {
+                "name": "cte",
+                "start": 27432,
+                "end": 27448,
+                "count": 1
+              },
+              {
+                "name": "st",
+                "start": 27774,
+                "end": 28298,
+                "count": 1
+              },
+              {
+                "name": "pte",
+                "start": 28367,
+                "end": 28373,
+                "count": 1
+              },
+              {
+                "name": "init_payload_graph_construct",
+                "start": 30577,
+                "end": 30592,
+                "count": 1
+              },
+              {
+                "name": "init_payload_full",
+                "start": 30892,
+                "end": 30919,
+                "count": 1
+              },
+              {
+                "name": "init_payload_document_common",
+                "start": 32325,
+                "end": 32340,
+                "count": 1
+              },
+              {
+                "name": "init_payload_document",
+                "start": 32440,
+                "end": 32455,
+                "count": 1
+              },
+              {
+                "name": "nne",
+                "start": 40266,
+                "end": 40292,
+                "count": 1
+              },
+              {
+                "name": "init_value_decode_client",
+                "start": 42029,
+                "end": 42038,
+                "count": 1
+              },
+              {
+                "name": "Jt",
+                "start": 45180,
+                "end": 45246,
+                "count": 1
+              },
+              {
+                "name": "init_resume_errors",
+                "start": 56751,
+                "end": 56897,
+                "count": 1
+              },
+              {
+                "name": "init_resume_arm_records",
+                "start": 60237,
+                "end": 60247,
+                "count": 1
+              },
+              {
+                "name": "yn",
+                "start": 60353,
+                "end": 60359,
+                "count": 1
+              },
+              {
+                "name": "init_instance_scope",
+                "start": 68450,
+                "end": 68739,
+                "count": 1
+              },
+              {
+                "name": "init_resume_locators",
+                "start": 113466,
+                "end": 113546,
+                "count": 1
+              },
+              {
+                "name": "init_resume$1",
+                "start": 115148,
+                "end": 115167,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_resolver__2FUsers_2Fjacksm5pro_2Fdev_2Fopen_source_2Fmarkless_2Fpackages_2Fheadless_2Fcomponents_2Fsrc_2Fselect_2Fselect",
+                "start": 145057,
+                "end": 151887,
+                "count": 1
+              },
+              {
+                "name": "init_callback_slot",
+                "start": 194354,
+                "end": 194363,
+                "count": 1
+              },
+              {
+                "name": "As",
+                "start": 565827,
+                "end": 565833,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$119",
+                "start": 566906,
+                "end": 566920,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$118",
+                "start": 568661,
+                "end": 568683,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$114",
+                "start": 569046,
+                "end": 569052,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$112",
+                "start": 569337,
+                "end": 569343,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$111",
+                "start": 569484,
+                "end": 569490,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$109",
+                "start": 569700,
+                "end": 569706,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$108",
+                "start": 569845,
+                "end": 569851,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$107",
+                "start": 569992,
+                "end": 569998,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$89",
+                "start": 575277,
+                "end": 575283,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$87",
+                "start": 575648,
+                "end": 575654,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$86",
+                "start": 575820,
+                "end": 575826,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$85",
+                "start": 575992,
+                "end": 575998,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$84",
+                "start": 576164,
+                "end": 576170,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$122",
+                "start": 580256,
+                "end": 580262,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$93",
+                "start": 581121,
+                "end": 581127,
+                "count": 1
+              },
+              {
+                "name": "init_payload_resume",
+                "start": 703098,
+                "end": 703126,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$429",
+                "start": 775084,
+                "end": 775090,
+                "count": 1
+              },
+              {
+                "name": "init_resume",
+                "start": 814916,
+                "end": 814926,
+                "count": 1
+              },
+              {
+                "name": "init_select",
+                "start": 816093,
+                "end": 816453,
+                "count": 1
+              },
+              {
+                "name": "fge",
+                "start": 823697,
+                "end": 823758,
+                "count": 1
+              },
+              {
+                "name": "_ge",
+                "start": 824892,
+                "end": 824898,
+                "count": 1
+              },
+              {
+                "name": "Sge",
+                "start": 826624,
+                "end": 826630,
+                "count": 1
+              },
+              {
+                "name": "init_graph",
+                "start": 830034,
+                "end": 830057,
+                "count": 1
+              },
+              {
+                "name": "init_src",
+                "start": 830090,
+                "end": 830100,
+                "count": 1
+              },
+              {
+                "name": "init_overlay",
+                "start": 834958,
+                "end": 835187,
+                "count": 1
+              },
+              {
+                "name": "init_roster_resume",
+                "start": 837575,
+                "end": 837725,
+                "count": 1
+              },
+              {
+                "name": "init_sync_policy_core",
+                "start": 838251,
+                "end": 838257,
+                "count": 1
+              },
+              {
+                "name": "Rx",
+                "start": 840270,
+                "end": 840311,
+                "count": 1
+              },
+              {
+                "name": "init_resume_commit_arm",
+                "start": 868945,
+                "end": 868960,
+                "count": 1
+              },
+              {
+                "name": "init_resume_events",
+                "start": 876925,
+                "end": 877194,
+                "count": 1
+              },
+              {
+                "name": "init_resume_runtime_shared",
+                "start": 885867,
+                "end": 885881,
+                "count": 1
+              },
+              {
+                "name": "init_resume_runtime_start",
+                "start": 891063,
+                "end": 891088,
+                "count": 1
+              },
+              {
+                "name": "init_resume_runtime",
+                "start": 899279,
+                "end": 899312,
+                "count": 1
+              },
+              {
+                "name": "init_resume_sync_computed",
+                "start": 901718,
+                "end": 901724,
+                "count": 1
+              },
+              {
+                "name": "init_resume_sync_demand",
+                "start": 902395,
+                "end": 902404,
+                "count": 1
+              },
+              {
+                "name": "init_storage_plane",
+                "start": 903231,
+                "end": 903242,
+                "count": 1
+              },
+              {
+                "name": "init_mode_select",
+                "start": 6413999,
+                "end": 6414085,
+                "count": 1
+              },
+              {
+                "name": "init_sidebar",
+                "start": 9985616,
+                "end": 9985704,
+                "count": 1
+              },
+              {
+                "name": "init_mdx_route",
+                "start": 10488442,
+                "end": 10488451,
+                "count": 1
+              }
+            ],
+            "containmentCalls": 137
+          },
+          {
+            "name": "repeat-1",
+            "executedSourceBytes": 30930,
+            "exportDeclarationBytes": 0,
+            "initializerBodiesInLoadedFiles": 1190,
+            "initializersCalled": [
+              {
+                "name": "init__virtual_markless_symbol$106",
+                "start": 570809,
+                "end": 570818,
+                "count": 1
+              }
+            ],
+            "containmentCalls": 116
+          },
+          {
+            "name": "repeat-2",
+            "executedSourceBytes": 29323,
+            "exportDeclarationBytes": 0,
+            "initializerBodiesInLoadedFiles": 1190,
+            "initializersCalled": [],
+            "containmentCalls": 93
+          }
+        ]
+      },
+      {
+        "test": "accordion",
+        "phases": [
+          {
+            "name": "before-input",
+            "executedSourceBytes": 0,
+            "exportDeclarationBytes": 0,
+            "initializerBodiesInLoadedFiles": 0,
+            "initializersCalled": [],
+            "containmentCalls": 0
+          },
+          {
+            "name": "first-action",
+            "executedSourceBytes": 380848,
+            "exportDeclarationBytes": 99030,
+            "initializerBodiesInLoadedFiles": 1111,
+            "initializersCalled": [
+              {
+                "name": "init_accordion$1",
+                "start": 55018,
+                "end": 59909,
+                "count": 1
+              },
+              {
+                "name": "init_preload_helper",
+                "start": 1025,
+                "end": 2362,
+                "count": 1
+              },
+              {
+                "name": "init_resume_entry_ts_markless_router_root__2FUsers_2Fjacksm5pro_2Fdev_2Fopen_source_2Fmarkless_2Fwebsite_lang_ts_lang",
+                "start": 2852,
+                "end": 8974,
+                "count": 1
+              },
+              {
+                "name": "Oe",
+                "start": 15250,
+                "end": 15311,
+                "count": 1
+              },
+              {
+                "name": "Ae",
+                "start": 15351,
+                "end": 15390,
+                "count": 1
+              },
+              {
+                "name": "je",
+                "start": 15568,
+                "end": 15583,
+                "count": 1
+              },
+              {
+                "name": "Le",
+                "start": 18715,
+                "end": 18759,
+                "count": 1
+              },
+              {
+                "name": "init_dom_journal",
+                "start": 22787,
+                "end": 22797,
+                "count": 1
+              },
+              {
+                "name": "tt",
+                "start": 26586,
+                "end": 26819,
+                "count": 1
+              },
+              {
+                "name": "ite",
+                "start": 26897,
+                "end": 26928,
+                "count": 1
+              },
+              {
+                "name": "ote",
+                "start": 27324,
+                "end": 27340,
+                "count": 1
+              },
+              {
+                "name": "cte",
+                "start": 27432,
+                "end": 27448,
+                "count": 1
+              },
+              {
+                "name": "st",
+                "start": 27774,
+                "end": 28298,
+                "count": 1
+              },
+              {
+                "name": "pte",
+                "start": 28367,
+                "end": 28373,
+                "count": 1
+              },
+              {
+                "name": "init_payload_graph_construct",
+                "start": 30577,
+                "end": 30592,
+                "count": 1
+              },
+              {
+                "name": "init_payload_full",
+                "start": 30892,
+                "end": 30919,
+                "count": 1
+              },
+              {
+                "name": "init_payload_document_common",
+                "start": 32325,
+                "end": 32340,
+                "count": 1
+              },
+              {
+                "name": "init_payload_document",
+                "start": 32440,
+                "end": 32455,
+                "count": 1
+              },
+              {
+                "name": "nne",
+                "start": 40266,
+                "end": 40292,
+                "count": 1
+              },
+              {
+                "name": "init_value_decode_client",
+                "start": 42029,
+                "end": 42038,
+                "count": 1
+              },
+              {
+                "name": "Jt",
+                "start": 45180,
+                "end": 45246,
+                "count": 1
+              },
+              {
+                "name": "init_resume_errors",
+                "start": 56751,
+                "end": 56897,
+                "count": 1
+              },
+              {
+                "name": "init_resume_arm_records",
+                "start": 60237,
+                "end": 60247,
+                "count": 1
+              },
+              {
+                "name": "yn",
+                "start": 60353,
+                "end": 60359,
+                "count": 1
+              },
+              {
+                "name": "init_instance_scope",
+                "start": 68450,
+                "end": 68739,
+                "count": 1
+              },
+              {
+                "name": "init_resume_locators",
+                "start": 113466,
+                "end": 113546,
+                "count": 1
+              },
+              {
+                "name": "init_resume$1",
+                "start": 115148,
+                "end": 115167,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_resolver__2FUsers_2Fjacksm5pro_2Fdev_2Fopen_source_2Fmarkless_2Fpackages_2Fheadless_2Fcomponents_2Fsrc_2Faccordion_2Faccordion",
+                "start": 135750,
+                "end": 140889,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_resolver__2FUsers_2Fjacksm5pro_2Fdev_2Fopen_source_2Fmarkless_2Fpackages_2Fheadless_2Fcomponents_2Fsrc_2Fselect_2Fselect",
+                "start": 145057,
+                "end": 151887,
+                "count": 1
+              },
+              {
+                "name": "init_callback_slot",
+                "start": 194354,
+                "end": 194363,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_resolver__2FUsers_2Fjacksm5pro_2Fdev_2Fopen_source_2Fmarkless_2Fwebsite_2Fcomponents_2Fdocs_2Fplayground_2Fgenerated_2Faccordion__basic",
+                "start": 357243,
+                "end": 529106,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$42",
+                "start": 547097,
+                "end": 547106,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$41",
+                "start": 547783,
+                "end": 547789,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$38",
+                "start": 548351,
+                "end": 548357,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$37",
+                "start": 548502,
+                "end": 548508,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$35",
+                "start": 548793,
+                "end": 548799,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$34",
+                "start": 548940,
+                "end": 548946,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$32",
+                "start": 549156,
+                "end": 549162,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$31",
+                "start": 549301,
+                "end": 549307,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$29",
+                "start": 550628,
+                "end": 550634,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$27",
+                "start": 551157,
+                "end": 551163,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$26",
+                "start": 551462,
+                "end": 551468,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$25",
+                "start": 551574,
+                "end": 551580,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$24",
+                "start": 552031,
+                "end": 552037,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$23",
+                "start": 552336,
+                "end": 552342,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$22",
+                "start": 552925,
+                "end": 552931,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$21",
+                "start": 553054,
+                "end": 553060,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$20",
+                "start": 553161,
+                "end": 553167,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$19",
+                "start": 553310,
+                "end": 553316,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$18",
+                "start": 553429,
+                "end": 553435,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$17",
+                "start": 553886,
+                "end": 553892,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$16",
+                "start": 554191,
+                "end": 554197,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$15",
+                "start": 554512,
+                "end": 554518,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$14",
+                "start": 554631,
+                "end": 554637,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$13",
+                "start": 554878,
+                "end": 554884,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$8",
+                "start": 556055,
+                "end": 556061,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$7",
+                "start": 556283,
+                "end": 556289,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$2",
+                "start": 557023,
+                "end": 557029,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$1",
+                "start": 557170,
+                "end": 557176,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol",
+                "start": 557319,
+                "end": 557325,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$114",
+                "start": 569046,
+                "end": 569052,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$113",
+                "start": 569192,
+                "end": 569198,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$112",
+                "start": 569337,
+                "end": 569343,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$111",
+                "start": 569484,
+                "end": 569490,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$109",
+                "start": 569700,
+                "end": 569706,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$108",
+                "start": 569845,
+                "end": 569851,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$107",
+                "start": 569992,
+                "end": 569998,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$103",
+                "start": 571035,
+                "end": 571041,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$102",
+                "start": 571186,
+                "end": 571192,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$101",
+                "start": 571335,
+                "end": 571341,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$100",
+                "start": 571484,
+                "end": 571490,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$89",
+                "start": 575277,
+                "end": 575283,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$87",
+                "start": 575648,
+                "end": 575654,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$86",
+                "start": 575820,
+                "end": 575826,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$85",
+                "start": 575992,
+                "end": 575998,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$84",
+                "start": 576164,
+                "end": 576170,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$83",
+                "start": 576443,
+                "end": 576449,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$80",
+                "start": 578304,
+                "end": 578310,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$79",
+                "start": 578425,
+                "end": 578431,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$78",
+                "start": 578535,
+                "end": 578541,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$75",
+                "start": 579169,
+                "end": 579175,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$122",
+                "start": 580256,
+                "end": 580262,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$121",
+                "start": 580475,
+                "end": 580481,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$93",
+                "start": 581121,
+                "end": 581127,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$82",
+                "start": 581270,
+                "end": 581276,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$71",
+                "start": 581419,
+                "end": 581425,
+                "count": 1
+              },
+              {
+                "name": "init_payload_resume",
+                "start": 703098,
+                "end": 703126,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$416",
+                "start": 771180,
+                "end": 771186,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$422",
+                "start": 773042,
+                "end": 773048,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$413",
+                "start": 774733,
+                "end": 774739,
+                "count": 1
+              },
+              {
+                "name": "init_resume",
+                "start": 814916,
+                "end": 814926,
+                "count": 1
+              },
+              {
+                "name": "init_accordion",
+                "start": 815021,
+                "end": 815204,
+                "count": 1
+              },
+              {
+                "name": "init_select",
+                "start": 816093,
+                "end": 816453,
+                "count": 1
+              },
+              {
+                "name": "fge",
+                "start": 823697,
+                "end": 823758,
+                "count": 1
+              },
+              {
+                "name": "_ge",
+                "start": 824892,
+                "end": 824898,
+                "count": 1
+              },
+              {
+                "name": "Sge",
+                "start": 826624,
+                "end": 826630,
+                "count": 1
+              },
+              {
+                "name": "init_graph",
+                "start": 830034,
+                "end": 830057,
+                "count": 1
+              },
+              {
+                "name": "init_src",
+                "start": 830090,
+                "end": 830100,
+                "count": 1
+              },
+              {
+                "name": "init_overlay",
+                "start": 834958,
+                "end": 835187,
+                "count": 1
+              },
+              {
+                "name": "init_roster_resume",
+                "start": 837575,
+                "end": 837725,
+                "count": 1
+              },
+              {
+                "name": "init_sync_policy_core",
+                "start": 838251,
+                "end": 838257,
+                "count": 1
+              },
+              {
+                "name": "Rx",
+                "start": 840270,
+                "end": 840311,
+                "count": 1
+              },
+              {
+                "name": "init_resume_branches",
+                "start": 863884,
+                "end": 863893,
+                "count": 1
+              },
+              {
+                "name": "init_resume_commit_arm",
+                "start": 868945,
+                "end": 868960,
+                "count": 1
+              },
+              {
+                "name": "init_resume_events",
+                "start": 876925,
+                "end": 877194,
+                "count": 1
+              },
+              {
+                "name": "init_resume_keyed_repeats",
+                "start": 883575,
+                "end": 883606,
+                "count": 1
+              },
+              {
+                "name": "init_resume_runtime_shared",
+                "start": 885867,
+                "end": 885881,
+                "count": 1
+              },
+              {
+                "name": "init_resume_runtime_start",
+                "start": 891063,
+                "end": 891088,
+                "count": 1
+              },
+              {
+                "name": "init_resume_runtime",
+                "start": 899279,
+                "end": 899312,
+                "count": 1
+              },
+              {
+                "name": "init_resume_sync_computed",
+                "start": 901718,
+                "end": 901724,
+                "count": 1
+              },
+              {
+                "name": "init_resume_sync_demand",
+                "start": 902395,
+                "end": 902404,
+                "count": 1
+              },
+              {
+                "name": "init_storage_plane",
+                "start": 903231,
+                "end": 903242,
+                "count": 1
+              },
+              {
+                "name": "init_accordion__basic",
+                "start": 7162200,
+                "end": 7162286,
+                "count": 1
+              },
+              {
+                "name": "init_mdx_route",
+                "start": 10488442,
+                "end": 10488451,
+                "count": 1
+              }
+            ],
+            "containmentCalls": 33379
+          },
+          {
+            "name": "repeat-1",
+            "executedSourceBytes": 53347,
+            "exportDeclarationBytes": 0,
+            "initializerBodiesInLoadedFiles": 1111,
+            "initializersCalled": [],
+            "containmentCalls": 7479
+          },
+          {
+            "name": "repeat-2",
+            "executedSourceBytes": 53117,
+            "exportDeclarationBytes": 0,
+            "initializerBodiesInLoadedFiles": 1111,
+            "initializersCalled": [],
+            "containmentCalls": 7328
+          }
+        ]
+      }
+    ]
+  },
+  "after": {
+    "input": "/private/tmp/markless-docs-execution-LSROY7/results.json",
+    "build": "/private/tmp/markless-docs-interaction-final-ui0fcr/.output",
+    "records": [
+      {
+        "test": "state-counter",
+        "phases": [
+          {
+            "name": "before-input",
+            "executedSourceBytes": 0,
+            "exportDeclarationBytes": 0,
+            "initializerBodiesInLoadedFiles": 0,
+            "initializersCalled": [],
+            "containmentCalls": 0
+          },
+          {
+            "name": "first-action",
+            "executedSourceBytes": 161370,
+            "exportDeclarationBytes": 98176,
+            "initializerBodiesInLoadedFiles": 1111,
+            "initializersCalled": [
+              {
+                "name": "init__virtual_markless_symbol$1",
+                "start": 1837,
+                "end": 1843,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol",
+                "start": 2011,
+                "end": 2017,
+                "count": 1
+              },
+              {
+                "name": "init_counter_demo",
+                "start": 11180,
+                "end": 11264,
+                "count": 1
+              },
+              {
+                "name": "init_counter",
+                "start": 11654,
+                "end": 11663,
+                "count": 1
+              },
+              {
+                "name": "init_state$1",
+                "start": 24621,
+                "end": 60444,
+                "count": 1
+              },
+              {
+                "name": "init_preload_helper",
+                "start": 1025,
+                "end": 2362,
+                "count": 1
+              },
+              {
+                "name": "init_resume_entry_ts_markless_router_root__2FUsers_2Fjacksm5pro_2Fdev_2Fopen_source_2Fmarkless_2Fwebsite_lang_ts_lang",
+                "start": 2852,
+                "end": 8974,
+                "count": 1
+              },
+              {
+                "name": "Oe",
+                "start": 15250,
+                "end": 15311,
+                "count": 1
+              },
+              {
+                "name": "Ae",
+                "start": 15351,
+                "end": 15390,
+                "count": 1
+              },
+              {
+                "name": "je",
+                "start": 15568,
+                "end": 15583,
+                "count": 1
+              },
+              {
+                "name": "Le",
+                "start": 18715,
+                "end": 18759,
+                "count": 1
+              },
+              {
+                "name": "init_dom_journal",
+                "start": 22787,
+                "end": 22797,
+                "count": 1
+              },
+              {
+                "name": "tt",
+                "start": 26586,
+                "end": 26819,
+                "count": 1
+              },
+              {
+                "name": "ite",
+                "start": 26897,
+                "end": 26928,
+                "count": 1
+              },
+              {
+                "name": "ote",
+                "start": 27324,
+                "end": 27340,
+                "count": 1
+              },
+              {
+                "name": "cte",
+                "start": 27432,
+                "end": 27448,
+                "count": 1
+              },
+              {
+                "name": "st",
+                "start": 27774,
+                "end": 28298,
+                "count": 1
+              },
+              {
+                "name": "pte",
+                "start": 28367,
+                "end": 28373,
+                "count": 1
+              },
+              {
+                "name": "init_payload_graph_construct",
+                "start": 30577,
+                "end": 30592,
+                "count": 1
+              },
+              {
+                "name": "init_payload_full",
+                "start": 30892,
+                "end": 30919,
+                "count": 1
+              },
+              {
+                "name": "init_payload_document_common",
+                "start": 32325,
+                "end": 32340,
+                "count": 1
+              },
+              {
+                "name": "init_payload_document",
+                "start": 32440,
+                "end": 32455,
+                "count": 1
+              },
+              {
+                "name": "nne",
+                "start": 40266,
+                "end": 40292,
+                "count": 1
+              },
+              {
+                "name": "init_value_decode_client",
+                "start": 42029,
+                "end": 42038,
+                "count": 1
+              },
+              {
+                "name": "init_resume_errors",
+                "start": 56751,
+                "end": 56897,
+                "count": 1
+              },
+              {
+                "name": "init_resume_arm_records",
+                "start": 60237,
+                "end": 60247,
+                "count": 1
+              },
+              {
+                "name": "yn",
+                "start": 60353,
+                "end": 60359,
+                "count": 1
+              },
+              {
+                "name": "init_instance_scope",
+                "start": 68450,
+                "end": 68739,
+                "count": 1
+              },
+              {
+                "name": "init_resume_locators",
+                "start": 113501,
+                "end": 113581,
+                "count": 1
+              },
+              {
+                "name": "init_resume$1",
+                "start": 115183,
+                "end": 115202,
+                "count": 1
+              },
+              {
+                "name": "init_payload_resume",
+                "start": 703133,
+                "end": 703161,
+                "count": 1
+              },
+              {
+                "name": "init_resume",
+                "start": 814951,
+                "end": 814961,
+                "count": 1
+              },
+              {
+                "name": "fge",
+                "start": 823732,
+                "end": 823793,
+                "count": 1
+              },
+              {
+                "name": "_ge",
+                "start": 824927,
+                "end": 824933,
+                "count": 1
+              },
+              {
+                "name": "Sge",
+                "start": 826659,
+                "end": 826665,
+                "count": 1
+              },
+              {
+                "name": "init_graph",
+                "start": 830069,
+                "end": 830092,
+                "count": 1
+              },
+              {
+                "name": "init_src",
+                "start": 830125,
+                "end": 830135,
+                "count": 1
+              },
+              {
+                "name": "init_overlay",
+                "start": 834993,
+                "end": 835222,
+                "count": 1
+              },
+              {
+                "name": "init_sync_policy_core",
+                "start": 838286,
+                "end": 838292,
+                "count": 1
+              },
+              {
+                "name": "Rx",
+                "start": 840305,
+                "end": 840346,
+                "count": 1
+              },
+              {
+                "name": "init_resume_commit_arm",
+                "start": 868980,
+                "end": 868995,
+                "count": 1
+              },
+              {
+                "name": "init_resume_events",
+                "start": 876995,
+                "end": 877264,
+                "count": 1
+              },
+              {
+                "name": "init_resume_runtime_shared",
+                "start": 885937,
+                "end": 885951,
+                "count": 1
+              },
+              {
+                "name": "init_resume_runtime_start",
+                "start": 891133,
+                "end": 891158,
+                "count": 1
+              },
+              {
+                "name": "init_resume_runtime",
+                "start": 899384,
+                "end": 899417,
+                "count": 1
+              },
+              {
+                "name": "init_resume_sync_demand",
+                "start": 902500,
+                "end": 902509,
+                "count": 1
+              },
+              {
+                "name": "init_storage_plane",
+                "start": 903336,
+                "end": 903347,
+                "count": 1
+              },
+              {
+                "name": "init_mdx_route",
+                "start": 10488547,
+                "end": 10488556,
+                "count": 1
+              }
+            ],
+            "containmentCalls": 3
+          },
+          {
+            "name": "repeat-1",
+            "executedSourceBytes": 16568,
+            "exportDeclarationBytes": 0,
+            "initializerBodiesInLoadedFiles": 1111,
+            "initializersCalled": [],
+            "containmentCalls": 2
+          },
+          {
+            "name": "repeat-2",
+            "executedSourceBytes": 16568,
+            "exportDeclarationBytes": 0,
+            "initializerBodiesInLoadedFiles": 1111,
+            "initializersCalled": [],
+            "containmentCalls": 2
+          }
+        ]
+      },
+      {
+        "test": "state-independent-controls",
+        "phases": [
+          {
+            "name": "before-input",
+            "executedSourceBytes": 0,
+            "exportDeclarationBytes": 0,
+            "initializerBodiesInLoadedFiles": 0,
+            "initializersCalled": [],
+            "containmentCalls": 0
+          },
+          {
+            "name": "first-action",
+            "executedSourceBytes": 161370,
+            "exportDeclarationBytes": 98176,
+            "initializerBodiesInLoadedFiles": 1111,
+            "initializersCalled": [
+              {
+                "name": "init__virtual_markless_symbol$1",
+                "start": 1837,
+                "end": 1843,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol",
+                "start": 2011,
+                "end": 2017,
+                "count": 1
+              },
+              {
+                "name": "init_counter_demo",
+                "start": 11180,
+                "end": 11264,
+                "count": 1
+              },
+              {
+                "name": "init_counter",
+                "start": 11654,
+                "end": 11663,
+                "count": 1
+              },
+              {
+                "name": "init_state$1",
+                "start": 24621,
+                "end": 60444,
+                "count": 1
+              },
+              {
+                "name": "init_preload_helper",
+                "start": 1025,
+                "end": 2362,
+                "count": 1
+              },
+              {
+                "name": "init_resume_entry_ts_markless_router_root__2FUsers_2Fjacksm5pro_2Fdev_2Fopen_source_2Fmarkless_2Fwebsite_lang_ts_lang",
+                "start": 2852,
+                "end": 8974,
+                "count": 1
+              },
+              {
+                "name": "Oe",
+                "start": 15250,
+                "end": 15311,
+                "count": 1
+              },
+              {
+                "name": "Ae",
+                "start": 15351,
+                "end": 15390,
+                "count": 1
+              },
+              {
+                "name": "je",
+                "start": 15568,
+                "end": 15583,
+                "count": 1
+              },
+              {
+                "name": "Le",
+                "start": 18715,
+                "end": 18759,
+                "count": 1
+              },
+              {
+                "name": "init_dom_journal",
+                "start": 22787,
+                "end": 22797,
+                "count": 1
+              },
+              {
+                "name": "tt",
+                "start": 26586,
+                "end": 26819,
+                "count": 1
+              },
+              {
+                "name": "ite",
+                "start": 26897,
+                "end": 26928,
+                "count": 1
+              },
+              {
+                "name": "ote",
+                "start": 27324,
+                "end": 27340,
+                "count": 1
+              },
+              {
+                "name": "cte",
+                "start": 27432,
+                "end": 27448,
+                "count": 1
+              },
+              {
+                "name": "st",
+                "start": 27774,
+                "end": 28298,
+                "count": 1
+              },
+              {
+                "name": "pte",
+                "start": 28367,
+                "end": 28373,
+                "count": 1
+              },
+              {
+                "name": "init_payload_graph_construct",
+                "start": 30577,
+                "end": 30592,
+                "count": 1
+              },
+              {
+                "name": "init_payload_full",
+                "start": 30892,
+                "end": 30919,
+                "count": 1
+              },
+              {
+                "name": "init_payload_document_common",
+                "start": 32325,
+                "end": 32340,
+                "count": 1
+              },
+              {
+                "name": "init_payload_document",
+                "start": 32440,
+                "end": 32455,
+                "count": 1
+              },
+              {
+                "name": "nne",
+                "start": 40266,
+                "end": 40292,
+                "count": 1
+              },
+              {
+                "name": "init_value_decode_client",
+                "start": 42029,
+                "end": 42038,
+                "count": 1
+              },
+              {
+                "name": "init_resume_errors",
+                "start": 56751,
+                "end": 56897,
+                "count": 1
+              },
+              {
+                "name": "init_resume_arm_records",
+                "start": 60237,
+                "end": 60247,
+                "count": 1
+              },
+              {
+                "name": "yn",
+                "start": 60353,
+                "end": 60359,
+                "count": 1
+              },
+              {
+                "name": "init_instance_scope",
+                "start": 68450,
+                "end": 68739,
+                "count": 1
+              },
+              {
+                "name": "init_resume_locators",
+                "start": 113501,
+                "end": 113581,
+                "count": 1
+              },
+              {
+                "name": "init_resume$1",
+                "start": 115183,
+                "end": 115202,
+                "count": 1
+              },
+              {
+                "name": "init_payload_resume",
+                "start": 703133,
+                "end": 703161,
+                "count": 1
+              },
+              {
+                "name": "init_resume",
+                "start": 814951,
+                "end": 814961,
+                "count": 1
+              },
+              {
+                "name": "fge",
+                "start": 823732,
+                "end": 823793,
+                "count": 1
+              },
+              {
+                "name": "_ge",
+                "start": 824927,
+                "end": 824933,
+                "count": 1
+              },
+              {
+                "name": "Sge",
+                "start": 826659,
+                "end": 826665,
+                "count": 1
+              },
+              {
+                "name": "init_graph",
+                "start": 830069,
+                "end": 830092,
+                "count": 1
+              },
+              {
+                "name": "init_src",
+                "start": 830125,
+                "end": 830135,
+                "count": 1
+              },
+              {
+                "name": "init_overlay",
+                "start": 834993,
+                "end": 835222,
+                "count": 1
+              },
+              {
+                "name": "init_sync_policy_core",
+                "start": 838286,
+                "end": 838292,
+                "count": 1
+              },
+              {
+                "name": "Rx",
+                "start": 840305,
+                "end": 840346,
+                "count": 1
+              },
+              {
+                "name": "init_resume_commit_arm",
+                "start": 868980,
+                "end": 868995,
+                "count": 1
+              },
+              {
+                "name": "init_resume_events",
+                "start": 876995,
+                "end": 877264,
+                "count": 1
+              },
+              {
+                "name": "init_resume_runtime_shared",
+                "start": 885937,
+                "end": 885951,
+                "count": 1
+              },
+              {
+                "name": "init_resume_runtime_start",
+                "start": 891133,
+                "end": 891158,
+                "count": 1
+              },
+              {
+                "name": "init_resume_runtime",
+                "start": 899384,
+                "end": 899417,
+                "count": 1
+              },
+              {
+                "name": "init_resume_sync_demand",
+                "start": 902500,
+                "end": 902509,
+                "count": 1
+              },
+              {
+                "name": "init_storage_plane",
+                "start": 903336,
+                "end": 903347,
+                "count": 1
+              },
+              {
+                "name": "init_mdx_route",
+                "start": 10488547,
+                "end": 10488556,
+                "count": 1
+              }
+            ],
+            "containmentCalls": 3
+          },
+          {
+            "name": "second-control",
+            "executedSourceBytes": 17191,
+            "exportDeclarationBytes": 0,
+            "initializerBodiesInLoadedFiles": 1111,
+            "initializersCalled": [
+              {
+                "name": "init__virtual_markless_symbol$3",
+                "start": 2154,
+                "end": 2160,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$2",
+                "start": 2331,
+                "end": 2337,
+                "count": 1
+              },
+              {
+                "name": "init_two_variables_demo",
+                "start": 23822,
+                "end": 23906,
+                "count": 1
+              },
+              {
+                "name": "init_two_variables",
+                "start": 24299,
+                "end": 24308,
+                "count": 1
+              }
+            ],
+            "containmentCalls": 3
+          },
+          {
+            "name": "return-first",
+            "executedSourceBytes": 16956,
+            "exportDeclarationBytes": 0,
+            "initializerBodiesInLoadedFiles": 1111,
+            "initializersCalled": [],
+            "containmentCalls": 3
+          },
+          {
+            "name": "repeat-second",
+            "executedSourceBytes": 16966,
+            "exportDeclarationBytes": 0,
+            "initializerBodiesInLoadedFiles": 1111,
+            "initializersCalled": [],
+            "containmentCalls": 3
+          }
+        ]
+      },
+      {
+        "test": "computed-total",
+        "phases": [
+          {
+            "name": "before-input",
+            "executedSourceBytes": 0,
+            "exportDeclarationBytes": 0,
+            "initializerBodiesInLoadedFiles": 0,
+            "initializersCalled": [],
+            "containmentCalls": 0
+          },
+          {
+            "name": "first-action",
+            "executedSourceBytes": 163368,
+            "exportDeclarationBytes": 97696,
+            "initializerBodiesInLoadedFiles": 1106,
+            "initializersCalled": [
+              {
+                "name": "init__virtual_markless_symbol$5",
+                "start": 1171,
+                "end": 1177,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$3",
+                "start": 1487,
+                "end": 1493,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$1",
+                "start": 1823,
+                "end": 1829,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol",
+                "start": 1942,
+                "end": 1948,
+                "count": 1
+              },
+              {
+                "name": "init_cart_total_demo",
+                "start": 17004,
+                "end": 17086,
+                "count": 1
+              },
+              {
+                "name": "init_cart_total",
+                "start": 17919,
+                "end": 18060,
+                "count": 1
+              },
+              {
+                "name": "init_computed$1",
+                "start": 18368,
+                "end": 49112,
+                "count": 1
+              },
+              {
+                "name": "init_preload_helper",
+                "start": 1025,
+                "end": 2362,
+                "count": 1
+              },
+              {
+                "name": "init_resume_entry_ts_markless_router_root__2FUsers_2Fjacksm5pro_2Fdev_2Fopen_source_2Fmarkless_2Fwebsite_lang_ts_lang",
+                "start": 2852,
+                "end": 8974,
+                "count": 1
+              },
+              {
+                "name": "Oe",
+                "start": 15250,
+                "end": 15311,
+                "count": 1
+              },
+              {
+                "name": "Ae",
+                "start": 15351,
+                "end": 15390,
+                "count": 1
+              },
+              {
+                "name": "je",
+                "start": 15568,
+                "end": 15583,
+                "count": 1
+              },
+              {
+                "name": "Le",
+                "start": 18715,
+                "end": 18759,
+                "count": 1
+              },
+              {
+                "name": "init_dom_journal",
+                "start": 22787,
+                "end": 22797,
+                "count": 1
+              },
+              {
+                "name": "tt",
+                "start": 26586,
+                "end": 26819,
+                "count": 1
+              },
+              {
+                "name": "ite",
+                "start": 26897,
+                "end": 26928,
+                "count": 1
+              },
+              {
+                "name": "ote",
+                "start": 27324,
+                "end": 27340,
+                "count": 1
+              },
+              {
+                "name": "cte",
+                "start": 27432,
+                "end": 27448,
+                "count": 1
+              },
+              {
+                "name": "st",
+                "start": 27774,
+                "end": 28298,
+                "count": 1
+              },
+              {
+                "name": "pte",
+                "start": 28367,
+                "end": 28373,
+                "count": 1
+              },
+              {
+                "name": "init_payload_graph_construct",
+                "start": 30577,
+                "end": 30592,
+                "count": 1
+              },
+              {
+                "name": "init_payload_full",
+                "start": 30892,
+                "end": 30919,
+                "count": 1
+              },
+              {
+                "name": "init_payload_document_common",
+                "start": 32325,
+                "end": 32340,
+                "count": 1
+              },
+              {
+                "name": "init_payload_document",
+                "start": 32440,
+                "end": 32455,
+                "count": 1
+              },
+              {
+                "name": "nne",
+                "start": 40266,
+                "end": 40292,
+                "count": 1
+              },
+              {
+                "name": "init_value_decode_client",
+                "start": 42029,
+                "end": 42038,
+                "count": 1
+              },
+              {
+                "name": "Jt",
+                "start": 45180,
+                "end": 45246,
+                "count": 1
+              },
+              {
+                "name": "init_resume_errors",
+                "start": 56751,
+                "end": 56897,
+                "count": 1
+              },
+              {
+                "name": "init_resume_arm_records",
+                "start": 60237,
+                "end": 60247,
+                "count": 1
+              },
+              {
+                "name": "yn",
+                "start": 60353,
+                "end": 60359,
+                "count": 1
+              },
+              {
+                "name": "init_instance_scope",
+                "start": 68450,
+                "end": 68739,
+                "count": 1
+              },
+              {
+                "name": "init_resume_locators",
+                "start": 113501,
+                "end": 113581,
+                "count": 1
+              },
+              {
+                "name": "init_resume$1",
+                "start": 115183,
+                "end": 115202,
+                "count": 1
+              },
+              {
+                "name": "init_payload_resume",
+                "start": 703133,
+                "end": 703161,
+                "count": 1
+              },
+              {
+                "name": "init_resume",
+                "start": 814951,
+                "end": 814961,
+                "count": 1
+              },
+              {
+                "name": "fge",
+                "start": 823732,
+                "end": 823793,
+                "count": 1
+              },
+              {
+                "name": "_ge",
+                "start": 824927,
+                "end": 824933,
+                "count": 1
+              },
+              {
+                "name": "Sge",
+                "start": 826659,
+                "end": 826665,
+                "count": 1
+              },
+              {
+                "name": "init_graph",
+                "start": 830069,
+                "end": 830092,
+                "count": 1
+              },
+              {
+                "name": "init_src",
+                "start": 830125,
+                "end": 830135,
+                "count": 1
+              },
+              {
+                "name": "init_overlay",
+                "start": 834993,
+                "end": 835222,
+                "count": 1
+              },
+              {
+                "name": "init_roster_resume",
+                "start": 837610,
+                "end": 837760,
+                "count": 1
+              },
+              {
+                "name": "init_sync_policy_core",
+                "start": 838286,
+                "end": 838292,
+                "count": 1
+              },
+              {
+                "name": "Rx",
+                "start": 840305,
+                "end": 840346,
+                "count": 1
+              },
+              {
+                "name": "init_resume_commit_arm",
+                "start": 868980,
+                "end": 868995,
+                "count": 1
+              },
+              {
+                "name": "init_resume_events",
+                "start": 876995,
+                "end": 877264,
+                "count": 1
+              },
+              {
+                "name": "init_resume_runtime_shared",
+                "start": 885937,
+                "end": 885951,
+                "count": 1
+              },
+              {
+                "name": "init_resume_runtime_start",
+                "start": 891133,
+                "end": 891158,
+                "count": 1
+              },
+              {
+                "name": "init_resume_runtime",
+                "start": 899384,
+                "end": 899417,
+                "count": 1
+              },
+              {
+                "name": "init_resume_sync_computed",
+                "start": 901823,
+                "end": 901829,
+                "count": 1
+              },
+              {
+                "name": "init_resume_sync_demand",
+                "start": 902500,
+                "end": 902509,
+                "count": 1
+              },
+              {
+                "name": "init_storage_plane",
+                "start": 903336,
+                "end": 903347,
+                "count": 1
+              },
+              {
+                "name": "init_mdx_route",
+                "start": 10488547,
+                "end": 10488556,
+                "count": 1
+              }
+            ],
+            "containmentCalls": 4
+          },
+          {
+            "name": "repeat-1",
+            "executedSourceBytes": 20199,
+            "exportDeclarationBytes": 0,
+            "initializerBodiesInLoadedFiles": 1106,
+            "initializersCalled": [],
+            "containmentCalls": 3
+          },
+          {
+            "name": "repeat-2",
+            "executedSourceBytes": 20199,
+            "exportDeclarationBytes": 0,
+            "initializerBodiesInLoadedFiles": 1106,
+            "initializersCalled": [],
+            "containmentCalls": 3
+          }
+        ]
+      },
+      {
+        "test": "mode-select",
+        "phases": [
+          {
+            "name": "before-input",
+            "executedSourceBytes": 0,
+            "exportDeclarationBytes": 0,
+            "initializerBodiesInLoadedFiles": 0,
+            "initializersCalled": [],
+            "containmentCalls": 0
+          },
+          {
+            "name": "first-action",
+            "executedSourceBytes": 184130,
+            "exportDeclarationBytes": 104091,
+            "initializerBodiesInLoadedFiles": 1190,
+            "initializersCalled": [
+              {
+                "name": "init_markless$1",
+                "start": 198372,
+                "end": 207035,
+                "count": 1
+              },
+              {
+                "name": "init_preload_helper",
+                "start": 1025,
+                "end": 2362,
+                "count": 1
+              },
+              {
+                "name": "init_resume_entry_ts_markless_router_root__2FUsers_2Fjacksm5pro_2Fdev_2Fopen_source_2Fmarkless_2Fwebsite_lang_ts_lang",
+                "start": 2852,
+                "end": 8974,
+                "count": 1
+              },
+              {
+                "name": "Oe",
+                "start": 15250,
+                "end": 15311,
+                "count": 1
+              },
+              {
+                "name": "Ae",
+                "start": 15351,
+                "end": 15390,
+                "count": 1
+              },
+              {
+                "name": "je",
+                "start": 15568,
+                "end": 15583,
+                "count": 1
+              },
+              {
+                "name": "Le",
+                "start": 18715,
+                "end": 18759,
+                "count": 1
+              },
+              {
+                "name": "init_dom_journal",
+                "start": 22787,
+                "end": 22797,
+                "count": 1
+              },
+              {
+                "name": "tt",
+                "start": 26586,
+                "end": 26819,
+                "count": 1
+              },
+              {
+                "name": "ite",
+                "start": 26897,
+                "end": 26928,
+                "count": 1
+              },
+              {
+                "name": "ote",
+                "start": 27324,
+                "end": 27340,
+                "count": 1
+              },
+              {
+                "name": "cte",
+                "start": 27432,
+                "end": 27448,
+                "count": 1
+              },
+              {
+                "name": "st",
+                "start": 27774,
+                "end": 28298,
+                "count": 1
+              },
+              {
+                "name": "pte",
+                "start": 28367,
+                "end": 28373,
+                "count": 1
+              },
+              {
+                "name": "init_payload_graph_construct",
+                "start": 30577,
+                "end": 30592,
+                "count": 1
+              },
+              {
+                "name": "init_payload_full",
+                "start": 30892,
+                "end": 30919,
+                "count": 1
+              },
+              {
+                "name": "init_payload_document_common",
+                "start": 32325,
+                "end": 32340,
+                "count": 1
+              },
+              {
+                "name": "init_payload_document",
+                "start": 32440,
+                "end": 32455,
+                "count": 1
+              },
+              {
+                "name": "nne",
+                "start": 40266,
+                "end": 40292,
+                "count": 1
+              },
+              {
+                "name": "init_value_decode_client",
+                "start": 42029,
+                "end": 42038,
+                "count": 1
+              },
+              {
+                "name": "Jt",
+                "start": 45180,
+                "end": 45246,
+                "count": 1
+              },
+              {
+                "name": "init_resume_errors",
+                "start": 56751,
+                "end": 56897,
+                "count": 1
+              },
+              {
+                "name": "init_resume_arm_records",
+                "start": 60237,
+                "end": 60247,
+                "count": 1
+              },
+              {
+                "name": "yn",
+                "start": 60353,
+                "end": 60359,
+                "count": 1
+              },
+              {
+                "name": "init_instance_scope",
+                "start": 68450,
+                "end": 68739,
+                "count": 1
+              },
+              {
+                "name": "init_resume_locators",
+                "start": 113501,
+                "end": 113581,
+                "count": 1
+              },
+              {
+                "name": "init_resume$1",
+                "start": 115183,
+                "end": 115202,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_resolver__2FUsers_2Fjacksm5pro_2Fdev_2Fopen_source_2Fmarkless_2Fpackages_2Fheadless_2Fcomponents_2Fsrc_2Fselect_2Fselect",
+                "start": 145092,
+                "end": 151922,
+                "count": 1
+              },
+              {
+                "name": "init_callback_slot",
+                "start": 194389,
+                "end": 194398,
+                "count": 1
+              },
+              {
+                "name": "As",
+                "start": 565862,
+                "end": 565868,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$119",
+                "start": 566941,
+                "end": 566955,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$118",
+                "start": 568696,
+                "end": 568718,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$114",
+                "start": 569081,
+                "end": 569087,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$112",
+                "start": 569372,
+                "end": 569378,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$111",
+                "start": 569519,
+                "end": 569525,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$109",
+                "start": 569735,
+                "end": 569741,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$108",
+                "start": 569880,
+                "end": 569886,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$107",
+                "start": 570027,
+                "end": 570033,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$89",
+                "start": 575312,
+                "end": 575318,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$87",
+                "start": 575683,
+                "end": 575689,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$86",
+                "start": 575855,
+                "end": 575861,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$85",
+                "start": 576027,
+                "end": 576033,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$84",
+                "start": 576199,
+                "end": 576205,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$122",
+                "start": 580291,
+                "end": 580297,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$93",
+                "start": 581156,
+                "end": 581162,
+                "count": 1
+              },
+              {
+                "name": "init_payload_resume",
+                "start": 703133,
+                "end": 703161,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$429",
+                "start": 775119,
+                "end": 775125,
+                "count": 1
+              },
+              {
+                "name": "init_resume",
+                "start": 814951,
+                "end": 814961,
+                "count": 1
+              },
+              {
+                "name": "init_select",
+                "start": 816128,
+                "end": 816488,
+                "count": 1
+              },
+              {
+                "name": "fge",
+                "start": 823732,
+                "end": 823793,
+                "count": 1
+              },
+              {
+                "name": "_ge",
+                "start": 824927,
+                "end": 824933,
+                "count": 1
+              },
+              {
+                "name": "Sge",
+                "start": 826659,
+                "end": 826665,
+                "count": 1
+              },
+              {
+                "name": "init_graph",
+                "start": 830069,
+                "end": 830092,
+                "count": 1
+              },
+              {
+                "name": "init_src",
+                "start": 830125,
+                "end": 830135,
+                "count": 1
+              },
+              {
+                "name": "init_overlay",
+                "start": 834993,
+                "end": 835222,
+                "count": 1
+              },
+              {
+                "name": "init_roster_resume",
+                "start": 837610,
+                "end": 837760,
+                "count": 1
+              },
+              {
+                "name": "init_sync_policy_core",
+                "start": 838286,
+                "end": 838292,
+                "count": 1
+              },
+              {
+                "name": "Rx",
+                "start": 840305,
+                "end": 840346,
+                "count": 1
+              },
+              {
+                "name": "init_resume_commit_arm",
+                "start": 868980,
+                "end": 868995,
+                "count": 1
+              },
+              {
+                "name": "init_resume_events",
+                "start": 876995,
+                "end": 877264,
+                "count": 1
+              },
+              {
+                "name": "init_resume_runtime_shared",
+                "start": 885937,
+                "end": 885951,
+                "count": 1
+              },
+              {
+                "name": "init_resume_runtime_start",
+                "start": 891133,
+                "end": 891158,
+                "count": 1
+              },
+              {
+                "name": "init_resume_runtime",
+                "start": 899384,
+                "end": 899417,
+                "count": 1
+              },
+              {
+                "name": "init_resume_sync_computed",
+                "start": 901823,
+                "end": 901829,
+                "count": 1
+              },
+              {
+                "name": "init_resume_sync_demand",
+                "start": 902500,
+                "end": 902509,
+                "count": 1
+              },
+              {
+                "name": "init_storage_plane",
+                "start": 903336,
+                "end": 903347,
+                "count": 1
+              },
+              {
+                "name": "init_mode_select",
+                "start": 6414104,
+                "end": 6414190,
+                "count": 1
+              },
+              {
+                "name": "init_sidebar",
+                "start": 9985721,
+                "end": 9985809,
+                "count": 1
+              },
+              {
+                "name": "init_mdx_route",
+                "start": 10488547,
+                "end": 10488556,
+                "count": 1
+              }
+            ],
+            "containmentCalls": 16
+          },
+          {
+            "name": "repeat-1",
+            "executedSourceBytes": 30957,
+            "exportDeclarationBytes": 0,
+            "initializerBodiesInLoadedFiles": 1190,
+            "initializersCalled": [
+              {
+                "name": "init__virtual_markless_symbol$106",
+                "start": 570844,
+                "end": 570853,
+                "count": 1
+              }
+            ],
+            "containmentCalls": 11
+          },
+          {
+            "name": "repeat-2",
+            "executedSourceBytes": 29393,
+            "exportDeclarationBytes": 0,
+            "initializerBodiesInLoadedFiles": 1190,
+            "initializersCalled": [],
+            "containmentCalls": 9
+          }
+        ]
+      },
+      {
+        "test": "accordion",
+        "phases": [
+          {
+            "name": "before-input",
+            "executedSourceBytes": 0,
+            "exportDeclarationBytes": 0,
+            "initializerBodiesInLoadedFiles": 0,
+            "initializersCalled": [],
+            "containmentCalls": 0
+          },
+          {
+            "name": "first-action",
+            "executedSourceBytes": 378855,
+            "exportDeclarationBytes": 99032,
+            "initializerBodiesInLoadedFiles": 1111,
+            "initializersCalled": [
+              {
+                "name": "init_accordion$1",
+                "start": 55019,
+                "end": 59921,
+                "count": 1
+              },
+              {
+                "name": "init_preload_helper",
+                "start": 1025,
+                "end": 2362,
+                "count": 1
+              },
+              {
+                "name": "init_resume_entry_ts_markless_router_root__2FUsers_2Fjacksm5pro_2Fdev_2Fopen_source_2Fmarkless_2Fwebsite_lang_ts_lang",
+                "start": 2852,
+                "end": 8974,
+                "count": 1
+              },
+              {
+                "name": "Oe",
+                "start": 15250,
+                "end": 15311,
+                "count": 1
+              },
+              {
+                "name": "Ae",
+                "start": 15351,
+                "end": 15390,
+                "count": 1
+              },
+              {
+                "name": "je",
+                "start": 15568,
+                "end": 15583,
+                "count": 1
+              },
+              {
+                "name": "Le",
+                "start": 18715,
+                "end": 18759,
+                "count": 1
+              },
+              {
+                "name": "init_dom_journal",
+                "start": 22787,
+                "end": 22797,
+                "count": 1
+              },
+              {
+                "name": "tt",
+                "start": 26586,
+                "end": 26819,
+                "count": 1
+              },
+              {
+                "name": "ite",
+                "start": 26897,
+                "end": 26928,
+                "count": 1
+              },
+              {
+                "name": "ote",
+                "start": 27324,
+                "end": 27340,
+                "count": 1
+              },
+              {
+                "name": "cte",
+                "start": 27432,
+                "end": 27448,
+                "count": 1
+              },
+              {
+                "name": "st",
+                "start": 27774,
+                "end": 28298,
+                "count": 1
+              },
+              {
+                "name": "pte",
+                "start": 28367,
+                "end": 28373,
+                "count": 1
+              },
+              {
+                "name": "init_payload_graph_construct",
+                "start": 30577,
+                "end": 30592,
+                "count": 1
+              },
+              {
+                "name": "init_payload_full",
+                "start": 30892,
+                "end": 30919,
+                "count": 1
+              },
+              {
+                "name": "init_payload_document_common",
+                "start": 32325,
+                "end": 32340,
+                "count": 1
+              },
+              {
+                "name": "init_payload_document",
+                "start": 32440,
+                "end": 32455,
+                "count": 1
+              },
+              {
+                "name": "nne",
+                "start": 40266,
+                "end": 40292,
+                "count": 1
+              },
+              {
+                "name": "init_value_decode_client",
+                "start": 42029,
+                "end": 42038,
+                "count": 1
+              },
+              {
+                "name": "Jt",
+                "start": 45180,
+                "end": 45246,
+                "count": 1
+              },
+              {
+                "name": "init_resume_errors",
+                "start": 56751,
+                "end": 56897,
+                "count": 1
+              },
+              {
+                "name": "init_resume_arm_records",
+                "start": 60237,
+                "end": 60247,
+                "count": 1
+              },
+              {
+                "name": "yn",
+                "start": 60353,
+                "end": 60359,
+                "count": 1
+              },
+              {
+                "name": "init_instance_scope",
+                "start": 68450,
+                "end": 68739,
+                "count": 1
+              },
+              {
+                "name": "init_resume_locators",
+                "start": 113501,
+                "end": 113581,
+                "count": 1
+              },
+              {
+                "name": "init_resume$1",
+                "start": 115183,
+                "end": 115202,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_resolver__2FUsers_2Fjacksm5pro_2Fdev_2Fopen_source_2Fmarkless_2Fpackages_2Fheadless_2Fcomponents_2Fsrc_2Faccordion_2Faccordion",
+                "start": 135785,
+                "end": 140924,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_resolver__2FUsers_2Fjacksm5pro_2Fdev_2Fopen_source_2Fmarkless_2Fpackages_2Fheadless_2Fcomponents_2Fsrc_2Fselect_2Fselect",
+                "start": 145092,
+                "end": 151922,
+                "count": 1
+              },
+              {
+                "name": "init_callback_slot",
+                "start": 194389,
+                "end": 194398,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_resolver__2FUsers_2Fjacksm5pro_2Fdev_2Fopen_source_2Fmarkless_2Fwebsite_2Fcomponents_2Fdocs_2Fplayground_2Fgenerated_2Faccordion__basic",
+                "start": 357278,
+                "end": 529141,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$42",
+                "start": 547132,
+                "end": 547141,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$41",
+                "start": 547818,
+                "end": 547824,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$38",
+                "start": 548386,
+                "end": 548392,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$37",
+                "start": 548537,
+                "end": 548543,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$35",
+                "start": 548828,
+                "end": 548834,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$34",
+                "start": 548975,
+                "end": 548981,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$32",
+                "start": 549191,
+                "end": 549197,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$31",
+                "start": 549336,
+                "end": 549342,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$29",
+                "start": 550663,
+                "end": 550669,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$27",
+                "start": 551192,
+                "end": 551198,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$26",
+                "start": 551497,
+                "end": 551503,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$25",
+                "start": 551609,
+                "end": 551615,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$24",
+                "start": 552066,
+                "end": 552072,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$23",
+                "start": 552371,
+                "end": 552377,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$22",
+                "start": 552960,
+                "end": 552966,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$21",
+                "start": 553089,
+                "end": 553095,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$20",
+                "start": 553196,
+                "end": 553202,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$19",
+                "start": 553345,
+                "end": 553351,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$18",
+                "start": 553464,
+                "end": 553470,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$17",
+                "start": 553921,
+                "end": 553927,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$16",
+                "start": 554226,
+                "end": 554232,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$15",
+                "start": 554547,
+                "end": 554553,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$14",
+                "start": 554666,
+                "end": 554672,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$13",
+                "start": 554913,
+                "end": 554919,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$8",
+                "start": 556090,
+                "end": 556096,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$7",
+                "start": 556318,
+                "end": 556324,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$2",
+                "start": 557058,
+                "end": 557064,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$1",
+                "start": 557205,
+                "end": 557211,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol",
+                "start": 557354,
+                "end": 557360,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$114",
+                "start": 569081,
+                "end": 569087,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$113",
+                "start": 569227,
+                "end": 569233,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$112",
+                "start": 569372,
+                "end": 569378,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$111",
+                "start": 569519,
+                "end": 569525,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$109",
+                "start": 569735,
+                "end": 569741,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$108",
+                "start": 569880,
+                "end": 569886,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$107",
+                "start": 570027,
+                "end": 570033,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$103",
+                "start": 571070,
+                "end": 571076,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$102",
+                "start": 571221,
+                "end": 571227,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$101",
+                "start": 571370,
+                "end": 571376,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$100",
+                "start": 571519,
+                "end": 571525,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$89",
+                "start": 575312,
+                "end": 575318,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$87",
+                "start": 575683,
+                "end": 575689,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$86",
+                "start": 575855,
+                "end": 575861,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$85",
+                "start": 576027,
+                "end": 576033,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$84",
+                "start": 576199,
+                "end": 576205,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$83",
+                "start": 576478,
+                "end": 576484,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$80",
+                "start": 578339,
+                "end": 578345,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$79",
+                "start": 578460,
+                "end": 578466,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$78",
+                "start": 578570,
+                "end": 578576,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$75",
+                "start": 579204,
+                "end": 579210,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$122",
+                "start": 580291,
+                "end": 580297,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$121",
+                "start": 580510,
+                "end": 580516,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$93",
+                "start": 581156,
+                "end": 581162,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$82",
+                "start": 581305,
+                "end": 581311,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$71",
+                "start": 581454,
+                "end": 581460,
+                "count": 1
+              },
+              {
+                "name": "init_payload_resume",
+                "start": 703133,
+                "end": 703161,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$416",
+                "start": 771215,
+                "end": 771221,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$422",
+                "start": 773077,
+                "end": 773083,
+                "count": 1
+              },
+              {
+                "name": "init__virtual_markless_symbol$413",
+                "start": 774768,
+                "end": 774774,
+                "count": 1
+              },
+              {
+                "name": "init_resume",
+                "start": 814951,
+                "end": 814961,
+                "count": 1
+              },
+              {
+                "name": "init_accordion",
+                "start": 815056,
+                "end": 815239,
+                "count": 1
+              },
+              {
+                "name": "init_select",
+                "start": 816128,
+                "end": 816488,
+                "count": 1
+              },
+              {
+                "name": "fge",
+                "start": 823732,
+                "end": 823793,
+                "count": 1
+              },
+              {
+                "name": "_ge",
+                "start": 824927,
+                "end": 824933,
+                "count": 1
+              },
+              {
+                "name": "Sge",
+                "start": 826659,
+                "end": 826665,
+                "count": 1
+              },
+              {
+                "name": "init_graph",
+                "start": 830069,
+                "end": 830092,
+                "count": 1
+              },
+              {
+                "name": "init_src",
+                "start": 830125,
+                "end": 830135,
+                "count": 1
+              },
+              {
+                "name": "init_overlay",
+                "start": 834993,
+                "end": 835222,
+                "count": 1
+              },
+              {
+                "name": "init_roster_resume",
+                "start": 837610,
+                "end": 837760,
+                "count": 1
+              },
+              {
+                "name": "init_sync_policy_core",
+                "start": 838286,
+                "end": 838292,
+                "count": 1
+              },
+              {
+                "name": "Rx",
+                "start": 840305,
+                "end": 840346,
+                "count": 1
+              },
+              {
+                "name": "init_resume_branches",
+                "start": 863919,
+                "end": 863928,
+                "count": 1
+              },
+              {
+                "name": "init_resume_commit_arm",
+                "start": 868980,
+                "end": 868995,
+                "count": 1
+              },
+              {
+                "name": "init_resume_events",
+                "start": 876995,
+                "end": 877264,
+                "count": 1
+              },
+              {
+                "name": "init_resume_keyed_repeats",
+                "start": 883645,
+                "end": 883676,
+                "count": 1
+              },
+              {
+                "name": "init_resume_runtime_shared",
+                "start": 885937,
+                "end": 885951,
+                "count": 1
+              },
+              {
+                "name": "init_resume_runtime_start",
+                "start": 891133,
+                "end": 891158,
+                "count": 1
+              },
+              {
+                "name": "init_resume_runtime",
+                "start": 899384,
+                "end": 899417,
+                "count": 1
+              },
+              {
+                "name": "init_resume_sync_computed",
+                "start": 901823,
+                "end": 901829,
+                "count": 1
+              },
+              {
+                "name": "init_resume_sync_demand",
+                "start": 902500,
+                "end": 902509,
+                "count": 1
+              },
+              {
+                "name": "init_storage_plane",
+                "start": 903336,
+                "end": 903347,
+                "count": 1
+              },
+              {
+                "name": "init_accordion__basic",
+                "start": 7162305,
+                "end": 7162391,
+                "count": 1
+              },
+              {
+                "name": "init_mdx_route",
+                "start": 10488547,
+                "end": 10488556,
+                "count": 1
+              }
+            ],
+            "containmentCalls": 70
+          },
+          {
+            "name": "repeat-1",
+            "executedSourceBytes": 53417,
+            "exportDeclarationBytes": 0,
+            "initializerBodiesInLoadedFiles": 1111,
+            "initializersCalled": [],
+            "containmentCalls": 28
+          },
+          {
+            "name": "repeat-2",
+            "executedSourceBytes": 53187,
+            "exportDeclarationBytes": 0,
+            "initializerBodiesInLoadedFiles": 1111,
+            "initializersCalled": [],
+            "containmentCalls": 26
+          }
+        ]
+      }
+    ]
+  },
+  "smoke": {
+    "raw": "/private/tmp/markless-docs-cold-yeW8sL/results.json",
+    "visits": 16,
+    "actions": 48,
+    "failures": 0,
+    "pageErrors": [],
+    "frameworkRequests": [
+      5
+    ],
+    "httpCacheHits": 0,
+    "newJsOnAction": 0,
+    "pendingJsAtAction": 0
+  },
+  "limitations": [
+    "Source-region bytes and invocation counts are not CPU duration.",
+    "Export declarations are included in Chrome source coverage but are not application handler bodies.",
+    "Two cold visits per route/condition establish correctness, not a latency improvement.",
+    "First MDX interaction still resumes the container runtime. Minimal initialization across the whole application is not established."
+  ]
+}

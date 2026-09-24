@@ -1,0 +1,130 @@
+{
+  "toolchain": {
+    "before": {
+      "vitePlus": "0.3.0",
+      "rolldown": "1.2.5"
+    },
+    "after": {
+      "vitePlus": "0.3.1",
+      "rolldown": "1.2.7"
+    }
+  },
+  "engineOld": {
+    "engine": "/Users/jacksm5pro/dev/open-source/markless/node_modules/.pnpm/@voidzero-dev+vite-plus-core@0.3.0_@types+node@24.12.2_jiti@2.7.0_typescript@5.9.3_yaml@2.9.0/node_modules/@voidzero-dev/vite-plus-core/dist/rolldown/index.mjs",
+    "version": "1.2.5",
+    "entry": "/private/tmp/markless-scalar-path-app-p3jtRz/node_modules/.nitro/vite/services/ssr/index.js",
+    "directory": "/private/tmp/markless-ssr-rebundle-G6Lwa1",
+    "loaded": false,
+    "failure": "SyntaxError: Export 'ssr_exports' is not defined in module"
+  },
+  "engineFixed": {
+    "engine": "/Users/jacksm5pro/dev/open-source/markless/node_modules/.pnpm/@voidzero-dev+vite-plus-core@0.3.1_@types+node@24.12.2_jiti@2.7.0_typescript@5.9.3_yaml@2.9.0/node_modules/@voidzero-dev/vite-plus-core/dist/rolldown/index.mjs",
+    "version": "1.2.7",
+    "entry": "/private/tmp/markless-scalar-path-app-p3jtRz/node_modules/.nitro/vite/services/ssr/index.js",
+    "directory": "/private/tmp/markless-ssr-rebundle-baxHyx",
+    "loaded": true
+  },
+  "timings": [
+    {
+      "condition": "normal",
+      "phases": [
+        {
+          "phase": "first",
+          "beforeMedian": 32.60000002384186,
+          "afterMedian": 32.35000002384186,
+          "beforeMad": 0.4500000476837158,
+          "afterMad": 0.6499999761581421,
+          "threshold": 10,
+          "meaningful": false
+        },
+        {
+          "phase": "second",
+          "beforeMedian": 15.150000095367432,
+          "afterMedian": 14.600000023841858,
+          "beforeMad": 0.25,
+          "afterMad": 0.4500000476837158,
+          "threshold": 10,
+          "meaningful": false
+        },
+        {
+          "phase": "third",
+          "beforeMedian": 15.099999904632568,
+          "afterMedian": 15.099999904632568,
+          "beforeMad": 0.19999992847442627,
+          "afterMad": 0.10000014305114746,
+          "threshold": 10,
+          "meaningful": false
+        }
+      ]
+    },
+    {
+      "condition": "constrained",
+      "phases": [
+        {
+          "phase": "first",
+          "beforeMedian": 74.74999988079071,
+          "afterMedian": 73.75,
+          "beforeMad": 2.25,
+          "afterMad": 3.450000047683716,
+          "threshold": 10,
+          "meaningful": false
+        },
+        {
+          "phase": "second",
+          "beforeMedian": 10.050000071525574,
+          "afterMedian": 10.699999928474426,
+          "beforeMad": 0.5999999046325684,
+          "afterMad": 1.0000001192092896,
+          "threshold": 10,
+          "meaningful": false
+        },
+        {
+          "phase": "third",
+          "beforeMedian": 10.850000023841858,
+          "afterMedian": 11.099999904632568,
+          "beforeMad": 1.0499999523162842,
+          "afterMad": 1.4500000476837158,
+          "threshold": 10,
+          "meaningful": false
+        }
+      ]
+    }
+  ],
+  "before": {
+    "visits": 20,
+    "actions": 60,
+    "errors": [],
+    "failedActions": [],
+    "frameworkRequests": [
+      5
+    ],
+    "frameworkEncodedBytes": [
+      235009
+    ],
+    "httpCacheHits": 0,
+    "constrainedFirstWithPendingScripts": 9
+  },
+  "after": {
+    "visits": 20,
+    "actions": 60,
+    "errors": [],
+    "failedActions": [],
+    "frameworkRequests": [
+      5
+    ],
+    "frameworkEncodedBytes": [
+      235035
+    ],
+    "httpCacheHits": 0,
+    "constrainedFirstWithPendingScripts": 9
+  },
+  "evidence": {
+    "beforePath": "/private/tmp/markless-docs-cold-42mKjY/results.json",
+    "afterPath": "/private/tmp/markless-docs-cold-2alZ0h/results.json",
+    "scalar": "/private/tmp/markless-scalar-path-app-h8fjjg/results.json",
+    "execution": "/private/tmp/markless-docs-execution-zyAksZ/results.json",
+    "attribution": "/private/tmp/markless-vp-patch-attribution.json",
+    "navigation": "/private/tmp/markless-docs-navigation-bBiTu2/results.json",
+    "candidate": "/private/tmp/markless-docs-toolchain-ht3oM4/.output"
+  }
+}

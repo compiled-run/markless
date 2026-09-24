@@ -4,6 +4,18 @@ import type { MarklessEnvironment } from '../types.ts';
 export const MARKLESS_BUILD_DIR = 'build';
 export const MARKLESS_BUILD_PREFIX = `${MARKLESS_BUILD_DIR}/`;
 export const MARKLESS_BUNDLE_GRAPH = `${MARKLESS_BUILD_PREFIX}bundle-graph.json`;
+export const MARKLESS_EXECUTION_SIZES = `${MARKLESS_BUILD_PREFIX}execution-sizes.json`;
+export const MARKLESS_EXECUTION_DEMAND = `${MARKLESS_BUILD_PREFIX}execution-demand.json`;
+export const MARKLESS_INTERACTION_CLOSURES = `${MARKLESS_BUILD_PREFIX}interaction-closures.json`;
+export const MARKLESS_BYTE_ATTRIBUTION = `${MARKLESS_BUILD_PREFIX}byte-attribution.json`;
+// Fixed-name build metadata under the public build prefix: its bytes change every build, so hosts must revalidate it.
+export const MARKLESS_BUILD_METADATA_FILES = [
+	MARKLESS_BUNDLE_GRAPH,
+	MARKLESS_EXECUTION_SIZES,
+	MARKLESS_EXECUTION_DEMAND,
+	MARKLESS_INTERACTION_CLOSURES,
+	MARKLESS_BYTE_ATTRIBUTION,
+] as const;
 
 // Progressive runtime execution (specs/framework/06-runtime-resumer.md): each web
 // runtime capability chunks separately so an action never executes untouched

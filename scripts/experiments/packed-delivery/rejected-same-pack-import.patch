@@ -1,0 +1,66 @@
+--- a/packages/bundler/src/build/lazy-module-facades.ts
++++ b/packages/bundler/src/build/lazy-module-facades.ts
+@@ -128,9 +128,12 @@
+ 	const referenced = new Set<string>();
+ 	const unsupported = new Set<string>();
+ 	const imports = new Map<string, Syntax[]>();
++	const awaiting = new Set<string>();
+ 	for (const chunk of chunks.values()) {
+ 		const expressions: Syntax[] = [];
+-		walk(parseSync(chunk.fileName, chunk.code).program, (node) => {
++		const program = parseSync(chunk.fileName, chunk.code).program;
++		if (hasTopLevelAwait(program)) awaiting.add(chunk.fileName);
++		walk(program, (node) => {
+ 			if (node.type === 'ImportExpression') expressions.push(node);
+ 		});
+ 		imports.set(chunk.fileName, expressions);
+@@ -315,7 +318,10 @@
+ 			replacements.push({
+ 				start: node.start!,
+ 				end: node.end!,
+-				source: `import(${JSON.stringify(path.startsWith('.') ? path : `./${path}`)}).then(module=>module.${facade.loader}())`,
++				source:
++					facade.target === chunk && !awaiting.has(chunk.fileName)
++						? `(async()=>{await 0;return ${facade.loader}()})()`
++						: `import(${JSON.stringify(path.startsWith('.') ? path : `./${path}`)}).then(module=>module.${facade.loader}())`,
+ 			});
+ 		}
+ 		const suffix = (additions.get(chunk.fileName) ?? []).join('\n');
+@@ -329,7 +335,14 @@
+ 		pieces.push(chunk.code.slice(cursor), suffix);
+ 		chunk.code = pieces.join('');
+ 		chunk.dynamicImports = [
+-			...new Set(chunk.dynamicImports.map((id) => facades.get(id)?.target.fileName ?? id)),
++			...new Set(
++				chunk.dynamicImports.flatMap((id) => {
++					const facade = facades.get(id);
++					return facade?.target === chunk && !awaiting.has(chunk.fileName)
++						? []
++						: [facade?.target.fileName ?? id];
++				}),
++			),
+ 		];
+ 	}
+ 	for (const [key, value] of Object.entries(bundle))
+@@ -392,6 +405,21 @@
+ 	return source.startsWith('.') ? normalize(join(dirname(importer), source)) : source;
+ }
+ 
++function hasTopLevelAwait(value: unknown): boolean {
++	if (!value || typeof value !== 'object') return false;
++	if (Array.isArray(value)) return value.some(hasTopLevelAwait);
++	const node = value as Syntax;
++	if (
++		node.type === 'FunctionDeclaration' ||
++		node.type === 'FunctionExpression' ||
++		node.type === 'ArrowFunctionExpression'
++	)
++		return false;
++	if (node.type === 'AwaitExpression' || (node.type === 'ForOfStatement' && node.await))
++		return true;
++	return Object.values(node).some(hasTopLevelAwait);
++}
++
+ function walk(value: unknown, visit: (node: Syntax) => void): void {
+ 	if (!value || typeof value !== 'object') return;
+ 	if (Array.isArray(value)) {

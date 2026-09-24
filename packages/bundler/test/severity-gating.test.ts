@@ -30,20 +30,23 @@ const SYMBOL_MODULE_ERROR = 'MARKLESS_SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE';
  * the only producer that reports it, which is what makes this the isolating
  * fixture.
  */
-// A row-local ASSIGNMENT TARGET is pinned as unlowerable (repeat-row-local-reads
-// witnesses: context.locals?.row.count is not a legal target), and the semantic
-// pass records nothing for it - so the read-back audit in symbol-modules is the
-// SOLE producer, which is what this file needs. The previous fixture (a compound
+// A row-local ASSIGNMENT TARGET over a plain (non-state) array has no graph element
+// to write (repeat-row-local-reads witnesses it), and the semantic pass records
+// nothing for it - so the read-back audit in symbol-modules is the SOLE producer,
+// which is what this file needs. Over a state list the same write now lowers. The previous fixture (a compound
 // RHS with a method call) became legitimately lowerable when non-binding-root
 // receivers landed; a computed-key handle read dual-produces with
 // MARKLESS_STATE_DYNAMIC_PATH_READ. Both were measured before this repoint.
 const COMPOUND_RHS_SOURCE = `import { state } from '@markless/core';
 
+const ROWS = [{ id: 'a', count: 0 }];
+
 export function App() @{
-	const s = state({ rows: [{ id: 'a', count: 0 }] });
+	const s = state({ total: 0 });
 
 	<ul>
-		@for (const row of s.rows; key row.id) {
+		<li>{s.total}</li>
+		@for (const row of ROWS; key row.id) {
 			<li><button onClick={(event) => { row.count = row.count + 1; }}>go</button></li>
 		}
 	</ul>

@@ -33,7 +33,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 	if ((input.boundSymbols?.length ?? 0) === 0) {
 		return input.symbols.length > 0 && input.symbols.length <= SMALL_SYMBOL_SWITCH_LIMIT
 			? emitSmallSymbolResolverModule(input)
-			: emitTableSymbolResolverModule(manifest);
+			: emitTableSymbolResolverModule(manifest, input.literalImports);
 	}
 	const scopesInstances = (input.boundSymbols ?? []).some((row) => row.instancePath);
 	// Which space an id belongs to is a runtime reading, not a prefix: a shared id
@@ -72,7 +72,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		JSON.stringify(manifest),
 		';',
 		'',
-		'const moduleUrls = symbolManifest[3];',
+		input.literalImports ? literalModuleLoads(manifest) : 'const moduleUrls = symbolManifest[3];',
 		'const exportNames = symbolManifest[4];',
 		'const symbolRows = symbolManifest[5];',
 		`const boundRows = ${serializeBoundRows(input.boundSymbols ?? [])};`,
@@ -83,7 +83,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'	if (bound) return loadBoundSymbol(bound);',
 		'	const row = symbolRows[id];',
 		'	if (!row) throw createUnknownSymbolError(id);',
-		'	return import(/* @vite-ignore */ moduleUrls[row[0]])',
+		input.literalImports ? '\treturn moduleLoads[id]()' : '	return import(/* @vite-ignore */ moduleUrls[row[0]])',
 		'		.then((mod) => {',
 		'			runGeneratedSymbolChunkInitializers(mod);',
 		'			return mod[exportNames[row[1]]];',
@@ -140,7 +140,8 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 			: []),
 		'			if (route.kind !== callbackRoute) throw new Error(`Capture slot ${slotId} is not a callback route`);',
 		'			if (typeof context.invokeSymbol !== "function") throw new Error("Bound callback invocation is unavailable");',
-		'			return context.invokeSymbol(route.callbackSymbolId, { ...context, event: context.event, args });',
+		// The row spells its composer's callback from its own module, which may sit under an instance path.
+		'			return context.invokeSymbol((context.graph?.marklessInstancePath || "") + route.callbackSymbolId, { ...context, event: context.event, args });',
 		'		},',
 		'	};',
 		'}',
@@ -270,6 +271,18 @@ function serializeBoundRows(rows: SymbolResolverModuleInput['boundSymbols']): st
 		{
 			...row,
 			ancestry: row.ancestry.map(({ componentEdgeId: _componentEdgeId, ...entry }) => entry),
+			captureSlots: row.captureSlots.map((slot) =>
+				slot.route.kind === 'callback-route' && slot.route.composerPath
+					? {
+							...slot,
+							route: {
+								...slot.route,
+								callbackSymbolId: slot.route.composerPath + slot.route.callbackSymbolId,
+								composerPath: undefined,
+							},
+						}
+					: slot,
+			),
 		},
 	]);
 	return JSON.stringify(
@@ -283,20 +296,20 @@ function serializeBoundRows(rows: SymbolResolverModuleInput['boundSymbols']): st
 	);
 }
 
-function emitTableSymbolResolverModule(manifest: SymbolResolverModuleManifest): string {
+function emitTableSymbolResolverModule(manifest: SymbolResolverModuleManifest, literalImports = false): string {
 	return [
 		'export const symbolManifest = ',
 		JSON.stringify(manifest),
 		';',
 		'',
-		'const moduleUrls = symbolManifest[3];',
+		literalImports ? literalModuleLoads(manifest) : 'const moduleUrls = symbolManifest[3];',
 		'const exportNames = symbolManifest[4];',
 		'const symbolRows = symbolManifest[5];',
 		'',
 		'export async function loadSymbol(id) {',
 		'\tconst row = symbolRows[id];',
 		'\tif (!row) throw createUnknownSymbolError(id);',
-		'\treturn import(/* @vite-ignore */ moduleUrls[row[0]])',
+		literalImports ? '\treturn moduleLoads[id]()' : '\treturn import(/* @vite-ignore */ moduleUrls[row[0]])',
 		'\t\t.then((mod) => {',
 		'\t\t\trunGeneratedSymbolChunkInitializers(mod);',
 		'\t\t\treturn mod[exportNames[row[1]]];',
@@ -323,9 +336,13 @@ function emitTableSymbolResolverModule(manifest: SymbolResolverModuleManifest): 
 	].join('\n');
 }
 
+function literalModuleLoads(manifest: SymbolResolverModuleManifest): string {
+	return `const moduleLoads = {${Object.entries(manifest[5]).map(([id, row]) => `${JSON.stringify(id)}:()=>import(${JSON.stringify(manifest[3][row[0]])})`).join(',')}};`;
+}
+
 function emitSmallSymbolResolverModule(input: SymbolResolverModuleInput): string {
 	const symbolBranches = input.symbols.flatMap((symbol) => [
-		`	if (id === ${JSON.stringify(symbol.id)}) return import(/* @vite-ignore */ ${JSON.stringify(symbol.chunk)})`,
+		`	if (id === ${JSON.stringify(symbol.id)}) return import(${input.bundlerVisibleImports ? '' : '/* @vite-ignore */ '}${JSON.stringify(symbol.chunk)})`,
 		`		.then((mod) => { mod.init__virtual_markless_symbol?.(); return mod${moduleExportAccess(symbol.exportName)}; });`,
 	]);
 

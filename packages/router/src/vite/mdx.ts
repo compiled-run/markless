@@ -16,6 +16,8 @@ import {
 } from 'satteri';
 import { decodePath, parsePath, parseURL, withQuery } from 'ufo';
 import { protocolIslandSegment } from '../../../serializer/src/protocol-constants.ts';
+import { emitQueuedResumeContainerEvent } from '../../../bundler/src/source-module.ts';
+import { scalarPlanSourceReference } from '../../../bundler/src/scalar-plan-source.ts';
 
 // Dev has to pre-bundle this or the first MDX route discovers it and Vite
 // re-optimizes mid-session.
@@ -112,13 +114,9 @@ type MdxPart =
 
 function emitMdxClientRoute(route: MdxRoute, id: string, resume: boolean): string {
 	return [
-		...(resume
-			? [`import { resumeFromPayloadDocument } from '@markless/core/web/resume';`]
-			: []),
-		`import { createMdxRenderDataSurface, loadMdxSymbol } from '${MDX_ROUTE_RUNTIME_SPECIFIER}';`,
-		`const marklessMdxParts = ${JSON.stringify(route.parts)};`,
+		`import { createMdxRenderDataSurface, loadMdxSymbol${resume ? ', tryResumeMdxScalar' : ''} } from '${MDX_ROUTE_RUNTIME_SPECIFIER}';`,
 		`const marklessMdxSymbolLoaders = ${renderSymbolLoaders(route.components)};`,
-		`const marklessMdxRenderData = ${renderMdxRenderDataLoader(route.components, id)};`,
+		`const marklessMdxRenderData = ${renderMdxRenderDataLoader(route.components, id, route.parts)};`,
 		renderOverlayLoader(),
 		'const marklessMdxPage = {',
 		'  renderData: marklessMdxRenderData,',
@@ -139,8 +137,7 @@ function renderOverlayLoader(): string {
 
 function emitComposedMdxRoute(route: MdxRoute, id: string): string {
 	return [
-		`import { resumeFromPayloadDocument } from '@markless/core/web/resume';`,
-		`import { composeMdxState, composeMdxView, createMdxRenderDataSurface, loadMdxSymbol, renderMdxChild } from '${MDX_ROUTE_RUNTIME_SPECIFIER}';`,
+		`import { composeMdxState, composeMdxView, createMdxRenderDataSurface, loadMdxSymbol, renderMdxChild, tryResumeMdxScalar } from '${MDX_ROUTE_RUNTIME_SPECIFIER}';`,
 		...route.imports,
 		'',
 		`const marklessMdxParts = ${JSON.stringify(route.parts)};`,
@@ -178,15 +175,29 @@ function emitComposedMdxRoute(route: MdxRoute, id: string): string {
 
 function renderMdxResumeHandler(): string[] {
 	return [
-		'export async function resumeContainerEvent(input) {',
-		'  input.root.__asyncResumeRuntimeStarted = true;',
-		'  const { runtime } = await resumeFromPayloadDocument({',
-		'    document: input.root,',
-		'    root: input.root,',
-		'    loadSymbol: marklessMdxLoadSymbol,',
-		'    renderData: marklessMdxRenderData,',
-		'  });',
-		'  await runtime.dispatch(input.event, { syncPolicyAlreadyApplied: true, ignoreUnmatched: input.eventRecord == null });',
+		'let marklessResumeModule;',
+		emitQueuedResumeContainerEvent(
+			[
+				'export async function resumeContainerEvent(input) {',
+				'  if (await tryResumeMdxScalar(input, marklessMdxLoadScalarPlan, marklessMdxLoadSymbol)) return;',
+				'  input.root.__asyncResumeRuntimeStarted = true;',
+				"  const { resumeFromPayloadDocument } = await (marklessResumeModule ??= import('@markless/core/web/resume').catch(error => { marklessResumeModule = undefined; throw error; }));",
+				'  const { runtime } = await resumeFromPayloadDocument({',
+				'    document: input.root,',
+				'    root: input.root,',
+				'    loadSymbol: marklessMdxLoadSymbol,',
+				'    handoffDispatchOptions: marklessMdxDispatchOptions,',
+				'    renderData: marklessMdxRenderData,',
+				'  });',
+				'  await runtime.dispatch(input.event, marklessMdxDispatchOptions(input));',
+				'}',
+				'function marklessMdxDispatchOptions(input) {',
+				'  return { syncPolicyAlreadyApplied: true, propagationStopped: input.propagationStopped, ignoreUnmatched: input.eventRecord == null };',
+				'}',
+			].join('\n'),
+		),
+		'function marklessMdxLoadScalarPlan(symbolId) {',
+		'  return marklessMdxSymbolLoaders.find(loader => symbolId.startsWith(loader.prefix))?.loadScalarActionPlan(symbolId);',
 		'}',
 	];
 }
@@ -267,15 +278,13 @@ function tsrxImportsFromProgram(program: EstreeProgram | null, id: string): MdxI
 				importSpecifier.type === 'ImportDefaultSpecifier',
 		);
 
-		if (
-			typeof specifier !== 'string' ||
-			!specifier.endsWith('.tsrx') ||
-			!defaultImport ||
-			statement.specifiers.length !== 1
-		) {
+		if (typeof specifier !== 'string' || !specifier.endsWith('.tsrx')) {
 			throw new Error(
 				`Markless Router MDX currently supports default imports from .tsrx files only: ${id}`,
 			);
+		}
+		if (!defaultImport || statement.specifiers.length !== 1) {
+			throw new Error(tsrxImportShapeMessage(statement.specifiers, specifier, id));
 		}
 
 		imports.push({ localName: defaultImport.local.name, specifier });
@@ -283,6 +292,36 @@ function tsrxImportsFromProgram(program: EstreeProgram | null, id: string): MdxI
 
 	return imports;
 }
+
+// Render data, symbols and storage seeds are emitted per .tsrx file for its default component.
+function tsrxImportShapeMessage(
+	specifiers: EstreeImportDeclaration['specifiers'],
+	specifier: string,
+	id: string,
+): string {
+	const intro = `Markless Router MDX imports a .tsrx component as that file's default export, one component per import: ${id}.`;
+	const source = JSON.stringify(specifier).slice(1, -1);
+	const defaultImport = specifiers.find((entry) => entry.type === 'ImportDefaultSpecifier');
+	if (defaultImport) {
+		return `${intro} Write \`import ${defaultImport.local.name} from '${source}';\` alone.`;
+	}
+	const named = specifiers.find(
+		(entry): entry is EstreeImportSpecifier => entry.type === 'ImportSpecifier',
+	);
+	if (named) {
+		const exported =
+			named.imported.type === 'Identifier' ? named.imported.name : String(named.imported.value);
+		return `${intro} Write \`import ${named.local.name} from '${source}';\` and make ${exported} the file's \`export default\`.`;
+	}
+	return `${intro} Write \`import Component from '${source}';\` and make the component the file's \`export default\`.`;
+}
+
+type EstreeImportDeclaration = Extract<EstreeProgram['body'][number], { type: 'ImportDeclaration' }>;
+
+type EstreeImportSpecifier = Extract<
+	EstreeImportDeclaration['specifiers'][number],
+	{ type: 'ImportSpecifier' }
+>;
 
 type EstreeImportDefaultSpecifier = Extract<
 	EstreeProgram['body'][number],
@@ -631,12 +670,16 @@ function renderSymbolLoaders(components: ReadonlyArray<MdxComponent>): string {
 	return `[${components
 		.map(
 			(component) =>
-				`{ prefix: ${JSON.stringify(component.prefix)}, loadSymbol(symbolId) { return import(${JSON.stringify(`${component.specifier}?markless-symbols`)}).then((mod) => mod.loadSymbol(symbolId.slice(${component.prefix.length}))); } }`,
+				`(() => { let module; const loadModule = () => module ??= import(${JSON.stringify(scalarPlanSourceReference(component.specifier))}).catch(error => { module = undefined; throw error; }); return { prefix: ${JSON.stringify(component.prefix)}, loadSymbol(symbolId) { return loadModule().then((mod) => mod.loadSymbol(symbolId.slice(${component.prefix.length}))); }, loadScalarActionPlan(symbolId) { return loadModule().then(mod => mod.loadScalarActionPlan?.(symbolId.slice(${component.prefix.length}))).then(action => action && ({ ...action, scope: ${JSON.stringify(component.prefix)} + action.scope })); } }; })()`,
 		)
 		.join(', ')}]`;
 }
 
-function renderMdxRenderDataLoader(components: ReadonlyArray<MdxComponent>, id: string): string {
+function renderMdxRenderDataLoader(
+	components: ReadonlyArray<MdxComponent>,
+	id: string,
+	parts?: ReadonlyArray<MdxPart>,
+): string {
 	const reachedFrom = mdxMaterializedReachRoot(id);
 	const imports = components.map((component) => {
 		const source = withQuery(component.specifier, {
@@ -650,7 +693,10 @@ function renderMdxRenderDataLoader(components: ReadonlyArray<MdxComponent>, id: 
 		(component, index) =>
 			`{ componentIndex: ${index}, hostPrefix: ${JSON.stringify(component.prefix)}, symbolPrefix: ${JSON.stringify(component.prefix)}, props: ${componentPropsExpression(component)}, surface: modules[${index}].${exportName} }`,
 	);
-	return `() => Promise.all([${imports.join(', ')}]).then(modules => createMdxRenderDataSurface(marklessMdxParts, [${children.join(', ')}]))`;
+	const load = `Promise.all([${imports.join(', ')}]).then(modules => createMdxRenderDataSurface(marklessMdxParts, [${children.join(', ')}]))`;
+	return parts
+		? `() => {\nconst marklessMdxParts = ${JSON.stringify(parts)};\nreturn ${load};\n}`
+		: `() => ${load}`;
 }
 
 function mdxMaterializedReachRoot(id: string): string | undefined {

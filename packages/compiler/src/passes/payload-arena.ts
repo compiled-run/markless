@@ -5,7 +5,9 @@ import type {
 	PayloadBehavior,
 	PayloadKeyedRepeat,
 	SemanticComponentPropBinding,
+	SemanticGraphArtifact,
 	SemanticGraphBinding,
+	SemanticKeyedRepeat,
 	SemanticTemplateRead,
 } from '../artifacts.ts';
 import {
@@ -142,7 +144,15 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 	// `el=` binding resolves in the component that authored it, not module-wide.
 	const handleScopeOf = componentGraphScopes(input.semanticGraph, { bindings, aliases });
 	const keyedRepeats = renderData.repeats.flatMap((repeat): PayloadKeyedRepeat[] => {
-		if (!repeat.collectionGraphNodeId) return [];
+		const nested = input.semanticGraph.keyedRepeats.find(
+			(candidate) => candidate.id === repeat.repeatId && candidate.enclosingRepeatId,
+		);
+		const collection = nested?.enclosingItemPath
+			? eachEnclosingRowCollection(nested, input.semanticGraph, bindingsById)
+			: repeat.collectionGraphNodeId
+				? clientCollection(repeat.collectionGraphNodeId, repeat.collectionPath, bindingsById)
+				: null;
+		if (!collection) return [];
 
 		const rowElementHandles = input.semanticGraph.elementHandleBindings.flatMap((binding) => {
 			if (binding.rowOwner?.repeatId !== repeat.repeatId) return [];
@@ -167,9 +177,11 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 				parentHostNodeId: repeat.parentHostNodeId,
 				...(repeat.ownerHostNodeId ? { ownerHostNodeId: repeat.ownerHostNodeId } : {}),
 				...(repeat.rowHostNodeId ? { rowHostNodeId: repeat.rowHostNodeId } : {}),
-				collectionGraphNodeId: repeat.collectionGraphNodeId,
-				collectionPath: repeat.collectionPath,
+				collectionGraphNodeId: collection.graphNodeId,
+				collectionPath: collection.path,
 				keyPath: repeat.keyPath,
+				...(nested?.enclosingRepeatId ? { enclosingRepeatId: nested.enclosingRepeatId } : {}),
+				...(nested?.enclosingItemPath ? { enclosingItemPath: nested.enclosingItemPath } : {}),
 				...(rowElementHandles.length > 0 ? { rowElementHandles } : {}),
 				...(rowBehaviors.length > 0 ? { rowBehaviors } : {}),
 			},
@@ -271,7 +283,6 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 			return {
 				locators: armHosts.map((hostNode, index) => ({
 					hostNodeId: hostNode.hostNodeId,
-					strategy: 'arm-relative' as const,
 					index,
 					tagName: hostNode.tagName,
 				})),
@@ -573,4 +584,36 @@ function literalStringValue(source: string): BehaviorInputValue | undefined {
 	}
 
 	return undefined;
+}
+
+// `group.items` inside `@for (const group of groups)` reads `groups` at `['*', 'items']`:
+// the wildcard stands for whichever enclosing row an instance of the nested repeat serves.
+function eachEnclosingRowCollection(
+	repeat: SemanticKeyedRepeat,
+	graph: SemanticGraphArtifact,
+	bindingsById: ReadonlyMap<string, SemanticGraphBinding>,
+): { readonly graphNodeId: string; readonly path: ReadonlyArray<string> } | null {
+	const enclosing = graph.keyedRepeats.find(
+		(candidate) => candidate.id === repeat.enclosingRepeatId,
+	);
+	const outer = !enclosing
+		? null
+		: enclosing.enclosingItemPath
+			? eachEnclosingRowCollection(enclosing, graph, bindingsById)
+			: enclosing.collectionGraphNodeId
+				? clientCollection(enclosing.collectionGraphNodeId, enclosing.collectionPath, bindingsById)
+				: null;
+	return outer
+		? { graphNodeId: outer.graphNodeId, path: [...outer.path, '*', ...(repeat.enclosingItemPath ?? [])] }
+		: null;
+}
+
+// The client graph holds an async computed as its snapshot; a bare collection read means the resolved value.
+function clientCollection(
+	graphNodeId: string,
+	path: ReadonlyArray<string>,
+	bindingsById: ReadonlyMap<string, SemanticGraphBinding>,
+): { readonly graphNodeId: string; readonly path: ReadonlyArray<string> } {
+	const binding = bindingsById.get(graphNodeId);
+	return { graphNodeId, path: binding ? runtimeGraphReadPath(binding, path) : path };
 }

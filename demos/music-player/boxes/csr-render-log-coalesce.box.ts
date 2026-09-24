@@ -40,7 +40,13 @@ export default box(
 			// The first click wakes this button's trigger group, which is a second
 			// render turn — and therefore exactly one more line.
 			await page.click(LIBRARY_BUTTON, WAIT);
-			await expect.page.attribute(page, LIBRARY_PANEL, 'class', 'library active-library', WAIT);
+			await expect.page.attribute(
+				page,
+				LIBRARY_PANEL,
+				'class',
+				'library active-library',
+				WAIT,
+			);
 
 			// Two more clicks, each with an observable state change, wake nothing
 			// further: no new render turn, so no new line. Asserting the exact total
@@ -49,7 +55,13 @@ export default box(
 			await page.click(LIBRARY_BUTTON, WAIT);
 			await expect.page.attribute(page, LIBRARY_PANEL, 'class', 'library', WAIT);
 			await page.click(LIBRARY_BUTTON, WAIT);
-			await expect.page.attribute(page, LIBRARY_PANEL, 'class', 'library active-library', WAIT);
+			await expect.page.attribute(
+				page,
+				LIBRARY_PANEL,
+				'class',
+				'library active-library',
+				WAIT,
+			);
 			await expect.page.attribute(page, 'html', RENDER_LOG_LINES, '2', WAIT);
 
 			await expect.page.outcome(page, { consoleErrors: 0, failedRequests: 0 }, WAIT);

@@ -31,7 +31,8 @@ export async function resumeScalarRowEventFromPayloadDocument(
 	// A wake carries no event at all - `0`, the shape the self-wake and the
 	// overlay primer both send. There is no row to match and nothing to run, so
 	// the only thing asked for is that the runtime start.
-	if (!input.event) return resumeFullEventOnly(input);
+	// A started runtime owns the cells; a lean graph would write a detached copy.
+	if (!input.event || input.root.__asyncResumeRuntimeStarted) return resumeFullEventOnly(input);
 	const action = rowAction(input.event.type, input.runtimeDemandMap);
 	if (!action?.plan) return resumeFullEventOnly(input);
 	const state = readPayloadScript(input.document, 'markless/state') as ProtocolStatePayload;
@@ -49,7 +50,6 @@ export async function resumeScalarRowEventFromPayloadDocument(
 	const {
 		findKeyedRepeatRowEventMatch,
 		findRepeatItemByKey,
-		readKeyedRepeatCollection,
 		validateOneRepeat,
 	} = await import('../resume-keyed-repeats.ts');
 	const rowDispatch = findKeyedRepeatRowEventMatch({
@@ -76,7 +76,7 @@ export async function resumeScalarRowEventFromPayloadDocument(
 	validateOneRepeat(graph as never, rowDispatch.match.repeat);
 	const rowLocals = {
 		[rowDispatch.match.repeat.itemName]: findRepeatItemByKey(
-			readKeyedRepeatCollection(graph as never, rowDispatch.match.repeat),
+			graph as never,
 			rowDispatch.match.repeat,
 			rowDispatch.match.rowKey,
 		),

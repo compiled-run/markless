@@ -2574,20 +2574,8 @@ test('renderToString envelope-encodes live directValue state cells before servin
 	expect(html).toContain('"records"');
 });
 
-/**
- * The Escape primer is pay-per-use, and this is the wall that keeps it that way.
- *
- * The gate is the `overlay` mark in the served html, because that is where the
- * mark is written - it is a static attribute, so no payload record carries it.
- * A page with no mark has to ship a resumer that is byte-identical to the one it
- * shipped before the primer existed, which is what the prefix check says: the
- * marked page's resumer is the unmarked one plus an appended tail and nothing
- * else.
- */
-// What elevation costs a page that uses it, in inline-resumer source bytes,
-// before compression. Re-anchor it in the same change set that moves it.
-// -50: the Escape primer stays armed until the overlay behaviour marks the root installed.
-const OVERLAY_PRIMER_BYTES = 1448;
+// Exact serialized source size, including comments retained by the test transformer.
+const OVERLAY_PRIMER_BYTES = 1124;
 
 function inlineResumerSourceOf(html: string): string {
 	const found = /<script data-async-resumer[^>]*>([\s\S]*?)<\/script>/.exec(html);
@@ -3114,7 +3102,6 @@ test('renderToString emits the resumer for keyed-repeat row events in a served a
 							locators: [
 								{
 									hostNodeId: 'h-list',
-									strategy: 'arm-relative',
 									index: 0,
 									tagName: 'ul',
 								},

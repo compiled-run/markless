@@ -1,0 +1,165 @@
+{
+  "preview": "http://localhost:3000/markless/concepts/state",
+  "output": "/private/tmp/markless-docs-overlay-primer-sjkt2c/.output",
+  "serverSession": 7925,
+  "files": {
+    "before": "/private/tmp/markless-docs-execution-OZcN25/results.json",
+    "after": "/private/tmp/markless-docs-execution-zremoH/results.json",
+    "attribution": "/private/tmp/markless-overlay-primer-attribution.json",
+    "navigation": "/private/tmp/markless-docs-navigation-vXHxjx/results.json"
+  },
+  "visits": 18,
+  "actions": 57,
+  "staticHeaderPresses": 3,
+  "errors": [],
+  "httpCacheHits": [],
+  "records": [
+    {
+      "test": "state-counter",
+      "phases": [
+        {
+          "name": "before-input",
+          "initialized": 0
+        },
+        {
+          "name": "first-action",
+          "initialized": 15
+        },
+        {
+          "name": "repeat-1",
+          "initialized": 0
+        },
+        {
+          "name": "repeat-2",
+          "initialized": 0
+        }
+      ]
+    },
+    {
+      "test": "state-header-then-counter",
+      "phases": [
+        {
+          "name": "before-input",
+          "initialized": 0
+        },
+        {
+          "name": "static-header",
+          "initialized": 0
+        },
+        {
+          "name": "first-action",
+          "initialized": 15
+        },
+        {
+          "name": "repeat-1",
+          "initialized": 0
+        },
+        {
+          "name": "repeat-2",
+          "initialized": 0
+        }
+      ]
+    },
+    {
+      "test": "state-independent-controls",
+      "phases": [
+        {
+          "name": "before-input",
+          "initialized": 0
+        },
+        {
+          "name": "first-action",
+          "initialized": 15
+        },
+        {
+          "name": "second-control",
+          "initialized": 3
+        },
+        {
+          "name": "return-first",
+          "initialized": 0
+        },
+        {
+          "name": "repeat-second",
+          "initialized": 0
+        }
+      ]
+    },
+    {
+      "test": "computed-total",
+      "phases": [
+        {
+          "name": "before-input",
+          "initialized": 0
+        },
+        {
+          "name": "first-action",
+          "initialized": 56
+        },
+        {
+          "name": "repeat-1",
+          "initialized": 0
+        },
+        {
+          "name": "repeat-2",
+          "initialized": 0
+        }
+      ]
+    },
+    {
+      "test": "mode-select",
+      "phases": [
+        {
+          "name": "before-input",
+          "initialized": 0
+        },
+        {
+          "name": "first-action",
+          "initialized": 72
+        },
+        {
+          "name": "repeat-1",
+          "initialized": 1
+        },
+        {
+          "name": "repeat-2",
+          "initialized": 0
+        }
+      ]
+    },
+    {
+      "test": "accordion",
+      "phases": [
+        {
+          "name": "before-input",
+          "initialized": 0
+        },
+        {
+          "name": "first-action",
+          "initialized": 117
+        },
+        {
+          "name": "repeat-1",
+          "initialized": 0
+        },
+        {
+          "name": "repeat-2",
+          "initialized": 0
+        }
+      ]
+    }
+  ],
+  "servedInline": {
+    "before": {
+      "raw": 15491,
+      "gzip": 4089,
+      "brotli5": 3904
+    },
+    "after": {
+      "raw": 15553,
+      "gzip": 4115,
+      "brotli5": 3926
+    }
+  },
+  "remainingBudgetFailures": 4
+}

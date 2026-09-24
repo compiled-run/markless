@@ -48,11 +48,10 @@ const renderOnlyHelper = `function shout(value: string) { return String(value).t
 // emits the same record it emitted before this field existed, so nothing about
 // its payload moved.
 test('a repeat whose row is not mintable carries no row markup', async () => {
-	const view = await viewOf(`${preamble}${renderOnlyHelper}
+	const view = await viewOf(`${preamble}
 export function App() @{
-	let rows = state([{ id: 'a' }]);
-	let theme = state('dark');
-	<ul>@for (const row of rows; key row.id) { <li class={shout(theme)}>t</li> }</ul>
+	let rows = state([{ id: 'a', on: true }]);
+	<ul>@for (const row of rows; key row.id) { <li>@if (row.on) { <b>yes</b> }</li> }</ul>
 }
 `);
 	expect(view.keyedRepeats).toHaveLength(1);
@@ -116,9 +115,9 @@ export function App() @{
 	]);
 });
 
-// Fail closed on what is left: a value only rendering produces has no channel in
-// the record at all, so the whole template stays off.
-test('a row whose value only rendering produces ships no markup', async () => {
+// A value only rendering produces rides as its authored source, with the outside
+// cell it reads, and the owning component that answers it.
+test('a row whose value only rendering produces ships its source and reads', async () => {
 	const view = await viewOf(`${preamble}${renderOnlyHelper}
 export function App() @{
 	let rows = state([{ id: 'a' }]);
@@ -126,8 +125,13 @@ export function App() @{
 	<ul>@for (const row of rows; key row.id) { <li>{shout(note)}</li> }</ul>
 }
 `);
-	expect(view.keyedRepeats).toHaveLength(1);
-	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowTemplate');
+	expect(view.keyedRepeats?.[0]?.rowTemplate).toEqual({
+		html: '<li><!--markless-slot:0--></li>',
+		componentName: 'App',
+		textSlots: [
+			{ path: [0, 0], source: 'shout(note)', reads: [{ graphNodeId: 'state:note', path: [] }] },
+		],
+	});
 });
 
 // The other side of that line, and why the refusal above is about the read and
@@ -198,17 +202,17 @@ export function App() @{
 // attribute is a part the mint does not fill. One test per slot kind the row can
 // hold, plus the two attribute values the mint cannot reach.
 
-// The mint reads paths off the item; it does not evaluate expressions, so an
-// attribute value computed from the item is still outside what it can finish.
-test('a row whose attribute value is a computed expression ships no markup', async () => {
+// An attribute computed from the item rides as its source; it reads nothing outside the row.
+test('a row whose attribute value is a computed expression ships its source', async () => {
 	const view = await viewOf(`${preamble}
 export function App() @{
 	let rows = state([{ id: 'a' }]);
 	<ul>@for (const row of rows; key row.id) { <li data-row={'r-' + row.id}>t</li> }</ul>
 }
 `);
-	expect(view.keyedRepeats).toHaveLength(1);
-	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowTemplate');
+	expect(view.keyedRepeats?.[0]?.rowTemplate?.attributeSlots).toEqual([
+		{ path: [0], name: 'data-row', source: "'r-' + row.id" },
+	]);
 });
 
 test('a row holding an @if ships no markup', async () => {
@@ -222,14 +226,29 @@ export function App() @{
 	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowTemplate');
 });
 
-test('a row holding a nested repeat ships no markup', async () => {
+test('a row holding a nested repeat whose rows mint ships markup with the nested marker', async () => {
 	const view = await viewOf(`${preamble}
 export function App() @{
 	let rows = state([{ id: 'a', tags: [{ id: 't' }] }]);
 	<ul>@for (const row of rows; key row.id) { <li>@for (const tag of row.tags; key tag.id) { <b>{tag.id}</b> }</li> }</ul>
 }
 `);
-	expect(view.keyedRepeats).toHaveLength(1);
+	expect(view.keyedRepeats).toHaveLength(2);
+	expect(view.keyedRepeats?.[0]?.rowTemplate?.html).toBe('<li><!--markless-slot:0--></li>');
+	expect(view.keyedRepeats?.[1]?.enclosingRow).toEqual({
+		repeatId: view.keyedRepeats?.[0]?.id,
+		parentHostPath: [],
+		itemPath: ['tags'],
+	});
+});
+
+test('a row holding a nested repeat whose rows cannot mint ships no markup', async () => {
+	const view = await viewOf(`${preamble}
+export function App() @{
+	let rows = state([{ id: 'a', tags: [{ id: 't', on: true }] }]);
+	<ul>@for (const row of rows; key row.id) { <li>@for (const tag of row.tags; key tag.id) { <b>@if (tag.on) { <i>on</i> }</b> }</li> }</ul>
+}
+`);
 	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowTemplate');
 });
 

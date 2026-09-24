@@ -1,11 +1,12 @@
 import type {
+	CaptureAnalysisArtifact,
 	RuntimeDemandMapAction,
 	RuntimeDemandMapArtifact,
 	SymbolResolverPlan,
 	TriggerGroupArtifact,
 } from '../artifacts.ts';
 import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer';
-import { PROTOCOL_EVENT_ACTION_KIND } from '@markless/serializer';
+import { PROTOCOL_EVENT_ACTION_KIND, protocolInstanceQualifies } from '@markless/serializer';
 
 const ACTION_STAGES_WAKE = {
 	[PROTOCOL_EVENT_ACTION_KIND.event]: true,
@@ -17,6 +18,7 @@ const ACTION_STAGES_WAKE = {
 // through bound component edges; the browser never guesses reachability.
 export function createTriggerGroups(input: {
 	readonly symbolResolver: SymbolResolverPlan;
+	readonly captureAnalysis?: CaptureAnalysisArtifact;
 	readonly protocolState: ProtocolStatePayload;
 	readonly protocolView: ProtocolViewPayload;
 	readonly runtimeDemandMap: RuntimeDemandMapArtifact;
@@ -53,6 +55,7 @@ export function createTriggerGroups(input: {
 						for (const write of symbol.writes ?? [])
 							graphNodeIds.add(write.graphNodeId);
 				}
+				closeCaptureDependencies(symbolIds, graphNodeIds, input.captureAnalysis, symbols);
 				for (const recordId of payloadRecordIds)
 					addRecordGraphNodes(graphNodeIds, recordId, input.protocolView);
 				closeComputedDependencies(graphNodeIds, input.protocolState);
@@ -66,6 +69,69 @@ export function createTriggerGroups(input: {
 				};
 			}),
 	};
+}
+
+function closeCaptureDependencies(
+	symbolIds: Set<string>,
+	graphNodeIds: Set<string>,
+	captures: CaptureAnalysisArtifact | undefined,
+	plans: ReadonlyMap<string, SymbolResolverPlan['symbols'][number]>,
+): void {
+	if (!captures) return;
+	const symbols = new Map(
+		captures.extractedSymbols.map((symbol) => [
+			symbol.loaderSymbolId ?? symbol.symbolId,
+			symbol,
+		]),
+	);
+	const rows = captures.boundResolverRows ?? [];
+	const visited = new Set<string>();
+	const pending = [...symbolIds].map((symbolId) => ({ symbolId, path: [] as readonly string[] }));
+	for (let index = 0; index < pending.length; index++) {
+		const { symbolId, path } = pending[index]!;
+		const candidates = rows.filter(
+			(row) =>
+				row.baseSymbolId === symbolId &&
+				row.componentEdgePath.length <= path.length &&
+				row.componentEdgePath.every((edge, index) => edge === path[index]),
+		);
+		const bound =
+			rows.find((row) => row.id === symbolId) ??
+			candidates.sort((a, b) => b.componentEdgePath.length - a.componentEdgePath.length)[0];
+		const key = bound?.id ?? symbolId;
+		if (visited.has(key)) continue;
+		visited.add(key);
+		if (bound?.loaderSymbolId) {
+			const imported = symbols.get(bound.loaderSymbolId);
+			for (const write of imported?.graphWrites ?? [])
+				graphNodeIds.add(
+					protocolInstanceQualifies(write.graphNodeId)
+						? (bound.instancePath ?? '') + write.graphNodeId
+						: write.graphNodeId,
+				);
+		}
+		if (bound) symbolIds.add(bound.id);
+		else {
+			const plan = plans.get(symbolId);
+			if (plan && 'reads' in plan)
+				for (const read of plan.reads ?? []) graphNodeIds.add(read.graphNodeId);
+			if (plan && 'writes' in plan)
+				for (const write of plan.writes ?? []) graphNodeIds.add(write.graphNodeId);
+		}
+		const routes = bound
+			? bound.captureSlots.map((slot) => slot.route)
+			: (symbols.get(symbolId)?.captureSlots.flatMap((slot) => slot.routes) ?? []);
+		for (const route of routes) {
+			if (route.kind === 'graph-reference' || route.kind === 'callback-slot-route')
+				graphNodeIds.add(route.graphNodeId);
+			if (route.kind !== 'callback-route') continue;
+			symbolIds.add(route.callbackSymbolId);
+			pending.push({
+				symbolId: route.callbackSymbolId,
+				path: bound?.componentEdgePath ?? path,
+			});
+		}
+	}
 }
 
 function addRecordGraphNodes(

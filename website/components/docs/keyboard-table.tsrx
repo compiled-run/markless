@@ -14,8 +14,10 @@ export type KeyboardRow = {
  readonly does: string;
 };
 
+// oxlint-disable-next-line no-unused-vars -- read by <script>{platformProbe}</script>
 const platformProbe = `document.documentElement.dataset.keyboardPlatform=(${detectPlatform.toString()})((navigator.userAgentData||{}).platform||navigator.platform||'',navigator.userAgent||'')`;
 
+// oxlint-disable-next-line no-unused-vars -- read by <script>{practiceShortcut}</script>
 const practiceShortcut = `if (!document.documentElement.hasAttribute('data-practice-shortcut')) {
  document.documentElement.setAttribute('data-practice-shortcut', '');
  document.addEventListener('keydown', event => {

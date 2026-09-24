@@ -1,0 +1,3296 @@
+{
+  "baseline": {
+    "metadata": {
+      "startedAt": "2026-09-22T01:09:35.330Z",
+      "siteEntry": "/private/tmp/markless-docs-baseline-output-gVnsaS/.output/server/index.mjs",
+      "serverEntrySha256": "1c5b66f216764e8515cec787a37b43363fb458d867d5f5a4863fbecf439f803a",
+      "options": {
+        "brotli": true,
+        "brotliHtml": true,
+        "http2": true,
+        "samples": 10,
+        "conditions": [
+          "normal",
+          "constrained"
+        ]
+      },
+      "cache": "CDP Network.setCacheDisabled true; fresh browser context per first interaction",
+      "serviceWorkers": "blocked",
+      "timing": "captured click event to expected DOM mutation; not compositor paint",
+      "localTransport": "Generated Nitro docs through a Brotli quality 5 JS proxy; localhost HTTP/2 TLS; HTML stream compressed with Brotli quality 5",
+      "preciseCoverage": false,
+      "servedThemeSha256": "7404f79754fffc3b8ec86d66ad2872b9f46a568416c067d653843af25849c742",
+      "expectedThemeSha256": "7404f79754fffc3b8ec86d66ad2872b9f46a568416c067d653843af25849c742",
+      "browserVersion": "153.0.8010.48",
+      "playwrightVersion": "1.58.2",
+      "finishedAt": "2026-09-22T01:15:44.894Z"
+    },
+    "groups": [
+      {
+        "key": "state-counter/normal",
+        "visits": 10,
+        "failures": 0,
+        "first": {
+          "count": 10,
+          "median": 36.74999988079071,
+          "p95": 37.299999952316284,
+          "mad": 0.45000016689300537
+        },
+        "repeated": {
+          "count": 20,
+          "median": 15.24999988079071,
+          "p95": 15.900000095367432,
+          "mad": 0.25
+        },
+        "scripts": {
+          "count": 10,
+          "median": 761,
+          "p95": 761,
+          "mad": 0
+        },
+        "frameworkScripts": {
+          "count": 10,
+          "median": 758,
+          "p95": 758,
+          "mad": 0
+        },
+        "scriptTransferBytes": {
+          "count": 10,
+          "median": 912762,
+          "p95": 912762,
+          "mad": 0
+        },
+        "pendingScriptsAtFirstInput": {
+          "count": 10,
+          "median": 0,
+          "p95": 0,
+          "mad": 0
+        },
+        "httpCacheHits": 0,
+        "pageErrors": [],
+        "integrity": [
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          }
+        ]
+      },
+      {
+        "key": "computed-total/normal",
+        "visits": 10,
+        "failures": 0,
+        "first": {
+          "count": 10,
+          "median": 37.40000009536743,
+          "p95": 39.89999985694885,
+          "mad": 0.6500000953674316
+        },
+        "repeated": {
+          "count": 20,
+          "median": 15.649999976158142,
+          "p95": 16.59999990463257,
+          "mad": 0.30000007152557373
+        },
+        "scripts": {
+          "count": 10,
+          "median": 759,
+          "p95": 759,
+          "mad": 0
+        },
+        "frameworkScripts": {
+          "count": 10,
+          "median": 756,
+          "p95": 756,
+          "mad": 0
+        },
+        "scriptTransferBytes": {
+          "count": 10,
+          "median": 909673,
+          "p95": 909696,
+          "mad": 5.5
+        },
+        "pendingScriptsAtFirstInput": {
+          "count": 10,
+          "median": 0,
+          "p95": 0,
+          "mad": 0
+        },
+        "httpCacheHits": 0,
+        "pageErrors": [],
+        "integrity": [
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          }
+        ]
+      },
+      {
+        "key": "mode-select/normal",
+        "visits": 10,
+        "failures": 0,
+        "first": {
+          "count": 10,
+          "median": 42.700000047683716,
+          "p95": 46.200000047683716,
+          "mad": 0.3500000238418579
+        },
+        "repeated": {
+          "count": 20,
+          "median": 16.90000009536743,
+          "p95": 17.299999952316284,
+          "mad": 0.19999992847442627
+        },
+        "scripts": {
+          "count": 10,
+          "median": 769,
+          "p95": 769,
+          "mad": 0
+        },
+        "frameworkScripts": {
+          "count": 10,
+          "median": 766,
+          "p95": 766,
+          "mad": 0
+        },
+        "scriptTransferBytes": {
+          "count": 10,
+          "median": 918404,
+          "p95": 918416,
+          "mad": 0
+        },
+        "pendingScriptsAtFirstInput": {
+          "count": 10,
+          "median": 0,
+          "p95": 0,
+          "mad": 0
+        },
+        "httpCacheHits": 0,
+        "pageErrors": [],
+        "integrity": [
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          }
+        ]
+      },
+      {
+        "key": "accordion/normal",
+        "visits": 10,
+        "failures": 0,
+        "first": {
+          "count": 10,
+          "median": 75.75,
+          "p95": 78,
+          "mad": 0.7500001192092896
+        },
+        "repeated": {
+          "count": 20,
+          "median": 24.299999952316284,
+          "p95": 24.700000047683716,
+          "mad": 0.10000014305114746
+        },
+        "scripts": {
+          "count": 10,
+          "median": 1277,
+          "p95": 1277,
+          "mad": 0
+        },
+        "frameworkScripts": {
+          "count": 10,
+          "median": 1274,
+          "p95": 1274,
+          "mad": 0
+        },
+        "scriptTransferBytes": {
+          "count": 10,
+          "median": 1166574,
+          "p95": 1166586,
+          "mad": 11
+        },
+        "pendingScriptsAtFirstInput": {
+          "count": 10,
+          "median": 0,
+          "p95": 0,
+          "mad": 0
+        },
+        "httpCacheHits": 0,
+        "pageErrors": [],
+        "integrity": [
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-C9ZgzzCP.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BPrxhEZn.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CSKnVsir.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-oKfLUKZM.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D6fUcH0u.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BHKS_vMq.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DkB7_E9C.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CR1yV5vT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DvdONLWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Dbc7ZxSm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B7jQR9J9.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DJST0Oom.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B6gDr2Qm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B-0r3BWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DWBseCip.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BZs4vPHO.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D3dHP8HE.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-C9ZgzzCP.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BPrxhEZn.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CSKnVsir.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-oKfLUKZM.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D6fUcH0u.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BHKS_vMq.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DkB7_E9C.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CR1yV5vT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DvdONLWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Dbc7ZxSm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B7jQR9J9.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DJST0Oom.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B6gDr2Qm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B-0r3BWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DWBseCip.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BZs4vPHO.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D3dHP8HE.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-C9ZgzzCP.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BPrxhEZn.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CSKnVsir.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-oKfLUKZM.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D6fUcH0u.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BHKS_vMq.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DkB7_E9C.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CR1yV5vT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DvdONLWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Dbc7ZxSm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B7jQR9J9.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DJST0Oom.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B6gDr2Qm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B-0r3BWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DWBseCip.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BZs4vPHO.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D3dHP8HE.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-C9ZgzzCP.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BPrxhEZn.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CSKnVsir.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-oKfLUKZM.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D6fUcH0u.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BHKS_vMq.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DkB7_E9C.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CR1yV5vT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DvdONLWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Dbc7ZxSm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B7jQR9J9.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DJST0Oom.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B6gDr2Qm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B-0r3BWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DWBseCip.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BZs4vPHO.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D3dHP8HE.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-C9ZgzzCP.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BPrxhEZn.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CSKnVsir.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-oKfLUKZM.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D6fUcH0u.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BHKS_vMq.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DkB7_E9C.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CR1yV5vT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DvdONLWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Dbc7ZxSm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B7jQR9J9.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DJST0Oom.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B6gDr2Qm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B-0r3BWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DWBseCip.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BZs4vPHO.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D3dHP8HE.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-C9ZgzzCP.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BPrxhEZn.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CSKnVsir.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-oKfLUKZM.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D6fUcH0u.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BHKS_vMq.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DkB7_E9C.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CR1yV5vT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DvdONLWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Dbc7ZxSm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B7jQR9J9.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DJST0Oom.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B6gDr2Qm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B-0r3BWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DWBseCip.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BZs4vPHO.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D3dHP8HE.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-C9ZgzzCP.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BPrxhEZn.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CSKnVsir.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-oKfLUKZM.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D6fUcH0u.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BHKS_vMq.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DkB7_E9C.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CR1yV5vT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DvdONLWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Dbc7ZxSm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B7jQR9J9.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DJST0Oom.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B6gDr2Qm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B-0r3BWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DWBseCip.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BZs4vPHO.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D3dHP8HE.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-C9ZgzzCP.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BPrxhEZn.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CSKnVsir.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-oKfLUKZM.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D6fUcH0u.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BHKS_vMq.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DkB7_E9C.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CR1yV5vT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DvdONLWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Dbc7ZxSm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B7jQR9J9.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DJST0Oom.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B6gDr2Qm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B-0r3BWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DWBseCip.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BZs4vPHO.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D3dHP8HE.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-C9ZgzzCP.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BPrxhEZn.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CSKnVsir.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-oKfLUKZM.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D6fUcH0u.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BHKS_vMq.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DkB7_E9C.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CR1yV5vT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DvdONLWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Dbc7ZxSm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B7jQR9J9.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DJST0Oom.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B6gDr2Qm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B-0r3BWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DWBseCip.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BZs4vPHO.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D3dHP8HE.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-C9ZgzzCP.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BPrxhEZn.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CSKnVsir.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-oKfLUKZM.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D6fUcH0u.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BHKS_vMq.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DkB7_E9C.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CR1yV5vT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DvdONLWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Dbc7ZxSm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B7jQR9J9.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DJST0Oom.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B6gDr2Qm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B-0r3BWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DWBseCip.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BZs4vPHO.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D3dHP8HE.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          }
+        ]
+      },
+      {
+        "key": "state-counter/constrained",
+        "visits": 10,
+        "failures": 0,
+        "first": {
+          "count": 10,
+          "median": 67.64999997615814,
+          "p95": 75.39999985694885,
+          "mad": 1.0500000715255737
+        },
+        "repeated": {
+          "count": 20,
+          "median": 14.449999928474426,
+          "p95": 16,
+          "mad": 1.0500000715255737
+        },
+        "scripts": {
+          "count": 10,
+          "median": 761,
+          "p95": 761,
+          "mad": 0
+        },
+        "frameworkScripts": {
+          "count": 10,
+          "median": 758,
+          "p95": 758,
+          "mad": 0
+        },
+        "scriptTransferBytes": {
+          "count": 10,
+          "median": 912750,
+          "p95": 912773,
+          "mad": 0
+        },
+        "pendingScriptsAtFirstInput": {
+          "count": 10,
+          "median": 0,
+          "p95": 0,
+          "mad": 0
+        },
+        "httpCacheHits": 0,
+        "pageErrors": [],
+        "integrity": [
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          }
+        ]
+      },
+      {
+        "key": "computed-total/constrained",
+        "visits": 10,
+        "failures": 0,
+        "first": {
+          "count": 10,
+          "median": 65.89999985694885,
+          "p95": 72.10000014305115,
+          "mad": 1.4499999284744263
+        },
+        "repeated": {
+          "count": 20,
+          "median": 15.649999976158142,
+          "p95": 18.40000009536743,
+          "mad": 1.149999976158142
+        },
+        "scripts": {
+          "count": 10,
+          "median": 759,
+          "p95": 759,
+          "mad": 0
+        },
+        "frameworkScripts": {
+          "count": 10,
+          "median": 756,
+          "p95": 756,
+          "mad": 0
+        },
+        "scriptTransferBytes": {
+          "count": 10,
+          "median": 909661,
+          "p95": 909696,
+          "mad": 0
+        },
+        "pendingScriptsAtFirstInput": {
+          "count": 10,
+          "median": 0,
+          "p95": 0,
+          "mad": 0
+        },
+        "httpCacheHits": 0,
+        "pageErrors": [],
+        "integrity": [
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          }
+        ]
+      },
+      {
+        "key": "mode-select/constrained",
+        "visits": 10,
+        "failures": 0,
+        "first": {
+          "count": 10,
+          "median": 1555.9500000476837,
+          "p95": 1566.7000000476837,
+          "mad": 4.900000095367432
+        },
+        "repeated": {
+          "count": 20,
+          "median": 18.200000047683716,
+          "p95": 19.5,
+          "mad": 0.6000000238418579
+        },
+        "scripts": {
+          "count": 10,
+          "median": 769,
+          "p95": 769,
+          "mad": 0
+        },
+        "frameworkScripts": {
+          "count": 10,
+          "median": 766,
+          "p95": 766,
+          "mad": 0
+        },
+        "scriptTransferBytes": {
+          "count": 10,
+          "median": 918450,
+          "p95": 918450,
+          "mad": 0
+        },
+        "pendingScriptsAtFirstInput": {
+          "count": 10,
+          "median": 0,
+          "p95": 0,
+          "mad": 0
+        },
+        "httpCacheHits": 0,
+        "pageErrors": [],
+        "integrity": [
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "mode-select: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          }
+        ]
+      },
+      {
+        "key": "accordion/constrained",
+        "visits": 10,
+        "failures": 0,
+        "first": {
+          "count": 10,
+          "median": 3840.1999999284744,
+          "p95": 3858.4000000953674,
+          "mad": 14.550000071525574
+        },
+        "repeated": {
+          "count": 20,
+          "median": 52.299999952316284,
+          "p95": 55.299999952316284,
+          "mad": 1.0999999046325684
+        },
+        "scripts": {
+          "count": 10,
+          "median": 1277,
+          "p95": 1277,
+          "mad": 0
+        },
+        "frameworkScripts": {
+          "count": 10,
+          "median": 1274,
+          "p95": 1274,
+          "mad": 0
+        },
+        "scriptTransferBytes": {
+          "count": 10,
+          "median": 1166666,
+          "p95": 1166666,
+          "mad": 0
+        },
+        "pendingScriptsAtFirstInput": {
+          "count": 10,
+          "median": 0,
+          "p95": 0,
+          "mad": 0
+        },
+        "httpCacheHits": 0,
+        "pageErrors": [],
+        "integrity": [
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-C9ZgzzCP.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BPrxhEZn.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CSKnVsir.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-oKfLUKZM.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D6fUcH0u.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BHKS_vMq.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DkB7_E9C.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CR1yV5vT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DvdONLWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Dbc7ZxSm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B7jQR9J9.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DJST0Oom.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B6gDr2Qm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B-0r3BWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DWBseCip.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BZs4vPHO.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D3dHP8HE.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-C9ZgzzCP.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BPrxhEZn.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CSKnVsir.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-oKfLUKZM.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D6fUcH0u.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BHKS_vMq.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DkB7_E9C.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CR1yV5vT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DvdONLWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Dbc7ZxSm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B7jQR9J9.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DJST0Oom.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B6gDr2Qm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B-0r3BWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DWBseCip.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BZs4vPHO.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D3dHP8HE.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-C9ZgzzCP.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BPrxhEZn.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CSKnVsir.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-oKfLUKZM.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D6fUcH0u.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BHKS_vMq.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DkB7_E9C.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CR1yV5vT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DvdONLWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Dbc7ZxSm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B7jQR9J9.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DJST0Oom.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B6gDr2Qm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B-0r3BWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DWBseCip.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BZs4vPHO.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D3dHP8HE.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-C9ZgzzCP.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BPrxhEZn.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CSKnVsir.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-oKfLUKZM.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D6fUcH0u.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BHKS_vMq.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DkB7_E9C.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CR1yV5vT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DvdONLWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Dbc7ZxSm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B7jQR9J9.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DJST0Oom.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B6gDr2Qm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B-0r3BWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DWBseCip.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BZs4vPHO.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D3dHP8HE.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-C9ZgzzCP.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BPrxhEZn.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CSKnVsir.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-oKfLUKZM.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D6fUcH0u.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BHKS_vMq.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DkB7_E9C.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CR1yV5vT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DvdONLWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Dbc7ZxSm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B7jQR9J9.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DJST0Oom.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B6gDr2Qm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B-0r3BWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DWBseCip.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BZs4vPHO.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D3dHP8HE.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-C9ZgzzCP.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BPrxhEZn.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CSKnVsir.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-oKfLUKZM.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D6fUcH0u.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BHKS_vMq.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DkB7_E9C.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CR1yV5vT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DvdONLWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Dbc7ZxSm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B7jQR9J9.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DJST0Oom.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B6gDr2Qm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B-0r3BWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DWBseCip.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BZs4vPHO.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D3dHP8HE.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-C9ZgzzCP.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BPrxhEZn.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CSKnVsir.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-oKfLUKZM.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D6fUcH0u.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BHKS_vMq.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DkB7_E9C.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CR1yV5vT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DvdONLWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Dbc7ZxSm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B7jQR9J9.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DJST0Oom.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B6gDr2Qm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B-0r3BWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DWBseCip.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BZs4vPHO.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D3dHP8HE.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-C9ZgzzCP.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BPrxhEZn.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CSKnVsir.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-oKfLUKZM.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D6fUcH0u.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BHKS_vMq.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DkB7_E9C.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CR1yV5vT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DvdONLWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Dbc7ZxSm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B7jQR9J9.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DJST0Oom.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B6gDr2Qm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B-0r3BWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DWBseCip.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BZs4vPHO.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D3dHP8HE.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-C9ZgzzCP.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BPrxhEZn.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CSKnVsir.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-oKfLUKZM.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D6fUcH0u.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BHKS_vMq.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DkB7_E9C.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CR1yV5vT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DvdONLWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Dbc7ZxSm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B7jQR9J9.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DJST0Oom.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B6gDr2Qm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B-0r3BWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DWBseCip.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BZs4vPHO.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D3dHP8HE.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "fail",
+              "details": [
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-C9ZgzzCP.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BPrxhEZn.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CSKnVsir.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-oKfLUKZM.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D6fUcH0u.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BHKS_vMq.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DkB7_E9C.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CR1yV5vT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DvdONLWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Dbc7ZxSm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D5XxtLaJ.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CCwPaeo2.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B7jQR9J9.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DJST0Oom.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BFMtHJuu.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-CBYZcR7_.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-Nq8rZA-O.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B6gDr2Qm.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-B-0r3BWT.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-DWBseCip.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-BZs4vPHO.js",
+                "accordion: module fetched during action without prior preload load: https://127.0.0.1:64320/markless/build/chunk-D3dHP8HE.js"
+              ]
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          }
+        ]
+      }
+    ]
+  },
+  "packed": {
+    "metadata": {
+      "startedAt": "2026-09-22T02:34:27.968Z",
+      "siteEntry": "/private/tmp/markless-docs-integrated-output-Db9whB/.output/server/index.mjs",
+      "serverEntrySha256": "ce33d2c75ea92fba1a8f9cd90bbb4d83fa62ce86a8e5f2a871bb0b3e81090f2f",
+      "options": {
+        "brotli": true,
+        "brotliHtml": true,
+        "http2": true,
+        "samples": 10,
+        "conditions": [
+          "normal",
+          "constrained"
+        ]
+      },
+      "cache": "CDP Network.setCacheDisabled true; fresh browser context per first interaction",
+      "serviceWorkers": "blocked",
+      "timing": "captured click event to expected DOM mutation; not compositor paint",
+      "localTransport": "Generated Nitro docs through a Brotli quality 5 JS proxy; localhost HTTP/2 TLS; HTML stream compressed with Brotli quality 5",
+      "preciseCoverage": false,
+      "servedThemeSha256": "7404f79754fffc3b8ec86d66ad2872b9f46a568416c067d653843af25849c742",
+      "expectedThemeSha256": "7404f79754fffc3b8ec86d66ad2872b9f46a568416c067d653843af25849c742",
+      "browserVersion": "153.0.8010.48",
+      "playwrightVersion": "1.58.2",
+      "finishedAt": "2026-09-22T02:38:27.021Z"
+    },
+    "groups": [
+      {
+        "key": "state-counter/normal",
+        "visits": 10,
+        "failures": 0,
+        "first": {
+          "count": 10,
+          "median": 38.550000071525574,
+          "p95": 41.59999990463257,
+          "mad": 0.45000016689300537
+        },
+        "repeated": {
+          "count": 20,
+          "median": 15.149999976158142,
+          "p95": 16.09999990463257,
+          "mad": 0.3500000238418579
+        },
+        "scripts": {
+          "count": 10,
+          "median": 8,
+          "p95": 8,
+          "mad": 0
+        },
+        "frameworkScripts": {
+          "count": 10,
+          "median": 5,
+          "p95": 5,
+          "mad": 0
+        },
+        "scriptTransferBytes": {
+          "count": 10,
+          "median": 234577,
+          "p95": 234600,
+          "mad": 0
+        },
+        "pendingScriptsAtFirstInput": {
+          "count": 10,
+          "median": 0,
+          "p95": 0,
+          "mad": 0
+        },
+        "httpCacheHits": 0,
+        "pageErrors": [],
+        "integrity": [
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          }
+        ],
+        "meaningfulThresholdMs": 10,
+        "firstMedianChangeMs": 1.8000001907348633
+      },
+      {
+        "key": "computed-total/normal",
+        "visits": 10,
+        "failures": 0,
+        "first": {
+          "count": 10,
+          "median": 39.200000047683716,
+          "p95": 41.19999980926514,
+          "mad": 0.3999999761581421
+        },
+        "repeated": {
+          "count": 20,
+          "median": 15.650000095367432,
+          "p95": 16.40000009536743,
+          "mad": 0.39999985694885254
+        },
+        "scripts": {
+          "count": 10,
+          "median": 8,
+          "p95": 8,
+          "mad": 0
+        },
+        "frameworkScripts": {
+          "count": 10,
+          "median": 5,
+          "p95": 5,
+          "mad": 0
+        },
+        "scriptTransferBytes": {
+          "count": 10,
+          "median": 233314,
+          "p95": 233314,
+          "mad": 0
+        },
+        "pendingScriptsAtFirstInput": {
+          "count": 10,
+          "median": 0,
+          "p95": 0,
+          "mad": 0
+        },
+        "httpCacheHits": 0,
+        "pageErrors": [],
+        "integrity": [
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          }
+        ],
+        "meaningfulThresholdMs": 10,
+        "firstMedianChangeMs": 1.7999999523162842
+      },
+      {
+        "key": "mode-select/normal",
+        "visits": 10,
+        "failures": 0,
+        "first": {
+          "count": 10,
+          "median": 40.34999990463257,
+          "p95": 44.700000047683716,
+          "mad": 0.5500001907348633
+        },
+        "repeated": {
+          "count": 20,
+          "median": 16.300000071525574,
+          "p95": 16.700000047683716,
+          "mad": 0.25
+        },
+        "scripts": {
+          "count": 10,
+          "median": 8,
+          "p95": 8,
+          "mad": 0
+        },
+        "frameworkScripts": {
+          "count": 10,
+          "median": 5,
+          "p95": 5,
+          "mad": 0
+        },
+        "scriptTransferBytes": {
+          "count": 10,
+          "median": 241784,
+          "p95": 241784,
+          "mad": 0
+        },
+        "pendingScriptsAtFirstInput": {
+          "count": 10,
+          "median": 0,
+          "p95": 0,
+          "mad": 0
+        },
+        "httpCacheHits": 0,
+        "pageErrors": [],
+        "integrity": [
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          }
+        ],
+        "meaningfulThresholdMs": 10,
+        "firstMedianChangeMs": -2.3500001430511475
+      },
+      {
+        "key": "accordion/normal",
+        "visits": 10,
+        "failures": 0,
+        "first": {
+          "count": 10,
+          "median": 63.34999990463257,
+          "p95": 69.70000004768372,
+          "mad": 0.8500000238418579
+        },
+        "repeated": {
+          "count": 20,
+          "median": 23.299999952316284,
+          "p95": 23.799999952316284,
+          "mad": 0.2999999523162842
+        },
+        "scripts": {
+          "count": 10,
+          "median": 8,
+          "p95": 8,
+          "mad": 0
+        },
+        "frameworkScripts": {
+          "count": 10,
+          "median": 5,
+          "p95": 5,
+          "mad": 0
+        },
+        "scriptTransferBytes": {
+          "count": 10,
+          "median": 233994,
+          "p95": 233994,
+          "mad": 0
+        },
+        "pendingScriptsAtFirstInput": {
+          "count": 10,
+          "median": 0,
+          "p95": 0,
+          "mad": 0
+        },
+        "httpCacheHits": 0,
+        "pageErrors": [],
+        "integrity": [
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          }
+        ],
+        "meaningfulThresholdMs": 10,
+        "firstMedianChangeMs": -12.400000095367432
+      },
+      {
+        "key": "state-counter/constrained",
+        "visits": 10,
+        "failures": 0,
+        "first": {
+          "count": 10,
+          "median": 70.55000007152557,
+          "p95": 76.70000004768372,
+          "mad": 2.9499999284744263
+        },
+        "repeated": {
+          "count": 20,
+          "median": 15.600000023841858,
+          "p95": 17.09999990463257,
+          "mad": 0.5999999046325684
+        },
+        "scripts": {
+          "count": 10,
+          "median": 8,
+          "p95": 8,
+          "mad": 0
+        },
+        "frameworkScripts": {
+          "count": 10,
+          "median": 5,
+          "p95": 5,
+          "mad": 0
+        },
+        "scriptTransferBytes": {
+          "count": 10,
+          "median": 234577,
+          "p95": 234600,
+          "mad": 0
+        },
+        "pendingScriptsAtFirstInput": {
+          "count": 10,
+          "median": 0,
+          "p95": 0,
+          "mad": 0
+        },
+        "httpCacheHits": 0,
+        "pageErrors": [],
+        "integrity": [
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          }
+        ],
+        "meaningfulThresholdMs": 10,
+        "firstMedianChangeMs": 2.9000000953674316
+      },
+      {
+        "key": "computed-total/constrained",
+        "visits": 10,
+        "failures": 0,
+        "first": {
+          "count": 10,
+          "median": 74.10000002384186,
+          "p95": 89.09999990463257,
+          "mad": 3.75
+        },
+        "repeated": {
+          "count": 20,
+          "median": 15.549999952316284,
+          "p95": 17.40000009536743,
+          "mad": 0.5500000715255737
+        },
+        "scripts": {
+          "count": 10,
+          "median": 8,
+          "p95": 8,
+          "mad": 0
+        },
+        "frameworkScripts": {
+          "count": 10,
+          "median": 5,
+          "p95": 5,
+          "mad": 0
+        },
+        "scriptTransferBytes": {
+          "count": 10,
+          "median": 233314,
+          "p95": 233337,
+          "mad": 0
+        },
+        "pendingScriptsAtFirstInput": {
+          "count": 10,
+          "median": 0,
+          "p95": 0,
+          "mad": 0
+        },
+        "httpCacheHits": 0,
+        "pageErrors": [],
+        "integrity": [
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          }
+        ],
+        "meaningfulThresholdMs": 10,
+        "firstMedianChangeMs": 8.200000166893005
+      },
+      {
+        "key": "mode-select/constrained",
+        "visits": 10,
+        "failures": 0,
+        "first": {
+          "count": 10,
+          "median": 81.45000004768372,
+          "p95": 90.5,
+          "mad": 3.5
+        },
+        "repeated": {
+          "count": 20,
+          "median": 18.25000011920929,
+          "p95": 21.09999990463257,
+          "mad": 0.5999999046325684
+        },
+        "scripts": {
+          "count": 10,
+          "median": 8,
+          "p95": 8,
+          "mad": 0
+        },
+        "frameworkScripts": {
+          "count": 10,
+          "median": 5,
+          "p95": 5,
+          "mad": 0
+        },
+        "scriptTransferBytes": {
+          "count": 10,
+          "median": 241784,
+          "p95": 241784,
+          "mad": 0
+        },
+        "pendingScriptsAtFirstInput": {
+          "count": 10,
+          "median": 0,
+          "p95": 0,
+          "mad": 0
+        },
+        "httpCacheHits": 0,
+        "pageErrors": [],
+        "integrity": [
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          }
+        ],
+        "meaningfulThresholdMs": 155.5950000047684,
+        "firstMedianChangeMs": -1474.5
+      },
+      {
+        "key": "accordion/constrained",
+        "visits": 10,
+        "failures": 0,
+        "first": {
+          "count": 10,
+          "median": 185.30000007152557,
+          "p95": 194.20000004768372,
+          "mad": 2.799999952316284
+        },
+        "repeated": {
+          "count": 20,
+          "median": 49.35000002384186,
+          "p95": 51.59999990463257,
+          "mad": 2.1999999284744263
+        },
+        "scripts": {
+          "count": 10,
+          "median": 8,
+          "p95": 8,
+          "mad": 0
+        },
+        "frameworkScripts": {
+          "count": 10,
+          "median": 5,
+          "p95": 5,
+          "mad": 0
+        },
+        "scriptTransferBytes": {
+          "count": 10,
+          "median": 233982,
+          "p95": 233982,
+          "mad": 0
+        },
+        "pendingScriptsAtFirstInput": {
+          "count": 10,
+          "median": 0,
+          "p95": 0,
+          "mad": 0
+        },
+        "httpCacheHits": 0,
+        "pageErrors": [],
+        "integrity": [
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          },
+          {
+            "invariant": {
+              "id": "MLA-S1-PRELOAD-INTEGRITY",
+              "status": "pass",
+              "details": []
+            },
+            "navigationLoads": {
+              "count": 0,
+              "urls": []
+            },
+            "warnings": []
+          }
+        ],
+        "meaningfulThresholdMs": 384.0199999928475,
+        "firstMedianChangeMs": -3654.899999856949
+      }
+    ]
+  }
+}

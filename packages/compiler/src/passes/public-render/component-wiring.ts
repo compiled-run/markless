@@ -240,7 +240,12 @@ export function collectSsrPropEvents(
 	const hostNodeIdByPath = new Map(
 		hostLocators.map((locator) => [JSON.stringify(locator.hostPath), locator.hostNodeId]),
 	);
-	const events = collectCsrPropEvents(root, propNames, source).flatMap((event) => {
+	const events: Array<{
+		readonly hostNodeId: string;
+		readonly eventName: string;
+		readonly propName: string;
+		readonly wraps?: true;
+	}> = collectCsrPropEvents(root, propNames, source).flatMap((event) => {
 		const hostNodeId = hostNodeIdByPath.get(JSON.stringify(event.hostPath));
 		return hostNodeId
 			? [{ hostNodeId, eventName: event.eventName, propName: event.propName }]
@@ -267,6 +272,8 @@ export function collectSsrPropEvents(
 				hostNodeId: event.hostNodeId,
 				eventName: event.eventName,
 				propName,
+				// A handler around the call, not the prop itself: its own arguments and statements matter.
+				wraps: true,
 			});
 	}
 	return events;
