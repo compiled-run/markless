@@ -363,7 +363,7 @@ function installDelegatedTriggers(
 	const installEventListener = (eventName: string) => {
 		if (eventName === PROTOCOL_VISIBLE_EVENT_NAME || installedEventNames.has(eventName)) return;
 		installedEventNames.add(eventName);
-		const route = async (event: DelegatedEvent) => {
+		const route = async (event: DelegatedEvent, retried?: boolean): Promise<void> => {
 			// A row event name is listened for on behalf of rows that may not exist
 			// yet, so this listener takes every event of that name, named or not.
 			let named = false;
@@ -394,7 +394,13 @@ function installDelegatedTriggers(
 			}
 			// This container listener exists for whichever element registered the
 			// record; a sibling with no record of its own is simply not ours.
-			if (!actionKind) return;
+			if (!actionKind) {
+				const pending = (output.root as { __marklessArmRegistering?: Set<Promise<unknown>> })
+					.__marklessArmRegistering;
+				return !retried && pending?.size
+					? Promise.all(pending).then(() => route(event, true))
+					: undefined;
+			}
 			const action = routes[actionKind];
 			// Fail-closed on a record this runtime cannot route, on the same dev
 			// gate this guard has always carried.

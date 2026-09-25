@@ -10,6 +10,71 @@ version of everything else.
 
 This file starts at 0.2.0. Earlier versions have no changelog entries.
 
+## 0.5.0
+
+Markless now packs your app by default, navigates without reloading the page,
+and responds to clicks faster, with fewer requests and less code running at
+load. Most apps need no changes.
+
+### Packing is on by default
+
+Production client builds now group code into a few packs instead of shipping one
+file per module. The compiler decides what each page needs right away, what only
+matters when navigating to it, and what is not needed yet, using what it knows
+about every click. Where it cannot be sure, it keeps the code preloaded, so a
+click never waits on a download. Set `packing: false` to turn it off.
+`experimentalNativePacking` still works but is deprecated, and
+`experimentalPackPlanner` is gone because the planner is now the only way
+Markless packs.
+
+File names come from their final contents, and router apps resolve files through
+an import map, so a deploy re-downloads only what changed. Shared app code and
+the framework ship in separate packs, so editing an app helper no longer
+re-downloads the runtime.
+
+### Navigation without page reloads
+
+Router links now fetch the next page's server-rendered HTML and resume it in
+place. Nothing reloads, persistent layout stays put, and Back and Forward keep
+your scroll position. Plain `<a>` links to your own pages work the same way.
+Prefetching is automatic: it starts when the user shows intent, and on pages
+with few links it also runs when the browser is idle. It only prefetches real
+pages, never server endpoints, and sends a `Purpose: prefetch` header.
+
+The only setting is `prefetch={false}`, on the router or on one link. Use it
+for links whose request changes something on the server. The `linkPreloading`
+router option is removed.
+
+### Faster clicks
+
+Many clicks now run without starting the page runtime or downloading any code.
+Handlers apply their changes in the same task as the input, and focus lands only
+after the new value is on the page. Clicking a link no longer wakes up the page
+you are leaving.
+
+### Deploys
+
+If a deploy removes code an open tab still needs, the first click that hits it
+reloads the page once instead of doing nothing. Build manifests are no longer
+served publicly; they now live in a `.markless/` folder next to your build
+output, so add `.markless/` to your `.gitignore`.
+
+### Fixes
+
+- Keyed `@for` rows update when their data changes under the same key,
+  including rows built from components, rows reading outer state or props, and
+  nested lists (inner rows now read the right outer item).
+- Async `@try` content keeps working when it streams in, settles in the
+  browser, or reloads after its data changes.
+- Text next to other elements updates only itself, so sibling elements (like an
+  input caret) are no longer wiped.
+- MDX content passed into a `.tsrx` layout renders as markup and stays
+  interactive.
+- `props.children` and `props.x` compile like destructured props.
+- Static text follows JSX whitespace rules.
+- Built files no longer contain your machine's folder paths.
+- The docs starter template builds again.
+
 ## 0.3.3
 
 A patch release that takes back most of the bytes 0.3.2 added. No behavior

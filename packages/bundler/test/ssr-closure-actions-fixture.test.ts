@@ -7,12 +7,13 @@ import { chromium, type Browser, type Page } from '@playwright/test';
 import { resolve } from 'pathe';
 import { expect, test } from 'vitest';
 import { resumeModuleClosure, servedResumeModuleUrl } from './helpers/served-resume-module.ts';
+import { listenOnFreePort } from './helpers/listen.ts';
 
 const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../..');
 const fixture = resolve(root, 'packages/bundler/fixtures/vite-ssr-closure-actions');
 const dist = resolve(fixture, 'dist');
-const port = 4293;
+let port = 0;
 
 type Step = { readonly name: string; run(page: Page): Promise<void> };
 
@@ -132,7 +133,7 @@ test('compiled closure actions match full resume after every step of every actio
 			response.end();
 		}
 	});
-	await new Promise<void>((done) => server.listen(port, '127.0.0.1', done));
+	port = await listenOnFreePort(server);
 	const browser = await chromium.launch();
 	try {
 		const sequences = [

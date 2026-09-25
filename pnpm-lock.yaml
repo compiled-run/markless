@@ -38,8 +38,8 @@ overrides:
 
 patchedDependencies:
   '@async/witness@0.7.0':
-    hash: 7dc5285a8339e9fb4bace0feb037194d20f2192cdea6763bf61a940a2941ac2e
-    path: patches/witness-0.7.0-pointer-actionability.patch
+    hash: ab2002670763280d07ac44dbc239da0f8b627d9f104e95bc0e7c8c94c6916314
+    path: patches/@async__witness@0.7.0.patch
 
 importers:
 
@@ -47,7 +47,7 @@ importers:
     devDependencies:
       '@async/witness':
         specifier: 0.7.0
-        version: 0.7.0(patch_hash=7dc5285a8339e9fb4bace0feb037194d20f2192cdea6763bf61a940a2941ac2e)(@voidzero-dev/vite-plus-core@0.3.1(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.0))
+        version: 0.7.0(patch_hash=ab2002670763280d07ac44dbc239da0f8b627d9f104e95bc0e7c8c94c6916314)(@voidzero-dev/vite-plus-core@0.3.1(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.0))
       '@guidepup/guidepup':
         specifier: 0.33.2
         version: 0.33.2
@@ -4290,7 +4290,7 @@ snapshots:
       package-manager-detector: 1.7.0
       tinyexec: 1.2.4
 
-  '@async/witness@0.7.0(patch_hash=7dc5285a8339e9fb4bace0feb037194d20f2192cdea6763bf61a940a2941ac2e)(@voidzero-dev/vite-plus-core@0.3.1(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.0))':
+  '@async/witness@0.7.0(patch_hash=ab2002670763280d07ac44dbc239da0f8b627d9f104e95bc0e7c8c94c6916314)(@voidzero-dev/vite-plus-core@0.3.1(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.0))':
     dependencies:
       mitt: 3.0.1
       pathe: 2.0.3

@@ -136,7 +136,7 @@ jobs:
               run: pnpm typecheck:sr-real
 
             - name: Read the ${{ matrix.family }} family with the virtual screen reader
-              run: pnpm test:sr -- src/${{ matrix.family }}/${{ matrix.family }}.sr.ts
+              run: pnpm test:sr src/${{ matrix.family }}/${{ matrix.family }}.sr.ts
 
     # Real NVDA on a real Windows desktop session. guidepup/setup-action
     # installs NVDA and the keyboard automation it needs.
@@ -200,7 +200,11 @@ jobs:
               run: pnpm install --frozen-lockfile
 
             - name: Install NVDA and its automation dependencies
-              uses: guidepup/setup-action@v3
+              uses: guidepup/setup-action@0.21.0
+
+            # The action configures the OS; the reader build guidepup drives is a per-project asset.
+            - name: Install the screen reader assets guidepup drives
+              run: pnpm dlx @guidepup/setup@0.28.0 install
 
             - name: Install the browser the reader reads through
               run: pnpm exec playwright install --with-deps chromium
@@ -223,7 +227,7 @@ jobs:
               run: |
                   mkdir -p sr-transcripts
                   set -o pipefail
-                  pnpm test:sr-real -- --project=nvda ${{ matrix.family }}/${{ matrix.family }}.nvda.ts 2>&1 \
+                  pnpm test:sr-real --project=nvda ${{ matrix.family }}/${{ matrix.family }}.nvda.ts 2>&1 \
                       | tee sr-transcripts/nvda-${{ matrix.family }}.txt
 
             - name: Upload the ${{ matrix.family }} NVDA transcript
@@ -337,7 +341,11 @@ jobs:
               run: pnpm install --frozen-lockfile
 
             - name: Grant VoiceOver automation permission
-              uses: guidepup/setup-action@v3
+              uses: guidepup/setup-action@0.21.0
+
+            # The action configures the OS; the reader build guidepup drives is a per-project asset.
+            - name: Install the screen reader assets guidepup drives
+              run: pnpm dlx @guidepup/setup@0.28.0 install
 
             - name: Install the browser the reader reads through
               run: pnpm exec playwright install --with-deps chromium
@@ -357,7 +365,7 @@ jobs:
               run: |
                   mkdir -p sr-transcripts
                   set -o pipefail
-                  pnpm test:sr-real -- --project=voiceover ${{ matrix.family }}/${{ matrix.family }}.voiceover.ts 2>&1 \
+                  pnpm test:sr-real --project=voiceover ${{ matrix.family }}/${{ matrix.family }}.voiceover.ts 2>&1 \
                       | tee sr-transcripts/voiceover-${{ matrix.family }}.txt
 
             - name: Upload the ${{ matrix.family }} VoiceOver transcript

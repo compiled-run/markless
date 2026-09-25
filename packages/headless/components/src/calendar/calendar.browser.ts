@@ -11,6 +11,7 @@ import Multiple from './scenarios/multiple.tsrx';
 import Popup from './scenarios/popup.tsrx';
 import PopupWithDateBox from './scenarios/popup-with-datebox.tsrx';
 import Range from './scenarios/range.tsrx';
+import RangePopup from './scenarios/range-popup.tsrx';
 import WeekStart from './scenarios/week-start.tsrx';
 
 const Root = page.getByTestId('root');
@@ -500,13 +501,20 @@ test('CSR: a press outside dismisses the popup and leaves focus where the person
 });
 
 test('CSR: a range in a popup stays open across both presses', async () => {
-	await render(Popup);
+	await render(RangePopup);
 	await expect.poll(() => days().length, { timeout: 5000 }).toBe(42);
-	// The single-date popup is the closing one; this row is its counterpart under
-	// `range`, which the same content must not close.
 	el<HTMLButtonElement>(Trigger).click();
 	await expect.poll(() => el(Content).hasAttribute('hidden'), { timeout: 5000 }).toBe(false);
+	// Each press is observed landing before the popup is read, so a close cannot race the check.
 	dayFor('2026-08-10').click();
+	await expect
+		.poll(() => text(page.getByTestId('anchor')), { timeout: 5000 })
+		.toBe('2026-08-10');
+	await settled();
+	expect(el(Content).hasAttribute('hidden')).toBe(false);
+	dayFor('2026-08-14').click();
+	await expect.poll(() => text(page.getByTestId('calls')), { timeout: 5000 }).toBe('1');
+	expect(text(page.getByTestId('end'))).toBe('2026-08-14');
 	await settled();
 	expect(el(Content).hasAttribute('hidden')).toBe(false);
 });

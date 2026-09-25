@@ -27,7 +27,12 @@ runMultiEmbedConformance({
 	rovingFrom: 'cherry',
 	// The gesture is aimed at the option's label, not the option: the option is
 	// `aria-disabled`, and the label is the child a pointer reaches inside it.
-	disabled: { control: 'banana-itemlabel', observe: 'banana', stateAttribute: 'ui-selected' },
+	disabled: {
+		control: 'banana-itemlabel',
+		observe: 'banana',
+		stateAttribute: 'ui-selected',
+		reveal: 'trigger',
+	},
 });
 
 const MODES = ['ssr', 'csr'] as const;

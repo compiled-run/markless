@@ -423,6 +423,11 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 	if (!s || !e || s.parentNode !== e.parentNode) throw new Error('MARKLESS_STREAM_ARM_ANCHORS_MISSING: ' + id);
 	const root = s.parentElement && s.parentElement.closest && s.parentElement.closest('[data-async-container]');
 	if (root && root.__mAdopted) return;
+	if (root && !root.__marklessCensus && root.getElementsByTagName) {
+		const c = [root], all = root.getElementsByTagName('*');
+		for (let i = 0; i < all.length; i++) c.push(all[i]);
+		root.__marklessCensus = c;
+	}
 	while (s.nextSibling && s.nextSibling !== e) s.parentNode.removeChild(s.nextSibling);
 	s.parentNode.insertBefore(tpl.content, e);
 	tpl.remove();${wake}

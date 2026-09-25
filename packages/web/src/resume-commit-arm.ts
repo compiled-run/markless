@@ -134,13 +134,13 @@ export function createArmCommitter(
 		}
 		replaceAnchorRange(boundary, fresh);
 		spliceDomOrderCensus(deps.root, outgoing, fresh);
-		const materialized = await registerArmRecordSet(
-			deps,
-			installEventType,
-			boundary,
-			update,
-			true,
-		);
+		// Arm content is in the DOM before its records; the container's listener waits on this set.
+		const pending = ((deps.root as { __marklessArmRegistering?: Set<Promise<unknown>> })
+			.__marklessArmRegistering ??= new Set());
+		const registering = registerArmRecordSet(deps, installEventType, boundary, update, true);
+		const settled = registering.catch(() => undefined);
+		pending.add(settled);
+		const materialized = await registering.finally(() => pending.delete(settled));
 		restoreFocusScroll(deps, boundary, captured, materialized.elementsByHostId);
 	};
 }

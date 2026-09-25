@@ -143,10 +143,10 @@ function take(
 	const key = pageKey(url);
 	const existing = state.prefetches.get(key);
 	state.prefetches.delete(key);
-	if (existing && now - existing.at < state.config.prefetchTtlMs) return existing;
-	existing?.abort();
+	// Back and Forward restore the page as it was left, never waiting on a newer fetch of it.
 	const cached = traverse ? state.visited.get(key) : undefined;
 	if (cached !== undefined) {
+		existing?.abort();
 		const ready = parsedVisits.get(state)?.get(key);
 		parsedVisits.get(state)?.delete(key);
 		return {
@@ -156,6 +156,8 @@ function take(
 			abort: () => {},
 		};
 	}
+	if (existing && now - existing.at < state.config.prefetchTtlMs) return existing;
+	existing?.abort();
 	state.preloadCode(url, false);
 	return state.request(url, false);
 }

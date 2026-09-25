@@ -166,6 +166,12 @@ export type MultiEmbedDisabled = {
 	readonly observe?: string;
 	/** Defaults to the interaction's state attribute. */
 	readonly stateAttribute?: string;
+	/**
+	 * Testid of the control that reveals `control` inside a popup surface. A press in one
+	 * embed light-dismisses another embed's open popup, so a hidden `control` is revealed
+	 * in its own embed before the gesture aimed at it.
+	 */
+	readonly reveal?: string;
 };
 
 export type MultiEmbedPageScope = {
@@ -349,8 +355,9 @@ function runMultiEmbedMode(
 				await userEvent.keyboard(keys);
 			}
 
+			// A family's own open delay (tooltip: 600 ms) plus an SSR resume outgrows the 1 s default.
 			await expect
-				.poll(() => readState(observed[0]!, stateAttribute))
+				.poll(() => readState(observed[0]!, stateAttribute), { timeout: 5000 })
 				.toBe(activeValue);
 			for (let embed = 1; embed < embeds; embed++) {
 				expect(
@@ -398,8 +405,17 @@ function runMultiEmbedMode(
 				const observed = disabled.observe ?? disabled.control;
 				const before = parts(observed, embeds).map((one) => readState(one, attribute));
 
-				for (const control of parts(disabled.control, embeds))
+				const controls = parts(disabled.control, embeds);
+				for (let embed = 0; embed < embeds; embed++) {
+					const control = controls[embed]!;
+					// A press in one embed dismisses another embed's popup only once its resume lands.
+					if (embed > 0 && disabled.reveal !== undefined) await wait(QUIET_MS);
+					if (disabled.reveal !== undefined && !control.checkVisibility()) {
+						await userEvent.click(parts(disabled.reveal, embeds)[embed]!);
+						await expect.poll(() => control.checkVisibility()).toBe(true);
+					}
 					await userEvent.click(control);
+				}
 				await wait(QUIET_MS);
 
 				expect(

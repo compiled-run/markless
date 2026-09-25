@@ -124,6 +124,8 @@ type InlineRoot = HTMLElement &
 		// The control a crossing woke this page on. A resting pointer sends no
 		// second crossing, so the runtime's own preload would otherwise miss it.
 		__marklessPrimedHover?: Element;
+		// DOM order as the first event found it; later changes splice it rather than renumbering around them.
+		__marklessCensus?: Element[];
 	};
 type InlineDispatchInput = {
 	readonly root: InlineRoot;
@@ -332,6 +334,12 @@ function runPrerenderSettleBoot(
 		);
 	const dispatch = (event: Event) => {
 		root.__marklessDelegatedDispatch = true;
+		if (!root.__marklessCensus) {
+			const census: Element[] = [root];
+			const all = root.getElementsByTagName?.('*') ?? [];
+			for (let index = 0; index < all.length; index++) census.push(all[index]!);
+			root.__marklessCensus = census;
+		}
 		replay(event.target as Element);
 		// Queued, not dropped: a gesture arriving before the arm settles
 		// waits for the fill. Dispatching it first would boot a runtime whose
@@ -631,6 +639,12 @@ function runPrerenderInlineResumer(
 	let loaded: Promise<InlineResumeModule> | undefined;
 	const dispatch = (event: Event) => {
 		root.__marklessDelegatedDispatch = true;
+		if (!root.__marklessCensus) {
+			const census: Element[] = [root];
+			const all = root.getElementsByTagName?.('*') ?? [];
+			for (let index = 0; index < all.length; index++) census.push(all[index]!);
+			root.__marklessCensus = census;
+		}
 		return (loaded ||= loadModule(resumeModuleUrl)).then((module) =>
 			module.resumeContainerEvent({ root, event, element: event.target, eventRecord: null }),
 		);
@@ -693,6 +707,12 @@ function runInlineResumerOverlayPrimer(
 		if ((event as KeyboardEvent).key === 'Escape')
 			root.__marklessOverlayPrimedDismissal = 'escape';
 		if (root.__marklessDelegatedDispatch === true) return;
+		if (!root.__marklessCensus) {
+			const census: Element[] = [root];
+			const all = root.getElementsByTagName?.('*') ?? [];
+			for (let index = 0; index < all.length; index++) census.push(all[index]!);
+			root.__marklessCensus = census;
+		}
 		setTimeout(() => {
 			if (root.__marklessDelegatedDispatch === true) return;
 			root.__marklessDelegatedDispatch = true;
@@ -747,6 +767,12 @@ function runInlineResumerVisiblePrimer(
 			records.delete(element);
 			if (fired.has(element) || root.__asyncResumeRuntimeStarted) continue;
 			root.__marklessDelegatedDispatch ||= visibleEventName;
+			if (!root.__marklessCensus) {
+				const census: Element[] = [root];
+				const all = root.getElementsByTagName?.('*') ?? [];
+				for (let index = 0; index < all.length; index++) census.push(all[index]!);
+				root.__marklessCensus = census;
+			}
 			pending++;
 			loadModule(resumeModuleUrl)
 				.then((module) =>
@@ -872,6 +898,8 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 	const elements: Element[] = [root];
 	let nextElement: Node | null;
 	while ((nextElement = walker.nextNode())) elements.push(nextElement as Element);
+	// The shell's DOM order, before any arm commits or default action moves it.
+	root.__marklessCensus ||= elements;
 	const hostIds = new Map(
 		view.locators.map((locator) => [elements[locator.index], locator.hostNodeId] as const),
 	);

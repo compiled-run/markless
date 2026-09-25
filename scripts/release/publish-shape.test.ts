@@ -3,7 +3,7 @@
 // (dist-targeting exports, files, bin) and — when `vp pack` output exists —
 // that every published exports target exists on disk and the core root entry
 // stays node-free after packing.
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import rootConfig from '../../vite.config.ts';
@@ -269,75 +269,121 @@ describe('publish manifest shape', () => {
 	});
 });
 
-// Requires `vp pack` output. Skipped when dist is absent (CI runs `vp test`
-// without packing); the prepublishOnly guard re-enforces this fail-closed at
-// publish time, so a publish can never skip these checks.
-const packedDistExists = releasePackageEntries.every((entry) =>
-	existsSync(resolve(entry.packageDir, 'dist')),
-);
+// Requires fresh `vp pack` output. Skipped when dist is absent or older than its package's
+// sources (CI runs `vp test` without packing; a stale local dist describes other code); the
+// prepublishOnly guard re-enforces this fail-closed at publish time.
+function fileTimes(dir: string): number[] {
+	if (!existsSync(dir)) return [];
+	return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+		if (entry.name === 'node_modules') return [];
+		const path = resolve(dir, entry.name);
+		return entry.isDirectory() ? fileTimes(path) : [statSync(path).mtimeMs];
+	});
+}
 
-describe.skipIf(!packedDistExists)('packed dist output (run `vp pack` first)', () => {
-	for (const entry of releasePackageEntries) {
+function packedDistIsFresh(packageDir: string): boolean {
+	const dist = fileTimes(resolve(packageDir, 'dist'));
+	if (dist.length === 0) return false;
+	const sources = [
+		...fileTimes(resolve(packageDir, 'src')),
+		statSync(resolve(packageDir, 'package.json')).mtimeMs,
+	];
+	return Math.min(...dist) >= Math.max(...sources);
+}
+
+// Only what `vp pack` builds: a package with its own build script writes dist mid-run.
+const packedEntries = releasePackageEntries.filter((entry) =>
+	[rootConfig.pack ?? []].flat().some((pack) => resolve(pack.cwd ?? '.') === entry.packageDir),
+);
+const packedFresh = (packageName: string) =>
+	packedEntries.some(
+		(entry) => entry.name === packageName && packedDistIsFresh(entry.packageDir),
+	);
+
+describe('packed dist output (run `vp pack` first)', () => {
+	for (const entry of packedEntries) {
 		const packageName = entry.name;
-		test(`${packageName} publishConfig.exports targets exist after vp pack`, () => {
-			const manifest = readManifest(packageName);
-			const devExports = manifest.exports ?? {};
-			for (const [subpath, target] of Object.entries(manifest.publishConfig?.exports ?? {})) {
-				const sourceTarget = devExports[subpath];
-				expect(sourceTarget, `${packageName} ${subpath} has a dev export`).toBeDefined();
-				for (const path of expandPublishedTargets(
-					entry.packageDir,
-					packageName,
-					subpath,
-					sourceTarget as ExportTarget,
-					target,
+		test.skipIf(!packedFresh(packageName))(
+			`${packageName} publishConfig.exports targets exist after vp pack`,
+			() => {
+				const manifest = readManifest(packageName);
+				const devExports = manifest.exports ?? {};
+				for (const [subpath, target] of Object.entries(
+					manifest.publishConfig?.exports ?? {},
 				)) {
+					const sourceTarget = devExports[subpath];
 					expect(
-						existsSync(resolve(entry.packageDir, path)),
-						`${packageName} ${subpath} -> ${path} missing from dist`,
-					).toBe(true);
+						sourceTarget,
+						`${packageName} ${subpath} has a dev export`,
+					).toBeDefined();
+					for (const path of expandPublishedTargets(
+						entry.packageDir,
+						packageName,
+						subpath,
+						sourceTarget as ExportTarget,
+						target,
+					)) {
+						// CJS targets come from the package's own build:cjs script (prepublishOnly), not from `vp pack`.
+						if (path.endsWith('.cjs')) continue;
+						expect(
+							existsSync(resolve(entry.packageDir, path)),
+							`${packageName} ${subpath} -> ${path} missing from dist`,
+						).toBe(true);
+					}
 				}
-			}
-		});
+			},
+		);
 	}
 
-	test('create-markless packed bin exists and keeps its shebang', () => {
-		const manifest = readManifest('create-markless');
-		const binPath = manifest.publishConfig?.bin?.['create-markless'];
-		expect(binPath).toBeDefined();
-		const absolute = resolve(repoRoot, 'packages', 'cli', binPath ?? '');
-		expect(existsSync(absolute), `cli bin ${binPath} missing from dist`).toBe(true);
-		expect(readFileSync(absolute, 'utf8').startsWith('#!')).toBe(true);
-	});
+	test.skipIf(!packedFresh('create-markless'))(
+		'create-markless packed bin exists and keeps its shebang',
+		() => {
+			const manifest = readManifest('create-markless');
+			const binPath = manifest.publishConfig?.bin?.['create-markless'];
+			expect(binPath).toBeDefined();
+			const absolute = resolve(repoRoot, 'packages', 'cli', binPath ?? '');
+			expect(existsSync(absolute), `cli bin ${binPath} missing from dist`).toBe(true);
+			expect(readFileSync(absolute, 'utf8').startsWith('#!')).toBe(true);
+		},
+	);
 
-	test('@markless/router packed vite plugin resolves entries where the tarball ships them', () => {
-		// dist/vite.js resolves the app-context entries relative to the package
-		// root; the literal must point at the shipped src/vite/entries directory.
-		const code = readFileSync(resolve(repoRoot, 'packages', 'router', 'dist/vite.js'), 'utf8');
-		expect(
-			code.includes('src/vite/entries'),
-			'dist/vite.js must resolve published entries under src/vite/entries',
-		).toBe(true);
-	});
-
-	test('@markless/core packed root entry stays node-free and bundler-free', () => {
-		const manifest = readManifest('core');
-		const rootTarget = manifest.publishConfig?.exports?.['.'];
-		const rootJs = targetPaths(rootTarget ?? {}).find((path) => path.endsWith('.js'));
-		expect(rootJs, 'core root js target').toBeDefined();
-		const code = readFileSync(resolve(repoRoot, 'packages', 'core', rootJs ?? ''), 'utf8');
-		for (const specifier of staticImportSpecifiers(code)) {
-			expect(specifier.startsWith('node:'), `core root entry imports ${specifier}`).toBe(
-				false,
+	test.skipIf(!packedFresh('@markless/router'))(
+		'@markless/router packed vite plugin resolves entries where the tarball ships them',
+		() => {
+			// dist/vite.js resolves the app-context entries relative to the package
+			// root; the literal must point at the shipped src/vite/entries directory.
+			const code = readFileSync(
+				resolve(repoRoot, 'packages', 'router', 'dist/vite.js'),
+				'utf8',
 			);
-			for (const forbidden of ['rolldown', 'vite', '@markless/bundler']) {
-				expect(
-					specifier === forbidden || specifier.startsWith(`${forbidden}/`),
-					`core root entry imports ${specifier}`,
-				).toBe(false);
+			expect(
+				code.includes('src/vite/entries'),
+				'dist/vite.js must resolve published entries under src/vite/entries',
+			).toBe(true);
+		},
+	);
+
+	test.skipIf(!packedFresh('@markless/core'))(
+		'@markless/core packed root entry stays node-free and bundler-free',
+		() => {
+			const manifest = readManifest('core');
+			const rootTarget = manifest.publishConfig?.exports?.['.'];
+			const rootJs = targetPaths(rootTarget ?? {}).find((path) => path.endsWith('.js'));
+			expect(rootJs, 'core root js target').toBeDefined();
+			const code = readFileSync(resolve(repoRoot, 'packages', 'core', rootJs ?? ''), 'utf8');
+			for (const specifier of staticImportSpecifiers(code)) {
+				expect(specifier.startsWith('node:'), `core root entry imports ${specifier}`).toBe(
+					false,
+				);
+				for (const forbidden of ['rolldown', 'vite', '@markless/bundler']) {
+					expect(
+						specifier === forbidden || specifier.startsWith(`${forbidden}/`),
+						`core root entry imports ${specifier}`,
+					).toBe(false);
+				}
 			}
-		}
-	});
+		},
+	);
 });
 
 // A published target no build step writes is only caught at publish time, after

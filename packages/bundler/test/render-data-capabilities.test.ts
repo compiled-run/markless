@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, realpath, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -19,7 +19,7 @@ for (const [shape, packing] of [
 	{ name: 'FloatingSurface', tag: 'aside', nested: true },
 ].flatMap((shape) => [true, false].map((packing) => [shape, packing] as const))) {
 	test(`render-data-only ${shape.name} registers a lazy root-gated capability (packing: ${packing})`, async () => {
-		const root = await mkdtemp(join(tmpdir(), 'markless-overlay-capability-'));
+		const root = await realpath(await mkdtemp(join(tmpdir(), 'markless-overlay-capability-')));
 		const previous = host.__marklessOverlay;
 		const evaluations = host.__overlayEvaluations;
 		delete host.__marklessOverlay;
@@ -127,13 +127,27 @@ export default function ${shape.name}() @{
 				source,
 				environment: 'client',
 			});
-			const ids = files.flatMap((item) =>
-				item.type === 'chunk' ? item.moduleIds.map((id) => (id.startsWith('\0') ? id.slice(1) : id)) : [],
+			// Handlers stay out of what registering the entry evaluates: the entry and its static imports.
+			const chunkByFile = new Map(
+				files.flatMap((item) => (item.type === 'chunk' ? [[item.fileName, item] as const] : [])),
 			);
-			for (const symbol of compiled.manifest.symbols.filter(
+			const eager = new Set<string>();
+			const visit = (fileName: string) => {
+				if (eager.has(fileName)) return;
+				eager.add(fileName);
+				for (const imported of chunkByFile.get(fileName)?.imports ?? []) visit(imported);
+			};
+			visit(entry.fileName);
+			const eagerIds = [...eager].flatMap((fileName) =>
+				(chunkByFile.get(fileName)?.moduleIds ?? []).map((id) =>
+					id.startsWith('\0') ? id.slice(1) : id,
+				),
+			);
+			const handlers = compiled.manifest.symbols.filter(
 				(symbol) => symbol.kind === 'event-handler',
-			))
-				expect(ids).not.toContain(symbol.virtualModuleId);
+			);
+			expect(handlers.length).toBeGreaterThan(0);
+			for (const symbol of handlers) expect(eagerIds).not.toContain(symbol.virtualModuleId);
 		} finally {
 			if (previous) host.__marklessOverlay = previous;
 			else delete host.__marklessOverlay;

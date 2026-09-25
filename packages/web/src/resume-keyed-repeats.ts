@@ -305,12 +305,13 @@ function applyKeyedRepeatRowOrder(
 			values = slots.ready ? rowSlotValues(repeat, item, index, graph, slots.read) : undefined,
 			seen = slots.values.get(rowKey);
 		let rowRoot = rowRootsByKey.get(rowKey);
-		// A row whose slot values moved is rebuilt.
+		// A row whose slot values moved is patched where it stands, else rebuilt.
 		const focus =
 			rowRoot &&
 			mint &&
 			!repeat.rowComponent &&
-			seen?.some((value, at) => !Object.is(value, values![at]))
+			seen?.some((value, at) => !Object.is(value, values![at])) &&
+			!mint.patchRow?.(rowRoot, repeat, seen, values!)
 				? (mint.focusPath?.(rowRoot) ?? [])
 				: undefined;
 		if (focus) rowRoot = undefined;

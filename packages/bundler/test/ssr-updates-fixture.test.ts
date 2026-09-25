@@ -6,12 +6,13 @@ import { promisify } from 'node:util';
 import { chromium, type Page } from '@playwright/test';
 import { resolve } from 'pathe';
 import { expect, test } from 'vitest';
+import { listenOnFreePort } from './helpers/listen.ts';
 
 const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../..');
 const fixture = resolve(root, 'packages/bundler/fixtures/vite-ssr-updates');
 const dist = resolve(fixture, 'dist');
-const port = 4387;
+let port = 0;
 
 function snapshot(page: Page) {
 	return page.evaluate(() => ({
@@ -51,7 +52,7 @@ test('served rows and bindings update after resume', async () => {
 			response.end();
 		}
 	});
-	await new Promise<void>((done) => server.listen(port, '127.0.0.1', done));
+	port = await listenOnFreePort(server);
 	const browser = await chromium.launch();
 	try {
 		const page = await browser.newPage();

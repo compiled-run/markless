@@ -6,12 +6,13 @@ import { promisify } from 'node:util';
 import { chromium, type Page } from '@playwright/test';
 import { resolve } from 'pathe';
 import { afterAll, beforeAll, expect, test } from 'vitest';
+import { listenOnFreePort } from './helpers/listen.ts';
 
 const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../..');
 const fixture = resolve(root, 'packages/bundler/fixtures/vite-ssr-row-writes');
 const dist = resolve(fixture, 'dist');
-const port = 4341;
+let port = 0;
 let server: ReturnType<typeof createServer> | undefined;
 
 function rows(page: Page) {
@@ -74,7 +75,7 @@ beforeAll(async () => {
 			response.end();
 		}
 	});
-	await new Promise<void>((done) => server!.listen(port, '127.0.0.1', done));
+	port = await listenOnFreePort(server!);
 }, 120_000);
 
 afterAll(async () => {

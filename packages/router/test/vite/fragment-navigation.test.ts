@@ -355,6 +355,45 @@ for (const [name, browserType] of [
 			await page.close();
 		});
 
+		test('the page a clicked link lands on is not fetched again, and Back to it needs no request', async () => {
+			const { page, requests, errors } = await open(browser);
+			await page.locator('[data-nav="other"]').click();
+			await landedOn(page, 'other');
+			await page.waitForTimeout(300);
+			expect(requests.filter((request) => request === '/other fragment')).toHaveLength(1);
+			await page.locator('[data-nav="form"]').click();
+			await landedOn(page, 'form');
+			await page.waitForTimeout(300);
+			const beforeBack = requests.length;
+			await page.goBack();
+			await landedOn(page, 'other');
+			expect(requests.slice(beforeBack)).not.toContain('/other fragment');
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
+		test('Back restores the page it left even while a hover prefetch of it is still in flight', async () => {
+			const { page, errors } = await open(browser);
+			await page.locator('[data-nav="other"]').click();
+			await landedOn(page, 'other');
+			let held = 0;
+			await page.route('**/other', async (route) => {
+				held += 1;
+				await new Promise((resolveHold) => setTimeout(resolveHold, 5000));
+				await route.continue().catch(() => {});
+			});
+			await page.locator('[data-nav="form"]').click();
+			await landedOn(page, 'form');
+			await page.locator('[data-nav="other"]').hover();
+			await expect.poll(() => held).toBeGreaterThan(0);
+			const started = Date.now();
+			await page.goBack();
+			await landedOn(page, 'other');
+			expect(Date.now() - started).toBeLessThan(2500);
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
 		test('a streamed @pending region settles after the swap and resumes', async () => {
 			const { page, errors } = await open(browser);
 			await page.locator('[data-nav="slow"]').click();

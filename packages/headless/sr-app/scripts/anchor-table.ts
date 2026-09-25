@@ -52,7 +52,7 @@ export function withAnchorTable(readme: string): string {
 
 /** The reason the README is stale, or null when it is current. */
 export async function anchorTableDrift(): Promise<string | null> {
-	const readme = await readFile(README, 'utf8');
+	const readme = (await readFile(README, 'utf8')).replace(/\r\n/g, '\n');
 	if (withAnchorTable(readme) === readme) return null;
 	return `packages/headless/sr-app/README.md's anchor table no longer matches FAMILY_ANCHORS (${Object.keys(FAMILY_ANCHORS).length} sections); run \`node packages/headless/sr-app/scripts/anchor-table.ts\`.`;
 }

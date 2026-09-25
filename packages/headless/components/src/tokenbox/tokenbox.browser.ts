@@ -612,3 +612,27 @@ for (const mode of MODES) {
 		await expectNoAxeViolations(scope, 'after typing');
 	});
 }
+
+// The browser deletes a token as the default action of the keydown that starts resume, before the
+// runtime resolves its locators; the resumed box still owns the surface that remains.
+test('SSR: a token deleted by the keydown that starts resume leaves the box resumable', async () => {
+	const errors: unknown[] = [];
+	const onRejection = (event: PromiseRejectionEvent) => errors.push(event.reason);
+	window.addEventListener('unhandledrejection', onRejection);
+	try {
+		await renderSSR(Prefilled);
+		caretAfterToken('u_1');
+		el(Input).dispatchEvent(
+			new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true, cancelable: true }),
+		);
+		tokenElement('u_1').remove();
+
+		caretToEnd();
+		await userEvent.keyboard('!');
+		await expect.poll(() => el(Held).textContent).toContain('!');
+		expect(tokensIn()).toEqual(['doc_9']);
+		expect(errors).toEqual([]);
+	} finally {
+		window.removeEventListener('unhandledrejection', onRejection);
+	}
+});

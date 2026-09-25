@@ -6,12 +6,13 @@ import { promisify } from 'node:util';
 import { chromium } from '@playwright/test';
 import { resolve } from 'pathe';
 import { afterAll, beforeAll, expect, test } from 'vitest';
+import { listenOnFreePort } from './helpers/listen.ts';
 
 const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../..');
 const fixture = resolve(root, 'packages/bundler/fixtures/vite-ssr-body-local-rows');
 const dist = resolve(fixture, 'dist');
-const port = 4276;
+let port = 0;
 let server: ReturnType<typeof createServer> | undefined;
 
 beforeAll(async () => {
@@ -38,7 +39,7 @@ beforeAll(async () => {
 			response.end();
 		}
 	});
-	await new Promise<void>((done) => server!.listen(port, '127.0.0.1', done));
+	port = await listenOnFreePort(server!);
 }, 120_000);
 
 afterAll(async () => {

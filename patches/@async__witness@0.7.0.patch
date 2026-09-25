@@ -1,0 +1,193 @@
+diff --git a/dist/runner-KOWah4hZ.mjs b/dist/runner-KOWah4hZ.mjs
+index cacf0c6df0cdefd7d000ba41804308c88f7307f0..39d5fb5e58465bcb127e871656255320f5ac56b5 100644
+--- a/dist/runner-KOWah4hZ.mjs
++++ b/dist/runner-KOWah4hZ.mjs
+@@ -2519,6 +2519,39 @@ async function mirrorWsUpdateEvidence(state, store) {
+ 	if (!store.events.some((event) => event.kind === "hot-payload" && event.source === "channel" && event.payload.type === "update")) return;
+ 	await store.waitUntil("the websocket hot client to mirror the HMR update payload", () => store.events.find((event) => event.kind === "hot-payload" && event.source === "ws" && event.payload.type === "update"), 3e3).catch(() => void 0);
+ }
++/** A box that never settles fails loudly with where it stopped, instead of holding the run until the CI job is cancelled. */
++function boxTimeoutMs() {
++	const configured = Number(globalThis.process?.env?.WITNESS_BOX_TIMEOUT_MS);
++	return Number.isFinite(configured) && configured > 0 ? configured : 24e4;
++}
++const TEARDOWN_STEP_TIMEOUT_MS = 3e4;
++function describeOpenHandles() {
++	const hostProcess = globalThis.process;
++	const handles = hostProcess?._getActiveHandles?.() ?? [];
++	const described = handles.map((handle) => {
++		const name = handle?.constructor?.name ?? typeof handle;
++		if (name === "Socket" || name === "TLSSocket") return `${name}(${handle.remoteAddress ?? handle.localAddress ?? "?"}:${handle.remotePort ?? handle.localPort ?? "?"})`;
++		if (name === "Server") return `Server(${JSON.stringify(handle.address?.() ?? null)})`;
++		if (name === "ChildProcess") return `ChildProcess(pid ${handle.pid} ${handle.spawnfile ?? ""})`;
++		return name;
++	});
++	return `${described.join(", ") || "none"}; pending requests: ${hostProcess?._getActiveRequests?.().length ?? "?"}`;
++}
++function boxStallReport(boxName, recorder, what) {
++	const last = recorder.timelineEvents.at(-1);
++	const lastStep = last ? `${last.type} ${JSON.stringify(Object.fromEntries(Object.entries(last).filter(([key]) => key !== "seq" && key !== "at" && key !== "type")))}` : "(no step recorded)";
++	return `witness: box "${boxName}" ${what}. Last step: ${lastStep}. Open handles: ${describeOpenHandles()}`;
++}
++async function boundedTeardownStep(boxName, recorder, step, work, onStall) {
++	let timer;
++	const stalled = await Promise.race([Promise.resolve().then(work).then(() => false, () => false), new Promise((resolve) => {
++		timer = setTimeout(() => resolve(true), TEARDOWN_STEP_TIMEOUT_MS);
++	})]);
++	clearTimeout(timer);
++	if (!stalled) return;
++	console.error(boxStallReport(boxName, recorder, `teardown step "${step}" did not finish within ${TEARDOWN_STEP_TIMEOUT_MS}ms`));
++	onStall();
++}
+ async function runSingleBox(args) {
+ 	const { discovered, root, runDir, receiptPath, boxIndex, assertionTimeoutMs, fileSystem, browser: browserCapability, headless } = args;
+ 	const definition = discovered.box;
+@@ -2692,8 +2725,16 @@ async function runSingleBox(args) {
+ 		exportName: discovered.exportName
+ 	});
+ 	let status = "passed";
++	let boxWatchdog;
+ 	try {
+-		await definition.run(context);
++		await Promise.race([definition.run(context), new Promise((_resolve, reject) => {
++			boxWatchdog = setTimeout(() => {
++				const message = boxStallReport(definition.name, recorder, `did not finish within ${boxTimeoutMs()}ms`);
++				console.error(message);
++				browserCapability?.discardAll?.();
++				reject(new Error(message));
++			}, boxTimeoutMs());
++		})]);
+ 	} catch (error) {
+ 		status = "failed";
+ 		recorder.error = error instanceof Error ? {
+@@ -2702,13 +2743,15 @@ async function runSingleBox(args) {
+ 		} : { message: String(error) };
+ 		recorder.timeline("box failed", { message: recorder.error.message });
+ 	} finally {
+-		await mirrorWsUpdateEvidence(state, store);
+-		await browserEvidence.closeAll();
+-		for (const openPreview of openPreviews.splice(0)) await openPreview.close().catch(() => void 0);
++		clearTimeout(boxWatchdog);
++		const bounded = (step, work) => boundedTeardownStep(definition.name, recorder, step, work, () => browserCapability?.discardAll?.());
++		await bounded("mirror HMR evidence", () => mirrorWsUpdateEvidence(state, store));
++		await bounded("close browser pages", () => browserEvidence.closeAll());
++		for (const openPreview of openPreviews.splice(0)) await bounded("close preview", () => openPreview.close().catch(() => void 0));
+ 		state.ws?.close();
+ 		if (state.server !== null) {
+ 			await waitForPendingDependencyScans(state.server, 1e4);
+-			await state.server.close().catch(() => void 0);
++			await bounded("close dev server", () => state.server.close().catch(() => void 0));
+ 			recorder.timeline("server closed", {});
+ 		}
+ 		await projectRuntime.restoreAll();
+diff --git a/dist/witness.mjs b/dist/witness.mjs
+index 8d5c052916c1b0a0565a34dba70799457f8ac51c..4e4f2b6d3337f48f11575494e38e0aa85817682a 100755
+--- a/dist/witness.mjs
++++ b/dist/witness.mjs
+@@ -275,9 +275,10 @@ function spawnWithNode(childProcess, executable, args) {
+ 		for (const listener of stderrListeners) listener(text);
+ 	});
+ 	return {
+-		kill: () => {
++		pid: child.pid,
++		kill: (signal) => {
+ 			try {
+-				child.kill();
++				child.kill(signal);
+ 			} catch {}
+ 		},
+ 		exited: new Promise((resolve) => {
+@@ -402,6 +403,8 @@ function platformLaunchFlags(platform) {
+ * temp directory.
+ */
+ const liveBrowserShutdowns = /* @__PURE__ */ new Set();
++/** How long a browser gets to exit on SIGTERM (and then on SIGKILL) before shutdown stops waiting. */
++const BROWSER_EXIT_GRACE_MS = 5e3;
+ /**
+ * Disposes every pooled browser process still alive: kills it and removes its
+ * temp profile dir. This is the one disposal path for pooled browsers — the
+@@ -435,10 +438,24 @@ async function launchBrowserEndpoint(options) {
+ 		...platformLaunchFlags(platform),
+ 		"about:blank"
+ 	]);
++	const settlesWithin = (promise, ms) => new Promise((resolve) => {
++		const timer = setTimeout(() => resolve(false), ms);
++		promise.then(() => {
++			clearTimeout(timer);
++			resolve(true);
++		}, () => {
++			clearTimeout(timer);
++			resolve(true);
++		});
++	});
+ 	const performShutdown = async () => {
+ 		child.kill();
+-		await child.exited.catch(() => void 0);
+-		await removeDirectory(profileDir);
++		if (!await settlesWithin(child.exited, BROWSER_EXIT_GRACE_MS)) {
++			console.error(`witness: browser pid ${child.pid ?? "?"} (${executable}) ignored SIGTERM for ${BROWSER_EXIT_GRACE_MS}ms; sending SIGKILL.`);
++			child.kill("SIGKILL");
++			if (!await settlesWithin(child.exited, BROWSER_EXIT_GRACE_MS)) console.error(`witness: browser pid ${child.pid ?? "?"} did not exit after SIGKILL; abandoning it.`);
++		}
++		await removeDirectory(profileDir).catch(() => void 0);
+ 		liveBrowserShutdowns.delete(shutdown);
+ 	};
+ 	let shutdownOutcome = null;
+@@ -657,6 +674,7 @@ async function raceHostBackstop(pageAnswer, backstopMs) {
+ 	}
+ }
+ /** Signals that the wait's execution context died before the page answered. */
++const SCREENSHOT_TIMEOUT_MS = 1e4;
+ const EXECUTION_CONTEXT_GONE = Symbol("witness execution context gone");
+ /**
+ * Bounded, event-driven wait on an in-page predicate: a single
+@@ -742,10 +760,17 @@ function clickPointExpression(selector) {
+ 	if (element.disabled === true) { return null; }
+ 	const style = getComputedStyle(element);
+ 	if (style.display === 'none' || style.visibility === 'hidden') { return null; }
+-	element.scrollIntoView({ block: 'center', inline: 'center' });
++	element.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'center' });
+ 	const rect = element.getBoundingClientRect();
+-	if (rect.width <= 0 || rect.height <= 0) { return null; }
+-	return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
++	if (![rect.left, rect.top, rect.width, rect.height].every(Number.isFinite)
++		|| rect.width <= 0 || rect.height <= 0) { return null; }
++	const x = rect.left + rect.width / 2;
++	const y = rect.top + rect.height / 2;
++	if (!Number.isFinite(x) || !Number.isFinite(y)
++		|| x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) { return null; }
++	const receiver = document.elementFromPoint(x, y);
++	if (receiver === null || !element.contains(receiver)) { return null; }
++	return { x, y };
+ })()`;
+ }
+ function decodeBase64(data) {
+@@ -879,10 +904,16 @@ async function createCdpPage(wiring) {
+ 			return composePageContent(await evaluateExpression(PAGE_CONTENT_EXPRESSION));
+ 		},
+ 		screenshot: async (filePath) => {
+-			await writeBinaryFile(filePath, decodeBase64((await pageConnection.send("Page.captureScreenshot", {
++			// A background tab produces no frame, so capture would wait forever.
++			await pageConnection.send("Page.bringToFront");
++			let timer;
++			const capture = await Promise.race([pageConnection.send("Page.captureScreenshot", {
+ 				format: "png",
+ 				optimizeForSpeed: true
+-			})).data));
++			}), new Promise((_resolve, reject) => {
++				timer = setTimeout(() => reject(/* @__PURE__ */ new Error(`Page.captureScreenshot produced no frame within ${SCREENSHOT_TIMEOUT_MS}ms.`)), SCREENSHOT_TIMEOUT_MS);
++			})]).finally(() => clearTimeout(timer));
++			await writeBinaryFile(filePath, decodeBase64(capture.data));
+ 		},
+ 		evaluate: (expression) => evaluateExpression(expression),
+ 		waitForExpression: async (expression, timeoutMs) => {
+@@ -1056,6 +1087,9 @@ function createHostBrowser(options = {}) {
+ 	};
+ 	return {
+ 		name: "chromium",
++		discardAll: () => {
++			for (const entry of pool.values()) entry.health.isDead = true;
++		},
+ 		launch: async (launchOptions) => {
+ 			const entry = await acquireLiveEntry(launchOptions.headless);
+ 			try {

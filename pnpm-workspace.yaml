@@ -42,4 +42,4 @@ overrides:
   vite: npm:@voidzero-dev/vite-plus-core@0.3.1
   vitest: 4.1.11
 patchedDependencies:
-  '@async/witness@0.7.0': patches/witness-0.7.0-pointer-actionability.patch
+  '@async/witness@0.7.0': patches/@async__witness@0.7.0.patch

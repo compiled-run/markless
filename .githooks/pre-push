@@ -1,0 +1,17 @@
+#!/bin/sh
+# Keep main green: a push onto a red main must be the fix (see docs/ci-process.md).
+while read -r local_ref local_sha remote_ref remote_sha; do
+	[ "$remote_ref" = "refs/heads/main" ] || continue
+	command -v gh >/dev/null 2>&1 || { echo "pre-push: gh not found; cannot check main's CI status" >&2; continue; }
+	state=$(gh run list --branch main --workflow ci.yml --limit 1 --json status,conclusion --jq '.[0] | "\(.status) \(.conclusion)"' 2>/dev/null)
+	case "$state" in
+		"completed failure" | "completed cancelled" | "completed timed_out")
+			if [ "$MARKLESS_FIXES_RED_MAIN" != "1" ]; then
+				echo "pre-push: CI on main is red ($state). Only the change that makes it green may be pushed." >&2
+				echo "If this push is that fix, re-run with MARKLESS_FIXES_RED_MAIN=1 and say so in the commit message." >&2
+				exit 1
+			fi
+			;;
+	esac
+done
+exit 0

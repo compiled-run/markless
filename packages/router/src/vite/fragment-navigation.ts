@@ -196,8 +196,9 @@ export function startFragmentNavigation(
 		// An unused prefetch still streaming holds a connection: drop it once stale, and keep only a few open,
 		// or an HTTP/1.1 origin's per-host connection limit stalls the next click behind them.
 		const prefetch = (url: URL) => {
-			if (!config.prefetch) return;
 			const key = pageKey(url);
+			// A hover timer can fire after its link's page is already shown.
+			if (!config.prefetch || key === state.shown) return;
 			const existing = state.prefetches.get(key);
 			if (existing && w.performance.now() - existing.at < config.prefetchTtlMs) return;
 			existing?.abort();

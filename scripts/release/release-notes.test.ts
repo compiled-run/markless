@@ -96,6 +96,9 @@ async function runNotes(
 	return wrapped;
 }
 
+// Each case spawns about a dozen git and node processes; 10.9 s was measured under full-suite load.
+const SPAWN_HEAVY_TIMEOUT_MS = 30_000;
+
 test('release notes include conventional and unclassified commits', async () => {
 	const { fixture, conventionalSha, proseSha } = await notesFixture();
 	const result = await runNotes(fixture, ['--from', 'v1.0.0', '--to', 'HEAD']);
@@ -105,7 +108,7 @@ test('release notes include conventional and unclassified commits', async () => 
 	expect(result.stdout).toContain(conventionalSha.slice(0, 7));
 	expect(result.stdout).toContain(proseSha.slice(0, 7));
 	expect(result.stderr).toContain('2 covered');
-});
+}, SPAWN_HEAVY_TIMEOUT_MS);
 
 test('invalid ranges fail without writing the output file', async () => {
 	const { fixture } = await notesFixture();
@@ -117,4 +120,4 @@ test('invalid ranges fail without writing the output file', async () => {
 	);
 	expect(result.exitCode).toBe(1);
 	await expect(access(out)).rejects.toThrow();
-});
+}, SPAWN_HEAVY_TIMEOUT_MS);

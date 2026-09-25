@@ -6,6 +6,7 @@ export function App() @{
 	let bumps = state(0);
 	let cheers = state(0);
 	let tide = state('open');
+	let afters = state(0);
 	const bumpEl = element();
 	const harbor = computed(async () => {
 		const level = tide;
@@ -29,5 +30,7 @@ export function App() @{
 		} @catch {
 			<p class="closed">Closed</p>
 		}
+		<button data-after onClick={() => afters++}>After</button>
+		<span data-afters>{afters}</span>
 	</main>
 }

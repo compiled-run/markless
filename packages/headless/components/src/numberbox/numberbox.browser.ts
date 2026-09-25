@@ -843,7 +843,8 @@ test('SSR: the first trigger press after a resume steps and starts its repeat', 
 
 	pointer(el(Forward), 'pointerdown');
 	await expect.poll(() => shown(Input), { timeout: 4000 }).toBe('1.75');
-	await expect.poll(() => shown(Input), { timeout: 4000 }).toBe('2.00');
+	// The repeat runs on to the max while held, so any later value proves it started.
+	await expect.poll(() => Number(shown(Input)), { timeout: 4000 }).toBeGreaterThan(1.75);
 	pointer(el(Forward), 'pointerup');
 });
 

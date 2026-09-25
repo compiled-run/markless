@@ -6,12 +6,13 @@ import { promisify } from 'node:util';
 import { chromium, type Page } from '@playwright/test';
 import { resolve } from 'pathe';
 import { expect, test } from 'vitest';
+import { listenOnFreePort } from './helpers/listen.ts';
 
 const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../..');
 const fixture = resolve(root, 'packages/bundler/fixtures/vite-ssr-action-scoped-lean');
 const dist = resolve(fixture, 'dist');
-const port = 4292;
+let port = 0;
 
 // A page whose branch and element handle need the full runtime still runs its
 // unrelated scalar counter lean; the full runtime boots on the first action that
@@ -59,7 +60,7 @@ test.each([false, true])(
 				response.end();
 			}
 		});
-		await new Promise<void>((done) => server.listen(port, '127.0.0.1', done));
+		port = await listenOnFreePort(server);
 		const browser = await chromium.launch();
 		const open = async () => {
 			const page = await browser.newPage();

@@ -6,7 +6,7 @@
 // its own idea of the shape, so it can pass a workflow the parser would reject
 // and disagree with itself about what a job's `if:` even says.
 
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -331,6 +331,41 @@ if (isCiSuite && !jobNames.includes(PLAYWRIGHT_JOB)) {
 		if (name !== PLAYWRIGHT_JOB && !needsOf(name).includes(PLAYWRIGHT_JOB))
 			fail(`Job \`${name}\` installs a Playwright browser but does not need \`${PLAYWRIGHT_JOB}\`.`);
 	}
+	const launchers = nodeTestsLaunchingBrowsers();
+	if (launchers.length > 0 && jobNames.includes('unit')) {
+		const unitText = jobText('unit');
+		if (
+			!needsOf('unit').includes(PLAYWRIGHT_JOB) ||
+			!/PLAYWRIGHT_BROWSERS_PATH/.test(unitText) ||
+			!/playwright install/.test(unitText)
+		)
+			fail(`Job \`unit\` runs node tests that launch a Playwright browser (${launchers[0]} and ${launchers.length - 1} more) but does not restore the browsers \`${PLAYWRIGHT_JOB}\` installs.`);
+	}
+}
+
+function nodeTestsLaunchingBrowsers() {
+	const found = [];
+	const walk = (dir) => {
+		let entries;
+		try {
+			entries = readdirSync(dir, { withFileTypes: true });
+		} catch {
+			return;
+		}
+		for (const entry of entries) {
+			if (entry.name === 'node_modules' || entry.name === 'dist' || entry.name.startsWith('.')) continue;
+			const path = resolve(dir, entry.name);
+			if (entry.isDirectory()) walk(path);
+			else if (entry.name.endsWith('.test.ts')) {
+				const text = readFileSync(path, 'utf8');
+				if (/from '@playwright\/test'/.test(text) && /\.launch\(/.test(text))
+					found.push(path.slice(repoRoot.length + 1));
+			}
+		}
+	};
+	for (const dir of readdirSync(resolve(repoRoot, 'packages'))) walk(resolve(repoRoot, 'packages', dir, 'test'));
+	walk(resolve(repoRoot, 'scripts'));
+	return found;
 }
 
 // 10. Token posture. Nothing in this workflow pushes, comments or publishes,

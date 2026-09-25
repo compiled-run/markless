@@ -32,6 +32,11 @@ type Node = {
 	insertBefore?: (node: Node, before: Node | null) => unknown;
 	removeChild?: (node: Node) => unknown;
 	replaceWith?: (node: Node) => void;
+	textContent?: string;
+	attributes?: Record<string, string>;
+	getAttribute?: (name: string) => string | null;
+	setAttribute?: (name: string, value: string) => void;
+	removeAttribute?: (name: string) => void;
 	ownerDocument?: unknown;
 	__marklessCensus?: Node[];
 };
@@ -50,8 +55,15 @@ function adopt(node: Node, children: Node[]): Node {
 }
 
 function el(tagName: string, children: Node[] = []): Node {
-	const node: Node = { nodeType: 1, tagName, childNodes: [] };
+	const node: Node = { nodeType: 1, tagName, childNodes: [], attributes: {} };
 	adopt(node, children);
+	Object.defineProperty(node, 'textContent', {
+		get: () => textOf(node),
+		set: (data: string) => adopt(node, [txt(data)]),
+	});
+	node.getAttribute = (name) => node.attributes![name] ?? null;
+	node.setAttribute = (name, value) => (node.attributes![name] = value);
+	node.removeAttribute = (name) => delete node.attributes![name];
 	node.insertBefore = (fresh, before) => {
 		// A real insertBefore MOVES a node that is already a child; the reconcile
 		// reorders rows by re-inserting them, so this double has to as well.
@@ -94,7 +106,11 @@ function elementsUnder(node: Node): Node[] {
 // The row shape every fixture here shares: a label position the mint fills from
 // the item, and a button the row's `click` record points at.
 const ROW_HTML = '<li data-row><b><!--markless-slot:0--></b><button></button></li>';
+// The label shares its element with static text, so a live row cannot be patched there.
+const PREFIXED_ROW_HTML = '<li data-row><b>#<!--markless-slot:0--></b><button></button></li>';
 const ARM_HTML = '<li data-empty>nothing</li>';
+// The button's class carries the module's scope class beside its bound part.
+const SCOPED_ROW_HTML = '<li data-row><b><!--markless-slot:0--></b><button class=" s1"></button></li>';
 
 function servedRow(label: string): Node {
 	return el('LI', [el('B', [txt(label)]), el('BUTTON')]);
@@ -102,6 +118,16 @@ function servedRow(label: string): Node {
 
 function mintedRow(): Node {
 	return el('LI', [el('B', [slot()]), el('BUTTON')]);
+}
+
+function mintedScopedRow(): Node {
+	const button = el('BUTTON');
+	button.setAttribute!('class', ' s1');
+	return el('LI', [el('B', [slot()]), button]);
+}
+
+function mintedPrefixedRow(): Node {
+	return el('LI', [el('B', [txt('#'), slot()]), el('BUTTON')]);
 }
 
 /**
@@ -119,7 +145,15 @@ function documentHost(builds: { count: number }) {
 					builds.count++;
 					content = {
 						childNodes:
-							html === ROW_HTML ? [mintedRow()] : html === ARM_HTML ? [el('LI', [txt('nothing')])] : [],
+							html === ROW_HTML
+								? [mintedRow()]
+								: html === SCOPED_ROW_HTML
+									? [mintedScopedRow()]
+									: html === PREFIXED_ROW_HTML
+									? [mintedPrefixedRow()]
+										: html === ARM_HTML
+											? [el('LI', [txt('nothing')])]
+											: [],
 					};
 				},
 				get content() {
@@ -143,13 +177,14 @@ function fixture(
 		readonly served?: ReadonlyArray<{ readonly id: string; readonly label: string }>;
 		readonly template?: Record<string, unknown>;
 		readonly cells?: ReadonlyArray<{ readonly graphNodeId: string; readonly value: unknown }>;
+		readonly labelPrefix?: string;
 	} = {},
 ) {
 	const served = options.served ?? [
 		{ id: 'a', label: 'alpha' },
 		{ id: 'b', label: 'bravo' },
 	];
-	const rows = served.map((item) => servedRow(item.label));
+	const rows = served.map((item) => servedRow(`${options.labelPrefix ?? ''}${item.label}`));
 	const header = el('LI', [txt('header')]);
 	const footer = el('LI', [txt('footer')]);
 	const list = el('UL', [header, ...rows, footer]);
@@ -157,6 +192,7 @@ function fixture(
 	const builds = { count: 0 };
 	root.ownerDocument = documentHost(builds);
 	list.ownerDocument = root.ownerDocument;
+	for (const row of rows) row.ownerDocument = root.ownerDocument;
 	// The pinned census in shipped order, exactly what materializeDomLocators
 	// would have taken at boot.
 	root.__marklessCensus = elementsUnder(root);
@@ -390,8 +426,9 @@ test('a page served empty with no @empty arm mints its first row', async () => {
 	expect(labels()).toEqual(['header', 'charlie', 'footer']);
 });
 
-test('an item replaced under a served key rebuilds that row alone', async () => {
-	const { builds, rows, write, list, labels, census, root, registered } = fixture();
+test('an item replaced under a served key is patched in its own row', async () => {
+	const { rows, write, list, labels, census, root, registered } = fixture();
+	const wired = registered.length;
 
 	await write([
 		{ id: 'a', label: 'alpha two' },
@@ -399,7 +436,28 @@ test('an item replaced under a served key rebuilds that row alone', async () => 
 	]);
 
 	expect(labels()).toEqual(['header', 'alpha two', 'bravo', 'footer']);
-	expect(builds.count).toBe(1);
+	expect(list.childNodes[1]).toBe(rows[0]);
+	expect(list.childNodes[2]).toBe(rows[1]);
+	expect(census()).toEqual(elementsUnder(root));
+	expect(registered).toHaveLength(wired);
+});
+
+test('a moved slot the live row does not hold on its own element rebuilds that row alone', async () => {
+	const { builds, rows, write, list, labels, census, root, registered } = fixture({
+		template: {
+			html: PREFIXED_ROW_HTML,
+			textSlots: [{ path: [0, 0, 1], itemPath: ['label'] }],
+		},
+		labelPrefix: '#',
+	});
+
+	await write([
+		{ id: 'a', label: 'alpha two' },
+		{ id: 'b', label: 'bravo' },
+	]);
+
+	expect(labels()).toEqual(['header', '#alpha two', '#bravo', 'footer']);
+	expect(builds.count).toBe(2);
 	expect(list.childNodes[1]).not.toBe(rows[0]);
 	expect(list.childNodes[2]).toBe(rows[1]);
 	expect(census()).toEqual(elementsUnder(root));
@@ -407,6 +465,46 @@ test('an item replaced under a served key rebuilds that row alone', async () => 
 		rowKey: 'a',
 		host: list.childNodes[1]!.childNodes[1],
 	});
+});
+
+test('a patched attribute slot writes a control property the user already moved', async () => {
+	const { graph, rows, list } = fixture({
+		template: {
+			html: ROW_HTML,
+			attributeSlots: [
+				{ path: [0, 1], name: 'checked', graphNodeId: 'state:on', graphPath: [] },
+			],
+		},
+		cells: [{ graphNodeId: 'state:on', value: false }],
+	});
+	await graph.flush();
+	const button = rows[0]!.childNodes[1] as Node & { checked?: boolean };
+	button.checked = false;
+
+	graph.write({ graphNodeId: 'state:on', value: true });
+	await graph.flush();
+
+	expect(list.childNodes[1]).toBe(rows[0]);
+	expect(button.checked).toBe(true);
+	expect(button.attributes).toEqual({ checked: '' });
+});
+
+test('a patched class slot keeps the static scope class the markup carries', async () => {
+	const { graph, rows, list } = fixture({
+		template: {
+			html: SCOPED_ROW_HTML,
+			attributeSlots: [{ path: [0, 1], name: 'class', graphNodeId: 'state:tone', graphPath: [] }],
+		},
+		cells: [{ graphNodeId: 'state:tone', value: 'dim' }],
+	});
+	await graph.flush();
+
+	graph.write({ graphNodeId: 'state:tone', value: 'lit' });
+	await graph.flush();
+
+	expect(list.childNodes[1]).toBe(rows[0]);
+	expect(rows[0]!.childNodes[1]!.attributes).toEqual({ class: 'lit s1' });
+	expect(rows[1]!.childNodes[1]!.attributes).toEqual({ class: 'lit s1' });
 });
 
 test('a new key at a served row position replaces that row', async () => {
@@ -421,7 +519,7 @@ test('a new key at a served row position replaces that row', async () => {
 	expect(census()).toEqual(elementsUnder(root));
 });
 
-test('an item mutated in place rebuilds its row, and a minted row rebuilds again', async () => {
+test('an item mutated in place refreshes its row, and a minted row refreshes again', async () => {
 	const { graph, write, labels } = fixture();
 
 	graph.write({ graphNodeId: 'state:rows', path: ['1', 'label'], value: 'bravo two' });
@@ -435,7 +533,7 @@ test('an item mutated in place rebuilds its row, and a minted row rebuilds again
 	expect(labels()).toEqual(['header', 'alpha', 'bravo three', 'footer']);
 });
 
-test('a row reading page state rebuilds when that state moves', async () => {
+test('a row reading page state is patched when that state moves', async () => {
 	const { graph, labels, rows, list } = fixture({
 		template: {
 			html: ROW_HTML,
@@ -449,10 +547,10 @@ test('a row reading page state rebuilds when that state moves', async () => {
 	await graph.flush();
 
 	expect(labels()).toEqual(['header', 'marked', 'marked', 'footer']);
-	expect(list.childNodes[1]).not.toBe(rows[0]);
+	expect(list.childNodes[1]).toBe(rows[0]);
 });
 
-test('an expression slot reads through the page reader, and rebuilds on its outside read', async () => {
+test('an expression slot reads through the page reader, and refreshes on its outside read', async () => {
 	const reads: Array<[string, unknown, number]> = [];
 	const rowMint = await import('../src/fns/row-mint.ts');
 	const host = globalThis as { __marklessRowMint?: () => Promise<unknown> };

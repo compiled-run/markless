@@ -6,12 +6,13 @@ import { promisify } from 'node:util';
 import { chromium } from '@playwright/test';
 import { resolve } from 'pathe';
 import { expect, test } from 'vitest';
+import { listenOnFreePort } from './helpers/listen.ts';
 
 const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../..');
 const fixture = resolve(root, 'packages/bundler/fixtures/vite-ssr-visible-wake');
 const dist = resolve(fixture, 'dist');
-const port = 4407;
+let port = 0;
 
 // Unpacked, the full prerender resume is its own chunk, and the trigger group's path never fetches it.
 // Packed, that code rides the preloaded pack; the per-element counts pin the trigger group's behaviour.
@@ -61,7 +62,7 @@ test.each([false, true])(
 				response.end();
 			}
 		});
-		await new Promise<void>((done) => server.listen(port, '127.0.0.1', done));
+		port = await listenOnFreePort(server);
 		const browser = await chromium.launch();
 		try {
 			const page = await browser.newPage({ viewport: { width: 800, height: 600 } });

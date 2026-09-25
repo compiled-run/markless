@@ -15,9 +15,12 @@ export default defineConfig({
 		// suffix is what separates the lanes: the `ui` browser project takes only
 		// `.browser.ts`, and this one only `.sr.ts`.
 		include: ['src/**/*.sr.ts'],
+		setupFiles: ['./test-support/sr-setup.ts'],
 		// Serial like the browser project (same measured contention class: parallel
 		// iframes push gesture polls past the ceiling; serial is green and faster).
 		fileParallelism: false,
+		// Same budget as the ui lane: a first gesture waits on the cold @markless/ui barrel (~3 s measured).
+		expect: { poll: { timeout: 5_000 } },
 		browser: {
 			enabled: true,
 			headless: true,

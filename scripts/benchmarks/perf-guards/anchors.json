@@ -603,6 +603,22 @@
 			"from": 14180,
 			"to": 12951,
 			"reason": "shrank (T184b scan moved to inline script)"
+		},
+		{
+			"date": "2026-09-25",
+			"guard": "runtime",
+			"subject": "web/fns/row-mint",
+			"from": 4502,
+			"to": 6738,
+			"reason": "T179: keyed rows patch moved slot values in place (select/dialog-save first use -47/-38 ms, repeat -36 ms constrained)"
+		},
+		{
+			"date": "2026-09-25",
+			"guard": "runtime",
+			"subject": "web/fns/row-mint",
+			"from": 6738,
+			"to": 6649,
+			"reason": "T197: in-place row patch keeps each attribute slot's static part (scoped class); patch caches merged, trimmed 6738 -> 6649"
 		}
 	],
 	"runtimeModules": {
@@ -650,7 +666,7 @@
 		"web/fns/instance-scope": 16966,
 		"web/fns/reconcile-plane": 334,
 		"web/fns/roster-resume": 5123,
-		"web/fns/row-mint": 4502,
+		"web/fns/row-mint": 6649,
 		"web/fns/row-slot-mint": 2633,
 		"web/fns/scalar-served": 3982,
 		"web/fns/scalar-specialized": 1426,

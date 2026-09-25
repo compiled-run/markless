@@ -2598,7 +2598,7 @@ test('renderToString envelope-encodes live directValue state cells before servin
 });
 
 // Exact serialized source size, including comments retained by the test transformer.
-const OVERLAY_PRIMER_BYTES = 1124;
+const OVERLAY_PRIMER_BYTES = 1354;
 
 function inlineResumerSourceOf(html: string): string {
 	const found = /<script data-async-resumer[^>]*>([\s\S]*?)<\/script>/.exec(html);

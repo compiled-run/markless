@@ -24,6 +24,8 @@ export const EVENT_ONLY_RESUMER_ATTRIBUTION = {
 	lateCommittedElements: 14,
 	// Paired OXC builds measured 1,104 -> 1,219: a followed link outside every repeat parent does not wake the page it leaves.
 	navigationLinkGuard: 115,
+	// Paired OXC builds measured 1,219 -> 1,229: resume locators keep the shell's DOM order after a default action or streamed arm moves it.
+	shellCensus: 10,
 	gzipCrossTerm: 3,
 };
 

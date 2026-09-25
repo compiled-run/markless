@@ -145,6 +145,8 @@ const buildOrder: PackUserConfig[] = [
 	}),
 	marklessPack({
 		packageName: 'bundler',
+		// The isolated-declarations emitter cannot type the web sources the prerender path bundles.
+		dts: { eager: true },
 		entry: {
 			'dev-error': './src/dev-error/index.ts',
 			preload: './src/preload.ts',
@@ -261,6 +263,7 @@ export default defineConfig({
 						'scripts/**/*.test.ts',
 					],
 					exclude: [
+						'**/node_modules/**',
 						'packages/typescript-plugin/test/completion-matrix.test.ts',
 						'scripts/experiments/**/results/**',
 					],

@@ -531,6 +531,8 @@ test('the undo keys cancel the browser default so nothing else claims them', asy
 // ------------------------------------------------------------------- buttons
 
 test('a consumer own buttons drive the drawing through the cell', async () => {
+	// The consumer handlers import the @markless/ui barrel: a ~3 s cold dev-server waterfall a build never pays.
+	await import('../index.ts');
 	await render(Buttons);
 	drawStroke(20);
 	drawStroke(140);

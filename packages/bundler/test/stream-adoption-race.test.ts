@@ -92,6 +92,48 @@ test.each([false, true])(
 			await page.locator('[data-cheer]').click();
 			await expect.poll(() => page.locator('[data-cheers]').textContent()).toBe('2');
 			await expect.poll(() => page.locator('[data-arm-cheers]').textContent()).toBe('2');
+			// Elements after the arm resolve through a census the committed arm spliced, not renumbered.
+			await page.locator('[data-after]').click();
+			await expect.poll(() => page.locator('[data-afters]').textContent()).toBe('1');
+			expect(errors).toEqual([]);
+		} finally {
+			await browser.close();
+			server.kill();
+		}
+	},
+	120_000,
+);
+
+// An arm that streams in before any gesture changes the element count ahead of later hosts; their
+// locators still name the order the shell was served in.
+test.each([false, true])(
+	'hosts after an arm that landed before the first gesture still resume (packing: %s)',
+	async (packing) => {
+		await rm(dist, { force: true, recursive: true });
+		await exec(resolve(root, 'node_modules/.bin/vp'), ['build', '--app'], {
+			cwd: fixture,
+			env: { ...process.env, MARKLESS_FIXTURE_NATIVE_PACKING: packing ? '1' : '0' },
+		});
+		const server = spawn(process.execPath, [resolve(fixture, 'serve.mjs'), dist], {
+			stdio: ['ignore', 'pipe', 'inherit'],
+		});
+		const [port] = (await once(server.stdout, 'data')) as [Buffer];
+		const origin = `http://127.0.0.1:${String(port).trim()}`;
+		const browser = await chromium.launch();
+		try {
+			const page = await browser.newPage();
+			const errors: string[] = [];
+			page.on('pageerror', (error) => errors.push(error.message));
+			await page.goto(`${origin}/`, { waitUntil: 'commit' });
+			await page.locator('p.waiting').waitFor();
+			expect(await (await fetch(`${origin}/__settle`)).text()).toBe('streamed');
+			await expect
+				.poll(() => page.locator('[data-cheer]').textContent(), { timeout: 5_000 })
+				.toBe('Harbor open');
+			await page.locator('[data-after]').click();
+			await expect.poll(() => page.locator('[data-afters]').textContent()).toBe('1');
+			await page.locator('[data-cheer]').click();
+			await expect.poll(() => page.locator('[data-cheers]').textContent()).toBe('1');
 			expect(errors).toEqual([]);
 		} finally {
 			await browser.close();

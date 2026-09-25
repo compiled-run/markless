@@ -1,5 +1,6 @@
 import { createServer } from 'node:net';
 import { box } from '@async/witness';
+import { isExecutionLogChunk } from '@markless/core/preload';
 import {
 	evaluateMusicSsrPreloadWindow,
 	evaluateMusicSsrRequests,
@@ -22,8 +23,9 @@ import { musicSsrAnalyzerPolicy } from './analyzer/policy.ts';
 // while execution stays lazy (resume summary still reports 0 executed).
 // The probe matcher is `/build/*.js` only: `/build/execution-sizes.json` is
 // the dev execution log auto-activating on localhost origins (PM ruling: dev
-// tooling, local-origin-gated at packages/web/src/dev-log.ts) and YouTube
-// embed traffic is out of scope. This probe lives in THIS box because witness
+// tooling, local-origin-gated at packages/web/src/dev-log.ts), a chunk holding
+// only that instrument is exempt for the same reason (no plan preloads it), and
+// YouTube embed traffic is out of scope. This probe lives in THIS box because witness
 // currently supports one nitro preview per run: a second in-process preview
 // reuses the first (closed) server entry module and 404s.
 const PLAY_TOGGLE = '[aria-label="Play or pause"]';
@@ -151,7 +153,10 @@ export default box(
 				'The first Play click charged no modules; the ledger mirrored nothing.',
 			);
 		const afterClickScripts = await waitForQuietBuildJs(page);
-		const lazyChunks = afterClickScripts.filter((path) => !startupScripts.includes(path));
+		const instrumentChunks = await executionLogChunkPaths(preview);
+		const lazyChunks = afterClickScripts.filter(
+			(path) => !startupScripts.includes(path) && !instrumentChunks.has(path),
+		);
 		receipt.note(
 			`ssr play-branch post-click /build JS request diff: ${formatPaths(lazyChunks)}`,
 		);
@@ -239,7 +244,11 @@ export default box(
 							: { actionId: 'play-pause-next-or-library' }),
 						url: request.url,
 					}))
-					.filter((observation) => new URL(observation.url).origin === fixtureOrigin),
+					.filter(
+						(observation) =>
+							new URL(observation.url).origin === fixtureOrigin &&
+							!instrumentChunks.has(new URL(observation.url).pathname),
+					),
 			}).invariant,
 			evaluateMusicSsrRequests({
 				pageOrigin: new URL(page.url).origin,
@@ -362,6 +371,24 @@ async function servedExecutionSizes(preview: {
 		throw new Error('Expected the served size map to carry a raw size for web:resume-events.');
 	}
 	return sizes;
+}
+
+async function executionLogChunkPaths(preview: {
+	request(path: string): Promise<string>;
+}): Promise<ReadonlySet<string>> {
+	const attribution = JSON.parse(await preview.request('/build/byte-attribution.json')) as {
+		readonly chunks: Record<
+			string,
+			{ readonly modules: ReadonlyArray<[string, string, number]> }
+		>;
+	};
+	return new Set(
+		Object.entries(attribution.chunks)
+			.filter(([, chunk]) =>
+				isExecutionLogChunk({ moduleIds: chunk.modules.map(([, key]) => key) }),
+			)
+			.map(([file]) => `/build/${file}`),
+	);
 }
 
 async function devLogRenderedBytes(

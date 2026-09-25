@@ -341,7 +341,7 @@ describe('debug registration mirrors successful framework wiring', () => {
 		const button = element('BUTTON'),
 			rowButton = element('BUTTON'),
 			root = element('MAIN', [button, rowButton]);
-		executeInline(await inlineHtml(), root, []);
+		executeInline(await inlineHtml(), root, [button, rowButton]);
 		const graph = createRuntimeGraph({ cells: [] });
 		const runtime = createResumeRuntime({
 			root: root as never,

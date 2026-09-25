@@ -24,7 +24,7 @@
  * the check at the same time instead of tripping each other's squatter guard.
  */
 
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { chromium, type Locator, type Page } from '@playwright/test';
 import { FAMILY_ANCHORS, PREVIEW_ORIGIN, type FamilyName } from '../preview-server.ts';
@@ -201,17 +201,21 @@ try {
 // the teardown below can reach both. Measured without it: signalling pnpm alone
 // left the vite process holding the port, and the next run of this check failed
 // its own squatter guard against the server the previous run started.
+// Windows resolves `pnpm` to pnpm.cmd only through a shell, and has no process groups to signal.
+const windows = process.platform === 'win32';
 const server = spawn('pnpm', ['exec', 'vp', 'dev'], {
 	cwd: appDir,
 	stdio: ['ignore', 'inherit', 'inherit'],
 	env: process.env,
-	detached: true,
+	detached: !windows,
+	shell: windows,
 });
 
 function signalServer(signal: NodeJS.Signals) {
 	try {
 		if (server.pid === undefined) return;
-		process.kill(-server.pid, signal);
+		if (windows) spawnSync('taskkill', ['/pid', String(server.pid), '/T', '/F']);
+		else process.kill(-server.pid, signal);
 	} catch {
 		// Already gone, or never became a group of its own.
 	}

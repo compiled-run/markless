@@ -1,4 +1,5 @@
 export {
+	isExecutionLogChunk,
 	planModulePreloadUrls,
 	planModulePreloads,
 	preloadLazySymbolModules,

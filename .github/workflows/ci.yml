@@ -35,10 +35,11 @@ jobs:
             - name: Verify committed agent files match .ruler/ sources
               run: |
                   pnpm dlx @intellectronica/ruler apply
-                  DRIFT="$(git status --porcelain -- AGENTS.md CLAUDE.md .claude/skills .codex/skills .mcp.json .codex/config.toml)"
+                  # Compare against the index so a pre-commit run with correctly staged files passes; in CI the index is HEAD.
+                  DRIFT="$(git diff --name-only -- AGENTS.md CLAUDE.md .claude/skills .codex/skills .mcp.json .codex/config.toml; git ls-files --others --exclude-standard -- AGENTS.md CLAUDE.md .claude/skills .codex/skills .mcp.json .codex/config.toml)"
                   if [ -n "$DRIFT" ]; then
                       echo "::error::Committed agent files are out of sync with .ruler/. Run 'pnpm rules' and commit the result."
-                      git status --porcelain -- AGENTS.md CLAUDE.md .claude/skills .codex/skills .mcp.json .codex/config.toml
+                      echo "$DRIFT"
                       exit 1
                   fi
 
@@ -119,7 +120,7 @@ jobs:
             key_receipts: ${{ steps.receipts.outputs.cache-primary-key }}
             run_receipts: ${{ steps.receipts.outputs.cache-hit != 'true' }}
             run_playwright:
-                ${{ steps.browser.outputs.cache-hit != 'true' || steps.boxes_bundler.outputs.cache-hit
+                ${{ steps.unit.outputs.cache-hit != 'true' || steps.browser.outputs.cache-hit != 'true' || steps.boxes_bundler.outputs.cache-hit
                 != 'true' || steps.boxes_router.outputs.cache-hit != 'true' ||
                 steps.boxes_music_player.outputs.cache-hit != 'true' ||
                 steps.boxes_music_player_ssr.outputs.cache-hit != 'true' }}
@@ -268,10 +269,11 @@ jobs:
                   echo "boxes-music-player-ssr=${{ steps.boxes_music_player_ssr.outputs.cache-hit != 'true' }}"
                   echo "receipts=${{ steps.receipts.outputs.cache-hit != 'true' }}"
 
-    # One Chromium download for the whole run: the browser and box lanes restore
-    # this cache instead of each fetching its own copy, which is what used to
-    # hang a runner for 28 minutes. Keyed by the lockfile, so the pinned
-    # Playwright version is part of the key.
+    # One browser download for the whole run: the unit, browser and box lanes
+    # restore this cache instead of each fetching its own copy, which is what
+    # used to hang a runner for 28 minutes. Keyed by the lockfile, so the pinned
+    # Playwright version is part of the key. WebKit rides along for the node
+    # tests that drive both engines.
     prepare-playwright:
         needs: lanes
         if: needs.lanes.outputs.run_playwright == 'true'
@@ -304,23 +306,23 @@ jobs:
               id: playwright-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-${{ runner.os }}-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+                  key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
                   path: .cache/ms-playwright
 
             - name: Install Markless dependencies
               if: steps.playwright-cache.outputs.cache-hit != 'true'
               run: pnpm install --frozen-lockfile
 
-            - name: Install the pinned Chromium
+            - name: Install the pinned Chromium and WebKit
               if: steps.playwright-cache.outputs.cache-hit != 'true'
               timeout-minutes: 10
-              run: pnpm --dir packages/vitest-browser exec playwright install --with-deps chromium
+              run: pnpm --dir packages/vitest-browser exec playwright install --with-deps chromium webkit
 
             - name: Save the Playwright browser cache
               if: steps.playwright-cache.outputs.cache-hit != 'true'
               uses: actions/cache/save@v4
               with:
-                  key: playwright-${{ runner.os }}-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+                  key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
                   path: .cache/ms-playwright
 
     # The steps that used to run back-to-back inside one 30-minute `test` job
@@ -330,8 +332,9 @@ jobs:
     # keeps its name and its meaning.
 
     # Node vitest project, split by test file across three runners (~200 files).
+    # Its fixture tests launch Chromium and WebKit, so it restores the prepared browser cache.
     unit:
-        needs: [typecheck, lanes]
+        needs: [typecheck, lanes, prepare-playwright]
         if: needs.lanes.outputs.run_unit == 'true'
         runs-on: ubuntu-latest
         timeout-minutes: 20
@@ -340,6 +343,7 @@ jobs:
             matrix:
                 shard: ['1/3', '2/3', '3/3']
         env:
+            PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.cache/ms-playwright
             NPM_CONFIG_AUDIT: 'false'
             NPM_CONFIG_FUND: 'false'
             NPM_CONFIG_PREFER_OFFLINE: 'true'
@@ -363,6 +367,21 @@ jobs:
 
             - name: Install Markless dependencies
               run: pnpm install --frozen-lockfile
+
+            - name: Restore the Playwright browser cache
+              id: playwright-cache
+              uses: actions/cache/restore@v4
+              with:
+                  key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
+                  path: .cache/ms-playwright
+
+            - name: Install Playwright system dependencies
+              run: pnpm --dir packages/vitest-browser exec playwright install-deps chromium webkit
+
+            - name: Install Playwright browsers for the node fixture tests
+              if: steps.playwright-cache.outputs.cache-hit != 'true'
+              timeout-minutes: 10
+              run: pnpm --dir packages/vitest-browser exec playwright install chromium webkit
 
             - name: Run unit and integration tests
               run: pnpm exec vp test --project node --shard=${{ matrix.shard }}
@@ -410,7 +429,7 @@ jobs:
               id: playwright-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-${{ runner.os }}-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+                  key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
                   path: .cache/ms-playwright
 
             - name: Install Playwright system dependencies
@@ -513,7 +532,7 @@ jobs:
               id: playwright-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-${{ runner.os }}-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+                  key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
                   path: .cache/ms-playwright
 
             - name: Install Playwright system dependencies
@@ -586,7 +605,7 @@ jobs:
               id: playwright-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-${{ runner.os }}-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+                  key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
                   path: .cache/ms-playwright
 
             - name: Install Playwright system dependencies
@@ -656,7 +675,7 @@ jobs:
               id: playwright-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-${{ runner.os }}-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+                  key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
                   path: .cache/ms-playwright
 
             - name: Install Playwright system dependencies
@@ -729,7 +748,7 @@ jobs:
               id: playwright-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-${{ runner.os }}-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+                  key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
                   path: .cache/ms-playwright
 
             - name: Install Playwright system dependencies
@@ -1140,8 +1159,14 @@ jobs:
               working-directory: ${{ env.MARKLESS_BASE_REPO_ROOT }}
               run: pnpm install --frozen-lockfile
 
+            # Pinned so upstream HEAD cannot change the harness under an unchanged tree.
             - name: Checkout JS Framework Benchmark
-              run: git clone --depth 1 https://github.com/krausest/js-framework-benchmark.git "$JSFB_ROOT"
+              env:
+                  JSFB_SHA: f2df01a8679de05225c32714ca8cecbea3d78c5d
+              run: |
+                  git init -q "$JSFB_ROOT"
+                  git -C "$JSFB_ROOT" fetch -q --depth 1 https://github.com/krausest/js-framework-benchmark.git "$JSFB_SHA"
+                  git -C "$JSFB_ROOT" checkout -q FETCH_HEAD
 
             - name: Cache JS Framework Benchmark npm downloads
               uses: actions/cache@v4

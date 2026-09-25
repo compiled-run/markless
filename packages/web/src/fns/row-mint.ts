@@ -118,20 +118,101 @@ export function mintRowNodes(
 		);
 	const valueAt = (at: number, slot: ProtocolRowTemplateSlotValue) =>
 		values ? values[at] : slotValue(slot, item, graph);
-	for (const [at, slot] of attributeSlots.entries()) {
-		const value = marklessAttributeValue(slot.name, valueAt(slots.length + at, slot)),
-			rest = hosts[at]!.getAttribute?.(slot.name);
-		// An always-present attribute is already in the html, a scoped class with its scope class.
-		if (rest == null && value === null) hosts[at]!.removeAttribute?.(slot.name);
-		else
-			hosts[at]!.setAttribute!(
-				slot.name,
-				rest?.endsWith(' ') ? rest + (value ?? '') : (value ?? '') + (rest ?? ''),
-			);
-	}
+	for (const [at, slot] of attributeSlots.entries())
+		writeAttribute(
+			hosts[at]!,
+			slot.name,
+			valueAt(slots.length + at, slot),
+			hosts[at]!.getAttribute?.(slot.name),
+		);
 	for (const [at, slot] of slots.entries())
 		anchors[at]!.replaceWith!(host.createTextNode(String(valueAt(at, slot) ?? '')));
 	return { rowRoot, nodes };
+}
+
+/** Writes moved slot values onto the live row, keeping its elements and focus; false (nothing written) means rebuild. */
+export function patchRow(
+	row: ResumeDomElement,
+	repeat: ResumeKeyedRepeatRecord,
+	before: ReadonlyArray<unknown>,
+	after: ReadonlyArray<unknown>,
+): boolean {
+	const template = repeat.rowTemplate!,
+		texts = template.textSlots ?? [],
+		writes: Array<() => void> = [];
+	let targets = slotTargets.get(template);
+	if (!targets) {
+		const host = row.ownerDocument?.createElement?.('template');
+		if (!host) return false;
+		host.innerHTML = template.html;
+		const nodes = Array.from(host.content?.childNodes ?? []) as ReadonlyArray<ResumeDomNode>;
+		targets = [...texts, ...(template.attributeSlots ?? [])].map((slot, at) =>
+			slotTarget(nodes, slot.path, at < texts.length),
+		);
+		slotTargets.set(template, targets);
+	}
+	for (const [at, value] of after.entries()) {
+		if (Object.is(value, before[at])) continue;
+		const [path, source] = targets[at] ?? [];
+		let node: ResumeDomNode | undefined = path && row;
+		for (const index of path ?? []) node = childElements(node)[index];
+		const element = node as (AttributableNode & Record<string, unknown>) | undefined;
+		if (!element) return false;
+		if (at < texts.length) {
+			if (Array.from(element.childNodes ?? []).some((kid, at) => at || kid.nodeType !== 3))
+				return false;
+			writes.push(() => (element.textContent = String(value ?? '')));
+		} else {
+			const name = template.attributeSlots![at - texts.length]!.name;
+			writes.push(() => writeAttribute(element, name, value, source!.getAttribute?.(name)));
+		}
+	}
+	for (const write of writes) write();
+	return true;
+}
+
+// Per slot: element indexes under the row root, and the template element holding the slot's static part.
+const slotTargets = new WeakMap<
+	object,
+	ReadonlyArray<readonly [number[], AttributableNode] | undefined>
+>();
+
+// A text slot must be its element's only child.
+function slotTarget(
+	nodes: ReadonlyArray<ResumeDomNode>,
+	path: ReadonlyArray<number>,
+	text: boolean,
+): readonly [number[], AttributableNode] | undefined {
+	let node = nodes[path[0]!];
+	if (node !== nodes.find((root) => root.nodeType === 1)) return;
+	const indexes: number[] = [];
+	for (const index of path.slice(1, text ? -1 : undefined)) {
+		const child: ResumeDomNode | undefined = node?.childNodes?.[index];
+		if (child?.nodeType !== 1) return;
+		indexes.push(childElements(node).indexOf(child));
+		node = child;
+	}
+	return node?.nodeType === 1 && (!text || node.childNodes?.length === 1)
+		? [indexes, node]
+		: undefined;
+}
+
+// An always-present attribute is already in the html, a scoped class with its scope class; a live control's state is its property.
+function writeAttribute(
+	element: AttributableNode & Record<string, unknown>,
+	name: string,
+	value: unknown,
+	rest: string | null | undefined,
+): void {
+	const text = marklessAttributeValue(name, value);
+	if (rest == null && text === null) element.removeAttribute?.(name);
+	else
+		element.setAttribute?.(
+			name,
+			rest?.endsWith(' ') ? rest + (text ?? '') : (text ?? '') + (rest ?? ''),
+		);
+	if ((name === 'checked' || name === 'selected' || name === 'value') && name in element)
+		element[name] = name === 'value' ? (text ?? '') : text !== null;
 }
 
 /** Where focus sits inside a row about to be rebuilt, as element indexes under the row root. */

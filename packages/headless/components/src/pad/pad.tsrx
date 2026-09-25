@@ -464,7 +464,8 @@ export function PadValueLabel({ ...rest }: PadValueLabelProps) @{
 		return pointText(heldPoint(list, at, boundsOf(lowX, highX, lowY, highY)));
 	});
 
-	<output {...rest} ui-value={readoutText} ui-disabled={pad.disabled}>{readoutText}</output>
+	// It follows focus, not only the value: live, it would repeat what the focused handle just said.
+	<output {...rest} aria-live="off" ui-value={readoutText} ui-disabled={pad.disabled}>{readoutText}</output>
 }
 
 // No handler of its own: the input is clipped, aria-hidden and out of the tab

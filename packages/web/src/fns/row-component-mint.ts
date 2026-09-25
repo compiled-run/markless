@@ -19,6 +19,7 @@ import {
 	mintRow as mintTemplateRow,
 	mintRowNodes,
 	nodeAtPath,
+	patchRow,
 	refocus,
 	renderEmptyArm,
 	type RowMintGraph,
@@ -75,6 +76,7 @@ export type RowComponentMintApi = {
 	readonly renderEmptyArm: typeof renderEmptyArm;
 	readonly focusPath: typeof focusPath;
 	readonly refocus: typeof refocus;
+	readonly patchRow: typeof patchRow;
 	mintRow(
 		parent: ResumeDomElement,
 		repeat: ResumeKeyedRepeatRecord,
@@ -156,6 +158,7 @@ export function marklessRowComponentMint(
 	return {
 		renderEmptyArm,
 		focusPath,
+		patchRow,
 		refocus,
 		mintRow(parent, repeat, item, rowMintGraph, values) {
 			if (!repeat.rowComponent)
