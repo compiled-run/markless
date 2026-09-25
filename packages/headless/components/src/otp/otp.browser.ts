@@ -64,6 +64,21 @@ function item(prefix: string, index: number) {
 	return el(page.getByTestId(`${prefix}${index}`));
 }
 
+// A box's own character: its text, without the caret slot a consumer put inside it.
+function char(prefix: string, index: number) {
+	return Array.from(item(prefix, index).childNodes)
+		.filter((node) => node.nodeType === Node.TEXT_NODE)
+		.map((node) => node.textContent)
+		.join('');
+}
+
+// The caret slot is the consumer's own markup: writing the character never removes it.
+function expectCaretKept(index: number) {
+	expect(
+		item('item-', index).querySelector(`[data-testid="indicator-${index}"]`)?.textContent,
+	).toBe('|');
+}
+
 // A real clipboard paste is not drivable from browser mode, and neither is SMS
 // autofill. Both reach the page as one input event carrying the whole string,
 // which is what this writes — the honest substitute, named so nobody reads the
@@ -150,16 +165,16 @@ function expectOneFormControl() {
 
 function expectPrefilledRendered() {
 	expect(el<HTMLInputElement>(Field).value).toBe('1234');
-	expect(item('item-', 0).textContent).toBe('1');
-	expect(item('item-', 1).textContent).toBe('2');
-	expect(item('item-', 2).textContent).toBe('3');
-	expect(item('item-', 3).textContent).toBe('4');
+	expect(char('item-', 0)).toBe('1');
+	expect(char('item-', 1)).toBe('2');
+	expect(char('item-', 2)).toBe('3');
+	expect(char('item-', 3)).toBe('4');
 	// Only the boxes with no character left carry the empty flag.
 	expect(item('item-', 0).hasAttribute('ui-empty')).toBe(false);
 	expect(item('item-', 3).hasAttribute('ui-empty')).toBe(false);
 	expect(item('item-', 4).getAttribute('ui-empty')).toBe('');
 	expect(item('item-', 5).getAttribute('ui-empty')).toBe('');
-	expect(item('item-', 4).textContent).toBe('');
+	expect(char('item-', 4)).toBe('');
 }
 
 function expectDisabledRendered() {
@@ -170,8 +185,8 @@ function expectDisabledRendered() {
 	// Locked part-way through: the boxes still paint what was entered.
 	expect(el<HTMLInputElement>(PartialField).disabled).toBe(true);
 	expect(el(PartialRoot).getAttribute('ui-disabled')).toBe('');
-	expect(item('partial-item-', 0).textContent).toBe('1');
-	expect(item('partial-item-', 1).textContent).toBe('2');
+	expect(char('partial-item-', 0)).toBe('1');
+	expect(char('partial-item-', 1)).toBe('2');
 	expect(item('partial-item-', 2).getAttribute('ui-empty')).toBe('');
 }
 
@@ -210,7 +225,7 @@ function expectTwoWidgetsRendered() {
 	expect(el<HTMLInputElement>(SmsField).value).toBe('');
 	expect(el<HTMLInputElement>(AppField).value).toBe('99');
 	expect(item('sms-item-', 0).getAttribute('ui-empty')).toBe('');
-	expect(item('app-item-', 0).textContent).toBe('9');
+	expect(char('app-item-', 0)).toBe('9');
 	expect(item('app-item-', 2).getAttribute('ui-empty')).toBe('');
 }
 
@@ -313,13 +328,14 @@ test('CSR: each keystroke fills the next box and leaves the rest empty', async (
 	el(Field).focus();
 
 	await userEvent.keyboard('4');
-	await expect.poll(() => item('item-', 0).textContent).toBe('4');
+	await expect.poll(() => char('item-', 0)).toBe('4');
+	expectCaretKept(0);
 	expect(item('item-', 0).hasAttribute('ui-empty')).toBe(false);
 	expect(item('item-', 1).getAttribute('ui-empty')).toBe('');
 
 	await userEvent.keyboard('2');
-	await expect.poll(() => item('item-', 1).textContent).toBe('2');
-	expect(item('item-', 0).textContent).toBe('4');
+	await expect.poll(() => char('item-', 1)).toBe('2');
+	expect(char('item-', 0)).toBe('4');
 	expect(item('item-', 2).getAttribute('ui-empty')).toBe('');
 	expect(el<HTMLInputElement>(Field).value).toBe('42');
 });
@@ -334,7 +350,7 @@ test('CSR: clicking a box focuses the field, and typing then fills it', async ()
 	await expect.poll(() => document.activeElement).toBe(el(Field));
 
 	await userEvent.keyboard('7');
-	await expect.poll(() => item('item-', 0).textContent).toBe('7');
+	await expect.poll(() => char('item-', 0)).toBe('7');
 	expect(el<HTMLInputElement>(Field).value).toBe('7');
 });
 
@@ -343,14 +359,17 @@ test('CSR: Backspace takes the last character back out of its box', async () => 
 	el(Field).focus();
 
 	await userEvent.keyboard('42');
-	await expect.poll(() => item('item-', 1).textContent).toBe('2');
+	await expect.poll(() => char('item-', 1)).toBe('2');
 
 	await userEvent.keyboard('{Backspace}');
 	await expect.poll(() => item('item-', 1).getAttribute('ui-empty')).toBe('');
-	expect(item('item-', 1).textContent).toBe('');
+	expect(char('item-', 1)).toBe('');
+	// Emptied, the box still holds its caret: the text write owns only its text.
+	expectCaretKept(1);
+	expect(item('item-', 1).textContent).toBe('|');
 	// The character before it is untouched: the code is one string, so moving
 	// left across the boxes costs the family no code at all.
-	expect(item('item-', 0).textContent).toBe('4');
+	expect(char('item-', 0)).toBe('4');
 	expect(el<HTMLInputElement>(Field).value).toBe('4');
 });
 
@@ -375,7 +394,7 @@ test('CSR: typing past the last box adds nothing', async () => {
 	el(Field).focus();
 
 	await userEvent.keyboard('12345');
-	await expect.poll(() => item('item-', 3).textContent).toBe('4');
+	await expect.poll(() => char('item-', 3)).toBe('4');
 	expect(el<HTMLInputElement>(Field).value).toBe('1234');
 });
 
@@ -383,9 +402,9 @@ test('CSR: a whole code arriving at once fills every box', async () => {
 	await render(Basic);
 	pasteInto(el<HTMLInputElement>(Field), '123456');
 
-	await expect.poll(() => item('item-', 5).textContent).toBe('6');
-	expect(item('item-', 0).textContent).toBe('1');
-	expect(item('item-', 2).textContent).toBe('3');
+	await expect.poll(() => char('item-', 5)).toBe('6');
+	expect(char('item-', 0)).toBe('1');
+	expect(char('item-', 2)).toBe('3');
 	expect(el<HTMLInputElement>(Field).value).toBe('123456');
 });
 
@@ -393,7 +412,7 @@ test('CSR: a longer code arriving at once keeps only one character per box', asy
 	await render(Basic);
 	pasteInto(el<HTMLInputElement>(Field), '12345678');
 
-	await expect.poll(() => item('item-', 5).textContent).toBe('6');
+	await expect.poll(() => char('item-', 5)).toBe('6');
 	expect(el<HTMLInputElement>(Field).value).toBe('123456');
 });
 
@@ -412,10 +431,10 @@ test('CSR: typing in one field leaves its neighbour alone', async () => {
 	el(SmsField).focus();
 
 	await userEvent.keyboard('12');
-	await expect.poll(() => item('sms-item-', 1).textContent).toBe('2');
+	await expect.poll(() => char('sms-item-', 1)).toBe('2');
 	// The other widget keeps its own value and its own boxes.
 	expect(el<HTMLInputElement>(AppField).value).toBe('99');
-	expect(item('app-item-', 0).textContent).toBe('9');
+	expect(char('app-item-', 0)).toBe('9');
 	expect(item('app-item-', 2).getAttribute('ui-empty')).toBe('');
 });
 
@@ -466,7 +485,7 @@ test('CSR: a field with no onChange still fills its boxes', async () => {
 	el(Field).focus();
 
 	await userEvent.keyboard('12');
-	await expect.poll(() => item('item-', 1).textContent).toBe('2');
+	await expect.poll(() => char('item-', 1)).toBe('2');
 	expect(el<HTMLInputElement>(Field).value).toBe('12');
 });
 
@@ -475,7 +494,7 @@ test('CSR: onComplete fires once, on the keystroke that fills the last box', asy
 	el(Field).focus();
 
 	await userEvent.keyboard('123');
-	await expect.poll(() => item('item-', 2).textContent).toBe('3');
+	await expect.poll(() => char('item-', 2)).toBe('3');
 	expect(el(Completions).textContent).toBe('0');
 
 	await userEvent.keyboard('4');
@@ -498,7 +517,7 @@ test('CSR: five boxes make a five-character code, and onComplete waits for the f
 	el(Field).focus();
 
 	await userEvent.keyboard('1234');
-	await expect.poll(() => item('item-', 3).textContent).toBe('4');
+	await expect.poll(() => char('item-', 3)).toBe('4');
 	expect(el(Completions).textContent).toBe('0');
 
 	await userEvent.keyboard('5');
@@ -553,13 +572,13 @@ test.skip('SSR: the served field and boxes carry the code, and the next keystrok
 	await renderSSR(Prefilled);
 	// What the server sent, before anything resumed.
 	expect(el<HTMLInputElement>(Field).value).toBe('1234');
-	expect(item('item-', 3).textContent).toBe('4');
+	expect(char('item-', 3)).toBe('4');
 	expect(item('item-', 4).getAttribute('ui-empty')).toBe('');
 
 	el(Field).focus();
 	await userEvent.keyboard('5');
 	await expect.poll(() => el<HTMLInputElement>(Field).value).toBe('12345');
-	await expect.poll(() => item('item-', 4).textContent).toBe('5');
+	await expect.poll(() => char('item-', 4)).toBe('5');
 	expect(item('item-', 4).hasAttribute('ui-empty')).toBe(false);
 });
 
@@ -567,8 +586,10 @@ test('SSR: a code arriving at once after resume fills every box', async () => {
 	await renderSSR(Basic);
 	pasteInto(el<HTMLInputElement>(Field), '246810');
 
-	await expect.poll(() => item('item-', 5).textContent).toBe('0');
-	expect(item('item-', 0).textContent).toBe('2');
+	await expect.poll(() => char('item-', 5)).toBe('0');
+	expect(char('item-', 0)).toBe('2');
+	expectCaretKept(0);
+	expectCaretKept(5);
 });
 
 // The arm-delivered verdict this family was asked for, in two halves. A part is
@@ -618,15 +639,15 @@ test('CSR: focusing a field that already holds a code puts the caret at the end'
 
 	await userEvent.keyboard('5');
 	await expect.poll(() => input.value).toBe('12345');
-	await expect.poll(() => item('item-', 4).textContent).toBe('5');
+	await expect.poll(() => char('item-', 4)).toBe('5');
 });
 
 test('CSR: an arm-delivered box follows the code like any other', async () => {
 	await render(ArmedLength);
 	pasteInto(el<HTMLInputElement>(Field), '13');
 
-	await expect.poll(() => item('sms-item-', 0).textContent).toBe('1');
-	expect(item('sms-item-', 1).textContent).toBe('3');
+	await expect.poll(() => char('sms-item-', 0)).toBe('1');
+	expect(char('sms-item-', 1)).toBe('3');
 	expect(item('sms-item-', 2).getAttribute('ui-empty')).toBe('');
 });
 
@@ -646,12 +667,12 @@ test('CSR: a digit typed with the caret walked back is pushed in, not written ov
 	input.focus();
 
 	await userEvent.keyboard('1234');
-	await expect.poll(() => item('item-', 3).textContent).toBe('4');
+	await expect.poll(() => char('item-', 3)).toBe('4');
 
 	await userEvent.keyboard('{ArrowLeft}9');
-	await expect.poll(() => item('item-', 3).textContent).toBe('9');
+	await expect.poll(() => char('item-', 3)).toBe('9');
 	// The character that was under the caret moved along rather than being replaced.
-	expect(item('item-', 4).textContent).toBe('4');
+	expect(char('item-', 4)).toBe('4');
 	expect(input.value).toBe('12394');
 });
 
@@ -661,10 +682,10 @@ test('CSR: backspace with the caret walked back takes the character before it', 
 	input.focus();
 
 	await userEvent.keyboard('1234');
-	await expect.poll(() => item('item-', 3).textContent).toBe('4');
+	await expect.poll(() => char('item-', 3)).toBe('4');
 
 	await userEvent.keyboard('{ArrowLeft}{Backspace}');
-	await expect.poll(() => item('item-', 2).textContent).toBe('4');
+	await expect.poll(() => char('item-', 2)).toBe('4');
 	expect(item('item-', 3).getAttribute('ui-empty')).toBe('');
 	expect(input.value).toBe('124');
 });
@@ -677,7 +698,7 @@ test('CSR: a full code takes no digit, even with the caret in the middle', async
 	input.focus();
 
 	await userEvent.keyboard('123456');
-	await expect.poll(() => item('item-', 5).textContent).toBe('6');
+	await expect.poll(() => char('item-', 5)).toBe('6');
 
 	await userEvent.keyboard('{ArrowLeft}{ArrowLeft}7');
 	// The refused digit is waited out by a Backspace through the same field: it
@@ -686,7 +707,7 @@ test('CSR: a full code takes no digit, even with the caret in the middle', async
 	// own text in the browser before any handler runs, so only the box proves
 	// the committed write.
 	await userEvent.keyboard('{Backspace}');
-	await expect.poll(() => item('item-', 3).textContent).toBe('5');
+	await expect.poll(() => char('item-', 3)).toBe('5');
 	expect(item('item-', 5).getAttribute('ui-empty')).toBe('');
 	expect(input.value).toBe('12356');
 });

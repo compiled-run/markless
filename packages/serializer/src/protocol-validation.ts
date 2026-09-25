@@ -509,6 +509,7 @@ function assertOptionalKeyedRepeats(record: Record<string, unknown>): void {
 		assertOptionalRowElementHandles(repeat, `${context}.rowElementHandles`);
 		assertOptionalEmptyArm(repeat, `${context}.emptyArm`);
 		assertOptionalRowTemplate(repeat, `${context}.rowTemplate`);
+		assertOptionalPropRoutes(repeat, `${context}.propRoutes`);
 		assertOptionalRowComponent(repeat, `${context}.rowComponent`);
 	}
 }
@@ -520,6 +521,23 @@ function assertOptionalEnclosingRow(record: Record<string, unknown>, context: st
 	assertStringField(enclosingRow, 'repeatId', context);
 	assertNonNegativeIntegerArrayField(enclosingRow, 'parentHostPath', context);
 	assertOptionalStringArrayField(enclosingRow, 'itemPath', context);
+}
+
+function assertOptionalPropRoutes(record: Record<string, unknown>, context: string): void {
+	const routes = record.propRoutes;
+	if (routes === undefined) return;
+	if (!Array.isArray(routes))
+		throw invalidPayloadShapeError(
+			contextPayloadType(context),
+			`Invalid ${context}: expected array.`,
+		);
+	for (const [index, route] of routes.entries()) {
+		const routeContext = `${context}[${index}]`;
+		assertRecordShape(route, routeContext);
+		assertStringField(route, 'name', routeContext);
+		assertStringField(route, 'graphNodeId', routeContext);
+		assertStringArrayField(route, 'path', routeContext);
+	}
 }
 
 function assertOptionalRowComponent(record: Record<string, unknown>, context: string): void {

@@ -86,6 +86,7 @@ function authoredHandlerReads(
 export function handlerReadGraphNodeIds(input: PublicRenderModuleInput): ReadonlySet<string> {
 	return new Set([
 		...input.symbolResolver.symbols.flatMap(authoredHandlerReads),
+		...flippedArmReadGraphNodeIds(input),
 		// A lifted collection's row handler reads its item out of it, and its derive
 		// can read a constant prop no browser graph holds, so its value is served.
 		...input.semanticGraph.keyedRepeats.flatMap((repeat) =>
@@ -94,6 +95,42 @@ export function handlerReadGraphNodeIds(input: PublicRenderModuleInput): Readonl
 				: [],
 		),
 	]);
+}
+
+// A flip after resume reads its arm's values off the resumed graph, just as a handler does.
+function flippedArmReadGraphNodeIds(input: PublicRenderModuleInput): ReadonlyArray<string> {
+	const flipped = new Set(
+		input.symbolResolver.symbols.flatMap((symbol) =>
+			symbol.kind === 'branch-update' ? [symbol.branchSiteId] : [],
+		),
+	);
+	if (flipped.size === 0) return [];
+	const chunks = new Map(input.renderData.chunks.map((chunk) => [chunk.id, chunk]));
+	const reads = new Set<string>();
+	const walked = new Set<string>();
+	const addResidue = (residue: { readonly kind: string; readonly graphNodeId?: string }) => {
+		if (residue.kind === 'graph-read' && residue.graphNodeId) reads.add(residue.graphNodeId);
+	};
+	const walk = (chunkId: string) => {
+		if (walked.has(chunkId)) return;
+		walked.add(chunkId);
+		for (const slot of chunks.get(chunkId)?.slots ?? []) {
+			if (slot.kind === 'text' || slot.kind === 'attribute') addResidue(slot.residue);
+			else if (slot.kind === 'dynamic-host') {
+				for (const attribute of slot.attributeSlots) addResidue(attribute.residue);
+				walk(slot.childChunkId);
+			} else if (slot.kind === 'branch') for (const armId of slot.armTemplateIds) walk(armId);
+			else if (slot.kind === 'repeat') {
+				const repeat = input.renderData.repeats.find(
+					(candidate) => candidate.repeatId === slot.repeatId,
+				);
+				if (repeat?.collectionGraphNodeId) reads.add(repeat.collectionGraphNodeId);
+			}
+		}
+	};
+	for (const branch of input.renderData.branches ?? [])
+		if (flipped.has(branch.branchSiteId)) for (const armId of branch.armChunkIds) walk(armId);
+	return [...reads];
 }
 
 /**

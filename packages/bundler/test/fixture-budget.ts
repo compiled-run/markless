@@ -5,7 +5,7 @@ import { BUDGETS } from '../../../scripts/benchmarks/perf-guards/config.mjs';
 import type { RuntimeSizeReport } from '../test-support/runtime-size.ts';
 
 export type RuntimeBudget = {
-	readonly maxRuntimeChunkGzipBytes: number;
+	readonly maxRuntimeChunkGzipBytes?: number;
 	readonly maxEmittedRuntimeGzipBytes: number;
 	readonly forbidVitePreloadHelper?: boolean;
 };
@@ -20,7 +20,8 @@ export function assertRuntimeBudget(input: {
 		`expected at least one runtime-heavy emitted chunk\n${emittedReport.summary}`,
 	);
 	assert(
-		(emittedReport.largestRuntimeChunk?.gzipBytes ?? 0) <= budget.maxRuntimeChunkGzipBytes,
+		budget.maxRuntimeChunkGzipBytes === undefined ||
+			(emittedReport.largestRuntimeChunk?.gzipBytes ?? 0) <= budget.maxRuntimeChunkGzipBytes,
 		`largest runtime chunk gzip budget exceeded: ${emittedReport.largestRuntimeChunk?.gzipBytes ?? 0} > ${budget.maxRuntimeChunkGzipBytes}\n${emittedReport.summary}`,
 	);
 	// Owner ruling 2026-07-05: no per-page fetch metric — fetched-but-unexecuted code is

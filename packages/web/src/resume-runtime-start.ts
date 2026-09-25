@@ -1,5 +1,7 @@
 import { PROTOCOL_VISIBLE_EVENT_NAME } from '../../serializer/src/protocol-event-names.ts';
 import type { DomJournalEntry, DomJournalResult } from '@markless/runtime';
+// Only resume.ts loads this module, and it imports the locators statically already.
+import { elementsBetweenAnchors, hostIdsInsideRemovedElements } from './resume-locators.ts';
 import type { AsyncBoundarySettleTracker } from './resume-async-wiring.ts';
 import type { ArmCommitUpdate } from './resume-commit-arm.ts';
 import type { OverlayHiddenBoundRoot } from './overlay-handoff.ts';
@@ -137,7 +139,7 @@ export async function startResumeRuntime(input: {
 		);
 	}
 	if ((runtimeInput.view.keyedRepeats ?? []).length > 0) {
-		const keyedRepeats = await import('./resume-keyed-repeats.ts');
+		const keyedRepeats = await import('./resume-keyed-repeats-lazy.ts');
 		await keyedRepeats.primeKeyedRepeatCollections({
 			graph: runtimeInput.graph,
 			repeats: runtimeInput.view.keyedRepeats ?? [],
@@ -344,20 +346,18 @@ async function disposeRemovedAsyncRangeHosts(
 	entries: ReadonlyArray<DomJournalEntry>,
 	disposeHost: (hostNodeId: string) => void,
 ): Promise<void> {
-	let locators: typeof import('./resume-locators.ts') | undefined;
 	for (const entry of entries) {
 		if (entry.type !== 'removeRange' || !entry.locator.startsWith('async-boundary:')) continue;
 		const boundary = prepared.asyncBoundariesById.get(
 			entry.locator.slice('async-boundary:'.length),
 		);
 		if (!boundary) continue;
-		locators ??= await import('./resume-locators.ts');
-		const removed = locators.elementsBetweenAnchors(
+		const removed = elementsBetweenAnchors(
 			input.root,
 			boundary.startAnchor,
 			boundary.endAnchor,
 		);
-		for (const id of locators.hostIdsInsideRemovedElements(prepared.elementsByHostId, removed))
+		for (const id of hostIdsInsideRemovedElements(prepared.elementsByHostId, removed))
 			disposeHost(id);
 	}
 }

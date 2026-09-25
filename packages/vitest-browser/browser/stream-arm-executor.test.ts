@@ -412,3 +412,39 @@ test('__mArm commits a later-flushed template into the anchor range without the 
 		delete (globalThis as { __mArm?: unknown }).__mArm;
 	}
 });
+
+test('__mArm commits until the runtime reads the streamed patches, then leaves the template unflushed', async () => {
+	for (const adopted of [false, true]) {
+		const stream = await renderToStream(beaconArtifact(30) as never, {});
+		const host = document.createElement('div');
+		document.body.appendChild(host);
+		const tail = document.createElement('div');
+		document.body.appendChild(tail);
+		try {
+			host.innerHTML = stream.shell;
+			const root = host.querySelector('[data-async-container]') as Element & {
+				__asyncResumeRuntimeStarted?: boolean;
+				__mAdopted?: boolean;
+			};
+			// A wake marks the runtime started before its adoption code has loaded.
+			root.__asyncResumeRuntimeStarted = true;
+			if (adopted) root.__mAdopted = true;
+			for await (const chunk of stream.appends()) {
+				tail.insertAdjacentHTML('beforeend', chunk);
+				runInlineScripts(tail);
+			}
+			await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 50)));
+			if (adopted) {
+				expect(host.querySelector('[data-waiting]')).not.toBeNull();
+				expect(document.querySelector('template[m\\:arm="beacon:0"]')).not.toBeNull();
+			} else {
+				expect(host.querySelector('[data-signal]')?.textContent).toBe('Signal locked');
+				expect(document.querySelector('template[m\\:arm]')).toBeNull();
+			}
+		} finally {
+			tail.remove();
+			host.remove();
+			delete (globalThis as { __mArm?: unknown }).__mArm;
+		}
+	}
+});

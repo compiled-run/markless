@@ -249,3 +249,13 @@ it('refreshes generated API descriptions and anatomy scene data when inputs chan
 	expect(next.modules[0]!.data).not.toEqual(first.modules[0]!.data);
 	expect(next.modules[1]!.data).not.toEqual(first.modules[1]!.data);
 });
+it('names generated modules the same from any checkout path', async () => {
+	const source = api + '<ApiTable family="tabs" />';
+	const [first, second] = await Promise.all(
+		[setup(), setup()].map(({ root, id }) => prepareDocsData(source, id, root, inputs)),
+	);
+	const names = (result: typeof first) =>
+		result.modules.map((module) => module.file.split('/').pop());
+	expect(names(first)).toEqual(names(second));
+	expect(first.code.replace(/import .*\n/g, '')).toBe(second.code.replace(/import .*\n/g, ''));
+});

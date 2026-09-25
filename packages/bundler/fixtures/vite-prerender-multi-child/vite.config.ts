@@ -3,12 +3,13 @@ import { defineConfig } from 'vite-plus';
 import { markless } from '@markless/bundler/vite';
 
 const root = import.meta.dirname;
+const page = process.env.MARKLESS_FIXTURE_PAGE ?? 'App.tsrx';
 const marklessPlugins = (() => {
 	const previousPrerender = process.env.MARKLESS_PRERENDER;
 	process.env.MARKLESS_PRERENDER = '1';
 	try {
 		return markless({
-			experimentalNativePacking: process.env.MARKLESS_FIXTURE_NATIVE_PACKING === '1',
+			packing: process.env.MARKLESS_FIXTURE_NATIVE_PACKING !== '0',
 		});
 	} finally {
 		if (previousPrerender === undefined) delete process.env.MARKLESS_PRERENDER;
@@ -37,7 +38,7 @@ export default defineConfig({
 			consumer: 'server',
 			build: {
 				rolldownOptions: {
-					input: { prerender: resolve(root, 'src/App.tsrx') },
+					input: { prerender: resolve(root, 'src', page) },
 				},
 			},
 		},

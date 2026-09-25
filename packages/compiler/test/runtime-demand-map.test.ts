@@ -708,3 +708,63 @@ test('lean dispatch marker modules name existing web runtime sources', () => {
 		).toBe(true);
 	}
 });
+
+// A control written inside an async arm is absent from the flat event stream, yet the page can click it.
+test('an event inside an async boundary arm is a planner action owned by its boundary record', async () => {
+	for (const [filename, source, eventName] of [
+		[
+			'/workspace/src/Harbor.tsrx',
+			`import { computed, state } from '@markless/core';
+			export default function Harbor() @{
+				let logged = state(0);
+				const forecast = computed(async () => ({ vessel: 'Petrel' }));
+				<main>
+					<output>{logged}</output>
+					@try {
+						<article><h2>{forecast.vessel}</h2><button onClick={() => logged++}>Log</button></article>
+					} @pending {
+						<p>waiting</p>
+					}
+				</main>
+			}`,
+			'click',
+		],
+		[
+			'/workspace/src/Orders.tsrx',
+			`import { computed, state } from '@markless/core';
+			export default function Orders() @{
+				let picked = state('');
+				const order = computed(async () => ({ id: 'A-7' }));
+				<section>
+					<span>{picked}</span>
+					@try {
+						<form><input onInput={(event) => (picked = order.id)} /></form>
+					} @pending {
+						<em>loading</em>
+					} @catch {
+						<em>failed</em>
+					}
+				</section>
+			}`,
+			'input',
+		],
+	] as const) {
+		const { compileTsrxModule } = await import('../src/index.ts');
+		const result = await compileTsrxModule({ filename, symbols: [], source });
+		for (const map of Object.values(result.runtimeDemandMaps)) {
+			expect(map.actions.some((action) => action.eventName === eventName)).toBe(false);
+			const boundary = map.payloadRecords.find((record) => record.kind === 'async-boundary')!;
+			const arm = map.armActions?.find((action) => action.eventName === eventName);
+			expect(arm?.payloadRecordIds).toEqual([boundary.recordId]);
+			expect(arm?.recordKinds).toContain('async-boundary');
+			expect(arm?.runtimeModuleIds).toContain('web/resume-runtime');
+			expect(arm?.firstUse).not.toBe('unknown');
+			const handlers = map.symbols
+				.filter((symbol) => symbol.kind === 'event-handler')
+				.map((symbol) => symbol.symbolId);
+			expect(arm?.firstUse === 'unknown' ? [] : arm?.firstUse?.symbolIds).toEqual(
+				expect.arrayContaining(handlers),
+			);
+		}
+	}
+});

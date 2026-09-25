@@ -180,6 +180,8 @@ function renderRowComponentEdge(
 			{
 				repeatItem: context?.repeatItem ?? input.item,
 				repeatIndex: context?.repeatIndex ?? input.rowIndex,
+				repeatId: context?.repeatId,
+				repeatOuter: context?.repeatOuter,
 				read,
 				idPrefix: ownerIdPrefix,
 			},
@@ -301,6 +303,8 @@ function renderRowComponentEdge(
 								return definition.readResidue(residue, {
 									repeatItem: context.repeatItem,
 									repeatIndex: context.repeatIndex,
+									repeatId: context.repeatId,
+									repeatOuter: context.repeatOuter,
 									read,
 									idPrefix: ownerIdPrefix,
 								});
@@ -354,6 +358,7 @@ function renderRowComponentEdge(
 									idPrefix: ownerIdPrefix + rowSegment + projectedEdge.hostPrefix,
 									symbolPrefix: ownerSymbolPrefix + rowSegment + projectedEdge.symbolPrefix,
 									boundSymbols: projectedEdge.boundSymbols,
+									composer: { symbolPrefix: ownerSymbolPrefix, read },
 									graphProps: projectedEdge.props,
 									loadSymbol: input.loadSymbol,
 									graph: undefined,
@@ -400,6 +405,7 @@ function renderRowComponentEdge(
 					idPrefix: ownerIdPrefix + hostPrefix,
 					symbolPrefix: ownerSymbolPrefix + symbolPrefix,
 					boundSymbols: edge.boundSymbols,
+					composer: { symbolPrefix: ownerSymbolPrefix, read },
 					graphProps: edge.props,
 					loadSymbol: input.loadSymbol,
 					graph: undefined,

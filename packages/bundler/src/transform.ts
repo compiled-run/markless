@@ -46,6 +46,7 @@ import {
 	rewriteSymbolModuleExport,
 	scopedSymbolExportName,
 	settleVirtualModuleId,
+	symbolEntryVirtualModuleId,
 	symbolVirtualModuleId,
 	type BoundSymbolDescriptor,
 	type BoundSymbolDescriptorMap,
@@ -293,10 +294,17 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 			? withServedScalarDemand(classDemandMap, servedScalarPlans)
 			: classDemandMap,
 	};
+	// Only packed loaders name every symbol with a literal specifier; a computed table import is no module edge.
+	const renderDataInitializers = input.experimentalNativePacking
+		? renderDataInitializerSymbolIds(compiled)
+		: new Set<string>();
 	const compilerSymbolRows = compiled.symbolModules.modules.map((module) => ({
 		id: module.symbolId,
 		chunk: symbolVirtualModuleId(input.filename, module.symbolId),
-		exportName: scopedSymbolExportName(input.filename, module.exportName),
+		exportName: scopedSymbolExportName(input.moduleId ?? input.filename, module.exportName),
+		...(renderDataInitializers.has(module.symbolId)
+			? { lazyChunk: symbolEntryVirtualModuleId(input.filename, module.symbolId) }
+			: {}),
 	}));
 	const linkedBoundarySymbols = linkedRenderDataBoundarySymbols(
 		linkedSymbolInput(compiled, input, renderDataId, resolverId, input.environment === 'client'),
@@ -322,7 +330,9 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 	const resolverSource = adaptImportedCaptureResolver(
 		emitSymbolResolverModule({
 			literalImports: input.experimentalNativePacking,
-			resolverId: input.experimentalNativePacking ? resolverId : undefined,
+			resolverId: input.experimentalNativePacking
+				? `${MARKLESS_VIRTUAL_PREFIX}resolver:${encodedModuleId}`
+				: undefined,
 			buildId: input.buildId,
 			symbols: resolverSymbols,
 			boundSymbols: importedBoundRows,
@@ -361,6 +371,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					symbolResolver: compiled.symbolResolver,
 					boundRows: importedBoundRows,
 					componentEdges: compiled.semanticGraph.componentEdges,
+					renderData: compiled.renderData,
 				})
 			: [];
 	const selfWakeArmRendererId = prerenderTriggerGroups.some((group) => group.id === 'self-wake')
@@ -459,6 +470,10 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 	const canonicalRenderData =
 		(input.prerenderRecords || linkedClientRenderData) &&
 		prerenderInterfacesComplete(compiled, input);
+	const lazyRenderDataId =
+		canonicalRenderData && compiled.publicRenderModule.renderDataModuleSource
+			? `${MARKLESS_VIRTUAL_PREFIX}render-data-entry:${encodedModuleId}`
+			: undefined;
 	const virtualModules: MarklessVirtualModule[] = [
 		...(compiled.publicRenderModule.renderDataModuleSource
 			? [
@@ -483,6 +498,15 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 									input.moduleId ?? input.filename,
 								)
 							: compiled.publicRenderModule.renderDataModuleSource,
+					},
+				]
+			: []),
+		...(lazyRenderDataId
+			? [
+					{
+						id: lazyRenderDataId,
+						type: 'render-data-entry' as const,
+						source: `export * from ${JSON.stringify(renderDataId)};`,
 					},
 				]
 			: []),
@@ -531,6 +555,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					input.prerenderRecords && prerenderInterfacesComplete(compiled, input)
 						? renderDataId
 						: undefined,
+				lazyRenderDataId,
 				// Only the canonical emission exports `marklessPrerenderData`, so a page
 				// without one has no surface a component row could be minted against.
 				renderDataId:
@@ -559,6 +584,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 							executionLog: input.executionLog,
 							needsFullResume: prerenderClosureNeedsWake,
 							prerenderDataId: renderDataId,
+							lazyRenderDataId,
 							prerenderTriggerGroups: prerenderTriggerGroups.map((group, index) => ({
 								...group,
 								moduleId: triggerGroupVirtualModuleId(input.filename, index),
@@ -618,6 +644,17 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 			}),
 		),
 		...linkedBoundarySymbols.map((symbol) => symbol.module),
+		...compilerSymbolRows.flatMap((row): MarklessVirtualModule[] =>
+			row.lazyChunk
+				? [
+						{
+							id: row.lazyChunk,
+							type: 'symbol-entry',
+							source: `export * from ${JSON.stringify(row.chunk)};`,
+						},
+					]
+				: [],
+		),
 		...(await Promise.all(
 			compiled.symbolModules.modules.map(
 				async (module, index): Promise<MarklessVirtualModule> => ({
@@ -765,6 +802,47 @@ function resolveAuthoredSpecifier(specifier: string, sourceFilename: string): st
 	return resolve(dirname(sourceFilename), specifier);
 }
 
+type InitializerDefinition = {
+	readonly initialValues?: RenderDataArtifact['initialValues'];
+	readonly initializerResidues?: Readonly<Record<string, string>>;
+};
+
+// The initializer symbol a component's render data imports for one initial value, if any.
+function renderDataInitializerSymbolId(
+	definition: InitializerDefinition,
+	initial: NonNullable<RenderDataArtifact['initialValues']>[number],
+	initializerSymbolIds: ReadonlySet<string>,
+): string | undefined {
+	if (initial.value.kind !== 'symbol-function') return undefined;
+	const symbolId = initial.value.symbolId;
+	if (definition.initializerResidues?.[symbolId] || !initializerSymbolIds.has(symbolId))
+		return undefined;
+	return symbolId;
+}
+
+function initializerModuleSymbolIds(compiled: CompileTsrxModuleResult): Set<string> {
+	return new Set(
+		compiled.symbolModules.modules
+			.filter(
+				(module) =>
+					module.kind === 'state-initializer' || module.kind === 'sync-computed-derive',
+			)
+			.map((module) => module.symbolId),
+	);
+}
+
+// Every initializer module render data imports statically; a packed loader reaches these through their export-star entry.
+function renderDataInitializerSymbolIds(compiled: CompileTsrxModuleResult): Set<string> {
+	const initializerSymbolIds = initializerModuleSymbolIds(compiled);
+	const ids = new Set<string>();
+	for (const definition of compiled.publicRenderModule.componentDefinitions as ReadonlyArray<InitializerDefinition>)
+		for (const initial of definition.initialValues ?? []) {
+			const symbolId = renderDataInitializerSymbolId(definition, initial, initializerSymbolIds);
+			if (symbolId) ids.add(symbolId);
+		}
+	return ids;
+}
+
 async function prerenderDataModuleSource(
 	compiled: CompileTsrxModuleResult,
 	environment: TransformTsrxModuleInput['environment'],
@@ -806,12 +884,10 @@ async function prerenderDataModuleSource(
 	const readerImports = new Map<string, string>();
 	const readerDeclarations = new Map<string, string>();
 	const initializerImports = new Map<string, { readonly local: string; readonly line: string }>();
+	const initializerSymbolIds = initializerModuleSymbolIds(compiled);
 	const initializerModules = new Map(
 		compiled.symbolModules.modules
-			.filter(
-				(module) =>
-					module.kind === 'state-initializer' || module.kind === 'sync-computed-derive',
-			)
+			.filter((module) => initializerSymbolIds.has(module.symbolId))
 			.map((module) => [module.symbolId, module]),
 	);
 	const componentEntries: Array<{ name: string; data: string; functions: string[] }> = [];
@@ -840,17 +916,15 @@ async function prerenderDataModuleSource(
 		};
 		const initializers = new Map<string, string>();
 		for (const initial of record.initialValues ?? []) {
-			if (initial.value.kind !== 'symbol-function') continue;
-			const symbolId = initial.value.symbolId;
-			if (record.initializerResidues?.[symbolId]) continue;
-			const module = initializerModules.get(symbolId);
-			if (!module) continue;
+			const symbolId = renderDataInitializerSymbolId(record, initial, initializerSymbolIds);
+			if (!symbolId) continue;
+			const module = initializerModules.get(symbolId)!;
 			let imported = initializerImports.get(symbolId);
 			if (!imported) {
 				const local = `marklessRenderInitializer${initializerImports.size}`;
 				imported = {
 					local,
-					line: `import { ${scopedSymbolExportName(sourceFilename, module.exportName)} as ${local} } from ${JSON.stringify(symbolVirtualModuleId(sourceFilename, symbolId))};`,
+					line: `import { ${scopedSymbolExportName(moduleId, module.exportName)} as ${local} } from ${JSON.stringify(symbolVirtualModuleId(sourceFilename, symbolId))};`,
 				};
 				initializerImports.set(symbolId, imported);
 			}
@@ -982,7 +1056,7 @@ function linkedSymbolInput(
 	compiled: CompileTsrxModuleResult,
 	input: Pick<
 		TransformTsrxModuleInput,
-		'filename' | 'importedModuleInterfaces' | 'artifactChildMaterializations'
+		'filename' | 'moduleId' | 'importedModuleInterfaces' | 'artifactChildMaterializations'
 	>,
 	renderDataId: string,
 	resolverId: string,
@@ -996,9 +1070,9 @@ function linkedSymbolInput(
 		resolverId,
 		symbolModuleId: (symbolId: string) => symbolVirtualModuleId(input.filename, symbolId),
 		boundaryExportName: (index: number) =>
-			scopedSymbolExportName(input.filename, `marklessLinkedBoundaryUpdate${index}`),
+			scopedSymbolExportName(input.moduleId ?? input.filename, `marklessLinkedBoundaryUpdate${index}`),
 		branchExportName: (index: number) =>
-			scopedSymbolExportName(input.filename, `marklessLinkedBranchUpdate${index}`),
+			scopedSymbolExportName(input.moduleId ?? input.filename, `marklessLinkedBranchUpdate${index}`),
 	} satisfies Parameters<typeof linkedRenderDataBoundarySymbols>[0];
 }
 

@@ -8,6 +8,7 @@ import {
 	type QuickInfo,
 	type QuickInfoService,
 } from './twoslash-quickinfo.ts';
+import { sharedFencePool } from './fence-pool.ts';
 
 /** Fence language -> the language shiki is asked for. */
 const FENCE_ALIASES: Readonly<Record<string, string>> = {
@@ -20,6 +21,9 @@ const FENCE_ALIASES: Readonly<Record<string, string>> = {
 	ts: 'typescript',
 	zsh: 'shellscript',
 };
+
+/** Read by `getHighlighter` from disk rather than imported, so the fence cache lists it by hand. */
+export const TSRX_GRAMMAR_URL = new URL('./tsrx.tmLanguage.json', import.meta.url);
 
 const LIGHT_THEME = 'github-light';
 const DARK_THEME = 'github-dark';
@@ -36,10 +40,7 @@ function quickInfo(): QuickInfoService {
 export function getHighlighter(): Promise<HighlighterGeneric<string, string>> {
 	highlighterPromise ??= (async () => {
 		const grammar = JSON.parse(
-			await readFile(
-				fileURLToPath(new URL('./tsrx.tmLanguage.json', import.meta.url)),
-				'utf8',
-			),
+			await readFile(fileURLToPath(TSRX_GRAMMAR_URL), 'utf8'),
 		) as LanguageRegistration;
 		return createHighlighter({
 			themes: [LIGHT_THEME, DARK_THEME],
@@ -263,38 +264,71 @@ export function useSiteSurface(
 		);
 }
 
+/** Renders one fence's code, or undefined when shiki does not know its language. */
+export type FenceRenderer = (code: string, fenceLanguage: string) => Promise<string | undefined>;
+
+/**
+ * Replaces every fenced block in one static-HTML chunk with what `render` makes of it.
+ * Fences `render` declines are left exactly as the MDX plugin wrote them.
+ */
+export async function replaceFences(html: string, render: FenceRenderer): Promise<string> {
+	FENCE.lastIndex = 0;
+	const fences = [...html.matchAll(FENCE)];
+	if (fences.length === 0) return html;
+	const rendered = await Promise.all(
+		fences.map((fence) => render(decodeEntities(fence[2]!).replace(/\n+$/, ''), fence[1]!)),
+	);
+	let out = '';
+	let cursor = 0;
+	for (const [index, fence] of fences.entries()) {
+		out += html.slice(cursor, fence.index) + (rendered[index] ?? fence[0]);
+		cursor = fence.index + fence[0].length;
+	}
+	return out + html.slice(cursor);
+}
+
+/** One fence through shiki and the type checker, on the calling thread. */
+export async function renderFence(
+	code: string,
+	fenceLanguage: string,
+): Promise<string | undefined> {
+	const highlighter = await getHighlighter();
+	const language = FENCE_ALIASES[fenceLanguage] ?? fenceLanguage;
+	if (!highlighter.getLoadedLanguages().includes(language)) return undefined;
+	const rendered = highlighter.codeToHtml(code, {
+		lang: language,
+		themes: { light: LIGHT_THEME, dark: DARK_THEME },
+		// The light colour stays the span's `color`, so the light output is the
+		// single-theme output with one extra custom property beside it.
+		defaultColor: 'light',
+	});
+	// Real types first: the quick-info pass reads the rendered code by counting
+	// characters, and the tooltip text `addTsrxHovers` injects is not code.
+	const typed = addQuickInfoHovers(
+		useSiteSurface(
+			rendered,
+			highlighter.getTheme(LIGHT_THEME).fg,
+			highlighter.getTheme(DARK_THEME).fg,
+		),
+		code,
+		hasQuickInfo(fenceLanguage) ? quickInfo().queryFence(code, fenceLanguage) : [],
+	);
+	return addTsrxHovers(typed).replace(
+		'<pre class="shiki',
+		`<pre data-lang="${fenceLanguage}" class="shiki`,
+	);
+}
+
+/** Every fence highlighted on this thread; the build uses `highlightFences` instead. */
+export function highlightFencesInProcess(html: string): Promise<string> {
+	return replaceFences(html, renderFence);
+}
+
 /**
  * Replaces every fenced block in one static-HTML chunk. Fences whose language
- * shiki does not know are left exactly as the MDX plugin wrote them.
+ * shiki does not know are left exactly as the MDX plugin wrote them. The work
+ * runs on worker threads, behind a disk cache, so the build's main thread keeps going.
  */
-export async function highlightFences(html: string): Promise<string> {
-	if (!FENCE.test(html)) return html;
-	FENCE.lastIndex = 0;
-	const highlighter = await getHighlighter();
-	const loaded = new Set(highlighter.getLoadedLanguages());
-	const lightForeground = highlighter.getTheme(LIGHT_THEME).fg;
-	const darkForeground = highlighter.getTheme(DARK_THEME).fg;
-	return html.replace(FENCE, (match, fenceLanguage: string, encoded: string) => {
-		const language = FENCE_ALIASES[fenceLanguage] ?? fenceLanguage;
-		if (!loaded.has(language)) return match;
-		const code = decodeEntities(encoded).replace(/\n+$/, '');
-		const rendered = highlighter.codeToHtml(code, {
-			lang: language,
-			themes: { light: LIGHT_THEME, dark: DARK_THEME },
-			// The light colour stays the span's `color`, so the light output is the
-			// single-theme output with one extra custom property beside it.
-			defaultColor: 'light',
-		});
-		// Real types first: the quick-info pass reads the rendered code by counting
-		// characters, and the tooltip text `addTsrxHovers` injects is not code.
-		const typed = addQuickInfoHovers(
-			useSiteSurface(rendered, lightForeground, darkForeground),
-			code,
-			hasQuickInfo(fenceLanguage) ? quickInfo().queryFence(code, fenceLanguage) : [],
-		);
-		return addTsrxHovers(typed).replace(
-			'<pre class="shiki',
-			`<pre data-lang="${fenceLanguage}" class="shiki`,
-		);
-	});
+export function highlightFences(html: string): Promise<string> {
+	return replaceFences(html, sharedFencePool().render);
 }

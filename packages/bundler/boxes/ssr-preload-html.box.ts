@@ -1,4 +1,5 @@
 import { box } from '@async/witness';
+import { unpackedFixture } from './unpacked-fixture.ts';
 
 const FIXTURE = 'fixtures/vite-ssr-preloader';
 const INDEX = `${FIXTURE}/dist/index.html`;
@@ -11,7 +12,7 @@ export default box(
 		tags: ['ssr', 'build', 'preview', 'preload'],
 		modes: ['build', 'preview'],
 	},
-	async ({ pipeline, expect, receipt }) => {
+	unpackedFixture(async ({ pipeline, expect, receipt }) => {
 		const build = await pipeline.build({
 			config: (config) => ({
 				...config,
@@ -42,7 +43,7 @@ export default box(
 		assertPreloadLinksLookFrameworkOwned(html, hrefs);
 		await preview.close();
 		await receipt.capture('ssr preload preview html modulepreload links');
-	},
+	}),
 );
 
 function modulePreloadHrefs(html: string): readonly string[] {

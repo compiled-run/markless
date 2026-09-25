@@ -6,7 +6,7 @@ const plugins = (() => {
 	const previousWake = process.env.MARKLESS_PRERENDER_WAKE;
 	process.env.MARKLESS_PRERENDER_WAKE = '1';
 	try {
-		return [markless()];
+		return [markless({ packing: process.env.MARKLESS_FIXTURE_NATIVE_PACKING !== '0' })];
 	} finally {
 		if (previousWake === undefined) delete process.env.MARKLESS_PRERENDER_WAKE;
 		else process.env.MARKLESS_PRERENDER_WAKE = previousWake;

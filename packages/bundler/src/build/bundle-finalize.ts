@@ -4,7 +4,7 @@ import { type MarklessBuildMetadataBundle, createBuildMetadata } from './build-m
 import { MARKLESS_BUNDLE_GRAPH, MARKLESS_EXECUTION_DEMAND } from './chunking.ts';
 import { createExecutionSizesAsset } from './execution-sizes.ts';
 import { collectRenderedModules, createByteAttributionAsset } from './byte-attribution.ts';
-import { clearParsedChunkCode } from './chunk-ast.ts';
+import { clearParsedChunkCode, prefetchChunkParses } from './chunk-ast.ts';
 import { unwrapAsyncImportWrappers } from './async-import-wrappers.ts';
 import { collapseInitFacadeImports } from './init-facade-imports.ts';
 import {
@@ -16,7 +16,12 @@ import {
 	specifyChunkReferences,
 } from './content-hash-names.ts';
 import { collectModulePreloadInjections, injectHeadLinks } from './head-links.ts';
-import { stripEmptyVitePreloadWrappers } from './preload-cleanup.ts';
+import { marklessDeferredChunkFileNames } from './route-pack-groups.ts';
+import {
+	importedVitePreloadHelperParses,
+	stripEmptyVitePreloadWrapperCalls,
+	stripImportedVitePreloadHelper,
+} from './preload-cleanup.ts';
 import {
 	type PreloadHelperChunk,
 	stripUnusedVitePreloadHelperFromBundle,
@@ -32,6 +37,10 @@ import {
 	executionLogActivationInjection,
 } from '../execution-log.ts';
 import type { ModuleMetadataRegistry } from '../module-metadata-registry.ts';
+import { chunkImportMapEnabled, nativePackingEnabled } from '../packing-option.ts';
+import { rootRelativeId } from '../module-id.ts';
+import { rootRelativeRegionComments } from './machine-paths.ts';
+import { resortInteractionClosuresFiles } from './interaction-closures.ts';
 import { withoutFirstUse } from '../source-module.ts';
 import type { MarklessRolldownOptions, MarklessTransformManifest } from '../types.ts';
 import {
@@ -52,8 +61,10 @@ export type FinalizeBundleOptions = {
 	bundleGraphAdders?: MarklessRolldownOptions['bundleGraphAdders'];
 	devInjections?: MarklessRolldownOptions['devInjections'];
 	executionLog?: MarklessRolldownOptions['executionLog'];
-	experimentalPackPlanner?: MarklessRolldownOptions['experimentalPackPlanner'];
 	experimentalNativePacking?: boolean;
+	packing?: boolean;
+	dev?: boolean;
+	chunkImportMap?: boolean;
 };
 
 export type FinalizeBundleContext = {
@@ -81,9 +92,11 @@ export async function finalizeBundle(
 ): Promise<void> {
 	const { options, moduleMetadata } = input;
 
-const renderedModules = collectRenderedModules(bundle);
-stripEmptyPreloadWrappersFromChunks(bundle);
+const renderedModules = collectRenderedModules(bundle, input.root);
+rootRelativeRegionComments(bundle, input.root);
+await stripEmptyPreloadWrappersFromChunks(bundle);
 const removedSymbolFacades = new Set(rewriteGeneratedSymbolFacadeImports(bundle));
+await prefetchDynamicImportParses(bundle);
 for (const fileName of collapseInitFacadeImports(bundle)) removedSymbolFacades.add(fileName);
 unwrapAsyncImportWrappers(bundle);
 rewriteGeneratedSymbolInitExports(bundle);
@@ -104,6 +117,7 @@ const attributionClaims = [...moduleMetadata.symbolClaimManifests()];
 const tableIntegrity = verifyGeneratedSymbolTableRoutes(
 	manifestBundle,
 	emittedSymbolClaims.values(),
+	input.root,
 );
 if (tableIntegrity.errors.length > 0) {
 	context.error(
@@ -116,14 +130,14 @@ if (tableIntegrity.errors.length > 0) {
 	);
 }
 
-const specifiers =
-	options.experimentalNativePacking === true
-		? await specifyChunkReferences(manifestBundle, {
-				publicPath: options.publicPath ?? ((fileName) => `/${fileName}`),
-				root: input.root,
-			})
-		: undefined;
+const specifiers = chunkImportMapEnabled(options)
+	? await specifyChunkReferences(manifestBundle, {
+			publicPath: options.publicPath ?? ((fileName) => `/${fileName}`),
+			root: input.root,
+		})
+	: undefined;
 await renameChunksToContentHashes(manifestBundle, { hashCharacters: input.hashCharacters });
+resortInteractionClosuresFiles(bundle);
 const importMap = specifiers?.importMap();
 if (importMap && Object.keys(importMap.imports).length > 0) {
 	injectImportMap(bundle, importMapScript(importMap));
@@ -151,6 +165,7 @@ if (options.prerenderWakeChannel === true) {
 	);
 }
 
+await prefetchDynamicImportParses(manifestBundle);
 const clientManifest = createBuildMetadata(
 	manifestBundle,
 	emittedSymbolClaims.values(),
@@ -176,8 +191,24 @@ injectHeadLinks(
 		wakeChunks:
 			options.prerender ||
 			options.prerenderWakeChannel === true
-				? productionWakeModuleChunks(bundle)
+				? productionWakeModuleChunks(bundle).sort()
 				: undefined,
+		lazyChunks: new Set(
+			[
+				...marklessDeferredChunkFileNames(
+					Object.values(bundle)
+						.filter(isChunkFile)
+						.map(
+							(chunk) =>
+								chunk as typeof chunk & {
+									readonly name?: string;
+									readonly imports: readonly string[];
+									readonly moduleIds?: readonly string[];
+								},
+						),
+				),
+			].map((fileName) => stripBuildPrefix(fileName)),
+		),
 		entryChunks: Object.values(bundle)
 			.filter(
 				(output) =>
@@ -188,7 +219,8 @@ injectHeadLinks(
 			)
 			.map((chunk) =>
 				stripBuildPrefix((chunk as { fileName: string }).fileName),
-			),
+			)
+			.sort(),
 	}),
 );
 
@@ -209,6 +241,7 @@ context.emitFile(
 			executionLogActive: executionLogInjection !== null,
 			hookedIds: input.executionLogEmittedIds,
 			root: input.root,
+			renderedModules,
 		},
 	),
 );
@@ -226,12 +259,14 @@ context.emitFile({
 			clientManifest.modules
 				.filter((module) => module.runtimeDemandMap)
 				.map((module) => [
-					module.source,
-					options.experimentalPackPlanner
+					rootRelativeId(module.source, input.root),
+					nativePackingEnabled(options) && !options.dev
 						? module.runtimeDemandMap
 						: withoutFirstUse(module.runtimeDemandMap),
 				]),
 		),
+		(key, value) =>
+			key === 'file' && typeof value === 'string' ? rootRelativeId(value, input.root) : value,
 	),
 });
 }
@@ -250,11 +285,16 @@ function bundleWithoutRemovedChunks(
 	return next;
 }
 
-function stripEmptyPreloadWrappersFromChunks(bundle: Record<string, unknown>) {
-	for (const output of Object.values(bundle)) {
-		if (!isChunkWithCode(output)) continue;
-
-		const nextCode = stripEmptyVitePreloadWrappers(output.code);
+async function stripEmptyPreloadWrappersFromChunks(bundle: Record<string, unknown>) {
+	const chunks = Object.values(bundle).filter(isChunkWithCode);
+	const staged = chunks.map((chunk) => stripEmptyVitePreloadWrapperCalls(chunk.code));
+	await prefetchChunkParses(
+		staged.flatMap((code) =>
+			importedVitePreloadHelperParses(code).map((text) => ({ fileName: 'chunk.js', code: text })),
+		),
+	);
+	for (const [index, output] of chunks.entries()) {
+		const nextCode = stripImportedVitePreloadHelper(staged[index]!);
 		if (nextCode !== output.code) {
 			output.code = nextCode;
 		}
@@ -262,6 +302,15 @@ function stripEmptyPreloadWrappersFromChunks(bundle: Record<string, unknown>) {
 	stripUnusedVitePreloadHelperFromBundle(
 		Object.values(bundle).filter(
 			(output): output is PreloadHelperChunk => isChunkWithCode(output) && isChunkFile(output),
+		),
+	);
+}
+
+function prefetchDynamicImportParses(bundle: Record<string, unknown>): Promise<void> {
+	return prefetchChunkParses(
+		Object.values(bundle).filter(
+			(output): output is { readonly type: 'chunk'; readonly fileName: string; code: string } =>
+				isChunkWithCode(output) && isChunkFile(output) && output.code.includes('import('),
 		),
 	);
 }

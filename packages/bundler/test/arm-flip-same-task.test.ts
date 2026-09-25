@@ -25,10 +25,7 @@ afterAll(() =>
 	]),
 );
 
-const variants = [
-	{ name: 'packed', port: 4218, env: {} },
-	{ name: 'closure packs', port: 4219, env: { MARKLESS_FIXTURE_PACK_PLANNER: 'closures' } },
-] as const;
+const variants = [{ name: 'packed', port: 4218, env: {} }] as const;
 
 type ProbeWindow = { armFlip(selector: string, present: boolean): void; flip: Promise<boolean> };
 

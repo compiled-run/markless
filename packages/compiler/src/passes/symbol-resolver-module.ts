@@ -33,7 +33,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 	if ((input.boundSymbols?.length ?? 0) === 0) {
 		return input.symbols.length > 0 && input.symbols.length <= SMALL_SYMBOL_SWITCH_LIMIT
 			? emitSmallSymbolResolverModule(input)
-			: emitTableSymbolResolverModule(manifest, input.literalImports);
+			: emitTableSymbolResolverModule(manifest, input.literalImports, input.symbols);
 	}
 	const scopesInstances = (input.boundSymbols ?? []).some((row) => row.instancePath);
 	// Which space an id belongs to is a runtime reading, not a prefix: a shared id
@@ -52,6 +52,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 			));
 	// A slot route reads its answering symbol id out of the graph, so only a page
 	// whose parts actually escape a widget callback carries the extra branch.
+	const rowed = scopesInstances && (input.boundSymbols ?? []).some((row) => row.rowPieces);
 	const routesCallbackSlots = (input.boundSymbols ?? []).some((row) =>
 		row.captureSlots.some((slot) => slot.route.kind === 'callback-slot-route'),
 	);
@@ -68,11 +69,19 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 					'',
 				]
 			: []),
+		...(rowed
+			? [
+					`import { marklessRowBoundGraphNodeId, marklessRowBoundPath } from '@markless/web/fns/row-bound-path';`,
+					'',
+				]
+			: []),
 		'export const symbolManifest = ',
 		JSON.stringify(manifest),
 		';',
 		'',
-		input.literalImports ? literalModuleLoads(manifest) : 'const moduleUrls = symbolManifest[3];',
+		input.literalImports
+			? literalModuleLoads(manifest, input.symbols)
+			: 'const moduleUrls = symbolManifest[3];',
 		'const exportNames = symbolManifest[4];',
 		'const symbolRows = symbolManifest[5];',
 		`const boundRows = ${serializeBoundRows(input.boundSymbols ?? [])};`,
@@ -98,7 +107,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'	return (context) => base({ ...context, capture: createCaptureContext(context, bound) });',
 		'}',
 		'',
-		...(scopesInstances ? instanceScopeLines(scopesWidgetGraphs) : []),
+		...(scopesInstances ? instanceScopeLines(scopesWidgetGraphs, rowed) : []),
 		'function createCaptureContext(context, bound) {',
 		'	const slots = {};',
 		'	for (const slot of bound.captureSlots) slots[slot.slotId] = slot;',
@@ -199,7 +208,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 // instance path of the edges it was composed through, but its own symbol still
 // spells child-local ids. The parent's capture routes and the prop reads the
 // capture adapter intercepts stay in page space.
-function instanceScopeLines(widgetAware: boolean): string[] {
+function instanceScopeLines(widgetAware: boolean, rowed: boolean): string[] {
 	// Which registry answers "does a widget own this id" is a property of the graph
 	// being dispatched on, so the emitted closure hands its own graph over rather
 	// than letting the runtime fall back to the per-dispatch `active` pointer. That
@@ -208,8 +217,17 @@ function instanceScopeLines(widgetAware: boolean): string[] {
 	const scoped = (graphNodeId: string, registry: string) =>
 		widgetAware ? `scoped(${graphNodeId}, ${registry})` : `scoped(${graphNodeId})`;
 	return [
-		'function instanceScopedBase(base, bound) {',
-		'	const path = bound.instancePath;',
+		...(rowed
+			? [
+					// A keyed row learns its row from the dispatching record, so its own nodes are placed per dispatch.
+					'function instanceScopedBase(base, bound) {',
+					'	if (!bound.rowPieces) return pathScopedBase(base, bound, bound.instancePath, bound.instancePath);',
+					'	return (context) => pathScopedBase(base, bound, bound.instancePath, marklessRowBoundPath(bound, context.graph))(context);',
+					'}',
+					'',
+					'function pathScopedBase(base, bound, path, rowedPath) {',
+				]
+			: ['function instanceScopedBase(base, bound) {', '	const path = bound.instancePath;']),
 		'	if (!path) return base;',
 		'	const pageSpace = new Set(bound.captureSlots.flatMap((slot) => slot.legacyGraphRead ? [slot.legacyGraphRead.graphNodeId] : []));',
 		// A `shared:`/`storage:` id belongs to the page, and a widget-scoped one to
@@ -217,8 +235,8 @@ function instanceScopeLines(widgetAware: boolean): string[] {
 		// owns that reading; restating it here would put the write on a graph the
 		// part's own records never read.
 		widgetAware
-			? '	const scoped = (graphNodeId, registry) => pageSpace.has(graphNodeId) ? graphNodeId : marklessComposedGraphNodeId(graphNodeId, path, registry);'
-			: '	const scoped = (graphNodeId) => pageSpace.has(graphNodeId) ? graphNodeId : path + graphNodeId;',
+			? `	const scoped = (graphNodeId, registry) => pageSpace.has(graphNodeId) ? graphNodeId : ${rowed ? 'marklessRowBoundGraphNodeId(graphNodeId, path, rowedPath, registry)' : 'marklessComposedGraphNodeId(graphNodeId, path, registry)'};`
+			: `	const scoped = (graphNodeId) => pageSpace.has(graphNodeId) ? graphNodeId : ${rowed ? 'marklessRowBoundGraphNodeId(graphNodeId, path, rowedPath)' : 'path + graphNodeId'};`,
 		'	const scopeGraph = (graph) => {',
 		// A graph-less context still has an answer: the runtime hands back the
 		// `active` pointer, which is what an older payload's resolver read anyway.
@@ -296,13 +314,17 @@ function serializeBoundRows(rows: SymbolResolverModuleInput['boundSymbols']): st
 	);
 }
 
-function emitTableSymbolResolverModule(manifest: SymbolResolverModuleManifest, literalImports = false): string {
+function emitTableSymbolResolverModule(
+	manifest: SymbolResolverModuleManifest,
+	literalImports = false,
+	symbols: SymbolResolverModuleInput['symbols'] = [],
+): string {
 	return [
 		'export const symbolManifest = ',
 		JSON.stringify(manifest),
 		';',
 		'',
-		literalImports ? literalModuleLoads(manifest) : 'const moduleUrls = symbolManifest[3];',
+		literalImports ? literalModuleLoads(manifest, symbols) : 'const moduleUrls = symbolManifest[3];',
 		'const exportNames = symbolManifest[4];',
 		'const symbolRows = symbolManifest[5];',
 		'',
@@ -336,13 +358,17 @@ function emitTableSymbolResolverModule(manifest: SymbolResolverModuleManifest, l
 	].join('\n');
 }
 
-function literalModuleLoads(manifest: SymbolResolverModuleManifest): string {
-	return `const moduleLoads = {${Object.entries(manifest[5]).map(([id, row]) => `${JSON.stringify(id)}:()=>import(${JSON.stringify(manifest[3][row[0]])})`).join(',')}};`;
+function literalModuleLoads(
+	manifest: SymbolResolverModuleManifest,
+	symbols: SymbolResolverModuleInput['symbols'],
+): string {
+	const lazy = new Map(symbols.flatMap((symbol) => (symbol.lazyChunk ? [[symbol.id, symbol.lazyChunk]] : [])));
+	return `const moduleLoads = {${Object.entries(manifest[5]).map(([id, row]) => `${JSON.stringify(id)}:()=>import(${JSON.stringify(lazy.get(id) ?? manifest[3][row[0]])})`).join(',')}};`;
 }
 
 function emitSmallSymbolResolverModule(input: SymbolResolverModuleInput): string {
 	const symbolBranches = input.symbols.flatMap((symbol) => [
-		`	if (id === ${JSON.stringify(symbol.id)}) return import(${input.bundlerVisibleImports ? '' : '/* @vite-ignore */ '}${JSON.stringify(symbol.chunk)})`,
+		`	if (id === ${JSON.stringify(symbol.id)}) return import(${input.bundlerVisibleImports ? '' : '/* @vite-ignore */ '}${JSON.stringify(symbol.lazyChunk ?? symbol.chunk)})`,
 		`		.then((mod) => { mod.init__virtual_markless_symbol?.(); return mod${moduleExportAccess(symbol.exportName)}; });`,
 	]);
 

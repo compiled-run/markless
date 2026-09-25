@@ -23,7 +23,12 @@ export default function Settings() @{
 }
 
 async function callbackModule(page: string) {
-	const result = await transformTsrxModule({ filename, source: page, environment: 'client' });
+	const result = await transformTsrxModule({
+		filename,
+		moduleId: 'pages/settings.tsrx',
+		source: page,
+		environment: 'client',
+	});
 	const module = result.virtualModules.find(
 		(candidate) => candidate.type === 'symbol' && candidate.source.includes('context.args'),
 	);

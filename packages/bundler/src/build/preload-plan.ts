@@ -7,6 +7,8 @@ export type ModulePreloadPlanInput = {
 	readonly base?: string;
 	readonly minProbability?: number;
 	readonly maxPreloads?: number;
+	// Chunks that load only on their first import(): no dynamic edge into them is planned.
+	readonly lazyChunks?: ReadonlySet<string>;
 };
 
 export type ModulePreloadRoot =
@@ -152,6 +154,7 @@ export function planModulePreloads(input: ModulePreloadPlanInput): ModulePreload
 		}
 		if (!suppressed) addModule(name, probability, priority, fetchPriority);
 		for (const dep of record.deps.filter((item) => item.kind === 'dynamic')) {
+			if (input.lazyChunks?.has(dep.name)) continue;
 			const edgeProbability = JAVASCRIPT_MODULE_RE.test(name) ? dep.probability : 1;
 			// Crossing a dynamic edge lifts suppression: the target is NOT part
 			// of the already-loading baseline, so it plans with its closure.

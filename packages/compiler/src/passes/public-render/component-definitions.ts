@@ -19,6 +19,7 @@ import {
 	callbackSymbolIds,
 	componentPropNames,
 	componentPropCellId,
+	componentEdgeHostSegment,
 	componentEdgeInstanceSegment,
 	componentEdgesFor,
 	componentOwnedInitialValues,
@@ -28,6 +29,7 @@ import {
 	staticHostLocators,
 } from './shared.ts';
 import { collectSsrPropEvents } from './component-wiring.ts';
+import { moduleIdOf } from '../../module-id.ts';
 import type { PublicRenderRoot } from './types.ts';
 
 // Component definitions are compiler data consumed by the linked prerender
@@ -71,7 +73,7 @@ export function collectPublicRenderComponentDefinitions(
 		);
 		const rootChunk = chunks.find((chunk) => chunk.id === `template:${componentName}`);
 		if (!rootChunk) return [];
-		const edges = componentEdgesFor(input, componentName).map((edge, index) => {
+		const edges = componentEdgesFor(input, componentName).map((edge) => {
 			const declaredInputs = childComponentInputs(input, componentMap, edge);
 			const passedInputs = new Set(edge.props.map((prop) => prop.name));
 			return {
@@ -82,7 +84,7 @@ export function collectPublicRenderComponentDefinitions(
 				id: edge.id,
 				childComponentName: edge.childComponentName,
 				...(edge.asyncBoundaryId ? { asyncBoundaryId: edge.asyncBoundaryId } : {}),
-				hostPrefix: `c${index}:`,
+				hostPrefix: componentEdgeHostSegment(edge, input.semanticGraph.componentEdges),
 				symbolPrefix: componentEdgeInstanceSegment(
 					edge,
 					input.semanticGraph.componentEdges,
@@ -230,7 +232,7 @@ export function collectPublicRenderComponentDefinitions(
 		);
 		const nativeChunks = chunks.map(({ statics: _statics, ...chunk }) => ({
 			...chunk,
-			nativeTemplateId: `markless-render-data:${encodeURIComponent(input.source.filename)}:${encodeURIComponent(componentName)}:template:${encodeURIComponent(chunk.id)}`,
+			nativeTemplateId: `markless-render-data:${encodeURIComponent(moduleIdOf(input.source))}:${encodeURIComponent(componentName)}:template:${encodeURIComponent(chunk.id)}`,
 		}));
 		const initializerResidues = componentInitializerResidues(input, componentName);
 		// Positions resolve a state name two components of one module both

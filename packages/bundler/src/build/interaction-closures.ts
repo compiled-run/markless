@@ -1,14 +1,20 @@
-import { isAbsolute, relative } from 'pathe';
-import type {
-	RuntimeDemandMapFirstUse,
-	RuntimeDemandMapFirstUseReach,
-	RuntimeDemandMapPassedProp,
-	RuntimeDemandMapRecordKind,
+import { rootRelativeId } from '../module-id.ts';
+import { MARKLESS_INTERACTION_CLOSURES } from './chunking.ts';
+import {
+	LEAN_DISPATCH_MARKER_MODULES,
+	type RuntimeDemandMapFirstUse,
+	type RuntimeDemandMapFirstUseReach,
+	type RuntimeDemandMapPassedProp,
+	type RuntimeDemandMapRecordKind,
 } from '@markless/compiler';
 import { PROTOCOL_EVENT_ACTION_KIND } from '@markless/serializer';
 import type { RuntimeDemandMapManifest } from '../types.ts';
 import { runtimeModuleIdFromOrigin } from './bundle-graph.ts';
-import { CARRIES_UNLISTED_RECORDS } from './undemanded-runtime.ts';
+import {
+	CARRIES_UNLISTED_RECORDS,
+	undemandedRuntimeModules,
+	withUndemandedReExportDoors,
+} from './undemanded-runtime.ts';
 import { symbolVirtualModuleId, symbolVirtualModuleSourceFile } from '../source-module.ts';
 import { isRouteNavigationSourceRequest, normalizeVirtualId } from '../virtual-ids.ts';
 
@@ -28,13 +34,16 @@ const RUNS_WITHOUT_INPUT = {
 	overlay: true,
 } satisfies Record<RuntimeDemandMapRecordKind, boolean>;
 
-export type PackPlannerMode = 'closures';
+const LEAN_DISPATCH_MODULE_IDS: ReadonlySet<string> = new Set(
+	Object.values(LEAN_DISPATCH_MARKER_MODULES).flat(),
+);
 
 export type InteractionClosureModule = {
 	readonly dependencies: readonly string[];
 	readonly dynamicDependencies?: readonly string[];
 	readonly source?: string;
 	readonly reachedFrom?: string;
+	readonly reExportsOnly?: boolean;
 };
 
 export type InteractionDemandSource = {
@@ -50,6 +59,8 @@ export type InteractionConsumer = {
 	readonly kind: InteractionConsumerKind;
 	// Set when the demand map could not bound this consumer and the superset was taken.
 	readonly conservative?: string;
+	// An action the compiler serves on a lean dispatch path: its first event runs without the full resume runtime.
+	readonly lean?: boolean;
 	readonly modules: readonly string[];
 };
 
@@ -116,7 +127,8 @@ export function computeInteractionClosures(input: {
 	readonly demand: Iterable<InteractionDemandSource>;
 }): RouteInteractionClosures[] {
 	const { modules } = input;
-	const demand = mergeDemand(input.demand);
+	const sources = [...input.demand];
+	const demand = mergeDemand(sources);
 	const byRuntimeId = new Map<string, string[]>();
 	const byVirtualId = new Map<string, string>();
 	const symbolsByFile = new Map<string, string[]>();
@@ -215,6 +227,35 @@ export function computeInteractionClosures(input: {
 				consumers: [],
 			});
 			continue;
+		}
+		// Runtime a feature needs loads on this route only when the route's own demand maps name it.
+		const undemanded = withUndemandedReExportDoors(
+			modules,
+			routeUndemandedRuntime(
+				sources
+					.filter(({ source }) => files.has(source.split('?')[0]!))
+					.map(({ map }) => map),
+				reach,
+			),
+		);
+		if (undemanded.size) {
+			reach.clear();
+			pending.push(...roots);
+			while (pending.length) {
+				const id = pending.pop()!;
+				if (reach.has(id)) continue;
+				if (routeOf.has(id) && routeOf.get(id) !== route) continue;
+				const module = modules.get(id);
+				if (!module) continue;
+				reach.add(id);
+				pending.push(
+					...module.dependencies,
+					...(module.dynamicDependencies ?? []).filter(
+						(target) => !undemanded.has(target),
+					),
+				);
+				if (module.source) pending.push(...(siblings.get(module.source) ?? []));
+			}
 		}
 		// The route facade and its own render data serve client navigation; landing boots through resume.
 		const renderRoots = roots.filter(isRouteNavigationSourceRequest);
@@ -335,6 +376,9 @@ export function computeInteractionClosures(input: {
 					key: `action:${display(file, input.root)}#${actionKey}`,
 					kind: 'action',
 					...(conservative ? { conservative } : {}),
+					...([...action.runtimeModuleIds].some((id) => LEAN_DISPATCH_MODULE_IDS.has(id))
+						? { lean: true }
+						: {}),
 					modules: useClosure(route, reach, seeds, { runtimeIds }),
 				});
 			}
@@ -349,17 +393,15 @@ export function interactionClosuresAsset(input: {
 	readonly closures: readonly RouteInteractionClosures[];
 	readonly packs: ReadonlyMap<string, string>;
 	readonly partition: 'tiers' | 'unsplit:entry-roots';
-	// Output file of each module, when the asset is written after rendering.
-	readonly chunkOf?: ReadonlyMap<string, string>;
+	// Output files an import of each module fetches, when the asset is written after rendering.
+	readonly chunkOf?: ReadonlyMap<string, readonly string[]>;
 }): string {
 	const filesFor = (route: RouteInteractionClosures, render: boolean) => {
 		const files = new Set<string>();
 		for (const consumer of route.consumers)
 			if ((consumer.kind === 'render') === render)
-				for (const id of consumer.modules) {
-					const file = input.chunkOf?.get(id);
-					if (file) files.add(file);
-				}
+				for (const id of consumer.modules)
+					for (const file of input.chunkOf?.get(id) ?? []) files.add(file);
 		return [...files].sort();
 	};
 	const packs = new Map<string, string[]>();
@@ -377,6 +419,7 @@ export function interactionClosuresAsset(input: {
 				key: consumer.key,
 				kind: consumer.kind,
 				...(consumer.conservative ? { conservative: consumer.conservative } : {}),
+				...(consumer.lean ? { lean: true } : {}),
 				modules: consumer.modules.map((id) => display(id, input.root)).sort(),
 			})),
 		})),
@@ -399,14 +442,44 @@ export function interactionClosuresAsset(input: {
 
 function packFiles(
 	packs: ReadonlyMap<string, string>,
-	chunkOf: ReadonlyMap<string, string>,
+	chunkOf: ReadonlyMap<string, readonly string[]>,
 ): Map<string, string[]> {
 	const files = new Map<string, Set<string>>();
-	for (const [id, name] of packs) {
-		const file = chunkOf.get(id);
-		if (file) addTo(files, name, file);
-	}
+	for (const [id, name] of packs)
+		for (const file of chunkOf.get(id) ?? []) addTo(files, name, file);
 	return new Map([...files].map(([name, set]) => [name, [...set].sort()]));
+}
+
+// Fail closed: nothing is pruned when an action carries records its map does not enumerate.
+function routeUndemandedRuntime(
+	maps: ReadonlyArray<RuntimeDemandMapManifest | undefined>,
+	moduleIds: Iterable<string>,
+): Set<string> {
+	const named = new Set<string>();
+	for (const map of maps) {
+		if (!map) return new Set();
+		for (const action of [...map.actions, ...(map.armActions ?? [])]) {
+			if (
+				!map.nestedRecordModuleIds &&
+				action.recordKinds.some(
+					(kind) =>
+						CARRIES_UNLISTED_RECORDS[kind as keyof typeof CARRIES_UNLISTED_RECORDS],
+				)
+			)
+				return new Set();
+			if (action.firstUse && action.firstUse !== 'unknown')
+				for (const id of action.firstUse.runtimeModuleIds) named.add(id);
+		}
+		const resume = map.firstUsePage?.resume;
+		if (resume === 'unknown') return new Set();
+		for (const id of resume?.runtimeModuleIds ?? []) named.add(id);
+	}
+	const undemanded = undemandedRuntimeModules({ demandMaps: maps, moduleIds });
+	for (const id of undemanded) {
+		const runtimeId = runtimeModuleIdFromOrigin(id.split('?')[0]!);
+		if (runtimeId && named.has(runtimeId)) undemanded.delete(id);
+	}
+	return undemanded;
 }
 
 function mergeDemand(sources: Iterable<InteractionDemandSource>): Map<string, MergedDemand> {
@@ -444,7 +517,7 @@ function mergeDemand(sources: Iterable<InteractionDemandSource>): Map<string, Me
 			if (RUNS_WITHOUT_INPUT[record.kind])
 				for (const id of record.symbolIds ?? []) entry.landingSymbols.add(id);
 		}
-		for (const action of map.actions) {
+		for (const action of [...map.actions, ...(map.armActions ?? [])]) {
 			const key = `${action.hostNodeId}:${action.eventName}`;
 			const existing = entry.actions.get(key) ?? {
 				hostNodeId: action.hostNodeId,
@@ -573,9 +646,7 @@ function isSymbolModule(id: string): boolean {
 }
 
 function display(id: string, root: string): string {
-	const bare = normalizeVirtualId(id);
-	if (isAbsolute(bare) && root) return relative(root, bare);
-	return root ? bare.split(encodeURIComponent(`${root}/`)).join('') : bare;
+	return rootRelativeId(normalizeVirtualId(id), root || undefined);
 }
 
 function addTo<K, V>(map: Map<K, Set<V>>, key: K, value: V) {
@@ -588,4 +659,20 @@ function push<K, V>(map: Map<K, V[]>, key: K, value: V) {
 	const values = map.get(key);
 	if (values) values.push(value);
 	else map.set(key, [value]);
+}
+
+// File lists sort by name when written, but content-hash renaming changes the names after that.
+export function resortInteractionClosuresFiles(bundle: Record<string, unknown>): void {
+	const asset = bundle[MARKLESS_INTERACTION_CLOSURES] as
+		| { readonly type?: string; source?: string | Uint8Array }
+		| undefined;
+	if (asset?.type !== 'asset' || typeof asset.source !== 'string') return;
+	const parsed = JSON.parse(asset.source) as {
+		readonly routes?: ReadonlyArray<{ readonly files?: Record<string, string[]> }>;
+		readonly packFiles?: Record<string, string[]>;
+	};
+	for (const route of parsed.routes ?? [])
+		for (const files of Object.values(route.files ?? {})) files.sort();
+	for (const files of Object.values(parsed.packFiles ?? {})) files.sort();
+	asset.source = JSON.stringify(parsed);
 }

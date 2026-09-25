@@ -41,6 +41,11 @@ import { __marklessDebugBootstrapSource } from './debug-channel.ts';
 // ruling 2026-07-07). One shared timer bounds the whole first flush.
 export const MARKLESS_STREAM_FIRST_FLUSH_DEADLINE_MS = 10;
 
+// A navigation that swaps the page out clears this global, retiring the old executor and its queue.
+export const STREAM_ARM_EXECUTOR_GLOBAL = '__mArm';
+export const STREAMED_ARM_SELECTOR =
+	'template[m\\:arm],script[type="markless/arm"],script[type="markless/state-patch"]';
+
 export type RenderToStreamOptions = RenderToStringOptions;
 
 export type MarklessSsrStream = {
@@ -342,8 +347,9 @@ function renderArmAppend(
 // The once-installed inline executor. Real range replacement between the
 // boundary's existing comment anchors (no reveal dance, no placeholder).
 // After the swap it wires wake triggers for the streamed arm's event names,
-// mirroring the inline resumer's record-less fallback. If the resume runtime
-// already started, the client settle path owns the boundary: no-op.
+// mirroring the inline resumer's record-less fallback. Once the runtime has
+// read the streamed patches (`__mAdopted`), the client settle path owns the
+// boundary: no-op, and the template stays so the commit still reads as unflushed.
 //
 // Reveal trains (T113, G1/C3/G2): commits queue and reveal in trains —
 // before the document's first paint they flush in the pre-paint frame (the
@@ -416,13 +422,14 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 	}
 	if (!s || !e || s.parentNode !== e.parentNode) throw new Error('MARKLESS_STREAM_ARM_ANCHORS_MISSING: ' + id);
 	const root = s.parentElement && s.parentElement.closest && s.parentElement.closest('[data-async-container]');
-	if (root && root.__asyncResumeRuntimeStarted) { tpl.remove(); return; }
+	if (root && root.__mAdopted) return;
 	while (s.nextSibling && s.nextSibling !== e) s.parentNode.removeChild(s.nextSibling);
 	s.parentNode.insertBefore(tpl.content, e);
 	tpl.remove();${wake}
 	};
 	const flush = () => {
 		scheduled = false;
+		if (globalThis.__mArm !== arm) { queue.length = 0; return; }
 		let moved = true;
 		while (moved) {
 			moved = false;

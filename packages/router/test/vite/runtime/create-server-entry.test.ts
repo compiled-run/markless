@@ -395,7 +395,6 @@ describe('server entry rendering', () => {
 	it('bridge client-navigates a document-rendered Link outside the page container', async () => {
 		const entry = createServerEntry({
 			navigationEntryPath: '/build/navigation.js',
-			linkPreloading: 'intent',
 			routeModulePreloads: { 'pages/about.tsrx': ['/build/about.js'] },
 			documentModuleLoader: async () => ({
 				default: {
@@ -576,7 +575,7 @@ describe('server entry rendering', () => {
 		}
 	});
 
-	it('emits exact route modulepreloads for visible Link targets', async () => {
+	it('leaves visible Link targets to link intent, never the landing preload', async () => {
 		const entry = createServerEntry({
 			navigationEntryPath: '/build/navigation.js',
 			resumeEntryPath: '/build/resume.js',
@@ -602,11 +601,9 @@ describe('server entry rendering', () => {
 		const response = await entry.fetch(new Request('http://markless-router.test/'));
 		const html = await response.text();
 
-		// Route swaps are client-side: preloading a visible Link's destination
-		// page chunks avoids a navigation waterfall.
-		expect(html).toContain('<link rel="modulepreload" href="/build/navigation.js"');
-		expect(html).toContain('<link rel="modulepreload" href="/build/docs.js"');
-		expect(html).toContain('<link rel="modulepreload" href="/build/docs-symbol.js"');
+		expect(html).not.toContain('<link rel="modulepreload" href="/build/navigation.js"');
+		expect(html).not.toContain('<link rel="modulepreload" href="/build/docs.js"');
+		expect(html).toContain('/build/docs-symbol.js');
 		expect(html).not.toContain('/build/not-found.js');
 	});
 

@@ -35,6 +35,10 @@ const servedPages: Record<Starter, ReadonlyArray<readonly [path: string, text: s
 		['/', '<h1>Markless Router Docs</h1>'],
 		['/docs', '<h1>Getting Started</h1>'],
 		['/docs/getting-started', '<nav aria-label="Docs">'],
+		[
+			'/docs/getting-started',
+			'<h1>Guide</h1><p>This catch-all MDX route renders its markdown inside a TSRX layout component.</p>',
+		],
 	],
 };
 

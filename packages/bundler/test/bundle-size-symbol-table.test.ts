@@ -109,8 +109,7 @@ describe('bundle-size generated symbol tables', () => {
 				{
 					symbolId: first.symbolId,
 					claimedChunk: facade.fileName,
-					reason:
-						'claimed chunk was not emitted. markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package',
+					reason: 'claimed chunk was not emitted. markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package',
 				},
 			],
 		});
@@ -165,7 +164,8 @@ function buildBundleSizeTodoMvc() {
 }
 
 async function captureBundleSizeTodoMvcBuild() {
-	const plugins = markless({ executionLog: 'never' });
+	// Symbol facades and table URL rewriting exist only in unpacked output; packed builds load symbols through literal imports.
+	const plugins = markless({ executionLog: 'never', packing: false });
 	for (const plugin of plugins) {
 		if (plugin.name === 'vite-plugin-markless') delete plugin.generateBundle;
 	}
@@ -202,6 +202,7 @@ async function captureBundleSizeTodoMvcBuild() {
 	const filename = resolve(fixtureRoot, 'app.tsrx');
 	const transformed = await transformTsrxModule({
 		filename,
+		moduleId: relative(fixtureRoot!, filename),
 		source: await readFile(filename, 'utf8'),
 		environment: 'client',
 	});

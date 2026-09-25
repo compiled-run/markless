@@ -41,17 +41,10 @@ declare module 'virtual:markless-router/routes' {
 }
 
 declare module 'virtual:markless-router/options' {
-	export const linkPreloading: import('./runtime/create-server-entry.ts').ServerEntryOptions['linkPreloading'];
 	export const documentNavigation: import('./document-navigation.ts').DocumentNavigation;
 	export function startLinkIntentPreloading(
 		root: Document | Element,
 		preload: (url: URL) => void,
 	): () => void;
-	export function startViewportPrefetching(
-		document: Document,
-		destinations: (
-			url: URL,
-		) => readonly import('@markless/web/render-to-string').ModulePreloadInput[] | undefined,
-	): void;
 }
 declare const __MARKLESS_ROUTER_LINK_INTENT__: boolean;

@@ -353,6 +353,42 @@ test('record parity: a value carrying markup characters survives as text', async
 	expect(kernel.armRecords).toEqual(full.armRecords);
 });
 
+// The compiler locates arm hosts only in the boundary's planned set, while their
+// text and attribute bindings stay in the flat stream until the settle moves them.
+function plannedOnlyArmHostSurface() {
+	const surface = feedSurface() as unknown as {
+		components: {
+			Feed: {
+				view: {
+					locators: Array<Record<string, unknown>>;
+					asyncBoundaries: Array<{ armRecords: Array<Record<string, unknown>> }>;
+				};
+			};
+		};
+	};
+	const view = surface.components.Feed.view;
+	view.locators = view.locators.filter((locator) => locator.hostNodeId === 'h0');
+	view.asyncBoundaries[0]!.armRecords = [
+		{ ...emptyArm, locators: [{ hostNodeId: 'h1', index: 0, tagName: 'ul' }] },
+		emptyArm,
+		emptyArm,
+	];
+	return surface;
+}
+
+test('a binding on an arm host located only by the planned set moves into the arm records', async () => {
+	const graph = fulfilledGraph({ source: 'live', updates: [{ id: 1, label: 'one' }] });
+	const { kernel, full } = await bothPaths(plannedOnlyArmHostSurface(), graph);
+
+	expect((kernel.armRecords as { readonly domUpdates: unknown }).domUpdates).toEqual([
+		expect.objectContaining({
+			hostNodeId: 'h1',
+			target: { kind: 'attribute', name: 'data-source' },
+		}),
+	]);
+	expect(kernel.armRecords).toEqual(full.armRecords);
+});
+
 // Two components of one module can both derive a computed of the same name, so
 // the graph-node id set cannot partition them; only the compiler's indexes can.
 function collidingComputedSurface() {

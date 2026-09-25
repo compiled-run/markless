@@ -136,6 +136,7 @@ export type KeyedRepeatRowMintRefusal =
 	| { readonly kind: 'component'; readonly componentName: string }
 	| { readonly kind: 'nested-construct'; readonly label: string }
 	| { readonly kind: 'attribute'; readonly attributeName: string }
+	| { readonly kind: 'style-object' }
 	| {
 			readonly kind: 'unfillable-read';
 			/** The read in the author's own words, so the clause names it, not its category. */
@@ -184,6 +185,11 @@ function refusalCause(
 			return {
 				message: `This @for row sets the ${refusal.attributeName} attribute from a value, and the row template fills text only.`,
 				suggestion: `Render the value as text inside the row instead of as the ${refusal.attributeName} attribute, or wait for attribute rows.`,
+			};
+		case 'style-object':
+			return {
+				message: `This @for row over ${itemName} sets style from a style object that reads page state. The browser computes that object's CSS text only once the state it reads changes, so a row built before then would have no style to write.`,
+				suggestion: `Write the style as a string expression over the same values, such as style={\`color: \${color}\`}.`,
 			};
 		case 'unfillable-read':
 			return {

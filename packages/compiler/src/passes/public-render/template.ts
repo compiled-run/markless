@@ -111,6 +111,7 @@ export function firstComponentRoot(component: AnyNode | undefined): AnyNode | nu
 }
 
 export function selectPublicRenderRoot(ast: AnyNode): PublicRenderRootSelection | null {
+	let firstExported: PublicRenderRootSelection | null = null;
 	let fallback: PublicRenderRootSelection | null = null;
 	for (const statement of asNodes(ast.body)) {
 		const component = getComponentFunction(statement);
@@ -118,13 +119,11 @@ export function selectPublicRenderRoot(ast: AnyNode): PublicRenderRootSelection 
 		const root = firstComponentRoot(component.node);
 		if (!root) continue;
 		const selection = { component: component.node, componentName: component.name, root };
-		if (
-			statement.type === 'ExportDefaultDeclaration' ||
-			statement.type === 'ExportNamedDeclaration'
-		) return selection;
+		if (statement.type === 'ExportDefaultDeclaration') return selection;
+		if (statement.type === 'ExportNamedDeclaration') firstExported ??= selection;
 		fallback ??= selection;
 	}
-	return fallback;
+	return firstExported ?? fallback;
 }
 
 export function supportedFragmentRoot(fragment: AnyNode): AnyNode | null {

@@ -40,7 +40,7 @@ export async function resumeScalarCoreEventFromPayloadDocument(
 			return resumeFullEventOnly(input);
 	}
 	if (plan.eventRecord.syncPolicy && !input.syncPolicyAlreadyApplied) {
-		const { runSyncPolicyActions } = await import('../inline/sync-policy-core.ts');
+		const { runSyncPolicyActions } = await import('../inline/sync-policy-core-lazy.ts');
 		runSyncPolicyActions(plan.eventRecord.syncPolicy, graph, input.event);
 	}
 	executePlanWrite(graph, action.plan);

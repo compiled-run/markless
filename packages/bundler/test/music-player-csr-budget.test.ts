@@ -4,6 +4,7 @@ import { afterAll, beforeAll, expect, test } from 'vitest';
 import { MARKLESS_BUILD_PREFIX } from '../src/build/chunking.ts';
 import { withoutDemand } from '../../../scripts/benchmarks/perf-guards/attribution.mjs';
 import { acquireDemoBuildLock, releaseDemoBuildLock } from './helpers/demo-build-lock.ts';
+import { executedAtLoad, serveStaticDirectory } from './helpers/executed-at-load.ts';
 import {
 	chunkName,
 	createStageLadder,
@@ -12,7 +13,6 @@ import {
 	gzipByChunk,
 	payPerUse,
 	payPerUseReport,
-	unexpectedUndemanded,
 	readClientBuildArtifacts,
 	readOverheadArtifacts,
 	RESUME_MODULE_ATTRIBUTE,
@@ -43,17 +43,30 @@ const STAGES = [
 	'interaction 3 marginal',
 ];
 
+// The staged ladder reads per-module chunk boundaries, so it measures the `packing: false` build.
+// The shipped default packs; its page load is gated only against that build: fewer bytes and files
+// downloaded, and no more JavaScript executed (V8 block coverage, same page, same settle point).
+// Packed chunks run Rolldown's lazy-init wrapper (its helper plus one init call per evaluated chunk):
+// measured +64 B on the CSR lane, +0 on the SSR lane.
+const EXECUTED_AT_LOAD_DE_MINIMIS = 128;
+const SETTLED = '.youtube-frame-host[data-command="cue"]';
+
 let measured: BudgetMeasurement;
 let artifacts: OverheadArtifacts;
 let eagerChunks: readonly string[];
+let packedLoad: PageLoad;
+let unpackedLoad: PageLoad;
 
 // build-determinism.test.ts builds this same demo into this same dist/, and
 // vitest runs the two files in parallel workers. The lock spans the whole file
 // because the last test reads dist/index.html long after the build.
 beforeAll(async () => {
 	await acquireDemoBuildLock(demo);
+	await buildDemo(true);
+	packedLoad = await measurePageLoad();
 	measured = await measureBuiltDemo();
-}, 240_000);
+	unpackedLoad = await measurePageLoad();
+}, 480_000);
 
 afterAll(() => releaseDemoBuildLock(demo));
 
@@ -73,7 +86,7 @@ test('music-player CSR page-load download pays only for runtime features the pag
 		'the page download must carry its demand maps',
 	).toBeGreaterThan(0);
 	expect(
-		unexpectedUndemanded(measured.payPerUse),
+		measured.payPerUse.undemanded,
 		payPerUseReport('music-player CSR', measured.payPerUse),
 	).toEqual([]);
 });
@@ -84,8 +97,18 @@ test('the pay-per-use gate goes red and names the runtime module it caught', () 
 
 	const result = payPerUse(artifacts, eagerChunks, withoutDemand(artifacts.demand, id!));
 
-	expect(unexpectedUndemanded(result)).toEqual([id]);
+	expect(result.undemanded).toEqual([id]);
 	expect(payPerUseReport('music-player CSR', result)).toContain(`runtime feature module ${id}`);
+});
+
+test('packing downloads less at page load than one chunk per module, and executes no more', () => {
+	const detail = JSON.stringify({ packedLoad, unpackedLoad });
+	expect(packedLoad.gzipBytes, detail).toBeLessThanOrEqual(unpackedLoad.gzipBytes);
+	expect(packedLoad.files, detail).toBeLessThanOrEqual(unpackedLoad.files);
+	expect(packedLoad.executedBytes, detail).toBeLessThanOrEqual(
+		unpackedLoad.executedBytes + EXECUTED_AT_LOAD_DE_MINIMIS,
+	);
+	console.info(`packed page-load: ${detail}`);
 });
 
 // The SSR wall's sixth stage has no counterpart here, and this pins why rather
@@ -107,11 +130,42 @@ function report(budget: BudgetMeasurement): string {
 	});
 }
 
-async function measureBuiltDemo(): Promise<BudgetMeasurement> {
+type PageLoad = {
+	readonly chunks: readonly string[];
+	readonly gzipBytes: number;
+	readonly files: number;
+	readonly executedBytes: number;
+};
+
+async function buildDemo(packing: boolean): Promise<void> {
 	await rm(clientPublic, { force: true, recursive: true });
 	// Consumer posture: the wall measures the 'never' build even though the
 	// demo's default build keeps the lab instrument (owner rulings 2026-07-12).
-	await execPnpm(root, ['--dir', demo, 'build'], { MARKLESS_CONSUMER_BUILD: '1' });
+	await execPnpm(root, ['--dir', demo, 'build'], {
+		MARKLESS_CONSUMER_BUILD: '1',
+		MARKLESS_FIXTURE_NATIVE_PACKING: packing ? '1' : '0',
+	});
+}
+
+async function measurePageLoad(): Promise<PageLoad> {
+	const html = await readFile(resolve(clientPublic, 'index.html'), 'utf8');
+	const chunks = eagerChunkNames(html, scriptTags(html)).sort();
+	const gzip = gzipByChunk(clientBuild);
+	const served = await serveStaticDirectory(clientPublic);
+	try {
+		return {
+			chunks,
+			gzipBytes: chunks.reduce((total, name) => total + gzip(name), 0),
+			files: chunks.length,
+			executedBytes: await executedAtLoad(served.url, { settledSelector: SETTLED }),
+		};
+	} finally {
+		await served.close();
+	}
+}
+
+async function measureBuiltDemo(): Promise<BudgetMeasurement> {
+	await buildDemo(false);
 
 	const { aggregateChunks, graph, instrumented } = await readClientBuildArtifacts(clientPublic);
 	const gzip = gzipByChunk(clientBuild);

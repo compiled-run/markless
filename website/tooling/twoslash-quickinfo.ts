@@ -199,6 +199,28 @@ function createReusableDocumentRegistry(isFence: (path: string) => boolean): ts.
 	};
 }
 
+/** What the service read from disk, so a cached answer can be checked against the disk later. */
+export type QuickInfoInputRecorder = {
+	read(path: string, text: string | undefined): void;
+	fileExists(path: string, found: boolean): void;
+	directoryExists(path: string, found: boolean): void;
+	realpath(path: string, real: string): void;
+	/** The service asked something the recorder cannot replay, such as a directory listing. */
+	unrepeatable(): void;
+};
+
+let recorder: QuickInfoInputRecorder | undefined;
+
+export function recordQuickInfoInputs(next: QuickInfoInputRecorder | undefined): void {
+	recorder = next;
+}
+
+function readRecorded(path: string): string | undefined {
+	const text = ts.sys.readFile(path);
+	recorder?.read(path, text);
+	return text;
+}
+
 function memoize<T>(read: (path: string) => T): (path: string) => T {
 	const seen = new Map<string, T>();
 	return (path) => {
@@ -215,12 +237,27 @@ function createDiskCache(): ts.ModuleResolutionHost & {
 	realpath(path: string): string;
 } {
 	return {
-		directoryExists: memoize((path) => ts.sys.directoryExists(path)),
-		fileExists: memoize((path) => ts.sys.fileExists(path)),
+		directoryExists: memoize((path) => {
+			const found = ts.sys.directoryExists(path);
+			recorder?.directoryExists(path, found);
+			return found;
+		}),
+		fileExists: memoize((path) => {
+			const found = ts.sys.fileExists(path);
+			recorder?.fileExists(path, found);
+			return found;
+		}),
 		getCurrentDirectory: () => SITE_ROOT,
-		getDirectories: memoize((path) => ts.sys.getDirectories(path)),
-		readFile: memoize((path) => ts.sys.readFile(path)),
-		realpath: memoize((path) => ts.sys.realpath?.(path) ?? path),
+		getDirectories: memoize((path) => {
+			recorder?.unrepeatable();
+			return ts.sys.getDirectories(path);
+		}),
+		readFile: memoize(readRecorded),
+		realpath: memoize((path) => {
+			const real = ts.sys.realpath?.(path) ?? path;
+			recorder?.realpath(path, real);
+			return real;
+		}),
 		useCaseSensitiveFileNames: ts.sys.useCaseSensitiveFileNames,
 	};
 }
@@ -274,7 +311,7 @@ function createService(): {
 		const cached = snapshots.get(fileName);
 		if (cached && cached.version === version) return cached.snapshot;
 		const fence = fenceByName.get(fileName);
-		const text = fence ? fence.text : ts.sys.readFile(fileName);
+		const text = fence ? fence.text : readRecorded(fileName);
 		if (text === undefined) return undefined;
 		const snapshot = ts.ScriptSnapshot.fromString(text);
 		snapshots.set(fileName, { snapshot, version });
@@ -293,8 +330,10 @@ function createService(): {
 		getScriptKind: (fileName) => SCRIPT_KINDS[extensionOf(fileName)] ?? ts.ScriptKind.TS,
 		getScriptSnapshot: readSnapshot,
 		getScriptVersion: versionOf,
-		readDirectory: (path, extensions, exclude, include, depth) =>
-			ts.sys.readDirectory(path, extensions, exclude, include, depth),
+		readDirectory: (path, extensions, exclude, include, depth) => {
+			recorder?.unrepeatable();
+			return ts.sys.readDirectory(path, extensions, exclude, include, depth);
+		},
 		readFile: disk.readFile,
 		// Resolve pnpm aliases to one document-registry identity.
 		realpath: disk.realpath,

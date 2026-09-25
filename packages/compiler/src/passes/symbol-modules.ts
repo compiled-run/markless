@@ -27,6 +27,7 @@ import type {
 } from '../artifacts.ts';
 import { PROTOCOL_PROPS_GRAPH_NODE_ID, protocolElementHandleReadId } from '@markless/serializer';
 import type { SourceSpan } from '../diagnostics.ts';
+import { boundarySettleRecords, type BoundarySettleRecords } from './boundary-settle-records.ts';
 import {
 	armChildDescent,
 	armChildOwnValueRefusal,
@@ -215,6 +216,17 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 			if (symbol.kind === 'async-boundary-update') {
 				const arms = boundaryArmsById.get(symbol.boundaryId);
 				if (!arms) return [];
+				const records = input.renderData
+					? boundarySettleRecords({
+							boundaryId: symbol.boundaryId,
+							protocolView: input.protocolView,
+							renderData: input.renderData,
+							captureAnalysis: input.captureAnalysis,
+							repeatPartCounts: arms.arms.map(
+								(arm) => arm.filter((part) => 'repeat' in part).length,
+							),
+						})
+					: null;
 				return [
 					{
 						symbolId: symbol.id,
@@ -223,6 +235,7 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 						source: emitAsyncBoundaryUpdateModuleNodes({
 							symbol,
 							arms,
+							...(records ? { records } : {}),
 							sourceFileName,
 							authoredSource,
 						}).code,
@@ -1979,6 +1992,15 @@ export function buildDomBindingEmission(input: DomBindingEmissionInput): Emissio
 	const body = isPlainTextUpdateLeaf(input.symbol.target)
 		? domTextLeafBody(exportName, input.symbol.hostNodeId)
 		: [
+				...(input.symbol.target.kind === 'text' && input.symbol.target.textNode !== undefined
+					? [
+							moduleImportNode({
+								kind: 'named',
+								localName: 'marklessTextNode',
+								source: '@markless/web/fns/text-node',
+							}),
+						]
+					: []),
 				exportNamedDeclarationNode(
 					functionDeclarationNode(
 						exportName,
@@ -2016,7 +2038,8 @@ function isPlainTextUpdateLeaf(target: DomUpdateTarget): boolean {
 		target.prefix === undefined &&
 		target.suffix === undefined &&
 		target.trueValue === undefined &&
-		target.falseValue === undefined
+		target.falseValue === undefined &&
+		target.textNode === undefined
 	);
 }
 
@@ -2059,6 +2082,9 @@ function domJournalEntryNode(
 			propertyNode('type', literalNode('setText')),
 			propertyNode('locator', locator),
 			propertyNode('value', textDomUpdateValueNode(target)),
+			...(target.textNode === undefined
+				? []
+				: [propertyNode('node', textNodeLocatorNode(target.textNode))]),
 		]);
 	}
 
@@ -2086,6 +2112,15 @@ function domJournalEntryNode(
 		propertyNode('name', literalNode(target.kind === 'style' ? 'style' : target.name)),
 		propertyNode('value', domUpdateValueNode()),
 	]);
+}
+
+/** `(host) => marklessTextNode(host, <textNode>)`. */
+function textNodeLocatorNode(textNode: number): EmissionNode {
+	const at = textNode < 0 ? unaryNode('-', literalNode(-textNode)) : literalNode(textNode);
+	return arrowFunctionNode(
+		['host'],
+		callNode(identifierNode('marklessTextNode'), [identifierNode('host'), at]),
+	);
 }
 
 /** `context.domUpdate?.hostNodeId ?? "<hostNodeId>"`. */
@@ -4217,6 +4252,8 @@ export type AsyncBoundaryUpdateEmissionInput = {
 	readonly sourceFileName: string;
 	/** The authored module's text, for the map's `sourcesContent`. */
 	readonly authoredSource: string;
+	/** Each arm's planned records, returned with its html so a client settle registers them. */
+	readonly records?: BoundarySettleRecords;
 };
 
 /**
@@ -4238,8 +4275,26 @@ export function buildAsyncBoundaryUpdateEmission(
 	};
 
 	const hasRepeatParts = input.arms.arms.some((arm) => arm.some((part) => 'repeat' in part));
+	const records = input.records;
+	const rowsShiftLocators = records?.rowElements.some((counts) => counts.length > 0) === true;
+	const armRecordsAt = (): EmissionNode =>
+		computedMemberNode(identifierNode('marklessBoundaryRecords'), identifierNode('arm'));
+	const armRecordsNode = rowsShiftLocators
+		? callNode(identifierNode('marklessBoundaryArmRecords'), [
+				armRecordsAt(),
+				computedMemberNode(identifierNode('marklessBoundaryRowElements'), identifierNode('arm')),
+				identifierNode('parts'),
+				memberChainNode('context.graph'),
+			])
+		: armRecordsAt();
 	const body: EmissionNode[] = [
 		constDeclarationNode('marklessBoundaryArms', jsonValueNode(input.arms.arms)),
+		...(records
+			? [constDeclarationNode('marklessBoundaryRecords', jsonValueNode(records.arms))]
+			: []),
+		...(records && rowsShiftLocators
+			? [constDeclarationNode('marklessBoundaryRowElements', jsonValueNode(records.rowElements))]
+			: []),
 		exportNamedDeclarationNode(
 			functionDeclarationNode(exportName, ['context'], [
 				// The runtime passes the settled status; arm 1 is @catch, arm 0 is @try.
@@ -4264,12 +4319,17 @@ export function buildAsyncBoundaryUpdateEmission(
 					armPartsHtmlExpression('marklessBoundaryText', hasRepeatParts),
 				),
 				returnStatementNode(
-					objectNode([shorthandPropertyNode('arm'), shorthandPropertyNode('html')]),
+					objectNode([
+						shorthandPropertyNode('arm'),
+						shorthandPropertyNode('html'),
+						...(records ? [propertyNode('armRecords', armRecordsNode)] : []),
+					]),
 				),
 			]),
 		),
 		armTextEscaperFunctionNode('marklessBoundaryText'),
 		...(hasRepeatParts ? [branchRowsFunctionNode('marklessBoundaryText')] : []),
+		...(records && rowsShiftLocators ? [boundaryArmRecordsFunctionNode()] : []),
 	];
 
 	return {
@@ -4285,6 +4345,98 @@ export function emitAsyncBoundaryUpdateModuleNodes(
 	input: AsyncBoundaryUpdateEmissionInput,
 ): EmittedModule {
 	return printEmittedModule(buildAsyncBoundaryUpdateEmission(input));
+}
+
+// Rows rendered before an element shift its locator by rows times the row element count.
+function boundaryArmRecordsFunctionNode(): EmissionNode {
+	const rowElementsRendered = callNode(
+		memberNode(
+			callNode(
+				memberNode(
+					callNode(memberChainNode('parts.filter'), [
+						arrowFunctionNode(
+							['part'],
+							binaryNode('!==', memberChainNode('part.repeat'), identifierNode('undefined')),
+						),
+					]),
+					'map',
+				),
+				[
+					arrowFunctionNode(
+						['part'],
+						callNode(memberChainNode('graph.read'), [
+							memberChainNode('part.repeat.read.graphNodeId'),
+							memberChainNode('part.repeat.read.path'),
+						]),
+					),
+				],
+			),
+			'map',
+		),
+		[
+			arrowFunctionNode(
+				['items', 'at'],
+				binaryNode(
+					'*',
+					conditionalNode(
+						callNode(memberChainNode('Array.isArray'), [identifierNode('items')]),
+						memberChainNode('items.length'),
+						literalNode(0),
+					),
+					computedMemberNode(identifierNode('rowElements'), identifierNode('at')),
+				),
+			),
+		],
+	);
+	const shiftedIndex = binaryNode(
+		'+',
+		memberChainNode('locator.index'),
+		callNode(
+			memberNode(
+				callNode(memberChainNode('rows.slice'), [
+					literalNode(0),
+					logicalNode('??', memberChainNode('locator.repeats'), literalNode(0)),
+				]),
+				'reduce',
+			),
+			[
+				arrowFunctionNode(
+					['sum', 'count'],
+					binaryNode('+', identifierNode('sum'), identifierNode('count')),
+				),
+				literalNode(0),
+			],
+		),
+	);
+	return functionDeclarationNode(
+		'marklessBoundaryArmRecords',
+		['records', 'rowElements', 'parts', 'graph'],
+		[
+			ifStatementNode(
+				binaryNode('===', identifierNode('records'), identifierNode('undefined')),
+				returnStatementNode(identifierNode('records')),
+			),
+			constDeclarationNode('rows', rowElementsRendered),
+			returnStatementNode(
+				objectNode([
+					spreadNode(identifierNode('records')),
+					propertyNode(
+						'locators',
+						callNode(memberChainNode('records.locators.map'), [
+							arrowFunctionNode(
+								['locator'],
+								objectNode([
+									propertyNode('hostNodeId', memberChainNode('locator.hostNodeId')),
+									propertyNode('index', shiftedIndex),
+									propertyNode('tagName', memberChainNode('locator.tagName')),
+								]),
+							),
+						]),
+					),
+				]),
+			),
+		],
+	);
 }
 
 /**

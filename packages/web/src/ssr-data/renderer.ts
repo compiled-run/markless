@@ -150,6 +150,9 @@ export type SsrDataReadContext = {
 	readonly chunkId: string;
 	readonly repeatItem?: unknown;
 	readonly repeatIndex?: number;
+	// The row this context renders, and the row enclosing it, so a nested row reads an enclosing item by its repeat.
+	readonly repeatId?: string;
+	readonly repeatOuter?: SsrDataReadContext;
 	// The row's authored key, so a child composed inside it takes its own identity.
 	readonly repeatKey?: unknown;
 	readonly asyncError?: unknown;
@@ -455,6 +458,8 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 			chunkId,
 			...(repeat.item !== undefined ? { repeatItem: repeat.item } : {}),
 			...(repeat.index !== undefined ? { repeatIndex: repeat.index } : {}),
+			repeatId: repeat.repeatId,
+			repeatOuter: repeat.repeatOuter,
 			...(repeat.key !== undefined ? { repeatKey: repeat.key } : {}),
 			...(repeat.freshInstances ? { freshInstances: repeat.freshInstances } : {}),
 			hostSegment: repeat.hostSegment,
@@ -549,6 +554,8 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 									item: context.repeatItem,
 									index: context.repeatIndex,
 									key: context.repeatKey,
+									repeatId: context.repeatId,
+									repeatOuter: context.repeatOuter,
 									sharedSeeds: childSeeds,
 									...input.projectionSegment?.(context),
 								})
@@ -683,6 +690,8 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 							renderChunk(slot.rowTemplateId, {
 								item,
 								index,
+								repeatId: slot.repeatId,
+								repeatOuter: context.repeatId === undefined ? undefined : context,
 								// Rows mint fresh item/index but must not drop the seed map the
 								// way branch and async keep it: a part's pre-row write rides here.
 								sharedSeeds: context.sharedSeeds,

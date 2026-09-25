@@ -18,7 +18,14 @@ export function unwrapAsyncImportWrappers(bundle: Record<string, unknown>): void
 	}
 }
 
+const GAP = String.raw`(?:\s|/\*[\s\S]*?\*/|//[^\n]*\n)*`;
+// The wrapper's opening tokens, comments allowed between them: code without them holds no wrapper.
+const WRAPPER_OPENING = new RegExp(
+	`async${GAP}\\(${GAP}\\)${GAP}=>${GAP}\\{${GAP}(?:let|const)${GAP}\\{`,
+);
+
 export function unwrapAsyncImportWrappersInCode(code: string): string {
+	if (!WRAPPER_OPENING.test(code)) return code;
 	let program: Syntax;
 	try {
 		const parsed = parseChunkCode('chunk.js', code);

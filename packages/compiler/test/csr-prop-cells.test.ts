@@ -31,7 +31,7 @@ test('linked definitions identify the prop:props cell', async () => {
 	expect(result.publicRenderModule.componentDefinitions[0]?.propCellId).toBe('prop:props');
 });
 
-test('linked definitions identify an identifier-parameter prop cell', async () => {
+test('an identifier parameter shares the prop:props cell', async () => {
 	const result = await compileTsrxModule({
 		filename: 'pages/whole-props.tsrx',
 		source: `import { computed } from '@markless/core';
@@ -46,7 +46,7 @@ export default function Page(pageProps) @{
 		symbols: [],
 	});
 
-	expect(result.publicRenderModule.componentDefinitions[0]?.propCellId).toBe('prop:pageProps');
+	expect(result.publicRenderModule.componentDefinitions[0]?.propCellId).toBe('prop:props');
 });
 
 test('pages without props publish no prop cell', async () => {

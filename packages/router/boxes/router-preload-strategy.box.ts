@@ -1,7 +1,13 @@
+import { existsSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { box } from '@async/witness';
 import type { Plugin } from 'vite';
 import { NAVIGATION_POLYFILL_MODULE } from '../src/navigation-polyfill.ts';
 import { readClientAssetsManifest } from '../src/vite/client-assets-manifest.ts';
+import {
+	MARKLESS_CHUNK_SPECIFIER_PREFIX,
+	marklessImportMapPath,
+} from '@markless/bundler/rolldown';
 
 const FIXTURE = 'fixtures/router';
 const NITRO_BUILD_DIR = 'node_modules/.nitro-router-preload-strategy';
@@ -9,6 +15,10 @@ const NITRO_BUILD_DIR = 'node_modules/.nitro-router-preload-strategy';
 const NITRO_OUTPUT_DIR = '.output/router-preload-strategy';
 const BUNDLE_GRAPH_REQUEST = '/build/bundle-graph.json';
 const EXECUTION_SIZES_REQUEST = '/build/execution-sizes.json';
+const INDEX_ROUTE = 'pages/index.tsrx';
+const DOCS_ROUTE = 'pages/docs/[...slug].mdx';
+const DOCS_PATH = '/docs/getting-started';
+const HOME_PATH = '/';
 const DOCS_LINK = 'a[data-markless-router-link]';
 const HOME_COUNTER = '[data-home-counter]';
 const HOME_INPUT = '[data-home-input]';
@@ -26,6 +36,13 @@ const SLOW_3G = {
 	uploadThroughputBytesPerSecond: (300 * 1024) / 8,
 	connectionType: 'cellular3g' as const,
 };
+// The idle tier only downloads on a connection the browser reports as 4g.
+const FAST_4G = {
+	latencyMs: 20,
+	downloadThroughputBytesPerSecond: (20 * 1024 * 1024) / 8,
+	uploadThroughputBytesPerSecond: (20 * 1024 * 1024) / 8,
+	connectionType: 'cellular4g' as const,
+};
 
 type Build = {
 	readonly artifacts: readonly { readonly path: string }[];
@@ -35,7 +52,7 @@ type Preview = {
 };
 type Request = {
 	readonly method: string;
-	readonly resourceType?: string;
+	readonly resourceType?: string | null;
 	readonly url: string;
 	readonly startTimeMs: number;
 	readonly endTimeMs: number | null;
@@ -56,7 +73,7 @@ type Receipt = {
 
 export default box(
 	{
-		name: 'router preload strategy: explicit preloads and route-owned demand loading',
+		name: 'router preload strategy: landing preloads and one-round fragment navigation',
 		tags: ['router', 'build', 'preview', 'browser', 'preload', 'network', 'waterfall'],
 		modes: ['build', 'preview'],
 	},
@@ -80,54 +97,33 @@ export default box(
 				nitro: isolatedNitroOutput(),
 			}),
 		});
-		const plan = await routeCandidatePlan(
-			build as Build,
-			preview as Preview,
-			polyfill.chunkPaths(),
-		);
-		receipt.note(`expected startup modulepreloads: ${plan.expectedHrefs.join(', ')}`);
-		receipt.note(`direct docs modulepreloads: ${plan.directDocsHrefs.join(', ')}`);
-		receipt.note(`required docs route/nav chain: ${plan.requiredHrefs.join(', ')}`);
-		receipt.note(`required home route/nav chain: ${plan.directDocsRequiredHrefs.join(', ')}`);
-		receipt.note(
-			`navigation polyfill chunks kept out of preloads: ${plan.polyfillHrefs.join(', ')}`,
-		);
-		receipt.note(
-			`forbidden sibling route preloads: ${plan.forbiddenRouteHrefs.join(', ') || '(none)'}`,
-		);
+		const plan = await deliveryPlan(build as Build, preview as Preview, polyfill.chunkPaths());
+		receipt.note(`index landing preloads: ${plan.index.landing.join(', ')}`);
+		receipt.note(`docs landing preloads: ${plan.docs.landing.join(', ')}`);
+		receipt.note(`index -> docs intent round: ${DOCS_PATH}, ${plan.docsRound.join(', ')}`);
+		receipt.note(`docs -> home intent round: ${HOME_PATH}, ${plan.homeRound.join(', ')}`);
+		receipt.note(`navigation polyfill chunks kept out: ${plan.polyfillHrefs.join(', ')}`);
 		try {
+			// Slow network: the landing round and the intent round are separable on the timeline.
 			const page = (await preview.browser.visit('/', {
 				networkConditions: SLOW_3G,
 			})) as Page;
 			page.allowedLazyHrefs = plan.observabilityHrefs;
 			await expect.page.text(page, 'h1', 'Markless Router', WAIT);
-			const startedPreloads = await waitForExpectedPreloadRequests(page, plan.expectedHrefs);
-			receipt.note(`pre-click modulepreloads:\n${timeline(startedPreloads)}`);
-			const initialJs = jsBuildRequests(await page.networkRequests());
-			const expectedPaths = new Set(plan.expectedHrefs.map((href) => pathOf(href)));
-			const unexpectedInitialJs = initialJs.filter(
-				(request) => !expectedPaths.has(pathOf(request.url)),
-			);
-			if (unexpectedInitialJs.length > 0) {
-				throw new Error(
-					`Expected startup JS to be only current route and visible Link modulepreloads, saw:\n${timeline(unexpectedInitialJs)}`,
-				);
-			}
-			const forbiddenPaths = new Set(plan.forbiddenRouteHrefs.map((href) => pathOf(href)));
-			const forbiddenPreloads = initialJs.filter((request) =>
-				forbiddenPaths.has(pathOf(request.url)),
-			);
-			if (forbiddenPreloads.length > 0) {
-				throw new Error(
-					`Expected current route and docs Link preloads to exclude unrelated sibling route chunks, saw:\n${timeline(forbiddenPreloads)}`,
-				);
-			}
-			page.demandHrefs = plan.docsDemandHrefs;
-			await expectRouteDemandJs(page, receipt, 'post-Link-click JS', async () => {
-				await page.click(DOCS_LINK, WAIT);
-				await expect.page.text(page, 'h1', 'Docs', WAIT);
-				await expect.page.text(page, MDX_COUNTER, 'MDX Count 0', WAIT);
+			const landing = await expectLandingRound(page, plan, plan.index, receipt, 'index');
+			const intent = await expectIntentRound(page, plan, receipt, {
+				label: 'index -> docs',
+				path: DOCS_PATH,
+				round: plan.docsRound,
+				landing,
+				navigate: async () => {
+					await page.click(DOCS_LINK, WAIT);
+					await expect.page.text(page, 'h1', 'Docs', WAIT);
+					await expect.page.text(page, MDX_COUNTER, 'MDX Count 0', WAIT);
+				},
 			});
+			receipt.note(`slow 3G docs round fired ${intent}`);
+			page.demandHrefs = plan.docs.demand;
 			await expectRouteDemandJs(page, receipt, 'post-MDX-counter JS', async () => {
 				await page.click(MDX_COUNTER, WAIT);
 				await expect.page.text(page, MDX_COUNTER, 'MDX Count 1', WAIT);
@@ -140,47 +136,71 @@ export default box(
 				await page.click(MDX_BOOST, WAIT);
 				await expect.page.text(page, MDX_BOOST, 'MDX Boost 1', WAIT);
 			});
-			const documentRequests = (await page.networkRequests()).filter(
-				(request) => request.resourceType === 'Document',
-			);
-			if (documentRequests.length !== 1) {
-				throw new Error(
-					`Expected CSR Link navigation to avoid a server document round trip, saw:\n${timeline(documentRequests)}`,
-				);
-			}
-			const graphRequests = bundleGraphRequests(await page.networkRequests());
-			if (graphRequests.length > 0) {
-				throw new Error(
-					`Expected route preloads to avoid browser bundle graph fetches, saw:\n${timeline(graphRequests)}`,
-				);
-			}
+			await expectNothingWasted(page, plan, 'index -> docs');
 			await page.clearNetworkEmulation();
 			await waitForSettledNetwork(page);
 			await expect.page.outcome(page, { consoleErrors: 0, failedRequests: 0 }, WAIT);
 
-			const directPage = (await preview.browser.visit('/docs/getting-started', {
+			// Fast network: the idle tier fetches the visible link's round, so the click itself fetches nothing.
+			const idlePage = (await preview.browser.visit('/', {
+				networkConditions: FAST_4G,
+			})) as Page;
+			idlePage.allowedLazyHrefs = plan.observabilityHrefs;
+			await expect.page.text(idlePage, 'h1', 'Markless Router', WAIT);
+			const idleLanding = await waitForRequests(idlePage, plan.index.landing);
+			const idleRound = await waitForRequests(idlePage, [...plan.docsRound, DOCS_PATH]);
+			receipt.note(`idle-tier docs round:\n${timeline(idleRound)}`);
+			expectOneRound(idleRound, 'idle-tier docs round');
+			await waitForSettledNetwork(idlePage);
+			const idleBefore = await idlePage.networkRequests();
+			const idleExtra = appRequests(idleBefore, plan).filter(
+				(request) =>
+					!idleLanding.some(same(request)) &&
+					!idleRound.some(same(request)) &&
+					!plan.observabilityPaths.has(pathOf(request.url)),
+			);
+			if (idleExtra.length > 0)
+				throw new Error(
+					`Expected the idle tier to fetch only the docs fragment and its landing code, saw:\n${timeline(idleExtra)}`,
+				);
+			await idlePage.click(DOCS_LINK, WAIT);
+			await expect.page.text(idlePage, 'h1', 'Docs', WAIT);
+			await expect.page.text(idlePage, MDX_COUNTER, 'MDX Count 0', WAIT);
+			await waitForSettledNetwork(idlePage);
+			const clickRequests = appRequests(
+				(await idlePage.networkRequests()).slice(idleBefore.length),
+				plan,
+			).filter((request) => !plan.observabilityPaths.has(pathOf(request.url)));
+			receipt.note(`idle-tier click requests:\n${timeline(clickRequests)}`);
+			// The destination's own idle tier may fetch fragments for the links it shows; code and the docs fragment may not come again.
+			const clickFetched = clickRequests.filter(
+				(request) =>
+					jsBuildRequests([request]).length > 0 || pathOf(request.url) === DOCS_PATH,
+			);
+			if (clickFetched.length > 0)
+				throw new Error(
+					`Expected a click after the idle round to fetch nothing, saw:\n${timeline(clickFetched)}`,
+				);
+			await expectNothingWasted(idlePage, plan, 'idle-tier index -> docs');
+			await idlePage.clearNetworkEmulation();
+			await waitForSettledNetwork(idlePage);
+			await expect.page.outcome(idlePage, { consoleErrors: 0, failedRequests: 0 }, WAIT);
+
+			const directPage = (await preview.browser.visit(DOCS_PATH, {
 				networkConditions: SLOW_3G,
 			})) as Page;
 			directPage.allowedLazyHrefs = plan.observabilityHrefs;
-			directPage.demandHrefs = plan.docsDemandHrefs;
 			await expect.page.text(directPage, 'h1', 'Docs', WAIT);
 			await expect.page.text(directPage, MDX_COUNTER, 'MDX Count 0', WAIT);
 			await expect.page.text(directPage, HOME_LINK, 'Home', WAIT);
-			const directPreloads = await waitForExpectedPreloadRequests(
+			const directLanding = await expectLandingRound(
 				directPage,
-				plan.directDocsHrefs,
+				plan,
+				plan.docs,
+				receipt,
+				'direct docs',
 			);
-			receipt.note(`direct docs preloads:\n${timeline(directPreloads)}`);
-			const directInitialJs = jsBuildRequests(await directPage.networkRequests());
-			const directExpectedPaths = new Set(plan.directDocsHrefs.map((href) => pathOf(href)));
-			const unexpectedDirectJs = directInitialJs.filter(
-				(request) => !directExpectedPaths.has(pathOf(request.url)),
-			);
-			if (unexpectedDirectJs.length > 0) {
-				throw new Error(
-					`Expected direct docs startup JS to be only current route and visible Link modulepreloads, saw:\n${timeline(unexpectedDirectJs)}`,
-				);
-			}
+			directPage.demandHrefs = plan.docs.demand;
 			await expectRouteDemandJs(
 				directPage,
 				receipt,
@@ -199,17 +219,19 @@ export default box(
 					await expect.page.text(directPage, MDX_INPUT_STATE, 'MDX Input on', WAIT);
 				},
 			);
-			directPage.demandHrefs = plan.homeDemandHrefs;
-			await expectRouteDemandJs(
-				directPage,
-				receipt,
-				'direct docs-to-home Link JS',
-				async () => {
+			const homeIntent = await expectIntentRound(directPage, plan, receipt, {
+				label: 'docs -> home',
+				path: HOME_PATH,
+				round: plan.homeRound,
+				landing: directLanding,
+				navigate: async () => {
 					await directPage.click(HOME_LINK, WAIT);
 					await expect.page.text(directPage, 'h1', 'Markless Router', WAIT);
 					await expect.page.text(directPage, HOME_COUNTER, 'Button 0', WAIT);
 				},
-			);
+			});
+			receipt.note(`slow 3G home round fired ${homeIntent}`);
+			directPage.demandHrefs = plan.index.demand;
 			await expectRouteDemandJs(
 				directPage,
 				receipt,
@@ -237,57 +259,55 @@ export default box(
 					await expect.page.text(directPage, HOME_BOOST, 'Home Boost 1', WAIT);
 				},
 			);
-			const directDocumentRequests = (await directPage.networkRequests()).filter(
-				(request) => request.resourceType === 'Document',
-			);
-			if (directDocumentRequests.length !== 1) {
-				throw new Error(
-					`Expected MDX-to-TSRX Link navigation to avoid a server document round trip, saw:\n${timeline(directDocumentRequests)}`,
-				);
-			}
-			const directGraphRequests = bundleGraphRequests(await directPage.networkRequests());
-			if (directGraphRequests.length > 0) {
-				throw new Error(
-					`Expected direct MDX route to avoid browser bundle graph fetches, saw:\n${timeline(directGraphRequests)}`,
-				);
-			}
+			await expectNothingWasted(directPage, plan, 'docs -> home');
 			await directPage.clearNetworkEmulation();
 			await waitForSettledNetwork(directPage);
 			await expect.page.outcome(directPage, { consoleErrors: 0, failedRequests: 0 }, WAIT);
 		} finally {
 			await preview.close();
 		}
-		await receipt.capture('router preload strategy slow-network modulepreload QA');
+		await receipt.capture('router preload strategy slow-network fragment navigation QA');
 	},
 );
 
-type RouteCandidatePlan = {
-	readonly docsDemandHrefs: readonly string[];
-	readonly homeDemandHrefs: readonly string[];
-	readonly directDocsHrefs: readonly string[];
-	readonly directDocsRequiredHrefs: readonly string[];
-	readonly expectedHrefs: readonly string[];
+type RoutePlan = {
+	readonly path: string;
+	// The route's SSR landing code: exactly what its document head preloads.
+	readonly landing: readonly string[];
+	// Landing code plus the chunks its interactions may import on demand.
+	readonly demand: readonly string[];
+	// Client code no other page's landing needs before intent: other routes' SSR and client-render code.
+	readonly foreign: readonly string[];
+};
+
+type DeliveryPlan = {
+	readonly index: RoutePlan;
+	readonly docs: RoutePlan;
+	readonly docsRound: readonly string[];
+	readonly homeRound: readonly string[];
 	readonly observabilityHrefs: readonly string[];
-	readonly requiredHrefs: readonly string[];
-	readonly forbiddenRouteHrefs: readonly string[];
+	readonly observabilityPaths: ReadonlySet<string>;
 	readonly polyfillHrefs: readonly string[];
 };
 
-async function routeCandidatePlan(
+async function deliveryPlan(
 	build: Build,
 	preview: Preview,
 	polyfillPaths: ReadonlySet<string>,
-): Promise<RouteCandidatePlan> {
+): Promise<DeliveryPlan> {
 	const manifest = await readClientAssetsManifest(`${FIXTURE}/${NITRO_OUTPUT_DIR}/public`, '/');
-	const docsDemandHrefs = manifest.routes.ssr['pages/docs/[...slug].mdx'];
-	const homeDemandHrefs = manifest.routes.ssr['pages/index.tsrx'];
-	if (!docsDemandHrefs?.length || !homeDemandHrefs?.length)
-		throw new Error('Missing fixture route SSR ownership plans.');
+	const fragmentEntry = manifest.entries.fragment;
+	if (!fragmentEntry) throw new Error('Expected the build to emit a fragment navigation entry.');
+	const indexLanding = manifest.routes.ssr[INDEX_ROUTE];
+	const docsLanding = manifest.routes.ssr[DOCS_ROUTE];
+	if (!indexLanding?.length || !docsLanding?.length)
+		throw new Error('Missing fixture route SSR landing plans.');
 	const chunks = new Map<string, string>();
+	const importMap = await builtImportMap();
 	for (const artifact of build.artifacts) {
 		const path = publicBuildPath(artifact.path);
 		if (!path) continue;
-		chunks.set(path, await preview.request(`/${path}`));
+		chunks.set(path, withRelativeChunkSpecifiers(await preview.request(`/${path}`), importMap));
 	}
 	const missingPolyfill = [...polyfillPaths].filter((path) => !chunks.has(path));
 	if (polyfillPaths.size === 0 || missingPolyfill.length > 0) {
@@ -295,161 +315,216 @@ async function routeCandidatePlan(
 			`Expected the build to emit the navigation polyfill as its own chunk, saw: ${[...polyfillPaths].join(', ') || '(none)'}`,
 		);
 	}
-	const navigation = [...chunks].find(([, code]) => isRouterNavigationChunk(code));
-	if (!navigation) {
-		throw new Error(
-			`Expected router navigation chunk. Artifacts: ${[...chunks.keys()].join(', ')}`,
-		);
-	}
-	const [navigationPath, navigationCode] = navigation;
-	const routeImports = routeImportsFromNavigation(navigationCode);
-	const routeImportPaths = new Set(routeImports.values());
-	const indexRoutePath = routeImports.get('/pages/index.tsrx');
-	if (!indexRoutePath) {
-		throw new Error(
-			`Expected index route chunk. Route imports: ${[...routeImports.entries()]
-				.map(([file, path]) => `${file} -> ${path}`)
-				.join(', ')}`,
-		);
-	}
-	const docsRoutePath =
-		routeImports.get('/pages/docs/[...slug].mdx') ??
-		[...chunks].find(([, code]) => isDocsRouteChunk(code))?.[0];
-	if (!docsRoutePath) {
-		throw new Error(
-			`Expected docs route chunk. Route imports: ${[...routeImports.entries()]
-				.map(([file, path]) => `${file} -> ${path}`)
-				.join(', ')}`,
-		);
-	}
-	const matches = routeChunkMatches({
-		chunks,
-		navigationCode,
-		navigationPath,
-		routeImportPaths,
-		routePath: docsRoutePath,
-	});
-	const homeMatches = routeChunkMatches({
-		chunks,
-		navigationCode,
-		navigationPath,
-		routeImportPaths,
-		routePath: indexRoutePath,
-	});
-	assertEventRecord(chunks, matches, 'click', 'docs route');
-	assertEventRecord(chunks, homeMatches, 'click', 'home route');
-	if (matches.size === 0) {
-		throw new Error(
-			`Expected docs route/navigation JS candidates. Artifacts: ${[...chunks.keys()].join(', ')}`,
-		);
-	}
-	const indexPreloads = modulePreloadPlacement(await preview.request('/'));
-	if (indexPreloads.bodyCount > 0) {
-		throw new Error(
-			`Expected index modulepreloads in head, saw ${indexPreloads.bodyCount} in body.`,
-		);
-	}
-	const directDocsPreloads = modulePreloadPlacement(
-		await preview.request('/docs/getting-started'),
+	const navigationPath = pathOf(manifest.entries.navigation).slice(1);
+	const navigationCode = chunks.get(navigationPath);
+	if (!navigationCode)
+		throw new Error(`Expected the navigation entry ${navigationPath} among build artifacts.`);
+	const routeImportPaths = new Set(routeImportsFromNavigation(navigationCode).values());
+	if (routeImportPaths.size === 0)
+		throw new Error('Expected the navigation entry to import the route modules lazily.');
+	const clientRenderCode = new Set(
+		[
+			manifest.entries.navigation,
+			...Object.values(manifest.routes.navigation).flat(),
+			...[...routeImportPaths].map((path) => `/${path}`),
+		].map(pathOf),
 	);
-	if (directDocsPreloads.hrefs.length === 0) {
-		throw new Error('Expected direct docs route to emit modulepreloads.');
-	}
-	if (directDocsPreloads.bodyCount > 0) {
-		throw new Error(
-			`Expected direct docs modulepreloads in head, saw ${directDocsPreloads.bodyCount} in body.`,
-		);
-	}
-	const expectedHrefs = indexPreloads.hrefs;
-	const observabilityHrefs = await observabilityChunkHrefs(chunks, preview);
-	// Loaded only where window.navigation is missing, so no preload plan names it.
-	const requiredHrefs = [...matches]
-		.filter((path) => !polyfillPaths.has(path))
-		.sort()
-		.map((path) => `/${path}`);
-	const directDocsRequiredHrefs = [...homeMatches]
-		.filter((path) => !polyfillPaths.has(path))
-		.sort()
-		.map((path) => `/${path}`);
+	const routePlan = (route: string, path: string): RoutePlan => {
+		const landing = manifest.routes.ssr[route] ?? [];
+		const own = new Set(landing.map(pathOf));
+		const otherLanding = Object.entries(manifest.routes.ssr)
+			.filter(([other]) => other !== route)
+			.flatMap(([, hrefs]) => hrefs.map(pathOf));
+		return {
+			path,
+			landing,
+			demand: demandClosure(chunks, landing, routeImportPaths),
+			foreign: [...new Set([...clientRenderCode, ...otherLanding, pathOf(fragmentEntry)])]
+				.filter((href) => !own.has(href))
+				.sort(),
+		};
+	};
+	const index = routePlan(INDEX_ROUTE, HOME_PATH);
+	const docs = routePlan(DOCS_ROUTE, DOCS_PATH);
+	await expectHeadLanding(preview, index);
+	await expectHeadLanding(preview, docs);
 	const polyfillHrefs = [...polyfillPaths].sort().map((path) => `/${path}`);
-	const preloadedPolyfill = [...indexPreloads.hrefs, ...directDocsPreloads.hrefs].filter((href) =>
+	const polyfillInLanding = [...index.landing, ...docs.landing].filter((href) =>
 		polyfillPaths.has(pathOf(href).slice(1)),
 	);
-	if (preloadedPolyfill.length > 0) {
+	if (polyfillInLanding.length > 0) {
 		throw new Error(
-			`Expected SSR modulepreloads to leave out the navigation polyfill, saw: ${preloadedPolyfill.join(', ')}`,
+			`Expected landing preloads to leave out the navigation polyfill, saw: ${polyfillInLanding.join(', ')}`,
 		);
 	}
-	const expectedPaths = new Set(expectedHrefs.map((href) => pathOf(href)));
-	const missingRequired = requiredHrefs.filter((href) => !expectedPaths.has(pathOf(href)));
-	if (missingRequired.length > 0) {
-		throw new Error(
-			`Expected SSR modulepreloads to include docs route plan, missing: ${missingRequired.join(', ')}`,
-		);
-	}
-	const directDocsPaths = new Set(directDocsPreloads.hrefs.map((href) => pathOf(href)));
-	const missingDirectDocsRequired = directDocsRequiredHrefs.filter(
-		(href) => !directDocsPaths.has(pathOf(href)),
-	);
-	if (missingDirectDocsRequired.length > 0) {
-		throw new Error(
-			`Expected direct docs modulepreloads to include visible home route plan, missing: ${missingDirectDocsRequired.join(', ')}`,
-		);
-	}
+	const observabilityHrefs = await observabilityChunkHrefs(chunks, preview);
 	return {
-		docsDemandHrefs: routeDemandHrefs(
-			chunks,
-			docsDemandHrefs,
-			navigationPath,
-			docsRoutePath,
-			routeImportPaths,
-		),
-		homeDemandHrefs: routeDemandHrefs(
-			chunks,
-			homeDemandHrefs,
-			navigationPath,
-			indexRoutePath,
-			routeImportPaths,
-		),
-		directDocsHrefs: directDocsPreloads.hrefs,
-		directDocsRequiredHrefs,
-		expectedHrefs,
+		index,
+		docs,
+		docsRound: intentRound(fragmentEntry, index.landing, docs.landing),
+		homeRound: intentRound(fragmentEntry, docs.landing, index.landing),
 		observabilityHrefs,
-		requiredHrefs,
+		observabilityPaths: new Set(observabilityHrefs.map(pathOf)),
 		polyfillHrefs,
-		forbiddenRouteHrefs: [...routeImportPaths]
-			.filter((path) => path !== docsRoutePath && path !== indexRoutePath)
-			.sort()
-			.map((path) => `/${path}`),
 	};
 }
 
-function routeDemandHrefs(
+// The swap module plus the destination landing code the current document has not already preloaded.
+function intentRound(
+	fragmentEntry: string,
+	current: readonly string[],
+	destination: readonly string[],
+): string[] {
+	const present = new Set(current.map(pathOf));
+	return [...new Set([fragmentEntry, ...destination].map(pathOf))]
+		.filter((href) => !present.has(href))
+		.sort();
+}
+
+async function expectHeadLanding(preview: Preview, route: RoutePlan): Promise<void> {
+	const placement = modulePreloadPlacement(await preview.request(route.path));
+	if (placement.bodyCount > 0)
+		throw new Error(
+			`Expected ${route.path} modulepreloads as head <link> elements only, saw ${placement.bodyCount} in body.`,
+		);
+	const head = [...placement.hrefs].map(pathOf).sort();
+	const landing = [...route.landing].map(pathOf).sort();
+	if (head.length !== new Set(head).size || head.join('\n') !== landing.join('\n'))
+		throw new Error(
+			`Expected ${route.path} head to preload exactly its landing code.\nexpected: ${landing.join(', ')}\nsaw: ${head.join(', ')}`,
+		);
+}
+
+function demandClosure(
 	chunks: ReadonlyMap<string, string>,
-	ssrHrefs: readonly string[],
-	navigationPath: string,
-	routePath: string,
+	landing: readonly string[],
 	routeImportPaths: ReadonlySet<string>,
 ): string[] {
-	const paths = new Set([
-		...ssrHrefs.map((href) => pathOf(href).slice(1)),
-		navigationPath,
-		routePath,
-	]);
+	const paths = new Set(landing.map((href) => pathOf(href).slice(1)));
 	for (const path of paths) {
 		const code = chunks.get(path);
 		if (!code) continue;
 		addStaticImports(paths, code);
-		addDynamicImports(
-			paths,
-			code,
-			(candidate) => candidate === routePath || !routeImportPaths.has(candidate),
-		);
+		addDynamicImports(paths, code, (candidate) => !routeImportPaths.has(candidate));
 	}
-	for (const path of paths)
-		if (routeImportPaths.has(path) && path !== routePath)
-			throw new Error(`Foreign route entered demand closure: ${path}`);
 	return [...paths].map((path) => '/' + path);
+}
+
+async function expectLandingRound(
+	page: Page,
+	plan: DeliveryPlan,
+	route: RoutePlan,
+	receipt: Receipt,
+	label: string,
+): Promise<readonly Request[]> {
+	const landing = await waitForRequests(page, route.landing);
+	receipt.note(`${label} landing round:\n${timeline(landing)}`);
+	expectOneRound(landing, `${label} landing round`);
+	const startup = jsBuildRequests(await page.networkRequests()).filter(
+		(request) =>
+			!landing.some(same(request)) && !plan.observabilityPaths.has(pathOf(request.url)),
+	);
+	const foreign = new Set(route.foreign);
+	const wasted = startup.filter((request) => foreign.has(pathOf(request.url)));
+	if (wasted.length > 0)
+		throw new Error(
+			`Expected ${label} startup to leave other routes' code for intent, saw:\n${timeline(wasted)}`,
+		);
+	if (startup.length > 0)
+		throw new Error(
+			`Expected ${label} startup JS to be only its landing preloads, saw:\n${timeline(startup)}`,
+		);
+	return landing;
+}
+
+// Press intent and the click arrive in one gesture on a slow page, and the idle tier may run first on a
+// fast one: either way the destination fragment and its landing code form one round and nothing follows.
+async function expectIntentRound(
+	page: Page,
+	plan: DeliveryPlan,
+	receipt: Receipt,
+	input: {
+		readonly label: string;
+		readonly path: string;
+		readonly round: readonly string[];
+		readonly landing: readonly Request[];
+		readonly navigate: () => Promise<void>;
+	},
+): Promise<'before the click' | 'with the click'> {
+	await waitForSettledNetwork(page);
+	const before = await page.networkRequests();
+	const preClick = appRequests(before, plan).filter(
+		(request) =>
+			!input.landing.some(same(request)) && !plan.observabilityPaths.has(pathOf(request.url)),
+	);
+	const preClickSettled = page.settledRequests
+		? preClick.filter((request) => !page.settledRequests!.some(same(request)))
+		: preClick;
+	await input.navigate();
+	await waitForSettledNetwork(page);
+	const after = await page.networkRequests();
+	const clickRequests = appRequests(after.slice(before.length), plan).filter(
+		(request) => !plan.observabilityPaths.has(pathOf(request.url)),
+	);
+	const round = [...preClickSettled, ...clickRequests];
+	receipt.note(`${input.label} intent round:\n${timeline(round)}`);
+	const expected = [...input.round, input.path].sort();
+	const seen = round.map((request) => pathOf(request.url)).sort();
+	if (seen.join('\n') !== expected.join('\n'))
+		throw new Error(
+			`Expected ${input.label} to fetch its fragment and landing code once each, nothing more.\nexpected: ${expected.join(', ')}\nsaw:\n${timeline(round)}`,
+		);
+	const fragment = round.find((request) => pathOf(request.url) === input.path)!;
+	if (fragment.resourceType === 'Document')
+		throw new Error(`Expected ${input.label} to fetch a fragment, not a document.`);
+	expectOneRound(round, `${input.label} intent round`);
+	if (preClickSettled.length > 0 && clickRequests.length > 0)
+		throw new Error(
+			`Expected the click after the ${input.label} idle round to fetch nothing, saw:\n${timeline(clickRequests)}`,
+		);
+	page.settledRequests = after;
+	return preClickSettled.length > 0 ? 'before the click' : 'with the click';
+}
+
+async function expectNothingWasted(page: Page, plan: DeliveryPlan, label: string): Promise<void> {
+	const requests = await page.networkRequests();
+	const documents = requests.filter((request) => request.resourceType === 'Document');
+	if (documents.length !== 1)
+		throw new Error(
+			`Expected ${label} fragment navigation to avoid a server document round trip, saw:\n${timeline(documents)}`,
+		);
+	const graph = requests.filter((request) => pathOf(request.url) === BUNDLE_GRAPH_REQUEST);
+	if (graph.length > 0)
+		throw new Error(
+			`Expected ${label} to avoid browser bundle graph fetches, saw:\n${timeline(graph)}`,
+		);
+	const polyfill = new Set(plan.polyfillHrefs);
+	const polyfillRequests = jsBuildRequests(requests).filter((request) =>
+		polyfill.has(pathOf(request.url)),
+	);
+	if (polyfillRequests.length > 0)
+		throw new Error(
+			`Expected ${label} to leave the navigation polyfill unloaded where the Navigation API exists, saw:\n${timeline(polyfillRequests)}`,
+		);
+	const seen = new Set<string>();
+	const repeated = appRequests(requests, plan).filter((request) => {
+		const path = pathOf(request.url);
+		if (!seen.has(path)) return void seen.add(path);
+		return true;
+	});
+	if (repeated.length > 0)
+		throw new Error(`Expected ${label} to fetch each file once, saw:\n${timeline(repeated)}`);
+}
+
+function expectOneRound(requests: readonly Request[], label: string): void {
+	const firstEnd = Math.min(
+		...requests.map((request) => request.endTimeMs ?? Number.POSITIVE_INFINITY),
+	);
+	const late = requests.filter((request) => request.startTimeMs >= firstEnd);
+	if (late.length > 0)
+		throw new Error(
+			`Expected ${label} to start in one round, saw requests start after another finished:\n${timeline(requests)}`,
+		);
 }
 
 function isolatedNitroOutput() {
@@ -482,7 +557,8 @@ function navigationPolyfillChunkRecorder(): {
 				if (resolved) polyfillIds.add(resolved.id);
 				return null;
 			},
-			generateBundle(_options, bundle) {
+			// Final names: Markless renames chunks to content hashes in its post-order generateBundle.
+			writeBundle(_options, bundle) {
 				if (this.environment?.name !== 'client') return;
 				for (const output of Object.values(bundle)) {
 					if (
@@ -556,36 +632,6 @@ function isObservabilityChunk(
 	);
 }
 
-function isRouterNavigationChunk(code: string): boolean {
-	return code.includes('navigateMarklessRouterLink');
-}
-
-function isDocsRouteChunk(code: string): boolean {
-	return code.includes('data-mdx-counter') || code.includes('<h1>Docs</h1>');
-}
-
-function isHomeRouteChunk(code: string): boolean {
-	return code.includes('data-home-counter') || code.includes('<h1>Markless Router</h1>');
-}
-
-function assertEventRecord(
-	chunks: ReadonlyMap<string, string>,
-	paths: ReadonlySet<string>,
-	eventName: string,
-	label: string,
-): void {
-	const found = [...paths].some((path) => {
-		const code = chunks.get(path) ?? '';
-		return (
-			code.includes(`eventName:\`${eventName}\``) ||
-			code.includes(`"eventName":"${eventName}"`)
-		);
-	});
-	if (!found) {
-		throw new Error(`Expected ${label} preload graph to include ${eventName} event records.`);
-	}
-}
-
 function modulePreloadHrefs(html: string): string[] {
 	return [
 		...html.matchAll(/<link\b(?=[^>]*\brel="modulepreload")(?=[^>]*\bhref="([^"]*)")[^>]*>/g),
@@ -599,12 +645,35 @@ function modulePreloadPlacement(html: string): {
 	const headEnd = html.indexOf('</head>');
 	const bodyStart = html.indexOf('<body');
 	return {
-		bodyCount:
-			bodyStart === -1
-				? 0
-				: (html.slice(bodyStart).match(/rel="modulepreload"/g) ?? []).length,
+		// Link elements only: the inline link bridge spells the selector `link[rel="modulepreload"]` in its source.
+		bodyCount: bodyStart === -1 ? 0 : modulePreloadHrefs(html.slice(bodyStart)).length,
 		hrefs: headEnd === -1 ? [] : modulePreloadHrefs(html.slice(0, headEnd)),
 	};
+}
+
+async function builtImportMap(): Promise<Record<string, string>> {
+	const file = marklessImportMapPath(`${FIXTURE}/${NITRO_OUTPUT_DIR}/public`);
+	if (!existsSync(file)) return {};
+	const parsed = JSON.parse(await readFile(file, 'utf8')) as {
+		readonly imports?: Record<string, string>;
+	};
+	return parsed.imports ?? {};
+}
+
+// Packed chunks import each other through import-map specifiers; spell them as the sibling files they name.
+function withRelativeChunkSpecifiers(
+	code: string,
+	imports: Readonly<Record<string, string>>,
+): string {
+	return code.replace(
+		new RegExp(`([\`"'])(${MARKLESS_CHUNK_SPECIFIER_PREFIX}[^\`"']+)\\1`, 'g'),
+		(whole, quote: string, specifier: string) => {
+			const target = imports[specifier];
+			return target?.startsWith('/build/')
+				? `${quote}./${target.slice('/build/'.length)}${quote}`
+				: whole;
+		},
+	);
 }
 
 function routeImportsFromNavigation(code: string): Map<string, string> {
@@ -615,46 +684,6 @@ function routeImportsFromNavigation(code: string): Map<string, string> {
 		imports.set(match[1] ?? '', `build/${match[2]}`);
 	}
 	return imports;
-}
-
-function routeChunkMatches(input: {
-	chunks: ReadonlyMap<string, string>;
-	navigationCode: string;
-	navigationPath: string;
-	routeImportPaths: ReadonlySet<string>;
-	routePath: string;
-}): Set<string> {
-	const matches = new Set<string>();
-	matches.add(input.navigationPath);
-	addStaticImports(matches, input.navigationCode);
-	addDynamicImports(matches, input.navigationCode, (path) => !input.routeImportPaths.has(path));
-	matches.add(input.routePath);
-	const routeCode = input.chunks.get(input.routePath);
-	if (routeCode) {
-		addStaticImports(matches, routeCode);
-		addDynamicImports(matches, routeCode, () => true);
-	}
-	addTransitiveImports(input.chunks, matches, input.routePath);
-	return matches;
-}
-
-function addTransitiveImports(
-	chunks: ReadonlyMap<string, string>,
-	matches: Set<string>,
-	routePath: string,
-): void {
-	let changed = true;
-	while (changed) {
-		changed = false;
-		for (const path of matches) {
-			const code = chunks.get(path);
-			if (!code) continue;
-			changed = addStaticImports(matches, code) || changed;
-			if (path === routePath || isDocsRouteChunk(code) || isHomeRouteChunk(code)) {
-				changed = addDynamicImports(matches, code, () => true) || changed;
-			}
-		}
-	}
 }
 
 function addStaticImports(matches: Set<string>, code: string): boolean {
@@ -698,8 +727,14 @@ function jsBuildRequests(requests: readonly Request[]): Request[] {
 	);
 }
 
-function bundleGraphRequests(requests: readonly Request[]): Request[] {
-	return requests.filter((request) => pathOf(request.url) === BUNDLE_GRAPH_REQUEST);
+// Build JS plus same-origin page fetches: everything a navigation can pull, minus the landing document.
+function appRequests(requests: readonly Request[], plan: DeliveryPlan): Request[] {
+	const pages = new Set([plan.index.path, plan.docs.path]);
+	return requests.filter(
+		(request) =>
+			jsBuildRequests([request]).length > 0 ||
+			(request.resourceType !== 'Document' && pages.has(pathOf(request.url))),
+	);
 }
 
 async function expectRouteDemandJs(
@@ -732,7 +767,7 @@ async function expectRouteDemandJs(
 	const unexpected = requests.filter((request) => !allowed.has(pathOf(request.url)));
 	if (unexpected.length)
 		throw new Error(
-			`Expected only destination SSR/native dependency closure or observability requests during ${label}:\n${timeline(unexpected)}`,
+			`Expected only the route's landing code dependency closure or observability requests during ${label}:\n${timeline(unexpected)}`,
 		);
 	page.settledRequests = after;
 }
@@ -749,7 +784,7 @@ function unescapeHtmlAttribute(value: string): string {
 		.replaceAll('&amp;', '&');
 }
 
-async function waitForExpectedPreloadRequests(
+async function waitForRequests(
 	page: Page,
 	expectedHrefs: readonly string[],
 ): Promise<readonly Request[]> {
@@ -757,14 +792,15 @@ async function waitForExpectedPreloadRequests(
 	const start = Date.now();
 	let latest: readonly Request[] = [];
 	while (Date.now() - start < WAIT.timeoutMs) {
-		latest = jsBuildRequests(await page.networkRequests()).filter((request) =>
-			expectedPaths.includes(pathOf(request.url)),
+		latest = (await page.networkRequests()).filter(
+			(request) =>
+				request.resourceType !== 'Document' && expectedPaths.includes(pathOf(request.url)),
 		);
 		const paths = new Set(latest.map((request) => pathOf(request.url)));
 		if (expectedPaths.every((path) => paths.has(path))) return latest;
 		await new Promise((resolve) => setTimeout(resolve, 50));
 	}
-	throw new Error(`Expected route modulepreloads, saw:\n${timeline(latest)}`);
+	throw new Error(`Expected requests for ${expectedPaths.join(', ')}, saw:\n${timeline(latest)}`);
 }
 
 async function waitForSettledNetwork(page: Page): Promise<void> {
@@ -795,7 +831,11 @@ function timeline(requests: readonly Request[]): string {
 			const start = Math.round(request.startTimeMs - first);
 			const end = request.endTimeMs === null ? '?' : Math.round(request.endTimeMs - first);
 			const duration = request.durationMs === null ? '?' : Math.round(request.durationMs);
-			return `${pathOf(request.url)} ${request.status ?? '?'} start=${start}ms end=${end}ms duration=${duration}ms`;
+			return `${request.resourceType ?? '?'} ${pathOf(request.url)} ${request.status ?? '?'} start=${start}ms end=${end}ms duration=${duration}ms`;
 		})
 		.join('\n');
+}
+
+function same(request: Request): (other: Request) => boolean {
+	return (other) => other.url === request.url && other.startTimeMs === request.startTimeMs;
 }

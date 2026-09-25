@@ -1,7 +1,9 @@
 import { execFile } from 'node:child_process';
 import { readFile, readdir, rm } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { promisify } from 'node:util';
 import { resolve } from 'pathe';
+import { marklessImportMapPath } from '@markless/bundler/rolldown';
 import { expect, test } from 'vitest';
 
 const exec = promisify(execFile);
@@ -30,6 +32,21 @@ test('router navigation chunk co-locates route imports with navigation', async (
 	// co-location then means the route map sits in the entry's STATIC closure - one
 	// fetch wave, no dynamic hop. Walk static imports rather than the entry alone.
 	const byFile = new Map(chunks.map((chunk) => [chunk.file, chunk.code]));
+	// Packed chunks name each other through the import map the router writes into every document.
+	const importMapFile = marklessImportMapPath(resolve(fixtureOutput, 'public'));
+	const mapped = new Map<string, string>(
+		existsSync(importMapFile)
+			? Object.entries(
+					(
+						JSON.parse(await readFile(importMapFile, 'utf8')) as {
+							imports: Record<string, string>;
+						}
+					).imports,
+				).map(([specifier, url]) => [specifier, url.split('/').pop()!])
+			: [],
+	);
+	const chunkFile = (specifier: string) =>
+		mapped.get(specifier) ?? (specifier.startsWith('./') ? specifier.slice(2) : specifier);
 	const closure = new Set<string>();
 	const queue = [navigationChunks[0]?.file ?? ''];
 	while (queue.length > 0) {
@@ -37,14 +54,14 @@ test('router navigation chunk co-locates route imports with navigation', async (
 		if (closure.has(file) || !byFile.has(file)) continue;
 		closure.add(file);
 		for (const match of (byFile.get(file) as string).matchAll(
-			/(?:from|import)\s*[`"']\.\/([^`"']+\.js)[`"']/g,
+			/(?:from|import)\s*[`"'](\.\/[^`"']+\.js|@markless\/c\/[^`"']+)[`"']/g,
 		)) {
-			queue.push(match[1] as string);
+			queue.push(chunkFile(match[1] as string));
 		}
 	}
 	expect(
 		[...closure].some((file) =>
-			/["']\/pages\/index\.tsrx["']:\(\)=>import\([`"']\.\/chunk-[^`"']+\.js[`"']\)/.test(
+			/["']\/pages\/index\.tsrx["']:\(\)=>import\([`"'](?:\.\/chunk-[^`"']+\.js|@markless\/c\/[^`"']+)[`"']\)/.test(
 				byFile.get(file) as string,
 			),
 		),

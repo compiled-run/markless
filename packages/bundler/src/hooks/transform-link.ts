@@ -29,8 +29,13 @@ import {
 	throwLinkedModuleChildDiagnostics,
 	warnDelegateImportFailures,
 } from '../link-driver.ts';
+import { moduleIdFor, sourceForModuleId } from '../module-id.ts';
 import { transformTsrxModuleWithPrerenderWakeClosure } from '../transform.ts';
-import type { TransformTsrxModuleInput, TransformTsrxModuleResult } from '../types.ts';
+import type {
+	MarklessModuleLinkArtifact,
+	TransformTsrxModuleInput,
+	TransformTsrxModuleResult,
+} from '../types.ts';
 import { isSymbolOnlySourceRequest, materializedReachedRenderDataSource } from '../virtual-ids.ts';
 import { recoverImportedChildMetadata } from './resolve-load.ts';
 import type { TransformRequest } from './transform-request.ts';
@@ -243,6 +248,7 @@ export async function linkTransformChildren(
 			claimsPublished: (source) =>
 				moduleMetadata.sourceClaimsPublished(currentEnvironment, source),
 			unawaitedSources,
+			...claimIdSpelling(ctx.getRoot()),
 		});
 		const [missing] = linkedSymbols.diagnostics;
 		if (missing) throw new Error(missing.message);
@@ -260,7 +266,7 @@ export async function linkTransformChildren(
 		});
 		const renderDataImportSources = materializedRenderDataReach
 			? renderDataReachImportSources(linkedGraph)
-			: undefined;
+			: delegateChildRenderDataSources(resolvedInterfaceImports, moduleLinkArtifacts);
 		linkedTransformInput = {
 			...linkedTransformInput,
 			symbols,
@@ -287,6 +293,22 @@ export async function linkTransformChildren(
 		linkedChildHasBrowserTriggers,
 		unawaitedSources,
 	};
+}
+
+// A child composing a delegate exports prerender data only from its reached spelling,
+// which materializes that delegate; its plain render data never does.
+function delegateChildRenderDataSources(
+	imports: ReadonlyArray<LinkedModuleChildResolution>,
+	artifacts: ReadonlyMap<string, MarklessModuleLinkArtifact>,
+): Record<string, string> | undefined {
+	const sources = Object.fromEntries(
+		imports.flatMap((child) =>
+			artifacts.get(child.source)?.delegateChildren
+				? [[child.specifier, materializedReachedRenderDataSource(child.source)] as const]
+				: [],
+		),
+	);
+	return Object.keys(sources).length > 0 ? sources : undefined;
 }
 
 // The aggregate pass exists so one resolver carries every sibling's claims; it
@@ -343,6 +365,7 @@ export async function sealWakeAggregate(
 				claimsPublished: (child) =>
 					moduleMetadata.sourceClaimsPublished(currentEnvironment, child),
 				unawaitedSources: unawaited,
+				...claimIdSpelling(ctx.getRoot()),
 			});
 		let aggregateLink = aggregateSymbolInputs();
 		let aggregateSymbols = aggregateLink.symbols;
@@ -387,4 +410,12 @@ export async function sealWakeAggregate(
 		}
 	}
 	return transformed;
+}
+
+// Linked claim ids reach client output, so they spell sources root-relative.
+function claimIdSpelling(root: string | undefined) {
+	return {
+		moduleIdForSource: (source: string) => moduleIdFor(source, root),
+		sourceForModuleId: (moduleId: string) => sourceForModuleId(moduleId, root),
+	};
 }

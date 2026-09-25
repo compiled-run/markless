@@ -154,3 +154,18 @@ export function Toggle() @{
 		/^computed:templateExpression:/,
 	);
 });
+
+test('projected children beside an interpolation are markup, never joined into its text', async () => {
+	const result = await compile(`import { computed, state } from '@markless/core';
+export function Box({ children }) @{
+	const code = state({ value: '' });
+	const char = computed(() => code.value.slice(0, 1));
+	<div onClick={() => (code.value = 'x')}>{char}{children}</div>
+}
+`);
+	const texts = result.protocolView.domUpdates.filter((update) => update.target?.kind === 'text');
+	expect(texts.find((update) => update.source === 'char')?.graphNodeId).toBe('computed:char');
+	expect(
+		texts.some((update) => update.graphNodeId.startsWith('computed:templateExpression:')),
+	).toBe(false);
+});

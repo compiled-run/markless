@@ -1,5 +1,6 @@
 import type { CodeSplittingOptions, OutputOptions } from 'rolldown';
 import type { MarklessEnvironment } from '../types.ts';
+import { EXECUTION_LOG_CHUNK_MODULE_PATTERN } from '../execution-log.ts';
 
 export const MARKLESS_BUILD_DIR = 'build';
 export const MARKLESS_BUILD_PREFIX = `${MARKLESS_BUILD_DIR}/`;
@@ -26,11 +27,18 @@ const WEB_RUNTIME_CAPABILITY_GROUPS = [
 	// Keep the sizeable direct renderer out of the public render chunk so both
 	// halves remain below the permanent runtime-heavy chunk walls.
 	{ name: 'markless-direct-renderer', test: fileBasenamePattern('direct') },
-	{ name: 'markless-resume-branches', test: fileBasenamePattern('resume-branches') },
+	{
+		name: 'markless-resume-branches',
+		test: fileBasenamePattern('resume-branches', 'resume-arm-records-lazy'),
+	},
 	{ name: 'markless-resume-behaviors', test: fileBasenamePattern('resume-behaviors') },
 	{
 		name: 'markless-resume-repeats',
-		test: fileBasenamePattern('resume-keyed-repeats', 'repeat-runtime'),
+		test: fileBasenamePattern(
+			'resume-keyed-repeats',
+			'resume-keyed-repeats-lazy',
+			'repeat-runtime',
+		),
 	},
 	{
 		name: 'markless-resume-async',
@@ -58,7 +66,10 @@ const WEB_RUNTIME_CAPABILITY_GROUPS = [
 		name: 'markless-payload-full',
 		test: fileBasenamePattern('payload-full', 'payload-full-storage-free'),
 	},
-	{ name: 'markless-payload-resume', test: fileBasenamePattern('payload-resume') },
+	{
+		name: 'markless-payload-resume',
+		test: fileBasenamePattern('payload-resume', 'payload-resume-lazy'),
+	},
 	{
 		name: 'markless-inline-payload-document',
 		test: /[/\\]web[/\\]src[/\\]inline[/\\]payload-document\.ts(?:[?#].*)?$/,
@@ -87,7 +98,11 @@ const WEB_RUNTIME_CAPABILITY_GROUPS = [
 	},
 	{
 		name: 'markless-value-decode',
-		test: fileBasenamePattern('value-decode-client', 'value-decode-extensions'),
+		test: fileBasenamePattern(
+			'value-decode-client',
+			'value-decode-client-lazy',
+			'value-decode-extensions',
+		),
 	},
 	{
 		name: 'markless-payload-leaves',
@@ -95,7 +110,7 @@ const WEB_RUNTIME_CAPABILITY_GROUPS = [
 	},
 	{
 		name: 'markless-dev-log',
-		test: /virtual:markless:dev-log|[/\\]web[/\\]src[/\\]dev-log\.ts(?:[?#].*)?$/,
+		test: EXECUTION_LOG_CHUNK_MODULE_PATTERN,
 	},
 	{ name: 'markless-resume-core', test: fileBasenamePattern('resume') },
 	{ name: 'markless-runtime-graph-core', test: fileBasenamePattern('graph-core') },

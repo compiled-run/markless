@@ -79,7 +79,6 @@ describe('Link clicks under a URL-dependent document', () => {
 		const fetched: string[] = [];
 		const entry = createServerEntry({
 			documentNavigation,
-			linkPreloading: 'intent',
 			navigationEntryPath: '/navigation.js',
 			documentModuleLoader: undefined,
 			routeSsrModulePreloads: {

@@ -186,7 +186,13 @@ export async function prepareDocsData(
 			prepared = deriveAnatomy(family, metadata, scene, data.order(family));
 		}
 		const hash = createHash('sha256')
-				.update(file + '\0' + node.position.start.offset + '\0' + binding.kind)
+				.update(
+					relative(root, file).replaceAll('\\', '/') +
+						'\0' +
+						node.position.start.offset +
+						'\0' +
+						binding.kind,
+				)
 				.digest('hex')
 				.slice(0, 16),
 			local = 'PreparedDocs' + hash,

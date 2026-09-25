@@ -1,11 +1,12 @@
 import { execFile } from 'node:child_process';
 import { createServer } from 'node:http';
-import { readdir, readFile, rm } from 'node:fs/promises';
+import { readFile, rm } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { chromium, type Browser, type Page } from '@playwright/test';
 import { resolve } from 'pathe';
 import { expect, test } from 'vitest';
+import { resumeModuleClosure, servedResumeModuleUrl } from './helpers/served-resume-module.ts';
 
 const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../..');
@@ -109,24 +110,12 @@ test('compiled closure actions match full resume after every step of every actio
 	await rm(dist, { force: true, recursive: true });
 	await exec(resolve(root, 'node_modules/.bin/vp'), ['build', '--app'], { cwd: fixture });
 
-	const buildDir = resolve(dist, 'build');
-	let resumeModuleUrl: string | undefined;
-	let resumeSource = '';
-	for (const file of await readdir(buildDir)) {
-		if (!file.endsWith('.js')) continue;
-		const source = await readFile(resolve(buildDir, file), 'utf8');
-		if (source.includes('resumeContainerEvent')) {
-			resumeModuleUrl = `/build/${file}`;
-			resumeSource = source;
-		}
-	}
-	expect(resumeModuleUrl).toBeDefined();
-	expect(resumeSource).toContain('loadClosureActionPlan');
-
 	const entry = (await import(
 		`${pathToFileURL(resolve(dist, 'server-render/server.js')).href}?test=${Date.now()}`
-	)) as { render(options: { resumeModuleUrl?: string }): Promise<string> };
-	const html = `<!doctype html><html><head></head><body>${await entry.render({ resumeModuleUrl })}</body></html>`;
+	)) as { render(): Promise<string> };
+	const html = `<!doctype html><html><head></head><body>${await entry.render()}</body></html>`;
+	const resume = await resumeModuleClosure(dist, servedResumeModuleUrl(html));
+	expect(resume.source).toContain('loadClosureActionPlan');
 	const server = createServer(async (request, response) => {
 		const path = new URL(request.url ?? '/', 'http://fixture.local').pathname;
 		if (path === '/') {

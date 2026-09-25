@@ -70,10 +70,10 @@ test('a row whose value only rendering produces mints from its source and stays 
 	});
 });
 
-// The same cell through a method call is a different answer, and the silence is
-// the point: that call lifts into a computed, so the row template names the
-// lifted node and the row grows.
-test('a row calling a method on that cell mints from the lifted node and stays silent', async () => {
+// The same cell through a method call mints too, and the silence is the point. The
+// page lifts that call into a computed, but a row built in the browser reads its
+// slots before that computed has a value, so the row keeps the expression and its read.
+test('a row calling a method on that cell mints from the expression and stays silent', async () => {
 	const compiled = await compilePage(
 		`<ul>@for (const row of rows; key row.id) { <li>{chosen.toUpperCase()}{row.label}</li> }</ul>`,
 	);
@@ -82,8 +82,8 @@ test('a row calling a method on that cell mints from the lifted node and stays s
 	expect(rowRecord(compiled)?.rowTemplate?.textSlots).toEqual([
 		{
 			path: [0, 0],
-			graphNodeId: expect.stringContaining('templateExpression'),
-			graphPath: [],
+			source: 'chosen.toUpperCase()',
+			reads: [{ graphNodeId: 'state:chosen', path: [] }],
 		},
 		{ path: [0, 1], itemPath: ['label'] },
 	]);

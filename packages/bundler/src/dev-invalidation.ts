@@ -7,6 +7,7 @@ import {
 } from '@markless/compiler';
 import { MARKLESS_EXECUTION_LOG_MODULE_ID, normalizeExecutionLogMode } from './execution-log.ts';
 import type { MarklessHookContext } from './hooks/hook-context.ts';
+import { moduleLinkArtifact } from './link-driver.ts';
 import { recordEmittedClaimOwnership } from './plugin-state.ts';
 import { transformTsrxModuleWithPrerenderWakeClosure } from './transform.ts';
 import type { MarklessEnvironment, TransformTsrxModuleResult } from './types.ts';
@@ -117,11 +118,9 @@ export async function invalidateEditedGeneratedModules(
 		foldEntries.findLast(({ result }) => captured(result))?.result.manifest ??
 		linkResult.manifest;
 	for (const [, cached] of nextEntries) {
-		state.moduleLinkArtifacts(cached.input.environment ?? 'client').set(changedSource, {
-			moduleGraphInterface: linkResult.moduleGraphInterface,
-			interfaceHash: linkResult.interfaceHash,
-			moduleImports: linkResult.moduleImports,
-		});
+		state
+			.moduleLinkArtifacts(cached.input.environment ?? 'client')
+			.set(changedSource, moduleLinkArtifact(linkResult));
 	}
 	moduleMetadata.recordCaptureMetadata(changedSource, captureManifest);
 	prerenderWakeCapabilities.set(

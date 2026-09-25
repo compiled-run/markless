@@ -344,7 +344,7 @@ import Density from '../../components/Density.tsrx';
 		);
 	});
 
-	it('passes static MDX children as escaped rendered HTML props', async () => {
+	it('passes static MDX children as rendered HTML with their element tags', async () => {
 		const code = await transformMdxRoute(
 			`import Callout from '../../components/Callout.tsrx';
 
@@ -356,6 +356,16 @@ Nested **copy**.
 		);
 
 		expect(code).toContain(`"children": "<p>Nested <strong>copy</strong>.</p>"`);
+		expect(code).toContain(`childrenElementTags: ["p","strong"]`);
+	});
+
+	it('names no children element tags for a component placed without children', async () => {
+		const code = await transformMdxRoute(
+			`import Callout from '../../components/Callout.tsrx';\n\n<Callout title="Docs" />\n`,
+			'/project/pages/docs/bare.mdx',
+		);
+
+		expect(code).not.toContain('childrenElementTags');
 	});
 
 	it('lowers literal-safe inline MDX expressions into escaped static HTML', async () => {

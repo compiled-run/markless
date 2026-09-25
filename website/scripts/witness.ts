@@ -783,6 +783,14 @@ try {
 		await page.evaluate(() => localStorage.removeItem('theme'));
 
 		await page.goto(`${origin}/markless/concepts/state`, { waitUntil: 'load' });
+		const sidebarBox = () =>
+			page.evaluate(() => {
+				const box = document.querySelector('.sidebar')?.getBoundingClientRect();
+				return box
+					? `${Math.round(box.left)},${Math.round(box.top)},${Math.round(box.width)}`
+					: '';
+			});
+		const sidebarBefore = await sidebarBox();
 		await page.evaluate(() => {
 			(window as { __beforeNavigation?: number }).__beforeNavigation = 1;
 		});
@@ -802,8 +810,12 @@ try {
 			crumb: document.querySelector('.crumb-page')?.textContent ?? '',
 			title: document.title,
 			canonical: document.querySelector('link[rel="canonical"]')?.getAttribute('href') ?? '',
+			description:
+				document.querySelector('meta[name="description"]')?.getAttribute('content') ?? '',
 			survived: (window as { __beforeNavigation?: number }).__beforeNavigation === 1,
 		}));
+		const sidebarAfter = await sidebarBox();
+		const sidebarKept = sidebarBefore !== '' && sidebarAfter === sidebarBefore;
 		check(
 			landed.crumb === 'Computed' &&
 				landed.title.startsWith('Computed') &&
@@ -811,11 +823,56 @@ try {
 			'a sidebar click lands on the page it names, chrome and all',
 			`${landed.crumb} / ${landed.title} / ${landed.canonical} / ${landed.heading}`,
 		);
-		// document.tsrx renders the title, crumb and pager from the URL, so the router must load a fresh document.
 		check(
-			!landed.survived,
-			'that click is a document load, because this site renders its chrome from the URL',
-			landed.survived ? 'the window survived the click, so the chrome can be stale' : '',
+			landed.survived && sidebarKept && landed.description !== '',
+			'that click is no document load: the sidebar stays and the head follows the page',
+			`survived ${landed.survived} / sidebar ${sidebarBefore} -> ${sidebarAfter} / description "${landed.description}"`,
+		);
+		// The pager and the breadcrumb home are plain anchors: the router takes them the same way.
+		const nextHref = await page.locator('a.pager-next').getAttribute('href');
+		await page.locator('a.pager-next').click();
+		await page.waitForURL(`**${nextHref}`);
+		await page
+			.waitForFunction(
+				(href) =>
+					document
+						.querySelector('link[rel="canonical"]')
+						?.getAttribute('href')
+						?.endsWith(href),
+				nextHref,
+				{ timeout: 10_000 },
+			)
+			.catch(() => {});
+		const paged = await page.evaluate(() => ({
+			survived: (window as { __beforeNavigation?: number }).__beforeNavigation === 1,
+			canonical: document.querySelector('link[rel="canonical"]')?.getAttribute('href') ?? '',
+		}));
+		check(
+			paged.survived && nextHref !== null && paged.canonical.endsWith(nextHref),
+			'the pager link is no document load and lands on the next page',
+			`${nextHref} / ${paged.canonical} / survived ${paged.survived}`,
+		);
+		await page.locator('a.crumb-home').click();
+		await page.waitForURL('**/markless');
+		await page
+			.waitForFunction(
+				() =>
+					document
+						.querySelector('link[rel="canonical"]')
+						?.getAttribute('href')
+						?.endsWith('/markless'),
+				undefined,
+				{ timeout: 10_000 },
+			)
+			.catch(() => {});
+		const home = await page.evaluate(() => ({
+			survived: (window as { __beforeNavigation?: number }).__beforeNavigation === 1,
+			canonical: document.querySelector('link[rel="canonical"]')?.getAttribute('href') ?? '',
+		}));
+		check(
+			home.survived && home.canonical.endsWith('/markless'),
+			'the breadcrumb home link is no document load and lands on the docs home',
+			`${home.canonical} / survived ${home.survived}`,
 		);
 
 		// --- sprites and mascots ------------------------------------------------

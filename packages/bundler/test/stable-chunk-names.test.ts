@@ -287,7 +287,7 @@ describe('fixture rebuilds: a file name never changes its bytes', () => {
 		return readTree(resolve(dir, 'dist'), (name) => /\.(?:js|css)$/.test(name));
 	}
 
-	for (const variant of ['off', 'packs', 'closures']) {
+	for (const variant of ['off', 'packs']) {
 		test(`${variant}: an edit below a handler renames every file whose bytes changed`, async () => {
 			const dir = await mkdtemp(join(tmpdir(), `markless-stable-names-${variant}-`));
 			workDirs.push(dir);

@@ -38,10 +38,8 @@ export type MarklessExecutionLedgerTurn = {
 };
 
 export type MarklessExecutionLedger = {
-	// Chunk granularity: several modules in one chunk are each charged the whole
-	// chunk's raw byte length (see the U2 size-map checkpoint for why per-module
-	// shipped lengths are not reachable).
-	readonly unit: 'chunk-raw-bytes' | 'estimated-source-bytes';
+	// module-raw-bytes: each module's share of its chunk; chunk-raw-bytes: maps without per-module lengths.
+	readonly unit: 'module-raw-bytes' | 'chunk-raw-bytes' | 'estimated-source-bytes';
 	readonly load: MarklessExecutionLedgerPart & { readonly modules: ReadonlyArray<string> };
 	readonly total: MarklessExecutionLedgerPart;
 	readonly turns: ReadonlyArray<MarklessExecutionLedgerTurn>;

@@ -338,6 +338,58 @@ describe('generated symbol-table identity integrity', () => {
 	});
 
 	test.each([
+		{ name: 'reads the namespace it picks', pick: true, rendered: true, verified: 1 },
+		{ name: 'reads the chunk itself', pick: false, rendered: true, verified: 0 },
+		{ name: 'lost the export to tree-shaking', pick: true, rendered: false, verified: 0 },
+	])(
+		'a direct loader of a symbol packed into another chunk: $name',
+		({ pick, rendered, verified }) => {
+			const source = '/pages/[...slug].mdx?markless-symbols';
+			const symbol = {
+				symbolId: 'symbol:0',
+				virtualModuleId: 'virtual:markless:symbol:layout:0',
+				exportName: 'symbol_0_layout',
+				kind: 'dom-update' as const,
+			};
+			const manifest = {
+				source,
+				payload: { virtualModuleId: 'payload' },
+				resolver: { virtualModuleId: 'virtual:markless:resolver:layout' },
+				symbols: [symbol],
+			};
+			const load = pick
+				? 'import("./route.js").then(e=>(e.Ha(),e.qI)).then(e=>read(e,"symbol_0_layout"))'
+				: 'import("./route.js").then(e=>read(e,"symbol_0_layout"))';
+			const bundle = {
+				'loader.js': {
+					...chunk({
+						fileName: 'loader.js',
+						moduleIds: [source],
+						dynamicImports: ['route.js'],
+					}),
+					code: `function loadSymbol(t){return t==="symbol:0"?${load}:Promise.reject()}`,
+				},
+				'route.js': {
+					...chunk({
+						fileName: 'route.js',
+						moduleIds: [
+							'/pages/[...slug].mdx?markless-route',
+							`\0${symbol.virtualModuleId}`,
+						],
+						exports: ['layout_exports', 'init_layout'],
+					}),
+					modules: {
+						[`\0${symbol.virtualModuleId}`]: {
+							renderedExports: rendered ? [symbol.exportName] : [],
+						},
+					},
+				},
+			};
+			expect(verifyGeneratedSymbolTableRoutes(bundle, [manifest]).verified).toBe(verified);
+		},
+	);
+
+	test.each([
 		{ name: 'in the resolver chunk', claimed: 'pack.js', loader: true, verified: 1 },
 		{ name: 'in a dynamically imported chunk', claimed: 'child.js', loader: true, verified: 1 },
 		{ name: 'without a literal loader', claimed: 'pack.js', loader: false, verified: 0 },
@@ -381,7 +433,9 @@ describe('generated symbol-table identity integrity', () => {
 				code: `${table}${loads}`,
 			};
 			const bundle =
-				claimed === 'pack.js' ? { 'pack.js': route } : { 'pack.js': route, [claimed]: holder };
+				claimed === 'pack.js'
+					? { 'pack.js': route }
+					: { 'pack.js': route, [claimed]: holder };
 			expect(verifyGeneratedSymbolTableRoutes(bundle, [manifest]).verified).toBe(verified);
 		},
 	);

@@ -199,3 +199,41 @@ test('a behavior or visible event inside an arm or row keeps the behavior runtim
 		undemandedRuntimeModules({ demandMaps: [plain, armAsync], moduleIds: ids }),
 	).not.toContain(asyncWiring);
 });
+
+test('a map that enumerates its arm and row records lets every feature module be judged', async () => {
+	const repeats = '/repo/packages/web/src/resume-keyed-repeats.ts';
+	const compiled = async (body: string) =>
+		(
+			await compileTsrxModule({
+				filename: '/workspace/src/Panel.tsrx',
+				symbols: [],
+				source: `import { state } from '@markless/core';\nfunction Row(props: { item: { id: number } }) @{ <b>{props.item.id}</b> }\nexport default function Panel() @{ let open = state(true); let items = state([{ id: 1 }]); ${body} }`,
+			})
+		).runtimeDemandMaps.prerender;
+	const toggle = `<button onClick={() => open = !open}>t</button>`;
+	const armOnly = await compiled(
+		`<main>${toggle}@if (open) { <p onClick={() => open = false}>on</p> }</main>`,
+	);
+	const repeatInArm = await compiled(
+		`<main>${toggle}@if (open) { <ul>@for (const item of items; key item.id) { <li onClick={() => open = false}>{item.id}</li> }</ul> }</main>`,
+	);
+	const componentRows = await compiled(
+		`<ul>${toggle}@for (const item of items; key item.id) { <Row item={item} /> }</ul>`,
+	);
+	expect(armOnly.nestedRecordModuleIds).toEqual(expect.arrayContaining(['web/resume-events']));
+	expect(repeatInArm.nestedRecordModuleIds).toEqual(
+		expect.arrayContaining(['web/resume-events']),
+	);
+	// Rows rooted by a component carry that component's records, which this map does not plan.
+	expect(componentRows.nestedRecordModuleIds).toBeUndefined();
+
+	const ids = [...moduleIds, repeats];
+	// Before arms and rows were enumerated, a branch record left only capabilities judgeable.
+	expect(undemandedRuntimeModules({ demandMaps: [armOnly], moduleIds: ids })).toContain(repeats);
+	expect(
+		undemandedRuntimeModules({ demandMaps: [armOnly, repeatInArm], moduleIds: ids }),
+	).not.toContain(repeats);
+	expect(
+		undemandedRuntimeModules({ demandMaps: [armOnly, componentRows], moduleIds: ids }),
+	).not.toContain(repeats);
+});

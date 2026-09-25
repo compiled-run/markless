@@ -105,7 +105,7 @@ are going. On a click it navigates on the client instead, and the router owns th
 <Collapsible
 	sprite="star-badge"
 	summary="The three props you will reach for eventually"
-	text="prefetch asks the router to start fetching the destination before the click, so the navigation begins with work already done. Its type is boolean | 'intent' | 'viewport', and the two strings are the useful part: 'intent' starts the fetch when the reader hovers or focuses the link, and 'viewport' starts it when the link scrolls into view. replace swaps the current history entry instead of adding one, which is what you want after a form submission or a redirect, so the back button does not walk the reader into the page they just left. scroll controls whether arriving at the new page moves the reader back to the top. All three are ordinary props on Link, and all three are optional."
+	text="prefetch is on by default and needs no setting: the router starts fetching the destination when the reader shows intent, so the navigation begins with work already done. Set prefetch={false} on a link that should never be fetched early, such as a logout link or a page with expensive server data. replace swaps the current history entry instead of adding one, which is what you want after a form submission or a redirect, so the back button does not walk the reader into the page they just left. scroll controls whether arriving at the new page moves the reader back to the top. All three are ordinary props on Link, and all three are optional."
 />
 
 ## Try it yourself

@@ -164,10 +164,15 @@ export async function renderCsrRuntime(input: {
 			for (const release of cleanup.splice(0).reverse()) release();
 			runtime?.dispose();
 		},
-		whenAsyncBoundariesSettled: async () =>
-			(await demandRuntime()).whenAsyncBoundariesSettled?.(),
-		holdPendingSettleCommits: async (ms) =>
-			(await demandRuntime()).holdPendingSettleCommits?.(ms),
+		// A page with no async boundary has nothing to settle; answering without the full runtime keeps a route swap demand-loaded.
+		whenAsyncBoundariesSettled: async () => {
+			if (view.asyncBoundaries.length === 0) return;
+			await (await demandRuntime()).whenAsyncBoundariesSettled?.();
+		},
+		holdPendingSettleCommits: async (ms) => {
+			if (view.asyncBoundaries.length === 0) return;
+			await (await demandRuntime()).holdPendingSettleCommits?.(ms);
+		},
 	};
 	const delegatedTriggers = installDelegatedTriggers(
 		output,
@@ -555,10 +560,11 @@ async function applyDefaultCsrDomJournal(
 				| CsrDomJournalTarget
 				| undefined;
 			if (!target) continue;
+			const node = (entry.node ? entry.node(target) : target) as CsrDomJournalTarget;
 			// A rewrite with the value already there is still a mutation, and an
 			// aria-live region announces on it.
 			const text = stringifyDomValue(entry.value);
-			if (target.textContent !== text) target.textContent = text;
+			if (node.textContent !== text) node.textContent = text;
 			continue;
 		}
 		if (entry.type === 'setAttr') {

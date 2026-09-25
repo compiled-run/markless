@@ -12,6 +12,9 @@ import type { decodePayloadScripts } from '../../serializer/src/protocol-client.
 import type { DecodedPayloadScripts } from '../../serializer/src/protocol-client-storage.ts';
 import { createRuntimeGraphFromResumePayload } from './payload-graph-construct.ts';
 import {
+	CONTAINER_RETIRE_PROPERTY,
+	type RetirableContainer,
+	deleteResumedPayload,
 	getAlreadyResumedPayload,
 	getRetiredResumedPayload,
 	setResumedPayload,
@@ -54,6 +57,7 @@ async function adoptStreamedPatchesIfPresent(
 			'script[type="markless/arm"],script[type="markless/state-patch"]',
 		)
 	) {
+		(root as { __mAdopted?: boolean }).__mAdopted = true;
 		return decoded;
 	}
 	const { adoptStreamedArmPatches } = await import('./resume-stream-patches.ts');
@@ -220,6 +224,11 @@ async function startDecodedResume(
 		renderAsyncBoundary: input.renderAsyncBoundary,
 		renderData: input.renderData,
 	});
+	const retiring = runtime;
+	(input.root as typeof input.root & RetirableContainer)[CONTAINER_RETIRE_PROPERTY] = () => {
+		deleteResumedPayload(input.root);
+		retiring.dispose();
+	};
 	await runtime.start();
 	// Reuse the existing streamed or staged dispatch authority.
 	input.root.__marklessDispatch ??= (handoff) =>

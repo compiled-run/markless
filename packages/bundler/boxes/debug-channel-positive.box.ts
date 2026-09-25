@@ -119,7 +119,8 @@ export function debugChannelReporter(debug: boolean): Plugin {
 						const html =
 							typeof chunk === 'string' ? chunk : new TextDecoder().decode(chunk);
 						const injected = `${html}<script>${source}</script>`;
-						response.removeHeader('content-length');
+						// Uncompressed responses (under 1 KB, as packed pages are) have sent their headers already.
+						if (!response.headersSent) response.removeHeader('content-length');
 						return end(new TextEncoder().encode(injected), ...(args as []));
 					}
 					return end(chunk, ...(args as []));

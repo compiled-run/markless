@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { createServer } from 'node:http';
-import { readFile, readdir, rm } from 'node:fs/promises';
+import { readFile, rm } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { chromium, type Page } from '@playwright/test';
@@ -32,18 +32,10 @@ beforeAll(async () => {
 	await rm(dist, { force: true, recursive: true });
 	await exec(resolve(root, 'node_modules/.bin/vp'), ['build', '--app'], { cwd: fixture });
 
-	const buildDir = resolve(dist, 'build');
-	let resumeModuleUrl: string | undefined;
-	for (const file of await readdir(buildDir)) {
-		if (!file.endsWith('.js')) continue;
-		const source = await readFile(resolve(buildDir, file), 'utf8');
-		if (source.includes('resumeContainerEvent')) resumeModuleUrl = `/build/${file}`;
-	}
-	expect(resumeModuleUrl).toBeDefined();
 	const entry = (await import(
 		`${pathToFileURL(resolve(dist, 'server-render/server.js')).href}?test=${Date.now()}`
-	)) as { render(options: { resumeModuleUrl?: string }): Promise<string> };
-	const html = `<!doctype html><html><body>${await entry.render({ resumeModuleUrl })}</body></html>`;
+	)) as { render(): Promise<string> };
+	const html = `<!doctype html><html><body>${await entry.render()}</body></html>`;
 
 	server = createServer(async (request, response) => {
 		const path = new URL(request.url ?? '/', 'http://fixture.local').pathname;

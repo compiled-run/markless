@@ -20,7 +20,10 @@ import { executionLogActivationInjection } from '../execution-log.ts';
 import { outputDefaults } from '../build/chunking.ts';
 import { unwrapAsyncImportWrappers } from '../build/async-import-wrappers.ts';
 import { collapseInitFacadeImports } from '../build/init-facade-imports.ts';
+import { deferredRuntimePlugin } from '../build/deferred-runtime.ts';
+import { prefetchChunkParses } from '../build/chunk-ast.ts';
 import { nativePackingPlugins } from '../build/native-packing.ts';
+import { DEPRECATED_NATIVE_PACKING_WARNING, nativePackingEnabled } from '../packing-option.ts';
 import { includeOptimizedDeps } from '../optimized-deps.ts';
 import { RESUME_ENTRY_SPECIFIER, STORAGE_FREE_RESUME_ENTRY_SPECIFIER } from '../source-module.ts';
 import { createMarklessRolldownPlugin } from '../rolldown.ts';
@@ -64,6 +67,7 @@ export interface MarklessViteOptions extends MarklessRolldownOptions {
 
 type MarklessOutputOptions = OutputOptions | OutputOptions[] | undefined;
 type InternalMarklessRolldownOptions = MarklessRolldownOptions & {
+	chunkImportMap?: boolean;
 	emitResumeModules?: boolean;
 	inlineResumerDebug?: boolean;
 	prerender?: boolean;
@@ -82,7 +86,12 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 	const bundleGraphAdders = new Set<BundleGraphAdder>();
 	const transformedTsrxSources = new Map<string, string>();
 	const prerenderRecordsBySource = new Map<string, BuiltPrerenderRecords>();
-	const rolldownOptions: InternalMarklessRolldownOptions = { ...options };
+	const { experimentalNativePacking: _deprecatedPacking, ...rest } = options;
+	const rolldownOptions: InternalMarklessRolldownOptions = {
+		...rest,
+		packing: nativePackingEnabled(options),
+		chunkImportMap: options.experimentalNativePacking === true,
+	};
 	const prerender = process.env.MARKLESS_PRERENDER === '1';
 	const explicitPrerenderWake = process.env.MARKLESS_PRERENDER_WAKE;
 	rolldownOptions.prerender = false;
@@ -188,6 +197,8 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 			}
 		},
 		configResolved(resolvedConfig) {
+			if (options.experimentalNativePacking !== undefined)
+				resolvedConfig.logger.warn(DEPRECATED_NATIVE_PACKING_WARNING);
 			resolvedRoot = resolvedConfig.root;
 			clientOutDir = resolvedConfig.build?.outDir ?? 'dist';
 			const serve = resolvedConfig.command === 'serve';
@@ -388,31 +399,44 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 			},
 			generateBundle: {
 				order: 'post',
-				handler(_options, bundle) {
+				async handler(_options, bundle) {
+					await prefetchChunkParses(
+						Object.values(bundle).filter(
+							(output) => output.type === 'chunk' && output.code.includes('import('),
+						) as Array<{ readonly fileName: string; readonly code: string }>,
+					);
 					collapseInitFacadeImports(bundle);
 					unwrapAsyncImportWrappers(bundle);
 				},
 			},
 		} satisfies Plugin,
-		...(options.experimentalNativePacking
+		...(nativePackingEnabled(options)
 			? nativePackingPlugins(
 					() => resolvedRoot,
 					() => basePlugin.api.runtimeDemandMaps(),
-					options.experimentalPackPlanner
-						? {
-								mode: options.experimentalPackPlanner,
-								demandSources: () => basePlugin.api.runtimeDemandSources(),
-							}
-						: undefined,
+					() => basePlugin.api.runtimeDemandSources(),
 				).map((plugin): Plugin => ({
 					...(plugin as Plugin),
 					apply: 'build' as const,
 					enforce: 'post' as const,
+					// A function config makes plugins per environment; only shared instances see the base plugin's state.
+					sharedDuringBuild: true,
 					applyToEnvironment(environment) {
 						return environment.config.consumer === 'client';
 					},
 				}))
-			: []),
+			: [
+					{
+						...(deferredRuntimePlugin(() =>
+							basePlugin.api.runtimeDemandMaps(),
+						) as Plugin),
+						apply: 'build' as const,
+						enforce: 'post' as const,
+						applyToEnvironment(environment: { config: { consumer: string } }) {
+							return environment.config.consumer === 'client';
+						},
+					} satisfies Plugin,
+				]),
 	];
 }
 

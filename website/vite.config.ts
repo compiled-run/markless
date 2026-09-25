@@ -47,8 +47,8 @@ export default {
 		uiDemos(),
 		anatomy(),
 		keyboard(),
-		markless({ experimentalNativePacking: true }),
-		router({ linkPreloading: 'intent' }),
+		markless(),
+		router(),
 		highlightMdx(),
 	],
 } satisfies UserConfig & { nitro: NitroConfig; lint: OxlintConfig };

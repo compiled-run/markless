@@ -56,8 +56,11 @@ export async function evaluate(page, fn, arg) {
 	throw new Error('page context kept changing');
 }
 
-/** options: { browserName, cpu, coverage }. */
-export async function openVisit(browser, { browserName, cpu = 1, coverage = false }) {
+/** options: { browserName, cpu, coverage, delayAdoptionMs }. */
+export async function openVisit(
+	browser,
+	{ browserName, cpu = 1, coverage = false, delayAdoptionMs = 0 },
+) {
 	const context = await browser.newContext({
 		viewport: VIEWPORT,
 		serviceWorkers: 'block',
@@ -65,6 +68,15 @@ export async function openVisit(browser, { browserName, cpu = 1, coverage = fals
 	});
 	await context.addInitScript(pageAgent);
 	await context.addInitScript(pageProbe, { selector: SELECTOR, textTypes: TEXT_INPUT_TYPES });
+	// Repro aid: a slow download of the code that adopts streamed arms.
+	if (delayAdoptionMs > 0)
+		await context.route(/\.m?js(?:[?#]|$)/, async (route) => {
+			const response = await route.fetch();
+			const body = await response.body();
+			if (body.includes('markless/state-patch'))
+				await new Promise((r) => setTimeout(r, delayAdoptionMs));
+			await route.fulfill({ response, body });
+		});
 	const page = await context.newPage();
 	const errors = [];
 	page.on('pageerror', (e) => errors.push(String(e?.message ?? e).slice(0, 300)));

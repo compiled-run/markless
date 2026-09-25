@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { createServer } from 'node:http';
-import { readdir, readFile, rm } from 'node:fs/promises';
+import { readFile, rm } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { chromium, type Page } from '@playwright/test';
@@ -19,7 +19,9 @@ function groups(page: Page) {
 	return page.evaluate(() =>
 		[...document.querySelectorAll('article')].map(
 			(group) =>
-				`${group.dataset.group}(${group.querySelector('h2')?.textContent?.replace(/\s+/g, '')}):${[...group.querySelectorAll('li')]
+				`${group.dataset.group}(${group.querySelector('h2')?.textContent?.replace(/\s+/g, '')}):${[
+					...group.querySelectorAll('li'),
+				]
 					.map((row) => `${row.dataset.item}${row.querySelector('.hits')?.textContent}`)
 					.join(',')}`,
 		),
@@ -51,19 +53,10 @@ beforeAll(async () => {
 	await rm(dist, { force: true, recursive: true });
 	await exec(resolve(root, 'node_modules/.bin/vp'), ['build', '--app'], { cwd: fixture });
 
-	const buildDir = resolve(dist, 'build');
-	let resumeModuleUrl: string | undefined;
-	for (const file of await readdir(buildDir))
-		if (
-			file.endsWith('.js') &&
-			(await readFile(resolve(buildDir, file), 'utf8')).includes('resumeContainerEvent')
-		)
-			resumeModuleUrl = `/build/${file}`;
-	expect(resumeModuleUrl).toBeDefined();
 	const entry = (await import(
 		`${pathToFileURL(resolve(dist, 'server-render/server.js')).href}?test=${Date.now()}`
-	)) as { render(options: { resumeModuleUrl?: string }): Promise<string> };
-	const html = `<!doctype html><html><body>${await entry.render({ resumeModuleUrl })}</body></html>`;
+	)) as { render(): Promise<string> };
+	const html = `<!doctype html><html><body>${await entry.render()}</body></html>`;
 
 	server = createServer(async (request, response) => {
 		const path = new URL(request.url ?? '/', 'http://fixture.local').pathname;
@@ -100,7 +93,11 @@ async function exerciseNestedRows(url: string, ready: (page: Page) => Promise<vo
 		await page.goto(url);
 		await ready(page);
 		const pick = (item: string) => page.click(`li[data-item="${item}"] .pick`);
-		expect(await groups(page)).toEqual(['g1(One0):a0,b0,c0', 'g2(Two0):d0,e0,f0', 'g3(Three0):g0,h0,i0']);
+		expect(await groups(page)).toEqual([
+			'g1(One0):a0,b0,c0',
+			'g2(Two0):d0,e0,f0',
+			'g3(Three0):g0,h0,i0',
+		]);
 
 		// A button in every enclosing row writes its own inner item, its enclosing item, and page state.
 		await pick('b');

@@ -89,3 +89,8 @@ const alreadyResumedWarning: ResumeAlreadyResumedWarning = {
 	],
 	docsUrl: 'https://markless.dev/errors/MARKLESS_RESUME_ALREADY_RESUMED',
 };
+
+// A navigation that removes a container calls this on its root: listeners, subscriptions, overlays and storage writes stop with it.
+export const CONTAINER_RETIRE_PROPERTY = '__marklessRetire';
+
+export type RetirableContainer = { [CONTAINER_RETIRE_PROPERTY]?: () => void };

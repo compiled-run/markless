@@ -5,16 +5,21 @@ import {
 	chunkLocalExportSpecifiers,
 	mayContainDynamicImport,
 	parseChunkCode,
+	prefetchChunkParses,
 	spansAnyOffset,
 	textOffsets,
 } from './chunk-ast.ts';
 import { RolldownMagicString, type Plugin } from 'rolldown';
+import { rootRelativeId } from '../module-id.ts';
+import { withoutMachinePaths } from './machine-paths.ts';
+import { startupPackOfLazy } from './route-pack-groups.ts';
 
 export function lazyModuleFacadesPlugin(
 	root: () => string = () => '',
 	packOf?: (moduleId: string) => string | undefined,
 	packRoutes?: (pack: string) => ReadonlyArray<string> | undefined,
-): Plugin {
+	eagerLazyRoutes?: (lazyPack: string) => ReadonlyArray<string> | undefined,
+): Plugin & { readonly api: { removedChunks(): ReadonlySet<string> } } {
 	let chunks: Record<string, Chunk> = {};
 	let removed = new Set<string>();
 	let pending = new Map<
@@ -31,6 +36,7 @@ export function lazyModuleFacadesPlugin(
 	};
 	return {
 		name: 'markless-lazy-module-facades',
+		api: { removedChunks: () => removed },
 		renderStart: reset,
 		renderChunk(code, chunk, options, meta) {
 			// Named fields only: spreading the rendered chunk runs every native getter, `modules` included.
@@ -49,39 +55,78 @@ export function lazyModuleFacadesPlugin(
 				pending.set(chunk.fileName, { resolve, reject });
 				// Rolldown renders chunks concurrently; collect their code before changing cross-chunk imports.
 				if (pending.size !== Object.keys(meta.chunks).length) return;
-				try {
-					const results = new Map<string, { code: string; map: string | null }>();
-					chunks = Object.fromEntries(
-						Object.entries(chunks).sort(([a], [b]) => localeOrder(a, b)),
-					);
-					removed = new Set(
-						collapseLazyModuleFacades(
-							chunks,
-							(chunk, replacements, suffix) => {
-								const source = new RolldownMagicString(chunk.code);
-								for (const replacement of replacements)
-									source.overwrite(
-										replacement.start,
-										replacement.end,
-										replacement.source,
-									);
-								source.append(suffix);
-								results.set(chunk.fileName, {
-									code: source.toString(),
-									map: options.sourcemap
-										? source.generateMap({ hires: true }).toString()
-										: null,
-								});
-							},
-							{ root: root(), packOf, packRoutes },
-						).removed,
-					);
-					for (const [name, wait] of pending) wait.resolve(results.get(name) ?? null);
-					pending.clear();
-				} catch (error) {
-					for (const wait of pending.values()) wait.reject(error);
-					pending.clear();
-				}
+				const collapse = () => {
+					try {
+						const results = new Map<string, { code: string; map: string | null }>();
+						chunks = Object.fromEntries(
+							Object.entries(chunks).sort(([a], [b]) => localeOrder(a, b)),
+						);
+						const originals = new Map(
+							Object.values(chunks).map((item) => [item.fileName, item.code]),
+						);
+						const edits = new Map<
+							string,
+							{ replacements: Replacement[]; suffix: string }
+						>();
+						removed = new Set(
+							collapseLazyModuleFacades(
+								chunks,
+								(chunk, replacements, suffix) =>
+									edits.set(chunk.fileName, { replacements, suffix }),
+								{ root: root(), packOf, packRoutes, eagerLazyRoutes },
+							).removed,
+						);
+						const prefixes = buildPathIdentifierPrefixes(root());
+						const strip = (text: string) =>
+							prefixes.reduce((result, prefix) => result.replaceAll(prefix, ''), text);
+						for (const [fileName, original] of originals) {
+							if (removed.has(fileName)) continue;
+							const edit = edits.get(fileName);
+							const replacements = edit?.replacements ?? [];
+							const rootless: Replacement[] = [];
+							for (const prefix of prefixes)
+								for (
+									let start = original.indexOf(prefix);
+									start !== -1;
+									start = original.indexOf(prefix, start + prefix.length)
+								) {
+									const end = start + prefix.length;
+									if (
+										![...replacements, ...rootless].some(
+											(item) => start < item.end && item.start < end,
+										)
+									)
+										rootless.push({ start, end, source: '' });
+								}
+							if (!edit && rootless.length === 0) continue;
+							const source = new RolldownMagicString(original);
+							for (const replacement of replacements)
+								source.overwrite(
+									replacement.start,
+									replacement.end,
+									strip(replacement.source),
+								);
+							for (const range of rootless) source.remove(range.start, range.end);
+							source.append(strip(edit?.suffix ?? ''));
+							results.set(fileName, {
+								code: source.toString(),
+								map: options.sourcemap
+									? source.generateMap({ hires: true }).toString()
+									: null,
+							});
+						}
+						for (const [name, wait] of pending) wait.resolve(results.get(name) ?? null);
+						pending.clear();
+					} catch (error) {
+						for (const wait of pending.values()) wait.reject(error);
+						pending.clear();
+					}
+				};
+				void prefetchChunkParses(
+					Object.values(chunks).filter(
+						(item) => !item.moduleIds.length || mayContainDynamicImport(item.code),
+					),
+				).then(collapse);
 			});
 		},
 		renderError(error) {
@@ -119,6 +164,18 @@ export function lazyModuleFacadesPlugin(
 
 // The collator `localeCompare` builds on every call, built once.
 const localeOrder = new Intl.Collator().compare;
+
+// Packed init exports are named after virtual ids, which embed the build machine's absolute path;
+// sources outside the root (a linked workspace package) share one of its ancestors, longest first.
+function buildPathIdentifierPrefixes(root: string): string[] {
+	const segments = root.split('/').filter(Boolean);
+	const prefixes: string[] = [];
+	for (let length = segments.length; length >= 2; length--)
+		prefixes.push(
+			encodeURIComponent(`/${segments.slice(0, length).join('/')}/`).replace(/[^\w$]/g, '_'),
+		);
+	return prefixes;
+}
 
 type Chunk = {
 	type: 'chunk';
@@ -158,6 +215,7 @@ export function collapseLazyModuleFacades(
 		readonly root?: string;
 		readonly packOf?: (moduleId: string) => string | undefined;
 		readonly packRoutes?: (pack: string) => ReadonlyArray<string> | undefined;
+		readonly eagerLazyRoutes?: (lazyPack: string) => ReadonlyArray<string> | undefined;
 	} = {},
 ): { removed: string[] } {
 	const chunks = new Map(
@@ -366,9 +424,7 @@ export function collapseLazyModuleFacades(
 	const reserve = (target: Chunk, base: string) => {
 		let reserved = reservedNames.get(target.fileName);
 		if (!reserved) {
-			reserved = [
-				...new Set(target.code.match(/__markless(?:Packed|Namespace)[\w$]*/g) ?? []),
-			];
+			reserved = [...new Set(target.code.match(PACKED_NAME_PATTERN) ?? [])];
 			reservedNames.set(target.fileName, reserved);
 		}
 		let name = base;
@@ -381,7 +437,7 @@ export function collapseLazyModuleFacades(
 	for (const facade of pending) {
 		if (!namespaces.has(facade.target.fileName))
 			namespaces.set(facade.target.fileName, reserve(facade.target, '__marklessNamespace'));
-		const loader = reserve(facade.target, `__marklessPacked${shortHash(facade.identity)}`);
+		const loader = reserve(facade.target, `${PACK_LOADER_PREFIX}${shortHash(facade.identity)}`);
 		const imports: Facade['imports'] = [];
 		const local = ({ from, name }: Binding) => {
 			if (from === facade.target.fileName) return facade.targetBindings.get(name)!;
@@ -426,13 +482,63 @@ export function collapseLazyModuleFacades(
 			);
 		}
 		declarations.push(
-			`let ${loader}Value,${loader}Error,${loader}Failed=false;export function ${loader}(){if(${loader}Failed)throw ${loader}Error;if(${loader}Value)return ${loader}Value;try{${facade.calls.map((name) => `${name}();`).join('')}return ${loader}Value=${namespace}({__proto__:null,${facade.exports.map(([name, local]) => `get ${JSON.stringify(name)}(){return ${local}}`).join(',')}})}catch(error){${loader}Failed=true;${loader}Error=error;throw error}}`,
+			// Loader state lives on the function, so an unevaluated loader adds no top-level statement.
+			`export function ${loader}(){const state=${loader}.state;if(state){if(state.failed)throw state.error;return state.value}try{${facade.calls.map((name) => `${name}();`).join('')}return(${loader}.state={value:${namespace}({__proto__:null,${facade.exports.map(([name, local]) => `get ${JSON.stringify(name)}(){return ${local}}`).join(',')}})}).value}catch(error){throw(${loader}.state={failed:true,error}).error}}`,
 		);
 		additions.set(facade.target.fileName, declarations);
 		facade.target.exports.push(loader);
 		const original = chunks.get(fileName)!;
 		if (original.facadeModuleId && !facade.target.moduleIds.includes(original.facadeModuleId))
 			facade.target.moduleIds.push(original.facadeModuleId);
+	}
+	// A pack only some routes preload, loaded from code other routes run too, is evaluated by those routes' own packs.
+	const routeChunks = new Map<string, Chunk[]>();
+	for (const chunk of chunks.values()) {
+		const pack = packs.get(chunk.fileName);
+		if (pack?.startsWith('route:') && !facades.has(chunk.fileName))
+			routeChunks.set(pack.slice(6), [...(routeChunks.get(pack.slice(6)) ?? []), chunk]);
+	}
+	const evaluatedByRoute = new Map<string, Set<Chunk>>();
+	for (const chunk of chunks.values()) {
+		if (facades.has(chunk.fileName) || !usesRegistry(chunk)) continue;
+		for (const node of imports.get(chunk.fileName) ?? []) {
+			const value = node.specifier;
+			const facade = typeof value === 'string' && facades.get(resolve(chunk.fileName, value));
+			if (
+				!facade ||
+				facade.target === chunk ||
+				awaiting.has(facade.target.fileName) ||
+				evaluatesWith(chunk, facade.target, packs, awaiting, options.packRoutes) ||
+				!inertClosure(facade.target.fileName)
+			)
+				continue;
+			const to = packs.get(facade.target.fileName);
+			const toRoutes = to?.startsWith('shared:') ? options.packRoutes?.(to) : undefined;
+			for (const route of toRoutes ?? [])
+				for (const evaluator of routeChunks.get(route) ?? [])
+					if (evaluator !== facade.target)
+						evaluatedByRoute.set(
+							evaluator.fileName,
+							new Set([...(evaluatedByRoute.get(evaluator.fileName) ?? []), facade.target]),
+						);
+		}
+	}
+	// A route whose first event needs a lazy sibling at once evaluates it with its own route pack, as if never cut.
+	const eagerImports = new Map<string, Chunk[]>();
+	for (const target of chunks.values()) {
+		const name = options.eagerLazyRoutes && ownPack(target, options.packOf);
+		if (!name || startupPackOfLazy(name) === name || facades.has(target.fileName)) continue;
+		const routes = options.eagerLazyRoutes!(name);
+		if (!routes?.length || !inertClosure(target.fileName)) continue;
+		for (const route of routes)
+			for (const evaluator of routeChunks.get(route) ?? []) {
+				const own = ownPack(evaluator, options.packOf);
+				if (evaluator === target || !own || startupPackOfLazy(own) !== own) continue;
+				eagerImports.set(evaluator.fileName, [
+					...(eagerImports.get(evaluator.fileName) ?? []),
+					target,
+				]);
+			}
 	}
 	for (const [fileName, loaders] of registered)
 		additions
@@ -444,7 +550,7 @@ export function collapseLazyModuleFacades(
 		if (facades.has(chunk.fileName)) continue;
 		const replacements: Replacement[] = [];
 		const lookup = usesRegistry(chunk);
-		const evaluated = new Set<Chunk>();
+		const evaluated = new Set<Chunk>(evaluatedByRoute.get(chunk.fileName));
 		for (const node of imports.get(chunk.fileName) ?? []) {
 			const value = node.specifier;
 			if (typeof value !== 'string') continue;
@@ -469,7 +575,16 @@ export function collapseLazyModuleFacades(
 							: `import(${specifier}).then(module=>module.${facade.loader}())`,
 			});
 		}
+		const eager = eagerImports.get(chunk.fileName) ?? [];
+		for (const target of eager) {
+			evaluated.delete(target);
+			if (!chunk.imports.includes(target.fileName)) chunk.imports.push(target.fileName);
+		}
 		const suffix = [
+			...eager.map((target) => {
+				const path = relative(dirname(chunk.fileName), target.fileName);
+				return `import${JSON.stringify(path.startsWith('.') ? path : `./${path}`)};`;
+			}),
 			...(additions.get(chunk.fileName) ?? []),
 			...(lookup && replacements.some(({ source }) => source.startsWith(PACK_LOAD))
 				? [PACK_LOAD_SOURCE]
@@ -512,7 +627,10 @@ export function collapseLazyModuleFacades(
 
 // A pack registers its loaders when it evaluates, because import() of an evaluated module still resolves a task later.
 const PACK_REGISTRY = '__marklessPacks';
-const PACK_LOAD = '__marklessPackLoad';
+// Loader names are exports every registering pack spells out at evaluation, so they stay short.
+export const PACK_LOADER_PREFIX = '$ml';
+const PACKED_NAME_PATTERN = /\$ml[\w$]*|__marklessNamespace[\w$]*/g;
+export const PACK_LOAD = '__marklessPackLoad';
 const PACK_LOAD_SOURCE = `function ${PACK_LOAD}(specifier,loader,load){const pack=globalThis.${PACK_REGISTRY}?.[import.meta.resolve?.(specifier)];return pack?Promise.resolve().then(pack[loader]):load().then(module=>module[loader]())}`;
 
 // Evaluating a pack only declares its lazy module bodies. A route preloads the lazy targets of every pack it
@@ -541,13 +659,24 @@ function evaluatesWith(
 }
 
 // The route a pack serves, 'shared' for every route or a shared:<id> pack for some; undefined outside the planned packs.
+// A lazy sibling pack serves the routes of the pack it was cut from.
 function chunkPack(
 	chunk: Chunk,
 	packOf: ((moduleId: string) => string | undefined) | undefined,
 ): string | undefined {
-	const names = new Set(chunk.moduleIds.map((id) => packOf?.(id)));
+	const names = new Set(chunk.moduleIds.map((id) => startupPackOfLazy(packOf?.(id) ?? '')));
 	const [name] = names;
 	return names.size === 1 ? /^(route:.+?|shared(?::[0-9a-z]+)?)(?:~\d+)?$/.exec(name ?? '')?.[1] : undefined;
+}
+
+// The one planned pack every module of a chunk belongs to, lazy siblings named as such.
+function ownPack(
+	chunk: Chunk,
+	packOf: ((moduleId: string) => string | undefined) | undefined,
+): string | undefined {
+	const names = new Set(chunk.moduleIds.map((id) => packOf?.(id)?.replace(/~\d+$/, '')));
+	const [name] = names;
+	return names.size === 1 ? name : undefined;
 }
 
 type TopLevelScope = { readonly declared: Set<string>; readonly leafImports: Set<string> };
@@ -684,16 +813,15 @@ function facadeIdentity(
 	calls: readonly Binding[],
 	root: string | undefined,
 ): string {
-	const module = chunk.facadeModuleId
-		? root && chunk.facadeModuleId.startsWith(root)
-			? relative(root, chunk.facadeModuleId)
-			: chunk.facadeModuleId
-		: '';
-	return [
-		module,
-		exports.map(([name, binding]) => `${name}=${binding.name}`).join(','),
-		calls.map((binding) => binding.name).join(','),
-	].join('\0');
+	const module = chunk.facadeModuleId ? rootRelativeId(chunk.facadeModuleId, root) : '';
+	return withoutMachinePaths(
+		[
+			module,
+			exports.map(([name, binding]) => `${name}=${binding.name}`).join(','),
+			calls.map((binding) => binding.name).join(','),
+		].join('\0'),
+		root,
+	);
 }
 
 function shortHash(text: string): string {

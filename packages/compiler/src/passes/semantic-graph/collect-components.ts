@@ -63,7 +63,7 @@ export function collectComponentProps(component: AnyNode, state: WalkState): voi
 		if (!name) return;
 
 		state.graph.graphBindings.push({
-			id: `prop:${name}`,
+			id: 'prop:props',
 			name,
 			kind: 'prop',
 			bindingId,

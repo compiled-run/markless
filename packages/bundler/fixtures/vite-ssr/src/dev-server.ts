@@ -2,10 +2,8 @@ import { readdir, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { renderToString, type SsrRenderable } from '@markless/core';
-import {
-	MARKLESS_IMPORT_MAP_ASSET,
-	importMapScript,
-} from '../../../src/build/content-hash-names.ts';
+import { marklessImportMapPath } from '../../../src/build/build-manifests.ts';
+import { importMapScript } from '../../../src/build/content-hash-names.ts';
 import { planModulePreloads, type ModulePreloadRoot } from '../../../src/build/preload-plan.ts';
 import type { MarklessBundleGraph } from '../../../src/types.ts';
 import {
@@ -195,7 +193,7 @@ async function renderPreviewRequest(root: string, outDir: string, renderEntry?: 
 		? await entry.render!(renderOptions)
 		: await renderToString(entry.default, renderOptions);
 	// A packed build's chunks import each other by specifier; the host serves the map ahead of every module.
-	const importMap = await readFile(resolve(dist, MARKLESS_IMPORT_MAP_ASSET), 'utf8').catch(
+	const importMap = await readFile(marklessImportMapPath(dist), 'utf8').catch(
 		() => undefined,
 	);
 	return new Response(importMap ? importMapScript(JSON.parse(importMap)) + html : html, {
@@ -220,7 +218,7 @@ async function readClientResumeModuleUrl(dist: string) {
 	const candidates: string[] = [];
 	const imported = new Set<string>();
 	const imports = JSON.parse(
-		await readFile(resolve(dist, MARKLESS_IMPORT_MAP_ASSET), 'utf8').catch(() => '{}'),
+		await readFile(marklessImportMapPath(dist), 'utf8').catch(() => '{}'),
 	) as { imports?: Record<string, string> };
 	for (const fileName of await readdir(buildDir)) {
 		if (!fileName.endsWith('.js')) continue;

@@ -4,6 +4,7 @@ import { nitro } from 'nitro/vite';
 import { dirname, isAbsolute, join, normalize, relative, resolve } from 'pathe';
 import {
 	type EnvironmentOptions,
+	minifySync,
 	sortUserPlugins,
 	type Plugin,
 	type PluginOption,
@@ -22,9 +23,12 @@ import {
 } from 'ufo';
 import {
 	isClientPrimarySourceRequest,
-	isMarklessDeferredPack,
+	isExecutionLogChunk,
 	isMarklessNavigationPack,
 	isRenderDataSourceRequest,
+	lazyStartupPackName,
+	marklessDeferredChunkFileNames,
+	startupPackOfLazy,
 	isResumeSourceRequest,
 	isRouteNavigationSourceRequest,
 	isSymbolOnlySourceRequest,
@@ -53,11 +57,11 @@ import { htmlTransformPlugin } from './html-transform.ts';
 import { mdxTransformPlugin } from './mdx.ts';
 import { compactRoutePreloadData, routePreloadDecoderSource } from './route-preload-data.ts';
 import { routeTypegenPlugin } from './route-typegen.ts';
-import type { ServerEntryOptions } from './runtime/create-server-entry.ts';
 import { LINK_ATTRIBUTE, PREFETCH_ATTRIBUTE } from '../link-attributes.ts';
 import { NAVIGATION_POLYFILL_MODULE } from '../navigation-polyfill.ts';
-import { listenForLinkIntent, startViewportPrefetch } from './link-intent.ts';
+import { listenForLinkIntent } from './link-intent.ts';
 import { documentNavigationFor } from './document-navigation.ts';
+import { startFragmentNavigation } from './fragment-navigation.ts';
 
 const ROUTE_DISCOVERY_ID = 'virtual:markless-router/routes';
 const CLIENT_ENTRY_ID = 'virtual:markless-router/client-entry';
@@ -70,6 +74,9 @@ const PRERENDER_WAKE_ENTRY_PATH_ID = 'virtual:markless-router/prerender-wake-ent
 const NAVIGATION_ENTRY_ID = 'virtual:markless-router/navigation-entry';
 const NAVIGATION_ENTRY_ORIGIN = '/entries/client-entry.ts';
 const NAVIGATION_ENTRY_PATH_ID = 'virtual:markless-router/navigation-entry-path';
+const FRAGMENT_ENTRY_ID = 'virtual:markless-router/fragment-entry';
+const FRAGMENT_ENTRY_ORIGIN = '/entries/fragment-entry.ts';
+const FRAGMENT_ENTRY_PATH_ID = 'virtual:markless-router/fragment-entry-path';
 const ROUTE_PRELOADS_ID = 'virtual:markless-router/route-preloads';
 const ROUTE_PRELOADS_PLACEHOLDER = '__MARKLESS_ROUTER_ROUTE_PRELOADS__';
 const DOCUMENT_STYLESHEETS_PLACEHOLDER = '__MARKLESS_ROUTER_DOCUMENT_STYLESHEETS__';
@@ -77,7 +84,7 @@ const SERVER_ENTRY_ID = 'virtual:markless-router/server-entry';
 const ROUTE_HREF_ID = 'virtual:markless-router/route-href';
 const ROUTER_OPTIONS_ID = 'virtual:markless-router/options';
 const PUBLIC_VIRTUAL_MODULE_ID_RE =
-	/^virtual:markless-router\/(?:routes|client-entry|resume-entry|resume-entry-path|prerender-wake-entry|prerender-wake-entry-path|navigation-entry|navigation-entry-path|route-preloads|server-entry|route-href|options)(?:\?.*)?$/;
+	/^virtual:markless-router\/(?:routes|client-entry|resume-entry|resume-entry-path|prerender-wake-entry|prerender-wake-entry-path|navigation-entry|navigation-entry-path|fragment-entry|fragment-entry-path|route-preloads|server-entry|route-href|options)(?:\?.*)?$/;
 const VITE_PLUGIN_FILE = decodePath(parseURL(import.meta.url).pathname);
 // The app-context entry files ship as SOURCE at src/vite/entries (see the
 // `files` field): running from src, they sit next to this file; running from
@@ -98,6 +105,7 @@ const virtualEntryFiles = {
 	[RESUME_ENTRY_ID]: 'resume-entry.ts',
 	[PRERENDER_WAKE_ENTRY_ID]: 'prerender-wake-entry.ts',
 	[NAVIGATION_ENTRY_ID]: 'client-entry.ts',
+	[FRAGMENT_ENTRY_ID]: 'fragment-entry.ts',
 	[SERVER_ENTRY_ID]: 'server-entry.ts',
 	[ROUTE_HREF_ID]: 'route-href.ts',
 } as const;
@@ -107,7 +115,12 @@ export interface MarklessRouterOptions {
 	// URLs live in the fragment; 'path' (default) routes by pathname.
 	mode?: 'path' | 'hash';
 	nitro?: boolean;
-	linkPreloading?: ServerEntryOptions['linkPreloading'];
+	/**
+	 * `false` downloads nothing for a link before it is clicked: no prefetch on hover, press,
+	 * focus or idle. Links still navigate. `<Link prefetch={false}>` does the same for one link.
+	 * Prefetches only ever request page routes, with a `Purpose: prefetch` header; endpoints are never prefetched.
+	 */
+	prefetch?: boolean;
 }
 
 export function router(options: MarklessRouterOptions = {}): PluginOption[] {
@@ -129,8 +142,8 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 	const resumeEntry = resumeEntryState();
 	const prerenderWakeEntry = resumeEntryState();
 	const navigationEntry = resumeEntryState();
+	const fragmentEntry = resumeEntryState();
 	const routePreloads = routePreloadState();
-	routePreloads.navigationOnIntent = linkIntentEnabled(options);
 
 	return [
 		routerConfigPlugin(
@@ -139,6 +152,7 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 			prerenderWakeEntry,
 			navigationEntry,
 			routePreloads,
+			fragmentEntry,
 		),
 		devSourceModuleRequestPlugin(),
 		mdxTransformPlugin(),
@@ -152,6 +166,7 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 			navigationEntry,
 			routePreloads,
 			options,
+			fragmentEntry,
 		),
 		nitroPlugins,
 	];
@@ -199,6 +214,7 @@ function routerConfigPlugin(
 	prerenderWakeEntry: ResumeEntryState,
 	navigationEntry: ResumeEntryState,
 	routePreloads: RoutePreloadState,
+	fragmentEntry: ResumeEntryState = resumeEntryState(),
 ): Plugin {
 	let clientOutDir = '';
 	let clientEnvironmentName = '';
@@ -270,16 +286,24 @@ function routerConfigPlugin(
 				serverEnvironmentConfig = config.environments.ssr;
 				clientOutDir = resolve(config.root, environment.build.outDir);
 			}
-			for (const entry of [resumeEntry, prerenderWakeEntry, navigationEntry, routePreloads]) {
+			for (const entry of [
+				resumeEntry,
+				prerenderWakeEntry,
+				navigationEntry,
+				fragmentEntry,
+				routePreloads,
+			]) {
 				entry.base = config.base;
 			}
 			routePreloads.root = config.root;
-			routePreloads.chunkSpecifiers = (config.plugins ?? []).some(
+			// The router writes every document, so each one can carry the import map packed chunks resolve through.
+			const markless = (config.plugins ?? []).find(
 				(plugin) =>
-					(
-						plugin as { api?: { chunkImportMap?: () => boolean } }
-					).api?.chunkImportMap?.() === true,
-			);
+					typeof (plugin as { api?: { chunkImportMap?: unknown } }).api
+						?.chunkImportMap === 'function',
+			) as { api: { chunkImportMap(): boolean; enableChunkImportMap?(): void } } | undefined;
+			markless?.api.enableChunkImportMap?.();
+			routePreloads.chunkSpecifiers = markless?.api.chunkImportMap() === true;
 		},
 		configEnvironment(_name, config) {
 			configureRouteInputs(config);
@@ -305,6 +329,7 @@ function routerConfigPlugin(
 				resumeEntry.fileName = undefined;
 				prerenderWakeEntry.fileName = undefined;
 				navigationEntry.fileName = undefined;
+				fragmentEntry.fileName = undefined;
 				routePreloads.routes = { navigation: {}, ssr: {}, styles: {} };
 				routePreloads.persisted = false;
 				routePreloads.importMap = undefined;
@@ -322,6 +347,9 @@ function routerConfigPlugin(
 				manifest.entries.navigation,
 				manifest.base,
 			);
+			fragmentEntry.fileName = manifest.entries.fragment
+				? clientAssetFileName(manifest.entries.fragment, manifest.base)
+				: undefined;
 			routePreloads.routes = manifest.routes;
 			routePreloads.persisted = true;
 			routePreloads.importMap = manifest.importMap;
@@ -366,12 +394,18 @@ function routerConfigPlugin(
 				if (navigationChunk) {
 					navigationEntry.fileName = navigationChunk.fileName;
 				}
+				const fragmentChunk = Object.values(bundle).find(
+					(item): item is OutputChunk =>
+						item.type === 'chunk' && isVirtualEntryChunk(item, FRAGMENT_ENTRY_ORIGIN),
+				);
+				if (fragmentChunk) {
+					fragmentEntry.fileName = fragmentChunk.fileName;
+				}
 				routePreloads.routes = routeModulePreloadsFromBundle({
 					base: routePreloads.base,
 					bundle,
 					navigationChunk,
 					navigationPolyfillIds,
-					navigationOnIntent: routePreloads.navigationOnIntent,
 					prerenderWakeChunk,
 					resumeChunk,
 					root: routePreloads.root,
@@ -408,6 +442,9 @@ function routerConfigPlugin(
 								}
 							: {}),
 						navigationEntry: joinURL(routePreloads.base, navigationEntry.fileName),
+						...(fragmentEntry.fileName
+							? { fragmentEntry: joinURL(routePreloads.base, fragmentEntry.fileName) }
+							: {}),
 						routes: routePreloads.routes,
 					});
 				}
@@ -430,7 +467,12 @@ function routerConfigPlugin(
 			if (renames.size > 0) {
 				pendingClientAssets = renameClientAssetChunks(pendingClientAssets, renames);
 				routePreloads.routes = pendingClientAssets.routes;
-				for (const entry of [resumeEntry, prerenderWakeEntry, navigationEntry])
+				for (const entry of [
+					resumeEntry,
+					prerenderWakeEntry,
+					navigationEntry,
+					fragmentEntry,
+				])
 					if (entry.fileName)
 						entry.fileName = renames.get(entry.fileName) ?? entry.fileName;
 			}
@@ -652,7 +694,6 @@ interface RoutePreloadState {
 	base: string;
 	chunkSpecifiers: boolean;
 	importMap?: { readonly imports: Record<string, string> } | undefined;
-	navigationOnIntent: boolean;
 	persisted: boolean;
 	root: string;
 	routes: RoutePreloadMaps;
@@ -668,7 +709,6 @@ function routePreloadState(): RoutePreloadState {
 	return {
 		base: '/',
 		chunkSpecifiers: false,
-		navigationOnIntent: false,
 		persisted: false,
 		root: '.',
 		routes: { navigation: {}, ssr: {}, styles: {} },
@@ -688,9 +728,10 @@ function routerClientInput(input: InputOption | undefined, root: string): InputO
 	const resumeEntryId = scopedVirtualEntryId(RESUME_ENTRY_ID, root);
 	const prerenderWakeEntryId = scopedVirtualEntryId(PRERENDER_WAKE_ENTRY_ID, root);
 	const navigationEntryId = scopedVirtualEntryId(NAVIGATION_ENTRY_ID, root);
+	const fragmentEntryId = scopedVirtualEntryId(FRAGMENT_ENTRY_ID, root);
 	const wakeEntries = prerenderWakeChannelEnabled() ? [prerenderWakeEntryId] : [];
 	if (input === undefined) {
-		return [resumeEntryId, ...wakeEntries, navigationEntryId];
+		return [resumeEntryId, ...wakeEntries, navigationEntryId, fragmentEntryId];
 	}
 
 	if (typeof input === 'string' || Array.isArray(input)) {
@@ -698,6 +739,7 @@ function routerClientInput(input: InputOption | undefined, root: string): InputO
 			resumeEntryId,
 			...wakeEntries,
 			navigationEntryId,
+			fragmentEntryId,
 			...(Array.isArray(input) ? input : [input]),
 		];
 	}
@@ -710,6 +752,7 @@ function routerClientInput(input: InputOption | undefined, root: string): InputO
 				? { 'markless-router-prerender-wake': prerenderWakeEntryId }
 				: {}),
 			'markless-router-navigation': navigationEntryId,
+			'markless-router-fragment': fragmentEntryId,
 		};
 	}
 
@@ -734,6 +777,7 @@ function virtualModulesPlugin(
 	navigationEntry: ResumeEntryState = resumeEntryState(),
 	routePreloads: RoutePreloadState = routePreloadState(),
 	options: MarklessRouterOptions = {},
+	fragmentEntry: ResumeEntryState = resumeEntryState(),
 ): Plugin {
 	let root = '';
 
@@ -767,6 +811,7 @@ function virtualModulesPlugin(
 					baseId === RESUME_ENTRY_PATH_ID ||
 					baseId === PRERENDER_WAKE_ENTRY_PATH_ID ||
 					baseId === NAVIGATION_ENTRY_PATH_ID ||
+					baseId === FRAGMENT_ENTRY_PATH_ID ||
 					baseId === ROUTE_PRELOADS_ID
 				) {
 					return `\0${baseId}${rootScopeQuery(root, id)}`;
@@ -808,6 +853,9 @@ function virtualModulesPlugin(
 					root,
 				);
 			}
+			if (id.startsWith(`\0${FRAGMENT_ENTRY_PATH_ID}`)) {
+				return entryPathSource('fragmentEntryPath', fragmentEntry, FRAGMENT_ENTRY_ID, root);
+			}
 			if (id.startsWith(`\0${ROUTE_PRELOADS_ID}`)) {
 				return routePreloadsSource(
 					routePreloads,
@@ -831,18 +879,14 @@ async function routerOptionsSource(
 	return [
 		'export const routerMode = "path";',
 		`export const documentNavigation = ${JSON.stringify(documentNavigationFor(documentSource, documentFile))};`,
-		`export const linkPreloading = ${JSON.stringify(options.linkPreloading ?? 'render')};`,
 		linkIntentEnabled(options)
 			? `export const startLinkIntentPreloading = (root, preload) => (${listenForLinkIntent.toString()})(root, ${JSON.stringify(LINK_ATTRIBUTE)}, preload, ${JSON.stringify(PREFETCH_ATTRIBUTE)});`
 			: 'export const startLinkIntentPreloading = () => () => {};',
-		linkIntentEnabled(options)
-			? `export const startViewportPrefetching = (document, destinations) => (${startViewportPrefetch.toString()})(document, ${JSON.stringify(LINK_ATTRIBUTE)}, ${JSON.stringify(PREFETCH_ATTRIBUTE)}, ${options.linkPreloading === 'viewport'}, destinations);`
-			: 'export const startViewportPrefetching = () => {};',
 	].join('\n');
 }
 
 function linkIntentEnabled(options: MarklessRouterOptions): boolean {
-	return options.linkPreloading === 'intent' || options.linkPreloading === 'viewport';
+	return options.prefetch !== false;
 }
 
 function entryPathSource(
@@ -864,6 +908,7 @@ function serverEntrySource(root: string, options: MarklessRouterOptions): string
 		`import { resumeEntryPath } from '${RESUME_ENTRY_PATH_ID}${query}';`,
 		`import { prerenderWakeEntryPath } from '${PRERENDER_WAKE_ENTRY_PATH_ID}${query}';`,
 		`import { navigationEntryPath } from '${NAVIGATION_ENTRY_PATH_ID}${query}';`,
+		`import { fragmentEntryPath } from '${FRAGMENT_ENTRY_PATH_ID}${query}';`,
 		`import { documentStylesheets, routeModulePreloads, routeSsrModulePreloads, routeStylesheets, documentImportMap } from '${ROUTE_PRELOADS_ID}${query}';`,
 		`import { pageModuleLoaders, routeFileIds } from '${ROUTE_DISCOVERY_ID}${query}';`,
 		`import { documentNavigation } from '${ROUTER_OPTIONS_ID}${query}';`,
@@ -873,7 +918,9 @@ function serverEntrySource(root: string, options: MarklessRouterOptions): string
 		`  resumeEntryPath,`,
 		`  prerenderWakeEntryPath,`,
 		`  navigationEntryPath,`,
-		`  linkPreloading: ${JSON.stringify(options.linkPreloading ?? 'render')},`,
+		`  fragmentEntryPath,`,
+		`  fragmentNavigationSource: ${JSON.stringify(minifiedFragmentNavigationSource())},`,
+		...(options.prefetch === false ? ['  prefetch: false,'] : []),
 		`  routeModulePreloads,`,
 		`  routeSsrModulePreloads,`,
 		`  routeStylesheets,`,
@@ -887,6 +934,22 @@ function serverEntrySource(root: string, options: MarklessRouterOptions): string
 		`export const fetch = entry.fetch;`,
 		`export default entry;`,
 	].join('\n');
+}
+
+// The bridge carries this inline on every page, so it ships minified.
+function minifiedFragmentNavigationSource(): string {
+	const result = minifySync(
+		'markless-fragment-navigation.js',
+		`export default (${startFragmentNavigation.toString()});`,
+		{ compress: true, mangle: true, module: true },
+	);
+	const prefix = 'export default';
+	const code = result.code.trim();
+	if (result.errors.length > 0 || !code.startsWith(prefix))
+		throw new Error(
+			`MARKLESS_ROUTER_FRAGMENT_MINIFY_FAILED: ${result.errors.map((error) => error.message).join('\n')}`,
+		);
+	return code.slice(prefix.length).replace(/;$/, '').trim();
 }
 
 function rootScopeQuery(root: string, id = ''): string {
@@ -1022,15 +1085,16 @@ function routeModulePreloadsFromBundle(input: {
 	readonly bundle: Record<string, unknown>;
 	readonly navigationChunk: OutputChunkLike | undefined;
 	readonly navigationPolyfillIds?: ReadonlySet<string>;
-	readonly navigationOnIntent: boolean;
 	readonly prerenderWakeChunk: OutputChunkLike | undefined;
 	readonly resumeChunk: OutputChunkLike | undefined;
 	readonly root: string;
 }): RoutePreloadMaps {
 	// The bundler packs runtime no page's payload demands into this chunk; it loads on first import().
-	const allChunks = outputChunks(input.bundle);
-	const chunks = allChunks.filter((chunk) => !isMarklessDeferredPack(chunk.name));
-	const deferredChunks = allChunks.filter((chunk) => isMarklessDeferredPack(chunk.name));
+	// The execution log loads only on pages that activate it, so no plan names it.
+	const allChunks = outputChunks(input.bundle).filter((chunk) => !isExecutionLogChunk(chunk));
+	const deferred = marklessDeferredChunkFileNames(allChunks);
+	const chunks = allChunks.filter((chunk) => !deferred.has(chunk.fileName));
+	const deferredChunks = allChunks.filter((chunk) => deferred.has(chunk.fileName));
 	const everyChunk = new Map(allChunks.map((chunk) => [chunk.fileName, chunk]));
 	// With the pack planner on: each route's landing files, from its first-use closures.
 	const plannedLanding = plannedLandingFiles(input.bundle);
@@ -1042,6 +1106,20 @@ function routeModulePreloadsFromBundle(input: {
 				resumeRuntimeFileNames,
 				{ chunks: everyChunk, everyChunk },
 				entry.fileName,
+			);
+	// The resume runtime's own code a first event reaches only through import() rides a lazy sibling pack.
+	const lazyRuntimePacks = new Set(
+		[...resumeRuntimeFileNames].flatMap((fileName) => {
+			const name = everyChunk.get(fileName)?.name;
+			return name && lazyStartupPackName(name) !== name ? [lazyStartupPackName(name)] : [];
+		}),
+	);
+	for (const chunk of allChunks)
+		if (chunk.name && lazyRuntimePacks.has(chunk.name))
+			includeChunk(
+				resumeRuntimeFileNames,
+				{ chunks: everyChunk, everyChunk },
+				chunk.fileName,
 			);
 	const routeChunks = new Map<string, OutputChunkLike[]>();
 	const routeChunkFileNames = new Set<string>();
@@ -1178,33 +1256,35 @@ function routeModulePreloadsFromBundle(input: {
 		// foreign routes' edges, and a page must link only its own CSS.
 		const styleFileNames = new Set([...navigationFileNames, ...ssrFileNames]);
 		const planned = plannedLanding?.get(routeFile);
-		if (planned) narrowToPlanned(ssrFileNames, planned, landingScope, [
-			input.resumeChunk,
-			input.prerenderWakeChunk,
-		]);
-
-		// The served page never names the navigation entry, so a first navigation
-		// starts its fetch only once the reader clicks — a second waterfall hop
-		// after the page has finished loading. Preload the entry, and the demand
-		// edges of it that cost nothing but themselves — unless link intent
-		// fetches them before the click.
-		if (input.navigationChunk && !input.navigationOnIntent) {
-			includeChunk(ssrFileNames, scope, input.navigationChunk.fileName);
-			for (const fileName of navigationEdgesWorthPreloading(
-				input.navigationChunk,
-				scope,
-				ssrFileNames,
-				routeChunkFileNames,
-				polyfillFileNames,
-			)) {
-				includeChunk(ssrFileNames, scope, fileName);
-			}
-		}
+		if (planned)
+			narrowToPlanned(ssrFileNames, planned, landingScope, [
+				input.resumeChunk,
+				input.prerenderWakeChunk,
+			]);
 
 		navigation[routeFile] = [...navigationFileNames].map((fileName) =>
 			joinURL(input.base, fileName),
 		);
-		ssr[routeFile] = [...ssrFileNames].map((fileName) => joinURL(input.base, fileName));
+		// Preloads download in document order: a first event waits for the page's static path, then for
+		// the lazy halves of the packs it split from, so those lead and the rest follows as found.
+		const firstEventPath = new Set<string>();
+		const lazySiblings = [...ssrFileNames].filter((fileName) => {
+			const name = everyChunk.get(fileName)?.name;
+			return !!name && startupPackOfLazy(name) !== name;
+		});
+		for (const entry of lazySiblings.length
+			? [input.resumeChunk, input.prerenderWakeChunk]
+			: []) {
+			if (!entry) continue;
+			includeChunk(firstEventPath, landingScope, entry.fileName);
+			for (const fileName of routeScopedDynamicImports(entry, routeFile))
+				includeChunk(firstEventPath, landingScope, fileName);
+		}
+		for (const fileName of lazySiblings) includeChunk(firstEventPath, landingScope, fileName);
+		ssr[routeFile] = [
+			...[...firstEventPath].filter((fileName) => ssrFileNames.has(fileName)),
+			...[...ssrFileNames].filter((fileName) => !firstEventPath.has(fileName)),
+		].map((fileName) => joinURL(input.base, fileName));
 		styles[routeFile] = routeStylesheetsForChunks(
 			routeFileChunks,
 			styleFileNames,
@@ -1213,48 +1293,6 @@ function routeModulePreloadsFromBundle(input: {
 		);
 	}
 	return { navigation, ssr, styles };
-}
-
-// Which of the navigation entry's demand edges the landing page should already
-// hold. Two structural conditions, no chunk names and no per-app knowledge:
-//   - the edge's whole static closure, minus the edge itself, is already
-//     planned, so preloading it costs exactly the edge's own rendered bytes and
-//     the browser can run it the moment it is wanted;
-//   - those bytes stay under the navigation entry's own, the one chunk a
-//     navigation is certain to fetch. A speculative edge may complete that
-//     certainty, never outweigh it — which is what keeps a vendored capability
-//     polyfill (larger than the entry, loaded only by engines missing the API)
-//     on demand while thin render-path adapters ride along.
-function navigationEdgesWorthPreloading(
-	navigationChunk: OutputChunkLike,
-	scope: ChunkScope,
-	planned: ReadonlySet<string>,
-	routeChunkFileNames: ReadonlySet<string>,
-	polyfillFileNames: ReadonlySet<string>,
-): string[] {
-	const budget = renderedByteLength(navigationChunk);
-	if (budget === 0) return [];
-	const edges: string[] = [];
-	for (const fileName of navigationChunk.dynamicImports) {
-		const edge = scope.chunks.get(fileName);
-		if (
-			!edge ||
-			planned.has(fileName) ||
-			routeChunkFileNames.has(fileName) ||
-			polyfillFileNames.has(fileName)
-		)
-			continue;
-		if (renderedByteLength(edge) >= budget) continue;
-		const closure = new Set<string>();
-		includeChunk(closure, scope, fileName);
-		closure.delete(fileName);
-		if ([...closure].every((name) => planned.has(name))) edges.push(fileName);
-	}
-	return edges;
-}
-
-function renderedByteLength(chunk: OutputChunkLike): number {
-	return chunk.code?.length ?? 0;
 }
 
 // CSS rides chunks no static import edge reaches — dynamically demanded

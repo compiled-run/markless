@@ -27,27 +27,10 @@ export async function runCodegenSize({ protocol, environment }) {
 			if (errors.length > 0) {
 				throw new TypeError(`${entry.file} compiler diagnostics: ${errors.join('; ')}`);
 			}
-			for (const [mode, code] of [
-				[
-					'client',
-					result.publicRenderModule.moduleSource ||
-						result.publicRenderModule.csrModuleSource,
-				],
-				['ssr', result.publicRenderModule.ssrModuleSource],
-			]) {
-				if (!code) throw new TypeError(`${entry.file} emitted empty ${mode} code`);
-				const minified = minifyJavaScript(code, `${entry.file}.${mode}.js`);
-				compiledFiles.push({
-					mode,
-					file: entry.file,
-					source: sourceBytes(entry.source),
-					compiled: {
-						raw: Buffer.byteLength(code),
-						minified: Buffer.byteLength(minified),
-						gzip: gzipBytes(minified),
-					},
-				});
-			}
+			compiledFiles.push(
+				measuredFile('client', entry, clientParts(entry.file, result)),
+				measuredFile('ssr', entry, { module: [result.publicRenderModule.ssrModuleSource] }),
+			);
 		}
 		const corpusManifest = corpus.map(({ file, sha256 }) => ({ file, sha256 }));
 		const cases = ['client', 'ssr'].map((mode) =>
@@ -63,7 +46,12 @@ export async function runCodegenSize({ protocol, environment }) {
 	} catch (error) {
 		const failure = error instanceof Error ? error.message : String(error);
 		return {
-			result: createFailedResult({ benchmark: 'codegen-size', protocol, environment, failure }),
+			result: createFailedResult({
+				benchmark: 'codegen-size',
+				protocol,
+				environment,
+				failure,
+			}),
 			exitCode: 1,
 		};
 	}
@@ -79,6 +67,17 @@ export function validateCodegenSizeResult(result, expectedCorpus) {
 		for (const field of ['raw', 'gzip']) assertByte(bytes?.source?.[field], `source.${field}`);
 		for (const field of compiledByteFields)
 			assertByte(bytes?.compiled?.[field], `compiled.${field}`);
+		const parts = Object.values(bytes?.parts ?? {});
+		if (parts.length === 0)
+			throw new TypeError(
+				`codegen-size ${benchmarkCase?.name ?? 'case'} requires per-part bytes`,
+			);
+		for (const field of compiledByteFields) {
+			if (parts.reduce((sum, part) => sum + part[field], 0) !== bytes.compiled[field])
+				throw new TypeError(
+					`codegen-size ${benchmarkCase.name} compiled.${field} does not equal its parts`,
+				);
+		}
 		if (manifestSignature(benchmarkCase?.metrics?.corpus) !== expected) {
 			throw new TypeError(
 				`codegen-size ${benchmarkCase?.name ?? 'case'} corpus hash mismatch`,
@@ -119,6 +118,54 @@ function compilerErrors(result) {
 		.map((diagnostic) => `${diagnostic.code}: ${diagnostic.message}`);
 }
 
+// Client code is everything the compiler emits for the browser: the render module, its render-data module, and one module per symbol.
+function clientParts(file, result) {
+	const parts = {
+		module: [result.publicRenderModule.moduleSource],
+		renderData: [result.publicRenderModule.renderDataModuleSource],
+		symbols: result.symbolModules.modules.map((module) => module.source),
+	};
+	if (Object.values(parts).every((sources) => sources.every((source) => !source))) {
+		throw new TypeError(`${file} emitted empty client code`);
+	}
+	return parts;
+}
+
+function measuredFile(mode, entry, parts) {
+	const compiled = zeroCompiled();
+	const measuredParts = {};
+	for (const [part, sources] of Object.entries(parts)) {
+		const bytes = zeroCompiled();
+		sources.forEach((code, index) => {
+			if (!code) return;
+			const minified = minifyJavaScript(code, `${entry.file}.${mode}.${part}.${index}.js`);
+			addCompiled(bytes, {
+				raw: Buffer.byteLength(code),
+				minified: Buffer.byteLength(minified),
+				gzip: gzipBytes(minified),
+			});
+		});
+		addCompiled(compiled, bytes);
+		measuredParts[part] = bytes;
+	}
+	if (compiled.raw === 0) throw new TypeError(`${entry.file} emitted empty ${mode} code`);
+	return {
+		mode,
+		file: entry.file,
+		source: sourceBytes(entry.source),
+		compiled,
+		parts: measuredParts,
+	};
+}
+
+function zeroCompiled() {
+	return { raw: 0, minified: 0, gzip: 0 };
+}
+
+function addCompiled(target, source) {
+	for (const field of compiledByteFields) target[field] += source[field];
+}
+
 function minifyJavaScript(code, filename) {
 	const result = minifySync(filename, code, { module: true, compress: true, mangle: true });
 	if (result.errors.length > 0)
@@ -128,10 +175,13 @@ function minifyJavaScript(code, filename) {
 
 function codegenCase(mode, corpus, files) {
 	const source = { raw: 0, gzip: 0 };
-	const compiled = { raw: 0, minified: 0, gzip: 0 };
+	const compiled = zeroCompiled();
+	const parts = {};
 	for (const file of files) {
 		for (const field of ['raw', 'gzip']) source[field] += file.source[field];
-		for (const field of compiledByteFields) compiled[field] += file.compiled[field];
+		addCompiled(compiled, file.compiled);
+		for (const [part, bytes] of Object.entries(file.parts))
+			addCompiled((parts[part] ??= zeroCompiled()), bytes);
 	}
 	return {
 		name: mode,
@@ -142,7 +192,7 @@ function codegenCase(mode, corpus, files) {
 		bodyBytes: compiled.raw,
 		timing: deterministicTiming(),
 		memory: deterministicMemory(),
-		metrics: { samples: 1, bytes: { source, compiled }, corpus, files },
+		metrics: { samples: 1, bytes: { source, compiled, parts }, corpus, files },
 	};
 }
 

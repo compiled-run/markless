@@ -421,7 +421,8 @@ function renderComponentRow(input: ComponentRowInput): Awaitable<RenderedCompone
 					}),
 				),
 				(rendered) => ({
-					rowSegment,
+					// Page space, like the widget ids the row files: an island prefix belongs in front.
+					rowSegment: owner.symbolPrefix + rowSegment,
 					rendered: {
 						...rendered,
 						view: ownerRecordsInPageSpace(
@@ -1004,7 +1005,7 @@ let valueDecoderPromise:
 	| Promise<typeof import('../../../serializer/src/value-decode-client.ts')>
 	| undefined;
 async function deserializeGraphValue(payload: SerializedGraphPayload): Promise<unknown> {
-	valueDecoderPromise ??= import('../../../serializer/src/value-decode-client.ts');
+	valueDecoderPromise ??= import('../../../serializer/src/value-decode-client-lazy.ts');
 	return (await valueDecoderPromise).deserializeGraphValueForClient(payload);
 }
 

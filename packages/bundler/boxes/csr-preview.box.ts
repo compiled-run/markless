@@ -2,6 +2,7 @@ import { box } from '@async/witness';
 import { planModulePreloads } from '../src/build/preload-plan.ts';
 import { runtimeSizeReport, type RuntimeSizeReport } from '../test-support/runtime-size.ts';
 import type { MarklessBundleGraph } from '../src/types.ts';
+import { unpackedFixture } from './unpacked-fixture.ts';
 
 // Product truth: the Vite CSR fixture's production output is not only emitted
 // correctly; it can be served by Vite preview and load the generated client
@@ -28,7 +29,7 @@ export default box(
 		tags: ['csr', 'preview', 'preload'],
 		modes: ['build', 'preview'],
 	},
-	async ({ pipeline, expect, receipt }) => {
+	unpackedFixture(async ({ pipeline, expect, receipt }) => {
 		const instrumentedBuild = await pipeline.build({
 			config: (config) => ({
 				...config,
@@ -119,7 +120,7 @@ export default box(
 
 		await preview.close();
 		await receipt.capture('csr preview loaded client counter click');
-	},
+	}),
 );
 
 type ScriptRequestLog = {

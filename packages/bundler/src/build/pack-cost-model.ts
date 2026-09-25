@@ -12,6 +12,8 @@ export const PACK_COST_MODEL = {
 	decodedMsPerKb: 0,
 	// Wrapper imports, exports and lost cross-file compression of one more file.
 	fileOverheadGzipKb: 0.5,
+	// The same for a lazy sibling, which imports its first half's bindings (router fixture landings: 0.96-1.00).
+	lazySiblingOverheadGzipKb: 1,
 	// Smallest deferred pack worth a file of its own; below it the per-file overhead dominates.
 	minDeferredGzipKb: 1,
 	// Pre-tree-shake module source to shipped gzip bytes, for planning before output exists.
@@ -45,4 +47,25 @@ export function mergeIntoWiderPack(
 // Moving code no first use needs off the boot path pays only when it outweighs the file it adds.
 export function deferralPays(gzipKb: number, model: PackCostModel = PACK_COST_MODEL): boolean {
 	return gzipKb >= model.minDeferredGzipKb;
+}
+
+// A lazy sibling still loads in the landing round: it takes its bytes off the first event's path on the
+// pages whose first events are lean, and every page loading it pays the bytes its extra file adds.
+export function lazySiblingPays(
+	input: { readonly gzipKb: number; readonly loadersSpedUp: number; readonly loaders: number },
+	model: PackCostModel = PACK_COST_MODEL,
+): boolean {
+	return (
+		deferralPays(input.gzipKb, model) &&
+		input.loadersSpedUp * input.gzipKb > input.loaders * model.lazySiblingOverheadGzipKb
+	);
+}
+
+// App code changes with nearly every deploy and framework code only on an upgrade, so a startup pack
+// holding both re-sends its framework half to returning visitors; both halves still load in one round.
+export function frameworkSplitPays(
+	input: { readonly appGzipKb: number; readonly frameworkGzipKb: number },
+	model: PackCostModel = PACK_COST_MODEL,
+): boolean {
+	return deferralPays(input.appGzipKb, model) && deferralPays(input.frameworkGzipKb, model);
 }

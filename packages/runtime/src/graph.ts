@@ -115,6 +115,8 @@ export type DomJournalEntry =
 			readonly type: 'setText';
 			readonly locator: string;
 			readonly value: unknown;
+			/** The one child text node this write owns, when its element holds other children too. */
+			readonly node?: (host: unknown) => unknown;
 	  }
 	| {
 			readonly type: 'setAttr' | 'setProp';

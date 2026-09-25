@@ -28,7 +28,7 @@ test.each([false, true])(
 					resolveId: (id) => (id in sources ? id : null),
 					load: (id) => sources[id],
 				},
-				marklessClient({ rootDir: '/', experimentalNativePacking: true }),
+				marklessClient({ rootDir: '/' }),
 			],
 		});
 		try {

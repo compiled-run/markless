@@ -1,6 +1,8 @@
 import { afterEach, expect, test } from 'vitest';
 import { PROTOCOL_EVENT_ACTION_KIND } from '@markless/web/fns/external-delegate';
+import { createInlineResumerSource } from '../../web/src/inline/resumer.ts';
 import { Link } from '../src/index.ts';
+import { LINK_ATTRIBUTE } from '../src/link-attributes.ts';
 
 const documentDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'document');
 
@@ -35,7 +37,7 @@ test('Link renders router anchors while preserving user attributes', () => {
 		disabled: false,
 		onClick: () => undefined,
 		params: { slug: ['getting-started'] },
-		prefetch: 'intent',
+		prefetch: false,
 		replace: true,
 		scroll: false,
 	};
@@ -57,7 +59,7 @@ test('Link renders router anchors while preserving user attributes', () => {
 	expect(root.hasAttribute('onClick')).toBe(false);
 	expect(root.hasAttribute('params')).toBe(false);
 	expect(root.hasAttribute('prefetch')).toBe(false);
-	expect(root.getAttribute('data-markless-router-prefetch')).toBe('intent');
+	expect(root.getAttribute('data-markless-router-prefetch')).toBe('none');
 	expect(root.innerHTML).toBe('Docs <strong>now</strong>');
 	expect(output.view).toMatchObject({
 		locators: [expect.objectContaining({ hostNodeId: 'router:link', index: 0 })],
@@ -88,7 +90,7 @@ test('Link renders router anchors while preserving user attributes', () => {
 	expect(ssr).toContain('>Docs <strong>now</strong></a>');
 	expect(ssr).not.toContain('params=');
 	expect(ssr).not.toMatch(/\sprefetch=/);
-	expect(ssr).toContain('data-markless-router-prefetch="intent"');
+	expect(ssr).toContain('data-markless-router-prefetch="none"');
 	expect(ssr).not.toContain('onClick=');
 	expect(ssrOutput.view).toEqual(output.view);
 	expect(ssrOutput.structureTokens).toEqual([
@@ -122,3 +124,16 @@ class FakeElement {
 		return this.attributes.has(name);
 	}
 }
+
+test('the inline resumer lets a router-prevented link click skip the wake by the router link attribute', () => {
+	const source = createInlineResumerSource({
+		debug: false,
+		executionLog: 'never',
+		graphSyncPolicy: false,
+		resumeModuleUrl: '/build/resume.js',
+		sharedGraphPolicy: false,
+		syncPolicy: false,
+	});
+
+	expect(source).toContain(`a[href][${LINK_ATTRIBUTE}]`);
+});

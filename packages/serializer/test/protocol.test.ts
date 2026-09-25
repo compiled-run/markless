@@ -313,6 +313,53 @@ test('keyed repeat enclosing row round-trips and refuses a malformed shape', () 
 		).toThrow(/keyedRepeat\[1\]\.enclosingRow/);
 });
 
+// A composed row's prop routes cross the wire on its record and are refused malformed.
+test('keyed repeat prop routes round-trip and refuse a malformed shape', () => {
+	const repeat = {
+		id: 'c0:repeat:0',
+		parentHostNodeId: 'c0:h0',
+		collectionGraphNodeId: 'state:tiles',
+		collectionPath: [],
+		keyPath: ['name'],
+		itemName: 'tile',
+		rowElementCount: 1,
+		rowEvents: [],
+		propRoutes: [{ name: 'chosen', graphNodeId: 'state:chosen', path: ['value'] }],
+	};
+	const view: ProtocolViewPayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		keyedRepeats: [repeat],
+		asyncBoundaries: [],
+	};
+	const state: ProtocolStatePayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		cells: [],
+		computed: [],
+	};
+
+	const decoded = decodePayloadScripts(renderPayloadScripts({ state, view }));
+	expect(decoded.view.keyedRepeats?.[0]?.propRoutes).toEqual(repeat.propRoutes);
+
+	for (const propRoutes of [
+		{ name: 'chosen' },
+		[{ name: 3, graphNodeId: 'state:chosen', path: [] }],
+		[{ name: 'chosen', graphNodeId: 'state:chosen' }],
+	])
+		expect(() =>
+			decodePayloadScripts(
+				renderPayloadScripts({
+					state,
+					view: { ...view, keyedRepeats: [{ ...repeat, propRoutes }] } as never,
+				}),
+			),
+		).toThrow(/keyedRepeat\[0\]\.propRoutes/);
+});
+
 test('keyed repeat @empty arm markup round-trips and refuses a malformed shape', () => {
 	const repeat = {
 		id: 'repeat:rows',

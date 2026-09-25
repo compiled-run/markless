@@ -5,18 +5,29 @@ export function marklessBoundSymbolId(
 	},
 	symbolId: string,
 ): string {
-	const direct = child.boundSymbols?.[symbolId];
-	if (direct) return marklessBoundOwnerPrefix(child.symbolPrefix) + direct;
+	const rebound = marklessReboundSymbolId(child.boundSymbols, symbolId);
+	return rebound
+		? marklessBoundOwnerPrefix(child.symbolPrefix) + rebound
+		: `${child.symbolPrefix ?? ''}${symbolId}`;
+}
 
+/** The row an edge binds a symbol id to, whether the id is the child's own or a bound id the child already chose. */
+export function marklessReboundSymbolId(
+	boundSymbols: Readonly<Record<string, string>> | undefined,
+	symbolId: string,
+): string | undefined {
+	const direct = boundSymbols?.[symbolId];
+	if (direct) return direct;
 	// A nested composed view can already carry the bound ID selected by its
 	// immediate parent. Rebind that symbol through the outer instance row when
 	// one exists; prefixing the inner bound ID would route it back to the child
 	// resolver and lose the outer instance's capture adapter.
 	const baseSymbolId = marklessBaseSymbolId(symbolId);
-	const rebound = baseSymbolId ? child.boundSymbols?.[baseSymbolId] : undefined;
-	return rebound
-		? marklessBoundOwnerPrefix(child.symbolPrefix) + rebound
-		: `${child.symbolPrefix ?? ''}${symbolId}`;
+	// An edge the claim passes through keys it by the bound id's prefix; the claim's own edge by its bare id.
+	return baseSymbolId
+		? (boundSymbols?.[symbolId.slice(0, symbolId.indexOf(':', 'bound:'.length))] ??
+				boundSymbols?.[baseSymbolId])
+		: undefined;
 }
 
 function marklessBoundOwnerPrefix(symbolPrefix: string | undefined): string {

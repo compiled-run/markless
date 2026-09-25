@@ -86,6 +86,7 @@ type MdxComponent = {
 	readonly specifier: string;
 	readonly prefix: string;
 	readonly props: ReadonlyArray<MdxProp>;
+	readonly childrenElementTags: ReadonlyArray<string>;
 };
 
 type MdxProp = {
@@ -365,10 +366,14 @@ function componentPart(node: MdxJsxElementNode, context: RoutePartsContext): Mdx
 
 	const componentIndex = context.components.length;
 	const props = componentProps(node, context.id);
-	const children = renderStaticHtml(node.children, context.id);
+	const childNodes = normalizeStaticHastNodes(node.children, context.id);
+	const children = childNodes.length
+		? toHtml({ type: 'root', children: childNodes }, { allowDangerousHtml: true })
+		: '';
 	context.components.push({
 		...imported,
 		prefix: protocolIslandSegment(componentIndex),
+		childrenElementTags: children ? hastElementTags(childNodes) : [],
 		props: children
 			? [
 					...props,
@@ -402,16 +407,6 @@ function appendHtmlPart(parts: MdxPart[], nodes: readonly HastNode[], id: string
 			elementTags,
 		});
 	}
-}
-
-function renderStaticHtml(nodes: readonly HastNode[], id: string): string {
-	if (nodes.length === 0) {
-		return '';
-	}
-	return toHtml(
-		{ type: 'root', children: normalizeStaticHastNodes(nodes, id) },
-		{ allowDangerousHtml: true },
-	);
 }
 
 // Static output is root content: a hast root only ever holds non-root nodes.
@@ -607,9 +602,15 @@ function renderHtmlExpression(route: MdxRoute): string {
 		route.parts.map((part) => {
 			if (part.kind === 'html') return JSON.stringify(part.html);
 			const component = route.components[part.componentIndex]!;
-			return `(await renderMdxChild(marklessMdxChildren, ${component.localName}, ${componentPropsExpression(component)}, { componentIndex: ${part.componentIndex}, hostPrefix: ${JSON.stringify(component.prefix)}, symbolPrefix: ${JSON.stringify(component.prefix)} }))`;
+			return `(await renderMdxChild(marklessMdxChildren, ${component.localName}, ${componentPropsExpression(component)}, { componentIndex: ${part.componentIndex}, hostPrefix: ${JSON.stringify(component.prefix)}, symbolPrefix: ${JSON.stringify(component.prefix)}${childrenElementTagsField(component)} }))`;
 		}),
 	);
+}
+
+function childrenElementTagsField(component: MdxComponent): string {
+	return component.childrenElementTags.length > 0
+		? `, childrenElementTags: ${JSON.stringify(component.childrenElementTags)}`
+		: '';
 }
 
 function componentPropsExpression(component: MdxComponent): string {

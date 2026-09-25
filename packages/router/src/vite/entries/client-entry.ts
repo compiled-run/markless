@@ -3,19 +3,14 @@
 // against the app root) — relative paths into src/ would escape the package.
 import { createRouteDiscovery } from '@markless/router/vite/runtime/create-route-discovery';
 import {
-	MARKLESS_ROUTER_RENDERED_EVENT,
 	__marklessRouterStartSpaNavigation,
 	buildRouteManifestFromFileIds,
 	ensureNavigationRuntime,
 	matchRouteManifest,
 	startRouteUpdateRenderer,
 } from '@markless/router';
-import { preloadRouteModule, routeModulePreloads } from 'virtual:markless-router/route-preloads';
-import {
-	documentNavigation,
-	startLinkIntentPreloading,
-	startViewportPrefetching,
-} from 'virtual:markless-router/options';
+import { preloadRouteModule } from 'virtual:markless-router/route-preloads';
+import { documentNavigation, startLinkIntentPreloading } from 'virtual:markless-router/options';
 
 const routeDiscovery = createRouteDiscovery(
 	import.meta.glob(['/pages/**/*.tsrx', '/pages/**/*.mdx'], {
@@ -31,13 +26,6 @@ if (__MARKLESS_ROUTER_LINK_INTENT__ && documentNavigation === 'client') {
 		const match = matchRouteManifest(url.pathname, routeManifest);
 		if (match) preloadRouteModule(match.route.file);
 	});
-	const destinations = (url: URL) => {
-		const match = matchRouteManifest(url.pathname, routeManifest);
-		return match ? routeModulePreloads[match.route.file] : undefined;
-	};
-	document.addEventListener(MARKLESS_ROUTER_RENDERED_EVENT, () =>
-		startViewportPrefetching(document, destinations),
-	);
 }
 
 void __marklessRouterStartSpaNavigation({

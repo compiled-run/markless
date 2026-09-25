@@ -98,7 +98,7 @@ export function Page() @{
 			await build.generate({ format: 'es' });
 			expect(pageRows.map((row) => row.baseSymbolId)).toEqual([
 				expect.stringMatching(
-					new RegExp(`^imported:${encodeURIComponent(button)}:symbol:`),
+					new RegExp(`^imported:${encodeURIComponent('Button.tsrx')}:symbol:`),
 				),
 			]);
 		} finally {

@@ -51,7 +51,10 @@ export function createResumeRuntime(
 				.catch(() => {})
 		: undefined;
 	const eventTypes = new Set<string>(),
+		addEventType = eventTypes.add.bind(eventTypes),
 		disposedHosts = new Set<string>();
+	// The startup script stays the only listener, so a type registered after serve is handed to it.
+	eventTypes.add = (type) => (input.root.__marklessListen?.(type), addEventType(type));
 	let captureListenersStarted = false;
 	const ignoredDisposedEventTargets = new WeakSet<ResumeDomElement>();
 	const hostSubscriptionReleases = new Map<string, Array<() => void>>(),
@@ -167,7 +170,7 @@ export function createResumeRuntime(
 		storeHostSubscription(
 			domUpdate.hostNodeId,
 			input.graph.subscribe({
-				id: `view-dom-update:${domUpdate.hostNodeId}:${domUpdate.target?.kind ?? ''}:${domUpdate.target && 'name' in domUpdate.target ? domUpdate.target.name : ''}:${domUpdate.graphNodeId}:${domUpdate.path.join('.')}`,
+				id: `view-dom-update:${domUpdate.hostNodeId}:${JSON.stringify(domUpdate.target)}:${domUpdate.graphNodeId}:${domUpdate.path.join('.')}`,
 				graphNodeId: domUpdate.graphNodeId,
 				path: domUpdate.path,
 				async run(value) {
@@ -283,7 +286,7 @@ export function createResumeRuntime(
 					[],
 					records.flatMap((repeat) => repeat.rowEvents),
 				);
-				const { wireKeyedRepeats } = await import('./resume-keyed-repeats.ts');
+				const { wireKeyedRepeats } = await import('./resume-keyed-repeats-lazy.ts');
 				for (const record of records)
 					await wireKeyedRepeats({
 						graph: input.graph,

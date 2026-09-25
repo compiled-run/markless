@@ -56,7 +56,7 @@ type NormalizedRouteSegment = {
 export function buildRouteManifestFromFileIds(fileIds: readonly string[]): RouteManifest {
 	const pages = unique(fileIds.map(normalizeRouteFileId))
 		.filter(isPageModuleFile)
-		.toSorted((left, right) => left.localeCompare(right))
+		.toSorted(compareCodeUnits)
 		.map(normalizePage);
 	const routes = pages.flatMap((page) => (page.kind === 'route' ? [page.route] : []));
 
@@ -220,7 +220,7 @@ function assertNoRouteConflicts(routes: readonly InternalRouteManifestRoute[]): 
 
 		const files = conflictingRoutes
 			.map((route) => route.relativeFile)
-			.toSorted((left, right) => left.localeCompare(right));
+			.toSorted(compareCodeUnits);
 
 		throw new Error(
 			[
@@ -255,11 +255,11 @@ function compareRoutes(left: RouteManifestRoute, right: RouteManifestRoute): num
 		const rankDifference = segmentRank(leftSegment) - segmentRank(rightSegment);
 		if (rankDifference !== 0) return rankDifference;
 		if (segmentRank(leftSegment) === 0 && leftSegment !== rightSegment) {
-			return leftSegment.localeCompare(rightSegment);
+			return compareCodeUnits(leftSegment, rightSegment);
 		}
 	}
 
-	return left.pathname.localeCompare(right.pathname);
+	return compareCodeUnits(left.pathname, right.pathname);
 }
 
 function splitRoutePathname(pathname: string): string[] {
@@ -316,6 +316,11 @@ function segmentRank(segment: string): number {
 	if (segment === '**') return 2;
 	if (segment.startsWith(':')) return 1;
 	return 0;
+}
+
+// localeCompare builds an ICU collator on first use, a measured multi-millisecond cost on the first client navigation.
+function compareCodeUnits(left: string, right: string): number {
+	return left < right ? -1 : left > right ? 1 : 0;
 }
 
 function unique(values: readonly string[]): string[] {

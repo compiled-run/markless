@@ -232,9 +232,11 @@ export function renderSettledArm(input: SettleKernelInput): SettleKernelOutput {
 	for (const locator of (planned.locators ?? []) as ReadonlyArray<LocatorRecord>)
 		if (lastByHostId.has(locator.hostNodeId)) localHostIds.add(locator.hostNodeId);
 
+	const completeArmHostIds = new Set(armLocators.map((locator) => locator.hostNodeId as string));
 	const moveHosted = (records: ReadonlyArray<HostedRecord> | undefined) =>
 		(records ?? []).filter(
-			(record) => localHostIds.has(record.hostNodeId) && movedHostIds.has(record.hostNodeId),
+			(record) =>
+				localHostIds.has(record.hostNodeId) && completeArmHostIds.has(record.hostNodeId),
 		);
 	for (const record of [
 		...(view.events ?? []),
@@ -242,7 +244,6 @@ export function renderSettledArm(input: SettleKernelInput): SettleKernelOutput {
 	])
 		assertUnbound(record);
 
-	const completeArmHostIds = new Set(armLocators.map((locator) => locator.hostNodeId as string));
 	const movedKeyedRepeats = (view.keyedRepeats ?? []).filter(
 		(repeat) =>
 			localHostIds.has(repeat.parentHostNodeId) &&

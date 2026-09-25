@@ -123,7 +123,7 @@ function createLinkTypes(): string {
 		'};',
 		'',
 		'export type MarklessRouterNavigationProps = {',
-		'\treadonly prefetch?: boolean | "intent" | "viewport";',
+		'\treadonly prefetch?: boolean;',
 		'\treadonly replace?: boolean;',
 		'\treadonly scroll?: boolean;',
 		'};',

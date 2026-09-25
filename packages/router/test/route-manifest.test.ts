@@ -111,3 +111,28 @@ test('fails on page-tree API routes and non-final catch-all segments', () => {
 		'Catch-all route segments must be final: pages/docs/[...slug]/edit.tsrx',
 	);
 });
+
+test('orders routes without a locale collator, which costs the first client navigation', () => {
+	const localeCompare = String.prototype.localeCompare;
+	String.prototype.localeCompare = () => {
+		throw new Error('route manifests must not build an ICU collator');
+	};
+	try {
+		const manifest = buildRouteManifestFromFileIds([
+			'pages/zeta.tsrx',
+			'pages/Alpha.tsrx',
+			'pages/alpha.tsrx',
+			'pages/[slug].tsrx',
+			'pages/index.tsrx',
+		]);
+		expect(manifest.routes.map((route) => route.pathname)).toEqual([
+			'/',
+			'/Alpha',
+			'/alpha',
+			'/zeta',
+			'/:slug',
+		]);
+	} finally {
+		String.prototype.localeCompare = localeCompare;
+	}
+});

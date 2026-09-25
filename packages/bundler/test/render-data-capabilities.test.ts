@@ -14,11 +14,11 @@ type OverlayHost = typeof globalThis & {
 };
 const host = globalThis as OverlayHost;
 
-for (const shape of [
+for (const [shape, packing] of [
 	{ name: 'Panel', tag: 'section', nested: false },
 	{ name: 'FloatingSurface', tag: 'aside', nested: true },
-]) {
-	test(`render-data-only ${shape.name} registers a lazy root-gated capability`, async () => {
+].flatMap((shape) => [true, false].map((packing) => [shape, packing] as const))) {
+	test(`render-data-only ${shape.name} registers a lazy root-gated capability (packing: ${packing})`, async () => {
 		const root = await mkdtemp(join(tmpdir(), 'markless-overlay-capability-'));
 		const previous = host.__marklessOverlay;
 		const evaluations = host.__overlayEvaluations;
@@ -54,7 +54,7 @@ export default function ${shape.name}() @{
 				logLevel: 'silent',
 				resolve: { alias: marklessSourceAliases(resolve(import.meta.dirname, '../../..')) },
 				plugins: [
-					markless(),
+					markless({ packing }),
 					{
 						name: 'observe-overlay-evaluation',
 						transform(code, id) {
@@ -106,7 +106,17 @@ export default function ${shape.name}() @{
 			await host.__marklessOverlay!(marked);
 			expect(marked.__marklessOverlayInstalled).toBe(true);
 			expect(host.__overlayEvaluations).toBe(1);
-			await load(entry.fileName, '?repeat');
+			// One overlay module instance per page: it ships in exactly one chunk.
+			expect(
+				files.filter(
+					(item) =>
+						item.type === 'chunk' &&
+						item.moduleIds.some((id) => id.endsWith('/web/src/fns/overlay.ts')),
+				),
+			).toHaveLength(1);
+			// Unpacked, the overlay is its own chunk, so even a second instance of the entry shares it.
+			// Packed, it rides the entry's chunk, which one page URL evaluates once.
+			if (!packing) await load(entry.fileName, '?repeat');
 			const installed = host.__marklessOverlay;
 			await load(plain.fileName, '?repeat');
 			expect(host.__marklessOverlay).toBe(installed);

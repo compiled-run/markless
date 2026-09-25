@@ -5,7 +5,6 @@ import {
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
 } from '@markless/serializer';
-import { validateKeyedRepeatPayloadKeys } from '../repeat-runtime.ts';
 import type { SsrRenderOutput } from '../render-to-string.ts';
 
 export async function prepareSsrResumeRecords(
@@ -18,7 +17,10 @@ export async function prepareSsrResumeRecords(
 		computed: serializeRuntimeAsyncSnapshots(rawState.computed ?? []),
 	};
 	const view = containerScopedView(output.view ?? emptyViewPayload());
-	await validateKeyedRepeatPayloadKeys({ state, view });
+	if (view.keyedRepeats?.length)
+		await (
+			await import('../repeat-runtime.ts')
+		).validateKeyedRepeatPayloadKeys({ state, view });
 	return { state, view };
 }
 

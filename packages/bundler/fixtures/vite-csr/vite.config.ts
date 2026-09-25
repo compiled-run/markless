@@ -16,7 +16,13 @@ type PreviewResponse = {
 const REQUEST_LOG_PATH = '/__markless-fixture-requests';
 
 export default defineConfig(({ mode }) => ({
-	plugins: [markless({ debug: mode === 'debug-channel' }), fixtureScriptRequestLog()],
+	plugins: [
+		markless({
+			debug: mode === 'debug-channel',
+			packing: process.env.MARKLESS_FIXTURE_NATIVE_PACKING !== '0',
+		}),
+		fixtureScriptRequestLog(),
+	],
 }));
 
 function fixtureScriptRequestLog(): Plugin {

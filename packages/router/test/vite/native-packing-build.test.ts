@@ -2,9 +2,10 @@ import { spawn } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
+import { clientAssetsManifestPath } from '../../src/vite/client-assets-manifest.ts';
 import { createBuilder } from 'vite';
 import { expect, test } from 'vitest';
-import { MARKLESS_CHUNK_SPECIFIER_PREFIX } from '@markless/bundler/rolldown';
+import { MARKLESS_CHUNK_SPECIFIER_PREFIX, marklessImportMapPath } from '@markless/bundler/rolldown';
 import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
 
@@ -63,7 +64,7 @@ test('a packed router build resolves every symbol of a page that loads through i
 			root,
 			configFile: false,
 			logLevel: 'silent',
-			plugins: [markless({ experimentalNativePacking: true }), router()],
+			plugins: [markless(), router()],
 		});
 		await builder.buildApp();
 
@@ -137,13 +138,18 @@ test('a packed router build serves one import map ahead of every module preload 
 		expect(code).not.toMatch(/["'`]\.\/chunk-[\w-]+\.js/);
 		const manifest = JSON.parse(
 			await readFile(
-				join(root, '.output/public/.vite/markless-router-client-manifest.json'),
+				clientAssetsManifestPath(join(root, '.output/public')),
 				'utf8',
 			),
 		) as { importMap: { imports: Record<string, string> } };
 		expect(Object.keys(manifest.importMap.imports).sort()).toEqual([...specifiers].sort());
 		for (const url of Object.values(manifest.importMap.imports))
 			expect(chunks).toContain(url.replace(/^\/build\//, ''));
+		// The files the client build hands the server build stay out of the statically served output.
+		expect(await readdir(join(root, '.output/public'))).not.toContain('.vite');
+		expect(
+			JSON.parse(await readFile(marklessImportMapPath(join(root, '.output/public')), 'utf8')),
+		).toEqual(manifest.importMap);
 
 		const port = 4800 + Math.floor(Math.random() * 400);
 		const server = spawn(process.execPath, [join(root, '.output/server/index.mjs')], {
@@ -159,6 +165,8 @@ test('a packed router build serves one import map ahead of every module preload 
 					await new Promise((resolve) => setTimeout(resolve, 100));
 				}
 			}
+			for (const path of ['/.vite/markless-import-map.json', '/.vite/markless-router-client-manifest.json'])
+				expect((await fetch(`http://localhost:${port}${path}`)).headers.get('content-type')).not.toMatch(/json/);
 			const maps = [...html.matchAll(/<script type="importmap">(.*?)<\/script>/g)];
 			expect(maps).toHaveLength(1);
 			expect(JSON.parse(maps[0]![1]!)).toEqual(manifest.importMap);

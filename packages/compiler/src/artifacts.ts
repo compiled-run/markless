@@ -1716,6 +1716,8 @@ export type BoundSymbolResolverRow = {
 	// The rendered instance the base symbol's own graph nodes were composed
 	// under: one segment per imported component edge in the ancestry.
 	readonly instancePath?: string;
+	// Per ancestry edge when one sits in a keyed repeat: the host-id segment, the instance segment, and how many row segments precede it.
+	readonly rowPieces?: ReadonlyArray<readonly [hostSegment: string, instanceSegment: string, rows: number]>;
 	readonly componentEdgePath: ReadonlyArray<string>;
 	readonly ancestry: ReadonlyArray<{
 		readonly componentEdgeId: string;
@@ -1890,6 +1892,11 @@ export type CaptureAnalysisArtifact = {
 	readonly passId: 'capture-analysis';
 	readonly boundResolverRows?: ReadonlyArray<BoundSymbolResolverRow>;
 	readonly componentEdgeInstancePaths?: BoundSymbolResolverArtifact['componentEdgeInstancePaths'];
+	// The components this module declares, and which of them each of its component edges sits in.
+	readonly componentComposition?: {
+		readonly components: ReadonlyArray<string>;
+		readonly edgeParents: Readonly<Record<string, string>>;
+	};
 	readonly extractedSymbols: ReadonlyArray<ExtractedCaptureSymbol>;
 	readonly diagnostics: ReadonlyArray<CaptureAnalysisDiagnostic>;
 };
@@ -1901,6 +1908,8 @@ export type SymbolModulesInput = {
 	readonly captureAnalysis: CaptureAnalysisArtifact;
 	readonly renderData?: RenderDataArtifact;
 	readonly publicRenderPlan?: PublicRenderPlanArtifact;
+	// Boundary update modules return the planned records of the arm they render.
+	readonly protocolView?: ProtocolViewPayloadWithArmRecords;
 	// Consumer builds drop the authored-source strings: nothing reads them at
 	// runtime, and every symbol chunk pays for them at load.
 	readonly omitAuthoredSource?: boolean;
@@ -2096,8 +2105,15 @@ export type RuntimeDemandMapArtifact = {
 	}>;
 	readonly payloadRecords: ReadonlyArray<RuntimeDemandMapRecord>;
 	readonly actions: ReadonlyArray<RuntimeDemandMapAction>;
+	/**
+	 * Events written inside async-boundary and branch arms, which ride outside the flat event stream.
+	 * Each names its outermost arm record as its own record. Only the build-time pack planner reads them.
+	 */
+	readonly armActions?: ReadonlyArray<RuntimeDemandMapAction>;
 	/** Capability runtime modules some record of this module can demand, arms and rows included; complete for `RUNTIME_CAPABILITY_MODULE_IDS`. */
 	readonly capabilityModuleIds?: ReadonlyArray<string>;
+	/** Runtime modules the records inside this module's arms and rows demand; absent when some arm's records are not enumerable. */
+	readonly nestedRecordModuleIds?: ReadonlyArray<string>;
 	readonly unknownRecordModuleIds: ReadonlyArray<string>;
 	readonly firstUsePage?: RuntimeDemandMapFirstUsePage;
 };
@@ -2131,10 +2147,17 @@ export type SymbolResolverModuleInput = {
 		// publishes one claim manifest for every component it exports, so an edge
 		// is offered its siblings' claims too; the owner is what tells them apart.
 		readonly ownerComponentName?: string;
+		// Every component the child module declares: an edge placing one other than the owner reaches the owner's claim only as a republished row.
+		readonly moduleComponentNames?: ReadonlyArray<string>;
 		// Why the parent has to bind this row; a widget-callback claim binds the
 		// callback slot alone and leaves the child's own captures to the child.
 		readonly claimKind?: 'prop-bound' | 'widget-callback';
 		readonly captureSymbol?: ExtractedCaptureSymbol;
+		/**
+		 * The module a literal `import()` of this symbol names when something else
+		 * imports `chunk` statically: an `export *` entry, so no module is imported both ways.
+		 */
+		readonly lazyChunk?: string;
 	}>;
 	readonly boundSymbols?: ReadonlyArray<BoundSymbolResolverRow>;
 };

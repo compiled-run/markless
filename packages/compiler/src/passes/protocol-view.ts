@@ -67,7 +67,8 @@ export function createProtocolViewPayload(
 	// their records ride armRecords in the owning range's coordinate space,
 	// since page-absolute locators cannot name elements a flip or an async
 	// settle replaces (D3).
-	const excludedHostIds = new Set([...armHostIds(input), ...boundaryArmHostIds(input)]);
+	const flipArmHostIds = armHostIds(input);
+	const excludedHostIds = new Set([...flipArmHostIds, ...boundaryArmHostIds(input)]);
 	// The consumer props a composed child's `{...rest}` carries onto its own
 	// elements. Joined here, at build time, they are ordinary view records.
 	const forwarded = forwardedSpreadViewRecords(input);
@@ -93,7 +94,7 @@ export function createProtocolViewPayload(
 		),
 		domUpdates: [
 			...input.payloadArena.view.domUpdates
-				.filter((domUpdate) => !armHostIds(input).has(domUpdate.hostNodeId))
+				.filter((domUpdate) => !flipArmHostIds.has(domUpdate.hostNodeId))
 				.map((domUpdate) => ({
 					...domUpdate,
 					symbolId: domUpdateSymbols.get(
@@ -216,7 +217,7 @@ function domUpdateTargetKey(
 	if (target.kind === 'attribute') return `attribute:${target.name}`;
 	if (target.kind === 'property') return `property:${target.name}`;
 	if (target.kind === 'text') {
-		return `text:${target.prefix ?? ''}:${target.suffix ?? ''}:${target.trueValue ?? ''}:${target.falseValue ?? ''}`;
+		return `text:${target.prefix ?? ''}:${target.suffix ?? ''}:${target.trueValue ?? ''}:${target.falseValue ?? ''}:${target.textNode ?? ''}`;
 	}
 	if (target.kind === 'class')
 		return `class:${target.trueValue ?? ''}:${target.falseValue ?? ''}`;
@@ -523,15 +524,16 @@ function mintableEmptyArm(
  * way it can exist is for the client to build it - and the client has no
  * renderer, only the payload. This ships the row chunk's finished markup, which
  * is honest for exactly two shapes: a row with NO slots, and a row whose every
- * slot - text or attribute - reads off the repeated item or off a graph node the
- * page holds. Anything else is a part the mint cannot fill - an attribute value
- * an expression computes, an element handle's id, a nested construct, a child
- * component - and half a row is worse than none.
+ * slot - text or attribute - reads off the repeated item, off a graph node the
+ * page holds, or through an expression the owning component's reader answers
+ * (props and enclosing rows' items included). Anything else is a part the mint
+ * cannot fill - a style object, an element handle's id, a nested construct, a
+ * child component - and half a row is worse than none.
  *
- * A graph read is taken once, at mint. A served row's outside read does not
- * refresh either - a row host carries no per-instance locator, so the repeat
- * ships no `domUpdates` for it - and a minted row that kept itself current would
- * disagree with the rows beside it.
+ * The template is also how a row stays current: a row host carries no
+ * per-instance locator, so the repeat ships no `domUpdates` for it, and a write
+ * to a graph node a slot reads rebuilds each row whose slot values moved. A row
+ * this refuses keeps the values it was served with.
  *
  * A third shape joins them once a row element WRAPS a child component: the
  * wrapper is this markup, and the child is named by identity in `rowComponent`,
@@ -648,7 +650,7 @@ function nestedRepeatMints(
 	if (render.emptyChunkId && !mintableEmptyArm(input, render).emptyArm) return false;
 	if (rowComponentMint(input, render)) return false;
 	const template = mintableRowTemplate(input, render, null).rowTemplate;
-	return template !== undefined && template.componentName === undefined;
+	return template !== undefined;
 }
 
 // A collection no graph node holds never changes after load, so its rows are never built again.
@@ -774,10 +776,12 @@ function wiredArmRecordSet(
 	};
 }
 
+// An escalating arm renders whole on flip, so its page records stay in the flat streams that render emits.
 function armHostIds(input: ProtocolViewPayloadInput): ReadonlySet<string> {
+	const escalatingIds = escalatingBranchIds(input);
 	return new Set(
 		renderDataOf(input).branches.flatMap((branch) =>
-			branch.armChunkIds.flatMap((chunkId) => [...branchArmHostPaths(input, chunkId).keys()]),
+			escalatingIds.has(branch.branchSiteId) ? [] : branch.armChunkIds.flatMap((chunkId) => [...branchArmHostPaths(input, chunkId).keys()]),
 		),
 	);
 }

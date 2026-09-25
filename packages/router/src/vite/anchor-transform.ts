@@ -83,7 +83,8 @@ export function anchorTransformPlugin(): Plugin {
 									);
 						transformed = lowerRouterLinks(transformed, linkedAst);
 					}
-					if (rewrites.size >= REWRITE_CACHE_LIMIT) rewrites.delete(rewrites.keys().next().value!);
+					if (rewrites.size >= REWRITE_CACHE_LIMIT)
+						rewrites.delete(rewrites.keys().next().value!);
 					rewrites.set(key, transformed);
 				}
 
@@ -127,11 +128,8 @@ function lowerRouterLinks(code: string, ast: Node): string {
 				if (['Literal', 'StringLiteral', 'BooleanLiteral'].includes(literal.type ?? '')) {
 					const choice = literal.value;
 					edits.push(
-						choice === false || choice === 'intent' || choice === 'viewport'
-							? {
-									...rangeOf(attribute),
-									text: `${PREFETCH_ATTRIBUTE}="${choice === false ? 'none' : choice}"`,
-								}
+						choice === false
+							? { ...rangeOf(attribute), text: `${PREFETCH_ATTRIBUTE}="none"` }
 							: { ...attributeRemovalRange(code, attribute), text: '' },
 					);
 					continue;
@@ -139,7 +137,7 @@ function lowerRouterLinks(code: string, ast: Node): string {
 				const expression = `(${slice(code, jsxExpression(value) ?? value)})`;
 				edits.push({
 					...rangeOf(attribute),
-					text: `${PREFETCH_ATTRIBUTE}={${expression} === false ? 'none' : ${expression} === 'intent' || ${expression} === 'viewport' ? ${expression} : undefined}`,
+					text: `${PREFETCH_ATTRIBUTE}={${expression} === false ? 'none' : undefined}`,
 				});
 			} else if (attributeName === 'replace' || attributeName === 'scroll') {
 				const value = node(attribute.value);

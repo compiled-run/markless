@@ -27,6 +27,7 @@ import {
 	resolveGraphPath,
 	semanticAliasMap,
 } from '../../artifact-helpers/graph-paths.ts';
+import { PROJECTION_PROP_NAME } from '../public-render/shared-seed-pass.ts';
 import { collectComponentEdge } from './collect-components.ts';
 import { overlayLiteralValue } from './overlay-attribute.ts';
 import {
@@ -212,6 +213,21 @@ const joinedTextExpressions = new WeakMap<
 // A text write replaces the host's whole text, so several interpolations update as one joined derive.
 function joinHostText(host: AnyNode, state: WalkState): void {
 	const children = asNodes(host.children).filter((child) => !isIgnorableJsxTextNode(child));
+	const shapes = children.map(hostChildShape);
+	if (shapes.some((shape) => shape === 'node' || shape === 'dynamic')) {
+		for (const run of textRuns(shapes))
+			if (run.holes > 1 && runPosition(shapes, run) !== null)
+				joinTextParts(
+					children.slice(run.start, run.end).filter((_, at) => shapes[run.start + at] !== 'none'),
+					state,
+				);
+		return;
+	}
+	joinTextParts(children, state);
+}
+
+// Several interpolations that render into one text node update as one joined derive.
+function joinTextParts(children: ReadonlyArray<AnyNode>, state: WalkState): void {
 	const values = children
 		.filter(isTemplateExpressionChild)
 		.map((child) => child.expression as AnyNode | undefined);
@@ -219,6 +235,7 @@ function joinHostText(host: AnyNode, state: WalkState): void {
 	if (!children.every((child) => isTemplateExpressionChild(child) || isStaticTextPart(child)))
 		return;
 	if (values.some((value) => !value || value.type === 'JSXEmptyExpression')) return;
+	if (values.some(isProjectedChildren)) return;
 	const readSources = joinReadSources(
 		values.map((value) => pureCompositeReadSources(value, state, TEMPLATE_READ_OPTIONS)),
 	);
@@ -234,6 +251,16 @@ function joinHostText(host: AnyNode, state: WalkState): void {
 	const [first, ...rest] = values as AnyNode[];
 	joinedTextExpressions.set(first!, { graphNodeId: composite.graphNodeId, source });
 	for (const value of rest) joinedTextExpressions.set(value, null);
+}
+
+// Projected children are markup, not text.
+function isProjectedChildren(value: AnyNode | undefined): boolean {
+	if (!value) return false;
+	if (getIdentifierName(value) === PROJECTION_PROP_NAME) return true;
+	return (
+		value.type === 'MemberExpression' &&
+		getIdentifierName(value.property as AnyNode | undefined) === PROJECTION_PROP_NAME
+	);
 }
 
 // An async value is read directly by its boundary's runner, never through a derive.
@@ -285,6 +312,9 @@ function textExpressionTarget(
 	expressionChild: AnyNode,
 ): SemanticTemplateBindingTarget {
 	const children = asNodes(host.children).filter((child) => !isIgnorableJsxTextNode(child));
+	const shapes = children.map(hostChildShape);
+	if (shapes.some((shape) => shape === 'node' || shape === 'dynamic'))
+		return textNodeTarget(children, shapes, children.indexOf(expressionChild));
 	const expressionChildren = children.filter(isTemplateExpressionChild);
 	if (expressionChildren.length !== 1 || expressionChildren[0] !== expressionChild) {
 		return { kind: 'text' };
@@ -307,6 +337,97 @@ function textExpressionTarget(
 		...(prefix ? { prefix } : {}),
 		...(suffix ? { suffix } : {}),
 	};
+}
+
+// How one host child renders: static text, a text hole, exactly one static node, or a count only the render knows.
+type HostChildShape = 'text' | 'hole' | 'none' | 'node' | 'dynamic';
+
+function hostChildShape(child: AnyNode): HostChildShape {
+	if (isStaticTextPart(child)) return staticTextValue(child) ? 'text' : 'none';
+	if (isTemplateExpressionChild(child)) {
+		const expression = child.expression as AnyNode | undefined;
+		if (!expression || expression.type === 'JSXEmptyExpression') return 'none';
+		return isProjectedChildren(expression) ? 'dynamic' : 'hole';
+	}
+	if (child.type === 'ExpressionStatement') {
+		const expression = child.expression as AnyNode | undefined;
+		return expression?.type?.startsWith('JSX') ? hostChildShape(expression) : 'none';
+	}
+	if (child.type !== 'Element' && child.type !== 'JSXElement') return 'dynamic';
+	const tagName = getElementTagName(child);
+	if (!tagName || !isHostTagName(tagName) || getDynamicTagExpression(child)) return 'dynamic';
+	return tagName === 'style' || tagName === 'script' ? 'dynamic' : 'node';
+}
+
+// Rendered DOM nodes among static children: each element is one, each run of adjacent text merges into one.
+function staticNodeCount(shapes: ReadonlyArray<HostChildShape>): number | null {
+	let count = 0;
+	let previous: HostChildShape | null = null;
+	for (const shape of shapes) {
+		if (shape === 'none') continue;
+		if (shape !== 'text' && shape !== 'node') return null;
+		if (shape === 'node' || previous !== 'text') count++;
+		previous = shape;
+	}
+	return count;
+}
+
+// A text hole beside other children owns only its text node; the whole-element write would delete them.
+function textNodeTarget(
+	children: ReadonlyArray<AnyNode>,
+	shapes: ReadonlyArray<HostChildShape>,
+	index: number,
+): SemanticTemplateBindingTarget {
+	const run = textRuns(shapes).find((candidate) => candidate.start <= index && index < candidate.end);
+	const textNode = run ? runPosition(shapes, run) : null;
+	if (!run || textNode === null) return { kind: 'text' };
+	// The joined derive already spells the run's static text.
+	if (run.holes > 1)
+		return joinedTextExpressions.has(children[index]!.expression as AnyNode)
+			? { kind: 'text', textNode }
+			: { kind: 'text' };
+	const { start, end } = run;
+	let prefix = '';
+	let suffix = '';
+	for (let at = start; at < end; at++) {
+		if (shapes[at] !== 'text') continue;
+		if (at < index) prefix += staticTextValue(children[at]!);
+		else suffix += staticTextValue(children[at]!);
+	}
+	return {
+		kind: 'text',
+		...(prefix ? { prefix } : {}),
+		...(suffix ? { suffix } : {}),
+		textNode,
+	};
+}
+
+type TextRun = { readonly start: number; readonly end: number; readonly holes: number };
+
+// Maximal stretches of static text and holes: each renders as one text node.
+function textRuns(shapes: ReadonlyArray<HostChildShape>): TextRun[] {
+	const runs: TextRun[] = [];
+	for (let start = 0; start < shapes.length; start++) {
+		if (!isRunShape(shapes[start])) continue;
+		let end = start;
+		let holes = 0;
+		while (isRunShape(shapes[end])) if (shapes[end++] === 'hole') holes++;
+		if (holes > 0) runs.push({ start, end, holes });
+		start = end;
+	}
+	return runs;
+}
+
+function isRunShape(shape: HostChildShape | undefined): boolean {
+	return shape === 'text' || shape === 'hole' || shape === 'none';
+}
+
+// Where the run's text node stands, counted from whichever end has only static nodes.
+function runPosition(shapes: ReadonlyArray<HostChildShape>, run: TextRun): number | null {
+	const before = staticNodeCount(shapes.slice(0, run.start));
+	if (before !== null) return before;
+	const after = staticNodeCount(shapes.slice(run.end));
+	return after === null ? null : -(after + 1);
 }
 
 function isStaticTextPart(node: AnyNode): boolean {

@@ -3,7 +3,7 @@
 	"kind": "markless-benchmark-result",
 	"benchmark": "bundle-size",
 	"status": "passed",
-	"recordedAt": "2026-07-13T21:59:31.572Z",
+	"recordedAt": "2026-09-24T22:19:30.090Z",
 	"protocol": {
 		"mode": "full",
 		"timedSeconds": 0,
@@ -14,22 +14,26 @@
 		"forcedGc": false
 	},
 	"environment": {
-		"os": "darwin 25.5.0",
+		"os": "darwin 25.6.0",
 		"arch": "arm64",
 		"cpuModel": "Apple M5 Pro",
 		"nodeVersion": "v24.15.0",
 		"pnpmVersion": "10.33.2",
-		"gitSha": "75b065416d8e72757527b8f1010e21c3b660f54e",
-		"dirtyTree": false
+		"gitSha": "45667f6af3090504ec7c85a68db46cc437b18d46",
+		"dirtyTree": true
 	},
 	"cases": [
 		{
 			"name": "js-framework-benchmark",
 			"gates": {
 				"passed": true,
-				"checks": ["bundle graph present", "application and framework buckets non-empty"]
+				"checks": [
+					"bundle graph present",
+					"every chunk has byte attribution",
+					"application and framework buckets non-empty"
+				]
 			},
-			"bodyBytes": 85634,
+			"bodyBytes": 182062,
 			"timing": {
 				"samples": 1,
 				"minMs": 0,
@@ -50,545 +54,497 @@
 				"samples": 1,
 				"bytes": {
 					"total": {
-						"raw": 85634,
-						"gzip": 36503,
-						"brotli": 32762
+						"raw": 182062,
+						"gzip": 52919,
+						"brotli": 46121
 					},
 					"application": {
-						"raw": 7600,
-						"gzip": 2992,
-						"brotli": 2660
+						"raw": 13086,
+						"gzip": 3719,
+						"brotli": 3219
 					},
 					"framework": {
-						"raw": 78034,
-						"gzip": 33511,
-						"brotli": 30102
+						"raw": 168976,
+						"gzip": 49200,
+						"brotli": 42902
 					}
 				},
 				"files": [
 					{
-						"file": "build/chunk-B0qWYodz.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 85,
-						"gzip": 97,
-						"brotli": 84
+						"file": "build/chunk-4ETCDUyx.js",
+						"raw": 52,
+						"gzip": 72,
+						"brotli": 56,
+						"application": {
+							"raw": 0,
+							"gzip": 0,
+							"brotli": 0
+						},
+						"framework": {
+							"raw": 52,
+							"gzip": 72,
+							"brotli": 56
+						},
+						"modules": []
 					},
 					{
-						"file": "build/chunk-B0W4rsW72.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume.ts"],
-						"raw": 1945,
-						"gzip": 939,
-						"brotli": 848
-					},
-					{
-						"file": "build/chunk-B7M7Uzi7.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 190,
-						"gzip": 159,
-						"brotli": 128
-					},
-					{
-						"file": "build/chunk-BcONQa1Q2.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-runtime-shared.ts"],
-						"raw": 1210,
-						"gzip": 595,
-						"brotli": 534
-					},
-					{
-						"file": "build/chunk-BehR2pkY2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 115,
-						"gzip": 127,
-						"brotli": 119
-					},
-					{
-						"file": "build/chunk-BFOsxdyA2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 79,
-						"gzip": 94,
-						"brotli": 83
-					},
-					{
-						"file": "build/chunk-BKTqLI03.js",
-						"bucket": "framework",
+						"file": "build/chunk-BohqzpEt.js",
+						"raw": 105,
+						"gzip": 114,
+						"brotli": 90,
+						"application": {
+							"raw": 0,
+							"gzip": 0,
+							"brotli": 0
+						},
+						"framework": {
+							"raw": 105,
+							"gzip": 114,
+							"brotli": 90
+						},
 						"modules": [
-							"<repo>/packages/runtime/src/graph.ts",
-							"<repo>/packages/runtime/src/index.ts"
-						],
-						"raw": 2640,
-						"gzip": 1130,
-						"brotli": 1040
+							{
+								"category": "glue",
+								"key": "rolldown/runtime.js",
+								"bytes": 200
+							}
+						]
 					},
 					{
-						"file": "build/chunk-BMfgdug7.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 86,
-						"gzip": 98,
-						"brotli": 85
-					},
-					{
-						"file": "build/chunk-BOglAY9o.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/runtime/src/graph-scheduler.ts"],
-						"raw": 285,
-						"gzip": 206,
-						"brotli": 185
-					},
-					{
-						"file": "build/chunk-BQwTIe5b2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 80,
-						"gzip": 92,
-						"brotli": 84
-					},
-					{
-						"file": "build/chunk-BSmfu8WF.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/runtime/src/graph-async.ts"],
-						"raw": 1529,
-						"gzip": 693,
-						"brotli": 637
-					},
-					{
-						"file": "build/chunk-Btma_K7Q.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/runtime/src/graph-core.ts"],
-						"raw": 1143,
-						"gzip": 555,
-						"brotli": 506
-					},
-					{
-						"file": "build/chunk-Bu37zt1B.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/payload-graph-construct.ts"],
-						"raw": 1753,
-						"gzip": 814,
-						"brotli": 745
-					},
-					{
-						"file": "build/chunk-BUtFIVKf2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 80,
-						"gzip": 92,
-						"brotli": 84
-					},
-					{
-						"file": "build/chunk-BX-f7Rso.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/dom-journal.ts"],
-						"raw": 2039,
-						"gzip": 807,
-						"brotli": 716
-					},
-					{
-						"file": "build/chunk-BxBETWbe.js",
-						"bucket": "framework",
-						"modules": ["\u0000rolldown/runtime.js"],
-						"raw": 50,
-						"gzip": 67,
-						"brotli": 54
-					},
-					{
-						"file": "build/chunk-BZ4Dde9A.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 82,
-						"gzip": 97,
-						"brotli": 73
-					},
-					{
-						"file": "build/chunk-C_LSHtDt.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/runtime/src/graph-computed.ts"],
-						"raw": 1111,
-						"gzip": 448,
-						"brotli": 404
-					},
-					{
-						"file": "build/chunk-C3__27AF.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 81,
-						"gzip": 93,
-						"brotli": 83
-					},
-					{
-						"file": "build/chunk-C6JZOPvu2.js",
-						"bucket": "application",
+						"file": "build/chunk-k1gdtbFM.js",
+						"raw": 19157,
+						"gzip": 6481,
+						"brotli": 5942,
+						"application": {
+							"raw": 0,
+							"gzip": 0,
+							"brotli": 0
+						},
+						"framework": {
+							"raw": 19157,
+							"gzip": 6481,
+							"brotli": 5942
+						},
 						"modules": [
-							"<repo>/demos/js-framework-benchmark/frameworks/keyed/markless/src/data.ts"
-						],
-						"raw": 947,
-						"gzip": 566,
-						"brotli": 519
+							{
+								"category": "runtime",
+								"key": "web/pending-timing",
+								"bytes": 509
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-async-wiring",
+								"bytes": 6706
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-behaviors",
+								"bytes": 8535
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-branches",
+								"bytes": 15064
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-resettle-hold",
+								"bytes": 2560
+							}
+						]
 					},
 					{
-						"file": "build/chunk-CC0xAYb3.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 130,
-						"gzip": 127,
-						"brotli": 107
-					},
-					{
-						"file": "build/chunk-CeNTnHBJ.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-handoff.ts"],
-						"raw": 711,
-						"gzip": 423,
-						"brotli": 367
-					},
-					{
-						"file": "build/chunk-CFbAWRzb.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 236,
-						"gzip": 171,
-						"brotli": 144
-					},
-					{
-						"file": "build/chunk-CHiJG8UR2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 108,
-						"gzip": 110,
-						"brotli": 99
-					},
-					{
-						"file": "build/chunk-CIlsefk8.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-locators.ts"],
-						"raw": 1243,
-						"gzip": 587,
-						"brotli": 529
-					},
-					{
-						"file": "build/chunk-cPTv-DUn.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-events.ts"],
-						"raw": 4085,
-						"gzip": 1622,
-						"brotli": 1464
-					},
-					{
-						"file": "build/chunk-CrVg9EL82.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-shared-patch.ts"],
-						"raw": 673,
-						"gzip": 329,
-						"brotli": 283
-					},
-					{
-						"file": "build/chunk-CtWfVVEU2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 80,
-						"gzip": 92,
-						"brotli": 84
-					},
-					{
-						"file": "build/chunk-CVEdMTvb2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 80,
-						"gzip": 92,
-						"brotli": 84
-					},
-					{
-						"file": "build/chunk-CWCk73G6.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-behaviors.ts"],
-						"raw": 4008,
-						"gzip": 1622,
-						"brotli": 1508
-					},
-					{
-						"file": "build/chunk-CXAQV_OL.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-branches.ts"],
-						"raw": 6483,
-						"gzip": 2462,
-						"brotli": 2259
-					},
-					{
-						"file": "build/chunk-CZ-AXNuP2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 91,
-						"gzip": 106,
-						"brotli": 95
-					},
-					{
-						"file": "build/chunk-D1a6cAp2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 78,
-						"gzip": 93,
-						"brotli": 82
-					},
-					{
-						"file": "build/chunk-D2Nsafzh.js",
-						"bucket": "framework",
+						"file": "build/chunk-zMNpxZZw.js",
+						"raw": 162748,
+						"gzip": 46252,
+						"brotli": 40033,
+						"application": {
+							"raw": 13086,
+							"gzip": 3719,
+							"brotli": 3219
+						},
+						"framework": {
+							"raw": 149662,
+							"gzip": 42533,
+							"brotli": 36814
+						},
 						"modules": [
-							"<repo>/packages/web/src/repeat-runtime.ts",
-							"<repo>/packages/web/src/resume-keyed-repeats.ts"
-						],
-						"raw": 3326,
-						"gzip": 1329,
-						"brotli": 1168
-					},
-					{
-						"file": "build/chunk-D3WDOqqg.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/runtime/src/graph-shared.ts"],
-						"raw": 1606,
-						"gzip": 744,
-						"brotli": 688
-					},
-					{
-						"file": "build/chunk-d6KRd4gB2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 80,
-						"gzip": 95,
-						"brotli": 84
-					},
-					{
-						"file": "build/chunk-D7_Hj3672.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-runtime-start.ts"],
-						"raw": 3694,
-						"gzip": 1420,
-						"brotli": 1272
-					},
-					{
-						"file": "build/chunk-DCzug9JL2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 171,
-						"gzip": 150,
-						"brotli": 123
-					},
-					{
-						"file": "build/chunk-DDzvjs5i2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 80,
-						"gzip": 92,
-						"brotli": 84
-					},
-					{
-						"file": "build/chunk-DEJwrBr_.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 77,
-						"gzip": 92,
-						"brotli": 79
-					},
-					{
-						"file": "build/chunk-DI_hy6pL.js",
-						"bucket": "application",
-						"modules": [
-							"<repo>/demos/js-framework-benchmark/frameworks/keyed/markless/index.html",
-							"<repo>/demos/js-framework-benchmark/frameworks/keyed/markless/src/main.ts",
-							"<repo>/demos/js-framework-benchmark/frameworks/keyed/markless/src/root.tsrx"
-						],
-						"raw": 6653,
-						"gzip": 2426,
-						"brotli": 2141
-					},
-					{
-						"file": "build/chunk-DjDDk54_2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 75,
-						"gzip": 90,
-						"brotli": 78
-					},
-					{
-						"file": "build/chunk-DQfJZuy4.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-async-wiring.ts"],
-						"raw": 2895,
-						"gzip": 1252,
-						"brotli": 1128
-					},
-					{
-						"file": "build/chunk-DQpc-uap2.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-sync-demand.ts"],
-						"raw": 781,
-						"gzip": 449,
-						"brotli": 393
-					},
-					{
-						"file": "build/chunk-Drse5l72.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 72,
-						"gzip": 87,
-						"brotli": 72
-					},
-					{
-						"file": "build/chunk-DrZX8T2p2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 80,
-						"gzip": 92,
-						"brotli": 84
-					},
-					{
-						"file": "build/chunk-DsnlnPqW.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/inline/resume-errors.ts"],
-						"raw": 756,
-						"gzip": 386,
-						"brotli": 325
-					},
-					{
-						"file": "build/chunk-DTcrnajc2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 81,
-						"gzip": 93,
-						"brotli": 85
-					},
-					{
-						"file": "build/chunk-DulkSE0f2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 77,
-						"gzip": 92,
-						"brotli": 81
-					},
-					{
-						"file": "build/chunk-DyR9-0RA.js",
-						"bucket": "framework",
-						"modules": [
-							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Fjs-framework-benchmark%2Fframeworks%2Fkeyed%2Fmarkless%2Fsrc%2Froot.tsrx:symbol%3A0",
-							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Fjs-framework-benchmark%2Fframeworks%2Fkeyed%2Fmarkless%2Fsrc%2Froot.tsrx:symbol%3A1",
-							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Fjs-framework-benchmark%2Fframeworks%2Fkeyed%2Fmarkless%2Fsrc%2Froot.tsrx:symbol%3A2",
-							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Fjs-framework-benchmark%2Fframeworks%2Fkeyed%2Fmarkless%2Fsrc%2Froot.tsrx:symbol%3A3",
-							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Fjs-framework-benchmark%2Fframeworks%2Fkeyed%2Fmarkless%2Fsrc%2Froot.tsrx:symbol%3A4",
-							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Fjs-framework-benchmark%2Fframeworks%2Fkeyed%2Fmarkless%2Fsrc%2Froot.tsrx:symbol%3A5",
-							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Fjs-framework-benchmark%2Fframeworks%2Fkeyed%2Fmarkless%2Fsrc%2Froot.tsrx:symbol%3A6",
-							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Fjs-framework-benchmark%2Fframeworks%2Fkeyed%2Fmarkless%2Fsrc%2Froot.tsrx:symbol%3A7",
-							"\u0000vite/preload-helper.js",
-							"<repo>/packages/web/src/fns/direct.ts",
-							"<repo>/packages/web/src/fns/write-scalar.ts",
-							"<repo>/packages/web/src/inline/sync-policy-core.ts",
-							"<repo>/packages/web/src/pending-timing.ts",
-							"<repo>/packages/web/src/render-csr.ts",
-							"<repo>/packages/web/src/render.ts",
-							"<repo>/packages/web/src/resume-anchor-census.ts",
-							"<repo>/packages/web/src/resume-arm-records.ts",
-							"<repo>/packages/web/src/resume-commit-arm.ts",
-							"<repo>/packages/web/src/resume-resettle-hold.ts",
-							"<repo>/packages/web/src/runtime-error-reporting.ts"
-						],
-						"raw": 19637,
-						"gzip": 6947,
-						"brotli": 6206
-					},
-					{
-						"file": "build/chunk-DYs2YFUI.js",
-						"bucket": "framework",
-						"modules": [
-							"<repo>/packages/serializer/src/value-decode-client.ts",
-							"<repo>/packages/serializer/src/value-decode-extensions.ts"
-						],
-						"raw": 2667,
-						"gzip": 964,
-						"brotli": 878
-					},
-					{
-						"file": "build/chunk-QBxYL6_Y2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 86,
-						"gzip": 101,
-						"brotli": 89
-					},
-					{
-						"file": "build/chunk-rYVCBcgT.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 81,
-						"gzip": 96,
-						"brotli": 71
-					},
-					{
-						"file": "build/chunk-uCfCGB8n2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 80,
-						"gzip": 92,
-						"brotli": 84
-					},
-					{
-						"file": "build/chunk-UDrXBmrH.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 83,
-						"gzip": 95,
-						"brotli": 86
-					},
-					{
-						"file": "build/chunk-v1QlC9Q3.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 95,
-						"gzip": 110,
-						"brotli": 98
-					},
-					{
-						"file": "build/chunk-Vvq1qz5J2.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-sync-computed.ts"],
-						"raw": 683,
-						"gzip": 404,
-						"brotli": 367
-					},
-					{
-						"file": "build/chunk-wFUEAYqU.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 253,
-						"gzip": 181,
-						"brotli": 145
-					},
-					{
-						"file": "build/chunk-wG5EaP_d2.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-runtime.ts"],
-						"raw": 5561,
-						"gzip": 2012,
-						"brotli": 1841
-					},
-					{
-						"file": "build/chunk-XuCD11F8.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 95,
-						"gzip": 107,
-						"brotli": 91
-					},
-					{
-						"file": "build/chunk-XwXw5R2G.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/runtime/src/graph-collections.ts"],
-						"raw": 2273,
-						"gzip": 900,
-						"brotli": 805
+							{
+								"category": "author",
+								"key": "index.html",
+								"bytes": 197
+							},
+							{
+								"category": "author",
+								"key": "src/data.ts",
+								"bytes": 1669
+							},
+							{
+								"category": "author",
+								"key": "src/main.ts",
+								"bytes": 371
+							},
+							{
+								"category": "author",
+								"key": "src/root.tsrx",
+								"bytes": 6270
+							},
+							{
+								"category": "author",
+								"key": "virtual:markless:render-data:src/root.tsrx",
+								"bytes": 14177
+							},
+							{
+								"category": "author",
+								"key": "virtual:markless:symbol:src/root.tsrx:symbol:0",
+								"bytes": 442
+							},
+							{
+								"category": "author",
+								"key": "virtual:markless:symbol:src/root.tsrx:symbol:1",
+								"bytes": 446
+							},
+							{
+								"category": "author",
+								"key": "virtual:markless:symbol:src/root.tsrx:symbol:2",
+								"bytes": 404
+							},
+							{
+								"category": "author",
+								"key": "virtual:markless:symbol:src/root.tsrx:symbol:3",
+								"bytes": 405
+							},
+							{
+								"category": "author",
+								"key": "virtual:markless:symbol:src/root.tsrx:symbol:4",
+								"bytes": 417
+							},
+							{
+								"category": "author",
+								"key": "virtual:markless:symbol:src/root.tsrx:symbol:5",
+								"bytes": 397
+							},
+							{
+								"category": "author",
+								"key": "virtual:markless:symbol:src/root.tsrx:symbol:6",
+								"bytes": 403
+							},
+							{
+								"category": "author",
+								"key": "virtual:markless:symbol:src/root.tsrx:symbol:7",
+								"bytes": 423
+							},
+							{
+								"category": "glue",
+								"key": "vite/preload-helper.js",
+								"bytes": 2659
+							},
+							{
+								"category": "runtime",
+								"key": "runtime/graph",
+								"bytes": 8418
+							},
+							{
+								"category": "runtime",
+								"key": "runtime/graph-async",
+								"bytes": 4114
+							},
+							{
+								"category": "runtime",
+								"key": "runtime/graph-collections",
+								"bytes": 4270
+							},
+							{
+								"category": "runtime",
+								"key": "runtime/graph-computed",
+								"bytes": 2303
+							},
+							{
+								"category": "runtime",
+								"key": "runtime/graph-core",
+								"bytes": 2223
+							},
+							{
+								"category": "runtime",
+								"key": "runtime/graph-scheduler",
+								"bytes": 567
+							},
+							{
+								"category": "runtime",
+								"key": "runtime/graph-shared",
+								"bytes": 3646
+							},
+							{
+								"category": "runtime",
+								"key": "runtime/index",
+								"bytes": 140
+							},
+							{
+								"category": "runtime",
+								"key": "serializer/async-boundary-arm",
+								"bytes": 291
+							},
+							{
+								"category": "runtime",
+								"key": "serializer/payload-scripts",
+								"bytes": 599
+							},
+							{
+								"category": "runtime",
+								"key": "serializer/protocol",
+								"bytes": 558
+							},
+							{
+								"category": "runtime",
+								"key": "serializer/protocol-constants",
+								"bytes": 530
+							},
+							{
+								"category": "runtime",
+								"key": "serializer/protocol-event-names",
+								"bytes": 252
+							},
+							{
+								"category": "runtime",
+								"key": "serializer/storage-slot",
+								"bytes": 475
+							},
+							{
+								"category": "runtime",
+								"key": "serializer/value-constants",
+								"bytes": 348
+							},
+							{
+								"category": "runtime",
+								"key": "serializer/value-decode-client",
+								"bytes": 3585
+							},
+							{
+								"category": "runtime",
+								"key": "serializer/value-decode-extensions",
+								"bytes": 1708
+							},
+							{
+								"category": "runtime",
+								"key": "web/coded-error",
+								"bytes": 356
+							},
+							{
+								"category": "runtime",
+								"key": "web/control-edit-hold",
+								"bytes": 1467
+							},
+							{
+								"category": "runtime",
+								"key": "web/dom-attribute",
+								"bytes": 340
+							},
+							{
+								"category": "runtime",
+								"key": "web/dom-journal",
+								"bytes": 7365
+							},
+							{
+								"category": "runtime",
+								"key": "web/fns/bound-symbol",
+								"bytes": 1613
+							},
+							{
+								"category": "runtime",
+								"key": "web/fns/composition",
+								"bytes": 18699
+							},
+							{
+								"category": "runtime",
+								"key": "web/fns/direct",
+								"bytes": 16821
+							},
+							{
+								"category": "runtime",
+								"key": "web/fns/element-handle-prop",
+								"bytes": 739
+							},
+							{
+								"category": "runtime",
+								"key": "web/fns/instance-scope",
+								"bytes": 13370
+							},
+							{
+								"category": "runtime",
+								"key": "web/fns/ssr",
+								"bytes": 29854
+							},
+							{
+								"category": "runtime",
+								"key": "web/fns/write-scalar",
+								"bytes": 971
+							},
+							{
+								"category": "runtime",
+								"key": "web/inline/resume-errors",
+								"bytes": 1425
+							},
+							{
+								"category": "runtime",
+								"key": "web/inline/sync-policy-core",
+								"bytes": 1243
+							},
+							{
+								"category": "runtime",
+								"key": "web/payload-graph-construct",
+								"bytes": 4423
+							},
+							{
+								"category": "runtime",
+								"key": "web/prerender/evaluator",
+								"bytes": 20798
+							},
+							{
+								"category": "runtime",
+								"key": "web/prerender/shared-seed-slot",
+								"bytes": 2824
+							},
+							{
+								"category": "runtime",
+								"key": "web/prerender/staged-graph",
+								"bytes": 399
+							},
+							{
+								"category": "runtime",
+								"key": "web/reconcile-plane-slot",
+								"bytes": 254
+							},
+							{
+								"category": "runtime",
+								"key": "web/render",
+								"bytes": 4063
+							},
+							{
+								"category": "runtime",
+								"key": "web/render-canonical",
+								"bytes": 2022
+							},
+							{
+								"category": "runtime",
+								"key": "web/render-csr",
+								"bytes": 15877
+							},
+							{
+								"category": "runtime",
+								"key": "web/render-route-holder",
+								"bytes": 741
+							},
+							{
+								"category": "runtime",
+								"key": "web/repeat-runtime",
+								"bytes": 2598
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume",
+								"bytes": 3412
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-anchor-census",
+								"bytes": 364
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-arm-records",
+								"bytes": 6264
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-census",
+								"bytes": 1459
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-commit-arm",
+								"bytes": 9068
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-events",
+								"bytes": 15334
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-handle-qualifier",
+								"bytes": 491
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-handoff",
+								"bytes": 1348
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-keyed-repeats",
+								"bytes": 14381
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-locators",
+								"bytes": 5471
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-runtime",
+								"bytes": 15159
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-runtime-shared",
+								"bytes": 2094
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-runtime-start",
+								"bytes": 8666
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-shared-patch",
+								"bytes": 1222
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-sync-computed",
+								"bytes": 1526
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-sync-demand",
+								"bytes": 1104
+							},
+							{
+								"category": "runtime",
+								"key": "web/runtime-error-reporting",
+								"bytes": 1864
+							},
+							{
+								"category": "runtime",
+								"key": "web/ssr-data/awaitable",
+								"bytes": 844
+							},
+							{
+								"category": "runtime",
+								"key": "web/ssr-data/branch-arm-idrefs",
+								"bytes": 1754
+							},
+							{
+								"category": "runtime",
+								"key": "web/ssr-data/renderer",
+								"bytes": 19177
+							},
+							{
+								"category": "runtime",
+								"key": "web/storage-plane",
+								"bytes": 1647
+							}
+						]
 					}
 				]
 			}
@@ -597,9 +553,13 @@
 			"name": "todomvc",
 			"gates": {
 				"passed": true,
-				"checks": ["bundle graph present", "application and framework buckets non-empty"]
+				"checks": [
+					"bundle graph present",
+					"every chunk has byte attribution",
+					"application and framework buckets non-empty"
+				]
 			},
-			"bodyBytes": 98776,
+			"bodyBytes": 190601,
 			"timing": {
 				"samples": 1,
 				"minMs": 0,
@@ -620,631 +580,512 @@
 				"samples": 1,
 				"bytes": {
 					"total": {
-						"raw": 98776,
-						"gzip": 41240,
-						"brotli": 36764
+						"raw": 190601,
+						"gzip": 54258,
+						"brotli": 47152
 					},
 					"application": {
-						"raw": 7496,
-						"gzip": 2866,
-						"brotli": 2525
+						"raw": 15976,
+						"gzip": 4439,
+						"brotli": 3830
 					},
 					"framework": {
-						"raw": 91280,
-						"gzip": 38374,
-						"brotli": 34239
+						"raw": 174625,
+						"gzip": 49819,
+						"brotli": 43322
 					}
 				},
 				"files": [
 					{
-						"file": "build/chunk-03_26LVU2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 80,
-						"gzip": 95,
-						"brotli": 83
+						"file": "build/chunk-43Vwx97y.js",
+						"raw": 52,
+						"gzip": 72,
+						"brotli": 56,
+						"application": {
+							"raw": 0,
+							"gzip": 0,
+							"brotli": 0
+						},
+						"framework": {
+							"raw": 52,
+							"gzip": 72,
+							"brotli": 56
+						},
+						"modules": []
 					},
 					{
-						"file": "build/chunk-7-FeJ0-A2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 81,
-						"gzip": 93,
-						"brotli": 85
-					},
-					{
-						"file": "build/chunk-am1BJB1f.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-async-wiring.ts"],
-						"raw": 2895,
-						"gzip": 1264,
-						"brotli": 1134
-					},
-					{
-						"file": "build/chunk-B2VZzpi82.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-branches.ts"],
-						"raw": 6483,
-						"gzip": 2461,
-						"brotli": 2256
-					},
-					{
-						"file": "build/chunk-BEvzFVsU2.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-sync-demand.ts"],
-						"raw": 783,
-						"gzip": 447,
-						"brotli": 391
-					},
-					{
-						"file": "build/chunk-BHmIL_Ja2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 115,
-						"gzip": 129,
-						"brotli": 96
-					},
-					{
-						"file": "build/chunk-BkHNHLfA2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 83,
-						"gzip": 95,
-						"brotli": 87
-					},
-					{
-						"file": "build/chunk-BKTqLI03.js",
-						"bucket": "framework",
+						"file": "build/chunk-BohqzpEt.js",
+						"raw": 105,
+						"gzip": 114,
+						"brotli": 90,
+						"application": {
+							"raw": 0,
+							"gzip": 0,
+							"brotli": 0
+						},
+						"framework": {
+							"raw": 105,
+							"gzip": 114,
+							"brotli": 90
+						},
 						"modules": [
-							"<repo>/packages/runtime/src/graph.ts",
-							"<repo>/packages/runtime/src/index.ts"
-						],
-						"raw": 2640,
-						"gzip": 1130,
-						"brotli": 1040
+							{
+								"category": "glue",
+								"key": "rolldown/runtime.js",
+								"bytes": 200
+							}
+						]
 					},
 					{
-						"file": "build/chunk-BlAzS3nY.js",
-						"bucket": "framework",
+						"file": "build/chunk-NHcPlB-H.js",
+						"raw": 19157,
+						"gzip": 6481,
+						"brotli": 5941,
+						"application": {
+							"raw": 0,
+							"gzip": 0,
+							"brotli": 0
+						},
+						"framework": {
+							"raw": 19157,
+							"gzip": 6481,
+							"brotli": 5941
+						},
 						"modules": [
-							"\u0000virtual:markless:resolver:<repo>%2Fdemos%2Ftodomvc%2Ffixture%2Fapp.tsrx",
-							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Ftodomvc%2Ffixture%2Fapp.tsrx:symbol%3A0",
-							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Ftodomvc%2Ffixture%2Fapp.tsrx:symbol%3A1",
-							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Ftodomvc%2Ffixture%2Fapp.tsrx:symbol%3A2",
-							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Ftodomvc%2Ffixture%2Fapp.tsrx:symbol%3A3",
-							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Ftodomvc%2Ffixture%2Fapp.tsrx:symbol%3A4",
-							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Ftodomvc%2Ffixture%2Fapp.tsrx:symbol%3A5",
-							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Ftodomvc%2Ffixture%2Fapp.tsrx:symbol%3A6",
-							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Ftodomvc%2Ffixture%2Fapp.tsrx:symbol%3A7",
-							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Ftodomvc%2Ffixture%2Fapp.tsrx:symbol%3A8",
-							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Ftodomvc%2Ffixture%2Fapp.tsrx:symbol%3A9",
-							"\u0000vite/preload-helper.js",
-							"<repo>/packages/core/src/index.ts",
-							"<repo>/packages/core/src/render.ts",
-							"<repo>/packages/web/src/fns/direct.ts",
-							"<repo>/packages/web/src/inline/sync-policy-core.ts",
-							"<repo>/packages/web/src/pending-timing.ts",
-							"<repo>/packages/web/src/render-csr.ts",
-							"<repo>/packages/web/src/render.ts",
-							"<repo>/packages/web/src/resume-anchor-census.ts",
-							"<repo>/packages/web/src/resume-arm-records.ts",
-							"<repo>/packages/web/src/resume-commit-arm.ts",
-							"<repo>/packages/web/src/resume-resettle-hold.ts",
-							"<repo>/packages/web/src/resume-stream-patches.ts",
-							"<repo>/packages/web/src/runtime-error-reporting.ts"
-						],
-						"raw": 24602,
-						"gzip": 7823,
-						"brotli": 6962
+							{
+								"category": "runtime",
+								"key": "web/pending-timing",
+								"bytes": 509
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-async-wiring",
+								"bytes": 6706
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-behaviors",
+								"bytes": 8535
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-branches",
+								"bytes": 14996
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-resettle-hold",
+								"bytes": 2560
+							}
+						]
 					},
 					{
-						"file": "build/chunk-BLoMwjSB.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 81,
-						"gzip": 93,
-						"brotli": 79
-					},
-					{
-						"file": "build/chunk-bo_z6EiX.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/payload-resume.ts"],
-						"raw": 1559,
-						"gzip": 737,
-						"brotli": 663
-					},
-					{
-						"file": "build/chunk-BOglAY9o.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/runtime/src/graph-scheduler.ts"],
-						"raw": 285,
-						"gzip": 206,
-						"brotli": 185
-					},
-					{
-						"file": "build/chunk-BrZmG6JT.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 85,
-						"gzip": 97,
-						"brotli": 89
-					},
-					{
-						"file": "build/chunk-BsGnmNMy.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 81,
-						"gzip": 93,
-						"brotli": 79
-					},
-					{
-						"file": "build/chunk-BSmfu8WF.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/runtime/src/graph-async.ts"],
-						"raw": 1529,
-						"gzip": 693,
-						"brotli": 637
-					},
-					{
-						"file": "build/chunk-Btma_K7Q.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/runtime/src/graph-core.ts"],
-						"raw": 1143,
-						"gzip": 555,
-						"brotli": 506
-					},
-					{
-						"file": "build/chunk-BX-f7Rso.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/dom-journal.ts"],
-						"raw": 2039,
-						"gzip": 807,
-						"brotli": 716
-					},
-					{
-						"file": "build/chunk-BxBETWbe.js",
-						"bucket": "framework",
-						"modules": ["\u0000rolldown/runtime.js"],
-						"raw": 50,
-						"gzip": 67,
-						"brotli": 54
-					},
-					{
-						"file": "build/chunk-BZ4Dde9A.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 82,
-						"gzip": 97,
-						"brotli": 73
-					},
-					{
-						"file": "build/chunk-C_LSHtDt.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/runtime/src/graph-computed.ts"],
-						"raw": 1111,
-						"gzip": 448,
-						"brotli": 404
-					},
-					{
-						"file": "build/chunk-C_ZsdcH_.js",
-						"bucket": "framework",
+						"file": "build/chunk-mukfzxjQ.js",
+						"raw": 171287,
+						"gzip": 47591,
+						"brotli": 41065,
+						"application": {
+							"raw": 15976,
+							"gzip": 4439,
+							"brotli": 3830
+						},
+						"framework": {
+							"raw": 155311,
+							"gzip": 43152,
+							"brotli": 37235
+						},
 						"modules": [
-							"<repo>/packages/web/src/payload-document.ts",
-							"<repo>/packages/web/src/payload-resume-registry.ts"
-						],
-						"raw": 2334,
-						"gzip": 1026,
-						"brotli": 865
-					},
-					{
-						"file": "build/chunk-C4eUm5o-.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 81,
-						"gzip": 93,
-						"brotli": 85
-					},
-					{
-						"file": "build/chunk-C80hwQaq2.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-shared-patch.ts"],
-						"raw": 677,
-						"gzip": 330,
-						"brotli": 280
-					},
-					{
-						"file": "build/chunk-C9avdd1z2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 73,
-						"gzip": 88,
-						"brotli": 77
-					},
-					{
-						"file": "build/chunk-CB3u6yGB.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 81,
-						"gzip": 93,
-						"brotli": 79
-					},
-					{
-						"file": "build/chunk-CBg5cyeP2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 78,
-						"gzip": 93,
-						"brotli": 73
-					},
-					{
-						"file": "build/chunk-CbMCwoUY2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 86,
-						"gzip": 101,
-						"brotli": 88
-					},
-					{
-						"file": "build/chunk-CeNTnHBJ2.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-handoff.ts"],
-						"raw": 711,
-						"gzip": 423,
-						"brotli": 367
-					},
-					{
-						"file": "build/chunk-CgT6ooZs.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 81,
-						"gzip": 93,
-						"brotli": 79
-					},
-					{
-						"file": "build/chunk-CIlsefk8.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-locators.ts"],
-						"raw": 1243,
-						"gzip": 587,
-						"brotli": 529
-					},
-					{
-						"file": "build/chunk-CLeGGSGe.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 81,
-						"gzip": 93,
-						"brotli": 85
-					},
-					{
-						"file": "build/chunk-CnW5mg7A.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 81,
-						"gzip": 93,
-						"brotli": 79
-					},
-					{
-						"file": "build/chunk-CQ42WnX62.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 79,
-						"gzip": 94,
-						"brotli": 82
-					},
-					{
-						"file": "build/chunk-CuunHp4L2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 171,
-						"gzip": 151,
-						"brotli": 119
-					},
-					{
-						"file": "build/chunk-CWCk73G62.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-behaviors.ts"],
-						"raw": 4008,
-						"gzip": 1622,
-						"brotli": 1508
-					},
-					{
-						"file": "build/chunk-CxjVqQoi2.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-runtime-shared.ts"],
-						"raw": 1212,
-						"gzip": 595,
-						"brotli": 535
-					},
-					{
-						"file": "build/chunk-CY2QYDxz.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 178,
-						"gzip": 139,
-						"brotli": 114
-					},
-					{
-						"file": "build/chunk-D1a6cAp2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 78,
-						"gzip": 93,
-						"brotli": 82
-					},
-					{
-						"file": "build/chunk-D3WDOqqg.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/runtime/src/graph-shared.ts"],
-						"raw": 1606,
-						"gzip": 744,
-						"brotli": 688
-					},
-					{
-						"file": "build/chunk-Dac4hIAW.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 190,
-						"gzip": 155,
-						"brotli": 134
-					},
-					{
-						"file": "build/chunk-DakRz1pe2.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-runtime-start.ts"],
-						"raw": 3696,
-						"gzip": 1421,
-						"brotli": 1271
-					},
-					{
-						"file": "build/chunk-DdC42Rs6.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 102,
-						"gzip": 106,
-						"brotli": 101
-					},
-					{
-						"file": "build/chunk-DeFj4ZP1.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/payload-graph-construct.ts"],
-						"raw": 1755,
-						"gzip": 812,
-						"brotli": 744
-					},
-					{
-						"file": "build/chunk-Dg0r-y5M.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 81,
-						"gzip": 96,
-						"brotli": 71
-					},
-					{
-						"file": "build/chunk-DIWhpeqr2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 87,
-						"gzip": 99,
-						"brotli": 86
-					},
-					{
-						"file": "build/chunk-DJGvmUM_2.js",
-						"bucket": "application",
-						"modules": ["<repo>/demos/todomvc/fixture/data.ts"],
-						"raw": 1048,
-						"gzip": 432,
-						"brotli": 393
-					},
-					{
-						"file": "build/chunk-Dl56_v2Y.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 236,
-						"gzip": 173,
-						"brotli": 153
-					},
-					{
-						"file": "build/chunk-DqHO3kDD.js",
-						"bucket": "framework",
-						"modules": [
-							"<repo>/packages/web/src/repeat-runtime.ts",
-							"<repo>/packages/web/src/resume-keyed-repeats.ts"
-						],
-						"raw": 3326,
-						"gzip": 1328,
-						"brotli": 1166
-					},
-					{
-						"file": "build/chunk-DS_iaFzp.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 95,
-						"gzip": 110,
-						"brotli": 88
-					},
-					{
-						"file": "build/chunk-DsnlnPqW.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/inline/resume-errors.ts"],
-						"raw": 756,
-						"gzip": 386,
-						"brotli": 325
-					},
-					{
-						"file": "build/chunk-DulkSE0f2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 77,
-						"gzip": 92,
-						"brotli": 81
-					},
-					{
-						"file": "build/chunk-DxAh_54n2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 91,
-						"gzip": 106,
-						"brotli": 94
-					},
-					{
-						"file": "build/chunk-Dy1uyqbb.js",
-						"bucket": "application",
-						"modules": [
-							"<repo>/demos/todomvc/fixture/app.tsrx",
-							"<repo>/demos/todomvc/fixture/index.html",
-							"<repo>/demos/todomvc/fixture/main.ts"
-						],
-						"raw": 6448,
-						"gzip": 2434,
-						"brotli": 2132
-					},
-					{
-						"file": "build/chunk-DZrrm3Th.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume.ts"],
-						"raw": 1947,
-						"gzip": 940,
-						"brotli": 848
-					},
-					{
-						"file": "build/chunk-DzS9BDQ02.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-events.ts"],
-						"raw": 4087,
-						"gzip": 1612,
-						"brotli": 1462
-					},
-					{
-						"file": "build/chunk-fV0aC52b.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/serializer/src/protocol-client.ts"],
-						"raw": 3379,
-						"gzip": 1344,
-						"brotli": 1165
-					},
-					{
-						"file": "build/chunk-G5hzN1Im2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 131,
-						"gzip": 128,
-						"brotli": 101
-					},
-					{
-						"file": "build/chunk-g6y0Thrg.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/payload-full.ts"],
-						"raw": 356,
-						"gzip": 241,
-						"brotli": 202
-					},
-					{
-						"file": "build/chunk-hL0RuWpm.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 95,
-						"gzip": 107,
-						"brotli": 98
-					},
-					{
-						"file": "build/chunk-ix9QtYt62.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 88,
-						"gzip": 100,
-						"brotli": 92
-					},
-					{
-						"file": "build/chunk-KTeWapjY2.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-runtime.ts"],
-						"raw": 5567,
-						"gzip": 2009,
-						"brotli": 1833
-					},
-					{
-						"file": "build/chunk-O1G9rq8e.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 76,
-						"gzip": 91,
-						"brotli": 69
-					},
-					{
-						"file": "build/chunk-qrsVSn7d2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 81,
-						"gzip": 93,
-						"brotli": 79
-					},
-					{
-						"file": "build/chunk-r5ycafHn.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 107,
-						"gzip": 108,
-						"brotli": 97
-					},
-					{
-						"file": "build/chunk-sEQhFpEw.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 81,
-						"gzip": 93,
-						"brotli": 79
-					},
-					{
-						"file": "build/chunk-SsUEouxA.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 81,
-						"gzip": 93,
-						"brotli": 79
-					},
-					{
-						"file": "build/chunk-UxWWHPzK.js",
-						"bucket": "framework",
-						"modules": [
-							"<repo>/packages/serializer/src/value-decode-client.ts",
-							"<repo>/packages/serializer/src/value-decode-extensions.ts"
-						],
-						"raw": 2669,
-						"gzip": 962,
-						"brotli": 879
-					},
-					{
-						"file": "build/chunk-Vvq1qz5J2.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-sync-computed.ts"],
-						"raw": 683,
-						"gzip": 404,
-						"brotli": 367
-					},
-					{
-						"file": "build/chunk-wFUEAYqU.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 253,
-						"gzip": 181,
-						"brotli": 145
-					},
-					{
-						"file": "build/chunk-XwXw5R2G.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/runtime/src/graph-collections.ts"],
-						"raw": 2273,
-						"gzip": 900,
-						"brotli": 805
-					},
-					{
-						"file": "build/chunk-Zepyfi8I.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 88,
-						"gzip": 103,
-						"brotli": 92
+							{
+								"category": "author",
+								"key": "app.tsrx",
+								"bytes": 5779
+							},
+							{
+								"category": "author",
+								"key": "data.ts",
+								"bytes": 1961
+							},
+							{
+								"category": "author",
+								"key": "index.html",
+								"bytes": 162
+							},
+							{
+								"category": "author",
+								"key": "main.ts",
+								"bytes": 936
+							},
+							{
+								"category": "author",
+								"key": "virtual:markless:render-data:app.tsrx",
+								"bytes": 14026
+							},
+							{
+								"category": "author",
+								"key": "virtual:markless:symbol:app.tsrx:symbol:0",
+								"bytes": 1302
+							},
+							{
+								"category": "author",
+								"key": "virtual:markless:symbol:app.tsrx:symbol:1",
+								"bytes": 943
+							},
+							{
+								"category": "author",
+								"key": "virtual:markless:symbol:app.tsrx:symbol:2",
+								"bytes": 914
+							},
+							{
+								"category": "author",
+								"key": "virtual:markless:symbol:app.tsrx:symbol:3",
+								"bytes": 578
+							},
+							{
+								"category": "author",
+								"key": "virtual:markless:symbol:app.tsrx:symbol:4",
+								"bytes": 879
+							},
+							{
+								"category": "author",
+								"key": "virtual:markless:symbol:app.tsrx:symbol:5",
+								"bytes": 919
+							},
+							{
+								"category": "author",
+								"key": "virtual:markless:symbol:app.tsrx:symbol:6",
+								"bytes": 673
+							},
+							{
+								"category": "author",
+								"key": "virtual:markless:symbol:app.tsrx:symbol:7",
+								"bytes": 676
+							},
+							{
+								"category": "author",
+								"key": "virtual:markless:symbol:app.tsrx:symbol:8",
+								"bytes": 679
+							},
+							{
+								"category": "author",
+								"key": "virtual:markless:symbol:app.tsrx:symbol:9",
+								"bytes": 772
+							},
+							{
+								"category": "glue",
+								"key": "virtual:markless:resolver:app.tsrx",
+								"bytes": 3086
+							},
+							{
+								"category": "glue",
+								"key": "vite/preload-helper.js",
+								"bytes": 2625
+							},
+							{
+								"category": "runtime",
+								"key": "runtime/graph",
+								"bytes": 8418
+							},
+							{
+								"category": "runtime",
+								"key": "runtime/graph-async",
+								"bytes": 4114
+							},
+							{
+								"category": "runtime",
+								"key": "runtime/graph-collections",
+								"bytes": 4270
+							},
+							{
+								"category": "runtime",
+								"key": "runtime/graph-computed",
+								"bytes": 2303
+							},
+							{
+								"category": "runtime",
+								"key": "runtime/graph-core",
+								"bytes": 2223
+							},
+							{
+								"category": "runtime",
+								"key": "runtime/graph-scheduler",
+								"bytes": 567
+							},
+							{
+								"category": "runtime",
+								"key": "runtime/graph-shared",
+								"bytes": 3646
+							},
+							{
+								"category": "runtime",
+								"key": "runtime/index",
+								"bytes": 140
+							},
+							{
+								"category": "runtime",
+								"key": "serializer/async-boundary-arm",
+								"bytes": 291
+							},
+							{
+								"category": "runtime",
+								"key": "serializer/payload-scripts",
+								"bytes": 599
+							},
+							{
+								"category": "runtime",
+								"key": "serializer/protocol",
+								"bytes": 558
+							},
+							{
+								"category": "runtime",
+								"key": "serializer/protocol-constants",
+								"bytes": 530
+							},
+							{
+								"category": "runtime",
+								"key": "serializer/protocol-event-names",
+								"bytes": 252
+							},
+							{
+								"category": "runtime",
+								"key": "serializer/storage-slot",
+								"bytes": 475
+							},
+							{
+								"category": "runtime",
+								"key": "serializer/value-constants",
+								"bytes": 348
+							},
+							{
+								"category": "runtime",
+								"key": "serializer/value-decode-client",
+								"bytes": 3568
+							},
+							{
+								"category": "runtime",
+								"key": "serializer/value-decode-extensions",
+								"bytes": 1708
+							},
+							{
+								"category": "runtime",
+								"key": "web/coded-error",
+								"bytes": 356
+							},
+							{
+								"category": "runtime",
+								"key": "web/control-edit-hold",
+								"bytes": 1467
+							},
+							{
+								"category": "runtime",
+								"key": "web/dom-attribute",
+								"bytes": 340
+							},
+							{
+								"category": "runtime",
+								"key": "web/dom-journal",
+								"bytes": 7365
+							},
+							{
+								"category": "runtime",
+								"key": "web/fns/bound-symbol",
+								"bytes": 1613
+							},
+							{
+								"category": "runtime",
+								"key": "web/fns/composition",
+								"bytes": 18699
+							},
+							{
+								"category": "runtime",
+								"key": "web/fns/direct",
+								"bytes": 16837
+							},
+							{
+								"category": "runtime",
+								"key": "web/fns/element-handle-prop",
+								"bytes": 739
+							},
+							{
+								"category": "runtime",
+								"key": "web/fns/instance-scope",
+								"bytes": 13370
+							},
+							{
+								"category": "runtime",
+								"key": "web/fns/row-mint",
+								"bytes": 4254
+							},
+							{
+								"category": "runtime",
+								"key": "web/fns/ssr",
+								"bytes": 29854
+							},
+							{
+								"category": "runtime",
+								"key": "web/inline/resume-errors",
+								"bytes": 1425
+							},
+							{
+								"category": "runtime",
+								"key": "web/inline/sync-policy-core",
+								"bytes": 1243
+							},
+							{
+								"category": "runtime",
+								"key": "web/payload-graph-construct",
+								"bytes": 4372
+							},
+							{
+								"category": "runtime",
+								"key": "web/prerender/evaluator",
+								"bytes": 20798
+							},
+							{
+								"category": "runtime",
+								"key": "web/prerender/shared-seed-slot",
+								"bytes": 2824
+							},
+							{
+								"category": "runtime",
+								"key": "web/prerender/staged-graph",
+								"bytes": 399
+							},
+							{
+								"category": "runtime",
+								"key": "web/reconcile-plane-slot",
+								"bytes": 254
+							},
+							{
+								"category": "runtime",
+								"key": "web/render",
+								"bytes": 3995
+							},
+							{
+								"category": "runtime",
+								"key": "web/render-canonical",
+								"bytes": 2005
+							},
+							{
+								"category": "runtime",
+								"key": "web/render-csr",
+								"bytes": 15809
+							},
+							{
+								"category": "runtime",
+								"key": "web/render-route-holder",
+								"bytes": 741
+							},
+							{
+								"category": "runtime",
+								"key": "web/repeat-runtime",
+								"bytes": 2598
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume",
+								"bytes": 3397
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-anchor-census",
+								"bytes": 364
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-arm-records",
+								"bytes": 6264
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-census",
+								"bytes": 1459
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-commit-arm",
+								"bytes": 9068
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-events",
+								"bytes": 15300
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-handle-qualifier",
+								"bytes": 491
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-handoff",
+								"bytes": 1348
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-keyed-repeats",
+								"bytes": 14364
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-locators",
+								"bytes": 5471
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-runtime",
+								"bytes": 14970
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-runtime-shared",
+								"bytes": 2077
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-runtime-start",
+								"bytes": 8564
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-shared-patch",
+								"bytes": 1188
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-sync-computed",
+								"bytes": 1526
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-sync-demand",
+								"bytes": 1087
+							},
+							{
+								"category": "runtime",
+								"key": "web/runtime-error-reporting",
+								"bytes": 1864
+							},
+							{
+								"category": "runtime",
+								"key": "web/ssr-data/awaitable",
+								"bytes": 844
+							},
+							{
+								"category": "runtime",
+								"key": "web/ssr-data/branch-arm-idrefs",
+								"bytes": 1754
+							},
+							{
+								"category": "runtime",
+								"key": "web/ssr-data/renderer",
+								"bytes": 19177
+							},
+							{
+								"category": "runtime",
+								"key": "web/storage-plane",
+								"bytes": 1647
+							}
+						]
 					}
 				]
 			}
@@ -1253,9 +1094,13 @@
 			"name": "chat-stream",
 			"gates": {
 				"passed": true,
-				"checks": ["bundle graph present", "application and framework buckets non-empty"]
+				"checks": [
+					"bundle graph present",
+					"every chunk has byte attribution",
+					"application and framework buckets non-empty"
+				]
 			},
-			"bodyBytes": 94605,
+			"bodyBytes": 182760,
 			"timing": {
 				"samples": 1,
 				"minMs": 0,
@@ -1276,577 +1121,482 @@
 				"samples": 1,
 				"bytes": {
 					"total": {
-						"raw": 94605,
-						"gzip": 40527,
-						"brotli": 36144
+						"raw": 182760,
+						"gzip": 53665,
+						"brotli": 46864
 					},
 					"application": {
-						"raw": 7470,
-						"gzip": 3323,
-						"brotli": 2920
+						"raw": 11591,
+						"gzip": 3333,
+						"brotli": 2892
 					},
 					"framework": {
-						"raw": 87135,
-						"gzip": 37204,
-						"brotli": 33224
+						"raw": 171169,
+						"gzip": 50332,
+						"brotli": 43972
 					}
 				},
 				"files": [
 					{
-						"file": "build/chunk--xNsLsjs.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/payload-full.ts"],
-						"raw": 354,
-						"gzip": 241,
-						"brotli": 198
+						"file": "build/chunk-6tYwdE2X.js",
+						"raw": 52,
+						"gzip": 72,
+						"brotli": 56,
+						"application": {
+							"raw": 0,
+							"gzip": 0,
+							"brotli": 0
+						},
+						"framework": {
+							"raw": 52,
+							"gzip": 72,
+							"brotli": 56
+						},
+						"modules": []
 					},
 					{
-						"file": "build/chunk-0XV78GnI.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 178,
-						"gzip": 139,
-						"brotli": 114
-					},
-					{
-						"file": "build/chunk-1YOMeqNg2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 81,
-						"gzip": 93,
-						"brotli": 85
-					},
-					{
-						"file": "build/chunk-3Pdv3yjx2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 79,
-						"gzip": 94,
-						"brotli": 83
-					},
-					{
-						"file": "build/chunk-4Tlgx2z-.js",
-						"bucket": "framework",
+						"file": "build/chunk-BohqzpEt.js",
+						"raw": 105,
+						"gzip": 114,
+						"brotli": 90,
+						"application": {
+							"raw": 0,
+							"gzip": 0,
+							"brotli": 0
+						},
+						"framework": {
+							"raw": 105,
+							"gzip": 114,
+							"brotli": 90
+						},
 						"modules": [
-							"<repo>/packages/web/src/payload-document.ts",
-							"<repo>/packages/web/src/payload-resume-registry.ts"
-						],
-						"raw": 2334,
-						"gzip": 1025,
-						"brotli": 864
+							{
+								"category": "glue",
+								"key": "rolldown/runtime.js",
+								"bytes": 200
+							}
+						]
 					},
 					{
-						"file": "build/chunk-B_CR9Ty3.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 88,
-						"gzip": 103,
-						"brotli": 84
-					},
-					{
-						"file": "build/chunk-B0ASCuY8.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/payload-graph-construct.ts"],
-						"raw": 1753,
-						"gzip": 812,
-						"brotli": 735
-					},
-					{
-						"file": "build/chunk-B6r45Cuy.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 81,
-						"gzip": 93,
-						"brotli": 85
-					},
-					{
-						"file": "build/chunk-B922RbMa.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 236,
-						"gzip": 173,
-						"brotli": 147
-					},
-					{
-						"file": "build/chunk-Bc1-tkIw.js",
-						"bucket": "framework",
+						"file": "build/chunk-QQYW385t.js",
+						"raw": 19157,
+						"gzip": 6480,
+						"brotli": 5943,
+						"application": {
+							"raw": 0,
+							"gzip": 0,
+							"brotli": 0
+						},
+						"framework": {
+							"raw": 19157,
+							"gzip": 6480,
+							"brotli": 5943
+						},
 						"modules": [
-							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Fchat-stream%2Ffixture%2Fapp.tsrx:symbol%3A0",
-							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Fchat-stream%2Ffixture%2Fapp.tsrx:symbol%3A1",
-							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Fchat-stream%2Ffixture%2Fapp.tsrx:symbol%3A2",
-							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Fchat-stream%2Ffixture%2Fapp.tsrx:symbol%3A3",
-							"\u0000virtual:markless:symbol:<repo>%2Fdemos%2Fchat-stream%2Ffixture%2Fapp.tsrx:symbol%3A4",
-							"\u0000vite/preload-helper.js",
-							"<repo>/packages/core/src/index.ts",
-							"<repo>/packages/core/src/render.ts",
-							"<repo>/packages/web/src/fns/direct.ts",
-							"<repo>/packages/web/src/inline/sync-policy-core.ts",
-							"<repo>/packages/web/src/pending-timing.ts",
-							"<repo>/packages/web/src/render-csr.ts",
-							"<repo>/packages/web/src/render.ts",
-							"<repo>/packages/web/src/resume-anchor-census.ts",
-							"<repo>/packages/web/src/resume-arm-records.ts",
-							"<repo>/packages/web/src/resume-commit-arm.ts",
-							"<repo>/packages/web/src/resume-resettle-hold.ts",
-							"<repo>/packages/web/src/resume-stream-patches.ts",
-							"<repo>/packages/web/src/runtime-error-reporting.ts"
-						],
-						"raw": 20987,
-						"gzip": 7229,
-						"brotli": 6449
+							{
+								"category": "runtime",
+								"key": "web/pending-timing",
+								"bytes": 509
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-async-wiring",
+								"bytes": 6706
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-behaviors",
+								"bytes": 8535
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-branches",
+								"bytes": 14996
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-resettle-hold",
+								"bytes": 2560
+							}
+						]
 					},
 					{
-						"file": "build/chunk-BKTqLI03.js",
-						"bucket": "framework",
+						"file": "build/chunk-j-av6ctD.js",
+						"raw": 163446,
+						"gzip": 46999,
+						"brotli": 40775,
+						"application": {
+							"raw": 11591,
+							"gzip": 3333,
+							"brotli": 2892
+						},
+						"framework": {
+							"raw": 151855,
+							"gzip": 43666,
+							"brotli": 37883
+						},
 						"modules": [
-							"<repo>/packages/runtime/src/graph.ts",
-							"<repo>/packages/runtime/src/index.ts"
-						],
-						"raw": 2640,
-						"gzip": 1130,
-						"brotli": 1040
-					},
-					{
-						"file": "build/chunk-Bndimj2d2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 83,
-						"gzip": 95,
-						"brotli": 87
-					},
-					{
-						"file": "build/chunk-BOglAY9o.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/runtime/src/graph-scheduler.ts"],
-						"raw": 285,
-						"gzip": 206,
-						"brotli": 185
-					},
-					{
-						"file": "build/chunk-BReVUYfV.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 76,
-						"gzip": 91,
-						"brotli": 80
-					},
-					{
-						"file": "build/chunk-BSmfu8WF.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/runtime/src/graph-async.ts"],
-						"raw": 1529,
-						"gzip": 693,
-						"brotli": 637
-					},
-					{
-						"file": "build/chunk-Btma_K7Q.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/runtime/src/graph-core.ts"],
-						"raw": 1143,
-						"gzip": 555,
-						"brotli": 506
-					},
-					{
-						"file": "build/chunk-BudKrTQ-.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 81,
-						"gzip": 93,
-						"brotli": 85
-					},
-					{
-						"file": "build/chunk-BuR5LHiX.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 95,
-						"gzip": 110,
-						"brotli": 88
-					},
-					{
-						"file": "build/chunk-BuXE2gV8.js",
-						"bucket": "application",
-						"modules": [
-							"<repo>/demos/chat-stream/fixture/app.tsrx",
-							"<repo>/demos/chat-stream/fixture/index.html",
-							"<repo>/demos/chat-stream/fixture/main.ts"
-						],
-						"raw": 5672,
-						"gzip": 2387,
-						"brotli": 2098
-					},
-					{
-						"file": "build/chunk-Bv9gJNAy.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume.ts"],
-						"raw": 1945,
-						"gzip": 937,
-						"brotli": 848
-					},
-					{
-						"file": "build/chunk-BX-f7Rso.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/dom-journal.ts"],
-						"raw": 2039,
-						"gzip": 807,
-						"brotli": 716
-					},
-					{
-						"file": "build/chunk-BxBETWbe.js",
-						"bucket": "framework",
-						"modules": ["\u0000rolldown/runtime.js"],
-						"raw": 50,
-						"gzip": 67,
-						"brotli": 54
-					},
-					{
-						"file": "build/chunk-BZ4Dde9A.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 82,
-						"gzip": 97,
-						"brotli": 73
-					},
-					{
-						"file": "build/chunk-C_LSHtDt.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/runtime/src/graph-computed.ts"],
-						"raw": 1111,
-						"gzip": 448,
-						"brotli": 404
-					},
-					{
-						"file": "build/chunk-C9YgJC6v.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 81,
-						"gzip": 96,
-						"brotli": 70
-					},
-					{
-						"file": "build/chunk-CAN34U6B2.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-shared-patch.ts"],
-						"raw": 675,
-						"gzip": 331,
-						"brotli": 279
-					},
-					{
-						"file": "build/chunk-CeNTnHBJ2.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-handoff.ts"],
-						"raw": 711,
-						"gzip": 423,
-						"brotli": 367
-					},
-					{
-						"file": "build/chunk-CG9WmV7I2.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-runtime-start.ts"],
-						"raw": 3694,
-						"gzip": 1423,
-						"brotli": 1277
-					},
-					{
-						"file": "build/chunk-CIlsefk8.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-locators.ts"],
-						"raw": 1243,
-						"gzip": 587,
-						"brotli": 529
-					},
-					{
-						"file": "build/chunk-CLDJblcP2.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-runtime.ts"],
-						"raw": 5564,
-						"gzip": 2009,
-						"brotli": 1841
-					},
-					{
-						"file": "build/chunk-CqbGyKCN2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 171,
-						"gzip": 152,
-						"brotli": 119
-					},
-					{
-						"file": "build/chunk-Cv06Pqj72.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-events.ts"],
-						"raw": 4085,
-						"gzip": 1608,
-						"brotli": 1461
-					},
-					{
-						"file": "build/chunk-CV7DdLM2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 107,
-						"gzip": 109,
-						"brotli": 90
-					},
-					{
-						"file": "build/chunk-CWCk73G62.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-behaviors.ts"],
-						"raw": 4008,
-						"gzip": 1622,
-						"brotli": 1508
-					},
-					{
-						"file": "build/chunk-CWeNn6uE.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 85,
-						"gzip": 97,
-						"brotli": 78
-					},
-					{
-						"file": "build/chunk-CwEt8X4f.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/payload-resume.ts"],
-						"raw": 1557,
-						"gzip": 739,
-						"brotli": 664
-					},
-					{
-						"file": "build/chunk-Cx9hHpQF.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 81,
-						"gzip": 93,
-						"brotli": 85
-					},
-					{
-						"file": "build/chunk-CyqPGuzm2.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-branches.ts"],
-						"raw": 6483,
-						"gzip": 2457,
-						"brotli": 2260
-					},
-					{
-						"file": "build/chunk-D1a6cAp2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 78,
-						"gzip": 93,
-						"brotli": 82
-					},
-					{
-						"file": "build/chunk-D1Xxm3Ne.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 190,
-						"gzip": 155,
-						"brotli": 132
-					},
-					{
-						"file": "build/chunk-D2-C8nqa2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 81,
-						"gzip": 93,
-						"brotli": 85
-					},
-					{
-						"file": "build/chunk-D26W3ogb.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 95,
-						"gzip": 107,
-						"brotli": 90
-					},
-					{
-						"file": "build/chunk-D2NHE9A72.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 86,
-						"gzip": 101,
-						"brotli": 89
-					},
-					{
-						"file": "build/chunk-D3WDOqqg.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/runtime/src/graph-shared.ts"],
-						"raw": 1606,
-						"gzip": 744,
-						"brotli": 688
-					},
-					{
-						"file": "build/chunk-D4o1AYIl.js",
-						"bucket": "framework",
-						"modules": [
-							"<repo>/packages/web/src/repeat-runtime.ts",
-							"<repo>/packages/web/src/resume-keyed-repeats.ts"
-						],
-						"raw": 3326,
-						"gzip": 1328,
-						"brotli": 1170
-					},
-					{
-						"file": "build/chunk-D87bLccf.js",
-						"bucket": "framework",
-						"modules": [
-							"<repo>/packages/serializer/src/value-decode-client.ts",
-							"<repo>/packages/serializer/src/value-decode-extensions.ts"
-						],
-						"raw": 2667,
-						"gzip": 965,
-						"brotli": 877
-					},
-					{
-						"file": "build/chunk-DFA7_p_I2.js",
-						"bucket": "application",
-						"modules": ["<repo>/demos/chat-stream/fixture/data.ts"],
-						"raw": 1798,
-						"gzip": 936,
-						"brotli": 822
-					},
-					{
-						"file": "build/chunk-Dg-kg0Xf2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 88,
-						"gzip": 100,
-						"brotli": 84
-					},
-					{
-						"file": "build/chunk-DIWhpeqr.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 87,
-						"gzip": 99,
-						"brotli": 86
-					},
-					{
-						"file": "build/chunk-Dmr7G0zV2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 81,
-						"gzip": 93,
-						"brotli": 85
-					},
-					{
-						"file": "build/chunk-DsnlnPqW.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/inline/resume-errors.ts"],
-						"raw": 756,
-						"gzip": 386,
-						"brotli": 325
-					},
-					{
-						"file": "build/chunk-DulkSE0f2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 77,
-						"gzip": 92,
-						"brotli": 81
-					},
-					{
-						"file": "build/chunk-DUPlLAEB2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 115,
-						"gzip": 130,
-						"brotli": 106
-					},
-					{
-						"file": "build/chunk-fV0aC52b.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/serializer/src/protocol-client.ts"],
-						"raw": 3379,
-						"gzip": 1344,
-						"brotli": 1165
-					},
-					{
-						"file": "build/chunk-G5hzN1Im2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 131,
-						"gzip": 128,
-						"brotli": 101
-					},
-					{
-						"file": "build/chunk-KR1KqnxX2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 80,
-						"gzip": 95,
-						"brotli": 84
-					},
-					{
-						"file": "build/chunk-m17ZsAZK2.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-sync-demand.ts"],
-						"raw": 781,
-						"gzip": 447,
-						"brotli": 394
-					},
-					{
-						"file": "build/chunk-qprakVNv.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-async-wiring.ts"],
-						"raw": 2895,
-						"gzip": 1261,
-						"brotli": 1138
-					},
-					{
-						"file": "build/chunk-VkTFf7rT2.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-runtime-shared.ts"],
-						"raw": 1210,
-						"gzip": 594,
-						"brotli": 531
-					},
-					{
-						"file": "build/chunk-Vvq1qz5J2.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/web/src/resume-sync-computed.ts"],
-						"raw": 683,
-						"gzip": 404,
-						"brotli": 367
-					},
-					{
-						"file": "build/chunk-wFUEAYqU.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 253,
-						"gzip": 181,
-						"brotli": 145
-					},
-					{
-						"file": "build/chunk-WwsHco722.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 78,
-						"gzip": 93,
-						"brotli": 72
-					},
-					{
-						"file": "build/chunk-XwXw5R2G.js",
-						"bucket": "framework",
-						"modules": ["<repo>/packages/runtime/src/graph-collections.ts"],
-						"raw": 2273,
-						"gzip": 900,
-						"brotli": 805
-					},
-					{
-						"file": "build/chunk-yAJoOjDq2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 91,
-						"gzip": 106,
-						"brotli": 95
-					},
-					{
-						"file": "build/chunk-yxGh1S3V2.js",
-						"bucket": "framework",
-						"modules": [],
-						"raw": 73,
-						"gzip": 88,
-						"brotli": 72
+							{
+								"category": "author",
+								"key": "app.tsrx",
+								"bytes": 4587
+							},
+							{
+								"category": "author",
+								"key": "data.ts",
+								"bytes": 3340
+							},
+							{
+								"category": "author",
+								"key": "index.html",
+								"bytes": 166
+							},
+							{
+								"category": "author",
+								"key": "main.ts",
+								"bytes": 1899
+							},
+							{
+								"category": "author",
+								"key": "virtual:markless:render-data:app.tsrx",
+								"bytes": 9084
+							},
+							{
+								"category": "author",
+								"key": "virtual:markless:symbol:app.tsrx:symbol:0",
+								"bytes": 498
+							},
+							{
+								"category": "author",
+								"key": "virtual:markless:symbol:app.tsrx:symbol:1",
+								"bytes": 502
+							},
+							{
+								"category": "author",
+								"key": "virtual:markless:symbol:app.tsrx:symbol:2",
+								"bytes": 1053
+							},
+							{
+								"category": "author",
+								"key": "virtual:markless:symbol:app.tsrx:symbol:3",
+								"bytes": 785
+							},
+							{
+								"category": "author",
+								"key": "virtual:markless:symbol:app.tsrx:symbol:4",
+								"bytes": 1002
+							},
+							{
+								"category": "glue",
+								"key": "vite/preload-helper.js",
+								"bytes": 2625
+							},
+							{
+								"category": "runtime",
+								"key": "runtime/graph",
+								"bytes": 8418
+							},
+							{
+								"category": "runtime",
+								"key": "runtime/graph-async",
+								"bytes": 4114
+							},
+							{
+								"category": "runtime",
+								"key": "runtime/graph-collections",
+								"bytes": 4270
+							},
+							{
+								"category": "runtime",
+								"key": "runtime/graph-computed",
+								"bytes": 2303
+							},
+							{
+								"category": "runtime",
+								"key": "runtime/graph-core",
+								"bytes": 2223
+							},
+							{
+								"category": "runtime",
+								"key": "runtime/graph-scheduler",
+								"bytes": 567
+							},
+							{
+								"category": "runtime",
+								"key": "runtime/graph-shared",
+								"bytes": 3646
+							},
+							{
+								"category": "runtime",
+								"key": "runtime/index",
+								"bytes": 140
+							},
+							{
+								"category": "runtime",
+								"key": "serializer/async-boundary-arm",
+								"bytes": 291
+							},
+							{
+								"category": "runtime",
+								"key": "serializer/payload-scripts",
+								"bytes": 599
+							},
+							{
+								"category": "runtime",
+								"key": "serializer/protocol",
+								"bytes": 558
+							},
+							{
+								"category": "runtime",
+								"key": "serializer/protocol-constants",
+								"bytes": 530
+							},
+							{
+								"category": "runtime",
+								"key": "serializer/protocol-event-names",
+								"bytes": 252
+							},
+							{
+								"category": "runtime",
+								"key": "serializer/storage-slot",
+								"bytes": 475
+							},
+							{
+								"category": "runtime",
+								"key": "serializer/value-constants",
+								"bytes": 348
+							},
+							{
+								"category": "runtime",
+								"key": "serializer/value-decode-client",
+								"bytes": 3568
+							},
+							{
+								"category": "runtime",
+								"key": "serializer/value-decode-extensions",
+								"bytes": 1708
+							},
+							{
+								"category": "runtime",
+								"key": "web/coded-error",
+								"bytes": 356
+							},
+							{
+								"category": "runtime",
+								"key": "web/control-edit-hold",
+								"bytes": 1467
+							},
+							{
+								"category": "runtime",
+								"key": "web/dom-attribute",
+								"bytes": 340
+							},
+							{
+								"category": "runtime",
+								"key": "web/dom-journal",
+								"bytes": 7365
+							},
+							{
+								"category": "runtime",
+								"key": "web/fns/bound-symbol",
+								"bytes": 1613
+							},
+							{
+								"category": "runtime",
+								"key": "web/fns/composition",
+								"bytes": 18699
+							},
+							{
+								"category": "runtime",
+								"key": "web/fns/direct",
+								"bytes": 16837
+							},
+							{
+								"category": "runtime",
+								"key": "web/fns/element-handle-prop",
+								"bytes": 739
+							},
+							{
+								"category": "runtime",
+								"key": "web/fns/instance-scope",
+								"bytes": 13370
+							},
+							{
+								"category": "runtime",
+								"key": "web/fns/row-mint",
+								"bytes": 4254
+							},
+							{
+								"category": "runtime",
+								"key": "web/fns/ssr",
+								"bytes": 29854
+							},
+							{
+								"category": "runtime",
+								"key": "web/inline/resume-errors",
+								"bytes": 1425
+							},
+							{
+								"category": "runtime",
+								"key": "web/inline/sync-policy-core",
+								"bytes": 1243
+							},
+							{
+								"category": "runtime",
+								"key": "web/payload-graph-construct",
+								"bytes": 4372
+							},
+							{
+								"category": "runtime",
+								"key": "web/prerender/evaluator",
+								"bytes": 20798
+							},
+							{
+								"category": "runtime",
+								"key": "web/prerender/shared-seed-slot",
+								"bytes": 2824
+							},
+							{
+								"category": "runtime",
+								"key": "web/prerender/staged-graph",
+								"bytes": 399
+							},
+							{
+								"category": "runtime",
+								"key": "web/reconcile-plane-slot",
+								"bytes": 254
+							},
+							{
+								"category": "runtime",
+								"key": "web/render",
+								"bytes": 3995
+							},
+							{
+								"category": "runtime",
+								"key": "web/render-canonical",
+								"bytes": 2005
+							},
+							{
+								"category": "runtime",
+								"key": "web/render-csr",
+								"bytes": 15809
+							},
+							{
+								"category": "runtime",
+								"key": "web/render-route-holder",
+								"bytes": 741
+							},
+							{
+								"category": "runtime",
+								"key": "web/repeat-runtime",
+								"bytes": 2598
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume",
+								"bytes": 3397
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-anchor-census",
+								"bytes": 364
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-arm-records",
+								"bytes": 6264
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-census",
+								"bytes": 1459
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-commit-arm",
+								"bytes": 9068
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-events",
+								"bytes": 15300
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-handle-qualifier",
+								"bytes": 491
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-handoff",
+								"bytes": 1348
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-keyed-repeats",
+								"bytes": 14364
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-locators",
+								"bytes": 5471
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-runtime",
+								"bytes": 14970
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-runtime-shared",
+								"bytes": 2077
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-runtime-start",
+								"bytes": 8564
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-shared-patch",
+								"bytes": 1188
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-sync-computed",
+								"bytes": 1526
+							},
+							{
+								"category": "runtime",
+								"key": "web/resume-sync-demand",
+								"bytes": 1087
+							},
+							{
+								"category": "runtime",
+								"key": "web/runtime-error-reporting",
+								"bytes": 1864
+							},
+							{
+								"category": "runtime",
+								"key": "web/ssr-data/awaitable",
+								"bytes": 844
+							},
+							{
+								"category": "runtime",
+								"key": "web/ssr-data/branch-arm-idrefs",
+								"bytes": 1754
+							},
+							{
+								"category": "runtime",
+								"key": "web/ssr-data/renderer",
+								"bytes": 19177
+							},
+							{
+								"category": "runtime",
+								"key": "web/storage-plane",
+								"bytes": 1647
+							}
+						]
 					}
 				]
 			}

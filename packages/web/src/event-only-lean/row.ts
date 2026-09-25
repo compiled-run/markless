@@ -51,7 +51,7 @@ export async function resumeScalarRowEventFromPayloadDocument(
 		findKeyedRepeatRowEventMatch,
 		findRepeatItemByKey,
 		validateOneRepeat,
-	} = await import('../resume-keyed-repeats.ts');
+	} = await import('../resume-keyed-repeats-lazy.ts');
 	const rowDispatch = findKeyedRepeatRowEventMatch({
 		graph: graph as never,
 		view: { keyedRepeats: plan.keyedRepeats },
@@ -70,7 +70,7 @@ export async function resumeScalarRowEventFromPayloadDocument(
 	}
 	const activeRecord = rowDispatch.match.rowEvent;
 	if (activeRecord.syncPolicy && !input.syncPolicyAlreadyApplied) {
-		const { runSyncPolicyActions } = await import('../inline/sync-policy-core.ts');
+		const { runSyncPolicyActions } = await import('../inline/sync-policy-core-lazy.ts');
 		runSyncPolicyActions(activeRecord.syncPolicy, graph, input.event);
 	}
 	validateOneRepeat(graph as never, rowDispatch.match.repeat);

@@ -72,11 +72,11 @@ async function highlightParts(code: string, id: string): Promise<string> {
 	const rewrites = new Map<string, string>();
 	const headings: Heading[] = [];
 	const seen = new Set<string>();
-	const rewritten: (string | undefined)[] = [];
+	const highlighted: (Promise<string> | undefined)[] = [];
 	let firstHtml = -1;
 	for (const [index, part] of parts.entries()) {
 		if (part.kind !== 'html') {
-			rewritten.push(undefined);
+			highlighted.push(undefined);
 			continue;
 		}
 		const counted = countElements(part.html);
@@ -86,8 +86,11 @@ async function highlightParts(code: string, id: string): Promise<string> {
 					`(counted ${counted}, part says ${part.elementCount}). Island offsets would move; refusing to rewrite.`,
 			);
 		if (firstHtml < 0 && part.html.trim() !== '') firstHtml = index;
-		rewritten.push(collectHeadings(await highlightFences(part.html), seen, headings));
+		highlighted.push(highlightFences(part.html));
 	}
+	const rewritten = (await Promise.all(highlighted)).map((html) =>
+		html === undefined ? undefined : collectHeadings(html, seen, headings),
+	);
 	const outline = outlineMarkup(headings);
 	if (outline && firstHtml >= 0)
 		rewritten[firstHtml] = spliceOutline(rewritten[firstHtml] ?? '', outline);

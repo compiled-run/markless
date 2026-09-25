@@ -1395,6 +1395,85 @@ test('one chunk reached under two names is charged once', async () => {
 	expect(charged).not.toContain(symbolId);
 });
 
+test('a packed chunk charges each module its own share, not the whole chunk per module', async () => {
+	const events = '/workspace/packages/web/src/resume-events.ts';
+	const branches = '/workspace/packages/web/src/resume-branches.ts';
+	const pack = sizeChunk('build/chunk-pack.js', [events, branches, `\0${APP_SYMBOL_ID}`], 'x'.repeat(1000));
+	const asset = await createExecutionSizesAsset(
+		{
+			'build/chunk-pack.js': pack,
+			'build/chunk-log.js': sizeChunk('build/chunk-log.js', [`\0${MARKLESS_EXECUTION_LOG_MODULE_ID}`]),
+		},
+		sizeMetadata({ fileName: 'chunk-pack.js' }),
+		stripBuild,
+		undefined,
+		{
+			renderedModules: new Map([
+				[
+					pack,
+					[
+						[events, 600],
+						[branches, 300],
+						[`\0${APP_SYMBOL_ID}`, 100],
+					],
+				],
+			]),
+		},
+	);
+	const sizes = JSON.parse(String(asset.source)) as Record<
+		string,
+		{ raw: number; module?: true; alias?: string[] }
+	>;
+	expect(sizes['web:resume-events']).toMatchObject({ raw: 600, module: true });
+	expect(sizes['web:resume-branches']).toMatchObject({ raw: 300, module: true });
+	expect(sizes[APP_SYMBOL_ID]).toMatchObject({ raw: 100, module: true });
+	expect(sizes['./chunk-pack.js']).toMatchObject({ raw: 100, alias: [APP_SYMBOL_ID] });
+
+	const attributes = stubExecutionLogDom();
+	vi.stubGlobal(
+		'fetch',
+		vi.fn(async () => ({ ok: true, json: async () => sizes })),
+	);
+	vi.spyOn(console, 'groupCollapsed').mockImplementation(() => {});
+	vi.spyOn(console, 'groupEnd').mockImplementation(() => {});
+	vi.spyOn(console, 'log').mockImplementation(() => {});
+	(globalThis as ExecutionLogGlobal).__mxLog = new Set();
+	const mod = await importExecutionLogModule(
+		executionLogVirtualModuleSource({ sizesUrl: '/execution-sizes.json' }),
+	);
+	await mod.logMarklessInteraction({
+		eventName: 'click',
+		selector: 'button',
+		eventRecord: { hostNodeId: 'h1', symbolIds: [APP_SYMBOL_ID] },
+		dispatchModuleId: EXECUTION_LOG_DISPATCH_MODULE_IDS[1],
+		before: new Set<string>(),
+		after: new Set(['./chunk-pack.js']),
+	});
+	expect(attributes.get('data-markless-log-unit')).toBe('module-raw-bytes');
+	expect(Number(attributes.get('data-markless-log-framework-bytes'))).toBe(600);
+	expect(Number(attributes.get('data-markless-log-app-bytes'))).toBe(100);
+	expect(
+		attributes
+			.get('data-markless-log-turn-modules')!
+			.split(' ')
+			.filter((id) => id !== MARKLESS_EXECUTION_LOG_MODULE_ID)
+			.sort(),
+	).toEqual([APP_SYMBOL_ID, 'web:resume-events'].sort());
+
+	await mod.logMarklessInteraction({
+		eventName: 'click',
+		selector: 'button',
+		eventRecord: { hostNodeId: 'h1', symbolIds: [APP_SYMBOL_ID] },
+		dispatchModuleId: EXECUTION_LOG_DISPATCH_MODULE_IDS[1],
+		before: new Set(['./chunk-pack.js']),
+		after: new Set(['./chunk-pack.js', 'web:resume-branches']),
+	});
+	// The second click's only new module is charged; the pack is not charged again.
+	expect(Number(attributes.get('data-markless-log-framework-bytes'))).toBe(300);
+	expect(Number(attributes.get('data-markless-log-app-bytes'))).toBe(0);
+	expect(attributes.get('data-markless-log-turn-modules')).toBe('web:resume-branches');
+});
+
 test('a prop-passed handler joins through the owning ancestor scope', async () => {
 	const attributes = stubExecutionLogDom('pages/index.tsrx');
 	const source = (name: string) => encodeURIComponent(`/workspace/src/${name}.tsrx`);

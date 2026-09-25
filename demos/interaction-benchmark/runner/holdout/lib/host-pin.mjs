@@ -11,6 +11,8 @@ export async function startHostPin(upstream) {
 		const headers = { ...req.headers, host: target.host };
 		for (const name of Object.keys(headers))
 			if (name.startsWith('x-forwarded-')) delete headers[name];
+		// The proxy compresses every response; a preview server asked for br recompresses each request far slower.
+		headers['accept-encoding'] = 'identity';
 		const out = http.request(
 			{
 				hostname: target.hostname,

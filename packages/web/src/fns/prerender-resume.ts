@@ -117,6 +117,7 @@ async function adoptStreamedForWake<
 			'script[type="markless/arm"],script[type="markless/state-patch"]',
 		)
 	) {
+		(input.root as { __mAdopted?: boolean }).__mAdopted = true;
 		return input;
 	}
 	const { adoptStreamedArmPatches } = await import('../resume-stream-patches.ts');

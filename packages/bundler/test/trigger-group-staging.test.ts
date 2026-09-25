@@ -401,8 +401,38 @@ test('self-wake groups render settled arms through their demand-loaded update sy
 	);
 	expect(renderer).toContain("from '@markless/web/fns/prerender-resume'");
 	expect(renderer).toContain('renderPrerenderBoundary(');
-	expect(renderer).toContain('marklessPreparedBoundaryArms.set');
-	expect(renderer).toContain('marklessPreparedBoundaryArms.delete');
+});
+
+// Two groups can re-settle one boundary at once, each preparing on its own graph
+// before it renders; one group's render must not take the arm the other prepared.
+test('a boundary prepared on two graphs at once renders each graph its own arm', async () => {
+	const body = emitPrerenderBoundaryRendererModule('virtual:markless:render-data:App')
+		.split('\n')
+		.filter((line) => !line.startsWith('import '))
+		.join('\n')
+		.replaceAll('export ', '');
+	const load = new Function(
+		'marklessPrerenderData',
+		'renderPrerenderBoundary',
+		`${body}\nreturn { prepareBoundaryArm, renderBoundaryArm };`,
+	) as (
+		data: unknown,
+		render: (data: unknown, boundaryId: string, status: string, graph: object) => Promise<unknown>,
+	) => {
+		prepareBoundaryArm: (boundaryId: string, status: string, graph: object) => Promise<void>;
+		renderBoundaryArm: (boundaryId: string, status: string, graph: object) => unknown;
+	};
+	const renderer = load({}, async (_data, _boundaryId, _status, graph) => ({ graph }));
+	const first = {};
+	const second = {};
+	await Promise.all([
+		renderer.prepareBoundaryArm('boundary:0', 'fulfilled', first),
+		renderer.prepareBoundaryArm('boundary:0', 'fulfilled', second),
+	]);
+
+	expect(renderer.renderBoundaryArm('boundary:0', 'fulfilled', first)).toEqual({ graph: first });
+	expect(renderer.renderBoundaryArm('boundary:0', 'fulfilled', second)).toEqual({ graph: second });
+	expect(() => renderer.renderBoundaryArm('boundary:0', 'fulfilled', first)).toThrow(/was not prepared/);
 });
 
 test('keeps every arm record and its lazy symbols when a staged group touches a branch', () => {

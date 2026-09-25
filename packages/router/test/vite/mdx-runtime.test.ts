@@ -13,6 +13,7 @@ import {
 	STORAGE_PROTOCOL_VERSION,
 } from '../../../serializer/src/protocol-constants.ts';
 import { transformMdxRoute } from '../../src/vite/mdx.ts';
+import { renderSsrData, type SsrRenderData } from '../../../web/src/ssr-data/renderer.ts';
 
 // A loader answers with a symbol, and the route scopes what it gets back, so a
 // stand-in has to be callable for its answer to survive the round trip.
@@ -161,6 +162,111 @@ describe('renderMdxChild with async compiled artifacts', () => {
 		expect((children[0] as { output: { html: string } }).output.html).toBe(
 			'<div data-mdx-counter>MDX Count 0</div>',
 		);
+	});
+});
+
+// A layout the compiler emits for `<section>{children}<button /></section>`: the
+// button's locator index is only right if the children's elements are counted.
+const layoutRenderData = {
+	root: { componentName: 'Layout', templateId: 'template:Layout' },
+	chunks: [
+		{
+			id: 'template:Layout',
+			kind: 'template',
+			componentName: 'Layout',
+			statics: ['<section><!--markless-slot:0-->', '<button>go</button></section>'],
+			hosts: [
+				{ hostNodeId: 'h0', tagName: 'section', coordinate: { kind: 'child-index', path: [0] } },
+				{ hostNodeId: 'h1', tagName: 'button', coordinate: { kind: 'child-index', path: [0, 1] } },
+			],
+			slots: [
+				{
+					kind: 'text',
+					raw: true,
+					residue: { kind: 'graph-read', graphNodeId: 'prop:props', path: ['children'] },
+					coordinate: { kind: 'comment-anchor', path: [0, 0] },
+					staticIndex: 0,
+				},
+			],
+		},
+	],
+} as unknown as SsrRenderData;
+
+const layoutArtifact = {
+	async renderSsr(props: unknown) {
+		const rendered = await renderSsrData({
+			renderData: layoutRenderData,
+			read: (residue) =>
+				residue.kind === 'graph-read'
+					? (props as Record<string, unknown>)[String(residue.path[0])]
+					: undefined,
+		});
+		return {
+			html: rendered.html,
+			elementCount: rendered.structure.elementCount,
+			locators: rendered.structure.locators,
+		};
+	},
+};
+
+describe('MDX children passed into a TSRX layout', () => {
+	it('renders the children as markup and counts their elements where the layout puts them', async () => {
+		const children: MdxChild[] = [];
+		const html = await renderMdxChild(
+			children,
+			layoutArtifact as never,
+			{ children: '<p>Some <strong>bold</strong> text.</p>' },
+			{
+				componentIndex: 0,
+				hostPrefix: 'm0:',
+				symbolPrefix: 'm0:',
+				childrenElementTags: ['p', 'strong'],
+			},
+		);
+
+		expect(html).toBe('<section><p>Some <strong>bold</strong> text.</p><button>go</button></section>');
+		const output = children[0]!.output as { elementCount: number; locators: Array<{ hostNodeId: string; index: number }> };
+		expect(output.elementCount).toBe(4);
+		expect(output.locators.find((locator) => locator.hostNodeId === 'h1')?.index).toBe(3);
+	});
+
+	it('advances the next island past the children the previous island rendered', async () => {
+		const children: MdxChild[] = [];
+		for (const componentIndex of [0, 1]) {
+			await renderMdxChild(
+				children,
+				layoutArtifact as never,
+				{ children: '<ul><li>a</li><li>b</li></ul>' },
+				{
+					componentIndex,
+					hostPrefix: `m${componentIndex}:`,
+					symbolPrefix: `m${componentIndex}:`,
+					childrenElementTags: ['ul', 'li', 'li'],
+				},
+			);
+		}
+		const view = composeMdxView(
+			[
+				{ kind: 'component', componentIndex: 0 },
+				{ kind: 'component', componentIndex: 1 },
+			],
+			children.map((child) => ({
+				...child,
+				output: {
+					...child.output,
+					view: {
+						version: 1,
+						locators: [{ hostNodeId: 'h1', index: 4, tagName: 'button' }],
+					},
+				},
+			})),
+			0,
+		);
+
+		expect(view?.locators?.map((locator) => [locator.hostNodeId, locator.index])).toEqual([
+			['m0:h1', 4],
+			['m1:h1', 9],
+		]);
 	});
 });
 

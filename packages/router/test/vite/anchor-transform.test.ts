@@ -17,7 +17,7 @@ describe('anchor transform', () => {
 			const source = `import { Link as RouteLink } from '${entry}';
 export default function Menu({ pages, replace, scroll }) @{
 	@for (const page of pages; key page.href) {
-		<RouteLink href={page.href} class={page.active ? 'active' : 'link'} replace={replace} scroll={scroll} prefetch="intent"><span>{page.title}</span></RouteLink>
+		<RouteLink href={page.href} class={page.active ? 'active' : 'link'} replace={replace} scroll={scroll} prefetch={false}><span>{page.title}</span></RouteLink>
 	}
 }`;
 			const plugin = anchorTransformPlugin();
@@ -38,7 +38,7 @@ export default function Menu({ pages, replace, scroll }) @{
 				"data-markless-router-scroll={(scroll) === false ? 'manual' : undefined}",
 			);
 			expect(result?.code).toContain('<span>{page.title}</span></a>');
-			expect(result?.code).toContain('data-markless-router-prefetch="intent"');
+			expect(result?.code).toContain('data-markless-router-prefetch="none"');
 			expect(result?.code).not.toMatch(/\sprefetch=/);
 		},
 	);
@@ -46,7 +46,7 @@ export default function Menu({ pages, replace, scroll }) @{
 		const source = `import { Link } from '@markless/router';
 export default function Nav({ mode }) @{
 	<nav>
-		<Link href="/a" prefetch="viewport">A</Link>
+		<Link href="/a" prefetch={true}>A</Link>
 		<Link href="/b" prefetch={false}>B</Link>
 		<Link href="/c" prefetch>C</Link>
 		<Link href="/d" prefetch={mode}>D</Link>
@@ -60,15 +60,13 @@ export default function Nav({ mode }) @{
 			source,
 			'/project/nav.tsrx',
 		);
-		expect(result?.code).toContain(
-			'<a data-markless-router-link href="/a" data-markless-router-prefetch="viewport">A</a>',
-		);
+		expect(result?.code).toContain('<a data-markless-router-link href="/a">A</a>');
 		expect(result?.code).toContain(
 			'<a data-markless-router-link href="/b" data-markless-router-prefetch="none">B</a>',
 		);
 		expect(result?.code).toContain('<a data-markless-router-link href="/c">C</a>');
 		expect(result?.code).toContain(
-			"data-markless-router-prefetch={(mode) === false ? 'none' : (mode) === 'intent' || (mode) === 'viewport' ? (mode) : undefined}",
+			"data-markless-router-prefetch={(mode) === false ? 'none' : undefined}",
 		);
 	});
 
@@ -118,7 +116,7 @@ export default () => {
   const slug = "hello";
 
   return (
-    <Link class="post" href="/blog/[slug]" params={{ slug }} prefetch="intent" replace scroll={false}>
+    <Link class="post" href="/blog/[slug]" params={{ slug }} prefetch={false} replace scroll={false}>
       Blog
     </Link>
   );
@@ -131,7 +129,7 @@ export default () => {
 			'import { __marklessRouteHref } from "virtual:markless-router/route-href";',
 		);
 		expect(transformed).toContain(
-			'<Link class="post" href={__marklessRouteHref("/blog/[slug]", { slug })} prefetch="intent" replace scroll={false}>',
+			'<Link class="post" href={__marklessRouteHref("/blog/[slug]", { slug })} prefetch={false} replace scroll={false}>',
 		);
 		expect(transformed).not.toContain('params=');
 	});

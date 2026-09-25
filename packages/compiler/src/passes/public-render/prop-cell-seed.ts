@@ -1,3 +1,4 @@
+import { PROTOCOL_PROP_GRAPH_NODE_PREFIX, PROTOCOL_PROPS_GRAPH_NODE_ID } from '@markless/serializer';
 import type { PublicRenderModuleInput } from '../../artifacts.ts';
 import type { AnyNode } from '../../ast/nodes.ts';
 import { componentDeriveGraphNodeIds } from './derive-set.ts';
@@ -8,11 +9,14 @@ import { componentPropCellId } from './shared.ts';
  * `keys` names the properties the bag must hold; `null` marks a cell that IS one
  * destructured prop. `scalarKeys` names properties only a resume-time derive
  * reads, which the payload carries only when their value is a scalar.
+ * `rowKeys` names properties a minted row's slots read, carried whatever their
+ * value unless the composer routes them to its own node.
  */
 export type SsrPropCellSeed = {
 	readonly graphNodeId: string;
 	readonly keys: ReadonlyArray<string> | null;
 	readonly scalarKeys?: ReadonlyArray<string>;
+	readonly rowKeys?: ReadonlyArray<string>;
 };
 
 type PropRead = {
@@ -61,6 +65,26 @@ function derivePropReads(
 	);
 }
 
+// The props a row template's expression slots read: a row minted after resume reads them back.
+function rowTemplatePropKeys(input: PublicRenderModuleInput, componentName: string): Set<string> {
+	const keys = new Set<string>();
+	for (const repeat of input.protocolView.keyedRepeats ?? []) {
+		const template = repeat.rowTemplate;
+		if (template?.componentName !== componentName) continue;
+		for (const slot of [...(template.textSlots ?? []), ...(template.attributeSlots ?? [])])
+			if ('reads' in slot)
+				for (const read of slot.reads ?? []) {
+					if (!read.graphNodeId.startsWith(PROTOCOL_PROP_GRAPH_NODE_PREFIX)) continue;
+					const key =
+						read.graphNodeId === PROTOCOL_PROPS_GRAPH_NODE_ID
+							? read.path[0]
+							: read.graphNodeId.slice(PROTOCOL_PROP_GRAPH_NODE_PREFIX.length);
+					if (key) keys.add(key);
+				}
+	}
+	return keys;
+}
+
 /**
  * The prop cells this component's server render has to leave in the payload. A
  * bag cell keeps only the properties something reads back: a props bag can hold
@@ -94,23 +118,31 @@ export function ssrPropCellSeeds(
 		deriveKeysByCell.set(graphNodeId, keys);
 	}
 
-	return [...new Set([...armKeysByCell.keys(), ...deriveKeysByCell.keys()])].flatMap(
-		(graphNodeId): SsrPropCellSeed[] => {
-			const armKeys = armKeysByCell.has(graphNodeId)
-				? (armKeysByCell.get(graphNodeId) ?? null)
-				: new Set<string>();
-			const deriveKeys = [...(deriveKeysByCell.get(graphNodeId) ?? [])];
-			if (armKeys === null) return [{ graphNodeId, keys: null }];
-			if (armKeys.size === 0 && deriveKeys.length === 0) return [];
-			return [
-				{
-					graphNodeId,
-					keys: [...armKeys],
-					...(deriveKeys.length > 0 ? { scalarKeys: deriveKeys } : {}),
-				},
-			];
-		},
-	);
+	const rowKeysByCell = new Map<string, Set<string>>();
+	const rowKeys = bagCellId ? rowTemplatePropKeys(input, componentName) : new Set<string>();
+	for (const key of rowKeys)
+		if (!armKeysByCell.get(bagCellId!)?.has(key) && !deriveKeysByCell.get(bagCellId!)?.has(key))
+			rowKeysByCell.set(bagCellId!, (rowKeysByCell.get(bagCellId!) ?? new Set()).add(key));
+
+	return [
+		...new Set([...armKeysByCell.keys(), ...deriveKeysByCell.keys(), ...rowKeysByCell.keys()]),
+	].flatMap((graphNodeId): SsrPropCellSeed[] => {
+		const armKeys = armKeysByCell.has(graphNodeId)
+			? (armKeysByCell.get(graphNodeId) ?? null)
+			: new Set<string>();
+		const deriveKeys = [...(deriveKeysByCell.get(graphNodeId) ?? [])];
+		const rowKeys = [...(rowKeysByCell.get(graphNodeId) ?? [])];
+		if (armKeys === null) return [{ graphNodeId, keys: null }];
+		if (armKeys.size === 0 && deriveKeys.length === 0 && rowKeys.length === 0) return [];
+		return [
+			{
+				graphNodeId,
+				keys: [...armKeys],
+				...(deriveKeys.length > 0 ? { scalarKeys: deriveKeys } : {}),
+				...(rowKeys.length > 0 ? { rowKeys } : {}),
+			},
+		];
+	});
 }
 
 // The composed state a server-rendered component returns, plus the prop cells

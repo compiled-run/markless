@@ -21,8 +21,11 @@ packages, not a published release.
 
 SSR (`renderMode: ssr`). Nitro serves every request and the router plugin renders it; the browser
 resumes the server's work instead of hydrating it. Configuration matches the docs site
-(`website/vite.config.ts`): `markless({ experimentalNativePacking: true })` plus
-`router({ linkPreloading: 'intent' })`.
+(`website/vite.config.ts`): `markless()`, which packs by default (`packing: false` opts out), plus
+`router()`. Navigation needs no setting: a link click fetches the destination's server-rendered
+region and resumes it (fragment navigation); a resting pointer, a press, focus or touch fetches it
+early, and on pages with few links an idle fetch takes at most two. `prefetch={false}` (on `router()`
+or on one `Link`) is the only knob and turns that early fetching off.
 
 App shape:
 
@@ -52,7 +55,7 @@ Run from `demos/interaction-benchmark/apps/markless` after `pnpm install` at the
 
 ## Build status on the current working tree
 
-`pnpm run build` succeeds with `experimentalNativePacking: true`, the configured entrant. Every
+`pnpm run build` succeeds with packing on (the default), the configured entrant. Every
 result below comes from that build.
 
 ## Contract status

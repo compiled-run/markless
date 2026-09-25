@@ -1,16 +1,27 @@
 import type { Plugin } from 'vite';
+import { rootRelativeId } from '../src/module-id.ts';
+import { isReExportOnlySource } from '../src/build/undemanded-runtime.ts';
 
 const WEB_SRC = '/packages/web/src/';
 const CORE_SRC = '/packages/core/src/';
 const MARKLESS_VIRTUAL_PREFIX = 'virtual:markless:';
 
 export function executedModulesPlugin(): Plugin {
+	let root: string | undefined;
 	return {
 		name: 'markless:test-executed-modules',
 		enforce: 'pre',
+		configResolved(config) {
+			root = config.root;
+		},
 		transform(code, id) {
-			const normalized = normalizedRuntimeModuleId(id);
-			if (!normalized) return null;
+			const found = normalizedRuntimeModuleId(id);
+			// The build respells symbol ids to their chunk URLs; every other id must not carry the checkout path.
+			const normalized =
+				found && !found.startsWith(`${MARKLESS_VIRTUAL_PREFIX}symbol:`)
+					? rootRelativeId(found, root)
+					: found;
+			if (!normalized || isReExportOnlySource(code)) return null;
 			return {
 				code:
 					`(globalThis.__marklessExecutedModules ??= new Set()).add(${JSON.stringify(normalized)});\n` +

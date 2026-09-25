@@ -1,5 +1,6 @@
 import type {
 	BoundSymbolResolverRow,
+	RenderDataArtifact,
 	SemanticComponentEdge,
 	SymbolResolverPlan,
 	TriggerGroupArtifact,
@@ -116,16 +117,19 @@ export function emitPrerenderBoundaryRendererModule(renderDataId: string): strin
 	return [
 		`import { marklessPrerenderData } from ${JSON.stringify(renderDataId)};`,
 		"import { renderPrerenderBoundary } from '@markless/web/fns/prerender-resume';",
-		'const marklessPreparedBoundaryArms = new Map();',
+		// Keyed by graph: two trigger groups can re-settle one boundary at once.
+		'const marklessPreparedBoundaryArms = new WeakMap();',
 		'export async function prepareBoundaryArm(boundaryId, status, graph, loadSymbol) {',
 		'\tconst rendered = await renderPrerenderBoundary(marklessPrerenderData, boundaryId, status, graph, loadSymbol);',
-		'\tmarklessPreparedBoundaryArms.set(`${boundaryId}:${status}`, rendered);',
+		'\tif (!marklessPreparedBoundaryArms.has(graph)) marklessPreparedBoundaryArms.set(graph, new Map());',
+		'\tmarklessPreparedBoundaryArms.get(graph).set(`${boundaryId}:${status}`, rendered);',
 		'}',
-		'export function renderBoundaryArm(boundaryId, status) {',
+		'export function renderBoundaryArm(boundaryId, status, graph) {',
 		'\tconst key = `${boundaryId}:${status}`;',
-		'\tconst rendered = marklessPreparedBoundaryArms.get(key);',
+		'\tconst prepared = marklessPreparedBoundaryArms.get(graph);',
+		'\tconst rendered = prepared?.get(key);',
 		'\tif (!rendered) throw new Error(`Markless prerender arm ${key} was not prepared.`);',
-		'\tmarklessPreparedBoundaryArms.delete(key);',
+		'\tprepared.delete(key);',
 		'\treturn rendered;',
 		'}',
 	].join('\n');
@@ -146,6 +150,7 @@ export function planPrerenderTriggerGroups(input: {
 	readonly symbolResolver: SymbolResolverPlan;
 	readonly boundRows: ReadonlyArray<BoundSymbolResolverRow>;
 	readonly componentEdges?: ReadonlyArray<SemanticComponentEdge>;
+	readonly renderData?: RenderDataArtifact;
 }): PrerenderTriggerGroup[] {
 	const symbols = new Map(input.symbolResolver.symbols.map((symbol) => [symbol.id, symbol]));
 	const bounds = new Map(input.boundRows.map((row) => [row.id, row]));
@@ -229,6 +234,7 @@ export function planPrerenderTriggerGroups(input: {
 				collectCompleteArmRecordClosure(arm, graphNodeIds, symbolIds);
 		}
 		const adoptedBoundaryIds = new Set<string>();
+		const escalatedHostNodeIds = new Set<string>();
 		for (const boundaryIndex of selfWakeBoundaries ?? []) {
 			const servedBoundary = input.view.asyncBoundaries[boundaryIndex]!;
 			selected.boundaries.add(boundaryIndex);
@@ -305,6 +311,24 @@ export function planPrerenderTriggerGroups(input: {
 				if (runnerSymbolId) symbolIds.add(runnerSymbolId);
 			}
 			selectViewSubscribers(closureView, graphNodeIds, symbolIds, selected);
+			const escalatedBranchIds = new Set<string>();
+			for (const index of selected.branches) {
+				const record = closureView.branches?.[index];
+				if (record?.escalates) escalatedBranchIds.add(record.id);
+			}
+			for (const index of selected.boundaries) {
+				const served = closureView.asyncBoundaries[index]!;
+				for (const arm of boundaryArmRecordSets(completeBoundaries.get(served.id) ?? served))
+					collectEscalatedArmBranchIds(arm, escalatedBranchIds);
+			}
+			for (const branchId of escalatedBranchIds)
+				collectEscalatedBranchClosure(
+					input,
+					branchId,
+					graphNodeIds,
+					symbolIds,
+					escalatedHostNodeIds,
+				);
 			// A gesture whose cells the settled arm reads must OWN that arm, or its
 			// write lands on a graph no record inside the arm is bound to and the
 			// next interaction there forks a second runtime off the raw prerender
@@ -343,6 +367,8 @@ export function planPrerenderTriggerGroups(input: {
 			changed = closureSize(graphNodeIds, symbolIds, selected) !== before;
 		}
 
+		// The arm commit registers an escalated arm's own hosts against the DOM it renders.
+		dropEscalatedHostRecords(closureView, selected, escalatedHostNodeIds);
 		const neededHosts = new Set<string>(branch ? [] : [event.hostNodeId]);
 		for (const index of selected.domUpdates)
 			neededHosts.add(closureView.domUpdates[index]!.hostNodeId);
@@ -509,6 +535,107 @@ function collectSettledArmHostRecordClosure(
 			for (const rowEvent of record.rowEvents)
 				for (const symbolId of rowEvent.symbolIds ?? []) symbolIds.add(symbolId);
 		}
+}
+
+function dropEscalatedHostRecords(
+	view: ProtocolViewPayload,
+	selected: {
+		readonly domUpdates: Set<number>;
+		readonly behaviors: Set<number>;
+		readonly elementHandles: Set<number>;
+		readonly repeats: Set<number>;
+	},
+	hostNodeIds: ReadonlySet<string>,
+): void {
+	if (hostNodeIds.size === 0) return;
+	const drop = (indexes: Set<number>, hostOf: (index: number) => string | undefined) => {
+		for (const index of indexes) if (hostNodeIds.has(hostOf(index) ?? '')) indexes.delete(index);
+	};
+	drop(selected.domUpdates, (index) => view.domUpdates[index]?.hostNodeId);
+	drop(selected.behaviors, (index) => view.behaviors[index]?.hostNodeId);
+	drop(selected.elementHandles, (index) => view.elementHandles[index]?.hostNodeId);
+	drop(selected.repeats, (index) => view.keyedRepeats?.[index]?.parentHostNodeId);
+}
+
+// An arm branch that flips with no update symbol of its own escalates through its boundary.
+function collectEscalatedArmBranchIds(
+	arm: {
+		readonly branches?: ReadonlyArray<{
+			readonly id: string;
+			readonly symbolId?: string;
+			readonly testReads?: ReadonlyArray<unknown>;
+			readonly armRecords?: ReadonlyArray<unknown>;
+		}>;
+	},
+	branchIds: Set<string>,
+): void {
+	for (const branch of arm.branches ?? []) {
+		if (!branch.symbolId && (branch.testReads?.length ?? 0) > 0) branchIds.add(branch.id);
+		for (const nested of branch.armRecords ?? [])
+			collectEscalatedArmBranchIds(nested as Parameters<typeof collectEscalatedArmBranchIds>[0], branchIds);
+	}
+}
+
+// An escalated flip runs the arm's components, naming their symbols through this group's resolver.
+function collectEscalatedBranchClosure(
+	input: {
+		readonly renderData?: RenderDataArtifact;
+		readonly symbolResolver: SymbolResolverPlan;
+		readonly boundRows: ReadonlyArray<BoundSymbolResolverRow>;
+	},
+	branchSiteId: string,
+	graphNodeIds: Set<string>,
+	symbolIds: Set<string>,
+	hostNodeIds: Set<string>,
+): void {
+	const renderData = input.renderData;
+	const branch = renderData?.branches.find((candidate) => candidate.branchSiteId === branchSiteId);
+	if (!renderData || !branch) return;
+	const chunks = new Map(renderData.chunks.map((chunk) => [chunk.id, chunk]));
+	const edgeIds = new Set<string>();
+	const walked = new Set<string>();
+	const walk = (chunkId: string | undefined) => {
+		if (!chunkId || walked.has(chunkId)) return;
+		walked.add(chunkId);
+		const chunk = chunks.get(chunkId);
+		if (!chunk) return;
+		for (const host of chunk.hosts) hostNodeIds.add(host.hostNodeId);
+		for (const slot of chunk.slots) {
+			if (slot.kind === 'child-component') {
+				edgeIds.add(slot.componentEdgeId);
+				walk(slot.childTemplateId);
+				walk(slot.projectionChunkId);
+			} else if (slot.kind === 'branch') for (const armId of slot.armTemplateIds) walk(armId);
+			else if (slot.kind === 'repeat') {
+				walk(slot.rowTemplateId);
+				walk(slot.emptyTemplateId);
+			} else if (slot.kind === 'async') {
+				walk(slot.armTemplateIds.try);
+				walk(slot.armTemplateIds.pending);
+				walk(slot.armTemplateIds.catch);
+			} else if (slot.kind === 'dynamic-host') walk(slot.childChunkId);
+			else if ('residue' in slot && slot.residue.kind === 'graph-read')
+				graphNodeIds.add(slot.residue.graphNodeId);
+		}
+	};
+	for (const armId of branch.armChunkIds) walk(armId);
+	// A text joining several holes reads its own derived node, not a template slot residue.
+	for (const symbol of input.symbolResolver.symbols)
+		if (symbol.kind === 'dom-update' && hostNodeIds.has(symbol.hostNodeId))
+			graphNodeIds.add(symbol.graphNodeId);
+	for (const symbol of input.symbolResolver.symbols) {
+		if (
+			('hostNodeId' in symbol && hostNodeIds.has(symbol.hostNodeId)) ||
+			(symbol.kind === 'callback-prop' && edgeIds.has(symbol.componentEdgeId)) ||
+			((symbol.kind === 'state-initializer' ||
+				symbol.kind === 'sync-computed-derive' ||
+				symbol.kind === 'async-computed-runner') &&
+				graphNodeIds.has(symbol.graphNodeId))
+		)
+			symbolIds.add(symbol.id);
+	}
+	for (const row of input.boundRows)
+		if (row.componentEdgePath.some((edgeId) => edgeIds.has(edgeId))) symbolIds.add(row.id);
 }
 
 function boundaryArmRecordSets(boundary: ProtocolViewPayload['asyncBoundaries'][number]) {

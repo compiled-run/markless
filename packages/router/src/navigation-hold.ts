@@ -8,7 +8,7 @@
 // (holdPendingSettleCommits raises the settle tracker's commit floor).
 // The settle-vs-deadline race itself is the SHARED pending-timing machine
 // (@markless/web pending-timing.ts) that also gates re-settle @pending (T120).
-import { settleOrPendingDeadline } from '@markless/web';
+import { settleOrPendingDeadline } from '@markless/web/fns/pending-timing';
 import { MARKLESS_NAV_PENDING_MIN_MS } from './navigation-timing.ts';
 
 // Injectable timer so tests control virtual time; production uses setTimeout.

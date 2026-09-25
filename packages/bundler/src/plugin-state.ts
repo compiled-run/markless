@@ -9,7 +9,7 @@ import {
 import type { LinkedModuleChildResolution } from '@markless/compiler';
 import type { createMarklessDevGraph } from './dev.ts';
 import { createBuildDelegateLoader } from './build/delegate-loader.ts';
-import { createDelegateModuleCache } from './link-driver.ts';
+import { createDelegateModuleCache, moduleLinkArtifact } from './link-driver.ts';
 import { hasExecutionLogModuleHook, requalifyExecutionLogModuleHook } from './execution-log.ts';
 import { ModuleMetadataRegistry } from './module-metadata-registry.ts';
 import { symbolExecutionLogId } from './module-id.ts';
@@ -230,11 +230,7 @@ export function registerTransformArtifacts(
 			);
 		}
 	}
-	state.moduleLinkArtifacts(input.environment).set(input.source, {
-		moduleGraphInterface: input.result.moduleGraphInterface,
-		interfaceHash: input.result.interfaceHash,
-		moduleImports: input.result.moduleImports,
-	});
+	state.moduleLinkArtifacts(input.environment).set(input.source, moduleLinkArtifact(input.result));
 	const previouslyOwned = state.transformVirtualModules.get(input.owner) ?? new Set<string>();
 	if (input.replaceOwnedArtifacts === true) {
 		for (const staleId of previouslyOwned) {

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'pathe';
 import type { Plugin } from 'vite';
 import { expect, test } from 'vitest';
-import { MARKLESS_ROUTER_CLIENT_ASSETS_MANIFEST } from '../../src/vite/client-assets-manifest.ts';
+import { clientAssetsManifestPath } from '../../src/vite/client-assets-manifest.ts';
 import { router } from '../../src/vite/index.ts';
 
 const flattenPlugins = (plugins: unknown[]): Plugin[] =>
@@ -56,7 +56,7 @@ test('collects stylesheets from a route’s dynamic and symbol chunks, and only 
 	const workspace = await mkdtemp(join(tmpdir(), 'markless-router-route-styles-'));
 	const root = join(workspace, 'app');
 	const clientOutDir = join(root, 'dist/client');
-	const manifestPath = join(clientOutDir, MARKLESS_ROUTER_CLIENT_ASSETS_MANIFEST);
+	const manifestPath = clientAssetsManifestPath(clientOutDir);
 	const resolvedConfig = {
 		base: '/app/',
 		command: 'build',

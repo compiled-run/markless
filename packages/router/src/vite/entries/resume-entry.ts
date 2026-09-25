@@ -11,15 +11,32 @@ export async function resumeContainerEvent(input: {
 	readonly [key: string]: unknown;
 }) {
 	const file = routeFileFromRoot(input.root);
-	const loadRouteResumeModule = file && routeResumeModuleLoader(file);
-	const routeResumeModule = loadRouteResumeModule
-		? await loadRouteModuleOnce(loadRouteResumeModule)
-		: undefined;
-	const resume = (routeResumeModule as RouteResumeModule | undefined)?.resumeContainerEvent;
-	if (typeof resume !== 'function') {
-		throw new Error(`Markless Router could not resume route module: ${file ?? '<unknown>'}`);
+	try {
+		const loadRouteResumeModule = file && routeResumeModuleLoader(file);
+		const routeResumeModule = loadRouteResumeModule
+			? await loadRouteModuleOnce(loadRouteResumeModule)
+			: undefined;
+		const resume = (routeResumeModule as RouteResumeModule | undefined)?.resumeContainerEvent;
+		if (typeof resume !== 'function') {
+			throw new Error(
+				`Markless Router could not resume route module: ${file ?? '<unknown>'}`,
+			);
+		}
+		await resume(input);
+	} catch (error) {
+		const failure = `${error}`;
+		// A gesture needing a chunk a deploy removed reloads once; the failure names the chunk's hashed URL.
+		if (
+			import.meta.env.DEV ||
+			!input.event ||
+			!/imported module|script failed/.test(failure) ||
+			sessionStorage.mlChunkReload === failure
+		) {
+			throw error;
+		}
+		sessionStorage.mlChunkReload = failure;
+		location.reload();
 	}
-	await resume(input);
 }
 
 interface RouteResumeModule {

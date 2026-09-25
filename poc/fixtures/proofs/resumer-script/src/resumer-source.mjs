@@ -20,6 +20,10 @@ export const EVENT_ONLY_RESUMER_ATTRIBUTION = {
 	fireOrderImportPromise: 7,
 	// Paired OXC builds measured 1,058 -> 1,090: gestures fired before boot are replayed.
 	earlyEventReplay: 32,
+	// Paired OXC builds measured 1,090 -> 1,104: elements the runtime commits after resume take events.
+	lateCommittedElements: 14,
+	// Paired OXC builds measured 1,104 -> 1,219: a followed link outside every repeat parent does not wake the page it leaves.
+	navigationLinkGuard: 115,
 	gzipCrossTerm: 3,
 };
 

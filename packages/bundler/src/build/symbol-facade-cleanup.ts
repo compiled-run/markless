@@ -613,7 +613,39 @@ function replaceIdentifierNames(code: string, replacements: ReadonlyMap<string, 
 		const replacement = replacements.get(name)!;
 		resolved.set(name, resolved.get(replacement) ?? replacement);
 	}
-	return code.replace(/(?<![$\w])[$A-Z_a-z][$\w]*/g, (name) => resolved.get(name) ?? name);
+	// A generated init export holds the prefix or ends in `$<digits>`, so only tokens around one can change.
+	if (names.some((name) => !name.includes(SYMBOL_INIT_EXPORT_PREFIX) && !/\$\d/.test(name)))
+		return code.replace(/(?<![$\w])[$A-Z_a-z][$\w]*/g, (name) => resolved.get(name) ?? name);
+	const anchors = new RegExp(`${escapeRegExp(SYMBOL_INIT_EXPORT_PREFIX)}|\\$\\d`, 'g');
+	let next = '';
+	let cursor = 0;
+	for (let match = anchors.exec(code); match; match = anchors.exec(code)) {
+		let start = match.index;
+		while (start > 0 && isIdentifierPart(code.charCodeAt(start - 1))) start--;
+		let end = match.index + match[0].length;
+		while (end < code.length && isIdentifierPart(code.charCodeAt(end))) end++;
+		anchors.lastIndex = end;
+		if (start < cursor || isDigit(code.charCodeAt(start))) continue;
+		const replacement = resolved.get(code.slice(start, end));
+		if (replacement === undefined) continue;
+		next += code.slice(cursor, start) + replacement;
+		cursor = end;
+	}
+	return cursor === 0 ? code : next + code.slice(cursor);
+}
+
+function isIdentifierPart(char: number): boolean {
+	return (
+		(char >= 48 && char <= 57) ||
+		(char >= 65 && char <= 90) ||
+		(char >= 97 && char <= 122) ||
+		char === 36 ||
+		char === 95
+	);
+}
+
+function isDigit(char: number): boolean {
+	return char >= 48 && char <= 57;
 }
 
 function identifierNameRE(name: string): RegExp {

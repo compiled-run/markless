@@ -220,3 +220,15 @@ export function importedSymbolRoutes(
 			: [],
 	);
 }
+
+// Where a composed child's elements sit, as its composer's render spells their host ids: the edge's position among its parent component's own edges.
+export function componentEdgeHostSegment(
+	edge: SemanticComponentEdge,
+	edges: ReadonlyArray<SemanticComponentEdge>,
+): string {
+	return protocolInstanceSegment(
+		edges
+			.filter((candidate) => candidate.parentComponentName === edge.parentComponentName)
+			.findIndex((candidate) => candidate.id === edge.id),
+	);
+}

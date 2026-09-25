@@ -1,4 +1,5 @@
 import { dirname, join, normalize, relative } from 'pathe';
+import { rootRelativeId } from '../module-id.ts';
 import { MARKLESS_VIRTUAL_PREFIX } from '../transform.ts';
 import type { MarklessSymbolManifestEntry, MarklessTransformManifest } from '../types.ts';
 import { executionLogIdentityOffsets } from './execution-log-hooks.ts';
@@ -80,6 +81,7 @@ export function scanGeneratedSymbolTableImports(code: string, chunkFileName: str
 export function verifyGeneratedSymbolTableRoutes(
 	bundle: Record<string, unknown>,
 	manifests: Iterable<MarklessTransformManifest>,
+	root?: string,
 ): SymbolTableIntegrityResult {
 	const chunks = collectChunks(bundle);
 	const errors: SymbolTableIntegrityError[] = [];
@@ -91,6 +93,7 @@ export function verifyGeneratedSymbolTableRoutes(
 			chunks,
 			manifest.resolver.virtualModuleId,
 			manifest.symbols,
+			root,
 		);
 		const routeChunk = resolverChunk ?? findSourceChunk(chunks, manifest.source);
 		if (!routeChunk) {
@@ -105,7 +108,12 @@ export function verifyGeneratedSymbolTableRoutes(
 		}
 
 		const table = resolverChunk
-			? findSymbolTable(routeChunk.code, manifest.symbols, manifest.resolver.virtualModuleId)
+			? findSymbolTable(
+					routeChunk.code,
+					manifest.symbols,
+					manifest.resolver.virtualModuleId,
+					root,
+				)
 			: undefined;
 		for (const symbol of manifest.symbols) {
 			if (!table) {
@@ -208,6 +216,7 @@ function findSymbolTable(
 	code: string,
 	symbols: readonly MarklessSymbolManifestEntry[],
 	resolverId?: string,
+	root?: string,
 ): ParsedSymbolTable | undefined {
 	let bestMatch: ParsedSymbolTable | undefined;
 	let bestScore = -1;
@@ -216,7 +225,8 @@ function findSymbolTable(
 		if (
 			identity !== undefined &&
 			resolverId !== undefined &&
-			normalizeVirtualId(identity) !== normalizeVirtualId(resolverId)
+			rootRelativeId(normalizeVirtualId(identity), root) !==
+				rootRelativeId(normalizeVirtualId(resolverId), root)
 		)
 			continue;
 		const moduleUrls = parseStringList(match[2]!);
@@ -295,7 +305,10 @@ function verifyDirectRoute(
 		)
 	)
 		return { claimedChunk: target.fileName };
-	if (!(target.exports ?? []).includes(symbol.exportName)) {
+	if (
+		!(target.exports ?? []).includes(symbol.exportName) &&
+		!namespacePickReaches(routeChunk, target, symbol)
+	) {
 		return {
 			claimedChunk: target.fileName,
 			reason: `claimed chunk does not export ${symbol.exportName}`,
@@ -311,6 +324,28 @@ function verifyDirectRoute(
 		};
 	}
 	return { claimedChunk: target.fileName };
+}
+
+// A symbol module packed into another chunk is reached as that module's namespace object: the loader must pick it off the import.
+function namespacePickReaches(
+	routeChunk: GeneratedChunk,
+	target: GeneratedChunk,
+	symbol: MarklessSymbolManifestEntry,
+): boolean {
+	if (
+		!symbolRenderedExports(target, normalizeVirtualId(symbol.virtualModuleId)).includes(
+			symbol.exportName,
+		)
+	)
+		return false;
+	const specifier = escapeRegExp(relativeChunkSpecifier(routeChunk.fileName, target.fileName));
+	return new RegExp(
+		String.raw`import\(\s*(["'\x60])${specifier}\1\s*\)\.then\(\s*\(?\s*([$\w]+)\s*\)?\s*=>\s*\(?\s*(?:\2\.[$\w]+\(\s*\)\s*,\s*)*\2\.[$\w]+\s*\)?\s*\)`,
+	).test(routeChunk.code);
+}
+
+function escapeRegExp(value: string): string {
+	return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 // Rolldown's dynamicImports metadata cannot see routes this plugin itself
@@ -462,13 +497,14 @@ function findResolverRouteChunk(
 	chunks: ReadonlyMap<string, GeneratedChunk>,
 	virtualId: string,
 	symbols: readonly MarklessSymbolManifestEntry[],
+	root: string | undefined,
 ): GeneratedChunk | undefined {
 	const normalized = normalizeVirtualId(virtualId);
 	const candidates = [...chunks.values()].filter((chunk) =>
 		virtualIds(chunk).includes(normalized),
 	);
 	return (
-		candidates.find((chunk) => !!findSymbolTable(chunk.code, symbols, virtualId)) ??
+		candidates.find((chunk) => !!findSymbolTable(chunk.code, symbols, virtualId, root)) ??
 		candidates.find((chunk) => chunk.moduleIds.map(normalizeVirtualId).includes(normalized)) ??
 		candidates[0]
 	);

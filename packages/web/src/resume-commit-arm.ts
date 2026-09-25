@@ -270,7 +270,7 @@ function registerArmDomUpdates(
 			domUpdate.hostNodeId,
 			deps.graph.subscribe({
 				// Target in the id: one graph node can drive two attributes on a host.
-				id: `view-dom-update:${domUpdate.hostNodeId}:${domUpdate.target?.kind ?? ''}:${domUpdate.target && 'name' in domUpdate.target ? domUpdate.target.name : ''}:${domUpdate.graphNodeId}:${domUpdate.path.join('.')}`,
+				id: `view-dom-update:${domUpdate.hostNodeId}:${JSON.stringify(domUpdate.target)}:${domUpdate.graphNodeId}:${domUpdate.path.join('.')}`,
 				graphNodeId: domUpdate.graphNodeId,
 				path: domUpdate.path,
 				async run(value) {

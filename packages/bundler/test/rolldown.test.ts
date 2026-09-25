@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { resolve } from 'pathe';
+import { relative, resolve } from 'pathe';
 import { pathToFileURL } from 'node:url';
 import { build as viteBuild, type Plugin } from 'vite';
 import {
@@ -106,7 +106,13 @@ describe('TSRX Rolldown plugin structure', () => {
 		expect(callOptions(marklessClient(), {})).toMatchObject({
 			preserveEntrySignatures: 'allow-extension',
 		});
+		// Packing moves entry modules into packs, so a packed build always lets entries extend.
 		expect(callOptions(marklessClient(), { preserveEntrySignatures: 'strict' })).toMatchObject({
+			preserveEntrySignatures: 'allow-extension',
+		});
+		expect(
+			callOptions(marklessClient({ packing: false }), { preserveEntrySignatures: 'strict' }),
+		).toMatchObject({
 			preserveEntrySignatures: 'strict',
 		});
 		expect(callOptions(marklessServer(), {})).toEqual({});
@@ -326,7 +332,8 @@ describe('TSRX Rolldown plugin structure', () => {
 			configFile: false,
 			root,
 			logLevel: 'silent',
-			plugins: [marklessClient({ executionLog: 'never', rootDir: root })],
+			// Symbol facades and table verification exist only in unpacked output.
+			plugins: [marklessClient({ executionLog: 'never', rootDir: root, packing: false })],
 			build: {
 				write: false,
 				minify: false,
@@ -358,9 +365,10 @@ describe('TSRX Rolldown plugin structure', () => {
 			),
 		).toBe(false);
 		const demandSources = Object.keys(JSON.parse(String(demandAsset?.source)));
-		expect(demandSources).toContain(`${filename}?markless-symbols`);
-		expect(demandSources).toContain(`${filename}?markless-render-data`);
-		expect(demandSources).not.toContain(filename);
+		// Asset keys are root-relative, so the build carries no checkout path.
+		expect(demandSources).toContain('pages/harbor.tsrx?markless-symbols');
+		expect(demandSources).toContain('pages/harbor.tsrx?markless-render-data');
+		expect(demandSources).not.toContain('pages/harbor.tsrx');
 		expect(JSON.parse(String(graphAsset?.source))).toEqual(
 			expect.arrayContaining(['symbol:0', 'symbol:5']),
 		);
@@ -403,7 +411,8 @@ export default function Docs() @{ <main><InteractiveCounter /></main> }`;
 			configFile: false,
 			root,
 			logLevel: 'silent',
-			plugins: [marklessClient({ executionLog: 'never', rootDir: root })],
+			// Symbol facades and table verification exist only in unpacked output.
+			plugins: [marklessClient({ executionLog: 'never', rootDir: root, packing: false })],
 			build: {
 				write: false,
 				minify: false,
@@ -431,6 +440,7 @@ export default function Docs() @{ <main><InteractiveCounter /></main> }`;
 		);
 		const transformed = await transformTsrxModule({
 			filename,
+			moduleId: relative(root, filename),
 			source: await readFile(filename, 'utf8'),
 			environment: 'client',
 			dev: true,
@@ -1821,7 +1831,7 @@ export function App() @{
 		const childHandler = child.manifest.captureMetadata.extractedSymbols.find(
 			(symbol) => symbol.kind === 'event-handler',
 		)!;
-		const loaderSymbolId = `imported:${encodeURIComponent(childFilename)}:${childHandler.symbolId}`;
+		const loaderSymbolId = `imported:${encodeURIComponent('components/Child.tsrx')}:${childHandler.symbolId}`;
 		const rows = parent.manifest.captureMetadata.boundResolverRows.filter(
 			(row) => row.baseSymbolId === loaderSymbolId,
 		);
@@ -1970,31 +1980,36 @@ export function App() @{
 		}
 	});
 
-	test('production build emits resolver routes for an imported composed child', async () => {
-		const parentFilename = resolve(
-			import.meta.dirname,
-			'fixtures/imported-resolver/Parent.tsrx',
-		);
-		const childFilename = resolve(
-			import.meta.dirname,
-			'fixtures/imported-resolver/CaptureButton.tsrx',
-		);
-		const fixturePlugin: Plugin = {
-			name: 'imported-resolver-fixture',
-			resolveId(id, importer) {
-				if (id === parentFilename) return parentFilename;
-				if (
-					id.split('?')[0] === './CaptureButton.tsrx' &&
-					importer?.split('?')[0] === parentFilename
-				) {
-					const query = id.includes('?') ? `?${id.split('?').slice(1).join('?')}` : '';
-					return `${childFilename}${query}`;
-				}
-				return null;
-			},
-			load(id) {
-				if (id.split('?')[0] === parentFilename) {
-					return `import { state } from '@markless/core';
+	// Unpacked, the child keeps its own emitted resolver; packed, the parent's resolver imports the child's symbols literally.
+	test.each([false, true])(
+		'production build emits resolver routes for an imported composed child (packing: %s)',
+		async (packing) => {
+			const parentFilename = resolve(
+				import.meta.dirname,
+				'fixtures/imported-resolver/Parent.tsrx',
+			);
+			const childFilename = resolve(
+				import.meta.dirname,
+				'fixtures/imported-resolver/CaptureButton.tsrx',
+			);
+			const fixturePlugin: Plugin = {
+				name: 'imported-resolver-fixture',
+				resolveId(id, importer) {
+					if (id === parentFilename) return parentFilename;
+					if (
+						id.split('?')[0] === './CaptureButton.tsrx' &&
+						importer?.split('?')[0] === parentFilename
+					) {
+						const query = id.includes('?')
+							? `?${id.split('?').slice(1).join('?')}`
+							: '';
+						return `${childFilename}${query}`;
+					}
+					return null;
+				},
+				load(id) {
+					if (id.split('?')[0] === parentFilename) {
+						return `import { state } from '@markless/core';
 import { CaptureButton } from './CaptureButton.tsrx';
 export function App() @{
 	let first = state('Server spruce');
@@ -2006,52 +2021,54 @@ export function App() @{
 		<output>{result}</output>
 	</main>
 }`;
-				}
-				if (id.split('?')[0] === childFilename) {
-					return `export function CaptureButton({ label, onTrace }) @{
+					}
+					if (id.split('?')[0] === childFilename) {
+						return `export function CaptureButton({ label, onTrace }) @{
 	<button type="button" onClick={() => onTrace(label)}>{label}</button>
 }`;
-				}
-				return null;
-			},
-		};
+					}
+					return null;
+				},
+			};
 
-		const output = await viteBuild({
-			configFile: false,
-			root: resolve(import.meta.dirname, '..'),
-			logLevel: 'silent',
-			plugins: [fixturePlugin, marklessClient({ executionLog: 'never' })],
-			build: {
-				write: false,
-				minify: false,
-				target: 'es2022',
-				rolldownOptions: { input: { symbols: parentFilename } },
-			},
-		});
-		const chunks = (
-			Array.isArray(output) ? output.flatMap((item) => item.output) : output.output
-		).filter((item) => item.type === 'chunk');
-		const childResolverId = `virtual:markless:resolver:${encodeURIComponent(childFilename)}`;
-		const normalizeModuleId = (id: string) => (id.startsWith('\0') ? id.slice(1) : id);
+			const output = await viteBuild({
+				configFile: false,
+				root: resolve(import.meta.dirname, '..'),
+				logLevel: 'silent',
+				plugins: [fixturePlugin, marklessClient({ executionLog: 'never', packing })],
+				build: {
+					write: false,
+					minify: false,
+					target: 'es2022',
+					rolldownOptions: { input: { symbols: parentFilename } },
+				},
+			});
+			const chunks = (
+				Array.isArray(output) ? output.flatMap((item) => item.output) : output.output
+			).filter((item) => item.type === 'chunk');
+			const childResolverId = `virtual:markless:resolver:${encodeURIComponent(childFilename)}`;
+			const normalizeModuleId = (id: string) => (id.startsWith('\0') ? id.slice(1) : id);
 
-		expect(
-			chunks.some((chunk) =>
-				chunk.moduleIds.some((id) => normalizeModuleId(id) === childResolverId),
-			),
-		).toBe(true);
-		expect(
-			chunks.some((chunk) =>
-				chunk.moduleIds.some((id) =>
-					normalizeModuleId(id).startsWith(
-						`virtual:markless:symbol:${encodeURIComponent(childFilename)}:`,
+			if (!packing)
+				expect(
+					chunks.some((chunk) =>
+						chunk.moduleIds.some((id) => normalizeModuleId(id) === childResolverId),
+					),
+				).toBe(true);
+			expect(
+				chunks.some((chunk) =>
+					chunk.moduleIds.some((id) =>
+						normalizeModuleId(id).startsWith(
+							`virtual:markless:symbol:${encodeURIComponent(childFilename)}:`,
+						),
 					),
 				),
-			),
-		).toBe(true);
-		const emittedCode = chunks.map((chunk) => chunk.code).join('\n');
-		expect(emittedCode).toMatch(/bound:[^"']+:component-edge%3A0/);
-		expect(emittedCode).toMatch(/bound:[^"']+:component-edge%3A1/);
-	});
+			).toBe(true);
+			const emittedCode = chunks.map((chunk) => chunk.code).join('\n');
+			expect(emittedCode).toMatch(/bound:[^"']+:component-edge%3A0/);
+			expect(emittedCode).toMatch(/bound:[^"']+:component-edge%3A1/);
+		},
+	);
 
 	test('execution-log symbol identities are spelled root-relative in hooks, sizes and attribution', async () => {
 		const plugin = marklessClient({ executionLog: 'always', rootDir: '/workspace/app' });
@@ -2134,6 +2151,7 @@ export function App() @{
 		const resolverSource = (await callLoad(plugin, `\0${resolverId}`)) as string;
 		const transformed = await transformTsrxModule({
 			filename: '/workspace/app/src/App.tsrx',
+			moduleId: 'src/App.tsrx',
 			source,
 			environment: 'client',
 		});
@@ -2336,7 +2354,12 @@ export function App() @{
 
 		callBuildStart(plugin, { cwd: '/workspace/app' });
 		await callTransform(plugin, source, filename);
-		const transformed = await transformTsrxModule({ filename, source, environment: 'client' });
+		const transformed = await transformTsrxModule({
+			filename,
+			moduleId: 'src/App.tsrx',
+			source,
+			environment: 'client',
+		});
 		const resolverId = `virtual:markless:resolver:${encoded}`;
 		const resolverSource = (await callLoad(plugin, `\0${resolverId}`)) as string;
 		const symbolChunks = transformed.manifest.symbols.map((symbol, index) => {

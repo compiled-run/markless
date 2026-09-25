@@ -339,6 +339,10 @@ export function linkedImportedSymbolInputs(input: {
 	readonly symbolClaimsForSource: (source: string) => LinkedSymbolClaimManifest | undefined;
 	readonly claimsPublished: (source: string) => boolean;
 	readonly unawaitedSources?: ReadonlySet<string>;
+	/** Spells a child source in minted ids; claim ids ship to the client, so the bundler passes a root-relative spelling. */
+	readonly moduleIdForSource?: (source: string) => string;
+	/** Reads a spelling from `moduleIdForSource` back to the source it names. */
+	readonly sourceForModuleId?: (moduleId: string) => string;
 }): LinkedImportedSymbolInputs {
 	const diagnostics: CompilerDiagnostic[] = [];
 	const symbols = input.children.flatMap((child) => {
@@ -376,11 +380,12 @@ export function linkedImportedSymbolInputs(input: {
 			const ownerComponentName = linkedClaimOwnerComponentName(captureSymbol);
 			return [
 				{
-					id: `imported:${encodeURIComponent(child.source)}:${symbol.symbolId}`,
+					id: importedClaimId(child.source, symbol.symbolId, input),
 					chunk: symbol.virtualModuleId,
 					exportName: symbol.exportName,
 					componentEdgeId: child.componentEdgeId,
 					...(ownerComponentName ? { ownerComponentName } : {}),
+					...childComponentNames(captureMetadata),
 					claimKind,
 					captureSymbol,
 				},
@@ -393,6 +398,14 @@ export function linkedImportedSymbolInputs(input: {
 
 type LinkedSymbolInput = SymbolResolverModuleInput['symbols'][number];
 
+// The child's own components, so only the edge placing the claim's owner is offered it.
+function childComponentNames(
+	captureMetadata: CaptureAnalysisArtifact,
+): Pick<LinkedSymbolInput, 'moduleComponentNames'> {
+	const components = captureMetadata.componentComposition?.components;
+	return components ? { moduleComponentNames: components } : {};
+}
+
 /**
  * The claims a child could not bind itself because they route through its own
  * props: its composer binds them, the way it binds the child's own claims.
@@ -403,13 +416,9 @@ type LinkedSymbolInput = SymbolResolverModuleInput['symbols'][number];
 function republishedClaimInputs(
 	child: LinkedModuleChildResolution,
 	captureMetadata: CaptureAnalysisArtifact,
-	input: {
-		readonly captureMetadataForSource: (source: string) => CaptureAnalysisArtifact | undefined;
-		readonly symbolClaimsForSource: (source: string) => LinkedSymbolClaimManifest | undefined;
-	},
+	input: ClaimSourceReaders,
 ): LinkedSymbolInput[] {
 	return (captureMetadata.boundResolverRows ?? []).flatMap((row): LinkedSymbolInput[] => {
-		if (!row.loaderSymbolId) return [];
 		const kinds = row.captureSlots.map((slot) => slot.route.kind);
 		if (
 			!kinds.includes('passthrough-route') ||
@@ -423,21 +432,31 @@ function republishedClaimInputs(
 			return [];
 		const onRow = (route: { readonly componentEdgePath?: ReadonlyArray<string> }) =>
 			route.componentEdgePath?.join('/') === row.componentEdgePath.join('/');
+		// The row already spells its graph routes in the child's root space.
+		const bound = new Map(row.captureSlots.map((slot) => [slot.slotId, slot.route]));
 		const rowSlots = (symbol: ExtractedCaptureSymbol) =>
 			symbol.captureSlots.flatMap((slot) => {
-				const routes = slot.routes.filter(onRow);
+				const routes = slot.routes
+					.filter(onRow)
+					.map((route) => (route.kind === 'graph-reference' ? (bound.get(slot.id) ?? route) : route));
 				return routes.length ? [{ ...slot, routes }] : [];
 			});
 		// A render symbol's forwarded prop reads compose through the edge's graph props already.
 		const extracted = captureMetadata.extractedSymbols.find(
 			(symbol) =>
-				symbol.kind === 'event-handler' &&
-				symbol.loaderSymbolId === row.loaderSymbolId &&
+				(symbol.kind === 'event-handler' || symbol.kind === 'sync-computed-derive') &&
+				(row.loaderSymbolId
+					? symbol.loaderSymbolId === row.loaderSymbolId
+					: !symbol.loaderSymbolId && symbol.symbolId === row.baseSymbolId) &&
 				rowSlots(symbol).length === row.captureSlots.length,
 		);
 		// A handler that IS the forwarded prop dispatches as its composer's callback, which composition stands in.
 		if (!extracted || isForwardedPropItself(extracted)) return [];
-		const chunk = claimedSymbolChunk(row.baseSymbolId, input, new Set());
+		const chunk = row.loaderSymbolId
+			? claimedSymbolChunk(row.baseSymbolId, input, new Set())
+			: input.symbolClaimsForSource(child.source)?.symbols.find(
+					(symbol) => symbol.symbolId === row.baseSymbolId,
+				);
 		if (!chunk) return [];
 		const captureSymbol: ExtractedCaptureSymbol = {
 			...extracted,
@@ -447,14 +466,18 @@ function republishedClaimInputs(
 		};
 		const claimKind = linkedImportedClaimKind(captureSymbol);
 		if (!claimKind) return [];
-		const ownerComponentName = linkedClaimOwnerComponentName(captureSymbol);
+		// The row belongs to the component its edge path starts in: the one a composing edge places.
+		const ownerComponentName =
+			captureMetadata.componentComposition?.edgeParents[row.componentEdgePath[0]!] ??
+			linkedClaimOwnerComponentName(captureSymbol);
 		return [
 			{
-				id: `imported:${encodeURIComponent(child.source)}:${row.id}`,
+				id: importedClaimId(child.source, row.id, input),
 				chunk: chunk.virtualModuleId,
 				exportName: chunk.exportName,
 				componentEdgeId: child.componentEdgeId!,
 				...(ownerComponentName ? { ownerComponentName } : {}),
+				...childComponentNames(captureMetadata),
 				claimKind,
 				captureSymbol,
 			},
@@ -467,19 +490,28 @@ function isForwardedPropItself(symbol: ExtractedCaptureSymbol): boolean {
 	return !!slot && rest.length === 0 && symbol.source.trim() === slot.source.trim();
 }
 
+type ClaimSourceReaders = {
+	readonly captureMetadataForSource: (source: string) => CaptureAnalysisArtifact | undefined;
+	readonly symbolClaimsForSource: (source: string) => LinkedSymbolClaimManifest | undefined;
+	readonly moduleIdForSource?: (source: string) => string;
+	readonly sourceForModuleId?: (moduleId: string) => string;
+};
+
+function importedClaimId(source: string, symbolId: string, input: ClaimSourceReaders): string {
+	return `imported:${encodeURIComponent(input.moduleIdForSource?.(source) ?? source)}:${symbolId}`;
+}
+
 // The emitted chunk behind a linked claim id, through as many republishing children as named it.
 function claimedSymbolChunk(
 	loaderSymbolId: string,
-	input: {
-		readonly captureMetadataForSource: (source: string) => CaptureAnalysisArtifact | undefined;
-		readonly symbolClaimsForSource: (source: string) => LinkedSymbolClaimManifest | undefined;
-	},
+	input: ClaimSourceReaders,
 	seen: Set<string>,
 ): { readonly virtualModuleId: string; readonly exportName: string } | undefined {
 	const match = /^imported:([^:]*):(.*)$/.exec(loaderSymbolId);
 	if (!match || seen.has(loaderSymbolId)) return undefined;
 	seen.add(loaderSymbolId);
-	const source = decodeURIComponent(match[1]!),
+	const moduleId = decodeURIComponent(match[1]!);
+	const source = input.sourceForModuleId?.(moduleId) ?? moduleId,
 		symbolId = match[2]!;
 	const own = input.symbolClaimsForSource(source)?.symbols.find(
 		(symbol) => symbol.symbolId === symbolId,

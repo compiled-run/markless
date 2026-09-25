@@ -12,8 +12,19 @@ import type {
 } from '../resume-types.ts';
 
 type WireInput = Parameters<typeof wireKeyedRepeats>[0];
-// `locals` answers the items of the rows enclosing an instance, for its row handlers.
-type NestedRecord = ResumeKeyedRepeatRecord & { readonly locals?: () => object };
+// `locals` answers the items of the rows enclosing an instance, for its row handlers;
+// `rowOuter` the enclosing row, by its authored repeat id, for its row slots.
+type NestedRecord = ResumeKeyedRepeatRecord & {
+	readonly locals?: () => object;
+	readonly authoredId?: string;
+	readonly rowOuter?: () => RowOuter;
+};
+type RowOuter = {
+	readonly repeatId: string;
+	readonly repeatItem: unknown;
+	readonly repeatIndex: number;
+	readonly repeatOuter: RowOuter | undefined;
+};
 type Scoped = { readonly graphNodeId: string; readonly path?: ReadonlyArray<string> };
 
 /**
@@ -104,9 +115,20 @@ function nestedInstance(
 	item: () => unknown,
 ): NestedRecord {
 	const { enclosingRow, ...own } = record;
+	const enclosingId = enclosingRow?.repeatId ?? enclosing.id,
+		prefix = enclosing.id.endsWith(enclosingId)
+			? enclosing.id.slice(0, enclosing.id.length - enclosingId.length)
+			: '';
 	const instance: NestedRecord = {
 		...own,
 		locals: () => ({ ...enclosing.locals?.(), [enclosing.itemName]: item() }),
+		authoredId: record.id.startsWith(prefix) ? record.id.slice(prefix.length) : record.id,
+		rowOuter: () => ({
+			repeatId: enclosingId,
+			repeatItem: item(),
+			repeatIndex: readKeyedRepeatCollection(graph, enclosing).indexOf(item()),
+			repeatOuter: enclosing.rowOuter?.(),
+		}),
 	};
 	const itemPath = enclosingRow?.itemPath;
 	if (!itemPath) return instance;

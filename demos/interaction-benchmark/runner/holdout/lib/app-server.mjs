@@ -23,6 +23,8 @@ function child(root, mode, { port = 0, options, logName }) {
 	const logPath = path.join(os.tmpdir(), `holdout-${logName}-${process.pid}.log`);
 	const fd = openSync(logPath, 'w');
 	const env = { ...process.env };
+	// Apps opt into lab instruments (the execution log) unless built as a consumer would build them.
+	if (!env.HOLDOUT_LAB_POSTURE) env.MARKLESS_CONSUMER_BUILD ??= '1';
 	if (options) env.HOLDOUT_MARKLESS_OPTIONS = JSON.stringify(options);
 	else delete env.HOLDOUT_MARKLESS_OPTIONS;
 	const proc = spawn(process.execPath, ['--import', HOOK, BUILD, root, mode, String(port)], {

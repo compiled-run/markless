@@ -47,8 +47,8 @@ test('full resume avoids the server value decoder in browser chunks', async () =
 	// T115: static edge — the demand map co-demands graph construction with
 	// payload-full on every tier that loads it; chunk groups keep them split.
 	expect(payloadSource).toContain("from './payload-graph-construct.ts'");
-	expect(payloadSource).not.toContain("import('../../serializer/src/value-decode-client.ts')");
-	expect(graphSource).toContain("import('../../serializer/src/value-decode-client.ts')");
+	expect(payloadSource).not.toContain("import('../../serializer/src/value-decode-client");
+	expect(graphSource).toContain("import('../../serializer/src/value-decode-client-lazy.ts')");
 	expect(repeatSource).toContain('@markless/serializer/decode-client');
 	expect(payloadSource).not.toContain("@markless/serializer/decode'");
 	expect(repeatSource).not.toContain("@markless/serializer/decode'");

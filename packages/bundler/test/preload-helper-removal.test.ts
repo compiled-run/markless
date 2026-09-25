@@ -44,6 +44,25 @@ describe('bundle-wide Vite preload helper removal', () => {
 		expect(onlyHelper.imports).toEqual(['build/chunk-runtime.js']);
 	});
 
+	test('a pack loader exported as a declaration beside the helper does not block the removal', () => {
+		const helper = helperChunk('export function $mlAb12(){return c()}');
+
+		stripUnusedVitePreloadHelperFromBundle([helper]);
+
+		expect(helper.code).toBe(
+			'import{t as e}from"./chunk-runtime.js";function s(e){return e+1}function c(){return(c=e((()=>{})))()}export function $mlAb12(){return c()}export{s as t,c as u};',
+		);
+	});
+
+	test('a declared export that reads the preload function keeps the helper', () => {
+		const helper = helperChunk('export function $mlAb12(){return a}');
+		const before = helper.code;
+
+		stripUnusedVitePreloadHelperFromBundle([helper]);
+
+		expect(helper.code).toBe(before);
+	});
+
 	test('keeps the whole bundle when any chunk still calls the preload function', () => {
 		const helper = helperChunk();
 		const caller: PreloadHelperChunk = {

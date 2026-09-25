@@ -91,27 +91,6 @@ export function payPerUse(
 	});
 }
 
-// Pay-per-use violations that already existed when the gate arrived; each is reported on every run.
-export const KNOWN_UNDEMANDED: Readonly<Record<string, string>> = Object.fromEntries(
-	['web/resume-async-wiring', 'web/resume-resettle-hold', 'web/resume-stream-patches'].map(
-		(id) => [
-			id,
-			"pre-existing (found 2026-09-24): the page's modulepreload plan follows the runtime's dynamic import() of the async-boundary capability although no compiled demand of the page names it",
-		],
-	),
-);
-
-export function unexpectedUndemanded(result: PayPerUse): string[] {
-	const known = result.undemanded.filter((id) => KNOWN_UNDEMANDED[id]);
-	if (known.length > 0)
-		console.info(
-			known
-				.map((id) => `KNOWN pay-per-use violation ${id}: ${KNOWN_UNDEMANDED[id]}`)
-				.join('\n'),
-		);
-	return result.undemanded.filter((id) => !KNOWN_UNDEMANDED[id]);
-}
-
 export function payPerUseReport(title: string, result: PayPerUse): string {
 	return result.undemanded
 		.map(

@@ -1,3 +1,4 @@
+import { createServer } from 'node:net';
 import { box } from '@async/witness';
 import {
 	evaluateMusicSsrPreloadWindow,
@@ -32,12 +33,11 @@ const LIBRARY_PANEL = '.library';
 const PAUSED_ICON = '▶';
 const PLAYING_ICON = '❚❚';
 const WAIT = { timeoutMs: 10_000 };
-// Head-size sanity: 64 links before resolver-aware preload (5 cold post-click
-// chunks); the route symbol closure adds ~22. Past 2x the old baseline means
-// the plan stopped being route-scoped (the named misfire is preloading EVERY
-// symbol module globally, breaking cross-route exclusion).
-const MIN_HEAD_LINKS = 65;
-const MAX_HEAD_LINKS = 128;
+// Head-size sanity for the packed default: the route's packs plus the shared runtime, 9 links
+// measured 2026-09-23 (one chunk per module needed 65-128). Far more links means the plan stopped
+// packing or stopped being route-scoped; none means the page lost its preload plan.
+const MIN_HEAD_LINKS = 4;
+const MAX_HEAD_LINKS = 18;
 // Permanent execution walls: owner ratification 2026-07-12, T006.
 const LOAD_APP_BYTES = 0;
 const LOAD_INSTRUMENT_BYTES = 0;
@@ -59,7 +59,10 @@ const LOAD_INSTRUMENT_BYTES = 0;
 // the specialized wrapper. Instrument bytes only - app bytes unmoved.
 // The wall prices the dev-log module itself; a turn's instrument total also counts the log hook in
 // every app module it wakes, which grows with app code, so that total is a receipt note.
-const DEV_LOG_BYTES_MAX = 9_792;
+// 9,792 -> 9,907 (2026-09-24): the ledger charges each module its own share of its chunk and
+// expands a chunk specifier to the symbol modules it names. Instrument bytes only.
+// 9,907 chunk raw -> 17,266 rendered (2026-09-24): the module's own bytes, not its pack glue; same in packed and unpacked builds.
+const DEV_LOG_RENDERED_BYTES_MAX = 17_266;
 
 export default box(
 	{
@@ -76,7 +79,13 @@ export default box(
 				mode: 'ssr',
 			}),
 		});
-		const preview = await pipeline.preview(build);
+		const port = await freePort();
+		const preview = await pipeline.preview(build, {
+			config: (config) => ({
+				...config,
+				preview: { ...config.preview, port, strictPort: true },
+			}),
+		});
 
 		// Server truth: `request('/')` resolves only for an OK status, and the
 		// html carries the player, the resume payload, and branch anchors —
@@ -131,11 +140,16 @@ export default box(
 		await expect.page.attribute(page, PLAY_TOGGLE, 'class', 'play active', WAIT);
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-command', 'play', WAIT);
 		const sizes = await servedExecutionSizes(preview);
+		receipt.note(`dev-log module rendered bytes: ${await devLogRenderedBytes(preview, sizes)}`);
 		const firstPlay = await waitForLogInteractionAttribute(page, 1, sizes, WAIT);
 		receipt.note(
 			`first-Play charge: app ${firstPlay.app} B, framework ${firstPlay.framework} B, instrument ${firstPlay.instrument} B over ` +
 				`[${firstPlay.modules.join(', ')}]`,
 		);
+		if (firstPlay.modules.length === 0)
+			throw new Error(
+				'The first Play click charged no modules; the ledger mirrored nothing.',
+			);
 		const afterClickScripts = await waitForQuietBuildJs(page);
 		const lazyChunks = afterClickScripts.filter((path) => !startupScripts.includes(path));
 		receipt.note(
@@ -159,12 +173,18 @@ export default box(
 		await expect.page.text(page, PLAY_ICON, PAUSED_ICON, WAIT);
 		await expect.page.attribute(page, PLAY_TOGGLE, 'class', 'play', WAIT);
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-command', 'pause', WAIT);
-		// The second click charges only what the first did not: the ledger counts
-		// each module once, so this turn's own delta is smaller, never a re-charge.
+		// The ledger charges each module once, so the round trip charges only modules the first
+		// click did not run; when the first click ran them all, that is none.
 		const secondPlay = await waitForLogInteractionAttribute(page, 2, sizes, WAIT);
 		receipt.note(
-			`second-Play charge: app ${secondPlay.app} B, framework ${secondPlay.framework} B`,
+			`second-Play charge: app ${secondPlay.app} B, framework ${secondPlay.framework} B over ` +
+				`[${secondPlay.modules.join(', ')}]`,
 		);
+		if (secondPlay.app > firstPlay.app || secondPlay.framework > firstPlay.framework)
+			throw new Error(
+				`Expected the round-trip click to charge no more than the first (app ${firstPlay.app} B, ` +
+					`framework ${firstPlay.framework} B), got app ${secondPlay.app} B, framework ${secondPlay.framework} B.`,
+			);
 
 		// Track navigation exercises composed events and dom updates deeper in
 		// the tree (also absorbed from the retired tmp-ssr box).
@@ -344,6 +364,28 @@ async function servedExecutionSizes(preview: {
 	return sizes;
 }
 
+async function devLogRenderedBytes(
+	preview: { request(path: string): Promise<string> },
+	sizes: ExecutionSizeMap,
+): Promise<number> {
+	const id = Object.entries(sizes).find(([, entry]) => entry?.instrument === true)?.[0];
+	const attribution = JSON.parse(await preview.request('/build/byte-attribution.json')) as {
+		readonly chunks: Record<
+			string,
+			{ readonly modules: ReadonlyArray<[string, string, number]> }
+		>;
+	};
+	let bytes = 0;
+	for (const chunk of Object.values(attribution.chunks))
+		for (const [, key, rendered] of chunk.modules) if (key === id) bytes += rendered;
+	if (!id || bytes === 0 || bytes > DEV_LOG_RENDERED_BYTES_MAX) {
+		throw new Error(
+			`Expected the dev-log module (${id}) to stay <= ${DEV_LOG_RENDERED_BYTES_MAX} rendered bytes, got ${bytes}.`,
+		);
+	}
+	return bytes;
+}
+
 // The turn's cost is proven, not guessed: the ledger names the modules it
 // charged, and each one is joined against the served size map by category. The
 // arithmetic is checked end to end over the observed set, so a new module waking
@@ -383,11 +425,6 @@ async function waitForLogInteractionAttribute(
 			);
 		}
 		const modules = (read('turn-modules') ?? '').split(' ').filter(Boolean);
-		if (modules.length === 0) {
-			throw new Error(
-				`Interaction ${count} charged no modules; the ledger mirrored nothing.`,
-			);
-		}
 		const expected = { app: 0, framework: 0, instrument: 0 };
 		for (const id of modules) {
 			const entry = sizes[id];
@@ -418,12 +455,6 @@ async function waitForLogInteractionAttribute(
 		const instrumentBytes = Number(read('instrument-bytes'));
 		if (!Number.isInteger(instrumentBytes)) {
 			throw new Error(`Expected interaction ${count} instrument bytes to be an integer.`);
-		}
-		const devLog = Object.values(sizes).find((entry) => entry?.instrument === true);
-		if (!devLog?.raw || devLog.raw > DEV_LOG_BYTES_MAX) {
-			throw new Error(
-				`Expected the dev-log module to stay <= ${DEV_LOG_BYTES_MAX} raw bytes, got ${devLog?.raw}.`,
-			);
 		}
 		return { app, framework, instrument: instrumentBytes, modules };
 	}
@@ -473,4 +504,16 @@ async function appBytesMirror(
 		await new Promise((resolve) => setTimeout(resolve, 25));
 	}
 	throw new Error('Expected the execution log to mirror app bytes.');
+}
+
+// Another checkout's server may hold the preview default port.
+function freePort(): Promise<number> {
+	return new Promise((resolve, reject) => {
+		const server = createServer();
+		server.once('error', reject);
+		server.listen(0, '127.0.0.1', () => {
+			const { port } = server.address() as { port: number };
+			server.close(() => resolve(port));
+		});
+	});
 }

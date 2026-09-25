@@ -17,23 +17,36 @@ import {
 	type RenderHeadInjection,
 	type SsrRenderArtifact,
 } from '@markless/web/render-to-string';
-import { renderToStream } from '@markless/web/render-to-stream';
+import {
+	renderToStream,
+	STREAM_ARM_EXECUTOR_GLOBAL,
+	STREAMED_ARM_SELECTOR,
+} from '@markless/web/render-to-stream';
+import { CONTAINER_RETIRE_PROPERTY } from '@markless/web/render-to-string';
 import {
 	normalizeMarklessDevError,
 	renderMarklessDevErrorDocument,
 } from '@markless/bundler/dev-error';
 import { __marklessDebugBootstrapSource } from '../../../../web/src/debug-channel.ts';
+import { appendModulePreloads, listenForLinkIntent } from '../link-intent.ts';
 import {
-	appendModulePreloads,
-	listenForLinkIntent,
-	startViewportPrefetch,
-} from '../link-intent.ts';
+	FRAGMENT_APPEND_END,
+	FRAGMENT_HOVER_DWELL_MS,
+	FRAGMENT_IDLE_FRAGMENTS,
+	FRAGMENT_IDLE_WITHOUT_CONNECTION_INFO,
+	FRAGMENT_PREFETCH_TTL_MS,
+	FRAGMENT_PREFETCH_CONNECTIONS,
+	FRAGMENT_REGION_END,
+	FRAGMENT_REQUEST_HEADER,
+	startFragmentNavigation,
+	type FragmentNavigationConfig,
+} from '../fragment-navigation.ts';
 
 export interface ServerEntryOptions {
 	readonly dev?: boolean;
 	readonly navigationEntryPath?: string;
-	// 'viewport' adds to 'intent': once the page is idle, links on screen download (never run) their destination's navigation plan.
-	readonly linkPreloading?: 'render' | 'intent' | 'viewport';
+	// false: nothing is downloaded before a click (no intent or idle prefetch); links still navigate.
+	readonly prefetch?: boolean;
 	readonly resumeEntryPath?: string;
 	readonly prerenderWakeEntryPath?: string;
 	readonly routeModulePreloads?: Record<string, readonly ModulePreloadInput[]>;
@@ -53,6 +66,12 @@ export interface ServerEntryOptions {
 	// open response. 'blocking' opts a host out — the document awaits every
 	// boundary before the first byte (the pre-T107 behavior).
 	readonly render?: 'streaming' | 'blocking';
+	// Route changes swap in the destination's server-rendered region and resume it ('fragment', the default); 'render' renders it client-side.
+	readonly navigation?: 'fragment' | 'render';
+	// The fragment swap module; without it route changes render client-side.
+	readonly fragmentEntryPath?: string;
+	// The inline half of fragment navigation, minified by the build (the source form serves otherwise).
+	readonly fragmentNavigationSource?: string;
 }
 
 interface RenderOutput {
@@ -96,20 +115,31 @@ const DOCUMENT_CHILDREN_PLACEHOLDER = '__markless_router_document_children__';
 export function createServerEntry(options: ServerEntryOptions) {
 	const manifest = buildRouteManifestFromFileIds(options.routeFileIds);
 	assertCurrentRouteAssets(options);
+	const fragmentBridge: FragmentBridge | undefined =
+		options.fragmentEntryPath !== undefined && options.navigation !== 'render'
+			? {
+					entry: options.fragmentEntryPath,
+					source: options.fragmentNavigationSource ?? startFragmentNavigation.toString(),
+					prefetch: options.prefetch !== false,
+					pages: manifest.routes.map((route) => route.pathname.replace(/:[^/]+/g, ':')),
+				}
+			: undefined;
+	const fragmentNavigation = fragmentBridge !== undefined;
 
 	async function fetch(request: Request): Promise<Response> {
 		const url = new URL(request.url);
+		const fragment = fragmentNavigation && request.headers.get(FRAGMENT_REQUEST_HEADER) === '1';
 		if (isNitroApiPathname(url.pathname)) {
 			return new Response('Not found', { status: 404 });
 		}
 
 		const match = matchRouteManifest(url.pathname, manifest);
 		if (!match) {
-			return renderStatusPage(url, manifest.statusPages.notFound, 404, 'Not found');
+			return renderStatusPage(url, manifest.statusPages.notFound, 404, 'Not found', fragment);
 		}
 
 		try {
-			return await renderPage(url, match.route.file, match.params, 200);
+			return await renderPage(url, match.route.file, match.params, 200, fragment);
 		} catch (error) {
 			// Surface the stack: a silent 500 hid the async-renderSsr break.
 			console.error('[markless-router] page render failed:', error);
@@ -122,6 +152,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 					manifest.statusPages.error,
 					500,
 					'Internal Server Error',
+					fragment,
 				);
 			} catch (errorPageError) {
 				console.error('[markless-router] error page render failed:', errorPageError);
@@ -162,12 +193,13 @@ export function createServerEntry(options: ServerEntryOptions) {
 		file: string | undefined,
 		status: number,
 		fallbackText: string,
+		fragment: boolean,
 	) {
 		if (!file) {
 			return new Response(fallbackText, { status });
 		}
 
-		return renderPage(url, file, {}, status);
+		return renderPage(url, file, {}, status, fragment);
 	}
 
 	async function renderPage(
@@ -175,6 +207,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 		file: string,
 		params: Readonly<Record<string, string>>,
 		status: number,
+		fragment: boolean,
 	) {
 		const loadPageModule = options.pageModuleLoaders[file];
 		if (!loadPageModule) {
@@ -194,7 +227,9 @@ export function createServerEntry(options: ServerEntryOptions) {
 		const documentModule = options.documentModuleLoader
 			? ((await options.documentModuleLoader()) as DocumentModule)
 			: undefined;
-		const headers = { 'content-type': 'text/html;charset=utf-8' };
+		const headers: Record<string, string> = { 'content-type': 'text/html;charset=utf-8' };
+		// A page URL answers with a document or, for a fragment fetch, the region document: caches must key on the header.
+		if (fragmentNavigation) headers.vary = FRAGMENT_REQUEST_HEADER;
 
 		const baseArtifact = pageModule.default;
 		const renderSsr = baseArtifact?.renderSsr ?? pageModule.marklessRenderSsr;
@@ -204,12 +239,12 @@ export function createServerEntry(options: ServerEntryOptions) {
 			return new Response(fillDocumentChildren(shell, message), { status, headers });
 		}
 		const documentLoads = options.documentNavigation === 'document';
-		const linkIntent =
-			options.linkPreloading === 'intent' || options.linkPreloading === 'viewport';
-		// A full document load runs the destination's SSR preloads, not its client-navigation modules.
-		const destinationPreloads = documentLoads
-			? options.routeSsrModulePreloads
-			: options.routeModulePreloads;
+		const linkIntent = fragmentNavigation || options.prefetch !== false;
+		// A document load or a fragment swap runs the destination's landing plan, not its client-navigation modules.
+		const destinationPreloads =
+			documentLoads || fragmentNavigation
+				? options.routeSsrModulePreloads
+				: options.routeModulePreloads;
 		const pageArtifact = routedPageArtifact(
 			renderSsr,
 			baseArtifact,
@@ -220,10 +255,16 @@ export function createServerEntry(options: ServerEntryOptions) {
 			documentModule?.default?.headInjections ?? [],
 			linkIntent
 				? (html: string) =>
-						linkIntentPreloads(html, pageProps.url.href, manifest, destinationPreloads)
+						linkIntentPreloads(
+							html,
+							pageProps.url.href,
+							manifest,
+							destinationPreloads,
+							fragmentNavigation,
+						)
 				: undefined,
 			documentLoads,
-			options.linkPreloading === 'viewport',
+			fragmentBridge,
 		);
 		const routedArtifact = options.prerenderWakeEntryPath
 			? { ...pageArtifact, prerenderWakeModuleUrl: options.prerenderWakeEntryPath }
@@ -231,16 +272,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 		const renderOptions = {
 			props: pageProps,
 			resumeModuleUrl: options.resumeEntryPath ?? baseArtifact?.resumeModuleUrl,
-			// Preloads read Link targets from the rendered shell html.
-			modulePreloads: (html: string) =>
-				modulePreloadsForPage(
-					file,
-					html,
-					pageProps.url.href,
-					manifest,
-					linkIntent || documentLoads ? undefined : options.routeModulePreloads,
-					options.routeSsrModulePreloads,
-				),
+			modulePreloads: () => landingModulePreloads(options.routeSsrModulePreloads?.[file]),
 		};
 
 		// Blocking opt-out: the pre-T107 whole-page await.
@@ -254,10 +286,10 @@ export function createServerEntry(options: ServerEntryOptions) {
 				pageHtml.headHtml,
 				options.importMap,
 			);
-			return new Response(fillDocumentChildren(shell, pageHtml.bodyHtml), {
-				status,
-				headers,
-			});
+			const html = fragment
+				? fragmentDocument(shell, pageHtml.bodyHtml, documentLoads) + FRAGMENT_REGION_END
+				: fillDocumentChildren(shell, pageHtml.bodyHtml);
+			return new Response(html, { status, headers });
 		}
 
 		// Streaming default (owner ruling 2026-07-07): out-of-order streaming is
@@ -273,18 +305,23 @@ export function createServerEntry(options: ServerEntryOptions) {
 			options.importMap,
 		);
 		if (stream.pendingArmCount === 0) {
-			return new Response(fillDocumentChildren(shell, pageHtml.bodyHtml), {
-				status,
-				headers,
-			});
+			const html = fragment
+				? fragmentDocument(shell, pageHtml.bodyHtml, documentLoads) + FRAGMENT_REGION_END
+				: fillDocumentChildren(shell, pageHtml.bodyHtml);
+			return new Response(html, { status, headers });
 		}
 		const placeholderAt = shell.indexOf(DOCUMENT_CHILDREN_PLACEHOLDER);
-		const prefix =
-			placeholderAt === -1 ? shell : shell.slice(0, placeholderAt) + pageHtml.bodyHtml;
+		// A fragment is a whole region document first; each settled arm then follows on its own, delimited.
+		const prefix = fragment
+			? fragmentDocument(shell, pageHtml.bodyHtml, documentLoads) + FRAGMENT_REGION_END
+			: placeholderAt === -1
+				? shell
+				: shell.slice(0, placeholderAt) + pageHtml.bodyHtml;
 		const suffix =
-			placeholderAt === -1
+			fragment || placeholderAt === -1
 				? ''
 				: shell.slice(placeholderAt + DOCUMENT_CHILDREN_PLACEHOLDER.length);
+		const appendEnd = fragment ? FRAGMENT_APPEND_END : '';
 		const encoder = new TextEncoder();
 		let cancelled = false;
 		let completed = false;
@@ -294,7 +331,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 				try {
 					for await (const chunk of stream.appends()) {
 						if (cancelled) return;
-						controller.enqueue(encoder.encode(chunk));
+						controller.enqueue(encoder.encode(chunk + appendEnd));
 					}
 				} catch (error) {
 					if (cancelled) return;
@@ -306,7 +343,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 					return;
 				}
 				if (cancelled) return;
-				controller.enqueue(encoder.encode(suffix));
+				if (suffix) controller.enqueue(encoder.encode(suffix));
 				controller.close();
 				completed = true;
 			},
@@ -390,7 +427,7 @@ function routedPageArtifact(
 	documentHeadInjections: ReadonlyArray<RenderHeadInjection> = [],
 	intentPreloads?: (html: string) => Record<string, readonly ModulePreloadInput[]>,
 	documentLoads = false,
-	visiblePrefetch = false,
+	fragment?: FragmentBridge,
 ) {
 	// The document's own injections (dev links its scoped-style closure there) come first: the shell's CSS precedes the page's.
 	const headInjections = dedupeHeadLinks([
@@ -421,8 +458,8 @@ function routedPageArtifact(
 						navigationEntryPath,
 						intentPreloads?.(output.html),
 						documentLoads,
-						visiblePrefetch,
-						output.html.includes(`${PREFETCH_ATTRIBUTE}="viewport"`),
+						fragment,
+						output.html.includes('href="#/'),
 					)
 				: '';
 			const stateWithProps = withPagePropsCell(output.state, pageProps);
@@ -458,28 +495,11 @@ function withPagePropsCell(state: unknown, props: PageComponentProps): unknown {
 	};
 }
 
-function modulePreloadsForPage(
-	file: string,
-	html: string,
-	baseHref: string,
-	manifest: ReturnType<typeof buildRouteManifestFromFileIds>,
-	routeModulePreloads: Record<string, readonly ModulePreloadInput[]> | undefined,
-	routeSsrModulePreloads: Record<string, readonly ModulePreloadInput[]> | undefined,
+function landingModulePreloads(
+	routePreloads: readonly ModulePreloadInput[] | undefined,
 ): readonly ModulePreloadInput[] | undefined {
 	const preloads: ModulePreloadInput[] = [];
-	const seen = new Set<string>();
-	addModulePreloads(preloads, seen, routeSsrModulePreloads?.[file]);
-	// Route swaps are client-side: preload the destination page chunks for
-	// every visible Link so navigation avoids a module-fetch waterfall.
-	if (!routeModulePreloads || !html.includes('data-markless-router-link')) {
-		return preloads.length > 0 ? preloads : undefined;
-	}
-
-	for (const href of routerLinkHrefs(html)) {
-		const url = parseSameOriginUrl(href, baseHref);
-		const match = url && matchRouteManifest(url.pathname, manifest);
-		addModulePreloads(preloads, seen, match && routeModulePreloads[match.route.file]);
-	}
+	addModulePreloads(preloads, new Set(), routePreloads);
 	return preloads.length > 0 ? preloads : undefined;
 }
 
@@ -491,20 +511,47 @@ function routerLinkHrefs(html: string): string[] {
 	].map((match) => unescapeHtmlAttribute(match[1] ?? ''));
 }
 
+function anchorHrefs(html: string): string[] {
+	return [...html.matchAll(/<a\b(?=[^>]*\bhref="([^"]*)")[^>]*>/g)].map((match) =>
+		unescapeHtmlAttribute(match[1] ?? ''),
+	);
+}
+
 function linkIntentPreloads(
 	html: string,
 	baseHref: string,
 	manifest: ReturnType<typeof buildRouteManifestFromFileIds>,
 	routes: ServerEntryOptions['routeModulePreloads'],
+	plainAnchors = false,
 ): Record<string, readonly ModulePreloadInput[]> {
 	const destinations: Record<string, readonly ModulePreloadInput[]> = Object.create(null);
-	for (const href of routerLinkHrefs(html)) {
+	for (const href of plainAnchors ? anchorHrefs(html) : routerLinkHrefs(html)) {
 		const url = parseSameOriginUrl(href, baseHref);
 		const match = url && matchRouteManifest(url.pathname, manifest);
 		const preloads = match && routes?.[match.route.file];
 		if (url && preloads?.length) destinations[url.pathname] = preloads;
 	}
 	return destinations;
+}
+
+function indexedPreloads(intentPreloads: Record<string, readonly ModulePreloadInput[]>): {
+	readonly preloads: ModulePreloadInput[];
+	readonly destinations: Record<string, number[]>;
+} {
+	const preloads: ModulePreloadInput[] = [];
+	const indexes = new Map<string, number>();
+	const destinations: Record<string, number[]> = Object.create(null);
+	for (const [pathname, list] of Object.entries(intentPreloads))
+		destinations[pathname] = list.map((preload) => {
+			const key = JSON.stringify(preload);
+			let index = indexes.get(key);
+			if (index === undefined) {
+				index = preloads.push(preload) - 1;
+				indexes.set(key, index);
+			}
+			return index;
+		});
+	return { preloads, destinations };
 }
 
 function parseSameOriginUrl(href: string, base: string): URL | undefined {
@@ -598,6 +645,14 @@ function fillDocumentChildren(documentShell: string, children: string): string {
 	);
 }
 
+// A client-navigation shell never varies by route, so its body is left out: the region document is the shell's head plus the page.
+function fragmentDocument(shell: string, bodyHtml: string, documentLoads: boolean): string {
+	const bodyAt = documentLoads ? -1 : shell.search(/<body[\s>]/i);
+	const bodyOpenEnd = bodyAt === -1 ? -1 : shell.indexOf('>', bodyAt);
+	if (bodyOpenEnd === -1) return fillDocumentChildren(shell, bodyHtml);
+	return `${shell.slice(0, bodyOpenEnd + 1)}${bodyHtml}</body></html>`;
+}
+
 async function renderDocumentModule(
 	documentModule: DocumentModule | undefined,
 	props: PageComponentProps & { readonly children: string },
@@ -640,22 +695,73 @@ function renderLinkBridgeScript(
 	resumeEntryPath: string,
 	intentPreloads?: Record<string, readonly ModulePreloadInput[]>,
 	documentLoads = false,
-	visiblePrefetch = false,
-	perLinkViewport = false,
+	fragment?: FragmentBridge,
+	hashLinks = false,
 ): string {
-	const visibleSource =
-		visiblePrefetch || perLinkViewport
-			? `
-	(${startViewportPrefetch.toString()})(d, linkAttr, prefetchAttr, ${visiblePrefetch}, (url) => destinations[url.pathname]);`
-			: '';
-	const intentSource = intentPreloads
+	const fragmentNavigation = fragment !== undefined;
+	const fragmentSource = fragment
 		? `
-	const destinations = ${escapeScriptJson(intentPreloads)};
+(${fragment.source})(d,()=>(${escapeScriptJson(fragmentConfig(fragment, documentLoads))}),${escapeScriptJson(intentPreloads ?? {})},(href)=>import(href));`
+		: '';
+	const indexed =
+		!fragmentNavigation && intentPreloads ? indexedPreloads(intentPreloads) : undefined;
+	// Routes share most of their packs, so each is written once and routes list indexes into it.
+	const intentSource = indexed
+		? `
+	const preloads = ${escapeScriptJson(indexed.preloads)};
+	const destinations = ${escapeScriptJson(indexed.destinations)};
+	const destination = (url) => destinations[url.pathname]?.map((index) => preloads[index]);
 	const append = (${appendModulePreloads.toString()});
 	(${listenForLinkIntent.toString()})(d, linkAttr, (url) => {
-		append(d, destinations[url.pathname]);
-	}, prefetchAttr);${visibleSource}`
+		append(d, destination(url));
+	}, prefetchAttr);`
 		: '';
+	// Hash routes ('#/…') still render client-side; a fragment page carries that click path only when it links one.
+	const hashClickSource =
+		fragment && !hashLinks
+			? ''
+			: `
+	if (d.__marklessRouterHashClickStarted) return;
+	d.__marklessRouterHashClickStarted = true;
+	const anchorFrom = (event) => {
+		const target = event.composedPath && event.composedPath()[0] || event.target;
+		return target && target.closest ? target.closest('a[href]') : target && target.parentElement && target.parentElement.closest ? target.parentElement.closest('a[href]') : null;
+	};
+	const sameOrigin = (href) => {
+		try {
+			const url = new URL(href, location.href);
+			return url.origin === location.origin ? url : null;
+		} catch {
+			return null;
+		}
+	};
+	d.addEventListener('click', async (event) => {
+		if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.altKey || event.ctrlKey || event.shiftKey) return;
+		const anchor = anchorFrom(event);
+		if (!anchor || !anchor.hasAttribute(linkAttr) || anchor.hasAttribute('download')) return;
+		const target = anchor.getAttribute('target');
+		if (target && target !== '_self') return;
+		if (anchor.relList && anchor.relList.contains('external')) return;
+		const url = sameOrigin(anchor.href);
+		if (!url${documentLoads || fragmentNavigation ? " || !url.hash.startsWith('#/')" : ''}) return;
+		event.preventDefault();
+		try {
+			const mod = await import(${JSON.stringify(resumeEntryPath)});
+			const navigate = mod.navigateMarklessRouterLink;
+			if (typeof navigate === 'function') {
+				await navigate({
+					href: url.href,
+					replace: anchor.hasAttribute(replaceAttr),
+					scroll: anchor.getAttribute(scrollAttr) === 'manual' ? 'manual' : undefined,
+				});
+			} else {
+				location.assign(url.href);
+			}
+		} catch (error) {
+			setTimeout(() => { throw error; });
+			location.assign(url.href);
+		}
+	}, true);`;
 	const debugBootstrap =
 		typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
 			? `<script data-markless-router-debug-bootstrap>${escapeInlineScript(`(() => {
@@ -675,60 +781,66 @@ function renderLinkBridgeScript(
 		if (md) { md.router('ssr-link-bridge'); md.activate(); }
 	} catch {}`
 			: '';
-	return `${debugBootstrap}<script data-markless-router-link-resumer>${escapeInlineScript(`(() => {
-	const d = document;
-	const s = d.currentScript;
-	const r = s && s.closest('[data-async-container]');
-	if (!r || d.__marklessRouterLinkResumerStarted) return;
-	d.__marklessRouterLinkResumerStarted = true;
-	const linkAttr = ${JSON.stringify(LINK_ATTRIBUTE)};
-	const prefetchAttr = ${JSON.stringify(PREFETCH_ATTRIBUTE)};
+	return `${debugBootstrap}<script data-markless-router-link-resumer>${escapeInlineScript(`(()=>{const d=document,s=d.currentScript,r=s&&s.closest('[data-async-container]');if(!r)return;${fragmentSource}${
+		fragment && !hashClickSource
+			? ''
+			: `
+if(d.__marklessRouterLinkResumerStarted${fragment ? '&&d.__marklessRouterHashClickStarted' : ''})return;d.__marklessRouterLinkResumerStarted=true;`
+	}${
+		intentSource || hashClickSource
+			? `
+	const linkAttr = ${JSON.stringify(LINK_ATTRIBUTE)};`
+			: ''
+	}${
+		intentSource
+			? `
+	const prefetchAttr = ${JSON.stringify(PREFETCH_ATTRIBUTE)};`
+			: ''
+	}${
+		hashClickSource
+			? `
 	const replaceAttr = ${JSON.stringify(REPLACE_ATTRIBUTE)};
-	const scrollAttr = ${JSON.stringify(SCROLL_ATTRIBUTE)};
-	const documentLoads = ${documentLoads};${intentSource}
-	const anchorFrom = (event) => {
-		const target = event.composedPath && event.composedPath()[0] || event.target;
-		return target && target.closest ? target.closest('a[href]') : target && target.parentElement && target.parentElement.closest ? target.parentElement.closest('a[href]') : null;
-	};
-	const sameOrigin = (href) => {
-		try {
-			const url = new URL(href, location.href);
-			return url.origin === location.origin ? url : null;
-		} catch {
-			return null;
-		}
-	};
-	if (location.hash && location.hash.startsWith('#/')) {
-		import(${JSON.stringify(resumeEntryPath)}).catch(() => {});
-	}
-	d.addEventListener('click', async (event) => {
-		if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.altKey || event.ctrlKey || event.shiftKey) return;
-		const anchor = anchorFrom(event);
-		if (!anchor || !anchor.hasAttribute(linkAttr) || anchor.hasAttribute('download')) return;
-		const target = anchor.getAttribute('target');
-		if (target && target !== '_self') return;
-		if (anchor.relList && anchor.relList.contains('external')) return;
-		const url = sameOrigin(anchor.href);
-		if (!url || (documentLoads && !url.hash.startsWith('#/'))) return;
-		event.preventDefault();
-		try {
-			const mod = await import(${JSON.stringify(resumeEntryPath)});
-			const navigate = mod.navigateMarklessRouterLink;
-			if (typeof navigate === 'function') {
-				await navigate({
-					href: url.href,
-					replace: anchor.hasAttribute(replaceAttr),
-					scroll: anchor.getAttribute(scrollAttr) === 'manual' ? 'manual' : undefined,
-				});
-			} else {
-				location.assign(url.href);
-			}
-		} catch (error) {
-			setTimeout(() => { throw error; });
-			location.assign(url.href);
-		}
-	}, true);${debugRegistration}
+	const scrollAttr = ${JSON.stringify(SCROLL_ATTRIBUTE)};`
+			: ''
+	}${intentSource}
+if(location.hash&&location.hash.startsWith('#/'))import(${JSON.stringify(resumeEntryPath)}).catch(()=>{});${hashClickSource}${debugRegistration}
 })();`)}</script>`;
+}
+
+interface FragmentBridge {
+	readonly entry: string;
+	readonly source: string;
+	readonly prefetch: boolean;
+	readonly pages: readonly string[];
+}
+
+function fragmentConfig(
+	fragment: FragmentBridge,
+	documentLoads: boolean,
+): FragmentNavigationConfig {
+	return {
+		entry: fragment.entry,
+		linkAttribute: LINK_ATTRIBUTE,
+		prefetchAttribute: PREFETCH_ATTRIBUTE,
+		replaceAttribute: REPLACE_ATTRIBUTE,
+		scrollAttribute: SCROLL_ATTRIBUTE,
+		routeScriptType: ROUTE_SCRIPT_TYPE,
+		retireProperty: CONTAINER_RETIRE_PROPERTY,
+		streamExecutorGlobal: STREAM_ARM_EXECUTOR_GLOBAL,
+		streamedArmSelector: STREAMED_ARM_SELECTOR,
+		requestHeader: FRAGMENT_REQUEST_HEADER,
+		regionEndMarker: FRAGMENT_REGION_END,
+		appendMarker: FRAGMENT_APPEND_END,
+		documentLoads,
+		hoverDwellMs: FRAGMENT_HOVER_DWELL_MS,
+		prefetchTtlMs: FRAGMENT_PREFETCH_TTL_MS,
+		prefetchConnections: FRAGMENT_PREFETCH_CONNECTIONS,
+		endpointPrefixes: [API_PATHNAME_PREFIX],
+		idleFragments: FRAGMENT_IDLE_FRAGMENTS,
+		idleWithoutConnectionInfo: FRAGMENT_IDLE_WITHOUT_CONNECTION_INFO,
+		prefetch: fragment.prefetch,
+		pages: fragment.pages,
+	};
 }
 
 function htmlAttributes(documentModule: DocumentModule | undefined, pageProps: PageComponentProps) {
@@ -770,8 +882,11 @@ function escapeInlineScript(value: string): string {
 	return value.replace(/<\/script/gi, '<\\/script');
 }
 
+// Nitro answers these with endpoints; the page renderer never does.
+const API_PATHNAME_PREFIX = '/api';
+
 function isNitroApiPathname(pathname: string) {
-	return pathname === '/api' || pathname.startsWith('/api/');
+	return pathname === API_PATHNAME_PREFIX || pathname.startsWith(`${API_PATHNAME_PREFIX}/`);
 }
 
 // Ahead of every module script and modulepreload, after <meta charset> so the charset stays in the first 1024 bytes.

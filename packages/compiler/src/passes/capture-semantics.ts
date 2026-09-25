@@ -39,6 +39,12 @@ export type SymbolSourceSemantics = {
 	 * expression such as `props.onSelect` matches the read it came from.
 	 */
 	invokes(expression: string): boolean;
+	/**
+	 * The property names `name` is read through when every free use of it is a
+	 * static member read (`props.title`, `props['title']`), or null when any use
+	 * passes, spreads, writes or indexes it dynamically.
+	 */
+	staticMemberKeys(name: string): ReadonlySet<string> | null;
 };
 
 /**
@@ -76,6 +82,7 @@ const UNANALYZABLE_SOURCE: SymbolSourceSemantics = {
 	freeNames: new Set(),
 	analysisFailed: true,
 	invokes: () => false,
+	staticMemberKeys: () => null,
 };
 
 // Several symbol kinds (`async-boundary-update`, `branch-update`) carry no
@@ -85,6 +92,7 @@ const SOURCELESS_SYMBOL: SymbolSourceSemantics = {
 	freeNames: new Set(),
 	analysisFailed: false,
 	invokes: () => false,
+	staticMemberKeys: () => new Set(),
 };
 
 function symbolSourceSemantics(source: string): SymbolSourceSemantics {
@@ -99,6 +107,7 @@ function symbolSourceSemantics(source: string): SymbolSourceSemantics {
 		freeNames: freeValueNames(module),
 		analysisFailed: false,
 		invokes: (expression) => calleeSources.has(expression),
+		staticMemberKeys: (name) => staticMemberKeys(module, name),
 	};
 }
 
@@ -137,4 +146,48 @@ function calleeSourceText(module: Module): ReadonlySet<string> {
 	}
 
 	return callees;
+}
+
+function staticMemberKeys(module: Module, name: string): ReadonlySet<string> | null {
+	const keys = new Set<string>();
+	for (const reference of module.unresolvedReferences) {
+		if (reference.inTypePosition || reference.name !== name) continue;
+		if (reference.isWrite) return null;
+		const member = module.parentOf(reference.node) as MemberNode | null;
+		if (!member || member.type !== 'MemberExpression' || member.object !== reference.node)
+			return null;
+		const key = staticMemberKey(member);
+		if (key === null || isAssignmentTarget(module, member)) return null;
+		keys.add(key);
+	}
+	return keys;
+}
+
+type MemberNode = {
+	readonly type: string;
+	readonly object?: unknown;
+	readonly property?: { readonly type?: string; readonly name?: string; readonly value?: unknown };
+	readonly computed?: boolean;
+};
+
+function staticMemberKey(member: MemberNode): string | null {
+	const property = member.property;
+	if (!property) return null;
+	if (!member.computed) return property.type === 'Identifier' && property.name ? property.name : null;
+	return (property.type === 'Literal' || property.type === 'StringLiteral') &&
+		typeof property.value === 'string'
+		? property.value
+		: null;
+}
+
+function isAssignmentTarget(module: Module, member: MemberNode): boolean {
+	const parent = module.parentOf(member as never) as {
+		readonly type?: string;
+		readonly left?: unknown;
+		readonly argument?: unknown;
+	} | null;
+	if (!parent) return false;
+	if (parent.type === 'AssignmentExpression') return parent.left === member;
+	if (parent.type === 'UpdateExpression') return parent.argument === member;
+	return parent.type === 'UnaryExpression' && (parent as { operator?: string }).operator === 'delete';
 }

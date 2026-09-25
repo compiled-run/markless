@@ -40,13 +40,71 @@ test('a real counter build names the click handler and its dispatch runtime in t
 	expect(boot.modules).toContain('virtual:markless:symbol:src%2Froot.tsrx:symbol%3A0');
 }, 180_000);
 
-test('the planner stays out of the build unless it is asked for', () => {
+test('native packing always plans packs from interaction closures', () => {
 	const [packing] = nativePackingPlugins(() => '/workspace');
-	expect(packing!.generateBundle).toBeUndefined();
-	const [planned] = nativePackingPlugins(
-		() => '/workspace',
+	expect(typeof packing!.generateBundle).toBe('function');
+});
+
+// An import() of a module whose chunk kept a module-free facade fetches the facade first; a landing
+// that preloads only the pack would fetch that facade at first use.
+test('planned first-use files list the facade chunk an import() fetches in front of its pack', () => {
+	const page = '/app/pages/feed.tsrx';
+	const adopt = '/repo/packages/web/src/resume-stream-patches.ts';
+	const graph: Record<string, { imports: string[]; dynamic: string[] }> = {
+		[`${page}?markless-route`]: { imports: [`${page}?markless-resume`], dynamic: [] },
+		[`${page}?markless-resume`]: { imports: [], dynamic: [adopt] },
+		[adopt]: { imports: [], dynamic: [] },
+	};
+	const map = {
+		version: 1,
+		recordKinds: [],
+		symbols: [],
+		payloadRecords: [],
+		actions: [],
+		unknownRecordModuleIds: [],
+		firstUsePage: {
+			resume: { symbolIds: [], runtimeModuleIds: [] },
+			pageSpaceReaders: [],
+			passedProps: [],
+			callbackSlots: [],
+		},
+	};
+	const [packing] = nativePackingPlugins(
+		() => '/app',
 		() => [],
-		{ mode: 'closures', demandSources: () => [] },
+		() => [{ source: `${page}?markless-resume`, map }],
 	);
-	expect(typeof planned!.generateBundle).toBe('function');
+	type Hook = (this: unknown, ...args: unknown[]) => void;
+	(packing!.buildEnd as Hook).call({
+		getModuleIds: () => Object.keys(graph)[Symbol.iterator](),
+		getModuleInfo: (id: string) => ({
+			importedIds: graph[id]!.imports,
+			dynamicallyImportedIds: graph[id]!.dynamic,
+			isEntry: false,
+			code: 'x',
+		}),
+	});
+	let asset = '';
+	(packing!.generateBundle as Hook).call(
+		{ emitFile: (file: { source: string }) => (asset = file.source) },
+		{},
+		{
+			'pack.js': {
+				type: 'chunk',
+				fileName: 'pack.js',
+				moduleIds: Object.keys(graph),
+				facadeModuleId: null,
+			},
+			'adopt-facade.js': {
+				type: 'chunk',
+				fileName: 'adopt-facade.js',
+				moduleIds: [],
+				facadeModuleId: adopt,
+			},
+		},
+	);
+	const route = (
+		JSON.parse(asset) as { routes: { route: string; files: { firstUse: string[] } }[] }
+	).routes.find((candidate) => candidate.route === 'pages/feed.tsrx')!;
+	expect(route.files.firstUse).toEqual(['adopt-facade.js', 'pack.js']);
 });

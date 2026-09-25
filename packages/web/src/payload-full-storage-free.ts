@@ -71,7 +71,7 @@ function decodeWithDevValidation(
 export async function resumeFromPayloadScripts(
 	input: ResumePayloadScriptsInput,
 ): Promise<ResumePayloadScriptsResult> {
-	return (await import('./payload-resume.ts')).resumeFromPayloadScriptsImpl(
+	return (await import('./payload-resume-lazy.ts')).resumeFromPayloadScriptsImpl(
 		input,
 		decodePayloadScripts,
 	);

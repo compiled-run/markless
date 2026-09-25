@@ -8,6 +8,7 @@ import {
 import { executedModulesPlugin } from '../test-support/executed-modules-plugin.ts';
 import { runtimeSizeReport, type RuntimeSizeReport } from '../test-support/runtime-size.ts';
 import { EVENT_ONLY_RESUMER_TARGET_BYTES } from '../../../poc/fixtures/proofs/resumer-script/src/resumer-source.mjs';
+import { unpackedFixture } from './unpacked-fixture.ts';
 
 // Product truth: SSR resumability needs server-produced HTML. This box uses the
 // fixture's real Vite app build, then serves it through Vite preview. Preview
@@ -38,7 +39,7 @@ export default box(
 		tags: ['ssr', 'build', 'preview', 'browser'],
 		modes: ['build', 'preview'],
 	},
-	async ({ pipeline, expect, receipt }) => {
+	unpackedFixture(async ({ pipeline, expect, receipt }) => {
 		const instrumentedBuild = await pipeline.build({
 			config: (config) => ({
 				...config,
@@ -269,7 +270,7 @@ export default box(
 		await receipt.capture(
 			'ssr preview preserved repeated state and shipped budgeted OXC output',
 		);
-	},
+	}),
 );
 
 type ScriptRequestLog = {

@@ -16,9 +16,16 @@ export type ExecutionSizeEntry = {
 	readonly gzip: number;
 	readonly chunk: string;
 	readonly instrument?: true;
-	/** Bytes of execution-log hook calls inside this chunk; `raw` and `gzip` exclude them. */
+	/** Bytes of execution-log hook calls; `raw` and `gzip` exclude them. */
 	readonly instrumentRaw?: number;
+	/** The module's own share of its chunk (by rendered length); without it the entry is the whole chunk. */
+	readonly module?: true;
+	/** A name several logged modules answer to; the ledger charges each of them once. */
+	readonly alias?: readonly string[];
 };
+
+// Per-module rendered lengths, keyed by the chunk object they were read from.
+export type RenderedChunkModules = ReadonlyMap<object, ReadonlyArray<readonly [string, number]>>;
 
 const HOOK_CALL = String.raw`globalThis\.__mxLog\?\.add\((?:\x60[^\x60]*\x60|"(?:[^"\\]|\\.)*")\)`;
 const HOOK_CALLS = new RegExp(`${HOOK_CALL}(?:;\\n?|,)|,${HOOK_CALL}|${HOOK_CALL}`, 'g');
@@ -46,6 +53,7 @@ export type ExecutionSizesCompletenessOptions = {
 	// is what decides whether the hook shipped; the log id is only its name.
 	readonly hookedIds?: ReadonlyMap<string, string>;
 	readonly root?: string;
+	readonly renderedModules?: RenderedChunkModules;
 };
 
 export async function createExecutionSizesAsset(
@@ -75,7 +83,25 @@ export async function createExecutionSizesAsset(
 		sizeByChunk.set(chunk, size);
 		return size;
 	};
-	const symbolLogIdsByChunk = new Map<string, string[]>();
+	const moduleSize = (
+		item: MarklessBuildMetadataChunk,
+		size: ExecutionSizeEntry,
+		moduleId: string,
+	): ExecutionSizeEntry => {
+		const rendered = options.renderedModules?.get(item);
+		const total = rendered?.reduce((sum, [, length]) => sum + length, 0) ?? 0;
+		const own = rendered?.find(([id]) => stripResolvedIdMarker(id) === moduleId)?.[1];
+		if (!own || total === 0) return size;
+		const share = (bytes: number) => Math.round((bytes * own) / total);
+		return {
+			raw: share(size.raw),
+			gzip: share(size.gzip),
+			chunk: size.chunk,
+			...(size.instrumentRaw ? { instrumentRaw: share(size.instrumentRaw) } : {}),
+			module: true,
+		};
+	};
+	const symbolLogIdsByChunk = new Map<string, Array<readonly [string, string]>>();
 	for (const module of metadata.modules) {
 		for (const symbol of module.symbols) {
 			if (!symbol.fileName) continue;
@@ -83,7 +109,10 @@ export async function createExecutionSizesAsset(
 			// Key symbols by their virtual module id (it embeds the source
 			// filename): same-numbered symbols from two source files must not
 			// overwrite each other in this flat map.
-			chunk.push(symbolExecutionLogId(symbol.virtualModuleId, options.root));
+			chunk.push([
+				symbolExecutionLogId(symbol.virtualModuleId, options.root),
+				stripResolvedIdMarker(symbol.virtualModuleId),
+			]);
 			symbolLogIdsByChunk.set(symbol.fileName, chunk);
 		}
 	}
@@ -91,10 +120,15 @@ export async function createExecutionSizesAsset(
 	for (const item of Object.values(bundle)) {
 		if (item.type !== 'chunk') continue;
 		const chunk = canonPath(item.fileName);
-		const logIds = new Set<string>([
-			...item.moduleIds.flatMap((id) => chunkModuleLogId(id) ?? []),
-			...(symbolLogIdsByChunk.get(chunk) ?? []),
+		const symbols = symbolLogIdsByChunk.get(chunk) ?? [];
+		const moduleOf = new Map<string, string>([
+			...item.moduleIds.flatMap((id): Array<[string, string]> => {
+				const logId = chunkModuleLogId(id);
+				return logId ? [[logId, stripResolvedIdMarker(id)]] : [];
+			}),
+			...symbols.map(([logId, moduleId]): [string, string] => [logId, moduleId]),
 		]);
+		const logIds = new Set(moduleOf.keys());
 		if (logIds.size === 0) continue;
 		if (logIds.has(MARKLESS_EXECUTION_LOG_MODULE_ID) && logIds.size > 1) {
 			const cohabitingIds = [...logIds]
@@ -107,13 +141,23 @@ export async function createExecutionSizesAsset(
 		const size = await chunkSize(item, chunk);
 		for (const id of logIds)
 			entries[id] =
-				id === MARKLESS_EXECUTION_LOG_MODULE_ID ? { ...size, instrument: true } : size;
-		// Rolldown rewrites a hook's own module-id literal into the chunk-relative
-		// specifier it emits for that module, so symbol modules log "./chunk-x.js".
-		// The unit is already the chunk, so the chunk answers to that name too —
-		// otherwise every symbol execution reads as an unmapped id.
+				id === MARKLESS_EXECUTION_LOG_MODULE_ID
+					? { ...size, instrument: true }
+					: moduleSize(item, size, moduleOf.get(id)!);
+		// Rolldown rewrites a symbol module's hook literal into the chunk-relative specifier it
+		// emits, so symbol modules log "./chunk-x.js", which names every symbol module in the chunk.
 		const emittedSpecifier = `./${chunk.split('/').pop()}`;
-		entries[emittedSpecifier] ??= size;
+		const members = (symbols.length ? symbols.map(([logId]) => logId) : [...logIds]).filter(
+			(id) => entries[id]?.module,
+		);
+		entries[emittedSpecifier] ??= members.length
+			? {
+					raw: members.reduce((sum, id) => sum + entries[id]!.raw, 0),
+					gzip: members.reduce((sum, id) => sum + entries[id]!.gzip, 0),
+					chunk,
+					alias: members.sort(),
+				}
+			: size;
 	}
 
 	const unshipped: Record<string, string> = {};
@@ -142,7 +186,16 @@ export async function createExecutionSizesAsset(
 			entries[required.id] =
 				required.id === MARKLESS_EXECUTION_LOG_MODULE_ID
 					? { ...size, instrument: true }
-					: size;
+					: moduleSize(
+							item,
+							size,
+							item.moduleIds
+								.map(stripResolvedIdMarker)
+								.find(
+									(id) =>
+										id === required.moduleId || workspaceModuleLogId(id) === required.id,
+								) ?? required.id,
+						);
 		}
 		if (unmappable.length > 0)
 			throw new Error(

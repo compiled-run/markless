@@ -351,6 +351,12 @@ export type ProtocolViewPayload = {
 					readonly suffix?: string;
 					readonly trueValue?: string;
 					readonly falseValue?: string;
+					/**
+					 * The host's child-node position of the one text node this write owns,
+					 * present only when the text shares its element with other children.
+					 * Negative counts back from the end: -1 is the last child node.
+					 */
+					readonly textNode?: number;
 			  }
 			| {
 					readonly kind: 'attribute';
@@ -484,11 +490,14 @@ export type ProtocolViewPayload = {
 		 * render path uses (absent for null, undefined and false).
 		 *
 		 * Carried only for a row the client can finish alone: static markup, or
-		 * markup whose every slot - text or attribute - reads off the repeated item
-		 * or off a graph node the page already holds. A row holding anything else -
-		 * an attribute value computed by an expression, an element handle's id, a
-		 * nested construct - needs wiring the mint cannot do, so it ships nothing
-		 * and the served behaviour stands. One child component is the exception: a
+		 * markup whose every slot - text or attribute - reads off the repeated item,
+		 * off the items of the rows enclosing it, off a graph node the page already
+		 * holds, or off an authored expression over those and the owning
+		 * component's props (a `source` slot, `class` and `style` included; the
+		 * html keeps a slot attribute's static part, such as the scope class). A row
+		 * holding anything else - an element handle's id, a value only the render
+		 * produces, a nested construct - needs wiring the mint cannot do, so it
+		 * ships nothing and the served behaviour stands. One child component is the exception: a
 		 * row element wrapping one is markup here plus identity in `rowComponent`,
 		 * whose `slotPath` names the marker in this html the child's rendered nodes
 		 * replace.
@@ -511,6 +520,20 @@ export type ProtocolViewPayload = {
 				} & ProtocolRowTemplateSlotValue
 			>;
 		};
+		/**
+		 * The parent graph node each prop a `rowTemplate` source slot reads follows,
+		 * by prop name. The owning component's reader reads a prop under the
+		 * child's own id, which holds the served value; the row reads the node the
+		 * parent passed instead. Only composition writes it, and only for a prop
+		 * passed as a live graph reference.
+		 *
+		 * Pay-per-use: a row reading no routed prop omits the field.
+		 */
+		readonly propRoutes?: ReadonlyArray<{
+			readonly name: string;
+			readonly graphNodeId: string;
+			readonly path: ReadonlyArray<string>;
+		}>;
 		/**
 		 * The component a row of this repeat roots, named by identity alone.
 		 *

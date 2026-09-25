@@ -11,6 +11,38 @@ describe('Vite preload cleanup', () => {
 		);
 	});
 
+	// Packing turns a same-chunk import() into a resolved promise or an async loader call, and Vite
+	// writes no dependencies as `void 0`.
+	test('removes empty preload wrappers around packed same-chunk imports', () => {
+		const code =
+			'const a=()=>p(()=>Promise.resolve().then(()=>(init(),ns)),void 0);const b=()=>p(()=>(async()=>(await 0,__marklessPackedAb12()))(),void 0);const c=()=>p(()=>import("./pack.js").then(m=>m.__marklessPackedCd34()),[]);';
+
+		expect(stripEmptyVitePreloadWrappers(code)).toBe(
+			'const a=()=>Promise.resolve().then(()=>(init(),ns));const b=()=>(async()=>(await 0,__marklessPackedAb12()))();const c=()=>import("./pack.js").then(m=>m.__marklessPackedCd34());',
+		);
+	});
+
+	test('removes empty preload wrappers around registry pack loads', () => {
+		const code =
+			'const a=()=>i(()=>$(`./chunk-a.js`,`$mlLNhe`,()=>import(`./chunk-a.js`)),[]);const b=()=>i(()=>load("./b.js","$mlW8LC",()=>import("./b.js")),void 0);';
+
+		expect(stripEmptyVitePreloadWrappers(code)).toBe(
+			'const a=()=>$(`./chunk-a.js`,`$mlLNhe`,()=>import(`./chunk-a.js`));const b=()=>load("./b.js","$mlW8LC",()=>import("./b.js"));',
+		);
+	});
+
+	test('keeps a pack-load-shaped call whose second argument is not a pack loader', () => {
+		const code = 'const a=()=>i(()=>$(`./chunk-a.js`,`other`,()=>import(`./chunk-a.js`)),[]);';
+
+		expect(stripEmptyVitePreloadWrappers(code)).toBe(code);
+	});
+
+	test('keeps a void-deps call that does not wrap an import', () => {
+		const code = 'const later=()=>p(()=>compute(),void 0);';
+
+		expect(stripEmptyVitePreloadWrappers(code)).toBe(code);
+	});
+
 	test('keeps non-empty preload wrappers so dependency preloading still works', () => {
 		const code =
 			'const route=()=>p(()=>import("./route.js").then((mod)=>mod.default),["route.css"],import.meta.url);';
@@ -101,5 +133,16 @@ describe('Vite preload cleanup', () => {
 		expect(stripEmptyVitePreloadWrappers(code)).toBe(
 			'import{__esmMin as e}from"./shared.js";var T=e((()=>{}));async function load(){let{createRuntimeGraph:e}=await (async()=>{let{createRuntimeGraph:e}=await import("./graph.js");return{createRuntimeGraph:e}})();return e({cells:[]})}var z=e((()=>{T()})),B=e((()=>{z()})),H=e((()=>{})),G=e((()=>{})),K=e((()=>{H(),G()}));e((()=>{B(),K()}))();',
 		);
+	});
+
+	test('reads shadowing from scopes: a parameter named like the helper is not a call to it', () => {
+		const preamble = 'const __vite__mapDeps=(i)=>i;\n//# allFunctionsCalledOnLoad\n';
+		const shadowed = `${preamble}import{__vitePreload as p,init_preload_helper as n}from"./preload.js";function run(p){return p()}var A=e((()=>{n()}));`;
+		const free = `${preamble}import{__vitePreload as p,init_preload_helper as n}from"./preload.js";function run(q){return p(()=>q(),["a.css"])}var A=e((()=>{n()}));`;
+
+		expect(stripEmptyVitePreloadWrappers(shadowed)).toBe(
+			`${preamble}function run(p){return p()}var A=e((()=>{}));`,
+		);
+		expect(stripEmptyVitePreloadWrappers(free)).toBe(free);
 	});
 });

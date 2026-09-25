@@ -37,6 +37,7 @@ type JournalEntry = {
 	readonly type?: unknown;
 	readonly name?: unknown;
 	readonly value?: unknown;
+	readonly node?: (host: unknown) => unknown;
 };
 
 const ESCALATE = 'MARKLESS_SCALAR_SPECIALIZED_ESCALATE';
@@ -217,7 +218,7 @@ export async function marklessRunClosureAction(
 		for (const name of STORE_REFUSED) graph[name] = () => escalate(name);
 
 		if (syncPolicy && !syncPolicyAlreadyApplied) {
-			const { runSyncPolicyActions } = await import('../inline/sync-policy-core.ts');
+			const { runSyncPolicyActions } = await import('../inline/sync-policy-core-lazy.ts');
 			runSyncPolicyActions(syncPolicy as never, graph as never, input.event as never);
 			syncPolicyAlreadyApplied = true;
 		}
@@ -254,8 +255,9 @@ export async function marklessRunClosureAction(
 			for (const [id, value] of memo) values.set(id, value);
 			for (const [element, entry] of entries) {
 				if (entry.type === 'setText') {
+					const node = (entry.node ? entry.node(element) : element) as typeof element;
 					const text = entry.value == null ? '' : String(entry.value);
-					if (element.textContent !== text) element.textContent = text;
+					if (node.textContent !== text) node.textContent = text;
 					continue;
 				}
 				const name = String(entry.name);

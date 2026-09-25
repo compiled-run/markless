@@ -45,5 +45,8 @@ export default defineConfig(({ command }) => ({
 			},
 		},
 	},
-	plugins: [coreFromSource, markless()],
+	plugins: [
+		coreFromSource,
+		markless({ packing: process.env.MARKLESS_FIXTURE_NATIVE_PACKING !== '0' }),
+	],
 }));

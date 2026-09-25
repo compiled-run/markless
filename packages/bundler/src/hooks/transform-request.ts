@@ -6,6 +6,7 @@ import { withQuery } from 'ufo';
 import { normalizeExecutionLogMode } from '../execution-log.ts';
 import { moduleIsEntry } from '../link-driver.ts';
 import { moduleIdFor } from '../module-id.ts';
+import { nativePackingEnabled } from '../packing-option.ts';
 import type { MarklessEnvironment, TransformTsrxModuleInput } from '../types.ts';
 import {
 	MARKLESS_ROUTE_SOURCE_QUERY_RE,
@@ -105,7 +106,7 @@ export function planTransformHookRequest(
 	const transformInput: TransformTsrxModuleInput = {
 		// Must match the emit gate: a packed build emits no symbol chunks, so every published resolver needs literal imports.
 		experimentalNativePacking:
-			internalOptions.experimentalNativePacking === true &&
+			nativePackingEnabled(internalOptions) &&
 			currentEnvironment === 'client' &&
 			internalOptions.dev !== true,
 		filename: source,

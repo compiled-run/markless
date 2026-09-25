@@ -449,6 +449,31 @@ export function sharedInstanceReadGraphNodeIds(
 	);
 }
 
+/**
+ * The value a row name binds to in a reader whose context is `context`.
+ *
+ * A row's context is its own row; a row nested in another's carries the
+ * enclosing row as `repeatOuter`, so a name declared by an enclosing `@for` is
+ * looked up by the repeat that declared it, innermost first. A name no nested
+ * row can read keeps the plain innermost read.
+ */
+export function repeatLocalSource(
+	repeats: PublicRenderModuleInput['semanticGraph']['keyedRepeats'],
+	name: string,
+	field: 'repeatItem' | 'repeatIndex',
+	context: string,
+): string {
+	const declaring = repeats.filter((repeat) =>
+		field === 'repeatItem' ? repeat.itemName === name : repeat.indexName === name,
+	);
+	const encloses = declaring.some((repeat) =>
+		repeats.some((candidate) => candidate.enclosingRepeatId === repeat.id),
+	);
+	if (!encloses) return `${context}.${field}`;
+	const ids = JSON.stringify(declaring.map((repeat) => repeat.id));
+	return `((r)=>{for(;r;r=r.repeatOuter)if(r.repeatId===undefined||${ids}.includes(r.repeatId))return r.${field};return ${context}.${field};})(${context})`;
+}
+
 const CONTEXT = 'marklessResidueContext';
 const initializerResidueCache = new WeakMap<
 	PublicRenderModuleInput,
@@ -577,11 +602,15 @@ export function emitClientResidueReader(
 	for (const repeat of input.semanticGraph.keyedRepeats) {
 		if (reads(repeat.itemName) && !bound.has(repeat.itemName)) {
 			bound.add(repeat.itemName);
-			lines.push(`const ${repeat.itemName}=${CONTEXT}.repeatItem;`);
+			lines.push(
+				`const ${repeat.itemName}=${repeatLocalSource(input.semanticGraph.keyedRepeats, repeat.itemName, 'repeatItem', CONTEXT)};`,
+			);
 		}
 		if (repeat.indexName && reads(repeat.indexName) && !bound.has(repeat.indexName)) {
 			bound.add(repeat.indexName);
-			lines.push(`const ${repeat.indexName}=${CONTEXT}.repeatIndex;`);
+			lines.push(
+				`const ${repeat.indexName}=${repeatLocalSource(input.semanticGraph.keyedRepeats, repeat.indexName, 'repeatIndex', CONTEXT)};`,
+			);
 		}
 	}
 	if (reads('error') && !bound.has('error')) {

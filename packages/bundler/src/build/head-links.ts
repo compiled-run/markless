@@ -63,6 +63,8 @@ export function collectModulePreloadInjections(
 		// does not fetch it until interaction. Preload that root and its complete
 		// built dependency closure so wake dispatch introduces no cold JS fetch.
 		wakeChunks?: readonly string[];
+		// Deferred packs (bundle-graph normalized): runtime no page demands, loaded on first import().
+		lazyChunks?: ReadonlySet<string>;
 	} = {},
 ): GlobalInjections[] {
 	const buildMetadata = isBuildMetadata(preloadSource) ? preloadSource : undefined;
@@ -96,6 +98,7 @@ export function collectModulePreloadInjections(
 			: joinURL('/', MARKLESS_BUILD_PREFIX),
 		bundleGraph,
 		roots,
+		lazyChunks: options.lazyChunks,
 	}).map(modulePreloadInjection);
 }
 

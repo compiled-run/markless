@@ -1,4 +1,4 @@
-// Builds the vite-ssr counter fixture with native packing and the closure pack planner on.
+// Builds the vite-ssr counter fixture with native packing, which always runs the pack planner.
 import { resolve } from 'pathe';
 import { createBuilder } from 'vite';
 import { markless } from '../../src/vite/index.ts';
@@ -24,6 +24,6 @@ const builder = await createBuilder({
 			},
 		},
 	},
-	plugins: [markless({ experimentalNativePacking: true, experimentalPackPlanner: 'closures' })],
+	plugins: [markless()],
 });
 await builder.buildApp();

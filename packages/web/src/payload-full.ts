@@ -116,7 +116,7 @@ export {
 export async function resumeFromPayloadScripts(
 	input: ResumePayloadScriptsInput,
 ): Promise<ResumePayloadScriptsResult> {
-	const resume = await import('./payload-resume.ts');
+	const resume = await import('./payload-resume-lazy.ts');
 	return resume.resumeFromPayloadScriptsImpl(input, decodePayloadScripts);
 }
 

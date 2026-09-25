@@ -26,7 +26,7 @@ import {
 } from '../fns/ssr.ts';
 import type { ComposeGraphProps } from '../fns/composition.ts';
 import { marklessCsrRemapChildGraph } from '../fns/composition.ts';
-import { marklessBoundSymbolId } from '../fns/bound-symbol.ts';
+import { marklessBoundSymbolId, marklessReboundSymbolId } from '../fns/bound-symbol.ts';
 import {
 	marklessInstancePath,
 	marklessRowFreeSymbolId,
@@ -153,6 +153,8 @@ export type PrerenderDataDefinition = {
 		context: {
 			readonly repeatItem?: unknown;
 			readonly repeatIndex?: number;
+			readonly repeatId?: string;
+			readonly repeatOuter?: unknown;
 			readonly asyncError?: unknown;
 			readonly read: (graphNodeId: string, path?: ReadonlyArray<string>) => unknown;
 			// What a minted element() id is derived from. The token naming the
@@ -572,6 +574,22 @@ function ownedStateCells(
 	return definition.state.cells.filter((cell) => owned.size === 0 || owned.has(cell.graphNodeId));
 }
 
+// A module as one render placed it: its root's prefix, each evaluated instance's reader, and the import edge an outer module claims through.
+type PrerenderBoundModule = {
+	readonly rootPrefix: string;
+	readonly instanceReads: Map<string, PrerenderRead>;
+	readonly outer?: {
+		readonly boundSymbols: Readonly<Record<string, string>>;
+		readonly composer: PrerenderBoundComposer;
+	} | undefined;
+};
+
+export type PrerenderBoundComposer = {
+	readonly symbolPrefix: string;
+	readonly read: PrerenderRead;
+	readonly module?: PrerenderBoundModule;
+};
+
 export function evaluatePrerenderDataComponent(input: {
 	readonly surface: PrerenderDataSurface;
 	readonly componentName: string;
@@ -579,6 +597,10 @@ export function evaluatePrerenderDataComponent(input: {
 	readonly idPrefix: string;
 	readonly symbolPrefix: string;
 	readonly boundSymbols?: Readonly<Record<string, string>>;
+	// The component whose edge bound this one's symbols: its resolver loads them, its nodes answer their captures.
+	readonly composer?: PrerenderBoundComposer;
+	// Set when the composer declares this component in its own module.
+	readonly module?: PrerenderBoundModule;
 	readonly graphProps?: ReadonlyArray<{
 		readonly name: string;
 		readonly kind: string;
@@ -684,6 +706,12 @@ export function evaluatePrerenderDataComponent(input: {
 			return readPath(input.boundGraphValues.get(graphNodeId), path);
 		return readPath(values.get(graphNodeId), path);
 	};
+	const ownModule: PrerenderBoundModule = input.module ?? {
+		rootPrefix: input.symbolPrefix,
+		instanceReads: input.composer?.module?.instanceReads ?? new Map(),
+		outer: input.composer && input.boundSymbols && { boundSymbols: input.boundSymbols, composer: input.composer },
+	};
+	ownModule.instanceReads.set(input.symbolPrefix, read);
 	// A part may derive where it stands in its family's roster. First paint has no
 	// DOM, so the answer is the order this widget instance emits its members.
 	// A row minted after resume is its own small render, with no page seeds to
@@ -720,11 +748,34 @@ export function evaluatePrerenderDataComponent(input: {
 			!input.graph && !input.boundSymbols?.[symbolId]
 				? definition.initializers?.[symbolId]
 				: undefined;
+		let boundSymbolId = input.boundSymbols?.[symbolId];
+		let composer = input.composer;
+		// An outer module that claimed the row again, through a prop its slot passed through, binds it there.
+		for (let outer = composer?.module?.outer; outer && boundSymbolId; outer = composer?.module?.outer) {
+			const rebound = marklessReboundSymbolId(outer.boundSymbols, boundSymbolId);
+			if (!rebound) break;
+			boundSymbolId = rebound;
+			composer = outer.composer;
+		}
+		const scope = composer;
+		// Slot routes name the composer's nodes bare and any other instance by its path in the module; a minted row knows only its composer.
+		const deriveRead: PrerenderRead =
+			boundSymbolId && scope && !input.graph
+				? (graphNodeId, path) => {
+						const at = marklessInstancePath(graphNodeId),
+							local = graphNodeId.slice(at.length),
+							holder = at ? scope.module?.instanceReads.get(scope.module.rootPrefix + at) : scope.read;
+						if (holder) return holder(local, path);
+						const own = read(graphNodeId, path);
+						return own === undefined && scope.symbolPrefix.endsWith(at) ? scope.read(local, path) : own;
+					}
+				: read;
 		return marklessThen(
 			linkedInitializer ??
 				(input.loadSymbol(
-					input.boundSymbols?.[symbolId] ??
-						marklessRowFreeSymbolId(input.symbolPrefix + symbolId, input.symbolPrefix),
+					boundSymbolId
+						? (composer?.symbolPrefix ?? '') + boundSymbolId
+						: marklessRowFreeSymbolId(input.symbolPrefix + symbolId, input.symbolPrefix),
 				) as Awaitable<unknown>),
 			(loaded) => {
 				if (typeof loaded !== 'function') {
@@ -732,7 +783,7 @@ export function evaluatePrerenderDataComponent(input: {
 				}
 				return marklessThen(
 					(loaded.length > 0
-						? loaded({ graph: { read }, read, ...rosterPositionContext })
+						? loaded({ graph: { read: deriveRead }, read: deriveRead, ...rosterPositionContext })
 						: loaded()) as Awaitable<unknown>,
 					(value) => {
 						values.set(initial.graphNodeId, value);
@@ -829,6 +880,8 @@ export function evaluatePrerenderDataComponent(input: {
 					{
 						repeatItem: context.repeatItem,
 						repeatIndex: context.repeatIndex,
+						repeatId: context.repeatId,
+						repeatOuter: context.repeatOuter,
 						read,
 						idPrefix: input.idPrefix,
 					},
@@ -868,6 +921,8 @@ export function evaluatePrerenderDataComponent(input: {
 							return definition.readResidue(residue, {
 								repeatItem: context.repeatItem,
 								repeatIndex: context.repeatIndex,
+								repeatId: context.repeatId,
+								repeatOuter: context.repeatOuter,
 								asyncError: context.asyncError,
 								read,
 								idPrefix: input.idPrefix,
@@ -1023,6 +1078,8 @@ export function evaluatePrerenderDataComponent(input: {
 								idPrefix: input.idPrefix + hostPrefix,
 								symbolPrefix: input.symbolPrefix + symbolPrefix,
 								boundSymbols: edge.boundSymbols,
+								composer: { symbolPrefix: input.symbolPrefix, read, module: ownModule },
+								...(childSurface === input.surface ? { module: ownModule } : {}),
 								graphProps: edge.props,
 								loadSymbol: input.loadSymbol,
 								graph: input.graph,

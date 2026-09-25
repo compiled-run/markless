@@ -38,6 +38,8 @@ export const DEFAULTS = {
 	coverage: true,
 	lock: '/private/tmp/mlbench-timing.lock',
 	build: true,
+	earlyRepeats: 1,
+	delayAdoptionMs: 0,
 };
 
 export function parseArgs(argv) {
@@ -84,6 +86,12 @@ export function parseArgs(argv) {
 				break;
 			case '--repo':
 				o.repo = next();
+				break;
+			case '--early-repeats':
+				o.earlyRepeats = Number(next());
+				break;
+			case '--delay-adoption-ms':
+				o.delayAdoptionMs = Number(next());
 				break;
 			case '--label':
 				o.label = next();
@@ -235,6 +243,7 @@ async function main() {
 		browsers: opts.browsers,
 		profiles: opts.profiles,
 		variants: Object.fromEntries(opts.variants.map((v) => [v, VARIANTS[v]])),
+		posture: process.env.HOLDOUT_LAB_POSTURE ? 'lab' : 'consumer',
 		options: { ...opts, out: undefined },
 		lanes: Object.fromEntries(
 			lanes.map((l) => [

@@ -116,6 +116,7 @@ type InlineRoot = HTMLElement &
 	OverlayPrimedDismissalHost & {
 		__asyncResumeRuntimeStarted?: boolean;
 		__marklessDelegatedDispatch?: boolean | string;
+		__marklessListen?: (eventName: string) => void;
 		__marklessSettledArms?: Array<MarklessSettledArmHandoff>;
 		__marklessEventOnlyGraph?: Map<string, unknown>;
 		__marklessEventOnlyGraphInitialized?: boolean;
@@ -329,23 +330,18 @@ function runPrerenderSettleBoot(
 		(loaded ||= loadModule(resumeModuleUrl)).then((module) =>
 			module.resumeContainerEvent(input as never),
 		);
-	for (const eventName of eventNames) {
-		root.addEventListener(
-			eventName,
-			(event) => {
-				root.__marklessDelegatedDispatch = true;
-				replay(event.target as Element);
-				// Queued, not dropped: a gesture arriving before the arm settles
-				// waits for the fill. Dispatching it first would boot a runtime whose
-				// records still describe @pending — and whichever trigger group
-				// covered the gesture would leave the boundary unowned.
-				return ready.then(() =>
-					resume({ root, event, element: event.target, eventRecord: null }),
-				);
-			},
-			true,
-		);
-	}
+	const dispatch = (event: Event) => {
+		root.__marklessDelegatedDispatch = true;
+		replay(event.target as Element);
+		// Queued, not dropped: a gesture arriving before the arm settles
+		// waits for the fill. Dispatching it first would boot a runtime whose
+		// records still describe @pending — and whichever trigger group
+		// covered the gesture would leave the boundary unowned.
+		return ready.then(() => resume({ root, event, element: event.target, eventRecord: null }));
+	};
+	eventNames.map(
+		(root.__marklessListen = (eventName) => root.addEventListener(eventName, dispatch, true)),
+	);
 	// Only the failure paths reach the runtime without a gesture: no plan, no
 	// settle module, a rejected runner, or a filler that refused to place a hole.
 	const wake = () => {
@@ -633,23 +629,15 @@ function runPrerenderInlineResumer(
 	// One import promise for this root, not one per event: same FIFO rule the
 	// classic resumer's `forward` follows.
 	let loaded: Promise<InlineResumeModule> | undefined;
-	for (const eventName of eventNames) {
-		root.addEventListener(
-			eventName,
-			(event) => {
-				root.__marklessDelegatedDispatch = true;
-				return (loaded ||= loadModule(resumeModuleUrl)).then((module) =>
-					module.resumeContainerEvent({
-						root,
-						event,
-						element: event.target,
-						eventRecord: null,
-					}),
-				);
-			},
-			true,
+	const dispatch = (event: Event) => {
+		root.__marklessDelegatedDispatch = true;
+		return (loaded ||= loadModule(resumeModuleUrl)).then((module) =>
+			module.resumeContainerEvent({ root, event, element: event.target, eventRecord: null }),
 		);
-	}
+	};
+	eventNames.map(
+		(root.__marklessListen = (eventName) => root.addEventListener(eventName, dispatch, true)),
+	);
 }
 
 // Serialized only into documents whose payload has an unsettled async runner.
@@ -1092,8 +1080,8 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 		),
 		...armRecordSets.flatMap((arm) => (arm.events ?? []).map((event) => event.eventName)),
 	]);
-	// New component rows and escalating arms have no initial DOM locator.
-	const mintsComponentRows =
+	// New component rows, escalating arms, and anything the runtime commits later have no initial DOM locator.
+	let forwardsUnknownElements =
 		keyedRepeats.some((repeat) => repeat.rowComponent !== undefined) ||
 		branches.some((branch) => branch.escalates);
 	const eventNames = new Set([
@@ -1111,8 +1099,22 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 		...pressPreloadEventNames,
 	];
 	const wakeOnUnknownElement =
-		mintsComponentRows ||
+		forwardsUnknownElements ||
 		focusWakeEventNames.some((eventName) => nestedEventNames.has(eventName));
+	// A followed link outside every located repeat parent reaches no row; the router prevents only the clicks it navigates.
+	const leavesPage = ({ defaultPrevented, target }: Event) =>
+		!forwardsUnknownElements &&
+		!branches.length &&
+		!view.asyncBoundaries.length &&
+		(target as Element).closest?.(
+			defaultPrevented ? 'a[href][data-markless-router-link]' : 'a[href]',
+		) &&
+		keyedRepeats.every((repeat) => {
+			const parent = elements.find(
+				(element) => hostIds.get(element) === repeat.parentHostNodeId,
+			);
+			return parent && !parent.contains(target as Node);
+		});
 	const primeEventNames = ['focusin', 'pointerover'].filter((_name, hover) =>
 		(hover ? pressPreloadEventNames : focusWakeEventNames).some((eventName) =>
 			eventNames.has(eventName),
@@ -1148,7 +1150,7 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 				if (element === root) break;
 			}
 			if (!primed) {
-				if (hover || !wakeOnUnknownElement) return;
+				if (hover || !wakeOnUnknownElement || leavesPage(event)) return;
 				primed = root;
 			}
 			// Retain the hovered control because a resting pointer sends no second crossing.
@@ -1189,12 +1191,16 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 			}
 			if (element === root) break;
 		}
-		if (mintsComponentRows || nestedEventNames.has(event.type)) {
+		if ((forwardsUnknownElements || nestedEventNames.has(event.type)) && !leavesPage(event)) {
 			return forward({ event, element: event.target, eventRecord: null });
 		}
 		if (__MARKLESS_INLINE_EXECUTION_LOG__ !== 'never' && globalScope.__mxLog) {
 			return forward({ event, element: event.target, eventRecord: null });
 		}
+	};
+	root.__marklessListen = (eventName) => {
+		forwardsUnknownElements = true;
+		root.addEventListener(eventName, dispatch, true);
 	};
 	for (const eventName of eventNames) {
 		if (eventName === __MARKLESS_INLINE_VISIBLE_EVENT__) continue;

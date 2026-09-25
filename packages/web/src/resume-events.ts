@@ -440,7 +440,8 @@ export function createEventWiring(input: {
 		rowEvents: ReadonlyArray<ResumeKeyedRepeatRowEvent>,
 	): Promise<void> {
 		if (![...viewEvents, ...rowEvents].some((record) => record.syncPolicy)) return;
-		runPolicy = (await import('./inline/sync-policy-core.ts')).runSyncPolicyActions as never;
+		runPolicy = (await import('./inline/sync-policy-core-lazy.ts'))
+			.runSyncPolicyActions as never;
 	}
 	async function dispatch(
 		event: ResumeDomEvent,
@@ -568,7 +569,7 @@ export function createEventWiring(input: {
 		stopsImmediately?: () => boolean,
 	): Promise<void> {
 		const beforeExecution = marklessExecutionLogSnapshot();
-		const repeats = await import('./resume-keyed-repeats.ts');
+		const repeats = await import('./resume-keyed-repeats-lazy.ts');
 		const { repeat, rowKey, rowEvent } = match;
 		const item = () => repeats.findRepeatItemByKey(input.graph, repeat, rowKey);
 		// The row is out of the document AND its item is out of the collection, so

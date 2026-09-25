@@ -5,6 +5,17 @@ import type { GlobalInjections } from './types.ts';
 export const MARKLESS_EXECUTION_LOG_MODULE_ID = 'virtual:markless:dev-log';
 export const MARKLESS_EXECUTION_LOG_GLOBAL = '__mxLog';
 
+// The instrument's own modules. Their chunk loads only once a page activates the log, so no plan preloads it.
+export const EXECUTION_LOG_CHUNK_MODULE_PATTERN =
+	/virtual:markless:dev-log|[/\\]web[/\\]src[/\\]dev-log\.ts(?:[?#].*)?$/;
+
+export function isExecutionLogChunk(chunk: { readonly moduleIds?: readonly string[] }): boolean {
+	return (
+		!!chunk.moduleIds?.length &&
+		chunk.moduleIds.every((id) => EXECUTION_LOG_CHUNK_MODULE_PATTERN.test(id))
+	);
+}
+
 // The runtime names these on dispatch records, so the size map must key them
 // even though no hook injects them; a new dispatch site must be declared here
 // or the bundler suite fails.
@@ -14,7 +25,7 @@ export const EXECUTION_LOG_DISPATCH_MODULE_IDS = ['web:render-csr', 'web:resume-
 // instrument, the inline activation script, and the inline resumer.
 export const MARKLESS_EXECUTION_LEDGER_GLOBAL = '__marklessExecutionLedger';
 
-// Chunk-raw-bytes is the honest unit for a build map at chunk granularity.
+// The ledger reports module-raw-bytes once a build map splits chunks per module; chunk-raw-bytes otherwise.
 export const MARKLESS_EXECUTION_LEDGER_INIT =
 	"{ unit: 'chunk-raw-bytes', load: { app: 0, framework: 0, instrument: 0, inline: 0, modules: [] }, total: { app: 0, framework: 0, instrument: 0, inline: 0 }, turns: [], incomplete: null }";
 
@@ -153,29 +164,29 @@ function accounting(items, sizes) {
 	return { appBytes: unmappedIds.length ? null : appBytes, instrumentBytes, appModules, instrumentModules, estimated: { app: appEstimated, instrument: instrumentEstimated }, unmappedIds };
 }
 function rowKb(items, sizes) { const a = accounting(items, sizes); if (a.unmappedIds.length) return 'bytes unknown'; const total = (a.appBytes || 0) + (a.instrumentBytes || 0); return (total / 1024).toFixed(1) + ' KB' + (a.estimated.app || a.estimated.instrument ? ' est. source' : ''); }
-// One cumulative ledger owns every number the console prints. A module's charge
-// is the whole raw byte length of the chunk that absorbed it (several modules in
-// one chunk are each charged the whole chunk), which is what unit says.
+// One cumulative ledger owns every number the console prints. A module's charge is its own share
+// of its chunk's raw bytes when the build map carries one, else the whole chunk; unit says which.
 function marklessLedger() { return (globalThis.${MARKLESS_EXECUTION_LEDGER_GLOBAL} ||= ${MARKLESS_EXECUTION_LEDGER_INIT}); }
 function ledgerCategory(id, record) { return record && record.instrument ? 'instrument' : ${EXECUTION_LOG_FRAMEWORK_ID_PATTERN}.test(id) ? 'framework' : 'app'; }
 function ledgerCharge(l, ids, sizes) {
 	const seen = (l.chargedIds ||= new Set());
 	const seenChunks = (l.chargedChunks ||= new Set());
 	const delta = { app: 0, framework: 0, instrument: 0, gzip: 0, modules: [], unmapped: [] };
-	for (const raw of ids) {
+	const charge = (raw, viaAlias) => {
 		const id = canonicalId(raw, sizes);
 		const record = sizes && sizes.get(id);
-		// The unit is the chunk, so the dedupe unit is the chunk: one chunk reached
-		// under two names (a symbol id and the emitted specifier Rolldown rewrote
-		// its hook to) is one charge, not two. Dev estimates carry no chunk, so
-		// there the id is still the unit.
-		const chunk = record && record.chunk;
-		if (chunk ? seenChunks.has(chunk) : seen.has(id)) continue;
+		// A name several modules answer to charges each of them, once.
+		if (record && record.alias) { if (!viaAlias) for (const member of record.alias) charge(member, true); return; }
+		// The dedupe unit is the unit charged: the module when the map splits its chunk, else the
+		// chunk, so one chunk reached under two names is one charge. Dev estimates dedupe by id.
+		const chunk = record && !record.module && record.chunk;
+		if (chunk ? seenChunks.has(chunk) : seen.has(id)) return;
 		if (chunk) seenChunks.add(chunk); else seen.add(id);
-		if (!record) { delta.unmapped.push(id); continue; }
-		if (record.estimated) l.unit = 'estimated-source-bytes';
+		if (!record) { delta.unmapped.push(id); return; }
+		if (record.estimated) l.unit = 'estimated-source-bytes'; else if (record.module && l.unit !== 'estimated-source-bytes') l.unit = 'module-raw-bytes';
 		delta[ledgerCategory(id, record)] += record.raw; delta.instrument += record.instrumentRaw || 0; delta.gzip += record.gzip || 0; delta.modules.push(id);
-	}
+	};
+	for (const raw of ids) charge(raw, false);
 	if (delta.unmapped.length) l.incomplete = { reason: 'unmapped-id', ids: [...new Set([...(l.incomplete ? l.incomplete.ids : []), ...delta.unmapped])] };
 	return delta;
 }

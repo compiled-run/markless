@@ -192,9 +192,9 @@ async function waitForLogInteractionAttribute(
 		}
 		// Estimated source bytes are the ledger's own honest-unknown fallback; a
 		// preview build measures real chunks, so seeing it means the map went stale.
-		if (read('unit') !== 'chunk-raw-bytes') {
+		if (read('unit') !== 'module-raw-bytes') {
 			throw new Error(
-				`Expected interaction ${count} to be charged in chunk-raw-bytes, got ${read('unit')}.`,
+				`Expected interaction ${count} to be charged in module-raw-bytes, got ${read('unit')}.`,
 			);
 		}
 		const modules = (read('turn-modules') ?? '').split(' ').filter(Boolean);

@@ -6,6 +6,7 @@ import {
 } from '../src/build/interaction-closures.ts';
 import { symbolVirtualModuleId } from '../src/source-module.ts';
 import type { RuntimeDemandMapManifest } from '../src/types.ts';
+import { LEAN_DISPATCH_MARKER_MODULES } from '@markless/compiler';
 
 const root = '/app';
 const runtime = (path: string) => `/repo/packages/web/src/${path}.ts`;
@@ -730,4 +731,161 @@ test('boot leaves a symbol only a control or nothing loads to that control, unle
 		demandMap({ payloadRecords: [served], actions: [click], page: { resume: 'unknown' } }),
 	);
 	expect(unbounded.get('boot')).toContain(symbol(file, 'symbol:3'));
+});
+
+test('runtime a feature needs stays out of a route whose own demand maps never name it', () => {
+	const list = `${root}/pages/list.tsrx`;
+	const about = `${root}/pages/about.tsrx`;
+	const page = (file: string) =>
+		new Map<string, InteractionClosureModule>([
+			[`${file}?markless-resume`, { dependencies: [runtime('resume-events')], source: file }],
+		]);
+	const modules = new Map<string, InteractionClosureModule>([
+		...page(list),
+		...page(about),
+		[
+			runtime('resume-events'),
+			{
+				dependencies: [],
+				dynamicDependencies: [runtime('resume-keyed-repeats')],
+				source: runtime('resume-events'),
+			},
+		],
+		[
+			runtime('resume-keyed-repeats'),
+			{ dependencies: [], source: runtime('resume-keyed-repeats') },
+		],
+	]);
+	const pageMap = (repeats: boolean, actionKinds: string[] = ['event']) => ({
+		...demandMap({
+			payloadRecords: [
+				{
+					recordId: 'event:h1:click',
+					kind: 'event',
+					symbolIds: [],
+					runtimeModuleIds: ['web/resume-events'],
+				},
+				...(repeats
+					? [
+							{
+								recordId: 'keyed-repeat:h2',
+								kind: 'keyed-repeat' as const,
+								symbolIds: [],
+								runtimeModuleIds: ['web/resume-keyed-repeats'],
+							},
+						]
+					: []),
+			],
+			actions: [
+				{
+					hostNodeId: 'h1',
+					eventName: 'click',
+					recordKind: 'event',
+					recordKinds:
+						actionKinds as RuntimeDemandMapManifest['actions'][number]['recordKinds'],
+					payloadRecordIds: ['event:h1:click'],
+					runtimeModuleIds: ['web/resume-events'],
+				},
+			],
+			unknown: ['web/resume-keyed-repeats'],
+		}),
+		capabilityModuleIds: [],
+		...(actionKinds.includes('branch') ? {} : { nestedRecordModuleIds: [] }),
+	});
+	const boot = (aboutMap: RuntimeDemandMapManifest) => {
+		const closures = computeInteractionClosures({
+			root,
+			modules,
+			routes: new Map([
+				['pages/list.tsrx', [`${list}?markless-resume`]],
+				['pages/about.tsrx', [`${about}?markless-resume`]],
+			]),
+			demand: [
+				{ source: `${list}?markless-resume`, map: pageMap(true) },
+				{ source: `${about}?markless-resume`, map: aboutMap },
+			],
+		});
+		return (route: string) =>
+			closures.find((closure) => closure.route === route)!.consumers[0]!.modules;
+	};
+	const bounded = boot(pageMap(false));
+	expect(bounded('pages/list.tsrx')).toContain(runtime('resume-keyed-repeats'));
+	expect(bounded('pages/about.tsrx')).not.toContain(runtime('resume-keyed-repeats'));
+	expect(bounded('pages/about.tsrx')).toContain(runtime('resume-events'));
+	// An action whose records the map cannot enumerate keeps every capability the runtime can load.
+	const open = boot(pageMap(false, ['event', 'branch']));
+	expect(open('pages/about.tsrx')).toContain(runtime('resume-keyed-repeats'));
+});
+
+// The planner splits landing packs only for controls the compiler serves without the full resume runtime.
+test('marks an action lean by its lean dispatch runtime and joins controls written inside arms', () => {
+	for (const [lean, full, arm, marker] of [
+		['h1', 'h2', 'h7', LEAN_DISPATCH_MARKER_MODULES.scalar[0]],
+		['h5', 'h3', 'h8', LEAN_DISPATCH_MARKER_MODULES.row[0]],
+	] as const) {
+		const file = `${root}/screens/panel.tsrx`;
+		const modules = graph(file, 'symbol:0', 'symbol:1', 'symbol:2');
+		const bounded = (symbolIds: string[]) => ({
+			symbolIds,
+			runtimeModuleIds: ['web/resume-events'],
+		});
+		const action = (host: string, runtimeModuleIds: string[], symbolIds: string[]) => ({
+			hostNodeId: host,
+			eventName: 'click',
+			recordKind: 'event' as const,
+			recordKinds: ['event' as const],
+			payloadRecordIds: [`event:${host}:click`],
+			runtimeModuleIds,
+			firstUse: bounded(symbolIds),
+		});
+		const map: RuntimeDemandMapManifest = {
+			...demandMap({
+				payloadRecords: [
+					{
+						recordId: `event:${lean}:click`,
+						kind: 'event',
+						symbolIds: ['symbol:0'],
+						runtimeModuleIds: [],
+					},
+					{
+						recordId: `event:${full}:click`,
+						kind: 'event',
+						symbolIds: ['symbol:0'],
+						runtimeModuleIds: [],
+					},
+					{
+						recordId: 'async-boundary:a0',
+						kind: 'async-boundary',
+						symbolIds: [],
+						runtimeModuleIds: [],
+					},
+				],
+				actions: [
+					action(lean, ['web/resume-events', marker], ['symbol:0']),
+					action(full, ['web/resume-events', 'web/resume-runtime'], ['symbol:0']),
+				],
+			}),
+			armActions: [
+				{
+					...action(arm, ['web/resume-events', 'web/resume-runtime'], ['symbol:2']),
+					recordKinds: ['event', 'async-boundary'],
+					payloadRecordIds: ['async-boundary:a0'],
+				},
+			],
+		};
+		const [route] = computeInteractionClosures({
+			root,
+			modules,
+			routes: new Map([
+				['screens/panel.tsrx', [...modules.keys()].filter((id) => id.includes('panel'))],
+			]),
+			demand: [{ source: `${file}?markless-symbols`, map }],
+		});
+		const byKey = new Map(route!.consumers.map((consumer) => [consumer.key, consumer]));
+		expect(byKey.get(`action:screens/panel.tsrx#${lean}:click`)?.lean).toBe(true);
+		expect(byKey.get(`action:screens/panel.tsrx#${full}:click`)?.lean).toBeUndefined();
+		const armed = byKey.get(`action:screens/panel.tsrx#${arm}:click`);
+		expect(armed?.lean).toBeUndefined();
+		expect(armed?.modules).toContain(symbol(file, 'symbol:2'));
+	}
 });

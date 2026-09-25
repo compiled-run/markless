@@ -315,7 +315,7 @@ test('creates a minimal Markless Router app with TSRX pages and Nitro-backed dep
 	expect(viteConfig).not.toContain('@vitejs/devtools');
 	expect(viteConfig).not.toContain('DevTools');
 	expect(viteConfig).not.toContain('nitro()');
-	expect(gitignore).toBe('node_modules/\ndist/\n.vite/\n*.log\n.DS_Store\n');
+	expect(gitignore).toBe('node_modules/\ndist/\n.vite/\n.markless/\n*.log\n.DS_Store\n');
 	await expect(exists(join(appRoot, 'gitignore'))).resolves.toBe(false);
 	await expect(readFile(join(appRoot, 'tsconfig.json'), 'utf-8')).resolves.not.toContain('tsx');
 	await expect(exists(join(appRoot, 'pages/index.tsx'))).resolves.toBe(false);
@@ -461,6 +461,7 @@ test('generates docs with MDX routes and component layouts only', async () => {
 	await expect(exists(join(appRoot, 'components/layouts/DocsLayout.tsrx'))).resolves.toBe(true);
 	expect(indexMdx).toContain('# Markless Router Docs');
 	expect(catchAllMdx).toContain('<DocsLayout');
+	expect(catchAllMdx).toContain('</DocsLayout>');
 	expect(catchAllMdx).toContain("import DocsLayout from '../../components/layouts/DocsLayout.tsrx';");
 	expect(viteConfig).not.toContain('mdx');
 

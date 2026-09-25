@@ -25,6 +25,8 @@ async function mount(): Promise<void> {
 
 async function flush(): Promise<void> {
 	if (!container) throw new Error('computed-chain fixture is not mounted');
+	// Clicks may resolve without starting the runtime, so demand the graph before reading it.
+	await container.runtime.start();
 	await container.graph.flush();
 }
 

@@ -9,18 +9,23 @@ import { symbolVirtualModuleId, symbolVirtualModuleSourceFile } from './source-m
 type LinkedPackage = { readonly id: string; readonly real: string };
 
 const linkedPackagesByRoot = new Map<string, ReadonlyArray<LinkedPackage>>();
+const mintedSources = new Map<string, string>();
 
 export function moduleIdFor(filename: string, root: string | undefined): string {
 	if (!root || !isAbsolute(filename)) return filename;
-	const id = relative(root, filename);
-	if (!id.startsWith('..') && !id.includes('node_modules/')) return id;
-	return packageRootedModuleId(filename, root) ?? id;
+	const relativeId = relative(root, filename);
+	const id =
+		!relativeId.startsWith('..') && !relativeId.includes('node_modules/')
+			? relativeId
+			: (packageRootedModuleId(filename, root) ?? relativeId);
+	mintedSources.set(`${root}\0${id}`, filename);
+	return id;
 }
 
 /** The file a module id names, spelled the way the bundler resolved it. */
 export function sourceForModuleId(moduleId: string, root: string | undefined): string {
 	if (!root || isAbsolute(moduleId)) return moduleId;
-	return realpathOf(resolve(root, moduleId));
+	return mintedSources.get(`${root}\0${moduleId}`) ?? realpathOf(resolve(root, moduleId));
 }
 
 function packageRootedModuleId(filename: string, root: string): string | null {
@@ -83,4 +88,36 @@ export function symbolExecutionLogId(virtualModuleId: string, root: string | und
 	if (source === null) return bare;
 	const encodedSymbolId = bare.slice(bare.lastIndexOf(':') + 1);
 	return symbolVirtualModuleId(moduleIdFor(source, root), decodeURIComponent(encodedSymbolId));
+}
+
+const EMBEDDED_SOURCE_RE = new RegExp(
+	`^(${String.fromCharCode(0)}?(?:virtual:markless:[a-z-]+:|imported:))([^:?]*)(.*)$`,
+	's',
+);
+
+/**
+ * Any id a build writes into output, with the file it names spelled by `moduleIdFor`:
+ * a bare path, `virtual:markless:<kind>:<source>...` or `imported:<source>:...`,
+ * the source raw or URI-encoded. Other ids pass through unchanged.
+ */
+export function rootRelativeId(id: string, root: string | undefined): string {
+	if (!root) return id;
+	if (isAbsolute(id)) {
+		const query = id.search(/[?#]/);
+		return query < 0
+			? moduleIdFor(id, root)
+			: `${moduleIdFor(id.slice(0, query), root)}${id.slice(query)}`;
+	}
+	const match = EMBEDDED_SOURCE_RE.exec(id);
+	if (!match) return id;
+	const [, prefix, spelled, rest] = match as unknown as [string, string, string, string];
+	let source: string;
+	try {
+		source = decodeURIComponent(spelled);
+	} catch {
+		return id;
+	}
+	if (!isAbsolute(source)) return id;
+	const moduleId = moduleIdFor(source, root);
+	return `${prefix}${spelled === source ? moduleId : encodeURIComponent(moduleId)}${rest}`;
 }

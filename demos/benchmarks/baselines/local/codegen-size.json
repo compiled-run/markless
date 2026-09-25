@@ -3,7 +3,7 @@
 	"kind": "markless-benchmark-result",
 	"benchmark": "codegen-size",
 	"status": "passed",
-	"recordedAt": "2026-07-13T21:59:31.892Z",
+	"recordedAt": "2026-09-24T22:19:28.329Z",
 	"protocol": {
 		"mode": "full",
 		"timedSeconds": 0,
@@ -14,22 +14,25 @@
 		"forcedGc": false
 	},
 	"environment": {
-		"os": "darwin 25.5.0",
+		"os": "darwin 25.6.0",
 		"arch": "arm64",
 		"cpuModel": "Apple M5 Pro",
 		"nodeVersion": "v24.15.0",
 		"pnpmVersion": "10.33.2",
-		"gitSha": "75b065416d8e72757527b8f1010e21c3b660f54e",
-		"dirtyTree": false
+		"gitSha": "45667f6af3090504ec7c85a68db46cc437b18d46",
+		"dirtyTree": true
 	},
 	"cases": [
 		{
 			"name": "client",
 			"gates": {
 				"passed": true,
-				"checks": ["14 corpus hashes recorded", "compiler diagnostics empty"]
+				"checks": [
+					"14 corpus hashes recorded",
+					"compiler diagnostics empty"
+				]
 			},
-			"bodyBytes": 41657,
+			"bodyBytes": 38608,
 			"timing": {
 				"samples": 1,
 				"minMs": 0,
@@ -54,9 +57,26 @@
 						"gzip": 2917
 					},
 					"compiled": {
-						"raw": 41657,
-						"minified": 8852,
-						"gzip": 4634
+						"raw": 38608,
+						"minified": 30572,
+						"gzip": 14136
+					},
+					"parts": {
+						"module": {
+							"raw": 5128,
+							"minified": 2705,
+							"gzip": 1466
+						},
+						"renderData": {
+							"raw": 24674,
+							"minified": 22178,
+							"gzip": 7653
+						},
+						"symbols": {
+							"raw": 8806,
+							"minified": 5689,
+							"gzip": 5017
+						}
 					}
 				},
 				"corpus": [
@@ -126,9 +146,26 @@
 							"gzip": 205
 						},
 						"compiled": {
-							"raw": 3108,
-							"minified": 1427,
-							"gzip": 720
+							"raw": 3827,
+							"minified": 2613,
+							"gzip": 1405
+						},
+						"parts": {
+							"module": {
+								"raw": 1754,
+								"minified": 941,
+								"gzip": 506
+							},
+							"renderData": {
+								"raw": 1407,
+								"minified": 1263,
+								"gzip": 487
+							},
+							"symbols": {
+								"raw": 666,
+								"minified": 409,
+								"gzip": 412
+							}
 						}
 					},
 					{
@@ -139,9 +176,26 @@
 							"gzip": 149
 						},
 						"compiled": {
-							"raw": 3393,
-							"minified": 93,
-							"gzip": 66
+							"raw": 1551,
+							"minified": 1333,
+							"gzip": 587
+						},
+						"parts": {
+							"module": {
+								"raw": 0,
+								"minified": 0,
+								"gzip": 0
+							},
+							"renderData": {
+								"raw": 1355,
+								"minified": 1221,
+								"gzip": 467
+							},
+							"symbols": {
+								"raw": 196,
+								"minified": 112,
+								"gzip": 120
+							}
 						}
 					},
 					{
@@ -152,9 +206,26 @@
 							"gzip": 311
 						},
 						"compiled": {
-							"raw": 8508,
-							"minified": 3355,
-							"gzip": 1503
+							"raw": 2788,
+							"minified": 2467,
+							"gzip": 899
+						},
+						"parts": {
+							"module": {
+								"raw": 0,
+								"minified": 0,
+								"gzip": 0
+							},
+							"renderData": {
+								"raw": 2515,
+								"minified": 2249,
+								"gzip": 749
+							},
+							"symbols": {
+								"raw": 273,
+								"minified": 218,
+								"gzip": 150
+							}
 						}
 					},
 					{
@@ -165,9 +236,26 @@
 							"gzip": 186
 						},
 						"compiled": {
-							"raw": 2216,
-							"minified": 124,
-							"gzip": 94
+							"raw": 1801,
+							"minified": 1553,
+							"gzip": 881
+						},
+						"parts": {
+							"module": {
+								"raw": 0,
+								"minified": 0,
+								"gzip": 0
+							},
+							"renderData": {
+								"raw": 1282,
+								"minified": 1145,
+								"gzip": 483
+							},
+							"symbols": {
+								"raw": 519,
+								"minified": 408,
+								"gzip": 398
+							}
 						}
 					},
 					{
@@ -178,9 +266,26 @@
 							"gzip": 272
 						},
 						"compiled": {
-							"raw": 2671,
-							"minified": 149,
-							"gzip": 113
+							"raw": 3046,
+							"minified": 2569,
+							"gzip": 1229
+						},
+						"parts": {
+							"module": {
+								"raw": 0,
+								"minified": 0,
+								"gzip": 0
+							},
+							"renderData": {
+								"raw": 2212,
+								"minified": 1976,
+								"gzip": 610
+							},
+							"symbols": {
+								"raw": 834,
+								"minified": 593,
+								"gzip": 619
+							}
 						}
 					},
 					{
@@ -191,9 +296,26 @@
 							"gzip": 222
 						},
 						"compiled": {
-							"raw": 1894,
-							"minified": 62,
-							"gzip": 60
+							"raw": 4387,
+							"minified": 3569,
+							"gzip": 1410
+						},
+						"parts": {
+							"module": {
+								"raw": 0,
+								"minified": 0,
+								"gzip": 0
+							},
+							"renderData": {
+								"raw": 2895,
+								"minified": 2619,
+								"gzip": 679
+							},
+							"symbols": {
+								"raw": 1492,
+								"minified": 950,
+								"gzip": 731
+							}
 						}
 					},
 					{
@@ -204,9 +326,26 @@
 							"gzip": 189
 						},
 						"compiled": {
-							"raw": 2303,
-							"minified": 122,
-							"gzip": 92
+							"raw": 2451,
+							"minified": 1983,
+							"gzip": 1038
+						},
+						"parts": {
+							"module": {
+								"raw": 0,
+								"minified": 0,
+								"gzip": 0
+							},
+							"renderData": {
+								"raw": 1624,
+								"minified": 1462,
+								"gzip": 512
+							},
+							"symbols": {
+								"raw": 827,
+								"minified": 521,
+								"gzip": 526
+							}
 						}
 					},
 					{
@@ -217,9 +356,26 @@
 							"gzip": 207
 						},
 						"compiled": {
-							"raw": 2245,
-							"minified": 128,
-							"gzip": 96
+							"raw": 1723,
+							"minified": 1469,
+							"gzip": 745
+						},
+						"parts": {
+							"module": {
+								"raw": 0,
+								"minified": 0,
+								"gzip": 0
+							},
+							"renderData": {
+								"raw": 1360,
+								"minified": 1224,
+								"gzip": 487
+							},
+							"symbols": {
+								"raw": 363,
+								"minified": 245,
+								"gzip": 258
+							}
 						}
 					},
 					{
@@ -230,9 +386,26 @@
 							"gzip": 196
 						},
 						"compiled": {
-							"raw": 2176,
-							"minified": 91,
-							"gzip": 86
+							"raw": 2698,
+							"minified": 2191,
+							"gzip": 975
+						},
+						"parts": {
+							"module": {
+								"raw": 0,
+								"minified": 0,
+								"gzip": 0
+							},
+							"renderData": {
+								"raw": 1844,
+								"minified": 1664,
+								"gzip": 577
+							},
+							"symbols": {
+								"raw": 854,
+								"minified": 527,
+								"gzip": 398
+							}
 						}
 					},
 					{
@@ -243,9 +416,26 @@
 							"gzip": 172
 						},
 						"compiled": {
-							"raw": 2171,
-							"minified": 95,
-							"gzip": 90
+							"raw": 2847,
+							"minified": 2241,
+							"gzip": 861
+						},
+						"parts": {
+							"module": {
+								"raw": 0,
+								"minified": 0,
+								"gzip": 0
+							},
+							"renderData": {
+								"raw": 1903,
+								"minified": 1723,
+								"gzip": 530
+							},
+							"symbols": {
+								"raw": 944,
+								"minified": 518,
+								"gzip": 331
+							}
 						}
 					},
 					{
@@ -256,9 +446,26 @@
 							"gzip": 191
 						},
 						"compiled": {
-							"raw": 2193,
-							"minified": 153,
-							"gzip": 122
+							"raw": 1058,
+							"minified": 947,
+							"gzip": 429
+						},
+						"parts": {
+							"module": {
+								"raw": 0,
+								"minified": 0,
+								"gzip": 0
+							},
+							"renderData": {
+								"raw": 1058,
+								"minified": 947,
+								"gzip": 429
+							},
+							"symbols": {
+								"raw": 0,
+								"minified": 0,
+								"gzip": 0
+							}
 						}
 					},
 					{
@@ -269,9 +476,26 @@
 							"gzip": 224
 						},
 						"compiled": {
-							"raw": 3168,
-							"minified": 1483,
-							"gzip": 761
+							"raw": 3971,
+							"minified": 2862,
+							"gzip": 1184
+						},
+						"parts": {
+							"module": {
+								"raw": 1609,
+								"minified": 812,
+								"gzip": 452
+							},
+							"renderData": {
+								"raw": 2166,
+								"minified": 1938,
+								"gzip": 611
+							},
+							"symbols": {
+								"raw": 196,
+								"minified": 112,
+								"gzip": 121
+							}
 						}
 					},
 					{
@@ -282,9 +506,26 @@
 							"gzip": 179
 						},
 						"compiled": {
-							"raw": 3088,
-							"minified": 1407,
-							"gzip": 713
+							"raw": 3720,
+							"minified": 2511,
+							"gzip": 1401
+						},
+						"parts": {
+							"module": {
+								"raw": 1765,
+								"minified": 952,
+								"gzip": 508
+							},
+							"renderData": {
+								"raw": 1268,
+								"minified": 1140,
+								"gzip": 474
+							},
+							"symbols": {
+								"raw": 687,
+								"minified": 419,
+								"gzip": 419
+							}
 						}
 					},
 					{
@@ -295,9 +536,26 @@
 							"gzip": 214
 						},
 						"compiled": {
-							"raw": 2523,
-							"minified": 163,
-							"gzip": 118
+							"raw": 2740,
+							"minified": 2264,
+							"gzip": 1092
+						},
+						"parts": {
+							"module": {
+								"raw": 0,
+								"minified": 0,
+								"gzip": 0
+							},
+							"renderData": {
+								"raw": 1785,
+								"minified": 1607,
+								"gzip": 558
+							},
+							"symbols": {
+								"raw": 955,
+								"minified": 657,
+								"gzip": 534
+							}
 						}
 					}
 				]
@@ -307,9 +565,12 @@
 			"name": "ssr",
 			"gates": {
 				"passed": true,
-				"checks": ["14 corpus hashes recorded", "compiler diagnostics empty"]
+				"checks": [
+					"14 corpus hashes recorded",
+					"compiler diagnostics empty"
+				]
 			},
-			"bodyBytes": 30283,
+			"bodyBytes": 53512,
 			"timing": {
 				"samples": 1,
 				"minMs": 0,
@@ -334,9 +595,16 @@
 						"gzip": 2917
 					},
 					"compiled": {
-						"raw": 30283,
-						"minified": 1807,
-						"gzip": 1361
+						"raw": 53512,
+						"minified": 1792,
+						"gzip": 1008
+					},
+					"parts": {
+						"module": {
+							"raw": 53512,
+							"minified": 1792,
+							"gzip": 1008
+						}
 					}
 				},
 				"corpus": [
@@ -406,9 +674,16 @@
 							"gzip": 205
 						},
 						"compiled": {
-							"raw": 1930,
-							"minified": 122,
-							"gzip": 91
+							"raw": 3368,
+							"minified": 128,
+							"gzip": 72
+						},
+						"parts": {
+							"module": {
+								"raw": 3368,
+								"minified": 128,
+								"gzip": 72
+							}
 						}
 					},
 					{
@@ -419,9 +694,16 @@
 							"gzip": 149
 						},
 						"compiled": {
-							"raw": 3092,
-							"minified": 93,
-							"gzip": 65
+							"raw": 6877,
+							"minified": 128,
+							"gzip": 72
+						},
+						"parts": {
+							"module": {
+								"raw": 6877,
+								"minified": 128,
+								"gzip": 72
+							}
 						}
 					},
 					{
@@ -432,9 +714,16 @@
 							"gzip": 311
 						},
 						"compiled": {
-							"raw": 2217,
-							"minified": 212,
-							"gzip": 136
+							"raw": 3657,
+							"minified": 128,
+							"gzip": 72
+						},
+						"parts": {
+							"module": {
+								"raw": 3657,
+								"minified": 128,
+								"gzip": 72
+							}
 						}
 					},
 					{
@@ -445,9 +734,16 @@
 							"gzip": 186
 						},
 						"compiled": {
-							"raw": 1883,
-							"minified": 124,
-							"gzip": 93
+							"raw": 3562,
+							"minified": 128,
+							"gzip": 72
+						},
+						"parts": {
+							"module": {
+								"raw": 3562,
+								"minified": 128,
+								"gzip": 72
+							}
 						}
 					},
 					{
@@ -458,9 +754,16 @@
 							"gzip": 272
 						},
 						"compiled": {
-							"raw": 2354,
-							"minified": 149,
-							"gzip": 112
+							"raw": 3607,
+							"minified": 128,
+							"gzip": 72
+						},
+						"parts": {
+							"module": {
+								"raw": 3607,
+								"minified": 128,
+								"gzip": 72
+							}
 						}
 					},
 					{
@@ -471,9 +774,16 @@
 							"gzip": 222
 						},
 						"compiled": {
-							"raw": 2486,
-							"minified": 93,
-							"gzip": 65
+							"raw": 3846,
+							"minified": 128,
+							"gzip": 72
+						},
+						"parts": {
+							"module": {
+								"raw": 3846,
+								"minified": 128,
+								"gzip": 72
+							}
 						}
 					},
 					{
@@ -484,9 +794,16 @@
 							"gzip": 189
 						},
 						"compiled": {
-							"raw": 1980,
-							"minified": 122,
-							"gzip": 91
+							"raw": 3515,
+							"minified": 128,
+							"gzip": 72
+						},
+						"parts": {
+							"module": {
+								"raw": 3515,
+								"minified": 128,
+								"gzip": 72
+							}
 						}
 					},
 					{
@@ -497,9 +814,16 @@
 							"gzip": 207
 						},
 						"compiled": {
-							"raw": 1922,
+							"raw": 3485,
 							"minified": 128,
-							"gzip": 95
+							"gzip": 72
+						},
+						"parts": {
+							"module": {
+								"raw": 3485,
+								"minified": 128,
+								"gzip": 72
+							}
 						}
 					},
 					{
@@ -510,9 +834,16 @@
 							"gzip": 196
 						},
 						"compiled": {
-							"raw": 2105,
-							"minified": 91,
-							"gzip": 85
+							"raw": 3581,
+							"minified": 128,
+							"gzip": 72
+						},
+						"parts": {
+							"module": {
+								"raw": 3581,
+								"minified": 128,
+								"gzip": 72
+							}
 						}
 					},
 					{
@@ -523,9 +854,16 @@
 							"gzip": 172
 						},
 						"compiled": {
-							"raw": 1991,
-							"minified": 95,
-							"gzip": 89
+							"raw": 3760,
+							"minified": 128,
+							"gzip": 72
+						},
+						"parts": {
+							"module": {
+								"raw": 3760,
+								"minified": 128,
+								"gzip": 72
+							}
 						}
 					},
 					{
@@ -536,9 +874,16 @@
 							"gzip": 191
 						},
 						"compiled": {
-							"raw": 1860,
-							"minified": 153,
-							"gzip": 121
+							"raw": 3423,
+							"minified": 128,
+							"gzip": 72
+						},
+						"parts": {
+							"module": {
+								"raw": 3423,
+								"minified": 128,
+								"gzip": 72
+							}
 						}
 					},
 					{
@@ -549,9 +894,16 @@
 							"gzip": 224
 						},
 						"compiled": {
-							"raw": 2434,
-							"minified": 132,
-							"gzip": 101
+							"raw": 3390,
+							"minified": 128,
+							"gzip": 72
+						},
+						"parts": {
+							"module": {
+								"raw": 3390,
+								"minified": 128,
+								"gzip": 72
+							}
 						}
 					},
 					{
@@ -562,9 +914,16 @@
 							"gzip": 179
 						},
 						"compiled": {
-							"raw": 1829,
-							"minified": 130,
-							"gzip": 99
+							"raw": 3388,
+							"minified": 128,
+							"gzip": 72
+						},
+						"parts": {
+							"module": {
+								"raw": 3388,
+								"minified": 128,
+								"gzip": 72
+							}
 						}
 					},
 					{
@@ -575,9 +934,16 @@
 							"gzip": 214
 						},
 						"compiled": {
-							"raw": 2200,
-							"minified": 163,
-							"gzip": 118
+							"raw": 4053,
+							"minified": 128,
+							"gzip": 72
+						},
+						"parts": {
+							"module": {
+								"raw": 4053,
+								"minified": 128,
+								"gzip": 72
+							}
 						}
 					}
 				]

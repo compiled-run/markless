@@ -132,7 +132,7 @@ function createBranchRegistration(
 		const paintArm = (arm: number) => {
 			currentArmByBranchId.set(branch.id, arm);
 			if (branch.idrefSites?.length)
-				void import('./resume-arm-records.ts').then((records) =>
+				void import('./resume-arm-records-lazy.ts').then((records) =>
 					records.syncBranchIdrefSites(input.elementsByHostId, branch, arm),
 				);
 		};
@@ -143,7 +143,7 @@ function createBranchRegistration(
 			const symbol = await input.loadSymbol(branch.symbolId);
 			let graph = composedBranchGraph(input.graph, branch);
 			if (branch.elementHandleIds)
-				graph = (await import('./resume-arm-records.ts')).armElementHandleIdGraph(
+				graph = (await import('./resume-arm-records-lazy.ts')).armElementHandleIdGraph(
 					graph,
 					branch,
 				);

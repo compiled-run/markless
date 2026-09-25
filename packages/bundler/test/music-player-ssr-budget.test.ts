@@ -1,4 +1,5 @@
-import { rm } from 'node:fs/promises';
+import { readFile, rm } from 'node:fs/promises';
+import { gzipSync } from 'node:zlib';
 import { protocolEventDispatchesMarkless, type ProtocolViewPayload } from '@markless/serializer';
 import { resolve } from 'pathe';
 import { beforeAll, expect, test } from 'vitest';
@@ -6,17 +7,20 @@ import { decodePayloadScripts } from '../../serializer/src/protocol-client.ts';
 import { MARKLESS_BUILD_PREFIX } from '../src/build/chunking.ts';
 import type { ParsedBundleGraphRecord } from '../src/build/preload-plan.ts';
 import { withoutDemand } from '../../../scripts/benchmarks/perf-guards/attribution.mjs';
+import { clientAssetsManifestPath } from '../../router/src/vite/client-assets-manifest.ts';
+import {
+	FRAGMENT_REGION_END,
+	FRAGMENT_REQUEST_HEADER,
+} from '../../router/src/vite/fragment-navigation.ts';
 import {
 	chunkName,
 	createStageLadder,
 	eagerChunkNames,
 	execPnpm,
 	gzipByChunk,
-	importedChunkNames,
 	payloadScript,
 	payPerUse,
 	payPerUseReport,
-	unexpectedUndemanded,
 	readClientBuildArtifacts,
 	readOverheadArtifacts,
 	renderServedPage,
@@ -31,6 +35,7 @@ import {
 	type BudgetMeasurement,
 	type OverheadArtifacts,
 } from './helpers/staged-budget.ts';
+import { executedAtLoad, startBuiltServer } from './helpers/executed-at-load.ts';
 
 const root = resolve(import.meta.dirname, '../../..');
 const demo = resolve(root, 'demos/music-player-ssr');
@@ -49,13 +54,26 @@ const STAGES = [
 	'first-navigation marginal',
 ];
 
+// The staged ladder reads per-module chunk boundaries, so it measures the `packing: false` build.
+// The shipped default packs; its page load is gated only against that build: fewer bytes and files
+// downloaded, and no more JavaScript executed (V8 block coverage, same page, same settle point).
+// Packed chunks run Rolldown's lazy-init wrapper (its helper plus one init call per evaluated chunk):
+// measured +64 B on the CSR lane, +0 on the SSR lane.
+const EXECUTED_AT_LOAD_DE_MINIMIS = 128;
+const SETTLED = '.youtube-frame-host[data-command="cue"]';
+
 let measured: BudgetMeasurement;
 let artifacts: OverheadArtifacts;
 let eagerChunks: readonly string[];
+let packedLoad: PageLoad;
+let unpackedLoad: PageLoad;
 
 beforeAll(async () => {
+	await buildDemo(true);
+	packedLoad = await measurePageLoad();
 	measured = await measureBuiltDemo();
-}, 240_000);
+	unpackedLoad = await measurePageLoad();
+}, 480_000);
 
 test('music-player-ssr page-load download pays only for runtime features the page uses', () => {
 	expect(measured.stages.map((stage) => stage.stage)).toEqual(STAGES);
@@ -73,7 +91,7 @@ test('music-player-ssr page-load download pays only for runtime features the pag
 		'the page download must carry its demand maps',
 	).toBeGreaterThan(0);
 	expect(
-		unexpectedUndemanded(measured.payPerUse),
+		measured.payPerUse.undemanded,
 		payPerUseReport('music-player-ssr', measured.payPerUse),
 	).toEqual([]);
 });
@@ -84,8 +102,18 @@ test('the pay-per-use gate goes red and names the runtime module it caught', () 
 
 	const result = payPerUse(artifacts, eagerChunks, withoutDemand(artifacts.demand, id!));
 
-	expect(unexpectedUndemanded(result)).toEqual([id]);
+	expect(result.undemanded).toEqual([id]);
 	expect(payPerUseReport('music-player-ssr', result)).toContain(`runtime feature module ${id}`);
+});
+
+test('packing downloads less at page load than one chunk per module, and executes no more', () => {
+	const detail = JSON.stringify({ packedLoad, unpackedLoad });
+	expect(packedLoad.gzipBytes, detail).toBeLessThanOrEqual(unpackedLoad.gzipBytes);
+	expect(packedLoad.files, detail).toBeLessThanOrEqual(unpackedLoad.files);
+	expect(packedLoad.executedBytes, detail).toBeLessThanOrEqual(
+		unpackedLoad.executedBytes + EXECUTED_AT_LOAD_DE_MINIMIS,
+	);
+	console.info(`packed page-load: ${detail}`);
 });
 
 function report(budget: BudgetMeasurement): string {
@@ -96,11 +124,42 @@ function report(budget: BudgetMeasurement): string {
 	});
 }
 
-async function measureBuiltDemo(): Promise<BudgetMeasurement> {
+type PageLoad = {
+	readonly chunks: readonly string[];
+	readonly gzipBytes: number;
+	readonly files: number;
+	readonly executedBytes: number;
+};
+
+async function buildDemo(packing: boolean): Promise<void> {
 	await rm(resolve(demo, '.output'), { force: true, recursive: true });
 	// Consumer posture: the wall measures the 'never' build even though the
 	// demo's default build keeps the lab instrument (owner rulings 2026-07-12).
-	await execPnpm(root, ['--dir', demo, 'build'], { MARKLESS_CONSUMER_BUILD: '1' });
+	await execPnpm(root, ['--dir', demo, 'build'], {
+		MARKLESS_CONSUMER_BUILD: '1',
+		MARKLESS_FIXTURE_NATIVE_PACKING: packing ? '1' : '0',
+	});
+}
+
+async function measurePageLoad(): Promise<PageLoad> {
+	const served = await startBuiltServer(demo);
+	try {
+		const html = await (await fetch(served.url)).text();
+		const chunks = eagerChunkNames(html, scriptTags(html)).sort();
+		const gzip = gzipByChunk(clientBuild);
+		return {
+			chunks,
+			gzipBytes: chunks.reduce((total, name) => total + gzip(name), 0),
+			files: chunks.length,
+			executedBytes: await executedAtLoad(served.url, { settledSelector: SETTLED }),
+		};
+	} finally {
+		await served.close();
+	}
+}
+
+async function measureBuiltDemo(): Promise<BudgetMeasurement> {
+	await buildDemo(false);
 
 	const { aggregateChunks, graph, instrumented } = await readClientBuildArtifacts(clientPublic);
 	const gzip = gzipByChunk(clientBuild);
@@ -108,6 +167,7 @@ async function measureBuiltDemo(): Promise<BudgetMeasurement> {
 		[...chunks].reduce((total, name) => total + gzip(name), 0);
 
 	const page = parseServedPage(await renderServedPage(demo));
+	const navigation = await firstFragmentNavigation(graph);
 	artifacts = readOverheadArtifacts(clientPublic, demo);
 	eagerChunks = page.eagerChunks;
 	const ladder = createStageLadder(sum, (chunks) => stageBreakdown(artifacts, chunks));
@@ -129,10 +189,11 @@ async function measureBuiltDemo(): Promise<BudgetMeasurement> {
 			wakeClosure(graph, event.symbolIds),
 		);
 	}
+	const preloaded = new Set(page.eagerChunks);
 	ladder.marginal(
 		'first-navigation marginal',
-		'everything the router link can still demand that the served page did not preload',
-		firstNavigationFetches(graph, page.navigationChunks, page.eagerChunks),
+		`a fragment navigation to ${navigation.destination}: the swap module and the destination's landing code the served page did not preload (its server HTML, ${navigation.htmlGzipBytes} gzip bytes, is not JS)`,
+		[...navigation.chunks].filter((chunk) => !preloaded.has(chunk)),
 	);
 
 	return {
@@ -143,38 +204,48 @@ async function measureBuiltDemo(): Promise<BudgetMeasurement> {
 	};
 }
 
-// What a first navigation actually costs the reader: every chunk the router
-// link's entry can reach - its static closure and every demand edge behind it -
-// minus what the served page's preload links already put in the browser. Demand
-// edges count because a chunk that falls out of the static closure is still
-// fetched, just one hop later; leaving them out let a planning change read as a
-// win when it had only moved the fetch. A ceiling, not an average: an edge the
-// running engine skips (a navigation polyfill Chromium never asks for) is
-// counted, because no build artifact says which engine is reading.
-function firstNavigationFetches(
+// A route change swaps in the destination's server region and resumes it like a landing: it downloads
+// the swap module and whatever the region's head names. The destination is the first router Link,
+// or the page itself when it links none.
+async function firstFragmentNavigation(
 	graph: ReadonlyMap<string, ParsedBundleGraphRecord>,
-	roots: Iterable<string>,
-	preloaded: Iterable<string>,
-): Set<string> {
-	const already = new Set(preloaded);
-	const seen = new Set<string>();
-	const fetched = new Set<string>();
-	const pending = [...roots];
-	while (pending.length > 0) {
-		const name = pending.pop()!;
-		if (seen.has(name)) continue;
-		seen.add(name);
-		if (name.endsWith('.js') && !already.has(name)) fetched.add(name);
-		for (const dep of graph.get(name)?.deps ?? []) pending.push(dep.name);
+): Promise<{
+	readonly destination: string;
+	readonly chunks: Set<string>;
+	readonly htmlGzipBytes: number;
+}> {
+	const manifest = JSON.parse(
+		await readFile(clientAssetsManifestPath(clientPublic), 'utf8'),
+	) as { readonly entries: { readonly fragment?: string } };
+	if (!manifest.entries.fragment) throw new Error('the build carries no fragment swap module');
+	const served = await startBuiltServer(demo);
+	try {
+		const html = await (await fetch(served.url)).text();
+		const link = /<a\b(?=[^>]*\bdata-markless-router-link\b)[^>]*\bhref="([^"]*)"/.exec(html);
+		const destination = new URL(link?.[1] ?? '/', served.url);
+		const response = await fetch(destination, { headers: { [FRAGMENT_REQUEST_HEADER]: '1' } });
+		const body = await response.text();
+		const end = body.indexOf(FRAGMENT_REGION_END);
+		if (!response.ok || end === -1)
+			throw new Error(`no fragment for ${destination.pathname}: ${response.status}`);
+		const region = body.slice(0, end);
+		return {
+			destination: destination.pathname,
+			chunks: new Set([
+				...staticClosure(graph, [chunkName(manifest.entries.fragment)]),
+				...eagerChunkNames(region, scriptTags(region)),
+			]),
+			htmlGzipBytes: gzipSync(body).length,
+		};
+	} finally {
+		await served.close();
 	}
-	return fetched;
 }
 
 type ServedPage = {
 	readonly eagerChunks: readonly string[];
 	readonly entryChunks: readonly string[];
 	readonly resumeChunk: string;
-	readonly navigationChunks: readonly string[];
 	readonly interactions: readonly {
 		readonly eventName: string;
 		readonly tagName: string;
@@ -204,7 +275,6 @@ function parseServedPage(html: string): ServedPage {
 			return src && chunkName(src) !== resumeChunk ? [chunkName(src)] : [];
 		}),
 		resumeChunk,
-		navigationChunks: [...new Set(importedChunkNames(routerLinks.body))],
 		interactions: scriptedInteractions(view),
 	};
 }

@@ -1,4 +1,5 @@
 import { renderSSRIslands } from '@markless/vitest-browser';
+import { expect, test } from 'vitest';
 import { runMultiEmbedConformance } from '../../test-support/multi-embed-conformance.ts';
 import MultiEmbed from './scenarios/multi-embed.tsrx';
 
@@ -53,4 +54,37 @@ runMultiEmbedConformance({
 			reason: 'pause is page-wide by design, so both regions hold together',
 		},
 	],
+});
+
+// One message reaches every region, so the same key mints a row in each island.
+// Each row is its own widget, filed under its island's path: the second island's
+// row used to be refused as a collision with the first, and never came alive.
+test('SSR islands: one message mints a live row in every region', async () => {
+	const refused: unknown[] = [];
+	const note = (event: PromiseRejectionEvent | ErrorEvent) =>
+		refused.push('reason' in event ? event.reason : event.error);
+	window.addEventListener('unhandledrejection', note);
+	window.addEventListener('error', note);
+	try {
+		await renderSSRIslands([MultiEmbed, MultiEmbed]);
+		const frames = () => Array.from(document.querySelectorAll('[data-testid="frame"]'));
+		(frames()[0]!.querySelector('[data-testid="save"]') as HTMLButtonElement).click();
+		await expect
+			.poll(() =>
+				frames().map((frame) => frame.querySelectorAll('[data-testid="item"]').length),
+			)
+			.toEqual([1, 1]);
+
+		// The second island's close button is live: it dismisses the one message.
+		(frames()[1]!.querySelector('[data-testid="itemclose"]') as HTMLButtonElement).click();
+		await expect
+			.poll(() =>
+				frames().map((frame) => frame.querySelector('[data-testid="count"]')?.textContent),
+			)
+			.toEqual(['0', '0']);
+		expect(refused).toEqual([]);
+	} finally {
+		window.removeEventListener('unhandledrejection', note);
+		window.removeEventListener('error', note);
+	}
 });

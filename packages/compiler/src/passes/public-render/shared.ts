@@ -20,13 +20,14 @@ import {
 	memberTagRootName,
 } from '../../ast/tsrx.ts';
 import type { ComponentEdge } from './types.ts';
+import { boundSymbolIdPrefix } from '../symbol-resolver.ts';
 import {
 	adoptedWidgetDefinitionIds,
 	widgetFallbackComponents,
 	widgetRootComponents,
 } from './shared-seed-pass.ts';
 
-export { componentEdgeInstanceSegment } from '../../component-edge-instance.ts';
+export { componentEdgeHostSegment, componentEdgeInstanceSegment } from '../../component-edge-instance.ts';
 
 /**
  * The prop a component edge hands its child the ids of the symbols its callback
@@ -48,13 +49,16 @@ export function callbackSymbolIds(input: PublicRenderModuleInput): ReadonlyMap<s
 				: [],
 		),
 		...(input.captureAnalysis.boundResolverRows ?? []).flatMap((row) =>
-			row.componentEdgePath.flatMap((edgeId) => {
+			row.componentEdgePath.flatMap((edgeId, index, path) => {
 				const childSymbolId = row.loaderSymbolId
 					? input.captureAnalysis.extractedSymbols.find(
 							(symbol) => symbol.loaderSymbolId === row.loaderSymbolId,
 						)?.symbolId
 					: row.baseSymbolId;
-				return childSymbolId ? [[`bound:${edgeId}:${childSymbolId}`, row.id] as const] : [];
+				if (!childSymbolId) return [];
+				// An outer edge's child owns its own ids, so only an inner bound id may rebind through it.
+				const key = index === path.length - 1 ? childSymbolId : boundSymbolIdPrefix(childSymbolId);
+				return [[`bound:${edgeId}:${key}`, row.id] as const];
 			}),
 		),
 	]);
@@ -336,6 +340,11 @@ export function destructureProps(
 ): string | null {
 	if (propNames.length === 0) return null;
 	const param = component ? asNodes(component.params)[0] : undefined;
+	if (param?.type === 'Identifier') {
+		const name = getIdentifierName(param);
+		if (!name || name === 'props') return null;
+		return `	const ${name} = props ?? {};`;
+	}
 	if (param?.type !== 'ObjectPattern') {
 		return `	const { ${propNames.join(', ')} } = props ?? {};`;
 	}
@@ -376,19 +385,15 @@ export function destructureProps(
 	return `	const { ${bindings.join(', ')} } = props ?? {};`;
 }
 
-// Page props live in the runtime graph under one cell: `prop:props` for a
-// destructured parameter, `prop:<name>` for a whole-object parameter. Lazy
+// Page props live in the runtime graph under one cell, `prop:props`, however the
+// parameter is written - destructured or taken whole under any name. Lazy
 // symbol modules (async computed runners, event handlers) read captured props
 // through that cell, so CSR mounts must seed it from the render props — during
 // server render the runners run inline with props in closure scope instead.
 export function componentPropCellId(component: AnyNode): string | null {
 	const param = asNodes(component.params)[0];
 	if (!param) return null;
-	if (param.type === 'Identifier') {
-		const name = getIdentifierName(param);
-		return name ? `prop:${name}` : null;
-	}
-	return param.type === 'ObjectPattern' ? 'prop:props' : null;
+	return param.type === 'Identifier' || param.type === 'ObjectPattern' ? 'prop:props' : null;
 }
 
 export function hasPropDependentComputed(input: PublicRenderModuleInput): boolean {
@@ -948,6 +953,16 @@ function resolvePayloadNodeOwners(
 		);
 		if (armChunk) branchOwner.set(graphNodeId, armChunk.componentName);
 	}
+	// A joined text derive is read by its DOM update, not by a chunk slot, so the component rendering the text declares it.
+	const textOwner = new Map<string, string>();
+	for (const read of input.semanticGraph.templateReads)
+		if (
+			read.target.kind === 'text' &&
+			read.computedGraphNodeId &&
+			read.componentName &&
+			!textOwner.has(read.computedGraphNodeId)
+		)
+			textOwner.set(read.computedGraphNodeId, read.componentName);
 	// A widget-scoped shared() graph is one instance per rendered widget, so its
 	// nodes belong to the widget root, not the module root: that component's
 	// composed instance path is the widget root.
@@ -970,7 +985,11 @@ function resolvePayloadNodeOwners(
 			const queue = pending.get(graphNodeId);
 			const declared = queue && queue.length > 1 ? queue.shift() : queue?.[0];
 			return (
-				declared ?? chunkOwner.get(graphNodeId) ?? branchOwner.get(graphNodeId) ?? rootComponentName
+				declared ??
+				chunkOwner.get(graphNodeId) ??
+				branchOwner.get(graphNodeId) ??
+				textOwner.get(graphNodeId) ??
+				rootComponentName
 			);
 		});
 	};

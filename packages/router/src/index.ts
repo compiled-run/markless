@@ -69,7 +69,12 @@ export interface PageProps<Params extends object = Readonly<Record<string, strin
 export interface MarklessRouterGeneratedRoutes {}
 
 export interface LinkNavigationProps {
-	readonly prefetch?: boolean | 'intent' | 'viewport';
+	/**
+	 * `false`: nothing for this link downloads before it is clicked. Only page routes are ever
+	 * prefetched (with a `Purpose: prefetch` header), never `/api` endpoints; set `false` on a link to
+	 * a page whose GET has side effects (a one-time token, a counter) so only the click requests it.
+	 */
+	readonly prefetch?: boolean;
 	readonly replace?: boolean;
 	readonly scroll?: boolean;
 }
@@ -228,17 +233,9 @@ function linkAnchorAttributes(props: LinkProps): Array<readonly [string, string]
 	attributes.set('href', typeof props.href === 'string' ? props.href : '#');
 	attributes.set(LINK_ATTRIBUTE, '');
 	if (props.replace) attributes.set(REPLACE_ATTRIBUTE, '');
-	const prefetch = linkPrefetchAttribute(props.prefetch);
-	if (prefetch) attributes.set(PREFETCH_ATTRIBUTE, prefetch);
+	if (props.prefetch === false) attributes.set(PREFETCH_ATTRIBUTE, 'none');
 	if (props.scroll === false) attributes.set(SCROLL_ATTRIBUTE, 'manual');
 	return [...attributes];
-}
-
-function linkPrefetchAttribute(
-	prefetch: LinkNavigationProps['prefetch'],
-): 'intent' | 'viewport' | 'none' | undefined {
-	if (prefetch === false) return 'none';
-	return prefetch === 'intent' || prefetch === 'viewport' ? prefetch : undefined;
 }
 
 function isLinkInternalProp(name: string): boolean {

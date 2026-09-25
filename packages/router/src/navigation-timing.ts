@@ -16,4 +16,4 @@
 export {
 	MARKLESS_PENDING_SETTLE_DEADLINE_MS as MARKLESS_NAV_SETTLE_DEADLINE_MS,
 	MARKLESS_PENDING_MIN_VISIBLE_MS as MARKLESS_NAV_PENDING_MIN_MS,
-} from '@markless/web';
+} from '@markless/web/fns/pending-timing';

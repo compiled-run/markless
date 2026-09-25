@@ -1,17 +1,43 @@
-import { parseSync } from 'rolldown/experimental';
+import { parse, parseSync } from 'rolldown/experimental';
 
 type ParseResult = ReturnType<typeof parseSync>;
 
 // Keyed by exact code: a rewritten chunk is a new string, so a later pass never reads a stale tree.
 const parsedByExtension = new Map<string, Map<string, ParseResult>>();
 
-export function parseChunkCode(fileName: string, code: string): ParseResult {
+function parsedFor(fileName: string): Map<string, ParseResult> {
 	const extension = fileName.slice(fileName.lastIndexOf('.'));
 	let parsed = parsedByExtension.get(extension);
 	if (!parsed) parsedByExtension.set(extension, (parsed = new Map()));
+	return parsed;
+}
+
+export function parseChunkCode(fileName: string, code: string): ParseResult {
+	const parsed = parsedFor(fileName);
 	let result = parsed.get(code);
 	if (!result) parsed.set(code, (result = parseSync(fileName, code)));
 	return result;
+}
+
+// Parses on the native thread pool, all at once, so the passes that follow read cached results.
+export async function prefetchChunkParses(
+	chunks: Iterable<{ readonly fileName: string; readonly code: string }>,
+): Promise<void> {
+	const pending: Promise<void>[] = [];
+	for (const { fileName, code } of chunks) {
+		const parsed = parsedFor(fileName);
+		if (parsed.has(code)) continue;
+		pending.push(
+			parse(fileName, code).then(
+				(result) => {
+					if (!parsed.has(code)) parsed.set(code, result);
+				},
+				// A parse that throws is left to the synchronous path, which reports it where it did.
+				() => {},
+			),
+		);
+	}
+	await Promise.all(pending);
 }
 
 export function clearParsedChunkCode(): void {

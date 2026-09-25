@@ -9,8 +9,10 @@ import {
 	isMarklessDeferredPack,
 	isMarklessNavigationPack,
 	isStartupPack,
+	lazyStartupPackName,
 	MARKLESS_DEFERRED_PACK,
 	planRoutePackGroups,
+	startupPackOfLazy,
 } from '../src/build/route-pack-groups.ts';
 
 test('packs route-local modules together and retains shared module identity', () => {
@@ -107,6 +109,52 @@ test('stops traversal at a foreign route root and handles circular dependencies'
 	expect(groups.get('red')).not.toBe(groups.get('blue'));
 });
 
+// A resume entry and a client render entry can share one source file. The render module and
+// the constant data it imports belong to the entry that imports them, never to the resume's pack.
+test('a source sibling another route imports stays out of the route that only shares its source', () => {
+	for (const [resume, render, data, handler, client] of [
+		['resume', 'render', 'render-data', 'handler', 'client'],
+		['wake', 'view', 'view-records', 'listener', 'boot'],
+	]) {
+		const groups = planRoutePackGroups({
+			modules: new Map([
+				[
+					resume!,
+					{ dependencies: ['runtime'], dynamicDependencies: [handler!], source: 'page' },
+				],
+				[handler!, { dependencies: [], source: 'page' }],
+				[render!, { dependencies: [data!, 'runtime'], source: 'page' }],
+				[data!, { dependencies: [] }],
+				[client!, { dependencies: [render!], source: 'client' }],
+				['runtime', { dependencies: [], source: 'runtime' }],
+			]),
+			routes: new Map([
+				['page', [resume!]],
+				['client', [client!]],
+			]),
+		});
+		expect(groups.get(render!)).toBe(groups.get(client!));
+		expect(groups.get(data!)).toBe(groups.get(client!));
+		expect(groups.get(resume!)).not.toBe(groups.get(render!));
+		expect(groups.get(handler!)).toBe(groups.get(resume!));
+	}
+});
+
+// A sibling nothing imports (a symbol the runtime loads by its module URL) still rides its source's route.
+test('a source sibling no route imports rides the route of its source', () => {
+	const groups = planRoutePackGroups({
+		modules: new Map([
+			['page', { dependencies: ['widget'], source: 'page' }],
+			['widget', { dependencies: [], source: 'widget' }],
+			['widget-action', { dependencies: ['action-helper'], source: 'widget' }],
+			['action-helper', { dependencies: [], source: 'action-helper' }],
+		]),
+		routes: new Map([['/page', ['page']]]),
+	});
+	expect(groups.get('widget-action')).toBe(groups.get('page'));
+	expect(groups.get('action-helper')).toBe(groups.get('page'));
+});
+
 type TierModule = {
 	dependencies: string[];
 	dynamicDependencies?: string[];
@@ -175,15 +223,26 @@ function tierInput(order?: readonly string[], size = 20_000) {
 			['/b', ['b']],
 		]),
 		closures,
+		pagesLoadOneRoute: true,
 	};
 }
 
-test('first-use code of a route rides its route pack, whole, in one preload round', () => {
-	const groups = planRoutePackGroups(tierInput());
+test('first-use code of an entry-rooted page rides its route pack, whole, in one preload round', () => {
+	const groups = planRoutePackGroups({ ...tierInput(), pagesLoadOneRoute: false });
 	for (const id of ['a', 'a-open', 'a-only']) expect(groups.get(id)).toBe('route:/a');
 	expect(groups.get('b')).toBe('route:/b');
 	expect(groups.get('core')).toBe('shared');
 	expect(new Set(groups.values()).size).toBeLessThanOrEqual(8);
+});
+
+test('first-use code a routed page reaches only through import() rides a lazy route pack in the same round', () => {
+	const groups = planLean(tierInput());
+	expect(groups.get('a')).toBe('route:/a');
+	for (const id of ['a-open', 'a-only'])
+		expect(groups.get(id)).toBe(lazyStartupPackName('route:/a'));
+	expect(isStartupPack(lazyStartupPackName('route:/a'))).toBe(true);
+	expect(groups.get('b')).toBe('route:/b');
+	expect(groups.get('core')).toBe('shared');
 });
 
 test('code only a client render needs leaves the landing packs for navigation packs', () => {
@@ -266,9 +325,9 @@ test('a route pack never carries code another route needs to render', () => {
 
 test('tiering skips a pack split that saves less than a file costs', () => {
 	const groups = planRoutePackGroups(tierInput(undefined, 100));
-	const untiered = planRoutePackGroups({ ...tierInput(undefined, 100), closures: undefined });
 	for (const id of ['a-idle', 'idle-helper', 'a-draw', 'chrome'])
-		expect(groups.get(id)).toBe(untiered.get(id));
+		expect(isStartupPack(groups.get(id)!)).toBe(true);
+	expect(groups.get('a-idle')).toBe('route:/a');
 });
 
 test('first-use code some routes share joins the shared pack when its bytes cost less than a file', () => {
@@ -300,6 +359,7 @@ test('first-use code some routes share joins the shared pack when its bytes cost
 			['/b', ['b']],
 			['/c', ['c']],
 		]),
+		pagesLoadOneRoute: true,
 		closures: [
 			consumer('/a', ['small', 'large']),
 			consumer('/b', ['large']),
@@ -316,16 +376,30 @@ test('tier pack names do not depend on module discovery order', () => {
 	expect(new Map([...reverse].sort())).toEqual(new Map([...forward].sort()));
 });
 
-test('a route without usable demand data keeps its untiered packs', () => {
+test('a route without usable demand data preloads everything its landing reaches', () => {
 	const input = tierInput();
 	const groups = planRoutePackGroups({
 		...input,
 		closures: [
 			{ route: '/a', fallback: 'missing-demand-map:a', consumers: [] },
-			{ route: '/b', fallback: 'missing-demand-map:b', consumers: [] },
+			input.closures[1]!,
 		],
 	});
-	expect(groups).toEqual(planRoutePackGroups({ ...input, closures: undefined }));
+	for (const id of ['a', 'a-open', 'a-only', 'a-draw', 'a-idle', 'idle-helper'])
+		expect(isStartupPack(groups.get(id)!)).toBe(true);
+	expect(startupPackOfLazy(groups.get('a-idle')!)).toBe('route:/a');
+	// The route with first-use data still tiers its own code.
+	expect(isMarklessNavigationPack(groups.get('b-draw'))).toBe(true);
+	expect(planRoutePackGroups({ ...input, closures: [] })).toEqual(
+		planRoutePackGroups({
+			...input,
+			closures: input.closures.map(({ route }) => ({
+				route,
+				fallback: 'missing',
+				consumers: [],
+			})),
+		}),
+	);
 });
 
 test('undemanded runtime stays in the one deferred pack under tiering', () => {
@@ -360,7 +434,11 @@ test("a route's navigation-only roots leave its landing pack for their own pack"
 			['pages/static', ['static-facade']],
 		]),
 	};
-	const groups = planRoutePackGroups(input);
+	const sized = new Map(
+		[...input.modules].map(([id, module]) => [id, { ...module, size: 20_000 }]),
+	);
+	// Without first-use data every landing import is preloaded; navigation-only code still leaves.
+	const groups = planRoutePackGroups({ ...input, modules: sized });
 	expect(groups.get('home-code')).toBe('route:pages/home');
 	expect(groups.get('home-handler')).toBe('route:pages/home');
 	expect(groups.get('home-facade')).toBe('navigation:pages/home');
@@ -372,9 +450,6 @@ test("a route's navigation-only roots leave its landing pack for their own pack"
 	expect(groups.get('static-facade')).toBe('route:pages/static');
 	expect(groups.get('shared')).toBe('shared');
 
-	const sized = new Map(
-		[...input.modules].map(([id, module]) => [id, { ...module, size: 20_000 }]),
-	);
 	const tiered = planRoutePackGroups({
 		...input,
 		modules: sized,
@@ -398,7 +473,7 @@ test("a route's navigation-only roots leave its landing pack for their own pack"
 			},
 		],
 	});
-	// The planner's render tier is the same navigation pack the default build cuts.
+	// Known first use cuts the same navigation packs.
 	expect(tiered.get('home-facade')).toBe(groups.get('home-facade'));
 	expect(tiered.get('home-data')).toBe(groups.get('home-data'));
 	expect(tiered.get('home-code')).toBe('route:pages/home');
@@ -406,8 +481,10 @@ test("a route's navigation-only roots leave its landing pack for their own pack"
 });
 
 test('render data a navigation-only root shares with landing code rides the landing pack once', () => {
+	const sized = (entries: [string, TierModule & { navigationOnly?: boolean }][]) =>
+		new Map(entries.map(([id, module]) => [id, { ...module, size: 20_000 }]));
 	const groups = planRoutePackGroups({
-		modules: new Map([
+		modules: sized([
 			[
 				'list-facade',
 				{
@@ -621,19 +698,25 @@ test('route-qualified render data stays with the route that reaches it', () => {
 	}
 });
 
-test('render data several routes reach packs with exactly those routes, not the shared pack', () => {
+test('render data several routes reach rides only those routes when the others would pay more', () => {
 	for (const [left, right, other, component] of [
 		['/one', '/two', '/three', 'nav'],
 		['/docs/b', '/docs/a', '/blog', 'banner'],
 	] as const) {
 		const reached = `${component}@reached`;
+		const routeSets = new Map<string, ReadonlyArray<string>>();
 		const groups = planRoutePackGroups({
+			routeSets,
+			pagesLoadOneRoute: true,
 			modules: new Map([
 				[left, { dependencies: ['runtime', reached] }],
 				[right, { dependencies: ['runtime', reached] }],
 				[other, { dependencies: ['runtime'] }],
 				['runtime', { dependencies: [] }],
-				[reached, { dependencies: [], source: component, reachedFrom: 'route' }],
+				[
+					reached,
+					{ dependencies: [], source: component, reachedFrom: 'route', size: 20_000 },
+				],
 			]),
 			routes: new Map([
 				[left, [left]],
@@ -642,20 +725,8 @@ test('render data several routes reach packs with exactly those routes, not the 
 			]),
 		});
 		expect(groups.get('runtime')).toBe('shared');
-		expect(groups.get(reached)).not.toBe('shared');
-		expect(groups.get(reached)).toBe(
-			planRoutePackGroups({
-				modules: new Map([
-					[right, { dependencies: [reached] }],
-					[left, { dependencies: [reached] }],
-					[reached, { dependencies: [], source: component, reachedFrom: 'route' }],
-				]),
-				routes: new Map([
-					[right, [right]],
-					[left, [left]],
-				]),
-			}).get(reached),
-		);
+		expect(groups.get(reached)).toMatch(/^shared:\w+$/);
+		expect([...routeSets.get(groups.get(reached)!)!].sort()).toEqual([left, right].sort());
 	}
 });
 
@@ -667,12 +738,16 @@ test('code only some routes reach gets its own pack when the others would pay mo
 		const routeSets = new Map<string, ReadonlyArray<string>>();
 		const groups = planRoutePackGroups({
 			routeSets,
+			pagesLoadOneRoute: true,
 			modules: new Map([
 				[left, { dependencies: ['runtime', scene] }],
 				[right, { dependencies: ['runtime', scene] }],
 				[other, { dependencies: ['runtime'] }],
 				['runtime', { dependencies: [] }],
-				[scene, { dependencies: ['runtime'], dynamicDependencies: [capability], size: 20_000 }],
+				[
+					scene,
+					{ dependencies: ['runtime'], dynamicDependencies: [capability], size: 20_000 },
+				],
 				[capability, { dependencies: [helper, 'runtime'], size: 20_000 }],
 				[helper, { dependencies: [] }],
 			]),
@@ -708,8 +783,12 @@ test('code only some routes reach stays in the shared pack when a file of its ow
 	expect(groups.get('helper')).toBe('shared');
 });
 
-test('a module code outside the routes imports stays in the shared pack', () => {
+// Code outside the routes runs on navigation, so what it imports is preloaded only where a landing needs it.
+test('a module code outside the routes imports rides only the landings that need it', () => {
+	const routeSets = new Map<string, ReadonlyArray<string>>();
 	const groups = planRoutePackGroups({
+		routeSets,
+		pagesLoadOneRoute: true,
 		modules: new Map([
 			['/one', { dependencies: ['policy'] }],
 			['/two', { dependencies: ['policy'] }],
@@ -723,24 +802,37 @@ test('a module code outside the routes imports stays in the shared pack', () => 
 			['/three', ['/three']],
 		]),
 	});
-	expect(groups.get('policy')).toBe('shared');
+	expect(groups.get('policy')).toMatch(/^shared:\w+$/);
+	expect([...routeSets.get(groups.get('policy')!)!].sort()).toEqual(['/one', '/two']);
+	expect(groups.has('navigation')).toBe(false);
 });
 
 test('a pack many routes share keeps a name short enough to be a file name', () => {
-	const pages = Array.from({ length: 300 }, (_, index) => `/docs/section-${index}/a-long-page-slug`);
+	const pages = Array.from(
+		{ length: 300 },
+		(_, index) => `/docs/section-${index}/a-long-page-slug`,
+	);
 	const groups = planRoutePackGroups({
+		pagesLoadOneRoute: true,
 		modules: new Map([
-			...pages.map((page): [string, { dependencies: string[] }] => [page, { dependencies: ['layout'] }]),
+			...pages.map((page): [string, { dependencies: string[] }] => [
+				page,
+				{ dependencies: ['layout'] },
+			]),
 			['/home', { dependencies: [] }],
 			['layout', { dependencies: [], size: 10_000_000 }],
 		]),
-		routes: new Map([...pages.map((page): [string, string[]] => [page, [page]]), ['/home', ['/home']]]),
+		routes: new Map([
+			...pages.map((page): [string, string[]] => [page, [page]]),
+			['/home', ['/home']],
+		]),
 	});
 	expect(groups.get('layout')).toMatch(/^shared:\w{1,16}$/);
 });
 
-test('render data and code the same routes reach never share a pack', () => {
+test('render data and code the same routes reach share one pack', () => {
 	const groups = planRoutePackGroups({
+		pagesLoadOneRoute: true,
 		modules: new Map([
 			['/one', { dependencies: ['view', 'view@reached'] }],
 			['/two', { dependencies: ['view', 'view@reached'] }],
@@ -755,8 +847,7 @@ test('render data and code the same routes reach never share a pack', () => {
 		]),
 	});
 	expect(groups.get('view')).toMatch(/^shared:/);
-	expect(groups.get('view@reached')).toMatch(/^shared:/);
-	expect(groups.get('view@reached')).not.toBe(groups.get('view'));
+	expect(groups.get('view@reached')).toBe(groups.get('view'));
 });
 
 // Pack names become import-map specifier keys, so a new pack must not rename the packs beside it.
@@ -791,6 +882,7 @@ test('a new tier pack leaves every other pack name alone', () => {
 			modules,
 			routes: new Map(routes.map((route) => [route, [route.slice(1)]])),
 			closures: routes.map(boot),
+			pagesLoadOneRoute: true,
 		};
 	};
 	const before = planRoutePackGroups(input(false));
@@ -811,3 +903,409 @@ function closureOf(modules: ReadonlyMap<string, TierModule>, root: string): Set<
 	}
 	return seen;
 }
+
+// Every root of an entry-rooted build can load on the one page, so splitting its shared code only adds files.
+test('an entry-rooted build keeps code some roots share in the one shared pack', () => {
+	for (const [left, right, other, scene] of [
+		['main', 'resume', 'wake', 'scene'],
+		['boot', 'settle', 'trigger', 'widget'],
+	] as const) {
+		const groups = planRoutePackGroups({
+			modules: new Map([
+				[left, { dependencies: ['runtime', scene] }],
+				[right, { dependencies: ['runtime', scene] }],
+				[other, { dependencies: ['runtime'] }],
+				['runtime', { dependencies: [] }],
+				[scene, { dependencies: ['runtime'], size: 40_000 }],
+			]),
+			routes: new Map([
+				[left, [left]],
+				[right, [right]],
+				[other, [other]],
+			]),
+		});
+		expect(groups.get(scene)).toBe('shared');
+	}
+});
+
+// An early click evaluates the page's resume module and its static imports before the handler runs, so a
+// shared helper on that static path must not share a file with runtime the page reaches only through import().
+test('keeps shared code a landing page reaches only through import() off its static path', () => {
+	for (const [page, other, helper, runtime, part] of [
+		['/', '/docs', 'write-text', 'resume-runtime', 'resume-events'],
+		['/home', '/about', 'dom-order', 'full-resume', 'arm-records'],
+	] as const) {
+		const groups = planLean({
+			pagesLoadOneRoute: true,
+			modules: new Map([
+				[page, { dependencies: [helper], dynamicDependencies: [runtime], source: page }],
+				[other, { dependencies: [helper], dynamicDependencies: [runtime], source: other }],
+				[helper, { dependencies: [], size: 800 }],
+				[runtime, { dependencies: [helper, part], size: 60_000 }],
+				[part, { dependencies: [], size: 30_000 }],
+			]),
+			routes: new Map([
+				[page, [page]],
+				[other, [other]],
+			]),
+		});
+		expect(groups.get(helper)).toBe('shared');
+		expect(groups.get(runtime)).toBe(lazyStartupPackName('shared'));
+		expect(groups.get(part)).toBe(groups.get(runtime));
+		expect(isStartupPack(groups.get(runtime)!)).toBe(true);
+	}
+});
+
+test('keeps a pack whole when what its static path leaves out is too small for a file of its own', () => {
+	const groups = planLean({
+		pagesLoadOneRoute: true,
+		modules: new Map([
+			['/', { dependencies: ['helper'], dynamicDependencies: ['tail'], source: '/' }],
+			['/docs', { dependencies: ['helper'], dynamicDependencies: ['tail'], source: '/docs' }],
+			['helper', { dependencies: [], size: 800 }],
+			['tail', { dependencies: [], size: 900 }],
+		]),
+		routes: new Map([
+			['/', ['/']],
+			['/docs', ['/docs']],
+		]),
+	});
+	expect(groups.get('tail')).toBe('shared');
+	expect(groups.get('helper')).toBe('shared');
+});
+
+test('only what a first event runs seeds the static path when modules say so', () => {
+	const groups = planLean({
+		pagesLoadOneRoute: true,
+		modules: new Map([
+			['/:resume', { dependencies: ['helper'], source: '/', firstEvent: true }],
+			['/:resolver', { dependencies: ['render-runtime'], source: '/', firstEvent: false }],
+			['/docs:resume', { dependencies: ['helper'], source: '/docs', firstEvent: true }],
+			[
+				'/docs:resolver',
+				{ dependencies: ['render-runtime'], source: '/docs', firstEvent: false },
+			],
+			['helper', { dependencies: [], size: 800, firstEvent: false }],
+			['render-runtime', { dependencies: [], size: 40_000, firstEvent: false }],
+		]),
+		routes: new Map([
+			['/', ['/:resume', '/:resolver']],
+			['/docs', ['/docs:resume', '/docs:resolver']],
+		]),
+	});
+	expect(groups.get('helper')).toBe('shared');
+	expect(groups.get('render-runtime')).toBe(lazyStartupPackName('shared'));
+});
+
+// Unpacked, each handler is its own file; packed, a handler whose imports weigh a file of their own would make
+// every early click on the page wait for them.
+test('keeps a handler with heavy imports off the static path the page’s other handlers share', () => {
+	for (const [light, heavy, data] of [
+		['increment', 'load-feed', 'feed-render-data'],
+		['toggle', 'fetch-rows', 'rows-template'],
+	] as const) {
+		const groups = planLean({
+			pagesLoadOneRoute: true,
+			modules: new Map([
+				['/:resume', { dependencies: [], source: '/', firstEvent: true }],
+				[light, { dependencies: ['write'], source: '/', firstEvent: true, handler: true }],
+				[heavy, { dependencies: [data], source: '/', firstEvent: true, handler: true }],
+				['write', { dependencies: [], size: 600, firstEvent: false }],
+				[data, { dependencies: [], size: 30_000, firstEvent: false }],
+				['/docs:resume', { dependencies: [], source: '/docs', firstEvent: true }],
+			]),
+			routes: new Map([
+				['/', ['/:resume', light, heavy]],
+				['/docs', ['/docs:resume']],
+			]),
+		});
+		expect(groups.get(light)).toBe('route:/');
+		expect(groups.get('write')).toBe('route:/');
+		expect(groups.get(heavy)).toBe(lazyStartupPackName('route:/'));
+		expect(groups.get(data)).toBe(lazyStartupPackName('route:/'));
+	}
+});
+
+// A component's handler loads through a computed import, never a static edge from the page. One only this page
+// reaches rides the route pack its first event already waits for; one several routes share leaves its pack whole.
+test('keeps a light handler only this page reaches through import() on its static path', () => {
+	for (const [component, data] of [
+		['counter', 'counter-render-data'],
+		['stepper', 'stepper-template'],
+	] as const) {
+		const modules = (sharedBy: readonly string[]) =>
+			new Map<
+				string,
+				{
+					dependencies: string[];
+					dynamicDependencies?: string[];
+					source?: string;
+					size?: number;
+					firstEvent: boolean;
+					handler?: boolean;
+				}
+			>([
+				...sharedBy.map(
+					(
+						route,
+					): [
+						string,
+						{
+							dependencies: string[];
+							dynamicDependencies: string[];
+							source: string;
+							firstEvent: boolean;
+						},
+					] => [
+						`${route}:resume`,
+						{
+							dependencies: [],
+							dynamicDependencies: [`${component}:resume`],
+							source: route,
+							firstEvent: true,
+						},
+					],
+				),
+				[
+					`${component}:resume`,
+					{
+						dependencies: [],
+						dynamicDependencies: [data],
+						source: component,
+						firstEvent: true,
+					},
+				],
+				[
+					`${component}:click`,
+					{ dependencies: ['write'], source: component, firstEvent: true, handler: true },
+				],
+				['write', { dependencies: [], size: 600, firstEvent: false }],
+				[data, { dependencies: [], size: 40_000, firstEvent: false }],
+				['/:resume', { dependencies: [], source: '/', firstEvent: true }],
+			]);
+		const own = planLean({
+			pagesLoadOneRoute: true,
+			modules: modules(['/docs']),
+			routes: new Map([
+				['/docs', ['/docs:resume']],
+				['/', ['/:resume']],
+			]),
+		});
+		for (const id of [`${component}:click`, 'write', `${component}:resume`])
+			expect(own.get(id)).toBe('route:/docs');
+		expect(own.get(data)).toBe(lazyStartupPackName('route:/docs'));
+		const shared = planLean({
+			pagesLoadOneRoute: true,
+			modules: modules(['/docs', '/blog']),
+			routes: new Map([
+				['/docs', ['/docs:resume']],
+				['/blog', ['/blog:resume']],
+				['/', ['/:resume']],
+			]),
+		});
+		expect(shared.get(`${component}:click`)).toBe(shared.get(data));
+	}
+});
+
+type PlanInput = Parameters<typeof planRoutePackGroups>[0];
+
+// Every landing action takes a lean dispatch path. Without closures, boot names all a route reaches, so tiers stay put.
+function withLeanFirstEvents(
+	input: PlanInput,
+	action: { lean?: boolean } = { lean: true },
+): PlanInput {
+	if (input.closures)
+		return {
+			...input,
+			closures: input.closures.map((route) => ({
+				...route,
+				consumers: route.consumers.map((consumer) =>
+					consumer.kind === 'action' ? { ...consumer, ...action } : consumer,
+				),
+			})),
+		};
+	const siblings = new Map<string, string[]>();
+	for (const [id, module] of input.modules)
+		if (module.source)
+			siblings.set(module.source, [...(siblings.get(module.source) ?? []), id]);
+	const closures = [...input.routes].map(([route, roots]) => {
+		const foreign = new Set(
+			[...input.routes].filter(([other]) => other !== route).flatMap(([, ids]) => ids),
+		);
+		const reached = new Set<string>();
+		const pending = [...roots];
+		while (pending.length) {
+			const id = pending.pop()!;
+			const module = input.modules.get(id);
+			if (reached.has(id) || foreign.has(id) || !module) continue;
+			reached.add(id);
+			pending.push(...module.dependencies, ...(module.dynamicDependencies ?? []));
+			if (module.source) pending.push(...(siblings.get(module.source) ?? []));
+		}
+		return {
+			route,
+			consumers: [
+				{ key: 'boot', kind: 'boot' as const, modules: [...reached] },
+				{ key: 'action:first', kind: 'action' as const, ...action, modules: [] },
+			],
+		};
+	});
+	return { ...input, closures };
+}
+
+function planLean(input: PlanInput) {
+	return planRoutePackGroups(withLeanFirstEvents(input));
+}
+
+function runtimeSplitInput(page: string, other: string, runtime: string, part: string): PlanInput {
+	return {
+		pagesLoadOneRoute: true,
+		modules: new Map([
+			[
+				page,
+				{
+					dependencies: ['helper', `${page}:own`],
+					dynamicDependencies: [runtime],
+					source: page,
+				},
+			],
+			[
+				other,
+				{
+					dependencies: ['helper', `${other}:own`],
+					dynamicDependencies: [runtime],
+					source: other,
+				},
+			],
+			[`${page}:own`, { dependencies: [], size: 400 }],
+			[`${other}:own`, { dependencies: [], size: 400 }],
+			['helper', { dependencies: [], size: 800 }],
+			[runtime, { dependencies: ['helper', part], size: 60_000 }],
+			[part, { dependencies: [], size: 30_000 }],
+		]),
+		routes: new Map([
+			[page, [page]],
+			[other, [other]],
+		]),
+	};
+}
+
+// A first event that needs the full runtime would wait for the lazy half; its pack stays whole.
+test('keeps a pack whole when every page loading it has a first event that needs the full runtime', () => {
+	for (const [page, other, runtime, part] of [
+		['/', '/feed', 'resume-runtime', 'resume-events'],
+		['/orders', '/cart', 'full-resume', 'arm-records'],
+	] as const) {
+		const input = runtimeSplitInput(page, other, runtime, part);
+		for (const groups of [
+			planRoutePackGroups(withLeanFirstEvents(input, { lean: false })),
+			planRoutePackGroups(input),
+			planRoutePackGroups({
+				...input,
+				closures: [...input.routes.keys()].map((route) => ({
+					route,
+					fallback: 'missing-demand-map:x.tsrx',
+					consumers: [],
+				})),
+			}),
+		]) {
+			expect(groups.get(runtime)).toBe('shared');
+			expect(groups.get(part)).toBe('shared');
+		}
+		expect(planLean(input).get(runtime)).toBe(lazyStartupPackName('shared'));
+	}
+});
+
+test('keeps a pack whole when no page loading it has an action to speed up', () => {
+	const input = runtimeSplitInput('/', '/about', 'resume-runtime', 'resume-events');
+	const noActions = withLeanFirstEvents(input);
+	const groups = planRoutePackGroups({
+		...noActions,
+		closures: noActions.closures!.map((route) => ({
+			...route,
+			consumers: route.consumers.filter((consumer) => consumer.kind !== 'action'),
+		})),
+	});
+	expect(groups.get('resume-runtime')).toBe('shared');
+});
+
+// Pages whose first events are lean still split a shared pack; a page that needs the runtime at once evaluates
+// the lazy half with its own route pack.
+test('splits a shared pack for lean pages and names the pages that must evaluate its lazy half eagerly', () => {
+	for (const [lean, full, runtime, part] of [
+		['/', '/harbor', 'resume-runtime', 'resume-events'],
+		['/docs', '/live', 'full-resume', 'stream-patches'],
+	] as const) {
+		const input = withLeanFirstEvents(runtimeSplitInput(lean, full, runtime, part));
+		const eagerLazyRoutes = new Map<string, ReadonlyArray<string>>();
+		const groups = planRoutePackGroups({
+			...input,
+			eagerLazyRoutes,
+			closures: input.closures!.map((route) =>
+				route.route === full
+					? {
+							...route,
+							consumers: route.consumers.map((consumer) =>
+								consumer.kind === 'action'
+									? { ...consumer, lean: false }
+									: consumer,
+							),
+						}
+					: route,
+			),
+		});
+		expect(groups.get(runtime)).toBe(lazyStartupPackName('shared'));
+		expect(groups.get(`${full}:own`)).toBe(`route:${full}`);
+		expect(eagerLazyRoutes.get(lazyStartupPackName('shared'))).toEqual([full]);
+	}
+});
+
+// App code changes with nearly every deploy; framework code only on an upgrade. A startup pack holding both
+// would re-send the framework half to every returning visitor after an app deploy.
+test('gives the framework half of a startup pack its own file when each half is worth one', () => {
+	for (const [page, other, helper, runtime] of [
+		['/', '/records', 'app-helper', 'graph-core'],
+		['/inbox', '/profile', 'format-date', 'resume-runtime'],
+	] as const) {
+		const groups = planRoutePackGroups({
+			modules: new Map([
+				[page, { dependencies: [helper, runtime], size: 2_000, app: true }],
+				[other, { dependencies: [helper, runtime], size: 2_000, app: true }],
+				[helper, { dependencies: [runtime], size: 8_000, app: true }],
+				[runtime, { dependencies: [], size: 60_000 }],
+			]),
+			routes: new Map([
+				[page, [page]],
+				[other, [other]],
+			]),
+			pagesLoadOneRoute: true,
+		});
+		expect(groups.get(helper)).toBe('shared');
+		expect(groups.get(runtime)).not.toBe('shared');
+		expect(isStartupPack(groups.get(runtime)!)).toBe(true);
+		expect(startupPackOfLazy(groups.get(runtime)!)).toBe(groups.get(runtime));
+	}
+});
+
+test('keeps a startup pack whole when its app or framework half is too small for a file', () => {
+	for (const [appSize, runtimeSize] of [
+		[400, 60_000],
+		[8_000, 400],
+	]) {
+		const groups = planRoutePackGroups({
+			modules: new Map([
+				['/', { dependencies: ['helper', 'runtime'], size: 100, app: true }],
+				['/about', { dependencies: ['helper', 'runtime'], size: 100, app: true }],
+				['helper', { dependencies: [], size: appSize, app: true }],
+				['runtime', { dependencies: [], size: runtimeSize }],
+			]),
+			routes: new Map([
+				['/', ['/']],
+				['/about', ['/about']],
+			]),
+			pagesLoadOneRoute: true,
+		});
+		expect(groups.get('helper')).toBe('shared');
+		expect(groups.get('runtime')).toBe('shared');
+	}
+});

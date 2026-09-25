@@ -28,7 +28,7 @@ import type {
 	SemanticMarkupSlot,
 	SourceSpan,
 } from '../../artifacts.ts';
-import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
+import { resolveSharedInstanceGraphPath, sharedInstanceVisibleFrom } from './collect-shared.ts';
 import {
 	branchElseSpellingDiagnostic,
 	idrefElementHandleIdConflictDiagnostic,
@@ -42,6 +42,7 @@ import {
 } from './style-object.ts';
 import { componentMarkupRoot } from '../public-render/component-markup-root.ts';
 import { collectStyleScopes } from '../public-render/style-scopes.ts';
+import { PROJECTION_PROP_NAME } from '../public-render/shared-seed-pass.ts';
 import { propsRestSignature } from './spread-event-guard.ts';
 import type { MutableSemanticGraphArtifact } from './types.ts';
 
@@ -114,6 +115,7 @@ export function collectSemanticMarkup(input: {
 		readonly node: AnyNode;
 		readonly root: AnyNode;
 		readonly exported: boolean;
+		readonly defaultExport: boolean;
 		readonly rootEligible: boolean;
 	}> = [];
 
@@ -130,6 +132,7 @@ export function collectSemanticMarkup(input: {
 			exported:
 				statement.type === 'ExportNamedDeclaration' ||
 				statement.type === 'ExportDefaultDeclaration',
+			defaultExport: statement.type === 'ExportDefaultDeclaration',
 		});
 	}
 
@@ -146,7 +149,10 @@ export function collectSemanticMarkup(input: {
 	}
 
 	const rootCandidates = components.filter((component) => component.rootEligible);
-	const selected = rootCandidates.find((component) => component.exported) ?? rootCandidates[0];
+	const selected =
+		rootCandidates.find((component) => component.defaultExport) ??
+		rootCandidates.find((component) => component.exported) ??
+		rootCandidates[0];
 	return {
 		root: selected
 			? { componentName: selected.name, templateId: `template:${selected.name}` }
@@ -203,16 +209,28 @@ function emitTextSlot(
 	repeat: { readonly id: string; readonly itemName: string } | null,
 ): number {
 	if (!expression) return 0;
-	addAnchorSlot(
-		builder,
-		{
-			kind: 'text',
-			residue: expressionResidue(expression, context, repeat, builder.componentName),
-			...(getIdentifierName(expression) === 'children' ? { raw: true } : {}),
-		},
-		path,
-	);
+	const residue = expressionResidue(expression, context, repeat, builder.componentName);
+	const raw =
+		getIdentifierName(expression) === PROJECTION_PROP_NAME ||
+		readsOwnChildrenProp(residue, context, builder.componentName);
+	addAnchorSlot(builder, { kind: 'text', residue, ...(raw ? { raw: true } : {}) }, path);
 	return 1;
+}
+
+// The component's own children prop, however the author bound it: `{ children: body }` or `props.children`.
+function readsOwnChildrenProp(
+	residue: SemanticMarkupResidue,
+	context: CollectionContext,
+	componentName: string,
+): boolean {
+	if (residue.kind !== 'graph-read') return false;
+	if (residue.path.length !== 1 || residue.path[0] !== PROJECTION_PROP_NAME) return false;
+	return context.graph.graphBindings.some(
+		(binding) =>
+			binding.id === residue.graphNodeId &&
+			binding.kind === 'prop' &&
+			binding.componentName === componentName,
+	);
 }
 
 function emitNode(
@@ -538,7 +556,7 @@ function emitNode(
 			kind: 'attribute',
 			name,
 			coordinate: { kind: 'child-index', path },
-			residue: expressionResidue(expression, context, repeat, builder.componentName),
+			residue: expressionResidue(expression, context, repeat, builder.componentName, name),
 			...(alwaysPresent ? { alwaysPresent: true } : {}),
 			...(name === 'class' && repeat
 				? {
@@ -872,7 +890,13 @@ function emitDynamicHost(
 			attributeSlots.push({
 				kind: 'attribute',
 				name,
-				residue: expressionResidue(expression, context, repeat, builder.componentName),
+				residue: expressionResidue(
+					expression,
+					context,
+					repeat,
+					builder.componentName,
+					name,
+				),
 			});
 		}
 	}
@@ -977,6 +1001,7 @@ function expressionResidue(
 	context: CollectionContext,
 	repeat: { readonly id: string; readonly itemName: string } | null,
 	componentName: string,
+	attributeName?: string,
 ): SemanticMarkupResidue {
 	return sourceResidue(
 		expressionSource(expression, context.source),
@@ -984,6 +1009,8 @@ function expressionResidue(
 		context,
 		repeat,
 		componentName,
+		attributeName === 'style' &&
+			(expression.type === 'ObjectExpression' || expression.type === 'Identifier'),
 	);
 }
 
@@ -993,6 +1020,7 @@ function sourceResidue(
 	context: CollectionContext,
 	repeat: { readonly id: string; readonly itemName: string } | null,
 	componentName: string,
+	loweredStyle = false,
 ): SemanticMarkupResidue {
 	if (repeat && (source === repeat.itemName || source.startsWith(`${repeat.itemName}.`))) {
 		const path =
@@ -1025,9 +1053,26 @@ function sourceResidue(
 	// render: the count is still a placeholder there. It renders through its own
 	// deferred thunk instead. The synthetic computed behind it stays - it is what
 	// wakes the update once the count is a live number.
-	return computedRead?.computedGraphNodeId && !spendsRosterCount(context, componentName, source)
+	// A row minted in the browser reads its slots before any synthetic computed has
+	// derived, so a row keeps the expression - unless only the computed can answer it.
+	return computedRead?.computedGraphNodeId &&
+		(!repeat || loweredStyle || readsSharedInstance(context, componentName, source)) &&
+		!spendsRosterCount(context, componentName, source)
 		? { kind: 'graph-read', graphNodeId: computedRead.computedGraphNodeId, path: [] }
 		: { kind: 'authored-expression', source };
+}
+
+// A shared instance local has no row reader binding of its own, so its reads stay lifted.
+function readsSharedInstance(
+	context: CollectionContext,
+	componentName: string,
+	source: string,
+): boolean {
+	return context.graph.sharedInstances.some(
+		(instance) =>
+			sharedInstanceVisibleFrom(instance, componentName) &&
+			new RegExp(`(^|[^\\w$.])${instance.localName}(?![\\w$])`).test(source),
+	);
 }
 
 /** One member of the object a residue reads, or null for a residue that is not an object read. */

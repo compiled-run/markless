@@ -391,7 +391,7 @@ function decodeScalarSlot(slot: SerializedSlot | undefined): unknown {
 async function decodeFullCell(payload: SerializedGraphPayload): Promise<unknown> {
 	if (payload.records.length === 0) return decodeScalarSlot(payload.root);
 	const { deserializeGraphValueForClient } =
-		await import('../../../serializer/src/value-decode-client.ts');
+		await import('../../../serializer/src/value-decode-client-lazy.ts');
 	return deserializeGraphValueForClient(payload);
 }
 

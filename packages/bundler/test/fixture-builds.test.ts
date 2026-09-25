@@ -24,48 +24,7 @@ const fixtures = [
 		runtimeBudget: {
 			dist: 'packages/bundler/fixtures/vite-csr/dist',
 			entryHtml: 'packages/bundler/fixtures/vite-csr/dist/index.html',
-			// 3,100 -> 3,300 (2026-08-23): +217 for the DOM-faithful bubble walk (defect 67).
-			// 3,300 -> 3,460 (2026-08-23): +149 measured 3,449 - per-graph widget registries
-			// (defect 72) + plural element-handle reads (C-prime) + keyed-row removal.
-			// Repayment owed to bundler-diet with the existing pay-per-use obligation.
-			// 3,460 -> 3,560 (2026-08-23): +91 measured 3,551 - the timer-callback write band
-			// (defect 79) + the emitted resolver's per-graph handle wrapper (defect 78,
-			// which also DELETED the runtime's host-derived fallback). Bundler-diet repayment.
-			// re-anchor 2026-08-27: 3,750 -> 5,162, measured 5,151 (raw 13,945; was raw 10,306 at the
-			// 3,739 anchor 48851c2b). Two changes moved it, and nothing else in this chunk did.
-			// Attribution is by module exhaustion, not revert-measurement: the chunk's whole string
-			// literal set names only the dispatch core (`web:resume-events`,
-			// MARKLESS_EVENT_DISPATCH_UNMATCHED), instance scope (MARKLESS_WIDGET_INSTANCE_UNRESOLVED)
-			// and the focus keys, and the only sources feeding it that changed since the anchor are
-			// resume-events.ts (+12,610 raw source B), fns/instance-scope.ts (+7,937),
-			// fns/overlay.ts (+3,023) and the new fns/element-handle-roster.ts.
-			//   529caa2d  focus replay moved INTO the dispatch core (marklessNativeFocus,
-			//             marklessOverlayFocusOrigin, marklessPrimedHover), so a plain click loads no
-			//             module for a handle it never reads - progressive execution buys the bytes.
-			//             The pointer/focus priming merges that fed it are in the same family.
-			//   9fbedb5c  the element-bound roster keyed by widget instance, with 65ab93e3 (a widget
-			//   65ab93e3  root's own element mints from its own instance token) and c288d956 (a
-			//   c288d956  surface's captured focus origin handed out through the runtime):
-			//             marklessQualifyGraphNodeId, marklessWidgetHostGraph, marklessRowParent.
-			// Named and NOT either family, both landing in resume-events.ts: 96b659d9 disposed-row
-			// dispatch and 61953e0d non-bubbling dispatch. The row-component mint stays demand-split -
-			// none of its MARKLESS_REPEAT_ROW_COMPONENT_* codes appear anywhere in this fixture's
-			// build, so it costs this wall nothing. Margin 11 B for gzip run variance, as before.
-			// Repayment owed to bundler-diet with the existing pay-per-use obligation.
-			// re-anchor 2026-08-27 (element-handle qualifier, chunk cost priced): the
-			// qualifier's install slot left resume-locators.ts for resume-arm-records.ts.
-			// Why it moved: fns/instance-scope.ts is statically imported by the dispatch
-			// core (resume-events.ts), so instance-scope importing resume-locators.ts made
-			// the always-loaded chunk swallow resume-locators + resume-census whole -
-			// 13,945 -> 16,952 raw, 5,151 -> 6,202 gzip, and NOT one byte of it new code.
-			// Priced by revert-measurement, not assumption: reverting the three web files
-			// on the tip returns this chunk to 13,945 raw / 5,151 gzip exactly, so the
-			// whole +1,051 was theirs. instance-scope already imported resume-arm-records,
-			// so hosting the slot there removed the edge without adding one.
-			// SPLIT: 1,053 gzip recovered here (6,202 -> 5,149, two under the 5,151 this
-			// chunk measured before the qualifier existed - the slot's own bytes left too).
-			// The residue is on the emitted wall below, not this one.
-			maxRuntimeChunkGzipBytes: 5_403, // re-anchor 2026-08-28: measured 5,391, margin 12 - control-edit-hold: a commit's property write onto an editable control is held when keystrokes landed since the handler read it. prior 5,190 (measured 5,178) - one module wrapper for the dedicated handle-qualifier module that took 12,540 chars off the resume.ts source closure. prior 5,160 (measured 5,149), margin 11 for gzip run variance. prior 5,162 (measured 5,151) - see the attribution above. prior 3,750 (measured 3,739, dispatch-ordering + row-mint + stop-threading). prior 3,730 (multi-binding chain).
+			// No largest-chunk wall: chunk size follows packing placement; fixture-runtime-anchors.json gates framework weight per module.
 			// anti-bloat wall — tightened by the runtime-stdlib goal; any increase must be justified
 			// Recalibrated to actuals for chained-async key-phase gating (runtime gate + self-wake + single-flight); zero slack.
 			// DE-MINIMIS INTERIM chain (settlement bridge +94); REPAYMENT OBLIGATION
@@ -219,6 +178,12 @@ describe('fixture builds', () => {
 			}
 
 			if ('runtimeBudget' in fixture) {
+				// The runtime walls price the library by its own chunks, which only an unpacked build keeps apart.
+				for (const output of fixture.outputs)
+					await rm(resolve(root, output), { force: true, recursive: true });
+				await execPnpm(['--filter', fixture.filter, 'build'], {
+					MARKLESS_FIXTURE_NATIVE_PACKING: '0',
+				});
 				await expectNoAppChunkStaticallyImportsInstrumentChunk(
 					resolve(root, fixture.runtimeBudget.dist),
 				);
@@ -230,7 +195,18 @@ describe('fixture builds', () => {
 				const evidence = process.env.MARKLESS_BUDGET_EVIDENCE_DIR;
 				if (evidence) {
 					await mkdir(evidence, { recursive: true });
-					await writeFile(resolve(evidence, fixture.filter.replace(/[^a-zA-Z0-9-]/g, '_') + '.json'), JSON.stringify({ fixture: fixture.filter, budget: fixture.runtimeBudget, emittedReport }, null, 2));
+					await writeFile(
+						resolve(evidence, fixture.filter.replace(/[^a-zA-Z0-9-]/g, '_') + '.json'),
+						JSON.stringify(
+							{
+								fixture: fixture.filter,
+								budget: fixture.runtimeBudget,
+								emittedReport,
+							},
+							null,
+							2,
+						),
+					);
 				}
 				const runtimeModules = fixtureRuntimeModules(
 					resolve(root, fixture.runtimeBudget.dist),
@@ -245,7 +221,7 @@ describe('fixture builds', () => {
 					).toEqual([]);
 				assertRuntimeBudget({ budget: fixture.runtimeBudget, emittedReport });
 			}
-		}, 120_000);
+		}, 240_000);
 	}
 });
 
@@ -254,6 +230,7 @@ describe('fixture builds', () => {
 // name - carries the machine's path. Build metadata JSON is tooling keyed by
 // resolved ids; a JS chunk named from a symbol id is the router's to relativise.
 const fixturesDirectory = resolve(root, 'packages/bundler/fixtures');
+const encodedFixturesDirectory = encodeURIComponent(fixturesDirectory).replace(/[^\w$]/g, '_');
 const SCANNED_OUTPUT = /\.(?:html|m?js|css)$/;
 const NAMED_OUTPUT = /\.(?:html|css)$/;
 
@@ -265,20 +242,25 @@ async function expectNoMachinePathInOutput(directory: string): Promise<void> {
 		// Vite spells an encoded id into a file name with `/` as `_2F` or `_`.
 		if (
 			NAMED_OUTPUT.test(entry.name) &&
-			['_2F', '_'].some((slash) => entry.name.includes(fixturesDirectory.replaceAll('/', slash)))
+			['_2F', '_'].some((slash) =>
+				entry.name.includes(fixturesDirectory.replaceAll('/', slash)),
+			)
 		)
 			leaks.push(`file name: ${path}`);
 		if (!SCANNED_OUTPUT.test(entry.name)) continue;
 		const text = await readFile(path, 'utf8');
 		const occurrences = text.split(fixturesDirectory).length - 1;
 		if (occurrences > 0) leaks.push(`${path}: ${occurrences} occurrence(s)`);
+		// Packed client chunks name cross-chunk init exports after module ids, as identifiers.
+		if (path.includes('/build/') && text.includes(encodedFixturesDirectory))
+			leaks.push(`${path}: identifier spelling of the fixtures directory`);
 	}
 	expect(leaks, `build output must not carry ${fixturesDirectory}`).toEqual([]);
 }
 
-async function execPnpm(args: string[]) {
+async function execPnpm(args: string[], env: Record<string, string> = {}) {
 	try {
-		await exec('pnpm', args, { cwd: root });
+		await exec('pnpm', args, { cwd: root, env: { ...process.env, ...env } });
 	} catch (error) {
 		const next = error as Error & { stdout?: string; stderr?: string };
 		throw new Error([next.message, next.stdout, next.stderr].filter(Boolean).join('\n'));

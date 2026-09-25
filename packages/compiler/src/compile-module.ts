@@ -7,6 +7,7 @@ import type {
 	PublicRenderModuleArtifact,
 	PublicRenderPlanArtifact,
 	PayloadScriptsArtifact,
+	ProtocolViewPayloadWithArmRecords,
 	RenderDataArtifact,
 	RunnableCompilerPassDefinition,
 	RuntimeDemandMapArtifact,
@@ -30,7 +31,7 @@ import { withClosureActionOwners } from './passes/link/closure-action-owners.ts'
 import { withRowSlotReaders } from './passes/link/row-slot-readers.ts';
 import { PROJECTION_PROP_NAME } from './passes/public-render/shared-seed-pass.ts';
 import { defaultCompilerPasses } from './pass-registry.ts';
-import { analyzeCaptures } from './passes/capture-analysis.ts';
+import { analyzeCaptures, componentComposition } from './passes/capture-analysis.ts';
 import { planPayloadArena } from './passes/payload-arena.ts';
 import { renderPayloadScriptArtifact } from './passes/payload-scripts.ts';
 import { emitPublicRenderModule } from './passes/public-render/module.ts';
@@ -296,6 +297,7 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 							...captureAnalysis,
 							boundResolverRows: bound.rows,
 							componentEdgeInstancePaths: bound.componentEdgeInstancePaths,
+							componentComposition: componentComposition(semanticGraph),
 						},
 					};
 				},
@@ -424,6 +426,7 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 							captureAnalysis: inputs.captureAnalysis as CaptureAnalysisArtifact,
 							renderData: inputs.renderData as RenderDataArtifact,
 							publicRenderPlan: inputs.publicRenderPlan as PublicRenderPlanArtifact,
+							protocolView: inputs.protocolView as ProtocolViewPayloadWithArmRecords,
 							omitAuthoredSource: (inputs.source as CompileTsrxModuleInput)
 								.omitAuthoredSource,
 						}),

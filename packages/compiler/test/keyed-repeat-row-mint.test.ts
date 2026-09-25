@@ -134,11 +134,10 @@ export function App() @{
 	});
 });
 
-// The other side of that line, and why the refusal above is about the read and
-// not about the punctuation: a method call ON an outside cell is lifted into a
-// computed before the mint looks, so the row template fills it from the graph
-// like any other outside read.
-test('a row whose text calls a method on an outside cell ships the lifted graph pair', async () => {
+// A method call ON an outside cell is lifted into a computed for the page, but a
+// row built in the browser reads its slots before that computed has a value, so
+// the row template keeps the expression and names the cell it reads.
+test('a row whose text calls a method on an outside cell ships its source and read', async () => {
 	const view = await viewOf(`${preamble}
 export function App() @{
 	let rows = state([{ id: 'a' }]);
@@ -149,8 +148,8 @@ export function App() @{
 	expect(view.keyedRepeats?.[0]?.rowTemplate?.textSlots).toEqual([
 		{
 			path: [0, 0],
-			graphNodeId: expect.stringContaining('templateExpression'),
-			graphPath: [],
+			source: "list.join('|')",
+			reads: [{ graphNodeId: 'state:list', path: [] }],
 		},
 	]);
 });

@@ -33,7 +33,9 @@
 		}
 	},
 	"lean": {
-		"/": ["click@counter-increment"],
+		"/": [
+			"click@counter-increment"
+		],
 		"/records": [],
 		"/settings": []
 	},
@@ -165,7 +167,9 @@
 			"guard": "lean",
 			"subject": "/",
 			"from": null,
-			"to": ["click@counter-increment"],
+			"to": [
+				"click@counter-increment"
+			],
 			"reason": "initial anchors: measured on bb53b203 (packed-delivery-performance tree) when the guards were introduced"
 		},
 		{
@@ -415,6 +419,190 @@
 			"from": null,
 			"to": "93 runtime modules anchored",
 			"reason": "initial per-feature runtime anchors: rendered bytes of each framework runtime module on the bench build (framework-overhead model, owner ruling 2026-09-24)"
+		},
+		{
+			"date": "2026-09-24",
+			"guard": "runtime",
+			"subject": "web/resume-runtime",
+			"from": 14847,
+			"to": 14982,
+			"reason": "runtime hands event types registered after resume to the startup script so late-mounted SSR children take events"
+		},
+		{
+			"date": "2026-09-24",
+			"guard": "runtime",
+			"subject": "web/fns/ssr",
+			"from": 29668,
+			"to": 29866,
+			"reason": "T161: composition keeps only boundaries the render placed (fixes @if-in-@try ANCHOR_MISSING)"
+		},
+		{
+			"date": "2026-09-24",
+			"guard": "runtime",
+			"subject": "web/prerender/evaluator",
+			"from": 18097,
+			"to": 19400,
+			"reason": "T161: boundary re-renders seed fresh/re-mounted children and read live children by instance id (correctness); reduction queued in follow-up list"
+		},
+		{
+			"date": "2026-09-24",
+			"guard": "runtime",
+			"subject": "web/prerender/evaluator",
+			"from": 19400,
+			"to": 20794,
+			"reason": "T166: bound rows in keyed repeats + derive republishing follow the module chain (correctness: rating hover, computed-chain); reduction in follow-up list"
+		},
+		{
+			"date": "2026-09-24",
+			"guard": "runtime",
+			"subject": "web/render-csr",
+			"from": 15653,
+			"to": 15785,
+			"reason": "T157: CSR route swap answers settled without demanding the full runtime (warm nav -17..20%)"
+		},
+		{
+			"date": "2026-09-25",
+			"guard": "runtime",
+			"subject": "serializer/value-decode-client-lazy",
+			"from": null,
+			"to": 230,
+			"reason": "T162: lazy re-export door, one import kind per module (zero INEFFECTIVE_DYNAMIC_IMPORT)"
+		},
+		{
+			"date": "2026-09-25",
+			"guard": "runtime",
+			"subject": "web/inline/sync-policy-core-lazy",
+			"from": null,
+			"to": 234,
+			"reason": "T162: lazy re-export door, one import kind per module (zero INEFFECTIVE_DYNAMIC_IMPORT)"
+		},
+		{
+			"date": "2026-09-25",
+			"guard": "runtime",
+			"subject": "web/payload-resume-lazy",
+			"from": null,
+			"to": 203,
+			"reason": "T162: lazy re-export door, one import kind per module (zero INEFFECTIVE_DYNAMIC_IMPORT)"
+		},
+		{
+			"date": "2026-09-25",
+			"guard": "runtime",
+			"subject": "web/resume-arm-records-lazy",
+			"from": null,
+			"to": 219,
+			"reason": "T162: lazy re-export door, one import kind per module (zero INEFFECTIVE_DYNAMIC_IMPORT)"
+		},
+		{
+			"date": "2026-09-25",
+			"guard": "runtime",
+			"subject": "web/resume-keyed-repeats-lazy",
+			"from": null,
+			"to": 227,
+			"reason": "T162: lazy re-export door, one import kind per module (zero INEFFECTIVE_DYNAMIC_IMPORT)"
+		},
+		{
+			"date": "2026-09-25",
+			"guard": "runtime",
+			"subject": "router/vite/entries/fragment-entry",
+			"from": null,
+			"to": 14180,
+			"reason": "T158: fragment navigation (swap module loads on intent/idle only; retire hook for the swapped-out runtime)"
+		},
+		{
+			"date": "2026-09-25",
+			"guard": "runtime",
+			"subject": "web/payload-resume",
+			"from": 4884,
+			"to": 4671,
+			"reason": "T158: fragment navigation (swap module loads on intent/idle only; retire hook for the swapped-out runtime)"
+		},
+		{
+			"date": "2026-09-25",
+			"guard": "runtime",
+			"subject": "web/payload-resume-registry",
+			"from": 1629,
+			"to": 1916,
+			"reason": "T158: fragment navigation (swap module loads on intent/idle only; retire hook for the swapped-out runtime)"
+		},
+		{
+			"date": "2026-09-25",
+			"guard": "runtime",
+			"subject": "router/vite/entries/resume-entry",
+			"from": 2255,
+			"to": 2406,
+			"reason": "open tab after a deploy: a gesture whose route or handler chunk was removed reloads the page once instead of dying (T181)"
+		},
+		{
+			"date": "2026-09-25",
+			"guard": "runtime",
+			"subject": "web/fns/composition",
+			"from": 18711,
+			"to": 19655,
+			"reason": "T189 row correctness (enclosing item, prop routes, style strings); INTERIM pending T192 trim"
+		},
+		{
+			"date": "2026-09-25",
+			"guard": "runtime",
+			"subject": "web/fns/row-slot-mint",
+			"from": 1707,
+			"to": 2685,
+			"reason": "T189 row correctness (enclosing item, prop routes, style strings); INTERIM pending T192 trim"
+		},
+		{
+			"date": "2026-09-25",
+			"guard": "runtime",
+			"subject": "web/ssr-data/renderer",
+			"from": 19189,
+			"to": 19425,
+			"reason": "T189 row correctness (enclosing item, prop routes, style strings); INTERIM pending T192 trim"
+		},
+		{
+			"date": "2026-09-25",
+			"guard": "runtime",
+			"subject": "serializer/protocol-constants",
+			"from": 542,
+			"to": 697,
+			"reason": "T189 row correctness (enclosing item, prop routes, style strings); INTERIM pending T192 trim"
+		},
+		{
+			"date": "2026-09-25",
+			"guard": "runtime",
+			"subject": "web/prerender/evaluator",
+			"from": 20794,
+			"to": 20934,
+			"reason": "T189 row correctness (enclosing item, prop routes, style strings); INTERIM pending T192 trim"
+		},
+		{
+			"date": "2026-09-25",
+			"guard": "runtime",
+			"subject": "web/fns/composition",
+			"from": 19655,
+			"to": 19605,
+			"reason": "row prop routes collected in the one remap pass and the row reader compacted; T189 correctness kept (T192 trim)"
+		},
+		{
+			"date": "2026-09-25",
+			"guard": "runtime",
+			"subject": "web/fns/row-slot-mint",
+			"from": 2685,
+			"to": 2633,
+			"reason": "row prop routes collected in the one remap pass and the row reader compacted; T189 correctness kept (T192 trim)"
+		},
+		{
+			"date": "2026-09-25",
+			"guard": "runtime",
+			"subject": "router/vite/entries/client-entry",
+			"from": 3161,
+			"to": 2666,
+			"reason": "shrank (fragment nav / T177 deferred bootstrap)"
+		},
+		{
+			"date": "2026-09-25",
+			"guard": "runtime",
+			"subject": "router/vite/entries/fragment-entry",
+			"from": 14180,
+			"to": 12951,
+			"reason": "shrank (T184b scan moved to inline script)"
 		}
 	],
 	"runtimeModules": {
@@ -426,8 +614,9 @@
 		"router/route-renderer": 1735,
 		"router/route-state": 805,
 		"router/spa-navigation": 6391,
-		"router/vite/entries/client-entry": 3161,
-		"router/vite/entries/resume-entry": 2255,
+		"router/vite/entries/client-entry": 2666,
+		"router/vite/entries/fragment-entry": 12951,
+		"router/vite/entries/resume-entry": 2406,
 		"router/vite/runtime/create-route-discovery": 527,
 		"runtime/graph": 8422,
 		"runtime/graph-async": 4122,
@@ -442,11 +631,12 @@
 		"serializer/payload-scripts": 611,
 		"serializer/protocol": 570,
 		"serializer/protocol-client": 6652,
-		"serializer/protocol-constants": 542,
+		"serializer/protocol-constants": 697,
 		"serializer/protocol-event-names": 264,
 		"serializer/storage-slot": 487,
 		"serializer/value-constants": 360,
 		"serializer/value-decode-client": 3580,
+		"serializer/value-decode-client-lazy": 230,
 		"serializer/value-decode-extensions": 1720,
 		"web/coded-error": 368,
 		"web/control-edit-hold": 1479,
@@ -454,40 +644,43 @@
 		"web/dom-journal": 7373,
 		"web/fns/bound-symbol": 1497,
 		"web/fns/closure-action": 7401,
-		"web/fns/composition": 18711,
+		"web/fns/composition": 19605,
 		"web/fns/dom-order": 464,
 		"web/fns/element-handle-prop": 751,
 		"web/fns/instance-scope": 16966,
 		"web/fns/reconcile-plane": 334,
 		"web/fns/roster-resume": 5123,
 		"web/fns/row-mint": 4502,
-		"web/fns/row-slot-mint": 1707,
+		"web/fns/row-slot-mint": 2633,
 		"web/fns/scalar-served": 3982,
 		"web/fns/scalar-specialized": 1426,
-		"web/fns/ssr": 29668,
+		"web/fns/ssr": 29866,
 		"web/fns/update-text": 531,
 		"web/fns/write-scalar": 983,
 		"web/inline/resume-errors": 1437,
 		"web/inline/sync-policy-core": 1255,
+		"web/inline/sync-policy-core-lazy": 234,
 		"web/payload-document-common": 2608,
 		"web/payload-full-storage-free": 773,
 		"web/payload-graph-construct": 4384,
-		"web/payload-resume": 4884,
-		"web/payload-resume-registry": 1629,
+		"web/payload-resume": 4671,
+		"web/payload-resume-lazy": 203,
+		"web/payload-resume-registry": 1916,
 		"web/pending-timing": 521,
-		"web/prerender/evaluator": 18097,
+		"web/prerender/evaluator": 20934,
 		"web/prerender/owning-surface": 1212,
 		"web/prerender/shared-seed-slot": 2836,
 		"web/prerender/staged-graph": 411,
 		"web/reconcile-plane-slot": 344,
 		"web/render": 4003,
 		"web/render-canonical": 2017,
-		"web/render-csr": 15653,
+		"web/render-csr": 15785,
 		"web/render-route-holder": 753,
 		"web/repeat-runtime": 2594,
 		"web/resume": 3419,
 		"web/resume-anchor-census": 376,
 		"web/resume-arm-records": 6276,
+		"web/resume-arm-records-lazy": 219,
 		"web/resume-async-wiring": 6615,
 		"web/resume-behaviors": 8547,
 		"web/resume-branches": 15012,
@@ -497,9 +690,10 @@
 		"web/resume-handle-qualifier": 685,
 		"web/resume-handoff": 1360,
 		"web/resume-keyed-repeats": 14376,
+		"web/resume-keyed-repeats-lazy": 227,
 		"web/resume-locators": 5483,
 		"web/resume-resettle-hold": 2572,
-		"web/resume-runtime": 14847,
+		"web/resume-runtime": 14982,
 		"web/resume-runtime-shared": 2089,
 		"web/resume-runtime-start": 8576,
 		"web/resume-shared-patch": 1200,
@@ -509,7 +703,7 @@
 		"web/runtime-error-reporting": 1876,
 		"web/ssr-data/awaitable": 856,
 		"web/ssr-data/branch-arm-idrefs": 1766,
-		"web/ssr-data/renderer": 19189,
+		"web/ssr-data/renderer": 19425,
 		"web/storage-plane": 1659
 	},
 	"constructGlue": {

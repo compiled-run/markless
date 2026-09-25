@@ -1,8 +1,9 @@
 import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, normalize, relative } from 'pathe';
 import { joinURL } from 'ufo';
+import { marklessBuildManifestDir } from '@markless/bundler/rolldown';
 
-export const MARKLESS_ROUTER_CLIENT_ASSETS_MANIFEST = '.vite/markless-router-client-manifest.json';
+export const MARKLESS_ROUTER_CLIENT_ASSETS_MANIFEST = 'router-client-manifest.json';
 
 const MARKLESS_ROUTER_CLIENT_ASSETS_MANIFEST_VERSION = 1;
 const VALID_ROUTE_FILE = /^pages\/.+\.(?:tsrx|mdx)$/;
@@ -21,6 +22,7 @@ export interface MarklessRouterClientAssetsManifest {
 		readonly resume: string;
 		readonly prerenderWake?: string;
 		readonly navigation: string;
+		readonly fragment?: string;
 	};
 	readonly routes: MarklessRouterClientAssetRoutes;
 	// Maps the chunk specifiers chunks import each other by to their hashed URLs; every document carries it.
@@ -32,6 +34,7 @@ export function createClientAssetsManifest(input: {
 	readonly resumeEntry: string;
 	readonly prerenderWakeEntry?: string;
 	readonly navigationEntry: string;
+	readonly fragmentEntry?: string;
 	readonly routes: MarklessRouterClientAssetRoutes;
 }): MarklessRouterClientAssetsManifest {
 	return {
@@ -41,6 +44,7 @@ export function createClientAssetsManifest(input: {
 			resume: input.resumeEntry,
 			...(input.prerenderWakeEntry ? { prerenderWake: input.prerenderWakeEntry } : {}),
 			navigation: input.navigationEntry,
+			...(input.fragmentEntry ? { fragment: input.fragmentEntry } : {}),
 		},
 		routes: {
 			navigation: sortRouteMap(input.routes.navigation),
@@ -186,8 +190,9 @@ export function clientAssetFileName(href: string, base: string): string {
 	return fileName;
 }
 
-function clientAssetsManifestPath(clientOutDir: string): string {
-	return join(clientOutDir, MARKLESS_ROUTER_CLIENT_ASSETS_MANIFEST);
+/** Where the client build leaves this manifest for the server build: outside the served client output. */
+export function clientAssetsManifestPath(clientOutDir: string): string {
+	return join(marklessBuildManifestDir(clientOutDir), MARKLESS_ROUTER_CLIENT_ASSETS_MANIFEST);
 }
 
 function clientAssetsManifestTemporaryPath(clientOutDir: string): string {
@@ -230,6 +235,9 @@ async function validateClientAssetsManifest(
 				}
 			: {}),
 		navigation: requiredString(input.entries.navigation, 'entries.navigation'),
+		...(input.entries.fragment !== undefined
+			? { fragment: requiredString(input.entries.fragment, 'entries.fragment') }
+			: {}),
 	};
 	const routes = {
 		navigation: routeMap(input.routes.navigation, 'routes.navigation'),
@@ -243,6 +251,7 @@ async function validateClientAssetsManifest(
 		entries.resume,
 		...(entries.prerenderWake !== undefined ? [entries.prerenderWake] : []),
 		entries.navigation,
+		...(entries.fragment !== undefined ? [entries.fragment] : []),
 		...Object.values(routes.navigation).flat(),
 		...Object.values(routes.ssr).flat(),
 		...Object.values(routes.styles).flat(),

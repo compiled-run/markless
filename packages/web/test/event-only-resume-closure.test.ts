@@ -90,7 +90,9 @@ const resumeOnDemandEntries = [
 // never reaches resume-locators, so the locator registry stays demand-loaded.
 // 2026-09-22: importing the visible event name from serializer cost 153 chars; resume-runtime.ts's
 // two missing-snapshot records now share one builder, so it measures 20,909 under the unchanged wall.
-const sourceByteLimit = 20970;
+// 2026-09-24: handing event types registered after serve to the startup script, the only listener, measures 21,176.
+// 2026-09-24: dynamic imports naming the -lazy re-export doors add 5 specifier chars (no shipped bytes): 21,181.
+const sourceByteLimit = 21181;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',

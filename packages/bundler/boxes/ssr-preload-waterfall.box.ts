@@ -3,6 +3,7 @@ import {
 	invalidateBundlerAnalyzerReceipt,
 	writeBundlerAnalyzerReceipt,
 } from './witness-verdict.ts';
+import { unpackedFixture } from './unpacked-fixture.ts';
 
 const FIXTURE = 'fixtures/vite-ssr-preloader';
 const COUNTER = '[data-counter]';
@@ -22,7 +23,7 @@ export default box(
 		tags: ['ssr', 'build', 'preview', 'browser', 'preload', 'network', 'waterfall'],
 		modes: ['build', 'preview'],
 	},
-	async ({ pipeline, expect, receipt }) => {
+	unpackedFixture(async ({ pipeline, expect, receipt }) => {
 		await invalidateBundlerAnalyzerReceipt('ssr-preload-waterfall');
 		if (process.env.MARKLESS_ANALYZER_FORCE_WITNESS_FAILURE === '1') {
 			throw new Error('MLA-EXT-WITNESS forced box failure');
@@ -63,7 +64,7 @@ export default box(
 			identity: { matrix: 'bundler-ssr-preload-waterfall-v1' },
 			results: [{ id: 'MLA-EXT-WITNESS', status: 'pass', details: [] }],
 		});
-	},
+	}),
 );
 
 type BrowserNetworkRequest = {

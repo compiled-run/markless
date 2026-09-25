@@ -2,6 +2,8 @@ import { expect, test } from 'vitest';
 import {
 	deferralPays,
 	estimatedGzipKb,
+	frameworkSplitPays,
+	lazySiblingPays,
 	mergeIntoWiderPack,
 	PACK_COST_MODEL,
 } from '../src/build/pack-cost-model.ts';
@@ -35,4 +37,22 @@ test('defers code only when it moves more than the deferred-pack floor off the b
 	expect(deferralPays(floor / 2)).toBe(false);
 	const sourceForFloor = (floor * 1024) / PACK_COST_MODEL.sourceGzipRatio;
 	expect(estimatedGzipKb(sourceForFloor)).toBeCloseTo(floor);
+});
+
+test('cuts a lazy sibling only when the pages it speeds up outweigh the file every loader pays for', () => {
+	const file = PACK_COST_MODEL.lazySiblingOverheadGzipKb;
+	const floor = PACK_COST_MODEL.minDeferredGzipKb;
+	const large = Math.max(file, floor) * 8;
+	expect(lazySiblingPays({ gzipKb: large, loadersSpedUp: 1, loaders: 4 })).toBe(true);
+	expect(lazySiblingPays({ gzipKb: large, loadersSpedUp: 0, loaders: 4 })).toBe(false);
+	// Too small for a file of its own, or paid by more pages than it helps.
+	expect(lazySiblingPays({ gzipKb: floor / 2, loadersSpedUp: 4, loaders: 4 })).toBe(false);
+	expect(lazySiblingPays({ gzipKb: file * 1.5, loadersSpedUp: 1, loaders: 4 })).toBe(false);
+});
+
+test('splits app code from framework code only when each half is worth a file of its own', () => {
+	const floor = PACK_COST_MODEL.minDeferredGzipKb;
+	expect(frameworkSplitPays({ appGzipKb: floor, frameworkGzipKb: floor * 20 })).toBe(true);
+	expect(frameworkSplitPays({ appGzipKb: floor / 2, frameworkGzipKb: floor * 20 })).toBe(false);
+	expect(frameworkSplitPays({ appGzipKb: floor * 20, frameworkGzipKb: floor / 2 })).toBe(false);
 });

@@ -15,6 +15,8 @@ import type {
 export type Environment = MarklessEnvironment | ((context: unknown) => MarklessEnvironment);
 
 export type InternalMarklessRolldownOptions = MarklessRolldownOptions & {
+	// Chunks name each other through an import map every document must carry, so it stays opt-in.
+	chunkImportMap?: boolean;
 	emitResumeModules?: boolean;
 	inlineResumerDebug?: boolean;
 	prerender?: boolean;

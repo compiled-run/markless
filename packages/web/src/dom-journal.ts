@@ -107,7 +107,7 @@ export function applyDomJournalEntries(
 		if (!target) continue;
 
 		if (entry.type === 'setText') {
-			setText(target, entry.value);
+			setText(entry.node ? entry.node(target) : target, entry.value);
 			continue;
 		}
 

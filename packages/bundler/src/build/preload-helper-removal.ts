@@ -48,7 +48,15 @@ function planHelperRemoval(
 	const removedLocals = new Set([helper.initName, ...helper.helperVars]);
 	for (const statement of asNodes(program.body)) {
 		if (statement.type !== 'ExportNamedDeclaration') continue;
-		if (statement.source || statement.declaration) return undefined;
+		if (statement.source) return undefined;
+		if (statement.declaration) {
+			const declared = new Set<string>();
+			collectBindingNames((statement.declaration as Node).id as Node | undefined, declared);
+			for (const declarator of asNodes((statement.declaration as Node).declarations))
+				collectBindingNames(declarator.id as Node, declared);
+			if ([...declared].some((name) => removedLocals.has(name))) return undefined;
+			continue;
+		}
 		const specifiers = asNodes(statement.specifiers);
 		const removed = new Set<Node>();
 		for (const specifier of specifiers) {

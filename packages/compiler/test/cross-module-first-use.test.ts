@@ -243,11 +243,12 @@ test('a same-module child re-renders through its props', async () => {
 			`,
 		},
 	]);
-	const badgeUpdate = result(PARENT).protocolView.domUpdates.find(
-		(update) => update.graphNodeId.startsWith('prop:') && update.path?.[0] === 'count',
+	// The edge-bound update row loads this base symbol.
+	const badgeUpdate = result(PARENT).symbolResolver.symbols.find(
+		(symbol) => symbol.kind === 'dom-update' && symbol.source === 'props.count',
 	)!;
-	expect(bounded(firstUse(PARENT, 'count++')).symbolIds).toContain(badgeUpdate.symbolId);
-	expect(bounded(firstUse(PARENT, "note = 'x'")).symbolIds).not.toContain(badgeUpdate.symbolId);
+	expect(bounded(firstUse(PARENT, 'count++')).symbolIds).toContain(badgeUpdate.id);
+	expect(bounded(firstUse(PARENT, "note = 'x'")).symbolIds).not.toContain(badgeUpdate.id);
 });
 
 test('a child whose interface is missing leaves its prop changes and resume start unknown', async () => {

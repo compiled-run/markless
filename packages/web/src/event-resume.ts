@@ -519,7 +519,8 @@ function applyDomJournalEntry(
 	if (!target) return;
 
 	if (entry.type === 'setText') {
-		target.textContent = stringifyDomValue(entry.value);
+		((entry.node ? entry.node(target) : target) as EventResumeDomElement).textContent =
+			stringifyDomValue(entry.value);
 		return;
 	}
 	if (entry.type === 'setAttr') {

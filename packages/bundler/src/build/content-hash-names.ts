@@ -1,4 +1,5 @@
 // Finalize rewrites code after Rolldown fixed names, so hashed names are re-derived from the shipped bytes.
+import { withoutMachinePaths } from './machine-paths.ts';
 
 export type HashCharacters = 'base64' | 'base36' | 'hex';
 
@@ -494,11 +495,12 @@ async function specifierKeys(
 	chunks: readonly Chunk[],
 	root: string | undefined,
 ): Promise<Map<Chunk, string>> {
-	const portable = (id: string) =>
-		root ? id.replaceAll(root, '').replaceAll(encodeURIComponent(root), '') : id;
+	const portable = (id: string) => withoutMachinePaths(id, root);
 	const identities = new Map<string, Chunk[]>();
 	for (const chunk of chunks) {
-		const identity = [chunk.name ?? '', portable(chunk.facadeModuleId ?? '')].join('\0');
+		const identity = [portable(chunk.name ?? ''), portable(chunk.facadeModuleId ?? '')].join(
+			'\0',
+		);
 		const group = identities.get(identity) ?? [];
 		group.push(chunk);
 		identities.set(identity, group);

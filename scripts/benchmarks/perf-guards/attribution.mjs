@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { isAbsolute, join, relative } from 'node:path';
 import {
 	MARKLESS_BUILD_PREFIX,
 	MARKLESS_BYTE_ATTRIBUTION,
@@ -89,14 +89,16 @@ export function runtimeFeatureIndex(demand) {
 		for (const { list, entry, ids } of demandEntries(map))
 			for (const id of ids) add(id, demandLabel(list, entry));
 		for (const id of map.capabilityModuleIds ?? []) add(id, 'capability');
+		for (const id of map.nestedRecordModuleIds ?? []) add(id, 'records inside arms and rows');
 		for (const id of map.unknownRecordModuleIds ?? []) add(id, 'records inside arms and rows');
 	}
 	return Object.fromEntries([...index].map(([id, labels]) => [id, [...labels].sort()]));
 }
 
-// A demand-map key is `<abs source>?markless-...`; the byte map names the same source root-relative.
+// A demand-map key is `<source>?markless-...`, spelled root-relative like the byte map.
 function demandSource(key, appDir) {
-	return relative(appDir, key.replace(/[?#].*$/, ''));
+	const source = key.replace(/[?#].*$/, '');
+	return isAbsolute(source) ? relative(appDir, source) : source;
 }
 
 function moduleSource(key) {
@@ -108,9 +110,9 @@ function moduleSource(key) {
 
 /**
  * Pay-per-use: a runtime module that some compiled demand names (a feature module) may ship on a
- * page only when a demand map of that page's own modules names it. Branch, row and async arms can
- * carry records their map does not list; on such pages only the capabilities every map enumerates
- * module-wide (`capabilityModuleIds`) can be judged, so only those are.
+ * page only when a demand map of that page's own modules names it. A map lists what its arms and
+ * rows demand in `nestedRecordModuleIds`; a map that could not enumerate them leaves it out, and on
+ * such pages only the capabilities every map enumerates module-wide (`capabilityModuleIds`) are judged.
  */
 export function undemandedRuntimeModules({ paths, attribution, demand, appDir, base }) {
 	const maps = Object.entries(demand ?? {}).filter(([, map]) => map);
@@ -118,6 +120,7 @@ export function undemandedRuntimeModules({ paths, attribution, demand, appDir, b
 	for (const [, map] of maps) {
 		for (const { ids } of demandEntries(map)) for (const id of ids) features.add(id);
 		for (const id of map.capabilityModuleIds ?? []) features.add(id);
+		for (const id of map.nestedRecordModuleIds ?? []) features.add(id);
 		for (const id of map.unknownRecordModuleIds ?? []) features.add(id);
 	}
 	const shipped = new Set();
@@ -138,8 +141,12 @@ export function undemandedRuntimeModules({ paths, attribution, demand, appDir, b
 		pageMaps.push(demandSource(key, appDir));
 		for (const { ids } of demandEntries(map)) for (const id of ids) demanded.add(id);
 		for (const id of map.capabilityModuleIds ?? []) demanded.add(id);
+		for (const id of map.nestedRecordModuleIds ?? []) demanded.add(id);
 		if (!map.capabilityModuleIds) capabilitiesEnumerated = false;
-		if ((map.payloadRecords ?? []).some((record) => CARRIES_UNLISTED_RECORDS[record.kind]))
+		if (
+			!map.nestedRecordModuleIds &&
+			(map.payloadRecords ?? []).some((record) => CARRIES_UNLISTED_RECORDS[record.kind])
+		)
 			unlisted = true;
 	}
 	const capabilities = new Set(RUNTIME_CAPABILITY_MODULE_IDS);
@@ -163,6 +170,8 @@ export function withoutDemand(demand, id) {
 			entry.runtimeModuleIds = (entry.runtimeModuleIds ?? []).filter((other) => other !== id);
 		if (map.capabilityModuleIds)
 			map.capabilityModuleIds = map.capabilityModuleIds.filter((other) => other !== id);
+		if (map.nestedRecordModuleIds)
+			map.nestedRecordModuleIds = map.nestedRecordModuleIds.filter((other) => other !== id);
 		map.unknownRecordModuleIds = [...new Set([...(map.unknownRecordModuleIds ?? []), id])];
 	}
 	return next;

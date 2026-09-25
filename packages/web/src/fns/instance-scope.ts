@@ -51,6 +51,10 @@ export function marklessRowFreeSymbolId(symbolId: string, instancePath?: string)
 
 const INSTANCE_SEGMENT = /[cpm]\d+:|r:[^:]*:/g;
 
+export function marklessInstanceSegments(path: string): string[] {
+	return path.match(INSTANCE_SEGMENT) ?? [];
+}
+
 /**
  * What a rendered row's record knows that a bound symbol's id cannot.
  *
@@ -274,6 +278,8 @@ function marklessRowRootedGraphNodeId(
 // runs through this same path - from inserting the row a second time.
 type MarklessRowScopedGraph = MarklessScopedGraph & {
 	readonly marklessRowScope?: string;
+	// The dispatching record's instance path, which a resolver row bound inside a keyed repeat reads its row from.
+	readonly marklessRowHostPath?: string;
 	readonly marklessWidgetHostGraph?: object;
 };
 
@@ -285,6 +291,7 @@ export function marklessRowScopedGraph(graph: RuntimeGraph, scope: MarklessRowSc
 		{
 			...graph,
 			marklessRowScope: tag,
+			marklessRowHostPath: scope[0]?.withRows,
 			// An own field, not the WeakMap alone: this graph is spread again on its way
 			// to the symbol (the imported-capture adapter builds its own reader over it),
 			// and a copy the map has never seen mints a registry of its own - one that
@@ -609,6 +616,10 @@ function composedWidgetRegistryView(
 // compose already applied; composed-page-space.test.ts keeps the two in step so
 // the browser never imports the serializer's protocol module.
 const PAGE_SPACE_ID = /^((?:[cpm]\d+:|r:[^:]*:)*)(shared|storage):/;
+
+export function marklessPageSpaceId(graphNodeId: string): boolean {
+	return PAGE_SPACE_ID.test(graphNodeId);
+}
 
 /**
  * One render's answer to "which rendered widget owns this id".

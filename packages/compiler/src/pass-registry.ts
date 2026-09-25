@@ -94,6 +94,7 @@ export const defaultCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 			'captureAnalysis',
 			'renderData',
 			'publicRenderPlan',
+			'protocolView',
 		],
 		produces: ['symbolModules'],
 	},

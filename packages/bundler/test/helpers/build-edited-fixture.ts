@@ -6,7 +6,7 @@ import { markless } from '../../src/vite/index.ts';
 
 const [name, workDir, variant, filesJson] = process.argv.slice(2);
 if (!name || !workDir || !variant)
-	throw new Error('usage: <fixture> <workDir> <off|packs|closures> [files]');
+	throw new Error('usage: <fixture> <workDir> <off|packs> [files]');
 const fixture = resolve(import.meta.dirname, '../../fixtures', name);
 const root = resolve(workDir, 'app');
 await rm(root, { force: true, recursive: true });
@@ -24,13 +24,5 @@ await build({
 	root,
 	logLevel: 'error',
 	build: { outDir: resolve(workDir, 'dist'), emptyOutDir: true },
-	plugins: [
-		markless(
-			variant === 'off'
-				? {}
-				: variant === 'closures'
-					? { experimentalNativePacking: true, experimentalPackPlanner: 'closures' }
-					: { experimentalNativePacking: true },
-		),
-	],
+	plugins: [markless(variant === 'off' ? { packing: false } : {})],
 });

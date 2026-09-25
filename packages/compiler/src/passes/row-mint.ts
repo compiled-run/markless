@@ -11,6 +11,7 @@ import {
 	semanticAliasMap,
 } from '../artifact-helpers/graph-paths.ts';
 import { childConstructReach, type ConstructReachInput } from './construct-reach.ts';
+import { TEMPLATE_EXPRESSION_GRAPH_NODE_PREFIX } from './public-render/html.ts';
 import { createResidueDependencyReader } from './public-render/residue-dependencies.ts';
 
 export type RowComponentMint = {
@@ -232,9 +233,21 @@ function projectedExpressionStaysCurrent(
 export function mintableSlotValue(slot: SemanticMarkupSlot): ProtocolRowTemplateSlotValue | null {
 	if (slot.kind !== 'text' && slot.kind !== 'attribute') return null;
 	if (slot.residue.kind === 'repeat-item') return { itemPath: slot.residue.path };
+	// A lowered style object has no value until its derive runs, after the row is built.
+	if (isLoweredStyleObject(slot)) return null;
 	return slot.residue.kind === 'graph-read'
 		? { graphNodeId: slot.residue.graphNodeId, graphPath: slot.residue.path }
 		: null;
+}
+
+/** A style object in a row, which only its synthetic computed turns into CSS text. */
+export function isLoweredStyleObject(slot: SemanticMarkupSlot): boolean {
+	return (
+		slot.kind === 'attribute' &&
+		slot.name === 'style' &&
+		slot.residue.kind === 'graph-read' &&
+		slot.residue.graphNodeId.startsWith(TEMPLATE_EXPRESSION_GRAPH_NODE_PREFIX)
+	);
 }
 
 const readResidueNames = createResidueDependencyReader();
@@ -252,8 +265,6 @@ export function expressionSlotValue(
 ): ProtocolRowTemplateSlotValue | null {
 	if (slot.kind !== 'text' && slot.kind !== 'attribute') return null;
 	if (slot.residue.kind !== 'authored-expression') return null;
-	// A class or style value is composed with scope classes and statics the mint does not see.
-	if (slot.kind === 'attribute' && (slot.name === 'class' || slot.name === 'style')) return null;
 	const names = readResidueNames(slot.residue.source, 'expression');
 	if (names.analysisFailed) return null;
 	const bindings = graphBindingMap(graph, null, componentName);
@@ -274,11 +285,38 @@ export function expressionSlotValue(
 				return null;
 			continue;
 		}
-		if (resolved.binding.kind !== 'state' && resolved.binding.kind !== 'computed') return null;
+		// A prop read is routed to the parent's node by composition, which drops the template when it cannot.
+		if (
+			resolved.binding.kind !== 'state' &&
+			resolved.binding.kind !== 'computed' &&
+			resolved.binding.kind !== 'prop'
+		)
+			return null;
 		if (resolved.binding.sharedDefinitionId !== undefined) return null;
+		if (resolved.binding.kind === 'prop' && resolved.path.length === 0) {
+			// A whole-props parameter: each member read follows its own prop.
+			const members = memberReads(slot.residue.source, name);
+			if (!members) return null;
+			for (const member of members)
+				reads.push({ graphNodeId: resolved.binding.id, path: [member] });
+			continue;
+		}
 		reads.push({ graphNodeId: resolved.binding.id, path: resolved.path });
 	}
 	return { source: slot.residue.source, ...(reads.length > 0 ? { reads } : {}) };
+}
+
+// The members `name` is read through, or null when any mention is not a plain `.member` read.
+function memberReads(source: string, name: string): ReadonlySet<string> | null {
+	const members = new Set<string>();
+	for (const match of source.matchAll(new RegExp(`(^|[^\\w$.])${name}(?![\\w$])`, 'g'))) {
+		const member = /^\s*\??\.\s*([A-Za-z_$][\w$]*)/.exec(
+			source.slice((match.index ?? 0) + match[0].length),
+		);
+		if (!member?.[1]) return null;
+		members.add(member[1]);
+	}
+	return members;
 }
 
 /**

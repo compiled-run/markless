@@ -5,6 +5,7 @@
 import { spawn } from 'node:child_process';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
+import { createServer } from 'node:net';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ASYNC_BOUNDARY_ARM } from '../../packages/serializer/src/protocol.ts';
@@ -32,7 +33,6 @@ const combos = [
 		id: 'music-player-csr',
 		demo: 'demos/music-player',
 		environment: 'csr',
-		port: 5311,
 		path: '/',
 		settledSelector: '.youtube-frame-host[data-command="cue"]',
 		proof: proveMusicPlayer,
@@ -42,7 +42,6 @@ const combos = [
 		id: 'music-player-ssr',
 		demo: 'demos/music-player-ssr',
 		environment: 'ssr',
-		port: 5312,
 		path: '/',
 		settledSelector: '.youtube-frame-host[data-command="cue"]',
 		proof: proveMusicPlayer,
@@ -52,7 +51,6 @@ const combos = [
 		id: 'live-feed-csr',
 		demo: 'demos/live-feed',
 		environment: 'csr',
-		port: 5313,
 		path: '/?latency=0',
 		settledSelector: '[data-update-list][data-row-count="3"]',
 		proof: proveLiveFeedCsr,
@@ -62,13 +60,15 @@ const combos = [
 		id: 'live-feed-ssr',
 		demo: 'demos/live-feed-ssr',
 		environment: 'ssr',
-		port: 5314,
 		path: '/?latency=0',
 		settledSelector: '[data-update-list][data-row-count="3"]',
 		proof: proveLiveFeedSsr,
 		interact: interactLiveFeed,
 	},
 ];
+
+// Free high ports, so concurrent runs on one machine never collide.
+for (const combo of combos) combo.port = await freePort();
 
 if (MODE !== 'baseline' && MODE !== 'gate') {
 	throw new Error('Usage: node measure.mjs baseline|gate');
@@ -259,7 +259,10 @@ async function measureCombo(combo) {
 			await page.waitForLoadState('load');
 		}
 
+		const pointer = trackPointer(page);
 		if (combo.interact) await combo.interact(page);
+		await fixedMicrotaskWindow(page);
+		await pointer.settle();
 		await fixedMicrotaskWindow(page);
 		const postInteraction = coverageSnapshot(
 			await cdp.send('Profiler.takePreciseCoverage'),
@@ -556,6 +559,22 @@ async function waitForAttribute(page, selector, attribute, value) {
 	);
 }
 
+// Chrome sends the pointerover for DOM changed under a resting pointer on its own timer; re-send the move so every run sees it.
+function trackPointer(page) {
+	let at;
+	const click = page.click.bind(page);
+	page.click = async (selector, options) => {
+		const box = await page.locator(selector).first().boundingBox();
+		if (box) at = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+		return click(selector, options);
+	};
+	return {
+		settle: async () => {
+			if (at) await page.mouse.move(at.x, at.y);
+		},
+	};
+}
+
 async function fixedMicrotaskWindow(page) {
 	await page.evaluate(async (turns) => {
 		for (let index = 0; index < turns; index++) await new Promise(queueMicrotask);
@@ -641,6 +660,17 @@ function isSameOrigin(scriptUrl, origin) {
 function displayScriptUrl(scriptUrl, origin) {
 	const url = new URL(scriptUrl);
 	return `${url.pathname}${url.search}${url.hash}` || scriptUrl.slice(origin.length);
+}
+
+function freePort() {
+	return new Promise((settle, fail) => {
+		const probe = createServer();
+		probe.once('error', fail);
+		probe.listen(0, '127.0.0.1', () => {
+			const { port } = probe.address();
+			probe.close(() => settle(port));
+		});
+	});
 }
 
 function comboUrl(combo) {

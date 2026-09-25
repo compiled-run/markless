@@ -168,7 +168,11 @@ test.each([
 		try {
 			const module = await server.ssrLoadModule(id);
 			const rootHtml = await renderToString(module.default, { executionLog: 'never' });
-			expect(rootHtml).toContain('>4</' + tag + '>');
+			// `module.default` is the page, not the first named export above it.
+			expect(rootHtml).toContain('<main>');
+			expect(rootHtml).toContain('>6</' + tag + '>');
+			expect(rootHtml).toContain('>10</' + tag + '>');
+			expect(rootHtml).not.toContain('>4</' + tag + '>');
 		} finally {
 			await server.close();
 		}

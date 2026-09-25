@@ -3,7 +3,7 @@ import { readFile, readdir, mkdir, writeFile } from 'node:fs/promises';
 import { resolve, relative, join } from 'node:path';
 import { spawn } from 'node:child_process';
 import net from 'node:net';
-import { MARKLESS_ROUTER_CLIENT_ASSETS_MANIFEST } from '../../../packages/router/src/vite/client-assets-manifest.ts';
+import { clientAssetsManifestPath } from '../../../packages/router/src/vite/client-assets-manifest.ts';
 
 export const sha256 = (value) => createHash('sha256').update(value).digest('hex');
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -27,7 +27,7 @@ export async function readBuildInventory(directory) {
 	if (resolve(graph.directory) !== publicDir)
 		throw Error('Build inventory public directory mismatch');
 	const manifest = JSON.parse(
-		await readFile(resolve(publicDir, MARKLESS_ROUTER_CLIENT_ASSETS_MANIFEST)),
+		await readFile(clientAssetsManifestPath(publicDir)),
 	);
 	const assets = new Map(),
 		digest = createHash('sha256');

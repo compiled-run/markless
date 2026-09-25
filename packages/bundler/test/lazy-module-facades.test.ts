@@ -4,6 +4,7 @@ import {
 	staleContentHashNames,
 } from '../src/build/content-hash-names.ts';
 import { collapseLazyModuleFacades } from '../src/build/lazy-module-facades.ts';
+import { lazyStartupPackName } from '../src/build/route-pack-groups.ts';
 import { execFileSync } from 'node:child_process';
 import { mkdtemp, realpath, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -397,7 +398,7 @@ test('a new facade leaves every other loader name and importer byte alone', () =
 	const before = build(false);
 	const after = build(true);
 	expect(after['entry.js']!.code).toBe(before['entry.js']!.code);
-	const loaders = (code: string) => code.match(/__marklessPacked[\w$]+?(?=\(\))/g) ?? [];
+	const loaders = (code: string) => code.match(/\$ml[\w$]+?(?=\(\))/g) ?? [];
 	expect(loaders(before['entry.js']!.code)).toHaveLength(2);
 	for (const declaration of before['pack.js']!.code.split('\n').slice(1))
 		expect(after['pack.js']!.code).toContain(declaration);
@@ -437,10 +438,10 @@ test('a loader name already present in the target gets a deterministic suffix', 
 			},
 		};
 		collapseLazyModuleFacades(bundle, undefined, { root: '/app' });
-		return /module\.(__marklessPacked[\w$]+)\(\)/.exec(bundle['entry.js'].code)![1]!;
+		return /module\.(\$ml[\w$]+)\(\)/.exec(bundle['entry.js'].code)![1]!;
 	};
 	const plain = build('let x=1;export{x};');
-	expect(plain).toMatch(/^__marklessPacked[0-9A-Za-z]{4}$/);
+	expect(plain).toMatch(/^\$ml[0-9A-Za-z]{4}$/);
 	const taken = build(`let x=1,${plain}Value=0;export{x};`);
 	expect(taken).toBe(`${plain}_1`);
 	expect(build(`let x=1,${plain}Value=0;export{x};`)).toBe(taken);
@@ -607,6 +608,187 @@ test('a pack preloaded beside its importer is evaluated a task later, and only w
 		'setTimeout(()=>{for(const pack of[import("./same.js"),import("./shared.js"),import("./some.js")])',
 	);
 	expect(bundle['route-a.js'].imports).toEqual([]);
+});
+
+test("a pack only some routes preload, loaded from code every route runs, is evaluated by those routes' own packs", () => {
+	const chunk = (
+		fileName: string,
+		code: string,
+		moduleIds: string[],
+		imports: string[] = [],
+	) => ({
+		type: 'chunk' as const,
+		fileName,
+		code,
+		imports,
+		dynamicImports: [] as string[],
+		moduleIds,
+		exports: [] as string[],
+	});
+	const bundle = {
+		'runtime.js': {
+			...chunk('runtime.js', 'export const load=()=>import("./rows-facade.js");', [
+				'runtime',
+			]),
+			dynamicImports: ['rows-facade.js'],
+		},
+		'rows.js': {
+			...chunk('rows.js', 'function start(){}let value=1;export{start,value};', ['rows']),
+			exports: ['start', 'value'],
+		},
+		'rows-facade.js': chunk(
+			'rows-facade.js',
+			'import{start as s,value as v}from"./rows.js";s();export{v as value};',
+			[],
+			['rows.js'],
+		),
+		'page-list.js': chunk('page-list.js', 'export const list=1;', ['list']),
+		'page-grid.js': chunk('page-grid.js', 'export const grid=1;', ['grid']),
+		'page-about.js': chunk('page-about.js', 'export const about=1;', ['about']),
+	};
+	const packs: Record<string, string> = {
+		runtime: 'shared',
+		rows: 'shared:lg',
+		list: 'route:pages/list.tsrx',
+		grid: 'route:pages/grid.tsrx',
+		about: 'route:pages/about.tsrx',
+	};
+	collapseLazyModuleFacades(bundle, undefined, {
+		packOf: (id) => packs[id],
+		packRoutes: (pack) =>
+			pack === 'shared:lg' ? ['pages/list.tsrx', 'pages/grid.tsrx'] : undefined,
+	});
+	const evaluates = 'setTimeout(()=>{for(const pack of[import("./rows.js")])';
+	expect(bundle['page-list.js'].code).toContain(evaluates);
+	expect(bundle['page-grid.js'].code).toContain(evaluates);
+	expect(bundle['page-about.js'].code).not.toContain('rows.js');
+	expect(bundle['runtime.js'].code).not.toContain('setTimeout');
+	expect(bundle['rows.js'].code).toContain('__marklessPacks');
+});
+
+test('a lazy sibling pack is evaluated a task after its importer on the routes of the pack it was cut from', () => {
+	const chunk = (
+		fileName: string,
+		code: string,
+		moduleIds: string[],
+		exports: string[] = [],
+	) => ({
+		type: 'chunk' as const,
+		fileName,
+		code,
+		imports: [] as string[],
+		dynamicImports: [] as string[],
+		moduleIds,
+		exports,
+	});
+	const pack = (fileName: string, moduleId: string) =>
+		chunk(
+			fileName,
+			'function start(){}let value=1;export{start,value};',
+			[moduleId],
+			['start', 'value'],
+		);
+	const facade = (fileName: string, target: string) => ({
+		...chunk(
+			fileName,
+			`import{start as s,value as v}from"./${target}";s();export{v as value};`,
+			[],
+		),
+		imports: [target],
+	});
+	const targets = ['own-lazy', 'shared-lazy', 'other-lazy', 'subset-lazy'];
+	const bundle: Record<string, ReturnType<typeof chunk>> = {
+		'route-a.js': {
+			...chunk(
+				'route-a.js',
+				`export const load=()=>[${targets.map((name) => `import("./${name}-facade.js")`).join(',')}];`,
+				['a-root'],
+			),
+			dynamicImports: targets.map((name) => `${name}-facade.js`),
+		},
+	};
+	for (const name of targets) {
+		bundle[`${name}.js`] = pack(`${name}.js`, name);
+		bundle[`${name}-facade.js`] = facade(`${name}-facade.js`, `${name}.js`);
+	}
+	const packs: Record<string, string> = {
+		'a-root': 'route:pages/a.tsrx',
+		'own-lazy': lazyStartupPackName('route:pages/a.tsrx'),
+		'shared-lazy': lazyStartupPackName('shared'),
+		'other-lazy': lazyStartupPackName('route:pages/b.tsrx'),
+		'subset-lazy': `${lazyStartupPackName('shared:ab')}~1`,
+	};
+	collapseLazyModuleFacades(bundle, undefined, {
+		packOf: (id) => packs[id],
+		packRoutes: (name) => (name === 'shared:ab' ? ['pages/a.tsrx', 'pages/b.tsrx'] : undefined),
+	});
+	expect(bundle['route-a.js']!.code).toContain(
+		'setTimeout(()=>{for(const pack of[import("./own-lazy.js"),import("./shared-lazy.js"),import("./subset-lazy.js")])',
+	);
+});
+
+// A page whose first event needs the lazy half at once evaluates it with its own route pack, as if never cut.
+test('a lazy sibling pack is imported statically by the route packs of pages that need it at once', () => {
+	for (const [eagerRoute, leanRoute, lazyName] of [
+		['pages/harbor.tsrx', 'pages/index.tsrx', 'runtime-lazy'],
+		['pages/live.tsrx', 'pages/docs.tsrx', 'engine-lazy'],
+	] as const) {
+		const chunk = (
+			fileName: string,
+			code: string,
+			moduleIds: string[],
+			exports: string[] = [],
+		) => ({
+			type: 'chunk' as const,
+			fileName,
+			code,
+			imports: [] as string[],
+			dynamicImports: [] as string[],
+			moduleIds,
+			exports,
+		});
+		const route = (fileName: string, moduleId: string) => ({
+			...chunk(fileName, `export const load=()=>import("./${lazyName}-facade.js");`, [
+				moduleId,
+			]),
+			dynamicImports: [`${lazyName}-facade.js`],
+		});
+		const bundle: Record<string, ReturnType<typeof chunk>> = {
+			'eager.js': route('eager.js', 'eager-root'),
+			'lean.js': route('lean.js', 'lean-root'),
+			[`${lazyName}.js`]: chunk(
+				`${lazyName}.js`,
+				'function start(){}let value=1;export{start,value};',
+				[lazyName],
+				['start', 'value'],
+			),
+			[`${lazyName}-facade.js`]: {
+				...chunk(
+					`${lazyName}-facade.js`,
+					`import{start as s,value as v}from"./${lazyName}.js";s();export{v as value};`,
+					[],
+				),
+				imports: [`${lazyName}.js`],
+			},
+		};
+		const packs: Record<string, string> = {
+			'eager-root': `route:${eagerRoute}`,
+			'lean-root': `route:${leanRoute}`,
+			[lazyName]: lazyStartupPackName('shared'),
+		};
+		collapseLazyModuleFacades(bundle, undefined, {
+			packOf: (id) => packs[id],
+			eagerLazyRoutes: (name) =>
+				name === lazyStartupPackName('shared') ? [eagerRoute] : undefined,
+		});
+		expect(bundle['eager.js']!.code).toContain(`import"./${lazyName}.js";`);
+		expect(bundle['eager.js']!.imports).toContain(`${lazyName}.js`);
+		expect(bundle['eager.js']!.code).not.toContain('setTimeout');
+		expect(bundle['lean.js']!.code).not.toContain(`import"./${lazyName}.js";`);
+		expect(bundle['lean.js']!.code).toContain(
+			`setTimeout(()=>{for(const pack of[import("./${lazyName}.js")])`,
+		);
+	}
 });
 
 test('the registry still answers after finalize renames packs to the hash of their bytes', async () => {

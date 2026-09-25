@@ -41,6 +41,7 @@ import { derivePrerenderResumeRecords } from './prerender/evaluator.ts';
 import { createEarlyEventCaptureSource } from './inline/early-events.ts';
 
 export { prepareSsrResumeRecords } from './prerender/records.ts';
+export { CONTAINER_RETIRE_PROPERTY } from './payload-resume-registry.ts';
 
 type RosterResumeHost = {
 	__marklessRosterResume?: () => Promise<typeof import('./fns/roster-resume.ts')>;

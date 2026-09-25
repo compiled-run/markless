@@ -1,7 +1,27 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { validateBundleSizeResult } from './run.mjs';
+import { splitChunkBytes, validateBundleSizeResult } from './run.mjs';
+
+test('bundle-size splits a packed chunk by attributed bytes, runtime and glue as framework', () => {
+	const split = splitChunkBytes({ raw: 1000, gzip: 400, brotli: 300 }, [
+		['author', 'src/root.tsrx', 200],
+		['glue', 'vite/preload-helper.js', 100],
+		['runtime', 'web/render', 500],
+		['third-party', 'npm:lodash', 200],
+	]);
+	assert.deepEqual(split, {
+		application: { raw: 400, gzip: 160, brotli: 120 },
+		framework: { raw: 600, gzip: 240, brotli: 180 },
+	});
+});
+
+test('bundle-size counts a chunk with no attributed modules as framework', () => {
+	assert.deepEqual(splitChunkBytes({ raw: 52, gzip: 40, brotli: 30 }, []), {
+		application: { raw: 0, gzip: 0, brotli: 0 },
+		framework: { raw: 52, gzip: 40, brotli: 30 },
+	});
+});
 
 test('bundle-size rejects an empty framework bucket', () => {
 	assert.throws(

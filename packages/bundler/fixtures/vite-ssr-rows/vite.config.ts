@@ -23,7 +23,7 @@ export default defineConfig(({ command }) => ({
 		},
 	},
 	plugins: [
-		markless({ experimentalNativePacking: process.env.MARKLESS_FIXTURE_NATIVE_PACKING === '1' }),
+		markless({ packing: process.env.MARKLESS_FIXTURE_NATIVE_PACKING !== '0' }),
 		fixtureSsrHost(),
 	],
 }));

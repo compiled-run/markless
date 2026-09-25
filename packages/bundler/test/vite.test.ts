@@ -95,6 +95,7 @@ describe('Vite adapter structure', () => {
 		const filename = '/workspace/app/src/App.tsrx';
 		const transformed = await transformTsrxModule({
 			filename,
+			moduleId: 'src/App.tsrx',
 			source,
 			environment: 'client',
 		});
@@ -206,33 +207,38 @@ describe('Vite adapter structure', () => {
 		expect(build).toHaveBeenCalledTimes(2);
 	});
 
-	test('does not emit client resume chunks without a configured SSR TSRX root', async () => {
-		const plugin = getAsyncPlugin();
-		const emitFile = vi.fn();
+	// Unpacked builds emit each symbol as a chunk, which shows the transform did emit; packed ones emit none.
+	test.each([false, true])(
+		'does not emit client resume chunks without a configured SSR TSRX root (packing: %s)',
+		async (packing) => {
+			const plugin = getAsyncPlugin({ packing });
+			const emitFile = vi.fn();
 
-		callConfig(plugin, {}, { command: 'build', mode: 'production' });
-		callConfigResolved(plugin, {
-			base: '/',
-			command: 'build',
-			root: '/workspace/app',
-		});
-		callBuildStart(plugin, { cwd: '/workspace/app', input: { symbols: 'src/App.tsrx' } });
-		await callTransform(plugin, source, '/workspace/app/src/App.tsrx', {
-			...createViteHookContext('client'),
-			emitFile,
-		});
+			callConfig(plugin, {}, { command: 'build', mode: 'production' });
+			callConfigResolved(plugin, {
+				base: '/',
+				command: 'build',
+				root: '/workspace/app',
+			});
+			callBuildStart(plugin, { cwd: '/workspace/app', input: { symbols: 'src/App.tsrx' } });
+			await callTransform(plugin, source, '/workspace/app/src/App.tsrx', {
+				...createViteHookContext('client'),
+				emitFile,
+			});
 
-		expect(emitFile.mock.calls.map((call) => call[0])).toEqual(
-			expect.arrayContaining([
-				expect.objectContaining({
-					id: expect.stringContaining('virtual:markless:symbol:'),
-				}),
-			]),
-		);
-		expect(emitFile.mock.calls.map((call) => call[0].id)).not.toContain(
-			`virtual:markless:resume:${encodeURIComponent('/workspace/app/src/App.tsrx')}`,
-		);
-	});
+			if (!packing)
+				expect(emitFile.mock.calls.map((call) => call[0])).toEqual(
+					expect.arrayContaining([
+						expect.objectContaining({
+							id: expect.stringContaining('virtual:markless:symbol:'),
+						}),
+					]),
+				);
+			expect(emitFile.mock.calls.map((call) => call[0].id)).not.toContain(
+				`virtual:markless:resume:${encodeURIComponent('/workspace/app/src/App.tsrx')}`,
+			);
+		},
+	);
 
 	test('emits client resume chunks when an SSR TSRX root owns browser resume', async () => {
 		const plugin = getAsyncPlugin();
@@ -508,7 +514,7 @@ export function App() @{
 		const childHandler = childResult!.manifest.captureMetadata.extractedSymbols.find(
 			(symbol) => symbol.kind === 'event-handler',
 		)!;
-		const loaderSymbolId = `imported:${encodeURIComponent(childFilename)}:${childHandler.symbolId}`;
+		const loaderSymbolId = `imported:${encodeURIComponent('components/Child.tsrx')}:${childHandler.symbolId}`;
 		const rows = parent.manifest.captureMetadata.boundResolverRows.filter(
 			(row) => row.baseSymbolId === loaderSymbolId,
 		);
@@ -1240,8 +1246,10 @@ export function App() @{
 	});
 });
 
-function getAsyncPlugin() {
-	return getPlugin(markless(), 'vite-plugin-markless') as ReturnType<typeof markless>[number] & {
+function getAsyncPlugin(options: Parameters<typeof markless>[0] = {}) {
+	return getPlugin(markless(options), 'vite-plugin-markless') as ReturnType<
+		typeof markless
+	>[number] & {
 		api?: {
 			registerBundleGraphAdder: (adder: () => Record<string, never>) => void;
 			registerDevInjection: (injection: unknown) => void;

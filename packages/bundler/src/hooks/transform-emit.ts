@@ -15,8 +15,10 @@ import {
 	linkedInterfaces,
 	materializeDelegateChildren,
 	mergeLinkedModuleChildren,
+	moduleLinkArtifact,
 	warnDelegateImportFailures,
 } from '../link-driver.ts';
+import { nativePackingEnabled } from '../packing-option.ts';
 import { registerRenderDataStyles, registerTransformArtifacts } from '../plugin-state.ts';
 import type { TransformTsrxModuleInput, TransformTsrxModuleResult } from '../types.ts';
 import {
@@ -85,11 +87,7 @@ export function registerFirstPassArtifacts(
 			manifestSource,
 			renderDataClaimManifest(transformed.manifest, manifestSource),
 		);
-		moduleLinkArtifacts.set(source, {
-			interfaceHash: transformed.interfaceHash,
-			moduleGraphInterface: transformed.moduleGraphInterface,
-			moduleImports: transformed.moduleImports,
-		});
+		moduleLinkArtifacts.set(source, moduleLinkArtifact(transformed));
 	}
 }
 
@@ -309,7 +307,7 @@ export async function emitTransformResult(
 		);
 		for (const module of transformed.virtualModules.filter((item) => {
 			if (
-				internalOptions.experimentalNativePacking &&
+				nativePackingEnabled(internalOptions) &&
 				(item.type === 'symbol' ||
 					item.type === 'symbol-bundle' ||
 					item.type === 'resolver')
@@ -336,7 +334,7 @@ export async function emitTransformResult(
 			pluginContext.emitFile({
 				type: 'chunk',
 				id: module.id,
-				preserveSignature: internalOptions.experimentalNativePacking
+				preserveSignature: nativePackingEnabled(internalOptions)
 					? 'allow-extension'
 					: 'strict',
 			});

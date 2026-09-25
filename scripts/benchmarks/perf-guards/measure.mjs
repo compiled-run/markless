@@ -231,7 +231,7 @@ async function leanActions(publicDir, served, browser, origin) {
 	const out = {};
 	for (const [route, source] of Object.entries(BENCH_ROUTE_SOURCES)) {
 		const entry = Object.entries(demand).find(([id]) =>
-			id.endsWith(`/${source}?markless-resume`),
+			`/${id}`.endsWith(`/${source}?markless-resume`),
 		)?.[1];
 		if (!entry) throw new Error(`execution-demand.json has no resume entry for ${source}`);
 		const view = viewPayload(served[route].html);

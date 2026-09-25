@@ -198,7 +198,11 @@ async function settledClick(browser, ctx, control) {
 
 async function earlyClick(browser, ctx, control, reference) {
 	const { lane, url, opts, cell } = ctx;
-	const visit = await openVisit(browser, { browserName: cell.browser, cpu: cell.cpu });
+	const visit = await openVisit(browser, {
+		browserName: cell.browser,
+		cpu: cell.cpu,
+		delayAdoptionMs: opts.delayAdoptionMs,
+	});
 	try {
 		await visit.goto(url, 'commit');
 		const point = await actionablePoint(visit, control.key, opts.actionTimeoutMs);
@@ -356,7 +360,8 @@ export async function measureRoute(browser, { lane, route, url, cell, opts }) {
 		const settled = await settledClick(browser, ctx, control);
 		push(settled.record);
 		if (settled.idle) idleHashes.add(settled.idle.hash);
-		early.push(await earlyClick(browser, ctx, control, settled));
+		for (let i = 0; i < (opts.earlyRepeats ?? 1); i++)
+			early.push(await earlyClick(browser, ctx, control, settled));
 		opts.log?.(
 			`    ${control.key}: ${settled.record.error ?? (settled.record.responded ? `${Math.round(settled.record.inputToResponseMs ?? -1)} ms` : 'no response')} / early ${early.at(-1).verdict}`,
 		);

@@ -97,3 +97,41 @@ test('a cell spelling a shared computed id does not steal the computed records',
 		AccordionContent: [2],
 	});
 });
+
+// A joined text derive is read by a DOM update rather than a chunk slot, so its
+// record belongs to the component rendering the text; filed under the root, a
+// child instance's update subscribed to a derive nothing ever ran.
+test('a joined text derive is owned by the component that renders it', async () => {
+	const joined = `
+import { computed, state } from '@markless/core';
+
+function Chip() @{
+	let hits = state(0);
+	const twice = computed(() => hits * 2);
+	<i onClick={() => hits++}>chip {hits}/{twice}</i>
+}
+
+export function App() @{
+	let count = state(0);
+	<main><p>{count} of {count}</p><Chip /><button onClick={() => count++}>go</button></main>
+}
+`;
+	const compiled = await compileTsrxModule({ filename, source: joined, symbols: [] });
+	const input: PublicRenderModuleInput = {
+		source: { filename, source: joined },
+		semanticGraph: compiled.semanticGraph,
+		renderData: compiled.renderData,
+		publicRenderPlan: compiled.publicRenderPlan,
+		symbolResolver: compiled.symbolResolver,
+		captureAnalysis: compiled.captureAnalysis,
+		protocolState: compiled.protocolState,
+		protocolView: compiled.protocolView,
+	};
+	const owned = (componentName: string) =>
+		componentOwnedStateNodes(input, componentName, 'App').computedIndexes.map(
+			(index) => input.protocolState.computed[index]!.graphNodeId,
+		);
+
+	expect(owned('Chip')).toEqual(['computed:twice', 'computed:templateExpression:0']);
+	expect(owned('App')).toEqual(['computed:templateExpression:1']);
+});

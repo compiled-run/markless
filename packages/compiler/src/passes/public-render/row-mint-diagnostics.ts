@@ -7,7 +7,12 @@ import type {
 	SemanticMarkupArtifact,
 	SemanticMarkupSlot,
 } from '../../artifacts.ts';
-import { expressionSlotValue, mintableSlotValue, resolveRowComponentMint } from '../row-mint.ts';
+import {
+	expressionSlotValue,
+	isLoweredStyleObject,
+	mintableSlotValue,
+	resolveRowComponentMint,
+} from '../row-mint.ts';
 import {
 	keyedRepeatRowMintUnsupportedDiagnostic,
 	type KeyedRepeatRowMintRefusal,
@@ -129,6 +134,7 @@ function rowMintRefusal(input: {
 			// The mint fills a text or attribute slot from the item or from the page's
 			// graph, so what is left is a value only the render can produce.
 			if (mintableSlotValue(slot)) continue;
+			if (isLoweredStyleObject(slot)) return { kind: 'style-object' };
 			if (
 				!componentSlot &&
 				chunk.componentName &&

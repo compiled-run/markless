@@ -36,6 +36,7 @@ import {
 	resolvePrerenderBoundaryAuthority,
 	type PrerenderBoundaryArmRegistration,
 } from '../prerender/staged-boundary-authority.ts';
+import { marklessInstanceScopedLoadSymbol } from './instance-scope.ts';
 
 let journal: typeof import('../dom-journal.ts') | undefined;
 
@@ -83,6 +84,7 @@ type StagedContainer = {
 			readonly record: PrerenderStagedComputedRegistration;
 		}
 	>;
+	readonly bornLate: Set<string>;
 	dispatchRegistered: boolean;
 };
 
@@ -111,6 +113,7 @@ export function resumePrerenderTriggerGroup(
 			segments: [],
 			runtimes: [],
 			computed: new Map(),
+			bornLate: new Set(),
 			dispatchRegistered: false,
 		};
 		stagedContainers.set(input.root, container);
@@ -149,6 +152,8 @@ async function startTriggerGroup(
 				return input.renderBoundaryArm!(boundaryId, status, graph);
 			}),
 	);
+	// An arm rendered after resume names its components' symbols by instance path.
+	const loadSymbol = marklessInstanceScopedLoadSymbol(adopted.loadSymbol);
 	const prior = container.segments[0] && createStagedGraph(container, container.segments[0]);
 	const state = prior
 		? {
@@ -175,7 +180,7 @@ async function startTriggerGroup(
 		state,
 		view: adopted.view,
 		root: adopted.root,
-		loadSymbol: adopted.loadSymbol,
+		loadSymbol,
 	});
 	const segment: GraphSegment = {
 		graph: segmentGraph,
@@ -264,7 +269,7 @@ async function startTriggerGroup(
 				graph,
 				state: adopted.state,
 				view: adopted.view,
-				loadSymbol: adopted.loadSymbol,
+				loadSymbol,
 				createVisibilityObserver: adopted.createVisibilityObserver,
 				createRemovalObserver: adopted.createRemovalObserver,
 				applyDomJournal,
@@ -376,6 +381,17 @@ function isUnmatchedDispatchError(error: unknown): boolean {
 function createStagedGraph(container: StagedContainer, local: GraphSegment): RuntimeGraph {
 	const matching = (graphNodeId: string) =>
 		container.segments.filter((segment) => segment.graphNodeIds.has(graphNodeId));
+	// A node born after resume belongs to every segment that writes it, so each committed arm hears it.
+	const owners = (graphNodeId: string) => {
+		const found = matching(graphNodeId);
+		if (found.length > 0 && !container.bornLate.has(graphNodeId)) return found;
+		container.bornLate.add(graphNodeId);
+		if (!local.graphNodeIds.has(graphNodeId)) {
+			local.graphNodeIds.add(graphNodeId);
+			found.push(local);
+		}
+		return found;
+	};
 	const graphFor = (graphNodeId: string) =>
 		(local.graphNodeIds.has(graphNodeId) ? local : matching(graphNodeId)[0])?.graph ??
 		local.graph;
@@ -420,12 +436,12 @@ function createStagedGraph(container: StagedContainer, local: GraphSegment): Run
 			return applied;
 		},
 		write: (write) => {
-			for (const segment of matching(write.graphNodeId)) segment.graph.write(write);
+			for (const segment of owners(write.graphNodeId)) segment.graph.write(write);
 		},
-		update: (update) => broadcastUpdate(staged, matching(update.graphNodeId), update),
+		update: (update) => broadcastUpdate(staged, owners(update.graphNodeId), update),
 		call: (call) => {
 			let result: unknown;
-			for (const [index, segment] of matching(call.graphNodeId).entries()) {
+			for (const [index, segment] of owners(call.graphNodeId).entries()) {
 				const next = segment.graph.call(call);
 				if (index === 0) result = next;
 			}
@@ -551,8 +567,10 @@ async function adoptStreamedForWake<T extends TriggerGroupInput>(input: T): Prom
 		!documentHost?.querySelector?.(
 			'script[type="markless/arm"],script[type="markless/state-patch"]',
 		)
-	)
+	) {
+		(input.root as { __mAdopted?: boolean }).__mAdopted = true;
 		return input;
+	}
 	const { adoptStreamedArmPatches } = await import('../resume-stream-patches.ts');
 	return { ...input, ...(await adoptStreamedArmPatches(input, input.root)) };
 }

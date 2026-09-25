@@ -20,8 +20,10 @@ import {
 	semanticAliasMap,
 	type ResolvedGraphPath,
 } from '../artifact-helpers/graph-paths.ts';
+import { protocolInstanceQualifies } from '@markless/serializer';
 import { sourceWithoutStringOrCommentText } from '../artifact-helpers/source-text.ts';
 import {
+	componentEdgeHostSegment,
 	componentEdgeInstancePath,
 	componentEdgeInstanceSegment,
 } from '../component-edge-instance.ts';
@@ -414,6 +416,11 @@ export function planBoundSymbolResolver(
 		for (const terminalEdgeId of terminalEdgeIds) {
 			for (const path of pathsByTerminalEdge.get(terminalEdgeId) ?? []) {
 				const componentEdgePath = path.map((edge) => edge.id);
+				// A composer nested in this module holds its nodes under its own place; a republished symbol's routes already say so.
+				const composerPath =
+					symbol.innerInstancePath === undefined
+						? componentEdgeInstancePath(path.slice(0, -1), input.semanticGraph.componentEdges)
+						: '';
 				const captureSlots = edgeDependentSlots.flatMap((slot) => {
 					const route = slot.routes.find(
 						(candidate) =>
@@ -430,7 +437,12 @@ export function planBoundSymbolResolver(
 								{
 									slotId: slot.id,
 									path: slot.path,
-									route,
+									route:
+										composerPath &&
+										route.kind === 'graph-reference' &&
+										protocolInstanceQualifies(route.graphNodeId) === true
+											? { ...route, graphNodeId: composerPath + route.graphNodeId }
+											: route,
 									...(slot.propName
 										? {
 												legacyGraphRead: {
@@ -462,6 +474,7 @@ export function planBoundSymbolResolver(
 				const instancePath =
 					componentEdgeInstancePath(path, input.semanticGraph.componentEdges) +
 					(symbol.innerInstancePath ?? '');
+				const rowPieces = boundRowPieces(path, input.semanticGraph.componentEdges);
 				rows.push({
 					id: boundSymbolId(symbol.symbolId, ancestry),
 					// Imported symbols keep the child-local ID in the bound record ID,
@@ -471,6 +484,7 @@ export function planBoundSymbolResolver(
 					baseSymbolId: symbol.loaderSymbolId ?? symbol.symbolId,
 					...(symbol.loaderSymbolId ? { loaderSymbolId: symbol.loaderSymbolId } : {}),
 					...(instancePath ? { instancePath } : {}),
+					...(rowPieces ? { rowPieces } : {}),
 					componentEdgePath,
 					ancestry,
 					captureSlots,
@@ -510,9 +524,29 @@ function componentEdgePaths(edges: SymbolResolverInput['semanticGraph']['compone
 	return result;
 }
 
+// A row inside a keyed repeat is one instance per rendered row, and only the dispatching record's host id names the row.
+function boundRowPieces(
+	path: ReadonlyArray<SymbolResolverInput['semanticGraph']['componentEdges'][number]>,
+	edges: SymbolResolverInput['semanticGraph']['componentEdges'],
+): BoundSymbolResolverRow['rowPieces'] {
+	if (!path.some((edge) => edge.keyedRepeatScopeIds.length > 0)) return undefined;
+	return path.map(
+		(edge) =>
+			[
+				componentEdgeHostSegment(edge, edges),
+				componentEdgeInstanceSegment(edge, edges),
+				edge.keyedRepeatScopeIds.length,
+			] as const,
+	);
+}
+
+export function boundSymbolIdPrefix(baseSymbolId: string): string {
+	return `bound:${encodeURIComponent(baseSymbolId)}`;
+}
+
 function boundSymbolId(baseSymbolId: string, ancestry: BoundSymbolResolverRow['ancestry']): string {
 	const segment = (values: ReadonlyArray<string>) => values.map(encodeURIComponent).join(',');
-	return `bound:${encodeURIComponent(baseSymbolId)}:${ancestry
+	return `${boundSymbolIdPrefix(baseSymbolId)}:${ancestry
 		.map((entry) => {
 			const scopes =
 				entry.branchScopeIds.length === 0 && entry.keyedRepeatScopeIds.length === 0

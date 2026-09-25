@@ -22,6 +22,8 @@ export type SourceSymbolRow = {
 	readonly id: string;
 	readonly chunk: string;
 	readonly exportName: string;
+	/** What `import()` names when `chunk` is also imported statically; see SymbolResolverModuleInput. */
+	readonly lazyChunk?: string;
 };
 
 export type SourceSymbolRoute = {
@@ -70,6 +72,10 @@ const SYMBOL_VIRTUAL_PREFIX = `${MARKLESS_VIRTUAL_PREFIX}symbol:`;
 
 export function symbolVirtualModuleId(filename: string, symbolId: string) {
 	return `${SYMBOL_VIRTUAL_PREFIX}${encodeURIComponent(filename)}:${encodeURIComponent(symbolId)}`;
+}
+
+export function symbolEntryVirtualModuleId(filename: string, symbolId: string) {
+	return `${symbolVirtualModuleId(filename, symbolId)}:entry`;
 }
 
 export function encodedSymbolSource(filename: string): string {
@@ -152,8 +158,8 @@ export function prerenderWakeVirtualModuleSourceFile(moduleId: string): string |
 	}
 }
 
-export function scopedSymbolExportName(filename: string, exportName: string) {
-	return `${exportName}_${stringHash(filename)}`;
+export function scopedSymbolExportName(moduleId: string, exportName: string) {
+	return `${exportName}_${stringHash(moduleId)}`;
 }
 
 export function rewriteSymbolModuleExport(
@@ -186,11 +192,18 @@ export function payloadModule(payload: {
 // Only the build-time pack planner reads first-use demand; no runtime path does.
 export function withoutFirstUse(runtimeDemandMap: unknown): unknown {
 	const map = runtimeDemandMap as
-		| { readonly actions?: ReadonlyArray<object>; readonly firstUsePage?: unknown }
+		| {
+				readonly actions?: ReadonlyArray<object>;
+				readonly armActions?: unknown;
+				readonly firstUsePage?: unknown;
+		  }
 		| undefined;
-	if (!map?.actions?.some((action) => 'firstUse' in action) && !(map && 'firstUsePage' in map))
+	if (
+		!map?.actions?.some((action) => 'firstUse' in action) &&
+		!(map && ('firstUsePage' in map || 'armActions' in map))
+	)
 		return runtimeDemandMap;
-	const { firstUsePage: _firstUsePage, ...rest } = map;
+	const { firstUsePage: _firstUsePage, armActions: _armActions, ...rest } = map;
 	return {
 		...rest,
 		...(map.actions
@@ -234,7 +247,7 @@ function emitPublicRenderModule(
 		source.replace(declaration, `function ${implementationName}()`),
 		`function ${localName}() {`,
 		`\tconst output = ${implementationName}();`,
-		'\tglobalThis.__mxLoadLog().then(log => log.logMarklessRenderSummary());',
+		'\tif (globalThis.__mxLog) globalThis.__mxLoadLog().then(log => log.logMarklessRenderSummary());',
 		'\treturn output;',
 		'}',
 	].join('\n');
@@ -716,6 +729,8 @@ export function emitResumeModule(input: {
 	// their document bytes and no execution.
 	readonly boundSymbolDescriptors?: BoundSymbolDescriptorMap;
 	readonly prerenderDataId?: string;
+	// Re-exports the render data for `import()`: one module imported both ways would not split.
+	readonly lazyRenderDataId?: string;
 	// The page's canonical render-data module, for the component-row mint alone.
 	// `prerenderDataId` is gated on prerendered records, so a plain resumed page
 	// has none - and a component row still has to reach the surface.
@@ -767,7 +782,7 @@ export function emitResumeModule(input: {
 			input.executionLog !== 'never',
 			input.prerenderDataId,
 			stagedPrerender,
-			componentRowLoader(input) ? input.renderDataId : undefined,
+			componentRowLoader(input) ? (input.lazyRenderDataId ?? input.renderDataId) : undefined,
 			input.symbolRoutes.length > 0 || servedPlansOnly,
 			// A composed child's own closure plan is asked for only where this page already dispatches lean.
 			(input.closurePlanRoutes ?? []).some((route) => 'importSource' in route) &&
@@ -792,7 +807,7 @@ export function emitResumeModule(input: {
 			? `import { marklessPrerenderData } from '${input.prerenderDataId}';`
 			: null,
 		stagedPrerender && input.prerenderDataId
-			? `async function marklessLoadPrerenderData() { const module = await import('${input.prerenderDataId}'); return module.marklessPrerenderData; }`
+			? `async function marklessLoadPrerenderData() { const module = await import('${input.lazyRenderDataId ?? input.prerenderDataId}'); return module.marklessPrerenderData; }`
 			: null,
 		`import { runtimeDemandMap as payloadRuntimeDemandMap } from '${input.payloadId}';`,
 		// Derived reconciliation is pay-per-use. Only a payload that carries
@@ -842,7 +857,7 @@ export function emitResumeModule(input: {
 		'',
 		input.executionLog === 'never' ? '' : emitExecutionLogLoader(),
 		input.installResumeSummary && input.executionLog !== 'never'
-			? 'globalThis.__mxLoadLog().then(log => log.installMarklessExecutionLog());'
+			? 'if (globalThis.__mxLog) globalThis.__mxLoadLog().then(log => log.installMarklessExecutionLog());'
 			: null,
 		'',
 		emitLoadSymbol(input, stagedPrerender ? 'readMarklessWakeSourceSymbol' : undefined),
@@ -1882,7 +1897,7 @@ function emitScalarAction(
 			? [
 					`	const syncPolicy = ${JSON.stringify(action.syncPolicy)};`,
 					'	if (syncPolicy && !syncPolicyAlreadyApplied) {',
-					"		const { runSyncPolicyActions } = await import('@markless/web/inline/sync-policy-core');",
+					"		const { runSyncPolicyActions } = await import('@markless/web/inline/sync-policy-core-lazy');",
 					'		runSyncPolicyActions(syncPolicy, graph, input.event);',
 					'		syncPolicyAlreadyApplied = true;',
 					'	}',
@@ -2016,7 +2031,7 @@ function emitDirectSourceSymbolLoader(
 	return [
 		'function loadSymbol(symbolId) {',
 		...symbols.flatMap((symbol) => [
-			`	if (symbolId === ${JSON.stringify(symbol.id)}) return import('${symbol.chunk}')`,
+			`	if (symbolId === ${JSON.stringify(symbol.id)}) return import('${symbol.lazyChunk ?? symbol.chunk}')`,
 			`		.then((mod) => ${readerName}(mod, ${JSON.stringify(symbol.exportName)}));`,
 		]),
 		'	return Promise.reject(new Error(`Unknown async symbol ${symbolId}`));',

@@ -1,11 +1,27 @@
-import type { JavaScriptAstNode } from '@markless/compiler';
+import { callsImportedOrFreeName, type JavaScriptAstNode } from '@markless/compiler';
 import { parseSync } from 'rolldown/experimental';
 import { calleeOffsets, parseChunkCode, spansAnyOffset } from './chunk-ast.ts';
+import { PACK_LOADER_PREFIX } from './lazy-module-facades.ts';
 
 export function stripEmptyVitePreloadWrappers(code: string): string {
+	return stripImportedVitePreloadHelper(stripEmptyVitePreloadWrapperCalls(code));
+}
+
+// The text-only half of the strip; what is left needs a parse, which a caller can run ahead in parallel.
+export function stripEmptyVitePreloadWrapperCalls(code: string): string {
 	const withoutDirectImports = stripDirectEmptyPreloadWrappers(code);
 	const withoutAsyncLoaders = stripAsyncEmptyPreloadWrappers(withoutDirectImports);
-	return stripImportedVitePreloadHelper(stripUnusedVitePreloadHelper(withoutAsyncLoaders));
+	return stripUnusedVitePreloadHelper(withoutAsyncLoaders);
+}
+
+// The texts stripImportedVitePreloadHelper parses for this code.
+export function importedVitePreloadHelperParses(code: string): string[] {
+	const helper = findImportedVitePreloadHelper(code);
+	if (!helper) return [];
+	return [
+		code,
+		code.slice(0, helper.importStart) + helper.keptImport + code.slice(helper.importEnd),
+	];
 }
 
 type ImportedVitePreloadHelper = {
@@ -16,6 +32,19 @@ type ImportedVitePreloadHelper = {
 	readonly initFunction: string;
 	readonly keptSpecifiers: ReadonlySet<number>;
 };
+
+const PRELOADED_IMPORT_BODIES = ['import(', 'Promise.resolve().then(', '(async()=>'];
+
+// A registry pack load: `load("./pack.js","<loader>",()=>import("./pack.js"))`.
+const PACK_LOAD_BODY_RE = new RegExp(
+	`[$A-Z_a-z][$\\w]*\\(\\s*(["'\`])[^"'\`]+\\1\\s*,\\s*(["'\`])${PACK_LOADER_PREFIX.replaceAll('$', '\\$')}[$\\w]+\\2\\s*,\\s*\\(\\)\\s*=>\\s*import\\(`,
+	'y',
+);
+
+function startsWithPackLoad(code: string, start: number): boolean {
+	PACK_LOAD_BODY_RE.lastIndex = start;
+	return PACK_LOAD_BODY_RE.test(code);
+}
 
 const IMPORT_DECLARATION_CANDIDATE_RE = /\bimport\s*\{[\s\S]*?\}\s*from\s*["'][^"']+["'];?/g;
 
@@ -28,7 +57,12 @@ function stripDirectEmptyPreloadWrappers(code: string): string {
 	for (let match = wrapperRE.exec(code); match; match = wrapperRE.exec(code)) {
 		const callStart = match.index;
 		const bodyStart = match.index + match[0]!.length;
-		if (!code.startsWith('import(', bodyStart)) continue;
+		// Packing rewrites a same-chunk import() into a resolved promise or an async loader call.
+		if (
+			!PRELOADED_IMPORT_BODIES.some((body) => code.startsWith(body, bodyStart)) &&
+			!startsWithPackLoad(code, bodyStart)
+		)
+			continue;
 
 		const wrapper = findEmptyPreloadWrapper(code, callStart, bodyStart);
 		if (!wrapper) continue;
@@ -85,8 +119,10 @@ function findEmptyPreloadWrapper(
 	if (firstArgumentEnd < 0) return undefined;
 
 	let cursor = skipSpaces(code, firstArgumentEnd + 1);
-	if (code[cursor] !== '[' || code[cursor + 1] !== ']') return undefined;
-	cursor = skipSpaces(code, cursor + 2);
+	if (code.startsWith('void 0', cursor)) cursor = skipSpaces(code, cursor + 'void 0'.length);
+	else if (code[cursor] === '[' && code[cursor + 1] === ']')
+		cursor = skipSpaces(code, cursor + 2);
+	else return undefined;
 
 	if (code[cursor] === ')') {
 		return { firstArgumentEnd, callEnd: cursor };
@@ -146,7 +182,7 @@ function skipSpaces(code: string, start: number): number {
 	return cursor;
 }
 
-function stripImportedVitePreloadHelper(code: string): string {
+export function stripImportedVitePreloadHelper(code: string): string {
 	const helper = findImportedVitePreloadHelper(code);
 	if (!helper) return code;
 
@@ -360,6 +396,10 @@ function preloadStillCalled(
 		parsesCleanly(withoutImport)
 	)
 		return false;
+	if (parsesCleanly(code) && importIsWholeStatement(code, helper)) {
+		const called = callsImportedOrFreeName(code, helper.preloadFunction);
+		if (called !== undefined) return called;
+	}
 	const program = tryParseChunk(code);
 	const body = asNodes(program?.body);
 	const index = body.findIndex(
@@ -382,6 +422,22 @@ function preloadStillCalled(
 		),
 	);
 	return callsFreeName(code, program, helper.preloadFunction, removed);
+}
+
+// The import is a top-level statement, first or after one ending in `;`, so removing it joins nothing.
+function importIsWholeStatement(code: string, helper: ImportedVitePreloadHelper): boolean {
+	if (
+		!parseChunkCode('chunk.js', code).module.staticImports.some(
+			(entry) => entry.start === helper.importStart && entry.end === helper.importEnd,
+		)
+	)
+		return false;
+	const lines = code.slice(0, helper.importStart).split('\n');
+	let last = '';
+	// Whole-line comments between statements are not statements.
+	while (lines.length && (last === '' || last.startsWith('//'))) last = lines.pop()!.trim();
+	if (last === '' || last.startsWith('//')) return true;
+	return last.endsWith(';') && !last.includes('//') && !last.includes('/*');
 }
 
 function parsesCleanly(code: string): boolean {

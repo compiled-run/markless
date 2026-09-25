@@ -2,6 +2,8 @@
 import { MARKLESS_BYTE_ATTRIBUTION } from './chunking.ts';
 import { runtimeModuleIdFromOrigin } from './bundle-graph.ts';
 import type { MarklessBuildMetadataBundle } from './build-metadata.ts';
+import { rootRelativeId } from '../module-id.ts';
+import { withoutMachinePaths } from './machine-paths.ts';
 
 export { MARKLESS_BYTE_ATTRIBUTION };
 
@@ -85,15 +87,36 @@ export function classifyShippedModule(
 	if (!bare.startsWith('/') && !/^[A-Za-z]:[/\\]/.test(bare))
 		return { category: BYTE_CATEGORY.glue, key: bare };
 	if (root && !bare.startsWith(withTrailingSlash(root)))
-		return { category: BYTE_CATEGORY.thirdParty, key: bare };
+		return { category: BYTE_CATEGORY.thirdParty, key: rootRelativeId(bare, root) };
 	return { category: BYTE_CATEGORY.author, key: relativeToRoot(bare, root) };
 }
 
-type RenderedModules = Record<string, { readonly renderedLength: number } | undefined>;
+/** Author code and compiler output derived from it: it changes with the app, not with a framework upgrade. */
+export function isAppModule(id: string, root: string | undefined): boolean {
+	const { category } = classifyShippedModule(id, root);
+	if (category === BYTE_CATEGORY.author) return true;
+	const bare = id.startsWith('\0') ? id.slice(1) : id;
+	return (
+		category === BYTE_CATEGORY.glue &&
+		(bare.startsWith(MARKLESS_VIRTUAL) || MARKLESS_QUERY.test(bare))
+	);
+}
+
+type RenderedModule = { readonly renderedLength: number; readonly code?: string | null };
+type RenderedModules = Record<string, RenderedModule | undefined>;
+
+// Unminified code carries bundler-minted names that spell source paths; count it without them.
+function renderedLength(module: RenderedModule | undefined, root: string | undefined): number {
+	if (!module) return 0;
+	return typeof module.code === 'string'
+		? withoutMachinePaths(module.code, root).length
+		: module.renderedLength;
+}
 
 // Rolldown's per-module rendered lengths are read before post-processing rewrites the chunk code.
 export function collectRenderedModules(
 	bundle: MarklessBuildMetadataBundle & Record<string, unknown>,
+	root?: string,
 ): Map<object, ReadonlyArray<readonly [string, number]>> {
 	const rendered = new Map<object, ReadonlyArray<readonly [string, number]>>();
 	for (const item of Object.values(bundle)) {
@@ -104,7 +127,7 @@ export function collectRenderedModules(
 		rendered.set(
 			item,
 			Object.entries(modules)
-				.map(([id, module]) => [id, module?.renderedLength ?? 0] as const)
+				.map(([id, module]) => [id, renderedLength(module, root)] as const)
 				.filter(([, length]) => length > 0),
 		);
 	}
@@ -165,7 +188,7 @@ function withoutQueryValues(id: string): string {
 
 function relativeToRoot(id: string, root: string | undefined): string {
 	if (!root) return id;
-	return id.split(withTrailingSlash(root)).join('');
+	return rootRelativeId(id, root).split(withTrailingSlash(root)).join('');
 }
 
 function withTrailingSlash(path: string): string {

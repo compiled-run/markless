@@ -19,13 +19,15 @@ export interface MarklessDevServer {
 }
 
 export interface MarklessRolldownOptions {
-	experimentalNativePacking?: boolean;
 	/**
-	 * Experimental, requires `experimentalNativePacking`: `'closures'` splits each critical pack by
-	 * which route boot, render path and compiled controls need each module, and emits
-	 * `interaction-closures.json`.
+	 * Packs a client production build's lazily loaded modules into a few chunks instead of one
+	 * chunk per module, cut by what each route's page load, first interactions and navigation
+	 * need, so a page preloads what its first interactions run in one round and nothing waits on a
+	 * waterfall. On by default; `false` ships one chunk per module. Dev builds are never packed.
 	 */
-	experimentalPackPlanner?: 'closures';
+	packing?: boolean;
+	/** @deprecated Packing is on by default. Remove the option, or use `packing: false` to opt out. */
+	experimentalNativePacking?: boolean;
 	dev?: boolean;
 	devInjections?: GlobalInjections[];
 	devServer?: MarklessDevServer;
@@ -40,10 +42,14 @@ export type MarklessVirtualModuleType =
 	| 'payload'
 	| 'prerender-wake'
 	| 'render-data'
+	// `export *` of the render data: every lazy import names this, every static import the render data.
+	| 'render-data-entry'
 	| 'resolver'
 	| 'resume'
 	| 'settle'
 	| 'symbol'
+	// `export *` of a symbol module that render data imports statically: loaders `import()` this instead.
+	| 'symbol-entry'
 	| 'symbol-bundle'
 	| 'trigger-group'
 	| 'style';
@@ -145,7 +151,10 @@ export type ArtifactChildCandidate = {
 export type MarklessModuleLinkArtifact = Pick<
 	TransformTsrxModuleResult,
 	'interfaceHash' | 'moduleGraphInterface' | 'moduleImports'
->;
+> & {
+	/** The module composes a child this build did not compile, so only its reached render data is canonical. */
+	readonly delegateChildren?: boolean;
+};
 
 export interface MarklessTransformManifest {
 	source: string;
@@ -229,6 +238,8 @@ export type BundleGraphAdder = (manifest: MarklessBuildMetadata) => PreloadGraph
 export type MarklessRolldownPluginApi = {
 	/** Whether client chunks import each other through specifiers that the document's import map resolves. */
 	chunkImportMap: () => boolean;
+	/** A plugin that writes every document the app serves turns chunk import maps on. */
+	enableChunkImportMap: () => void;
 	invalidateGeneratedModules: (
 		parent: string,
 		environment?: MarklessEnvironment,

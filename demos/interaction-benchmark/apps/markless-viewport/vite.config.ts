@@ -38,5 +38,5 @@ export default {
 	define: {
 		'import.meta.env.BENCHMARK_BUILD_ID': JSON.stringify(buildId),
 	},
-	plugins: [markless({ experimentalNativePacking: true }), router({ linkPreloading: 'viewport' })],
+	plugins: [markless(), router()],
 } satisfies UserConfig;

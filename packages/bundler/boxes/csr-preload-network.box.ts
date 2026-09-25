@@ -12,6 +12,7 @@ import {
 	invalidateBundlerAnalyzerReceipt,
 	writeBundlerAnalyzerReceipt,
 } from './witness-verdict.ts';
+import { unpackedFixture } from './unpacked-fixture.ts';
 
 const FIXTURE = 'fixtures/vite-csr-preloader';
 const COUNTER = '[data-counter]';
@@ -32,7 +33,7 @@ export default box(
 		tags: ['csr', 'build', 'preview', 'browser', 'preload', 'network', 'waterfall'],
 		modes: ['build', 'preview'],
 	},
-	async ({ pipeline, expect, receipt }) => {
+	unpackedFixture(async ({ pipeline, expect, receipt }) => {
 		await invalidateBundlerAnalyzerReceipt('csr-preloader');
 		const build = await pipeline.build({
 			config: (config) => ({
@@ -100,7 +101,7 @@ export default box(
 			identity: { fixture: 'vite-csr-preloader' },
 			results: analyzerResults,
 		});
-	},
+	}),
 );
 
 type BrowserNetworkRequest = {

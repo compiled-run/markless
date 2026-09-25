@@ -836,6 +836,7 @@ export function marklessSsrSeedPropCells(
 		readonly graphNodeId: string;
 		readonly keys: ReadonlyArray<string> | null;
 		readonly scalarKeys?: ReadonlyArray<string>;
+		readonly rowKeys?: ReadonlyArray<string>;
 	}>,
 ) {
 	const seeded = cells.flatMap((cell) => {
@@ -843,6 +844,7 @@ export function marklessSsrSeedPropCells(
 		const present = [
 			...(cell.keys ?? []).filter((key) => props?.[key] !== undefined),
 			...(cell.scalarKeys ?? []).filter((key) => marklessIsScalarProp(props?.[key])),
+			...(cell.rowKeys ?? []).filter((key) => props?.[key] !== undefined),
 		];
 		if (cell.keys ? present.length === 0 : props?.[name] === undefined) return [];
 		const value = cell.keys
@@ -854,7 +856,7 @@ export function marklessSsrSeedPropCells(
 			valueKind: marklessSsrValueKind(value),
 			value: marklessSerializeGraphValue(value),
 		};
-		if (cell.keys && cell.scalarKeys && cell.graphNodeId === 'prop:props')
+		if (cell.keys && (cell.scalarKeys || cell.rowKeys) && cell.graphNodeId === 'prop:props')
 			marklessSsrRoutedPropCell.set(seededCell, (graphProps) => {
 				const kept = Object.fromEntries(
 					present.flatMap((key) =>
@@ -1175,20 +1177,6 @@ export function marklessSsrArmizeBoundaries(
 			});
 			streams.locators.splice(i, 1);
 		}
-		const armHostIds = new Set(armLocators.map((locator) => locator.hostNodeId));
-		const moved: {
-			events: SsrEventRecord[];
-			domUpdates: SsrDomUpdateRecord[];
-			behaviors: SsrBehaviorRecord[];
-			elementHandles: SsrHostedRecord[];
-		} = { events: [], domUpdates: [], behaviors: [], elementHandles: [] };
-		for (const key of Object.keys(moved) as ReadonlyArray<keyof typeof moved>) {
-			const records: SsrHostedRecord[] = streams[key] ?? [];
-			for (let i = records.length - 1; i >= 0; i--) {
-				if (armHostIds.has(records[i].hostNodeId))
-					(moved[key] as SsrHostedRecord[]).unshift(...records.splice(i, 1));
-			}
-		}
 		const directStatus = snapshotById.get(boundary.runnerGraphNodeId)?.status;
 		// Authored sync gates are the recorded settle nodes, while their snapshots
 		// are derived request-locally and intentionally absent from the serialized
@@ -1231,6 +1219,19 @@ export function marklessSsrArmizeBoundaries(
 		}
 		armLocators.sort((left, right) => left.index - right.index);
 		const completeArmHostIds = new Set(armLocators.map((locator) => locator.hostNodeId));
+		const moved: {
+			events: SsrEventRecord[];
+			domUpdates: SsrDomUpdateRecord[];
+			behaviors: SsrBehaviorRecord[];
+			elementHandles: SsrHostedRecord[];
+		} = { events: [], domUpdates: [], behaviors: [], elementHandles: [] };
+		for (const key of Object.keys(moved) as ReadonlyArray<keyof typeof moved>) {
+			const records: SsrHostedRecord[] = streams[key] ?? [];
+			for (let i = records.length - 1; i >= 0; i--) {
+				if (completeArmHostIds.has(records[i].hostNodeId))
+					(moved[key] as SsrHostedRecord[]).unshift(...records.splice(i, 1));
+			}
+		}
 		const movedKeyedRepeats: SsrKeyedRepeatRecord[] = [];
 		for (let i = (streams.keyedRepeats ?? []).length - 1; i >= 0; i--) {
 			if (completeArmHostIds.has(streams.keyedRepeats[i].parentHostNodeId))
@@ -1556,6 +1557,7 @@ export function marklessSsrAppendChildView(context: {
 			collectionGraphNodeId: mapped.graphNodeId,
 			collectionPath: mapped.path,
 			...(repeat.rowTemplate ? { rowTemplate: mapped.rowTemplate } : {}),
+			...(mapped.propRoutes ? { propRoutes: mapped.propRoutes } : {}),
 			rowEvents,
 		});
 	}
@@ -1830,6 +1832,7 @@ export function marklessSsrPrefixBoundaryArmRecords(set: SsrArmRecordSet, child:
 							collectionGraphNodeId: mapped.graphNodeId,
 							collectionPath: mapped.path,
 							...(repeat.rowTemplate ? { rowTemplate: mapped.rowTemplate } : {}),
+							...(mapped.propRoutes ? { propRoutes: mapped.propRoutes } : {}),
 							rowEvents: repeat.rowEvents.map((event) => ({
 								...event,
 								symbolIds: event.symbolIds.map((symbolId) =>

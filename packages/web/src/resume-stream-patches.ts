@@ -15,10 +15,12 @@ import type { ResumeDomOwnerDocument } from './resume-types.ts';
 // A template still present in the document is a commit the reveal train has
 // QUEUED but not flushed: its boundary still shows @pending, so neither its
 // records nor its snapshot may be adopted — the runtime re-demands the
-// computed and owns the boundary (the queued commit no-ops at flush).
+// computed and owns the boundary (the queued commit no-ops at flush). Wakes
+// that find no patch scripts set `__mAdopted` themselves, at that check.
 
 type StreamPatchDocumentRoot = {
 	readonly ownerDocument?: ResumeDomOwnerDocument;
+	__mAdopted?: boolean;
 };
 
 type StreamedStateDelta = Pick<ProtocolStatePayload, 'cells' | 'computed'>;
@@ -27,6 +29,8 @@ export function adoptStreamedArmPatches(
 	decoded: DecodedPayloadScripts,
 	root: StreamPatchDocumentRoot,
 ): DecodedPayloadScripts {
+	// From here the stream executor leaves every later commit to the runtime.
+	root.__mAdopted = true;
 	const query = root.ownerDocument?.querySelectorAll?.bind(root.ownerDocument);
 	if (!query) return decoded;
 	const scripts = [

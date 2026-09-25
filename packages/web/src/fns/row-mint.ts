@@ -20,7 +20,7 @@ import type { ResumeDomElement, ResumeDomNode, ResumeKeyedRepeatRecord } from '.
  * imports are types, which erase.
  */
 
-/** The read half of the live graph: a row's outside reads, taken once at mint. */
+/** The read half of the live graph, for a row's outside reads. */
 export type RowMintGraph = Pick<RuntimeGraph, 'read'>;
 
 /**
@@ -119,9 +119,15 @@ export function mintRowNodes(
 	const valueAt = (at: number, slot: ProtocolRowTemplateSlotValue) =>
 		values ? values[at] : slotValue(slot, item, graph);
 	for (const [at, slot] of attributeSlots.entries()) {
-		const value = marklessAttributeValue(slot.name, valueAt(slots.length + at, slot));
-		if (value === null) hosts[at]!.removeAttribute?.(slot.name);
-		else hosts[at]!.setAttribute!(slot.name, value);
+		const value = marklessAttributeValue(slot.name, valueAt(slots.length + at, slot)),
+			rest = hosts[at]!.getAttribute?.(slot.name);
+		// An always-present attribute is already in the html, a scoped class with its scope class.
+		if (rest == null && value === null) hosts[at]!.removeAttribute?.(slot.name);
+		else
+			hosts[at]!.setAttribute!(
+				slot.name,
+				rest?.endsWith(' ') ? rest + (value ?? '') : (value ?? '') + (rest ?? ''),
+			);
 	}
 	for (const [at, slot] of slots.entries())
 		anchors[at]!.replaceWith!(host.createTextNode(String(valueAt(at, slot) ?? '')));
@@ -173,13 +179,7 @@ function focusAt(row: ResumeDomElement, path: ReadonlyArray<number>): boolean {
 	return (node as { readonly focus?: () => void } | undefined)?.focus !== undefined;
 }
 
-/**
- * One slot's value: off the item, or off the page's graph, read ONCE here.
- *
- * A served row's outside read does not refresh - a row host carries no
- * per-instance locator, so the repeat ships no `domUpdates` for it - so a minted
- * row that kept itself current would disagree with the rows beside it.
- */
+// A slot value when the repeat runtime handed none; a write to what it reads rebuilds the row.
 function slotValue(
 	slot: ProtocolRowTemplateSlotValue,
 	item: unknown,
@@ -213,6 +213,7 @@ type MintingDocument = NonNullable<ResumeDomElement['ownerDocument']> & {
 };
 type ReplaceableNode = ResumeDomNode & { readonly replaceWith?: (node: ResumeDomNode) => void };
 type AttributableNode = ResumeDomNode & {
+	readonly getAttribute?: (name: string) => string | null;
 	readonly setAttribute?: (name: string, value: string) => void;
 	readonly removeAttribute?: (name: string) => void;
 };

@@ -19,6 +19,7 @@ import {
 	moduleIsEntry,
 	resolveImportedModuleInterfaces,
 } from '../link-driver.ts';
+import { isReExportOnlySource } from '../build/undemanded-runtime.ts';
 import { yieldToEventLoop } from '../event-loop.ts';
 import { MARKLESS_VIRTUAL_PREFIX, transformTsrxModule } from '../transform.ts';
 import type {
@@ -156,7 +157,7 @@ function transformNonTsrxModule(
 		pluginContext.getModuleInfo(id)?.isEntry === true
 	) {
 		return {
-			code: `${code}\nglobalThis.__mxLoadLog ||= () => import(${JSON.stringify(MARKLESS_EXECUTION_LOG_MODULE_ID)});\nglobalThis.__mxLoadLog().then(log => log.logMarklessRenderSummary());`,
+			code: `${code}\nglobalThis.__mxLoadLog ||= () => import(${JSON.stringify(MARKLESS_EXECUTION_LOG_MODULE_ID)});\nif (globalThis.__mxLog) globalThis.__mxLoadLog().then(log => log.logMarklessRenderSummary());`,
 			map: null,
 		};
 	}
@@ -166,7 +167,8 @@ function transformNonTsrxModule(
 	if (
 		currentEnvironment === 'client' &&
 		normalizeExecutionLogMode(internalOptions.executionLog) !== 'never' &&
-		isMarklessRuntimeModule(id)
+		isMarklessRuntimeModule(id) &&
+		!isReExportOnlySource(code)
 	) {
 		executionLogEstimatedSizes.set(executionLogRuntimeModuleId(id), code.length);
 		executionLogEmittedIds.set(executionLogRuntimeModuleId(id), pathname(id));

@@ -5,6 +5,12 @@ import { brotliCompressSync, constants as zlibConstants, gzipSync } from 'node:z
 
 import { build } from 'vite';
 
+import { BYTE_CATEGORY } from '../../packages/bundler/src/build/byte-attribution.ts';
+import {
+	MARKLESS_BUILD_PREFIX,
+	MARKLESS_BUNDLE_GRAPH,
+	MARKLESS_BYTE_ATTRIBUTION,
+} from '../../packages/bundler/src/build/chunking.ts';
 import { createFailedResult } from '../benchmarks/lib/results.mjs';
 
 const benchmarkRoot = path.dirname(fileURLToPath(import.meta.url));
@@ -14,11 +20,11 @@ const jsfbRoot = path.join(
 	'demos/js-framework-benchmark/frameworks/keyed/markless',
 );
 const byteFields = ['raw', 'gzip', 'brotli'];
+const frameworkCategories = new Set([BYTE_CATEGORY.runtime, BYTE_CATEGORY.glue]);
 export const bundleSizeDefinitions = [
 	{
 		name: 'js-framework-benchmark',
 		root: jsfbRoot,
-		appRoot: path.join(jsfbRoot, 'src'),
 		configFile: path.join(jsfbRoot, 'vite.config.ts'),
 	},
 	{ name: 'todomvc', root: path.resolve(benchmarkRoot, '../todomvc/fixture') },
@@ -36,7 +42,12 @@ export async function runBundleSize({ protocol, environment }) {
 	} catch (error) {
 		const failure = error instanceof Error ? error.message : String(error);
 		return {
-			result: createFailedResult({ benchmark: 'bundle-size', protocol, environment, failure }),
+			result: createFailedResult({
+				benchmark: 'bundle-size',
+				protocol,
+				environment,
+				failure,
+			}),
 			exitCode: 1,
 		};
 	}
@@ -75,15 +86,12 @@ export function validateBundleSizeResult(result) {
 
 async function buildAndMeasure(definition) {
 	const outputDirectory = path.join(benchmarkRoot, 'dist', definition.name);
-	const appRoot = definition.appRoot ?? definition.root;
-	const chunkModules = new Map();
-	const provenancePlugin = {
-		name: `markless-bundle-size-provenance-${definition.name}`,
-		generateBundle(_options, bundle) {
-			for (const [fileName, output] of Object.entries(bundle)) {
-				if (output.type === 'chunk')
-					chunkModules.set(fileName, Object.keys(output.modules).sort());
-			}
+	const chunkFiles = [];
+	const writtenNamesPlugin = {
+		name: `markless-bundle-size-written-names-${definition.name}`,
+		writeBundle(_options, bundle) {
+			for (const [fileName, output] of Object.entries(bundle))
+				if (output.type === 'chunk') chunkFiles.push(fileName);
 		},
 	};
 	const previousRepositoryRoot = process.env.MARKLESS_REPO_ROOT;
@@ -94,7 +102,7 @@ async function buildAndMeasure(definition) {
 			configFile: definition.configFile ?? path.join(definition.root, 'vite.config.mjs'),
 			mode: 'production',
 			logLevel: 'warn',
-			plugins: [provenancePlugin],
+			plugins: [writtenNamesPlugin],
 			build: {
 				outDir: outputDirectory,
 				emptyOutDir: true,
@@ -112,39 +120,64 @@ async function buildAndMeasure(definition) {
 		else process.env.MARKLESS_REPO_ROOT = previousRepositoryRoot;
 	}
 
-	const graphPath = path.join(outputDirectory, 'build', 'bundle-graph.json');
-	const graph = JSON.parse(fs.readFileSync(graphPath, 'utf8'));
+	const graph = readBuildJson(outputDirectory, MARKLESS_BUNDLE_GRAPH);
 	if (!Array.isArray(graph) || graph.length === 0) {
 		throw new TypeError(`${definition.name} build emitted an empty bundle-graph.json`);
 	}
+	const attribution = readBuildJson(outputDirectory, MARKLESS_BYTE_ATTRIBUTION);
 
 	const buckets = { application: zeroBytes(), framework: zeroBytes() };
 	const files = [];
-	for (const [fileName, moduleIds] of [...chunkModules].sort(([left], [right]) =>
-		left.localeCompare(right),
-	)) {
+	for (const fileName of chunkFiles.sort()) {
 		if (!/\.(?:m?js)$/.test(fileName)) continue;
-		const appModules = moduleIds.filter((id) => isApplicationModule(id, appRoot));
-		const frameworkModules = moduleIds.filter(isFrameworkModule);
-		if (appModules.length > 0 && frameworkModules.length > 0) {
-			throw new TypeError(
-				`${definition.name} chunk ${fileName} mixes application and framework provenance: ${moduleIds.join(', ')}`,
-			);
-		}
-		const bucket = appModules.length > 0 ? 'application' : 'framework';
+		const chunk = attribution.chunks?.[withoutBuildPrefix(fileName)];
+		if (!chunk)
+			throw new TypeError(`${definition.name} chunk ${fileName} has no byte attribution`);
 		const measured = measureBuffer(fs.readFileSync(path.join(outputDirectory, fileName)));
-		addBytes(buckets[bucket], measured);
+		const split = splitChunkBytes(measured, chunk.modules);
+		addBytes(buckets.application, split.application);
+		addBytes(buckets.framework, split.framework);
 		files.push({
 			file: fileName,
-			bucket,
-			modules: moduleIds.map(normalizeModuleId),
 			...measured,
+			...split,
+			modules: chunk.modules.map(([category, key, bytes]) => ({ category, key, bytes })),
 		});
 	}
 	const total = zeroBytes();
 	addBytes(total, buckets.application);
 	addBytes(total, buckets.framework);
 	return sizeCase(definition.name, { total, ...buckets }, files);
+}
+
+function readBuildJson(outputDirectory, fileName) {
+	return JSON.parse(fs.readFileSync(path.join(outputDirectory, fileName), 'utf8'));
+}
+
+function withoutBuildPrefix(fileName) {
+	return fileName.startsWith(MARKLESS_BUILD_PREFIX)
+		? fileName.slice(MARKLESS_BUILD_PREFIX.length)
+		: fileName;
+}
+
+// Packing mixes app and framework modules in one chunk, so each chunk's shipped bytes are split by its attributed rendered bytes.
+export function splitChunkBytes(measured, modules) {
+	let frameworkWeight = 0;
+	let totalWeight = 0;
+	for (const [category, , bytes] of modules) {
+		totalWeight += bytes;
+		if (frameworkCategories.has(category)) frameworkWeight += bytes;
+	}
+	const framework = zeroBytes();
+	const application = zeroBytes();
+	for (const field of byteFields) {
+		framework[field] =
+			totalWeight === 0
+				? measured[field]
+				: Math.round((measured[field] * frameworkWeight) / totalWeight);
+		application[field] = measured[field] - framework[field];
+	}
+	return { application, framework };
 }
 
 export function createBundleSizeCodeSplitting() {
@@ -154,19 +187,6 @@ export function createBundleSizeCodeSplitting() {
 	};
 }
 
-function isApplicationModule(id, appRoot) {
-	let clean = id;
-	while (clean.startsWith('\0')) clean = clean.slice(1);
-	clean = clean.split('?')[0];
-	const relative = path.relative(appRoot, clean);
-	return (
-		relative !== '' &&
-		!relative.startsWith('..') &&
-		!path.isAbsolute(relative) &&
-		/\.(?:ts|tsrx)$/.test(clean)
-	);
-}
-
 function isFrameworkModule(id) {
 	const clean = id.split('?')[0];
 	return (
@@ -174,14 +194,6 @@ function isFrameworkModule(id) {
 		clean.includes(`${path.sep}node_modules${path.sep}`) ||
 		clean.includes(`${path.sep}packages${path.sep}`)
 	);
-}
-
-function normalizeModuleId(id) {
-	return id
-		.replaceAll(encodeURIComponent(repositoryRoot), '<repo>')
-		.replaceAll(repositoryRoot, '<repo>')
-		.split(path.sep)
-		.join('/');
 }
 
 function measureBuffer(buffer) {
@@ -207,7 +219,11 @@ function sizeCase(name, bytes, files) {
 		name,
 		gates: {
 			passed: true,
-			checks: ['bundle graph present', 'application and framework buckets non-empty'],
+			checks: [
+				'bundle graph present',
+				'every chunk has byte attribution',
+				'application and framework buckets non-empty',
+			],
 		},
 		bodyBytes: bytes.total.raw,
 		timing: deterministicTiming(),

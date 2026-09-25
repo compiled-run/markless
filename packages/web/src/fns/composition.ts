@@ -54,7 +54,9 @@ export type ComposeKeyedRepeat = {
 export type ComposeMappedKeyedRepeat = ComposeGraphRead & {
 	readonly rowTemplate?: ComposeRowTemplate;
 	readonly instancePath?: string;
+	readonly propRoutes?: ReadonlyArray<ComposePropRoute>;
 };
+export type ComposePropRoute = ComposeGraphRead & { readonly name: string };
 export type ComposeStateNode = {
 	readonly graphNodeId: string;
 	readonly directValue?: unknown;
@@ -895,17 +897,32 @@ export function marklessCsrRemapChildKeyedRepeat(
 		: mapped;
 	// A row's outside read is a graph node id like the collection's, so it takes
 	// the same qualification or the mint reads a node the live graph never holds.
-	return repeat.rowTemplate
-		? {
-				...withPath,
-				rowTemplate: composedRowTemplate(
-					repeat.rowTemplate,
-					graphProps,
-					hostPrefix + repeat.id,
-					instancePath,
-				),
-			}
-		: withPath;
+	if (!repeat.rowTemplate) return withPath;
+	// The row reader reads a prop under the child's own id, so each routed one names
+	// the parent node it follows; a deeper level's routes follow this level onward.
+	const routes = new Map<string, ComposeGraphRead>();
+	const inner = repeat.propRoutes as ReadonlyArray<ComposePropRoute> | undefined;
+	const rowTemplate = composedRowTemplate(
+		repeat.rowTemplate,
+		graphProps,
+		hostPrefix + repeat.id,
+		instancePath,
+		inner ? undefined : routes,
+	);
+	for (const route of inner ?? []) {
+		const mapped = marklessCsrRemapChildGraph(route, graphProps, instancePath);
+		if (mapped && !routes.has(route.name)) routes.set(route.name, mapped);
+	}
+	const propRoutes = [...routes].map(([name, read]) => ({
+		name,
+		graphNodeId: read.graphNodeId,
+		path: read.path,
+	}));
+	return {
+		...withPath,
+		rowTemplate,
+		...(rowTemplate && propRoutes.length > 0 && { propRoutes }),
+	};
 }
 
 // One unqualifiable slot drops the WHOLE template: a slot cannot be dropped
@@ -916,22 +933,28 @@ function composedRowTemplate(
 	graphProps: ComposeGraphProps,
 	repeatId: string,
 	instancePath: string,
+	routes?: Map<string, ComposeGraphRead>,
 ): ComposeRowTemplate | undefined {
 	let dropped = '';
 	const remap = <S extends RowTemplateSlot>(slot: S): S => {
 		if ('source' in slot) {
 			if (!slot.reads) return slot;
-			const reads = slot.reads.map((read) =>
-				marklessCsrRemapChildGraph(read, graphProps, instancePath),
-			);
-			if (reads.every((read) => read !== null))
-				return {
-					...slot,
-					reads: reads.map((read) => ({
-						graphNodeId: read.graphNodeId,
-						path: read.path,
-					})),
-				};
+			const reads = slot.reads.flatMap((read) => {
+				const mapped = marklessCsrRemapChildGraph(read, graphProps, instancePath);
+				const name = marklessCompositionPropName(read.graphNodeId, read.path);
+				if (mapped && name != null && !routes?.has(name)) routes?.set(name, mapped);
+				// An unpassed or constant prop never moves, so the reader's served value stands.
+				const prop =
+					mapped || (graphProps ?? []).find((candidate) => candidate.name === name);
+				return mapped
+					? [{ graphNodeId: mapped.graphNodeId, path: mapped.path }]
+					: !prop ||
+						  prop.kind === 'serializable' ||
+						  prop.kind === 'compiler-known-constant'
+						? []
+						: [null];
+			});
+			if (reads.every((read) => read !== null)) return { ...slot, reads };
 			dropped ||= 'name' in slot ? slot.name : 'its text';
 			return slot;
 		}

@@ -2048,6 +2048,29 @@ test('CSR external delegation no-ops on its recorded element and lets record-fre
 	}
 });
 
+test('a held CSR swap of a page without async boundaries settles without demanding the graph', async () => {
+	const root = element('MAIN');
+	const container = await renderCsrRuntime({
+		output: {
+			root,
+			state: createProtocolStatePayload({ cells: [] }),
+			view: staticView(),
+			loadSymbol() {
+				throw new Error('settling a boundary-free page must not load a symbol');
+			},
+		},
+		options: {},
+	} as never);
+	const runtime = container.runtime as {
+		readonly whenAsyncBoundariesSettled: () => Promise<void>;
+		readonly holdPendingSettleCommits: (ms: number) => Promise<void>;
+	};
+
+	await expect(runtime.whenAsyncBoundariesSettled()).resolves.toBeUndefined();
+	await expect(runtime.holdPendingSettleCommits(100)).resolves.toBeUndefined();
+	expect(() => container.graph).toThrow('MARKLESS_CSR_GRAPH_NOT_DEMANDED');
+});
+
 test('CSR delegated triggers report a record whose action kind names no route', async () => {
 	const link = element('A');
 	const root = element('MAIN', [link]);

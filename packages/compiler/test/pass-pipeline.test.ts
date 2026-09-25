@@ -108,6 +108,7 @@ test('default compiler passes declare stable artifact boundaries', () => {
 					'captureAnalysis',
 					'renderData',
 					'publicRenderPlan',
+					'protocolView',
 				],
 				produces: ['symbolModules'],
 			}),

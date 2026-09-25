@@ -3,6 +3,10 @@ import {
 	marklessIslandSpacedSymbol,
 } from '../../../../web/src/fns/instance-scope.ts';
 import { marklessThen } from '../../../../web/src/ssr-data/awaitable.ts';
+import {
+	type StructureToken,
+	withProjectionSpan,
+} from '../../../../web/src/ssr-data/renderer.ts';
 import { marklessSsrRosterPositionContext } from '../../../../web/src/fns/roster-position.ts';
 import { marklessSsrIslandRosterAnswered } from '../../../../web/src/prerender/island-roster.ts';
 import {
@@ -42,6 +46,8 @@ export type MdxChild = {
 	readonly componentIndex: number;
 	readonly hostPrefix: string;
 	readonly symbolPrefix: string;
+	// The tags of the elements in the markdown written between the component's tags, in document order.
+	readonly childrenElementTags?: ReadonlyArray<string>;
 	readonly output?: MdxRenderOutput;
 };
 
@@ -299,7 +305,7 @@ export async function renderMdxChild(
 	// counts here: this render is the only place the island's handles are still
 	// spelled the way the counts it minted name them.
 	const renderContext = marklessSsrRosterPositionContext(undefined);
-	const rendered = await component.renderSsr?.(props, renderContext);
+	const rendered = await renderWithMdxChildren(component, props, child, renderContext);
 	const output =
 		rendered && typeof rendered.html === 'string'
 			? await marklessSsrIslandRosterAnswered(
@@ -309,6 +315,29 @@ export async function renderMdxChild(
 			: rendered;
 	if (output) children.push({ ...child, output });
 	return output?.html ?? '';
+}
+
+// Markdown children travel as a projection, so the island counts their elements where its `{children}` lands.
+async function renderWithMdxChildren(
+	component: MdxComponentArtifact,
+	props: unknown,
+	child: Omit<MdxChild, 'output'>,
+	renderContext: unknown,
+): Promise<MdxRenderOutput | undefined> {
+	const tags = child.childrenElementTags;
+	const childrenHtml = (props as { readonly children?: unknown } | null)?.children;
+	if (!tags?.length || typeof childrenHtml !== 'string') {
+		return component.renderSsr?.(props, renderContext);
+	}
+	const tokens: StructureToken[] = tags.map((tagName, index) => ({
+		kind: 'element',
+		hostNodeId: `__mdx:children:${index}`,
+		tagName,
+	}));
+	const { result } = await withProjectionSpan(tokens, (mark) =>
+		component.renderSsr?.({ ...(props as object), children: mark + childrenHtml }, renderContext),
+	);
+	return result;
 }
 
 export function composeMdxState(children: readonly MdxChild[]): MdxStatePayload | undefined {

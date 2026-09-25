@@ -174,7 +174,7 @@ function runtimeModule(): Promise<RuntimeModule> {
 }
 
 async function deserializeGraphValue(payload: SerializedGraphPayload): Promise<unknown> {
-	valueDecoderPromise ??= import('../../serializer/src/value-decode-client.ts');
+	valueDecoderPromise ??= import('../../serializer/src/value-decode-client-lazy.ts');
 	const { deserializeGraphValueForClient } = await valueDecoderPromise;
 	return deserializeGraphValueForClient(payload);
 }

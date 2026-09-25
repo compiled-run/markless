@@ -226,6 +226,40 @@ describe('generated symbol facade cleanup', () => {
 		);
 	});
 
+	test('renames whole identifier tokens only, for init names with and without the generated prefix', () => {
+		// Same length as the prefix and ending in $1, so it reads as a generated init export.
+		const lookalike = 'init_anatomy_2b383bb946b90e01$1';
+		const tokens = `${lookalike},x${lookalike},${lookalike}2,"${lookalike}",$${lookalike},_${lookalike}`;
+		const bundle = {
+			'build/shared.js': {
+				type: 'chunk',
+				fileName: 'build/shared.js',
+				code: `function l(){}export{l as ${lookalike}};`,
+				exports: [lookalike],
+				imports: [],
+				dynamicImports: [],
+				moduleIds: ['\0virtual:markless:symbol:%2Fworkspace%2Fsrc%2Froot.tsrx:symbol%3A0'],
+			},
+			'build/runtime.js': {
+				type: 'chunk',
+				fileName: 'build/runtime.js',
+				code: `import{${lookalike} as a}from"./shared.js";const t=[${tokens}];`,
+				exports: [],
+				imports: ['build/shared.js'],
+				dynamicImports: [],
+				moduleIds: ['\0virtual:markless:resolver:%2Fworkspace%2Fsrc%2Froot.tsrx'],
+			},
+		};
+
+		rewriteGeneratedSymbolInitExports(bundle);
+
+		const renamed = 'init__virtual_markless_symbol$1';
+		expect(bundle['build/shared.js'].code).toBe(`function l(){}export{l as ${renamed}};`);
+		expect(bundle['build/runtime.js'].code).toBe(
+			`import{${renamed} as a}from"./shared.js";const t=[${renamed},x${lookalike},${lookalike}2,"${renamed}",$${lookalike},_${lookalike}];`,
+		);
+	});
+
 	test('keeps init export names when chunks sharing a generated name would shorten it differently', () => {
 		const first = 'init__virtual_markless_symbol__2Fworkspace_2Fsrc_2Ffirst_2Etsrx$1';
 		const second = 'init__virtual_markless_symbol__2Fworkspace_2Fsrc_2Fsecond_2Etsrx$1';

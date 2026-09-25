@@ -255,7 +255,15 @@ export function createRuntimeDemandMap(
 			scalarRows,
 			closurePlans,
 		),
+		armActions: armActionDemandRecords(scope, dispatchCore),
 		capabilityModuleIds: capabilityModuleIds(input.symbolResolver, input.protocolView),
+		...nestedRecordDemand(
+			input.protocolView,
+			closedSymbolDemand,
+			renderRuntimeModuleIds,
+			dispatchCore,
+			fullTier,
+		),
 		unknownRecordModuleIds: unique([
 			...dispatchCore,
 			...(classRouting.scalarEvents ? CLOSURE_DISPATCH_CORE : []),
@@ -374,6 +382,70 @@ function capabilityModuleIds(
 				symbol.kind === 'async-computed-runner' || symbol.kind === 'async-boundary-update',
 		);
 	return [...(behavior ? BEHAVIOR : []), ...(asyncBoundary ? ASYNC_BOUNDARY : [])];
+}
+
+// Records served inside arms and rows ride outside the flat payload streams. Every one the compiler
+// plans is enumerated here; an arm it does not plan (an escalating branch, a component-rooted row)
+// leaves the answer undefined, so consumers keep treating those records as unlisted.
+function nestedRecordDemand(
+	view: ProtocolViewPayload,
+	symbolDemand: ReadonlyMap<string, ReadonlyArray<string>>,
+	renderRuntimeModuleIds: ReadonlyArray<string>,
+	dispatchCore: ReadonlyArray<string>,
+	fullTier: ReadonlyArray<string>,
+): Pick<RuntimeDemandMapArtifact, 'nestedRecordModuleIds'> {
+	type Repeat = NonNullable<ProtocolViewPayload['keyedRepeats']>[number];
+	type Arm = ProtocolArmRecordSet | NonNullable<ProtocolArmBranchRecord['armRecords']>[number];
+	const nested = {
+		events: [] as object[],
+		domUpdates: [] as object[],
+		behaviors: [] as object[],
+		elementHandles: [] as object[],
+		keyedRepeats: [] as Repeat[],
+		branches: [] as ProtocolArmBranchRecord[],
+		asyncBoundaries: [],
+	};
+	let enumerable = true;
+	const hostNodeId = 'nested';
+	const visitRepeat = (repeat: Repeat) => {
+		if (repeat.rowComponent) enumerable = false;
+		for (const event of repeat.rowEvents) nested.events.push({ ...event, hostNodeId });
+		for (const handle of repeat.rowElementHandles ?? [])
+			nested.elementHandles.push({ ...handle, hostNodeId });
+	};
+	const visitArm = (arm: Arm) => {
+		for (const event of arm.events) nested.events.push({ ...event, hostNodeId });
+		nested.domUpdates.push(...(arm.domUpdates ?? []));
+		nested.behaviors.push(...arm.behaviors);
+		nested.elementHandles.push(...arm.elementHandles);
+		for (const repeat of ('keyedRepeats' in arm && arm.keyedRepeats) || []) {
+			nested.keyedRepeats.push(repeat);
+			visitRepeat(repeat);
+		}
+		for (const branch of ('branches' in arm && arm.branches) || []) {
+			nested.branches.push(branch);
+			for (const inner of branch.armRecords ?? []) visitArm(inner);
+		}
+	};
+	for (const repeat of view.keyedRepeats ?? []) visitRepeat(repeat);
+	for (const branch of view.branches ?? []) {
+		if (branch.escalates) enumerable = false;
+		for (const arm of branch.armRecords ?? []) visitArm(arm);
+		if (branch.servedArmRecords) visitArm(branch.servedArmRecords);
+	}
+	for (const boundary of view.asyncBoundaries ?? [])
+		for (const arm of [boundary.armRecords ?? []].flat()) visitArm(arm);
+	if (!enumerable) return {};
+	const records = payloadDemandRecords(
+		nested as unknown as ProtocolViewPayload,
+		symbolDemand,
+		renderRuntimeModuleIds,
+		{ scalarEventKeys: new Set(), closureEventKeys: new Set(), scalarRows: false },
+		dispatchCore,
+		fullTier,
+		[],
+	);
+	return { nestedRecordModuleIds: unique(records.flatMap((record) => record.runtimeModuleIds)) };
 }
 
 function recordKindPhases(input: {
@@ -559,7 +631,8 @@ function isScalarTextUpdateSymbol(
 	return (
 		target?.kind === 'text' &&
 		target.trueValue === undefined &&
-		target.falseValue === undefined
+		target.falseValue === undefined &&
+		target.textNode === undefined
 	);
 }
 
@@ -1001,6 +1074,83 @@ function actionDemandRecords(
 			}),
 		),
 	];
+}
+
+// An arm's events dispatch through the full resume runtime once its arm is adopted; a first use the
+// page's records cannot bound stays 'unknown'.
+function armActionDemandRecords(
+	scope: FirstUseScope,
+	dispatchCore: ReadonlyArray<string>,
+): RuntimeDemandMapAction[] {
+	type Arm =
+		| ProtocolArmRecordSet
+		| NonNullable<ProtocolArmBranchRecord['armRecords']>[number];
+	type Repeat = NonNullable<ProtocolViewPayload['keyedRepeats']>[number];
+	const { view, records, symbolDemand } = scope;
+	const actions: RuntimeDemandMapAction[] = [];
+	const action = (
+		containerId: string,
+		containerKind: RuntimeDemandMapRecordKind,
+		hostNodeId: string,
+		event: { readonly eventName: string; readonly symbolIds?: ReadonlyArray<string> },
+		recordKind: RuntimeDemandMapAction['recordKind'],
+	) => {
+		const symbolIds = event.symbolIds ?? [];
+		actions.push({
+			hostNodeId,
+			eventName: event.eventName,
+			recordKind,
+			recordKinds: unique([
+				recordKind === 'keyed-repeat-row' ? 'keyed-repeat' : recordKind,
+				containerKind,
+			]),
+			payloadRecordIds: [containerId],
+			runtimeModuleIds: unique([
+				...dispatchCore,
+				...recordModules(records, containerId),
+				...symbolIdsDemand(symbolIds, symbolDemand),
+			]),
+			firstUse: firstUseDemand(scope, symbolIds, [containerId]),
+		});
+	};
+	const visitRepeat = (containerId: string, kind: RuntimeDemandMapRecordKind, repeat: Repeat) => {
+		for (const event of repeat.rowEvents)
+			action(containerId, kind, repeat.parentHostNodeId, event, 'keyed-repeat-row');
+	};
+	const visitArm = (containerId: string, kind: RuntimeDemandMapRecordKind, arm: Arm) => {
+		for (const event of arm.events)
+			action(
+				containerId,
+				kind,
+				'hostNodeId' in event ? event.hostNodeId : `${containerId}/${event.hostPath.join('.')}`,
+				event,
+				protocolEventActionKind(event),
+			);
+		for (const repeat of ('keyedRepeats' in arm && arm.keyedRepeats) || [])
+			visitRepeat(containerId, kind, repeat);
+		for (const branch of ('branches' in arm && arm.branches) || [])
+			for (const inner of branch.armRecords ?? []) visitArm(containerId, kind, inner);
+	};
+	for (const branch of view.branches ?? []) {
+		for (const arm of branch.armRecords ?? []) visitArm(`branch:${branch.id}`, 'branch', arm);
+		if (branch.servedArmRecords)
+			visitArm(`branch:${branch.id}`, 'branch', branch.servedArmRecords);
+	}
+	for (const boundary of view.asyncBoundaries ?? [])
+		for (const arm of [boundary.armRecords ?? []].flat())
+			visitArm(`async-boundary:${boundary.id}`, 'async-boundary', arm);
+	const seen = new Set(
+		(view.events ?? []).map(
+			(event) =>
+				`${eventKey(event.hostNodeId, event.eventName)}\0${protocolEventActionKind(event)}`,
+		),
+	);
+	return actions.filter((entry) => {
+		const key = `${eventKey(entry.hostNodeId, entry.eventName)}\0${entry.recordKind}`;
+		if (seen.has(key)) return false;
+		seen.add(key);
+		return true;
+	});
 }
 
 function scalarActionPlan(

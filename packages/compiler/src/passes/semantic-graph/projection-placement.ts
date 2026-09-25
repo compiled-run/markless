@@ -139,8 +139,8 @@ function scopeOf(input: ChunkScopeInput): Scope {
 	};
 }
 
-// `{children}` is the one raw text slot the markup collector mints, and it does
-// so exactly when the expression names the `children` prop.
+// `{children}` is the one raw text slot the markup collector mints: a read of the
+// component's own `children` prop, whatever local name it is bound to.
 function projectionSites(
 	chunks: ReadonlyArray<SemanticMarkupChunk>,
 	componentName: string,

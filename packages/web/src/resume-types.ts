@@ -36,6 +36,8 @@ export type ResumeDomElement = ResumeDomNode & {
 	// Full and staged runtimes register records only; they never add a second
 	// listener authority while this marker is present.
 	__marklessDelegatedDispatch?: boolean;
+	// Set by the startup script: adds its own capture listener for an event type first registered after serve.
+	__marklessListen?: (eventType: string) => void;
 	__marklessDispatch?: (input: {
 		readonly root: ResumeDomElement;
 		readonly event: ResumeDomEvent;

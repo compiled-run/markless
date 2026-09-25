@@ -32,7 +32,7 @@ export default box(
 			deltaPayload.state.computed.length === 0 ||
 			deltaPayload.view.locators.length !== 0 ||
 			deltaPayload.view.events.length !== 0 ||
-			deltaPayload.view.domUpdates.length === 0 ||
+			shippedDomUpdates(deltaPayload.view) === 0 ||
 			deltaPayload.view.asyncBoundaries.length === 0
 		) {
 			throw new Error(
@@ -117,6 +117,21 @@ export default box(
 );
 
 type ContentPage = { content(): Promise<string> };
+
+// A dom update ships at top level or under the arm that hosts it; either way the page can apply it.
+function shippedDomUpdates(view: {
+	readonly domUpdates: ReadonlyArray<unknown>;
+	readonly asyncBoundaries: ReadonlyArray<unknown>;
+}): number {
+	return (
+		view.asyncBoundaries as ReadonlyArray<{
+			readonly armRecords?: { readonly domUpdates?: ReadonlyArray<unknown> };
+		}>
+	).reduce(
+		(total, boundary) => total + (boundary.armRecords?.domUpdates?.length ?? 0),
+		view.domUpdates.length,
+	);
+}
 
 function readResumePayload(html: string): {
 	readonly bytes: number;

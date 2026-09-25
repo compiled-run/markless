@@ -34,30 +34,15 @@
 			"prereleaseSummary": "Unreleased working tree; Nitro v3 beta",
 			"renderMode": "ssr",
 			"renderingNote": "SSR on every request through Nitro; the router plugin renders each page.",
-			"activation": "Resume: the browser continues the server's work instead of hydrating; components do not re-run in the browser. Built with experimentalNativePacking and intent link preloading.",
+			"activation": "Resume: the browser continues the server's work instead of hydrating; components do not re-run in the browser. Built with default packing and the router's automatic navigation.",
 			"delivery": "About 71.7 KB gzip JS over 6 scripts on / at scaffold time; one ~68 KB chunk is modulepreloaded on every page (BENCH.md, 'Client JS on /').",
 			"navigation": "client",
-			"navigationNote": "Client navigation through Link from @markless/router.",
+			"navigationNote": "Fragment navigation: a link click swaps in the destination's server-rendered region and resumes it; a resting pointer, press, focus or touch fetches it early, and pages with few links fetch at most two at idle.",
 			"vercelRuntime": "Node (Nitro vercel preset; BENCH.md records nodejs24.x chosen by the preset)",
 			"variants": [
 				{
 					"label": "default",
-					"note": "experimentalNativePacking + linkPreloading: intent, same as the docs site."
-				},
-				{
-					"label": "viewport",
-					"note": "Same app with viewport link preloading: after the page settles, on-screen links download (never run) their destination files at low priority. Source apps/markless-viewport, runner target markless-viewport.",
-					"source": "demos/interaction-benchmark/apps/markless-viewport",
-					"benchMd": "demos/interaction-benchmark/apps/markless-viewport/BENCH.md",
-					"runnerTarget": "markless-viewport",
-					"tunings": [
-						{
-							"setting": "router({ linkPreloading: \"viewport\" }) (vite.config.ts)",
-							"default": "\"intent\" (destination files download on hover, focus or pointerdown)",
-							"why": "Navigation files for links on screen are already downloaded when the user clicks, so a client navigation needs no network round. Starts only after the page's own modulepreloads finished (after load or the first input) and the browser is idle; two downloads at a time, fetchpriority low, paused by each new input; skipped for Save-Data and 2g.",
-							"source": "packages/router/src/vite/link-intent.ts (startViewportPrefetch); LinkNavigationProps.prefetch in @markless/router"
-						}
-					]
+					"note": "Default packing + the router's automatic navigation, same as the docs site."
 				}
 			],
 			"deviations": [

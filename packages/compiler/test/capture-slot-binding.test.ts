@@ -10,7 +10,7 @@ import {
 import type { PublicRenderModuleInput } from '../src/artifacts.ts';
 import { createCompilerKnownConstantCaptureRoute } from '../src/passes/capture-analysis.ts';
 import { callbackSymbolIds } from '../src/passes/public-render/shared.ts';
-import { planBoundSymbolResolver } from '../src/passes/symbol-resolver.ts';
+import { boundSymbolIdPrefix, planBoundSymbolResolver } from '../src/passes/symbol-resolver.ts';
 
 async function compileCaptureArtifacts(source: string) {
 	const semanticGraph = await buildSemanticGraph({
@@ -778,8 +778,11 @@ export function App() @{
 		['component-edge:1', 'component-edge:0'],
 		['component-edge:2', 'component-edge:0'],
 	]);
-	expect(symbols.get(`bound:component-edge:1:${handler?.symbolId}`)).toBe(rows[0]?.id);
-	expect(symbols.get(`bound:component-edge:2:${handler?.symbolId}`)).toBe(rows[1]?.id);
+	// The outer edges compose Relay, whose own ids the bare handler id would shadow.
+	const rebindKey = boundSymbolIdPrefix(handler!.symbolId);
+	expect(symbols.get(`bound:component-edge:1:${rebindKey}`)).toBe(rows[0]?.id);
+	expect(symbols.get(`bound:component-edge:2:${rebindKey}`)).toBe(rows[1]?.id);
+	expect(symbols.has(`bound:component-edge:1:${handler?.symbolId}`)).toBe(false);
 });
 
 test('an unroutable forwarded prop chain stays fail-closed', async () => {

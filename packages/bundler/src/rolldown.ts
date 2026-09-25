@@ -1,15 +1,23 @@
 import type { InputOptions, Plugin } from 'rolldown';
 import { computeExecutionAttribution, type LinkedModuleChildResolution } from '@markless/compiler';
 import { clearParsedChunkCode } from './build/chunk-ast.ts';
+import { moveImportMapOutOfClientOutput } from './build/build-manifests.ts';
 import { outputDefaults } from './build/chunking.ts';
 import { nativePackingPlugins } from './build/native-packing.ts';
+import {
+	chunkImportMapEnabled,
+	DEPRECATED_NATIVE_PACKING_WARNING,
+	nativePackingEnabled,
+} from './packing-option.ts';
 import { createMarklessDevGraph } from './dev.ts';
 import {
 	invalidateAllGeneratedModules,
 	invalidateEditedGeneratedModules,
 } from './dev-invalidation.ts';
 import { generateBundleHook } from './hooks/generate-bundle.ts';
+import { machinePathLeaks, machinePathRoots } from './build/machine-paths.ts';
 import {
+	MARKLESS_IMPORT_MAP_ASSET,
 	staleChunkNamesMessage,
 	staleContentHashNames,
 	unmappedChunkSpecifiers,
@@ -93,18 +101,9 @@ export function createMarklessRolldownPlugin(input: {
 	}
 	const [packing, facades] =
 		environment === 'client' &&
-		internalOptions.experimentalNativePacking &&
+		nativePackingEnabled(internalOptions) &&
 		!internalOptions.dev
-			? nativePackingPlugins(
-					() => getRoot() ?? '',
-					runtimeDemandMaps,
-					internalOptions.experimentalPackPlanner
-						? {
-								mode: internalOptions.experimentalPackPlanner,
-								demandSources: runtimeDemandSources,
-							}
-						: undefined,
-				)
+			? nativePackingPlugins(() => getRoot() ?? '', runtimeDemandMaps, runtimeDemandSources)
 			: [];
 
 	function* runtimeDemandMaps() {
@@ -160,8 +159,10 @@ export function createMarklessRolldownPlugin(input: {
 			},
 			runtimeDemandMaps,
 			runtimeDemandSources,
-			chunkImportMap: () =>
-				internalOptions.experimentalNativePacking === true && !internalOptions.dev,
+			chunkImportMap: () => chunkImportMapEnabled(internalOptions),
+			enableChunkImportMap: () => {
+				internalOptions.chunkImportMap = true;
+			},
 		},
 		name,
 		options(input: InputOptions) {
@@ -178,6 +179,8 @@ export function createMarklessRolldownPlugin(input: {
 			};
 		},
 		async buildStart(input) {
+			if (internalOptions.experimentalNativePacking !== undefined)
+				this.warn(DEPRECATED_NATIVE_PACKING_WARNING);
 			if (!root) {
 				root = internalOptions.rootDir ?? input.cwd;
 			}
@@ -222,6 +225,12 @@ export function createMarklessRolldownPlugin(input: {
 		},
 		async writeBundle(output, bundle) {
 			if (getEnvironment(this) !== 'client') return;
+			const root = getRoot();
+			const leaks = root ? machinePathLeaks(bundle, machinePathRoots(root)) : [];
+			if (leaks.length > 0)
+				this.error(
+					`Markless client output spells this machine's checkout path, so it would differ between machines: ${leaks.join(', ')}. Every id written into client output must be root-relative (moduleIdFor / rootRelativeId).`,
+				);
 			const stale = await staleContentHashNames(bundle, {
 				hashCharacters: output.hashCharacters,
 			});
@@ -231,6 +240,8 @@ export function createMarklessRolldownPlugin(input: {
 				this.error(
 					`Markless emitted chunks that import specifiers its import map does not resolve to an emitted chunk: ${unmapped.join(', ')}. A plugin changed chunk code or file names after the Markless finalize pass. markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package`,
 				);
+			if (output.dir)
+				await moveImportMapOutOfClientOutput(output.dir, MARKLESS_IMPORT_MAP_ASSET in bundle);
 		},
 	} satisfies Plugin & { api: MarklessRolldownPluginApi };
 
@@ -254,6 +265,7 @@ export {
 export { createBuildMetadata } from './build/build-metadata.ts';
 export { convertManifestToBundleGraph, createPreloadGraphAdder } from './build/bundle-graph.ts';
 export { collectHeadLinkInjections } from './build/head-links.ts';
+export { marklessBuildManifestDir, marklessImportMapPath } from './build/build-manifests.ts';
 export {
 	MARKLESS_CHUNK_SPECIFIER_PREFIX,
 	MARKLESS_IMPORT_MAP_ASSET,

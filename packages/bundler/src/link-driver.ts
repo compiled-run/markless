@@ -51,6 +51,7 @@ import type {
 	MarklessModuleLinkArtifact,
 	MarklessRolldownOptions,
 	MarklessTransformManifest,
+	TransformTsrxModuleResult,
 } from './types.ts';
 import { TSRX_SOURCE_FILE, isRelativeImport, pathname } from './virtual-ids.ts';
 
@@ -653,6 +654,20 @@ function buildDelegateSpecifierResolve(context: LinkResolveContext): DelegateSpe
 // loads the dependency's module, and calls its `renderSsr`. It is the one place
 // a linker executes code the compiler did not produce, which is exactly why it
 // lives here and not in the pass.
+export function moduleLinkArtifact(
+	result: Pick<
+		TransformTsrxModuleResult,
+		'interfaceHash' | 'moduleGraphInterface' | 'moduleImports' | 'artifactChildren'
+	>,
+): MarklessModuleLinkArtifact {
+	return {
+		interfaceHash: result.interfaceHash,
+		moduleGraphInterface: result.moduleGraphInterface,
+		moduleImports: result.moduleImports,
+		delegateChildren: delegateChildResolutionRequests(result.artifactChildren).length > 0,
+	};
+}
+
 export async function materializeDelegateChildren(
 	context: LinkResolveContext,
 	parent: string,

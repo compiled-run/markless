@@ -1,0 +1,410 @@
+{
+ "markless": {
+  "base2": {
+   "routes": {
+    "/": {
+     "all": {
+      "files": 11,
+      "gz": 71831,
+      "br": 61462
+     },
+     "redl": {
+      "files": 0,
+      "gz": 0,
+      "br": 0
+     }
+    },
+    "/records": {
+     "all": {
+      "files": 11,
+      "gz": 71831,
+      "br": 61462
+     },
+     "redl": {
+      "files": 0,
+      "gz": 0,
+      "br": 0
+     }
+    },
+    "/settings": {
+     "all": {
+      "files": 11,
+      "gz": 71831,
+      "br": 61462
+     },
+     "redl": {
+      "files": 0,
+      "gz": 0,
+      "br": 0
+     }
+    }
+   },
+   "sameUrlChanged": [],
+   "revalidatingAtLoad": 0,
+   "skew": {
+    "lazyNeeded": 0,
+    "lazyMissing": 0,
+    "lazyMismatched": 0,
+    "anyOldMissing": 0,
+    "oldFiles": 11
+   },
+   "build": {
+    "assetFiles": 27,
+    "changedAssets": 0,
+    "changedAssetsGz": 0,
+    "sameNameChanged": [],
+    "removedAssets": 0,
+    "anyFileChanged": 0
+   },
+   "errors": []
+  },
+  "e1": {
+   "routes": {
+    "/": {
+     "all": {
+      "files": 11,
+      "gz": 71834,
+      "br": 61451
+     },
+     "redl": {
+      "files": 1,
+      "gz": 8654,
+      "br": 7144
+     }
+    },
+    "/records": {
+     "all": {
+      "files": 11,
+      "gz": 71834,
+      "br": 61451
+     },
+     "redl": {
+      "files": 1,
+      "gz": 8654,
+      "br": 7144
+     }
+    },
+    "/settings": {
+     "all": {
+      "files": 11,
+      "gz": 71834,
+      "br": 61451
+     },
+     "redl": {
+      "files": 1,
+      "gz": 8654,
+      "br": 7144
+     }
+    }
+   },
+   "sameUrlChanged": [],
+   "revalidatingAtLoad": 0,
+   "skew": {
+    "lazyNeeded": 0,
+    "lazyMissing": 0,
+    "lazyMismatched": 0,
+    "anyOldMissing": 1,
+    "oldFiles": 11
+   },
+   "build": {
+    "assetFiles": 27,
+    "changedAssets": 1,
+    "changedAssetsGz": 8654,
+    "sameNameChanged": [],
+    "removedAssets": 1,
+    "anyFileChanged": 7
+   },
+   "errors": []
+  },
+  "e2": {
+   "routes": {
+    "/": {
+     "all": {
+      "files": 11,
+      "gz": 71836,
+      "br": 61479
+     },
+     "redl": {
+      "files": 2,
+      "gz": 33758,
+      "br": 29734
+     }
+    },
+    "/records": {
+     "all": {
+      "files": 11,
+      "gz": 71836,
+      "br": 61479
+     },
+     "redl": {
+      "files": 2,
+      "gz": 33758,
+      "br": 29734
+     }
+    },
+    "/settings": {
+     "all": {
+      "files": 11,
+      "gz": 71836,
+      "br": 61479
+     },
+     "redl": {
+      "files": 2,
+      "gz": 33758,
+      "br": 29734
+     }
+    }
+   },
+   "sameUrlChanged": [],
+   "revalidatingAtLoad": 0,
+   "skew": {
+    "lazyNeeded": 0,
+    "lazyMissing": 0,
+    "lazyMismatched": 0,
+    "anyOldMissing": 2,
+    "oldFiles": 11
+   },
+   "build": {
+    "assetFiles": 27,
+    "changedAssets": 2,
+    "changedAssetsGz": 33758,
+    "sameNameChanged": [],
+    "removedAssets": 2,
+    "anyFileChanged": 8
+   },
+   "errors": []
+  },
+  "e3": {
+   "routes": {
+    "/": {
+     "all": {
+      "files": 11,
+      "gz": 72426,
+      "br": 61847
+     },
+     "redl": {
+      "files": 1,
+      "gz": 6237,
+      "br": 4666
+     }
+    },
+    "/records": {
+     "all": {
+      "files": 11,
+      "gz": 72426,
+      "br": 61847
+     },
+     "redl": {
+      "files": 1,
+      "gz": 6237,
+      "br": 4666
+     }
+    },
+    "/settings": {
+     "all": {
+      "files": 11,
+      "gz": 72426,
+      "br": 61847
+     },
+     "redl": {
+      "files": 1,
+      "gz": 6237,
+      "br": 4666
+     }
+    }
+   },
+   "sameUrlChanged": [],
+   "revalidatingAtLoad": 0,
+   "skew": {
+    "lazyNeeded": 0,
+    "lazyMissing": 0,
+    "lazyMismatched": 0,
+    "anyOldMissing": 1,
+    "oldFiles": 11
+   },
+   "build": {
+    "assetFiles": 27,
+    "changedAssets": 2,
+    "changedAssetsGz": 11615,
+    "sameNameChanged": [],
+    "removedAssets": 2,
+    "anyFileChanged": 9
+   },
+   "errors": []
+  },
+  "e4": {
+   "routes": {
+    "/": {
+     "all": {
+      "files": 11,
+      "gz": 71837,
+      "br": 61473
+     },
+     "redl": {
+      "files": 1,
+      "gz": 1626,
+      "br": 1368
+     }
+    },
+    "/records": {
+     "all": {
+      "files": 11,
+      "gz": 71837,
+      "br": 61473
+     },
+     "redl": {
+      "files": 1,
+      "gz": 1626,
+      "br": 1368
+     }
+    },
+    "/settings": {
+     "all": {
+      "files": 11,
+      "gz": 71837,
+      "br": 61473
+     },
+     "redl": {
+      "files": 1,
+      "gz": 1626,
+      "br": 1368
+     }
+    }
+   },
+   "sameUrlChanged": [],
+   "revalidatingAtLoad": 0,
+   "skew": {
+    "lazyNeeded": 0,
+    "lazyMissing": 0,
+    "lazyMismatched": 0,
+    "anyOldMissing": 1,
+    "oldFiles": 11
+   },
+   "build": {
+    "assetFiles": 27,
+    "changedAssets": 1,
+    "changedAssetsGz": 1626,
+    "sameNameChanged": [],
+    "removedAssets": 1,
+    "anyFileChanged": 1
+   },
+   "errors": []
+  },
+  "e5": {
+   "routes": {
+    "/": {
+     "all": {
+      "files": 11,
+      "gz": 71834,
+      "br": 61407
+     },
+     "redl": {
+      "files": 1,
+      "gz": 30351,
+      "br": 26763
+     }
+    },
+    "/records": {
+     "all": {
+      "files": 11,
+      "gz": 71834,
+      "br": 61407
+     },
+     "redl": {
+      "files": 1,
+      "gz": 30351,
+      "br": 26763
+     }
+    },
+    "/settings": {
+     "all": {
+      "files": 11,
+      "gz": 71834,
+      "br": 61407
+     },
+     "redl": {
+      "files": 1,
+      "gz": 30351,
+      "br": 26763
+     }
+    }
+   },
+   "sameUrlChanged": [],
+   "revalidatingAtLoad": 0,
+   "skew": {
+    "lazyNeeded": 0,
+    "lazyMissing": 0,
+    "lazyMismatched": 0,
+    "anyOldMissing": 1,
+    "oldFiles": 11
+   },
+   "build": {
+    "assetFiles": 27,
+    "changedAssets": 1,
+    "changedAssetsGz": 30351,
+    "sameNameChanged": [],
+    "removedAssets": 1,
+    "anyFileChanged": 7
+   },
+   "errors": []
+  },
+  "e6": {
+   "routes": {
+    "/": {
+     "all": {
+      "files": 11,
+      "gz": 71831,
+      "br": 61462
+     },
+     "redl": {
+      "files": 0,
+      "gz": 0,
+      "br": 0
+     }
+    },
+    "/records": {
+     "all": {
+      "files": 11,
+      "gz": 71831,
+      "br": 61462
+     },
+     "redl": {
+      "files": 0,
+      "gz": 0,
+      "br": 0
+     }
+    },
+    "/settings": {
+     "all": {
+      "files": 11,
+      "gz": 71831,
+      "br": 61462
+     },
+     "redl": {
+      "files": 0,
+      "gz": 0,
+      "br": 0
+     }
+    }
+   },
+   "sameUrlChanged": [],
+   "revalidatingAtLoad": 0,
+   "skew": {
+    "lazyNeeded": 0,
+    "lazyMissing": 0,
+    "lazyMismatched": 0,
+    "anyOldMissing": 0,
+    "oldFiles": 11
+   },
+   "build": {
+    "assetFiles": 27,
+    "changedAssets": 1,
+    "changedAssetsGz": 4865,
+    "sameNameChanged": [],
+    "removedAssets": 1,
+    "anyFileChanged": 6
+   },
+   "errors": []
+  }
+ }
+}

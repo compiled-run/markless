@@ -23,6 +23,10 @@ async function compileChain(shape: {
 	readonly top: { readonly file: string; readonly source: string };
 	readonly topLeafEdgeIds: ReadonlyArray<string>;
 	readonly topMiddleEdgeId: string;
+	readonly spelling?: {
+		readonly moduleIdForSource: (source: string) => string;
+		readonly sourceForModuleId: (moduleId: string) => string;
+	};
 }) {
 	const metadata = new Map<string, CaptureAnalysisArtifact>();
 	const manifests = new Map<string, LinkedSymbolClaimManifest>();
@@ -38,6 +42,7 @@ async function compileChain(shape: {
 			captureMetadataForSource: (source) => metadata.get(source),
 			symbolClaimsForSource: (source) => manifests.get(source),
 			claimsPublished: () => true,
+			...shape.spelling,
 		});
 	const leaf = await compileTsrxModule({ filename: shape.leaf.file, source: shape.leaf.source, symbols: [] });
 	metadata.set(shape.leaf.file, leaf.captureAnalysis);
@@ -213,4 +218,54 @@ export function Top() @{
 		topMiddleEdgeId: 'component-edge:0',
 	});
 	expect(topLinked.symbols.filter((symbol) => symbol.id.includes('bound'))).toEqual([]);
+});
+
+test('claim ids spell sources through the caller spelling and still bind republished rows', async () => {
+	const root = '/checkout/app/';
+	const { middle, top, topLinked } = await compileChain({
+		leaf: {
+			file: `${root}src/picker.tsrx`,
+			source: `
+export function Picker({ onPick, label }) @{
+	<button type="button" onClick={() => onPick('!')}>{label}</button>
+}
+`,
+		},
+		middle: {
+			file: `${root}src/relay.tsrx`,
+			source: `
+import { Picker } from '${root}src/picker.tsrx';
+
+export function Relay({ onPick }) @{
+	<div><Picker label="inner" onPick={onPick} /></div>
+}
+`,
+		},
+		top: {
+			file: `${root}src/page.tsrx`,
+			source: `
+import { state } from '@markless/core';
+import { Relay } from '${root}src/relay.tsrx';
+
+export function Top() @{
+	let forwarded = state('');
+	<section><Relay onPick={(mark) => (forwarded = forwarded + mark)} /></section>
+}
+`,
+		},
+		topLeafEdgeIds: [],
+		topMiddleEdgeId: 'component-edge:0',
+		spelling: {
+			moduleIdForSource: (source) => source.slice(root.length),
+			sourceForModuleId: (moduleId) => `${root}${moduleId}`,
+		},
+	});
+	const middleRow = middle.captureAnalysis.boundResolverRows!.find((row) =>
+		row.captureSlots.some((slot) => slot.route.kind === 'passthrough-route'),
+	)!;
+	const republished = topLinked.symbols.find((symbol) => symbol.componentEdgeId === 'component-edge:0')!;
+	expect(republished.id).toBe(`imported:${encodeURIComponent('src/relay.tsrx')}:${middleRow.id}`);
+	expect(republished.chunk).toContain(`${root}src/picker.tsrx`);
+	expect(JSON.stringify(topLinked.symbols.map((symbol) => symbol.id))).not.toContain('checkout');
+	expect(top.captureAnalysis.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
 });

@@ -7,6 +7,7 @@ import type {
 	LoweredStateRead,
 	PlannedSymbol,
 	SemanticComponentEdge,
+	SemanticGraphArtifact,
 	SemanticComponentPropDeclaration,
 	SemanticGraphBinding,
 	SemanticLocalBinding,
@@ -194,7 +195,7 @@ function importedCaptureSymbols(
 			(candidate) => candidate.id === symbol.componentEdgeId,
 		);
 		if (!edge) return [];
-		if (!claimBelongsToEdge(symbol.ownerComponentName, edge, input)) return [];
+		if (!claimBelongsToEdge(symbol, edge, input)) return [];
 		const captureSymbol = symbol.captureSymbol;
 		// A child's own claim it could not bind: its slots already name the child's routes, save the props it forwards.
 		const republished = captureSymbol.innerInstancePath !== undefined;
@@ -288,7 +289,13 @@ function importedCaptureSymbols(
 					}))
 					.filter(
 						(slot) => republished || !wasProjectedThroughComponentEdge(slot.propName, edge),
-					),
+					)
+					// A derive whose prop has no route on this edge stays unbound here and reads its own instance's props.
+					.flatMap((slot) => {
+						if (captureSymbol.kind !== 'sync-computed-derive') return [slot];
+						const routes = slot.routes.filter((route) => route.kind !== 'unsupported-opaque');
+						return routes.length > 0 ? [{ ...slot, routes }] : [];
+					}),
 			},
 		];
 	});
@@ -324,15 +331,33 @@ function republishedGraphNodeId(
  * requiring an owner here would refuse every one of them.
  */
 function claimBelongsToEdge(
-	ownerComponentName: string | undefined,
+	claim: {
+		readonly ownerComponentName?: string;
+		readonly moduleComponentNames?: ReadonlyArray<string>;
+	},
 	edge: SemanticComponentEdge,
 	input: CaptureAnalysisInput,
 ): boolean {
+	const ownerComponentName = claim.ownerComponentName;
 	if (ownerComponentName === undefined) return true;
 	if (edge.childComponentName === ownerComponentName) return true;
+	// An edge placing another of the child's components binds the owner's claim only through that component's republished rows.
+	if (claim.moduleComponentNames?.includes(edge.childComponentName)) return false;
 	return !input.semanticGraph.componentEdges.some(
 		(candidate) => candidate.childComponentName === ownerComponentName,
 	);
+}
+
+/** The module's own composition graph, as a composing module needs it to place this module's claims. */
+export function componentComposition(
+	semanticGraph: Pick<SemanticGraphArtifact, 'components' | 'componentEdges'>,
+): NonNullable<CaptureAnalysisArtifact['componentComposition']> {
+	return {
+		components: semanticGraph.components.map((component) => component.name),
+		edgeParents: Object.fromEntries(
+			semanticGraph.componentEdges.map((edge) => [edge.id, edge.parentComponentName]),
+		),
+	};
 }
 
 // Projected children are compiler-owned template content, not a runtime prop
@@ -619,7 +644,14 @@ function domUpdatePath(
 	);
 	if (symbol.graphNodeId === 'prop:props') {
 		const declaration = componentPropDeclarationForSymbol(symbol, read?.sourceSpan, input);
-		return declaration?.propPath ?? [];
+		if (!declaration || declaration.propPath.length > 0) return declaration?.propPath ?? [];
+		// A whole-props parameter (`props.title`) reads through the member path it names.
+		const resolved = resolveGraphPath(
+			symbol.source,
+			graphBindingMap(input.semanticGraph, undefined, declaration.componentName),
+			semanticAliasMap(input.semanticGraph, undefined, declaration.componentName),
+		);
+		return resolved?.binding.id === 'prop:props' ? resolved.path : [];
 	}
 	const resolved = resolveGraphPath(
 		symbol.source,
@@ -670,7 +702,24 @@ function semanticReadForSymbol(symbol: PlannedSymbol, source: string, input: Cap
 			(read) => read.hostNodeId === symbol.hostNodeId && read.source === source,
 		);
 	}
-	return input.semanticGraph.stateReads.find((read) => read.source === source);
+	const reads = input.semanticGraph.stateReads.filter((read) => read.source === source);
+	// A name several components declare resolves to the read inside the component that declared the computed.
+	const componentId =
+		symbol.kind === 'sync-computed-derive' || symbol.kind === 'async-computed-runner'
+			? input.semanticGraph.graphBindings.find((binding) => binding.id === symbol.graphNodeId)
+					?.componentId
+			: undefined;
+	const range = componentId ? componentSourceRange(componentId) : undefined;
+	return (
+		(range &&
+			reads.find(
+				(read) =>
+					read.sourceSpan !== undefined &&
+					read.sourceSpan.start >= range.start &&
+					read.sourceSpan.end <= range.end,
+			)) ||
+		reads[0]
+	);
 }
 
 function componentPropDeclarationForSymbol(
@@ -724,7 +773,12 @@ function captureSlotIdentity(
 	routePath: ReadonlyArray<string>,
 ): string {
 	const owner = componentName ?? 'module';
-	const prop = declaration ? declaration.propPath : propName ? [propName] : undefined;
+	const prop =
+		declaration && declaration.propPath.length > 0
+			? declaration.propPath
+			: propName
+				? [propName]
+				: declaration?.propPath;
 	return prop
 		? `prop:${owner}:${[...prop, ...routePath].join('.')}`
 		: `graph:${owner}:${read.graphNodeId}:${routePath.join('.')}`;
@@ -1388,7 +1442,8 @@ function unreducedPropReadDiagnostics(
 	input: CaptureAnalysisInput,
 	semantics: SymbolSourceSemanticsReader,
 ): ReadonlyArray<CaptureAnalysisDiagnostic> {
-	const { freeNames, analysisFailed } = semantics.read(symbol.source);
+	const sourceSemantics = semantics.read(symbol.source);
+	const { freeNames, analysisFailed } = sourceSemantics;
 	if (analysisFailed || freeNames.size === 0) return [];
 	const routed = new Set(
 		symbol.captureSlots.flatMap((slot) => (slot.propName ? [slot.propName] : [])),
@@ -1400,6 +1455,10 @@ function unreducedPropReadDiagnostics(
 		if (!declarationOwnsSymbol(declaration, symbol.owner?.componentName, span)) return [];
 		const propName = declaration.propPath[0] ?? declaration.localName;
 		if (routed.has(propName) || routed.has(declaration.localName)) return [];
+		const wholeProps = declaration.propPath.length === 0;
+		const memberKeys = wholeProps ? sourceSemantics.staticMemberKeys(declaration.localName) : null;
+		if (memberKeys && memberKeys.size > 0 && [...memberKeys].every((key) => routed.has(key)))
+			return [];
 		const componentName = declaration.componentName;
 		return [
 			{
@@ -1407,7 +1466,9 @@ function unreducedPropReadDiagnostics(
 				severity: 'error' as const,
 				phase: CAPTURE_ANALYSIS_PHASE,
 				title: 'Lazy handler prop capture is not resumable',
-				message: `Cannot bind lazy symbol "${symbol.symbolId}" because prop "${propName}" for "${componentName}" is read through a path the compiler cannot reduce to a capture slot, so "${declaration.localName}" would reach the browser unbound.`,
+				message: wholeProps
+					? `Cannot bind lazy symbol "${symbol.symbolId}" because "${componentName}" uses its whole props object "${declaration.localName}" in \`${symbol.source}\` - passed on, spread, destructured, or indexed with a runtime key - so the compiler cannot tell which props it needs, and "${declaration.localName}" would reach the browser unbound.`
+					: `Cannot bind lazy symbol "${symbol.symbolId}" because prop "${propName}" for "${componentName}" is read through a path the compiler cannot reduce to a capture slot, so "${declaration.localName}" would reach the browser unbound.`,
 				why: 'A demanded capture slot must route to a graph node, a compiler-known constant, or a callback symbol. A prop path state lowering cannot reduce - an indexed element, a computed key, or an optional-chained call with no plain read beside it - produces no route at all, and the emitted handler would throw a ReferenceError on its first dispatch.',
 				primarySpan: declaration.sourceSpan,
 				passId: CAPTURE_ANALYSIS_PASS_ID,
@@ -1418,7 +1479,9 @@ function unreducedPropReadDiagnostics(
 				source: symbol.source,
 				suggestions: [
 					{
-						message: `Read ${declaration.localName} through plain property access (${declaration.localName}.someName), or pass the value this handler needs as its own prop.`,
+						message: wholeProps
+							? `Read each prop by name (${declaration.localName}.title or ${declaration.localName}['title']), or destructure the parameter (function ${componentName}({ title })).`
+							: `Read ${declaration.localName} through plain property access (${declaration.localName}.someName), or pass the value this handler needs as its own prop.`,
 					},
 				],
 				docsUrl: 'https://markless.dev/errors/MARKLESS_CAPTURE_OPAQUE_PROP',

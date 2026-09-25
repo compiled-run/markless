@@ -11,6 +11,7 @@ import type { RuntimeDemandMapManifest } from '../src/types.ts';
 import { markless } from '../src/vite/index.ts';
 import { marklessClient, marklessServer } from '../src/rolldown.ts';
 import { MARKLESS_EXECUTION_LOG_MODULE_ID } from '../src/execution-log.ts';
+import { DEPRECATED_NATIVE_PACKING_WARNING } from '../src/packing-option.ts';
 import { callLoad, callTransform } from './helpers.ts';
 
 test('native packs keep the execution instrument separate from measured runtime code', async () => {
@@ -30,7 +31,6 @@ test('native packs keep the execution instrument separate from measured runtime 
 			},
 			marklessClient({
 				rootDir: '/workspace',
-				experimentalNativePacking: true,
 				executionLog: 'always',
 			}),
 		],
@@ -58,7 +58,7 @@ test('the standalone client option groups lazy modules and preserves its plugin 
 		'/workspace/first.js': 'export const value=1;',
 		'/workspace/second.js': 'export const value=2;',
 	};
-	const plugin = marklessClient({ experimentalNativePacking: true, rootDir: '/workspace' });
+	const plugin = marklessClient({ rootDir: '/workspace' });
 	expect(typeof plugin.api.invalidateGeneratedModules).toBe('function');
 	const build = await rolldown({
 		input: '/workspace/entry.js',
@@ -85,17 +85,55 @@ test('the standalone client option groups lazy modules and preserves its plugin 
 	} finally {
 		await build.close();
 	}
-	expect(marklessServer({ experimentalNativePacking: true }).renderChunk).toBeUndefined();
-	expect(
-		marklessClient({ experimentalNativePacking: true, dev: true }).renderChunk,
-	).toBeUndefined();
+	expect(marklessServer().renderChunk).toBeUndefined();
+	expect(marklessClient({ dev: true }).renderChunk).toBeUndefined();
+	expect(marklessClient({ packing: false }).renderChunk).toBeUndefined();
 });
 
-test('the Vite packing option installs transport planning and lazy facade handling', () => {
-	const names = markless({ experimentalNativePacking: true }).map((plugin) => plugin.name);
+test('Vite builds pack by default and opt out with packing: false', () => {
+	const names = markless().map((plugin) => plugin.name);
 	expect(names).toContain('markless:route-packs');
 	expect(names).toContain('markless-lazy-module-facades');
-	expect(markless().map((plugin) => plugin.name)).not.toContain('markless:route-packs');
+	expect(markless({ packing: false }).map((plugin) => plugin.name)).not.toContain(
+		'markless:route-packs',
+	);
+});
+
+// A function config makes plugins per environment; per-environment packing plugins would read an
+// unconfigured base plugin (no root, no demand maps), so they must be the shared build instances.
+test('Vite packing plugins share the build with the base plugin they read', () => {
+	const plugins = markless();
+	const shared = (name: string) =>
+		(plugins.find((plugin) => plugin.name === name) as { sharedDuringBuild?: boolean })
+			.sharedDuringBuild;
+	expect(shared('vite-plugin-markless')).toBe(true);
+	expect(shared('markless:route-packs')).toBe(true);
+	expect(shared('markless-lazy-module-facades')).toBe(true);
+});
+
+test('the deprecated experimentalNativePacking alias still decides packing and warns', () => {
+	expect(
+		markless({ experimentalNativePacking: false }).map((plugin) => plugin.name),
+	).not.toContain('markless:route-packs');
+	expect(markless({ experimentalNativePacking: true }).map((plugin) => plugin.name)).toContain(
+		'markless:route-packs',
+	);
+	expect(
+		markless({ packing: false, experimentalNativePacking: true }).map((plugin) => plugin.name),
+	).not.toContain('markless:route-packs');
+	const warnings: string[] = [];
+	const plugin = markless({ experimentalNativePacking: true }).find(
+		(item) => item.name === 'vite-plugin-markless',
+	)!;
+	const configResolved = plugin.configResolved as (config: unknown) => void;
+	configResolved({
+		root: '/workspace',
+		base: '/',
+		command: 'build',
+		build: {},
+		logger: { warn: (message: string) => warnings.push(message) },
+	});
+	expect(warnings).toEqual([DEPRECATED_NATIVE_PACKING_WARNING]);
 });
 
 test('route query roots pack their lazy actions without assuming a pages directory', async () => {
@@ -228,7 +266,6 @@ ${tallies.map((name) => `\t\t<button type="button" onClick={() => ${name}++}>{${
 	</section>
 }`;
 	const plugin = marklessClient({
-		experimentalNativePacking: true,
 		executionLog: 'never',
 		rootDir: '/workspace',
 	});
@@ -298,6 +335,65 @@ test('critical packs lead with the V8 eager-compile hint; deferred and lazy chun
 		for (const chunk of [deferredPack, lazyChunk]) {
 			expect(chunk.code).not.toContain(EAGER_COMPILE_HINT);
 			expect(chunk.code.startsWith('/* user */')).toBe(true);
+		}
+	} finally {
+		await build.close();
+	}
+});
+
+test('packed init exports carry no trace of the build directory', async () => {
+	const root = '/home/ci/repo/app';
+	const shared = `\0virtual:markless:resolver:${encodeURIComponent(`${root}/shared.tsrx`)}`;
+	const linked = `\0virtual:markless:resolver:${encodeURIComponent('/home/ci/repo/lib/linked.tsrx')}`;
+	const alpha = `${root}/alpha.tsrx?markless-route`;
+	const beta = `${root}/beta.tsrx?markless-route`;
+	const sources: Record<string, string> = {
+		[`${root}/entry.js`]: `export const alpha=()=>import(${JSON.stringify(alpha)});export const beta=()=>import(${JSON.stringify(beta)});`,
+		[alpha]: `import {read} from ${JSON.stringify(shared)};import {tag} from ${JSON.stringify(linked)};export const run=()=>tag(read("alpha"));`,
+		[beta]: `import {read} from ${JSON.stringify(shared)};import {tag} from ${JSON.stringify(linked)};export const run=()=>tag(read("beta"));`,
+		[linked]: 'export const tag=(name)=>name;',
+		[shared]:
+			'globalThis.__rootlessTrace=(globalThis.__rootlessTrace??0)+1;export const read=(name)=>name;',
+	};
+	const build = await rolldown({
+		input: `${root}/entry.js`,
+		plugins: [
+			{
+				name: 'memory',
+				resolveId: (id) => (id in sources ? id : null),
+				load: (id) => sources[id],
+			},
+			...nativePackingPlugins(() => root),
+		],
+	});
+	try {
+		const { output } = await build.generate({ format: 'es' });
+		const chunks = output.filter((chunk) => chunk.type === 'chunk');
+		const encodedRoot = encodeURIComponent('/home/ci/').replace(/[^\w$]/g, '_');
+		expect(chunks.some((chunk) => chunk.imports.length > 0)).toBe(true);
+		// Rolldown names the shared init export after the virtual id; only the shipped code is rewritten.
+		expect(
+			chunks.some((chunk) => chunk.exports.some((name) => name.includes(encodedRoot))),
+		).toBe(true);
+		for (const chunk of chunks) expect(chunk.code).not.toContain(encodedRoot);
+		const directory = await mkdtemp(join(tmpdir(), 'markless-rootless-'));
+		try {
+			for (const chunk of chunks)
+				await writeFile(join(directory, chunk.fileName), chunk.code);
+			const entry = chunks.find((chunk) => chunk.isEntry)!;
+			const url = pathToFileURL(join(directory, entry.fileName)).href;
+			const result = execFileSync(
+				process.execPath,
+				[
+					'--input-type=module',
+					'-e',
+					`const entry=await import(${JSON.stringify(url)});const a=(await entry.alpha()).run();const b=(await entry.beta()).run();console.log(JSON.stringify([a,b,globalThis.__rootlessTrace]));`,
+				],
+				{ encoding: 'utf8' },
+			);
+			expect(JSON.parse(result)).toEqual(['alpha', 'beta', 1]);
+		} finally {
+			await rm(directory, { recursive: true, force: true });
 		}
 	} finally {
 		await build.close();

@@ -713,6 +713,24 @@ test('emitSourceModule emits the CSR execution log loader only when logging is e
 	);
 });
 
+// An inactive page must never fetch the instrument: each emitted load waits on the activation flag.
+test('emitted execution log loads run only on a page that activated the log', () => {
+	const publicRenderModuleSource = 'export function Fixture() { return { root: {} }; }';
+	for (const emitted of [
+		emitResumeModule({ ...scalarResumeInput(), executionLog: 'auto', installResumeSummary: true }),
+		emitSourceModule({
+			...baseInput,
+			executionLog: 'auto',
+			publicRenderModuleSource,
+			publicRenderRootExportName: 'Fixture',
+		}),
+	]) {
+		const loads = emitted.match(/[^\n]*globalThis\.__mxLoadLog\(\)[^\n]*/g) ?? [];
+		expect(loads.length).toBeGreaterThan(0);
+		for (const line of loads) expect(line).toMatch(/if \((?:globalThis\.__mxLog|marklessLogBefore)\)/);
+	}
+});
+
 function scalarResumeInput() {
 	return {
 		...baseInput,
@@ -1062,6 +1080,22 @@ test('the resume handoff carries this page render data to the runtime, lazily', 
 	expect(emitted).toContain(
 		"renderData: () => import('\0markless:render-data:page.tsrx').then((data) => data.marklessPrerenderData),",
 	);
+});
+
+// Render data is imported statically elsewhere; a lazy import of the same module would not split it.
+test('lazy render-data loads name the export-star entry, never the render data itself', () => {
+	const renderDataId = '\0markless:render-data:page.tsrx';
+	const lazyRenderDataId = '\0markless:render-data-entry:page.tsrx';
+	const rows = emitResumeModule({
+		...baseInput,
+		renderDataId,
+		lazyRenderDataId,
+		runtimeDemandMap: repeatDemandMap(COMPONENT_ROW_DEMAND),
+	});
+	expect(rows).toContain(
+		`renderData: () => import('${lazyRenderDataId}').then((data) => data.marklessPrerenderData),`,
+	);
+	expect(rows).not.toContain(`import('${renderDataId}')`);
 });
 
 // A prerendered page already holds its surface at the resume call site, so
