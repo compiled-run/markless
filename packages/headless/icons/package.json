@@ -1,6 +1,6 @@
 {
 	"name": "@markless/icons",
-	"version": "0.4.0",
+	"version": "0.5.0",
 	"description": "Every Iconify icon pack as <pack.icon /> tags in TSRX and MDX, inlined at build time.",
 	"license": "MIT",
 	"repository": {

@@ -1,10 +1,11 @@
 # Changelog
 
-Every published Markless package shares one version number: the eleven packages
+Every published Markless package shares one version number: the packages
 (`@markless/analyzer`, `@markless/bundler`, `@markless/compiler`,
 `@markless/core`, `@markless/router`, `@markless/runtime`,
 `@markless/serializer`, `@markless/typescript-plugin`, `@markless/vitest-browser`,
-`@markless/web`, and `create-markless`) are always released together at the same
+`@markless/web`, `@markless/ui`, `@markless/icons`, `@markless/ui-tools`, and
+`create-markless`) are always released together at the same
 version, because a project scaffolded by `create-markless` asks for that exact
 version of everything else.
 
@@ -58,6 +59,27 @@ If a deploy removes code an open tab still needs, the first click that hits it
 reloads the page once instead of doing nothing. Build manifests are no longer
 served publicly; they now live in a `.markless/` folder next to your build
 output, so add `.markless/` to your `.gitignore`.
+
+### @markless/ui and icons
+
+`@markless/ui` adds 24 component families, including menu, menubar, toolbar,
+tooltip, hovercard, drawer, calendar, datebox, timebox, numberbox, colorpicker,
+fileupload, table, gridlist, taglist, tokenbox, rating, editable, resizable,
+crop, pad, ink and tour.
+
+Popover placement is now plain CSS: the `side` prop and the `ui-side`
+attribute are gone from every overlay family, so position overlays in your
+stylesheet instead.
+
+The new `@markless/icons` package lets you use any Iconify icon set as
+`<pack.icon />` in `.tsrx` and `.mdx`. Icons are inlined as SVG at build time.
+The `ui()` Vite plugin from the new `@markless/ui-tools` package sets this up.
+
+### Compiler
+
+- `storage()` works inside a component body, not only at module scope.
+- A `class` prop passed to a child component gets the calling file's scoped
+  style class, so scoped `<style>` rules reach it.
 
 ### Fixes
 
