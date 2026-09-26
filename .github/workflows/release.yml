@@ -110,9 +110,6 @@ jobs:
                   if [ "$failed" -ne 0 ]; then exit 1; fi
                   echo "no stored npm credential is present in this job"
 
-            - name: Assert the dispatched version matches every manifest
-              run: node scripts/release/assert-release-version.mjs "$RELEASE_VERSION"
-
             - name: Require the typed confirmation phrase
               if: inputs.mode == 'publish'
               run: |
@@ -163,6 +160,10 @@ jobs:
 
             - name: Install dependencies
               run: pnpm install --frozen-lockfile
+
+            # After the install: the release set is read from pnpm-workspace.yaml with the yaml package.
+            - name: Assert the dispatched version matches every manifest
+              run: node scripts/release/assert-release-version.mjs "$RELEASE_VERSION"
 
             - name: Build publishable output
               run: pnpm build
