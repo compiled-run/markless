@@ -4,7 +4,7 @@
 // that every published exports target exists on disk and the core root entry
 // stays node-free after packing.
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { basename, resolve } from 'node:path';
+import { basename, matchesGlob, relative, resolve } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import rootConfig from '../../vite.config.ts';
 import { releasePackages } from './release-packages.mjs';
@@ -31,6 +31,8 @@ type PackageManifest = {
 	readonly bin?: Record<string, string>;
 	readonly scripts?: Record<string, string>;
 	readonly dependencies?: Record<string, string>;
+	readonly peerDependencies?: Record<string, string>;
+	readonly peerDependenciesMeta?: Record<string, { readonly optional?: boolean }>;
 	readonly repository?: { readonly url?: string; readonly directory?: string };
 	readonly publishConfig?: {
 		readonly access?: string;
@@ -112,6 +114,33 @@ function staticImportSpecifiers(code: string): string[] {
 		}
 	}
 	return specifiers;
+}
+
+const SOURCE_FILE = /\.(?:[cm]?[jt]s|tsrx)$/;
+const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/;
+
+/** The source files that reach the tarball: src minus tests and the manifest's `!` file patterns. */
+function publishedSourceFiles(packageDir: string, manifest: PackageManifest): string[] {
+	const excluded = (manifest.files ?? [])
+		.filter((pattern) => pattern.startsWith('!'))
+		.flatMap((pattern) => [pattern.slice(1), `${pattern.slice(1)}/**`]);
+	const walk = (dir: string): string[] =>
+		readdirSync(dir, { withFileTypes: true }).flatMap((dirent) => {
+			const path = resolve(dir, dirent.name);
+			if (dirent.isDirectory()) return walk(path);
+			const rel = relative(packageDir, path);
+			if (!SOURCE_FILE.test(rel) || TEST_FILE.test(rel)) return [];
+			return excluded.some((pattern) => matchesGlob(rel, pattern)) ? [] : [path];
+		});
+	const src = resolve(packageDir, 'src');
+	return existsSync(src) ? walk(src) : [];
+}
+
+function importsPackage(source: string, name: string): boolean {
+	const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	return new RegExp(
+		`(?:from\\s*|import\\s*\\(\\s*|require\\s*\\(\\s*|import\\s+)['"]${escaped}(?:/[^'"]*)?['"]`,
+	).test(source);
 }
 
 describe('publish manifest shape', () => {
@@ -259,6 +288,26 @@ describe('publish manifest shape', () => {
 			}
 		});
 	});
+
+	// A required peer the published code never imports still fails a consumer's npm install
+	// whenever their version of it falls outside the range.
+	for (const entry of releasePackageEntries) {
+		const manifest = readManifest(entry.name);
+		const requiredPeers = Object.keys(manifest.peerDependencies ?? {}).filter(
+			(peer) => manifest.peerDependenciesMeta?.[peer]?.optional !== true,
+		);
+		for (const peer of requiredPeers) {
+			test(`${entry.name} imports its required peer ${peer} from a published file`, () => {
+				const importers = publishedSourceFiles(entry.packageDir, manifest).filter((path) =>
+					importsPackage(readFileSync(path, 'utf8'), peer),
+				);
+				expect(
+					importers,
+					`${entry.name} requires peer ${peer}; make it optional in peerDependenciesMeta`,
+				).not.toEqual([]);
+			});
+		}
+	}
 
 	test('create-markless bin is rewritten to a dist file and ships templates', () => {
 		const manifest = readManifest('create-markless');
