@@ -397,6 +397,24 @@ test('scopes router virtual entry modules by resolved Vite root', () => {
 	expect(first).not.toBe(second);
 });
 
+test('resolves the client route-href helper to one root-free module', () => {
+	const routePlugin = flattenPlugins([router()]).find(
+		(plugin) => plugin.name === 'markless-router:routes',
+	);
+	const resolve = hookHandler(routePlugin?.resolveId) as
+		| ((id: string) => string | undefined)
+		| undefined;
+
+	routePlugin?.configResolved?.({ root: '/project/first' } as never);
+	const first = resolve?.('virtual:markless-router/route-href');
+	routePlugin?.configResolved?.({ root: '/project/second' } as never);
+	const second = resolve?.('virtual:markless-router/route-href');
+
+	expect(first).toMatch(/\/entries\/route-href\.ts$/);
+	expect(first).not.toContain('/project/');
+	expect(second).toBe(first);
+});
+
 test('generated server entries pass Vite development mode explicitly', () => {
 	const routePlugin = flattenPlugins([router()]).find(
 		(plugin) => plugin.name === 'markless-router:routes',
