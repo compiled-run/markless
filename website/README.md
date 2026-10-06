@@ -1,6 +1,6 @@
 # website
 
-The Markless documentation site, served at `compiled.run/markless`. It lives in the framework
+The Markless documentation site, served at `markless.dev`. It lives in the framework
 monorepo as the `website` workspace package and consumes `@markless/*` through `workspace:*`, so a
 framework change is checked against the real site in the same change set.
 
@@ -24,68 +24,35 @@ page shows the playground unstyled until the first interaction. Visual checks
 (`scripts/brand-review.ts`) therefore target a production serve:
 `PORT=4310 node .output/server/index.mjs`.
 
-Pages live under `pages/markless/`, which is what puts them at `/markless/…`; `vite.config.ts` sets
-the matching `base` and `nitro.baseURL`.
+Pages live under `pages/`, and a file's path under it is its URL: `pages/concepts/state.mdx` is
+`/concepts/state`. Files in `public/` are served from the site root.
 
 ## Deploy
 
-The site is its own Vercel project, and `compiled.run` proxies it. Nothing about the deploy is
-special: the whole point of the base path is that this project genuinely serves `/markless/…`, so
-the proxy in front of it is a path-preserving rewrite and not a rewrite that has to strip anything.
+The site is served at `https://markless.dev`, from the root of the origin. `vite.config.ts` reads
+`base` and `nitro.baseURL` from `site-base.ts`, which is `/`.
 
-|                  |                                                                                                                    |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Repo             | `https://github.com/compiled-run/compiled-website`                                                                 |
-| Vercel project   | `markless-docs`, team `jack-shelton` (`team_4TrBQsvIkFM0lYTqh08Fqxgd`), project `prj_rv06xPVYEu7z8GdStWatxRbjV8tm` |
-| Production alias | `https://markless-docs.vercel.app/markless`                                                                        |
-| Public path      | `https://compiled.run/markless` once the rewrite below is merged                                                   |
-
-### How a deploy happens
-
-`.github/workflows/deploy.yml` runs on every push to `main`: `npm ci`, then a build with nitro's
-Vercel preset, then `vercel deploy --prebuilt --prod`, then it curls three routes on the production
-alias and fails the run if any of them is not 200. The org and project ids are plain values in the
-workflow; the one secret it needs is `VERCEL_TOKEN`, which only the account owner can create:
-
-```sh
-# owner-only: create a token at https://vercel.com/account/settings/tokens, then
-gh secret set VERCEL_TOKEN --repo compiled-run/compiled-website
-```
-
-Until that secret exists the workflow builds and then stops at the deploy step with an explicit
-error, rather than deploying nothing quietly.
-
-To deploy by hand from a clean checkout:
-
-```sh
-npm ci
-NITRO_PRESET=vercel npm run build          # writes .vercel/output (Build Output API v3)
-npx --yes vercel@57.0.0 deploy --prebuilt --prod --yes --scope jack-shelton
-```
-
-The preset is what turns `.output/` into `.vercel/output/`: `static/markless/**` for the files the
-CDN serves and one `__server` function for everything else. `vercel.json` records the same build for
-a Vercel-side build, should the project ever be connected to the repo. It is not connected today:
-`vercel link` reported `You need to add a Login Connection to your GitHub account first`, which is a
-click in the owner's Vercel account, so CI is the only path to production.
-
-Per-deployment URLs (`markless-docs-<hash>-jack-shelton.vercel.app`) answer 302 to Vercel's SSO gate
-because deployment protection is on for the team. The production alias is not protected and answers
-200, which is why every check — the workflow's and your own — runs against the alias.
-
-### What `compiled-run/website` needs
-
-Two entries in that repo's `vercel.json` `rewrites` array, after the `yuku-tsrx` pair. `:path*` does
-not match the bare path, so both are needed:
+Vercel builds it from this monorepo. `vercel.json` in this folder is the whole build record:
 
 ```json
-{ "source": "/markless", "destination": "https://markless-docs.vercel.app/markless" },
-{ "source": "/markless/:path*", "destination": "https://markless-docs.vercel.app/markless/:path*" }
+{
+	"framework": "nitro",
+	"installCommand": "cd .. && pnpm install --frozen-lockfile",
+	"buildCommand": "NITRO_PRESET=vercel pnpm run build"
+}
 ```
 
-No `headers` entry: that repo's COOP/COEP block is only for projects that need cross-origin
-isolation, and this site self-hosts its fonts. The same PR adds a `<a href="/markless">Markless
-&rarr;</a>` link to that repo's `index.html` and a row to its Projects table.
+The install runs at the repository root, because the site consumes `@markless/*` through
+`workspace:*`. The build runs `scripts/generate-seo.ts` and then `vp build`; nitro's `vercel` preset
+writes `.vercel/output/` (Build Output API v3): `static/**` for the files the CDN serves and one
+`__server` function for everything else.
+
+To check a production build locally:
+
+```sh
+pnpm --filter website build
+PORT=4310 node website/.output/server/index.mjs
+```
 
 ## The document head, and what a crawler is given
 
@@ -96,10 +63,9 @@ the Open Graph tags and the favicon. An unknown path falls back to the site's ow
 
 `scripts/generate-seo.ts` writes `public/robots.txt`, `public/sitemap.xml` and `public/llms.txt`
 from the same array, and `npm run build` runs it before `vp build` so the files are copied into the
-output. `npm run seo` runs it on its own. The site is one section of `compiled.run`, served under
-`/markless/`, so `public/` lands at `/markless/` and all three are served from there; a host-level
-`/robots.txt` belongs to the origin, and the copy here states this section's rules and names its
-sitemap. Adding a page still means adding one entry to `nav.ts` and nothing else.
+output. `npm run seo` runs it on its own. The site owns the root of `markless.dev`, so all three are
+served from there and `robots.txt` names the sitemap. Adding a page still means adding one entry to
+`nav.ts` and nothing else.
 
 ## Page metadata
 
@@ -115,7 +81,7 @@ believes. Every one of the 19 pages is set from it, the reference page included.
 
 ```sh
 # words on one page
-sed '/^import /d' pages/markless/concepts/state.mdx | wc -w
+sed '/^import /d' pages/concepts/state.mdx | wc -w
 ```
 
 Rewriting a page means recomputing its `time` in the same change set. The other three props:
@@ -146,7 +112,7 @@ screenshots into the markless repo's goal notes.
 
 ## Layout
 
-- `pages/markless/**.mdx` — one file per page. Prose is markdown; interactive pieces are default
+- `pages/**.mdx` — one file per page. Prose is markdown; interactive pieces are default
   exports of `.tsrx` files, imported at the top and used as top-level blocks.
 - `components/demos/` — the demos, grouped by the docs section that shows them (`home/`,
   `how-it-works/`, `start/`, `concepts/`, `build/`, `router/`) and, for UI families, `ui/<family>/`

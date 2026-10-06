@@ -18,7 +18,7 @@ try {
 			const errors: string[] = [];
 			page.on('pageerror', (error) => errors.push(error.message));
 			for (const route of ['home', 'accordion']) {
-				const path = route === 'home' ? '/markless' : '/markless/ui/accordion';
+				const path = route === 'home' ? '/' : '/ui/accordion';
 				await page.goto(`${origin}${path}`, { waitUntil: 'networkidle' });
 				await page.evaluate(() => document.fonts.ready);
 				assert.equal(await page.locator('html').getAttribute('data-theme'), theme);

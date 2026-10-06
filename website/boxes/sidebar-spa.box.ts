@@ -12,10 +12,10 @@ export default box(
 		await pipeline.dev({
 			config: (config) => ({ ...config, server: { ...config.server, watch: null } }),
 		});
-		const page = await browser.visit('/markless/');
+		const page = await browser.visit('/');
 		await expect.page.text(page, 'h1', 'The compiler for user interfaces', WAIT);
 		await page.click('.sidebar-summary', WAIT);
-		await page.click('.sidebar a[href="/markless/start/first-app"]', WAIT);
+		await page.click('.sidebar a[href="/start/first-app"]', WAIT);
 		await expect.page.text(page, 'h1', 'One command, then three scripts', WAIT);
 		const documents = (await page.networkRequests()).filter(
 			(request) => request.resourceType === 'Document',
@@ -27,7 +27,7 @@ export default box(
 		}
 		await expect.page.exists(
 			page,
-			'.sidebar a[aria-current="page"][href="/markless/start/first-app"]',
+			'.sidebar a[aria-current="page"][href="/start/first-app"]',
 			WAIT,
 		);
 		await page.click('[data-theme-toggle="dark"]', WAIT);

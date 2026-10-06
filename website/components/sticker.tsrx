@@ -1,3 +1,5 @@
+import { asset } from '../site-base.ts';
+
 // One of the owner's die-cut stickers, cut out of `stickers-sheet.png` by
 // `tooling/cut-sprites.ts`. A sticker carries its own white border and printed
 // shadow, so one file reads on both the paper and the dark ground and there is
@@ -20,7 +22,7 @@ export default function Sticker({
 
 	<img
 		class={spot ? 'sticker is-' + spot : 'sticker'}
-		src={'/markless/stickers/' + name + '.png'}
+		src={asset('stickers/' + name + '.png')}
 		alt={label}
 		aria-hidden={hidden}
 		style={'--sticker-size:' + (size ?? '3rem')}

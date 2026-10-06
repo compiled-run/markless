@@ -115,7 +115,7 @@ export default function SiteHeader({ pathname }: { readonly pathname: string }) 
 				}
 			}
 		</style>
-		<a class="crumb crumb-home" href="/markless">
+		<a class="crumb crumb-home" href="/">
 			<span>Home</span>
 		</a>
 		<lucide.chevronright class="crumb-sep crumb-sep-section" aria-hidden="true" />

@@ -77,9 +77,9 @@ export default function AccordionScene({ scenario }: { readonly scenario: Scenar
    .entry-trigger[ui-open] .chevron { transform:rotate(225deg); margin-bottom:0; }
 
    .art { display:block; width:100%; height:100%; background-repeat:no-repeat; background-position:0 0; background-size:300% 200%; }
-   .art[data-sheet='case-portraits'] { background-image:url('/markless/accordion-art/case-portraits.png'); background-size:400% 100%; }
-   .art[data-sheet='rulebook-art'] { background-image:url('/markless/accordion-art/rulebook-art.png'); background-size:300% 100%; }
-   .art[data-sheet='roadtrip-art'] { background-image:url('/markless/accordion-art/roadtrip-art.png'); }
+   .art[data-sheet='case-portraits'] { background-image:url('/accordion-art/case-portraits.png'); background-size:400% 100%; }
+   .art[data-sheet='rulebook-art'] { background-image:url('/accordion-art/rulebook-art.png'); background-size:300% 100%; }
+   .art[data-sheet='roadtrip-art'] { background-image:url('/accordion-art/roadtrip-art.png'); }
    .art[data-index='1'],.art[data-index='4'] { background-position:50% 0; }.art[data-index='2'],.art[data-index='5'] { background-position:100% 0; }
    .art[data-index='3'] { background-position:0 100%; }.art[data-index='4'] { background-position:50% 100%; }.art[data-index='5'] { background-position:100% 100%; }
    .art[data-sheet='case-portraits'][data-index='1']{ background-position:33.333% 0; }.art[data-sheet='case-portraits'][data-index='2']{ background-position:66.667% 0; }.art[data-sheet='case-portraits'][data-index='3']{ background-position:100% 0; }

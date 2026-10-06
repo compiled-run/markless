@@ -6,11 +6,11 @@ const card =
 
 export default function Mention() @{
 	<hovercard.root open={true} style="display: grid; justify-items: center;">
-		<hovercard.trigger href="/markless/ui/accordion" style={link}>the accordion page</hovercard.trigger>
+		<hovercard.trigger href="/ui/accordion" style={link}>the accordion page</hovercard.trigger>
 		<hovercard.content style={card}>
 			<strong>accordion</strong>
 			<span>Sections named by value, with the closed panel left in the page.</span>
-			<a href="/markless/ui/accordion" style={link}>Read it</a>
+			<a href="/ui/accordion" style={link}>Read it</a>
 		</hovercard.content>
 	</hovercard.root>
 }

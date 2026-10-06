@@ -7,7 +7,7 @@ try {
  page.setDefaultTimeout(10000);
  const errors = [];
  page.on('pageerror', error => errors.push(error.message));
- await page.goto((process.env.PREVIEW_URL || 'http://127.0.0.1:4324') + '/markless/ui/accordion#keyboard');
+ await page.goto((process.env.PREVIEW_URL || 'http://127.0.0.1:4324') + '/ui/accordion#keyboard');
  const study = page.locator('.keyboard-study');
  const game = page.locator('[data-keyboard-practice]');
  await study.evaluate(el => el.scrollIntoView({ block: 'center' }));

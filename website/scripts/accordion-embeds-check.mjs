@@ -11,7 +11,7 @@ try {
  page.setDefaultTimeout(15000);
  const errors = [];
  page.on('pageerror', error => errors.push(error.message));
- await page.goto(base + '/markless/ui/accordion');
+ await page.goto(base + '/ui/accordion');
  const examples = page.locator('[data-accordion-examples]');
  await examples.waitFor();
  assert.equal(await examples.locator('iframe').count(), 0, 'Examples are linked images, without an expanded iframe');
@@ -20,7 +20,7 @@ try {
  const cards = examples.locator('[data-example-card]');
  assert.deepEqual(await cards.evaluateAll(items => items.map(item => item.getAttribute('data-example-card'))), ['road-trip', 'case-file', 'rulebook']);
  const gallery = await browser.newPage();
- await gallery.goto(base + '/markless/ui/accordion-examples');
+ await gallery.goto(base + '/ui/accordion-examples');
  assert.deepEqual(await gallery.locator('[data-select-scenario]').evaluateAll(items => items.map(item => item.getAttribute('data-select-scenario'))), ['road-trip', 'case-file', 'rulebook']);
  assert.equal(await gallery.locator('[data-select-treatment]').count(), 0, 'Only the chosen treatment is available for each story');
  for (const [id, treatment] of [['road-trip', 'C'], ['case-file', 'B'], ['rulebook', 'C']]) {
@@ -28,7 +28,7 @@ try {
   await gallery.locator(`[data-scene="${id}"][data-treatment="${treatment}"]`).waitFor({ state: 'visible' });
  }
  for (const id of ['advent', 'cook-along', 'planets']) {
-  await gallery.goto(base + '/markless/examples/accordion/' + id);
+  await gallery.goto(base + '/examples/accordion/' + id);
   assert.equal(await gallery.locator('[data-scene]').count(), 0, 'Removed scenarios do not render');
  }
  await gallery.close();
@@ -36,7 +36,7 @@ try {
  for (const id of ['road-trip', 'case-file', 'rulebook']) {
   const card = examples.locator(`[data-example-card="${id}"]`);
   assert.equal(await card.evaluate(element => element.tagName), 'A', 'The whole card is a native link');
-  assert.equal(await card.getAttribute('href'), '/markless/examples/accordion/' + id);
+  assert.equal(await card.getAttribute('href'), '/examples/accordion/' + id);
   await card.locator('img').evaluate(image => image.decode());
  }
  for (const theme of ['dark', 'light']) {
@@ -79,7 +79,7 @@ try {
   } else {
    await card.locator('img').click();
   }
-  await page.waitForURL(base + '/markless/examples/accordion/' + id);
+  await page.waitForURL(base + '/examples/accordion/' + id);
   await page.locator(`[data-scene="${id}"]`).waitFor();
   assert.equal(await page.locator(`[data-scene="${id}"]`).getAttribute('data-treatment'), id === 'case-file' ? 'B' : 'C');
   assert.equal(await page.locator('.sidebar, .site-header, .site-shell, .pager').count(), 0, 'Linked examples have no documentation layout');
@@ -89,15 +89,15 @@ try {
    await page.waitForFunction(() => document.querySelectorAll('[data-example-trigger][aria-expanded="true"]').length === 3);
   }
   await page.getByRole('link', { name: '← Accordion examples', exact: true }).click();
-  await page.waitForURL(base + '/markless/ui/accordion#examples');
+  await page.waitForURL(base + '/ui/accordion#examples');
   await examples.waitFor();
   await page.locator('.site-header').waitFor();
   console.log('PASS: ' + id + ' opens its retained treatment and returns to the docs.');
  }
  const plain = await browser.newPage({ javaScriptEnabled: false });
- await plain.goto(base + '/markless/ui/accordion');
+ await plain.goto(base + '/ui/accordion');
  await plain.locator('[data-example-card="road-trip"] img').click();
- await plain.waitForURL(base + '/markless/examples/accordion/road-trip');
+ await plain.waitForURL(base + '/examples/accordion/road-trip');
  await plain.locator('[data-scene="road-trip"]').waitFor();
  assert.deepEqual(errors, []);
  console.log('PASS: compact image-link cards; no iframe or preview controls; Road trip first; pointer and keyboard navigation; live standalone examples without docs layout; return link; responsive alignment; fixed sidebar; light/dark screenshots; navigation without JavaScript; no page errors.');

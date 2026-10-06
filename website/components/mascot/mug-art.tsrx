@@ -25,7 +25,7 @@ export default function MugArt({
 		class="mug"
 		viewBox="20 -28 220 270"
 		data-variant={variant}
-		data-docs-mug={variant === 'toc' ? 'true' : undefined}
+		data-docs-mug={variant === 'toc' || variant === 'mark' || variant === 'hero' ? 'true' : undefined}
 		data-state={mood}
 		data-expression={face}
 		data-glaze={glaze}
@@ -792,7 +792,7 @@ export default function MugArt({
 .mug[data-state='idle'] .eye-r { html[data-mascot-expression='sleepy'] & { transform:translate(136px,156px) rotate(8deg) scale(1,0.17); } }
 
 .mug[data-variant='toc'] { width:10rem; height:10rem; }
-.mug[data-variant='toc'] .gaze { animation:none; transform:translate(var(--gaze-x,0px),var(--gaze-y,0px)); }
+.mug[data-docs-mug] .gaze { animation:none; transform:translate(var(--gaze-x,0px),var(--gaze-y,0px)); }
 .mug[data-reaction='odd'] .steam { animation:tip-steam-odd 1800ms linear; }
 .mug[data-reaction='even'] .steam { animation:tip-steam-even 1800ms linear; }
 @keyframes tip-steam-odd { 0%,100% { opacity:1; } 5%,90% { opacity:0; } }
@@ -809,7 +809,7 @@ export default function MugArt({
 @media(prefers-reduced-motion:reduce) {
 .mug .eye-l,.mug .eye-r,.mug .pose { transition:none!important; }
 .mug .pop,.mug .breath,.mug .greeting-eyes,.mug .steam { animation:none!important; }
-.mug[data-variant='toc'] .gaze { transform:none; }
+.mug[data-docs-mug] .gaze { transform:none; }
 .mug[data-reaction='odd'] .greeting-eyes { transform:scaleY(.65); }
 .mug[data-reaction='even'] .greeting-eyes { transform:scaleY(.8); }
 }

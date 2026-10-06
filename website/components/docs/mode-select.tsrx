@@ -138,8 +138,8 @@ export default function ModeSelect({ mode }: { readonly mode: Mode }) @{
 			value={mode}
 			name="documentation-mode"
 			onChange={(value) => {
-				if (value === 'framework') location.assign('/markless');
-				if (value === 'ui') location.assign('/markless/ui');
+				if (value === 'framework') location.assign('/');
+				if (value === 'ui') location.assign('/ui');
 			}}
 		>
 			<select.label style="clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px;">

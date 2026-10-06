@@ -18,11 +18,11 @@ afterEach(() => {
 const setup = () => {
 	const root = mkdtempSync(join(tmpdir(), 'docs-data-'));
 	roots.push(root);
-	return { root, id: join(root, 'pages/markless/ui/accordion.mdx') };
+	return { root, id: join(root, 'pages/ui/accordion.mdx') };
 };
 const inputs: DocsInputs = { manifest, scenes, order: (family) => metaIfAny(family)?.partOrder };
-const api = "import ApiTable from '../../../components/docs/api-table.tsrx';\n\n";
-const anatomy = "import AnatomyTable from '../../../components/docs/anatomy-table.tsrx';\n\n";
+const api = "import ApiTable from '../../components/docs/api-table.tsrx';\n\n";
+const anatomy = "import AnatomyTable from '../../components/docs/anatomy-table.tsrx';\n\n";
 
 describe('static docs data', () => {
 	it.each(['accordion', 'tabs'])(
@@ -129,7 +129,7 @@ describe('static docs data', () => {
 		expect(result.modules).toHaveLength(0);
 		expect(result.code).toBe(api + tail);
 		for (const source of [
-			'import { ApiTable } from \'../../../components/docs/api-table.tsrx\';\n\n<ApiTable family="tabs" />',
+			'import { ApiTable } from \'../../components/docs/api-table.tsrx\';\n\n<ApiTable family="tabs" />',
 			'import ApiTable from \'./unrelated.tsrx\';\n\n<ApiTable family="tabs" />',
 		]) {
 			expect((await prepareDocsData(source, id, root, inputs)).code).toBe(source);

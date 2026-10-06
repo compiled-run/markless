@@ -9,7 +9,7 @@ export default function RunOnceDemo() @{
 	const ranAt = new Date().toLocaleTimeString('en-GB');
 
 	<div class="run-once">
-		<button aria-label="Like" onClick={() => likes++}><img src="/markless/stickers/heart.png" alt="" aria-hidden="true" /><span>{likes}</span></button>
+		<button aria-label="Like" onClick={() => likes++}><img src="/stickers/heart.png" alt="" aria-hidden="true" /><span>{likes}</span></button>
 		<div class="log">
 			<span class="label">your function runs</span>
 			<span class="entry">#1 at {ranAt}</span>

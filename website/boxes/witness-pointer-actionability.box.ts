@@ -44,7 +44,7 @@ export default box(
 						order: 'pre',
 						handler(server) {
 						server.middlewares.use((request, response, next) => {
-							if (request.url !== '/markless/__pointer-fixture') return next();
+							if (request.url !== '/__pointer-fixture') return next();
 							response.setHeader('Content-Type', 'text/html');
 							response.end(fixture);
 						});
@@ -53,7 +53,7 @@ export default box(
 				}],
 			}),
 		});
-		const page = await browser.visit('/markless/__pointer-fixture');
+		const page = await browser.visit('/__pointer-fixture');
 		try {
 			const content = await page.content();
 			const documents = (await page.networkRequests()).filter((request) => request.resourceType === 'Document');

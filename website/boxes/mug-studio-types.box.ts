@@ -58,7 +58,7 @@ export default box(
 			receipt.note(JSON.stringify({ label, state }));
 		};
 		try {
-			await page.goto(new URL('/markless/mascot', server.url).href);
+			await page.goto(new URL('/mascot', server.url).href);
 			const mug = page.locator('.mascot .drawing svg.mug');
 			await expect(mug).toBeVisible();
 			await capture('initial');

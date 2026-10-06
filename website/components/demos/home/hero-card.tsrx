@@ -190,7 +190,7 @@ export default function HeroCard() @{
         >
           <img
             class={hot === "img" ? "mug hot" : "mug"}
-            src="/markless/stickers/coffee-mug.png"
+            src="/stickers/coffee-mug.png"
             alt="A hand-drawn coffee mug sticker"
             onMouseenter={() => (hot = "img")}
             onMouseleave={() => (hot = "photo")}
@@ -220,7 +220,7 @@ export default function HeroCard() @{
           onMouseenter={() => (hot = "button")}
           onMouseleave={() => (hot = "card")}
         >
-          <img src="/markless/stickers/heart.png" alt="" aria-hidden="true" />
+          <img src="/stickers/heart.png" alt="" aria-hidden="true" />
           <span class={hot === "likes" ? "hot" : ""}>{likes}</span>
         </button>
       </article>

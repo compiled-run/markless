@@ -1001,19 +1001,19 @@ html {
 }
 
 .callout[data-sticker='spring']::after {
-	background-image: url('/markless/stickers/spring.png');
+	background-image: url('/stickers/spring.png');
 }
 
 .callout[data-sticker='map']::after {
-	background-image: url('/markless/stickers/map.png');
+	background-image: url('/stickers/map.png');
 }
 
 .callout[data-sticker='cloud']::after {
-	background-image: url('/markless/stickers/cloud.png');
+	background-image: url('/stickers/cloud.png');
 }
 
 .callout[data-sticker='scribble']::after {
-	background-image: url('/markless/stickers/scribble.png');
+	background-image: url('/stickers/scribble.png');
 }
 
 .pager-doodles .sticker {

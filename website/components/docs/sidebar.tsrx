@@ -1,8 +1,9 @@
 import { tree } from '@markless/ui';
 import { Link } from '@markless/core/router';
-import Mascot from '../mascot.tsrx';
+import MarklessMug from '../mascot/markless-mug.tsrx';
 import ModeSelect from './mode-select.tsrx';
 import { modeFor, sidebarFor } from '../../nav.ts';
+import { asset } from '../../site-base.ts';
 
 export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 	const here = modeFor(pathname);
@@ -26,8 +27,8 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 			if (row.hasAttribute('data-page-href')) row.querySelector<HTMLAnchorElement>('a')?.click();
 		}}
 	>
-		<Link class="site-mark" href="/markless">
-			<Mascot name="markless" size="2.5rem" variant="mark" />
+		<Link class="site-mark" href="/">
+			<MarklessMug variant="mark" size="3rem" mood="idle" />
 			<span class="site-name">Markless</span>
 		</Link>
 		<ModeSelect mode={here.key} />
@@ -73,13 +74,13 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 												<span class="nav-icon" aria-hidden="true">
 													<img
 														class="nav-icon-ink nav-icon-light"
-														src={entry.icon ? '/markless/sidebar/' + entry.icon + '-light.png' : '/markless/sprites/' + (entry.sprite ?? 'sparkle') + '.png'}
+														src={asset(entry.icon ? 'sidebar/' + entry.icon + '-light.png' : 'sprites/' + (entry.sprite ?? 'sparkle') + '.png')}
 														alt=""
 														decoding="async"
 													/>
 													<img
 														class="nav-icon-ink nav-icon-dark"
-														src={entry.icon ? '/markless/sidebar/' + entry.icon + '-dark.png' : '/markless/sprites/' + (entry.sprite ?? 'sparkle') + '.dark.png'}
+														src={asset(entry.icon ? 'sidebar/' + entry.icon + '-dark.png' : 'sprites/' + (entry.sprite ?? 'sparkle') + '.dark.png')}
 														alt=""
 														decoding="async"
 													/>

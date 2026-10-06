@@ -1,3 +1,5 @@
+import { asset } from '../site-base.ts';
+
 // One of the owner's hand-drawn crayon doodles, cut out of `sprites-sheet.png`
 // by `tooling/cut-sprites.ts`. `public/sprites/` holds two files per sprite: the
 // drawing as it was scanned, and a `.dark.png` whose dark crayon outline has been
@@ -18,14 +20,14 @@ export default function Sprite({
 	<span class="sprite" style={'--sprite-size:' + (size ?? '1.6em')}>
 		<img
 			class="sprite-ink sprite-ink-light"
-			src={'/markless/sprites/' + name + '.png'}
+			src={asset('sprites/' + name + '.png')}
 			alt={label}
 			aria-hidden={hidden}
 			decoding="async"
 		/>
 		<img
 			class="sprite-ink sprite-ink-dark"
-			src={'/markless/sprites/' + name + '.dark.png'}
+			src={asset('sprites/' + name + '.dark.png')}
 			alt=""
 			aria-hidden="true"
 			decoding="async"

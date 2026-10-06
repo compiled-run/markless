@@ -1,6 +1,7 @@
 // The sibling projects, as their mascots. versionless has no public repository
 // yet, so its link points at the compiled-run organisation as a placeholder.
 import Mascot from '../mascot.tsrx';
+import MarklessMug from '../mascot/markless-mug.tsrx';
 
 export default function MoreFromCompiled() @{
 	<aside class="more-from">
@@ -59,7 +60,7 @@ export default function MoreFromCompiled() @{
 		<ul class="more-from-list">
 			<li class="more-from-item">
 				<a class="more-from-link" href="https://github.com/compiled-run/markless">
-					<Mascot name="markless" size="4.5rem" alt="The markless mascot" />
+					<MarklessMug variant="tile" size="4.5rem" drawn="6rem" mood="idle" announced={true} />
 					<span class="more-from-name">markless</span>
 					<span class="more-from-note">this site</span>
 				</a>

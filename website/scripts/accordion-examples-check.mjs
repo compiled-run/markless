@@ -13,7 +13,7 @@ try {
  const check = async (name, run) => { try { await run(); console.log('PASS: ' + name); } catch (error) { failures.push(name + ': ' + error.message); console.error('FAIL: ' + name + ': ' + error.stack); } };
  page.setDefaultTimeout(30000);
  page.on('pageerror', error => errors.push(error.message));
- await page.goto(base + '/markless/ui/accordion-examples');
+ await page.goto(base + '/ui/accordion-examples');
  await page.locator('[data-gallery]').waitFor();
  const scenarios = [['road-trip', 'C'], ['case-file', 'B'], ['rulebook', 'C']];
  for (const [scenario, treatment] of scenarios) {
@@ -29,7 +29,7 @@ try {
    await page.waitForFunction(({ scenario, before }) => document.querySelector('[data-scene="' + scenario + '"] [data-example-trigger]')?.getAttribute('aria-expanded') !== before, { scenario, before });
    await trigger.click();
  }
- await page.goto(base + '/markless/ui/accordion-examples');
+ await page.goto(base + '/ui/accordion-examples');
  let scene;
  await check('Case file: read stamps and culprit unlock', async () => {
  await page.locator('[data-select-scenario="case-file"]').click();
@@ -62,7 +62,7 @@ try {
  assert.equal(await scene.locator('[data-example-trigger][aria-expanded="true"]').count(), 2);
  assert.equal(await scene.getByRole('button', { name: /Day 4/ }).isDisabled(), false);
  });
- await page.goto(base + '/markless/ui/accordion-examples');
+ await page.goto(base + '/ui/accordion-examples');
  await page.setViewportSize({ width: 390, height: 844 });
  for (const [scenario, treatment] of scenarios) {
    await page.locator('[data-select-scenario="' + scenario + '"]').click();

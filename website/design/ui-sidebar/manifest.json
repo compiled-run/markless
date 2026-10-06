@@ -330,7 +330,7 @@
 			"color": "pink",
 			"behavior": "Overview of composable headless component families",
 			"subject": "Three chunky interlocking puzzle blocks with a tiny jaunty crown",
-			"source": "website/pages/markless/ui/index.mdx"
+			"source": "website/pages/ui/index.mdx"
 		},
 		{
 			"name": "styling",
@@ -340,7 +340,7 @@
 			"color": "pink",
 			"behavior": "CSS styles target family ui-state attributes",
 			"subject": "Broad paintbrush making a short swash beside three crayon color swatches",
-			"source": "website/pages/markless/ui/styling.mdx"
+			"source": "website/pages/ui/styling.mdx"
 		},
 		{
 			"name": "table",

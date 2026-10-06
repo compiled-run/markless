@@ -5,7 +5,7 @@ import { familyOf } from '../api-derive/manifest.ts';
 
 describe('anatomy drawings', () => {
 	it('has a distinct drawing for each public component page', () => {
-		const pages = new URL('../../../pages/markless/ui/', import.meta.url);
+		const pages = new URL('../../../pages/ui/', import.meta.url);
 		for (const file of readdirSync(pages)) {
 			const source = readFileSync(new URL(file, pages), 'utf8');
 			if (!/^## (Anatomy|Structure)$/m.test(source) || file.startsWith('_')) continue;

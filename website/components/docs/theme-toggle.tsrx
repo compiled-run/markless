@@ -1,4 +1,5 @@
 import { storage } from '@markless/core';
+import { asset } from '../../site-base.ts';
 
 export default function ThemeToggle() @{
 	// oxlint-disable-next-line no-unused-vars -- the write persists the choice
@@ -58,7 +59,7 @@ export default function ThemeToggle() @{
 		>
 			<img
 				class="theme-toggle-icon"
-				src="/markless/theme/sun.png"
+				src={asset('theme/sun.png')}
 				alt=""
 				aria-hidden="true"
 				decoding="async"
@@ -76,7 +77,7 @@ export default function ThemeToggle() @{
 		>
 			<img
 				class="theme-toggle-icon"
-				src="/markless/theme/moon.png"
+				src={asset('theme/moon.png')}
 				alt=""
 				aria-hidden="true"
 				decoding="async"

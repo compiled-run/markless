@@ -6,7 +6,7 @@ export default function AccordionGallery() @{
  let choice = state<Scenario>('road-trip');
  const stories = state(scenarios);
  <div class="gallery" data-gallery>
-  <header class="gallery-heading"><a href="/markless/ui/accordion">← Accordion</a><h1>Little stories that open up.</h1><p>Three working examples. Pick a story and make yourself at home.</p></header>
+  <header class="gallery-heading"><a href="/ui/accordion">← Accordion</a><h1>Little stories that open up.</h1><p>Three working examples. Pick a story and make yourself at home.</p></header>
   <div class="scenario-picker" role="group" aria-label="Choose a scenario">@for (const story of stories; key story.id) { <button type="button" data-select-scenario={story.id} aria-pressed={choice === story.id} onClick={() => { choice = story.id; }}>{story.label}</button> }</div>
   <div class="scene-holder" hidden={choice !== 'road-trip'}><AccordionScene scenario="road-trip" /></div>
   <div class="scene-holder" hidden={choice !== 'case-file'}><AccordionScene scenario="case-file" /></div>

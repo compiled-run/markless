@@ -1,7 +1,7 @@
 import type { Plugin } from 'vite';
 
 // The page file already names the family and the route, so a docs tag may leave
-// them out: in pages/markless/ui/accordion.mdx `<ApiTable />` reads as
+// them out: in pages/ui/accordion.mdx `<ApiTable />` reads as
 // `<ApiTable family="accordion" />`, `scenario="basic"` as
 // `scenario="accordion/basic"`, and `<Sidebar />` gets the page's pathname.
 const PAGES = '/pages/';

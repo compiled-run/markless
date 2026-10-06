@@ -1,4 +1,5 @@
 import { headFor, siteOrigin } from './nav.ts';
+import { asset } from './site-base.ts';
 import Pager from './components/docs/pager.tsrx';
 import SiteHeader from './components/docs/site-header.tsrx';
 import stylesheet from './styles/global.css?url';
@@ -14,7 +15,7 @@ export default function Document({
 	const pathname = (url?.pathname ?? '/').replace(/\/+$/, '') || '/';
 	const head = headFor(pathname);
 	const canonical = `${siteOrigin}${pathname}`;
-	const examplePage = pathname.startsWith('/markless/examples/accordion/');
+	const examplePage = pathname.startsWith('/examples/accordion/');
 	const previewTheme = examplePage ? 'light' : undefined;
 
 	<html lang="en" data-theme={previewTheme} class={previewTheme}>
@@ -33,15 +34,15 @@ export default function Document({
 			<meta property="og:description" content={head.description} />
 			<meta property="og:url" content={canonical} />
 			<meta name="twitter:card" content="summary" />
-			<link rel="icon" href="/markless/favicon.svg" type="image/svg+xml" />
-			<link rel="apple-touch-icon" href="/markless/mascots/markless.png" />
+			<link rel="icon" href={asset('favicon.svg')} type="image/svg+xml" />
+			<link rel="apple-touch-icon" href={asset('markless-mug-icon.png')} />
 			<link rel="stylesheet" href={stylesheet} />
 			<link rel="stylesheet" href={brandStylesheet} />
-			<script src="/markless/theme.js"></script>
-			<script src="/markless/mascot.js"></script>
-			<script type="module" src="/markless/outline.js"></script>
+			<script src={asset('theme.js')}></script>
+			<script src={asset('mascot.js')}></script>
+			<script type="module" src={asset('outline.js')}></script>
 			@if (examplePage) {
-				<script type="module" src="/markless/accordion-preview.js"></script>;
+				<script type="module" src={asset('accordion-preview.js')}></script>;
 			}
 		</head>
 		<body>

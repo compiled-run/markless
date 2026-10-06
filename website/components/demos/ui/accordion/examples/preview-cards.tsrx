@@ -2,22 +2,22 @@ export default function AccordionPreviewCards() @{
  <section class="accordion-examples" data-accordion-examples aria-label="Live accordion examples">
   <p class="intro">Little worlds built with accordion. Pick one to explore.</p>
   <div class="cards">
-   <a class="sticker" data-example-card="road-trip" href="/markless/examples/accordion/road-trip" aria-labelledby="road-trip-card-title">
-    <img src="/markless/accordion-art/previews/road-trip.jpg" alt="" width={800} height={480} loading="lazy" />
+   <a class="sticker" data-example-card="road-trip" href="/examples/accordion/road-trip" aria-labelledby="road-trip-card-title">
+    <img src="/accordion-art/previews/road-trip.jpg" alt="" width={800} height={480} loading="lazy" />
     <div class="caption">
      <h3 id="road-trip-card-title">Road trip: Lisbon to Porto</h3><span class="arrow" aria-hidden="true">↗</span>
      <p>A coastal itinerary, two days at a time.</p>
     </div>
    </a>
-   <a class="sticker" data-example-card="case-file" href="/markless/examples/accordion/case-file" aria-labelledby="case-file-card-title">
-    <img src="/markless/accordion-art/previews/case-file.jpg" alt="" width={800} height={480} loading="lazy" />
+   <a class="sticker" data-example-card="case-file" href="/examples/accordion/case-file" aria-labelledby="case-file-card-title">
+    <img src="/accordion-art/previews/case-file.jpg" alt="" width={800} height={480} loading="lazy" />
     <div class="caption">
      <h3 id="case-file-card-title">Case file: the missing sourdough starter</h3><span class="arrow" aria-hidden="true">↗</span>
      <p>A bakery mystery, one alibi at a time.</p>
     </div>
    </a>
-   <a class="sticker" data-example-card="rulebook" href="/markless/examples/accordion/rulebook" aria-labelledby="rulebook-card-title">
-    <img src="/markless/accordion-art/previews/rulebook.jpg" alt="" width={800} height={480} loading="lazy" />
+   <a class="sticker" data-example-card="rulebook" href="/examples/accordion/rulebook" aria-labelledby="rulebook-card-title">
+    <img src="/accordion-art/previews/rulebook.jpg" alt="" width={800} height={480} loading="lazy" />
     <div class="caption">
      <h3 id="rulebook-card-title">Rulebook: Moon Goats</h3><span class="arrow" aria-hidden="true">↗</span>
      <p>A small rulebook for an unruly herd.</p>

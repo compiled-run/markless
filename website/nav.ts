@@ -43,7 +43,7 @@ export const nav: readonly NavSection[] = [
 		entries: [
 			{
 				title: 'What is Markless',
-				href: '/markless',
+				href: '/',
 				sprite: 'crown',
 				icon: 'what-is-markless',
 				number: '1',
@@ -52,7 +52,7 @@ export const nav: readonly NavSection[] = [
 			},
 			{
 				title: 'Your first app',
-				href: '/markless/start/first-app',
+				href: '/start/first-app',
 				sprite: 'plus',
 				icon: 'first-app',
 				number: '2',
@@ -61,7 +61,7 @@ export const nav: readonly NavSection[] = [
 			},
 			{
 				title: 'Reading a .tsrx file',
-				href: '/markless/start/reading-tsrx',
+				href: '/start/reading-tsrx',
 				sprite: 'bookmark',
 				icon: 'reading-tsrx',
 				number: '3',
@@ -77,7 +77,7 @@ export const nav: readonly NavSection[] = [
 		entries: [
 			{
 				title: 'State',
-				href: '/markless/concepts/state',
+				href: '/concepts/state',
 				sprite: 'sparkle',
 				icon: 'state',
 				number: '1',
@@ -86,7 +86,7 @@ export const nav: readonly NavSection[] = [
 			},
 			{
 				title: 'Computed',
-				href: '/markless/concepts/computed',
+				href: '/concepts/computed',
 				sprite: 'spiral',
 				icon: 'computed',
 				number: '2',
@@ -95,7 +95,7 @@ export const nav: readonly NavSection[] = [
 			},
 			{
 				title: 'Events',
-				href: '/markless/concepts/events',
+				href: '/concepts/events',
 				sprite: 'bolt',
 				icon: 'events',
 				number: '3',
@@ -104,7 +104,7 @@ export const nav: readonly NavSection[] = [
 			},
 			{
 				title: 'Conditionals',
-				href: '/markless/concepts/conditionals',
+				href: '/concepts/conditionals',
 				sprite: 'corner-bracket',
 				icon: 'conditionals',
 				number: '4',
@@ -113,7 +113,7 @@ export const nav: readonly NavSection[] = [
 			},
 			{
 				title: 'Lists',
-				href: '/markless/concepts/lists',
+				href: '/concepts/lists',
 				sprite: 'dashes',
 				icon: 'lists',
 				number: '5',
@@ -122,7 +122,7 @@ export const nav: readonly NavSection[] = [
 			},
 			{
 				title: 'Async',
-				href: '/markless/concepts/async',
+				href: '/concepts/async',
 				sprite: 'arrow-loop',
 				icon: 'async',
 				number: '6',
@@ -131,7 +131,7 @@ export const nav: readonly NavSection[] = [
 			},
 			{
 				title: 'Styling',
-				href: '/markless/concepts/styling',
+				href: '/concepts/styling',
 				sprite: 'flower',
 				icon: 'styling',
 				number: '7',
@@ -147,7 +147,7 @@ export const nav: readonly NavSection[] = [
 		entries: [
 			{
 				title: 'Components',
-				href: '/markless/build/components',
+				href: '/build/components',
 				sprite: 'crown',
 				icon: 'components',
 				number: '1',
@@ -156,7 +156,7 @@ export const nav: readonly NavSection[] = [
 			},
 			{
 				title: 'Elements',
-				href: '/markless/build/elements',
+				href: '/build/elements',
 				sprite: 'bolt',
 				icon: 'elements',
 				number: '2',
@@ -165,7 +165,7 @@ export const nav: readonly NavSection[] = [
 			},
 			{
 				title: 'Storage',
-				href: '/markless/build/storage',
+				href: '/build/storage',
 				sprite: 'bookmark',
 				icon: 'storage',
 				number: '3',
@@ -174,7 +174,7 @@ export const nav: readonly NavSection[] = [
 			},
 			{
 				title: 'Shared',
-				href: '/markless/build/shared',
+				href: '/build/shared',
 				sprite: 'spiral',
 				icon: 'shared',
 				number: '4',
@@ -190,7 +190,7 @@ export const nav: readonly NavSection[] = [
 		entries: [
 			{
 				title: 'Pages',
-				href: '/markless/router/pages',
+				href: '/router/pages',
 				sprite: 'square',
 				icon: 'pages',
 				number: '1',
@@ -199,7 +199,7 @@ export const nav: readonly NavSection[] = [
 			},
 			{
 				title: 'Links',
-				href: '/markless/router/links',
+				href: '/router/links',
 				sprite: 'arrow-curve',
 				icon: 'links',
 				number: '2',
@@ -208,7 +208,7 @@ export const nav: readonly NavSection[] = [
 			},
 			{
 				title: 'Page data',
-				href: '/markless/router/data',
+				href: '/router/data',
 				sprite: 'drops',
 				icon: 'data',
 				number: '3',
@@ -224,7 +224,7 @@ export const nav: readonly NavSection[] = [
 		entries: [
 			{
 				title: 'How it works',
-				href: '/markless/how-it-works',
+				href: '/how-it-works',
 				sprite: 'rays',
 				icon: 'how-it-works',
 				number: '1',
@@ -239,7 +239,7 @@ export const nav: readonly NavSection[] = [
 		entries: [
 			{
 				title: 'Reference',
-				href: '/markless/reference',
+				href: '/reference',
 				sprite: 'hash',
 				number: '1',
 				description:
@@ -254,7 +254,7 @@ export const nav: readonly NavSection[] = [
 		entries: [
 			{
 				title: 'The mug',
-				href: '/markless/mascot',
+				href: '/mascot',
 				sprite: 'smiley',
 				number: '1',
 				description:
@@ -285,7 +285,7 @@ export const siteDescription =
 	'The Markless documentation: a framework whose compiler works out what changes while it builds your file, so the browser ships the update rather than the machinery for finding it.';
 
 /** Where this site is served, which is what an absolute URL in `sitemap.xml` needs. */
-export const siteOrigin = 'https://compiled.run';
+export const siteOrigin = 'https://markless.dev';
 
 export type Head = { readonly title: string; readonly description: string };
 
@@ -331,22 +331,22 @@ export function pagerFor(pathname: string): Pager {
  * what the reader sees and follows, so a page never spells a URL itself.
  */
 export const concepts: Readonly<Record<string, NavEntry>> = {
-	'first-app': { title: 'your first app', href: '/markless/start/first-app' },
-	'reading-tsrx': { title: 'reading a .tsrx file', href: '/markless/start/reading-tsrx' },
-	async: { title: 'async', href: '/markless/concepts/async' },
-	computed: { title: 'computed', href: '/markless/concepts/computed' },
-	conditionals: { title: 'conditionals', href: '/markless/concepts/conditionals' },
-	events: { title: 'events', href: '/markless/concepts/events' },
-	lists: { title: 'lists', href: '/markless/concepts/lists' },
-	state: { title: 'state', href: '/markless/concepts/state' },
-	styling: { title: 'styling', href: '/markless/concepts/styling' },
-	components: { title: 'components', href: '/markless/build/components' },
-	elements: { title: 'elements', href: '/markless/build/elements' },
-	storage: { title: 'storage', href: '/markless/build/storage' },
-	shared: { title: 'shared', href: '/markless/build/shared' },
-	routes: { title: 'routes are files', href: '/markless/router/pages' },
-	links: { title: 'links', href: '/markless/router/links' },
-	data: { title: 'page data', href: '/markless/router/data' },
+	'first-app': { title: 'your first app', href: '/start/first-app' },
+	'reading-tsrx': { title: 'reading a .tsrx file', href: '/start/reading-tsrx' },
+	async: { title: 'async', href: '/concepts/async' },
+	computed: { title: 'computed', href: '/concepts/computed' },
+	conditionals: { title: 'conditionals', href: '/concepts/conditionals' },
+	events: { title: 'events', href: '/concepts/events' },
+	lists: { title: 'lists', href: '/concepts/lists' },
+	state: { title: 'state', href: '/concepts/state' },
+	styling: { title: 'styling', href: '/concepts/styling' },
+	components: { title: 'components', href: '/build/components' },
+	elements: { title: 'elements', href: '/build/elements' },
+	storage: { title: 'storage', href: '/build/storage' },
+	shared: { title: 'shared', href: '/build/shared' },
+	routes: { title: 'routes are files', href: '/router/pages' },
+	links: { title: 'links', href: '/router/links' },
+	data: { title: 'page data', href: '/router/data' },
 };
 
 export type AssumesItem = {
@@ -390,7 +390,7 @@ export function assumesFor(assumes: string): readonly AssumesItem[] {
 }
 
 /* ---------------------------------------------------------------------------
-   The UI section. `@markless/ui` is a second set of pages under /markless/ui,
+   The UI section. `@markless/ui` is a second set of pages under /ui,
    and the switch at the top of the sidebar moves a reader between the two. What
    follows is the same shape as the framework nav above, so one file still
    decides the sidebar, the breadcrumb, the pager and the document head.
@@ -406,8 +406,8 @@ export type Mode = { readonly key: ModeKey; readonly title: string; readonly hre
  * it wants instead of searching for it and each title is written once.
  */
 export const modes: Readonly<Record<ModeKey, Mode>> = {
-	framework: { key: 'framework', title: 'Framework', href: '/markless' },
-	ui: { key: 'ui', title: 'UI', href: '/markless/ui' },
+	framework: { key: 'framework', title: 'Framework', href: '/' },
+	ui: { key: 'ui', title: 'UI', href: '/ui' },
 };
 
 export const uiNav: readonly NavSection[] = [
@@ -418,7 +418,7 @@ export const uiNav: readonly NavSection[] = [
 		entries: [
 			{
 				title: 'Overview',
-				href: '/markless/ui',
+				href: '/ui',
 				sprite: 'star-face',
 				number: '1',
 				description:
@@ -426,7 +426,7 @@ export const uiNav: readonly NavSection[] = [
 			},
 			{
 				title: 'Styling',
-				href: '/markless/ui/styling',
+				href: '/ui/styling',
 				sprite: 'flower',
 				number: '2',
 				description:
@@ -441,7 +441,7 @@ export const uiNav: readonly NavSection[] = [
 		entries: [
 			{
 				title: 'checkbox',
-				href: '/markless/ui/checkbox',
+				href: '/ui/checkbox',
 				sprite: 'check',
 				number: '1',
 				description:
@@ -449,7 +449,7 @@ export const uiNav: readonly NavSection[] = [
 			},
 			{
 				title: 'checklist',
-				href: '/markless/ui/checklist',
+				href: '/ui/checklist',
 				sprite: 'dashes',
 				number: '2',
 				description:
@@ -457,7 +457,7 @@ export const uiNav: readonly NavSection[] = [
 			},
 			{
 				title: 'combobox',
-				href: '/markless/ui/combobox',
+				href: '/ui/combobox',
 				sprite: 'cursor',
 				number: '3',
 				description:
@@ -465,7 +465,7 @@ export const uiNav: readonly NavSection[] = [
 			},
 			{
 				title: 'otp',
-				href: '/markless/ui/otp',
+				href: '/ui/otp',
 				sprite: 'hash',
 				number: '4',
 				description:
@@ -473,7 +473,7 @@ export const uiNav: readonly NavSection[] = [
 			},
 			{
 				title: 'radiogroup',
-				href: '/markless/ui/radiogroup',
+				href: '/ui/radiogroup',
 				sprite: 'oval',
 				number: '5',
 				description:
@@ -481,7 +481,7 @@ export const uiNav: readonly NavSection[] = [
 			},
 			{
 				title: 'select',
-				href: '/markless/ui/select',
+				href: '/ui/select',
 				sprite: 'triangle',
 				number: '6',
 				description:
@@ -489,7 +489,7 @@ export const uiNav: readonly NavSection[] = [
 			},
 			{
 				title: 'textbox',
-				href: '/markless/ui/textbox',
+				href: '/ui/textbox',
 				sprite: 'pill',
 				number: '7',
 				description:
@@ -497,7 +497,7 @@ export const uiNav: readonly NavSection[] = [
 			},
 			{
 				title: 'toggle',
-				href: '/markless/ui/toggle',
+				href: '/ui/toggle',
 				sprite: 'bolt',
 				number: '8',
 				description:
@@ -512,7 +512,7 @@ export const uiNav: readonly NavSection[] = [
 		entries: [
 			{
 				title: 'accordion',
-				href: '/markless/ui/accordion',
+				href: '/ui/accordion',
 				sprite: 'arrow-curve',
 				number: '1',
 				description:
@@ -520,7 +520,7 @@ export const uiNav: readonly NavSection[] = [
 			},
 			{
 				title: 'collapsible',
-				href: '/markless/ui/collapsible',
+				href: '/ui/collapsible',
 				sprite: 'plus',
 				number: '2',
 				description:
@@ -528,7 +528,7 @@ export const uiNav: readonly NavSection[] = [
 			},
 			{
 				title: 'modal',
-				href: '/markless/ui/modal',
+				href: '/ui/modal',
 				sprite: 'square',
 				number: '3',
 				description:
@@ -536,7 +536,7 @@ export const uiNav: readonly NavSection[] = [
 			},
 			{
 				title: 'navbar',
-				href: '/markless/ui/navbar',
+				href: '/ui/navbar',
 				sprite: 'arrow-straight',
 				number: '4',
 				description:
@@ -544,7 +544,7 @@ export const uiNav: readonly NavSection[] = [
 			},
 			{
 				title: 'tabs',
-				href: '/markless/ui/tabs',
+				href: '/ui/tabs',
 				sprite: 'bookmark',
 				number: '5',
 				description:
@@ -552,7 +552,7 @@ export const uiNav: readonly NavSection[] = [
 			},
 			{
 				title: 'tree',
-				href: '/markless/ui/tree',
+				href: '/ui/tree',
 				sprite: 'spiral',
 				number: '6',
 				description:
@@ -567,7 +567,7 @@ export const uiNav: readonly NavSection[] = [
 		entries: [
 			{
 				title: 'drawer',
-				href: '/markless/ui/drawer',
+				href: '/ui/drawer',
 				sprite: 'corner-bracket',
 				number: '1',
 				description:
@@ -575,7 +575,7 @@ export const uiNav: readonly NavSection[] = [
 			},
 			{
 				title: 'hovercard',
-				href: '/markless/ui/hovercard',
+				href: '/ui/hovercard',
 				sprite: 'speech-bubble',
 				number: '2',
 				description:
@@ -583,7 +583,7 @@ export const uiNav: readonly NavSection[] = [
 			},
 			{
 				title: 'popover',
-				href: '/markless/ui/popover',
+				href: '/ui/popover',
 				sprite: 'plus',
 				number: '3',
 				description:
@@ -591,7 +591,7 @@ export const uiNav: readonly NavSection[] = [
 			},
 			{
 				title: 'tooltip',
-				href: '/markless/ui/tooltip',
+				href: '/ui/tooltip',
 				sprite: 'dashes',
 				number: '4',
 				description:
@@ -606,7 +606,7 @@ export const uiNav: readonly NavSection[] = [
 		entries: [
 			{
 				title: 'gridlist',
-				href: '/markless/ui/gridlist',
+				href: '/ui/gridlist',
 				sprite: 'dashes',
 				number: '1',
 				description:
@@ -614,7 +614,7 @@ export const uiNav: readonly NavSection[] = [
 			},
 			{
 				title: 'table',
-				href: '/markless/ui/table',
+				href: '/ui/table',
 				sprite: 'hash',
 				number: '2',
 				description:
@@ -622,7 +622,7 @@ export const uiNav: readonly NavSection[] = [
 			},
 			{
 				title: 'resizable',
-				href: '/markless/ui/resizable',
+				href: '/ui/resizable',
 				sprite: 'arrow-straight',
 				number: '3',
 				description:
@@ -637,7 +637,7 @@ export const uiNav: readonly NavSection[] = [
 		entries: [
 			{
 				title: 'carousel',
-				href: '/markless/ui/carousel',
+				href: '/ui/carousel',
 				sprite: 'arrow-loop',
 				number: '1',
 				description:
@@ -645,7 +645,7 @@ export const uiNav: readonly NavSection[] = [
 			},
 			{
 				title: 'pagination',
-				href: '/markless/ui/pagination',
+				href: '/ui/pagination',
 				sprite: 'dots',
 				number: '2',
 				description:
@@ -653,7 +653,7 @@ export const uiNav: readonly NavSection[] = [
 			},
 			{
 				title: 'progress',
-				href: '/markless/ui/progress',
+				href: '/ui/progress',
 				sprite: 'drops',
 				number: '3',
 				description:
@@ -661,7 +661,7 @@ export const uiNav: readonly NavSection[] = [
 			},
 			{
 				title: 'qrcode',
-				href: '/markless/ui/qrcode',
+				href: '/ui/qrcode',
 				sprite: 'star-badge',
 				number: '4',
 				description:
@@ -669,7 +669,7 @@ export const uiNav: readonly NavSection[] = [
 			},
 			{
 				title: 'toaster',
-				href: '/markless/ui/toaster',
+				href: '/ui/toaster',
 				sprite: 'speech-bubble',
 				number: '5',
 				description:
@@ -688,7 +688,7 @@ const allFlat: readonly NavEntry[] = [...flatNav, ...flatUiNav];
 
 /** Which of the two sets of pages a pathname belongs to. */
 export function modeOf(pathname: string): ModeKey {
-	const inUi = pathname === '/markless/ui' || pathname.startsWith('/markless/ui/');
+	const inUi = pathname === '/ui' || pathname.startsWith('/ui/');
 	return inUi ? 'ui' : 'framework';
 }
 

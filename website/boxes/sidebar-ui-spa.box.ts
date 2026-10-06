@@ -12,10 +12,10 @@ export default box(
 		await pipeline.dev({
 			config: (config) => ({ ...config, server: { ...config.server, watch: null } }),
 		});
-		const page = await browser.visit('/markless/ui/select');
+		const page = await browser.visit('/ui/select');
 		await expect.page.text(page, 'h1', 'select', WAIT);
 		await page.click('.sidebar-summary', WAIT);
-		await page.click('.sidebar a[href="/markless/ui/combobox"]', WAIT);
+		await page.click('.sidebar a[href="/ui/combobox"]', WAIT);
 		await expect.page.text(page, 'h1', 'combobox', WAIT);
 		await expect.page.exists(page, '.site-header', WAIT);
 		if (

@@ -73,7 +73,7 @@ export default function Pager({ pathname }: { readonly pathname: string }) @{
 		</style>
 		<a
 			class={steps.prevHref ? 'pager-link pager-prev' : 'pager-link pager-prev is-empty'}
-			href={steps.prevHref || '/markless'}
+			href={steps.prevHref || '/'}
 		>
 			<span class="pager-dir">← Previous</span>
 			<span class="pager-title">{steps.prevTitle}</span>
@@ -90,7 +90,7 @@ export default function Pager({ pathname }: { readonly pathname: string }) @{
 		</span>
 		<a
 			class={steps.nextHref ? 'pager-link pager-next' : 'pager-link pager-next is-empty'}
-			href={steps.nextHref || '/markless'}
+			href={steps.nextHref || '/'}
 		>
 			<span class="pager-dir">Next <lucide.arrowright aria-hidden="true" /></span>
 			<span class="pager-title">{steps.nextTitle}</span>

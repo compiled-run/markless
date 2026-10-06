@@ -5,7 +5,7 @@ import { createServer } from 'node:net';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, type Locator, type Page } from 'playwright-core';
-import { flatNav, headFor, nav } from '../nav.ts';
+import { flatNav, headFor, nav, siteOrigin } from '../nav.ts';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const shotsDir =
@@ -82,8 +82,8 @@ const tooltipIsVisible = (tip: Locator) =>
 		);
 	});
 
-/** A page's screenshot name: /markless/concepts/state -> concepts-state. */
-const slugFor = (href: string) => href.replace(/^\/markless\/?/, '').replace(/\//g, '-') || 'index';
+/** A page's screenshot name: /concepts/state -> concepts-state. */
+const slugFor = (href: string) => href.replace(/^\//, '').replace(/\//g, '-') || 'index';
 
 /** Waits until one element's text satisfies a predicate, then returns it. */
 const settleText = async (locator: Locator, wanted: (text: string) => boolean, label: string) => {
@@ -110,14 +110,14 @@ const settleOn = (page: Page, text: string) =>
 		.catch(() => {});
 
 try {
-	await waitFor(`${origin}/markless`);
+	await waitFor(`${origin}/`);
 
-	const landing = await fetch(`${origin}/markless`);
-	check(landing.status === 200, 'GET /markless', String(landing.status));
+	const landing = await fetch(`${origin}/`);
+	check(landing.status === 200, 'GET /', String(landing.status));
 	const landingHtml = await landing.text();
 
-	const statePage = await fetch(`${origin}/markless/concepts/state`);
-	check(statePage.status === 200, 'GET /markless/concepts/state', String(statePage.status));
+	const statePage = await fetch(`${origin}/concepts/state`);
+	check(statePage.status === 200, 'GET /concepts/state', String(statePage.status));
 	const stateHtml = await statePage.text();
 	check(
 		stateHtml.includes('State is a variable the page is watching'),
@@ -129,7 +129,7 @@ try {
 	);
 
 	const assetPath = landingHtml.match(
-		/(?:href|src)="(\/markless\/(?:assets|build)\/[^"]+)"/,
+		/(?:href|src)="(\/(?:assets|build)\/[^"]+)"/,
 	)?.[1];
 	check(Boolean(assetPath), 'built asset URL found in served HTML', assetPath ?? 'none');
 	if (assetPath) {
@@ -148,8 +148,8 @@ try {
 		const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 
 		for (const [href, selectedTitle, otherTitle] of [
-			['/markless', 'Framework', 'UI'],
-			['/markless/ui', 'UI', 'Framework'],
+			['/', 'Framework', 'UI'],
+			['/ui', 'UI', 'Framework'],
 		] as const) {
 			await page.goto(`${origin}${href}`, { waitUntil: 'load' });
 			const trigger = page.locator('.mode-select-trigger');
@@ -177,7 +177,7 @@ try {
 			);
 		}
 
-		await page.goto(`${origin}/markless/concepts/state`, { waitUntil: 'load' });
+		await page.goto(`${origin}/concepts/state`, { waitUntil: 'load' });
 		await mkdir(shotsDir, { recursive: true });
 
 		// --- highlighting ------------------------------------------------------
@@ -253,7 +253,7 @@ try {
 
 		// A UI family page carries both kinds at once: the prose fences the page
 		// writes and the demo pane the playground generates. Both are monospace.
-		await page.goto(`${origin}/markless/ui/accordion`, { waitUntil: 'load' });
+		await page.goto(`${origin}/ui/accordion`, { waitUntil: 'load' });
 		const paneFonts = await page.evaluate(() => {
 			const fontOf = (selector: string) => {
 				const node = document.querySelector(selector);
@@ -263,15 +263,15 @@ try {
 		});
 		check(
 			isMono(paneFonts.prose),
-			'/markless/ui/accordion: its prose fences are set in the monospace stack',
+			'/ui/accordion: its prose fences are set in the monospace stack',
 			paneFonts.prose,
 		);
 		check(
 			isMono(paneFonts.pane),
-			'/markless/ui/accordion: the generated demo pane is set in the monospace stack',
+			'/ui/accordion: the generated demo pane is set in the monospace stack',
 			paneFonts.pane,
 		);
-		await page.goto(`${origin}/markless/concepts/state`, { waitUntil: 'load' });
+		await page.goto(`${origin}/concepts/state`, { waitUntil: 'load' });
 
 		// --- hover docs --------------------------------------------------------
 		// Most tokens are typed but not documented: the hover shows the type the
@@ -405,11 +405,11 @@ try {
 					`${entry.href} declares the language it is written in`,
 				);
 				check(
-					html.includes('rel="icon" href="/markless/favicon.svg"'),
+					html.includes('rel="icon" href="/favicon.svg"'),
 					`${entry.href} links a favicon`,
 				);
 				check(
-					html.includes(`<link rel="canonical" href="https://compiled.run${entry.href}"`),
+					html.includes(`<link rel="canonical" href="${siteOrigin}${entry.href}"`),
 					`${entry.href} names itself canonical`,
 				);
 				// B1: the published `computed<T>(derive: () => T)` takes no argument,
@@ -452,30 +452,29 @@ try {
 		);
 
 		// --- what a crawler and an agent look for before any page ---------------
-		// The site is one section of compiled.run, so `public/` is served under
-		// /markless/. scripts/generate-seo.ts writes all three from nav.ts.
+		// `public/` is served at the site root; scripts/generate-seo.ts writes all three from nav.ts.
 		for (const [path, wanted] of [
-			['/markless/robots.txt', 'Sitemap: https://compiled.run/markless/sitemap.xml'],
-			['/markless/sitemap.xml', '<loc>https://compiled.run/markless/concepts/state</loc>'],
-			['/markless/llms.txt', '](https://compiled.run/markless/reference)'],
-			['/markless/favicon.svg', '<svg'],
+			['/robots.txt', `Sitemap: ${siteOrigin}/sitemap.xml`],
+			['/sitemap.xml', `<loc>${siteOrigin}/concepts/state</loc>`],
+			['/llms.txt', `](${siteOrigin}/reference)`],
+			['/favicon.svg', '<svg'],
 		] as const) {
 			const response = await fetch(`${origin}${path}`);
 			check(response.status === 200, `GET ${path}`, String(response.status));
 			const body = await response.text();
 			check(body.includes(wanted), `${path} carries what it is for`, wanted);
 		}
-		const sitemapBody = await (await fetch(`${origin}/markless/sitemap.xml`)).text();
+		const sitemapBody = await (await fetch(`${origin}/sitemap.xml`)).text();
 		check(
 			flatNav.every((entry) =>
-				sitemapBody.includes(`<loc>https://compiled.run${entry.href}</loc>`),
+				sitemapBody.includes(`<loc>${siteOrigin}${entry.href}</loc>`),
 			),
 			'the sitemap lists every page in the nav',
 			`${(sitemapBody.match(/<loc>/g) ?? []).length} urls for ${flatNav.length} pages`,
 		);
-		const llmsBody = await (await fetch(`${origin}/markless/llms.txt`)).text();
+		const llmsBody = await (await fetch(`${origin}/llms.txt`)).text();
 		check(
-			flatNav.every((entry) => llmsBody.includes(`(https://compiled.run${entry.href}):`)),
+			flatNav.every((entry) => llmsBody.includes(`(${siteOrigin}${entry.href}):`)),
 			'llms.txt lists every page with a sentence about it',
 		);
 
@@ -484,7 +483,7 @@ try {
 		// the resume proof lives there: the count is served at nought, and two
 		// clicks reach two. The run log next to it is the page's other claim, that
 		// the component body ran once — it must still read one entry afterwards.
-		await page.goto(`${origin}/markless`, { waitUntil: 'load' });
+		await page.goto(`${origin}/`, { waitUntil: 'load' });
 		const mugHeart = page.locator('.mug-demo article button');
 		const mugLikes = page.locator('.mug-demo article button span').first();
 		await mugHeart.waitFor();
@@ -549,7 +548,7 @@ try {
 		});
 
 		// --- widget: two variables on the state page ---------------------------
-		await page.goto(`${origin}/markless/concepts/state`, { waitUntil: 'load' });
+		await page.goto(`${origin}/concepts/state`, { waitUntil: 'load' });
 		const twoNumbers = async () =>
 			(await page.locator('.playground p').allTextContents()).map((text) =>
 				Number(text.replace(/[^0-9]+/g, '')),
@@ -586,7 +585,7 @@ try {
 		);
 		await page.screenshot({ path: `${shotsDir}/T005-two-variables-after.png`, fullPage: true });
 
-		await page.goto(`${origin}/markless/concepts/computed`, { waitUntil: 'load' });
+		await page.goto(`${origin}/concepts/computed`, { waitUntil: 'load' });
 		const totalLine = page.locator('.playground p').nth(2);
 		const addShirt = page.getByRole('button', { name: 'Add a shirt' });
 		const addMug = page.getByRole('button', { name: 'Add a mug' });
@@ -611,7 +610,7 @@ try {
 		await page.screenshot({ path: `${shotsDir}/T005-cart-total-after.png`, fullPage: true });
 
 		// --- widget: three differences on the reading-tsrx page ----------------
-		await page.goto(`${origin}/markless/start/reading-tsrx`, { waitUntil: 'load' });
+		await page.goto(`${origin}/start/reading-tsrx`, { waitUntil: 'load' });
 		const explorerNote = page.locator('.explorer-note');
 		const litLines = page.locator('.file-line.is-lit');
 		await explorerNote.waitFor();
@@ -668,7 +667,7 @@ try {
 			fullPage: true,
 		});
 
-		await page.goto(`${origin}/markless/concepts/state`, { waitUntil: 'load' });
+		await page.goto(`${origin}/concepts/state`, { waitUntil: 'load' });
 		const headSeed = await page.evaluate(() =>
 			[...document.head.querySelectorAll('script:not([src])')].some((node) =>
 				node.textContent?.includes('tsrx.storage/1'),
@@ -729,7 +728,7 @@ try {
 			atRest.offered,
 		);
 		check(
-			atRest.icon.src === '/markless/theme/sun.png',
+			atRest.icon.src === '/theme/sun.png',
 			'the light page shows the sun drawing',
 			atRest.icon.src,
 		);
@@ -755,7 +754,7 @@ try {
 		);
 		check(dark.offered === 'light', 'the dark page offers the light button', dark.offered);
 		check(
-			dark.icon.src === '/markless/theme/moon.png',
+			dark.icon.src === '/theme/moon.png',
 			'the drawing swaps with the theme: dark shows the moon',
 			dark.icon.src,
 		);
@@ -782,7 +781,7 @@ try {
 		check(back.paper === atRest.paper, 'light is the light it started on', back.paper);
 		await page.evaluate(() => localStorage.removeItem('theme'));
 
-		await page.goto(`${origin}/markless/concepts/state`, { waitUntil: 'load' });
+		await page.goto(`${origin}/concepts/state`, { waitUntil: 'load' });
 		const sidebarBox = () =>
 			page.evaluate(() => {
 				const box = document.querySelector('.sidebar')?.getBoundingClientRect();
@@ -794,13 +793,13 @@ try {
 		await page.evaluate(() => {
 			(window as { __beforeNavigation?: number }).__beforeNavigation = 1;
 		});
-		await page.locator('a.sidebar-link[href="/markless/concepts/computed"]').click();
-		await page.waitForURL('**/markless/concepts/computed');
+		await page.locator('a.sidebar-link[href="/concepts/computed"]').click();
+		await page.waitForURL('**/concepts/computed');
 		await page
 			.waitForFunction(
 				() =>
 					document.querySelector('.sidebar-link.is-active')?.getAttribute('href') ===
-					'/markless/concepts/computed',
+					'/concepts/computed',
 				undefined,
 				{ timeout: 10_000 },
 			)
@@ -819,7 +818,7 @@ try {
 		check(
 			landed.crumb === 'Computed' &&
 				landed.title.startsWith('Computed') &&
-				landed.canonical.endsWith('/markless/concepts/computed'),
+				landed.canonical.endsWith('/concepts/computed'),
 			'a sidebar click lands on the page it names, chrome and all',
 			`${landed.crumb} / ${landed.title} / ${landed.canonical} / ${landed.heading}`,
 		);
@@ -853,14 +852,14 @@ try {
 			`${nextHref} / ${paged.canonical} / survived ${paged.survived}`,
 		);
 		await page.locator('a.crumb-home').click();
-		await page.waitForURL('**/markless');
+		await page.waitForURL('**/');
 		await page
 			.waitForFunction(
 				() =>
 					document
 						.querySelector('link[rel="canonical"]')
 						?.getAttribute('href')
-						?.endsWith('/markless'),
+						?.endsWith('/'),
 				undefined,
 				{ timeout: 10_000 },
 			)
@@ -870,28 +869,19 @@ try {
 			canonical: document.querySelector('link[rel="canonical"]')?.getAttribute('href') ?? '',
 		}));
 		check(
-			home.survived && home.canonical.endsWith('/markless'),
+			home.survived && home.canonical === `${siteOrigin}/`,
 			'the breadcrumb home link is no document load and lands on the docs home',
 			`${home.canonical} / survived ${home.survived}`,
 		);
 
 		// --- sprites and mascots ------------------------------------------------
-		await page.goto(`${origin}/markless`, { waitUntil: 'load' });
-		const heroMascot = page.locator('.prose img.mascot').first();
-		await heroMascot.waitFor();
-		const heroSrc = await heroMascot.getAttribute('src');
+		await page.goto(`${origin}/`, { waitUntil: 'load' });
+		const heroMug = page.locator('.prose .markless-mug.is-hero svg.mug').first();
+		await heroMug.waitFor();
 		check(
-			heroSrc === '/markless/mascots/markless.png',
-			'the landing hero is the markless mascot',
-			String(heroSrc),
-		);
-		const heroWidth = await heroMascot.evaluate(
-			(node) => (node as HTMLImageElement).naturalWidth,
-		);
-		check(
-			heroWidth > 0,
-			'the markless mascot on the landing decodes',
-			`naturalWidth ${heroWidth}`,
+			(await heroMug.getAttribute('data-docs-mug')) === 'true',
+			'the landing hero is the Markless mug, and it follows the pointer',
+			String(await heroMug.getAttribute('data-variant')),
 		);
 		const siblingMascots = await page.locator('.more-from img.mascot').evaluateAll((nodes) =>
 			nodes.map((node) => ({
@@ -899,10 +889,11 @@ try {
 				width: (node as HTMLImageElement).naturalWidth,
 			})),
 		);
+		const tileMugs = await page.locator('.more-from .markless-mug svg.mug').count();
 		check(
-			siblingMascots.length === 4 && siblingMascots.every((one) => one.width > 0),
-			'the More from compiled.run strip shows four mascots that decode',
-			siblingMascots.map((one) => `${one.src}:${one.width}`).join(' '),
+			siblingMascots.length === 3 && siblingMascots.every((one) => one.width > 0) && tileMugs === 1,
+			'the More from compiled.run strip shows the Markless mug and three mascots that decode',
+			`${tileMugs} mug, ` + siblingMascots.map((one) => `${one.src}:${one.width}`).join(' '),
 		);
 		const sprites = await page
 			.locator('.sprite img.sprite-ink-light')
@@ -915,8 +906,8 @@ try {
 		);
 
 		for (const [label, href] of [
-			['index', '/markless'],
-			['state', '/markless/concepts/state'],
+			['index', '/'],
+			['state', '/concepts/state'],
 		] as const) {
 			for (const theme of ['light', 'dark'] as const) {
 				await page.goto(`${origin}${href}`, { waitUntil: 'load' });
@@ -976,7 +967,7 @@ try {
 		await page.evaluate(() => document.documentElement.removeAttribute('data-theme'));
 
 		for (const theme of ['light', 'dark'] as const) {
-			await page.goto(`${origin}/markless`, { waitUntil: 'load' });
+			await page.goto(`${origin}/`, { waitUntil: 'load' });
 			await page.evaluate((wanted) => {
 				document.documentElement.setAttribute('data-theme', wanted);
 				document.querySelector('details.sidebar-disclosure')?.setAttribute('open', '');
@@ -1029,8 +1020,8 @@ try {
 				const actual = icons.entries.find((actual) => actual.href === entry.href);
 				const cuts = ['light', 'dark'].map((cut) =>
 					entry.icon
-						? `/markless/sidebar/${entry.icon}-${cut}.png`
-						: `/markless/sprites/${entry.sprite ?? 'sparkle'}${cut === 'dark' ? '.dark' : ''}.png`,
+						? `/sidebar/${entry.icon}-${cut}.png`
+						: `/sprites/${entry.sprite ?? 'sparkle'}${cut === 'dark' ? '.dark' : ''}.png`,
 				);
 				check(
 					cuts.every((src) => actual?.sources.includes(src)),
@@ -1057,8 +1048,8 @@ try {
 					(entry, index) =>
 						icons.sources[index] ===
 						(entry.icon
-							? `/markless/sidebar/${entry.icon}-${theme}.png`
-							: `/markless/sprites/${entry.sprite ?? 'sparkle'}${theme === 'dark' ? '.dark' : ''}.png`),
+							? `/sidebar/${entry.icon}-${theme}.png`
+							: `/sprites/${entry.sprite ?? 'sparkle'}${theme === 'dark' ? '.dark' : ''}.png`),
 				),
 				`the ${theme} theme selects the matching navigation asset`,
 			);
@@ -1068,8 +1059,8 @@ try {
 		await page.evaluate(() => document.documentElement.removeAttribute('data-theme'));
 
 		for (const [label, href] of [
-			['index', '/markless'],
-			['state', '/markless/concepts/state'],
+			['index', '/'],
+			['state', '/concepts/state'],
 		] as const) {
 			const entry = nav
 				.flatMap((section) => section.entries)
@@ -1309,9 +1300,9 @@ try {
 
 		// --- the assumes line links the pages it names -------------------------
 		for (const href of [
-			'/markless',
-			'/markless/concepts/state',
-			'/markless/concepts/computed',
+			'/',
+			'/concepts/state',
+			'/concepts/computed',
 		]) {
 			await page.goto(`${origin}${href}`, { waitUntil: 'load' });
 			const assumed = await page
@@ -1331,14 +1322,14 @@ try {
 				);
 			}
 			check(
-				href === '/markless' ? assumed.length === 0 : assumed.length > 0,
+				href === '/' ? assumed.length === 0 : assumed.length > 0,
 				`${href}: the assumes line has the links it should`,
 				`${assumed.length} links`,
 			);
 		}
 
 		// --- the footer doodles react to the pointer ----------------------------
-		await page.goto(`${origin}/markless/concepts/state`, { waitUntil: 'load' });
+		await page.goto(`${origin}/concepts/state`, { waitUntil: 'load' });
 		const doodles = page.locator('.pager-doodles .sprite');
 		await doodles.first().waitFor();
 		check(
@@ -1416,9 +1407,9 @@ try {
 		// the reader does. The checks below do exactly what the page asks the
 		// reader to do, and assert what the page then claims they will see.
 		for (const href of [
-			'/markless/concepts/events',
-			'/markless/concepts/conditionals',
-			'/markless/concepts/lists',
+			'/concepts/events',
+			'/concepts/conditionals',
+			'/concepts/lists',
 		]) {
 			const response = await fetch(`${origin}${href}`);
 			check(response.status === 200, `GET ${href}`, String(response.status));
@@ -1432,7 +1423,7 @@ try {
 		}
 
 		// --- widget: the name echo on the events page --------------------------
-		await page.goto(`${origin}/markless/concepts/events`, { waitUntil: 'load' });
+		await page.goto(`${origin}/concepts/events`, { waitUntil: 'load' });
 		const echoField = page.locator('.playground input').first();
 		const echoLine = page.locator('.playground-echo p').first();
 		await echoField.waitFor();
@@ -1471,28 +1462,28 @@ try {
 		// on it is the first thing the reader is told, so each one is checked
 		// verbatim rather than by a phrase.
 		const noBoxTitle: Record<string, string> = {
-			'/markless/concepts/async': 'What is missing here, and what this build actually does',
-			'/markless/concepts/styling': 'Why the two cards are not side by side on this page',
-			'/markless/build/components': 'Why that pair is not a box on this page',
-			'/markless/build/storage': 'Why that file is not a box on this page',
+			'/concepts/async': 'What is missing here, and what this build actually does',
+			'/concepts/styling': 'Why the two cards are not side by side on this page',
+			'/build/components': 'Why that pair is not a box on this page',
+			'/build/storage': 'Why that file is not a box on this page',
 		};
 
-		await page.goto(`${origin}/markless/concepts/conditionals`, { waitUntil: 'load' });
+		await page.goto(`${origin}/concepts/conditionals`, { waitUntil: 'load' });
 		const refusedTitles = await page
 			.locator('.callout-title')
 			.evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()));
 		check(
 			refusedTitles.includes('This first file does not build, on purpose'),
-			'/markless/concepts/conditionals marks its first file as refused by the build',
+			'/concepts/conditionals marks its first file as refused by the build',
 			refusedTitles.join(' | '),
 		);
 		const conditionalsText = (await page.locator('body').textContent()) ?? '';
 		check(
 			conditionalsText.includes('MARKLESS_STATE_CREATION_SITE_UNSTABLE'),
-			'/markless/concepts/conditionals names the error the build stops with',
+			'/concepts/conditionals names the error the build stops with',
 		);
 
-		for (const href of ['/markless/concepts/conditionals', '/markless/concepts/lists']) {
+		for (const href of ['/concepts/conditionals', '/concepts/lists']) {
 			await page.goto(`${origin}${href}`, { waitUntil: 'load' });
 			check(
 				(await page.locator('.playground').count()) === 0,
@@ -1505,9 +1496,9 @@ try {
 		// outline asked for cannot run on this build, so what is checked is that
 		// the page says so and really has no demo frame to mislead anyone.
 		for (const href of [
-			'/markless/start/first-app',
-			'/markless/concepts/async',
-			'/markless/concepts/styling',
+			'/start/first-app',
+			'/concepts/async',
+			'/concepts/styling',
 		]) {
 			const response = await fetch(`${origin}${href}`);
 			check(response.status === 200, `GET ${href}`, String(response.status));
@@ -1528,7 +1519,7 @@ try {
 		// widget is missing. The day the framework fix lands and the widget goes
 		// back on the page, the `.playground` check above fails and the callout has
 		// to come out with the note it names.
-		for (const href of ['/markless/concepts/async', '/markless/concepts/styling']) {
+		for (const href of ['/concepts/async', '/concepts/styling']) {
 			await page.goto(`${origin}${href}`, { waitUntil: 'load' });
 			const told = await page
 				.locator('.callout-title')
@@ -1553,7 +1544,7 @@ try {
 		// re-settle never commits the pending arm, so the callout has to say in so
 		// many words that those rules are quoted and not measured here. It stays
 		// until that is no longer true.
-		await page.goto(`${origin}/markless/concepts/async`, { waitUntil: 'load' });
+		await page.goto(`${origin}/concepts/async`, { waitUntil: 'load' });
 		const asyncCalloutBody = await page
 			.locator('.callout-body')
 			.evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()).join(' '));
@@ -1567,7 +1558,7 @@ try {
 
 		// The first-app page must carry the override a reader needs today, exactly,
 		// and must not fake a terminal.
-		await page.goto(`${origin}/markless/start/first-app`, { waitUntil: 'load' });
+		await page.goto(`${origin}/start/first-app`, { waitUntil: 'load' });
 		const firstAppText = (await page.locator('.prose').first().innerText()).replace(
 			/\s+/g,
 			' ',
@@ -1586,10 +1577,10 @@ try {
 		// the reader does, and the checks below do exactly that and assert what
 		// the page says will happen. The fourth is the honest kind.
 		for (const href of [
-			'/markless/build/components',
-			'/markless/build/elements',
-			'/markless/build/storage',
-			'/markless/build/shared',
+			'/build/components',
+			'/build/elements',
+			'/build/storage',
+			'/build/shared',
 		]) {
 			const response = await fetch(`${origin}${href}`);
 			check(response.status === 200, `GET ${href}`, String(response.status));
@@ -1602,17 +1593,17 @@ try {
 			});
 		}
 
-		await page.goto(`${origin}/markless/build/components`, { waitUntil: 'load' });
+		await page.goto(`${origin}/build/components`, { waitUntil: 'load' });
 		check(
 			(await page.locator('.playground').count()) === 0,
-			'/markless/build/components really has no playground frame to mislead the reader',
+			'/build/components really has no playground frame to mislead the reader',
 		);
 		const componentCallouts = await page
 			.locator('.callout-title')
 			.evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()));
 		check(
-			componentCallouts.includes(noBoxTitle['/markless/build/components']),
-			'/markless/build/components says out loud why it has no demo box',
+			componentCallouts.includes(noBoxTitle['/build/components']),
+			'/build/components says out loud why it has no demo box',
 			componentCallouts.join(' | '),
 		);
 		const componentBody = await page
@@ -1620,13 +1611,13 @@ try {
 			.evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()).join(' '));
 		check(
 			componentBody.includes('finding 29'),
-			'/markless/build/components names the finding its missing widget is recorded under',
+			'/build/components names the finding its missing widget is recorded under',
 		);
 
 		// --- widget: the focus field on the elements page ------------------------
 		// The claim is that the handle is the real node, so what is checked is the
 		// browser's own idea of which element has the caret.
-		await page.goto(`${origin}/markless/build/elements`, { waitUntil: 'load' });
+		await page.goto(`${origin}/build/elements`, { waitUntil: 'load' });
 		const focusButton = page.getByRole('button', { name: 'Put the cursor in the field' });
 		await focusButton.waitFor();
 		const activeIsField = () =>
@@ -1648,17 +1639,17 @@ try {
 		);
 		await page.screenshot({ path: `${shotsDir}/T006-focus-field-after.png`, fullPage: true });
 
-		await page.goto(`${origin}/markless/build/storage`, { waitUntil: 'load' });
+		await page.goto(`${origin}/build/storage`, { waitUntil: 'load' });
 		check(
 			(await page.locator('.playground').count()) === 0,
-			'/markless/build/storage really has no playground frame to mislead the reader',
+			'/build/storage really has no playground frame to mislead the reader',
 		);
 		const storageCallouts = await page
 			.locator('.callout-title')
 			.evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()));
 		check(
-			storageCallouts.includes(noBoxTitle['/markless/build/storage']),
-			'/markless/build/storage says out loud why it has no demo box',
+			storageCallouts.includes(noBoxTitle['/build/storage']),
+			'/build/storage says out loud why it has no demo box',
 			storageCallouts.join(' | '),
 		);
 		const storageBody = await page
@@ -1666,20 +1657,20 @@ try {
 			.evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()).join(' '));
 		check(
 			storageBody.includes('finding 30'),
-			'/markless/build/storage names the finding its missing widget is recorded under',
+			'/build/storage names the finding its missing widget is recorded under',
 		);
 
-		await page.goto(`${origin}/markless/build/shared`, { waitUntil: 'load' });
+		await page.goto(`${origin}/build/shared`, { waitUntil: 'load' });
 		check(
 			(await page.locator('.playground').count()) === 0,
-			'/markless/build/shared really has no playground frame to mislead the reader',
+			'/build/shared really has no playground frame to mislead the reader',
 		);
 		const sharedCallouts = await page
 			.locator('.callout-title')
 			.evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()));
 		check(
 			sharedCallouts.some((title) => title.includes('when we tried it on 0.3.1')),
-			'/markless/build/shared says out loud what happened when it was tried',
+			'/build/shared says out loud what happened when it was tried',
 			sharedCallouts.join(' | '),
 		);
 		const sharedBody = await page
@@ -1687,7 +1678,7 @@ try {
 			.evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()).join(' '));
 		check(
 			sharedBody.includes('NOTES.md'),
-			'/markless/build/shared names the finding its missing widget is recorded under',
+			'/build/shared names the finding its missing widget is recorded under',
 		);
 
 		// --- batch 5: the Router section, how it works, and the reference -------
@@ -1695,11 +1686,11 @@ try {
 		// plus text bindings. Each check does what its page tells the reader to
 		// do and asserts the line the page says they will then be looking at.
 		for (const href of [
-			'/markless/router/pages',
-			'/markless/router/links',
-			'/markless/router/data',
-			'/markless/how-it-works',
-			'/markless/reference',
+			'/router/pages',
+			'/router/links',
+			'/router/data',
+			'/how-it-works',
+			'/reference',
 		]) {
 			const response = await fetch(`${origin}${href}`);
 			check(response.status === 200, `GET ${href}`, String(response.status));
@@ -1713,7 +1704,7 @@ try {
 		}
 
 		// --- widget: the route tree on the pages page ---------------------------
-		await page.goto(`${origin}/markless/router/pages`, { waitUntil: 'load' });
+		await page.goto(`${origin}/router/pages`, { waitUntil: 'load' });
 		const routeUrl = page.locator('.playground .playground-output').first();
 		const routeNote = page.locator('.playground .explorer-note').first();
 		await routeUrl.waitFor();
@@ -1746,7 +1737,7 @@ try {
 		await page.screenshot({ path: `${shotsDir}/T030-route-tree-after.png`, fullPage: true });
 
 		// --- widget: the renamed route on the links page ------------------------
-		await page.goto(`${origin}/markless/router/links`, { waitUntil: 'load' });
+		await page.goto(`${origin}/router/links`, { waitUntil: 'load' });
 		const typoLine = page.locator('.playground .file-line').first();
 		const typoAnswer = page.locator('.playground .playground-output').first();
 		await typoAnswer.waitFor();
@@ -1769,7 +1760,7 @@ try {
 		await page.screenshot({ path: `${shotsDir}/T030-link-typo-after.png`, fullPage: true });
 
 		// --- widget: the streaming illustration on the data page ----------------
-		await page.goto(`${origin}/markless/router/data`, { waitUntil: 'load' });
+		await page.goto(`${origin}/router/data`, { waitUntil: 'load' });
 		const stepMark = page.locator('.playground .playground-output').first();
 		const stepNote = page.locator('.playground .explorer-note').first();
 		await stepMark.waitFor();
@@ -1808,7 +1799,7 @@ try {
 		// --- widget: the tier ladder on the how-it-works page -------------------
 		// This is the page's whole argument, so the check is the argument: the
 		// first three tiers run no component code and the last two do.
-		await page.goto(`${origin}/markless/how-it-works`, { waitUntil: 'load' });
+		await page.goto(`${origin}/how-it-works`, { waitUntil: 'load' });
 		const tierLine = page.locator('.playground .playground-output').first();
 		const runsLine = page.locator('.playground [data-runs-code]').first();
 		await tierLine.waitFor();
@@ -1910,7 +1901,7 @@ try {
 		);
 
 		// --- the reference page names the surface it promises -------------------
-		await page.goto(`${origin}/markless/reference`, { waitUntil: 'load' });
+		await page.goto(`${origin}/reference`, { waitUntil: 'load' });
 		const referenceText = (await page.locator('.prose').first().innerText()).replace(
 			/\s+/g,
 			' ',
@@ -1936,9 +1927,9 @@ try {
 			check(referenceText.includes(code), `the reference diagnostics table carries ${code}`);
 		}
 
-		await page.goto(`${origin}/markless/concepts/state`, { waitUntil: 'load' });
+		await page.goto(`${origin}/concepts/state`, { waitUntil: 'load' });
 		const mugButton = page.getByRole('button', { name: 'Say hello to the mug' });
-		const mug = page.locator('[data-docs-mug]');
+		const mug = mugButton.locator('[data-docs-mug]');
 		await mugButton.waitFor();
 		check(
 			(await page.getByRole('button', { name: 'Like this page', exact: true }).count()) ===
@@ -1961,7 +1952,7 @@ try {
 				await page.keyboard.press(activation);
 			}
 			await page.waitForTimeout(50);
-			const response = await page.locator('.greeting-eyes').evaluate((node) => {
+			const response = await mugButton.locator('.greeting-eyes').evaluate((node) => {
 				const animation = node.getAnimations()[0];
 				animation?.pause();
 				if (animation) animation.currentTime = 100;
@@ -1972,7 +1963,7 @@ try {
 		await page.screenshot({ path: `${shotsDir}/mug-greeting.png`, fullPage: false });
 
 		// --- the stickers are on the pages that ask for them --------------------
-		await page.goto(`${origin}/markless`, { waitUntil: 'load' });
+		await page.goto(`${origin}/`, { waitUntil: 'load' });
 		const heroSticker = page.locator('.sticker.is-hero');
 		check((await heroSticker.count()) === 1, 'the landing hero carries one sticker');
 		const heroLoaded = await heroSticker.evaluate(
@@ -1984,12 +1975,12 @@ try {
 			'the footer strip mixes two stickers in with the doodles',
 		);
 		await page.screenshot({ path: `${shotsDir}/T024-stickers-landing.png`, fullPage: true });
-		await page.goto(`${origin}/markless/concepts/conditionals`, { waitUntil: 'load' });
+		await page.goto(`${origin}/concepts/conditionals`, { waitUntil: 'load' });
 		const cornerSticker = await page
 			.locator('.callout[data-sticker="spring"]')
 			.evaluate((node) => getComputedStyle(node as Element, '::after').backgroundImage);
 		check(
-			cornerSticker.includes('/markless/stickers/spring.png'),
+			cornerSticker.includes('/stickers/spring.png'),
 			'a concept page callout paints its corner sticker',
 			cornerSticker.slice(0, 60),
 		);
