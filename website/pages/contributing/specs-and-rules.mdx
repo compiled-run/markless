@@ -1,0 +1,88 @@
+import PageMeta from '../../components/page-meta.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
+import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../components/docs/sidebar.tsrx';
+import LikeHeart from '../../components/docs/like-heart.tsrx';
+
+<Sidebar />
+
+# Specs, rules and skills
+
+<PageMeta level="Contributing" time="3 min" assumes="nothing" sprite="bookmark" />
+
+<ThemeToggle />
+
+Last page, CI checked your code. But who decides what the code must do?
+
+Two folders answer that. `specs/` says how Markless behaves. `.ruler/` says how people and AI agents work in the repo.
+
+## Specs: the behavior contract
+
+- `specs/framework-design.md` is the index. Read it first.
+- `specs/framework/00-overview.md` to `14-emission-codegen-migration.md` each own one area, such as `03-state-graph.md` or `07-diagnostics.md`.
+- `specs/framework/08-deferred-decisions.md` lists the topics that stay open on purpose.
+- `specs/router/` covers routing, typed routing and the router CLI.
+- `specs/framework/archive/` is history, not the current contract.
+
+When you edit a spec, follow `.ruler/skills/markless-spec-maintenance/spec.md`:
+
+- Keep accepted decisions, unless your task reopens them.
+- Record an open topic as deferred. Do not decide it in passing.
+- Write behavior that a test can check, not storage shapes or exact compiler output.
+- Check TSRX syntax with the TSRX MCP server first, and record what you checked. If the server is not available, use `tsrx.dev/specification` and record that fallback.
+- Run `git diff --check` before you finish.
+
+<Callout
+	sprite="cross"
+	title="Specs are not proof"
+	text="A spec can drift from the code. When they disagree, the code and its tests show what Markless does today."
+/>
+
+<Callout
+	sprite="thought-bubble"
+	title="Where is specs/state.md?"
+	text="CONTRIBUTING.md and specs/framework-design.md link to specs/state.md. That file is not in the repo today."
+/>
+
+## Rules: one source in .ruler/
+
+`pnpm rules` runs `ruler apply`. It generates `AGENTS.md`, `CLAUDE.md`, the skill copies and the MCP configuration. Do not edit those outputs by hand.
+
+- `.ruler/AGENTS.md` holds the rules for every agent.
+- `.ruler/claude.md` holds extra notes for Claude.
+- `.ruler/ruler.toml` lists the outputs and the MCP servers.
+- `.ruler/skills/*/` holds the skills, such as `markless-implementation`, `markless-spec-maintenance` and `markless-component-research`.
+
+After you edit `.ruler/`, regenerate the outputs and commit them:
+
+```bash
+pnpm rules
+```
+
+The `agent-files` CI job fails if the generated files drift from `.ruler/`. The `pre-commit` hook runs the same drift check when you stage a `.ruler/` file.
+
+## Rules to know
+
+- Run `pnpm run typecheck` and `pnpm ci:local --fast` before you call a change done.
+- Write tests first. Run the narrowest failing test, then make the smallest change.
+- Do not add hydration, a virtual DOM, or a second build stack besides Rolldown and Vite.
+- Keep compiler, runtime, serializer and render code free of Node-only APIs.
+- Import protocol and configuration facts from the package that owns them. Do not copy them as literals.
+- A merge or push to `main` needs the owner's explicit go-ahead. So does a push to any shared branch. Each go-ahead covers one change set, and it does not carry over to new commits.
+- A PR stays open until every review finding has an answer. CodeRabbit findings count too.
+
+## Comments in code
+
+Comments are a last resort. Write one only for a fact the code cannot show, such as a hidden constraint. Keep it to one short line.
+
+Never write task numbers or process notes in comments. That history belongs in git.
+
+<Callout
+	sprite="check"
+	title="Does this apply to doc comments?"
+	text="No. Doc comments on public props and types stay. They are part of the API that users read."
+/>
+
+Next: [improve the docs](/contributing/improve-the-docs).
+
+<LikeHeart />

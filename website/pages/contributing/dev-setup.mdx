@@ -1,0 +1,72 @@
+import PageMeta from '../../components/page-meta.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
+import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../components/docs/sidebar.tsrx';
+import LikeHeart from '../../components/docs/like-heart.tsrx';
+
+<Sidebar />
+
+# Set up the repo on your machine
+
+<PageMeta level="Contributing" time="2 min" assumes="nothing" sprite="plus" />
+
+<ThemeToggle />
+
+Last page, you saw the stack of packages. Now get all of them to build on your machine.
+
+One `pnpm install` sets up every package. It also turns on the git hooks, so your first commit runs CI's fast checks.
+
+## What you need
+
+- **Node 24.** The repo does not pin a Node version. Every CI job that installs Node installs 24, so use 24 too.
+- **pnpm 10.33.2.** The root `package.json` pins it in `packageManager`.
+- **git.** The hooks are shell scripts in `.githooks/`.
+- **The `gh` command line**, if you push to `main`. The `pre-push` hook uses it.
+
+## Clone and install
+
+```bash
+git clone https://github.com/compiled-run/markless.git
+cd markless
+corepack enable
+pnpm install
+```
+
+`pnpm install` runs the root `prepare` script. That script runs `git config core.hooksPath .githooks`.
+
+Some tests start real browsers. CI installs them with this command:
+
+```bash
+pnpm --dir packages/vitest-browser exec playwright install chromium webkit
+```
+
+You can also run `pnpm ci:local --install`. It runs each job's setup steps before its checks, and the Playwright install is one of them.
+
+## The scripts you will use
+
+- `pnpm run typecheck`: runs the `.tsrx`-aware checker, `packages/typescript-plugin/src/tsc.ts`, on the root `tsconfig.json`.
+- `pnpm ci:local --fast`: runs CI's fast jobs with the exact commands from `ci.yml`.
+- `pnpm exec vp test <file>`: runs one test file.
+- `pnpm test:compiler`: runs `packages/compiler/test/*.test.ts`.
+- `pnpm test:headless`: runs the `ui` test project, the `@markless/ui` browser tests.
+- `pnpm lint`: runs `vp lint`.
+- `pnpm check`: runs `vp check`.
+- `pnpm fmt`: runs `vp fmt`.
+- `pnpm build`: packs the packages with `vp pack`, plus CommonJS builds of `router` and `typescript-plugin`.
+- `pnpm test`: runs the long local suite: completion matrix, every test project, benchmark guard, box tests, perf guards.
+- `pnpm rules`: regenerates the agent files from `.ruler/`.
+- `pnpm docs:dev`: starts this website's dev server.
+
+`vp` is the Vite+ command line. The repo installs it as the `vite-plus` dev dependency.
+
+The root `vite.config.ts` defines three test projects: `node`, `browser` and `ui`. Pass `--project <name>` to run one.
+
+<Callout
+	sprite="cross"
+	title="Is pnpm test the same as CI?"
+	text="No. pnpm test runs a different set of commands from ci.yml. Use pnpm ci:local to run what CI runs."
+/>
+
+Next: [your first pull request](/contributing/first-pr).
+
+<LikeHeart />

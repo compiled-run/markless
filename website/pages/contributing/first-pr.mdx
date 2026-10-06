@@ -1,0 +1,93 @@
+import PageMeta from '../../components/page-meta.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
+import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../components/docs/sidebar.tsrx';
+import LikeHeart from '../../components/docs/like-heart.tsrx';
+
+<Sidebar />
+
+# Your first pull request
+
+<PageMeta level="Contributing" time="2 min" assumes="nothing" sprite="arrow-straight" />
+
+<ThemeToggle />
+
+Last page, `pnpm install` turned on the git hooks. Now put them to work on a real change.
+
+A green CI run does not finish a Markless PR. An answer to every review finding finishes it.
+
+## 1. Read the rules for your area
+
+Read `AGENTS.md` first. Then read `specs/framework-design.md` and the one spec in `specs/framework/` that covers your change. For a UI component, also read `packages/headless/components/SPEC.md`.
+
+## 2. Make a branch
+
+Do not commit to `main`.
+
+```bash
+git switch -c fix/counter-text
+```
+
+## 3. Write the failing test first
+
+Add or update the closest focused test. Run it, and make sure that it fails for the reason you expect.
+
+```bash
+pnpm exec vp test packages/compiler/test/semantic-graph.test.ts
+```
+
+Compiler tests assert pass artifacts and diagnostics where they can. Use Vitest browser mode for component and browser behavior.
+
+## 4. Make the smallest change
+
+Change only what the test needs. Then run the focused test again until it passes.
+
+## 5. Typecheck
+
+This checker reads `.tsrx` files. Plain `tsc` does not.
+
+```bash
+pnpm run typecheck
+```
+
+## 6. Run CI's fast jobs
+
+This runs the `agent-files`, `typecheck` and `unit` jobs with the commands from `ci.yml`.
+
+```bash
+pnpm ci:local --fast
+```
+
+If you touched the bundler, router, web, runtime, compiler or demos, run the matching jobs too. For example: `pnpm ci:local --job browser --job boxes-router`.
+
+## 7. Commit and let the hook run
+
+The `pre-commit` hook runs `vp lint --deny-warnings`, then the fast jobs with `--bail`. If you staged a file in `.ruler/`, it also checks that the generated agent files match.
+
+If lint fails, the hook prints the fix command: `pnpm exec vp lint --fix --fix-suggestions --fix-dangerously`.
+
+## 8. Push your branch and open a PR
+
+Push your own branch. Pushing to `main`, or to a branch other people share, needs the owner's explicit go-ahead. That go-ahead covers one change set only.
+
+In the PR, say which `ci:local` mode you ran, on which commit, and the result line it printed.
+
+## 9. Answer every review finding
+
+Read every finding from people and from the CodeRabbit bot. Fix the ones that are right. Reply with your reason on the ones that are stale or wrong.
+
+<Callout
+	sprite="cross"
+	title="Why did my push to main fail?"
+	text="The pre-push hook asks GitHub, through gh, for the last CI run on main. If that run failed, the hook blocks the push. Only the fix can go onto a red main, and it needs MARKLESS_FIXES_RED_MAIN=1."
+/>
+
+<Callout
+	sprite="thought-bubble"
+	title="What if a check fails that I did not touch?"
+	text="Find out why before you change it. It can be environment drift, your regression, an older failure or a flaky test. Fix the cause, and never weaken the check."
+/>
+
+Next: [CI and the checks you run at home](/contributing/ci).
+
+<LikeHeart />

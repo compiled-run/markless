@@ -1,0 +1,148 @@
+import PageMeta from '../../components/page-meta.tsrx';
+import TypoCountDemo from '../../components/demos/contributing/typo-count-demo.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
+import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../components/docs/sidebar.tsrx';
+import LikeHeart from '../../components/docs/like-heart.tsrx';
+
+<Sidebar />
+
+# Improve the docs
+
+<PageMeta level="Contributing" time="5 min" assumes="nothing" sprite="sparkle" />
+
+<ThemeToggle />
+
+Last page covered the rules for the framework code. This site lives in the same repo, in `website/`, and it has a short list of its own.
+
+The site is a Markless app. The packages it describes build every page you read here. So a framework change and the docs that explain it can land in one PR.
+
+## Run the site
+
+From the repo root, after `pnpm install`:
+
+```bash
+pnpm docs:dev       # dev server
+pnpm docs:build     # production build into website/.output/
+pnpm docs:preview   # serve the production build
+```
+
+To see a page the way readers get it, build the site and serve the output:
+
+```bash
+pnpm docs:build
+PORT=4310 node website/.output/server/index.mjs
+```
+
+## Where things live
+
+- `website/pages/` holds the pages. A file's path is its URL: `pages/concepts/state.mdx` is `/concepts/state`. An `index.mdx` is its folder's own page.
+- `website/nav.ts` is the one list of pages. The sidebar, the breadcrumb, the pager and the document head all read it. A new page needs an entry there with a title, an `href` and a one-sentence `description`.
+- `website/components/demos/<section>/` holds the live demos, one folder per docs section.
+- `website/components/docs/` holds the page chrome: `Callout`, `Collapsible`, `Subtitle`, the sidebar and the pager.
+- `website/styles/global.css` holds the tokens, the type scale and the site-wide rules.
+- `website/AGENTS.md` holds the styling and code panel rules. Read it before you touch a component.
+
+## The shape of a page
+
+Each page is an `.mdx` file. The top imports the components it uses. Then come the sidebar, one `H1`, the meta line and the theme toggle. The prose follows, and the like heart closes the page.
+
+```txt
+import PageMeta from '../../components/page-meta.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
+import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../components/docs/sidebar.tsrx';
+import LikeHeart from '../../components/docs/like-heart.tsrx';
+
+<Sidebar />
+
+# One title per page
+
+<PageMeta level="Building" time="3 min" assumes="state,events" sprite="burst" />
+
+<ThemeToggle />
+
+Prose, demos and callouts go here.
+
+<LikeHeart />
+```
+
+`PageMeta` takes four props. `level` names the part of the site. `assumes` lists keys from the `concepts` map in `nav.ts`. `sprite` names a file in `public/sprites/`. `time` comes from a formula, not a guess. `website/README.md` has it, so recompute it when you rewrite a page.
+
+Code fences in `tsrx`, `ts`, `tsx`, `js`, `json`, `css`, `sh`, `bash` and `html` get highlighted at build time. In a `tsrx` fence, readers can point at `state` or `@if` and get a one-sentence explanation.
+
+## Demos and honest code panels
+
+A reader learns faster from code they can poke at. So a concept page shows the real component running, then the file that made it.
+
+Click the button.
+
+{/* PLAYGROUND: starter files typo-count.tsrx. Try: change the label, or add a second line that also reads fixed. */ null}
+
+<TypoCountDemo />
+
+That button is this file:
+
+```tsrx
+import { state } from '@markless/core';
+
+export default function TypoCount() @{
+	let fixed = state(0);
+
+	<button onClick={() => fixed++}>Typos fixed: {fixed}</button>
+}
+```
+
+A demo is two files in `components/demos/<section>/`. `typo-count.tsrx` is the component the page shows. `typo-count-demo.tsrx` wraps it in `<div class="playground">`, which draws the frame. The page imports the wrapper, because MDX cannot nest components.
+
+The code you show must be the smallest honest version of the file. Every line shown must do what it says. You can leave out the demo's own `<style>` block, because the panel teaches the feature, not the cosmetics.
+
+## Styles belong to their component
+
+Write a component's styles in a `<style>` block inside its `.tsrx` file. Markless scopes those selectors to that component, so short names like `.photo` stay safe. Use the global tokens, such as `var(--ink)`, `var(--paper)` and `var(--step--1)`.
+
+Put a rule in `global.css` only if no single component owns it. Tokens, prose type and shared classes go there.
+
+<Callout
+	sprite="cross"
+	title="Why does my scoped class pick up a global rule?"
+	text="Scoping keeps your selectors inside the component. It does not keep global selectors out. If global.css also styles your class name, or a prose rule such as .prose h3 reaches your element, reset what it sets in your own style block."
+/>
+
+## Facts come from the code
+
+Check every API name, import path and command against the Markless source before you write it. Good sources are package code, tests, fixtures, demos and the CLI templates.
+
+- Treat specs as pointers, not proof.
+- If you cannot check a fact, leave it out.
+- Do not write sizes or timings. They change every release.
+
+Keep a claim list while you write. Give each fact one line: the claim, the file and line that proves it, and your check. A reviewer can then check each line against the code.
+
+```txt
+| Claim                     | Source                               | Checked by |
+| pnpm is pinned to 10.33.2 | package.json, packageManager field   | read       |
+| --list runs nothing       | node scripts/ci/local.mjs --list     | ran        |
+```
+
+<Callout
+	sprite="thought-bubble"
+	title="Does Markless need a server?"
+	text="No. So the docs never say it does. Lead with what Markless works out before your app runs. Then show the same component in any environment: a browser, a server, a build step or a test. The server is one option, never the default story."
+/>
+
+## Check your work
+
+CI does not build this site. Run these yourself before you open the PR:
+
+```bash
+pnpm --filter website typecheck   # the .tsrx-aware checker over pages and components
+pnpm --filter website test run    # the site's own tooling tests
+pnpm docs:build                   # the production build
+```
+
+Then serve the build and open each page you changed. Look at it in the light and the dark theme, on a wide window and on a phone-sized one. Click every demo.
+
+Next: [every Markless package](/reference).
+
+<LikeHeart />

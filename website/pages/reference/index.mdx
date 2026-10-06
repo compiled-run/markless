@@ -1,0 +1,55 @@
+import PageMeta from '../../components/page-meta.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
+import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../components/docs/sidebar.tsrx';
+import LikeHeart from '../../components/docs/like-heart.tsrx';
+
+<Sidebar />
+
+# Every Markless package
+
+<PageMeta level="Reference" time="2 min" assumes="nothing" sprite="hash" />
+
+<ThemeToggle />
+
+This section is for looking things up. It starts with the package list: what each one does, and whether you can install it from npm today.
+
+All packages share one version. The repo is at `0.5.0`. On npm, the latest release is `0.4.0`. The npm versions below come from `npm view` on 2026-10-06.
+
+## Packages you install
+
+These are the packages an app author touches. A Node or Bun app from `npm create markless` lists `core`, `router`, `typescript-plugin` and `analyzer`.
+
+- **`@markless/core`** (`0.4.0` on npm). The authoring calls `state`, `computed`, `shared`, `element` and `storage`. Also `render()` for the browser, `renderToString()` for HTML, and the Vite plugin at `@markless/core/vite`.
+- **`@markless/router`** (`0.4.0` on npm). Multi-page apps: file routes in `pages/`, `Html`, `Link`, and the Vite plugin at `@markless/router/vite`. It builds through Nitro, which deploys to many hosts.
+- **`@markless/typescript-plugin`** (`0.4.0` on npm). Editor support for `.tsrx` files: completions and errors.
+- **`@markless/ui`** (`0.4.0` on npm). Headless, accessible UI components. See [UI components](/ui).
+- **`@markless/vitest-browser`** (`0.4.0` on npm). Browser test helpers `render()` and `renderSSR()`. Experimental.
+- **`@markless/analyzer`** (`0.4.0` on npm). Browser checks for a running app: console errors, network requests, event wiring, and JavaScript budgets that you set. Optional Playwright driver at `@markless/analyzer/playwright`.
+- **`create-markless`** (`0.4.0` on npm). Creates a new app. See [CLI](/reference/cli).
+
+## Packages the others use
+
+You don't import these yourself. The packages above depend on them.
+
+- **`@markless/compiler`** (`0.4.0` on npm). The TSRX compiler. Before your app runs, it plans the state, the updates and the code each event runs.
+- **`@markless/bundler`** (`0.4.0` on npm). Build plugins for Rolldown and Vite.
+- **`@markless/runtime`** (`0.4.0` on npm). The state runtime: reads, writes and computed updates.
+- **`@markless/serializer`** (`0.4.0` on npm). The format for state and page data that travel with rendered HTML.
+- **`@markless/web`** (`0.4.0` on npm). The render code behind `render()` in the browser and `renderToString()` for HTML.
+- **`@markless/icons`** (not published). Iconify icon packs as `<pack.icon />` tags, inlined at build time.
+- **`@markless/ui-tools`** (not published). Build tools for the `@markless/ui` design system.
+
+In the repo, `@markless/ui` `0.5.0` depends on `@markless/icons` and `@markless/ui-tools`. The `0.4.0` release on npm depends only on `@markless/core`.
+
+`markless-sr-app` is private. It serves the app for the screen-reader test lanes, and it never goes to npm.
+
+<Callout
+	sprite="thought-bubble"
+	title="Why does a new app say ^0.4.0 when the repo says 0.5.0?"
+	text="The CLI pins @markless/* to its own version, with a ^ in front. The 0.5.0 packages are not on npm yet, so npm create markless@latest writes ^0.4.0 today."
+/>
+
+Next: [the glossary](/reference/glossary).
+
+<LikeHeart />

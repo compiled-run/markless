@@ -1,0 +1,116 @@
+import PageMeta from '../../components/page-meta.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
+import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../components/docs/sidebar.tsrx';
+import LikeHeart from '../../components/docs/like-heart.tsrx';
+
+<Sidebar />
+
+# CLI
+
+<PageMeta level="Reference" time="3 min" assumes="nothing" sprite="star-face" />
+
+<ThemeToggle />
+
+The glossary defined the words. This page lists the commands.
+
+## Create an app
+
+```bash
+npm create markless@latest my-app
+```
+
+With no flags, the CLI asks you questions. With `--yes`, it takes the defaults, and you must give a folder name.
+
+```bash
+npm create markless@latest my-app -- --yes --starter app --no-git
+```
+
+## Flags
+
+This is the real `--help` output. The repo source (`0.5.0`) and the npm release (`0.4.0`) print the same text.
+
+```txt
+create-markless
+
+Create Markless apps
+
+Usage:
+  create-markless <target> [--yes]
+
+Options:
+  --yes, -y          Use defaults
+  --format <name>   node, deno, or bun
+  --starter <name>  minimal, app, docs, or full-stack
+  --agents <list>   claude-code, codex, gemini-cli, github-copilot, or none
+  --no-install      Skip dependency installation
+  --no-git          Skip git initialization
+  --workspace       Add the app to the enclosing workspace, if there is one
+  --no-workspace    Keep the app separate from the enclosing workspace
+  --force           Write into a non-empty directory
+```
+
+With `--yes`, the format is `node` and the starter is `minimal`. The CLI also installs the packages and runs `git init`. The target folder must be empty unless you pass `--force`.
+
+If the folder sits inside an existing workspace, the CLI keeps the app separate by default. Pass `--workspace` to add it to that workspace.
+
+## Starters
+
+All four starters are multi-page apps built on `@markless/router` and Nitro. That is a choice of the starters. Markless itself does not need a server: `render()` from `@markless/core` mounts an app in the browser alone.
+
+| `--starter` | Prompt label | What you get |
+| --- | --- | --- |
+| `minimal` | Learn Markless | A small TSRX counter app in `pages/index.tsrx`. |
+| `app` | Build an app | The `minimal` files plus `document.tsrx` and `404` and `500` pages. |
+| `docs` | Write docs | An MDX docs site with a layout and sidebar components. |
+| `full-stack` | Full-stack app | The `app` files plus `api/` and `middleware/` folders. |
+
+A `minimal` app made with `--yes --no-install --no-git --agents none` holds these files:
+
+```txt
+.gitignore
+.vscode/extensions.json
+.vscode/settings.json
+.zed/settings.json
+README.md
+package.json
+pages/index.tsrx
+public/.gitkeep
+scripts/markless-doctor.mjs
+tsconfig.json
+vite.config.ts
+```
+
+## Coding agent skills
+
+The CLI can write a Markless skill file for a coding agent. The file goes into the agent's folder in your home folder, like `~/.claude/skills/markless/SKILL.md`. A subcommand adds or removes it later.
+
+```txt
+Usage: create-markless agents <add|remove> [--agents <list|none>]
+```
+
+Cursor shows in the list, but you can't pick it. Its User Rules apply to every project, so the CLI does not write one.
+
+## Scripts in a new app
+
+- `npm run dev` runs `vp dev`. Starts the dev server on `http://localhost:5173`.
+- `npm run build` runs `vp build`. Builds the app and its server into `.output/`.
+- `npm run preview` runs `vp preview`. Serves the build.
+- `npm run check` runs `vp check`. Runs the Vite+ checks.
+- `npm run doctor` runs `node scripts/markless-doctor.mjs`. Checks the Markless packages and `tsconfig.json`, then runs `pnpm exec vp build`. Add `-- --no-build` to skip the build.
+- `npm run fmt` runs `vp fmt`. Formats the code.
+- `npm run test` runs `vp test`. Runs Vitest.
+
+A Deno app gets the same tasks in `deno.json`, without `doctor`. Run them with `deno task dev`.
+
+To run the built server without Vite, use `node .output/server/index.mjs`. It reads the `PORT` variable.
+
+<Callout
+	sprite="cross"
+	title="Why does npm dev fail?"
+	text="When you create the app with npm, the CLI prints npm dev as the next step. npm answers Unknown command: dev. Type npm run dev instead."
+/>
+
+Want to change any of this? Start with [a tour of the Markless repo](/contributing).
+
+<LikeHeart />

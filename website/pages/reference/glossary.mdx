@@ -1,0 +1,72 @@
+import PageMeta from '../../components/page-meta.tsrx';
+import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../components/docs/sidebar.tsrx';
+import LikeHeart from '../../components/docs/like-heart.tsrx';
+
+<Sidebar />
+
+# Glossary
+
+<PageMeta level="Reference" time="4 min" assumes="nothing" sprite="speech-bubble" />
+
+<ThemeToggle />
+
+The package list named a lot of parts. This page pins down the words around them. Each word has one meaning across the site.
+
+## Writing components
+
+| Term | Meaning |
+| --- | --- |
+| component | A function in a `.tsrx` file whose body is markup, written `function Counter() @{ ... }`. |
+| TSRX | The file format for components: TypeScript plus markup and `@if`, `@for` and `@try` blocks. |
+| state | A value from `state()` that you read and write as a plain variable, like `count`. |
+| computed | A value from `computed()` that Markless works out from state. |
+| shared | Data from `shared()` that many components reach without props. |
+| storage | A string value from `storage()` that Markless saves in `localStorage`. |
+| element handle | A reference from `element()` to one element in the markup. |
+| key | The identity of each row in an `@for`, as in `key item.id`. |
+| async boundary | An `@try` block with `@pending` and `@catch` around an async read. |
+
+## Where a component renders
+
+Markless does its planning before your app runs. The compiled component then renders wherever you need it. The model is the same in every place.
+
+| Term | Meaning |
+| --- | --- |
+| browser-only | `render()` from `@markless/core` mounts the app in the browser. You need no server. |
+| client render | Another name for browser-only rendering. The test helper `render()` uses it too. |
+| server render | `renderToString()` turns a component into HTML on a server. The component body runs there, and zero times in the browser. |
+| streamed render | `renderToStream()` from `@markless/web/render-to-stream` sends the HTML in pieces as slow parts finish. |
+| multi-page app | An app built with `@markless/router`: file routes, links, and pages rendered through Nitro, which deploys to many hosts. |
+| prerender | HTML made at build time. The bundler turns it on when `MARKLESS_PRERENDER` is `1`. There is no public option yet, so treat it as a preview. |
+| test render | `@markless/vitest-browser` renders a component in a browser test, either mounted directly or through a server render. |
+| native host | Proofs in the repo drive UIKit and AppKit controls with the same model. They are proofs, not a feature you can use. |
+
+## How it works
+
+| Term | Meaning |
+| --- | --- |
+| compiler | The build step that reads `.tsrx` files. It plans the state, the updates and the code each event runs, before the app runs. |
+| direct module | What the compiler writes for a simple component, such as a counter. At mount, it builds the DOM and its own small state graph. It puts listeners on the elements and patches text directly. No full runtime comes along. |
+| fallback runtime | What `render()` uses when the compiler cannot write a direct module. A container listens for events and brings in the full runtime when it needs it. |
+| symbol | One piece of code that the compiler split out, like one click handler. |
+| chunk | A file that holds symbols. A click's code runs only when someone clicks. A production build can still fetch the chunk earlier. |
+| packing | The production build step that groups symbols into fewer chunks. It is on by default. Set `packing: false` to turn it off. |
+| state graph | The map of which computed values and which page updates read each piece of state. |
+| payload | In server output, the data next to the HTML. `markless/state` scripts hold the values. `markless/view` scripts say which element does what. |
+| container | In server output, the element with the `data-async-container` attribute. It wraps the HTML and its payload. |
+| resumer | The small inline script in server output. It waits for the first interaction, then brings in the code that interaction needs. A page with no interactions gets no resumer. |
+| resume | The browser carries on from server HTML and its payload. It does not run the component body again. |
+| hydrate | What many other frameworks do: run components again in the browser to attach events. Markless doesn't. |
+
+## Tooling
+
+| Term | Meaning |
+| --- | --- |
+| diagnostic | A compiler message with a code, a title, a reason, suggested fixes and a docs link. |
+| `markless-allow` | A comment that silences one warning, with a reason: `// markless-allow CODE: reason`. It cannot silence an error. |
+| `TS91001` | The error code that `pnpm typecheck` and the editor use for a `.tsrx` file that does not parse. |
+
+Next: [the CLI](/reference/cli).
+
+<LikeHeart />
