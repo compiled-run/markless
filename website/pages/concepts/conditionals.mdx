@@ -1,5 +1,5 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import Collapsible from '../../components/docs/collapsible.tsrx';
+import NotePanelDemo from '../../components/demos/concepts/note-panel-demo.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
@@ -9,168 +9,118 @@ import LikeHeart from '../../components/docs/like-heart.tsrx';
 
 # A hidden branch is not hidden, it is gone
 
-<PageMeta level="Start here" time="5 min" assumes="state, events" sprite="corner-bracket" />
+<PageMeta level="Start here" time="5 min" assumes="state, computed, events" sprite="corner-bracket" />
 
 <ThemeToggle />
 
-Here is a bug you have met. A panel with a message box in it. You type half a sentence, close the
-panel by accident, open it again, and your half sentence is not there.
+You type half a note into a panel. You close the panel by accident. You open it again, and the note
+is gone.
 
-Markless does not let you write that bug. Once you can see why, the fix is one line, and the build
-tells you the day you forget it.
+That bug comes from a reasonable idea: keep the note next to the field that edits it. In Markless,
+the build will not let you write it that way. Once you see why, the fix is one line.
 
-**`@if` puts real elements into the page and takes them out again, and anything declared inside the
-branch would go out with them.**
+**`@if` puts real elements on the page and takes them off again. A value only outlives the branch if
+you declare it above the branch.**
 
-## The version Markless refuses
+## Close it, open it again
 
-Here is the tempting way to write the panel. The value typed into the field, `draft`, is declared
-inside the `@if`, next to the field that uses it.
+Press **Show or hide the note**. Type a note longer than twenty letters. Close the panel, then open
+it again.
 
-<Callout
-	sticker="spring"
-	sprite="cross"
-	title="This first file does not build, on purpose"
-	text="Do not paste the next file into your project: Markless stops the build on it. The file is here so you can see the mistake the build error is pointing at. The file after it is the one to use."
-/>
+{/* SKETCH: "Where does the note live while the panel is closed?" The reader toggles the panel. The figure shows the label and input leaving the page and coming back, while the note value sits above the branch the whole time. */ null}
 
-```tsrx
-// Refused example: the build stops on the line that creates draft.
-import { state } from '@markless/core';
+<NotePanelDemo />
 
-export default function DraftLost() @{
-	let open = state(false);
+{/* PLAYGROUND: starter file note-panel.tsrx as printed below. Try: move let note = state('') inside the @if and read the build error. Try: change 20 to 5 in the recipe. */ null}
 
-	<section>
-		<button onClick={() => (open = !open)}>Toggle the panel</button>
-
-		@if (open) {
-			let draft = state('');
-
-			<label>
-				Your message
-				<input value={draft} onInput={(event) => (draft = event.currentTarget.value)} />
-			</label>
-			<p>Draft: {draft}</p>
-		}
-	</section>
-}
-```
-
-Think about what this would do if it ran. `draft` lives inside the branch, so when the panel closes
-and the branch leaves the page, `draft` leaves with it. Opening the panel again would not restore
-anything. It would build a new field with a new, empty `draft`, and whatever you had typed would be
-gone without a word.
-
-Rather than ship that, Markless stops the build and names the line. The error code is
-`MARKLESS_STATE_CREATION_SITE_UNSTABLE`, and the message reads: state() creates "draft" inside a
-branch. In plain words: a value made with `state()` has to be created in a place that exists for as
-long as the component does, and the inside of an `@if` is not that place. The same build run may
-list a couple of other errors on the same lines; they are knock-on effects of this one and go away
-with it.
-
-## The fix is to move one line up
-
-Take `draft` out of the branch and put it in the component body, above the `@if`. The branch still
-comes and goes, but the value it reads does not:
+The field left the page when you closed the panel. Your note did not. It lives in `note`, which sits
+in the component body above the `@if`. The line under the field kept working the whole time, because
+it reads `note` too.
 
 ```tsrx
-import { state } from '@markless/core';
+import { computed, state } from '@markless/core';
 
-export default function DraftKept() @{
+export default function NotePanel() @{
 	let open = state(false);
-	let draft = state('');
+	let note = state('');
+	const long = computed(() => note.length > 20);
 
 	<section>
-		<button onClick={() => (open = !open)}>Toggle the panel</button>
-
+		<button onClick={() => (open = !open)}>Show or hide the note</button>
 		@if (open) {
 			<label>
-				Your message
-				<input value={draft} onInput={(event) => (draft = event.currentTarget.value)} />
+				Note
+				<input value={note} onInput={(event) => (note = event.currentTarget.value)} />
 			</label>
-			<p>Draft: {draft}</p>
 		}
-	</section>
-}
-```
-
-This one builds. Open the panel, type something into the field, close the panel, then open it again:
-your text is still there. The only difference between the two components is which side of the `@if`
-the declaration sits on.
-
-The rule to carry away: **where you declare a value decides how long it lives.** Above a branch
-means "for as long as the component is". Markless does not let you create state inside a branch,
-because there it would only last as long as the branch is on screen.
-
-## The rest of the shapes
-
-`@else` covers the other side of the same condition:
-
-```tsrx
-import { state } from '@markless/core';
-
-export default function Either() @{
-	let open = state(false);
-
-	<section>
-		<button onClick={() => (open = !open)}>Toggle</button>
-		@if (open) {
-			<p class="open">Shown</p>
+		@if (long) {
+			<p>That is a long note.</p>
 		} @else {
-			<p class="closed">Hidden</p>
+			<p>Short and sweet.</p>
 		}
 	</section>
 }
 ```
 
-Choosing between more than two reads better as `@switch` than as a chain. It renders the one `@case`
-whose value matches, and `@default` catches everything else:
+## Why state cannot live inside the branch
+
+Move `let note = state('');` inside the `@if`, and the build stops with
+`MARKLESS_STATE_CREATION_SITE_UNSTABLE`. The message reads: state() creates "note" inside a branch.
+
+Picture that note if the build let it through. It leaves the page with the branch. Opening the
+panel again creates a new, empty note. Markless stops the build instead of shipping that bug. The same
+run can list other errors on the same lines. They go away with the first one.
+
+**Where you declare a value decides how long it lives.** The component body lasts as long as the
+component. A branch lasts as long as its test is true.
+
+## The shapes
+
+`@else` covers the other side of the same test. Write it with the `@`. A plain `else` stops the
+build with `MARKLESS_BRANCH_ELSE_SPELLING`.
+
+For three or more cases, use `@switch`. It shows the one `@case` that matches, and `@default`
+catches the rest:
 
 ```tsrx
 import { state } from '@markless/core';
 
-export default function Pick() @{
-	let kind = state('alpha');
+export default function Light() @{
+	let color = state('red');
 
 	<section>
-		<button onClick={() => (kind = 'beta')}>Choose beta</button>
-		@switch (kind) {
-			@case 'alpha': {
-				<p>A</p>
+		<button onClick={() => (color = color === 'red' ? 'green' : 'red')}>Switch</button>
+		@switch (color) {
+			@case 'red': {
+				<p>Stop.</p>
 			}
-			@case 'beta': {
-				<p>B</p>
+			@case 'green': {
+				<p>Go.</p>
 			}
 			@default: {
-				<p>Other</p>
+				<p>Wait.</p>
 			}
 		}
 	</section>
 }
 ```
 
-These are part of the language, not a trick played with JavaScript expressions inside the markup.
-That is what lets the compiler treat a branch as a real thing with a beginning and an end, rather
-than as an opaque expression it has to re-evaluate.
+## Give the test a name
 
-## What actually happens when the condition flips
+The demo tests `long`, not `note.length > 20`. The recipe in `computed()` gives the test a name, and
+the `@if` reads that name. If the build warns `MARKLESS_TEMPLATE_EXPRESSION_STATIC` about a test,
+this is the fix.
 
-Not much, and that is the point. Flipping a branch swaps a range of real DOM nodes in or out and
-cleans up anything that belonged only to the branch. No component function runs again, not the one
-holding the `@if` and not any component inside it.
-
-<Collapsible
-	sprite="thought-bubble"
-	summary="Coming from another framework?"
-	text="If you are used to writing conditions as an expression, with a ternary or a logical and inside the markup, the shape here is a statement instead, and the difference is more than cosmetic. A branch has an identity the compiler can name, so it can be given its own scope, its own disposal and its own place in the page. That is why the draft in the first file would really be destroyed rather than merely hidden, since there is no retained shadow copy of the tree anywhere for it to hide in, and why the build refuses to create it there."
+<Callout
+	sprite="cross"
+	title="Why can't I put an @if inside another @if?"
+	text="Today a branch cannot hold another branch. An @if or @switch inside an @if, or an @else if chain, stops the build with MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED. Put the branches side by side, as the demo does, or use @switch when one value picks between three or more cases."
 />
 
-## Try it yourself
+## Try this
 
-Take the second component and move `let draft = state('');` back inside the `@if`, then build.
-Read the error the build prints and find the line it points at. Move the declaration back above the
-branch and build again. Seeing the error once is the fastest way to make the rule stick.
+Move `let note = state('');` inside the `@if` and build. Read the error and find the line it points
+at. Move the line back above the branch and build again.
 
 Next: [rows that keep their own state when the list moves](/concepts/lists).
 

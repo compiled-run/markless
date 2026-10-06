@@ -1,6 +1,7 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import CartTotalDemo from '../../components/demos/concepts/cart-total-demo.tsrx';
+import MugOrderDemo from '../../components/demos/concepts/mug-order-demo.tsrx';
 import Collapsible from '../../components/docs/collapsible.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import LikeHeart from '../../components/docs/like-heart.tsrx';
@@ -9,90 +10,97 @@ import LikeHeart from '../../components/docs/like-heart.tsrx';
 
 # A value you work out is never out of date
 
-<PageMeta level="Start here" time="3 min" assumes="state" sprite="spiral" />
+<PageMeta level="Start here" time="4 min" assumes="state" sprite="spiral" />
 
 <ThemeToggle />
 
-Everybody has shipped this bug. Two numbers on a screen disagree with each other, because one was
-updated and the other was supposed to be updated at the same time and was not. The cart says three
-items and the total says the price of two.
+You have seen this bug in a shop. The basket says three items. The total says the price of two.
 
-The code that keeps them in step is somewhere in the file, and it is right nine times out of ten.
+Somebody stored the total in its own variable. Then somebody else added a button that changed the
+items and forgot the total. Two copies of one fact drifted apart.
 
-That bug exists because the total was stored. Storing it made it a second source of truth that
-somebody has to maintain.
-
-**If a value can be worked out from other values, do not store it. Work it out.** That is what
-`computed()` is for.
+**If you can work a value out from other values, do not store it. Write the recipe once with
+`computed()`.**
 
 ```tsrx
-const total = computed(() => shirts * 20 + mugs * 8);
+const total = computed(() => mugs * 12 + coasters * 3);
 ```
 
-You read `total` like any other variable. You never call it, you never hand it a list of the things
-it depends on, and you never tell it that something changed. The compiler read the body, so it
-already knows this value is made out of `shirts` and `mugs`.
+You read `total` like any other variable. You never call it, and you never list what it depends on.
+Markless reads the recipe and sees `mugs` and `coasters` in it.
 
-Here it is running. Add a shirt, wait a beat, then add a mug, and watch the total:
+## Fill the basket
 
-<CartTotalDemo />
+Press **Add a mug**. Then press **Add a coaster** twice. Watch the total.
 
-Now read the file, and go looking for the line that updates the total:
+{/* SKETCH: "Who updates the total?" The reader adds a mug. The figure draws arrows from mugs and coasters into the total recipe, lights the recipe when either input changes, and shows that no button touches total. */ null}
+
+<MugOrderDemo />
+
+{/* PLAYGROUND: starter file mug-order.tsrx as printed below. Try: add a third item with its own price and add it to the recipe. Try: write total = 0 in a click handler and read the build error. */ null}
+
+Now read the file and look for the line that updates the total:
 
 ```tsrx
 import { computed, state } from '@markless/core';
 
-export default function CartTotal() @{
-	let shirts = state(1);
-	let mugs = state(0);
-	const total = computed(() => shirts * 20 + mugs * 8);
+export default function MugOrder() @{
+	let mugs = state(1);
+	let coasters = state(0);
+	const total = computed(() => mugs * 12 + coasters * 3);
 
 	<section>
-		<p>Shirts at 20 each: {shirts}</p>
-		<p>Mugs at 8 each: {mugs}</p>
+		<p>Mugs at 12 each: {mugs}</p>
+		<p>Coasters at 3 each: {coasters}</p>
 		<p>Total: {total}</p>
-		<button onClick={() => shirts++}>Add a shirt</button>
 		<button onClick={() => mugs++}>Add a mug</button>
+		<button onClick={() => coasters++}>Add a coaster</button>
 	</section>
 }
 ```
 
-There is not one. The two buttons change a quantity and stop there. `total` is not a thing that gets
-updated. It is a description of how to work the total out, and the only moment it is ever worked out
-is a moment when something on screen needs it.
+There is no such line. Each button changes one count and stops. When a count changes, Markless runs
+the recipe again and updates the text that shows `total`.
 
-## Nothing runs until the screen asks for it
+## What a recipe can read
 
-That is the design, not a detail. The specification states the invariant:
+A recipe can read state, props, imports, and `const` values built from those. It cannot read other
+variables from the component body. Those exist only while the component sets up the page, and the
+recipe runs again long after that. The build stops with `MARKLESS_COMPUTED_READS_RENDER_LOCAL` and
+names the variable.
 
-> The entire graph is demand-driven from the DOM. State to computed to DOM updates, where
-> compiler-generated DOM update symbols are the only effects in the system. Nothing computes unless
-> the screen needs it.
+## A computed is read-only
 
-Two things follow. A `computed()` costs you nothing while nothing is looking at it. And a value on
-screen cannot lag behind its inputs, because being on screen is exactly what causes it to be worked
-out.
+Assign to a computed, as in `total = 0`, and the build stops with `MARKLESS_STATE_READ_ONLY_WRITE`.
+Change its inputs instead. A recipe cannot change state either. A state change inside
+one gives `MARKLESS_STATE_WRITE_IN_COMPUTED`.
 
-## Two rules, and then you know this
+<Callout
+	sprite="cross"
+	title="Why can't I call my own function in the markup?"
+	text="Markup can show plain reads, operators and method calls, such as {count * 2}. It cannot look inside a function you wrote, so {label(count)} stops the build with MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED. Move the call into a recipe, as in const text = computed(() => label(count)), and show {text} instead."
+/>
 
-**Do not write to a computed.** It is derived, so assigning to it would be claiming two different
-answers at once. Change the values it is made from instead.
+## Where does side work go?
 
-**Do not declare something as state if you could derive it.** Here is the tell: if you catch
-yourself writing a line whose only job is keeping one variable in agreement with another, the second
-one wanted to be a `computed()`.
+Saving, logging, and sending a message are not values. They do not belong in a recipe. Put them in
+the event handler that causes them. `@markless/core` has no effect function to run code when a value
+changes. Each change starts in a handler, so the handler is the place for its side work.
 
 <Collapsible
 	sprite="star-badge"
-	summary="Where is the dependency list, and where is the effect hook?"
-	text="There is no dependency list because there is nothing for you to keep accurate: the compiler reads the body of the computed and works out what it read. There is no effect primitive either, and the specification is direct that there never will be. Its reasoning is that a computed and an effect are the same node, and the only difference is that a computed runs when it is read while an effect runs because its inputs changed, with nobody asking. That second property is the one that breaks resumability, because it is code that wakes itself up. The classic uses each have a home: deriving a value from other values is computed, fetching data is an async computed, and one-off side work belongs in the event handler where the change actually originated."
+	summary="Coming from another framework?"
+	text="There is no dependency array to keep accurate, because Markless reads the recipe and finds its inputs before your app runs. There is no effect hook either. Derive values with computed(), and do side work in the handler where the change starts."
 />
 
-## Where to go next
+## Try this
 
-If you take one habit from this page, take the tell. You do not have to spot it in advance. You will
-notice it the second time you write it.
+Add a third item to the order, with its own `state()` and price. Add it to the recipe and give it a
+button. The total follows, and you changed one line of the recipe to make that happen.
 
-Next: [events](/concepts/events), which is where a click turns into a change.
+Then try to cheat: write `total = 0` in a click handler and build. The error tells you to change the
+inputs instead.
+
+Next: [events](/concepts/events), where a click turns into a change.
 
 <LikeHeart />

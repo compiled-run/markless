@@ -1,4 +1,5 @@
 import PageMeta from '../../components/page-meta.tsrx';
+import TwoCardsDemo from '../../components/demos/concepts/two-cards-demo.tsrx';
 import Collapsible from '../../components/docs/collapsible.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
@@ -13,141 +14,112 @@ import LikeHeart from '../../components/docs/like-heart.tsrx';
 
 <ThemeToggle />
 
-Every stylesheet you have ever written was a shared room. You call something `.card`, someone two
-folders away calls something else `.card`, and one of you loses: usually the one who loaded first,
-always the one who finds out last.
+A plain stylesheet is a shared room. You call something `.card`. Someone two folders away also calls
+something `.card`. One of you loses, and it is whoever finds out last.
 
-Here are two components. Both use the class name `card`, both say what `.card` looks like, and
-neither one wins, because neither one leaks.
+**Put a `<style>` block inside a component, and its rules reach that file's elements and nothing
+else.**
 
-**A `<style>` block written inside a component styles that component and nothing else, and no
-JavaScript runs to make that true.**
+## Two cards, one class name
+
+Both cards below use the class `card`. Both files say what `.card` looks like, and they disagree.
+Press **Light it up** on the second card.
+
+{/* SKETCH: "Which elements does each .card rule reach?" The reader hovers a rule in either file. The figure outlines the elements that rule matches, and shows the extra class Markless added to each file's elements and selectors. */ null}
+
+<TwoCardsDemo />
+
+{/* PLAYGROUND: starter files paper-card.tsrx and chalk-card.tsrx as printed below. Try: change the background in one file and watch only that card change. Try: open the browser's inspector on a card and find the extra mk- class. */ null}
+
+Each card keeps its own look. Neither file mentions the other, and the order of the imports does not
+matter. The button swaps the second card's class, and the scoped `.lit` rule takes over.
 
 ```tsrx
-export default function FirstCard() @{
+export default function PaperCard() @{
 	<article class="card">
 		<style>
 			.card {
-				padding: 0.7em 0.9em;
-				border: 2px solid rgb(28, 26, 22);
-				background: rgb(198, 226, 255);
-			}
-			.name {
-				font-weight: 700;
+				padding: 0.6em 0.9em;
+				border: 2px solid currentColor;
+				background: lightyellow;
+				color: black;
 			}
 		</style>
-		<p class="name">First card</p>
+		<p>Paper card</p>
 	</article>
 }
 ```
 
 ```tsrx
-export default function SecondCard() @{
-	<article class="card">
+import { state } from '@markless/core';
+
+export default function ChalkCard() @{
+	let lit = state(false);
+
+	<article class={lit ? 'card lit' : 'card'}>
 		<style>
 			.card {
-				padding: 0.7em 0.9em;
-				border: 2px solid rgb(28, 26, 22);
-				background: rgb(214, 245, 214);
+				padding: 0.6em 0.9em;
+				border: 2px dashed currentColor;
+				background: darkslategray;
+				color: white;
 			}
-			.name {
-				font-weight: 700;
+			.lit {
+				background: plum;
+				color: black;
 			}
 		</style>
-		<p class="name">Second card</p>
+		<p>Chalk card</p>
+		<button onClick={() => (lit = !lit)}>Light it up</button>
 	</article>
 }
 ```
 
-Put both on one page and the first card is blue and the second is green. Neither file mentions the
-other, neither one is more specific than the other, and the order you import them in does not
-matter.
+## The extra class
 
-## The class name in your file is not the class name in the page
+When Markless builds your app, it gives each file with a `<style>` block its own class, such as
+`mk-1qak359`. The class comes from the file's path. Markless adds it to every selector in the block
+and to every element the file renders.
 
-The trick is one extra class, added for you at build time. Each component module that has a
-`<style>` block gets its own scope class, and the compiler puts that class in two places: on the
-selectors inside the block, and on the elements the component renders.
+So `.card` in the first file becomes `.card.mk-1qak359` in the stylesheet, and the article goes out
+as `class="card mk-1qak359"`. The second file gets a different class. Its `.card` rule cannot match
+the first file's article.
 
-So `.card` in the file becomes `.card.mk-1a6qykh` in the stylesheet, and the `<article>` goes out as
-`class="card mk-1a6qykh"`. The other component gets a different hash, so its `.card` rule describes a
-class combination that the first card's markup does not have. Two rules that looked identical in
-your editor cannot match each other's elements.
+Rules inside `@media` get the class too. `@keyframes` names stay as you wrote them.
 
-Two details are worth knowing before you write your first block. Media queries and other at-rules
-are descended into, so the rules inside them are scoped like any other. Animation names are left
-alone, so a `@keyframes` you define is global and can be shared, which is almost always what you
-want.
+The rules end up in an ordinary stylesheet that the page links to. No script runs to apply them.
 
-## Nothing runs to make it happen
+## A class is a string
 
-There is no runtime here at all. The compiled CSS is handed to the bundler as an ordinary
-stylesheet, "so Vite/Rolldown's CSS pipeline owns bundling and delivery; no JavaScript runs to apply
-styles". The scope class is in the HTML the server sends, so a reader with JavaScript disabled still
-gets the styled page.
-
-That also means the usual costs of scoping are not here. No class names are generated while the page
-runs, no `<style>` element is written into the head as a component appears, and there is no
-first-paint flash while a stylesheet is assembled.
-
-## A class is an expression like any other
-
-`class` takes a value, and any expression will do. This is the same `state` you already have, so the
-class changes when the value changes:
-
-```tsrx
-import { state } from '@markless/core';
-
-export function Classes() @{
-	let active = state(false);
-
-	<section class={active ? 'panel active' : 'panel idle'}>
-		<button class={active ? 'toggle on' : 'toggle off'} onClick={() => (active = !active)}>
-			Toggle
-		</button>
-	</section>
-}
-```
-
-The value is a string, and you build it with the ordinary tools: a ternary, a template literal, a
-small function that takes a couple of booleans and returns the string. There is no class-name helper
-to import, because there is nothing here that a helper would be helping with.
-
-The `style` attribute takes a string in the same way, and is the right choice for a value that comes
-from arithmetic rather than from a set of named looks:
-
-```tsrx
-import { state } from '@markless/core';
-
-export function Bar() @{
-	let percent = state(40);
-
-	<div class="bar" style={`width: ${percent}%`}>{percent}</div>
-}
-```
-
-Reach for it when the number is genuinely continuous. A dozen named states belong in classes, where
-the stylesheet can see them.
+`class` takes a string. Any expression that makes one works, such as a `? :` or a template string.
+The second card uses `lit ? 'card lit' : 'card'`, and the page updates the class when `lit` changes.
 
 <Callout
-	sticker="scribble"
 	sprite="cross"
-	title="Why the two cards are not side by side on this page"
-	text="Two cards, one of them repainting when you press a button, would say all of this in a second. They are not here, and the reason is the framework build this site is pinned to. The scoped stylesheet a component compiles to is written into the build output and then never linked from the page that needs it, so a component whose only styling is its own style block renders unstyled here. The scope class itself is real and is in the served HTML, which is the half of the story that can be checked: the static card goes out as class='card mk-1a6qykh'. The other half of the finding is that an element whose class is an expression is emitted without the scope class at all, so on this build do not mix a style block with a class expression in the same component. NOTES.md finding 26 in the site repository has both reproductions, and the cards arrive the day the stylesheet reaches the page."
+	title="Why does my class say [object Object]?"
+	text="An object or an array is not a class string. Write class={{ lit: on }} or class={['card', on && 'lit']} and the page renders class='[object Object]'. Markless warns with MARKLESS_ATTRIBUTE_OBJECT_VALUE, and if the value reads state the build stops with MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED. Build the string with a ? : instead."
 />
+
+## One file, one class
+
+The class belongs to the file, not to the component. Two components in one `.tsrx` file share one
+class and one stylesheet. To give a component its own scope, move it to its own file.
+
+A `<style>` block outside any component's markup never reaches the page. Markless warns with
+`MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT`. For rules that cover the whole site, import an
+ordinary stylesheet.
 
 <Collapsible
 	sprite="thought-bubble"
 	summary="Coming from another framework?"
-	text="This is closest to a CSS module, except that you do not import the class names and you do not rename anything: you write the plain name and the compiler adds a scope class beside it, so what you read in the file is what you read in the browser's element inspector. It is not CSS-in-JS: there is no runtime, no template literal compiled into a component, and no style element written while the page runs. Styles composed from a parent, and an escape hatch for deliberately global rules, are both named as unspecified in the host contract today, so a rule you want to be global belongs in an ordinary stylesheet you link yourself."
+	text="This is close to scoped styles in single-file components. You write the plain class name, and Markless adds one class per file to selectors and elements when it builds your app. What you see in the inspector is your own class name next to the added one."
 />
 
-## Try it yourself
+## Try this
 
-Give a component a `<style>` block, then look at the element in your browser's inspector. You will
-see your own class name next to a short hashed one, and the rule in the stylesheet carrying both.
-Then copy the whole component to a second file, change one colour, and put both on a page. Watching
-two identical selectors not fight is the moment the idea lands.
+Open your browser's inspector on one of the cards. Find your own `card` class and the `mk-` class
+beside it. Then copy `PaperCard` into a new file, change one colour, and put both on a page. Two
+identical selectors, and neither one wins.
 
 Next: [splitting a page into components](/build/components).
 

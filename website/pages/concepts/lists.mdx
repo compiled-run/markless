@@ -1,5 +1,5 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import Collapsible from '../../components/docs/collapsible.tsrx';
+import ShoppingListDemo from '../../components/demos/concepts/shopping-list-demo.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
@@ -9,158 +9,108 @@ import LikeHeart from '../../components/docs/like-heart.tsrx';
 
 # A key tells the page which row is which
 
-<PageMeta level="Start here" time="5 min" assumes="state, conditionals" sprite="dashes" />
+<PageMeta level="Start here" time="5 min" assumes="state, events, conditionals" sprite="dashes" />
 
 <ThemeToggle />
 
-Everybody ships this bug once. A table with a checkbox on every row. You tick one, you sort the
-table, and the tick is now on somebody else's row. Nothing threw. Nothing looked broken. The wrong
-person got the email.
+You tick a row in a list. You sort the list. The tick is now on somebody else's row.
 
-The page had no idea the rows were the same rows in a new order. It saw three slots, and it filled
-them again from the top.
+Nothing crashed. The page saw three slots and filled them again from the top. It had no idea the rows
+were the same rows in a new order.
 
-**A key is the answer to "which row is this?", and once a row has one, everything attached to that
-row moves with it.**
+**A key answers "which row is this?" Once a row has a key, everything on that row moves with it.**
 
 ## Tick a row, then sort
 
-Three rows, one checkbox each, and a button that sorts them alphabetically. Put the file below in
-your own project, tick the first row, Pears, then press Sort, and watch where the word "picked"
-ends up.
+Tick **Pears**. Press **Sort A to Z**. Then press **Remove ticked** until the list is empty.
 
-Pears moves, and the tick moves with it. Nothing in the code copies a checkbox state from one row to
-another, because nothing needs to. The row is a thing with a name, and the name did not change when
-its position did.
+{/* SKETCH: "Which row did the tick go to?" The reader ticks Pears and sorts. The figure tags each row element with its key, then shows the same three elements moving into a new order, with no element made or thrown away. */ null}
+
+<ShoppingListDemo />
+
+{/* PLAYGROUND: starter file shopping-list.tsrx as printed below. Try: add a fourth item to the starting list and sort. Try: change key item.id to key i and read the build warning. */ null}
+
+Pears moves to the bottom, and its tick goes with it. The sort did not build new rows. It moved the
+three rows that were already on the page into a new order. When the last row goes, the `@empty`
+block shows instead.
 
 ```tsrx
 import { state } from '@markless/core';
 
-export default function SortableRows() @{
-	let rows = state([
-		{ id: 'pears', label: 'Pears', picked: false },
-		{ id: 'apples', label: 'Apples', picked: false },
-		{ id: 'plums', label: 'Plums', picked: false },
+export default function ShoppingList() @{
+	let items = state([
+		{ id: 'pears', name: 'Pears', done: false },
+		{ id: 'coffee', name: 'Coffee', done: false },
+		{ id: 'milk', name: 'Milk', done: false },
 	]);
 
 	<section>
-		<ul class="row-list">
-			@for (const row of rows; key row.id) {
-				<li class="row">
+		<ul>
+			@for (const item of items; key item.id) {
+				<li>
 					<label>
-						<input
-							type="checkbox"
-							checked={row.picked}
-							onChange={() => (row.picked = !row.picked)}
-						/>
-						{row.label}
+						<input type="checkbox" checked={item.done} onChange={() => (item.done = !item.done)} />
+						{item.name}
 					</label>
-					<span class="row-mark">{row.picked ? 'picked' : ''}</span>
 				</li>
+			} @empty {
+				<li>Nothing left to buy.</li>
 			}
 		</ul>
-		<button
-			onClick={() =>
-				(rows = [...rows].sort((left, right) => left.label.localeCompare(right.label)))
-			}
-		>
+		<button onClick={() => (items = [...items].sort((a, b) => a.name.localeCompare(b.name)))}>
 			Sort A to Z
 		</button>
+		<button onClick={() => (items = items.filter((item) => !item.done))}>Remove ticked</button>
 	</section>
 }
 ```
 
-The whole of the identity story is `key row.id` in the loop header.
+`key item.id` in the loop header is the whole identity story. Each row's checkbox handler changes
+`item.done` on its own item, wherever that row sits.
 
-## What a key buys you
+## Choosing a key
 
-The specification is specific about what travels with a keyed row: its component instances, its
-local `state()`, its derived values, its async work, its DOM updates and its event wiring all stay
-attached to the same logical item "across reorder, insert, and delete operations".
+Use the value that names the item in your data: an id, a slug, an order number. It must be unique
+in the list, and the same item must carry the same key every time.
 
-So a key is not a hint for a diffing algorithm to do better. It is the identity of the row, and it
-is what makes a row a place where state can live at all.
+Avoid two things. The position names the slot, not the item, so it brings the original bug back. And
+a value the reader can edit turns a renamed row into a new row.
 
-## Choosing the key
-
-Use the thing that identifies the item in your data. A database id, a slug, an order number. It has
-to be stable, meaning the same item carries the same key on every render, and unique within the
-list.
-
-Two things not to use. Not the array index by accident, because it names the slot rather than the
-item, which is the original bug in a new costume. And not a value the reader can edit, because a row
-that gets renamed becomes, as far as the page is concerned, a different row.
-
-Naming the position is sometimes genuinely what you want, and TSRX has a way to say so out loud:
-
-```tsrx
-import ProductCard from './product-card.tsrx';
-import type { Product } from './products.ts';
-
-export default function ProductGrid({ products }: { readonly products: readonly Product[] }) @{
-	<section>
-		@for (const product of products; index i; key i) {
-			<ProductCard product={product} />
-		}
-	</section>
-}
-```
-
-That reads "state follows the slot, not the item", which is right for a fixed set of positions and
-wrong for a list that reorders.
-
-<Callout
-	sprite="cross"
-	title="What if I just leave the key off?"
-	text="An unkeyed loop is positional, which is fine for output that never changes and holds nothing: a list of static labels, say. The moment a row holds state or handles events, the compiler asks for a key and points at the @for header. The three diagnostics are MARKLESS_REPEAT_KEY_REQUIRED when there is no key on a stateful loop, MARKLESS_REPEAT_KEY_IS_INDEX when the key is the index and the list can reorder, and MARKLESS_REPEAT_KEY_UNSTABLE when the key is something that can change under you. You find out at build time, not from a support ticket."
-/>
-
-## An empty list gets its own branch
-
-You do not need an `@if` around the loop to say "nothing here yet". `@empty` belongs to the loop and
-renders when it has no items:
+To get the position for display, add `index i` to the header. Keep the key on the data:
 
 ```tsrx
 import { state } from '@markless/core';
 
-export default function Updates() @{
-	let updates = state([{ id: 'markless', project: 'Markless', version: '0.3.1' }]);
+export default function Steps() @{
+	let steps = state([
+		{ id: 'grind', text: 'Grind the beans' },
+		{ id: 'pour', text: 'Pour the water' },
+	]);
 
-	<ul class="update-list">
-		@for (const update of updates; key update.id) {
+	<ol>
+		@for (const step of steps; index i; key step.id) {
 			<li>
-				<strong>{update.project}</strong>
-				<span>{update.version}</span>
+				{i + 1}: {step.text}
 			</li>
-		} @empty {
-			<li>No local updates</li>
 		}
-	</ul>
+	</ol>
 }
 ```
 
-## Why the sort was cheap
-
-Reordering a keyed list moves existing rows. It does not rebuild them, and it does not run any
-component function again: the rows already exist, keyed, and the work is moving DOM nodes into a new
-order.
-
-That is the same promise as the previous pages, kept at a different scale. Changing a number touched
-one piece of text. Sorting a list touched the order of some rows. Neither one re-ran your code.
-
-<Collapsible
-	sprite="star-badge"
-	summary="Coming from another framework?"
-	text="If you have written keys before, you have probably been told they are a performance hint, and that using the index is a small sin you can get away with in a static list. The framing here is different and stricter. A key is the identity root for the row's own graph scope, which is to say it is what makes local state inside a row possible in the first place. That is also why the compiler refuses to guess: an interactive loop without a stable key is a build error rather than a warning in a console you may never open."
+<Callout
+	sprite="cross"
+	title="What if I leave the key off?"
+	text="A @for over state needs a key. Leave it off and the build stops with MARKLESS_REPEAT_KEY_REQUIRED and points at the loop header. Key by position, as in key i, and the build warns with MARKLESS_REPEAT_KEY_IS_INDEX, because a row would then follow its slot and not its data."
 />
 
-## Try it yourself
+## Try this
 
-Give each row its own counter with a button that increases it, tick nothing, and sort. The counts
-follow their rows. Then change `key row.id` to `key i`, using an `index i` clause, and do it again.
-Watching the counts stay behind while the labels move is the clearest demonstration of what a key
-does that exists.
+Add a fourth item, `{ id: 'beans', name: 'Beans', done: false }`, to the starting list. Tick it
+and sort. The tick rides along with Beans.
 
-Next: [how a page waits for data](/concepts/async), without you ever writing a loading flag.
+Then change the header to `@for (const item of items; index i; key i)` and build. Read the warning
+in your terminal. Put `key item.id` back.
+
+Next: [how a page waits for data](/concepts/async).
 
 <LikeHeart />
