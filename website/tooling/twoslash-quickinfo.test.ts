@@ -9,15 +9,15 @@ const fences = (file: string) =>
 			/^```tsrx\n([\s\S]*?)^```/gm,
 		),
 	].map((match) => match[1]!.replace(/\n+$/, ''));
-const counter = fences('../pages/concepts/state.mdx').find((text) =>
-	text.includes('function Counter()'),
+const cups = fences('../pages/concepts/state.mdx').find((text) =>
+	text.includes('function Cups()'),
 )!;
 const gridlist = fences('../pages/ui/gridlist.mdx');
 const files = gridlist.find((text) => text.includes('function Files()'))!;
 const multiple = gridlist.find((text) => text.startsWith('<gridlist.root multiple'))!;
 const wrap = gridlist.find((text) => text.startsWith('<gridlist.root wrap'))!;
 
-test.each([counter, files])(
+test.each([cups, files])(
 	'incomplete fences do not reuse the preceding document: %s',
 	(prior) => {
 		const service = createQuickInfoService();

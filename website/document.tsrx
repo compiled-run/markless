@@ -1,4 +1,5 @@
 import { headFor, siteOrigin } from './nav.ts';
+import { findError } from './components/docs/errors/lookup.ts';
 import { asset } from './site-base.ts';
 import Pager from './components/docs/pager.tsrx';
 import SiteHeader from './components/docs/site-header.tsrx';
@@ -13,7 +14,7 @@ export default function Document({
 	readonly children?: unknown;
 }) @{
 	const pathname = (url?.pathname ?? '/').replace(/\/+$/, '') || '/';
-	const head = headFor(pathname);
+	const head = headFor(pathname, findError);
 	const canonical = `${siteOrigin}${pathname}`;
 	const examplePage = pathname.startsWith('/examples/accordion/');
 	const previewTheme = examplePage ? 'light' : undefined;

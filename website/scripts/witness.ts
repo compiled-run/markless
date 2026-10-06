@@ -4,8 +4,10 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { chromium, type Locator, type Page } from 'playwright-core';
+import { chromium, type Locator } from 'playwright-core';
 import { flatNav, headFor, nav, siteOrigin } from '../nav.ts';
+import { findError } from '../components/docs/errors/lookup.ts';
+import { errorIndex } from '../components/docs/errors/errors-index.ts';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const shotsDir =
@@ -97,18 +99,6 @@ const settleText = async (locator: Locator, wanted: (text: string) => boolean, l
 	return text;
 };
 
-const settleOn = (page: Page, text: string) =>
-	page
-		.waitForFunction(
-			(expected) =>
-				[...document.querySelectorAll('button')].some(
-					(node) => node.textContent?.trim() === expected,
-				),
-			text,
-			{ timeout: 5000 },
-		)
-		.catch(() => {});
-
 try {
 	await waitFor(`${origin}/`);
 
@@ -120,7 +110,7 @@ try {
 	check(statePage.status === 200, 'GET /concepts/state', String(statePage.status));
 	const stateHtml = await statePage.text();
 	check(
-		stateHtml.includes('State is a variable the page is watching'),
+		stateHtml.includes('State is a variable the page watches'),
 		'state page carries its prose',
 	);
 	check(
@@ -347,29 +337,38 @@ try {
 		await hover.blur();
 
 		// --- the island still resumes -----------------------------------------
-		const button = page.getByRole('button', { name: /Clicked/ }).first();
+		const button = page.getByRole('button', { name: 'Pour a cup' }).first();
+		const cupsLine = page.locator('.playground p').first();
 		await button.waitFor();
 		await page.screenshot({ path: `${shotsDir}/T004-state-before.png`, fullPage: true });
 
-		const readCount = async () => (await button.textContent())?.trim();
+		const readCount = async () => ((await cupsLine.textContent()) ?? '').trim();
 		const before = await readCount();
 		check(
-			before === 'Clicked 0 times',
-			'counter renders its zero state from the server',
-			String(before),
+			before === 'Cups of coffee today: 0',
+			'the cups demo renders its zero state from the server',
+			before,
 		);
 
 		// First click both wakes the island and increments; wait for the text to
 		// settle before the second click (a click sent mid-resume is dropped).
 		await button.click();
-		await settleOn(page, 'Clicked 1 times');
+		await settleText(
+			cupsLine,
+			(text) => text === 'Cups of coffee today: 1',
+			'the cups demo counts the first click',
+		);
 		await button.click();
-		await settleOn(page, 'Clicked 2 times');
+		await settleText(
+			cupsLine,
+			(text) => text === 'Cups of coffee today: 2',
+			'the cups demo counts the second click',
+		);
 		const after = await readCount();
 		check(
-			after === 'Clicked 2 times',
-			'counter reaches 2 after two clicks (island resumed)',
-			String(after),
+			after === 'Cups of coffee today: 2',
+			'the cups demo reaches 2 after two clicks (island resumed)',
+			after,
 		);
 		await page.screenshot({ path: `${shotsDir}/T004-state-after.png`, fullPage: true });
 
@@ -478,192 +477,189 @@ try {
 			'llms.txt lists every page with a sentence about it',
 		);
 
-		// --- widget: the mug card on the landing page ---------------------------
-		// The landing teaches `state` with the polaroid's heart, not a counter, so
-		// the resume proof lives there: the count is served at nought, and two
-		// clicks reach two. The run log next to it is the page's other claim, that
-		// the component body ran once — it must still read one entry afterwards.
+		// --- widget: the counter on the landing page ----------------------------
+		// The landing opens on the counter, so the resume proof lives there: the
+		// count is served at nought, and two clicks reach two.
 		await page.goto(`${origin}/`, { waitUntil: 'load' });
-		const mugHeart = page.locator('.mug-demo article button');
-		const mugLikes = page.locator('.mug-demo article button span').first();
-		await mugHeart.waitFor();
+		const landingDemos = page.locator('.playground');
+		const landingCount = landingDemos.first().getByRole('button');
+		await landingCount.waitFor();
+		const landingText = async () => ((await landingCount.textContent()) ?? '').trim();
 		check(
-			((await mugLikes.textContent()) ?? '').trim() === '0',
-			'the landing mug card serves nought likes from the server',
-			((await mugLikes.textContent()) ?? '').trim(),
+			(await landingText()) === 'Count 0',
+			'the landing counter serves Count 0 from the server',
+			await landingText(),
 		);
-		await mugHeart.click();
+		await landingCount.click();
 		await settleText(
-			mugLikes,
-			(text) => text === '1',
-			'the landing mug card counts the first click',
+			landingCount,
+			(text) => text === 'Count 1',
+			'the landing counter counts the first click',
 		);
 		check(
-			((await mugLikes.textContent()) ?? '').trim() === '1',
-			'clicking the heart adds a like, so the landing island resumed',
-			((await mugLikes.textContent()) ?? '').trim(),
+			(await landingText()) === 'Count 1',
+			'clicking the counter adds one, so the landing island resumed',
+			await landingText(),
 		);
-		await mugHeart.click();
+		await landingCount.click();
 		await settleText(
-			mugLikes,
-			(text) => text === '2',
-			'the landing mug card counts a second click',
+			landingCount,
+			(text) => text === 'Count 2',
+			'the landing counter counts a second click',
 		);
 		check(
-			((await mugLikes.textContent()) ?? '').trim() === '2',
-			'the likes keep adding on repeat clicks, so the island stayed awake',
-			((await mugLikes.textContent()) ?? '').trim(),
+			(await landingText()) === 'Count 2',
+			'the count keeps adding on repeat clicks, so the island stayed awake',
+			await landingText(),
 		);
 
-		// --- widget: the run log on the landing page ----------------------------
-		const runOnceLikes = page.locator('.run-once button span').first();
-		const runOnceEntries = page.locator('.run-once .entry');
-		await runOnceLikes.waitFor();
-		const ranAt = ((await runOnceEntries.first().textContent()) ?? '').trim();
+		// --- widget: the rolled die on the landing page --------------------------
+		// The page's other claim is that the component body ran once: the die is
+		// rolled while the body runs, so it must read the same after a click.
+		const rolledLine = landingDemos.nth(1).locator('p').first();
+		const rolledCount = landingDemos.nth(1).getByRole('button');
+		await rolledCount.waitFor();
+		const rolledAt = ((await rolledLine.textContent()) ?? '').trim();
 		check(
-			(await runOnceEntries.count()) === 1 && ranAt.startsWith('#1 at '),
-			'the run log opens on one entry, stamped when the body ran',
-			ranAt,
+			/^Rolled when the component ran: [1-6]$/.test(rolledAt),
+			'the die opens on one roll, made when the body ran',
+			rolledAt,
 		);
-		await runOnceLikes.click();
+		await rolledCount.click();
 		await settleText(
-			runOnceLikes,
-			(text) => text === '1',
-			'the run-log heart counts its click',
+			rolledCount,
+			(text) => text === 'Count 1',
+			'the die demo counts its click',
 		);
 		check(
-			((await runOnceLikes.textContent()) ?? '').trim() === '1',
-			'the run-log heart adds a like too',
-			((await runOnceLikes.textContent()) ?? '').trim(),
+			((await rolledCount.textContent()) ?? '').trim() === 'Count 1',
+			'the die demo button adds one too',
+			((await rolledCount.textContent()) ?? '').trim(),
 		);
 		check(
-			(await runOnceEntries.count()) === 1 &&
-				((await runOnceEntries.first().textContent()) ?? '').trim() === ranAt,
-			'the log gains no second entry, so the click ran no component body again',
-			((await runOnceEntries.first().textContent()) ?? '').trim(),
+			((await rolledLine.textContent()) ?? '').trim() === rolledAt,
+			'the die does not roll again, so the click ran no component body again',
+			((await rolledLine.textContent()) ?? '').trim(),
 		);
 		await page.screenshot({
 			path: `${shotsDir}/T004-landing-widgets-after.png`,
 			fullPage: true,
 		});
 
-		// --- widget: two variables on the state page ---------------------------
+		// --- widget: the drawn number on the state page --------------------------
 		await page.goto(`${origin}/concepts/state`, { waitUntil: 'load' });
-		const twoNumbers = async () =>
+		const cupsNumbers = async () =>
 			(await page.locator('.playground p').allTextContents()).map((text) =>
 				Number(text.replace(/[^0-9]+/g, '')),
 			);
-		const addWatched = page.getByRole('button', { name: 'Add one to the watched variable' });
-		await addWatched.waitFor();
-		const [watchedBefore, drawnBefore] = await twoNumbers();
+		const pour = page.getByRole('button', { name: 'Pour a cup' });
+		await pour.waitFor();
+		const [watchedBefore, drawnBefore] = await cupsNumbers();
+		check(watchedBefore === 0, 'cups watched number starts at 0', String(watchedBefore));
 		check(
-			watchedBefore === 0,
-			'two-variables watched number starts at 0',
-			String(watchedBefore),
-		);
-		check(
-			Number.isFinite(drawnBefore) && drawnBefore >= 100,
-			'two-variables drew a number during render',
+			Number.isFinite(drawnBefore) && drawnBefore >= 10 && drawnBefore <= 99,
+			'cups drew a number while the page was set up',
 			String(drawnBefore),
 		);
-		await addWatched.click();
+		await pour.click();
 		await settleText(
 			page.locator('.playground p').first(),
-			(text) => text.endsWith('1'),
-			'two-variables watched number reaches 1',
+			(text) => text.endsWith(': 1'),
+			'cups watched number reaches 1',
 		);
-		const [watchedAfter, drawnAfter] = await twoNumbers();
-		check(
-			watchedAfter === 1,
-			'two-variables watched number moved on click',
-			String(watchedAfter),
-		);
+		const [watchedAfter, drawnAfter] = await cupsNumbers();
+		check(watchedAfter === 1, 'cups watched number moved on click', String(watchedAfter));
 		check(
 			drawnAfter === drawnBefore,
-			'two-variables drawn number did not move, so the component did not run again',
+			'cups drawn number did not move, so the component did not run again',
 			`${drawnBefore} then ${drawnAfter}`,
 		);
-		await page.screenshot({ path: `${shotsDir}/T005-two-variables-after.png`, fullPage: true });
+		await page.getByRole('button', { name: 'Start over' }).click();
+		await settleText(
+			page.locator('.playground p').first(),
+			(text) => text === 'Cups of coffee today: 0',
+			'Start over assigns the count back to 0',
+		);
+		await page.screenshot({ path: `${shotsDir}/T005-cups-after.png`, fullPage: true });
 
 		await page.goto(`${origin}/concepts/computed`, { waitUntil: 'load' });
 		const totalLine = page.locator('.playground p').nth(2);
-		const addShirt = page.getByRole('button', { name: 'Add a shirt' });
 		const addMug = page.getByRole('button', { name: 'Add a mug' });
-		await addShirt.waitFor();
+		const addCoaster = page.getByRole('button', { name: 'Add a coaster' });
+		await addMug.waitFor();
 		check(
-			((await totalLine.textContent()) ?? '').trim() === 'Total: 20',
-			'cart total renders 20 from the server',
+			((await totalLine.textContent()) ?? '').trim() === 'Total: 12',
+			'mug order total renders 12 from the server',
 			((await totalLine.textContent()) ?? '').trim(),
 		);
-		await addShirt.click();
-		await settleText(totalLine, (text) => text === 'Total: 40', 'cart total reaches 40');
-		check(
-			((await totalLine.textContent()) ?? '').trim() === 'Total: 40',
-			'adding a shirt re-derives the total with no line updating it',
-		);
 		await addMug.click();
-		await settleText(totalLine, (text) => text === 'Total: 48', 'cart total reaches 48');
+		await settleText(totalLine, (text) => text === 'Total: 24', 'mug order total reaches 24');
 		check(
-			((await totalLine.textContent()) ?? '').trim() === 'Total: 48',
-			'adding a mug re-derives the same total',
+			((await totalLine.textContent()) ?? '').trim() === 'Total: 24',
+			'adding a mug re-derives the total with no line updating it',
 		);
-		await page.screenshot({ path: `${shotsDir}/T005-cart-total-after.png`, fullPage: true });
+		await addCoaster.click();
+		await settleText(totalLine, (text) => text === 'Total: 27', 'mug order total reaches 27');
+		check(
+			((await totalLine.textContent()) ?? '').trim() === 'Total: 27',
+			'adding a coaster re-derives the same total',
+		);
+		await page.screenshot({ path: `${shotsDir}/T005-mug-order-after.png`, fullPage: true });
 
-		// --- widget: three differences on the reading-tsrx page ----------------
+		// --- widgets on the reading-tsrx page ------------------------------------
 		await page.goto(`${origin}/start/reading-tsrx`, { waitUntil: 'load' });
-		const explorerNote = page.locator('.explorer-note');
-		const litLines = page.locator('.file-line.is-lit');
-		await explorerNote.waitFor();
-		check(
-			((await explorerNote.textContent()) ?? '').includes('statement container') ||
-				((await explorerNote.textContent()) ?? '').includes('body is written'),
-			'three-differences opens on the body explanation',
-			((await explorerNote.textContent()) ?? '').slice(0, 60),
+		// The page walks through counter.tsrx line by line, so the fence it prints
+		// is the file the demo above it runs, not a second counter that differs.
+		const trimmedLines = (text: string) =>
+			text
+				.split('\n')
+				.map((line) => line.trim())
+				.filter((line) => line !== '');
+		const counterFence = (await page.locator('pre.shiki').allInnerTexts()).find((text) =>
+			text.includes('export default function Counter()'),
+		);
+		const counterFile = trimmedLines(
+			await readFile(`${root}/components/demos/start/counter.tsrx`, 'utf8'),
 		);
 		check(
-			(await litLines.count()) === 2,
-			'three-differences lights the two body lines to start with',
-			String(await litLines.count()),
+			trimmedLines(counterFence ?? '').join('\n') === counterFile.join('\n'),
+			'the reading-tsrx page prints the counter file its demo runs',
+			trimmedLines(counterFence ?? '').join(' | '),
 		);
-		await page.getByRole('button', { name: 'The markup' }).click();
+		const readingDemos = page.locator('.playground');
+		const labelledLine = readingDemos.nth(1).locator('p').first();
+		await labelledLine.waitFor();
+		check(
+			((await labelledLine.textContent()) ?? '').trim() === 'You clicked 0 times.',
+			'the fragment demo serves its paragraph at 0',
+			((await labelledLine.textContent()) ?? '').trim(),
+		);
+		await readingDemos.nth(1).getByRole('button', { name: 'Click me' }).click();
 		await settleText(
-			explorerNote,
-			(text) => text.includes('The markup is a statement'),
-			'three-differences explains the markup after a click',
+			labelledLine,
+			(text) => text === 'You clicked 1 times.',
+			'the paragraph beside the button follows its click',
 		);
+		const teaToggle = readingDemos.nth(2).getByRole('button');
+		const teaNote = readingDemos.nth(2).locator('p.note');
 		check(
-			((await explorerNote.textContent()) ?? '').includes('The markup is a statement'),
-			'clicking a label swaps the sentence under the file',
+			((await teaToggle.textContent()) ?? '').trim() === 'Show the note' &&
+				(await teaNote.count()) === 0,
+			'the @if demo starts with no note in the page',
 		);
+		await teaToggle.click();
+		await teaNote.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 		check(
-			(await litLines.count()) === 1,
-			'clicking a label moves the highlight to one line',
-			String(await litLines.count()),
+			((await teaNote.textContent()) ?? '').trim() === 'Steep it for three minutes.' &&
+				((await teaToggle.textContent()) ?? '').trim() === 'Hide the note',
+			'opening the branch puts the note into the page',
+			((await teaToggle.textContent()) ?? '').trim(),
 		);
-		// The widget shows `components/demos/concepts/counter.tsrx` line for line, so the
-		// page carries one counter file rather than two that differ. The counter
-		// renders a single element, so the fragment is taught from its own
-		// example further down the page and the widget has no third label.
-		const widgetFile = (await page.locator('.file-lines .file-line').allTextContents())
-			.map((line) => line.trim())
-			.filter((line) => line !== '');
-		const counterFile = (
-			await readFile(`${root}/components/demos/concepts/counter.tsrx`, 'utf8')
-		)
-			.split('\n')
-			.map((line) => line.trim())
-			.filter((line) => line !== '');
-		check(
-			widgetFile.join('\n') === counterFile.join('\n'),
-			'the three-differences widget shows the counter file itself',
-			widgetFile.join(' | '),
-		);
-		check(
-			(await page.getByRole('button', { name: 'The fragment' }).count()) === 0,
-			'the widget offers no fragment label, because the counter file has no fragment',
-		);
+		await teaToggle.click();
+		await teaNote.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+		check((await teaNote.count()) === 0, 'closing the branch takes the note out of the page');
 		await page.screenshot({
-			path: `${shotsDir}/T005-three-differences-after.png`,
+			path: `${shotsDir}/T005-reading-tsrx-after.png`,
 			fullPage: true,
 		});
 
@@ -1422,30 +1418,35 @@ try {
 			});
 		}
 
-		// --- widget: the name echo on the events page --------------------------
+		// --- widget: the mug label on the events page ---------------------------
 		await page.goto(`${origin}/concepts/events`, { waitUntil: 'load' });
-		const echoField = page.locator('.playground input').first();
+		const echoField = page.locator('.playground-echo input').first();
 		const echoLine = page.locator('.playground-echo p').first();
+		const printedLine = page.locator('.playground-echo p').nth(1);
 		await echoField.waitFor();
 		check(
-			((await echoLine.textContent()) ?? '').trim() === 'Hello,',
-			'name echo renders its empty greeting from the server',
+			((await echoLine.textContent()) ?? '').trim() === 'Preview:',
+			'mug label renders its empty preview from the server',
 			((await echoLine.textContent()) ?? '').trim(),
 		);
 		await echoField.click();
 		await echoField.pressSequentially('Ada', { delay: 40 });
 		await settleText(
 			echoLine,
-			(text) => text === 'Hello, Ada',
-			'name echo follows the keystrokes',
+			(text) => text === 'Preview: Ada',
+			'mug label preview follows the keystrokes',
 		);
 		check(
-			((await echoLine.textContent()) ?? '').trim() === 'Hello, Ada',
-			'typing into the field moves the echo under it',
+			((await echoLine.textContent()) ?? '').trim() === 'Preview: Ada',
+			'typing into the field moves the preview under it',
 		);
 		const urlBeforeSubmit = page.url();
 		await echoField.press('Enter');
-		await page.waitForTimeout(400);
+		await settleText(
+			printedLine,
+			(text) => text === 'Printed: Ada',
+			'pressing Enter runs the submit handler',
+		);
 		check(
 			page.url() === urlBeforeSubmit,
 			'pressing Enter does not navigate, because the handler calls preventDefault',
@@ -1456,26 +1457,18 @@ try {
 			'the field still holds what was typed after the submit',
 			await echoField.inputValue(),
 		);
-		await page.screenshot({ path: `${shotsDir}/T013-name-echo-after.png`, fullPage: true });
-
-		// Four pages ship a callout where a widget was meant to be, and the heading
-		// on it is the first thing the reader is told, so each one is checked
-		// verbatim rather than by a phrase.
-		const noBoxTitle: Record<string, string> = {
-			'/concepts/async': 'What is missing here, and what this build actually does',
-			'/concepts/styling': 'Why the two cards are not side by side on this page',
-			'/build/components': 'Why that pair is not a box on this page',
-			'/build/storage': 'Why that file is not a box on this page',
-		};
+		await echoField.press('Escape');
+		await settleText(echoLine, (text) => text === 'Preview:', 'Escape clears the name');
+		await page.screenshot({ path: `${shotsDir}/T013-mug-label-after.png`, fullPage: true });
 
 		await page.goto(`${origin}/concepts/conditionals`, { waitUntil: 'load' });
-		const refusedTitles = await page
+		const conditionalsTitles = await page
 			.locator('.callout-title')
 			.evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()));
 		check(
-			refusedTitles.includes('This first file does not build, on purpose'),
-			'/concepts/conditionals marks its first file as refused by the build',
-			refusedTitles.join(' | '),
+			conditionalsTitles.includes("Why can't I put an @if inside another @if?"),
+			'/concepts/conditionals answers the nested @if question',
+			conditionalsTitles.join(' | '),
 		);
 		const conditionalsText = (await page.locator('body').textContent()) ?? '';
 		check(
@@ -1483,18 +1476,82 @@ try {
 			'/concepts/conditionals names the error the build stops with',
 		);
 
-		for (const href of ['/concepts/conditionals', '/concepts/lists']) {
-			await page.goto(`${origin}${href}`, { waitUntil: 'load' });
-			check(
-				(await page.locator('.playground').count()) === 0,
-				`${href} has no playground frame trying to build its files`,
-			);
+		// --- widget: the note panel on the conditionals page ---------------------
+		// The page's claim: the field leaves the page with the branch, and the note
+		// survives because it is declared above the branch.
+		const notePanel = page.locator('.playground').first();
+		const noteToggle = notePanel.getByRole('button', { name: 'Show or hide the note' });
+		const noteField = notePanel.locator('input');
+		const noteVerdict = notePanel.locator('p').first();
+		await noteToggle.waitFor();
+		check((await noteField.count()) === 0, 'the note field is not in the page while closed');
+		await noteToggle.click();
+		await noteField.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+		const longNote = 'A note longer than twenty letters';
+		await noteField.fill(longNote);
+		await settleText(
+			noteVerdict,
+			(text) => text === 'That is a long note.',
+			'the computed under the field follows the note',
+		);
+		await noteToggle.click();
+		await noteField.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+		check((await noteField.count()) === 0, 'closing the panel takes the field out of the page');
+		check(
+			((await noteVerdict.textContent()) ?? '').trim() === 'That is a long note.',
+			'the note outlives the branch, because it is declared above it',
+			((await noteVerdict.textContent()) ?? '').trim(),
+		);
+		await noteToggle.click();
+		await noteField.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+		check(
+			(await noteField.inputValue()) === longNote,
+			'opening the panel again shows the note that was typed',
+			await noteField.inputValue(),
+		);
+		await page.screenshot({ path: `${shotsDir}/T013-note-panel-after.png`, fullPage: true });
+
+		// --- widget: the shopping list on the lists page --------------------------
+		await page.goto(`${origin}/concepts/lists`, { waitUntil: 'load' });
+		const shopping = page.locator('.playground').first();
+		const shoppingRows = async () =>
+			(await shopping.locator('li').allTextContents()).map((text) => text.trim());
+		const pears = shopping.getByRole('checkbox', { name: 'Pears' });
+		await pears.waitFor();
+		check(
+			(await shoppingRows()).join('|') === 'Pears|Coffee|Milk',
+			'the list serves its rows in their first order',
+			(await shoppingRows()).join('|'),
+		);
+		await pears.check();
+		await shopping.getByRole('button', { name: 'Sort A to Z' }).click();
+		for (let attempt = 0; attempt < 40; attempt += 1) {
+			if ((await shoppingRows()).join('|') === 'Coffee|Milk|Pears') break;
+			await new Promise((done) => setTimeout(done, 100));
 		}
+		check(
+			(await shoppingRows()).join('|') === 'Coffee|Milk|Pears',
+			'sorting reorders the rows',
+			(await shoppingRows()).join('|'),
+		);
+		check(
+			(await pears.isChecked()) &&
+				!(await shopping.getByRole('checkbox', { name: 'Coffee' }).isChecked()),
+			'the tick moves with Pears through the sort, because each row has a key',
+		);
+		await shopping.getByRole('button', { name: 'Remove ticked' }).click();
+		for (let attempt = 0; attempt < 40; attempt += 1) {
+			if ((await shoppingRows()).join('|') === 'Coffee|Milk') break;
+			await new Promise((done) => setTimeout(done, 100));
+		}
+		check(
+			(await shoppingRows()).join('|') === 'Coffee|Milk',
+			'removing ticked rows drops Pears and keeps the rest',
+			(await shoppingRows()).join('|'),
+		);
+		await page.screenshot({ path: `${shotsDir}/T013-shopping-list-after.png`, fullPage: true });
 
 		// --- batch 3: first app, async, styling ---------------------------------
-		// Three pages, and two of them are the honest kind: the widget their
-		// outline asked for cannot run on this build, so what is checked is that
-		// the page says so and really has no demo frame to mislead anyone.
 		for (const href of [
 			'/start/first-app',
 			'/concepts/async',
@@ -1506,8 +1563,8 @@ try {
 			const heading = ((await page.locator('h1').first().textContent()) ?? '').trim();
 			check(heading.length > 0, `${href} renders its h1 in the browser`, heading);
 			check(
-				(await page.locator('.playground').count()) === 0,
-				`${href} has no demo frame, because it has no live widget`,
+				(await page.locator('.playground').count()) > 0,
+				`${href} carries its live demo`,
 			);
 			await page.screenshot({
 				path: `${shotsDir}/T014-${slugFor(href)}.png`,
@@ -1515,67 +1572,102 @@ try {
 			});
 		}
 
-		// The async and styling pages each carry the callout that says why the
-		// widget is missing. The day the framework fix lands and the widget goes
-		// back on the page, the `.playground` check above fails and the callout has
-		// to come out with the note it names.
-		for (const href of ['/concepts/async', '/concepts/styling']) {
-			await page.goto(`${origin}${href}`, { waitUntil: 'load' });
-			const told = await page
-				.locator('.callout-title')
-				.evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()));
-			check(
-				told.includes(noBoxTitle[href]),
-				`${href} says out loud why it has no demo box`,
-				told.join(' | '),
-			);
-			const body = await page
-				.locator('.callout-body')
-				.evaluateAll((nodes) =>
-					nodes.map((node) => (node.textContent ?? '').trim()).join(' '),
-				);
-			check(
-				body.includes('NOTES.md finding 25') || body.includes('NOTES.md finding 26'),
-				`${href} names the finding its missing widget is recorded under`,
-			);
-		}
-
-		// The page quotes the specification's deadline rules, and on this build a
-		// re-settle never commits the pending arm, so the callout has to say in so
-		// many words that those rules are quoted and not measured here. It stays
-		// until that is no longer true.
+		// --- widget: the mug facts on the async page ------------------------------
+		// The page's claim: each pick runs the recipe again, the old answer stays
+		// until the new one is ready, a failure swaps in @catch, and a later pick
+		// recovers. Every text read while waiting must be the old or the new answer.
 		await page.goto(`${origin}/concepts/async`, { waitUntil: 'load' });
-		const asyncCalloutBody = await page
-			.locator('.callout-body')
-			.evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()).join(' '));
+		const facts = page.locator('.playground').first();
+		const factLine = facts.locator('p').first();
+		await factLine.waitFor();
+		await settleText(
+			factLine,
+			(text) => text === 'Pick a mug.',
+			'the async demo serves its prompt',
+		);
+		const waitForFact = async (button: string, from: string, to: string, label: string) => {
+			await facts.getByRole('button', { name: button }).click();
+			const seen = new Set<string>();
+			for (let attempt = 0; attempt < 60; attempt += 1) {
+				const text = ((await factLine.textContent()) ?? '').trim();
+				seen.add(text);
+				if (text === to) break;
+				await new Promise((done) => setTimeout(done, 100));
+			}
+			check(
+				seen.has(to) && [...seen].every((text) => text === from || text === to),
+				label,
+				[...seen].join(' -> '),
+			);
+		};
+		await waitForFact(
+			'Tall mug',
+			'Pick a mug.',
+			'The tall mug holds a big coffee.',
+			'the async demo holds the old answer until the new one is ready, then swaps',
+		);
+		await waitForFact(
+			'Cracked mug',
+			'The tall mug holds a big coffee.',
+			'That mug is not on the shelf.',
+			'a failed lookup swaps in the @catch block',
+		);
+		await waitForFact(
+			'Small mug',
+			'That mug is not on the shelf.',
+			'The small mug holds one espresso.',
+			'picking another mug after a failure recovers',
+		);
+		await page.screenshot({ path: `${shotsDir}/T014-mug-facts-after.png`, fullPage: true });
+
+		// --- widget: two cards on the styling page --------------------------------
+		await page.goto(`${origin}/concepts/styling`, { waitUntil: 'load' });
+		const cards = page.locator('.playground').first().locator('article.card');
+		await cards.first().waitFor();
+		const cardGrounds = () =>
+			cards.evaluateAll((nodes) =>
+				nodes.map((node) => getComputedStyle(node as Element).backgroundColor),
+			);
+		const groundsAtRest = await cardGrounds();
 		check(
-			asyncCalloutBody.includes(
-				'the deadline rules above are quoted from the specification, not measured on this site',
-			),
-			'the async page says which of its deadline claims are spec and not measured',
-			asyncCalloutBody.slice(-120),
+			groundsAtRest.length === 2 && groundsAtRest[0] !== groundsAtRest[1],
+			'two components both call it .card, and each keeps its own style',
+			groundsAtRest.join(' vs '),
+		);
+		await page.getByRole('button', { name: 'Light it up' }).click();
+		for (let attempt = 0; attempt < 40; attempt += 1) {
+			if ((await cardGrounds())[1] !== groundsAtRest[1]) break;
+			await new Promise((done) => setTimeout(done, 100));
+		}
+		const groundsLit = await cardGrounds();
+		check(
+			groundsLit[1] !== groundsAtRest[1] && groundsLit[0] === groundsAtRest[0],
+			'lighting the chalk card restyles it and leaves the paper card alone',
+			groundsLit.join(' vs '),
 		);
 
-		// The first-app page must carry the override a reader needs today, exactly,
-		// and must not fake a terminal.
+		// The first-app page carries the scaffold command and a starter home that runs.
 		await page.goto(`${origin}/start/first-app`, { waitUntil: 'load' });
 		const firstAppText = (await page.locator('.prose').first().innerText()).replace(
 			/\s+/g,
 			' ',
 		);
 		check(
-			firstAppText.includes('"@tsrx/core": "0.1.58"'),
-			'the first-app page carries the @tsrx/core override a clean install needs',
-		);
-		check(
 			firstAppText.includes('npm create markless@latest'),
 			'the first-app page carries the scaffold command',
 		);
+		const starterCount = page.locator('.playground').first().getByRole('button');
+		await starterCount.waitFor();
+		await starterCount.click();
+		await settleText(
+			starterCount,
+			(text) => text === 'Count 1',
+			'the first-app starter home counts a click',
+		);
 
 		// --- batch 4: the Building an app section -------------------------------
-		// Four pages. Three carry a widget whose whole teaching moment is a thing
-		// the reader does, and the checks below do exactly that and assert what
-		// the page says will happen. The fourth is the honest kind.
+		// Four pages, each with a widget whose teaching moment is a thing the
+		// reader does. The checks below do that and assert what the page says.
 		for (const href of [
 			'/build/components',
 			'/build/elements',
@@ -1593,104 +1685,142 @@ try {
 			});
 		}
 
+		// --- widgets: the badge and the picker on the components page -------------
+		// A prop is a live read of the parent's value, and the child body runs once.
 		await page.goto(`${origin}/build/components`, { waitUntil: 'load' });
+		const badgeDemo = page
+			.locator('.playground')
+			.filter({ has: page.getByRole('button', { name: 'Add one' }) });
+		const badgeLine = badgeDemo.locator('p').first();
+		await badgeLine.waitFor();
+		const badgeDrawn = async () =>
+			((await badgeLine.textContent()) ?? '').match(/drew (\d+)/)?.[1] ?? '';
+		const drewAtRest = await badgeDrawn();
 		check(
-			(await page.locator('.playground').count()) === 0,
-			'/build/components really has no playground frame to mislead the reader',
+			((await badgeLine.locator('strong').textContent()) ?? '').trim() === '0' &&
+				drewAtRest !== '',
+			'the badge serves 0 clicks and the number it drew',
+			((await badgeLine.textContent()) ?? '').trim(),
 		);
-		const componentCallouts = await page
-			.locator('.callout-title')
-			.evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()));
+		await badgeDemo.getByRole('button', { name: 'Add one' }).click();
+		await settleText(
+			badgeLine.locator('strong'),
+			(text) => text === '1',
+			'the badge reads the parent count live',
+		);
 		check(
-			componentCallouts.includes(noBoxTitle['/build/components']),
-			'/build/components says out loud why it has no demo box',
-			componentCallouts.join(' | '),
+			(await badgeDrawn()) === drewAtRest,
+			'the badge body did not run again, so its drawn number stayed',
+			`${drewAtRest} then ${await badgeDrawn()}`,
 		);
-		const componentBody = await page
-			.locator('.callout-body')
-			.evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()).join(' '));
+		const pickerDemo = page
+			.locator('.playground')
+			.filter({ has: page.getByRole('button', { name: 'Pick Grace' }) });
+		const pickedLine = pickerDemo.locator('p').first();
 		check(
-			componentBody.includes('finding 29'),
-			'/build/components names the finding its missing widget is recorded under',
+			((await pickedLine.textContent()) ?? '').trim() === 'Picked: nobody',
+			'the picker serves nobody picked',
+			((await pickedLine.textContent()) ?? '').trim(),
 		);
+		await pickerDemo.getByRole('button', { name: 'Pick Grace' }).click();
+		await settleText(
+			pickedLine,
+			(text) => text === 'Picked: Grace',
+			'a callback prop talks back to the parent',
+		);
+		await page.screenshot({ path: `${shotsDir}/T006-components-after.png`, fullPage: true });
 
-		// --- widget: the focus field on the elements page ------------------------
+		// --- widget: the focus counter on the elements page -----------------------
 		// The claim is that the handle is the real node, so what is checked is the
 		// browser's own idea of which element has the caret.
 		await page.goto(`${origin}/build/elements`, { waitUntil: 'load' });
-		const focusButton = page.getByRole('button', { name: 'Put the cursor in the field' });
+		const focusButton = page.getByRole('button', { name: 'Add one and focus' });
 		await focusButton.waitFor();
 		const activeIsField = () =>
 			page.evaluate(() => {
 				const field = document.querySelector('.playground input');
 				return Boolean(field) && document.activeElement === field;
 			});
+		const settleFocus = async () => {
+			for (let attempt = 0; attempt < 40; attempt += 1) {
+				if (await activeIsField()) return;
+				await new Promise((done) => setTimeout(done, 100));
+			}
+		};
 		check(!(await activeIsField()), 'the field does not start out focused');
 		await focusButton.click();
+		await settleFocus();
+		check(await activeIsField(), 'clicking the button puts the caret in the field');
+		check(
+			(await page.locator('.playground input').inputValue()) === '1',
+			'the same click adds one to the count in the field',
+			await page.locator('.playground input').inputValue(),
+		);
+		await focusButton.focus();
+		await page.locator('.playground label').click();
+		await settleFocus();
+		check(
+			await activeIsField(),
+			'clicking the label focuses the field, because for={field} names it',
+		);
+		await page.screenshot({ path: `${shotsDir}/T006-focus-counter-after.png`, fullPage: true });
+
+		// --- widget: the drink pick on the storage page ----------------------------
+		await page.goto(`${origin}/build/storage`, { waitUntil: 'load' });
+		const drinkAttr = () =>
+			page.evaluate(() => document.documentElement.getAttribute('data-docs-drink'));
+		await page.locator('.playground button.coffee').click();
 		for (let attempt = 0; attempt < 40; attempt += 1) {
-			if (await activeIsField()) break;
+			if ((await drinkAttr()) === 'coffee') break;
 			await new Promise((done) => setTimeout(done, 100));
 		}
-		check(await activeIsField(), 'clicking the button puts the caret in the field');
-		await settleText(
-			page.locator('.playground-echo p').first(),
-			(text) => text === 'The cursor is in the field',
-			'the focus field reports the cursor moved',
+		check(
+			(await drinkAttr()) === 'coffee',
+			'picking a drink writes it onto <html>',
+			String(await drinkAttr()),
 		);
-		await page.screenshot({ path: `${shotsDir}/T006-focus-field-after.png`, fullPage: true });
+		await page.reload({ waitUntil: 'domcontentloaded' });
+		check(
+			(await drinkAttr()) === 'coffee',
+			'the pick survives a reload, applied before the page is shown',
+			String(await drinkAttr()),
+		);
+		await page.screenshot({ path: `${shotsDir}/T006-drink-pick-after.png`, fullPage: true });
+		await page.evaluate(() => localStorage.clear());
 
-		await page.goto(`${origin}/build/storage`, { waitUntil: 'load' });
-		check(
-			(await page.locator('.playground').count()) === 0,
-			'/build/storage really has no playground frame to mislead the reader',
-		);
-		const storageCallouts = await page
-			.locator('.callout-title')
-			.evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()));
-		check(
-			storageCallouts.includes(noBoxTitle['/build/storage']),
-			'/build/storage says out loud why it has no demo box',
-			storageCallouts.join(' | '),
-		);
-		const storageBody = await page
-			.locator('.callout-body')
-			.evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()).join(' '));
-		check(
-			storageBody.includes('finding 30'),
-			'/build/storage names the finding its missing widget is recorded under',
-		);
-
+		// --- widget: the shared counter on the shared page --------------------------
 		await page.goto(`${origin}/build/shared`, { waitUntil: 'load' });
+		const sharedDemo = page
+			.locator('.playground')
+			.filter({ hasText: 'Badge shows:' })
+			.first();
+		const sharedBadge = sharedDemo.locator('output').first();
+		await sharedBadge.waitFor();
 		check(
-			(await page.locator('.playground').count()) === 0,
-			'/build/shared really has no playground frame to mislead the reader',
+			((await sharedBadge.textContent()) ?? '').trim() === '0',
+			'the shared badge serves 0',
+			((await sharedBadge.textContent()) ?? '').trim(),
 		);
-		const sharedCallouts = await page
-			.locator('.callout-title')
-			.evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()));
-		check(
-			sharedCallouts.some((title) => title.includes('when we tried it on 0.3.1')),
-			'/build/shared says out loud what happened when it was tried',
-			sharedCallouts.join(' | '),
+		await sharedDemo.getByRole('button', { name: 'Add one' }).click();
+		await settleText(
+			sharedBadge,
+			(text) => text === '1',
+			'a click in one component moves the badge in another through shared()',
 		);
-		const sharedBody = await page
-			.locator('.callout-body')
-			.evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()).join(' '));
-		check(
-			sharedBody.includes('NOTES.md'),
-			'/build/shared names the finding its missing widget is recorded under',
-		);
+		await page.screenshot({ path: `${shotsDir}/T006-shared-after.png`, fullPage: true });
 
 		// --- batch 5: the Router section, how it works, and the reference -------
-		// Five pages, four of them carrying a widget that is a plain state read
-		// plus text bindings. Each check does what its page tells the reader to
-		// do and asserts the line the page says they will then be looking at.
+		// Each widget check does what its page tells the reader to do and asserts
+		// the line the page says they will then be looking at.
 		for (const href of [
 			'/router/pages',
 			'/router/links',
 			'/router/data',
+			'/router/api-routes',
+			'/router/deploying',
 			'/how-it-works',
 			'/reference',
+			'/errors',
 		]) {
 			const response = await fetch(`${origin}${href}`);
 			check(response.status === 200, `GET ${href}`, String(response.status));
@@ -1703,159 +1833,170 @@ try {
 			});
 		}
 
-		// --- widget: the route tree on the pages page ---------------------------
+		// --- widget: the URL picker on the pages page -----------------------------
 		await page.goto(`${origin}/router/pages`, { waitUntil: 'load' });
-		const routeUrl = page.locator('.playground .playground-output').first();
+		const routeAnswer = page.locator('.playground .playground-output').first();
 		const routeNote = page.locator('.playground .explorer-note').first();
-		await routeUrl.waitFor();
+		await routeAnswer.waitFor();
 		check(
-			((await routeUrl.textContent()) ?? '').trim() === '/',
-			'the route tree opens on the index file, which is the site root',
-			((await routeUrl.textContent()) ?? '').trim(),
+			((await routeAnswer.textContent()) ?? '').trim() ===
+				'pages/blog/[slug].tsrx answers, with params.slug = "hello".',
+			'the URL picker opens on the bracketed file and its parameter',
+			((await routeAnswer.textContent()) ?? '').trim(),
 		);
-		await page.getByRole('button', { name: 'pages/blog/[slug].tsrx' }).click();
+		await page.getByRole('button', { name: '/docs/guide/intro' }).click();
 		await settleText(
-			routeUrl,
-			(text) => text === '/blog/:slug',
-			'the route tree answers with the dynamic route URL',
+			routeAnswer,
+			(text) => text === 'pages/docs/[...slug].mdx answers, with params.slug = "guide/intro".',
+			'the URL picker answers with the catch-all file',
+		);
+		await page.getByRole('button', { name: '/docs', exact: true }).click();
+		await settleText(
+			routeAnswer,
+			(text) => text === 'pages/404.tsrx answers, with status 404.',
+			'a catch-all with nothing to catch falls through to the 404 page',
 		);
 		check(
-			((await routeUrl.textContent()) ?? '').trim() === '/blog/:slug',
-			'clicking a bracketed file name shows the URL it produces',
-		);
-		check(
-			((await routeNote.textContent()) ?? '').includes('parameter'),
-			'the route tree explains what the brackets did',
+			((await routeNote.textContent()) ?? '').includes('at least one more part'),
+			'the URL picker explains why /docs matched nothing',
 			((await routeNote.textContent()) ?? '').slice(0, 60),
 		);
-		await page.getByRole('button', { name: 'pages/docs/[...slug].mdx' }).click();
-		await settleText(
-			routeUrl,
-			(text) => text === '/docs/**',
-			'the route tree answers with the catch-all route URL',
-		);
-		await page.screenshot({ path: `${shotsDir}/T030-route-tree-after.png`, fullPage: true });
+		await page.screenshot({ path: `${shotsDir}/T030-url-picker-after.png`, fullPage: true });
 
-		// --- widget: the renamed route on the links page ------------------------
+		// --- widget: the link check on the links page -----------------------------
 		await page.goto(`${origin}/router/links`, { waitUntil: 'load' });
-		const typoLine = page.locator('.playground .file-line').first();
-		const typoAnswer = page.locator('.playground .playground-output').first();
-		await typoAnswer.waitFor();
+		const linkLine = page.locator('.playground .file-lines').first();
+		const linkAnswer = page.locator('.playground .playground-output').first();
+		const linkNote = page.locator('.playground .explorer-note').first();
+		await linkAnswer.waitFor();
 		check(
-			((await typoAnswer.textContent()) ?? '').includes('This one compiles'),
-			'the link widget opens on the link that compiles',
-			((await typoAnswer.textContent()) ?? '').slice(0, 60),
+			((await linkAnswer.textContent()) ?? '').trim() === 'The build passes.',
+			'the link widget opens on the link that builds',
+			((await linkAnswer.textContent()) ?? '').trim(),
 		);
-		await page.getByRole('button', { name: 'Somebody renamed the folder' }).click();
+		await page.getByRole('button', { name: 'The folder was renamed' }).click();
 		await settleText(
-			typoAnswer,
-			(text) => text.includes('Type error on href'),
-			'the link widget shows the type error after the rename',
+			linkAnswer,
+			(text) => text === 'The build stops.',
+			'the link widget stops the build after the rename',
 		);
 		check(
-			((await typoLine.textContent()) ?? '').includes('/blogs/[slug]'),
-			'the code line above the error carries the typo',
-			((await typoLine.textContent()) ?? '').slice(0, 60),
+			((await linkLine.textContent()) ?? '').includes('/blogs/[slug]') &&
+				((await linkNote.textContent()) ?? '').includes('does not match any route'),
+			'the code line carries the renamed route and the note names the error',
+			((await linkNote.textContent()) ?? '').slice(0, 60),
 		);
-		await page.screenshot({ path: `${shotsDir}/T030-link-typo-after.png`, fullPage: true });
+		await page.getByRole('button', { name: 'The params are missing' }).click();
+		await settleText(
+			linkNote,
+			(text) => text.includes('requires params'),
+			'the link widget names the missing params',
+		);
+		await page.screenshot({ path: `${shotsDir}/T030-link-check-after.png`, fullPage: true });
 
-		// --- widget: the streaming illustration on the data page ----------------
+		// --- widget: the streamed feed on the data page ---------------------------
 		await page.goto(`${origin}/router/data`, { waitUntil: 'load' });
-		const stepMark = page.locator('.playground .playground-output').first();
-		const stepNote = page.locator('.playground .explorer-note').first();
-		await stepMark.waitFor();
+		const feedNote = page.locator('.playground .explorer-note').first();
+		const feedBody = page.locator('.playground .screen p').nth(1);
+		await feedNote.waitFor();
 		check(
-			((await stepMark.textContent()) ?? '').trim() === 'Request',
-			'the streaming illustration starts at the request',
-			((await stepMark.textContent()) ?? '').trim(),
+			((await feedNote.textContent()) ?? '').includes('Nothing has arrived yet'),
+			'the streamed feed starts at the request',
+			((await feedNote.textContent()) ?? '').slice(0, 60),
 		);
-		const stepButton = page.getByRole('button', { name: 'Step forward' });
-		await stepButton.click();
+		const nextPart = page.getByRole('button', { name: 'Next part' });
+		await nextPart.click();
 		await settleText(
-			stepMark,
-			(text) => text === 'First flush',
-			'the streaming illustration reaches the first flush',
+			feedBody,
+			(text) => text === 'Loading...',
+			'the first part of the response carries the @pending content',
 		);
-		await stepButton.click();
-		await stepButton.click();
+		await nextPart.click();
 		await settleText(
-			stepMark,
-			(text) => text === 'Committed',
-			'the streaming illustration reaches the commit',
+			feedBody,
+			(text) => text === 'Loaded for /feed',
+			'the same response then sends the @try content',
 		);
-		check(
-			((await stepNote.textContent()) ?? '').includes('live'),
-			'the last step says the settled content is live',
-			((await stepNote.textContent()) ?? '').slice(0, 60),
-		);
-		await page.getByRole('button', { name: 'Back to the start' }).click();
+		await page.getByRole('button', { name: 'Start over' }).click();
 		await settleText(
-			stepMark,
-			(text) => text === 'Request',
+			feedNote,
+			(text) => text.includes('Nothing has arrived yet'),
 			'the illustration can be replayed',
 		);
-		await page.screenshot({ path: `${shotsDir}/T030-stream-steps-after.png`, fullPage: true });
+		await page.screenshot({ path: `${shotsDir}/T030-feed-steps-after.png`, fullPage: true });
 
-		// --- widget: the tier ladder on the how-it-works page -------------------
-		// This is the page's whole argument, so the check is the argument: the
-		// first three tiers run no component code and the last two do.
+		// --- widget: the endpoint picker on the API routes page ---------------------
+		await page.goto(`${origin}/router/api-routes`, { waitUntil: 'load' });
+		const apiNote = page.locator('.playground .explorer-note').first();
+		await apiNote.waitFor();
+		check(
+			((await apiNote.textContent()) ?? '').trim().startsWith('200 {"id":"42"}'),
+			'a GET to the users endpoint answers with its params',
+			((await apiNote.textContent()) ?? '').slice(0, 60),
+		);
+		await page.getByRole('button', { name: 'POST', exact: true }).click();
+		await settleText(
+			apiNote,
+			(text) => text.startsWith('404 Not found. The file name says get'),
+			'a POST finds no endpoint, because the file name says get',
+		);
+
+		// --- widget: the state graph demo ------------------------------------------
+		// One write moves the state and the computed that reads it, nothing else.
+		await page.goto(`${origin}/how-it-works/state-graph`, { waitUntil: 'load' });
+		const graphOutputs = page.locator('.playground output');
+		await graphOutputs.first().waitFor();
+		const graphValues = async () =>
+			(await graphOutputs.allTextContents()).map((text) => text.trim()).join(',');
+		check(
+			(await graphValues()) === '2,4',
+			'the state graph demo serves count 2 and doubled 4',
+			await graphValues(),
+		);
+		await page.getByRole('button', { name: 'Next', exact: true }).click();
+		for (let attempt = 0; attempt < 40; attempt += 1) {
+			if ((await graphValues()) === '3,6') break;
+			await new Promise((done) => setTimeout(done, 100));
+		}
+		check(
+			(await graphValues()) === '3,6',
+			'one write moves the state and the computed that reads it',
+			await graphValues(),
+		);
+		await page.screenshot({ path: `${shotsDir}/T030-state-graph-after.png`, fullPage: true });
+
+		// How it works is the one place the docs name semantic analysis, and it
+		// defines the term in the words the learner pages paraphrase.
 		await page.goto(`${origin}/how-it-works`, { waitUntil: 'load' });
-		const tierLine = page.locator('.playground .playground-output').first();
-		const runsLine = page.locator('.playground [data-runs-code]').first();
-		await tierLine.waitFor();
-		check(
-			((await tierLine.textContent()) ?? '').trim() === 'Tier 1, value slots',
-			'the tier ladder opens on tier 1',
-			((await tierLine.textContent()) ?? '').trim(),
-		);
-		check(
-			((await runsLine.textContent()) ?? '').trim() === 'No component code runs.',
-			'changing a number runs no component code',
-			((await runsLine.textContent()) ?? '').trim(),
-		);
-		await page.getByRole('button', { name: 'Toggle a panel' }).click();
-		await settleText(
-			tierLine,
-			(text) => text === 'Tier 3, branch range flips',
-			'the tier ladder puts a branch flip at tier 3',
-		);
-		check(
-			((await runsLine.textContent()) ?? '').trim() === 'No component code runs.',
-			'a branch flip still runs no component code',
-			((await runsLine.textContent()) ?? '').trim(),
-		);
-		await page.getByRole('button', { name: 'Load slow data' }).click();
-		await settleText(
-			tierLine,
-			(text) => text === 'Tier 4, arm commit',
-			'the tier ladder puts an async settle at tier 4',
-		);
-		await settleText(
-			runsLine,
-			(text) => text.startsWith('Component code runs'),
-			'the tier ladder says out loud that tier 4 executes components',
-		);
-		await page.screenshot({ path: `${shotsDir}/T030-tier-ladder-after.png`, fullPage: true });
-
-		// The how-it-works page is the most over-claimable on the site, so the
-		// quoted doctrine sentence has to be on it verbatim, and the comparison
-		// words may only appear inside the closed collapsible.
 		const howItWorksText = (await page.locator('.prose').first().innerText()).replace(
 			/\s+/g,
 			' ',
 		);
 		check(
 			howItWorksText.includes(
-				'"No hydration" forbids re-executing components over existing server HTML; it does not forbid rendering new content client-side',
+				'Reading code for what it means, not only for how it is spelled, is called semantic analysis.',
 			),
-			'how-it-works quotes the doctrine sentence rather than upgrading it',
+			'how-it-works defines semantic analysis in plain words',
 		);
 		check(
-			howItWorksText.includes(
-				'Component execution is paid exactly once per appearance of content',
-			),
-			'how-it-works quotes the vanilla-JS floor paragraph',
+			howItWorksText.includes('Hydration means the browser runs your components again'),
+			'how-it-works defines hydration before it rules it out',
 		);
+		for (const href of flatNav
+			.map((entry) => entry.href)
+			.filter((href) => /^\/(?:$|start|concepts|build|router)/.test(href))) {
+			const learnerText = (await (await fetch(`${origin}${href}`)).text()).replace(
+				/<[^>]+>/g,
+				' ',
+			);
+			check(
+				!/semantic analysis/i.test(learnerText),
+				`${href} keeps the term semantic analysis for How it works`,
+			);
+		}
+
+		// --- the landing comparison stays behind its collapsible -------------------
+		await page.goto(`${origin}/`, { waitUntil: 'load' });
 		const comparison = page
 			.locator('.collapsible')
 			.filter({ has: page.getByRole('button', { name: 'Coming from another framework?' }) });
@@ -1872,7 +2013,7 @@ try {
 		await comparisonText.waitFor({ state: 'visible' });
 		check(
 			(await comparisonTrigger.getAttribute('aria-expanded')) === 'true' &&
-				/virtual DOM/i.test(await comparisonText.innerText()),
+				/\.value/.test(await comparisonText.innerText()),
 			'opening the comparison exposes its actual text',
 		);
 		await comparisonTrigger.click();
@@ -1882,49 +2023,66 @@ try {
 				!(await comparisonText.isVisible()),
 			'closing the comparison hides its text again',
 		);
-		const virtualDomOutsideCollapsible = await page.evaluate(() => {
-			const prose = document.querySelector('.prose');
-			if (!prose) return true;
-			const clone = prose.cloneNode(true) as HTMLElement;
-			for (const comparison of clone.querySelectorAll('.collapsible')) {
-				if (
-					comparison.querySelector('.collapsible-trigger')?.textContent?.trim() ===
-					'Coming from another framework?'
-				)
-					comparison.remove();
-			}
-			return /virtual DOM/i.test(clone.textContent ?? '');
-		});
-		check(
-			!virtualDomOutsideCollapsible,
-			'the words virtual DOM appear only inside the collapsible comparison',
-		);
 
-		// --- the reference page names the surface it promises -------------------
+		// --- the reference names the packages it promises -------------------------
 		await page.goto(`${origin}/reference`, { waitUntil: 'load' });
 		const referenceText = (await page.locator('.prose').first().innerText()).replace(
 			/\s+/g,
 			' ',
 		);
 		for (const name of [
-			'state',
-			'computed',
-			'storage',
-			'element',
-			'attach',
-			'@if',
-			'@for',
-			'@try',
+			'@markless/core',
+			'@markless/router',
+			'@markless/typescript-plugin',
+			'@markless/ui',
+			'@markless/vitest-browser',
+			'@markless/compiler',
+			'@markless/runtime',
+			'@markless/web',
 		]) {
 			check(referenceText.includes(name), `the reference page lists ${name}`);
 		}
+
+		// --- the error codes index and one page per code ---------------------------
+		await page.goto(`${origin}/errors`, { waitUntil: 'load' });
+		const errorLinks = await page
+			.locator('a[href^="/errors/MARKLESS_"]')
+			.evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href') ?? ''));
+		check(
+			errorLinks.length === errorIndex.total,
+			'/errors links a page for every code in the generated index',
+			`${errorLinks.length} links for ${errorIndex.total} codes`,
+		);
 		for (const code of [
 			'MARKLESS_ASYNC_BOUNDARY_REQUIRED',
 			'MARKLESS_REPEAT_KEY_REQUIRED',
 			'MARKLESS_ATTACH_HOST_ELEMENT_REQUIRED',
 			'MARKLESS_SERIALIZE_UNSUPPORTED_VALUE',
 		]) {
-			check(referenceText.includes(code), `the reference diagnostics table carries ${code}`);
+			check(errorLinks.includes(`/errors/${code}`), `/errors lists ${code}`);
+			const response = await fetch(`${origin}/errors/${code}`);
+			check(response.status === 200, `GET /errors/${code}`, String(response.status));
+			const parsed = await page.evaluate((source) => {
+				const document = new DOMParser().parseFromString(source, 'text/html');
+				return {
+					title: document.title,
+					description:
+						document.querySelector('meta[name="description"]')?.getAttribute('content') ??
+						'',
+				};
+			}, await response.text());
+			const wanted = headFor(`/errors/${code}`, findError);
+			check(
+				parsed.title === `${code} | Markless docs` && parsed.title === wanted.title,
+				`/errors/${code} serves its code as its <title>`,
+				parsed.title,
+			);
+			check(
+				parsed.description === wanted.description &&
+					parsed.description === findError(code)?.description,
+				`/errors/${code} serves its error description as <meta name="description">`,
+				parsed.description.slice(0, 60),
+			);
 		}
 
 		await page.goto(`${origin}/concepts/state`, { waitUntil: 'load' });
@@ -1975,15 +2133,6 @@ try {
 			'the footer strip mixes two stickers in with the doodles',
 		);
 		await page.screenshot({ path: `${shotsDir}/T024-stickers-landing.png`, fullPage: true });
-		await page.goto(`${origin}/concepts/conditionals`, { waitUntil: 'load' });
-		const cornerSticker = await page
-			.locator('.callout[data-sticker="spring"]')
-			.evaluate((node) => getComputedStyle(node as Element, '::after').backgroundImage);
-		check(
-			cornerSticker.includes('/stickers/spring.png'),
-			'a concept page callout paints its corner sticker',
-			cornerSticker.slice(0, 60),
-		);
 
 		await writeFile(
 			`${shotsDir}/T016-witness.json`,

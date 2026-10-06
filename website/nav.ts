@@ -48,7 +48,7 @@ export const nav: readonly NavSection[] = [
 				icon: 'what-is-markless',
 				number: '1',
 				description:
-					'What Markless is: the reliable way to build software with AI agents. Plain TypeScript functions, a compiler that checks the whole interface before anything ships, and nothing hidden to trip over.',
+					'What Markless is: components are plain TypeScript functions, state() makes the page follow a value, and the same component renders in a browser, on a server or in a test.',
 			},
 			{
 				title: 'Your first app',
@@ -57,16 +57,25 @@ export const nav: readonly NavSection[] = [
 				icon: 'first-app',
 				number: '2',
 				description:
-					'Scaffold a Markless app with one command, then live in the dev, build and preview scripts, with the npm override a clean install needs today.',
+					'Create a multi-page app with npm create markless, start it, and learn the starters, scripts and flags.',
+			},
+			{
+				title: 'Use Markless in the browser',
+				href: '/start/browser-only',
+				sprite: 'square',
+				icon: 'first-app',
+				number: '3',
+				description:
+					'Put a Markless component into a plain HTML page with Vite, render() and no server.',
 			},
 			{
 				title: 'Reading a .tsrx file',
 				href: '/start/reading-tsrx',
 				sprite: 'bookmark',
 				icon: 'reading-tsrx',
-				number: '3',
+				number: '4',
 				description:
-					'A .tsrx file is TypeScript with three unfamiliar things in it: the at-sign body, markup written as a statement, and the fragment. That is the whole list.',
+					'Every part of a .tsrx file, line by line, then the other files in a starter app.',
 			},
 		],
 	},
@@ -82,7 +91,7 @@ export const nav: readonly NavSection[] = [
 				icon: 'state',
 				number: '1',
 				description:
-					'state() is how you tell the page to watch a variable. No wrapper, no setter and no .value: you read it and assign to it like any other let.',
+					'state() tells the page to watch a variable. You read it and assign to it like any other let.',
 			},
 			{
 				title: 'Computed',
@@ -109,7 +118,7 @@ export const nav: readonly NavSection[] = [
 				icon: 'conditionals',
 				number: '4',
 				description:
-					'@if puts real elements into the page and takes them out again, and anything declared inside the branch is disposed along with it.',
+					'@if puts real elements on the page and takes them off again, so a value that must outlive the branch is declared above it.',
 			},
 			{
 				title: 'Lists',
@@ -161,7 +170,7 @@ export const nav: readonly NavSection[] = [
 				icon: 'elements',
 				number: '2',
 				description:
-					'A DOM node is not state. element() hands you a claim ticket for one node, bound with el, that you cash in inside a handler.',
+					'An element is not state. element() gives you a handle, bound with el, that points at one real element once it is on the page.',
 			},
 			{
 				title: 'Storage',
@@ -204,7 +213,7 @@ export const nav: readonly NavSection[] = [
 				icon: 'links',
 				number: '2',
 				description:
-					'A link is a route plus its parts rather than a string you build, so a renamed folder is a type error instead of a 404.',
+					'Link to a route pattern and pass its params, and the build checks both, so a link with a typo stops the build instead of shipping a 404.',
 			},
 			{
 				title: 'Page data',
@@ -213,7 +222,68 @@ export const nav: readonly NavSection[] = [
 				icon: 'data',
 				number: '3',
 				description:
-					'There is no loader: a page receives the request in its props, and an async computed that reads them is the load.',
+					'There is no loader: a page loads data with an async computed() inside @try, and the slow part arrives later in the same response.',
+			},
+			{
+				title: 'API routes',
+				href: '/router/api-routes',
+				icon: 'data',
+				sprite: 'arrow-straight',
+				number: '4',
+				description:
+					'A file in api/ is an endpoint: the address comes from the path, the HTTP method from the file name, and the file default-exports one function.',
+			},
+			{
+				title: 'Deploying',
+				href: '/router/deploying',
+				icon: 'pages',
+				sprite: 'rays',
+				number: '5',
+				description:
+					'Build once into .output/ for a Node server, or pick another host with a Nitro preset. Your files stay the same.',
+			},
+		],
+	},
+	{
+		title: 'Tooling',
+		stroke: 'pink',
+		sprite: 'cursor',
+		entries: [
+			{
+				title: 'Editor setup',
+				href: '/tooling/editor-setup',
+				icon: 'elements',
+				sprite: 'cursor',
+				number: '1',
+				description:
+					'An editor extension colours .tsrx files; a TypeScript plugin named in tsconfig.json adds Markless suggestions, hints and errors.',
+			},
+			{
+				title: 'Type checking',
+				href: '/tooling/type-checking',
+				icon: 'reading-tsrx',
+				sprite: 'check',
+				number: '2',
+				description:
+					'TypeScript checks a TSX copy of each .tsrx file, and every error points back to the line you wrote.',
+			},
+			{
+				title: 'Testing',
+				href: '/tooling/testing',
+				icon: 'events',
+				sprite: 'star-badge',
+				number: '3',
+				description:
+					'@markless/vitest-browser mounts a component in a real browser or renders it on a test server, and your test clicks it.',
+			},
+			{
+				title: 'Diagnostics',
+				href: '/tooling/diagnostics',
+				icon: 'how-it-works',
+				sprite: 'speech-bubble',
+				number: '4',
+				description:
+					'Each Markless error names a code, says why, suggests a fix and links to its page; markless-allow silences one warning.',
 			},
 		],
 	},
@@ -223,13 +293,120 @@ export const nav: readonly NavSection[] = [
 		sprite: 'rays',
 		entries: [
 			{
-				title: 'How it works',
+				title: 'Design choices',
 				href: '/how-it-works',
 				sprite: 'rays',
 				icon: 'how-it-works',
 				number: '1',
 				description:
-					'Follow one click from the compiled artifact down to the DOM update, through the five tiers of the arm rendering ladder.',
+					'The design choices behind Markless on one page, for contributors and agents who want to weigh how it works.',
+			},
+			{
+				title: 'The big idea',
+				href: '/how-it-works/the-big-idea',
+				sprite: 'rays',
+				number: '2',
+				description:
+					'Markless reads a component at build time instead of running it, so the plan is written before anything renders, anywhere.',
+			},
+			{
+				title: 'The compiler',
+				href: '/how-it-works/compiler',
+				sprite: 'rays',
+				number: '3',
+				description:
+					'The real output the compiler makes from a counter: its state, its updates and the code each event runs.',
+			},
+			{
+				title: 'The payload',
+				href: '/how-it-works/payload',
+				sprite: 'rays',
+				number: '4',
+				description:
+					'What a server adds to its HTML so the browser can carry on: the state values, which element does what, and a small script that waits for the first interaction.',
+			},
+			{
+				title: 'Resuming',
+				href: '/how-it-works/resuming',
+				sprite: 'rays',
+				number: '5',
+				description:
+					'Who hears the first click on each of the three paths a page can take: the browser with a direct module, the browser on the general path, or a server-rendered page.',
+			},
+			{
+				title: 'The state graph',
+				href: '/how-it-works/state-graph',
+				sprite: 'rays',
+				number: '6',
+				description:
+					'The compiler writes down who reads what before the page exists, so one write touches one text node.',
+			},
+			{
+				title: 'Lazy chunks',
+				href: '/how-it-works/lazy-chunks',
+				sprite: 'rays',
+				number: '7',
+				description:
+					'Where the small functions behind each handler and update live, and when the browser gets and runs them.',
+			},
+			{
+				title: 'Native targets',
+				href: '/how-it-works/native-targets',
+				sprite: 'rays',
+				number: '8',
+				description:
+					'The same counter on a phone: the state graph and its functions are data, so a browser is not the only place they run.',
+			},
+		],
+	},
+	{
+		title: 'Contributing',
+		stroke: 'green',
+		sprite: 'hash',
+		entries: [
+			{
+				title: 'Repo tour',
+				href: '/contributing',
+				sprite: 'hash',
+				number: '1',
+				description:
+					'Where each package lives and its job, from compile time to rendering anywhere.',
+			},
+			{
+				title: 'Dev setup',
+				href: '/contributing/dev-setup',
+				sprite: 'plus',
+				number: '2',
+				description: 'Clone, install with pnpm, and the root scripts you run every day.',
+			},
+			{
+				title: 'Your first PR',
+				href: '/contributing/first-pr',
+				sprite: 'arrow-straight',
+				number: '3',
+				description:
+					'The path from a branch to a merged change, with the checks you run first.',
+			},
+			{
+				title: 'CI and checks',
+				href: '/contributing/ci',
+				sprite: 'check',
+				number: '4',
+				description: 'What each CI job runs and how pnpm ci:local runs the same commands.',
+			},
+			{
+				title: 'Specs and rules',
+				href: '/contributing/specs-and-rules',
+				sprite: 'bookmark',
+				number: '5',
+				description: 'Where the behavior contract and contributor rules live.',
+			},
+			{
+				title: 'Improve the docs',
+				href: '/contributing/improve-the-docs',
+				sprite: 'sparkle',
+				number: '6',
+				description: 'How to fix a page on this site, or add a new one.',
 			},
 		],
 	},
@@ -238,12 +415,34 @@ export const nav: readonly NavSection[] = [
 		sprite: 'hash',
 		entries: [
 			{
-				title: 'Reference',
+				title: 'Packages',
 				href: '/reference',
 				sprite: 'hash',
 				number: '1',
+				description: 'Every Markless package, what it does, and its npm version.',
+			},
+			{
+				title: 'Glossary',
+				href: '/reference/glossary',
+				sprite: 'speech-bubble',
+				number: '2',
+				description: 'One meaning for each word these docs use.',
+			},
+			{
+				title: 'CLI',
+				href: '/reference/cli',
+				sprite: 'star-face',
+				number: '3',
+				description: 'The create-markless flags, starters and new-app scripts.',
+			},
+			{
+				title: 'Error codes',
+				href: '/errors',
+				icon: 'data',
+				sprite: 'hash',
+				number: '4',
 				description:
-					'Every authoring call, TSRX construct, router export and MARKLESS_ diagnostic on published 0.3.1, in the order you reach for them.',
+					'Every MARKLESS_ code Markless can print, grouped by the package that raises it, each with its own page.',
 			},
 		],
 	},
@@ -293,11 +492,25 @@ export type Head = { readonly title: string; readonly description: string };
  * The document head for one pathname. Every page's title is its own, because a
  * column of identical tabs and a column of identical search results are pages a
  * reader cannot tell apart. An unknown path (a 404, say) falls back to the
- * site's own name and sentence rather than throwing.
+ * site's own name and sentence rather than throwing. `errorFor` names an
+ * /errors/<CODE> page; it is a parameter because the sidebar imports this file,
+ * and importing the error data here would ship every entry to the browser.
  */
-export function headFor(pathname: string): Head {
+export function headFor(
+	pathname: string,
+	errorFor?: (
+		code: string,
+	) => { readonly code: string; readonly description: string } | undefined,
+): Head {
 	const entry = allFlat.find((one) => one.href === pathname);
-	if (!entry) return { title: `${siteName} docs`, description: siteDescription };
+	if (!entry) {
+		const error = pathname.startsWith('/errors/')
+			? errorFor?.(pathname.slice('/errors/'.length))
+			: undefined;
+		if (error)
+			return { title: `${error.code} | ${siteName} docs`, description: error.description };
+		return { title: `${siteName} docs`, description: siteDescription };
+	}
 	return {
 		title: `${entry.title} | ${siteName} docs`,
 		description: entry.description ?? siteDescription,
@@ -332,6 +545,7 @@ export function pagerFor(pathname: string): Pager {
  */
 export const concepts: Readonly<Record<string, NavEntry>> = {
 	'first-app': { title: 'your first app', href: '/start/first-app' },
+	'browser-only': { title: 'using Markless in the browser', href: '/start/browser-only' },
 	'reading-tsrx': { title: 'reading a .tsrx file', href: '/start/reading-tsrx' },
 	async: { title: 'async', href: '/concepts/async' },
 	computed: { title: 'computed', href: '/concepts/computed' },

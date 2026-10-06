@@ -13,10 +13,10 @@ export default box(
 			config: (config) => ({ ...config, server: { ...config.server, watch: null } }),
 		});
 		const page = await browser.visit('/');
-		await expect.page.text(page, 'h1', 'The compiler for user interfaces', WAIT);
+		await expect.page.text(page, 'h1', 'Write a variable. The page follows it.', WAIT);
 		await page.click('.sidebar-summary', WAIT);
 		await page.click('.sidebar a[href="/start/first-app"]', WAIT);
-		await expect.page.text(page, 'h1', 'One command, then three scripts', WAIT);
+		await expect.page.text(page, 'h1', 'One command, then a counter on localhost', WAIT);
 		const documents = (await page.networkRequests()).filter(
 			(request) => request.resourceType === 'Document',
 		);
@@ -42,7 +42,7 @@ export default box(
 			);
 		}
 		await page.click('.sidebar .site-mark', WAIT);
-		await expect.page.text(page, 'h1', 'The compiler for user interfaces', WAIT);
+		await expect.page.text(page, 'h1', 'Write a variable. The page follows it.', WAIT);
 		if (
 			(await page.networkRequests()).filter((request) => request.resourceType === 'Document')
 				.length !== 1

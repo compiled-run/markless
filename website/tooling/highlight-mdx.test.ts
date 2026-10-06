@@ -53,7 +53,7 @@ const statePath = ${JSON.stringify(new URL('../pages/concepts/state.mdx', import
 const source = fs.readFileSync(gridPath, 'utf8');
 const fences = text => [...text.matchAll(/^\x60\x60\x60tsrx\\n([\\s\\S]*?)^\x60\x60\x60/gm)].map(match=>match[1].replace(/\\n+$/,''));
 const grid = fences(source), state = fences(fs.readFileSync(statePath, 'utf8'));
-const prior = process.argv[1] === 'counter' ? state.find(text=>text.includes('function Counter()')) : grid.find(text=>text.includes('function Files()'));
+const prior = process.argv[1] === 'cups' ? state.find(text=>text.includes('function Cups()')) : grid.find(text=>text.includes('function Files()'));
 const service = createQuickInfoService();
 const priorInfo = service.queryFence(prior, 'tsrx');
 const incomplete = grid.filter(text=>text.startsWith('<gridlist.root multiple')||text.startsWith('<gridlist.root wrap'));
@@ -63,7 +63,7 @@ const transformed = await highlightMdx().transform.handler(code,gridPath);
 process.stdout.write(JSON.stringify({priorInfo,infos,code:transformed.code}));
 `;
 	const results = [];
-	for (const name of ['counter', 'files']) {
+	for (const name of ['cups', 'files']) {
 		const { stdout } = await run(
 			process.execPath,
 			['--input-type=module', '-e', producer, name],

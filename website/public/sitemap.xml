@@ -10,6 +10,10 @@
 		<changefreq>weekly</changefreq>
 	</url>
 	<url>
+		<loc>https://markless.dev/start/browser-only</loc>
+		<changefreq>weekly</changefreq>
+	</url>
+	<url>
 		<loc>https://markless.dev/start/reading-tsrx</loc>
 		<changefreq>weekly</changefreq>
 	</url>
@@ -70,11 +74,99 @@
 		<changefreq>weekly</changefreq>
 	</url>
 	<url>
+		<loc>https://markless.dev/router/api-routes</loc>
+		<changefreq>weekly</changefreq>
+	</url>
+	<url>
+		<loc>https://markless.dev/router/deploying</loc>
+		<changefreq>weekly</changefreq>
+	</url>
+	<url>
+		<loc>https://markless.dev/tooling/editor-setup</loc>
+		<changefreq>weekly</changefreq>
+	</url>
+	<url>
+		<loc>https://markless.dev/tooling/type-checking</loc>
+		<changefreq>weekly</changefreq>
+	</url>
+	<url>
+		<loc>https://markless.dev/tooling/testing</loc>
+		<changefreq>weekly</changefreq>
+	</url>
+	<url>
+		<loc>https://markless.dev/tooling/diagnostics</loc>
+		<changefreq>weekly</changefreq>
+	</url>
+	<url>
 		<loc>https://markless.dev/how-it-works</loc>
 		<changefreq>weekly</changefreq>
 	</url>
 	<url>
+		<loc>https://markless.dev/how-it-works/the-big-idea</loc>
+		<changefreq>weekly</changefreq>
+	</url>
+	<url>
+		<loc>https://markless.dev/how-it-works/compiler</loc>
+		<changefreq>weekly</changefreq>
+	</url>
+	<url>
+		<loc>https://markless.dev/how-it-works/payload</loc>
+		<changefreq>weekly</changefreq>
+	</url>
+	<url>
+		<loc>https://markless.dev/how-it-works/resuming</loc>
+		<changefreq>weekly</changefreq>
+	</url>
+	<url>
+		<loc>https://markless.dev/how-it-works/state-graph</loc>
+		<changefreq>weekly</changefreq>
+	</url>
+	<url>
+		<loc>https://markless.dev/how-it-works/lazy-chunks</loc>
+		<changefreq>weekly</changefreq>
+	</url>
+	<url>
+		<loc>https://markless.dev/how-it-works/native-targets</loc>
+		<changefreq>weekly</changefreq>
+	</url>
+	<url>
+		<loc>https://markless.dev/contributing</loc>
+		<changefreq>weekly</changefreq>
+	</url>
+	<url>
+		<loc>https://markless.dev/contributing/dev-setup</loc>
+		<changefreq>weekly</changefreq>
+	</url>
+	<url>
+		<loc>https://markless.dev/contributing/first-pr</loc>
+		<changefreq>weekly</changefreq>
+	</url>
+	<url>
+		<loc>https://markless.dev/contributing/ci</loc>
+		<changefreq>weekly</changefreq>
+	</url>
+	<url>
+		<loc>https://markless.dev/contributing/specs-and-rules</loc>
+		<changefreq>weekly</changefreq>
+	</url>
+	<url>
+		<loc>https://markless.dev/contributing/improve-the-docs</loc>
+		<changefreq>weekly</changefreq>
+	</url>
+	<url>
 		<loc>https://markless.dev/reference</loc>
+		<changefreq>weekly</changefreq>
+	</url>
+	<url>
+		<loc>https://markless.dev/reference/glossary</loc>
+		<changefreq>weekly</changefreq>
+	</url>
+	<url>
+		<loc>https://markless.dev/reference/cli</loc>
+		<changefreq>weekly</changefreq>
+	</url>
+	<url>
+		<loc>https://markless.dev/errors</loc>
 		<changefreq>weekly</changefreq>
 	</url>
 	<url>
