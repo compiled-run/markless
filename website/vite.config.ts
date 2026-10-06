@@ -11,12 +11,14 @@ import { uiDemos } from './tooling/ui-demos.ts';
 import { pageProps } from './tooling/page-props.ts';
 import { anatomy } from './tooling/anatomy.ts';
 import { keyboard } from './tooling/keyboard.ts';
+import { codeBlocks } from './tooling/code-blocks.ts';
+import { codeClient } from './tooling/code-client.ts';
 import { siteBase } from './site-base.ts';
 
 export default {
 	base: siteBase,
 	nitro: { baseURL: siteBase },
-	// pageProps and uiDemos run before router(): they rewrite the .mdx source router() parses.
+	// pageProps, codeBlocks and uiDemos run before router(): they rewrite the .mdx source router() parses.
 	// highlightMdx runs after router(): it rewrites the module router() emits.
 	lint: {
 		rules: {
@@ -46,6 +48,8 @@ export default {
 		errors(),
 		ui(),
 		pageProps(),
+		codeBlocks(),
+		codeClient(),
 		docsData(),
 		uiDemos(),
 		anatomy(),
