@@ -2,6 +2,7 @@ import PageMeta from '../../components/page-meta.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
+import LayerWins from '../../components/sketch/ui/layer-wins.tsrx';
 
 <Sidebar />
 
@@ -83,7 +84,7 @@ right of **Save**:
 
 {/* PLAYGROUND: starter = components/demos/ui/overview/save-tip.tsrx. Try: delete position-area from .tip and watch the tip jump back above Save, or change it to block-end. */ null}
 
-{/* SKETCH: two stacked cards labelled "@layer markless" (position-area: block-start) and "your rule" (position-area: inline-end). An arrow shows your card winning, with a small tooltip drawn in each position. */ null}
+<LayerWins />
 
 You moved the tip with CSS, not a prop. The tooltip has no prop for where it sits. Placement lives
 in CSS, where your rule can change it.

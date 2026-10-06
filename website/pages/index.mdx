@@ -10,6 +10,8 @@ import MoreFromCompiled from '../components/docs/more-from-compiled.tsrx';
 import ThemeToggle from '../components/docs/theme-toggle.tsrx';
 import Sidebar from '../components/docs/sidebar.tsrx';
 import LikeHeart from '../components/docs/like-heart.tsrx';
+import WhatMarklessNoted from '../components/sketch/start/what-markless-noted.tsrx';
+import WhereItRuns from '../components/sketch/start/where-it-runs.tsrx';
 
 <Sidebar />
 
@@ -53,7 +55,7 @@ So how does the page know which number to change?
 
 Before your app runs, Markless reads your component the way you read it. It sees that `count` shows up in the button text, and that the click changes it. It writes that down. So when `count` changes, it already knows the one piece of text to update.
 
-{/* SKETCH: "What did Markless write down about this counter?" The reader hovers count in the code. The figure lights the button text that reads it and the click that changes it. Then the reader clicks, and only that one text changes. */ null}
+<WhatMarklessNoted />
 
 ## Your component runs once
 
@@ -97,7 +99,7 @@ Markless does not need a server. The same component renders wherever your app ne
 
 You write the component the same way for each one. Pick the place your app needs.
 
-{/* SKETCH: "Where can this counter run?" The reader picks a browser tab, a server, or a test. The same Count button shows up each time, with a note that says where the component ran, once. */ null}
+<WhereItRuns />
 
 <Collapsible
 	sprite="star-badge"

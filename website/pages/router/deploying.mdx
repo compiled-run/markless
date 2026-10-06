@@ -3,6 +3,7 @@ import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import LikeHeart from '../../components/docs/like-heart.tsrx';
+import BuildTargets from '../../components/sketch/router/build-targets.tsrx';
 
 <Sidebar />
 
@@ -18,7 +19,7 @@ laptop.
 The router builds on [Nitro](https://nitro.build). Nitro turns one app into output for many hosts,
 and a preset picks the host. Your files stay the same. Only the output folder changes.
 
-{/* SKETCH: one app folder (pages/, api/, middleware/) on the left, an arrow labelled "npm run build" to .output/ (Node server), and a second arrow labelled "NITRO_PRESET=vercel npm run build" to .vercel/output/ (static/ and functions/). The app folder is identical on both arrows. */ null}
+<BuildTargets />
 
 ## The default: a Node server
 

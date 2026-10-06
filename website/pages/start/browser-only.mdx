@@ -4,6 +4,7 @@ import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import LikeHeart from '../../components/docs/like-heart.tsrx';
+import RenderIntoApp from '../../components/sketch/start/render-into-app.tsrx';
 
 <Sidebar />
 
@@ -23,7 +24,7 @@ Here is the result. The dashed box is the `<div id="app">` from `index.html`, an
 
 <AppTargetDemo />
 
-{/* SKETCH: "What does render() do to the empty #app?" The reader presses Run. The figure shows index.html with an empty div, then the same div with the Count button inside it, and a note that App ran once, in the browser. Clicks change only the number. */ null}
+<RenderIntoApp />
 
 {/* PLAYGROUND: starter files index.html, src/main.ts and src/App.tsrx as printed below. Try: change the button label. Try: add a paragraph above the button that also shows count. */ null}
 

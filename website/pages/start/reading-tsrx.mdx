@@ -6,6 +6,7 @@ import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import LikeHeart from '../../components/docs/like-heart.tsrx';
+import LineToPart from '../../components/sketch/start/line-to-part.tsrx';
 
 <Sidebar />
 
@@ -35,7 +36,7 @@ export default function Counter() @{
 }
 ```
 
-{/* SKETCH: "Which line made which part of the button?" The reader hovers a line of the counter file. The figure lights the part of the button that line made: the body, the state, the click, the text. */ null}
+<LineToPart />
 
 **`import { state } from '@markless/core'`** is a normal import. `@markless/core` is the main Markless package.
 
