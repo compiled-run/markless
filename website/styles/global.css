@@ -470,6 +470,9 @@ markless-outline { display: contents; }
 	line-height: 1.3;
 	border-radius: 3px 5px 3px 6px;
 	transform: rotate(-0.8deg);
+	/* A MARKLESS_ error code has no break point and would widen a phone page. */
+	max-width: 100%;
+	overflow-wrap: anywhere;
 }
 
 /* Fenced blocks are monospace; inline code inside a sentence keeps Joy Elia so
@@ -492,6 +495,7 @@ markless-outline { display: contents; }
 
 .prose pre code {
 	display: block;
+	overflow-wrap: normal;
 	background: none;
 	padding: 0;
 	color: inherit;
@@ -512,6 +516,19 @@ markless-outline { display: contents; }
 .prose pre .tsrx-tip,
 .prose pre .tsrx-tip span {
 	font-family: 'Joy Elia', system-ui, sans-serif;
+}
+
+/* Joy Elia's ligatures draw `--` as an em dash, which misprints a CLI flag. */
+code,
+code *,
+kbd,
+kbd *,
+pre,
+pre * {
+	font-variant-ligatures: none;
+	font-feature-settings:
+		'liga' 0,
+		'calt' 0;
 }
 
 /* Each span carries its light colour inline and its dark one in `--shiki-dark`;
