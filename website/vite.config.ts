@@ -1,4 +1,5 @@
 import { docsData } from './tooling/docs-data.ts';
+import { errors } from './tooling/errors.ts';
 import { markless } from '@markless/core/vite';
 import { ui } from '@markless/ui/vite';
 import { router } from '@markless/router/vite';
@@ -42,6 +43,7 @@ export default {
 		},
 	},
 	plugins: [
+		errors(),
 		ui(),
 		pageProps(),
 		docsData(),

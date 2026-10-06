@@ -1,0 +1,122 @@
+import PageMeta from '../../components/page-meta.tsrx';
+import BuildDemo from '../../components/demos/tooling/build-demo.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
+import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../components/docs/sidebar.tsrx';
+import LikeHeart from '../../components/docs/like-heart.tsrx';
+
+<Sidebar />
+
+# Read a Markless error in four lines
+
+<PageMeta level="Tooling" time="4 min" assumes="lists" sprite="speech-bubble" />
+
+<ThemeToggle />
+
+Sometimes the build stops before your app ever runs, with a long code in capital letters. That is
+Markless refusing a piece of code it cannot make work.
+
+You do not get a stack trace. You get four answers: what broke, why, how to fix it, and where to
+read more.
+
+Your editor shows type errors and syntax errors. Markless's own rules run when the dev server or the
+build reads a `.tsrx` file. An error stops the build. A warning lets the build go on.
+
+Press **Build**. Then add the key and build again.
+
+<BuildDemo />
+
+The fix fits on one line, and the error suggested it.
+
+## What the build prints
+
+Here is that list again, with no key:
+
+```tsrx
+import { state } from '@markless/core';
+
+export default function List() @{
+	let items = state(['a', 'b']);
+
+	<ul>
+		@for (const item of items) {
+			<li>{item}</li>
+		}
+	</ul>
+}
+```
+
+The build prints this, word for word:
+
+```text
+MARKLESS_COMPILE_BLOCKED: List.tsrx has 1 compiler error(s).
+
+MARKLESS_REPEAT_KEY_REQUIRED: @for (const item of items) repeats reactive state without a key. When items changes, the rows of this list have no identity to update, reorder, or resume by. (List.tsrx:7:3)
+A keyed loop item keeps its state, events, and DOM attached to the same logical item across reorder, insert, and delete; without a key there is no stable identity root.
+Add a stable domain key such as `@for (const item of items; key item.id)`, or key by position with `index i; key i` when state should follow the slot.
+https://markless.dev/errors/MARKLESS_REPEAT_KEY_REQUIRED
+```
+
+The first line counts the errors in the file. Then each error gets a block. Read it top down: the
+code and the place, then why, then the first fix, then the link.
+
+The link opens [the page for that code](/errors/MARKLESS_REPEAT_KEY_REQUIRED). Every code has one.
+
+{/* PLAYGROUND: starter file List.tsrx. Try: build it, then add key item to the @for and build again. Try: change the key to index i; key i and read the warning. */ null}
+
+## Silence a warning
+
+If you accept a warning on purpose, write `// markless-allow CODE: reason`. Put it on the line above
+the warning, or on the same line.
+
+```tsrx
+<section>
+	// markless-allow MARKLESS_REPEAT_KEY_IS_INDEX: static list, order never changes
+	@for (const record of records; index slot; key slot) {
+		<p>{record.label}</p>
+	}
+</section>
+```
+
+The comment has three rules. Break one, and you get a warning of its own.
+
+| Code if you break it                                                        | Rule                                                      |
+| --------------------------------------------------------------------------- | --------------------------------------------------------- |
+| [`ALLOW_REASON_REQUIRED`](/errors/MARKLESS_ALLOW_REASON_REQUIRED)           | Write a reason after the colon.                           |
+| [`ALLOW_ERROR_UNSUPPRESSIBLE`](/errors/MARKLESS_ALLOW_ERROR_UNSUPPRESSIBLE) | You cannot silence an error. Fix it.                      |
+| [`ALLOW_STALE`](/errors/MARKLESS_ALLOW_STALE)                               | If the warning no longer fires there, delete the comment. |
+
+Like the table below, this one drops the `MARKLESS_` start of each code.
+
+## Common codes
+
+Every code starts with `MARKLESS_`. The table drops that start.
+
+| Code                                                                                | Kind                | What to do                                                                                                  |
+| ----------------------------------------------------------------------------------- | ------------------- | ----------------------------------------------------------------------------------------------------------- |
+| [`FRAMEWORK_IMPORT_REQUIRED`](/errors/MARKLESS_FRAMEWORK_IMPORT_REQUIRED)           | error               | Add `import { state } from '@markless/core'`.                                                               |
+| [`STATE_MODULE_SCOPE`](/errors/MARKLESS_STATE_MODULE_SCOPE)                         | error               | Move `state()` into the component body. For values many components share, use `shared()`.                   |
+| [`STATE_CREATION_SITE_UNSTABLE`](/errors/MARKLESS_STATE_CREATION_SITE_UNSTABLE)     | error               | Declare `state()` in the component body itself. Keep it out of branches, loops, handlers, and `computed()`. |
+| [`STATE_STALE_LOCAL_WRITE`](/errors/MARKLESS_STATE_STALE_LOCAL_WRITE)               | error               | A handler writes a plain `let`. Wrap its value in `state()`.                                                |
+| [`REPEAT_KEY_REQUIRED`](/errors/MARKLESS_REPEAT_KEY_REQUIRED)                       | error               | Add a key to the `@for`, like `key item.id`.                                                                |
+| [`REPEAT_KEY_IS_INDEX`](/errors/MARKLESS_REPEAT_KEY_IS_INDEX)                       | warning             | Key by a stable field. Keep `key i` only if state belongs to the slot.                                      |
+| [`ASYNC_BOUNDARY_REQUIRED`](/errors/MARKLESS_ASYNC_BOUNDARY_REQUIRED)               | error               | Wrap the async read in `@try` with `@pending` and `@catch`.                                                 |
+| [`ASYNC_POST_AWAIT_READ`](/errors/MARKLESS_ASYNC_POST_AWAIT_READ)                   | error               | Read the state before the first `await`.                                                                    |
+| [`STATE_WRITE_IN_COMPUTED`](/errors/MARKLESS_STATE_WRITE_IN_COMPUTED)               | error               | Move the write into an event handler.                                                                       |
+| [`EVENT_HANDLER_EMIT_UNSUPPORTED`](/errors/MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED) | error               | The handler reads a plain local from the body. Use state, props, element handles, or imports instead.       |
+| [`TRY_BLOCK_TOGGLE_RERENDER`](/errors/MARKLESS_TRY_BLOCK_TOGGLE_RERENDER)           | warning             | An `@if` inside `@try` holds a component. Move the component out of the `@if`.                              |
+| [`SHARED_FAMILY_SCOPE_IMPLICIT`](/errors/MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT)     | warning             | Pass `{ scope: 'widget' }` or `{ scope: 'page' }` to `shared()`.                                            |
+| [`FRAMEWORK_API_RUNTIME_CALL`](/errors/MARKLESS_FRAMEWORK_API_RUNTIME_CALL)         | error while running | Call `state()` and its friends only in `.tsrx` files.                                                       |
+
+Markless has many more codes than this table shows. [All error codes](/errors) lists every one,
+grouped by the package that raises it.
+
+<Callout
+	sprite="speech-bubble"
+	title="Where do the markless.dev/errors links go?"
+	text="Each error prints a link to markless.dev/errors/ followed by its code. That link opens the page for the code on this site, with the message, the fix, and the source file that raises it."
+/>
+
+Next: [how Markless works under the hood](/how-it-works).
+
+<LikeHeart />

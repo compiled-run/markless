@@ -1,0 +1,105 @@
+import PageMeta from '../../components/page-meta.tsrx';
+import EditorDemo from '../../components/demos/tooling/editor-demo.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
+import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../components/docs/sidebar.tsrx';
+import LikeHeart from '../../components/docs/like-heart.tsrx';
+
+<Sidebar />
+
+# Make your editor read `.tsrx` files
+
+<PageMeta level="Tooling" time="4 min" assumes="reading-tsrx" sprite="cursor" />
+
+<ThemeToggle />
+
+Open a `.tsrx` file in a fresh editor and you get plain grey text. No suggestions, no red lines, no
+help.
+
+Two pieces fix that. An editor extension knows the TSRX syntax, so it adds the colours. A
+TypeScript plugin, named in `tsconfig.json`, knows Markless. It adds everything else.
+
+Turn each piece on, and watch what changes.
+
+<EditorDemo />
+
+Only the colours come from the extension. The hint after `<widget.trigger`, the red line under
+`onClik`, and the menu after `@` all come from the plugin. Any editor that runs TypeScript's own
+language server can load the plugin.
+
+## Check `tsconfig.json`
+
+An app from `npm create markless` already has these lines:
+
+```json
+{
+	"tsrx": {
+		"compiler": "@markless/typescript-plugin/volar"
+	},
+	"compilerOptions": {
+		"jsx": "preserve",
+		"plugins": [
+			{ "name": "@markless/typescript-plugin" },
+			{ "name": "@markless/router/typescript-plugin" }
+		]
+	}
+}
+```
+
+| Line                                 | What it does                                                 |
+| ------------------------------------ | ------------------------------------------------------------ |
+| `tsrx.compiler`                      | Tells the TSRX tools to read `.tsrx` files the Markless way. |
+| `@markless/typescript-plugin`        | Adds Markless suggestions, part hints, and `.tsrx` imports.  |
+| `@markless/router/typescript-plugin` | Suggests your page addresses inside `href`.                  |
+
+## Pick your editor
+
+**VS Code.** Install the TSRX extension. The starter's `.vscode/extensions.json` recommends it, so VS
+Code offers it when you open the app.
+
+```bash
+code --install-extension ripple-ts.ripple-ts-vscode-plugin
+```
+
+Markless no longer ships its own extension. If you installed an old build by hand, remove it.
+Otherwise two extensions fight over `.tsrx` files.
+
+```bash
+code --uninstall-extension markless.markless
+```
+
+**Zed.** The starter writes `.zed/settings.json` for you. It opens `.tsrx` files as TSX and loads
+the Markless plugin into Zed's TypeScript server. You have nothing to install.
+
+**Other editors.** WebStorm and other editors built on TypeScript's language server read the same
+`tsconfig.json` lines.
+
+## What you get
+
+Type `@` in a component body, and the editor offers blocks like `@if`, `@for`, and `@try`. After a
+part tag, a small hint names the HTML element that the part renders.
+
+```tsrx
+<widget.trigger value="go">Go</widget.trigger>
+```
+
+Here the editor shows `: button` right after `<widget.trigger`. To turn these hints off, add
+`"partHints": false` to the plugin's entry in `tsconfig.json`.
+
+{/* PLAYGROUND: starter files tsconfig.json and pages/index.tsrx. Try: delete the tsrx block from tsconfig.json and watch the suggestions stop. Try: add "partHints": false. */ null}
+
+<Callout
+	sprite="cross"
+	title="Why does my Deno app show wrong errors?"
+	text="Deno's language server reads deno.json and ignores the plugins list. So it reads .tsrx files as plain TypeScript. Edit a Deno app in VS Code or Zed instead, and turn off Deno's own editor support for that folder."
+/>
+
+<Callout
+	sprite="check"
+	title="Is my setup right?"
+	text="In a Node or Bun app, run npm run doctor -- --no-build. One of its checks makes sure that tsconfig.json has the tsrx.compiler line, and it tells you the line to add if it is missing."
+/>
+
+Next: [check every file at once](/tooling/type-checking).
+
+<LikeHeart />

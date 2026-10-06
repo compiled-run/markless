@@ -1,0 +1,76 @@
+import PageMeta from '../../components/page-meta.tsrx';
+import TypecheckDemo from '../../components/demos/tooling/typecheck-demo.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
+import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../components/docs/sidebar.tsrx';
+import LikeHeart from '../../components/docs/like-heart.tsrx';
+
+<Sidebar />
+
+# How TypeScript checks a `.tsrx` file
+
+<PageMeta level="Tooling" time="3 min" assumes="components" sprite="check" />
+
+<ThemeToggle />
+
+Your editor underlines mistakes in `.tsrx` files. But TypeScript has never heard of `.tsrx`. So who
+checks them?
+
+Markless hands TypeScript a TSX copy of each `.tsrx` file. TypeScript checks the copy, and every
+error points back to the line you wrote. Your own file stays exactly as you wrote it.
+
+Pick a value for `label`, then press **Check**.
+
+<TypecheckDemo />
+
+`Nav` wants `label` to be a `string`. Pass it `42`, and TypeScript reports that `number` is not
+assignable to `string`. It points at `label` in `App.tsrx`, line 4.
+
+## What gets checked
+
+The copy keeps your real types, so a wrong prop is an error at the exact attribute. The check covers
+the whole file: props, attributes, event handlers, and element handles.
+
+```tsrx
+import { Nav } from './Nav.tsrx';
+
+export function App() @{
+	<Nav label={42} />
+}
+```
+
+{/* PLAYGROUND: starter files Nav.tsrx and App.tsrx. Try: change label={42} to label="Home" and check again. Try: write className="big" on the nav element. */ null}
+
+<Callout
+	sprite="cross"
+	title="Why is className an error?"
+	text="Markless uses the HTML name, class. The checker rejects className on HTML elements, so write class instead."
+/>
+
+## From the command line
+
+Inside the Markless repo, `pnpm typecheck` checks the whole workspace. It wraps `tsc`, so `-p`,
+`--watch`, and every other `tsc` flag still work.
+
+```bash
+pnpm typecheck
+```
+
+A type error in a `.tsrx` file shows the file, the line, and the column. A file that does not parse
+fails the run too:
+
+```text
+counter.tsrx(9,8): error TS2322: Type 'string' is not assignable to type 'number'.
+broken.tsrx(6,1): error TS91001: Markless TSRX parse error: Unexpected '}' in JSX text
+Found 1 Markless TSRX compile error.
+```
+
+<Callout
+	sprite="thought-bubble"
+	title="Can I run this in my own app?"
+	text="Not yet. The published @markless/typescript-plugin ships the editor plugin only, with no command. In your app, the editor checks types. npm run build stops on Markless errors, but it does not run the type checker."
+/>
+
+Next: [test a component in a real browser](/tooling/testing).
+
+<LikeHeart />

@@ -1,0 +1,129 @@
+import PageMeta from '../../components/page-meta.tsrx';
+import TestPathsDemo from '../../components/demos/tooling/test-paths-demo.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
+import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../components/docs/sidebar.tsrx';
+import LikeHeart from '../../components/docs/like-heart.tsrx';
+
+<Sidebar />
+
+# Test a component in a real browser
+
+<PageMeta level="Tooling" time="5 min" assumes="state,events" sprite="star-badge" />
+
+<ThemeToggle />
+
+Types pass. But a type check never clicks a button.
+
+`@markless/vitest-browser` runs your component in a real browser, and your test clicks it. The
+package is experimental.
+
+A Markless component renders wherever you need it: in the browser, on a server, at build time. A
+test is one more of those places. The package gives you two ways in. Mount the component in the
+browser. Or render it to HTML on a server, then click that HTML.
+
+A bug can hide in one way and not in the other. So write the check once and run it both ways.
+
+Pick a way in. Then press **Step** until the test ends.
+
+<TestPathsDemo />
+
+Only the first step differs. After that, both tests click the same button and wait for the same
+text.
+
+| Helper               | What it does                                                                   |
+| -------------------- | ------------------------------------------------------------------------------ |
+| `render(Counter)`    | Mounts `Counter` in the browser, the way an app without a server does.         |
+| `renderSSR(Counter)` | Renders `Counter` to HTML on the test server, then puts that HTML in the page. |
+
+## Set it up
+
+The starters do not include this setup yet. This configuration comes from the Markless repo's own
+test projects.
+
+```bash
+npm install -D @markless/vitest-browser vitest playwright
+npx playwright install chromium
+```
+
+```ts
+import { markless } from '@markless/core/vite';
+import { testSSR } from '@markless/vitest-browser/ssr-plugin';
+import { playwright } from 'vite-plus/test/browser-playwright';
+import { defineProject } from 'vitest/config';
+
+export default defineProject({
+	plugins: [testSSR(), markless()],
+	test: {
+		include: ['src/**/*.browser.ts'],
+		browser: {
+			enabled: true,
+			headless: true,
+			provider: playwright(),
+			instances: [{ browser: 'chromium' }],
+		},
+	},
+});
+```
+
+That file is `vitest.config.ts`. Put `testSSR()` before `markless()`. Without it, `renderSSR()`
+throws.
+
+## One check, both ways
+
+Take the counter from the starter app:
+
+```tsrx
+import { state } from '@markless/core';
+
+export default function Counter() @{
+	let count = state(0);
+
+	<button onClick={() => count++}>Count {count}</button>
+}
+```
+
+Write the check once, in `counter.browser.ts`. Then run it both ways:
+
+```ts
+import { render, renderSSR } from '@markless/vitest-browser';
+import { expect, test } from 'vitest';
+import Counter from './Counter.tsrx';
+
+async function clickCounts(container: HTMLElement) {
+	const button = container.querySelector('button')!;
+	button.click();
+	await expect.poll(() => button.textContent).toBe('Count 1');
+}
+
+test('mounted in the browser: a click counts', async () => {
+	const screen = await render(Counter);
+	await clickCounts(screen.container as HTMLElement);
+});
+
+test('rendered on a server: a click counts', async () => {
+	const screen = await renderSSR(Counter);
+	await clickCounts(screen.container);
+});
+```
+
+The package removes each mounted component after each test. Call `cleanup()` yourself only in the
+middle of a test.
+
+{/* PLAYGROUND: starter files Counter.tsrx and counter.browser.ts. Try: change the button text and watch both tests fail. Try: remove testSSR() from the config. */ null}
+
+<Callout
+	sprite="cross"
+	title="Why does renderSSR() throw 'was not transformed'?"
+	text="testSSR() rewrites the text renderSSR(Counter) before the test runs. Write the call by name, with a component from its own .tsrx file and no props. A helper that gets renderSSR passed in as a value skips the rewrite."
+/>
+
+<Callout
+	sprite="thought-bubble"
+	title="Why does my check see the old text?"
+	text="In a test, the code for a click can load during that first click. So a read straight after click() can still see the old text. Wait with expect.poll before you compare."
+/>
+
+Next: [read a Markless error](/tooling/diagnostics).
+
+<LikeHeart />
