@@ -460,6 +460,16 @@ real gesture. This replaces three separate log implementations that disagreed
 with each other and printed zeros and "bytes unknown". Builds with logging off
 gain nothing from it.
 
+### The `app` and `full-stack` starters run in dev
+
+`npm run dev` in a fresh `app` or `full-stack` app failed on `document.tsrx`
+with `MARKLESS_CAPTURE_METADATA_MISSING`. The document imports `Html` from
+`@markless/router`, and the dev server resolved that package to its built
+JavaScript without marking it external, so the linker took it for a prebuilt
+component with no capture metadata. The server build already marked it
+external. The dev server now does the same for any bare dependency's built
+JavaScript in a server environment, unless `resolve.noExternal` claims it.
+
 ### Dev server and hot reload fixes
 
 Four ways an edit could leave the dev server serving stale code or crash it
