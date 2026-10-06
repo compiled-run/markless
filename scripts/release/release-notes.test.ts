@@ -2,7 +2,7 @@
 // exercises the production script and a real changelogen install;
 // MARKLESS_REPO_ROOT is the only test seam.
 import { spawnSync } from 'node:child_process';
-import { access, mkdtemp, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -21,6 +21,24 @@ const gitIdentityEnv = {
 	LANG: 'C',
 };
 
+// A git hook exports GIT_DIR (absolute inside a linked worktree), which would point fixture
+// commands at the real repository instead of the temp fixture.
+const repositoryEnvKeys = [
+	'GIT_DIR',
+	'GIT_WORK_TREE',
+	'GIT_INDEX_FILE',
+	'GIT_COMMON_DIR',
+	'GIT_OBJECT_DIRECTORY',
+	'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+	'GIT_PREFIX',
+];
+
+function fixtureEnv(extra: Record<string, string> = {}): NodeJS.ProcessEnv {
+	const env: NodeJS.ProcessEnv = { ...process.env, ...gitIdentityEnv, ...extra };
+	for (const key of repositoryEnvKeys) delete env[key];
+	return env;
+}
+
 type NotesResult = {
 	readonly exitCode: number;
 	readonly stdout: string;
@@ -37,7 +55,7 @@ function git(fixture: string, args: readonly string[]): string {
 	const result = spawnSync('git', args, {
 		cwd: fixture,
 		encoding: 'utf8',
-		env: { ...process.env, ...gitIdentityEnv },
+		env: fixtureEnv(),
 	});
 	if (result.status !== 0) {
 		throw new Error(`git ${args.join(' ')} failed\n${result.stdout}\n${result.stderr}`);
@@ -81,7 +99,7 @@ async function runNotes(
 	const result = spawnSync(process.execPath, [releaseNotesCli, ...args], {
 		cwd: fixture,
 		encoding: 'utf8',
-		env: { ...process.env, ...gitIdentityEnv, MARKLESS_REPO_ROOT: fixture },
+		env: fixtureEnv({ MARKLESS_REPO_ROOT: fixture }),
 	});
 	const wrapped: NotesResult = {
 		exitCode: result.status ?? 1,
@@ -98,6 +116,21 @@ async function runNotes(
 
 // Each case spawns about a dozen git and node processes; 10.9 s was measured under full-suite load.
 const SPAWN_HEAVY_TIMEOUT_MS = 30_000;
+
+test('fixture git commands ignore a GIT_DIR inherited from a git hook', async () => {
+	const outer = await mkdtemp(join(tmpdir(), 'markless-release-notes-outer-'));
+	spawnSync('git', ['init', '-b', 'main'], { cwd: outer, env: fixtureEnv() });
+	const outerConfig = await readFile(join(outer, '.git', 'config'), 'utf8');
+	const previous = process.env.GIT_DIR;
+	process.env.GIT_DIR = join(outer, '.git');
+	try {
+		await notesFixture();
+	} finally {
+		if (previous === undefined) delete process.env.GIT_DIR;
+		else process.env.GIT_DIR = previous;
+	}
+	expect(await readFile(join(outer, '.git', 'config'), 'utf8')).toBe(outerConfig);
+});
 
 test('release notes include conventional and unclassified commits', async () => {
 	const { fixture, conventionalSha, proseSha } = await notesFixture();
