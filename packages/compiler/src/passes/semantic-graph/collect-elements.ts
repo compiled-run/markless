@@ -73,7 +73,13 @@ import {
 } from './diagnostics.ts';
 import { acceptsIdrefList, isCssAnchorAttribute, isIdrefAttribute } from './idref-attributes.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
-import { inlineHandlerRenderLocals } from './render-local-inline.ts';
+import {
+	collectDefinitionReads,
+	inlineHandlerRenderLocals,
+	inlineRenderLocals,
+} from './render-local-inline.ts';
+import { collectGraphDependencies } from './collect-async.ts';
+import { repeatRowBindsName } from './collect-repeat.ts';
 import {
 	createStyleConstResolver,
 	lowerStyleObject,
@@ -236,21 +242,58 @@ function joinTextParts(children: ReadonlyArray<AnyNode>, state: WalkState): void
 		return;
 	if (values.some((value) => !value || value.type === 'JSXEmptyExpression')) return;
 	if (values.some(isProjectedChildren)) return;
-	const readSources = joinReadSources(
-		values.map((value) => pureCompositeReadSources(value, state, TEMPLATE_READ_OPTIONS)),
-	);
+	// A shared() factory's locals are carried by the factory scope, not recomputed here.
+	const shared = Boolean(state.currentSharedDefinitionId);
+	const inlined = new Map<AnyNode, { readonly source: string; readonly definitions: AnyNode[] }>();
+	for (const value of values as AnyNode[]) {
+		const entry = shared
+			? {
+					kind: 'inlined' as const,
+					source: expressionSource(value, state.source),
+					definitions: [],
+				}
+			: inlineRenderLocals(value, state);
+		if (entry.kind !== 'inlined') return;
+		inlined.set(value, { source: entry.source ?? '', definitions: [...entry.definitions] });
+	}
+	const definitions = [...inlined.values()].flatMap((entry) => entry.definitions);
+	const readSources = joinReadSources([
+		...values.map((value) => {
+			const sources = pureCompositeReadSources(value, state, TEMPLATE_READ_OPTIONS);
+			return shared
+				? sources
+				: (sources?.filter((source) => !readsRenderDefinition(source, state)) ?? null);
+		}),
+		...definitions.map((definition) =>
+			collectGraphDependencies(definition, state).map((dependency) => dependency.source),
+		),
+	]);
 	if (!readSources || readSources.some((source) => readsAsyncComputed(source, state))) return;
 	const parts = children.map((child) =>
 		isTemplateExpressionChild(child)
-			? `\${(${expressionSource(child.expression as AnyNode, state.source)}) ?? ''}`
+			? `\${(${inlined.get(child.expression as AnyNode)!.source}) ?? ''}`
 			: staticTextValue(child).replace(/[\\`]|\$\{/g, (match) => `\\${match}`),
 	);
 	const source = `\`${parts.join('')}\``;
 	const composite = mintTemplateExpressionComputed(`() => ${source}`, readSources, state, true);
 	if (!composite) return;
+	for (const definition of definitions) collectDefinitionReads(definition, state);
 	const [first, ...rest] = values as AnyNode[];
 	joinedTextExpressions.set(first!, { graphNodeId: composite.graphNodeId, source });
 	for (const value of rest) joinedTextExpressions.set(value, null);
+}
+
+// A read rooted in a body const the join spliced in by its definition, not a graph read.
+function readsRenderDefinition(source: string, state: WalkState): boolean {
+	const root = /^[^.?[(\s]+/.exec(source)?.[0];
+	if (!root || repeatRowBindsName(root, state)) return false;
+	return (
+		!resolveGraphPath(
+			root,
+			graphBindingMap(state.graph, state.currentSharedDefinitionId),
+			semanticAliasMap(state.graph, state.currentSharedDefinitionId),
+		) && !resolveSharedInstanceGraphPath(source, state.graph, state.currentComponentName)
+	);
 }
 
 // Projected children are markup, not text.

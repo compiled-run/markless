@@ -194,7 +194,7 @@ export function inlineHandlerRenderLocals(
 }
 
 // The spliced definition's reads are lowered at its own span, once however many handlers splice it.
-function collectDefinitionReads(definition: AnyNode, state: WalkState): void {
+export function collectDefinitionReads(definition: AnyNode, state: WalkState): void {
 	const reads = state.graph.stateReads;
 	const known = new Set(reads.map(readKey));
 	const before = reads.length;
