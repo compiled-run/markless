@@ -1,55 +1,194 @@
+import PageMeta from '../../components/page-meta.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
+import EditAddressDemo from '../../components/demos/ui/overview/edit-address-demo.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 
 <Sidebar />
 
-# Components you style yourself
+# The hard part of a dialog, already written
+
+<PageMeta level="Start here" time="5 min" assumes="nothing" sprite="star-face" />
 
 <ThemeToggle />
 
-`@markless/ui` is a set of component families, a select, a modal, a set of tabs, with the
-keyboard, the focus and the screen-reader wiring already written, and the look left entirely to
-you. There is no stylesheet in the package. Nothing arrives carrying a colour, a border, a font or
-a class name you have to argue with.
+A dialog takes ten minutes to draw. Then Escape does nothing. Focus slips out behind it. A screen
+reader never hears it open.
+
+`@markless/ui` writes that part for you. It gives you menus, dialogs, pickers and tabs that already
+handle the keyboard, focus and screen readers. It gives you no colours, fonts or spacing. You bring
+those with your own CSS.
+
+People call a library like this **headless**. It has the behaviour, and the look is yours.
+
+## A dialog with no handlers
+
+Click **Edit address**. Press Tab a few times, then press Escape.
+
+<EditAddressDemo />
+
+That dialog is this file. Its `<style>` block is left out here:
+
+```tsrx
+import { modal } from '@markless/ui';
+
+export default function EditAddress() @{
+	<modal.root>
+		<modal.trigger class="open">Edit address</modal.trigger>
+		<modal.backdrop class="backdrop">
+			<modal.content class="dialog">
+				<modal.title class="title">Edit delivery address</modal.title>
+				<modal.description>We will send your order here.</modal.description>
+				<modal.close class="close">Cancel</modal.close>
+			</modal.content>
+		</modal.backdrop>
+	</modal.root>
+}
+```
+
+{/* PLAYGROUND: starter = components/demos/ui/overview/edit-address.tsrx. Try: delete the modal.close part and check that Escape still closes it, or add a second button inside modal.content and Tab between the two. */ null}
+
+Focus stayed inside the dialog while you pressed Tab. Escape closed it and put focus back on
+**Edit address**. You wrote none of that. The modal's own tests check it:
+
+- **Escape** closes the dialog and puts focus back on the trigger.
+- While it is open, the mouse, the keyboard and screen readers cannot reach the page behind it.
+- **Tab** never moves focus to the page behind it.
+- A screen reader announces `modal.title` as the dialog's name.
+
+## Families and parts
+
+Each component is a **family**: a set of parts that work together. `modal` is one family, and
+`modal.trigger`, `modal.content` and `modal.close` are its parts. You write each part as a tag.
+
+The `root` part holds the state, such as whether the dialog is open. The other parts read that
+state. Most of them also show it on their own element as a `ui-*` attribute, such as `ui-open`.
+That attribute is how you style them, and [Styling](/ui/styling) covers it.
+
+{/* SKETCH: the modal's parts as a stack of labelled boxes (root, trigger, backdrop, content, title, close). One "open" switch at the root lights up ui-open on root, trigger, backdrop and content at the same time. Title and close stay unlit. */ null}
+
+Each part name is one lowercase word. `select.itemtrigger` is the trigger of one item.
+`slider.valuelabel` is the label that shows the slider's value.
+
+<Callout
+	sprite="speech-bubble"
+	title="Why is the switch family called toggle?"
+	text="switch is a reserved word in JavaScript, so no export can use that name. The on/off switch family is toggle."
+/>
+
+## Add it to your app
+
+Install the package:
 
 ```bash
 npm install @markless/ui
 ```
 
-One family is one import, and its parts are properties on it:
+Then add its `ui()` plugin to `vite.config.ts`, next to `markless()`:
 
-```tsrx
-import { accordion } from '@markless/ui';
+```ts
+import { defineConfig } from 'vite';
+import { markless } from '@markless/core/vite';
+import { ui } from '@markless/ui/vite';
+
+export default defineConfig({
+	plugins: [ui(), markless()],
+});
 ```
 
-## Styling
+`ui()` does two jobs. It turns icon tags, such as `<lucide.check />`, into inline SVG. It also tells
+Vite to leave the package alone, so Markless builds the families together with your own
+components. Vite runs `ui()` before `markless()` whatever order you list them in.
 
-A part writes its state onto its own element as a `ui-*` attribute, and a plain CSS selector does
-the rest: [styling](/ui/styling) is the whole story.
+In a multi-page app built with the router, the list is `[ui(), markless(), router()]`.
 
-## The families
+<Callout
+	sprite="bolt"
+	title="Why does my icon tag throw 'reached runtime'?"
+	text="If ui() is missing, an icon tag such as <lucide.check /> is still code when the page runs. It throws this error: @markless/icons: <lucide.check /> reached runtime. Add ui() from '@markless/ui/vite' before markless() in vite.config, or icons() from '@markless/icons/vite' when you use icons without @markless/ui. Add ui() to your plugins and the error goes away."
+/>
 
-Every family below has a page. New ones are added here as they land.
+## Import a family
 
-**Forms** — [checkbox](/ui/checkbox), [checklist](/ui/checklist),
-[combobox](/ui/combobox), [otp](/ui/otp),
-[radiogroup](/ui/radiogroup), [select](/ui/select),
-[textbox](/ui/textbox), [toggle](/ui/toggle).
+Import a family by name from the package root. Its parts are properties on that name:
 
-**Show and hide** — [accordion](/ui/accordion),
-[collapsible](/ui/collapsible), [modal](/ui/modal),
-[navbar](/ui/navbar), [tabs](/ui/tabs), [tree](/ui/tree).
+```tsrx
+import { modal, select, tabs } from '@markless/ui';
+```
 
-**Overlays** — [drawer](/ui/drawer), [hovercard](/ui/hovercard),
-[popover](/ui/popover), [tooltip](/ui/tooltip).
+Most families also have a path of their own, named after the family, such as `@markless/ui/tabs`.
+Three do not: `base`, `hovercard` and `tokenbox`. Import those from the root. The root also exports icon packs, such as
+`lucide`.
 
-**Collections** — [gridlist](/ui/gridlist), [table](/ui/table),
-[resizable](/ui/resizable).
+<Callout
+	sprite="flower"
+	title="Which version do I have?"
+	text="These pages follow @markless/ui 0.5.0. Version 0.4.0 has fewer families and no @markless/ui/vite entry. If a family or the ui() plugin is missing from your install, check your version with npm view @markless/ui version."
+/>
 
-**Display** — [carousel](/ui/carousel), [pagination](/ui/pagination),
-[progress](/ui/progress), [qrcode](/ui/qrcode),
-[toaster](/ui/toaster).
+## It renders wherever your app does
 
-There is one more import, `base`, holding three primitives the families are built from: a button,
-a label and a visually hidden span. It has no page of its own; you almost never reach for it
-directly.
+A family is a Markless component, like the ones you write. So it runs wherever your app runs: in
+the browser alone, on a server, or inside a test. The package's own tests render every family
+both in the browser alone and from server HTML, and the same checks pass both ways.
+
+{/* SKETCH: one select shown three times side by side, labelled "browser alone", "from a server" and "in a test". The same parts and the same ui-open / ui-selected attributes are highlighted in each copy. */ null}
+
+## Every family
+
+There are 46 families. Each name links to its page where one exists. The rest have no page yet,
+but they ship in the package and you can import them today.
+
+| Family | What it is |
+| --- | --- |
+| [accordion](/ui/accordion) | Stacked sections. Each heading opens or closes its own panel. |
+| `base` | Small parts the families build on: `button`, `label`, `separator` and `visuallyhidden`. Root import only. |
+| `buttongroup` | A set of toggle buttons, such as text alignment or bold and italic. |
+| `calendar` | A month of days to pick a date from. |
+| [carousel](/ui/carousel) | Slides with back, forward, slide-picker and play controls. |
+| [checkbox](/ui/checkbox) | One checkbox with a label, a description, an error and a form field. |
+| [checklist](/ui/checklist) | A group of checkboxes with a select-all box. |
+| [collapsible](/ui/collapsible) | One trigger that shows or hides one panel. |
+| `colorpicker` | A colour picker with an area, channel tracks, a typed value and swatches. |
+| [combobox](/ui/combobox) | A text field with a list attached. Focus stays in the field. |
+| `crop` | A rectangle you move and resize inside an area, such as an image cropper. |
+| `datebox` | A date typed into three number boxes. |
+| [drawer](/ui/drawer) | A dialog that slides in from an edge and swipes back out. |
+| `editable` | Rename in place. A value shows as a button and edits in a text field. |
+| `fileupload` | A drop area, a browse button and a row for each chosen file. |
+| [gridlist](/ui/gridlist) | A list of rich items, such as cards, where a row holds its own controls. |
+| [hovercard](/ui/hovercard) | A card that shows when the pointer rests on its trigger or focus stays there. Root import only. |
+| `ink` | A freehand drawing area, such as a signature pad. |
+| `menu` | A menu that a button or a right-click opens, with submenus. |
+| `menubar` | An application menu bar, such as File, Edit and View. |
+| [modal](/ui/modal) | A dialog that blocks the page behind it. It has an alert mode. |
+| [navbar](/ui/navbar) | The site's main navigation, with dropdown items. |
+| `numberbox` | One number in a text field, with two step buttons. |
+| [otp](/ui/otp) | A one-time code shown as boxes over one real text field. |
+| `pad` | A control that picks an X and a Y value on one area. |
+| [pagination](/ui/pagination) | Page links with back and forward controls. |
+| [popover](/ui/popover) | A panel that a trigger opens, placed next to that trigger. |
+| [progress](/ui/progress) | A progress bar with a track, an indicator and a value label. |
+| [qrcode](/ui/qrcode) | Draws a value as a QR code. |
+| [radiogroup](/ui/radiogroup) | A group of radio choices. |
+| `rating` | One number out of a row of marks, such as stars. |
+| [resizable](/ui/resizable) | Panels in a row or column with dividers you drag. |
+| [select](/ui/select) | A button that opens a list of options. You pick one. |
+| `slider` | A value or a range along a track, with one or two thumbs. |
+| [table](/ui/table) | Rows and columns with arrow-key movement, row selection and sort headers. |
+| [tabs](/ui/tabs) | A list of tabs. Each tab shows one panel. |
+| `taglist` | A row of text tags. Add `taglist.input` to type new ones. |
+| [textbox](/ui/textbox) | A labelled input or textarea with a description and an error. |
+| `timebox` | A time of day typed into separate hour and minute boxes. |
+| [toaster](/ui/toaster) | A region that shows short messages and reads them to screen readers. |
+| [toggle](/ui/toggle) | An on/off switch. |
+| `tokenbox` | Text with tokens inside it, such as mentions. Still early. Root import only. |
+| `toolbar` | A bar of controls that share one Tab stop. |
+| [tooltip](/ui/tooltip) | A short description that shows on hover or keyboard focus. |
+| `tour` | A tour of steps that highlights elements on the page. |
+| [tree](/ui/tree) | A nested tree, such as a file tree. |
+
+The package's own notes say `tokenbox` still waits on work in Markless itself. You can import it today, but
+expect it to change.
+
+Next: give these parts a look in [Styling](/ui/styling).

@@ -1,3 +1,5 @@
+import PageMeta from '../../components/page-meta.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 
@@ -5,57 +7,107 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 # The look is yours, the state is an attribute
 
+<PageMeta level="Start here" time="6 min" assumes="styling" sprite="flower" />
+
 <ThemeToggle />
 
-Nothing in `@markless/ui` arrives with a look. What a part hands you instead is its state, written
-onto its own element as a plain attribute, so your stylesheet reaches it the way it reaches
-`:hover`. There is no class to toggle from TypeScript and nothing to keep in sync.
+Your select works. It opens, it picks, it talks to screen readers. It also looks like plain HTML
+from 1998. Here is how you give it a look.
+
+`@markless/ui` ships no stylesheet. Instead, each part writes its state onto its own element as a
+`ui-*` attribute. You put a class on the part, and a plain CSS selector does the rest.
+
+## A class and an attribute
+
+Open the picker. Pick **Ink**, then open it again. Try to pick **Neon**.
+
+<Example scenario="overview/styled-picker" />
+
+{/* PLAYGROUND: starter = components/demos/ui/overview/styled-picker.tsrx. Try: delete the .mark[ui-hidden] rule and watch every option show its tick, or change .option[ui-selected] to a background colour. */ null}
+
+The trigger turned yellow while the list was open, because `.picker[ui-open] .trigger` matched. **Ink** went
+bold because its option gained `ui-selected`. **Neon** looks faded because it carries `ui-disabled`.
+No line of TypeScript adds or removes a class. The family writes the attribute, and your
+stylesheet reads it.
+
+Most of these attributes are on/off flags with no value. `ui-open` is on the element while the
+state holds, and gone when it does not. So `[ui-open]` is the whole selector.
+
+A few attributes carry a value instead. An accordion item writes its own `value`, so
+`[ui-value='returns']` reaches that one section:
 
 ```css
-[ui-open] {
+.section[ui-value='returns'][ui-open] {
 	border-color: rebeccapurple;
 }
 ```
 
-## The attributes
-
-Every family writes `ui-*` attributes as its state changes: `ui-open` and `ui-closed` on an
-accordion section, `ui-checked` on a box, `ui-disabled` anywhere something has stopped responding.
-Most are flags with no value, present while the state holds and gone while it does not, so
-`[ui-open]` is the whole selector.
-
-A few carry a value instead, so one selector can name one element: an accordion item writes
-`ui-value="returns"`, and `[ui-value='returns']` reaches that section alone.
-
-Each family's page lists what its parts write.
-
-## Ten lines that style an accordion
-
-You give the parts your own class names and select on the attribute where the state matters:
-
-```css
-.section {
-	border: 2px solid #ddd;
-}
-
-.section[ui-open] {
-	border-color: rebeccapurple;
-}
-
-.trigger[ui-open]::after {
-	transform: rotate(180deg);
-}
-```
+<Callout
+	sprite="speech-bubble"
+	title="Why does every option show its tick?"
+	text="select.itemindicator gets ui-hidden on every option nobody picked. The family marks it but does not hide it. That choice is yours. Add a rule such as .mark[ui-hidden] { visibility: hidden }."
+/>
 
 ## Your class names stay yours
 
-Write that block inside the component and the names in it belong to that file: the compiler adds a
-scope class beside each one, so a `.section` here cannot collide with a `.section` two folders away.
-The [scoping rules](/concepts/styling) are the framework's, not this package's, and they
-are the same ones your own components already get.
+The `<style>` block in a component belongs to that file. Markless scopes it, so a `.picker` here
+cannot collide with a `.picker` two folders away. A class you put on a family part still reaches
+it. The package's tests check exactly that, both in the browser alone and from server HTML.
 
-## When a family ships CSS
+These are the same [scoping rules](/concepts/styling) your own components already get.
 
-A family that cannot work without CSS, an overlay that has to sit above the page or a panel that
-starts hidden, ships that rule inside `@layer markless`. Your own unlayered rule beats it without
-`!important`, which is the entire reason the layer is there.
+## Defaults you can beat
+
+A few families need some CSS to work at all. A tooltip has to sit next to its trigger. A drawer's
+backdrop has to cover the page. Sixteen families ship that CSS inside a CSS layer named `markless`. They are
+`colorpicker`, `crop`, `drawer`, `gridlist`, `hovercard`, `ink`, `menu`, `menubar`, `pad`,
+`popover`, `rating`, `resizable`, `table`, `tokenbox`, `tooltip` and `tour`.
+
+A rule in a layer loses to any rule outside a layer. So one plain rule of yours beats the default,
+with no `!important` and no specificity fight.
+
+Here is the line in the tooltip's own CSS that places the tip. It puts the tip above its trigger:
+
+```css
+@layer markless {
+	[overlay] {
+		position-area: block-start;
+	}
+}
+```
+
+This tip has one rule of yours on it, `position-area: inline-end`. That is enough to move it to the
+right of **Save**:
+
+<Example scenario="overview/save-tip" />
+
+{/* PLAYGROUND: starter = components/demos/ui/overview/save-tip.tsrx. Try: delete position-area from .tip and watch the tip jump back above Save, or change it to block-end. */ null}
+
+{/* SKETCH: two stacked cards labelled "@layer markless" (position-area: block-start) and "your rule" (position-area: inline-end). An arrow shows your card winning, with a small tooltip drawn in each position. */ null}
+
+You moved the tip with CSS, not a prop. The tooltip has no prop for where it sits. Placement lives
+in CSS, where your rule can change it.
+
+<Callout
+	sprite="bolt"
+	title="Why is my closed panel still showing?"
+	text="Closed panels use the hidden attribute. If you give the panel a display rule, yours beats the browser's own rule for hidden, so the panel stays on screen. Write .panel:not([hidden]) { display: grid } instead."
+/>
+
+## Parts that nest
+
+A tree or a submenu does not need new parts for the next level down. It uses the same ones again.
+A `tree.item` holds a `tree.itemcontent`, and that holds more `tree.item`s. Each nested item keeps
+its own open or closed state, and the same CSS styles every level.
+
+Click the arrow next to **src**. Then use the arrow keys to walk the rows.
+
+<Example scenario="overview/files" />
+
+{/* PLAYGROUND: starter = components/demos/ui/overview/files.tsrx. Try: copy the src item inside its own itemcontent to make a third level, and watch .arrow[ui-open] turn its arrow too. */ null}
+
+`index.ts` and `app.tsrx` use the same `tree.item` part as `src`, one level down. The
+`.arrow[ui-open]` rule turns the arrow on any row at any depth. Menus nest the same way: a submenu
+is a `menu.itemcontent` written inside a `menu.item`.
+
+Next: pick a family from the [overview](/ui) and style it.
