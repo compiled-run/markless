@@ -1,5 +1,6 @@
 import PageMeta from '../../components/page-meta.tsrx';
 import MugOrderDemo from '../../components/demos/concepts/mug-order-demo.tsrx';
+import ComputedSketch from '../../components/sketch/concepts/computed-sketch.tsrx';
 import Collapsible from '../../components/docs/collapsible.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
@@ -33,7 +34,7 @@ Markless reads the recipe and sees `mugs` and `coasters` in it.
 
 Press **Add a mug**. Then press **Add a coaster** twice. Watch the total.
 
-{/* SKETCH: "Who updates the total?" The reader adds a mug. The figure draws arrows from mugs and coasters into the total recipe, lights the recipe when either input changes, and shows that no button touches total. */ null}
+<ComputedSketch />
 
 <MugOrderDemo />
 

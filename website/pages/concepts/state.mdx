@@ -1,5 +1,6 @@
 import PageMeta from '../../components/page-meta.tsrx';
 import CupsDemo from '../../components/demos/concepts/cups-demo.tsrx';
+import StateSketch from '../../components/sketch/concepts/state-sketch.tsrx';
 import Collapsible from '../../components/docs/collapsible.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
@@ -37,7 +38,7 @@ difference: every spot on the page that shows `cups` now changes when `cups` cha
 
 Press **Pour a cup** three times. Then press **Start over**. Keep an eye on the second line.
 
-{/* SKETCH: "What changes when I click?" The reader clicks Pour a cup. The figure lights the one text spot that shows cups and leaves the drawn number dark, with a note that the component did not run again. */ null}
+<StateSketch />
 
 <CupsDemo />
 
