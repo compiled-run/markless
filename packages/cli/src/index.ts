@@ -703,16 +703,16 @@ function creationSummary(options: CreateOptions): string {
 	].join('\n');
 }
 
-function nextSteps(options: CreateOptions): string {
-	// A deno app declares `tasks`, not `scripts`, and `deno dev` is not a
-	// command. Keyed on the format because the format is what wrote deno.json.
-	const devCommand =
-		options.format === 'deno' ? 'deno task dev' : `${options.packageManager} dev`;
+// A deno app declares `tasks`, not `scripts`, and npm rejects a bare `npm dev`.
+function devCommand(options: Pick<CreateOptions, 'format' | 'packageManager'>): string {
+	return options.format === 'deno' ? 'deno task dev' : `${options.packageManager} run dev`;
+}
 
+function nextSteps(options: CreateOptions): string {
 	return [
 		'Next steps:',
 		`  cd ${options.target}`,
-		`  ${devCommand}`,
+		`  ${devCommand(options)}`,
 		'',
 		'Then open:',
 		'  http://localhost:5173',
@@ -783,8 +783,8 @@ async function starterFiles(options: CreateOptions, fs: ProgramFileSystem): Prom
 	).flat();
 
 	const renderedFiles = renderTemplateFiles(files, {
+		devCommand: devCommand(options),
 		marklessVersion: await marklessVersionRange(fs),
-		packageManager: options.packageManager,
 		packageName: packageName(options.target),
 	});
 	return renderedFiles;

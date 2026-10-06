@@ -219,7 +219,7 @@ test('prompts interactively when a TTY run has no target', async () => {
 	);
 	expect(events).toContain('select:Ready to create?:create:Create app|,Cancel|');
 	expect(events).toContain(
-		'note:Created interactive-docs:Next steps:\n  cd interactive-docs\n  pnpm dev\n\nThen open:\n  http://localhost:5173',
+		'note:Created interactive-docs:Next steps:\n  cd interactive-docs\n  pnpm run dev\n\nThen open:\n  http://localhost:5173',
 	);
 	expect(events).toContain('outro:Markless app ready.');
 	await expect(exists(join(root, 'interactive-docs/pages/index.mdx'))).resolves.toBe(true);
@@ -315,7 +315,7 @@ test('creates a minimal Markless Router app with TSRX pages and Nitro-backed dep
 	expect(viteConfig).not.toContain('@vitejs/devtools');
 	expect(viteConfig).not.toContain('DevTools');
 	expect(viteConfig).not.toContain('nitro()');
-	expect(gitignore).toBe('node_modules/\ndist/\n.vite/\n.markless/\n*.log\n.DS_Store\n');
+	expect(gitignore).toBe('node_modules/\ndist/\n.vite/\n.markless/\n.output/\n*.log\n.DS_Store\n');
 	await expect(exists(join(appRoot, 'gitignore'))).resolves.toBe(false);
 	await expect(readFile(join(appRoot, 'tsconfig.json'), 'utf-8')).resolves.not.toContain('tsx');
 	await expect(exists(join(appRoot, 'pages/index.tsx'))).resolves.toBe(false);
@@ -522,6 +522,60 @@ test('scaffolded manifests pin @markless deps to the publishing cli version, nev
 	expect(denoJson.imports['@markless/typescript-plugin']).toBe(
 		`npm:@markless/typescript-plugin@${expectedRange}`,
 	);
+});
+
+test('a node-format manifest lets npm and pnpm install the vite-plus vite alias', async () => {
+	const root = await makeWorkspace();
+	await new CreateProgram().run(['alias-app', '--no-install', '--no-git'], runtime(root));
+
+	const manifest = JSON.parse(await readFile(join(root, 'alias-app/package.json'), 'utf-8')) as {
+		devDependencies: Record<string, string>;
+		overrides?: Record<string, string>;
+		pnpm?: { peerDependencyRules?: { allowAny?: string[] } };
+	};
+
+	// The alias installs as vite 0.3.1, outside the exact vite peer the router and bundler declare:
+	// npm refuses the install unless the override names it, and pnpm warns unless told to allow it.
+	expect(manifest.devDependencies.vite).toMatch(/^npm:@voidzero-dev\/vite-plus-core@/);
+	expect(manifest.overrides).toEqual({ vite: '$vite' });
+	expect(manifest.pnpm?.peerDependencyRules?.allowAny).toEqual(['vite']);
+});
+
+test('tells every package manager a dev command it accepts, in the output and the README', async () => {
+	const cases = [
+		['npm/11.6.2', 'node', 'npm run dev'],
+		['pnpm/10.33.2', 'node', 'pnpm run dev'],
+		['yarn/4.17.1', 'node', 'yarn run dev'],
+		['bun/1.3.14', 'bun', 'bun run dev'],
+		['pnpm/10.33.2', 'deno', 'deno task dev'],
+	] as const;
+	for (const [userAgent, format, command] of cases) {
+		const root = await makeWorkspace();
+		const stdoutWrites: string[] = [];
+		await new CreateProgram().run(
+			['dev-app', '--format', format, '--yes', '--no-install', '--no-git', '--agents', 'none'],
+			runtime(root, { env: { npm_config_user_agent: userAgent }, stdoutWrites }),
+		);
+		const readme = await readFile(join(root, 'dev-app/README.md'), 'utf-8');
+
+		expect(stdoutWrites.join(''), userAgent).toContain(`\n  ${command}\n`);
+		expect(readme, userAgent).toContain(`\n${command}\n`);
+	}
+});
+
+test('every starter document gives its pages the project name as their title', async () => {
+	for (const starter of STARTER_CHOICES.map((choice) => choice.value)) {
+		const root = await makeWorkspace();
+		await new CreateProgram().run(
+			['titled-app', '--starter', starter, '--no-install', '--no-git'],
+			runtime(root),
+		);
+
+		await expect(
+			readFile(join(root, 'titled-app/document.tsrx'), 'utf-8'),
+			starter,
+		).resolves.toContain('<title>titled-app</title>');
+	}
 });
 
 test('rejects --yes without a positional target', async () => {
