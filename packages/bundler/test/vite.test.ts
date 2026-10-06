@@ -385,6 +385,42 @@ describe('Vite adapter structure', () => {
 		);
 	});
 
+	test('dev server transforms treat a plain dependency component as external, like the server build', async () => {
+		const parentFilename = '/workspace/app/document.tsrx';
+		const dependencyFilename = '/workspace/app/node_modules/@markless/router/dist/index.js';
+		const parentSource = `import { Html } from '@markless/router';
+export default function Document({ children }) @{ <Html><body>{children}</body></Html> }`;
+		const resolveDependency = vi.fn(async (specifier: string) =>
+			specifier === '@markless/router' ? { id: dependencyFilename } : null,
+		);
+		const serverContext = (resolve: { noExternal?: unknown } = {}) => {
+			const context = createViteHookContext('server');
+			const environment = context.environment as { config: Record<string, unknown> };
+			environment.config.resolve = resolve;
+			return { ...context, resolve: resolveDependency };
+		};
+		const servePlugin = () => {
+			const plugin = getAsyncPlugin();
+			callConfig(plugin, {}, { command: 'serve', mode: 'development' });
+			callConfigResolved(plugin, { base: '/', command: 'serve', root: '/workspace/app' });
+			callBuildStart(plugin, { cwd: '/workspace/app' }, serverContext());
+			return plugin;
+		};
+
+		await expect(
+			callTransform(servePlugin(), parentSource, parentFilename, serverContext()),
+		).resolves.toMatchObject({ manifest: expect.any(Object) });
+
+		await expect(
+			callTransform(
+				servePlugin(),
+				parentSource,
+				parentFilename,
+				serverContext({ noExternal: ['@markless/router'] }),
+			),
+		).rejects.toThrow('MARKLESS_CAPTURE_METADATA_MISSING');
+	});
+
 	test('dev transforms reject imported compiled children without capture metadata', async () => {
 		const childFilename = '/workspace/app/components/Child.tsrx';
 		const parentFilename = '/workspace/app/pages/App.tsrx';

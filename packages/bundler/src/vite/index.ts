@@ -38,6 +38,7 @@ import {
 } from '../types.ts';
 import { createDevTags } from './dev-tags.ts';
 import { createDevPrerender } from './dev-prerender.ts';
+import { withDevServerExternals } from './dev-server-externals.ts';
 import {
 	isServerViteEnvironment,
 	marklessEnvironment,
@@ -350,7 +351,8 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 					transformedTsrxSources.set(parsePath(id).pathname, code);
 				}
 				try {
-					return await runHook(basePlugin.transform, this, code, id, transformOptions);
+					const context = rolldownOptions.dev === true ? withDevServerExternals(this) : this;
+					return await runHook(basePlugin.transform, context, code, id, transformOptions);
 				} catch (error) {
 					if (rolldownOptions.dev === true && TSRX_INPUT_FILE.test(id)) {
 						// Only a dev environment carries the HMR channel the error client listens on.
