@@ -1,5 +1,5 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import StreamStepsDemo from '../../components/demos/router/stream-steps-demo.tsrx';
+import FeedStepsDemo from '../../components/demos/router/feed-steps-demo.tsrx';
 import Collapsible from '../../components/docs/collapsible.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
@@ -8,107 +8,87 @@ import LikeHeart from '../../components/docs/like-heart.tsrx';
 
 <Sidebar />
 
-# There is no loader, because a page is already the loader
+# Page data arrives in the same response
 
-<PageMeta level="Building" time="4 min" assumes="async" sprite="drops" />
+<PageMeta level="Building" time="4 min" assumes="async, routes" sprite="drops" />
 
 <ThemeToggle />
 
-Here is the API you are looking for, and it does not exist. No `getServerSideProps`, no exported
-`load`, no data function sitting above the component waiting to hand it an object.
+A page needs data from somewhere slow, like a database. You don't want the whole page to wait for
+it. You also don't want the browser to make a second trip to fetch it.
 
-**A page receives the request in its props, and an async `computed` that reads them is the load.**
-You already know both halves. The only new part is where the request comes from.
+There is no special loader function for this. A page loads data the way any component does: with an
+async `computed()` inside `@try`.
 
-## A page takes props, and the router fills them in
+Think of a restaurant that brings the bread first. The main dish comes later, to the same table.
+That is an analogy. In the router, the bread is everything fast, and the main dish is the `@try`
+content.
 
-```tsrx
-import type { PageProps } from '@markless/router';
+Step through one page request. Then switch to quick data and step again.
 
-export function App({ url, params }: PageProps) @{
-	// url.href, url.pathname, url.search
-	// params.slug, for a page called [slug].tsrx
-}
-```
+<FeedStepsDemo />
 
-`params` holds the pieces of the path that were in brackets, so a page at `pages/blog/[slug].tsrx`
-gets `params.slug`. `url` is the address that was asked for, split into the parts you normally want.
+With slow data, the reader sees the heading and **Loading...** first. The data comes later, in the
+same response. The browser never asks a second time.
 
-Then the load is the thing you would have written anyway, and the waiting and the failure are the
-blocks you already know. Here is the whole page file:
+## The code
 
 ```tsrx
 import { computed } from '@markless/core';
 import type { PageProps } from '@markless/router';
-import { fetchLocalUpdates } from '../lib/updates.ts';
+import { slowGreeting } from '../lib/slow.ts';
 
-export default function App({ url }: PageProps) @{
-	const feed = computed(async () => fetchLocalUpdates(url.href));
+export default function Feed({ url }: PageProps) @{
+	const data = computed(async () => slowGreeting(url.pathname));
 
-	@try {
-		<p class="channel">{feed.channel}</p>
-	} @pending {
-		<p class="pending">Checking local updates...</p>
-	} @catch {
-		<p class="error">Local updates unavailable</p>
-	}
+	<main>
+		<h1>Feed</h1>
+		@try {
+			<p>{data.text}</p>
+		} @pending {
+			<p>Loading...</p>
+		} @catch {
+			<p>Failed</p>
+		}
+	</main>
 }
 ```
 
-That is a `computed` whose body is `async`. It depends on `url` because it read `url`, so a different
-URL is a different value, worked out again, with nothing wired up by you. The derive function takes
-no arguments: on 0.3.1 the published type is `computed<T>(derive: () => T)`, so there is nothing
-handed in for you to cancel with.
+`slowGreeting` stands for any slow call that returns `{ text }`. If it is slow, one response comes in
+two parts:
 
-## The server does not wait for the slow part
+1. The heading and the `@pending` content come first.
+2. When the data is ready, the same response adds the `@try` content. The page puts it in place, and
+   the response ends.
 
-This is worth understanding, because it changes what you put on a page. The server does not hold the
-whole document until every boundary settles:
+If the data is ready quickly, it goes in the first part, and the server never sends `Loading...`. You turn
+nothing on. For the rules of async values, see [async](/concepts/async).
 
-> The server flushes the document with each still-pending boundary showing its @pending arm between
-> its existing comment anchors, and keeps the response open. When a boundary settles, the server
-> appends to the same stream.
+{/* PLAYGROUND: starter files pages/feed.tsrx and lib/slow.ts (a function that waits, then returns an object with a text field). Try: change the wait to zero and reload. Try: throw from slowGreeting and see the @catch arm. */ null}
 
-The settled block arrives as an inert `<template>`, which the browser parses without rendering, and
-a small executor moves that content into place. In the specification's words: "The pending arm is
-genuinely replaced, not hidden and kept."
-
-## Try it: step through one request
-
-Press "Step forward" three times, and read the sentence each time. This is an illustration of a
-sequence you cannot watch inside a demo box, not a live request:
-
-<StreamStepsDemo />
-
-The last step is cheap because a streamed commit is one fragment move plus record registration, and
-nothing else. The framework has no runtime copy of the document to reconcile the new content
-against.
+<Callout
+	sprite="cross"
+	title="Why does fetch fail on the server?"
+	text="On the server, fetch needs a full address with a host. A path like /api/feed is not enough. Build the full address from the url.href prop, for example new URL('/api/feed', url.href)."
+/>
 
 <Callout
 	sprite="speech-bubble"
-	title="Is streaming something I turn on?"
-	text="It is the default posture for server rendering, and the specification says blocking render is the explicit opt-out. The reason it is safe as a default is that it degrades gracefully: a buffering proxy in front of your server delivers one complete document whose inert templates commit on parse, so early paint is lost and correctness never is. Structure decides the rest. An authored @pending arm is the boundary's declaration that it is willing to stream, because that arm is the waiting UI."
+	title="Can the server wait for all the data first?"
+	text="Not with router(). It has no option for that. A slow @try always sends its @pending content first."
 />
-
-## Navigating away does not blank the screen
-
-When the reader clicks through to another page whose data is slow, the outgoing page stays live and
-interactive until the destination settles. You do not have to build that behaviour, and you do not
-have to hold a spinner over the whole layout to get it.
 
 <Collapsible
 	sprite="star-badge"
-	summary="What about API routes and middleware?"
-	text="They are top-level folders beside pages/, not inside it, and each is an ordinary module with a default export. An api/health.ts exports a function returning a Response, so the whole file can be one line of work. A middleware/request.ts exports a function taking the request context, and it runs before the request reaches a page, which is where a header, a redirect or an auth check belongs. Note that pages/api/ is not supported: a file there is a page with a confusing name."
+	summary="Coming from another framework?"
+	text="The router has no loader or action export. A page gets only params, url and status as props. Data comes from async values inside the page, and slow parts arrive later in the same response."
 />
 
 ## Try it yourself
 
-Give a page an async `computed` that reads `params`, and put a slow call in it. Load the page and
-watch the `@pending` block appear and then be replaced. Then add a second boundary beside the first
-with a faster call, and notice that the fast one does not wait for the slow one, because they are
-separate boundaries and each settles on its own.
+Give the feed page a second `@try` block with its own slow call. Make one call slower than the
+other, and watch which part shows up first.
 
-Next: [what the compiler is doing underneath all of this](/how-it-works).
+Next: [answer requests with API routes](/router/api-routes).
 
 <LikeHeart />

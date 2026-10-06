@@ -1,0 +1,94 @@
+import PageMeta from '../../components/page-meta.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
+import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../components/docs/sidebar.tsrx';
+import LikeHeart from '../../components/docs/like-heart.tsrx';
+
+<Sidebar />
+
+# Build once, then pick where it runs
+
+<PageMeta level="Building" time="4 min" assumes="routes" sprite="rays" />
+
+<ThemeToggle />
+
+You have pages, endpoints and maybe some middleware. Now they need to run somewhere other than your
+laptop.
+
+The router builds on [Nitro](https://nitro.build). Nitro turns one app into output for many hosts,
+and a preset picks the host. Your files stay the same. Only the output folder changes.
+
+{/* SKETCH: one app folder (pages/, api/, middleware/) on the left, an arrow labelled "npm run build" to .output/ (Node server), and a second arrow labelled "NITRO_PRESET=vercel npm run build" to .vercel/output/ (static/ and functions/). The app folder is identical on both arrows. */ null}
+
+## The default: a Node server
+
+```bash
+npm run build
+PORT=3000 node .output/server/index.mjs
+```
+
+The build runs three steps: the browser build, the server build, then Nitro. By default, Nitro
+builds a Node server. The server reads the port from the `PORT` variable.
+
+To try the build on your own machine, run `npm run preview`.
+
+## What is in `.output/`
+
+| Path | What it holds |
+| --- | --- |
+| `.output/server/index.mjs` | the server you start |
+| `.output/public/build/` | the browser code, sent with long-lived cache headers |
+| `.output/markless/router/types/` | the route types the build checks your links against |
+| `.output/nitro.json` | Nitro's notes about this build |
+
+<Callout
+	sprite="cross"
+	title="Is .output/ in my .gitignore?"
+	text="Not in the starter. Its .gitignore lists dist/ and .markless/, but not .output/. Add it yourself before your first commit."
+/>
+
+## Other hosts
+
+Nitro reads the preset from the `NITRO_PRESET` variable. This build writes output for Vercel:
+
+```bash
+NITRO_PRESET=vercel npm run build
+```
+
+The output goes to `.vercel/output/`, with a `static/` folder and a `functions/` folder. This
+website deploys the same way.
+
+Nitro has presets for many other hosts. We have tested two of them with Markless: the default Node
+server and Vercel. Treat the others as untested for now, and try a preview deploy first.
+
+## Nitro configuration
+
+Put Nitro configuration under a top-level `nitro` key in `vite.config.ts`. The router merges it into
+the Nitro setup it makes for you. This is how an app serves from a sub-path:
+
+```ts
+import { markless } from '@markless/core/vite';
+import { router } from '@markless/router/vite';
+import { defineConfig } from 'vite-plus';
+
+export default defineConfig({
+	base: '/shop/',
+	nitro: { baseURL: '/shop/' },
+	plugins: [markless(), router()],
+});
+```
+
+<Callout
+	sprite="cross"
+	title="Why does my build say Remove nitro()?"
+	text="The router adds Nitro for you. If you also add nitro() to the plugins in vite.config.ts, the build stops and asks you to remove it. Keep plugins: [markless(), router()], and put Nitro settings under the nitro key."
+/>
+
+## Try it yourself
+
+Build your app twice: once with no preset, once with `NITRO_PRESET=vercel`. Compare `.output/` with
+`.vercel/output/`. Your own files did not change between the two builds.
+
+Back to the start of this section: [make a file, get a URL](/router/pages).
+
+<LikeHeart />
