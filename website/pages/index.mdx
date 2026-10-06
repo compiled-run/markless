@@ -1,6 +1,8 @@
 import PageMeta from '../components/page-meta.tsrx';
-import HeroCard from '../components/demos/home/hero-card.tsrx';
-import RunOnceDemo from '../components/demos/home/run-once-demo.tsrx';
+import Subtitle from '../components/docs/subtitle.tsrx';
+import CounterDemo from '../components/demos/start/counter-demo.tsrx';
+import RolledOnceDemo from '../components/demos/start/rolled-once-demo.tsrx';
+import Callout from '../components/docs/callout.tsrx';
 import Collapsible from '../components/docs/collapsible.tsrx';
 import MarklessMug from '../components/mascot/markless-mug.tsrx';
 import Sticker from '../components/sticker.tsrx';
@@ -8,7 +10,6 @@ import MoreFromCompiled from '../components/docs/more-from-compiled.tsrx';
 import ThemeToggle from '../components/docs/theme-toggle.tsrx';
 import Sidebar from '../components/docs/sidebar.tsrx';
 import LikeHeart from '../components/docs/like-heart.tsrx';
-import OpenerLine from '../components/docs/opener-line.tsrx';
 
 <Sidebar />
 
@@ -16,58 +17,109 @@ import OpenerLine from '../components/docs/opener-line.tsrx';
 
 <MarklessMug variant="hero" size="10rem" mood="hello" />
 
-# The compiler for user interfaces
+# Write a variable. The page follows it.
 
-<PageMeta level="Start here" time="3 min" assumes="nothing" sprite="crown" />
+<PageMeta level="Start here" time="4 min" assumes="nothing" sprite="crown" />
 
 <ThemeToggle />
 
-<OpenerLine />
+<Subtitle text="Markless is a way to build user interfaces from plain TypeScript functions. The same component runs in a browser tab, on a server, or in a test." />
 
-The idea underneath is small. When you create a variable, create it with `state`. Whatever
-reads it stays current, and the screen is one of the things reading it.
+Here is a whole component. Click the button a few times.
 
-Hover a line if you don't believe it. Then click the heart:
+<CounterDemo />
 
-<HeroCard />
+{/* PLAYGROUND: starter file counter.tsrx as printed below. Try: change the label from Count to Clicks. Try: change count++ to count += 10. */ null}
 
-You just changed a variable. The number followed, because `state` told the page to follow
-`likes`. That is the whole trick.
+That button is this file:
 
-## Nothing hidden
+```tsrx
+import { state } from '@markless/core';
 
-Too simple, right? Surely something is re-running your code on every click. Good instinct,
-wrong framework. This heart keeps a log of every time your function runs:
+export default function Counter() @{
+	let count = state(0);
 
-<RunOnceDemo />
+	<button onClick={() => count++}>Count {count}</button>
+}
+```
 
-Your function ran once. Every click since is just `likes++`. Your AI can't hallucinate what
-doesn't exist. There's nothing hidden under the page: one run, then plain updates. And when
-code can't compile safely, the build fails and says why, which your AI can easily fix.
+`count` is a plain variable. You read it by writing `count`, and you change it with `count++`. There is no setter to call and nothing to unwrap.
 
-## One language
+`state(0)` is the one new word. It tells Markless that the page shows this value, so the page has to follow it.
 
-A component is a TypeScript function in a `.tsrx` file. There is no template language. Add the
-router and a file under `pages/` is a URL, with no routing config either. That is the whole
-learning curve, for you and for your agent.
+## Markless reads your component first
 
-## Not married to the web
+So how does the page know which number to change?
 
-TSRX, the language underneath, also compiles to React, Solid and Vue. Nothing about a compiled
-interface insists on a browser either. And the speed people notice is a side effect: every update
-is written in advance. [How it works](/how-it-works) shows the machinery.
+Before your app runs, Markless reads your component the way you read it. It sees that `count` shows up in the button text, and that the click changes it. It writes that down. So when `count` changes, it already knows the one piece of text to update.
+
+{/* SKETCH: "What did Markless write down about this counter?" The reader hovers count in the code. The figure lights the button text that reads it and the click that changes it. Then the reader clicks, and only that one text changes. */ null}
+
+## Your component runs once
+
+Here is a second component. It rolls a die with `Math.random()` when it runs. Click **Count** a few times, and watch the die.
+
+<RolledOnceDemo />
+
+{/* PLAYGROUND: starter file rolled-once.tsrx as printed below. Try: click Count and watch the roll stay put. Try: reload the page, and the die rolls again, once. */ null}
+
+The count goes up. The die does not roll again.
+
+```tsrx
+import { state } from '@markless/core';
+
+export default function RolledOnce() @{
+	let count = state(0);
+	const roll = Math.floor(Math.random() * 6) + 1;
+
+	<section>
+		<p>Rolled when the component ran: {roll}</p>
+		<button onClick={() => count++}>Count {count}</button>
+	</section>
+}
+```
+
+The function body ran one time, to set up the page. On this site, that happened before the page reached you. After that, a click runs `count++` and nothing else. Only the text that shows `count` changes.
+
+This is the whole model. You write setup code that runs once. You change values with plain code. The page keeps up.
+
+## Render it anywhere
+
+Markless does not need a server. The same component renders wherever your app needs it:
+
+| Where | How |
+| --- | --- |
+| A page in the browser | `render(App, { target })` from `@markless/core` puts a component into an element. |
+| A multi-page app | `@markless/router` turns each file in `pages/` into a URL. |
+| HTML from a server | `renderToString()` from `@markless/core` turns a component into HTML. |
+| Tests | `@markless/vitest-browser` runs components in the Vitest browser mode. |
+| Native apps | Two experiments drive iOS and macOS buttons from the same kind of counter. |
+
+You write the component the same way for each one. Pick the place your app needs.
+
+{/* SKETCH: "Where can this counter run?" The reader picks a browser tab, a server, or a test. The same Count button shows up each time, with a note that says where the component ran, once. */ null}
 
 <Collapsible
 	sprite="star-badge"
 	summary="Coming from another framework?"
-	text="Three things you may be looking for are absent on purpose. There is no virtual DOM: templates compile to real DOM operations, and nothing re-renders. There is no hydration pass: a server-rendered page wakes up without re-running your components, which Markless calls resume. And there is no second syntax to hold in your head, because there is exactly one authoring language. That also means JSX and TSX are not supported, now or later."
+	text="Your code carries no markers for the framework. There is no .value to read through, no dollar sign, and no use prefix. That is where the name comes from. Nothing re-renders. The component body sets up the page once, and Markless wires each update. There is no effect system, so you never keep a dependency list in step. Markless borrows ideas from Solid, Ripple, Octane, Svelte, Marko and Qwik. For the technical version, read How it works."
+/>
+
+<Callout
+	sprite="cross"
+	title="Is Markless ready for my next project?"
+	text="Not yet. Markless is a work in progress, and its authors have not announced it. These pages follow the code at version 0.5.0. Today, npm still installs 0.4.0. The native apps are experiments. They leave out styles and app packaging."
 />
 
 ## Where to go next
 
-[Your first app](/start/first-app) is one command and four questions.
-[Reading a .tsrx file](/start/reading-tsrx) is five minutes on the three unfamiliar bits.
-Already have a component? [State](/concepts/state) covers updates.
+[Your first app](/start/first-app) is one command. You get a multi-page app with the counter on its home page.
+
+[Use Markless in the browser](/start/browser-only) puts the counter into a plain HTML page, with no server.
+
+[Reading a .tsrx file](/start/reading-tsrx) walks through every part of a component file.
+
+[How it works](/how-it-works) is for the curious. It shows what Markless does with your component before it runs.
 
 <MoreFromCompiled />
 

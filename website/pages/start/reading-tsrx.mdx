@@ -1,47 +1,29 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import ThreeDifferencesDemo from '../../components/demos/start/three-differences-demo.tsrx';
-import Collapsible from '../../components/docs/collapsible.tsrx';
+import CounterDemo from '../../components/demos/start/counter-demo.tsrx';
+import LabelledCounterDemo from '../../components/demos/start/labelled-counter-demo.tsrx';
+import TeaNoteDemo from '../../components/demos/start/tea-note-demo.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import LikeHeart from '../../components/docs/like-heart.tsrx';
 
 <Sidebar />
 
-# A component file is TypeScript with three differences
+# A .tsrx file is TypeScript with markup in it
 
-<PageMeta level="Start here" time="4 min" assumes="nothing" sprite="bookmark" />
-
-_Already read a `.tsrx` file? Skip to [state](/concepts/state), which is the one new
-word in it._
+<PageMeta level="Start here" time="6 min" assumes="nothing" sprite="bookmark" />
 
 <ThemeToggle />
 
-Open a file ending in `.tsrx` and you will recognise almost all of it. Imports are imports. A
-component is a function. Types are types, and your editor checks them the way it always did.
+Open a `.tsrx` file and most of it looks familiar. Imports are imports. A component is a function. Types are types.
 
-**Three things look unfamiliar. That is the whole list, and it is not going to grow.**
+A few things are new. This page goes through each of them. Then it walks through the other files in a starter app.
 
-Here is the counter file with two of the three marked. Click each label and read the sentence
-underneath:
+## The counter, line by line
 
-<ThreeDifferencesDemo />
+Here is the counter again. Click it once, so you know what the code does:
 
-The third one, the fragment, is not in that file at all, because the counter renders a single
-element. It gets its own section below.
-
-## The body is written with an at sign
-
-A component is an ordinary function, and its body is written `@{` and `}` instead of the usual
-braces. Inside it you write ordinary statements: variables, conditions, whatever the component
-needs.
-
-The at sign is how the compiler knows this function produces markup rather than just a value, which
-is what lets it read the markup structurally instead of at runtime.
-
-## The markup is a statement, not something you return
-
-You do not return an element. You write it in the body, on its own, the way you would write any
-other statement, and the compiler takes it as the component's output.
+<CounterDemo />
 
 ```tsrx
 import { state } from '@markless/core';
@@ -49,65 +31,152 @@ import { state } from '@markless/core';
 export default function Counter() @{
 	let count = state(0);
 
-	<button onClick={() => count++}>Clicked {count} times</button>
+	<button onClick={() => count++}>Count {count}</button>
 }
 ```
 
-That is the entire file behind the counter you have been clicking. The `<button>` line is a
-statement, like `let count = state(0)` above it. Nothing is returned, and nothing needs to be.
+{/* SKETCH: "Which line made which part of the button?" The reader hovers a line of the counter file. The figure lights the part of the button that line made: the body, the state, the click, the text. */ null}
 
-## Two things side by side go in a fragment
+**`import { state } from '@markless/core'`** is a normal import. `@markless/core` is the main Markless package.
 
-When a component renders more than one thing at the top level, wrap them in an empty pair of angle
-brackets rather than inventing a `<div>` nobody asked for:
+**`export default function Counter() @{`** starts a component. A component is a function, and its body opens with `@{` instead of `{`.
+
+**`let count = state(0)`** makes a value the page follows. It is still a `let`, and it starts at `0`.
+
+**`<button ...>`** is the markup. You do not `return` it. You write it in the body as a statement, like the `let` line above it.
+
+**`onClick={() => count++}`** handles a click. An event prop is `on` plus the event name, so `onInput` and `onKeyDown` work the same way.
+
+**`{count}`** is a hole in the markup. Curly braces hold any expression, in text or in an attribute. When `count` changes, that text changes with it.
+
+## More than one element
+
+A body can make more than one element. Write them one after the other, the same way you write two statements.
+
+<LabelledCounterDemo />
+
+{/* PLAYGROUND: starter file labelled-counter.tsrx as printed below. Try: add a third line that shows count times two. Try: move the paragraph below the button. */ null}
 
 ```tsrx
 import { state } from '@markless/core';
 
-export default function CounterWithLabel() @{
+export default function LabelledCounter() @{
 	let count = state(0);
 
-	<>
-		<p>Clicked {count} times</p>
-		<button onClick={() => count++}>Click me</button>
-	</>
+	<p>You clicked {count} times.</p>
+	<button onClick={() => count++}>Click me</button>
 }
 ```
 
-That is the third difference, and you have now seen all three.
+The paragraph reads `count`. Click the button, and only the number in the paragraph changes.
 
-## Everything else is HTML with holes in it
+## Lines that start with @ control the markup
 
-Attributes are attributes. An expression in curly braces is a hole you fill with a value, in an
-attribute or in text. Spreading an object over an element works too:
+An at sign at the start of a line inside markup starts a block. `@if` shows markup only while a condition is true. `@for` repeats markup for each item in a list.
+
+<TeaNoteDemo />
+
+{/* PLAYGROUND: starter file tea-note.tsrx as printed below. Try: add an @else branch that says the note is hidden. Try: change the note text and the class. */ null}
 
 ```tsrx
 import { state } from '@markless/core';
 
-export default function Card() @{
-	let meta = state({ id: 'hero', role: 'note', hidden: false });
+export default function TeaNote() @{
+	let open = state(false);
 
-	<section data-kind="card" {...meta} title="Stable">
-		<p>Spread attributes</p>
+	<section>
+		<style>
+			.note {
+				font-style: italic;
+			}
+		</style>
+		<button onClick={() => (open = !open)}>{open ? 'Hide' : 'Show'} the note</button>
+		@if (open) {
+			<p class="note">Steep it for three minutes.</p>
+		}
 	</section>
 }
 ```
 
-Markless supports exactly one authoring language, and this is it. There is no second template syntax
-waiting for you later, and no configuration deciding which files get compiled how.
+This file shows one more thing: the `<style>` block. Its rules reach the elements in this file and nothing else. Another file can use the class `note` for something different.
 
-<Collapsible
-	sprite="star-badge"
-	summary="Why not JSX, which I already know?"
-	text="Because the compiler needs to see your component structurally, and it needs a guarantee that it is seeing all of it. The overview puts the tradeoff plainly: because the framework owns the language, the compiler sees every component, every state creation site, every closure and every async boundary, which is what makes marker-free resumability, async dataflow and a plain-value state API tractable. That is the deal you are taking. In exchange for three unfamiliar characters, you get a plain let and a plain count++ with no wrapper, no setter and no marker anywhere in your code. The overview is equally plain about the cost: JSX and TSX are explicitly not supported, now or later."
+[Conditionals](/concepts/conditionals), [Lists](/concepts/lists) and [Styling](/concepts/styling) go deeper on each of these.
+
+<Callout
+	sprite="cross"
+	title="Can I keep my .tsx files?"
+	text="No. Markless reads components from .tsrx files only. It does not support JSX or TSX components."
+/>
+
+## The other files in a starter app
+
+A new app from `npm create markless` has more files around your components. Here is the `app` starter:
+
+```txt
+my-app/
+  pages/
+    index.tsrx
+    404.tsrx
+    500.tsrx
+  public/
+  scripts/
+    markless-doctor.mjs
+  .vscode/
+  .zed/
+  document.tsrx
+  vite.config.ts
+  tsconfig.json
+  package.json
+  README.md
+  .gitignore
+```
+
+The default `minimal` starter has the same files, minus `document.tsrx`, `404.tsrx` and `500.tsrx`.
+
+| File | What it does |
+| --- | --- |
+| `pages/index.tsrx` | The page at `/`. It holds the counter. |
+| `pages/404.tsrx` | The page you get when no page matches the URL. It says "Not found". |
+| `pages/500.tsrx` | The page you get when a page fails with an error. It says "Something went wrong". |
+| `document.tsrx` | The HTML shell around every page, built with `<Html>` from `@markless/router`. |
+| `public/` | Files your app serves as they are, like images. It starts empty. |
+| `vite.config.ts` | Adds the `markless()` and `router()` plugins. |
+| `tsconfig.json` | Lets your editor read `.tsrx` files. |
+| `scripts/markless-doctor.mjs` | Checks your setup. Run it with `npm run doctor`. |
+| `.vscode/`, `.zed/` | Editor settings. VS Code suggests the TSRX extension. |
+
+Every starter has this `vite.config.ts`:
+
+```ts
+import { markless } from '@markless/core/vite';
+import { router } from '@markless/router/vite';
+import { defineConfig } from 'vite-plus';
+
+export default defineConfig({
+	plugins: [markless(), router()],
+});
+```
+
+Compare it with the [browser-only setup](/start/browser-only). It has one more plugin, `router()`, and that plugin turns `pages/` into URLs.
+
+The `full-stack` starter adds two more files. `api/health.ts` answers a request with `ok`. `middleware/request.ts` adds a header to every response.
+
+<Callout
+	sprite="cross"
+	title="Where did .output come from?"
+	text="Your first dev run or build writes an .output folder and a markless-router-env.d.ts file. The starter's .gitignore does not list .output yet, so add it yourself."
+/>
+
+<Callout
+	sprite="cross"
+	title="Do I add nitro() to vite.config.ts?"
+	text="No. router() already sets up Nitro. If you add nitro() as well, the router stops with Markless Router wires Nitro internally."
 />
 
 ## Where to go next
 
-That is the syntax. Every sample on the rest of this site is made of those pieces, so a page that
-looks dense from here is dense about an idea, never about punctuation.
+[State](/concepts/state) is about `state()`, the one new word in the counter.
 
-Next: [State](/concepts/state), the one new word in the counter file above and the idea the
-whole framework is built around.
+[Events](/concepts/events) is about `onClick` and the other event props.
 
 <LikeHeart />
