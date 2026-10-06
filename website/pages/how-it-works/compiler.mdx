@@ -3,6 +3,7 @@ import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import LikeHeart from '../../components/docs/like-heart.tsrx';
+import CompilerPasses from '../../components/sketch/how/compiler-passes.tsrx';
 
 <Sidebar />
 
@@ -54,7 +55,7 @@ For the counter, the chain runs 15 passes, in this order:
 | `trigger-groups` | Groups each event with the state, records and symbols it touches |
 | `symbol-resolver-module` | Writes the module that imports symbols by ID |
 
-{/* SKETCH: an assembly line of 15 small stations, left to right, each dropping a labelled card on a tray. Highlight the three cards this page shows: symbol:0, symbol:1 and the view record. */ null}
+<CompilerPasses />
 
 The _semantic graph_ is the first pass's output. It lists every piece of state, element, read and
 write in the file, with what each one means. Every later pass works from it.
