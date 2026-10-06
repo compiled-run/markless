@@ -1,5 +1,9 @@
 import type { InputOptions, Plugin } from 'rolldown';
-import { computeExecutionAttribution, type LinkedModuleChildResolution } from '@markless/compiler';
+import {
+	DEBUGGING_PLAYBOOK_HINT,
+	computeExecutionAttribution,
+	type LinkedModuleChildResolution,
+} from '@markless/compiler';
 import { clearParsedChunkCode } from './build/chunk-ast.ts';
 import { moveImportMapOutOfClientOutput } from './build/build-manifests.ts';
 import { outputDefaults } from './build/chunking.ts';
@@ -238,7 +242,7 @@ export function createMarklessRolldownPlugin(input: {
 			const unmapped = unmappedChunkSpecifiers(bundle);
 			if (unmapped.length > 0)
 				this.error(
-					`Markless emitted chunks that import specifiers its import map does not resolve to an emitted chunk: ${unmapped.join(', ')}. A plugin changed chunk code or file names after the Markless finalize pass. markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package`,
+					`Markless emitted chunks that import specifiers its import map does not resolve to an emitted chunk: ${unmapped.join(', ')}. A plugin changed chunk code or file names after the Markless finalize pass. ${DEBUGGING_PLAYBOOK_HINT}`,
 				);
 			if (output.dir)
 				await moveImportMapOutOfClientOutput(output.dir, MARKLESS_IMPORT_MAP_ASSET in bundle);

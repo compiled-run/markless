@@ -1,6 +1,7 @@
 // Post-processes the emitted bundle: chunk removal, preload wrapper stripping, symbol tables,
 // facade cleanup, build metadata.
 import { type MarklessBuildMetadataBundle, createBuildMetadata } from './build-metadata.ts';
+import { DEBUGGING_PLAYBOOK_HINT } from '@markless/compiler';
 import { MARKLESS_BUNDLE_GRAPH, MARKLESS_EXECUTION_DEMAND } from './chunking.ts';
 import { createExecutionSizesAsset } from './execution-sizes.ts';
 import { collectRenderedModules, createByteAttributionAsset } from './byte-attribution.ts';
@@ -105,7 +106,7 @@ const manifestBundle = bundleWithoutRemovedChunks(bundle, removedSymbolFacades);
 const tableRewrite = rewriteGeneratedSymbolTableUrls(manifestBundle);
 if (tableRewrite.unresolved.length > 0) {
 	context.error(
-		`Markless symbol resolver table contains unresolved generated symbol chunks: ${tableRewrite.unresolved.join(', ')}. markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package`,
+		`Markless symbol resolver table contains unresolved generated symbol chunks: ${tableRewrite.unresolved.join(', ')}. ${DEBUGGING_PLAYBOOK_HINT}`,
 	);
 }
 // The strip can erase a resolver together with every route it owned.

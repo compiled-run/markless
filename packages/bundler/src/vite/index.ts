@@ -9,6 +9,7 @@ import type {
 } from 'vite';
 import type { OutputOptions } from 'rolldown';
 import { resolve } from 'pathe';
+import { DEBUGGING_PLAYBOOK_HINT } from '@markless/compiler';
 import { joinURL, parsePath, withQuery } from 'ufo';
 import { createPreloadGraphAdder } from '../build/bundle-graph.ts';
 import {
@@ -291,7 +292,7 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 		},
 		configureServer(server: ViteDevServer) {
 			server.config.logger?.info(
-				'markless diagnostics available - window.__MARKLESS_DEBUG__ records containers, lifecycles, and event routing; markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package.',
+				`markless diagnostics available - window.__MARKLESS_DEBUG__ records containers, lifecycles, and event routing; ${DEBUGGING_PLAYBOOK_HINT}.`,
 			);
 			rolldownOptions.devServer = {
 				transformRequest: (url, environment) =>

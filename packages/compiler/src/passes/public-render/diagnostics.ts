@@ -1,6 +1,7 @@
 import type { AnyNode } from '../../ast/nodes.ts';
 import { sourceSpan } from '../../ast/source.ts';
 import type { CompilerDiagnostic } from '../../diagnostics.ts';
+import { DEBUGGING_PLAYBOOK_HINT } from '../../debugging-playbook.ts';
 
 // The public render plan pass owns these diagnostic contract values. Tests and
 // any other reader import them from here rather than restating the strings, so
@@ -48,7 +49,7 @@ export function unsupportedRenderConstructDiagnostic(input: {
 		severity: input.severity ?? 'warning',
 		phase: PUBLIC_RENDER_PHASE,
 		title: `${input.label} is not rendered by the public render path yet`,
-		message: `${input.message} markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package`,
+		message: `${input.message} ${DEBUGGING_PLAYBOOK_HINT}`,
 		why: 'The public render module only emits compiler-proven output. Content inside an unsupported construct would silently disappear from rendered HTML, so the compiler reports it instead.',
 		primarySpan: sourceSpan(input.node, input.filename),
 		passId: PUBLIC_RENDER_PLAN_PASS_ID,
