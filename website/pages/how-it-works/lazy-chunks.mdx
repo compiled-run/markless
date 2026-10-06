@@ -1,0 +1,145 @@
+import PageMeta from '../../components/page-meta.tsrx';
+import ElementBehaviorDemo from '../../components/demos/how-it-works/element-behavior-demo.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
+import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../components/docs/sidebar.tsrx';
+import LikeHeart from '../../components/docs/like-heart.tsrx';
+
+<Sidebar />
+
+# When click code downloads, and when it runs
+
+<PageMeta level="Under the hood" time="6 min" assumes="state, events, elements" sprite="rays" />
+
+<ThemeToggle />
+
+Every handler and every update turned out to be a small function. Where does that code live, and
+when does it reach the browser?
+
+This page answers two questions that sound like one. When does the code **download**? When does it
+**run**? Markless gives them different answers.
+
+## Two different costs
+
+Downloading costs network time. Running costs main-thread time. A page that waits for the first
+click to download its click code makes that click wait. A page that runs all its code at load makes
+the load wait.
+
+Markless keeps the two apart. A production build fetches the code for first interactions early. That
+code still runs only when its event fires.
+
+## Symbols and chunks
+
+The compiler cuts your component into _symbols_. A symbol is one function with a stable ID, such as
+`symbol:0`. The compiler plans one for each of these:
+
+- an event handler, such as `onClick`, or a callback prop
+- a DOM update, such as the text that shows `count`
+- an `attach={...}` behavior
+- the derive function of a sync `computed()`, and the runner of an async one
+- a `state()` initializer and a `shared()` seed
+- `@if` branch updates and async block updates
+
+A _chunk_ is one JavaScript file the browser downloads. One chunk can hold many symbols.
+
+As an analogy, think of a kitchen. Packing a chunk is a delivery. Running a symbol is cooking one
+dish. The ingredients can arrive early, and the cook still waits for each order.
+
+{/* SKETCH: two lanes, "downloaded" and "ran". At page load the first-use pack drops into the downloaded lane while the ran lane stays empty. Each click adds one card to the ran lane and nothing to the downloaded lane. */ null}
+
+## When code runs
+
+A symbol runs only when its trigger fires. A click runs its handler. A write runs the updates that
+read the written path. An `onVisible` handler runs when its element scrolls into view.
+
+At mount, no handler runs. That is true on every path from [resuming](/how-it-works/resuming).
+
+## When code downloads: packing
+
+Production client builds turn on _packing_ by default. Packing puts the lazily loaded modules into a
+few chunks instead of one chunk per module. The bundler cuts those chunks by what each route needs,
+and when:
+
+| Pack | Holds | Downloads |
+| --- | --- | --- |
+| First use | Code that the page load and its first interactions run | With the page, through `modulepreload` |
+| Navigation | Code that only a client-side navigation runs | On navigation intent, never on a landing page |
+| Deferred | Code that no page load, first use or navigation needs | On its first `import()` |
+
+A `<link rel="modulepreload">` tag tells the browser to fetch and parse a module early. It does not
+run the module. A production build adds these tags for symbol chunks, at high fetch priority.
+
+One packed chunk still runs lazily inside. Each module in it starts only when something first
+imports it. A bundler test puts two modules in one chunk. After the first import, only the first
+module has run.
+
+Set `packing: false` in the `markless()` plugin options to ship one chunk per module. Dev builds are
+never packed.
+
+<Callout
+	sprite="speech-bubble"
+	title="So does nothing download before the click?"
+	text="Not in a production build. The code for first interactions downloads with the page. What waits for the click is running that code."
+/>
+
+## What a symbol can reach
+
+A symbol runs later, after the component body has finished. On a server-rendered page, it also runs
+on a different machine from the body. So it can only reach values that Markless can find again. The
+compiler checks every symbol when it compiles the file. A symbol can use:
+
+- state and computed values, through the graph
+- element handles from `element()`
+- props and `shared()` values
+- module imports
+- constants it can write down, such as a string or a `Date`
+
+Here is a handler that uses an element handle and a piece of state. Click **Focus**:
+
+{/* PLAYGROUND: starter file element-behavior.tsrx (below). Try: add a second button that writes status = 'idle' and moves focus away. Then try the broken version from the next block and read the error. */ null}
+
+<ElementBehaviorDemo />
+
+```tsrx
+import { element, state } from '@markless/core';
+
+export default function ElementBehavior() @{
+	const field = element<HTMLInputElement>();
+	let status = state('idle');
+
+	<section>
+		<input el={field} />
+		<button onClick={() => { field?.focus(); status = 'focused'; }}>Focus</button>
+		<output>{status}</output>
+	</section>
+}
+```
+
+Anything else fails the build. A DOM node held in a local variable is the common case:
+
+```tsrx
+import { state } from '@markless/core';
+
+export function Panel() @{
+	const panel = document.querySelector('#panel');
+	let shown = state(0);
+
+	<button onClick={() => { panel?.scrollIntoView(); shown++; }}>Show {shown}</button>
+}
+```
+
+That fails with `MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED`. The message says why: `panel` is a local
+DOM node value that cannot cross a resume boundary. Use an element handle instead, as above.
+
+A local helper function fails the same way. Move it to module scope, or turn its result into a
+`computed()`.
+
+| Symbol kind | Error code |
+| --- | --- |
+| Event handler or callback prop | `MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED` |
+| `attach={...}` behavior | `MARKLESS_BEHAVIOR_SYMBOL_EMIT_UNSUPPORTED` |
+| Any other symbol | `MARKLESS_CAPTURE_UNSUPPORTED_VALUE` |
+
+Next: [the same counter on a phone](/how-it-works/native-targets).
+
+<LikeHeart />

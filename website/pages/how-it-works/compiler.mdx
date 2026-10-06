@@ -1,0 +1,171 @@
+import PageMeta from '../../components/page-meta.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
+import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../components/docs/sidebar.tsrx';
+import LikeHeart from '../../components/docs/like-heart.tsrx';
+
+<Sidebar />
+
+# What the compiler makes from a counter
+
+<PageMeta level="Under the hood" time="7 min" assumes="state, events" sprite="rays" />
+
+<ThemeToggle />
+
+Last page said the compiler decides the state, the updates and the event code before anything
+runs. This page shows the real output for the counter. I compiled it with `compileTsrxModule()`
+from `@markless/compiler`, in this repo, and copied what came out.
+
+```tsrx
+import { state } from '@markless/core';
+
+export function Counter() @{
+	let count = state(0);
+
+	<button onClick={() => count++}>Count {count}</button>
+}
+```
+
+## A chain of passes
+
+The compiler is not one big walk over your code. It is a chain of _passes_: small steps, each with
+named inputs and named outputs. Each pass reads the outputs of earlier passes and adds its own.
+
+Before any pass runs, the compiler checks the chain itself. A missing input, two passes making the
+same output, or a cycle stops the compile with `MARKLESS_COMPILER_PASS_GRAPH_INVALID`.
+
+For the counter, the chain runs 15 passes, in this order:
+
+| Pass | What it does |
+| --- | --- |
+| `tsrx-semantic-graph` | Builds the semantic graph from the source |
+| `state-lowering` | Turns state reads and writes into graph reads and writes |
+| `payload-arena` | Plans the state and view records |
+| `symbol-resolver` | Plans the symbols |
+| `render-data` | Splits the markup into static HTML and dynamic slots |
+| `public-render-plan` | Plans direct DOM output for `render()`, where it can prove it |
+| `capture-analysis` | Checks what each symbol reads |
+| `protocol-state` | Writes the state record |
+| `protocol-view` | Writes the view record, with symbol IDs on each entry |
+| `public-render-module` | Writes the browser and server render modules |
+| `payload-scripts` | Writes the `markless/state` and `markless/view` script tags |
+| `symbol-modules` | Writes one module source per symbol |
+| `runtime-demand-map` | Maps each symbol and record to the runtime code it needs |
+| `trigger-groups` | Groups each event with the state, records and symbols it touches |
+| `symbol-resolver-module` | Writes the module that imports symbols by ID |
+
+{/* SKETCH: an assembly line of 15 small stations, left to right, each dropping a labelled card on a tray. Highlight the three cards this page shows: symbol:0, symbol:1 and the view record. */ null}
+
+The _semantic graph_ is the first pass's output. It lists every piece of state, element, read and
+write in the file, with what each one means. Every later pass works from it.
+
+## The click became a symbol
+
+The click handler became `symbol:0`. Your `count++` is now an update to the graph node `state:count`:
+
+```js
+import { marklessWriteScalar } from "@markless/web/fns/write-scalar";
+/* scalar leaf marker: context.graph.update({ */
+export function symbol_0(context) {
+  return marklessWriteScalar(context, { graphNodeId: "state:count", returnValue: "next", update(value) {
+    return Number(value) + 1;
+  } });
+}
+```
+
+A symbol is a module of its own. Nothing imports it until something asks for `symbol:0` by ID.
+
+## The text became a symbol too
+
+The text `Count {count}` became `symbol:1`. It returns one instruction: set the text of one node.
+
+```js
+export function symbol_1(context) {
+  return { type: "setText", locator: context.domUpdate?.hostNodeId ?? "h0", value: "Count " + (context.value == null ? "" : String(context.value)) + "" };
+}
+```
+
+`h0` is a _host node ID_: the compiler's name for the button. A _locator_ is the record that finds
+that element again in a real page.
+
+## The view record ties them together
+
+The view record says which element does what. A click on `h0` runs `symbol:0`. A change to
+`state:count` runs `symbol:1` against `h0`. I added the line breaks.
+
+```json
+{
+  "version": 1,
+  "locators": [{ "hostNodeId": "h0", "strategy": "dom-order", "index": 0, "tagName": "button" }],
+  "events": [{ "hostNodeId": "h0", "eventName": "click", "symbolIds": ["symbol:0"] }],
+  "domUpdates": [
+    {
+      "hostNodeId": "h0",
+      "source": "count",
+      "graphNodeId": "state:count",
+      "path": [],
+      "target": { "kind": "text", "prefix": "Count " },
+      "symbolId": "symbol:1"
+    }
+  ],
+  "behaviors": [],
+  "elementHandles": [],
+  "keyedRepeats": [],
+  "branches": [],
+  "asyncBoundaries": []
+}
+```
+
+The state record next to it holds one cell: `state:count`, a scalar, starting at `0`.
+
+## Two render modules
+
+The same compile writes a browser module and a server module.
+
+The server module exports `marklessRenderSsr`. It renders the counter to HTML and fills in the state
+and view records. [The payload](/how-it-works/payload) shows what it sends.
+
+The browser module is the interesting one. For a simple component like this, the compiler writes a
+_direct browser module_. Here is the part that `render()` calls:
+
+```js
+export function Counter() {
+	const graph = createMarklessPublicGraph();
+	const root = renderMarklessDirectChunk(graph, loadSymbol);
+	return { root, graph, runtime: { async dispatch() {} } };
+}
+```
+
+`createMarklessPublicGraph()` is written into the same module. It holds the counter's state in a
+plain `Map`, seeded at compile time:
+
+```js
+const cells = new Map([["state:count", 0]]);
+```
+
+`renderMarklessDirectChunk` clones the button from a template, fills in the text, and puts a click
+listener on the button itself. It does not load the full runtime. [Resuming](/how-it-works/resuming)
+follows what happens on the first click.
+
+Not every component gets a direct module. The compiler writes one only when it can prove the
+simple path covers the whole component. Each of these sends a component down the general path
+instead:
+
+- props
+- child components
+- a scoped `<style>`
+- a `computed()`
+- an element handle
+- an async block
+
+That general path is the fallback, and the next pages cover it.
+
+<Callout
+	sprite="cross"
+	title="Why did my handler fail to build?"
+	text="A symbol runs later, apart from the component body, so it can read only what the compiler can find again: state, element handles, props, imports and values it can write down. A handler that reads a local such as const seen = new WeakMap() fails with MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED, and the message names the local: a local class instance value that cannot cross a resume boundary."
+/>
+
+Next: [the format a server writes into its HTML](/how-it-works/payload).
+
+<LikeHeart />

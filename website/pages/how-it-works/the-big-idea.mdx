@@ -1,0 +1,98 @@
+import PageMeta from '../../components/page-meta.tsrx';
+import CounterDemo from '../../components/demos/how-it-works/counter-demo.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
+import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../components/docs/sidebar.tsrx';
+import LikeHeart from '../../components/docs/like-heart.tsrx';
+
+<Sidebar />
+
+# Plan before running, render anywhere
+
+<PageMeta level="Under the hood" time="5 min" assumes="state, events" sprite="rays" />
+
+<ThemeToggle />
+
+**Misconception: a framework has to run your component to learn what it does.** Markless reads it
+instead, at build time. By the time anything runs, the plan is already written.
+
+Here is the counter this whole section follows. Click it a few times:
+
+{/* PLAYGROUND: starter file counter.tsrx (below). Try: change the text to `Clicked {count} times`, then add a second button that runs `count = 0`. */ null}
+
+<CounterDemo />
+
+```tsrx
+import { state } from '@markless/core';
+
+export default function Counter() @{
+	let count = state(0);
+
+	<button onClick={() => count++}>Count {count}</button>
+}
+```
+
+## Decided before anything runs
+
+From that file, the compiler works out three things:
+
+1. **The state.** `count` becomes a node in a graph, with the ID `state:count`.
+2. **The updates.** The text `Count {count}` becomes one planned text write.
+3. **The event code.** The click becomes its own _symbol_: one function with a stable ID, `symbol:0`.
+
+The same compile also writes two render modules. One builds the counter in a browser. The other
+renders it to HTML on a server. [The compiler](/how-it-works/compiler) shows all of this output.
+
+{/* SKETCH: one .tsrx file on the left, an arrow labelled "build time" into three cards (state:count, the text write, symbol:0), then two arrows out to "browser module" and "server module". No sizes. */ null}
+
+## Rendered where you need it
+
+Pick the environment your app or your agent needs. The compiled component is the same in each one.
+
+| Environment | How you call it | What it is good for |
+| --- | --- | --- |
+| Browser | `render(App, { target })` from `@markless/core` | A plain Vite app with no server at all |
+| Server | `renderToString()` from `@markless/core`, or `renderToStream()` from `@markless/web/render-to-stream` | HTML that is ready when it arrives |
+| Multi-page app | `@markless/router` | File routes on Nitro, which deploys to many targets |
+| Tests | `render()` and `renderSSR()` from `@markless/vitest-browser` | Browser-mode tests, with or without a server render first |
+| Build time | `MARKLESS_PRERENDER=1` in the repo's demos | A preview, with no public option yet |
+| Native hosts | UIKit and AppKit, see [native targets](/how-it-works/native-targets) | Hand-written proofs, not wired to the compiler |
+
+A browser-only app needs three files: an `index.html` with a `<div id="app">`, a `vite.config.ts`
+that adds `markless()` from `@markless/core/vite`, and this:
+
+```ts
+import { render } from '@markless/core';
+import App from './App.tsrx';
+
+await render(App, { target: document.querySelector('#app')! });
+```
+
+`renderSSR()` renders the component in Node, then loads that HTML into the test browser. So one
+test file can check both paths.
+
+## What stays the same
+
+**Setup runs once.** In the browser, the compiled component builds its DOM one time. On a server,
+the component body runs there, and the browser never runs it.
+
+**No handler runs before its event.** The click code runs the first time someone clicks. A
+production build can fetch that code early, but fetching is not running.
+[Lazy chunks](/how-it-works/lazy-chunks) explains the difference.
+
+**A write updates its readers and nothing else.** After `count++`, the text that reads `count`
+changes. No component runs again, and nothing compares an old page with a new one.
+
+The environments differ only in how the plan reaches the browser. In the browser alone, it lives in
+memory. A server writes it into the HTML as JSON, and [the payload](/how-it-works/payload) shows
+that format.
+
+<Callout
+	sprite="speech-bubble"
+	title="Why does my server page ship no script?"
+	text="Because nothing on it can react. If a page has no handlers, computed values, behaviors, storage or async work, renderToString() sends the HTML in a container div and nothing else. A counter rendered as a plain paragraph comes out as one div with one p inside it."
+/>
+
+Next: [what the compiler makes from that counter](/how-it-works/compiler).
+
+<LikeHeart />

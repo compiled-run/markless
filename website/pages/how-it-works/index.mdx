@@ -1,0 +1,106 @@
+import PageMeta from '../../components/page-meta.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
+import Collapsible from '../../components/docs/collapsible.tsrx';
+import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../components/docs/sidebar.tsrx';
+import LikeHeart from '../../components/docs/like-heart.tsrx';
+
+<Sidebar />
+
+# The design choices, on one page
+
+<PageMeta level="Under the hood" time="5 min" assumes="state, events" sprite="rays" />
+
+<ThemeToggle />
+
+This section is for contributors and agents who want to weigh how Markless works. Nothing here is
+needed to ship an app. Technical terms are fine here, and each one gets a definition the first time
+it shows up.
+
+Before your app runs, Markless reads your component like a person reads it. It sees that `count`
+shows up in the button text. It sees that the click changes `count`, and it writes that down. So when
+`count` changes, it already knows the one piece of text to update. Reading code for what it means,
+not only for how it is spelled, is called semantic analysis.
+
+Everything else in this section follows from that one move.
+
+## The short version
+
+**The compiler plans every update.** `@markless/compiler` reads each `.tsrx` file at build time. It
+writes down each piece of state, each text or attribute that reads it, and each handler that writes
+it. See [the compiler](/how-it-works/compiler).
+
+**One compile renders anywhere.** The same compiled component renders in the browser with
+`render()`, on a server with `renderToString()`, and in tests with `@markless/vitest-browser`. A
+server is one option, not a requirement. See [the big idea](/how-it-works/the-big-idea).
+
+**Plain values.** You write `let count = state(0)` and `count++`. `@markless/core` exports `state`,
+`computed`, `shared`, `element` and `storage`. It exports no effect function.
+
+**The setup runs once.** A component sets up its part of the page one time. After that, a write
+updates the text, attributes and list rows that read it. Nothing re-renders.
+
+**Click code runs on first use.** The compiler cuts each handler into a _symbol_: one function with a
+stable ID. The runtime loads it by that ID. A handler runs the first time its event fires, and
+never before. See [lazy chunks](/how-it-works/lazy-chunks).
+
+**Multi-page apps.** `@markless/router` adds file routes on top of Nitro, which deploys to many
+targets.
+
+**No hydration.** _Hydration_ means the browser runs your components again over HTML a server
+already made. When a server renders the page, Markless _resumes_ instead: it reads records the server
+wrote and carries on from them. See [resuming](/how-it-works/resuming).
+
+## How it compares
+
+The rows for other projects come from their public docs. I did not run them for this page. The
+table compares mechanisms, not speed.
+
+| | How you write a value | On update | Effect API | Over server HTML |
+| --- | --- | --- | --- | --- |
+| React | `useState` and a setter | Runs the component again, then diffs a virtual DOM | `useEffect` | Hydration |
+| Solid | `createSignal`, read as `count()` | Signals write the DOM | `createEffect` | Hydration |
+| Svelte 5 | The `$state` rune | Compiled signals | `$effect` | Hydration |
+| Qwik | `useSignal`, read as `.value`, with `$` on lazy code | Signals | `useTask$` | Resumes |
+| Markless | `state(0)`, then plain `count` | Writes the compiler planned | None | Resumes |
+
+A _signal_ is a value that tells its readers when it changes. Markless keeps a similar graph while
+the page runs. The compiler wires it, so your code never names it.
+
+## What it costs
+
+**Handlers have limits.** A handler can read state, element handles, props, imports, and values the
+compiler can write down. If it reads another local, such as a `WeakMap`, the build fails with
+`MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED`.
+
+**Server state must be data.** When a server renders the page, state travels to the browser as JSON
+records. `@markless/serializer` refuses a function with `MARKLESS_SERIALIZE_UNSUPPORTED_VALUE`.
+
+**A new file type.** A `.tsrx` file needs the Markless compiler to build. Editors need
+`@markless/typescript-plugin` to type-check it.
+
+<Callout
+	sprite="cross"
+	title="Which parts are not stable yet?"
+	text="Build-time prerendering runs in the repo's demos behind the MARKLESS_PRERENDER environment variable, with no public option. Treat it as a preview. The native targets are hand-written proofs, and the compiler does not produce their input yet."
+/>
+
+## The pages in this section
+
+1. [The big idea](/how-it-works/the-big-idea): plan before running, render anywhere.
+2. [The compiler](/how-it-works/compiler): the real output for a counter.
+3. [The payload](/how-it-works/payload): the format a server writes into its HTML.
+4. [Resuming](/how-it-works/resuming): what happens on the first click, in each environment.
+5. [The state graph](/how-it-works/state-graph): why one write touches one text node.
+6. [Lazy chunks](/how-it-works/lazy-chunks): when click code downloads, and when it runs.
+7. [Native targets](/how-it-works/native-targets): the same counter driving iOS and macOS controls.
+
+<Collapsible
+	sprite="star-badge"
+	summary="Why a new file type?"
+	text="The compiler owns the language. It can see every state creation site, every closure and every async block in the file, which is what lets it plan updates without markers such as a dollar suffix or .value. The price is the file type: components live in .tsrx files, and those need the Markless compiler."
+/>
+
+Next: [plan before running, render anywhere](/how-it-works/the-big-idea).
+
+<LikeHeart />

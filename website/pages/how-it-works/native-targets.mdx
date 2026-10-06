@@ -1,0 +1,106 @@
+import PageMeta from '../../components/page-meta.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
+import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../components/docs/sidebar.tsrx';
+import LikeHeart from '../../components/docs/like-heart.tsrx';
+
+<Sidebar />
+
+# The same counter on a phone
+
+<PageMeta level="Under the hood" time="5 min" assumes="state, events" sprite="rays" />
+
+<ThemeToggle />
+
+The state graph and its symbols turned out to be data plus small functions. Does a browser have to
+run them?
+
+The Markless README states the goal: one web-like component model for web and native apps. Today,
+two small proofs test that idea. Neither one is a product.
+
+<Callout
+	sprite="cross"
+	title="Hand-written proofs, not a feature"
+	text="The proofs live in poc/fixtures/proofs/ in the Markless repo. Each one reads an artifact.json that is checked in by hand. No Markless package writes this format, the compiler has no native output, and @markless/web is the only rendering target package."
+/>
+
+## The question
+
+The web path ends in DOM changes, such as `setText`. A phone has no DOM. A native button needs its
+own control, its own event and its own way to set a title.
+
+So the question is narrow. Can a graph-shaped description of a counter drive real native controls,
+with the handler still written in JavaScript?
+
+As an analogy, think of sheet music. The score says which notes play and when. Each instrument plays
+the same score in its own way. Here the score is the artifact, and a small Swift runtime is the
+instrument.
+
+{/* SKETCH: one artifact card in the middle (state:count, the click record, the text binding). Three arrows out to a browser button, an iPhone UIButton and a Mac NSButton, each showing "Count 1". The native two carry a "hand-written proof" tag. */ null}
+
+## The proof
+
+The iOS proof starts from this component. The macOS proof differs only in its heading.
+
+```tsrx
+import { state } from '@markless/core';
+
+export function Counter() @{
+  let count = state(0);
+
+  <main>
+    <h1>Markless iOS Proof</h1>
+    <button onClick={() => count++}>Count {count}</button>
+  </main>
+}
+```
+
+The artifact lists state cells, host nodes, event records, text bindings and symbol bodies. Its
+event record maps the authored `onClick` to a semantic `activate` event, then names the host event:
+
+```json
+{
+  "node": "host:button",
+  "authoredEvent": "onClick",
+  "semanticEvent": "activate",
+  "nativeEvent": "touchUpInside",
+  "symbolId": "symbol:counter.increment"
+}
+```
+
+On iOS the host event is `touchUpInside`. On macOS it is `action`. The symbol body is the same in
+both, and it is also written by hand:
+
+```js
+graph["state:count"] = graph["state:count"] + 1;
+```
+
+## What the Swift runtime does
+
+1. It creates a `JSContext` from JavaScriptCore, and a plain `graph` object with `state:count` set to
+   `0`.
+2. It turns each host node into a control. On iOS, `main` becomes a `UIStackView` and `button`
+   becomes a `UIButton`.
+3. It connects the native event to the symbol ID.
+4. On a tap, it runs the symbol in JavaScriptCore.
+5. Then it reads every text binding again and sets the button title, such as `Count 1`.
+
+The macOS proof does the same with an `NSButton` and its `action` event. In both proofs, an XCTest
+checks that the title goes from `Count 0` to `Count 1`.
+
+## What the proofs do not show
+
+The proofs are narrow on purpose:
+
+- They do not use `@markless/runtime`. The graph is a plain JavaScript object.
+- They update every text binding after each tap. They do not use path subscriptions.
+- They do not cover styling, Android, Windows, Linux or production packaging.
+- A check script in each proof makes sure that the files name no web view or cross-platform shell.
+
+**Misconception: Markless ships native apps today.** It does not. The proofs show that this artifact
+shape can drive native controls. The compiler does not produce that artifact yet.
+
+That is the whole engine, from the compiler's plan to a button on a phone. For the API itself, go to
+[the reference](/reference).
+
+<LikeHeart />

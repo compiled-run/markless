@@ -1,0 +1,148 @@
+import PageMeta from '../../components/page-meta.tsrx';
+import StateComputedDemo from '../../components/demos/how-it-works/state-computed-demo.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
+import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import Sidebar from '../../components/docs/sidebar.tsrx';
+import LikeHeart from '../../components/docs/like-heart.tsrx';
+
+<Sidebar />
+
+# Why one write touches one text node
+
+<PageMeta level="Under the hood" time="7 min" assumes="state, computed, events" sprite="rays" />
+
+<ThemeToggle />
+
+Last page, a click ran `count++`, and one number on the page changed. Who decided which number?
+
+The compiler did, before the page existed. It wrote down who reads what.
+
+## The problem
+
+A write has to change the page. One common way is to run the component again and compare the result
+with the page. That costs the same on every write, even when one character changes.
+
+Markless skips that work. It needs a list that says which text, attributes and rows read each piece
+of state. That list is the _state graph_.
+
+## Three parts
+
+- A **node** holds one value. Each `state()` becomes a node with an ID like `state:count`. Each
+  `computed()` becomes one too.
+- A **subscription** is a reader. It names one node and one path into that node's value. When that
+  path changes, it runs a small function.
+- The **journal** is the list of DOM changes those functions return, such as "set this text".
+
+Think of plumbing, as an analogy. A write opens one tap, and water reaches only the pipes on that tap.
+
+Here is a counter with one computed value. Press **Next** a few times:
+
+{/* PLAYGROUND: starter file state-computed.tsrx (below). Try: add a third output that reads `count + 100`, then a second state() with its own button, and see that each button moves only its own readers. */ null}
+
+<StateComputedDemo />
+
+```tsrx
+import { computed, state } from '@markless/core';
+
+export default function StateComputed() @{
+	let count = state(2);
+	const doubled = computed(() => count * 2);
+
+	<section>
+		<button onClick={() => count++}>Next</button>
+		<output>{count}</output>
+		<output>{doubled}</output>
+	</section>
+}
+```
+
+Both outputs move, because both read `count`, one of them through `doubled`. The button label never
+changes, because it reads nothing.
+
+{/* SKETCH: two nodes (state:count, computed:doubled) with arrows to two subscriptions, each subscription pointing at its output. A write lights up count, then doubled, then both outputs. The button stays grey. */ null}
+
+## One write, step by step
+
+The full graph lives in `@markless/runtime`. The general browser path builds it, and so does a
+server-rendered page that needs the full runtime. In that graph, a click that runs `count++` does
+this:
+
+1. If the new value equals the old one, nothing happens.
+2. Otherwise the graph stores it and records the written path as dirty.
+3. The graph marks `doubled` as stale, because `doubled` depends on `count`.
+4. The graph schedules one flush as a _microtask_: a job that runs right after the current code
+   finishes.
+5. The flush runs each subscription whose path meets a dirty path. The `doubled` subscription reads
+   `doubled`, so it recomputes now.
+6. Each subscription returns a journal entry, such as `setText`. Markless applies the entries to the
+   DOM.
+
+Two writes in the same turn share one flush. If a handler writes `1` and then `2`, the journal gets
+one entry, with `2`.
+
+**Misconception: something compares the old page with the new page.** Nothing does. A subscription
+returns the exact change. There is no tree to compare.
+
+## Paths, not whole objects
+
+A subscription listens to a path inside a value, not to the whole value. Two paths meet when one is
+a prefix of the other.
+
+```tsrx
+import { state } from '@markless/core';
+
+export function Menu() @{
+	let menu = state({ open: true, title: 'Menu' });
+
+	<section>
+		<h2>{menu.title}</h2>
+		<button onClick={() => { menu.open = false; }}>Close</button>
+	</section>
+}
+```
+
+A write to `menu.open` does not wake the reader of `menu.title`. A write that replaces `menu` wakes
+both, because the empty path is a prefix of every path.
+
+## Computed values
+
+A computed node lists the paths it depends on. A write to one of those paths marks it stale. It
+recomputes on its next read, not before. Chains work the same way: a computed that reads another
+computed goes stale with it.
+
+On a server-rendered page, the `markless/state` script carries each computed as a recipe. The
+recipe is its dependencies plus the ID of a derive symbol. The current value travels too, but only for a computed
+that a handler reads.
+
+## What a subscription can return
+
+Every DOM change in the full runtime goes through the journal. These are the entry types:
+
+| Entry | What it does |
+| --- | --- |
+| `setText` | Sets the text of one text node |
+| `setAttr`, `setProp` | Sets one attribute, or one DOM property |
+| `insertRange`, `removeRange`, `moveRange` | Inserts, removes or moves a run of nodes, such as an `@if` branch |
+| `runCleanup` | Runs a cleanup registered for one element |
+
+**Misconception: you need an effect to keep the page in sync.** `@markless/core` exports no effect
+function. Its authoring exports are `state`, `computed`, `shared`, `element` and `storage`. The
+compiler plans every subscription for you.
+
+## The direct module keeps it smaller
+
+Mount the counter from earlier pages with `render()`, and it takes the direct browser module instead. That
+module skips this machinery. Its graph is a `Map` of state values. After a handler runs, it reads
+each text slot again and writes only the ones whose value changed.
+
+Same result, fewer moving parts: only the text that reads the changed state changes.
+
+<Callout
+	sprite="cross"
+	title="Why did my @if run a component again?"
+	text="An @if or @switch inside @try can hold a component. Then a toggle re-renders the whole @try block and runs the component again. The compiler warns with MARKLESS_TRY_BLOCK_TOGGLE_RERENDER, and the fix it suggests is to move the component outside the @if."
+/>
+
+Next: [when click code downloads, and when it runs](/how-it-works/lazy-chunks).
+
+<LikeHeart />
