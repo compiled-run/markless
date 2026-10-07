@@ -1,5 +1,4 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import ShoppingListDemo from '../../components/demos/concepts/shopping-list-demo.tsrx';
 import ListsSketch from '../../components/sketch/concepts/lists-sketch.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
@@ -27,15 +26,8 @@ Tick **Pears**. Press **Sort A to Z**. Then press **Remove ticked** until the li
 
 <ListsSketch />
 
-<ShoppingListDemo />
-
-{/* PLAYGROUND: starter file shopping-list.tsrx as printed below. Try: add a fourth item to the starting list and sort. Try: change key item.id to key i and read the build warning. */ null}
-
-Pears moves to the bottom, and its tick goes with it. The sort did not build new rows. It moved the
-three rows that were already on the page into a new order. When the last row goes, the `@empty`
-block shows instead.
-
-```tsrx
+<Code note="Add { id: 'beans', name: 'Beans', done: false } to the starting list. Tick Beans and sort: the tick rides along.">
+```tsrx title="shopping-list.tsrx"
 import { state } from '@markless/core';
 
 export default function ShoppingList() @{
@@ -65,6 +57,11 @@ export default function ShoppingList() @{
 	</section>
 }
 ```
+</Code>
+
+Pears moves to the bottom, and its tick goes with it. The sort did not build new rows. It moved the
+three rows that were already on the page into a new order. When the last row goes, the `@empty`
+block shows instead.
 
 `key item.id` in the loop header is the whole identity story. Each row's checkbox handler changes
 `item.done` on its own item, wherever that row sits.

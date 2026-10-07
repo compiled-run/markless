@@ -336,7 +336,7 @@ try {
 
 		// --- the island still resumes -----------------------------------------
 		const button = page.getByRole('button', { name: 'Pour a cup' }).first();
-		const cupsLine = page.locator('.playground p').first();
+		const cupsLine = page.locator('.code-block [data-code-stage] p').first();
 		await button.waitFor();
 		await page.screenshot({ path: `${shotsDir}/T004-state-before.png`, fullPage: true });
 
@@ -544,11 +544,12 @@ try {
 
 		// --- widget: the drawn number on the state page --------------------------
 		await page.goto(`${origin}/concepts/state`, { waitUntil: 'load' });
+		const cupsStage = page.locator('.code-block [data-code-stage]').first();
 		const cupsNumbers = async () =>
-			(await page.locator('.playground p').allTextContents()).map((text) =>
+			(await cupsStage.locator('p').allTextContents()).map((text) =>
 				Number(text.replace(/[^0-9]+/g, '')),
 			);
-		const pour = page.locator('.playground').getByRole('button', { name: 'Pour a cup' });
+		const pour = cupsStage.getByRole('button', { name: 'Pour a cup' });
 		await pour.waitFor();
 		const [watchedBefore, drawnBefore] = await cupsNumbers();
 		check(watchedBefore === 0, 'cups watched number starts at 0', String(watchedBefore));
@@ -559,7 +560,7 @@ try {
 		);
 		await pour.click();
 		await settleText(
-			page.locator('.playground p').first(),
+			cupsStage.locator('p').first(),
 			(text) => text.endsWith(': 1'),
 			'cups watched number reaches 1',
 		);
@@ -570,9 +571,9 @@ try {
 			'cups drawn number did not move, so the component did not run again',
 			`${drawnBefore} then ${drawnAfter}`,
 		);
-		await page.locator('.playground').getByRole('button', { name: 'Start over' }).click();
+		await cupsStage.getByRole('button', { name: 'Start over' }).click();
 		await settleText(
-			page.locator('.playground p').first(),
+			cupsStage.locator('p').first(),
 			(text) => text === 'Cups of coffee today: 0',
 			'Start over assigns the count back to 0',
 		);
@@ -737,9 +738,10 @@ try {
 		}
 
 		await page.goto(`${origin}/concepts/computed`, { waitUntil: 'load' });
-		const totalLine = page.locator('.playground p').nth(2);
-		const addMug = page.getByRole('button', { name: 'Add a mug' });
-		const addCoaster = page.getByRole('button', { name: 'Add a coaster' });
+		const orderStage = page.locator('.code-block [data-code-stage]').first();
+		const totalLine = orderStage.locator('p').nth(2);
+		const addMug = orderStage.getByRole('button', { name: 'Add a mug' });
+		const addCoaster = orderStage.getByRole('button', { name: 'Add a coaster' });
 		await addMug.waitFor();
 		check(
 			((await totalLine.textContent()) ?? '').trim() === 'Total: 12',
@@ -1568,9 +1570,10 @@ try {
 
 		// --- widget: the mug label on the events page ---------------------------
 		await page.goto(`${origin}/concepts/events`, { waitUntil: 'load' });
-		const echoField = page.locator('.playground-echo input').first();
-		const echoLine = page.locator('.playground-echo p').first();
-		const printedLine = page.locator('.playground-echo p').nth(1);
+		const echoStage = page.locator('.code-block [data-code-stage]').first();
+		const echoField = echoStage.locator('input').first();
+		const echoLine = echoStage.locator('p').first();
+		const printedLine = echoStage.locator('p').nth(1);
 		await echoField.waitFor();
 		check(
 			((await echoLine.textContent()) ?? '').trim() === 'Preview:',
@@ -1627,7 +1630,7 @@ try {
 		// --- widget: the note panel on the conditionals page ---------------------
 		// The page's claim: the field leaves the page with the branch, and the note
 		// survives because it is declared above the branch.
-		const notePanel = page.locator('.playground').first();
+		const notePanel = page.locator('.code-block [data-code-stage]').first();
 		const noteToggle = notePanel.getByRole('button', { name: 'Show or hide the note' });
 		const noteField = notePanel.locator('input');
 		const noteVerdict = notePanel.locator('p').first();
@@ -1661,7 +1664,7 @@ try {
 
 		// --- widget: the shopping list on the lists page --------------------------
 		await page.goto(`${origin}/concepts/lists`, { waitUntil: 'load' });
-		const shopping = page.locator('.playground').first();
+		const shopping = page.locator('.code-block [data-code-stage]').first();
 		const shoppingRows = async () =>
 			(await shopping.locator('li').allTextContents()).map((text) => text.trim());
 		const pears = shopping.getByRole('checkbox', { name: 'Pears' });
@@ -1706,7 +1709,10 @@ try {
 			await page.goto(`${origin}${href}`, { waitUntil: 'load' });
 			const heading = ((await page.locator('h1').first().textContent()) ?? '').trim();
 			check(heading.length > 0, `${href} renders its h1 in the browser`, heading);
-			check((await page.locator('.playground').count()) > 0, `${href} carries its live demo`);
+			check(
+				(await page.locator('.playground, .code-block').count()) > 0,
+				`${href} carries its live demo`,
+			);
 			await page.screenshot({
 				path: `${shotsDir}/T014-${slugFor(href)}.png`,
 				fullPage: true,
@@ -1718,7 +1724,7 @@ try {
 		// until the new one is ready, a failure swaps in @catch, and a later pick
 		// recovers. Every text read while waiting must be the old or the new answer.
 		await page.goto(`${origin}/concepts/async`, { waitUntil: 'load' });
-		const facts = page.locator('.playground').first();
+		const facts = page.locator('.code-block [data-code-stage]').first();
 		const factLine = facts.locator('p').first();
 		await factLine.waitFor();
 		await settleText(

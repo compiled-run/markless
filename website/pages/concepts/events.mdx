@@ -1,5 +1,4 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import MugLabelDemo from '../../components/demos/concepts/mug-label-demo.tsrx';
 import EventsSketch from '../../components/sketch/concepts/events-sketch.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
@@ -39,16 +38,8 @@ Type a name into the field. Press Enter. Then press Escape.
 
 <EventsSketch />
 
-<MugLabelDemo />
-
-{/* PLAYGROUND: starter file mug-label.tsrx as printed below. Try: show {name.length} next to the preview. Try: swap onInput for onChange and notice that the preview now waits until you leave the field. */ null}
-
-The preview follows every key, because `onInput` changes `name`. Enter copies the name to the
-printed line, and the page stays put. Escape clears the field.
-
-Here is the whole file:
-
-```tsrx
+<Code note="Add a paragraph under the preview that shows {name.length}, and type a name. Then change onInput to onChange and type again: the preview waits until you leave the field.">
+```tsrx title="mug-label.tsrx"
 import { state } from '@markless/core';
 
 export default function MugLabel() @{
@@ -77,6 +68,10 @@ export default function MugLabel() @{
 	</form>
 }
 ```
+</Code>
+
+The preview follows every key, because `onInput` changes `name`. Enter copies the name to the
+printed line, and the page stays put. Escape clears the field.
 
 The submit handler calls `event.preventDefault()`, the same as in a script tag. That is why Enter
 does not reload the page.

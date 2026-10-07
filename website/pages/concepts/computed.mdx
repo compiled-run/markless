@@ -1,5 +1,4 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import MugOrderDemo from '../../components/demos/concepts/mug-order-demo.tsrx';
 import ComputedSketch from '../../components/sketch/concepts/computed-sketch.tsrx';
 import Collapsible from '../../components/docs/collapsible.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
@@ -36,13 +35,8 @@ Press **Add a mug**. Then press **Add a coaster** twice. Watch the total.
 
 <ComputedSketch />
 
-<MugOrderDemo />
-
-{/* PLAYGROUND: starter file mug-order.tsrx as printed below. Try: add a third item with its own price and add it to the recipe. Try: write total = 0 in a click handler and read the build error. */ null}
-
-Now read the file and look for the line that updates the total:
-
-```tsrx
+<Code note="Add a third item with its own state() and price, put it in the recipe and give it a button. Then write total = 0 in a click handler and read the build error.">
+```tsrx title="mug-order.tsrx"
 import { computed, state } from '@markless/core';
 
 export default function MugOrder() @{
@@ -59,9 +53,11 @@ export default function MugOrder() @{
 	</section>
 }
 ```
+</Code>
 
-There is no such line. Each button changes one count and stops. When a count changes, Markless runs
-the recipe again and updates the text that shows `total`.
+Now look in the file for the line that updates the total. There is no such line. Each button
+changes one count and stops. When a count changes, Markless runs the recipe again and updates the
+text that shows `total`.
 
 ## What a recipe can read
 

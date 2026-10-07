@@ -1,5 +1,4 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import NotePanelDemo from '../../components/demos/concepts/note-panel-demo.tsrx';
 import ConditionalsSketch from '../../components/sketch/concepts/conditionals-sketch.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
@@ -30,15 +29,8 @@ it again.
 
 <ConditionalsSketch />
 
-<NotePanelDemo />
-
-{/* PLAYGROUND: starter file note-panel.tsrx as printed below. Try: move let note = state('') inside the @if and read the build error. Try: change 20 to 5 in the recipe. */ null}
-
-The field left the page when you closed the panel. Your note did not. It lives in `note`, which sits
-in the component body above the `@if`. The line under the field kept working the whole time, because
-it reads `note` too.
-
-```tsrx
+<Code note="Move let note = state('') inside the @if and read the build error. Put it back. Then change 20 to 5 and type a six-letter word.">
+```tsrx title="note-panel.tsrx"
 import { computed, state } from '@markless/core';
 
 export default function NotePanel() @{
@@ -62,6 +54,11 @@ export default function NotePanel() @{
 	</section>
 }
 ```
+</Code>
+
+The field left the page when you closed the panel. Your note did not. It lives in `note`, which sits
+in the component body above the `@if`. The line under the field kept working the whole time, because
+it reads `note` too.
 
 ## Why state cannot live inside the branch
 
