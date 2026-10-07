@@ -11,7 +11,12 @@ import { pagination } from './pagination.ts';
 import { progress } from './progress.ts';
 import { qrcode } from './qrcode.ts';
 import { radiogroup } from './radiogroup.ts';
+import { resizable } from './resizable.ts';
+import { table } from './table.ts';
+import { tabs } from './tabs.ts';
+import { textbox } from './textbox.ts';
 import { toaster } from './toaster.ts';
+import { tree } from './tree.ts';
 import type { FamilyMeta } from './types.ts';
 
 export * from './keys.ts';
@@ -29,7 +34,12 @@ const registry: Readonly<Record<string, FamilyMeta>> = {
 	progress,
 	qrcode,
 	radiogroup,
+	resizable,
+	table,
+	tabs,
+	textbox,
 	toaster,
+	tree,
 };
 
 export function metaFor(family: string): FamilyMeta {

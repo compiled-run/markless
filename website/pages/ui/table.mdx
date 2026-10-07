@@ -3,7 +3,6 @@ import ApiTable from '../../components/docs/api-table.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import TableDemo from '../../components/demos/ui/table/basic.tsrx';
 
 <Sidebar />
 
@@ -14,50 +13,11 @@ import TableDemo from '../../components/demos/ui/table/basic.tsrx';
 `table` is a plain HTML table that can do more. It adds arrow keys from cell to cell, rows a person
 can pick, and headers that ask for a sort.
 
-<TableDemo shows="Three preserves. Arrow across the cells, then press Space to pick a row." />
+<Playground scenario="basic" />
 
-```tsrx
-import { table } from '@markless/ui';
-
-const grid = 'border-collapse: collapse; inline-size: min(32rem, 100%); font-size: var(--step--1)';
-const title = 'padding-block-end: 0.4em; font-weight: 700; text-align: left';
-const head = 'padding: 0.35em 0.6em; border-block-end: 2px solid var(--code-edge); font-size: var(--step--2); letter-spacing: 0.06em; text-transform: uppercase; text-align: left';
-const sorts = 'padding: 0.35em 0.6em; border-block-end: 2px solid var(--code-edge); font-size: var(--step--2); letter-spacing: 0.06em; text-transform: uppercase; text-align: left; cursor: pointer';
-const cell = 'padding: 0.4em 0.6em; border-block-end: 1px solid var(--code-edge); text-align: left';
-
-export default function Pantry() @{
-	<table.root multiple value={['jam']} sort={{ column: 'jars', direction: 'descending' }} style={grid}>
-		<caption style={title}>What the pantry put up</caption>
-		<thead>
-			<tr>
-				<th style={head}>Preserve</th>
-				<table.coltrigger value="jars" style={sorts}>Jars</table.coltrigger>
-				<table.coltrigger value="sealed" style={sorts}>Sealed</table.coltrigger>
-			</tr>
-		</thead>
-		<tbody>
-			<table.item value="jam">
-				<table.itemcontent rowheader style={cell}>Damson jam</table.itemcontent>
-				<table.itemcontent style={cell}>48</table.itemcontent>
-				<table.itemcontent style={cell}>In August</table.itemcontent>
-			</table.item>
-			<table.item value="chutney">
-				<table.itemcontent rowheader style={cell}>Green tomato chutney</table.itemcontent>
-				<table.itemcontent style={cell}>31</table.itemcontent>
-				<table.itemcontent style={cell}>Last week</table.itemcontent>
-			</table.item>
-			<table.item value="marmalade">
-				<table.itemcontent rowheader style={cell}>Seville marmalade</table.itemcontent>
-				<table.itemcontent style={cell}>12</table.itemcontent>
-				<table.itemcontent style={cell}>In March</table.itemcontent>
-			</table.item>
-		</tbody>
-	</table.root>
-}
-```
-
-Click a cell, then use the arrow keys. Press Space to pick the row you are on. Hold Shift and press
-Down to pick a run of rows.
+Click a cell, then use the arrow keys. Press Space to pick the row you are on. Turn on
+**Multiple**, then hold Shift and press Down to pick a run of rows. Press a column header, and the
+line under the table names it. The rows stay put.
 
 ## You add the extras one at a time
 

@@ -3,7 +3,6 @@ import ApiTable from '../../components/docs/api-table.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import TreeDemo from '../../components/demos/ui/tree/basic.tsrx';
 
 <Sidebar />
 
@@ -14,47 +13,11 @@ import TreeDemo from '../../components/demos/ui/tree/basic.tsrx';
 `tree` is a nested list that opens and closes, such as a file tree. A person walks it with the
 arrow keys.
 
-<TreeDemo shows="Tab into the tree. Press Right to open src, then walk down with the arrows." />
+<Playground scenario="basic" />
 
-```tsrx
-import { tree } from '@markless/ui';
-
-export default function Files() @{
-	<tree.root class="files" aria-label="Project files">
-		<tree.item class="row" level={1}>
-			<tree.itemtrigger class="arrow-button">
-				<tree.itemindicator class="arrow">▸</tree.itemindicator>
-			</tree.itemtrigger>
-			<tree.itemlabel>src</tree.itemlabel>
-			<tree.itemcontent class="group">
-				<tree.item class="row" leaf level={2}>
-					<tree.itemlabel>index.ts</tree.itemlabel>
-				</tree.item>
-				<tree.item class="row" leaf level={2}>
-					<tree.itemlabel>app.tsrx</tree.itemlabel>
-				</tree.item>
-			</tree.itemcontent>
-		</tree.item>
-		<tree.item class="row" level={1}>
-			<tree.itemtrigger class="arrow-button">
-				<tree.itemindicator class="arrow">▸</tree.itemindicator>
-			</tree.itemtrigger>
-			<tree.itemlabel>docs</tree.itemlabel>
-			<tree.itemcontent class="group">
-				<tree.item class="row" leaf level={2}>
-					<tree.itemlabel>guide.md</tree.itemlabel>
-				</tree.item>
-			</tree.itemcontent>
-		</tree.item>
-		<tree.item class="row" leaf level={1}>
-			<tree.itemlabel>README.md</tree.itemlabel>
-		</tree.item>
-	</tree.root>
-}
-```
-
-Now press `r`. Focus jumps to **README.md**, because typing a letter finds the next row whose label
-starts with it.
+Click a row, then walk the tree with the arrow keys. On **docs**, Right opens it. Press `r`, and focus
+jumps to **README.md**. Typing a letter finds the next row whose label starts with it. The line
+under the tree shows the last row that opened or closed.
 
 A level does not need new parts. A `tree.item` holds a `tree.itemcontent`, and that holds more
 `tree.item`s. Each item keeps its own open or closed state.
