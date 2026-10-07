@@ -48,6 +48,7 @@ import {
 	viteEnvironmentName,
 } from './environment.ts';
 import { createViteHmr } from './hmr.ts';
+import { installDevRuntimeImportResolution } from './dev-runtime-imports.ts';
 
 export type {
 	BundleGraphAdder,
@@ -310,6 +311,7 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 				},
 			};
 			hmr.configureServer(server);
+			installDevRuntimeImportResolution(server, viteEnvironmentName('client', options));
 			devPrerender?.configureServer(server);
 		},
 		transformIndexHtml(html) {
@@ -352,7 +354,8 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 					transformedTsrxSources.set(parsePath(id).pathname, code);
 				}
 				try {
-					const context = rolldownOptions.dev === true ? withDevServerExternals(this) : this;
+					const context =
+						rolldownOptions.dev === true ? withDevServerExternals(this) : this;
 					return await runHook(basePlugin.transform, context, code, id, transformOptions);
 				} catch (error) {
 					if (rolldownOptions.dev === true && TSRX_INPUT_FILE.test(id)) {
