@@ -407,6 +407,8 @@ function callsMethodOnReadValue(callee: AnyNode, state: WalkState): boolean {
 	if (!resolved) return false;
 
 	if (resolved.binding.kind === 'computed') return true;
+	// A state() cell holds serializable data, never a callable the graph declares.
+	if (resolved.binding.kind === 'state' && resolved.binding.valueKind === 'unknown') return true;
 	return resolved.binding.valueKind === 'scalar' || resolved.binding.valueKind === 'array';
 }
 

@@ -2355,12 +2355,38 @@ function createUnknownSymbolError(id) {
     "domUpdates": [],
     "behaviors": [],
     "elementHandles": [],
-    "keyedRepeats": [],
+    "keyedRepeats": [
+      {
+        "id": "repeat:0",
+        "parentHostNodeId": "h0",
+        "collectionGraphNodeId": "state:records",
+        "collectionPath": [],
+        "keyPath": [],
+        "indexKey": true,
+        "itemName": "record",
+        "rowElementCount": 1,
+        "rowTemplate": {
+          "html": "<li><!--markless-slot:0--></li>",
+          "textSlots": [
+            {
+              "path": [
+                0,
+                0
+              ],
+              "itemPath": [
+                "label"
+              ]
+            }
+          ]
+        },
+        "rowEvents": []
+      }
+    ],
     "branches": [],
     "asyncBoundaries": []
   },
   "stateScript": "<script type=\\"markless/state\\">{\\"version\\":1,\\"cells\\":[{\\"graphNodeId\\":\\"state:records\\",\\"name\\":\\"records\\",\\"valueKind\\":\\"array\\",\\"value\\":{\\"version\\":1,\\"root\\":{\\"$ref\\":0},\\"records\\":[{\\"id\\":0,\\"type\\":\\"array\\",\\"items\\":[{\\"$ref\\":1}]},{\\"id\\":1,\\"type\\":\\"object\\",\\"fields\\":[[\\"label\\",\\"Zero\\"]]}]}}],\\"computed\\":[],\\"sharedDefinitions\\":[]}</script>",
-  "viewScript": "<script type=\\"markless/view\\">{\\"version\\":1,\\"locators\\":[{\\"hostNodeId\\":\\"h0\\",\\"strategy\\":\\"dom-order\\",\\"index\\":0,\\"tagName\\":\\"ol\\"},{\\"hostNodeId\\":\\"h1\\",\\"strategy\\":\\"dom-order\\",\\"index\\":1,\\"tagName\\":\\"li\\"}],\\"events\\":[],\\"domUpdates\\":[],\\"behaviors\\":[],\\"elementHandles\\":[],\\"keyedRepeats\\":[],\\"branches\\":[],\\"asyncBoundaries\\":[]}</script>"
+  "viewScript": "<script type=\\"markless/view\\">{\\"version\\":1,\\"locators\\":[{\\"hostNodeId\\":\\"h0\\",\\"strategy\\":\\"dom-order\\",\\"index\\":0,\\"tagName\\":\\"ol\\"},{\\"hostNodeId\\":\\"h1\\",\\"strategy\\":\\"dom-order\\",\\"index\\":1,\\"tagName\\":\\"li\\"}],\\"events\\":[],\\"domUpdates\\":[],\\"behaviors\\":[],\\"elementHandles\\":[],\\"keyedRepeats\\":[{\\"id\\":\\"repeat:0\\",\\"parentHostNodeId\\":\\"h0\\",\\"collectionGraphNodeId\\":\\"state:records\\",\\"collectionPath\\":[],\\"keyPath\\":[],\\"indexKey\\":true,\\"itemName\\":\\"record\\",\\"rowElementCount\\":1,\\"rowTemplate\\":{\\"html\\":\\"<li>\\\\u003C!--markless-slot:0-->\\\\u003C/li>\\",\\"textSlots\\":[{\\"path\\":[0,0],\\"itemPath\\":[\\"label\\"]}]},\\"rowEvents\\":[]}],\\"branches\\":[],\\"asyncBoundaries\\":[]}</script>"
 }",
     "protocolState": "{
   "version": 1,
@@ -2421,7 +2447,33 @@ function createUnknownSymbolError(id) {
   "domUpdates": [],
   "behaviors": [],
   "elementHandles": [],
-  "keyedRepeats": [],
+  "keyedRepeats": [
+    {
+      "id": "repeat:0",
+      "parentHostNodeId": "h0",
+      "collectionGraphNodeId": "state:records",
+      "collectionPath": [],
+      "keyPath": [],
+      "indexKey": true,
+      "itemName": "record",
+      "rowElementCount": 1,
+      "rowTemplate": {
+        "html": "<li><!--markless-slot:0--></li>",
+        "textSlots": [
+          {
+            "path": [
+              0,
+              0
+            ],
+            "itemPath": [
+              "label"
+            ]
+          }
+        ]
+      },
+      "rowEvents": []
+    }
+  ],
   "branches": [],
   "asyncBoundaries": []
 }",

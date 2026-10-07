@@ -235,3 +235,27 @@ export function Banned() @{
 		),
 	).toBe(true);
 });
+
+test('a method on state whose initial value comes from a call reads the receiver', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Groceries.tsrx',
+		source: `import { state } from '@markless/core';
+const seed = (round: number) => [{ id: 'pears-' + round }, { id: 'milk-' + round }];
+export function Groceries() @{
+	let items = state(seed(0));
+	let label = state(String(1));
+	<section>
+		<button onClick={() => { items = items.slice(1); }}>drop</button>
+		<button onClick={() => (label = label.toUpperCase())}>shout</button>
+		<p>{items.length}{label}</p>
+	</section>
+}`,
+		symbols: [],
+	});
+	const sources = result.symbolModules.modules.map((module) => module.source).join('\n');
+
+	expect(sources).toContain('context.graph.read("state:items").slice(1)');
+	expect(sources).toContain('context.graph.read("state:label").toUpperCase()');
+	expect(sources).not.toContain('["slice"]');
+	expect(sources).not.toContain('["toUpperCase"]');
+});

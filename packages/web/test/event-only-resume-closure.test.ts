@@ -92,7 +92,10 @@ const resumeOnDemandEntries = [
 // two missing-snapshot records now share one builder, so it measures 20,909 under the unchanged wall.
 // 2026-09-24: handing event types registered after serve to the startup script, the only listener, measures 21,176.
 // 2026-09-24: dynamic imports naming the -lazy re-export doors add 5 specifier chars (no shipped bytes): 21,181.
-const sourceByteLimit = 21181;
+// 2026-10-07: position keys, fresh rows for returning keys, and rows that follow the @if arm they are written in:
+// resume-keyed-repeats.ts 21,041 -> 22,411, resume-branches.ts 20,932 -> 21,508; minified+gzip 2,872 -> 3,102 and
+// 3,093 -> 3,180 bytes, both under the 4,800 gzip wall; the arm-following code is a lazy module only those rows load.
+const sourceByteLimit = 22411;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',

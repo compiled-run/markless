@@ -454,6 +454,18 @@ export type ProtocolViewPayload = {
 		readonly collectionGraphNodeId?: string;
 		readonly collectionPath: ReadonlyArray<string>;
 		readonly keyPath: ReadonlyArray<string>;
+		/**
+		 * `key i`: a row's key is its position, not a value read off the item.
+		 * Pay-per-use: a repeat keyed by item data omits the field.
+		 */
+		readonly indexKey?: true;
+		/**
+		 * Rows written straight into an `@if`/`@switch` arm, with no element of the
+		 * arm around them: they stand between that branch's anchors, and only while
+		 * `arm` is the one shown. `branchId` is spelled as the authoring module spells
+		 * it; composition prefixes it the way it prefixes this record's `id`.
+		 */
+		readonly branchArm?: { readonly branchId: string; readonly arm: number };
 		readonly itemName: string;
 		readonly rowElementCount: number;
 		/**

@@ -315,7 +315,7 @@ test('a minted component row is wired for the same row events a served row is', 
 	expect(last.host.tagName).toBe('BUTTON');
 });
 
-test('a component key that comes back reuses its parked row and never mints twice', async () => {
+test('a component key that comes back mints a fresh row, not the one that left', async () => {
 	const { write, mints, commits, list, labels } = fixture();
 
 	await write(GROWN);
@@ -326,9 +326,9 @@ test('a component key that comes back reuses its parked row and never mints twic
 	]);
 	await write(GROWN);
 
-	expect(mints.map((mint) => mint.rowKey)).toEqual(['c']);
-	expect(commits).toHaveLength(1);
-	expect(list.childNodes[3]).toBe(minted);
+	expect(mints.map((mint) => mint.rowKey)).toEqual(['c', 'c']);
+	expect(commits).toHaveLength(2);
+	expect(list.childNodes[3]).not.toBe(minted);
 	expect(labels()).toEqual(['header', 'alpha', 'bravo', 'charlie', 'footer']);
 });
 

@@ -501,6 +501,16 @@ function assertOptionalKeyedRepeats(record: Record<string, unknown>): void {
 		assertOptionalStringField(repeat, 'collectionGraphNodeId', context);
 		assertStringArrayField(repeat, 'collectionPath', context);
 		assertStringArrayField(repeat, 'keyPath', context);
+		if (repeat.indexKey !== undefined && repeat.indexKey !== true)
+			throw invalidPayloadShapeError(
+				'markless/view',
+				`Invalid ${context}: expected indexKey true when present.`,
+			);
+		if (repeat.branchArm !== undefined) {
+			assertRecordShape(repeat.branchArm, `${context}.branchArm`);
+			assertStringField(repeat.branchArm, 'branchId', `${context}.branchArm`);
+			assertNonNegativeIntegerField(repeat.branchArm, 'arm', `${context}.branchArm`);
+		}
 		assertStringField(repeat, 'itemName', context);
 		assertNonNegativeIntegerField(repeat, 'rowElementCount', context);
 		if (repeat.rowStartOffset !== undefined)
