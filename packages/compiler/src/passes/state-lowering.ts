@@ -477,14 +477,87 @@ type ResolvedStateGraphPath = {
 function templateExpressionGraphReadSource(source: string, lookup: GraphLookup): string | null {
 	if (!isCompositeTemplateExpression(source)) return null;
 
+	const code = blankLiteralText(source);
 	const candidates = [...lookup.bindings.keys(), ...lookup.aliases.keys()].sort(
 		(left, right) => right.length - left.length,
 	);
 	for (const name of candidates) {
-		if (sourceContainsIdentifier(source, name)) return name;
+		if (sourceContainsIdentifier(code, name)) return name;
 	}
 
 	return null;
+}
+
+// Blanks string, template-text and comment characters so only code is searched for names.
+function blankLiteralText(source: string): string {
+	let out = '';
+	const braceDepths: number[] = [];
+	let depth = 0;
+	let index = 0;
+	const blankUntil = (end: number) => {
+		out += source.slice(index, end).replace(/[^\n]/g, ' ');
+		index = end;
+	};
+	const scanTemplateText = () => {
+		while (index < source.length) {
+			const char = source[index];
+			if (char === '\\') {
+				blankUntil(Math.min(index + 2, source.length));
+			} else if (char === '`') {
+				out += char;
+				index += 1;
+				return;
+			} else if (char === '$' && source[index + 1] === '{') {
+				out += '${';
+				index += 2;
+				braceDepths.push(depth);
+				depth += 1;
+				return;
+			} else {
+				blankUntil(index + 1);
+			}
+		}
+	};
+	while (index < source.length) {
+		const char = source[index]!;
+		if (char === "'" || char === '"') {
+			out += char;
+			index += 1;
+			while (index < source.length && source[index] !== char) {
+				blankUntil(Math.min(index + (source[index] === '\\' ? 2 : 1), source.length));
+			}
+			if (index < source.length) {
+				out += char;
+				index += 1;
+			}
+		} else if (char === '`') {
+			out += char;
+			index += 1;
+			scanTemplateText();
+		} else if (char === '/' && source[index + 1] === '/') {
+			const end = source.indexOf('\n', index);
+			blankUntil(end === -1 ? source.length : end);
+		} else if (char === '/' && source[index + 1] === '*') {
+			const end = source.indexOf('*/', index + 2);
+			blankUntil(end === -1 ? source.length : end + 2);
+		} else if (char === '{') {
+			depth += 1;
+			out += char;
+			index += 1;
+		} else if (char === '}') {
+			depth -= 1;
+			out += char;
+			index += 1;
+			if (braceDepths.at(-1) === depth) {
+				braceDepths.pop();
+				scanTemplateText();
+			}
+		} else {
+			out += char;
+			index += 1;
+		}
+	}
+	return out;
 }
 
 function isCompositeTemplateExpression(source: string): boolean {

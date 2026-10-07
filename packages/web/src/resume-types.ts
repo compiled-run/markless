@@ -48,6 +48,8 @@ export type ResumeDomElement = ResumeDomNode & {
 	__marklessEventOnlyGraph?: Map<string, unknown>;
 	// Container-scoped element census in DOM order, shared by every wake.
 	__marklessCensus?: ResumeDomElement[];
+	// The arm each flipping branch shows, for rows written straight into an arm.
+	__marklessBranchArms?: Map<string, ResumeBranchArmEntry>;
 	// Resume reads the host document off the root element (streamed arm patch
 	// scripts, template rendering); the DOM guarantees it, so the surface does too.
 	readonly ownerDocument?: ResumeDomOwnerDocument;
@@ -70,6 +72,12 @@ export type ResumeDomCreatedElement = {
 	readonly content?: { readonly childNodes?: ArrayLike<unknown> };
 };
 export type ResumeDomComment = ResumeDomNode & { readonly nodeType: 8; readonly data?: string };
+export type ResumeBranchArmEntry = {
+	arm?: number;
+	start?: ResumeDomComment;
+	end?: ResumeDomComment;
+	readonly listeners: Set<() => void>;
+};
 export type ResumeDomEvent = {
 	readonly type: string;
 	readonly target: ResumeDomElement | null;

@@ -367,6 +367,11 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 			repeat.indexKey === true ? [repeat.id] : [],
 		),
 	);
+	const nestedRepeatIds = new Set(
+		(input.payloadArena.view.keyedRepeats ?? []).flatMap((repeat) =>
+			repeat.enclosingRepeatId ? [repeat.enclosingRepeatId] : [],
+		),
+	);
 	const emitted = new Set<string>();
 	return (input.payloadArena.view.keyedRepeats ?? []).flatMap((repeat) => {
 		const render = renderEntries.get(repeat.id);
@@ -386,9 +391,14 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 		// row. Shipping the record anyway would pair every key with the wrong
 		// element - the reconcile has no second way to find a row - so the repeat
 		// stays unresumed instead of resumed wrong.
+		// A position key resumes only where nothing reads a row's key off its item.
+		const positionKeyed = indexKeyed.has(repeat.id);
 		if (
 			!render ||
-			indexKeyed.has(repeat.id) ||
+			(positionKeyed &&
+				(repeat.enclosingRepeatId !== undefined ||
+					nestedRepeatIds.has(repeat.id) ||
+					liveRowComponentMint(input, repeat, render) !== null)) ||
 			render.rowStartOffset === 'unknown' ||
 			!rowRootsOneElement(input, render) ||
 			enclosingRow === null
@@ -421,6 +431,8 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 				collectionGraphNodeId: repeat.collectionGraphNodeId,
 				collectionPath: repeat.collectionPath,
 				keyPath: repeat.keyPath,
+				...(positionKeyed ? { indexKey: true as const } : {}),
+				...branchArmField(input, repeat),
 				itemName: render.itemName,
 				rowElementCount: render.rowElementCount,
 				// Pay-per-use: rows that already start the parent say nothing.
@@ -446,6 +458,41 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 			},
 		];
 	});
+}
+
+// Rows written straight into a branch arm stand between its anchors only while that arm is shown.
+function branchArmField(
+	input: ProtocolViewPayloadInput,
+	repeat: PayloadKeyedRepeat,
+): { readonly branchArm?: { readonly branchId: string; readonly arm: number } } {
+	if (repeat.enclosingRepeatId) return {};
+	const flips = supportedBranchIds(input);
+	const escalating = escalatingBranchIds(input);
+	const chunks = renderDataOf(input).chunks;
+	for (const branch of renderDataOf(input).branches) {
+		if (!flips.has(branch.branchSiteId) || escalating.has(branch.branchSiteId)) continue;
+		const hasSymbol = input.symbolResolver.symbols.some(
+			(symbol) =>
+				symbol.kind === 'branch-update' && symbol.branchSiteId === branch.branchSiteId,
+		);
+		for (const [arm, chunkId] of branch.armChunkIds.entries()) {
+			const chunk = chunks.find((candidate) => candidate.id === chunkId);
+			const holdsRepeat = chunk?.slots.some(
+				(slot) => slot.kind === 'repeat' && slot.repeatId === repeat.id,
+			);
+			if (!chunk || !holdsRepeat) continue;
+			if (chunk.hosts.some((host) => host.hostNodeId === repeat.parentHostNodeId)) return {};
+			const onlyTheRows =
+				chunk.slots.length === 1 &&
+				chunk.statics.every(
+					(text) => text.replace(/<!--markless-slot:\d+-->/g, '').trim() === '',
+				);
+			return hasSymbol && onlyTheRows
+				? { branchArm: { branchId: branch.branchSiteId, arm } }
+				: {};
+		}
+	}
+	return {};
 }
 
 // A nested record's own parent renders once per enclosing row, so it names the outermost

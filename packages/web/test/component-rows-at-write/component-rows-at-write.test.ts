@@ -181,7 +181,8 @@ test('a component repeat dropping a row it already built is placed at the write'
 	expect(page.labels()).toEqual(['alpha']);
 });
 
-test('a key that left a component repeat can come back at the write', async () => {
+// A key that left is a new row when it returns, so it waits like any key never built.
+test('a key that left a component repeat is not revived at the write', async () => {
 	const page = fixture({ component: true });
 	await page.graph.settleWriteObservers!();
 	page.write([ALPHA]);
@@ -189,7 +190,7 @@ test('a key that left a component repeat can come back at the write', async () =
 
 	page.write([BRAVO, ALPHA]);
 
-	expect(page.labels()).toEqual(['bravo', 'alpha']);
+	expect(page.labels()).toEqual(['alpha']);
 });
 
 // Pins the fallback the synchronous render path has to turn: a component row's

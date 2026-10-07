@@ -121,6 +121,19 @@ The `ui()` Vite plugin from the new `@markless/ui-tools` package sets this up.
 - Parentheses inside a markup expression, like
   `{(open ? 'Hide' : 'Show') + ' details'}`, no longer fail the build with
   `MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED`.
+- A `@for` keyed by position (`index i; key i`) updates its rows when the list
+  changes. Before, its rows kept their first text and count.
+- A keyed row that leaves the list and comes back gets a new element, so it no
+  longer brings back old state such as a ticked checkbox.
+- A `@for` written straight inside an `@if` or `@else` (with no element of its
+  own around it) keeps the right rows when the branch switches, with no
+  duplicate rows, and shows its `@empty` block after a switch.
+- Calling a method on state set from a function call, like
+  `items = items.slice(1)` after `state(makeItems())`, no longer throws in a
+  handler.
+- A string such as `'" data-size="'` in markup no longer raises a false
+  `MARKLESS_TEMPLATE_EXPRESSION_STATIC` warning because it contains a state
+  name.
 
 ## 0.3.3
 

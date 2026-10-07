@@ -46,6 +46,7 @@ export async function primeKeyedRepeatCollections(input: {
 }
 
 type RepeatReadableGraph = Pick<RuntimeGraph, 'read'>;
+let armRows: typeof import('./resume-repeat-branch-arm.ts') | undefined;
 
 // The mint loader is written into `__marklessRowMint` by the app's resume module only when a repeat can build; naming it here would ship it to every app.
 type RowMint = typeof import('./fns/row-mint.ts') &
@@ -89,8 +90,8 @@ export function findRepeatItemByKey(
 	repeat: ResumeKeyedRepeatRecord,
 	key: unknown,
 ): unknown {
-	for (const item of readKeyedRepeatCollection(graph, repeat))
-		if (Object.is(repeatItemKey(item, repeat), key)) return item;
+	for (const [index, item] of readKeyedRepeatCollection(graph, repeat).entries())
+		if (Object.is(repeatItemKey(item, repeat, index), key)) return item;
 }
 export function findKeyedRepeatRowEventMatch(input: {
 	readonly graph: RepeatReadableGraph;
@@ -116,13 +117,14 @@ export function findKeyedRepeatRowEventMatch(input: {
 				input.elementsByHostId.get(repeat.parentHostNodeId) ??
 				input.materializeHost(repeat.parentHostNodeId);
 			if (!parent) continue;
+			if (repeat.branchArm && armRows?.hiddenBranchArm(parent, repeat)) continue;
 			const items = readKeyedRepeatCollection(input.graph, repeat);
 			for (const [rowIndex, rowRoot] of repeatRowElements(
 				parent,
 				repeat,
 				items.length,
 			).entries()) {
-				const rowKey = repeatItemKey(items[rowIndex], repeat);
+				const rowKey = repeatItemKey(items[rowIndex], repeat, rowIndex);
 				for (const rowEvent of rowEvents) {
 					if (rowEventHost(rowRoot, rowEvent.hostPath) === element) {
 						return { element, match: { repeat, parent, rowRoot, rowKey, rowEvent } };
@@ -140,12 +142,18 @@ export function wireKeyedRepeats(
 		readonly events: ResumeEventWiring;
 		readonly storeContainerSubscription: (release: () => void) => void;
 		readonly renderData?: ResumeRenderDataThunk;
+		readonly root?: ResumeDomElement;
 	},
 	rowComponentHost?: RowComponentHost,
 	onRow?: ResumeRepeatRowHook,
 ): void | Promise<void> {
 	const nested = !onRow && (globalThis as ResumeNestedRepeatsHost).__marklessNestedRepeats;
 	if (nested) return nested(input, rowComponentHost);
+	if (!armRows && input.view.keyedRepeats?.some((repeat) => repeat.branchArm))
+		return import('./resume-repeat-branch-arm.ts').then((module) => {
+			armRows = module;
+			return wireKeyedRepeats(input, rowComponentHost, onRow);
+		});
 	for (const repeat of input.view.keyedRepeats ?? []) validateOneRepeat(input.graph, repeat);
 	for (const repeat of input.view.keyedRepeats ?? []) {
 		const parent = input.elementsByHostId.get(repeat.parentHostNodeId);
@@ -166,23 +174,33 @@ export function wireKeyedRepeats(
 			onRow?.(repeat, rowRoot, rowKey);
 		};
 		// A server-painted `@empty` arm is not this runtime's to remove.
-		const arm: MountedEmptyArm = { mounted: items.length === 0, nodes: [] };
+		const arm: MountedEmptyArm = { mounted: false, nodes: [] };
 		const builds = Boolean(repeat.rowTemplate ?? repeat.emptyArm ?? repeat.rowComponent),
 			cell = builds ? rowMintCell(input.graph) : undefined;
-		for (const [rowIndex, rowRoot] of repeatRowElements(
-			parent,
-			repeat,
-			items.length,
-		).entries()) {
-			const item = items[rowIndex],
-				rowKey = repeatItemKey(item, repeat);
-			rowRootsByKey.set(rowKey, rowRoot);
-			served.set(rowKey, [repeat.rowComponent ? itemCopy(item) : item, rowIndex]);
-			if (slots.ready) slots.values.set(rowKey, rowSlotValues(repeat, item, rowIndex, input.graph));
-			registerRowEvents(rowRoot, rowKey);
+		const adopt = (rows: ReadonlyArray<ResumeDomNode>, from: ReadonlyArray<unknown>): void => {
+			rowRootsByKey.clear();
+			slots.values.clear();
+			served.clear();
+			for (const [rowIndex, rowRoot] of elementsOf(rows).entries()) {
+				const item = from[rowIndex],
+					rowKey = repeatItemKey(item, repeat, rowIndex);
+				rowRootsByKey.set(rowKey, rowRoot);
+				served.set(rowKey, [repeat.rowComponent ? itemCopy(item) : item, rowIndex]);
+				if (slots.ready)
+					slots.values.set(rowKey, rowSlotValues(repeat, item, rowIndex, input.graph));
+				registerRowEvents(rowRoot, rowKey);
+			}
+		};
+		const follow = repeat.branchArm
+			? armRows!.followBranchArm(parent, repeat, input, arm, adopt)
+			: undefined;
+		if (!follow) {
+			arm.mounted = items.length === 0;
+			adopt(repeatRowElements(parent, repeat, items.length), items);
 		}
 		if (!repeat.collectionGraphNodeId) continue;
 		const apply = (mint: RowMint | undefined): void => {
+			if (follow && !follow.showing()) return;
 			applyKeyedRepeatRowOrder(
 				input.graph,
 				repeat,
@@ -192,6 +210,7 @@ export function wireKeyedRepeats(
 				mint,
 				registerRowEvents,
 				slots,
+				follow?.end(),
 			);
 		};
 		const readyMint = (): Promise<RowMint> | undefined =>
@@ -295,13 +314,14 @@ function applyKeyedRepeatRowOrder(
 	mint: RowMint | undefined,
 	registerRowEvents?: (rowRoot: ResumeDomElement, rowKey: unknown) => void,
 	slots: RowSlots = { values: new Map(), ready: true },
+	rangeEnd?: ResumeDomNode,
 ): void {
 	const nextRows: ResumeDomElement[] = [],
 		focused: Array<[ResumeDomElement, number[]]> = [];
 	// Every row this repeat owns, not a prefix: a row dropped off the end was stranded.
 	const knownRows = new Set(rowRootsByKey.values());
 	for (const [index, item] of readKeyedRepeatCollection(graph, repeat).entries()) {
-		const rowKey = repeatItemKey(item, repeat),
+		const rowKey = repeatItemKey(item, repeat, index),
 			values = slots.ready ? rowSlotValues(repeat, item, index, graph, slots.read) : undefined,
 			seen = slots.values.get(rowKey);
 		let rowRoot = rowRootsByKey.get(rowKey);
@@ -346,23 +366,31 @@ function applyKeyedRepeatRowOrder(
 		arm.mounted = false;
 		arm.nodes = [];
 	}
-	// A departed key keeps its record; the row keeps its parent for an in-flight dispatch.
+	// A key that left returns as a fresh row where one can be built; the old row keeps its parent for an in-flight dispatch.
 	const staying = new Set(nextRows);
+	if (mint && (repeat.rowTemplate ?? repeat.rowComponent))
+		for (const [rowKey, rowRoot] of rowRootsByKey)
+			if (!staying.has(rowRoot)) {
+				rowRootsByKey.delete(rowKey);
+				slots.values.delete(rowKey);
+			}
 	for (const rowRoot of currentRows)
 		if (!staying.has(rowRoot)) {
 			mutableParent.removeChild?.(rowRoot);
 			(rowRoot as DisposedRepeatRow).__marklessRowParent = parent;
 		}
-	const anchor = elementChildren(parent)
-		.slice(repeat.rowStartOffset ?? 0)
-		.find((child) => !knownRows.has(child));
+	const anchor =
+		rangeEnd ??
+		elementChildren(parent)
+			.slice(repeat.rowStartOffset ?? 0)
+			.find((child) => !knownRows.has(child));
 	for (const rowRoot of nextRows) insertRepeatNode(mutableParent, rowRoot, anchor);
 	mint?.refocus?.(parent, focused);
 	if (census && (currentRows.length > 0 || nextRows.length > 0))
 		spliceDomOrderCensus(census, currentRows, nextRows);
 	if (nextRows.length > 0 || arm.mounted || !repeat.emptyArm || !mint) return;
 	const nodes = mint.renderEmptyArm(parent, repeat);
-	const armAnchor = elementChildren(parent).slice(repeat.rowStartOffset ?? 0)[0];
+	const armAnchor = rangeEnd ?? elementChildren(parent).slice(repeat.rowStartOffset ?? 0)[0];
 	for (const node of nodes) insertRepeatNode(mutableParent, node, armAnchor);
 	arm.mounted = true;
 	arm.nodes = nodes;
@@ -443,8 +471,8 @@ export function readKeyedRepeatCollection(
 	const value = graph.read(repeat.collectionGraphNodeId, repeat.collectionPath);
 	return Array.isArray(value) ? value : Array.from((value ?? []) as Iterable<unknown>);
 }
-function repeatItemKey(item: unknown, repeat: ResumeKeyedRepeatRecord): unknown {
-	return readItemPath(item, repeat.keyPath);
+function repeatItemKey(item: unknown, repeat: ResumeKeyedRepeatRecord, index: number): unknown {
+	return repeat.indexKey ? index : readItemPath(item, repeat.keyPath);
 }
 function readItemPath(item: unknown, path: ReadonlyArray<string>): unknown {
 	let cursor = item as Record<string, unknown> | null | undefined;
@@ -503,8 +531,8 @@ function firstDuplicateRepeatKey(
 	items: ReadonlyArray<unknown>,
 ): { readonly key: unknown } | undefined {
 	const seen = new Set<unknown>();
-	for (const item of items) {
-		const key = repeatItemKey(item, repeat);
+	for (const [index, item] of items.entries()) {
+		const key = repeatItemKey(item, repeat, index);
 		if (seen.has(key)) return { key };
 		seen.add(key);
 	}
@@ -542,9 +570,10 @@ function repeatRowElements(
 	return elementChildren(parent).slice(offset, offset + count);
 }
 function elementChildren(element: ResumeDomElement): ResumeDomElement[] {
-	return Array.from(element.childNodes ?? []).filter(
-		(child): child is ResumeDomElement => child.nodeType === 1,
-	);
+	return elementsOf(Array.from(element.childNodes ?? []));
+}
+function elementsOf(nodes: ReadonlyArray<ResumeDomNode>): ResumeDomElement[] {
+	return nodes.filter((child): child is ResumeDomElement => child.nodeType === 1);
 }
 function rowEventHost(
 	rowRoot: ResumeDomElement,

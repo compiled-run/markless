@@ -61,6 +61,7 @@ export function wireBranches(input: any) {
 			const branchId = entry.locator.slice('branch:'.length, -':start'.length),
 				branch = branchesById.get(branchId),
 				arm = currentArmByBranchId.get(branchId);
+			if (branch && arm !== undefined) announceArm(input.root, branch, arm);
 			if (!branch || arm === undefined || !branch.armRecords?.[arm]) continue;
 			// Preloaded by the flip; evaluate now so the arm's next update needs no import task.
 			for (const { symbolId } of branch.armRecords[arm].domUpdates)
@@ -138,6 +139,7 @@ function createBranchRegistration(
 		};
 		let currentArm = wiredBranchArm(input.graph, branch);
 		paintArm(currentArm);
+		announceArm(input.root, branch, currentArm);
 		async function replaceArmRange(arm: number) {
 			const painted = currentArm;
 			const symbol = await input.loadSymbol(branch.symbolId);
@@ -279,6 +281,17 @@ export function composedBranchGraph(graph: RuntimeGraph, branch: ResumeBranchRec
 				: graph.read(id, path);
 		},
 	};
+}
+
+// Rows written straight into an arm follow the arm painted, once it is in the DOM.
+function announceArm(root: ResumeDomElement, branch: ResumeBranchRecord, arm: number): void {
+	const arms = (root.__marklessBranchArms ??= new Map()),
+		shown = arms.get(branch.id) ?? { listeners: new Set() };
+	arms.set(
+		branch.id,
+		Object.assign(shown, { arm, start: branch.startAnchor, end: branch.endAnchor }),
+	);
+	for (const paint of shown.listeners) paint();
 }
 
 function onceRelease(release: () => void): () => void {

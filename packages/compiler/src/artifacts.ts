@@ -2397,6 +2397,8 @@ export type PublicRenderPlanBranchArmPart =
 					  }
 					| { readonly itemPath: ReadonlyArray<string> }
 				>;
+				// The `@empty` block's markup, shown when the collection is empty.
+				readonly empty?: string;
 			};
 	  }
 	// An attribute whose value reads the graph at flip time; `alwaysPresent`

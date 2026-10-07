@@ -72,8 +72,11 @@ test('a scalar-keyed repeat still ships a keyed-repeat view record', async () =>
 	expect(compiled.protocolView.keyedRepeats?.[0]?.keyPath).toEqual([]);
 });
 
-test('a position-keyed repeat ships none, because a slot number is not an identity', async () => {
+// Rows that never resumed kept their first text forever; the record keys them by slot instead.
+test('a position-keyed repeat ships a record keyed by slot, not by item data', async () => {
 	const compiled = await compileRepeat('index', 'const row of rows; index index');
 
-	expect(compiled.protocolView.keyedRepeats?.length ?? 0).toBe(0);
+	expect(compiled.protocolView.keyedRepeats).toEqual([
+		expect.objectContaining({ keyPath: [], indexKey: true }),
+	]);
 });
