@@ -1,228 +1,206 @@
-// "What is in the server's HTML?": the real renderToString() response for the
-// counter on an index card; pressing a line circles it and explains it.
+// Lines are the real renderToString() response for the counter, cut to fit; the full response is on the page.
 import { state } from '@markless/core';
-import IndexCard from '../index-card.tsrx';
-import InkArrow from '../ink-arrow.tsrx';
-import MarkerCircle from '../marker-circle.tsrx';
-import Ask from './ask.tsrx';
+import PreviewCard, { Controls, Stage, Watch } from '../../docs/preview-card.tsrx';
 
 export default function PayloadCard() @{
-	let part = state(4);
+	let part = state('view');
 
-	<figure class="sketch payload-card">
-		<Ask question="What is in the server's HTML?" hint="Press a line on the card. A marker note explains it." />
-
-		<p class="note scope"><span class="tag">one environment</span> a server render. In the browser alone, render() writes none of this.</p>
-
-		<div class="board">
-			<IndexCard label="renderToString(Counter)" tilt="-0.6deg">
-				<div class="html" role="group" aria-label="Lines of the server response">
-					<button type="button" class="ln" aria-label="The link" aria-pressed={part === 1 ? 'true' : 'false'} onClick={() => (part = 1)}>
-						<span class="t">{'<link '}</span><span class="hit"><span class="a">rel</span>{'='}<span class="s">"modulepreload"</span><MarkerCircle beat={part === 1 ? 'odd' : 'rest'} /></span>{' '}<span class="a">href</span>{'='}<span class="s">"/build/chunk--CpAagRl.js"</span>{' …'}<span class="t">{'>'}</span>
+	<PreviewCard name="payload-card" label="The server's HTML, line by line">
+		<Controls title="Which element does each line serve?" />
+		<Stage>
+			<div class="board" data-part={part}>
+				<div class="listing" role="group" aria-label="Lines of the server response">
+					<button type="button" class="ln" data-line="link" aria-pressed={part === 'link' ? 'true' : 'false'} onMouseenter={() => (part = 'link')} onFocus={() => (part = 'link')} onClick={() => (part = 'link')}>
+						{'<link rel="modulepreload" href="/build/chunk-…">'}
 					</button>
-					<button type="button" class="ln" aria-label="The early-event script" aria-pressed={part === 2 ? 'true' : 'false'} onClick={() => (part = 2)}>
-						<span class="t">{'<script>'}</span>{'(function '}<span class="hit"><span class="f">captureEarlyEvents</span><MarkerCircle beat={part === 2 ? 'odd' : 'rest'} /></span>{'(eventNames) { … })(["click"]);'}<span class="t">{'</script>'}</span>
+					<button type="button" class="ln" data-line="early" aria-pressed={part === 'early' ? 'true' : 'false'} onMouseenter={() => (part = 'early')} onFocus={() => (part = 'early')} onClick={() => (part = 'early')}>
+						{'<script>(function captureEarlyEvents…</script>'}
 					</button>
-					<button type="button" class="ln" aria-label="The container div" aria-pressed={part === 3 ? 'true' : 'false'} onClick={() => (part = 3)}>
-						<span class="t">{'<div '}</span><span class="hit"><span class="a">data-async-container</span><MarkerCircle beat={part === 3 ? 'odd' : 'rest'} /></span><span class="t">{'>'}</span>
+					<button type="button" class="ln" data-line="container" aria-pressed={part === 'container' ? 'true' : 'false'} onMouseenter={() => (part = 'container')} onFocus={() => (part = 'container')} onClick={() => (part = 'container')}>
+						{'<div data-async-container>'}
 					</button>
-					<button type="button" class="ln in" aria-label="The button" aria-pressed={part === 4 ? 'true' : 'false'} onClick={() => (part = 4)}>
-						<span class="hit"><span class="t">{'<button>'}</span><MarkerCircle beat={part === 4 ? 'odd' : 'rest'} /></span>{'Count 0'}<span class="t">{'</button>'}</span>
+					<button type="button" class="ln in" data-line="button" aria-pressed={part === 'button' ? 'true' : 'false'} onMouseenter={() => (part = 'button')} onFocus={() => (part = 'button')} onClick={() => (part = 'button')}>
+						{'<button>Count 0</button>'}
 					</button>
-					<button type="button" class="ln in" aria-label="The state script" aria-pressed={part === 5 ? 'true' : 'false'} onClick={() => (part = 5)}>
-						<span class="t">{'<script '}</span><span class="a">type</span>{'='}<span class="s">"markless/state"</span><span class="t">{'>'}</span>{'{"version":1,"cells":[{"graphNodeId":"state:count","name":"count","valueKind":"scalar","value":{"version":1,'}<span class="hit">{'"root":0'}<MarkerCircle beat={part === 5 ? 'odd' : 'rest'} /></span>{',"records":[]}}],"computed":[],"sharedDefinitions":[]}'}<span class="t">{'</script>'}</span>
+					<button type="button" class="ln in" data-line="state" aria-pressed={part === 'state' ? 'true' : 'false'} onMouseenter={() => (part = 'state')} onFocus={() => (part = 'state')} onClick={() => (part = 'state')}>
+						{'<script type="markless/state">… "root":0 …'}
 					</button>
-					<button type="button" class="ln in" aria-label="The view script" aria-pressed={part === 6 ? 'true' : 'false'} onClick={() => (part = 6)}>
-						<span class="t">{'<script '}</span><span class="a">type</span>{'='}<span class="s">"markless/view"</span><span class="t">{'>'}</span>{'{"version":1,"locators":[{"hostNodeId":"h0","strategy":"dom-order",'}<span class="hit">{'"index":1'}<MarkerCircle beat={part === 6 ? 'odd' : 'rest'} /></span>{',"tagName":"button"}],"events":[{"hostNodeId":"h0","eventName":"click","symbolIds":["symbol:0"]}],"domUpdates":[ … "symbolId":"symbol:1"}], … }'}<span class="t">{'</script>'}</span>
+					<button type="button" class="ln in" data-line="view" aria-pressed={part === 'view' ? 'true' : 'false'} onMouseenter={() => (part = 'view')} onFocus={() => (part = 'view')} onClick={() => (part = 'view')}>
+						{'<script type="markless/view">… "h0" … "index":1 …'}
 					</button>
-					<button type="button" class="ln in" aria-label="The inline resumer" aria-pressed={part === 7 ? 'true' : 'false'} onClick={() => (part = 7)}>
-						<span class="t">{'<script '}</span><span class="hit"><span class="a">data-async-resumer</span><MarkerCircle beat={part === 7 ? 'odd' : 'rest'} /></span>{' '}<span class="a">data-markless-resume-module</span>{'='}<span class="s">"/build/chunk--CpAagRl.js"</span><span class="t">{'>'}</span>{'(function(e){ … })(e=>import(e));'}<span class="t">{'</script>'}</span>
+					<button type="button" class="ln in" data-line="resumer" aria-pressed={part === 'resumer' ? 'true' : 'false'} onMouseenter={() => (part = 'resumer')} onFocus={() => (part = 'resumer')} onClick={() => (part = 'resumer')}>
+						{'<script data-async-resumer …>'}
 					</button>
-					<span class="ln end"><span class="t">{'</div>'}</span></span>
+					<span class="ln end">{'</div>'}</span>
 				</div>
-			</IndexCard>
 
-			<div class="explain">
-				<span class="arrow" aria-hidden="true"><InkArrow width={70} height={46} x1={66} y1={6} x2={6} y2={38} bend={-10} seed={13} shown="true" /></span>
-				<p class="say" aria-live="polite">
-					{part === 1
-						? 'The link lets the browser fetch the resume module early. Fetching it does not run it.'
-						: part === 2
-							? 'This script records events that fire while the document is still loading. The resumer replays them later.'
-							: part === 3
-								? 'The container marks the part of the page this render owns. The resumer counts it as element 0.'
-								: part === 4
-									? 'No onclick, no event attribute at all. The click lives only in the view record.'
-									: part === 5
-										? 'The state. root holds the number 0 itself. An object or an array would go into records.'
-										: part === 6
-											? 'Locators, events and text updates. The index is 1 because the container div is element 0.'
-											: 'The inline resumer. It listens for the first interaction, then imports the resume module.'}
-				</p>
+				<div class="shown">
+					<p class="cap">What the browser shows</p>
+					<div class="page">
+						<p class="tag outside">{part === 'link' ? 'fetched early, not run' : 'outside the container'}</p>
+						<div class="box">
+							<p class="tag">container, element 0</p>
+							<span class="btn">Count <span class="value">0</span></span>
+							<p class="tag below">{part === 'state' ? 'state:count fills this text' : 'h0, element 1'}</p>
+						</div>
+					</div>
+				</div>
 			</div>
-		</div>
-
-		<p class="foot">This is the real response for the counter. I cut the script bodies and the middle of the view record to …</p>
-
+		</Stage>
+		<Watch>
+			<span>{part === 'link'
+				? 'The link lets the browser fetch the resume module early. Fetching it does not run it. It belongs to no element.'
+				: part === 'early'
+					? 'This script records events that land inside the container while the document is still loading. The resumer replays them later.'
+					: part === 'container'
+						? 'The container marks the part of the page this render owns. The resumer counts it as element 0.'
+						: part === 'button'
+							? 'No onclick, no event attribute at all. The click lives only in the view record.'
+							: part === 'state'
+								? 'The state. "root":0 holds the number 0 itself, the value the button text shows.'
+								: part === 'view'
+									? 'Locator h0 is element 1 in document order: the button. A click on it runs symbol:0.'
+									: 'The inline resumer listens on the container for the first interaction, then imports the resume module.'}</span>
+		</Watch>
 		<style>
-			.sketch {
-				container-type: inline-size;
-				margin: var(--space-l) 0;
-				padding: 0;
-			}
-
-			.note {
-				margin: 0;
-				font-family: 'Joy Elia', system-ui, sans-serif;
-				font-size: var(--step-0);
-				line-height: 1.25;
-				color: var(--ink);
-			}
-
-			.scope {
-				margin: 0 0 var(--space-m);
-				text-align: center;
-				text-wrap: balance;
-			}
-
-			.tag {
-				display: inline-block;
-				margin-right: 0.35rem;
-				padding: 0 0.5rem;
-				border: 1.5px solid var(--ink);
-				border-radius: 999px;
-				background: var(--yellow);
-				color: oklch(28% 0.015 90);
-				rotate: -2deg;
-			}
-
 			.board {
 				display: grid;
-				grid-template-columns: minmax(0, 1fr) 13rem;
-				gap: 1.4rem;
+				grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+				gap: 1.2em;
 				align-items: center;
-				padding-left: 0.4rem;
+				width: min(42rem, 100%);
 			}
 
-			.html {
+			.listing {
 				display: grid;
-				font-family: var(--font-mono);
-				font-size: 0.74rem;
-				line-height: 1.5rem;
+				padding: 0.5em 0;
+				border: 1px solid var(--ink);
+				border-radius: 6px;
+				background: var(--paper);
 			}
 
 			.ln {
-				position: relative;
 				display: block;
+				box-sizing: border-box;
 				width: 100%;
 				margin: 0;
-				padding: 0 0.3rem;
+				padding: 0.2em 0.85em;
 				border: 0;
-				border-radius: 2px;
-				background: none;
-				font: inherit;
-				line-height: inherit;
-				text-align: left;
-				color: oklch(28% 0.015 90);
-				white-space: pre-wrap;
+				background: transparent;
+				color: var(--ink);
+				font-family: var(--font-mono);
+				font-size: 0.8em;
+				line-height: 1.6;
+				text-align: start;
 				overflow-wrap: anywhere;
 				cursor: pointer;
+				transition: background 140ms ease;
 			}
 
 			.ln.in {
-				padding-left: 1.3rem;
+				padding-inline-start: 2.1em;
 			}
 
-			.ln:hover {
-				background: color-mix(in oklch, var(--yellow) 22%, transparent);
-			}
-
-			.ln:focus-visible {
-				outline: 2.5px dashed var(--purple);
-				outline-offset: 1px;
-			}
-
-			.end {
+			.ln.end {
 				cursor: default;
 			}
 
+			.ln:hover {
+				background: color-mix(in srgb, var(--purple) 16%, var(--paper));
+			}
+
 			.ln[aria-pressed='true'] {
-				background: color-mix(in oklch, var(--yellow) 55%, transparent);
+				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
 			}
 
-			.hit {
-				position: relative;
-				z-index: 1;
-				display: inline-block;
+			.ln:focus-visible {
+				outline: 2px solid var(--ink);
+				outline-offset: -3px;
 			}
 
-			.t {
-				color: #116329;
-			}
-
-			.a {
-				color: #0550ae;
-			}
-
-			.s {
-				color: #0a3069;
-			}
-
-			.f {
-				color: #6639ba;
-			}
-
-			.explain {
-				position: relative;
-				padding-top: 2.6rem;
-			}
-
-			.arrow {
-				position: absolute;
-				top: 0;
-				left: -0.6rem;
-				width: 4.2rem;
-				height: 2.6rem;
+			.cap {
+				margin: 0 0 0.5em;
 				color: var(--ink);
-				--ink-weight: 2.2;
-			}
-
-			.say {
-				margin: 0;
 				font-family: 'Joy Elia', system-ui, sans-serif;
-				font-size: var(--step-1);
-				line-height: 1.25;
-				color: oklch(48% 0.2 0);
-				rotate: -1.5deg;
-
-				html.dark & {
-					color: var(--pink);
-				}
+				font-weight: 700;
 			}
 
-			.foot {
-				margin: var(--space-s) 0 0;
-				font-size: var(--step--1);
-				line-height: 1.4;
-				color: color-mix(in oklch, var(--ink) 75%, var(--paper));
+			.page {
+				display: grid;
+				gap: 0.5em;
+				padding: 0.75em;
+				border: 1px solid var(--ink);
+				border-radius: 6px;
 			}
 
-			@container (max-width: 38rem) {
+			.box {
+				display: grid;
+				justify-items: center;
+				gap: 0.45em;
+				padding: 0.6em 0.75em 0.75em;
+				border: 1.5px dashed var(--ink);
+				border-radius: 6px;
+				transition: background 140ms ease;
+			}
+
+			.tag {
+				margin: 0;
+				justify-self: start;
+				color: var(--ink);
+				font-size: var(--step--2);
+			}
+
+			.tag.below {
+				justify-self: center;
+			}
+
+			.btn {
+				padding: 0.45em 1em;
+				border: 1px solid var(--ink);
+				border-radius: 6px;
+				background: var(--paper);
+				color: var(--ink);
+				font-size: var(--step-0);
+				transition: background 140ms ease;
+			}
+
+			.value {
+				border-radius: 3px;
+				transition: background 140ms ease;
+			}
+
+			.board:is([data-part='early'], [data-part='container'], [data-part='resumer']) .box,
+			.board:is([data-part='button'], [data-part='view']) .btn {
+				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+			}
+
+			.board[data-part='state'] .value {
+				padding: 0 0.15em;
+				background: var(--mark);
+				color: var(--on-mark);
+			}
+
+			.board[data-part='link'] .tag.outside {
+				padding: 0 0.3em;
+				border-radius: 3px;
+				background: var(--mark);
+				color: var(--on-mark);
+			}
+
+			@media (max-width: 640px) {
 				.board {
 					grid-template-columns: minmax(0, 1fr);
-					gap: 0.6rem;
-					padding-left: 0;
 				}
+			}
 
-				.explain {
-					padding: 2.4rem 0.4rem 0;
-				}
-
-				.arrow {
-					left: 40%;
-					rotate: 60deg;
+			@media (prefers-reduced-motion: reduce) {
+				.ln,
+				.box,
+				.btn,
+				.value {
+					transition: none;
 				}
 			}
 		</style>
-	</figure>
+	</PreviewCard>
 }

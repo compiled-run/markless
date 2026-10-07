@@ -2331,95 +2331,209 @@ try {
 		);
 		await page.screenshot({ path: `${shotsDir}/T030-state-graph-after.png`, fullPage: true });
 
-		// --- sketch figures in How it works ----------------------------------------
-		// Each one is driven the way its hint tells the reader to drive it.
+		// --- previews in How it works ----------------------------------------------
+		// Each one is driven the way its card invites, and the check reads the part
+		// of the card that shows the mechanism, not only the demo.
+		const see = async (locator: Locator, wanted: (text: string) => boolean, label: string) => {
+			const text = await settleText(locator, wanted, label);
+			if (wanted(text)) check(true, label);
+		};
+
 		await page.goto(`${origin}/how-it-works/the-big-idea`, { waitUntil: 'load' });
-		const planFigure = page.locator('figure.plan-anywhere');
-		await planFigure.waitFor();
-		const planLive = planFigure.locator('.env[data-for="browser"] .live');
+		const planCard = page.locator('section[data-preview="plan-anywhere"]');
+		const planWatch = planCard.locator('.pv-watch-text');
+		await planCard.waitFor();
+		const planLive = planCard.locator('.live');
 		await planLive.click();
-		await settleText(
-			planLive,
-			(text) => text === 'Count 1',
-			'the plan figure counter counts in Browser',
+		await see(planLive, (text) => text === 'Count 1', 'the plan card counter counts in Browser');
+		await see(
+			planWatch,
+			(text) => text.includes('symbol:0 ran count++'),
+			'the plan card names the symbol and the text write the click used',
 		);
-		await planFigure.getByRole('button', { name: 'Server', exact: true }).click();
-		const serverPanel = planFigure.locator('.env[data-for="server"]');
-		await serverPanel.waitFor({ state: 'visible' });
-		check(
-			((await serverPanel.textContent()) ?? '').includes('renderToString(App)') &&
-				!(await planFigure.locator('.env[data-for="browser"]').isVisible()),
-			'picking Server swaps in the server panel and the same plan cards stay',
+		await planCard.getByRole('radio', { name: 'Server' }).check();
+		await see(
+			planCard.locator('.where').first(),
+			(text) => text === 'markless/state script',
+			'picking Server moves state:count into the markless/state script',
 		);
 		check(
-			(await planFigure.locator('.cards li').count()) === 3,
-			'the plan figure keeps three plan cards',
+			(await planCard.locator('.rows .row').count()) === 3 &&
+				(await planCard.locator('.env:visible').innerText()).includes('renderToString(App)'),
+			'the same three plan rows stay while the place changes',
 		);
 
 		await page.goto(`${origin}/how-it-works/compiler`, { waitUntil: 'load' });
-		const passFigure = page.locator('figure.compiler-passes');
-		const passWhere = passFigure.locator('.where');
+		const passCard = page.locator('section[data-preview="compiler-passes"]');
+		const passWhere = passCard.locator('.where');
 		await passWhere.waitFor();
 		check(
 			((await passWhere.textContent()) ?? '').trim() === 'Pass 1 of 15',
-			'the pass figure opens on pass 1',
+			'the pass card opens on pass 1',
 			((await passWhere.textContent()) ?? '').trim(),
 		);
-		await passFigure.getByRole('button', { name: 'Next →' }).click();
-		await settleText(passWhere, (text) => text === 'Pass 2 of 15', 'Next moves to pass 2');
-		await passFigure.getByRole('button', { name: 'Pass 9, protocol-view' }).click();
-		await settleText(
-			passWhere,
-			(text) => text === 'Pass 9 of 15',
-			'a station button jumps to pass 9',
+		const passNext = passCard.getByRole('button', { name: 'Next →' });
+		await passNext.click();
+		await see(passWhere, (text) => text === 'Pass 2 of 15', 'Next moves to pass 2');
+		check(
+			(await passCard.locator('.chip.read').allTextContents()).join() === 'semanticGraph' &&
+				(await passCard.locator('.chip.new').allTextContents()).join() === 'stateLowering',
+			'pass 2 reads the semantic graph and writes stateLowering',
+		);
+		for (let pass = 3; pass <= 9; pass += 1) await passNext.click();
+		await see(passWhere, (text) => text === 'Pass 9 of 15', 'Next reaches pass 9');
+		await see(
+			passCard.locator('.pv-watch-text'),
+			(text) => text === 'New: protocolView. 5 later passes read it.',
+			'the Watch line counts the later passes that read the view record',
 		);
 		check(
-			((await passFigure.locator('.pass[data-n="9"]').textContent()) ?? '').includes(
-				'"symbol:1"',
-			) && (await passFigure.locator('.pass[data-n="9"]').isVisible()),
-			'pass 9 shows the view record card with its symbol IDs',
+			((await passCard.locator('.out').textContent()) ?? '').includes('"symbol:1"'),
+			'pass 9 shows the view record excerpt with its symbol IDs',
 		);
 
 		await page.goto(`${origin}/how-it-works/payload`, { waitUntil: 'load' });
-		const payloadFigure = page.locator('figure.payload-card');
-		const payloadSay = payloadFigure.locator('.say');
-		await payloadSay.waitFor();
+		const payloadCard = page.locator('section[data-preview="payload-card"]');
+		const payloadWatch = payloadCard.locator('.pv-watch-text');
+		await payloadWatch.waitFor();
 		check(
-			((await payloadSay.textContent()) ?? '').includes(
-				'The click lives only in the view record.',
-			),
-			'the payload card opens on the button line',
-			((await payloadSay.textContent()) ?? '').slice(0, 60),
+			((await payloadWatch.textContent()) ?? '').includes('Locator h0 is element 1'),
+			'the payload card opens on the view record and its element',
 		);
-		await payloadFigure.getByRole('button', { name: 'The link' }).click();
-		await settleText(
-			payloadSay,
+		await payloadCard.locator('[data-line="state"]').hover();
+		await see(
+			payloadWatch,
+			(text) => text.includes('"root":0'),
+			'hovering the state line explains the value',
+		);
+		check(
+			(await payloadCard.locator('.board').getAttribute('data-part')) === 'state',
+			'hovering the state line marks the text it fills',
+		);
+		await payloadCard.locator('[data-line="link"]').focus();
+		await see(
+			payloadWatch,
 			(text) => text.includes('Fetching it does not run it.'),
-			'pressing the link line explains the preload',
+			'focusing the link line explains the preload',
 		);
 
 		await page.goto(`${origin}/how-it-works/resuming`, { waitUntil: 'load' });
-		const clickFigure = page.locator('figure.first-click');
-		const clickLive = clickFigure.locator('.live');
+		const clickCard = page.locator('section[data-preview="first-click"]');
+		const clickWatch = clickCard.locator('.pv-watch-text');
+		const clickLive = clickCard.locator('.live');
 		await clickLive.waitFor();
 		await clickLive.click();
-		await settleText(clickLive, (text) => text === 'Count 1', 'the first-click counter counts');
-		await settleText(
-			clickFigure.locator('.steps[data-for="direct"] li').last(),
-			(text) => text.includes('Count 1'),
-			'the direct path notes name the text that was written',
+		await see(clickLive, (text) => text === 'Count 1', 'the first-click counter counts');
+		await see(
+			clickWatch,
+			(text) => text.includes("button's own listener imported symbol:0"),
+			'the direct path names the listener on the button',
 		);
-		await clickFigure.getByRole('button', { name: 'Server-rendered page' }).click();
-		await settleText(
-			clickLive,
-			(text) => text === 'Count 0',
-			'switching path starts the counter over',
+		await clickCard.getByRole('radio', { name: 'General' }).check();
+		await see(clickLive, (text) => text === 'Count 0', 'switching path starts the counter over');
+		await clickLive.hover();
+		await see(
+			clickWatch,
+			(text) => text.includes('symbol:0 was fetched before the press'),
+			'on the general path a hover fetches the symbol without running it',
 		);
+		await clickLive.click();
+		await see(
+			clickWatch,
+			(text) => text.includes('started the runtime'),
+			'on the general path the first click starts the full runtime',
+		);
+		await clickCard.getByRole('radio', { name: 'Server' }).check();
 		check(
-			await clickFigure.locator('.steps[data-for="server"]').isVisible(),
-			'the server path shows its own steps',
+			(await clickCard.locator('.rows:visible .row.never').count()) === 2,
+			'the server path lists the full runtime and the body as never started',
 		);
 		await page.screenshot({ path: `${shotsDir}/T030-first-click-after.png`, fullPage: true });
+
+		await page.goto(`${origin}/how-it-works/state-graph`, { waitUntil: 'load' });
+		const wakeCard = page.locator('section[data-preview="state-graph"]');
+		const journal = () => wakeCard.locator('.entries li:visible').allTextContents();
+		await wakeCard.waitFor();
+		await wakeCard.getByRole('button', { name: 'count++' }).click();
+		await see(
+			wakeCard.locator('.slot.on-count').last(),
+			(text) => text === 'doubled 6',
+			'count++ moves the computed that reads count',
+		);
+		check(
+			(await journal()).join('|') === 'setText count → "3"|setText doubled → "6"',
+			'the journal lists the two text writes of that flush',
+			(await journal()).join('|'),
+		);
+		await wakeCard.getByRole('button', { name: "label = 'Cups'" }).click();
+		await see(
+			wakeCard.locator('.slot.on-label'),
+			(text) => text === 'Cups',
+			'the label write changes the heading',
+		);
+		check(
+			(await journal()).join('|') === 'setText heading → "Cups"',
+			'the label write leaves count and doubled out of the journal',
+			(await journal()).join('|'),
+		);
+		await wakeCard.getByRole('button', { name: 'count = 3' }).click();
+		await see(
+			wakeCard.locator('.entries li:visible').first(),
+			(text) => text === 'empty: no flush ran',
+			'writing the same value runs no flush',
+		);
+
+		await page.goto(`${origin}/how-it-works/lazy-chunks`, { waitUntil: 'load' });
+		const lanesCard = page.locator('section[data-preview="lazy-lanes"]');
+		const ranChips = () => lanesCard.locator('tbody td:nth-child(3)').allTextContents();
+		await lanesCard.waitFor();
+		check(
+			(await ranChips()).every((text) => text.trim() === 'not yet'),
+			'no handler has run at load',
+		);
+		await lanesCard.getByRole('button', { name: 'Like 0' }).click();
+		await see(
+			lanesCard.locator('tbody td:nth-child(3)').first(),
+			(text) => text === '×1',
+			'Like runs its handler',
+		);
+		check(
+			(await ranChips()).map((text) => text.trim()).join() === '×1,×1,not yet,not yet',
+			'Like runs its handler and its text update, and Save stays unrun',
+			(await ranChips()).join(),
+		);
+		await lanesCard.getByRole('button', { name: 'Load the page again' }).click();
+		await see(
+			lanesCard.locator('tbody td:nth-child(3)').first(),
+			(text) => text === 'not yet',
+			'loading again clears what ran',
+		);
+
+		await page.goto(`${origin}/how-it-works/native-targets`, { waitUntil: 'load' });
+		const hostCard = page.locator('section[data-preview="native-hosts"]');
+		const hostTrace = hostCard.locator('.trace li').last();
+		await hostCard.waitFor();
+		await hostCard.locator('.device.web .live').click();
+		await see(hostTrace, (text) => text === 'text: Count 1', 'the browser button writes its text');
+		await hostCard.getByRole('radio', { name: 'iOS' }).check();
+		await see(
+			hostCard.locator('.json:visible mark'),
+			(text) => text === '"touchUpInside"',
+			'the iOS proof record names touchUpInside',
+		);
+		await hostCard.locator('.device.phone .live').click();
+		await see(hostTrace, (text) => text === 'title: Count 1', 'the drawn UIButton sets its title');
+		await see(
+			hostCard.locator('.pv-watch-text'),
+			(text) => text.includes('touchUpInside ran symbol:counter.increment'),
+			'the Watch line follows the native event to the symbol',
+		);
+		await hostCard.getByRole('radio', { name: 'macOS' }).check();
+		await see(
+			hostCard.locator('.json:visible mark'),
+			(text) => text === '"action"',
+			'the macOS proof record names action',
+		);
 
 		// How it works is the one place the docs name semantic analysis, and it
 		// defines the term in the words the learner pages paraphrase.
