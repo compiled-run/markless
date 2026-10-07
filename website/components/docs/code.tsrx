@@ -21,6 +21,7 @@ export default function Code({
 	panes,
 	title,
 	note,
+	skin,
 	children,
 }: {
 	/** The starter files, entry `.tsrx` first or not; Reset restores them. */
@@ -31,11 +32,14 @@ export default function Code({
 	readonly title?: string;
 	/** A suggestion printed under the block, such as what to change and what to watch. */
 	readonly note?: string;
+	/** `image` draws the notebook from layers cut out of the reference art; the default draws it in CSS. */
+	readonly skin?: 'drawn' | 'image';
 	/** The starter's own render, shown in the Result pane until the first run. */
 	readonly children?: unknown;
 }) @{
 	<figure
 		class="code-block"
+		data-skin={skin ?? 'drawn'}
 		data-code="idle"
 		onPointerover={(event) => boot(event, files)}
 		onFocusin={(event) => boot(event, files)}
@@ -314,6 +318,45 @@ export default function Code({
 				.rings {
 					left: -1.1rem;
 				}
+			}
+
+			.code-block[data-skin='image'] {
+				--code-tab-left: 35px;
+				border-color: transparent;
+				box-shadow: none;
+			}
+
+			.code-block[data-skin='image']::before {
+				content: '';
+				position: absolute;
+				inset: -9px -13px -16px -19px;
+				pointer-events: none;
+				background:
+					url('/notebook/tl.png') left top / 56px 50px no-repeat,
+					url('/notebook/tr.png') right top / 42px 32px no-repeat,
+					url('/notebook/bl.png') left bottom / 64px 32px no-repeat,
+					url('/notebook/br.png') right bottom / 42px 32px no-repeat,
+					url('/notebook/top.png') 56px top / calc(100% - 98px) 32px no-repeat,
+					url('/notebook/bottom.png') 64px bottom / calc(100% - 106px) 32px no-repeat,
+					url('/notebook/right.png') right 32px / 32px calc(100% - 64px) no-repeat;
+			}
+
+			.code-block[data-skin='image'] .rings {
+				top: 41px;
+				bottom: 16px;
+				left: -19px;
+				width: 50px;
+				background: url('/notebook/coil.png') 0 0 / 50px 34px no-repeat round;
+			}
+
+			.code-block[data-skin='image'] .rings::before,
+			.code-block[data-skin='image'] .rings::after {
+				display: none;
+			}
+
+			html.dark .code-block[data-skin='image']::before,
+			html.dark .code-block[data-skin='image'] .rings {
+				filter: invert(1) hue-rotate(180deg);
 			}
 
 			@media (prefers-reduced-motion: reduce) {
