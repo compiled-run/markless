@@ -1,5 +1,4 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import ElementBehaviorDemo from '../../components/demos/how-it-works/element-behavior-demo.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
@@ -97,11 +96,8 @@ compiler checks every symbol when it compiles the file. A symbol can use:
 
 Here is a handler that uses an element handle and a piece of state. Click **Focus**:
 
-{/* PLAYGROUND: starter file element-behavior.tsrx (below). Try: add a second button that writes status = 'idle' and moves focus away. Then try the broken version from the next block and read the error. */ null}
-
-<ElementBehaviorDemo />
-
-```tsrx
+<Code note="Add a second button that runs field?.blur() and sets status = 'idle'. Then add const box = document.querySelector('input'); above the markup, change field?.focus() to box?.focus(), and read the error.">
+```tsrx title="element-behavior.tsrx"
 import { element, state } from '@markless/core';
 
 export default function ElementBehavior() @{
@@ -115,6 +111,7 @@ export default function ElementBehavior() @{
 	</section>
 }
 ```
+</Code>
 
 Anything else fails the build. A DOM node held in a local variable is the common case:
 
