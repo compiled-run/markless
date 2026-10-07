@@ -577,7 +577,7 @@ try {
 		await rolledCount.waitFor();
 		const rolledAt = ((await rolledLine.textContent()) ?? '').trim();
 		check(
-			/^Rolled when the component ran: [1-6]$/.test(rolledAt),
+			/^Rolled at setup: [1-6]$/.test(rolledAt),
 			'the die opens on one roll, made when the body ran',
 			rolledAt,
 		);
@@ -2731,10 +2731,10 @@ try {
 		// One write moves the state and the computed that reads it, nothing else.
 		await page.goto(`${origin}/how-it-works/state-graph`, { waitUntil: 'load' });
 		const graphStage = page.locator('.code-block [data-code-stage]').first();
-		const graphOutputs = graphStage.locator('output');
+		const graphOutputs = graphStage.locator('p');
 		await graphOutputs.first().waitFor();
 		const graphValues = async () =>
-			(await graphOutputs.allTextContents()).map((text) => text.trim()).join(',');
+			(await graphOutputs.allTextContents()).map((text) => text.split(':').at(-1)!.trim()).join(',');
 		check(
 			(await graphValues()) === '2,4',
 			'the state graph demo serves count 2 and doubled 4',

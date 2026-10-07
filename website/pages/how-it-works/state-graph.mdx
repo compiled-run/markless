@@ -37,7 +37,7 @@ Think of plumbing, as an analogy. A write opens one tap, and water reaches only 
 
 Here is a counter with one computed value. Press **Next** a few times:
 
-<Code note="Add a third output that reads {count + 100}. Then add a second state() with its own button and output. Each button moves only the outputs that read its state.">
+<Code note="Add a third line that reads {count + 100}. Then add a second state() with its own button and line. Each button moves only the lines that read its state.">
 ```tsrx title="state-computed.tsrx"
 import { computed, state } from '@markless/core';
 
@@ -47,14 +47,14 @@ export default function StateComputed() @{
 
 	<section>
 		<button onClick={() => count++}>Next</button>
-		<output>{count}</output>
-		<output>{doubled}</output>
+		<p>count: {count}</p>
+		<p>doubled: {doubled}</p>
 	</section>
 }
 ```
 </Code>
 
-Both outputs move, because both read `count`, one of them through `doubled`. The button label never
+Both lines move, because both read `count`, one of them through `doubled`. The button label never
 changes, because it reads nothing.
 
 <StateGraphSketch />

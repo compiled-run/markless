@@ -53,7 +53,7 @@ Before your app runs, Markless reads your component the way you read it. It sees
 
 ## Your component runs once
 
-Here is a second component. It rolls a die with `Math.random()` when it runs. Click **Count** a few times, and watch the die.
+Here is a second component. It rolls a die with `Math.random()` during setup. Click **Count** a few times, and watch the die.
 
 <Code note="Click Count a few times, and the roll stays put. Then change the 6 to 100. Your edit runs the component again, so it rolls once more.">
 ```tsrx title="rolled-once.tsrx"
@@ -64,7 +64,7 @@ export default function RolledOnce() @{
 	const roll = Math.floor(Math.random() * 6) + 1;
 
 	<section>
-		<p>Rolled when the component ran: {roll}</p>
+		<p>Rolled at setup: {roll}</p>
 		<button onClick={() => count++}>Count {count}</button>
 	</section>
 }
