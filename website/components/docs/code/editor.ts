@@ -14,6 +14,8 @@ import type { CodeDiagnostic } from './protocol.ts';
 export type CodeEditor = {
 	text(): string;
 	replace(code: string): void;
+	/** Sets the text without focus or an undo step, for code restored from storage. */
+	load(code: string): void;
 	showProblems(problems: readonly CodeDiagnostic[]): void;
 	reveal(line: number, column: number): void;
 	dispose(): void;
@@ -161,6 +163,10 @@ export function createEditor(
 					mode: 'start',
 				},
 			});
+		},
+		load(code) {
+			input.value = editorText(code);
+			paint();
 		},
 		showProblems(next) {
 			problems = next;

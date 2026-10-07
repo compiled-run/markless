@@ -21,6 +21,24 @@ export function bootCodeBlock(
 	return session;
 }
 
+/** Where a block keeps the reader's edits: per page, per block, per starter text. */
+function storageKey(box: HTMLElement, starters: readonly CodeFile[]): string {
+	const index = [...document.querySelectorAll('.code-block')].indexOf(box);
+	let hash = 0;
+	for (const char of starters.map((file) => file.name + file.code).join('\0'))
+		hash = (Math.imul(hash, 31) + char.charCodeAt(0)) | 0;
+	return `markless-code:${location.pathname}:${index}:${(hash >>> 0).toString(36)}`;
+}
+
+function readSaved(key: string): Record<string, string> | undefined {
+	try {
+		const saved = JSON.parse(localStorage.getItem(key) ?? 'null') as unknown;
+		return saved && typeof saved === 'object' ? (saved as Record<string, string>) : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
 function part<T extends HTMLElement>(box: HTMLElement, name: string): T {
 	const found = box.querySelector<T>(`[data-code-${name}]`);
 	if (!found) throw new Error(`The Code block has no [data-code-${name}] element.`);
@@ -144,7 +162,30 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 			}),
 		);
 	}
+	const key = storageKey(box, starters);
+	const saved = readSaved(key);
+	if (saved) {
+		for (const starter of starters) {
+			const code = saved[starter.name];
+			if (typeof code === 'string') editors.get(starter.name)?.load(code);
+		}
+		edited = true;
+		box.toggleAttribute('data-restored', true);
+		if (ready) run();
+	}
 	box.dataset.code = 'ready';
+
+	function save(current: readonly CodeFile[]): void {
+		const changed = current.some(
+			(file, index) => file.code.replace(/\n$/, '') !== starters[index]!.code.replace(/\n$/, ''),
+		);
+		try {
+			if (changed)
+				localStorage.setItem(key, JSON.stringify(Object.fromEntries(current.map((file) => [file.name, file.code]))));
+			else localStorage.removeItem(key);
+		} catch {}
+		box.toggleAttribute('data-restored', changed && box.hasAttribute('data-restored'));
+	}
 
 	function files(): CodeFile[] {
 		return starters.map((file) => ({
@@ -158,7 +199,9 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 		latest = nextId++;
 		box.dataset.code = 'running';
 		status.textContent = 'Compiling…';
-		send({ type: 'code:run', id: latest, files: files() });
+		const current = files();
+		save(current);
+		send({ type: 'code:run', id: latest, files: current });
 	}
 
 	function reveal(problem: CodeDiagnostic): void {
@@ -195,6 +238,7 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 	function reset(): void {
 		const pressed = document.activeElement as HTMLElement | null;
 		for (const starter of starters) editors.get(starter.name)?.replace(starter.code);
+		box.removeAttribute('data-restored');
 		pressed?.focus({ preventScroll: true });
 		clearTimeout(timer);
 		edited = true;

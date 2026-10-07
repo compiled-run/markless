@@ -4,8 +4,8 @@ import { lucide } from '@markless/ui';
 import sessionUrl from 'virtual:code-session-url';
 import CodeFiles from './code-files.tsrx';
 
-// A URL the bundler cannot follow keeps the editor out of preloads; the block is found from the target until onVisible works.
-function boot(event: Event, files: readonly CodeFile[]): void {
+// A URL the bundler cannot follow keeps the editor out of preloads.
+function boot(event: { readonly target: unknown }, files: readonly CodeFile[]): void {
 	const box = (event.target as Element | null)?.closest<HTMLElement>('.code-block');
 	if (box)
 		void (import(/* @vite-ignore */ sessionUrl) as Promise<typeof import('./code/session.ts')>).then(
@@ -38,12 +38,12 @@ export default function Code({
 		class="code-block"
 		data-skin={skin ?? 'drawn'}
 		data-code="idle"
-		onPointerover={(event) => boot(event, files)}
+		onVisible={(event) => boot(event, files)}
 		onFocusin={(event) => boot(event, files)}
 	>
 		<span class="rings" aria-hidden="true"></span>
 		<header class="bar">
-			<span class="title">{title ?? 'Playground'}</span>
+			<span class="title">{title ?? 'Playground'}<span class="restored">(Restored)</span></span>
 			<div class="tools" role="toolbar" aria-label="Playground tools">
 				<button type="button" class="tool" data-code-action="reset" aria-label="Reset code" title="Reset code">
 					<lucide.rotateccw aria-hidden="true" />
@@ -163,6 +163,17 @@ export default function Code({
 			.title {
 				font-size: var(--step-1);
 				line-height: 1.2;
+			}
+
+			.restored {
+				display: none;
+				margin-inline-start: 0.5em;
+				color: var(--muted-ink);
+				font-size: var(--step--1);
+			}
+
+			.code-block[data-restored] .restored {
+				display: inline;
 			}
 
 			.tools {

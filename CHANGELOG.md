@@ -122,6 +122,7 @@ The `ui()` Vite plugin from the new `@markless/ui-tools` package sets this up.
 - An `onVisible` handler receives an event whose `target` and `currentTarget`
   are the element, and `onVisible` inside MDX pages no longer throws
   `MARKLESS_EVENT_DISPATCH_UNMATCHED` on load.
+- `onVisible` type-checks on any element; its handler gets the element as `event.target`.
 - Text passed straight in as a component's children, like
   `<Watch>{count} cups</Watch>`, updates when the state changes, the way it
   already did when wrapped in an element.
