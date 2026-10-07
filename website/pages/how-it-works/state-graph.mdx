@@ -4,6 +4,7 @@ import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import LikeHeart from '../../components/docs/like-heart.tsrx';
+import StateGraphSketch from '../../components/sketch/how2/state-graph-sketch.tsrx';
 
 <Sidebar />
 
@@ -59,7 +60,7 @@ export default function StateComputed() @{
 Both outputs move, because both read `count`, one of them through `doubled`. The button label never
 changes, because it reads nothing.
 
-{/* SKETCH: two nodes (state:count, computed:doubled) with arrows to two subscriptions, each subscription pointing at its output. A write lights up count, then doubled, then both outputs. The button stays grey. */ null}
+<StateGraphSketch />
 
 ## One write, step by step
 

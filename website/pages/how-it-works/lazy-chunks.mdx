@@ -4,6 +4,7 @@ import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import LikeHeart from '../../components/docs/like-heart.tsrx';
+import LazyLanesSketch from '../../components/sketch/how2/lazy-lanes-sketch.tsrx';
 
 <Sidebar />
 
@@ -45,7 +46,7 @@ A _chunk_ is one JavaScript file the browser downloads. One chunk can hold many 
 As an analogy, think of a kitchen. Packing a chunk is a delivery. Running a symbol is cooking one
 dish. The ingredients can arrive early, and the cook still waits for each order.
 
-{/* SKETCH: two lanes, "downloaded" and "ran". At page load the first-use pack drops into the downloaded lane while the ran lane stays empty. Each click adds one card to the ran lane and nothing to the downloaded lane. */ null}
+<LazyLanesSketch />
 
 ## When code runs
 
