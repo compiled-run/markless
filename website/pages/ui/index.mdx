@@ -3,6 +3,8 @@ import Callout from '../../components/docs/callout.tsrx';
 import EditAddressDemo from '../../components/demos/ui/overview/edit-address-demo.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
+import ModalParts from '../../components/sketch/ui/modal-parts.tsrx';
+import SelectEverywhere from '../../components/sketch/ui/select-everywhere.tsrx';
 
 <Sidebar />
 
@@ -65,7 +67,7 @@ The `root` part holds the state, such as whether the dialog is open. The other p
 state. Most of them also show it on their own element as a `ui-*` attribute, such as `ui-open`.
 That attribute is how you style them, and [Styling](/ui/styling) covers it.
 
-{/* SKETCH: the modal's parts as a stack of labelled boxes (root, trigger, backdrop, content, title, close). One "open" switch at the root lights up ui-open on root, trigger, backdrop and content at the same time. Title and close stay unlit. */ null}
+<ModalParts />
 
 Each part name is one lowercase word. `select.itemtrigger` is the trigger of one item.
 `slider.valuelabel` is the label that shows the slider's value.
@@ -132,7 +134,7 @@ A family is a Markless component, like the ones you write. So it runs wherever y
 the browser alone, on a server, or inside a test. The package's own tests render every family
 both in the browser alone and from server HTML, and the same checks pass both ways.
 
-{/* SKETCH: one select shown three times side by side, labelled "browser alone", "from a server" and "in a test". The same parts and the same ui-open / ui-selected attributes are highlighted in each copy. */ null}
+<SelectEverywhere />
 
 ## Every family
 
