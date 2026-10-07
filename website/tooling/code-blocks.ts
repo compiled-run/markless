@@ -9,7 +9,8 @@ import { ColourTable, DocRegistry, highlightHtml, paneLines } from './ui-code-ru
 export const CODE_GENERATED_DIR = 'components/docs/code/generated';
 const CODE_COMPONENT = 'components/docs/code.tsrx';
 
-const OPEN = /^<Code(\s[^>]*)?>$/;
+// Attribute values may hold `>` (a note can show markup), so quoted and braced values are matched whole.
+const OPEN = /^<Code((?:\s+[A-Za-z][\w-]*(?:=(?:"[^"]*"|'[^']*'|\{[^}]*\}))?)*)\s*>$/;
 const CLOSE = /^<\/Code>$/;
 const FENCE = /^(`{3,})([\w-]*)(.*)$/;
 const TITLE = /\btitle="([^"]+)"/;
