@@ -138,13 +138,19 @@ export const label = 'Typos fixed';
 </Code>
 
 - Put `<Code>` and `</Code>` on their own lines. Only titled fences and blank lines go between them.
-- Give exactly one fence a `.tsrx` title. Its default export is what the Result pane shows. Other fences hold helpers, titled `.ts` or `.css`.
+- Give at least one fence a `.tsrx` title. The first `.tsrx` fence is the entry: its default export is what the Result pane shows. To run a different one, name it with `entry`, as in `<Code entry="page.tsrx">`. Other fences hold more components, or helpers titled `.ts` or `.css`.
 - `note` is optional. It prints under the block as a "Try this" suggestion.
 - The starter must build. The site builds it like any other component and shows it in the Result pane, live, before any script for the editor loads. A broken starter stops the site build.
 
 The editor, the result frame and the compiler load when the reader first points at, focuses or touches the block. Nothing extra loads before that. Each edit compiles in the reader's browser, in a background worker. The result runs in a separate frame at `/_code-frame.html`, so the reader's code cannot break the page around it. A build error shows under the line it names, and **Reset** puts the starter back.
 
-One limit: a block holds a single `.tsrx` file. A `.tsrx` file cannot import another `.tsrx` file in the same block, because linking one compiled component to another needs the bundler's full build. Put shared logic in a `.ts` helper instead.
+A block's files import each other by relative path, such as `import Card from './card.tsrx'`, and they can import `@markless/core` and `@markless/ui`. Each `.tsrx` file keeps its own scoped `<style>` block, as it does in an app. Import a UI family by name from the package root, such as `import { accordion } from '@markless/ui'`. The compiler rejects a family path such as `@markless/ui/accordion` with `MARKLESS_UI_IMPORT_SHAPE`, in a block as in an app.
+
+Some things do not run in a block:
+
+- Icon tags, such as `<lucide.plus />`. They need the `ui()` build plugin, which the browser compiler does not run.
+- `storage()`. A block that calls it stops the site build, because of an open bundler issue.
+- Routes, API routes and anything else that needs a server. A block runs one component tree in the browser.
 
 ## Styles belong to their component
 

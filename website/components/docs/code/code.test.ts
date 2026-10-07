@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { compileFiles, entryFile } from './compile.ts';
 import { firstSentence } from './editor.ts';
 import { exportTarget, runtimeImportCall } from './frame-runtime.ts';
-import { createLinker, moduleKey, type LinkHost } from './link.ts';
+import { blockStyles, createLinker, moduleKey, type LinkHost } from './link.ts';
 import type { CompiledModule } from './protocol.ts';
 import { nodeSourceHost } from './node-sources.ts';
 import { groupProblems } from './session.ts';
@@ -268,6 +268,27 @@ describe('createLinker', () => {
 		expect(linker.styles.join('')).toContain('color: teal');
 		for (const code of links.made)
 			expect(code).not.toMatch(/(from|import) ["']\.\/math\.ts["']/);
+	});
+
+	it('gives the frame the styles of a child component the runtime links on its own', async () => {
+		const outcome = await compileFiles(
+			[
+				{
+					name: 'Page.tsrx',
+					code: "import Card from './Card.tsrx';\n\nexport default function Page() @{\n\t<Card />\n}\n",
+				},
+				{
+					name: 'Card.tsrx',
+					code: 'export default function Card() @{\n\t<p class="card">card<style>.card { color: plum; }</style></p>\n}\n',
+				},
+			],
+			'test',
+			host,
+		);
+		if (!outcome.ok) throw new Error(JSON.stringify(outcome.diagnostics));
+		const linker = createLinker(outcome.modules, textHost());
+		await linker.url(outcome.entry);
+		expect(blockStyles(outcome.modules)).toContain('color: plum');
 	});
 
 	it('turns a dynamic import into the host call and links each module once', async () => {

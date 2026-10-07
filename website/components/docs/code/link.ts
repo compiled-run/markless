@@ -76,3 +76,11 @@ export function createLinker(modules: readonly CompiledModule[], host: LinkHost)
 
 	return { url, styles };
 }
+
+/** The CSS of every style module a block compiled; a child component's styles never pass through a link. */
+export function blockStyles(modules: readonly CompiledModule[]): string {
+	return modules
+		.filter((module) => module.kind === 'style')
+		.map((module) => module.code)
+		.join('\n');
+}

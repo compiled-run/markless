@@ -1769,7 +1769,7 @@ try {
 
 		// --- widget: two cards on the styling page --------------------------------
 		await page.goto(`${origin}/concepts/styling`, { waitUntil: 'load' });
-		const cards = page.locator('.playground').first().locator('article.card');
+		const cards = page.locator('.code-block [data-code-stage]').first().locator('article.card');
 		await cards.first().waitFor();
 		const cardGrounds = () =>
 			cards.evaluateAll((nodes) =>
@@ -1791,6 +1791,18 @@ try {
 			groundsLit[1] !== groundsAtRest[1] && groundsLit[0] === groundsAtRest[0],
 			'lighting the chalk card restyles it and leaves the paper card alone',
 			groundsLit.join(' vs '),
+		);
+
+		const paperTab = page.locator('.code-block [data-code-tab="paper-card.tsrx"]').first();
+		await paperTab.click();
+		const paperPane = page.locator('.code-block [data-code-file="paper-card.tsrx"]').first();
+		for (let attempt = 0; attempt < 40; attempt += 1) {
+			if (await paperPane.isVisible()) break;
+			await new Promise((done) => setTimeout(done, 100));
+		}
+		check(
+			(await paperTab.getAttribute('aria-selected')) === 'true' && (await paperPane.isVisible()),
+			'a Code block with several files switches to the file tab the reader clicks',
 		);
 
 		// The first-app page carries the scaffold command and a starter home that runs.
@@ -1839,7 +1851,7 @@ try {
 		// A prop is a live read of the parent's value, and the child body runs once.
 		await page.goto(`${origin}/build/components`, { waitUntil: 'load' });
 		const badgeDemo = page
-			.locator('.playground')
+			.locator('.code-block [data-code-stage]')
 			.filter({ has: page.getByRole('button', { name: 'Add one' }) });
 		const badgeLine = badgeDemo.locator('p').first();
 		await badgeLine.waitFor();

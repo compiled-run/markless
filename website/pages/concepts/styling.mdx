@@ -1,5 +1,4 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import TwoCardsDemo from '../../components/demos/concepts/two-cards-demo.tsrx';
 import StylingSketch from '../../components/sketch/concepts/styling-sketch.tsrx';
 import Collapsible from '../../components/docs/collapsible.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
@@ -28,12 +27,20 @@ Press **Light it up** on the second card.
 
 <StylingSketch />
 
-<TwoCardsDemo />
+<Code note="In paper-card.tsrx, change the background to lightblue. Only the paper card turns blue, though chalk-card.tsrx also styles .card. Then press Light it up on the chalk card.">
+```tsrx title="two-cards.tsrx"
+import PaperCard from './paper-card.tsrx';
+import ChalkCard from './chalk-card.tsrx';
 
-Each card keeps its own look. Neither file mentions the other, and the order of the imports does not
-matter. The button swaps the second card's class, and the scoped `.lit` rule takes over.
+export default function TwoCards() @{
+	<div>
+		<PaperCard />
+		<ChalkCard />
+	</div>
+}
+```
 
-```tsrx
+```tsrx title="paper-card.tsrx"
 export default function PaperCard() @{
 	<article class="card">
 		<style>
@@ -49,7 +56,7 @@ export default function PaperCard() @{
 }
 ```
 
-```tsrx
+```tsrx title="chalk-card.tsrx"
 import { state } from '@markless/core';
 
 export default function ChalkCard() @{
@@ -73,6 +80,10 @@ export default function ChalkCard() @{
 	</article>
 }
 ```
+</Code>
+
+Each card keeps its own look. Neither card file mentions the other, and the order of the imports
+does not matter. The button swaps the second card's class, and the scoped `.lit` rule takes over.
 
 ## The extra class
 

@@ -3,7 +3,7 @@
 // Blob URLs and renders the entry's default export into its body.
 import { render, type RenderTarget } from '@markless/core';
 import { installRuntimeImport, runtimeImportCall, runtimeModuleUrl } from './frame-runtime.ts';
-import { createLinker } from './link.ts';
+import { blockStyles, createLinker } from './link.ts';
 import type {
 	CodeDiagnostic,
 	FrameReply,
@@ -96,7 +96,7 @@ async function run(id: number, files: WorkerRequest['files']): Promise<void> {
 	}
 	if (id !== latest) return;
 	const style = document.createElement('style');
-	style.textContent = linker.styles.join('\n');
+	style.textContent = blockStyles(outcome.modules);
 	stage.replaceChildren(style, mount);
 	for (const old of runs.keys()) if (old < id) runs.delete(old);
 	for (const url of previousUrls) URL.revokeObjectURL(url);
