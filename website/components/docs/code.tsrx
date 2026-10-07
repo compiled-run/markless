@@ -37,23 +37,25 @@ export default function Code({
 	<figure
 		class="code-block"
 		data-code="idle"
-		data-layout="split"
 		onPointerover={(event) => boot(event, files)}
 		onFocusin={(event) => boot(event, files)}
 	>
 		<header class="bar">
-			<span class="title">{title ?? 'Playground'}</span>
+			<span class="title">
+				<span class="glyph" aria-hidden="true"><lucide.squareterminal /></span>
+				{title ?? 'Playground'}
+			</span>
 			<div class="tools" role="toolbar" aria-label="Playground tools">
-				<button type="button" class="tool" data-code-action="reset" aria-label="Reset code" data-tip="Reset code">
+				<button type="button" class="tool" data-code-action="reset" aria-label="Reset code">
 					<lucide.rotateccw aria-hidden="true" />
+					<span>Reset</span>
 				</button>
-				<button type="button" class="tool layout-tool" data-code-action="layout" aria-label="Stack code above result" aria-pressed="false" data-tip="Stack code above result">
-					<lucide.rows2 class="when-split" aria-hidden="true" />
-					<lucide.columns2 class="when-stacked" aria-hidden="true" />
-				</button>
-				<button type="button" class="tool" data-code-action="fullscreen" aria-label="Full screen" aria-pressed="false" data-tip="Full screen">
+				<span class="sep" aria-hidden="true"></span>
+				<button type="button" class="tool" data-code-action="fullscreen" aria-label="Full screen" aria-pressed="false">
 					<lucide.maximize2 class="when-normal" aria-hidden="true" />
 					<lucide.minimize2 class="when-full" aria-hidden="true" />
+					<span class="when-normal">Expand</span>
+					<span class="when-full">Close</span>
 				</button>
 			</div>
 		</header>
@@ -63,23 +65,27 @@ export default function Code({
 			</div>
 			<div class="result" data-code-result>
 				<div class="result-head">
-					<span class="result-tab">Result</span>
+					<span class="result-label">Live preview</span>
 					<span class="status" data-code-status role="status"></span>
+					<span class="live" aria-hidden="true"><i></i>Live</span>
 				</div>
 				<div class="stage-wrap">
-					<div class="stage code-stage" data-code-stage>{children}</div>
+					<div class="sheet">
+						<div class="stage code-stage" data-code-stage>{children}</div>
+					</div>
 					<ul class="problems" data-code-problems hidden aria-label="Problems"></ul>
 				</div>
 			</div>
 		</div>
 		@if (note) {
-			<figcaption class="note"><span class="try">Try this</span> {note}</figcaption>;
+			<figcaption class="note"><span class="try">Try this</span><span class="note-text">{note}</span></figcaption>;
 		}
 		<style>
 			.code-block {
 				--code-band: color-mix(in oklch, var(--ink) 80%, transparent);
 				--code-wash: color-mix(in srgb, var(--purple) 26%, var(--paper));
-				--code-tip-shadow: color-mix(in srgb, var(--purple) 45%, var(--paper));
+				--code-grid: color-mix(in srgb, var(--purple) 30%, transparent);
+				--code-grid-fill: color-mix(in srgb, var(--purple) 9%, var(--paper));
 				--code-head: 2.6rem;
 				--code-gutter: 3.1rem;
 				--code-gutter-ink: var(--muted-ink);
@@ -87,6 +93,7 @@ export default function Code({
 				--code-selection: color-mix(in oklch, var(--yellow) 55%, transparent);
 				--code-problem: oklch(52% 0.19 20);
 				--code-problem-wash: color-mix(in oklch, var(--pink) 18%, transparent);
+				--code-live: oklch(62% 0.15 150);
 				container-type: inline-size;
 				position: relative;
 				display: flex;
@@ -105,10 +112,12 @@ export default function Code({
 
 				html.dark & {
 					--code-wash: color-mix(in srgb, var(--purple) 20%, var(--paper));
-					--code-tip-shadow: color-mix(in srgb, var(--purple) 42%, var(--paper));
+					--code-grid: color-mix(in srgb, var(--purple) 22%, transparent);
+					--code-grid-fill: color-mix(in srgb, var(--purple) 6%, var(--paper));
 					--code-selection: color-mix(in oklch, var(--yellow) 28%, transparent);
 					--code-problem: oklch(76% 0.14 15);
 					--code-problem-wash: color-mix(in oklch, var(--pink) 13%, transparent);
+					--code-live: oklch(74% 0.15 150);
 				}
 			}
 
@@ -117,34 +126,58 @@ export default function Code({
 				align-items: center;
 				justify-content: space-between;
 				gap: var(--space-xs);
-				padding: 0.45rem 0.6rem 0.45rem var(--space-s);
+				padding: 0.5rem 0.75rem 0.5rem var(--space-s);
 				border-bottom: 1px solid var(--code-band);
 				border-radius: 12.5px 12.5px 0 0;
 			}
 
 			.title {
+				display: flex;
+				align-items: center;
+				gap: 0.6rem;
 				font-family: 'Joy Elia', system-ui, sans-serif;
 				font-size: var(--step-0);
 				font-weight: 700;
 				line-height: 1.2;
 			}
 
+			.glyph {
+				display: grid;
+				place-items: center;
+				width: 1.9rem;
+				height: 1.9rem;
+				border: 1.5px solid var(--ink);
+				border-radius: 6px;
+			}
+
+			.glyph svg {
+				width: 1.15rem;
+				height: 1.15rem;
+			}
+
 			.tools {
 				display: flex;
-				gap: 0.35rem;
+				align-items: center;
+				gap: 0.25rem;
+			}
+
+			.sep {
+				width: 1px;
+				height: 1.3rem;
+				background: var(--code-band);
 			}
 
 			.tool {
-				position: relative;
-				display: grid;
-				place-items: center;
-				width: 2rem;
-				height: 2rem;
-				padding: 0;
+				display: inline-flex;
+				align-items: center;
+				gap: 0.4rem;
+				padding: 0.35rem 0.55rem;
 				border: 0;
 				border-radius: 6px;
 				background: transparent;
 				color: var(--ink);
+				font-family: 'Joy Elia', system-ui, sans-serif;
+				font-size: var(--step--1);
 				cursor: pointer;
 				transition: background-color 130ms ease;
 			}
@@ -168,45 +201,13 @@ export default function Code({
 				outline-offset: 2px;
 			}
 
-			.tool::after {
-				content: attr(data-tip);
-				position: absolute;
-				top: calc(100% + 0.45rem);
-				right: 0;
-				z-index: 30;
-				width: max-content;
-				padding: 0.3em 0.65em;
-				border-radius: 6px;
-				background: var(--slab);
-				box-shadow: 3px 3px 0 var(--code-tip-shadow);
-				color: var(--slab-ink);
-				font-family: 'Joy Elia', system-ui, sans-serif;
-				font-size: var(--step--1);
-				line-height: 1.3;
-				opacity: 0;
-				pointer-events: none;
-				transition: opacity 130ms ease;
-			}
-
-			.tool:hover::after {
-				opacity: 1;
-				transition-delay: 450ms;
-			}
-
-			.tool:focus-visible::after {
-				opacity: 1;
-			}
-
-			.when-stacked,
 			.when-full,
-			.code-block[data-layout='stacked'] .when-split,
 			.code-block[data-full] .when-normal {
 				display: none;
 			}
 
-			.code-block[data-layout='stacked'] .when-stacked,
 			.code-block[data-full] .when-full {
-				display: block;
+				display: inline;
 			}
 
 			.body {
@@ -229,43 +230,85 @@ export default function Code({
 
 			.result-head {
 				display: flex;
-				align-items: end;
-				gap: 0.5rem;
+				align-items: center;
+				justify-content: flex-end;
+				gap: 0.9rem;
 				min-height: var(--code-head);
 				box-sizing: border-box;
-				padding-inline: 0.6rem;
+				padding-inline: var(--space-s);
 				border-bottom: 1px solid var(--code-band);
 			}
 
-			.result-tab {
-				position: relative;
-				margin-block-end: -1px;
-				padding: 0.5em 1em;
-				border: 1px solid var(--code-band);
-				border-block-end: 0;
-				border-radius: 6px 6px 0 0;
-				background: var(--code-wash);
+			.result-label {
+				color: var(--muted-ink);
 				font-family: var(--font-mono);
 				font-size: var(--step--2);
-				line-height: 1.55;
+				letter-spacing: 0.12em;
+				text-transform: uppercase;
+			}
+
+			.live {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.4rem;
+				font-size: var(--step--1);
+			}
+
+			.live i {
+				width: 0.7rem;
+				height: 0.7rem;
+				border: 1.5px solid var(--ink);
+				border-radius: 50%;
+				background: var(--code-live);
+			}
+
+			.status:empty {
+				display: none;
 			}
 
 			.status {
-				flex: 1;
-				align-self: center;
-				text-align: end;
 				color: var(--muted-ink);
 			}
 
+			.code-block:is([data-code='running'], [data-code='error']) .live {
+				display: none;
+			}
+
 			.stage-wrap {
+				display: flex;
 				flex: 1;
-				padding: var(--space-s);
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				gap: var(--space-xs);
+				padding: var(--space-m) var(--space-s);
+				background-color: var(--code-grid-fill);
+				background-image:
+					linear-gradient(var(--code-grid) 1px, transparent 1px),
+					linear-gradient(90deg, var(--code-grid) 1px, transparent 1px);
+				background-size: 1.25rem 1.25rem;
+			}
+
+			.sheet {
+				box-sizing: border-box;
+				min-width: min(100%, 14rem);
+				max-width: 100%;
+				padding: var(--space-s) var(--space-m);
+				border: 1.5px solid var(--ink);
+				border-radius: 10px;
+				background: var(--paper);
+				box-shadow: 4px 4px 0 var(--muted-ink);
+			}
+
+			.sheet:has(> .code-frame:not([hidden])) {
+				align-self: stretch;
 			}
 
 			.problems {
 				display: grid;
+				align-self: stretch;
 				gap: 0.5rem;
-				margin: var(--space-xs) 0 0;
+				margin: 0;
 				padding: 0.6rem 0.75rem;
 				list-style: none;
 				border-left: 4px solid var(--code-problem);
@@ -278,11 +321,14 @@ export default function Code({
 				display: none;
 			}
 
-			.code-block[data-code='error'] .stage {
+			.code-block[data-code='error'] .sheet {
 				opacity: 0.5;
 			}
 
 			.note {
+				display: flex;
+				align-items: baseline;
+				gap: 0.9rem;
 				padding: var(--space-xs) var(--space-s);
 				border-top: 1px dashed var(--code-band);
 				border-radius: 0 0 12.5px 12.5px;
@@ -290,25 +336,21 @@ export default function Code({
 			}
 
 			.try {
-				margin-right: 0.35em;
+				flex: none;
+				padding-right: 0.9rem;
+				border-right: 1px solid var(--code-band);
 				font-family: 'Joy Elia', system-ui, sans-serif;
 				font-weight: 700;
 			}
 
-			@container (min-width: 60rem) {
-				.code-block[data-layout='split'] .body {
-					grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+			@container (min-width: 40rem) {
+				.body {
+					grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
 				}
 
-				.code-block[data-layout='split'] .source {
+				.source {
 					border-bottom: 0;
 					border-inline-end: 1px solid var(--code-band);
-				}
-			}
-
-			@container (max-width: 59.99rem) {
-				.layout-tool {
-					display: none;
 				}
 			}
 
@@ -346,11 +388,14 @@ export default function Code({
 				.note {
 					border-radius: 0 0 8.5px 8.5px;
 				}
+
+				.tool span {
+					display: none;
+				}
 			}
 
 			@media (prefers-reduced-motion: reduce) {
-				.tool,
-				.tool::after {
+				.tool {
 					transition: none;
 				}
 			}

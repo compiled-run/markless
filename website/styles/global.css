@@ -607,27 +607,29 @@ html.dark .shiki span:not(.tsrx-tip):not(.tsrx-tip-title):not(.tsrx-tip-body) {
 .code-stage button {
 	align-self: flex-start;
 	margin: 0 0.5rem 0.5rem 0;
-	padding: 0.35em 0.9em;
-	border: 1px solid var(--ink);
+	padding: 0.35em 1em;
+	border: 1.5px solid var(--ink);
 	border-radius: 6px;
-	background: var(--paper);
-	color: var(--ink);
+	background: var(--yellow);
+	box-shadow: 3px 3px 0 var(--ink);
+	color: var(--on-accent);
 	font: inherit;
 	cursor: pointer;
 	transition: background-color 130ms ease;
 }
 
 .code-stage button:hover {
-	background: color-mix(in srgb, var(--purple) 16%, var(--paper));
+	background: color-mix(in srgb, var(--yellow) 80%, var(--paper));
 }
 
 .code-stage button:active {
-	background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+	transform: translate(2px, 2px);
+	box-shadow: 1px 1px 0 var(--ink);
 }
 
 .code-stage button:focus-visible {
 	outline: 2px solid var(--ink);
-	outline-offset: 2px;
+	outline-offset: 3px;
 }
 
 .code-stage :is(ul, ol) {

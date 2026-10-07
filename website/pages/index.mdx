@@ -34,7 +34,9 @@ import { state } from '@markless/core';
 export default function Counter() @{
 	let count = state(0);
 
-	<button onClick={() => count++}>Count {count}</button>
+	<button onClick={() => count++}>
+		Count {count}
+	</button>
 }
 ```
 </Code>
@@ -65,7 +67,9 @@ export default function RolledOnce() @{
 
 	<section>
 		<p>Rolled at setup: {roll}</p>
-		<button onClick={() => count++}>Count {count}</button>
+		<button onClick={() => count++}>
+			Count {count}
+		</button>
 	</section>
 }
 ```
