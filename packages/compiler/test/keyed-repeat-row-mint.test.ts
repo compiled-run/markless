@@ -50,8 +50,9 @@ const renderOnlyHelper = `function shout(value: string) { return String(value).t
 test('a repeat whose row is not mintable carries no row markup', async () => {
 	const view = await viewOf(`${preamble}
 export function App() @{
-	let rows = state([{ id: 'a', on: true }]);
-	<ul>@for (const row of rows; key row.id) { <li>@if (row.on) { <b>yes</b> }</li> }</ul>
+	let rows = state([{ id: 'a' }]);
+	let on = state(true);
+	<ul>@for (const row of rows; key row.id) { <li>@if (on) { <b>yes</b> }</li> }</ul>
 }
 `);
 	expect(view.keyedRepeats).toHaveLength(1);
@@ -217,8 +218,9 @@ export function App() @{
 test('a row holding an @if ships no markup', async () => {
 	const view = await viewOf(`${preamble}
 export function App() @{
-	let rows = state([{ id: 'a', on: true }]);
-	<ul>@for (const row of rows; key row.id) { <li>@if (row.on) { <b>yes</b> }</li> }</ul>
+	let rows = state([{ id: 'a' }]);
+	let on = state(true);
+	<ul>@for (const row of rows; key row.id) { <li>@if (on) { <b>yes</b> }</li> }</ul>
 }
 `);
 	expect(view.keyedRepeats).toHaveLength(1);

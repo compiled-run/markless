@@ -570,12 +570,17 @@ export type ProtocolViewPayload = {
 		 * Carried only for a key-identified repeat whose row start is known and
 		 * whose child is declared in the same module; anything else is refused, so
 		 * the served behaviour stands and the record is byte-identical.
+		 *
+		 * `rowChunkId` replaces `componentEdgeId` for a row whose markup an @if or
+		 * @switch over the row item picks: the client renders that owner chunk
+		 * whole, the way the server did, instead of one edge.
 		 */
 		readonly rowComponent?: {
-			readonly componentEdgeId: string;
+			readonly componentEdgeId?: string;
 			readonly componentName: string;
 			readonly itemPropName?: string;
 			readonly slotPath?: ReadonlyArray<number>;
+			readonly rowChunkId?: string;
 		};
 		readonly rowElementHandles?: ReadonlyArray<{
 			readonly hostPath: ReadonlyArray<number>;

@@ -2775,6 +2775,80 @@ test('compileTsrxModule renders sibling top-level elements as an implicit fragme
 	);
 });
 
+test('compileTsrxModule refuses a component whose whole template is a bare @for', async () => {
+	const loopOnly = `
+	@for (const item of items; key item.id) {
+		<li>{item.id}</li>
+	}`;
+	const rootDiagnostics = (result: Awaited<ReturnType<typeof compileTsrxModule>>) =>
+		result.publicRenderModule.diagnostics.filter(
+			(entry) => entry.code === 'MARKLESS_PUBLIC_RENDER_ROOT_UNSUPPORTED',
+		);
+
+	const alone = await compileTsrxModule({
+		filename: 'src/List.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export default function List() @{
+	const items = state([{ id: 'a' }]);${loopOnly}
+}
+`,
+		symbols: [],
+	});
+	expect(rootDiagnostics(alone)).toEqual([
+		expect.objectContaining({
+			severity: 'error',
+			title: 'This component root cannot be rendered yet',
+			message: expect.stringContaining('<List> is one @for loop with no element around it'),
+			suggestions: [{ message: expect.stringContaining('Wrap the @for loop in an element') }],
+			docsUrl: 'https://markless.dev/errors/MARKLESS_PUBLIC_RENDER_ROOT_UNSUPPORTED',
+		}),
+	]);
+
+	// A helper beside a rooted page is refused too: the page would render it as nothing.
+	const helper = await compileTsrxModule({
+		filename: 'src/Page.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+function Rows({ items }) @{${loopOnly}
+}
+
+export default function Page() @{
+	const items = state([{ id: 'a' }]);
+	<ul><Rows items={items} /></ul>
+}
+`,
+		symbols: [],
+	});
+	expect(rootDiagnostics(helper)).toEqual([
+		expect.objectContaining({
+			severity: 'error',
+			message: expect.stringContaining('<Rows> is one @for loop'),
+		}),
+	]);
+
+	for (const template of [
+		`<ul>${loopOnly}</ul>`,
+		`<h2>Items</h2>${loopOnly}`,
+	]) {
+		const accepted = await compileTsrxModule({
+			filename: 'src/Accepted.tsrx',
+			source: `
+import { state } from '@markless/core';
+
+export default function Accepted() @{
+	const items = state([{ id: 'a' }]);
+	${template}
+}
+`,
+			symbols: [],
+		});
+		expect(rootDiagnostics(accepted)).toEqual([]);
+	}
+});
+
 test('compileTsrxModule gives implicit sibling roots the explicit fragment diagnostics', async () => {
 	const withComponent = (open: string, close: string) => `
 import { Widget } from './widget.tsrx';

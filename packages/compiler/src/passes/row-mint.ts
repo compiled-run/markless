@@ -15,7 +15,8 @@ import { TEMPLATE_EXPRESSION_GRAPH_NODE_PREFIX } from './public-render/html.ts';
 import { createResidueDependencyReader } from './public-render/residue-dependencies.ts';
 
 export type RowComponentMint = {
-	readonly componentEdgeId: string;
+	/** Absent when `rowChunkId` names the row's own markup instead of one edge. */
+	readonly componentEdgeId?: string;
 	readonly componentName: string;
 	readonly itemPropName?: string;
 	/**
@@ -24,6 +25,11 @@ export type RowComponentMint = {
 	 * the component and there is no wrapper to place it in.
 	 */
 	readonly slotPath?: ReadonlyArray<number>;
+	/**
+	 * The owner's row chunk, rendered whole for each new row: set for a row that
+	 * picks its markup with an @if or @switch over the row item.
+	 */
+	readonly rowChunkId?: string;
 };
 
 /**
@@ -103,6 +109,128 @@ export function resolveRowComponentMint(
 		...(itemProps.length === 1 ? { itemPropName: itemProps[0]!.name } : {}),
 		...(wraps ? { slotPath: slot.coordinate.path } : {}),
 	};
+}
+
+/**
+ * A row whose markup an @if or @switch picks from the row item, rendered whole
+ * by the client the way the server rendered it.
+ *
+ * The record names the owner's row chunk, and the mint runs the same chunk
+ * render the server ran - arm choice, child components and projections included -
+ * in the row's own identity. Admitted only when everything the row renders is
+ * decided by the row itself: a branch test over the row's names, text and
+ * attribute values that stay current with the row, owner elements carrying no
+ * record a minted row would have to register, and child components the reach
+ * question clears. A test that reads page state would have to flip inside a
+ * minted row, which nothing registers, so it is refused.
+ */
+export function resolveRowChunkMint(
+	input: RowMintInput & {
+		readonly rowChunkId: string;
+		readonly rowElementCount: number;
+		readonly rowNames: ReadonlyArray<string>;
+	},
+): RowComponentMint | null {
+	const chunk = input.chunks.find((candidate) => candidate.id === input.rowChunkId);
+	if (!chunk?.componentName || !input.semanticGraph || input.rowElementCount < 1) return null;
+	if (!chunk.slots.some((slot) => slot.kind === 'branch')) return null;
+	// One row element holds everything, so the row's root is that element whichever arm renders.
+	if (chunk.hosts.filter((host) => host.coordinate.path.length === 1).length !== 1) return null;
+	const onRowElement = chunk.slots.every(
+		(slot) =>
+			slot.coordinate.path[0] === 0 &&
+			(slot.kind === 'attribute' || slot.coordinate.path.length > 1),
+	);
+	if (!onRowElement) return null;
+	if (!rowContentIsMintable(input, chunk.id, new Set(), input.rowNames)) return null;
+	return { componentName: chunk.componentName, rowChunkId: chunk.id };
+}
+
+function rowContentIsMintable(
+	input: RowMintInput,
+	chunkId: string,
+	seen: Set<string>,
+	rowNames: ReadonlyArray<string>,
+): boolean {
+	if (seen.has(chunkId)) return false;
+	seen.add(chunkId);
+	const chunk = input.chunks.find((candidate) => candidate.id === chunkId);
+	if (!chunk || !input.recordHostIds) return false;
+	if (chunk.hosts.some((host) => input.recordHostIds!.has(host.hostNodeId))) return false;
+	return chunk.slots.every((slot) => {
+		if (slot.kind === 'text' || slot.kind === 'attribute') {
+			if (slot.residue.kind === 'repeat-item') return true;
+			return (
+				slot.residue.kind === 'authored-expression' &&
+				readsOnlyTheRow(input, chunk.componentName, slot.residue.source, rowNames)
+			);
+		}
+		if (slot.kind === 'branch') {
+			const site = input.semanticGraph?.branchSites.find(
+				(candidate) => candidate.id === slot.branchSiteId,
+			);
+			if (!site || site.asyncBoundaryId || site.testComputedGraphNodeId) return false;
+			if (!readsOnlyTheRow(input, chunk.componentName, site.testSource, rowNames)) return false;
+			return slot.armTemplateIds.every((armChunkId) =>
+				rowContentIsMintable(input, armChunkId, seen, rowNames),
+			);
+		}
+		if (slot.kind !== 'child-component') return false;
+		if (
+			slot.projectionChunkId !== undefined &&
+			(!projectionIsMintable(input, slot.projectionChunkId, seen, rowNames) ||
+				!projectionCarriesNoRecords(input, slot.projectionChunkId, new Set()))
+		)
+			return false;
+		const edge = input.componentEdges.find((candidate) => candidate.id === slot.componentEdgeId);
+		if (!edge || edge.parentComponentName !== chunk.componentName) return false;
+		if (edge.children.childCount > 0 && slot.projectionChunkId === undefined) return false;
+		return childIsMintable(input, edge, slot.childTemplateId, new Set());
+	});
+}
+
+// The row renders with an empty owner view, so an owner element it projects must need no record.
+function projectionCarriesNoRecords(
+	input: RowMintInput,
+	chunkId: string,
+	seen: Set<string>,
+): boolean {
+	if (seen.has(chunkId)) return true;
+	seen.add(chunkId);
+	const chunk = input.chunks.find((candidate) => candidate.id === chunkId);
+	if (!chunk || chunk.hosts.some((host) => input.recordHostIds?.has(host.hostNodeId) ?? true))
+		return false;
+	return chunk.slots.every((slot) => {
+		if (slot.kind === 'child-component')
+			return slot.projectionChunkId === undefined
+				? true
+				: projectionCarriesNoRecords(input, slot.projectionChunkId, seen);
+		if (slot.kind === 'repeat')
+			return [slot.rowTemplateId, ...(slot.emptyTemplateId ? [slot.emptyTemplateId] : [])].every(
+				(nested) => projectionCarriesNoRecords(input, nested, seen),
+			);
+		return true;
+	});
+}
+
+// Answered by the owner's reader with nothing outside the row: a graph read here would go stale in a minted row.
+function readsOnlyTheRow(
+	input: RowMintInput,
+	componentName: string | undefined,
+	source: string,
+	rowNames: ReadonlyArray<string>,
+): boolean {
+	if (!input.semanticGraph || !componentName) return false;
+	const value = expressionSlotValue(
+		{
+			kind: 'text',
+			residue: { kind: 'authored-expression', source },
+		} as SemanticMarkupSlot,
+		input.semanticGraph,
+		componentName,
+		new Set(rowNames),
+	);
+	return value !== null && !('reads' in value && value.reads?.length);
 }
 
 export type RowMintInput = ConstructReachInput & {

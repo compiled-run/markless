@@ -415,18 +415,28 @@ test('render summary coalesces callers arriving across separate task checkpoints
 	vi.stubGlobal('requestAnimationFrame', (callback: () => void) => setTimeout(callback, 16));
 
 	const mod = await importExecutionLogModule(executionLogVirtualModuleSource());
-	const calls = [];
-	for (let index = 0; index < 3; index++) {
-		calls.push(mod.logMarklessRenderSummary());
-		await new Promise((resolve) => setTimeout(resolve, 1));
+	// Fake clock: a stalled worker must not stretch three 1 ms gaps past the frame.
+	vi.useFakeTimers();
+	try {
+		const calls = [];
+		for (let index = 0; index < 3; index++) {
+			calls.push(mod.logMarklessRenderSummary());
+			await vi.advanceTimersByTimeAsync(1);
+		}
+		expect(logged).toHaveLength(0);
+		await vi.advanceTimersByTimeAsync(16);
+		await Promise.all(calls);
+
+		expect(logged).toHaveLength(1);
+
+		const next = mod.logMarklessRenderSummary();
+		await vi.advanceTimersByTimeAsync(16);
+		await next;
+
+		expect(logged).toHaveLength(2);
+	} finally {
+		vi.useRealTimers();
 	}
-	await Promise.all(calls);
-
-	expect(logged).toHaveLength(1);
-
-	await mod.logMarklessRenderSummary();
-
-	expect(logged).toHaveLength(2);
 });
 
 test('interaction rows resolve qualified symbol ids and display them short', async () => {

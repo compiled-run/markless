@@ -180,7 +180,10 @@ function refusalCause(
 		case 'nested-construct':
 			return {
 				message: `This @for row holds ${refusal.label}, and a construct inside the row is wiring the browser would have to register per row.`,
-				suggestion: `Lift ${refusal.label} outside the @for, or keep the row to plain elements and text read off ${itemName}.`,
+				suggestion:
+					refusal.label === '@if' || refusal.label === '@switch'
+						? `Make the ${refusal.label} test read only ${itemName}, and keep its arms to elements, text and components that read only ${itemName}, so a new row can pick its own arm; or lift ${refusal.label} outside the @for.`
+						: `Lift ${refusal.label} outside the @for, or keep the row to plain elements and text read off ${itemName}.`,
 			};
 		case 'attribute':
 			return {

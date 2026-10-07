@@ -554,7 +554,8 @@ function assertOptionalRowComponent(record: Record<string, unknown>, context: st
 	const rowComponent = record.rowComponent;
 	if (rowComponent === undefined) return;
 	assertRecordShape(rowComponent, context);
-	assertStringField(rowComponent, 'componentEdgeId', context);
+	if (rowComponent.rowChunkId === undefined) assertStringField(rowComponent, 'componentEdgeId', context);
+	else assertStringField(rowComponent, 'rowChunkId', context);
 	assertStringField(rowComponent, 'componentName', context);
 	assertOptionalStringField(rowComponent, 'itemPropName', context);
 	if (rowComponent.slotPath !== undefined)

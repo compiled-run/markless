@@ -544,16 +544,8 @@ for (const mode of MODES) {
 		await expectLinkMovesTheCurrentPage();
 	});
 
-	// Expected red: a click inside a keyed row lands nothing at all - not the write,
-	// not the callback. The two flat cases bound the cause. In `Basic` the same
-	// `item > itemtrigger` nesting outside a loop moves aria-current on click; in
-	// `WithOnChange`, flat, the write lands and only the callback is lost. Here, both
-	// inside a keyed row AND one part deeper than the root's direct children, neither
-	// arrives. The item part's projection site is registered in the root's subtree
-	// while the dispatching part is spelled in the consumer's, so the item's shared
-	// id stays in page space; that registration gap lives in composition's projection
-	// bridge, not in this family.
-	test.fails(`${mode}: the rendered controls follow the page as the range changes`, async () => {
+	// Rows the range adds after load are built in the browser, each picking its own arm.
+	test(`${mode}: the rendered controls follow the page as the range changes`, async () => {
 		if (mode === 'CSR') await render(Products);
 		else await renderSSR(Products);
 		await expectTheRenderedRowSetFollowsThePage();
@@ -626,10 +618,7 @@ test('SSR: the served page carries the current page and both bounds', async () =
 	expect(at('itemtrigger-1').hasAttribute('aria-current')).toBe(false);
 });
 
-// Expected red on the post-click half only: the served range arrives exactly as the
-// family computed it, and then the first click after resume lands nothing, for the
-// row-dispatch reason named above.
-test.fails('SSR: the served looped range is the one the consumer computed', async () => {
+test('SSR: the served looped range is the one the consumer computed', async () => {
 	await renderSSR(Products);
 	expect(renderedPages()).toEqual(['1', '2', '3', '4', '5', '20']);
 	expect(ellipsisCount()).toBe(1);

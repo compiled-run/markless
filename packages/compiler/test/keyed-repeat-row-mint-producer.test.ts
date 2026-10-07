@@ -89,15 +89,30 @@ test('a row calling a method on that cell mints from the expression and stays si
 	]);
 });
 
-test('a row holding a construct warns that the list can never grow', async () => {
+test('a row holding a construct over page state warns that the list can never grow', async () => {
 	const compiled = await compilePage(
-		`<ul>@for (const row of rows; key row.id) { <li>@if (row.on) { <em>on</em> } @else { <em>off</em> }</li> }</ul>`,
+		`<ul>@for (const row of rows; key row.id) { <li>@if (chosen === 'a') { <em>on</em> } @else { <em>off</em> }</li> }</ul>`,
 	);
 
 	expect(rowMintWarnings(compiled)).toEqual([
 		['warning', expect.stringContaining('This @for row holds @if')],
 	]);
 	expect(rowRecord(compiled)?.rowTemplate).toBeUndefined();
+	expect(rowRecord(compiled)?.rowComponent).toBeUndefined();
+});
+
+// The row decides its own arm, so the browser renders the whole row chunk for a new row.
+test('a row whose @if reads only the row item stays silent - the payload names the row chunk', async () => {
+	const compiled = await compilePage(
+		`<ul>@for (const row of rows; key row.id) { <li>@if (row.on) { <em>on</em> } @else { <em>off</em> }</li> }</ul>`,
+	);
+
+	expect(rowMintWarnings(compiled)).toEqual([]);
+	expect(rowRecord(compiled)?.rowTemplate).toBeUndefined();
+	expect(rowRecord(compiled)?.rowComponent).toEqual({
+		componentName: 'App',
+		rowChunkId: 'repeat:repeat:0:row',
+	});
 });
 
 test('a row whose element wraps a component stays silent - both halves ship', async () => {
@@ -132,9 +147,22 @@ test('a wrapper whose value only rendering produces warns, component inside or n
 
 // A wrapper holding a construct is refused by the same clause for the same
 // reason: its anchors were counted once, for the rows the page served.
-test('a wrapper holding a branch around a component warns', async () => {
+test('a wrapper holding an item-only branch beside a component renders its whole row chunk', async () => {
 	const compiled = await compilePage(
 		`<ul>@for (const row of rows; key row.id) { <li>@if (row.on) { <em>on</em> }<Cell label={row.label} /></li> }</ul>`,
+	);
+
+	expect(rowMintWarnings(compiled)).toEqual([]);
+	expect(rowRecord(compiled)?.rowComponent).toEqual({
+		componentName: 'App',
+		rowChunkId: 'repeat:repeat:0:row',
+	});
+	expect(rowRecord(compiled)?.rowTemplate).toBeUndefined();
+});
+
+test('a wrapper holding a page-state branch beside a component warns', async () => {
+	const compiled = await compilePage(
+		`<ul>@for (const row of rows; key row.id) { <li>@if (chosen === 'a') { <em>on</em> }<Cell label={row.label} /></li> }</ul>`,
 	);
 
 	expect(rowMintWarnings(compiled)).toEqual([
