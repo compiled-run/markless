@@ -10,7 +10,7 @@ import LikeHeart from '../../components/docs/like-heart.tsrx';
 
 # A value you work out is never out of date
 
-<PageMeta level="Start here" time="4 min" assumes="state" sprite="spiral" />
+<PageMeta level="Start here" time="3 min" assumes="state" sprite="spiral" />
 
 <ThemeToggle />
 
@@ -31,9 +31,9 @@ Markless reads the recipe and sees `mugs` and `coasters` in it.
 
 ## Fill the basket
 
-Press **Add a mug**. Then press **Add a coaster** twice. Watch the total.
-
 <ComputedSketch />
+
+In the code below, press **Add a mug**. Then press **Add a coaster** twice. Watch the total.
 
 <Code note="Add a third item with its own state() and price, put it in the recipe and give it a button. Then write total = 0 in a click handler and read the build error.">
 ```tsrx title="mug-order.tsrx"
@@ -87,16 +87,8 @@ changes. Each change starts in a handler, so the handler is the place for its si
 <Collapsible
 	sprite="star-badge"
 	summary="Coming from another framework?"
-	text="There is no dependency array to keep accurate, because Markless reads the recipe and finds its inputs before your app runs. There is no effect hook either. Derive values with computed(), and do side work in the handler where the change starts."
+	text="There is no dependency array to keep accurate. Markless reads the recipe and finds its inputs before your app runs. There is no effect hook either. Derive values with computed(), and do side work in the handler where the change starts."
 />
-
-## Try this
-
-Add a third item to the order, with its own `state()` and price. Add it to the recipe and give it a
-button. The total follows, and you changed one line of the recipe to make that happen.
-
-Then try to cheat: write `total = 0` in a click handler and build. The error tells you to change the
-inputs instead.
 
 Next: [events](/concepts/events), where a click turns into a change.
 

@@ -9,7 +9,7 @@ import LikeHeart from '../../components/docs/like-heart.tsrx';
 
 # Waiting is a block, not a flag
 
-<PageMeta level="Building" time="5 min" assumes="state, computed, conditionals" sprite="arrow-loop" />
+<PageMeta level="Start here" time="3 min" assumes="state, computed, conditionals" sprite="arrow-loop" />
 
 <ThemeToggle />
 
@@ -23,11 +23,12 @@ wait, and one for a failure.**
 
 ## Pick a mug
 
-Press **Tall mug** and wait a moment. Press **Small mug**. Then press **Cracked mug**.
-
 <AsyncSketch />
 
-<Code note="Delete the @catch block and pick the cracked mug. Then move const which = mug; below the await line and read the build error.">
+In the code below, press **Tall mug** and wait a moment. Press **Small mug**. Then press **Cracked
+mug**.
+
+<Code note="Delete the @catch block and pick the cracked mug. Then change the return line to return { text: (await loadMugFact(which)) + mug }; and read the build error.">
 ```tsrx title="mug-facts.tsrx"
 import { computed, state } from '@markless/core';
 import { loadMugFact } from './mug-facts.ts';
@@ -73,9 +74,8 @@ export function loadMugFact(mug: string): Promise<string> {
 ```
 </Code>
 
-Each pick runs the recipe again. The old answer stays on the page until the new one is ready, then
-swaps. The cracked mug fails, and the `@catch` block takes its place. Pick another mug and the page
-recovers.
+Each pick runs the recipe again. When the answer is ready, it swaps in. The cracked mug fails, and
+the `@catch` block takes its place. Pick another mug and the page recovers.
 
 `loadMugFact`, in the `mug-facts.ts` tab, stands in for a `fetch`. It answers "Pick a mug." straight
 away, waits before it answers anything else, and fails for a mug it does not know.
@@ -87,9 +87,8 @@ away, waits before it answers anything else, and fails for a mug it does not kno
 
 `@catch` holds what you show when the recipe throws or its promise rejects.
 
-`@pending` holds what you show while there is no answer yet, such as the first render of a
-browser-only app. This page arrived with its first answer, "Pick a mug.", already in place. Later
-picks keep the old answer on screen. So on this page, `@pending` has nothing to cover.
+`@pending` holds what you show while there is no answer yet. If a new answer takes a while, it can
+show again.
 
 <Callout
 	sprite="cross"
@@ -102,14 +101,6 @@ picks keep the old answer on screen. So on this page, `@pending` has nothing to 
 The recipe copies `mug` into `which` before it awaits anything. That is on purpose. The reads before
 the first `await` tell Markless when to run the recipe again. A state read after an `await` stops the
 build with `MARKLESS_ASYNC_POST_AWAIT_READ`.
-
-## Try this
-
-Delete the `@catch` block and pick the cracked mug. The answer disappears, and nothing on the page
-says why. Put the block back. It is the only place your page says what failure looks like.
-
-Then move `const which = mug;` below the `await` line and build. Read the error, and move the line
-back.
 
 Next: [two components that both call something .card](/concepts/styling).
 

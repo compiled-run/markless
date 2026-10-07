@@ -23,7 +23,7 @@ import WhereItRuns from '../components/sketch/start/where-it-runs.tsrx';
 
 <ThemeToggle />
 
-<Subtitle text="Markless is a way to build user interfaces from plain TypeScript functions. The same component runs in a browser tab, on a server, or in a test." />
+<Subtitle text="Markless is a way to build user interfaces from TypeScript functions with markup in them. The same component runs in a browser tab, on a server, or in a test." />
 
 Here is a whole component. Click the button a few times. Then change the code, and the result changes with it.
 
@@ -41,7 +41,7 @@ export default function Counter() @{
 
 `count` is a plain variable. You read it by writing `count`, and you change it with `count++`. There is no setter to call and nothing to unwrap.
 
-`state(0)` is the one new word. It tells Markless that the page shows this value, so the page has to follow it.
+`state(0)` is the one new word. It tells Markless this value can change, so the page has to follow it.
 
 ## Markless reads your component first
 

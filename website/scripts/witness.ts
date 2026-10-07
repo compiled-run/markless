@@ -1718,9 +1718,7 @@ try {
 		}
 
 		// --- widget: the mug facts on the async page ------------------------------
-		// The page's claim: each pick runs the recipe again, the old answer stays
-		// until the new one is ready, a failure swaps in @catch, and a later pick
-		// recovers. Every text read while waiting must be the old or the new answer.
+		// On the served page every text read while waiting must be the old or the new answer.
 		await page.goto(`${origin}/concepts/async`, { waitUntil: 'load' });
 		const facts = page.locator('.code-block [data-code-stage]').first();
 		const factLine = facts.locator('p').first();

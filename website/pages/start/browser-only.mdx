@@ -10,7 +10,7 @@ import RenderIntoApp from '../../components/sketch/start/render-into-app.tsrx';
 
 # One HTML page, one empty div, no server
 
-<PageMeta level="Start here" time="5 min" assumes="nothing" sprite="square" />
+<PageMeta level="Start here" time="2 min" assumes="nothing" sprite="square" />
 
 <ThemeToggle />
 
@@ -20,7 +20,7 @@ Markless works there too. You need two packages, `@markless/core` and `vite`, an
 
 **`render(App, { target })` runs your component once and puts what it made into the element you pass.**
 
-Here is the result. The dashed box is the `<div id="app">` from `index.html`, and the counter is what `render()` put inside it:
+Here is the result. The dashed box is the `<div id="app">` from `index.html`. The counter that runs inside it is the same `App`:
 
 <AppTargetDemo />
 

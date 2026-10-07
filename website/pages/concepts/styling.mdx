@@ -10,7 +10,7 @@ import LikeHeart from '../../components/docs/like-heart.tsrx';
 
 # Two components can both call it .card
 
-<PageMeta level="Start here" time="5 min" assumes="state" sprite="flower" />
+<PageMeta level="Start here" time="3 min" assumes="state" sprite="flower" />
 
 <ThemeToggle />
 
@@ -22,10 +22,10 @@ else.**
 
 ## Two cards, one class name
 
-Both cards below use the class `card`. Both files say what `.card` looks like, and they disagree.
-Press **Light it up** on the second card.
-
 <StylingSketch />
+
+Both cards in the code below use the class `card`. Both files say what `.card` looks like, and they
+disagree. Press **Light it up** on the second card.
 
 <Code note="In paper-card.tsrx, change the background to lightblue. Only the paper card turns blue, though chalk-card.tsrx also styles .card. Then press Light it up on the chalk card.">
 ```tsrx title="two-cards.tsrx"
@@ -97,7 +97,7 @@ the first file's article.
 
 Rules inside `@media` get the class too. `@keyframes` names stay as you wrote them.
 
-The rules end up in an ordinary stylesheet that the page links to. No script runs to apply them.
+In a built app, the rules end up in an ordinary stylesheet that the page links to. No script runs to apply them.
 
 ## A class is a string
 
@@ -107,7 +107,7 @@ The second card uses `lit ? 'card lit' : 'card'`, and the page updates the class
 <Callout
 	sprite="cross"
 	title="Why does my class say [object Object]?"
-	text="An object or an array is not a class string. Write class={{ lit: on }} or class={['card', on && 'lit']} and the page renders class='[object Object]'. Markless warns with MARKLESS_ATTRIBUTE_OBJECT_VALUE, and if the value reads state the build stops with MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED. Build the string with a ? : instead."
+	text="An object or an array is not a class string. Write class={{ lit: on }} and the page renders class='[object Object]'. An array such as ['card', on && 'lit'] renders as 'card,false'. Markless warns with MARKLESS_ATTRIBUTE_OBJECT_VALUE either way. If the value reads state, the build stops with MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED. Build the string with a ? : instead."
 />
 
 ## One file, one class
@@ -122,14 +122,14 @@ ordinary stylesheet.
 <Collapsible
 	sprite="thought-bubble"
 	summary="Coming from another framework?"
-	text="This is close to scoped styles in single-file components. You write the plain class name, and Markless adds one class per file to selectors and elements when it builds your app. What you see in the inspector is your own class name next to the added one."
+	text="This is close to scoped styles in single-file components. You write the plain class name. When Markless builds your app, it adds one class per file to selectors and elements. What you see in the inspector is your own class name next to the added one."
 />
 
 ## Try this
 
 Open your browser's inspector on one of the cards. Find your own `card` class and the `mk-` class
-beside it. Then copy `PaperCard` into a new file, change one colour, and put both on a page. Two
-identical selectors, and neither one wins.
+beside it. In `chalk-card.tsrx`, make its `.card` rule match the paper card's, then change one colour. Each
+card keeps its own look.
 
 Next: [splitting a page into components](/build/components).
 

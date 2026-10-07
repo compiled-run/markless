@@ -9,7 +9,7 @@ import LikeHeart from '../../components/docs/like-heart.tsrx';
 
 # A key tells the page which row is which
 
-<PageMeta level="Start here" time="5 min" assumes="state, events, conditionals" sprite="dashes" />
+<PageMeta level="Start here" time="3 min" assumes="state, events, conditionals" sprite="dashes" />
 
 <ThemeToggle />
 
@@ -22,9 +22,10 @@ were the same rows in a new order.
 
 ## Tick a row, then sort
 
-Tick **Pears**. Press **Sort A to Z**. Then press **Remove ticked** until the list is empty.
-
 <ListsSketch />
+
+In the code below, tick **Pears**. Press **Sort A to Z**. Then tick every row and press **Remove
+ticked**. The `@empty` line takes over.
 
 <Code note="Add { id: 'beans', name: 'Beans', done: false } to the starting list. Tick Beans and sort: the tick rides along.">
 ```tsrx title="shopping-list.tsrx"
@@ -98,16 +99,8 @@ export default function Steps() @{
 <Callout
 	sprite="cross"
 	title="What if I leave the key off?"
-	text="A @for over state needs a key. Leave it off and the build stops with MARKLESS_REPEAT_KEY_REQUIRED and points at the loop header. Key by position, as in key i, and the build warns with MARKLESS_REPEAT_KEY_IS_INDEX, because a row would then follow its slot and not its data."
+	text="Every @for needs a key. Leave it off and the build stops with MARKLESS_REPEAT_KEY_REQUIRED and points at the loop header. Key by position, as in key i, and the build warns with MARKLESS_REPEAT_KEY_IS_INDEX. A row then follows its slot and not its data."
 />
-
-## Try this
-
-Add a fourth item, `{ id: 'beans', name: 'Beans', done: false }`, to the starting list. Tick it
-and sort. The tick rides along with Beans.
-
-Then change the header to `@for (const item of items; index i; key i)` and build. Read the warning
-in your terminal. Put `key item.id` back.
 
 Next: [how a page waits for data](/concepts/async).
 

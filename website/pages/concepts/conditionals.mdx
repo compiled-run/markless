@@ -9,7 +9,7 @@ import LikeHeart from '../../components/docs/like-heart.tsrx';
 
 # A hidden branch is not hidden, it is gone
 
-<PageMeta level="Start here" time="5 min" assumes="state, computed, events" sprite="corner-bracket" />
+<PageMeta level="Start here" time="3 min" assumes="state, computed, events" sprite="corner-bracket" />
 
 <ThemeToggle />
 
@@ -24,12 +24,12 @@ you declare it above the branch.**
 
 ## Close it, open it again
 
-Press **Show or hide the note**. Type a note longer than twenty letters. Close the panel, then open
-it again.
-
 <ConditionalsSketch />
 
-<Code note="Move let note = state('') inside the @if and read the build error. Put it back. Then change 20 to 5 and type a six-letter word.">
+In the code below, press **Show or hide the note**. Type a note longer than twenty characters. Close
+the panel, then open it again.
+
+<Code note="Move let note = state('') inside the @if and read the build error. Put it back. Then change 20 to 5 and type six characters.">
 ```tsrx title="note-panel.tsrx"
 import { computed, state } from '@markless/core';
 
@@ -112,13 +112,8 @@ this is the fix.
 <Callout
 	sprite="cross"
 	title="Why can't I put an @if inside another @if?"
-	text="Today a branch cannot hold another branch. An @if or @switch inside an @if, or an @else if chain, stops the build with MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED. Put the branches side by side, as the demo does, or use @switch when one value picks between three or more cases."
+	text="Today a branch cannot hold another branch. An @if or @switch inside an @if, or an @else if chain, stops the build with MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED. Put the branches side by side, as the demo does. Or use @switch when one value picks between three or more cases."
 />
-
-## Try this
-
-Move `let note = state('');` inside the `@if` and build. Read the error and find the line it points
-at. Move the line back above the branch and build again.
 
 Next: [rows that keep their own state when the list moves](/concepts/lists).
 

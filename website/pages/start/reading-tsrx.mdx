@@ -10,7 +10,7 @@ import LineToPart from '../../components/sketch/start/line-to-part.tsrx';
 
 # A .tsrx file is TypeScript with markup in it
 
-<PageMeta level="Start here" time="6 min" assumes="nothing" sprite="bookmark" />
+<PageMeta level="Start here" time="4 min" assumes="nothing" sprite="bookmark" />
 
 <ThemeToggle />
 
@@ -46,7 +46,7 @@ export default function Counter() @{
 
 **`onClick={() => count++}`** handles a click. An event prop is `on` plus the event name, so `onInput` and `onKeyDown` work the same way.
 
-**`{count}`** is a hole in the markup. Curly braces hold any expression, in text or in an attribute. When `count` changes, that text changes with it.
+**`{count}`** is a hole in the markup. Curly braces hold an expression, in text or in an attribute: a read like `{count}`, or math like `{count * 2}`. When `count` changes, that text changes with it.
 
 ## More than one element
 
@@ -138,7 +138,7 @@ The default `minimal` starter has the same files, minus `document.tsrx`, `404.ts
 | `vite.config.ts` | Adds the `markless()` and `router()` plugins. |
 | `tsconfig.json` | Lets your editor read `.tsrx` files. |
 | `scripts/markless-doctor.mjs` | Checks your setup. Run it with `npm run doctor`. |
-| `.vscode/`, `.zed/` | Editor settings. VS Code suggests the TSRX extension. |
+| `.vscode/`, `.zed/` | Editor settings. VS Code suggests the TSRX extension, `ripple-ts.ripple-ts-vscode-plugin`. |
 
 Every starter has this `vite.config.ts`:
 

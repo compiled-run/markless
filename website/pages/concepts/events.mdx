@@ -9,7 +9,7 @@ import LikeHeart from '../../components/docs/like-heart.tsrx';
 
 # Events hand you the browser's own event
 
-<PageMeta level="Start here" time="4 min" assumes="state" sprite="bolt" />
+<PageMeta level="Start here" time="3 min" assumes="state" sprite="bolt" />
 
 <ThemeToggle />
 
@@ -17,7 +17,7 @@ You have written this in a plain script, with no framework anywhere near it:
 
 ```ts
 input.addEventListener('input', (event) => {
-	console.log(event.currentTarget.value);
+	name = event.currentTarget.value;
 });
 ```
 
@@ -29,7 +29,7 @@ Everything in that line still holds here. Same event names, same event object, s
 <input onInput={(event) => (name = event.currentTarget.value)} />
 ```
 
-`event.key`, `event.currentTarget` and `event.preventDefault()` are the real ones. The docs you read
+`event.key`, `event.target` and `event.preventDefault()` are the real ones. The docs you read
 when you learned the DOM still apply.
 
 ## Print a mug
@@ -112,7 +112,7 @@ variable.
 <Callout
 	sprite="cross"
 	title="Why does preventDefault() inside an if stop the build?"
-	text="The browser decides about its default action the moment the event fires. So Markless runs your preventDefault() decision right then, before the rest of the handler. That only works if the if test reads state, props, constants, or fields of the event, such as event.key === 'Enter'. A test that reads anything else stops the build with MARKLESS_SYNC_POLICY_UNEXTRACTABLE."
+	text="The browser decides about its default action the moment the event fires. So Markless runs your preventDefault() decision right then, before the rest of the handler. That only works if the if test reads state, props or constants. It can also compare one field of the event with a fixed value, such as event.key === 'Enter'. A test that reads anything else stops the build with MARKLESS_SYNC_POLICY_UNEXTRACTABLE."
 />
 
 ## Try this

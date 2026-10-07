@@ -10,13 +10,13 @@ import LikeHeart from '../../components/docs/like-heart.tsrx';
 
 # State is a variable the page watches
 
-<PageMeta level="Start here" time="4 min" assumes="reading-tsrx" sprite="burst" />
+<PageMeta level="Start here" time="3 min" assumes="reading-tsrx" sprite="burst" />
 
 <ThemeToggle />
 
 You already know how to count in JavaScript.
 
-```tsrx
+```ts
 let cups = 0;
 cups++;
 ```
@@ -35,9 +35,10 @@ difference: every spot on the page that shows `cups` now changes when `cups` cha
 
 ## Pour a few cups
 
-Press **Pour a cup** three times. Then press **Start over**. Keep an eye on the second line.
-
 <StateSketch />
+
+In the code below, press **Pour a cup** three times. Then press **Start over**. Keep an eye on the
+second line.
 
 <Code note="Add a third paragraph that also shows {cups}, then press Pour a cup. Then change state(0) to a plain 0 and read the build error under the line it names.">
 ```tsrx title="cups.tsrx"
@@ -114,8 +115,8 @@ Create state at the top of the component body, next to your other variables. Eac
 the build, and each error names the line:
 
 - A `state()` outside the component function gives `MARKLESS_STATE_MODULE_SCOPE`.
-- A `state()` inside an `@if` or a loop gives `MARKLESS_STATE_CREATION_SITE_UNSTABLE`. The
-  [conditionals page](/concepts/conditionals) shows why.
+- A `state()` inside an `@if`, a handler or a `for` statement gives
+  `MARKLESS_STATE_CREATION_SITE_UNSTABLE`. The [conditionals page](/concepts/conditionals) shows why.
 - A change inside the markup, such as `{cups++}`, gives `MARKLESS_STATE_WRITE_IN_TEMPLATE`.
 
 `state()` works inside `.tsrx` files. Call it from a plain `.ts` file and it throws
@@ -124,22 +125,14 @@ the build, and each error names the line:
 <Callout
 	sprite="cross"
 	title="Why does my plain let fail the build?"
-	text="If a click handler changes a plain let that the markup shows, the build stops. One of the errors, MARKLESS_STATE_STALE_LOCAL_WRITE, says why: the markup reads a plain let only while the page is set up, so the screen would never change. Wrap the starting value in state() and the error goes away."
+	text="If a click handler changes a plain let that the markup shows, the build stops. One of the errors, MARKLESS_STATE_STALE_LOCAL_WRITE, says why. The markup reads a plain let only while the page is set up. A later change never reaches the screen. Wrap the starting value in state() and the error goes away."
 />
 
 <Collapsible
 	sprite="star-badge"
 	summary="Coming from another framework?"
-	text="There is no setter function, no .value to read through, and no special character in the name. The variable is the state. Your component body runs once and is never re-rendered, so code in the body is setup code, not code that repeats."
+	text="There is no setter function, no .value to read through, and no special character in the name. The variable is the state. Your component body runs once and never re-renders. Code in the body is setup code, not code that repeats."
 />
-
-## Try this
-
-Add a third paragraph to the file that also shows `{cups}`. Click once. Both paragraphs update, and
-you wrote nothing to connect them.
-
-Then change `let cups = state(0);` to `let cups = 0;` and build. Read the error, find the line it
-points at, and put `state()` back.
 
 Next: [values you work out instead of storing](/concepts/computed).
 
