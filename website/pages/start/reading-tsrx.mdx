@@ -71,7 +71,7 @@ The paragraph reads `count`. Click the button, and only the number in the paragr
 
 An at sign at the start of a line inside markup starts a block. `@if` shows markup only while a condition is true. `@for` repeats markup for each item in a list.
 
-<Code note="Right after the closing brace of the @if, write @else and a block with a paragraph that says the note is hidden. Then change the note text, and the class name in both places.">
+<Code note="After the closing brace of the @if, add @else { <p>The note is hidden.</p> } and press the button. Then change the note text, and the class name in both places.">
 ```tsrx title="tea-note.tsrx"
 import { state } from '@markless/core';
 
