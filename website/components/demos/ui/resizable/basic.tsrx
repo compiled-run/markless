@@ -1,8 +1,123 @@
-import Preview from '../../../ui/preview.tsrx';
-import Workspace from './example.tsrx';
+import { resizable } from '@markless/ui';
 
-export default function ResizableDemo({ shows }: { readonly shows: string }) @{
-	<Preview shows={shows}>
-		<Workspace />
-	</Preview>
+export default function Workspace() @{
+	<resizable.root class="group" defaultSizes={{ files: 28, editor: 44, notes: 28 }}>
+		<resizable.item class="pane" value="files">
+			<span class="pane-name">Files</span>
+		</resizable.item>
+		<resizable.thumb class="divider" value="files" min={15} max={55} aria-label="Resize files" />
+		<resizable.item class="pane" value="editor">
+			<span class="pane-name">Editor</span>
+		</resizable.item>
+		<resizable.thumb class="divider" value="editor" min={20} max={70} aria-label="Resize editor" />
+		<resizable.item class="pane" value="notes">
+			<span class="pane-name">Notes</span>
+		</resizable.item>
+
+		<style>
+			.group {
+				box-sizing: border-box;
+				width: min(31rem, 100%);
+				height: 9rem;
+				border: 1px solid var(--ink);
+				border-radius: 6px;
+				overflow: clip;
+				font-family: 'Shantell Sans', system-ui, sans-serif;
+				font-size: var(--step--1);
+				line-height: 1.4;
+				color: var(--ink);
+			}
+
+			.group[ui-orientation='vertical'] {
+				height: 16rem;
+			}
+
+			.group[ui-disabled] {
+				opacity: 0.55;
+			}
+
+			.pane {
+				display: grid;
+				place-content: center;
+				gap: 0.15em;
+				min-width: 0;
+				padding: 0.5em;
+				text-align: center;
+			}
+
+			.group[ui-orientation='vertical'] .pane {
+				grid-auto-flow: column;
+				gap: 0.6em;
+				align-items: baseline;
+			}
+
+			.pane-name {
+				font-family: 'Joy Elia', system-ui, sans-serif;
+				font-size: var(--step-0);
+			}
+
+			/* The share the family writes, rounded to two places. */
+			.pane::after {
+				content: attr(ui-size) '%';
+				font-family: var(--font-mono);
+				font-size: var(--step--1);
+			}
+
+			.divider {
+				position: relative;
+				width: 0.75em;
+				border-inline: 1px solid var(--ink);
+				background: var(--paper);
+				transition: background 140ms ease;
+			}
+
+			.divider::before {
+				content: '';
+				position: absolute;
+				inset: 50% auto auto 50%;
+				width: 0.2em;
+				height: 1.6em;
+				border-radius: 999px;
+				background: var(--ink);
+				translate: -50% -50%;
+			}
+
+			.divider[ui-orientation='vertical'] {
+				width: auto;
+				height: 0.75em;
+				border-inline: 0;
+				border-block: 1px solid var(--ink);
+			}
+
+			.divider[ui-orientation='vertical']::before {
+				width: 1.6em;
+				height: 0.2em;
+			}
+
+			.divider:hover {
+				background: color-mix(in srgb, var(--purple) 16%, var(--paper));
+			}
+
+			.divider[ui-dragging],
+			.divider:active {
+				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+			}
+
+			.divider[ui-disabled]:hover {
+				background: var(--paper);
+			}
+
+			.divider:focus-visible {
+				outline: 2px solid var(--ink);
+				outline-offset: -3px;
+				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+			}
+
+			@media (prefers-reduced-motion: reduce) {
+				.divider {
+					transition: none;
+				}
+			}
+		</style>
+	</resizable.root>;
 }

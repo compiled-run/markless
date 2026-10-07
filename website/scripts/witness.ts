@@ -3170,6 +3170,113 @@ try {
 				'/ui/toaster: Dismiss removes the message',
 			);
 		}
+		const toggleNamed = (card: Locator, name: string) =>
+			card
+				.locator('.pg-ctl')
+				.filter({ has: page.locator('.pg-name', { hasText: new RegExp(`^${name}$`) }) })
+				.locator('.pg-switch');
+		const focusedText = () => page.evaluate(() => document.activeElement?.textContent?.trim() ?? '');
+		{
+			const { card, stage } = await playground('tabs');
+			const shown = () => stage.locator('.tab[ui-selected]').innerText();
+			await stage.locator('.tab', { hasText: 'Billing' }).click();
+			await page.keyboard.press('ArrowRight');
+			check(
+				await settle(shown, 'Alerts'),
+				'/ui/tabs: Right arrow skips the disabled Team tab and shows Alerts',
+			);
+			await toggleNamed(card, 'SelectOnFocus').click();
+			await stage.locator('.tab', { hasText: 'Alerts' }).focus();
+			await page.keyboard.press('Home');
+			check(
+				(await settle(focusedText, 'Overview')) && (await shown()) === 'Alerts',
+				'/ui/tabs: with SelectOnFocus off, Home moves focus but keeps Alerts showing',
+			);
+			await page.keyboard.press('Enter');
+			check(await settle(shown, 'Overview'), '/ui/tabs: Enter shows the focused tab');
+			await choose(card, 'orientation', 'vertical');
+			check(
+				await settle(() => stage.locator('.list[aria-orientation="vertical"]').count(), 1),
+				'/ui/tabs: the orientation control stacks the tabs',
+			);
+		}
+		{
+			const { card, stage } = await playground('resizable');
+			const files = () => stage.locator('.pane[ui-value="files"]').getAttribute('ui-size');
+			const divider = stage.locator('.divider').first();
+			await divider.focus();
+			await page.keyboard.press('ArrowRight');
+			check(await settle(files, '29'), '/ui/resizable: Right arrow grows Files by one step');
+			await choose(card, 'step', '10');
+			await divider.focus();
+			await page.keyboard.press('ArrowRight');
+			check(await settle(files, '39'), '/ui/resizable: the step control makes one press move ten');
+			await toggleNamed(card, 'Disabled').click();
+			check(
+				await settle(() => divider.getAttribute('tabindex'), '-1'),
+				'/ui/resizable: the Disabled switch takes the dividers out of the Tab order',
+			);
+		}
+		{
+			const { card, stage } = await playground('tree');
+			const rows = stage.locator('[role="treeitem"]');
+			const docs = rows.filter({ hasText: 'docs' }).first();
+			await stage.locator('.files').focus();
+			check(await settle(focusedText, (text: string) => text.startsWith('src')), '/ui/tree: focus lands on src');
+			for (let step = 0; step < 3; step += 1) await page.keyboard.press('ArrowDown');
+			await page.keyboard.press('ArrowRight');
+			check(
+				await settle(() => docs.getAttribute('aria-expanded'), 'true'),
+				'/ui/tree: Right arrow opens docs',
+			);
+			check(
+				await settle(() => stage.locator('.readout').innerText(), (t: string) => t.includes('docs opened')),
+				'/ui/tree: the readout names the row that opened',
+			);
+			await toggleNamed(card, 'src open').click();
+			check(
+				await settle(() => rows.first().getAttribute('aria-expanded'), 'false'),
+				'/ui/tree: the src open switch closes src',
+			);
+		}
+		{
+			const { card, stage } = await playground('textbox');
+			await stage.locator('.label').click();
+			await page.keyboard.type('ada99');
+			check(
+				await settle(() => stage.locator('.echo-text').innerText(), 'ada99'),
+				'/ui/textbox: typing reaches onChange',
+			);
+			check(
+				await settle(() => stage.locator('.hook-empty').isVisible(), false),
+				'/ui/textbox: the root drops ui-empty once the field holds text',
+			);
+			await toggleNamed(card, 'Readonly').click();
+			check(
+				await settle(() => stage.locator('.input').getAttribute('readonly'), ''),
+				'/ui/textbox: the Readonly switch makes the input read-only',
+			);
+		}
+		{
+			const { card, stage } = await playground('table');
+			const picked = () => stage.locator('.picked').innerText();
+			await stage.locator('td', { hasText: 'Last week' }).click();
+			await page.keyboard.press('ArrowDown');
+			await page.keyboard.press('Space');
+			check(await settle(picked, 'marmalade'), '/ui/table: Space picks the row under focus');
+			await stage.locator('th', { hasText: 'Sealed' }).click();
+			check(
+				await settle(() => stage.locator('.asked').innerText(), 'sealed'),
+				'/ui/table: a header press reaches onSortChange',
+			);
+			await toggleNamed(card, 'Multiple').click();
+			await stage.locator('th', { hasText: 'Damson jam' }).click();
+			await page.keyboard.press('Shift+ArrowDown');
+			check(
+				await settle(picked, 'jam, chutney'),
+				'/ui/table: with Multiple on, Shift and Down picks a run of rows',
+			);
+		}
 
 		// --- the stickers are on the pages that ask for them --------------------
 		await page.goto(`${origin}/`, { waitUntil: 'load' });

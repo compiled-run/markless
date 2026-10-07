@@ -3,7 +3,6 @@ import ApiTable from '../../components/docs/api-table.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import TabsDemo from '../../components/demos/ui/tabs/basic.tsrx';
 
 <Sidebar />
 
@@ -14,33 +13,13 @@ import TabsDemo from '../../components/demos/ui/tabs/basic.tsrx';
 `tabs` is a row of tabs over a set of panels. Each tab shows one panel, and only one panel shows
 at a time.
 
-<TabsDemo shows="Click Billing. Then use the arrow keys. Team is disabled." />
-
-```tsrx
-import { tabs } from '@markless/ui';
-
-export default function Account() @{
-	<tabs.root class="tabs" value="overview">
-		<tabs.list class="list">
-			<tabs.trigger class="tab" value="overview">Overview</tabs.trigger>
-			<tabs.trigger class="tab" value="billing">Billing</tabs.trigger>
-			<tabs.trigger class="tab" value="team" disabled>Team</tabs.trigger>
-		</tabs.list>
-		<tabs.content class="panel" value="overview" aria-label="Overview">
-			Three orders this month. One is on its way.
-		</tabs.content>
-		<tabs.content class="panel" value="billing" aria-label="Billing">
-			Your next invoice is due on the 1st.
-		</tabs.content>
-		<tabs.content class="panel" value="team" aria-label="Team">
-			Two people can see this account.
-		</tabs.content>
-	</tabs.root>
-}
-```
+<Playground scenario="basic" />
 
 Click a tab, then press the Right arrow. Focus moves to the next tab and shows its panel. The
 arrows walk past **Team**, because it is disabled.
+
+Switch off **SelectOnFocus**, and the arrows move focus without showing the panel. Then Enter
+shows it.
 
 A tab and a panel with the same `value` are a pair. The family never matches them by position.
 The root's `value` names the tab that shows first. If you leave it out, no tab shows.
