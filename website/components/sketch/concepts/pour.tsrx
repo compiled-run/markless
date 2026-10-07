@@ -7,28 +7,47 @@ export default function Pour() @{
 	<section>
 		<p>Cups today: {cups}</p>
 		<p>Drawn once: {drawn}</p>
-		<button onClick={() => cups++}>Pour one</button>
+		<button onClick={() => cups++}>Pour a cup</button>
 		<style>
+			section {
+				display: grid;
+				gap: 0.7em;
+				justify-items: start;
+			}
+
 			p {
-				margin: 0 0 0.4rem;
-				font-size: var(--step-1);
+				margin: 0;
+				font-size: var(--step-0);
 			}
 
 			button {
-				margin-top: 0.3rem;
-				font-size: var(--step-0);
-				padding: 0.3em 0.9em;
-				color: var(--on-accent);
-				background: var(--green-soft);
-				border: 2px solid var(--ink);
-				border-radius: 2px;
-				box-shadow: 3px 3px 0 var(--ink);
+				padding: 0.45em 1em;
+				border: 1px solid var(--ink);
+				border-radius: 6px;
+				background: var(--paper);
+				color: var(--ink);
+				font: inherit;
 				cursor: pointer;
+				transition: background 140ms ease;
+			}
+
+			button:hover {
+				background: color-mix(in srgb, var(--purple) 16%, var(--paper));
 			}
 
 			button:active {
-				transform: translate(3px, 3px);
-				box-shadow: none;
+				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+			}
+
+			button:focus-visible {
+				outline: 2px solid var(--ink);
+				outline-offset: 4px;
+			}
+
+			@media (prefers-reduced-motion: reduce) {
+				button {
+					transition: none;
+				}
 			}
 		</style>
 	</section>
