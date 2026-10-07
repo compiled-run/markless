@@ -261,7 +261,8 @@ export function marklessQualifyChildState(
 			),
 		}),
 	}));
-	if (state.sharedSeeds)
+	// A module's own remap carries no instance path, and a seed follows its component's own props, which only the composer routes.
+	if (state.sharedSeeds && instancePath)
 		state.sharedSeeds = state.sharedSeeds.flatMap((seed) => {
 			// A prop with no live route was never passed live, so the child already
 			// rendered its final value and this seed has nothing to follow.

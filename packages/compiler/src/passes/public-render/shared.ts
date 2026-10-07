@@ -1002,6 +1002,16 @@ function resolvePayloadNodeOwners(
 			!textOwner.has(read.computedGraphNodeId)
 		)
 			textOwner.set(read.computedGraphNodeId, read.componentName);
+	// A computed minted for a component-edge prop is read by the edge, not a chunk slot.
+	const edgeOwner = new Map<string, string>();
+	for (const edge of input.semanticGraph.componentEdges)
+		for (const prop of edge.props)
+			if (
+				prop.kind === 'graph-reference' &&
+				prop.graphBindingKind === 'computed' &&
+				!edgeOwner.has(prop.graphNodeId)
+			)
+				edgeOwner.set(prop.graphNodeId, edge.parentComponentName);
 	// A widget-scoped shared() graph is one instance per rendered widget, so its
 	// nodes belong to the widget root, not the module root: that component's
 	// composed instance path is the widget root.
@@ -1028,6 +1038,7 @@ function resolvePayloadNodeOwners(
 				chunkOwner.get(graphNodeId) ??
 				branchOwner.get(graphNodeId) ??
 				textOwner.get(graphNodeId) ??
+				edgeOwner.get(graphNodeId) ??
 				rootComponentName
 			);
 		});

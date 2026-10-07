@@ -5,6 +5,7 @@ import { installCarouselCss } from './scenarios/carousel-css.ts';
 import Basic from './scenarios/basic.tsrx';
 import GalleryAutoplay from './scenarios/gallery-autoplay.tsrx';
 import Rewind from './scenarios/rewind.tsrx';
+import SlidesFromData from './scenarios/slides-from-data.tsrx';
 import Stepped from './scenarios/stepped.tsrx';
 import Tabbed from './scenarios/tabbed.tsrx';
 import TwoCarousels from './scenarios/two-carousels.tsrx';
@@ -549,3 +550,19 @@ test('a press from a pointer the platform is not tracking throws nothing', async
 		window.removeEventListener('unhandledrejection', recordRejection);
 	}
 });
+
+// Slides and pickers written as keyed loops over data, each taking its value from the row.
+for (const mode of MODES) {
+	test(`${mode}: slides and pickers from a keyed loop keep their own values`, async () => {
+		if (mode === 'CSR') await render(SlidesFromData);
+		else await renderSSR(SlidesFromData);
+		expect(el(ParisItem).getAttribute('ui-value')).toBe('paris');
+		expect(el(LimaNav).getAttribute('ui-value')).toBe('lima');
+		expect(el(ParisItem).hasAttribute('ui-active')).toBe(true);
+
+		el(LimaNav).click();
+		await expect.poll(() => el(LimaItem).hasAttribute('ui-active')).toBe(true);
+		expect(el(ParisItem).hasAttribute('ui-active')).toBe(false);
+		expect(el(LimaNav).getAttribute('aria-selected')).toBe('true');
+	});
+}

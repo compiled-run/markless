@@ -99,6 +99,26 @@ test('a keyed row composes a widget of its own', () => {
 	);
 });
 
+// A part's own adapter spells only its last edge and carries no row, so it
+// leaves that edge on the id for a row to answer. When the adapter outside it
+// is the row's own instance path, that one answers it: the edge it was handed
+// is where the part reads, not a widget anybody rendered there.
+test('a part read through an adapter inside a keyed row reaches the widget of that row', () => {
+	const rows = ['alpha', 'beta'].map(
+		(key) => protocolRowSegment(key) + protocolInstanceSegment(0),
+	);
+	const composed = marklessComposeState({ cells: [], computed: [] }, rows.map(groupRootChild));
+	const widgets = marklessComposedWidgetRegistry(composed);
+	const partEdge = protocolInstanceSegment(5);
+
+	const waiting = marklessComposedGraphNodeId(CELL, partEdge, widgets);
+	expect(waiting).toBe(`${partEdge}${CELL}`);
+	for (const row of rows)
+		expect(marklessComposedGraphNodeId(waiting, partPath(row), widgets)).toBe(
+			`${row}${protocolInstanceSegment(0)}${CELL}`,
+		);
+});
+
 test('composition writes the projection site into the payload it serves', () => {
 	const site = protocolInstanceSegment(7);
 	const composed = marklessComposeState({ cells: [], computed: [] }, [groupRootChild(site)]);

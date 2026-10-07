@@ -152,6 +152,14 @@ The `ui()` Vite plugin from the new `@markless/ui-tools` package sets this up.
   ticked.
 - Turning `disabled` on for one `tree.item` after the page is live no longer
   disables the open/close button of the item next to it.
+- `checklist` items follow the group after the page is live: the select-all
+  ticks and unticks them, and `disabled` set on `checklist.root` by the page
+  locks them. Items built in a `@for` tick on click instead of throwing
+  `MARKLESS_CALLBACK_SLOT_UNRESOLVED`.
+- A prop passed a value from a `@for` row, like
+  `<carousel.item value={row.value}>`, builds instead of failing with
+  `MARKLESS_CAPTURE_OPAQUE_PROP` when the component imported from another file
+  only shows that value. A click handler that reads it is still refused.
 
 ## 0.3.3
 

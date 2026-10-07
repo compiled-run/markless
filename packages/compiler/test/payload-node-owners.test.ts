@@ -135,3 +135,49 @@ export function App() @{
 	expect(owned('Chip')).toEqual(['computed:twice', 'computed:templateExpression:0']);
 	expect(owned('App')).toEqual(['computed:templateExpression:1']);
 });
+
+// A computed minted for a component-edge prop is read by the edge, not by a
+// chunk slot, so it belongs to the component that wrote the edge - not the
+// module's first component. Owned by the wrong one, every rendered instance of
+// the right one renders it once as a static value and never re-derives it.
+test('a computed minted for a component-edge prop belongs to the component writing the edge', async () => {
+	const edgeFilename = 'src/Group.tsrx';
+	const edgeSource = `
+import { state } from '@markless/core';
+
+function Box({ on, locked }) @{
+	<button disabled={locked}>{on ? 'on' : 'off'}</button>
+}
+
+export function Group({ children }) @{
+	let picked = state(['a']);
+	<section>{children}</section>
+}
+
+export function Entry({ name, locked }) @{
+	let held = state({ list: ['a'] });
+	<Box on={held.list.includes(name)} locked={held.list.length > 1 || locked === true} />
+}
+`;
+	const compiled = await compileTsrxModule({
+		filename: edgeFilename,
+		source: edgeSource,
+		symbols: [],
+	});
+	const input: PublicRenderModuleInput = {
+		source: { filename: edgeFilename, source: edgeSource },
+		semanticGraph: compiled.semanticGraph,
+		renderData: compiled.renderData,
+		publicRenderPlan: compiled.publicRenderPlan,
+		symbolResolver: compiled.symbolResolver,
+		captureAnalysis: compiled.captureAnalysis,
+		protocolState: compiled.protocolState,
+		protocolView: compiled.protocolView,
+	};
+	const edgeComputed = input.protocolState.computed.flatMap((computed, index) =>
+		computed.graphNodeId.startsWith('computed:templateExpression:') ? [index] : [],
+	);
+	expect(edgeComputed.length).toBe(2);
+	expect(componentOwnedStateNodes(input, 'Entry', 'Group').computedIndexes).toEqual(edgeComputed);
+	expect(componentOwnedStateNodes(input, 'Group', 'Group').computedIndexes).toEqual([]);
+});

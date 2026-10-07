@@ -298,9 +298,15 @@ function importedCaptureSymbols(
 						(slot) => republished || !wasProjectedThroughComponentEdge(slot.propName, edge),
 					)
 					// A derive whose prop has no route on this edge stays unbound here and reads its own instance's props.
+					// A row's value is rendered with the row, and a changed item rebuilds it, so only a callback needs it later.
 					.flatMap((slot) => {
-						if (captureSymbol.kind !== 'sync-computed-derive') return [slot];
-						const routes = slot.routes.filter((route) => route.kind !== 'unsupported-opaque');
+						if (captureSymbol.kind === 'event-handler' || captureSymbol.kind === 'callback-prop')
+							return [slot];
+						const routes = slot.routes.filter(
+							(route) =>
+								route.kind !== 'unsupported-opaque' ||
+								(captureSymbol.kind !== 'sync-computed-derive' && route.rowValue !== true),
+						);
 						return routes.length > 0 ? [{ ...slot, routes }] : [];
 					}),
 			},
@@ -1077,8 +1083,35 @@ function resolvePropCaptureRoute(
 		componentEdgePath: edgePathIds,
 		expression: prop.source,
 		...(prop.sourceSpan ? { sourceSpan: prop.sourceSpan } : {}),
+		...(readsOnlyRowLocals(prop.source, edge, input) ? { rowValue: true as const } : {}),
 	};
 }
+
+// Whether an edge prop's expression reads nothing but the item and index of the keyed rows the edge renders in.
+function readsOnlyRowLocals(
+	source: string,
+	edge: SemanticComponentEdge,
+	input: CaptureAnalysisInput,
+): boolean {
+	if (edge.keyedRepeatScopeIds.length === 0) return false;
+	const rowLocals = new Set(
+		input.semanticGraph.keyedRepeats.flatMap((repeat) =>
+			edge.keyedRepeatScopeIds.includes(repeat.id)
+				? [repeat.itemName, ...(repeat.indexName ? [repeat.indexName] : [])]
+				: [],
+		),
+	);
+	let reader = rowLocalReaders.get(input);
+	if (!reader) rowLocalReaders.set(input, (reader = createSymbolSourceSemanticsReader()));
+	const semantics = reader.read(source);
+	return (
+		!semantics.analysisFailed &&
+		semantics.freeNames.size > 0 &&
+		[...semantics.freeNames].every((name) => rowLocals.has(name))
+	);
+}
+
+const rowLocalReaders = new WeakMap<CaptureAnalysisInput, SymbolSourceSemanticsReader>();
 
 export function createCompilerKnownConstantCaptureRoute(
 	componentEdgeId: string,

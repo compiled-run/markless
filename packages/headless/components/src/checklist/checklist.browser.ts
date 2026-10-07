@@ -1,13 +1,9 @@
-// The skipped rows in this file all rest on one open limitation: nothing a person
-// does to one part moves the group. The dispatch itself is not the gap — measured,
-// `checkbox.toggle()` does reach `checklist.setAll` through the root's callback
-// prop, and `setAll` writes the group's value — but the items' checked bindings
-// never re-read it, so every box stays where it was.
 import { render, renderSSR } from '@markless/vitest-browser';
 import { page, userEvent } from 'vite-plus/test/browser';
 import { expect, test } from 'vitest';
 import Basic from './scenarios/basic.tsrx';
 import CondimentsForm from './scenarios/condiments-form.tsrx';
+import DrivenByParent from './scenarios/driven-by-parent.tsrx';
 import ItemsFromData from './scenarios/items-from-data.tsrx';
 import Partial from './scenarios/partial.tsrx';
 import TwoLists from './scenarios/two-lists.tsrx';
@@ -278,10 +274,6 @@ async function expectOmittedCallbackStillTicks() {
 	await expect.poll(() => el(SelectAllTrigger).getAttribute('aria-checked')).toBe('mixed');
 }
 
-// Every `test.skip` below is skipped on the limitation named at the top of the
-// file: `setAll` writes the group's value and no part re-reads it. Un-skip when a
-// write to the shared instance moves the parts bound to it.
-
 for (const mode of MODES) {
 	test(`${mode}: the starter renders a named group, a select-all and three items`, async () => {
 		if (mode === 'CSR') await render(Basic);
@@ -342,13 +334,13 @@ for (const mode of MODES) {
 		await expect.poll(() => submit().textContent).toBe('{"lettuce":"lettuce"}');
 	});
 
-	test.skip(`${mode}: only ticked items appear in what the form submits`, async () => {
+	test(`${mode}: only ticked items appear in what the form submits`, async () => {
 		if (mode === 'CSR') await render(CondimentsForm);
 		else await renderSSR(CondimentsForm);
 		await expectTickedItemsSubmit();
 	});
 
-	test.skip(`${mode}: the select-all ticks every item`, async () => {
+	test(`${mode}: the select-all ticks every item`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
 		await expectSelectAllTicksEverything();
@@ -360,7 +352,7 @@ for (const mode of MODES) {
 		await expectSelectAllUnticksEverything();
 	});
 
-	test.skip(`${mode}: a mixed select-all ticks everything rather than cycling`, async () => {
+	test(`${mode}: a mixed select-all ticks everything rather than cycling`, async () => {
 		if (mode === 'CSR') await render(Partial);
 		else await renderSSR(Partial);
 		await expectMixedSelectAllTicksEverything();
@@ -372,13 +364,13 @@ for (const mode of MODES) {
 		await expectOneItemMovesTheSelectAllToMixed();
 	});
 
-	test.skip(`${mode}: ticking every item checks the select-all, and unticking one returns it to mixed`, async () => {
+	test(`${mode}: ticking every item checks the select-all, and unticking one returns it to mixed`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
 		await expectTickingEveryItemChecksTheSelectAll();
 	});
 
-	test.skip(`${mode}: a select-all in one list leaves the other list alone`, async () => {
+	test(`${mode}: a select-all in one list leaves the other list alone`, async () => {
 		if (mode === 'CSR') await render(TwoLists);
 		else await renderSSR(TwoLists);
 		await expectInstancesStayIsolated();
@@ -390,7 +382,7 @@ for (const mode of MODES) {
 		await expectSiblingItemsStayIsolated();
 	});
 
-	test.skip(`${mode}: the consumer onChange is called once with the whole new ticked set`, async () => {
+	test(`${mode}: the consumer onChange is called once with the whole new ticked set`, async () => {
 		if (mode === 'CSR') await render(WithOnChange);
 		else await renderSSR(WithOnChange);
 		await expectConsumerCallbackCarriesTheWholeSet();
@@ -419,9 +411,7 @@ for (const mode of MODES) {
 // its own tab stop and Space is the only activation key, so the family adds no
 // keyboard rule of its own beyond what the composed checkbox already has.
 
-// The keyboard path is not the gap: the same gesture through a click is skipped the
-// same way, on the same dispatch defect.
-test.skip('CSR: Space on the focused select-all ticks every item', async () => {
+test('CSR: Space on the focused select-all ticks every item', async () => {
 	await render(Basic);
 	el(SelectAllTrigger).focus();
 	expect(document.activeElement).toBe(el(SelectAllTrigger));
@@ -431,7 +421,7 @@ test.skip('CSR: Space on the focused select-all ticks every item', async () => {
 	await expect.poll(() => el(LettuceTrigger).getAttribute('aria-checked')).toBe('true');
 });
 
-test.skip('CSR: Space on a focused item moves the select-all to mixed', async () => {
+test('CSR: Space on a focused item moves the select-all to mixed', async () => {
 	await render(Basic);
 	el(LettuceTrigger).focus();
 
@@ -440,33 +430,49 @@ test.skip('CSR: Space on a focused item moves the select-all to mixed', async ()
 	await expect.poll(() => el(SelectAllTrigger).getAttribute('aria-checked')).toBe('mixed');
 });
 
+for (const mode of MODES) {
+	test(`${mode}: items from a keyed loop each get their own instance`, async () => {
+		if (mode === 'CSR') await render(ItemsFromData);
+		else await renderSSR(ItemsFromData);
+		const triggers = all('row-trigger');
+		expect(triggers.length).toBe(3);
+		expect(new Set(triggers.map((trigger) => trigger.id)).size).toBe(3);
 
-// Skipped on the dispatch defect plus a second one measured here: inside
-// `items-from-data.tsrx` the three row triggers mint ONE id, because the seed pass
-// builds an element() handle's token from the host id prefix rather than from the
-// instance path, so the row segment reaches the graph path but not the token.
-test.skip('CSR: items from a keyed loop each get their own instance', async () => {
-	await render(ItemsFromData);
-	const triggers = all('row-trigger');
-	expect(triggers.length).toBe(3);
-	expect(new Set(triggers.map((trigger) => trigger.id)).size).toBe(3);
+		(triggers[1] as HTMLElement).click();
+		await expect.poll(() => triggers[1]?.getAttribute('aria-checked')).toBe('true');
+		expect(triggers[0]?.getAttribute('aria-checked')).toBe('false');
+		expect(triggers[2]?.getAttribute('aria-checked')).toBe('false');
+		await expect.poll(() => el(SelectAllTrigger).getAttribute('aria-checked')).toBe('mixed');
+	});
 
-	(triggers[1] as HTMLElement).click();
-	await expect.poll(() => triggers[1]?.getAttribute('aria-checked')).toBe('true');
-	expect(triggers[0]?.getAttribute('aria-checked')).toBe('false');
-	expect(triggers[2]?.getAttribute('aria-checked')).toBe('false');
-	await expect.poll(() => el(SelectAllTrigger).getAttribute('aria-checked')).toBe('mixed');
-});
+	test(`${mode}: the select-all ticks every row of a looped list`, async () => {
+		if (mode === 'CSR') await render(ItemsFromData);
+		else await renderSSR(ItemsFromData);
+		el(SelectAllTrigger).click();
+		await expect.poll(() => el(SelectAllTrigger).getAttribute('aria-checked')).toBe('true');
+		for (const trigger of all('row-trigger')) {
+			await expect.poll(() => trigger.getAttribute('aria-checked')).toBe('true');
+		}
+	});
 
-test.skip('CSR: the select-all ticks every row of a looped list', async () => {
-	await render(ItemsFromData);
-	el(SelectAllTrigger).click();
-	await expect.poll(() => el(SelectAllTrigger).getAttribute('aria-checked')).toBe('true');
-	for (const trigger of all('row-trigger')) {
-		await expect.poll(() => trigger.getAttribute('aria-checked')).toBe('true');
-	}
-});
+	test(`${mode}: locking the group from the page locks every item`, async () => {
+		if (mode === 'CSR') await render(DrivenByParent);
+		else await renderSSR(DrivenByParent);
+		expect(el(LettuceTrigger).hasAttribute('disabled')).toBe(false);
 
+		el(page.getByTestId('lock')).click();
+		await expect.poll(() => el(Root).hasAttribute('ui-disabled')).toBe(true);
+		await expect.poll(() => el(LettuceTrigger).hasAttribute('disabled')).toBe(true);
+		expect(el(TomatoTrigger).hasAttribute('disabled')).toBe(true);
+		expect(el(SelectAllTrigger).hasAttribute('disabled')).toBe(true);
+
+		el(LettuceTrigger).click();
+		el(SelectAllTrigger).click();
+		await new Promise((resolve) => setTimeout(resolve, 150));
+		expect(el(LettuceTrigger).getAttribute('aria-checked')).toBe('false');
+		expect(el(TomatoTrigger).getAttribute('aria-checked')).toBe('false');
+	});
+}
 
 // Expected red: the APG mixed-checkbox example puts an IDREF list on the tri-state
 // parent naming every box it controls, and an IDREF position takes exactly one

@@ -1856,6 +1856,8 @@ export type CaptureSlotRoute =
 			// The consumer passed no such prop, so the diagnostic names the missing
 			// prop instead of an authored runtime expression.
 			readonly absentProp?: true;
+			// The expression reads only the keyed row's item or index: rendered with the row, never live.
+			readonly rowValue?: true;
 	  };
 
 // A slot belongs to one authored binding in one component and may have one
