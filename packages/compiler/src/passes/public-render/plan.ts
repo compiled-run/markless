@@ -16,6 +16,7 @@ import {
 	collectUndeclaredTemplateReadDiagnostics,
 	collectUnsupportedConstructDiagnostics,
 	componentConditionalRootDiagnostics,
+	componentLoopOnlyRootDiagnostics,
 	componentRootDiagnostics,
 	componentUnsupportedBodyDiagnostics,
 	emptyPlan,
@@ -35,6 +36,11 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 		input.source.filename,
 	);
 	if (conditionalRootDiagnostics.length > 0) return emptyPlan(conditionalRootDiagnostics);
+	const loopOnlyRootDiagnostics = componentLoopOnlyRootDiagnostics(
+		ast,
+		input.source.filename,
+	);
+	if (loopOnlyRootDiagnostics.length > 0) return emptyPlan(loopOnlyRootDiagnostics);
 	const unsupportedBodyDiagnostics = componentUnsupportedBodyDiagnostics(
 		ast,
 		input.source.filename,

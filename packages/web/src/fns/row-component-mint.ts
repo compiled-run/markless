@@ -410,7 +410,9 @@ function renderComponentRow(input: ComponentRowInput): Awaitable<RenderedCompone
 							),
 						surface: owner.surface,
 						ownerComponentName: rowComponent.componentName,
-						componentEdgeId: rowComponent.componentEdgeId,
+						...(rowComponent.rowChunkId
+							? { rowChunkId: rowComponent.rowChunkId }
+							: { componentEdgeId: rowComponent.componentEdgeId }),
 						itemPropName: rowComponent.itemPropName,
 						item: input.item,
 						rowKey: input.rowKey,

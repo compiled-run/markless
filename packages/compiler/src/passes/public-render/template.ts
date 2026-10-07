@@ -70,6 +70,17 @@ function implicitFragment(body: AnyNode): ImplicitFragment | null {
 	return found;
 }
 
+// A body whose only template content is one @for has no element to hold its rows.
+export function soleLoopRoot(component: AnyNode | undefined): AnyNode | null {
+	const body = component?.body as AnyNode | undefined;
+	if (!body) return null;
+	const templates = childNodes(body)
+		.map(topLevelTemplateNode)
+		.filter((template): template is AnyNode => template !== null);
+	const [only] = templates;
+	return templates.length === 1 && only?.type === 'JSXForExpression' ? only : null;
+}
+
 export function implicitFragmentRoot(component: AnyNode | undefined): AnyNode | null {
 	const body = component?.body as AnyNode | undefined;
 	return body ? (implicitFragment(body)?.fragment ?? null) : null;

@@ -14,6 +14,7 @@ import {
 	expressionSlotValue,
 	mintableSlotValue,
 	payloadRecordHosts,
+	resolveRowChunkMint,
 	resolveRowComponentMint,
 	type RowComponentMint,
 } from './row-mint.ts';
@@ -612,7 +613,8 @@ function mintableRowTemplate(
 	const chunk = renderDataOf(input).chunks.find(
 		(candidate) => candidate.id === render.rowChunkId,
 	);
-	if (!chunk) return {};
+	// A row rendered whole from its chunk carries no markup of its own.
+	if (!chunk || mint?.rowChunkId) return {};
 	// A child component has a graph, not a template - one instance per rendered
 	// row - so markup could never finish it. It is named by identity instead, in
 	// `rowComponent`; markup carries only the row element that wraps it, and a row
@@ -711,12 +713,7 @@ function liveRowComponentMint(
 
 // A refusal emits no field at all, so the record stays byte-identical.
 function mintableRowComponent(rowComponent: RowComponentMint | null): {
-	readonly rowComponent?: {
-		readonly componentEdgeId: string;
-		readonly componentName: string;
-		readonly itemPropName?: string;
-		readonly slotPath?: ReadonlyArray<number>;
-	};
+	readonly rowComponent?: RowComponentMint;
 } {
 	return rowComponent ? { rowComponent } : {};
 }
@@ -727,7 +724,7 @@ function rowComponentMint(
 	input: ProtocolViewPayloadInput,
 	render: RenderDataArtifact['repeats'][number],
 ): RowComponentMint | null {
-	return resolveRowComponentMint({
+	const rowMintInput = {
 		...payloadRecordHosts(input.payloadArena.view),
 		...(input.semanticGraph ? { semanticGraph: input.semanticGraph } : {}),
 		chunks: renderDataOf(input).chunks,
@@ -738,8 +735,19 @@ function rowComponentMint(
 			: {}),
 		rowChunkId: render.rowChunkId,
 		rowElementCount: render.rowElementCount,
-		itemName: render.itemName,
-	});
+	};
+	const semanticRepeat = input.semanticGraph?.keyedRepeats.find(
+		(candidate) => candidate.id === render.repeatId,
+	);
+	return (
+		resolveRowComponentMint({ ...rowMintInput, itemName: render.itemName }) ??
+		resolveRowChunkMint({
+			...rowMintInput,
+			rowNames: [render.itemName, semanticRepeat?.indexName].filter(
+				(name): name is string => name !== undefined,
+			),
+		})
+	);
 }
 
 function componentSlotAt(

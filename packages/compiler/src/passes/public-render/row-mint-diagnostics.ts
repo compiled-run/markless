@@ -11,6 +11,7 @@ import {
 	expressionSlotValue,
 	isLoweredStyleObject,
 	mintableSlotValue,
+	resolveRowChunkMint,
 	resolveRowComponentMint,
 } from '../row-mint.ts';
 import {
@@ -111,6 +112,23 @@ function rowMintRefusal(input: {
 	const rowChunkId = `repeat:${input.repeatId}:row`;
 	const chunk = input.chunks.find((candidate) => candidate.id === rowChunkId);
 	if (!chunk) return null;
+	if (
+		resolveRowChunkMint({
+			...(input.recordHostIds ? { recordHostIds: input.recordHostIds } : {}),
+			...(input.liveHostIds ? { liveHostIds: input.liveHostIds } : {}),
+			semanticGraph: input.graph,
+			chunks: input.chunks,
+			componentEdges: input.componentEdges,
+			componentNames: input.componentNames,
+			...(input.importedModuleInterfaces
+				? { importedModuleInterfaces: input.importedModuleInterfaces }
+				: {}),
+			rowChunkId,
+			rowElementCount: chunk.hosts.length,
+			rowNames: [...input.rowNames],
+		})
+	)
+		return null;
 	const componentSlot = chunk.slots.find((slot) => slot.kind === 'child-component');
 	if (componentSlot?.kind === 'child-component') {
 		const mint = resolveRowComponentMint({

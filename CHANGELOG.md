@@ -152,6 +152,25 @@ The `ui()` Vite plugin from the new `@markless/ui-tools` package sets this up.
   ticked.
 - Turning `disabled` on for one `tree.item` after the page is live no longer
   disables the open/close button of the item next to it.
+- A keyed `@for` row that picks its markup with an `@if` or `@switch` on the
+  row's own item, like `@if (entry.type === 'page')`, now builds the rows
+  added after the page loads. Before, the list kept the rows it first rendered
+  and ignored new ones, so a `@markless/ui` pagination range never moved.
+- A component whose whole template is a `@for` with no element around it now
+  fails the build with `MARKLESS_PUBLIC_RENDER_ROOT_UNSUPPORTED` and says to
+  wrap the loop in an element. Before, it rendered nothing, threw
+  `MARKLESS_MDX_RENDER_DATA_ROOT_MISSING` on an MDX page, or stopped a page
+  that imported it from loading.
+- `@markless/ui` `otp` boxes show what you type on router pages, both MDX pages
+  and plain routes, in dev and in production builds. Before, the code reached
+  the field but every box went blank. The same applies to any part that works
+  out its position from its widget's list of `element()` parts, when the page
+  places that widget through another component.
+- An element bound inside an `@if` block to an `element()` handle declared in
+  the same component now gets the `id` that `aria-controls`, `for` or another
+  id reference outside the block points at, instead of `id=""` when the block
+  appears. A reference inside the block to such an element outside it gets the
+  right id too.
 - `checklist` items follow the group after the page is live: the select-all
   ticks and unticks them, and `disabled` set on `checklist.root` by the page
   locks them. Items built in a `@for` tick on click instead of throwing

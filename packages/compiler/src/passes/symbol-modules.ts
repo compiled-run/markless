@@ -1587,15 +1587,14 @@ function renderChunkParts(
 				} });
 				continue;
 			}
-			// The id a bound element carries is minted from the rendered widget's
-			// token, which no flip can reach; the render that served the arm resolves
-			// it onto the branch record and the symbol reads it back through the same
-			// read channel its value parts use.
+			// The id a bound element carries, or an always-written reference names, is
+			// minted for the rendered instance, which no flip can reach; the render that
+			// served the arm resolves it onto the branch record and the symbol reads it
+			// back through the same read channel its value parts use.
 			if (
 				slot.kind === 'attribute' &&
 				slot.alwaysPresent === true &&
 				slot.residue.kind === 'element-handle-id' &&
-				slot.residue.idref !== true &&
 				!child
 			) {
 				parts.push({ read: {
