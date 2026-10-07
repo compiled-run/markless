@@ -1965,6 +1965,82 @@ try {
 		);
 		await page.screenshot({ path: `${shotsDir}/T030-state-graph-after.png`, fullPage: true });
 
+		// --- sketch figures in How it works ----------------------------------------
+		// Each one is driven the way its hint tells the reader to drive it.
+		await page.goto(`${origin}/how-it-works/the-big-idea`, { waitUntil: 'load' });
+		const planFigure = page.locator('figure.plan-anywhere');
+		await planFigure.waitFor();
+		const planLive = planFigure.locator('.env[data-for="browser"] .live');
+		await planLive.click();
+		await settleText(planLive, (text) => text === 'Count 1', 'the plan figure counter counts in Browser');
+		await planFigure.getByRole('button', { name: 'Server', exact: true }).click();
+		const serverPanel = planFigure.locator('.env[data-for="server"]');
+		await serverPanel.waitFor({ state: 'visible' });
+		check(
+			((await serverPanel.textContent()) ?? '').includes('renderToString(App)') &&
+				!(await planFigure.locator('.env[data-for="browser"]').isVisible()),
+			'picking Server swaps in the server panel and the same plan cards stay',
+		);
+		check(
+			(await planFigure.locator('.cards li').count()) === 3,
+			'the plan figure keeps three plan cards',
+		);
+
+		await page.goto(`${origin}/how-it-works/compiler`, { waitUntil: 'load' });
+		const passFigure = page.locator('figure.compiler-passes');
+		const passWhere = passFigure.locator('.where');
+		await passWhere.waitFor();
+		check(
+			((await passWhere.textContent()) ?? '').trim() === 'Pass 1 of 15',
+			'the pass figure opens on pass 1',
+			((await passWhere.textContent()) ?? '').trim(),
+		);
+		await passFigure.getByRole('button', { name: 'Next →' }).click();
+		await settleText(passWhere, (text) => text === 'Pass 2 of 15', 'Next moves to pass 2');
+		await passFigure.getByRole('button', { name: 'Pass 9, protocol-view' }).click();
+		await settleText(passWhere, (text) => text === 'Pass 9 of 15', 'a station button jumps to pass 9');
+		check(
+			((await passFigure.locator('.pass[data-n="9"]').textContent()) ?? '').includes(
+				'"symbol:1"',
+			) && (await passFigure.locator('.pass[data-n="9"]').isVisible()),
+			'pass 9 shows the view record card with its symbol IDs',
+		);
+
+		await page.goto(`${origin}/how-it-works/payload`, { waitUntil: 'load' });
+		const payloadFigure = page.locator('figure.payload-card');
+		const payloadSay = payloadFigure.locator('.say');
+		await payloadSay.waitFor();
+		check(
+			((await payloadSay.textContent()) ?? '').includes('The click lives only in the view record.'),
+			'the payload card opens on the button line',
+			((await payloadSay.textContent()) ?? '').slice(0, 60),
+		);
+		await payloadFigure.getByRole('button', { name: 'The link' }).click();
+		await settleText(
+			payloadSay,
+			(text) => text.includes('Fetching it does not run it.'),
+			'pressing the link line explains the preload',
+		);
+
+		await page.goto(`${origin}/how-it-works/resuming`, { waitUntil: 'load' });
+		const clickFigure = page.locator('figure.first-click');
+		const clickLive = clickFigure.locator('.live');
+		await clickLive.waitFor();
+		await clickLive.click();
+		await settleText(clickLive, (text) => text === 'Count 1', 'the first-click counter counts');
+		await settleText(
+			clickFigure.locator('.steps[data-for="direct"] li').last(),
+			(text) => text.includes('Count 1'),
+			'the direct path notes name the text that was written',
+		);
+		await clickFigure.getByRole('button', { name: 'Server-rendered page' }).click();
+		await settleText(clickLive, (text) => text === 'Count 0', 'switching path starts the counter over');
+		check(
+			await clickFigure.locator('.steps[data-for="server"]').isVisible(),
+			'the server path shows its own steps',
+		);
+		await page.screenshot({ path: `${shotsDir}/T030-first-click-after.png`, fullPage: true });
+
 		// How it works is the one place the docs name semantic analysis, and it
 		// defines the term in the words the learner pages paraphrase.
 		await page.goto(`${origin}/how-it-works`, { waitUntil: 'load' });

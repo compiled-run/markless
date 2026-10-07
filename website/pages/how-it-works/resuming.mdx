@@ -3,6 +3,7 @@ import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import LikeHeart from '../../components/docs/like-heart.tsrx';
+import FirstClick from '../../components/sketch/how/first-click.tsrx';
 
 <Sidebar />
 
@@ -27,7 +28,7 @@ component is. There are three paths, and this page walks each one.
 In all three, a click on the counter runs the handler and updates the text that reads `count`. The
 component itself does not run again.
 
-{/* SKETCH: three lanes side by side, one per path. Each lane shows the button, who is listening (element, container, inline resumer), and what arrives on the first press. Same button, same "Count 1" at the bottom of every lane. */ null}
+<FirstClick />
 
 ## Path 1: the direct browser module
 

@@ -3,6 +3,7 @@ import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import LikeHeart from '../../components/docs/like-heart.tsrx';
+import PayloadCard from '../../components/sketch/how/payload-card.tsrx';
 
 <Sidebar />
 
@@ -25,7 +26,7 @@ to your HTML so the browser can carry on from it.
 The server runs the component body once. Then it writes two JSON scripts: the state values, and
 which element does what. A small inline script waits beside them for the first interaction.
 
-{/* SKETCH: the server HTML as a stack of labelled strips (preload link, early-event script, container div, button, state note, view note, inline script). Each strip has a one-line caption. The button strip shows no event attribute. */ null}
+<PayloadCard />
 
 ## The real response
 
