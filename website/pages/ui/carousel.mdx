@@ -1,6 +1,7 @@
 import AnatomyTable from '../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
 import Preview from '../../components/ui/preview.tsrx';
 
 <Sidebar />
@@ -28,33 +29,101 @@ export default function Destinations() @{
 }
 ```
 
-A slide is named by its `value`, and nothing counts positions for you, so the slide that should
-show is named rather than numbered. Mounting `carousel.title` is what names the carousel for a
-screen reader. Add a `carousel.navlist` of pickers and the slides become tab panels; leave it out
-and they stay plain groups.
+A carousel shows one slide at a time, with buttons to step through the rest. Use it for a row of
+featured items that share one spot on the page.
+
+Each slide has a name, its `value`. The root's `value` names the slide that is showing. Nothing
+counts positions, so you always name a slide, never number it.
 
 ## Anatomy
 
 <AnatomyTable />
 
-It writes `ui-active`, `ui-value`, `ui-align`, `ui-loop`, `ui-draggable`, `ui-vertical` and
-`ui-track`.
+The back and forward triggers step one slide. Set `move` on the root to step more, or set
+`move="view"` to step a whole window of slides.
+
+Add a `carousel.navlist` with one `carousel.navtrigger` per slide to get a row of slide pickers.
+Then the pickers are tabs and the slides are tab panels. Without the nav list, each slide is a
+group that screen readers call a "slide".
+
+## Keyboard
+
+The back, forward and play triggers are plain buttons, so Tab, Enter and Space work as usual.
+The pickers in a nav list share one Tab stop.
+
+| Key | What it does |
+| --- | --- |
+| Left or Right arrow | Show the previous or next slide and focus its picker. |
+| Up or Down arrow | The same, in place of Left and Right, when `orientation="vertical"`. |
+| Home or End | Show the first or the last slide. |
+
+Focusing a picker shows its slide. At either end the arrows stop. Set `loop` or `rewind` to make
+the ends come round.
+
+## Autoplay
+
+`carousel.playtrigger` starts and stops the slides moving on their own. Its screen reader label
+says what the next press will do.
+
+The rotation stops for good when focus moves inside the carousel. It pauses while the pointer is
+over the carousel and starts again when the pointer leaves. While it runs, the root sets
+`aria-live="off"`, so a screen reader does not read every slide.
+
+If the reader's system asks for reduced motion, the play trigger refuses to start. It gets
+`aria-disabled="true"` and `ui-reduced-motion`, so you can show why.
+
+<Callout
+	sprite="bolt"
+	title="Why does autoplay not start?"
+	text="The autoplay prop alone starts no timer. Only a press on carousel.playtrigger starts the rotation. Render a play trigger if you want the slides to move."
+/>
+
+## Styling
+
+The family ships no CSS, so an unstyled carousel is a stack of slides. The scroll area renders
+two elements. The outer one gets your props, and it is the window. Give it a size and
+`overflow: hidden`. The inner one carries `ui-track`, and the family moves it with a transform.
+Give it `display: flex`.
+
+A vertical carousel needs a fixed height on the window. Without one, the window grows to fit every
+slide, and there is nothing left to step to.
+
+| Attribute | On | When |
+| --- | --- | --- |
+| `ui-active` | `item`, `navtrigger` | This slide is the one showing. |
+| `ui-value` | `item`, `navtrigger` | Always. It holds the slide's `value`. |
+| `ui-vertical` | `root`, `scrollarea`, the track | `orientation="vertical"`. |
+| `ui-loop` | `root` | `loop` is set. `rewind` does not set it. |
+| `ui-draggable` | `scrollarea` | Dragging is on. It is on unless you set `draggable={false}`. |
+| `ui-align` | `scrollarea` | Always. It holds `start`, `center` or `end`. |
+| `ui-track` | The track inside `scrollarea` | Always. |
+| `ui-reduced-motion` | `root`, `playtrigger` | A press on play was refused for reduced motion. |
+
+<Callout
+	sprite="speech-bubble"
+	title="Does carousel.title name the carousel?"
+	text="No. It renders a plain div, and the root does not point at it. To give the carousel a name, put an aria-label on carousel.root. Leave the word carousel out of the label, because the root already says it is one."
+/>
+
+`mousewheel` lets the wheel step the slides. The family does not cancel the wheel event, so the
+page can scroll at the same time.
 
 ## Props on `carousel.root`
 
-| Prop               | Type                             | What it does                                                                              |
-| ------------------ | -------------------------------- | ----------------------------------------------------------------------------------------- |
-| `value`            | `string`                         | The slide showing now, named by its own `value`.                                          |
-| `orientation`      | `'horizontal' \| 'vertical'`     | Which axis the slides run along. Omit it and they run left to right.                      |
-| `align`            | `'start' \| 'center' \| 'end'`   | Where a slide comes to rest in the viewport. Omit it and slides rest at the start.        |
-| `move`             | `number \| 'view'`               | How many slides a back or forward trigger moves. `"view"` moves a whole viewport's worth. |
-| `loop`             | `boolean`                        | The slides run in an endless ring. Omit it and the ends stop.                             |
-| `rewind`           | `boolean`                        | Moving past the last slide lands on the first.                                            |
-| `draggable`        | `boolean`                        | A drag moves the slides. Omit it and dragging is on.                                      |
-| `mousewheel`       | `boolean`                        | The wheel moves the slides. Omit it and the wheel scrolls the page.                       |
-| `autoplay`         | `boolean`                        | Slides advance on their own.                                                              |
-| `autoplayInterval` | `number`                         | How long each slide is shown while autoplay runs, in milliseconds.                        |
-| `sensitivity`      | two numbers, `mouse` and `touch` | How far the slides travel for a given drag distance, per pointer kind.                    |
-| `onChange`         | `(value) => void`                | Called with the new value whenever the showing slide changes.                             |
+| Prop | Type | What it does |
+| --- | --- | --- |
+| `value` | `string` | The slide showing now, named by its `value`. |
+| `orientation` | `'horizontal' \| 'vertical'` | The axis the slides run along. The default is `horizontal`. |
+| `align` | `'start' \| 'center' \| 'end'` | Where a slide rests in the window. The default is `start`. |
+| `move` | `number \| 'view'` | How far one back or forward press goes. The default is `1`. |
+| `loop` | `boolean` | Stepping past either end comes round to the other end. |
+| `rewind` | `boolean` | Stepping past either end comes round to the other end. It does not set `ui-loop`. |
+| `draggable` | `boolean` | A drag moves the slides. The default is `true`. |
+| `mousewheel` | `boolean` | The wheel steps the slides. The default is `false`. |
+| `autoplay` | `boolean` | The rotation state the root renders with. It starts no timer. |
+| `autoplayInterval` | `number` | Milliseconds per slide while the rotation runs. The default is `3000`. |
+| `sensitivity` | `{ mouse?: number; touch?: number }` | How far a drag moves the slides. The defaults are `1.5` and `1.25`. |
+| `onChange` | `(value: string) => void` | Called with the new `value` when the showing slide changes. |
 
-Everything a `<div>` accepts reaches the element too.
+Every other prop goes on the root `<div>`. `carousel.item` and `carousel.navtrigger` each need a
+`value`.

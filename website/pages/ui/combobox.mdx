@@ -1,6 +1,7 @@
 import AnatomyTable from '../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
 import Preview from '../../components/ui/preview.tsrx';
 
 <Sidebar />
@@ -15,9 +16,9 @@ import Preview from '../../components/ui/preview.tsrx';
 import { combobox } from '@markless/ui';
 
 export default function Fruit() @{
-	<combobox.root name="fruit">
+	<combobox.root name="fruit" placeholder="Type a fruit">
 		<combobox.label>Favourite fruit</combobox.label>
-		<combobox.input placeholder="Type a fruit" />
+		<combobox.input />
 		<combobox.trigger>Show</combobox.trigger>
 		<combobox.content>
 			<combobox.item value="apple" label="Apple">
@@ -33,36 +34,123 @@ export default function Fruit() @{
 }
 ```
 
-A combobox is a text field with a list attached, and it is not a select. Focus never leaves the
-input, so printable keys go where a person expects them to; the highlighted option is the family's
-own state rather than whatever the browser focused. `label` is the words the field shows once an
-option is chosen — omit it and the value is used. Filtering the list is yours: read the typed text
-and render the options you want.
+A combobox is a text field with a list of options under it. Use it when the list is long enough
+that people want to type to find an option. For a short list with no typing, use
+[select](/ui/select).
+
+Focus stays in the text field the whole time. The arrow keys move a highlight through the options,
+but the caret never leaves the field. Even a click on an option puts focus back in the field.
+
+When a person picks an option, the field shows that option's `label`. If you leave `label` out,
+the field shows the `value`.
 
 ## Anatomy
 
 <AnatomyTable />
 
-It writes `ui-open`, `ui-closed`, `ui-highlighted`, `ui-selected`, `ui-hidden`, `ui-inline`,
-`ui-required`, `ui-disabled` and `ui-value`.
+`combobox.input` is the only Tab stop. `combobox.trigger` opens and closes the list with a click,
+but Tab skips it. Screen readers hear it as "Show options".
+
+## Filtering is yours
+
+The family does not filter the list. It keeps the typed text, and you render the options you want.
+`onInput` on the root gets the text on every keystroke. A component inside the root can also read
+it as `combobox.state().input`.
+
+<Callout
+	sprite="bolt"
+	title="Why do new options not appear as I type?"
+	text="A @for that renders combobox.item rows gets the warning MARKLESS_KEYED_REPEAT_ROW_MINT_UNSUPPORTED. In the browser, that list can remove and reorder the rows from the first render. It ignores rows that were not in the first render."
+/>
+
+## Keyboard
+
+| Key | What it does |
+| --- | --- |
+| Down arrow | Open the list on the first option, or move the highlight down. |
+| Up arrow | Open the list on the last option, or move the highlight up. |
+| Home or End | While the list shows, highlight the first or last option. Otherwise, move the caret. |
+| Page Down or Page Up | While the list shows, move the highlight ten options. |
+| Enter | While the list shows, pick the highlighted option. Otherwise, submit the form. |
+| Escape | Close the list. The choice stays as it was. |
+| Tab | Close the list and move on. |
+| Backspace | With `multiple` and `removeOnBackspace`, in an empty field, remove the last choice. |
+
+The highlight stops at the ends. Set `loop` to make it wrap. It skips disabled options.
+
+## Choosing and unchoosing
+
+A click on an option picks it and closes the list. A click on the option that is already picked
+unpicks it and leaves the list open. Without `multiple`, an empty field also clears the choice.
+
+With `multiple`, the root's `value` is a list, and the list stays open after each pick. With
+`inline`, the list is always on the page. Nothing opens or closes it.
+
+## Help and errors
+
+`combobox.description` is a hint and `combobox.error` is an error message. The input lists both in
+`aria-describedby`, the error first. The error has `role="alert"`, so a screen reader reads it
+when it appears.
+
+<Callout
+	sprite="bolt"
+	title="Why is my field not marked invalid?"
+	text="Unlike checkbox, rendering combobox.error does not mark the field invalid. Set invalid on combobox.root, and the input gets aria-invalid='true'."
+/>
+
+## Forms
+
+`combobox.field` renders a hidden native `<select>` for the form. It reads `name`, `required` and
+`disabled` from the root, and submits the chosen `value`.
+
+<Callout
+	sprite="speech-bubble"
+	title="Does the form get every choice with multiple?"
+	text="No. combobox.field holds a single option, so it does not submit one entry per choice. Send a multiple combobox's value from onChange instead."
+/>
+
+## Styling
+
+The family ships no CSS. It writes these attributes:
+
+| Attribute | On | When |
+| --- | --- | --- |
+| `ui-open`, `ui-closed` | `root`, `input`, `trigger`, `content` | The list is open or closed. |
+| `ui-highlighted` | `item` | The keyboard or the pointer has this option highlighted. |
+| `ui-selected` | `item` | This option is picked. |
+| `ui-disabled` | `root`, `item` | The combobox or this option is disabled. |
+| `ui-value` | `item` | Always. It holds the option's `value`. |
+| `ui-hidden` | `itemindicator` | Its option is not picked. |
+| `ui-required` | `root` | `required` is set. |
+| `ui-inline` | `root` | `inline` is set. |
+
+`combobox.itemindicator` stays in the page while its option is not picked. Hide it with
+`[ui-hidden] { visibility: hidden }`.
+
+<Callout
+	sprite="bolt"
+	title="Why is my placeholder gone?"
+	text="Put placeholder on combobox.root, not on combobox.input. The input always takes the root's placeholder, and the root's default is an empty string."
+/>
 
 ## Props on `combobox.root`
 
-| Prop                | Type                 | What it does                                                                            |
-| ------------------- | -------------------- | --------------------------------------------------------------------------------------- |
-| `value`             | `string \| string[]` | The chosen option. With `multiple` it is the list of chosen values.                     |
-| `open`              | `boolean`            | The list is showing. Omit it and it starts closed.                                      |
-| `multiple`          | `boolean`            | More than one option can be chosen, and `value` becomes a list.                         |
-| `inline`            | `boolean`            | The list is part of the page rather than a popup: always showing, nothing dismisses it. |
-| `loop`              | `boolean`            | The arrow walk wraps around the ends instead of stopping.                               |
-| `removeOnBackspace` | `boolean`            | Backspace in an empty field removes the last chosen value. `multiple` only.             |
-| `disabled`          | `boolean`            | Nobody can choose or type.                                                              |
-| `required`          | `boolean`            | A choice is needed before the form submits.                                             |
-| `invalid`           | `boolean`            | Reported as `aria-invalid` on the input.                                                |
-| `name`              | `string`             | Submitted under this name by `combobox.field`.                                          |
-| `placeholder`       | `string`             | The field's placeholder. The root's value wins over the input's own.                    |
-| `onChange`          | `(value) => void`    | Called with the new selection.                                                          |
-| `onInput`           | `(value) => void`    | Called with the field's new text every time a person types.                             |
-| `onOpenChange`      | `(open) => void`     | Called when the list opens or closes.                                                   |
+| Prop | Type | What it does |
+| --- | --- | --- |
+| `value` | `string \| readonly string[]` | The picked option. With `multiple`, the list of picked options. |
+| `open` | `boolean` | Whether the list starts open. The default is `false`. |
+| `multiple` | `boolean` | More than one option can be picked, and `value` becomes a list. |
+| `inline` | `boolean` | The list is part of the page and always shows. |
+| `loop` | `boolean` | The highlight wraps at the ends instead of stopping. |
+| `removeOnBackspace` | `boolean` | Backspace in an empty field removes the last choice. Needs `multiple`. |
+| `disabled` | `boolean` | Nobody can type or pick. |
+| `required` | `boolean` | The form will not submit without a choice. |
+| `invalid` | `boolean` | Sets `aria-invalid="true"` on the input. |
+| `name` | `string` | The name `combobox.field` submits under. |
+| `placeholder` | `string` | The field's placeholder. It replaces any placeholder on the input. |
+| `onChange` | `(value: string \| readonly string[]) => void` | Called with the new choice. |
+| `onInput` | `(value: string) => void` | Called with the field's text on every keystroke. |
+| `onOpenChange` | `(open: boolean) => void` | Called when the list opens or closes. |
 
-Everything a `<div>` accepts reaches the element too.
+Every other prop goes on the root `<div>`, which has `role="group"`. `combobox.item` takes
+`value`, which it needs, plus `label` and `disabled`.

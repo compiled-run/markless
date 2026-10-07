@@ -1,6 +1,7 @@
 import AnatomyTable from '../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
 import { Basic, Value, Mixed, Disabled, Form, Help } from 'ui-demos:checkbox';
 
 <Sidebar />
@@ -9,23 +10,17 @@ import { Basic, Value, Mixed, Disabled, Form, Help } from 'ui-demos:checkbox';
 
 <ThemeToggle />
 
-<Basic shows="One ticked box. The tick is the indicator, drawn only while the box is on." />
+<Basic shows="Click the box or its words. The tick shows only while the box is on." />
 
 ## Overview
 
-A checkbox is on, off, or mixed. The control a person clicks is a `<button>` with
-`role="checkbox"`, so it carries its own state instead of borrowing a native input's. What a form
-receives is a separate hidden input, added by writing `checkbox.field`. `name`, `value` and
-`required` are declared once on `checkbox.root`, so the button and the input can never drift apart.
+A checkbox is one yes-or-no choice with a label. It can also be **mixed**, for a box that stands
+over a list where only some rows are ticked. For a whole list with a select-all box, use
+[checklist](/ui/checklist).
 
-## Key features
-
-- Three values, not two: `checked` takes `true`, `false` or `'mixed'`.
-- The label toggles the box. Its `for` points at the trigger the family bound.
-- Mounting `checkbox.error` is what marks the control invalid, so there is no second flag to keep
-  in step.
-- A form sees a real `<input type="checkbox">`, indeterminate and all, only when you ask for one.
-- Every state a stylesheet needs is an attribute: `ui-checked`, `ui-mixed`, `ui-disabled`.
+The box you click is a `<button role="checkbox">`, not a native input. A form never sees that
+button. If the choice has to reach a form, add `checkbox.field`. It renders a hidden native
+checkbox for the form to read.
 
 ## Anatomy
 
@@ -46,26 +41,27 @@ export default function Terms() @{
 }
 ```
 
-It writes `ui-checked`, `ui-mixed` and `ui-disabled` as its state changes.
+`checkbox.label` is a real `<label>` tied to the trigger, so a click on the words toggles the box.
+`checkbox.indicator` holds your tick. Its children show only while the box is on or mixed.
 
-## Managing the checked value
+## The checked value
 
-`checked` on the root is the whole value. Omit it and the box starts off. `onChange` is called with
-the new value each time a person toggles it, so your own variable can hold it.
+`checked` on the root is the starting value. Leave it out and the box starts off. Each click calls
+`onChange` with the new value, so your own state can follow it.
 
-<Value shows="Two boxes: the first starts off, the second starts on." />
+<Value shows="Two boxes. The first starts off and the second starts on." />
 
 ```tsrx
 <checkbox.root>…</checkbox.root>
 <checkbox.root checked>…</checkbox.root>
 ```
 
-## A box that is neither on nor off
+## The mixed value
 
-Set `checked="mixed"` for the row that stands over a part-ticked list. The trigger reports
-`aria-checked="mixed"`, and `checkbox.field` sets the native input's `indeterminate` for you.
+Set `checked="mixed"` for a box that stands over a part-ticked list. The trigger reports
+`aria-checked="mixed"`, and `checkbox.field` sets `indeterminate` on its native input.
 
-<Mixed shows="A parent box in the mixed state. Its indicator is a dash, not a tick." />
+<Mixed shows="A box in the mixed state. Its indicator draws a dash." />
 
 ```tsrx
 <checkbox.root checked="mixed" name="all">
@@ -77,16 +73,21 @@ Set `checked="mixed"` for the row that stands over a part-ticked list. The trigg
 </checkbox.root>
 ```
 
-**Why does the indicator still draw something when the box is mixed?** Its children render while
-the value is anything other than `false`, so one part covers both the tick and the dash. Which
-glyph you put inside it is yours.
+A click on a mixed box turns it on. The next click turns it off. A click never leads back to mixed,
+so mixed only comes from your `checked` prop.
 
-## A box nobody may change
+<Callout
+	sprite="speech-bubble"
+	title="Why does the indicator draw something when the box is mixed?"
+	text="The indicator shows its children whenever the value is not false. One part covers both states, so you choose the glyph. Put a dash inside it for a box that starts mixed."
+/>
 
-`disabled` on the root disables the trigger outright and puts `ui-disabled` on both the root and
-the button, so one selector reaches the whole thing.
+## A disabled box
 
-<Disabled shows="A ticked box that will not toggle. The button is disabled natively." />
+`disabled` on the root disables the trigger button, so a click does nothing and Tab skips it. The
+root and the trigger both get `ui-disabled`.
+
+<Disabled shows="A ticked box that does not change when you click it." />
 
 ```tsrx
 <checkbox.root checked disabled>
@@ -97,13 +98,15 @@ the button, so one selector reaches the whole thing.
 </checkbox.root>
 ```
 
+A disabled box sends nothing with its form, even when it is ticked. That is how a native disabled
+checkbox behaves too.
+
 ## Sending it with a form
 
-Write `checkbox.field` and a visually hidden `<input type="checkbox">` joins the form. It takes no
-configuration of its own: `name`, `value` and `required` come from the root, and a `required` box
-that is not ticked stops the submit the way a native one does.
+Add `checkbox.field` to put a hidden `<input type="checkbox">` in the form. It takes no props of
+its own. It reads `name`, `value` and `required` from the root.
 
-<Form shows="A form field named newsletter. Submitting it unticked is refused." />
+<Form shows="Press Save while the box is off. The form refuses to send." />
 
 ```tsrx
 <checkbox.root required name="newsletter" value="weekly">
@@ -115,12 +118,13 @@ that is not ticked stops the submit the way a native one does.
 </checkbox.root>
 ```
 
+A ticked box sends its `name` with its `value`. Without a `value` it sends `"on"`, like a native
+checkbox. An unticked box and a mixed box send nothing.
+
 ## Help and error text
 
-`checkbox.description` is the hint, `checkbox.error` is what went wrong. The trigger names both
-through `aria-describedby`, the error first, wherever the two parts sit in the markup. Render
-`checkbox.error` only when there is an error: mounting it is what sets `aria-invalid` on the
-trigger.
+`checkbox.description` is a hint. `checkbox.error` says what went wrong. The trigger lists both in
+`aria-describedby`, the error first, wherever you place them.
 
 <Help shows="A required box with a hint under it and an error under that." />
 
@@ -135,81 +139,78 @@ trigger.
 </checkbox.root>
 ```
 
+<Callout
+	sprite="bolt"
+	title="Why is my box marked invalid?"
+	text="Rendering checkbox.error is what sets aria-invalid='true' on the trigger. There is no invalid prop. Render the error part only while there is an error."
+/>
+
 ## Keyboard
 
-Focus lands on the trigger, and a disabled trigger is skipped by the browser's own tab order.
+| Key | What it does |
+| --- | --- |
+| Tab | Move focus to the trigger, or past it. |
+| Space | Toggle the box. |
+| Enter | Nothing. A checkbox is not a submit button, so the family cancels Enter. |
 
-| Key   | What it does                                                                |
-| ----- | --------------------------------------------------------------------------- |
-| Tab   | Move to the trigger, or past it.                                            |
-| Space | Toggle the checkbox.                                                        |
-| Enter | Nothing. The family prevents it, because a checkbox is not a submit button. |
+## Styling
+
+| Attribute | On | When |
+| --- | --- | --- |
+| `ui-checked` | `root`, `trigger` | The value is `true`. |
+| `ui-mixed` | `root`, `trigger` | The value is `'mixed'`. |
+| `ui-disabled` | `root`, `trigger` | `disabled` is set. |
+
+The family ships no CSS. The box has no size or border until you give it one.
 
 ## API reference
 
-Every prop is optional, and the types below are the family's own.
-
 ### `checkbox.root`
 
-| Prop       | Type                                    | What it does                                                                            |
-| ---------- | --------------------------------------- | --------------------------------------------------------------------------------------- |
-| `checked`  | `boolean \| 'mixed'`                    | The value the checkbox shows. Omit it and the box starts off.                           |
-| `disabled` | `boolean`                               | Nobody can toggle the checkbox, and the trigger is disabled outright.                   |
-| `required` | `boolean`                               | Marks the hidden `checkbox.field` input required, so a form refuses to submit unticked. |
-| `name`     | `string`                                | Submitted under this name by `checkbox.field`.                                          |
-| `value`    | `string`                                | Submitted instead of the browser default `"on"`.                                        |
-| `onChange` | `(checked: boolean \| 'mixed') => void` | Called with the new value when a person toggles the checkbox.                           |
+| Prop | Type | What it does |
+| --- | --- | --- |
+| `checked` | `boolean \| 'mixed'` | The starting value. The default is `false`. |
+| `disabled` | `boolean` | Nobody can toggle the box. The trigger button is disabled. |
+| `required` | `boolean` | The form will not submit while the box is off. Needs `checkbox.field`. |
+| `name` | `string` | The name `checkbox.field` submits under. |
+| `value` | `string` | What `checkbox.field` submits. The default is `"on"`. |
+| `onChange` | `(checked: boolean \| 'mixed') => void` | Called with the new value after each toggle. |
 
-| Attribute       | Present when           | What to key styling off                                             |
-| --------------- | ---------------------- | ------------------------------------------------------------------- |
-| `ui-checked`    | The value is `true`    | The ticked look.                                                    |
-| `ui-mixed`      | The value is `'mixed'` | The part-ticked look.                                               |
-| `ui-disabled`   | `disabled` is set      | The unreachable look.                                               |
-| `aria-disabled` | Always                 | `true` or `false`, for a screen reader rather than your stylesheet. |
-
-Everything a `<div>` accepts reaches the element too, apart from `onChange`, which is the family's.
+The root renders a `<div>` with `aria-disabled` set to `true` or `false`. Every other prop goes on
+that `<div>`.
 
 ### `checkbox.trigger`
 
-No props of its own. It renders a `<button type="button" role="checkbox">`, and everything a
-`<button>` accepts reaches the element. Your own `onClick` and `onKeydown` run after the checkbox
-has toggled.
+A `<button type="button" role="checkbox">`. It has no props of its own, and every button prop goes
+on the button. Your own `onClick` and `onKeydown` run after the family's.
 
-| Attribute          | Present when           | What to key styling off                                     |
-| ------------------ | ---------------------- | ----------------------------------------------------------- |
-| `ui-checked`       | The value is `true`    | The ticked look.                                            |
-| `ui-mixed`         | The value is `'mixed'` | The part-ticked look.                                       |
-| `ui-disabled`      | `disabled` is set      | The unreachable look.                                       |
-| `aria-checked`     | Always                 | `true`, `false` or `mixed`.                                 |
-| `aria-invalid`     | Always                 | `true` while a `checkbox.error` is mounted.                 |
-| `aria-describedby` | Always                 | The ids of the error and the description, error first.      |
-| `disabled`         | The root is disabled   | The native disabled state, so the browser skips the button. |
+| Attribute | Value |
+| --- | --- |
+| `aria-checked` | `true`, `false` or `mixed`. |
+| `aria-invalid` | `true` while a `checkbox.error` is rendered, else `false`. |
+| `aria-describedby` | The ids of `checkbox.error` and `checkbox.description`, error first. |
+| `disabled` | Present while the root is disabled. |
 
 ### `checkbox.indicator`
 
-No props of its own. It renders a `<span aria-hidden="true">`, and everything a `<span>` accepts
-reaches the element. Its children render only while the value is on or mixed, and it is hidden from
-a screen reader so the state is never announced twice.
+A `<span aria-hidden="true">`. Its children show while the value is `true` or `'mixed'`. Screen
+readers skip it, because the trigger already reports the state.
 
 ### `checkbox.label`
 
-No props of its own. It renders a `<label>` whose `for` points at `checkbox.trigger`, so clicking
-the words toggles the box. Everything a `<label>` accepts reaches the element.
+A `<label>` whose `for` points at the trigger.
 
 ### `checkbox.description`
 
-No props of its own. It renders a `<div>`, and everything a `<div>` accepts reaches the element.
-`checkbox.trigger` names it through `aria-describedby`, after any `checkbox.error`.
+A `<div>`. The trigger lists it in `aria-describedby`, after any error.
 
 ### `checkbox.error`
 
-No props of its own. It renders a `<div>`, and everything a `<div>` accepts reaches the element.
-Mounting it is what marks the checkbox invalid, and `checkbox.trigger` names it first in
+A `<div>`. Rendering it marks the trigger invalid. The trigger lists it first in
 `aria-describedby`.
 
 ### `checkbox.field`
 
-No props of its own, by design: `name`, `value` and `required` all come from `checkbox.root`. It
-renders a visually hidden `<input type="checkbox">` with `tabindex="-1"` and `aria-hidden="true"`,
-so nothing but the family ever changes it, and it carries `indeterminate` when the value is mixed.
-Everything an `<input>` accepts reaches the element.
+A hidden `<input type="checkbox">` with `tabindex="-1"` and `aria-hidden="true"`. It has no props
+of its own. It reads `name`, `value`, `required` and `disabled` from the root, and sets
+`indeterminate` while the value is mixed.
