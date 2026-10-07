@@ -60,6 +60,8 @@ export function isCompositeTemplateExpression(
 	node: AnyNode,
 	options: CompositeReadOptions = {},
 ): boolean {
+	// Parentheses only group; what they wrap answers for its own reads.
+	if (node.type === 'ParenthesizedExpression') return true;
 	return (
 		node.type === 'ConditionalExpression' ||
 		node.type === 'BinaryExpression' ||
@@ -90,7 +92,7 @@ export function pureCompositeReadSources(
 	options: CompositeReadOptions = {},
 ): ReadonlyArray<string> | null {
 	if (!node) return [];
-	if (node.type === 'ChainExpression') {
+	if (node.type === 'ChainExpression' || node.type === 'ParenthesizedExpression') {
 		return pureCompositeReadSources(node.expression as AnyNode | undefined, state, options);
 	}
 	if (isLiteralExpression(node)) return [];

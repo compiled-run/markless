@@ -578,10 +578,13 @@ test('a widget-scoped cell is owned by the component that seeds it, not the firs
 		source.indexOf('async function marklessRenderSsr('),
 	);
 
+	// The trailing list is the seeds: only the component whose body seeds the cell carries them.
 	expect(seeding).toContain(
-		'marklessSelectStateNodes(marklessCloneState(payloadState), [0], [])',
+		'marklessSelectStateNodes(marklessCloneState(payloadState), [0], [], [0])',
 	);
-	expect(part).toContain('marklessSelectStateNodes(marklessCloneState(payloadState), [], [])');
+	expect(part).toContain(
+		'marklessSelectStateNodes(marklessCloneState(payloadState), [], [], [])',
+	);
 	expect(seeding).toContain(
 		'marklessStateValue(marklessSsrRenderStateValues, marklessSsrPayloadState, ' +
 			'"shared:src/gate.tsrx#gate/state:cell",',

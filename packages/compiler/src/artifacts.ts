@@ -146,6 +146,13 @@ export type SemanticComponentEdge = {
 	readonly props: ReadonlyArray<SemanticComponentPropBinding>;
 	readonly children: {
 		readonly childCount: number;
+		/** Text-only children: the graph value their one text node renders, for the child's `{children}`. */
+		readonly text?: {
+			readonly source: string;
+			readonly graphNodeId: string;
+			readonly graphBindingKind: SemanticGraphBinding['kind'];
+			readonly path: ReadonlyArray<string>;
+		};
 	};
 	readonly branchScopeIds: ReadonlyArray<string>;
 	readonly keyedRepeatScopeIds: ReadonlyArray<string>;

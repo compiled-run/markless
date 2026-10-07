@@ -52,6 +52,7 @@ export type SsrComposableView = Parameters<typeof marklessSsrComposeView>[1];
 export type SsrComposableChildOutput = NonNullable<MarklessSsrComposedChild['output']>;
 
 type GraphValues = ReadonlyMap<string, unknown>;
+type SeedSelection = { sharedSeeds?: ProtocolStatePayload['sharedSeeds'] };
 
 export type PrerenderRead = (graphNodeId: string, path?: ReadonlyArray<string>) => unknown;
 
@@ -80,6 +81,7 @@ export type PrerenderDataDefinition = {
 	// components: two of them may spell one graph node id.
 	readonly stateCellIndexes?: ReadonlyArray<number>;
 	readonly stateComputedIndexes?: ReadonlyArray<number>;
+	readonly stateSharedSeedIndexes?: ReadonlyArray<number>;
 	// Positions into `state.computed` for the sync computeds a handler reads:
 	// their derived value travels with the payload so the first read, before any
 	// dependency write, answers with it.
@@ -857,6 +859,9 @@ export function evaluatePrerenderDataComponent(input: {
 								: computed,
 					),
 			};
+			const seeds = definition.stateSharedSeedIndexes;
+			if (seeds)
+				(state as SeedSelection).sharedSeeds = seeds.map((at) => state.sharedSeeds![at]!);
 			if (definition.propCellId) {
 				const propCell = state.cells.find((cell) => cell.graphNodeId === definition.propCellId);
 				if (propCell) Object.assign(propCell, { value: undefined, directValue: input.props });

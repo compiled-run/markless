@@ -110,6 +110,17 @@ The `ui()` Vite plugin from the new `@markless/ui-tools` package sets this up.
 - An `onVisible` handler receives an event whose `target` and `currentTarget`
   are the element, and `onVisible` inside MDX pages no longer throws
   `MARKLESS_EVENT_DISPATCH_UNMATCHED` on load.
+- Text passed straight in as a component's children, like
+  `<Watch>{count} cups</Watch>`, updates when the state changes, the way it
+  already did when wrapped in an element.
+- A part that seeds widget state from its own children no longer picks up the
+  live text passed to a sibling part.
+- A component that mixes its own state with a destructured prop, like
+  `title={open ? label : ''}`, follows the parent's changes to that prop when
+  both components are in one file, and still renders when the prop is left out.
+- Parentheses inside a markup expression, like
+  `{(open ? 'Hide' : 'Show') + ' details'}`, no longer fail the build with
+  `MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED`.
 
 ## 0.3.3
 

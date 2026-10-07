@@ -804,6 +804,7 @@ export function componentOwnedStateNodes(
 	readonly cellIndexes: ReadonlyArray<number>;
 	readonly computedIndexes: ReadonlyArray<number>;
 	readonly seedCellIndexes: ReadonlyArray<number>;
+	readonly sharedSeedIndexes?: ReadonlyArray<number>;
 } {
 	const owner = payloadNodeOwners(input, rootComponentName);
 	// Every resolver of an unseeded widget family carries its cells, so a page
@@ -857,7 +858,37 @@ export function componentOwnedStateNodes(
 				? [index]
 				: [],
 		),
+		...(input.protocolState.sharedSeeds?.length
+			? { sharedSeedIndexes: componentSharedSeedIndexes(input, componentName) }
+			: {}),
 	};
+}
+
+/** The node positions `marklessSelectStateNodes` keeps for one component, as emitted arguments. */
+export function selectedStateNodeArguments(owned: {
+	readonly cellIndexes: ReadonlyArray<number>;
+	readonly computedIndexes: ReadonlyArray<number>;
+	readonly sharedSeedIndexes?: ReadonlyArray<number>;
+}): string {
+	const seeds = owned.sharedSeedIndexes ? [owned.sharedSeedIndexes] : [];
+	return [owned.cellIndexes, owned.computedIndexes, ...seeds]
+		.map((indexes) => JSON.stringify(indexes))
+		.join(', ');
+}
+
+// A seed follows the props of the component whose body writes it, so only that component carries it.
+function componentSharedSeedIndexes(
+	input: PublicRenderModuleInput,
+	componentName: string,
+): ReadonlyArray<number> {
+	const writers = new Map(
+		input.symbolResolver.symbols.flatMap((symbol) =>
+			symbol.kind === 'shared-seed' ? [[symbol.id, symbol.componentName] as const] : [],
+		),
+	);
+	return (input.protocolState.sharedSeeds ?? []).flatMap((seed, index) =>
+		writers.get(seed.deriveSymbolId) === componentName ? [index] : [],
+	);
 }
 
 // Every graph node a set of reads reaches, following each computed to what it

@@ -676,7 +676,8 @@ export function marklessCsrRemapGraphOutput(
 		for (const prop of graphProps ?? []) {
 			const route = marklessLiveBoundGraphRoute(prop);
 			// The draft cell list belongs to this render pass, so seeding writes in place.
-			if (route?.path.length === 0 && props[prop.name] !== undefined)
+			// Projected text arrives as its HTML, so its source node keeps its own value.
+			if (route?.path.length === 0 && !prop.projected && props[prop.name] !== undefined)
 				(output.state.cells as ComposeStateNode[]).push({
 					graphNodeId: route.graphNodeId,
 					directValue: props[prop.name],

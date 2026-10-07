@@ -32,6 +32,7 @@ import {
 } from './capture-semantics.ts';
 import { sharedCallbackSlotGraphNodeId } from './semantic-graph/collect-shared.ts';
 import { createSourceMemo } from './semantic-graph/shared-ast.ts';
+import { PROJECTION_PROP_NAME } from './public-render/shared-seed-pass.ts';
 
 // Capture analysis owns these diagnostic contract values. Tests and any other
 // reader import them from here rather than restating the strings, so the
@@ -369,8 +370,23 @@ function wasProjectedThroughComponentEdge(
 ): boolean {
 	return (
 		propName === 'children' &&
+		!edge.children.text &&
 		(edge.children.childCount > 0 || edge.props.some((prop) => prop.name === 'children'))
 	);
+}
+
+// Text-only children reach the child as the live value of their one text node.
+function edgePropBinding(
+	edge: SemanticComponentEdge,
+	propName: string,
+): SemanticComponentEdge['props'][number] | undefined {
+	const prop = edge.props.find((candidate) => candidate.name === propName);
+	if (prop || propName !== PROJECTION_PROP_NAME || !edge.children.text) return prop;
+	return {
+		name: propName,
+		kind: 'graph-reference',
+		...edge.children.text,
+	};
 }
 
 function symbolCaptureSlots(
@@ -670,12 +686,14 @@ function propReadForLazySymbol(
 	const semanticRead = semanticReadForSymbol(symbol, read.source, input);
 	// Only state reads name the authored prop binding; template reads are host-scoped.
 	const stateRead = semanticRead && !isTemplateRead(semanticRead) ? semanticRead : undefined;
-	const declaration = componentPropDeclarationForSymbol(
-		symbol,
-		semanticRead?.sourceSpan,
-		input,
-		stateRead?.bindingId,
-	);
+	const declaration =
+		templateComputedPropDeclaration(symbol, read.source, input) ??
+		componentPropDeclarationForSymbol(
+			symbol,
+			semanticRead?.sourceSpan,
+			input,
+			stateRead?.bindingId,
+		);
 	return [
 		{
 			...read,
@@ -688,6 +706,24 @@ function propReadForLazySymbol(
 					: {}),
 		},
 	];
+}
+
+// A computed minted for one markup expression reads the props of the component that wrote it.
+function templateComputedPropDeclaration(
+	symbol: PlannedSymbol,
+	source: string,
+	input: CaptureAnalysisInput,
+): SemanticComponentPropDeclaration | undefined {
+	if (symbol.kind !== 'sync-computed-derive') return undefined;
+	const componentName = input.semanticGraph.templateReads.find(
+		(read) => read.computedGraphNodeId === symbol.graphNodeId,
+	)?.componentName;
+	const name = rootIdentifierName(source);
+	if (!componentName || !name) return undefined;
+	return input.semanticGraph.componentPropBindings.find(
+		(declaration) =>
+			declaration.componentName === componentName && declaration.localName === name,
+	);
 }
 
 function isTemplateRead(
@@ -799,10 +835,12 @@ function captureSlot(
 	const componentName = declaration?.componentName ?? read.componentName;
 	const propName = read.graphNodeId.startsWith('prop:') ? read.path[0] : undefined;
 	const routePath = propName ? read.path.slice(1) : read.path;
-	// Absent callback props fold to undefined only at optional/guarded call sites.
+	// Absent callback props fold to undefined only at optional/guarded call sites; a derive
+	// reads an absent prop as undefined, as an imported claim's derive already does.
 	const absentPropIsUndefined =
-		(symbol.kind === 'event-handler' || symbol.kind === 'callback-prop') &&
-		referenceInvocationIsAbsentSafe(symbolSource(symbol), read.source);
+		symbol.kind === 'sync-computed-derive' ||
+		((symbol.kind === 'event-handler' || symbol.kind === 'callback-prop') &&
+			referenceInvocationIsAbsentSafe(symbolSource(symbol), read.source));
 	let routes = propName
 		? propCaptureRoutes(componentName, propName, routePath, input, absentPropIsUndefined)
 		: [
@@ -932,7 +970,7 @@ function resolvePropCaptureRoute(
 	const edge = componentEdgePath[edgeIndex];
 	if (!edge) throw new Error('Capture route ancestry ended before its terminal value.');
 	const edgePathIds = componentEdgePath.map((candidate) => candidate.id);
-	const prop = edge.props.find((candidate) => candidate.name === propName);
+	const prop = edgePropBinding(edge, propName);
 	if (!prop) {
 		if (absentPropIsUndefined) {
 			return createCompilerKnownConstantCaptureRoute(terminalEdgeId, edgePathIds, undefined);
