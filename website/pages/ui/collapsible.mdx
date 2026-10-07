@@ -1,6 +1,7 @@
 import AnatomyTable from '../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
 import Preview from '../../components/ui/preview.tsrx';
 
 <Sidebar />
@@ -24,24 +25,57 @@ export default function What() @{
 }
 ```
 
-One button, one panel. A closed panel stays in the page — `hidden` decides whether it shows — so
-focus, scroll position and anything typed inside survive being closed. By default a closed panel
-carries `hidden="until-found"`, which is what lets the browser's find-in-page reach the text inside
-it and open the panel on a hit.
+A collapsible is one button that shows or hides one panel. Use it for a "Show more" section or one
+question with its answer. For a stack of sections, use [accordion](/ui/accordion).
 
 ## Anatomy
 
 <AnatomyTable />
 
-It writes `ui-open`, `ui-closed` and `ui-disabled`.
+`collapsible.trigger` is a native `<button>`, so Tab reaches it, and Enter and Space press it. It
+reports `aria-expanded` and points at the panel with `aria-controls`.
+
+## A closed panel stays in the page
+
+Closing the panel hides it. It does not remove it. So anything inside keeps its state, such as text
+typed into a field.
+
+A closed panel gets `hidden="until-found"`. The browser's find-in-page still searches it, and a hit
+opens the panel. `onChange` runs with `true` when that happens.
+
+If you set `disableUntilFound`, a closed panel gets plain `hidden` instead, and find-in-page skips
+it.
+
+<Callout
+	sprite="bolt"
+	title="Why did a disabled panel open?"
+	text="disabled stops the trigger. It does not stop find-in-page. A disabled panel with until-found still opens when the browser finds text in it. Set disableUntilFound too if it must stay shut."
+/>
+
+## Styling
+
+The family ships no CSS. It writes these attributes:
+
+| Attribute | On | When |
+| --- | --- | --- |
+| `ui-open` | `root`, `trigger`, `content` | The panel is showing. |
+| `ui-closed` | `root`, `trigger`, `content` | The panel is hidden. |
+| `ui-disabled` | `root` | `disabled` is set. |
+
+<Callout
+	sprite="speech-bubble"
+	title="Why is my closed panel still showing?"
+	text="The panel hides with the hidden attribute. If you give it a display rule, your rule beats the browser's rule for hidden. Write .panel:not([hidden]) { display: grid } instead."
+/>
 
 ## Props on `collapsible.root`
 
-| Prop                | Type             | What it does                                                                          |
-| ------------------- | ---------------- | ------------------------------------------------------------------------------------- |
-| `open`              | `boolean`        | Whether the panel is showing. Omit it and it starts closed.                           |
-| `disabled`          | `boolean`        | Nothing opens or closes.                                                              |
-| `disableUntilFound` | `boolean`        | The closed panel is hidden outright, so find-in-page cannot reach the text inside it. |
-| `onChange`          | `(open) => void` | Called with the new value when a person opens or closes the panel.                    |
+| Prop | Type | What it does |
+| --- | --- | --- |
+| `open` | `boolean` | Whether the panel starts open. The default is `false`. |
+| `disabled` | `boolean` | The trigger is disabled, so a press does nothing. |
+| `disableUntilFound` | `boolean` | A closed panel gets plain `hidden`, so find-in-page skips it. |
+| `onChange` | `(open: boolean) => void` | Called with the new value when the panel opens or closes. |
 
-Everything a `<div>` accepts reaches the element too.
+Every other prop goes on the root `<div>`. Your own `onClick` on the trigger runs after the panel
+has changed.

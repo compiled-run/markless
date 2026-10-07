@@ -1,6 +1,7 @@
 import AnatomyTable from '../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
 import Preview from '../../components/ui/preview.tsrx';
 
 <Sidebar />
@@ -36,25 +37,76 @@ export default function Condiments() @{
 }
 ```
 
-The select-all is never told what it is. It works its own value out by comparing the ticked set
-against `values`, which is why it goes mixed on its own when some but not all of the items are on.
-The group and the select-all's own checkbox are one element: `checklist.root` is a `role="group"`
-and a checkbox root at the same time.
+A checklist is a group of checkboxes with one select-all box on top. Use it when a person picks
+any number of options from one short list. For a single box, use [checkbox](/ui/checkbox).
+
+You give the root two lists. `values` is every option the list offers. `value` is the options that
+are ticked. Each `checklist.item` names its option with its own `value`.
+
+## How the select-all works
+
+You never set the select-all's state. The family works it out from your two lists:
+
+- Nothing ticked: the select-all is off.
+- Every option in `values` ticked: the select-all is on.
+- Anything in between: the select-all is mixed.
+
+The test is a count. If `value` holds as many entries as `values`, the select-all is on. So keep
+`values` in step with the items you render.
+
+A click on the select-all from mixed or off ticks everything. A click from on clears everything.
+Either way `onChange` gets the whole new list of ticked values.
+
+<Callout
+	sprite="bolt"
+	title="Known gap: the item boxes can lag behind the select-all"
+	text="The package's own tests for ticking every item from the select-all are skipped today. onChange gets the right list, but the item boxes on screen do not always follow. Ticking items one at a time works, and it moves the select-all to mixed."
+/>
 
 ## Anatomy
 
 <AnatomyTable />
 
-Every row is a checkbox, so the family writes `ui-checked`, `ui-mixed` and `ui-disabled`.
+The root and the select-all share one checkbox. The root is that checkbox's root, with
+`role="group"`, and `checklist.selectall` is its trigger. `checklist.label` names the group by
+labelling that trigger.
+
+Each `checklist.item` is a checkbox of its own, with its own trigger, label, description and
+indicator. Items carry the checkbox [keyboard rules](/ui/checkbox): each box is a Tab
+stop, and Space toggles it.
+
+## Forms and errors
+
+Put a `checklist.field` inside an item to send that item with a form. The field submits the item's
+`name` and `value`. An item that is ticked and disabled sends nothing.
+
+`checklist.error` placed directly in the root marks the select-all invalid. Inside an item, it marks
+only that item.
+
+<Callout
+	sprite="speech-bubble"
+	title="Can I render the items with a loop?"
+	text="Not yet. Items rendered by a keyed @for share one id today, so the package skips that test. Write the items out by hand until it is fixed."
+/>
+
+## Styling
+
+Every box is a checkbox, so the family writes the checkbox attributes:
+
+| Attribute | On | When |
+| --- | --- | --- |
+| `ui-checked` | `root`, `selectall`, `item`, `itemtrigger` | That box is on. |
+| `ui-mixed` | `root`, `selectall` | Some items are ticked, not all. |
+| `ui-disabled` | `root`, `selectall`, `item`, `itemtrigger` | That box is disabled. |
 
 ## Props on `checklist.root`
 
-| Prop       | Type              | What it does                                                                     |
-| ---------- | ----------------- | -------------------------------------------------------------------------------- |
-| `value`    | `string[]`        | The values that are ticked. Omit it and nothing is.                              |
-| `values`   | `string[]`        | Every value the list offers. Select-all compares the ticked set against this.    |
-| `disabled` | `boolean`         | Nobody can change any item, and the select-all is locked too.                    |
-| `onChange` | `(value) => void` | Called with the whole new ticked set whenever an item or the select-all changes. |
+| Prop | Type | What it does |
+| --- | --- | --- |
+| `value` | `readonly string[]` | The ticked options. The default is an empty list. |
+| `values` | `readonly string[]` | Every option the list offers. The select-all compares against it. |
+| `disabled` | `boolean` | Nobody can change any box, the select-all included. |
+| `onChange` | `(value: readonly string[]) => void` | Called with the whole new ticked list. |
 
-Everything a `<div>` accepts reaches the element too. `checklist.item` takes its own `value`,
-`disabled` and `name`.
+Every other prop goes on the root `<div>`. `checklist.item` takes `value`, which it needs,
+plus `disabled` and `name`.

@@ -1,6 +1,7 @@
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
 import AnatomyTable from '../../components/docs/anatomy-table.tsrx';
 import KeyboardTable from '../../components/docs/keyboard-table.tsrx';
 import ApiTable from '../../components/docs/api-table.tsrx';
@@ -12,9 +13,17 @@ import AccordionPreviewCards from '../../components/demos/ui/accordion/examples/
 
 <ThemeToggle />
 
-<Subtitle text="Vertically stacked sections that expand to reveal content." />
+<Subtitle text="Stacked sections. Each heading opens or closes its own panel." />
 
 <Playground scenario="basic" />
+
+Use an accordion when a page has several sections and a reader wants one or two at a time. A help
+page full of questions is the usual case. For one panel on its own, use
+[collapsible](/ui/collapsible).
+
+Each section has a name, the `value` you write on `accordion.item`. The root's `value` names the
+section that is open. Opening another section closes the first one. Add `multiple` and the root's
+`value` becomes a list, so several sections can stay open.
 
 ## Examples
 
@@ -24,9 +33,60 @@ import AccordionPreviewCards from '../../components/demos/ui/accordion/examples/
 
 <AnatomyTable />
 
+`accordion.itemlabel` renders an `<h3>`, and the trigger goes inside it. That heading also names
+the panel: the panel is a `role="region"` whose `aria-labelledby` points at it. If you leave the
+heading out, the panel has no name.
+
 ## Keyboard
 
 <KeyboardTable />
+
+The arrow keys move focus between triggers. They open nothing. At the last trigger, Down goes back
+to the first, and there is no prop to stop that. The walk skips sections that are disabled.
+
+## Closed panels stay in the page
+
+A closed panel keeps its content. It gets `hidden="until-found"`, so the browser's find-in-page
+still searches it. When find-in-page lands on a word inside, the section opens and `onChange` runs.
+
+If you set `disableUntilFound`, a closed panel gets plain `hidden` instead. Then find-in-page skips
+it. A disabled section always gets plain `hidden`, so a search can never open it.
+
+## Styling
+
+The family ships no CSS. It writes these attributes for your selectors:
+
+| Attribute | On | When |
+| --- | --- | --- |
+| `ui-open` | `item`, `itemtrigger`, `itemcontent` | The section is open. |
+| `ui-closed` | `item`, `itemtrigger`, `itemcontent` | The section is closed. |
+| `ui-disabled` | `root`, `item` | The accordion or this section is disabled. |
+| `ui-multiple` | `root` | `multiple` is set. |
+| `ui-value` | `item` | Always. It holds the section's own `value`. |
+
+`ui-value` lets one rule reach one section:
+
+```css
+.section[ui-value='returns'][ui-open] {
+	border-color: rebeccapurple;
+}
+```
+
+<Callout
+	sprite="bolt"
+	title="Why will my open section not close?"
+	text="collapsible is on by default. If you set collapsible={false}, the open section stays open when its trigger is pressed. Another section can still replace it. The trigger says so to screen readers with aria-disabled='true'."
+/>
+
+<Callout
+	sprite="speech-bubble"
+	title="Can I pick the heading level?"
+	text="Not yet. accordion.itemlabel is always an h3. If the accordion sits under an h3, it needs h4 headings, and today it cannot have them."
+/>
+
+When the last open section closes, `onChange` gets an empty string. With `multiple` it gets an
+empty list. Your own `onClick` on a trigger runs after the section has changed, so it reads the
+new state.
 
 ## API reference
 
