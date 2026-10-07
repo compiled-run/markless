@@ -1,22 +1,26 @@
-import { state } from '@markless/core';
-
-export default function ChalkTag() @{
-	let lit = state(false);
-
+export default function ChalkTag({ lit }: { readonly lit: boolean }) @{
 	<div class={lit ? 'card lit' : 'card'}>
+		Chalk card
 		<style>
 			.card {
-				padding: 0.5em 0.8em;
-				border: 2px dashed;
-				background: darkslategray;
-				color: white;
+				padding: 0.7em 1.2em;
+				border: 1.5px dashed var(--ink);
+				border-radius: 6px;
+				background: var(--paper);
+				color: var(--ink);
+				font-size: var(--step-0);
+				transition: background 140ms ease;
 			}
+
 			.lit {
-				background: plum;
-				color: black;
+				background: color-mix(in srgb, var(--purple) 40%, var(--paper));
+			}
+
+			@media (prefers-reduced-motion: reduce) {
+				.card {
+					transition: none;
+				}
 			}
 		</style>
-		Chalk card
-		<button onClick={() => (lit = !lit)}>Light up</button>
 	</div>
 }

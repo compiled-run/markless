@@ -1,45 +1,40 @@
-import { computed, state } from '@markless/core';
+import { computed } from '@markless/core';
 import { lookUp } from './look-up.ts';
 
-export default function MugLookup() @{
-	let mug = state('');
+export default function MugLookup({ mug }: { readonly mug: string }) @{
 	const fact = computed(async () => {
 		const which = mug;
 		return { text: await lookUp(which) };
 	});
 
-	<section>
-		<button onClick={() => (mug = 'tall')}>Tall</button>
-		<button onClick={() => (mug = 'small')}>Small</button>
-		<button onClick={() => (mug = 'cracked')}>Cracked</button>
-		@try {
-			<p class="answer">{fact.text}</p>
-		} @pending {
-			<p class="wait">Looking it up...</p>
-		} @catch {
-			<p class="oops">Not on the shelf.</p>
-		}
+	<section class="mugs">
+		<div class="out">
+			@try {
+				<p class="answer">{fact.text}</p>
+			} @pending {
+				<p class="wait">Looking it up...</p>
+			} @catch {
+				<p class="oops">Not on the shelf.</p>
+			}
+		</div>
 		<style>
-			button {
-				margin: 0 0.5rem 0.4rem 0;
+			.out {
+				min-height: 3lh;
+			}
+
+			.answer,
+			.wait,
+			.oops {
+				margin: 0;
+				color: var(--ink);
 				font-size: var(--step-0);
-				padding: 0.3em 0.9em;
-				color: var(--on-accent);
-				background: var(--green-soft);
-				border: 2px solid var(--ink);
-				border-radius: 2px;
-				box-shadow: 3px 3px 0 var(--ink);
-				cursor: pointer;
 			}
 
-			button:active {
-				transform: translate(3px, 3px);
-				box-shadow: none;
-			}
-
-			p {
-				margin: 0.5rem 0 0;
-				font-size: var(--step-1);
+			.oops {
+				display: inline-block;
+				padding: 0.1em 0.45em;
+				border-radius: 4px;
+				background: color-mix(in srgb, var(--pink) 14%, var(--paper));
 			}
 		</style>
 	</section>
