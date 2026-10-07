@@ -2,7 +2,6 @@ import AnatomyTable from '../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
-import HovercardDemo from '../../components/demos/ui/hovercard/basic.tsrx';
 
 <Sidebar />
 
@@ -10,26 +9,10 @@ import HovercardDemo from '../../components/demos/ui/hovercard/basic.tsrx';
 
 <ThemeToggle />
 
-<HovercardDemo shows="The card under the link is held open here, so you can read it." />
+<Playground scenario="basic" />
 
-```tsrx
-import { hovercard } from '@markless/ui';
-
-const link = 'color: var(--ink); font-weight: 700; text-decoration: underline;';
-const card =
-	'display: grid; gap: 0.35em; width: min(18rem, 100%); margin-block-start: 0.45em; padding: 0.8em; border: 2px solid var(--ink); border-radius: 6px; background: var(--raised); box-shadow: 3px 3px 0 var(--ink); font-size: var(--step--1); text-align: left;';
-
-export default function Mention() @{
-	<hovercard.root open={true} style="display: grid; justify-items: center;">
-		<hovercard.trigger href="/ui/accordion" style={link}>the accordion page</hovercard.trigger>
-		<hovercard.content style={card}>
-			<strong>accordion</strong>
-			<span>Sections named by value, with the closed panel left in the page.</span>
-			<a href="/ui/accordion" style={link}>Read it</a>
-		</hovercard.content>
-	</hovercard.root>
-}
-```
+Rest the pointer on the link, or Tab to it, and the card opens below it. Change `delay` and
+`closeDelay` to set the waits.
 
 A hover card is a preview of where a link goes. It shows when the pointer rests on the link, or
 when focus stays on it. Use it for a profile behind a name, or a summary behind a page link.
@@ -94,7 +77,7 @@ anchor must come before the element placed against it.
 <Callout
 	sprite="speech-bubble"
 	title="Why does a screen reader not read the card with the link?"
-	text="The card has no role, and the link has no aria-describedby. A card full of links read as one description would be a run-on sentence with no reachable links. The link has aria-expanded instead, so a reader learns that the card exists."
+	text="The card has no role, and the link has no aria-describedby. Read as one description, a card full of links becomes a run-on sentence with no reachable links. The link has aria-expanded instead, so a reader learns that the card exists."
 />
 
 ## API

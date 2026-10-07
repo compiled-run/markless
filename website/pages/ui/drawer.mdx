@@ -2,7 +2,6 @@ import AnatomyTable from '../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
-import DrawerDemo from '../../components/demos/ui/drawer/basic.tsrx';
 
 <Sidebar />
 
@@ -10,29 +9,10 @@ import DrawerDemo from '../../components/demos/ui/drawer/basic.tsrx';
 
 <ThemeToggle />
 
-<DrawerDemo shows="Press the button. Then drag the bar on the sheet down, or press Escape." />
+<Playground scenario="basic" />
 
-```tsrx
-import { drawer } from '@markless/ui';
-
-const chip =
-	'padding: 0.5em 0.9em; border: 2px solid var(--ink); border-radius: 6px; background: var(--paper); color: var(--ink); font: inherit; font-weight: 700; cursor: pointer;';
-
-export default function DeliverySheet() @{
-	<drawer.root style="display: grid; justify-items: center;">
-		<drawer.trigger style={chip}>Choose a delivery day</drawer.trigger>
-		<drawer.backdrop class="backdrop">
-			<drawer.content class="sheet">
-				<drawer.title style="margin: 0; font-size: var(--step-0);">Delivery day</drawer.title>
-				<drawer.description style="margin: 0; font-size: var(--step--1);">
-					Drag the bar at the top down to put the sheet away, or press the button.
-				</drawer.description>
-				<drawer.close style={chip}>Thursday it is</drawer.close>
-			</drawer.content>
-		</drawer.backdrop>
-	</drawer.root>
-}
-```
+Press **Change day** to open the sheet. Pick a day, press Escape, or drag the sheet down. Change
+`orientation` and `start` to bring it in from another edge.
 
 A drawer is a dialog that slides in from one edge of the screen. A person can swipe it back out.
 Use it for a bottom sheet on a phone, or a side panel of filters or settings.

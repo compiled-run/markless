@@ -1,8 +1,80 @@
-import Preview from '../../../ui/preview.tsrx';
-import Save from './save.tsrx';
+import { lucide, tooltip } from '@markless/ui';
 
-export default function TooltipDemo({ shows }: { readonly shows: string }) @{
-	<Preview shows={shows}>
-		<Save />
-	</Preview>
+export default function TooltipBasic() @{
+	<tooltip.root class="tooltip">
+		<tooltip.trigger class="save">
+			<lucide.save class="icon" aria-hidden="true" />
+			Save
+		</tooltip.trigger>
+		<tooltip.content class="tip">Keeps a copy in your drafts</tooltip.content>
+
+		<style>
+			.tooltip {
+				display: grid;
+				justify-items: center;
+				padding-block-start: 3.5em;
+				font-family: 'Shantell Sans', system-ui, sans-serif;
+				font-size: var(--step--1);
+				line-height: 1.5;
+				color: var(--ink);
+			}
+
+			.save {
+				display: inline-flex;
+				gap: 0.5em;
+				align-items: center;
+				padding: 0.55em 1.1em;
+				border: 1px solid var(--ink);
+				border-radius: 6px;
+				background: var(--paper);
+				color: var(--ink);
+				font: inherit;
+				font-family: 'Shantell Sans', system-ui, sans-serif;
+				cursor: pointer;
+				transition: background 140ms ease;
+			}
+
+			.save:hover {
+				background: color-mix(in srgb, var(--purple) 16%, var(--paper));
+			}
+
+			.save:active {
+				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+			}
+
+			.save:focus-visible {
+				outline: 2px solid var(--ink);
+				outline-offset: 4px;
+			}
+
+			.icon {
+				width: 1em;
+				height: 1em;
+				flex: none;
+			}
+
+			.tip {
+				z-index: 5;
+				width: max-content;
+				max-width: 16rem;
+				margin-block-end: 0.6em;
+				padding: 0.35em 0.75em;
+				border-radius: 6px;
+				background: var(--slab);
+				box-shadow: 3px 3px 0 color-mix(in srgb, var(--purple) 45%, var(--paper));
+				color: var(--slab-ink);
+				font-family: 'Shantell Sans', system-ui, sans-serif;
+			}
+
+			.tip[hidden] {
+				display: none;
+			}
+
+			@media (prefers-reduced-motion: reduce) {
+				.save {
+					transition: none;
+				}
+			}
+		</style>
+	</tooltip.root>;
 }

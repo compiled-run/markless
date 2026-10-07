@@ -3,7 +3,6 @@ import ApiTable from '../../components/docs/api-table.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import ToggleDemo from '../../components/demos/ui/toggle/basic.tsrx';
 
 <Sidebar />
 
@@ -14,21 +13,9 @@ import ToggleDemo from '../../components/demos/ui/toggle/basic.tsrx';
 `toggle` is an on/off switch. It is either on or off, never half-way. The family's name is
 `toggle` because `switch` is a reserved word in JavaScript.
 
-<ToggleDemo shows="Click the switch or its label. Then Tab to it and press Space." />
+<Playground scenario="basic" />
 
-```tsrx
-import { toggle } from '@markless/ui';
-
-export default function Notifications() @{
-	<toggle.root class="row" name="notifications">
-		<toggle.label class="label">Email me when an order ships</toggle.label>
-		<toggle.trigger class="track">
-			<toggle.thumb class="thumb" />
-		</toggle.trigger>
-		<toggle.field />
-	</toggle.root>
-}
-```
+Click the switch, or Tab to it and press Space. The line under the label follows the switch.
 
 Clicking the words flips the switch too, because the label's `for` points at the trigger. A
 screen reader hears a switch named "Email me when an order ships", and whether it is on.

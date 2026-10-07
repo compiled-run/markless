@@ -3170,6 +3170,182 @@ try {
 				'/ui/toaster: Dismiss removes the message',
 			);
 		}
+		// An open overlay must sit fully inside its card and be the topmost thing at its centre.
+		const overlayOnTop = async (overlay: Locator, card: Locator) =>
+			overlay.evaluate((node, frame) => {
+				const box = node.getBoundingClientRect();
+				const edge = (frame as Element).getBoundingClientRect();
+				const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+				return (
+					box.width > 0 &&
+					box.top >= edge.top &&
+					box.bottom <= edge.bottom &&
+					box.left >= edge.left &&
+					box.right <= edge.right &&
+					node.contains(hit)
+				);
+			}, await card.elementHandle());
+		const switchIn = (card: Locator, name: string) =>
+			card
+				.locator('.pg-ctl')
+				.filter({ has: page.locator('.pg-name', { hasText: new RegExp(`^${name}$`) }) })
+				.locator('.pg-switch');
+		{
+			const { card, stage } = await playground('tooltip');
+			const tip = stage.locator('.tip');
+			check(!(await tooltipIsVisible(tip)), '/ui/tooltip: the tip is hidden at first');
+			await stage.locator('.save').hover();
+			check(
+				await settle(() => tooltipIsVisible(tip), true),
+				'/ui/tooltip: resting on Save shows the tip',
+			);
+			check(await overlayOnTop(tip, card), '/ui/tooltip: the tip is inside the card and on top');
+			await page.mouse.move(2, 2);
+			check(
+				await settle(() => tooltipIsVisible(tip), false),
+				'/ui/tooltip: the tip hides when the pointer leaves',
+			);
+			await switchIn(card, 'Open').click();
+			check(
+				await settle(() => tooltipIsVisible(tip), true),
+				'/ui/tooltip: the open switch shows the tip',
+			);
+		}
+		{
+			const { card, stage } = await playground('hovercard');
+			const panel = stage.locator('.card');
+			await choose(card, 'delay', '0');
+			await stage.locator('.link').first().hover();
+			check(
+				await settle(() => panel.isVisible(), true),
+				'/ui/hovercard: resting on the link shows the card',
+			);
+			check(
+				await overlayOnTop(panel, card),
+				'/ui/hovercard: the open card is inside its frame and on top',
+			);
+			await page.keyboard.press('Escape');
+			check(await settle(() => panel.isVisible(), false), '/ui/hovercard: Escape hides the card');
+		}
+		{
+			const { card, stage } = await playground('popover');
+			const panel = stage.locator('.panel');
+			await stage.locator('.share').click();
+			check(await settle(() => panel.isVisible(), true), '/ui/popover: Share opens the panel');
+			check(
+				await overlayOnTop(panel, card),
+				'/ui/popover: the open panel is inside its card, above the code below it',
+			);
+			await page.keyboard.press('Escape');
+			check(await settle(() => panel.isVisible(), false), '/ui/popover: Escape closes the panel');
+			await stage.locator('.share').click();
+			await settle(() => panel.isVisible(), true);
+			await page.mouse.click(5, 5);
+			check(
+				await settle(() => panel.isVisible(), false),
+				'/ui/popover: a press outside closes the panel',
+			);
+		}
+		{
+			const { card, stage } = await playground('drawer');
+			const sheet = page.locator('.sheet');
+			await stage.locator('.open').click();
+			check(await settle(() => sheet.isVisible(), true), '/ui/drawer: Change day opens the sheet');
+			check(
+				await sheet.evaluate((node) => {
+					const box = node.getBoundingClientRect();
+					const hit = document.elementFromPoint(box.left + box.width / 2, box.bottom - 8);
+					return box.bottom <= innerHeight + 1 && box.top >= 0 && node.contains(hit);
+				}),
+				'/ui/drawer: the open sheet is on screen and on top',
+			);
+			await sheet.getByRole('button', { name: 'Friday' }).click();
+			check(
+				await settle(() => stage.locator('.card-day').innerText(), 'Friday'),
+				'/ui/drawer: picking Friday closes the sheet and updates the card',
+			);
+			await choose(card, 'orientation', 'horizontal');
+			await stage.locator('.open').click();
+			check(
+				await settle(() => sheet.getAttribute('ui-orientation'), 'horizontal'),
+				'/ui/drawer: orientation turns the sheet into a side panel',
+			);
+			await page.keyboard.press('Escape');
+			check(await settle(() => sheet.isVisible(), false), '/ui/drawer: Escape closes it');
+		}
+		{
+			const { card, stage } = await playground('toggle');
+			const line = stage.locator('.now');
+			await stage.locator('.track').click();
+			check(
+				await settle(() => line.innerText(), (text: string) => text.startsWith('On')),
+				'/ui/toggle: a click turns the switch on and the line follows',
+			);
+			await page.keyboard.press('Space');
+			check(
+				await settle(() => line.innerText(), (text: string) => text.startsWith('Off')),
+				'/ui/toggle: Space turns it off again',
+			);
+			await switchIn(card, 'Disabled').click();
+			check(
+				await settle(() => stage.locator('.track').isDisabled(), true),
+				'/ui/toggle: the Disabled switch disables the switch',
+			);
+		}
+		{
+			const { card, stage } = await playground('select');
+			await stage.locator('.trigger').click();
+			const list = stage.locator('.list');
+			check(await settle(() => list.isVisible(), true), '/ui/select: the button opens the list');
+			check(await overlayOnTop(list, card), '/ui/select: the open list is inside the card and on top');
+			await stage.locator('.option', { hasText: 'Banana' }).click();
+			check(
+				await settle(() => stage.locator('.trigger').innerText(), 'Banana'),
+				'/ui/select: picking Banana writes it on the button',
+			);
+			check(
+				(await stage.locator('.note').innerText()).includes("'banana'"),
+				'/ui/select: the line shows the value, not the label',
+			);
+			await switchIn(card, 'Disabled').click();
+			check(
+				await settle(() => stage.locator('.trigger').isDisabled(), true),
+				'/ui/select: the Disabled switch disables the button',
+			);
+		}
+		{
+			const { card, stage } = await playground('checkbox');
+			await stage.locator('.box').click();
+			check(
+				await settle(() => stage.locator('.note').innerText(), (text: string) => text.endsWith('true')),
+				'/ui/checkbox: a click ticks the box and the line shows true',
+			);
+			await switchIn(card, 'Required').click();
+			check(
+				await settle(() => stage.locator('input[type="checkbox"]').evaluate((node) => (node as HTMLInputElement).required), true),
+				'/ui/checkbox: the Required switch reaches the form field',
+			);
+			const mixed = page.locator('.cp[data-family="checkbox"]').nth(0);
+			const all = mixed.getByRole('checkbox', { name: 'Order both' });
+			check((await all.getAttribute('aria-checked')) === 'mixed', '/ui/checkbox: Order both starts mixed');
+			await mixed.getByText('Cake', { exact: true }).click();
+			check(
+				await settle(() => all.getAttribute('aria-checked'), 'true'),
+				'/ui/checkbox: ticking the last row turns Order both on',
+			);
+			const form = page.locator('.cp[data-family="checkbox"]').nth(1);
+			await form.getByRole('button', { name: 'Save' }).click();
+			check(
+				(await form.locator('.note').innerText()) === 'Nothing sent yet.',
+				'/ui/checkbox: a required box that is off stops the form',
+			);
+			await form.locator('.box').click();
+			await form.getByRole('button', { name: 'Save' }).click();
+			check(
+				await settle(() => form.locator('.note').innerText(), 'Sent email=ada@example.com newsletter=weekly'),
+				'/ui/checkbox: a ticked box sends its name and value',
+			);
+		}
 
 		// --- the stickers are on the pages that ask for them --------------------
 		await page.goto(`${origin}/`, { waitUntil: 'load' });

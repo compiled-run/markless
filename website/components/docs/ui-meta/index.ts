@@ -2,16 +2,23 @@
 // file beside this one and one line below it; nothing else on the site changes.
 import { accordion } from './accordion.ts';
 import { carousel } from './carousel.ts';
+import { checkbox } from './checkbox.ts';
 import { checklist } from './checklist.ts';
 import { collapsible } from './collapsible.ts';
 import { combobox } from './combobox.ts';
+import { drawer } from './drawer.ts';
+import { hovercard } from './hovercard.ts';
 import { modal } from './modal.ts';
 import { navbar } from './navbar.ts';
 import { pagination } from './pagination.ts';
+import { popover } from './popover.ts';
 import { progress } from './progress.ts';
 import { qrcode } from './qrcode.ts';
 import { radiogroup } from './radiogroup.ts';
+import { select } from './select.ts';
 import { toaster } from './toaster.ts';
+import { toggle } from './toggle.ts';
+import { tooltip } from './tooltip.ts';
 import type { FamilyMeta } from './types.ts';
 
 export * from './keys.ts';
@@ -20,16 +27,23 @@ export * from './types.ts';
 const registry: Readonly<Record<string, FamilyMeta>> = {
 	accordion,
 	carousel,
+	checkbox,
 	checklist,
 	collapsible,
 	combobox,
+	drawer,
+	hovercard,
 	modal,
 	navbar,
 	pagination,
+	popover,
 	progress,
 	qrcode,
 	radiogroup,
+	select,
 	toaster,
+	toggle,
+	tooltip,
 };
 
 export function metaFor(family: string): FamilyMeta {

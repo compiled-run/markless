@@ -2,7 +2,6 @@ import AnatomyTable from '../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
-import { Basic, Value, Mixed, Disabled, Form, Help } from 'ui-demos:checkbox';
 
 <Sidebar />
 
@@ -10,7 +9,9 @@ import { Basic, Value, Mixed, Disabled, Form, Help } from 'ui-demos:checkbox';
 
 <ThemeToggle />
 
-<Basic shows="Click the box or its words. The tick shows only while the box is on." />
+<Playground scenario="basic" />
+
+Click the box or its words. The line under it shows the `checked` value.
 
 ## Overview
 
@@ -26,21 +27,6 @@ checkbox for the form to read.
 
 <AnatomyTable />
 
-### Composition
-
-```tsrx
-import { checkbox } from '@markless/ui';
-
-export default function Terms() @{
-	<checkbox.root checked name="terms">
-		<checkbox.trigger>
-			<checkbox.indicator>✓</checkbox.indicator>
-		</checkbox.trigger>
-		<checkbox.label>I have read the terms</checkbox.label>
-	</checkbox.root>
-}
-```
-
 `checkbox.label` is a real `<label>` tied to the trigger, so a click on the words toggles the box.
 `checkbox.indicator` holds your tick. Its children show only while the box is on or mixed.
 
@@ -48,8 +34,6 @@ export default function Terms() @{
 
 `checked` on the root is the starting value. Leave it out and the box starts off. Each click calls
 `onChange` with the new value, so your own state can follow it.
-
-<Value shows="Two boxes. The first starts off and the second starts on." />
 
 ```tsrx
 <checkbox.root>…</checkbox.root>
@@ -61,17 +45,9 @@ export default function Terms() @{
 Set `checked="mixed"` for a box that stands over a part-ticked list. The trigger reports
 `aria-checked="mixed"`, and `checkbox.field` sets `indeterminate` on its native input.
 
-<Mixed shows="A box in the mixed state. Its indicator draws a dash." />
+<Example scenario="mixed" />
 
-```tsrx
-<checkbox.root checked="mixed" name="all">
-	<checkbox.field />
-	<checkbox.trigger>
-		<checkbox.indicator>–</checkbox.indicator>
-	</checkbox.trigger>
-	<checkbox.label>Select all four rows</checkbox.label>
-</checkbox.root>
-```
+Tick only Tea or only Cake, and **Order both** turns mixed. Its `checked` is worked out from the two rows.
 
 A click on a mixed box turns it on. The next click turns it off. A click never leads back to mixed,
 so mixed only comes from your `checked` prop.
@@ -86,8 +62,6 @@ so mixed only comes from your `checked` prop.
 
 `disabled` on the root disables the trigger button, so a click does nothing and Tab skips it. The
 root and the trigger both get `ui-disabled`.
-
-<Disabled shows="A ticked box that does not change when you click it." />
 
 ```tsrx
 <checkbox.root checked disabled>
@@ -106,17 +80,10 @@ checkbox behaves too.
 Add `checkbox.field` to put a hidden `<input type="checkbox">` in the form. It takes no props of
 its own. It reads `name`, `value` and `required` from the root.
 
-<Form shows="Press Save while the box is off. The form refuses to send." />
+<Example scenario="form" />
 
-```tsrx
-<checkbox.root required name="newsletter" value="weekly">
-	<checkbox.field />
-	<checkbox.trigger>
-		<checkbox.indicator>✓</checkbox.indicator>
-	</checkbox.trigger>
-	<checkbox.label>Send me the weekly digest</checkbox.label>
-</checkbox.root>
-```
+Press **Save** while the box is off, and the form refuses to send. Tick it and press **Save** again.
+The line under **Save** shows what the form sent.
 
 A ticked box sends its `name` with its `value`. Without a `value` it sends `"on"`, like a native
 checkbox. An unticked box and a mixed box send nothing.
@@ -125,8 +92,6 @@ checkbox. An unticked box and a mixed box send nothing.
 
 `checkbox.description` is a hint. `checkbox.error` says what went wrong. The trigger lists both in
 `aria-describedby`, the error first, wherever you place them.
-
-<Help shows="A required box with a hint under it and an error under that." />
 
 ```tsrx
 <checkbox.root required>
