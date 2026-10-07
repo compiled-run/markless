@@ -1,5 +1,4 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import BadgeCounterDemo from '../../components/demos/build/badge-counter-demo.tsrx';
 import NamePickerDemo from '../../components/demos/build/name-picker-demo.tsrx';
 import Collapsible from '../../components/docs/collapsible.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
@@ -27,14 +26,8 @@ again.
 
 Click **Add one** a few times.
 
-<BadgeCounterDemo />
-
-The count goes up. The number Badge drew stays the same. Badge drew it once, when it ran, and it
-never ran again.
-
-That demo is this file:
-
-```tsrx
+<Code note="Add a second Badge with value={count * 2}, then click Add one. Both bold numbers follow count, and each Badge keeps the number it drew.">
+```tsrx title="badge-counter.tsrx"
 import { state } from '@markless/core';
 
 function Badge({ value }: { value: number }) @{
@@ -54,6 +47,10 @@ export default function BadgeCounter() @{
 	</section>
 }
 ```
+</Code>
+
+The count goes up. The number Badge drew stays the same. Badge drew it once, when it ran, and it
+never ran again.
 
 `Badge` takes `{ value }`, and the parent writes `value={count}`. That is the whole connection. A
 click changes `count`, and Markless updates the text inside `<strong>`. Nothing else on the page

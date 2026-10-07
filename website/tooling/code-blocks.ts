@@ -14,6 +14,8 @@ const OPEN = /^<Code((?:\s+[A-Za-z][\w-]*(?:=(?:"[^"]*"|'[^']*'|\{[^}]*\}))?)*)\
 const CLOSE = /^<\/Code>$/;
 const FENCE = /^(`{3,})([\w-]*)(.*)$/;
 const TITLE = /\btitle="([^"]+)"/;
+const ENTRY = /(?:^|\s+)entry="([^"]*)"/;
+const MODULE_NAME = 'block.tsrx';
 const FILE_NAME = /^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*\.(tsrx|ts|css)$/;
 const LANGUAGES: Readonly<Record<string, string>> = { tsrx: 'tsrx', ts: 'ts', css: 'css' };
 
@@ -22,6 +24,8 @@ export type CodeBlockFile = { readonly name: string; readonly code: string };
 export type CodeBlock = {
 	/** The `<Code ...>` attributes, passed on to the component as written. */
 	readonly attributes: string;
+	/** The `.tsrx` file the Result pane runs: `entry="..."` if given, else the first `.tsrx` fence. */
+	readonly entry: string;
 	readonly files: readonly CodeBlockFile[];
 	/** 0-based lines of the block's `<Code>` and `</Code>` in the page. */
 	readonly startLine: number;
@@ -31,7 +35,15 @@ export type CodeBlock = {
 /** One run of highlighted code: shiki's colour pair as an inline style. */
 export type CodeRun = { readonly id: string; readonly text: string; readonly style?: string };
 export type CodeLine = { readonly id: string; readonly runs: readonly CodeRun[] };
-export type CodePane = { readonly name: string; readonly lines: readonly CodeLine[] };
+export type CodePane = {
+	readonly name: string;
+	/** The tab's value: `FIRST_TAB` for the first pane, else the file name. */
+	readonly tab: string;
+	readonly lines: readonly CodeLine[];
+};
+
+/** code.tsrx opens on this literal: tabs resume only from an arrival value the compiler can see. */
+export const FIRST_TAB = 'first';
 
 function fail(file: string, line: number, message: string): never {
 	throw new Error(`code-blocks: ${file}:${line + 1}: ${message}`);
@@ -73,6 +85,8 @@ export function findCodeBlocks(source: string, file: string): CodeBlock[] {
 			const kind = FILE_NAME.exec(title)?.[1];
 			if (!kind)
 				fail(file, at, `"${title}" is not a file name ending in .tsrx, .ts or .css.`);
+			if (title === MODULE_NAME)
+				fail(file, at, `"${MODULE_NAME}" is the name of the generated block module; pick another title.`);
 			if (files.some((existing) => existing.name === title))
 				fail(file, at, `two fences inside <Code> are both titled "${title}".`);
 			const body: string[] = [];
@@ -84,19 +98,20 @@ export function findCodeBlocks(source: string, file: string): CodeBlock[] {
 		}
 		if (endLine < 0) fail(file, startLine, '<Code> is never closed with </Code>.');
 		const tsrx = files.filter((entry) => entry.name.endsWith('.tsrx'));
-		if (tsrx.length !== 1)
-			fail(
-				file,
-				startLine,
-				`<Code> needs exactly one .tsrx fence (found ${tsrx.length}); helpers go in .ts or .css fences.`,
-			);
-		blocks.push({ attributes: open[1]?.trim() ?? '', files, startLine, endLine });
+		if (tsrx.length === 0) fail(file, startLine, '<Code> needs at least one .tsrx fence.');
+		const written = open[1]?.trim() ?? '';
+		const named = ENTRY.exec(written)?.[1];
+		if (named !== undefined && !tsrx.some((entry) => entry.name === named))
+			fail(file, startLine, `entry="${named}" names no .tsrx fence in this <Code>.`);
+		const entry = named ?? tsrx[0]!.name;
+		const attributes = written.replace(ENTRY, '').trim();
+		blocks.push({ attributes, entry, files, startLine, endLine });
 	}
 	return blocks;
 }
 
 /** The highlighted lines of one file, as the component draws them before the editor loads. */
-export async function codePane(file: CodeBlockFile): Promise<CodePane> {
+export async function codePane(file: CodeBlockFile, index = 0): Promise<CodePane> {
 	const language = LANGUAGES[file.name.slice(file.name.lastIndexOf('.') + 1)] ?? 'ts';
 	const html = await highlightHtml(file.code.replace(/\n$/, ''), language);
 	// The colour table hands back the style itself, so each run keeps shiki's light/dark pair.
@@ -104,6 +119,7 @@ export async function codePane(file: CodeBlockFile): Promise<CodePane> {
 	const lines = paneLines(html, new DocRegistry('code'), styles);
 	return {
 		name: file.name,
+		tab: index === 0 ? FIRST_TAB : file.name,
 		lines: lines.map((line) => ({
 			id: line.id,
 			runs: line.runs.map((run) => {
@@ -139,12 +155,16 @@ export function codeBlockModule(input: {
 	readonly page: string;
 }): string {
 	const { block, panes, moduleFile, componentFile, page } = input;
-	const entry = block.files.find((file) => file.name.endsWith('.tsrx'))!;
-	const files = block.files.map(({ name, code }) => ({ name, code }));
+	// The engine runs the first .tsrx in `files`; the tabs keep the page's order.
+	const ordered = [
+		...block.files.filter((file) => file.name === block.entry),
+		...block.files.filter((file) => file.name !== block.entry),
+	];
+	const files = ordered.map(({ name, code }) => ({ name, code }));
 	const attributes = block.attributes ? ` ${block.attributes}` : '';
 	return `// Written by tooling/code-blocks.ts from ${page}. Edit the page, not this file.
 import Code from ${JSON.stringify(specifier(moduleFile, componentFile))};
-import Starter from ${JSON.stringify(`./${entry.name}`)};
+import Starter from ${JSON.stringify(`./${block.entry}`)};
 
 const files = ${JSON.stringify(files)};
 
@@ -183,9 +203,9 @@ export async function rewriteCodeBlocks(
 	const page = relative(root, file);
 	for (const [index, block] of blocks.entries()) {
 		const dir = join(root, CODE_GENERATED_DIR, `${slug}-${index + 1}`);
-		const moduleFile = join(dir, 'block.tsrx');
+		const moduleFile = join(dir, MODULE_NAME);
 		for (const starter of block.files) write(join(dir, starter.name), starter.code);
-		const panes = await Promise.all(block.files.map(codePane));
+		const panes = await Promise.all(block.files.map((file, index) => codePane(file, index)));
 		write(moduleFile, codeBlockModule({ block, panes, moduleFile, componentFile, page }));
 		const local = `CodeBlock${index + 1}`;
 		imports.push(`import ${local} from ${JSON.stringify(specifier(file, moduleFile))};`);

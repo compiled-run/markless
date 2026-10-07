@@ -22,7 +22,94 @@ from 1998. Here is how you give it a look.
 
 Open the picker. Pick **Ink**, then open it again. Try to pick **Neon**.
 
-<Example scenario="overview/styled-picker" />
+<Code note="In the .picker[ui-open] .trigger rule, change the background to plum. Open the picker: the trigger turns plum while the list is open.">
+```tsrx title="styled-picker.tsrx"
+import { select } from '@markless/ui';
+
+export default function StyledPicker() @{
+	<section class="frame">
+		<select.root class="picker">
+			<select.label class="label">Theme</select.label>
+			<select.trigger class="trigger">Choose a theme</select.trigger>
+			<select.content class="list">
+				<select.item class="option" value="paper">
+					<select.itemlabel>Paper</select.itemlabel>
+					<select.itemindicator class="mark">✓</select.itemindicator>
+				</select.item>
+				<select.item class="option" value="ink">
+					<select.itemlabel>Ink</select.itemlabel>
+					<select.itemindicator class="mark">✓</select.itemindicator>
+				</select.item>
+				<select.item class="option" value="neon" disabled>
+					<select.itemlabel>Neon</select.itemlabel>
+					<select.itemindicator class="mark">✓</select.itemindicator>
+				</select.item>
+			</select.content>
+		</select.root>
+
+		<style>
+			.picker {
+				display: grid;
+				gap: 0.4em;
+				width: min(16rem, 100%);
+			}
+
+			.label {
+				font-weight: 700;
+			}
+
+			.trigger {
+				padding: 0.5em 0.9em;
+				border: 2px solid var(--ink);
+				border-radius: 6px;
+				background: var(--paper);
+				color: var(--ink);
+				font: inherit;
+				text-align: start;
+				cursor: pointer;
+			}
+
+			.picker[ui-open] .trigger {
+				background: var(--yellow);
+				color: var(--on-accent);
+			}
+
+			.list:not([hidden]) {
+				display: grid;
+				border: 2px solid var(--ink);
+				border-radius: 6px;
+				overflow: clip;
+			}
+
+			.option {
+				display: flex;
+				justify-content: space-between;
+				padding: 0.45em 0.9em;
+				cursor: pointer;
+			}
+
+			.option:focus-visible {
+				outline: 2px solid var(--ink);
+				outline-offset: -4px;
+			}
+
+			.option[ui-selected] {
+				font-weight: 700;
+			}
+
+			.option[ui-disabled] {
+				opacity: 0.5;
+				cursor: not-allowed;
+			}
+
+			.mark[ui-hidden] {
+				visibility: hidden;
+			}
+		</style>
+	</section>
+}
+```
+</Code>
 
 The trigger turned yellow while the list was open, because `.picker[ui-open] .trigger` matched. **Ink** went
 bold because its option gained `ui-selected`. **Neon** looks faded because it carries `ui-disabled`.
@@ -78,7 +165,47 @@ Here is the line in the tooltip's own CSS that places the tip. It puts the tip a
 This tip has one rule of yours on it, `position-area: inline-end`. That is enough to move it to the
 right of **Save**:
 
-<Example scenario="overview/save-tip" />
+<Code note="Change position-area: inline-end to block-end. The tip moves below Save, because your rule still beats the default in the layer.">
+```tsrx title="save-tip.tsrx"
+import { tooltip } from '@markless/ui';
+
+export default function SaveTip() @{
+	<section class="frame">
+		<tooltip.root open={true}>
+			<tooltip.trigger class="save">Save</tooltip.trigger>
+			<tooltip.content class="tip">Keeps a copy in your drafts</tooltip.content>
+		</tooltip.root>
+
+		<style>
+			.tip {
+				position-area: inline-end;
+				margin-inline-start: 0.5em;
+				padding: 0.35em 0.65em;
+				border-radius: 4px;
+				background: var(--slab);
+				color: var(--slab-ink);
+				font-size: var(--step--1);
+			}
+
+			.frame {
+				padding-block-end: 3rem;
+				padding-inline-end: 12rem;
+			}
+
+			.save {
+				padding: 0.5em 0.9em;
+				border: 2px solid var(--ink);
+				border-radius: 6px;
+				background: var(--paper);
+				color: var(--ink);
+				font: inherit;
+				font-weight: 700;
+			}
+		</style>
+	</section>
+}
+```
+</Code>
 
 <LayerWins />
 
@@ -99,7 +226,77 @@ its own open or closed state, and the same CSS styles every level.
 
 Click the arrow next to **src**. Then use the arrow keys to walk the rows.
 
-<Example scenario="overview/files" />
+<Code note="Add a third leaf under src, such as styles.css at level 2. Open src, then walk to the new row with the arrow keys.">
+```tsrx title="files.tsrx"
+import { tree } from '@markless/ui';
+
+export default function Files() @{
+	<tree.root class="files" aria-label="Project files">
+		<tree.item class="row" level={1}>
+			<tree.itemtrigger class="arrow-button">
+				<tree.itemindicator class="arrow">▸</tree.itemindicator>
+			</tree.itemtrigger>
+			<tree.itemlabel>src</tree.itemlabel>
+			<tree.itemcontent class="group">
+				<tree.item class="row" leaf level={2}>
+					<tree.itemlabel>index.ts</tree.itemlabel>
+				</tree.item>
+				<tree.item class="row" leaf level={2}>
+					<tree.itemlabel>app.tsrx</tree.itemlabel>
+				</tree.item>
+			</tree.itemcontent>
+		</tree.item>
+		<tree.item class="row" leaf level={1}>
+			<tree.itemlabel>README.md</tree.itemlabel>
+		</tree.item>
+
+		<style>
+			.files {
+				width: min(16rem, 100%);
+				font-family: ui-monospace, monospace;
+			}
+
+			.row {
+				padding: 0.2em 0.4em;
+				border-radius: 4px;
+			}
+
+			.row[ui-leaf] {
+				padding-inline-start: 2em;
+			}
+
+			.row:focus-visible {
+				outline: 2px solid var(--ink);
+			}
+
+			.arrow-button {
+				width: 1.4em;
+				padding: 0;
+				border: 0;
+				background: none;
+				box-shadow: none;
+				color: var(--ink);
+				font: inherit;
+				cursor: pointer;
+			}
+
+			.arrow {
+				display: inline-block;
+			}
+
+			.arrow[ui-open] {
+				rotate: 90deg;
+			}
+
+			.group:not([hidden]) {
+				margin-inline-start: 1em;
+				border-inline-start: 2px dashed var(--ink);
+			}
+		</style>
+	</tree.root>
+}
+```
+</Code>
 
 `index.ts` and `app.tsrx` use the same `tree.item` part as `src`, one level down. The
 `.arrow[ui-open]` rule turns the arrow on any row at any depth. Menus nest the same way: a submenu

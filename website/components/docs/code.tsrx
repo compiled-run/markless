@@ -2,12 +2,12 @@
 // fences; tooling/code-blocks.ts turns each block into a module that passes the files
 // in and projects the starter, built by the site, as the Result pane's first paint.
 // The editor, the result frame and the compiler load on the first point, focus or edit.
-import { tabs } from '@markless/ui';
 import type { CodePane } from '../../tooling/code-blocks.ts';
 import type { CodeFile } from './code/protocol.ts';
 import type { CodeSession } from './code/session.ts';
 import sessionUrl from 'virtual:code-session-url';
 import MarkerSweep from '../sketch/marker-sweep.tsrx';
+import CodeFiles from './code-files.tsrx';
 
 // An import the bundler cannot follow, so the editor is not among the page's preloads.
 // The block is found from the event target: an element() handle shared by two blocks on one
@@ -35,8 +35,6 @@ export default function Code({
 	/** The starter's own render, shown in the Result pane until the first edit. */
 	readonly children?: unknown;
 }) @{
-	const first = panes[0]?.name ?? '';
-
 	<figure
 		class="code-block"
 		data-code="idle"
@@ -44,39 +42,15 @@ export default function Code({
 		onFocusin={(event) => void session(event, files)}
 	>
 		<div class="source">
-			<tabs.root class="files" value={first}>
-				<div class="bar">
-					<tabs.list class="strip" aria-label="Files">
-						<div class="strip-row" role="presentation">
-							@for (const pane of panes; key pane.name) {
-								<tabs.trigger class="tab" value={pane.name} data-code-tab={pane.name}>{pane.name}</tabs.trigger>
-							}
-						</div>
-					</tabs.list>
-					<button
-						type="button"
-						class="reset"
-						onClick={(event) => void session(event, files).then((live) => live?.reset())}
-					>
-						Reset
-					</button>
-				</div>
-				@for (const pane of panes; key pane.name) {
-					<tabs.content class="pane" value={pane.name}>
-						<div class="editor" data-code-file={pane.name}>
-							<pre class="first-paint shiki" aria-label={pane.name}>
-								@for (const line of pane.lines; key line.id) {
-									<span class="line">
-										@for (const run of line.runs; key run.id) {
-											<span style={run.style}>{run.text}</span>
-										}
-									</span>
-								}
-							</pre>
-						</div>
-					</tabs.content>
-				}
-			</tabs.root>
+			<CodeFiles panes={panes}>
+				<button
+					type="button"
+					class="reset"
+					onClick={(event) => void session(event, files).then((live) => live?.reset())}
+				>
+					Reset
+				</button>
+			</CodeFiles>
 		</div>
 		<div class="result" data-code-result>
 			<p class="result-head">
@@ -126,42 +100,6 @@ export default function Code({
 				background: var(--code-surface);
 			}
 
-			.bar {
-				display: flex;
-				align-items: end;
-				justify-content: space-between;
-				gap: var(--space-xs);
-				padding: 0.4rem 0.5rem 0;
-				border-bottom: 1px solid var(--code-edge);
-				background: var(--raised);
-			}
-
-			.strip-row {
-				display: flex;
-				flex-wrap: wrap;
-				gap: 0.2em;
-			}
-
-			.tab {
-				padding: 0.3em 0.75em;
-				border: 0;
-				border-radius: 6px 6px 0 0;
-				background: transparent;
-				color: var(--ink);
-				font-family: var(--font-mono);
-				font-size: var(--step--2);
-				opacity: 0.65;
-				cursor: pointer;
-			}
-
-			.tab[ui-selected] {
-				background: var(--code-surface);
-				opacity: 1;
-				font-weight: 700;
-				box-shadow: inset 0 -3px 0 var(--yellow);
-			}
-
-			.tab:focus-visible,
 			.reset:focus-visible {
 				outline: 2px solid var(--purple);
 				outline-offset: 2px;
@@ -183,41 +121,6 @@ export default function Code({
 			.reset:active {
 				transform: translate(2px, 2px);
 				box-shadow: none;
-			}
-
-			.editor {
-				overflow: hidden;
-			}
-
-			.first-paint {
-				margin: 0;
-				padding: 0.75rem 0;
-				font-family: var(--font-mono);
-				font-size: var(--step--2);
-				line-height: 1.6;
-				counter-reset: code-line;
-				tab-size: 2;
-				max-height: 26rem;
-				overflow: auto;
-			}
-
-			.line {
-				position: relative;
-				display: block;
-				min-height: 1.6em;
-				padding-inline: 3rem 0.75rem;
-				white-space: pre-wrap;
-				overflow-wrap: anywhere;
-			}
-
-			.line::before {
-				content: counter(code-line);
-				counter-increment: code-line;
-				position: absolute;
-				left: 0;
-				width: 2.25rem;
-				text-align: right;
-				color: var(--code-comment);
 			}
 
 			.result {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { codePane, findCodeBlocks, rewriteCodeBlocks } from './code-blocks.ts';
+import { codePane, FIRST_TAB, findCodeBlocks, rewriteCodeBlocks } from './code-blocks.ts';
 
 const PAGE = '/site/pages/concepts/demo.mdx';
 
@@ -48,11 +48,16 @@ describe('findCodeBlocks', () => {
 	it.each([
 		['an untitled fence', '<Code>\n```tsrx\nx\n```\n</Code>', /needs title=/],
 		['prose inside the block', '<Code>\nhello\n</Code>', /only titled code fences/],
-		['no .tsrx file', '<Code>\n```ts title="a.ts"\nx\n```\n</Code>', /exactly one \.tsrx/],
+		['no .tsrx file', '<Code>\n```ts title="a.ts"\nx\n```\n</Code>', /at least one \.tsrx/],
 		[
-			'two .tsrx files',
-			'<Code>\n```tsrx title="A.tsrx"\nx\n```\n```tsrx title="B.tsrx"\nx\n```\n</Code>',
-			/exactly one \.tsrx/,
+			'an entry that names no .tsrx fence',
+			'<Code entry="C.tsrx">\n```tsrx title="A.tsrx"\nx\n```\n```ts title="C.ts"\nx\n```\n</Code>',
+			/entry="C\.tsrx" names no \.tsrx fence/,
+		],
+		[
+			'a fence titled like the generated module',
+			'<Code>\n```tsrx title="block.tsrx"\nx\n```\n</Code>',
+			/block\.tsrx/,
 		],
 		[
 			'a repeated title',
@@ -64,6 +69,60 @@ describe('findCodeBlocks', () => {
 	])('rejects %s and names the line', (_, source, message) => {
 		expect(() => findCodeBlocks(source, PAGE)).toThrow(message);
 		expect(() => findCodeBlocks(source, PAGE)).toThrow(/demo\.mdx:\d+:/);
+	});
+});
+
+const twoFiles = `<Code note="Edit the card">
+\`\`\`tsrx title="Page.tsrx"
+import Card from './Card.tsrx';
+
+export default function Page() @{
+	<Card />
+}
+\`\`\`
+
+\`\`\`tsrx title="Card.tsrx"
+export default function Card() @{
+	<p>card</p>
+}
+\`\`\`
+</Code>
+`;
+
+describe('several .tsrx files in one block', () => {
+	it('runs the first .tsrx fence when no entry is named', () => {
+		const [block] = findCodeBlocks(twoFiles, PAGE);
+		expect(block?.entry).toBe('Page.tsrx');
+		expect(block?.files.map((file) => file.name)).toEqual(['Page.tsrx', 'Card.tsrx']);
+	});
+
+	it('runs the fence entry= names and keeps entry= off the component', async () => {
+		const named = twoFiles.replace('<Code note="Edit the card">', '<Code entry="Card.tsrx" note="Edit the card">');
+		const [block] = findCodeBlocks(named, PAGE);
+		expect(block?.entry).toBe('Card.tsrx');
+		expect(block?.attributes).toBe('note="Edit the card"');
+
+		const written = new Map<string, string>();
+		await rewriteCodeBlocks(named, PAGE, '/site', (path, text) => written.set(path, text));
+		const dir = '/site/components/docs/code/generated/concepts-demo-1';
+		const module = written.get(`${dir}/block.tsrx`) ?? '';
+		expect(module).toContain('import Starter from "./Card.tsrx";');
+		expect(module).toContain('<Code files={files} panes={panes} note="Edit the card">');
+		const files = JSON.parse(/const files = (.*);/.exec(module)?.[1] ?? '[]') as { name: string }[];
+		expect(files.map((file) => file.name)).toEqual(['Card.tsrx', 'Page.tsrx']);
+		const panes = JSON.parse(/const panes = (.*);/.exec(module)?.[1] ?? '[]') as { name: string }[];
+		expect(panes.map((pane) => pane.name)).toEqual(['Page.tsrx', 'Card.tsrx']);
+		const tabs = JSON.parse(/const panes = (.*);/.exec(module)?.[1] ?? '[]') as { tab: string }[];
+		expect(tabs.map((pane) => pane.tab)).toEqual([FIRST_TAB, 'Card.tsrx']);
+	});
+
+	it('writes every .tsrx file beside the module so the entry\'s relative imports resolve', async () => {
+		const written = new Map<string, string>();
+		await rewriteCodeBlocks(twoFiles, PAGE, '/site', (path, text) => written.set(path, text));
+		const dir = '/site/components/docs/code/generated/concepts-demo-1';
+		expect(written.get(`${dir}/Page.tsrx`)).toContain("import Card from './Card.tsrx';");
+		expect(written.get(`${dir}/Card.tsrx`)).toContain('export default function Card()');
+		expect(written.get(`${dir}/block.tsrx`)).toContain('import Starter from "./Page.tsrx";');
 	});
 });
 
