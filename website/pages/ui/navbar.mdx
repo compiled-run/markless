@@ -1,7 +1,6 @@
 import AnatomyTable from '../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import Preview from '../../components/ui/preview.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 
 <Sidebar />
@@ -10,29 +9,10 @@ import Callout from '../../components/docs/callout.tsrx';
 
 <ThemeToggle />
 
-<Preview shows="Three top-level entries, one showing its dropdown." />
+<Playground scenario="basic" />
 
 `navbar` is your site's main navigation. Each entry is a link, or a button that shows a dropdown of
 links. Use it for the bar across the top of a site.
-
-```tsrx
-import { navbar } from '@markless/ui';
-
-export default function Primary() @{
-	<navbar.root aria-label="Primary">
-		<navbar.item value="home">
-			<navbar.itemlink href="/" current>Home</navbar.itemlink>
-		</navbar.item>
-		<navbar.item value="products">
-			<navbar.itemtrigger>Products</navbar.itemtrigger>
-			<navbar.itemcontent>
-				<navbar.itemlink href="/products/keyboards">Keyboards</navbar.itemlink>
-				<navbar.itemlink href="/products/mice">Mice</navbar.itemlink>
-			</navbar.itemcontent>
-		</navbar.item>
-	</navbar.root>
-}
-```
 
 It is not a menu bar. It writes no `menu`, `menubar` or `menuitem` role, and the tests check that.
 A screen reader hears plain links and buttons, which is what site navigation is.

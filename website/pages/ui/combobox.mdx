@@ -2,7 +2,6 @@ import AnatomyTable from '../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
-import Preview from '../../components/ui/preview.tsrx';
 
 <Sidebar />
 
@@ -10,29 +9,7 @@ import Preview from '../../components/ui/preview.tsrx';
 
 <ThemeToggle />
 
-<Preview shows="A field you type in, with three fruits under it." />
-
-```tsrx
-import { combobox } from '@markless/ui';
-
-export default function Fruit() @{
-	<combobox.root name="fruit" placeholder="Type a fruit">
-		<combobox.label>Favourite fruit</combobox.label>
-		<combobox.input />
-		<combobox.trigger>Show</combobox.trigger>
-		<combobox.content>
-			<combobox.item value="apple" label="Apple">
-				<combobox.itemlabel>Apple</combobox.itemlabel>
-				<combobox.itemindicator>Chosen</combobox.itemindicator>
-			</combobox.item>
-			<combobox.item value="banana" label="Banana">
-				<combobox.itemlabel>Banana</combobox.itemlabel>
-				<combobox.itemindicator>Chosen</combobox.itemindicator>
-			</combobox.item>
-		</combobox.content>
-	</combobox.root>
-}
-```
+<Playground scenario="basic" />
 
 A combobox is a text field with a list of options under it. Use it when the list is long enough
 that people want to type to find an option. For a short list with no typing, use

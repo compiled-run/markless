@@ -2371,6 +2371,174 @@ try {
 		}
 		await page.screenshot({ path: `${shotsDir}/mug-greeting.png`, fullPage: false });
 
+		// --- UI family playgrounds: each control and demo really drives the family --
+		const poll = async <T>(read: () => Promise<T>, wanted: (value: T) => boolean) => {
+			let value = await read();
+			for (let attempt = 0; attempt < 40 && !wanted(value); attempt += 1) {
+				await page.waitForTimeout(100);
+				value = await read();
+			}
+			return value;
+		};
+		const playground = async (family: string) => {
+			await page.goto(`${origin}/ui/${family}`, { waitUntil: 'networkidle' });
+			const card = page.locator(`section.pg[data-family="${family}"]`);
+			check((await card.count()) === 1, `/ui/${family}: the page carries its playground`);
+			return card;
+		};
+		const switchFor = (card: Locator, name: string) =>
+			card
+				.locator('.pg-ctl')
+				.filter({ has: page.locator('.pg-name', { hasText: new RegExp(`^${name}$`) }) })
+				.locator('.pg-switch');
+
+		{
+			const card = await playground('carousel');
+			const showing = () =>
+				card.locator('.slide[ui-active] .slide-name').textContent().then((text) => text ?? '');
+			const next = card.getByRole('button', { name: 'Next slide' });
+			await next.click();
+			check((await poll(showing, (v) => v === 'Oslo')) === 'Oslo', 'carousel: Next shows Oslo');
+			const painted = () =>
+				card.locator('.window').evaluate((window) => {
+					const box = window.getBoundingClientRect();
+					const hit = document.elementFromPoint(
+						box.left + box.width / 2,
+						box.top + box.height / 2,
+					);
+					return hit?.closest('.slide')?.querySelector('.slide-name')?.textContent ?? '';
+				});
+			check(
+				(await poll(painted, (v) => v === 'Oslo')) === 'Oslo',
+				'carousel: the window paints the Oslo slide once it has moved',
+			);
+			await next.click();
+			await poll(showing, (v) => v === 'Lima');
+			await switchFor(card, 'Rewind').click();
+			await next.click();
+			check(
+				(await poll(showing, (v) => v === 'Paris')) === 'Paris',
+				'carousel: with the Rewind switch on, Next at the end comes round to Paris',
+			);
+			await card.getByRole('tab', { name: 'Paris' }).focus();
+			await page.keyboard.press('ArrowRight');
+			check(
+				(await poll(showing, (v) => v === 'Oslo')) === 'Oslo',
+				'carousel: Right arrow on a picker shows the next slide',
+			);
+		}
+
+		{
+			const card = await playground('collapsible');
+			const trigger = card.locator('.trigger');
+			const panel = card.locator('.panel');
+			await trigger.click();
+			check(
+				(await poll(() => panel.getAttribute('hidden'), (v) => v === 'until-found')) ===
+					'until-found',
+				'collapsible: closing the panel leaves it hidden="until-found"',
+			);
+			await switchFor(card, 'DisableUntilFound').click();
+			check(
+				(await poll(() => panel.getAttribute('hidden'), (v) => v === '')) === '',
+				'collapsible: the DisableUntilFound switch turns that into plain hidden',
+			);
+			await switchFor(card, 'Disabled').click();
+			check(
+				await poll(() => trigger.isDisabled(), (v) => v),
+				'collapsible: the Disabled switch disables the trigger',
+			);
+		}
+
+		{
+			const card = await playground('combobox');
+			const input = card.locator('.input');
+			await card.locator('.option', { hasText: 'Mango' }).click();
+			check(
+				(await poll(() => input.inputValue(), (v) => v === 'Mango')) === 'Mango',
+				'combobox: a click on an option writes its label into the field',
+			);
+			await switchFor(card, 'Inline').click();
+			check(
+				await poll(() => card.locator('.list').isHidden(), (v) => v),
+				'combobox: the Inline switch off turns the list into a closed popup',
+			);
+			await card.locator('.show').click();
+			check(
+				await poll(() => card.locator('.list').isVisible(), (v) => v),
+				'combobox: the trigger opens the popup list',
+			);
+			await page.keyboard.press('Escape');
+			check(
+				await poll(() => card.locator('.list').isHidden(), (v) => v),
+				'combobox: Escape closes the popup list',
+			);
+		}
+
+		{
+			const card = await playground('modal');
+			const dialog = page.locator('.dialog');
+			await card.locator('.open').click();
+			check(await poll(() => dialog.isVisible(), (v) => v), 'modal: the trigger opens the dialog');
+			const onTop = await dialog.evaluate((node) => {
+				const box = node.getBoundingClientRect();
+				const hit = document.elementFromPoint(box.left + box.width / 2, box.top + 12);
+				return (
+					box.top >= 0 &&
+					box.left >= 0 &&
+					box.bottom <= innerHeight &&
+					box.right <= innerWidth &&
+					node.contains(hit)
+				);
+			});
+			check(onTop, 'modal: the open dialog is fully inside the viewport and on top');
+			await dialog.locator('.field').fill('9 Mill Road');
+			check(
+				(await settleText(card.locator('.card-address'), (t) => t === '9 Mill Road', 'modal: card')) ===
+					'9 Mill Road',
+				'modal: typing in the dialog updates the address on the page',
+			);
+			await page.keyboard.press('Escape');
+			check(await poll(() => dialog.isHidden(), (v) => v), 'modal: Escape closes the dialog');
+			await switchFor(card, 'Alert').click();
+			await card.locator('.open').click();
+			await poll(() => dialog.isVisible(), (v) => v);
+			await page.mouse.click(5, 5);
+			await page.waitForTimeout(400);
+			check(await dialog.isVisible(), 'modal: with Alert on, a press on the backdrop does not close');
+			await page.keyboard.press('Escape');
+			await poll(() => dialog.isHidden(), (v) => v);
+		}
+
+		{
+			const card = await playground('navbar');
+			const open = () =>
+				card
+					.locator('.item[ui-open] > .top')
+					.textContent()
+					.then((text) => text ?? '')
+					.catch(() => '');
+			check(/Products/.test(await open()), 'navbar: the playground starts with Products open');
+			await card.locator('.top', { hasText: 'Docs' }).hover();
+			check(/Docs/.test(await poll(open, (v) => /Docs/.test(v))), 'navbar: resting on Docs opens it');
+			const shown = card
+				.locator('.pg-cell')
+				.filter({ hasText: 'value' })
+				.locator('.pg-pick-value');
+			check(
+				(await settleText(shown, (t) => t === 'docs', 'navbar: value')) === 'docs',
+				'navbar: the value control follows the open dropdown',
+			);
+			await page.mouse.move(5, 5);
+			await switchFor(card, 'Hover').click();
+			await poll(open, (v) => v === '');
+			await card.locator('.top', { hasText: 'Products' }).hover();
+			await page.waitForTimeout(500);
+			check((await open()) === '', 'navbar: with Hover off, resting on an item opens nothing');
+			await card.locator('.top', { hasText: 'Products' }).click();
+			check(/Products/.test(await poll(open, (v) => /Products/.test(v))), 'navbar: a click opens Products');
+		}
+
 		// --- the stickers are on the pages that ask for them --------------------
 		await page.goto(`${origin}/`, { waitUntil: 'load' });
 		const heroSticker = page.locator('.sticker.is-hero');

@@ -1,7 +1,6 @@
 import AnatomyTable from '../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import Preview from '../../components/ui/preview.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 
 <Sidebar />
@@ -10,27 +9,10 @@ import Callout from '../../components/docs/callout.tsrx';
 
 <ThemeToggle />
 
-<Preview shows="A button that opens a dialog over a dimmed page." />
+<Playground scenario="basic" />
 
 `modal` is a dialog that blocks the page behind it. Use it when a person must finish or cancel one
 task before they go back to the page.
-
-```tsrx
-import { modal } from '@markless/ui';
-
-export default function EditAddress() @{
-	<modal.root>
-		<modal.trigger>Edit address</modal.trigger>
-		<modal.backdrop>
-			<modal.content>
-				<modal.title>Edit delivery address</modal.title>
-				<modal.description>We will send your order here.</modal.description>
-				<modal.close>Cancel</modal.close>
-			</modal.content>
-		</modal.backdrop>
-	</modal.root>
-}
-```
 
 `modal.backdrop` wraps `modal.content`. It does not sit beside it. The dialog sits inside the dim
 layer, so you can center it with one grid rule on the backdrop.
