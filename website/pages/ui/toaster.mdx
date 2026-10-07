@@ -1,4 +1,6 @@
 import AnatomyTable from '../../components/docs/anatomy-table.tsrx';
+import ApiTable from '../../components/docs/api-table.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Preview from '../../components/ui/preview.tsrx';
@@ -9,7 +11,10 @@ import Preview from '../../components/ui/preview.tsrx';
 
 <ThemeToggle />
 
-<Preview shows="A button, and one message that appears and leaves." />
+`toaster` shows short messages, such as "Draft saved", and screen readers announce each new one.
+The family holds the queue of messages. You write the markup for each message.
+
+<Preview shows="A Save draft button, and the message it raises." />
 
 ```tsrx
 import { toaster } from '@markless/ui';
@@ -17,53 +22,126 @@ import { toaster } from '@markless/ui';
 export default function Save() @{
 	const toasts = toaster.state();
 
-	<main>
+	<section class="frame">
 		<button
+			class="save"
 			type="button"
 			onClick={() => {
-				toasts.queue = toaster.say(toasts.queue, 'Saved', { id: 'save' });
+				toasts.queue = toaster.say(toasts.queue, 'Draft saved', {
+					id: 'save',
+					tone: 'success',
+					description: 'You can close this tab.',
+				});
 			}}
-		>Save</button>
-		<toaster.root>
+		>Save draft</button>
+		<toaster.root class="region">
 			<div role="presentation">
 				@for (const message of toasts.queue; key message.id) {
-					<toaster.item toast={message}>
-						<toaster.itemicon />
-						<toaster.itemtitle />
-						<toaster.itemdescription />
-						<toaster.itemclose aria-label="Dismiss">×</toaster.itemclose>
+					<toaster.item class="toast" toast={message}>
+						<toaster.itemicon class="icon" />
+						<div>
+							<toaster.itemtitle class="title" />
+							<toaster.itemdescription />
+						</div>
+						<toaster.itemclose class="close" aria-label="Dismiss">×</toaster.itemclose>
 					</toaster.item>
 				}
 			</div>
 		</toaster.root>
-	</main>
+	</section>
 }
 ```
 
-The region is on the page before the first message, because a live region added at the same moment
-as its text is not announced. The root renders no rows of its own, so how many show is your own
-repeat to decide — `toaster.shown(queue, n)` is the cap to write against. A message is raised by
-assigning the queue from your handler: `toasts.queue = toaster.say(toasts.queue, ...)`. Say it
-again with the same `id` and the message already showing is updated rather than duplicated.
+If a person clicks **Save draft** twice, they still see one message. Both calls use `id: 'save'`,
+so the second call updates the first message in place. Focus stays on the button. A message never
+takes focus.
 
-## Anatomy
+## How a message gets on screen
+
+`toaster.state()` returns the page's one queue. Every component on the page that calls it gets the
+same queue. So a button far from the region can still raise a message.
+
+To raise a message, set the queue to what `toaster.say()` returns:
+
+```tsrx
+toasts.queue = toaster.say(toasts.queue, 'Upload failed', {
+	tone: 'error',
+	description: 'The file was too large.',
+});
+```
+
+`toaster.say(queue, title, options)` takes these options: `id`, `tone`, `description` and
+`duration`. `tone` is `neutral`, `success`, `warning` or `error`. To remove a message from your own
+code, write `toasts.queue = toaster.drop(toasts.queue, id)`.
+
+`toaster.root` renders no messages of its own. Your `@for` decides which ones show. To show at most
+three, put `toaster.shown()` in a `computed()` and loop over that:
+
+```tsrx
+import { computed } from '@markless/core';
+
+const shown = computed(() => toaster.shown(toasts.queue, 3));
+```
+
+Do not write the call inside the `@for` line. That form breaks when the page renders on a server.
+The other messages wait in the queue, and dismissing one brings the next forward.
+
+## When to use it
+
+Use `toaster` for a short status that does not need an answer, such as "Saved" or "Copied". If the
+person has to decide something, use a [modal](/ui/modal) instead.
+
+## Parts
 
 <AnatomyTable />
 
-It writes `ui-toast`, `ui-toaster`, `ui-tone`, `ui-front` and `ui-paused`, plus one per part.
+- `toaster.root` is the live region, a `<div>` with `aria-live="polite"`. Keep it on the page from
+  the start. A screen reader can miss a region that appears together with its text.
+- `toaster.item` is one message. It needs `toast`, one record from the queue. It has
+  `role="status"`, or `role="alert"` for the `error` tone, so a screen reader interrupts for errors.
+- `toaster.itemtitle` shows the message's title. Give it children and they show instead.
+- `toaster.itemdescription` shows the description line, or its own children.
+- `toaster.itemicon` shows a mark for the tone: `✓`, `!`, `×` or `i`. It is `aria-hidden`.
+- `toaster.itemclose` is a button that dismisses the message it sits in. With no children, its
+  name is a hidden word, "Close".
 
-## Props on `toaster.root`
+## Styling hooks
 
-`toaster.root` takes no props of its own beyond what an `<ol>` accepts. There is no `visible`
-prop, because the root renders no rows: the cap belongs to your repeat.
+| Attribute | On | Present when |
+| --- | --- | --- |
+| `ui-toaster` | root | Always. |
+| `ui-paused` | root | The pointer rests on the region, or focus is inside it. |
+| `ui-toast` | item | Always. |
+| `ui-tone` | item | Always. Its value is the tone, such as `ui-tone="error"`. |
+| `ui-front` | item | This message is first in the queue. |
 
-`toaster.item` is where the data goes:
+Each `toaster.item` also gets two CSS custom properties in its `style` attribute. `--index` is its
+place in the queue, from 0. `--offset` is that place times 100%. Use them to stack the messages.
+The family owns that `style` attribute, so style items from your stylesheet, not with a `style`
+prop.
 
-| Prop    | Type          | What it does                                      |
-| ------- | ------------- | ------------------------------------------------- |
-| `toast` | `ToastRecord` | The message this row shows. Required.             |
-| `index` | `number`      | Where it stands in the stack. 0 is the front one. |
+A modal does not hide the region. The messages behind an open dialog stay reachable.
 
-`toaster.say(queue, title, options)` takes an `id`, a `tone` of `neutral`, `success`, `warning` or
-`error`, a `description`, and a `duration` in milliseconds — `Infinity` keeps the message until
-something dismisses it.
+## Gotchas
+
+<Callout
+	sprite="bolt"
+	title="Why does my message never go away by itself?"
+	text="Today, a message raised with toaster.say stays until someone dismisses it. The duration option has no effect yet, and the hover pause has no clock to stop. The family's own test for a message that leaves by itself is marked as a known failure. Give every message a toaster.itemclose."
+/>
+
+<Callout
+	sprite="speech-bubble"
+	title="Why is the @for wrapped in a div?"
+	text="A construct such as @for cannot be the direct child of a component tag like toaster.root. Wrap it in a plain element. The family's own examples use a div with role=presentation."
+/>
+
+<Callout
+	sprite="thought-bubble"
+	title="Why does a screen reader say 'times'?"
+	text="If toaster.itemclose shows a visible × with no label, a screen reader reads the symbol. Add aria-label, such as aria-label=Dismiss, or leave the button empty to get the hidden word Close."
+/>
+
+## API reference
+
+<ApiTable />

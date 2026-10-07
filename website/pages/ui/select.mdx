@@ -1,7 +1,9 @@
 import AnatomyTable from '../../components/docs/anatomy-table.tsrx';
+import ApiTable from '../../components/docs/api-table.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import Preview from '../../components/ui/preview.tsrx';
+import SelectDemo from '../../components/demos/ui/select/basic.tsrx';
 
 <Sidebar />
 
@@ -9,23 +11,38 @@ import Preview from '../../components/ui/preview.tsrx';
 
 <ThemeToggle />
 
-<Preview shows="A closed button that opens a list of three fruits." />
+`select` is a button that opens a list of options. A person picks one, and the list closes.
+
+<SelectDemo shows="Open the list and pick a fruit. Cherry is disabled." />
 
 ```tsrx
+import { state } from '@markless/core';
 import { select } from '@markless/ui';
 
 export default function Fruit() @{
-	<select.root name="fruit">
-		<select.label>Favourite fruit</select.label>
-		<select.trigger>Choose a fruit</select.trigger>
-		<select.content>
-			<select.item value="apple">
+	let shown = state('Choose a fruit');
+
+	<select.root
+		class="picker"
+		name="fruit"
+		onChange={(value: string) => {
+			shown = value;
+		}}
+	>
+		<select.label class="label">Favourite fruit</select.label>
+		<select.trigger class="trigger"><span>{shown}</span></select.trigger>
+		<select.content class="list">
+			<select.item class="option" value="Apple">
 				<select.itemlabel>Apple</select.itemlabel>
-				<select.itemindicator>Chosen</select.itemindicator>
+				<select.itemindicator class="mark">✓</select.itemindicator>
 			</select.item>
-			<select.item value="banana">
+			<select.item class="option" value="Banana">
 				<select.itemlabel>Banana</select.itemlabel>
-				<select.itemindicator>Chosen</select.itemindicator>
+				<select.itemindicator class="mark">✓</select.itemindicator>
+			</select.item>
+			<select.item class="option" value="Cherry" disabled>
+				<select.itemlabel>Cherry</select.itemlabel>
+				<select.itemindicator class="mark">✓</select.itemindicator>
 			</select.item>
 		</select.content>
 		<select.field />
@@ -33,28 +50,82 @@ export default function Fruit() @{
 }
 ```
 
-A button that opens a listbox, with typeahead over the option labels and the arrow keys walking
-them. An option is named by its required `value` — no index stands in for it — so reordering the
-list is a reorder and never a silent change of what is chosen. `multiple` is deliberately absent:
-it is the one prop that turns `value` into a union and doubles the keyboard table.
+Now try it with the keyboard. Tab to the button and type `b`. The list opens on **Banana**. Press
+Enter to pick it.
 
-## Anatomy
+Each option has a `value`, and the family tracks the choice by that value. It never uses the
+option's position. So you can reorder the options and the choice stays the same.
+
+## When to use it
+
+Use `select` when a person picks one option from a fixed list. If they need to type to filter
+the list, use [combobox](/ui/combobox) instead. `select` has no `multiple` prop. For several
+choices, use [checklist](/ui/checklist).
+
+## Parts
 
 <AnatomyTable />
 
-It writes `ui-open`, `ui-closed`, `ui-selected`, `ui-hidden`, `ui-required` and `ui-disabled`.
+- `select.root` holds the chosen value, whether the list is open, and the form settings.
+- `select.label` names the button and the list. Both point at it with `aria-labelledby`.
+- `select.trigger` is the button that opens the list. It is the only Tab stop in the family.
+- `select.content` is the list, with `role="listbox"`. A closed list gets `hidden`. It stays in
+  the page.
+- `select.item` is one option. Its `value` is required.
+- `select.itemlabel` holds the option's words. Typing a letter matches against this text only.
+- `select.itemindicator` is the mark on the chosen option. It is `aria-hidden`, so a screen reader
+  does not read it.
+- `select.field` is a hidden native `<select>`. It sends the choice to a form under `name`. Tab
+  never reaches it.
 
-## Props on `select.root`
+## Styling hooks
 
-| Prop           | Type              | What it does                                                        |
-| -------------- | ----------------- | ------------------------------------------------------------------- |
-| `value`        | `string`          | The value of the chosen option. Omit it and nothing is chosen.      |
-| `open`         | `boolean`         | The popup is showing. Omit it and it starts closed.                 |
-| `disabled`     | `boolean`         | Nobody can change the choice.                                       |
-| `required`     | `boolean`         | A choice is needed before the form submits.                         |
-| `name`         | `string`          | Submitted under this name by `select.field`.                        |
-| `onChange`     | `(value) => void` | Called with the new value when a person chooses a different option. |
-| `onOpenChange` | `(open) => void`  | Called when the popup opens or closes.                              |
+The family writes these attributes. Each one is present while its state holds:
 
-Everything a `<div>` accepts reaches the element too. `select.item` takes its own `value` and
-`disabled`.
+| Attribute | On | Present when |
+| --- | --- | --- |
+| `ui-open`, `ui-closed` | root, trigger, content | The list is open, or closed. |
+| `ui-disabled` | root | `disabled` is set on the root. |
+| `ui-required` | root | `required` is set on the root. |
+| `ui-selected` | item | This option is the chosen one. |
+| `ui-disabled` | item | This option or the whole select is disabled. |
+| `ui-hidden` | itemindicator | Its option is not the chosen one. |
+
+## Keyboard
+
+The family's tests check each of these rows.
+
+| Key | What it does |
+| --- | --- |
+| Down arrow, Home, Enter or Space on the button | Opens the list. Focus goes to the chosen option, or else to the first one. |
+| Up arrow or End on the button | Opens the list. Focus goes to the chosen option, or else to the last one. |
+| Alt and Down arrow on the button | Opens the list. Focus stays on the button. |
+| A letter on the button | Opens the list on the first option that starts with that letter. |
+| Down arrow or Up arrow in the list | Moves focus one option. It stops at the ends. |
+| Home or End in the list | Moves focus to the first or the last option. |
+| Page Down or Page Up in the list | Moves focus ten options. It stops at the ends. |
+| Letters in the list | Moves focus to the first option that starts with what you typed. |
+| Enter or Space in the list | Picks the focused option, closes the list, and puts focus on the button. |
+| Escape | Closes the list without a change. Focus goes back to the button. |
+| Tab in the list | Closes the list without a change. |
+
+The arrows and typed letters skip a disabled option. A click outside the open list closes it and
+picks nothing.
+
+## Gotchas
+
+<Callout
+	sprite="speech-bubble"
+	title="Why does the button not show what I picked?"
+	text="The button's words are yours. The family does not copy the chosen option's label into select.trigger. The demo keeps its own state, sets it in onChange, and shows it inside a span in the trigger. If the select starts with a value, write that option's words into the trigger too."
+/>
+
+<Callout
+	sprite="bolt"
+	title="Why does every option show its tick?"
+	text="select.itemindicator gets ui-hidden on every option that is not chosen. The family marks it but does not hide it. Add a rule such as .mark[ui-hidden] { visibility: hidden }."
+/>
+
+## API reference
+
+<ApiTable />

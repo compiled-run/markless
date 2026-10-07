@@ -1,7 +1,9 @@
 import AnatomyTable from '../../components/docs/anatomy-table.tsrx';
+import ApiTable from '../../components/docs/api-table.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import Preview from '../../components/ui/preview.tsrx';
+import TreeDemo from '../../components/demos/ui/tree/basic.tsrx';
 
 <Sidebar />
 
@@ -9,48 +11,121 @@ import Preview from '../../components/ui/preview.tsrx';
 
 <ThemeToggle />
 
-<Preview shows="A folder with three files under it." />
+`tree` is a nested list that opens and closes, such as a file tree. A person walks it with the
+arrow keys.
+
+<TreeDemo shows="Tab into the tree. Press Right to open src, then walk down with the arrows." />
 
 ```tsrx
 import { tree } from '@markless/ui';
 
 export default function Files() @{
-	<tree.root aria-label="Project files">
-		<tree.item level={1}>
-			<tree.itemtrigger>
-				<tree.itemindicator />
-				<tree.itemlabel>src</tree.itemlabel>
+	<tree.root class="files" aria-label="Project files">
+		<tree.item class="row" level={1}>
+			<tree.itemtrigger class="arrow-button">
+				<tree.itemindicator class="arrow">▸</tree.itemindicator>
 			</tree.itemtrigger>
-			<tree.itemcontent>
-				<tree.item leaf level={2}>
+			<tree.itemlabel>src</tree.itemlabel>
+			<tree.itemcontent class="group">
+				<tree.item class="row" leaf level={2}>
 					<tree.itemlabel>index.ts</tree.itemlabel>
+				</tree.item>
+				<tree.item class="row" leaf level={2}>
+					<tree.itemlabel>app.tsrx</tree.itemlabel>
 				</tree.item>
 			</tree.itemcontent>
 		</tree.item>
-		<tree.item leaf level={1}>
+		<tree.item class="row" level={1}>
+			<tree.itemtrigger class="arrow-button">
+				<tree.itemindicator class="arrow">▸</tree.itemindicator>
+			</tree.itemtrigger>
+			<tree.itemlabel>docs</tree.itemlabel>
+			<tree.itemcontent class="group">
+				<tree.item class="row" leaf level={2}>
+					<tree.itemlabel>guide.md</tree.itemlabel>
+				</tree.item>
+			</tree.itemcontent>
+		</tree.item>
+		<tree.item class="row" leaf level={1}>
 			<tree.itemlabel>README.md</tree.itemlabel>
 		</tree.item>
 	</tree.root>
 }
 ```
 
-The whole tree holds one tab stop, and typing jumps to the next row whose label starts with what
-you typed. A row with no children is `leaf`, and a leaf reports no open state at all — that is the
-WAI-ARIA rule a reader needs to tell "nothing to open" apart from "closed". Depth is written on the
-row rather than counted, because a node that roots its own instance cannot read the one enclosing
-it. Name the tree with a plain `aria-label` on the root.
+Now press `r`. Focus jumps to **README.md**, because typing a letter finds the next row whose label
+starts with it.
 
-## Anatomy
+A level does not need new parts. A `tree.item` holds a `tree.itemcontent`, and that holds more
+`tree.item`s. Each item keeps its own open or closed state.
+
+## When to use it
+
+Use `tree` for nested data that a person opens one branch at a time, such as folders. The family
+offers no selection. It writes no `aria-selected`, and it keeps any `aria-selected` you write.
+
+## Parts
 
 <AnatomyTable />
 
-It writes `ui-open`, `ui-closed`, `ui-leaf`, `ui-disabled` and `ui-value`.
+- `tree.root` is the container, with `role="tree"`. The whole tree is one Tab stop.
+- `tree.item` is one row, with `role="treeitem"`. Mark a row with no children as `leaf`.
+- `tree.itemtrigger` is the button that opens and closes a row. Tab never stops on it. The arrow
+  keys and Enter press it for you.
+- `tree.itemcontent` holds a row's children, with `role="group"`. A closed group gets `hidden`. It
+  stays in the page.
+- `tree.itemlabel` is the row's name. The trigger takes its name from it, and typing a letter matches it.
+- `tree.itemindicator` is a mark, such as an arrow, that shows whether the row is open.
+- `tree.label` is a heading for the tree. It does not name the tree.
 
-## Props on `tree.root`
+Write a `level` on every nested `tree.item`. It defaults to 1, the top level. The family does not
+count the depth for you, because a row cannot read the row around it. `level` becomes
+`aria-level`.
 
-| Prop       | Type      | What it does                       |
-| ---------- | --------- | ---------------------------------- |
-| `disabled` | `boolean` | Nobody can open or close anything. |
+## Styling hooks
 
-Everything a `<div>` accepts reaches the element too, `aria-label` included — which is how the tree
-is named. `tree.item` carries the rest: `open`, `leaf`, `level` and its own `onChange`.
+| Attribute | On | Present when |
+| --- | --- | --- |
+| `ui-open` | item, itemtrigger, itemcontent, itemindicator | The row is open. |
+| `ui-closed` | item, itemtrigger, itemcontent, itemindicator | The row is closed. |
+| `ui-leaf` | item | The row is a `leaf`. |
+| `ui-disabled` | root, item | `disabled` is set there. |
+| `ui-inside` | root | Focus is on a control inside a row, not on the row itself. |
+
+A leaf writes neither `ui-open` nor `ui-closed` on its row. It also has no `aria-expanded`, so a
+screen reader can tell "nothing to open" from "closed".
+
+## Keyboard
+
+The family's tests check each of these rows. The arrows reach only the rows a person can see.
+
+| Key | What it does |
+| --- | --- |
+| Down arrow or Up arrow | Moves to the next or the previous visible row. It never opens anything. |
+| Home or End | Moves to the first or the last visible row. |
+| Right arrow | Opens a closed row. On an open row, moves to its first child. On a leaf, does nothing. |
+| Left arrow | Closes an open row. On a closed row or a leaf, moves to its parent. |
+| Enter or Space | Opens or closes the row. |
+| `*` | Opens every closed row at the same level as this one. |
+| Letters | Moves to the next visible row whose label starts with what you typed. |
+
+When focus is on a link or a button inside a row, the arrows belong to that control. The tree
+walks again once focus is back on the row. The walk skips a disabled row, and no key opens it.
+
+## Gotchas
+
+<Callout
+	sprite="speech-bubble"
+	title="Why does my tree have no name?"
+	text="tree.label does not name the tree. Put a plain aria-label on tree.root, as the demo does."
+/>
+
+<Callout
+	sprite="bolt"
+	title="Why are my nested rows missing?"
+	text="A keyed @for inside tree.itemcontent renders no rows when the page renders in the browser alone. From server HTML it works. The family's own test for this is skipped in browser-only mode. Until it is fixed, write the nested rows out by hand."
+/>
+
+## API reference
+
+<ApiTable />

@@ -1,7 +1,9 @@
 import AnatomyTable from '../../components/docs/anatomy-table.tsrx';
+import ApiTable from '../../components/docs/api-table.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import Preview from '../../components/ui/preview.tsrx';
+import TextboxDemo from '../../components/demos/ui/textbox/basic.tsrx';
 
 <Sidebar />
 
@@ -9,39 +11,102 @@ import Preview from '../../components/ui/preview.tsrx';
 
 <ThemeToggle />
 
-<Preview shows="A labelled field with a sentence under it." />
+`textbox` is a text field with its label, a help line and an error message wired to it. It
+renders a real `<input>` or `<textarea>`.
+
+<TextboxDemo shows="Type a username. The line under the field follows what you type." />
 
 ```tsrx
+import { state } from '@markless/core';
 import { textbox } from '@markless/ui';
 
 export default function Username() @{
-	<textbox.root name="username" required>
-		<textbox.label>Username</textbox.label>
-		<textbox.input />
-		<textbox.description>Letters and numbers, no spaces.</textbox.description>
-	</textbox.root>
+	let name = state('');
+
+	<section class="frame">
+		<textbox.root
+			class="field"
+			name="username"
+			required
+			onChange={(value: string) => {
+				name = value;
+			}}
+		>
+			<textbox.label class="label">Username</textbox.label>
+			<textbox.input class="input" />
+			<textbox.description class="help">Letters and numbers, no spaces.</textbox.description>
+		</textbox.root>
+		<p class="echo">You typed: {name}</p>
+	</section>
 }
 ```
 
-A labelled field over one line or many: swap `textbox.input` for `textbox.textarea` and nothing
-else changes. `disabled`, `required` and `readonly` may be set on the root or on the control, and a
-restriction set in either place stands — a part can add a restriction, never remove one.
+Click the word **Username**. Focus moves into the field, because the label's `for` points at the
+input. The dashed border goes solid as soon as you type, because the root loses `ui-empty`.
 
-## Anatomy
+## When to use it
+
+Use `textbox` for free text, such as a name or a message. For one line, use `textbox.input`.
+For several lines, swap it for `textbox.textarea`, and nothing else changes. For numbers, dates or
+codes, look at `numberbox`, `datebox` and [otp](/ui/otp) first.
+
+## Parts
 
 <AnatomyTable />
 
-It writes `ui-empty`, `ui-required`, `ui-readonly` and `ui-disabled`.
+- `textbox.root` holds the text and the rules, such as `required`. It renders a `<div>` and no
+  control of its own.
+- `textbox.input` is a one-line `<input>`.
+- `textbox.textarea` is a `<textarea>` for several lines.
+- `textbox.label` names the field. Clicking it focuses the `textbox.input`.
+- `textbox.description` is a help line. The control points at it with `aria-describedby`.
+- `textbox.error` is the error message. The control points at it too, before the help line.
 
-## Props on `textbox.root`
+`disabled`, `required` and `readonly` work on the root or on the control. If either place sets
+one, it holds. A control can add a rule the root did not set, but it cannot remove one.
 
-| Prop       | Type              | What it does                                                       |
-| ---------- | ----------------- | ------------------------------------------------------------------ |
-| `value`    | `string`          | The text the box shows. Omit it and the box starts empty.          |
-| `disabled` | `boolean`         | Nobody can type in it.                                             |
-| `required` | `boolean`         | Text is needed before the form submits.                            |
-| `readonly` | `boolean`         | The text can be read and selected but not changed.                 |
-| `name`     | `string`          | Submitted under this name by whichever control the family renders. |
-| `onChange` | `(value) => void` | Called with the new text as a person types.                        |
+## Styling hooks
 
-Everything a `<div>` accepts reaches the element too.
+All of these sit on `textbox.root`:
+
+| Attribute | Present when |
+| --- | --- |
+| `ui-empty` | The field holds no text. |
+| `ui-required` | `required` is set on the root. |
+| `ui-readonly` | `readonly` is set on the root. |
+| `ui-disabled` | `disabled` is set on the root. |
+| `ui-invalid` | A `textbox.error` is on the page. |
+
+The control itself gets `aria-invalid="true"` while a `textbox.error` is on the page.
+
+## Keyboard
+
+The field is a native control, so the browser's own keys apply. The family's tests check these:
+
+| Key | What it does |
+| --- | --- |
+| Enter in `textbox.input` | Submits the form. The text does not change. |
+| Enter in `textbox.textarea` | Starts a new line. It does not submit. |
+| Escape | Leaves the text as it is. |
+
+`onChange` runs once per change, with the whole text so far. It does not run for the text the
+field starts with. With an input method editor, the family never writes over the draft. The
+characters the person picks are what land.
+
+## Gotchas
+
+<Callout
+	sprite="bolt"
+	title="Why is my field marked invalid?"
+	text="Putting a textbox.error on the page marks the field invalid. The family does not check the text for you. Render the error part only when there is an error to show, for example inside an @if."
+/>
+
+<Callout
+	sprite="speech-bubble"
+	title="Why does clicking the label not focus my textarea?"
+	text="textbox.label points its for at the textbox.input. A field with only a textbox.textarea has no input, so the label's for names nothing. The family's own test pins this as a known failure. A screen reader still hears the name, because the textarea uses aria-labelledby."
+/>
+
+## API reference
+
+<ApiTable />

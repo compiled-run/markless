@@ -1,7 +1,9 @@
 import AnatomyTable from '../../components/docs/anatomy-table.tsrx';
+import ApiTable from '../../components/docs/api-table.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import Preview from '../../components/ui/preview.tsrx';
+import TabsDemo from '../../components/demos/ui/tabs/basic.tsrx';
 
 <Sidebar />
 
@@ -9,43 +11,100 @@ import Preview from '../../components/ui/preview.tsrx';
 
 <ThemeToggle />
 
-<Preview shows="Three tabs over one panel, the first showing." />
+`tabs` is a row of tabs over a set of panels. Each tab shows one panel, and only one panel shows
+at a time.
+
+<TabsDemo shows="Click Billing. Then use the arrow keys. Team is disabled." />
 
 ```tsrx
 import { tabs } from '@markless/ui';
 
 export default function Account() @{
-	<tabs.root value="overview">
-		<tabs.list>
-			<tabs.trigger value="overview">Overview</tabs.trigger>
-			<tabs.trigger value="billing">Billing</tabs.trigger>
+	<tabs.root class="tabs" value="overview">
+		<tabs.list class="list">
+			<tabs.trigger class="tab" value="overview">Overview</tabs.trigger>
+			<tabs.trigger class="tab" value="billing">Billing</tabs.trigger>
+			<tabs.trigger class="tab" value="team" disabled>Team</tabs.trigger>
 		</tabs.list>
-		<tabs.content value="overview">Everything that happened this month.</tabs.content>
-		<tabs.content value="billing">Your next invoice is due on the 1st.</tabs.content>
+		<tabs.content class="panel" value="overview" aria-label="Overview">
+			Three orders this month. One is on its way.
+		</tabs.content>
+		<tabs.content class="panel" value="billing" aria-label="Billing">
+			Your next invoice is due on the 1st.
+		</tabs.content>
+		<tabs.content class="panel" value="team" aria-label="Team">
+			Two people can see this account.
+		</tabs.content>
 	</tabs.root>
 }
 ```
 
-A trigger and the panel with the same `value` are a pair. Every panel stays in the page — `hidden`
-decides which one shows — so focus, scroll position and anything typed inside a panel survive a tab
-change. A tab carries `role="tab"`, which makes every child of it presentational: put label text in
-there and nothing else, because a close button or a link inside a tab is stripped of its own
-semantics.
+Click a tab, then press the Right arrow. Focus moves to the next tab and shows its panel. The
+arrows walk past **Team**, because it is disabled.
 
-## Anatomy
+A tab and a panel with the same `value` are a pair. The family never matches them by position.
+The root's `value` names the tab that shows first. If you leave it out, no tab shows.
+
+## When to use it
+
+Use `tabs` when a person switches between views of the same thing, such as the pages of an
+account. If several sections can be open at once, use [accordion](/ui/accordion) instead.
+
+## Parts
 
 <AnatomyTable />
 
-It writes `ui-selected` and `ui-vertical`.
+- `tabs.root` holds which tab shows, the arrow-key axis, and the focus rules. It renders a
+  `<div>`.
+- `tabs.list` is the row of tabs, with `role="tablist"`. It also writes `aria-orientation`.
+- `tabs.trigger` is one tab. It is a `<button>` with `role="tab"`, and its `value` is required.
+- `tabs.content` is one panel, with `role="tabpanel"`. Its `value` is required.
 
-## Props on `tabs.root`
+The whole row of tabs is one Tab stop. Only the showing tab has `tabindex="0"`. The showing
+panel is a Tab stop too, so Tab from the tabs lands on the panel.
 
-| Prop            | Type                         | What it does                                                                                    |
-| --------------- | ---------------------------- | ----------------------------------------------------------------------------------------------- |
-| `value`         | `string`                     | The tab that is showing. Omit it and no tab shows.                                              |
-| `orientation`   | `'horizontal' \| 'vertical'` | Which axis the arrow keys walk. Omit it and the tabs run left to right.                         |
-| `loop`          | `boolean`                    | Arrow past the last tab and land on the first. Omit it and the ends stop.                       |
-| `selectOnFocus` | `boolean`                    | Arrowing to a tab shows it. Turn it off and arrowing only moves focus; Enter or Space shows it. |
-| `onChange`      | `(value) => void`            | Called with the new value when a person changes tab.                                            |
+Every panel stays in the page. A panel that is not showing gets `hidden`. So what a person typed
+in a panel, and its scroll position, are still there when they come back.
 
-Everything a `<div>` accepts reaches the element too.
+## Styling hooks
+
+| Attribute | On | Present when |
+| --- | --- | --- |
+| `ui-selected` | trigger, content | This tab or panel is the one showing. |
+| `ui-vertical` | root, list, trigger | `orientation` is `vertical`. |
+
+A horizontal set writes no orientation attribute. Only the vertical one does.
+
+## Keyboard
+
+The family's tests check each of these rows.
+
+| Key | What it does |
+| --- | --- |
+| Right arrow or Left arrow | Moves to the next or the previous tab. In a vertical set, use Down and Up. |
+| Home or End | Moves to the first or the last tab. |
+| Enter or Space | Shows the focused tab. You need this only when `selectOnFocus` is `false`. |
+
+By default a tab shows as soon as focus reaches it. Set `selectOnFocus={false}` and the arrows move
+focus only. Then Enter or Space shows the tab.
+
+The arrows stop at the ends. Set `loop` and they wrap around from the last tab to the first.
+The arrows skip a disabled tab. An arrow pressed with Alt, Ctrl or Cmd is left to the browser.
+
+## Gotchas
+
+<Callout
+	sprite="speech-bubble"
+	title="Why does a screen reader not say which tab a panel belongs to?"
+	text="The family does not link a panel to its tab with aria-labelledby yet. Its own screen reader test for that is marked as a known failure. Until it lands, give each tabs.content an aria-label, as the demo does."
+/>
+
+<Callout
+	sprite="bolt"
+	title="Why does the close button inside my tab not work for screen readers?"
+	text="role=tab tells a screen reader to treat everything inside the tab as plain text. A button or a link inside a tabs.trigger loses its own role. Put a close button next to the tab, not inside it."
+/>
+
+## API reference
+
+<ApiTable />

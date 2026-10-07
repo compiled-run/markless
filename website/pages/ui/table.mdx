@@ -1,4 +1,6 @@
 import AnatomyTable from '../../components/docs/anatomy-table.tsrx';
+import ApiTable from '../../components/docs/api-table.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import TableDemo from '../../components/demos/ui/table/basic.tsrx';
@@ -8,6 +10,9 @@ import TableDemo from '../../components/demos/ui/table/basic.tsrx';
 # table
 
 <ThemeToggle />
+
+`table` is a plain HTML table that can do more. It adds arrow keys from cell to cell, rows a person
+can pick, and headers that ask for a sort.
 
 <TableDemo shows="Three preserves. Arrow across the cells, then press Space to pick a row." />
 
@@ -51,166 +56,116 @@ export default function Pantry() @{
 }
 ```
 
-The family does no data work. Rows arrive in the order they should read, and the table reports
-which header was pressed and which rows are picked; sorting, filtering and paging stay in your own
-`computed()`. The parts are a ladder: a bare `table.root` around your own `<thead>` and `<tbody>` is
-a plain HTML table, one `<th>` swapped for a `table.coltrigger` makes that column sort, and `value`
-or `onChange` makes the rows pickable, which earns the grid roles.
+Click a cell, then use the arrow keys. Press Space to pick the row you are on. Hold Shift and press
+Down to pick a run of rows.
 
-## Anatomy
+## You add the extras one at a time
+
+A bare `table.root` around your own `<thead>` and `<tbody>` is a plain HTML table. It writes no
+role and no Tab stop. Each part you add turns on one extra:
+
+- Wrap cells in `table.itemcontent`, and the arrow keys move from cell to cell.
+- Swap a `<th>` for a `table.coltrigger`, and that column can ask for a sort.
+- Write `value`, `onChange` or `multiple` on the root, and rows can be picked. The table then
+  becomes `role="grid"`.
+
+The family does no data work. It does not sort, filter or page your rows. It tells you which
+header was pressed and which rows are picked. Your own code puts the rows in order.
+
+## When to use it
+
+Use `table` for data in rows and columns, where each column means something. For a list of cards
+or rich items, use [gridlist](/ui/gridlist) instead.
+
+## Parts
 
 <AnatomyTable />
 
-`<caption>`, `<thead>`, `<tbody>`, `<tfoot>` and the header row need no parts: they are your own
-elements and already say what they are.
+- `table.root` is the `<table>`. It holds which rows are picked and which column is sorted.
+- `table.item` is one body row, a `<tr>`. Its `value` names the row, and it is required.
+- `table.itemcontent` is one cell, a `<td>`. Add `rowheader` and it renders a `<th>` that names its
+  row.
+- `table.coltrigger` is a column header that asks for a sort, a `<th>`. Its `value` names the
+  column.
+- `table.itemfield` is a hidden checkbox that sends a picked row to a form. Put it inside a cell,
+  because a `<tr>` can only hold cells.
 
-It writes `ui-selectable`, `ui-multiple`, `ui-disabled`, `ui-value`, `ui-selected` and `ui-sorted`
-as its state changes.
+`<caption>`, `<thead>`, `<tbody>`, `<tfoot>`, the header row and a plain `<th>` need no parts.
+Write them as normal HTML.
 
 ## Sort a column
 
-Pressing a `table.coltrigger` calls `onSortChange` with that column's name and nothing else. What
-the next direction should be is your policy. Sort the rows yourself and pass the order back in as
-`sort`.
+Pressing a `table.coltrigger` calls `onSortChange` with that column's `value`. It does not pick a
+direction. Your code decides the next direction, sorts the rows, and passes the result back as
+`sort`:
 
 ```tsrx
 <table.root sort={{ column: 'jars', direction: 'descending' }} onSortChange={turn}>
-	<table.coltrigger value="jars">Jars</table.coltrigger>
 ```
+
+`sort.direction` is `ascending` or `descending`, the same words `aria-sort` uses. Every
+`table.coltrigger` writes `aria-sort`. A column that is not the sorted one says `none`.
 
 ## Pick rows
 
-Writing `value`, `onChange` or `multiple` is what makes the rows selectable. No mode to choose: the
-rows become pickable the moment you have somewhere to put the picked set.
+Write `value`, `onChange` or `multiple`, and rows can be picked. `value` is the list of picked row
+values. `onChange` receives the whole new list each time it changes. With `multiple`, a person can
+pick more than one row.
 
 ```tsrx
 <table.root multiple value={picked} onChange={keep}>
 ```
 
-## Walk cell by cell
+## Styling hooks
 
-Wrap the cells in `table.itemcontent` and every cell is a focus stop, so the arrows move column by
-column as well as row by row. Mark the cell that names its row with `rowheader`.
+| Attribute | On | Present when |
+| --- | --- | --- |
+| `ui-selectable` | root | Rows can be picked. |
+| `ui-multiple` | root | `multiple` is set. |
+| `ui-disabled` | root, item | The table or this row is disabled. |
+| `ui-value` | item, coltrigger | Always. Its value is the row's or column's `value`. |
+| `ui-selected` | item | This row is picked. |
+| `ui-sorted` | coltrigger | The rows are sorted by this column. |
 
-```tsrx
-<table.item value="jam">
-	<table.itemcontent rowheader>Damson jam</table.itemcontent>
-	<table.itemcontent>48</table.itemcontent>
-</table.item>
-```
+A table whose rows can be picked gets `user-select: none` from a rule in `@layer markless`. Without
+it, a Shift click paints the page's own text selection across the rows. One rule of yours outside a
+layer beats it.
 
 ## Keyboard
 
-A `table.coltrigger` is its own control: in the tab order, outside the walk, answering `Enter` and
-`Space` only. Everything below needs selectable rows or `table.itemcontent` cells; without cells
-the walk moves by whole rows.
+The family's tests check each of these rows. They work once the table has `table.itemcontent` cells
+or rows that can be picked. Without cells, the arrows move whole rows.
 
-| Key                         | What it does                                                                                     |
-| --------------------------- | ------------------------------------------------------------------------------------------------ |
-| Left arrow or Right arrow   | Focus the cell before or after this one.                                                         |
-| Down arrow or Up arrow      | Focus the same column in the row below or above.                                                 |
-| Home or End                 | Focus the first or the last cell of this row.                                                    |
-| Ctrl or Cmd and Home or End | Focus the first cell of the table, or the last.                                                  |
-| Space                       | Pick the row the focus is in, or let it go again.                                                |
-| Escape                      | Let go of everything picked.                                                                     |
-| Shift and Down or Up arrow  | Replace what is picked with the run from the anchor row to the one arrived at. Needs `multiple`. |
-| Ctrl or Cmd and A           | Pick every row. Needs `multiple`.                                                                |
-| Any letter                  | Focus the next row whose text starts with what you typed.                                        |
-| Enter or Space on a header  | Report that this column's header was pressed.                                                    |
+| Key | What it does |
+| --- | --- |
+| Left arrow or Right arrow | Moves to the cell before or after. It stops at the ends of the row. |
+| Down arrow or Up arrow | Moves to the same column in the next or the previous row. |
+| Home or End | Moves to the first or the last cell of the row. |
+| Ctrl or Cmd with Home or End | Moves to the first cell of the table, or the last. |
+| Space | Picks the row, or lets go of it. |
+| Shift and Down arrow or Up arrow | Picks the run of rows from where you started. Needs `multiple`. |
+| Ctrl or Cmd and A | Picks every row. Needs `multiple`. |
+| Escape | Lets go of every picked row. |
+| Letters | Moves to the next row whose text starts with what you typed. |
+| Enter or Space on a `table.coltrigger` | Calls `onSortChange` for that column. |
 
-## API
+The table is one Tab stop. When focus comes back, it lands on the cell it left. Each
+`table.coltrigger` is a Tab stop of its own, outside the arrow walk. The walk skips a disabled row.
 
-Every prop is optional unless its row says so, and the types are the family's own.
+## Gotchas
 
-### `table.root`
+<Callout
+	sprite="bolt"
+	title="Why did pressing a header not reorder my rows?"
+	text="table.coltrigger only reports the press through onSortChange. The family never moves a row. Sort your data, render the rows in the new order, and pass the new sort back to table.root."
+/>
 
-| Prop           | Type                                 | What it does                                                                                                                   |
-| -------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| `value`        | `readonly string[]`                  | The rows that are picked, named by the `value` each row was written with. Writing it at all is what makes the rows selectable. |
-| `multiple`     | `boolean`                            | Several rows can be picked at once, and the table says so with `aria-multiselectable`.                                         |
-| `disabled`     | `boolean`                            | No row can be reached or picked, and the table drops out of the tab order.                                                     |
-| `sort`         | `TableSort`                          | Which column the rows are already sorted by. Omit it and every sortable header reads `aria-sort="none"`.                       |
-| `onChange`     | `(value: readonly string[]) => void` | Called with the rows that are picked whenever that changes. Writing it is the other way to make the rows selectable.           |
-| `onSortChange` | `(column: string) => void`           | Called with the column a `table.coltrigger` was activated for. It reports the press, not a direction.                          |
+<Callout
+	sprite="speech-bubble"
+	title="Why did two rows get picked together?"
+	text="A row's value is how the table tells rows apart. It never uses the row's position. Give every table.item a value that no other row has."
+/>
 
-`TableSort` is `{ readonly column: string; readonly direction: 'ascending' | 'descending' }`:
-`aria-sort`'s own vocabulary rather than a library's `asc` and `desc`.
+## API reference
 
-| Attribute              | Present when            | What to key styling off                                        |
-| ---------------------- | ----------------------- | -------------------------------------------------------------- |
-| `role`                 | The rows are selectable | `grid`. A table nobody is steering keeps its native semantics. |
-| `tabindex`             | The rows are selectable | `0`, or `-1` while the table is disabled.                      |
-| `aria-multiselectable` | `multiple` is set       | `true`, for a screen reader rather than your stylesheet.       |
-| `aria-disabled`        | `disabled` is set       | `true`.                                                        |
-| `ui-selectable`        | The rows are selectable | The table is doing selection.                                  |
-| `ui-multiple`          | `multiple` is set       | The many-picked look.                                          |
-| `ui-disabled`          | `disabled` is set       | Nothing in here responds.                                      |
-
-| Selector          | Default             | Why                                                                                                                                                       |
-| ----------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `[ui-selectable]` | `user-select: none` | A Shift walk and a Shift click both paint the page's own text selection across the rows they cross, over the top of the selection the table is reporting. |
-
-Everything a `<table>` accepts reaches the element too, apart from `onChange`, which is the family's.
-
-### `table.item`
-
-| Prop        | Type      | What it does                                                                                                 |
-| ----------- | --------- | ------------------------------------------------------------------------------------------------------------ |
-| **`value`** | `string`  | Required. This row's identity in the picked set. Position is never identity, so two rows must not share one. |
-| `disabled`  | `boolean` | This row cannot be reached by the walk or picked.                                                            |
-
-| Attribute       | Present when                      | What to key styling off                                                     |
-| --------------- | --------------------------------- | --------------------------------------------------------------------------- |
-| `role`          | The rows are selectable           | `row`. A plain table has no roles of its own to write over the native ones. |
-| `tabindex`      | The rows are selectable           | `-1` as rendered. Focus arriving moves the `0` to where it landed.          |
-| `aria-selected` | The rows are selectable           | `true` or `false`. Absent entirely while nothing can be picked.             |
-| `aria-disabled` | This row or the table is disabled | `true`.                                                                     |
-| `ui-value`      | Always                            | Holds this row's name, so one selector can reach one row.                   |
-| `ui-selected`   | This row is picked                | The picked look.                                                            |
-| `ui-disabled`   | This row or the table is disabled | The unreachable look.                                                       |
-
-Everything a `<tr>` accepts reaches the element too.
-
-### `table.itemcontent`
-
-| Prop        | Type      | What it does                                                                                                                 |
-| ----------- | --------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `rowheader` | `boolean` | This cell is what names its row. It renders a `<th>` instead of a `<td>`, and a reader announces it on the way into the row. |
-
-| Attribute  | Present when            | What to key styling off                                                                                                   |
-| ---------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `role`     | The rows are selectable | `gridcell`, or `rowheader` with the `rowheader` prop. Left off outside a grid, where the native elements already mean it. |
-| `tabindex` | Always                  | `-1`. The cell is a focus stop the walk moves the `0` to.                                                                 |
-
-Everything a `<td>` accepts reaches the element too.
-
-### `table.coltrigger`
-
-| Prop        | Type     | What it does                                                                        |
-| ----------- | -------- | ----------------------------------------------------------------------------------- |
-| **`value`** | `string` | Required. This column's name, as it appears in `sort.column` and in `onSortChange`. |
-
-| Attribute   | Present when                              | What to key styling off                                                                |
-| ----------- | ----------------------------------------- | -------------------------------------------------------------------------------------- |
-| `role`      | Always                                    | `columnheader`.                                                                        |
-| `tabindex`  | Always                                    | `0`. The header is its own tab stop, outside the row walk.                             |
-| `aria-sort` | Always                                    | `ascending`, `descending`, or `none` for a sortable column that is not the sorted one. |
-| `ui-value`  | Always                                    | Holds this column's name.                                                              |
-| `ui-sorted` | This is the column the rows are sorted by | The arrow, and the heavier header.                                                     |
-
-Everything a `<th>` accepts reaches the element too. A header that cannot be sorted needs no part:
-`<th scope="col">` already associates its column.
-
-### `table.itemfield`
-
-No props of its own. Give it a `name` and a form submits the picked rows under it. Put it inside a
-cell, never straight inside the row: a `<tr>` may only hold cells. It renders a visually hidden
-`<input>`, and everything an `<input>` accepts reaches the element.
-
-| Attribute     | Present when       | What to key styling off                                |
-| ------------- | ------------------ | ------------------------------------------------------ |
-| `type`        | Always             | `checkbox`.                                            |
-| `tabindex`    | Always             | `-1`. Nothing reaches it; the row is what is operated. |
-| `aria-hidden` | Always             | `true`. The row already says whether it is picked.     |
-| `value`       | Always             | The row's own name.                                    |
-| `checked`     | This row is picked | What the form submits.                                 |
+<ApiTable />
