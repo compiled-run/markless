@@ -10,8 +10,11 @@ runMultiEmbedConformance({
 	render: () => renderSSRIslands([MultiEmbed, MultiEmbed]),
 	embedFrame: 'frame',
 	widgetDefinitionSuffixes: ['#tooltipState'],
+	// A press never shows the tip; keyboard focus does, so the gesture is a Tab from
+	// the button before the trigger.
 	interaction: {
-		activate: 'trigger',
+		activate: 'background',
+		keys: '{Tab}',
 		observe: 'content',
 		stateAttribute: 'ui-open',
 		restValue: null,

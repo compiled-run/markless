@@ -96,6 +96,18 @@ async function quiesced(read: () => string): Promise<string> {
 	}
 }
 
+// A fill or clear selects the text as it focuses the field, and the focus handler,
+// settling later, collapses that selection to a caret at the end; so the edit
+// starts only once the caret has landed.
+async function focusSettled(locator: { element(): Element | null }) {
+	const input = el<HTMLInputElement>(locator);
+	input.focus();
+	const end = input.value.length;
+	await expect
+		.poll(() => [input.selectionStart, input.selectionEnd], { timeout: GESTURE_MS })
+		.toEqual([end, end]);
+}
+
 async function typeInto(locator: { element(): Element | null }, keys: string) {
 	el(locator).focus();
 	await userEvent.keyboard(keys);
@@ -397,6 +409,7 @@ for (const mode of MODES) {
 test('CSR: what a person types stays exactly as typed until it commits', async () => {
 	await render(MinMaxStep);
 
+	await focusSettled(Input);
 	await userEvent.clear(el<HTMLInputElement>(Input));
 	await userEvent.keyboard('2.5');
 	// Not reformatted mid-word: turning this into 2.50 under the person's fingers
@@ -461,7 +474,7 @@ test('CSR: a minus is typeable when there is somewhere below zero to go', async 
 test('CSR: a minus is refused outright by a field that cannot go below zero', async () => {
 	await render(Currency);
 
-	el(Input).focus();
+	await focusSettled(Input);
 	await userEvent.clear(el<HTMLInputElement>(Input));
 	// Emptied before the minus goes in: a minus that arrived while the clear was
 	// still being taken would be refused for a reason this row is not about.
@@ -479,6 +492,7 @@ test('CSR: a minus is refused outright by a field that cannot go below zero', as
 test('CSR: a whole currency string can be typed back into the field it came from', async () => {
 	await render(Currency);
 
+	await focusSettled(Input);
 	await userEvent.fill(el<HTMLInputElement>(Input), '$1,450.75');
 	await expect.poll(() => shown(Input)).toBe('$1,450.75');
 	el(Input).blur();
@@ -489,6 +503,7 @@ test('CSR: a whole currency string can be typed back into the field it came from
 test('CSR: an entry beyond the bounds is pulled back when it commits', async () => {
 	await render(MinMaxStep);
 
+	await focusSettled(Input);
 	await userEvent.fill(el<HTMLInputElement>(Input), '99');
 	// Never while typing: a field with min 0.5 that rewrote a lone 9 under the
 	// person's fingers would make 99 unreachable.
@@ -505,6 +520,7 @@ test('CSR: an entry beyond the bounds is pulled back when it commits', async () 
 test('CSR: clearing the field empties the value and the form', async () => {
 	await render(Currency);
 
+	await focusSettled(Input);
 	await userEvent.clear(el<HTMLInputElement>(Input));
 	el(Input).blur();
 	await expect.poll(() => shown(Input)).toBe('');
@@ -583,6 +599,7 @@ test('CSR: an off-grid number is pulled onto the grid in the direction pressed',
 test('CSR: an empty field starts from its floor rather than one step above it', async () => {
 	await render(MinMaxStep);
 
+	await focusSettled(Input);
 	await userEvent.clear(el<HTMLInputElement>(Input));
 	await userEvent.keyboard('{ArrowUp}');
 	await expect.poll(() => shown(Input)).toBe('0.50');
@@ -645,6 +662,7 @@ test('CSR: ten steps of a tenth land on whole numbers, not on binary dust', asyn
 test('CSR: escape does not put a half-typed number back', async () => {
 	await render(MinMaxStep);
 
+	await focusSettled(Input);
 	await userEvent.clear(el<HTMLInputElement>(Input));
 	await userEvent.keyboard('2.5');
 	await expect.poll(() => shown(Input)).toBe('2.5');
@@ -664,6 +682,7 @@ test('CSR: escape does not put a half-typed number back', async () => {
 test('CSR: enter commits and the form still submits with the committed value', async () => {
 	await render(Form);
 
+	await focusSettled(Input);
 	await userEvent.fill(el<HTMLInputElement>(Input), '2,000');
 	await userEvent.keyboard('{Enter}');
 	await expect.poll(() => shown(Input)).toBe('2,000');
@@ -806,6 +825,7 @@ test('CSR: clearing the field calls the consumer with no number', async () => {
 	await render(Controlled);
 	const input = page.getByTestId('first-input');
 
+	await focusSettled(input);
 	await userEvent.clear(el<HTMLInputElement>(input));
 	el(input).blur();
 	await expect.poll(() => el(FirstValue).textContent).toBe('null');

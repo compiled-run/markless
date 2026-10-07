@@ -16,6 +16,8 @@ import {
 	type MdxRoutePart,
 } from '../../router/src/vite/runtime/mdx-route.ts';
 import { protocolIslandSegment } from '../../serializer/src/protocol-constants.ts';
+// The per-root FIFO a composed route's resume entry dispatches through.
+import { emitQueuedResumeContainerEvent } from '../../bundler/src/source-module.ts';
 
 // Node-side vitest plugin for SSR/resume browser tests. It rewrites
 // renderSSR(Component), renderSSRIslands([Component, ...]),
@@ -86,7 +88,10 @@ function islandResumeModuleSource(modulePaths: ReadonlyArray<string>): string {
 	return [
 		`import { createIslandResumeContainerEvent } from './island-resume.ts';`,
 		'',
-		`export const resumeContainerEvent = createIslandResumeContainerEvent([${loaders.join(', ')}]);`,
+		`const marklessIslandResume = createIslandResumeContainerEvent([${loaders.join(', ')}]);`,
+		emitQueuedResumeContainerEvent(
+			'export async function resumeContainerEvent(input) {\n\treturn marklessIslandResume(input);\n}',
+		),
 		'',
 	].join('\n');
 }
