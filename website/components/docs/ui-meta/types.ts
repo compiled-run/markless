@@ -8,6 +8,25 @@ import type { KeyCap } from './keys.ts';
 
 export type { PropRef };
 
+/**
+ * A control over a `const` the demo declares in its body, for a value that lives
+ * in the consumer's own code rather than on the family root: `const count = 20;`
+ * becomes a cell the control writes, and the code panel prints the new literal.
+ * Its kind follows the literal: a boolean is a switch, a number needs `options`,
+ * a string is a select with `options` or a text field without.
+ */
+export type LocalRef = {
+	readonly local: string;
+	/** The control's label. Defaults to the const's name. */
+	readonly label?: string;
+	/** The help dot's sentence, from the family's own docs. */
+	readonly doc: string;
+	readonly options?: readonly string[];
+};
+
+/** One control in the quick row or behind "Show all": a root prop or a demo const. */
+export type ControlRef = PropRef | LocalRef;
+
 /** One keyboard row: the keys pressed and what pressing them does. */
 export type KeyboardShortcut = {
 	/** One cap per key. `[keys.enter, keys.space]` draws two. */
@@ -56,10 +75,10 @@ export type FamilyMeta = {
 	readonly family: string;
 	/** Reading order for the anatomy and API sections. Omit it for root-first, then alphabetical. */
 	readonly partOrder?: readonly string[];
-	/** The props the quick controls row draws, in order. */
-	readonly quick: readonly PropRef[];
-	/** The props "Show all" reveals, in order, after the quick row. */
-	readonly showAll: readonly PropRef[];
+	/** The controls the quick row draws, in order. Both lists empty draws no controls band. */
+	readonly quick: readonly ControlRef[];
+	/** The controls "Show all" reveals, in order, after the quick row. Empty draws no "Show all". */
+	readonly showAll: readonly ControlRef[];
 	readonly overrides?: readonly ControlOverride[];
 	/** The named value sets the playground's Scenario select offers, first one first. */
 	readonly presets: readonly FamilyPreset[];

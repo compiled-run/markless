@@ -33,6 +33,17 @@ const check = (ok: boolean, label: string, detail = '') => {
 	console.log(`FAIL          ${line}`);
 };
 
+/** Polls `read` until it equals `want` (or satisfies it, when `want` is a predicate), for up to two seconds. */
+const expectPoll = async (read: () => Promise<unknown>, want: unknown) => {
+	for (let attempt = 0; attempt < 40; attempt += 1) {
+		const got = await read();
+		if (typeof want === 'function' ? (want as (value: unknown) => boolean)(got) : got === want)
+			return true;
+		await new Promise((done) => setTimeout(done, 50));
+	}
+	return false;
+};
+
 const freePort = () =>
 	new Promise<number>((done, fail) => {
 		const probe = createServer();
@@ -1797,7 +1808,8 @@ try {
 			await new Promise((done) => setTimeout(done, 100));
 		}
 		check(
-			(await paperTab.getAttribute('aria-selected')) === 'true' && (await paperPane.isVisible()),
+			(await paperTab.getAttribute('aria-selected')) === 'true' &&
+				(await paperPane.isVisible()),
 			'a Code block with several files switches to the file tab the reader clicks',
 		);
 
@@ -2370,6 +2382,122 @@ try {
 			check(response < 0.9, `${activation} greeting produces a visible blink`);
 		}
 		await page.screenshot({ path: `${shotsDir}/mug-greeting.png`, fullPage: false });
+
+		// --- UI family playgrounds: each control and the widget itself respond ----
+		const playground = async (family: string) => {
+			await page.goto(`${origin}/ui/${family}`, { waitUntil: 'load' });
+			const card = page.locator(`section.pg[data-family="${family}"]`);
+			check((await card.count()) === 1, `/ui/${family}: the page carries one playground`);
+			return { card, stage: card.locator('.pg-stage') };
+		};
+		const choose = async (card: Locator, label: string, option: string) => {
+			await card
+				.locator('.pg-cell', { hasText: label })
+				.first()
+				.locator('.pg-pick-trigger')
+				.click();
+			await page
+				.locator('.pg-pick-item:visible', { hasText: new RegExp(`^\\s*${option}\\s*$`) })
+				.first()
+				.click();
+		};
+		const settle = (read: () => Promise<unknown>, want: unknown) => expectPoll(read, want);
+		{
+			const { card, stage } = await playground('radiogroup');
+			const chosen = () => stage.locator('.plan[ui-selected]').innerText();
+			check((await chosen()).includes('Annual'), '/ui/radiogroup: Annual is chosen at first');
+			await stage.locator('label', { hasText: 'Lifetime' }).click();
+			check(
+				await settle(chosen, (text: string) => text.includes('Lifetime')),
+				'/ui/radiogroup: a click chooses Lifetime',
+			);
+			await page.keyboard.press('ArrowUp');
+			check(
+				await settle(chosen, (text: string) => text.includes('Annual')),
+				'/ui/radiogroup: Up arrow chooses the option above',
+			);
+			check(
+				(await card.locator('.pg-pick-value').first().innerText()) === 'annual',
+				'/ui/radiogroup: the value control follows the choice',
+			);
+			await choose(card, 'orientation', 'horizontal');
+			check(
+				await settle(() => stage.locator('[ui-horizontal]').count(), 1),
+				'/ui/radiogroup: orientation lays the options in a row',
+			);
+		}
+		{
+			const { card, stage } = await playground('qrcode');
+			const path = () => stage.locator('.qr-pattern path').getAttribute('d');
+			const first = await path();
+			await card.locator('.pg-field').fill('hello');
+			check(
+				await settle(path, (d: string) => d !== first),
+				'/ui/qrcode: typing a value redraws the code',
+			);
+			await card.locator('.pg-cell', { hasText: 'Logo' }).locator('.pg-switch').click();
+			check(
+				await settle(() => stage.locator('.qr-logo').isVisible(), true),
+				'/ui/qrcode: the Logo switch shows the overlay',
+			);
+		}
+		{
+			const { card, stage } = await playground('progress');
+			const bar = stage.locator('[role="progressbar"]');
+			await choose(card, 'value', '60');
+			check(
+				await settle(() => bar.getAttribute('aria-valuenow'), '60'),
+				'/ui/progress: the value control moves the bar',
+			);
+			await choose(card, 'value', '\\(none\\)');
+			check(
+				await settle(() => bar.getAttribute('ui-progress'), 'indeterminate'),
+				'/ui/progress: no value makes the bar indeterminate',
+			);
+		}
+		{
+			const { card, stage } = await playground('pagination');
+			const current = () => stage.locator('[aria-current="page"]').innerText();
+			check((await current()) === '3', '/ui/pagination: page 3 is current at first');
+			await stage.getByRole('button', { name: 'Next page' }).focus();
+			await page.keyboard.press('Enter');
+			check(await settle(current, '4'), '/ui/pagination: Enter on Next moves to page 4');
+			await choose(card, 'page', '1');
+			check(
+				await settle(current, '1'),
+				'/ui/pagination: the page control moves the current page',
+			);
+		}
+		{
+			const { card, stage } = await playground('toaster');
+			const toast = stage.locator('[ui-toast]');
+			check(!(await toast.isVisible()), '/ui/toaster: no message shows before Save draft');
+			await choose(card, 'Tone', 'error');
+			await stage.getByRole('button', { name: 'Save draft' }).focus();
+			await page.keyboard.press('Enter');
+			check(
+				await settle(() => toast.isVisible(), true),
+				'/ui/toaster: Enter on Save draft shows the message',
+			);
+			check(
+				(await toast.getAttribute('role')) === 'alert',
+				'/ui/toaster: an error message is role=alert',
+			);
+			const box = await toast.boundingBox();
+			const frame = await stage.boundingBox();
+			check(
+				!!box &&
+					!!frame &&
+					box.y >= frame.y &&
+					box.y + box.height <= frame.y + frame.height,
+				'/ui/toaster: the message is fully inside the stage',
+			);
+			await stage.getByRole('button', { name: 'Dismiss' }).click();
+			check(
+				await settle(() => toast.isVisible(), false),
+				'/ui/toaster: Dismiss removes the message',
+			);
+		}
 
 		// --- the stickers are on the pages that ask for them --------------------
 		await page.goto(`${origin}/`, { waitUntil: 'load' });

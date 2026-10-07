@@ -13,7 +13,13 @@ import {
 	valueText,
 	type ControlValue,
 } from '../components/docs/playground/slot-text.ts';
-import type { FamilyMeta, FamilyPreset, PropRef } from '../components/docs/ui-meta/index.ts';
+import type {
+	ControlRef,
+	FamilyMeta,
+	FamilyPreset,
+	LocalRef,
+	PropRef,
+} from '../components/docs/ui-meta/index.ts';
 import { RUN_TYPES, docsMarkup, runMarkup, type Doc, type Line, type Run } from './ui-code-runs.ts';
 import { docRules } from './ui-playground-css.ts';
 
@@ -127,6 +133,27 @@ export type DemoAnalysis = {
 	readonly itemValues: readonly string[];
 	/** The statements the demo body runs ahead of its element, the data a repeat reads. */
 	readonly prelude: string;
+	/** Where `prelude` starts in `source`, so a local's declaration can be cut out of it. */
+	readonly preludeStart?: number;
+	/** The rendered element's span when a plain element wraps the family root. */
+	readonly renderStart?: number;
+	readonly renderEnd?: number;
+	/** Body-level `const name = <literal>;` declarations a local control can take over. */
+	readonly locals?: readonly LocalDeclaration[];
+	/** Named imports the demo takes from `@markless/core` and `@markless/ui`. */
+	readonly imports?: { readonly core: readonly string[]; readonly ui: readonly string[] };
+};
+
+/** One body-level `const` with a literal value. */
+export type LocalDeclaration = {
+	readonly name: string;
+	/** The whole statement. */
+	readonly start: number;
+	readonly end: number;
+	/** The literal. */
+	readonly valueStart: number;
+	readonly valueEnd: number;
+	readonly literal: string | number | boolean;
 };
 
 /** `name` -> the array literal a body-level `const name = [...]` holds. */
@@ -241,25 +268,36 @@ export async function analyzeDemo(
 		throw new Error(`ui-playground: ${file} has no default-exported component to build on.`);
 	const declaration = (exported as { declaration?: AstNode }).declaration;
 	const block = declaration ? (declaration as { body?: AstNode }).body : undefined;
-	const root = block ? ((block as { render?: AstNode }).render ?? undefined) : undefined;
-	if (!root || root.type !== 'JSXElement')
+	const rendered = block ? ((block as { render?: AstNode }).render ?? undefined) : undefined;
+	if (!rendered || rendered.type !== 'JSXElement')
 		throw new Error(
 			`ui-playground: ${file} does not render a single element, so it cannot host a playground.`,
 		);
 
+	const renderedTag = jsxName((rendered.openingElement as AstNode).name as AstNode);
+	const wrapped = !renderedTag.startsWith(`${family}.`);
+	if (wrapped && !/^[a-z][a-z0-9]*$/.test(renderedTag))
+		throw new Error(
+			`ui-playground: ${file} roots '${renderedTag}', which is neither a '${family}.*' part nor a plain element wrapping one.`,
+		);
+	const root = wrapped ? familyRoot(rendered, `${family}.root`) : rendered;
+	if (!root)
+		throw new Error(
+			`ui-playground: ${file} wraps its demo in <${renderedTag}> but renders no <${family}.root> inside it.`,
+		);
+
 	const opening = root.openingElement as AstNode;
 	const tag = jsxName(opening.name as AstNode);
-	if (!tag.startsWith(`${family}.`))
-		throw new Error(
-			`ui-playground: ${file} roots '${tag}', not a '${family}.*' part; a playground is generated from the family's own root.`,
-		);
 
 	const attributes = ((opening.attributes as AstNode[]) ?? [])
 		.filter((node) => node.type === 'JSXAttribute')
 		.map((node) => attributeOf(source, node));
 
 	const kids = ((root as { children?: AstNode[] }).children ?? []) as AstNode[];
-	const style = kids.find((node) => node.type === 'JSXStyleElement');
+	const outerKids = ((rendered as { children?: AstNode[] }).children ?? []) as AstNode[];
+	const style =
+		kids.find((node) => node.type === 'JSXStyleElement') ??
+		(wrapped ? outerKids.find((node) => node.type === 'JSXStyleElement') : undefined);
 	const closingNode = (root as { closingElement?: AstNode }).closingElement;
 
 	const statements = ((block as { body?: AstNode[] }).body ?? []) as AstNode[];
@@ -348,7 +386,86 @@ export async function analyzeDemo(
 		css,
 		itemValues,
 		prelude,
+		...(statements.length === 0
+			? {}
+			: { preludeStart: source.lastIndexOf('\n', statements[0].start) + 1 }),
+		...(wrapped ? { renderStart: rendered.start, renderEnd: rendered.end } : {}),
+		locals: localDeclarations(statements),
+		imports: demoImports(program.body, file),
 	};
+}
+
+/** The first `<tag>` element below `node`, depth first. */
+function familyRoot(node: AstNode, tag: string): AstNode | undefined {
+	for (const child of children(node)) {
+		if (
+			child.type === 'JSXElement' &&
+			jsxName((child.openingElement as AstNode).name as AstNode) === tag
+		)
+			return child;
+		const found = familyRoot(child, tag);
+		if (found) return found;
+	}
+	return undefined;
+}
+
+function localDeclarations(statements: readonly AstNode[]): LocalDeclaration[] {
+	const found: LocalDeclaration[] = [];
+	for (const statement of statements) {
+		if (statement.type !== 'VariableDeclaration' || statement.kind !== 'const') continue;
+		const declarations = (statement as { declarations?: AstNode[] }).declarations ?? [];
+		if (declarations.length !== 1) continue;
+		const id = declarations[0].id as AstNode;
+		const init = (declarations[0] as { init?: AstNode | null }).init;
+		const literal = literalOf(init);
+		if (id.type !== 'Identifier' || !init || literal === undefined || Array.isArray(literal))
+			continue;
+		found.push({
+			name: String(id.name),
+			start: statement.start,
+			end: statement.end,
+			valueStart: init.start,
+			valueEnd: init.end,
+			literal: literal as string | number | boolean,
+		});
+	}
+	return found;
+}
+
+/**
+ * The generated module sits in another folder, so only package imports carry
+ * over, and only from the two packages whose bindings it merges into its own.
+ */
+function demoImports(
+	body: readonly AstNode[],
+	file: string,
+): { readonly core: string[]; readonly ui: string[] } {
+	const core: string[] = [];
+	const ui: string[] = [];
+	for (const node of body) {
+		if (node.type !== 'ImportDeclaration') continue;
+		const from = String((node.source as { value?: unknown }).value);
+		const into = from === '@markless/core' ? core : from === '@markless/ui' ? ui : undefined;
+		if (!into)
+			throw new Error(
+				`ui-playground: ${file} imports '${from}'; a playground demo may import from @markless/core and @markless/ui only.`,
+			);
+		for (const specifier of (node as { specifiers?: AstNode[] }).specifiers ?? []) {
+			const imported = specifier.imported as AstNode | undefined;
+			const local = specifier.local as AstNode | undefined;
+			if (
+				specifier.type !== 'ImportSpecifier' ||
+				!imported ||
+				!local ||
+				imported.name !== local.name
+			)
+				throw new Error(
+					`ui-playground: ${file} renames or default-imports from '${from}'; write a plain named import.`,
+				);
+			into.push(String(local.name));
+		}
+	}
+	return { core, ui };
 }
 
 // --- the control model ------------------------------------------------------
@@ -372,13 +489,19 @@ export type PlaygroundControl = {
 	/** `pValue` — the value the select holding the control is given. */
 	readonly pick: string;
 	/** How the cell is written. */
-	readonly holds: 'boolean' | 'string';
+	readonly holds: 'boolean' | 'string' | 'number';
+	/** A `number` control whose type admits `null`, which its `''` option stands for. */
+	readonly nullable?: boolean;
+	/** A string cell's literal union, `'a' | 'b'`, when its options are the whole type. */
+	readonly literal?: string;
+	/** Set when the control writes a demo `const` rather than a root prop. */
+	readonly local?: { readonly label: string };
 	/** The type admits a list of strings, so `multiple` turns the value into one. */
 	readonly list: boolean;
 	/** The cell's opening value. */
-	readonly seen: ControlValue;
+	readonly seen: CellValue;
 	/** The family's own default, which the code panel leaves unwritten. */
-	readonly fallback: boolean | string;
+	readonly fallback: boolean | string | number | null;
 	/** `onChange` only: the callback's parameter type. */
 	readonly parameter?: string;
 };
@@ -459,17 +582,30 @@ function manifestProp(family: string, part: string, prop: string): ManifestProp 
 	return found;
 }
 
+/** What a cell can hold: a control value, or a number for a `number` prop. */
+type CellValue = ControlValue | number | null;
+
+function numberValue(value: ControlValue | number | undefined): number | null {
+	if (typeof value === 'number') return value;
+	if (typeof value !== 'string' || value.trim() === '') return null;
+	const read = Number(value);
+	return Number.isFinite(read) ? read : null;
+}
+
 function controlValue(
-	holds: 'boolean' | 'string',
+	holds: 'boolean' | 'string' | 'number',
 	value: ControlValue | number | undefined,
-): ControlValue {
+): CellValue {
+	if (holds === 'number') return numberValue(value);
 	if (holds === 'boolean') return value === true || value === 'true';
 	if (value === undefined) return '';
 	if (typeof value === 'boolean') return String(value);
 	return typeof value === 'number' ? String(value) : value;
 }
 
-function sourceLiteral(value: ControlValue): string {
+function sourceLiteral(value: CellValue): string {
+	if (value === null) return 'null';
+	if (typeof value === 'number') return String(value);
 	if (typeof value === 'boolean') return value ? 'true' : 'false';
 	if (typeof value === 'string') return quote(value);
 	return `[${value.map(quote).join(', ')}]`;
@@ -510,6 +646,34 @@ function controlOf(
 		};
 	}
 
+	if (descriptor.kind === 'stepper') {
+		const options = override?.options ?? [];
+		if (options.length === 0 || options.some((one) => one !== '' && numberValue(one) === null))
+			throw new Error(
+				`ui-playground: '${demo.family}.${ref.part}.${ref.prop}' is a number; give it numeric options in ui-meta/${demo.family}.ts.`,
+			);
+		const nullable = descriptor.members.includes('null');
+		const seen = numberValue(authored?.literal ?? initialValue(prop.default));
+		if (seen === null && !nullable)
+			throw new Error(
+				`ui-playground: '${demo.family}.${ref.part}.${ref.prop}' has no default, so the demo has to write it.`,
+			);
+		return {
+			part: ref.part,
+			prop: ref.prop,
+			kind: 'select',
+			type: descriptor.type,
+			doc: hintDoc(prop.doc),
+			options,
+			...cells,
+			holds: 'number',
+			nullable,
+			list: false,
+			seen,
+			fallback: numberValue(initialValue(prop.default)),
+		};
+	}
+
 	const holds: 'boolean' | 'string' = descriptor.kind === 'toggle' ? 'boolean' : 'string';
 	const fallback = controlValue(holds, initialValue(prop.default));
 	const seen = controlValue(holds, authored?.literal ?? initialValue(prop.default));
@@ -530,16 +694,21 @@ function controlOf(
 	if (override?.kind === 'toggle' || override?.kind === 'select' || override?.kind === 'textbox')
 		kind = override.kind;
 
-	if (descriptor.kind === 'stepper' || descriptor.kind === 'none')
-		if (kind === 'textbox' && options.length === 0)
-			throw new Error(
-				`ui-playground: '${demo.family}.${ref.part}.${ref.prop}' is typed '${descriptor.type}', which no playground control draws yet. Give it a kind or an option set in ui-meta/${demo.family}.ts.`,
-			);
+	if (descriptor.kind === 'none' && kind === 'textbox' && options.length === 0)
+		throw new Error(
+			`ui-playground: '${demo.family}.${ref.part}.${ref.prop}' is typed '${descriptor.type}', which no playground control draws yet. Give it a kind or an option set in ui-meta/${demo.family}.ts.`,
+		);
+
+	const literal =
+		descriptor.kind === 'select' && kind === 'select' && holds === 'string'
+			? unionOf(options)
+			: undefined;
 
 	return {
 		part: ref.part,
 		prop: ref.prop,
 		kind,
+		...(literal === undefined ? {} : { literal }),
 		type: descriptor.type,
 		doc: hintDoc(prop.doc),
 		options,
@@ -555,6 +724,60 @@ function controlOf(
 	};
 }
 
+/** Names the generated module declares itself, which a local cell may not shadow. */
+const RESERVED = new Set(['state', 'docs', 'presets', 'events', 'logging', 'logClass', 'scenario']);
+
+function localControl(demo: DemoAnalysis, ref: LocalRef): PlaygroundControl {
+	const declared = demo.locals?.find((one) => one.name === ref.local);
+	if (!declared)
+		throw new Error(
+			`ui-playground: ui-meta/${demo.family}.ts draws a control for '${ref.local}', but ${demo.file} declares no \`const ${ref.local} = <literal>;\` in its body.`,
+		);
+	if (RESERVED.has(ref.local) || /^(c|t|s|p|tl|sl|pl|src|css)[A-Z]/.test(ref.local))
+		throw new Error(
+			`ui-playground: the local '${ref.local}' in ${demo.file} collides with a name the generated module uses; rename it.`,
+		);
+	const tail = identifier(ref.local);
+	const options = ref.options ?? [];
+	const holds: PlaygroundControl['holds'] =
+		typeof declared.literal === 'boolean'
+			? 'boolean'
+			: typeof declared.literal === 'number'
+				? 'number'
+				: 'string';
+	if (holds === 'number' && options.length === 0)
+		throw new Error(
+			`ui-playground: the number local '${ref.local}' needs options in ui-meta/${demo.family}.ts.`,
+		);
+	return {
+		part: '',
+		prop: ref.local,
+		kind: holds === 'boolean' ? 'toggle' : options.length > 0 ? 'select' : 'textbox',
+		type: typeof declared.literal,
+		doc: ref.doc,
+		options,
+		cell: ref.local,
+		text: `tl${tail}`,
+		shown: `sl${tail}`,
+		pick: `pl${tail}`,
+		holds,
+		...(holds === 'string' && options.length > 0 ? { literal: unionOf(options) } : {}),
+		list: false,
+		seen: declared.literal,
+		fallback: null,
+		local: { label: ref.label ?? ref.local },
+	};
+}
+
+/** `'a' | 'b'`: what a cell over a closed set of strings is typed. */
+function unionOf(options: readonly string[]): string {
+	return options.map((one) => `'${one.replaceAll("'", "\\'")}'`).join(' | ');
+}
+
+function isLocal(ref: ControlRef): ref is LocalRef {
+	return 'local' in ref;
+}
+
 /** The controls a family's page draws: the quick row first, then "Show all". */
 export function playgroundControls(
 	demo: DemoAnalysis,
@@ -564,7 +787,9 @@ export function playgroundControls(
 		(meta.overrides ?? []).map((one) => [`${one.part}.${one.prop}`, one] as const),
 	);
 	return [...meta.quick, ...meta.showAll].map((ref) =>
-		controlOf(demo, ref, overrides.get(`${ref.part}.${ref.prop}`)),
+		isLocal(ref)
+			? localControl(demo, ref)
+			: controlOf(demo, ref, overrides.get(`${ref.part}.${ref.prop}`)),
 	);
 }
 
@@ -580,7 +805,7 @@ const SLOT_PATTERN = /(PGSLOT\d+)/;
  */
 export type CodeSlot = {
 	readonly control: PlaygroundControl;
-	readonly form: 'value' | 'attribute';
+	readonly form: 'value' | 'attribute' | 'local';
 	/** The whitespace the slot prints ahead of the attribute, taken from the source. */
 	readonly lead: string;
 	/** What the slot replaces in the authored file; absent for a prop the demo never wrote. */
@@ -605,11 +830,23 @@ export function codeSlots(
 ): readonly CodeSlot[] {
 	return controls
 		.filter((control) => control.kind !== 'event')
-		.map((control) => {
+		.map((control): CodeSlot => {
+			if (control.local) {
+				const declared = demo.locals?.find((one) => one.name === control.prop);
+				return {
+					control,
+					form: 'local',
+					lead: '',
+					start: declared?.valueStart,
+					end: declared?.valueEnd,
+					before: '',
+					after: '',
+				};
+			}
 			const authored = demo.attributes.find((attribute) => attribute.name === control.prop);
 			if (!authored) return { control, form: 'attribute', lead: ' ', before: ' ', after: '' };
 			if (
-				control.holds === 'string' &&
+				(control.holds === 'string' || control.holds === 'number') &&
 				authored.valueStart !== undefined &&
 				authored.valueEnd !== undefined
 			)
@@ -770,15 +1007,42 @@ const CHROME_FAMILIES = ['collapsible', 'select', 'tabs', 'toggle', 'tooltip'];
 
 /** The code panel's text for a control, as a source expression over `value`. */
 function slotTextSource(slot: CodeSlot, value: string): string {
+	if (slot.form === 'local') return `literalText(${value})`;
+	if (slot.control.holds === 'number') {
+		if (slot.form === 'value') return `'{' + String(${value}) + '}'`;
+		return `(${value} === ${sourceLiteral(slot.control.fallback)} ? '' : ${quote(`${slot.lead}${slot.control.prop}={`)} + String(${value}) + '}')`;
+	}
 	if (slot.form === 'value') return `valueText(${value})`;
 	return `attributeText(${quote(slot.control.prop)}, ${value}, ${sourceLiteral(slot.control.fallback)}, ${quote(slot.lead)})`;
 }
 
+/** A local's literal as the demo writes it: single-quoted text, or the bare value. */
+function literalText(value: CellValue): string {
+	if (typeof value === 'string') return `'${value.replaceAll("'", "\\'")}'`;
+	return String(value);
+}
+
+/** Emitted into a module that has a local control, so its writes print the same text. */
+const LITERAL_TEXT = `const literalText = (value: string | number | boolean | null): string =>
+	typeof value === 'string' ? "'" + value.replaceAll("'", "\\\\'") + "'" : String(value);`;
+
 /** The code panel's opening text for a control. */
 function slotText(slot: CodeSlot): string {
 	const { control } = slot;
+	if (slot.form === 'local') return literalText(control.seen);
+	if (control.holds === 'number') {
+		if (slot.form === 'value') return `{${String(control.seen)}}`;
+		return control.seen === control.fallback
+			? ''
+			: `${slot.lead}${control.prop}={${String(control.seen)}}`;
+	}
 	if (slot.form === 'value') return valueText(control.seen as string | readonly string[]);
-	return attributeText(control.prop, control.seen, control.fallback, slot.lead);
+	return attributeText(
+		control.prop,
+		control.seen as ControlValue,
+		control.fallback as boolean | string,
+		slot.lead,
+	);
 }
 
 /**
@@ -795,7 +1059,10 @@ function writes(
 	const local = `next${identifier(control.prop)}`;
 	const lines = [`const ${local} = ${value};`, `${control.cell} = ${local};`];
 	if (slot) lines.push(`${control.text} = ${slotTextSource(slot, local)};`);
-	if (control.kind === 'select') {
+	if (control.kind === 'select' && control.holds === 'number') {
+		lines.push(`${control.shown} = ${local} === null ? '(none)' : String(${local});`);
+		lines.push(`${control.pick} = ${local} === null ? '' : String(${local});`);
+	} else if (control.kind === 'select') {
 		lines.push(`${control.shown} = listText(${local});`);
 		lines.push(`${control.pick} = pickValue(${local});`);
 	}
@@ -847,7 +1114,7 @@ function toggleCell(emit: Emit, control: PlaygroundControl, extra: string): stri
 ${writes(emit.slots, control, 'next', '\t\t\t\t\t\t\t')}${extra}${follow}
 						}}
 					>
-						<toggle.label class="pg-name">${control.prop.charAt(0).toUpperCase() + control.prop.slice(1)}</toggle.label>
+						<toggle.label class="pg-name">${control.local?.label ?? control.prop.charAt(0).toUpperCase() + control.prop.slice(1)}</toggle.label>
 ${hintFor(control)}
 						<toggle.trigger class="pg-switch">
 							<toggle.thumb class="pg-knob" />
@@ -861,7 +1128,13 @@ function selectCell(emit: Emit, control: PlaygroundControl): string {
 	const chosen =
 		paired && paired.value === control
 			? `${paired.multiple.cell} ? toggled(${control.cell}, next) : next`
-			: 'next';
+			: control.holds === 'number'
+				? control.nullable
+					? `next === '' ? null : Number(next)`
+					: 'Number(next)'
+				: control.literal
+					? `next as ${control.literal}`
+					: 'next';
 	const items = control.options
 		.map(
 			(
@@ -879,7 +1152,7 @@ function selectCell(emit: Emit, control: PlaygroundControl): string {
 ${writes(emit.slots, control, chosen, '\t\t\t\t\t\t\t')}
 						}}
 					>
-						<select.label class="pg-name">${control.prop}</select.label>
+						<select.label class="pg-name">${control.local?.label ?? control.prop}</select.label>
 						<select.trigger class="pg-pick-trigger">
 							<span class="pg-pick-value">{${control.shown}}</span>
 							<lucide.chevrondown class="pg-pick-caret" aria-hidden="true" />
@@ -901,7 +1174,7 @@ function textboxCell(emit: Emit, control: PlaygroundControl): string {
 ${writes(emit.slots, control, 'next', '\t\t\t\t\t\t\t')}
 						}}
 					>
-						<textbox.label class="pg-name">${control.prop}</textbox.label>
+						<textbox.label class="pg-name">${control.local?.label ?? control.prop}</textbox.label>
 						<textbox.input class="pg-field" />
 					</textbox.root>
 ${hintFor(control)}
@@ -924,15 +1197,19 @@ function controlCell(emit: Emit, control: PlaygroundControl): string {
 function openingTag(demo: DemoAnalysis, emit: Emit): string {
 	const { controls, slots } = emit;
 	const byProp = new Map(
-		controls.filter((one) => one.kind !== 'event').map((one) => [one.prop, one]),
+		controls.filter((one) => one.kind !== 'event' && !one.local).map((one) => [one.prop, one]),
 	);
-	const event = controls.find((one) => one.kind === 'event' && one.prop === 'onChange');
-	const value = controls.find((one) => one.prop === 'value' && one.kind !== 'event');
+	const event = controls.find((one) => one.kind === 'event');
+	const handler = event?.prop ?? 'onChange';
+	const value =
+		handler === 'onChange'
+			? controls.find((one) => one.prop === 'value' && one.kind !== 'event' && !one.local)
+			: undefined;
 	const written: string[] = [];
 	const seen = new Set<string>();
 
 	for (const attribute of demo.attributes) {
-		if (attribute.name === 'onChange') continue;
+		if (attribute.name === handler) continue;
 		seen.add(attribute.name);
 		const control = byProp.get(attribute.name);
 		if (!control) {
@@ -944,7 +1221,7 @@ function openingTag(demo: DemoAnalysis, emit: Emit): string {
 	for (const control of byProp.values())
 		if (!seen.has(control.prop)) written.push(`${control.prop}={${control.cell}}`);
 
-	const authored = demo.attributes.find((one) => one.name === 'onChange');
+	const authored = demo.attributes.find((one) => one.name === handler);
 	if (event) {
 		const lines: string[] = [];
 		if (value)
@@ -959,7 +1236,7 @@ function openingTag(demo: DemoAnalysis, emit: Emit): string {
 		lines.push('\t\t\t\t\t\tevents = logging ? events + 1 : events;');
 		if (authored?.expression) lines.push(`\t\t\t\t\t\t(${authored.expression})(next);`);
 		written.push(
-			`onChange={(next: ${event.parameter ?? 'unknown'}) => {\n${lines.join('\n')}\n\t\t\t\t\t}}`,
+			`${handler}={(next: ${event.parameter ?? 'unknown'}) => {\n${lines.join('\n')}\n\t\t\t\t\t}}`,
 		);
 	} else if (authored) written.push(demo.source.slice(authored.start, authored.end));
 
@@ -967,16 +1244,46 @@ function openingTag(demo: DemoAnalysis, emit: Emit): string {
 	return `<${demo.tag}${body}\n\t\t\t\t${demo.selfClosing ? '/>' : '>'}`;
 }
 
-/** The demo body as authored, minus the `<style>` block the outer card carries. */
-function demoBody(demo: DemoAnalysis): string {
-	if (demo.selfClosing) return '';
-	let inner = demo.source.slice(demo.childrenStart, demo.childrenEnd);
-	if (demo.styleStart !== undefined && demo.styleEnd !== undefined) {
-		const from = demo.styleStart - demo.childrenStart;
-		const to = demo.styleEnd - demo.childrenStart;
-		inner = `${inner.slice(0, from).trimEnd()}\n${inner.slice(to).replace(/^[ \t]*\n/, '')}`;
+/** `source[from, to)` minus the `<style>` block the outer card carries, when it falls inside. */
+function withoutStyle(demo: DemoAnalysis, from: number, to: number): string {
+	const inner = demo.source.slice(from, to);
+	if (demo.styleStart === undefined || demo.styleEnd === undefined) return inner;
+	if (demo.styleStart < from || demo.styleEnd > to) return inner;
+	const cut = demo.styleStart - from;
+	const resume = demo.styleEnd - from;
+	return `${inner.slice(0, cut).trimEnd()}\n${inner.slice(resume).replace(/^[ \t]*\n/, '')}`;
+}
+
+/** The rendered demo with the family root's opening tag reading the cells. */
+function stageMarkup(demo: DemoAnalysis, emit: Emit): string {
+	const rootEnd = demo.selfClosing ? demo.openingEnd : demo.childrenEnd + demo.closing.length;
+	const before =
+		demo.renderStart === undefined
+			? ''
+			: withoutStyle(demo, demo.renderStart, demo.openingStart);
+	const after = withoutStyle(demo, demo.openingEnd, demo.renderEnd ?? rootEnd);
+	return `${before}${openingTag(demo, emit)}${after}`;
+}
+
+/** The demo's statements, minus the declarations a local control turned into cells. */
+function preludeOf(demo: DemoAnalysis, controls: readonly PlaygroundControl[]): string {
+	const taken = new Set(controls.filter((one) => one.local).map((one) => one.prop));
+	if (taken.size === 0 || demo.preludeStart === undefined) return demo.prelude;
+	const cuts = (demo.locals ?? [])
+		.filter((one) => taken.has(one.name))
+		.sort((left, right) => right.start - left.start);
+	let text = demo.prelude;
+	for (const cut of cuts) {
+		let from = cut.start - demo.preludeStart;
+		let to = cut.end - demo.preludeStart;
+		while (from > 0 && /[ \t]/.test(text[from - 1] ?? '')) from -= 1;
+		if (text[to] === '\n') to += 1;
+		text = `${text.slice(0, from)}${text.slice(to)}`;
 	}
-	return inner;
+	return text
+		.replace(/\n{3,}/g, '\n\n')
+		.replace(/^\n+/, '')
+		.trimEnd();
 }
 
 function lineMarkup(list: string, indent: string): string {
@@ -1117,10 +1424,19 @@ function presetTable(
 		}
 		return `\t${quote(preset.name)}: { ${fields.join(', ')} },`;
 	});
-	return `const presets: Readonly<Record<string, Readonly<Record<string, string | boolean | readonly string[]>>>> = {\n${rows.join('\n')}\n};`;
+	return `const presets: Readonly<Record<string, Readonly<Record<string, ${presetValueType(controls)}>>>> = {\n${rows.join('\n')}\n};`;
+}
+
+/** The preset table's value type: the accordion's union, widened only when a number cell needs it. */
+function presetValueType(controls: readonly PlaygroundControl[]): string {
+	const base = 'string | boolean | readonly string[]';
+	if (!controls.some((one) => one.holds === 'number')) return base;
+	return controls.some((one) => one.nullable) ? `${base} | number | null` : `${base} | number`;
 }
 
 function cellType(control: PlaygroundControl): string {
+	if (control.holds === 'number') return control.nullable ? 'number | null' : 'number';
+	if (control.literal) return control.literal;
 	return control.holds === 'boolean'
 		? 'boolean'
 		: control.list
@@ -1188,7 +1504,8 @@ export function playgroundModule(input: PlaygroundInput): string {
 	const docs = input.docs.filter((doc) => pointed.has(doc.n));
 
 	const lines = panelLines(input.sourceLines, slots);
-	const rootLine = demo.source.slice(0, demo.openingStart).split('\n').length - 1;
+	const rootLine =
+		demo.source.slice(0, demo.renderStart ?? demo.openingStart).split('\n').length - 1;
 	const context = paneMarkup(lines.slice(0, rootLine), 'srcContext', '\t\t\t\t\t\t\t\t\t');
 	const source = paneMarkup(lines.slice(rootLine), 'srcLines', '\t\t\t\t\t\t\t\t\t');
 	const css = paneMarkup(panelLines(input.cssLines, []), 'cssLines', '\t\t\t\t\t\t\t\t\t');
@@ -1212,14 +1529,21 @@ export function playgroundModule(input: PlaygroundInput): string {
 			`\tlet ${control.cell} = state<${cellType(control)}>(${sourceLiteral(control.seen)});`,
 		);
 		if (slot) cells.push(`\tlet ${control.text} = state(${quote(slotText(slot))});`);
-		if (control.kind === 'select') {
+		if (control.kind === 'select' && control.holds === 'number') {
+			const held = control.seen === null ? '' : String(control.seen);
+			cells.push(`\tlet ${control.shown} = state(${quote(held === '' ? '(none)' : held)});`);
+			cells.push(`\tlet ${control.pick} = state(${quote(held)});`);
+		} else if (control.kind === 'select') {
 			const held = control.seen as string | readonly string[];
 			cells.push(`\tlet ${control.shown} = state(${quote(listText(held))});`);
 			cells.push(`\tlet ${control.pick} = state(${quote(pickValue(held))});`);
 		}
 	}
-	cells.push(`\tlet events = state(0);`);
-	cells.push(`\tlet logClass = state('pg-log pg-log-quiet');`);
+	const event = controls.find((one) => one.kind === 'event');
+	if (event) {
+		cells.push(`\tlet events = state(0);`);
+		cells.push(`\tlet logClass = state('pg-log pg-log-quiet');`);
+	}
 	cells.push(`\tlet scenario = state(${quote(presets[0].label)});`);
 	cells.push(`\tlet scenarioName = state(${quote(presets[0].name)});`);
 
@@ -1232,6 +1556,48 @@ export function playgroundModule(input: PlaygroundInput): string {
 		.map((control) => controlCell(emit, control))
 		.join('\n\n');
 
+	const showAll =
+		rest === ''
+			? ''
+			: `
+
+				<collapsible.trigger class="pg-showall">
+					<span class="pg-showall-more">Show all</span>
+					<span class="pg-showall-less">Show less</span>
+					<lucide.chevrondown class="pg-showall-caret" aria-hidden="true" />
+				</collapsible.trigger>`;
+	const band =
+		controls.length === 0
+			? ''
+			: rest === ''
+				? `
+		<div class="pg-controls">
+			<div class="pg-quick">
+${quick}
+			</div>
+		</div>
+`
+				: `
+		<collapsible.root class="pg-controls">
+			<div class="pg-quick">
+${quick}${showAll}
+			</div>
+
+			<collapsible.content class="pg-rest">
+${rest}
+			</collapsible.content>
+		</collapsible.root>
+`;
+	const log = event
+		? `
+		<p class={logClass}>${event.prop} called {events} time(s)</p>
+`
+		: '';
+	const coreImports = [...new Set(['state', ...(demo.imports?.core ?? [])])].sort();
+	const uiImports = [...new Set([...families, 'lucide', ...(demo.imports?.ui ?? [])])].sort();
+	const prelude = preludeOf(demo, controls);
+	const helpers = controls.some((one) => one.local) ? `\n${LITERAL_TEXT}\n` : '';
+
 	const panes: ChromePane[] = [
 		{
 			value: 'source',
@@ -1242,12 +1608,12 @@ export function playgroundModule(input: PlaygroundInput): string {
 	if (input.cssLines.length > 0)
 		panes.push({ value: 'css', label: input.cssLabel, markup: css.markup });
 
-	return `import { state } from '@markless/core';
-import { ${[...families, 'lucide'].sort().join(', ')} } from '@markless/ui';
+	return `import { ${coreImports.join(', ')} } from '@markless/core';
+import { ${uiImports.join(', ')} } from '@markless/ui';
 import { attributeText, heldList, listText, pickValue, toggled, valueText } from '../slot-text.ts';
 
 ${RUN_TYPES}
-
+${helpers}
 ${context.consts.join('\n')}
 ${source.consts.join('\n')}
 ${css.consts.join('\n')}
@@ -1256,28 +1622,10 @@ ${presetTable(controls, presets)}
 
 export default function ${componentName(demo.family, demo.stem)}() @{
 ${cells.join('\n')}
-${demo.prelude === '' ? '' : `\n${demo.prelude}\n`}
-	<section class="pg" data-family="${demo.family}">
-		<collapsible.root class="pg-controls">
-			<div class="pg-quick">
-${quick}
-
-				<collapsible.trigger class="pg-showall">
-					<span class="pg-showall-more">Show all</span>
-					<span class="pg-showall-less">Show less</span>
-					<lucide.chevrondown class="pg-showall-caret" aria-hidden="true" />
-				</collapsible.trigger>
-			</div>
-
-			<collapsible.content class="pg-rest">
-${rest}
-			</collapsible.content>
-		</collapsible.root>
-
-		<p class={logClass}>onChange called {events} time(s)</p>
-
+${prelude === '' ? '' : `\n${prelude}\n`}
+	<section class="pg" data-family="${demo.family}">${band}${log}
 		<div class="pg-stage">
-			${openingTag(demo, emit)}${demoBody(demo)}${demo.closing}
+			${stageMarkup(demo, emit)}
 		</div>
 
 		<div class="pg-code">

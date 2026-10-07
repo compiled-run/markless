@@ -3,7 +3,6 @@ import ApiTable from '../../components/docs/api-table.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import Preview from '../../components/ui/preview.tsrx';
 
 <Sidebar />
 
@@ -14,7 +13,7 @@ import Preview from '../../components/ui/preview.tsrx';
 `toaster` shows short messages, such as "Draft saved", and screen readers announce each new one.
 The family holds the queue of messages. You write the markup for each message.
 
-<Preview shows="A Save draft button, and the message it raises." />
+<Playground scenario="basic" />
 
 ```tsrx
 import { toaster } from '@markless/ui';
