@@ -101,6 +101,7 @@ export type RepeatRowComponentInput = {
 	readonly loadSymbol: PrerenderLoadSymbol;
 	readonly read: PrerenderRead;
 	readonly idPrefix?: string;
+	readonly elementIdScope?: string;
 	readonly symbolPrefix?: string;
 	/**
 	 * The live page's widget instances this row is being minted inside, by the
@@ -224,7 +225,7 @@ function renderRowComponentEdge(
 			) {
 				childProps[prop.name] = definition.readResidue(
 					{ kind: 'element-handle-id', handleGraphNodeId: prop.graphNodeId },
-					{ read, idPrefix: ownerIdPrefix },
+					{ read, idPrefix: ownerIdPrefix, elementIdScope: input.elementIdScope },
 				);
 			} else if (prop.kind === 'absent') {
 				childProps[prop.name] = undefined;
@@ -307,6 +308,7 @@ function renderRowComponentEdge(
 									repeatOuter: context.repeatOuter,
 									read,
 									idPrefix: ownerIdPrefix,
+									elementIdScope: input.elementIdScope,
 								});
 							throw new Error('MARKLESS_PRERENDER_RESIDUE_MISSING');
 						},
@@ -356,6 +358,7 @@ function renderRowComponentEdge(
 											? part.props
 											: { ...part.props, children: context.projectionHtml },
 									idPrefix: ownerIdPrefix + rowSegment + projectedEdge.hostPrefix,
+									elementIdScope: input.elementIdScope,
 									symbolPrefix: ownerSymbolPrefix + rowSegment + projectedEdge.symbolPrefix,
 									boundSymbols: projectedEdge.boundSymbols,
 									composer: { symbolPrefix: ownerSymbolPrefix, read },
@@ -403,6 +406,7 @@ function renderRowComponentEdge(
 					componentName: edge.childComponentName,
 					props: children === undefined ? childProps : { ...childProps, children },
 					idPrefix: ownerIdPrefix + hostPrefix,
+					elementIdScope: input.elementIdScope,
 					symbolPrefix: ownerSymbolPrefix + symbolPrefix,
 					boundSymbols: edge.boundSymbols,
 					composer: { symbolPrefix: ownerSymbolPrefix, read },

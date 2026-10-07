@@ -243,3 +243,25 @@ export function Box({ children }) @{
 `;
 	await expect(renderFixture(source)).rejects.toThrow(/MARKLESS_PROJECTION_NOT_RENDERED/);
 });
+
+// A child that places `{children}` only in an arm it did not take serves no
+// projection, so the table counts none of it, whatever element it holds.
+test('{children} only in an arm the render did not take is left out of the served table', async () => {
+	const rendered = await renderFixture(`
+import { state } from '@markless/core';
+
+export default function Page() @{
+	<main><Box><svg ui-projected=""><path d="M0 0" /></svg></Box><div ui-tail=""></div></main>
+}
+
+export function Box({ children }) @{
+	let shown = state(false);
+	<span ui-box="" onClick={() => (shown = !shown)}>@if (shown) { <>{children}</> }</span>
+}
+`);
+	expect(rendered.html).not.toContain('ui-projected');
+	expect(rendered.html).not.toContain('markless-projection');
+	expect(documentTagNames(rendered.html)).toEqual(['main', 'span', 'div']);
+	expect(locatorDisagreements(rendered.html, rendered.structure.locators)).toEqual([]);
+	expect(rendered.structure.elementCount).toBe(3);
+});

@@ -109,6 +109,7 @@ import type { ComponentEdge, PublicRenderRoot } from './types.ts';
 function elementHandleIdSource(handleGraphNodeId: string): string {
 	const readCase = elementHandleIdReadCase({
 		idPrefixSource: 'marklessSsrIdPrefix',
+		idScopeSource: "(marklessSsrRenderContext?.elementIdScope??'')",
 		widgetInstanceRead: hasSharedElementHandle([handleGraphNodeId])
 			? widgetInstanceReadSource((key) => `marklessSsrRenderStateValues.get(${key})`)
 			: null,
@@ -745,6 +746,7 @@ function emitSsrDataLines(
 		handleIds.length > 0
 			? elementHandleIdReadCase({
 					idPrefixSource: 'marklessSsrIdPrefix',
+					idScopeSource: "(marklessSsrRenderContext?.elementIdScope??'')",
 					widgetInstanceRead: hasSharedElementHandle(handleIds)
 						? widgetInstanceReadSource((key) => `marklessSsrRenderStateValues.get(${key})`)
 						: null,

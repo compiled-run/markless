@@ -142,6 +142,16 @@ The `ui()` Vite plugin from the new `@markless/ui-tools` package sets this up.
   of the component's.
 - A component imported through another `.tsrx` module that re-exports it, like
   `export { default as Code } from './code.tsrx'`, renders.
+- Two components placed on one MDX page, or mounted with two `render()` calls
+  on one document, no longer give their `element()` parts the same `id`. A
+  `@markless/ui` label in one example now focuses and ticks its own box, not
+  the box in the example above it.
+- `checkbox.indicator` can hold an element, like an icon or a `<span>`, on a box
+  that starts unticked. The page no longer fails with
+  `MARKLESS_PROJECTION_NOT_RENDERED`, and the element shows when the box is
+  ticked.
+- Turning `disabled` on for one `tree.item` after the page is live no longer
+  disables the open/close button of the item next to it.
 
 ## 0.3.3
 

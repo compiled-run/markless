@@ -1029,7 +1029,8 @@ function marklessSsrComposedView(
 			view: child.output?.view,
 			externalSymbolIds: new Set(child.output?.externalSymbolIds ?? []),
 		}))
-		.filter((child): child is SsrChildData => Boolean(child.view));
+		.filter((child): child is SsrChildData => Boolean(child.view))
+		.filter((child) => marklessSsrChildServed(child, renderedHostIds, idPrefix));
 	const locators: SsrLocatorRecord[] = [];
 	const renderedRepeatIds = new Set(structure.repeatIds ?? []);
 	const { events, domUpdates, keyedRepeats, branches, asyncBoundaries } =
@@ -1405,6 +1406,20 @@ export function marklessSsrIsArmBranchAnchor(text: unknown) {
 	return (
 		typeof text === 'string' &&
 		(text.startsWith('markless:arm-branch:') || text.startsWith('/markless:arm-branch:'))
+	);
+}
+
+// A child rendered into a projection placed only in an arm not taken reached no served byte.
+function marklessSsrChildServed(
+	child: SsrChildData,
+	rendered: ReadonlySet<string>,
+	idPrefix: string,
+): boolean {
+	const { locators } = child.view;
+	return (
+		!child.output?.structureTokens ||
+		!locators.length ||
+		locators.some((locator) => rendered.has(idPrefix + child.hostPrefix + locator.hostNodeId))
 	);
 }
 

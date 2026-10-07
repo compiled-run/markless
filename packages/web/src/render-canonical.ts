@@ -2,9 +2,25 @@ import type { ResumeDomElement } from './resume.ts';
 import type { CsrRenderArtifact, CsrRenderOutput, RenderTarget } from './render.ts';
 import { materializeDomLocators } from './resume-locators.ts';
 
+const scopeIndexByTarget = new Map<RenderTarget, number>();
+
+// A second live root on the page mints its element() ids under a segment of its own.
+function elementIdScopeFor(target: RenderTarget): string {
+	const held = new Set<number>();
+	for (const [other, index] of scopeIndexByTarget)
+		if ((other as { readonly isConnected?: boolean }).isConnected === false)
+			scopeIndexByTarget.delete(other);
+		else if (other !== target) held.add(index);
+	let index = 0;
+	while (held.has(index)) index++;
+	scopeIndexByTarget.set(target, index);
+	return index ? `v${index}:` : '';
+}
+
 export async function renderCanonicalClientOutput(
 	component: CsrRenderArtifact,
 	target: RenderTarget,
+	elementIdScope: string = elementIdScopeFor(target),
 ): Promise<CsrRenderOutput> {
 	const ownerDocument = (target as { readonly ownerDocument?: Document }).ownerDocument ??
 		(typeof document === 'undefined' ? undefined : document);
@@ -12,9 +28,10 @@ export async function renderCanonicalClientOutput(
 		throw new TypeError('Canonical client rendering requires a DOM document.');
 	}
 	if (component.renderData) {
-		const surface = await (typeof component.renderData === 'function'
+		const authored = await (typeof component.renderData === 'function'
 			? component.renderData()
 			: component.renderData);
+		const surface = elementIdScope ? { ...authored, elementIdScope } : authored;
 		const loadSymbol = component.loadSymbol ?? missingCanonicalSymbol;
 		const output = await (
 			await import('./prerender/evaluator.ts')
@@ -31,7 +48,10 @@ export async function renderCanonicalClientOutput(
 			'render(App) requires a compiled TSRX artifact with a canonical render surface.',
 		);
 	}
-	const output = await component.renderSsr();
+	const output = await component.renderSsr(
+		undefined,
+		elementIdScope ? { elementIdScope } : undefined,
+	);
 	return clientOutputFromHtml(ownerDocument, output.html, {
 		state: output.state,
 		view: output.view,

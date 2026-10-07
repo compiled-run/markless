@@ -418,6 +418,9 @@ function renderComponentRow(input: ComponentRowInput): Awaitable<RenderedCompone
 						loadSymbol: input.loadSymbol,
 						read: ownerSpaceRead(input.graph, owner, instanceScopeModule),
 						idPrefix: hostPrefix,
+						...(input.surface.elementIdScope
+							? { elementIdScope: input.surface.elementIdScope }
+							: {}),
 						symbolPrefix: owner.symbolPrefix,
 						enclosingWidgetRoots: input.enclosing.roots,
 						enclosingInstancePath: rowInstancePath,

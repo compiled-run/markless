@@ -2379,6 +2379,10 @@ export type PublicRenderPlanBranchArmPart =
 				readonly graphNodeId: string;
 				readonly path: ReadonlyArray<string>;
 			};
+			// `{children}`: where the instance's own props cell holds it. A value equal to
+			// that served markup is written as HTML; anything else, such as text routed
+			// from the caller, stays escaped.
+			readonly raw?: ReadonlyArray<string>;
 	  }
 	// A keyed @for inside an arm-scoped branch arm: rows rebuild from a live
 	// graph read of the collection at flip time (no keyed diffing — the flip

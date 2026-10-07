@@ -64,9 +64,11 @@ export async function composeCsrIslands(
 	const islandRenderData: Array<Parameters<typeof composeIslandRenderData>[0][number]> = [];
 	for (const [componentIndex, component] of components.entries()) {
 		const segment = protocolIslandSegment(componentIndex);
+		// The island's segment leads its minted ids, as the served island's render context does.
 		const output = await renderCanonicalClientOutput(
 			component as CsrRenderArtifact,
 			root as unknown as RenderTarget,
+			segment,
 		);
 		children.push({
 			componentIndex,

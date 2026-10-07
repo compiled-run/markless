@@ -4,6 +4,7 @@ import type {
 	CaptureSlotRoute,
 	GeneratedSymbolModule,
 	PublicRenderPlanAsyncBoundaryArms,
+	PublicRenderPlanBranchArmPart,
 	PublicRenderPlanBranchArms,
 	LoweredElementHandleRead,
 	LoweredRowItem,
@@ -25,7 +26,11 @@ import type {
 	SymbolModulesInput,
 	SymbolResolverPlan,
 } from '../artifacts.ts';
-import { PROTOCOL_PROPS_GRAPH_NODE_ID, protocolElementHandleReadId } from '@markless/serializer';
+import {
+	PROTOCOL_PROP_GRAPH_NODE_PREFIX,
+	PROTOCOL_PROPS_GRAPH_NODE_ID,
+	protocolElementHandleReadId,
+} from '@markless/serializer';
 import type { SourceSpan } from '../diagnostics.ts';
 import { boundarySettleRecords, type BoundarySettleRecords } from './boundary-settle-records.ts';
 import {
@@ -1511,14 +1516,20 @@ function renderChunkParts(
 					else parts.push(scoped);
 					continue;
 				}
-				parts.push({ read: {
-					graphNodeId: slot.residue.graphNodeId,
-					path: armPartReadPath(
-						slot.residue.graphNodeId,
-						slot.residue.path,
-						asyncComputedNodeIds,
-					),
-				} });
+				const raw = slot.raw
+					? ownPropsPath(slot.residue.graphNodeId, slot.residue.path)
+					: null;
+				parts.push({
+					read: {
+						graphNodeId: slot.residue.graphNodeId,
+						path: armPartReadPath(
+							slot.residue.graphNodeId,
+							slot.residue.path,
+							asyncComputedNodeIds,
+						),
+					},
+					...(raw ? { raw } : {}),
+				});
 				continue;
 			}
 			if (slot.kind === 'child-component') {
@@ -1675,6 +1686,17 @@ function scopedPropPart(
 	}
 	if (value !== null && typeof value === 'object') return 'unsupported';
 	return { text: armTextEscape(value) };
+}
+
+// Where a prop read sits in the instance's own props cell, or null for any other read.
+function ownPropsPath(
+	graphNodeId: string,
+	path: ReadonlyArray<string>,
+): ReadonlyArray<string> | null {
+	if (graphNodeId === PROTOCOL_PROPS_GRAPH_NODE_ID) return path.length > 0 ? path : null;
+	return graphNodeId.startsWith(PROTOCOL_PROP_GRAPH_NODE_PREFIX)
+		? [graphNodeId.slice(PROTOCOL_PROP_GRAPH_NODE_PREFIX.length), ...path]
+		: null;
 }
 
 function armTextEscape(value: unknown): string {
@@ -4193,8 +4215,10 @@ export function buildBranchUpdateEmission(input: BranchUpdateEmissionInput): Emi
 		arm.some((part) => 'repeat' in part && part.repeat.empty !== undefined),
 	);
 	const hasAttributeParts = arms.arms.some((arm) => arm.some((part) => 'attribute' in part));
+	const hasRawParts = armsHaveRawParts(arms.arms);
 
 	const body: EmissionNode[] = [
+		...(hasRawParts ? [projectionHtmlImportNode()] : []),
 		...(hasAttributeParts
 			? [
 					moduleImportNode({
@@ -4227,7 +4251,12 @@ export function buildBranchUpdateEmission(input: BranchUpdateEmissionInput): Emi
 				),
 				constDeclarationNode(
 					'html',
-					armPartsHtmlExpression('marklessBranchText', hasRepeatParts, hasAttributeParts),
+					armPartsHtmlExpression(
+						'marklessBranchText',
+						hasRepeatParts,
+						hasAttributeParts,
+						hasRawParts,
+					),
 				),
 				returnStatementNode(
 					objectNode([
@@ -4302,7 +4331,9 @@ export function buildAsyncBoundaryUpdateEmission(
 				memberChainNode('context.graph'),
 			])
 		: armRecordsAt();
+	const hasRawParts = armsHaveRawParts(input.arms.arms);
 	const body: EmissionNode[] = [
+		...(hasRawParts ? [projectionHtmlImportNode()] : []),
 		constDeclarationNode('marklessBoundaryArms', jsonValueNode(input.arms.arms)),
 		...(records
 			? [constDeclarationNode('marklessBoundaryRecords', jsonValueNode(records.arms))]
@@ -4331,7 +4362,7 @@ export function buildAsyncBoundaryUpdateEmission(
 				),
 				constDeclarationNode(
 					'html',
-					armPartsHtmlExpression('marklessBoundaryText', hasRepeatParts),
+					armPartsHtmlExpression('marklessBoundaryText', hasRepeatParts, false, hasRawParts),
 				),
 				returnStatementNode(
 					objectNode([
@@ -4469,13 +4500,29 @@ function armPartsHtmlExpression(
 	escaperName: string,
 	hasRepeatParts: boolean,
 	hasAttributeParts = false,
+	hasRawParts = false,
 ): EmissionNode {
-	const escapedRead = callNode(identifierNode(escaperName), [
+	const partRead = (): EmissionNode =>
 		callNode(memberChainNode('context.graph.read'), [
 			memberChainNode('part.read.graphNodeId'),
 			memberChainNode('part.read.path'),
-		]),
-	]);
+		]);
+	const textRead = callNode(identifierNode(escaperName), [partRead()]);
+	const escapedRead = hasRawParts
+		? conditionalNode(
+				memberChainNode('part.raw'),
+				callNode(identifierNode('marklessProjectionHtml'), [
+					partRead(),
+					callNode(memberChainNode('context.graph.read'), [
+						literalNode(PROTOCOL_PROPS_GRAPH_NODE_ID),
+						arrayNode([]),
+					]),
+					memberChainNode('part.raw'),
+					identifierNode(escaperName),
+				]),
+				textRead,
+			)
+		: textRead;
 
 	const readOrRows = hasRepeatParts
 		? conditionalNode(
@@ -4519,6 +4566,20 @@ function armPartsHtmlExpression(
 		),
 		[literalNode('')],
 	);
+}
+
+function armsHaveRawParts(
+	arms: ReadonlyArray<ReadonlyArray<PublicRenderPlanBranchArmPart>>,
+): boolean {
+	return arms.some((arm) => arm.some((part) => 'raw' in part && part.raw !== undefined));
+}
+
+function projectionHtmlImportNode(): EmissionNode {
+	return moduleImportNode({
+		kind: 'named',
+		localName: 'marklessProjectionHtml',
+		source: '@markless/web/fns/projection-html',
+	});
 }
 
 /**

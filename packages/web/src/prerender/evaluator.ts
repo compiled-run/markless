@@ -163,6 +163,7 @@ export type PrerenderDataDefinition = {
 			// widget a part belongs to arrives through the seed map, so `read`
 			// already answers it.
 			readonly idPrefix?: string;
+			readonly elementIdScope?: string;
 			// Where an expression that SPENDS a roster count goes: the count is a
 			// placeholder until the page has composed, so the whole expression is
 			// handed over and the resolver splices its answer.
@@ -175,6 +176,8 @@ export type PrerenderDataDefinition = {
 
 export type PrerenderDataSurface = {
 	readonly rootComponentName: string | null;
+	/** Leads every element() id this page mints, so two roots rendered on one document never mint the same id. */
+	readonly elementIdScope?: string;
 	readonly renderData: PrerenderRenderData;
 	readonly components: Readonly<Record<string, PrerenderDataDefinition>>;
 	readonly imports: Readonly<Record<string, PrerenderDataSurface>>;
@@ -442,6 +445,7 @@ async function evaluatePrerenderDataSurface(
 		componentName: rootName,
 		props,
 		idPrefix: '',
+		...(surface.elementIdScope ? { elementIdScope: surface.elementIdScope } : {}),
 		symbolPrefix: '',
 		loadSymbol,
 		graph,
@@ -597,6 +601,7 @@ export function evaluatePrerenderDataComponent(input: {
 	readonly componentName: string;
 	readonly props: Readonly<Record<string, unknown>>;
 	readonly idPrefix: string;
+	readonly elementIdScope?: string;
 	readonly symbolPrefix: string;
 	readonly boundSymbols?: Readonly<Record<string, string>>;
 	// The component whose edge bound this one's symbols: its resolver loads them, its nodes answer their captures.
@@ -931,6 +936,7 @@ export function evaluatePrerenderDataComponent(input: {
 								asyncError: context.asyncError,
 								read,
 								idPrefix: input.idPrefix,
+								elementIdScope: input.elementIdScope,
 								deferCount: rosterPositionContext.deferCount,
 							});
 						throw new Error('MARKLESS_PRERENDER_RESIDUE_MISSING');
@@ -960,7 +966,7 @@ export function evaluatePrerenderDataComponent(input: {
 								(handleGraphNodeId) =>
 									definition.readResidue?.(
 										{ kind: 'element-handle-id', handleGraphNodeId },
-										{ read, idPrefix: input.idPrefix },
+										{ read, idPrefix: input.idPrefix, elementIdScope: input.elementIdScope },
 									),
 							),
 						});
@@ -1047,7 +1053,7 @@ export function evaluatePrerenderDataComponent(input: {
 								// so the two sides of the relationship cannot disagree.
 								childProps[prop.name] = definition.readResidue(
 									{ kind: 'element-handle-id', handleGraphNodeId: prop.graphNodeId },
-									{ read, idPrefix: input.idPrefix },
+									{ read, idPrefix: input.idPrefix, elementIdScope: input.elementIdScope },
 								);
 							} else if (prop.kind === 'absent') {
 								childProps[prop.name] = undefined;
@@ -1081,6 +1087,7 @@ export function evaluatePrerenderDataComponent(input: {
 								componentName: edge.childComponentName,
 								props: childProps,
 								idPrefix: input.idPrefix + hostPrefix,
+								elementIdScope: input.elementIdScope,
 								symbolPrefix: input.symbolPrefix + symbolPrefix,
 								boundSymbols: edge.boundSymbols,
 								composer: { symbolPrefix: input.symbolPrefix, read, module: ownModule },
