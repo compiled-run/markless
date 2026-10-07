@@ -374,7 +374,7 @@ try {
 		await hover.blur();
 
 		// --- the island still resumes -----------------------------------------
-		const button = page.getByRole('button', { name: 'Pour a cup' }).first();
+		const button = page.locator('.code-block [data-code-stage]').getByRole('button', { name: 'Pour a cup' }).first();
 		const cupsLine = page.locator('.code-block [data-code-stage] p').first();
 		await button.waitFor();
 		await page.screenshot({ path: `${shotsDir}/T004-state-before.png`, fullPage: true });
@@ -1792,6 +1792,105 @@ try {
 			await noteField.inputValue(),
 		);
 		await page.screenshot({ path: `${shotsDir}/T013-note-panel-after.png`, fullPage: true });
+
+		// --- concept previews: each one reports what the reader's action really did ---
+		const ledgerText = async (card: Locator) =>
+			((await card.getByRole('list').innerText()) ?? '').replace(/\s+/g, ' ').trim();
+		const watchText = async (card: Locator) =>
+			((await card.locator('.pv-watch-text').innerText()) ?? '').replace(/\s+/g, ' ').trim();
+		const settleWatch = async (card: Locator, wanted: (text: string) => boolean, label: string) => {
+			for (let attempt = 0; attempt < 40; attempt += 1) {
+				if (wanted(await watchText(card))) return;
+				await new Promise((done) => setTimeout(done, 100));
+			}
+			check(false, label, `never settled, last read "${await watchText(card)}"`);
+		};
+
+		await page.goto(`${origin}/concepts/state`, { waitUntil: 'load' });
+		const pourCard = page.locator('section[data-preview="state-pour"]');
+		const pourButton = pourCard.locator('.slot:not([hidden])').getByRole('button', { name: 'Pour a cup' });
+		await pourButton.waitFor();
+		await pourButton.focus();
+		await page.keyboard.press('Enter');
+		await pourButton.click();
+		await settleWatch(pourCard, (text) => text.includes('“Cups today: 2”'), 'state preview reports the text a click changed');
+		check(
+			(await watchText(pourCard)).includes('“Cups today: 2”'),
+			'state preview: two pours, by key and by click, change only the cups text',
+			await watchText(pourCard),
+		);
+		check(
+			(await ledgerText(pourCard)).includes('{drawn} never changed') &&
+				(await ledgerText(pourCard)).includes('cups++ ran 2 times'),
+			'state preview: the ledger counts cups++ runs and shows {drawn} untouched',
+			await ledgerText(pourCard),
+		);
+		await pourCard.getByRole('switch', { name: 'Button shows cups too' }).click();
+		await pourCard.locator('.slot:not([hidden])').getByRole('button', { name: /Pour cup/ }).click();
+		await settleWatch(pourCard, (text) => text.includes('2 pieces of text'), 'state preview counts both readers');
+		check(
+			(await watchText(pourCard)).includes('“Pour cup 2”'),
+			'state preview: with the button reading cups, one click changes both texts',
+			await watchText(pourCard),
+		);
+
+		await page.goto(`${origin}/concepts/computed`, { waitUntil: 'load' });
+		const basketCard = page.locator('section[data-preview="computed-basket"]');
+		const basketSlot = () => basketCard.locator('.slot:not([hidden])');
+		await basketSlot().getByRole('button', { name: 'One more coaster' }).waitFor();
+		await basketSlot().getByRole('button', { name: 'One more coaster' }).click();
+		await settleWatch(basketCard, (text) => text.includes('total is now 15'), 'computed preview: the recipe reruns for a coaster');
+		check(
+			(await ledgerText(basketCard)).includes('ran again, because it reads coasters'),
+			'computed preview: the recipe row says it ran again',
+			await ledgerText(basketCard),
+		);
+		await basketCard.getByRole('switch', { name: 'Recipe reads coasters' }).click();
+		await basketSlot().getByRole('button', { name: 'One more coaster' }).click();
+		await settleWatch(basketCard, (text) => text.includes('stayed 12'), 'computed preview: a recipe that skips coasters leaves the total');
+		check(
+			(await basketSlot().locator('p').nth(2).textContent())?.trim() === 'Total: 12',
+			'computed preview: the mugs-only total really stayed 12',
+		);
+
+		await page.goto(`${origin}/concepts/events`, { waitUntil: 'load' });
+		const eventsCard = page.locator('section[data-preview="events-mug"]');
+		const mugField = eventsCard.getByLabel('Name for the mug');
+		await mugField.waitFor();
+		await mugField.focus();
+		await page.keyboard.type('Ada', { delay: 40 });
+		await settleWatch(eventsCard, (text) => text.includes('set name to "Ada"'), 'events preview: onInput reports the value it got');
+		const eventsUrl = page.url();
+		await page.keyboard.press('Enter');
+		await settleWatch(eventsCard, (text) => text.includes('did not reload'), 'events preview: Enter runs onSubmit with preventDefault');
+		check(page.url() === eventsUrl, 'events preview: the submit does not navigate');
+		check(
+			(await ledgerText(eventsCard)).includes('set printed = "Ada"'),
+			'events preview: the onSubmit row shows what it printed',
+			await ledgerText(eventsCard),
+		);
+		await page.keyboard.press('Escape');
+		await settleWatch(eventsCard, (text) => text.startsWith('Escape fired keydown'), 'events preview: Escape runs onKeyDown');
+		check((await mugField.inputValue()) === '', 'events preview: Escape cleared the field', await mugField.inputValue());
+
+		await page.goto(`${origin}/concepts/conditionals`, { waitUntil: 'load' });
+		const branchCard = page.locator('section[data-preview="conditionals-note"]');
+		const branchToggle = branchCard.getByRole('button', { name: 'Show or hide' });
+		await branchToggle.waitFor();
+		await branchToggle.focus();
+		await page.keyboard.press('Enter');
+		await branchCard.getByLabel('Note').waitFor();
+		await branchCard.getByLabel('Note').fill('buy milk');
+		await branchToggle.click();
+		await settleWatch(branchCard, (text) => text.includes('note still holds "buy milk"'), 'conditionals preview: the note outlives the branch');
+		check((await branchCard.getByLabel('Note').count()) === 0, 'conditionals preview: closing removes the field');
+		await branchToggle.click();
+		await settleWatch(branchCard, (text) => text.includes('built field number 2'), 'conditionals preview: reopening builds a new field');
+		check(
+			(await branchCard.getByLabel('Note').inputValue()) === 'buy milk',
+			'conditionals preview: the new field is filled from note',
+		);
+		await branchCard.screenshot({ path: `${shotsDir}/concepts-conditionals-preview.png` });
 
 		// --- widget: the shopping list on the lists page --------------------------
 		await page.goto(`${origin}/concepts/lists`, { waitUntil: 'load' });

@@ -3,41 +3,59 @@ import { computed, state } from '@markless/core';
 export default function Basket() @{
 	let mugs = state(1);
 	let coasters = state(0);
-	const total = computed(
-		() => mugs * 12 + coasters * 3,
-	);
+	const total = computed(() => mugs * 12 + coasters * 3);
 
 	<section>
 		<p>Mugs: {mugs}</p>
 		<p>Coasters: {coasters}</p>
 		<p>Total: {total}</p>
-		<button onClick={() => mugs++}>
-			One more mug
-		</button>
-		<button onClick={() => coasters++}>
-			One more coaster
-		</button>
+		<button onClick={() => mugs++}>One more mug</button>
+		<button onClick={() => coasters++}>One more coaster</button>
 		<style>
+			section {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 0.7em;
+			}
+
 			p {
-				margin: 0 0 0.4rem;
-				font-size: var(--step-1);
+				flex-basis: 100%;
+			}
+
+			p {
+				margin: 0;
+				font-size: var(--step-0);
 			}
 
 			button {
-				margin: 0.3rem 0.5rem 0 0;
-				font-size: var(--step-0);
-				padding: 0.3em 0.9em;
-				color: var(--on-accent);
-				background: var(--green-soft);
-				border: 2px solid var(--ink);
-				border-radius: 2px;
-				box-shadow: 3px 3px 0 var(--ink);
+				padding: 0.45em 1em;
+				border: 1px solid var(--ink);
+				border-radius: 6px;
+				background: var(--paper);
+				color: var(--ink);
+				font: inherit;
+				white-space: nowrap;
 				cursor: pointer;
+				transition: background 140ms ease;
+			}
+
+			button:hover {
+				background: color-mix(in srgb, var(--purple) 16%, var(--paper));
 			}
 
 			button:active {
-				transform: translate(3px, 3px);
-				box-shadow: none;
+				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+			}
+
+			button:focus-visible {
+				outline: 2px solid var(--ink);
+				outline-offset: 4px;
+			}
+
+			@media (prefers-reduced-motion: reduce) {
+				button {
+					transition: none;
+				}
 			}
 		</style>
 	</section>

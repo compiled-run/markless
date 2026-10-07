@@ -5,9 +5,7 @@ export default function NoteDrawer() @{
 	let note = state('');
 
 	<section>
-		<button onClick={() => (open = !open)}>
-			Show or hide
-		</button>
+		<button onClick={() => (open = !open)}>Show or hide</button>
 		@if (open) {
 			<input
 				aria-label="Note"
@@ -20,42 +18,56 @@ export default function NoteDrawer() @{
 		<p>Saved: {note}</p>
 		<style>
 			section {
-				display: flex;
-				flex-direction: column;
-				align-items: flex-start;
-				gap: 0.6rem;
+				display: grid;
+				gap: 0.7em;
+				justify-items: start;
 			}
 
 			button {
-				font-size: var(--step-0);
-				padding: 0.3em 0.9em;
-				color: var(--on-accent);
-				background: var(--green-soft);
-				border: 2px solid var(--ink);
-				border-radius: 2px;
-				box-shadow: 3px 3px 0 var(--ink);
+				padding: 0.45em 1em;
+				border: 1px solid var(--ink);
+				border-radius: 6px;
+				background: var(--paper);
+				color: var(--ink);
+				font: inherit;
 				cursor: pointer;
+				transition: background 140ms ease;
+			}
+
+			button:hover {
+				background: color-mix(in srgb, var(--purple) 16%, var(--paper));
 			}
 
 			button:active {
-				transform: translate(3px, 3px);
-				box-shadow: none;
+				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+			}
+
+			button:focus-visible,
+			input:focus-visible {
+				outline: 2px solid var(--ink);
+				outline-offset: 4px;
 			}
 
 			input {
-				font: inherit;
-				font-size: var(--step-0);
+				box-sizing: border-box;
 				width: min(14rem, 100%);
-				padding: 0.25em 0.5em;
-				color: var(--ink);
+				padding: 0.4em 0.6em;
+				border: 1px solid var(--ink);
+				border-radius: 6px;
 				background: var(--paper);
-				border: 2px solid var(--ink);
-				border-radius: 2px;
+				color: var(--ink);
+				font: inherit;
 			}
 
 			p {
 				margin: 0;
-				font-size: var(--step-1);
+				overflow-wrap: anywhere;
+			}
+
+			@media (prefers-reduced-motion: reduce) {
+				button {
+					transition: none;
+				}
 			}
 		</style>
 	</section>
