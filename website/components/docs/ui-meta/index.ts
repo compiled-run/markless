@@ -1,12 +1,24 @@
 // The registry the docs components look a family up in. Adding a family is one
 // file beside this one and one line below it; nothing else on the site changes.
 import { accordion } from './accordion.ts';
+import { pagination } from './pagination.ts';
+import { progress } from './progress.ts';
+import { qrcode } from './qrcode.ts';
+import { radiogroup } from './radiogroup.ts';
+import { toaster } from './toaster.ts';
 import type { FamilyMeta } from './types.ts';
 
 export * from './keys.ts';
 export * from './types.ts';
 
-const registry: Readonly<Record<string, FamilyMeta>> = { accordion };
+const registry: Readonly<Record<string, FamilyMeta>> = {
+	accordion,
+	pagination,
+	progress,
+	qrcode,
+	radiogroup,
+	toaster,
+};
 
 export function metaFor(family: string): FamilyMeta {
 	const found = registry[family];
