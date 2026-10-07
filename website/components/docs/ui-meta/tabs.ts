@@ -12,6 +12,7 @@ export const tabs: FamilyMeta = {
 		{ part: 'root', prop: 'value' },
 		{ part: 'root', prop: 'onChange' },
 	],
+	overrides: [{ part: 'root', prop: 'selectOnFocus', label: 'Select on focus' }],
 	presets: [
 		{
 			name: 'basic',

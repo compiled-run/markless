@@ -3406,6 +3406,17 @@ try {
 				.filter({ has: page.locator('.pg-name', { hasText: new RegExp(`^${name}$`) }) })
 				.locator('.pg-switch');
 		const focusedText = () => page.evaluate(() => document.activeElement?.textContent?.trim() ?? '');
+		const chooseNamed = async (card: Locator, name: string, option: string) => {
+			await card
+				.locator('.pg-cell')
+				.filter({ has: page.locator('.pg-name', { hasText: new RegExp(`^${name}$`) }) })
+				.locator('.pg-pick-trigger')
+				.click();
+			await page
+				.locator('.pg-pick-item:visible', { hasText: new RegExp(`^\\s*${option}\\s*$`) })
+				.first()
+				.click();
+		};
 		{
 			const { card, stage } = await playground('tabs');
 			const shown = () => stage.locator('.tab[ui-selected]').innerText();
@@ -3415,12 +3426,12 @@ try {
 				await settle(shown, 'Alerts'),
 				'/ui/tabs: Right arrow skips the disabled Team tab and shows Alerts',
 			);
-			await toggleNamed(card, 'SelectOnFocus').click();
+			await toggleNamed(card, 'Select on focus').click();
 			await stage.locator('.tab', { hasText: 'Alerts' }).focus();
 			await page.keyboard.press('Home');
 			check(
 				(await settle(focusedText, 'Overview')) && (await shown()) === 'Alerts',
-				'/ui/tabs: with SelectOnFocus off, Home moves focus but keeps Alerts showing',
+				'/ui/tabs: with Select on focus off, Home moves focus but keeps Alerts showing',
 			);
 			await page.keyboard.press('Enter');
 			check(await settle(shown, 'Overview'), '/ui/tabs: Enter shows the focused tab');
@@ -3441,6 +3452,14 @@ try {
 			await divider.focus();
 			await page.keyboard.press('ArrowRight');
 			check(await settle(files, '39'), '/ui/resizable: the step control makes one press move ten');
+			await card.locator('.pg-showall').click();
+			await toggleNamed(card, 'OnChange').click();
+			await divider.focus();
+			await page.keyboard.press('ArrowLeft');
+			check(
+				await settle(() => card.locator('.pg-log').innerText(), 'onChange called 1 time(s)'),
+				'/ui/resizable: with the onChange log on, one arrow press is logged once',
+			);
 			await toggleNamed(card, 'Disabled').click();
 			check(
 				await settle(() => divider.getAttribute('tabindex'), '-1'),
@@ -3505,6 +3524,56 @@ try {
 			check(
 				await settle(picked, 'jam, chutney'),
 				'/ui/table: with Multiple on, Shift and Down picks a run of rows',
+			);
+			await card.locator('.pg-showall').click();
+			await chooseNamed(card, 'value', 'marmalade');
+			check(
+				await settle(picked, 'jam, chutney, marmalade'),
+				'/ui/table: with Multiple on, the value control adds a row to the pick',
+			);
+			await toggleNamed(card, 'Multiple').click();
+			check(
+				await settle(picked, 'jam'),
+				'/ui/table: turning Multiple off keeps the value a list of its first row',
+			);
+		}
+		{
+			const { card, stage } = await playground('gridlist');
+			const picked = () => stage.locator('.picked').innerText();
+			await stage.locator('[role="row"]', { hasText: 'invoice' }).click();
+			check(await settle(picked, 'invoice'), '/ui/gridlist: a click picks the row');
+			await page.keyboard.press('ArrowDown');
+			await page.keyboard.press('Enter');
+			await page.keyboard.press('Enter');
+			check(
+				await settle(() => stage.locator('.pressed').innerText(), 'Rename sardines-on-toast.jpg'),
+				'/ui/gridlist: Enter reaches the row button and presses it',
+			);
+			await page.keyboard.press('Escape');
+			await toggleNamed(card, 'Multiple').click();
+			await stage.locator('[role="row"]', { hasText: 'moodboard' }).click();
+			check(
+				await settle(picked, 'invoice, moodboard'),
+				'/ui/gridlist: with Multiple on, a second row joins the pick',
+			);
+			await card.locator('.pg-showall').click();
+			await chooseNamed(card, 'value', 'sardines');
+			check(
+				await settle(picked, 'invoice, moodboard, sardines'),
+				'/ui/gridlist: with Multiple on, the value control adds a row to the pick',
+			);
+			await toggleNamed(card, 'Multiple').click();
+			check(
+				await settle(picked, 'invoice'),
+				'/ui/gridlist: turning Multiple off keeps the value a list of its first row',
+			);
+			await chooseNamed(card, 'value', 'sardines');
+			const selectedRows = stage.locator('[role="row"][aria-selected="true"]');
+			check(
+				(await settle(picked, 'sardines')) &&
+					(await settle(() => selectedRows.count(), 1)) &&
+					(await selectedRows.innerText()).includes('sardines-on-toast.jpg'),
+				'/ui/gridlist: with Multiple off, the value control moves the pick to one row',
 			);
 		}
 

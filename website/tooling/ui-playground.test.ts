@@ -250,4 +250,137 @@ describe('generator controls', () => {
 		expect(module).toContain('<p class={logClass}>onChange called {events} time(s)</p>');
 		expect(module).toContain('<collapsible.trigger class="pg-showall">');
 	});
+
+	it("types an event control's parameter through the family namespace when it names the family's own alias", async () => {
+		const file = demoFile(
+			'alias',
+			'import { resizable } from \'@markless/ui\';\n\nexport default function Panes() @{\n\t<resizable.root>\n\t\t<resizable.item value="a" />\n\t</resizable.root>;\n}\n',
+		);
+		const demo = await analyzeDemo('resizable', 'alias', file);
+		const { controls, module } = generate(
+			demo,
+			meta({ family: 'resizable', showAll: [{ part: 'root', prop: 'onChange' }] }),
+		);
+		expect(controls[0]?.parameter).toBe('resizable.ResizableSizes');
+		expect(module).toContain('onChange={(next: resizable.ResizableSizes) => {');
+		expect(module).not.toMatch(/next: ResizableSizes/);
+	});
+
+	it('leaves a parameter of plain and global types unqualified', async () => {
+		const file = demoFile(
+			'plain',
+			'import { radiogroup } from \'@markless/ui\';\n\nexport default function Plans() @{\n\t<radiogroup.root value="a" />;\n}\n',
+		);
+		const demo = await analyzeDemo('radiogroup', 'plain', file);
+		const { controls } = generate(
+			demo,
+			meta({ family: 'radiogroup', showAll: [{ part: 'root', prop: 'onChange' }] }),
+		);
+		expect(controls[0]?.parameter).toBe('string');
+	});
+
+	it('names a control chip with the ui-meta label override', async () => {
+		const file = demoFile(
+			'label',
+			'import { tabs } from \'@markless/ui\';\n\nexport default function Panel() @{\n\t<tabs.root value="a">\n\t\t<tabs.trigger value="a">A</tabs.trigger>\n\t</tabs.root>;\n}\n',
+		);
+		const demo = await analyzeDemo('tabs', 'label', file);
+		const { module } = generate(
+			demo,
+			meta({
+				family: 'tabs',
+				quick: [
+					{ part: 'root', prop: 'selectOnFocus' },
+					{ part: 'root', prop: 'loop' },
+					{ part: 'root', prop: 'value' },
+				],
+				overrides: [
+					{ part: 'root', prop: 'selectOnFocus', label: 'Select on focus' },
+					{ part: 'root', prop: 'value', label: 'Showing' },
+				],
+			}),
+		);
+		expect(module).toContain('<toggle.label class="pg-name">Select on focus</toggle.label>');
+		expect(module).toContain('<toggle.label class="pg-name">Loop</toggle.label>');
+		expect(module).toContain('<select.label class="pg-name">Showing</select.label>');
+		expect(module).not.toContain('SelectOnFocus</toggle.label>');
+		expect(module).toContain('aria-label="About selectOnFocus"');
+	});
+
+	it('keeps a list-only value a list when Multiple is off, and writes the state cell the demo binds', async () => {
+		const file = demoFile(
+			'listonly',
+			"import { computed, state } from '@markless/core';\nimport { gridlist } from '@markless/ui';\n\nexport default function Files() @{\n\tlet picked = state<readonly string[]>(['a']);\n\tconst shown = computed(() => picked.join(', '));\n\n\t<div class=\"desk\">\n\t\t<gridlist.root selectable value={picked} onChange={(next: readonly string[]) => {\n\t\t\tpicked = next;\n\t\t}}>\n\t\t\t<gridlist.item value=\"a\" />\n\t\t\t<gridlist.item value=\"b\" />\n\t\t</gridlist.root>\n\t\t<p>{shown}</p>\n\t</div>;\n}\n",
+		);
+		const demo = await analyzeDemo('gridlist', 'listonly', file);
+		const { controls, slots, module } = generate(
+			demo,
+			meta({
+				family: 'gridlist',
+				quick: [{ part: 'root', prop: 'multiple' }],
+				showAll: [
+					{ part: 'root', prop: 'value' },
+					{ part: 'root', prop: 'onChange' },
+				],
+				presets: [
+					{ name: 'basic', label: 'Basic', values: { multiple: 'false', value: 'a' } },
+					{ name: 'two', label: 'Two', values: { multiple: 'true', value: 'a, b' } },
+					{ name: 'none', label: 'None', values: { multiple: 'false', value: '' } },
+				],
+			}),
+		);
+		const value = controls.find((one) => one.prop === 'value')!;
+		expect([value.kind, value.cell, value.listOnly, value.seen, value.options]).toEqual([
+			'select',
+			'picked',
+			true,
+			['a'],
+			['a', 'b', ''],
+		]);
+		expect(module).toContain('let picked = state<readonly string[]>(["a"]);');
+		expect(module).not.toContain("let picked = state<readonly string[]>(['a']);");
+		expect(module).toContain('const shown = computed(() => picked.join');
+		expect(module).toContain(
+			'const nextValue = next ? heldList(picked) : heldList(picked).slice(0, 1);',
+		);
+		expect(module).not.toMatch(/heldList\(picked\)\[0\] \?\? ''/);
+		expect(module).toContain(
+			"const nextValue = next === '' ? [] : cMultiple ? toggled(picked, next) : heldList(picked).includes(next) ? [] : [next];",
+		);
+		expect(module).toContain('value={picked}');
+		expect(module).toContain(
+			'{"The rows that are picked, named by the value each gridlist.item was written with. Omit it and nothing starts picked."}',
+		);
+		expect(module).toContain('"basic": { label: "Basic", cMultiple: false, picked: ["a"] },');
+		expect(module).toContain('"two": { label: "Two", cMultiple: true, picked: ["a", "b"] },');
+		expect(module).toContain('"none": { label: "None", cMultiple: false, picked: [] },');
+		expect(module).toContain('const nextValue = preset["picked"] as readonly string[];');
+		expect(slots.find((one) => one.control === value)?.form).toBe('local');
+		expect(module).toContain('let tValue = state("[\'a\']");');
+		expect(module).toContain('tValue = valueText(nextValue).slice(1, -1);');
+		expect(displaySource(demo, slots)).toMatch(/state<readonly string\[\]>\(PGSLOT\d+\)/);
+	});
+
+	it('still turns a string-or-list value into one string when Multiple is off', async () => {
+		const file = demoFile(
+			'either',
+			'import { accordion } from \'@markless/ui\';\n\nexport default function Questions() @{\n\t<accordion.root value="a">\n\t\t<accordion.item value="a" />\n\t</accordion.root>;\n}\n',
+		);
+		const demo = await analyzeDemo('accordion', 'either', file);
+		const { controls, module } = generate(
+			demo,
+			meta({
+				family: 'accordion',
+				quick: [
+					{ part: 'root', prop: 'multiple' },
+					{ part: 'root', prop: 'value' },
+				],
+			}),
+		);
+		expect(controls[1]?.listOnly).toBeUndefined();
+		expect(module).toContain(
+			"const nextValue = next ? heldList(cValue) : (heldList(cValue)[0] ?? '');",
+		);
+		expect(module).toContain('const nextValue = cMultiple ? toggled(cValue, next) : next;');
+	});
 });

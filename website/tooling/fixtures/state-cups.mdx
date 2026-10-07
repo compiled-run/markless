@@ -1,0 +1,15 @@
+```tsrx
+import { state } from '@markless/core';
+
+export default function Cups() @{
+	let cups = state(0);
+	const drawn = Math.floor(Math.random() * 90) + 10;
+
+	<section>
+		<p>Cups of coffee today: {cups}</p>
+		<p>A number drawn once, when the page was set up: {drawn}</p>
+		<button onClick={() => cups++}>Pour a cup</button>
+		<button onClick={() => (cups = 0)}>Start over</button>
+	</section>
+}
+```

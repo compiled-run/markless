@@ -8,6 +8,7 @@ import {
 } from '../components/docs/api-derive/control-kind.ts';
 import {
 	attributeText,
+	heldList,
 	listText,
 	pickValue,
 	valueText,
@@ -142,6 +143,8 @@ export type DemoAnalysis = {
 	readonly locals?: readonly LocalDeclaration[];
 	/** Named imports the demo takes from `@markless/core` and `@markless/ui`. */
 	readonly imports?: { readonly core: readonly string[]; readonly ui: readonly string[] };
+	/** Body-level `let name = state(<literal>);` cells a root prop can read. */
+	readonly states?: readonly StateDeclaration[];
 };
 
 /** One body-level `const` with a literal value. */
@@ -154,6 +157,18 @@ export type LocalDeclaration = {
 	readonly valueStart: number;
 	readonly valueEnd: number;
 	readonly literal: string | number | boolean;
+};
+
+/** One body-level `let name = state(<literal>);`. */
+export type StateDeclaration = {
+	readonly name: string;
+	/** The whole statement. */
+	readonly start: number;
+	readonly end: number;
+	/** The literal passed to `state`. */
+	readonly valueStart: number;
+	readonly valueEnd: number;
+	readonly literal: ControlValue | number;
 };
 
 /** `name` -> the array literal a body-level `const name = [...]` holds. */
@@ -391,6 +406,7 @@ export async function analyzeDemo(
 			: { preludeStart: source.lastIndexOf('\n', statements[0].start) + 1 }),
 		...(wrapped ? { renderStart: rendered.start, renderEnd: rendered.end } : {}),
 		locals: localDeclarations(statements),
+		states: stateDeclarations(statements),
 		imports: demoImports(program.body, file),
 	};
 }
@@ -427,6 +443,32 @@ function localDeclarations(statements: readonly AstNode[]): LocalDeclaration[] {
 			valueStart: init.start,
 			valueEnd: init.end,
 			literal: literal as string | number | boolean,
+		});
+	}
+	return found;
+}
+
+function stateDeclarations(statements: readonly AstNode[]): StateDeclaration[] {
+	const found: StateDeclaration[] = [];
+	for (const statement of statements) {
+		if (statement.type !== 'VariableDeclaration' || statement.kind !== 'let') continue;
+		const declarations = (statement as { declarations?: AstNode[] }).declarations ?? [];
+		if (declarations.length !== 1) continue;
+		const id = declarations[0].id as AstNode;
+		const init = (declarations[0] as { init?: AstNode | null }).init;
+		if (id.type !== 'Identifier' || init?.type !== 'CallExpression') continue;
+		const callee = init.callee as AstNode;
+		const args = (init.arguments as AstNode[] | undefined) ?? [];
+		if (callee.type !== 'Identifier' || callee.name !== 'state' || args.length !== 1) continue;
+		const literal = literalOf(args[0]);
+		if (literal === undefined) continue;
+		found.push({
+			name: String(id.name),
+			start: statement.start,
+			end: statement.end,
+			valueStart: args[0].start,
+			valueEnd: args[0].end,
+			literal,
 		});
 	}
 	return found;
@@ -496,8 +538,17 @@ export type PlaygroundControl = {
 	readonly literal?: string;
 	/** Set when the control writes a demo `const` rather than a root prop. */
 	readonly local?: { readonly label: string };
+	/** The control chip's name, from a ui-meta override. */
+	readonly label?: string;
+	/**
+	 * Set when the root prop reads a `let name = state(<literal>)` the demo declares:
+	 * the control writes that cell, so the demo's own readers follow it.
+	 */
+	readonly bound?: StateDeclaration;
 	/** The type admits a list of strings, so `multiple` turns the value into one. */
 	readonly list: boolean;
+	/** The type admits only a list, so the value stays a list whatever `multiple` says. */
+	readonly listOnly?: boolean;
 	/** The cell's opening value. */
 	readonly seen: CellValue;
 	/** The family's own default, which the code panel leaves unwritten. */
@@ -515,7 +566,7 @@ function hintDoc(doc: string | undefined): string {
 		.split(/\n[ \t]*\n/)[0]
 		.replace(/\s+/g, ' ')
 		.trim();
-	const sentences = paragraph.match(/[^.!?]+[.!?]+(?=\s|$)/g);
+	const sentences = paragraph.match(/(?:[^.!?]|[.!?](?!\s|$))+[.!?]+(?=\s|$)/g);
 	const cut = sentences ? sentences.slice(0, 2).join('').trim() : paragraph;
 	return cut.replaceAll('`', '');
 }
@@ -536,6 +587,53 @@ function callbackParameter(type: string): string {
 	const parameter = type.slice(opened + 1, closed).trim();
 	const colon = parameter.indexOf(':');
 	return colon < 0 ? 'unknown' : parameter.slice(colon + 1).trim();
+}
+
+/** Type names TypeScript itself declares, which a callback parameter may use unqualified. */
+const GLOBAL_TYPES = new Set([
+	'Array',
+	'Date',
+	'Element',
+	'Event',
+	'File',
+	'HTMLElement',
+	'KeyboardEvent',
+	'Map',
+	'MouseEvent',
+	'Partial',
+	'PointerEvent',
+	'Promise',
+	'Readonly',
+	'ReadonlyArray',
+	'ReadonlyMap',
+	'ReadonlySet',
+	'Record',
+	'Set',
+]);
+
+/**
+ * A parameter typed with the family's own alias (`ResizableSizes`) is written
+ * through the family namespace the module already imports (`resizable.ResizableSizes`).
+ */
+function qualifiedParameter(family: string, parameter: string): string {
+	const names = [...new Set(parameter.match(/(?<![.\w$'"])[A-Z][\w$]*/g) ?? [])].filter(
+		(name) => !GLOBAL_TYPES.has(name),
+	);
+	if (names.length === 0) return parameter;
+	const exported = familyExports(family);
+	for (const name of names)
+		if (!new RegExp(`\\b${name}\\b`).test(exported))
+			throw new Error(
+				`ui-playground: a '${family}' callback takes '${name}', which @markless/ui/${family} does not export, so the generated module cannot name it.`,
+			);
+	return parameter.replace(/(?<![.\w$'"])[A-Z][\w$]*/g, (name) =>
+		GLOBAL_TYPES.has(name) ? name : `${family}.${name}`,
+	);
+}
+
+function familyExports(family: string): string {
+	const fromHere = createRequire(import.meta.url);
+	return readFileSync(fromHere.resolve(`@markless/ui/${family}`), 'utf8');
 }
 
 type ManifestProp = {
@@ -642,7 +740,7 @@ function controlOf(
 			list: false,
 			seen: false,
 			fallback: false,
-			parameter: callbackParameter(descriptor.type),
+			parameter: qualifiedParameter(demo.family, callbackParameter(descriptor.type)),
 		};
 	}
 
@@ -675,8 +773,17 @@ function controlOf(
 	}
 
 	const holds: 'boolean' | 'string' = descriptor.kind === 'toggle' ? 'boolean' : 'string';
+	const list =
+		holds === 'string' &&
+		descriptor.members.some((member) => /\bstring\[\]$|^Array<|^ReadonlyArray</.test(member));
+	const listOnly = list && !descriptor.members.includes('string');
+	const bound = boundState(demo, authored);
 	const fallback = controlValue(holds, initialValue(prop.default));
-	const seen = controlValue(holds, authored?.literal ?? initialValue(prop.default));
+	const read = controlValue(
+		holds,
+		bound?.literal ?? authored?.literal ?? initialValue(prop.default),
+	);
+	const seen = listOnly ? heldList(read as string | readonly string[]) : read;
 	let kind: PlaygroundControl['kind'] =
 		descriptor.kind === 'toggle'
 			? 'toggle'
@@ -713,15 +820,32 @@ function controlOf(
 		doc: hintDoc(prop.doc),
 		options,
 		...cells,
+		...(bound ? { cell: bound.name, bound } : {}),
 		holds,
-		list:
-			holds === 'string' &&
-			descriptor.members.some((member) =>
-				/\bstring\[\]$|^Array<|^ReadonlyArray</.test(member),
-			),
+		list,
+		...(listOnly ? { listOnly } : {}),
 		seen,
 		fallback: typeof fallback === 'boolean' || typeof fallback === 'string' ? fallback : '',
 	};
+}
+
+/** The `let name = state(<literal>)` an authored `prop={name}` reads, if the demo declares one. */
+function boundState(
+	demo: DemoAnalysis,
+	authored: RootAttribute | undefined,
+): StateDeclaration | undefined {
+	const name = authored?.expression;
+	if (name === undefined || !/^[A-Za-z_$][\w$]*$/.test(name)) return undefined;
+	const found = demo.states?.find((one) => one.name === name);
+	if (found) refuseCollision(demo, name);
+	return found;
+}
+
+function refuseCollision(demo: DemoAnalysis, name: string): void {
+	if (RESERVED.has(name) || /^(c|t|s|p|tl|sl|pl|src|css)[A-Z]/.test(name))
+		throw new Error(
+			`ui-playground: the local '${name}' in ${demo.file} collides with a name the generated module uses; rename it.`,
+		);
 }
 
 /** Names the generated module declares itself, which a local cell may not shadow. */
@@ -733,10 +857,7 @@ function localControl(demo: DemoAnalysis, ref: LocalRef): PlaygroundControl {
 		throw new Error(
 			`ui-playground: ui-meta/${demo.family}.ts draws a control for '${ref.local}', but ${demo.file} declares no \`const ${ref.local} = <literal>;\` in its body.`,
 		);
-	if (RESERVED.has(ref.local) || /^(c|t|s|p|tl|sl|pl|src|css)[A-Z]/.test(ref.local))
-		throw new Error(
-			`ui-playground: the local '${ref.local}' in ${demo.file} collides with a name the generated module uses; rename it.`,
-		);
+	refuseCollision(demo, ref.local);
 	const tail = identifier(ref.local);
 	const options = ref.options ?? [];
 	const holds: PlaygroundControl['holds'] =
@@ -786,11 +907,12 @@ export function playgroundControls(
 	const overrides = new Map(
 		(meta.overrides ?? []).map((one) => [`${one.part}.${one.prop}`, one] as const),
 	);
-	return [...meta.quick, ...meta.showAll].map((ref) =>
-		isLocal(ref)
-			? localControl(demo, ref)
-			: controlOf(demo, ref, overrides.get(`${ref.part}.${ref.prop}`)),
-	);
+	return [...meta.quick, ...meta.showAll].map((ref) => {
+		if (isLocal(ref)) return localControl(demo, ref);
+		const override = overrides.get(`${ref.part}.${ref.prop}`);
+		const control = controlOf(demo, ref, override);
+		return override?.label ? { ...control, label: override.label } : control;
+	});
 }
 
 // --- the code panel's slots -------------------------------------------------
@@ -843,6 +965,16 @@ export function codeSlots(
 					after: '',
 				};
 			}
+			if (control.bound)
+				return {
+					control,
+					form: 'local',
+					lead: '',
+					start: control.bound.valueStart,
+					end: control.bound.valueEnd,
+					before: '',
+					after: '',
+				};
 			const authored = demo.attributes.find((attribute) => attribute.name === control.prop);
 			if (!authored) return { control, form: 'attribute', lead: ' ', before: ' ', after: '' };
 			if (
@@ -1007,7 +1139,12 @@ const CHROME_FAMILIES = ['collapsible', 'select', 'tabs', 'toggle', 'tooltip'];
 
 /** The code panel's text for a control, as a source expression over `value`. */
 function slotTextSource(slot: CodeSlot, value: string): string {
-	if (slot.form === 'local') return `literalText(${value})`;
+	if (slot.form === 'local') {
+		if (slot.control.listOnly) return `valueText(${value}).slice(1, -1)`;
+		if (slot.control.list)
+			return `(typeof ${value} === 'string' ? literalText(${value}) : valueText(${value}).slice(1, -1))`;
+		return `literalText(${value})`;
+	}
 	if (slot.control.holds === 'number') {
 		if (slot.form === 'value') return `'{' + String(${value}) + '}'`;
 		return `(${value} === ${sourceLiteral(slot.control.fallback)} ? '' : ${quote(`${slot.lead}${slot.control.prop}={`)} + String(${value}) + '}')`;
@@ -1016,9 +1153,10 @@ function slotTextSource(slot: CodeSlot, value: string): string {
 	return `attributeText(${quote(slot.control.prop)}, ${value}, ${sourceLiteral(slot.control.fallback)}, ${quote(slot.lead)})`;
 }
 
-/** A local's literal as the demo writes it: single-quoted text, or the bare value. */
+/** A local's literal as the demo writes it: single-quoted text, a list, or the bare value. */
 function literalText(value: CellValue): string {
 	if (typeof value === 'string') return `'${value.replaceAll("'", "\\'")}'`;
+	if (Array.isArray(value)) return valueText(value).slice(1, -1);
 	return String(value);
 }
 
@@ -1102,9 +1240,11 @@ function hintFor(control: PlaygroundControl): string {
 
 function toggleCell(emit: Emit, control: PlaygroundControl, extra: string): string {
 	const paired = listFollowsMultiple(emit.controls);
+	const held = paired ? `heldList(${paired.value.cell})` : '';
+	const single = paired?.value.listOnly ? `${held}.slice(0, 1)` : `(${held}[0] ?? '')`;
 	const follow =
 		paired && paired.multiple === control
-			? `\n${writes(emit.slots, paired.value, `next ? heldList(${paired.value.cell}) : (heldList(${paired.value.cell})[0] ?? '')`, '\t\t\t\t\t\t\t')}`
+			? `\n${writes(emit.slots, paired.value, `next ? ${held} : ${single}`, '\t\t\t\t\t\t\t')}`
 			: '';
 	return `				<div class="pg-cell">
 					<toggle.root
@@ -1114,7 +1254,7 @@ function toggleCell(emit: Emit, control: PlaygroundControl, extra: string): stri
 ${writes(emit.slots, control, 'next', '\t\t\t\t\t\t\t')}${extra}${follow}
 						}}
 					>
-						<toggle.label class="pg-name">${control.local?.label ?? control.prop.charAt(0).toUpperCase() + control.prop.slice(1)}</toggle.label>
+						<toggle.label class="pg-name">${control.label ?? control.local?.label ?? control.prop.charAt(0).toUpperCase() + control.prop.slice(1)}</toggle.label>
 ${hintFor(control)}
 						<toggle.trigger class="pg-switch">
 							<toggle.thumb class="pg-knob" />
@@ -1125,8 +1265,9 @@ ${hintFor(control)}
 
 function selectCell(emit: Emit, control: PlaygroundControl): string {
 	const paired = listFollowsMultiple(emit.controls);
-	const chosen =
-		paired && paired.value === control
+	const chosen = control.listOnly
+		? `next === '' ? [] : ${paired && paired.value === control ? `${paired.multiple.cell} ? toggled(${control.cell}, next) : ` : ''}heldList(${control.cell}).includes(next) ? [] : [next]`
+		: paired && paired.value === control
 			? `${paired.multiple.cell} ? toggled(${control.cell}, next) : next`
 			: control.holds === 'number'
 				? control.nullable
@@ -1152,7 +1293,7 @@ function selectCell(emit: Emit, control: PlaygroundControl): string {
 ${writes(emit.slots, control, chosen, '\t\t\t\t\t\t\t')}
 						}}
 					>
-						<select.label class="pg-name">${control.local?.label ?? control.prop}</select.label>
+						<select.label class="pg-name">${control.label ?? control.local?.label ?? control.prop}</select.label>
 						<select.trigger class="pg-pick-trigger">
 							<span class="pg-pick-value">{${control.shown}}</span>
 							<lucide.chevrondown class="pg-pick-caret" aria-hidden="true" />
@@ -1174,7 +1315,7 @@ function textboxCell(emit: Emit, control: PlaygroundControl): string {
 ${writes(emit.slots, control, 'next', '\t\t\t\t\t\t\t')}
 						}}
 					>
-						<textbox.label class="pg-name">${control.local?.label ?? control.prop}</textbox.label>
+						<textbox.label class="pg-name">${control.label ?? control.local?.label ?? control.prop}</textbox.label>
 						<textbox.input class="pg-field" />
 					</textbox.root>
 ${hintFor(control)}
@@ -1265,13 +1406,14 @@ function stageMarkup(demo: DemoAnalysis, emit: Emit): string {
 	return `${before}${openingTag(demo, emit)}${after}`;
 }
 
-/** The demo's statements, minus the declarations a local control turned into cells. */
+/** The demo's statements, minus the declarations a local or bound control turned into cells. */
 function preludeOf(demo: DemoAnalysis, controls: readonly PlaygroundControl[]): string {
 	const taken = new Set(controls.filter((one) => one.local).map((one) => one.prop));
-	if (taken.size === 0 || demo.preludeStart === undefined) return demo.prelude;
-	const cuts = (demo.locals ?? [])
-		.filter((one) => taken.has(one.name))
-		.sort((left, right) => right.start - left.start);
+	const cuts: { readonly start: number; readonly end: number }[] = [
+		...(demo.locals ?? []).filter((one) => taken.has(one.name)),
+		...controls.flatMap((one) => (one.bound ? [one.bound] : [])),
+	].sort((left, right) => right.start - left.start);
+	if (cuts.length === 0 || demo.preludeStart === undefined) return demo.prelude;
 	let text = demo.prelude;
 	for (const cut of cuts) {
 		let from = cut.start - demo.preludeStart;
@@ -1418,13 +1560,22 @@ function presetTable(
 		const fields = [`label: ${quote(preset.label)}`];
 		for (const control of editable) {
 			const written = preset.values[control.prop];
-			fields.push(
-				`${control.cell}: ${sourceLiteral(written === undefined ? control.seen : controlValue(control.holds, written))}`,
-			);
+			fields.push(`${control.cell}: ${sourceLiteral(presetValue(control, written))}`);
 		}
 		return `\t${quote(preset.name)}: { ${fields.join(', ')} },`;
 	});
 	return `const presets: Readonly<Record<string, Readonly<Record<string, ${presetValueType(controls)}>>>> = {\n${rows.join('\n')}\n};`;
+}
+
+/** A preset's written value as the cell holds it; a list is written `'a, b'`. */
+function presetValue(control: PlaygroundControl, written: string | undefined): CellValue {
+	if (written === undefined) return control.seen;
+	if (control.listOnly)
+		return written
+			.split(',')
+			.map((one) => one.trim())
+			.filter((one) => one !== '');
+	return controlValue(control.holds, written);
 }
 
 /** The preset table's value type: the accordion's union, widened only when a number cell needs it. */
@@ -1437,6 +1588,7 @@ function presetValueType(controls: readonly PlaygroundControl[]): string {
 function cellType(control: PlaygroundControl): string {
 	if (control.holds === 'number') return control.nullable ? 'number | null' : 'number';
 	if (control.literal) return control.literal;
+	if (control.listOnly) return 'readonly string[]';
 	return control.holds === 'boolean'
 		? 'boolean'
 		: control.list
@@ -1596,7 +1748,9 @@ ${rest}
 	const coreImports = [...new Set(['state', ...(demo.imports?.core ?? [])])].sort();
 	const uiImports = [...new Set([...families, 'lucide', ...(demo.imports?.ui ?? [])])].sort();
 	const prelude = preludeOf(demo, controls);
-	const helpers = controls.some((one) => one.local) ? `\n${LITERAL_TEXT}\n` : '';
+	const helpers = slots.some((one) => one.form === 'local' && !one.control.listOnly)
+		? `\n${LITERAL_TEXT}\n`
+		: '';
 
 	const panes: ChromePane[] = [
 		{

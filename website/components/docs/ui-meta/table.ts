@@ -7,15 +7,27 @@ export const table: FamilyMeta = {
 		{ part: 'root', prop: 'multiple' },
 		{ part: 'root', prop: 'disabled' },
 	],
-	showAll: [{ part: 'root', prop: 'onChange' }],
+	showAll: [
+		{ part: 'root', prop: 'value' },
+		{ part: 'root', prop: 'onChange' },
+	],
+	overrides: [{ part: 'root', prop: 'value', options: ['jam', 'chutney', 'marmalade', ''] }],
 	presets: [
-		{ name: 'basic', label: 'Basic', values: { multiple: 'false', disabled: 'false' } },
+		{
+			name: 'basic',
+			label: 'Basic',
+			values: { multiple: 'false', disabled: 'false', value: 'jam' },
+		},
 		{
 			name: 'multiple',
 			label: 'Pick several',
-			values: { multiple: 'true', disabled: 'false' },
+			values: { multiple: 'true', disabled: 'false', value: 'jam, chutney' },
 		},
-		{ name: 'locked', label: 'Locked', values: { multiple: 'false', disabled: 'true' } },
+		{
+			name: 'locked',
+			label: 'Locked',
+			values: { multiple: 'false', disabled: 'true', value: 'jam' },
+		},
 	],
 	keyboard: [
 		{ caps: [keys.left, keys.right], join: 'or', does: 'Move to the cell before or after.' },

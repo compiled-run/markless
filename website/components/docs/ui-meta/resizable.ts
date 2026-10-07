@@ -8,7 +8,7 @@ export const resizable: FamilyMeta = {
 		{ part: 'root', prop: 'step' },
 		{ part: 'root', prop: 'disabled' },
 	],
-	showAll: [],
+	showAll: [{ part: 'root', prop: 'onChange' }],
 	overrides: [{ part: 'root', prop: 'step', options: ['1', '5', '10'] }],
 	presets: [
 		{

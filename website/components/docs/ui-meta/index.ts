@@ -5,6 +5,7 @@ import { carousel } from './carousel.ts';
 import { checklist } from './checklist.ts';
 import { collapsible } from './collapsible.ts';
 import { combobox } from './combobox.ts';
+import { gridlist } from './gridlist.ts';
 import { modal } from './modal.ts';
 import { navbar } from './navbar.ts';
 import { pagination } from './pagination.ts';
@@ -28,6 +29,7 @@ const registry: Readonly<Record<string, FamilyMeta>> = {
 	checklist,
 	collapsible,
 	combobox,
+	gridlist,
 	modal,
 	navbar,
 	pagination,

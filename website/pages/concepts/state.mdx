@@ -67,24 +67,6 @@ That number comes from `Math.random()`. The component drew it once, while it set
 Your component runs once, to set up the page. A click does not run it again. The click runs
 `cups++`, and Markless changes the one piece of text that shows `cups`.
 
-Here is the whole file:
-
-```tsrx
-import { state } from '@markless/core';
-
-export default function Cups() @{
-	let cups = state(0);
-	const drawn = Math.floor(Math.random() * 90) + 10;
-
-	<section>
-		<p>Cups of coffee today: {cups}</p>
-		<p>A number drawn once, when the page was set up: {drawn}</p>
-		<button onClick={() => cups++}>Pour a cup</button>
-		<button onClick={() => (cups = 0)}>Start over</button>
-	</section>
-}
-```
-
 ## How does Markless know which text to change?
 
 Before your app runs, Markless reads your component the way you do. It sees that `cups` shows up
