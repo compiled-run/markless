@@ -228,13 +228,19 @@ export function TagListInput({
 				return;
 			}
 
-			const next = (event.target as HTMLInputElement).value;
+			const field = event.target as HTMLInputElement;
+			const next = field.value;
 			const mark = taglist.delimiter;
 			const at = mark === '' ? -1 : next.lastIndexOf(mark);
 			// Everything before the last delimiter is committed; what follows it is
 			// still being typed.
 			if (at >= 0) taglist.take(splitPasted(next.slice(0, at), mark));
-			taglist.input = at >= 0 ? next.slice(at + mark.length) : next;
+			// Keys typed ahead are already in the field and the bound write may be held or a no-op, so cut the committed words here or the next queued input re-commits them.
+			const committed = at >= 0 ? next.slice(0, at + mark.length) : '';
+			const now = field.value;
+			const rest = committed !== '' && now.startsWith(committed) ? now.slice(committed.length) : now;
+			if (rest !== now) field.value = rest;
+			taglist.input = rest;
 			onInput?.(event);
 		}}
 		// The cancel is unconditional because it has to be decided before the

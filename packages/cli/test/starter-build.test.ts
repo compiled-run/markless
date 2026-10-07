@@ -1,6 +1,5 @@
 import { execFile, spawn } from 'node:child_process';
 import { mkdir, mkdtemp, rm, symlink } from 'node:fs/promises';
-import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { promisify } from 'node:util';
 import { join, resolve } from 'pathe';
@@ -78,45 +77,31 @@ async function check(appRoot: string): Promise<string> {
 	return result.stdout + result.stderr;
 }
 
-async function freePort(): Promise<number> {
-	return new Promise((resolvePort, reject) => {
-		const server = createServer();
-		server.once('error', reject);
-		server.listen(0, () => {
-			const address = server.address();
-			server.close(() =>
-				typeof address === 'object' && address
-					? resolvePort(address.port)
-					: reject(new Error('no port')),
-			);
-		});
+// The server binds a port of its own choosing and names it on stdout once it is listening;
+// srvx stays quiet while `TEST` is set, so the child runs without it.
+async function serve(appRoot: string): Promise<string> {
+	const { TEST: _test, ...env } = process.env;
+	const server = spawn(process.execPath, [join(appRoot, '.output/server/index.mjs')], {
+		cwd: appRoot,
+		env: { ...env, PORT: '0' },
+		stdio: ['ignore', 'pipe', 'pipe'],
 	});
-}
-
-// Another suite can take the probed port before this server binds, so readiness means serving
-// this starter's own page, and a server that exits (port taken) is retried on a new port.
-async function serve(appRoot: string, starter: Starter): Promise<string> {
-	const [readyPath, readyText] = servedPages[starter][0];
-	for (let bind = 0; bind < 3; bind++) {
-		const port = await freePort();
-		const server = spawn(process.execPath, [join(appRoot, '.output/server/index.mjs')], {
-			cwd: appRoot,
-			env: { ...process.env, PORT: String(port) },
-			stdio: 'ignore',
+	cleanups.push(() => void server.kill());
+	let output = '';
+	return new Promise((resolveOrigin, reject) => {
+		server.stdout.on('data', (chunk: Buffer) => {
+			output += chunk.toString();
+			const listening = /Listening on:\s*(\S+)/.exec(output);
+			if (listening) resolveOrigin(new URL(listening[1]!).origin);
 		});
-		cleanups.push(() => void server.kill());
-		const origin = `http://localhost:${port}`;
-		for (let attempt = 0; attempt < 100 && server.exitCode === null; attempt++) {
-			const ours = await fetch(new URL(readyPath, origin)).then(
-				async (response) => response.ok && (await response.text()).includes(readyText),
-				() => false,
-			);
-			if (ours) return origin;
-			await new Promise((wait) => setTimeout(wait, 100));
-		}
-		if (server.exitCode === null) throw new Error('built server never served its first page');
-	}
-	throw new Error('built server could not bind a port');
+		server.stderr.on('data', (chunk: Buffer) => {
+			output += chunk.toString();
+		});
+		server.once('error', reject);
+		server.once('exit', (code, signal) =>
+			reject(new Error(`built server exited (${code ?? signal}) before listening:\n${output}`)),
+		);
+	});
 }
 
 test('the starter list this build covers is the list the CLI offers', () => {
@@ -138,7 +123,7 @@ test.each(STARTER_CHOICES.map((choice) => choice.value))(
 		await builder.buildApp();
 		await check(appRoot);
 
-		const origin = await serve(appRoot, starter);
+		const origin = await serve(appRoot);
 		for (const [path, text] of servedPages[starter]) {
 			const response = await fetch(new URL(path, origin));
 			expect(response.status, path).toBe(200);

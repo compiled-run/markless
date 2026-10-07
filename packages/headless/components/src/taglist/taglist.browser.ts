@@ -11,6 +11,7 @@ import DisplayOnly from './scenarios/display-only.tsrx';
 import Editable from './scenarios/editable.tsrx';
 import TopicsForm from './scenarios/topics-form.tsrx';
 import TwoTagLists from './scenarios/two-taglists.tsrx';
+import TypedAhead from './scenarios/typed-ahead.tsrx';
 import { admit, afterRemoval, nextHighlight, rename, splitPasted } from './tag-walk.ts';
 
 const Root = page.getByTestId('root');
@@ -56,6 +57,13 @@ function spoken(scope: Element = el(Root)): string {
 async function typeInto(locator: { element(): Element | null }, keys: string) {
 	el<HTMLInputElement>(locator).focus();
 	await userEvent.keyboard(keys);
+}
+
+/** Text that arrives as one input, the way dictation or autofill inserts it. */
+function insertRun(field: HTMLInputElement, text: string) {
+	field.focus();
+	field.value += text;
+	field.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }));
 }
 
 /** Put the caret exactly where a row needs it, then press. */
@@ -251,6 +259,21 @@ for (const mode of MODES) {
 		await expect.poll(() => spoken()).toBe('gamma added');
 	});
 
+	test(`${mode}: keys typed while a commit is running are not committed twice`, async () => {
+		if (mode === 'CSR') await render(TypedAhead);
+		else await renderSSR(TypedAhead);
+
+		const field = el<HTMLInputElement>(Input);
+		insertRun(field, 'two;three;');
+		await expect.poll(() => el(Held).textContent).toBe('one|two|three');
+		// The scenario landed a key while that commit ran; this is that key's own input.
+		field.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: 'r' }));
+		await expect.poll(() => field.value).toBe('four');
+		// Re-reading the committed words would hit the cap and announce a refusal nobody asked for.
+		await expect.poll(() => spoken()).toBe('2 tags added');
+		await expect.poll(() => el(Held).textContent).toBe('one|two|three');
+	});
+
 	test(`${mode}: enter commits the typed words`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
@@ -443,7 +466,9 @@ for (const mode of MODES) {
 		if (mode === 'CSR') await render(Capped);
 		else await renderSSR(Capped);
 
-		await typeInto(Input, 'two;three;four;');
+		// One insertion, so the whole run reaches one handler: typed key by key it would
+		// announce each tag as its own delimiter lands, however fast the keys arrive.
+		insertRun(el<HTMLInputElement>(Input), 'two;three;four;');
 		await expect.poll(() => el(Held).textContent).toBe('one|two|three');
 		// The run stopped at the cap, so it still admitted two. Only a run that
 		// admits nothing at all is a refusal worth speaking.
