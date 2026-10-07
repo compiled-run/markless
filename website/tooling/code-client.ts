@@ -35,7 +35,7 @@ export function codeFrameHtml(script: string, preloads: readonly string[] = []):
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>Code result</title>
-<style>html,body{margin:0;background:transparent}body{padding:0 6px 6px 0}</style>
+<style>html,body{margin:0;background:transparent !important}body{padding:0 6px 6px 0}body::before,body::after{display:none !important}</style>
 ${preloads.map((href) => `<link rel="modulepreload" href="${href}">`).join('\n')}
 <script type="module" src="${script}"></script>
 </head>

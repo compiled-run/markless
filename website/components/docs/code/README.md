@@ -1,4 +1,24 @@
-# The Code component's browser compiler
+# The Code component's browser editor and compiler
+
+## The editor
+
+Each file is a server-rendered `<textarea readonly>` over the build's highlighted `<pre>`, both in
+one grid cell (`../code-files.tsrx`): the `<pre>` sets the size, the textarea is transparent text
+with a visible caret, and the pane around both scrolls. A reader's first point at or focus into the
+block calls `bootCodeBlock` (`session.ts`), the one entry point every trigger uses. It wires the
+header's Reset, layout and full screen buttons and the Result pane's Run again button, loads the
+highlighter, and removes `readonly`.
+
+`editor.ts` repaints the `<pre>` on each input with `highlight.ts`: shiki's core on its JavaScript
+regex engine, with the same github-light/github-dark pair, the site's `tsrx` grammar and the same
+surface pass (`tooling/shiki-surface.ts`) as the build. Dark mode stays a CSS swap. Tab, Shift+Tab,
+Enter, Backspace and closing pairs are pure functions in `edit-commands.ts`, ported from shikicode
+(MIT, https://github.com/magic-akari/shikicode); the editor applies them through
+`execCommand('insertText')`, so the browser's own undo keeps every edit. Escape then Tab leaves
+the editor. A build error marks its line and prints its first sentence at the line's end; the
+problem list under the result jumps to the line with `setSelectionRange`.
+
+## The compiler
 
 `<Code>` (`../code.tsrx`) compiles the reader's edits in the browser. `compile-worker.ts` runs
 `compile.ts`, which drives the Markless bundler's own resolve, load and transform hooks
