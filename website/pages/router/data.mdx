@@ -1,5 +1,5 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import FeedStepsDemo from '../../components/demos/router/feed-steps-demo.tsrx';
+import FeedSteps from '../../components/demos/router/feed-steps.tsrx';
 import Collapsible from '../../components/docs/collapsible.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
@@ -10,7 +10,7 @@ import LikeHeart from '../../components/docs/like-heart.tsrx';
 
 # Page data arrives in the same response
 
-<PageMeta level="Building" time="4 min" assumes="async, routes" sprite="drops" />
+<PageMeta level="Building" time="2 min" assumes="async, routes" sprite="drops" />
 
 <ThemeToggle />
 
@@ -24,9 +24,9 @@ Think of a restaurant that brings the bread first. The main dish comes later, to
 That is an analogy. In the router, the bread is everything fast, and the main dish is the `@try`
 content.
 
-Step through one page request. Then switch to quick data and step again.
+Press **Next** to see the second part of one page response. Then pick **quick** data.
 
-<FeedStepsDemo />
+<FeedSteps />
 
 With slow data, the reader sees the heading and **Loading...** first. The data comes later, in the
 same response. The browser never asks a second time.

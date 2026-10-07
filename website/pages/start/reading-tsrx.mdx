@@ -1,5 +1,4 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import CounterDemo from '../../components/demos/start/counter-demo.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
@@ -20,19 +19,7 @@ A few things are new. This page goes through each of them. Then it walks through
 
 ## The counter, line by line
 
-Here is the counter again. Click it once, so you know what the code does:
-
-<CounterDemo />
-
-```tsrx
-import { state } from '@markless/core';
-
-export default function Counter() @{
-	let count = state(0);
-
-	<button onClick={() => count++}>Count {count}</button>
-}
-```
+Here is the counter again. Click a line of the file to see which part of the button it made. Then click the button.
 
 <LineToPart />
 

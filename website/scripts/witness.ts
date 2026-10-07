@@ -138,6 +138,18 @@ const settleText = async (locator: Locator, wanted: (text: string) => boolean, l
 	return text;
 };
 
+/** Like settleText, but reads only what is rendered: Watch lines keep their other answers in hidden spans. */
+const settleInner = async (locator: Locator, wanted: (text: string) => boolean, label: string) => {
+	for (let attempt = 0; attempt < 40; attempt += 1) {
+		const text = (await locator.innerText()).trim();
+		if (wanted(text)) return text;
+		await new Promise((done) => setTimeout(done, 100));
+	}
+	const text = (await locator.innerText()).trim();
+	check(false, label, `never settled, last read "${text}"`);
+	return text;
+};
+
 try {
 	await waitFor(`${origin}/`);
 
@@ -826,23 +838,40 @@ try {
 
 		// --- widgets on the reading-tsrx page ------------------------------------
 		await page.goto(`${origin}/start/reading-tsrx`, { waitUntil: 'load' });
-		// The page walks through counter.tsrx line by line, so the fence it prints
-		// is the file the demo above it runs, not a second counter that differs.
+		// The page walks through counter.tsrx line by line, so the card's code box
+		// is the file the home page runs, not a second counter that differs.
 		const trimmedLines = (text: string) =>
 			text
 				.split('\n')
 				.map((line) => line.trim())
 				.filter((line) => line !== '');
-		const counterFence = (await page.locator('pre.shiki').allInnerTexts()).find((text) =>
-			text.includes('export default function Counter()'),
-		);
+		const lineCard = page.locator('section[data-preview="line-to-part"]');
 		const counterFile = trimmedLines(
 			await readFile(`${root}/components/demos/start/counter.tsrx`, 'utf8'),
 		);
+		const cardLines = trimmedLines(await lineCard.locator('.code').innerText());
 		check(
-			trimmedLines(counterFence ?? '').join('\n') === counterFile.join('\n'),
-			'the reading-tsrx page prints the counter file its demo runs',
-			trimmedLines(counterFence ?? '').join(' | '),
+			cardLines.join('\n') === counterFile.join('\n'),
+			'the reading-tsrx card prints the counter file line by line',
+			cardLines.join(' | '),
+		);
+		const lineWatch = lineCard.locator('.pv-watch-text');
+		check(
+			(await lineWatch.innerText()).includes('made the number'),
+			'the line card opens on the state line and the number it made',
+			await lineWatch.innerText(),
+		);
+		await lineCard.getByRole('button', { name: /^\s*<button onClick/ }).click();
+		await settleInner(
+			lineWatch,
+			(text) => text.includes('The markup made the button'),
+			'clicking the markup line names the button it made',
+		);
+		await lineCard.locator('.count').click();
+		await settleInner(
+			lineCard.locator('.count'),
+			(text) => text === 'Count 1',
+			'the counter inside the line card counts',
 		);
 		const readingDemos = page.locator('.code-block [data-code-stage]');
 		const labelledLine = readingDemos.nth(0).locator('p').first();
@@ -2188,112 +2217,313 @@ try {
 
 		// --- widget: the URL picker on the pages page -----------------------------
 		await page.goto(`${origin}/router/pages`, { waitUntil: 'load' });
-		const routeAnswer = page.locator('.playground .playground-output').first();
-		const routeNote = page.locator('.playground .explorer-note').first();
-		await routeAnswer.waitFor();
+		const urlCard = page.locator('section[data-preview="url-picker"]');
+		const routeWatch = urlCard.locator('.pv-watch-text');
+		await routeWatch.waitFor();
 		check(
-			((await routeAnswer.textContent()) ?? '').trim() ===
-				'pages/blog/[slug].tsrx answers, with params.slug = "hello".',
+			(await routeWatch.innerText()).startsWith('pages/blog/[slug].tsrx answers.') &&
+				(await urlCard.locator('.file.slug .param').innerText()) === 'slug = "hello"',
 			'the URL picker opens on the bracketed file and its parameter',
-			((await routeAnswer.textContent()) ?? '').trim(),
+			await routeWatch.innerText(),
 		);
-		await page.getByRole('button', { name: '/docs/guide/intro' }).click();
-		await settleText(
-			routeAnswer,
-			(text) =>
-				text === 'pages/docs/[...slug].mdx answers, with params.slug = "guide/intro".',
+		await urlCard.getByRole('button', { name: '/docs/guide/intro' }).click();
+		await settleInner(
+			routeWatch,
+			(text) => text.startsWith('pages/docs/[...slug].mdx answers.'),
 			'the URL picker answers with the catch-all file',
 		);
-		await page.getByRole('button', { name: '/docs', exact: true }).click();
-		await settleText(
-			routeAnswer,
-			(text) => text === 'pages/404.tsrx answers, with status 404.',
-			'a catch-all with nothing to catch falls through to the 404 page',
-		);
 		check(
-			((await routeNote.textContent()) ?? '').includes('at least one more part'),
-			'the URL picker explains why /docs matched nothing',
-			((await routeNote.textContent()) ?? '').slice(0, 60),
+			(await urlCard.locator('.file.rest .param').innerText()) === 'slug = "guide/intro"',
+			'the catch-all file row shows the whole rest of the path as one param',
+		);
+		await urlCard.getByRole('button', { name: '/docs', exact: true }).click();
+		await settleInner(
+			routeWatch,
+			(text) => text.startsWith('pages/404.tsrx answers.') && text.includes('at least one more part'),
+			'a catch-all with nothing to catch falls through to the 404 page, and the card says why',
 		);
 		await page.screenshot({ path: `${shotsDir}/T030-url-picker-after.png`, fullPage: true });
 
 		// --- widget: the link check on the links page -----------------------------
 		await page.goto(`${origin}/router/links`, { waitUntil: 'load' });
-		const linkLine = page.locator('.playground .file-lines').first();
-		const linkAnswer = page.locator('.playground .playground-output').first();
-		const linkNote = page.locator('.playground .explorer-note').first();
-		await linkAnswer.waitFor();
+		const linkCard = page.locator('section[data-preview="link-check"]');
+		const linkResult = linkCard.locator('.result');
+		await linkResult.waitFor();
 		check(
-			((await linkAnswer.textContent()) ?? '').trim() === 'The build passes.',
-			'the link widget opens on the link that builds',
-			((await linkAnswer.textContent()) ?? '').trim(),
+			(await linkResult.innerText()).startsWith('The build passes'),
+			'the link card opens on the link that builds',
+			await linkResult.innerText(),
 		);
-		await page.getByRole('button', { name: 'The folder was renamed' }).click();
-		await settleText(
-			linkAnswer,
-			(text) => text === 'The build stops.',
-			'the link widget stops the build after the rename',
+		await linkCard.getByRole('radio', { name: 'renamed' }).check();
+		await settleInner(
+			linkResult,
+			(text) => text.startsWith('The build stops') && text.includes('does not match any route'),
+			'the link card stops the build after the rename, with the error',
 		);
 		check(
-			((await linkLine.textContent()) ?? '').includes('/blogs/[slug]') &&
-				((await linkNote.textContent()) ?? '').includes('does not match any route'),
-			'the code line carries the renamed route and the note names the error',
-			((await linkNote.textContent()) ?? '').slice(0, 60),
+			(await linkCard.locator('.wide .code').innerText()).includes('/blogs/[slug]'),
+			'the code line carries the renamed route',
 		);
-		await page.getByRole('button', { name: 'The params are missing' }).click();
-		await settleText(
-			linkNote,
+		await linkCard.getByRole('radio', { name: 'no params' }).check();
+		await settleInner(
+			linkResult,
 			(text) => text.includes('requires params'),
-			'the link widget names the missing params',
+			'the link card names the missing params',
 		);
 		await page.screenshot({ path: `${shotsDir}/T030-link-check-after.png`, fullPage: true });
 
 		// --- widget: the streamed feed on the data page ---------------------------
 		await page.goto(`${origin}/router/data`, { waitUntil: 'load' });
-		const feedNote = page.locator('.playground .explorer-note').first();
-		const feedBody = page.locator('.playground .screen p').nth(1);
-		await feedNote.waitFor();
+		const feedCard = page.locator('section[data-preview="feed-steps"]');
+		const feedBody = feedCard.locator('.screen .text');
+		await feedBody.waitFor();
 		check(
-			((await feedNote.textContent()) ?? '').includes('Nothing has arrived yet'),
-			'the streamed feed starts at the request',
-			((await feedNote.textContent()) ?? '').slice(0, 60),
+			(await feedBody.innerText()) === 'Loading...' &&
+				(await feedCard.locator('.end').innerText()) === 'The response stays open.',
+			'the first part of the response carries the @pending content and leaves it open',
+			await feedBody.innerText(),
 		);
-		const nextPart = page.getByRole('button', { name: 'Next part' });
-		await nextPart.click();
-		await settleText(
-			feedBody,
-			(text) => text === 'Loading...',
-			'the first part of the response carries the @pending content',
-		);
-		await nextPart.click();
-		await settleText(
+		await feedCard.getByRole('button', { name: 'Next', exact: true }).click();
+		await settleInner(
 			feedBody,
 			(text) => text === 'Loaded for /feed',
 			'the same response then sends the @try content',
 		);
-		await page.getByRole('button', { name: 'Start over' }).click();
-		await settleText(
-			feedNote,
-			(text) => text.includes('Nothing has arrived yet'),
-			'the illustration can be replayed',
+		check(
+			(await feedCard.locator('.end').innerText()) === 'The response ends.',
+			'after the second part the response ends',
+		);
+		await feedCard.getByRole('radio', { name: 'quick' }).check();
+		await settleInner(
+			feedCard.locator('.part.one'),
+			(text) => text.includes('Loaded for /feed') && !text.includes('Loading...'),
+			'quick data goes out in the first part, and Loading... is never sent',
 		);
 		await page.screenshot({ path: `${shotsDir}/T030-feed-steps-after.png`, fullPage: true });
 
 		// --- widget: the endpoint picker on the API routes page ---------------------
 		await page.goto(`${origin}/router/api-routes`, { waitUntil: 'load' });
-		const apiNote = page.locator('.playground .explorer-note').first();
-		await apiNote.waitFor();
+		const apiCard = page.locator('section[data-preview="api-answers"]');
+		const apiWatch = apiCard.locator('.pv-watch-text');
+		await apiWatch.waitFor();
 		check(
-			((await apiNote.textContent()) ?? '').trim().startsWith('200 {"id":"42"}'),
+			(await apiWatch.innerText()).startsWith('users/[id].get.ts answers') &&
+				(await apiCard.locator('.reply .body').innerText()) === '200 {"id":"42"}',
 			'a GET to the users endpoint answers with its params',
-			((await apiNote.textContent()) ?? '').slice(0, 60),
+			await apiWatch.innerText(),
 		);
-		await page.getByRole('button', { name: 'POST', exact: true }).click();
-		await settleText(
-			apiNote,
-			(text) => text.startsWith('404 Not found. The file name says get'),
+		await apiCard.getByRole('radio', { name: 'POST', exact: true }).check();
+		await settleInner(
+			apiWatch,
+			(text) => text.startsWith('The file name says get, so a POST'),
 			'a POST finds no endpoint, because the file name says get',
 		);
+		check(
+			(await apiCard.locator('.reply .body').innerText()) === '404 Not found',
+			'the response box answers the POST with 404',
+		);
+
+		// --- widget: the build targets on the deploying page ------------------------
+		await page.goto(`${origin}/router/deploying`, { waitUntil: 'load' });
+		const buildCard = page.locator('section[data-preview="build-targets"]');
+		await buildCard.getByRole('radio', { name: 'vercel' }).check();
+		await settleInner(
+			buildCard.locator('.pv-watch-text'),
+			(text) => text.includes('.vercel/output/'),
+			'the vercel preset writes .vercel/output/ from the same app folder',
+		);
+		check(
+			(await buildCard.locator('.command').innerText()).includes('NITRO_PRESET=vercel npm run build'),
+			'the command box shows the preset variable',
+		);
+
+		// --- preview cards on the home, start, tooling, contributing and UI pages ----
+		// Each card is driven the way its page tells the reader to drive it.
+		const card = (name: string) => page.locator(`section[data-preview="${name}"]`);
+		const watchOf = (name: string) => card(name).locator('.pv-watch-text');
+
+		await page.goto(`${origin}/`, { waitUntil: 'load' });
+		await card('what-markless-noted').locator('.count').click();
+		await settleInner(
+			watchOf('what-markless-noted'),
+			(text) => text.startsWith('Click 1 ran count++'),
+			'the notes card says the click ran count++ and changed one piece of text',
+		);
+		check(
+			(await card('what-markless-noted').locator('.board').getAttribute('data-used')) === 'yes',
+			'after a click the notes and the number they name are marked',
+		);
+		await card('where-it-runs').getByRole('radio', { name: 'server' }).check();
+		await settleInner(
+			card('where-it-runs').locator('.bar'),
+			(text) => text.includes('renderToString()'),
+			'picking server changes the frame to HTML from renderToString()',
+		);
+		check(
+			(await card('where-it-runs').locator('.pg-tab:visible').first().innerText()) === 'server.ts',
+			'the code band switches to the server file',
+		);
+		await card('where-it-runs').locator('.count').click();
+		await settleInner(
+			watchOf('where-it-runs'),
+			(text) => text.includes('click 1 changed only the number'),
+			'the same counter counts in every place',
+		);
+
+		await page.goto(`${origin}/start/browser-only`, { waitUntil: 'load' });
+		const appCard = card('render-into-app');
+		check(
+			!(await appCard.locator('.count').isVisible()),
+			'#app starts empty before main.ts runs',
+		);
+		await appCard.getByRole('button', { name: 'Run main.ts' }).click();
+		await appCard.locator('.count').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+		await appCard.locator('.count').click();
+		await settleInner(
+			watchOf('render-into-app'),
+			(text) => text.includes('Click 1 changed only the number'),
+			'Run main.ts fills #app with the counter, and its click counts',
+		);
+		await appCard.getByRole('button', { name: 'Start over' }).click();
+		await settleInner(
+			watchOf('render-into-app'),
+			(text) => text.startsWith('Nothing has run yet'),
+			'Start over empties #app again',
+		);
+
+		await page.goto(`${origin}/tooling/editor-setup`, { waitUntil: 'load' });
+		const editorCard = card('editor');
+		check(
+			!(await editorCard.locator('.problem').isVisible()),
+			'with the plugin off there is no error under the code',
+		);
+		await editorCard.getByRole('switch').nth(1).click();
+		await editorCard.locator('.problem').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+		check(
+			await editorCard.locator('.problem').isVisible(),
+			'turning the plugin on shows the onClik error',
+		);
+		await editorCard.getByRole('switch').first().click();
+		await settleInner(
+			watchOf('editor'),
+			(text) => text.startsWith('Colours from the extension'),
+			'with both on, the card says which piece made what',
+		);
+
+		await page.goto(`${origin}/tooling/testing`, { waitUntil: 'load' });
+		const testCard = card('test-paths');
+		await testCard.getByRole('button', { name: 'Next', exact: true }).click();
+		await settleInner(
+			watchOf('test-paths'),
+			(text) => text.startsWith('The test clicks the button'),
+			'Next steps the test to its click',
+		);
+		check(
+			(await testCard.locator('.count-button').innerText()) === 'Count 1',
+			'after the click step the counter reads Count 1',
+		);
+		await testCard.getByRole('radio', { name: 'renderSSR' }).check();
+		await settleInner(
+			watchOf('test-paths'),
+			(text) => text.startsWith('The test server renders Counter to HTML'),
+			'renderSSR changes only the first step',
+		);
+
+		await page.goto(`${origin}/tooling/type-checking`, { waitUntil: 'load' });
+		const typeCard = card('typecheck');
+		await typeCard.getByRole('button', { name: 'Check', exact: true }).click();
+		await typeCard.locator('.error').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+		check(
+			(await typeCard.locator('.error').innerText()).includes('TS2322'),
+			'Check puts the TS2322 error under line 4 of App.tsrx',
+		);
+		await typeCard.getByRole('radio', { name: '"Home"' }).check();
+		await typeCard.getByRole('button', { name: 'Check', exact: true }).click();
+		await settleInner(
+			watchOf('typecheck'),
+			(text) => text.startsWith('No errors'),
+			'a string label checks clean',
+		);
+
+		await page.goto(`${origin}/contributing`, { waitUntil: 'load' });
+		await card('repo-map').getByRole('button', { name: 'web', exact: true }).click();
+		await settleInner(
+			watchOf('repo-map'),
+			(text) => text.startsWith('@markless/web') && text.includes('Imported by: bundler, core, router, vitest-browser'),
+			'picking web names its job and the packages that import it',
+		);
+
+		await page.goto(`${origin}/contributing/ci`, { waitUntil: 'load' });
+		await card('ci-modes').getByRole('radio', { name: '--full' }).check();
+		await settleInner(
+			card('ci-modes').locator('.job.full .state'),
+			(text) => text === 'Runs',
+			'--full moves the eight full jobs to Runs',
+		);
+
+		await page.goto(`${origin}/contributing/improve-the-docs`, { waitUntil: 'load' });
+		const typoCard = card('typo-count');
+		check((await typoCard.locator('.part:visible').count()) === 0, 'part names start hidden');
+		await typoCard.getByRole('switch').click();
+		await settleInner(
+			typoCard.locator('.pg-controls'),
+			(text) => text.includes('<Controls>'),
+			'Part names labels each band with the part that draws it',
+		);
+		check((await typoCard.locator('.part:visible').count()) === 4, 'all four part names show');
+
+		await page.goto(`${origin}/ui`, { waitUntil: 'load' });
+		const addressCard = card('edit-address');
+		await addressCard.getByRole('button', { name: 'Edit address' }).click();
+		await page.keyboard.press('Tab');
+		await page.keyboard.press('Tab');
+		await settleInner(
+			watchOf('edit-address'),
+			(text) => text.includes('inside the dialog') && text.includes('Tab pressed 2 times'),
+			'Tab keeps focus inside the dialog, and the card counts the presses',
+		);
+		await page.keyboard.press('Escape');
+		await settleInner(
+			watchOf('edit-address'),
+			(text) => text === 'The dialog closed, and focus went back to Edit address.',
+			'Escape closes the dialog and focus goes back to the trigger',
+		);
+		const partsCard = card('modal-parts');
+		await partsCard.getByRole('button', { name: 'Edit address' }).click();
+		await settleInner(
+			watchOf('modal-parts'),
+			(text) => text.startsWith('Open.'),
+			'opening the drawn modal says which parts carry ui-open',
+		);
+		check(
+			(await partsCard.locator('[ui-open]').count()) === 4,
+			'exactly root, trigger, backdrop and content carry ui-open',
+			String(await partsCard.locator('[ui-open]').count()),
+		);
+		await page.keyboard.press('Escape');
+		await card('select-everywhere').getByRole('radio', { name: 'server' }).check();
+		await settleInner(
+			watchOf('select-everywhere'),
+			(text) => text.includes('A server wrote its HTML first'),
+			'the select card names the server path',
+		);
+
+		await page.goto(`${origin}/ui/styling`, { waitUntil: 'load' });
+		const layerCard = card('layer-wins');
+		const tipSide = () =>
+			layerCard.evaluate((node) => {
+				const save = node.querySelector('.save')!.getBoundingClientRect();
+				const tip = node.querySelector('.tip')!.getBoundingClientRect();
+				return tip.left >= save.right - 1 ? 'right' : tip.bottom <= save.top + 1 ? 'above' : 'other';
+			});
+		check((await tipSide()) === 'above', 'the layered default puts the tip above Save', await tipSide());
+		await layerCard.getByRole('switch').click();
+		for (let attempt = 0; attempt < 40; attempt += 1) {
+			if ((await tipSide()) === 'right') break;
+			await new Promise((done) => setTimeout(done, 100));
+		}
+		check((await tipSide()) === 'right', 'your plain rule moves the tip right of Save', await tipSide());
+		await page.screenshot({ path: `${shotsDir}/T038-layer-wins-after.png`, fullPage: true });
 
 		// --- widget: the state graph demo ------------------------------------------
 		// One write moves the state and the computed that reads it, nothing else.
