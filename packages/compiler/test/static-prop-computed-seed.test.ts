@@ -187,3 +187,29 @@ test('composition drops a seeded derive key the composer routes live, keeps a st
 	expect(JSON.stringify(carried)).toContain('label');
 	expect(JSON.stringify(carried)).not.toContain('weight');
 });
+
+// A row handler reads its item out of the collection at resume, and resume
+// matches served rows to items by reading it, so a prop collection is served.
+test('SSR seeds the prop a component iterates, and nothing else of the bag', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Choices.tsrx',
+		source: `
+import { state } from '@markless/core';
+export function Choices({ heading, choices, children }) @{
+	let last = state('');
+	<div>
+		<h2>{heading}</h2>
+		@for (const choice of choices; key choice) {
+			<button onClick={() => { last = choice; }}>{choice}</button>
+		}
+		{children}
+	</div>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderModule.ssrModuleSource).toContain(
+		'props, [{"graphNodeId":"prop:props","keys":[],"rowKeys":["choices"]}])',
+	);
+});

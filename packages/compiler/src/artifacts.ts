@@ -1885,6 +1885,8 @@ export type ExtractedCaptureSymbol = {
 	readonly touchesPageSpaceGraph?: true;
 	/** Where the symbol's component sits below the edge that binds it, for a claim a child republished from its own child. */
 	readonly innerInstancePath?: string;
+	/** A claim the child passed on from one of its own children: its id is that grandchild's, not one the child declared. */
+	readonly forwarded?: true;
 	readonly captureSlots: ReadonlyArray<CaptureSlot>;
 };
 

@@ -70,3 +70,95 @@ test('an intermediate edge rebinds the nested child claim without claiming the c
 	const nested = marklessBoundSymbolId(toChild, childHandler.symbolId);
 	expect(marklessBoundSymbolId(toMiddle, nested)).toBe(childRow.id);
 });
+
+// The child's own handler and a grandchild's handler composed inside it can both
+// be `symbol:0`: the edge into the child binds only the child's own.
+test("an edge binding its child's own symbol does not take a grandchild's bound id of the same local id", () => {
+	const intoChild = {
+		symbolPrefix: 'c0:',
+		boundSymbols: { 'symbol:0': 'bound:symbol%3A0:component-edge%3A0' },
+	};
+	const grandchild = 'bound:symbol%3A0:component-edge%3A2[b=;k=repeat%3A0]';
+	expect(marklessBoundSymbolId(intoChild, 'symbol:0')).toBe(
+		'bound:symbol%3A0:component-edge%3A0',
+	);
+	expect(marklessBoundSymbolId(intoChild, grandchild)).toBe(`c0:${grandchild}`);
+});
+
+test('a claim the child forwards from its own child still rebinds through the edge into the child', async () => {
+	const songSource = `export function Song({ name, onSelect }) @{
+		<button type="button" onClick={() => onSelect(name)}>{name}</button>
+	}`;
+	const song = await compileTsrxModule({
+		filename: 'src/Song.tsrx',
+		source: songSource,
+		symbols: [],
+	});
+	const songHandler = song.captureAnalysis.extractedSymbols.find(
+		(symbol) => symbol.kind === 'event-handler',
+	)!;
+	const songInput = {
+		id: 'imported:Song:symbol:0',
+		chunk: 'virtual:markless:symbol:Song:0',
+		exportName: 'songHandler',
+		componentEdgeId: 'component-edge:0',
+		captureSymbol: songHandler,
+	};
+	const library = await compileTsrxModule({
+		filename: 'src/Library.tsrx',
+		source: `import { Song } from './Song.tsrx';
+	export function Library({ name, onPick }) @{
+		<section><Song name={name} onSelect={onPick} /></section>
+	}`,
+		symbols: [songInput],
+	});
+	const forwarded = library.captureAnalysis.extractedSymbols.find(
+		(symbol) => symbol.loaderSymbolId === songInput.id,
+	)!;
+	const libraryRow = library.boundSymbolResolver.rows.find(
+		(row) => row.loaderSymbolId === songInput.id,
+	)!;
+	const app = await compileTsrxModule({
+		filename: 'src/App.tsrx',
+		source: `import { state } from '@markless/core';
+	import { Library } from './Library.tsrx';
+	function Lead() @{
+		<h1>Songs</h1>
+	}
+	export function App() @{
+		let picked = state('none');
+		<main>
+			<Lead />
+			<Library name="cedar" onPick={(value) => picked = value} />
+			<output>{picked}</output>
+		</main>
+	}`,
+		symbols: [
+			{
+				id: 'imported:Library:symbol:0',
+				chunk: 'virtual:markless:symbol:Song:0',
+				exportName: 'songHandler',
+				componentEdgeId: 'component-edge:1',
+				captureSymbol: forwarded,
+			},
+		],
+	});
+	const toLibrary = (
+		app.publicRenderModule.componentDefinitions as ReadonlyArray<{
+			readonly name: string;
+			readonly edges?: ReadonlyArray<{
+				readonly id: string;
+				readonly symbolPrefix: string;
+				readonly boundSymbols?: Readonly<Record<string, string>>;
+			}>;
+		}>
+	)
+		.find((definition) => definition.name === 'App')!
+		.edges!.find((edge) => edge.id === 'component-edge:1')!;
+	const appRow = app.boundSymbolResolver.rows.find(
+		(row) => row.loaderSymbolId === 'imported:Library:symbol:0',
+	)!;
+
+	expect(appRow.id).not.toBe(libraryRow.id);
+	expect(marklessBoundSymbolId(toLibrary, libraryRow.id)).toBe(appRow.id);
+});

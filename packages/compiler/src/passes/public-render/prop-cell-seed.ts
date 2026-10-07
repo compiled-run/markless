@@ -85,6 +85,34 @@ function rowTemplatePropKeys(input: PublicRenderModuleInput, componentName: stri
 	return keys;
 }
 
+// The props this component's own `@for` iterates: resume matches each served row
+// to its item, and a row handler reads its binding, from the collection.
+function repeatCollectionPropKeys(
+	input: PublicRenderModuleInput,
+	componentName: string,
+	bagCellId: string,
+): Set<string> {
+	const keys = new Set<string>();
+	for (const chunk of input.renderData.chunks) {
+		if (chunk.componentName !== componentName) continue;
+		for (const slot of chunk.slots) {
+			if (slot.kind !== 'repeat') continue;
+			const repeat = input.renderData.repeats.find(
+				(candidate) => candidate.repeatId === slot.repeatId,
+			);
+			const key = repeat?.collectionPath[0];
+			if (
+				key &&
+				key !== '*' &&
+				(repeat.collectionGraphNodeId === PROTOCOL_PROPS_GRAPH_NODE_ID ||
+					repeat.collectionGraphNodeId === bagCellId)
+			)
+				keys.add(key);
+		}
+	}
+	return keys;
+}
+
 /**
  * The prop cells this component's server render has to leave in the payload. A
  * bag cell keeps only the properties something reads back: a props bag can hold
@@ -119,7 +147,12 @@ export function ssrPropCellSeeds(
 	}
 
 	const rowKeysByCell = new Map<string, Set<string>>();
-	const rowKeys = bagCellId ? rowTemplatePropKeys(input, componentName) : new Set<string>();
+	const rowKeys = bagCellId
+		? new Set([
+				...rowTemplatePropKeys(input, componentName),
+				...repeatCollectionPropKeys(input, componentName, bagCellId),
+			])
+		: new Set<string>();
 	for (const key of rowKeys)
 		if (!armKeysByCell.get(bagCellId!)?.has(key) && !deriveKeysByCell.get(bagCellId!)?.has(key))
 			rowKeysByCell.set(bagCellId!, (rowKeysByCell.get(bagCellId!) ?? new Set()).add(key));

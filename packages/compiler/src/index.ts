@@ -52,6 +52,7 @@ export type {
 export {
 	MODULE_LINK_PASS_ID,
 	linkBarrelComponents,
+	overlayBarrelInterfaces,
 	linkImportedModules,
 	linkedChildrenHaveBrowserTriggers,
 	linkedImportedClaimKind,

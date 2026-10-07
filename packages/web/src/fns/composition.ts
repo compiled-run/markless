@@ -874,13 +874,13 @@ export function marklessCsrRemapChildKeyedRepeat(
 	if (!graphNodeId) return null;
 	const propName = marklessCompositionPropName(graphNodeId, repeat.collectionPath);
 	let mapped: ComposeGraphRead | null;
-	if (propName === null)
+	// A static prop never moves, but its rows still resume against it: the child's own seeded prop cell holds it.
+	if (propName === null || marklessCompositionGraphProp(graphProps, propName) === null)
 		mapped = {
 			graphNodeId: marklessComposedGraphNodeId(graphNodeId, instancePath),
 			path: repeat.collectionPath,
 		};
 	else {
-		if (marklessCompositionGraphProp(graphProps, propName) === null) return null;
 		mapped = marklessCsrRemapChildGraph(
 			{ graphNodeId, path: repeat.collectionPath },
 			graphProps,

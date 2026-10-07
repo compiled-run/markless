@@ -104,6 +104,14 @@ The `ui()` Vite plugin from the new `@markless/ui-tools` package sets this up.
   build.
 - Text that joins a `const` from the component body with state, like
   `{label} {count}`, keeps the `const` part when the state changes.
+- A click handler on a `@for` row over a component's props, such as
+  `onClick={() => onPick(option)}`, receives its own row and keeps working
+  after the first click.
+- Parts of a library widget rendered inside a component whose own handlers read
+  its props, such as `@markless/ui` tab triggers, run their own handlers instead
+  of the component's.
+- A component imported through another `.tsrx` module that re-exports it, like
+  `export { default as Code } from './code.tsrx'`, renders.
 
 ## 0.3.3
 

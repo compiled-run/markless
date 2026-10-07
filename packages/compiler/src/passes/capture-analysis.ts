@@ -197,6 +197,10 @@ function importedCaptureSymbols(
 		if (!edge) return [];
 		if (!claimBelongsToEdge(symbol, edge, input)) return [];
 		const captureSymbol = symbol.captureSymbol;
+		const forwarded =
+			captureSymbol.loaderSymbolId !== undefined || captureSymbol.forwarded === true
+				? ({ forwarded: true } as const)
+				: {};
 		// A child's own claim it could not bind: its slots already name the child's routes, save the props it forwards.
 		const republished = captureSymbol.innerInstancePath !== undefined;
 		// One route per ancestry the edge is rendered under, as a local symbol's routes are.
@@ -214,6 +218,7 @@ function importedCaptureSymbols(
 				{
 					...captureSymbol,
 					loaderSymbolId: symbol.id,
+					...forwarded,
 					captureSlots: captureSymbol.captureSlots.flatMap((slot) =>
 						slot.routes.some((route) => route.kind === 'widget-callback-route')
 							? [
@@ -237,6 +242,7 @@ function importedCaptureSymbols(
 				// Republished to this module's composers, the claim belongs to the component that composes its owner here.
 				owner: { componentName: edge.parentComponentName },
 				loaderSymbolId: symbol.id,
+				...forwarded,
 				captureSlots: symbol.captureSymbol.captureSlots
 					.map((slot) => ({
 						...slot,

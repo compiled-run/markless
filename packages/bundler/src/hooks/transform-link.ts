@@ -10,6 +10,7 @@ import {
 	linkedImportedSymbolInputs,
 	linkedManifestHasBrowserTriggers,
 	linkedModuleChildKey,
+	overlayBarrelInterfaces,
 	renderDataReachImportSources,
 } from '@markless/compiler';
 import {
@@ -36,7 +37,11 @@ import type {
 	TransformTsrxModuleInput,
 	TransformTsrxModuleResult,
 } from '../types.ts';
-import { isSymbolOnlySourceRequest, materializedReachedRenderDataSource } from '../virtual-ids.ts';
+import {
+	TSRX_SOURCE_FILE,
+	isSymbolOnlySourceRequest,
+	materializedReachedRenderDataSource,
+} from '../virtual-ids.ts';
 import { recoverImportedChildMetadata } from './resolve-load.ts';
 import type { TransformRequest } from './transform-request.ts';
 
@@ -152,22 +157,37 @@ export async function linkTransformChildren(
 		transformed.moduleImports,
 		fallbackImportedSource,
 	);
-	const barrelComponents =
-		resolvedBarrels ??
-		(await linkBarrelComponentInterfaces(
+	const linkBarrels = (moduleImports: typeof transformed.moduleImports) =>
+		linkBarrelComponentInterfaces(
 			pluginContext,
 			manifestSource,
-			transformed.moduleImports,
+			moduleImports,
 			moduleLinkArtifacts,
 			internalOptions.buildId,
 			ctx.getRoot(),
-		));
-	// The interfaces this module links: the barrel's synthetic entry first, so a
-	// real compiled interface for the same specifier always wins.
-	const barrelLinkedInterfaces = () => ({
-		...barrelComponents.interfaces,
-		...linkedInterfaces(barrelComponents.children, moduleLinkArtifacts).interfaces,
-	});
+			resolvedInterfaceImports,
+		);
+	// A walk run before this one skipped `.tsrx` imports; only their re-exports are added to it.
+	const tsrxReexports = resolvedBarrels
+		? await linkBarrels(
+				transformed.moduleImports.filter((moduleImport) =>
+					TSRX_SOURCE_FILE.test(moduleImport.source),
+				),
+			)
+		: undefined;
+	const barrelComponents =
+		resolvedBarrels && tsrxReexports
+			? {
+					interfaces: { ...resolvedBarrels.interfaces, ...tsrxReexports.interfaces },
+					children: mergeLinkedModuleChildren(resolvedBarrels.children, tsrxReexports.children),
+				}
+			: await linkBarrels(transformed.moduleImports);
+	// A real compiled interface wins over the barrel walk's entry, keeping the components the walk found it re-exporting.
+	const barrelLinkedInterfaces = () =>
+		overlayBarrelInterfaces(
+			barrelComponents.interfaces,
+			linkedInterfaces(barrelComponents.children, moduleLinkArtifacts).interfaces,
+		);
 	// A barrel names the parts module, not the components; the symbol routes
 	// below must already point at the `.tsrx` files, so the link runs before
 	// children are resolved from the manifest.
@@ -270,7 +290,7 @@ export async function linkTransformChildren(
 		linkedTransformInput = {
 			...linkedTransformInput,
 			symbols,
-			importedModuleInterfaces: { ...barrelLinkedInterfaces(), ...linkedGraph.interfaces },
+			importedModuleInterfaces: overlayBarrelInterfaces(barrelLinkedInterfaces(), linkedGraph.interfaces),
 			...(renderDataImportSources ? { renderDataImportSources } : {}),
 			linkedStyleModuleIds: [
 				...new Set(

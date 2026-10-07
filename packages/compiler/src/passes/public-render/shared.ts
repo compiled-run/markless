@@ -50,15 +50,23 @@ export function callbackSymbolIds(input: PublicRenderModuleInput): ReadonlyMap<s
 		),
 		...(input.captureAnalysis.boundResolverRows ?? []).flatMap((row) =>
 			row.componentEdgePath.flatMap((edgeId, index, path) => {
-				const childSymbolId = row.loaderSymbolId
+				const claim = row.loaderSymbolId
 					? input.captureAnalysis.extractedSymbols.find(
 							(symbol) => symbol.loaderSymbolId === row.loaderSymbolId,
-						)?.symbolId
-					: row.baseSymbolId;
+						)
+					: undefined;
+				const childSymbolId = row.loaderSymbolId ? claim?.symbolId : row.baseSymbolId;
 				if (!childSymbolId) return [];
 				// An outer edge's child owns its own ids, so only an inner bound id may rebind through it.
-				const key = index === path.length - 1 ? childSymbolId : boundSymbolIdPrefix(childSymbolId);
-				return [[`bound:${edgeId}:${key}`, row.id] as const];
+				if (index < path.length - 1)
+					return [[`bound:${edgeId}:${boundSymbolIdPrefix(childSymbolId)}`, row.id] as const];
+				// A forwarded claim reaches this edge as the bound id its child composed, never as the child's own id.
+				return [
+					[`bound:${edgeId}:${childSymbolId}`, row.id] as const,
+					...(claim?.forwarded
+						? [[`bound:${edgeId}:${boundSymbolIdPrefix(childSymbolId)}`, row.id] as const]
+						: []),
+				];
 			}),
 		),
 	]);

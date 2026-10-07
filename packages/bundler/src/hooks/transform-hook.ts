@@ -1,6 +1,6 @@
 // Runs the transform hook as named steps: plans the request, produces the
 // first-pass transform, then drives the link and emit steps in order.
-import { compileTsrxModuleLinkArtifact } from '@markless/compiler';
+import { compileTsrxModuleLinkArtifact, overlayBarrelInterfaces } from '@markless/compiler';
 import type { TransformPluginContext } from 'rolldown';
 import { importedModuleConstants, missingConstantSources } from './module-constants.ts';
 import {
@@ -279,6 +279,7 @@ async function runFirstPassTransform(
 					moduleLinkArtifacts,
 					internalOptions.buildId,
 					ctx.getRoot(),
+					provisionalImports,
 				);
 			} catch {
 				throw error;
@@ -304,15 +305,14 @@ async function runFirstPassTransform(
 			);
 			linkedTransformInput = {
 				...transformInput,
-				// The barrel's synthetic entries first, so a real compiled interface
-				// for the same specifier always wins.
-				importedModuleInterfaces: {
-					...provisionalBarrels.interfaces,
-					...linkModuleGraph(provisionalChildren, {
+				// A real compiled interface wins over the barrel walk's entry, keeping the components the walk found it re-exporting.
+				importedModuleInterfaces: overlayBarrelInterfaces(
+					provisionalBarrels.interfaces,
+					linkModuleGraph(provisionalChildren, {
 						moduleArtifacts: moduleLinkArtifacts,
 						metadata: moduleMetadata,
 					}).interfaces,
-				},
+				),
 			};
 			linkedTransformResult = await transformTsrxModule(linkedTransformInput);
 		}

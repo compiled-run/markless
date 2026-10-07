@@ -420,10 +420,16 @@ function walkBarrels(input: {
 	readonly moduleImports: BarrelComponentLinkInput['moduleImports'];
 	readonly resolve: (specifier: string, importer: string) => string | null;
 	readonly interfaces: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
+	/** The driver already resolved these `.tsrx` imports and asks for their re-exports. */
+	readonly followTsrxImports?: boolean;
 }) {
 	declaredFiles.clear();
 	for (const filename of Object.keys(input.interfaces)) declaredFiles.add(filename);
 	const resolution: Record<string, string | null> = {};
+	if (input.followTsrxImports)
+		for (const { source } of input.moduleImports)
+			if (source.endsWith('.tsrx'))
+				resolution[moduleLinkResolutionKey(source, input.parent)] = input.resolve(source, input.parent);
 	const read = new Map<string, ModuleGraphInterfaceArtifact | null>();
 	const call = () =>
 		linkBarrelComponents({
@@ -432,6 +438,7 @@ function walkBarrels(input: {
 			resolution,
 			moduleInterface: (filename) => read.get(filename),
 			rebase: (target) => `./${target.slice('/app/'.length)}`,
+			followTsrxImports: input.followTsrxImports,
 		});
 	let artifact = call();
 	for (let round = 0; artifact.pendingResolutions.length + artifact.pendingInterfaces.length;) {
@@ -622,4 +629,100 @@ test('separate named imports retain both component branches from one barrel', ()
 	expect(
 		artifact.interfaces['./library.ts']?.linkedComponents?.map((part) => part.exportPath),
 	).toEqual([['second'], ['first']]);
+});
+
+test('a .tsrx module that re-exports a component links it like a .ts barrel', () => {
+	const artifact = walkBarrels({
+		followTsrxImports: true,
+		parent: '/app/Consumer.tsrx',
+		moduleImports: [
+			{ source: './parts.tsrx', kind: 'named', importedName: 'Code' },
+			{ source: './parts.tsrx', kind: 'named', importedName: 'Badge' },
+			{ source: './parts.tsrx', kind: 'named', importedName: 'Own' },
+		],
+		resolve: joinResolve,
+		interfaces: {
+			'/app/parts.tsrx': {
+				...componentInterface('/app/parts.tsrx', 'Own', 'Own'),
+				reexports: [
+					{ exportName: 'Code', source: './code/code.tsrx', importedName: 'default' },
+					{ exportName: 'Badge', source: './badge.tsrx', importedName: 'Badge' },
+				],
+			},
+			'/app/code/code.tsrx': componentInterface(
+				'/app/code/code.tsrx',
+				'CodeBlock',
+				'default',
+			),
+			'/app/badge.tsrx': componentInterface('/app/badge.tsrx', 'Badge', 'Badge'),
+		},
+	});
+	expect(artifact.diagnostics).toEqual([]);
+	expect(artifact.children.map((child) => child.source)).toEqual([
+		'/app/code/code.tsrx',
+		'/app/badge.tsrx',
+	]);
+	const parts = artifact.interfaces['./parts.tsrx'];
+	expect(parts?.render.components.map((component) => component.componentName)).toEqual(['Own']);
+	expect(parts?.linkedComponents).toEqual([
+		{
+			exportPath: ['Code'],
+			source: './code/code.tsrx',
+			importKind: 'default',
+			componentName: 'CodeBlock',
+		},
+		{
+			exportPath: ['Badge'],
+			source: './badge.tsrx',
+			importKind: 'named',
+			importedName: 'Badge',
+			componentName: 'Badge',
+		},
+	]);
+});
+
+test('a .ts barrel reaches a component through a .tsrx module that re-exports it', () => {
+	const artifact = walkBarrels({
+		parent: '/app/Consumer.tsrx',
+		moduleImports: [{ source: './index.ts', kind: 'named', importedName: 'Panel' }],
+		resolve: joinResolve,
+		interfaces: {
+			'/app/index.ts': barrelInterface('/app/index.ts', [
+				{ exportName: 'Panel', source: './parts.tsrx', importedName: 'Box' },
+			]),
+			'/app/parts.tsrx': barrelInterface('/app/parts.tsrx', [
+				{ exportName: 'Box', source: './box.tsrx', importedName: 'default' },
+			]),
+			'/app/box.tsrx': componentInterface('/app/box.tsrx', 'Box', 'default'),
+		},
+	});
+	expect(artifact.diagnostics).toEqual([]);
+	expect(artifact.interfaces['./index.ts']?.linkedComponents).toEqual([
+		{
+			exportPath: ['Panel'],
+			source: './box.tsrx',
+			importKind: 'default',
+			componentName: 'Box',
+		},
+	]);
+});
+
+test('a .tsrx import the driver has not resolved is not followed', () => {
+	const requested: string[] = [];
+	const artifact = walkBarrels({
+		parent: '/app/Consumer.tsrx',
+		moduleImports: [{ source: './parts.tsrx', kind: 'named', importedName: 'Badge' }],
+		resolve: (source, parent) => {
+			requested.push(source);
+			return joinResolve(source, parent);
+		},
+		interfaces: {
+			'/app/parts.tsrx': barrelInterface('/app/parts.tsrx', [
+				{ exportName: 'Badge', source: './badge.tsrx', importedName: 'Badge' },
+			]),
+			'/app/badge.tsrx': componentInterface('/app/badge.tsrx', 'Badge', 'Badge'),
+		},
+	});
+	expect(requested).toEqual([]);
+	expect(artifact.interfaces).toEqual({});
 });

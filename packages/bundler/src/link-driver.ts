@@ -198,11 +198,24 @@ export async function linkBarrelComponentInterfaces(
 	artifacts: ReadonlyMap<string, MarklessModuleLinkArtifact>,
 	buildId: string | undefined,
 	root: string | undefined,
+	resolvedImports: ReadonlyArray<LinkedModuleChildResolution> = [],
 ): Promise<{
 	readonly interfaces: Record<string, ModuleGraphInterfaceArtifact>;
 	readonly children: ReadonlyArray<LinkedModuleChildResolution>;
 }> {
 	const resolution: Record<string, string | null> = {};
+	// Imports the caller already resolved: a `.tsrx` one is followed for its re-exports at no further resolve.
+	const imported = new Set<string>();
+	for (const resolved of resolvedImports)
+		if (!resolved.externalized) {
+			const id = pathname(resolved.source);
+			resolution[moduleLinkResolutionKey(resolved.specifier, resolved.parent)] = id;
+			imported.add(id);
+		}
+	// A direct import is already in the module graph; watching it as well breaks a server runner's HMR.
+	const watchFile = (file: string) => {
+		if (!imported.has(file)) context.addWatchFile?.(file);
+	};
 	const interfacesByFile = new Map<string, ModuleGraphInterfaceArtifact | null>();
 	const rebase = (target: string) => {
 		const specifier = relative(dirname(parent), target);
@@ -225,6 +238,7 @@ export async function linkBarrelComponentInterfaces(
 		resolution,
 		moduleInterface: (filename: string) => interfacesByFile.get(filename),
 		rebase,
+		followTsrxImports: resolvedImports.length > 0,
 	});
 
 	let artifact = linkBarrelComponents(passInput());
@@ -253,9 +267,7 @@ export async function linkBarrelComponentInterfaces(
 			artifact.pendingInterfaces.map(async (filename) => {
 				interfacesByFile.set(
 					filename,
-					await barrelModuleInterface(filename, artifacts, buildId, root, (file) =>
-						context.addWatchFile?.(file),
-					),
+					await barrelModuleInterface(filename, artifacts, buildId, root, watchFile),
 				);
 			}),
 		);
