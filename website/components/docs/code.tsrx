@@ -358,9 +358,23 @@ export default function Code({
 				display: none;
 			}
 
-			html.dark .code-block[data-skin='image']::before,
+			html.dark .code-block[data-skin='image']::before {
+				background:
+					url('/notebook/tl-dark.png') left top / 56px 50px no-repeat,
+					url('/notebook/tr-dark.png') right top / 42px 32px no-repeat,
+					url('/notebook/bl-dark.png') left bottom / 64px 32px no-repeat,
+					url('/notebook/br-dark.png') right bottom / 42px 32px no-repeat,
+					url('/notebook/top-dark.png') 56px top / calc(100% - 98px) 32px no-repeat,
+					url('/notebook/bottom-dark.png') 64px bottom / calc(100% - 106px) 32px no-repeat,
+					url('/notebook/right-dark.png') right 32px / 32px calc(100% - 64px) no-repeat;
+			}
+
+			html.dark .code-block[data-skin='image'] {
+				--paper: var(--raised);
+			}
+
 			html.dark .code-block[data-skin='image'] .rings {
-				filter: invert(1) hue-rotate(180deg);
+				background-image: url('/notebook/coil-dark.png');
 			}
 
 			@media (prefers-reduced-motion: reduce) {
