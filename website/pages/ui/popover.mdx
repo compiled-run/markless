@@ -1,7 +1,6 @@
 import AnatomyTable from '../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import PopoverDemo from '../../components/demos/ui/popover/basic.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 
 <Sidebar />
@@ -10,29 +9,9 @@ import Callout from '../../components/docs/callout.tsrx';
 
 <ThemeToggle />
 
-<PopoverDemo shows="Pinned open here. Press Share, Escape, or outside to close it." />
+<Playground scenario="basic" />
 
-```tsrx
-import { popover } from '@markless/ui';
-
-const chip =
-	'padding: 0.5em 0.9em; border: 2px solid var(--ink); border-radius: 6px; background: var(--paper); color: var(--ink); font: inherit; font-weight: 700; cursor: pointer;';
-const surface =
-	'display: grid; gap: 0.5em; width: min(19rem, 100%); margin-block-start: 0.5em; padding: 0.9em; border: 2px solid var(--ink); border-radius: 6px; background: var(--raised); box-shadow: 3px 3px 0 var(--ink); text-align: left;';
-
-export default function Share() @{
-	<popover.root open={true} style="display: grid; justify-items: center;">
-		<popover.trigger style={chip}>Share</popover.trigger>
-		<popover.content style={surface}>
-			<popover.title style="margin: 0; font-size: var(--step-0);">Share this page</popover.title>
-			<popover.description style="margin: 0; font-size: var(--step--1);">
-				Anyone holding the link can read it.
-			</popover.description>
-			<popover.close style={chip}>Copy link</popover.close>
-		</popover.content>
-	</popover.root>
-}
-```
+Press **Share** to open the panel. Press it again, press Escape, or click outside to close it.
 
 `popover` is a panel that a button opens next to itself. Use it for a small task, such as a share
 link or a filter. The rest of the page stays usable.

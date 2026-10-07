@@ -1,8 +1,126 @@
-import Preview from '../../../ui/preview.tsrx';
-import Notifications from './notifications.tsrx';
+import { state } from '@markless/core';
+import { toggle } from '@markless/ui';
 
-export default function ToggleDemo({ shows }: { readonly shows: string }) @{
-	<Preview shows={shows}>
-		<Notifications />
-	</Preview>
+export default function ToggleBasic() @{
+	let on = state(false);
+
+	<toggle.root
+		class="row"
+		name="notifications"
+		checked={on}
+		onChange={(next: boolean) => {
+			on = next;
+		}}
+	>
+		<div class="words">
+			<toggle.label class="label">Email me when an order ships</toggle.label>
+			<p class="now">{on ? 'On: we send one email per order.' : 'Off: no emails.'}</p>
+		</div>
+		<toggle.trigger class="track">
+			<toggle.thumb class="thumb" />
+		</toggle.trigger>
+		<toggle.field />
+
+		<style>
+			.row {
+				display: flex;
+				gap: 1.5em;
+				align-items: center;
+				justify-content: space-between;
+				box-sizing: border-box;
+				width: min(26rem, 100%);
+				padding: 0.85em 1em;
+				border: 1px solid var(--ink);
+				border-radius: 6px;
+				font-family: 'Shantell Sans', system-ui, sans-serif;
+				font-size: var(--step--1);
+				line-height: 1.5;
+				color: var(--ink);
+				transition: background 140ms ease;
+			}
+
+			.row[ui-checked] {
+				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+			}
+
+			.words {
+				display: grid;
+				gap: 0.15em;
+			}
+
+			.label {
+				font-family: 'Shantell Sans', system-ui, sans-serif;
+				font-size: var(--step-0);
+				cursor: pointer;
+			}
+
+			.row:has(:required) .label::after {
+				content: ' (required)';
+				color: var(--muted-ink);
+				font-size: var(--step--1);
+			}
+
+			.now {
+				margin: 0;
+				font-family: 'Shantell Sans', system-ui, sans-serif;
+			}
+
+			.track {
+				position: relative;
+				flex: none;
+				box-sizing: border-box;
+				width: 3em;
+				height: 1.65em;
+				padding: 0;
+				border: 1px solid var(--ink);
+				border-radius: 999px;
+				background: color-mix(in srgb, var(--switch-off) 20%, var(--paper));
+				cursor: pointer;
+				transition: background 140ms ease;
+			}
+
+			.track[ui-checked] {
+				background: color-mix(in srgb, var(--switch-on) 65%, var(--paper));
+			}
+
+			.thumb {
+				position: absolute;
+				inset-block: -1px;
+				inset-inline-start: -1px;
+				box-sizing: border-box;
+				width: 1.65em;
+				height: 1.65em;
+				border: 1px solid var(--ink);
+				border-radius: 999px;
+				background: var(--paper);
+				transition: translate 130ms ease;
+			}
+
+			.track[ui-checked] .thumb {
+				translate: 1.35em 0;
+			}
+
+			.track:focus-visible {
+				outline: 2px solid var(--ink);
+				outline-offset: 4px;
+			}
+
+			.row[ui-disabled] {
+				opacity: 0.55;
+			}
+
+			.row[ui-disabled] .track,
+			.row[ui-disabled] .label {
+				cursor: not-allowed;
+			}
+
+			@media (prefers-reduced-motion: reduce) {
+				.row,
+				.track,
+				.thumb {
+					transition: none;
+				}
+			}
+		</style>
+	</toggle.root>;
 }

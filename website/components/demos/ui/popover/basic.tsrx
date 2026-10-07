@@ -1,8 +1,118 @@
-import Preview from '../../../ui/preview.tsrx';
-import Share from './share.tsrx';
+import { lucide, popover } from '@markless/ui';
 
-export default function PopoverDemo({ shows }: { readonly shows: string }) @{
-	<Preview shows={shows}>
-		<Share />
-	</Preview>
+export default function PopoverBasic() @{
+	<popover.root class="popover">
+		<popover.trigger class="button share">
+			<lucide.share2 class="icon" aria-hidden="true" />
+			Share
+		</popover.trigger>
+		<popover.content class="panel">
+			<popover.title class="title">Share this page</popover.title>
+			<popover.description class="description">Anyone with the link can read it.</popover.description>
+			<input class="field" value="markless.dev/ui/popover" readonly aria-label="Link" />
+			<popover.close class="button done">Done</popover.close>
+		</popover.content>
+
+		<style>
+			.popover {
+				display: grid;
+				justify-items: center;
+				align-content: start;
+				min-height: 16.5rem;
+				font-family: 'Shantell Sans', system-ui, sans-serif;
+				font-size: var(--step--1);
+				line-height: 1.5;
+				color: var(--ink);
+			}
+
+			.button {
+				display: inline-flex;
+				gap: 0.5em;
+				align-items: center;
+				padding: 0.45em 0.9em;
+				border: 1px solid var(--ink);
+				border-radius: 6px;
+				background: var(--paper);
+				color: var(--ink);
+				font: inherit;
+				font-family: 'Shantell Sans', system-ui, sans-serif;
+				cursor: pointer;
+				transition: background 140ms ease;
+			}
+
+			.button:hover {
+				background: color-mix(in srgb, var(--purple) 16%, var(--paper));
+			}
+
+			.button:active,
+			.share[ui-open] {
+				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+			}
+
+			.button:focus-visible,
+			.field:focus-visible {
+				outline: 2px solid var(--ink);
+				outline-offset: 4px;
+			}
+
+			.icon {
+				width: 1em;
+				height: 1em;
+				flex: none;
+			}
+
+			.panel {
+				z-index: 5;
+				display: grid;
+				gap: 0.6em;
+				box-sizing: border-box;
+				width: min(19rem, calc(100vw - 4rem));
+				margin-block-start: 0.6em;
+				padding: 1em 1.1em;
+				border: 1px solid var(--ink);
+				border-radius: 6px;
+				background: var(--raised);
+				box-shadow: 3px 3px 0 color-mix(in srgb, var(--purple) 45%, var(--paper));
+			}
+
+			.panel[hidden] {
+				display: none;
+			}
+
+			.title {
+				margin: 0;
+				font-family: 'Joy Elia', system-ui, sans-serif;
+				font-size: var(--step-0);
+				font-weight: 400;
+				line-height: 1.2;
+				text-shadow: none;
+			}
+
+			.description {
+				margin: 0;
+				font-family: 'Shantell Sans', system-ui, sans-serif;
+			}
+
+			.field {
+				padding: 0.4em 0.65em;
+				border: 1px solid var(--ink);
+				border-radius: 6px;
+				background: var(--paper);
+				color: var(--ink);
+				font: inherit;
+				font-family: var(--font-mono);
+				font-size: 0.9em;
+			}
+
+			.done {
+				justify-self: end;
+			}
+
+			@media (prefers-reduced-motion: reduce) {
+				.button {
+					transition: none;
+				}
+			}
+		</style>
+	</popover.root>;
 }
