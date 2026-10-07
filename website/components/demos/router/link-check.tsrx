@@ -34,7 +34,7 @@ export default function LinkCheck() @{
 		</p>
 		<p class="explorer-note">
 			{shown === 'good'
-				? 'The page gets a plain <a href="/blog/hello">First post</a>.'
+				? 'The page gets a real <a href="/blog/hello">First post</a>.'
 				: shown === 'renamed'
 					? 'Typed route error: /blogs/[slug] does not match any route in pages/.'
 					: 'Typed route error: /blog/[slug] requires params: - slug'}

@@ -91,8 +91,8 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 		how: 'Check the value with an `if` before you write. Or give the state a start value so the path always exists.',
 	},
 	MARKLESS_REPEAT_KEY_REQUIRED: {
-		summary: 'An @for loop with state or events has no key.',
-		what: 'The rows of this list have state or event handlers. Without a key, Markless cannot tell which row is which when the list changes.',
+		summary: 'An @for loop has no key.',
+		what: 'Every `@for` inside an element needs a key, even one over a fixed list. Without a key, Markless cannot tell which row is which when the list changes.',
 		how: 'Add a key that stays the same for each item, like an id. If state belongs to the position in the list, key by the index instead.',
 		example: ['@for (const item of items; key item.id) {', '\t<li>{item.name}</li>', '}'],
 	},
@@ -142,8 +142,8 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 	},
 	MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED: {
 		summary: 'An event handler reads a local variable that does not exist in the browser.',
-		what: 'The handler reads a plain local from the component body. The browser does not run the component body again, so that local does not exist when the click happens.',
-		how: 'Make the local `state()`. Or move it to the top of the file. Or build it only from props, state, and imports.',
+		what: 'The handler reads a local from the component body that Markless cannot carry to the browser. It holds a function, a class instance, a DOM node, or another value that is not plain data.',
+		how: 'Move the function to the top of the file. Keep plain data in the local, or make it `state()`. For an element, use `element()`.',
 	},
 	MARKLESS_EVENT_HANDLER_NOT_A_FUNCTION: {
 		summary: 'An event prop like onClick gets a value instead of a function.',
@@ -199,8 +199,8 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 		how: 'Drop the parentheses. Write `total`, not `total()`.',
 	},
 	MARKLESS_TEMPLATE_EXPRESSION_STATIC: {
-		summary: 'A markup expression reads state but never updates.',
-		what: 'Today, only plain reads like `{label}` update the page. This expression does more than read, so it shows its first value and never changes.',
+		summary: 'A markup expression assigns a value, so its text never updates.',
+		what: 'This expression in the markup assigns to a variable, like `{local = flag}`. Markless cannot keep that text current, so it shows its first value and never changes.',
 		how: 'Move the logic into `computed()` and render the result.',
 		example: [
 			"const label = computed(() => (open ? 'Hide' : 'Show'));",

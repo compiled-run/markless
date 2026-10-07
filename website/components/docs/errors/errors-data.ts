@@ -2881,13 +2881,13 @@ export const errorEntries: readonly ErrorEntry[] = [
 			what: [
 				{
 					id: 's0',
-					text: 'The handler reads a plain local from the component body. The browser does not run the component body again, so that local does not exist when the click happens.',
+					text: 'The handler reads a local from the component body that Markless cannot carry to the browser. It holds a function, a class instance, a DOM node, or another value that is not plain data.',
 				},
 			],
 			how: [
 				{
 					id: 's0',
-					text: 'Make the local ',
+					text: 'Move the function to the top of the file. Keep plain data in the local, or make it ',
 				},
 				{
 					id: 's1',
@@ -2896,7 +2896,16 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 				{
 					id: 's2',
-					text: '. Or move it to the top of the file. Or build it only from props, state, and imports.',
+					text: '. For an element, use ',
+				},
+				{
+					id: 's3',
+					text: 'element()',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: '.',
 				},
 			],
 			example: [],
@@ -4911,7 +4920,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
-		description: 'An @for loop with state or events has no key.',
+		description: 'An @for loop has no key.',
 		printed: [
 			'MARKLESS_REPEAT_KEY_REQUIRED: @for (const <itemName> of <collectionSource>) repeats reactive state without a key. When <collectionSource> changes, the rows of this list have no identity to update, reorder, or resume by.',
 			'A keyed loop item keeps its state, events, and DOM attached to the same logical item across reorder, insert, and delete; without a key there is no stable identity root.',
@@ -4920,11 +4929,20 @@ export const errorEntries: readonly ErrorEntry[] = [
 		],
 		structured: true,
 		guide: {
-			summary: 'An @for loop with state or events has no key.',
+			summary: 'An @for loop has no key.',
 			what: [
 				{
 					id: 's0',
-					text: 'The rows of this list have state or event handlers. Without a key, Markless cannot tell which row is which when the list changes.',
+					text: 'Every ',
+				},
+				{
+					id: 's1',
+					text: '@for',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ' inside an element needs a key, even one over a fixed list. Without a key, Markless cannot tell which row is which when the list changes.',
 				},
 			],
 			how: [
@@ -8553,7 +8571,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'warning',
-		description: 'A markup expression reads state but never updates.',
+		description: 'A markup expression assigns a value, so its text never updates.',
 		printed: [
 			'MARKLESS_TEMPLATE_EXPRESSION_STATIC: This text reads `<readSource>`, but only plain reads like `{<readSource>}` update the page today. The expression renders its initial value and never changes when `<readSource>` changes.',
 			'Each template read compiles to a graph subscription with a DOM-update record; composite expressions are not lowered yet, so no subscription exists to wake this text.',
@@ -8562,20 +8580,20 @@ export const errorEntries: readonly ErrorEntry[] = [
 		],
 		structured: true,
 		guide: {
-			summary: 'A markup expression reads state but never updates.',
+			summary: 'A markup expression assigns a value, so its text never updates.',
 			what: [
 				{
 					id: 's0',
-					text: 'Today, only plain reads like ',
+					text: 'This expression in the markup assigns to a variable, like ',
 				},
 				{
 					id: 's1',
-					text: '{label}',
+					text: '{local = flag}',
 					code: true,
 				},
 				{
 					id: 's2',
-					text: ' update the page. This expression does more than read, so it shows its first value and never changes.',
+					text: '. Markless cannot keep that text current, so it shows its first value and never changes.',
 				},
 			],
 			how: [

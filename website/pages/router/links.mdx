@@ -9,7 +9,7 @@ import LikeHeart from '../../components/docs/like-heart.tsrx';
 
 # Links the build can check
 
-<PageMeta level="Building" time="5 min" assumes="routes" sprite="arrow-curve" />
+<PageMeta level="Building" time="3 min" assumes="routes" sprite="arrow-curve" />
 
 <ThemeToggle />
 
@@ -49,9 +49,10 @@ drops `params`. A plain `<a>` with a pattern and `params` works the same way.
 | `href="/blog/[slug]"` with `params={{ slug }}` | the build passes, and `href` becomes the real address |
 | `href="/blog/[id]"`, and no such route exists | the build stops: `Typed route error: /blog/[id] does not match any route in pages/.` |
 | `href="/blog/[slug]"` with no `params` | the build stops: `Typed route error: /blog/[slug] requires params:` |
-| `href="/abuot"` | the build passes, and TypeScript flags the typo |
+| `<Link href="/abuot">` | the build passes, and your editor flags the typo |
 
-A plain address like `/about` has no brackets, so the build does not check it. TypeScript does.
+A plain address like `/about` has no brackets, so the build does not check it. On a `Link`, your
+editor does.
 The router writes your route types to `.output/markless/router/types/routes.d.ts`. The file
 `markless-router-env.d.ts` in your app root points TypeScript at them.
 
@@ -60,6 +61,9 @@ The router writes your route types to `.output/markless/router/types/routes.d.ts
 When someone clicks a link to one of your pages, the browser keeps the page it has. The router asks
 the server for the next page and swaps in only the page area. The address bar changes, and Back and
 Forward bring back each page and its scroll position.
+
+If `document.tsrx` reads a prop other than `children`, such as the URL, a click loads the whole new
+page instead.
 
 The router also starts that request a little early. A pointer over a link, a focus, or a press
 starts it. When the browser is idle, a few visible links start too. Links to `/api/` endpoints never
@@ -86,8 +90,8 @@ Links still work.
 
 ## Try it yourself
 
-Add a link to `/blog/[slug]` with `params={{ slug: 'second' }}`, and run the build. Open the output
-HTML and find the `href` the build wrote.
+Add a link to `/blog/[slug]` with `params={{ slug: 'second' }}`. Start the app, open the page, and
+view its source. Find the `href` the build wrote.
 
 Next: [load data for a page](/router/data).
 
