@@ -29,6 +29,12 @@ After.
 `;
 
 describe('findCodeBlocks', () => {
+	it('reads a <Code> whose note contains a > or quotes of the other kind', () => {
+		const withArrow = page.replace('<Code note="Try it">', `<Code note="Type <b>{count}</b>, then watch 'it' > 0">`);
+		const [block] = findCodeBlocks(withArrow, PAGE);
+		expect(block?.attributes).toBe(`note="Type <b>{count}</b>, then watch 'it' > 0"`);
+	});
+
 	it('reads each titled fence inside <Code> as a file and skips <Code> inside a fence', () => {
 		const [block, ...rest] = findCodeBlocks(page, PAGE);
 		expect(rest).toEqual([]);

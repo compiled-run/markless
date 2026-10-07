@@ -2,7 +2,6 @@
 // fences; tooling/code-blocks.ts turns each block into a module that passes the files
 // in and projects the starter, built by the site, as the Result pane's first paint.
 // The editor, the result frame and the compiler load on the first point, focus or edit.
-import { element } from '@markless/core';
 import { tabs } from '@markless/ui';
 import type { CodePane } from '../../tooling/code-blocks.ts';
 import type { CodeFile } from './code/protocol.ts';
@@ -11,7 +10,10 @@ import sessionUrl from 'virtual:code-session-url';
 import MarkerSweep from '../sketch/marker-sweep.tsrx';
 
 // An import the bundler cannot follow, so the editor is not among the page's preloads.
-function session(box: HTMLElement | undefined, files: readonly CodeFile[]): Promise<CodeSession | undefined> {
+// The block is found from the event target: an element() handle shared by two blocks on one
+// MDX page cannot be read from its own handler today.
+function session(event: Event, files: readonly CodeFile[]): Promise<CodeSession | undefined> {
+	const box = (event.target as Element | null)?.closest<HTMLElement>('.code-block') ?? undefined;
 	if (!box) return Promise.resolve(undefined);
 	return (import(/* @vite-ignore */ sessionUrl) as Promise<typeof import('./code/session.ts')>).then((code) =>
 		code.codeSession(box, files),
@@ -33,15 +35,13 @@ export default function Code({
 	/** The starter's own render, shown in the Result pane until the first edit. */
 	readonly children?: unknown;
 }) @{
-	const box = element<HTMLElement>();
 	const first = panes[0]?.name ?? '';
 
 	<figure
 		class="code-block"
-		el={box}
 		data-code="idle"
-		onPointerover={() => void session(box, files)}
-		onFocusin={() => void session(box, files)}
+		onPointerover={(event) => void session(event, files)}
+		onFocusin={(event) => void session(event, files)}
 	>
 		<div class="source">
 			<tabs.root class="files" value={first}>
@@ -56,7 +56,7 @@ export default function Code({
 					<button
 						type="button"
 						class="reset"
-						onClick={() => void session(box, files).then((live) => live?.reset())}
+						onClick={(event) => void session(event, files).then((live) => live?.reset())}
 					>
 						Reset
 					</button>
