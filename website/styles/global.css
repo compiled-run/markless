@@ -610,21 +610,19 @@ html.dark .shiki span:not(.tsrx-tip):not(.tsrx-tip-title):not(.tsrx-tip-body) {
 	padding: 0.35em 1em;
 	border: 1.5px solid var(--ink);
 	border-radius: 6px;
-	background: var(--yellow);
-	box-shadow: 3px 3px 0 var(--ink);
-	color: var(--on-accent);
+	background: var(--paper);
+	color: var(--ink);
 	font: inherit;
 	cursor: pointer;
 	transition: background-color 130ms ease;
 }
 
 .code-stage button:hover {
-	background: color-mix(in srgb, var(--yellow) 80%, var(--paper));
+	background: color-mix(in oklch, var(--ink) var(--hover-wash), var(--paper));
 }
 
 .code-stage button:active {
-	transform: translate(2px, 2px);
-	box-shadow: 1px 1px 0 var(--ink);
+	background: color-mix(in srgb, var(--purple) 22%, var(--paper));
 }
 
 .code-stage button:focus-visible {

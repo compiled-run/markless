@@ -62,9 +62,14 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 
 	const actions: Record<string, () => void> = {
 		reset,
-		layout() {
-			box.dataset.layout = box.dataset.layout === 'stacked' ? 'split' : 'stacked';
+		lines() {
+			box.dataset.lines = box.dataset.lines === 'off' ? 'on' : 'off';
 			syncTools();
+		},
+		edit() {
+			const input = box.querySelector<HTMLTextAreaElement>('.pane:not([hidden]) [data-code-input]');
+			input?.focus();
+			input?.setSelectionRange(input.value.length, input.value.length);
 		},
 		fullscreen() {
 			if (document.fullscreenElement === box) void document.exitFullscreen();
@@ -82,8 +87,7 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 		box.toggleAttribute('data-full', full);
 		for (const button of box.querySelectorAll<HTMLElement>('[data-code-action]')) {
 			const action = button.dataset.codeAction;
-			if (action === 'layout')
-				button.setAttribute('aria-pressed', String(box.dataset.layout === 'stacked'));
+			if (action === 'lines') button.setAttribute('aria-pressed', String(box.dataset.lines !== 'off'));
 			if (action === 'fullscreen') button.setAttribute('aria-pressed', String(full));
 		}
 	}

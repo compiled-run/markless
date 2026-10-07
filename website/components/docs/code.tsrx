@@ -40,22 +40,22 @@ export default function Code({
 		onPointerover={(event) => boot(event, files)}
 		onFocusin={(event) => boot(event, files)}
 	>
+		<span class="rings" aria-hidden="true"></span>
 		<header class="bar">
-			<span class="title">
-				<span class="glyph" aria-hidden="true"><lucide.squareterminal /></span>
-				{title ?? 'Playground'}
-			</span>
+			<span class="title">{title ?? 'Playground'}</span>
 			<div class="tools" role="toolbar" aria-label="Playground tools">
-				<button type="button" class="tool" data-code-action="reset" aria-label="Reset code">
+				<button type="button" class="tool" data-code-action="reset" aria-label="Reset code" title="Reset code">
 					<lucide.rotateccw aria-hidden="true" />
-					<span>Reset</span>
 				</button>
-				<span class="sep" aria-hidden="true"></span>
-				<button type="button" class="tool" data-code-action="fullscreen" aria-label="Full screen" aria-pressed="false">
-					<lucide.maximize2 class="when-normal" aria-hidden="true" />
-					<lucide.minimize2 class="when-full" aria-hidden="true" />
-					<span class="when-normal">Expand</span>
-					<span class="when-full">Close</span>
+				<button type="button" class="tool" data-code-action="lines" aria-label="Line numbers" aria-pressed="true" title="Line numbers">
+					<lucide.hash aria-hidden="true" />
+				</button>
+				<button type="button" class="tool" data-code-action="edit" aria-label="Edit code" title="Edit code">
+					<lucide.pencil aria-hidden="true" />
+				</button>
+				<button type="button" class="tool" data-code-action="fullscreen" aria-label="Full screen" aria-pressed="false" title="Full screen">
+					<lucide.maximize class="when-normal" aria-hidden="true" />
+					<lucide.minimize class="when-full" aria-hidden="true" />
 				</button>
 			</div>
 		</header>
@@ -64,47 +64,41 @@ export default function Code({
 				<CodeFiles panes={panes} />
 			</div>
 			<div class="result" data-code-result>
-				<div class="result-head">
-					<span class="result-label">Live preview</span>
-					<span class="status" data-code-status role="status"></span>
-					<span class="live" aria-hidden="true"><i></i>Live</span>
-				</div>
-				<div class="stage-wrap">
-					<div class="sheet">
-						<div class="stage code-stage" data-code-stage>{children}</div>
-					</div>
-					<ul class="problems" data-code-problems hidden aria-label="Problems"></ul>
-				</div>
+				<span class="status" data-code-status role="status"></span>
+				<div class="stage code-stage" data-code-stage>{children}</div>
+				<ul class="problems" data-code-problems hidden aria-label="Problems"></ul>
 			</div>
 		</div>
 		@if (note) {
-			<figcaption class="note"><span class="try">Try this</span><span class="note-text">{note}</span></figcaption>;
+			<figcaption class="note"><span class="try">Try this</span>{note}</figcaption>;
 		}
 		<style>
 			.code-block {
-				--code-band: color-mix(in oklch, var(--ink) 80%, transparent);
+				--code-band: color-mix(in oklch, var(--ink) 70%, transparent);
 				--code-wash: color-mix(in srgb, var(--purple) 26%, var(--paper));
-				--code-grid: color-mix(in srgb, var(--purple) 30%, transparent);
-				--code-grid-fill: color-mix(in srgb, var(--purple) 9%, var(--paper));
-				--code-head: 2.6rem;
-				--code-gutter: 3.1rem;
+				--code-tab-back: color-mix(in oklch, var(--ink) 9%, var(--paper));
+				--code-tab-h: 2.6rem;
+				--code-tab-left: 2.6rem;
+				--code-editor-surface: transparent;
+				--code-gutter: 2.3rem;
 				--code-gutter-ink: var(--muted-ink);
 				--code-max-height: 26rem;
 				--code-selection: color-mix(in oklch, var(--yellow) 55%, transparent);
 				--code-problem: oklch(52% 0.19 20);
 				--code-problem-wash: color-mix(in oklch, var(--pink) 18%, transparent);
-				--code-live: oklch(62% 0.15 150);
+				--code-inset: 1.1rem;
 				container-type: inline-size;
 				position: relative;
 				display: flex;
 				flex-direction: column;
 				box-sizing: border-box;
 				width: 100%;
-				margin: var(--space-l) 0;
+				margin: calc(var(--space-l) + var(--code-tab-h)) 0 var(--space-l);
+				padding: 0.25rem var(--code-inset) 0.4rem 2.4rem;
 				border: 1.5px solid var(--ink);
-				border-radius: 14px;
+				border-radius: 6px;
 				background: var(--paper);
-				box-shadow: 7px 7px 0 var(--muted-ink);
+				box-shadow: 6px 6px 0 color-mix(in oklch, var(--ink) 22%, transparent);
 				color: var(--ink);
 				font-family: 'Shantell Sans', system-ui, sans-serif;
 				font-size: var(--step--1);
@@ -112,13 +106,27 @@ export default function Code({
 
 				html.dark & {
 					--code-wash: color-mix(in srgb, var(--purple) 20%, var(--paper));
-					--code-grid: color-mix(in srgb, var(--purple) 22%, transparent);
-					--code-grid-fill: color-mix(in srgb, var(--purple) 6%, var(--paper));
+					--code-tab-back: color-mix(in oklch, var(--ink) 12%, var(--paper));
 					--code-selection: color-mix(in oklch, var(--yellow) 28%, transparent);
 					--code-problem: oklch(76% 0.14 15);
 					--code-problem-wash: color-mix(in oklch, var(--pink) 13%, transparent);
-					--code-live: oklch(74% 0.15 150);
 				}
+			}
+
+			.code-block[data-lines='off'] {
+				--code-gutter: 1rem;
+				--code-numbers: none;
+			}
+
+			.rings {
+				position: absolute;
+				top: 0.6rem;
+				bottom: 0.4rem;
+				left: -0.95rem;
+				width: 34px;
+				background: var(--ink);
+				mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2234%22%20height%3D%2232%22%3E%3Cellipse%20cx%3D%2225%22%20cy%3D%2215%22%20rx%3D%222.6%22%20ry%3D%222.4%22/%3E%3Cpath%20d%3D%22M25%2014.2C19%208.6%204.5%208.4%203.2%2013.6C2%2018.6%2015%2019.8%2024.6%2016.4%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%223.2%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E") 0 0 / 34px 32px space;
+				pointer-events: none;
 			}
 
 			.bar {
@@ -126,74 +134,50 @@ export default function Code({
 				align-items: center;
 				justify-content: space-between;
 				gap: var(--space-xs);
-				padding: 0.5rem 0.75rem 0.5rem var(--space-s);
-				border-bottom: 1px solid var(--code-band);
-				border-radius: 12.5px 12.5px 0 0;
+				padding: 0.55rem 0 0.55rem 0.4rem;
+				border-bottom: 1.5px dashed var(--code-band);
 			}
 
 			.title {
-				display: flex;
-				align-items: center;
-				gap: 0.6rem;
-				font-family: 'Joy Elia', system-ui, sans-serif;
 				font-size: var(--step-0);
-				font-weight: 700;
 				line-height: 1.2;
-			}
-
-			.glyph {
-				display: grid;
-				place-items: center;
-				width: 1.9rem;
-				height: 1.9rem;
-				border: 1.5px solid var(--ink);
-				border-radius: 6px;
-			}
-
-			.glyph svg {
-				width: 1.15rem;
-				height: 1.15rem;
 			}
 
 			.tools {
 				display: flex;
 				align-items: center;
-				gap: 0.25rem;
-			}
-
-			.sep {
-				width: 1px;
-				height: 1.3rem;
-				background: var(--code-band);
+				gap: 0.35rem;
 			}
 
 			.tool {
-				display: inline-flex;
-				align-items: center;
-				gap: 0.4rem;
-				padding: 0.35rem 0.55rem;
+				display: grid;
+				place-items: center;
+				width: 2.1rem;
+				height: 2.1rem;
+				padding: 0;
 				border: 0;
 				border-radius: 6px;
 				background: transparent;
 				color: var(--ink);
-				font-family: 'Joy Elia', system-ui, sans-serif;
-				font-size: var(--step--1);
 				cursor: pointer;
 				transition: background-color 130ms ease;
 			}
 
 			.tool svg {
-				width: 1.05rem;
-				height: 1.05rem;
+				width: 1.2rem;
+				height: 1.2rem;
 			}
 
 			.tool:hover {
 				background: color-mix(in oklch, var(--ink) var(--hover-wash), transparent);
 			}
 
-			.tool:active,
-			.tool[aria-pressed='true'] {
+			.tool:active {
 				background: var(--code-wash);
+			}
+
+			.tool[data-code-action='lines'][aria-pressed='false'] {
+				color: var(--muted-ink);
 			}
 
 			.tool:focus-visible {
@@ -207,7 +191,7 @@ export default function Code({
 			}
 
 			.code-block[data-full] .when-full {
-				display: inline;
+				display: block;
 			}
 
 			.body {
@@ -219,94 +203,28 @@ export default function Code({
 
 			.source {
 				min-width: 0;
-				border-bottom: 1px solid var(--code-band);
+				border-bottom: 1.5px dashed var(--code-band);
 			}
 
 			.result {
+				position: relative;
 				display: flex;
 				flex-direction: column;
+				gap: var(--space-xs);
 				min-width: 0;
-			}
-
-			.result-head {
-				display: flex;
-				align-items: center;
-				justify-content: flex-end;
-				gap: 0.9rem;
-				min-height: var(--code-head);
-				box-sizing: border-box;
-				padding-inline: var(--space-s);
-				border-bottom: 1px solid var(--code-band);
-			}
-
-			.result-label {
-				color: var(--muted-ink);
-				font-family: var(--font-mono);
-				font-size: var(--step--2);
-				letter-spacing: 0.12em;
-				text-transform: uppercase;
-			}
-
-			.live {
-				display: inline-flex;
-				align-items: center;
-				gap: 0.4rem;
-				font-size: var(--step--1);
-			}
-
-			.live i {
-				width: 0.7rem;
-				height: 0.7rem;
-				border: 1.5px solid var(--ink);
-				border-radius: 50%;
-				background: var(--code-live);
-			}
-
-			.status:empty {
-				display: none;
+				padding: 0.9rem 0 0.9rem 1.1rem;
 			}
 
 			.status {
+				position: absolute;
+				top: 0.4rem;
+				right: 0;
 				color: var(--muted-ink);
-			}
-
-			.code-block:is([data-code='running'], [data-code='error']) .live {
-				display: none;
-			}
-
-			.stage-wrap {
-				display: flex;
-				flex: 1;
-				flex-direction: column;
-				align-items: center;
-				justify-content: center;
-				gap: var(--space-xs);
-				padding: var(--space-m) var(--space-s);
-				background-color: var(--code-grid-fill);
-				background-image:
-					linear-gradient(var(--code-grid) 1px, transparent 1px),
-					linear-gradient(90deg, var(--code-grid) 1px, transparent 1px);
-				background-size: 1.25rem 1.25rem;
-			}
-
-			.sheet {
-				box-sizing: border-box;
-				min-width: min(100%, 14rem);
-				max-width: 100%;
-				padding: var(--space-s) var(--space-m);
-				border: 1.5px solid var(--ink);
-				border-radius: 10px;
-				background: var(--paper);
-				box-shadow: 4px 4px 0 var(--muted-ink);
-			}
-
-			.sheet:has(> .code-frame:not([hidden])) {
-				align-self: stretch;
+				font-size: var(--step--2);
 			}
 
 			.problems {
 				display: grid;
-				align-self: stretch;
 				gap: 0.5rem;
 				margin: 0;
 				padding: 0.6rem 0.75rem;
@@ -321,45 +239,39 @@ export default function Code({
 				display: none;
 			}
 
-			.code-block[data-code='error'] .sheet {
+			.code-block[data-code='error'] .stage {
 				opacity: 0.5;
 			}
 
 			.note {
-				display: flex;
-				align-items: baseline;
-				gap: 0.9rem;
-				padding: var(--space-xs) var(--space-s);
-				border-top: 1px dashed var(--code-band);
-				border-radius: 0 0 12.5px 12.5px;
-				background: var(--tinted);
+				padding: 0.7rem 0 0.35rem 0.4rem;
+				border-top: 1.5px dashed var(--code-band);
 			}
 
 			.try {
-				flex: none;
-				padding-right: 0.9rem;
-				border-right: 1px solid var(--code-band);
+				margin-right: 0.6em;
 				font-family: 'Joy Elia', system-ui, sans-serif;
 				font-weight: 700;
 			}
 
-			@container (min-width: 40rem) {
+			@container (min-width: 36rem) {
 				.body {
-					grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+					grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
 				}
 
 				.source {
 					border-bottom: 0;
-					border-inline-end: 1px solid var(--code-band);
+					border-inline-end: 1.5px dashed var(--code-band);
 				}
 			}
 
 			.code-block:fullscreen,
 			.code-block[data-expanded] {
 				--code-max-height: none;
+				--code-tab-top: 0.5rem;
 				width: auto;
 				margin: 0;
-				border: 0;
+				padding-top: calc(var(--code-tab-h) + 0.75rem);
 				border-radius: 0;
 				box-shadow: none;
 			}
@@ -370,27 +282,14 @@ export default function Code({
 				z-index: 100;
 			}
 
-			.code-block[data-full] .bar,
-			.code-block[data-full] .note {
-				border-radius: 0;
-			}
-
 			@media (max-width: 600px) {
 				.code-block {
-					border-radius: 10px;
-					box-shadow: 4px 4px 0 var(--muted-ink);
+					--code-tab-left: 1.6rem;
+					padding-left: 1.9rem;
 				}
 
-				.bar {
-					border-radius: 8.5px 8.5px 0 0;
-				}
-
-				.note {
-					border-radius: 0 0 8.5px 8.5px;
-				}
-
-				.tool span {
-					display: none;
+				.rings {
+					left: -1.1rem;
 				}
 			}
 

@@ -45,49 +45,53 @@ export default function CodeFiles({ panes }: { readonly panes: readonly CodePane
 	}
 
 	.strip {
+		position: absolute;
+		top: var(--code-tab-top, calc(-1 * var(--code-tab-h)));
+		left: var(--code-tab-left);
+		z-index: 2;
 		display: flex;
 		align-items: end;
-		min-height: var(--code-head);
-		box-sizing: border-box;
-		padding-inline: 0.6rem;
-		border-bottom: 1px solid var(--code-band);
+		height: var(--code-tab-h);
 	}
 
 	.strip-row {
 		display: flex;
-		flex-wrap: wrap;
 		align-items: flex-end;
 	}
 
 	.tab {
-		margin-block-end: -1px;
-		padding: 0.5em 1em;
-		border: 1px solid var(--code-band);
+		position: relative;
+		margin-block-end: -1.5px;
+		padding: 0.35em 1.25em 0.3em;
+		border: 1.5px solid var(--ink);
 		border-block-end: 0;
-		border-radius: 6px 6px 0 0;
-		background: var(--paper);
-		color: var(--ink);
-		font-family: var(--font-mono);
-		font-size: var(--step--2);
-		line-height: 1.55;
+		border-radius: 14px 14px 0 0;
+		background: var(--code-tab-back);
+		color: color-mix(in oklch, var(--ink) 78%, var(--paper));
+		font-family: 'Shantell Sans', system-ui, sans-serif;
+		font-size: var(--step--1);
+		line-height: 1.4;
 		cursor: pointer;
 		transition: background-color 130ms ease;
 	}
 
 	.tab + .tab {
-		margin-inline-start: -1px;
+		margin-inline-start: -0.35rem;
 	}
 
 	.tab:hover {
-		background: color-mix(in oklch, var(--code-wash) 50%, var(--paper));
+		color: var(--ink);
 	}
 
 	.tab[ui-selected] {
-		background: var(--code-wash);
+		z-index: 1;
+		padding-block: 0.5em 0.45em;
+		background: var(--paper);
+		color: var(--ink);
+		font-size: var(--step-0);
 	}
 
 	.tab:focus-visible {
-		position: relative;
 		outline: 2px solid var(--ink);
 		outline-offset: 2px;
 	}
@@ -105,13 +109,13 @@ export default function CodeFiles({ panes }: { readonly panes: readonly CodePane
 		max-height: var(--code-max-height);
 		height: 100%;
 		overflow: auto;
-		background: var(--code-surface);
+		background: var(--code-editor-surface, var(--code-surface));
 		scrollbar-width: thin;
 	}
 
 	.editor:focus-within {
-		outline: 2px solid var(--ink);
-		outline-offset: -5px;
+		outline: 2px dashed var(--code-band);
+		outline-offset: -4px;
 	}
 
 	.layers {
@@ -120,7 +124,7 @@ export default function CodeFiles({ panes }: { readonly panes: readonly CodePane
 		min-width: 100%;
 		min-height: 100%;
 		font-family: var(--font-mono);
-		font-size: var(--step--2);
+		font-size: var(--code-font-size, var(--step--2));
 		line-height: 1.6;
 		tab-size: 2;
 		font-variant-ligatures: none;
@@ -134,7 +138,7 @@ export default function CodeFiles({ panes }: { readonly panes: readonly CodePane
 		grid-area: 1 / 1;
 		box-sizing: border-box;
 		margin: 0;
-		padding: 0.85rem 1.35em 0.85rem 0;
+		padding: 0.85rem 0 0.85rem 0;
 		border: 0;
 		border-radius: 0;
 		font: inherit;
@@ -183,6 +187,7 @@ export default function CodeFiles({ panes }: { readonly panes: readonly CodePane
 	}
 
 	.line::before {
+		display: var(--code-numbers, block);
 		content: counter(code-line);
 		counter-increment: code-line;
 		position: absolute;
