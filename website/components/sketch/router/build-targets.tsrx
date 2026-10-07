@@ -1,337 +1,157 @@
-// "Where does the build go?" One app folder, two build commands, two output
-// folders. Pressing a command draws its output; the app folder never changes.
 import { state } from '@markless/core';
-import MugArt from '../../mascot/mug-art.tsrx';
-import IndexCard from '../index-card.tsrx';
-import InkArrow from '../ink-arrow.tsrx';
-import MarkerCircle from '../marker-circle.tsrx';
-import MarkerSweep from '../marker-sweep.tsrx';
-import SketchAsk from '../start/sketch-ask.tsrx';
+import PreviewCard, { Choice, Controls, Mono, Stage, Watch } from '../../docs/preview-card.tsrx';
 
 export default function BuildTargets() @{
-	let node = state(false);
-	let vercel = state(false);
-	let builds = state(0);
-	let nodeBeat = state('rest');
-	let vercelBeat = state('rest');
-	let say = state('press a command');
+	let preset = state('node');
 
-	<figure class="sketch">
-		<SketchAsk text="Where does the build go?" />
-
-		<div class="board">
-			<div class="app">
-				<IndexCard label="my-app/" tilt="-1.4deg">
-					<ul class="tree">
+	<PreviewCard name="build-targets" label="One app folder, two build outputs">
+		<Controls title="Where does the build go?">
+			<Choice
+				label="Preset"
+				hint="Nitro reads the preset from the NITRO_PRESET variable. Node is the default."
+				options={['node', 'vercel']}
+				value="node"
+				onChange={(next: string) => (preset = next)}
+			/>
+		</Controls>
+		<Stage>
+			<div class="board" data-preset={preset}>
+				<div class="box">
+					<div class="head">my-app/</div>
+					<ul class="files">
 						<li>pages/</li>
 						<li>api/</li>
 						<li>middleware/</li>
 					</ul>
-				</IndexCard>
-				<p class="same" data-shown={builds > 0 ? 'true' : 'false'}><span class="hit">same folder<MarkerCircle beat={builds === 0 ? 'rest' : builds % 2 === 0 ? 'even' : 'odd'} /></span>{' every time'}</p>
-			</div>
-
-			<div class="route one">
-				<button
-					type="button"
-					class="cmd"
-					aria-pressed={node ? 'true' : 'false'}
-					onClick={() => {
-						node = true;
-						builds++;
-						nodeBeat = nodeBeat === 'odd' ? 'even' : 'odd';
-						say = vercel ? 'same app, two outputs' : 'a Node server, in .output/';
-					}}
-				>npm run build</button>
-				<div class="arrow">
-					<InkArrow width={120} height={40} x1={4} y1={22} x2={114} y2={18} bend={-6} seed={61} shown={node ? 'true' : 'false'} />
+				</div>
+				<span class="arrow" aria-hidden="true">→</span>
+				<div class="command">
+					<span class="prompt">$</span>
+					<span class="for-node">npm run build</span>
+					<span class="for-vercel">NITRO_PRESET=vercel npm run build</span>
+				</div>
+				<span class="arrow" aria-hidden="true">→</span>
+				<div class="box out">
+					<div class="head for-node">.output/</div>
+					<div class="head for-vercel">.vercel/output/</div>
+					<ul class="files for-node">
+						<li>server/index.mjs</li>
+						<li>public/build/</li>
+					</ul>
+					<ul class="files for-vercel">
+						<li>static/</li>
+						<li>functions/</li>
+					</ul>
 				</div>
 			</div>
-
-			<div class="out one" data-built={node ? 'true' : 'false'}>
-				<div class="card">
-					<IndexCard label=".output/" pin="pin" tilt="1.2deg">
-						<ul class="tree">
-							<li>server/index.mjs</li>
-							<li>public/build/</li>
-						</ul>
-					</IndexCard>
-				</div>
-				<p class="kind"><span class="hit">a Node server<MarkerSweep beat={nodeBeat} place="" /></span></p>
-				<p class="empty" aria-hidden="true">not built yet</p>
-			</div>
-
-			<div class="route two">
-				<button
-					type="button"
-					class="cmd"
-					aria-pressed={vercel ? 'true' : 'false'}
-					onClick={() => {
-						vercel = true;
-						builds++;
-						vercelBeat = vercelBeat === 'odd' ? 'even' : 'odd';
-						say = node ? 'same app, two outputs' : 'Vercel files, in .vercel/output/';
-					}}
-				>NITRO_PRESET=vercel npm run build</button>
-				<div class="arrow">
-					<InkArrow width={120} height={40} x1={4} y1={18} x2={114} y2={24} bend={6} seed={67} shown={vercel ? 'true' : 'false'} />
-				</div>
-			</div>
-
-			<div class="out two" data-built={vercel ? 'true' : 'false'}>
-				<div class="card">
-					<IndexCard label=".vercel/output/" pin="pin" tilt="-0.8deg">
-						<ul class="tree">
-							<li>static/</li>
-							<li>functions/</li>
-						</ul>
-					</IndexCard>
-				</div>
-				<p class="kind"><span class="hit">ready for Vercel<MarkerSweep beat={vercelBeat} place="" /></span></p>
-				<p class="empty" aria-hidden="true">not built yet</p>
-			</div>
-		</div>
-
-		<div class="footer">
-			<p class="note" aria-live="polite">{say}</p>
-			<span class="mug-spot">
-				<MugArt
-					variant="toc"
-					mood={builds === 0 ? 'idle' : builds % 2 === 0 ? 'wiggle' : 'wide'}
-					face="neutral"
-					glaze="cream"
-					pour="rosetta"
-					coaster="off"
-					companion="off"
-					paused="false"
-					interacted={builds > 0 ? 'true' : 'false'}
-					reaction="rest"
-				/>
+		</Stage>
+		<Watch>
+			<span class="said">
+				Same <Mono>my-app/</Mono> folder.{' '}
+				{preset === 'node'
+					? 'Nitro wrote a Node server to .output/. Start it with node .output/server/index.mjs.'
+					: 'Nitro wrote Vercel files to .vercel/output/, with a static/ and a functions/ folder.'}
 			</span>
-		</div>
-
+		</Watch>
 		<style>
-			.sketch {
-				--sweep-delay: 520ms;
-				--circle-delay: 200ms;
-				container-type: inline-size;
-				margin: var(--space-l) 0;
-				padding: 0;
+			.said,
+			.said :where(span, b) {
+				font-family: var(--pg-font);
 			}
 
 			.board {
 				display: grid;
-				grid-template-columns: 10rem minmax(0, 1fr) 11.5rem;
-				grid-template-areas:
-					'app one-route one-out'
-					'app two-route two-out';
-				column-gap: 0.8rem;
-				row-gap: 1.6rem;
+				grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.2fr) auto minmax(0, 1.1fr);
+				gap: 0.6em;
 				align-items: center;
-				padding: 0.8rem 0.4rem 0.4rem;
-			}
-
-			.app {
-				grid-area: app;
-				display: grid;
-				gap: 0.8rem;
-			}
-
-			.route.one {
-				grid-area: one-route;
-			}
-
-			.route.two {
-				grid-area: two-route;
-			}
-
-			.out.one {
-				grid-area: one-out;
-			}
-
-			.out.two {
-				grid-area: two-out;
-			}
-
-			.tree {
-				margin: 0;
-				padding: 0.1rem 0 0 0.2rem;
-				list-style: none;
-				font-family: var(--font-mono);
-				font-size: 0.8rem;
-				color: oklch(28% 0.015 90);
-			}
-
-			.tree li {
-				margin: 0;
-				white-space: nowrap;
-			}
-
-			.tree li::before {
-				content: '└ ' / '';
-				opacity: 0.55;
-			}
-
-			.hit {
-				position: relative;
-				display: inline-block;
-			}
-
-			.same,
-			.kind,
-			.empty,
-			.note {
-				margin: 0;
-				font-family: 'Joy Elia', system-ui, sans-serif;
-				line-height: 1.15;
-			}
-
-			.same {
-				font-size: var(--step-0);
-				color: var(--ink);
-				rotate: 1.5deg;
-				text-align: center;
-			}
-
-			.same[data-shown='false'] {
-				visibility: hidden;
-			}
-
-			.route {
-				display: grid;
-				justify-items: center;
-				gap: 0.2rem;
-				min-width: 0;
-			}
-
-			.cmd {
-				max-width: 100%;
-				padding: 0.3em 0.7em;
-				border: 2px solid var(--ink);
-				border-radius: 4px;
-				background: var(--slab);
-				color: var(--slab-ink);
-				font-family: var(--font-mono);
-				font-size: 0.76rem;
-				line-height: 1.3;
-				overflow-wrap: anywhere;
-				box-shadow: 2px 3px 0 var(--pink);
-				cursor: pointer;
-				rotate: -1deg;
-				font-variant-ligatures: none;
-			}
-
-			.cmd::before {
-				content: '$ ' / '';
-				color: var(--green-star);
-			}
-
-			.cmd:active {
-				translate: 2px 3px;
-				box-shadow: none;
-			}
-
-			.cmd[aria-pressed='true'] {
-				box-shadow: 2px 3px 0 var(--green-star);
-			}
-
-			.cmd:focus-visible {
-				outline: 2.5px dashed var(--purple);
-				outline-offset: 4px;
-			}
-
-			.route.two .cmd {
-				rotate: 0.8deg;
-			}
-
-			.arrow {
 				width: 100%;
-				height: 2.4rem;
+			}
+
+			.box {
+				box-sizing: border-box;
+				min-width: 0;
+				border: 1px solid var(--ink);
+				border-radius: 6px;
+				background: var(--paper);
 				color: var(--ink);
-				--ink-weight: 2.2;
+				overflow: hidden;
+				transition: background 140ms ease;
 			}
 
 			.out {
-				position: relative;
+				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+			}
+
+			.head {
+				padding: 0.35em 0.85em;
+				border-block-end: 1px solid var(--pg-edge);
+				font-family: var(--font-mono);
+				font-size: 0.85em;
+			}
+
+			.files {
 				display: grid;
-				gap: 0.5rem;
+				margin: 0;
+				padding: 0.45em 0.85em 0.55em;
+				list-style: none;
 			}
 
-			.kind {
-				font-size: var(--step-0);
-				color: var(--ink);
-				text-align: center;
-				rotate: -1deg;
-
-				html.dark & {
-					--sweep-blend: overlay;
-				}
+			li {
+				margin: 0;
+				font-family: var(--font-mono);
+				font-size: 0.85em;
+				line-height: 1.6;
+				overflow-wrap: anywhere;
 			}
 
-			.empty {
-				position: absolute;
-				inset: 0;
-				display: none;
-				place-items: center;
-				border: 2px dashed color-mix(in oklch, var(--ink) 35%, transparent);
+			.command {
+				min-width: 0;
+				padding: 0.6em 0.75em;
+				border: 1px dashed var(--ink);
 				border-radius: 6px;
-				font-size: var(--step-0);
-				color: color-mix(in oklch, var(--ink) 55%, transparent);
-			}
-
-			.out[data-built='false'] > :not(.empty) {
-				visibility: hidden;
-			}
-
-			.out[data-built='false'] .empty {
-				display: grid;
-			}
-
-			.footer {
-				display: flex;
-				align-items: center;
-				justify-content: center;
-				gap: 1rem;
-				margin-top: 0.4rem;
-			}
-
-			.note {
-				font-size: var(--step-0);
 				color: var(--ink);
-				rotate: -1deg;
+				font-family: var(--font-mono);
+				font-size: 0.85em;
+				line-height: 1.5;
+				overflow-wrap: anywhere;
 			}
 
-			.mug-spot {
-				zoom: 0.4;
-				--gaze-x: -6px;
-				--gaze-y: -4px;
+			.command span {
+				font-family: var(--font-mono);
 			}
 
-			@container (max-width: 36rem) {
+			.prompt {
+				margin-inline-end: 0.4em;
+				color: var(--muted-ink);
+			}
+
+			.board[data-preset='node'] .for-vercel,
+			.board[data-preset='vercel'] .for-node {
+				display: none;
+			}
+
+			.arrow {
+				color: var(--ink);
+				font-family: 'Shantell Sans', system-ui, sans-serif;
+				font-size: var(--step-0);
+			}
+
+			@media (max-width: 40rem) {
 				.board {
-					grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-					grid-template-areas:
-						'app app'
-						'one-route two-route'
-						'one-out two-out';
-					row-gap: 0.8rem;
-				}
-
-				.app {
-					justify-self: center;
-					width: 12rem;
+					grid-template-columns: minmax(0, 1fr);
 				}
 
 				.arrow {
-					width: 2.4rem;
-					height: 2.4rem;
+					justify-self: center;
 					rotate: 90deg;
 				}
+			}
 
-				.out .tree {
-					font-size: 0.7rem;
+			@media (prefers-reduced-motion: reduce) {
+				.box {
+					transition: none;
 				}
 			}
 		</style>
-	</figure>
+	</PreviewCard>
 }

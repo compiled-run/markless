@@ -75,23 +75,11 @@ Code fences in `tsrx`, `ts`, `tsx`, `js`, `json`, `css`, `sh`, `bash` and `html`
 
 A reader learns faster from code they can poke at. So a concept page shows the real component running, then the file that made it.
 
-Click the button.
+Click the button. Then turn on **Part names**.
 
 <TypoCountDemo />
 
-That button is this file:
-
-```tsrx
-import { state } from '@markless/core';
-
-export default function TypoCount() @{
-	let fixed = state(0);
-
-	<button onClick={() => fixed++}>Typos fixed: {fixed}</button>
-}
-```
-
-A demo is two files in `components/demos/<section>/`. `typo-count.tsrx` is the component the page shows. `typo-count-demo.tsrx` wraps it in `<div class="playground">`, which draws the frame. The page imports the wrapper, because a page places each component as its own top-level block.
+A demo is two files in `components/demos/<section>/`. `typo-count.tsrx` is the component the page shows. `typo-count-demo.tsrx` puts it in a `PreviewCard`, which draws the card. Each band of the card is one part: `Controls`, `Stage`, `Watch` and `Code`. `website/README.md` lists every part and its props, under "Previews". The page imports the wrapper, because a page places each component as its own top-level block.
 
 The code you show must be the smallest honest version of the file. Every line shown must do what it says. You can leave out the demo's own `<style>` block, because the panel teaches the feature, not the cosmetics.
 
@@ -142,7 +130,7 @@ export const label = 'Typos fixed';
 - `note` is optional. It prints under the block as a "Try this" suggestion.
 - The starter must build. The site builds it like any other component. It shows in the Result pane before any editor script loads. A broken starter stops the site build.
 
-The code is plain text in the page, highlighted at build time. The editor, the result frame and the compiler load when the reader first points at, focuses or touches the block. Nothing extra loads before that. Each edit compiles in the reader's browser, in a background worker. The result runs in a separate frame at `/_code-frame.html`, so the reader's code cannot break the page around it. A build error marks the line it names and is listed under the result. The header bar holds **Reset**, which puts the starter back, a button that stacks the code above the result when the block is wide enough to set them side by side, and full screen. Add `title="..."` to `<Code>` to name the block in its header; it reads **Playground** otherwise.
+The code is plain text in the page, highlighted at build time. The editor, the result frame and the compiler load when the reader first points at, focuses or touches the block. Nothing extra loads before that. Each edit compiles in the reader's browser, in a background worker. The result runs in a separate frame at `/_code-frame.html`, so the reader's code cannot break the page around it. A build error marks the line it names and is listed under the result. The header bar holds three buttons. **Reset** puts the starter back. When the block is wide, a second button stacks the code above the result. The third is full screen. Add `title="..."` to `<Code>` to name the block in its header. Otherwise it reads **Playground**.
 
 A block's files import each other by relative path, such as `import Card from './card.tsrx'`, and they can import `@markless/core` and `@markless/ui`. Each `.tsrx` file keeps its own scoped `<style>` block, as it does in an app. Import a UI family by name from the package root, such as `import { accordion } from '@markless/ui'`. The compiler rejects a family path such as `@markless/ui/accordion` with `MARKLESS_UI_IMPORT_SHAPE`, in a block as in an app.
 

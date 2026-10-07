@@ -29,24 +29,7 @@ Click **Edit address**. Press Tab a few times, then press Escape.
 
 <EditAddressDemo />
 
-That dialog is this file. Its `<style>` block is left out here:
-
-```tsrx
-import { modal } from '@markless/ui';
-
-export default function EditAddress() @{
-	<modal.root>
-		<modal.trigger class="open">Edit address</modal.trigger>
-		<modal.backdrop class="backdrop">
-			<modal.content class="dialog">
-				<modal.title class="title">Edit delivery address</modal.title>
-				<modal.description>We will send your order here.</modal.description>
-				<modal.close class="close">Cancel</modal.close>
-			</modal.content>
-		</modal.backdrop>
-	</modal.root>
-}
-```
+The tab under the dialog is its whole file, without the `<style>` block.
 
 Focus stayed inside the dialog while you pressed Tab. Escape closed it and put focus back on
 **Edit address**. You wrote none of that. The modal's own tests check it:

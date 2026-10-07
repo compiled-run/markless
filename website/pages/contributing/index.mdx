@@ -1,5 +1,5 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import RepoMapDemo from '../../components/demos/contributing/repo-map-demo.tsrx';
+import RepoMap from '../../components/demos/contributing/repo-map.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
@@ -19,7 +19,7 @@ Most of the packages form one pipeline. The compile half reads `Counter.tsrx` be
 
 Press a package to see its job and what it imports.
 
-<RepoMapDemo />
+<RepoMap />
 
 Press `web`. One package serves the browser, the server, build time and tests. Only the host around it changes. Then press `serializer`. Four packages import it, and it imports none.
 

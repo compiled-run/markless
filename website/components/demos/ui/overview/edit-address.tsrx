@@ -6,7 +6,7 @@ export default function EditAddress() @{
 		<modal.backdrop class="backdrop">
 			<modal.content class="dialog">
 				<modal.title class="title">Edit delivery address</modal.title>
-				<modal.description>We will send your order here.</modal.description>
+				<modal.description class="desc">We will send your order here.</modal.description>
 				<modal.close class="close">Cancel</modal.close>
 			</modal.content>
 		</modal.backdrop>
@@ -14,19 +14,30 @@ export default function EditAddress() @{
 		<style>
 			.open,
 			.close {
-				padding: 0.5em 0.9em;
-				border: 2px solid var(--ink);
+				padding: 0.5em 1em;
+				border: 1px solid var(--ink);
 				border-radius: 6px;
 				background: var(--paper);
 				color: var(--ink);
-				font: inherit;
-				font-weight: 700;
+				font-family: 'Shantell Sans', system-ui, sans-serif;
+				font-size: var(--step-0);
 				cursor: pointer;
+				transition: background 140ms ease;
+			}
+
+			.open:hover,
+			.close:hover {
+				background: color-mix(in srgb, var(--purple) 16%, var(--paper));
 			}
 
 			.open[ui-open] {
-				background: var(--yellow);
-				color: var(--on-accent);
+				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+			}
+
+			.open:focus-visible,
+			.close:focus-visible {
+				outline: 2px solid var(--ink);
+				outline-offset: 4px;
 			}
 
 			.backdrop:not([hidden]) {
@@ -36,7 +47,7 @@ export default function EditAddress() @{
 				display: grid;
 				place-items: center;
 				padding: 1rem;
-				background: color-mix(in oklch, var(--ink) 45%, transparent);
+				background: color-mix(in oklch, var(--slab) 55%, transparent);
 			}
 
 			.dialog {
@@ -46,14 +57,26 @@ export default function EditAddress() @{
 				box-sizing: border-box;
 				width: min(24rem, 100%);
 				padding: 1.25em;
-				border: 2px solid var(--ink);
-				border-radius: 8px;
+				border: 1.5px solid var(--ink);
+				border-radius: 14px;
 				background: var(--paper);
+				box-shadow: 7px 7px 0 var(--muted-ink);
 				color: var(--ink);
+				font-family: 'Shantell Sans', system-ui, sans-serif;
+			}
+
+			.dialog:focus {
+				outline: none;
+			}
+
+			.desc {
+				margin: 0;
+				font-family: 'Shantell Sans', system-ui, sans-serif;
 			}
 
 			.title {
 				margin: 0;
+				font-family: 'Joy Elia', system-ui, sans-serif;
 				font-size: var(--step-1);
 				text-shadow: none;
 			}
