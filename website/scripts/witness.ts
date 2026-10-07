@@ -552,7 +552,7 @@ try {
 			(await page.locator('.playground p').allTextContents()).map((text) =>
 				Number(text.replace(/[^0-9]+/g, '')),
 			);
-		const pour = page.getByRole('button', { name: 'Pour a cup' });
+		const pour = page.locator('.playground').getByRole('button', { name: 'Pour a cup' });
 		await pour.waitFor();
 		const [watchedBefore, drawnBefore] = await cupsNumbers();
 		check(watchedBefore === 0, 'cups watched number starts at 0', String(watchedBefore));
@@ -574,13 +574,84 @@ try {
 			'cups drawn number did not move, so the component did not run again',
 			`${drawnBefore} then ${drawnAfter}`,
 		);
-		await page.getByRole('button', { name: 'Start over' }).click();
+		await page.locator('.playground').getByRole('button', { name: 'Start over' }).click();
 		await settleText(
 			page.locator('.playground p').first(),
 			(text) => text === 'Cups of coffee today: 0',
 			'Start over assigns the count back to 0',
 		);
 		await page.screenshot({ path: `${shotsDir}/T005-cups-after.png`, fullPage: true });
+
+		// --- the Code block on the state page --------------------------------------
+		{
+			const codePage = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+			const codeRequests: string[] = [];
+			codePage.on('request', (request) => codeRequests.push(request.url()));
+			const editorAssets = /\.wasm|compile-worker|_code-frame/;
+			await codePage.goto(`${origin}/concepts/state`, { waitUntil: 'networkidle' });
+			const block = codePage.locator('.code-block');
+			check(
+				!codeRequests.some((url) => editorAssets.test(url)),
+				'Code: the page fetches no compiler, wasm or result frame before the reader interacts',
+				codeRequests.filter((url) => editorAssets.test(url)).join(', ') || 'none',
+			);
+			const preloads = await codePage
+				.locator('link[rel="modulepreload"]')
+				.evaluateAll((links) => links.map((link) => (link as HTMLLinkElement).href));
+			const preloadedCode: string[] = [];
+			for (const href of preloads) {
+				const body = await (await fetch(href)).text();
+				if (/cm-editor|code:run|yuku/.test(body)) preloadedCode.push(href);
+			}
+			check(
+				preloadedCode.length === 0,
+				'Code: no modulepreload carries the editor, the session or the compiler',
+				preloadedCode.join(', ') || `${preloads.length} preloads checked`,
+			);
+			await block
+				.locator('[data-code-stage]')
+				.getByRole('button', { name: 'Pour a cup' })
+				.click();
+			await settleText(
+				block.locator('[data-code-stage] p').first(),
+				(text) => text.endsWith(': 1'),
+				'Code: the prerendered starter result is live before the editor loads',
+			);
+			await block.hover();
+			await block.locator('.cm-editor').waitFor({ timeout: 20000 });
+			check(true, 'Code: pointing at the block loads the editor');
+			const line = (text: string) => block.locator('.cm-line', { hasText: text }).first();
+			await line('Cups of coffee today').click();
+			await codePage.keyboard.press('Home');
+			await codePage.keyboard.press('Shift+End');
+			await codePage.keyboard.type('<p>Mugs poured: {cups}</p>');
+			const frame = codePage.frameLocator('.code-frame');
+			await frame.locator('text=Mugs poured: 0').waitFor({ timeout: 30000 });
+			check(
+				await block.locator('[data-code-stage]').isHidden(),
+				'Code: an edit compiles in the browser and the frame takes over the Result pane',
+			);
+			await line('let cups = state(0)').click();
+			await codePage.keyboard.press('Home');
+			await codePage.keyboard.press('Shift+End');
+			await codePage.keyboard.type('let cups = 0;');
+			await block.locator('.cm-code-problem-note').first().waitFor({ timeout: 30000 });
+			check(
+				/MARKLESS_STATE_STALE_LOCAL_WRITE/.test(
+					(await block.locator('.cm-editor').textContent()) ?? '',
+				),
+				'Code: a build error shows inline under the line it names',
+			);
+			await block.getByRole('button', { name: 'Reset' }).click();
+			await frame.locator('text=Cups of coffee today: 0').waitFor({ timeout: 30000 });
+			check(
+				(await block.locator('.cm-code-problem-note').count()) === 0 &&
+					(await line('let cups = state(0)').count()) === 1,
+				'Code: Reset restores the starter and clears the error',
+			);
+			await block.screenshot({ path: `${shotsDir}/T012-code-reset.png` });
+			await codePage.close();
+		}
 
 		await page.goto(`${origin}/concepts/computed`, { waitUntil: 'load' });
 		const totalLine = page.locator('.playground p').nth(2);

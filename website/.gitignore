@@ -12,5 +12,7 @@ dist/
 
 # written by tooling/ui-demos.ts at build time from the authored demo
 components/docs/playground/generated/
+# written by tooling/code-blocks.ts at build time from each page's <Code> blocks
+components/docs/code/generated/
 .witness*/
 .vercel

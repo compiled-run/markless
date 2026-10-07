@@ -24,9 +24,18 @@
 		"vite-plus": "0.3.1"
 	},
 	"devDependencies": {
+		"@codemirror/commands": "^6.11.1",
+		"@codemirror/lang-javascript": "^6.2.5",
+		"@codemirror/language": "^6.12.4",
+		"@codemirror/lint": "^6.9.7",
+		"@codemirror/state": "^6.7.6",
+		"@codemirror/view": "^6.43.13",
+		"@lezer/highlight": "^1.2.5",
 		"@markless/analyzer": "workspace:*",
 		"@markless/typescript-plugin": "workspace:*",
 		"@types/node": "24.12.2",
+		"@yuku-analyzer/wasm": "0.9.1",
+		"@yuku-codegen/wasm": "0.9.1",
 		"oxlint": "^1.79.0",
 		"playwright-core": "^1.56.0",
 		"shiki": "^4.4.3",

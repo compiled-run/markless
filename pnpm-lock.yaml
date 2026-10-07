@@ -95,7 +95,7 @@ importers:
         version: 0.3.1(@types/node@24.12.2)(@vitest/browser-playwright@4.1.11(@voidzero-dev/vite-plus-core@0.3.1(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.0))(playwright@1.58.2)(vitest@4.1.11))(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.0)
       vitest:
         specifier: 4.1.11
-        version: 4.1.11(@types/node@24.12.2)(@vitest/browser-playwright@4.1.11(@voidzero-dev/vite-plus-core@0.3.1(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.0))(playwright@1.58.2)(vitest@4.1.11))(@vitest/browser-preview@4.1.11)(@voidzero-dev/vite-plus-core@0.3.1(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.0))
+        version: 4.1.11(@types/node@24.12.2)(@vitest/browser-playwright@4.1.11)(@vitest/browser-preview@4.1.11)(@voidzero-dev/vite-plus-core@0.3.1(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.0))
       yaml:
         specifier: 2.9.0
         version: 2.9.0
@@ -696,7 +696,7 @@ importers:
         version: 0.3.1(@types/node@24.12.2)(@vitest/browser-playwright@4.1.11(@voidzero-dev/vite-plus-core@0.3.1(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.0))(playwright@1.58.2)(vitest@4.1.11))(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.0)
       vitest:
         specifier: 4.1.11
-        version: 4.1.11(@types/node@24.12.2)(@vitest/browser-playwright@4.1.11(@voidzero-dev/vite-plus-core@0.3.1(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.0))(playwright@1.58.2)(vitest@4.1.11))(@vitest/browser-preview@4.1.11)(@voidzero-dev/vite-plus-core@0.3.1(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.0))
+        version: 4.1.11(@types/node@24.12.2)(@vitest/browser-playwright@4.1.11)(@vitest/browser-preview@4.1.11)(@voidzero-dev/vite-plus-core@0.3.1(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.0))
 
   packages/bundler/fixtures/vite-prerender-multi-child:
     dependencies:
@@ -900,7 +900,7 @@ importers:
         version: '@voidzero-dev/vite-plus-core@0.3.1(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.0)'
       vitest:
         specifier: 4.1.11
-        version: 4.1.11(@types/node@24.12.2)(@vitest/browser-playwright@4.1.11(@voidzero-dev/vite-plus-core@0.3.1(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.0))(playwright@1.58.2)(vitest@4.1.11))(@vitest/browser-preview@4.1.11)(@voidzero-dev/vite-plus-core@0.3.1(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.0))
+        version: 4.1.11(@types/node@24.12.2)(@vitest/browser-playwright@4.1.11)(@vitest/browser-preview@4.1.11)(@voidzero-dev/vite-plus-core@0.3.1(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.0))
     devDependencies:
       '@markless/vitest-browser':
         specifier: workspace:*
@@ -1135,7 +1135,7 @@ importers:
         version: '@voidzero-dev/vite-plus-core@0.3.1(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.0)'
       vitest:
         specifier: 4.1.11
-        version: 4.1.11(@types/node@24.12.2)(@vitest/browser-playwright@4.1.11(@voidzero-dev/vite-plus-core@0.3.1(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.0))(playwright@1.58.2)(vitest@4.1.11))(@vitest/browser-preview@4.1.11)(@voidzero-dev/vite-plus-core@0.3.1(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.0))
+        version: 4.1.11(@types/node@24.12.2)(@vitest/browser-playwright@4.1.11)(@vitest/browser-preview@4.1.11)(@voidzero-dev/vite-plus-core@0.3.1(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.0))
     devDependencies:
       playwright:
         specifier: 1.58.2
@@ -1175,6 +1175,27 @@ importers:
         specifier: 0.3.1
         version: 0.3.1(@types/node@24.12.2)(@vitest/browser-playwright@4.1.11(@voidzero-dev/vite-plus-core@0.3.1(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.0))(playwright@1.58.2)(vitest@4.1.11))(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.0)
     devDependencies:
+      '@codemirror/commands':
+        specifier: ^6.11.1
+        version: 6.11.1
+      '@codemirror/lang-javascript':
+        specifier: ^6.2.5
+        version: 6.2.5
+      '@codemirror/language':
+        specifier: ^6.12.4
+        version: 6.12.4
+      '@codemirror/lint':
+        specifier: ^6.9.7
+        version: 6.9.7
+      '@codemirror/state':
+        specifier: ^6.7.6
+        version: 6.7.6
+      '@codemirror/view':
+        specifier: ^6.43.13
+        version: 6.43.13
+      '@lezer/highlight':
+        specifier: ^1.2.5
+        version: 1.2.5
       '@markless/analyzer':
         specifier: workspace:*
         version: link:../packages/analyzer
@@ -1184,6 +1205,12 @@ importers:
       '@types/node':
         specifier: 24.12.2
         version: 24.12.2
+      '@yuku-analyzer/wasm':
+        specifier: 0.9.1
+        version: 0.9.1
+      '@yuku-codegen/wasm':
+        specifier: 0.9.1
+        version: 0.9.1
       oxlint:
         specifier: ^1.79.0
         version: 1.79.0(oxlint-tsgolint@7.0.2001)(vite-plus@0.3.1(@types/node@24.12.2)(@vitest/browser-playwright@4.1.11(@voidzero-dev/vite-plus-core@0.3.1(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.0))(playwright@1.58.2)(vitest@4.1.11))(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.0))
@@ -1372,6 +1399,27 @@ packages:
     resolution: {integrity: sha512-EYlRokl8szrP9Z25qT5aepMdBjzBvHF9ZEhzIiUBc9guz/T31EqRgvD0QSgZcpE93xiwrr+OkB4nz0BZyF6fSA==}
     engines: {node: '>= 20.12.0'}
 
+  '@codemirror/autocomplete@6.20.3':
+    resolution: {integrity: sha512-tlosUqb+3BbxCxZdu4tKeRghPFC+QM7q4X5YhKV2eCmPG+1r2F3f4AaSz5sCrFqUtX4Jh20VFTKecl16MgiV9g==}
+
+  '@codemirror/commands@6.11.1':
+    resolution: {integrity: sha512-O/4hG3SC1YwcmQ0d2UVNDs+AsaNWd1iHVxbTeEBuqH+6bExAiPK3iS/BvpY6rZGURALv4ZD3sIgcCmRvw3ehBg==}
+
+  '@codemirror/lang-javascript@6.2.5':
+    resolution: {integrity: sha512-zD4e5mS+50htS7F+TYjBPsiIFGanfVqg4HyUz6WNFikgOPf2BgKlx+TQedI1w6n/IqRBVBbBWmGFdLB/7uxO4A==}
+
+  '@codemirror/language@6.12.4':
+    resolution: {integrity: sha512-1q4PaT+o6PbgpkJt4Q8Fv5XJxTy4FUZ4MWETtyiDw3J0Pyr9E2vqcKL+k9wcvjNTIsauxvE7OfmWj3FRPHQ76A==}
+
+  '@codemirror/lint@6.9.7':
+    resolution: {integrity: sha512-28/+iWLYxKxsvGYhSYL7zaCZqLz5+FFFDq9tVsvGv9kv8RY4fFAchJ5WX9M3YrrRlTIsECjsXPqeNgnSmNP2dg==}
+
+  '@codemirror/state@6.7.6':
+    resolution: {integrity: sha512-kAz+AncRtKuIknedxT1bq4XwXv4UowhbkHU1myPrtVb/jZtImWuV5BXzv5vK6i3kYACsdiZiQKFQQ5Mq7elW8w==}
+
+  '@codemirror/view@6.43.13':
+    resolution: {integrity: sha512-sihaFrUzAsYBQsL9J2t69y8nfMQGwcYmggAZsk+kjPbjYZMyuf2hU8tUNTZ+P+isb6XRr8JE22TZlJxBoVdH1A==}
+
   '@emnapi/core@1.9.1':
     resolution: {integrity: sha512-mukuNALVsoix/w1BJwFzwXBN/dHeejQtuVzcDsfOEsdpCumXb/E9j8w11h5S54tT1xhifGfbbSm/ICrObRb3KA==}
 
@@ -1418,6 +1466,21 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
+
+  '@lezer/common@1.5.3':
+    resolution: {integrity: sha512-H0iErY4e43LpXbYDyBci5W4v/RwTgGV3YzYOlJPiGZ8RY8w51kVE+xLn1tg3Z6UmSfyETvtsUK3r7YsgDQEI7Q==}
+
+  '@lezer/highlight@1.2.5':
+    resolution: {integrity: sha512-O1GMVKgtf5YspFaRzpmqkVgMtIk2HG9uMAbH6wdAIdNh3TVzCsch/+cRi+6l2//UGDKe6NB9BW3cvuR5ezMQ0w==}
+
+  '@lezer/javascript@1.5.6':
+    resolution: {integrity: sha512-sEvOqpl4vJQca0NugSQK02vQPbc5KrvoojnYGoqqFgFO0MtcYhwGiHKVEB+LuXYJnfyXo4QPA8ztbrEa4Fw5NA==}
+
+  '@lezer/lr@1.4.10':
+    resolution: {integrity: sha512-rnCpTIBafOx4mRp43xOxDJbFipJm/c0cia/V5TiGlhmMa+wsSdoGmUN3w5Bqrks/09Q/D4tNAmWaT8p6NRi77A==}
+
+  '@marijn/find-cluster-break@1.0.4':
+    resolution: {integrity: sha512-Wy0V7+SGUjnF9/TkiM1hKVDPj7jKXduPNboMVtHTA8dySMURWqfg/JZ9E2Sq8JgSJmkl7k7Qe9FLeMSrSraWmQ==}
 
   '@napi-rs/wasm-runtime@1.1.5':
     resolution: {integrity: sha512-AWPoBRJ9tsnVhor4sjO7rkni+7p+2IAEFj6cx06UgP10jkQHqay/36uRV/bFkgrh18D9vb4cr8Q0Pthskgzy+Q==}
@@ -2878,6 +2941,10 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@yuku-analyzer/wasm@0.9.1':
+    resolution: {integrity: sha512-79vDZJxi11s9g+b36b3Bm0XSX+zbPSCVnvMFC+8PylKC6iqkgMTTXGhyIbRLUZEhtB69dyRUKwAq/seAi8C4UA==}
+    deprecated: Use yuku-analyzer with @yuku-core/wasm, see https://yuku.fyi/#webassembly
+
   '@yuku-codegen/binding-android-arm64@0.9.1':
     resolution: {integrity: sha512-PiZjoFFQkhu5QhwoAHCDVpjUr1s+9HUgcWGeFo8DVKkfk7oB9m+ejK2IZRQGHWihyKRyxg2L6MkUvDNlgrx9xA==}
     cpu: [arm64]
@@ -3009,6 +3076,10 @@ packages:
     resolution: {integrity: sha512-FxENahEjWSan59Syh/us/Kf4wNq8qrJLFJ3R2N4Oiwtb6yNdz/rWLNTIoNSssnsp7IoWJdUP6o/Z8ppg7lXMcg==}
     cpu: [x64]
     os: [win32]
+
+  '@yuku-codegen/wasm@0.9.1':
+    resolution: {integrity: sha512-Pniy+2dWFDKJjh78wHVX0m+Q7OXlQ8zfAfJDnImVYkz3hV0lnwLrsvc4bflgbGwB8oDRmgFlstOQwHQW36JIKA==}
+    deprecated: yuku-codegen is pure JavaScript and runs everywhere
 
   '@yuku-parser/binding-android-arm64@0.9.5':
     resolution: {integrity: sha512-A2JCFCSHfnficqYEw4Iujpx7XrkMM3UfFcgJFmYpZSo9zM4nyhmdIIE0FogSduuU60lhM0/UcfuUBXIVNBMlGQ==}
@@ -3198,6 +3269,9 @@ packages:
 
   cookie-es@3.1.1:
     resolution: {integrity: sha512-UaXxwISYJPTr9hwQxMFYZ7kNhSXboMXP+Z3TRX6f1/NyaGPfuNUZOWP1pUEb75B2HjfklIYLVRfWiFZJyC6Npg==}
+
+  crelt@1.0.7:
+    resolution: {integrity: sha512-aK6BbWfhf4U/wCcLHKPJl/xa6VkVstRaPywWtMKGwuOLc/wZTyQYuoxgvZnNsBvv7Kg3YTBQYYBCggcviQczuA==}
 
   crossws@0.4.6:
     resolution: {integrity: sha512-/Wxe9Z007EbJ496j88nToZEvyPZ8PY/wjZJ18Agh/GCA9cYHyLbxtrpdFlFzAw3TV20F0SUYGl0g6PzChbwUrg==}
@@ -3929,6 +4003,9 @@ packages:
   stringify-entities@4.0.4:
     resolution: {integrity: sha512-IwfBptatlO+QCJUo19AqvrPNqlVMpW9YEL2LIVY+Rpv2qsjCGxaDLNRgeGsQWJhfItebuJhsGSLjaBbNSQ+ieg==}
 
+  style-mod@4.1.4:
+    resolution: {integrity: sha512-XXWIQt633/EpAFx8aZDOTjBzrCaGmhvEQlQo6MVPfa2OzO2cWo+4hV9h+6UkHYlXGfy+ODXKUdP7Pthmcu5ATw==}
+
   tinybench@2.9.0:
     resolution: {integrity: sha512-0+DUvqWMValLmha6lr4kD8iAMK1HzV0/aKnCtWb9v9641TnP/MFb7Pc2bxoxQjTXAErryXVgUOfv2YqNllqGeg==}
 
@@ -4218,6 +4295,9 @@ packages:
 
   vscode-uri@3.1.0:
     resolution: {integrity: sha512-/BpdSx+yCQGnCvecbyXdxHDkuk55/G3xwnC0GqY4gmQ3j+A+g8kzzgB4Nk/SINjqn6+waqw3EgbVF2QKExkRxQ==}
+
+  w3c-keyname@2.2.8:
+    resolution: {integrity: sha512-dpojBhNsCNN7T82Tm7k26A6G9ML3NkhDsnw9n/eoxSRlVBB4CEtIQ/KTCLI2Fwf3ataSXRhYFkQi3SlnFwPvPQ==}
 
   webpack-virtual-modules@0.6.2:
     resolution: {integrity: sha512-66/V2i5hQanC51vBQKPH4aI8NMAcBW59FVBs+rC7eGHupMyfn34q7rZIE+ETlJ+XTevqfUhVVBgSUNSW2flEUQ==}
@@ -4534,6 +4614,56 @@ snapshots:
       fast-wrap-ansi: 0.2.2
       sisteransi: 1.0.5
 
+  '@codemirror/autocomplete@6.20.3':
+    dependencies:
+      '@codemirror/language': 6.12.4
+      '@codemirror/state': 6.7.6
+      '@codemirror/view': 6.43.13
+      '@lezer/common': 1.5.3
+
+  '@codemirror/commands@6.11.1':
+    dependencies:
+      '@codemirror/language': 6.12.4
+      '@codemirror/state': 6.7.6
+      '@codemirror/view': 6.43.13
+      '@lezer/common': 1.5.3
+
+  '@codemirror/lang-javascript@6.2.5':
+    dependencies:
+      '@codemirror/autocomplete': 6.20.3
+      '@codemirror/language': 6.12.4
+      '@codemirror/lint': 6.9.7
+      '@codemirror/state': 6.7.6
+      '@codemirror/view': 6.43.13
+      '@lezer/common': 1.5.3
+      '@lezer/javascript': 1.5.6
+
+  '@codemirror/language@6.12.4':
+    dependencies:
+      '@codemirror/state': 6.7.6
+      '@codemirror/view': 6.43.13
+      '@lezer/common': 1.5.3
+      '@lezer/highlight': 1.2.5
+      '@lezer/lr': 1.4.10
+      style-mod: 4.1.4
+
+  '@codemirror/lint@6.9.7':
+    dependencies:
+      '@codemirror/state': 6.7.6
+      '@codemirror/view': 6.43.13
+      crelt: 1.0.7
+
+  '@codemirror/state@6.7.6':
+    dependencies:
+      '@marijn/find-cluster-break': 1.0.4
+
+  '@codemirror/view@6.43.13':
+    dependencies:
+      '@codemirror/state': 6.7.6
+      crelt: 1.0.7
+      style-mod: 4.1.4
+      w3c-keyname: 2.2.8
+
   '@emnapi/core@1.9.1':
     dependencies:
       '@emnapi/wasi-threads': 1.2.0
@@ -4600,6 +4730,24 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
+
+  '@lezer/common@1.5.3': {}
+
+  '@lezer/highlight@1.2.5':
+    dependencies:
+      '@lezer/common': 1.5.3
+
+  '@lezer/javascript@1.5.6':
+    dependencies:
+      '@lezer/common': 1.5.3
+      '@lezer/highlight': 1.2.5
+      '@lezer/lr': 1.4.10
+
+  '@lezer/lr@1.4.10':
+    dependencies:
+      '@lezer/common': 1.5.3
+
+  '@marijn/find-cluster-break@1.0.4': {}
 
   '@napi-rs/wasm-runtime@1.1.5(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)':
     dependencies:
@@ -5730,6 +5878,11 @@ snapshots:
   '@yuku-analyzer/binding-win32-x64@0.9.1':
     optional: true
 
+  '@yuku-analyzer/wasm@0.9.1':
+    dependencies:
+      '@yuku-toolchain/types': 0.9.5
+      yuku-ast: 0.9.5
+
   '@yuku-codegen/binding-android-arm64@0.9.1':
     optional: true
 
@@ -5801,6 +5954,8 @@ snapshots:
 
   '@yuku-codegen/binding-win32-x64@0.9.5':
     optional: true
+
+  '@yuku-codegen/wasm@0.9.1': {}
 
   '@yuku-parser/binding-android-arm64@0.9.5':
     optional: true
@@ -5969,6 +6124,8 @@ snapshots:
   convert-source-map@2.0.0: {}
 
   cookie-es@3.1.1: {}
+
+  crelt@1.0.7: {}
 
   crossws@0.4.6(srvx@0.11.22):
     optionalDependencies:
@@ -6749,6 +6906,8 @@ snapshots:
       character-entities-html4: 2.1.0
       character-entities-legacy: 3.0.0
 
+  style-mod@4.1.4: {}
+
   tinybench@2.9.0: {}
 
   tinyexec@1.2.4: {}
@@ -7060,6 +7219,8 @@ snapshots:
       - msw
 
   vscode-uri@3.1.0: {}
+
+  w3c-keyname@2.2.8: {}
 
   webpack-virtual-modules@0.6.2: {}
 

@@ -1,0 +1,87 @@
+// The Markless runtime modules compiled code imports, served from the frame's own copy:
+// each specifier becomes a small module that re-exports the frame's instance, so the
+// result and the frame share one runtime.
+import corePackage from '../../../../packages/core/package.json' with { type: 'json' };
+import webPackage from '../../../../packages/web/package.json' with { type: 'json' };
+
+type Namespace = Record<string, unknown>;
+type Loader = () => Promise<Namespace>;
+
+const PACKAGES = '../../../../packages/';
+const sources: Record<string, Loader> = {
+	...import.meta.glob(['../../../../packages/web/src/**/*.ts', '!**/*.test.ts']),
+	...import.meta.glob([
+		'../../../../packages/core/src/web/**/*.ts',
+		'../../../../packages/core/src/runtime/**/*.ts',
+		'!**/*.test.ts',
+	]),
+} as Record<string, Loader>;
+
+const RUNTIME = '__marklessCodeRuntime';
+const namespaces: Map<string, Namespace> = ((globalThis as Record<string, unknown>)[RUNTIME] ??=
+	new Map()) as Map<string, Namespace>;
+
+/** The file a package export pattern maps `subpath` to, `*` patterns included. */
+export function exportTarget(
+	exports: Readonly<Record<string, string>>,
+	subpath: string,
+): string | undefined {
+	for (const [pattern, target] of Object.entries(exports)) {
+		const star = pattern.indexOf('*');
+		if (star < 0) {
+			if (pattern === subpath) return target;
+			continue;
+		}
+		const head = pattern.slice(0, star);
+		const tail = pattern.slice(star + 1);
+		if (
+			subpath.length >= head.length + tail.length &&
+			subpath.startsWith(head) &&
+			subpath.endsWith(tail)
+		)
+			return target.replace('*', subpath.slice(head.length, subpath.length - tail.length));
+	}
+	return undefined;
+}
+
+function loaderFor(specifier: string): Loader | undefined {
+	if (specifier === corePackage.name) return () => import('@markless/core');
+	for (const [pkg, folder] of [
+		[webPackage, 'web/'],
+		[corePackage, 'core/'],
+	] as const) {
+		if (specifier !== pkg.name && !specifier.startsWith(`${pkg.name}/`)) continue;
+		const target = exportTarget(
+			pkg.exports as Record<string, string>,
+			`.${specifier.slice(pkg.name.length)}`,
+		);
+		return target ? sources[`${PACKAGES}${folder}${target.slice(2)}`] : undefined;
+	}
+	return undefined;
+}
+
+const shims = new Map<string, Promise<string>>();
+
+/** A URL re-exporting the frame's copy of runtime module `specifier`, or undefined when it is not one. */
+export function runtimeModuleUrl(
+	specifier: string,
+	url: (code: string) => string,
+): Promise<string> | undefined {
+	const known = shims.get(specifier);
+	if (known) return known;
+	const loader = loaderFor(specifier);
+	if (!loader) return undefined;
+	const shim = loader().then((namespace) => {
+		namespaces.set(specifier, namespace);
+		const names = Object.keys(namespace).filter((name) => name !== 'default');
+		return url(
+			[
+				`const m = globalThis.${RUNTIME}.get(${JSON.stringify(specifier)});`,
+				names.length > 0 ? `export const { ${names.join(', ')} } = m;` : '',
+				'default' in namespace ? 'export default m.default;' : '',
+			].join('\n'),
+		);
+	});
+	shims.set(specifier, shim);
+	return shim;
+}

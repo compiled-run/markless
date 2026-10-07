@@ -97,6 +97,38 @@ A demo is two files in `components/demos/<section>/`. `typo-count.tsrx` is the c
 
 The code you show must be the smallest honest version of the file. Every line shown must do what it says. You can leave out the demo's own `<style>` block, because the panel teaches the feature, not the cosmetics.
 
+## Code the reader can edit
+
+When the lesson is "change this and watch", give the reader a `Code` block. Wrap one or more titled fences in `<Code>`. The page needs no import, because the build adds it.
+
+````txt
+<Code note="Change the label, then add a second line that also shows {fixed}.">
+```tsrx title="typo-count.tsrx"
+import { state } from '@markless/core';
+import { label } from './label.ts';
+
+export default function TypoCount() @{
+	let fixed = state(0);
+
+	<button onClick={() => fixed++}>{label}: {fixed}</button>
+}
+```
+
+```ts title="label.ts"
+export const label = 'Typos fixed';
+```
+</Code>
+````
+
+- Put `<Code>` and `</Code>` on their own lines. Only titled fences and blank lines go between them.
+- Give exactly one fence a `.tsrx` title. Its default export is what the Result pane shows. Other fences hold helpers, titled `.ts` or `.css`.
+- `note` is optional. It prints under the block as a "Try this" suggestion.
+- The starter must build. The site builds it like any other component and shows it in the Result pane, live, before any script for the editor loads. A broken starter stops the site build.
+
+The editor, the result frame and the compiler load when the reader first points at, focuses or touches the block. Nothing extra loads before that. Each edit compiles in the reader's browser, in a background worker. The result runs in a separate frame at `/_code-frame.html`, so the reader's code cannot break the page around it. A build error shows under the line it names, and **Reset** puts the starter back.
+
+One limit: a block holds a single `.tsrx` file. A `.tsrx` file cannot import another `.tsrx` file in the same block, because linking one compiled component to another needs the bundler's full build. Put shared logic in a `.ts` helper instead.
+
 ## Styles belong to their component
 
 Write a component's styles in a `<style>` block inside its `.tsrx` file. Markless scopes those selectors to that component, so short names like `.photo` stay safe. Use the global tokens, such as `var(--ink)`, `var(--paper)` and `var(--step--1)`.

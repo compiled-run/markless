@@ -42,7 +42,23 @@ Press **Pour a cup** three times. Then press **Start over**. Keep an eye on the 
 
 <CupsDemo />
 
-{/* PLAYGROUND: starter file cups.tsrx as printed below. Try: add a third paragraph that also shows {cups}, then click. Try: change state(0) to a plain 0 and read the build error. */ null}
+<Code note="Add a third paragraph that also shows {cups}, then press Pour a cup. Then change state(0) to a plain 0 and read the build error under the line it names.">
+```tsrx title="cups.tsrx"
+import { state } from '@markless/core';
+
+export default function Cups() @{
+	let cups = state(0);
+	const drawn = Math.floor(Math.random() * 90) + 10;
+
+	<section>
+		<p>Cups of coffee today: {cups}</p>
+		<p>A number drawn once, when the page was set up: {drawn}</p>
+		<button onClick={() => cups++}>Pour a cup</button>
+		<button onClick={() => (cups = 0)}>Start over</button>
+	</section>
+}
+```
+</Code>
 
 The count moves. The second number never does.
 
