@@ -96,6 +96,14 @@ The `ui()` Vite plugin from the new `@markless/ui-tools` package sets this up.
 - Static text follows JSX whitespace rules.
 - Built files no longer contain your machine's folder paths.
 - The docs starter template builds again.
+- A new app from `create-markless` installs with npm and pnpm, passes `vp check`
+  before and after a build, and starts `npm run dev` without a server error.
+- `@markless/ui` pages render in `pnpm dev` under pnpm's strict layout.
+- `@markless/ui` no longer asks you to install `vitest`.
+- A `Link` with `params` no longer writes your machine's folder path into the
+  build.
+- Text that joins a `const` from the component body with state, like
+  `{label} {count}`, keeps the `const` part when the state changes.
 
 ## 0.3.3
 
