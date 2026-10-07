@@ -6,7 +6,7 @@ Each file is a server-rendered `<textarea readonly>` over the build's highlighte
 one grid cell (`../code-files.tsrx`): the `<pre>` sets the size, the textarea is transparent text
 with a visible caret, and the pane around both scrolls. A reader's first point at or focus into the
 block calls `bootCodeBlock` (`session.ts`), the one entry point every trigger uses. It wires the
-header's Reset, layout and full screen buttons and the Result pane's Run again button, loads the
+header's Reset, layout and full screen buttons, loads the
 highlighter, and removes `readonly`.
 
 `editor.ts` repaints the `<pre>` on each input with `highlight.ts`: shiki's core on its JavaScript

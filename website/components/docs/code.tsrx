@@ -5,7 +5,6 @@ import type { CodePane } from '../../tooling/code-blocks.ts';
 import type { CodeFile } from './code/protocol.ts';
 import { lucide } from '@markless/ui';
 import sessionUrl from 'virtual:code-session-url';
-import MarkerSweep from '../sketch/marker-sweep.tsrx';
 import CodeFiles from './code-files.tsrx';
 
 // A URL the bundler cannot follow keeps the editor out of preloads; the block is found from the target until onVisible works.
@@ -64,14 +63,8 @@ export default function Code({
 			</div>
 			<div class="result" data-code-result>
 				<div class="result-head">
-					<span class="result-tab" data-code-marker>
-						Result
-						<MarkerSweep beat="rest" tone="yellow" place="" />
-					</span>
+					<span class="result-tab">Result</span>
 					<span class="status" data-code-status role="status"></span>
-					<button type="button" class="tool" data-code-action="refresh" aria-label="Run again" data-tip="Run again">
-						<lucide.refreshcw aria-hidden="true" />
-					</button>
 				</div>
 				<div class="stage-wrap">
 					<div class="stage code-stage" data-code-stage>{children}</div>
@@ -94,17 +87,13 @@ export default function Code({
 				--code-selection: color-mix(in oklch, var(--yellow) 55%, transparent);
 				--code-problem: oklch(52% 0.19 20);
 				--code-problem-wash: color-mix(in oklch, var(--pink) 18%, transparent);
-				/* Room beside the prose column: these widths and breakpoints mirror .site-shell in document.tsrx. */
-				--code-room: calc(100vw - 2 * var(--space-s-l));
-				--code-width: min(var(--code-room), 64rem);
 				container-type: inline-size;
 				position: relative;
 				display: flex;
 				flex-direction: column;
 				box-sizing: border-box;
-				width: max(100%, var(--code-width));
-				margin-block: var(--space-l);
-				margin-inline: min(0px, calc((100% - var(--code-width)) / 2));
+				width: 100%;
+				margin: var(--space-l) 0;
 				border: 1.5px solid var(--ink);
 				border-radius: 14px;
 				background: var(--paper);
@@ -120,18 +109,6 @@ export default function Code({
 					--code-selection: color-mix(in oklch, var(--yellow) 28%, transparent);
 					--code-problem: oklch(76% 0.14 15);
 					--code-problem-wash: color-mix(in oklch, var(--pink) 13%, transparent);
-				}
-			}
-
-			@media (min-width: 70.01rem) {
-				.code-block {
-					--code-room: calc(100vw - 27rem - 4 * var(--space-s-l));
-				}
-			}
-
-			@media (min-width: 96.01rem) {
-				.code-block {
-					--code-room: calc(100vw - 32rem - 4 * var(--space-s-l));
 				}
 			}
 
@@ -268,9 +245,9 @@ export default function Code({
 				border-block-end: 0;
 				border-radius: 6px 6px 0 0;
 				background: var(--code-wash);
-				font-family: 'Joy Elia', system-ui, sans-serif;
-				font-size: var(--step--1);
-				line-height: 1.3;
+				font-family: var(--font-mono);
+				font-size: var(--step--2);
+				line-height: 1.55;
 			}
 
 			.status {
@@ -278,10 +255,6 @@ export default function Code({
 				align-self: center;
 				text-align: end;
 				color: var(--muted-ink);
-			}
-
-			.result-head .tool {
-				align-self: center;
 			}
 
 			.stage-wrap {
@@ -318,14 +291,11 @@ export default function Code({
 
 			.try {
 				margin-right: 0.35em;
-				padding: 0 0.3em;
 				font-family: 'Joy Elia', system-ui, sans-serif;
 				font-weight: 700;
-				background: linear-gradient(transparent 45%, var(--mark) 45%, var(--mark) 90%, transparent 90%);
-				color: var(--on-mark);
 			}
 
-			@container (min-width: 46rem) {
+			@container (min-width: 60rem) {
 				.code-block[data-layout='split'] .body {
 					grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
 				}
@@ -336,7 +306,7 @@ export default function Code({
 				}
 			}
 
-			@container (max-width: 45.99rem) {
+			@container (max-width: 59.99rem) {
 				.layout-tool {
 					display: none;
 				}

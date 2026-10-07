@@ -41,7 +41,6 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 	const stage = part(box, 'stage');
 	const status = part(box, 'status');
 	const problemsList = part(box, 'problems');
-	const marker = box.querySelector('[data-code-marker] .marker-sweep');
 	const listening = new AbortController();
 	const { signal } = listening;
 	box.dataset.code = 'loading';
@@ -63,10 +62,6 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 
 	const actions: Record<string, () => void> = {
 		reset,
-		refresh() {
-			edited = true;
-			run();
-		},
 		layout() {
 			box.dataset.layout = box.dataset.layout === 'stacked' ? 'split' : 'stacked';
 			syncTools();
@@ -191,8 +186,6 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 		showProblems([]);
 		stage.hidden = true;
 		frame.hidden = false;
-		const beat = marker?.getAttribute('data-beat');
-		marker?.setAttribute('data-beat', beat === 'odd' ? 'even' : 'odd');
 	}
 
 	function reset(): void {
