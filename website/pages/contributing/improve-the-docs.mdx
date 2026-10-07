@@ -9,7 +9,7 @@ import LikeHeart from '../../components/docs/like-heart.tsrx';
 
 # Improve the docs
 
-<PageMeta level="Contributing" time="5 min" assumes="nothing" sprite="sparkle" />
+<PageMeta level="Contributing" time="7 min" assumes="nothing" sprite="sparkle" />
 
 <ThemeToggle />
 
@@ -91,7 +91,7 @@ export default function TypoCount() @{
 }
 ```
 
-A demo is two files in `components/demos/<section>/`. `typo-count.tsrx` is the component the page shows. `typo-count-demo.tsrx` wraps it in `<div class="playground">`, which draws the frame. The page imports the wrapper, because MDX cannot nest components.
+A demo is two files in `components/demos/<section>/`. `typo-count.tsrx` is the component the page shows. `typo-count-demo.tsrx` wraps it in `<div class="playground">`, which draws the frame. The page imports the wrapper, because a page places each component as its own top-level block.
 
 The code you show must be the smallest honest version of the file. Every line shown must do what it says. You can leave out the demo's own `<style>` block, because the panel teaches the feature, not the cosmetics.
 
@@ -140,7 +140,7 @@ export const label = 'Typos fixed';
 - Put `<Code>` and `</Code>` on their own lines. Only titled fences and blank lines go between them.
 - Give at least one fence a `.tsrx` title. The first `.tsrx` fence is the entry: its default export is what the Result pane shows. To run a different one, name it with `entry`, as in `<Code entry="page.tsrx">`. Other fences hold more components, or helpers titled `.ts` or `.css`.
 - `note` is optional. It prints under the block as a "Try this" suggestion.
-- The starter must build. The site builds it like any other component and shows it in the Result pane, live, before any script for the editor loads. A broken starter stops the site build.
+- The starter must build. The site builds it like any other component. It shows in the Result pane before any editor script loads. A broken starter stops the site build.
 
 The editor, the result frame and the compiler load when the reader first points at, focuses or touches the block. Nothing extra loads before that. Each edit compiles in the reader's browser, in a background worker. The result runs in a separate frame at `/_code-frame.html`, so the reader's code cannot break the page around it. A build error shows under the line it names, and **Reset** puts the starter back.
 
@@ -161,7 +161,7 @@ Put a rule in `global.css` only if no single component owns it. Tokens, prose ty
 <Callout
 	sprite="cross"
 	title="Why does my scoped class pick up a global rule?"
-	text="Scoping keeps your selectors inside the component. It does not keep global selectors out. If global.css also styles your class name, or a prose rule such as .prose h3 reaches your element, reset what it sets in your own style block."
+	text="Scoping keeps your selectors inside the component. It does not keep global selectors out. The global.css file can style your class name, and a prose rule such as .prose h3 can reach your element. Reset what they set in your own style block."
 />
 
 ## Facts come from the code

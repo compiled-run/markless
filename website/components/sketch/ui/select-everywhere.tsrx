@@ -1,6 +1,4 @@
-// "Is it the same select everywhere?" Three copies of one real select, framed
-// as the three places a family can render. The tags are CSS reading the live
-// ui-* attributes, so each copy shows exactly what it carries.
+// Three copies of one real select; the tags are CSS reading the live ui-* attributes.
 import { state } from '@markless/core';
 import { select } from '@markless/ui';
 import MugArt from '../../mascot/mug-art.tsrx';
@@ -14,6 +12,7 @@ export default function SelectEverywhere() @{
 
 	<figure class="sketch">
 		<SketchAsk text="Is it the same select everywhere?" />
+		<p class="caption">A drawing: all three copies run on this page.</p>
 
 		<div class="board">
 			<div class="frame" data-tried={alone ? 'true' : 'false'}>
@@ -338,6 +337,13 @@ export default function SelectEverywhere() @{
 				justify-content: center;
 				gap: 1rem;
 				margin-top: 0.8rem;
+			}
+
+			.caption {
+				margin: 0 0 0.6rem;
+				text-align: center;
+				font-size: var(--step--1);
+				color: color-mix(in oklch, var(--ink) 70%, transparent);
 			}
 
 			.note {

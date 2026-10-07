@@ -4,9 +4,9 @@
 
 TSRX supports a co-located `<style>` tag inside `.tsrx` components, and its
 selectors are scoped to the component. Component-specific styles belong there,
-not in `styles/global.css`. Reach for `global.css` only for genuinely
-site-wide rules: tokens, the type ramp, the prose column, the paper grain,
-code-fence surfaces, and the header/sidebar chrome.
+not in `styles/global.css`. Reach for `global.css` only for what one component
+cannot own: tokens on `:root` or `html`, typography for MDX prose, markup emitted
+by tooling, and classes several components share.
 
 `components/demos/home/hero-card.tsrx` and `components/docs/opener-line.tsrx` are
 the pattern to copy. Global tokens (`var(--ink)`, `var(--step--1)`, the space

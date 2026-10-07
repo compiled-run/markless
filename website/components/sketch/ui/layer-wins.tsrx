@@ -1,5 +1,4 @@
-// "Whose rule places the tip?" A layered default and one plain rule, both
-// running on the tip beside Save. The switch turns the plain rule on and off.
+// A layered default and one plain rule, both live on the tip beside Save.
 import { state } from '@markless/core';
 import MugArt from '../../mascot/mug-art.tsrx';
 import IndexCard from '../index-card.tsrx';
@@ -21,7 +20,7 @@ export default function LayerWins() @{
 		<div class="board" data-mine={mine ? 'on' : 'off'}>
 			<div class="cards">
 				<IndexCard label="@layer markless" tilt="-1.2deg">
-					<pre class="code"><span class="line"><span class="k">@layer</span>{' markless {'}</span><span class="line">{'  '}<span class="f">.tip</span>{' {'}</span><span class="line">{'    '}<span class="a">position-area</span>{': '}<span class="hit loser">block-start<MarkerSweep beat={sweepBeat} place="" /><svg class="strike" viewBox="0 0 100 20" preserveAspectRatio="none" aria-hidden="true"><path d="M2 12 C 30 9 60 13 98 8" /></svg></span>;</span><span class="line">{'  }'}</span><span class="line">{'}'}</span></pre>
+					<pre class="code"><span class="line"><span class="k">@layer</span>{' markless {'}</span><span class="line">{'  '}<span class="f">[overlay]</span>{' {'}</span><span class="line">{'    '}<span class="a">position-area</span>{': '}<span class="hit loser">block-start<MarkerSweep beat={sweepBeat} place="" /><svg class="strike" viewBox="0 0 100 20" preserveAspectRatio="none" aria-hidden="true"><path d="M2 12 C 30 9 60 13 98 8" /></svg></span>;</span><span class="line">{'  }'}</span><span class="line">{'}'}</span></pre>
 				</IndexCard>
 				<div class="mine-card">
 					<IndexCard label="your rule" pin="pin" tilt="1.4deg">

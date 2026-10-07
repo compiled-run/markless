@@ -8,7 +8,7 @@ import LayerWins from '../../components/sketch/ui/layer-wins.tsrx';
 
 # The look is yours, the state is an attribute
 
-<PageMeta level="Start here" time="6 min" assumes="styling" sprite="flower" />
+<PageMeta level="Start here" time="5 min" assumes="styling" sprite="flower" />
 
 <ThemeToggle />
 
@@ -138,7 +138,7 @@ A few attributes carry a value instead. An accordion item writes its own `value`
 
 The `<style>` block in a component belongs to that file. Markless scopes it, so a `.picker` here
 cannot collide with a `.picker` two folders away. A class you put on a family part still reaches
-it. The package's tests check exactly that, both in the browser alone and from server HTML.
+it. The tooltip and accordion tests check exactly that, in the browser alone and from server HTML.
 
 These are the same [scoping rules](/concepts/styling) your own components already get.
 
@@ -215,7 +215,7 @@ in CSS, where your rule can change it.
 <Callout
 	sprite="bolt"
 	title="Why is my closed panel still showing?"
-	text="Closed panels use the hidden attribute. If you give the panel a display rule, yours beats the browser's own rule for hidden, so the panel stays on screen. Write .panel:not([hidden]) { display: grid } instead."
+	text="Closed panels use the hidden attribute. A display rule of yours beats the browser's own rule for hidden. So the panel stays on screen. Write .panel:not([hidden]) { display: grid } instead."
 />
 
 ## Parts that nest
