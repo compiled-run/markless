@@ -1,5 +1,4 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import StateComputedDemo from '../../components/demos/how-it-works/state-computed-demo.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
@@ -38,11 +37,8 @@ Think of plumbing, as an analogy. A write opens one tap, and water reaches only 
 
 Here is a counter with one computed value. Press **Next** a few times:
 
-{/* PLAYGROUND: starter file state-computed.tsrx (below). Try: add a third output that reads `count + 100`, then a second state() with its own button, and see that each button moves only its own readers. */ null}
-
-<StateComputedDemo />
-
-```tsrx
+<Code note="Add a third output that reads {count + 100}. Then add a second state() with its own button and output. Each button moves only the outputs that read its state.">
+```tsrx title="state-computed.tsrx"
 import { computed, state } from '@markless/core';
 
 export default function StateComputed() @{
@@ -56,6 +52,7 @@ export default function StateComputed() @{
 	</section>
 }
 ```
+</Code>
 
 Both outputs move, because both read `count`, one of them through `doubled`. The button label never
 changes, because it reads nothing.

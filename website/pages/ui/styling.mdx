@@ -24,8 +24,6 @@ Open the picker. Pick **Ink**, then open it again. Try to pick **Neon**.
 
 <Example scenario="overview/styled-picker" />
 
-{/* PLAYGROUND: starter = components/demos/ui/overview/styled-picker.tsrx. Try: delete the .mark[ui-hidden] rule and watch every option show its tick, or change .option[ui-selected] to a background colour. */ null}
-
 The trigger turned yellow while the list was open, because `.picker[ui-open] .trigger` matched. **Ink** went
 bold because its option gained `ui-selected`. **Neon** looks faded because it carries `ui-disabled`.
 No line of TypeScript adds or removes a class. The family writes the attribute, and your
@@ -82,8 +80,6 @@ right of **Save**:
 
 <Example scenario="overview/save-tip" />
 
-{/* PLAYGROUND: starter = components/demos/ui/overview/save-tip.tsrx. Try: delete position-area from .tip and watch the tip jump back above Save, or change it to block-end. */ null}
-
 <LayerWins />
 
 You moved the tip with CSS, not a prop. The tooltip has no prop for where it sits. Placement lives
@@ -104,8 +100,6 @@ its own open or closed state, and the same CSS styles every level.
 Click the arrow next to **src**. Then use the arrow keys to walk the rows.
 
 <Example scenario="overview/files" />
-
-{/* PLAYGROUND: starter = components/demos/ui/overview/files.tsrx. Try: copy the src item inside its own itemcontent to make a third level, and watch .arrow[ui-open] turn its arrow too. */ null}
 
 `index.ts` and `app.tsrx` use the same `tree.item` part as `src`, one level down. The
 `.arrow[ui-open]` rule turns the arrow on any row at any depth. Menus nest the same way: a submenu

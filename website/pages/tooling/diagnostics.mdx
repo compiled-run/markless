@@ -1,5 +1,4 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import BuildDemo from '../../components/demos/tooling/build-demo.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
@@ -22,15 +21,32 @@ read more.
 Your editor shows type errors and syntax errors. Markless's own rules run when the dev server or the
 build reads a `.tsrx` file. An error stops the build. A warning lets the build go on.
 
-Press **Build**. Then add the key and build again.
+This list builds. Take its key away and see what Markless says.
 
-<BuildDemo />
+<Code note="Delete ; key item from the @for line and read the error under it. Reset puts the key back.">
+```tsrx title="List.tsrx"
+import { state } from '@markless/core';
+
+export default function List() @{
+	let items = state(['a', 'b']);
+
+	<section>
+		<ul>
+			@for (const item of items; key item) {
+				<li>{item}</li>
+			}
+		</ul>
+		<button onClick={() => (items = [...items, `row ${items.length + 1}`])}>Add a row</button>
+	</section>
+}
+```
+</Code>
 
 The fix fits on one line, and the error suggested it.
 
 ## What the build prints
 
-Here is that list again, with no key:
+Here is a shorter list with no key:
 
 ```tsrx
 import { state } from '@markless/core';
@@ -61,8 +77,6 @@ The first line counts the errors in the file. Then each error gets a block. Read
 code and the place, then why, then the first fix, then the link.
 
 The link opens [the page for that code](/errors/MARKLESS_REPEAT_KEY_REQUIRED). Every code has one.
-
-{/* PLAYGROUND: starter file List.tsrx. Try: build it, then add key item to the @for and build again. Try: change the key to index i; key i and read the warning. */ null}
 
 ## Silence a warning
 

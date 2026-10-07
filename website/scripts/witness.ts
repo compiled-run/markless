@@ -2015,7 +2015,8 @@ try {
 		// --- widget: the state graph demo ------------------------------------------
 		// One write moves the state and the computed that reads it, nothing else.
 		await page.goto(`${origin}/how-it-works/state-graph`, { waitUntil: 'load' });
-		const graphOutputs = page.locator('.playground output');
+		const graphStage = page.locator('.code-block [data-code-stage]').first();
+		const graphOutputs = graphStage.locator('output');
 		await graphOutputs.first().waitFor();
 		const graphValues = async () =>
 			(await graphOutputs.allTextContents()).map((text) => text.trim()).join(',');
@@ -2024,7 +2025,7 @@ try {
 			'the state graph demo serves count 2 and doubled 4',
 			await graphValues(),
 		);
-		await page.getByRole('button', { name: 'Next', exact: true }).click();
+		await graphStage.getByRole('button', { name: 'Next', exact: true }).click();
 		for (let attempt = 0; attempt < 40; attempt += 1) {
 			if ((await graphValues()) === '3,6') break;
 			await new Promise((done) => setTimeout(done, 100));

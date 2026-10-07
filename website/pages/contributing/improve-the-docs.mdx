@@ -77,8 +77,6 @@ A reader learns faster from code they can poke at. So a concept page shows the r
 
 Click the button.
 
-{/* PLAYGROUND: starter files typo-count.tsrx. Try: change the label, or add a second line that also reads fixed. */ null}
-
 <TypoCountDemo />
 
 That button is this file:
@@ -119,6 +117,25 @@ export const label = 'Typos fixed';
 ```
 </Code>
 ````
+
+Here is that block, live on this page:
+
+<Code note="Change the label, then add a second line that also shows {fixed}.">
+```tsrx title="typo-count.tsrx"
+import { state } from '@markless/core';
+import { label } from './label.ts';
+
+export default function TypoCount() @{
+	let fixed = state(0);
+
+	<button onClick={() => fixed++}>{label}: {fixed}</button>
+}
+```
+
+```ts title="label.ts"
+export const label = 'Typos fixed';
+```
+</Code>
 
 - Put `<Code>` and `</Code>` on their own lines. Only titled fences and blank lines go between them.
 - Give exactly one fence a `.tsrx` title. Its default export is what the Result pane shows. Other fences hold helpers, titled `.ts` or `.css`.

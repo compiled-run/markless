@@ -1,5 +1,4 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import CounterDemo from '../../components/demos/how-it-works/counter-demo.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
@@ -19,11 +18,8 @@ instead, at build time. By the time anything runs, the plan is already written.
 
 Here is the counter this whole section follows. Click it a few times:
 
-{/* PLAYGROUND: starter file counter.tsrx (below). Try: change the text to `Clicked {count} times`, then add a second button that runs `count = 0`. */ null}
-
-<CounterDemo />
-
-```tsrx
+<Code note="Change the text to Clicked {count} times, then add a second button that runs count = 0. Both buttons write the same state, and the one text that reads it changes.">
+```tsrx title="counter.tsrx"
 import { state } from '@markless/core';
 
 export default function Counter() @{
@@ -32,6 +28,7 @@ export default function Counter() @{
 	<button onClick={() => count++}>Count {count}</button>
 }
 ```
+</Code>
 
 ## Decided before anything runs
 
