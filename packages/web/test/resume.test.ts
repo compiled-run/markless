@@ -1744,6 +1744,57 @@ test('resume runtime visible symbols read current graph values without subscribi
 	expect(seenTitles).toEqual(['visible-title']);
 });
 
+test('resume runtime hands a visible handler an event whose target is its element', async () => {
+	const image = element('IMG');
+	const root = element('SECTION', [image]);
+	const events: unknown[] = [];
+	let visibilityCallback:
+		| ((
+				entries: ReadonlyArray<{
+					readonly target: FakeElement;
+					readonly isIntersecting: boolean;
+				}>,
+		  ) => void)
+		| undefined;
+	const view = {
+		locators: [
+			{ hostNodeId: 'h0', strategy: 'dom-order' as const, index: 0, tagName: 'section' },
+			{ hostNodeId: 'h1', strategy: 'dom-order' as const, index: 1, tagName: 'img' },
+		],
+		events: [{ hostNodeId: 'h1', eventName: 'visible', symbolIds: ['symbol:visible'] }],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const resume = createResumeRuntime({
+		root,
+		graph: createRuntimeGraph({ cells: [] }),
+		view,
+		createVisibilityObserver(callback) {
+			visibilityCallback = callback;
+			return { observe() {}, unobserve() {} };
+		},
+		loadSymbol() {
+			return ({ event }) => {
+				events.push(event);
+			};
+		},
+	});
+
+	await resume.start();
+	// An MDX or event-only entry forwards the primer's visible dispatch with its record named, so unmatched is not ignored.
+	await resume.dispatch({ type: 'visible', target: image }, { ignoreUnmatched: false });
+	visibilityCallback?.([{ target: image, isIntersecting: true }]);
+	await settleMicrotasks();
+
+	expect(events).toEqual([{ type: 'visible', target: image, currentTarget: image }]);
+	// A staged segment learns from this refusal that another segment owns the host.
+	await expect(
+		resume.dispatch({ type: 'visible', target: root }, { ignoreUnmatched: false }),
+	).rejects.toMatchObject({ code: 'MARKLESS_EVENT_DISPATCH_UNMATCHED' });
+});
+
 test('resume runtime activates element behaviors on visible triggers', async () => {
 	const canvas = element('CANVAS');
 	const root = element('SECTION', [canvas]);
