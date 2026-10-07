@@ -2,6 +2,7 @@ import AnatomyTable from '../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Preview from '../../components/ui/preview.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
 
 <Sidebar />
 
@@ -11,42 +12,80 @@ import Preview from '../../components/ui/preview.tsrx';
 
 <Preview shows="Six empty boxes with a caret in the first." />
 
+`otp` is a field for a one-time code, such as the six digits a site texts you. It shows one box per
+character, but a person types into one real text input.
+
 ```tsrx
 import { otp } from '@markless/ui';
 
 export default function Code() @{
-	<otp.root length={6}>
+	<otp.root>
 		<otp.field aria-label="Verification code" />
-		<otp.item index={0}><otp.itemindicator>|</otp.itemindicator></otp.item>
-		<otp.item index={1}><otp.itemindicator>|</otp.itemindicator></otp.item>
-		<otp.item index={2}><otp.itemindicator>|</otp.itemindicator></otp.item>
-		<otp.item index={3}><otp.itemindicator>|</otp.itemindicator></otp.item>
-		<otp.item index={4}><otp.itemindicator>|</otp.itemindicator></otp.item>
-		<otp.item index={5}><otp.itemindicator>|</otp.itemindicator></otp.item>
+		<otp.item><otp.itemindicator>|</otp.itemindicator></otp.item>
+		<otp.item><otp.itemindicator>|</otp.itemindicator></otp.item>
+		<otp.item><otp.itemindicator>|</otp.itemindicator></otp.item>
+		<otp.item><otp.itemindicator>|</otp.itemindicator></otp.item>
+		<otp.item><otp.itemindicator>|</otp.itemindicator></otp.item>
+		<otp.item><otp.itemindicator>|</otp.itemindicator></otp.item>
 	</otp.root>
 }
 ```
 
-There is one real input, and it is invisible and stretched over the whole row, so a click anywhere
-on the boxes lands on it. That is what makes paste, one-time-code autofill, undo and a single tab
-stop free rather than reimplemented — six separate inputs would have cost all four. Each box says
-which character of the code it shows, counting from 0.
+There is no `length` prop. Six `otp.item` boxes make a six-character code. Each box shows the
+character at its own place in the row, so you never number them. A box you write in an `@for` loop
+works the same way.
+
+## One input under the boxes
+
+`otp.field` is a plain `<input>`. It is invisible, and it covers every box. A click anywhere on the
+boxes lands on it. Because it is a real input, paste, undo and the browser's one-time-code autofill
+work with no extra code.
+
+The family writes these attributes on the input:
+
+- `type="text"` and `inputmode="numeric"`, so phones show a number pad.
+- `autocomplete="one-time-code"`, so the browser can offer the code from a text message.
+- `maxlength`, set to the number of boxes.
+
+Your own attributes, such as `pattern` or `name`, reach the input too. The family's own values win.
+The tests check that a `maxlength` you write cannot replace the box count.
 
 ## Anatomy
 
 <AnatomyTable />
 
-It writes `ui-empty` and `ui-disabled`.
+- `otp.root` is a `<div>` around the boxes. The input measures itself against it.
+- `otp.field` is the one `<input>`. It is the only form control in the widget.
+- `otp.item` is one box. It shows one character of the code.
+- `otp.itemindicator` is a `<span>` inside a box, for a caret you draw. It has no state.
+
+`otp.item` writes `ui-empty` while it has no character. The root and every box write `ui-disabled`
+when you set `disabled`.
+
+## What the tests check
+
+- Each keystroke fills the next box.
+- **Backspace** removes the last character.
+- Typing past the last box adds nothing.
+- A pasted code fills every box. A longer code keeps one character per box.
+- Focus on the field puts the caret after the last character.
+- In a form, the code submits under the `name` you give `otp.field`.
+
+<Callout
+	sprite="bolt"
+	title="Why can I not style the root with a style prop?"
+	text="otp.root writes its own style attribute, position: relative, so the input can cover the boxes. Style the root from a stylesheet with a class instead."
+/>
 
 ## Props on `otp.root`
 
-| Prop              | Type              | What it does                                                                                      |
-| ----------------- | ----------------- | ------------------------------------------------------------------------------------------------- |
-| `length`          | `number`          | How many characters the code has. Required.                                                       |
-| `value`           | `string`          | The code entered so far. Omit it and the field starts empty.                                      |
-| `disabled`        | `boolean`         | Nothing can be typed.                                                                             |
-| `shiftPWManagers` | `boolean`         | Keep a password manager's icon off the boxes. Omit it and the icon is pushed past the right edge. |
-| `onChange`        | `(value) => void` | Called with the whole code every time it changes, not with the character typed.                   |
-| `onComplete`      | `(value) => void` | Called once, the moment the code reaches `length` characters.                                     |
+| Prop              | Type              | What it does                                                                            |
+| ----------------- | ----------------- | --------------------------------------------------------------------------------------- |
+| `value`           | `string`          | The code entered so far. Omit it and the field starts empty.                            |
+| `disabled`        | `boolean`         | Stops all typing.                                                                       |
+| `shiftPWManagers` | `boolean`         | Keeps a password manager's icon off the boxes. It is on by default.                     |
+| `onChange`        | `(value) => void` | Gets the whole code each time it changes. It does not get the one character typed.      |
+| `onComplete`      | `(value) => void` | Gets the whole code once, when every box holds a character.                             |
 
-Everything a `<div>` accepts reaches the element too, except `style`.
+The root passes anything a `<div>` accepts to its element, except `style`. `otp.field` takes
+anything an `<input>` accepts, except `value` and `style`.

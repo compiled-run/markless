@@ -2,6 +2,7 @@ import AnatomyTable from '../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Preview from '../../components/ui/preview.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
 
 <Sidebar />
 
@@ -10,6 +11,9 @@ import Preview from '../../components/ui/preview.tsrx';
 <ThemeToggle />
 
 <Preview shows="A square code in a white frame." />
+
+`qrcode` draws a string as a QR code. Use it for a link a phone can scan, a pairing code, or a
+two-factor setup secret.
 
 ```tsrx
 import { qrcode } from '@markless/ui';
@@ -25,23 +29,59 @@ export default function Scan() @{
 }
 ```
 
-The whole code is one `<path>`, so its colour is `fill` and its rendered size is CSS. Give the
-frame light-coloured padding of roughly four modules: the encoded symbol carries no margin of its
-own, and scanners need that quiet zone to find the code. Name the code for what scanning it does
-rather than for the string it holds — the root is `role="img"`, so everything inside it is
-presentational and an overlay can hold nothing a reader needs to hear.
+The family encodes the code while it renders. So HTML from a server already holds the finished
+path. If `value` changes later, the pattern changes with it.
 
 ## Anatomy
 
 <AnatomyTable />
 
-This family writes no `ui-` attributes: nothing about a code changes as a person uses it.
+- `qrcode.root` is a `<div>` with `role="img"`. It holds the value and the recovery level.
+- `qrcode.frame` is a `<div>` around the code.
+- `qrcode.patternsvg` is the `<svg>`. One unit of its `viewBox` is one square of the code.
+- `qrcode.patternpath` is one `<path>` that draws every dark square.
+- `qrcode.overlay` is a `<div>` for a logo in the middle of the code.
+
+This family writes no `ui-*` attributes. Nothing about a code changes while a person uses the page.
+
+## Size and colour
+
+The whole code is one `<path>`, so `fill` sets its colour. The `width` and `height` you give
+`qrcode.patternsvg`, or your CSS, set its size. The `viewBox` holds the squares alone, with no
+margin.
+
+A scanner needs a light border around the code to find it. Give `qrcode.frame` light padding of
+about four squares on each side.
+
+```css
+.frame {
+	padding: 1rem;
+	background: white;
+	color: black;
+}
+```
+
+## Name it for what scanning does
+
+The root writes no `aria-label` of its own. Write one that says what scanning does, such as "Scan
+to open the site". Do not name it after the string it holds. For a two-factor secret, that name
+reads the secret out loud. The tests check that the value never shows up in the code's own markup.
+
+`role="img"` makes everything inside the root decoration to a screen reader. So put nothing a
+person needs to hear in `qrcode.overlay`.
+
+<Callout
+	sprite="bolt"
+	title="Why does my code with a logo not scan?"
+	text="A logo covers squares the scanner needs. Set recovery to quartile or high, so the code carries enough spare data to read around the logo."
+/>
 
 ## Props on `qrcode.root`
 
-| Prop       | Type                                        | What it does                                                                                                                                   |
-| ---------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `value`    | `string`                                    | The text the code carries, usually a URL. Required.                                                                                            |
-| `recovery` | `'low' \| 'medium' \| 'quartile' \| 'high'` | How much of the code can be damaged or covered and still be read: 7%, 15%, 25%, 30%. Omit it for medium. A logo on top needs quartile or high. |
+| Prop       | Type                                        | What it does                                                                   |
+| ---------- | ------------------------------------------- | ------------------------------------------------------------------------------ |
+| `value`    | `string`                                    | The text the code carries, often a URL. Required.                              |
+| `recovery` | `'low' \| 'medium' \| 'quartile' \| 'high'` | How much of the code can be covered and still scan: 7%, 15%, 25% or 30%.       |
 
-Everything a `<div>` accepts reaches the element too, `aria-label` included.
+`recovery` defaults to `'medium'`. A string too long for the largest QR code throws an error. The
+family does not cut it short. The root passes anything a `<div>` accepts to its element.
