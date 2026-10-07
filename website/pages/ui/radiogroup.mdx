@@ -2,6 +2,7 @@ import AnatomyTable from '../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Preview from '../../components/ui/preview.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
 
 <Sidebar />
 
@@ -11,13 +12,15 @@ import Preview from '../../components/ui/preview.tsrx';
 
 <Preview shows="Three billing periods, none chosen yet." />
 
+`radiogroup` is a set of choices where a person picks exactly one. Use it for a short list that
+fits on screen, such as a billing period or a shipping speed.
+
 ```tsrx
 import { radiogroup } from '@markless/ui';
 
 export default function Billing() @{
-	<radiogroup.root>
+	<radiogroup.root name="billing">
 		<radiogroup.label>Billing period</radiogroup.label>
-		<radiogroup.field name="billing" required />
 		<radiogroup.item value="monthly">
 			<radiogroup.itemfield />
 			<radiogroup.itemtrigger>
@@ -36,26 +39,68 @@ export default function Billing() @{
 }
 ```
 
-The group is a real `<fieldset>` and its label is a real `<legend>`, so it is named natively: no
-id, no IDREF, and better screen-reader support than `aria-labelledby` on a `role="radiogroup"`
-div. What a form receives is declared once on `radiogroup.field` rather than repeated on every
-option, and the whole group holds a single tab stop with the arrow keys walking the options.
+Each option holds a real `<input type="radio">`, hidden from sight. That input is what a person
+focuses, and it is what a form submits.
 
 ## Anatomy
 
 <AnatomyTable />
 
-It writes `ui-selected`, `ui-horizontal`, `ui-required` and `ui-disabled`.
+- `radiogroup.root` is a `<div>` with `role="radiogroup"`. It holds the chosen value.
+- `radiogroup.label` is a `<label>`. The group points `aria-labelledby` at it.
+- `radiogroup.description` is help text. The group points `aria-describedby` at it.
+- `radiogroup.error` is an error message. While it is on the page, the group writes `aria-invalid`.
+- `radiogroup.item` is one option. Its `value` is what the form submits.
+- `radiogroup.itemfield` is the hidden radio input for that option.
+- `radiogroup.itemtrigger` is the shape a person clicks. It has no role of its own.
+- `radiogroup.itemindicator` shows its children only while its option is chosen. It is `aria-hidden`.
+- `radiogroup.itemlabel` is a `<label>` for the option's input. A click on it chooses the option.
+
+`radiogroup.item` and `radiogroup.itemtrigger` write `ui-selected` on the chosen option. They write
+`ui-disabled` when the option or the group is disabled. The root writes `ui-horizontal`,
+`ui-disabled` and `ui-required` from its props.
+
+## Keyboard
+
+The whole group is one **Tab** stop. The chosen option holds it. With nothing chosen, **Tab** still
+reaches the group.
+
+| Key                       | What it does                                                                |
+| ------------------------- | --------------------------------------------------------------------------- |
+| Down arrow or Up arrow    | Moves focus to the next or previous option, and chooses it.                 |
+| Right arrow or Left arrow | The same, in a group with `orientation="horizontal"`.                       |
+| Home or End               | Chooses the first or the last option.                                       |
+| Space                     | Chooses the focused option.                                                 |
+
+The arrows skip a disabled option. At the last option, the next arrow goes back to the first,
+unless `loop` is `false`. The arrows of the other axis do nothing. An arrow with Alt, Ctrl or Cmd held stays with the browser.
+
+## In a form
+
+Set `name` once on the root. Every option's input submits under it, and only the chosen option is
+sent. Set `required` on the root when the form needs a choice.
+
+```tsrx
+<radiogroup.root name="plan" required>
+```
+
+<Callout
+	sprite="bolt"
+	title="Why does my form get nothing from the group?"
+	text="With no name on radiogroup.root, the inputs have no name, so the form skips them. Add name to the root. The options do not take one."
+/>
 
 ## Props on `radiogroup.root`
 
 | Prop          | Type                         | What it does                                                                |
 | ------------- | ---------------------------- | --------------------------------------------------------------------------- |
 | `value`       | `string`                     | The value of the chosen option. Omit it and nothing is chosen.              |
-| `orientation` | `'horizontal' \| 'vertical'` | Which axis the arrow keys walk. Omit it and the options stack.              |
-| `loop`        | `boolean`                    | Arrow past the last option and land on the first. The ends wrap either way. |
-| `disabled`    | `boolean`                    | Nobody can change any option.                                               |
-| `onChange`    | `(value) => void`            | Called with the new value when a person picks a different option.           |
+| `orientation` | `'horizontal' \| 'vertical'` | Which arrows move between options. The default is `'vertical'`.             |
+| `loop`        | `boolean`                    | Wraps from the last option to the first. The default is `true`.             |
+| `disabled`    | `boolean`                    | Stops every option from changing.                                           |
+| `name`        | `string`                     | The name every option submits under.                                        |
+| `required`    | `boolean`                    | The form needs a choice before it submits.                                  |
+| `onChange`    | `(value) => void`            | Gets the new value when a person picks a different option.                  |
 
-Everything a `<fieldset>` accepts reaches the element too. `radiogroup.item` takes its own `value`
-and `disabled`.
+The root passes anything a `<div>` accepts to its element. `radiogroup.item` takes `value`, which is
+required, and `disabled`.

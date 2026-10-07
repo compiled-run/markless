@@ -2,6 +2,7 @@ import AnatomyTable from '../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Preview from '../../components/ui/preview.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
 
 <Sidebar />
 
@@ -10,6 +11,9 @@ import Preview from '../../components/ui/preview.tsrx';
 <ThemeToggle />
 
 <Preview shows="A button that opens a dialog over a dimmed page." />
+
+`modal` is a dialog that blocks the page behind it. Use it when a person must finish or cancel one
+task before they go back to the page.
 
 ```tsrx
 import { modal } from '@markless/ui';
@@ -28,23 +32,79 @@ export default function EditAddress() @{
 }
 ```
 
-The backdrop wraps the surface rather than sitting beside it, so styling the dimming layer and the
-dialog together is ordinary nesting. Opening a dialog marks the rest of the page inert; closing it
-puts focus back on the trigger that opened it, or on whatever had focus if something else did.
-Mounting `modal.title` is what names the dialog.
+`modal.backdrop` wraps `modal.content`. It does not sit beside it. The dialog sits inside the dim
+layer, so you can center it with one grid rule on the backdrop.
 
 ## Anatomy
 
 <AnatomyTable />
 
-It writes `ui-open` and `ui-closed`.
+- `modal.root` holds the state: whether the dialog is open, and whether it is an alert.
+- `modal.trigger` is a `<button>` that opens the dialog. It writes `aria-haspopup="dialog"`,
+  `aria-expanded` and `aria-controls`.
+- `modal.backdrop` is the layer behind the dialog. It carries `hidden` while the dialog is closed.
+- `modal.content` is the dialog. It writes `role="dialog"`, `aria-modal="true"` and `tabindex="-1"`.
+- `modal.title` is an `<h2>`. It gives the dialog its name.
+- `modal.description` is a `<p>`. A screen reader reads it after the name.
+- `modal.close` is a `<button>` that closes the dialog.
+
+The root, the trigger, the backdrop and the content write `ui-open` while the dialog shows. They
+write `ui-closed` while it does not.
+
+## What the tests check
+
+- While the dialog is open, the page behind it is inert. Focus cannot reach it, and the page does not scroll.
+- **Tab** never leaves the dialog.
+- **Escape** closes the dialog and puts focus back on the trigger.
+- If a dialog opens a second dialog, **Escape** closes only the one on top.
+- A press on the backdrop closes the dialog. The press must start and end on the backdrop.
+- A right-button press on the backdrop does nothing.
+- A press inside the dialog never closes it.
+
+When the dialog opens, focus goes to `modal.content` itself, not to its first control. If your own
+code opens the dialog through `open`, focus goes back where it was when the dialog closes.
+
+## Alerts
+
+Set `alert` on the root for a dialog that asks a person to confirm something. The content then
+writes `role="alertdialog"`. A press on the backdrop does not close it, but **Escape** does. Focus
+goes to `modal.close` when it opens.
+
+```tsrx
+<modal.root alert>
+```
+
+## Style the backdrop
+
+`modal` ships no CSS. The backdrop does not cover the page until you write that rule. Give it a
+class, such as `backdrop`:
+
+```css
+.backdrop:not([hidden]) {
+	position: fixed;
+	inset: 0;
+	display: grid;
+	place-items: center;
+	background: rgb(0 0 0 / 0.4);
+}
+```
+
+<Callout
+	sprite="bolt"
+	title="Why does my closed dialog still cover the page?"
+	text="The backdrop hides with the hidden attribute. A plain display rule on it beats the browser's rule for hidden. Put :not([hidden]) on the selector, as above."
+/>
+
+The dialog takes focus when it opens, so the browser can draw a focus ring around all of it. Style
+`:focus-visible` on your dialog class to change that ring.
 
 ## Props on `modal.root`
 
-| Prop       | Type             | What it does                                                                                                                                       |
-| ---------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `open`     | `boolean`        | Whether the dialog is showing. Omit it and it starts closed.                                                                                       |
-| `alert`    | `boolean`        | An alert dialog: it announces as `alertdialog`, refuses to close on an outside press, and puts focus on the close control. Escape still closes it. |
-| `onChange` | `(open) => void` | Called with the new value when the dialog opens or closes, dismissals included.                                                                    |
+| Prop       | Type             | What it does                                                                                                |
+| ---------- | ---------------- | ----------------------------------------------------------------------------------------------------------- |
+| `open`     | `boolean`        | Whether the dialog shows. Omit it and the dialog starts closed.                                             |
+| `alert`    | `boolean`        | Makes an alert dialog. A backdrop press cannot close it. Focus goes to the close control when it opens.     |
+| `onChange` | `(open) => void` | Gets the new value each time the dialog opens or closes. **Escape** and backdrop presses call it too.       |
 
-Everything a `<div>` accepts reaches the element too.
+The root also passes anything a `<div>` accepts to its element. Your own `onClick` on the trigger
+runs after the dialog opens. Your own `onClick` on `modal.close` runs after it closes.

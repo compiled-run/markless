@@ -2,6 +2,7 @@ import AnatomyTable from '../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Preview from '../../components/ui/preview.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
 
 <Sidebar />
 
@@ -11,11 +12,14 @@ import Preview from '../../components/ui/preview.tsrx';
 
 <Preview shows="Five numbered pages between a back and a next." />
 
+`pagination` is a row of page numbers with back and next controls. Use it when a list or a table
+splits its rows across pages.
+
 ```tsrx
 import { pagination } from '@markless/ui';
 
 export default function Pages() @{
-	<pagination.root count={5} page={1}>
+	<pagination.root count={5} page={1} aria-label="Results pages">
 		<pagination.backtrigger>Previous</pagination.backtrigger>
 		<pagination.item value={1}>
 			<pagination.itemtrigger>1</pagination.itemtrigger>
@@ -28,29 +32,82 @@ export default function Pages() @{
 }
 ```
 
-The page number is written once, on the item, and the control inside reads it back, so the two can
-never fall out of step. `count` is pages, not rows — how many rows fit on a page is your data layer,
-and a component told about the data twice can disagree with itself. For long runs, ask the family
-which pages to draw: `pagination.entries(count, page, siblingCount)` returns the range, so how
-pages are picked can change without changing what you wrote.
+You write the page number once, on `pagination.item`. The control inside it reads that number back.
+So a button cannot say page 2 and go to page 3.
 
-There is no exported state for this family yet. A consumer reaches the range through
-`pagination.entries` rather than reading the instance.
+`count` is the number of pages, not rows. How many rows fit on a page is your data's job.
 
 ## Anatomy
 
 <AnatomyTable />
 
-It writes `ui-active` and `ui-disabled`.
+- `pagination.root` is a `<nav>` landmark. It holds the current page and the page count.
+- `pagination.item` is the box for one page. Its `value` is that page's number.
+- `pagination.itemtrigger` is a `<button>` that goes to its item's page.
+- `pagination.itemlink` is the same control as an `<a>`, for pages that have real URLs.
+- `pagination.backtrigger` and `pagination.forwardtrigger` are `<button>`s that step one page.
+
+The current page's item and control write `ui-active`. Its control also writes `aria-current="page"`.
+The root writes `ui-disabled` when you set `disabled`.
+
+The back control is `disabled` on page 1, and the forward control is `disabled` on the last page.
+They read "Previous page" and "Next page" to a screen reader unless you write your own `aria-label`.
+
+## Keyboard
+
+Every control is a native button or link, so the browser's own keys work.
+
+| Key            | What it does                                                                |
+| -------------- | --------------------------------------------------------------------------- |
+| Tab            | Moves through the controls in page order. It skips a disabled step control. |
+| Enter or Space | Goes to the focused page, or steps one page.                                |
+
+## Long runs of pages
+
+Twenty buttons do not fit in a row. `pagination.entries(page, count, siblingCount)` returns the pages
+to draw, with gaps where pages are left out. You loop over that list and draw each entry yourself:
+
+```tsrx
+const entries = computed(() => pagination.entries(nav.page, 20, 1));
+
+@for (const entry of entries; key entry.key) {
+	<li>
+		@if (entry.type === 'page') {
+			<pagination.item value={entry.value}>
+				<pagination.itemtrigger>{entry.value}</pagination.itemtrigger>
+			</pagination.item>
+		} @else {
+			<span aria-hidden="true">…</span>
+		}
+	</li>
+}
+```
+
+The third argument is the number of pages on each side of the current one. An entry is either
+`{ type: 'page', value, key }` or `{ type: 'ellipsis', key }`. Loop on
+`entry.key`, not on the index. A page keeps its key as the range slides. A gap never stands for one
+page. The family shows that page instead.
+
+<Callout
+	sprite="bolt"
+	title="Why can I still tab to a disabled page link?"
+	text="An <a> has no disabled attribute. So a disabled pagination.itemlink stays in the tab order and writes aria-disabled. It keeps its href, but a click on it goes nowhere."
+/>
+
+## Name the landmark
+
+`pagination.root` writes no `aria-label`. A page with a site nav and a pagination has two `<nav>`
+landmarks. A screen reader lists them by name, so give this one a name of its own.
 
 ## Props on `pagination.root`
 
-| Prop           | Type             | What it does                                                                 |
-| -------------- | ---------------- | ---------------------------------------------------------------------------- |
-| `count`        | `number`         | How many pages there are in total. Required.                                 |
-| `page`         | `number`         | Which page is showing, counting from 1. Omit it and it starts at page 1.     |
-| `siblingCount` | `number`         | How many pages to show on each side of the current one. Omit it and it is 1. |
-| `disabled`     | `boolean`        | Nothing navigates, and every control reports unavailable.                    |
-| `onChange`     | `(page) => void` | Called with the new page number when a person moves to another page.         |
+| Prop           | Type             | What it does                                                               |
+| -------------- | ---------------- | -------------------------------------------------------------------------- |
+| `count`        | `number`         | How many pages there are. Required.                                        |
+| `page`         | `number`         | The page that shows. The first page is 1, and it is the default.          |
+| `siblingCount` | `number`         | How many pages to show on each side of the current one. The default is 1.  |
+| `disabled`     | `boolean`        | Stops all page changes. Every control says it is unavailable.              |
+| `onChange`     | `(page) => void` | Gets the new page number when a person moves to another page.              |
 
-Everything a `<nav>` accepts reaches the element too. `pagination.item` takes its own `value`.
+The root passes anything a `<nav>` accepts to its element. `pagination.item` takes `value`, which is
+required. A click on the page that already shows does not call `onChange`.

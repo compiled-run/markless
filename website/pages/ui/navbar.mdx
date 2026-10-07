@@ -2,6 +2,7 @@ import AnatomyTable from '../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Preview from '../../components/ui/preview.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
 
 <Sidebar />
 
@@ -10,6 +11,9 @@ import Preview from '../../components/ui/preview.tsrx';
 <ThemeToggle />
 
 <Preview shows="Three top-level entries, one showing its dropdown." />
+
+`navbar` is your site's main navigation. Each entry is a link, or a button that shows a dropdown of
+links. Use it for the bar across the top of a site.
 
 ```tsrx
 import { navbar } from '@markless/ui';
@@ -30,27 +34,74 @@ export default function Primary() @{
 }
 ```
 
-This is a disclosure, deliberately never a menubar. `role="menubar"` puts screen readers into
-application mode and promises desktop-menu behaviour that site navigation does not have. The
-landmark carries no name of its own, because a page can have a primary nav and a footer nav and an
-invented "Navigation" on both is two landmarks a reader cannot tell apart — write your own
-`aria-label`.
+It is not a menu bar. It writes no `menu`, `menubar` or `menuitem` role, and the tests check that.
+A screen reader hears plain links and buttons, which is what site navigation is.
 
 ## Anatomy
 
 <AnatomyTable />
 
-It writes `ui-open`, `ui-closed` and `ui-active`.
+- `navbar.root` is the `<nav>` landmark. It holds which dropdown is showing.
+- `navbar.item` is one top-level entry. Its `value` names it.
+- `navbar.itemtrigger` is a `<button>` that shows or hides the item's dropdown. It writes
+  `aria-expanded` and `aria-controls`.
+- `navbar.itemcontent` is the dropdown. It carries `hidden` while it is closed.
+- `navbar.itemlink` is an `<a>`. It works at the top level and inside a dropdown.
+
+The root, the item, the trigger and the dropdown write `ui-open` while a dropdown shows. They write
+`ui-closed` while it does not. `navbar.item` writes `ui-active` when you set `active` on it.
+`navbar.itemlink` writes `ui-active` and `aria-current="page"` when you set `current` on it.
+
+Set `current` on the one link for the page a person is on. Set `active` on the item for the section
+that page sits in. Only `current` reaches a screen reader.
+
+## Keyboard
+
+| Key                       | What it does                                                                      |
+| ------------------------- | --------------------------------------------------------------------------------- |
+| Enter or Space            | Opens or closes the dropdown of the focused trigger.                              |
+| Left arrow or Right arrow | Moves between top-level controls, and wraps at the ends. It skips dropdown links. |
+| Home or End               | Jumps to the first or last top-level control.                                     |
+| Down arrow on a trigger   | Opens the dropdown and moves focus to its first link.                             |
+| Arrows inside a dropdown  | Move between that dropdown's links, and wrap at the ends.                         |
+| Home or End in a dropdown | Jumps to the dropdown's first or last link.                                       |
+| Escape                    | Closes the dropdown. If focus was inside it, focus goes back to the trigger.      |
+| Tab                       | Moves on as normal. When focus leaves the landmark, the open dropdown closes.     |
+
+A press outside the open dropdown closes it too.
+
+## Hover
+
+By default a dropdown opens when the pointer rests on its item. The first one waits for `delay`.
+Once one shows, the next item opens as soon as the pointer reaches it.
+
+When the pointer leaves the landmark, the dropdown closes after a short grace period. If the pointer
+comes back in time, the dropdown stays.
+
+<Callout
+	sprite="speech-bubble"
+	title="Why did my click not close the dropdown?"
+	text="A click right after a hover opens the dropdown is ignored for clickGrace. Without that, the click that follows a hover shuts the panel it just opened. Set hover={false} for a navbar that opens on click only."
+/>
+
+## Name the landmark
+
+`navbar.root` writes no `aria-label`. A page can have a main nav and a footer nav. The same made-up
+name on both gives a screen reader two landmarks it cannot tell apart. Write your own label, as in
+the example above.
+
+`navbar.itemcontent` gets no placement CSS from the family. Position the dropdown with your own
+stylesheet.
 
 ## Props on `navbar.root`
 
-| Prop         | Type              | What it does                                                                                   |
-| ------------ | ----------------- | ---------------------------------------------------------------------------------------------- |
-| `value`      | `string`          | Which item's dropdown is showing. Omit it, or pass the empty string, and everything is closed. |
-| `hover`      | `boolean`         | Dropdowns open when the pointer rests on an item. Omit it and they do.                         |
-| `delay`      | `number`          | How long the pointer must rest before the first dropdown opens. Omit it and it is 200ms.       |
-| `clickGrace` | `number`          | How long after a hover-open a click on the same trigger is ignored. Omit it and it is 300ms.   |
-| `onChange`   | `(value) => void` | Called with the value now showing its dropdown, or the empty string when everything closed.    |
+| Prop         | Type              | What it does                                                                                    |
+| ------------ | ----------------- | ----------------------------------------------------------------------------------------------- |
+| `value`      | `string`          | The `value` of the item whose dropdown shows. Omit it, or pass `''`, and every dropdown closes. |
+| `hover`      | `boolean`         | Opens a dropdown when the pointer rests on its item. Omit it and hover is on.                   |
+| `delay`      | `number`          | How long the pointer rests before the first dropdown opens, in ms. Omit it and it is 200.       |
+| `clickGrace` | `number`          | How long a click on the trigger is ignored after a hover opened it, in ms. The default is 300.  |
+| `onChange`   | `(value) => void` | Gets the `value` now showing, or `''` when everything closed.                                   |
 
-Everything a `<nav>` accepts reaches the element too. `navbar.item` takes its own `value` and
-`active`; `navbar.itemlink` takes `current`.
+The root passes anything a `<nav>` accepts to its element. `navbar.item` takes `value`, which is
+required, and `active`. `navbar.itemlink` takes `current`.
