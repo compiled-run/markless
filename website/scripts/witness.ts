@@ -4,7 +4,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { chromium, type Locator } from 'playwright-core';
+import { chromium, type Locator, type Page } from 'playwright-core';
 import { flatNav, headFor, nav, siteOrigin } from '../nav.ts';
 import { findError } from '../components/docs/errors/lookup.ts';
 import { errorIndex } from '../components/docs/errors/errors-index.ts';
@@ -88,6 +88,45 @@ const tooltipIsVisible = (tip: Locator) =>
 const slugFor = (href: string) => href.replace(/^\//, '').replace(/\//g, '-') || 'index';
 
 /** Waits until one element's text satisfies a predicate, then returns it. */
+/** Selects the code of the line holding `find` in the block's visible file and types `replacement` over it. */
+async function retype(
+	page: Page,
+	block: Locator,
+	find: string,
+	replacement: string,
+): Promise<void> {
+	const input = block.locator('[data-code-input]:visible').first();
+	await input.evaluate((element, wanted) => {
+		const area = element as HTMLTextAreaElement;
+		const at = area.value.indexOf(wanted);
+		const start = area.value.lastIndexOf('\n', at) + 1;
+		const end = area.value.indexOf('\n', at);
+		const indent = /^[ \t]*/.exec(area.value.slice(start))?.[0].length ?? 0;
+		area.focus();
+		area.setSelectionRange(start + indent, end < 0 ? area.value.length : end);
+	}, find);
+	await page.keyboard.press('Backspace');
+	await page.keyboard.type(replacement);
+}
+
+/** Whether the visible file's highlighted lines hold the textarea's text, and how far their heights differ. */
+function codeLayers(block: Locator): Promise<{ same: boolean; heightGap: number }> {
+	return block
+		.locator('[data-code-file]:visible')
+		.first()
+		.evaluate((editor) => {
+			const area = editor.querySelector('textarea')!;
+			const pre = editor.querySelector('pre')!;
+			const lines = [...pre.children].map((line) => line.textContent ?? '');
+			return {
+				same: lines.join('\n') === area.value,
+				heightGap: Math.abs(
+					area.getBoundingClientRect().height - pre.getBoundingClientRect().height,
+				),
+			};
+		});
+}
+
 const settleText = async (locator: Locator, wanted: (text: string) => boolean, label: string) => {
 	for (let attempt = 0; attempt < 40; attempt += 1) {
 		const text = ((await locator.textContent()) ?? '').trim();
@@ -582,12 +621,12 @@ try {
 			const codePage = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 			const codeRequests: string[] = [];
 			codePage.on('request', (request) => codeRequests.push(request.url()));
-			const editorAssets = /\.wasm|compile-worker|_code-frame/;
+			const editorAssets = /\.wasm|compile-worker|_code-frame|code-session/;
 			await codePage.goto(`${origin}/concepts/state`, { waitUntil: 'networkidle' });
 			const block = codePage.locator('.code-block');
 			check(
 				!codeRequests.some((url) => editorAssets.test(url)),
-				'Code: the page fetches no compiler, wasm or result frame before the reader interacts',
+				'Code: the page fetches no editor, compiler, wasm or result frame before the reader interacts',
 				codeRequests.filter((url) => editorAssets.test(url)).join(', ') || 'none',
 			);
 			const preloads = await codePage
@@ -596,12 +635,18 @@ try {
 			const preloadedCode: string[] = [];
 			for (const href of preloads) {
 				const body = await (await fetch(href)).text();
-				if (/cm-editor|code:run|yuku/.test(body)) preloadedCode.push(href);
+				if (/insertText|code:run|yuku|getTheme/.test(body)) preloadedCode.push(href);
 			}
 			check(
 				preloadedCode.length === 0,
-				'Code: no modulepreload carries the editor, the session or the compiler',
+				'Code: no modulepreload carries the editor, the highlighter, the session or the compiler',
 				preloadedCode.join(', ') || `${preloads.length} preloads checked`,
+			);
+			const input = block.locator('[data-code-input]').first();
+			check(
+				(await input.getAttribute('readonly')) !== null &&
+					(await input.inputValue()).includes('let cups = state(0)'),
+				'Code: the server sends each file as a read-only textarea over its highlighted lines',
 			);
 			await block
 				.locator('[data-code-stage]')
@@ -613,37 +658,60 @@ try {
 				'Code: the prerendered starter result is live before the editor loads',
 			);
 			await block.hover();
-			await block.locator('.cm-editor').waitFor({ timeout: 20000 });
-			check(true, 'Code: pointing at the block loads the editor');
-			const line = (text: string) => block.locator('.cm-line', { hasText: text }).first();
-			await line('Cups of coffee today').click();
-			await codePage.keyboard.press('Home');
-			await codePage.keyboard.press('Shift+End');
-			await codePage.keyboard.type('<p>Mugs poured: {cups}</p>');
+			await block.and(codePage.locator('[data-code="ready"]')).waitFor({ timeout: 20000 });
+			check(
+				(await input.getAttribute('readonly')) === null,
+				'Code: pointing at the block makes the code editable',
+			);
+			await retype(codePage, block, 'Cups of coffee today', '<p>Mugs poured: {cups}</p>');
 			const frame = codePage.frameLocator('.code-frame');
 			await frame.locator('text=Mugs poured: 0').waitFor({ timeout: 30000 });
 			check(
 				await block.locator('[data-code-stage]').isHidden(),
 				'Code: an edit compiles in the browser and the frame takes over the Result pane',
 			);
-			await line('let cups = state(0)').click();
-			await codePage.keyboard.press('Home');
-			await codePage.keyboard.press('Shift+End');
-			await codePage.keyboard.type('let cups = 0;');
-			await block.locator('.cm-code-problem-note').first().waitFor({ timeout: 30000 });
+			const layers = await codeLayers(block);
+			check(
+				layers.same && layers.heightGap < 1,
+				"Code: the highlighted lines repaint under the edit and stay the textarea's size",
+				JSON.stringify(layers),
+			);
+			await retype(codePage, block, 'let cups = state(0)', 'let cups = 0;');
+			await block.locator('.line.problem').first().waitFor({ timeout: 30000 });
 			check(
 				/MARKLESS_STATE_STALE_LOCAL_WRITE/.test(
-					(await block.locator('.cm-editor').textContent()) ?? '',
-				),
-				'Code: a build error shows inline under the line it names',
+					(await block.locator('.line.problem').first().getAttribute('data-problem')) ??
+						'',
+				) &&
+					/MARKLESS_STATE_STALE_LOCAL_WRITE/.test(
+						(await block.locator('[data-code-problems]').textContent()) ?? '',
+					),
+				'Code: a build error marks the line it names and is listed under the result',
 			);
-			await block.getByRole('button', { name: 'Reset' }).click();
+			await block.getByRole('button', { name: 'Reset code' }).click();
 			await frame.locator('text=Cups of coffee today: 0').waitFor({ timeout: 30000 });
 			check(
-				(await block.locator('.cm-code-problem-note').count()) === 0 &&
-					(await line('let cups = state(0)').count()) === 1,
+				(await block.locator('.line.problem').count()) === 0 &&
+					(await input.inputValue()).includes('let cups = state(0)'),
 				'Code: Reset restores the starter and clears the error',
 			);
+			const fullScreen = block.getByRole('button', { name: 'Full screen' });
+			await fullScreen.click();
+			const covered = await block
+				.and(codePage.locator('[data-full]'))
+				.waitFor({ timeout: 5000 })
+				.then(
+					() => true,
+					() => false,
+				);
+			check(
+				covered && (await fullScreen.getAttribute('aria-pressed')) === 'true',
+				'Code: the full screen button puts the block over the whole screen',
+			);
+			await fullScreen.click();
+			await codePage
+				.locator('.code-block[data-full]')
+				.waitFor({ state: 'detached', timeout: 5000 });
 			await block.screenshot({ path: `${shotsDir}/T012-code-reset.png` });
 			await codePage.close();
 		}
@@ -656,14 +724,10 @@ try {
 			const editLine = async (index: number, find: string, replacement: string) => {
 				const block = blocks.nth(index);
 				await block.hover();
-				// The session swaps the static code for editors, then marks the block ready.
 				await block.and(proof.locator('[data-code="ready"]')).waitFor({ timeout: 20000 });
-				await block.locator('.cm-line', { hasText: find }).first().click();
-				await proof.keyboard.press('Home');
-				await proof.keyboard.press('Shift+End');
-				await proof.keyboard.type(replacement);
+				await retype(proof, block, find, replacement);
 				await block
-					.locator('.cm-line', { hasText: replacement.slice(0, 40) })
+					.locator('.line', { hasText: replacement.slice(0, 40) })
 					.first()
 					.waitFor({ timeout: 5000 });
 				return { block, frame: block.frameLocator('.code-frame') };
@@ -1797,7 +1861,8 @@ try {
 			await new Promise((done) => setTimeout(done, 100));
 		}
 		check(
-			(await paperTab.getAttribute('aria-selected')) === 'true' && (await paperPane.isVisible()),
+			(await paperTab.getAttribute('aria-selected')) === 'true' &&
+				(await paperPane.isVisible()),
 			'a Code block with several files switches to the file tab the reader clicks',
 		);
 

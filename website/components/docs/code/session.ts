@@ -1,19 +1,21 @@
-// The live half of a <Code> block, loaded on the reader's first point, focus or edit:
-// editors replace the first-paint code, and the result frame starts compiling. The
-// prerendered starter stays in the Result pane until the first edit or Reset.
+// The live half of a <Code> block; the prerendered starter stays in the Result pane until the first run.
 import { asset } from '../../../site-base.ts';
 import type { CodeEditor } from './editor.ts';
+import { groupProblems, problemItem } from './problems.ts';
 import type { CodeDiagnostic, CodeFile, FrameReply, FrameRequest } from './protocol.ts';
 
-export type CodeSession = { reset(): void };
+export type CodeSession = { reset(): void; dispose(): void };
 
 const EDIT_DELAY_MS = 300;
 // Compiles the starter as soon as the frame is up, so the first edit finds the compiler loaded.
 const WARM_UP = 0;
 const sessions = new WeakMap<HTMLElement, Promise<CodeSession>>();
 
-/** The session of `box`, started on the first call. */
-export function codeSession(box: HTMLElement, starters: readonly CodeFile[]): Promise<CodeSession> {
+/** The one way a block starts: every trigger calls this with the block's `<figure>`. */
+export function bootCodeBlock(
+	box: HTMLElement,
+	starters: readonly CodeFile[],
+): Promise<CodeSession> {
 	let session = sessions.get(box);
 	if (!session) sessions.set(box, (session = start(box, starters)));
 	return session;
@@ -35,64 +37,13 @@ function siteLook(): FrameRequest {
 	};
 }
 
-/** One entry per distinct message, carrying every place it was reported. */
-export function groupProblems(
-	problems: readonly CodeDiagnostic[],
-): Array<{ readonly first: CodeDiagnostic; readonly places: readonly CodeDiagnostic[] }> {
-	const groups = new Map<string, CodeDiagnostic[]>();
-	for (const problem of problems) {
-		const key = `${problem.file}\n${problem.message}`;
-		groups.set(key, [...(groups.get(key) ?? []), problem]);
-	}
-	return [...groups.values()].map((places) => ({ first: places[0]!, places }));
-}
-
-function problemItem(
-	group: ReturnType<typeof groupProblems>[number],
-	reveal: (problem: CodeDiagnostic) => void,
-): HTMLLIElement {
-	const item = document.createElement('li');
-	const head = document.createElement('p');
-	head.className = 'code-problem-head';
-	const located = group.places.filter((place) => place.line > 0);
-	if (located.length === 0)
-		head.append(group.first.file ? `${group.first.file}: ` : 'While running: ');
-	else {
-		head.append(`${group.first.file}, line${located.length > 1 ? 's' : ''} `);
-		located.forEach((place, index) => {
-			if (index > 0) head.append(', ');
-			const jump = document.createElement('button');
-			jump.type = 'button';
-			jump.className = 'code-problem-where';
-			jump.textContent = String(place.line);
-			jump.setAttribute('aria-label', `Go to ${place.file} line ${place.line}`);
-			jump.addEventListener('click', () => reveal(place));
-			head.append(jump);
-		});
-		head.append(': ');
-	}
-	const message = document.createElement('span');
-	message.className = 'code-problem-message';
-	message.textContent = group.first.message;
-	head.append(message);
-	item.append(head);
-	if (group.first.detail) {
-		const more = document.createElement('details');
-		more.className = 'code-problem-detail';
-		const summary = document.createElement('summary');
-		summary.textContent = 'Why, and how to fix it';
-		more.append(summary, group.first.detail);
-		item.append(more);
-	}
-	return item;
-}
-
 async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<CodeSession> {
 	const stage = part(box, 'stage');
-	const result = part(box, 'result');
 	const status = part(box, 'status');
 	const problemsList = part(box, 'problems');
 	const marker = box.querySelector('[data-code-marker] .marker-sweep');
+	const listening = new AbortController();
+	const { signal } = listening;
 	box.dataset.code = 'loading';
 
 	const frame = document.createElement('iframe');
@@ -108,33 +59,84 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 	let edited = false;
 	const send = (message: FrameRequest) =>
 		frame.contentWindow?.postMessage(message, location.origin);
-
 	const editors = new Map<string, CodeEditor>();
+
+	const actions: Record<string, () => void> = {
+		reset,
+		refresh() {
+			edited = true;
+			run();
+		},
+		layout() {
+			box.dataset.layout = box.dataset.layout === 'stacked' ? 'split' : 'stacked';
+			syncTools();
+		},
+		fullscreen() {
+			if (document.fullscreenElement === box) void document.exitFullscreen();
+			else if (box.hasAttribute('data-expanded')) box.removeAttribute('data-expanded');
+			else if (document.fullscreenEnabled && box.requestFullscreen)
+				box.requestFullscreen().catch(() => box.setAttribute('data-expanded', ''));
+			// iPhone Safari has no element full screen; the block covers the viewport in place instead.
+			else box.setAttribute('data-expanded', '');
+			syncTools();
+		},
+	};
+
+	function syncTools(): void {
+		const full = document.fullscreenElement === box || box.hasAttribute('data-expanded');
+		box.toggleAttribute('data-full', full);
+		for (const button of box.querySelectorAll<HTMLElement>('[data-code-action]')) {
+			const action = button.dataset.codeAction;
+			if (action === 'layout')
+				button.setAttribute('aria-pressed', String(box.dataset.layout === 'stacked'));
+			if (action === 'fullscreen') button.setAttribute('aria-pressed', String(full));
+		}
+	}
+
+	// Wired before anything loads, so a press that started the session still lands.
+	for (const button of box.querySelectorAll<HTMLElement>('[data-code-action]'))
+		button.addEventListener('click', () => actions[button.dataset.codeAction ?? '']?.(), {
+			signal,
+		});
+	document.addEventListener('fullscreenchange', syncTools, { signal });
+	document.addEventListener(
+		'keydown',
+		(event) => {
+			if (event.key === 'Escape' && box.hasAttribute('data-expanded')) actions.fullscreen!();
+		},
+		{ signal },
+	);
+
 	// Listening before the frame loads: it says it is ready once, possibly before the editor arrives.
-	window.addEventListener('message', (event: MessageEvent<FrameReply>) => {
-		if (event.source !== frame.contentWindow || event.origin !== location.origin) return;
-		const message = event.data;
-		if (message.type === 'code:ready') {
-			ready = true;
-			send(siteLook());
-			if (edited) run();
-			else send({ type: 'code:run', id: WARM_UP, files: starters });
-		} else if (message.type === 'code:height') frame.style.height = `${message.height}px`;
-		else if (message.type === 'code:result') onResult(message);
-	});
+	window.addEventListener(
+		'message',
+		(event: MessageEvent<FrameReply>) => {
+			if (event.source !== frame.contentWindow || event.origin !== location.origin) return;
+			const message = event.data;
+			if (message.type === 'code:ready') {
+				ready = true;
+				send(siteLook());
+				if (edited) run();
+				else send({ type: 'code:run', id: WARM_UP, files: starters });
+			} else if (message.type === 'code:height') frame.style.height = `${message.height}px`;
+			else if (message.type === 'code:result') onResult(message);
+		},
+		{ signal },
+	);
+	stage.after(frame);
 
-	result.append(frame);
-
-	const { createEditor } = await import('./editor.ts');
+	const [{ createEditor }, highlighter] = await Promise.all([
+		import('./editor.ts'),
+		import('./highlight.ts').then((code) => code.loadHighlighter()),
+	]);
 	for (const host of box.querySelectorAll<HTMLElement>('[data-code-file]')) {
 		const name = host.dataset.codeFile ?? '';
-		const starter = starters.find((file) => file.name === name);
-		if (!starter) continue;
+		if (!starters.some((file) => file.name === name)) continue;
 		editors.set(
 			name,
 			createEditor(host, {
 				file: name,
-				code: starter.code,
+				highlighter,
 				onChange() {
 					edited = true;
 					clearTimeout(timer);
@@ -142,7 +144,6 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 				},
 			}),
 		);
-		host.querySelector('pre')?.remove();
 	}
 	box.dataset.code = 'ready';
 
@@ -194,17 +195,30 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 		marker?.setAttribute('data-beat', beat === 'odd' ? 'even' : 'odd');
 	}
 
-	new MutationObserver(() => {
+	function reset(): void {
+		const pressed = document.activeElement as HTMLElement | null;
+		for (const starter of starters) editors.get(starter.name)?.replace(starter.code);
+		pressed?.focus({ preventScroll: true });
+		clearTimeout(timer);
+		edited = true;
+		showProblems([]);
+		run();
+	}
+
+	const look = new MutationObserver(() => {
 		if (ready) send(siteLook());
-	}).observe(document.documentElement, { attributeFilter: ['class'] });
+	});
+	look.observe(document.documentElement, { attributeFilter: ['class'] });
 
 	return {
-		reset() {
-			for (const starter of starters) editors.get(starter.name)?.replace(starter.code);
+		reset,
+		dispose() {
+			listening.abort();
+			look.disconnect();
 			clearTimeout(timer);
-			edited = true;
-			showProblems([]);
-			run();
+			for (const editor of editors.values()) editor.dispose();
+			frame.remove();
+			sessions.delete(box);
 		},
 	};
 }

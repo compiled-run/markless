@@ -9,6 +9,7 @@ import {
 	type QuickInfoService,
 } from './twoslash-quickinfo.ts';
 import { sharedFencePool } from './fence-pool.ts';
+import { DARK_THEME, LIGHT_THEME, useSiteSurface } from './shiki-surface.ts';
 
 /** Fence language -> the language shiki is asked for. */
 const FENCE_ALIASES: Readonly<Record<string, string>> = {
@@ -24,9 +25,6 @@ const FENCE_ALIASES: Readonly<Record<string, string>> = {
 
 /** Read by `getHighlighter` from disk rather than imported, so the fence cache lists it by hand. */
 export const TSRX_GRAMMAR_URL = new URL('./tsrx.tmLanguage.json', import.meta.url);
-
-const LIGHT_THEME = 'github-light';
-const DARK_THEME = 'github-dark';
 
 let highlighterPromise: Promise<HighlighterGeneric<string, string>> | undefined;
 let quickInfoService: QuickInfoService | undefined;
@@ -238,30 +236,6 @@ export function addQuickInfoHovers(
 		}
 	}
 	return open === undefined ? out : `${out}${open}${buffer}`;
-}
-
-/**
- * Drops both themes' own surface colours so the block sits on the site's own
- * ground rather than on a theme's slab: the `<pre>` loses its inline style, and
- * every span painted a theme's default foreground is repainted with the page's
- * ink, in that theme's channel. Token colours are left exactly as the themes
- * chose them.
- */
-export function useSiteSurface(
-	html: string,
-	lightForeground: string,
-	darkForeground: string,
-): string {
-	// Shiki writes hex in the theme's own casing, which is not the casing the
-	// theme object reports, so both replacements match without regard to case.
-	const hex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-	return html
-		.replace(/(<pre class="shiki[^"]*")\s+style="[^"]*"/, '$1')
-		.replace(new RegExp(`(?<!-)color:${hex(lightForeground)}`, 'gi'), 'color:var(--ink)')
-		.replace(
-			new RegExp(`--shiki-dark:${hex(darkForeground)}`, 'gi'),
-			'--shiki-dark:var(--ink)',
-		);
 }
 
 /** Renders one fence's code, or undefined when shiki does not know its language. */

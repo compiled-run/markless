@@ -623,6 +623,15 @@ html.dark .shiki span:not(.tsrx-tip):not(.tsrx-tip-title):not(.tsrx-tip-body) {
 	color-scheme: normal;
 }
 
+.code-frame[hidden] {
+	display: none;
+}
+
+/* The editor repaints these spans at run time, so they carry no scope class for code-files.tsrx to match. */
+.code-block .highlight span {
+	font-family: var(--font-mono);
+}
+
 .code-problem-head {
 	margin: 0;
 }

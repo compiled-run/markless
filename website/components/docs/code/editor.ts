@@ -1,229 +1,185 @@
-// One CodeMirror 6 editor per file of a <Code> block. Colours come from CSS custom
-// properties the component sets, so the editor follows the site's light and dark themes.
-import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
-import { tsxLanguage, typescriptLanguage } from '@codemirror/lang-javascript';
+// One file of a <Code> block: its textarea over the highlighted <pre>; edits use execCommand so undo keeps them.
 import {
-	bracketMatching,
-	HighlightStyle,
-	indentService,
-	indentUnit,
-	LanguageSupport,
-	syntaxHighlighting,
-} from '@codemirror/language';
-import { EditorState, StateEffect, StateField, type Range } from '@codemirror/state';
-import {
-	Decoration,
-	type DecorationSet,
-	drawSelection,
-	EditorView,
-	keymap,
-	lineNumbers,
-	WidgetType,
-} from '@codemirror/view';
-import { tags } from '@lezer/highlight';
+	backspaceText,
+	closingPairText,
+	enterText,
+	indentText,
+	outdentText,
+	type EditAction,
+	type EditState,
+} from './edit-commands.ts';
+import type { Highlighter } from './highlight.ts';
 import type { CodeDiagnostic } from './protocol.ts';
 
 export type CodeEditor = {
-	readonly view: EditorView;
 	text(): string;
 	replace(code: string): void;
 	showProblems(problems: readonly CodeDiagnostic[]): void;
 	reveal(line: number, column: number): void;
+	dispose(): void;
 };
 
-const colours = HighlightStyle.define([
-	{
-		tag: [tags.keyword, tags.operatorKeyword, tags.modifier, tags.controlKeyword],
-		color: 'var(--code-keyword)',
-	},
-	{ tag: [tags.string, tags.special(tags.string), tags.regexp], color: 'var(--code-string)' },
-	{
-		tag: [
-			tags.function(tags.variableName),
-			tags.function(tags.propertyName),
-			tags.className,
-			tags.typeName,
-		],
-		color: 'var(--code-function)',
-	},
-	{
-		tag: [tags.number, tags.bool, tags.null, tags.atom, tags.propertyName, tags.attributeName],
-		color: 'var(--code-constant)',
-	},
-	{ tag: [tags.tagName, tags.angleBracket], color: 'var(--code-tag)' },
-	{
-		tag: [tags.comment, tags.lineComment, tags.blockComment],
-		color: 'var(--code-comment)',
-		fontStyle: 'italic',
-	},
-	{ tag: tags.invalid, color: 'inherit' },
-]);
-
-const look = EditorView.theme({
-	'&': {
-		color: 'var(--ink)',
-		backgroundColor: 'transparent',
-		fontSize: 'var(--step--2)',
-		maxHeight: '26rem',
-	},
-	'&.cm-focused': { outline: 'none' },
-	'.cm-scroller': { fontFamily: 'var(--font-mono)', lineHeight: '1.6', overflow: 'auto' },
-	'.cm-content': { padding: '0.75rem 0', caretColor: 'var(--ink)' },
-	'.cm-line': { padding: '0 0.75rem' },
-	'.cm-gutters': { backgroundColor: 'transparent', color: 'var(--code-comment)', border: 'none' },
-	'.cm-lineNumbers .cm-gutterElement': { padding: '0', minWidth: '2.25rem', textAlign: 'right' },
-	'.cm-cursor': { borderLeftColor: 'var(--ink)', borderLeftWidth: '2px' },
-	'&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection': {
-		backgroundColor: 'var(--code-selection) !important',
-	},
-	'.cm-matchingBracket': { backgroundColor: 'var(--code-selection)', outline: 'none' },
-	'.cm-code-problem': {
-		textDecoration: 'underline wavy var(--code-problem)',
-		textDecorationSkipInk: 'none',
-		textUnderlineOffset: '3px',
-	},
-	'.cm-code-problem-note': {
-		margin: '0.15rem 0.75rem 0.35rem 0.75rem',
-		padding: '0.35rem 0.6rem',
-		borderLeft: '3px solid var(--code-problem)',
-		background: 'var(--code-problem-wash)',
-		fontFamily: 'var(--font-mono)',
-		fontSize: '0.92em',
-		whiteSpace: 'pre-line',
-		overflowWrap: 'anywhere',
-		lineHeight: '1.45',
-	},
-});
-
-class ProblemNote extends WidgetType {
-	constructor(readonly message: string) {
-		super();
-	}
-
-	override eq(other: ProblemNote): boolean {
-		return other.message === this.message;
-	}
-
-	toDOM(): HTMLElement {
-		const note = document.createElement('div');
-		note.className = 'cm-code-problem-note';
-		note.setAttribute('role', 'note');
-		note.textContent = this.message;
-		return note;
-	}
+/** The text a pane's textarea holds: the file without its final newline, so the two layers have equal lines. */
+export function editorText(code: string): string {
+	return code.replace(/\n$/, '');
 }
 
-// The TSX grammar reads a `@{` body as an error, so its own indentation guesses go astray:
-// a new line keeps the previous line's indent, one deeper after an opening bracket or tag.
-const keepIndent = indentService.of((context, pos) => {
-	const previous = context.state.doc.lineAt(pos).number - 1;
-	if (previous < 1) return 0;
-	const text = context.state.doc.line(previous).text;
-	const indent = context.lineIndent(context.state.doc.line(previous).from);
-	const opens =
-		/[{([]\s*$/.test(text) || (/<[A-Za-z][^>]*[^/]>\s*$/.test(text) && !/<\//.test(text));
-	return opens ? indent + context.unit : indent;
-});
+/** The offset of 1-based `line` and `column` in `text`, clamped to the text. */
+export function offsetOf(text: string, line: number, column: number): number {
+	let at = 0;
+	for (let row = 1; row < line; row++) {
+		const next = text.indexOf('\n', at);
+		if (next < 0) return text.length;
+		at = next + 1;
+	}
+	const end = text.indexOf('\n', at);
+	return Math.min(at + Math.max(column - 1, 0), end < 0 ? text.length : end);
+}
 
-/** `CODE: First sentence.` of a diagnostic message. */
+/** The first sentence of a diagnostic, as the end of its problem line shows it. */
 export function firstSentence(message: string): string {
 	const end = message.search(/\.(\s|$)/);
 	return end < 0 ? message : message.slice(0, end + 1);
 }
 
-const setProblems = StateEffect.define<readonly CodeDiagnostic[]>();
-
-/** The underline and the note under the line of each problem in this file. */
-function problemDecorations(
-	state: EditorState,
-	problems: readonly CodeDiagnostic[],
-): DecorationSet {
-	const ranges: Range<Decoration>[] = [];
-	const byLine = new Map<number, CodeDiagnostic[]>();
-	for (const problem of problems) {
-		if (problem.line < 1) continue;
-		const at = Math.min(problem.line, state.doc.lines);
-		byLine.set(at, [...(byLine.get(at) ?? []), problem]);
+function apply(input: HTMLTextAreaElement, action: EditAction): void {
+	if (action.patch) {
+		const { value, start, end, mode } = action.patch;
+		input.setSelectionRange(start, end);
+		// execCommand edits whatever has focus, and a hidden pane's textarea cannot take it.
+		const native =
+			input.ownerDocument.activeElement === input &&
+			input.ownerDocument.execCommand('insertText', false, value);
+		if (!native) {
+			input.setRangeText(value, start, end, 'end');
+			input.dispatchEvent(new Event('input', { bubbles: true }));
+		}
+		const caret = mode === 'start' ? start : start + value.length;
+		input.setSelectionRange(mode === 'select' ? start : caret, caret);
 	}
-	for (const [at, onLine] of byLine) {
-		const line = state.doc.line(at);
-		const from = Math.min(line.from + Math.max(onLine[0]!.column - 1, 0), line.to);
-		if (from < line.to)
-			ranges.push(Decoration.mark({ class: 'cm-code-problem' }).range(from, line.to));
-		const notes = [...new Set(onLine.map((problem) => firstSentence(problem.message)))];
-		ranges.push(
-			Decoration.widget({
-				widget: new ProblemNote(notes.join('\n')),
-				block: true,
-				side: 1,
-			}).range(line.to),
-		);
-	}
-	return Decoration.set(ranges, true);
+	if (action.select)
+		input.setSelectionRange(action.select.start, action.select.end, action.select.direction);
 }
-
-const problemsField = StateField.define<DecorationSet>({
-	create: () => Decoration.none,
-	update(decorations, transaction) {
-		let next = decorations.map(transaction.changes);
-		for (const effect of transaction.effects)
-			if (effect.is(setProblems)) next = problemDecorations(transaction.state, effect.value);
-		return next;
-	},
-	provide: (field) => EditorView.decorations.from(field),
-});
 
 export function createEditor(
 	host: HTMLElement,
-	options: { readonly file: string; readonly code: string; onChange(): void },
+	options: { readonly file: string; readonly highlighter: Highlighter; onChange(): void },
 ): CodeEditor {
-	const language = options.file.endsWith('.css')
-		? []
-		: new LanguageSupport(options.file.endsWith('.tsrx') ? tsxLanguage : typescriptLanguage);
-	const view = new EditorView({
-		parent: host,
-		state: EditorState.create({
-			doc: options.code,
-			extensions: [
-				lineNumbers(),
-				EditorView.lineWrapping,
-				history(),
-				drawSelection(),
-				keepIndent,
-				bracketMatching(),
-				indentUnit.of('\t'),
-				EditorState.tabSize.of(2),
-				language,
-				syntaxHighlighting(colours),
-				look,
-				problemsField,
-				keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
-				EditorView.contentAttributes.of({
-					'aria-label': `${options.file}, editable. Press Escape then Tab to leave the editor.`,
-					spellcheck: 'false',
-					autocapitalize: 'off',
-					autocorrect: 'off',
-				}),
-				EditorView.updateListener.of((update) => {
-					if (update.docChanged) options.onChange();
-				}),
-			],
-		}),
-	});
+	const input = host.querySelector<HTMLTextAreaElement>('textarea')!;
+	const output = host.querySelector<HTMLElement>('pre')!;
+	let problems: readonly CodeDiagnostic[] = [];
+	let lastHtml: string[] = [];
+	let leaving = false;
+	// Server-rendered lines carry the component's scope class; a line added here needs it too.
+	const lineClass = output.firstElementChild?.className ?? 'line';
+
+	function paint(): void {
+		const html = options.highlighter.lines(input.value, options.file);
+		const marks = new Map<number, string[]>();
+		for (const problem of problems)
+			if (problem.line > 0)
+				marks.set(problem.line, [
+					...(marks.get(problem.line) ?? []),
+					firstSentence(problem.message),
+				]);
+		const lines = [...output.children] as HTMLElement[];
+		for (const [index, markup] of html.entries()) {
+			let line = lines[index];
+			if (!line) {
+				line = document.createElement('span');
+				line.className = lineClass;
+				output.append(line);
+			}
+			if (lastHtml[index] !== markup || !line.isConnected) line.innerHTML = markup;
+			const mark = marks.get(index + 1);
+			line.classList.toggle('problem', mark !== undefined);
+			if (mark) line.dataset.problem = [...new Set(mark)].join(' ');
+			else delete line.dataset.problem;
+		}
+		for (const extra of lines.slice(html.length)) extra.remove();
+		lastHtml = html;
+		pin();
+	}
+
+	// The textarea never scrolls itself: the pane around both layers does.
+	const pin = () => {
+		input.scrollTop = 0;
+		input.scrollLeft = 0;
+	};
+
+	const onInput = () => {
+		paint();
+		options.onChange();
+	};
+
+	const onKeydown = (event: KeyboardEvent) => {
+		if (event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
+		if (event.key === 'Escape') {
+			leaving = true;
+			return;
+		}
+		if (event.key === 'Tab' && leaving) return;
+		leaving = false;
+		const state: EditState = input;
+		let action: EditAction = {};
+		if (event.key === 'Tab') action = event.shiftKey ? outdentText(state) : indentText(state);
+		else if (event.key === 'Enter' && !event.shiftKey) action = enterText(state);
+		else if (event.key === 'Backspace') {
+			action = closingPairText(state, 'Backspace');
+			if (!action.select) action = backspaceText(state);
+		} else if (event.key.length === 1) action = closingPairText(state, event.key);
+		// Backspace only widens the selection; the browser's own delete removes it.
+		if (event.key === 'Tab' || (event.key !== 'Backspace' && (action.patch || action.select)))
+			event.preventDefault();
+		apply(input, action);
+	};
+
+	// Keep the caret's line in view inside the pane, which scrolls instead of the textarea.
+	const onSelect = () => {
+		if (document.activeElement !== input) return;
+		const row = input.value.slice(0, input.selectionEnd).split('\n').length - 1;
+		const line = output.children[row] as HTMLElement | undefined;
+		line?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+	};
+
+	input.addEventListener('input', onInput);
+	input.addEventListener('keydown', onKeydown);
+	input.addEventListener('keyup', onSelect);
+	input.addEventListener('scroll', pin);
+	input.readOnly = false;
+	lastHtml = [...output.children].map((line) => line.innerHTML);
+
 	return {
-		view,
-		text: () => view.state.doc.toString(),
+		text: () => `${input.value}\n`,
 		replace(code) {
-			view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: code } });
+			input.focus({ preventScroll: true });
+			apply(input, {
+				patch: {
+					value: editorText(code),
+					start: 0,
+					end: input.value.length,
+					mode: 'start',
+				},
+			});
 		},
-		showProblems(problems) {
-			view.dispatch({ effects: setProblems.of(problems) });
+		showProblems(next) {
+			problems = next;
+			paint();
 		},
 		reveal(line, column) {
-			const target = view.state.doc.line(Math.min(Math.max(line, 1), view.state.doc.lines));
-			const at = Math.min(target.from + Math.max(column - 1, 0), target.to);
-			view.dispatch({ selection: { anchor: at }, scrollIntoView: true });
-			view.focus();
+			const at = offsetOf(input.value, line, column);
+			input.focus({ preventScroll: true });
+			input.setSelectionRange(at, at);
+			(output.children[Math.max(line - 1, 0)] as HTMLElement | undefined)?.scrollIntoView({
+				block: 'nearest',
+			});
+		},
+		dispose() {
+			input.removeEventListener('input', onInput);
+			input.removeEventListener('keydown', onKeydown);
+			input.removeEventListener('keyup', onSelect);
+			input.removeEventListener('scroll', pin);
+			input.readOnly = true;
 		},
 	};
 }

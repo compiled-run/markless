@@ -4,6 +4,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import type { Plugin } from 'vite';
+import { editorText } from '../components/docs/code/editor.ts';
 import { ColourTable, DocRegistry, highlightHtml, paneLines } from './ui-code-runs.ts';
 
 export const CODE_GENERATED_DIR = 'components/docs/code/generated';
@@ -39,6 +40,8 @@ export type CodePane = {
 	readonly name: string;
 	/** The tab's value: `FIRST_TAB` for the first pane, else the file name. */
 	readonly tab: string;
+	/** The file as its textarea holds it. */
+	readonly code: string;
 	readonly lines: readonly CodeLine[];
 };
 
@@ -86,7 +89,11 @@ export function findCodeBlocks(source: string, file: string): CodeBlock[] {
 			if (!kind)
 				fail(file, at, `"${title}" is not a file name ending in .tsrx, .ts or .css.`);
 			if (title === MODULE_NAME)
-				fail(file, at, `"${MODULE_NAME}" is the name of the generated block module; pick another title.`);
+				fail(
+					file,
+					at,
+					`"${MODULE_NAME}" is the name of the generated block module; pick another title.`,
+				);
 			if (files.some((existing) => existing.name === title))
 				fail(file, at, `two fences inside <Code> are both titled "${title}".`);
 			const body: string[] = [];
@@ -110,16 +117,18 @@ export function findCodeBlocks(source: string, file: string): CodeBlock[] {
 	return blocks;
 }
 
-/** The highlighted lines of one file, as the component draws them before the editor loads. */
+/** The highlighted lines of one file, drawn under the textarea that holds its text. */
 export async function codePane(file: CodeBlockFile, index = 0): Promise<CodePane> {
 	const language = LANGUAGES[file.name.slice(file.name.lastIndexOf('.') + 1)] ?? 'ts';
-	const html = await highlightHtml(file.code.replace(/\n$/, ''), language);
+	const code = editorText(file.code);
+	const html = await highlightHtml(code, language);
 	// The colour table hands back the style itself, so each run keeps shiki's light/dark pair.
 	const styles = { classFor: (style: string) => style || undefined } as unknown as ColourTable;
 	const lines = paneLines(html, new DocRegistry('code'), styles);
 	return {
 		name: file.name,
 		tab: index === 0 ? FIRST_TAB : file.name,
+		code,
 		lines: lines.map((line) => ({
 			id: line.id,
 			runs: line.runs.map((run) => {

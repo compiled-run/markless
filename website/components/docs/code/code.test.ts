@@ -5,7 +5,7 @@ import { exportTarget, runtimeImportCall } from './frame-runtime.ts';
 import { blockStyles, createLinker, moduleKey, type LinkHost } from './link.ts';
 import type { CompiledModule } from './protocol.ts';
 import { nodeSourceHost } from './node-sources.ts';
-import { groupProblems } from './session.ts';
+import { groupProblems } from './problems.ts';
 
 const host = nodeSourceHost();
 
@@ -446,7 +446,7 @@ describe('problem display', () => {
 		]);
 	});
 
-	it('keeps the code and first sentence for the note under a line', () => {
+	it('keeps the code and first sentence for the end of a problem line', () => {
 		expect(firstSentence('CODE: Cannot write to "cups". Move it.')).toBe(
 			'CODE: Cannot write to "cups".',
 		);
