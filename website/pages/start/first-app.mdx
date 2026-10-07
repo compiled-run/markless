@@ -1,5 +1,4 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import StarterDemo from '../../components/demos/start/starter-demo.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import Collapsible from '../../components/docs/collapsible.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
@@ -50,15 +49,10 @@ cd my-markless-app
 npm run dev
 ```
 
-Open `http://localhost:5173`. You see a heading and a button. Click **Count 0** a few times:
+Open `http://localhost:5173`. You see a heading and a button. That page is the file `pages/index.tsrx`. Here it is, and you can edit it. Click **Count 0** a few times first:
 
-<StarterDemo />
-
-{/* PLAYGROUND: starter file pages/index.tsrx as printed below. Try: add a second line that shows count, above the button. Try: change the heading text. */ null}
-
-That page is the file `pages/index.tsrx`:
-
-```tsrx
+<Code note="Add a paragraph above the button that shows {count}, then click the button. Then change the heading text.">
+```tsrx title="index.tsrx"
 import { state } from '@markless/core';
 
 export default function Home() @{
@@ -70,6 +64,7 @@ export default function Home() @{
 	</main>
 }
 ```
+</Code>
 
 The file name is `index`, so it is the page at `/`. Add `pages/about.tsrx`, and you have a page at `/about`.
 
