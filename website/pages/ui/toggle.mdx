@@ -1,7 +1,9 @@
 import AnatomyTable from '../../components/docs/anatomy-table.tsrx';
+import ApiTable from '../../components/docs/api-table.tsrx';
+import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import Preview from '../../components/ui/preview.tsrx';
+import ToggleDemo from '../../components/demos/ui/toggle/basic.tsrx';
 
 <Sidebar />
 
@@ -9,40 +11,83 @@ import Preview from '../../components/ui/preview.tsrx';
 
 <ThemeToggle />
 
-<Preview shows="One switch with a label, off then on." />
+`toggle` is an on/off switch. It is either on or off, never half-way. The family's name is
+`toggle` because `switch` is a reserved word in JavaScript.
+
+<ToggleDemo shows="Click the switch or its label. Then Tab to it and press Space." />
 
 ```tsrx
 import { toggle } from '@markless/ui';
 
 export default function Notifications() @{
-	<toggle.root name="notifications">
-		<toggle.label>Enable notifications</toggle.label>
-		<toggle.trigger>
-			<toggle.thumb />
+	<toggle.root class="row" name="notifications">
+		<toggle.label class="label">Email me when an order ships</toggle.label>
+		<toggle.trigger class="track">
+			<toggle.thumb class="thumb" />
 		</toggle.trigger>
+		<toggle.field />
 	</toggle.root>
 }
 ```
 
-A switch, not a checkbox: it reads as on or off and never as mixed. The thumb is an element and
-nothing else, there for a stylesheet to move. What a form receives is a hidden native input added
-with `toggle.field`, and `name`, `value` and `required` are declared once on the root.
+Clicking the words flips the switch too, because the label's `for` points at the trigger. A
+screen reader hears a switch named "Email me when an order ships", and whether it is on.
 
-## Anatomy
+## When to use it
+
+Use `toggle` for a setting that takes effect at once, such as notifications. If the choice only
+counts when a form is sent, or it can be mixed, use [checkbox](/ui/checkbox) instead.
+
+## Parts
 
 <AnatomyTable />
 
-It writes `ui-checked` and `ui-disabled`.
+- `toggle.root` holds whether the switch is on, and what a form receives. It renders a `<div>`.
+- `toggle.trigger` is the switch. It is a `<button>` with `role="switch"` and `aria-checked`.
+- `toggle.thumb` is a `<span>` for the moving dot. It does nothing on its own. Your CSS moves it.
+- `toggle.label` names the switch. Clicking it flips the switch.
+- `toggle.description` is a help line. The switch points at it with `aria-describedby`.
+- `toggle.error` is an error message. The switch points at it too, before the help line.
+- `toggle.field` is a hidden checkbox that sends the switch to a form. Tab never reaches it.
 
-## Props on `toggle.root`
+`name`, `value` and `required` go on the root, and `toggle.field` reads them from there. A form
+receives `value` under `name` while the switch is on. If you leave `value` out, the form gets
+`on`. A switch that is off or disabled sends nothing.
 
-| Prop       | Type                | What it does                                               |
-| ---------- | ------------------- | ---------------------------------------------------------- |
-| `checked`  | `boolean`           | Whether the switch reads as on. Omit it and it starts off. |
-| `disabled` | `boolean`           | Nobody can flip it.                                        |
-| `required` | `boolean`           | It must be on before the form submits.                     |
-| `name`     | `string`            | Submitted under this name by `toggle.field`.               |
-| `value`    | `string`            | Submitted instead of the browser default `"on"`.           |
-| `onChange` | `(checked) => void` | Called with the new value when a person flips the switch.  |
+## Styling hooks
 
-Everything a `<div>` accepts reaches the element too.
+| Attribute | On | Present when |
+| --- | --- | --- |
+| `ui-checked` | root, trigger | The switch is on. |
+| `ui-disabled` | root, trigger | `disabled` is set on the root. |
+
+The thumb writes no attributes. Style it from its parent, such as
+`.track[ui-checked] .thumb { translate: 1.4em 0 }`.
+
+## Keyboard
+
+`toggle.trigger` is a native button, so it takes focus with Tab.
+
+| Key | What it does |
+| --- | --- |
+| Space or Enter | Flips the switch. |
+
+A disabled switch ignores clicks, Space and Enter. It never calls `onChange`.
+
+## Gotchas
+
+<Callout
+	sprite="bolt"
+	title="Why does my switch say it is invalid?"
+	text="Putting a toggle.error on the page sets aria-invalid on the switch. The family does not check anything for you. Render the error part only when there is an error to show."
+/>
+
+<Callout
+	sprite="speech-bubble"
+	title="Why can Tab not reach my switch inside a toolbar?"
+	text="Inside a toolbar.root, the toolbar owns the Tab stop. The switch gets tabindex -1, and the toolbar's arrow keys move focus to it."
+/>
+
+## API reference
+
+<ApiTable />
