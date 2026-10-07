@@ -3,6 +3,7 @@ import type {
 	PayloadArenaInput,
 	PayloadArmRecordSet,
 	PayloadBehavior,
+	SemanticBehavior,
 	PayloadKeyedRepeat,
 	SemanticComponentPropBinding,
 	SemanticGraphArtifact,
@@ -443,12 +444,19 @@ function payloadBehavior(
 	bindings: ReadonlyMap<string, SemanticGraphBinding>,
 	aliases: ReturnType<typeof semanticAliasMap>,
 ): PayloadBehavior {
-	const inputValues = behaviorInputValues(behavior.inputSources, bindings, aliases);
+	const { constantInputs, ...record } = behavior;
 	const inputGraphReads = behaviorInputGraphReads(behavior.inputSources, bindings, aliases);
-	if (!inputValues && !inputGraphReads) return behavior;
+	const inputValues = behaviorInputValues(
+		behavior.inputSources,
+		bindings,
+		aliases,
+		constantInputs,
+		inputGraphReads,
+	);
+	if (!inputValues && !inputGraphReads) return record;
 
 	return {
-		...behavior,
+		...record,
 		...(inputValues ? { inputValues } : {}),
 		...(inputGraphReads ? { inputGraphReads } : {}),
 	};
@@ -486,24 +494,30 @@ function behaviorInputGraphReads(
 	return graphReads.length > 0 ? graphReads : undefined;
 }
 
+// A slot a graph read fills at resume holds null; with nothing known at build time there is no array at all.
 function behaviorInputValues(
 	inputSources: ReadonlyArray<string>,
 	bindings: ReadonlyMap<string, SemanticGraphBinding>,
 	aliases: ReturnType<typeof semanticAliasMap>,
+	constantInputs: SemanticBehavior['constantInputs'],
+	graphReads: PayloadBehavior['inputGraphReads'],
 ): ReadonlyArray<unknown> | undefined {
-	if (inputSources.length === 0) return undefined;
-
 	const values: unknown[] = [];
-	for (const inputSource of inputSources) {
+	let known = false;
+	for (const [inputIndex, inputSource] of inputSources.entries()) {
+		const constant = constantInputs?.find((input) => input.inputIndex === inputIndex);
 		const inputValue =
+			(constant ? { value: constant.value } : undefined) ??
 			literalBehaviorInputValue(inputSource) ??
 			graphInitialBehaviorInputValue(inputSource, bindings, aliases);
-		if (!inputValue) return undefined;
-
-		values.push(inputValue.value);
+		if (inputValue) {
+			known = true;
+			values.push(inputValue.value);
+		} else if (graphReads?.some((read) => read.inputIndex === inputIndex)) values.push(null);
+		else return undefined;
 	}
 
-	return values;
+	return known ? values : undefined;
 }
 
 type BehaviorInputValue = {

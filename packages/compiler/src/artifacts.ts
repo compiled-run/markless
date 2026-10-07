@@ -950,6 +950,11 @@ export type SemanticBehavior = {
 	readonly source: string;
 	readonly functionSource: string;
 	readonly inputSources: ReadonlyArray<string>;
+	/** Inputs whose value is plain data known at build time: literals and unmutated module constants. */
+	readonly constantInputs?: ReadonlyArray<{
+		readonly inputIndex: number;
+		readonly value: unknown;
+	}>;
 	readonly keyedRepeatScopeIds?: ReadonlyArray<string>;
 };
 
@@ -1438,7 +1443,7 @@ export type PayloadAsyncBoundary = {
 	readonly armRecords: ReadonlyArray<PayloadArmRecordSet>;
 };
 
-export type PayloadBehavior = SemanticBehavior & {
+export type PayloadBehavior = Omit<SemanticBehavior, 'constantInputs'> & {
 	readonly inputValues?: ReadonlyArray<unknown>;
 	readonly inputGraphReads?: ReadonlyArray<{
 		readonly inputIndex: number;

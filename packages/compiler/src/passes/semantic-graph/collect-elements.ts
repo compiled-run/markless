@@ -29,6 +29,7 @@ import {
 } from '../../artifact-helpers/graph-paths.ts';
 import { PROJECTION_PROP_NAME } from '../public-render/shared-seed-pass.ts';
 import { collectComponentEdge } from './collect-components.ts';
+import { constantPropValue } from './constant-props.ts';
 import { overlayLiteralValue } from './overlay-attribute.ts';
 import {
 	collectCompositeTemplateExpression,
@@ -1785,12 +1786,18 @@ function behaviorSourceParts(
 	const callee = node.callee as AnyNode | undefined;
 	const calleeSource = callee ? expressionSource(callee, state.source) : behaviorSource;
 
+	const inputs = asNodes(node.arguments);
+	const constantInputs = inputs.flatMap((argument, inputIndex) => {
+		const constant = constantPropValue(argument, state).value;
+		return constant.ok && constant.value !== undefined
+			? [{ inputIndex, value: constant.value }]
+			: [];
+	});
 	return {
 		source: behaviorSource,
 		functionSource: localFunctionDeclarationSource(callee, state) ?? calleeSource,
-		inputSources: asNodes(node.arguments).map((argument) =>
-			expressionSource(argument, state.source),
-		),
+		inputSources: inputs.map((argument) => expressionSource(argument, state.source)),
+		...(constantInputs.length > 0 ? { constantInputs } : {}),
 	};
 }
 

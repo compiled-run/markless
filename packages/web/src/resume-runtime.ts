@@ -514,7 +514,7 @@ export function createResumeRuntime(
 	const runtime: ResumeRuntime = {
 		start,
 		dispatch: async (event: ResumeDomEvent, options?: ResumeDispatchOptions) => {
-			if (disposed) return;
+			if (disposed || behaviorRuntime?.observesVisible(event)) return;
 			const wiring = await getEvents();
 			if (!disposed) await wiring.dispatch(event, options);
 		},

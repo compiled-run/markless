@@ -104,6 +104,12 @@ The `ui()` Vite plugin from the new `@markless/ui-tools` package sets this up.
   build.
 - Text that joins a `const` from the component body with state, like
   `{label} {count}`, keeps the `const` part when the state changes.
+- `attach={factory(args)}` passes its arguments to the factory: props,
+  literals like `['a', 'b']`, and module constants, in the page root or a
+  component used more than once.
+- An `onVisible` handler receives an event whose `target` and `currentTarget`
+  are the element, and `onVisible` inside MDX pages no longer throws
+  `MARKLESS_EVENT_DISPATCH_UNMATCHED` on load.
 
 ## 0.3.3
 
