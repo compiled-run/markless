@@ -16,7 +16,10 @@ import {
 } from 'satteri';
 import { decodePath, parsePath, parseURL, withQuery } from 'ufo';
 import { protocolIslandSegment } from '../../../serializer/src/protocol-constants.ts';
-import { emitQueuedResumeContainerEvent } from '../../../bundler/src/source-module.ts';
+import {
+	emitQueuedResumeContainerEvent,
+	emitRosterResumeLoaderInstall,
+} from '../../../bundler/src/source-module.ts';
 import { scalarPlanSourceReference } from '../../../bundler/src/scalar-plan-source.ts';
 
 // Dev has to pre-bundle this or the first MDX route discovers it and Vite
@@ -119,6 +122,7 @@ function emitMdxClientRoute(route: MdxRoute, id: string, resume: boolean): strin
 		`const marklessMdxSymbolLoaders = ${renderSymbolLoaders(route.components)};`,
 		`const marklessMdxRenderData = ${renderMdxRenderDataLoader(route.components, id, route.parts)};`,
 		renderOverlayLoader(),
+		emitRosterResumeLoaderInstall(),
 		'const marklessMdxPage = {',
 		'  renderData: marklessMdxRenderData,',
 		'  loadSymbol: marklessMdxLoadSymbol,',
@@ -148,6 +152,7 @@ function emitComposedMdxRoute(route: MdxRoute, id: string): string {
 		`const marklessMdxHeadInjections = ${renderHeadInjections(route.components)};`,
 		'',
 		renderOverlayLoader(),
+		emitRosterResumeLoaderInstall(),
 		'',
 		'const marklessMdxPage = {',
 		'  renderData: marklessMdxRenderData,',

@@ -314,6 +314,12 @@ export type ModuleGraphInterfaceArtifact = {
 			 */
 			readonly closureActions?: true;
 			/**
+			 * Present when this component's tree holds a computed that reads an
+			 * element() roster, so a page placing it must install the live-roster
+			 * loader before resume.
+			 */
+			readonly rosterDerivation?: true;
+			/**
 			 * What runs in the browser when a composing module changes one of this
 			 * component's props or creates an instance of it. Read by the build-time
 			 * pack planner only.

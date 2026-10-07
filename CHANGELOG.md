@@ -161,6 +161,16 @@ The `ui()` Vite plugin from the new `@markless/ui-tools` package sets this up.
   wrap the loop in an element. Before, it rendered nothing, threw
   `MARKLESS_MDX_RENDER_DATA_ROOT_MISSING` on an MDX page, or stopped a page
   that imported it from loading.
+- `@markless/ui` `otp` boxes show what you type on router pages, both MDX pages
+  and plain routes, in dev and in production builds. Before, the code reached
+  the field but every box went blank. The same applies to any part that works
+  out its position from its widget's list of `element()` parts, when the page
+  places that widget through another component.
+- An element bound inside an `@if` block to an `element()` handle declared in
+  the same component now gets the `id` that `aria-controls`, `for` or another
+  id reference outside the block points at, instead of `id=""` when the block
+  appears. A reference inside the block to such an element outside it gets the
+  right id too.
 
 ## 0.3.3
 

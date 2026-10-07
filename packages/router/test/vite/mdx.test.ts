@@ -202,9 +202,37 @@ This page is static markdown.
 		);
 	});
 
-	it('static markdown routes name no overlay loader', async () => {
+	// Same reach as the overlay loader: a part deriving its place from its
+	// family's roster needs the live roster at runtime start, and the island
+	// module that would name the loader has not loaded yet.
+	it('composed and resume routes install the roster loader before any island resumes', async () => {
+		for (const id of [
+			'/project/pages/docs/beads.mdx',
+			'/project/pages/docs/beads.mdx?markless-resume',
+		]) {
+			const code = await transformMdxRoute(
+				`import Necklace from '../../components/Necklace.tsrx';
+
+# Beads
+
+<Necklace />
+`,
+				id,
+			);
+
+			expect(code).toContain(
+				"globalThis.__marklessRosterResume ??= () => import('@markless/web/fns/roster-resume');",
+			);
+			expect(code.indexOf('globalThis.__marklessRosterResume ??=')).toBeLessThan(
+				code.indexOf('export function resumeContainerEvent'),
+			);
+		}
+	});
+
+	it('static markdown routes name no overlay or roster loader', async () => {
 		const code = await transformMdxRoute('# Docs\n', '/project/pages/docs.mdx');
 		expect(code).not.toContain('__marklessOverlay');
+		expect(code).not.toContain('__marklessRosterResume');
 	});
 
 	it('links MDX child render data through the materialized route context', async () => {

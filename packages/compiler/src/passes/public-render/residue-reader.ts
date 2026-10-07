@@ -229,7 +229,8 @@ export function armBoundIdrefHandles(
 			if (
 				slot.kind === 'attribute' &&
 				slot.residue.kind === 'element-handle-id' &&
-				slot.residue.idref === true
+				slot.residue.idref === true &&
+				slot.alwaysPresent !== true
 			)
 				named.add(slot.residue.handleGraphNodeId);
 	if (named.size === 0) return [];

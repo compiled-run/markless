@@ -28,6 +28,7 @@ import {
 	type ChildrenSeedPathsInput,
 } from './passes/link/children-seed-paths.ts';
 import { withClosureActionOwners } from './passes/link/closure-action-owners.ts';
+import { withRosterDerivations } from './passes/link/roster-derivations.ts';
 import { withRowSlotReaders } from './passes/link/row-slot-readers.ts';
 import { PROJECTION_PROP_NAME } from './passes/public-render/shared-seed-pass.ts';
 import { defaultCompilerPasses } from './pass-registry.ts';
@@ -103,14 +104,21 @@ async function runCompile(input: CompileTsrxModuleInput): Promise<CompileTsrxMod
 		semanticGraph: artifacts.semanticGraph,
 		moduleGraphInterface: withFirstUseReach(
 			withClosureActionOwners(
-				withRowSlotReaders(
-					withSeedsFromProps(artifacts.semanticGraph.moduleGraphInterface, {
-						symbolResolver: artifacts.symbolResolver,
-						protocolState: artifacts.protocolState,
-					}),
+				withRosterDerivations(
+					withRowSlotReaders(
+						withSeedsFromProps(artifacts.semanticGraph.moduleGraphInterface, {
+							symbolResolver: artifacts.symbolResolver,
+							protocolState: artifacts.protocolState,
+						}),
+						{
+							componentEdges: artifacts.semanticGraph.componentEdges,
+							protocolView: artifacts.protocolView,
+							importedModuleInterfaces: input.importedModuleInterfaces,
+						},
+					),
 					{
 						componentEdges: artifacts.semanticGraph.componentEdges,
-						protocolView: artifacts.protocolView,
+						protocolState: artifacts.protocolState,
 						importedModuleInterfaces: input.importedModuleInterfaces,
 					},
 				),

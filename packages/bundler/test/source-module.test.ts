@@ -947,6 +947,18 @@ test('the live-roster loader is named only where a roster derivation can exist',
 	expect(emitResumeModule({ ...baseInput, needsFullResume: true })).not.toContain(
 		'roster-resume',
 	);
+	// A page composing a roster family from another module serves that family's
+	// computeds, but its own compiled payload holds none.
+	expect(
+		emitResumeModule({
+			...baseInput,
+			needsFullResume: true,
+			payloadState: { cells: [], computed: [] },
+			rosterDerivation: true,
+		}),
+	).toContain(
+		"globalThis.__marklessRosterResume ??= () => import('@markless/web/fns/roster-resume');",
+	);
 
 	// A CSR mount evaluates no resume module, so its rows would never be
 	// renumbered without the same line on the client source module.

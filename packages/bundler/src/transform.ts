@@ -404,6 +404,9 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		compiled.publicRenderPlan.styleScopes.length > 0
 			? `${MARKLESS_VIRTUAL_PREFIX}style:${encodedModuleId}.css`
 			: null;
+	const rosterDerivation = compiled.moduleGraphInterface.render.components.some(
+		(component) => component.rosterDerivation === true,
+	);
 	const pageNeedsFullResume = needsFullResume(
 		compiled.protocolState,
 		compiled.protocolView,
@@ -563,6 +566,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 						? renderDataId
 						: undefined,
 				linkedRowSlotReaders: importedRowSlotReaders(input.importedModuleInterfaces),
+				rosterDerivation,
 				hasBoundSymbols: compiled.boundSymbolResolver.rows.length > 0,
 				boundSymbolDescriptors,
 				symbols: symbolRows,
@@ -589,6 +593,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 								...group,
 								moduleId: triggerGroupVirtualModuleId(input.filename, index),
 							})),
+							rosterDerivation,
 							installResumeSummary: true,
 							recordsOnly: true,
 							hasBoundSymbols: compiled.boundSymbolResolver.rows.length > 0,
