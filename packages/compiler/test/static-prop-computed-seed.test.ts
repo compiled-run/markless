@@ -188,6 +188,34 @@ test('composition drops a seeded derive key the composer routes live, keeps a st
 	expect(JSON.stringify(carried)).not.toContain('weight');
 });
 
+// An attach factory's arguments are read back when the behavior runs in the
+// browser, so a prop it is handed has to be in the payload whatever its value.
+test('SSR seeds the prop cell a behavior input reads, only for its own component', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Badge.tsrx',
+		source: `
+function tag(labels: readonly string[]) {
+	return (element: HTMLElement) => element.setAttribute('data-count', String(labels.length));
+}
+export function Badge({ labels, tone }: { readonly labels: readonly string[]; readonly tone: string }) @{
+	<em attach={tag(labels)} data-tone={tone}>badge</em>
+}
+export function Plain({ labels }: { readonly labels: readonly string[] }) @{
+	<i>{labels.length}</i>
+}
+`,
+		symbols: [],
+	});
+
+	const ssr = result.publicRenderModule.ssrModuleSource;
+	expect(componentSsrSource(ssr, 'marklessRenderSsr')).toContain(
+		'marklessSsrSeedPropCells(marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren), props, [{"graphNodeId":"prop:props","keys":[],"rowKeys":["labels"]}])',
+	);
+	expect(componentSsrSource(ssr, 'marklessRenderSsrPlain')).not.toContain(
+		'marklessSsrSeedPropCells(',
+	);
+});
+
 // A row handler reads its item out of the collection at resume, and resume
 // matches served rows to items by reading it, so a prop collection is served.
 test('SSR seeds the prop a component iterates, and nothing else of the bag', async () => {

@@ -29,6 +29,7 @@ import {
 	marklessLiveBoundGraphRoute,
 } from './bound-symbol.ts';
 import {
+	marklessComposedGraphNodeId,
 	marklessInstancePath,
 	marklessRowSegment,
 	marklessWidgetHandleId,
@@ -248,6 +249,20 @@ export type MarklessSsrHostLocators = Array<MarklessSsrHostLocator> & {
 
 export { marklessComposeState };
 export const marklessSsrRemapChildGraph = marklessCsrRemapChildGraph;
+// A prop with no live route was seeded into this instance's own prop cell, so the read follows the instance.
+function marklessSsrRemapBehaviorRead<T extends ComposeGraphRead>(
+	read: T,
+	graphProps: ComposeGraphProps,
+	instancePath: string,
+): T {
+	const mapped = marklessCsrRemapChildGraph(read, graphProps, instancePath);
+	return {
+		...read,
+		graphNodeId:
+			mapped?.graphNodeId ?? marklessComposedGraphNodeId(read.graphNodeId, instancePath),
+		path: mapped?.path ?? read.path,
+	};
+}
 export function marklessSsrRemapGraphOutput(
 	output: Parameters<typeof marklessCsrRemapGraphOutput>[0],
 	graphProps: ComposeGraphProps,
@@ -1567,16 +1582,13 @@ export function marklessSsrAppendChildView(context: {
 			hostNodeId: context.child.hostPrefix + behavior.hostNodeId,
 			...(behavior.inputGraphReads
 				? {
-						inputGraphReads: behavior.inputGraphReads.map((read) => {
-							const mapped = marklessSsrRemapChildGraph(
+						inputGraphReads: behavior.inputGraphReads.map((read) =>
+							marklessSsrRemapBehaviorRead(
 								read,
 								context.child.graphProps,
 								childInstancePath,
-							);
-							return mapped
-								? { ...read, graphNodeId: mapped.graphNodeId, path: mapped.path }
-								: read;
-						}),
+							),
+						),
 					}
 				: {}),
 			...(behavior.symbolId
@@ -1791,16 +1803,9 @@ export function marklessSsrPrefixBoundaryArmRecords(set: SsrArmRecordSet, child:
 			hostNodeId: child.hostPrefix + behavior.hostNodeId,
 			...(behavior.inputGraphReads
 				? {
-						inputGraphReads: behavior.inputGraphReads.map((read) => {
-							const mapped = marklessSsrRemapChildGraph(
-								read,
-								child.graphProps,
-								instancePath,
-							);
-							return mapped
-								? { ...read, graphNodeId: mapped.graphNodeId, path: mapped.path }
-								: read;
-						}),
+						inputGraphReads: behavior.inputGraphReads.map((read) =>
+							marklessSsrRemapBehaviorRead(read, child.graphProps, instancePath),
+						),
 					}
 				: {}),
 			...(behavior.symbolId

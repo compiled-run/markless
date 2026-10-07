@@ -1556,6 +1556,12 @@ function renderChunkParts(
 						else return refuse('a repeated row inside it reads a value that cannot be recomputed');
 					}
 				}
+				const emptyChunk = repeat.emptyChunkId
+					? renderData.chunks.find((candidate) => candidate.id === repeat.emptyChunkId)
+					: undefined;
+				if (emptyChunk && emptyChunk.slots.length > 0)
+					return refuse('its @empty block holds a value that changes');
+				const empty = emptyChunk?.statics.join('');
 				parts.push({ repeat: {
 					read: {
 						graphNodeId: repeat.collectionGraphNodeId,
@@ -1566,6 +1572,7 @@ function renderChunkParts(
 						),
 					},
 					rowParts,
+					...(empty ? { empty } : {}),
 				} });
 				continue;
 			}
@@ -4182,6 +4189,9 @@ export function buildBranchUpdateEmission(input: BranchUpdateEmissionInput): Emi
 	// Arm-scoped flips may carry repeat parts: rows rebuild from a live graph
 	// read of the collection at flip time (still no component execution).
 	const hasRepeatParts = arms.arms.some((arm) => arm.some((part) => 'repeat' in part));
+	const hasEmptyRepeatParts = arms.arms.some((arm) =>
+		arm.some((part) => 'repeat' in part && part.repeat.empty !== undefined),
+	);
 	const hasAttributeParts = arms.arms.some((arm) => arm.some((part) => 'attribute' in part));
 
 	const body: EmissionNode[] = [
@@ -4229,7 +4239,9 @@ export function buildBranchUpdateEmission(input: BranchUpdateEmissionInput): Emi
 			]),
 		),
 		armTextEscaperFunctionNode('marklessBranchText'),
-		...(hasRepeatParts ? [branchRowsFunctionNode()] : []),
+		...(hasRepeatParts
+			? [branchRowsFunctionNode('marklessBranchText', hasEmptyRepeatParts)]
+			: []),
 	];
 
 	return {
@@ -4275,6 +4287,9 @@ export function buildAsyncBoundaryUpdateEmission(
 	};
 
 	const hasRepeatParts = input.arms.arms.some((arm) => arm.some((part) => 'repeat' in part));
+	const hasEmptyRepeatParts = input.arms.arms.some((arm) =>
+		arm.some((part) => 'repeat' in part && part.repeat.empty !== undefined),
+	);
 	const records = input.records;
 	const rowsShiftLocators = records?.rowElements.some((counts) => counts.length > 0) === true;
 	const armRecordsAt = (): EmissionNode =>
@@ -4328,7 +4343,9 @@ export function buildAsyncBoundaryUpdateEmission(
 			]),
 		),
 		armTextEscaperFunctionNode('marklessBoundaryText'),
-		...(hasRepeatParts ? [branchRowsFunctionNode('marklessBoundaryText')] : []),
+		...(hasRepeatParts
+			? [branchRowsFunctionNode('marklessBoundaryText', hasEmptyRepeatParts)]
+			: []),
 		...(records && rowsShiftLocators ? [boundaryArmRecordsFunctionNode()] : []),
 	];
 
@@ -4580,7 +4597,10 @@ function switchArmSelectorFunctionNode(): EmissionNode {
  * against the row's own item, or a graph read. The walk is a `reduce` that
  * short-circuits on a nullish intermediate, exactly as the text path writes it.
  */
-function branchRowsFunctionNode(escaperName = 'marklessBranchText'): EmissionNode {
+function branchRowsFunctionNode(
+	escaperName = 'marklessBranchText',
+	withEmpty = false,
+): EmissionNode {
 	const rowExpression = conditionalNode(
 		binaryNode('!==', memberChainNode('row.text'), identifierNode('undefined')),
 		memberChainNode('row.text'),
@@ -4630,6 +4650,16 @@ function branchRowsFunctionNode(escaperName = 'marklessBranchText'): EmissionNod
 			unaryNode('!', callNode(memberChainNode('Array.isArray'), [identifierNode('items')])),
 			returnStatementNode(literalNode('')),
 		),
+		...(withEmpty
+			? [
+					ifStatementNode(
+						binaryNode('===', memberChainNode('items.length'), literalNode(0)),
+						returnStatementNode(
+							logicalNode('??', memberChainNode('repeat.empty'), literalNode('')),
+						),
+					),
+				]
+			: []),
 		returnStatementNode(
 			callNode(
 				memberNode(

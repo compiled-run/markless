@@ -116,7 +116,7 @@ test('the served computed is one the root-s payload selection carries', async ()
 	const compiled = await compile(READS_COMPUTED);
 	const source = compiled.publicRenderModule.ssrModuleSource ?? '';
 	const root = ssrFunction(source, 'async function marklessRenderSsr(');
-	const selection = /marklessSelectStateNodes\(marklessCloneState\(payloadState\), \[[^\]]*\], \[([^\]]*)\]\)/.exec(
+	const selection = /marklessSelectStateNodes\(marklessCloneState\(payloadState\), \[[^\]]*\], \[([^\]]*)\](?:, \[[^\]]*\])?\)/.exec(
 		root,
 	);
 	const marksIndex = compiled.protocolState.computed.findIndex(

@@ -321,17 +321,19 @@ describe('publish manifest shape', () => {
 // Requires fresh `vp pack` output. Skipped when dist is absent or older than its package's
 // sources (CI runs `vp test` without packing; a stale local dist describes other code); the
 // prepublishOnly guard re-enforces this fail-closed at publish time.
-function fileTimes(dir: string): number[] {
+function fileTimes(dir: string, keep: (name: string) => boolean = () => true): number[] {
 	if (!existsSync(dir)) return [];
 	return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
 		if (entry.name === 'node_modules') return [];
 		const path = resolve(dir, entry.name);
-		return entry.isDirectory() ? fileTimes(path) : [statSync(path).mtimeMs];
+		if (entry.isDirectory()) return fileTimes(path, keep);
+		return keep(entry.name) ? [statSync(path).mtimeMs] : [];
 	});
 }
 
 function packedDistIsFresh(packageDir: string): boolean {
-	const dist = fileTimes(resolve(packageDir, 'dist'));
+	// `vp pack` emits ESM only; a lone .cjs is build:cjs output, not a pack.
+	const dist = fileTimes(resolve(packageDir, 'dist'), (name) => !name.endsWith('.cjs'));
 	if (dist.length === 0) return false;
 	const sources = [
 		...fileTimes(resolve(packageDir, 'src')),

@@ -68,6 +68,7 @@ import {
 	publicRenderValueImports,
 	composedGraphProps,
 	componentOwnedStateNodes,
+	selectedStateNodeArguments,
 	SSR_CALLBACKS_PROP_NAME,
 	stateEntries,
 	staticHostLocators,
@@ -266,7 +267,7 @@ export function emitPublicSsrRenderModule(
 				'marklessSsrStateValues',
 				ownedNodes === undefined
 					? 'marklessCloneState(payloadState)'
-					: `marklessSelectStateNodes(marklessCloneState(payloadState), ${JSON.stringify(ownedNodes.cellIndexes)}, ${JSON.stringify(ownedNodes.computedIndexes)})`,
+					: `marklessSelectStateNodes(marklessCloneState(payloadState), ${selectedStateNodeArguments(ownedNodes)})`,
 				rootDataLines.seedForward,
 				rootDataLines.bodySharedComputed,
 			),
@@ -276,9 +277,7 @@ export function emitPublicSsrRenderModule(
 		// it keeps the whole clone and emits no selection list.
 		ownedNodes === undefined
 			? '	const marklessSsrPayloadState = marklessCloneState(payloadState);'
-			: `	const marklessSsrPayloadState = marklessSelectStateNodes(marklessCloneState(payloadState), ${JSON.stringify(
-					ownedNodes.cellIndexes,
-				)}, ${JSON.stringify(ownedNodes.computedIndexes)});`,
+			: `	const marklessSsrPayloadState = marklessSelectStateNodes(marklessCloneState(payloadState), ${selectedStateNodeArguments(ownedNodes)});`,
 		'	const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);',
 		sharedSeedConsumeLine(input, rootInfo.componentName, 'marklessSsrRenderStateValues'),
 		...rootDataLines.carriedSeed,

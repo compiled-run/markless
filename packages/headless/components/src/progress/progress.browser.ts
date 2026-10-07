@@ -276,12 +276,21 @@ test('CSR: the bar follows an amount the consumer changes from outside', async (
 	expect(el(Label).textContent).toContain('Progress:');
 });
 
-// Expected red: a cell interpolated inside a part's children is rendered once by the
-// consumer and projected into the part; no record re-renders the projection when the
-// cell moves, so the label keeps the served text while the bar itself follows.
-test.fails('CSR: a cell interpolated inside the label follows the outside write', async () => {
-	await render(Live);
+// Text-only children reach the part as one live text, and the bar's own value text
+// does not take it: only the value label's body seeds the text the bar reports.
+async function expectLabelFollowsOutsideWrite() {
 	el<HTMLButtonElement>(Advance).click();
 	await expect.poll(() => el(Amount).textContent).toBe('70');
 	await expect.poll(() => el(Label).textContent).toBe('Progress: 70%');
+	expect(el(Root).getAttribute('aria-valuetext')).toBe('70%');
+}
+
+test('CSR: a cell interpolated inside the label follows the outside write', async () => {
+	await render(Live);
+	await expectLabelFollowsOutsideWrite();
+});
+
+test('SSR resume: a cell interpolated inside the label follows the outside write', async () => {
+	await renderSSR(Live);
+	await expectLabelFollowsOutsideWrite();
 });

@@ -5,6 +5,7 @@ import type {
 	ResumeBehaviorCleanup,
 	ResumeBehaviorRecord,
 	ResumeDomElement,
+	ResumeDomEvent,
 	ResumeDomNode,
 	ResumeRemovalObserver,
 	ResumeRemovalObserverFactory,
@@ -203,6 +204,11 @@ export function createBehaviorRuntime(input: {
 				const result = await symbol({
 					graph: input.graph,
 					read: input.graph.read,
+					event: {
+						type: PROTOCOL_VISIBLE_EVENT_NAME,
+						target: element,
+						currentTarget: element,
+					},
 					element,
 					getElementHandle: input.elementHandles.get,
 				});
@@ -212,6 +218,13 @@ export function createBehaviorRuntime(input: {
 		} finally {
 			await input.flushRuntimeGraph();
 		}
+	}
+	// The observer fires its own visible hosts, so a dispatch naming one is already answered; any other host still refuses.
+	function observesVisible(event: ResumeDomEvent): boolean {
+		return (
+			event.type === PROTOCOL_VISIBLE_EVENT_NAME &&
+			[...visibleElementsByHostId.values()].includes(event.target!)
+		);
 	}
 	function disconnect(): void {
 		visibilityObserver?.disconnect?.();
@@ -227,6 +240,7 @@ export function createBehaviorRuntime(input: {
 		activateBehaviorsFromTrigger,
 		activateBehaviors,
 		installVisibilityObserver,
+		observesVisible,
 		installRemovalObserver,
 		disposeBehaviorHost,
 		runHostCleanups,

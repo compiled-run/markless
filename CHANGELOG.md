@@ -104,6 +104,36 @@ The `ui()` Vite plugin from the new `@markless/ui-tools` package sets this up.
   build.
 - Text that joins a `const` from the component body with state, like
   `{label} {count}`, keeps the `const` part when the state changes.
+- `attach={factory(args)}` passes its arguments to the factory: props,
+  literals like `['a', 'b']`, and module constants, in the page root or a
+  component used more than once.
+- An `onVisible` handler receives an event whose `target` and `currentTarget`
+  are the element, and `onVisible` inside MDX pages no longer throws
+  `MARKLESS_EVENT_DISPATCH_UNMATCHED` on load.
+- Text passed straight in as a component's children, like
+  `<Watch>{count} cups</Watch>`, updates when the state changes, the way it
+  already did when wrapped in an element.
+- A part that seeds widget state from its own children no longer picks up the
+  live text passed to a sibling part.
+- A component that mixes its own state with a destructured prop, like
+  `title={open ? label : ''}`, follows the parent's changes to that prop when
+  both components are in one file, and still renders when the prop is left out.
+- Parentheses inside a markup expression, like
+  `{(open ? 'Hide' : 'Show') + ' details'}`, no longer fail the build with
+  `MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED`.
+- A `@for` keyed by position (`index i; key i`) updates its rows when the list
+  changes. Before, its rows kept their first text and count.
+- A keyed row that leaves the list and comes back gets a new element, so it no
+  longer brings back old state such as a ticked checkbox.
+- A `@for` written straight inside an `@if` or `@else` (with no element of its
+  own around it) keeps the right rows when the branch switches, with no
+  duplicate rows, and shows its `@empty` block after a switch.
+- Calling a method on state set from a function call, like
+  `items = items.slice(1)` after `state(makeItems())`, no longer throws in a
+  handler.
+- A string such as `'" data-size="'` in markup no longer raises a false
+  `MARKLESS_TEMPLATE_EXPRESSION_STATIC` warning because it contains a state
+  name.
 - A click handler on a `@for` row over a component's props, such as
   `onClick={() => onPick(option)}`, receives its own row and keeps working
   after the first click.

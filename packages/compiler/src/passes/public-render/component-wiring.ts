@@ -192,9 +192,15 @@ export function componentEdgeGraphRoutes(edge: ComponentEdge | undefined, hasPro
 					kind: prop.kind === 'serializable' ? 'compiler-known-constant' : prop.kind,
 				},
 	);
-	return hasProjection && !routes.some((route) => route.name === 'children')
-		? [...routes, { name: 'children', kind: 'projection' }]
-		: routes;
+	if (!hasProjection || routes.some((route) => route.name === 'children')) return routes;
+	// Text-only children are one text node whose value the child follows like any prop.
+	const text = edge?.children.text;
+	return [
+		...routes,
+		text
+			? { name: 'children', graphNodeId: text.graphNodeId, path: text.path, projected: true }
+			: { name: 'children', kind: 'projection' },
+	];
 }
 
 function hasChildrenProjection(node: AnyNode): boolean {

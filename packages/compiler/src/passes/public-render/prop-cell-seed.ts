@@ -9,8 +9,8 @@ import { componentPropCellId } from './shared.ts';
  * `keys` names the properties the bag must hold; `null` marks a cell that IS one
  * destructured prop. `scalarKeys` names properties only a resume-time derive
  * reads, which the payload carries only when their value is a scalar.
- * `rowKeys` names properties a minted row's slots read, carried whatever their
- * value unless the composer routes them to its own node.
+ * `rowKeys` names properties a minted row's slots or a behavior's inputs read,
+ * carried whatever their value unless the composer routes them to its own node.
  */
 export type SsrPropCellSeed = {
 	readonly graphNodeId: string;
@@ -65,23 +65,32 @@ function derivePropReads(
 	);
 }
 
-// The props a row template's expression slots read: a row minted after resume reads them back.
+// The props read back after resume whatever their value: a row template's expression
+// slots, read by a row minted later, and an attach factory's arguments, read when it runs.
 function rowTemplatePropKeys(input: PublicRenderModuleInput, componentName: string): Set<string> {
 	const keys = new Set<string>();
+	const addKey = (read: PropRead): void => {
+		if (!read.graphNodeId.startsWith(PROTOCOL_PROP_GRAPH_NODE_PREFIX)) return;
+		const key =
+			read.graphNodeId === PROTOCOL_PROPS_GRAPH_NODE_ID
+				? read.path[0]
+				: read.graphNodeId.slice(PROTOCOL_PROP_GRAPH_NODE_PREFIX.length);
+		if (key) keys.add(key);
+	};
 	for (const repeat of input.protocolView.keyedRepeats ?? []) {
 		const template = repeat.rowTemplate;
 		if (template?.componentName !== componentName) continue;
 		for (const slot of [...(template.textSlots ?? []), ...(template.attributeSlots ?? [])])
-			if ('reads' in slot)
-				for (const read of slot.reads ?? []) {
-					if (!read.graphNodeId.startsWith(PROTOCOL_PROP_GRAPH_NODE_PREFIX)) continue;
-					const key =
-						read.graphNodeId === PROTOCOL_PROPS_GRAPH_NODE_ID
-							? read.path[0]
-							: read.graphNodeId.slice(PROTOCOL_PROP_GRAPH_NODE_PREFIX.length);
-					if (key) keys.add(key);
-				}
+			if ('reads' in slot) for (const read of slot.reads ?? []) addKey(read);
 	}
+	const componentHostIds = new Set(
+		input.renderData.chunks.flatMap((chunk) =>
+			chunk.componentName === componentName ? chunk.hosts.map((host) => host.hostNodeId) : [],
+		),
+	);
+	for (const behavior of input.protocolView.behaviors)
+		if (componentHostIds.has(behavior.hostNodeId))
+			for (const read of behavior.inputGraphReads ?? []) addKey(read);
 	return keys;
 }
 

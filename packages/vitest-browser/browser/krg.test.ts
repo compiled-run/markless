@@ -399,7 +399,7 @@ async function expectOneWriteSwapsAServedKeyForAnUnservedOne(container: ParentNo
 	expect(mintListChildren(container)).toEqual(['header', 'bravo', 'delta']);
 }
 
-async function expectAMintedRowThatLeavesAndReturnsIsTheSameRow(container: ParentNode) {
+async function expectAMintedRowThatLeavesAndReturnsIsANewRow(container: ParentNode) {
 	press(container, 'data-krg-grow');
 	await expect.poll(() => mintRows(container)).toEqual(['alpha', 'bravo', 'charlie', 'delta']);
 	const minted = container.querySelectorAll('[data-krg-mint-row]')[3]!;
@@ -409,8 +409,8 @@ async function expectAMintedRowThatLeavesAndReturnsIsTheSameRow(container: Paren
 	press(container, 'data-krg-grow');
 	await expect.poll(() => mintRows(container)).toEqual(['alpha', 'bravo', 'charlie', 'delta']);
 
-	// Element identity: the row was kept and put back, not built a second time.
-	expect(container.querySelectorAll('[data-krg-mint-row]')[3]).toBe(minted);
+	// A key that left is a new row when it returns: no element, and no element state, comes back.
+	expect(container.querySelectorAll('[data-krg-mint-row]')[3]).not.toBe(minted);
 }
 
 test('CSR: a handler write that admits an unserved key mints a real row', async () => {
@@ -428,9 +428,9 @@ test('CSR: one write that admits an unserved key and drops a served one does bot
 	await expectOneWriteSwapsAServedKeyForAnUnservedOne(screen.container as HTMLElement);
 });
 
-test('CSR: a minted key that leaves and returns keeps its own row', async () => {
+test('CSR: a minted key that leaves and returns gets a new row', async () => {
 	const screen = await render(MintPage);
-	await expectAMintedRowThatLeavesAndReturnsIsTheSameRow(screen.container as HTMLElement);
+	await expectAMintedRowThatLeavesAndReturnsIsANewRow(screen.container as HTMLElement);
 });
 
 test('SSR resume: a handler write that admits an unserved key mints a real row', async () => {
@@ -448,9 +448,9 @@ test('SSR resume: one write that admits an unserved key and drops a served one d
 	await expectOneWriteSwapsAServedKeyForAnUnservedOne(screen.container);
 });
 
-test('SSR resume: a minted key that leaves and returns keeps its own row', async () => {
+test('SSR resume: a minted key that leaves and returns gets a new row', async () => {
 	const screen = await renderSSR(MintPage);
-	await expectAMintedRowThatLeavesAndReturnsIsTheSameRow(screen.container);
+	await expectAMintedRowThatLeavesAndReturnsIsANewRow(screen.container);
 });
 
 // ------------------------------------------------ the same, from a computed()
