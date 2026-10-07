@@ -9,7 +9,7 @@ import MarkerSweep from '../marker-sweep.tsrx';
 import SketchAsk from './sketch-ask.tsrx';
 
 export default function RenderIntoApp() @{
-	let ran = state(false);
+	let ran = state<boolean>(false);
 	let runs = state(0);
 	let clicks = state(0);
 	let say = state('empty, for now');

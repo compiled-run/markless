@@ -96,6 +96,7 @@ export default function StateGraphSketch() @{
 				type="button"
 				data-act="same"
 				onClick={() => {
+					// oxlint-disable-next-line no-self-assign -- the figure writes the same value on purpose
 					count = count;
 					last = 'same';
 					writes++;
