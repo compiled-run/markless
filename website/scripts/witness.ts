@@ -931,6 +931,75 @@ try {
 		check(back.paper === atRest.paper, 'light is the light it started on', back.paper);
 		await page.evaluate(() => localStorage.removeItem('theme'));
 
+		// A router link rewrites the server-set <html> class, so the painted theme must survive it.
+		for (const os of ['light', 'dark'] as const) {
+			const navPage = await browser.newPage({
+				viewport: { width: 1280, height: 900 },
+				colorScheme: os,
+			});
+			await navPage.goto(`${origin}/concepts/state`, { waitUntil: 'load' });
+			const painted = () =>
+				navPage.evaluate(() => ({
+					path: location.pathname,
+					theme: document.documentElement.classList.contains('dark')
+						? 'dark'
+						: document.documentElement.classList.contains('light')
+							? 'light'
+							: 'none',
+					paper: getComputedStyle(document.body).backgroundColor,
+				}));
+			const papers: Record<string, string> = {};
+			for (const chosen of [os === 'light' ? 'dark' : 'light', os] as const) {
+				await navPage.locator(`.theme-toggle-to-${chosen}`).click();
+				await navPage.waitForFunction(
+					(wanted) => document.documentElement.classList.contains(wanted),
+					chosen,
+				);
+				papers[chosen] = (await painted()).paper;
+			}
+			check(papers.light !== papers.dark, `OS ${os}: the two themes paint different paper`);
+			for (const chosen of [os === 'light' ? 'dark' : 'light', os] as const) {
+				await navPage.locator(`.theme-toggle-to-${chosen}`).click();
+				const seen: string[] = [];
+				const visited = new Set([new URL(navPage.url()).pathname]);
+				for (let step = 0; step < 5; step += 1) {
+					const links = navPage.locator('.sidebar a[data-markless-router-link]:visible');
+					const hrefs = await links.evaluateAll((nodes) =>
+						nodes.map((node) => node.getAttribute('href') ?? ''),
+					);
+					const href = hrefs.find((candidate) => !visited.has(candidate));
+					if (!href) break;
+					visited.add(href);
+					await navPage
+						.locator(`.sidebar a[data-markless-router-link][href="${href}"]:visible`)
+						.first()
+						.click();
+					await navPage.waitForURL(`**${href}`);
+					await navPage
+						.waitForFunction(
+							(wanted) =>
+								document
+									.querySelector('.sidebar [aria-current="page"]')
+									?.getAttribute('href') === wanted,
+							href,
+							{ timeout: 5000 },
+						)
+						.catch(() => {});
+					const now = await painted();
+					if (now.theme !== chosen || now.paper !== papers[chosen])
+						seen.push(`${now.path} painted ${now.theme} (${now.paper})`);
+					else seen.push('');
+				}
+				const wrong = seen.filter(Boolean);
+				check(
+					seen.length >= 3 && wrong.length === 0,
+					`OS ${os}, chose ${chosen}: the theme stays across ${seen.length} router navigations`,
+					wrong.join('; '),
+				);
+			}
+			await navPage.close();
+		}
+
 		await page.goto(`${origin}/concepts/state`, { waitUntil: 'load' });
 		const sidebarBox = () =>
 			page.evaluate(() => {
@@ -1797,7 +1866,8 @@ try {
 			await new Promise((done) => setTimeout(done, 100));
 		}
 		check(
-			(await paperTab.getAttribute('aria-selected')) === 'true' && (await paperPane.isVisible()),
+			(await paperTab.getAttribute('aria-selected')) === 'true' &&
+				(await paperPane.isVisible()),
 			'a Code block with several files switches to the file tab the reader clicks',
 		);
 

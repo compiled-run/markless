@@ -13,5 +13,6 @@
 	};
 	paint();
 	mq.addEventListener('change', paint);
-	new MutationObserver(paint).observe(html, { attributeFilter: ['data-theme'] });
+	// Client navigation rewrites the server-set class attribute, dropping the painted class.
+	new MutationObserver(paint).observe(html, { attributeFilter: ['data-theme', 'class'] });
 })();
