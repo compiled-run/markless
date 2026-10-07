@@ -1,6 +1,5 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import TalliesPageDemo from '../../components/demos/build/tallies-page-demo.tsrx';
-import TalliesWidgetDemo from '../../components/demos/build/tallies-widget-demo.tsrx';
+import TalliesDemo from '../../components/demos/build/tallies-demo.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
@@ -69,55 +68,13 @@ A widget is the first component that calls the definition, plus everything you p
 are two tallies, each a `Tally` with a `Badge` inside. With `'page'`, they share one copy. Click
 either button:
 
-<TalliesPageDemo />
+<TalliesDemo />
 
-Both numbers move together. Now the same files with `'widget'`:
+Both numbers move together. Now set **Scope** to `widget` and click again. Each tally keeps its own
+number. Inside one tally, the button and the badge still share.
 
-<TalliesWidgetDemo />
-
-Each tally keeps its own number. Inside one tally, the button and the badge still share.
-
-The pieces live in one file, `tally.tsrx`:
-
-```tsrx
-import type { Children } from '@markless/core';
-import { shared, state } from '@markless/core';
-
-export const tally = shared(
-	() => {
-		const box = state({ count: 0 });
-		return { ...box, increment() { box.count++; } };
-	},
-	{ scope: 'widget' },
-);
-
-export function Tally({ label, children }: { label: string; children?: Children }) @{
-	const t = tally();
-
-	<p>
-		{label}: {children} <button onClick={() => t.increment()}>Add one</button>
-	</p>
-}
-
-export function Badge() @{
-	const t = tally();
-
-	<output>{t.count}</output>
-}
-```
-
-And a second file puts two of them on the page:
-
-```tsrx
-import * as tally from './tally.tsrx';
-
-export default function Tallies() @{
-	<section>
-		<tally.Tally label="Left"><tally.Badge /></tally.Tally>
-		<tally.Tally label="Right"><tally.Badge /></tally.Tally>
-	</section>
-}
-```
+The card's code has two files. `tally.tsrx` holds the definition and both components.
+`tallies.tsrx` puts two tallies on the page. Only the `scope` line differs between the two settings.
 
 The [UI components](/ui) use `'widget'`. That is how two menus on one page each stay open or closed
 on their own.

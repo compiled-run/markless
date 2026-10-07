@@ -196,3 +196,35 @@ Pages teach with `<Code>` blocks the reader can edit.
 [`components/docs/code/README.md`](components/docs/code/README.md) explains how a block compiles in
 the browser. `pages/contributing/improve-the-docs.mdx`, served at `/contributing/improve-the-docs`,
 explains how to write one.
+
+## Previews
+
+A UI family preview comes from the generator: `<Playground scenario="family/demo" />`. Every other
+interactive figure composes `components/docs/preview-card.tsrx`, which draws the same card with the
+same CSS (`components/docs/preview-card.test.ts` keeps it equal to `tooling/ui-playground-css.ts`).
+
+An `.mdx` page cannot wrap a component in another, so write a small `.tsrx` wrapper and render it
+from the page:
+
+```tsrx
+import PreviewCard, { Action, Choice, Controls, Mono, Stage, Switch, Watch } from '../../docs/preview-card.tsrx';
+import Code from '../../docs/preview-card/code.tsrx';
+```
+
+| Part | Props | Draws |
+| --- | --- | --- |
+| `PreviewCard` (default) | `name` (`data-preview`, for tests), `label` (accessible name) | the card |
+| `Controls` | `title` | top band: title on the left, then the controls inside it |
+| `Switch` | `label`, `hint`, `checked`, `disabled`, `onChange(checked)` | on/off switch |
+| `Choice` | `label` (unique on the page), `hint`, `options` (2-4), `value`, `onChange(value)` | segmented one-of-few |
+| `Action` | `end`, `disabled`, `onClick()` | text button: Reset, Reload, Back, Next |
+| `Stage` | children | centred demo band |
+| `Watch` | children | yellow strip saying what the mechanism did |
+| `Mono` | children | code or an identifier inside Watch, without the prose chip |
+| `Code` | `files` (1-3 `CodePane`s from `codePane()` in `tooling/code-blocks.ts`) | file tabs, clamp, Expand code |
+
+The build demos keep their highlighted files in `components/demos/build/code-panes.ts`, written by
+`code-panes.test.ts` from the demo files; run `vp test -u` after editing a demo. Each part carries
+its own `<style>`, because the compiler stamps a module's scope class only on components that
+declare one. Option lists are fixed slots, not `@for`: an item built by a repeat loses its value
+or its handler when the page resumes.

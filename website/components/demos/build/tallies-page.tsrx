@@ -4,5 +4,27 @@ export default function TalliesPage() @{
 	<section>
 		<tally.Tally label="Left"><tally.Badge /></tally.Tally>
 		<tally.Tally label="Right"><tally.Badge /></tally.Tally>
+		<style>
+			section {
+				position: relative;
+				display: flex;
+				flex-wrap: wrap;
+				gap: 1.5em;
+				justify-content: center;
+				padding: 2.4em 1.4em 1.4em;
+				border: 1.5px dashed var(--muted-ink);
+				border-radius: 10px;
+			}
+
+			section::before {
+				content: 'one copy for the page' / '';
+				position: absolute;
+				inset-block-start: 0.7em;
+				inset-inline-start: 1.1em;
+				color: var(--muted-ink);
+				font-family: var(--font-mono);
+				font-size: var(--step--2);
+			}
+		</style>
 	</section>
 }
