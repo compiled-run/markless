@@ -2,7 +2,7 @@
 // the files; the compile worker turns them into modules; this page links them to
 // Blob URLs and renders the entry's default export into its body.
 import { render, type RenderTarget } from '@markless/core';
-import { runtimeModuleUrl } from './frame-runtime.ts';
+import { installRuntimeImport, runtimeImportCall, runtimeModuleUrl } from './frame-runtime.ts';
 import { createLinker } from './link.ts';
 import type {
 	CodeDiagnostic,
@@ -40,6 +40,12 @@ function blobUrl(code: string): string {
 	return url;
 }
 
+// Runtime shims are shared by every run, so their URLs outlive the run that made them.
+function runtimeUrl(code: string): string {
+	return URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
+}
+installRuntimeImport(runtimeUrl);
+
 function runtimeError(error: unknown): CodeDiagnostic {
 	const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
 	return { file: '', line: 0, column: 0, message };
@@ -62,9 +68,9 @@ async function run(id: number, files: WorkerRequest['files']): Promise<void> {
 	urls = [];
 	const linker = createLinker(outcome.modules, {
 		url: blobUrl,
-		runtime: (specifier) => runtimeModuleUrl(specifier, blobUrl),
-		dynamicImport: (specifier) =>
-			`globalThis.${RUNS}.get(${id}).load(${JSON.stringify(specifier)})`,
+		runtime: (specifier) => runtimeModuleUrl(specifier, runtimeUrl),
+		dynamicImport: (expression, specifier) =>
+			runtimeImportCall(specifier) ?? `globalThis.${RUNS}.get(${id}).load(${expression})`,
 	});
 	runs.set(id, {
 		load: async (specifier) => import(/* @vite-ignore */ await linker.url(specifier)),

@@ -118,9 +118,7 @@ try {
 		'no code fence was left unhighlighted in the served HTML',
 	);
 
-	const assetPath = landingHtml.match(
-		/(?:href|src)="(\/(?:assets|build)\/[^"]+)"/,
-	)?.[1];
+	const assetPath = landingHtml.match(/(?:href|src)="(\/(?:assets|build)\/[^"]+)"/)?.[1];
 	check(Boolean(assetPath), 'built asset URL found in served HTML', assetPath ?? 'none');
 	if (assetPath) {
 		const asset = await fetch(`${origin}${assetPath}`);
@@ -465,9 +463,7 @@ try {
 		}
 		const sitemapBody = await (await fetch(`${origin}/sitemap.xml`)).text();
 		check(
-			flatNav.every((entry) =>
-				sitemapBody.includes(`<loc>${siteOrigin}${entry.href}</loc>`),
-			),
+			flatNav.every((entry) => sitemapBody.includes(`<loc>${siteOrigin}${entry.href}</loc>`)),
 			'the sitemap lists every page in the nav',
 			`${(sitemapBody.match(/<loc>/g) ?? []).length} urls for ${flatNav.length} pages`,
 		);
@@ -651,6 +647,93 @@ try {
 			);
 			await block.screenshot({ path: `${shotsDir}/T012-code-reset.png` });
 			await codePage.close();
+		}
+
+		// --- Code blocks that need every compiled module linked ---------------------
+		{
+			const proof = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+			await proof.goto(`${origin}/_code-proof`, { waitUntil: 'networkidle' });
+			const blocks = proof.locator('.code-block');
+			const editLine = async (index: number, find: string, replacement: string) => {
+				const block = blocks.nth(index);
+				await block.hover();
+				// The session swaps the static code for editors, then marks the block ready.
+				await block.and(proof.locator('[data-code="ready"]')).waitFor({ timeout: 20000 });
+				await block.locator('.cm-line', { hasText: find }).first().click();
+				await proof.keyboard.press('Home');
+				await proof.keyboard.press('Shift+End');
+				await proof.keyboard.type(replacement);
+				await block
+					.locator('.cm-line', { hasText: replacement.slice(0, 40) })
+					.first()
+					.waitFor({ timeout: 5000 });
+				return { block, frame: block.frameLocator('.code-frame') };
+			};
+			const noProblems = async (block: Locator) =>
+				((await block.locator('[data-code-problems]').textContent()) ?? '').trim();
+
+			const badge = await editLine(
+				0,
+				'<button onClick',
+				'<button onClick={() => count++}>Add one</button>',
+			);
+			const addOne = badge.frame.getByRole('button', { name: 'Add one' });
+			await addOne.waitFor({ timeout: 30000 });
+			await addOne.click();
+			await addOne.click();
+			await settleText(
+				badge.frame.locator('strong'),
+				(text) => text === '2',
+				'Code: after an edit, a child component follows the live prop its parent passes',
+			);
+			check(
+				(await noProblems(badge.block)) === '',
+				'Code: the edited child-prop block reports no problem',
+				await noProblems(badge.block),
+			);
+
+			const faq = await editLine(
+				1,
+				"{ value: 'returns'",
+				"{ value: 'returns', question: 'Can I return it?', answer: 'Yes, for thirty days.' }, { value: 'gift', question: 'Can I gift it?', answer: 'Wrapped, too.' },",
+			);
+			const gift = faq.frame.getByRole('button', { name: 'Can I gift it?' });
+			await gift.waitFor({ timeout: 30000 });
+			await gift.click();
+			await faq.frame
+				.getByText('Wrapped, too.')
+				.waitFor({ state: 'visible', timeout: 5000 })
+				.catch(() => {});
+			check(
+				(await faq.frame.getByText('Wrapped, too.').isVisible()) &&
+					(await gift.getAttribute('aria-expanded')) === 'true',
+				'Code: an @markless/ui accordion runs in the frame, and an item the reader adds opens',
+				(await noProblems(faq.block)) || 'opened',
+			);
+
+			const note = await editLine(2, '<p>Short and sweet', '<p>Short and sweet!</p>');
+			await note.frame.getByText('Short and sweet!').waitFor({ timeout: 30000 });
+			await note.frame.locator('input').fill('a note that is longer than twenty characters');
+			await settleText(
+				note.frame.locator('section p'),
+				(text) => text === 'That is a long note.',
+				'Code: after an edit, a computed branch still switches',
+			);
+
+			const list = await editLine(
+				3,
+				"{ id: 'milk'",
+				"{ id: 'milk', name: 'Milk' }, { id: 'apples', name: 'Apples' },",
+			);
+			await list.frame.getByText('Apples').waitFor({ timeout: 30000 });
+			await list.frame.getByRole('button', { name: 'Sort A to Z' }).click();
+			await settleText(
+				list.frame.locator('ul'),
+				(text) => text.replace(/\s+/g, '') === 'ApplesCoffeeMilkPears',
+				'Code: after an edit, a keyed list still sorts',
+			);
+			await proof.screenshot({ path: `${shotsDir}/T017-code-proof.png`, fullPage: true });
+			await proof.close();
 		}
 
 		await page.goto(`${origin}/concepts/computed`, { waitUntil: 'load' });
@@ -958,7 +1041,9 @@ try {
 		);
 		const tileMugs = await page.locator('.more-from .markless-mug svg.mug').count();
 		check(
-			siblingMascots.length === 3 && siblingMascots.every((one) => one.width > 0) && tileMugs === 1,
+			siblingMascots.length === 3 &&
+				siblingMascots.every((one) => one.width > 0) &&
+				tileMugs === 1,
 			'the More from compiled.run strip shows the Markless mug and three mascots that decode',
 			`${tileMugs} mug, ` + siblingMascots.map((one) => `${one.src}:${one.width}`).join(' '),
 		);
@@ -1366,11 +1451,7 @@ try {
 		await page.evaluate(() => document.documentElement.removeAttribute('data-theme'));
 
 		// --- the assumes line links the pages it names -------------------------
-		for (const href of [
-			'/',
-			'/concepts/state',
-			'/concepts/computed',
-		]) {
+		for (const href of ['/', '/concepts/state', '/concepts/computed']) {
 			await page.goto(`${origin}${href}`, { waitUntil: 'load' });
 			const assumed = await page
 				.locator('.page-meta a.page-meta-assume-link:not(.is-hidden)')
@@ -1473,11 +1554,7 @@ try {
 		// Three pages, each with a widget whose whole teaching moment is a thing
 		// the reader does. The checks below do exactly what the page asks the
 		// reader to do, and assert what the page then claims they will see.
-		for (const href of [
-			'/concepts/events',
-			'/concepts/conditionals',
-			'/concepts/lists',
-		]) {
+		for (const href of ['/concepts/events', '/concepts/conditionals', '/concepts/lists']) {
 			const response = await fetch(`${origin}${href}`);
 			check(response.status === 200, `GET ${href}`, String(response.status));
 			await page.goto(`${origin}${href}`, { waitUntil: 'load' });
@@ -1623,20 +1700,13 @@ try {
 		await page.screenshot({ path: `${shotsDir}/T013-shopping-list-after.png`, fullPage: true });
 
 		// --- batch 3: first app, async, styling ---------------------------------
-		for (const href of [
-			'/start/first-app',
-			'/concepts/async',
-			'/concepts/styling',
-		]) {
+		for (const href of ['/start/first-app', '/concepts/async', '/concepts/styling']) {
 			const response = await fetch(`${origin}${href}`);
 			check(response.status === 200, `GET ${href}`, String(response.status));
 			await page.goto(`${origin}${href}`, { waitUntil: 'load' });
 			const heading = ((await page.locator('h1').first().textContent()) ?? '').trim();
 			check(heading.length > 0, `${href} renders its h1 in the browser`, heading);
-			check(
-				(await page.locator('.playground').count()) > 0,
-				`${href} carries its live demo`,
-			);
+			check((await page.locator('.playground').count()) > 0, `${href} carries its live demo`);
 			await page.screenshot({
 				path: `${shotsDir}/T014-${slugFor(href)}.png`,
 				fullPage: true,
@@ -1861,10 +1931,7 @@ try {
 
 		// --- widget: the shared counter on the shared page --------------------------
 		await page.goto(`${origin}/build/shared`, { waitUntil: 'load' });
-		const sharedDemo = page
-			.locator('.playground')
-			.filter({ hasText: 'Badge shows:' })
-			.first();
+		const sharedDemo = page.locator('.playground').filter({ hasText: 'Badge shows:' }).first();
 		const sharedBadge = sharedDemo.locator('output').first();
 		await sharedBadge.waitFor();
 		check(
@@ -1918,7 +1985,8 @@ try {
 		await page.getByRole('button', { name: '/docs/guide/intro' }).click();
 		await settleText(
 			routeAnswer,
-			(text) => text === 'pages/docs/[...slug].mdx answers, with params.slug = "guide/intro".',
+			(text) =>
+				text === 'pages/docs/[...slug].mdx answers, with params.slug = "guide/intro".',
 			'the URL picker answers with the catch-all file',
 		);
 		await page.getByRole('button', { name: '/docs', exact: true }).click();
@@ -2043,7 +2111,11 @@ try {
 		await planFigure.waitFor();
 		const planLive = planFigure.locator('.env[data-for="browser"] .live');
 		await planLive.click();
-		await settleText(planLive, (text) => text === 'Count 1', 'the plan figure counter counts in Browser');
+		await settleText(
+			planLive,
+			(text) => text === 'Count 1',
+			'the plan figure counter counts in Browser',
+		);
 		await planFigure.getByRole('button', { name: 'Server', exact: true }).click();
 		const serverPanel = planFigure.locator('.env[data-for="server"]');
 		await serverPanel.waitFor({ state: 'visible' });
@@ -2069,7 +2141,11 @@ try {
 		await passFigure.getByRole('button', { name: 'Next →' }).click();
 		await settleText(passWhere, (text) => text === 'Pass 2 of 15', 'Next moves to pass 2');
 		await passFigure.getByRole('button', { name: 'Pass 9, protocol-view' }).click();
-		await settleText(passWhere, (text) => text === 'Pass 9 of 15', 'a station button jumps to pass 9');
+		await settleText(
+			passWhere,
+			(text) => text === 'Pass 9 of 15',
+			'a station button jumps to pass 9',
+		);
 		check(
 			((await passFigure.locator('.pass[data-n="9"]').textContent()) ?? '').includes(
 				'"symbol:1"',
@@ -2082,7 +2158,9 @@ try {
 		const payloadSay = payloadFigure.locator('.say');
 		await payloadSay.waitFor();
 		check(
-			((await payloadSay.textContent()) ?? '').includes('The click lives only in the view record.'),
+			((await payloadSay.textContent()) ?? '').includes(
+				'The click lives only in the view record.',
+			),
 			'the payload card opens on the button line',
 			((await payloadSay.textContent()) ?? '').slice(0, 60),
 		);
@@ -2105,7 +2183,11 @@ try {
 			'the direct path notes name the text that was written',
 		);
 		await clickFigure.getByRole('button', { name: 'Server-rendered page' }).click();
-		await settleText(clickLive, (text) => text === 'Count 0', 'switching path starts the counter over');
+		await settleText(
+			clickLive,
+			(text) => text === 'Count 0',
+			'switching path starts the counter over',
+		);
 		check(
 			await clickFigure.locator('.steps[data-for="server"]').isVisible(),
 			'the server path shows its own steps',
@@ -2209,15 +2291,19 @@ try {
 			check(errorLinks.includes(`/errors/${code}`), `/errors lists ${code}`);
 			const response = await fetch(`${origin}/errors/${code}`);
 			check(response.status === 200, `GET /errors/${code}`, String(response.status));
-			const parsed = await page.evaluate((source) => {
-				const document = new DOMParser().parseFromString(source, 'text/html');
-				return {
-					title: document.title,
-					description:
-						document.querySelector('meta[name="description"]')?.getAttribute('content') ??
-						'',
-				};
-			}, await response.text());
+			const parsed = await page.evaluate(
+				(source) => {
+					const document = new DOMParser().parseFromString(source, 'text/html');
+					return {
+						title: document.title,
+						description:
+							document
+								.querySelector('meta[name="description"]')
+								?.getAttribute('content') ?? '',
+					};
+				},
+				await response.text(),
+			);
 			const wanted = headFor(`/errors/${code}`, findError);
 			check(
 				parsed.title === `${code} | Markless docs` && parsed.title === wanted.title,

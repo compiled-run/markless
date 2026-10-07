@@ -3,6 +3,9 @@
 // result and the frame share one runtime.
 import corePackage from '../../../../packages/core/package.json' with { type: 'json' };
 import webPackage from '../../../../packages/web/package.json' with { type: 'json' };
+import { exportTarget } from './package-exports.ts';
+
+export { exportTarget };
 
 type Namespace = Record<string, unknown>;
 type Loader = () => Promise<Namespace>;
@@ -18,31 +21,9 @@ const sources: Record<string, Loader> = {
 } as Record<string, Loader>;
 
 const RUNTIME = '__marklessCodeRuntime';
+const RUNTIME_IMPORT = '__marklessCodeRuntimeImport';
 const namespaces: Map<string, Namespace> = ((globalThis as Record<string, unknown>)[RUNTIME] ??=
 	new Map()) as Map<string, Namespace>;
-
-/** The file a package export pattern maps `subpath` to, `*` patterns included. */
-export function exportTarget(
-	exports: Readonly<Record<string, string>>,
-	subpath: string,
-): string | undefined {
-	for (const [pattern, target] of Object.entries(exports)) {
-		const star = pattern.indexOf('*');
-		if (star < 0) {
-			if (pattern === subpath) return target;
-			continue;
-		}
-		const head = pattern.slice(0, star);
-		const tail = pattern.slice(star + 1);
-		if (
-			subpath.length >= head.length + tail.length &&
-			subpath.startsWith(head) &&
-			subpath.endsWith(tail)
-		)
-			return target.replace('*', subpath.slice(head.length, subpath.length - tail.length));
-	}
-	return undefined;
-}
 
 function loaderFor(specifier: string): Loader | undefined {
 	if (specifier === corePackage.name) return () => import('@markless/core');
@@ -51,10 +32,7 @@ function loaderFor(specifier: string): Loader | undefined {
 		[corePackage, 'core/'],
 	] as const) {
 		if (specifier !== pkg.name && !specifier.startsWith(`${pkg.name}/`)) continue;
-		const target = exportTarget(
-			pkg.exports as Record<string, string>,
-			`.${specifier.slice(pkg.name.length)}`,
-		);
+		const target = exportTarget(pkg.exports, `.${specifier.slice(pkg.name.length)}`);
 		return target ? sources[`${PACKAGES}${folder}${target.slice(2)}`] : undefined;
 	}
 	return undefined;
@@ -84,4 +62,20 @@ export function runtimeModuleUrl(
 	});
 	shims.set(specifier, shim);
 	return shim;
+}
+
+/**
+ * An `import()` of runtime module `specifier` that outlives the run that linked it, or undefined
+ * when it is not one. Compiled code caches such imports in page globals (`??=`), which a later
+ * run reads after the run that set them is gone.
+ */
+export function runtimeImportCall(specifier: string | undefined): string | undefined {
+	if (specifier === undefined || !loaderFor(specifier)) return undefined;
+	return `globalThis.${RUNTIME_IMPORT}(${JSON.stringify(specifier)})`;
+}
+
+/** Answers `runtimeImportCall` expressions, with shim URLs `url` makes and never revokes. */
+export function installRuntimeImport(url: (code: string) => string): void {
+	(globalThis as Record<string, unknown>)[RUNTIME_IMPORT] = async (specifier: string) =>
+		import(/* @vite-ignore */ await runtimeModuleUrl(specifier, url)!);
 }

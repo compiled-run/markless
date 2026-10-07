@@ -1,0 +1,110 @@
+import Sidebar from '../components/docs/sidebar.tsrx';
+
+<Sidebar />
+
+# Code block proof
+
+A scratch page: it exists to witness `Code` blocks, not to teach anything.
+
+## A child component with a live prop
+
+`Badge` reads `value`, which follows the parent's `count`. Edit anything, then press Add.
+
+<Code note="Change the label to Add one, then press it and watch the badge.">
+```tsrx title="badge-counter.tsrx"
+import { state } from '@markless/core';
+
+function Badge({ value }: { value: number }) @{
+	<strong>{value}</strong>
+}
+
+export default function BadgeCounter() @{
+	let count = state(0);
+
+	<section>
+		<button onClick={() => count++}>Add</button>
+		<Badge value={count} />
+	</section>
+}
+```
+</Code>
+
+## An accordion from @markless/ui
+
+<Code note="Add a third question to the list, then open it.">
+```tsrx title="faq.tsrx"
+import { accordion } from '@markless/ui';
+
+export default function Faq() @{
+	const questions = [
+		{ value: 'ship', question: 'When does my order ship?', answer: 'Within two working days.' },
+		{ value: 'returns', question: 'Can I return it?', answer: 'Yes, for thirty days.' },
+	];
+
+	<accordion.root value="ship">
+		@for (const q of questions; key q.value) {
+			<accordion.item value={q.value}>
+				<accordion.itemlabel>
+					<accordion.itemtrigger>{q.question}</accordion.itemtrigger>
+				</accordion.itemlabel>
+				<accordion.itemcontent>{q.answer}</accordion.itemcontent>
+			</accordion.item>;
+		}
+	</accordion.root>;
+}
+```
+</Code>
+
+## A computed branch and a sorted list
+
+Both cache a runtime import in a page global the first run sets, which every later run reads.
+
+<Code note="Type a note longer than twenty characters.">
+```tsrx title="note-panel.tsrx"
+import { computed, state } from '@markless/core';
+
+export default function NotePanel() @{
+	let note = state('');
+	const long = computed(() => note.length > 20);
+
+	<section>
+		<label>
+			Note
+			<input value={note} onInput={(event) => (note = event.currentTarget.value)} />
+		</label>
+		@if (long) {
+			<p>That is a long note.</p>
+		} @else {
+			<p>Short and sweet.</p>
+		}
+	</section>
+}
+```
+</Code>
+
+<Code note="Add a fourth item, then sort.">
+```tsrx title="shopping-list.tsrx"
+import { state } from '@markless/core';
+
+export default function ShoppingList() @{
+	let items = state([
+		{ id: 'pears', name: 'Pears' },
+		{ id: 'coffee', name: 'Coffee' },
+		{ id: 'milk', name: 'Milk' },
+	]);
+
+	<section>
+		<ul>
+			@for (const item of items; key item.id) {
+				<li>{item.name}</li>
+			} @empty {
+				<li>Nothing left to buy.</li>
+			}
+		</ul>
+		<button onClick={() => (items = [...items].sort((a, b) => a.name.localeCompare(b.name)))}>
+			Sort A to Z
+		</button>
+	</section>
+}
+```
+</Code>

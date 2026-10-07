@@ -5,8 +5,10 @@ export type CodeFile = { readonly name: string; readonly code: string };
 export type ImportSite = {
 	readonly start: number;
 	readonly end: number;
+	/** The module name; for a `computed` `import()`, the expression that yields it at run time. */
 	readonly specifier: string;
 	readonly dynamic: boolean;
+	readonly computed?: boolean;
 };
 
 export type CompiledModule = {
