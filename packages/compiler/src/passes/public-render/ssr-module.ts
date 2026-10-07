@@ -117,7 +117,10 @@ function elementHandleIdSource(handleGraphNodeId: string): string {
 	return `(residue=>{${readCase}})({kind:'element-handle-id',handleGraphNodeId:${JSON.stringify(handleGraphNodeId)}})`;
 }
 
-/** Every element() handle a branch's arms bind, against the arm that binds it. */
+/**
+ * Every element() handle a branch's arms carry the id of, or name through an
+ * always-written IDREF, against the arm that holds it.
+ */
 export function branchArmMintedHandles(
 	chunks: ReadonlyArray<SemanticMarkupChunk>,
 	armChunkIds: ReadonlyArray<string>,
@@ -128,14 +131,14 @@ export function branchArmMintedHandles(
 			if (
 				slot.kind === 'attribute' &&
 				slot.residue.kind === 'element-handle-id' &&
-				slot.residue.idref !== true &&
+				(slot.residue.idref !== true || slot.alwaysPresent === true) &&
 				!handles.has(slot.residue.handleGraphNodeId)
 			)
 				handles.set(slot.residue.handleGraphNodeId, armIndex);
 	return handles;
 }
 
-/** The IDREF positions in this module that name one of those handles. */
+/** The omittable IDREF positions in this module that name one of those handles. */
 function idrefSitesNaming(
 	chunks: ReadonlyArray<SemanticMarkupChunk>,
 	handles: ReadonlyMap<string, number>,
@@ -144,7 +147,7 @@ function idrefSitesNaming(
 	for (const chunk of chunks)
 		for (const slot of chunk.slots) {
 			if (slot.kind !== 'attribute' || slot.residue.kind !== 'element-handle-id') continue;
-			if (slot.residue.idref !== true) continue;
+			if (slot.residue.idref !== true || slot.alwaysPresent === true) continue;
 			const armIndex = handles.get(slot.residue.handleGraphNodeId);
 			if (armIndex === undefined) continue;
 			const path = slot.coordinate.path.join('.');
@@ -162,10 +165,27 @@ function idrefSitesNaming(
 	return sites;
 }
 
+// An always-written IDREF names a handle whatever arm is painted, so it needs the id but no site.
+function namedByAlwaysWrittenIdref(
+	chunks: ReadonlyArray<SemanticMarkupChunk>,
+	handles: ReadonlyMap<string, number>,
+): boolean {
+	return chunks.some((chunk) =>
+		chunk.slots.some(
+			(slot) =>
+				slot.kind === 'attribute' &&
+				slot.residue.kind === 'element-handle-id' &&
+				slot.residue.idref === true &&
+				slot.alwaysPresent === true &&
+				handles.has(slot.residue.handleGraphNodeId),
+		),
+	);
+}
+
 /**
- * The two fields a served branch record carries when its arms bind a handle an
- * IDREF names: the ids this render minted, and the outside positions that name
- * them. Empty for every other branch, so those payloads stay byte-identical.
+ * The fields a served branch record carries when its arms hold a handle an IDREF
+ * names: the ids this render minted, and the omittable outside positions that
+ * name them. Empty for every other branch, so those payloads stay byte-identical.
  */
 function branchArmHandleResolution(
 	chunks: ReadonlyArray<SemanticMarkupChunk>,
@@ -174,7 +194,7 @@ function branchArmHandleResolution(
 	const handles = branchArmMintedHandles(chunks, armChunkIds);
 	if (handles.size === 0) return '';
 	const sites = idrefSitesNaming(chunks, handles);
-	if (sites.length === 0) return '';
+	if (sites.length === 0 && !namedByAlwaysWrittenIdref(chunks, handles)) return '';
 	const ids = [...handles.keys()]
 		.map(
 			(handle) =>

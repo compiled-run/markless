@@ -111,3 +111,84 @@ test('one handle bound in both arms of a branch is still a duplicate', async () 
 	expect(duplicate?.severity).toBe('error');
 	expect(duplicate?.message).toContain('panelEl');
 });
+
+// The same relationship with a component-local handle: one element per rendered
+// component, so the reference outside the arm is always written, and the arm
+// still has to carry the very id that reference names.
+const localNamedByIdref = `import { element, state } from '@markless/core';
+export default function Drawer() @{
+	let shown = state(false);
+	const sheet = element<HTMLElement>();
+	<div>
+		<button type="button" aria-controls={sheet} onClick={() => (shown = !shown)}>more</button>
+		@if (shown) {
+			<aside el={sheet}>sheet body</aside>
+		}
+	</div>
+}
+`;
+
+const localNamedInsideArm = `import { element, state } from '@markless/core';
+export default function Drawer() @{
+	let shown = state(false);
+	const note = element<HTMLElement>();
+	<div>
+		<p el={note}>note body</p>
+		<button type="button" onClick={() => (shown = !shown)}>more</button>
+		@if (shown) {
+			<h3 aria-describedby={note}>heading</h3>
+		}
+	</div>
+}
+`;
+
+function servedBranchRecords(source: string): string {
+	return source.slice(source.indexOf('marklessSsrBranches.push'));
+}
+
+test('a component-local IDREF naming a handle bound inside the arm is a reference, and the render files the id', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/LocalNamedByIdref.tsrx',
+		source: localNamedByIdref,
+		buildId: 'build',
+		resolverId: 'resolver',
+		symbols: [],
+	});
+	expect(result.symbolModules.diagnostics.filter((entry) => entry.severity === 'error')).toEqual(
+		[],
+	);
+	const reference = result.renderData.chunks
+		.flatMap((chunk) => chunk.slots)
+		.find((slot) => slot.kind === 'attribute' && slot.name === 'aria-controls');
+	expect(reference?.residue).toEqual({
+		kind: 'element-handle-id',
+		handleGraphNodeId: 'element:sheet',
+		idref: true,
+	});
+	const readId = protocolElementHandleReadId('element:sheet');
+	const served = servedBranchRecords(result.publicRenderModule.ssrModuleSource ?? '');
+	expect(served).toContain(`elementHandleIds:{${JSON.stringify(readId)}:`);
+	// Always written outside the arm, so no site toggles its presence.
+	expect(served).toContain('idrefSites:[]');
+	const flip = result.symbolModules.modules.find((module) => module.kind === 'branch-update');
+	expect(flip?.source).toContain(readId);
+});
+
+test('a component-local IDREF inside the arm reads the id the render filed', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/LocalNamedInsideArm.tsrx',
+		source: localNamedInsideArm,
+		buildId: 'build',
+		resolverId: 'resolver',
+		symbols: [],
+	});
+	expect(result.symbolModules.diagnostics.filter((entry) => entry.severity === 'error')).toEqual(
+		[],
+	);
+	const readId = protocolElementHandleReadId('element:note');
+	expect(servedBranchRecords(result.publicRenderModule.ssrModuleSource ?? '')).toContain(
+		`elementHandleIds:{${JSON.stringify(readId)}:`,
+	);
+	const flip = result.symbolModules.modules.find((module) => module.kind === 'branch-update');
+	expect(flip?.source).toContain(readId);
+});

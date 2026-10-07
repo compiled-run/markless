@@ -42,6 +42,8 @@ vi.mock('@markless/compiler', async (importOriginal) => {
 			// CompileTsrxModuleResult); transform.ts reads payloadArena.state.storage
 			// unguarded. Empty storage keeps this test focused on tier selection.
 			payloadArena: { state: { storage: [] } },
+			// Required too: transform.ts asks the interface whether the tree derives from a roster.
+			moduleGraphInterface: { render: { components: [] } },
 			// runtimeDemandMap is likewise a required compiler artifact. This fixture
 			// predates that contract; an empty map represents its no-demand module.
 			runtimeDemandMap: runtimeDemandMap(false),

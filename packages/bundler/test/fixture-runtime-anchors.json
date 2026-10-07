@@ -70,7 +70,7 @@
 		"web/resume-sync-demand": 1087,
 		"web/runtime-error-reporting": 1864,
 		"web/ssr-data/awaitable": 844,
-		"web/ssr-data/branch-arm-idrefs": 1754,
+		"web/ssr-data/branch-arm-idrefs": 1847,
 		"web/ssr-data/renderer": 20257,
 		"web/storage-plane": 1647
 	},
@@ -144,7 +144,7 @@
 		"web/resume-sync-demand": 1087,
 		"web/runtime-error-reporting": 1864,
 		"web/ssr-data/awaitable": 844,
-		"web/ssr-data/branch-arm-idrefs": 1754,
+		"web/ssr-data/branch-arm-idrefs": 1847,
 		"web/ssr-data/renderer": 20257,
 		"web/storage-plane": 1647
 	},

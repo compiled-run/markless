@@ -735,12 +735,7 @@ function elementHandleIdrefTarget(
 /** One residue for however many handles an IDREF position named. */
 function elementHandleIdrefResidue(handles: ReadonlyArray<string>): SemanticMarkupResidue {
 	if (handles.length > 1) return { kind: 'element-handle-id-list', handleGraphNodeIds: handles };
-	const handleGraphNodeId = handles[0]!;
-	return {
-		kind: 'element-handle-id',
-		handleGraphNodeId,
-		...(handleGraphNodeId.startsWith('shared:') ? { idref: true as const } : {}),
-	};
+	return { kind: 'element-handle-id', handleGraphNodeId: handles[0]!, idref: true };
 }
 
 // Whether the whole attribute has to be slot-written: a shared() handle names an
