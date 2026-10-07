@@ -15,8 +15,35 @@ function parseTypeScript(code: string): { program: unknown; errors: Diagnostic[]
 	}
 }
 
+type Node = {
+	readonly type: string;
+	readonly start: number;
+	readonly source?: { readonly value?: unknown } | null;
+};
+
+// The import and re-export sources of oxc's module record, read off the yuku tree.
+function moduleRecord(program: unknown) {
+	const body = ((program as { body?: Node[] } | null)?.body ?? []) as Node[];
+	const request = (node: Node) =>
+		typeof node.source?.value === 'string' ? { value: node.source.value } : null;
+	return {
+		staticImports: body
+			.filter((node) => node.type === 'ImportDeclaration')
+			.map((node) => ({ start: node.start, moduleRequest: request(node)! })),
+		staticExports: body
+			.filter(
+				(node) =>
+					node.type === 'ExportNamedDeclaration' ||
+					node.type === 'ExportAllDeclaration' ||
+					node.type === 'ExportDefaultDeclaration',
+			)
+			.map((node) => ({ start: node.start, entries: [{ moduleRequest: request(node) }] })),
+	};
+}
+
 export function parseSync(_filename: string, code: string) {
-	return parseTypeScript(code);
+	const parsed = parseTypeScript(code);
+	return { ...parsed, module: moduleRecord(parsed.program) };
 }
 
 export function transformSync(_filename: string, code: string) {

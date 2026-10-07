@@ -1,6 +1,6 @@
 // Turns compiled modules into loadable URLs: each module's import specifiers are
-// rewritten to the URLs of the modules they name, and each dynamic import becomes a
-// call the host answers at run time.
+// rewritten to the URLs of the modules they name, and each dynamic import, computed
+// ones included, becomes a call the host answers at run time.
 import type { CompiledModule } from './protocol.ts';
 
 export type LinkHost = {
@@ -8,8 +8,8 @@ export type LinkHost = {
 	url(code: string): string;
 	/** The URL of a runtime module the page provides, or undefined when `specifier` is not one. */
 	runtime(specifier: string): Promise<string> | undefined;
-	/** A JavaScript expression that imports `specifier` when evaluated. */
-	dynamicImport(specifier: string): string;
+	/** A JavaScript expression importing the module `expression` names; `specifier` is that name when spelled literally. */
+	dynamicImport(expression: string, specifier?: string): string;
 };
 
 export type Linker = {
@@ -19,12 +19,9 @@ export type Linker = {
 	readonly styles: readonly string[];
 };
 
-/** The module id a specifier names: `./x`, `/code/x` and `x?query` all name `x`. */
+/** The module id a specifier names: the compile step resolves every one, so only Rolldown's `\0` marks differ. */
 export function moduleKey(specifier: string): string {
-	const bare = specifier.replace(/\?.*$/, '');
-	if (bare.startsWith('./')) return bare.slice(2);
-	if (bare.startsWith('/code/')) return bare.slice('/code/'.length);
-	return bare;
+	return specifier.startsWith('\0') ? specifier.slice(1) : specifier;
 }
 
 export function createLinker(modules: readonly CompiledModule[], host: LinkHost): Linker {
@@ -43,7 +40,9 @@ export function createLinker(modules: readonly CompiledModule[], host: LinkHost)
 			let code = module.code;
 			for (const site of [...module.imports].sort((a, b) => b.start - a.start)) {
 				const replacement = site.dynamic
-					? host.dynamicImport(site.specifier)
+					? site.computed
+						? host.dynamicImport(`(${site.specifier})`)
+						: host.dynamicImport(JSON.stringify(site.specifier), site.specifier)
 					: JSON.stringify(await url(site.specifier));
 				code = code.slice(0, site.start) + replacement + code.slice(site.end);
 			}
@@ -67,7 +66,7 @@ export function createLinker(modules: readonly CompiledModule[], host: LinkHost)
 		if (!module)
 			return Promise.reject(
 				new Error(
-					`Cannot import "${specifier}". A Code block can import @markless/core and the block's own .ts and .css files.`,
+					`Cannot import "${specifier}". A Code block can import @markless/core, @markless/ui and the block's own .tsrx, .ts and .css files.`,
 				),
 			);
 		linked = linkModule(module);

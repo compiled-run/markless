@@ -2,6 +2,7 @@
 import { compileFiles } from './compile.ts';
 import type { WorkerReply, WorkerRequest } from './protocol.ts';
 import { loadCodeWasm } from './wasm.ts';
+import { workerSourceHost } from './worker-sources.ts';
 
 const scope = self as unknown as {
 	postMessage(message: WorkerReply): void;
@@ -20,7 +21,10 @@ scope.addEventListener('message', (event) => {
 			return scope.postMessage({ id, outcome: { ok: false, diagnostics: [] } });
 		try {
 			await loadCodeWasm();
-			scope.postMessage({ id, outcome: await compileFiles(files, `code-${id}`) });
+			scope.postMessage({
+				id,
+				outcome: await compileFiles(files, `code-${id}`, workerSourceHost),
+			});
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			scope.postMessage({

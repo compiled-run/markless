@@ -100,7 +100,6 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 	frame.title = 'Result of the code';
 	frame.hidden = true;
 	frame.src = asset(`_code-frame.html`);
-	result.append(frame);
 
 	let ready = false;
 	let nextId = 1;
@@ -110,8 +109,23 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 	const send = (message: FrameRequest) =>
 		frame.contentWindow?.postMessage(message, location.origin);
 
-	const { createEditor } = await import('./editor.ts');
 	const editors = new Map<string, CodeEditor>();
+	// Listening before the frame loads: it says it is ready once, possibly before the editor arrives.
+	window.addEventListener('message', (event: MessageEvent<FrameReply>) => {
+		if (event.source !== frame.contentWindow || event.origin !== location.origin) return;
+		const message = event.data;
+		if (message.type === 'code:ready') {
+			ready = true;
+			send(siteLook());
+			if (edited) run();
+			else send({ type: 'code:run', id: WARM_UP, files: starters });
+		} else if (message.type === 'code:height') frame.style.height = `${message.height}px`;
+		else if (message.type === 'code:result') onResult(message);
+	});
+
+	result.append(frame);
+
+	const { createEditor } = await import('./editor.ts');
 	for (const host of box.querySelectorAll<HTMLElement>('[data-code-file]')) {
 		const name = host.dataset.codeFile ?? '';
 		const starter = starters.find((file) => file.name === name);
@@ -179,18 +193,6 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 		const beat = marker?.getAttribute('data-beat');
 		marker?.setAttribute('data-beat', beat === 'odd' ? 'even' : 'odd');
 	}
-
-	window.addEventListener('message', (event: MessageEvent<FrameReply>) => {
-		if (event.source !== frame.contentWindow || event.origin !== location.origin) return;
-		const message = event.data;
-		if (message.type === 'code:ready') {
-			ready = true;
-			send(siteLook());
-			if (edited) run();
-			else send({ type: 'code:run', id: WARM_UP, files: starters });
-		} else if (message.type === 'code:height') frame.style.height = `${message.height}px`;
-		else if (message.type === 'code:result') onResult(message);
-	});
 
 	new MutationObserver(() => {
 		if (ready) send(siteLook());

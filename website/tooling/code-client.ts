@@ -13,7 +13,14 @@ const FRAME_ENTRY = `${CODE_DIR}frame.ts`;
 const SESSION_ENTRY = `${CODE_DIR}session.ts`;
 const SESSION_URL = 'virtual:code-session-url';
 const SESSION_URL_ID = `\0${SESSION_URL}`;
-const NODE_FS_STUB = '\0code-frame:node-fs';
+const BUNDLER_SWAPS: Readonly<Record<string, string>> = {
+	'node:fs': `${CODE_DIR}source-fs.ts`,
+	'node:fs/promises': `${CODE_DIR}source-fs.ts`,
+	'node:url': `${CODE_DIR}bundler-shims.ts`,
+	vite: `${CODE_DIR}bundler-shims.ts`,
+	'vite/module-runner': `${CODE_DIR}bundler-shims.ts`,
+	'rolldown/experimental': `${CODE_DIR}oxc-transform.ts`,
+};
 const NATIVE_PACKAGES = ['@tsrx/yuku', 'yuku-analyzer', 'yuku-codegen'];
 
 /** The file the frame is served as, under the site's base path. */
@@ -54,19 +61,12 @@ export function codeCompilerSwaps(): Plugin {
 						?.id ?? null
 				);
 			if (source === 'yuku-codegen') return `${CODE_DIR}yuku-codegen.ts`;
-			if (source === 'rolldown/experimental' && importer.includes('/packages/bundler/src/'))
-				return `${CODE_DIR}oxc-transform.ts`;
-			if (source === 'node:fs' && importer.includes('/packages/bundler/src/'))
-				return NODE_FS_STUB;
-			return null;
-		},
-		load(id) {
-			if (id !== NODE_FS_STUB) return null;
-			return [
-				"const unavailable = () => { throw new Error('node:fs is not available in the browser'); };",
-				'export const readdirSync = unavailable;',
-				'export const realpathSync = unavailable;',
-			].join('\n');
+			if (!importer.includes('/packages/bundler/src/')) return null;
+			// The bundler's hooks run in the worker over an in-memory copy of the block's source.
+			if (source === 'node:path')
+				return (await this.resolve('pathe', importer, { skipSelf: true }))?.id ?? null;
+			if (/(?:^|\/)event-loop\.ts$/.test(source)) return `${CODE_DIR}bundler-shims.ts`;
+			return BUNDLER_SWAPS[source] ?? null;
 		},
 	};
 }

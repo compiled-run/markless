@@ -1,9 +1,23 @@
 # The Code component's browser compiler
 
 `<Code>` (`../code.tsrx`) compiles the reader's edits in the browser. `compile-worker.ts` runs
-`compile.ts`, which calls the Markless bundler's own `transformTsrxModule`. The compiler's
-parser, analyzer and printer are native addons, so `tooling/code-client.ts` swaps each one for
-a WebAssembly build in the worker's bundle:
+`compile.ts`, which drives the Markless bundler's own resolve, load and transform hooks
+(`bundle-host.ts`) over the block's files and the package source they import, so a component
+from another `.tsrx` file or from `@markless/ui` links exactly as in an app build.
+`frame.ts` links every compiled module to a Blob URL; each `import()`, computed ones
+included, goes through the run that linked it, and runtime imports go through a loader every
+later run can still call.
+
+`@markless/ui` families compile from the package source the worker bundles as text
+(`worker-sources.ts`); the bundler reads it through the in-memory `source-fs.ts`. Import a
+family as `import { accordion } from '@markless/ui'`; the compiler rejects family subpaths.
+Icon tags such as `<lucide.plus />` need the `ui()` build plugin, which reads the Iconify data
+under Node, so they do not run in a block.
+
+The compiler's parser, analyzer and printer are native addons, and the bundler's hooks import
+`node:fs`, `node:url` and `vite`, so `tooling/code-client.ts` swaps each in the worker's
+bundle: `source-fs.ts` and `bundler-shims.ts` for the Node and Vite imports, and a
+WebAssembly build for each native addon:
 
 | Native package        | Browser build                                                        |
 | --------------------- | -------------------------------------------------------------------- |
