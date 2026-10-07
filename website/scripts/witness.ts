@@ -481,7 +481,7 @@ try {
 		// The landing opens on the counter, so the resume proof lives there: the
 		// count is served at nought, and two clicks reach two.
 		await page.goto(`${origin}/`, { waitUntil: 'load' });
-		const landingDemos = page.locator('.playground');
+		const landingDemos = page.locator('.code-block [data-code-stage]');
 		const landingCount = landingDemos.first().getByRole('button');
 		await landingCount.waitFor();
 		const landingText = async () => ((await landingCount.textContent()) ?? '').trim();
@@ -697,22 +697,22 @@ try {
 			'the reading-tsrx page prints the counter file its demo runs',
 			trimmedLines(counterFence ?? '').join(' | '),
 		);
-		const readingDemos = page.locator('.playground');
-		const labelledLine = readingDemos.nth(1).locator('p').first();
+		const readingDemos = page.locator('.code-block [data-code-stage]');
+		const labelledLine = readingDemos.nth(0).locator('p').first();
 		await labelledLine.waitFor();
 		check(
 			((await labelledLine.textContent()) ?? '').trim() === 'You clicked 0 times.',
 			'the fragment demo serves its paragraph at 0',
 			((await labelledLine.textContent()) ?? '').trim(),
 		);
-		await readingDemos.nth(1).getByRole('button', { name: 'Click me' }).click();
+		await readingDemos.nth(0).getByRole('button', { name: 'Click me' }).click();
 		await settleText(
 			labelledLine,
 			(text) => text === 'You clicked 1 times.',
 			'the paragraph beside the button follows its click',
 		);
-		const teaToggle = readingDemos.nth(2).getByRole('button');
-		const teaNote = readingDemos.nth(2).locator('p.note');
+		const teaToggle = readingDemos.nth(1).getByRole('button');
+		const teaNote = readingDemos.nth(1).locator('p.note');
 		check(
 			((await teaToggle.textContent()) ?? '').trim() === 'Show the note' &&
 				(await teaNote.count()) === 0,
@@ -1634,7 +1634,7 @@ try {
 			const heading = ((await page.locator('h1').first().textContent()) ?? '').trim();
 			check(heading.length > 0, `${href} renders its h1 in the browser`, heading);
 			check(
-				(await page.locator('.playground').count()) > 0,
+				(await page.locator('.playground, .code-block').count()) > 0,
 				`${href} carries its live demo`,
 			);
 			await page.screenshot({
@@ -1727,7 +1727,10 @@ try {
 			firstAppText.includes('npm create markless@latest'),
 			'the first-app page carries the scaffold command',
 		);
-		const starterCount = page.locator('.playground').first().getByRole('button');
+		const starterCount = page
+			.locator('.code-block [data-code-stage]')
+			.first()
+			.getByRole('button', { name: /^Count/ });
 		await starterCount.waitFor();
 		await starterCount.click();
 		await settleText(

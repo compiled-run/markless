@@ -1,7 +1,5 @@
 import PageMeta from '../components/page-meta.tsrx';
 import Subtitle from '../components/docs/subtitle.tsrx';
-import CounterDemo from '../components/demos/start/counter-demo.tsrx';
-import RolledOnceDemo from '../components/demos/start/rolled-once-demo.tsrx';
 import Callout from '../components/docs/callout.tsrx';
 import Collapsible from '../components/docs/collapsible.tsrx';
 import MarklessMug from '../components/mascot/markless-mug.tsrx';
@@ -27,15 +25,10 @@ import WhereItRuns from '../components/sketch/start/where-it-runs.tsrx';
 
 <Subtitle text="Markless is a way to build user interfaces from plain TypeScript functions. The same component runs in a browser tab, on a server, or in a test." />
 
-Here is a whole component. Click the button a few times.
+Here is a whole component. Click the button a few times. Then change the code, and the result changes with it.
 
-<CounterDemo />
-
-{/* PLAYGROUND: starter file counter.tsrx as printed below. Try: change the label from Count to Clicks. Try: change count++ to count += 10. */ null}
-
-That button is this file:
-
-```tsrx
+<Code note="Change the label from Count to Clicks. Then change count++ to count += 10, and click again.">
+```tsrx title="counter.tsrx"
 import { state } from '@markless/core';
 
 export default function Counter() @{
@@ -44,6 +37,7 @@ export default function Counter() @{
 	<button onClick={() => count++}>Count {count}</button>
 }
 ```
+</Code>
 
 `count` is a plain variable. You read it by writing `count`, and you change it with `count++`. There is no setter to call and nothing to unwrap.
 
@@ -61,13 +55,8 @@ Before your app runs, Markless reads your component the way you read it. It sees
 
 Here is a second component. It rolls a die with `Math.random()` when it runs. Click **Count** a few times, and watch the die.
 
-<RolledOnceDemo />
-
-{/* PLAYGROUND: starter file rolled-once.tsrx as printed below. Try: click Count and watch the roll stay put. Try: reload the page, and the die rolls again, once. */ null}
-
-The count goes up. The die does not roll again.
-
-```tsrx
+<Code note="Click Count a few times, and the roll stays put. Then change the 6 to 100. Your edit runs the component again, so it rolls once more.">
+```tsrx title="rolled-once.tsrx"
 import { state } from '@markless/core';
 
 export default function RolledOnce() @{
@@ -80,6 +69,9 @@ export default function RolledOnce() @{
 	</section>
 }
 ```
+</Code>
+
+The count goes up. The die does not roll again.
 
 The function body ran one time, to set up the page. On this site, that happened before the page reached you. After that, a click runs `count++` and nothing else. Only the text that shows `count` changes.
 

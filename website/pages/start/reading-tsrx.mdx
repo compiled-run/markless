@@ -1,7 +1,5 @@
 import PageMeta from '../../components/page-meta.tsrx';
 import CounterDemo from '../../components/demos/start/counter-demo.tsrx';
-import LabelledCounterDemo from '../../components/demos/start/labelled-counter-demo.tsrx';
-import TeaNoteDemo from '../../components/demos/start/tea-note-demo.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
@@ -54,11 +52,8 @@ export default function Counter() @{
 
 A body can make more than one element. Write them one after the other, the same way you write two statements.
 
-<LabelledCounterDemo />
-
-{/* PLAYGROUND: starter file labelled-counter.tsrx as printed below. Try: add a third line that shows count times two. Try: move the paragraph below the button. */ null}
-
-```tsrx
+<Code note="Add a third line that shows count times two, with {count * 2}. Then move the paragraph below the button.">
+```tsrx title="labelled-counter.tsrx"
 import { state } from '@markless/core';
 
 export default function LabelledCounter() @{
@@ -68,6 +63,7 @@ export default function LabelledCounter() @{
 	<button onClick={() => count++}>Click me</button>
 }
 ```
+</Code>
 
 The paragraph reads `count`. Click the button, and only the number in the paragraph changes.
 
@@ -75,11 +71,8 @@ The paragraph reads `count`. Click the button, and only the number in the paragr
 
 An at sign at the start of a line inside markup starts a block. `@if` shows markup only while a condition is true. `@for` repeats markup for each item in a list.
 
-<TeaNoteDemo />
-
-{/* PLAYGROUND: starter file tea-note.tsrx as printed below. Try: add an @else branch that says the note is hidden. Try: change the note text and the class. */ null}
-
-```tsrx
+<Code note="Right after the closing brace of the @if, write @else and a block with a paragraph that says the note is hidden. Then change the note text, and the class name in both places.">
+```tsrx title="tea-note.tsrx"
 import { state } from '@markless/core';
 
 export default function TeaNote() @{
@@ -98,6 +91,7 @@ export default function TeaNote() @{
 	</section>
 }
 ```
+</Code>
 
 This file shows one more thing: the `<style>` block. Its rules reach the elements in this file and nothing else. Another file can use the class `note` for something different.
 
