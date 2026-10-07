@@ -1,6 +1,3 @@
-// A code example the reader can edit and run. A page writes <Code> around titled
-// fences; tooling/code-blocks.ts turns each block into a module that passes the files
-// in and projects the starter, built by the site, as the Result pane's first paint.
 import type { CodePane } from '../../tooling/code-blocks.ts';
 import type { CodeFile } from './code/protocol.ts';
 import { lucide } from '@markless/ui';
@@ -77,12 +74,12 @@ export default function Code({
 				--code-band: color-mix(in oklch, var(--ink) 70%, transparent);
 				--code-wash: color-mix(in srgb, var(--purple) 26%, var(--paper));
 				--code-tab-back: color-mix(in oklch, var(--ink) 9%, var(--paper));
-				--code-tab-h: 3.2rem;
+				--code-tab-h: 2.7rem;
 				--code-tab-left: 2.3rem;
 				--code-bleed: 0px;
-				--code-font-size: clamp(0.78rem, 1.8cqi, 1.06rem);
+				--code-font-size: clamp(0.78rem, 2cqi, 1.15rem);
 				--code-editor-surface: transparent;
-				--code-gutter: 2.3rem;
+				--code-gutter: 2.9rem;
 				--code-gutter-ink: var(--muted-ink);
 				--code-max-height: 26rem;
 				--code-selection: color-mix(in oklch, var(--yellow) 55%, transparent);
@@ -95,12 +92,14 @@ export default function Code({
 				flex-direction: column;
 				box-sizing: border-box;
 				width: calc(100% + var(--code-bleed));
-				margin: calc(var(--space-l) + var(--code-tab-h)) 0 var(--space-l);
+				margin: calc(var(--space-s) + var(--code-tab-h)) 0 var(--space-l);
 				padding: 0.25rem var(--code-inset) 0.4rem 2.6rem;
 				border: 2px solid var(--ink);
-				border-radius: 8px;
+				border-radius: 12px 15px 13px 16px / 10px 12px 14px 18px;
 				background: var(--paper);
-				box-shadow: 7px 8px 0 color-mix(in oklch, var(--ink) 24%, transparent);
+				box-shadow: 1px 3px 0 var(--paper), 0 5px 0 -1px var(--ink),
+					3px 7px 0 -2px color-mix(in oklch, var(--ink) 55%, var(--paper)),
+					9px 12px 0 color-mix(in oklch, var(--ink) 24%, transparent);
 				color: var(--ink);
 				font-family: 'Shantell Sans', system-ui, sans-serif;
 				font-size: var(--step--1);
@@ -122,11 +121,13 @@ export default function Code({
 
 			.rings {
 				position: absolute;
-				top: 0.7rem;
-				bottom: 0.5rem;
+				top: 0.35rem;
+				bottom: 0.65rem;
 				left: -18px;
 				width: 40px;
 				pointer-events: none;
+				background: var(--ink);
+				mask: url('/notebook-holes.svg') 0 0 / 40px 34px space;
 			}
 
 			.rings::before,
@@ -134,13 +135,13 @@ export default function Code({
 				content: '';
 				position: absolute;
 				inset: 0;
-				mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2240%22%20height%3D%2234%22%3E%3Cellipse%20cx%3D%2236%22%20cy%3D%2215.8%22%20rx%3D%223%22%20ry%3D%223.3%22/%3E%3Cpath%20d%3D%22M34%2015C30%208.5%209%207.5%206.5%2013.5C4.5%2019.5%2025%2021%2035%2017%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%224.6%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E") 0 0 / 40px 34px space;
-				background: var(--ink);
+				mask: url('/notebook-wire.svg') 0 0 / 40px 34px space;
+				background: color-mix(in oklch, var(--ink) 85%, var(--paper));
 			}
 
 			.rings::after {
-				mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2240%22%20height%3D%2234%22%3E%3Cpath%20d%3D%22M11%2010.9C17%209.3%2025%209.6%2030%2011.2%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%221.4%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E");
-				background: color-mix(in oklch, var(--paper) 70%, transparent);
+				mask-image: url('/notebook-sheen.svg');
+				background: color-mix(in oklch, var(--paper) 80%, var(--ink));
 			}
 
 			.bar {
@@ -148,7 +149,7 @@ export default function Code({
 				align-items: center;
 				justify-content: space-between;
 				gap: var(--space-xs);
-				padding: 0.55rem 0 0.55rem 0.4rem;
+				padding: 0.35rem 0 0.35rem 0.4rem;
 				border-bottom: 2px dashed var(--code-band);
 			}
 
@@ -259,8 +260,8 @@ export default function Code({
 			}
 
 			.note {
-				padding: 0.7rem 0 0.35rem 0.4rem;
-				font-size: var(--step-0);
+				padding: 0.7rem 0 0.55rem 0.4rem;
+				font-size: var(--step--1);
 				border-top: 2px dashed var(--code-band);
 			}
 
@@ -273,13 +274,15 @@ export default function Code({
 
 			@media (min-width: 96.01rem) {
 				.code-block {
-					--code-bleed: 6.5rem;
+					--code-bleed: 4.2rem;
+					margin-left: 0.8rem;
 				}
 			}
 
 			@container (min-width: 36rem) {
 				.body {
 					grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+					min-height: 25.5rem;
 				}
 
 				.source {

@@ -62,10 +62,10 @@ export default function CodeFiles({ panes }: { readonly panes: readonly CodePane
 	.tab {
 		position: relative;
 		margin-block-end: -2px;
-		padding: 0.4em 1.3em 0.35em;
+		padding: 0.25em 1.3em 0.25em;
 		border: 2px solid var(--ink);
 		border-block-end: 0;
-		border-radius: 16px 16px 0 0;
+		border-radius: 22px 24px 5px 4px / 18px 20px 5px 4px;
 		background: var(--code-tab-back);
 		color: color-mix(in oklch, var(--ink) 82%, var(--paper));
 		font-family: 'Shantell Sans', system-ui, sans-serif;
@@ -89,7 +89,7 @@ export default function CodeFiles({ panes }: { readonly panes: readonly CodePane
 
 	.tab[ui-selected] {
 		z-index: 1;
-		padding: 0.5em 1.45em 0.45em;
+		padding: 0.25em 1.25em 0.3em;
 		background: var(--paper);
 		color: var(--ink);
 		font-size: var(--step-1);
