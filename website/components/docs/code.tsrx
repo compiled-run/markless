@@ -77,8 +77,10 @@ export default function Code({
 				--code-band: color-mix(in oklch, var(--ink) 70%, transparent);
 				--code-wash: color-mix(in srgb, var(--purple) 26%, var(--paper));
 				--code-tab-back: color-mix(in oklch, var(--ink) 9%, var(--paper));
-				--code-tab-h: 2.6rem;
-				--code-tab-left: 2.6rem;
+				--code-tab-h: 3.2rem;
+				--code-tab-left: 2.3rem;
+				--code-bleed: 0px;
+				--code-font-size: clamp(0.78rem, 1.8cqi, 1.06rem);
 				--code-editor-surface: transparent;
 				--code-gutter: 2.3rem;
 				--code-gutter-ink: var(--muted-ink);
@@ -92,13 +94,13 @@ export default function Code({
 				display: flex;
 				flex-direction: column;
 				box-sizing: border-box;
-				width: 100%;
+				width: calc(100% + var(--code-bleed));
 				margin: calc(var(--space-l) + var(--code-tab-h)) 0 var(--space-l);
-				padding: 0.25rem var(--code-inset) 0.4rem 2.4rem;
-				border: 1.5px solid var(--ink);
-				border-radius: 6px;
+				padding: 0.25rem var(--code-inset) 0.4rem 2.6rem;
+				border: 2px solid var(--ink);
+				border-radius: 8px;
 				background: var(--paper);
-				box-shadow: 6px 6px 0 color-mix(in oklch, var(--ink) 22%, transparent);
+				box-shadow: 7px 8px 0 color-mix(in oklch, var(--ink) 24%, transparent);
 				color: var(--ink);
 				font-family: 'Shantell Sans', system-ui, sans-serif;
 				font-size: var(--step--1);
@@ -120,13 +122,25 @@ export default function Code({
 
 			.rings {
 				position: absolute;
-				top: 0.6rem;
-				bottom: 0.4rem;
-				left: -0.95rem;
-				width: 34px;
-				background: var(--ink);
-				mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2234%22%20height%3D%2232%22%3E%3Cellipse%20cx%3D%2225%22%20cy%3D%2215%22%20rx%3D%222.6%22%20ry%3D%222.4%22/%3E%3Cpath%20d%3D%22M25%2014.2C19%208.6%204.5%208.4%203.2%2013.6C2%2018.6%2015%2019.8%2024.6%2016.4%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%223.2%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E") 0 0 / 34px 32px space;
+				top: 0.7rem;
+				bottom: 0.5rem;
+				left: -18px;
+				width: 40px;
 				pointer-events: none;
+			}
+
+			.rings::before,
+			.rings::after {
+				content: '';
+				position: absolute;
+				inset: 0;
+				mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2240%22%20height%3D%2234%22%3E%3Cellipse%20cx%3D%2236%22%20cy%3D%2215.8%22%20rx%3D%223%22%20ry%3D%223.3%22/%3E%3Cpath%20d%3D%22M34%2015C30%208.5%209%207.5%206.5%2013.5C4.5%2019.5%2025%2021%2035%2017%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%224.6%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E") 0 0 / 40px 34px space;
+				background: var(--ink);
+			}
+
+			.rings::after {
+				mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2240%22%20height%3D%2234%22%3E%3Cpath%20d%3D%22M11%2010.9C17%209.3%2025%209.6%2030%2011.2%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%221.4%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E");
+				background: color-mix(in oklch, var(--paper) 70%, transparent);
 			}
 
 			.bar {
@@ -135,11 +149,11 @@ export default function Code({
 				justify-content: space-between;
 				gap: var(--space-xs);
 				padding: 0.55rem 0 0.55rem 0.4rem;
-				border-bottom: 1.5px dashed var(--code-band);
+				border-bottom: 2px dashed var(--code-band);
 			}
 
 			.title {
-				font-size: var(--step-0);
+				font-size: var(--step-1);
 				line-height: 1.2;
 			}
 
@@ -152,8 +166,8 @@ export default function Code({
 			.tool {
 				display: grid;
 				place-items: center;
-				width: 2.1rem;
-				height: 2.1rem;
+				width: 2.5rem;
+				height: 2.5rem;
 				padding: 0;
 				border: 0;
 				border-radius: 6px;
@@ -164,8 +178,9 @@ export default function Code({
 			}
 
 			.tool svg {
-				width: 1.2rem;
-				height: 1.2rem;
+				width: 1.5rem;
+				height: 1.5rem;
+				stroke-width: 2.3;
 			}
 
 			.tool:hover {
@@ -203,7 +218,7 @@ export default function Code({
 
 			.source {
 				min-width: 0;
-				border-bottom: 1.5px dashed var(--code-band);
+				border-bottom: 2px dashed var(--code-band);
 			}
 
 			.result {
@@ -245,13 +260,21 @@ export default function Code({
 
 			.note {
 				padding: 0.7rem 0 0.35rem 0.4rem;
-				border-top: 1.5px dashed var(--code-band);
+				font-size: var(--step-0);
+				border-top: 2px dashed var(--code-band);
 			}
 
 			.try {
-				margin-right: 0.6em;
+				margin-right: 0.7em;
+				font-size: var(--step-1);
 				font-family: 'Joy Elia', system-ui, sans-serif;
 				font-weight: 700;
+			}
+
+			@media (min-width: 96.01rem) {
+				.code-block {
+					--code-bleed: 6.5rem;
+				}
 			}
 
 			@container (min-width: 36rem) {
@@ -261,7 +284,7 @@ export default function Code({
 
 				.source {
 					border-bottom: 0;
-					border-inline-end: 1.5px dashed var(--code-band);
+					border-inline-end: 2px dashed var(--code-band);
 				}
 			}
 

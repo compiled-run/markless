@@ -38,6 +38,9 @@ export type CodeRun = { readonly id: string; readonly text: string; readonly sty
 export type CodeLine = { readonly id: string; readonly runs: readonly CodeRun[] };
 export type CodePane = {
 	readonly name: string;
+	/** The file name before its extension, and the extension with its dot, for the tab label. */
+	readonly stem: string;
+	readonly ext: string;
 	/** The tab's value: `FIRST_TAB` for the first pane, else the file name. */
 	readonly tab: string;
 	/** The file as its textarea holds it. */
@@ -125,8 +128,11 @@ export async function codePane(file: CodeBlockFile, index = 0): Promise<CodePane
 	// The colour table hands back the style itself, so each run keeps shiki's light/dark pair.
 	const styles = { classFor: (style: string) => style || undefined } as unknown as ColourTable;
 	const lines = paneLines(html, new DocRegistry('code'), styles);
+	const dot = file.name.lastIndexOf('.');
 	return {
 		name: file.name,
+		stem: dot > 0 ? file.name.slice(0, dot) : file.name,
+		ext: dot > 0 ? file.name.slice(dot) : '',
 		tab: index === 0 ? FIRST_TAB : file.name,
 		code,
 		lines: lines.map((line) => ({

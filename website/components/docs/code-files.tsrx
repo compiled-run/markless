@@ -7,7 +7,7 @@ export default function CodeFiles({ panes }: { readonly panes: readonly CodePane
 		<tabs.list class="strip" aria-label="Files">
 			<div class="strip-row" role="presentation">
 				@for (const pane of panes; key pane.name) {
-					<tabs.trigger class="tab" value={pane.tab} data-code-tab={pane.name}>{pane.name}</tabs.trigger>
+					<tabs.trigger class="tab" value={pane.tab} data-code-tab={pane.name}><span>{pane.stem}</span><b class="ext">{pane.ext}</b></tabs.trigger>
 				}
 			</div>
 		</tabs.list>
@@ -61,22 +61,26 @@ export default function CodeFiles({ panes }: { readonly panes: readonly CodePane
 
 	.tab {
 		position: relative;
-		margin-block-end: -1.5px;
-		padding: 0.35em 1.25em 0.3em;
-		border: 1.5px solid var(--ink);
+		margin-block-end: -2px;
+		padding: 0.4em 1.3em 0.35em;
+		border: 2px solid var(--ink);
 		border-block-end: 0;
-		border-radius: 14px 14px 0 0;
+		border-radius: 16px 16px 0 0;
 		background: var(--code-tab-back);
-		color: color-mix(in oklch, var(--ink) 78%, var(--paper));
+		color: color-mix(in oklch, var(--ink) 82%, var(--paper));
 		font-family: 'Shantell Sans', system-ui, sans-serif;
-		font-size: var(--step--1);
-		line-height: 1.4;
+		font-size: var(--step-0);
+		line-height: 1.35;
 		cursor: pointer;
-		transition: background-color 130ms ease;
+		transition: color 130ms ease;
 	}
 
 	.tab + .tab {
-		margin-inline-start: -0.35rem;
+		margin-inline-start: -0.3rem;
+	}
+
+	.ext {
+		font-weight: 400;
 	}
 
 	.tab:hover {
@@ -85,10 +89,14 @@ export default function CodeFiles({ panes }: { readonly panes: readonly CodePane
 
 	.tab[ui-selected] {
 		z-index: 1;
-		padding-block: 0.5em 0.45em;
+		padding: 0.5em 1.45em 0.45em;
 		background: var(--paper);
 		color: var(--ink);
-		font-size: var(--step-0);
+		font-size: var(--step-1);
+	}
+
+	.tab[ui-selected] .ext {
+		font-weight: 700;
 	}
 
 	.tab:focus-visible {
