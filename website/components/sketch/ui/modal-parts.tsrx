@@ -1,5 +1,4 @@
-// "Which parts say the dialog is open?" A real modal drawn as nested, labelled
-// boxes. Every label and ui-open tag comes from CSS reading the live attributes.
+// A real modal drawn as boxes; every ui-open tag is CSS reading the live attributes.
 import { state } from '@markless/core';
 import { modal } from '@markless/ui';
 import MugArt from '../../mascot/mug-art.tsrx';

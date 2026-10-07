@@ -10,11 +10,11 @@ import SelectEverywhere from '../../components/sketch/ui/select-everywhere.tsrx'
 
 # The hard part of a dialog, already written
 
-<PageMeta level="Start here" time="5 min" assumes="nothing" sprite="star-face" />
+<PageMeta level="Start here" time="7 min" assumes="nothing" sprite="star-face" />
 
 <ThemeToggle />
 
-A dialog takes ten minutes to draw. Then Escape does nothing. Focus slips out behind it. A screen
+Drawing a dialog is quick. Then Escape does nothing. Focus slips out behind it. A screen
 reader never hears it open.
 
 `@markless/ui` writes that part for you. It gives you menus, dialogs, pickers and tabs that already
@@ -67,7 +67,7 @@ That attribute is how you style them, and [Styling](/ui/styling) covers it.
 
 <ModalParts />
 
-Each part name is one lowercase word. `select.itemtrigger` is the trigger of one item.
+Each part name is one lowercase word. `accordion.itemtrigger` is the trigger of one item.
 `slider.valuelabel` is the label that shows the slider's value.
 
 <Callout
@@ -77,6 +77,12 @@ Each part name is one lowercase word. `select.itemtrigger` is the trigger of one
 />
 
 ## Add it to your app
+
+<Callout
+	sprite="flower"
+	title="Which version does npm install?"
+	text="These pages follow @markless/ui 0.5.0, which is not on npm yet. npm install @markless/ui gets 0.4.0 today. It has 22 of the 46 families, no @markless/ui/vite and no import-shape check."
+/>
 
 Install the package:
 
@@ -116,21 +122,16 @@ Import a family by name from the package root. Its parts are properties on that 
 import { modal, select, tabs } from '@markless/ui';
 ```
 
-Always import families from the package root in your components. The package also lists a path per family,
-such as `@markless/ui/tabs`. The build rejects a value import from that path with
-[`MARKLESS_UI_IMPORT_SHAPE`](/errors/MARKLESS_UI_IMPORT_SHAPE). The root also exports icon packs, such as `lucide`.
-
-<Callout
-	sprite="flower"
-	title="Which version do I have?"
-	text="These pages follow @markless/ui 0.5.0. Version 0.4.0 has fewer families and no @markless/ui/vite entry. If a family or the ui() plugin is missing from your install, check your version with npm view @markless/ui version."
-/>
+Always import families from the package root in your components. The package also lists a path for most
+families, such as `@markless/ui/tabs`. The build rejects a value import from that path with
+[`MARKLESS_UI_IMPORT_SHAPE`](/errors/MARKLESS_UI_IMPORT_SHAPE). A namespace import such as
+`import * as ui from '@markless/ui'` fails the same way. The root also exports icon packs, such as `lucide`.
 
 ## It renders wherever your app does
 
 A family is a Markless component, like the ones you write. So it runs wherever your app runs: in
 the browser alone, on a server, or inside a test. The package's own tests render every family
-both in the browser alone and from server HTML, and the same checks pass both ways.
+both in the browser alone and from server HTML. A shared set of checks runs both ways.
 
 <SelectEverywhere />
 

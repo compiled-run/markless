@@ -409,12 +409,10 @@ try {
 					html.includes(`<link rel="canonical" href="${siteOrigin}${entry.href}"`),
 					`${entry.href} names itself canonical`,
 				);
-				// B1: the published `computed<T>(derive: () => T)` takes no argument,
-				// so a documented `{ signal }` parameter is a snippet that does not
-				// compile. Proven with tsc against @markless/core/dist/index.d.ts.
+				// `computed<T>(derive: () => T)` takes no argument, so a `{ signal }` parameter does not compile.
 				check(
 					!/computed\(async\s*\(\s*\{/.test(html.replace(/<[^>]+>/g, '')),
-					`${entry.href} prints no computed(async ({ … }) => …), which does not typecheck on 0.3.1`,
+					`${entry.href} prints no computed(async ({ … }) => …), which does not typecheck`,
 				);
 				heads.push({ href: entry.href, title, description });
 				await page.goto(`${origin}${entry.href}`, { waitUntil: 'load' });

@@ -69,7 +69,7 @@ pnpm ci:local --dry-run                         # print the commands, run nothin
 <Callout
 	sprite="cross"
 	title="Why did CI fail when my local run passed?"
-	text="Your machine has browsers and files that the runner does not have. docs/ci-process.md records one unit run that passed on a Mac and failed on CI, because that job installed no browsers. Use --clean. For Linux-only risks, open a PR and let CI run."
+	text="Your machine has browsers and files that the runner does not have. docs/ci-process.md records one unit run that passed on a Mac and failed on CI, because that job installed no browsers. --clean catches untracked files, not tools your machine already has. --linux catches both, but it needs docker. Without docker, open a PR and let CI run."
 />
 
 ## Two more workflows

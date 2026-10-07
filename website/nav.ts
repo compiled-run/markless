@@ -635,16 +635,14 @@ export const uiNav: readonly NavSection[] = [
 				href: '/ui',
 				sprite: 'star-face',
 				number: '1',
-				description:
-					'Component families that ship the behaviour and the accessibility and nothing else: no styles, no class names, and no theme to argue with.',
+				description: 'Families that handle the keyboard, focus and screen readers. The look is yours.',
 			},
 			{
 				title: 'Styling',
 				href: '/ui/styling',
 				sprite: 'flower',
 				number: '2',
-				description:
-					'Every family writes its state onto the element as a ui- attribute, so a plain CSS selector styles it: no class to toggle, nothing to keep in sync.',
+				description: 'Parts write their state as ui-* attributes, so plain CSS can style them.',
 			},
 		],
 	},
