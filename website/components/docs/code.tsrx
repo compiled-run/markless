@@ -350,6 +350,7 @@ export default function Code({
 				left: -19px;
 				width: 50px;
 				background: url('/notebook/coil.png') 0 0 / 50px 34px no-repeat round;
+				mask: none;
 			}
 
 			.code-block[data-skin='image'] .rings::before,
