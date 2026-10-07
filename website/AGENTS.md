@@ -8,8 +8,8 @@ not in `styles/global.css`. Reach for `global.css` only for what one component
 cannot own: tokens on `:root` or `html`, typography for MDX prose, markup emitted
 by tooling, and classes several components share.
 
-`components/demos/home/hero-card.tsrx` and `components/docs/opener-line.tsrx` are
-the pattern to copy. Global tokens (`var(--ink)`, `var(--step--1)`, the space
+`components/docs/preview-card.tsrx` and `components/docs/opener-line.tsrx` are
+the pattern to copy. Every interactive preview follows `PreviewCard` (see README "Previews"). Global tokens (`var(--ink)`, `var(--step--1)`, the space
 scale) resolve inside scoped styles as usual.
 
 Inside a scoped `<style>`, prefer the simplest selectors that work: bare

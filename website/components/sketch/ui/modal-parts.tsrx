@@ -1,7 +1,7 @@
 // A real modal drawn as boxes; every ui-open tag is CSS reading the live attributes.
 import { state } from '@markless/core';
 import { modal } from '@markless/ui';
-import PreviewCard, { Controls, Mono, Stage, Watch } from '../../docs/preview-card.tsrx';
+import PreviewCard, { Controls, Stage, Watch } from '../../docs/preview-card.tsrx';
 
 export default function ModalParts() @{
 	let open = state(false);

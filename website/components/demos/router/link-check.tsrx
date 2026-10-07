@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import PreviewCard, { Choice, Controls, Mono, Stage, Watch } from '../../docs/preview-card.tsrx';
+import PreviewCard, { Choice, Controls, Stage, Watch } from '../../docs/preview-card.tsrx';
 
 // Answers are inline ternaries: a computed that reads a plain object is not in the chunk the click runs.
 export default function LinkCheck() @{
