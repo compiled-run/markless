@@ -1,4 +1,3 @@
-import { spawn } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
@@ -8,6 +7,7 @@ import { expect, test } from 'vitest';
 import { MARKLESS_CHUNK_SPECIFIER_PREFIX, marklessImportMapPath } from '@markless/bundler/rolldown';
 import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
+import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 
 const packagesRoot = resolve(import.meta.dirname, '../../..');
 
@@ -151,22 +151,11 @@ test('a packed router build serves one import map ahead of every module preload 
 			JSON.parse(await readFile(marklessImportMapPath(join(root, '.output/public')), 'utf8')),
 		).toEqual(manifest.importMap);
 
-		const port = 4800 + Math.floor(Math.random() * 400);
-		const server = spawn(process.execPath, [join(root, '.output/server/index.mjs')], {
-			env: { ...process.env, PORT: String(port) },
-			stdio: 'ignore',
-		});
+		const server = await startBuiltServer(join(root, '.output/server/index.mjs'));
 		try {
-			let html = '';
-			for (let attempt = 0; attempt < 100 && !html; attempt++) {
-				try {
-					html = await (await fetch(`http://localhost:${port}/`)).text();
-				} catch {
-					await new Promise((resolve) => setTimeout(resolve, 100));
-				}
-			}
+			const html = await (await fetch(`${server.origin}/`)).text();
 			for (const path of ['/.vite/markless-import-map.json', '/.vite/markless-router-client-manifest.json'])
-				expect((await fetch(`http://localhost:${port}${path}`)).headers.get('content-type')).not.toMatch(/json/);
+				expect((await fetch(`${server.origin}${path}`)).headers.get('content-type')).not.toMatch(/json/);
 			const maps = [...html.matchAll(/<script type="importmap">(.*?)<\/script>/g)];
 			expect(maps).toHaveLength(1);
 			expect(JSON.parse(maps[0]![1]!)).toEqual(manifest.importMap);
@@ -174,7 +163,7 @@ test('a packed router build serves one import map ahead of every module preload 
 			expect(mapAt).toBeGreaterThan(html.indexOf('<meta charset="utf-8">'));
 			expect(html.indexOf('rel="modulepreload"')).toBeGreaterThan(mapAt);
 		} finally {
-			server.kill();
+			server.close();
 		}
 	} finally {
 		await rm(root, { recursive: true, force: true });

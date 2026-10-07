@@ -29,6 +29,7 @@ import {
 	describeUnsupportedFragmentContent,
 	implicitFragmentRoot,
 	isRootStatement,
+	soleLoopRoot,
 	supportedFragmentRoot,
 } from './template.ts';
 
@@ -213,6 +214,25 @@ export function componentRootDiagnostics(ast: AnyNode, filename: string) {
 	}
 
 	return [noRenderableRootDiagnostic({ node: ast, filename })];
+}
+
+export function componentLoopOnlyRootDiagnostics(ast: AnyNode, filename: string) {
+	const diagnostics: ReturnType<typeof unsupportedRenderRootDiagnostic>[] = [];
+	for (const statement of asNodes(ast.body)) {
+		const component = getComponentFunction(statement);
+		const loop = component ? soleLoopRoot(component.node) : null;
+		if (!component || !loop) continue;
+		diagnostics.push(
+			unsupportedRenderRootDiagnostic({
+				message: `The whole template of <${component.name}> is one @for loop with no element around it. A component needs an element to hold the rows the loop renders, so <${component.name}> would render nothing, and a page that imports it would fail to load.`,
+				node: loop,
+				filename,
+				suggestion:
+					'Wrap the @for loop in an element, for example <ul>@for (...) { <li>...</li> }</ul>.',
+			}),
+		);
+	}
+	return diagnostics;
 }
 
 export function componentConditionalRootDiagnostics(ast: AnyNode, filename: string) {

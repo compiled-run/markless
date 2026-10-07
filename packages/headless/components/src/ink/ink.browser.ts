@@ -531,7 +531,7 @@ test('the undo keys cancel the browser default so nothing else claims them', asy
 // ------------------------------------------------------------------- buttons
 
 test('a consumer own buttons drive the drawing through the cell', async () => {
-	// The consumer handlers import the @markless/ui barrel: a ~3 s cold dev-server waterfall a build never pays.
+	// The consumer handlers import the @markless/ui barrel: a cold dev-server waterfall a build never pays, measured at 3.7 s idle and 9.4 s with every core busy, hence the 30 s budget.
 	await import('../index.ts');
 	await render(Buttons);
 	drawStroke(20);
@@ -547,7 +547,7 @@ test('a consumer own buttons drive the drawing through the cell', async () => {
 	await expect.poll(() => committed().length).toBe(2);
 	el<HTMLButtonElement>(Undo).click();
 	await expect.poll(() => committed().length).toBe(1);
-});
+}, 30_000);
 
 // ---------------------------------------------------------------- controlled
 

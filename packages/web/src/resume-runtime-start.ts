@@ -156,6 +156,7 @@ export async function startResumeRuntime(input: {
 				events,
 				storeContainerSubscription,
 				renderData: runtimeInput.renderData,
+				root: runtimeInput.root,
 			},
 			{
 				runtimeInput,

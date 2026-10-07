@@ -229,7 +229,8 @@ export function armBoundIdrefHandles(
 			if (
 				slot.kind === 'attribute' &&
 				slot.residue.kind === 'element-handle-id' &&
-				slot.residue.idref === true
+				slot.residue.idref === true &&
+				slot.alwaysPresent !== true
 			)
 				named.add(slot.residue.handleGraphNodeId);
 	if (named.size === 0) return [];
@@ -277,6 +278,8 @@ export function armBoundHandleReadSource(
  */
 export function elementHandleIdReadCase(input: {
 	readonly idPrefixSource: string;
+	/** The render root's page-unique scope: separately rendered roots on one page share component paths. */
+	readonly idScopeSource: string;
 	readonly widgetInstanceRead: ((handleExpression: string) => string) | null;
 	/** Reads one seed-map key; supplied wherever a shared() IDREF can be omitted. */
 	readonly boundRead?: (keyExpression: string) => string;
@@ -289,7 +292,7 @@ export function elementHandleIdReadCase(input: {
 		const prefix = input.widgetInstanceRead
 			? `(${handle}.startsWith('shared:')?(${input.widgetInstanceRead(handle)}??${missingWidgetInstance(handle)}):${input.idPrefixSource})`
 			: input.idPrefixSource;
-		return `(${prefix}+${handle}).replace(/\\W+/g,'-')`;
+		return `(${input.idScopeSource}+${prefix}+${handle}).replace(/\\W+/g,'-')`;
 	};
 	// The token is read WITHOUT the mint's throw: an omitted IDREF is the right
 	// answer for a part that resolved no instance, and the mint still refuses.
@@ -671,6 +674,7 @@ export function emitClientResidueReader(
 		handles.length > 0
 			? elementHandleIdReadCase({
 					idPrefixSource: `(${CONTEXT}.idPrefix??'')`,
+					idScopeSource: `(${CONTEXT}.elementIdScope??'')`,
 					widgetInstanceRead: hasSharedElementHandle(handles)
 						? widgetInstanceReadSource((key) => `${CONTEXT}.read(${key})`)
 						: null,

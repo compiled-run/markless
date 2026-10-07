@@ -968,7 +968,15 @@ export function marklessComposedGraphNodeId(
 	if (pageSpace[2] === 'storage') return graphNodeId;
 	// Only a widget lookup writes a prefix onto a `shared:` id, so a prefixed one
 	// names a widget root: composing it AGAIN is another rendered widget.
-	if (pageSpace[1]) return instancePath + graphNodeId;
+	if (pageSpace[1]) {
+		// The row-free path an inner adapter kept for a row this adapter names.
+		const sharedId = graphNodeId.slice(pageSpace[1].length);
+		const rowRoot =
+			!pageSpace[1].includes('r:') && instancePath.includes('r:')
+				? widgetRootPathFor(sharedId, instancePath + pageSpace[1], registry)
+				: undefined;
+		return (rowRoot ?? instancePath + pageSpace[1]) + sharedId;
+	}
 	const rootPath = marklessWidgetRootPathThroughRows(graphNodeId, instancePath, registry);
 	if (rootPath) return rootPath + graphNodeId;
 	// Only a minted row installs enclosing roots, and only for ids its own render

@@ -15,6 +15,7 @@ import {
 } from '../../ast/tsrx.ts';
 import type {
 	SemanticBehavior,
+	SemanticComponentEdge,
 	SemanticComponentPropBinding,
 	SemanticElementHandleBinding,
 	SemanticGraphDiagnostic,
@@ -29,6 +30,7 @@ import {
 } from '../../artifact-helpers/graph-paths.ts';
 import { PROJECTION_PROP_NAME } from '../public-render/shared-seed-pass.ts';
 import { collectComponentEdge } from './collect-components.ts';
+import { constantPropValue } from './constant-props.ts';
 import { overlayLiteralValue } from './overlay-attribute.ts';
 import {
 	collectCompositeTemplateExpression,
@@ -73,7 +75,13 @@ import {
 } from './diagnostics.ts';
 import { acceptsIdrefList, isCssAnchorAttribute, isIdrefAttribute } from './idref-attributes.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
-import { inlineHandlerRenderLocals } from './render-local-inline.ts';
+import {
+	collectDefinitionReads,
+	inlineHandlerRenderLocals,
+	inlineRenderLocals,
+} from './render-local-inline.ts';
+import { collectGraphDependencies } from './collect-async.ts';
+import { repeatRowBindsName } from './collect-repeat.ts';
 import {
 	createStyleConstResolver,
 	lowerStyleObject,
@@ -109,6 +117,7 @@ const TEMPLATE_READ_OPTIONS: CompositeReadOptions = { methodCalls: true, unaryOp
 
 export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGraphWalk): void {
 	const componentEdgeId = collectComponentEdge(node, state, walk);
+	if (componentEdgeId) routeProjectedText(node, componentEdgeId, state);
 
 	const tagName = getElementTagName(node);
 	const previousHost = state.currentHostNodeId;
@@ -226,31 +235,120 @@ function joinHostText(host: AnyNode, state: WalkState): void {
 	joinTextParts(children, state);
 }
 
+// Text-only children render as one text node the child writes with its `{children}`
+// update, so the edge hands the child that text's live value.
+function routeProjectedText(node: AnyNode, edgeId: string, state: WalkState): void {
+	// An arm re-renders its whole range, the edge included.
+	if (state.currentArmScope && state.currentArmScope.hostNodeId === state.currentHostNodeId)
+		return;
+	if (state.currentKeyedRepeatScopeIds.length > 0) return;
+	const children = asNodes(node.children).filter((child) => !isIgnorableJsxTextNode(child));
+	const values = children.filter(isTemplateExpressionChild);
+	if (values.length === 0) return;
+	const expression = values[0]!.expression as AnyNode | undefined;
+	const route =
+		children.length === 1 && expression && !isProjectedChildren(expression)
+			? directTextRoute(expression, state)
+			: null;
+	const text = route ?? joinTextParts(children, state, 1);
+	if (!text) return;
+	const edges = state.graph.componentEdges;
+	const at = edges.findIndex((edge) => edge.id === edgeId);
+	const edge = edges[at];
+	if (edge) edges[at] = { ...edge, children: { ...edge.children, text } };
+}
+
+// A lone interpolation naming a graph node is that node, as the same value in an attribute would be.
+function directTextRoute(
+	expression: AnyNode,
+	state: WalkState,
+): NonNullable<SemanticComponentEdge['children']['text']> | null {
+	const source = expressionSource(expression, state.source);
+	if (repeatRowBindsName(source, state)) return null;
+	const shared = state.currentSharedDefinitionId ?? null;
+	const graph =
+		resolveGraphPath(
+			source,
+			graphBindingMap(state.graph, shared, state.currentComponentName),
+			semanticAliasMap(state.graph, shared, state.currentComponentName),
+		) ?? resolveSharedInstanceGraphPath(source, state.graph, state.currentComponentName);
+	if (!graph || graph.binding.kind === 'element' || graph.binding.asyncCapable) return null;
+	return {
+		source,
+		graphNodeId: graph.binding.id,
+		graphBindingKind: graph.binding.kind,
+		path: graph.path,
+	};
+}
+
 // Several interpolations that render into one text node update as one joined derive.
-function joinTextParts(children: ReadonlyArray<AnyNode>, state: WalkState): void {
+function joinTextParts(
+	children: ReadonlyArray<AnyNode>,
+	state: WalkState,
+	minimumHoles = 2,
+): NonNullable<SemanticComponentEdge['children']['text']> | null {
 	const values = children
 		.filter(isTemplateExpressionChild)
 		.map((child) => child.expression as AnyNode | undefined);
-	if (values.length < 2) return;
+	if (values.length < minimumHoles) return null;
 	if (!children.every((child) => isTemplateExpressionChild(child) || isStaticTextPart(child)))
-		return;
-	if (values.some((value) => !value || value.type === 'JSXEmptyExpression')) return;
-	if (values.some(isProjectedChildren)) return;
-	const readSources = joinReadSources(
-		values.map((value) => pureCompositeReadSources(value, state, TEMPLATE_READ_OPTIONS)),
-	);
-	if (!readSources || readSources.some((source) => readsAsyncComputed(source, state))) return;
+		return null;
+	if (values.some((value) => !value || value.type === 'JSXEmptyExpression')) return null;
+	if (values.some(isProjectedChildren)) return null;
+	// A shared() factory's locals are carried by the factory scope, not recomputed here.
+	const shared = Boolean(state.currentSharedDefinitionId);
+	const inlined = new Map<AnyNode, { readonly source: string; readonly definitions: AnyNode[] }>();
+	for (const value of values as AnyNode[]) {
+		const entry = shared
+			? {
+					kind: 'inlined' as const,
+					source: expressionSource(value, state.source),
+					definitions: [],
+				}
+			: inlineRenderLocals(value, state);
+		if (entry.kind !== 'inlined') return null;
+		inlined.set(value, { source: entry.source ?? '', definitions: [...entry.definitions] });
+	}
+	const definitions = [...inlined.values()].flatMap((entry) => entry.definitions);
+	const readSources = joinReadSources([
+		...values.map((value) => {
+			const sources = pureCompositeReadSources(value, state, TEMPLATE_READ_OPTIONS);
+			return shared
+				? sources
+				: (sources?.filter((source) => !readsRenderDefinition(source, state)) ?? null);
+		}),
+		...definitions.map((definition) =>
+			collectGraphDependencies(definition, state).map((dependency) => dependency.source),
+		),
+	]);
+	if (!readSources || readSources.some((source) => readsAsyncComputed(source, state)))
+		return null;
 	const parts = children.map((child) =>
 		isTemplateExpressionChild(child)
-			? `\${(${expressionSource(child.expression as AnyNode, state.source)}) ?? ''}`
+			? `\${(${inlined.get(child.expression as AnyNode)!.source}) ?? ''}`
 			: staticTextValue(child).replace(/[\\`]|\$\{/g, (match) => `\\${match}`),
 	);
 	const source = `\`${parts.join('')}\``;
 	const composite = mintTemplateExpressionComputed(`() => ${source}`, readSources, state, true);
-	if (!composite) return;
+	if (!composite) return null;
+	for (const definition of definitions) collectDefinitionReads(definition, state);
 	const [first, ...rest] = values as AnyNode[];
 	joinedTextExpressions.set(first!, { graphNodeId: composite.graphNodeId, source });
 	for (const value of rest) joinedTextExpressions.set(value, null);
+	return { source, graphNodeId: composite.graphNodeId, graphBindingKind: 'computed', path: [] };
+}
+
+// A read rooted in a body const the join spliced in by its definition, not a graph read.
+function readsRenderDefinition(source: string, state: WalkState): boolean {
+	const root = /^[^.?[(\s]+/.exec(source)?.[0];
+	if (!root || repeatRowBindsName(root, state)) return false;
+	return (
+		!resolveGraphPath(
+			root,
+			graphBindingMap(state.graph, state.currentSharedDefinitionId),
+			semanticAliasMap(state.graph, state.currentSharedDefinitionId),
+		) && !resolveSharedInstanceGraphPath(source, state.graph, state.currentComponentName)
+	);
 }
 
 // Projected children are markup, not text.
@@ -312,7 +410,11 @@ function textExpressionTarget(
 	expressionChild: AnyNode,
 ): SemanticTemplateBindingTarget {
 	const children = asNodes(host.children).filter((child) => !isIgnorableJsxTextNode(child));
-	const shapes = children.map(hostChildShape);
+	// Projected children update only when an edge routes them as text, so their own hole is text.
+	const shapes = children.map((child) => {
+		const shape = hostChildShape(child);
+		return child === expressionChild && shape === 'dynamic' ? 'hole' : shape;
+	});
 	if (shapes.some((shape) => shape === 'node' || shape === 'dynamic'))
 		return textNodeTarget(children, shapes, children.indexOf(expressionChild));
 	const expressionChildren = children.filter(isTemplateExpressionChild);
@@ -1742,12 +1844,18 @@ function behaviorSourceParts(
 	const callee = node.callee as AnyNode | undefined;
 	const calleeSource = callee ? expressionSource(callee, state.source) : behaviorSource;
 
+	const inputs = asNodes(node.arguments);
+	const constantInputs = inputs.flatMap((argument, inputIndex) => {
+		const constant = constantPropValue(argument, state).value;
+		return constant.ok && constant.value !== undefined
+			? [{ inputIndex, value: constant.value }]
+			: [];
+	});
 	return {
 		source: behaviorSource,
 		functionSource: localFunctionDeclarationSource(callee, state) ?? calleeSource,
-		inputSources: asNodes(node.arguments).map((argument) =>
-			expressionSource(argument, state.source),
-		),
+		inputSources: inputs.map((argument) => expressionSource(argument, state.source)),
+		...(constantInputs.length > 0 ? { constantInputs } : {}),
 	};
 }
 

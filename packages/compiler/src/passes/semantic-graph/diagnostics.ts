@@ -1,5 +1,6 @@
 import type { AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
+import { DEBUGGING_PLAYBOOK_HINT } from '../../debugging-playbook.ts';
 import type {
 	SemanticElementHandleBinding,
 	SemanticGraphDiagnostic,
@@ -1353,8 +1354,8 @@ export function duplicateElementHandleDiagnostic(
 		phase: 'semantic-graph',
 		title: 'element() handle is bound more than once',
 		message: repeated
-			? `Cannot bind element handle "${binding.handleName}" inside a keyed repeat because one authored handle would point at many row host elements. markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package`
-			: `Cannot bind element handle "${binding.handleName}" to multiple live host elements. markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package`,
+			? `Cannot bind element handle "${binding.handleName}" inside a keyed repeat because one authored handle would point at many row host elements. ${DEBUGGING_PLAYBOOK_HINT}`
+			: `Cannot bind element handle "${binding.handleName}" to multiple live host elements. ${DEBUGGING_PLAYBOOK_HINT}`,
 		why: repeated
 			? 'Each repeated row has its own DOM locator, so one handle declared as a single element cannot say which row it means.'
 			: 'A resumed element handle declared as a single element must resolve to one current DOM locator. Binding it to multiple live elements would make lazy event code ambiguous.',
@@ -1383,7 +1384,7 @@ export function unsupportedRowElementHandleDiagnostic(
 		severity: 'error',
 		phase: 'semantic-graph',
 		title: 'This is not a row-ownable element() handle',
-		message: `Cannot bind el={${binding.handleName}} inside ${nested ? 'a @for nested in another @for row: nested rows own no element() handle slot yet' : 'a keyed repeat'}. A row host takes a declared element() handle, named directly (el={row}) or as one member off a shared() instance (el={select.optionEls}). markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package`,
+		message: `Cannot bind el={${binding.handleName}} inside ${nested ? 'a @for nested in another @for row: nested rows own no element() handle slot yet' : 'a keyed repeat'}. A row host takes a declared element() handle, named directly (el={row}) or as one member off a shared() instance (el={select.optionEls}). ${DEBUGGING_PLAYBOOK_HINT}`,
 		why: 'The keyed row record owns one host slot per authored handle and repeat key. Forwarded props, deeper paths, and nested repeat scopes do not identify one compiler-proven row-owned slot.',
 		primarySpan: binding.sourceSpan,
 		passId: 'tsrx-semantic-graph',

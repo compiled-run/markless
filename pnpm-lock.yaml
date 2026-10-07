@@ -895,12 +895,6 @@ importers:
       '@markless/ui-tools':
         specifier: workspace:*
         version: link:../tools
-      vite:
-        specifier: npm:@voidzero-dev/vite-plus-core@0.3.1
-        version: '@voidzero-dev/vite-plus-core@0.3.1(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.0)'
-      vitest:
-        specifier: 4.1.11
-        version: 4.1.11(@types/node@24.12.2)(@vitest/browser-playwright@4.1.11(@voidzero-dev/vite-plus-core@0.3.1(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.0))(playwright@1.58.2)(vitest@4.1.11))(@vitest/browser-preview@4.1.11)(@voidzero-dev/vite-plus-core@0.3.1(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.0))
     devDependencies:
       '@markless/vitest-browser':
         specifier: workspace:*

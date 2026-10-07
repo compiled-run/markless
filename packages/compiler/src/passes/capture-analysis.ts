@@ -32,6 +32,7 @@ import {
 } from './capture-semantics.ts';
 import { sharedCallbackSlotGraphNodeId } from './semantic-graph/collect-shared.ts';
 import { createSourceMemo } from './semantic-graph/shared-ast.ts';
+import { PROJECTION_PROP_NAME } from './public-render/shared-seed-pass.ts';
 
 // Capture analysis owns these diagnostic contract values. Tests and any other
 // reader import them from here rather than restating the strings, so the
@@ -197,6 +198,10 @@ function importedCaptureSymbols(
 		if (!edge) return [];
 		if (!claimBelongsToEdge(symbol, edge, input)) return [];
 		const captureSymbol = symbol.captureSymbol;
+		const forwarded =
+			captureSymbol.loaderSymbolId !== undefined || captureSymbol.forwarded === true
+				? ({ forwarded: true } as const)
+				: {};
 		// A child's own claim it could not bind: its slots already name the child's routes, save the props it forwards.
 		const republished = captureSymbol.innerInstancePath !== undefined;
 		// One route per ancestry the edge is rendered under, as a local symbol's routes are.
@@ -214,6 +219,7 @@ function importedCaptureSymbols(
 				{
 					...captureSymbol,
 					loaderSymbolId: symbol.id,
+					...forwarded,
 					captureSlots: captureSymbol.captureSlots.flatMap((slot) =>
 						slot.routes.some((route) => route.kind === 'widget-callback-route')
 							? [
@@ -237,6 +243,7 @@ function importedCaptureSymbols(
 				// Republished to this module's composers, the claim belongs to the component that composes its owner here.
 				owner: { componentName: edge.parentComponentName },
 				loaderSymbolId: symbol.id,
+				...forwarded,
 				captureSlots: symbol.captureSymbol.captureSlots
 					.map((slot) => ({
 						...slot,
@@ -291,9 +298,15 @@ function importedCaptureSymbols(
 						(slot) => republished || !wasProjectedThroughComponentEdge(slot.propName, edge),
 					)
 					// A derive whose prop has no route on this edge stays unbound here and reads its own instance's props.
+					// A row's value is rendered with the row, and a changed item rebuilds it, so only a callback needs it later.
 					.flatMap((slot) => {
-						if (captureSymbol.kind !== 'sync-computed-derive') return [slot];
-						const routes = slot.routes.filter((route) => route.kind !== 'unsupported-opaque');
+						if (captureSymbol.kind === 'event-handler' || captureSymbol.kind === 'callback-prop')
+							return [slot];
+						const routes = slot.routes.filter(
+							(route) =>
+								route.kind !== 'unsupported-opaque' ||
+								(captureSymbol.kind !== 'sync-computed-derive' && route.rowValue !== true),
+						);
 						return routes.length > 0 ? [{ ...slot, routes }] : [];
 					}),
 			},
@@ -369,8 +382,23 @@ function wasProjectedThroughComponentEdge(
 ): boolean {
 	return (
 		propName === 'children' &&
+		!edge.children.text &&
 		(edge.children.childCount > 0 || edge.props.some((prop) => prop.name === 'children'))
 	);
+}
+
+// Text-only children reach the child as the live value of their one text node.
+function edgePropBinding(
+	edge: SemanticComponentEdge,
+	propName: string,
+): SemanticComponentEdge['props'][number] | undefined {
+	const prop = edge.props.find((candidate) => candidate.name === propName);
+	if (prop || propName !== PROJECTION_PROP_NAME || !edge.children.text) return prop;
+	return {
+		name: propName,
+		kind: 'graph-reference',
+		...edge.children.text,
+	};
 }
 
 function symbolCaptureSlots(
@@ -670,12 +698,14 @@ function propReadForLazySymbol(
 	const semanticRead = semanticReadForSymbol(symbol, read.source, input);
 	// Only state reads name the authored prop binding; template reads are host-scoped.
 	const stateRead = semanticRead && !isTemplateRead(semanticRead) ? semanticRead : undefined;
-	const declaration = componentPropDeclarationForSymbol(
-		symbol,
-		semanticRead?.sourceSpan,
-		input,
-		stateRead?.bindingId,
-	);
+	const declaration =
+		templateComputedPropDeclaration(symbol, read.source, input) ??
+		componentPropDeclarationForSymbol(
+			symbol,
+			semanticRead?.sourceSpan,
+			input,
+			stateRead?.bindingId,
+		);
 	return [
 		{
 			...read,
@@ -688,6 +718,24 @@ function propReadForLazySymbol(
 					: {}),
 		},
 	];
+}
+
+// A computed minted for one markup expression reads the props of the component that wrote it.
+function templateComputedPropDeclaration(
+	symbol: PlannedSymbol,
+	source: string,
+	input: CaptureAnalysisInput,
+): SemanticComponentPropDeclaration | undefined {
+	if (symbol.kind !== 'sync-computed-derive') return undefined;
+	const componentName = input.semanticGraph.templateReads.find(
+		(read) => read.computedGraphNodeId === symbol.graphNodeId,
+	)?.componentName;
+	const name = rootIdentifierName(source);
+	if (!componentName || !name) return undefined;
+	return input.semanticGraph.componentPropBindings.find(
+		(declaration) =>
+			declaration.componentName === componentName && declaration.localName === name,
+	);
 }
 
 function isTemplateRead(
@@ -799,10 +847,12 @@ function captureSlot(
 	const componentName = declaration?.componentName ?? read.componentName;
 	const propName = read.graphNodeId.startsWith('prop:') ? read.path[0] : undefined;
 	const routePath = propName ? read.path.slice(1) : read.path;
-	// Absent callback props fold to undefined only at optional/guarded call sites.
+	// Absent callback props fold to undefined only at optional/guarded call sites; a derive
+	// reads an absent prop as undefined, as an imported claim's derive already does.
 	const absentPropIsUndefined =
-		(symbol.kind === 'event-handler' || symbol.kind === 'callback-prop') &&
-		referenceInvocationIsAbsentSafe(symbolSource(symbol), read.source);
+		symbol.kind === 'sync-computed-derive' ||
+		((symbol.kind === 'event-handler' || symbol.kind === 'callback-prop') &&
+			referenceInvocationIsAbsentSafe(symbolSource(symbol), read.source));
 	let routes = propName
 		? propCaptureRoutes(componentName, propName, routePath, input, absentPropIsUndefined)
 		: [
@@ -932,7 +982,7 @@ function resolvePropCaptureRoute(
 	const edge = componentEdgePath[edgeIndex];
 	if (!edge) throw new Error('Capture route ancestry ended before its terminal value.');
 	const edgePathIds = componentEdgePath.map((candidate) => candidate.id);
-	const prop = edge.props.find((candidate) => candidate.name === propName);
+	const prop = edgePropBinding(edge, propName);
 	if (!prop) {
 		if (absentPropIsUndefined) {
 			return createCompilerKnownConstantCaptureRoute(terminalEdgeId, edgePathIds, undefined);
@@ -1033,8 +1083,35 @@ function resolvePropCaptureRoute(
 		componentEdgePath: edgePathIds,
 		expression: prop.source,
 		...(prop.sourceSpan ? { sourceSpan: prop.sourceSpan } : {}),
+		...(readsOnlyRowLocals(prop.source, edge, input) ? { rowValue: true as const } : {}),
 	};
 }
+
+// Whether an edge prop's expression reads nothing but the item and index of the keyed rows the edge renders in.
+function readsOnlyRowLocals(
+	source: string,
+	edge: SemanticComponentEdge,
+	input: CaptureAnalysisInput,
+): boolean {
+	if (edge.keyedRepeatScopeIds.length === 0) return false;
+	const rowLocals = new Set(
+		input.semanticGraph.keyedRepeats.flatMap((repeat) =>
+			edge.keyedRepeatScopeIds.includes(repeat.id)
+				? [repeat.itemName, ...(repeat.indexName ? [repeat.indexName] : [])]
+				: [],
+		),
+	);
+	let reader = rowLocalReaders.get(input);
+	if (!reader) rowLocalReaders.set(input, (reader = createSymbolSourceSemanticsReader()));
+	const semantics = reader.read(source);
+	return (
+		!semantics.analysisFailed &&
+		semantics.freeNames.size > 0 &&
+		[...semantics.freeNames].every((name) => rowLocals.has(name))
+	);
+}
+
+const rowLocalReaders = new WeakMap<CaptureAnalysisInput, SymbolSourceSemanticsReader>();
 
 export function createCompilerKnownConstantCaptureRoute(
 	componentEdgeId: string,

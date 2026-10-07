@@ -4,6 +4,7 @@ export type MarklessCloneableState = {
 	readonly cells?: ReadonlyArray<Readonly<Record<string, unknown>>>;
 	readonly computed?: ReadonlyArray<unknown>;
 	readonly sharedDefinitions?: ReadonlyArray<unknown>;
+	readonly sharedSeeds?: ReadonlyArray<unknown>;
 	readonly [key: string]: unknown;
 };
 
@@ -16,6 +17,7 @@ export function marklessSelectStateNodes<T extends MarklessCloneableState>(
 	state: T,
 	cellIndexes: ReadonlyArray<number>,
 	computedIndexes: ReadonlyArray<number>,
+	sharedSeedIndexes?: ReadonlyArray<number>,
 ) {
 	const cells = state.cells ?? [];
 	const computed = state.computed ?? [];
@@ -25,6 +27,11 @@ export function marklessSelectStateNodes<T extends MarklessCloneableState>(
 		computed: computedIndexes.flatMap((index) =>
 			computed[index] === undefined ? [] : [computed[index]],
 		),
+		...(sharedSeedIndexes && {
+			sharedSeeds: sharedSeedIndexes.flatMap((index) =>
+				state.sharedSeeds?.[index] ? [state.sharedSeeds[index]] : [],
+			),
+		}),
 	};
 }
 

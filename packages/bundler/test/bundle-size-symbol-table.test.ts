@@ -109,7 +109,7 @@ describe('bundle-size generated symbol tables', () => {
 				{
 					symbolId: first.symbolId,
 					claimedChunk: facade.fileName,
-					reason: 'claimed chunk was not emitted. markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package',
+					reason: 'claimed chunk was not emitted. markless debugging playbook: run the doctor script (npm run doctor), or read agent/markless.md in the installed @markless/core package',
 				},
 			],
 		});
@@ -150,7 +150,7 @@ describe('bundle-size generated symbol tables', () => {
 					symbolId: first.symbolId,
 					claimedChunk: secondFacade.fileName,
 					reason: expect.stringMatching(
-						/does not contain its generated symbol module.*markless debugging playbook: run pnpm doctor, or read agent\/markless\.md in the installed @markless\/core package/,
+						/does not contain its generated symbol module.*markless debugging playbook: run the doctor script \(npm run doctor\), or read agent\/markless\.md in the installed @markless\/core package/,
 					),
 				},
 			],

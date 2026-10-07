@@ -4,7 +4,7 @@
 // that every published exports target exists on disk and the core root entry
 // stays node-free after packing.
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { basename, resolve } from 'node:path';
+import { basename, matchesGlob, relative, resolve } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import rootConfig from '../../vite.config.ts';
 import { releasePackages } from './release-packages.mjs';
@@ -31,6 +31,8 @@ type PackageManifest = {
 	readonly bin?: Record<string, string>;
 	readonly scripts?: Record<string, string>;
 	readonly dependencies?: Record<string, string>;
+	readonly peerDependencies?: Record<string, string>;
+	readonly peerDependenciesMeta?: Record<string, { readonly optional?: boolean }>;
 	readonly repository?: { readonly url?: string; readonly directory?: string };
 	readonly publishConfig?: {
 		readonly access?: string;
@@ -112,6 +114,33 @@ function staticImportSpecifiers(code: string): string[] {
 		}
 	}
 	return specifiers;
+}
+
+const SOURCE_FILE = /\.(?:[cm]?[jt]s|tsrx)$/;
+const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/;
+
+/** The source files that reach the tarball: src minus tests and the manifest's `!` file patterns. */
+function publishedSourceFiles(packageDir: string, manifest: PackageManifest): string[] {
+	const excluded = (manifest.files ?? [])
+		.filter((pattern) => pattern.startsWith('!'))
+		.flatMap((pattern) => [pattern.slice(1), `${pattern.slice(1)}/**`]);
+	const walk = (dir: string): string[] =>
+		readdirSync(dir, { withFileTypes: true }).flatMap((dirent) => {
+			const path = resolve(dir, dirent.name);
+			if (dirent.isDirectory()) return walk(path);
+			const rel = relative(packageDir, path);
+			if (!SOURCE_FILE.test(rel) || TEST_FILE.test(rel)) return [];
+			return excluded.some((pattern) => matchesGlob(rel, pattern)) ? [] : [path];
+		});
+	const src = resolve(packageDir, 'src');
+	return existsSync(src) ? walk(src) : [];
+}
+
+function importsPackage(source: string, name: string): boolean {
+	const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	return new RegExp(
+		`(?:from\\s*|import\\s*\\(\\s*|require\\s*\\(\\s*|import\\s+)['"]${escaped}(?:/[^'"]*)?['"]`,
+	).test(source);
 }
 
 describe('publish manifest shape', () => {
@@ -260,6 +289,23 @@ describe('publish manifest shape', () => {
 		});
 	});
 
+	// npm checks an optional peer's range too: when another package pulls a version outside it,
+	// the consumer's install fails with ERESOLVE, so a peer nothing published imports is dropped.
+	for (const entry of releasePackageEntries) {
+		const manifest = readManifest(entry.name);
+		for (const peer of Object.keys(manifest.peerDependencies ?? {})) {
+			test(`${entry.name} imports its peer ${peer} from a published file`, () => {
+				const importers = publishedSourceFiles(entry.packageDir, manifest).filter((path) =>
+					importsPackage(readFileSync(path, 'utf8'), peer),
+				);
+				expect(
+					importers,
+					`${entry.name} declares peer ${peer} but no published file imports it; remove the peer`,
+				).not.toEqual([]);
+			});
+		}
+	}
+
 	test('create-markless bin is rewritten to a dist file and ships templates', () => {
 		const manifest = readManifest('create-markless');
 		const publishedBin = manifest.publishConfig?.bin?.['create-markless'];
@@ -272,17 +318,19 @@ describe('publish manifest shape', () => {
 // Requires fresh `vp pack` output. Skipped when dist is absent or older than its package's
 // sources (CI runs `vp test` without packing; a stale local dist describes other code); the
 // prepublishOnly guard re-enforces this fail-closed at publish time.
-function fileTimes(dir: string): number[] {
+function fileTimes(dir: string, keep: (name: string) => boolean = () => true): number[] {
 	if (!existsSync(dir)) return [];
 	return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
 		if (entry.name === 'node_modules') return [];
 		const path = resolve(dir, entry.name);
-		return entry.isDirectory() ? fileTimes(path) : [statSync(path).mtimeMs];
+		if (entry.isDirectory()) return fileTimes(path, keep);
+		return keep(entry.name) ? [statSync(path).mtimeMs] : [];
 	});
 }
 
 function packedDistIsFresh(packageDir: string): boolean {
-	const dist = fileTimes(resolve(packageDir, 'dist'));
+	// `vp pack` emits ESM only; a lone .cjs is build:cjs output, not a pack.
+	const dist = fileTimes(resolve(packageDir, 'dist'), (name) => !name.endsWith('.cjs'));
 	if (dist.length === 0) return false;
 	const sources = [
 		...fileTimes(resolve(packageDir, 'src')),

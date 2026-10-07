@@ -1215,6 +1215,42 @@ export function App() @{
 	expect(lowered.diagnostics.map((diagnostic) => diagnostic.source)).toEqual(['local = flag']);
 });
 
+test('a state name inside a string literal is not a read of that state', async () => {
+	const source = `import { state } from '@markless/core';
+export function Readout() @{
+	let size = state('small');
+	<code>
+		{'" data-size="'}
+		{"size = " + 'size'}
+		{\`(size)\`}
+		<button onClick={() => (size = 'big')}>{size}</button>
+	</code>
+}`;
+	const semanticGraph = await buildSemanticGraph({ filename: 'src/Readout.tsrx', source });
+
+	const lowered = lowerStateAccess({ semanticGraph });
+
+	expect(
+		lowered.diagnostics.filter(
+			(diagnostic) => diagnostic.code === 'MARKLESS_TEMPLATE_EXPRESSION_STATIC',
+		),
+	).toEqual([]);
+});
+
+test('a state name in a template literal substitution still counts as a read', async () => {
+	const source = `import { state } from '@markless/core';
+export function App() @{
+	let flag = state(true);
+	let local = false;
+	<p>{\`\${local = flag}\`}</p>
+}`;
+	const semanticGraph = await buildSemanticGraph({ filename: 'src/Tpl.tsrx', source });
+
+	const lowered = lowerStateAccess({ semanticGraph });
+
+	expect(lowered.diagnostics.map((diagnostic) => diagnostic.statePath)).toContain('flag');
+});
+
 test('lowerStateAccess reports a structured diagnostic for const graph binding reassignment', async () => {
 	const semanticGraph = await buildSemanticGraph({
 		filename: 'src/ConstState.tsrx',

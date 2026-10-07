@@ -146,6 +146,13 @@ export type SemanticComponentEdge = {
 	readonly props: ReadonlyArray<SemanticComponentPropBinding>;
 	readonly children: {
 		readonly childCount: number;
+		/** Text-only children: the graph value their one text node renders, for the child's `{children}`. */
+		readonly text?: {
+			readonly source: string;
+			readonly graphNodeId: string;
+			readonly graphBindingKind: SemanticGraphBinding['kind'];
+			readonly path: ReadonlyArray<string>;
+		};
 	};
 	readonly branchScopeIds: ReadonlyArray<string>;
 	readonly keyedRepeatScopeIds: ReadonlyArray<string>;
@@ -306,6 +313,12 @@ export type ModuleGraphInterfaceArtifact = {
 			 * closure plan, so a composing page routes plan lookups toward it.
 			 */
 			readonly closureActions?: true;
+			/**
+			 * Present when this component's tree holds a computed that reads an
+			 * element() roster, so a page placing it must install the live-roster
+			 * loader before resume.
+			 */
+			readonly rosterDerivation?: true;
 			/**
 			 * What runs in the browser when a composing module changes one of this
 			 * component's props or creates an instance of it. Read by the build-time
@@ -950,6 +963,11 @@ export type SemanticBehavior = {
 	readonly source: string;
 	readonly functionSource: string;
 	readonly inputSources: ReadonlyArray<string>;
+	/** Inputs whose value is plain data known at build time: literals and unmutated module constants. */
+	readonly constantInputs?: ReadonlyArray<{
+		readonly inputIndex: number;
+		readonly value: unknown;
+	}>;
 	readonly keyedRepeatScopeIds?: ReadonlyArray<string>;
 };
 
@@ -1438,7 +1456,7 @@ export type PayloadAsyncBoundary = {
 	readonly armRecords: ReadonlyArray<PayloadArmRecordSet>;
 };
 
-export type PayloadBehavior = SemanticBehavior & {
+export type PayloadBehavior = Omit<SemanticBehavior, 'constantInputs'> & {
 	readonly inputValues?: ReadonlyArray<unknown>;
 	readonly inputGraphReads?: ReadonlyArray<{
 		readonly inputIndex: number;
@@ -1844,6 +1862,8 @@ export type CaptureSlotRoute =
 			// The consumer passed no such prop, so the diagnostic names the missing
 			// prop instead of an authored runtime expression.
 			readonly absentProp?: true;
+			// The expression reads only the keyed row's item or index: rendered with the row, never live.
+			readonly rowValue?: true;
 	  };
 
 // A slot belongs to one authored binding in one component and may have one
@@ -1885,6 +1905,8 @@ export type ExtractedCaptureSymbol = {
 	readonly touchesPageSpaceGraph?: true;
 	/** Where the symbol's component sits below the edge that binds it, for a claim a child republished from its own child. */
 	readonly innerInstancePath?: string;
+	/** A claim the child passed on from one of its own children: its id is that grandchild's, not one the child declared. */
+	readonly forwarded?: true;
 	readonly captureSlots: ReadonlyArray<CaptureSlot>;
 };
 
@@ -2365,6 +2387,10 @@ export type PublicRenderPlanBranchArmPart =
 				readonly graphNodeId: string;
 				readonly path: ReadonlyArray<string>;
 			};
+			// `{children}`: where the instance's own props cell holds it. A value equal to
+			// that served markup is written as HTML; anything else, such as text routed
+			// from the caller, stays escaped.
+			readonly raw?: ReadonlyArray<string>;
 	  }
 	// A keyed @for inside an arm-scoped branch arm: rows rebuild from a live
 	// graph read of the collection at flip time (no keyed diffing — the flip
@@ -2385,6 +2411,8 @@ export type PublicRenderPlanBranchArmPart =
 					  }
 					| { readonly itemPath: ReadonlyArray<string> }
 				>;
+				// The `@empty` block's markup, shown when the collection is empty.
+				readonly empty?: string;
 			};
 	  }
 	// An attribute whose value reads the graph at flip time; `alwaysPresent`

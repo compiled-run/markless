@@ -1,4 +1,5 @@
 import { dirname, join, normalize, relative } from 'pathe';
+import { DEBUGGING_PLAYBOOK_HINT } from '@markless/compiler';
 import { rootRelativeId } from '../module-id.ts';
 import { MARKLESS_VIRTUAL_PREFIX } from '../transform.ts';
 import type { MarklessSymbolManifestEntry, MarklessTransformManifest } from '../types.ts';
@@ -389,15 +390,15 @@ function routeTerminationError(
 ): string | undefined {
 	const target = chunks.get(claimedChunk);
 	if (!target) {
-		return 'claimed chunk was not emitted. markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package';
+		return `claimed chunk was not emitted. ${DEBUGGING_PLAYBOOK_HINT}`;
 	}
 
 	const symbolVirtualId = normalizeVirtualId(symbol.virtualModuleId);
 	if (!chunkOrReexportChainContainsSymbol(chunks, target, symbolVirtualId, symbol.exportName)) {
-		return `claimed chunk does not contain its generated symbol module ${symbol.virtualModuleId} or a live re-export chain to it. markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package`;
+		return `claimed chunk does not contain its generated symbol module ${symbol.virtualModuleId} or a live re-export chain to it. ${DEBUGGING_PLAYBOOK_HINT}`;
 	}
 	if (!(target.exports ?? []).includes(symbol.exportName)) {
-		return `claimed chunk does not export ${symbol.exportName}. markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package`;
+		return `claimed chunk does not export ${symbol.exportName}. ${DEBUGGING_PLAYBOOK_HINT}`;
 	}
 	return undefined;
 }

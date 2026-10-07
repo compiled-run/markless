@@ -50,15 +50,23 @@ export function callbackSymbolIds(input: PublicRenderModuleInput): ReadonlyMap<s
 		),
 		...(input.captureAnalysis.boundResolverRows ?? []).flatMap((row) =>
 			row.componentEdgePath.flatMap((edgeId, index, path) => {
-				const childSymbolId = row.loaderSymbolId
+				const claim = row.loaderSymbolId
 					? input.captureAnalysis.extractedSymbols.find(
 							(symbol) => symbol.loaderSymbolId === row.loaderSymbolId,
-						)?.symbolId
-					: row.baseSymbolId;
+						)
+					: undefined;
+				const childSymbolId = row.loaderSymbolId ? claim?.symbolId : row.baseSymbolId;
 				if (!childSymbolId) return [];
 				// An outer edge's child owns its own ids, so only an inner bound id may rebind through it.
-				const key = index === path.length - 1 ? childSymbolId : boundSymbolIdPrefix(childSymbolId);
-				return [[`bound:${edgeId}:${key}`, row.id] as const];
+				if (index < path.length - 1)
+					return [[`bound:${edgeId}:${boundSymbolIdPrefix(childSymbolId)}`, row.id] as const];
+				// A forwarded claim reaches this edge as the bound id its child composed, never as the child's own id.
+				return [
+					[`bound:${edgeId}:${childSymbolId}`, row.id] as const,
+					...(claim?.forwarded
+						? [[`bound:${edgeId}:${boundSymbolIdPrefix(childSymbolId)}`, row.id] as const]
+						: []),
+				];
 			}),
 		),
 	]);
@@ -804,6 +812,7 @@ export function componentOwnedStateNodes(
 	readonly cellIndexes: ReadonlyArray<number>;
 	readonly computedIndexes: ReadonlyArray<number>;
 	readonly seedCellIndexes: ReadonlyArray<number>;
+	readonly sharedSeedIndexes?: ReadonlyArray<number>;
 } {
 	const owner = payloadNodeOwners(input, rootComponentName);
 	// Every resolver of an unseeded widget family carries its cells, so a page
@@ -857,7 +866,37 @@ export function componentOwnedStateNodes(
 				? [index]
 				: [],
 		),
+		...(input.protocolState.sharedSeeds?.length
+			? { sharedSeedIndexes: componentSharedSeedIndexes(input, componentName) }
+			: {}),
 	};
+}
+
+/** The node positions `marklessSelectStateNodes` keeps for one component, as emitted arguments. */
+export function selectedStateNodeArguments(owned: {
+	readonly cellIndexes: ReadonlyArray<number>;
+	readonly computedIndexes: ReadonlyArray<number>;
+	readonly sharedSeedIndexes?: ReadonlyArray<number>;
+}): string {
+	const seeds = owned.sharedSeedIndexes ? [owned.sharedSeedIndexes] : [];
+	return [owned.cellIndexes, owned.computedIndexes, ...seeds]
+		.map((indexes) => JSON.stringify(indexes))
+		.join(', ');
+}
+
+// A seed follows the props of the component whose body writes it, so only that component carries it.
+function componentSharedSeedIndexes(
+	input: PublicRenderModuleInput,
+	componentName: string,
+): ReadonlyArray<number> {
+	const writers = new Map(
+		input.symbolResolver.symbols.flatMap((symbol) =>
+			symbol.kind === 'shared-seed' ? [[symbol.id, symbol.componentName] as const] : [],
+		),
+	);
+	return (input.protocolState.sharedSeeds ?? []).flatMap((seed, index) =>
+		writers.get(seed.deriveSymbolId) === componentName ? [index] : [],
+	);
 }
 
 // Every graph node a set of reads reaches, following each computed to what it
@@ -963,6 +1002,16 @@ function resolvePayloadNodeOwners(
 			!textOwner.has(read.computedGraphNodeId)
 		)
 			textOwner.set(read.computedGraphNodeId, read.componentName);
+	// A computed minted for a component-edge prop is read by the edge, not a chunk slot.
+	const edgeOwner = new Map<string, string>();
+	for (const edge of input.semanticGraph.componentEdges)
+		for (const prop of edge.props)
+			if (
+				prop.kind === 'graph-reference' &&
+				prop.graphBindingKind === 'computed' &&
+				!edgeOwner.has(prop.graphNodeId)
+			)
+				edgeOwner.set(prop.graphNodeId, edge.parentComponentName);
 	// A widget-scoped shared() graph is one instance per rendered widget, so its
 	// nodes belong to the widget root, not the module root: that component's
 	// composed instance path is the widget root.
@@ -989,6 +1038,7 @@ function resolvePayloadNodeOwners(
 				chunkOwner.get(graphNodeId) ??
 				branchOwner.get(graphNodeId) ??
 				textOwner.get(graphNodeId) ??
+				edgeOwner.get(graphNodeId) ??
 				rootComponentName
 			);
 		});

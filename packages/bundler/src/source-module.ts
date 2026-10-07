@@ -555,8 +555,9 @@ export function emitOverlayLoaderInstall(): string {
  *
  * Both call sites (the start-up wiring and a sync computed's re-derive) sit in
  * modules every resumed page runs, which is why neither may write the specifier.
+ * A composed MDX route writes it too: it cannot see its islands' computeds.
  */
-function emitRosterResumeLoaderInstall(): string {
+export function emitRosterResumeLoaderInstall(): string {
 	return "globalThis.__marklessRosterResume ??= () => import('@markless/web/fns/roster-resume');";
 }
 
@@ -736,6 +737,8 @@ export function emitResumeModule(input: {
 	// has none - and a component row still has to reach the surface.
 	readonly renderDataId?: string;
 	readonly linkedRowSlotReaders?: boolean;
+	// The page's component tree derives from an element() roster, possibly through a child module whose computeds this payload never holds.
+	readonly rosterDerivation?: boolean;
 	readonly installResumeSummary?: boolean;
 	// The wake variant serves pages whose container carries no payload
 	// scripts; lean routes read the payload document and must never emit.
@@ -821,7 +824,9 @@ export function emitResumeModule(input: {
 					'installMarklessDerivedReconcile();',
 					emitRosterResumeLoaderInstall(),
 				].join('\n')
-			: null,
+			: input.rosterDerivation === true
+				? emitRosterResumeLoaderInstall()
+				: null,
 		// Elevation is pay-per-use the same way, but one step further: this module
 		// is the ONLY place the overlay behaviour's specifier is written, so an app
 		// the compiler recorded no `overlay` demand for never emits its chunk at

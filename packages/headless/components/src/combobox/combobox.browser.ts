@@ -8,6 +8,7 @@ import { LongList } from './scenarios/long-list.tsrx';
 import { Multiple } from './scenarios/multiple.tsrx';
 import { OpenList } from './scenarios/open-list.tsrx';
 import { Prefilled } from './scenarios/prefilled.tsrx';
+import { ValueFromPage } from './scenarios/value-from-page.tsrx';
 import { PrefilledForm } from './scenarios/prefilled-form.tsrx';
 import { SignupForm } from './scenarios/signup-form.tsrx';
 import { TwoComboboxes } from './scenarios/two-comboboxes.tsrx';
@@ -816,6 +817,27 @@ test.fails('the field names the highlighted option for a screen reader', async (
 	const named = el(Input).getAttribute('aria-activedescendant');
 	expect(named).toBeTruthy();
 	expect(named).toBe(el(Apple).getAttribute('id'));
+});
+
+// A value the page sets moves the chosen option with it.
+for (const mode of MODES) {
+	test(`${mode}: a value the page sets moves the chosen option`, async () => {
+		if (mode === 'CSR') await render(ValueFromPage);
+		else await renderSSR(ValueFromPage);
+		expect(el(Apple).getAttribute('aria-selected')).toBe('true');
+
+		el(page.getByTestId('pick-banana')).click();
+		await expect.poll(() => el(Banana).getAttribute('aria-selected')).toBe('true');
+		expect(el(Apple).getAttribute('aria-selected')).toBe('false');
+	});
+}
+
+// PENDING CAPABILITY - the words of an option chosen from outside. Only an item
+// knows its `label`, and only the widget root seeds the shared instance, so a
+// value set by the page moves the chosen option but writes nothing into the field.
+test.fails('the field shows the label of a value the page sets', async () => {
+	await render(ValueFromPage);
+	expect(el<HTMLInputElement>(Input).value).toBe('Apple');
 });
 
 /** A cancelable keydown, and whether the family's synchronous policy cancelled it. */

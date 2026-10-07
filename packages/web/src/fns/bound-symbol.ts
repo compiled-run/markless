@@ -22,11 +22,10 @@ export function marklessReboundSymbolId(
 	// immediate parent. Rebind that symbol through the outer instance row when
 	// one exists; prefixing the inner bound ID would route it back to the child
 	// resolver and lose the outer instance's capture adapter.
-	const baseSymbolId = marklessBaseSymbolId(symbolId);
-	// An edge the claim passes through keys it by the bound id's prefix; the claim's own edge by its bare id.
-	return baseSymbolId
-		? (boundSymbols?.[symbolId.slice(0, symbolId.indexOf(':', 'bound:'.length))] ??
-				boundSymbols?.[baseSymbolId])
+	// Keyed by the bound id's prefix: a bare key is the child's own id, and the
+	// nested id's base is a grandchild's, which can spell the same `symbol:N`.
+	return marklessBaseSymbolId(symbolId)
+		? boundSymbols?.[symbolId.slice(0, symbolId.indexOf(':', 'bound:'.length))]
 		: undefined;
 }
 

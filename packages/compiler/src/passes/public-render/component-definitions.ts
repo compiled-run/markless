@@ -29,6 +29,7 @@ import {
 	staticHostLocators,
 } from './shared.ts';
 import { collectSsrPropEvents } from './component-wiring.ts';
+import { PROJECTION_PROP_NAME } from './shared-seed-pass.ts';
 import { moduleIdOf } from '../../module-id.ts';
 import type { PublicRenderRoot } from './types.ts';
 
@@ -75,7 +76,13 @@ export function collectPublicRenderComponentDefinitions(
 		if (!rootChunk) return [];
 		const edges = componentEdgesFor(input, componentName).map((edge) => {
 			const declaredInputs = childComponentInputs(input, componentMap, edge);
-			const passedInputs = new Set(edge.props.map((prop) => prop.name));
+			const text = edge.props.some((prop) => prop.name === PROJECTION_PROP_NAME)
+				? undefined
+				: edge.children.text;
+			const passedInputs = new Set([
+				...edge.props.map((prop) => prop.name),
+				...(text ? [PROJECTION_PROP_NAME] : []),
+			]);
 			return {
 				...projectionProp(
 					input.source.source,
@@ -114,6 +121,19 @@ export function collectPublicRenderComponentDefinitions(
 							: {}),
 						...(prop.kind === 'callback' ? {} : { source: prop.source }),
 					})),
+					// The projection renders the HTML; the route lets the child follow its text.
+					...(text
+						? [
+								{
+									name: PROJECTION_PROP_NAME,
+									kind: 'graph-reference',
+									graphNodeId: text.graphNodeId,
+									path: text.path,
+									source: text.source,
+									projected: true,
+								},
+							]
+						: []),
 				],
 				...(materializations[edge.id] ? { materialized: materializations[edge.id] } : {}),
 			};
@@ -264,6 +284,9 @@ export function collectPublicRenderComponentDefinitions(
 					? {
 							stateCellIndexes: ownedNodes.cellIndexes,
 							stateComputedIndexes: ownedNodes.computedIndexes,
+							...(ownedNodes.sharedSeedIndexes
+								? { stateSharedSeedIndexes: ownedNodes.sharedSeedIndexes }
+								: {}),
 						}
 					: {}),
 				...(servedComputedIndexes.length > 0 ? { servedComputedIndexes } : {}),

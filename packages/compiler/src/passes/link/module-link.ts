@@ -627,6 +627,8 @@ export type BarrelComponentLinkInput = {
 	readonly moduleInterface: (filename: string) => ModuleGraphInterfaceArtifact | null | undefined;
 	/** The specifier `parent` must use to import `target`. Path math is the driver's. */
 	readonly rebase: (target: string) => string;
+	/** Follow a `.tsrx` import's re-exports too, for an import already in `resolution`. */
+	readonly followTsrxImports?: boolean;
 };
 
 export type BarrelComponentLinkArtifact = {
@@ -751,7 +753,22 @@ export function linkBarrelComponents(
 			const sharedDefinition = targetInterface.sharedDefinitions?.some(
 				(candidate) => candidate.exportName === reexport.importedName,
 			);
-			if (!component && !sharedDefinition) continue;
+			if (!component && !sharedDefinition) {
+				// A `.tsrx` module re-exporting a component it does not declare: follow it, keeping the outer name.
+				const forwarded = walkBarrel(
+					target,
+					prefix,
+					new Set([...seen, filename]),
+					reexport.importedName,
+				);
+				for (const linked of forwarded.linkedComponents) {
+					linkedComponents.push({
+						...linked,
+						exportPath: [...exportPath, ...linked.exportPath.slice(prefix.length + 1)],
+					});
+				}
+				continue;
+			}
 			publishInterface(specifier, targetInterface);
 			linkChild(target, specifier);
 			if (component) {
@@ -778,11 +795,20 @@ export function linkBarrelComponents(
 
 	for (const moduleImport of input.moduleImports) {
 		if (moduleImport.typeOnly) continue;
-		if (TSRX_SOURCE_FILE.test(moduleImport.source)) continue;
 		if (!moduleImport.source.startsWith('.')) continue;
+		if (
+			TSRX_SOURCE_FILE.test(moduleImport.source) &&
+			!(
+				input.followTsrxImports &&
+				Object.hasOwn(input.resolution, moduleLinkResolutionKey(moduleImport.source, input.parent))
+			)
+		)
+			continue;
 		const barrel = resolveId(moduleImport.source, input.parent);
 		// An import that names no module in this build is not a barrel to follow.
 		if (barrel === undefined || barrel === null) continue;
+		const ownInterface = TSRX_SOURCE_FILE.test(barrel) ? readInterface(barrel) : undefined;
+		if (ownInterface === undefined && TSRX_SOURCE_FILE.test(barrel)) continue;
 		const selectedExport =
 			moduleImport.kind === 'default'
 				? 'default'
@@ -795,6 +821,13 @@ export function linkBarrelComponents(
 			new Set(),
 			selectedExport,
 		);
+		if (ownInterface !== undefined) {
+			// A `.tsrx` module keeps its own surface; only the components it re-exports are added.
+			if (ownInterface !== null && linkedComponents.length > 0) {
+				publishInterface(moduleImport.source, { ...ownInterface, linkedComponents });
+			}
+			continue;
+		}
 		if (linkedComponents.length === 0 && sharedReexports.length === 0) continue;
 		publishInterface(moduleImport.source, {
 			passId: 'module-graph-interface',
@@ -814,6 +847,24 @@ export function linkBarrelComponents(
 		pendingResolutions,
 		pendingInterfaces,
 	};
+}
+
+/**
+ * The interfaces a module compiles against: the barrel walk's entries under the
+ * linked ones, except that a `.tsrx` module's own interface keeps the
+ * components the walk found it re-exporting.
+ */
+export function overlayBarrelInterfaces(
+	barrel: Readonly<Record<string, ModuleGraphInterfaceArtifact>>,
+	linked: Readonly<Record<string, ModuleGraphInterfaceArtifact>>,
+): Record<string, ModuleGraphInterfaceArtifact> {
+	const interfaces = { ...barrel, ...linked };
+	for (const [key, entry] of Object.entries(linked)) {
+		const walked = barrel[key];
+		if (walked?.linkedComponents && walked.filename === entry.filename && walked !== entry)
+			interfaces[key] = mergeBarrelInterfaces(entry, walked);
+	}
+	return interfaces;
 }
 
 // Two interfaces published under one key for one resolved file: the halves the

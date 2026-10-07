@@ -1,6 +1,4 @@
-import { spawn, type ChildProcess } from 'node:child_process';
 import { cp, mkdir, mkdtemp, rm, symlink } from 'node:fs/promises';
-import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
 import { chromium, type Browser, type Page } from '@playwright/test';
@@ -8,6 +6,7 @@ import { createBuilder } from 'vite';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
+import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 
 // Links the fragment router must leave to the browser, or fetch no more than once:
 // in-page anchors, server endpoints, the document's own head scripts, and prefetches the user never takes.
@@ -17,19 +16,6 @@ vi.setConfig({ testTimeout: 30_000 });
 const packagesRoot = resolve(import.meta.dirname, '../../..');
 let origin = '';
 let close: (() => Promise<void>) | undefined;
-
-async function freePort(): Promise<number> {
-	return new Promise((resolvePort, reject) => {
-		const probe = createServer();
-		probe.once('error', reject);
-		probe.listen(0, '127.0.0.1', () => {
-			const address = probe.address();
-			probe.close(() =>
-				typeof address === 'object' && address ? resolvePort(address.port) : reject(),
-			);
-		});
-	});
-}
 
 beforeAll(async () => {
 	const root = await mkdtemp(join(tmpdir(), 'markless-fragment-edge-app-'));
@@ -51,23 +37,14 @@ beforeAll(async () => {
 		plugins: [markless(), router()],
 	});
 	await builder.buildApp();
-	const port = await freePort();
-	origin = `http://127.0.0.1:${port}`;
-	const server: ChildProcess = spawn(process.execPath, [join(root, '.output/server/index.mjs')], {
-		env: { PATH: process.env.PATH, PORT: String(port), HOST: '127.0.0.1' },
-		stdio: 'ignore',
+	const server = await startBuiltServer(join(root, '.output/server/index.mjs'), {
+		env: { PATH: process.env.PATH, HOST: '127.0.0.1' },
 	});
+	origin = server.origin;
 	close = async () => {
-		server.kill();
+		server.close();
 		await rm(root, { recursive: true, force: true });
 	};
-	for (let attempt = 0; attempt < 100; attempt += 1) {
-		try {
-			if ((await fetch(origin)).ok) return;
-		} catch {}
-		await new Promise((resolveWait) => setTimeout(resolveWait, 100));
-	}
-	throw new Error('fragment-edge-app fixture server did not start');
 }, 240_000);
 
 afterAll(async () => {

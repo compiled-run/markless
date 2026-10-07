@@ -1,9 +1,10 @@
-import { execFile, spawn } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { mkdir, rm, symlink } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { chromium, type Browser, type Page } from '@playwright/test';
 import { resolve } from 'pathe';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { startBuiltServer } from '../../../scripts/test-utils/built-server.ts';
 
 // Code the page preloaded is used in the input's own task: no request, and no task hop for an import().
 
@@ -25,7 +26,7 @@ afterAll(() =>
 	]),
 );
 
-const variants = [{ name: 'packed', port: 4218, env: {} }] as const;
+const variants = [{ name: 'packed', env: {} }] as const;
 
 type ProbeWindow = { armFlip(selector: string, present: boolean): void; flip: Promise<boolean> };
 
@@ -84,23 +85,12 @@ describe('routed first uses', () => {
 				cwd: app,
 				env: { ...process.env, ...variant.env },
 			});
-			const server = spawn(process.execPath, [resolve(app, '.output/server/index.mjs')], {
-				env: { ...process.env, PORT: String(variant.port), HOST: '127.0.0.1' },
-				stdio: 'ignore',
+			const server = await startBuiltServer(resolve(app, '.output/server/index.mjs'), {
+				env: { ...process.env, HOST: '127.0.0.1' },
 			});
 			const browser = await chromium.launch();
 			try {
-				const origin = `http://127.0.0.1:${variant.port}`;
-				await expect
-					.poll(
-						() =>
-							fetch(origin).then(
-								(response) => response.ok,
-								() => false,
-							),
-						{ timeout: 20_000 },
-					)
-					.toBe(true);
+				const { origin } = server;
 
 				const index = await open(browser, `${origin}/`);
 				const toggle = index.page.locator('[data-toggle]');
@@ -163,7 +153,7 @@ describe('routed first uses', () => {
 				expect(primedStart).toBe(true);
 			} finally {
 				await browser.close();
-				server.kill();
+				server.close();
 			}
 		}, 180_000);
 	}

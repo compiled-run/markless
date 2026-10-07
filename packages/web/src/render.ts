@@ -33,7 +33,10 @@ export type CsrRenderArtifact = {
 		| (() => PrerenderDataSurface | Promise<PrerenderDataSurface>);
 	readonly props?: unknown;
 	readonly renderCsr?: (props?: unknown) => CsrRenderOutput;
-	readonly renderSsr?: (props?: unknown) =>
+	readonly renderSsr?: (
+		props?: unknown,
+		renderContext?: { readonly elementIdScope?: string },
+	) =>
 		| {
 				readonly html: string;
 				readonly state?: ProtocolStatePayload;

@@ -495,6 +495,33 @@ none.
 it, so a family composed inside a `@pending` arm follows its parent only after
 the page's own registration ran.
 
+## What the 0.5.0 release fix changed
+
+**The return leg was missing a computed, not a channel.** A computed minted for
+a component-edge prop (`checked={checklist.value.includes(item.value)}`,
+`disabled={checklist.disabled || disabled === true}`) is read by the edge, not a
+chunk slot, so payload ownership gave it to the module's first component,
+`ChecklistRoot`. Every `checklist.item` then served it as a fixed cell and only
+the root carried the record, under the root's path. Ownership now goes to the
+component writing the edge (`packages/compiler/src/passes/public-render/shared.ts`),
+so each item's computed re-derives and the seed record already following it
+moves the composed checkbox. Every row this file skipped on "the items never
+re-read" is now a plain row, SSR included.
+
+**A looped item's click resolved to no widget.** A part dispatched inside a keyed
+row reads through a chain of adapters. The innermost one spells only the part's
+last edge and keeps that edge on the id for a row to answer; the next one out
+was already spelled with the row and took the kept edge for a rendered root. It
+now asks the registry with the whole path when the prefix is not a root
+(`packages/web/src/fns/instance-scope.ts`).
+
+**A served page routed the group's own props through its items' edges.** A
+module root remaps its output once more over the props it hands its own
+children, with no instance path. That pass also rewrote the root's seeds, so on a
+served page `checklist.disabled` followed the select-all's own `disabled` instead
+of the page's `locked`. Seeds now take that remap only from a composer
+(`packages/web/src/fns/composition.ts`).
+
 ## Framework limits this family ran into
 
 1. **A spread onto a component tag was dropped on the CSR side.** _(fixed)_

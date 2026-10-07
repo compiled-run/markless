@@ -1,5 +1,6 @@
 // Finalize rewrites code after Rolldown fixed names, so hashed names are re-derived from the shipped bytes.
 import { withoutMachinePaths } from './machine-paths.ts';
+import { DEBUGGING_PLAYBOOK_HINT } from '@markless/compiler';
 
 export type HashCharacters = 'base64' | 'base36' | 'hex';
 
@@ -384,7 +385,7 @@ export function staleChunkNamesMessage(stale: readonly StaleChunkName[]): string
 		.map((entry) => `- ${entry.fileName} (bytes hash to ${entry.expected})`)
 		.join(
 			'\n',
-		)}\nA plugin rewrote chunk code after the Markless finalize pass renamed chunks. markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package`;
+		)}\nA plugin rewrote chunk code after the Markless finalize pass renamed chunks. ${DEBUGGING_PLAYBOOK_HINT}`;
 }
 
 // Chunks name each other through stable specifiers; the document's import map carries the hashed names.

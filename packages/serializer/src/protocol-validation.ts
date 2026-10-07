@@ -501,6 +501,16 @@ function assertOptionalKeyedRepeats(record: Record<string, unknown>): void {
 		assertOptionalStringField(repeat, 'collectionGraphNodeId', context);
 		assertStringArrayField(repeat, 'collectionPath', context);
 		assertStringArrayField(repeat, 'keyPath', context);
+		if (repeat.indexKey !== undefined && repeat.indexKey !== true)
+			throw invalidPayloadShapeError(
+				'markless/view',
+				`Invalid ${context}: expected indexKey true when present.`,
+			);
+		if (repeat.branchArm !== undefined) {
+			assertRecordShape(repeat.branchArm, `${context}.branchArm`);
+			assertStringField(repeat.branchArm, 'branchId', `${context}.branchArm`);
+			assertNonNegativeIntegerField(repeat.branchArm, 'arm', `${context}.branchArm`);
+		}
 		assertStringField(repeat, 'itemName', context);
 		assertNonNegativeIntegerField(repeat, 'rowElementCount', context);
 		if (repeat.rowStartOffset !== undefined)
@@ -544,7 +554,8 @@ function assertOptionalRowComponent(record: Record<string, unknown>, context: st
 	const rowComponent = record.rowComponent;
 	if (rowComponent === undefined) return;
 	assertRecordShape(rowComponent, context);
-	assertStringField(rowComponent, 'componentEdgeId', context);
+	if (rowComponent.rowChunkId === undefined) assertStringField(rowComponent, 'componentEdgeId', context);
+	else assertStringField(rowComponent, 'rowChunkId', context);
 	assertStringField(rowComponent, 'componentName', context);
 	assertOptionalStringField(rowComponent, 'itemPropName', context);
 	if (rowComponent.slotPath !== undefined)

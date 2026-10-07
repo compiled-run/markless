@@ -2996,7 +2996,7 @@ export function Widget() @{
 		(candidate) => candidate.code === 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
 	);
 	expect(diagnostic?.message).toBe(
-		'<Widget> contains an @try block, but <Widget> is a helper component in the same file as the page. Its @try/@pending/@catch content is dropped from the rendered HTML. markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package',
+		'<Widget> contains an @try block, but <Widget> is a helper component in the same file as the page. Its @try/@pending/@catch content is dropped from the rendered HTML. markless debugging playbook: run the doctor script (npm run doctor), or read agent/markless.md in the installed @markless/core package',
 	);
 	expect(diagnostic?.suggestions?.[0]?.message).toBe(
 		'Move <Widget> into its own .tsrx file and import it, or move the @try block into the page component.',

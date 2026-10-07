@@ -821,6 +821,8 @@ function virtualModulesPlugin(
 				if (!entryFile) {
 					return undefined;
 				}
+				// Pages ship this helper to the client, and it reads nothing from the app root.
+				if (baseId === ROUTE_HREF_ID) return join(VIRTUAL_ENTRY_DIR, entryFile);
 				return `${join(VIRTUAL_ENTRY_DIR, entryFile)}${rootScopeQuery(root, id)}`;
 			},
 		},

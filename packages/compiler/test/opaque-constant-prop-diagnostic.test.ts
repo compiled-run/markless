@@ -150,3 +150,62 @@ export function Sidebar() @{
 		'prop "group" for "Group" is the runtime expression "loadGroups()[0]"',
 	);
 });
+
+// A keyed row's item is data the row was rendered from, and a changed item
+// rebuilds the row, so a DOM update reading it never needs it live. A handler
+// still does, and a value that is not the row's keeps the refusal.
+test('a prop passed a keyed row value binds a DOM update, and a handler still refuses it', async () => {
+	const rowParent = (expression: string) =>
+		compileParent(`
+import { Group } from './Group.tsrx';
+
+const SECTIONS = [{ id: 'intro', title: 'Intro' }, { id: 'outro', title: 'Outro' }];
+
+export function Sidebar() @{
+	<nav>
+		@for (const section of SECTIONS; key section.id) {
+			<Group group={${expression}} />
+		}
+	</nav>
+}
+`);
+
+	expect(opaqueDiagnostics(await rowParent('section'))).toEqual([]);
+	expect(opaqueDiagnostics(await rowParent('{ title: section.title }'))).toEqual([]);
+	expect(opaqueDiagnostics(await rowParent('pick(section)'))).toHaveLength(1);
+
+	const child = await compileTsrxModule({
+		filename: 'src/Group.tsrx',
+		source: `export function Group({ group }) @{
+	<button onClick={() => console.log(group.title)}>{group.title}</button>
+}`,
+		symbols: [],
+	});
+	const handler = child.captureAnalysis.extractedSymbols.find(
+		(symbol) => symbol.kind === 'event-handler',
+	)!;
+	const handlerParent = await compileTsrxModule({
+		filename: 'src/Sidebar.tsrx',
+		source: `
+import { Group } from './Group.tsrx';
+const SECTIONS = [{ id: 'intro', title: 'Intro' }];
+export function Sidebar() @{
+	<nav>
+		@for (const section of SECTIONS; key section.id) {
+			<Group group={section} />
+		}
+	</nav>
+}
+`,
+		symbols: [
+			{
+				id: 'imported:Group:symbol:click',
+				chunk: 'virtual:markless:symbol:Group:click',
+				exportName: 'groupClick',
+				componentEdgeId: 'component-edge:0',
+				captureSymbol: handler,
+			},
+		],
+	});
+	expect(opaqueDiagnostics(handlerParent)).toHaveLength(1);
+});

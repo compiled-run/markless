@@ -23,6 +23,7 @@ import {
 } from './shared-seed-pass.ts';
 import {
 	componentOwnedStateNodes,
+	selectedStateNodeArguments,
 	componentPropNames,
 	destructureProps,
 	stateEntries,
@@ -103,9 +104,7 @@ export function emitSameModuleSsrComponents(
 		const valuesName = `marklessSsrStateValues${componentName}`;
 		const localName = localNames.get(componentName);
 		const dataLines = componentDataLines(componentName);
-		const payloadStateExpression = `marklessSelectStateNodes(marklessCloneState(payloadState), ${JSON.stringify(
-			owned.cellIndexes,
-		)}, ${JSON.stringify(owned.computedIndexes)})`;
+		const payloadStateExpression = `marklessSelectStateNodes(marklessCloneState(payloadState), ${selectedStateNodeArguments(owned)})`;
 		return [
 			`const ${valuesName} = new Map([`,
 			stateEntries(input, owned.seedCellIndexes).join(',\n'),

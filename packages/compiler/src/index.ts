@@ -3,6 +3,7 @@ export type * from './diagnostics.ts';
 export type * from './type-service.ts';
 
 export { collectTsrxModuleDiagnostics } from './collect-diagnostics.ts';
+export { DEBUGGING_PLAYBOOK_HINT } from './debugging-playbook.ts';
 export { compileTsrxModule } from './compile-module.ts';
 export { compileTsrxForTypeService, compile_to_volar_mappings } from './type-service.ts';
 export { parseJavaScriptModule, type JavaScriptAstNode } from './js-ast.ts';
@@ -51,6 +52,7 @@ export type {
 export {
 	MODULE_LINK_PASS_ID,
 	linkBarrelComponents,
+	overlayBarrelInterfaces,
 	linkImportedModules,
 	linkedChildrenHaveBrowserTriggers,
 	linkedImportedClaimKind,

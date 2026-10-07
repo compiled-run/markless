@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import type { EnvironmentOptions, UserConfig } from 'vite';
 import { join } from 'pathe';
@@ -91,6 +91,24 @@ describe('Vite config integration', () => {
 			RESUME_ENTRY_SPECIFIER,
 			STORAGE_FREE_RESUME_ENTRY_SPECIFIER,
 		]);
+	});
+
+	test('keeps a dependency that ships Markless source out of the dev pre-bundle', () => {
+		const plugin = getMarklessPlugin();
+		const root = installedCoreRoot('installed-ships-source');
+		writeFileSync(
+			join(root, 'package.json'),
+			JSON.stringify({ dependencies: { '@markless/core': '1.0.0', '@acme/kit': '1.0.0' } }),
+		);
+		mkdirSync(join(root, 'node_modules', '@acme', 'kit'), { recursive: true });
+		writeFileSync(
+			join(root, 'node_modules', '@acme', 'kit', 'package.json'),
+			JSON.stringify({ name: '@acme/kit', publishConfig: { marklessShipsSource: true } }),
+		);
+		const config: UserConfig = { root };
+		callConfig(plugin, config, { command: 'serve' });
+
+		expect(config.optimizeDeps?.exclude).toEqual(['@acme/kit']);
 	});
 
 	test('leaves the dependency optimizer alone for production builds', () => {

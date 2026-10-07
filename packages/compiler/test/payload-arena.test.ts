@@ -464,6 +464,49 @@ export function App() @{
 	]);
 });
 
+test('planPayloadArena serializes array, object and module-constant behavior inputs', async () => {
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/ConstantBehaviorInputs.tsrx',
+		source: `
+const PALETTE = { accent: 'teal', steps: [1, 2] };
+const PULSE = [PALETTE.accent];
+
+function paint(colors: readonly string[], options: { readonly loop: boolean }) {
+	return (element: HTMLElement) => element.setAttribute('data-colors', colors.join(options.loop ? '+' : ','));
+}
+
+export function Gallery({ tone }: { readonly tone: string }) @{
+	<ul>
+		<li attach={paint(['x', 'y'], { loop: true })} />
+		<li attach={paint(PULSE, PALETTE)} />
+		<li attach={paint(tone, { loop: false })} />
+	</ul>
+}
+`,
+	});
+	const payload = planPayloadArena({
+		semanticGraph,
+		stateLowering: lowerStateAccess({ semanticGraph }),
+	});
+
+	expect(
+		payload.view.behaviors.map(({ hostNodeId, inputValues, inputGraphReads }) => ({
+			hostNodeId,
+			inputValues,
+			reads: inputGraphReads?.map((read) => read.inputIndex),
+		})),
+	).toEqual([
+		{ hostNodeId: 'h1', inputValues: [['x', 'y'], { loop: true }], reads: undefined },
+		{
+			hostNodeId: 'h2',
+			inputValues: [['teal'], { accent: 'teal', steps: [1, 2] }],
+			reads: undefined,
+		},
+		{ hostNodeId: 'h3', inputValues: [null, { loop: false }], reads: [0] },
+	]);
+	expect(payload.view.behaviors.some((behavior) => 'constantInputs' in behavior)).toBe(false);
+});
+
 test('planPayloadArena classifies class and style binding targets', async () => {
 	const semanticGraph = await buildSemanticGraph({
 		filename: 'src/ClassStyleTargets.tsrx',

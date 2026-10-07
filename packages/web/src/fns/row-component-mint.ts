@@ -410,7 +410,9 @@ function renderComponentRow(input: ComponentRowInput): Awaitable<RenderedCompone
 							),
 						surface: owner.surface,
 						ownerComponentName: rowComponent.componentName,
-						componentEdgeId: rowComponent.componentEdgeId,
+						...(rowComponent.rowChunkId
+							? { rowChunkId: rowComponent.rowChunkId }
+							: { componentEdgeId: rowComponent.componentEdgeId }),
 						itemPropName: rowComponent.itemPropName,
 						item: input.item,
 						rowKey: input.rowKey,
@@ -418,6 +420,9 @@ function renderComponentRow(input: ComponentRowInput): Awaitable<RenderedCompone
 						loadSymbol: input.loadSymbol,
 						read: ownerSpaceRead(input.graph, owner, instanceScopeModule),
 						idPrefix: hostPrefix,
+						...(input.surface.elementIdScope
+							? { elementIdScope: input.surface.elementIdScope }
+							: {}),
 						symbolPrefix: owner.symbolPrefix,
 						enclosingWidgetRoots: input.enclosing.roots,
 						enclosingInstancePath: rowInstancePath,

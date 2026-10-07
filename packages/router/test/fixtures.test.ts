@@ -47,13 +47,19 @@ test('router docs fixture exposes MDX docs routes and catch-all types', async ()
 	const declaration = createRouteTypesDeclaration(manifest);
 
 	expect(files).toEqual([
+		'components/barrel.ts',
 		'components/docs/Sidebar.tsrx',
 		'components/layouts/DocsLayout.tsrx',
+		'components/spell/index.ts',
+		'components/spell/spell.tsrx',
+		'components/Spelling.tsrx',
 		'document.tsrx',
 		'package.json',
 		'pages/docs/[...slug].mdx',
 		'pages/docs/index.mdx',
 		'pages/index.mdx',
+		'pages/spelled.mdx',
+		'pages/spelling.tsrx',
 		'tsconfig.json',
 		'vite.config.ts',
 	]);
@@ -61,6 +67,8 @@ test('router docs fixture exposes MDX docs routes and catch-all types', async ()
 		['/', 'pages/index.mdx'],
 		['/docs', 'pages/docs/index.mdx'],
 		['/docs/**', 'pages/docs/[...slug].mdx'],
+		['/spelled', 'pages/spelled.mdx'],
+		['/spelling', 'pages/spelling.tsrx'],
 	]);
 	expect(declaration).toContain(
 		'export type MarklessRouterRoutePattern =\n\t| "/docs/[...slug]";',

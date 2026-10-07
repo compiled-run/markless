@@ -5,9 +5,9 @@ import {
 import type { SsrDataChunk } from './renderer.ts';
 
 /**
- * The two fields a served branch record carries when its arms bind an element()
- * handle an IDREF names: the ids THIS render minted, and the positions outside
- * the arms that name them.
+ * The fields a served branch record carries when its arms hold an element()
+ * handle an IDREF names: the ids THIS render minted, and the omittable positions
+ * outside the arms that name them.
  *
  * A minted id is the rendered widget's instance token plus the handle, and that
  * token is a seed-map value no flip can reach — so the render that served the
@@ -23,7 +23,7 @@ export type BranchArmIdrefResolution = {
 	readonly idrefSites?: ReadonlyArray<ProtocolBranchIdrefSite>;
 };
 
-/** Every handle this branch's arms bind, against the arm that binds it. */
+/** Every handle this branch's arms carry the id of, or name through an always-written IDREF. */
 function armMintedHandles(
 	chunks: ReadonlyArray<SsrDataChunk>,
 	armChunkIds: ReadonlyArray<string>,
@@ -34,7 +34,7 @@ function armMintedHandles(
 			if (
 				slot.kind === 'attribute' &&
 				slot.residue.kind === 'element-handle-id' &&
-				slot.residue.idref !== true &&
+				(slot.residue.idref !== true || slot.alwaysPresent === true) &&
 				!handles.has(slot.residue.handleGraphNodeId)
 			)
 				handles.set(slot.residue.handleGraphNodeId, armIndex);
@@ -50,12 +50,16 @@ export function branchArmIdrefResolution(
 	const handles = armMintedHandles(chunks, armChunkIds);
 	if (handles.size === 0) return {};
 	const sites: Array<ProtocolBranchIdrefSite> = [];
+	let named = false;
 	for (const chunk of chunks)
 		for (const slot of chunk.slots) {
 			if (slot.kind !== 'attribute' || slot.residue.kind !== 'element-handle-id') continue;
 			if (slot.residue.idref !== true) continue;
 			const armIndex = handles.get(slot.residue.handleGraphNodeId);
 			if (armIndex === undefined) continue;
+			named = true;
+			// An always-written IDREF names its handle whatever arm is painted: it needs the id, not a site.
+			if (slot.alwaysPresent) continue;
 			// An attribute slot's coordinate is its host's own position, so the host
 			// it sits on is the one at the same path in the same chunk.
 			const path = slot.coordinate.path.join('.');
@@ -68,7 +72,7 @@ export function branchArmIdrefResolution(
 					armIndex,
 				});
 		}
-	if (sites.length === 0) return {};
+	if (!named) return {};
 	const elementHandleIds: Record<string, string> = {};
 	for (const handle of handles.keys()) {
 		const id = mint(handle);

@@ -1,15 +1,17 @@
-import { spawn } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { mkdir, mkdtemp, rm, symlink } from 'node:fs/promises';
-import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
+import { promisify } from 'node:util';
 import { join, resolve } from 'pathe';
 import { createBuilder } from 'vite';
 import { afterEach, expect, test } from 'vitest';
+import { startBuiltServer } from '../../../scripts/test-utils/built-server.ts';
 import { CreateProgram, STARTER_CHOICES, type Starter } from '../src/index.ts';
 import { createNodeRuntime } from '../src/node-runtime.ts';
 
 const repoRoot = resolve(import.meta.dirname, '../../..');
 const cleanups: Array<() => Promise<void> | void> = [];
+const execFileAsync = promisify(execFile);
 
 afterEach(async () => {
 	for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
@@ -65,45 +67,15 @@ async function scaffold(starter: Starter): Promise<string> {
 	return appRoot;
 }
 
-async function freePort(): Promise<number> {
-	return new Promise((resolvePort, reject) => {
-		const server = createServer();
-		server.once('error', reject);
-		server.listen(0, () => {
-			const address = server.address();
-			server.close(() =>
-				typeof address === 'object' && address
-					? resolvePort(address.port)
-					: reject(new Error('no port')),
-			);
-		});
+// The scaffold's own `check` script: formatting under its vite config's fmt settings, then lint.
+async function check(appRoot: string): Promise<string> {
+	const result = await execFileAsync(join(repoRoot, 'node_modules/.bin/vp'), ['check'], {
+		cwd: appRoot,
+		env: { ...process.env, NO_COLOR: '1' },
+	}).catch((error: { stdout?: string; stderr?: string }) => {
+		throw new Error(`vp check failed:\n${error.stdout ?? ''}${error.stderr ?? ''}`);
 	});
-}
-
-// Another suite can take the probed port before this server binds, so readiness means serving
-// this starter's own page, and a server that exits (port taken) is retried on a new port.
-async function serve(appRoot: string, starter: Starter): Promise<string> {
-	const [readyPath, readyText] = servedPages[starter][0];
-	for (let bind = 0; bind < 3; bind++) {
-		const port = await freePort();
-		const server = spawn(process.execPath, [join(appRoot, '.output/server/index.mjs')], {
-			cwd: appRoot,
-			env: { ...process.env, PORT: String(port) },
-			stdio: 'ignore',
-		});
-		cleanups.push(() => void server.kill());
-		const origin = `http://localhost:${port}`;
-		for (let attempt = 0; attempt < 100 && server.exitCode === null; attempt++) {
-			const ours = await fetch(new URL(readyPath, origin)).then(
-				async (response) => response.ok && (await response.text()).includes(readyText),
-				() => false,
-			);
-			if (ours) return origin;
-			await new Promise((wait) => setTimeout(wait, 100));
-		}
-		if (server.exitCode === null) throw new Error('built server never served its first page');
-	}
-	throw new Error('built server could not bind a port');
+	return result.stdout + result.stderr;
 }
 
 test('the starter list this build covers is the list the CLI offers', () => {
@@ -116,18 +88,28 @@ test.each(STARTER_CHOICES.map((choice) => choice.value))(
 	'a freshly scaffolded %s starter builds with its own vite config and serves its pages',
 	async (starter) => {
 		const appRoot = await scaffold(starter);
+		await check(appRoot);
 		const builder = await createBuilder({
 			root: appRoot,
 			configFile: join(appRoot, 'vite.config.ts'),
 			logLevel: 'silent',
 		});
 		await builder.buildApp();
+		await check(appRoot);
 
-		const origin = await serve(appRoot, starter);
+		const server = await startBuiltServer(join(appRoot, '.output/server/index.mjs'), {
+			cwd: appRoot,
+		});
+		cleanups.push(() => server.close());
+		const { origin } = server;
 		for (const [path, text] of servedPages[starter]) {
 			const response = await fetch(new URL(path, origin));
 			expect(response.status, path).toBe(200);
-			expect(await response.text(), path).toContain(text);
+			const html = await response.text();
+			expect(html, path).toContain(text);
+			if (response.headers.get('content-type')?.startsWith('text/html')) {
+				expect(html, path).toContain('<title>app</title>');
+			}
 		}
 	},
 	180_000,

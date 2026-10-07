@@ -454,6 +454,18 @@ export type ProtocolViewPayload = {
 		readonly collectionGraphNodeId?: string;
 		readonly collectionPath: ReadonlyArray<string>;
 		readonly keyPath: ReadonlyArray<string>;
+		/**
+		 * `key i`: a row's key is its position, not a value read off the item.
+		 * Pay-per-use: a repeat keyed by item data omits the field.
+		 */
+		readonly indexKey?: true;
+		/**
+		 * Rows written straight into an `@if`/`@switch` arm, with no element of the
+		 * arm around them: they stand between that branch's anchors, and only while
+		 * `arm` is the one shown. `branchId` is spelled as the authoring module spells
+		 * it; composition prefixes it the way it prefixes this record's `id`.
+		 */
+		readonly branchArm?: { readonly branchId: string; readonly arm: number };
 		readonly itemName: string;
 		readonly rowElementCount: number;
 		/**
@@ -558,12 +570,17 @@ export type ProtocolViewPayload = {
 		 * Carried only for a key-identified repeat whose row start is known and
 		 * whose child is declared in the same module; anything else is refused, so
 		 * the served behaviour stands and the record is byte-identical.
+		 *
+		 * `rowChunkId` replaces `componentEdgeId` for a row whose markup an @if or
+		 * @switch over the row item picks: the client renders that owner chunk
+		 * whole, the way the server did, instead of one edge.
 		 */
 		readonly rowComponent?: {
-			readonly componentEdgeId: string;
+			readonly componentEdgeId?: string;
 			readonly componentName: string;
 			readonly itemPropName?: string;
 			readonly slotPath?: ReadonlyArray<number>;
+			readonly rowChunkId?: string;
 		};
 		readonly rowElementHandles?: ReadonlyArray<{
 			readonly hostPath: ReadonlyArray<number>;

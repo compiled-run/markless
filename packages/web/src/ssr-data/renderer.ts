@@ -1,3 +1,4 @@
+import { PROJECTION_MARK_PATTERN, PROJECTION_MARK_PREFIX } from '../fns/projection-html.ts';
 import { marklessAttributeValue } from '../dom-attribute.ts';
 import {
 	MARKLESS_DEFERRED_COUNT_CLOSE,
@@ -275,18 +276,16 @@ export type StructureToken =
 type RenderedPart = { readonly html: string; readonly tokens: ReadonlyArray<StructureToken> };
 
 /**
- * Defect 97. The HTML side splices a projection INSIDE the child, at the
+ * The HTML side splices a projection INSIDE the child, at the
  * `{children}` position; the token side used to append it after the child's own
  * tokens, so the served locator table stopped naming the element a document walk
  * reaches at that index. The child is the only party that knows where its
  * `{children}` landed, so the projection's token span rides the projection HTML
  * into the child render and the child's own `{children}` slot reports it back:
  * `renderChunk` then sorts it by that slot's coordinate, exactly as it sorts the
- * child's own hosts. The mark below is the carrier. It is stripped by the same
- * slot that reports the tokens, so it never reaches the served bytes.
+ * child's own hosts. The projection mark is the carrier. It is stripped by the
+ * same slot that reports the tokens, so it never reaches the served bytes.
  */
-const PROJECTION_MARK_PREFIX = '<!--markless-projection:';
-const PROJECTION_MARK_PATTERN = /<!--markless-projection:(\d+)-->/g;
 
 type ProjectionSpan = {
 	readonly key: string;
@@ -514,6 +513,28 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 		});
 	}
 
+	// `{children}` in an arm not taken serves no projection: spend its span, count no tokens.
+	function releaseSkippedProjections(
+		chunkIds: ReadonlyArray<string | undefined>,
+		context: SsrDataReadContext,
+	): void {
+		for (const chunkId of chunkIds)
+			for (const slot of (chunkId && chunks.get(chunkId)?.slots) || []) {
+				if (slot.kind === 'text') {
+					const value =
+						slot.raw && slot.residue.kind === 'graph-read' ? input.read(slot.residue, context) : 0;
+					if (typeof value === 'string') claimProjectionSpans(value, false);
+				} else if (slot.kind === 'branch') releaseSkippedProjections(slot.armTemplateIds, context);
+				else if (slot.kind === 'async')
+					releaseSkippedProjections(Object.values(slot.armTemplateIds), context);
+				else if (slot.kind === 'repeat')
+					releaseSkippedProjections([slot.rowTemplateId, slot.emptyTemplateId], context);
+				else if (slot.kind === 'child-component')
+					releaseSkippedProjections([slot.projectionChunkId], context);
+				else if (slot.kind === 'dynamic-host') releaseSkippedProjections([slot.childChunkId], context);
+			}
+	}
+
 	function renderSlot(slot: SsrDataSlot, context: SsrDataReadContext): Awaitable<RenderedPart> {
 		switch (slot.kind) {
 			case 'text':
@@ -648,6 +669,10 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 								})
 							: ({ html: '', tokens: [] } as RenderedPart),
 						(body): RenderedPart => {
+							releaseSkippedProjections(
+								slot.armTemplateIds.filter((_, index) => index !== arm),
+								context,
+							);
 							const id = `${idPrefix}${slot.branchSiteId}`;
 							const marker = input.renderData.branches?.some(
 								(branch) =>

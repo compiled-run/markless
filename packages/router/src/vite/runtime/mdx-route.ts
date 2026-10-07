@@ -304,7 +304,9 @@ export async function renderMdxChild(
 	// Each island renders under its own roster context and answers its own
 	// counts here: this render is the only place the island's handles are still
 	// spelled the way the counts it minted name them.
-	const renderContext = marklessSsrRosterPositionContext(undefined);
+	// The island's segment leads its minted element() ids: every island composes
+	// from its own root, and the page's client surface spells them under it too.
+	const renderContext = marklessSsrRosterPositionContext({ elementIdScope: child.hostPrefix });
 	const rendered = await renderWithMdxChildren(component, props, child, renderContext);
 	const output =
 		rendered && typeof rendered.html === 'string'

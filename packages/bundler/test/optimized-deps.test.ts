@@ -1,9 +1,13 @@
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import type { UserConfig } from 'vite';
-import { join } from 'pathe';
+import { dirname, join } from 'pathe';
 import { afterAll, describe, expect, test } from 'vitest';
-import { includeOptimizedDeps, optimizedDepsToInclude } from '../src/optimized-deps.ts';
+import {
+	excludeSourceShippedDeps,
+	includeOptimizedDeps,
+	optimizedDepsToInclude,
+} from '../src/optimized-deps.ts';
 import {
 	RESUME_ENTRY_SPECIFIER,
 	STORAGE_FREE_RESUME_ENTRY_SPECIFIER,
@@ -162,5 +166,117 @@ describe('includeOptimizedDeps', () => {
 		};
 		includeOptimizedDeps(config, RESUME_ENTRIES);
 		expect(config.optimizeDeps?.include).toEqual(RESUME_ENTRIES);
+	});
+});
+
+// An app whose package.json names its dependencies, each installed with its own manifest.
+function appWith(
+	name: string,
+	dependencies: Record<string, Record<string, unknown>>,
+	options: { readonly layout?: 'flat' | 'pnpm'; readonly dev?: readonly string[] } = {},
+) {
+	const root = join(directory, name);
+	mkdirSync(root, { recursive: true });
+	const names = Object.keys(dependencies);
+	const dev = new Set(options.dev ?? []);
+	writeFileSync(
+		join(root, 'package.json'),
+		JSON.stringify({
+			dependencies: Object.fromEntries(
+				names.filter((n) => !dev.has(n)).map((n) => [n, '1.0.0']),
+			),
+			devDependencies: Object.fromEntries(
+				names.filter((n) => dev.has(n)).map((n) => [n, '1.0.0']),
+			),
+		}),
+	);
+	for (const [dependency, manifest] of Object.entries(dependencies)) {
+		const visible = join(root, 'node_modules', dependency);
+		const installed =
+			options.layout === 'pnpm'
+				? join(
+						root,
+						'node_modules',
+						'.pnpm',
+						`${dependency.replace('/', '+')}@1.0.0`,
+						'node_modules',
+						dependency,
+					)
+				: visible;
+		mkdirSync(installed, { recursive: true });
+		writeFileSync(
+			join(installed, 'package.json'),
+			JSON.stringify({ name: dependency, ...manifest }),
+		);
+		if (installed !== visible) {
+			mkdirSync(dirname(visible), { recursive: true });
+			symlinkSync(installed, visible, 'dir');
+		}
+	}
+	return root;
+}
+
+const SHIPS_SOURCE = { publishConfig: { marklessShipsSource: true }, exports: './src/index.ts' };
+
+describe('excludeSourceShippedDeps', () => {
+	test('excludes a dependency that declares it ships Markless source', () => {
+		const config: UserConfig = {
+			root: appWith('ships-flat', { '@acme/kit': SHIPS_SOURCE, destr: {} }),
+		};
+		excludeSourceShippedDeps(config);
+		expect(config.optimizeDeps?.exclude).toEqual(['@acme/kit']);
+	});
+
+	test('reads the declaration through a pnpm store link and from devDependencies', () => {
+		const config: UserConfig = {
+			root: appWith(
+				'ships-pnpm',
+				{ 'widgets-src': SHIPS_SOURCE, destr: {} },
+				{ layout: 'pnpm', dev: ['widgets-src'] },
+			),
+		};
+		excludeSourceShippedDeps(config);
+		expect(config.optimizeDeps?.exclude).toEqual(['widgets-src']);
+	});
+
+	test('excludes a source-shipping dependency of a source-shipping dependency', () => {
+		const root = appWith('ships-nested', {
+			'@acme/kit': { ...SHIPS_SOURCE, dependencies: { '@acme/parts': '1.0.0' } },
+		});
+		const nested = join(root, 'node_modules', '@acme', 'kit', 'node_modules', '@acme', 'parts');
+		mkdirSync(nested, { recursive: true });
+		writeFileSync(
+			join(nested, 'package.json'),
+			JSON.stringify({ name: '@acme/parts', ...SHIPS_SOURCE }),
+		);
+		const config: UserConfig = { root };
+		excludeSourceShippedDeps(config);
+		expect(config.optimizeDeps?.exclude).toEqual(['@acme/kit', '@acme/parts']);
+	});
+
+	test('keeps a consumer exclude and does not duplicate an entry', () => {
+		const config: UserConfig = {
+			root: appWith('ships-consumer', { '@acme/kit': SHIPS_SOURCE }),
+			optimizeDeps: { exclude: ['other', '@acme/kit'] },
+		};
+		excludeSourceShippedDeps(config);
+		expect(config.optimizeDeps?.exclude).toEqual(['other', '@acme/kit']);
+	});
+
+	test('leaves optimizeDeps untouched when no dependency ships source', () => {
+		const config: UserConfig = { root: appWith('ships-none', { destr: {} }) };
+		excludeSourceShippedDeps(config);
+		expect(config.optimizeDeps).toBeUndefined();
+	});
+
+	test('skips a dependency that is named but not installed', () => {
+		const root = appWith('ships-missing', {});
+		writeFileSync(
+			join(root, 'package.json'),
+			JSON.stringify({ dependencies: { ghost: '1.0.0' } }),
+		);
+		const config: UserConfig = { root };
+		excludeSourceShippedDeps(config);
+		expect(config.optimizeDeps).toBeUndefined();
 	});
 });

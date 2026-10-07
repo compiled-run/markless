@@ -7,12 +7,11 @@
 //
 // A snapshot keeps the served page's HTML too, so the eager fetch set (the
 // `page-load download` stage) can be attributed per chunk.
-import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { createServer } from 'node:net';
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { gzipSync } from 'node:zlib';
+import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 
 const MODULEPRELOAD_LINK =
 	/<link\b[^>]*\brel=(?:"modulepreload"|'modulepreload'|modulepreload(?=[\s/>]))[^>]*\bhref=(?:"([^"]+)"|'([^']+)'|([^\s>]+))/g;
@@ -123,34 +122,15 @@ function chunkName(href) {
 }
 
 async function servedPage(demo) {
-	const port = await freePort();
-	const server = spawn(process.execPath, [resolve(demo, '.output/server/index.mjs')], {
+	const server = await startBuiltServer(resolve(demo, '.output/server/index.mjs'), {
 		cwd: demo,
-		env: { ...process.env, HOST: '127.0.0.1', PORT: String(port) },
-		stdio: ['ignore', 'pipe', 'pipe'],
+		env: { ...process.env, HOST: '127.0.0.1' },
 	});
 	try {
-		const deadline = Date.now() + 60_000;
-		while (Date.now() < deadline) {
-			try {
-				const response = await fetch(`http://127.0.0.1:${port}/`);
-				if (response.ok) return await response.text();
-			} catch {}
-			await new Promise((settle) => setTimeout(settle, 250));
-		}
-		throw new Error('built server never answered /');
+		const response = await fetch(`${server.origin}/`);
+		if (!response.ok) throw new Error(`built server answered / with ${response.status}`);
+		return await response.text();
 	} finally {
-		server.kill('SIGKILL');
+		server.close('SIGKILL');
 	}
-}
-
-function freePort() {
-	return new Promise((settle, fail) => {
-		const probe = createServer();
-		probe.once('error', fail);
-		probe.listen(0, '127.0.0.1', () => {
-			const { port } = probe.address();
-			probe.close(() => settle(port));
-		});
-	});
 }

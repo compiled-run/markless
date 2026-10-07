@@ -338,7 +338,7 @@ test('a minted key that leaves detaches and gives the census back', async () => 
 	expect(census()).toEqual(elementsUnder(root));
 });
 
-test('a minted key that comes back reuses its own row instead of building a second', async () => {
+test('a minted key that comes back gets a fresh row, not the one that left', async () => {
 	const { builds, write, list, labels } = fixture();
 	const grown = [
 		{ id: 'a', label: 'alpha' },
@@ -354,8 +354,8 @@ test('a minted key that comes back reuses its own row instead of building a seco
 	]);
 	await write(grown);
 
-	expect(builds.count).toBe(1);
-	expect(list.childNodes[3]).toBe(minted);
+	expect(builds.count).toBe(2);
+	expect(list.childNodes[3]).not.toBe(minted);
 	expect(labels()).toEqual(['header', 'alpha', 'bravo', 'charlie', 'footer']);
 });
 

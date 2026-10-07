@@ -9,6 +9,7 @@ import type {
 } from 'vite';
 import type { OutputOptions } from 'rolldown';
 import { resolve } from 'pathe';
+import { DEBUGGING_PLAYBOOK_HINT } from '@markless/compiler';
 import { joinURL, parsePath, withQuery } from 'ufo';
 import { createPreloadGraphAdder } from '../build/bundle-graph.ts';
 import {
@@ -24,7 +25,7 @@ import { deferredRuntimePlugin } from '../build/deferred-runtime.ts';
 import { prefetchChunkParses } from '../build/chunk-ast.ts';
 import { nativePackingPlugins } from '../build/native-packing.ts';
 import { DEPRECATED_NATIVE_PACKING_WARNING, nativePackingEnabled } from '../packing-option.ts';
-import { includeOptimizedDeps } from '../optimized-deps.ts';
+import { excludeSourceShippedDeps, includeOptimizedDeps } from '../optimized-deps.ts';
 import { RESUME_ENTRY_SPECIFIER, STORAGE_FREE_RESUME_ENTRY_SPECIFIER } from '../source-module.ts';
 import { createMarklessRolldownPlugin } from '../rolldown.ts';
 import { sharedReachedRenderDataRequest } from '../virtual-ids.ts';
@@ -47,6 +48,7 @@ import {
 	viteEnvironmentName,
 } from './environment.ts';
 import { createViteHmr } from './hmr.ts';
+import { installDevRuntimeImportResolution } from './dev-runtime-imports.ts';
 
 export type {
 	BundleGraphAdder,
@@ -189,6 +191,7 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 					RESUME_ENTRY_SPECIFIER,
 					STORAGE_FREE_RESUME_ENTRY_SPECIFIER,
 				]);
+				excludeSourceShippedDeps(config);
 			}
 			// MARKLESS_PRERENDER apps keep their entry regardless of the wake
 			// channel; only the shell prerender itself stays MARKLESS_PRERENDER's.
@@ -291,7 +294,7 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 		},
 		configureServer(server: ViteDevServer) {
 			server.config.logger?.info(
-				'markless diagnostics available - window.__MARKLESS_DEBUG__ records containers, lifecycles, and event routing; markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package.',
+				`markless diagnostics available - window.__MARKLESS_DEBUG__ records containers, lifecycles, and event routing; ${DEBUGGING_PLAYBOOK_HINT}.`,
 			);
 			rolldownOptions.devServer = {
 				transformRequest: (url, environment) =>
@@ -309,6 +312,7 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 				},
 			};
 			hmr.configureServer(server);
+			installDevRuntimeImportResolution(server, viteEnvironmentName('client', options));
 			devPrerender?.configureServer(server);
 		},
 		transformIndexHtml(html) {
@@ -351,7 +355,8 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 					transformedTsrxSources.set(parsePath(id).pathname, code);
 				}
 				try {
-					const context = rolldownOptions.dev === true ? withDevServerExternals(this) : this;
+					const context =
+						rolldownOptions.dev === true ? withDevServerExternals(this) : this;
 					return await runHook(basePlugin.transform, context, code, id, transformOptions);
 				} catch (error) {
 					if (rolldownOptions.dev === true && TSRX_INPUT_FILE.test(id)) {

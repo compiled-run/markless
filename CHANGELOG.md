@@ -96,6 +96,101 @@ The `ui()` Vite plugin from the new `@markless/ui-tools` package sets this up.
 - Static text follows JSX whitespace rules.
 - Built files no longer contain your machine's folder paths.
 - The docs starter template builds again.
+- A new app from `create-markless` installs with npm and pnpm, passes `vp check`
+  before and after a build, and starts `npm run dev` without a server error.
+- `@markless/ui` pages render in `pnpm dev` under pnpm's strict layout.
+- `npm install @markless/ui` works without `--legacy-peer-deps`. `@markless/ui`
+  no longer declares `vite` or `vitest` peers, which made npm stop with
+  `ERESOLVE` once it picked `vitest` 5 for Vite's own optional peers.
+- `@markless/ui` works in `vp dev` without `ui()` in `vite.config`: `markless()`
+  now keeps every dependency that ships Markless source out of Vite's
+  dependency pre-bundling, so the optimizer no longer fails on `.tsrx` files
+  and blocks the page with an error overlay. Icon tags still need `ui()`.
+- When icon tags like `<lucide.chevronright />` reach `vp build` without
+  `ui()`, the build stops with the same message dev shows (add `ui()` from
+  `@markless/ui/vite` before `markless()`), instead of a CSS parse error
+  followed by a "checkout path" error.
+- The starter's `doctor` script builds with the app's own `vp`, so
+  `npm run doctor` and `bun run doctor` work on machines without pnpm.
+- A `Link` with `params` no longer writes your machine's folder path into the
+  build.
+- Text that joins a `const` from the component body with state, like
+  `{label} {count}`, keeps the `const` part when the state changes.
+- `attach={factory(args)}` passes its arguments to the factory: props,
+  literals like `['a', 'b']`, and module constants, in the page root or a
+  component used more than once.
+- An `onVisible` handler receives an event whose `target` and `currentTarget`
+  are the element, and `onVisible` inside MDX pages no longer throws
+  `MARKLESS_EVENT_DISPATCH_UNMATCHED` on load.
+- Text passed straight in as a component's children, like
+  `<Watch>{count} cups</Watch>`, updates when the state changes, the way it
+  already did when wrapped in an element.
+- A part that seeds widget state from its own children no longer picks up the
+  live text passed to a sibling part.
+- A component that mixes its own state with a destructured prop, like
+  `title={open ? label : ''}`, follows the parent's changes to that prop when
+  both components are in one file, and still renders when the prop is left out.
+- Parentheses inside a markup expression, like
+  `{(open ? 'Hide' : 'Show') + ' details'}`, no longer fail the build with
+  `MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED`.
+- A `@for` keyed by position (`index i; key i`) updates its rows when the list
+  changes. Before, its rows kept their first text and count.
+- A keyed row that leaves the list and comes back gets a new element, so it no
+  longer brings back old state such as a ticked checkbox.
+- A `@for` written straight inside an `@if` or `@else` (with no element of its
+  own around it) keeps the right rows when the branch switches, with no
+  duplicate rows, and shows its `@empty` block after a switch.
+- Calling a method on state set from a function call, like
+  `items = items.slice(1)` after `state(makeItems())`, no longer throws in a
+  handler.
+- A string such as `'" data-size="'` in markup no longer raises a false
+  `MARKLESS_TEMPLATE_EXPRESSION_STATIC` warning because it contains a state
+  name.
+- A click handler on a `@for` row over a component's props, such as
+  `onClick={() => onPick(option)}`, receives its own row and keeps working
+  after the first click.
+- Parts of a library widget rendered inside a component whose own handlers read
+  its props, such as `@markless/ui` tab triggers, run their own handlers instead
+  of the component's.
+- A component imported through another `.tsrx` module that re-exports it, like
+  `export { default as Code } from './code.tsrx'`, renders.
+- Two components placed on one MDX page, or mounted with two `render()` calls
+  on one document, no longer give their `element()` parts the same `id`. A
+  `@markless/ui` label in one example now focuses and ticks its own box, not
+  the box in the example above it.
+- `checkbox.indicator` can hold an element, like an icon or a `<span>`, on a box
+  that starts unticked. The page no longer fails with
+  `MARKLESS_PROJECTION_NOT_RENDERED`, and the element shows when the box is
+  ticked.
+- Turning `disabled` on for one `tree.item` after the page is live no longer
+  disables the open/close button of the item next to it.
+- A keyed `@for` row that picks its markup with an `@if` or `@switch` on the
+  row's own item, like `@if (entry.type === 'page')`, now builds the rows
+  added after the page loads. Before, the list kept the rows it first rendered
+  and ignored new ones, so a `@markless/ui` pagination range never moved.
+- A component whose whole template is a `@for` with no element around it now
+  fails the build with `MARKLESS_PUBLIC_RENDER_ROOT_UNSUPPORTED` and says to
+  wrap the loop in an element. Before, it rendered nothing, threw
+  `MARKLESS_MDX_RENDER_DATA_ROOT_MISSING` on an MDX page, or stopped a page
+  that imported it from loading.
+- `@markless/ui` `otp` boxes show what you type on router pages, both MDX pages
+  and plain routes, in dev and in production builds. Before, the code reached
+  the field but every box went blank. The same applies to any part that works
+  out its position from its widget's list of `element()` parts, when the page
+  places that widget through another component.
+- An element bound inside an `@if` block to an `element()` handle declared in
+  the same component now gets the `id` that `aria-controls`, `for` or another
+  id reference outside the block points at, instead of `id=""` when the block
+  appears. A reference inside the block to such an element outside it gets the
+  right id too.
+- `checklist` items follow the group after the page is live: the select-all
+  ticks and unticks them, and `disabled` set on `checklist.root` by the page
+  locks them. Items built in a `@for` tick on click instead of throwing
+  `MARKLESS_CALLBACK_SLOT_UNRESOLVED`.
+- A prop passed a value from a `@for` row, like
+  `<carousel.item value={row.value}>`, builds instead of failing with
+  `MARKLESS_CAPTURE_OPAQUE_PROP` when the component imported from another file
+  only shows that value. A click handler that reads it is still refused.
 
 ## 0.3.3
 

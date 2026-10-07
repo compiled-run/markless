@@ -1,7 +1,6 @@
-import { execFile, spawn, type ChildProcess } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { createServer } from 'node:net';
 import { promisify } from 'node:util';
 import { gzipSync } from 'node:zlib';
 import { resolve } from 'pathe';
@@ -9,6 +8,7 @@ import { MARKLESS_BUILD_PREFIX, MARKLESS_BUNDLE_GRAPH } from '../../src/build/ch
 import { MARKLESS_EXECUTION_SIZES } from '../../src/build/execution-sizes.ts';
 import { parseBundleGraph, type ParsedBundleGraphRecord } from '../../src/build/preload-plan.ts';
 import type { MarklessBundleGraph } from '../../src/types.ts';
+import { startBuiltServer as startNitroServer } from '../../../../scripts/test-utils/built-server.ts';
 import {
 	attributeFiles,
 	readAttribution,
@@ -284,20 +284,14 @@ export function chunkName(href: string): string {
 }
 
 export async function renderServedPage(demo: string): Promise<string> {
-	const port = await freePort();
-	const server = spawn(process.execPath, [resolve(demo, '.output/server/index.mjs')], {
+	const server = await startNitroServer(resolve(demo, '.output/server/index.mjs'), {
 		cwd: demo,
-		env: { ...process.env, HOST: '127.0.0.1', PORT: String(port) },
-		stdio: ['ignore', 'pipe', 'pipe'],
+		env: { ...process.env, HOST: '127.0.0.1' },
 	});
-	let output = '';
-	const collect = (chunk: Buffer) => {
-		output += chunk.toString();
-	};
-	server.stdout?.on('data', collect);
-	server.stderr?.on('data', collect);
 	try {
-		const response = await servedPageResponse(server, port, () => output);
+		const response = await fetch(`${server.origin}/`);
+		if (!response.ok)
+			throw new Error(`built server answered / with ${response.status}: ${server.output()}`);
 		const html = await response.text();
 		const evidence = process.env.MARKLESS_BUDGET_EVIDENCE_DIR;
 		if (evidence) {
@@ -306,7 +300,7 @@ export async function renderServedPage(demo: string): Promise<string> {
 		}
 		return html;
 	} finally {
-		server.kill('SIGKILL');
+		server.close('SIGKILL');
 	}
 }
 
@@ -321,45 +315,6 @@ export async function execPnpm(
 		const next = error as Error & { stdout?: string; stderr?: string };
 		throw new Error([next.message, next.stdout, next.stderr].filter(Boolean).join('\n'));
 	}
-}
-
-async function servedPageResponse(
-	server: ChildProcess,
-	port: number,
-	output: () => string,
-): Promise<Response> {
-	const url = `http://127.0.0.1:${port}/`;
-	const deadline = Date.now() + 60_000;
-	let last = '';
-	while (Date.now() < deadline) {
-		if (server.exitCode !== null)
-			throw new Error(`built server exited with ${server.exitCode}: ${output()}`);
-		try {
-			const response = await fetch(url);
-			if (response.ok) return response;
-			last = `answered / with ${response.status}`;
-		} catch (error) {
-			last = (error as Error).message;
-		}
-		await new Promise((settle) => setTimeout(settle, 250));
-	}
-	throw new Error(`built server never served ${url} (${last}): ${output()}`);
-}
-
-function freePort(): Promise<number> {
-	return new Promise((settle, fail) => {
-		const probe = createServer();
-		probe.once('error', fail);
-		probe.listen(0, '127.0.0.1', () => {
-			const address = probe.address();
-			if (address === null || typeof address === 'string') {
-				probe.close();
-				fail(new Error('could not reserve a port for the built server'));
-				return;
-			}
-			probe.close(() => settle(address.port));
-		});
-	});
 }
 
 // An unquoted attribute value runs to the tag's whitespace; a trailing slash

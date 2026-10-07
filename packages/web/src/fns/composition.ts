@@ -261,7 +261,8 @@ export function marklessQualifyChildState(
 			),
 		}),
 	}));
-	if (state.sharedSeeds)
+	// A module's own remap carries no instance path, and a seed follows its component's own props, which only the composer routes.
+	if (state.sharedSeeds && instancePath)
 		state.sharedSeeds = state.sharedSeeds.flatMap((seed) => {
 			// A prop with no live route was never passed live, so the child already
 			// rendered its final value and this seed has nothing to follow.
@@ -676,7 +677,8 @@ export function marklessCsrRemapGraphOutput(
 		for (const prop of graphProps ?? []) {
 			const route = marklessLiveBoundGraphRoute(prop);
 			// The draft cell list belongs to this render pass, so seeding writes in place.
-			if (route?.path.length === 0 && props[prop.name] !== undefined)
+			// Projected text arrives as its HTML, so its source node keeps its own value.
+			if (route?.path.length === 0 && !prop.projected && props[prop.name] !== undefined)
 				(output.state.cells as ComposeStateNode[]).push({
 					graphNodeId: route.graphNodeId,
 					directValue: props[prop.name],
@@ -874,13 +876,13 @@ export function marklessCsrRemapChildKeyedRepeat(
 	if (!graphNodeId) return null;
 	const propName = marklessCompositionPropName(graphNodeId, repeat.collectionPath);
 	let mapped: ComposeGraphRead | null;
-	if (propName === null)
+	// A static prop never moves, but its rows still resume against it: the child's own seeded prop cell holds it.
+	if (propName === null || marklessCompositionGraphProp(graphProps, propName) === null)
 		mapped = {
 			graphNodeId: marklessComposedGraphNodeId(graphNodeId, instancePath),
 			path: repeat.collectionPath,
 		};
 	else {
-		if (marklessCompositionGraphProp(graphProps, propName) === null) return null;
 		mapped = marklessCsrRemapChildGraph(
 			{ graphNodeId, path: repeat.collectionPath },
 			graphProps,
