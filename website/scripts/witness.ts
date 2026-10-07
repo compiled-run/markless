@@ -2005,10 +2005,8 @@ try {
 			'the badge body did not run again, so its drawn number stayed',
 			`${drewAtRest} then ${await badgeDrawn()}`,
 		);
-		const pickerDemo = page
-			.locator('.playground')
-			.filter({ has: page.getByRole('button', { name: 'Pick Grace' }) });
-		const pickedLine = pickerDemo.locator('p').first();
+		const pickerDemo = page.locator('section[data-preview="name-picker"]');
+		const pickedLine = pickerDemo.locator('.pg-stage p').first();
 		check(
 			((await pickedLine.textContent()) ?? '').trim() === 'Picked: nobody',
 			'the picker serves nobody picked',
@@ -2061,7 +2059,15 @@ try {
 		await page.goto(`${origin}/build/storage`, { waitUntil: 'load' });
 		const drinkAttr = () =>
 			page.evaluate(() => document.documentElement.getAttribute('data-docs-drink'));
-		await page.locator('.playground button.coffee').click();
+		const drinkCard = page.locator('section[data-preview="drink-pick"]');
+		const watchedDrink = () =>
+			drinkCard.locator('.pv-watch mark:visible').allTextContents();
+		check(
+			(await watchedDrink()).join() === 'tea,tea',
+			'the drink card watches the starting value on <html>',
+			(await watchedDrink()).join(),
+		);
+		await drinkCard.locator('button.coffee').click();
 		for (let attempt = 0; attempt < 40; attempt += 1) {
 			if ((await drinkAttr()) === 'coffee') break;
 			await new Promise((done) => setTimeout(done, 100));
@@ -2071,11 +2077,24 @@ try {
 			'picking a drink writes it onto <html>',
 			String(await drinkAttr()),
 		);
-		await page.reload({ waitUntil: 'domcontentloaded' });
+		check(
+			(await watchedDrink()).join() === 'coffee,coffee',
+			'the Watch line follows the pick',
+			(await watchedDrink()).join(),
+		);
+		await Promise.all([
+			page.waitForEvent('load'),
+			drinkCard.getByRole('button', { name: 'Reload page' }).click(),
+		]);
 		check(
 			(await drinkAttr()) === 'coffee',
-			'the pick survives a reload, applied before the page is shown',
+			'the pick survives the card\'s Reload page, applied before the page is shown',
 			String(await drinkAttr()),
+		);
+		check(
+			(await watchedDrink()).join() === 'coffee,coffee',
+			'after the reload the Watch line still shows the saved pick',
+			(await watchedDrink()).join(),
 		);
 		await page.screenshot({ path: `${shotsDir}/T006-drink-pick-after.png`, fullPage: true });
 		await page.evaluate(() => localStorage.clear());
@@ -2095,6 +2114,51 @@ try {
 			sharedBadge,
 			(text) => text === '1',
 			'a click in one component moves the badge in another through shared()',
+		);
+		const talliesCard = page.locator('section[data-preview="tallies"]');
+		const tallyCounts = async () =>
+			(await talliesCard.locator('.pg-stage output:visible').allTextContents())
+				.map((text) => text.trim())
+				.join();
+		check((await tallyCounts()) === '0,0', 'the tallies start at 0 and 0', await tallyCounts());
+		await talliesCard.locator('.pg-stage button:visible', { hasText: 'Add one' }).first().click();
+		await settleText(
+			talliesCard.locator('.pg-stage output:visible').last(),
+			(text) => text === '1',
+			"with { scope: 'page' }, a click on Left moves Right too",
+		);
+		await talliesCard.getByRole('radio', { name: 'widget' }).check();
+		check(
+			(await tallyCounts()) === '0,0',
+			"the 'widget' tallies start with their own copies",
+			await tallyCounts(),
+		);
+		await talliesCard.locator('.pg-stage button:visible', { hasText: 'Add one' }).first().click();
+		await settleText(
+			talliesCard.locator('.pg-stage output:visible').first(),
+			(text) => text === '1',
+			"with { scope: 'widget' }, a click on Left moves Left",
+		);
+		check(
+			(await tallyCounts()) === '1,0',
+			"with { scope: 'widget' }, Right keeps its own number",
+			await tallyCounts(),
+		);
+		await talliesCard.getByRole('radio', { name: 'page' }).check();
+		check(
+			(await talliesCard.locator('.pv-watch-text span:visible').innerText()).includes("'page'"),
+			'switching Scope back shows the page-scope Watch line',
+		);
+		const talliesTab = talliesCard.locator('.pg-tab:visible', { hasText: 'tallies.tsrx' });
+		await talliesTab.click();
+		for (let attempt = 0; attempt < 40; attempt += 1) {
+			if ((await talliesTab.getAttribute('aria-selected')) === 'true') break;
+			await new Promise((done) => setTimeout(done, 100));
+		}
+		check(
+			(await talliesTab.getAttribute('aria-selected')) === 'true' &&
+				(await talliesCard.locator('.pg-pane:visible').innerText()).includes('<tally.Tally'),
+			"the tallies card's code switches to the file tab the reader clicks",
 		);
 		await page.screenshot({ path: `${shotsDir}/T006-shared-after.png`, fullPage: true });
 

@@ -25,21 +25,8 @@ Pick a drink.
 <DrinkPick />
 
 One click changed three things: the highlighted button, the saved value in `localStorage`, and the
-`data-docs-drink` attribute on `<html>`. Now reload the page. Your pick keeps its highlight.
-
-```tsrx
-import { storage } from '@markless/core';
-
-export default function DrinkPick() @{
-	let drink = storage('docs-drink', 'tea');
-
-	<section>
-		<button class="tea" onClick={() => (drink = 'tea')}>Tea</button>
-		<button class="coffee" onClick={() => (drink = 'coffee')}>Coffee</button>
-		<button class="cocoa" onClick={() => (drink = 'cocoa')}>Cocoa</button>
-	</section>
-}
-```
+`data-docs-drink` attribute on `<html>`. The Watch line shows the attribute. Now click **Reload
+page**. Your pick keeps its highlight.
 
 The first argument is the `localStorage` key. The second is the starting value, for a reader who
 has not picked yet. With the key `docs-drink`, `<html>` gets `data-docs-drink`.
