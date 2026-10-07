@@ -2,7 +2,6 @@ import AnatomyTable from '../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
-import Preview from '../../components/ui/preview.tsrx';
 
 <Sidebar />
 
@@ -10,24 +9,7 @@ import Preview from '../../components/ui/preview.tsrx';
 
 <ThemeToggle />
 
-<Preview shows="Three destinations with a back and a next button." />
-
-```tsrx
-import { carousel } from '@markless/ui';
-
-export default function Destinations() @{
-	<carousel.root value="paris">
-		<carousel.title>Featured destinations</carousel.title>
-		<carousel.scrollarea>
-			<carousel.item value="paris">Paris</carousel.item>
-			<carousel.item value="oslo">Oslo</carousel.item>
-			<carousel.item value="lima">Lima</carousel.item>
-		</carousel.scrollarea>
-		<carousel.backtrigger>Back</carousel.backtrigger>
-		<carousel.forwardtrigger>Next</carousel.forwardtrigger>
-	</carousel.root>
-}
-```
+<Playground scenario="basic" />
 
 A carousel shows one slide at a time, with buttons to step through the rest. Use it for a row of
 featured items that share one spot on the page.

@@ -2,7 +2,6 @@ import AnatomyTable from '../../components/docs/anatomy-table.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
-import Preview from '../../components/ui/preview.tsrx';
 
 <Sidebar />
 
@@ -10,20 +9,7 @@ import Preview from '../../components/ui/preview.tsrx';
 
 <ThemeToggle />
 
-<Preview shows="One button with a paragraph that appears under it." />
-
-```tsrx
-import { collapsible } from '@markless/ui';
-
-export default function What() @{
-	<collapsible.root>
-		<collapsible.trigger>What is a collapsible?</collapsible.trigger>
-		<collapsible.content>
-			A button that shows and hides the content below it.
-		</collapsible.content>
-	</collapsible.root>
-}
-```
+<Playground scenario="basic" />
 
 A collapsible is one button that shows or hides one panel. Use it for a "Show more" section or one
 question with its answer. For a stack of sections, use [accordion](/ui/accordion).
