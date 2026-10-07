@@ -108,7 +108,14 @@ export default function ElementBehavior() @{
 
 	<section>
 		<input el={field} />
-		<button onClick={() => { field?.focus(); status = 'focused'; }}>Focus</button>
+		<button
+			onClick={() => {
+				field?.focus();
+				status = 'focused';
+			}}
+		>
+			Focus
+		</button>
 		<output>{status}</output>
 	</section>
 }

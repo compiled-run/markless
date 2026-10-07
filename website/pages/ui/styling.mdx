@@ -29,20 +29,40 @@ import { select } from '@markless/ui';
 export default function StyledPicker() @{
 	<section class="frame">
 		<select.root class="picker">
-			<select.label class="label">Theme</select.label>
-			<select.trigger class="trigger">Choose a theme</select.trigger>
+			<select.label class="label">
+				Theme
+			</select.label>
+			<select.trigger class="trigger">
+				Choose a theme
+			</select.trigger>
 			<select.content class="list">
 				<select.item class="option" value="paper">
-					<select.itemlabel>Paper</select.itemlabel>
-					<select.itemindicator class="mark">✓</select.itemindicator>
+					<select.itemlabel>
+						Paper
+					</select.itemlabel>
+					<select.itemindicator class="mark">
+						✓
+					</select.itemindicator>
 				</select.item>
 				<select.item class="option" value="ink">
-					<select.itemlabel>Ink</select.itemlabel>
-					<select.itemindicator class="mark">✓</select.itemindicator>
+					<select.itemlabel>
+						Ink
+					</select.itemlabel>
+					<select.itemindicator class="mark">
+						✓
+					</select.itemindicator>
 				</select.item>
-				<select.item class="option" value="neon" disabled>
-					<select.itemlabel>Neon</select.itemlabel>
-					<select.itemindicator class="mark">✓</select.itemindicator>
+				<select.item
+					class="option"
+					value="neon"
+					disabled
+				>
+					<select.itemlabel>
+						Neon
+					</select.itemlabel>
+					<select.itemindicator class="mark">
+						✓
+					</select.itemindicator>
 				</select.item>
 			</select.content>
 		</select.root>
@@ -172,8 +192,12 @@ import { tooltip } from '@markless/ui';
 export default function SaveTip() @{
 	<section class="frame">
 		<tooltip.root open={true}>
-			<tooltip.trigger class="save">Save</tooltip.trigger>
-			<tooltip.content class="tip">Keeps a copy in your drafts</tooltip.content>
+			<tooltip.trigger class="save">
+				Save
+			</tooltip.trigger>
+			<tooltip.content class="tip">
+				Keeps a copy in your drafts
+			</tooltip.content>
 		</tooltip.root>
 
 		<style>
@@ -231,18 +255,27 @@ Click the arrow next to **src**. Then use the arrow keys to walk the rows.
 import { tree } from '@markless/ui';
 
 export default function Files() @{
-	<tree.root class="files" aria-label="Project files">
+	<tree.root
+		class="files"
+		aria-label="Project files"
+	>
 		<tree.item class="row" level={1}>
 			<tree.itemtrigger class="arrow-button">
-				<tree.itemindicator class="arrow">▸</tree.itemindicator>
+				<tree.itemindicator class="arrow">
+					▸
+				</tree.itemindicator>
 			</tree.itemtrigger>
 			<tree.itemlabel>src</tree.itemlabel>
 			<tree.itemcontent class="group">
 				<tree.item class="row" leaf level={2}>
-					<tree.itemlabel>index.ts</tree.itemlabel>
+					<tree.itemlabel>
+						index.ts
+					</tree.itemlabel>
 				</tree.item>
 				<tree.item class="row" leaf level={2}>
-					<tree.itemlabel>app.tsrx</tree.itemlabel>
+					<tree.itemlabel>
+						app.tsrx
+					</tree.itemlabel>
 				</tree.item>
 			</tree.itemcontent>
 		</tree.item>
@@ -290,7 +323,8 @@ export default function Files() @{
 
 			.group:not([hidden]) {
 				margin-inline-start: 1em;
-				border-inline-start: 2px dashed var(--ink);
+				border-inline-start:
+					2px dashed var(--ink);
 			}
 		</style>
 	</tree.root>

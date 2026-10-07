@@ -57,7 +57,9 @@ export default function MugLabel() @{
 			Name for the mug
 			<input
 				value={name}
-				onInput={(event) => (name = event.currentTarget.value)}
+				onInput={(event) =>
+					(name = event.currentTarget.value)
+				}
 				onKeyDown={(event) => {
 					if (event.key === 'Escape') name = '';
 				}}

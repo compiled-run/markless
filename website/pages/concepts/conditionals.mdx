@@ -41,11 +41,18 @@ export default function NotePanel() @{
 	const long = computed(() => note.length > 20);
 
 	<section>
-		<button onClick={() => (open = !open)}>Show or hide the note</button>
+		<button onClick={() => (open = !open)}>
+			Show or hide the note
+		</button>
 		@if (open) {
 			<label>
 				Note
-				<input value={note} onInput={(event) => (note = event.currentTarget.value)} />
+				<input
+					value={note}
+					onInput={(event) =>
+						(note = event.currentTarget.value)
+					}
+				/>
 			</label>
 		}
 		@if (long) {

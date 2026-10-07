@@ -37,17 +37,29 @@ import { accordion } from '@markless/ui';
 
 export default function Faq() @{
 	const questions = [
-		{ value: 'ship', question: 'When does my order ship?', answer: 'Within two working days.' },
-		{ value: 'returns', question: 'Can I return it?', answer: 'Yes, for thirty days.' },
+		{
+			value: 'ship',
+			question: 'When does my order ship?',
+			answer: 'Within two working days.',
+		},
+		{
+			value: 'returns',
+			question: 'Can I return it?',
+			answer: 'Yes, for thirty days.',
+		},
 	];
 
 	<accordion.root value="ship">
 		@for (const q of questions; key q.value) {
 			<accordion.item value={q.value}>
 				<accordion.itemlabel>
-					<accordion.itemtrigger>{q.question}</accordion.itemtrigger>
+					<accordion.itemtrigger>
+						{q.question}
+					</accordion.itemtrigger>
 				</accordion.itemlabel>
-				<accordion.itemcontent>{q.answer}</accordion.itemcontent>
+				<accordion.itemcontent>
+					{q.answer}
+				</accordion.itemcontent>
 			</accordion.item>;
 		}
 	</accordion.root>;
@@ -70,7 +82,12 @@ export default function NotePanel() @{
 	<section>
 		<label>
 			Note
-			<input value={note} onInput={(event) => (note = event.currentTarget.value)} />
+			<input
+				value={note}
+				onInput={(event) =>
+					(note = event.currentTarget.value)
+				}
+			/>
 		</label>
 		@if (long) {
 			<p>That is a long note.</p>
@@ -101,7 +118,13 @@ export default function ShoppingList() @{
 				<li>Nothing left to buy.</li>
 			}
 		</ul>
-		<button onClick={() => (items = [...items].sort((a, b) => a.name.localeCompare(b.name)))}>
+		<button
+			onClick={() =>
+				(items = [...items].sort((a, b) =>
+					a.name.localeCompare(b.name),
+				))
+			}
+		>
 			Sort A to Z
 		</button>
 	</section>

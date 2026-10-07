@@ -780,8 +780,8 @@ try {
 
 			const faq = await editLine(
 				1,
-				"{ value: 'returns'",
-				"{ value: 'returns', question: 'Can I return it?', answer: 'Yes, for thirty days.' }, { value: 'gift', question: 'Can I gift it?', answer: 'Wrapped, too.' },",
+				'];',
+				"{ value: 'gift', question: 'Can I gift it?', answer: 'Wrapped, too.' }, ];",
 			);
 			const gift = faq.frame.getByRole('button', { name: 'Can I gift it?' });
 			await gift.waitFor({ timeout: 30000 });

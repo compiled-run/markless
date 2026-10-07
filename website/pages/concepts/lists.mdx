@@ -45,7 +45,13 @@ export default function ShoppingList() @{
 			@for (const item of items; key item.id) {
 				<li>
 					<label>
-						<input type="checkbox" checked={item.done} onChange={() => (item.done = !item.done)} />
+						<input
+							type="checkbox"
+							checked={item.done}
+							onChange={() =>
+								(item.done = !item.done)
+							}
+						/>
 						{item.name}
 					</label>
 				</li>
@@ -53,10 +59,24 @@ export default function ShoppingList() @{
 				<li>Nothing left to buy.</li>
 			}
 		</ul>
-		<button onClick={() => (items = [...items].sort((a, b) => a.name.localeCompare(b.name)))}>
+		<button
+			onClick={() =>
+				(items = [...items].sort((a, b) =>
+					a.name.localeCompare(b.name),
+				))
+			}
+		>
 			Sort A to Z
 		</button>
-		<button onClick={() => (items = items.filter((item) => !item.done))}>Remove ticked</button>
+		<button
+			onClick={() =>
+				(items = items.filter(
+					(item) => !item.done,
+				))
+			}
+		>
+			Remove ticked
+		</button>
 	</section>
 }
 ```

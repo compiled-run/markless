@@ -96,7 +96,9 @@ import { label } from './label.ts';
 export default function TypoCount() @{
 	let fixed = state(0);
 
-	<button onClick={() => fixed++}>{label}: {fixed}</button>
+	<button onClick={() => fixed++}>
+		{label}: {fixed}
+	</button>
 }
 ```
 
@@ -116,7 +118,9 @@ import { label } from './label.ts';
 export default function TypoCount() @{
 	let fixed = state(0);
 
-	<button onClick={() => fixed++}>{label}: {fixed}</button>
+	<button onClick={() => fixed++}>
+		{label}: {fixed}
+	</button>
 }
 ```
 

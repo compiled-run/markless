@@ -28,7 +28,12 @@ import { shared, state } from '@markless/core';
 export const counter = shared(
 	() => {
 		const box = state({ count: 0 });
-		return { ...box, increment() { box.count++; } };
+		return {
+			...box,
+			increment() {
+				box.count++;
+			},
+		};
 	},
 	{ scope: 'page' },
 );
@@ -44,7 +49,9 @@ export default function SharedCounter() @{
 
 	<section>
 		<p>Badge shows: <Badge /></p>
-		<button onClick={() => c.increment()}>Add one</button>
+		<button onClick={() => c.increment()}>
+			Add one
+		</button>
 	</section>
 }
 ```

@@ -43,9 +43,15 @@ export default function MugFacts() @{
 	});
 
 	<section>
-		<button onClick={() => (mug = 'tall')}>Tall mug</button>
-		<button onClick={() => (mug = 'small')}>Small mug</button>
-		<button onClick={() => (mug = 'cracked')}>Cracked mug</button>
+		<button onClick={() => (mug = 'tall')}>
+			Tall mug
+		</button>
+		<button onClick={() => (mug = 'small')}>
+			Small mug
+		</button>
+		<button onClick={() => (mug = 'cracked')}>
+			Cracked mug
+		</button>
 		@try {
 			<p>{fact.text}</p>
 		} @pending {
@@ -63,13 +69,20 @@ const facts: Record<string, string> = {
 	small: 'The small mug holds one espresso.',
 };
 
-export function loadMugFact(mug: string): Promise<string> {
-	if (mug === '') return Promise.resolve('Pick a mug.');
+export function loadMugFact(
+	mug: string,
+): Promise<string> {
+	if (mug === '') {
+		return Promise.resolve('Pick a mug.');
+	}
 	return new Promise((resolve, reject) => {
 		setTimeout(() => {
 			const fact = facts[mug];
-			if (fact) resolve(fact);
-			else reject(new Error(`No mug called ${mug}`));
+			if (fact) {
+				resolve(fact);
+			} else {
+				reject(new Error(`No mug called ${mug}`));
+			}
 		}, 1500);
 	});
 }

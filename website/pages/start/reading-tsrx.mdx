@@ -47,7 +47,9 @@ export default function LabelledCounter() @{
 	let count = state(0);
 
 	<p>You clicked {count} times.</p>
-	<button onClick={() => count++}>Click me</button>
+	<button onClick={() => count++}>
+		Click me
+	</button>
 }
 ```
 </Code>
@@ -71,9 +73,13 @@ export default function TeaNote() @{
 				font-style: italic;
 			}
 		</style>
-		<button onClick={() => (open = !open)}>{open ? 'Hide' : 'Show'} the note</button>
+		<button onClick={() => (open = !open)}>
+			{open ? 'Hide' : 'Show'} the note
+		</button>
 		@if (open) {
-			<p class="note">Steep it for three minutes.</p>
+			<p class="note">
+				Steep it for three minutes.
+			</p>
 		}
 	</section>
 }

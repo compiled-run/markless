@@ -36,7 +36,16 @@ export default function List() @{
 				<li>{item}</li>
 			}
 		</ul>
-		<button onClick={() => (items = [...items, `row ${items.length + 1}`])}>Add a row</button>
+		<button
+			onClick={() =>
+				(items = [
+					...items,
+					`row ${items.length + 1}`,
+				])
+			}
+		>
+			Add a row
+		</button>
 	</section>
 }
 ```
