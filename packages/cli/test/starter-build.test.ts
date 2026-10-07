@@ -1,10 +1,11 @@
-import { execFile, spawn } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { mkdir, mkdtemp, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { promisify } from 'node:util';
 import { join, resolve } from 'pathe';
 import { createBuilder } from 'vite';
 import { afterEach, expect, test } from 'vitest';
+import { startBuiltServer } from '../../../scripts/test-utils/built-server.ts';
 import { CreateProgram, STARTER_CHOICES, type Starter } from '../src/index.ts';
 import { createNodeRuntime } from '../src/node-runtime.ts';
 
@@ -77,33 +78,6 @@ async function check(appRoot: string): Promise<string> {
 	return result.stdout + result.stderr;
 }
 
-// The server binds a port of its own choosing and names it on stdout once it is listening;
-// srvx stays quiet while `TEST` is set, so the child runs without it.
-async function serve(appRoot: string): Promise<string> {
-	const { TEST: _test, ...env } = process.env;
-	const server = spawn(process.execPath, [join(appRoot, '.output/server/index.mjs')], {
-		cwd: appRoot,
-		env: { ...env, PORT: '0' },
-		stdio: ['ignore', 'pipe', 'pipe'],
-	});
-	cleanups.push(() => void server.kill());
-	let output = '';
-	return new Promise((resolveOrigin, reject) => {
-		server.stdout.on('data', (chunk: Buffer) => {
-			output += chunk.toString();
-			const listening = /Listening on:\s*(\S+)/.exec(output);
-			if (listening) resolveOrigin(new URL(listening[1]!).origin);
-		});
-		server.stderr.on('data', (chunk: Buffer) => {
-			output += chunk.toString();
-		});
-		server.once('error', reject);
-		server.once('exit', (code, signal) =>
-			reject(new Error(`built server exited (${code ?? signal}) before listening:\n${output}`)),
-		);
-	});
-}
-
 test('the starter list this build covers is the list the CLI offers', () => {
 	expect(STARTER_CHOICES.map((choice) => choice.value).toSorted()).toEqual(
 		Object.keys(servedPages).toSorted(),
@@ -123,7 +97,11 @@ test.each(STARTER_CHOICES.map((choice) => choice.value))(
 		await builder.buildApp();
 		await check(appRoot);
 
-		const origin = await serve(appRoot);
+		const server = await startBuiltServer(join(appRoot, '.output/server/index.mjs'), {
+			cwd: appRoot,
+		});
+		cleanups.push(() => server.close());
+		const { origin } = server;
 		for (const [path, text] of servedPages[starter]) {
 			const response = await fetch(new URL(path, origin));
 			expect(response.status, path).toBe(200);

@@ -1,6 +1,4 @@
-import { spawn, type ChildProcess } from 'node:child_process';
 import { cp, mkdir, mkdtemp, readFile, rm, symlink } from 'node:fs/promises';
-import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
 import { clientAssetsManifestPath } from '../../src/vite/client-assets-manifest.ts';
@@ -9,6 +7,7 @@ import { createBuilder } from 'vite';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
+import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 
 // A built router app served by its real Nitro server and driven in real browsers:
 // every route change here is a fragment swap, and each case pins one thing the
@@ -28,19 +27,6 @@ let navigationEntry = '';
 let docOrigin = '';
 let productionOrigin = '';
 const served: ServedFixture[] = [];
-
-async function freePort(): Promise<number> {
-	return new Promise((resolvePort, reject) => {
-		const probe = createServer();
-		probe.once('error', reject);
-		probe.listen(0, '127.0.0.1', () => {
-			const address = probe.address();
-			probe.close(() =>
-				typeof address === 'object' && address ? resolvePort(address.port) : reject(),
-			);
-		});
-	});
-}
 
 async function serveFixture(name: string, production = false): Promise<ServedFixture> {
 	const root = await mkdtemp(join(tmpdir(), `markless-${name}-`));
@@ -69,25 +55,17 @@ async function serveFixture(name: string, production = false): Promise<ServedFix
 			'utf8',
 		),
 	) as { entries: { navigation: string } };
-	const port = await freePort();
-	const url = `http://127.0.0.1:${port}`;
-	const server: ChildProcess = spawn(process.execPath, [join(root, '.output/server/index.mjs')], {
-		env: { PATH: process.env.PATH, PORT: String(port), HOST: '127.0.0.1' },
-		stdio: 'ignore',
+	const server = await startBuiltServer(join(root, '.output/server/index.mjs'), {
+		env: { PATH: process.env.PATH, HOST: '127.0.0.1' },
+	}).catch(async (error: unknown) => {
+		await rm(root, { recursive: true, force: true });
+		throw error;
 	});
 	const close = async () => {
-		server.kill();
+		server.close();
 		await rm(root, { recursive: true, force: true });
 	};
-	for (let attempt = 0; attempt < 100; attempt += 1) {
-		try {
-			if ((await fetch(url)).ok)
-				return { origin: url, navigationEntry: manifest.entries.navigation, close };
-		} catch {}
-		await new Promise((resolveWait) => setTimeout(resolveWait, 100));
-	}
-	await close();
-	throw new Error(`${name} fixture server did not start`);
+	return { origin: server.origin, navigationEntry: manifest.entries.navigation, close };
 }
 
 beforeAll(async () => {

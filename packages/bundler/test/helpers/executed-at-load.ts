@@ -1,9 +1,9 @@
-import { spawn } from 'node:child_process';
 import { readFile, stat } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { extname, resolve } from 'pathe';
 import { chromium } from '@playwright/test';
+import { startBuiltServer as startNitroServer } from '../../../../scripts/test-utils/built-server.ts';
 
 export type ServedApp = { readonly url: string; close(): Promise<void> };
 
@@ -38,30 +38,13 @@ export async function serveStaticDirectory(directory: string): Promise<ServedApp
 
 /** Starts a demo's built Nitro server. */
 export async function startBuiltServer(demo: string): Promise<ServedApp> {
-	const probe = await listen(createServer());
-	const port = new URL(probe.url).port;
-	await probe.close();
-	const child = spawn(process.execPath, [resolve(demo, '.output/server/index.mjs')], {
+	const server = await startNitroServer(resolve(demo, '.output/server/index.mjs'), {
 		cwd: demo,
-		env: { ...process.env, HOST: '127.0.0.1', PORT: port },
-		stdio: 'ignore',
+		env: { ...process.env, HOST: '127.0.0.1' },
 	});
-	const url = `http://127.0.0.1:${port}/`;
-	const deadline = Date.now() + 60_000;
-	while (Date.now() < deadline) {
-		if (child.exitCode !== null) throw new Error(`built server exited with ${child.exitCode}`);
-		try {
-			if ((await fetch(url)).ok) break;
-		} catch {
-			// not listening yet
-		}
-		await new Promise((settle) => setTimeout(settle, 250));
-	}
 	return {
-		url,
-		close: async () => {
-			child.kill('SIGKILL');
-		},
+		url: `${server.origin}/`,
+		close: async () => server.close('SIGKILL'),
 	};
 }
 

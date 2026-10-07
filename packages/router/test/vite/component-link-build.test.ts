@@ -1,6 +1,4 @@
-import { spawn } from 'node:child_process';
 import { cp, mkdir, mkdtemp, rm, symlink } from 'node:fs/promises';
-import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
 import { chromium } from '@playwright/test';
@@ -8,6 +6,7 @@ import { createBuilder } from 'vite';
 import { afterAll, expect, test } from 'vitest';
 import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
+import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 
 // A Link with no href rendered by a component file (not by the page itself) must
 // not leave the pages composing that component importing render data it never exports.
@@ -16,19 +15,6 @@ const cleanups: Array<() => Promise<void> | void> = [];
 afterAll(async () => {
 	for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
 });
-
-async function freePort(): Promise<number> {
-	return new Promise((resolvePort, reject) => {
-		const probe = createServer();
-		probe.once('error', reject);
-		probe.listen(0, '127.0.0.1', () => {
-			const address = probe.address();
-			probe.close(() =>
-				typeof address === 'object' && address ? resolvePort(address.port) : reject(),
-			);
-		});
-	});
-}
 
 test('a component file holding an href-less Link builds and serves every page composing it', async () => {
 	const root = await mkdtemp(join(tmpdir(), 'markless-component-link-'));
@@ -45,21 +31,12 @@ test('a component file holding an href-less Link builds and serves every page co
 	});
 	await builder.buildApp();
 
-	const port = await freePort();
-	const server = spawn(process.execPath, [join(root, '.output/server/index.mjs')], {
-		env: { PATH: process.env.PATH, PORT: String(port), HOST: '127.0.0.1' },
-		stdio: 'ignore',
+	const server = await startBuiltServer(join(root, '.output/server/index.mjs'), {
+		env: { PATH: process.env.PATH, HOST: '127.0.0.1' },
 	});
-	cleanups.push(() => void server.kill());
-	const origin = `http://127.0.0.1:${port}`;
-	const fetchPage = async (path: string) => {
-		for (let attempt = 0; attempt < 100; attempt++) {
-			const response = await fetch(new URL(path, origin)).catch(() => undefined);
-			if (response) return response;
-			await new Promise((wait) => setTimeout(wait, 100));
-		}
-		throw new Error('built server never answered');
-	};
+	cleanups.push(() => server.close());
+	const { origin } = server;
+	const fetchPage = (path: string) => fetch(new URL(path, origin));
 	for (const [path, page] of [
 		['/', 'first'],
 		['/second', 'second'],
