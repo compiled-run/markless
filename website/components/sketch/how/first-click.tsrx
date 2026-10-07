@@ -1,387 +1,241 @@
 import { state } from '@markless/core';
-import MarkerCircle from '../marker-circle.tsrx';
-import MarkerSweep from '../marker-sweep.tsrx';
-import Ask from './ask.tsrx';
+import PreviewCard, { Action, Choice, Controls, Stage, Watch } from '../../docs/preview-card.tsrx';
 
 export default function FirstClick() @{
-	let path = state('direct');
+	let path = state('Direct');
 	let clicks = state(0);
+	let hovered = state(false);
 
-	<figure class="sketch first-click" data-path={path} data-clicked={clicks === 0 ? 'no' : clicks === 1 ? 'once' : 'more'}>
-		<Ask question="Who hears the first click?" hint="Pick a path, then press the counter. The notes follow that path." />
-
-		<div class="pick" role="group" aria-label="How the counter got on the page">
-			<button type="button" aria-pressed={path === 'direct' ? 'true' : 'false'} onClick={() => { path = 'direct'; clicks = 0; }}>
-				Browser, direct module
-			</button>
-			<button type="button" aria-pressed={path === 'general' ? 'true' : 'false'} onClick={() => { path = 'general'; clicks = 0; }}>
-				Browser, general path
-			</button>
-			<button type="button" aria-pressed={path === 'server' ? 'true' : 'false'} onClick={() => { path = 'server'; clicks = 0; }}>
-				Server-rendered page
-			</button>
-		</div>
-
-		<div class="board">
-			<div class="page-side">
-				<p class="call note">
-					{path === 'direct'
-						? 'render(Counter, { target }), simple component'
-						: path === 'general'
-							? 'render(App, { target }), with props or a computed()'
-							: 'renderToString(), then the HTML arrives'}
-				</p>
-				<div class="window playground">
-					<p class="strip" aria-hidden="true"><span class="dots"><i></i><i></i><i></i></span>your page</p>
+	<PreviewCard name="first-click" label="What starts on the first click, per path">
+		<Controls title="Who hears the first click?">
+			<Choice
+				label="Path"
+				hint="Direct: render() with a direct browser module. General: render() on the general path. Server: a server-rendered page. The button is real; the list traces the path you pick."
+				options={['Direct', 'General', 'Server']}
+				value="Direct"
+				onChange={(next: string) => {
+					path = next;
+					clicks = 0;
+					hovered = false;
+				}}
+			/>
+			<Action
+				end
+				onClick={() => {
+					clicks = 0;
+					hovered = false;
+				}}
+			>
+				Start over
+			</Action>
+		</Controls>
+		<Stage>
+			<div class="board" data-path={path} data-clicks={clicks === 0 ? 'none' : clicks === 1 ? 'one' : 'more'} data-hovered={hovered ? 'yes' : 'no'}>
+				<div class="page">
+					<p class="cap">Your page</p>
 					<div class="container">
-						<span class="hit tagline" aria-hidden="true">{path === 'direct' ? 'the mount target' : path === 'general' ? 'the container: the root render() mounted' : '<div data-async-container>'}<MarkerCircle beat={path === 'direct' ? 'rest' : path === 'general' ? 'odd' : 'even'} tone="purple" /></span>
-						<span class="hit">
-							<button type="button" class="live" onClick={() => clicks++}>
-								Count {clicks}
-							</button>
-							<MarkerCircle beat={path === 'direct' ? 'odd' : 'rest'} tone="purple" />
-						</span>
-						<span class="script" aria-hidden="true">{'<script data-async-resumer>'}</span>
+						<p class="who">
+							{path === 'Direct'
+								? 'listener: on the button itself'
+								: path === 'General'
+									? 'listener: on the container'
+									: 'listener: the inline resumer, on the container'}
+						</p>
+						<button type="button" class="live" onMouseenter={() => (hovered = true)} onFocus={() => (hovered = true)} onClick={() => clicks++}>
+							Count {clicks}
+						</button>
 					</div>
 				</div>
-				<p class="who note" aria-hidden="true">
-					{path === 'direct'
-						? '↑ a click listener on the button itself'
-						: path === 'general'
-							? '↑ one capture listener per event name, on the container'
-							: '↑ the inline resumer: one capture listener per event name, on the container'}
-				</p>
+
+				<div class="started">
+					<p class="cap">What has started</p>
+					<ul class="rows" hidden={path !== 'Direct'}>
+						<li class="row on"><span>click listener on the button</span><b class="chip">at mount</b></li>
+						<li class={clicks > 0 ? 'row on' : 'row'}><span><code>symbol:0</code> imported, then kept</span><b class="chip">{clicks > 0 ? 'first click' : 'not yet'}</b></li>
+						<li class={clicks > 0 ? 'row on' : 'row'}><span><code>count++</code> on the small <code>Map</code> graph</span><b class="chip">{clicks > 0 ? '×' + clicks : 'not yet'}</b></li>
+						<li class={clicks > 0 ? 'row on' : 'row'}><span>changed text slots written</span><b class="chip">{clicks > 0 ? '×' + clicks : 'not yet'}</b></li>
+						<li class="row never"><span>full runtime</span><b class="chip">never</b></li>
+					</ul>
+					<ul class="rows" hidden={path !== 'General'}>
+						<li class="row on"><span>one listener per event name, on the container</span><b class="chip">at mount</b></li>
+						<li class={hovered || clicks > 0 ? 'row on' : 'row'}><span><code>symbol:0</code> fetched</span><b class="chip">{hovered ? 'on hover' : clicks > 0 ? 'first click' : 'not yet'}</b></li>
+						<li class={clicks > 0 ? 'row on' : 'row'}><span>state graph built, full runtime started</span><b class="chip">{clicks > 0 ? 'first click' : 'not yet'}</b></li>
+						<li class={clicks > 0 ? 'row on' : 'row'}><span><code>symbol:0</code> ran <code>count++</code></span><b class="chip">{clicks > 0 ? '×' + clicks : 'not yet'}</b></li>
+						<li class="row never"><span>the component body, again</span><b class="chip">never</b></li>
+					</ul>
+					<ul class="rows" hidden={path !== 'Server'}>
+						<li class="row on"><span>inline resumer listening on the container</span><b class="chip">at load</b></li>
+						<li class={hovered || clicks > 0 ? 'row on' : 'row'}><span>resume module imported</span><b class="chip">{hovered ? 'on hover' : clicks > 0 ? 'first click' : 'not yet'}</b></li>
+						<li class={clicks > 0 ? 'row on' : 'row'}><span>specialized code ran <code>count++</code></span><b class="chip">{clicks > 0 ? '×' + clicks : 'not yet'}</b></li>
+						<li class="row never"><span>full runtime, for this counter</span><b class="chip">never</b></li>
+						<li class="row never"><span>the component body, in the browser</span><b class="chip">never</b></li>
+					</ul>
+				</div>
 			</div>
-
-			<div class="runs-side">
-				<p class="runs-title note">{clicks === 0 ? 'no click code has run yet' : 'what ran when you pressed'}</p>
-
-				<ol class="steps" data-for="direct">
-					<li><span class="tag">listens</span> the button's own listener asks for <code>symbol:0</code> by ID</li>
-					<li><span class="tag">imports</span> <code>symbol:0</code> once, then keeps it</li>
-					<li><span class="hit"><span class="tag">runs</span> <code>count++</code> on the small <code>Map</code> graph<MarkerSweep beat={clicks === 0 ? 'rest' : clicks % 2 === 0 ? 'even' : 'odd'} place="" /></span></li>
-					<li><span class="tag">writes</span> each text slot is read again, and <code>Count {clicks}</code> is written</li>
-				</ol>
-
-				<ol class="steps" data-for="general">
-					<li><span class="tag">listens</span> the container's listener walks up from the button</li>
-					<li><span class="tag">finds</span> <code>h0</code> plus <code>click</code> in the view record, held in memory</li>
-					<li><span class="tag">builds</span> the state graph and starts the full runtime</li>
-					<li><span class="hit"><span class="tag">runs</span> <code>symbol:0</code> loads and runs <code>count++</code><MarkerSweep beat={clicks === 0 ? 'rest' : clicks % 2 === 0 ? 'even' : 'odd'} place="" /></span></li>
-					<li><span class="tag">writes</span> the text that reads <code>count</code>: <code>Count {clicks}</code></li>
-				</ol>
-
-				<ol class="steps" data-for="server">
-					<li><span class="tag">listens</span> the inline resumer matches <code>h0</code> plus <code>click</code></li>
-					<li><span class="tag">imports</span> the resume module and passes the event on</li>
-					<li><span class="tag">picks</span> this counter's records were all replaced with specialized code, so that code runs</li>
-					<li><span class="hit"><span class="tag">runs</span> <code>count++</code><MarkerSweep beat={clicks === 0 ? 'rest' : clicks % 2 === 0 ? 'even' : 'odd'} place="" /></span></li>
-					<li><span class="tag">writes</span> the text that reads <code>count</code>: <code>Count {clicks}</code></li>
-				</ol>
-
-				<p class="later note">
-					{path === 'direct'
-						? 'Next press: no import. symbol:0 is already kept.'
-						: path === 'general'
-							? 'Next press: the runtime is already running.'
-							: 'Next press: the resume module is already imported.'}
-				</p>
-
-				<p class="never note">
-					{path === 'direct'
-						? 'Never ran: the full runtime.'
-						: path === 'general'
-							? 'Never ran: the component body, again.'
-							: 'Never ran in this browser: the component body. For this counter, the full runtime never starts either.'}
-				</p>
-			</div>
-		</div>
-
-		<p class="said" aria-live="polite">
-			{clicks === 0
-				? ''
-				: path === 'direct'
-					? 'The button listener imported symbol:0 and wrote the new count.'
-					: path === 'general'
-						? 'The container listener started the full runtime, which ran symbol:0.'
-						: 'The inline resumer imported the resume module, which ran the specialized code.'}
-		</p>
-
-		<p class="foot">
-			The button is a real Markless counter, but this site always serves it the same way. The notes trace the
-			path you pick. A plain counter mounted with render() gets a direct module. The general path is what a component with props, child components, a scoped style or a
-			computed() gets.
-		</p>
-
+		</Stage>
+		<Watch>
+			<span>{clicks > 1
+				? path === 'Direct'
+					? 'Next press: no import. symbol:0 is already kept, so it just runs.'
+					: path === 'General'
+						? 'Next press: the runtime is already running, so symbol:0 just runs.'
+						: 'Next press: the resume module is already imported, so the code just runs.'
+				: clicks === 1
+					? path === 'Direct'
+						? "First click: the button's own listener imported symbol:0, ran it, and wrote Count 1."
+						: path === 'General'
+							? 'First click: the container listener found h0 + click, built the graph, started the runtime and ran symbol:0.'
+							: 'First click: the resumer matched h0 + click and passed it to the resume module, which ran the specialized code.'
+					: hovered
+						? path === 'Direct'
+							? 'Hover: nothing starts. The direct module waits for the click.'
+							: path === 'General'
+								? 'Hover: symbol:0 was fetched before the press. It has not run.'
+								: 'Hover: the resume module was imported before the press. No click code has run.'
+						: path === 'Direct'
+							? 'Mount: render() cloned the button and put a click listener on it. No click code has run.'
+							: path === 'General'
+								? 'Mount: Markless built the DOM and kept the records in memory. No click code has run.'
+								: 'Load: the server sent the HTML and records. The browser never runs the component body.'}</span>
+		</Watch>
 		<style>
-			.sketch {
-				container-type: inline-size;
-				margin: var(--space-l) 0;
-				padding: 0;
-			}
-
-			.note {
-				margin: 0;
-				font-family: 'Joy Elia', system-ui, sans-serif;
-				font-size: var(--step-0);
-				line-height: 1.25;
-				color: var(--ink);
-			}
-
-			.pick {
-				display: flex;
-				flex-wrap: wrap;
-				justify-content: center;
-				gap: 0.5rem;
-				margin: 0 0 var(--space-m);
-			}
-
-			.pick button {
-				font-family: 'Joy Elia', system-ui, sans-serif;
-				font-size: var(--step-0);
-				line-height: 1.1;
-				padding: 0.35em 0.85em;
-				color: var(--ink);
-				background: transparent;
-				border: 2px solid var(--ink);
-				border-radius: 999px 860px 920px 780px / 780px 920px 860px 999px;
-				cursor: pointer;
-			}
-
-			.pick button[aria-pressed='true'] {
-				background: var(--yellow);
-				color: oklch(28% 0.015 90);
-				box-shadow: 2px 2px 0 var(--ink);
-			}
-
-			.pick button:focus-visible,
-			.live:focus-visible {
-				outline: 2.5px dashed var(--purple);
-				outline-offset: 4px;
-			}
-
 			.board {
 				display: grid;
-				grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-				gap: 2rem;
-				align-items: start;
-			}
-
-			.call {
-				margin: 0 0 0.5rem;
-				font-family: var(--font-mono);
-				font-size: 0.8rem;
-				color: var(--ink);
-			}
-
-			.window {
-				margin: 0;
-				gap: 0.5rem;
-				align-items: stretch;
-			}
-
-			.strip {
-				display: flex;
+				grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+				gap: 1.4em;
 				align-items: center;
-				gap: 0.5rem;
-				margin: -0.35rem 0 0;
+				width: min(42rem, 100%);
+			}
+
+			.cap {
+				margin: 0 0 0.5em;
+				color: var(--ink);
 				font-family: 'Joy Elia', system-ui, sans-serif;
-				font-size: var(--step--1);
-				color: color-mix(in oklch, var(--ink) 70%, var(--paper));
+				font-weight: 700;
 			}
 
-			.dots {
-				display: inline-flex;
-				gap: 0.25rem;
-			}
-
-			.dots i {
-				width: 0.55rem;
-				height: 0.55rem;
-				border: 1.5px solid var(--ink);
-				border-radius: 50%;
-			}
-
-			.dots i:nth-child(1) {
-				background: var(--pink);
-			}
-
-			.dots i:nth-child(2) {
-				background: var(--yellow);
-			}
-
-			.dots i:nth-child(3) {
-				background: var(--green-star);
+			.page {
+				padding: 0.75em;
+				border: 1px solid var(--ink);
+				border-radius: 6px;
 			}
 
 			.container {
-				position: relative;
 				display: grid;
-				justify-items: start;
-				gap: 0.6rem;
-				padding: 0.6rem 0.8rem 0.8rem;
-				border: 2px dashed color-mix(in oklch, var(--ink) 50%, transparent);
-				border-radius: 4px;
+				justify-items: center;
+				gap: 0.6em;
+				padding: 0.7em 0.6em 0.9em;
+				border: 1.5px solid transparent;
+				border-radius: 6px;
 			}
 
-			.first-click:not([data-path='direct']) .container {
-				border: 2.5px solid var(--purple);
-			}
-
-			.tagline,
-			.script {
-				font-family: var(--font-mono);
-				font-size: 0.72rem;
-				color: color-mix(in oklch, var(--ink) 70%, var(--paper));
-			}
-
-			.script {
-				display: none;
-				padding: 0.1rem 0.4rem;
-				border-radius: 2px;
-				background: color-mix(in oklch, var(--yellow) 55%, transparent);
-				color: var(--ink);
-			}
-
-			.first-click[data-path='server'] .script {
-				display: inline-block;
-			}
-
-			.hit {
-				position: relative;
-				display: inline-block;
-			}
-
-			.live {
-				margin: 0;
+			.board:not([data-path='Direct']) .container {
+				border-color: var(--ink);
+				border-style: dashed;
 			}
 
 			.who {
-				margin: 0.6rem 0 0 0.4rem;
-				rotate: -1.5deg;
-				color: oklch(48% 0.2 310);
-
-				html.dark & {
-					color: var(--purple);
-				}
-			}
-
-			.runs-title {
-				margin: 0 0 0.5rem;
-				font-size: var(--step-1);
-				rotate: -1.5deg;
-			}
-
-			.steps {
-				display: none;
-				gap: 0.45rem;
 				margin: 0;
-				padding: 0;
-				list-style: none;
-				counter-reset: step;
-			}
-
-			.first-click[data-path='direct'] .steps[data-for='direct'],
-			.first-click[data-path='general'] .steps[data-for='general'],
-			.first-click[data-path='server'] .steps[data-for='server'] {
-				display: grid;
-			}
-
-			.steps li {
-				margin: 0;
-				font-size: var(--step--1);
-				line-height: 1.4;
-				opacity: 0.3;
-				transition: opacity 260ms ease;
-			}
-
-			.first-click:not([data-clicked='no']) .steps li {
-				opacity: 1;
-			}
-
-			.steps li:nth-child(2) {
-				transition-delay: 120ms;
-			}
-
-			.steps li:nth-child(3) {
-				transition-delay: 240ms;
-			}
-
-			.steps li:nth-child(4) {
-				transition-delay: 360ms;
-			}
-
-			.steps li:nth-child(5) {
-				transition-delay: 480ms;
-			}
-
-			.steps .tag {
-				display: inline-block;
-				min-width: 4.6rem;
-				margin-right: 0.3rem;
-				padding: 0 0.4rem;
-				border: 1.5px solid var(--ink);
-				border-radius: 999px;
-				font-family: 'Joy Elia', system-ui, sans-serif;
-				font-size: var(--step--1);
+				color: var(--ink);
+				font-size: var(--step--2);
 				text-align: center;
 			}
 
-			.later {
+			.live {
+				padding: 0.5em 1.1em;
+				border: 1px solid var(--ink);
+				border-radius: 6px;
+				background: var(--paper);
+				color: var(--ink);
+				font-family: 'Shantell Sans', system-ui, sans-serif;
+				font-size: var(--step-0);
+				cursor: pointer;
+				transition: background 140ms ease;
+			}
+
+			.board[data-path='Direct'] .live {
+				border: 1.5px dashed var(--ink);
+			}
+
+			.live:hover {
+				background: color-mix(in srgb, var(--purple) 16%, var(--paper));
+			}
+
+			.live:active {
+				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+			}
+
+			.live:focus-visible {
+				outline: 2px solid var(--ink);
+				outline-offset: 4px;
+			}
+
+			.rows {
+				display: grid;
+				gap: 0.35em;
+				margin: 0;
+				padding: 0;
+				list-style: none;
+			}
+
+			.rows[hidden] {
 				display: none;
 			}
 
-			.later,
-			.never {
-				margin-top: 0.8rem;
-				rotate: -1deg;
-				color: oklch(48% 0.2 0);
+			.row {
+				display: flex;
+				gap: 0.6em;
+				align-items: center;
+				justify-content: space-between;
+				padding: 0.3em 0.3em 0.3em 0.6em;
+				border-radius: 6px;
+				color: var(--ink);
+				line-height: 1.35;
+			}
 
-				html.dark & {
-					color: var(--pink);
+			.row code {
+				padding: 0;
+				background: none;
+				color: inherit;
+				font-family: var(--font-mono);
+				font-size: 0.9em;
+			}
+
+			.chip {
+				flex: none;
+				min-width: 5.5em;
+				padding: 0.1em 0.5em;
+				border: 1px dashed var(--ink);
+				border-radius: 6px;
+				font-size: var(--step--2);
+				font-weight: 400;
+				text-align: center;
+				transition: background 140ms ease;
+			}
+
+			.row.on .chip {
+				border-style: solid;
+				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				font-weight: 700;
+			}
+
+			.row.never .chip {
+				border-style: solid;
+				text-decoration: line-through;
+			}
+
+			@media (max-width: 640px) {
+				.board {
+					grid-template-columns: minmax(0, 1fr);
 				}
-			}
-
-			.never {
-				visibility: hidden;
-			}
-
-			.first-click[data-clicked='more'] .later {
-				display: block;
-			}
-
-			.first-click:not([data-clicked='no']) .never {
-				visibility: visible;
-			}
-
-			.said {
-				position: absolute;
-				width: 1px;
-				height: 1px;
-				overflow: hidden;
-				clip-path: inset(50%);
-				white-space: nowrap;
-			}
-
-			.foot {
-				margin: var(--space-s) 0 0;
-				font-size: var(--step--1);
-				line-height: 1.4;
-				color: color-mix(in oklch, var(--ink) 75%, var(--paper));
 			}
 
 			@media (prefers-reduced-motion: reduce) {
-				.steps li {
+				.live,
+				.chip {
 					transition: none;
 				}
 			}
-
-			@container (max-width: 38rem) {
-				.board {
-					grid-template-columns: minmax(0, 1fr);
-					gap: 1.4rem;
-				}
-			}
 		</style>
-	</figure>
+	</PreviewCard>
 }

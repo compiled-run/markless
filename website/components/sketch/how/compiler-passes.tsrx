@@ -1,286 +1,224 @@
-// Every excerpt is copied from compileTsrxModule() output for the counter.
-import { state } from '@markless/core';
-import IndexCard from '../index-card.tsrx';
-import MarkerCircle from '../marker-circle.tsrx';
-import MarkerSweep from '../marker-sweep.tsrx';
-import Ask from './ask.tsrx';
+// Pass names, inputs and outputs come from the compiler's own registry; excerpts are copied from compileTsrxModule() output.
+import { computed, state } from '@markless/core';
+import { defaultCompilerPasses } from '../../../../packages/compiler/src/pass-registry.ts';
+import PreviewCard, { Action, Controls, Stage, Watch } from '../../docs/preview-card.tsrx';
+
+const PASSES = defaultCompilerPasses;
+
+const NOTES: Record<string, { readonly does: string; readonly out: string; readonly marks: string }> = {
+	'tsrx-semantic-graph': {
+		does: 'Builds the semantic graph from the source.',
+		out: 'state:count   state, scalar, starts at 0\nh0            <button>\nevent:0       click on h0\n              runs "() => count++"',
+		marks: 'state button click',
+	},
+	'state-lowering': {
+		does: 'Turns state reads and writes into graph reads and writes.',
+		out: 'read   count    → state:count\nwrite  count++  → state:count\n       operation "update", operator "++"',
+		marks: 'click text',
+	},
+	'payload-arena': {
+		does: 'Plans the state and view records.',
+		out: 'cell     state:count, scalar\nlocator  h0, dom-order, index 0\nupdate   text of h0, prefix "Count "',
+		marks: 'state button',
+	},
+	'symbol-resolver': {
+		does: 'Plans the symbols.',
+		out: 'symbol:0  event-handler, click on h0\nsymbol:1  dom-update, text of h0',
+		marks: 'click text',
+	},
+	'render-data': {
+		does: 'Splits the markup into static HTML and dynamic slots.',
+		out: 'statics  "<button>Count <!--markless-slot:0-->"\n         "</button>"\nslot 0   text, reads state:count',
+		marks: 'button text',
+	},
+	'public-render-plan': {
+		does: 'Collects scoped styles and flags markup the render modules cannot emit.',
+		out: 'styleScopes  []\ndiagnostics  []',
+		marks: '',
+	},
+	'capture-analysis': {
+		does: 'Checks what each symbol reads.',
+		out: 'symbol:0  captures count\n          → graph reference state:count\nsymbol:1  captures nothing',
+		marks: 'click',
+	},
+	'protocol-state': {
+		does: 'Writes the state record.',
+		out: '{"graphNodeId":"state:count",\n "name":"count","valueKind":"scalar",\n "value":{"version":1,"root":0,"records":[]}}',
+		marks: 'state',
+	},
+	'protocol-view': {
+		does: 'Writes the view record, with symbol IDs on each entry.',
+		out: 'events      h0 click → ["symbol:0"]\ndomUpdates  state:count → text of h0\n            → "symbol:1"',
+		marks: 'button click text',
+	},
+	'public-render-module': {
+		does: 'Writes the browser and server render modules, and picks the direct module when it can.',
+		out: 'export function Counter() { … }\n  ↑ the browser module\nasync function marklessRenderSsr(props = {}, …)\n  ↑ the server module',
+		marks: 'state',
+	},
+	'payload-scripts': {
+		does: 'Writes the markless/state and markless/view script tags.',
+		out: '<script type="markless/state">…</script>\n<script type="markless/view">…</script>',
+		marks: '',
+	},
+	'symbol-modules': {
+		does: 'Writes one module source per symbol.',
+		out: 'export function symbol_0(context) { … }\nexport function symbol_1(context) { … }',
+		marks: 'click text',
+	},
+	'runtime-demand-map': {
+		does: 'Maps each symbol and record to the runtime code it needs.',
+		out: 'symbol:0  needs web/fns/write-scalar\nsymbol:1  needs nothing extra',
+		marks: 'click text',
+	},
+	'trigger-groups': {
+		does: 'Groups each event with the state, records and symbols it touches.',
+		out: 'h0:click  → state:count\n          → symbol:0, symbol:1',
+		marks: 'click',
+	},
+	'symbol-resolver-module': {
+		does: 'Writes the module that imports symbols by ID.',
+		out: 'export async function loadSymbol(id) { … }',
+		marks: '',
+	},
+};
 
 export default function CompilerPasses() @{
 	let step = state(1);
+	const passId = computed(() => PASSES[step - 1].passId);
+	const does = computed(() => NOTES[PASSES[step - 1].passId].does);
+	const out = computed(() => NOTES[PASSES[step - 1].passId].out);
+	const marks = computed(() => NOTES[PASSES[step - 1].passId].marks);
+	const reads = computed(() => [...PASSES[step - 1].consumes]);
+	const writes = computed(() => [...PASSES[step - 1].produces]);
+	const watch = computed(() => {
+		const pass = PASSES[step - 1];
+		const made = `New: ${pass.produces.join(' and ')}.`;
+		const readers = PASSES.slice(step).filter((later) => later.consumes.some((name) => pass.produces.includes(name))).length;
+		if (step === PASSES.length) return `${made} That is the last pass.`;
+		return `${made} ${readers === 0 ? 'No later pass reads it.' : readers === 1 ? 'One later pass reads it.' : `${readers} later passes read it.`}`;
+	});
+	const where = computed(() => `Pass ${step} of ${PASSES.length}`);
+	const track = computed(() => `--done:${step - 1};--total:${PASSES.length}`);
+	const atEnd = computed(() => step === PASSES.length);
 
-	<figure class="sketch compiler-passes" data-step={step} style={'--step:' + step}>
-		<Ask question="What does the compiler write down?" hint="Step through the passes. Each one adds a card to the tray." />
-
-		<div class="board">
-			<div class="code-side">
-				<IndexCard label="Counter.tsrx" tilt="-1.2deg">
-					<pre class="code"><span class="line"><span class="k">export function</span>{' '}<span class="f">Counter</span>{'() '}<span class="k">{'@{'}</span></span><span class="line">{'\t'}<span class="k">let</span>{' '}<span class="hit">{'count = '}<span class="f">state</span>{'(0)'}<MarkerSweep beat={step === 1 ? 'odd' : step === 3 ? 'odd' : step === 8 ? 'even' : step === 10 ? 'even' : 'rest'} place="" /></span>{';'}</span><span class="line">{'\t'}<span class="hit"><span class="t">{'<button'}</span><MarkerSweep beat={step === 1 ? 'odd' : step === 3 ? 'odd' : step === 5 ? 'odd' : step === 9 ? 'odd' : 'rest'} place="" /></span>{' '}<span class="hit"><span class="a">onClick</span>{'={() => count++}'}<MarkerSweep beat={step === 1 ? 'odd' : step === 2 ? 'even' : step === 4 ? 'even' : step === 7 ? 'odd' : step === 9 ? 'odd' : step === 12 ? 'even' : step === 13 ? 'odd' : step === 14 ? 'even' : 'rest'} tone="pink" place="" /></span><span class="t">{'>'}</span></span><span class="line">{'\t\t'}<span class="hit">{'Count {count}'}<MarkerSweep beat={step === 2 ? 'even' : step === 4 ? 'even' : step === 5 ? 'odd' : step === 9 ? 'odd' : step === 12 ? 'even' : step === 13 ? 'odd' : 'rest'} tone="green" place="" /></span></span><span class="line">{'\t'}<span class="t">{'</button>'}</span></span><span class="line"><span class="k">{'}'}</span></span></pre>
-				</IndexCard>
-				<p class="note about" aria-hidden="true">{step === 6 ? 'nothing to mark: no scoped style here' : step === 11 || step === 15 ? 'nothing to mark: it reads earlier cards' : '↑ what this pass is about'}</p>
+	<PreviewCard name="compiler-passes" label="The compiler passes, one at a time">
+		<Controls title="What does each pass add?">
+			<div class="stepper">
+				<Action disabled={step === 1} onClick={() => (step = step > 1 ? step - 1 : 1)}>← Back</Action>
+				<p class="where" aria-live="polite">{where}</p>
+				<Action disabled={atEnd} onClick={() => (step = step < PASSES.length ? step + 1 : PASSES.length)}>Next →</Action>
 			</div>
-
-			<div class="line-side">
-				<div class="stations" role="group" aria-label="Passes">
-					<button type="button" aria-label="Pass 1, tsrx-semantic-graph" aria-pressed={step === 1 ? 'true' : 'false'} onClick={() => (step = 1)}>1</button>
-					<button type="button" aria-label="Pass 2, state-lowering" aria-pressed={step === 2 ? 'true' : 'false'} onClick={() => (step = 2)}>2</button>
-					<button type="button" aria-label="Pass 3, payload-arena" aria-pressed={step === 3 ? 'true' : 'false'} onClick={() => (step = 3)}>3</button>
-					<button type="button" aria-label="Pass 4, symbol-resolver" aria-pressed={step === 4 ? 'true' : 'false'} onClick={() => (step = 4)}>4</button>
-					<button type="button" aria-label="Pass 5, render-data" aria-pressed={step === 5 ? 'true' : 'false'} onClick={() => (step = 5)}>5</button>
-					<button type="button" aria-label="Pass 6, public-render-plan" aria-pressed={step === 6 ? 'true' : 'false'} onClick={() => (step = 6)}>6</button>
-					<button type="button" aria-label="Pass 7, capture-analysis" aria-pressed={step === 7 ? 'true' : 'false'} onClick={() => (step = 7)}>7</button>
-					<button type="button" aria-label="Pass 8, protocol-state" aria-pressed={step === 8 ? 'true' : 'false'} onClick={() => (step = 8)}>8</button>
-					<button type="button" aria-label="Pass 9, protocol-view" aria-pressed={step === 9 ? 'true' : 'false'} onClick={() => (step = 9)}>9</button>
-					<button type="button" aria-label="Pass 10, public-render-module" aria-pressed={step === 10 ? 'true' : 'false'} onClick={() => (step = 10)}>10</button>
-					<button type="button" aria-label="Pass 11, payload-scripts" aria-pressed={step === 11 ? 'true' : 'false'} onClick={() => (step = 11)}>11</button>
-					<button type="button" aria-label="Pass 12, symbol-modules" aria-pressed={step === 12 ? 'true' : 'false'} onClick={() => (step = 12)}>12</button>
-					<button type="button" aria-label="Pass 13, runtime-demand-map" aria-pressed={step === 13 ? 'true' : 'false'} onClick={() => (step = 13)}>13</button>
-					<button type="button" aria-label="Pass 14, trigger-groups" aria-pressed={step === 14 ? 'true' : 'false'} onClick={() => (step = 14)}>14</button>
-					<button type="button" aria-label="Pass 15, symbol-resolver-module" aria-pressed={step === 15 ? 'true' : 'false'} onClick={() => (step = 15)}>15</button>
+			<span class="track" aria-hidden="true" style={track}></span>
+		</Controls>
+		<Stage>
+			<div class="board" data-marks={marks}>
+				<div class="source">
+					<p class="file">Counter.tsrx</p>
+					<pre class="code"><code><span class="line"><b>export function</b> Counter() <b>{'@{'}</b></span><span class="line">{'  let '}<span class="m state">{'count = state(0)'}</span>{';'}</span><span class="line">{'  '}<span class="m button">{'<button'}</span>{' '}<span class="m click">{'onClick={() => count++}'}</span>{'>'}</span><span class="line">{'    '}<span class="m text">{'Count {count}'}</span></span><span class="line">{'  </button>'}</span><span class="line"><b>{'}'}</b></span></code></pre>
 				</div>
-
-				<div class="station-card">
-					<div class="pass" data-n="1">
-						<p class="name"><code>tsrx-semantic-graph</code></p>
-						<p class="does">Builds the semantic graph from the source.</p>
-						<pre class="out">{'state:count   state, scalar, starts at 0\nh0            <button>\nevent:0       click on h0\n              runs "() => count++"'}</pre>
+				<div class="pass">
+					<p class="name"><code>{passId}</code></p>
+					<p class="does">{does}</p>
+					<div class="io">
+						<span class="io-name">Reads</span>
+						<ul class="chips">
+							@for (const name of reads; key name) {
+								<li class="chip read">{name}</li>
+							}
+						</ul>
+						<span class="io-name">Writes</span>
+						<ul class="chips">
+							@for (const name of writes; key name) {
+								<li class="chip new">{name}</li>
+							}
+						</ul>
 					</div>
-					<div class="pass" data-n="2">
-						<p class="name"><code>state-lowering</code></p>
-						<p class="does">Turns state reads and writes into graph reads and writes.</p>
-						<pre class="out">{'read   count    → state:count\nwrite  count++  → state:count\n       operation "update", operator "++"'}</pre>
-					</div>
-					<div class="pass" data-n="3">
-						<p class="name"><code>payload-arena</code></p>
-						<p class="does">Plans the state and view records.</p>
-						<pre class="out">{'cell     state:count, scalar\nlocator  h0, dom-order, index 0\nupdate   text of h0, prefix "Count "'}</pre>
-					</div>
-					<div class="pass" data-n="4">
-						<p class="name"><code>symbol-resolver</code></p>
-						<p class="does">Plans the symbols.</p>
-						<pre class="out">{'symbol:0  event-handler, click on h0\nsymbol:1  dom-update, text of h0'}</pre>
-					</div>
-					<div class="pass" data-n="5">
-						<p class="name"><code>render-data</code></p>
-						<p class="does">Splits the markup into static HTML and dynamic slots.</p>
-						<pre class="out">{'statics  "<button>Count <!--markless-slot:0-->"\n         "</button>"\nslot 0   text, reads state:count'}</pre>
-					</div>
-					<div class="pass" data-n="6">
-						<p class="name"><code>public-render-plan</code></p>
-						<p class="does">Collects scoped styles and flags markup the render modules cannot emit.</p>
-						<pre class="out">{'styleScopes  []\ndiagnostics  []'}</pre>
-					</div>
-					<div class="pass" data-n="7">
-						<p class="name"><code>capture-analysis</code></p>
-						<p class="does">Checks what each symbol reads.</p>
-						<pre class="out">{'symbol:0  captures count\n          → graph reference state:count\nsymbol:1  captures nothing'}</pre>
-					</div>
-					<div class="pass" data-n="8">
-						<p class="name"><code>protocol-state</code></p>
-						<p class="does">Writes the state record.</p>
-						<pre class="out">{'{"graphNodeId":"state:count",\n "name":"count","valueKind":"scalar",\n "value":{"version":1,"root":0,"records":[]}}'}</pre>
-					</div>
-					<div class="pass" data-n="9">
-						<p class="name"><code>protocol-view</code></p>
-						<p class="does">Writes the view record, with symbol IDs on each entry.</p>
-						<pre class="out">{'events      h0 click → ["symbol:0"]\ndomUpdates  state:count → text of h0\n            → "symbol:1"'}</pre>
-					</div>
-					<div class="pass" data-n="10">
-						<p class="name"><code>public-render-module</code></p>
-						<p class="does">Writes the browser and server render modules, and picks the direct module when it can.</p>
-						<pre class="out">{'export function Counter() { … }\n  ↑ the browser module\nasync function marklessRenderSsr(props = {}, …)\n  ↑ the server module'}</pre>
-					</div>
-					<div class="pass" data-n="11">
-						<p class="name"><code>payload-scripts</code></p>
-						<p class="does">Writes the markless/state and markless/view script tags.</p>
-						<pre class="out">{'<script type="markless/state">…</script>\n<script type="markless/view">…</script>'}</pre>
-					</div>
-					<div class="pass" data-n="12">
-						<p class="name"><code>symbol-modules</code></p>
-						<p class="does">Writes one module source per symbol.</p>
-						<pre class="out">{'export function symbol_0(context) { … }\nexport function symbol_1(context) { … }'}</pre>
-					</div>
-					<div class="pass" data-n="13">
-						<p class="name"><code>runtime-demand-map</code></p>
-						<p class="does">Maps each symbol and record to the runtime code it needs.</p>
-						<pre class="out">{'symbol:0  needs web/fns/write-scalar\nsymbol:1  needs nothing extra'}</pre>
-					</div>
-					<div class="pass" data-n="14">
-						<p class="name"><code>trigger-groups</code></p>
-						<p class="does">Groups each event with the state, records and symbols it touches.</p>
-						<pre class="out">{'h0:click  → state:count\n          → symbol:0, symbol:1'}</pre>
-					</div>
-					<div class="pass" data-n="15">
-						<p class="name"><code>symbol-resolver-module</code></p>
-						<p class="does">Writes the module that imports symbols by ID.</p>
-						<pre class="out">{'export async function loadSymbol(id) { … }'}</pre>
-					</div>
-				</div>
-
-				<div class="steps">
-					<button type="button" class="go" disabled={step === 1} onClick={() => (step = step > 1 ? step - 1 : 1)}>← Back</button>
-					<p class="where" aria-live="polite">{'Pass ' + step + ' of 15'}</p>
-					<button type="button" class="go" disabled={step === 15} onClick={() => (step = step < 15 ? step + 1 : 15)}>Next →</button>
+					<pre class="out"><code>{out}</code></pre>
 				</div>
 			</div>
-		</div>
-
-		<div class="tray-side">
-			<p class="note tray-title" aria-hidden="true">the tray</p>
-			<ol class="tray" aria-label="Cards written so far">
-				<li style="--n:1">semantic graph</li>
-				<li style="--n:2">reads, writes</li>
-				<li style="--n:3">record plan</li>
-				<li style="--n:4">symbol plan</li>
-				<li style="--n:5">HTML, slots</li>
-				<li style="--n:6">styles, checks</li>
-				<li style="--n:7">captures</li>
-				<li style="--n:8">state record</li>
-				<li class="star" style="--n:9"><span class="hit">view record<MarkerCircle beat={step >= 9 ? 'odd' : 'rest'} /></span></li>
-				<li style="--n:10">render modules</li>
-				<li style="--n:11">script tags</li>
-				<li class="star" style="--n:12"><span class="hit">symbol:0<MarkerCircle beat={step >= 12 ? 'odd' : 'rest'} /></span>{' '}<span class="hit two">symbol:1<MarkerCircle beat={step >= 12 ? 'odd' : 'rest'} /></span></li>
-				<li style="--n:13">demand map</li>
-				<li style="--n:14">trigger groups</li>
-				<li style="--n:15">loadSymbol module</li>
-			</ol>
-			<p class="note circled" aria-hidden="true">{step >= 12 ? 'circled: the three cards this page shows in full' : step >= 9 ? 'circled: shown in full below' : ''}</p>
-		</div>
-
-		<p class="foot">Excerpts are trimmed from the real output for this counter. Line breaks and arrows are mine.</p>
-
+		</Stage>
+		<Watch>
+			<span>{watch}</span>
+		</Watch>
 		<style>
-			.sketch {
-				container-type: inline-size;
-				margin: var(--space-l) 0;
-				padding: 0;
+			.stepper {
+				display: flex;
+				gap: 0.5em;
+				align-items: center;
+				margin-inline-start: auto;
+			}
+
+			.where {
+				margin: 0;
+				min-width: 6.5em;
+				color: var(--ink);
+				text-align: center;
 			}
 
 			.board {
 				display: grid;
-				grid-template-columns: minmax(0, 15.5rem) minmax(0, 1fr);
-				gap: 2.2rem;
-				align-items: start;
-				padding-left: 0.4rem;
+				grid-template-columns: max-content minmax(0, 1fr);
+				gap: 1.1em 1.4em;
+				width: min(42rem, 100%);
 			}
 
-			pre {
+			.source,
+			.pass {
+				min-width: 0;
+			}
+
+			.file,
+			.cap {
+				margin: 0 0 0.4em;
+				color: var(--ink);
+				font-family: 'Joy Elia', system-ui, sans-serif;
+				font-weight: 700;
+			}
+
+			.code,
+			.out {
 				margin: 0;
+				padding: 0.7em 0.85em;
+				border: 1px solid var(--ink);
+				border-radius: 6px;
+				background: var(--paper);
+				overflow-x: auto;
+			}
+
+			.code code,
+			.out code,
+			.name code,
+			.chip {
 				padding: 0;
-				overflow: visible;
 				background: none;
-				border: 0;
+				color: var(--ink);
 				font-family: var(--font-mono);
-				font-size: 0.8rem;
-				line-height: inherit;
-				tab-size: 2;
-				color: oklch(28% 0.015 90);
+				font-size: 0.85em;
+				line-height: 1.6;
+			}
+
+			.code code *,
+			.out code * {
+				font-family: var(--font-mono);
 			}
 
 			.line {
 				display: block;
-				position: relative;
 				white-space: pre;
-				min-height: 1lh;
 			}
 
-			.k {
-				color: #cf222e;
+			.m {
+				border-radius: 3px;
+				transition: background 140ms ease;
 			}
 
-			.f {
-				color: #6639ba;
-			}
-
-			.t {
-				color: #116329;
-			}
-
-			.a {
-				color: #0550ae;
-			}
-
-			.hit {
-				position: relative;
-				display: inline-block;
-			}
-
-			.note {
-				margin: 0;
-				font-family: 'Joy Elia', system-ui, sans-serif;
-				font-size: var(--step-0);
-				line-height: 1.15;
-				color: var(--ink);
-			}
-
-			.about {
-				margin: 0.9rem 0 0 1.2rem;
-				rotate: -2deg;
-				color: oklch(55% 0.2 0);
-
-				html.dark & {
-					color: var(--pink);
-				}
-			}
-
-			.stations {
-				display: grid;
-				grid-template-columns: repeat(8, minmax(0, 1fr));
-				gap: 0.35rem;
-			}
-
-			.stations button {
-				min-width: 0;
-				height: 2.2rem;
-				padding: 0;
-				font-family: 'Joy Elia', system-ui, sans-serif;
-				font-size: var(--step--1);
-				color: var(--ink);
-				background: transparent;
-				border: 1.5px solid var(--ink);
-				border-radius: 46% 54% 50% 50% / 52% 46% 54% 48%;
-				cursor: pointer;
-			}
-
-			.stations button[aria-pressed='true'] {
-				background: var(--yellow);
-				color: oklch(28% 0.015 90);
-				box-shadow: 2px 2px 0 var(--ink);
-			}
-
-			button:focus-visible {
-				outline: 2.5px dashed var(--purple);
-				outline-offset: 3px;
-			}
-
-			.station-card {
-				margin-top: 0.9rem;
-				padding: 0.7rem 0.9rem 0.8rem;
-				border: 2px solid var(--ink);
-				border-radius: 2px;
-				background: var(--raised);
-				box-shadow: 4px 4px 0 var(--purple);
-			}
-
-			.pass {
-				display: none;
-			}
-
-			.compiler-passes[data-step='1'] .pass[data-n='1'],
-			.compiler-passes[data-step='2'] .pass[data-n='2'],
-			.compiler-passes[data-step='3'] .pass[data-n='3'],
-			.compiler-passes[data-step='4'] .pass[data-n='4'],
-			.compiler-passes[data-step='5'] .pass[data-n='5'],
-			.compiler-passes[data-step='6'] .pass[data-n='6'],
-			.compiler-passes[data-step='7'] .pass[data-n='7'],
-			.compiler-passes[data-step='8'] .pass[data-n='8'],
-			.compiler-passes[data-step='9'] .pass[data-n='9'],
-			.compiler-passes[data-step='10'] .pass[data-n='10'],
-			.compiler-passes[data-step='11'] .pass[data-n='11'],
-			.compiler-passes[data-step='12'] .pass[data-n='12'],
-			.compiler-passes[data-step='13'] .pass[data-n='13'],
-			.compiler-passes[data-step='14'] .pass[data-n='14'],
-			.compiler-passes[data-step='15'] .pass[data-n='15'] {
-				display: block;
+			.board[data-marks~='state'] .m.state,
+			.board[data-marks~='button'] .m.button,
+			.board[data-marks~='click'] .m.click,
+			.board[data-marks~='text'] .m.text {
+				background: var(--mark);
+				color: var(--on-mark);
 			}
 
 			.name {
@@ -293,138 +231,75 @@ export default function CompilerPasses() @{
 			}
 
 			.does {
-				margin: 0.3rem 0 0.6rem;
-				font-size: var(--step-0);
-				line-height: 1.35;
-			}
-
-			.out {
-				padding: 0.5rem 0.65rem;
-				border-radius: 2px;
-				background: var(--code-surface);
-				border: 1px solid var(--code-edge);
+				margin: 0.2em 0 0.6em;
 				color: var(--ink);
-				font-size: 0.78rem;
-				line-height: 1.5;
-				white-space: pre-wrap;
-				overflow-wrap: anywhere;
 			}
 
-			.steps {
-				display: flex;
-				align-items: center;
-				justify-content: space-between;
-				gap: 0.5rem;
-				margin-top: 0.8rem;
+			.out code {
+				white-space: pre;
 			}
 
-			.go {
-				font-family: 'Joy Elia', system-ui, sans-serif;
-				font-size: var(--step-0);
-				padding: 0.3em 0.9em;
-				color: oklch(28% 0.015 90);
-				background: var(--green-soft);
-				border: 2px solid var(--ink);
-				border-radius: 2px;
-				box-shadow: 3px 3px 0 var(--ink);
-				cursor: pointer;
+			.io {
+				display: grid;
+				grid-template-columns: auto minmax(0, 1fr);
+				gap: 0.55em 0.8em;
+				align-items: start;
+				margin-block-end: 0.75em;
 			}
 
-			.go:disabled {
-				opacity: 0.45;
-				box-shadow: none;
-				cursor: default;
+			.io-name {
+				padding-block-start: 0.1em;
+				color: var(--ink);
 			}
 
-			.where {
-				margin: 0;
-				font-family: 'Joy Elia', system-ui, sans-serif;
-				font-size: var(--step-0);
-			}
-
-			.tray-side {
-				margin-top: var(--space-m);
-			}
-
-			.tray-title {
-				margin: 0 0 0.4rem 0.4rem;
-				rotate: -2deg;
-			}
-
-			.tray {
+			.chips {
 				display: flex;
 				flex-wrap: wrap;
-				gap: 0.45rem 0.5rem;
+				gap: 0.35em;
 				margin: 0;
-				padding: 0.8rem;
+				padding: 0;
 				list-style: none;
-				border: 2px dashed color-mix(in oklch, var(--ink) 55%, transparent);
+			}
+
+			.chip {
+				padding: 0.1em 0.45em;
+				border: 1px solid var(--ink);
 				border-radius: 6px;
+				font-size: var(--step--2);
 			}
 
-			.tray li {
-				margin: 0;
-				padding: 0.2rem 0.55rem;
-				border: 1.5px solid oklch(28% 0.015 90);
-				border-radius: 2px;
-				background: #fbf6e6;
-				color: oklch(28% 0.015 90);
-				font-family: 'Joy Elia', system-ui, sans-serif;
-				font-size: var(--step--1);
-				line-height: 1.3;
-				box-shadow: -1px 2px 0 rgb(51 48 42 / 0.25);
-				opacity: clamp(0.2, (var(--step) - var(--n) + 1) * 1, 1);
-				translate: 0 calc(clamp(0, var(--n) - var(--step), 1) * -0.5rem);
-				transition: opacity 240ms ease, translate 240ms ease;
+			.chip.read {
+				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
 			}
 
-			.tray li:nth-child(odd) {
-				rotate: -1deg;
+			.chip.new {
+				background: var(--mark);
+				color: var(--on-mark);
+				font-weight: 700;
 			}
 
-			.tray li:nth-child(even) {
-				rotate: 1.2deg;
+			.track {
+				flex: 1 0 100%;
+				height: 6px;
+				border: 1px solid var(--ink);
+				border-radius: 999px;
+				background:
+					linear-gradient(var(--ink), var(--ink)) 0 0 / calc(100% * var(--done) / var(--total)) 100% no-repeat,
+					linear-gradient(color-mix(in srgb, var(--purple) 55%, var(--paper)), color-mix(in srgb, var(--purple) 55%, var(--paper))) calc(100% * var(--done) / (var(--total) - 1)) 0 / calc(100% / var(--total)) 100% no-repeat,
+					var(--paper);
 			}
 
-			.tray .star {
-				background: var(--yellow);
-			}
-
-			.two {
-				margin-left: 0.6rem;
-			}
-
-			.circled {
-				min-height: 1.2em;
-				margin: 0.5rem 0 0 0.4rem;
-				rotate: -1deg;
-				color: oklch(55% 0.2 0);
-
-				html.dark & {
-					color: var(--pink);
+			@media (max-width: 640px) {
+				.board {
+					grid-template-columns: minmax(0, 1fr);
 				}
-			}
-
-			.foot {
-				margin: var(--space-s) 0 0;
-				font-size: var(--step--1);
-				line-height: 1.4;
-				color: color-mix(in oklch, var(--ink) 75%, var(--paper));
 			}
 
 			@media (prefers-reduced-motion: reduce) {
-				.tray li {
+				.m {
 					transition: none;
 				}
 			}
-
-			@container (max-width: 38rem) {
-				.board {
-					grid-template-columns: minmax(0, 1fr);
-					gap: 1.2rem;
-					padding-left: 0;
-				}
-			}
 		</style>
-	</figure>
+	</PreviewCard>
 }

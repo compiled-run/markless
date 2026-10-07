@@ -1,510 +1,279 @@
-// "One plan, three hosts" as a zine page: the counter plan on an index card,
-// fanned out to a browser, a phone and a Mac drawn by hand. Each host keeps its
-// own count, the way three separate apps would.
+// The iOS and macOS records are copied from poc/fixtures/proofs/*-native-rendering-target/artifact.json.
 import { computed, state } from '@markless/core';
-import IndexCard from '../index-card.tsrx';
-import InkArrow from '../ink-arrow.tsrx';
-import MarkerCircle from '../marker-circle.tsrx';
-import MarkerSweep from '../marker-sweep.tsrx';
-import RoughBox from './rough-box.tsrx';
+import PreviewCard, { Choice, Controls, Stage, Watch } from '../../docs/preview-card.tsrx';
 
 export default function NativeHostsSketch() @{
+	let host = state('Browser');
 	let web = state(0);
 	let ios = state(0);
 	let mac = state(0);
-	let taps = state(0);
-	let lastHost = state('none');
-	const beat = computed(() => (taps % 2 === 0 ? 'even' : 'odd'));
-	const webBeat = computed(() => (lastHost === 'web' ? beat : 'rest'));
-	const iosBeat = computed(() => (lastHost === 'ios' ? beat : 'rest'));
-	const macBeat = computed(() => (lastHost === 'mac' ? beat : 'rest'));
+	const presses = computed(() => (host === 'Browser' ? web : host === 'iOS' ? ios : mac));
+	const result = computed(() => (host === 'Browser' ? 'text: Count ' : 'title: Count ') + presses);
+	const said = computed(() =>
+		host === 'Browser'
+			? presses === 0
+				? "Browser: what Markless ships today. Press the button to run the compiler's click symbol."
+				: `Browser: the DOM click ran symbol:0, and the text that reads count changed to Count ${presses}.`
+			: presses === 0
+				? 'A hand-written proof. Press the drawn button to follow its native event.'
+				: `${host === 'iOS' ? 'iOS proof: touchUpInside' : 'macOS proof: action'} ran symbol:counter.increment. Then the Swift runtime read every text binding again.`,
+	);
 
-	<figure class="sketch">
-		<figcaption>
-			<span class="ask">One plan, three hosts</span>
-			<svg class="underline" viewBox="0 0 300 14" preserveAspectRatio="none" aria-hidden="true">
-				<path d="M3 9.5 C 60 5.2 120 10.8 180 7.4 C 225 5 262 8.6 297 6.2" />
-			</svg>
-		</figcaption>
-
-		<div class="plan">
-			<IndexCard label="the counter plan" tilt="-1deg">
-				<ul class="facts">
-					<li><span class="k">state:count</span> = 0</li>
-					<li><span class="k">onClick</span> → activate</li>
-					<li>button text: <span class="s">Count {'${value}'}</span></li>
-					<li><span class="k">symbol:counter.increment</span></li>
-				</ul>
-			</IndexCard>
-		</div>
-
-		<div class="fan" aria-hidden="true">
-			<span class="arrow left"><InkArrow width={120} height={70} x1={112} y1={4} x2={14} y2={64} bend={-10} seed={3} shown="true" /></span>
-			<span class="arrow mid"><InkArrow width={40} height={70} x1={20} y1={4} x2={21} y2={64} bend={4} seed={9} shown="true" /></span>
-			<span class="arrow right"><InkArrow width={120} height={70} x1={8} y1={4} x2={106} y2={64} bend={10} seed={17} shown="true" /></span>
-		</div>
-
-		<div class="hosts">
-			<div role="group" class="host web" aria-label="Browser">
-				<p class="via">compiled by Markless</p>
-				<div class="screen browser">
-					<RoughBox shape="a" />
-					<p class="bar" aria-hidden="true"><span class="dots"><i></i><i></i><i></i></span>browser DOM</p>
-					<button
-						type="button"
-						class="dom-button"
-						data-act="web"
-						aria-label={'Browser button: Count ' + web}
-						onClick={() => {
-							web++;
-							lastHost = 'web';
-							taps++;
-						}}
-					>
-						<span class="hit">Count {web}<MarkerSweep beat={webBeat} place="" /></span>
-					</button>
-					<p class="kind" aria-hidden="true">{'<button>'}</p>
+	<PreviewCard name="native-hosts" label="One counter record, three hosts">
+		<Controls title="One event record, three hosts">
+			<Choice
+				label="Host"
+				hint="The browser runs the compiler's real output. The iOS and macOS proofs read a hand-written artifact.json."
+				options={['Browser', 'iOS', 'macOS']}
+				value="Browser"
+				onChange={(next: string) => (host = next)}
+			/>
+		</Controls>
+		<Stage>
+			<div class="board" data-host={host} data-pressed={presses > 0 ? 'yes' : 'no'}>
+				<div class="record">
+					<p class="cap">{host === 'Browser' ? 'markless/view event record' : 'artifact.json event record'}</p>
+					<pre class="json" hidden={host !== 'Browser'}><code>{'{\n  "hostNodeId": "h0",\n  "eventName": '}<mark>"click"</mark>{',\n  "symbolIds": ["symbol:0"]\n}'}</code></pre>
+					<pre class="json" hidden={host === 'Browser'}><code>{'{\n  "node": "host:button",\n  "authoredEvent": "onClick",\n  "semanticEvent": "activate",\n  "nativeEvent": '}<mark>{host === 'macOS' ? '"action"' : '"touchUpInside"'}</mark>{',\n  "symbolId": "symbol:counter.increment"\n}'}</code></pre>
+					<p class="note">{host === 'Browser' ? 'Written by the compiler.' : 'Written by hand. No Markless package writes it yet.'}</p>
 				</div>
-				<p class="event"><span class="hit ev">click<MarkerCircle beat={webBeat} tone="green" /></span></p>
-				<p class="sticky real">What Markless ships today. It runs the compiler's own output, not the plan card.</p>
-			</div>
 
-			<div role="group" class="host ios" aria-label="iOS proof">
-				<p class="via">hand-written artifact.json</p>
-				<div class="screen phone">
-					<RoughBox shape="b" />
-					<span class="notch" aria-hidden="true"></span>
-					<p class="heading">Markless iOS Proof</p>
-					<button
-						type="button"
-						class="ui-button"
-						data-act="ios"
-						aria-label={'Drawn iOS UIButton: Count ' + ios}
-						onClick={() => {
-							ios++;
-							lastHost = 'ios';
-							taps++;
-						}}
-					>
-						<span class="hit">Count {ios}<MarkerSweep beat={iosBeat} tone="pink" place="" /></span>
-					</button>
-					<p class="kind" aria-hidden="true">UIButton</p>
+				<div class="host">
+					<div class="device web" hidden={host !== 'Browser'}>
+						<p class="bar" aria-hidden="true"><span></span><span></span><span></span></p>
+						<button type="button" class="live" onClick={() => web++}>Count {web}</button>
+						<p class="kind">a DOM <code>{'<button>'}</code></p>
+					</div>
+					<div class="device phone" hidden={host !== 'iOS'}>
+						<span class="notch" aria-hidden="true"></span>
+						<p class="heading">Markless iOS Proof</p>
+						<button type="button" class="live" aria-label={'Drawn UIButton: Count ' + ios} onClick={() => ios++}>Count {ios}</button>
+						<p class="kind"><code>UIButton</code>, drawn here</p>
+					</div>
+					<div class="device mac" hidden={host !== 'macOS'}>
+						<p class="bar" aria-hidden="true"><span></span><span></span><span></span></p>
+						<p class="heading">Markless macOS Proof</p>
+						<button type="button" class="live" aria-label={'Drawn NSButton: Count ' + mac} onClick={() => mac++}>Count {mac}</button>
+						<p class="kind"><code>NSButton</code>, drawn here</p>
+					</div>
+
+					<ol class="trace">
+						<li><code>{host === 'Browser' ? 'click' : host === 'iOS' ? 'touchUpInside' : 'action'}</code></li>
+						<li>{host === 'Browser' ? 'symbol:0 runs' : 'symbol runs in JavaScriptCore'}</li>
+						<li>{result}</li>
+					</ol>
 				</div>
-				<p class="event"><span class="hit ev">touchUpInside<MarkerCircle beat={iosBeat} /></span></p>
-				<p class="sticky proof">Hand-written proof. No Markless package writes this plan yet.</p>
 			</div>
-
-			<div role="group" class="host mac" aria-label="macOS proof">
-				<p class="via">hand-written artifact.json</p>
-				<div class="screen window">
-					<RoughBox shape="c" />
-					<p class="bar" aria-hidden="true"><span class="dots lights"><i></i><i></i><i></i></span></p>
-					<p class="heading">Markless macOS Proof</p>
-					<button
-						type="button"
-						class="ns-button"
-						data-act="mac"
-						aria-label={'Drawn macOS NSButton: Count ' + mac}
-						onClick={() => {
-							mac++;
-							lastHost = 'mac';
-							taps++;
-						}}
-					>
-						<span class="hit">Count {mac}<MarkerSweep beat={macBeat} tone="purple" place="" /></span>
-					</button>
-					<p class="kind" aria-hidden="true">NSButton</p>
-				</div>
-				<p class="event"><span class="hit ev">action<MarkerCircle beat={macBeat} tone="purple" /></span></p>
-				<p class="sticky proof">Hand-written proof. A Swift runtime runs the symbol in JavaScriptCore.</p>
-			</div>
-		</div>
-
-		<p class="say" aria-live="polite">
-			{lastHost === 'web'
-				? 'Browser: the DOM click event ran count++, and the button text changed to Count ' + web + '.'
-				: lastHost === 'ios'
-					? 'iOS proof: touchUpInside runs symbol:counter.increment, then the runtime reads every text binding again. Title: Count ' + ios + '.'
-					: lastHost === 'mac'
-						? 'macOS proof: action runs symbol:counter.increment, then the runtime reads every text binding again. Title: Count ' + mac + '.'
-						: 'Press each button. Same plan, a different event name on each host.'}
-		</p>
-
+		</Stage>
+		<Watch>
+			<span>{said}</span>
+		</Watch>
 		<style>
-			.sketch {
-				container-type: inline-size;
-				margin: var(--space-l) 0;
-				padding: 0 0.4rem;
-				color: var(--ink);
-			}
-
-			figcaption {
-				position: relative;
-				width: fit-content;
-				margin: 0 auto var(--space-m);
-				rotate: -1.5deg;
-			}
-
-			.ask {
-				font-family: 'Joy Elia', system-ui, sans-serif;
-				font-size: var(--step-2);
-				font-weight: 700;
-				line-height: 1.15;
-			}
-
-			.underline {
-				display: block;
-				width: 100%;
-				height: 0.55em;
-				margin-top: -0.1em;
-				fill: none;
-				stroke: var(--pink);
-				stroke-width: 4;
-				stroke-linecap: round;
-			}
-
-			.plan {
-				width: min(100%, 19rem);
-				margin: 1rem auto 0;
-			}
-
-			.facts {
-				margin: 0;
-				padding: 0;
-				list-style: none;
-				font-family: var(--font-mono);
-				font-size: 0.76rem;
-				line-height: 1.5rem;
-			}
-
-			.facts li {
-				margin: 0;
-				padding: 0;
-			}
-
-			.k {
-				color: #6639ba;
-			}
-
-			.s {
-				color: #0a3069;
-			}
-
-			.fan {
-				position: relative;
-				height: 4.4rem;
-				margin: 0.4rem auto 0;
-				width: min(100%, 34rem);
-				color: var(--ink);
-				--ink-weight: 2.2;
-			}
-
-			.arrow {
-				position: absolute;
-				top: 0;
-				height: 100%;
-			}
-
-			.left {
-				left: 6%;
-				width: 32%;
-			}
-
-			.mid {
-				left: calc(50% - 1.25rem);
-				width: 2.5rem;
-			}
-
-			.right {
-				right: 6%;
-				width: 32%;
-			}
-
-			.hosts {
+			.board {
 				display: grid;
-				grid-template-columns: repeat(3, minmax(0, 1fr));
-				gap: 1.4rem;
-				align-items: start;
+				grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+				gap: 1.4em;
+				align-items: center;
+				width: min(40rem, 100%);
+			}
+
+			.cap {
+				margin: 0 0 0.45em;
+				color: var(--ink);
+				font-family: 'Joy Elia', system-ui, sans-serif;
+				font-weight: 700;
+			}
+
+			.json {
+				margin: 0;
+				padding: 0.7em 0.85em;
+				border: 1px solid var(--ink);
+				border-radius: 6px;
+				background: var(--paper);
+				overflow-x: auto;
+			}
+
+			.json[hidden],
+			.device[hidden] {
+				display: none;
+			}
+
+			.json code,
+			.json mark,
+			.kind code,
+			.trace code {
+				padding: 0;
+				background: none;
+				color: var(--ink);
+				font-family: var(--font-mono);
+				font-size: 0.8em;
+				line-height: 1.6;
+			}
+
+			.json mark {
+				padding: 0 0.15em;
+				border-radius: 3px;
+				background: var(--mark);
+				color: var(--on-mark);
+				font-size: 1em;
+				font-weight: 700;
+			}
+
+			.note {
+				margin: 0.45em 0 0;
+				color: var(--ink);
+				font-size: var(--step--2);
 			}
 
 			.host {
-				display: flex;
-				flex-direction: column;
-				align-items: center;
-				gap: 0.5rem;
-				margin: 0;
+				display: grid;
+				justify-items: center;
+				gap: 0.9em;
 			}
 
-			.via {
-				margin: 0;
-				font-family: 'Joy Elia', system-ui, sans-serif;
-				font-size: var(--step--1);
-				color: var(--muted-ink);
-				text-align: center;
-			}
-
-			.screen {
-				position: relative;
-				display: flex;
-				flex-direction: column;
-				align-items: center;
-				gap: 0.6rem;
-				width: 100%;
-				min-height: 11rem;
-				padding: 0.6rem 0.7rem 0.8rem;
+			.device {
+				display: grid;
+				justify-items: center;
+				gap: 0.5em;
 				box-sizing: border-box;
-				--box-fill: var(--raised);
-				--box-weight: 2;
-			}
-
-			.bar {
-				position: relative;
-				align-self: stretch;
-				display: flex;
-				align-items: center;
-				gap: 0.45rem;
-				margin: 0;
-				padding-bottom: 0.35rem;
-				border-bottom: 1.5px dashed color-mix(in oklch, var(--ink) 40%, transparent);
-				font-family: 'Joy Elia', system-ui, sans-serif;
-				font-size: var(--step--1);
-				color: var(--muted-ink);
-				min-height: 1.4rem;
-			}
-
-			.dots {
-				display: inline-flex;
-				gap: 0.22rem;
-			}
-
-			.dots i {
-				width: 0.5rem;
-				height: 0.5rem;
 				border: 1.5px solid var(--ink);
-				border-radius: 50%;
+				background: var(--paper);
 			}
 
-			.dots i:nth-child(1) {
-				background: var(--pink);
-			}
-
-			.dots i:nth-child(2) {
-				background: var(--yellow);
-			}
-
-			.dots i:nth-child(3) {
-				background: var(--green-star);
-			}
-
-			.heading {
-				position: relative;
-				margin: 0;
-				font-family: 'Joy Elia', system-ui, sans-serif;
-				font-size: var(--step-0);
-				font-weight: 700;
-				text-align: center;
-				line-height: 1.15;
+			.web,
+			.mac {
+				width: 13rem;
+				padding: 0 0.9em 0.8em;
+				border-radius: 8px;
 			}
 
 			.phone {
-				width: min(100%, 9.5rem);
+				width: 11rem;
 				min-height: 13rem;
-				padding-top: 1.5rem;
-				justify-content: flex-start;
-			}
-
-			.phone .heading {
-				font-size: var(--step--1);
+				align-content: center;
+				padding: 1.6em 0.8em 1.2em;
+				border-radius: 22px;
+				position: relative;
 			}
 
 			.notch {
 				position: absolute;
-				top: 0.55rem;
-				left: 50%;
-				width: 2.6rem;
-				height: 0.55rem;
+				inset-block-start: 0.5em;
+				inset-inline-start: 50%;
+				width: 3em;
+				height: 0.55em;
+				border: 1px solid var(--ink);
+				border-radius: 999px;
 				translate: -50% 0;
-				border-radius: 1rem;
-				background: var(--ink);
 			}
 
-			button {
-				position: relative;
-				cursor: pointer;
-				font: inherit;
+			.bar {
+				display: flex;
+				gap: 0.3em;
+				justify-self: stretch;
+				margin: 0 -0.9em;
+				padding: 0.4em 0.6em;
+				border-block-end: 1px solid var(--ink);
 			}
 
-			button:focus-visible {
-				outline: 2.5px dashed var(--purple);
-				outline-offset: 4px;
+			.bar span {
+				width: 0.55em;
+				height: 0.55em;
+				border: 1px solid var(--ink);
+				border-radius: 999px;
 			}
 
-			.hit {
-				position: relative;
-				display: inline-block;
-			}
-
-			.dom-button {
-				font-size: var(--step-0);
-				padding: 0.3em 0.9em;
-				color: var(--on-accent);
-				background: var(--green-soft);
-				border: 2px solid var(--ink);
-				border-radius: 2px;
-				box-shadow: 3px 3px 0 var(--ink);
-			}
-
-			.dom-button:active {
-				transform: translate(3px, 3px);
-				box-shadow: none;
-			}
-
-			.ui-button {
-				font-family: system-ui, sans-serif;
-				font-size: 0.95rem;
-				padding: 0.45em 1.1em;
-				color: #fff;
-				background: oklch(58% 0.19 255);
-				border: 1.5px solid var(--ink);
-				border-radius: 0.8rem;
-			}
-
-			.ns-button {
-				font-family: system-ui, sans-serif;
-				font-size: 0.9rem;
-				padding: 0.2em 1em;
-				color: oklch(25% 0 0);
-				background: linear-gradient(oklch(99% 0 0), oklch(93% 0 0));
-				border: 1.5px solid var(--ink);
-				border-radius: 0.35rem;
-			}
-
-			.ui-button:active,
-			.ns-button:active {
-				filter: brightness(0.9);
+			.heading {
+				margin: 0;
+				color: var(--ink);
+				font-weight: 700;
+				text-align: center;
 			}
 
 			.kind {
-				position: relative;
-				margin: auto 0 0;
-				font-family: var(--font-mono);
-				font-size: 0.72rem;
-				color: var(--muted-ink);
+				margin: 0;
+				color: var(--ink);
+				font-size: var(--step--2);
 			}
 
-			.window .bar {
-				min-height: 1.1rem;
-			}
-
-			.lights i:nth-child(1) {
-				background: oklch(68% 0.2 25);
-			}
-
-			.lights i:nth-child(2) {
-				background: oklch(83% 0.16 85);
-			}
-
-			.lights i:nth-child(3) {
-				background: oklch(75% 0.17 145);
-			}
-
-			.event {
-				margin: 0.2rem 0 0;
-				font-family: var(--font-mono);
-				font-size: 0.82rem;
-				font-weight: 600;
-			}
-
-			.ev {
-				padding: 0 0.15rem;
-			}
-
-			.sticky {
-				margin: 0.3rem 0 0;
-				padding: 0.55rem 0.7rem;
-				max-width: 12rem;
-				font-family: 'Joy Elia', system-ui, sans-serif;
-				font-size: var(--step--1);
-				line-height: 1.2;
-				color: oklch(28% 0.015 90);
-				box-shadow: -2px 4px 6px rgb(0 0 0 / 0.18);
-			}
-
-			.real {
-				background: color-mix(in oklch, var(--green-star) 55%, #fff);
-				rotate: 1.5deg;
-			}
-
-			.proof {
-				background: color-mix(in oklch, var(--yellow) 80%, #fff);
-				rotate: -2deg;
-			}
-
-			.mac .proof {
-				rotate: 2.5deg;
-			}
-
-			.say {
-				margin: var(--space-m) 0 0;
-				font-family: 'Joy Elia', system-ui, sans-serif;
+			.live {
+				padding: 0.45em 1em;
+				border: 1px solid var(--ink);
+				border-radius: 6px;
+				background: var(--paper);
+				color: var(--ink);
+				font-family: 'Shantell Sans', system-ui, sans-serif;
 				font-size: var(--step-0);
-				line-height: 1.25;
+				cursor: pointer;
+				transition: background 140ms ease;
 			}
 
-			@container (max-width: 40rem) {
-				.ask {
-					font-size: var(--step-1);
-				}
+			.phone .live {
+				border-radius: 999px;
+			}
 
-				.fan .left,
-				.fan .right {
-					display: none;
-				}
+			.web .live {
+				margin-block-start: 0.4em;
+			}
 
-				.fan {
-					height: 3rem;
-				}
+			.live:hover {
+				background: color-mix(in srgb, var(--purple) 16%, var(--paper));
+			}
 
-				.hosts {
+			.live:active {
+				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+			}
+
+			.live:focus-visible {
+				outline: 2px solid var(--ink);
+				outline-offset: 4px;
+			}
+
+			.trace {
+				display: grid;
+				justify-items: center;
+				gap: 1.3em;
+				margin: 0;
+				padding: 0;
+				list-style: none;
+			}
+
+			.trace li {
+				position: relative;
+				padding: 0.1em 0.5em;
+				border: 1px dashed var(--ink);
+				border-radius: 6px;
+				color: var(--ink);
+				font-size: var(--step--2);
+				transition: background 140ms ease;
+			}
+
+			.trace li + li::before {
+				position: absolute;
+				inset-block-end: 100%;
+				inset-inline-start: 50%;
+				translate: -50% 0;
+				line-height: 1.3;
+				content: '↓';
+			}
+
+			.board[data-pressed='yes'] .trace li {
+				border-style: solid;
+				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+			}
+
+			@media (max-width: 640px) {
+				.board {
 					grid-template-columns: minmax(0, 1fr);
-					gap: 2rem;
 				}
+			}
 
-				.host {
-					display: grid;
-					grid-template-columns: minmax(0, 1fr) minmax(0, 9rem);
-					grid-template-areas:
-						'via via'
-						'screen sticky'
-						'event sticky';
-					column-gap: 1rem;
-					row-gap: 0.4rem;
-					align-items: start;
-					justify-items: center;
-				}
-
-				.via {
-					grid-area: via;
-				}
-
-				.screen {
-					grid-area: screen;
-					min-height: 0;
-				}
-
-				.phone {
-					min-height: 11rem;
-				}
-
-				.event {
-					grid-area: event;
-				}
-
-				.sticky {
-					grid-area: sticky;
-					margin-top: 0.8rem;
+			@media (prefers-reduced-motion: reduce) {
+				.live,
+				.trace li {
+					transition: none;
 				}
 			}
 		</style>
-	</figure>
+	</PreviewCard>
 }
