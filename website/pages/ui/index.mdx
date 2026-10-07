@@ -116,9 +116,9 @@ Import a family by name from the package root. Its parts are properties on that 
 import { modal, select, tabs } from '@markless/ui';
 ```
 
-Most families also have a path of their own, named after the family, such as `@markless/ui/tabs`.
-Three do not: `base`, `hovercard` and `tokenbox`. Import those from the root. The root also exports icon packs, such as
-`lucide`.
+Always import families from the package root in your components. The package also lists a path per family,
+such as `@markless/ui/tabs`. The build rejects a value import from that path with
+[`MARKLESS_UI_IMPORT_SHAPE`](/errors/MARKLESS_UI_IMPORT_SHAPE). The root also exports icon packs, such as `lucide`.
 
 <Callout
 	sprite="flower"
