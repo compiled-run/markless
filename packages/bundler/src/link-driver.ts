@@ -720,12 +720,20 @@ export async function materializeDelegateChildren(
 			});
 			continue;
 		}
-		const component =
+		const imported =
 			candidate.importKind === 'default'
 				? module.default
 				: candidate.importKind === 'namespace'
 					? module
 					: module[candidate.importedName ?? candidate.componentName];
+		// `<pack.icon>` renders the member; a package that throws on the read fails the build with its message.
+		const component = candidate.componentName
+			.split('.')
+			.slice(1)
+			.reduce<unknown>(
+				(object, member) => (object as Record<string, unknown> | undefined)?.[member],
+				imported,
+			);
 		const renderSsr = (component as { readonly renderSsr?: unknown } | undefined)?.renderSsr;
 		if (typeof renderSsr !== 'function') continue;
 		const plan = delegateChildRenderPlan(candidate);

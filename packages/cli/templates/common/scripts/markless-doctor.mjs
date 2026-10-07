@@ -3,7 +3,8 @@
 // guidance for humans and AI agents. Node-only: no browser required.
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { createRequire } from 'node:module';
+import { dirname, resolve } from 'node:path';
 
 const root = process.cwd();
 const results = [];
@@ -104,24 +105,46 @@ check(
 	'add this as a top-level key of tsconfig.json, beside compilerOptions: "tsrx": { "compiler": "@markless/typescript-plugin/volar" }',
 );
 
+// The app's own vite-plus bin, run with this node, so npm, pnpm and bun installs all build the same way.
+const vpBin = () => {
+	const manifestPath = createRequire(resolve(root, 'package.json')).resolve(
+		'vite-plus/package.json',
+	);
+	const { bin } = JSON.parse(readFileSync(manifestPath, 'utf8'));
+	return resolve(dirname(manifestPath), typeof bin === 'string' ? bin : bin.vp);
+};
+
 const skipBuild = process.argv.includes('--no-build');
 if (!skipBuild) {
+	let bin;
 	try {
-		execFileSync('pnpm', ['exec', 'vp', 'build'], { cwd: root, stdio: 'pipe' });
-		check('production build', true, 'vp build succeeded');
+		bin = vpBin();
 	} catch (error) {
-		const output = `${error.stdout ?? ''}${error.stderr ?? ''}`
-			.trim()
-			.split('\n')
-			.slice(-12)
-			.join('\n');
 		check(
 			'production build',
 			false,
-			'vp build failed',
-			'markless build errors are fail-closed and name the offending construct — fix the authored shape, never suppress the gate',
+			`vite-plus is not installed — ${error.message.split('\n')[0]}`,
+			'install dependencies with your package manager (npm install, pnpm install or bun install), then rerun doctor',
 		);
-		if (output) console.log(output);
+	}
+	if (bin) {
+		try {
+			execFileSync(process.execPath, [bin, 'build'], { cwd: root, stdio: 'pipe' });
+			check('production build', true, 'vp build succeeded');
+		} catch (error) {
+			const output = `${error.stdout ?? ''}${error.stderr ?? ''}`
+				.trim()
+				.split('\n')
+				.slice(-12)
+				.join('\n');
+			check(
+				'production build',
+				false,
+				'vp build failed',
+				'markless build errors are fail-closed and name the offending construct — fix the authored shape, never suppress the gate',
+			);
+			if (output) console.log(output);
+		}
 	}
 }
 

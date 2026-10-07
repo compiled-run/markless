@@ -1,4 +1,4 @@
-import { existsSync, realpathSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import type { AliasOptions, UserConfig } from 'vite';
 import { dirname, isAbsolute, join, normalize, resolve } from 'pathe';
 
@@ -33,6 +33,64 @@ export function includeOptimizedDeps(config: UserConfig, specifiers: ReadonlyArr
 		...include,
 		...bundled.filter((specifier) => !include.includes(specifier)),
 	];
+}
+
+// A package that ships Markless source (`publishConfig.marklessShipsSource`) is compiled by the
+// app's own pipeline; the optimizer would parse its `.tsrx` as JavaScript.
+export function excludeSourceShippedDeps(config: UserConfig): void {
+	const root = resolve(config.root ?? '');
+	const appManifest = nearestManifest(root);
+	if (!appManifest) return;
+	const shipsSource: string[] = [];
+	const seen = new Set<string>();
+	const visit = (names: Iterable<string>, from: string) => {
+		for (const name of names) {
+			const directory = installedPackage(name, from);
+			if (directory === undefined || seen.has(directory)) continue;
+			seen.add(directory);
+			const manifest = readManifest(join(directory, 'package.json'));
+			if (manifest?.publishConfig?.marklessShipsSource !== true) continue;
+			if (!shipsSource.includes(name)) shipsSource.push(name);
+			visit(Object.keys(manifest.dependencies ?? {}), realpathOf(directory));
+		}
+	};
+	visit(
+		[
+			...Object.keys(appManifest.manifest.dependencies ?? {}),
+			...Object.keys(appManifest.manifest.devDependencies ?? {}),
+		],
+		appManifest.directory,
+	);
+	if (shipsSource.length === 0) return;
+	const optimizeDeps = (config.optimizeDeps ??= {});
+	const exclude = optimizeDeps.exclude ?? [];
+	optimizeDeps.exclude = [...exclude, ...shipsSource.filter((name) => !exclude.includes(name))];
+}
+
+type PackageManifest = {
+	readonly dependencies?: Record<string, string>;
+	readonly devDependencies?: Record<string, string>;
+	readonly publishConfig?: { readonly marklessShipsSource?: unknown };
+};
+
+function readManifest(path: string): PackageManifest | undefined {
+	try {
+		return JSON.parse(readFileSync(path, 'utf8')) as PackageManifest;
+	} catch {
+		return undefined;
+	}
+}
+
+function nearestManifest(
+	root: string,
+): { readonly directory: string; readonly manifest: PackageManifest } | undefined {
+	for (let directory = root; ; directory = dirname(directory)) {
+		const manifest = existsSync(join(directory, 'package.json'))
+			? readManifest(join(directory, 'package.json'))
+			: undefined;
+		if (manifest) return { directory, manifest };
+		if (dirname(directory) === directory) return undefined;
+	}
 }
 
 // Vite's alias matching: a string find is the id or a `find/` prefix of it.

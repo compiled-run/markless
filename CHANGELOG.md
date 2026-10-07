@@ -99,7 +99,19 @@ The `ui()` Vite plugin from the new `@markless/ui-tools` package sets this up.
 - A new app from `create-markless` installs with npm and pnpm, passes `vp check`
   before and after a build, and starts `npm run dev` without a server error.
 - `@markless/ui` pages render in `pnpm dev` under pnpm's strict layout.
-- `@markless/ui` no longer asks you to install `vitest`.
+- `npm install @markless/ui` works without `--legacy-peer-deps`. `@markless/ui`
+  no longer declares `vite` or `vitest` peers, which made npm stop with
+  `ERESOLVE` once it picked `vitest` 5 for Vite's own optional peers.
+- `@markless/ui` works in `vp dev` without `ui()` in `vite.config`: `markless()`
+  now keeps every dependency that ships Markless source out of Vite's
+  dependency pre-bundling, so the optimizer no longer fails on `.tsrx` files
+  and blocks the page with an error overlay. Icon tags still need `ui()`.
+- When icon tags like `<lucide.chevronright />` reach `vp build` without
+  `ui()`, the build stops with the same message dev shows (add `ui()` from
+  `@markless/ui/vite` before `markless()`), instead of a CSS parse error
+  followed by a "checkout path" error.
+- The starter's `doctor` script builds with the app's own `vp`, so
+  `npm run doctor` and `bun run doctor` work on machines without pnpm.
 - A `Link` with `params` no longer writes your machine's folder path into the
   build.
 - Text that joins a `const` from the component body with state, like

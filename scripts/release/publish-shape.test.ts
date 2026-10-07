@@ -289,21 +289,18 @@ describe('publish manifest shape', () => {
 		});
 	});
 
-	// A required peer the published code never imports still fails a consumer's npm install
-	// whenever their version of it falls outside the range.
+	// npm checks an optional peer's range too: when another package pulls a version outside it,
+	// the consumer's install fails with ERESOLVE, so a peer nothing published imports is dropped.
 	for (const entry of releasePackageEntries) {
 		const manifest = readManifest(entry.name);
-		const requiredPeers = Object.keys(manifest.peerDependencies ?? {}).filter(
-			(peer) => manifest.peerDependenciesMeta?.[peer]?.optional !== true,
-		);
-		for (const peer of requiredPeers) {
-			test(`${entry.name} imports its required peer ${peer} from a published file`, () => {
+		for (const peer of Object.keys(manifest.peerDependencies ?? {})) {
+			test(`${entry.name} imports its peer ${peer} from a published file`, () => {
 				const importers = publishedSourceFiles(entry.packageDir, manifest).filter((path) =>
 					importsPackage(readFileSync(path, 'utf8'), peer),
 				);
 				expect(
 					importers,
-					`${entry.name} requires peer ${peer}; make it optional in peerDependenciesMeta`,
+					`${entry.name} declares peer ${peer} but no published file imports it; remove the peer`,
 				).not.toEqual([]);
 			});
 		}

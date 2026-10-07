@@ -25,7 +25,7 @@ import { deferredRuntimePlugin } from '../build/deferred-runtime.ts';
 import { prefetchChunkParses } from '../build/chunk-ast.ts';
 import { nativePackingPlugins } from '../build/native-packing.ts';
 import { DEPRECATED_NATIVE_PACKING_WARNING, nativePackingEnabled } from '../packing-option.ts';
-import { includeOptimizedDeps } from '../optimized-deps.ts';
+import { excludeSourceShippedDeps, includeOptimizedDeps } from '../optimized-deps.ts';
 import { RESUME_ENTRY_SPECIFIER, STORAGE_FREE_RESUME_ENTRY_SPECIFIER } from '../source-module.ts';
 import { createMarklessRolldownPlugin } from '../rolldown.ts';
 import { sharedReachedRenderDataRequest } from '../virtual-ids.ts';
@@ -191,6 +191,7 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 					RESUME_ENTRY_SPECIFIER,
 					STORAGE_FREE_RESUME_ENTRY_SPECIFIER,
 				]);
+				excludeSourceShippedDeps(config);
 			}
 			// MARKLESS_PRERENDER apps keep their entry regardless of the wake
 			// channel; only the shell prerender itself stays MARKLESS_PRERENDER's.

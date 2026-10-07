@@ -104,7 +104,11 @@ export function createBuildDelegateLoader(): BuildDelegateLoader {
 			importedModuleInterfaces,
 		});
 		for (const module of transformed.virtualModules) {
-			virtualSources.set(normalizeVirtualId(module.id), module.source);
+			// A stylesheet is CSS, not a module this process can evaluate, and render data carries it.
+			virtualSources.set(
+				normalizeVirtualId(module.id),
+				module.type === 'style' ? '' : module.source,
+			);
 		}
 		return transformed.code;
 	}

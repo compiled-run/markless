@@ -16,6 +16,10 @@ import { callBuildStart, callLoad, callTransform } from './helpers.ts';
 const directory = mkdtempSync(join(tmpdir(), 'markless-source-delegate-'));
 afterAll(() => rmSync(directory, { recursive: true, force: true }));
 
+// The style block sits inside the element, which is what makes the module import a CSS sibling.
+const STYLED_FRAME =
+	'export function Frame({ label }) @{\n\t<div class="frame">\n\t\t{label}\n\t\t<style>\n\t\t\t@layer markless { [ui-frame] { anchor-scope: --frame; } }\n\t\t</style>\n\t</div>\n}\n';
+
 const AUTHORED_FRAME =
 	'export function Frame({ label }) @{\n\t<div class="frame">{label}</div>\n}\n';
 
@@ -211,6 +215,95 @@ export default function Page() @{ <main><Frame label="Sized" /></main> }`,
 	expect(warn.mock.calls.map(([message]) => String(message))).not.toContainEqual(
 		expect.stringContaining('MARKLESS_DELEGATE_ARTIFACT_MISSING'),
 	);
+});
+
+test('the build-mode loader executes a source-shipped delegate that carries a style block', async () => {
+	const source = installSourceShippedPackage('@acme/styled-frame', STYLED_FRAME);
+	const loader = createBuildDelegateLoader();
+	const resolveSpecifier = packageRelativeResolve();
+
+	const rendered = await materializeDelegateChildren(
+		{ resolve: async () => source },
+		join(directory, 'App.tsrx'),
+		[child('edge-1')],
+		{
+			modules: createDelegateModuleCache(),
+			importModule: (id: string) => loader.load(id, resolveSpecifier),
+		},
+	);
+
+	expect(rendered.importFailures).toEqual([]);
+	expect(rendered.diagnostics).toEqual([]);
+	expect(rendered.materializations['edge-1']?.html).toMatch(
+		/^<div class="frame[^"]*">Sized<\/div>$/,
+	);
+});
+
+// A kit barrel re-exporting a styled component and an object of member tags from plain JS.
+function installMemberTagKit(name: string, members: string) {
+	const barrel = installSourceShippedPackage(name, STYLED_FRAME);
+	const packageDirectory = dirname(barrel);
+	writeFileSync(join(packageDirectory, 'members.js'), members, 'utf8');
+	writeFileSync(
+		barrel,
+		"export { Frame } from './frame.tsrx';\nexport { glyphs } from './members.js';\n",
+		'utf8',
+	);
+	return barrel;
+}
+
+async function buildPage(name: string, barrel: string, page: string) {
+	const appRoot = join(directory, name);
+	mkdirSync(join(appRoot, 'pages'), { recursive: true });
+	const pageFile = join(appRoot, 'pages/index.tsrx');
+	const plugin = marklessClient({ rootDir: appRoot });
+	callBuildStart(plugin, { cwd: appRoot });
+	await callTransform(plugin, page, pageFile, {
+		resolve: vi.fn(async (specifier: string, importer?: string) =>
+			specifier === name
+				? { id: barrel }
+				: specifier.startsWith('.') && importer
+					? { id: resolve(dirname(importer), specifier) }
+					: null,
+		),
+		getModuleInfo: () => ({ isEntry: true }),
+		warn: vi.fn(),
+	});
+	const loaded = await callLoad(
+		plugin,
+		`\0virtual:markless:render-data:${encodeURIComponent(moduleIdFor(pageFile, appRoot))}`,
+	);
+	return typeof loaded === 'string' ? loaded : ((loaded as { code?: string } | null)?.code ?? '');
+}
+
+test("a member tag whose object refuses the read fails the build with that package's message", async () => {
+	const barrel = installMemberTagKit(
+		'@acme/glyph-kit',
+		'export const glyphs = new Proxy({}, { get(_target, property) { throw new Error(`@acme/glyph-kit: <glyphs.${String(property)} /> needs the kit plugin in vite.config.`); } });\n',
+	);
+
+	await expect(
+		buildPage(
+			'@acme/glyph-kit',
+			barrel,
+			"import { glyphs } from '@acme/glyph-kit';\nexport default function Page() @{ <main><glyphs.star /></main> }",
+		),
+	).rejects.toThrow('@acme/glyph-kit: <glyphs.star /> needs the kit plugin in vite.config.');
+});
+
+test('a member tag naming a component renders that member at build time', async () => {
+	const barrel = installMemberTagKit(
+		'@acme/member-kit',
+		'export const glyphs = { Badge: { renderSsr: (props) => ({ html: `<b>${props.label}</b>`, elementCount: 1 }) } };\n',
+	);
+
+	const renderData = await buildPage(
+		'@acme/member-kit',
+		barrel,
+		'import { glyphs } from \'@acme/member-kit\';\nexport default function Page() @{ <main><glyphs.Badge label="Kept" /></main> }',
+	);
+
+	expect(renderData).toContain('<b>Kept</b>');
 });
 
 test('a delegate the build loader cannot compile keeps the fail-closed diagnostic', async () => {
