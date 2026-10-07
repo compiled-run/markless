@@ -23,7 +23,7 @@ import WhereItRuns from '../components/sketch/start/where-it-runs.tsrx';
 
 <ThemeToggle />
 
-<Subtitle text="Markless is a way to build user interfaces from TypeScript functions with markup in them. The same component runs in a browser tab, on a server, or in a test." />
+<Subtitle text="Markless is a way to build user interfaces from TypeScript functions with markup in them. One component can render anywhere: a browser, a server, a test, or a native screen like iOS." />
 
 Here is a whole component. Click the button a few times. Then change the code, and the result changes with it.
 
@@ -79,7 +79,7 @@ This is the whole model. You write setup code that runs once. You change values 
 
 ## Render it anywhere
 
-Markless does not need a server. The same component renders wherever your app needs it:
+Markless builds one component for any target. Learn it once, and you know how to render to each one:
 
 | Where | How |
 | --- | --- |
@@ -89,7 +89,7 @@ Markless does not need a server. The same component renders wherever your app ne
 | Tests | `@markless/vitest-browser` runs components in the Vitest browser mode. |
 | Native apps | Two experiments drive iOS and macOS buttons from the same kind of counter. |
 
-You write the component the same way for each one. Pick the place your app needs.
+You write the component the same way for each one. The browser, server and test targets work today. iOS and macOS run as early proofs.
 
 <WhereItRuns />
 

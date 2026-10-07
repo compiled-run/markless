@@ -48,7 +48,7 @@ export const nav: readonly NavSection[] = [
 				icon: 'what-is-markless',
 				number: '1',
 				description:
-					'What Markless is: components are plain TypeScript functions, state() makes the page follow a value, and the same component renders in a browser, on a server or in a test.',
+					'What Markless is: components are plain TypeScript functions, state() makes the page follow a value, and one component renders anywhere: a browser, a server, a test or a native screen.',
 			},
 			{
 				title: 'Your first app',
