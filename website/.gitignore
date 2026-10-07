@@ -16,3 +16,6 @@ components/docs/playground/generated/
 components/docs/code/generated/
 .witness*/
 .vercel
+
+# Written by tooling/docs-data.ts on every dev and build start; names hash the page path and offset.
+components/docs/generated-data/
