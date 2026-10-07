@@ -9,7 +9,7 @@ import LikeHeart from '../../components/docs/like-heart.tsrx';
 
 # The design choices, on one page
 
-<PageMeta level="Under the hood" time="5 min" assumes="state, events" sprite="rays" />
+<PageMeta level="Under the hood" time="4 min" assumes="state, events" sprite="rays" />
 
 <ThemeToggle />
 
@@ -38,7 +38,8 @@ server is one option, not a requirement. See [the big idea](/how-it-works/the-bi
 `computed`, `shared`, `element` and `storage`. It exports no effect function.
 
 **The setup runs once.** A component sets up its part of the page one time. After that, a write
-updates the text, attributes and list rows that read it. Nothing re-renders.
+updates the text, attributes and list rows that read it. Nothing re-renders, outside one case the
+compiler warns about.
 
 **Click code runs on first use.** The compiler cuts each handler into a _symbol_: one function with a
 stable ID. The runtime loads it by that ID. A handler runs the first time its event fires, and
@@ -98,7 +99,7 @@ records. `@markless/serializer` refuses a function with `MARKLESS_SERIALIZE_UNSU
 <Collapsible
 	sprite="star-badge"
 	summary="Why a new file type?"
-	text="The compiler owns the language. It can see every state creation site, every closure and every async block in the file, which is what lets it plan updates without markers such as a dollar suffix or .value. The price is the file type: components live in .tsrx files, and those need the Markless compiler."
+	text="The compiler owns the language. It can see every state creation site, closure and async block in the file. That is what lets it plan updates without markers such as a dollar suffix or .value. The price is the file type: components live in .tsrx files, and those need the Markless compiler."
 />
 
 Next: [plan before running, render anywhere](/how-it-works/the-big-idea).

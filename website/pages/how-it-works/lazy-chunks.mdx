@@ -9,7 +9,7 @@ import LazyLanesSketch from '../../components/sketch/how2/lazy-lanes-sketch.tsrx
 
 # When click code downloads, and when it runs
 
-<PageMeta level="Under the hood" time="6 min" assumes="state, events, elements" sprite="rays" />
+<PageMeta level="Under the hood" time="4 min" assumes="state, events, elements" sprite="rays" />
 
 <ThemeToggle />
 
@@ -30,8 +30,8 @@ code still runs only when its event fires.
 
 ## Symbols and chunks
 
-The compiler cuts your component into _symbols_. A symbol is one function with a stable ID, such as
-`symbol:0`. The compiler plans one for each of these:
+The compiler cuts your component into [symbols](/how-it-works), such as `symbol:0`. The compiler
+plans one for each of these:
 
 - an event handler, such as `onClick`, or a callback prop
 - a DOM update, such as the text that shows `count`
@@ -66,12 +66,14 @@ and when:
 | Navigation | Code that only a client-side navigation runs | On navigation intent, never on a landing page |
 | Deferred | Code that no page load, first use or navigation needs | On its first `import()` |
 
+A tier too small to earn a file of its own rides in the first-use pack instead.
+
 A `<link rel="modulepreload">` tag tells the browser to fetch and parse a module early. It does not
 run the module. A production build adds these tags for symbol chunks, at high fetch priority.
 
 One packed chunk still runs lazily inside. Each module in it starts only when something first
-imports it. A bundler test puts two modules in one chunk. After the first import, only the first
-module has run.
+imports it. A bundler test packs three modules into one chunk. After the first import, only the
+first module has run.
 
 Set `packing: false` in the `markless()` plugin options to ship one chunk per module. Dev builds are
 never packed.

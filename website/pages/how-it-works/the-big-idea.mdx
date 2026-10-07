@@ -9,7 +9,7 @@ import PlanAnywhere from '../../components/sketch/how/plan-anywhere.tsrx';
 
 # Plan before running, render anywhere
 
-<PageMeta level="Under the hood" time="5 min" assumes="state, events" sprite="rays" />
+<PageMeta level="Under the hood" time="3 min" assumes="state, events" sprite="rays" />
 
 <ThemeToggle />
 
@@ -36,7 +36,7 @@ From that file, the compiler works out three things:
 
 1. **The state.** `count` becomes a node in a graph, with the ID `state:count`.
 2. **The updates.** The text `Count {count}` becomes one planned text write.
-3. **The event code.** The click becomes its own _symbol_: one function with a stable ID, `symbol:0`.
+3. **The event code.** The click becomes its own symbol, `symbol:0`.
 
 The same compile also writes two render modules. One builds the counter in a browser. The other
 renders it to HTML on a server. [The compiler](/how-it-works/compiler) shows all of this output.
@@ -81,14 +81,14 @@ production build can fetch that code early, but fetching is not running.
 **A write updates its readers and nothing else.** After `count++`, the text that reads `count`
 changes. No component runs again, and nothing compares an old page with a new one.
 
-The environments differ only in how the plan reaches the browser. In the browser alone, it lives in
-memory. A server writes it into the HTML as JSON, and [the payload](/how-it-works/payload) shows
-that format.
+The plan is the same everywhere. What changes is how it reaches the browser. In the browser alone,
+it lives in memory. A server writes it into the HTML as JSON, and [the payload](/how-it-works/payload)
+shows that format.
 
 <Callout
 	sprite="speech-bubble"
 	title="Why does my server page ship no script?"
-	text="Because nothing on it can react. If a page has no handlers, computed values, behaviors, storage or async work, renderToString() sends the HTML in a container div and nothing else. A counter rendered as a plain paragraph comes out as one div with one p inside it."
+	text="Because nothing on it can react. Some pages have no handlers, computed values, behaviors, storage or async work. For those, renderToString() sends the HTML in a container div and nothing else. A counter rendered as a plain paragraph comes out as one div with one p inside it."
 />
 
 Next: [what the compiler makes from that counter](/how-it-works/compiler).

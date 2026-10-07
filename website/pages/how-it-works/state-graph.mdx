@@ -9,7 +9,7 @@ import StateGraphSketch from '../../components/sketch/how2/state-graph-sketch.ts
 
 # Why one write touches one text node
 
-<PageMeta level="Under the hood" time="7 min" assumes="state, computed, events" sprite="rays" />
+<PageMeta level="Under the hood" time="5 min" assumes="state, computed, events" sprite="rays" />
 
 <ThemeToggle />
 
@@ -20,7 +20,7 @@ The compiler did, before the page existed. It wrote down who reads what.
 ## The problem
 
 A write has to change the page. One common way is to run the component again and compare the result
-with the page. That costs the same on every write, even when one character changes.
+with the page. That reruns the whole component, even when one character changes.
 
 Markless skips that work. It needs a list that says which text, attributes and rows read each piece
 of state. That list is the _state graph_.
@@ -99,7 +99,7 @@ export function Menu() @{
 }
 ```
 
-A write to `menu.open` does not wake the reader of `menu.title`. A write that replaces `menu` wakes
+In the full runtime, a write to `menu.open` does not wake the reader of `menu.title`. A write that replaces `menu` wakes
 both, because the empty path is a prefix of every path.
 
 ## Computed values
@@ -109,12 +109,12 @@ recomputes on its next read, not before. Chains work the same way: a computed th
 computed goes stale with it.
 
 On a server-rendered page, the `markless/state` script carries each computed as a recipe. The
-recipe is its dependencies plus the ID of a derive symbol. The current value travels too, but only for a computed
-that a handler reads.
+recipe is its dependencies plus the ID of a derive symbol. The current value travels too, but only for a sync
+computed that a handler reads.
 
 ## What a subscription can return
 
-Every DOM change in the full runtime goes through the journal. These are the entry types:
+The full runtime sends its DOM changes through the journal. These are the entry types:
 
 | Entry | What it does |
 | --- | --- |

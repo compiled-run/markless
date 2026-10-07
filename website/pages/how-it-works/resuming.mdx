@@ -9,7 +9,7 @@ import FirstClick from '../../components/sketch/how/first-click.tsrx';
 
 # The first click, in each environment
 
-<PageMeta level="Under the hood" time="8 min" assumes="state, events" sprite="rays" />
+<PageMeta level="Under the hood" time="5 min" assumes="state, events" sprite="rays" />
 
 <ThemeToggle />
 
@@ -22,7 +22,7 @@ component is. There are three paths, and this page walks each one.
 | --- | --- | --- | --- |
 | Who builds the first DOM? | The compiled module, once | Markless, from the compiled output, once | The server |
 | Who listens? | A listener on each element with an event | One listener per event name on the container | The inline resumer, one listener per event name |
-| What loads on the first click? | That click's symbol | That click's symbols, the state graph and the full runtime | The resume module, then what it needs |
+| What starts on the first click? | That click's symbol | That click's symbols, the state graph and the full runtime | The resume module, then what it needs |
 | Inline script in the HTML? | No | No | Yes, if the page can react |
 
 In all three, a click on the counter runs the handler and updates the text that reads `count`. The
@@ -32,9 +32,8 @@ component itself does not run again.
 
 ## Path 1: the direct browser module
 
-This is the path the counter takes when you call `render()` in a browser. [The
-compiler](/how-it-works/compiler) showed that for a simple component, it writes a _direct browser
-module_.
+This is the path the counter takes when you call `render()` in a browser. For a simple component,
+the compiler writes a [direct browser module](/how-it-works/compiler).
 
 At mount, that module does three things:
 
@@ -42,7 +41,7 @@ At mount, that module does three things:
 2. It builds the component's own small state graph: a `Map` holding `state:count`.
 3. It adds a click listener to the button itself.
 
-That is the whole setup. No full runtime loads.
+That is the whole setup. The full runtime never starts.
 
 On the first click, the listener asks for `symbol:0` by ID. The module imports it once, then keeps
 it. The symbol runs `count++` against the small graph. Then the module reads each text slot again,
@@ -62,12 +61,12 @@ On the first matching event, the listener walks up from the target to the contai
 the element plus the event name in the view record. If a record matches, Markless builds the state
 graph, starts the full runtime, and loads that record's symbols.
 
-Markless's own test for this path mounts a counter, then clicks once. The setup ran once, no symbol
+Markless's own test for this path mounts a hand-built counter, then clicks once. The setup ran once, no symbol
 loaded at mount, and the click loaded exactly one symbol. The test also checks that there is no
 inline script and no payload script.
 
 This path also starts work before the press. A pointer that moves onto an element with a click
-record fetches that click's symbols. Focus on an element with key or input handlers does the same.
+record fetches that click's symbols. Focus on an element with key, input or press handlers does the same.
 These loads never run the handler.
 
 ## Path 3: a server-rendered page
@@ -76,14 +75,12 @@ Here the server ran the component body, and the browser never runs it. The recor
 JSON scripts inside the container, next to the inline resumer. [The payload](/how-it-works/payload)
 shows that HTML.
 
-_Resuming_ means carrying on from the page as it is, without building it again. _Hydration_ is the
-common alternative: the browser runs the component code again to attach listeners. Markless never
-does that.
+This is where Markless [resumes instead of hydrating](/how-it-works).
 
 When the page loads, the inline resumer does three things:
 
 1. It reads the `markless/view` script and walks the container's elements once, in document order.
-2. It maps each locator to an element. A locator names an element by its position in that walk.
+2. It maps each [locator](/how-it-works/compiler) to an element, by the element's position in that walk.
 3. It adds one capture-phase listener per event name to the container. It imports no app code.
 
 When a record matches, the resumer imports the page's resume module and passes the event to it.
@@ -91,23 +88,23 @@ The bundler generates that module from your component file. It queues events, so
 order they fired. Then it picks one of two ways in:
 
 - If the compiler replaced every event and text-update record on the page with specialized code,
-  the module runs that code. The full runtime never loads.
+  the module runs that code. The full runtime never starts.
 - Otherwise it loads the full runtime and builds the state graph from the `markless/state` script.
 
 The resumer also wakes early. A pointer that crosses onto an element with a press record imports
-the resume module before the press lands. Focus on an element with a key record does the same. A
+the resume module before the press lands. Focus on an element with a key, input or press record does the same. A
 second crossing does not import again.
 
 <Callout
 	sprite="speech-bubble"
 	title="What if I click before the inline resumer runs?"
-	text="A tiny capture script sits before the container. While the document is still loading, it records events that land inside the container. The resumer replays them, in order, when it starts. A burst of clicks shares one import of the resume module, and each click still runs in the order it fired."
+	text="A tiny capture script sits before the container. While the document is still loading, it records events that land inside the container. The resumer replays them, in order, when it starts. A burst of clicks shares one import of the resume module. Each click still runs in the order it fired."
 />
 
 <Callout
 	sprite="dots"
 	title="What about onVisible?"
-	text="On a server-rendered page, a visible record gets no event listener. The inline resumer watches those elements with an IntersectionObserver instead, and that observer code ships only if the page has an onVisible handler."
+	text="On a server-rendered page, a visible record gets no event listener. The inline resumer watches those elements with an IntersectionObserver instead. That observer code ships only if the page has an onVisible handler."
 />
 
 Next: [how a write finds the text that reads it](/how-it-works/state-graph).

@@ -1,5 +1,3 @@
-// "Downloaded is not ran" as a zine page: a real two-button page, and two
-// hand-drawn lanes. The page load fills the downloaded lane; clicks fill ran.
 import { computed, state } from '@markless/core';
 import MugArt from '../../mascot/mug-art.tsrx';
 import IndexCard from '../index-card.tsrx';
@@ -148,7 +146,7 @@ export default function LazyLanesSketch() @{
 				? 'The Like click ran its handler and the likes text update. Nothing new downloaded.'
 				: lastAct === 'save'
 					? 'The Save click ran its handler and the saves text update. Nothing new downloaded.'
-					: 'Page load: the first-use pack downloaded. Nothing ran.'}
+					: 'Page load: the first-use pack downloaded. No handler ran.'}
 		</p>
 
 		<style>

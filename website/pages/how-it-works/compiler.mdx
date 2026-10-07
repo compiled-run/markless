@@ -9,7 +9,7 @@ import CompilerPasses from '../../components/sketch/how/compiler-passes.tsrx';
 
 # What the compiler makes from a counter
 
-<PageMeta level="Under the hood" time="7 min" assumes="state, events" sprite="rays" />
+<PageMeta level="Under the hood" time="5 min" assumes="state, events" sprite="rays" />
 
 <ThemeToggle />
 
@@ -35,6 +35,9 @@ named inputs and named outputs. Each pass reads the outputs of earlier passes an
 Before any pass runs, the compiler checks the chain itself. A missing input, two passes making the
 same output, or a cycle stops the compile with `MARKLESS_COMPILER_PASS_GRAPH_INVALID`.
 
+The _semantic graph_ is the first pass's output. It lists every piece of state, element, read and
+write in the file, with what each one means. Every later pass works from it.
+
 For the counter, the chain runs 15 passes, in this order:
 
 | Pass | What it does |
@@ -44,11 +47,11 @@ For the counter, the chain runs 15 passes, in this order:
 | `payload-arena` | Plans the state and view records |
 | `symbol-resolver` | Plans the symbols |
 | `render-data` | Splits the markup into static HTML and dynamic slots |
-| `public-render-plan` | Plans direct DOM output for `render()`, where it can prove it |
+| `public-render-plan` | Collects scoped styles and flags markup the render modules cannot emit |
 | `capture-analysis` | Checks what each symbol reads |
 | `protocol-state` | Writes the state record |
 | `protocol-view` | Writes the view record, with symbol IDs on each entry |
-| `public-render-module` | Writes the browser and server render modules |
+| `public-render-module` | Writes the browser and server render modules, and picks the direct module when it can |
 | `payload-scripts` | Writes the `markless/state` and `markless/view` script tags |
 | `symbol-modules` | Writes one module source per symbol |
 | `runtime-demand-map` | Maps each symbol and record to the runtime code it needs |
@@ -56,9 +59,6 @@ For the counter, the chain runs 15 passes, in this order:
 | `symbol-resolver-module` | Writes the module that imports symbols by ID |
 
 <CompilerPasses />
-
-The _semantic graph_ is the first pass's output. It lists every piece of state, element, read and
-write in the file, with what each one means. Every later pass works from it.
 
 ## The click became a symbol
 
@@ -74,7 +74,8 @@ export function symbol_0(context) {
 }
 ```
 
-A symbol is a module of its own. Nothing imports it until something asks for `symbol:0` by ID.
+A symbol is a module of its own. Its code runs only when something asks for `symbol:0` by ID, even
+if a production build fetched it earlier.
 
 ## The text became a symbol too
 
@@ -123,7 +124,7 @@ The state record next to it holds one cell: `state:count`, a scalar, starting at
 
 The same compile writes a browser module and a server module.
 
-The server module exports `marklessRenderSsr`. It renders the counter to HTML and fills in the state
+The server module defines `marklessRenderSsr`. It renders the counter to HTML and fills in the state
 and view records. [The payload](/how-it-works/payload) shows what it sends.
 
 The browser module is the interesting one. For a simple component like this, the compiler writes a
@@ -145,12 +146,12 @@ const cells = new Map([["state:count", 0]]);
 ```
 
 `renderMarklessDirectChunk` clones the button from a template, fills in the text, and puts a click
-listener on the button itself. It does not load the full runtime. [Resuming](/how-it-works/resuming)
+listener on the button itself. It never starts the full runtime. [Resuming](/how-it-works/resuming)
 follows what happens on the first click.
 
 Not every component gets a direct module. The compiler writes one only when it can prove the
-simple path covers the whole component. Each of these sends a component down the general path
-instead:
+simple path covers the whole component. Each of these, among others, sends a component down the
+general path instead:
 
 - props
 - child components
@@ -158,13 +159,16 @@ instead:
 - a `computed()`
 - an element handle
 - an async block
+- more than one root element
+- a dynamic attribute other than `class`
+- `shared()` or an `attach={...}` behavior
 
 That general path is the fallback, and the next pages cover it.
 
 <Callout
 	sprite="cross"
 	title="Why did my handler fail to build?"
-	text="A symbol runs later, apart from the component body, so it can read only what the compiler can find again: state, element handles, props, imports and values it can write down. A handler that reads a local such as const seen = new WeakMap() fails with MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED, and the message names the local: a local class instance value that cannot cross a resume boundary."
+	text="A symbol runs later, apart from the component body. So it can read only what the compiler can find again. That means state, element handles, props, imports and values it can write down. A handler that reads a local such as const seen = new WeakMap() fails with MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED. The message names the local: a local class instance value that cannot cross a resume boundary."
 />
 
 Next: [the format a server writes into its HTML](/how-it-works/payload).

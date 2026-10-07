@@ -9,7 +9,7 @@ import PayloadCard from '../../components/sketch/how/payload-card.tsrx';
 
 # What a server writes into its HTML
 
-<PageMeta level="Under the hood" time="5 min" assumes="state, events" sprite="rays" />
+<PageMeta level="Under the hood" time="3 min" assumes="state, events" sprite="rays" />
 
 <ThemeToggle />
 
@@ -69,7 +69,7 @@ Values must be data. `@markless/serializer` refuses a function with
 <Callout
 	sprite="speech-bubble"
 	title="Why is the JSON readable?"
-	text="Both scripts hold plain JSON.stringify output. The serializer escapes only the two sequences that can end a script tag early, which are a less-than sign followed by a slash or by an exclamation mark."
+	text="Both scripts hold plain JSON.stringify output. The serializer escapes only the two sequences that can end a script tag early. One is a less-than sign followed by a slash. The other is a less-than sign followed by an exclamation mark."
 />
 
 ## A page with nothing to react to

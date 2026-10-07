@@ -1,5 +1,3 @@
-// "Who hears the first click?": one real counter, three ways it can be on the
-// page, and marker notes on who listens and what runs when it is pressed.
 import { state } from '@markless/core';
 import MarkerCircle from '../marker-circle.tsrx';
 import MarkerSweep from '../marker-sweep.tsrx';
@@ -94,7 +92,7 @@ export default function FirstClick() @{
 						? 'Never ran: the full runtime.'
 						: path === 'general'
 							? 'Never ran: the component body, again.'
-							: 'Never ran in this browser: the component body. For this counter, the full runtime never loads either.'}
+							: 'Never ran in this browser: the component body. For this counter, the full runtime never starts either.'}
 				</p>
 			</div>
 		</div>
@@ -110,8 +108,8 @@ export default function FirstClick() @{
 		</p>
 
 		<p class="foot">
-			The button is a real Markless counter; the notes trace the path you pick. The counter itself gets a direct
-			module. The general path is what a component with props, child components, a scoped style or a
+			The button is a real Markless counter, but this site always serves it the same way. The notes trace the
+			path you pick. A plain counter mounted with render() gets a direct module. The general path is what a component with props, child components, a scoped style or a
 			computed() gets.
 		</p>
 

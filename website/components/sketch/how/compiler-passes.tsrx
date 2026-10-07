@@ -1,5 +1,4 @@
-// "What does the compiler write down?": step through the 15 passes for the
-// counter. Every excerpt is copied from compileTsrxModule() output for it.
+// Every excerpt is copied from compileTsrxModule() output for the counter.
 import { state } from '@markless/core';
 import IndexCard from '../index-card.tsrx';
 import MarkerCircle from '../marker-circle.tsrx';
@@ -67,7 +66,7 @@ export default function CompilerPasses() @{
 					</div>
 					<div class="pass" data-n="6">
 						<p class="name"><code>public-render-plan</code></p>
-						<p class="does">Plans direct DOM output for render(), where it can prove it.</p>
+						<p class="does">Collects scoped styles and flags markup the render modules cannot emit.</p>
 						<pre class="out">{'styleScopes  []\ndiagnostics  []'}</pre>
 					</div>
 					<div class="pass" data-n="7">
@@ -87,7 +86,7 @@ export default function CompilerPasses() @{
 					</div>
 					<div class="pass" data-n="10">
 						<p class="name"><code>public-render-module</code></p>
-						<p class="does">Writes the browser and server render modules.</p>
+						<p class="does">Writes the browser and server render modules, and picks the direct module when it can.</p>
 						<pre class="out">{'export function Counter() { … }\n  ↑ the browser module\nasync function marklessRenderSsr(props = {}, …)\n  ↑ the server module'}</pre>
 					</div>
 					<div class="pass" data-n="11">
@@ -133,7 +132,7 @@ export default function CompilerPasses() @{
 				<li style="--n:3">record plan</li>
 				<li style="--n:4">symbol plan</li>
 				<li style="--n:5">HTML, slots</li>
-				<li style="--n:6">direct DOM plan</li>
+				<li style="--n:6">styles, checks</li>
 				<li style="--n:7">captures</li>
 				<li style="--n:8">state record</li>
 				<li class="star" style="--n:9"><span class="hit">view record<MarkerCircle beat={step >= 9 ? 'odd' : 'rest'} /></span></li>
