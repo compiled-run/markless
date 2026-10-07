@@ -1,5 +1,4 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import SharedCounterDemo from '../../components/demos/build/shared-counter-demo.tsrx';
 import TalliesPageDemo from '../../components/demos/build/tallies-page-demo.tsrx';
 import TalliesWidgetDemo from '../../components/demos/build/tallies-widget-demo.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
@@ -23,11 +22,8 @@ definition gets the same `count`, and a change from one shows up in the other.
 
 Click **Add one**.
 
-<SharedCounterDemo />
-
-The click runs in `SharedCounter`, but the number changes inside `Badge`. No prop connects them.
-
-```tsrx
+<Code note="Add a decrement() method next to increment(), and a second button that calls it. Then add a third component that shows c.count * 2, and put it in the section.">
+```tsrx title="shared-counter.tsrx"
 import { shared, state } from '@markless/core';
 
 export const counter = shared(
@@ -53,11 +49,12 @@ export default function SharedCounter() @{
 	</section>
 }
 ```
+</Code>
+
+The click runs in `SharedCounter`, but the number changes inside `Badge`. No prop connects them.
 
 The function you pass to `shared()` creates the state. It returns the state plus any methods you
 want, like `increment()`. Each component calls `counter()` to get it.
-
-{/* PLAYGROUND: starter file shared-counter.tsrx. Try: add a decrement() method and a second button. Try: add a third component that shows c.count * 2. */ null}
 
 ## Who gets the same copy
 

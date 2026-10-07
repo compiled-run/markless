@@ -1,5 +1,4 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import FocusCounterDemo from '../../components/demos/build/focus-counter-demo.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
@@ -22,12 +21,8 @@ that element is on the page.
 
 Click **Add one and focus**.
 
-<FocusCounterDemo />
-
-The number goes up, and the cursor lands in the field. Click the word **Count** too. The cursor goes
-to the field, because the label points at it. Nobody wrote an id.
-
-```tsrx
+<Code note="Add a Select button whose click runs field?.select(). Click it, and the number in the field is selected. Then add a second input with its own handle, and a button that focuses it.">
+```tsrx title="focus-counter.tsrx"
 import { element, state } from '@markless/core';
 
 export default function FocusCounter() @{
@@ -41,11 +36,13 @@ export default function FocusCounter() @{
 	</section>
 }
 ```
+</Code>
+
+The number goes up, and the cursor lands in the field. Click the word **Count** too. The cursor goes
+to the field, because the label points at it. Nobody wrote an id.
 
 `el={field}` links the handle to the `<input>`. Inside a handler, `field` is the element itself. If
 the element is not on the page, `field` is `undefined`. That is why the code writes `field?.focus()`.
-
-{/* PLAYGROUND: starter file focus-counter.tsrx. Try: change the handler to field?.select(). Try: add a second input with its own handle and a button that focuses it. */ null}
 
 ## Links without ids
 
@@ -102,7 +99,7 @@ with `MARKLESS_ATTACH_HOST_ELEMENT_REQUIRED`.
 
 ## Try it yourself
 
-Add a **Clear** button to the demo file. Its handler sets `count` to `0` and puts the cursor back in
+Add a **Clear** button to the file above. Its handler sets `count` to `0` and puts the cursor back in
 the field.
 
 Next: [keep a value across reloads](/build/storage).

@@ -1879,7 +1879,7 @@ try {
 		await focusButton.waitFor();
 		const activeIsField = () =>
 			page.evaluate(() => {
-				const field = document.querySelector('.playground input');
+				const field = document.querySelector('.code-block [data-code-stage] input');
 				return Boolean(field) && document.activeElement === field;
 			});
 		const settleFocus = async () => {
@@ -1893,12 +1893,12 @@ try {
 		await settleFocus();
 		check(await activeIsField(), 'clicking the button puts the caret in the field');
 		check(
-			(await page.locator('.playground input').inputValue()) === '1',
+			(await page.locator('.code-block [data-code-stage] input').inputValue()) === '1',
 			'the same click adds one to the count in the field',
-			await page.locator('.playground input').inputValue(),
+			await page.locator('.code-block [data-code-stage] input').inputValue(),
 		);
 		await focusButton.focus();
-		await page.locator('.playground label').click();
+		await page.locator('.code-block [data-code-stage] label').click();
 		await settleFocus();
 		check(
 			await activeIsField(),
@@ -1931,7 +1931,7 @@ try {
 
 		// --- widget: the shared counter on the shared page --------------------------
 		await page.goto(`${origin}/build/shared`, { waitUntil: 'load' });
-		const sharedDemo = page.locator('.playground').filter({ hasText: 'Badge shows:' }).first();
+		const sharedDemo = page.locator('.code-block [data-code-stage]').first();
 		const sharedBadge = sharedDemo.locator('output').first();
 		await sharedBadge.waitFor();
 		check(
