@@ -1935,6 +1935,98 @@ try {
 			'a Code block with several files switches to the file tab the reader clicks',
 		);
 
+		// --- previews: lists, async and styling concept cards --------------------
+		// Each card reads the live component, so these checks drive the card and read what it reports.
+		const watchSays = async (card: Locator, wanted: (text: string) => boolean, label: string) => {
+			const read = async () => (await card.locator('.pv-watch-text').innerText()).replace(/\s+/g, ' ').trim();
+			for (let attempt = 0; attempt < 40; attempt += 1) {
+				if (wanted(await read())) break;
+				await new Promise((done) => setTimeout(done, 100));
+			}
+			const text = await read();
+			check(wanted(text), label, text);
+			return text;
+		};
+
+		await page.goto(`${origin}/concepts/lists`, { waitUntil: 'load' });
+		const rowsCard = page.locator('section[data-preview="lists"]');
+		const rowNames = async () =>
+			(await rowsCard.locator('li.row').allTextContents()).map((text) => text.trim()).join('|');
+		await rowsCard.getByRole('checkbox', { name: 'Pears' }).check();
+		await watchSays(rowsCard, (text) => text.includes('Pears on row'), 'the lists card numbers the rows on the first tick');
+		const pearsRow = await rowsCard.locator('li.row', { hasText: 'Pears' }).getAttribute('data-row');
+		await rowsCard.getByRole('button', { name: 'Reverse' }).click();
+		await watchSays(
+			rowsCard,
+			(text) => text.startsWith('Reverse: 2 moved, 0 made, 0 thrown away. The tick rode along with Pears.'),
+			'Reverse moves the keyed rows, makes none, and the tick rides with Pears',
+		);
+		check((await rowNames()) === 'Milk|Coffee|Pears', 'Reverse reorders the rows', await rowNames());
+		check(
+			(await rowsCard.locator('li.row', { hasText: 'Pears' }).getAttribute('data-row')) === pearsRow &&
+				(await rowsCard.getByRole('checkbox', { name: 'Pears' }).isChecked()),
+			'the Pears element keeps its number and its tick through the reverse',
+		);
+		for (let left = 2; left >= 0; left -= 1) {
+			await rowsCard.getByRole('button', { name: 'Remove top' }).click();
+			await watchSays(rowsCard, (text) => text.startsWith('Remove top: 0 moved, 0 made, 1 thrown away.'), `Remove top throws one row away (${left} left)`);
+		}
+		check(
+			((await rowsCard.locator('li.none').textContent()) ?? '').trim() === 'Nothing left to buy.',
+			'the empty list shows its @empty block',
+		);
+		await rowsCard.getByRole('button', { name: 'Reset' }).click();
+		await watchSays(rowsCard, (text) => text.startsWith('Reset: 0 moved, 3 made, 0 thrown away.'), 'Reset makes three new rows');
+
+		await page.goto(`${origin}/concepts/async`, { waitUntil: 'load' });
+		const blocksCard = page.locator('section[data-preview="async"]');
+		const onPage = () => blocksCard.locator('li.block[data-on="true"], li.block[data-on="held"]').innerText();
+		await blocksCard.getByRole('radio', { name: 'tall', exact: true }).check({ force: true });
+		await watchSays(blocksCard, (text) => text.startsWith('The tall answer is ready'), 'the async card swaps in the tall answer');
+		await blocksCard.getByRole('radio', { name: 'small', exact: true }).check({ force: true });
+		await watchSays(blocksCard, (text) => text.startsWith('Looking up the small mug.'), 'the async card reports the new lookup');
+		check(
+			((await blocksCard.locator('.answer').textContent()) ?? '').trim() === 'The tall mug holds a big coffee.' &&
+				(await blocksCard.locator('li.block[data-on="held"]').count()) === 1,
+			'while small is looked up, the tall answer stays and @try is marked as still showing',
+		);
+		await watchSays(blocksCard, (text) => text.startsWith('The small answer is ready'), 'the small answer replaces the tall one');
+		await blocksCard.getByRole('radio', { name: 'cracked', exact: true }).check({ force: true });
+		await watchSays(blocksCard, (text) => text.startsWith('The lookup failed'), 'the cracked mug lands in @catch');
+		check((await onPage()).includes('@catch'), 'the async card marks @catch as on the page', await onPage());
+
+		await page.goto(`${origin}/concepts/styling`, { waitUntil: 'load' });
+		const scopeCard = page.locator('section[data-preview="styling"]');
+		const groundOf = (index: number) =>
+			scopeCard.locator('.card').nth(index).evaluate((node) => getComputedStyle(node).backgroundColor);
+		const paperAtRest = await groundOf(0);
+		const chalkAtRest = await groundOf(1);
+		check(paperAtRest !== chalkAtRest, 'two files style .card, and the two cards look different', `${paperAtRest} vs ${chalkAtRest}`);
+		await scopeCard.getByRole('switch', { name: 'Chalk card lit' }).click();
+		await watchSays(scopeCard, (text) => text.startsWith("The chalk card's class is now card lit."), 'the lit switch reports the new class');
+		check(
+			(await scopeCard.locator('.card').nth(1).getAttribute('class'))?.split(/\s+/).includes('lit') === true &&
+				(await groundOf(1)) !== chalkAtRest &&
+				(await groundOf(0)) === paperAtRest,
+			'lighting the chalk card restyles it and leaves the paper card alone',
+		);
+		await scopeCard.getByRole('radio', { name: 'big', exact: true }).check({ force: true });
+		await watchSays(scopeCard, (text) => text.includes('data-size is now big'), 'the size choice reports the new attribute');
+		check(
+			(await scopeCard.locator('.card').first().getAttribute('data-size')) === 'big',
+			'the paper card carries data-size="big"',
+		);
+		await scopeCard.getByRole('switch', { name: 'Show page classes' }).click();
+		const scopes = await watchSays(scopeCard, (text) => /mk-\w+ and mk-\w+/.test(text), 'the card reads each file class from the page');
+		const [paperScope, chalkScope] = scopes.match(/mk-\w+/g) ?? [];
+		check(
+			paperScope !== chalkScope &&
+				(await scopeCard.locator('.card').first().getAttribute('class'))?.includes(paperScope ?? '?') === true &&
+				(await scopeCard.locator('.card').nth(1).getAttribute('class'))?.includes(chalkScope ?? '?') === true,
+			'each card carries a different file class, the one the card reports',
+			`${paperScope} vs ${chalkScope}`,
+		);
+
 		// The first-app page carries the scaffold command and a starter home that runs.
 		await page.goto(`${origin}/start/first-app`, { waitUntil: 'load' });
 		const firstAppText = (await page.locator('.prose').first().innerText()).replace(
