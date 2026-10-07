@@ -121,10 +121,7 @@ export default function CodeFiles({ panes }: { readonly panes: readonly CodePane
 		scrollbar-width: thin;
 	}
 
-	.editor:focus-within {
-		outline: 2px dashed var(--code-band);
-		outline-offset: -4px;
-	}
+
 
 	.layers {
 		display: grid;

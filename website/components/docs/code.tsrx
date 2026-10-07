@@ -124,14 +124,17 @@ export default function Code({
 			}
 
 			.rings {
+				--ring: hsl(256deg 25% 69%);
+				--ring-shine: hsl(256deg 30% 82%);
 				position: absolute;
 				top: 0.35rem;
 				bottom: 0.65rem;
 				left: -18px;
 				width: 40px;
 				pointer-events: none;
-				background: var(--ink);
-				mask: url('/notebook-holes.svg') 0 0 / 40px 34px space;
+				background:
+					radial-gradient(circle at 26.5px 10.5px, hsl(30deg 8% 12%) 0 4.2px, transparent 4.7px)
+					0 0 / 40px 40px no-repeat round;
 			}
 
 			.rings::before,
@@ -139,13 +142,13 @@ export default function Code({
 				content: '';
 				position: absolute;
 				inset: 0;
-				mask: url('/notebook-wire.svg') 0 0 / 40px 34px space;
-				background: color-mix(in oklch, var(--ink) 85%, var(--paper));
+				background: var(--ring);
+				mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2240%22%20height%3D%2240%22%3E%3Cpath%20d%3D%22M25.5%209.4C20%202.6%206.5%203.2%204.4%2012.6C2.8%2019.8%209.6%2023.6%2017.5%2022.2%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%226%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E") 0 0 / 40px 40px no-repeat round;
 			}
 
 			.rings::after {
-				mask-image: url('/notebook-sheen.svg');
-				background: color-mix(in oklch, var(--paper) 80%, var(--ink));
+				background: var(--ring-shine);
+				mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2240%22%20height%3D%2240%22%3E%3Cpath%20d%3D%22M21.5%206.2C15%203.4%207.6%205%205.9%2011.6%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E");
 			}
 
 			.bar {
@@ -325,56 +328,18 @@ export default function Code({
 
 			.code-block[data-skin='image'] {
 				--code-tab-left: 35px;
-				border-color: transparent;
+				border: 2px solid transparent;
+				border-image: url('/notebook/frame.png') 50 30 32 64 / 50px 30px 32px 64px / 8px 11px 15px 18px round;
 				box-shadow: none;
 			}
 
-			.code-block[data-skin='image']::before {
-				content: '';
-				position: absolute;
-				inset: -9px -13px -16px -19px;
-				pointer-events: none;
-				background:
-					url('/notebook/tl.png') left top / 56px 50px no-repeat,
-					url('/notebook/tr.png') right top / 42px 32px no-repeat,
-					url('/notebook/bl.png') left bottom / 64px 32px no-repeat,
-					url('/notebook/br.png') right bottom / 42px 32px no-repeat,
-					url('/notebook/top.png') 56px top / calc(100% - 98px) 32px no-repeat,
-					url('/notebook/bottom.png') 64px bottom / calc(100% - 106px) 32px no-repeat,
-					url('/notebook/right.png') right 32px / 32px calc(100% - 64px) no-repeat;
-			}
-
 			.code-block[data-skin='image'] .rings {
-				top: 41px;
-				bottom: 16px;
-				left: -19px;
-				width: 50px;
-				background: url('/notebook/coil.png') 0 0 / 50px 34px no-repeat round;
-				mask: none;
-			}
-
-			.code-block[data-skin='image'] .rings::before,
-			.code-block[data-skin='image'] .rings::after {
 				display: none;
-			}
-
-			html.dark .code-block[data-skin='image']::before {
-				background:
-					url('/notebook/tl-dark.png') left top / 56px 50px no-repeat,
-					url('/notebook/tr-dark.png') right top / 42px 32px no-repeat,
-					url('/notebook/bl-dark.png') left bottom / 64px 32px no-repeat,
-					url('/notebook/br-dark.png') right bottom / 42px 32px no-repeat,
-					url('/notebook/top-dark.png') 56px top / calc(100% - 98px) 32px no-repeat,
-					url('/notebook/bottom-dark.png') 64px bottom / calc(100% - 106px) 32px no-repeat,
-					url('/notebook/right-dark.png') right 32px / 32px calc(100% - 64px) no-repeat;
 			}
 
 			html.dark .code-block[data-skin='image'] {
 				--paper: var(--raised);
-			}
-
-			html.dark .code-block[data-skin='image'] .rings {
-				background-image: url('/notebook/coil-dark.png');
+				border-image-source: url('/notebook/frame-dark.png');
 			}
 
 			@media (prefers-reduced-motion: reduce) {
