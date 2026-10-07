@@ -9,7 +9,7 @@ import LikeHeart from '../../components/docs/like-heart.tsrx';
 
 # Make a file, get a URL
 
-<PageMeta level="Building" time="5 min" assumes="components" sprite="square" />
+<PageMeta level="Building" time="3 min" assumes="components" sprite="square" />
 
 <ThemeToggle />
 
@@ -27,7 +27,8 @@ Pick an address.
 
 <UrlPickerDemo />
 
-Try `/docs`. The catch-all file needs at least one more part after `/docs`, so the 404 page answers.
+Try `/docs`. This demo has no `docs/index.mdx`, and the catch-all needs at least one more part
+after `/docs`. So the 404 page answers.
 
 ## The rules
 
@@ -41,8 +42,8 @@ Try `/docs`. The catch-all file needs at least one more part after `/docs`, so t
 | `404.tsrx` | any address with no matching file, with status 404 |
 | `500.tsrx` | a page that throws in a production build, with status 500 |
 
-Page files end in `.tsrx` or `.mdx`. The router skips every other file in `pages/`. So a helper file
-can live next to the page that uses it.
+Page files end in `.tsrx` or `.mdx`. The router skips every other file in `pages/`. So a helper `.ts`
+file can live next to the page that uses it. A `.tsrx` or `.mdx` file in `pages/` is always a page.
 
 If two files match one address, a plain name wins over `[param]`. A `[param]` wins over
 `[...rest]`. So `blog/new.tsrx` answers `/blog/new`, and `blog/[slug].tsrx` answers the rest.
@@ -65,7 +66,7 @@ is one string: for `/docs/guide/intro`, `slug` is `guide/intro`.
 <Callout
 	sprite="cross"
 	title="Why does my build stop on a route?"
-	text="Some file names stop the build, and the message names the file. Two files for one address do it, like docs.tsrx next to docs.mdx. So does a partial bracket like post-[id].tsrx, a catch-all that is not the last part, a 404.tsrx inside a folder, or any file in pages/api/."
+	text="Some file names stop the build, and the message names the file. Two files for one address do it, like docs.tsrx next to docs.mdx. A partial bracket like post-[id].tsrx does it too. So does a catch-all that is not the last part. So does a 404.tsrx or 500.tsrx inside a folder, or any page file in pages/api/."
 />
 
 ## One document around every page

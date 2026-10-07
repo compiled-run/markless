@@ -9,14 +9,13 @@ import LikeHeart from '../../components/docs/like-heart.tsrx';
 
 # Test a component in a real browser
 
-<PageMeta level="Tooling" time="5 min" assumes="state,events" sprite="star-badge" />
+<PageMeta level="Tooling" time="3 min" assumes="state,events" sprite="star-badge" />
 
 <ThemeToggle />
 
 Types pass. But a type check never clicks a button.
 
-`@markless/vitest-browser` runs your component in a real browser, and your test clicks it. The
-package is experimental.
+`@markless/vitest-browser` runs your component in a real browser, and your test clicks it.
 
 A Markless component renders wherever you need it: in the browser, on a server, at build time. A
 test is one more of those places. The package gives you two ways in. Mount the component in the
@@ -42,7 +41,7 @@ The starters do not include this setup yet. This configuration comes from the Ma
 test projects.
 
 ```bash
-npm install -D @markless/vitest-browser vitest playwright
+npm install -D @markless/vitest-browser @vitest/browser-playwright vitest playwright
 npx playwright install chromium
 ```
 
@@ -71,7 +70,7 @@ throws.
 
 ## One check, both ways
 
-Take the counter from the starter app:
+Here is a counter like the one in the starter app:
 
 ```tsrx
 import { state } from '@markless/core';
@@ -107,6 +106,8 @@ test('rendered on a server: a click counts', async () => {
 });
 ```
 
+Put `Counter.tsrx` and `counter.browser.ts` in a `src/` folder. Then run `npx vp test run --config vitest.config.ts`.
+
 The package removes each mounted component after each test. Call `cleanup()` yourself only in the
 middle of a test.
 
@@ -119,7 +120,7 @@ middle of a test.
 <Callout
 	sprite="thought-bubble"
 	title="Why does my check see the old text?"
-	text="In a test, the code for a click can load during that first click. So a read straight after click() can still see the old text. Wait with expect.poll before you compare."
+	text="A click's change can land a moment after click() returns, especially after a server render. So a read straight after click() can still see the old text. Wait with expect.poll before you compare."
 />
 
 Next: [read a Markless error](/tooling/diagnostics).

@@ -24,7 +24,7 @@ export default function ErrorIndex() @{
 			<code>MARKLESS_</code>
 			<span>
 				{' '}
-				and prints a link to its page here. Find your code below, or search the page for it.
+				and most print a link to its page here. Find your code below, or search the page for it.
 			</span>
 		</p>
 		<p>

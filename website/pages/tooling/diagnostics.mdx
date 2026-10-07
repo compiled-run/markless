@@ -62,7 +62,7 @@ export default function List() @{
 }
 ```
 
-The build prints this, word for word:
+The build prints this. In your app, the file path is longer:
 
 ```text
 MARKLESS_COMPILE_BLOCKED: List.tsrx has 1 compiler error(s).
@@ -100,8 +100,6 @@ The comment has three rules. Break one, and you get a warning of its own.
 | [`ALLOW_ERROR_UNSUPPRESSIBLE`](/errors/MARKLESS_ALLOW_ERROR_UNSUPPRESSIBLE) | You cannot silence an error. Fix it.                      |
 | [`ALLOW_STALE`](/errors/MARKLESS_ALLOW_STALE)                               | If the warning no longer fires there, delete the comment. |
 
-Like the table below, this one drops the `MARKLESS_` start of each code.
-
 ## Common codes
 
 Every code starts with `MARKLESS_`. The table drops that start.
@@ -117,7 +115,7 @@ Every code starts with `MARKLESS_`. The table drops that start.
 | [`ASYNC_BOUNDARY_REQUIRED`](/errors/MARKLESS_ASYNC_BOUNDARY_REQUIRED)               | error               | Wrap the async read in `@try` with `@pending` and `@catch`.                                                 |
 | [`ASYNC_POST_AWAIT_READ`](/errors/MARKLESS_ASYNC_POST_AWAIT_READ)                   | error               | Read the state before the first `await`.                                                                    |
 | [`STATE_WRITE_IN_COMPUTED`](/errors/MARKLESS_STATE_WRITE_IN_COMPUTED)               | error               | Move the write into an event handler.                                                                       |
-| [`EVENT_HANDLER_EMIT_UNSUPPORTED`](/errors/MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED) | error               | The handler reads a plain local from the body. Use state, props, element handles, or imports instead.       |
+| [`EVENT_HANDLER_EMIT_UNSUPPORTED`](/errors/MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED) | error               | The handler reads a body local that is a function or an object Markless cannot carry. Move it to the top of the file, or use state. |
 | [`TRY_BLOCK_TOGGLE_RERENDER`](/errors/MARKLESS_TRY_BLOCK_TOGGLE_RERENDER)           | warning             | An `@if` inside `@try` holds a component. Move the component out of the `@if`.                              |
 | [`SHARED_FAMILY_SCOPE_IMPLICIT`](/errors/MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT)     | warning             | Pass `{ scope: 'widget' }` or `{ scope: 'page' }` to `shared()`.                                            |
 | [`FRAMEWORK_API_RUNTIME_CALL`](/errors/MARKLESS_FRAMEWORK_API_RUNTIME_CALL)         | error while running | Call `state()` and its friends only in `.tsrx` files.                                                       |
@@ -128,7 +126,7 @@ grouped by the package that raises it.
 <Callout
 	sprite="speech-bubble"
 	title="Where do the markless.dev/errors links go?"
-	text="Each error prints a link to markless.dev/errors/ followed by its code. That link opens the page for the code on this site, with the message, the fix, and the source file that raises it."
+	text="Each error prints a link to markless.dev/errors/ followed by its code. That link opens the page for that code on this site. It shows the message, the files that raise it, and a written fix when there is one."
 />
 
 Next: [how Markless works under the hood](/how-it-works).

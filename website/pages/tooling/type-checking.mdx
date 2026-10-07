@@ -9,7 +9,7 @@ import LikeHeart from '../../components/docs/like-heart.tsrx';
 
 # How TypeScript checks a `.tsrx` file
 
-<PageMeta level="Tooling" time="3 min" assumes="components" sprite="check" />
+<PageMeta level="Tooling" time="2 min" assumes="components" sprite="check" />
 
 <ThemeToggle />
 
@@ -45,7 +45,10 @@ export function App() @{
 	text="Markless uses the HTML name, class. The checker rejects className on HTML elements, so write class instead."
 />
 
-## From the command line
+## Working on Markless itself
+
+In your own app, the editor checks types. `npm run build` stops on Markless errors, but it does not
+run the type checker.
 
 Inside the Markless repo, `pnpm typecheck` checks the whole workspace. It wraps `tsc`, so `-p`,
 `--watch`, and every other `tsc` flag still work.
@@ -58,15 +61,15 @@ A type error in a `.tsrx` file shows the file, the line, and the column. A file 
 fails the run too:
 
 ```text
-counter.tsrx(9,8): error TS2322: Type 'string' is not assignable to type 'number'.
 broken.tsrx(6,1): error TS91001: Markless TSRX parse error: Unexpected '}' in JSX text
+counter.tsrx(9,8): error TS2322: Type 'string' is not assignable to type 'number'.
 Found 1 Markless TSRX compile error.
 ```
 
 <Callout
 	sprite="thought-bubble"
 	title="Can I run this in my own app?"
-	text="Not yet. The published @markless/typescript-plugin ships the editor plugin only, with no command. In your app, the editor checks types. npm run build stops on Markless errors, but it does not run the type checker."
+	text="Not yet. The published @markless/typescript-plugin ships the editor plugin only, with no command."
 />
 
 Next: [test a component in a real browser](/tooling/testing).
