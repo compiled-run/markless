@@ -1197,6 +1197,134 @@ try {
 			`${home.canonical} / survived ${home.survived}`,
 		);
 
+		// --- rapid router navigation keeps the brand fonts ------------------------
+		{
+			const rapid = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+			await rapid.addInitScript(() => {
+				const bad: string[] = [];
+				(window as { __fontFrames?: string[] }).__fontFrames = bad;
+				const frame = () => {
+					const heading = document.querySelector('main h1');
+					const prose = document.querySelector('main.prose p');
+					const faces =
+						document.fonts.check('16px "Joy Elia"') &&
+						document.fonts.check('16px "Shantell Sans"');
+					const headingFont = heading ? getComputedStyle(heading).fontFamily : 'Joy Elia';
+					const proseFont = prose ? getComputedStyle(prose).fontFamily : 'Shantell Sans';
+					const sheet = document.querySelector('link[rel="stylesheet"][href*="global"]');
+					if (
+						document.readyState === 'complete' &&
+						(!faces ||
+							!sheet ||
+							!headingFont.includes('Joy Elia') ||
+							!proseFont.includes('Shantell Sans'))
+					)
+						bad.push(`${location.pathname}: ${headingFont} / ${proseFont} / faces ${faces}`);
+					requestAnimationFrame(frame);
+				};
+				requestAnimationFrame(frame);
+			});
+			await rapid.goto(`${origin}/concepts/state`, { waitUntil: 'load' });
+			await rapid.waitForFunction(() => document.fonts.status === 'loaded');
+			await rapid.evaluate(() => {
+				(window as { __fontFrames?: string[] }).__fontFrames!.length = 0;
+			});
+			const hrefs = await rapid
+				.locator('.sidebar a.page-link:visible')
+				.evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href') ?? ''));
+			const order = [...hrefs.slice(1), ...hrefs.slice(0, -1).reverse()].slice(0, 10);
+			for (const href of order) {
+				const box = await rapid
+					.locator(`.sidebar a.page-link[href="${href}"]`)
+					.first()
+					.boundingBox();
+				if (box) await rapid.mouse.click(box.x + 8, box.y + box.height / 2);
+			}
+			const last = order.at(-1) ?? '';
+			await rapid.waitForURL(`**${last}`);
+			await rapid
+				.waitForFunction(
+					(href) =>
+						document
+							.querySelector('link[rel="canonical"]')
+							?.getAttribute('href')
+							?.endsWith(href),
+					last,
+					{ timeout: 10_000 },
+				)
+				.catch(() => {});
+			await rapid.waitForTimeout(500);
+			const fontFrames = await rapid.evaluate(
+				() => (window as { __fontFrames?: string[] }).__fontFrames ?? [],
+			);
+			check(
+				order.length >= 8 && fontFrames.length === 0,
+				`${order.length} sidebar clicks with no wait keep Joy Elia and Shantell Sans painted on every frame`,
+				[...new Set(fontFrames)].slice(0, 3).join('; '),
+			);
+			await rapid.close();
+		}
+
+		// --- the sidebar keeps its scroll; the page lands at the top at once -------
+		{
+			const scroller = await browser.newPage({ viewport: { width: 1280, height: 600 } });
+			await scroller.goto(`${origin}/reference/cli`, { waitUntil: 'load' });
+			await scroller.evaluate(() => {
+				const seen: number[] = [];
+				(window as { __landedAt?: number[] }).__landedAt = seen;
+				document.addEventListener('marklessrouterrendered', () => seen.push(scrollY));
+			});
+			const kept: string[] = [];
+			// /errors renders the sidebar inside its own wrapper, so the tree position changes.
+			for (const href of ['/errors', '/reference/glossary', '/reference/cli']) {
+				const from = new URL(scroller.url()).pathname;
+				const link = scroller.locator(`.sidebar a[href="${href}"]:visible`).first();
+				await scroller.evaluate(() => {
+					const sidebar = document.querySelector('.sidebar')!;
+					sidebar.scrollTop = sidebar.scrollHeight;
+					scrollTo({ top: 400, behavior: 'instant' });
+				});
+				await scroller.waitForTimeout(150);
+				const before = await scroller.evaluate(
+					() => document.querySelector('.sidebar')!.scrollTop,
+				);
+				const box = await link.boundingBox();
+				if (box) await scroller.mouse.click(box.x + 8, box.y + box.height / 2);
+				await scroller.waitForURL(`**${href}`);
+				await scroller.waitForFunction(
+					(wanted) =>
+						document.querySelector('.sidebar [aria-current="page"]')?.getAttribute('href') ===
+						wanted,
+					href,
+					{ timeout: 10_000 },
+				);
+				const after = await scroller.evaluate(() => {
+					const sidebar = document.querySelector('.sidebar')!;
+					return {
+						top: sidebar.scrollTop,
+						max: sidebar.scrollHeight - sidebar.clientHeight,
+					};
+				});
+				kept.push(
+					`${from} -> ${href}: ${before} -> ${after.top}${after.top === Math.min(before, after.max) && before > 0 ? '' : ' (moved)'}`,
+				);
+			}
+			const landedAt = await scroller.evaluate(
+				() => (window as { __landedAt?: number[] }).__landedAt ?? [],
+			);
+			check(
+				kept.every((line) => !line.endsWith('(moved)')),
+				'the sidebar keeps its scroll position across router navigations, /errors included',
+				kept.join('; '),
+			);
+			check(
+				landedAt.length === 3 && landedAt.every((y) => y === 0),
+				'each new page lands at the top in one step, with no smooth scroll from the old offset',
+				landedAt.join(', '),
+			);
+			await scroller.close();
+		}
+
 		// --- sprites and mascots ------------------------------------------------
 		await page.goto(`${origin}/`, { waitUntil: 'load' });
 		const heroMug = page.locator('.prose .markless-mug.is-hero svg.mug').first();

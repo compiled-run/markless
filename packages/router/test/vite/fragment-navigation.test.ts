@@ -600,6 +600,37 @@ for (const [name, browserType] of [
 			await page.close();
 		});
 
+		test('a scrolled box the next page wraps differently keeps its offset, and the page lands without a smooth scroll', async () => {
+			const { page, errors } = await open(browser, '/', docOrigin);
+			await page.evaluate(() => {
+				document.querySelector('[data-side]')!.scrollTop = 900;
+				window.scrollTo({ top: 1200, behavior: 'instant' });
+				const seen: Array<{ y: number; side: number }> = [];
+				(window as unknown as Record<string, unknown>).__landed = seen;
+				document.addEventListener('marklessrouterrendered', () =>
+					seen.push({
+						y: window.scrollY,
+						side: document.querySelector('[data-side]')!.scrollTop,
+					}),
+				);
+			});
+			await page.waitForTimeout(100);
+			await page
+				.locator('[data-side-link="gamma"]')
+				.evaluate((link) => (link as HTMLElement).click());
+			await landedOn(page, 'gamma');
+			await page.goBack();
+			await landedOn(page, 'index');
+			expect(
+				await page.evaluate(() => (window as unknown as Record<string, unknown>).__landed),
+			).toEqual([
+				{ y: 0, side: 900 },
+				{ y: 1200, side: 900 },
+			]);
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
 		test('at idle, only a few visible page links fetch their fragments, never a dead link', async () => {
 			const { page, requests, errors } = await open(browser);
 			await page.waitForTimeout(3500);

@@ -192,6 +192,11 @@ The `ui()` Vite plugin from the new `@markless/ui-tools` package sets this up.
   `<carousel.item value={row.value}>`, builds instead of failing with
   `MARKLESS_CAPTURE_OPAQUE_PROP` when the component imported from another file
   only shows that value. A click handler that reads it is still refused.
+- Router links land a new page at the top, or Back and Forward at the saved
+  position, in one step. Before, a page with `scroll-behavior: smooth` showed
+  the new page at the old offset and then animated the scroll. A scrolled box
+  such as a sidebar also keeps its offset when the next page wraps it in a
+  different element; before, it jumped back to the top.
 
 ## 0.3.3
 

@@ -10,5 +10,6 @@ export default function Side({ current }: { readonly current: string }) @{
 			<p style="height: 30px; margin: 0">{`filler ${index}`}</p>
 		}
 		<Link href="/beta" data-side-link="beta" aria-current={current === '/beta' ? 'page' : undefined}>Beta</Link>
+		<Link href="/gamma" data-side-link="gamma" aria-current={current === '/gamma' ? 'page' : undefined}>Gamma</Link>
 	</nav>
 }
