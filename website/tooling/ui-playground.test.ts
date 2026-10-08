@@ -1,7 +1,7 @@
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import type { FamilyMeta } from '../components/docs/ui-meta/index.ts';
 import {
 	analyzeDemo,
@@ -112,6 +112,14 @@ describe('generator controls', () => {
 		presets: [{ name: 'basic', label: 'Basic', values: {} }],
 		...overrides,
 	});
+	// The first analyzeDemo loads the analyzer (~0.7 s idle); paying it here keeps it out of any one test's budget.
+	beforeAll(async () => {
+		await analyzeDemo(
+			'progress',
+			'warm',
+			demoFile('warm', "import { progress } from '@markless/ui';\n\nexport default function Warm() @{\n\t<progress.root />;\n}\n"),
+		);
+	}, 30_000);
 	const generate = (demo: DemoAnalysis, family: FamilyMeta) => {
 		const controls = playgroundControls(demo, family);
 		const slots = codeSlots(demo, controls);

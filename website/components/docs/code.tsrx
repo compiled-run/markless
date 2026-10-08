@@ -18,7 +18,6 @@ export default function Code({
 	panes,
 	title,
 	note,
-	skin,
 	children,
 }: {
 	/** The starter files, entry `.tsrx` first or not; Reset restores them. */
@@ -29,19 +28,15 @@ export default function Code({
 	readonly title?: string;
 	/** A suggestion printed under the block, such as what to change and what to watch. */
 	readonly note?: string;
-	/** `image` draws the notebook from layers cut out of the reference art; the default draws it in CSS. */
-	readonly skin?: 'drawn' | 'image';
 	/** The starter's own render, shown in the Result pane until the first run. */
 	readonly children?: unknown;
 }) @{
 	<figure
 		class="code-block"
-		data-skin={skin ?? 'drawn'}
 		data-code="idle"
 		onVisible={(event) => boot(event, files)}
 		onFocusin={(event) => boot(event, files)}
 	>
-		<span class="rings" aria-hidden="true"></span>
 		<header class="bar">
 			<span class="title">{title ?? 'Playground'}<span class="restored">(Restored)</span></span>
 			<div class="tools" role="toolbar" aria-label="Playground tools">
@@ -98,12 +93,9 @@ export default function Code({
 				width: calc(100% + var(--code-bleed));
 				margin: calc(var(--space-s) + var(--code-tab-h)) 0 var(--space-l);
 				padding: 0.25rem var(--code-inset) 0.4rem 2.6rem;
-				border: 2px solid var(--ink);
-				border-radius: 12px 15px 13px 16px / 10px 12px 14px 18px;
+				border: 2px solid transparent;
+				border-image: url('/notebook/frame.png') 50 47 50 72 / 35.7px 33.6px 35.7px 51.4px / 7.1px 14.3px 19.3px 17.9px round;
 				background: var(--paper);
-				box-shadow: 1px 3px 0 var(--paper), 0 5px 0 -1px var(--ink),
-					3px 7px 0 -2px color-mix(in oklch, var(--ink) 55%, var(--paper)),
-					9px 12px 0 color-mix(in oklch, var(--ink) 24%, transparent);
 				color: var(--ink);
 				font-family: 'Shantell Sans', system-ui, sans-serif;
 				font-size: var(--step--1);
@@ -121,34 +113,6 @@ export default function Code({
 			.code-block[data-lines='off'] {
 				--code-gutter: 1rem;
 				--code-numbers: none;
-			}
-
-			.rings {
-				--ring: hsl(256deg 25% 69%);
-				--ring-shine: hsl(256deg 30% 82%);
-				position: absolute;
-				top: 0.35rem;
-				bottom: 0.65rem;
-				left: -18px;
-				width: 40px;
-				pointer-events: none;
-				background:
-					radial-gradient(circle at 26.5px 10.5px, hsl(30deg 8% 12%) 0 4.2px, transparent 4.7px)
-					0 0 / 40px 40px no-repeat round;
-			}
-
-			.rings::before,
-			.rings::after {
-				content: '';
-				position: absolute;
-				inset: 0;
-				background: var(--ring);
-				mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2240%22%20height%3D%2240%22%3E%3Cpath%20d%3D%22M25.5%209.4C20%202.6%206.5%203.2%204.4%2012.6C2.8%2019.8%209.6%2023.6%2017.5%2022.2%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%226%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E") 0 0 / 40px 40px no-repeat round;
-			}
-
-			.rings::after {
-				background: var(--ring-shine);
-				mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2240%22%20height%3D%2240%22%3E%3Cpath%20d%3D%22M21.5%206.2C15%203.4%207.6%205%205.9%2011.6%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E");
 			}
 
 			.bar {
@@ -329,26 +293,11 @@ export default function Code({
 			@media (max-width: 600px) {
 				.code-block {
 					--code-tab-left: 1.6rem;
-					padding-left: 1.9rem;
-				}
-
-				.rings {
-					left: -1.1rem;
+					padding-left: 2.2rem;
 				}
 			}
 
-			.code-block[data-skin='image'] {
-				--code-tab-left: 35px;
-				border: 2px solid transparent;
-				border-image: url('/notebook/frame.png') 50 30 32 64 / 50px 30px 32px 64px / 8px 11px 15px 18px round;
-				box-shadow: none;
-			}
-
-			.code-block[data-skin='image'] .rings {
-				display: none;
-			}
-
-			html.dark .code-block[data-skin='image'] {
+			html.dark .code-block {
 				--paper: var(--raised);
 				border-image-source: url('/notebook/frame-dark.png');
 			}
