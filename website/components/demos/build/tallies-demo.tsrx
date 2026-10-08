@@ -1,4 +1,5 @@
 import { state } from '@markless/core';
+import Illustration from '../../docs/illustration.tsrx';
 import PreviewCard, { Choice, Controls, Mono, Stage, Watch } from '../../docs/preview-card.tsrx';
 import Code from '../../docs/preview-card/code.tsrx';
 import { talliesPage, talliesWidget } from './code-panes.ts';
@@ -19,11 +20,14 @@ export default function TalliesDemo() @{
 			/>
 		</Controls>
 		<Stage>
-			<div class="variant" hidden={scope !== 'page'}>
-				<TalliesPage />
-			</div>
-			<div class="variant" hidden={scope !== 'widget'}>
-				<TalliesWidget />
+			<div class="pin">
+				<div class="variant" hidden={scope !== 'page'}>
+					<TalliesPage />
+				</div>
+				<div class="variant" hidden={scope !== 'widget'}>
+					<TalliesWidget />
+				</div>
+				<Illustration name="tally-counter" size="3.4rem" spot="corner" />
 			</div>
 		</Stage>
 		<Watch>
@@ -43,6 +47,11 @@ export default function TalliesDemo() @{
 			<Code files={talliesWidget} />
 		</div>
 		<style>
+			.pin {
+				position: relative;
+				display: grid;
+			}
+
 			.variant[hidden] {
 				display: none;
 			}

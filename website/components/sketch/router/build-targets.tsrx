@@ -1,4 +1,5 @@
 import { state } from '@markless/core';
+import TerminalFrame from '../../docs/terminal-frame.tsrx';
 import PreviewCard, { Choice, Controls, Mono, Stage, Watch } from '../../docs/preview-card.tsrx';
 
 export default function BuildTargets() @{
@@ -25,11 +26,13 @@ export default function BuildTargets() @{
 					</ul>
 				</div>
 				<span class="arrow" aria-hidden="true">→</span>
-				<div class="command">
-					<span class="prompt">$</span>
-					<span class="for-node">npm run build</span>
-					<span class="for-vercel">NITRO_PRESET=vercel npm run build</span>
-				</div>
+				<TerminalFrame title="my-app">
+					<div class="command">
+						<span class="prompt">$</span>
+						<span class="for-node">npm run build</span>
+						<span class="for-vercel">NITRO_PRESET=vercel npm run build</span>
+					</div>
+				</TerminalFrame>
 				<span class="arrow" aria-hidden="true">→</span>
 				<div class="box out">
 					<div class="head for-node">.output/</div>
@@ -106,13 +109,7 @@ export default function BuildTargets() @{
 
 			.command {
 				min-width: 0;
-				padding: 0.6em 0.75em;
-				border: 1px dashed var(--ink);
-				border-radius: 6px;
-				color: var(--ink);
 				font-family: var(--font-mono);
-				font-size: 0.85em;
-				line-height: 1.5;
 				overflow-wrap: anywhere;
 			}
 
@@ -122,7 +119,7 @@ export default function BuildTargets() @{
 
 			.prompt {
 				margin-inline-end: 0.4em;
-				color: var(--muted-ink);
+				color: color-mix(in srgb, var(--slab-ink) 60%, var(--slab));
 			}
 
 			.board[data-preset='node'] .for-vercel,

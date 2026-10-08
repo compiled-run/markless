@@ -38,7 +38,7 @@ export default function ConditionalsSketch() @{
 		<Controls title="Where does the note go when you close it?" />
 		<Stage>
 			<Board>
-				<LivePage>
+				<LivePage art="sticky-note">
 					<div
 						class="slot"
 						el={slot}

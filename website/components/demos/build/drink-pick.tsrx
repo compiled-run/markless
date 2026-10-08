@@ -1,5 +1,6 @@
 import { storage } from '@markless/core';
 import { lucide } from '@markless/ui';
+import Illustration from '../../docs/illustration.tsrx';
 import PreviewCard, { Action, Controls, Mono, Stage, Watch } from '../../docs/preview-card.tsrx';
 import Code from '../../docs/preview-card/code.tsrx';
 import { drinkPick } from './code-panes.ts';
@@ -19,9 +20,9 @@ export default function DrinkPick() @{
 		<Stage>
 			<div class="drinks" role="group" aria-labelledby="docs-drink-label">
 				<p class="caption" id="docs-drink-label">Your drink</p>
-				<button class="tea" onClick={() => (drink = 'tea')}>Tea</button>
-				<button class="coffee" onClick={() => (drink = 'coffee')}>Coffee</button>
-				<button class="cocoa" onClick={() => (drink = 'cocoa')}>Cocoa</button>
+				<button class="tea" onClick={() => (drink = 'tea')}><Illustration name="tea" size="2.6em" />Tea</button>
+				<button class="coffee" onClick={() => (drink = 'coffee')}><Illustration name="mug" size="2.6em" />Coffee</button>
+				<button class="cocoa" onClick={() => (drink = 'cocoa')}><Illustration name="cocoa" size="2.6em" />Cocoa</button>
 			</div>
 		</Stage>
 		<Watch>
@@ -53,6 +54,9 @@ export default function DrinkPick() @{
 			}
 
 			button {
+				display: grid;
+				justify-items: center;
+				gap: 0.3em;
 				padding: 0.6em 1em;
 				border: 1px solid var(--ink);
 				border-radius: 6px;

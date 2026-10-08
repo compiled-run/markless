@@ -38,7 +38,7 @@ export default function EventsSketch() @{
 		<Controls title="What does each handler get?" />
 		<Stage>
 			<Board>
-				<LivePage>
+				<LivePage art="mug">
 					<div
 						onKeyDown={(event) => {
 							key = event.key === ' ' ? 'Space' : event.key;

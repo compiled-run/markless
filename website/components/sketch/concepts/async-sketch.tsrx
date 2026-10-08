@@ -1,6 +1,8 @@
 // Which of @try, @pending and @catch is on the page, read from the live component itself.
 import { computed, element, state } from '@markless/core';
 import PreviewCard, { Choice, Controls, Mono, Stage, Watch } from '../../docs/preview-card.tsrx';
+import BrowserFrame from '../../docs/browser-frame.tsrx';
+import Illustration from '../../docs/illustration.tsrx';
 import MugLookup from './mug-lookup.tsrx';
 import { afterUpdate, watchChanges } from './place.ts';
 
@@ -51,10 +53,18 @@ export default function AsyncSketch() @{
 		</Controls>
 		<Stage>
 			<div class="split">
-				<div class="page" el={page}>
-					<p class="tag" aria-hidden="true">your page</p>
-					<MugLookup mug={mug} />
-					<p class="held" hidden={phase !== 'waiting'}>kept while waiting</p>
+				<div class="window">
+					<BrowserFrame address="my-app.dev">
+						<div class="page" el={page}>
+							<MugLookup mug={mug} />
+							<p class="held" hidden={phase !== 'waiting'}>kept while waiting</p>
+						</div>
+					</BrowserFrame>
+					<span class="art" data-mug={mug}>
+						<span class="pick small"><Illustration name="mug" size="2.9rem" spot="corner" /></span>
+						<span class="pick tall"><Illustration name="mug-tall" size="2.9rem" spot="corner" /></span>
+						<span class="pick cracked"><Illustration name="mug-cracked" size="2.9rem" spot="corner" /></span>
+					</span>
 				</div>
 				<ol class="blocks" aria-label="Async blocks">
 					<li class="block" data-on={tryOn}>
@@ -96,18 +106,30 @@ export default function AsyncSketch() @{
 				width: min(38rem, 100%);
 			}
 
+			.window {
+				position: relative;
+				display: grid;
+				min-width: 0;
+			}
+
 			.page {
 				display: grid;
 				gap: 0.5em;
 				align-content: start;
 				box-sizing: border-box;
 				padding: 0.85em 1em 1em;
-				border: 1px solid var(--ink);
-				border-radius: 6px;
-				background: var(--paper);
 			}
 
-			.tag,
+			.pick {
+				display: contents;
+			}
+
+			.art:not([data-mug='tall']) .tall,
+			.art:not([data-mug='cracked']) .cracked,
+			.art:is([data-mug='tall'], [data-mug='cracked']) .small {
+				display: none;
+			}
+
 			.held {
 				margin: 0;
 				color: var(--muted-ink);

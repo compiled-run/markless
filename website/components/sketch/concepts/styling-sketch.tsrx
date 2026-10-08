@@ -1,5 +1,6 @@
 // The page-class readouts come from the live cards, so they show the class Markless really added.
 import { computed, element, state } from '@markless/core';
+import Illustration from '../../docs/illustration.tsrx';
 import PreviewCard, { Choice, Controls, Mono, Stage, Switch, Watch } from '../../docs/preview-card.tsrx';
 import ChalkTag from './chalk-tag.tsrx';
 import PaperTag from './paper-tag.tsrx';
@@ -56,7 +57,7 @@ export default function StylingSketch() @{
 		<Stage>
 			<div class="pair">
 				<div class="side" el={paperSide}>
-					<p class="file">paper-tag.tsrx</p>
+					<p class="file"><Illustration name="paper-card" size="1.9em" />paper-tag.tsrx</p>
 					<PaperTag size={size} />
 					<p class="attr">
 						<code class="cls">
@@ -74,7 +75,7 @@ export default function StylingSketch() @{
 					</p>
 				</div>
 				<div class="side" el={chalkSide}>
-					<p class="file">chalk-tag.tsrx</p>
+					<p class="file"><Illustration name="chalk-card" size="1.9em" />chalk-tag.tsrx</p>
 					<ChalkTag lit={lit} />
 					<p class="attr">
 						<code class="cls">
@@ -124,6 +125,12 @@ export default function StylingSketch() @{
 				gap: 0.7em;
 				justify-items: center;
 				text-align: center;
+			}
+
+			.file {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.5em;
 			}
 
 			.file,

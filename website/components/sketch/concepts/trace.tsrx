@@ -1,31 +1,30 @@
 // Shared stage parts for the concept previews: the live page box and the ledger of what ran.
 import type { Children } from '@markless/core';
+import BrowserFrame from '../../docs/browser-frame.tsrx';
+import Illustration from '../../docs/illustration.tsrx';
 
-/** The box the live component renders into, captioned "your page". */
-export function LivePage({ children }: { readonly children?: Children }) @{
+/** The browser window the live component renders into; `art` pins an illustration on its corner. */
+export function LivePage({ art, children }: { readonly art?: string; readonly children?: Children }) @{
 	<div class="tr-page">
-		<p class="tr-caption" aria-hidden="true">your page</p>
-		{children}
+		<BrowserFrame address="my-app.dev">
+			<div class="tr-view">{children}</div>
+		</BrowserFrame>
+		@if (art) {
+			<Illustration name={art} size="2.9rem" spot="corner" />
+		}
 		<style>
 			.tr-page {
 				position: relative;
+				min-width: 0;
+			}
+
+			.tr-view {
 				display: grid;
 				gap: 0.6em;
 				align-content: start;
 				min-width: 0;
 				padding: 0.85em 1em 1.1em;
-				border: 1px solid var(--ink);
-				border-radius: 6px;
-				background: var(--paper);
 				font-size: var(--step-0);
-			}
-
-			.tr-caption {
-				margin: 0;
-				color: var(--muted-ink);
-				font-family: 'Joy Elia', system-ui, sans-serif;
-				font-size: var(--step--1);
-				line-height: 1.2;
 			}
 		</style>
 	</div>

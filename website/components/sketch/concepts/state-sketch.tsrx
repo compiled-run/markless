@@ -57,7 +57,7 @@ export default function StateSketch() @{
 		</Controls>
 		<Stage>
 			<Board>
-				<LivePage>
+				<LivePage art="mug">
 					<div
 						class="slot"
 						hidden={twice}

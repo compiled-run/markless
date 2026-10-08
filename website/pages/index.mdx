@@ -66,6 +66,11 @@ export default function RolledOnce() @{
 	const roll = Math.floor(Math.random() * 6) + 1;
 
 	<section>
+		<img
+			src="/illustrations/die-light.png"
+			alt="A die"
+			width="56"
+		/>
 		<p>Rolled at setup: {roll}</p>
 		<button onClick={() => count++}>
 			Count {count}

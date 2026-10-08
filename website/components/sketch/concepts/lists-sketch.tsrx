@@ -1,5 +1,6 @@
 // Each row element gets a number the first time the figure sees it, so a reorder shows which elements moved.
 import { element, state } from '@markless/core';
+import Illustration from '../../docs/illustration.tsrx';
 import PreviewCard, { Action, Controls, Stage, Watch } from '../../docs/preview-card.tsrx';
 import { elementId } from './element-ids.ts';
 import { afterUpdate, watchChanges } from './place.ts';
@@ -110,18 +111,25 @@ export default function ListsSketch() @{
 					line = tickNote(look(list));
 				}}
 			>
-				<ul class="rows" el={list}>
-					@for (const item of items; key item.id) {
-						<li class="row">
-							<label>
-								<input type="checkbox" />
-								{item.name}
-							</label>
-						</li>
-					} @empty {
-						<li class="none">Nothing left to buy.</li>
-					}
-				</ul>
+				<div class="pin">
+					<ul class="rows" el={list}>
+						@for (const item of items; key item.id) {
+							<li class="row">
+								<label>
+									<input type="checkbox" />
+									{item.name}
+								</label>
+							</li>
+						} @empty {
+							<li class="none">Nothing left to buy.</li>
+						}
+					</ul>
+					<span class="groceries" aria-hidden="true">
+						<Illustration name="pears" size="2.3rem" />
+						<Illustration name="coffee-bag" size="2.3rem" />
+						<Illustration name="milk" size="2.3rem" />
+					</span>
+				</div>
 			</div>
 		</Stage>
 		<Watch>
@@ -144,10 +152,27 @@ export default function ListsSketch() @{
 				width: 100%;
 			}
 
+			.pin {
+				position: relative;
+				width: min(19rem, 100%);
+			}
+
+			.groceries {
+				position: absolute;
+				inset-block-start: -1.5rem;
+				inset-inline-end: -1.4rem;
+				display: flex;
+				rotate: 6deg;
+				pointer-events: none;
+			}
+
+			.groceries > :not(:first-child) {
+				margin-inline-start: -0.7rem;
+			}
+
 			.rows {
 				display: grid;
 				gap: 0.7em;
-				width: min(19rem, 100%);
 				margin: 0;
 				padding: 0;
 				list-style: none;

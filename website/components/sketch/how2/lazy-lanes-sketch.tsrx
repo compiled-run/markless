@@ -1,4 +1,5 @@
 import { state } from '@markless/core';
+import BrowserFrame from '../../docs/browser-frame.tsrx';
 import PreviewCard, { Action, Controls, Stage, Watch } from '../../docs/preview-card.tsrx';
 
 export default function LazyLanesSketch() @{
@@ -21,31 +22,32 @@ export default function LazyLanesSketch() @{
 		</Controls>
 		<Stage>
 			<div class="board">
-				<div class="page">
-					<p class="cap">Your page</p>
-					<div class="buttons">
-						<button
-							type="button"
-							class="live"
-							onClick={() => {
-								likes++;
-								last = 'like';
-							}}
-						>
-							Like {likes}
-						</button>
-						<button
-							type="button"
-							class="live"
-							onClick={() => {
-								saves++;
-								last = 'save';
-							}}
-						>
-							Save {saves}
-						</button>
+				<BrowserFrame address="my-app.dev">
+					<div class="page">
+						<div class="buttons">
+							<button
+								type="button"
+								class="live"
+								onClick={() => {
+									likes++;
+									last = 'like';
+								}}
+							>
+								Like {likes}
+							</button>
+							<button
+								type="button"
+								class="live"
+								onClick={() => {
+									saves++;
+									last = 'save';
+								}}
+							>
+								Save {saves}
+							</button>
+						</div>
 					</div>
-				</div>
+				</BrowserFrame>
 
 				<table class="symbols">
 					<thead>
@@ -100,16 +102,8 @@ export default function LazyLanesSketch() @{
 				justify-items: center;
 				gap: 0.4em;
 				padding: 0.75em 1.5em 1em;
-				border: 1px solid var(--ink);
-				border-radius: 6px;
 			}
 
-			.cap {
-				margin: 0;
-				color: var(--ink);
-				font-family: 'Joy Elia', system-ui, sans-serif;
-				font-weight: 700;
-			}
 
 			.buttons {
 				display: flex;
