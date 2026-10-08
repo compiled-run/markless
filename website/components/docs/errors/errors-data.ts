@@ -2286,7 +2286,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 		severity: 'error',
 		description: 'element() handle is bound more than once: a Markless build error.',
 		printed: [
-			'MARKLESS_ELEMENT_HANDLE_DUPLICATE: Cannot bind element handle "<handleName>" inside a keyed repeat because one authored handle would point at many row host elements. markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package',
+			'MARKLESS_ELEMENT_HANDLE_DUPLICATE: Cannot bind element handle "<handleName>" inside a keyed repeat because one authored handle would point at many row host elements. markless debugging playbook: run the doctor script (npm run doctor), or read agent/markless.md in the installed @markless/core package',
 			'Each repeated row has its own DOM locator, so one handle declared as a single element cannot say which row it means.',
 			'Declare the handle as an ordered set by widening its type argument to an array - element<HTMLElement[]>() - written literally as T[], Array<T> or readonly T[]. Reads then answer every bound element in document order. Otherwise create a separate element() handle for each host element.',
 			'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_DUPLICATE',
@@ -4466,7 +4466,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 		description:
 			'<label> is not rendered by the public render path yet: a Markless build warning.',
 		printed: [
-			'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT: <message> markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package',
+			'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT: <message> markless debugging playbook: run the doctor script (npm run doctor), or read agent/markless.md in the installed @markless/core package',
 			'The public render module only emits compiler-proven output. Content inside an unsupported construct would silently disappear from rendered HTML, so the compiler reports it instead.',
 			'https://markless.dev/errors/MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
 		],
@@ -5823,7 +5823,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 		severity: 'error',
 		description: 'This is not a row-ownable element() handle: a Markless build error.',
 		printed: [
-			'MARKLESS_ROW_ELEMENT_HANDLE_UNSUPPORTED: Cannot bind el={<handleName>} inside <element>. A row host takes a declared element() handle, named directly (el={row}) or as one member off a shared() instance (el={select.optionEls}). markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package',
+			'MARKLESS_ROW_ELEMENT_HANDLE_UNSUPPORTED: Cannot bind el={<handleName>} inside <element>. A row host takes a declared element() handle, named directly (el={row}) or as one member off a shared() instance (el={select.optionEls}). markless debugging playbook: run the doctor script (npm run doctor), or read agent/markless.md in the installed @markless/core package',
 			'The keyed row record owns one host slot per authored handle and repeat key. Forwarded props, deeper paths, and nested repeat scopes do not identify one compiler-proven row-owned slot.',
 			'Declare the handle with const row = element<HTMLElement[]>() in this component or in the shared() factory the row reads, then bind el={row} - or el={family.row} - directly on the keyed row host.',
 			'https://markless.dev/errors/MARKLESS_ROW_ELEMENT_HANDLE_UNSUPPORTED',

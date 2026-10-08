@@ -344,9 +344,14 @@ export function scanCodes(files: readonly SourceFile[]): ScannedCode[] {
 	const parsed: Parsed[] = files.map((file) => ({ ...file, tokens: tokenize(file.src) }));
 
 	const constants = new Map<string, string>();
+	const textConstants = new Map<string, string>();
 	for (const { tokens } of parsed) {
 		tokens.forEach((t, k) => {
-			if (t.type !== 'str' || t.exprs.length || !CODE_RE.test(t.value)) return;
+			if (t.type !== 'str' || t.exprs.length) return;
+			const before = tokens[k - 2];
+			if (tokens[k - 1]?.value === '=' && before?.type === 'ident' && /^[A-Z][A-Z0-9_]*$/.test(before.value))
+				textConstants.set(before.value, t.value);
+			if (!CODE_RE.test(t.value)) return;
 			const eq = tokens[k - 1];
 			const name = tokens[k - 2];
 			if (
@@ -376,7 +381,7 @@ export function scanCodes(files: readonly SourceFile[]): ScannedCode[] {
 	function renderTemplate(token: Token): string {
 		return token.value.replace(/\uE000(\d+)\uE000/g, (_, n: string) => {
 			const expr = token.exprs[Number(n)]!;
-			const constant = constants.get(expr);
+			const constant = constants.get(expr) ?? textConstants.get(expr);
 			if (constant) return constant;
 			const literal = expr.match(/^(['"])(.*)\1$/);
 			if (literal) return literal[2]!;
