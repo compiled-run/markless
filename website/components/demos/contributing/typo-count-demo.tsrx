@@ -1,4 +1,5 @@
 import { state } from '@markless/core';
+import Illustration from '../../docs/illustration.tsrx';
 import PreviewCard, { Controls, Stage, Switch, Watch } from '../../docs/preview-card.tsrx';
 import Code from '../../docs/preview-card/code.tsrx';
 import { typoCount } from './code-panes.ts';
@@ -19,7 +20,10 @@ export default function TypoCountDemo() @{
 		<Stage>
 			<div class="spot">
 				<span class="part corner" hidden={!names}>{'<Stage>'}</span>
-				<TypoCount />
+				<span class="with-art">
+					<Illustration name="pencil" size="2.6rem" />
+					<TypoCount />
+				</span>
 			</div>
 		</Stage>
 		<Watch>
@@ -69,6 +73,12 @@ export default function TypoCountDemo() @{
 				place-items: center;
 				width: 100%;
 				min-height: calc(18rem - 4.75em);
+			}
+
+			.with-art {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.8em;
 			}
 
 			.corner {

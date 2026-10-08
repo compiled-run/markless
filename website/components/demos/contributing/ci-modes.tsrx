@@ -1,4 +1,5 @@
 import { state } from '@markless/core';
+import TerminalFrame from '../../docs/terminal-frame.tsrx';
 import PreviewCard, { Choice, Controls, Stage, Watch } from '../../docs/preview-card.tsrx';
 
 // Text bindings rather than a record lookup: a computed that reads a plain object
@@ -18,10 +19,12 @@ export default function CiModes() @{
 		</Controls>
 		<Stage>
 			<div class="board" data-mode={mode === '--fast' ? 'fast' : mode === '--full' ? 'full' : 'ci'}>
-				<div class="command">
-					<span class="prompt">$</span>
-					{mode === '--fast' ? 'pnpm ci:local --fast' : mode === '--full' ? 'pnpm ci:local --full' : 'git push'}
-				</div>
+				<TerminalFrame title="my-app">
+					<div class="command">
+						<span class="prompt">$</span>
+						{mode === '--fast' ? 'pnpm ci:local --fast' : mode === '--full' ? 'pnpm ci:local --full' : 'git push'}
+					</div>
+				</TerminalFrame>
 				<div class="job fast">
 					<span class="state">{mode === 'CI only' ? 'Also on your machine' : 'Runs'}</span>
 					<span class="names">agent-files, typecheck, unit</span>
@@ -58,15 +61,12 @@ export default function CiModes() @{
 			}
 
 			.command {
-				margin-block-end: 0.3em;
-				color: var(--ink);
 				font-family: var(--font-mono);
-				font-size: 0.9em;
 			}
 
 			.prompt {
 				margin-inline-end: 0.5em;
-				color: var(--muted-ink);
+				color: color-mix(in srgb, var(--slab-ink) 60%, var(--slab));
 				font-family: var(--font-mono);
 			}
 

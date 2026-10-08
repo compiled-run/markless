@@ -1,4 +1,5 @@
 import { state } from '@markless/core';
+import BrowserFrame from '../../docs/browser-frame.tsrx';
 import PreviewCard, { Action, Choice, Controls, Mono, Stage, Watch } from '../../docs/preview-card.tsrx';
 
 // An illustration of one streamed response, not a measurement.
@@ -26,13 +27,12 @@ export default function FeedSteps() @{
 		</Controls>
 		<Stage>
 			<div class="board" data-fast={fast ? 'yes' : 'no'} data-step={step}>
-				<div class="box">
-					<div class="head">/feed</div>
+				<BrowserFrame address="my-app.dev/feed">
 					<div class="screen">
 						<span class="title">Feed</span>
 						<span class="text">{fast || step === 2 ? 'Loaded for /feed' : 'Loading...'}</span>
 					</div>
-				</div>
+				</BrowserFrame>
 				<div class="response">
 					<span class="label">one response</span>
 					<div class="part one">
@@ -87,21 +87,7 @@ export default function FeedSteps() @{
 				width: min(32rem, 100%);
 			}
 
-			.box {
-				box-sizing: border-box;
-				min-width: 0;
-				border: 1px solid var(--ink);
-				border-radius: 6px;
-				background: var(--paper);
-				color: var(--ink);
-			}
 
-			.head {
-				padding: 0.35em 0.85em;
-				border-block-end: 1px solid var(--pg-edge);
-				font-family: var(--font-mono);
-				font-size: 0.85em;
-			}
 
 			.screen {
 				display: grid;

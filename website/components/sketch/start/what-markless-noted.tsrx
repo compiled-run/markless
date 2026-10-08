@@ -1,4 +1,5 @@
 import { state } from '@markless/core';
+import BrowserFrame from '../../docs/browser-frame.tsrx';
 import PreviewCard, { Action, Controls, Mono, Stage, Watch } from '../../docs/preview-card.tsrx';
 
 export default function WhatMarklessNoted() @{
@@ -32,12 +33,13 @@ export default function WhatMarklessNoted() @{
 							<li class="note click">a click runs <Mono>count++</Mono></li>
 						</ol>
 					</div>
-					<div class="page">
-						<span class="tag">your page</span>
-						<button type="button" class="count" onClick={() => clicks++}>
-							Count <span class="num">{clicks}</span>
-						</button>
-					</div>
+					<BrowserFrame address="my-app.dev">
+						<div class="page">
+							<button type="button" class="count" onClick={() => clicks++}>
+								Count <span class="num">{clicks}</span>
+							</button>
+						</div>
+					</BrowserFrame>
 				</div>
 			</div>
 		</Stage>
@@ -142,14 +144,9 @@ export default function WhatMarklessNoted() @{
 
 			.page {
 				display: grid;
+				padding: 0.9em 1em 1em;
 				gap: 0.4em;
 				justify-items: start;
-			}
-
-			.tag {
-				color: var(--muted-ink);
-				font-family: 'Shantell Sans', system-ui, sans-serif;
-				font-size: var(--step--1);
 			}
 
 			.count {

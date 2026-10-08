@@ -1,4 +1,5 @@
 import { state } from '@markless/core';
+import BrowserFrame from '../../docs/browser-frame.tsrx';
 import PreviewCard, { Controls, Mono, Stage, Watch } from '../../docs/preview-card.tsrx';
 
 // Each code line is a fixed button: a handler on a repeated item stops after the first change.
@@ -22,14 +23,15 @@ export default function LineToPart() @{
 						<span class="line plain" aria-hidden="true">{'}'}</span>
 					</div>
 				</div>
-				<div class="page">
-					<span class="tag">your page</span>
-					<span class="whole">
-						<button type="button" class="count" onClick={() => clicks++}>
-							<span class="words">Count</span> <span class="num">{clicks}</span>
-						</button>
-					</span>
-				</div>
+				<BrowserFrame address="my-app.dev">
+					<div class="page">
+						<span class="whole">
+							<button type="button" class="count" onClick={() => clicks++}>
+								<span class="words">Count</span> <span class="num">{clicks}</span>
+							</button>
+						</span>
+					</div>
+				</BrowserFrame>
 			</div>
 		</Stage>
 		<Watch>
@@ -125,13 +127,9 @@ export default function LineToPart() @{
 
 			.page {
 				display: grid;
+				padding: 0.9em 1em 1em;
 				gap: 0.5em;
 				justify-items: center;
-			}
-
-			.tag {
-				color: var(--muted-ink);
-				font-family: 'Shantell Sans', system-ui, sans-serif;
 			}
 
 			.whole {

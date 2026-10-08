@@ -1,6 +1,7 @@
 // One real select in a drawn frame; the frame names where it would run, the select does not change.
 import { state } from '@markless/core';
 import { select } from '@markless/ui';
+import { WindowDots } from '../../docs/browser-frame.tsrx';
 import PreviewCard, { Choice, Controls, Mono, Stage, Watch } from '../../docs/preview-card.tsrx';
 
 export default function SelectEverywhere() @{
@@ -20,6 +21,7 @@ export default function SelectEverywhere() @{
 		<Stage>
 			<div class="frame" data-host={host}>
 				<div class="bar">
+					<WindowDots />
 					<span class="for-browser"><Mono>render()</Mono> in the browser alone</span>
 					<span class="for-server">HTML from a server, then the browser</span>
 					<span class="for-test">a Vitest browser test</span>
@@ -62,8 +64,14 @@ export default function SelectEverywhere() @{
 			}
 
 			.bar {
-				padding: 0.45em 0.9em;
+				display: flex;
+				align-items: center;
+				gap: 0.75em;
+				padding: 0.45em 0.8em;
 				border-block-end: 1px solid var(--pg-edge);
+				border-start-start-radius: inherit;
+				border-start-end-radius: inherit;
+				background: color-mix(in srgb, var(--ink) var(--hover-wash), var(--paper));
 				font-family: 'Shantell Sans', system-ui, sans-serif;
 			}
 

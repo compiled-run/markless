@@ -1,6 +1,7 @@
 // Computed page preview: a click changes one count, and the stage shows whether the recipe ran and moved the total.
 import { computed, element, state } from '@markless/core';
 import PreviewCard, { Controls, Mono, Stage, Switch, Watch } from '../../docs/preview-card.tsrx';
+import Illustration from '../../docs/illustration.tsrx';
 import Code from '../../docs/preview-card/code.tsrx';
 import Basket from './basket.tsrx';
 import BasketMugsOnly from './basket-mugs-only.tsrx';
@@ -54,7 +55,7 @@ export default function ComputedSketch() @{
 		</Controls>
 		<Stage>
 			<Board>
-				<LivePage>
+				<LivePage art="basket">
 					<div
 						class="slot"
 						hidden={!reads}
@@ -110,10 +111,10 @@ export default function ComputedSketch() @{
 				</LivePage>
 				<Ledger label="What ran and what changed">
 					<Row name={'{mugs}'}>
-						<span data-hot={input === 'mugs' ? 'true' : 'false'}>{input === 'mugs' ? 'changed by the click' : 'as it was'}</span>
+						<span class="thing" data-hot={input === 'mugs' ? 'true' : 'false'}><Illustration name="mug" size="1.6em" />{input === 'mugs' ? 'changed by the click' : 'as it was'}</span>
 					</Row>
 					<Row name={'{coasters}'}>
-						<span data-hot={input === 'coasters' ? 'true' : 'false'}>{input === 'coasters' ? 'changed by the click' : 'as it was'}</span>
+						<span class="thing" data-hot={input === 'coasters' ? 'true' : 'false'}><Illustration name="coaster" size="1.6em" />{input === 'coasters' ? 'changed by the click' : 'as it was'}</span>
 					</Row>
 					<div class="optional" hidden={!reads}>
 						<Row name="mugs * 12 + coasters * 3">
@@ -151,6 +152,12 @@ export default function ComputedSketch() @{
 		<style>
 			.slot {
 				position: relative;
+			}
+
+			.thing {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.4em;
 			}
 
 			.mark {

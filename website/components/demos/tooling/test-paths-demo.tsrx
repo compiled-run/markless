@@ -1,4 +1,5 @@
 import { state } from '@markless/core';
+import BrowserFrame from '../../docs/browser-frame.tsrx';
 import PreviewCard, { Action, Choice, Controls, Stage, Watch } from '../../docs/preview-card.tsrx';
 
 // The Count button is a drawing of Counter.tsrx; Next stands in for the test's own click.
@@ -32,13 +33,12 @@ export default function TestPathsDemo() @{
 					<li class="s3">Wait until it reads Count 1.</li>
 					<li class="s4">Remove the counter.</li>
 				</ol>
-				<div class="box">
-					<div class="head">test browser</div>
+				<BrowserFrame address="localhost:63315">
 					<div class="screen">
 						<span class="count-button">Count {step >= 2 ? 1 : 0}</span>
 						<span class="gone">empty</span>
 					</div>
-				</div>
+				</BrowserFrame>
 			</div>
 		</Stage>
 		<Watch>
@@ -109,20 +109,7 @@ export default function TestPathsDemo() @{
 				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
 			}
 
-			.box {
-				box-sizing: border-box;
-				min-width: 0;
-				border: 1px solid var(--ink);
-				border-radius: 6px;
-				background: var(--paper);
-				color: var(--ink);
-			}
 
-			.head {
-				padding: 0.35em 0.85em;
-				border-block-end: 1px solid var(--pg-edge);
-				font-family: 'Shantell Sans', system-ui, sans-serif;
-			}
 
 			.screen {
 				display: grid;

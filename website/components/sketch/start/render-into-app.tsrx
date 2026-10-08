@@ -1,5 +1,6 @@
 import { state } from '@markless/core';
 import PreviewCard, { Action, Controls, Mono, Stage, Watch } from '../../docs/preview-card.tsrx';
+import BrowserFrame from '../../docs/browser-frame.tsrx';
 import Code from '../../docs/preview-card/code.tsrx';
 import { browserOnly } from './code-panes.ts';
 
@@ -31,8 +32,7 @@ export default function RenderIntoApp() @{
 						<span class="line">{'await '}<span class="call">{'render(App, { target })'}</span>;</span>
 					</div>
 				</div>
-				<div class="box">
-					<div class="head">your page</div>
+				<BrowserFrame address="my-app.dev">
 					<div class="sheet">
 						<span class="tag">{'<div id="app">'}</span>
 						<div class="app">
@@ -41,7 +41,7 @@ export default function RenderIntoApp() @{
 						</div>
 						<span class="tag">{'</div>'}</span>
 					</div>
-				</div>
+				</BrowserFrame>
 			</div>
 		</Stage>
 		<Watch>

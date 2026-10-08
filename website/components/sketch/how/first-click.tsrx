@@ -1,4 +1,5 @@
 import { state } from '@markless/core';
+import BrowserFrame from '../../docs/browser-frame.tsrx';
 import PreviewCard, { Action, Choice, Controls, Stage, Watch } from '../../docs/preview-card.tsrx';
 
 export default function FirstClick() @{
@@ -31,21 +32,22 @@ export default function FirstClick() @{
 		</Controls>
 		<Stage>
 			<div class="board" data-path={path} data-clicks={clicks === 0 ? 'none' : clicks === 1 ? 'one' : 'more'} data-hovered={hovered ? 'yes' : 'no'}>
-				<div class="page">
-					<p class="cap">Your page</p>
-					<div class="container">
-						<p class="who">
-							{path === 'Direct'
-								? 'listener: on the button itself'
-								: path === 'General'
-									? 'listener: on the container'
-									: 'listener: the inline resumer, on the container'}
-						</p>
-						<button type="button" class="live" onMouseenter={() => (hovered = true)} onFocus={() => (hovered = true)} onClick={() => clicks++}>
-							Count {clicks}
-						</button>
+				<BrowserFrame address="my-app.dev">
+					<div class="page">
+						<div class="container">
+							<p class="who">
+								{path === 'Direct'
+									? 'listener: on the button itself'
+									: path === 'General'
+										? 'listener: on the container'
+										: 'listener: the inline resumer, on the container'}
+							</p>
+							<button type="button" class="live" onMouseenter={() => (hovered = true)} onFocus={() => (hovered = true)} onClick={() => clicks++}>
+								Count {clicks}
+							</button>
+						</div>
 					</div>
-				</div>
+				</BrowserFrame>
 
 				<div class="started">
 					<p class="cap">What has started</p>
@@ -116,8 +118,6 @@ export default function FirstClick() @{
 
 			.page {
 				padding: 0.75em;
-				border: 1px solid var(--ink);
-				border-radius: 6px;
 			}
 
 			.container {

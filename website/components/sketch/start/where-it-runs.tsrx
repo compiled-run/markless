@@ -1,4 +1,5 @@
 import { state } from '@markless/core';
+import { WindowDots } from '../../docs/browser-frame.tsrx';
 import PreviewCard, { Choice, Controls, Mono, Stage, Watch } from '../../docs/preview-card.tsrx';
 import Code from '../../docs/preview-card/code.tsrx';
 import { hostBrowser, hostServer, hostTest } from './code-panes.ts';
@@ -23,6 +24,7 @@ export default function WhereItRuns() @{
 		<Stage>
 			<div class="frame" data-host={host}>
 				<div class="bar">
+					<WindowDots />
 					<span class="for-browser">a page at <Mono>my-app.dev</Mono></span>
 					<span class="for-server">HTML from <Mono>renderToString()</Mono></span>
 					<span class="for-test">a test in <Mono>counter.browser.ts</Mono></span>
@@ -69,8 +71,14 @@ export default function WhereItRuns() @{
 			}
 
 			.bar {
-				padding: 0.45em 0.9em;
+				display: flex;
+				align-items: center;
+				gap: 0.75em;
+				padding: 0.45em 0.8em;
 				border-block-end: 1px solid var(--pg-edge);
+				border-start-start-radius: inherit;
+				border-start-end-radius: inherit;
+				background: color-mix(in srgb, var(--ink) var(--hover-wash), var(--paper));
 				font-family: 'Shantell Sans', system-ui, sans-serif;
 			}
 
