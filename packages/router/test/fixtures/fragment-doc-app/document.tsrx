@@ -11,7 +11,7 @@ export default function Document({
 	const pathname = url?.pathname ?? '/';
 	const title = titles[pathname] ?? 'Guide';
 
-	<html lang="en" data-page-shell={pathname}>
+	<html lang="en" data-page-shell={pathname} style="scroll-behavior: smooth">
 		<head>
 			<meta charset="utf-8" />
 			<title>{title}</title>

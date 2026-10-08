@@ -328,7 +328,18 @@ function morphNode(d: Document, from: ChildNode, to: ChildNode, fresh: Element[]
 	morphChildren(d, element, incoming, fresh);
 }
 
-// Scrolled boxes (a sidebar) keep their offset when the same box, by position in the tree, is there after the swap.
+// Scrolled boxes (a sidebar) keep their offset when the same box is there after the swap:
+// at its old place in the tree, or else the one element of its kind when the next page wraps it differently.
+type ScrolledBox = {
+	readonly path: string | undefined;
+	readonly kind: string;
+	readonly top: number;
+	readonly left: number;
+};
+
+const boxKind = (element: Element) =>
+	`${element.localName}#${element.id}.${element.getAttribute('class') ?? ''}[${element.getAttribute('aria-label') ?? ''}]`;
+
 function elementPath(root: Element, element: Element): string | undefined {
 	const steps: string[] = [];
 	for (let node: Element | null = element; node && node !== root; node = node.parentElement) {
@@ -348,6 +359,16 @@ function elementAt(root: Element, path: string): Element | undefined {
 		node = child;
 	}
 	return node;
+}
+
+function sameBox(root: Element, box: ScrolledBox): Element | undefined {
+	const placed = box.path === undefined ? undefined : elementAt(root, box.path);
+	if (placed) return placed;
+	const name = box.kind.slice(0, box.kind.indexOf('#'));
+	const matches = [...root.getElementsByTagName(name)].filter(
+		(element) => boxKind(element) === box.kind,
+	);
+	return matches.length === 1 ? matches[0] : undefined;
 }
 
 // Streamed @pending arms arrive after the region, one delimited piece each, and run exactly as on a landing.
@@ -449,14 +470,16 @@ export async function navigate(
 		if (mode === 'push') w.history.pushState(entry, '', fetched.url);
 		else w.history.replaceState(entry, '', fetched.url);
 	}
-	const offsets: Array<readonly [string, number, number]> = [];
+	const offsets: ScrolledBox[] = [];
 	for (const element of state.scrolled) {
-		const path =
-			element.isConnected && scope.contains(element)
-				? elementPath(scope, element)
-				: undefined;
-		if (path !== undefined && (element.scrollTop || element.scrollLeft))
-			offsets.push([path, element.scrollTop, element.scrollLeft]);
+		if (!element.isConnected || !scope.contains(element)) continue;
+		if (element.scrollTop || element.scrollLeft)
+			offsets.push({
+				path: elementPath(scope, element),
+				kind: boxKind(element),
+				top: element.scrollTop,
+				left: element.scrollLeft,
+			});
 	}
 	state.scrolled.clear();
 	retire(state, outgoing);
@@ -474,12 +497,9 @@ export async function navigate(
 		outgoing.replaceWith(region);
 		fresh.push(region);
 	}
-	for (const [path, top, left] of offsets) {
-		const element = elementAt(scope, path);
-		if (!element) continue;
-		element.scrollTop = top;
-		element.scrollLeft = left;
-	}
+	// 'instant': a `scroll-behavior: smooth` page would otherwise animate every landing.
+	for (const box of offsets)
+		sameBox(scope, box)?.scrollTo({ top: box.top, left: box.left, behavior: 'instant' });
 	const end = d.createComment('');
 	if (documentLoads) region.append(end);
 	else region.after(end);
@@ -496,9 +516,10 @@ export async function navigate(
 	(region.querySelector('[autofocus]') as HTMLElement | null)?.focus();
 	if (restore === 'reset') {
 		const target = url.hash ? d.getElementById(decodeURIComponent(url.hash.slice(1))) : null;
-		if (target) target.scrollIntoView();
-		else w.scrollTo(0, 0);
-	} else if (restore !== 'manual') w.scrollTo(restore.x, restore.y);
+		if (target) target.scrollIntoView({ behavior: 'instant' });
+		else w.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+	} else if (restore !== 'manual')
+		w.scrollTo({ top: restore.y, left: restore.x, behavior: 'instant' });
 	d.dispatchEvent(new CustomEvent('marklessrouterrendered'));
 	state.rescan();
 	const controller = new AbortController();
