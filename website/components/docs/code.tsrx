@@ -77,8 +77,8 @@ export default function Code({
 				--code-wash: color-mix(in srgb, var(--purple) 26%, var(--paper));
 				--code-tab-back: color-mix(in oklch, var(--ink) 9%, var(--paper));
 				--code-tab-h: 2.7rem;
-				--code-tab-left: 2.3rem;
-				--code-bleed: 0px;
+				--code-bleed: min(4.6rem, 2 * var(--space-s-l));
+				--code-tab-left: calc(var(--code-bleed) / 2 - 2px);
 				--code-font-size: clamp(0.78rem, 2cqi, 1.15rem);
 				--code-editor-surface: transparent;
 				--code-gutter: 2.9rem;
@@ -257,12 +257,6 @@ export default function Code({
 				font-weight: 700;
 			}
 
-			@media (min-width: 96.01rem) {
-				.code-block {
-					--code-bleed: 4.2rem;
-				}
-			}
-
 			@container (min-width: 36rem) {
 				.body {
 					grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
@@ -294,7 +288,6 @@ export default function Code({
 
 			@media (max-width: 600px) {
 				.code-block {
-					--code-tab-left: 1.6rem;
 					padding-left: 2.2rem;
 				}
 
