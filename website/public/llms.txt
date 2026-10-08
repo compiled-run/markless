@@ -9,8 +9,8 @@ rather than documenting the plan.
 
 ## Start here
 
-- [What is Markless](https://markless.dev/): What Markless is: components are plain TypeScript functions, state() makes the page follow a value, and one component renders anywhere: a browser, a server, a test or a native screen.
-- [Your first app](https://markless.dev/start/first-app): Create a multi-page app with npm create markless, start it, and learn the starters, scripts and flags.
+- [What is Markless](https://markless.dev/): What Markless is: plain TypeScript, state() keeps the page in step with a value, and the same code runs in a browser, on a server or on your phone.
+- [Your first app](https://markless.dev/start/first-app): Make a new app with one command, open it in your browser, and change it.
 - [Use Markless in the browser](https://markless.dev/start/browser-only): Put a Markless component into a plain HTML page with Vite, render() and no server.
 - [Reading a .tsrx file](https://markless.dev/start/reading-tsrx): Every part of a .tsrx file, line by line, then the other files in a starter app.
 
