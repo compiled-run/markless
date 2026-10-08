@@ -94,7 +94,7 @@ export default function Code({
 				margin: calc(var(--space-s) + var(--code-tab-h)) 0 var(--space-l);
 				padding: 0.25rem var(--code-inset) 0.4rem 2.6rem;
 				border: 2px solid transparent;
-				border-image: url('/notebook/frame.png') 50 47 50 72 / 35.7px 33.6px 35.7px 51.4px / 7.1px 14.3px 19.3px 17.9px round;
+				border-image: url('/notebook/frame.png') 34 47 50 72 / 24.3px 33.6px 35.7px 51.4px / 7.1px 14.3px 19.3px 17.9px round;
 				background: var(--paper);
 				color: var(--ink);
 				font-family: 'Shantell Sans', system-ui, sans-serif;
