@@ -80,7 +80,7 @@ The parent's function sets `picked`, and the paragraph changes.
 
 ## Put children where you want them
 
-Markup between a component's tags arrives as the `children` prop. Write `{children}` where it goes.
+Elements between a component's tags arrive as the `children` prop. Write `{children}` where it goes.
 Its type is `Children` from `@markless/core`.
 
 ```tsrx
@@ -109,12 +109,12 @@ export default function Welcome() @{
 <Callout
 	sprite="cross"
 	title="Why can't I map over children?"
-	text="You can place children, wrap it in more markup, or pass it to another component. You can't look inside it. Mapping, counting or indexing children stops the build with MARKLESS_CHILDREN_OPAQUE."
+	text="You can place children, wrap it in more elements, or pass it to another component. You can't look inside it. Mapping, counting or indexing children stops the build with MARKLESS_CHILDREN_OPAQUE."
 />
 
 ## Defaults for props
 
-A default like `{ text = 'none' }` looks natural, but Markless refuses it when your markup shows the
+A default like `{ text = 'none' }` looks natural, but Markless refuses it when your elements show the
 prop. The build stops with `MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED`. Work out the fallback
 in a computed value instead:
 

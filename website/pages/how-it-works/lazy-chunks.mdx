@@ -98,7 +98,7 @@ compiler checks every symbol when it compiles the file. A symbol can use:
 
 Here is a handler that uses an element handle and a piece of state. Click **Focus**:
 
-<Code note="Add a second button that runs field?.blur() and sets status = 'idle'. Then add const box = document.querySelector('input'); above the markup, change field?.focus() to box?.focus(), and read the error.">
+<Code note="Add a second button that runs field?.blur() and sets status = 'idle'. Then add const box = document.querySelector('input'); above the elements, change field?.focus() to box?.focus(), and read the error.">
 ```tsrx title="element-behavior.tsrx"
 import { element, state } from '@markless/core';
 

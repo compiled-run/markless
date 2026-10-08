@@ -80,6 +80,10 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 
 	const actions: Record<string, () => void> = {
 		reset,
+		refresh() {
+			edited = true;
+			run();
+		},
 		lines() {
 			box.dataset.lines = box.dataset.lines === 'off' ? 'on' : 'off';
 			syncTools();

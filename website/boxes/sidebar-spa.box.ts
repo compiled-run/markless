@@ -16,7 +16,7 @@ export default box(
 		await expect.page.text(page, 'h1', 'Write a variable. The page follows it.', WAIT);
 		await page.click('.sidebar-summary', WAIT);
 		await page.click('.sidebar a[href="/start/first-app"]', WAIT);
-		await expect.page.text(page, 'h1', 'One command, then a counter on localhost', WAIT);
+		await expect.page.text(page, 'h1', 'Make your first app', WAIT);
 		const documents = (await page.networkRequests()).filter(
 			(request) => request.resourceType === 'Document',
 		);

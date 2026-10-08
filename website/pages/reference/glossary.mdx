@@ -17,13 +17,13 @@ The package list named a lot of parts. This page pins down the words around them
 
 | Term | Meaning |
 | --- | --- |
-| component | A function in a `.tsrx` file whose body is markup, written `function Counter() @{ ... }`. |
-| TSRX | The file format for components: TypeScript plus markup and `@if`, `@for` and `@try` blocks. |
+| component | A function in a `.tsrx` file whose body holds elements, written `function Counter() @{ ... }`. |
+| TSRX | The file format for components: TypeScript plus elements and `@if`, `@for` and `@try` blocks. |
 | state | A value from `state()` that you read and write as a plain variable, like `count`. |
 | computed | A value from `computed()` that Markless works out from state. |
 | shared | Data from `shared()` that many components reach without props. |
 | storage | A string value from `storage()` that Markless saves in `localStorage`. |
-| element handle | A reference from `element()` to one element in the markup. |
+| element handle | A reference from `element()` to one element on the page. |
 | key | The identity of each row in an `@for`, as in `key item.id`. |
 | async boundary | An `@try` block with `@pending` and `@catch` around an async read. |
 

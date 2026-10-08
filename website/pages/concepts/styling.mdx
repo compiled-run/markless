@@ -119,7 +119,7 @@ The second card uses `lit ? 'card lit' : 'card'`, and the page updates the class
 The class belongs to the file, not to the component. Two components in one `.tsrx` file share one
 class and one stylesheet. To give a component its own scope, move it to its own file.
 
-A `<style>` block outside any component's markup never reaches the page. Markless warns with
+A `<style>` block outside a function's elements never reaches the page. Markless warns with
 `MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT`. For rules that cover the whole site, import an
 ordinary stylesheet.
 

@@ -48,7 +48,7 @@ export const nav: readonly NavSection[] = [
 				icon: 'what-is-markless',
 				number: '1',
 				description:
-					'What Markless is: components are plain TypeScript functions, state() makes the page follow a value, and one component renders anywhere: a browser, a server, a test or a native screen.',
+					'What Markless is: plain TypeScript, state() keeps the page in step with a value, and the same code runs in a browser, on a server or on your phone.',
 			},
 			{
 				title: 'Your first app',
@@ -57,7 +57,7 @@ export const nav: readonly NavSection[] = [
 				icon: 'first-app',
 				number: '2',
 				description:
-					'Create a multi-page app with npm create markless, start it, and learn the starters, scripts and flags.',
+					'Make a new app with one command, open it in your browser, and change it.',
 			},
 			{
 				title: 'Use Markless in the browser',
@@ -830,7 +830,7 @@ export const uiNav: readonly NavSection[] = [
 				sprite: 'hash',
 				number: '2',
 				description:
-					'A real table with sortable column headers, where the sort state lives on the family and lands in the markup.',
+					'A real table with sortable column headers, where the sort state lives on the family and lands in the elements.',
 			},
 			{
 				title: 'resizable',

@@ -7,7 +7,7 @@ import LineToPart from '../../components/sketch/start/line-to-part.tsrx';
 
 <Sidebar />
 
-# A .tsrx file is TypeScript with markup in it
+# A .tsrx file is TypeScript with elements in it
 
 <PageMeta level="Start here" time="4 min" assumes="nothing" sprite="bookmark" />
 
@@ -25,15 +25,15 @@ Here is the counter again. Click a line of the file to see which part of the but
 
 **`import { state } from '@markless/core'`** is a normal import. `@markless/core` is the main Markless package.
 
-**`export default function Counter() @{`** starts a component. A component is a function, and its body opens with `@{` instead of `{`.
+**`export default function Counter() @{`** starts a function. Its body opens with `@{` instead of `{`. Inside `@{`, you can write elements like `<button>` and TypeScript statements like `let`.
 
 **`let count = state(0)`** makes a value the page follows. It is still a `let`, and it starts at `0`.
 
-**`<button ...>`** is the markup. You do not `return` it. You write it in the body as a statement, like the `let` line above it.
+**`<button ...>`** is an element. It works like HTML, with a few extras: `{count}` shows a value, and `onClick` runs code on a click. You do not `return` it. You write it in the body as a statement, like the `let` line above it.
 
 **`onClick={() => count++}`** handles a click. An event prop is `on` plus the event name, so `onInput` and `onKeyDown` work the same way.
 
-**`{count}`** is a hole in the markup. Curly braces hold an expression, in text or in an attribute: a read like `{count}`, or math like `{count * 2}`. When `count` changes, that text changes with it.
+**`{count}`** is a hole in the elements. Curly braces hold an expression, in text or in an attribute: a read like `{count}`, or math like `{count * 2}`. When `count` changes, that text changes with it.
 
 ## More than one element
 
@@ -56,9 +56,9 @@ export default function LabelledCounter() @{
 
 The paragraph reads `count`. Click the button, and only the number in the paragraph changes.
 
-## Lines that start with @ control the markup
+## Lines that start with @ control the elements
 
-An at sign at the start of a line inside markup starts a block. `@if` shows markup only while a condition is true. `@for` repeats markup for each item in a list.
+An at sign at the start of a line among the elements starts a block. `@if` shows its elements only while a condition is true. `@for` repeats its elements for each item in a list.
 
 <Code note="After the closing brace of the @if, add @else { <p>The note is hidden.</p> } and press the button. Then change the note text, and the class name in both places.">
 ```tsrx title="tea-note.tsrx"

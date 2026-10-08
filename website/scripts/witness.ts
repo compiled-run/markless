@@ -718,6 +718,15 @@ try {
 					(await input.inputValue()).includes('let cups = state(0)'),
 				'Code: Reset restores the starter and clears the error',
 			);
+			await retype(codePage, block, 'let cups = state(0)', 'let cups = state(7)');
+			const typed = await input.inputValue();
+			await block.getByRole('button', { name: 'Run again' }).click();
+			await codePage.waitForTimeout(800);
+			check(
+				(await input.inputValue()) === typed && typed.includes('state(7)'),
+				'Code: Run again re-runs the preview and keeps the typed code',
+			);
+			await block.getByRole('button', { name: 'Reset code' }).click();
 			const fullScreen = block.getByRole('button', { name: 'Full screen' });
 			await fullScreen.click();
 			const covered = await block
@@ -1333,20 +1342,6 @@ try {
 			(await heroMug.getAttribute('data-docs-mug')) === 'true',
 			'the landing hero is the Markless mug, and it follows the pointer',
 			String(await heroMug.getAttribute('data-variant')),
-		);
-		const siblingMascots = await page.locator('.more-from img.mascot').evaluateAll((nodes) =>
-			nodes.map((node) => ({
-				src: (node as HTMLImageElement).getAttribute('src'),
-				width: (node as HTMLImageElement).naturalWidth,
-			})),
-		);
-		const tileMugs = await page.locator('.more-from .markless-mug svg.mug').count();
-		check(
-			siblingMascots.length === 3 &&
-				siblingMascots.every((one) => one.width > 0) &&
-				tileMugs === 1,
-			'the More from compiled.run strip shows the Markless mug and three mascots that decode',
-			`${tileMugs} mug, ` + siblingMascots.map((one) => `${one.src}:${one.width}`).join(' '),
 		);
 		const sprites = await page
 			.locator('.sprite img.sprite-ink-light')

@@ -4,7 +4,6 @@ import Callout from '../components/docs/callout.tsrx';
 import Collapsible from '../components/docs/collapsible.tsrx';
 import MarklessMug from '../components/mascot/markless-mug.tsrx';
 import Sticker from '../components/sticker.tsrx';
-import MoreFromCompiled from '../components/docs/more-from-compiled.tsrx';
 import ThemeToggle from '../components/docs/theme-toggle.tsrx';
 import Sidebar from '../components/docs/sidebar.tsrx';
 import LikeHeart from '../components/docs/like-heart.tsrx';
@@ -23,9 +22,9 @@ import WhereItRuns from '../components/sketch/start/where-it-runs.tsrx';
 
 <ThemeToggle />
 
-<Subtitle text="Markless is a way to build user interfaces from TypeScript functions with markup in them. One component can render anywhere: a browser, a server, a test, or a native screen like iOS." />
+<Subtitle text="Markless is a way to build websites and apps with TypeScript. The same code can run in a browser, on a server, or on your phone, like an iPhone or Android." />
 
-Here is a whole component. Click the button a few times. Then change the code, and the result changes with it.
+Here is a button that counts its clicks. Click it a few times. Then change the code, and watch the button change with it.
 
 <Code note="Change the label from Count to Clicks. Then change count++ to count += 10, and click again.">
 ```tsrx title="counter.tsrx"
@@ -43,21 +42,21 @@ export default function Counter() @{
 
 `count` is a plain variable. You read it by writing `count`, and you change it with `count++`. There is no setter to call and nothing to unwrap.
 
-`state(0)` is the one new word. It tells Markless this value can change, so the page has to follow it.
+`state(0)` is the one new word. It starts `count` at 0 and keeps the page in step with it. When `count` changes, the text that shows it changes too.
 
-## Markless reads your component first
+## Markless reads your code first
 
 So how does the page know which number to change?
 
-Before your app runs, Markless reads your component the way you read it. It sees that `count` shows up in the button text, and that the click changes it. It writes that down. So when `count` changes, it already knows the one piece of text to update.
+Before your app runs, Markless reads your code the way you read it. It sees that `count` shows up in the button text, and that the click changes it. It writes that down. So when `count` changes, it already knows the one piece of text to update.
 
 <WhatMarklessNoted />
 
-## Your component runs once
+## Your function runs once
 
-Here is a second component. It rolls a die with `Math.random()` during setup. Click **Count** a few times, and watch the die.
+Here is a second function. It rolls a die with `Math.random()` during setup. Click **Count** a few times, and watch the die.
 
-<Code note="Click Count a few times, and the roll stays put. Then change the 6 to 100. Your edit runs the component again, so it rolls once more.">
+<Code note="Click Count a few times, and the roll stays put. Then change the 6 to 100. Your edit runs the function again, so it rolls once more.">
 ```tsrx title="rolled-once.tsrx"
 import { state } from '@markless/core';
 
@@ -88,17 +87,17 @@ This is the whole model. You write setup code that runs once. You change values 
 
 ## Render it anywhere
 
-Markless builds one component for any target. Learn it once, and you know how to render to each one:
+Markless builds what you write for any target. Learn it once, and you know how to render to each one:
 
 | Where | How |
 | --- | --- |
-| A page in the browser | `render(App, { target })` from `@markless/core` puts a component into an element. |
+| A page in the browser | `render(App, { target })` from `@markless/core` draws your code into an element. |
 | A multi-page app | `@markless/router` turns each file in `pages/` into a URL. |
-| HTML from a server | `renderToString()` from `@markless/core` turns a component into HTML. |
-| Tests | `@markless/vitest-browser` runs components in the Vitest browser mode. |
+| HTML from a server | `renderToString()` from `@markless/core` turns your code into HTML. |
+| Tests | `@markless/vitest-browser` runs your code in the Vitest browser mode. |
 | Native apps | Two experiments drive iOS and macOS buttons from the same kind of counter. |
 
-You write the component the same way for each one. The browser, server and test targets work today. iOS and macOS run as early proofs.
+You write the code the same way for each one. The browser, server and test targets work today. iOS and macOS run as early proofs.
 
 <WhereItRuns />
 
@@ -120,10 +119,9 @@ You write the component the same way for each one. The browser, server and test 
 
 [Use Markless in the browser](/start/browser-only) puts the counter into a plain HTML page, with no server.
 
-[Reading a .tsrx file](/start/reading-tsrx) walks through every part of a component file.
+[Reading a .tsrx file](/start/reading-tsrx) walks through every part of a `.tsrx` file.
 
-[How it works](/how-it-works) is for the curious. It shows what Markless does with your component before it runs.
+[How it works](/how-it-works) is for the curious. It shows what Markless does with your code before it runs.
 
-<MoreFromCompiled />
 
 <LikeHeart />

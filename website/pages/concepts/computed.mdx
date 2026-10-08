@@ -83,8 +83,8 @@ one gives `MARKLESS_STATE_WRITE_IN_COMPUTED`.
 
 <Callout
 	sprite="cross"
-	title="Why can't I call my own function in the markup?"
-	text="Markup can show plain reads, operators and method calls, such as {count * 2}. It cannot look inside a function you wrote, so {label(count)} stops the build with MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED. Move the call into a recipe, as in const text = computed(() => label(count)), and show {text} instead."
+	title="Why can't I call my own function in the elements?"
+	text="Elements can show plain reads, operators and method calls, such as {count * 2}. It cannot look inside a function you wrote, so {label(count)} stops the build with MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED. Move the call into a recipe, as in const text = computed(() => label(count)), and show {text} instead."
 />
 
 ## Where does side work go?

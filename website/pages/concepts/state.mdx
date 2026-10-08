@@ -110,7 +110,7 @@ the build, and each error names the line:
 - A `state()` outside the component function gives `MARKLESS_STATE_MODULE_SCOPE`.
 - A `state()` inside an `@if`, a handler or a `for` statement gives
   `MARKLESS_STATE_CREATION_SITE_UNSTABLE`. The [conditionals page](/concepts/conditionals) shows why.
-- A change inside the markup, such as `{cups++}`, gives `MARKLESS_STATE_WRITE_IN_TEMPLATE`.
+- A change inside the elements, such as `{cups++}`, gives `MARKLESS_STATE_WRITE_IN_TEMPLATE`.
 
 `state()` works inside `.tsrx` files. Call it from a plain `.ts` file and it throws
 `MARKLESS_FRAMEWORK_API_RUNTIME_CALL` the moment it runs.
@@ -118,7 +118,7 @@ the build, and each error names the line:
 <Callout
 	sprite="cross"
 	title="Why does my plain let fail the build?"
-	text="If a click handler changes a plain let that the markup shows, the build stops. One of the errors, MARKLESS_STATE_STALE_LOCAL_WRITE, says why. The markup reads a plain let only while the page is set up. A later change never reaches the screen. Wrap the starting value in state() and the error goes away."
+	text="If a click handler changes a plain let that the elements show, the build stops. One of the errors, MARKLESS_STATE_STALE_LOCAL_WRITE, says why. The elements read a plain let only while the page is set up. A later change never reaches the screen. Wrap the starting value in state() and the error goes away."
 />
 
 <Collapsible

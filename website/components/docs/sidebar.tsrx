@@ -1,6 +1,5 @@
 import { tree } from '@markless/ui';
 import { Link } from '@markless/core/router';
-import MarklessMug from '../mascot/markless-mug.tsrx';
 import ModeSelect from './mode-select.tsrx';
 import { modeFor, sidebarFor } from '../../nav.ts';
 import { asset } from '../../site-base.ts';
@@ -27,10 +26,6 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 			if (row.hasAttribute('data-page-href')) row.querySelector<HTMLAnchorElement>('a')?.click();
 		}}
 	>
-		<Link class="site-mark" href="/">
-			<MarklessMug variant="mark" size="3rem" mood="idle" />
-			<span class="site-name">Markless</span>
-		</Link>
 		<ModeSelect mode={here.key} />
 		<details class="sidebar-disclosure">
 			<summary class="sidebar-summary">Browse pages</summary>
@@ -101,16 +96,6 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 		</details>
 
 		<style>
-			.site-name {
-				display: block;
-				font-size: var(--step-1);
-				font-weight: 700;
-				color: var(--ink);
-				text-decoration: none;
-				margin-bottom: var(--space-m);
-				--shadow-color: var(--yellow);
-			}
-
 			/* The nav list is inside a <details> with no `open` attribute, so a phone gets
 			   one line of navigation instead of nineteen and the article's h1 is in the
 			   first screenful. Above 70rem the column sits beside the prose, so the
@@ -229,19 +214,6 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 				transform: rotate(-0.8deg);
 			}
 
-			/* The site mark: the markless mug beside the word. */
-			.site-mark {
-				display: flex;
-				gap: 0.5rem;
-				align-items: center;
-				margin-bottom: var(--space-m);
-				text-decoration: none;
-			}
-
-			.site-mark .site-name {
-				margin-bottom: 0;
-			}
-
 			.sidebar {
 				position: fixed;
 				left: var(--space-s-l);
@@ -290,10 +262,6 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 			.sidebar {
 				padding-block: 0.5rem 1rem;
 				mask-image: none;
-			}
-
-			.site-mark {
-				margin-bottom: 1rem;
 			}
 
 			.page-tree {

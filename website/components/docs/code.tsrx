@@ -40,8 +40,11 @@ export default function Code({
 		<header class="bar">
 			<span class="title">{title ?? 'Playground'}<span class="restored">(Restored)</span></span>
 			<div class="tools" role="toolbar" aria-label="Playground tools">
+				<button type="button" class="tool" data-code-action="refresh" aria-label="Run again" title="Run again">
+					<lucide.rotatecw aria-hidden="true" />
+				</button>
 				<button type="button" class="tool" data-code-action="reset" aria-label="Reset code" title="Reset code">
-					<lucide.rotateccw aria-hidden="true" />
+					<lucide.undo2 aria-hidden="true" />
 				</button>
 				<button type="button" class="tool" data-code-action="lines" aria-label="Line numbers" aria-pressed="true" title="Line numbers">
 					<lucide.hash aria-hidden="true" />
@@ -94,7 +97,7 @@ export default function Code({
 				margin: calc(var(--space-s) + var(--code-tab-h)) 0 var(--space-l);
 				padding: 0.25rem var(--code-inset) 0.4rem 2.6rem;
 				border: 2px solid transparent;
-				border-image: url('/notebook/frame.png') 34 47 50 72 / 24.3px 33.6px 35.7px 51.4px / 7.1px 14.3px 19.3px 17.9px round;
+				border-image: url('/notebook/frame.png') 40 47 50 72 / 28.6px 33.6px 35.7px 51.4px / 7.1px 14.3px 19.3px 17.9px round;
 				background: var(--paper);
 				color: var(--ink);
 				font-family: 'Shantell Sans', system-ui, sans-serif;
@@ -294,6 +297,14 @@ export default function Code({
 				.code-block {
 					--code-tab-left: 1.6rem;
 					padding-left: 2.2rem;
+				}
+
+				.tools {
+					gap: 0;
+				}
+
+				.tool {
+					width: 2.1rem;
 				}
 			}
 
