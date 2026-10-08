@@ -94,7 +94,7 @@ export default function Code({
 				flex-direction: column;
 				box-sizing: border-box;
 				width: calc(100% + var(--code-bleed));
-				margin: calc(var(--space-s) + var(--code-tab-h)) 0 var(--space-l);
+				margin: calc(var(--space-s) + var(--code-tab-h)) 0 var(--space-l) calc(var(--code-bleed) / -2);
 				padding: 0.25rem var(--code-inset) 0.4rem 2.6rem;
 				border: 2px solid transparent;
 				border-image: url('/notebook/frame.png') 40 47 50 72 / 28.6px 33.6px 35.7px 51.4px / 7.1px 14.3px 19.3px 17.9px round;
@@ -260,7 +260,6 @@ export default function Code({
 			@media (min-width: 96.01rem) {
 				.code-block {
 					--code-bleed: 4.2rem;
-					margin-left: 0.8rem;
 				}
 			}
 
