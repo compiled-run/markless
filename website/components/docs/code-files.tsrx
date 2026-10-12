@@ -117,11 +117,75 @@ export default function CodeFiles({ panes }: { readonly panes: readonly CodePane
 		max-height: var(--code-max-height);
 		height: 100%;
 		overflow: auto;
+		overscroll-behavior: contain;
 		background: var(--code-editor-surface, var(--code-surface));
 		scrollbar-width: thin;
+		scrollbar-color: transparent transparent;
+		--fade-top: 0px;
+		--fade-bottom: 0px;
+		mask-image: linear-gradient(to bottom, transparent, #000 var(--fade-top), #000 calc(100% - var(--fade-bottom)), transparent);
+		animation: editor-fade linear both;
+		animation-timeline: scroll(self block);
 	}
 
+	/* A pane that fits has no scroll timeline, so both fades stay at 0px. */
+	@property --fade-top {
+		syntax: '<length>';
+		inherits: false;
+		initial-value: 0px;
+	}
 
+	@property --fade-bottom {
+		syntax: '<length>';
+		inherits: false;
+		initial-value: 0px;
+	}
+
+	@keyframes editor-fade {
+		0% {
+			--fade-top: 0px;
+			--fade-bottom: 3rem;
+		}
+
+		8%,
+		92% {
+			--fade-top: 3rem;
+			--fade-bottom: 3rem;
+		}
+
+		100% {
+			--fade-top: 3rem;
+			--fade-bottom: 0px;
+		}
+	}
+
+	.editor:hover {
+		scrollbar-color: color-mix(in oklch, var(--ink) 16%, transparent) transparent;
+	}
+
+	.editor::-webkit-scrollbar {
+		width: 8px;
+		height: 8px;
+	}
+
+	.editor::-webkit-scrollbar-track,
+	.editor::-webkit-scrollbar-corner {
+		background: transparent;
+	}
+
+	.editor::-webkit-scrollbar-thumb {
+		border: 2px solid transparent;
+		border-radius: 999px;
+		background: transparent padding-box;
+	}
+
+	.editor:hover::-webkit-scrollbar-thumb {
+		background-color: color-mix(in oklch, var(--ink) 16%, transparent);
+	}
+
+	.editor::-webkit-scrollbar-thumb:hover {
+		background-color: color-mix(in oklch, var(--ink) 30%, transparent);
+	}
 
 	.layers {
 		display: grid;
@@ -215,6 +279,28 @@ export default function CodeFiles({ panes }: { readonly panes: readonly CodePane
 		content: attr(data-problem);
 		margin-inline-start: 2.5ch;
 		color: var(--code-problem);
+	}
+
+	/* A phone wraps long lines instead of scrolling sideways; both layers wrap alike, so the caret stays on its text. */
+	@media (max-width: 600px) {
+		.layers {
+			width: 100%;
+		}
+
+		.highlight,
+		.input {
+			white-space: pre-wrap;
+			overflow-wrap: anywhere;
+		}
+
+		.line::before {
+			white-space: nowrap;
+			overflow-wrap: normal;
+		}
+
+		.editor {
+			overflow-x: hidden;
+		}
 	}
 
 	@media (prefers-reduced-motion: reduce) {

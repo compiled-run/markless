@@ -35,11 +35,18 @@ export type CompileOutcome =
 
 /** Docs page to frame. */
 export type FrameRequest =
-	| { readonly type: 'code:run'; readonly id: number; readonly files: readonly CodeFile[] }
+	| {
+			readonly type: 'code:modules';
+			readonly id: number;
+			readonly entry: string;
+			readonly modules: readonly CompiledModule[];
+	  }
 	| {
 			readonly type: 'code:look';
 			readonly dark: boolean;
 			readonly stylesheets: readonly string[];
+			/** The page's viewport-relative custom properties, resolved to pixels on the page. */
+			readonly tokens: Readonly<Record<string, string>>;
 	  };
 
 /** Frame to docs page. */
@@ -53,6 +60,12 @@ export type FrameReply =
 			readonly diagnostics: readonly CodeDiagnostic[];
 	  };
 
-/** Frame to compile worker and back. */
-export type WorkerRequest = { readonly id: number; readonly files: readonly CodeFile[] };
+/** Docs page to compile worker and back; `block` names the block the files belong to. */
+export type WorkerRequest = {
+	readonly id: number;
+	readonly block: string;
+	readonly files: readonly CodeFile[];
+	/** The starter, compiled while nothing else waits; a real request for the block drops it. */
+	readonly warmUp?: boolean;
+};
 export type WorkerReply = { readonly id: number; readonly outcome: CompileOutcome };

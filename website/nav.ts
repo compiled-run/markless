@@ -48,7 +48,7 @@ export const nav: readonly NavSection[] = [
 				icon: 'what-is-markless',
 				number: '1',
 				description:
-					'What Markless is: plain TypeScript, state() keeps the page in step with a value, and the same code runs in a browser, on a server or on your phone.',
+					'What Markless is: elements and events in TypeScript, with an API designed to compile to any device. The browser, server rendering and tests work today, and iOS and macOS are early proofs.',
 			},
 			{
 				title: 'Your first app',
@@ -60,20 +60,11 @@ export const nav: readonly NavSection[] = [
 					'Make a new app with one command, open it in your browser, and change it.',
 			},
 			{
-				title: 'Use Markless in the browser',
-				href: '/start/browser-only',
-				sprite: 'square',
-				icon: 'first-app',
-				number: '3',
-				description:
-					'Put a Markless component into a plain HTML page with Vite, render() and no server.',
-			},
-			{
 				title: 'Reading a .tsrx file',
 				href: '/start/reading-tsrx',
 				sprite: 'bookmark',
 				icon: 'reading-tsrx',
-				number: '4',
+				number: '3',
 				description:
 					'Every part of a .tsrx file, line by line, then the other files in a starter app.',
 			},
@@ -189,6 +180,15 @@ export const nav: readonly NavSection[] = [
 				number: '4',
 				description:
 					'shared() gives a piece of data a name, so a component that wants it calls the name instead of having it threaded down through props.',
+			},
+			{
+				title: 'Add to an existing site',
+				href: '/build/existing-site',
+				sprite: 'square',
+				icon: 'first-app',
+				number: '5',
+				description:
+					'Put a Markless component into one element of an HTML page you already have, with Vite and render(), and ship static files.',
 			},
 		],
 	},
@@ -481,7 +481,7 @@ export function breadcrumbFor(pathname: string): Crumb {
 }
 
 export const siteDescription =
-	'The Markless documentation: a framework whose compiler works out what changes while it builds your file, so the browser ships the update rather than the machinery for finding it.';
+	'The Markless documentation: build for any device, the web way. Elements and events in TypeScript, with an API designed to compile to any device.';
 
 /** Where this site is served, which is what an absolute URL in `sitemap.xml` needs. */
 export const siteOrigin = 'https://markless.dev';
@@ -545,7 +545,7 @@ export function pagerFor(pathname: string): Pager {
  */
 export const concepts: Readonly<Record<string, NavEntry>> = {
 	'first-app': { title: 'your first app', href: '/start/first-app' },
-	'browser-only': { title: 'using Markless in the browser', href: '/start/browser-only' },
+	'browser-only': { title: 'adding Markless to an existing site', href: '/build/existing-site' },
 	'reading-tsrx': { title: 'reading a .tsrx file', href: '/start/reading-tsrx' },
 	async: { title: 'async', href: '/concepts/async' },
 	computed: { title: 'computed', href: '/concepts/computed' },

@@ -1,6 +1,8 @@
 // Recount rewritten HTML so the router’s island element offsets stay aligned.
 import type { Plugin } from 'vite';
 import type { MdxRoutePart as RouterMdxRoutePart } from '../../packages/router/src/vite/runtime/mdx-route.ts';
+import * as core from '@markless/core';
+import { frameCodeBlocks } from '../components/docs/snippet/torn-strip.ts';
 import { countElements, elementTags, highlightFences } from './highlight-code.ts';
 
 type MdxRoutePart = RouterMdxRoutePart & { readonly html: string };
@@ -11,6 +13,18 @@ const FENCE_MARKER = '<pre><code class=';
 const HEADING_MARKER = '<h2';
 
 type Heading = { readonly level: number; readonly id: string; readonly html: string };
+
+// Inline code naming a function @markless/core exports gets the API highlighter; names the page made up stay plain.
+const API_NAMES = new Set(Object.entries(core).filter(([name, value]) => typeof value === 'function' && /^[a-z]/.test(name)).map(([name]) => name));
+const INLINE_CODE = /(<pre[^>]*>[\s\S]*?<\/pre>)|<code>([\s\S]*?)<\/code>/g;
+
+export function markApiCode(html: string): string {
+	return html.replace(INLINE_CODE, (whole, fence: string | undefined, inner: string | undefined) => {
+		if (fence !== undefined || inner === undefined) return whole;
+		const name = /^([A-Za-z_$][\w$]*)\s*(\(.*\))?$/.exec(inner.trim())?.[1];
+		return name !== undefined && API_NAMES.has(name) ? `<code class="api">${inner}</code>` : whole;
+	});
+}
 
 const HEADING = /<h([23])((?:\s[^>]*)?)>([\s\S]*?)<\/h\1>/g;
 
@@ -86,10 +100,10 @@ async function highlightParts(code: string, id: string): Promise<string> {
 					`(counted ${counted}, part says ${part.elementCount}). Island offsets would move; refusing to rewrite.`,
 			);
 		if (firstHtml < 0 && part.html.trim() !== '') firstHtml = index;
-		highlighted.push(highlightFences(part.html));
+		highlighted.push(highlightFences(part.html).then(frameCodeBlocks));
 	}
 	const rewritten = (await Promise.all(highlighted)).map((html) =>
-		html === undefined ? undefined : collectHeadings(html, seen, headings),
+		html === undefined ? undefined : collectHeadings(markApiCode(html), seen, headings),
 	);
 	const outline = outlineMarkup(headings);
 	if (outline && firstHtml >= 0)
@@ -121,7 +135,7 @@ async function highlightSoloHtml(code: string): Promise<string> {
 	if (!solo) return code;
 	const headings: Heading[] = [];
 	const body = collectHeadings(
-		await highlightFences(JSON.parse(solo[1]) as string),
+		markApiCode(frameCodeBlocks(await highlightFences(JSON.parse(solo[1]) as string))),
 		new Set<string>(),
 		headings,
 	);
@@ -136,7 +150,7 @@ export function highlightMdx(): Plugin {
 			async handler(code: string, id: string) {
 				if (!isMdxRoute(id)) return;
 				const fenced = code.includes(FENCE_MARKER);
-				if (!fenced && !code.includes(HEADING_MARKER)) return;
+				if (!fenced && !code.includes(HEADING_MARKER) && !code.includes('<code>')) return;
 				const known = PARTS_LINE.test(code) || SOLO_HTML.test(code);
 				if (fenced && !known)
 					throw new Error(

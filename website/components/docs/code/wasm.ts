@@ -16,9 +16,14 @@ let instances: Instances | undefined;
 let loading: Promise<void> | undefined;
 
 async function instantiate(url: string): Promise<WebAssembly.Exports> {
-	const response = await fetch(url);
-	if (!response.ok) throw new Error(`Could not load ${url}: HTTP ${response.status}`);
-	return (await WebAssembly.instantiate(await response.arrayBuffer(), {})).instance.exports;
+	try {
+		return (await WebAssembly.instantiateStreaming(fetch(url), {})).instance.exports;
+	} catch {
+		// Streaming refuses any `content-type` but `application/wasm`; this path takes the bytes as they are.
+		const response = await fetch(url);
+		if (!response.ok) throw new Error(`Could not load ${url}: HTTP ${response.status}`);
+		return (await WebAssembly.instantiate(await response.arrayBuffer(), {})).instance.exports;
+	}
 }
 
 export function loadCodeWasm(): Promise<void> {

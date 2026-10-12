@@ -1,14 +1,14 @@
+import OutcomeLine from '../components/docs/outcome-line.tsrx';
 import PageMeta from '../components/page-meta.tsrx';
 import Subtitle from '../components/docs/subtitle.tsrx';
-import Callout from '../components/docs/callout.tsrx';
-import Collapsible from '../components/docs/collapsible.tsrx';
 import MarklessMug from '../components/mascot/markless-mug.tsrx';
 import Sticker from '../components/sticker.tsrx';
 import ThemeToggle from '../components/docs/theme-toggle.tsrx';
 import Sidebar from '../components/docs/sidebar.tsrx';
-import LikeHeart from '../components/docs/like-heart.tsrx';
-import WhatMarklessNoted from '../components/sketch/start/what-markless-noted.tsrx';
-import WhereItRuns from '../components/sketch/start/where-it-runs.tsrx';
+import IntroAnatomy from '../components/figures/intro/intro-anatomy.tsrx';
+import DevicesAnatomy from '../components/figures/devices/devices-anatomy.tsrx';
+import PopupAnatomy from '../components/figures/popup/popup-anatomy.tsrx';
+import NameAnatomy from '../components/figures/name/name-anatomy.tsrx';
 
 <Sidebar />
 
@@ -16,112 +16,65 @@ import WhereItRuns from '../components/sketch/start/where-it-runs.tsrx';
 
 <MarklessMug variant="hero" size="10rem" mood="hello" />
 
-# Write a variable. The page follows it.
+# Build for any device, the web way.
 
 <PageMeta level="Start here" time="4 min" assumes="nothing" sprite="crown" />
 
 <ThemeToggle />
 
-<Subtitle text="Markless is a way to build websites and apps with TypeScript. The same code can run in a browser, on a server, or on your phone, like an iPhone or Android." />
+<Subtitle text="Write elements and events in TypeScript. Markless is designed to compile them to any device." terms="elements events" />
 
-Here is a button that counts its clicks. Click it a few times. Then change the code, and watch the button change with it.
+<IntroAnatomy />
 
-<Code note="Change the label from Count to Clicks. Then change count++ to count += 10, and click again.">
-```tsrx title="counter.tsrx"
+<OutcomeLine icon="js" title="Ready on the first click." text="Your JavaScript loads and runs only when someone is about to use it, so the first tap answers with no delay." />
+
+<OutcomeLine icon="agent" title="Code your agent picks up in one read." text="Plain variables, few rules, and errors that name the line and the fix." />
+
+<OutcomeLine icon="devices" title="One API, every device." text="Markless reads what your screen means, not just how it looks, so each device can draw it in its own way. The browser, server rendering and tests work today, and iOS and macOS already drive real native buttons." link="Help us reach yours." href="/contributing" />
+
+<DevicesAnatomy />
+
+**[Make your first app →](/start/first-app)** One command gives you a working app to change. Markless is pre-release: the browser, server rendering and tests are ready to try, and native is early.
+
+## Try it
+
+Here is an order like the one in the drawing, as code. Press **Mark ready**, and watch which part of the page changes. Then change the code, and watch the order change with it.
+
+<Code steps={[{ label: 'Rename `Mark ready 🔔` to `Done 🎉`.', shows: 'Done 🎉' }, { label: "Start the order at `'Queued 📋'` instead of `'Brewing ⏳'`.", source: "state('Queued 📋')" }, { label: 'Under line 8, add `<p>Again: {status}</p>`. Press the button, and both lines update.', rewrites: 2 }]}>
+```tsrx title="order.tsrx"
 import { state } from '@markless/core';
 
-export default function Counter() @{
-	let count = state(0);
-
-	<button onClick={() => count++}>
-		Count {count}
-	</button>
-}
-```
-</Code>
-
-`count` is a plain variable. You read it by writing `count`, and you change it with `count++`. There is no setter to call and nothing to unwrap.
-
-`state(0)` is the one new word. It starts `count` at 0 and keeps the page in step with it. When `count` changes, the text that shows it changes too.
-
-## Markless reads your code first
-
-So how does the page know which number to change?
-
-Before your app runs, Markless reads your code the way you read it. It sees that `count` shows up in the button text, and that the click changes it. It writes that down. So when `count` changes, it already knows the one piece of text to update.
-
-<WhatMarklessNoted />
-
-## Your function runs once
-
-Here is a second function. It rolls a die with `Math.random()` during setup. Click **Count** a few times, and watch the die.
-
-<Code note="Click Count a few times, and the roll stays put. Then change the 6 to 100. Your edit runs the function again, so it rolls once more.">
-```tsrx title="rolled-once.tsrx"
-import { state } from '@markless/core';
-
-export default function RolledOnce() @{
-	let count = state(0);
-	const roll = Math.floor(Math.random() * 6) + 1;
+export default function Order() @{
+	let status = state('Brewing ⏳');
 
 	<section>
-		<img
-			src="/illustrations/die-light.png"
-			alt="A die"
-			width="56"
-		/>
-		<p>Rolled at setup: {roll}</p>
-		<button onClick={() => count++}>
-			Count {count}
+		<p>☕ Latte for Marcus</p>
+		<p>Status: {status}</p>
+		<button onClick={() => {
+			status = 'Ready for pickup ✅';
+		}}>
+			Mark ready 🔔
 		</button>
 	</section>
 }
 ```
 </Code>
 
-The count goes up. The die does not roll again.
+`status` is a plain variable. `state()` gives it a starting value, and you change it by assigning to it.
 
-The function body ran one time, to set up the page. On this site, that happened before the page reached you. After that, a click runs `count++` and nothing else. Only the text that shows `count` changes.
+`Order` runs once, to set up the page. A click runs only the code in `onClick`, and only the text showing `status` changes.
 
-This is the whole model. You write setup code that runs once. You change values with plain code. The page keeps up.
+## Markless reads your code first
 
-## Render it anywhere
+Most tools figure out how your page fits together by running your code in the visitor's browser. **Markless finds out while it builds your app, before anyone visits.** The browser gets the finished map, so nothing has to run to create it.
 
-Markless builds what you write for any target. Learn it once, and you know how to render to each one:
+<PopupAnatomy />
 
-| Where | How |
-| --- | --- |
-| A page in the browser | `render(App, { target })` from `@markless/core` draws your code into an element. |
-| A multi-page app | `@markless/router` turns each file in `pages/` into a URL. |
-| HTML from a server | `renderToString()` from `@markless/core` turns your code into HTML. |
-| Tests | `@markless/vitest-browser` runs your code in the Vitest browser mode. |
-| Native apps | Two experiments drive iOS and macOS buttons from the same kind of counter. |
+## Why the name Markless?
 
-You write the code the same way for each one. The browser, server and test targets work today. iOS and macOS run as early proofs.
+Many frameworks ask you to mark your code for them: a special prefix, a `$` sign, a `.value` to read through, a hook with its rules. Every mark is one more rule to remember, for you and your agent, instead of your product. We want you both focused on what you are building.
 
-<WhereItRuns />
+Markless reads plain code instead. A value is a `let`, a change is a plain assignment, and the compiler works out the rest on its own. No marks needed. That is the name.
 
-<Collapsible
-	sprite="star-badge"
-	summary="Coming from another framework?"
-	text="Your code carries no markers for the framework. There is no .value to read through, no dollar sign, and no use prefix. That is where the name comes from. Nothing re-renders. The component body sets up the page once, and Markless wires each update. There is no effect system, so you never keep a dependency list in step. Markless borrows ideas from Solid, Ripple, Octane, Svelte, Marko and Qwik. For the technical version, read How it works."
-/>
+<NameAnatomy />
 
-<Callout
-	sprite="cross"
-	title="Is Markless ready for my next project?"
-	text="Not yet. Markless is a work in progress, and its authors have not announced it. These pages follow the code at version 0.5.0. Today, npm still installs 0.4.0. The native apps are experiments. They leave out styles and app packaging."
-/>
-
-## Where to go next
-
-[Your first app](/start/first-app) is one command. You get a multi-page app with the counter on its home page.
-
-[Use Markless in the browser](/start/browser-only) puts the counter into a plain HTML page, with no server.
-
-[Reading a .tsrx file](/start/reading-tsrx) walks through every part of a `.tsrx` file.
-
-[How it works](/how-it-works) is for the curious. It shows what Markless does with your code before it runs.
-
-
-<LikeHeart />

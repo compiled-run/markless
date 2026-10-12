@@ -4,6 +4,7 @@ import Collapsible from '../../components/docs/collapsible.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import LikeHeart from '../../components/docs/like-heart.tsrx';
+import PmCommand from '../../components/docs/pm-command.tsrx';
 
 <Sidebar />
 
@@ -17,7 +18,7 @@ One command makes a new app folder on your computer. Then you can open it in you
 
 Each file in the `pages/` folder becomes a page of your site. A file named `about.tsrx` becomes `/about`.
 
-Only want one button on an existing web page? Read [Use Markless in the browser](/start/browser-only) instead.
+Only want one button on an existing web page? Read [Add Markless to an existing site](/build/existing-site) instead.
 
 ## Before you start
 
@@ -27,9 +28,7 @@ You need Node.js `^20.19.0`, `^22.18.0` or `>=24.11.0`. The build tools in the s
 
 Run this in the folder that will hold your project:
 
-```bash
-npm create markless@latest
-```
+<PmCommand create="markless@latest" />
 
 It asks a few questions:
 
@@ -46,8 +45,9 @@ Last, it shows a summary under `Ready to create?` It writes no files until you p
 
 ```bash
 cd my-markless-app
-npm run dev
 ```
+
+<PmCommand run="dev" />
 
 Open `http://localhost:5173`. You see a heading and a button. That page is the file `pages/index.tsrx`. Here it is, and you can edit it. Click **Count 0** a few times first:
 

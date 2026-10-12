@@ -680,6 +680,10 @@ try {
 				(text) => text.endsWith(': 1'),
 				'Code: the prerendered starter result is live before the editor loads',
 			);
+			const prerenderedSize = await block
+				.locator('[data-code-stage] p')
+				.first()
+				.evaluate((node) => getComputedStyle(node).fontSize);
 			await block.hover();
 			await block.and(codePage.locator('[data-code="ready"]')).waitFor({ timeout: 20000 });
 			check(
@@ -692,6 +696,15 @@ try {
 			check(
 				await block.locator('[data-code-stage]').isHidden(),
 				'Code: an edit compiles in the browser and the frame takes over the Result pane',
+			);
+			const frameSize = await frame
+				.locator('p')
+				.first()
+				.evaluate((node) => getComputedStyle(node).fontSize);
+			check(
+				frameSize === prerenderedSize,
+				"Code: the frame's text is the prerendered result's size, so fluid type follows the page's window",
+				`${prerenderedSize} then ${frameSize}`,
 			);
 			const layers = await codeLayers(block);
 			check(
@@ -2693,27 +2706,6 @@ try {
 			watchOf('where-it-runs'),
 			(text) => text.includes('click 1 changed only the number'),
 			'the same counter counts in every place',
-		);
-
-		await page.goto(`${origin}/start/browser-only`, { waitUntil: 'load' });
-		const appCard = card('render-into-app');
-		check(
-			!(await appCard.locator('.count').isVisible()),
-			'#app starts empty before main.ts runs',
-		);
-		await appCard.getByRole('button', { name: 'Run main.ts' }).click();
-		await appCard.locator('.count').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-		await appCard.locator('.count').click();
-		await settleInner(
-			watchOf('render-into-app'),
-			(text) => text.includes('Click 1 changed only the number'),
-			'Run main.ts fills #app with the counter, and its click counts',
-		);
-		await appCard.getByRole('button', { name: 'Start over' }).click();
-		await settleInner(
-			watchOf('render-into-app'),
-			(text) => text.startsWith('Nothing has run yet'),
-			'Start over empties #app again',
 		);
 
 		await page.goto(`${origin}/tooling/editor-setup`, { waitUntil: 'load' });

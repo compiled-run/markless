@@ -35,6 +35,12 @@ describe('findCodeBlocks', () => {
 		expect(block?.attributes).toBe(`note="Type <b>{count}</b>, then watch 'it' > 0"`);
 	});
 
+	it('reads a braced attribute that nests objects and strings holding braces and backticks', () => {
+		const steps = "showUpdates steps={[{ label: 'Show `{shots}` twice', rewrites: 2 }, { label: \"it's }\", shows: '>' }]}";
+		const [block] = findCodeBlocks(page.replace('<Code note="Try it">', `<Code ${steps}>`), PAGE);
+		expect(block?.attributes).toBe(steps);
+	});
+
 	it('reads each titled fence inside <Code> as a file and skips <Code> inside a fence', () => {
 		const [block, ...rest] = findCodeBlocks(page, PAGE);
 		expect(rest).toEqual([]);

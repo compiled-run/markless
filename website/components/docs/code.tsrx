@@ -1,16 +1,37 @@
 import type { CodePane } from '../../tooling/code-blocks.ts';
 import type { CodeFile } from './code/protocol.ts';
+import { labelPieces, type CodeStep } from './playground/checklist.ts';
 import { lucide } from '@markless/ui';
 import sessionUrl from 'virtual:code-session-url';
+import liveUrl from 'virtual:code-live-url';
 import CodeFiles from './code-files.tsrx';
 
 // A URL the bundler cannot follow keeps the editor out of preloads.
-function boot(event: { readonly target: unknown }, files: readonly CodeFile[]): void {
+function boot(event: { readonly target: unknown }, files: readonly CodeFile[], onSight = false): void {
 	const box = (event.target as Element | null)?.closest<HTMLElement>('.code-block');
-	if (box)
-		void (import(/* @vite-ignore */ sessionUrl) as Promise<typeof import('./code/session.ts')>).then(
-			(code) => code.bootCodeBlock(box, files),
-		);
+	if (!box || (onSight && !bootsOnSight(box))) return;
+	// Keys typed before the editor attaches stay in the textarea; the session compiles them.
+	for (const input of box.querySelectorAll<HTMLTextAreaElement>('[data-code-input]')) input.readOnly = false;
+	void (import(/* @vite-ignore */ sessionUrl) as Promise<typeof import('./code/session.ts')>).then(
+		(code) => {
+			void code.bootCodeBlock(box, files);
+			if (box.hasAttribute('data-code-live'))
+				void (
+					import(/* @vite-ignore */ liveUrl) as Promise<typeof import('./playground/live.ts')>
+				).then((live) => live.bootLive(box));
+		},
+	);
+}
+
+// Mirrors session.ts: `markless-code:editor` and `markless-code:<path>:<block index>:<hash>`.
+function bootsOnSight(box: HTMLElement): boolean {
+	try {
+		const connection = (navigator as { connection?: { saveData?: boolean } }).connection;
+		if (localStorage.getItem('markless-code:editor') && !connection?.saveData) return true;
+		const prefix = `markless-code:${location.pathname}:${[...document.querySelectorAll('.code-block')].indexOf(box)}:`;
+		for (let i = 0; i < localStorage.length; i++) if (localStorage.key(i)?.startsWith(prefix)) return true;
+	} catch {}
+	return false;
 }
 
 export default function Code({
@@ -18,6 +39,8 @@ export default function Code({
 	panes,
 	title,
 	note,
+	showUpdates,
+	steps,
 	children,
 }: {
 	/** The starter files, entry `.tsrx` first or not; Reset restores them. */
@@ -28,17 +51,38 @@ export default function Code({
 	readonly title?: string;
 	/** A suggestion printed under the block, such as what to change and what to watch. */
 	readonly note?: string;
+	/** Washes each piece of the result an update rewrites in highlighter yellow for a moment. */
+	readonly showUpdates?: boolean;
+	/** "Try this" as a checklist that ticks each step once the reader has done it; replaces `note`. */
+	readonly steps?: readonly CodeStep[];
 	/** The starter's own render, shown in the Result pane until the first run. */
 	readonly children?: unknown;
 }) @{
+	const live = showUpdates === true || (steps?.length ?? 0) > 0;
+	const stepRows = (steps ?? []).map((step, id) => ({
+		id,
+		pieces: labelPieces(step.label),
+		shows: step.shows,
+		source: step.source,
+		rewrites: step.rewrites === undefined ? undefined : String(step.rewrites),
+	}));
+
 	<figure
 		class="code-block"
 		data-code="idle"
-		onVisible={(event) => boot(event, files)}
+		data-code-live={live ? '' : undefined}
+		onVisible={(event) => boot(event, files, true)}
+		onPointerenter={(event) => boot(event, files)}
+		onTouchstart={(event) => boot(event, files)}
 		onFocusin={(event) => boot(event, files)}
 	>
 		<header class="bar">
-			<span class="title">{title ?? 'Playground'}<span class="restored">(Restored)</span></span>
+			<span class="title">{title ?? 'Playground'}</span>
+			<span class="restored">
+				Restored your edit
+				<span aria-hidden="true">·</span>
+				<button type="button" class="restored-reset" data-code-action="reset">Reset</button>
+			</span>
 			<div class="tools" role="toolbar" aria-label="Playground tools">
 				<button type="button" class="tool" data-code-action="refresh" aria-label="Run again" title="Run again">
 					<lucide.rotatecw aria-hidden="true" />
@@ -65,11 +109,46 @@ export default function Code({
 			<div class="result" data-code-result>
 				<span class="status" data-code-status role="status"></span>
 				<div class="stage code-stage" data-code-stage>{children}</div>
+				@if (showUpdates) {
+					<div class="updates" data-code-updates aria-hidden="true">
+						<span class="update" data-code-update-mark hidden></span>
+					</div>
+				}
 				<ul class="problems" data-code-problems hidden aria-label="Problems"></ul>
 			</div>
 		</div>
-		@if (note) {
-			<figcaption class="note"><span class="try">Try this</span>{note}</figcaption>;
+		@if (stepRows.length > 0) {
+			<figcaption class="note">
+				<span class="try">Try this</span>
+				<ol class="steps">
+					@for (const step of stepRows; key step.id) {
+						<li
+							class="step"
+							data-code-step
+							data-step-shows={step.shows}
+							data-step-source={step.source}
+							data-step-rewrites={step.rewrites}
+						>
+							<span class="tick" aria-hidden="true"></span>
+							<span class="said" data-step-state>To do: </span>
+							<span data-step-label>
+								@for (const piece of step.pieces; key piece.id) {
+									@if (piece.code) {
+										<code class="step-code">{piece.text}</code>
+									} @else {
+										<span>{piece.text}</span>
+									}
+								}
+							</span>
+						</li>
+					}
+				</ol>
+				<span class="said" data-code-step-said aria-live="polite"></span>
+			</figcaption>
+		} @else {
+			@if (note) {
+				<figcaption class="note"><span class="try">Try this</span>{note}</figcaption>;
+			}
 		}
 		<style>
 			.code-block {
@@ -134,13 +213,46 @@ export default function Code({
 
 			.restored {
 				display: none;
-				margin-inline-start: 0.5em;
-				color: var(--muted-ink);
+				align-items: center;
+				gap: 0.4em;
+				margin-inline-end: auto;
+				padding: 0.15em 0.3em 0.15em 0.7em;
+				border-radius: 999px;
+				background: var(--tinted);
+				box-shadow: inset 0 0 0 1.5px color-mix(in oklch, var(--yellow) 60%, transparent);
 				font-size: var(--step--1);
+				line-height: 1.3;
+				white-space: nowrap;
 			}
 
 			.code-block[data-restored] .restored {
-				display: inline;
+				display: inline-flex;
+			}
+
+			.code-block[data-restored] .bar {
+				flex-wrap: wrap;
+			}
+
+			.restored-reset {
+				padding: 0.15em 0.45em;
+				border: 0;
+				border-radius: 999px;
+				background: transparent;
+				color: inherit;
+				font: inherit;
+				font-weight: 700;
+				text-decoration: underline;
+				text-underline-offset: 0.18em;
+				cursor: pointer;
+			}
+
+			.restored-reset:hover {
+				background: color-mix(in oklch, var(--ink) var(--hover-wash), transparent);
+			}
+
+			.restored-reset:focus-visible {
+				outline: 2px solid var(--ink);
+				outline-offset: 1px;
 			}
 
 			.tools {
@@ -257,6 +369,103 @@ export default function Code({
 				font-weight: 700;
 			}
 
+			.steps {
+				display: grid;
+				gap: 0.3rem;
+				margin: 0.3rem 0 0;
+				padding: 0;
+				list-style: none;
+			}
+
+			.step {
+				display: flex;
+				align-items: baseline;
+				gap: 0.55em;
+				transition: color 200ms ease;
+			}
+
+			.tick {
+				position: relative;
+				flex: none;
+				width: 0.95em;
+				height: 0.95em;
+				border: 2px solid var(--ink);
+				border-radius: 4px 3px 5px 3px;
+				transform: translateY(0.12em);
+			}
+
+			.step[data-done] {
+				color: color-mix(in oklch, var(--ink) 62%, var(--paper));
+			}
+
+			.step[data-done] .tick {
+				border-color: var(--muted-ink);
+				background: var(--mark);
+			}
+
+			.step[data-done] .tick::after {
+				position: absolute;
+				left: 0.24em;
+				top: -0.12em;
+				width: 0.28em;
+				height: 0.62em;
+				border: solid var(--ink);
+				border-width: 0 2.5px 2.5px 0;
+				transform: rotate(40deg);
+				content: '';
+			}
+
+			.step-code {
+				padding: 0.05em 0.3em;
+				border-radius: 4px;
+				background: color-mix(in oklch, var(--ink) 8%, transparent);
+				font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+				font-size: 0.9em;
+			}
+
+			.said {
+				position: absolute;
+				width: 1px;
+				height: 1px;
+				overflow: hidden;
+				clip-path: inset(50%);
+				white-space: nowrap;
+			}
+
+			.updates {
+				position: absolute;
+				inset: 0;
+				z-index: 1;
+				pointer-events: none;
+				mix-blend-mode: multiply;
+			}
+
+			html.dark .updates {
+				mix-blend-mode: screen;
+			}
+
+			.update {
+				position: absolute;
+				border-radius: 3px 5px 3px 4px;
+				background: var(--yellow);
+				animation: code-update-fade 600ms ease-out forwards;
+			}
+
+			html.dark .update {
+				background: color-mix(in oklch, var(--yellow) 45%, transparent);
+			}
+
+			@keyframes code-update-fade {
+				0%,
+				35% {
+					opacity: 1;
+				}
+
+				100% {
+					opacity: 0;
+				}
+			}
+
 			@container (min-width: 36rem) {
 				.body {
 					grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
@@ -288,11 +497,21 @@ export default function Code({
 
 			@media (max-width: 600px) {
 				.code-block {
-					padding-left: 2.2rem;
+					--code-bleed: calc(2 * var(--space-s-l));
+					--code-tab-left: calc(var(--space-s-l) + 0.4rem);
+					--code-gutter: 2.5rem;
+					--code-inset: 0.6rem;
+					--code-font-size: 0.875rem;
+					padding-left: 1.5rem;
 				}
 
 				.tools {
 					gap: 0;
+				}
+
+				.restored {
+					order: 1;
+					margin-block-end: 0.15rem;
 				}
 
 				.tool {
@@ -306,8 +525,13 @@ export default function Code({
 			}
 
 			@media (prefers-reduced-motion: reduce) {
-				.tool {
+				.tool,
+				.step {
 					transition: none;
+				}
+
+				.update {
+					animation: none;
 				}
 			}
 		</style>

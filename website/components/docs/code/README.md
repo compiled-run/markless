@@ -20,15 +20,37 @@ problem list under the result jumps to the line with `setSelectionRange`.
 
 ## The compiler
 
-`<Code>` (`../code.tsrx`) compiles the reader's edits in the browser. `compile-worker.ts` runs
-`compile.ts`, which drives the Markless bundler's own resolve, load and transform hooks
-(`bundle-host.ts`) over the block's files and the package source they import, so a component
+`<Code>` (`../code.tsrx`) compiles the reader's edits in the browser. A docs page has one
+compile worker (`compile-worker.ts`), started by the first block that boots and shared by every
+block on the page. Each request names its block: the worker keeps only each block's newest edit,
+compiles the block that edited most recently first, and places each block's files in their own
+folder (`/code/<block>/`), so blocks with the same file names never collide. The package source
+one compile reads stays loaded for the next. Every block that boots without a saved or typed
+edit sends its starter as a warm-up: the worker runs warm-ups only when no block has an edit
+waiting, drops a block's warm-up once that block sends an edit, and the hidden frame links and
+renders the result so the first real edit finds it ready. The worker runs `compile.ts`, which drives the Markless bundler's own resolve,
+load and transform hooks (`bundle-host.ts`) over the block's files and the package source they import, so a component
 from another `.tsrx` file or from `@markless/ui` links exactly as in an app build.
+
+Compiles are incremental, the way a dev server's are. Each block keeps one compiler
+(`createBlockCompiler`) for its whole life: one bundler state, one dev graph, one build id, and
+each module's last build with what it was built from (its loaded text, the resolves its hooks
+asked for, the text of every file they resolved or watched, and the code of every module they
+loaded). Before a compile, each edited file goes through the bundler's own dev invalidation
+(`invalidateEditedGeneratedModules` for an edited `.tsrx`, `invalidateAllGeneratedModules` for
+the `.tsrx` files importing any other edited file), and the modules it names are rebuilt. A
+module whose recorded inputs all read the same again returns its last code without running the
+transform hook. A compile that fails leaves nothing half-built: the builds it started finish
+first, and the files whose transform threw are invalidated before the next compile.
+`incremental.test.ts` holds every `<Code>` block on the site to this: after each edit in a fixed
+sequence, the incremental output must equal a cold build's, module for module.
 A block may hold several `.tsrx` files. The engine runs the first `.tsrx` in the `files` it is
 given; `tooling/code-blocks.ts` puts the page's entry there (the first `.tsrx` fence, or the one
 `<Code entry="name.tsrx">` names) and writes every file beside the generated block module, so
 the site build prerenders the entry with its relative imports resolved.
-`frame.ts` links every compiled module to a Blob URL; each `import()`, computed ones
+Every block keeps its own result frame. The session reports compile errors itself and posts the
+compiled modules to the frame (`code:modules`); `frame.ts` links every module to a Blob URL,
+renders the entry, and reports runtime errors and its height back; each `import()`, computed ones
 included, goes through the run that linked it, and runtime imports go through a loader every
 later run can still call.
 

@@ -1,5 +1,6 @@
 import PageMeta from '../../components/page-meta.tsrx';
 import StateSketch from '../../components/sketch/concepts/state-sketch.tsrx';
+import StateAnatomy from '../../components/figures/state/state-anatomy.tsrx';
 import Collapsible from '../../components/docs/collapsible.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
@@ -14,24 +15,50 @@ import LikeHeart from '../../components/docs/like-heart.tsrx';
 
 <ThemeToggle />
 
-You already know how to count in JavaScript.
+Say you work at Beanshop, a coffee brand. Customers press **Add to cart** on your shop page, and
+the page needs to keep track of how many bags they have added.
+
+You already know how to count in JavaScript:
 
 ```ts
-let cups = 0;
-cups++;
+let cart = 0;
+cart++;
 ```
 
-Put `cups` on a page, run `cups++`, and the page does not change. Nothing is wrong with the
-variable. Nobody told the page to care about it.
+Here is that variable as a jar beside your shop page. Press **Add to cart**.
 
-**Wrap the starting value in `state()`, and the page cares.**
+<StateAnatomy wired={false} />
+
+The jar fills up, but the page still says 0. A plain variable has no wires to the page, so the
+page never finds out.
+
+**Wrap the starting value in `state()`, and the page keeps up.**
 
 ```tsrx
-let cups = state(0);
+let cart = state(0);
 ```
 
-It is still a `let`. You still read it as `cups`, and you still change it with `cups++`. The one
-difference: every spot on the page that shows `cups` now changes when `cups` changes.
+## Follow the wire
+
+It is still a `let`, read as `cart` and changed with `cart++`. Before the page runs, Markless wires
+`cart` to every spot that shows it. Press **Add to cart** again.
+
+<StateAnatomy />
+
+<Collapsible sprite="star-badge" summary="How do existing tools handle this?">
+
+Most JavaScript tools ask you to treat the value in a special way, so they can tell when it changes.
+
+Some have you change it through a setter function instead of `cart++`. After each change, they run
+your whole component again and compare the new result with the old one to find what is different.
+
+Others keep the value inside a container. You read it through `.value`, or call it like a function,
+so the tool can see every read and every write as it happens.
+
+Markless keeps it a plain `let`. Your component runs once and never runs again. The wires are
+worked out before the page loads, so a change goes straight to the spots that show it.
+
+</Collapsible>
 
 ## Pour a few cups
 
@@ -119,12 +146,6 @@ the build, and each error names the line:
 	sprite="cross"
 	title="Why does my plain let fail the build?"
 	text="If a click handler changes a plain let that the elements show, the build stops. One of the errors, MARKLESS_STATE_STALE_LOCAL_WRITE, says why. The elements read a plain let only while the page is set up. A later change never reaches the screen. Wrap the starting value in state() and the error goes away."
-/>
-
-<Collapsible
-	sprite="star-badge"
-	summary="Coming from another framework?"
-	text="There is no setter function, no .value to read through, and no special character in the name. The variable is the state. Your component body runs once and never re-renders. Code in the body is setup code, not code that repeats."
 />
 
 Next: [values you work out instead of storing](/concepts/computed).

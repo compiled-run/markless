@@ -2,14 +2,55 @@
 import { asset } from '../../../site-base.ts';
 import type { CodeEditor } from './editor.ts';
 import { groupProblems, problemItem } from './problems.ts';
-import type { CodeDiagnostic, CodeFile, FrameReply, FrameRequest } from './protocol.ts';
+import type {
+	CodeDiagnostic,
+	CodeFile,
+	CompileOutcome,
+	FrameReply,
+	FrameRequest,
+	WorkerReply,
+	WorkerRequest,
+} from './protocol.ts';
 
 export type CodeSession = { reset(): void; dispose(): void };
 
-const EDIT_DELAY_MS = 300;
-// Compiles the starter as soon as the frame is up, so the first edit finds the compiler loaded.
-const WARM_UP = 0;
+/** How long the editor waits after a keystroke before it compiles. */
+export const EDIT_DELAY_MS = 300;
 const sessions = new WeakMap<HTMLElement, Promise<CodeSession>>();
+// code.tsrx reads this key: a reader who has edited once gets later blocks booted on sight.
+const EDITOR_FLAG = 'markless-code:editor';
+let flagged = false;
+let compiler: Worker | undefined;
+const compiles = new Map<number, (outcome: CompileOutcome) => void>();
+let nextId = 1;
+let blockCount = 0;
+
+/** The page's one compile worker, shared by every block on it. */
+function startCompiler(): Worker {
+	if (compiler) return compiler;
+	compiler = new Worker(new URL('./compile-worker.ts', import.meta.url), { type: 'module' });
+	compiler.addEventListener('message', (event: MessageEvent<WorkerReply>) => {
+		compiles.get(event.data.id)?.(event.data.outcome);
+		compiles.delete(event.data.id);
+	});
+	return compiler;
+}
+
+function compile(request: WorkerRequest): Promise<CompileOutcome> {
+	const worker = startCompiler();
+	return new Promise((resolve) => {
+		compiles.set(request.id, resolve);
+		worker.postMessage(request);
+	});
+}
+
+function markEditor(): void {
+	if (flagged) return;
+	flagged = true;
+	try {
+		localStorage.setItem(EDITOR_FLAG, '1');
+	} catch {}
+}
 
 /** The one way a block starts: every trigger calls this with the block's `<figure>`. */
 export function bootCodeBlock(
@@ -45,6 +86,46 @@ function part<T extends HTMLElement>(box: HTMLElement, name: string): T {
 	return found;
 }
 
+let fluidNames: readonly string[] | undefined;
+
+/** The page's `:root`/`html` custom properties whose declared value uses `vw`. */
+function fluidTokens(): readonly string[] {
+	if (fluidNames) return fluidNames;
+	const names = new Set<string>();
+	const visit = (rules: CSSRuleList) => {
+		for (const rule of rules) {
+			if (rule instanceof CSSStyleRule && /^(:root|html)$/.test(rule.selectorText.trim())) {
+				for (const name of rule.style)
+					if (name.startsWith('--') && /vw\b/.test(rule.style.getPropertyValue(name)))
+						names.add(name);
+			}
+			if ('cssRules' in rule) visit((rule as CSSGroupingRule).cssRules);
+		}
+	};
+	for (const sheet of document.styleSheets) {
+		try {
+			visit(sheet.cssRules);
+		} catch {}
+	}
+	if (names.size > 0) fluidNames = [...names];
+	return [...names];
+}
+
+// vw inside the frame is the frame's width, so the page sends each fluid token already resolved.
+function resolvedTokens(): Record<string, string> {
+	const probe = document.createElement('div');
+	probe.style.display = 'none';
+	document.body.append(probe);
+	const values: Record<string, string> = {};
+	for (const name of fluidTokens()) {
+		probe.style.width = `var(${name})`;
+		const width = getComputedStyle(probe).width;
+		if (width.endsWith('px')) values[name] = width;
+	}
+	probe.remove();
+	return values;
+}
+
 function siteLook(): FrameRequest {
 	return {
 		type: 'code:look',
@@ -52,6 +133,7 @@ function siteLook(): FrameRequest {
 		stylesheets: [...document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].map(
 			(link) => link.href,
 		),
+		tokens: resolvedTokens(),
 	};
 }
 
@@ -62,6 +144,8 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 	const listening = new AbortController();
 	const { signal } = listening;
 	box.dataset.code = 'loading';
+	const block = `block-${blockCount++}`;
+	startCompiler();
 
 	const frame = document.createElement('iframe');
 	frame.className = 'code-frame';
@@ -70,10 +154,10 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 	frame.src = asset(`_code-frame.html`);
 
 	let ready = false;
-	let nextId = 1;
 	let latest = 0;
+	let warmUp = -1;
+	let held: FrameRequest | undefined;
 	let timer: ReturnType<typeof setTimeout> | undefined;
-	let edited = false;
 	const send = (message: FrameRequest) =>
 		frame.contentWindow?.postMessage(message, location.origin);
 	const editors = new Map<string, CodeEditor>();
@@ -81,7 +165,6 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 	const actions: Record<string, () => void> = {
 		reset,
 		refresh() {
-			edited = true;
 			run();
 		},
 		lines() {
@@ -137,8 +220,8 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 			if (message.type === 'code:ready') {
 				ready = true;
 				send(siteLook());
-				if (edited) run();
-				else send({ type: 'code:run', id: WARM_UP, files: starters });
+				if (held) send(held);
+				held = undefined;
 			} else if (message.type === 'code:height') frame.style.height = `${message.height}px`;
 			else if (message.type === 'code:result') onResult(message);
 		},
@@ -146,37 +229,49 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 	);
 	stage.after(frame);
 
+	const key = storageKey(box, starters);
+	const typedAtStart = [...box.querySelectorAll('textarea')].some(
+		(input) => input.value !== input.defaultValue,
+	);
+	// Compiling the starter while the reader looks pays the block's first compile and render early.
+	if (!typedAtStart && !readSaved(key)) {
+		warmUp = latest = nextId++;
+		void compileAndShow(warmUp, starters);
+	}
+
 	const [{ createEditor }, highlighter] = await Promise.all([
 		import('./editor.ts'),
 		import('./highlight.ts').then((code) => code.loadHighlighter()),
 	]);
+	const typedEarly: HTMLTextAreaElement[] = [];
 	for (const host of box.querySelectorAll<HTMLElement>('[data-code-file]')) {
 		const name = host.dataset.codeFile ?? '';
 		if (!starters.some((file) => file.name === name)) continue;
+		const input = host.querySelector('textarea');
+		if (input && input.value !== input.defaultValue) typedEarly.push(input);
 		editors.set(
 			name,
 			createEditor(host, {
 				file: name,
 				highlighter,
 				onChange() {
-					edited = true;
+					markEditor();
 					clearTimeout(timer);
 					timer = setTimeout(run, EDIT_DELAY_MS);
 				},
 			}),
 		);
 	}
-	const key = storageKey(box, starters);
-	const saved = readSaved(key);
+	const saved = typedEarly.length > 0 ? undefined : readSaved(key);
 	if (saved) {
 		for (const starter of starters) {
 			const code = saved[starter.name];
 			if (typeof code === 'string') editors.get(starter.name)?.load(code);
 		}
-		edited = true;
 		box.toggleAttribute('data-restored', true);
-		if (ready) run();
+		run();
 	}
+	for (const input of typedEarly) input.dispatchEvent(new Event('input', { bubbles: true }));
 	box.dataset.code = 'ready';
 
 	function save(current: readonly CodeFile[]): void {
@@ -199,13 +294,35 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 	}
 
 	function run(): void {
-		if (!ready) return;
 		latest = nextId++;
 		box.dataset.code = 'running';
 		status.textContent = 'Compiling…';
 		const current = files();
 		save(current);
-		send({ type: 'code:run', id: latest, files: current });
+		void compileAndShow(latest, current);
+	}
+
+	async function compileAndShow(id: number, current: readonly CodeFile[]): Promise<void> {
+		const outcome = await compile({ id, block, files: current, warmUp: id === warmUp });
+		if (id !== latest) return;
+		if (!outcome.ok) {
+			if (id !== warmUp) showFailure(outcome.diagnostics);
+			return;
+		}
+		const modules: FrameRequest = {
+			type: 'code:modules',
+			id,
+			entry: outcome.entry,
+			modules: outcome.modules,
+		};
+		if (ready) send(modules);
+		else held = modules;
+	}
+
+	function showFailure(problems: readonly CodeDiagnostic[]): void {
+		box.dataset.code = 'error';
+		status.textContent = 'Not built';
+		showProblems(problems);
 	}
 
 	function reveal(problem: CodeDiagnostic): void {
@@ -223,15 +340,8 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 	}
 
 	function onResult(message: Extract<FrameReply, { type: 'code:result' }>): void {
-		if (message.id === WARM_UP || message.id !== latest) return;
-		if (!message.ok) {
-			// An empty list is a compile the worker skipped because a newer edit arrived.
-			if (message.diagnostics.length === 0) return;
-			box.dataset.code = 'error';
-			status.textContent = 'Not built';
-			showProblems(message.diagnostics);
-			return;
-		}
+		if (message.id === warmUp || message.id !== latest) return;
+		if (!message.ok) return showFailure(message.diagnostics);
 		box.dataset.code = 'ready';
 		status.textContent = '';
 		showProblems([]);
@@ -245,7 +355,6 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 		box.removeAttribute('data-restored');
 		pressed?.focus({ preventScroll: true });
 		clearTimeout(timer);
-		edited = true;
 		showProblems([]);
 		run();
 	}
@@ -254,12 +363,25 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 		if (ready) send(siteLook());
 	});
 	look.observe(document.documentElement, { attributeFilter: ['class'] });
+	let resizing = 0;
+	window.addEventListener(
+		'resize',
+		() => {
+			if (!ready || resizing) return;
+			resizing = requestAnimationFrame(() => {
+				resizing = 0;
+				send(siteLook());
+			});
+		},
+		{ signal },
+	);
 
 	return {
 		reset,
 		dispose() {
 			listening.abort();
 			look.disconnect();
+			cancelAnimationFrame(resizing);
 			clearTimeout(timer);
 			for (const editor of editors.values()) editor.dispose();
 			frame.remove();

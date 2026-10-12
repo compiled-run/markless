@@ -57,6 +57,22 @@ export default function PreviewCard({
 
 			.pg {
 				--pg-shadow: var(--muted-ink);
+				--pg-bleed: min(4.6rem, 2 * var(--space-s-l));
+				--pg-inset: calc(var(--pg-bleed) / 2 - 1.5px);
+				width: calc(100% + var(--pg-bleed));
+				box-sizing: border-box;
+				margin-inline: calc(var(--pg-bleed) / -2) 0;
+			}
+
+			.pg .pg-controls {
+				padding-inline-start: var(--pg-inset);
+			}
+
+			@media (max-width: 600px) {
+				.pg {
+					--pg-bleed: 0px;
+					--pg-inset: 1em;
+				}
 			}
 		</style>
 	</section>

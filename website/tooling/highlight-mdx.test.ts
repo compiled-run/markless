@@ -22,7 +22,7 @@ test('the outline keeps native heading links inside an independently mounted rea
 
 test('highlighting preserves the element order used by client navigation', async () => {
 	const code = await transformMdxRoute(
-		'import Note from "./note.tsrx";\n\n# Title\n\n<Note />\n\n## First\n\n## Second\n',
+		'import Note from "./note.tsrx";\n\n# Title\n\n<Note />\n\n## First\n\n```text\nplain\n```\n\n## Second\n',
 		'/page.mdx',
 	);
 	const transform = highlightMdx().transform as {
@@ -35,6 +35,9 @@ test('highlighting preserves the element order used by client navigation', async
 		expect(part.elementTags).toEqual(tags);
 		expect(part.elementCount).toBe(tags.length);
 	}
+	const framed = parts.filter((part: { html?: string }) => part.html?.includes('<div class="torn-strip">'));
+	expect(framed).toHaveLength(1);
+	expect(framed[0].html).toMatch(/<div class="torn-strip"><span class="torn-art" aria-hidden="true">[\s\S]*<pre><code class="language-text">plain\n?<\/code><\/pre><\/div>/);
 });
 
 test('actual Gridlist highlighting is independent of unrelated predecessor fences', async () => {

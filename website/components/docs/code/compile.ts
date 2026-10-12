@@ -2,7 +2,12 @@
 // compile worker in the browser and under Node in tests; the browser build swaps the
 // compiler's native parser, analyzer and printer for their WebAssembly builds.
 import { normalizeMarklessDevError } from '../../../../packages/bundler/src/dev-error/index.ts';
-import { buildBlock, ModuleBuildError, type SourceHost } from './bundle-host.ts';
+import {
+	createBlockBuilder,
+	ModuleBuildError,
+	type BuildReport,
+	type SourceHost,
+} from './bundle-host.ts';
 import type { CodeDiagnostic, CodeFile, CompileOutcome } from './protocol.ts';
 
 export { importSites } from './import-sites.ts';
@@ -38,39 +43,58 @@ function diagnosticsOf(error: unknown, file: string): CodeDiagnostic[] {
 	});
 }
 
-/** Compiles every file and what it imports; a failure reports the block file it happened in. */
-export async function compileFiles(
+/** Compiles one block edit after edit, rebuilding only what each edit changed. */
+export type BlockCompiler = {
+	/** Compiles every file and what it imports; a failure reports the block file it happened in. */
+	compile(files: readonly CodeFile[]): Promise<CompileOutcome>;
+	readonly lastBuild: BuildReport;
+};
+
+export function createBlockCompiler(host: SourceHost, buildId: string): BlockCompiler {
+	const builder = createBlockBuilder(host, buildId);
+	return {
+		get lastBuild() {
+			return builder.lastBuild;
+		},
+		async compile(files) {
+			const entry = entryFile(files);
+			if (!entry)
+				return {
+					ok: false,
+					diagnostics: [
+						{
+							file: files[0]?.name ?? '',
+							line: 1,
+							column: 1,
+							message:
+								'A Code block needs one .tsrx file whose default export is the component to show.',
+						},
+					],
+				};
+			try {
+				const modules = await builder.build(files);
+				return { ok: true, entry: `${host.codeDir}${entry.name}`, modules };
+			} catch (error) {
+				const at = error instanceof ModuleBuildError ? error.moduleId : '';
+				const path = at.replace(/\?.*$/, '');
+				const file = path.startsWith(host.codeDir) ? path.slice(host.codeDir.length) : '';
+				return {
+					ok: false,
+					diagnostics: diagnosticsOf(
+						error instanceof ModuleBuildError ? error.cause : error,
+						file,
+					),
+				};
+			}
+		},
+	};
+}
+
+/** Compiles every file and what it imports from nothing; a failure reports the block file it happened in. */
+export function compileFiles(
 	files: readonly CodeFile[],
 	buildId: string,
 	host: SourceHost,
 ): Promise<CompileOutcome> {
-	const entry = entryFile(files);
-	if (!entry)
-		return {
-			ok: false,
-			diagnostics: [
-				{
-					file: files[0]?.name ?? '',
-					line: 1,
-					column: 1,
-					message:
-						'A Code block needs one .tsrx file whose default export is the component to show.',
-				},
-			],
-		};
-	try {
-		const modules = await buildBlock(files, buildId, host);
-		return { ok: true, entry: `${host.codeDir}${entry.name}`, modules };
-	} catch (error) {
-		const at = error instanceof ModuleBuildError ? error.moduleId : '';
-		const path = at.replace(/\?.*$/, '');
-		const file = path.startsWith(host.codeDir) ? path.slice(host.codeDir.length) : '';
-		return {
-			ok: false,
-			diagnostics: diagnosticsOf(
-				error instanceof ModuleBuildError ? error.cause : error,
-				file,
-			),
-		};
-	}
+	return createBlockCompiler(host, buildId).compile(files);
 }

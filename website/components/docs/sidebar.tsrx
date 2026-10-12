@@ -221,6 +221,7 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 				width: 16rem;
 				max-height: calc(100vh - var(--header-height) - var(--space-s));
 				overflow-y: auto;
+				overscroll-behavior: contain;
 				/* The rail scrolls, but its track is not part of the drawing: the fade at the
 				   bottom (T017) is what says there is more list under the fold. */
 				scrollbar-width: none;

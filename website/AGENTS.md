@@ -21,6 +21,10 @@ class name that also exists in `global.css` still receives those global rules
 globals (`.prose h3` and friends) can still reach elements inside a component,
 so reset what they set when it shows.
 
+## Anatomy figures
+
+"Follow the wire" figures in `components/figures/` (pen-and-ink drawings of a shop page wired to its state, like the State page's) follow the `markless-anatomy` skill (`.ruler/skills/markless-anatomy/SKILL.md`).
+
 ## Demo code panels
 
 When a demo renders a code panel that claims to be a `.tsrx` file (the front

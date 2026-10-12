@@ -1,6 +1,6 @@
 // The browser half of <Code>. The editor session is its own entry chunk, reached through
 // a URL the bundler cannot follow, so a page with a block preloads none of it. The result
-// runs in /_code-frame.html and compiles in a Web Worker the frame starts; the compiler's
+// runs in /_code-frame.html and compiles in the one Web Worker the session starts; the compiler's
 // parser, analyzer and printer ship as native addons, so the worker's build swaps each for
 // its WebAssembly build.
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -10,9 +10,14 @@ import type { Plugin } from 'vite';
 
 const CODE_DIR = fileURLToPath(new URL('../components/docs/code/', import.meta.url));
 const FRAME_ENTRY = `${CODE_DIR}frame.ts`;
-const SESSION_ENTRY = `${CODE_DIR}session.ts`;
-const SESSION_URL = 'virtual:code-session-url';
-const SESSION_URL_ID = `\0${SESSION_URL}`;
+// Each is its own entry chunk the page reaches only through the URL its virtual module exports.
+const BROWSER_ENTRIES: Readonly<Record<string, { readonly file: string; readonly name: string }>> = {
+	'virtual:code-session-url': { file: `${CODE_DIR}session.ts`, name: 'code-session' },
+	'virtual:code-live-url': {
+		file: fileURLToPath(new URL('../components/docs/playground/live.ts', import.meta.url)),
+		name: 'code-live',
+	},
+};
 const BUNDLER_SWAPS: Readonly<Record<string, string>> = {
 	'node:fs': `${CODE_DIR}source-fs.ts`,
 	'node:fs/promises': `${CODE_DIR}source-fs.ts`,
@@ -74,7 +79,7 @@ export function codeCompilerSwaps(): Plugin {
 export function codeClient(): Plugin[] {
 	let base = '/';
 	let frameRef = '';
-	let sessionRef = '';
+	const entryRefs = new Map<string, string>();
 	return [
 		codeCompilerSwaps(),
 		{
@@ -107,20 +112,20 @@ export function codeClient(): Plugin[] {
 				)
 					return;
 				frameRef = this.emitFile({ type: 'chunk', id: FRAME_ENTRY, name: 'code-frame' });
-				sessionRef = this.emitFile({
-					type: 'chunk',
-					id: SESSION_ENTRY,
-					name: 'code-session',
-				});
+				for (const [url, entry] of Object.entries(BROWSER_ENTRIES))
+					entryRefs.set(url, this.emitFile({ type: 'chunk', id: entry.file, name: entry.name }));
 			},
 			resolveId(source) {
-				return source === SESSION_URL ? SESSION_URL_ID : null;
+				return Object.hasOwn(BROWSER_ENTRIES, source) ? `\0${source}` : null;
 			},
 			load(id) {
-				if (id !== SESSION_URL_ID) return null;
+				const url = id.startsWith('\0') ? id.slice(1) : '';
+				const entry = Object.hasOwn(BROWSER_ENTRIES, url) ? BROWSER_ENTRIES[url] : undefined;
+				if (!entry) return null;
 				if (this.environment?.config.consumer === 'server') return 'export default "";';
-				if (sessionRef) return `export default import.meta.ROLLUP_FILE_URL_${sessionRef};`;
-				return `export default ${JSON.stringify(`${base}@fs${SESSION_ENTRY}`)};`;
+				const ref = entryRefs.get(url);
+				if (ref) return `export default import.meta.ROLLUP_FILE_URL_${ref};`;
+				return `export default ${JSON.stringify(`${base}@fs${entry.file}`)};`;
 			},
 			generateBundle(_options, bundle) {
 				if (!frameRef || this.environment?.name !== 'client') return;

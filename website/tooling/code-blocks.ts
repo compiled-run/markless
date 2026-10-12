@@ -10,8 +10,14 @@ import { ColourTable, DocRegistry, highlightHtml, paneLines } from './ui-code-ru
 export const CODE_GENERATED_DIR = 'components/docs/code/generated';
 const CODE_COMPONENT = 'components/docs/code.tsrx';
 
-// Attribute values may hold `>` (a note can show markup), so quoted and braced values are matched whole.
-const OPEN = /^<Code((?:\s+[A-Za-z][\w-]*(?:=(?:"[^"]*"|'[^']*'|\{[^}]*\}))?)*)\s*>$/;
+// Attribute values may hold `>` (a note can show markup), so quoted and braced values are matched whole;
+// a braced value may nest one level of braces, and strings inside it may hold any brace.
+const STRING = String.raw`"[^"]*"|'[^']*'|\`[^\`]*\``;
+const FLAT = String.raw`\{(?:[^{}"'\`]|${STRING})*\}`;
+const BRACED = String.raw`\{(?:[^{}"'\`]|${STRING}|${FLAT})*\}`;
+const OPEN = new RegExp(
+	String.raw`^<Code((?:\s+[A-Za-z][\w-]*(?:=(?:"[^"]*"|'[^']*'|${BRACED}))?)*)\s*>$`,
+);
 const CLOSE = /^<\/Code>$/;
 const FENCE = /^(`{3,})([\w-]*)(.*)$/;
 const TITLE = /\btitle="([^"]+)"/;

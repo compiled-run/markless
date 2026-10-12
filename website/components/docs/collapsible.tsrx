@@ -1,3 +1,4 @@
+import type { Children } from '@markless/core';
 import Sprite from '../sprite.tsrx';
 import { collapsible, lucide } from '@markless/ui';
 
@@ -5,10 +6,13 @@ export default function Collapsible({
 	summary,
 	text,
 	sprite,
+	children,
 }: {
 	readonly summary: string;
-	readonly text: string;
+	/** One paragraph; pass children instead for several. */
+	readonly text?: string;
 	readonly sprite?: string;
+	readonly children?: Children;
 }) @{
 	<collapsible.root class="collapsible">
 		<style>
@@ -55,7 +59,10 @@ export default function Collapsible({
 			{summary}
 		</collapsible.trigger>
 		<collapsible.content>
-			<p>{text}</p>
+			@if (text) {
+				<p>{text}</p>
+			}
+			{children}
 		</collapsible.content>
 	</collapsible.root>
 }

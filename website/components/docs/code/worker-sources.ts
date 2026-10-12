@@ -36,7 +36,7 @@ for (const [path, code] of Object.entries(sourcePackageManifests(PACKAGES)))
 	addSourceFile(path, code);
 
 const packages = sourcePackages(PACKAGES);
-let placed: string[] = [];
+const placed = new Map<string, string[]>();
 
 async function read(path: string): Promise<string | undefined> {
 	if (hasSourceContents(path)) return readFileSync(path);
@@ -47,20 +47,25 @@ async function read(path: string): Promise<string | undefined> {
 	return code;
 }
 
-export const workerSourceHost: SourceHost = {
-	codeDir: '/code/',
-	root: '/',
-	isRuntime: isRuntimeSpecifier,
-	packageFile: (specifier) => packageFile(packages, specifier),
-	placeBlock(files: readonly CodeFile[]) {
-		for (const path of placed) removeSourceFile(path);
-		placed = files.map((file) => `/code/${file.name}`);
-		files.forEach((file, index) => addSourceFile(placed[index]!, file.code));
-	},
-	read,
-	async takeMisses() {
-		const misses = takeSourceMisses();
-		await Promise.all(misses.map(read));
-		return misses;
-	},
-};
+/** The source host for one block: its files live in their own folder, the package source is shared. */
+export function workerSourceHost(block: string): SourceHost {
+	const codeDir = `/code/${encodeURIComponent(block)}/`;
+	return {
+		codeDir,
+		root: '/',
+		isRuntime: isRuntimeSpecifier,
+		packageFile: (specifier) => packageFile(packages, specifier),
+		placeBlock(files: readonly CodeFile[]) {
+			for (const path of placed.get(block) ?? []) removeSourceFile(path);
+			const paths = files.map((file) => `${codeDir}${file.name}`);
+			placed.set(block, paths);
+			files.forEach((file, index) => addSourceFile(paths[index]!, file.code));
+		},
+		read,
+		async takeMisses() {
+			const misses = takeSourceMisses();
+			await Promise.all(misses.map(read));
+			return misses;
+		},
+	};
+}
