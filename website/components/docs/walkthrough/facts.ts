@@ -70,3 +70,6 @@ export const commandFor = (starter: string, manager: ManagerId = 'npm') => creat
 export const scriptCommand = (manager: ManagerId, script: string) => (manager === 'deno' ? 'deno task ' : manager + ' run ') + script;
 
 export const scriptsFor = (manager: ManagerId) => SCRIPTS.filter((script) => manager !== 'deno' || !NO_DENO_TASK.includes(script.name));
+
+/** The folder name create-markless offers by default. */
+export const DEFAULT_APP = 'my-markless-app';

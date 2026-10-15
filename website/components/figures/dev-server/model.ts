@@ -73,7 +73,8 @@ export const ghostFor = (typed: string) => (COMMAND.startsWith(typed) ? COMMAND.
 /** What the sheet shows: history, the prompt with what is typed, the output so far, scrolled so the newest line is on the sheet. */
 export function screen(desk: Desk, typed = '', at = typed.length): Row[] {
 	const prompt = desk.phase === 'off' ? { ...row('$', typed.slice(0, at), 'prompt'), caret: '|', after: typed.slice(at), ghost: at === typed.length ? ghostFor(typed) : '' } : row('$', COMMAND, 'cmd');
-	const all = [...desk.history, prompt, ...OUTPUT.slice(0, desk.shown)];
+	const hint = desk.phase === 'off' && desk.history.length === 1 ? [row('', '↵ Press Enter to run it', 'start')] : [];
+	const all = [...desk.history, prompt, ...hint, ...OUTPUT.slice(0, desk.shown)];
 	const top = Math.max(0, all.length - SLOTS);
 	const rows = all.slice(top);
 	return [...rows, ...Array.from({ length: SLOTS - rows.length }, () => BLANK)];

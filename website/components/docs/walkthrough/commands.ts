@@ -1,6 +1,7 @@
 // The shell blocks the Walkthrough shows for each package manager, as the highlighted runs a ```bash fence gets.
 import {
 	createCommand,
+	DEFAULT_APP,
 	MANAGERS,
 	type ManagerId,
 	scriptCommand,
@@ -33,7 +34,7 @@ const lower = (text: string) => text.charAt(0).toLowerCase() + text.slice(1).rep
 
 function rows(kind: CommandKind, manager: ManagerId): [string, string?][] {
 	if (kind === 'create') return [[createCommand(manager)]];
-	if (kind === 'dev') return [[scriptCommand(manager, 'dev')]];
+	if (kind === 'dev') return [[`cd ${DEFAULT_APP}`], [scriptCommand(manager, 'dev')]];
 	if (kind === 'scripts')
 		return scriptsFor(manager).map((script) => [
 			scriptCommand(manager, script.name),
@@ -57,7 +58,9 @@ export function shellLine(
 		text: index === 0 ? word : ' ' + word,
 		style:
 			index === 0
-				? SHELL_STYLES.command
+				? word === 'cd'
+					? SHELL_STYLES.flag
+					: SHELL_STYLES.command
 				: word.startsWith('-')
 					? SHELL_STYLES.flag
 					: SHELL_STYLES.word,

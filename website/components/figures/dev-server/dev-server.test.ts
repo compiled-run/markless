@@ -23,7 +23,7 @@ describe('the dev server figure shows the real starter', () => {
 		expect(DONE.text).toBe('cd my-markless-app');
 		expect(OUTPUT.map((r) => r.text)).toEqual(['', 'VITE+ v0.3.1', '', `Local:   ${URL_LINE}`, 'Network: use --host to expose']);
 		const blank = { mark: '', text: '', kind: 'blank', caret: '', after: '', ghost: '' };
-		expect(screen(START)).toEqual([DONE, { mark: '$', text: '', kind: 'prompt', caret: '|', after: '', ghost: COMMAND }, ...Array(SLOTS - 2).fill(blank)]);
+		expect(screen(START)).toEqual([DONE, { mark: '$', text: '', kind: 'prompt', caret: '|', after: '', ghost: COMMAND }, { ...blank, text: '↵ Press Enter to run it', kind: 'start' }, ...Array(SLOTS - 3).fill(blank)]);
 		expect(screen(START, 'npm r')[1]).toMatchObject({ text: 'npm r', caret: '|', after: '', ghost: 'un dev' });
 		expect(screen(START, 'npm r', 2)[1]).toMatchObject({ text: 'np', after: 'm r', ghost: '' });
 		expect(screen(START, 'ls')[1]!.ghost).toBe('');

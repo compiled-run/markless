@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { commandVariants, type CommandKind } from './commands.ts';
-import { COMMON_FILES, commandFor, createCommand, MANAGERS, NO_DENO_TASK, scriptCommand, SCRIPTS, scriptsFor, STARTERS } from './facts.ts';
+import { COMMON_FILES, DEFAULT_APP, commandFor, createCommand, MANAGERS, NO_DENO_TASK, scriptCommand, SCRIPTS, scriptsFor, STARTERS } from './facts.ts';
 
 const templates = new URL('../../../../packages/cli/templates/', import.meta.url);
 const cli = readFileSync(new URL('../../../../packages/cli/src/index.ts', import.meta.url), 'utf8');
@@ -52,6 +52,7 @@ describe('the Walkthrough facts match create-markless', () => {
 	it('uses the menu labels and flags of the CLI', () => {
 		for (const starter of STARTERS) expect(cli).toContain(`value: '${starter.id}',\n\t\tlabel: '${starter.label}',`);
 		expect(cli).toContain("message: 'What are you building today?'");
+		expect(cli).toContain(`const DEFAULT_TARGET = '${DEFAULT_APP}';`);
 		expect(cli).toContain("`${options.packageManager} run dev`");
 		expect(commandFor('app')).toBe('npm create markless@latest my-app -- --yes --starter app');
 	});

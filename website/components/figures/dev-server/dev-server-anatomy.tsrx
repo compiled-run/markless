@@ -72,6 +72,7 @@ export default function DevServer() @{
 				<path class="sheet-ink" d={art.browser.nav} />
 				<text class="url" transform={art.browser.pill.matrix}>{HOST}</text>
 				<path class="sheet-ink" d={art.browser.bar.ink} />
+				<text class="waiting" transform={art.browser.head}>Nothing here until the server runs.</text>
 				<g class="served">
 					<text class="page-head" transform={art.browser.head}>{HEADING}</text>
 					<path class="sheet-hatch" d={art.browser.button.side} />
@@ -384,6 +385,21 @@ export default function DevServer() @{
 			.term[data-kind='prompt'] :is(.line, .ghost),
 			.term[data-kind='local'] .line {
 				font-weight: 700;
+			}
+
+			.term[data-kind='start'] .line {
+				font-weight: 700;
+			}
+
+			.waiting {
+				font-family: 'Joy Elia', system-ui, sans-serif;
+				font-size: 14px;
+				fill: var(--ink);
+				opacity: 0.45;
+			}
+
+			.scene:not([data-phase='off']) .waiting {
+				visibility: hidden;
 			}
 
 			.term[data-kind='note'] .line {
