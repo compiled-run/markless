@@ -180,7 +180,7 @@ export interface Row {
 	readonly value: string;
 	/** A hint line, indented under the option it explains. */
 	readonly hint: string;
-	/** cmd, bar, active, done, value, pick, hint, opt, note, input */
+	/** cmd, bar, active, done, value, pick, hint, opt, note, input, start */
 	readonly kind: string;
 	/** The option index a click on this row picks, or -1. */
 	readonly option: number;
@@ -224,7 +224,7 @@ const shell = (run: Run): Row[] => [...run.tries.flatMap((t) => [row('$', t, 'cm
 
 /** The whole transcript so far, top to bottom, as the shell and clack print it. */
 export function transcript(run: Run): Row[] {
-	if (run.outcome === 'idle') return shell(run);
+	if (run.outcome === 'idle') return run.tries.length ? shell(run) : [...shell(run), row('', '', 'start', '', -1, '↵ Press Enter to run it')];
 	const rows: Row[] = [row('$', COMMAND, 'cmd'), row('┌', INTRO, 'done'), row('│')];
 	for (let step = 0; step < run.picks.length; step++) {
 		if (PROMPTS[step]!.key === 'ready') rows.push(...summary(run));

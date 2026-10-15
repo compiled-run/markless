@@ -118,7 +118,8 @@ describe('the create figure plays the real CLI', () => {
 
 	it('waits at a shell prompt: the command runs on Enter, an empty Enter takes the suggestion, anything else gets one friendly line', () => {
 		expect(START.outcome).toBe('idle');
-		expect(transcript(START).map((r) => r.kind)).toEqual(['input']);
+		expect(transcript(START).map((r) => r.kind)).toEqual(['input', 'start']);
+		expect(transcript(START)[1]!.hint).toBe('↵ Press Enter to run it');
 		expect(ghostFor(START, '')).toBe(COMMAND);
 		expect(ghostFor(START, 'npm cr')).toBe('eate markless@latest');
 		expect(ghostFor(START, 'yarn')).toBe('');

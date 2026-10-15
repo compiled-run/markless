@@ -638,6 +638,12 @@ export default function CreateAnatomy() @{
 				opacity: 0.72;
 			}
 
+			.row[data-kind='start'] .hint {
+				font-size: 13px;
+				font-weight: 700;
+				opacity: 1;
+			}
+
 			.row[data-kind='cmd'] .line,
 			.row[data-kind='active'] .line,
 			.row[data-kind='pick'] .line,
@@ -811,6 +817,10 @@ export default function CreateAnatomy() @{
 
 				.hint {
 					font-size: 11px;
+				}
+
+				.row[data-kind='start'] .hint {
+					font-size: 17px;
 				}
 
 				.peek {
