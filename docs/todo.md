@@ -104,6 +104,8 @@ Lower priority or parked:
 - TSRX intrinsic types reject SVG filter and pattern attributes, `href` and `dy`.
 - A page component placed inside a library component's children gets mismatched paths: with `CodeFiles` inside `resizable.item`, its elements are located under `m4:c0:c2:r:<file>:...` but its state and click handlers under `m4:c0:c0:p1:p2:r:<file>:...`, so clicks cannot find their state (the docs playground's file tab blanked the editor). Worked around in `website/components/docs/code.tsrx` by keeping the tabs outside the split.
 
+- A keyed `@for` over a computed list does not re-render when the state it derives from changes, while a second list built the same way does (found building the Walkthrough's create figure, 2026-10-15; repro in goals/walkthrough-page/notes/for-computed-bug.md). Looping over frozen art and indexing a computed is rejected with `MARKLESS_REPEAT_ROWS_FROZEN` and `MARKLESS_STATE_DYNAMIC_PATH_READ`, so the anatomy skill's advice no longer works either. Worked around with fixed slots.
+
 ## Bundle growth accepted on 2026-10-15
 
 - benchmark-guard failed on main at `abfe7d4d`: `41_size-uncompressed` grew by 3.00 kB against `c3317d30`, from the runtime work in the 140-commit push of 2026-10-12 (234 package files). The owner accepted it to unblock main. Find which commit added the bytes and either cut them or record why they are needed.

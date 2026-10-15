@@ -51,8 +51,8 @@ export const nav: readonly NavSection[] = [
 					'What Markless is: elements and events in TypeScript, with an API designed to compile to any device. The browser, server rendering and tests work today, and iOS and macOS are early proofs.',
 			},
 			{
-				title: 'Your first app',
-				href: '/start/first-app',
+				title: 'Walkthrough',
+				href: '/start/walkthrough',
 				sprite: 'plus',
 				icon: 'first-app',
 				number: '2',
@@ -544,7 +544,7 @@ export function pagerFor(pathname: string): Pager {
  * what the reader sees and follows, so a page never spells a URL itself.
  */
 export const concepts: Readonly<Record<string, NavEntry>> = {
-	'first-app': { title: 'your first app', href: '/start/first-app' },
+	'first-app': { title: 'your first app', href: '/start/walkthrough' },
 	'browser-only': { title: 'adding Markless to an existing site', href: '/build/existing-site' },
 	'reading-tsrx': { title: 'reading a .tsrx file', href: '/start/reading-tsrx' },
 	async: { title: 'async', href: '/concepts/async' },
