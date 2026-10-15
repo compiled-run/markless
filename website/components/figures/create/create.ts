@@ -49,7 +49,7 @@ const { proj, projAll } = createCamera({
 	width: WIDTH,
 	height: HEIGHT,
 	view: { azimuth: 90, elevation: 62, distance: 80, target: [12, 13.6, 0] },
-	bounds: [[FOLDER.u - 0.3, -0.4, 0], [SHEET_O[0] + SHEET_W + 1.4, -0.4, 0], [FOLDER.u - 0.3, FOLDER.v + FOLDER.h + 1.2, 0], [FOLDER.w + 5.2, FOLDER.v + FOLDER.h + 1.2, 0], [FOLDER.w + 5.2, FOLDER.v - 1.4, 0]],
+	bounds: [[FOLDER.u - 5.2, -0.4, 0], [SHEET_O[0] + SHEET_W + 1.4, -0.4, 0], [FOLDER.u - 5.2, FOLDER.v + FOLDER.h + 1.2, 0], [FOLDER.w + 5.2, FOLDER.v + FOLDER.h + 1.2, 0], [FOLDER.w + 5.2, FOLDER.v - 1.4, 0]],
 	pad: 4,
 });
 const onSheet = (pts: P[], lift = 0): P[] => pts.map(([u, v]) => proj(sheetAt(u, v, lift)));
@@ -246,31 +246,29 @@ function arrowTo(from: P, aim: P, seed: number, via: P[] = [[from[0] - 10, from[
 function aimAt(slot: number): P {
 	const { col, depth } = slotAt(slot);
 	const v = SLIP.top + depth * SLIP.step + 0.42;
-	return proj(folder.at(slot < PER ? col.u + col.w - 0.5 : col.u + col.w + 0.15, v, 0.1));
+	return proj(folder.at(slot < PER ? col.u - 0.15 : col.u + col.w + 0.15, v, 0.1));
 }
 
-/** A file note's arrow; one to a left-column sheet runs along the seam under that row so it crosses no name in the right column. */
+/** A file note's arrow, from the margin on the sheet's own side of the folder. */
 function fileArrow(slot: number, from: P) {
 	const aim = aimAt(slot);
-	if (slot >= PER) return arrowTo(from, aim, 620 + slot * 3, [[from[0] - 10, (from[1] + aim[1]) / 2], [aim[0] + 24, aim[1] + 1]]);
-	const { depth } = slotAt(slot);
-	const seam = SLIP.top + depth * SLIP.step + 0.8;
-	const right = proj(folder.at(FOLDER.w + 0.2, seam, 0.1));
-	const gap = proj(folder.at(COLS[1]!.u - 0.1, seam, 0.1));
-	return arrowTo(from, aim, 620 + slot * 3, [[from[0] - 8, (from[1] + right[1]) / 2], right, gap, [aim[0] + 14, aim[1] + 3]]);
+	const out = slot < PER ? -1 : 1;
+	return arrowTo(from, aim, 620 + slot * 3, [[from[0] - 10 * out, (from[1] + aim[1]) / 2], [aim[0] + 24 * out, aim[1] + 1]]);
 }
 
-/** The margin note right of the folder: by default ONE FILE IS YOUR PAGE with its arrow onto the page sheet, and for a hovered sheet that file's name and what it is for, with an arrow onto that sheet. */
+/** The margin notes: by default ONE FILE IS YOUR PAGE right of the folder, and for a hovered sheet its name and what it is for, in the margin on that sheet's side, with an arrow onto it. */
 function noteArt() {
 	const base = proj(folder.at(FOLDER.w, SLIP.top + 3.6, 0));
 	const label: P = [WIDTH - 4, base[1]];
-	const left = r1(proj(folder.at(FOLDER.w, SLIP.top + 2.4, 0))[0] + 16);
+	const right = r1(proj(folder.at(FOLDER.w, SLIP.top + 2.4, 0))[0] + 16);
+	const left = r1(proj(folder.at(FOLDER.u, SLIP.top + 2.4, 0))[0] - 26);
 	const top = r1(base[1] - 34);
+	const lines = Array.from({ length: NOTE_LINES }, (_, k) => r1(top + 20 + k * 15));
 	return {
 		at: { x: r1(label[0]), y: r1(label[1]), y2: r1(label[1] + 18) },
 		arrow: arrowTo([label[0] - 92, label[1] - 22], aimAt(PER), 600),
-		file: { x: left, y: top, lines: Array.from({ length: NOTE_LINES }, (_, k) => r1(top + 20 + k * 15)) },
-		arrows: Array.from({ length: MOST_FILES }, (_, slot) => fileArrow(slot, [left - 6, top - 4])),
+		file: { right, left, y: top, lines },
+		arrows: Array.from({ length: MOST_FILES }, (_, slot) => fileArrow(slot, slot < PER ? [left + 12, top - 4] : [right - 6, top - 4])),
 	};
 }
 

@@ -26,6 +26,7 @@ export default function CreateAnatomy() @{
 	const mode = computed(() => typing(run));
 	const front = computed(() => frontAt(run, peek));
 	const pointer = computed(() => art.note.arrows[front.slot]!);
+	const noteX = computed(() => (front.side === 'left' ? art.note.file.left : art.note.file.right));
 	const s0 = computed(() => slipAt(run, 0, peek));
 	const s1 = computed(() => slipAt(run, 1, peek));
 	const s2 = computed(() => slipAt(run, 2, peek));
@@ -366,16 +367,16 @@ export default function CreateAnatomy() @{
 						<tspan x={art.note.at.x} y={art.note.at.y2}>YOUR PAGE</tspan>
 					</text>
 				</g>
-				<g class="file-note" data-on={front.on} aria-hidden="true">
+				<g class="file-note" data-on={front.on} data-side={front.side} aria-hidden="true">
 					<path class="halo" d={pointer} />
 					<path class="ink" d={pointer} />
-					<text class="file-name" x={art.note.file.x} y={art.note.file.y}>{front.name}</text>
+					<text class="file-name" x={noteX} y={art.note.file.y}>{front.name}</text>
 					<text class="file-says">
-						<tspan x={art.note.file.x} y={art.note.file.lines[0]}>{front.lines[0]}</tspan>
-						<tspan x={art.note.file.x} y={art.note.file.lines[1]}>{front.lines[1]}</tspan>
-						<tspan x={art.note.file.x} y={art.note.file.lines[2]}>{front.lines[2]}</tspan>
-						<tspan x={art.note.file.x} y={art.note.file.lines[3]}>{front.lines[3]}</tspan>
-						<tspan x={art.note.file.x} y={art.note.file.lines[4]}>{front.lines[4]}</tspan>
+						<tspan x={noteX} y={art.note.file.lines[0]}>{front.lines[0]}</tspan>
+						<tspan x={noteX} y={art.note.file.lines[1]}>{front.lines[1]}</tspan>
+						<tspan x={noteX} y={art.note.file.lines[2]}>{front.lines[2]}</tspan>
+						<tspan x={noteX} y={art.note.file.lines[3]}>{front.lines[3]}</tspan>
+						<tspan x={noteX} y={art.note.file.lines[4]}>{front.lines[4]}</tspan>
 					</text>
 				</g>
 			</svg>
@@ -497,6 +498,10 @@ export default function CreateAnatomy() @{
 
 			.file-note {
 				pointer-events: none;
+			}
+
+			.file-note[data-side='left'] text {
+				text-anchor: end;
 			}
 
 			.file-name {

@@ -312,7 +312,7 @@ export function frontAt(run: Run, slot: number) {
 	const path = layout(landed(run))[slot] ?? '';
 	const cut = path.lastIndexOf('/') + 1;
 	const lines = noteLines(NOTES[path] ?? '');
-	return { on: path === '' ? 'no' : 'yes', slot: path === '' ? 0 : slot, name: path.slice(cut), lines: Array.from({ length: NOTE_LINES }, (_, k) => lines[k] ?? '') };
+	return { on: path === '' ? 'no' : 'yes', slot: path === '' ? 0 : slot, side: slot >= 0 && slot < PER ? 'left' : 'right', name: path.slice(cut), lines: Array.from({ length: NOTE_LINES }, (_, k) => lines[k] ?? '') };
 }
 
 /** The terminal input's label: what the open line expects. */
