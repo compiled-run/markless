@@ -53,7 +53,7 @@ export const PROJECT_FORMAT_CHOICES = [
 		label: 'Node',
 		hint: 'Creates a package.json project for pnpm, npm, or yarn.',
 	},
-	{ value: 'deno', label: 'Deno', hint: 'Creates a deno.json project with npm: imports.' },
+	{ value: 'deno', label: 'Deno', hint: 'If you love its security model. Any deno-compatible runtime works.' },
 	{ value: 'bun', label: 'Bun', hint: 'Creates a package.json project tuned for Bun.' },
 ] as const satisfies readonly Choice<ProjectFormat>[];
 
@@ -715,7 +715,7 @@ function nextSteps(options: CreateOptions): string {
 		`  ${devCommand(options)}`,
 		'',
 		'Then open:',
-		'  http://localhost:5173',
+		'  http://localhost:3000',
 	].join('\n');
 }
 

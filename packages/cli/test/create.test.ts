@@ -206,7 +206,7 @@ test('prompts interactively when a TTY run has no target', async () => {
 	);
 	expect(events).toContain('text:What should we call it?:my-markless-app:my-markless-app');
 	expect(events).toContain(
-		'select:Where should it run?:node:Node|Creates a package.json project for pnpm, npm, or yarn.,Deno|Creates a deno.json project with npm: imports.,Bun|Creates a package.json project tuned for Bun.',
+		'select:Where should it run?:node:Node|Creates a package.json project for pnpm, npm, or yarn.,Deno|If you love its security model. Any deno-compatible runtime works.,Bun|Creates a package.json project tuned for Bun.',
 	);
 	expect(events).toContain(
 		'select:Install dependencies now?:yes:Yes|Runs pnpm install after files are created.,No|Leaves dependencies for you to install later.',
@@ -219,7 +219,7 @@ test('prompts interactively when a TTY run has no target', async () => {
 	);
 	expect(events).toContain('select:Ready to create?:create:Create app|,Cancel|');
 	expect(events).toContain(
-		'note:Created interactive-docs:Next steps:\n  cd interactive-docs\n  pnpm run dev\n\nThen open:\n  http://localhost:5173',
+		'note:Created interactive-docs:Next steps:\n  cd interactive-docs\n  pnpm run dev\n\nThen open:\n  http://localhost:3000',
 	);
 	expect(events).toContain('outro:Markless app ready.');
 	await expect(exists(join(root, 'interactive-docs/pages/index.mdx'))).resolves.toBe(true);

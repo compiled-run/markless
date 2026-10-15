@@ -16,6 +16,9 @@
 		"templates"
 	],
 	"type": "module",
+	"engines": {
+		"node": "^20.19.0 || ^22.18.0 || >=24.11.0"
+	},
 	"exports": {
 		".": "./src/index.ts"
 	},

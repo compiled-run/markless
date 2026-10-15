@@ -64,7 +64,7 @@ flag collection or a manually printed text menu:
     Creates a package.json project for pnpm, npm, or yarn.
 
     Deno
-    Creates a deno.json project with npm: imports.
+    If you love its security model. Any deno-compatible runtime works.
 
     Bun
     Creates a package.json project tuned for Bun.
