@@ -52,3 +52,7 @@ goals/
 /output/
 docs/goals/
 .markless/
+
+# raw per-sample benchmark data stays local; results keep summary, run and results files
+demos/interaction-benchmark/results/**/raw.jsonl
+packages/vitest-browser/browser/**/__screenshots__/

@@ -1,0 +1,4 @@
+{
+  "label": "first-click-2026-10-13",
+  "note": "30 visits per cell (the acceptance bar). Chromium and WebKit, normal profile, early phase only: the three cases that click while the page is still loading. Deployed builds at https://mlbench-<name>.vercel.app, visited directly. --skip-correctness, as in public-2026-09-22. The constrained cells in this run are recorded as unsupported because the proxy cannot shape deployed URLs; see first-click-2026-10-13-slow."
+}

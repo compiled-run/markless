@@ -1,0 +1,4 @@
+{
+  "label": "first-click-2026-10-13-slow",
+  "note": "30 visits per cell. Chromium only, constrained profile through CDP (150 ms latency, 5 Mbps down, 1 Mbps up, 4x CPU slowdown), early phase, same three cases and deployments as first-click-2026-10-13. WebKit has no CDP, so it has no constrained cells against deployed URLs."
+}
