@@ -143,7 +143,7 @@
 	src: url('/fonts/Recursive-variable.woff2') format('woff2');
 }
 
-* {
+*:where(:not(.code-stage *)) {
 	font-family: 'Joy Elia';
 	/* Only Recursive has these axes, so every other face ignores them. */
 	font-variation-settings: 'MONO' 1, 'CASL' 1;
@@ -152,14 +152,12 @@
 /* Article prose reads in Shantell Sans; headings, sidebar, chips, buttons, and
    code stay Joy Elia / mono. The `*` rule above beats inheritance, so inline
    children are matched explicitly. Bold maps to the real 600 weight. */
-.prose :is(p, li, blockquote, dd, dt, td, th, figcaption, summary),
-.prose
-	:is(p, li, blockquote, dd, dt, td, th, figcaption, summary)
-	:is(a, strong, em, b, i, mark, small, span) {
+.prose :is(p, li, blockquote, dd, dt, td, th, figcaption, summary):where(:not(.code-stage *)),
+.prose :is(p, li, blockquote, dd, dt, td, th, figcaption, summary) :is(a, strong, em, b, i, mark, small, span):where(:not(.code-stage *)) {
 	font-family: 'Shantell Sans', system-ui, sans-serif;
 }
 
-.prose :is(p, li, blockquote) :is(strong, b) {
+.prose :is(p, li, blockquote) :is(strong, b):where(:not(.code-stage *)) {
 	font-weight: 600;
 }
 
@@ -175,12 +173,12 @@ body {
 
 /* The base offset plus its four corners at --shadow-grow: a solid silhouette
    grown outward on every side. Invisible until an element sets --shadow-color. */
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
+h1:where(:not(.code-stage *)),
+h2:where(:not(.code-stage *)),
+h3:where(:not(.code-stage *)),
+h4:where(:not(.code-stage *)),
+h5:where(:not(.code-stage *)),
+h6:where(:not(.code-stage *)) {
 	text-shadow:
 		var(--shadow-x) var(--shadow-y) 0 var(--shadow-color),
 		calc(var(--shadow-x) - var(--shadow-grow)) calc(var(--shadow-y) - var(--shadow-grow)) 0
@@ -193,7 +191,7 @@ h6 {
 			var(--shadow-color);
 }
 
-h1 {
+h1:where(:not(.code-stage *)) {
 	font-size: var(--step-5);
 	--shadow-color: var(--pink);
 	line-height: 115%;
@@ -438,16 +436,34 @@ markless-outline { display: contents; }
 	overflow-wrap: break-word;
 }
 
-.prose p,
-.prose ul,
-.prose ol {
+.prose p:where(:not(.code-stage *)),
+.prose ul:where(:not(.code-stage *)),
+.prose ol:where(:not(.code-stage *)) {
 	margin-block: var(--space-s);
 }
 
-.prose h2 {
+/* Figures are the page's set pieces: give each one a full beat of paper above and below. */
+/* Three steps of space, so proximity shows what belongs together: lines in a group sit
+   --space-s apart, a drawing or demo sits --space-l from the text it illustrates, and a new
+   section opens with the large gap above its h2. */
+.prose figure:is(.anatomy, .popup),
+.prose .order {
+	margin-block: var(--space-l) !important;
+}
+
+/* The outcome lines are a list of three; the line after them stands apart as its own beat. */
+.prose .outcome {
+	margin-block: var(--space-s) !important;
+}
+
+.prose .outcome + p {
+	margin-top: var(--space-m);
+}
+
+.prose h2:where(:not(.code-stage *)) {
 	font-size: var(--step-3);
 	--shadow-color: var(--purple);
-	margin-top: var(--space-l);
+	margin-top: calc(var(--space-2xl) * 1.5);
 	margin-bottom: var(--space-s);
 
 	html.dark & {
@@ -462,7 +478,7 @@ markless-outline { display: contents; }
 	line-height: 1.3;
 }
 
-.prose h3 {
+.prose h3:where(:not(.code-stage *)) {
 	font-size: var(--step-2);
 	--shadow-color: var(--green-soft);
 	margin-top: var(--space-m);
@@ -474,14 +490,14 @@ markless-outline { display: contents; }
 	}
 }
 
-.prose a {
+.prose a:where(:not(.code-stage *)) {
 	color: var(--ink);
 	text-decoration-color: var(--pink);
 	text-decoration-thickness: 0.12em;
 	text-underline-offset: 0.16em;
 }
 
-.prose code {
+.prose code:where(:not(.code-stage *)) {
 	display: inline-block;
 	background: color-mix(in oklch, var(--ink) 8%, transparent);
 	color: var(--ink);
@@ -501,7 +517,7 @@ markless-outline { display: contents; }
    it still reads as part of the sentence. The block hugs its content: no
    min-height, no reserved strip, and the highlighter strips the trailing
    newline so there is no empty last line. */
-.prose pre {
+.prose pre:where(:not(.code-stage *)) {
 	background: var(--code-surface);
 	margin-block: var(--space-m);
 	color: var(--ink);
@@ -515,7 +531,7 @@ markless-outline { display: contents; }
 	tab-size: 2;
 }
 
-.prose pre code {
+.prose pre code:where(:not(.code-stage *)) {
 	display: block;
 	overflow-wrap: normal;
 	background: none;
@@ -529,9 +545,9 @@ markless-outline { display: contents; }
 /* `* { font-family }` above matches every token span the highlighter emits, and
    a direct match beats a family inherited from `pre`, so the spans have to be
    named. The hover doc is prose, not code, and keeps Joy Elia. */
-.prose pre,
-.prose pre code,
-.prose pre code span {
+.prose pre:where(:not(.code-stage *)),
+.prose pre code:where(:not(.code-stage *)),
+.prose pre code span:where(:not(.code-stage *)) {
 	font-family: var(--font-mono);
 }
 
@@ -546,7 +562,7 @@ code *,
 kbd,
 kbd *,
 pre,
-pre * {
+pre *:where(:not(.code-stage *)) {
 	font-variant-ligatures: none;
 	font-feature-settings:
 		'liga' 0,
@@ -606,70 +622,22 @@ html.dark .shiki span:not(.tsrx-tip):not(.tsrx-tip-title):not(.tsrx-tip-body) {
 	box-shadow: none;
 }
 
-/* ---------------------------------------------------------------------------
-   Code blocks (components/docs/code.tsrx). The result runs in a frame and the
-   problem list is written at run time, so neither carries the component's scope
-   class; the frame's body is a .code-stage too, so a result looks the same
-   before and after the first edit.
-   --------------------------------------------------------------------------- */
-
+/* A <Code> result is the reader's page: browser defaults on the paper, none of the site's styles.
+   The frame's body matches it in tooling/code-client.ts. */
 .code-stage {
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-xs);
-	color: var(--ink);
-	font-family: 'Shantell Sans', system-ui, sans-serif;
-	font-size: var(--step-0);
+	all: initial;
+	display: block;
+	color: CanvasText;
+	font-family: system-ui, sans-serif;
+	color-scheme: light;
+
+	html.dark & {
+		color-scheme: dark;
+	}
 }
 
 .code-stage[hidden] {
 	display: none;
-}
-
-.code-stage button {
-	align-self: flex-start;
-	margin: 0 0.5rem 0.5rem 0;
-	padding: 0.35em 1em;
-	border: 1.5px solid var(--ink);
-	border-radius: 6px;
-	background: var(--paper);
-	color: var(--ink);
-	font: inherit;
-	cursor: pointer;
-	transition: background-color 130ms ease;
-}
-
-.code-stage button:hover {
-	background: color-mix(in oklch, var(--ink) var(--hover-wash), var(--paper));
-}
-
-.code-stage button:active {
-	background: color-mix(in srgb, var(--purple) 22%, var(--paper));
-}
-
-.code-stage button:focus-visible {
-	outline: 2px solid var(--ink);
-	outline-offset: 3px;
-}
-
-.code-stage :is(ul, ol) {
-	margin: 0 0 0.5em;
-	padding-left: 1.3em;
-}
-
-.code-stage label {
-	display: inline-flex;
-	align-items: center;
-	gap: 0.45em;
-}
-
-.code-stage input:is([type='checkbox'], [type='radio']) {
-	margin: 0;
-	accent-color: var(--ink);
-}
-
-.code-stage p {
-	margin-block: 0 0.5em;
 }
 
 .code-block[data-code='error'] .code-frame {
@@ -682,7 +650,11 @@ html.dark .shiki span:not(.tsrx-tip):not(.tsrx-tip-title):not(.tsrx-tip-body) {
 	min-height: 4rem;
 	border: 0;
 	background: transparent;
-	color-scheme: normal;
+	color-scheme: light;
+
+	html.dark & {
+		color-scheme: dark;
+	}
 }
 
 .code-frame[hidden] {
@@ -1415,7 +1387,7 @@ html.dark .prose .torn-strip {
 
 /* The props table. `display: block` is what lets a table scroll inside its own
    column instead of pushing the whole document sideways on a phone. */
-.prose table {
+.prose table:where(:not(.code-stage *)) {
 	display: block;
 	width: 100%;
 	overflow-x: auto;
@@ -1424,22 +1396,22 @@ html.dark .prose .torn-strip {
 	font-size: var(--step--1);
 }
 
-.prose th,
-.prose td {
+.prose th:where(:not(.code-stage *)),
+.prose td:where(:not(.code-stage *)) {
 	padding: 0.4em 0.7em;
 	border-bottom: 1px solid var(--code-edge);
 	text-align: left;
 	vertical-align: top;
 }
 
-.prose th {
+.prose th:where(:not(.code-stage *)) {
 	text-transform: uppercase;
 	letter-spacing: 0.06em;
 	font-size: var(--step--2);
 	opacity: 0.75;
 }
 
-.prose td:first-child {
+.prose td:first-child:where(:not(.code-stage *)) {
 	white-space: nowrap;
 }
 

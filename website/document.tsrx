@@ -35,7 +35,7 @@ export default function Document({
 			<meta property="og:description" content={head.description} />
 			<meta property="og:url" content={canonical} />
 			<meta name="twitter:card" content="summary" />
-			<link rel="icon" href={asset('favicon.svg')} type="image/svg+xml" />
+			<link rel="icon" href={asset('favicon-mug.svg')} type="image/svg+xml" />
 			<link rel="apple-touch-icon" href={asset('markless-mug-icon.png')} />
 			<link rel="stylesheet" href={stylesheet} />
 			<link rel="stylesheet" href={brandStylesheet} />

@@ -4,7 +4,6 @@ import Collapsible from '../../components/docs/collapsible.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import LikeHeart from '../../components/docs/like-heart.tsrx';
-import PmCommand from '../../components/docs/pm-command.tsrx';
 
 <Sidebar />
 
@@ -28,7 +27,9 @@ You need Node.js `^20.19.0`, `^22.18.0` or `>=24.11.0`. The build tools in the s
 
 Run this in the folder that will hold your project:
 
-<PmCommand create="markless@latest" />
+```bash
+npm create markless@latest
+```
 
 It asks a few questions:
 
@@ -47,7 +48,9 @@ Last, it shows a summary under `Ready to create?` It writes no files until you p
 cd my-markless-app
 ```
 
-<PmCommand run="dev" />
+```bash
+npm run dev
+```
 
 Open `http://localhost:5173`. You see a heading and a button. That page is the file `pages/index.tsrx`. Here it is, and you can edit it. Click **Count 0** a few times first:
 

@@ -1,6 +1,5 @@
 import PageMeta from '../../components/page-meta.tsrx';
 import Collapsible from '../../components/docs/collapsible.tsrx';
-import PmCommand from '../../components/docs/pm-command.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import LikeHeart from '../../components/docs/like-heart.tsrx';
@@ -20,7 +19,9 @@ You give Markless one empty element, and it fills that element with your compone
 
 In your site's folder, install Markless and Vite, the tool that builds the page:
 
-<PmCommand add="@markless/core vite" />
+```bash
+npm install @markless/core vite
+```
 
 ## Cut one spot
 
@@ -107,13 +108,17 @@ export default defineConfig({
 
 ## Run it
 
-<PmCommand run="dev" />
+```bash
+npm run dev
+```
 
 Open `http://localhost:5173`. You see the **Beanshop** heading and a **Count 0** button under it. Click the button: the number goes up, and the heading never changes. The first time you open the page, Vite may reload it once while it gets Markless ready.
 
 ## Ship it
 
-<PmCommand run="build" />
+```bash
+npm run build
+```
 
 The `dist/` folder now holds `index.html` and a `build/` folder of JavaScript files. Upload `dist/` to any static file host. To try the built page on your machine first, run the `preview` script.
 
@@ -146,7 +151,9 @@ await render(Cart, { target: document.querySelector('#cart')! });
 
 Your editor needs the Markless TypeScript plugin to read `.tsrx` files. Install it with TypeScript:
 
-<PmCommand devAdd="@markless/typescript-plugin typescript" />
+```bash
+npm install --save-dev @markless/typescript-plugin typescript
+```
 
 Then add this `tsconfig.json` next to `package.json`:
 

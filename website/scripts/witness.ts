@@ -464,7 +464,7 @@ try {
 					`${entry.href} declares the language it is written in`,
 				);
 				check(
-					html.includes('rel="icon" href="/favicon.svg"'),
+					html.includes('rel="icon" href="/favicon-mug.svg"'),
 					`${entry.href} links a favicon`,
 				);
 				check(

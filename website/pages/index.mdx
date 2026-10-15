@@ -1,3 +1,5 @@
+import JumpNote from '../components/docs/jump-note.tsrx';
+import StartWithAgent from '../components/docs/start-with-agent.tsrx';
 import OutcomeLine from '../components/docs/outcome-line.tsrx';
 import PageMeta from '../components/page-meta.tsrx';
 import Subtitle from '../components/docs/subtitle.tsrx';
@@ -26,7 +28,9 @@ import NameAnatomy from '../components/figures/name/name-anatomy.tsrx';
 
 <IntroAnatomy />
 
-<OutcomeLine icon="js" title="Ready on the first click." text="Your JavaScript loads and runs only when someone is about to use it, so the first tap answers with no delay." />
+## Fast pages, plain code, any device
+
+<OutcomeLine icon="js" title="Ready on the first click." text="A tap while the page is still loading still works. Markless answered all 270 early taps in our benchmark, and six of the eight other frameworks dropped some." link="See the benchmark." href="https://github.com/compiled-run/markless/tree/main/demos/interaction-benchmark/results/first-click-2026-10-13" />
 
 <OutcomeLine icon="agent" title="Code your agent picks up in one read." text="Plain variables, few rules, and errors that name the line and the fix." />
 
@@ -34,20 +38,21 @@ import NameAnatomy from '../components/figures/name/name-anatomy.tsrx';
 
 <DevicesAnatomy />
 
-**[Make your first app →](/start/first-app)** One command gives you a working app to change. Markless is pre-release: the browser, server rendering and tests are ready to try, and native is early.
+<JumpNote lead="Ready to try it?" link="Start your first app ↓" href="#start-your-first-app" />
 
-## Try it
+## Change one line, watch one line change
 
 Here is an order like the one in the drawing, as code. Press **Mark ready**, and watch which part of the page changes. Then change the code, and watch the order change with it.
 
-<Code steps={[{ label: 'Rename `Mark ready 🔔` to `Done 🎉`.', shows: 'Done 🎉' }, { label: "Start the order at `'Queued 📋'` instead of `'Brewing ⏳'`.", source: "state('Queued 📋')" }, { label: 'Under line 8, add `<p>Again: {status}</p>`. Press the button, and both lines update.', rewrites: 2 }]}>
+<Code steps={[{ label: 'Rename `Mark ready 🔔` to `Done 🎉`.', shows: 'Done 🎉' }, { label: "Start the order at `'Queued 📋'` instead of `'Brewing ⏳'`.", source: "state('Queued 📋')" }, { label: 'Under line 9, add `<p>Again: {status}</p>`. Press the button, and both lines update.', rewrites: 2 }]}>
 ```tsrx title="order.tsrx"
 import { state } from '@markless/core';
+import './style.css';
 
 export default function Order() @{
 	let status = state('Brewing ⏳');
 
-	<section>
+	<section class="ticket">
 		<p>☕ Latte for Marcus</p>
 		<p>Status: {status}</p>
 		<button onClick={() => {
@@ -56,6 +61,26 @@ export default function Order() @{
 			Mark ready 🔔
 		</button>
 	</section>
+}
+```
+```css title="style.css"
+.ticket {
+	font-family: 'Shantell Sans', sans-serif;
+	color: light-dark(#2d2a24, #ebe7e0);
+}
+
+.ticket p {
+	margin: 0 0 0.5rem;
+}
+
+.ticket button {
+	padding: 0.35em 1em;
+	border: 1.5px solid currentColor;
+	border-radius: 6px;
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	cursor: pointer;
 }
 ```
 </Code>
@@ -78,3 +103,8 @@ Markless reads plain code instead. A value is a `let`, a change is a plain assig
 
 <NameAnatomy />
 
+## Start your first app
+
+Pick an assistant. It opens a new chat asking it to read the Markless docs and walk you through your first app. You just press send.
+
+<StartWithAgent />

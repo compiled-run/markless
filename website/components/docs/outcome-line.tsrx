@@ -68,8 +68,12 @@ export default function OutcomeLine({ title, text, icon, link, href }: { readonl
 				fill: var(--paper);
 			}
 
-			.ink .fill {
-				fill: color-mix(in oklch, var(--pink) 45%, var(--paper));
+			.agent .fill {
+				fill: color-mix(in oklch, var(--purple) 45%, var(--paper));
+			}
+
+			.devices .fill {
+				fill: color-mix(in oklch, var(--green-soft) 70%, var(--paper));
 			}
 
 			.line {
