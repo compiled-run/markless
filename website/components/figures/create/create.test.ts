@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { CreateProgram, PROJECT_FORMAT_CHOICES, STARTER_CHOICES, type ProgramRuntime } from '../../../../packages/cli/src/index.ts';
-import { choose, COMMAND, COMMON_FILES, cursorRow, describe as say, dropOrder, enter, filesFor, focusRow, type Format, FORMATS, ghostFor, isFirstPage, layout, LONGEST, move, MOST_FILES, NOTES, PAGE_SLOT, PER, PROMPTS, ROWS, type Run, screen, slipAt, START, type Starter, STARTERS, submit, tabOf, TARGET, transcript, widthOf, wrap, WRAP } from './model.ts';
+import { choose, COMMAND, COMMON_FILES, cursorRow, describe as say, dropOrder, enter, filesFor, focusRow, type Format, FORMATS, ghostFor, isFirstPage, layout, LONGEST, MAX_TYPED, move, MOST_FILES, NOTES, PAGE_SLOT, PER, PROMPTS, ROWS, type Run, screen, slipAt, START, type Starter, STARTERS, submit, tabOf, TARGET, transcript, widthOf, wrap, WRAP } from './model.ts';
 import { drawing } from './create.ts';
 import { recall, remember } from './history.ts';
 
@@ -121,6 +121,7 @@ describe('the create figure plays the real CLI', () => {
 		expect(transcript(START).map((r) => r.kind)).toEqual(['input', 'start']);
 		expect(transcript(START)[1]!.hint).toBe('↵ Press Enter to run it');
 		expect(ghostFor(START, '')).toBe(COMMAND);
+		expect(COMMAND.length).toBeLessThanOrEqual(MAX_TYPED);
 		expect(ghostFor(START, 'npm cr')).toBe('eate markless@latest');
 		expect(ghostFor(START, 'yarn')).toBe('');
 		const wrong = submit(START, 'npm i markless');

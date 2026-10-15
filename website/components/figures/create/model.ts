@@ -256,8 +256,10 @@ export function transcript(run: Run): Row[] {
 
 export const ROWS = 11;
 const BLANK = row('', '', 'blank');
-/** The longest line the reader can type; the terminal and the folder's tab are drawn for it. */
-export const MAX_TYPED = 24;
+/** The longest line the reader can type at the shell; the command and some slack must fit. */
+export const MAX_TYPED = 40;
+/** The longest app name; the terminal and the folder's tab are drawn for it. */
+export const MAX_NAME = 24;
 
 /** The suggestion shown faintly after the caret: the rest of the command at the shell, the default name at the name prompt. */
 export function ghostFor(run: Run, typed: string): string {

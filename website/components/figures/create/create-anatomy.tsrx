@@ -1,6 +1,6 @@
 // A terminal drawn on a sheet on the desk: type the create command, answer the real prompts, and the starter's files drop into the folder below as paper sheets that say what they are for.
 import { computed, state } from '@markless/core';
-import { choose, COMMAND, cursorRow, describe, flip, focusRow, ghostFor, labelOf, landed, MAX_TYPED, move, noteAt, type Run, screen, slipAt, START, submit, tabOf, typing, widthOf } from './model.ts';
+import { choose, COMMAND, cursorRow, describe, flip, focusRow, ghostFor, labelOf, landed, MAX_NAME, MAX_TYPED, move, noteAt, type Run, screen, slipAt, START, submit, tabOf, typing, widthOf } from './model.ts';
 import { art } from './create.art.ts';
 import { recall, remember } from './history.ts';
 
@@ -80,6 +80,7 @@ export default function CreateAnatomy() @{
 				onInput={(event) => {
 					const input = event.target as HTMLInputElement;
 					if (typing(run) === 'none') input.value = '';
+					if (typing(run) === 'name' && input.value.length > MAX_NAME) input.value = input.value.slice(0, MAX_NAME);
 					typed = input.value;
 					at = input.selectionStart ?? input.value.length;
 					tick = tick === 'a' ? 'b' : 'a';
@@ -108,7 +109,7 @@ export default function CreateAnatomy() @{
 						run = move(run, event.key === 'ArrowDown' ? 1 : -1);
 						said = describe(run, true);
 					} else if (event.key === 'ArrowRight' && input.selectionStart === input.value.length && ghostFor(run, input.value) !== '') {
-						input.value = (input.value + ghostFor(run, input.value)).slice(0, MAX_TYPED);
+						input.value = (input.value + ghostFor(run, input.value)).slice(0, typing(run) === 'name' ? MAX_NAME : MAX_TYPED);
 						typed = input.value;
 						at = input.value.length;
 					} else if (event.key === 'Enter') {
