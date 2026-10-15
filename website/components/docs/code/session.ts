@@ -14,8 +14,11 @@ import type {
 
 export type CodeSession = { reset(): void; dispose(): void };
 
-/** How long the editor waits after a keystroke before it compiles. */
-export const EDIT_DELAY_MS = 300;
+/**
+ * How long the reader must stop typing before a build error shows. Longer than the gap between
+ * most keystrokes, so half-typed code does not flash errors, and short enough to read as a pause.
+ */
+export const ERROR_PAUSE_MS = 450;
 const sessions = new WeakMap<HTMLElement, Promise<CodeSession>>();
 // code.tsrx reads this key: a reader who has edited once gets later blocks booted on sight.
 const EDITOR_FLAG = 'markless-code:editor';
@@ -154,10 +157,15 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 	frame.src = asset(`_code-frame.html`);
 
 	let ready = false;
+	// The newest compile sent, and the newest result sent to the frame.
 	let latest = 0;
+	let framed = 0;
 	let warmUp = -1;
+	let compiling = false;
+	let queued = false;
+	let lastInput = 0;
 	let held: FrameRequest | undefined;
-	let timer: ReturnType<typeof setTimeout> | undefined;
+	let errorTimer: ReturnType<typeof setTimeout> | undefined;
 	const send = (message: FrameRequest) =>
 		frame.contentWindow?.postMessage(message, location.origin);
 	const editors = new Map<string, CodeEditor>();
@@ -165,7 +173,7 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 	const actions: Record<string, () => void> = {
 		reset,
 		refresh() {
-			run();
+			request();
 		},
 		lines() {
 			box.dataset.lines = box.dataset.lines === 'off' ? 'on' : 'off';
@@ -256,8 +264,9 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 				highlighter,
 				onChange() {
 					markEditor();
-					clearTimeout(timer);
-					timer = setTimeout(run, EDIT_DELAY_MS);
+					lastInput = performance.now();
+					clearTimeout(errorTimer);
+					request();
 				},
 			}),
 		);
@@ -269,7 +278,7 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 			if (typeof code === 'string') editors.get(starter.name)?.load(code);
 		}
 		box.toggleAttribute('data-restored', true);
-		run();
+		request();
 	}
 	for (const input of typedEarly) input.dispatchEvent(new Event('input', { bubbles: true }));
 	box.dataset.code = 'ready';
@@ -293,10 +302,17 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 		}));
 	}
 
-	function run(): void {
-		latest = nextId++;
+	// One compile in flight per block; text typed meanwhile goes in the next one, as it reads then.
+	function request(): void {
 		box.dataset.code = 'running';
 		status.textContent = 'Compiling…';
+		if (compiling) queued = true;
+		else run();
+	}
+
+	function run(): void {
+		latest = nextId++;
+		compiling = true;
 		const current = files();
 		save(current);
 		void compileAndShow(latest, current);
@@ -304,11 +320,19 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 
 	async function compileAndShow(id: number, current: readonly CodeFile[]): Promise<void> {
 		const outcome = await compile({ id, block, files: current, warmUp: id === warmUp });
-		if (id !== latest) return;
+		if (id !== warmUp) {
+			compiling = false;
+			if (queued) {
+				queued = false;
+				run();
+			}
+		}
+		if (id === warmUp ? id !== latest : id <= framed) return;
 		if (!outcome.ok) {
-			if (id !== warmUp) showFailure(outcome.diagnostics);
+			if (id === latest && id !== warmUp) fail(outcome.diagnostics);
 			return;
 		}
+		framed = id;
 		const modules: FrameRequest = {
 			type: 'code:modules',
 			id,
@@ -317,6 +341,13 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 		};
 		if (ready) send(modules);
 		else held = modules;
+	}
+
+	function fail(problems: readonly CodeDiagnostic[]): void {
+		clearTimeout(errorTimer);
+		const wait = lastInput + ERROR_PAUSE_MS - performance.now();
+		if (wait > 0) errorTimer = setTimeout(() => showFailure(problems), wait);
+		else showFailure(problems);
 	}
 
 	function showFailure(problems: readonly CodeDiagnostic[]): void {
@@ -340,11 +371,16 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 	}
 
 	function onResult(message: Extract<FrameReply, { type: 'code:result' }>): void {
-		if (message.id === warmUp || message.id !== latest) return;
-		if (!message.ok) return showFailure(message.diagnostics);
-		box.dataset.code = 'ready';
-		status.textContent = '';
-		showProblems([]);
+		if (message.id === warmUp || message.id !== framed) return;
+		if (!message.ok) {
+			if (message.id === latest) fail(message.diagnostics);
+			return;
+		}
+		if (message.id === latest) {
+			box.dataset.code = 'ready';
+			status.textContent = '';
+			showProblems([]);
+		}
 		stage.hidden = true;
 		frame.hidden = false;
 	}
@@ -354,9 +390,9 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 		for (const starter of starters) editors.get(starter.name)?.replace(starter.code);
 		box.removeAttribute('data-restored');
 		pressed?.focus({ preventScroll: true });
-		clearTimeout(timer);
+		clearTimeout(errorTimer);
 		showProblems([]);
-		run();
+		request();
 	}
 
 	const look = new MutationObserver(() => {
@@ -382,7 +418,7 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 			listening.abort();
 			look.disconnect();
 			cancelAnimationFrame(resizing);
-			clearTimeout(timer);
+			clearTimeout(errorTimer);
 			for (const editor of editors.values()) editor.dispose();
 			frame.remove();
 			sessions.delete(box);

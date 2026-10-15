@@ -47,6 +47,11 @@ async function read(path: string): Promise<string | undefined> {
 	return code;
 }
 
+/** Every package source file the worker can load, by its path in the in-memory file system. */
+export function sourceFiles(): string[] {
+	return [...loaders.keys()];
+}
+
 /** The source host for one block: its files live in their own folder, the package source is shared. */
 export function workerSourceHost(block: string): SourceHost {
 	const codeDir = `/code/${encodeURIComponent(block)}/`;

@@ -84,34 +84,15 @@ async function run(
 	reply({ type: 'code:result', id, ok: true, diagnostics: [] });
 }
 
-function look(
-	dark: boolean,
-	stylesheets: readonly string[],
-	tokens: Readonly<Record<string, string>>,
-): void {
-	const root = document.documentElement;
-	root.classList.toggle('dark', dark);
-	root.classList.toggle('light', !dark);
-	for (const [name, value] of Object.entries(tokens)) root.style.setProperty(name, value);
-	const have = new Set(
-		[...document.querySelectorAll('link[rel="stylesheet"]')].map((link) =>
-			link.getAttribute('href'),
-		),
-	);
-	for (const href of stylesheets) {
-		if (have.has(href)) continue;
-		const link = document.createElement('link');
-		link.rel = 'stylesheet';
-		link.href = href;
-		document.head.append(link);
-	}
+function look(dark: boolean): void {
+	document.documentElement.classList.toggle('dark', dark);
 }
 
 window.addEventListener('message', (event: MessageEvent<FrameRequest>) => {
 	if (event.origin !== location.origin || event.source !== parent) return;
 	const message = event.data;
 	if (message.type === 'code:modules') void run(message.id, message.entry, message.modules);
-	else if (message.type === 'code:look') look(message.dark, message.stylesheets, message.tokens);
+	else if (message.type === 'code:look') look(message.dark);
 });
 
 // A handler that throws after the result is up is still the reader's code failing.

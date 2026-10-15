@@ -133,6 +133,11 @@ export function createBlockBuilder(host: SourceHost, buildId: string): BlockBuil
 	const traces = new Map<string, Trace>();
 	// Files a failed build may have left half-recorded in the bundler's state.
 	const dirty = new Set<string>();
+	// Modules building now, those that built since misses were last taken, and those built while a read missed.
+	const active = new Set<string>();
+	let exposed = new Set<string>();
+	const suspects = new Set<string>();
+	let missed = false;
 	let placed = new Map<string, string>();
 	let report: { transformed: string[]; invalidated: string[] } = {
 		transformed: [],
@@ -144,6 +149,15 @@ export function createBlockBuilder(host: SourceHost, buildId: string): BlockBuil
 		const paths = new Set(files);
 		for (const id of traces.keys())
 			if (keys.has(keyOf(id)) || paths.has(moduleFile(id))) traces.delete(id);
+	}
+
+	async function takeMisses(): Promise<void> {
+		const seen = exposed;
+		exposed = new Set(active);
+		const misses = await host.takeMisses();
+		if (misses.length === 0) return;
+		missed = true;
+		for (const id of [...seen, ...exposed]) suspects.add(id);
 	}
 
 	async function invalidateAll(parent: string): Promise<void> {
@@ -301,6 +315,18 @@ export function createBlockBuilder(host: SourceHost, buildId: string): BlockBuil
 		}
 
 		async function buildModule(id: string, ancestors: ReadonlySet<string>): Promise<string> {
+			active.add(id);
+			exposed.add(id);
+			try {
+				return await buildFresh(id, ancestors);
+			} finally {
+				active.delete(id);
+				// Reading what this module missed now spares the modules after it the same miss.
+				await takeMisses();
+			}
+		}
+
+		async function buildFresh(id: string, ancestors: ReadonlySet<string>): Promise<string> {
 			const info: ModuleInfo = { id, isEntry: entries.has(id), meta: {} };
 			infos.set(id, info);
 			const recording: Recording = {
@@ -402,7 +428,9 @@ export function createBlockBuilder(host: SourceHost, buildId: string): BlockBuil
 			await invalidateDirty();
 			await invalidateEdits(files);
 			for (let round = 0; ; round += 1) {
-				const transformedBefore = report.transformed.length;
+				suspects.clear();
+				exposed = new Set();
+				missed = false;
 				let modules: CompiledModule[] | undefined;
 				let failure: unknown;
 				try {
@@ -410,15 +438,14 @@ export function createBlockBuilder(host: SourceHost, buildId: string): BlockBuil
 				} catch (error) {
 					failure = error;
 				}
-				const misses = await host.takeMisses();
-				if (misses.length === 0 || round === READ_ROUNDS) {
+				await takeMisses();
+				if (!missed || round === READ_ROUNDS) {
 					if (modules) return modules;
 					throw failure;
 				}
-				// A module transformed while a file it read was missing is built again with it.
-				const missed = report.transformed.slice(transformedBefore);
-				for (const id of missed) dirty.add(moduleFile(id));
-				forget(missed, []);
+				// Only a module that was building while a read missed is built again with the file.
+				for (const id of suspects) dirty.add(moduleFile(id));
+				forget(suspects, []);
 				await invalidateDirty();
 			}
 		},

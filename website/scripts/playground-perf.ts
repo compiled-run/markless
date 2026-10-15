@@ -1,11 +1,20 @@
-// Run after `pnpm --dir website build`: node --experimental-strip-types website/scripts/playground-perf.ts [--out <path> | --check]
+// Run after `pnpm --dir website build`: node --experimental-strip-types website/scripts/playground-perf.ts [--out <path> | --check] [--browser chromium|firefox|webkit]
 import { spawn } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { chromium, type Browser, type BrowserContext, type Locator, type Page } from 'playwright-core';
-import { EDIT_DELAY_MS } from '../components/docs/code/session.ts';
+import {
+	chromium,
+	devices,
+	firefox,
+	webkit,
+	type Browser,
+	type BrowserContext,
+	type Locator,
+	type Page,
+} from 'playwright-core';
+import { ERROR_PAUSE_MS } from '../components/docs/code/session.ts';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const pagePath = '/ui/styling';
@@ -20,6 +29,13 @@ const blocks = [
 const outIndex = process.argv.indexOf('--out');
 const outPath = outIndex > 0 ? process.argv[outIndex + 1] : undefined;
 const checking = process.argv.includes('--check');
+const browserIndex = process.argv.indexOf('--browser');
+const browserName = browserIndex > 0 ? process.argv[browserIndex + 1] : 'chromium';
+if (browserName !== 'chromium' && browserName !== 'firefox' && browserName !== 'webkit')
+	throw new Error(`--browser must be chromium, firefox or webkit, not ${browserName}`);
+// CPU throttling is a Chrome DevTools Protocol call; firefox and webkit have no equivalent.
+const throttles = browserName === 'chromium';
+const mobileDevice = 'iPhone 15';
 const editorFlag = 'markless-code:editor';
 
 const freePort = () =>
@@ -319,8 +335,36 @@ async function scrollEveryBlockIntoView(page: Page) {
 	return count;
 }
 
-async function freshPage(browser: Browser, flag: boolean) {
+type WorkerLogEntry = { block: string; warmUp: boolean; sent: number; ok?: boolean; replied?: number };
+
+/** Records, on `window.workerLog`, each compile the page sends and when its reply arrives. */
+async function logWorker(context: BrowserContext) {
+	await context.addInitScript(() => {
+		if (window !== window.top) return;
+		const log: WorkerLogEntry[] = [];
+		(window as unknown as { workerLog: typeof log }).workerLog = log;
+		const Native = window.Worker;
+		window.Worker = class extends Native {
+			constructor(url: string | URL, options?: WorkerOptions) {
+				super(url, options);
+				const sent = new Map<number, WorkerLogEntry>();
+				const post = this.postMessage.bind(this);
+				this.postMessage = (message: { id: number; block: string; warmUp?: boolean }) => {
+					sent.set(message.id, { block: message.block, warmUp: message.warmUp === true, sent: performance.now() });
+					post(message);
+				};
+				this.addEventListener('message', (event: MessageEvent<{ id: number; outcome: { ok: boolean } }>) => {
+					const request = sent.get(event.data.id);
+					if (request) log.push({ ...request, ok: event.data.outcome.ok, replied: performance.now() });
+				});
+			}
+		};
+	});
+}
+
+async function freshPage(browser: Browser, flag: boolean, logged = false) {
 	const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+	if (logged) await logWorker(context);
 	if (flag)
 		await context.addInitScript((key) => {
 			if (window === window.top) localStorage.setItem(key, '1');
@@ -435,7 +479,7 @@ async function checks(browser: Browser): Promise<Check[]> {
 	}
 
 	{
-		const { context, page } = await freshPage(browser, false);
+		const { context, page } = await freshPage(browser, false, true);
 		const edits = blocks.map((block) => ({ block, target: blockFor(page, block.title) }));
 		for (const { target } of edits) {
 			await target.hover();
@@ -455,41 +499,55 @@ async function checks(browser: Browser): Promise<Check[]> {
 				return (await frame?.evaluate(() => document.body.textContent ?? '')) ?? '';
 			}),
 		);
+		const edited = (
+			(await page.evaluate(() => (window as unknown as { workerLog: WorkerLogEntry[] }).workerLog)) as WorkerLogEntry[]
+		).filter((entry) => !entry.warmUp);
+		const [firstEdit, secondEdit] = edited;
+		const overlapped = Boolean(firstEdit && secondEdit && secondEdit.sent < firstEdit.replied!);
 		results.push({
-			name: 'edits to two blocks inside one debounce both reach their own frames',
+			name: 'edits to two blocks compiling at once both reach their own frames',
 			ok:
-				typedWithinMs < EDIT_DELAY_MS &&
+				edited.length === 2 &&
+				firstEdit!.block !== secondEdit!.block &&
+				overlapped &&
 				shown.every((text, at) =>
 					blocks.every((block, other) => text.includes(`${block.visible}8`) === (at === other)),
 				),
-			detail: { typedWithinMs, shown: shown.map((text) => text.replace(/\s+/g, ' ').slice(0, 120)) },
+			detail: { typedWithinMs, overlapped, shown: shown.map((text) => text.replace(/\s+/g, ' ').slice(0, 120)) },
+		});
+		await context.close();
+	}
+
+	{
+		const { context, page } = await freshPage(browser, false);
+		const target = blockFor(page, first.title);
+		await target.hover();
+		await target.and(page.locator('[data-code="ready"]')).waitFor({ timeout: 60000 });
+		await caretAfter(target, first.caretAfter);
+		await page.keyboard.type('7');
+		await frameShows(target, `${first.visible}7`);
+		const started = performance.now();
+		await page.keyboard.type('}');
+		await target.and(page.locator('[data-code="error"]')).waitFor({ timeout: 60000 });
+		const errorShownAfterMs = Math.round(performance.now() - started);
+		const keptResult = await target.evaluate(
+			(box, want) => {
+				const frame = box.querySelector<HTMLIFrameElement>('iframe.code-frame')!;
+				return !frame.hidden && (frame.contentDocument?.body.textContent ?? '').includes(want);
+			},
+			`${first.visible}7`,
+		);
+		results.push({
+			name: 'a build error waits for the reader to pause and keeps the last good result',
+			ok: errorShownAfterMs >= ERROR_PAUSE_MS && keptResult,
+			detail: { errorShownAfterMs, pauseMs: ERROR_PAUSE_MS, keptResult },
 		});
 		await context.close();
 	}
 
 	{
 		const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
-		await context.addInitScript(() => {
-			if (window !== window.top) return;
-			const log: { block: string; warmUp: boolean; ok?: boolean }[] = [];
-			(window as unknown as { workerLog: typeof log }).workerLog = log;
-			const Native = window.Worker;
-			window.Worker = class extends Native {
-				constructor(url: string | URL, options?: WorkerOptions) {
-					super(url, options);
-					const sent = new Map<number, { block: string; warmUp: boolean }>();
-					const post = this.postMessage.bind(this);
-					this.postMessage = (message: { id: number; block: string; warmUp?: boolean }) => {
-						sent.set(message.id, { block: message.block, warmUp: message.warmUp === true });
-						post(message);
-					};
-					this.addEventListener('message', (event: MessageEvent<{ id: number; outcome: { ok: boolean } }>) => {
-						const request = sent.get(event.data.id);
-						if (request) log.push({ ...request, ok: event.data.outcome.ok });
-					});
-				}
-			};
-		});
+		await logWorker(context);
 		let release = () => {};
 		const released = new Promise<void>((done) => (release = done));
 		await context.route('**/*.wasm', async (route) => {
@@ -510,7 +568,7 @@ async function checks(browser: Browser): Promise<Check[]> {
 		await frameShows(a!.target, `${a!.block.visible}6`);
 		const log = await page.waitForFunction(
 			() => {
-				const entries = (window as unknown as { workerLog: { block: string; warmUp: boolean; ok?: boolean }[] }).workerLog;
+				const entries = (window as unknown as { workerLog: WorkerLogEntry[] }).workerLog;
 				return entries.filter((entry) => entry.ok).length >= 3 ? entries : undefined;
 			},
 			undefined,
@@ -571,12 +629,42 @@ async function checks(browser: Browser): Promise<Check[]> {
 		});
 		await context.close();
 	}
+
+	if (browserName === 'webkit') {
+		const context = await browser.newContext(devices[mobileDevice]);
+		const page = await context.newPage();
+		await page.goto(`${origin}${pagePath}`, { waitUntil: 'load' });
+		const target = blockFor(page, first.title);
+		await target.scrollIntoViewIfNeeded();
+		const stateBeforeTap = await target.evaluate((box) => (box as HTMLElement).dataset.code);
+		await target.locator('[data-code-input]:visible').first().tap();
+		await target.and(page.locator('[data-code="ready"]')).waitFor({ timeout: 60000 });
+		await caretAfter(target, first.caretAfter);
+		await page.keyboard.type('5');
+		await frameShows(target, `${first.visible}5`);
+		results.push({
+			name: `a tap boots a block and an edit shows its result (${mobileDevice} emulation)`,
+			ok: stateBeforeTap === 'idle',
+			detail: { device: mobileDevice, stateBeforeTap, shown: `${first.visible}5` },
+		});
+		await context.close();
+	}
 	return results;
 }
 
-const browser = await chromium.launch({ channel: 'chrome', headless: true });
+const browser =
+	browserName === 'chromium'
+		? await chromium.launch({ channel: 'chrome', headless: true })
+		: await (browserName === 'firefox' ? firefox : webkit).launch({ headless: true });
+const browserLabel = `${browserName === 'chromium' ? 'chrome' : browserName} ${browser.version()} headless`;
+const skipped = [
+	...(throttles ? [] : ['CPU 4x editing: CPU throttling is a Chrome DevTools Protocol call, chromium only']),
+	...(browserName === 'firefox' ? [`${mobileDevice} tap check: webkit only, Playwright's Firefox has no mobile emulation`] : []),
+];
 try {
 	if (checking) {
+		console.log(`browser: ${browserLabel}`);
+		for (const reason of skipped) console.log(`skip ${reason}`);
 		const results = await checks(browser);
 		for (const result of results)
 			console.log(`${result.ok ? 'ok  ' : 'FAIL'} ${result.name}\n     ${JSON.stringify(result.detail)}`);
@@ -585,17 +673,17 @@ try {
 	const summary = {
 		measuredAt: new Date().toISOString(),
 		page: pagePath,
-		browser: `chrome ${browser.version()} headless`,
+		browser: browserLabel,
 		viewport: '1280x900',
 		notes: [
 			'transferredBytes = encoded response body plus headers as received; uncompressedBytes = decoded body length',
-			'keystroke-to-result includes the editor debounce before a compile is sent',
+			'keystroke-to-result has no debounce: a keystroke sends its compile at once unless the block has one in flight',
 			'each scenario runs in a fresh browser context with an empty cache',
 		],
 		scrollPast: await scrollPast(browser),
 		bootEveryBlock: await bootEveryBlock(browser),
 		editing: await editing(browser, 1),
-		editingCpu4x: await editing(browser, 4),
+		editingCpu4x: throttles ? await editing(browser, 4) : { skipped: skipped[0] },
 	};
 	const json = JSON.stringify(summary, null, '\t');
 	console.log(json);

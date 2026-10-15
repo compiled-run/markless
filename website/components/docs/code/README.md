@@ -42,6 +42,14 @@ the `.tsrx` files importing any other edited file), and the modules it names are
 module whose recorded inputs all read the same again returns its last code without running the
 transform hook. A compile that fails leaves nothing half-built: the builds it started finish
 first, and the files whose transform threw are invalidated before the next compile.
+In the worker, package source arrives as the bundler first asks for it, so a synchronous read
+of a file not loaded yet misses: the file is loaded, and only the modules that were building
+when a read missed are built again.
+
+The editor sends a compile on each keystroke when its block has none in flight; text typed
+while one is in flight goes in the next compile, sent when that one returns. A successful
+result shows at once. A build error shows only once the reader has stopped typing for
+`ERROR_PAUSE_MS` (`session.ts`), and the last good result stays up meanwhile.
 `incremental.test.ts` holds every `<Code>` block on the site to this: after each edit in a fixed
 sequence, the incremental output must equal a cold build's, module for module.
 A block may hold several `.tsrx` files. The engine runs the first `.tsrx` in the `files` it is

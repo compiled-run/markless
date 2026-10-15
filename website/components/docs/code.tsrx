@@ -1,10 +1,10 @@
 import type { CodePane } from '../../tooling/code-blocks.ts';
 import type { CodeFile } from './code/protocol.ts';
 import { labelPieces, type CodeStep } from './playground/checklist.ts';
-import { lucide } from '@markless/ui';
+import { lucide, resizable } from '@markless/ui';
 import sessionUrl from 'virtual:code-session-url';
 import liveUrl from 'virtual:code-live-url';
-import CodeFiles from './code-files.tsrx';
+import CodeFiles, { CodeTabs } from './code-files.tsrx';
 
 // A URL the bundler cannot follow keeps the editor out of preloads.
 function boot(event: { readonly target: unknown }, files: readonly CodeFile[], onSight = false): void {
@@ -41,6 +41,7 @@ export default function Code({
 	note,
 	showUpdates,
 	steps,
+	stylesheets,
 	children,
 }: {
 	/** The starter files, entry `.tsrx` first or not; Reset restores them. */
@@ -55,6 +56,8 @@ export default function Code({
 	readonly showUpdates?: boolean;
 	/** "Try this" as a checklist that ticks each step once the reader has done it; replaces `note`. */
 	readonly steps?: readonly CodeStep[];
+	/** URLs of the block's own .css files, linked so the starter's render wears them before the first run. */
+	readonly stylesheets?: readonly string[];
 	/** The starter's own render, shown in the Result pane until the first run. */
 	readonly children?: unknown;
 }) @{
@@ -66,6 +69,15 @@ export default function Code({
 		source: step.source,
 		rewrites: step.rewrites === undefined ? undefined : String(step.rewrites),
 	}));
+	// Panel names become element ids, so each block names its panes after its own files.
+	const key = (
+		[...files.map((file) => `${file.name}\n${file.code}`).join('\n')].reduce(
+			(hash, char) => Math.imul(hash ^ char.charCodeAt(0), 16777619),
+			2166136261,
+		) >>> 0
+	).toString(36);
+	const codePane = `code-pane-${key}`;
+	const resultPane = `result-pane-${key}`;
 
 	<figure
 		class="code-block"
@@ -102,21 +114,29 @@ export default function Code({
 				</button>
 			</div>
 		</header>
-		<div class="body">
-			<div class="source">
-				<CodeFiles panes={panes} />
-			</div>
-			<div class="result" data-code-result>
-				<span class="status" data-code-status role="status"></span>
-				<div class="stage code-stage" data-code-stage>{children}</div>
-				@if (showUpdates) {
-					<div class="updates" data-code-updates aria-hidden="true">
-						<span class="update" data-code-update-mark hidden></span>
-					</div>
-				}
-				<ul class="problems" data-code-problems hidden aria-label="Problems"></ul>
-			</div>
-		</div>
+		<CodeTabs panes={panes}>
+			<resizable.root class="body" defaultSizes={{ [codePane]: 64, [resultPane]: 36 }}>
+				<resizable.item class="source" value={codePane}>
+					<CodeFiles panes={panes} />
+				</resizable.item>
+				<resizable.thumb class="split" value={codePane} min={25} max={80} aria-label="Resize code and preview">
+					<span class="grip" aria-hidden="true"><i></i><i></i><i></i></span>
+				</resizable.thumb>
+				<resizable.item class="result" value={resultPane} data-code-result>
+					<span class="status" data-code-status role="status"></span>
+					@for (const href of stylesheets ?? []; key href) {
+						<link rel="stylesheet" href={href} />
+					}
+					<div class="stage code-stage" data-code-stage>{children}</div>
+					@if (showUpdates) {
+						<div class="updates" data-code-updates aria-hidden="true">
+							<span class="update" data-code-update-mark hidden></span>
+						</div>
+					}
+					<ul class="problems" data-code-problems hidden aria-label="Problems"></ul>
+				</resizable.item>
+			</resizable.root>
+		</CodeTabs>
 		@if (stepRows.length > 0) {
 			<figcaption class="note">
 				<span class="try">Try this</span>
@@ -308,8 +328,6 @@ export default function Code({
 			}
 
 			.body {
-				display: grid;
-				grid-template-columns: minmax(0, 1fr);
 				flex: 1;
 				min-height: 0;
 			}
@@ -326,6 +344,8 @@ export default function Code({
 				gap: var(--space-xs);
 				min-width: 0;
 				padding: 0.9rem 0 0.9rem 1.1rem;
+				overflow: clip;
+				overflow-clip-margin: 0.4rem;
 			}
 
 			.status {
@@ -466,15 +486,76 @@ export default function Code({
 				}
 			}
 
+			.split {
+				--split-ink: var(--code-band);
+				position: relative;
+				display: grid;
+				place-items: center;
+				width: 0.8rem;
+				border-radius: 4px;
+				cursor: col-resize;
+			}
+
+			.split::before {
+				position: absolute;
+				inset-block: 0;
+				inset-inline-start: calc(50% - 1px);
+				border-inline-start: 2px dashed var(--split-ink);
+				content: '';
+			}
+
+			.split:hover,
+			.split[ui-dragging] {
+				--split-ink: var(--ink);
+			}
+
+			.split:focus-visible {
+				outline: 2px solid var(--ink);
+				outline-offset: -1px;
+			}
+
+			.grip {
+				position: relative;
+				display: grid;
+				gap: 0.28rem;
+				padding: 0.35rem 0.15rem;
+				border-radius: 7px 5px 8px 6px;
+				background: var(--paper);
+			}
+
+			.grip i {
+				width: 0.36rem;
+				height: 0.33rem;
+				border-radius: 52% 48% 45% 55%;
+				background: var(--split-ink);
+			}
+
+			.grip i:nth-child(2) {
+				transform: translateX(0.5px) rotate(18deg);
+			}
+
+			@container not (min-width: 36rem) {
+				.body {
+					flex-direction: column;
+				}
+
+				.source,
+				.result {
+					flex: none;
+				}
+
+				.split {
+					display: none;
+				}
+			}
+
 			@container (min-width: 36rem) {
 				.body {
-					grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
 					min-height: 25.5rem;
 				}
 
 				.source {
 					border-bottom: 0;
-					border-inline-end: 2px dashed var(--code-band);
 				}
 			}
 

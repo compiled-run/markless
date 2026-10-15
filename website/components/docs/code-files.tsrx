@@ -2,8 +2,8 @@
 import { tabs } from '@markless/ui';
 import type { CodePane } from '../../tooling/code-blocks.ts';
 
-export default function CodeFiles({ panes }: { readonly panes: readonly CodePane[] }) @{
-	<tabs.root class="files" value="first">
+export function CodeTabs({ panes, children }: { readonly panes: readonly CodePane[]; readonly children?: unknown }) @{
+	<tabs.root class="file-tabs" value="first">
 		<tabs.list class="strip" aria-label="Files">
 			<div class="strip-row" role="presentation">
 				@for (const pane of panes; key pane.name) {
@@ -11,37 +11,10 @@ export default function CodeFiles({ panes }: { readonly panes: readonly CodePane
 				}
 			</div>
 		</tabs.list>
-		@for (const pane of panes; key pane.name) {
-			<tabs.content class="pane" value={pane.tab}>
-				<div class="editor" data-code-file={pane.name}>
-					<div class="layers">
-						<pre class="shiki highlight" aria-hidden="true">
-							@for (const line of pane.lines; key line.id) {
-								<span class="line">
-									@for (const run of line.runs; key run.id) {
-										<span style={run.style}>{run.text}</span>
-									}
-								</span>
-							}
-						</pre>
-						<textarea
-							class="input"
-							readonly
-							spellcheck="false"
-							autocapitalize="off"
-							aria-label={`${pane.name}, editable. Press Escape then Tab to leave the editor.`}
-							data-code-input
-						>{pane.code}</textarea>
-					</div>
-				</div>
-			</tabs.content>
-		}
+		{children}
 		<style>
-	.files {
-		display: flex;
-		flex-direction: column;
-		min-width: 0;
-		height: 100%;
+	.file-tabs {
+		display: contents;
 	}
 
 	.strip {
@@ -104,6 +77,50 @@ export default function CodeFiles({ panes }: { readonly panes: readonly CodePane
 		outline-offset: 2px;
 	}
 
+	@media (prefers-reduced-motion: reduce) {
+		.tab {
+			transition: none;
+		}
+	}
+		</style>
+	</tabs.root>
+}
+
+export default function CodeFiles({ panes }: { readonly panes: readonly CodePane[] }) @{
+	<div class="files">
+		@for (const pane of panes; key pane.name) {
+			<tabs.content class="pane" value={pane.tab}>
+				<div class="editor" data-code-file={pane.name}>
+					<div class="layers">
+						<pre class="shiki highlight" aria-hidden="true">
+							@for (const line of pane.lines; key line.id) {
+								<span class="line">
+									@for (const run of line.runs; key run.id) {
+										<span style={run.style}>{run.text}</span>
+									}
+								</span>
+							}
+						</pre>
+						<textarea
+							class="input"
+							readonly
+							spellcheck="false"
+							autocapitalize="off"
+							aria-label={`${pane.name}, editable. Press Escape then Tab to leave the editor.`}
+							data-code-input
+						>{pane.code}</textarea>
+					</div>
+				</div>
+			</tabs.content>
+		}
+		<style>
+	.files {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+		height: 100%;
+	}
+
 	.pane {
 		flex: 1;
 		min-height: 0;
@@ -116,7 +133,7 @@ export default function CodeFiles({ panes }: { readonly panes: readonly CodePane
 	.editor {
 		max-height: var(--code-max-height);
 		height: 100%;
-		overflow: auto;
+		overflow: hidden auto;
 		overscroll-behavior: contain;
 		background: var(--code-editor-surface, var(--code-surface));
 		scrollbar-width: thin;
@@ -189,8 +206,7 @@ export default function CodeFiles({ panes }: { readonly panes: readonly CodePane
 
 	.layers {
 		display: grid;
-		width: max-content;
-		min-width: 100%;
+		width: 100%;
 		min-height: 100%;
 		font-family: var(--font-mono);
 		font-size: var(--code-font-size, var(--step--2));
@@ -207,14 +223,14 @@ export default function CodeFiles({ panes }: { readonly panes: readonly CodePane
 		grid-area: 1 / 1;
 		box-sizing: border-box;
 		margin: 0;
-		padding: 0.85rem 0 0.85rem 0;
+		padding: 0.85rem 0.1rem 0.85rem 0;
 		border: 0;
 		border-radius: 0;
 		font: inherit;
 		letter-spacing: 0;
 		tab-size: inherit;
-		white-space: pre;
-		overflow-wrap: normal;
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
 	}
 
 	.highlight {
@@ -263,6 +279,8 @@ export default function CodeFiles({ panes }: { readonly panes: readonly CodePane
 		left: 0;
 		width: calc(var(--code-gutter) - 1.1rem);
 		text-align: right;
+		white-space: nowrap;
+		overflow-wrap: normal;
 		color: var(--code-gutter-ink);
 	}
 
@@ -280,34 +298,6 @@ export default function CodeFiles({ panes }: { readonly panes: readonly CodePane
 		margin-inline-start: 2.5ch;
 		color: var(--code-problem);
 	}
-
-	/* A phone wraps long lines instead of scrolling sideways; both layers wrap alike, so the caret stays on its text. */
-	@media (max-width: 600px) {
-		.layers {
-			width: 100%;
-		}
-
-		.highlight,
-		.input {
-			white-space: pre-wrap;
-			overflow-wrap: anywhere;
-		}
-
-		.line::before {
-			white-space: nowrap;
-			overflow-wrap: normal;
-		}
-
-		.editor {
-			overflow-x: hidden;
-		}
-	}
-
-	@media (prefers-reduced-motion: reduce) {
-		.tab {
-			transition: none;
-		}
-	}
 		</style>
-	</tabs.root>
+	</div>
 }
