@@ -39,10 +39,10 @@ describe('the Beanshop cup', () => {
 		expect(say(0, true)).toBe('A fresh cup. The label now says 0 extra shots.');
 	});
 
-	it('plays nothing by itself: the name is already written and only a press moves anything', () => {
+	it('runs no idle tour: the barista writing the name is the only thing that plays by itself', () => {
 		expect(piece).not.toContain('setInterval');
-		expect(piece).not.toContain('onVisible');
-		expect(piece).not.toContain('data-written');
+		expect(piece).toContain("written = 'yes';");
+		expect(piece).toMatch(/@media \(prefers-reduced-motion: no-preference\) \{\s*\.scene\[data-written='no'\] \.name \{\s*opacity: 0;/);
 	});
 
 	it('never ties the name or the product line to the count', () => {
@@ -86,7 +86,6 @@ describe('the Beanshop cup', () => {
 		expect(cupArt.shots.boxes.every((box) => box.length > 3 && box.ink.length > 50)).toBe(true);
 		expect(cupArt.sticker.ink.length).toBeGreaterThan(100);
 		expect(cupArt.steam).toHaveLength(3);
-		expect(cupArt.cup.pencil.length).toBeGreaterThan(100);
 	});
 
 	it('draws the same scene every time', () => {

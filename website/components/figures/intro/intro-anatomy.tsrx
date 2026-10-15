@@ -7,13 +7,19 @@ export default function IntroAnatomy() @{
 	let count = state(START);
 	let newest = state('');
 	let beat = state('rest');
+	let written = state('no');
 	const level = computed(() => '--count:' + count);
 	const latest = computed(() => art.shots.boxes[Math.max(0, count - 1)]!);
 	const tick = computed(() => latest.d);
 	const tickLength = computed(() => '--l:' + latest.length);
 	const said = computed(() => describe(count, beat !== 'rest'));
 
-	<figure class="anatomy">
+	<figure
+		class="anatomy"
+		onVisible={() => {
+			written = 'yes';
+		}}
+	>
 		<button
 			type="button"
 			class="stage"
@@ -31,7 +37,7 @@ export default function IntroAnatomy() @{
 				}
 			}}
 		>
-			<svg class="scene" data-beat={beat} data-empty={count === 0 ? 'yes' : 'no'} style={level} viewBox={'0 0 ' + art.width + ' ' + art.height} aria-hidden="true">
+			<svg class="scene" data-beat={beat} data-written={written} data-empty={count === 0 ? 'yes' : 'no'} style={level} viewBox={'0 0 ' + art.width + ' ' + art.height} aria-hidden="true">
 				<path class="shadow-wash" d={art.cup.shadow.wash} />
 				<path class="hatch deep light" d={art.cup.shadow.hatch} />
 				<path class="hatch deep" d={art.cup.shadow.core} />
@@ -109,7 +115,6 @@ export default function IntroAnatomy() @{
 						<path class="jar-ink wisp" d={wisp.d} style={'--w:' + wisp.key} />
 					}
 				</g>
-				<path class="pencil" d={art.cup.pencil} />
 			</svg>
 		</button>
 		<figcaption class="sr">
@@ -326,18 +331,6 @@ export default function IntroAnatomy() @{
 				display: none;
 			}
 
-			.pencil {
-				fill: none;
-				stroke: color-mix(in srgb, var(--pink) 70%, #e0603c);
-				stroke-width: 0.7;
-				stroke-linecap: round;
-				opacity: 0.5;
-
-				html.dark & {
-					opacity: 0.32;
-				}
-			}
-
 			.scene[data-beat='odd'] {
 				--sink: sink-a;
 				--draw: draw-a;
@@ -403,8 +396,56 @@ export default function IntroAnatomy() @{
 			}
 
 			@media (prefers-reduced-motion: no-preference) {
+				.scene[data-written='no'] .name {
+					opacity: 0;
+				}
+
+				.scene[data-written='yes'] .write {
+					animation: write-in 420ms var(--d) ease-out both;
+				}
+
+				.scene[data-written='yes'] .draw {
+					animation: draw-on 300ms var(--d) ease-out both;
+				}
+
+				.scene[data-written='yes'] .eyes {
+					animation: pop-in 120ms 1560ms both;
+				}
+
 				.wisp {
 					animation: rise 4.8s calc(var(--w) * -1.6s) ease-in-out infinite;
+				}
+			}
+
+			@keyframes write-in {
+				from {
+					stroke-dashoffset: 40;
+					fill-opacity: 0;
+				}
+
+				60% {
+					fill-opacity: 0;
+				}
+
+				to {
+					stroke-dashoffset: 0;
+					fill-opacity: 1;
+				}
+			}
+
+			@keyframes draw-on {
+				from {
+					stroke-dashoffset: var(--l);
+				}
+
+				to {
+					stroke-dashoffset: 0;
+				}
+			}
+
+			@keyframes pop-in {
+				from {
+					opacity: 0;
 				}
 			}
 

@@ -1,6 +1,6 @@
 // A Beanshop takeaway cup on a desk: the barista's name, the sleeve's shot boxes holding the count, and a printed lid sticker that follows it.
 import { add3, dot3, mul3, sub3 } from '../kit/lathe.ts';
-import { centreOf, createCamera, ellipse, jitter, LIGHT, matrixOf, type P, type Point3, roundRect, shadowOnDesk, TAU } from '../ink/desk.ts';
+import { centreOf, createCamera, ellipse, LIGHT, matrixOf, type P, type Point3, roundRect, shadowOnDesk, TAU } from '../ink/desk.ts';
 import { hatch, hull, lengthOf, line, outline, pathOf, pool, r1, resample, seeded, wash } from '../ink/ink.ts';
 import { CAP, SLOTS, STICKER } from './model.ts';
 
@@ -191,8 +191,6 @@ function cupArt() {
 		}));
 	})();
 
-	const axisTop = proj([CUP[0], CUP[1], LID.z1 + 1.2]);
-	const axisBottom = proj([CUP[0], CUP[1], -1.2]);
 
 	return {
 		shadow: {
@@ -238,7 +236,6 @@ function cupArt() {
 				line(lid.right, { w: 2.1, seed: 679 }) +
 				outline(sip, { w: 0.9, seed: 680 }),
 		},
-		pencil: [pathOf(jitter(resample([axisTop, axisBottom], 8), 690, 0.8)), pathOf(jitter(base.all, 691, 0.6), true), pathOf(jitter(ringArcs(LID.z1, LID.r + 0.4).all, 692, 0.7), true)].join(''),
 	};
 }
 
