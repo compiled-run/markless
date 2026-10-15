@@ -84,6 +84,10 @@ describe('the dev server figure shows the real starter', () => {
 		expect(piece.match(/class="hand"/g)).toHaveLength(1);
 		expect(piece).toContain("event.key !== 'Enter'");
 		expect(piece).toContain("event.key !== 'Escape'");
+		expect(piece).toContain("import { recall, remember } from '../create/history.ts';");
+		expect(piece).toContain('recall(ran, back, ');
+		expect(piece).toContain('remember(ran, ');
+		expect(piece).toContain('onSelectionChange');
 		expect(piece).toContain("window.matchMedia('(prefers-reduced-motion: reduce)').matches");
 		expect(piece).not.toContain('IntersectionObserver');
 		expect(piece).not.toContain('setInterval');

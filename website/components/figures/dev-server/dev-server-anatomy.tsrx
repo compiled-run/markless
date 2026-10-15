@@ -1,8 +1,9 @@
 // The create figure's terminal sheet, where the reader types npm run dev; the browser sheet below it then shows the starter page, whose drawn Count button really counts.
 import { computed, state } from '@markless/core';
-import { COMMAND, describe, type Desk, enter, ghostFor, HEADING, HOST, LABEL, MAX_TYPED, PAGE_FILE, press, print, screen, START, TARGET, washFor } from './model.ts';
+import { COMMAND, describe, type Desk, enter, ghostFor, HEADING, HOST, LABEL, MAX_TYPED, PAGE_FILE, press, print, screen, START, TARGET, tidy, washFor } from './model.ts';
 import { every, fieldIn, halt } from './play.ts';
 import { art } from './dev-server.art.ts';
+import { recall, remember } from '../create/history.ts';
 
 const PRINT_MS = 260;
 
@@ -11,6 +12,9 @@ export default function DevServer() @{
 	let said = state('');
 	let typed = state('');
 	let at = state(0);
+	let ran = state([] as string[]);
+	let back = state(0);
+	let tick = state('a');
 	const pick = computed(() => washFor(desk.count));
 	const lines = computed(() => {
 		const rows = screen(desk, typed, at);
@@ -28,12 +32,13 @@ export default function DevServer() @{
 			if (input) input.value = '';
 			typed = '';
 			at = 0;
+			back = 0;
 			desk = START;
 			said = 'Back at the prompt in ' + TARGET + '.';
 		}}
 	>
 		<div class="desk">
-			<svg class="scene" data-phase={desk.phase} viewBox={'0 0 ' + art.width + ' ' + art.height} aria-hidden="true">
+			<svg class="scene" data-phase={desk.phase} data-tick={tick} viewBox={'0 0 ' + art.width + ' ' + art.height} aria-hidden="true">
 				<path class="pencil" d={art.terminal.pencil} />
 				<path class="pencil" d={art.browser.pencil} />
 
@@ -99,61 +104,78 @@ export default function DevServer() @{
 					<text class="hand-file" x={art.note.file.x} y={art.note.file.y}>{PAGE_FILE}</text>
 				</g>
 			</svg>
-			<div class="term-hit" style={art.terminal.box} aria-hidden="true" onClick={(event) => fieldIn(event.target as Element)?.focus()}></div>
-			<input
-				class="line-in"
-				type="text"
-				aria-label={'Terminal in ' + TARGET + '. Type ' + COMMAND + ' and press Enter.'}
-				readonly={desk.phase !== 'off'}
-				maxlength={MAX_TYPED}
-				autocomplete="off"
-				autocapitalize="off"
-				spellcheck="false"
-				enterkeyhint="go"
-				onInput={(event) => {
-					const input = event.target as HTMLInputElement;
-					typed = input.value;
-					at = input.selectionStart ?? input.value.length;
-				}}
-				onKeyUp={(event) => {
-					const input = event.target as HTMLInputElement;
-					at = input.selectionStart ?? input.value.length;
-				}}
-				onKeyDown={(event) => {
-					const input = event.target as HTMLInputElement;
-					if (event.key === 'ArrowRight' && desk.phase === 'off' && input.selectionStart === input.value.length && ghostFor(input.value) !== '') {
-						input.value = input.value + ghostFor(input.value);
+			<label class="term-hit" style={art.terminal.box}>
+				<input
+					class="line-in"
+					type="text"
+					aria-label={'Terminal in ' + TARGET + '. Type ' + COMMAND + ' and press Enter.'}
+					readonly={desk.phase !== 'off'}
+					maxlength={MAX_TYPED}
+					autocomplete="off"
+					autocapitalize="off"
+					spellcheck="false"
+					enterkeyhint="go"
+					onInput={(event) => {
+						const input = event.target as HTMLInputElement;
 						typed = input.value;
-						at = input.value.length;
-						return;
-					}
-					if (event.key !== 'Enter') return;
-					const after = enter(desk, input.value);
-					if (after === desk) return;
-					input.value = '';
-					typed = '';
-					at = 0;
-					if (after.phase === 'off') {
+						at = input.selectionStart ?? input.value.length;
+						tick = tick === 'a' ? 'b' : 'a';
+					}}
+					onSelectionChange={(event) => {
+						const input = event.target as HTMLInputElement;
+						const next = input.selectionStart ?? input.value.length;
+						if (next === at) return;
+						at = next;
+						tick = tick === 'a' ? 'b' : 'a';
+					}}
+					onKeyDown={(event) => {
+						if (event.key === 'ArrowUp' || event.key === 'ArrowDown') event.preventDefault();
+						const input = event.target as HTMLInputElement;
+						if ((event.key === 'ArrowUp' || event.key === 'ArrowDown') && desk.phase === 'off') {
+							const step = recall(ran, back, event.key === 'ArrowUp' ? 1 : -1);
+							if (!step) return;
+							back = step.back;
+							input.value = step.line;
+							typed = step.line;
+							at = step.line.length;
+							return;
+						}
+						if (event.key === 'ArrowRight' && desk.phase === 'off' && input.selectionStart === input.value.length && ghostFor(input.value) !== '') {
+							input.value = input.value + ghostFor(input.value);
+							typed = input.value;
+							at = input.value.length;
+							return;
+						}
+						if (event.key !== 'Enter') return;
+						const after = enter(desk, input.value);
+						if (after === desk) return;
+						ran = remember(ran, tidy(input.value) || COMMAND);
+						back = 0;
+						input.value = '';
+						typed = '';
+						at = 0;
+						if (after.phase === 'off') {
+							desk = after;
+							said = describe(after);
+							return;
+						}
+						if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+							let done = after;
+							while (done.phase === 'starting') done = print(done);
+							desk = done;
+							said = describe(done);
+							return;
+						}
 						desk = after;
-						said = describe(after);
-						return;
-					}
-					if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-						let done = after;
-						while (done.phase === 'starting') done = print(done);
-						desk = done;
-						said = describe(done);
-						return;
-					}
-					desk = after;
-					said = COMMAND;
-					every(input, PRINT_MS, () => {
-						desk = print(desk);
-						said = describe(desk);
-						return desk.phase === 'starting';
-					});
-				}}
-			/>
+						said = COMMAND;
+						every(input, PRINT_MS, () => {
+							desk = print(desk);
+							said = describe(desk);
+							return desk.phase === 'starting';
+						});
+					}}
+				/>
+			</label>
 			<button
 				type="button"
 				class="hit"
@@ -215,14 +237,24 @@ export default function DevServer() @{
 			.caret {
 				visibility: hidden;
 				font-weight: 700;
-				animation: blink 1.06s steps(1) infinite;
+				animation: blink-a 1.06s steps(1) infinite;
+			}
+
+			.scene[data-tick='b'] .caret {
+				animation-name: blink-b;
 			}
 
 			.desk:has(.line-in:focus) .caret {
 				visibility: visible;
 			}
 
-			@keyframes blink {
+			@keyframes blink-a {
+				50% {
+					opacity: 0;
+				}
+			}
+
+			@keyframes blink-b {
 				50% {
 					opacity: 0;
 				}

@@ -106,6 +106,8 @@ Lower priority or parked:
 
 - A keyed `@for` over a computed list does not re-render when the state it derives from changes, while a second list built the same way does (found building the Walkthrough's create figure, 2026-10-15; repro in goals/walkthrough-page/notes/for-computed-bug.md). Looping over frozen art and indexing a computed is rejected with `MARKLESS_REPEAT_ROWS_FROZEN` and `MARKLESS_STATE_DYNAMIC_PATH_READ`, so the anatomy skill's advice no longer works either. Worked around with fixed slots.
 
+- On a fresh page, the first Escape or Enter in a figure's input is handled late (about 140 ms in dev) because event replay waits for the handler to load, and its `input.value = ''` then wipes keys typed in that gap (Escape then `npm create markless` became `create markless` in the Walkthrough's create terminal, 2026-10-15). Fix belongs in the early-event replay, not the figure.
+
 ## Bundle growth accepted on 2026-10-15
 
 - benchmark-guard failed on main at `abfe7d4d`: `41_size-uncompressed` grew by 3.00 kB against `c3317d30`, from the runtime work in the 140-commit push of 2026-10-12 (234 package files). The owner accepted it to unblock main. Find which commit added the bytes and either cut them or record why they are needed.

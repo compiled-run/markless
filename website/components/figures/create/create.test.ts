@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { CreateProgram, PROJECT_FORMAT_CHOICES, STARTER_CHOICES, type ProgramRuntime } from '../../../../packages/cli/src/index.ts';
 import { choose, COMMAND, COMMON_FILES, cursorRow, describe as say, dropOrder, enter, filesFor, focusRow, type Format, FORMATS, ghostFor, isFirstPage, layout, LONGEST, move, MOST_FILES, NOTES, PAGE_SLOT, PER, PROMPTS, ROWS, type Run, screen, slipAt, START, type Starter, STARTERS, submit, tabOf, TARGET, transcript, widthOf, wrap, WRAP } from './model.ts';
 import { drawing } from './create.ts';
+import { recall, remember } from './history.ts';
 
 const scene = drawing();
 const cli = readFileSync(new URL('../../../../packages/cli/src/index.ts', import.meta.url), 'utf8');
@@ -246,6 +247,24 @@ describe('the create figure plays the real CLI', () => {
 		expect(piece).toContain('.stage:focus-within .focus[data-on=\'yes\']');
 		expect(piece).toContain('@media (prefers-reduced-motion: reduce)');
 		expect(piece).toContain("import { art } from './create.art.ts';");
+	});
+
+	it('recalls the commands run at the prompt like a shell: ArrowUp walks back newest first, ArrowDown walks forward to the empty line', () => {
+		const ran = remember(remember(remember([], 'ls'), 'npm create'), COMMAND);
+		expect(ran).toEqual(['ls', 'npm create', COMMAND]);
+		expect(recall([], 0, 1)).toBeNull();
+		expect(recall(ran, 0, -1)).toBeNull();
+		const up1 = recall(ran, 0, 1)!;
+		const up2 = recall(ran, up1.back, 1)!;
+		const up3 = recall(ran, up2.back, 1)!;
+		expect([up1.line, up2.line, up3.line]).toEqual([COMMAND, 'npm create', 'ls']);
+		expect(recall(ran, up3.back, 1)).toBeNull();
+		const down = recall(ran, up3.back, -1)!;
+		expect(down.line).toBe('npm create');
+		expect(recall(ran, 1, -1)).toEqual({ back: 0, line: '' });
+		expect(piece).toContain('recall(ran, back, ');
+		expect(piece).toContain('remember(ran, ');
+		expect(piece).toContain('onSelectionChange');
 	});
 
 	it('inks every part fully enough not to look thin, and the same way every time', () => {

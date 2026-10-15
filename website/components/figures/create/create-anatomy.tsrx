@@ -1,7 +1,8 @@
 // A terminal drawn on a sheet on the desk: type the create command, answer the real prompts, and the starter's files drop into the folder below as paper sheets that say what they are for.
 import { computed, state } from '@markless/core';
-import { choose, cursorRow, describe, flip, focusRow, ghostFor, labelOf, landed, MAX_TYPED, move, noteAt, type Run, screen, slipAt, START, submit, tabOf, typing, widthOf } from './model.ts';
+import { choose, COMMAND, cursorRow, describe, flip, focusRow, ghostFor, labelOf, landed, MAX_TYPED, move, noteAt, type Run, screen, slipAt, START, submit, tabOf, typing, widthOf } from './model.ts';
 import { art } from './create.art.ts';
+import { recall, remember } from './history.ts';
 
 export default function CreateAnatomy() @{
 	let run = state(START as Run);
@@ -10,6 +11,9 @@ export default function CreateAnatomy() @{
 	let beat = state('rest');
 	let said = state('');
 	let peek = state(-1);
+	let ran = state([] as string[]);
+	let back = state(0);
+	let tick = state('a');
 	const lines = computed(() => {
 		const rows = screen(run, typed, at);
 		const cursor = cursorRow(rows);
@@ -39,18 +43,18 @@ export default function CreateAnatomy() @{
 	const s15 = computed(() => slipAt(run, 15, peek));
 
 	<figure class="anatomy">
-		<div
+		<label
 			class="stage"
 			data-typing={mode}
 			onClick={(event) => {
 				const target = event.target as Element;
+				const input = target.closest('.stage')!.querySelector('input')!;
 				const sheet = target.closest('[data-on="yes"][data-slot]');
 				if (sheet) {
 					peek = Number(sheet.getAttribute('data-slot'));
-					(sheet as SVGElement).focus();
+					input.focus();
 					return;
 				}
-				const input = target.closest('.stage')!.querySelector('input')!;
 				const option = Number(target.closest('[data-option]')?.getAttribute('data-option') ?? -1);
 				const after = choose(run, option);
 				if (after !== run) {
@@ -78,15 +82,28 @@ export default function CreateAnatomy() @{
 					if (typing(run) === 'none') input.value = '';
 					typed = input.value;
 					at = input.selectionStart ?? input.value.length;
+					tick = tick === 'a' ? 'b' : 'a';
 				}}
-				onKeyUp={(event) => {
+				onSelectionChange={(event) => {
 					const input = event.target as HTMLInputElement;
-					at = input.selectionStart ?? input.value.length;
+					const next = input.selectionStart ?? input.value.length;
+					if (next === at) return;
+					at = next;
+					tick = tick === 'a' ? 'b' : 'a';
 				}}
 				onKeyDown={(event) => {
 					if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Enter') event.preventDefault();
 					const input = event.target as HTMLInputElement;
 					if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+						if (typing(run) === 'shell') {
+							const step = recall(ran, back, event.key === 'ArrowUp' ? 1 : -1);
+							if (!step) return;
+							back = step.back;
+							input.value = step.line;
+							typed = step.line;
+							at = step.line.length;
+							return;
+						}
 						if (typing(run) !== 'none') return;
 						run = move(run, event.key === 'ArrowDown' ? 1 : -1);
 						said = describe(run, true);
@@ -95,6 +112,8 @@ export default function CreateAnatomy() @{
 						typed = input.value;
 						at = input.value.length;
 					} else if (event.key === 'Enter') {
+						if (typing(run) === 'shell') ran = remember(ran, input.value.trim() || COMMAND);
+						back = 0;
 						const after = submit(run, input.value);
 						if (after.outcome === 'created' && run.outcome === 'asking') beat = flip(beat);
 						else if (after.outcome === 'asking' && run.outcome !== 'asking') beat = 'rest';
@@ -106,6 +125,7 @@ export default function CreateAnatomy() @{
 						peek = -1;
 					} else if (event.key === 'Escape') {
 						run = START;
+						back = 0;
 						beat = 'rest';
 						said = '';
 						input.value = '';
@@ -119,6 +139,7 @@ export default function CreateAnatomy() @{
 				class="scene"
 				style={count}
 				data-beat={beat}
+				data-tick={tick}
 				data-made={run.outcome === 'created' ? 'yes' : 'no'}
 				viewBox={'0 0 ' + art.width + ' ' + art.height}
 				role="group"
@@ -348,7 +369,7 @@ export default function CreateAnatomy() @{
 					</text>
 				</g>
 			</svg>
-		</div>
+		</label>
 		<figcaption class="sr">
 			A pen-and-ink drawing of a desk. A sheet of paper drawn as a terminal waits at a shell prompt: type npm create markless@latest and
 			press Enter, or press Enter on the empty line to take the suggestion. It then asks the real questions one at a time: what you are
@@ -365,6 +386,7 @@ export default function CreateAnatomy() @{
 			}
 
 			.stage {
+				display: block;
 				position: relative;
 				cursor: text;
 			}
@@ -410,10 +432,20 @@ export default function CreateAnatomy() @{
 
 			.caret {
 				font-weight: 700;
-				animation: blink 1.06s steps(1) infinite;
+				animation: blink-a 1.06s steps(1) infinite;
 			}
 
-			@keyframes blink {
+			.scene[data-tick='b'] .caret {
+				animation-name: blink-b;
+			}
+
+			@keyframes blink-a {
+				50% {
+					opacity: 0;
+				}
+			}
+
+			@keyframes blink-b {
 				50% {
 					opacity: 0;
 				}
