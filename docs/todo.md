@@ -103,3 +103,7 @@ Lower priority or parked:
 - An inline `attach={(el) => ...}` arrow fails with `MARKLESS_SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE`, and `attach={fn}` never runs without a trigger; figures start from `onVisible` instead.
 - TSRX intrinsic types reject SVG filter and pattern attributes, `href` and `dy`.
 - A page component placed inside a library component's children gets mismatched paths: with `CodeFiles` inside `resizable.item`, its elements are located under `m4:c0:c2:r:<file>:...` but its state and click handlers under `m4:c0:c0:p1:p2:r:<file>:...`, so clicks cannot find their state (the docs playground's file tab blanked the editor). Worked around in `website/components/docs/code.tsrx` by keeping the tabs outside the split.
+
+## Bundle growth accepted on 2026-10-15
+
+- benchmark-guard failed on main at `abfe7d4d`: `41_size-uncompressed` grew by 3.00 kB against `c3317d30`, from the runtime work in the 140-commit push of 2026-10-12 (234 package files). The owner accepted it to unblock main. Find which commit added the bytes and either cut them or record why they are needed.
