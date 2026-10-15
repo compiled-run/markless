@@ -25,7 +25,7 @@ export default function CreateAnatomy() @{
 	const label = computed(() => labelOf(run));
 	const mode = computed(() => typing(run));
 	const front = computed(() => frontAt(run, peek));
-	const pulled = computed(() => art.slips[front.slot]!.pulled);
+	const pointer = computed(() => art.note.arrows[front.slot]!);
 	const s0 = computed(() => slipAt(run, 0, peek));
 	const s1 = computed(() => slipAt(run, 1, peek));
 	const s2 = computed(() => slipAt(run, 2, peek));
@@ -358,23 +358,24 @@ export default function CreateAnatomy() @{
 					<text class="file" transform={art.slips[15]!.nameMatrix}><tspan class="dir">{s15.dir}</tspan>{s15.name}</text>
 				</g>
 
-				<g class="front" data-on={front.on} aria-hidden="true">
-					<path class="shadow-wash" d={pulled.cast} />
-					<path class="sheet-paper" d={pulled.paper} />
-					<path class="wash pink" d={pulled.wash} />
-					<path class="sheet-hatch light" d={pulled.fold} />
-					<path class="sheet-ink" d={pulled.ink} />
-					<text class="file" transform={pulled.nameMatrix}><tspan class="dir">{front.dir}</tspan>{front.name}</text>
-					<text class="front-note" transform={pulled.noteMatrices[0]}>{front.lines[0]}</text>
-					<text class="front-note" transform={pulled.noteMatrices[1]}>{front.lines[1]}</text>
-					<text class="front-note" transform={pulled.noteMatrices[2]}>{front.lines[2]}</text>
-				</g>
-				<g class="note" aria-hidden="true">
+				<g class="note" data-off={front.on} aria-hidden="true">
 					<path class="halo" d={art.note.arrow} />
 					<path class="ink" d={art.note.arrow} />
 					<text class="hand">
 						<tspan x={art.note.at.x} y={art.note.at.y}>ONE FILE IS</tspan>
 						<tspan x={art.note.at.x} y={art.note.at.y2}>YOUR PAGE</tspan>
+					</text>
+				</g>
+				<g class="file-note" data-on={front.on} aria-hidden="true">
+					<path class="halo" d={pointer} />
+					<path class="ink" d={pointer} />
+					<text class="file-name" x={art.note.file.x} y={art.note.file.y}>{front.name}</text>
+					<text class="file-says">
+						<tspan x={art.note.file.x} y={art.note.file.lines[0]}>{front.lines[0]}</tspan>
+						<tspan x={art.note.file.x} y={art.note.file.lines[1]}>{front.lines[1]}</tspan>
+						<tspan x={art.note.file.x} y={art.note.file.lines[2]}>{front.lines[2]}</tspan>
+						<tspan x={art.note.file.x} y={art.note.file.lines[3]}>{front.lines[3]}</tspan>
+						<tspan x={art.note.file.x} y={art.note.file.lines[4]}>{front.lines[4]}</tspan>
 					</text>
 				</g>
 			</svg>
@@ -489,19 +490,26 @@ export default function CreateAnatomy() @{
 				stroke-width: 2;
 			}
 
-			.front {
-				pointer-events: none;
-				transform: translate(-1px, -3px);
-			}
-
-			.front[data-on='no'] {
+			.note[data-off='yes'],
+			.file-note[data-on='no'] {
 				visibility: hidden;
 			}
 
-			.front-note {
+			.file-note {
+				pointer-events: none;
+			}
+
+			.file-name {
+				font-family: var(--font-mono);
+				font-size: 11px;
+				font-weight: 700;
+				fill: var(--ink);
+			}
+
+			.file-says {
 				font-family: 'Joy Elia', system-ui, sans-serif;
-				font-size: 10px;
-				fill: var(--sheet-ink);
+				font-size: 12px;
+				fill: var(--ink);
 			}
 
 			.cursor,

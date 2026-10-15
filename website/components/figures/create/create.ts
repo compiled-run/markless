@@ -31,8 +31,6 @@ const COLS = [
 	{ u: 9.1, w: 9.8 },
 ];
 const SLIP = { step: 0.86, top: 0.7, bottom: 8.4, dog: 0.62 };
-/** How tall a pulled sheet must be to show its name and a full note; a sheet lower in the pile rises out of it by the difference. */
-const PULLED = 1.4 + NOTE_LINES * 0.62 + 0.1;
 const FOLDER = { u: 0, v: SHEET_H + 2.6, w: COLS[1]!.u + COLS[1]!.w + 0.4, h: SLIP.bottom + 0.4, tab: { u0: 0.5, u1: 8.4, h: 1.3 } };
 
 const sheetLocal = (u: number, v: number): Point3 => {
@@ -202,14 +200,7 @@ function slipsArt() {
 		const h = SLIP.bottom + (rnd() - 0.5) * 0.08 - top;
 		const turn = (rnd() - 0.5) * 0.016;
 		const u = col.u + (rnd() - 0.5) * 0.12;
-		const sheet = pileSheet(i, col.w, u, top, h, turn, rnd);
-		const rise = Math.min(top, SLIP.bottom - PULLED);
-		const pulled = pileSheet(i + 50, col.w, u, rise, SLIP.bottom - rise, turn, seeded(700 + i * 13));
-		return {
-			key: i,
-			...sheet,
-			pulled: { cast: pulled.cast, paper: pulled.paper, ink: pulled.ink, fold: pulled.fold, wash: pulled.wash, nameMatrix: pulled.nameMatrix, noteMatrices: pulled.noteMatrices },
-		};
+		return { key: i, ...pileSheet(i, col.w, u, top, h, turn, rnd) };
 	});
 }
 
@@ -237,26 +228,49 @@ function pileSheet(i: number, sw: number, u: number, top: number, h: number, tur
 		wash: wash(spot, 470 + i, 1, 2.4),
 		pool: wash(pool(spot, spot[0]!, 0.55), 490 + i, 0.4, 1.4),
 		nameMatrix: at.matrix(0.32, 0.56, TEXT),
-		noteMatrices: Array.from({ length: NOTE_LINES }, (_, k) => at.matrix(0.36, 1.4 + k * 0.62, TEXT)),
 	};
 }
 
-/** The margin note right of the folder, in two lines, and its loose arrow up and left onto the page sheet's name. */
-function noteArt() {
-	const { col } = slotAt(PER);
-	const aim = proj(folder.at(col.u + col.w + 0.15, SLIP.top + 0.42, 0.1));
-	const base = proj(folder.at(FOLDER.w, SLIP.top + 3.6, 0));
-	const label: P = [WIDTH - 4, base[1]];
-	const from: P = [label[0] - 92, label[1] - 22];
-	const arrow = resample([from, [from[0] - 10, from[1] - 26], [aim[0] + 30, aim[1] + 2], [aim[0] + 3, aim[1]]], 3);
+/** A loose hand-drawn arrow from a margin note onto a sheet's name. */
+function arrowTo(from: P, aim: P, seed: number, via: P[] = [[from[0] - 10, from[1] - 26], [aim[0] + 30, aim[1] + 2]]) {
+	const arrow = resample([from, ...via, [aim[0] + 3, aim[1]]], 3);
 	const smooth = arrow.map((p, i, all) => (i === 0 || i === all.length - 1 ? p : ([(all[i - 1]![0] + p[0] + all[i + 1]![0]) / 3, (all[i - 1]![1] + p[1] + all[i + 1]![1]) / 3] as P)));
 	const end = smooth.at(-1)!;
 	const prev = smooth.at(-4)!;
 	const ang = Math.atan2(end[1] - prev[1], end[0] - prev[0]);
 	const head = (s: number): P[] => [[end[0] - Math.cos(ang + s) * 9, end[1] - Math.sin(ang + s) * 9], end];
+	return line(smooth, { w: 1.3, seed, over: 1 }) + stroke(head(0.45), { w: 1.3, seed: seed + 1, over: 0.5 }) + stroke(head(-0.45), { w: 1.3, seed: seed + 2, over: 0.5 });
+}
+
+/** Where an arrow lands on a slot's sheet: just past the right column's edge, or on the right end of a left-column sheet. */
+function aimAt(slot: number): P {
+	const { col, depth } = slotAt(slot);
+	const v = SLIP.top + depth * SLIP.step + 0.42;
+	return proj(folder.at(slot < PER ? col.u + col.w - 0.5 : col.u + col.w + 0.15, v, 0.1));
+}
+
+/** A file note's arrow; one to a left-column sheet runs along the seam under that row so it crosses no name in the right column. */
+function fileArrow(slot: number, from: P) {
+	const aim = aimAt(slot);
+	if (slot >= PER) return arrowTo(from, aim, 620 + slot * 3, [[from[0] - 10, (from[1] + aim[1]) / 2], [aim[0] + 24, aim[1] + 1]]);
+	const { depth } = slotAt(slot);
+	const seam = SLIP.top + depth * SLIP.step + 0.8;
+	const right = proj(folder.at(FOLDER.w + 0.2, seam, 0.1));
+	const gap = proj(folder.at(COLS[1]!.u - 0.1, seam, 0.1));
+	return arrowTo(from, aim, 620 + slot * 3, [[from[0] - 8, (from[1] + right[1]) / 2], right, gap, [aim[0] + 14, aim[1] + 3]]);
+}
+
+/** The margin note right of the folder: by default ONE FILE IS YOUR PAGE with its arrow onto the page sheet, and for a hovered sheet that file's name and what it is for, with an arrow onto that sheet. */
+function noteArt() {
+	const base = proj(folder.at(FOLDER.w, SLIP.top + 3.6, 0));
+	const label: P = [WIDTH - 4, base[1]];
+	const left = r1(proj(folder.at(FOLDER.w, SLIP.top + 2.4, 0))[0] + 16);
+	const top = r1(base[1] - 34);
 	return {
 		at: { x: r1(label[0]), y: r1(label[1]), y2: r1(label[1] + 18) },
-		arrow: line(smooth, { w: 1.3, seed: 600, over: 1 }) + stroke(head(0.45), { w: 1.3, seed: 601, over: 0.5 }) + stroke(head(-0.45), { w: 1.3, seed: 602, over: 0.5 }),
+		arrow: arrowTo([label[0] - 92, label[1] - 22], aimAt(PER), 600),
+		file: { x: left, y: top, lines: Array.from({ length: NOTE_LINES }, (_, k) => r1(top + 20 + k * 15)) },
+		arrows: Array.from({ length: MOST_FILES }, (_, slot) => fileArrow(slot, [left - 6, top - 4])),
 	};
 }
 

@@ -105,7 +105,7 @@ export function slipAt(run: Run, slot: number, peek = -1) {
 }
 export const isFirstPage = (path: string) => path === 'pages/index.tsrx' || path === 'pages/index.mdx';
 
-/** What each file is for, in words for someone who has never seen it; written on the sheet when it is pulled out. */
+/** What each file is for, in words for someone who has never seen it; written in the margin while its sheet is hovered, tapped or focused. */
 export const NOTES: Record<string, string> = {
 	'pages/index.tsrx': 'Your home page, at /. Edit it and the browser shows the change.',
 	'pages/index.mdx': 'Your home page, at /, in Markdown. Edit it and the browser shows it.',
@@ -131,9 +131,9 @@ export const NOTES: Record<string, string> = {
 	'.zed/settings.json': 'Tells Zed how to read .tsrx files, for autocomplete and errors.',
 };
 
-/** Characters per line of a note written on a sheet, and how many lines a sheet has room for. */
-export const NOTE_WIDTH = 28;
-export const NOTE_LINES = 3;
+/** Characters per line of a file's margin note, and how many lines the margin has room for. */
+export const NOTE_WIDTH = 20;
+export const NOTE_LINES = 5;
 export function noteLines(text: string): string[] {
 	const lines: string[] = [];
 	for (const word of text.split(' ')) {
@@ -307,12 +307,12 @@ export const flip = (beat: string) => (beat === 'odd' ? 'even' : 'odd');
 /** The folder's tab: the app's name, shortened to fit. */
 export const tabOf = (run: Run) => (run.name.length > 15 ? run.name.slice(0, 14) + '…' : run.name) + '/';
 
-/** The sheet pulled to the front of the pile while it is hovered, tapped or focused: which slot, its name and its note written in lines. */
+/** The margin note for the hovered, tapped or focused sheet: which slot, its file name and its note in lines. */
 export function frontAt(run: Run, slot: number) {
 	const path = layout(landed(run))[slot] ?? '';
 	const cut = path.lastIndexOf('/') + 1;
 	const lines = noteLines(NOTES[path] ?? '');
-	return { on: path === '' ? 'no' : 'yes', slot: path === '' ? 0 : slot, dir: path.slice(0, cut), name: path.slice(cut), lines: Array.from({ length: NOTE_LINES }, (_, k) => lines[k] ?? '') };
+	return { on: path === '' ? 'no' : 'yes', slot: path === '' ? 0 : slot, name: path.slice(cut), lines: Array.from({ length: NOTE_LINES }, (_, k) => lines[k] ?? '') };
 }
 
 /** The terminal input's label: what the open line expects. */
