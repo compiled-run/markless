@@ -1,10 +1,22 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { COMMON_FILES, commandFor, SCRIPTS, STARTERS } from './facts.ts';
+import { commandVariants, type CommandKind } from './commands.ts';
+import { COMMON_FILES, commandFor, createCommand, MANAGERS, NO_DENO_TASK, scriptCommand, SCRIPTS, scriptsFor, STARTERS } from './facts.ts';
 
 const templates = new URL('../../../../packages/cli/templates/', import.meta.url);
 const cli = readFileSync(new URL('../../../../packages/cli/src/index.ts', import.meta.url), 'utf8');
 const page = readFileSync(new URL('../../../pages/start/walkthrough.mdx', import.meta.url), 'utf8');
+const cliPackage = JSON.parse(readFileSync(new URL('../../../../packages/cli/package.json', import.meta.url), 'utf8')) as { name: string };
+
+// Under the test runner's resolve conditions shiki loads a wasm build Node cannot run, so the fences render in a plain child.
+function renderBashFences(codes: readonly string[]): string[] {
+	const script = `import { renderFence } from ${JSON.stringify(new URL('../../../tooling/highlight-code.ts', import.meta.url).href)};
+const out = [];
+for (const code of ${JSON.stringify(codes)}) out.push(await renderFence(code, 'bash'));
+process.stdout.write(JSON.stringify(out));`;
+	return JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', script], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 })) as string[];
+}
 
 function filesUnder(dir: URL, prefix = ''): string[] {
 	return readdirSync(dir).flatMap((name) => {
@@ -47,6 +59,60 @@ describe('the Walkthrough facts match create-markless', () => {
 	it('shows the create figure and no bare tables', () => {
 		expect(page).toContain('<CreateAnatomy />');
 		expect(page).not.toMatch(/\| --- \|/);
+	});
+});
+
+describe('the package-manager commands', () => {
+	it('offers the package managers the CLI knows', () => {
+		const known = /export type PackageManager = ([^;]+);/.exec(cli)?.[1];
+		expect(known?.split(' | ').map((name) => name.slice(1, -1))).toEqual(MANAGERS.map((manager) => manager.id));
+	});
+
+	it('runs create-markless through each manager', () => {
+		expect(cliPackage.name).toBe('create-markless');
+		expect(MANAGERS.map((manager) => createCommand(manager.id))).toEqual([
+			'npm create markless@latest',
+			'pnpm create markless',
+			'yarn create markless',
+			'bun create markless',
+			'deno run -A npm:create-markless',
+		]);
+		expect(commandFor('app', 'pnpm')).toBe('pnpm create markless my-app --yes --starter app');
+		expect(commandFor('app', 'deno')).toBe('deno run -A npm:create-markless my-app --yes --starter app');
+	});
+
+	it('runs scripts the way the CLI tells you to run dev', () => {
+		expect(cli).toContain("options.format === 'deno' ? 'deno task dev' : `${options.packageManager} run dev`");
+		for (const manager of MANAGERS) expect(scriptCommand(manager.id, 'dev')).toBe(manager.id === 'deno' ? 'deno task dev' : `${manager.id} run dev`);
+	});
+
+	it('leaves out the scripts a Deno app has no task for', () => {
+		const deno = JSON.parse(readFileSync(new URL('formats/deno/deno.json', templates), 'utf8')) as { tasks: Record<string, string> };
+		expect(scriptsFor('deno').map((script) => script.name)).toEqual(Object.keys(deno.tasks));
+		expect(SCRIPTS.filter((script) => !(script.name in deno.tasks)).map((script) => script.name)).toEqual(NO_DENO_TASK);
+	});
+
+	it('colours every block exactly as the site highlights a bash fence', () => {
+		const variants = (['create', 'dev', 'scripts', 'starters'] as CommandKind[]).flatMap((kind) => commandVariants(kind));
+		const rendered = renderBashFences(variants.map((variant) => variant.code));
+		for (const [index, variant] of variants.entries()) {
+			const fenced = rendered[index]!.split('<span class="line">').slice(1).map((line) => [...line.matchAll(/<span style="([^"]*)">([^<]*)<\/span>/g)].map(([, style, text]) => [style, text]));
+			expect(variant.lines.map((line) => line.runs.map((run) => [run.style, run.text])), variant.code).toEqual(fenced);
+		}
+	});
+
+	it('styles a block and a tab for every manager', () => {
+		for (const file of ['commands.tsrx', 'create-command.tsrx']) {
+			const source = readFileSync(new URL(file, import.meta.url), 'utf8');
+			const part = file === 'commands.tsrx' ? '.variant' : '.tab';
+			for (const manager of MANAGERS) expect(source, `${file} ${manager.id}`).toContain(`html[data-pm='${manager.id}'] ${part}[data-pm='${manager.id}']`);
+		}
+	});
+
+	it('puts every manager command on the page through the components', () => {
+		expect(page).toContain('<CreateCommand />');
+		for (const kind of ['dev', 'scripts', 'starters']) expect(page).toContain(`<Commands kind="${kind}" />`);
+		expect(page).not.toMatch(/^npm (create|run) /m);
 	});
 });
 

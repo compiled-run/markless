@@ -7,6 +7,8 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 import LikeHeart from '../../components/docs/like-heart.tsrx';
 import CreateAnatomy from '../../components/figures/create/create-anatomy.tsrx';
 import DevServer from '../../components/figures/dev-server/dev-server-anatomy.tsrx';
+import CreateCommand from '../../components/docs/walkthrough/create-command.tsrx';
+import Commands from '../../components/docs/walkthrough/commands.tsrx';
 
 <Sidebar />
 
@@ -28,17 +30,9 @@ Try it here first. Click the terminal below and press Enter. It asks the same qu
 
 Then do it for real, in the folder that will hold your project:
 
-```bash
-npm create markless@latest
-```
+<CreateCommand />
 
 Press Enter through every question to take its default. Nothing is written until you pick **Create app**.
-
-<Collapsible
-	sprite="star-badge"
-	summary="Using Bun or Deno instead of Node.js?"
-	text="On Bun, run bun create markless. On Deno, run deno run -A npm:create-markless. The questions are the same."
-/>
 
 ## Start it, and open your page
 
@@ -46,9 +40,7 @@ Press Enter through every question to take its default. Nothing is written until
 cd my-markless-app
 ```
 
-```bash
-npm run dev
-```
+<Commands kind="dev" />
 
 <DevServer />
 
@@ -87,23 +79,13 @@ The file is named `index`, so it is the page at `/`. Add `pages/about.tsrx`, and
 
 ## Ship it, one script at a time
 
-Your folder's `package.json` has seven scripts:
+Your app comes with these scripts:
 
-```bash
-npm run dev       # starts the dev server at localhost:3000
-npm run build     # makes the production build
-npm run preview   # serves the production build, so you click the real thing
-npm run check     # runs the format and lint checks
-npm run doctor    # checks your setup, then runs a production build
-npm run fmt       # formats your files
-npm run test      # runs your tests with Vitest
-```
+<Commands kind="scripts" />
 
 `dev` is where you spend your day. Before you ship, run `build` and then `preview`. It serves the real production build, so you click what your users will get.
 
-Something wrong with the setup? Run `npm run doctor` first. It checks that the `@markless/*` packages are there, on matching versions. It checks the editor wiring in `tsconfig.json`, and then it runs a build.
-
-On Deno the scripts are tasks, so you run `deno task dev`. Deno has no `doctor` task.
+Something wrong with the setup? Run the `doctor` script first (Deno apps do not have one). It checks that the `@markless/*` packages are there, on matching versions. It checks the editor wiring in `tsconfig.json`, and then it runs a build.
 
 ## Try a different starter
 
@@ -111,12 +93,7 @@ Every starter writes the same base files, then a few of its own. Pick a differen
 
 To skip the questions, name the folder, add `--yes` and pick a starter:
 
-```bash
-npm create markless@latest my-app -- --yes --starter minimal      # Learn Markless: one counter page
-npm create markless@latest my-app -- --yes --starter app          # Build an app: plus 404 and 500 pages
-npm create markless@latest my-app -- --yes --starter full-stack   # Full-stack app: plus api/ and middleware/
-npm create markless@latest my-app -- --yes --starter docs         # Write docs: an MDX docs site
-```
+<Commands kind="starters" />
 
 `--yes` takes the default for every question a flag did not answer. The other flags: `--format` with `node`, `deno` or `bun`, `--no-install`, `--no-git`, `--agents` with a list or `none`, `--workspace` or `--no-workspace`, and `--force` to write into a folder that is not empty.
 
