@@ -26,24 +26,19 @@ Try it here first. Click the terminal below and press Enter. It asks the same qu
 
 <CreateAnatomy />
 
-Run this in the folder that will hold your project:
+Then do it for real, in the folder that will hold your project:
 
 ```bash
 npm create markless@latest
 ```
 
-That needs Node.js. On Bun, run `bun create markless`. On Deno, run `deno run -A npm:create-markless`. If your Node.js is too old for a new app, the command says so and stops before writing anything.
+Press Enter through every question to take its default. Nothing is written until you pick **Create app**.
 
-It asks a few questions. Each one has a default, so you can press Enter all the way through.
-
-1. `What are you building today?` **Learn Markless** is the default, a small counter app.
-2. `What should we call it?` This is the folder name. The default is `my-markless-app`.
-3. `Where should it run?` Node, Deno or Bun. Not sure? Pick Node.
-4. `Install dependencies now?` and `Initialize git?` Both default to yes.
-
-It can ask two more. Inside an existing workspace, it asks whether the new app joins that workspace. If it finds coding agents on your machine, it offers to set Markless up for them.
-
-Last comes a summary under `Ready to create?` Nothing is written until you pick **Create app**.
+<Collapsible
+	sprite="star-badge"
+	summary="Using Bun or Deno instead of Node.js?"
+	text="On Bun, run bun create markless. On Deno, run deno run -A npm:create-markless. The questions are the same."
+/>
 
 ## Start it, and open your page
 

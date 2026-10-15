@@ -2,10 +2,10 @@
 import { centreOf, createCamera, ellipse, jitter, matrixOf, type P, type Point3, roundRect, shadowOnDesk } from '../ink/desk.ts';
 import { hatch, hull, line, outline, pathOf, pool, r1, resample, seeded, stroke, wash } from '../ink/ink.ts';
 import { pencil, plane, type Plane } from '../ink/plane.ts';
-import { MOST_FILES, PER, ROWS } from './model.ts';
+import { MOST_FILES, NOTE_LINES, PER, ROWS } from './model.ts';
 
 export const WIDTH = 640;
-export const HEIGHT = 600;
+export const HEIGHT = 560;
 
 /** The terminal sheet's corner on the desk; its width fits the longest hint line, its height the eleven rows. */
 const SHEET_O: P = [2.2, 0];
@@ -31,6 +31,8 @@ const COLS = [
 	{ u: 9.1, w: 9.8 },
 ];
 const SLIP = { step: 0.86, top: 0.7, bottom: 8.4, dog: 0.62 };
+/** How tall a pulled sheet must be to show its name and a full note; a sheet lower in the pile rises out of it by the difference. */
+const PULLED = 1.4 + NOTE_LINES * 0.62 + 0.1;
 const FOLDER = { u: 0, v: SHEET_H + 2.6, w: COLS[1]!.u + COLS[1]!.w + 0.4, h: SLIP.bottom + 0.4, tab: { u0: 0.5, u1: 8.4, h: 1.3 } };
 
 const sheetLocal = (u: number, v: number): Point3 => {
@@ -49,7 +51,7 @@ const { proj, projAll } = createCamera({
 	width: WIDTH,
 	height: HEIGHT,
 	view: { azimuth: 90, elevation: 62, distance: 80, target: [12, 13.6, 0] },
-	bounds: [[FOLDER.u - 0.3, -0.4, 0], [SHEET_O[0] + SHEET_W + 1.4, -0.4, 0], [FOLDER.u - 0.3, FOLDER.v + FOLDER.h + 2.9, 0], [FOLDER.w + 5.2, FOLDER.v + FOLDER.h + 2.9, 0], [FOLDER.w + 5.2, FOLDER.v - 1.4, 0]],
+	bounds: [[FOLDER.u - 0.3, -0.4, 0], [SHEET_O[0] + SHEET_W + 1.4, -0.4, 0], [FOLDER.u - 0.3, FOLDER.v + FOLDER.h + 1.2, 0], [FOLDER.w + 5.2, FOLDER.v + FOLDER.h + 1.2, 0], [FOLDER.w + 5.2, FOLDER.v - 1.4, 0]],
 	pad: 4,
 });
 const onSheet = (pts: P[], lift = 0): P[] => pts.map(([u, v]) => proj(sheetAt(u, v, lift)));
@@ -198,33 +200,45 @@ function slipsArt() {
 		const { col, depth } = slotAt(i);
 		const top = SLIP.top + depth * SLIP.step + (rnd() - 0.5) * 0.05;
 		const h = SLIP.bottom + (rnd() - 0.5) * 0.08 - top;
-		const sw = col.w;
 		const turn = (rnd() - 0.5) * 0.016;
-		const U: Point3 = [Math.cos(turn), Math.sin(turn), 0];
-		const V: Point3 = [-Math.sin(turn), Math.cos(turn), 0];
-		const at = plane(proj, folder.at(col.u + (rnd() - 0.5) * 0.12, top, 0.05 + i * 0.004), U, V);
-		const dog = SLIP.dog;
-		const edge: P[] = [[0, 0], [sw - dog, 0], [sw, dog], [sw, h], [0, h]];
-		const sil = at.on(jitter(resample(edge, 0.35, true), 410 + i, 0.03));
-		const fold = at.on([[sw - dog, 0], [sw - dog, dog], [sw, dog]]);
-		const cast = hull([...at.on(edge), ...at.on(edge).map(([x, y]) => [x + 2.2, y + 2.6] as P)]);
-		const spot = at.on(roundRect(0.12, 0.06, sw - 0.75, 0.76, 0.3, 3));
-		const centre = proj(at.at(sw / 2, 0.4));
-		const ys = Array.from({ length: 6 }, (_, k) => 1.12 + k * 0.36).filter((y) => y < h - 0.3);
-		const lines = ys.map((y, k) => stroke(at.on([[0.4 + (k % 3 === 1 ? 0.5 : 0), y], [0.9 + rnd() * (sw - 2.6), y]]), { w: 0.55, seed: 450 + i * 7 + k, over: 0, wobble: 0.1 }));
+		const u = col.u + (rnd() - 0.5) * 0.12;
+		const sheet = pileSheet(i, col.w, u, top, h, turn, rnd);
+		const rise = Math.min(top, SLIP.bottom - PULLED);
+		const pulled = pileSheet(i + 50, col.w, u, rise, SLIP.bottom - rise, turn, seeded(700 + i * 13));
 		return {
 			key: i,
-			origin: `transform-origin:${r1(centre[0])}px ${r1(centre[1])}px`,
-			cast: wash(cast, 430 + i, 0.3, 0.9),
-			paper: pathOf(sil, true),
-			ink: outline(sil, { w: 1.05, heavy: 1.1, centre: centreOf(sil), seed: 440 + i }) + line(fold, { w: 0.7, seed: 460 + i, over: 0.3 }),
-			fold: pathOf(fold, true),
-			rules: lines.join(''),
-			wash: wash(spot, 470 + i, 1, 2.4),
-			pool: wash(pool(spot, spot[0]!, 0.55), 490 + i, 0.4, 1.4),
-			nameMatrix: at.matrix(0.32, 0.56, TEXT),
+			...sheet,
+			pulled: { cast: pulled.cast, paper: pulled.paper, ink: pulled.ink, fold: pulled.fold, wash: pulled.wash, nameMatrix: pulled.nameMatrix, noteMatrices: pulled.noteMatrices },
 		};
 	});
+}
+
+/** One sheet of the pile: paper, outline, dog-ear, ruled lines, the name's pink spot, and where its name and note are written. */
+function pileSheet(i: number, sw: number, u: number, top: number, h: number, turn: number, rnd: () => number) {
+	const U: Point3 = [Math.cos(turn), Math.sin(turn), 0];
+	const V: Point3 = [-Math.sin(turn), Math.cos(turn), 0];
+	const at = plane(proj, folder.at(u, top, 0.05 + i * 0.004), U, V);
+	const dog = SLIP.dog;
+	const edge: P[] = [[0, 0], [sw - dog, 0], [sw, dog], [sw, h], [0, h]];
+	const sil = at.on(jitter(resample(edge, 0.35, true), 410 + i, 0.03));
+	const fold = at.on([[sw - dog, 0], [sw - dog, dog], [sw, dog]]);
+	const cast = hull([...at.on(edge), ...at.on(edge).map(([x, y]) => [x + 2.2, y + 2.6] as P)]);
+	const spot = at.on(roundRect(0.12, 0.06, sw - 0.75, 0.76, 0.3, 3));
+	const centre = proj(at.at(sw / 2, 0.4));
+	const ys = Array.from({ length: 6 }, (_, k) => 1.12 + k * 0.36).filter((y) => y < h - 0.3);
+	const lines = ys.map((y, k) => stroke(at.on([[0.4 + (k % 3 === 1 ? 0.5 : 0), y], [0.9 + rnd() * (sw - 2.6), y]]), { w: 0.55, seed: 450 + i * 7 + k, over: 0, wobble: 0.1 }));
+	return {
+		origin: `transform-origin:${r1(centre[0])}px ${r1(centre[1])}px`,
+		cast: wash(cast, 430 + i, 0.3, 0.9),
+		paper: pathOf(sil, true),
+		ink: outline(sil, { w: 1.05, heavy: 1.1, centre: centreOf(sil), seed: 440 + i }) + line(fold, { w: 0.7, seed: 460 + i, over: 0.3 }),
+		fold: pathOf(fold, true),
+		rules: lines.join(''),
+		wash: wash(spot, 470 + i, 1, 2.4),
+		pool: wash(pool(spot, spot[0]!, 0.55), 490 + i, 0.4, 1.4),
+		nameMatrix: at.matrix(0.32, 0.56, TEXT),
+		noteMatrices: Array.from({ length: NOTE_LINES }, (_, k) => at.matrix(0.36, 1.4 + k * 0.62, TEXT)),
+	};
 }
 
 /** The margin note right of the folder, in two lines, and its loose arrow up and left onto the page sheet's name. */
@@ -246,12 +260,6 @@ function noteArt() {
 	};
 }
 
-/** Where a hovered, tapped or focused sheet's name and note are written, on the desk under the folder. */
-function peekArt() {
-	const at = proj([FOLDER.u + 0.5, FOLDER.v + FOLDER.h + 1.5, 0]);
-	return { x: r1(at[0]), y: r1(at[1]), y2: r1(at[1] + 17) };
-}
-
 /** The whole scene, frozen into create.art.ts. */
 export function drawing() {
 	return {
@@ -262,6 +270,5 @@ export function drawing() {
 		folder: folderArt(),
 		slips: slipsArt(),
 		note: noteArt(),
-		peek: peekArt(),
 	};
 }

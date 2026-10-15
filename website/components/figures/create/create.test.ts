@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { CreateProgram, PROJECT_FORMAT_CHOICES, STARTER_CHOICES, type ProgramRuntime } from '../../../../packages/cli/src/index.ts';
-import { choose, COMMAND, COMMON_FILES, cursorRow, describe as say, dropOrder, enter, filesFor, focusRow, type Format, FORMATS, ghostFor, isFirstPage, layout, LONGEST, MAX_TYPED, move, MOST_FILES, NOTES, PAGE_SLOT, PER, PROMPTS, ROWS, type Run, screen, slipAt, START, type Starter, STARTERS, submit, tabOf, TARGET, transcript, widthOf, wrap, WRAP } from './model.ts';
+import { choose, COMMAND, COMMON_FILES, cursorRow, describe as say, dropOrder, enter, filesFor, focusRow, type Format, FORMATS, ghostFor, isFirstPage, layout, LONGEST, MAX_TYPED, move, MOST_FILES, NOTE_LINES, noteLines, NOTES, PAGE_SLOT, PER, PROMPTS, ROWS, type Run, screen, slipAt, START, type Starter, STARTERS, submit, tabOf, TARGET, transcript, widthOf, wrap, WRAP } from './model.ts';
 import { drawing } from './create.ts';
 import { recall, remember } from './history.ts';
 
@@ -66,30 +66,7 @@ describe('the create figure plays the real CLI', () => {
 		expect(filesFor('minimal', 'node')).toContain('pages/index.tsrx');
 		expect(filesFor('docs', 'node')).not.toContain('pages/index.tsrx');
 		expect(filesFor('minimal', 'deno')).toContain('deno.json');
-		expect(NOTES).toEqual({
-			'pages/index.tsrx': 'your first page, served at /: a button that counts',
-			'pages/index.mdx': 'your first page, served at /, written in Markdown',
-			'document.tsrx': 'the HTML shell every page renders inside',
-			'pages/404.tsrx': 'shown when no page matches the address',
-			'pages/500.tsrx': 'shown when a page fails with an error',
-			'api/health.ts': 'an endpoint at /api/health that answers ok',
-			'middleware/request.ts': 'runs on every request and adds a response header',
-			'pages/docs/index.mdx': 'the docs home, served at /docs',
-			'pages/docs/[...slug].mdx': 'every other /docs/ page, inside the docs layout',
-			'components/layouts/DocsLayout.tsrx': 'the docs layout: a sidebar beside the page',
-			'components/docs/Sidebar.tsrx': 'the docs sidebar and its links',
-			'package.json': "the app's scripts (dev, build, doctor...) and packages",
-			'deno.json': "the app's Deno tasks (dev, build...) and npm imports",
-			'vite.config.ts': 'turns on Markless and the router for dev and build',
-			'tsconfig.json': 'TypeScript settings that teach your editor .tsrx',
-			'README.md': 'how to start the app and set up your editor',
-			'.gitignore': 'keeps node_modules, build output and logs out of git',
-			'scripts/markless-doctor.mjs': 'checks your setup and hints at each fix',
-			'public/.gitkeep': 'keeps public/, where files served as-is go',
-			'.vscode/extensions.json': 'suggests the TSRX extension to VS Code',
-			'.vscode/settings.json': 'turns on Emmet in .tsrx files in VS Code',
-			'.zed/settings.json': 'sets Zed up to read .tsrx with the Markless plugin',
-		});
+		for (const note of Object.values(NOTES)) expect(noteLines(note).length, note).toBeLessThanOrEqual(NOTE_LINES);
 	});
 
 	it('pins each note to what its template really holds', () => {

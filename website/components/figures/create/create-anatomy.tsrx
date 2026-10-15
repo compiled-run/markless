@@ -1,6 +1,6 @@
 // A terminal drawn on a sheet on the desk: type the create command, answer the real prompts, and the starter's files drop into the folder below as paper sheets that say what they are for.
 import { computed, state } from '@markless/core';
-import { choose, COMMAND, cursorRow, describe, flip, focusRow, ghostFor, labelOf, landed, MAX_NAME, MAX_TYPED, move, noteAt, type Run, screen, slipAt, START, submit, tabOf, typing, widthOf } from './model.ts';
+import { choose, COMMAND, cursorRow, describe, flip, focusRow, ghostFor, labelOf, landed, MAX_NAME, MAX_TYPED, move, frontAt, type Run, screen, slipAt, START, submit, tabOf, typing, widthOf } from './model.ts';
 import { art } from './create.art.ts';
 import { recall, remember } from './history.ts';
 
@@ -24,7 +24,8 @@ export default function CreateAnatomy() @{
 	const tab = computed(() => tabOf(run));
 	const label = computed(() => labelOf(run));
 	const mode = computed(() => typing(run));
-	const shown = computed(() => noteAt(run, peek));
+	const front = computed(() => frontAt(run, peek));
+	const pulled = computed(() => art.slips[front.slot]!.pulled);
 	const s0 = computed(() => slipAt(run, 0, peek));
 	const s1 = computed(() => slipAt(run, 1, peek));
 	const s2 = computed(() => slipAt(run, 2, peek));
@@ -357,10 +358,17 @@ export default function CreateAnatomy() @{
 					<text class="file" transform={art.slips[15]!.nameMatrix}><tspan class="dir">{s15.dir}</tspan>{s15.name}</text>
 				</g>
 
-				<text class="peek" data-on={shown.path === '' ? 'no' : 'yes'} aria-hidden="true">
-					<tspan class="peek-path" x={art.peek.x} y={art.peek.y}>{shown.path}</tspan>
-					<tspan x={art.peek.x} y={art.peek.y2}>{shown.note}</tspan>
-				</text>
+				<g class="front" data-on={front.on} aria-hidden="true">
+					<path class="shadow-wash" d={pulled.cast} />
+					<path class="sheet-paper" d={pulled.paper} />
+					<path class="wash pink" d={pulled.wash} />
+					<path class="sheet-hatch light" d={pulled.fold} />
+					<path class="sheet-ink" d={pulled.ink} />
+					<text class="file" transform={pulled.nameMatrix}><tspan class="dir">{front.dir}</tspan>{front.name}</text>
+					<text class="front-note" transform={pulled.noteMatrices[0]}>{front.lines[0]}</text>
+					<text class="front-note" transform={pulled.noteMatrices[1]}>{front.lines[1]}</text>
+					<text class="front-note" transform={pulled.noteMatrices[2]}>{front.lines[2]}</text>
+				</g>
 				<g class="note" aria-hidden="true">
 					<path class="halo" d={art.note.arrow} />
 					<path class="ink" d={art.note.arrow} />
@@ -481,19 +489,19 @@ export default function CreateAnatomy() @{
 				stroke-width: 2;
 			}
 
-			.peek {
-				font-size: 13px;
-				fill: var(--ink);
+			.front {
+				pointer-events: none;
+				transform: translate(-1px, -3px);
 			}
 
-			.peek[data-on='no'] {
+			.front[data-on='no'] {
 				visibility: hidden;
 			}
 
-			.peek-path {
-				font-family: var(--font-mono);
-				font-weight: 700;
-				font-size: 12px;
+			.front-note {
+				font-family: 'Joy Elia', system-ui, sans-serif;
+				font-size: 10px;
+				fill: var(--sheet-ink);
 			}
 
 			.cursor,

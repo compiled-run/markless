@@ -105,31 +105,44 @@ export function slipAt(run: Run, slot: number, peek = -1) {
 }
 export const isFirstPage = (path: string) => path === 'pages/index.tsrx' || path === 'pages/index.mdx';
 
-/** One plain line per file, read from the template the CLI copies (packages/cli/templates). */
+/** What each file is for, in words for someone who has never seen it; written on the sheet when it is pulled out. */
 export const NOTES: Record<string, string> = {
-	'pages/index.tsrx': 'your first page, served at /: a button that counts',
-	'pages/index.mdx': 'your first page, served at /, written in Markdown',
-	'document.tsrx': 'the HTML shell every page renders inside',
-	'pages/404.tsrx': 'shown when no page matches the address',
-	'pages/500.tsrx': 'shown when a page fails with an error',
-	'api/health.ts': 'an endpoint at /api/health that answers ok',
-	'middleware/request.ts': 'runs on every request and adds a response header',
-	'pages/docs/index.mdx': 'the docs home, served at /docs',
-	'pages/docs/[...slug].mdx': 'every other /docs/ page, inside the docs layout',
-	'components/layouts/DocsLayout.tsrx': 'the docs layout: a sidebar beside the page',
-	'components/docs/Sidebar.tsrx': 'the docs sidebar and its links',
-	'package.json': 'the app\'s scripts (dev, build, doctor...) and packages',
-	'deno.json': 'the app\'s Deno tasks (dev, build...) and npm imports',
-	'vite.config.ts': 'turns on Markless and the router for dev and build',
-	'tsconfig.json': 'TypeScript settings that teach your editor .tsrx',
-	'README.md': 'how to start the app and set up your editor',
-	'.gitignore': 'keeps node_modules, build output and logs out of git',
-	'scripts/markless-doctor.mjs': 'checks your setup and hints at each fix',
-	'public/.gitkeep': 'keeps public/, where files served as-is go',
-	'.vscode/extensions.json': 'suggests the TSRX extension to VS Code',
-	'.vscode/settings.json': 'turns on Emmet in .tsrx files in VS Code',
-	'.zed/settings.json': 'sets Zed up to read .tsrx with the Markless plugin',
+	'pages/index.tsrx': 'Your home page, at /. Edit it and the browser shows the change.',
+	'pages/index.mdx': 'Your home page, at /, in Markdown. Edit it and the browser shows it.',
+	'document.tsrx': 'The HTML around every page: the head, the title, and the body.',
+	'pages/404.tsrx': 'The page people see when an address has no page.',
+	'pages/500.tsrx': 'The page people see when a page breaks with an error.',
+	'api/health.ts': 'A server endpoint at /api/health. It answers with data, not a page.',
+	'middleware/request.ts': 'Code that runs on the server before every request.',
+	'pages/docs/index.mdx': 'The docs home page, at /docs.',
+	'pages/docs/[...slug].mdx': 'Every other page under /docs, wrapped in the docs layout.',
+	'components/layouts/DocsLayout.tsrx': 'The frame around each docs page: the sidebar beside the text.',
+	'components/docs/Sidebar.tsrx': 'The list of links down the side of the docs.',
+	'package.json': 'Lists the packages your app uses and its commands, like npm run dev.',
+	'deno.json': 'Lists the packages your app uses and its tasks, like deno task dev.',
+	'vite.config.ts': 'Sets up Vite, which serves and builds your app. Markless plugs in here.',
+	'tsconfig.json': 'Tells your editor how to read .tsrx files, for autocomplete and errors.',
+	'README.md': 'How to start the app and set up your editor.',
+	'.gitignore': 'Tells git which files not to save, like node_modules and build output.',
+	'scripts/markless-doctor.mjs': 'Run npm run doctor to check your setup and see how to fix problems.',
+	'public/.gitkeep': 'Files you put in public/, like images, are served as they are.',
+	'.vscode/extensions.json': 'Suggests the extension VS Code needs to read .tsrx files.',
+	'.vscode/settings.json': 'Turns on HTML shortcuts (Emmet) for .tsrx files in VS Code.',
+	'.zed/settings.json': 'Tells Zed how to read .tsrx files, for autocomplete and errors.',
 };
+
+/** Characters per line of a note written on a sheet, and how many lines a sheet has room for. */
+export const NOTE_WIDTH = 28;
+export const NOTE_LINES = 3;
+export function noteLines(text: string): string[] {
+	const lines: string[] = [];
+	for (const word of text.split(' ')) {
+		const last = lines.at(-1);
+		if (last !== undefined && last.length + 1 + word.length <= NOTE_WIDTH) lines[lines.length - 1] = `${last} ${word}`;
+		else lines.push(word);
+	}
+	return lines;
+}
 
 /** The run: before the command runs it is idle at the shell prompt; then which prompt is open, where the cursor sits, what was chosen, the name typed, and any mistyped commands. */
 export interface Run {
@@ -294,10 +307,12 @@ export const flip = (beat: string) => (beat === 'odd' ? 'even' : 'odd');
 /** The folder's tab: the app's name, shortened to fit. */
 export const tabOf = (run: Run) => (run.name.length > 15 ? run.name.slice(0, 14) + '…' : run.name) + '/';
 
-/** What the slot's sheet is, for a reader who hovers, taps or focuses it. */
-export function noteAt(run: Run, slot: number) {
+/** The sheet pulled to the front of the pile while it is hovered, tapped or focused: which slot, its name and its note written in lines. */
+export function frontAt(run: Run, slot: number) {
 	const path = layout(landed(run))[slot] ?? '';
-	return { path, note: NOTES[path] ?? '' };
+	const cut = path.lastIndexOf('/') + 1;
+	const lines = noteLines(NOTES[path] ?? '');
+	return { on: path === '' ? 'no' : 'yes', slot: path === '' ? 0 : slot, dir: path.slice(0, cut), name: path.slice(cut), lines: Array.from({ length: NOTE_LINES }, (_, k) => lines[k] ?? '') };
 }
 
 /** The terminal input's label: what the open line expects. */
