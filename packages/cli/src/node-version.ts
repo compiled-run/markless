@@ -7,8 +7,10 @@ export const SUPPORTED_NODE = [
 
 export const SUPPORTED_NODE_RANGE = '^20.19.0 || ^22.18.0 || >=24.11.0';
 
-/** Why this Node.js cannot run a new app, or null when it can. */
-export function unsupportedNode(version: string): string | null {
+/** Why this Node.js cannot run a new app, or null when it can. Bun and Deno report a Node.js version but run the app themselves. */
+export function unsupportedNode(versions: { node: string; bun?: string; deno?: string }): string | null {
+	if (versions.bun || versions.deno) return null;
+	const version = versions.node;
 	const [major = 0, minor = 0] = version.replace(/^v/, '').split('.').map(Number);
 	const fits = SUPPORTED_NODE.some((line) =>
 		'orNewer' in line

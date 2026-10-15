@@ -3,7 +3,7 @@ import { CreateProgram } from './index.ts';
 import { createNodeRuntime } from './node-runtime.ts';
 import { unsupportedNode } from './node-version.ts';
 
-const unsupported = unsupportedNode(process.versions.node);
+const unsupported = unsupportedNode(process.versions);
 if (unsupported) {
 	process.stderr.write(`${unsupported}\n`);
 	process.exitCode = 1;

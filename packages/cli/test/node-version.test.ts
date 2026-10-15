@@ -7,17 +7,22 @@ const require = createRequire(import.meta.url);
 
 test('accepts exactly the Node.js versions the starter build tools accept', () => {
 	for (const version of ['20.19.0', '20.20.1', '22.18.0', '22.19.3', '24.11.0', '25.0.0', 'v26.1.0']) {
-		expect(unsupportedNode(version), version).toBeNull();
+		expect(unsupportedNode({ node: version }), version).toBeNull();
 	}
 	for (const version of ['18.20.4', '20.18.9', '21.7.3', '22.17.9', '23.11.0', '24.10.9']) {
-		expect(unsupportedNode(version), version).toContain(`this is v${version}`);
+		expect(unsupportedNode({ node: version }), version).toContain(`this is v${version}`);
 	}
 });
 
 test('names the versions to install and where', () => {
-	expect(unsupportedNode('18.17.0')).toBe(
+	expect(unsupportedNode({ node: '18.17.0' })).toBe(
 		'Markless needs Node.js 20.19+, 22.18+ or 24.11+, and this is v18.17.0. Install the latest LTS from https://nodejs.org, then run this again.',
 	);
+});
+
+test('lets Bun and Deno through whatever Node.js version they report', () => {
+	expect(unsupportedNode({ node: '24.3.0', bun: '1.3.14' })).toBeNull();
+	expect(unsupportedNode({ node: '20.11.1', deno: '2.8.3' })).toBeNull();
 });
 
 test('matches vite-plus engines and the package engines', () => {
