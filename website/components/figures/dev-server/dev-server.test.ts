@@ -1,7 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { COMMAND, describe as say, DONE, enter, ghostFor, HEADING, interrupt, LABEL, OUTPUT, PAGE_FILE, press, print, screen, SLOTS, START, TARGET, URL_LINE, washFor } from './model.ts';
+import { MANAGERS, scriptCommand } from '../../docs/walkthrough/facts.ts';
+import { describe as say, DONE, enter, FOOTER, ghostFor, HEADING, interrupt, LABEL, OUTPUT, PAGE_FILE, press, print, screen, showsFooter, SLOTS, START, TARGET, URL_LINE, washFor } from './model.ts';
 import { drawing } from './dev-server.ts';
+
+const COMMAND = scriptCommand('npm', 'dev');
+const ids = MANAGERS.map((m) => m.id);
 
 const scene = drawing();
 const starter = readFileSync(new URL('../../../../packages/cli/templates/starters/minimal/pages/index.tsrx', import.meta.url), 'utf8');
@@ -22,22 +26,75 @@ describe('the dev server figure shows the real starter', () => {
 		expect(COMMAND).toBe('npm run dev');
 		expect(DONE.text).toBe('cd my-markless-app');
 		expect(OUTPUT.map((r) => r.text)).toEqual(['', 'VITE+ v0.3.1', '', `Local:   ${URL_LINE}`, 'Network: use --host to expose']);
-		const blank = { mark: '', text: '', kind: 'blank', caret: '', after: '', ghost: '' };
-		expect(screen(START)).toEqual([DONE, { mark: '$', text: '', kind: 'prompt', caret: '|', after: '', ghost: COMMAND }, { ...blank, text: '↵ Press Enter to run it', kind: 'start' }, ...Array(SLOTS - 3).fill(blank)]);
+		const blank = { mark: '', text: '', kind: 'blank', caret: '', after: '', ghost: '', invalid: 'no', wait0: '', wait1: '', wait2: '', wait3: '', wait4: '' };
+		const waits = Object.fromEntries(ids.map((id, k) => [`wait${k}`, scriptCommand(id, 'dev')]));
+		expect(screen(START)).toEqual([DONE, { ...blank, mark: '$', kind: 'prompt', caret: '|', ...waits }, { ...blank, text: '↵ Press Enter to run it', kind: 'start' }, ...Array(SLOTS - 4).fill(blank), FOOTER]);
 		expect(screen(START, 'npm r')[1]).toMatchObject({ text: 'npm r', caret: '|', after: '', ghost: 'un dev' });
 		expect(screen(START, 'npm r', 2)[1]).toMatchObject({ text: 'np', after: 'm r', ghost: '' });
 		expect(screen(START, 'ls')[1]!.ghost).toBe('');
-		expect([ghostFor(''), ghostFor('npm '), ghostFor('yarn')]).toEqual([COMMAND, 'run dev', '']);
+		expect([ghostFor(''), ghostFor('npm '), ghostFor('yarn')]).toEqual([COMMAND, 'run dev', ' run dev']);
 	});
 
-	it('runs only on Enter with npm run dev, typed or taken from the ghost', () => {
-		expect(enter(START, '')).toEqual({ ...START, phase: 'starting', shown: 0 });
+	it("runs on Enter with any package manager's dev command, typed or taken from the ghost", () => {
+		expect(enter(START, '')).toEqual({ ...START, phase: 'starting', shown: 0, command: COMMAND, manager: 'npm' });
 		expect(enter(START, '  npm   run dev ')).toEqual(enter(START, ''));
+		for (const id of ids) {
+			expect(enter(START, scriptCommand(id, 'dev'))).toMatchObject({ phase: 'starting', manager: id, command: scriptCommand(id, 'dev') });
+			expect(enter(START, '', id)).toMatchObject({ phase: 'starting', manager: id, command: scriptCommand(id, 'dev') });
+		}
+		expect(scriptCommand('deno', 'dev')).toBe('deno task dev');
+		expect(enter(START, 'deno run dev')).toMatchObject({ phase: 'starting', manager: 'deno' });
 		const miss = enter(START, 'npm start');
 		expect(miss.phase).toBe('off');
 		expect(miss.history.slice(1).map((r) => r.text)).toEqual(['npm start', 'Try npm run dev']);
+		expect(enter(START, 'bun dev', 'bun').history.slice(1).map((r) => r.text)).toEqual(['bun dev', 'Try bun run dev']);
 		expect(screen(miss)[3]!.kind).toBe('prompt');
 		expect(enter(enter(START, ''), 'ls')).toEqual(enter(START, ''));
+		let stopped = enter(START, 'pnpm run dev');
+		while (stopped.phase === 'starting') stopped = print(stopped);
+		expect(interrupt(stopped, '').history.map((r) => r.text)).toContain('pnpm run dev');
+		expect(screen(enter(START, 'yarn run dev'))[1]).toMatchObject({ kind: 'cmd', text: 'yarn run dev' });
+	});
+
+	it("completes whichever manager's dev command the text starts, the saved one first", () => {
+		expect(ghostFor('', 'bun')).toBe('bun run dev');
+		expect(ghostFor('', 'deno')).toBe('deno task dev');
+		expect(ghostFor('p')).toBe('npm run dev');
+		expect(ghostFor('b')).toBe('un run dev');
+		expect(ghostFor('d')).toBe('eno task dev');
+		expect(ghostFor('y', 'pnpm')).toBe('arn run dev');
+		expect(ghostFor('n', 'bun')).toBe('pm run dev');
+		expect(screen(START, 'pn', 2)[1]!.ghost).toBe('pm run dev');
+	});
+
+	it('keeps the bottom row for the footer while the prompt is empty, and leaves its names and the empty-line ghost to the saved manager on the page', () => {
+		const rows = screen(START, '', 0);
+		expect(rows.slice(0, 3).map((r) => r.kind)).toEqual(['cmd', 'prompt', 'start']);
+		expect(rows).toHaveLength(SLOTS);
+		expect(rows.at(-1)).toEqual(FOOTER);
+		expect(rows[1]!.ghost).toBe('');
+		expect(screen(START, 'p', 1).some((r) => r.kind === 'footer')).toBe(false);
+		expect(showsFooter(enter(START, ''), '')).toBe(false);
+		let crowded = START;
+		for (const miss of ['a', 'b', 'c', 'd']) crowded = enter(crowded, miss);
+		const scrolled = screen(crowded);
+		expect(scrolled.at(-2)!.kind).toBe('prompt');
+		expect(scrolled.at(-1)!.kind).toBe('footer');
+		ids.forEach((id, k) => expect(piece).toContain(`data-pm="${id}">{slot.wait${k}}</tspan>`));
+		for (const id of ids) expect(piece).toContain(`html[data-package-manager='${id}'] :is(.wait-ghost, .others)[data-pm='${id}']`);
+		expect(piece).toContain("scriptCommand(managerOf(pick), 'dev')");
+		expect(piece.match(/^\s+packageManager = /gm)).toHaveLength(1);
+		expect(piece).toMatch(/\.desk \{[^}]*user-select: none;/);
+	});
+
+	it('marks a line red once no dev command starts with it, and keeps a wrong command red above its hint', () => {
+		expect(screen(START, 'npm r')[1]!.invalid).toBe('no');
+		expect(screen(START, 'deno t')[1]!.invalid).toBe('no');
+		expect(screen(START, 'npm s')[1]).toMatchObject({ invalid: 'yes', ghost: '' });
+		const miss = enter(START, 'npm start');
+		expect(miss.history.slice(1).map((r) => r.invalid)).toEqual(['yes', 'no']);
+		expect(interrupt(START, 'npm s').history.at(-1)!.invalid).toBe('no');
+		expect(piece).toContain('data-invalid={slot.invalid}');
 	});
 
 	it('prints one line per tick, scrolls the sheet, and serves the page after the last', () => {
@@ -47,7 +104,7 @@ describe('the dev server figure shows the real starter', () => {
 			desk = print(desk);
 			seen.push(say(desk));
 		}
-		expect(desk).toEqual({ ...START, phase: 'on', shown: OUTPUT.length });
+		expect(desk).toEqual({ ...START, phase: 'on', shown: OUTPUT.length, command: COMMAND });
 		expect(seen.slice(0, -1)).toEqual([COMMAND, 'VITE+ v0.3.1', 'VITE+ v0.3.1', `Local:   ${URL_LINE}`]);
 		expect(screen(desk).map((r) => r.text)).toEqual(['cd my-markless-app', COMMAND, ...OUTPUT.map((r) => r.text)]);
 		let late = enter(enter(START, 'x'), '');
@@ -55,6 +112,7 @@ describe('the dev server figure shows the real starter', () => {
 		const scrolled = screen(late);
 		expect(scrolled).toHaveLength(SLOTS);
 		expect(scrolled.map((r) => r.text).slice(0, 2)).toEqual(['Try npm run dev', COMMAND]);
+		expect(scrolled[1]!.invalid).toBe('no');
 		expect(scrolled.at(-1)!.text).toBe('Network: use --host to expose');
 	});
 
@@ -78,7 +136,8 @@ describe('the dev server figure shows the real starter', () => {
 	it('pins the markup: a labelled prompt input, one real button, one live region, one margin note, no tour, keyboard and reduced motion', () => {
 		expect(piece.match(/<button/g)).toHaveLength(1);
 		expect(piece.match(/<input/g)).toHaveLength(1);
-		expect(piece).toMatch(/aria-label=\{'Terminal in '/);
+		expect(piece).toContain("const label = 'Terminal in ' + TARGET");
+		expect(piece).toContain('aria-label={label}');
 		expect(piece).toContain('<tspan class="ghost">');
 		expect(piece.match(/aria-live="polite"/g)).toHaveLength(1);
 		expect(piece.match(/class="hand"/g)).toHaveLength(1);

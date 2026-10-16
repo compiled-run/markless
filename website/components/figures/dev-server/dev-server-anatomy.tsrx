@@ -1,11 +1,14 @@
-// The create figure's terminal sheet, where the reader types npm run dev; the browser sheet below it then shows the starter page, whose drawn Count button really counts.
-import { computed, state } from '@markless/core';
-import { COMMAND, describe, type Desk, enter, ghostFor, HEADING, HOST, interrupt, LABEL, MAX_TYPED, PAGE_FILE, press, print, screen, START, TARGET, tidy, washFor } from './model.ts';
+// The create figure's terminal sheet, where the reader types any package manager's dev command; the browser sheet below it then shows the starter page, whose drawn Count button really counts.
+import { computed, state, storage } from '@markless/core';
+import { scriptCommand } from '../../docs/walkthrough/facts.ts';
+import { FOOTERS, managerOf, savedOnPage } from '../create/managers.ts';
+import { describe, type Desk, enter, ghostFor, HEADING, HOST, interrupt, LABEL, MAX_TYPED, PAGE_FILE, press, print, screen, showsFooter, START, TARGET, tidy, washFor } from './model.ts';
 import { every, fieldIn, halt } from './play.ts';
 import { art } from './dev-server.art.ts';
 import { recall, remember } from '../create/history.ts';
 
 const PRINT_MS = 260;
+const FOOT = art.terminal.rows.at(-1)!.matrix;
 
 export default function DevServer() @{
 	let desk = state(START as Desk);
@@ -15,6 +18,9 @@ export default function DevServer() @{
 	let ran = state([] as string[]);
 	let back = state(0);
 	let tick = state('a');
+	let packageManager = storage('package-manager', 'npm');
+	const suggesting = computed(() => (showsFooter(desk, typed) ? 'yes' : 'no'));
+	const label = 'Terminal in ' + TARGET + '. Type the dev command of npm, pnpm, yarn, Bun or Deno and press Enter; Enter on an empty line runs the suggested one.';
 	const pick = computed(() => washFor(desk.count));
 	const lines = computed(() => {
 		const rows = screen(desk, typed, at);
@@ -38,7 +44,27 @@ export default function DevServer() @{
 		}}
 	>
 		<div class="desk">
-			<svg class="scene" data-phase={desk.phase} data-tick={tick} viewBox={'0 0 ' + art.width + ' ' + art.height} aria-hidden="true">
+			<svg
+				class="scene"
+				data-phase={desk.phase}
+				data-tick={tick}
+				data-suggesting={suggesting}
+				viewBox={'0 0 ' + art.width + ' ' + art.height}
+				aria-hidden="true"
+				onClick={(event) => {
+					if (suggesting !== 'yes') return;
+					const input = fieldIn(event.target as Element);
+					if (!input) return;
+					const pick = (event.target as Element).closest("[data-pick]:not([data-pick=''])")?.getAttribute('data-pick');
+					if (pick) {
+						const fill = scriptCommand(managerOf(pick), 'dev');
+						input.value = fill;
+						typed = fill;
+						at = fill.length;
+					}
+					input.focus();
+				}}
+			>
 				<path class="pencil" d={art.terminal.pencil} />
 				<path class="pencil" d={art.browser.pencil} />
 
@@ -50,14 +76,30 @@ export default function DevServer() @{
 				<path class="sheet-hatch light" d={art.terminal.bar.tone} />
 				<path class="sheet-ink" d={art.terminal.bar.ink} />
 				@for (const slot of lines; key slot.key) {
-					<text class="term" data-kind={slot.kind} transform={slot.matrix}>
+					<text class="term" data-kind={slot.kind} data-invalid={slot.invalid} transform={slot.matrix}>
 						<tspan class="mark">{slot.mark}</tspan>
 						<tspan class="line" x="26">{slot.text}</tspan>
 						<tspan class="caret">{slot.caret}</tspan>
 						<tspan class="line">{slot.after}</tspan>
 						<tspan class="ghost">{slot.ghost}</tspan>
+						<tspan class="ghost wait-ghost" data-pm="npm">{slot.wait0}</tspan>
+						<tspan class="ghost wait-ghost" data-pm="pnpm">{slot.wait1}</tspan>
+						<tspan class="ghost wait-ghost" data-pm="yarn">{slot.wait2}</tspan>
+						<tspan class="ghost wait-ghost" data-pm="bun">{slot.wait3}</tspan>
+						<tspan class="ghost wait-ghost" data-pm="deno">{slot.wait4}</tspan>
 					</text>
 				}
+				<text class="term footer" transform={FOOT}>
+					<tspan class="also" x="26">also: </tspan>
+					@for (const footer of FOOTERS; key footer.saved) {
+						<tspan class="others" data-pm={footer.saved}>
+							@for (const other of footer.others; key other.id) {
+								<tspan class="gap">{other.gap}</tspan>
+								<tspan class="pick" data-pick={other.id}>{other.id}</tspan>
+							}
+						</tspan>
+					}
+				</text>
 				<path class="sheet-ink" d={art.terminal.curl.ink} />
 				<path class="sheet-ink" d={art.terminal.ink} />
 
@@ -109,7 +151,7 @@ export default function DevServer() @{
 				<input
 					class="line-in"
 					type="text"
-					aria-label={'Terminal in ' + TARGET + '. Type ' + COMMAND + ' and press Enter.'}
+					aria-label={label}
 					readonly={desk.phase !== 'off'}
 					maxlength={MAX_TYPED}
 					autocomplete="off"
@@ -141,8 +183,8 @@ export default function DevServer() @{
 							at = step.line.length;
 							return;
 						}
-						if (event.key === 'ArrowRight' && desk.phase === 'off' && input.selectionStart === input.value.length && ghostFor(input.value) !== '') {
-							input.value = input.value + ghostFor(input.value);
+						if (event.key === 'ArrowRight' && desk.phase === 'off' && input.selectionStart === input.value.length && ghostFor(input.value, managerOf(savedOnPage(packageManager))) !== '') {
+							input.value = input.value + ghostFor(input.value, managerOf(savedOnPage(packageManager)));
 							typed = input.value;
 							at = input.value.length;
 							return;
@@ -157,9 +199,10 @@ export default function DevServer() @{
 							return;
 						}
 						if (event.key !== 'Enter') return;
-						const after = enter(desk, input.value);
+						const saved = managerOf(savedOnPage(packageManager));
+						const after = enter(desk, input.value, saved);
 						if (after === desk) return;
-						ran = remember(ran, tidy(input.value) || COMMAND);
+						ran = remember(ran, tidy(input.value) || scriptCommand(saved, 'dev'));
 						back = 0;
 						input.value = '';
 						typed = '';
@@ -169,6 +212,7 @@ export default function DevServer() @{
 							said = describe(after);
 							return;
 						}
+						packageManager = after.manager;
 						if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
 							let done = after;
 							while (done.phase === 'starting') done = print(done);
@@ -177,7 +221,7 @@ export default function DevServer() @{
 							return;
 						}
 						desk = after;
-						said = COMMAND;
+						said = after.command;
 						every(input, PRINT_MS, () => {
 							desk = print(desk);
 							said = describe(desk);
@@ -200,8 +244,9 @@ export default function DevServer() @{
 		</div>
 		<figcaption class="sr">
 			A pen-and-ink drawing of a desk. A sheet of paper drawn as a terminal shows cd {TARGET} already run, and a prompt waiting for
-			you to type {COMMAND}. Below it lies a browser window at {HOST}, still blank. Type {COMMAND} and press Enter, or press Enter on
-			the empty prompt to take the suggestion: the dev server prints its Local address, and the browser shows the starter page from
+			you to run the dev script with npm, pnpm, yarn, Bun or Deno, the other managers named at the foot of the sheet.
+			Below it lies a browser window at {HOST}, still blank. Type one and press Enter, or press Enter on the empty prompt to take the
+			suggestion: the dev server prints its Local address, and the browser shows the starter page from
 			{PAGE_FILE}, a {HEADING} heading and a {LABEL} button. Press that button to count, as the real page does. Escape starts over.
 		</figcaption>
 		<p class="sr" aria-live="polite">{said}</p>
@@ -213,12 +258,16 @@ export default function DevServer() @{
 
 			.desk {
 				position: relative;
+				user-select: none;
+				-webkit-user-select: none;
 				--sheet: color-mix(in oklch, var(--paper) 50%, white);
 				--sheet-ink: var(--ink);
 				--shade: color-mix(in oklch, var(--ink) 24%, transparent);
 				--shade-ink: var(--ink);
+				--red: oklch(52% 0.19 27);
 
 				html.dark & {
+					--red: oklch(55% 0.2 27);
 					--sheet: color-mix(in oklch, var(--ink) 94%, var(--yellow));
 					--sheet-ink: var(--paper);
 					--shade: rgb(0 0 0 / 0.55);
@@ -229,6 +278,51 @@ export default function DevServer() @{
 			.term-hit {
 				position: absolute;
 				cursor: text;
+			}
+
+			.desk:has(.scene[data-suggesting='yes']) .term-hit {
+				pointer-events: none;
+			}
+
+			.scene[data-suggesting='yes'] {
+				cursor: text;
+			}
+
+			.term.footer {
+				font-size: 11px;
+				opacity: 0.45;
+				visibility: hidden;
+			}
+
+			.scene[data-suggesting='yes'] .footer {
+				visibility: visible;
+			}
+
+			.pick {
+				cursor: pointer;
+			}
+
+			.pick:hover {
+				opacity: 0.6;
+			}
+
+			.wait-ghost,
+			.others {
+				display: none;
+			}
+
+			/* One selector per manager in facts.ts MANAGERS, keyed off the attribute storage() writes. */
+			html:not([data-package-manager]) :is(.wait-ghost, .others)[data-pm='npm'],
+			html[data-package-manager='npm'] :is(.wait-ghost, .others)[data-pm='npm'],
+			html[data-package-manager='pnpm'] :is(.wait-ghost, .others)[data-pm='pnpm'],
+			html[data-package-manager='yarn'] :is(.wait-ghost, .others)[data-pm='yarn'],
+			html[data-package-manager='bun'] :is(.wait-ghost, .others)[data-pm='bun'],
+			html[data-package-manager='deno'] :is(.wait-ghost, .others)[data-pm='deno'] {
+				display: inline;
+			}
+
+			.term[data-invalid='yes'] .line {
+				fill: var(--red);
 			}
 
 			.line-in {
@@ -498,6 +592,10 @@ export default function DevServer() @{
 			@container anatomy (max-width: 520px) {
 				.term {
 					font-size: 17px;
+				}
+
+				.term.footer {
+					font-size: 14px;
 				}
 
 				.url {

@@ -108,8 +108,8 @@ describe('the package-manager commands', () => {
 	});
 
 	it('puts every manager command on the page through the components', () => {
-		expect(page).toContain('<ManagerCommand kind="create" />');
-		for (const kind of ['dev', 'ship']) expect(page).toContain(`<Commands kind="${kind}" />`);
+		expect(page).not.toContain('<ManagerCommand');
+		for (const kind of ['create', 'dev', 'ship']) expect(page).toContain(`<Commands kind="${kind}" />`);
 		expect(page).not.toMatch(/^npm (create|run) /m);
 		const existing = readFileSync(new URL('../../../pages/start/existing-site.mdx', import.meta.url), 'utf8');
 		expect(existing).toContain('<ManagerCommand kind="install" />');

@@ -1,8 +1,12 @@
-// A terminal drawn on a sheet on the desk: type the create command, answer the real prompts, and the starter's files drop into the folder below as paper sheets that say what they are for.
-import { computed, state } from '@markless/core';
-import { choose, COMMAND, cursorRow, describe, flip, focusRow, interrupt, ghostFor, labelOf, landed, MAX_NAME, MAX_TYPED, move, frontAt, type Run, screen, slipAt, START, submit, tabOf, typing, widthOf } from './model.ts';
+// A terminal drawn on a sheet on the desk: type any package manager's create command, answer the real prompts, and the starter's files drop into the folder below as paper sheets that say what they are for.
+import { computed, state, storage } from '@markless/core';
+import { createCommand } from '../../docs/walkthrough/facts.ts';
+import { FOOTERS, managerOf, savedOnPage } from './managers.ts';
+import { choose, cursorRow, describe, flip, focusRow, interrupt, ghostFor, labelOf, landed, MAX_NAME, MAX_TYPED, move, frontAt, type Run, screen, showsFooter, slipAt, START, submit, tabOf, typing, widthOf } from './model.ts';
 import { art } from './create.art.ts';
 import { recall, remember } from './history.ts';
+
+const FOOT = art.rows.at(-1)!.matrix;
 
 export default function CreateAnatomy() @{
 	let run = state(START as Run);
@@ -14,6 +18,8 @@ export default function CreateAnatomy() @{
 	let ran = state([] as string[]);
 	let back = state(0);
 	let tick = state('a');
+	let packageManager = storage('package-manager', 'npm');
+	const suggesting = computed(() => (showsFooter(run, typed) ? 'yes' : 'no'));
 	const lines = computed(() => {
 		const rows = screen(run, typed, at);
 		const cursor = cursorRow(rows);
@@ -48,9 +54,19 @@ export default function CreateAnatomy() @{
 		<label
 			class="stage"
 			data-typing={mode}
+			data-suggesting={suggesting}
 			onClick={(event) => {
 				const target = event.target as Element;
 				const input = target.closest('.stage')!.querySelector('input')!;
+				const pick = target.closest("[data-pick]:not([data-pick=''])")?.getAttribute('data-pick');
+				if (pick) {
+					const fill = createCommand(managerOf(pick));
+					input.value = fill;
+					typed = fill;
+					at = fill.length;
+					input.focus();
+					return;
+				}
 				const sheet = target.closest('[data-on="yes"][data-slot]');
 				if (sheet) {
 					peek = Number(sheet.getAttribute('data-slot'));
@@ -110,16 +126,20 @@ export default function CreateAnatomy() @{
 						if (typing(run) !== 'none') return;
 						run = move(run, event.key === 'ArrowDown' ? 1 : -1);
 						said = describe(run, true);
-					} else if (event.key === 'ArrowRight' && input.selectionStart === input.value.length && ghostFor(run, input.value) !== '') {
-						input.value = (input.value + ghostFor(run, input.value)).slice(0, typing(run) === 'name' ? MAX_NAME : MAX_TYPED);
+					} else if (event.key === 'ArrowRight' && input.selectionStart === input.value.length && ghostFor(run, input.value, managerOf(savedOnPage(packageManager))) !== '') {
+						input.value = (input.value + ghostFor(run, input.value, managerOf(savedOnPage(packageManager)))).slice(0, typing(run) === 'name' ? MAX_NAME : MAX_TYPED);
 						typed = input.value;
 						at = input.value.length;
 					} else if (event.key === 'Enter') {
-						if (typing(run) === 'shell') ran = remember(ran, input.value.trim() || COMMAND);
+						const saved = managerOf(savedOnPage(packageManager));
+						if (typing(run) === 'shell') ran = remember(ran, input.value.trim() || createCommand(saved));
 						back = 0;
-						const after = submit(run, input.value);
+						const after = submit(run, input.value, saved);
 						if (after.outcome === 'created' && run.outcome === 'asking') beat = flip(beat);
-						else if (after.outcome === 'asking' && run.outcome !== 'asking') beat = 'rest';
+						else if (after.outcome === 'asking' && run.outcome !== 'asking') {
+							beat = 'rest';
+							packageManager = after.manager;
+						}
 						run = after;
 						said = describe(after);
 						input.value = '';
@@ -195,7 +215,7 @@ export default function CreateAnatomy() @{
 				<path class="sheet-hatch light" d={art.sheet.bar.tone} />
 				<path class="sheet-ink" d={art.sheet.bar.ink} />
 				@for (const slot of lines; key slot.key) {
-					<g class="row" data-option={slot.option} data-kind={slot.kind}>
+					<g class="row" data-option={slot.option} data-kind={slot.kind} data-invalid={slot.invalid}>
 						<g class="cursor" style={slot.fit} data-on={slot.on}>
 							<path class="wash pink" d={slot.wash} />
 							<path class="wash pink pool" d={slot.pool} />
@@ -207,6 +227,11 @@ export default function CreateAnatomy() @{
 							<tspan class="caret">{slot.caret}</tspan>
 							<tspan class="line">{slot.after}</tspan>
 							<tspan class="ghost">{slot.ghost}</tspan>
+							<tspan class="ghost wait-ghost" data-pm="npm">{slot.wait0}</tspan>
+							<tspan class="ghost wait-ghost" data-pm="pnpm">{slot.wait1}</tspan>
+							<tspan class="ghost wait-ghost" data-pm="yarn">{slot.wait2}</tspan>
+							<tspan class="ghost wait-ghost" data-pm="bun">{slot.wait3}</tspan>
+							<tspan class="ghost wait-ghost" data-pm="deno">{slot.wait4}</tspan>
 							<tspan class="value" x="104">{slot.value}</tspan>
 							<tspan class="hint" x="46">{slot.hint}</tspan>
 						</text>
@@ -216,6 +241,17 @@ export default function CreateAnatomy() @{
 						</g>
 					</g>
 				}
+				<text class="term footer" transform={FOOT}>
+					<tspan class="also" x="30">also: </tspan>
+					@for (const footer of FOOTERS; key footer.saved) {
+						<tspan class="others" data-pm={footer.saved}>
+							@for (const other of footer.others; key other.id) {
+								<tspan class="gap">{other.gap}</tspan>
+								<tspan class="pick" data-pick={other.id}>{other.id}</tspan>
+							}
+						</tspan>
+					}
+				</text>
 				<path class="sheet-ink" d={art.sheet.curl.ink} />
 				<path class="sheet-ink" d={art.sheet.ink} />
 
@@ -392,8 +428,10 @@ export default function CreateAnatomy() @{
 			</svg>
 		</label>
 		<figcaption class="sr">
-			A pen-and-ink drawing of a desk. A sheet of paper drawn as a terminal waits at a shell prompt: type npm create markless@latest and
-			press Enter, or press Enter on the empty line to take the suggestion. It then asks the real questions one at a time: what you are
+			A pen-and-ink drawing of a desk. A sheet of paper drawn as a terminal waits at a shell prompt that takes the create command of
+			npm, pnpm, yarn, Bun or Deno, the other managers named at the foot of the sheet: type one and press Enter, or press Enter on the
+			empty line to take the suggestion.
+			The commands on this page then follow the package manager you ran. It then asks the real questions one at a time: what you are
 			building, the app's name, where it runs, whether to install dependencies and initialize git, and whether to create the app. Arrow keys
 			move, Enter picks, typing names the app, Escape starts over. Below lies a closed folder labelled with the app's name. On Create app it
 			opens and every file the chosen starter writes drops into it as a sheet of paper; the first page's name is washed yellow. Hover, tap
@@ -410,6 +448,8 @@ export default function CreateAnatomy() @{
 				display: block;
 				position: relative;
 				cursor: text;
+				user-select: none;
+				-webkit-user-select: none;
 			}
 
 			.line-in {
@@ -422,11 +462,44 @@ export default function CreateAnatomy() @{
 				border: 0;
 				font-size: 16px;
 				opacity: 0;
-				cursor: text;
+				pointer-events: none;
 			}
 
-			.stage[data-typing='none'] .line-in {
-				pointer-events: none;
+			.term.footer {
+				font-size: 11px;
+				opacity: 0.45;
+				visibility: hidden;
+			}
+
+			.stage[data-suggesting='yes'] .footer {
+				visibility: visible;
+			}
+
+			.pick {
+				cursor: pointer;
+			}
+
+			.pick:hover {
+				opacity: 0.6;
+			}
+
+			.wait-ghost,
+			.others {
+				display: none;
+			}
+
+			/* One selector per manager in facts.ts MANAGERS, keyed off the attribute storage() writes. */
+			html:not([data-package-manager]) :is(.wait-ghost, .others)[data-pm='npm'],
+			html[data-package-manager='npm'] :is(.wait-ghost, .others)[data-pm='npm'],
+			html[data-package-manager='pnpm'] :is(.wait-ghost, .others)[data-pm='pnpm'],
+			html[data-package-manager='yarn'] :is(.wait-ghost, .others)[data-pm='yarn'],
+			html[data-package-manager='bun'] :is(.wait-ghost, .others)[data-pm='bun'],
+			html[data-package-manager='deno'] :is(.wait-ghost, .others)[data-pm='deno'] {
+				display: inline;
+			}
+
+			.row[data-invalid='yes'] .line {
+				fill: var(--red);
 			}
 
 			.row[data-option]:not([data-option='-1']) {
@@ -543,8 +616,10 @@ export default function CreateAnatomy() @{
 				--kraft: color-mix(in oklch, var(--paper) 72%, oklch(74% 0.07 72));
 				--shade: color-mix(in oklch, var(--ink) 24%, transparent);
 				--shade-ink: var(--ink);
+				--red: oklch(52% 0.19 27);
 
 				html.dark & {
+					--red: oklch(55% 0.2 27);
 					--sheet: color-mix(in oklch, var(--ink) 94%, var(--yellow));
 					--sheet-ink: var(--paper);
 					--kraft: color-mix(in oklch, var(--paper) 74%, oklch(48% 0.06 72));
@@ -849,6 +924,10 @@ export default function CreateAnatomy() @{
 
 				.hint {
 					font-size: 11px;
+				}
+
+				.term.footer {
+					font-size: 14px;
 				}
 
 				.row[data-kind='start'] .hint {

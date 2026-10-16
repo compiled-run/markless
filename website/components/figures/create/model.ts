@@ -1,6 +1,10 @@
 // The create-markless run as the figure plays it: the real prompts, options and defaults from packages/cli/src/index.ts, and the files each starter writes.
+import { createCommand, type ManagerId } from '../../docs/walkthrough/facts.ts';
+import { completion, isInvalid, NO_WAIT, ranWith, waitsOf } from './managers.ts';
+
 export type Starter = 'minimal' | 'app' | 'docs' | 'full-stack';
 export type Format = 'node' | 'deno' | 'bun';
+export type Editor = 'vscode' | 'zed' | 'none';
 
 export interface Option {
 	readonly value: string;
@@ -8,10 +12,10 @@ export interface Option {
 	readonly hint: string;
 }
 
-export const COMMAND = 'npm create markless@latest';
+/** The commands that start create-markless with each manager; npm also takes it without @latest. */
+export const createCommands = (manager: ManagerId): readonly string[] => (manager === 'npm' ? [createCommand(manager), createCommand(manager).replace('@latest', '')] : [createCommand(manager)]);
 export const INTRO = 'Welcome to Markless';
 export const TARGET = 'my-markless-app';
-export const MANAGER = 'npm';
 
 export const STARTERS: readonly Option[] = [
 	{ value: 'minimal', label: 'Learn Markless', hint: 'A small TSRX counter app. Best first project.' },
@@ -24,8 +28,13 @@ export const FORMATS: readonly Option[] = [
 	{ value: 'deno', label: 'Deno', hint: 'If you love its security model. Any deno-compatible runtime works.' },
 	{ value: 'bun', label: 'Bun', hint: 'Creates a package.json project tuned for Bun.' },
 ];
-const INSTALL: readonly Option[] = [
-	{ value: 'yes', label: 'Yes', hint: `Runs ${MANAGER} install after files are created.` },
+export const EDITORS: readonly Option[] = [
+	{ value: 'vscode', label: 'VS Code', hint: 'Also Cursor and Windsurf.' },
+	{ value: 'zed', label: 'Zed', hint: '' },
+	{ value: 'none', label: 'Other', hint: 'Writes no editor settings.' },
+];
+const install = (manager: ManagerId): readonly Option[] => [
+	{ value: 'yes', label: 'Yes', hint: `Runs ${manager} install after files are created.` },
 	{ value: 'no', label: 'No', hint: 'Leaves dependencies for you to install later.' },
 ];
 const GIT: readonly Option[] = [
@@ -38,21 +47,24 @@ const READY: readonly Option[] = [
 ];
 
 export interface Prompt {
-	readonly key: 'starter' | 'name' | 'format' | 'install' | 'git' | 'ready';
+	readonly key: 'starter' | 'name' | 'format' | 'editor' | 'install' | 'git' | 'ready';
 	readonly message: string;
 	/** Empty for the text prompt, which takes the default name. */
 	readonly options: readonly Option[];
 }
 
-/** The six prompts in the order the CLI asks them; workspace and agent prompts only appear on some machines and are left out. */
-export const PROMPTS: readonly Prompt[] = [
+/** The prompts in the order the CLI asks them, as the manager that launched it words them; workspace and agent prompts only appear on some machines and are left out. */
+export const promptsFor = (manager: ManagerId): readonly Prompt[] => [
 	{ key: 'starter', message: 'What are you building today?', options: STARTERS },
 	{ key: 'name', message: 'What should we call it?', options: [] },
 	{ key: 'format', message: 'Where should it run?', options: FORMATS },
-	{ key: 'install', message: 'Install dependencies now?', options: INSTALL },
+	{ key: 'editor', message: 'Which editor do you use?', options: EDITORS },
+	{ key: 'install', message: 'Install dependencies now?', options: install(manager) },
 	{ key: 'git', message: 'Initialize git?', options: GIT },
 	{ key: 'ready', message: 'Ready to create?', options: READY },
 ];
+export const PROMPTS = promptsFor('npm');
+const stepOf = (key: Prompt['key']) => PROMPTS.findIndex((p) => p.key === key);
 
 /** The files `create-markless` writes, by template folder, after `gitignore` becomes `.gitignore`. */
 export const COMMON_FILES = ['.gitignore', '.vscode/extensions.json', '.vscode/settings.json', '.zed/settings.json', 'README.md', 'public/.gitkeep', 'scripts/markless-doctor.mjs', 'tsconfig.json', 'vite.config.ts'];
@@ -62,17 +74,21 @@ const APP = ['pages/404.tsrx', 'pages/500.tsrx'];
 const FULL_STACK = ['api/health.ts', 'middleware/request.ts'];
 const DOCS = ['pages/index.mdx', 'document.tsrx', 'pages/docs/index.mdx', 'pages/docs/[...slug].mdx', 'components/layouts/DocsLayout.tsrx', 'components/docs/Sidebar.tsrx'];
 
-/** Every file the starter writes, the first page first. */
-export function filesFor(starter: Starter, format: Format): string[] {
+const EDITOR_DIRECTORY: Record<Editor, string> = { vscode: '.vscode/', zed: '.zed/', none: '' };
+const isEditorFile = (path: string) => path.startsWith('.vscode/') || path.startsWith('.zed/');
+
+/** Every file the starter writes, the first page first; only the chosen editor's settings. */
+export function filesFor(starter: Starter, format: Format, editor: Editor = 'vscode'): string[] {
 	const own = starter === 'docs' ? DOCS : [...MINIMAL, ...(starter === 'minimal' ? [] : APP), ...(starter === 'full-stack' ? FULL_STACK : [])];
-	return [...own, FORMAT_FILE[format], ...COMMON_FILES];
+	const common = COMMON_FILES.filter((path) => !isEditorFile(path) || (EDITOR_DIRECTORY[editor] !== '' && path.startsWith(EDITOR_DIRECTORY[editor])));
+	return [...own, FORMAT_FILE[format], ...common];
 }
 export const MOST_FILES = 16;
 /** Slots per column: 0–7 the left column back to front, 8–15 the right one; slot 8, top of the right column, is always the first page. */
 export const PER = 8;
 export const PAGE_SLOT = PER;
 /** The files lying in the folder: none until the run creates the app. */
-export const landed = (run: Run) => (run.outcome === 'created' ? filesFor(starterOf(run), formatOf(run)) : []);
+export const landed = (run: Run) => (run.outcome === 'created' ? filesFor(starterOf(run), formatOf(run), editorOf(run)) : []);
 
 /** Where each file lies: the shared files fill the left column from the top, the page and the starter's own files the right. */
 export function layout(files: readonly string[]): string[] {
@@ -144,47 +160,61 @@ export function noteLines(text: string): string[] {
 	return lines;
 }
 
-/** The run: before the command runs it is idle at the shell prompt; then which prompt is open, where the cursor sits, what was chosen, the name typed, and any mistyped commands. */
+export interface Try {
+	readonly line: string;
+	readonly saved: ManagerId;
+}
+
+/** The run: before the command runs it is idle at the shell prompt; then the command and the manager that launched it, which prompt is open, where the cursor sits, what was chosen, the name typed, and any mistyped commands. */
 export interface Run {
+	readonly command: string;
+	readonly manager: ManagerId;
 	readonly step: number;
 	readonly cursor: number;
 	readonly picks: readonly number[];
 	readonly outcome: 'idle' | 'asking' | 'created' | 'cancelled';
 	readonly name: string;
-	readonly tries: readonly string[];
+	/** Mistyped lines, each with the manager saved when it was typed, whose command the Try line names. */
+	readonly tries: readonly Try[];
 }
-export const START: Run = { step: 0, cursor: 0, picks: [], outcome: 'idle', name: TARGET, tries: [] };
-const ASK: Run = { ...START, outcome: 'asking' };
+export const START: Run = { command: '', manager: 'npm', step: 0, cursor: 0, picks: [], outcome: 'idle', name: TARGET, tries: [] };
 
-const optionsAt = (step: number) => PROMPTS[step]?.options ?? [];
-export const starterOf = (run: Run): Starter => STARTERS[run.picks[0] ?? 0]!.value as Starter;
-export const formatOf = (run: Run): Format => FORMATS[run.picks[2] ?? 0]!.value as Format;
+const optionsAt = (run: Run, step = run.step) => promptsFor(run.manager)[step]?.options ?? [];
+const pickOf = (run: Run, key: Prompt['key']) => run.picks[stepOf(key)] ?? 0;
+export const starterOf = (run: Run): Starter => STARTERS[pickOf(run, 'starter')]!.value as Starter;
+export const formatOf = (run: Run): Format => FORMATS[pickOf(run, 'format')]!.value as Format;
+export const editorOf = (run: Run): Editor => EDITORS[pickOf(run, 'editor')]!.value as Editor;
 /** Whether the line being typed is a shell command, the name prompt, or nothing (a select is open). */
 export const typing = (run: Run) => (run.outcome !== 'asking' ? 'shell' : PROMPTS[run.step]!.key === 'name' ? 'name' : 'none');
 
 /** Arrow keys move the highlight round the open select, as clack does. */
 export function move(run: Run, by: number): Run {
-	const n = optionsAt(run.step).length;
+	const n = optionsAt(run).length;
 	if (run.outcome !== 'asking' || n === 0) return run;
 	return { ...run, cursor: (run.cursor + by + n) % n };
 }
 
-/** Enter with `text` on the line: at the shell it runs the command (an empty line takes the suggestion), at the name prompt it names the app, in a select it picks the highlight. */
-export function submit(run: Run, text = ''): Run {
+/** Enter with `text` on the line: at the shell any manager's create command runs it as that manager (an empty line takes the saved manager's), at the name prompt it names the app, in a select it picks the highlight. */
+export function submit(run: Run, text = '', saved: ManagerId = 'npm'): Run {
 	const line = text.trim();
-	if (run.outcome !== 'asking') return line === '' || line === COMMAND ? ASK : { ...run, tries: [...run.tries, line].slice(-2) };
+	if (run.outcome !== 'asking') {
+		const manager = line === '' ? saved : ranWith(line, createCommands);
+		if (manager) return { ...START, outcome: 'asking', manager, command: line === '' ? createCommand(saved) : line.replace(/\s+/g, ' ') };
+		return { ...run, tries: [...run.tries, { line, saved }].slice(-2) };
+	}
 	const picks = [...run.picks, run.cursor];
 	const name = PROMPTS[run.step]!.key === 'name' ? line || TARGET : run.name;
 	if (run.step === PROMPTS.length - 1) return { ...run, picks, name, outcome: run.cursor === 0 ? 'created' : 'cancelled' };
 	return { ...run, step: run.step + 1, cursor: 0, picks, name };
 }
 /** Enter on an empty line. */
-export const enter = (run: Run) => submit(run, '');
+export const enter = (run: Run, saved: ManagerId = 'npm') => submit(run, '', saved);
 
 /** A click on an option picks and submits it, as clack allows; a click anywhere else changes nothing. */
-export const choose = (run: Run, option: number): Run => (run.outcome === 'asking' && option >= 0 && option < optionsAt(run.step).length ? submit({ ...run, cursor: option }) : run);
+export const choose = (run: Run, option: number): Run => (run.outcome === 'asking' && option >= 0 && option < optionsAt(run).length ? submit({ ...run, cursor: option }) : run);
 
-export const devCommand = (format: Format) => (format === 'deno' ? 'deno task dev' : `${MANAGER} run dev`);
+/** The CLI's next-steps dev command: a Deno app runs its task, any other app the launching manager's script. */
+export const devCommand = (format: Format, manager: ManagerId) => (format === 'deno' ? 'deno task dev' : `${manager} run dev`);
 
 export interface Row {
 	readonly mark: string;
@@ -193,8 +223,16 @@ export interface Row {
 	readonly value: string;
 	/** A hint line, indented under the option it explains. */
 	readonly hint: string;
-	/** cmd, bar, active, done, value, pick, hint, opt, note, input, start */
+	/** cmd, bar, active, done, value, pick, hint, opt, note, input, start, footer */
 	readonly kind: string;
+	/** A command no manager accepts, typed or echoed: yes or no. */
+	readonly invalid: string;
+	/** On an empty prompt, each manager's command in MANAGERS order; the page's <html data-package-manager> shows the saved one. */
+	readonly wait0: string;
+	readonly wait1: string;
+	readonly wait2: string;
+	readonly wait3: string;
+	readonly wait4: string;
 	/** The option index a click on this row picks, or -1. */
 	readonly option: number;
 	/** On the line being typed: the caret, the text after it, and the faint suggestion. */
@@ -203,7 +241,7 @@ export interface Row {
 	readonly ghost: string;
 }
 
-const row = (mark: string, text = '', kind = 'bar', value = '', option = -1, hint = ''): Row => ({ mark, text, value, hint, kind, option, caret: '', after: '', ghost: '' });
+const row = (mark: string, text = '', kind = 'bar', value = '', option = -1, hint = ''): Row => ({ mark, text, value, hint, kind, option, caret: '', after: '', ghost: '', invalid: 'no', ...NO_WAIT });
 
 /** A hint longer than this wraps onto two balanced lines, as a narrow terminal would. */
 export const WRAP = 58;
@@ -216,42 +254,51 @@ export function wrap(text: string, width = WRAP): string[] {
 
 function answer(run: Run, step: number): string {
 	if (PROMPTS[step]!.key === 'name') return run.name;
-	return optionsAt(step)[run.picks[step]!]!.label;
+	return optionsAt(run, step)[run.picks[step]!]!.label;
 }
 
 function summary(run: Run): Row[] {
-	const yes = (i: number) => (run.picks[i] ?? 0) === 0;
+	const yes = (key: Prompt['key']) => pickOf(run, key) === 0;
+	const editor = EDITORS[pickOf(run, 'editor')]!;
 	return [
 		row('◇', 'Ready to create?', 'note'),
 		row('│', 'App:', 'value', run.name),
-		row('│', 'Starter:', 'value', STARTERS[run.picks[0] ?? 0]!.label),
-		row('│', 'Runtime:', 'value', FORMATS[run.picks[2] ?? 0]!.label),
-		row('│', 'Install:', 'value', yes(3) ? `Yes, with ${MANAGER}` : 'No'),
-		row('│', 'Git:', 'value', yes(4) ? 'Yes' : 'No'),
+		row('│', 'Starter:', 'value', STARTERS[pickOf(run, 'starter')]!.label),
+		row('│', 'Runtime:', 'value', FORMATS[pickOf(run, 'format')]!.label),
+		row('│', 'Install:', 'value', yes('install') ? `Yes, with ${run.manager}` : 'No'),
+		row('│', 'Git:', 'value', yes('git') ? 'Yes' : 'No'),
+		row('│', 'Editor:', 'value', editor.value === 'none' ? 'Other, no editor settings' : editor.label),
 		row('│'),
 	];
 }
 
+const echo = (line: string): Row => ({ ...row('$', line, 'cmd'), invalid: 'yes' });
 /** The friendly answers to mistyped commands, then a fresh shell prompt. */
-const shell = (run: Run): Row[] => [...run.tries.flatMap((t) => (t.endsWith('^C') ? [row('$', t, 'cmd')] : [row('$', t, 'cmd'), row('', `Try ${COMMAND}`, 'note')])), row('$', '', 'input')];
+const shell = (run: Run): Row[] => [
+	...run.tries.flatMap((t) => (t.line.endsWith('^C') ? [row('$', t.line, 'cmd')] : [echo(t.line), row('', `Try ${createCommand(t.saved)}`, 'note')])),
+	row('$', '', 'input'),
+];
+/** The bottom row, kept clear for the footer naming the other managers while the shell line is empty and nothing has run. */
+export const FOOTER = { ...row(''), kind: 'footer' };
+export const showsFooter = (run: Run, typed: string) => run.outcome === 'idle' && typed === '';
 
 /** Ctrl+C: at a question it cancels the create, as clack does; at the shell it abandons the line and opens a fresh prompt. */
 export function interrupt(run: Run, typed: string): Run {
 	if (run.outcome === 'asking') return { ...run, outcome: 'cancelled' };
-	return { ...run, tries: [...run.tries, `${typed}^C`].slice(-2) };
+	return { ...run, tries: [...run.tries, { line: `${typed}^C`, saved: run.manager }].slice(-2) };
 }
 
 /** The whole transcript so far, top to bottom, as the shell and clack print it. */
 export function transcript(run: Run): Row[] {
 	if (run.outcome === 'idle') return run.tries.length ? shell(run) : [...shell(run), row('', '', 'start', '', -1, '↵ Press Enter to run it')];
-	const rows: Row[] = [row('$', COMMAND, 'cmd'), row('┌', INTRO, 'done'), row('│')];
+	const rows: Row[] = [row('$', run.command, 'cmd'), row('┌', INTRO, 'done'), row('│')];
 	for (let step = 0; step < run.picks.length; step++) {
 		if (PROMPTS[step]!.key === 'ready') rows.push(...summary(run));
 		rows.push(row('◇', PROMPTS[step]!.message, 'done'), row('│', answer(run, step), 'value'), row('│'));
 	}
 	if (run.outcome === 'created') {
 		const format = formatOf(run);
-		rows.push(row('◇', `Created ${run.name}`, 'note'), row('│', 'Next steps:', 'value'), row('│', `  cd ${run.name}`, 'value'), row('│', `  ${devCommand(format)}`, 'value'), row('│', 'Then open:', 'value'), row('│', '  http://localhost:3000', 'value'), row('└', 'Markless app ready.', 'done'));
+		rows.push(row('◇', `Created ${run.name}`, 'note'), row('│', 'Next steps:', 'value'), row('│', `  cd ${run.name}`, 'value'), row('│', `  ${devCommand(format, run.manager)}`, 'value'), row('│', 'Then open:', 'value'), row('│', '  http://localhost:3000', 'value'), row('└', 'Markless app ready.', 'done'));
 		return [...rows, ...shell(run)];
 	}
 	if (run.outcome === 'cancelled') {
@@ -259,7 +306,7 @@ export function transcript(run: Run): Row[] {
 		rows.push(row('■', 'Create cancelled.', 'done'));
 		return [...rows, ...shell(run)];
 	}
-	const prompt = PROMPTS[run.step]!;
+	const prompt = promptsFor(run.manager)[run.step]!;
 	if (prompt.key === 'ready') rows.push(...summary(run));
 	rows.push(row('◆', prompt.message, 'active'));
 	if (prompt.options.length === 0) rows.push(row('│', '', 'input', '', 0));
@@ -280,20 +327,26 @@ export const MAX_TYPED = 40;
 /** The longest app name; the terminal and the folder's tab are drawn for it. */
 export const MAX_NAME = 24;
 
-/** The suggestion shown faintly after the caret: the rest of the command at the shell, the default name at the name prompt. */
-export function ghostFor(run: Run, typed: string): string {
+
+/** The suggestion shown faintly after the caret: at the shell the rest of whichever manager's create command the text starts (the saved manager's on an empty line), the default name at the name prompt. */
+export function ghostFor(run: Run, typed: string, saved: ManagerId = 'npm'): string {
 	const kind = typing(run);
-	if (kind === 'shell') return COMMAND.startsWith(typed) ? COMMAND.slice(typed.length) : '';
+	if (kind === 'shell') return completion(typed, saved, createCommands);
 	if (kind === 'name') return typed === '' ? TARGET : '';
 	return '';
 }
 
-/** What the terminal sheet shows: the last ROWS lines, like a terminal that scrolls, with the typed line, caret and suggestion filled in; an empty line keeps a zero-width character so its text still starts at its column. */
+/** Whether the shell line can no longer become any manager's create command. */
+export const invalidAt = (run: Run, typed: string) => typing(run) === 'shell' && isInvalid(typed, createCommands);
+
+/** What the terminal sheet shows: the last lines, like a terminal that scrolls, with the typed line, caret and suggestion filled in, and the footer on the bottom row while the shell line is empty; an empty line keeps a zero-width character so its text still starts at its column. */
 export function screen(run: Run, typed = '', at = typed.length): Row[] {
+	const foot = showsFooter(run, typed) ? [FOOTER] : [];
+	const waiting = typing(run) === 'shell' && typed === '';
 	const all = transcript(run)
-		.map((r) => (r.kind === 'input' ? { ...r, text: typed.slice(0, at) || '\u200b', caret: '|', after: typed.slice(at), ghost: at === typed.length ? ghostFor(run, typed) : '' } : r))
-		.slice(-ROWS);
-	return [...all, ...Array.from({ length: ROWS - all.length }, () => BLANK)];
+		.map((r) => (r.kind === 'input' ? { ...r, text: typed.slice(0, at) || '\u200b', caret: '|', after: typed.slice(at), ghost: at === typed.length && !waiting ? ghostFor(run, typed) : '', invalid: invalidAt(run, typed) ? 'yes' : 'no', ...(waiting ? waitsOf(createCommands) : NO_WAIT) } : r))
+		.slice(-(ROWS - foot.length));
+	return [...all, ...Array.from({ length: ROWS - foot.length - all.length }, () => BLANK), ...foot];
 }
 
 /** The row the pink cursor wash sits on, or -1 when nothing is waiting for a pick. */
@@ -324,21 +377,23 @@ export function frontAt(run: Run, slot: number) {
 /** The terminal input's label: what the open line expects. */
 export function labelOf(run: Run): string {
 	const kind = typing(run);
-	if (kind === 'shell') return `Terminal. Type ${COMMAND} and press Enter; Enter on an empty line runs it.`;
+	if (kind === 'shell') return "Terminal. Type the create command of npm, pnpm, yarn, Bun or Deno and press Enter; Enter on an empty line runs the suggested one.";
 	if (kind === 'name') return `What should we call it? Type a name, or press Enter to keep ${TARGET}.`;
 	return `${PROMPTS[run.step]!.message} Arrow keys move, Enter picks, Escape starts over.`;
 }
 
 /** The sentence the live region speaks: the new lines the terminal printed. */
 export function describe(run: Run, moved = false): string {
-	if (run.outcome === 'idle') return run.tries.length > 0 ? `Try ${COMMAND}` : '';
+	const last = run.tries.at(-1);
+	const retry = last ? `Try ${createCommand(last.saved)}` : '';
+	if (run.outcome === 'idle') return run.tries.length > 0 ? retry : '';
 	if (run.outcome === 'created') {
-		const files = filesFor(starterOf(run), formatOf(run));
+		const files = landed(run);
 		const page = files.find(isFirstPage)!;
-		return run.tries.length > 0 ? `Try ${COMMAND}` : `Created ${run.name}: ${files.length} files dropped into the folder, and ${page} is your first page.`;
+		return run.tries.length > 0 ? retry : `Created ${run.name}: ${files.length} files dropped into the folder, and ${page} is your first page.`;
 	}
-	if (run.outcome === 'cancelled') return run.tries.length > 0 ? `Try ${COMMAND}` : 'Create cancelled. Nothing was written.';
-	const prompt = PROMPTS[run.step]!;
+	if (run.outcome === 'cancelled') return run.tries.length > 0 ? retry : 'Create cancelled. Nothing was written.';
+	const prompt = promptsFor(run.manager)[run.step]!;
 	const option = prompt.options[run.cursor];
 	const said = option ? `${option.label}${option.hint ? `: ${option.hint}` : ''}` : `Type a name, or press Enter to keep ${TARGET}.`;
 	if (moved) return said;

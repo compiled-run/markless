@@ -1,24 +1,30 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { CreateProgram, PROJECT_FORMAT_CHOICES, STARTER_CHOICES, type ProgramRuntime } from '../../../../packages/cli/src/index.ts';
-import { choose, COMMAND, COMMON_FILES, cursorRow, describe as say, dropOrder, enter, filesFor, focusRow, type Format, FORMATS, ghostFor, isFirstPage, layout, LONGEST, MAX_TYPED, interrupt, move, MOST_FILES, NOTE_LINES, noteLines, NOTES, PAGE_SLOT, PER, PROMPTS, ROWS, type Run, screen, slipAt, START, type Starter, STARTERS, submit, tabOf, TARGET, transcript, widthOf, wrap, WRAP } from './model.ts';
+import { CreateProgram, EDITOR_CHOICES, PROJECT_FORMAT_CHOICES, STARTER_CHOICES, type ProgramPrompts, type ProgramRuntime } from '../../../../packages/cli/src/index.ts';
+import { createCommand, MANAGERS, type ManagerId } from '../../docs/walkthrough/facts.ts';
+import { choose, COMMON_FILES, createCommands, cursorRow, describe as say, dropOrder, type Editor, EDITORS, enter, filesFor, focusRow, type Format, FORMATS, ghostFor, invalidAt, isFirstPage, labelOf, landed, layout, LONGEST, MAX_TYPED, interrupt, move, MOST_FILES, NOTE_LINES, noteLines, NOTES, PAGE_SLOT, PER, PROMPTS, promptsFor, ROWS, type Run, screen, showsFooter, slipAt, START, type Starter, STARTERS, submit, tabOf, TARGET, transcript, widthOf, wrap, WRAP } from './model.ts';
+import { FOOTERS } from './managers.ts';
 import { drawing } from './create.ts';
 import { recall, remember } from './history.ts';
+
+const COMMAND = createCommand('npm');
+const ids = MANAGERS.map((m) => m.id);
 
 const scene = drawing();
 const cli = readFileSync(new URL('../../../../packages/cli/src/index.ts', import.meta.url), 'utf8');
 const piece = readFileSync(new URL('./create-anatomy.tsrx', import.meta.url), 'utf8');
 
-/** Runs the CLI's own execute() with no git, no install and no agents, and returns the paths it writes. */
-async function written(starter: Starter, format: Format): Promise<string[]> {
-	const paths: string[] = [];
-	const path = (p: string | URL) => (p instanceof URL ? fileURLToPath(p) : p);
-	const runtime: ProgramRuntime = {
+const path = (p: string | URL) => (p instanceof URL ? fileURLToPath(p) : p);
+
+/** A machine with no agents, no workspace and no editor terminal, whose files land in `paths`. */
+function machine(paths: string[] = [], env: Record<string, string> = {}, prompts?: ProgramPrompts): ProgramRuntime {
+	return {
 		cwd: () => '/tmp/desk',
-		env: {},
+		env,
 		homeDir: '/tmp/home',
-		isTTY: false,
+		isTTY: prompts !== undefined,
+		prompts,
 		sha256: async () => '',
 		fs: {
 			atomicCreateFile: async () => true,
@@ -35,8 +41,58 @@ async function written(starter: Starter, format: Format): Promise<string[]> {
 			},
 		},
 	};
-	await new CreateProgram().execute({ target: TARGET, format, starter, install: false, git: false, force: false, packageManager: 'npm', cwd: '/tmp/desk', agents: [] }, runtime);
+}
+
+/** Runs the CLI's own execute() with no git, no install and no agents, and returns the paths it writes. */
+async function written(starter: Starter, format: Format, editor: Editor): Promise<string[]> {
+	const paths: string[] = [];
+	await new CreateProgram().execute({ target: TARGET, format, starter, install: false, git: false, force: false, packageManager: 'npm', cwd: '/tmp/desk', agents: [], editor }, machine(paths));
 	return paths.sort();
+}
+
+interface Asked {
+	readonly message: string;
+	readonly options: readonly { label: string; hint: string }[];
+	readonly initial: string;
+}
+
+/** Launches the CLI the way `manager` does (its user agent), answers each question with the option at `picks[i]`, creates without install or git, and records what it asked and printed. */
+async function launched(manager: ManagerId, picks: readonly number[]) {
+	const asked: Asked[] = [];
+	const paths: string[] = [];
+	const notes: { title: string; body: string }[] = [];
+	let i = 0;
+	const prompts: ProgramPrompts = {
+		intro: () => {},
+		note: (body, title = '') => void notes.push({ title, body }),
+		outro: () => {},
+		cancel: () => {},
+		multiselect: async () => [],
+		text: async (options) => {
+			asked.push({ message: options.message, options: [], initial: options.initialValue ?? '' });
+			i++;
+			return options.defaultValue ?? '';
+		},
+		select: async (options) => {
+			asked.push({ message: options.message, options: options.options.map(({ label, hint }) => ({ label, hint })), initial: options.initialValue });
+			return options.options[picks[i++] ?? 0]!.value;
+		},
+	};
+	const program = new CreateProgram();
+	const runtime = machine(paths, { npm_config_user_agent: `${manager}/1.0.0 node/v22.0.0` }, prompts);
+	const options = await program.interact(program.validate([], runtime), runtime);
+	await program.execute({ ...options, install: false, git: false }, runtime);
+	return { asked, notes, options, paths: paths.sort() };
+}
+
+/** The figure's run for the same command and picks. */
+function played(manager: ManagerId, picks: readonly number[]): Run {
+	let run = submit(START, createCommand(manager));
+	for (const pick of picks) {
+		const next = choose(run, pick);
+		run = next === run ? submit(run) : next;
+	}
+	return run;
 }
 
 describe('the create figure plays the real CLI', () => {
@@ -47,6 +103,7 @@ describe('the create figure plays the real CLI', () => {
 		expect([...order].sort((a, b) => a - b)).toEqual(order);
 		expect(STARTERS.map(({ value, label, hint }) => ({ value, label, hint }))).toEqual(STARTER_CHOICES.map(({ value, label, hint }) => ({ value, label, hint })));
 		expect(FORMATS.map(({ value, label, hint }) => ({ value, label, hint }))).toEqual(PROJECT_FORMAT_CHOICES.map(({ value, label, hint }) => ({ value, label, hint })));
+		expect(EDITORS.map(({ value, label, hint }) => ({ value, label, hint }))).toEqual(EDITOR_CHOICES.map(({ value, label, hint }) => ({ value, label, hint })));
 		expect(cli).toContain("const DEFAULT_TARGET = 'my-markless-app';");
 		expect(cli).toContain("prompts.intro('Welcome to Markless');");
 		expect(cli).toContain("{ value: 'create', label: 'Create app', hint: '' }");
@@ -54,15 +111,16 @@ describe('the create figure plays the real CLI', () => {
 		expect(cli).toContain("'  http://localhost:3000'");
 	});
 
-	it('drops exactly the files the CLI writes for every starter and runtime, each with a true one-line note', async () => {
+	it('drops exactly the files the CLI writes for every starter, runtime and editor, each with a true one-line note', async () => {
 		for (const starter of STARTERS.map((s) => s.value as Starter))
-			for (const format of FORMATS.map((f) => f.value as Format)) {
-				const files = filesFor(starter, format);
-				expect([...files].sort()).toEqual(await written(starter, format));
-				expect(files.length).toBeLessThanOrEqual(MOST_FILES);
-				expect(isFirstPage(files[0]!)).toBe(true);
-				for (const file of files) expect(NOTES[file]).toBeTruthy();
-			}
+			for (const format of FORMATS.map((f) => f.value as Format))
+				for (const editor of EDITORS.map((e) => e.value as Editor)) {
+					const files = filesFor(starter, format, editor);
+					expect([...files].sort(), `${starter} ${format} ${editor}`).toEqual(await written(starter, format, editor));
+					expect(files.length).toBeLessThanOrEqual(MOST_FILES);
+					expect(isFirstPage(files[0]!)).toBe(true);
+					for (const file of files) expect(NOTES[file]).toBeTruthy();
+				}
 		expect(filesFor('minimal', 'node')).toContain('pages/index.tsrx');
 		expect(filesFor('docs', 'node')).not.toContain('pages/index.tsrx');
 		expect(filesFor('minimal', 'deno')).toContain('deno.json');
@@ -96,6 +154,7 @@ describe('the create figure plays the real CLI', () => {
 	it('takes Ctrl+C like a terminal: a fresh prompt at the shell, Create cancelled at a question', () => {
 		const abandoned = interrupt(START, 'npm cre');
 		expect(transcript(abandoned).map((r) => r.text)).toEqual(['npm cre^C', '']);
+		expect(transcript(abandoned)[0]!.invalid).toBe('no');
 		const cancelled = interrupt(enter(START), '');
 		expect(cancelled.outcome).toBe('cancelled');
 		expect(transcript(cancelled).map((r) => r.text)).toContain('Create cancelled.');
@@ -106,9 +165,9 @@ describe('the create figure plays the real CLI', () => {
 		expect(transcript(START).map((r) => r.kind)).toEqual(['input', 'start']);
 		expect(transcript(START)[1]!.hint).toBe('↵ Press Enter to run it');
 		expect(ghostFor(START, '')).toBe(COMMAND);
-		expect(COMMAND.length).toBeLessThanOrEqual(MAX_TYPED);
+		for (const id of ids) for (const command of createCommands(id)) expect(command.length).toBeLessThanOrEqual(MAX_TYPED);
 		expect(ghostFor(START, 'npm cr')).toBe('eate markless@latest');
-		expect(ghostFor(START, 'yarn')).toBe('');
+		expect(ghostFor(START, 'yarn')).toBe(' create markless');
 		const wrong = submit(START, 'npm i markless');
 		expect(wrong.outcome).toBe('idle');
 		expect(transcript(wrong).map((r) => r.text)).toEqual(['npm i markless', `Try ${COMMAND}`, '']);
@@ -118,6 +177,105 @@ describe('the create figure plays the real CLI', () => {
 		const row = screen(START, 'npm', 3)[0]!;
 		expect(row).toMatchObject({ kind: 'input', text: 'npm', caret: '|', ghost: ' create markless@latest' });
 		expect(screen(START, 'npm', 1)[0]).toMatchObject({ text: 'n', after: 'pm', ghost: '' });
+	});
+
+	it('takes any package manager create command, and remembers which one ran it', () => {
+		for (const id of ids) {
+			const run = submit(START, createCommand(id));
+			expect(run).toMatchObject({ outcome: 'asking', manager: id, command: createCommand(id) });
+			expect(transcript(run)[0]).toMatchObject({ mark: '$', text: createCommand(id), kind: 'cmd' });
+			expect(enter(START, id)).toMatchObject({ outcome: 'asking', manager: id, command: createCommand(id) });
+		}
+		expect(submit(START, '  npm   create markless ')).toMatchObject({ outcome: 'asking', manager: 'npm', command: 'npm create markless' });
+		expect(submit(START, 'pnpm create markless@latest').outcome).toBe('idle');
+		expect(transcript(submit(START, 'yarn add markless', 'bun')).map((r) => r.text)).toEqual(['yarn add markless', 'Try bun create markless', '']);
+		expect(say(submit(START, 'ls', 'deno'))).toBe('Try deno run -A npm:create-markless');
+		expect(labelOf(START)).toContain('npm, pnpm, yarn, Bun or Deno');
+	});
+
+	it("completes whichever manager's command the text starts, the saved one first", () => {
+		expect(ghostFor(START, '', 'bun')).toBe('bun create markless');
+		expect(ghostFor(START, '', 'deno')).toBe('deno run -A npm:create-markless');
+		expect(ghostFor(START, 'p')).toBe('npm create markless');
+		expect(ghostFor(START, 'b', 'npm')).toBe('un create markless');
+		expect(ghostFor(START, 'd', 'npm')).toBe('eno run -A npm:create-markless');
+		expect(ghostFor(START, 'y', 'pnpm')).toBe('arn create markless');
+		expect(ghostFor(START, 'n', 'bun')).toBe('pm create markless@latest');
+		expect(ghostFor(START, 'npm create markless')).toBe('@latest');
+		expect(ghostFor(START, 'x')).toBe('');
+		expect(screen(START, 'pn', 2)[0]!.ghost).toBe('pm create markless');
+	});
+
+	it('leaves the empty-line ghost and the footer to the saved manager on the page, so only running a command changes them', () => {
+		const rows = screen(START, '', 0);
+		expect(rows.slice(0, 2).map((r) => r.kind)).toEqual(['input', 'start']);
+		expect(rows[0]!.ghost).toBe('');
+		expect([rows[0]!.wait0, rows[0]!.wait1, rows[0]!.wait2, rows[0]!.wait3, rows[0]!.wait4]).toEqual(ids.map((id) => createCommand(id)));
+		expect(rows.at(-1)!.kind).toBe('footer');
+		expect(rows.filter((r) => r.kind === 'footer')).toHaveLength(1);
+		expect(rows).toHaveLength(ROWS);
+		expect(showsFooter(START, '')).toBe(true);
+		const typing = screen(START, 'b', 1);
+		expect(typing.some((r) => r.kind === 'footer')).toBe(false);
+		expect(typing[0]!.wait0).toBe('');
+		const missed = screen(submit(START, 'ls'), '', 0);
+		expect(missed.slice(0, 3).map((r) => r.kind)).toEqual(['cmd', 'note', 'input']);
+		expect(missed.at(-1)!.kind).toBe('footer');
+		let made = enter(START);
+		for (let i = 0; i < PROMPTS.length; i++) made = enter(made);
+		expect(showsFooter(made, '')).toBe(false);
+		expect(screen(made).map((r) => r.text)).toContain('  npm run dev');
+		for (const { saved, others } of FOOTERS) expect(others.map((o) => o.id)).toEqual(ids.filter((id) => id !== saved));
+		ids.forEach((id, k) => expect(piece).toContain(`data-pm="${id}">{slot.wait${k}}</tspan>`));
+		for (const id of ids) expect(piece).toContain(`html[data-package-manager='${id}'] :is(.wait-ghost, .others)[data-pm='${id}']`);
+		expect(piece).toContain('createCommand(managerOf(pick))');
+		expect(piece.match(/^\s+packageManager = /gm)).toHaveLength(1);
+		expect(piece.slice(piece.indexOf("event.key === 'Enter') {"), piece.indexOf("event.key === 'c' && event.ctrlKey) {"))).toContain('packageManager = after.manager;');
+		for (const handler of ['onFocusIn', 'onPointerOver']) for (const block of piece.split(handler).slice(1)) expect(block.slice(0, 300)).not.toContain('savedOnPage');
+	});
+
+	it('keeps the caret where the keyboard left it: a click only focuses the line, and nothing in the figure selects as text', () => {
+		expect(piece).toMatch(/\.line-in \{[^}]*pointer-events: none;/);
+		expect(piece).toMatch(/\.stage \{[^}]*user-select: none;/);
+	});
+
+	it('marks a line red once no create command starts with it, and keeps a wrong command red above its hint', () => {
+		for (const typed of ['', 'n', 'pnpm cr', 'deno run -A', COMMAND]) expect(invalidAt(START, typed), typed).toBe(false);
+		for (const typed of ['x', 'npm i', 'pnpm create markless@']) expect(invalidAt(START, typed), typed).toBe(true);
+		expect(screen(START, 'npm x', 5)[0]).toMatchObject({ invalid: 'yes', ghost: '' });
+		expect(screen(START, 'npm', 3)[0]!.invalid).toBe('no');
+		const wrong = transcript(submit(START, 'npm i markless'));
+		expect(wrong[0]).toMatchObject({ text: 'npm i markless', invalid: 'yes' });
+		expect(wrong[1]!.invalid).toBe('no');
+		expect(invalidAt(enter(enter(START)), 'zzz')).toBe(false);
+		expect(piece).toContain("data-invalid={slot.invalid}");
+	});
+
+	it('asks what the CLI asks when each manager launches it, and prints its summary and next steps', async () => {
+		const answers = [[0, 0, 0, 0, 0, 0, 0], [2, 0, 1, 1, 1, 1, 0], [3, 0, 2, 2, 0, 0, 0], [1, 0, 0, 0, 1, 1, 0]];
+		for (const manager of ids)
+			for (const picks of answers) {
+				const cli = await launched(manager, picks);
+				const run = played(manager, picks);
+				expect(run.outcome, `${manager} ${picks}`).toBe('created');
+				expect(cli.options.packageManager).toBe(manager);
+				const prompts = promptsFor(manager);
+				expect(cli.asked.map((a) => a.message)).toEqual(prompts.map((p) => p.message));
+				cli.asked.forEach((a, step) => {
+					expect(a.options, a.message).toEqual(prompts[step]!.options.map(({ label, hint }) => ({ label, hint })));
+					if (a.options.length) expect(a.initial, a.message).toBe(prompts[step]!.options[0]!.value);
+				});
+				const rows = transcript(run);
+				const pairs = (lines: string) => lines.split('\n').map((line) => line.split(/:\s+/).map((part) => part.trim()));
+				const summary = cli.notes.find((n) => n.title === 'Ready to create?')!;
+				const drawn = rows.slice(rows.findIndex((r) => r.text === 'Ready to create?' && r.kind === 'note') + 1).filter((r) => r.kind === 'value' && r.value).map((r) => [r.text.replace(':', ''), r.value]);
+				expect(drawn.slice(0, pairs(summary.body).length)).toEqual(pairs(summary.body));
+				const created = cli.notes.find((n) => n.title.startsWith('Created '))!;
+				expect(rows.map((r) => r.text)).toContain(created.title);
+				const steps = rows.slice(rows.findIndex((r) => r.text === created.title) + 1, rows.findIndex((r) => r.text === 'Markless app ready.'));
+				expect(steps.map((r) => r.text)).toEqual(created.body.split('\n').filter(Boolean));
+				expect([...landed(run)].sort()).toEqual(cli.paths);
+			}
 	});
 
 	it('asks the prompts like the CLI: Enter picks the highlight, typing names the app, a click picks an option and nothing else', () => {
@@ -143,7 +301,7 @@ describe('the create figure plays the real CLI', () => {
 		expect(choose(cancel, 1).outcome).toBe('cancelled');
 		const again = submit(run, 'ls');
 		expect(again.outcome).toBe('created');
-		expect(again.tries).toEqual(['ls']);
+		expect(again.tries).toEqual([{ line: 'ls', saved: 'npm' }]);
 		expect(enter(run).outcome).toBe('asking');
 	});
 
@@ -167,7 +325,7 @@ describe('the create figure plays the real CLI', () => {
 		let ready: Run = enter(START);
 		for (let i = 0; i < PROMPTS.length - 1; i++) ready = enter(ready);
 		const summary = screen(ready);
-		expect(summary.filter((r) => r.kind === 'value').map((r) => r.text + ' ' + r.value)).toEqual(['App: my-markless-app', 'Starter: Learn Markless', 'Runtime: Node', 'Install: Yes, with npm', 'Git: Yes']);
+		expect(summary.filter((r) => r.kind === 'value').map((r) => r.text + ' ' + r.value)).toEqual(['App: my-markless-app', 'Starter: Learn Markless', 'Runtime: Node', 'Install: Yes, with npm', 'Git: Yes', 'Editor: VS Code']);
 		expect(cursorRow(summary)).toBeGreaterThan(0);
 	});
 
@@ -192,7 +350,7 @@ describe('the create figure plays the real CLI', () => {
 		expect(say(enter(enter(START)))).toBe('Learn Markless. Next: What should we call it? Type a name, or press Enter to keep my-markless-app.');
 		let run = enter(START);
 		for (let i = 0; i < PROMPTS.length; i++) run = enter(run);
-		expect(say(run)).toBe('Created my-markless-app: 12 files dropped into the folder, and pages/index.tsrx is your first page.');
+		expect(say(run)).toBe('Created my-markless-app: 11 files dropped into the folder, and pages/index.tsrx is your first page.');
 	});
 
 	it('lays every file in its own slot, shared files left, the page on top of the right column, and nothing before Create', () => {
