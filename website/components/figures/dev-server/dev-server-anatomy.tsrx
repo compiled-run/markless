@@ -1,6 +1,6 @@
 // The create figure's terminal sheet, where the reader types npm run dev; the browser sheet below it then shows the starter page, whose drawn Count button really counts.
 import { computed, state } from '@markless/core';
-import { COMMAND, describe, type Desk, enter, ghostFor, HEADING, HOST, LABEL, MAX_TYPED, PAGE_FILE, press, print, screen, START, TARGET, tidy, washFor } from './model.ts';
+import { COMMAND, describe, type Desk, enter, ghostFor, HEADING, HOST, interrupt, LABEL, MAX_TYPED, PAGE_FILE, press, print, screen, START, TARGET, tidy, washFor } from './model.ts';
 import { every, fieldIn, halt } from './play.ts';
 import { art } from './dev-server.art.ts';
 import { recall, remember } from '../create/history.ts';
@@ -130,7 +130,7 @@ export default function DevServer() @{
 						tick = tick === 'a' ? 'b' : 'a';
 					}}
 					onKeyDown={(event) => {
-						if (event.key === 'ArrowUp' || event.key === 'ArrowDown') event.preventDefault();
+						if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || (event.key === 'c' && event.ctrlKey === true)) event.preventDefault();
 						const input = event.target as HTMLInputElement;
 						if ((event.key === 'ArrowUp' || event.key === 'ArrowDown') && desk.phase === 'off') {
 							const step = recall(ran, back, event.key === 'ArrowUp' ? 1 : -1);
@@ -145,6 +145,15 @@ export default function DevServer() @{
 							input.value = input.value + ghostFor(input.value);
 							typed = input.value;
 							at = input.value.length;
+							return;
+						}
+						if (event.key === 'c' && event.ctrlKey) {
+							desk = interrupt(desk, input.value);
+							said = describe(desk);
+							back = 0;
+							input.value = '';
+							typed = '';
+							at = 0;
 							return;
 						}
 						if (event.key !== 'Enter') return;

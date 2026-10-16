@@ -105,7 +105,7 @@ describe('the package-manager commands', () => {
 
 	it('styles a block for every manager and draws a tab for each', () => {
 		const source = readFileSync(new URL('commands.tsrx', import.meta.url), 'utf8');
-		for (const manager of MANAGERS) expect(source, manager.id).toContain(`html[data-pm='${manager.id}'] .variant[data-pm='${manager.id}']`);
+		for (const manager of MANAGERS) expect(source, manager.id).toContain(`html[data-package-manager='${manager.id}'] .variant[data-package-manager='${manager.id}']`);
 		expect(tabsInk().map((tab) => tab.id)).toEqual(MANAGERS.map((manager) => manager.id));
 	});
 

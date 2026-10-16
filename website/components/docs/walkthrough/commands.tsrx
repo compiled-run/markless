@@ -1,13 +1,13 @@
 import { commandVariants, type CommandKind } from './commands.ts';
 import type { ManagerId } from './facts.ts';
 
-/** Every package manager's version of one shell block; the one named by `data-pm` on <html> shows, npm when none is. With `only`, just that manager's block, always shown. */
+/** Every package manager's version of one shell block; the one named by `data-package-manager` on <html> shows, npm when none is. With `only`, just that manager's block, always shown. */
 export default function Commands({ kind, only }: { readonly kind: CommandKind; readonly only?: ManagerId }) @{
 	const variants = commandVariants(kind).filter((variant) => !only || variant.manager === only);
 
 	<div class="commands" data-only={only ? 'yes' : 'no'}>
 		@for (const variant of variants; key variant.manager) {
-			<div class="variant" data-pm={variant.manager}>
+			<div class="variant" data-package-manager={variant.manager}>
 				<div class="torn-strip">
 					<span class="torn-art" aria-hidden="true">
 						<span class="torn-cast">
@@ -50,12 +50,12 @@ export default function Commands({ kind, only }: { readonly kind: CommandKind; r
 			}
 
 			/* One selector per manager in facts.ts MANAGERS; walkthrough.test.ts checks none is missing. */
-			html:not([data-pm]) .variant[data-pm='npm'],
-			html[data-pm='npm'] .variant[data-pm='npm'],
-			html[data-pm='pnpm'] .variant[data-pm='pnpm'],
-			html[data-pm='yarn'] .variant[data-pm='yarn'],
-			html[data-pm='bun'] .variant[data-pm='bun'],
-			html[data-pm='deno'] .variant[data-pm='deno'],
+			html:not([data-package-manager]) .variant[data-package-manager='npm'],
+			html[data-package-manager='npm'] .variant[data-package-manager='npm'],
+			html[data-package-manager='pnpm'] .variant[data-package-manager='pnpm'],
+			html[data-package-manager='yarn'] .variant[data-package-manager='yarn'],
+			html[data-package-manager='bun'] .variant[data-package-manager='bun'],
+			html[data-package-manager='deno'] .variant[data-package-manager='deno'],
 			.commands[data-only='yes'] .variant {
 				display: block;
 			}

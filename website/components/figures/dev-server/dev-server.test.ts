@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { COMMAND, describe as say, DONE, enter, ghostFor, HEADING, LABEL, OUTPUT, PAGE_FILE, press, print, screen, SLOTS, START, TARGET, URL_LINE, washFor } from './model.ts';
+import { COMMAND, describe as say, DONE, enter, ghostFor, HEADING, interrupt, LABEL, OUTPUT, PAGE_FILE, press, print, screen, SLOTS, START, TARGET, URL_LINE, washFor } from './model.ts';
 import { drawing } from './dev-server.ts';
 
 const scene = drawing();
@@ -119,5 +119,14 @@ import type { drawing } from './dev-server.ts';
 export const art: ReturnType<typeof drawing> = ${JSON.stringify(scene, null, '\t')};
 `;
 		await expect(module).toMatchFileSnapshot('./dev-server.art.ts');
+	});
+
+	it('takes Ctrl+C like a terminal: a fresh prompt, and a running server stops', () => {
+		expect(screen(interrupt(START, 'npm r')).map((r) => r.text).slice(0, 3)).toEqual([`cd ${TARGET}`, 'npm r^C', '']);
+		let desk = enter(START, '');
+		while (desk.phase === 'starting') desk = print(desk);
+		const stopped = interrupt(press(desk), '');
+		expect(stopped).toMatchObject({ phase: 'off', count: 0 });
+		expect(stopped.history.map((r) => r.text)).toContain('^C');
 	});
 });

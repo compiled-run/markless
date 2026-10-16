@@ -233,7 +233,13 @@ function summary(run: Run): Row[] {
 }
 
 /** The friendly answers to mistyped commands, then a fresh shell prompt. */
-const shell = (run: Run): Row[] => [...run.tries.flatMap((t) => [row('$', t, 'cmd'), row('', `Try ${COMMAND}`, 'note')]), row('$', '', 'input')];
+const shell = (run: Run): Row[] => [...run.tries.flatMap((t) => (t.endsWith('^C') ? [row('$', t, 'cmd')] : [row('$', t, 'cmd'), row('', `Try ${COMMAND}`, 'note')])), row('$', '', 'input')];
+
+/** Ctrl+C: at a question it cancels the create, as clack does; at the shell it abandons the line and opens a fresh prompt. */
+export function interrupt(run: Run, typed: string): Run {
+	if (run.outcome === 'asking') return { ...run, outcome: 'cancelled' };
+	return { ...run, tries: [...run.tries, `${typed}^C`].slice(-2) };
+}
 
 /** The whole transcript so far, top to bottom, as the shell and clack print it. */
 export function transcript(run: Run): Row[] {

@@ -5,11 +5,12 @@ import { pencil, plane, type Plane } from '../ink/plane.ts';
 import { MOST_FILES, NOTE_LINES, PER, ROWS } from './model.ts';
 
 export const WIDTH = 640;
-export const HEIGHT = 560;
+export const HEIGHT = 700;
 
 /** The terminal sheet's corner on the desk; its width fits the longest hint line, its height the eleven rows. */
-const SHEET_O: P = [2.2, 0];
 const SHEET_W = 19.4;
+/** The terminal is drawn in its own units and scaled up onto the desk, so it spans the folder and both note margins. */
+const SHEET_K = 1.5;
 const BAR = 1.5;
 /** Row pitch on the terminal, in world units, the first row's baseline, and where a row's mark and text start. */
 const PITCH = 1;
@@ -31,7 +32,8 @@ const COLS = [
 	{ u: 9.1, w: 9.8 },
 ];
 const SLIP = { step: 0.86, top: 0.7, bottom: 8.4, dog: 0.62 };
-const FOLDER = { u: 0, v: SHEET_H + 2.6, w: COLS[1]!.u + COLS[1]!.w + 0.4, h: SLIP.bottom + 0.4, tab: { u0: 0.5, u1: 8.4, h: 1.3 } };
+const FOLDER = { u: 0, v: SHEET_H * SHEET_K + 2.6, w: COLS[1]!.u + COLS[1]!.w + 0.4, h: SLIP.bottom + 0.4, tab: { u0: 0.5, u1: 8.4, h: 1.3 } };
+const SHEET_O: P = [(FOLDER.w - SHEET_W * SHEET_K) / 2, 0];
 
 const sheetLocal = (u: number, v: number): Point3 => {
 	const e = (u / SHEET_W + v / SHEET_H - FOLD) / FOLD_K;
@@ -42,14 +44,14 @@ const sheetLocal = (u: number, v: number): Point3 => {
 };
 const sheetAt = (u: number, v: number, lift = 0): Point3 => {
 	const [a, b, z] = sheetLocal(u, v);
-	return [a + SHEET_O[0], b + SHEET_O[1], z + 0.02 + lift];
+	return [a * SHEET_K + SHEET_O[0], b * SHEET_K + SHEET_O[1], z * SHEET_K + 0.02 + lift];
 };
 
 const { proj, projAll } = createCamera({
 	width: WIDTH,
 	height: HEIGHT,
 	view: { azimuth: 90, elevation: 62, distance: 80, target: [12, 13.6, 0] },
-	bounds: [[FOLDER.u - 5.2, -0.4, 0], [SHEET_O[0] + SHEET_W + 1.4, -0.4, 0], [FOLDER.u - 5.2, FOLDER.v + FOLDER.h + 1.2, 0], [FOLDER.w + 5.2, FOLDER.v + FOLDER.h + 1.2, 0], [FOLDER.w + 5.2, FOLDER.v - 1.4, 0]],
+	bounds: [[FOLDER.u - 5.2, -0.4, 0], [SHEET_O[0] + SHEET_W * SHEET_K + 1.4, -0.4, 0], [SHEET_O[0] - 0.4, -0.4, 0], [FOLDER.u - 5.2, FOLDER.v + FOLDER.h + 1.2, 0], [FOLDER.w + 5.2, FOLDER.v + FOLDER.h + 1.2, 0], [FOLDER.w + 5.2, FOLDER.v - 1.4, 0]],
 	pad: 4,
 });
 const onSheet = (pts: P[], lift = 0): P[] => pts.map(([u, v]) => proj(sheetAt(u, v, lift)));

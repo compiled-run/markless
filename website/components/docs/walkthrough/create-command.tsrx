@@ -3,15 +3,15 @@ import { tabs } from '@markless/ui';
 import Commands from './commands.tsrx';
 import { tabsArt } from './tabs-ink.art.ts';
 
-/** The create command under inked package-manager tabs; the choice is saved as pm, which every Commands block on the page follows. */
+/** The create command under inked package-manager tabs; the choice is saved as package-manager, which every Commands block on the page follows. */
 export default function CreateCommand() @{
-	let pm = storage('pm', 'npm');
+	let packageManager = storage('package-manager', 'npm');
 
 	<tabs.root
 		class="create-command"
-		value={pm}
+		value={packageManager}
 		onChange={(next: string) => {
-			pm = next;
+			packageManager = next;
 		}}
 	>
 		<tabs.list class="strip" aria-label="Package manager">

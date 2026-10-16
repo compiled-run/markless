@@ -1,6 +1,6 @@
 // A terminal drawn on a sheet on the desk: type the create command, answer the real prompts, and the starter's files drop into the folder below as paper sheets that say what they are for.
 import { computed, state } from '@markless/core';
-import { choose, COMMAND, cursorRow, describe, flip, focusRow, ghostFor, labelOf, landed, MAX_NAME, MAX_TYPED, move, frontAt, type Run, screen, slipAt, START, submit, tabOf, typing, widthOf } from './model.ts';
+import { choose, COMMAND, cursorRow, describe, flip, focusRow, interrupt, ghostFor, labelOf, landed, MAX_NAME, MAX_TYPED, move, frontAt, type Run, screen, slipAt, START, submit, tabOf, typing, widthOf } from './model.ts';
 import { art } from './create.art.ts';
 import { recall, remember } from './history.ts';
 
@@ -95,7 +95,7 @@ export default function CreateAnatomy() @{
 					tick = tick === 'a' ? 'b' : 'a';
 				}}
 				onKeyDown={(event) => {
-					if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Enter') event.preventDefault();
+					if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Enter' || (event.key === 'c' && event.ctrlKey === true)) event.preventDefault();
 					const input = event.target as HTMLInputElement;
 					if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
 						if (typing(run) === 'shell') {
@@ -120,6 +120,16 @@ export default function CreateAnatomy() @{
 						const after = submit(run, input.value);
 						if (after.outcome === 'created' && run.outcome === 'asking') beat = flip(beat);
 						else if (after.outcome === 'asking' && run.outcome !== 'asking') beat = 'rest';
+						run = after;
+						said = describe(after);
+						input.value = '';
+						typed = '';
+						at = 0;
+						peek = -1;
+					} else if (event.key === 'c' && event.ctrlKey) {
+						back = 0;
+						const after = interrupt(run, input.value);
+						if (after.outcome === 'cancelled' && run.outcome === 'asking') beat = 'rest';
 						run = after;
 						said = describe(after);
 						input.value = '';

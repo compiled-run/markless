@@ -57,6 +57,12 @@ export function enter(desk: Desk, typed: string): Desk {
 	return { ...desk, history: [...desk.history, row('$', line, 'cmd'), row('', `Try ${COMMAND}`, 'note')] };
 }
 
+/** Ctrl+C: at the prompt it abandons the line; while the server runs it stops it, leaves its output above, and opens a fresh prompt. */
+export function interrupt(desk: Desk, typed: string): Desk {
+	if (desk.phase === 'off') return { ...desk, history: [...desk.history, row('$', `${typed}^C`, 'cmd')] };
+	return { history: [...desk.history, row('$', COMMAND, 'cmd'), ...OUTPUT.slice(0, desk.shown), row('', '^C', 'note')], phase: 'off', shown: 0, count: 0 };
+}
+
 /** One more output line; after the last one the server serves the page. */
 export function print(desk: Desk): Desk {
 	if (desk.phase !== 'starting') return desk;

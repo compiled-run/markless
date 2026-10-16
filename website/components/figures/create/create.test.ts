@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { CreateProgram, PROJECT_FORMAT_CHOICES, STARTER_CHOICES, type ProgramRuntime } from '../../../../packages/cli/src/index.ts';
-import { choose, COMMAND, COMMON_FILES, cursorRow, describe as say, dropOrder, enter, filesFor, focusRow, type Format, FORMATS, ghostFor, isFirstPage, layout, LONGEST, MAX_TYPED, move, MOST_FILES, NOTE_LINES, noteLines, NOTES, PAGE_SLOT, PER, PROMPTS, ROWS, type Run, screen, slipAt, START, type Starter, STARTERS, submit, tabOf, TARGET, transcript, widthOf, wrap, WRAP } from './model.ts';
+import { choose, COMMAND, COMMON_FILES, cursorRow, describe as say, dropOrder, enter, filesFor, focusRow, type Format, FORMATS, ghostFor, isFirstPage, layout, LONGEST, MAX_TYPED, interrupt, move, MOST_FILES, NOTE_LINES, noteLines, NOTES, PAGE_SLOT, PER, PROMPTS, ROWS, type Run, screen, slipAt, START, type Starter, STARTERS, submit, tabOf, TARGET, transcript, widthOf, wrap, WRAP } from './model.ts';
 import { drawing } from './create.ts';
 import { recall, remember } from './history.ts';
 
@@ -91,6 +91,14 @@ describe('the create figure plays the real CLI', () => {
 		expect(template('common/.vscode/extensions.json')).toContain('ripple-ts.ripple-ts-vscode-plugin');
 		expect(template('common/.vscode/settings.json')).toContain('emmet.includeLanguages');
 		expect(template('common/.zed/settings.json')).toContain('@markless/typescript-plugin');
+	});
+
+	it('takes Ctrl+C like a terminal: a fresh prompt at the shell, Create cancelled at a question', () => {
+		const abandoned = interrupt(START, 'npm cre');
+		expect(transcript(abandoned).map((r) => r.text)).toEqual(['npm cre^C', '']);
+		const cancelled = interrupt(enter(START), '');
+		expect(cancelled.outcome).toBe('cancelled');
+		expect(transcript(cancelled).map((r) => r.text)).toContain('Create cancelled.');
 	});
 
 	it('waits at a shell prompt: the command runs on Enter, an empty Enter takes the suggestion, anything else gets one friendly line', () => {
