@@ -11,6 +11,18 @@ export function storageAttributeName(driverKey: string): string {
 	return `data-${driverKey.replace(/[^A-Za-z0-9-]+/g, '-')}`;
 }
 
+// A storage key's cookie name. encodeURIComponent keeps distinct keys distinct
+// (markless:theme and markless-theme must not share a cookie) and turns the
+// colon, which a cookie name cannot hold, into %3A.
+export function storageCookieName(driverKey: string): string {
+	return `markless-${encodeURIComponent(driverKey)}`;
+}
+
+// max-age is 400 days, the longest lifetime browsers honour for a cookie.
+export function storageCookieAssignment(driverKey: string, value: string, secure: boolean): string {
+	return `${storageCookieName(driverKey)}=${encodeURIComponent(value)};path=/;max-age=34560000;samesite=lax${secure ? ';secure' : ''}`;
+}
+
 export type StorageSeedMetadata = {
 	readonly slotKey: string;
 	readonly driverKey: string;

@@ -1,6 +1,7 @@
 import {
 	STORAGE_SLOT_SYMBOL_KEY,
 	storageAttributeName,
+	storageCookieAssignment,
 	storageSlotEntryKeyFromGraphNodeId,
 } from '../../serializer/src/storage-slot.ts';
 import type { ProtocolStatePayload } from '@markless/serializer/protocol';
@@ -43,6 +44,13 @@ export function createStoragePlane(input: {
 			run(value) {
 				try {
 					globalThis.localStorage.setItem(record.key, String(value));
+				} catch {}
+				try {
+					globalThis.document.cookie = storageCookieAssignment(
+						record.key,
+						String(value),
+						globalThis.location.protocol === 'https:',
+					);
 				} catch {}
 				setStorageAttribute(record.key, value);
 			},

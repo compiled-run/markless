@@ -13,6 +13,7 @@ import {
 	artifactResumeModuleUrl,
 	assembleSsrContainer,
 	renderSsrOutput,
+	storageRenderContext,
 	type RenderToStringOptions,
 	type SsrRenderable,
 	type SsrRenderOutput,
@@ -64,7 +65,7 @@ type StreamRunEntry = {
 	settled?: { readonly status: 'fulfilled' | 'rejected' };
 };
 
-type StreamRenderContext = {
+type StreamRenderContext = ReturnType<typeof storageRenderContext> & {
 	readonly streaming: {
 		readonly runs: Map<string, StreamRunEntry>;
 		readonly signal: AbortSignal;
@@ -104,10 +105,13 @@ export async function renderToStream(
 	// boundary can no longer consume the shared deadline on behalf of later,
 	// faster boundaries; the shell flushes at the deadline, not at the sum of
 	// sequential waits.
+	const storage = storageRenderContext(options.cookie);
 	const discoveryOutput = await renderSsrOutput(component, options.props, {
+		...storage,
 		streaming: { runs, signal: settleController.signal, prestart: true },
 	} satisfies StreamRenderContext);
 	const renderContext: StreamRenderContext = {
+		...storage,
 		streaming: { runs, signal: settleController.signal, deadline },
 	};
 	let output = discoveryOutput;

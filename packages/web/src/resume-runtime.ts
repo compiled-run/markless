@@ -434,6 +434,8 @@ export function createResumeRuntime(
 			armRegistrationDeps,
 			installArmEventType,
 		});
+		// The seeded-value reconcile flushed before the journal listener existed; the graph kept its entries.
+		if (storagePlane) await input.graph.flush();
 		captureListenersStarted = true;
 		if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__) {
 			if (disposed) return;

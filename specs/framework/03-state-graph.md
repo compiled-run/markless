@@ -523,6 +523,48 @@ diagnostic. Props and `computed()` aliases remain read-only in v1.
 Component props are getter-backed; reads inside the child re-read the parent's
 graph. Destructuring in the parameter list is auto-aliased as above.
 
+### Saved state — `storage()`
+
+`storage(key, fallback)` (or `storage(fallback)`, whose key is derived as
+`markless:<identifier>`) is writable string state whose value outlives the
+page. Key and fallback are string literals. It may be declared at module scope
+or in a component body; both follow the same contract.
+
+- **Cookie is the default backing.** A server render that has a request reads
+  the value from the request's `Cookie` header and renders with it, so text,
+  attributes and everything derived from the value (for example a tabs root's
+  `aria-selected`, `ui-selected` and hidden panels) are right in the first
+  byte with no runtime start. Hosts pass the header as the `cookie` render
+  option of `renderToString`/`renderToStream`; the router forwards the
+  request's header, including to MDX children. The cookie name for a key is
+  owned by `@markless/serializer` (`storageCookieName`).
+- **Cookie values are untrusted input.** A value that does not URI-decode, or
+  that is longer than a cookie can carry, reads as absent and the fallback
+  renders. Accepted values are escaped like any rendered string in HTML and
+  attributes, and are embedded in startup scripts only as script-safe JSON.
+- **Writes persist to both stores.** When the value changes in the browser the
+  runtime writes the cookie (`path=/`, a 400-day `max-age`, `SameSite=Lax`,
+  `Secure` on https), `localStorage` under the key, and the `<html>` data
+  attribute the head script sets.
+- **A response rendered from storage is private to the visitor.** When a routed
+  page renders any storage cell, the router answers with
+  `Cache-Control: private` and adds `cookie` to `Vary`: `private` keeps shared
+  caches (CDNs, proxies, many of which ignore `Vary: Cookie`) from handing one
+  visitor's copy to another, and `Vary: Cookie` keeps the browser's own cache
+  from reusing a copy rendered for an older cookie. This applies whether or not
+  the request carried a cookie, because a fallback render is equally wrong for
+  a visitor who has one.
+- **Without a request the page corrects itself at idle, and only when needed.**
+  Prerendered output, and a request without the cookie from a visitor whose
+  value is only in `localStorage`, render the fallback. The head script reads
+  each saved value (cookie first, then `localStorage`) before paint and sets
+  the `<html>` data attribute; the startup script compares those values with
+  the ones the page was rendered with and, when any differs, starts the runtime
+  at idle on the same self-wake path unsettled async pages use, which brings
+  every binding to the saved value and writes the cookie. When every saved
+  value equals the rendered one (including a visit with nothing saved), no
+  extra code runs.
+
 ### Shared state — `shared()`
 
 There is no `context()` and no `store()`. React-style context makes authors

@@ -1,4 +1,4 @@
-import { jsonSourceWithNonFiniteNumbers } from '@markless/serializer';
+import { jsonSourceWithNonFiniteNumbers, STORAGE_RENDER_CONTEXT_READER } from '@markless/serializer';
 import type {
 	PublicRenderModuleInput,
 	SemanticElementRosterCount,
@@ -51,13 +51,22 @@ export function renderBodyLines(
 	rootLines: ReadonlyArray<string>,
 	bodySharedComputedLines: ReadonlyArray<string> = [],
 ): string[] {
-	const body = rootInfo.component.body as AnyNode | undefined;
-	if (!body) return indentLines(rootLines);
-
 	const stateBindings = componentBindingMap(input, 'state', rootInfo.componentName);
+	const body = rootInfo.component.body as AnyNode | undefined;
+	const bodyNames = new Set(body ? childNodes(body).flatMap(declaredNames) : []);
+	// A module-scope storage() cell is read per request, so each render shadows the module's fallback local.
+	const moduleStorageLines = [...stateBindings.values()].flatMap((binding) =>
+		binding.storage && binding.componentName === undefined && !bodyNames.has(binding.name)
+			? [
+					`let ${binding.name} = ${stateValueFunctionName}(${stateValuesName}, ${statePayloadName}, ${JSON.stringify(binding.id)}, ${storageInitializerSource(binding)});`,
+				]
+			: [],
+	);
+	if (!body) return indentLines([...moduleStorageLines, ...rootLines]);
+
 	const computedBindings = componentBindingMap(input, 'computed', rootInfo.componentName);
 	const sharedInstanceNames = sharedInstanceLocalNames(input.semanticGraph, rootInfo.componentName);
-	const lines: string[] = [];
+	const lines: string[] = [...moduleStorageLines];
 	let emittedRoot = false;
 	let derivedSharedComputed = bodySharedComputedLines.length === 0;
 	const rootStatements = childNodes(body).filter((statement) =>
@@ -366,14 +375,14 @@ function stateDeclarationLine(
 		return null;
 	const authoredInitializer = (binding as GraphBinding & { readonly initializerSource?: string })
 		.initializerSource;
-	const initializerSource =
-		(authoredInitializer === undefined
+	const initializerSource = binding.storage
+		? storageInitializerSource(binding)
+		: authoredInitializer === undefined
 			? undefined
 			: stripAuthoredExpression(authoredInitializer, {
 					filename,
 					what: 'a state initializer',
-				})) ??
-		(binding.storage ? jsonSourceWithNonFiniteNumbers(binding.initialValue) : undefined);
+				});
 	const args = [
 		stateValuesName,
 		statePayloadName,
@@ -381,6 +390,19 @@ function stateDeclarationLine(
 		initializerSource,
 	].filter((arg): arg is string => arg !== undefined);
 	return `let ${binding.name} = ${stateValueFunctionName}(${args.join(', ')});`;
+}
+
+function declaredNames(statement: AnyNode): string[] {
+	if (statement.type !== 'VariableDeclaration') return [];
+	return asNodes(statement.declarations).flatMap((declaration) => {
+		const name = getIdentifierName(declaration.id as AnyNode | undefined);
+		return name ? [name] : [];
+	});
+}
+
+// A server render with a request reads the saved value; without one, the fallback.
+function storageInitializerSource(binding: GraphBinding): string {
+	return `(marklessSsrRenderContext?.${STORAGE_RENDER_CONTEXT_READER}?.(${JSON.stringify(binding.storage!.key)}) ?? ${jsonSourceWithNonFiniteNumbers(binding.initialValue)})`;
 }
 
 // `const shell = session()` names a shared instance. Every read and write

@@ -12,6 +12,7 @@ import {
 	protocolStateVersion,
 	STORAGE_PROTOCOL_VERSION,
 } from '../../../serializer/src/protocol-constants.ts';
+import { STORAGE_RENDER_CONTEXT_READER } from '../../../serializer/src/storage-cookie.ts';
 import { transformMdxRoute } from '../../src/vite/mdx.ts';
 import { renderSsrData, type SsrRenderData } from '../../../web/src/ssr-data/renderer.ts';
 
@@ -162,6 +163,28 @@ describe('renderMdxChild with async compiled artifacts', () => {
 		expect((children[0] as { output: { html: string } }).output.html).toBe(
 			'<div data-mdx-counter>MDX Count 0</div>',
 		);
+	});
+
+	it('hands the page request storage reader, and nothing else of the page context, to the child', async () => {
+		const seen: Array<Record<string, unknown> | undefined> = [];
+		const read = (key: string) => (key === 'theme' ? 'dark' : undefined);
+		const html = await renderMdxChild(
+			[],
+			{
+				renderSsr: async (_props: unknown, context?: Record<string, unknown>) => {
+					seen.push(context);
+					const reader = context?.[STORAGE_RENDER_CONTEXT_READER] as typeof read;
+					return { html: `<p>${reader('theme')}</p>` };
+				},
+			} as never,
+			{},
+			{ componentIndex: 0, hostPrefix: 'm0:', symbolPrefix: 'm0:' } as never,
+			{ [STORAGE_RENDER_CONTEXT_READER]: read, streaming: { runs: new Map() } },
+		);
+
+		expect(html).toBe('<p>dark</p>');
+		expect(seen[0]?.streaming).toBeUndefined();
+		expect(seen[0]?.elementIdScope).toBe('m0:');
 	});
 });
 

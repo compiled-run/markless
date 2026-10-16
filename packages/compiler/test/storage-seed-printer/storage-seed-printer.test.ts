@@ -1,4 +1,8 @@
-import { jsonSourceWithNonFiniteNumbers, nonFiniteName } from '@markless/serializer';
+import {
+	jsonSourceWithNonFiniteNumbers,
+	nonFiniteName,
+	STORAGE_RENDER_CONTEXT_READER,
+} from '@markless/serializer';
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../../src/index.ts';
 import { renderBodyLines } from '../../src/passes/public-render/render-body.ts';
@@ -10,6 +14,9 @@ import { renderBodyLines } from '../../src/passes/public-render/render-body.ts';
  * would hand the cell a silently wrong value; the emitted module is JavaScript,
  * where the serializer's own name for that value denotes it exactly.
  */
+const seedLine = (fallback: string) =>
+	`\tlet cap = stateValue(values, payload, "storage:src/App.tsrx#cap", (marklessSsrRenderContext?.${STORAGE_RENDER_CONTEXT_READER}?.("cap") ?? ${fallback}));`;
+
 function storageSeedLines(initialValue: unknown): string[] {
 	const storageDeclaration = {
 		type: 'VariableDeclaration',
@@ -52,22 +59,24 @@ function storageSeedLines(initialValue: unknown): string[] {
 
 test('a finite storage seed prints the bytes JSON already printed', () => {
 	expect(storageSeedLines('light')).toEqual([
-		'\tlet cap = stateValue(values, payload, "storage:src/App.tsrx#cap", "light");',
+		seedLine('"light"'),
 		'\treturn root;',
 	]);
 	expect(storageSeedLines({ span: 3, label: 'rows' })).toEqual([
-		'\tlet cap = stateValue(values, payload, "storage:src/App.tsrx#cap", {"span":3,"label":"rows"});',
+		seedLine('{"span":3,"label":"rows"}'),
 		'\treturn root;',
 	]);
 });
 
 test('a non-finite storage seed prints the serializer name, not null', () => {
 	expect(storageSeedLines(Number.POSITIVE_INFINITY)).toEqual([
-		`\tlet cap = stateValue(values, payload, "storage:src/App.tsrx#cap", ${nonFiniteName(Number.POSITIVE_INFINITY)});`,
+		seedLine(nonFiniteName(Number.POSITIVE_INFINITY)),
 		'\treturn root;',
 	]);
 	expect(storageSeedLines({ cap: Number.POSITIVE_INFINITY, floor: Number.NEGATIVE_INFINITY, missing: Number.NaN, span: 3 })).toEqual([
-		`\tlet cap = stateValue(values, payload, "storage:src/App.tsrx#cap", {"cap":${nonFiniteName(Number.POSITIVE_INFINITY)},"floor":${nonFiniteName(Number.NEGATIVE_INFINITY)},"missing":${nonFiniteName(Number.NaN)},"span":3});`,
+		seedLine(
+			`{"cap":${nonFiniteName(Number.POSITIVE_INFINITY)},"floor":${nonFiniteName(Number.NEGATIVE_INFINITY)},"missing":${nonFiniteName(Number.NaN)},"span":3}`,
+		),
 		'\treturn root;',
 	]);
 });

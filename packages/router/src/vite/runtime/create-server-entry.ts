@@ -129,17 +129,25 @@ export function createServerEntry(options: ServerEntryOptions) {
 	async function fetch(request: Request): Promise<Response> {
 		const url = new URL(request.url);
 		const fragment = fragmentNavigation && request.headers.get(FRAGMENT_REQUEST_HEADER) === '1';
+		const cookie = request.headers.get('cookie');
 		if (isNitroApiPathname(url.pathname)) {
 			return new Response('Not found', { status: 404 });
 		}
 
 		const match = matchRouteManifest(url.pathname, manifest);
 		if (!match) {
-			return renderStatusPage(url, manifest.statusPages.notFound, 404, 'Not found', fragment);
+			return renderStatusPage(
+				url,
+				manifest.statusPages.notFound,
+				404,
+				'Not found',
+				fragment,
+				cookie,
+			);
 		}
 
 		try {
-			return await renderPage(url, match.route.file, match.params, 200, fragment);
+			return await renderPage(url, match.route.file, match.params, 200, fragment, cookie);
 		} catch (error) {
 			// Surface the stack: a silent 500 hid the async-renderSsr break.
 			console.error('[markless-router] page render failed:', error);
@@ -153,6 +161,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 					500,
 					'Internal Server Error',
 					fragment,
+					cookie,
 				);
 			} catch (errorPageError) {
 				console.error('[markless-router] error page render failed:', errorPageError);
@@ -194,12 +203,13 @@ export function createServerEntry(options: ServerEntryOptions) {
 		status: number,
 		fallbackText: string,
 		fragment: boolean,
+		cookie: string | null,
 	) {
 		if (!file) {
 			return new Response(fallbackText, { status });
 		}
 
-		return renderPage(url, file, {}, status, fragment);
+		return renderPage(url, file, {}, status, fragment, cookie);
 	}
 
 	async function renderPage(
@@ -208,6 +218,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 		params: Readonly<Record<string, string>>,
 		status: number,
 		fragment: boolean,
+		cookie: string | null,
 	) {
 		const loadPageModule = options.pageModuleLoaders[file];
 		if (!loadPageModule) {
@@ -266,10 +277,26 @@ export function createServerEntry(options: ServerEntryOptions) {
 			documentLoads,
 			fragmentBridge,
 		);
-		const routedArtifact = options.prerenderWakeEntryPath
-			? { ...pageArtifact, prerenderWakeModuleUrl: options.prerenderWakeEntryPath }
-			: pageArtifact;
+		let rendersStorage = false;
+		const routedArtifact = {
+			...pageArtifact,
+			...(options.prerenderWakeEntryPath
+				? { prerenderWakeModuleUrl: options.prerenderWakeEntryPath }
+				: {}),
+			async renderSsr(renderProps?: unknown, renderContext?: unknown) {
+				const output = await pageArtifact.renderSsr(renderProps, renderContext);
+				if (documentStorageRecords(output.state).length > 0) rendersStorage = true;
+				return output;
+			},
+		};
+		// A page that renders storage() depends on the visitor's cookies, with or without one: no shared cache may reuse it.
+		const privateToVisitor = () => {
+			if (!rendersStorage) return;
+			headers['cache-control'] = 'private';
+			headers.vary = headers.vary ? `${headers.vary}, cookie` : 'cookie';
+		};
 		const renderOptions = {
+			cookie,
 			props: pageProps,
 			resumeModuleUrl: options.resumeEntryPath ?? baseArtifact?.resumeModuleUrl,
 			modulePreloads: () => landingModulePreloads(options.routeSsrModulePreloads?.[file]),
@@ -280,6 +307,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 			const pageHtml = splitLeadingHeadHtml(
 				await renderToString(routedArtifact as never, renderOptions),
 			);
+			privateToVisitor();
 			const shell = await renderDocumentShell(
 				documentModule,
 				pageProps,
@@ -297,6 +325,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 		// deadline render inline; the rest flush @pending and settle on the
 		// same open response.
 		const stream = await renderToStream(routedArtifact as never, renderOptions);
+		privateToVisitor();
 		const pageHtml = splitLeadingHeadHtml(stream.shell);
 		const shell = await renderDocumentShell(
 			documentModule,

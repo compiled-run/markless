@@ -1,7 +1,10 @@
 import { ASYNC_BOUNDARY_ARM, ASYNC_PROTOCOL_VERSION } from '@markless/serializer';
 import { expect, test } from 'vitest';
 import { marklessSsrAttachSnapshots, marklessSsrRunAsyncComputed } from '../src/fns/ssr.ts';
-import { createInlineResumerSelfWakeSource } from '../src/inline/resumer.ts';
+import {
+	createInlineResumerSelfWakeSource,
+	INLINE_MODULE_LOADER_SOURCE,
+} from '../src/inline/resumer.ts';
 import { renderToStream } from '../src/render-to-stream.ts';
 
 // Once the page has painted, the reveal train holds a streamed commit on a timer.
@@ -172,7 +175,12 @@ test('an event-less wake waits for a timer-held streamed commit before starting 
 		page.run(commit);
 		expect(page.timers).toHaveLength(1);
 
-		page.run(createInlineResumerSelfWakeSource('/build/lighthouse-resume.js'));
+		page.run(
+			createInlineResumerSelfWakeSource('/build/lighthouse-resume.js').replace(
+				INLINE_MODULE_LOADER_SOURCE,
+				'__vite_ssr_dynamic_import__',
+			),
+		);
 		await page.drain();
 		expect(page.log).toEqual([]);
 
@@ -193,7 +201,12 @@ test('an event-less wake on a document with no queued streamed commit starts aft
 	const page = paintedDocument();
 	try {
 		page.run(executor);
-		page.run(createInlineResumerSelfWakeSource('/build/lighthouse-resume.js'));
+		page.run(
+			createInlineResumerSelfWakeSource('/build/lighthouse-resume.js').replace(
+				INLINE_MODULE_LOADER_SOURCE,
+				'__vite_ssr_dynamic_import__',
+			),
+		);
 		await page.drain();
 		expect(page.log).toEqual(['import /build/lighthouse-resume.js', 'wake event=0']);
 	} finally {

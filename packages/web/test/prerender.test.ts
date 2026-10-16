@@ -3,6 +3,7 @@ import {
 	createProtocolStatePayload,
 	PROTOCOL_VISIBLE_EVENT_NAME,
 	renderPayloadScripts,
+	STORAGE_SLOT_SYMBOL_KEY,
 } from '@markless/serializer';
 import { classifyResumeRecordDelta } from '@markless/serializer/resume-record-delta';
 import {
@@ -545,6 +546,57 @@ test('self-wakes an unsettled prerendered async boundary without payload scripts
 	expect(html).toContain('data-markless-self-wake');
 	expect(html).toContain('queueMicrotask');
 	expect(html).toContain('DOMContentLoaded');
+});
+
+test('a storage page carries the values it was rendered with to the idle wake check, script-safe', async () => {
+	const artifact: SsrRenderArtifact = {
+		resumeModuleUrl: '/build/resume.js',
+		renderSsr: () => ({ html: '' }),
+	};
+	const hostile = '</script><script>globalThis.pwned=1</script><!--';
+	const container = (rendered: string, storage = true) => ({
+		html: '<output>value</output>',
+		state: {
+			version: 2 as const,
+			cells: [
+				{
+					graphNodeId: 'storage:src/App.tsrx#theme',
+					name: 'theme',
+					valueKind: 'scalar' as const,
+					value: { version: 1, root: rendered, records: [] },
+				},
+			],
+			computed: [],
+			sharedDefinitions: [],
+			...(storage
+				? { storage: [{ graphNodeId: 'storage:src/App.tsrx#theme', key: 'theme' }] }
+				: {}),
+		},
+		view: {
+			version: 1 as const,
+			locators: [],
+			events: [{ hostNodeId: 'h0', eventName: 'click', symbolIds: ['symbol:0'] }],
+			domUpdates: [],
+			behaviors: [],
+			elementHandles: [],
+			keyedRepeats: [],
+			branches: [],
+			asyncBoundaries: [],
+		},
+	});
+	const scriptBodies = (html: string) =>
+		[...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map((match) => match[1]!);
+
+	const page = await assemblePrerenderContainer(artifact, container('light'), {});
+	expect(page).toContain(`${JSON.stringify(STORAGE_SLOT_SYMBOL_KEY)},[["src/App.tsrx#theme","light"]]`);
+
+	const escaped = await assemblePrerenderContainer(artifact, container(hostile), {});
+	expect(scriptBodies(escaped).join('')).not.toContain('</script');
+	expect(scriptBodies(escaped).join('')).not.toContain('<!--');
+	expect(scriptBodies(escaped)).toHaveLength(scriptBodies(page).length);
+
+	const storageFree = await assemblePrerenderContainer(artifact, container('light', false), {});
+	expect(storageFree).not.toContain(STORAGE_SLOT_SYMBOL_KEY);
 });
 
 test('built prerender closure uses pending-only async evaluation', async () => {

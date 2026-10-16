@@ -1,5 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it, vi } from 'vitest';
+import { STORAGE_RENDER_CONTEXT_READER } from '../../serializer/src/storage-cookie.ts';
+import { storageCookieName } from '../../serializer/src/storage-slot.ts';
 import { createServerEntry } from '../src/vite/runtime/create-server-entry.ts';
 
 describe('server entry with async compiled artifacts', () => {
@@ -106,6 +108,51 @@ describe('server entry with async compiled artifacts', () => {
 		const hrefs = [...html.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((m) => m[1]);
 
 		expect(hrefs).toEqual(['/dev/site-header.css', '/dev/document.css', '/dev/island.css']);
+	});
+
+	it('renders storage() from the request cookie and keeps that response out of shared caches', async () => {
+		const storagePage = {
+			default: {
+				renderSsr: async (_props: unknown, context?: Record<string, unknown>) => {
+					const read = context?.[STORAGE_RENDER_CONTEXT_READER] as
+						| ((key: string) => string | undefined)
+						| undefined;
+					return {
+						html: `<main>${read?.('theme') ?? 'light'}</main>`,
+						state: {
+							version: 2,
+							cells: [],
+							computed: [],
+							sharedDefinitions: [],
+							storage: [{ graphNodeId: 'storage:pages/index.tsrx#theme', key: 'theme' }],
+						},
+					};
+				},
+			},
+		};
+		const entry = (page: unknown) =>
+			createServerEntry({
+				documentModuleLoader: undefined,
+				pageModuleLoaders: { 'pages/index.tsrx': async () => page },
+				routeFileIds: ['pages/index.tsrx'],
+			});
+		const withCookie = await entry(storagePage).fetch(
+			new Request('http://localhost/', {
+				headers: { cookie: `${storageCookieName('theme')}=dark` },
+			}),
+		);
+		const withoutCookie = await entry(storagePage).fetch(new Request('http://localhost/'));
+		const storageFree = await entry({
+			default: { renderSsr: async () => ({ html: '<main>plain</main>' }) },
+		}).fetch(new Request('http://localhost/'));
+
+		expect(await withCookie.text()).toContain('<main>dark</main>');
+		expect(withCookie.headers.get('cache-control')).toBe('private');
+		expect(withCookie.headers.get('vary')).toContain('cookie');
+		expect(await withoutCookie.text()).toContain('<main>light</main>');
+		expect(withoutCookie.headers.get('cache-control')).toBe('private');
+		expect(storageFree.headers.get('cache-control')).toBeNull();
+		expect(storageFree.headers.get('vary')).toBeNull();
 	});
 
 	it('logs render errors before serving the 500 status page', async () => {

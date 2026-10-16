@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from 'vitest';
 import { cleanup, renderSSRPhased, type SsrRenderResult } from '../src/index.ts';
+import { storageCookieName } from '../../serializer/src/storage-slot.ts';
 import StorageFixture from './fixtures/storage.tsrx';
 
 const storageSlot = Symbol.for('tsrx.storage/1');
@@ -7,6 +8,7 @@ const storageSlot = Symbol.for('tsrx.storage/1');
 afterEach(async () => {
 	await cleanup();
 	localStorage.removeItem('theme');
+	document.cookie = `${storageCookieName('theme')}=;path=/;max-age=0`;
 	document.documentElement.removeAttribute('data-theme');
 	delete (globalThis as Record<symbol, unknown>)[storageSlot];
 });
@@ -96,4 +98,15 @@ test('storage writes update every plane and survive a fresh SSR mount', async ()
 	await expect.poll(() => themeValue(reloaded).textContent).toBe('dark');
 	expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
 	expect(localStorage.getItem('theme')).toBe('dark');
+});
+
+test('module-scope storage renders the request cookie value on the server', async () => {
+	const cookie = `${storageCookieName('theme')}=dark`;
+	document.cookie = `${cookie};path=/`;
+	const screen = (await renderSSRPhased(StorageFixture, { cookie })).mount();
+
+	expect(themeValue(screen).textContent).toBe('dark');
+	expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+	await wake(screen);
+	expect(themeValue(screen).textContent).toBe('dark');
 });

@@ -159,7 +159,7 @@ function emitComposedMdxRoute(route: MdxRoute, id: string): string {
 		'  storageSeeds: marklessMdxStorageSeeds,',
 		'  headInjections: marklessMdxHeadInjections,',
 		'  loadSymbol: marklessMdxLoadSymbol,',
-		'  async renderSsr(props = {}) {',
+		'  async renderSsr(props = {}, marklessMdxRenderContext) {',
 		'    const marklessMdxChildren = [];',
 		`    const html = ${renderHtmlExpression(route)};`,
 		'    const state = composeMdxState(marklessMdxChildren);',
@@ -607,7 +607,7 @@ function renderHtmlExpression(route: MdxRoute): string {
 		route.parts.map((part) => {
 			if (part.kind === 'html') return JSON.stringify(part.html);
 			const component = route.components[part.componentIndex]!;
-			return `(await renderMdxChild(marklessMdxChildren, ${component.localName}, ${componentPropsExpression(component)}, { componentIndex: ${part.componentIndex}, hostPrefix: ${JSON.stringify(component.prefix)}, symbolPrefix: ${JSON.stringify(component.prefix)}${childrenElementTagsField(component)} }))`;
+			return `(await renderMdxChild(marklessMdxChildren, ${component.localName}, ${componentPropsExpression(component)}, { componentIndex: ${part.componentIndex}, hostPrefix: ${JSON.stringify(component.prefix)}, symbolPrefix: ${JSON.stringify(component.prefix)}${childrenElementTagsField(component)} }, marklessMdxRenderContext))`;
 		}),
 	);
 }

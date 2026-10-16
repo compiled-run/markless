@@ -168,6 +168,9 @@ const _INLINE_EVENT_ACTIONS = {
 	[PROTOCOL_EVENT_ACTION_KIND.externalDelegate]: 'noop',
 } as const satisfies Record<ProtocolEventActionKind, 'forward' | 'noop'>;
 
+// Written into startup scripts as text: a serialized function body containing import() would carry the host's transform of it.
+export const INLINE_MODULE_LOADER_SOURCE = '(url) => import(/* @vite-ignore */ url)';
+
 export function createInlineResumerSource(options: InlineResumerBuildOptions): string {
 	if (options.debug && (!options.debugBootstrapSource || !options.debugRegistrationSource)) {
 		throw new Error('MARKLESS_INLINE_RESUMER_DEBUG_SOURCE_REQUIRED');
@@ -187,7 +190,7 @@ const __MARKLESS_INLINE_RESUME_MODULE_URL__=${JSON.stringify(options.resumeModul
 const __MARKLESS_INLINE_VISIBLE_EVENT__=${JSON.stringify(PROTOCOL_VISIBLE_EVENT_NAME)};
 const __MARKLESS_INLINE_DEBUG_BOOTSTRAP__=${debugBootstrap};
 const __MARKLESS_INLINE_DEBUG_REGISTER__=${debugRegistration};
-${logging ? `(${runGeneralInlineLogSummary.toString()})(${JSON.stringify(options.executionLog)});\n` : ''}(${runInlineResumer.toString()})((url) => import(/* @vite-ignore */ url));
+${logging ? `(${runGeneralInlineLogSummary.toString()})(${JSON.stringify(options.executionLog)});\n` : ''}(${runInlineResumer.toString()})(${INLINE_MODULE_LOADER_SOURCE});
 }`;
 }
 
@@ -196,7 +199,31 @@ export function createInlineResumerDebugRegistrationSource(): string {
 }
 
 export function createInlineResumerSelfWakeSource(resumeModuleUrl: string | undefined): string {
-	return `;(${runInlineResumerSelfWake.toString()})(${JSON.stringify(resumeModuleUrl)});`;
+	return `;(${runInlineResumerSelfWake.toString()})(${JSON.stringify(resumeModuleUrl)},${INLINE_MODULE_LOADER_SOURCE});`;
+}
+
+// Appended only to a page that renders storage() cells. The head seed script has
+// already put each saved value in the slot; the page starts its runtime at idle,
+// exactly as an unsettled async page does, only when one of them differs from the
+// value this page was rendered with. `renderedJson` is script-safe JSON.
+export function createInlineResumerStorageWakeSource(
+	resumeModuleUrl: string | undefined,
+	slotSymbolKey: string,
+	renderedJson: string,
+): string {
+	return `;(${runInlineResumerStorageWake.toString()})(${JSON.stringify(slotSymbolKey)},${renderedJson},()=>(${runInlineResumerSelfWake.toString()})(${JSON.stringify(resumeModuleUrl)},${INLINE_MODULE_LOADER_SOURCE}));`;
+}
+
+function runInlineResumerStorageWake(
+	slotSymbolKey: string,
+	rendered: ReadonlyArray<readonly [slotKey: string, value: string]>,
+	wake: () => void,
+): void {
+	const slot = (globalThis as Record<symbol, Record<string, unknown> | undefined>)[
+		Symbol.for(slotSymbolKey)
+	];
+	if (slot && rendered.some(([key, value]) => Object.hasOwn(slot, key) && slot[key] !== value))
+		wake();
 }
 
 /**
@@ -211,7 +238,7 @@ export function createInlineResumerSelfWakeSource(resumeModuleUrl: string | unde
 export function createInlineResumerOverlayPrimerSource(
 	resumeModuleUrl: string | undefined,
 ): string {
-	return `;(${runInlineResumerOverlayPrimer.toString()})(${JSON.stringify(resumeModuleUrl)},(url) => import(/* @vite-ignore */ url));`;
+	return `;(${runInlineResumerOverlayPrimer.toString()})(${JSON.stringify(resumeModuleUrl)},${INLINE_MODULE_LOADER_SOURCE});`;
 }
 
 // The page's event names vary, so a precompiled boot cannot bake them in. The
@@ -657,7 +684,10 @@ function runPrerenderInlineResumer(
 // Serialized only into documents whose payload has an unsettled async runner.
 // Keeping this outside runInlineResumer leaves event-only documents on the
 // smaller interaction-triggered bootstrap.
-function runInlineResumerSelfWake(fallbackResumeModuleUrl: string | undefined): void {
+function runInlineResumerSelfWake(
+	fallbackResumeModuleUrl: string | undefined,
+	loadModule: (url: string) => Promise<InlineResumeModule>,
+): void {
 	const currentScript = document.currentScript as HTMLScriptElement | null;
 	const root = currentScript?.closest<InlineRoot>('[data-async-container]');
 	const resumeModuleUrl =
@@ -670,9 +700,7 @@ function runInlineResumerSelfWake(fallbackResumeModuleUrl: string | undefined): 
 				queueMicrotask(async () => {
 					if (!root.__asyncResumeRuntimeStarted) {
 						root.__marklessDelegatedDispatch = true;
-						const module = (await import(
-							/* @vite-ignore */ resumeModuleUrl
-						)) as InlineResumeModule;
+						const module = await loadModule(resumeModuleUrl);
 						await module.resumeContainerEvent({ root, event: 0 });
 					}
 				});
@@ -735,7 +763,7 @@ function runInlineResumerOverlayPrimer(
 export function createInlineResumerVisiblePrimerSource(
 	resumeModuleUrl: string | undefined,
 ): string {
-	return `;(${runInlineResumerVisiblePrimer.toString()})(${JSON.stringify(PROTOCOL_VISIBLE_EVENT_NAME)},${JSON.stringify(resumeModuleUrl)},(url) => import(/* @vite-ignore */ url));`;
+	return `;(${runInlineResumerVisiblePrimer.toString()})(${JSON.stringify(PROTOCOL_VISIBLE_EVENT_NAME)},${JSON.stringify(resumeModuleUrl)},${INLINE_MODULE_LOADER_SOURCE});`;
 }
 
 function runInlineResumerVisiblePrimer(

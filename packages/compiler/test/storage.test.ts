@@ -1,3 +1,4 @@
+import { STORAGE_RENDER_CONTEXT_READER } from '@markless/serializer';
 import { expect, test } from 'vitest';
 import { buildSemanticGraph, compileTsrxModule } from '../src/index.ts';
 import { renderBodyLines } from '../src/passes/public-render/render-body.ts';
@@ -442,7 +443,7 @@ test('render body lowering treats storage metadata as a state initializer', () =
 	);
 
 	expect(lines).toEqual([
-		'\tlet theme = stateValue(values, payload, "storage:src/App.tsrx#theme-mode", "light");',
+		`\tlet theme = stateValue(values, payload, "storage:src/App.tsrx#theme-mode", (marklessSsrRenderContext?.${STORAGE_RENDER_CONTEXT_READER}?.("theme-mode") ?? "light"));`,
 		'\treturn root;',
 	]);
 });

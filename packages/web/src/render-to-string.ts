@@ -1,6 +1,11 @@
 import {
+	createStorageCookieReader,
+	escapeScriptJson,
+	STORAGE_RENDER_CONTEXT_READER,
 	STORAGE_SLOT_SYMBOL_KEY,
 	storageAttributeName,
+	storageCookieName,
+	storageSlotEntryKeyFromGraphNodeId,
 	type ProtocolEventAction,
 	type ProtocolSyncPolicy,
 	type ProtocolSyncPolicyCondition,
@@ -27,6 +32,7 @@ import {
 	createPrerenderInlineVisiblePrimerSource,
 	createInlineResumerSelfWakeSource,
 	createInlineResumerSource,
+	createInlineResumerStorageWakeSource,
 	renderPrerenderInlineResumerSource,
 	type InlineResumerSourceVariants,
 	type PrerenderBootArtifact,
@@ -96,6 +102,8 @@ export type RenderToStringOptions = {
 	readonly executionLog?: MarklessExecutionLogMode;
 	// Page props forwarded to the compiled renderSsr (router hosts).
 	readonly props?: unknown;
+	/** The request's Cookie header. storage() cells render from the values saved in it. */
+	readonly cookie?: string | null;
 	// Build-computed settled-arm templates plus their fill plan. Inert markup:
 	// it sits after the rendered page so no page element or comment index moves.
 	readonly armEmission?: string;
@@ -120,8 +128,19 @@ export async function renderToString(
 	component: SsrRenderable,
 	options: RenderToStringOptions = {},
 ): Promise<string> {
-	const output = await renderSsrOutput(component, options.props, undefined);
+	const output = await renderSsrOutput(
+		component,
+		options.props,
+		storageRenderContext(options.cookie),
+	);
 	return assembleSsrContainer(component, output, options);
+}
+
+/** The render-context half of `cookie`: compiled storage() cells read their value through it. */
+export function storageRenderContext(cookie: string | null | undefined): {
+	readonly [STORAGE_RENDER_CONTEXT_READER]?: (key: string) => string | undefined;
+} {
+	return cookie ? { [STORAGE_RENDER_CONTEXT_READER]: createStorageCookieReader(cookie) } : {};
 }
 
 // Shared container assembly for the blocking (renderToString) and streaming
@@ -226,7 +245,8 @@ export async function assembleSsrContainer(
 					true,
 					overlayPrimer,
 					!wakeChannelEnabled && hasVisibleEvents,
-					wakeChannelEnabled ? prerenderVisiblePrimerSource(view) : '',
+					(wakeChannelEnabled ? prerenderVisiblePrimerSource(view) : '') +
+						(selfWake ? '' : storageWakeSource(state, selectedResumeModuleUrl)),
 				)
 			: '';
 	const storageSeedScript = renderStorageSeedScript(
@@ -308,7 +328,8 @@ export async function assemblePrerenderPageParts(
 					!boot,
 					false,
 					false,
-					prerenderVisiblePrimerSource(view),
+					prerenderVisiblePrimerSource(view) +
+						(selfWake ? '' : storageWakeSource(state, resumeModuleUrl)),
 				)
 			: '';
 
@@ -482,8 +503,40 @@ function renderStorageSeedScript(
 	// (fallback on miss/throw), publish it into the landing slot the runtime
 	// consumes, and set the no-flash data attribute on <html>. The attribute name
 	// is precomputed (sanitized) so a derived markless:<key> becomes data-markless-<key>.
-	const source = `(()=>{const s=globalThis[Symbol.for(${JSON.stringify(STORAGE_SLOT_SYMBOL_KEY)})]||={};for(const[k,d,a,f]of ${JSON.stringify(seeds.map((seed) => [seed.slotKey, seed.driverKey, storageAttributeName(seed.driverKey), seed.fallback]))}){let v=f;try{v=localStorage.getItem(d)??f}catch{}s[k]=v;document.documentElement.setAttribute(a,v)}})()`;
+	// The cookie is read first: it is the value a server render with this request saw.
+	const source = `(()=>{const s=globalThis[Symbol.for(${JSON.stringify(STORAGE_SLOT_SYMBOL_KEY)})]||={},c=document.cookie.split('; ');for(const[k,d,a,f,n]of ${escapeScriptJson(JSON.stringify(seeds.map((seed) => [seed.slotKey, seed.driverKey, storageAttributeName(seed.driverKey), seed.fallback, storageCookieName(seed.driverKey)])))}){let v=f;try{const e=c.find(e=>e.startsWith(n+'='));v=e?decodeURIComponent(e.slice(n.length+1)):localStorage.getItem(d)??f}catch{}s[k]=v;document.documentElement.setAttribute(a,v)}})()`;
 	return `<script${nonceAttribute}>${escapeInlineScript(source)}</script>`;
+}
+
+// Each storage cell's slot key and the value this render gave it.
+function storageWakeSource(
+	state: ProtocolStatePayload,
+	resumeModuleUrl: string | undefined,
+): string {
+	const rendered = (state.storage ?? []).flatMap((record) => {
+		const value = renderedCellValue(
+			state.cells.find((cell) => cell.graphNodeId === record.graphNodeId),
+		);
+		return value === undefined
+			? []
+			: [[storageSlotEntryKeyFromGraphNodeId(record.graphNodeId), value] as const];
+	});
+	if (rendered.length === 0) return '';
+	return createInlineResumerStorageWakeSource(
+		resumeModuleUrl,
+		STORAGE_SLOT_SYMBOL_KEY,
+		escapeScriptJson(JSON.stringify(rendered)),
+	);
+}
+
+function renderedCellValue(
+	cell: ProtocolStatePayload['cells'][number] | undefined,
+): string | undefined {
+	if (typeof cell?.directValue === 'string') return cell.directValue;
+	const value = cell?.value;
+	if (typeof value === 'string') return value;
+	const root = (value as { readonly root?: unknown } | undefined)?.root;
+	return typeof root === 'string' ? root : undefined;
 }
 
 function renderHeadInjection(injection: RenderHeadInjection, nonce: string | undefined): string {

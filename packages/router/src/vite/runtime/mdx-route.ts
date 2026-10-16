@@ -8,6 +8,7 @@ import {
 	withProjectionSpan,
 } from '../../../../web/src/ssr-data/renderer.ts';
 import { marklessSsrRosterPositionContext } from '../../../../web/src/fns/roster-position.ts';
+import { STORAGE_RENDER_CONTEXT_READER } from '../../../../serializer/src/storage-cookie.ts';
 import { marklessSsrIslandRosterAnswered } from '../../../../web/src/prerender/island-roster.ts';
 import {
 	protocolInstancePath,
@@ -296,6 +297,7 @@ export async function renderMdxChild(
 	component: MdxComponentArtifact,
 	props: unknown,
 	child: Omit<MdxChild, 'output'>,
+	pageRenderContext?: unknown,
 ): Promise<string> {
 	// Compiled marklessRenderSsr is async (initial render awaits demanded
 	// async work); the unawaited Promise passed the truthy guard while .html
@@ -306,7 +308,13 @@ export async function renderMdxChild(
 	// spelled the way the counts it minted name them.
 	// The island's segment leads its minted element() ids: every island composes
 	// from its own root, and the page's client surface spells them under it too.
-	const renderContext = marklessSsrRosterPositionContext({ elementIdScope: child.hostPrefix });
+	const storageValue = (pageRenderContext as Record<string, unknown> | undefined)?.[
+		STORAGE_RENDER_CONTEXT_READER
+	];
+	const renderContext = marklessSsrRosterPositionContext({
+		elementIdScope: child.hostPrefix,
+		...(storageValue ? { [STORAGE_RENDER_CONTEXT_READER]: storageValue } : {}),
+	});
 	const rendered = await renderWithMdxChildren(component, props, child, renderContext);
 	const output =
 		rendered && typeof rendered.html === 'string'

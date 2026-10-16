@@ -163,7 +163,7 @@ This page is static markdown.
 		expect(code).toContain(
 			`import InteractiveCounter from "../../components/InteractiveCounter.tsrx";`,
 		);
-		expect(code).toContain('renderSsr(props = {})');
+		expect(code).toContain('renderSsr(props = {}, marklessMdxRenderContext)');
 		expect(code).not.toContain('renderCsr(props = {})');
 		expect(code).toContain('renderData: marklessMdxRenderData');
 		expect(code).toContain('preload()');

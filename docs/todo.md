@@ -41,7 +41,7 @@ passed for all 14 packages. Nothing is published yet.
 
 ## Follow-ups, highest value first
 
-- **State read from `storage()` is stale in the resumed DOM until first interaction.** With a saved value other than the default, attributes and text that depend on it (`aria-selected`, a `{pm}` text node) keep the server default after load; only `<html>` data set by the head script is right. The walkthrough's package-manager switch uses plain buttons with CSS-driven ", selected" text because of this; real tabs need the fix.
+- **The walkthrough's package-manager switch can become real tabs.** `storage()` now renders from the request cookie and corrects a prerendered page at idle, so the plain buttons with CSS-driven ", selected" text are no longer needed.
 
 - **Compiler refuses an imported stateful component inside `@if`** on
   server-rendered pages, for example an imported modal. Common pattern.
