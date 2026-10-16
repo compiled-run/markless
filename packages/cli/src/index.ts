@@ -39,6 +39,7 @@ declare const __VERSION__: string | undefined;
 export type ProjectFormat = 'node' | 'bun' | 'deno';
 export type Starter = 'minimal' | 'app' | 'docs' | 'full-stack';
 export type PackageManager = 'npm' | 'pnpm' | 'yarn' | 'bun' | 'deno';
+export type Editor = 'vscode' | 'zed' | 'none';
 
 export type Choice<T extends string> = {
 	readonly value: T;
@@ -79,6 +80,28 @@ export const STARTER_CHOICES = [
 		hint: 'App routes plus api/ and middleware/ files.',
 	},
 ] as const satisfies readonly Choice<Starter>[];
+
+export const EDITOR_CHOICES = [
+	{ value: 'vscode', label: 'VS Code', hint: 'Also Cursor and Windsurf.' },
+	{ value: 'zed', label: 'Zed', hint: '' },
+	{ value: 'none', label: 'Other', hint: 'Writes no editor settings.' },
+] as const satisfies readonly Choice<Editor>[];
+
+const EDITOR_SETTINGS_DIRECTORIES = { vscode: '.vscode/', zed: '.zed/' } as const;
+
+const EDITOR_README_NOTES: Record<Editor, string> = {
+	vscode: '`.vscode/extensions.json` recommends that TSRX extension, and `.vscode/settings.json` turns on\nEmmet in `.tsrx` files.',
+	zed: "`.zed/settings.json` opens `.tsrx` files as TSX and loads the Markless TypeScript plugin into\nZed's TypeScript language server.",
+	none: 'This app was created without editor settings files, so your editor reads `tsconfig.json` alone.',
+};
+
+/** Picks the editor whose integrated terminal is running this setup, falling back to VS Code. */
+export function detectEditor(env: ProgramRuntime['env']): Editor {
+	// VS Code, Cursor and Windsurf all report TERM_PROGRAM=vscode; Zed sets TERM_PROGRAM=zed and ZED_TERM=true.
+	if (env.TERM_PROGRAM === 'vscode') return 'vscode';
+	if (env.TERM_PROGRAM === 'zed' || env.ZED_TERM === 'true') return 'zed';
+	return 'vscode';
+}
 
 export type ProgramPath = string | URL;
 
@@ -192,6 +215,7 @@ export interface ValidatedCreateInput {
 	help: boolean;
 	version: boolean;
 	agents?: WritableAgentId[];
+	editor?: Editor;
 	cwd: string;
 	packageManager: PackageManager;
 }
@@ -207,6 +231,8 @@ export interface CreateOptions {
 	cwd: string;
 	agents: WritableAgentId[];
 	agentDriven?: WritableAgentId;
+	/** Whose settings files the app gets. Undefined means the editor detected from the environment. */
+	editor?: Editor;
 	/**
 	 * The workspace the new app would land inside, decided once in `interact`
 	 * and only read from here on. Null when the app is not inside one.
@@ -277,6 +303,7 @@ export class CreateProgram {
 				cwd: input.cwd,
 				agents: input.agents ?? (agentDriven ? [agentDriven] : []),
 				agentDriven,
+				editor: input.editor ?? detectEditor(runtime.env),
 				// A run that cannot ask defaults to keeping the app separate,
 				// and says so before installing. `--workspace` is the only way
 				// such a run joins.
@@ -322,6 +349,13 @@ export class CreateProgram {
 				initialValue: 'node',
 				message: 'Where should it run?',
 				options: PROJECT_FORMAT_CHOICES,
+			}));
+		const editor =
+			input.editor ??
+			(await prompts.select<Editor>({
+				initialValue: detectEditor(runtime.env),
+				message: 'Which editor do you use?',
+				options: EDITOR_CHOICES,
 			}));
 		// Detected here rather than right after the target prompt because the
 		// format decides which manager actually installs, and that decides
@@ -373,6 +407,7 @@ export class CreateProgram {
 			packageManager: input.packageManager,
 			cwd: input.cwd,
 			agents,
+			editor,
 			enclosingWorkspace,
 			workspace,
 		};
@@ -399,7 +434,11 @@ export class CreateProgram {
 		const targetDir = resolve(options.cwd, options.target);
 
 		await ensureWritableTarget(targetDir, options.force, runtime.fs);
-		await writeStarter(options, targetDir, runtime.fs);
+		await writeStarter(
+			{ ...options, editor: options.editor ?? detectEditor(runtime.env) },
+			targetDir,
+			runtime.fs,
+		);
 
 		if (options.git) {
 			runCommand(runtime, 'git', ['init'], targetDir);
@@ -574,6 +613,15 @@ function parseArgs(args: readonly string[]): ValidatedCreateInput {
 			);
 			continue;
 		}
+		if (arg === '--editor' || arg.startsWith('--editor=')) {
+			parsed.editor = readChoice(
+				'editor',
+				arg,
+				arg.includes('=') ? undefined : args[++index],
+				EDITOR_CHOICES,
+			);
+			continue;
+		}
 
 		throw new Error(`Unknown option: ${arg}`);
 	}
@@ -606,7 +654,9 @@ function readChoice<T extends string>(
 
 	if (!value) throw new Error(`Missing value for --${name}.`);
 	if (!choices.some((choice) => choice.value === value)) {
-		throw new Error(`Unsupported ${name}: ${value}`);
+		throw new Error(
+			`Unsupported ${name}: ${value}. Use ${choices.map((choice) => choice.value).join(', ')}.`,
+		);
 	}
 
 	return value as T;
@@ -689,6 +739,7 @@ function creationSummary(options: CreateOptions): string {
 		`Runtime:  ${choiceLabel(PROJECT_FORMAT_CHOICES, options.format)}`,
 		`Install:  ${options.install ? `Yes, with ${options.packageManager}` : 'No'}`,
 		`Git:      ${options.git ? 'Yes' : 'No'}`,
+		`Editor:   ${options.editor === 'none' ? 'Other, no editor settings' : choiceLabel(EDITOR_CHOICES, options.editor ?? 'vscode')}`,
 		// Left out for an app that already matches a member declaration: that
 		// case is silent, and there is no choice to report.
 		...(enclosing && !enclosing.isMember
@@ -757,7 +808,7 @@ async function ensureWritableTarget(
 }
 
 async function writeStarter(
-	options: CreateOptions,
+	options: CreateOptions & { readonly editor: Editor },
 	targetDir: string,
 	fs: ProgramFileSystem,
 ): Promise<void> {
@@ -772,7 +823,10 @@ async function writeStarter(
 	);
 }
 
-async function starterFiles(options: CreateOptions, fs: ProgramFileSystem): Promise<StarterFile[]> {
+async function starterFiles(
+	options: CreateOptions & { readonly editor: Editor },
+	fs: ProgramFileSystem,
+): Promise<StarterFile[]> {
 	const directories = [
 		new URL('common/', TEMPLATE_ROOT),
 		new URL(`formats/${options.format}/`, TEMPLATE_ROOT),
@@ -780,10 +834,18 @@ async function starterFiles(options: CreateOptions, fs: ProgramFileSystem): Prom
 	];
 	const files = (
 		await Promise.all(directories.map((directory) => readTemplateDirectory(directory, fs)))
-	).flat();
+	)
+		.flat()
+		.filter((file) =>
+			Object.entries(EDITOR_SETTINGS_DIRECTORIES).every(
+				([editor, directory]) =>
+					editor === options.editor || !file.path.startsWith(directory),
+			),
+		);
 
 	const renderedFiles = renderTemplateFiles(files, {
 		devCommand: devCommand(options),
+		editorNote: EDITOR_README_NOTES[options.editor],
 		marklessVersion: await marklessVersionRange(fs),
 		packageName: packageName(options.target),
 	});
@@ -1025,6 +1087,7 @@ Options:
   --yes, -y          Use defaults
   --format <name>   node, deno, or bun
   --starter <name>  minimal, app, docs, or full-stack
+  --editor <name>   vscode, zed, or none
   --agents <list>   claude-code, codex, gemini-cli, github-copilot, or none
   --no-install      Skip dependency installation
   --no-git          Skip git initialization

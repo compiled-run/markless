@@ -107,7 +107,17 @@ test('preselects found writable agents, shows exact skill paths, and disables Cu
 		},
 	});
 	const input = program.validate(
-		['app', '--starter', 'minimal', '--format', 'node', '--no-install', '--no-git'],
+		[
+			'app',
+			'--starter',
+			'minimal',
+			'--format',
+			'node',
+			'--editor',
+			'vscode',
+			'--no-install',
+			'--no-git',
+		],
 		testRuntime,
 	);
 	const options = await program.interact(input, testRuntime);
@@ -371,10 +381,7 @@ test('agents add reports every Node-runtime result when one agent collides', asy
 	});
 
 	await expect(
-		new CreateProgram().run(
-			['agents', 'add', '--agents', 'claude-code,codex'],
-			testRuntime,
-		),
+		new CreateProgram().run(['agents', 'add', '--agents', 'claude-code,codex'], testRuntime),
 	).rejects.toThrow('one or more collisions');
 	expect(stderr.join('')).toContain(`Agent configuration collision at ${claudePath}`);
 	expect(stdout.join('')).toContain(

@@ -24,8 +24,10 @@ const detectAgenticEnvironment = vi.hoisted(() =>
 vi.mock('am-i-vibing', () => ({ detectAgenticEnvironment }));
 import {
 	CreateProgram,
+	EDITOR_CHOICES,
 	PROJECT_FORMAT_CHOICES,
 	STARTER_CHOICES,
+	detectEditor,
 	detectEnclosingWorkspace,
 	installDependencies,
 	planInstall,
@@ -171,6 +173,7 @@ test('prompts interactively when a TTY run has no target', async () => {
 					);
 					if (message === 'What are you building today?') return 'docs';
 					if (message === 'Where should it run?') return 'node';
+					if (message === 'Which editor do you use?') return 'zed';
 					if (message === 'Install dependencies now?') return 'no';
 					if (message === 'Initialize git?') return 'no';
 					if (message === 'Ready to create?') return 'create';
@@ -209,13 +212,23 @@ test('prompts interactively when a TTY run has no target', async () => {
 		'select:Where should it run?:node:Node|Creates a package.json project for pnpm, npm, or yarn.,Deno|If you love its security model. Any deno-compatible runtime works.,Bun|Creates a package.json project tuned for Bun.',
 	);
 	expect(events).toContain(
+		'select:Which editor do you use?:vscode:VS Code|Also Cursor and Windsurf.,Zed|,Other|Writes no editor settings.',
+	);
+	const selects = events.filter((event) => event.startsWith('select:'));
+	expect(selects.findIndex((event) => event.startsWith('select:Which editor do you use?:'))).toBe(
+		selects.findIndex((event) => event.startsWith('select:Where should it run?:')) + 1,
+	);
+	expect(
+		selects.findIndex((event) => event.startsWith('select:Install dependencies now?:')),
+	).toBe(selects.findIndex((event) => event.startsWith('select:Which editor do you use?:')) + 1);
+	expect(events).toContain(
 		'select:Install dependencies now?:yes:Yes|Runs pnpm install after files are created.,No|Leaves dependencies for you to install later.',
 	);
 	expect(events).toContain(
 		'select:Initialize git?:yes:Yes|Runs git init in the app directory.,No|Leaves version control untouched.',
 	);
 	expect(events).toContain(
-		'note:Ready to create?:App:      interactive-docs\nStarter:  Write docs\nRuntime:  Node\nInstall:  No\nGit:      No',
+		'note:Ready to create?:App:      interactive-docs\nStarter:  Write docs\nRuntime:  Node\nInstall:  No\nGit:      No\nEditor:   Zed',
 	);
 	expect(events).toContain('select:Ready to create?:create:Create app|,Cancel|');
 	expect(events).toContain(
@@ -224,6 +237,131 @@ test('prompts interactively when a TTY run has no target', async () => {
 	expect(events).toContain('outro:Markless app ready.');
 	await expect(exists(join(root, 'interactive-docs/pages/index.mdx'))).resolves.toBe(true);
 	await expect(exists(join(root, 'interactive-docs/document.tsrx'))).resolves.toBe(true);
+	await expect(exists(join(root, 'interactive-docs/.zed/settings.json'))).resolves.toBe(true);
+	await expect(exists(join(root, 'interactive-docs/.vscode'))).resolves.toBe(false);
+});
+
+test('preselects the editor whose terminal runs the CLI, and VS Code otherwise', () => {
+	expect(EDITOR_CHOICES.map(({ value, label, hint }) => ({ value, label, hint }))).toEqual([
+		{ value: 'vscode', label: 'VS Code', hint: 'Also Cursor and Windsurf.' },
+		{ value: 'zed', label: 'Zed', hint: '' },
+		{ value: 'none', label: 'Other', hint: 'Writes no editor settings.' },
+	]);
+	expect(detectEditor({ TERM_PROGRAM: 'vscode' })).toBe('vscode');
+	expect(detectEditor({ TERM_PROGRAM: 'zed', ZED_TERM: 'true' })).toBe('zed');
+	expect(detectEditor({ ZED_TERM: 'true' })).toBe('zed');
+	expect(detectEditor({ TERM_PROGRAM: 'zed' })).toBe('zed');
+	expect(detectEditor({ TERM_PROGRAM: 'iTerm.app' })).toBe('vscode');
+	expect(detectEditor({})).toBe('vscode');
+});
+
+test('offers the detected editor as the initial interactive answer', async () => {
+	const root = await makeWorkspace();
+	let initialEditor: string | undefined;
+	const program = new CreateProgram();
+	const tty = runtime(root, {
+		env: { npm_config_user_agent: 'pnpm/10.33.2', TERM_PROGRAM: 'zed', ZED_TERM: 'true' },
+		isTTY: true,
+		prompts: {
+			intro() {},
+			note() {},
+			outro() {},
+			cancel() {},
+			async multiselect() {
+				return [];
+			},
+			async text() {
+				return 'editor-app';
+			},
+			async select({ message, initialValue }) {
+				if (message === 'Which editor do you use?') initialEditor = initialValue;
+				return initialValue;
+			},
+		},
+	});
+
+	const options = await program.interact(program.validate([], tty), tty);
+
+	expect(initialEditor).toBe('zed');
+	expect(options.editor).toBe('zed');
+});
+
+test('--yes writes the settings of the editor detected from the environment', async () => {
+	const cases = [
+		{ env: { TERM_PROGRAM: 'vscode' }, editor: 'vscode' },
+		{ env: { TERM_PROGRAM: 'zed', ZED_TERM: 'true' }, editor: 'zed' },
+		{ env: {}, editor: 'vscode' },
+	] as const;
+	for (const { env, editor } of cases) {
+		const root = await makeWorkspace();
+		const host = runtime(root, { env: { npm_config_user_agent: 'pnpm/10.33.2', ...env } });
+		const program = new CreateProgram();
+		const options = await program.interact(program.validate(['my-app', '--yes'], host), host);
+
+		expect(options.editor).toBe(editor);
+		await program.execute({ ...options, install: false, git: false }, host);
+		await expect(exists(join(root, 'my-app/.vscode'))).resolves.toBe(editor === 'vscode');
+		await expect(exists(join(root, 'my-app/.zed'))).resolves.toBe(editor === 'zed');
+	}
+});
+
+test('--editor writes only the chosen editor settings and names them in the README', async () => {
+	const written = {
+		vscode: ['.vscode/extensions.json', '.vscode/settings.json'],
+		zed: ['.zed/settings.json'],
+		none: [],
+	} as const;
+	for (const editor of ['vscode', 'zed', 'none'] as const) {
+		const root = await makeWorkspace();
+		const host = runtime(root, {
+			env: { npm_config_user_agent: 'pnpm/10.33.2', TERM_PROGRAM: 'zed' },
+		});
+		await new CreateProgram().run(
+			['my-app', '--editor', editor, '--no-install', '--no-git'],
+			host,
+		);
+
+		const appRoot = join(root, 'my-app');
+		const editorFiles = [
+			...(await readdir(join(appRoot, '.vscode')).catch(() => [])).map(
+				(name) => `.vscode/${name}`,
+			),
+			...(await readdir(join(appRoot, '.zed')).catch(() => [])).map((name) => `.zed/${name}`),
+		].sort();
+		expect(editorFiles).toEqual(written[editor]);
+		for (const file of written[editor]) {
+			await expect(readFile(join(appRoot, file), 'utf-8')).resolves.toBe(
+				await readFile(new URL(`../templates/common/${file}`, import.meta.url), 'utf-8'),
+			);
+		}
+
+		const readme = await readFile(join(appRoot, 'README.md'), 'utf-8');
+		expect(readme).not.toContain('{{');
+		expect(readme.includes('.vscode/')).toBe(editor === 'vscode');
+		expect(readme.includes('.zed/')).toBe(editor === 'zed');
+	}
+});
+
+test('--editor= form is accepted and an unknown editor lists the valid ones', async () => {
+	const root = await makeWorkspace();
+	const program = new CreateProgram();
+
+	expect(program.validate(['my-app', '--editor=none'], runtime(root)).editor).toBe('none');
+	expect(() => program.validate(['my-app', '--editor', 'vim'], runtime(root))).toThrow(
+		'Unsupported editor: vim. Use vscode, zed, none.',
+	);
+	expect(() => program.validate(['my-app', '--editor'], runtime(root))).toThrow(
+		'Missing value for --editor.',
+	);
+});
+
+test('lists --editor in the help output', async () => {
+	const root = await makeWorkspace();
+	const stdoutWrites: string[] = [];
+
+	await new CreateProgram().run(['--help'], runtime(root, { stdoutWrites }));
+
+	expect(stdoutWrites.join('')).toContain('  --editor <name>   vscode, zed, or none\n');
 });
 
 test('creates a minimal Markless Router app with TSRX pages and Nitro-backed deps', async () => {
@@ -252,11 +390,6 @@ test('creates a minimal Markless Router app with TSRX pages and Nitro-backed dep
 	const vscodeExtensions = JSON.parse(
 		await readFile(join(appRoot, '.vscode/extensions.json'), 'utf-8'),
 	) as unknown;
-	const zedSettings = await readFile(join(appRoot, '.zed/settings.json'), 'utf-8');
-	const zedSettingsTemplate = await readFile(
-		new URL('../templates/common/.zed/settings.json', import.meta.url),
-		'utf-8',
-	);
 
 	expect(packageJson.scripts).toMatchObject({
 		build: 'vp build',
@@ -291,7 +424,7 @@ test('creates a minimal Markless Router app with TSRX pages and Nitro-backed dep
 	expect(vscodeExtensions).toEqual({
 		recommendations: ['ripple-ts.ripple-ts-vscode-plugin'],
 	});
-	expect(zedSettings).toBe(zedSettingsTemplate);
+	await expect(exists(join(appRoot, '.zed'))).resolves.toBe(false);
 	await expect(exists(join(appRoot, 'AGENTS.md'))).resolves.toBe(false);
 	await expect(exists(join(appRoot, 'CLAUDE.md'))).resolves.toBe(false);
 	await expect(exists(join(appRoot, '.claude'))).resolves.toBe(false);
@@ -315,7 +448,9 @@ test('creates a minimal Markless Router app with TSRX pages and Nitro-backed dep
 	expect(viteConfig).not.toContain('@vitejs/devtools');
 	expect(viteConfig).not.toContain('DevTools');
 	expect(viteConfig).not.toContain('nitro()');
-	expect(gitignore).toBe('node_modules/\ndist/\n.vite/\n.markless/\n.output/\n*.log\n.DS_Store\n');
+	expect(gitignore).toBe(
+		'node_modules/\ndist/\n.vite/\n.markless/\n.output/\n*.log\n.DS_Store\n',
+	);
 	await expect(exists(join(appRoot, 'gitignore'))).resolves.toBe(false);
 	await expect(readFile(join(appRoot, 'tsconfig.json'), 'utf-8')).resolves.not.toContain('tsx');
 	await expect(exists(join(appRoot, 'pages/index.tsx'))).resolves.toBe(false);
@@ -462,7 +597,9 @@ test('generates docs with MDX routes and component layouts only', async () => {
 	expect(indexMdx).toContain('# Markless Router Docs');
 	expect(catchAllMdx).toContain('<DocsLayout');
 	expect(catchAllMdx).toContain('</DocsLayout>');
-	expect(catchAllMdx).toContain("import DocsLayout from '../../components/layouts/DocsLayout.tsrx';");
+	expect(catchAllMdx).toContain(
+		"import DocsLayout from '../../components/layouts/DocsLayout.tsrx';",
+	);
 	expect(viteConfig).not.toContain('mdx');
 
 	await expect(exists(join(appRoot, 'content'))).resolves.toBe(false);
@@ -553,7 +690,16 @@ test('tells every package manager a dev command it accepts, in the output and th
 		const root = await makeWorkspace();
 		const stdoutWrites: string[] = [];
 		await new CreateProgram().run(
-			['dev-app', '--format', format, '--yes', '--no-install', '--no-git', '--agents', 'none'],
+			[
+				'dev-app',
+				'--format',
+				format,
+				'--yes',
+				'--no-install',
+				'--no-git',
+				'--agents',
+				'none',
+			],
 			runtime(root, { env: { npm_config_user_agent: userAgent }, stdoutWrites }),
 		);
 		const readme = await readFile(join(root, 'dev-app/README.md'), 'utf-8');
@@ -996,6 +1142,7 @@ const promptThroughCli = async (
 					);
 					if (message === 'What are you building today?') return 'minimal';
 					if (message === 'Where should it run?') return 'node';
+					if (message === 'Which editor do you use?') return 'vscode';
 					if (message === 'Install dependencies now?') return 'yes';
 					if (message === 'Initialize git?') return 'no';
 					if (message === 'Ready to create?') return 'create';

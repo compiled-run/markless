@@ -9,6 +9,16 @@ npm create markless@latest
 (`npm create markless` requires a `create-markless` package on the registry,
 which is not part of this release.)
 
+## Editor settings
+
+The CLI asks which editor you use and writes only that editor's settings:
+`VS Code` writes `.vscode/settings.json` and `.vscode/extensions.json` (Cursor and
+Windsurf read them too), `Zed` writes `.zed/settings.json`, and `Other` writes
+neither. The preselected answer, and the one `--yes` uses, is the editor whose
+terminal is running the CLI (`TERM_PROGRAM=vscode` means VS Code, Cursor, or
+Windsurf; `TERM_PROGRAM=zed` or `ZED_TERM=true` means Zed), and VS Code
+otherwise. `--editor <vscode|zed|none>` answers up front.
+
 ## Scaffolding inside an existing workspace
 
 If the new app lands inside a directory tree that already belongs to a pnpm,
