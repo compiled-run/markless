@@ -336,6 +336,9 @@ export function ghostFor(run: Run, typed: string, saved: ManagerId = 'npm'): str
 	return '';
 }
 
+/** Whether Tab would take a suggestion: the caret is at the end of a line that has one; an empty shell line always suggests the saved manager's command. */
+export const completesAt = (run: Run, typed: string, at: number) => typing(run) !== 'none' && at === typed.length && ghostFor(run, typed) !== '';
+
 /** Whether the shell line can no longer become any manager's create command. */
 export const invalidAt = (run: Run, typed: string) => typing(run) === 'shell' && isInvalid(typed, createCommands);
 

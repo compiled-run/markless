@@ -2,7 +2,7 @@
 import { computed, state, storage } from '@markless/core';
 import { scriptCommand } from '../../docs/walkthrough/facts.ts';
 import { FOOTERS, managerOf, savedOnPage } from '../create/managers.ts';
-import { describe, type Desk, enter, ghostFor, HEADING, HOST, interrupt, LABEL, MAX_TYPED, PAGE_FILE, press, print, screen, showsFooter, START, TARGET, tidy, washFor } from './model.ts';
+import { completesAt, describe, type Desk, enter, ghostFor, HEADING, HOST, interrupt, LABEL, MAX_TYPED, PAGE_FILE, press, print, screen, showsFooter, START, TARGET, tidy, washFor } from './model.ts';
 import { every, fieldIn, halt } from './play.ts';
 import { art } from './dev-server.art.ts';
 import { recall, remember } from '../create/history.ts';
@@ -19,6 +19,7 @@ export default function DevServer() @{
 	let back = state(0);
 	let tick = state('a');
 	let packageManager = storage('package-manager', 'npm');
+	const completes = computed(() => completesAt(desk, typed, at));
 	const suggesting = computed(() => (showsFooter(desk, typed) ? 'yes' : 'no'));
 	const label = 'Terminal in ' + TARGET + '. Type the dev command of npm, pnpm, yarn, Bun or Deno and press Enter; Enter on an empty line runs the suggested one.';
 	const pick = computed(() => washFor(desk.count));
@@ -172,7 +173,7 @@ export default function DevServer() @{
 						tick = tick === 'a' ? 'b' : 'a';
 					}}
 					onKeyDown={(event) => {
-						if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || (event.key === 'c' && event.ctrlKey === true)) event.preventDefault();
+						if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || (event.key === 'c' && event.ctrlKey === true) || (event.key === 'Tab' && event.shiftKey === false && completes)) event.preventDefault();
 						const input = event.target as HTMLInputElement;
 						if ((event.key === 'ArrowUp' || event.key === 'ArrowDown') && desk.phase === 'off') {
 							const step = recall(ran, back, event.key === 'ArrowUp' ? 1 : -1);
@@ -183,7 +184,7 @@ export default function DevServer() @{
 							at = step.line.length;
 							return;
 						}
-						if (event.key === 'ArrowRight' && desk.phase === 'off' && input.selectionStart === input.value.length && ghostFor(input.value, managerOf(savedOnPage(packageManager))) !== '') {
+						if ((event.key === 'ArrowRight' || (event.key === 'Tab' && !event.shiftKey)) && desk.phase === 'off' && input.selectionStart === input.value.length && ghostFor(input.value, managerOf(savedOnPage(packageManager))) !== '') {
 							input.value = input.value + ghostFor(input.value, managerOf(savedOnPage(packageManager)));
 							typed = input.value;
 							at = input.value.length;

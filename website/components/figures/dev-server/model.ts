@@ -93,6 +93,9 @@ export const press = (desk: Desk): Desk => (desk.phase === 'on' ? { ...desk, cou
 export const ghostFor = (typed: string, saved: ManagerId = 'npm') => completion(typed, saved, devCommands);
 
 
+/** Whether Tab would take a suggestion: the prompt is open and the caret is at the end of a line that has one; an empty prompt always suggests the saved manager's command. */
+export const completesAt = (desk: Desk, typed: string, at: number) => desk.phase === 'off' && at === typed.length && ghostFor(typed) !== '';
+
 /** The bottom row, kept clear for the footer naming the other managers while the prompt is empty. */
 export const FOOTER = row('', '', 'footer');
 export const showsFooter = (desk: Desk, typed: string) => desk.phase === 'off' && typed === '';

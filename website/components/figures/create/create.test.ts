@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { CreateProgram, EDITOR_CHOICES, PROJECT_FORMAT_CHOICES, STARTER_CHOICES, type ProgramPrompts, type ProgramRuntime } from '../../../../packages/cli/src/index.ts';
 import { createCommand, MANAGERS, type ManagerId } from '../../docs/walkthrough/facts.ts';
-import { choose, COMMON_FILES, createCommands, cursorRow, describe as say, dropOrder, type Editor, EDITORS, enter, filesFor, focusRow, type Format, FORMATS, ghostFor, invalidAt, isFirstPage, labelOf, landed, layout, LONGEST, MAX_TYPED, interrupt, move, MOST_FILES, NOTE_LINES, noteLines, NOTES, PAGE_SLOT, PER, PROMPTS, promptsFor, ROWS, type Run, screen, showsFooter, slipAt, START, type Starter, STARTERS, submit, tabOf, TARGET, transcript, widthOf, wrap, WRAP } from './model.ts';
+import { choose, completesAt, COMMON_FILES, createCommands, cursorRow, describe as say, dropOrder, type Editor, EDITORS, enter, filesFor, focusRow, type Format, FORMATS, ghostFor, invalidAt, isFirstPage, labelOf, landed, layout, LONGEST, MAX_TYPED, interrupt, move, MOST_FILES, NOTE_LINES, noteLines, NOTES, PAGE_SLOT, PER, PROMPTS, promptsFor, ROWS, type Run, screen, showsFooter, slipAt, START, type Starter, STARTERS, submit, tabOf, TARGET, transcript, widthOf, wrap, WRAP } from './model.ts';
 import { FOOTERS } from './managers.ts';
 import { drawing } from './create.ts';
 import { recall, remember } from './history.ts';
@@ -232,6 +232,20 @@ describe('the create figure plays the real CLI', () => {
 		expect(piece.match(/^\s+packageManager = /gm)).toHaveLength(1);
 		expect(piece.slice(piece.indexOf("event.key === 'Enter') {"), piece.indexOf("event.key === 'c' && event.ctrlKey) {"))).toContain('packageManager = after.manager;');
 		for (const handler of ['onFocusIn', 'onPointerOver']) for (const block of piece.split(handler).slice(1)) expect(block.slice(0, 300)).not.toContain('savedOnPage');
+	});
+
+	it('lets Tab take the suggestion only while there is one at the caret, so Tab with nothing to complete leaves the terminal', () => {
+		expect(completesAt(START, '', 0)).toBe(true);
+		expect(completesAt(START, 'pn', 2)).toBe(true);
+		expect(completesAt(START, 'pn', 1)).toBe(false);
+		expect(completesAt(START, 'x', 1)).toBe(false);
+		expect(completesAt(START, COMMAND, COMMAND.length)).toBe(false);
+		const naming = enter(enter(START));
+		expect(completesAt(naming, '', 0)).toBe(true);
+		expect(completesAt(naming, 'beanshop', 8)).toBe(false);
+		expect(completesAt(enter(START), '', 0)).toBe(false);
+		expect(piece).toContain("(event.key === 'Tab' && event.shiftKey === false && completes)) event.preventDefault();");
+		expect(piece).toContain("(event.key === 'ArrowRight' || (event.key === 'Tab' && !event.shiftKey))");
 	});
 
 	it('keeps the caret where the keyboard left it: a click only focuses the line, and nothing in the figure selects as text', () => {

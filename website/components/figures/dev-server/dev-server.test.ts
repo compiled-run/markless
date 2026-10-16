@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { MANAGERS, scriptCommand } from '../../docs/walkthrough/facts.ts';
-import { describe as say, DONE, enter, FOOTER, ghostFor, HEADING, interrupt, LABEL, OUTPUT, PAGE_FILE, press, print, screen, showsFooter, SLOTS, START, TARGET, URL_LINE, washFor } from './model.ts';
+import { completesAt, describe as say, DONE, enter, FOOTER, ghostFor, HEADING, interrupt, LABEL, OUTPUT, PAGE_FILE, press, print, screen, showsFooter, SLOTS, START, TARGET, URL_LINE, washFor } from './model.ts';
 import { drawing } from './dev-server.ts';
 
 const COMMAND = scriptCommand('npm', 'dev');
@@ -85,6 +85,16 @@ describe('the dev server figure shows the real starter', () => {
 		expect(piece).toContain("scriptCommand(managerOf(pick), 'dev')");
 		expect(piece.match(/^\s+packageManager = /gm)).toHaveLength(1);
 		expect(piece).toMatch(/\.desk \{[^}]*user-select: none;/);
+	});
+
+	it('lets Tab take the suggestion only while there is one at the caret, so Tab with nothing to complete leaves the terminal', () => {
+		expect(completesAt(START, '', 0)).toBe(true);
+		expect(completesAt(START, 'pn', 2)).toBe(true);
+		expect(completesAt(START, 'pn', 1)).toBe(false);
+		expect(completesAt(START, 'ls', 2)).toBe(false);
+		expect(completesAt(START, COMMAND, COMMAND.length)).toBe(false);
+		expect(completesAt(enter(START, ''), '', 0)).toBe(false);
+		expect(piece).toContain("(event.key === 'Tab' && event.shiftKey === false && completes)) event.preventDefault();");
 	});
 
 	it('marks a line red once no dev command starts with it, and keeps a wrong command red above its hint', () => {

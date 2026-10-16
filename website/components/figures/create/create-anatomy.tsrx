@@ -2,7 +2,7 @@
 import { computed, state, storage } from '@markless/core';
 import { createCommand } from '../../docs/walkthrough/facts.ts';
 import { FOOTERS, managerOf, savedOnPage } from './managers.ts';
-import { choose, cursorRow, describe, flip, focusRow, interrupt, ghostFor, labelOf, landed, MAX_NAME, MAX_TYPED, move, frontAt, type Run, screen, showsFooter, slipAt, START, submit, tabOf, typing, widthOf } from './model.ts';
+import { choose, completesAt, cursorRow, describe, flip, focusRow, interrupt, ghostFor, labelOf, landed, MAX_NAME, MAX_TYPED, move, frontAt, type Run, screen, showsFooter, slipAt, START, submit, tabOf, typing, widthOf } from './model.ts';
 import { art } from './create.art.ts';
 import { recall, remember } from './history.ts';
 
@@ -19,6 +19,7 @@ export default function CreateAnatomy() @{
 	let back = state(0);
 	let tick = state('a');
 	let packageManager = storage('package-manager', 'npm');
+	const completes = computed(() => completesAt(run, typed, at));
 	const suggesting = computed(() => (showsFooter(run, typed) ? 'yes' : 'no'));
 	const lines = computed(() => {
 		const rows = screen(run, typed, at);
@@ -111,7 +112,7 @@ export default function CreateAnatomy() @{
 					tick = tick === 'a' ? 'b' : 'a';
 				}}
 				onKeyDown={(event) => {
-					if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Enter' || (event.key === 'c' && event.ctrlKey === true)) event.preventDefault();
+					if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Enter' || (event.key === 'c' && event.ctrlKey === true) || (event.key === 'Tab' && event.shiftKey === false && completes)) event.preventDefault();
 					const input = event.target as HTMLInputElement;
 					if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
 						if (typing(run) === 'shell') {
@@ -126,7 +127,7 @@ export default function CreateAnatomy() @{
 						if (typing(run) !== 'none') return;
 						run = move(run, event.key === 'ArrowDown' ? 1 : -1);
 						said = describe(run, true);
-					} else if (event.key === 'ArrowRight' && input.selectionStart === input.value.length && ghostFor(run, input.value, managerOf(savedOnPage(packageManager))) !== '') {
+					} else if ((event.key === 'ArrowRight' || (event.key === 'Tab' && !event.shiftKey)) && input.selectionStart === input.value.length && ghostFor(run, input.value, managerOf(savedOnPage(packageManager))) !== '') {
 						input.value = (input.value + ghostFor(run, input.value, managerOf(savedOnPage(packageManager)))).slice(0, typing(run) === 'name' ? MAX_NAME : MAX_TYPED);
 						typed = input.value;
 						at = input.value.length;
