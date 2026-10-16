@@ -38,11 +38,11 @@ describe('the Beanshop order slip', () => {
 		expect(existsSync(new URL('./copy-command.tsrx', import.meta.url))).toBe(false);
 	});
 
-	it('is the only thing in the section after one short line, with no small print on the slip', () => {
+	it('is the only thing in the section between one short line and the link to Creating a new app, with no small print on the slip', () => {
 		expect(turn.match(/<StartWithAgent \/>/g)).toHaveLength(1);
 		const before = turn.slice('## Start your first app'.length, turn.indexOf('<StartWithAgent />')).trim();
 		expect(before.split('\n').filter(Boolean)).toHaveLength(1);
-		expect(turn.slice(turn.indexOf('<StartWithAgent />') + '<StartWithAgent />'.length).trim()).toBe('');
+		expect(turn.slice(turn.indexOf('<StartWithAgent />') + '<StartWithAgent />'.length).trim()).toBe('Prefer to set it up yourself? See [Creating a new app →](/start/new-app)');
 		expect(piece).not.toContain('pre-release');
 	});
 

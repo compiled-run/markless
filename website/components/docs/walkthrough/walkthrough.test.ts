@@ -6,7 +6,7 @@ import { COMMON_FILES, DEFAULT_APP, createCommand, MANAGERS, scriptCommand, SHOW
 
 const templates = new URL('../../../../packages/cli/templates/', import.meta.url);
 const cli = readFileSync(new URL('../../../../packages/cli/src/index.ts', import.meta.url), 'utf8');
-const page = readFileSync(new URL('../../../pages/start/walkthrough.mdx', import.meta.url), 'utf8');
+const page = readFileSync(new URL('../../../pages/start/new-app.mdx', import.meta.url), 'utf8');
 const cliPackage = JSON.parse(readFileSync(new URL('../../../../packages/cli/package.json', import.meta.url), 'utf8')) as { name: string };
 
 // Under the test runner's resolve conditions shiki loads a wasm build Node cannot run, so the fences render in a plain child.

@@ -6,7 +6,12 @@
 	"redirects": [
 		{
 			"source": "/start/first-app",
-			"destination": "/start/walkthrough",
+			"destination": "/start/new-app",
+			"permanent": true
+		},
+		{
+			"source": "/build/existing-site",
+			"destination": "/start/existing-site",
 			"permanent": true
 		}
 	]

@@ -5,7 +5,7 @@ import { drawing } from './wired.ts';
 
 const scene = drawing();
 
-const page = readFileSync(new URL('../../../pages/build/existing-site.mdx', import.meta.url), 'utf8');
+const page = readFileSync(new URL('../../../pages/start/existing-site.mdx', import.meta.url), 'utf8');
 const piece = readFileSync(new URL('./existing-site-anatomy.tsrx', import.meta.url), 'utf8');
 const between = (from: string, to: string) => {
 	const at = piece.indexOf(from);

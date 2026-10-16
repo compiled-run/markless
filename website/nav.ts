@@ -51,8 +51,8 @@ export const nav: readonly NavSection[] = [
 					'What Markless is: elements and events in TypeScript, with an API designed to compile to any device. The browser, server rendering and tests work today, and iOS and macOS are early proofs.',
 			},
 			{
-				title: 'Walkthrough',
-				href: '/start/walkthrough',
+				title: 'Creating a new app',
+				href: '/start/new-app',
 				sprite: 'plus',
 				icon: 'first-app',
 				number: '2',
@@ -60,11 +60,20 @@ export const nav: readonly NavSection[] = [
 					'Make a new app with one command, open it in your browser, and change it.',
 			},
 			{
+				title: 'Adding to an existing site',
+				href: '/start/existing-site',
+				sprite: 'square',
+				icon: 'first-app',
+				number: '3',
+				description:
+					'Put a Markless component into one element of an HTML page you already have, with Vite and render(), and ship static files.',
+			},
+			{
 				title: 'Reading a .tsrx file',
 				href: '/start/reading-tsrx',
 				sprite: 'bookmark',
 				icon: 'reading-tsrx',
-				number: '3',
+				number: '4',
 				description:
 					'Every part of a .tsrx file, line by line, then the other files in a starter app.',
 			},
@@ -180,15 +189,6 @@ export const nav: readonly NavSection[] = [
 				number: '4',
 				description:
 					'shared() gives a piece of data a name, so a component that wants it calls the name instead of having it threaded down through props.',
-			},
-			{
-				title: 'Add to an existing site',
-				href: '/build/existing-site',
-				sprite: 'square',
-				icon: 'first-app',
-				number: '5',
-				description:
-					'Put a Markless component into one element of an HTML page you already have, with Vite and render(), and ship static files.',
 			},
 		],
 	},
@@ -544,8 +544,8 @@ export function pagerFor(pathname: string): Pager {
  * what the reader sees and follows, so a page never spells a URL itself.
  */
 export const concepts: Readonly<Record<string, NavEntry>> = {
-	'first-app': { title: 'your first app', href: '/start/walkthrough' },
-	'browser-only': { title: 'adding Markless to an existing site', href: '/build/existing-site' },
+	'first-app': { title: 'your first app', href: '/start/new-app' },
+	'browser-only': { title: 'adding Markless to an existing site', href: '/start/existing-site' },
 	'reading-tsrx': { title: 'reading a .tsrx file', href: '/start/reading-tsrx' },
 	async: { title: 'async', href: '/concepts/async' },
 	computed: { title: 'computed', href: '/concepts/computed' },

@@ -6,7 +6,11 @@
 		<changefreq>weekly</changefreq>
 	</url>
 	<url>
-		<loc>https://markless.dev/start/walkthrough</loc>
+		<loc>https://markless.dev/start/new-app</loc>
+		<changefreq>weekly</changefreq>
+	</url>
+	<url>
+		<loc>https://markless.dev/start/existing-site</loc>
 		<changefreq>weekly</changefreq>
 	</url>
 	<url>
@@ -55,10 +59,6 @@
 	</url>
 	<url>
 		<loc>https://markless.dev/build/shared</loc>
-		<changefreq>weekly</changefreq>
-	</url>
-	<url>
-		<loc>https://markless.dev/build/existing-site</loc>
 		<changefreq>weekly</changefreq>
 	</url>
 	<url>

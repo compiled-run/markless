@@ -2109,7 +2109,7 @@ try {
 		await page.screenshot({ path: `${shotsDir}/T013-shopping-list-after.png`, fullPage: true });
 
 		// --- batch 3: first app, async, styling ---------------------------------
-		for (const href of ['/start/walkthrough', '/concepts/async', '/concepts/styling']) {
+		for (const href of ['/start/new-app', '/concepts/async', '/concepts/styling']) {
 			const response = await fetch(`${origin}${href}`);
 			check(response.status === 200, `GET ${href}`, String(response.status));
 			await page.goto(`${origin}${href}`, { waitUntil: 'load' });
@@ -2303,7 +2303,7 @@ try {
 		);
 
 		// The first-app page carries the scaffold command and a starter home that runs.
-		await page.goto(`${origin}/start/walkthrough`, { waitUntil: 'load' });
+		await page.goto(`${origin}/start/new-app`, { waitUntil: 'load' });
 		const firstAppText = (await page.locator('.prose').first().innerText()).replace(
 			/\s+/g,
 			' ',

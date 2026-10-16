@@ -15,7 +15,7 @@ export default box(
 		const page = await browser.visit('/');
 		await expect.page.text(page, 'h1', 'Write a variable. The page follows it.', WAIT);
 		await page.click('.sidebar-summary', WAIT);
-		await page.click('.sidebar a[href="/start/walkthrough"]', WAIT);
+		await page.click('.sidebar a[href="/start/new-app"]', WAIT);
 		await expect.page.text(page, 'h1', 'Creating a new app', WAIT);
 		const documents = (await page.networkRequests()).filter(
 			(request) => request.resourceType === 'Document',
@@ -27,7 +27,7 @@ export default box(
 		}
 		await expect.page.exists(
 			page,
-			'.sidebar a[aria-current="page"][href="/start/walkthrough"]',
+			'.sidebar a[aria-current="page"][href="/start/new-app"]',
 			WAIT,
 		);
 		await page.click('[data-theme-toggle="dark"]', WAIT);
