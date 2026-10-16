@@ -1,5 +1,7 @@
 import PageMeta from '../../components/page-meta.tsrx';
 import Collapsible from '../../components/docs/collapsible.tsrx';
+import Commands from '../../components/docs/walkthrough/commands.tsrx';
+import ManagerCommand from '../../components/docs/walkthrough/manager-command.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import LikeHeart from '../../components/docs/like-heart.tsrx';
@@ -7,21 +9,13 @@ import ExistingSiteAnatomy from '../../components/figures/existing-site/existing
 
 <Sidebar />
 
-# Add Markless to an existing site
+# Adding to an existing site
 
-<PageMeta level="Building" time="3 min" assumes="state, events" sprite="square" />
+<PageMeta level="Start here" time="3 min" assumes="state, events" sprite="square" />
 
 <ThemeToggle />
 
-Starting fresh? [Creating a new app](/start/new-app) is quicker. This page is for when the page already exists, and you want one interactive part on it: a cart button, a calculator, a live search.
-
-You give Markless one empty element, and it fills that element with your component. The rest of the page stays as it is. There is no router and no server, and the build is a folder of static files.
-
-In your site's folder, install Markless and Vite, the tool that builds the page:
-
-```bash
-npm install @markless/core vite
-```
+Markless can run one interactive part of a page you already have: a cart button, a calculator, a live search. You give it one empty element, it fills that element, and the rest of the page stays as it is. There is no router and no server; the build is a folder of static files.
 
 ## Cut one spot
 
@@ -30,6 +24,12 @@ Your page stays your page. `render(App, { target })` runs your component once an
 Press the drawing to drop the like button into its spot, then press again to like it.
 
 <ExistingSiteAnatomy />
+
+## Install it
+
+In your site's folder, add Markless and Vite, the tool that builds the page:
+
+<ManagerCommand kind="install" />
 
 ## Three files
 
@@ -108,17 +108,13 @@ export default defineConfig({
 
 ## Run it
 
-```bash
-npm run dev
-```
+<Commands kind="start" />
 
 Open `http://localhost:5173`. You see the **Beanshop** heading and a **Count 0** button under it. Click the button: the number goes up, and the heading never changes. The first time you open the page, Vite may reload it once while it gets Markless ready.
 
 ## Ship it
 
-```bash
-npm run build
-```
+<Commands kind="build" />
 
 The `dist/` folder now holds `index.html` and a `build/` folder of JavaScript files. Upload `dist/` to any static file host. To try the built page on your machine first, run the `preview` script.
 
@@ -151,9 +147,7 @@ await render(Cart, { target: document.querySelector('#cart')! });
 
 Your editor needs the Markless TypeScript plugin to read `.tsrx` files. Install it with TypeScript:
 
-```bash
-npm install --save-dev @markless/typescript-plugin typescript
-```
+<Commands kind="install-editor" />
 
 Then add this `tsconfig.json` next to `package.json`:
 

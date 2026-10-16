@@ -89,7 +89,7 @@ describe('the package-manager commands', () => {
 	});
 
 	it('colours every block exactly as the site highlights a bash fence', () => {
-		const variants = (['create', 'dev', 'ship'] as CommandKind[]).flatMap((kind) => commandVariants(kind));
+		const variants = (['create', 'dev', 'ship', 'install', 'install-editor', 'start', 'build'] as CommandKind[]).flatMap((kind) => commandVariants(kind));
 		const rendered = renderBashFences(variants.map((variant) => variant.code));
 		for (const [index, variant] of variants.entries()) {
 			const fenced = rendered[index]!.split('<span class="line">').slice(1).map((line) => [...line.matchAll(/<span style="([^"]*)">([^<]*)<\/span>/g)].map(([, style, text]) => [style, text]));
@@ -102,9 +102,17 @@ describe('the package-manager commands', () => {
 		for (const manager of MANAGERS) expect(source, manager.id).toContain(`html[data-package-manager='${manager.id}'] .variant[data-package-manager='${manager.id}']`);
 	});
 
+	it('writes one panel per manager in the picker', () => {
+		const source = readFileSync(new URL('manager-command.tsrx', import.meta.url), 'utf8');
+		expect([...source.matchAll(/only="(\w+)"/g)].map((match) => match[1])).toEqual(MANAGERS.map((manager) => manager.id));
+	});
+
 	it('puts every manager command on the page through the components', () => {
-		expect(page).toContain('<CreateCommand />');
+		expect(page).toContain('<ManagerCommand kind="create" />');
 		for (const kind of ['dev', 'ship']) expect(page).toContain(`<Commands kind="${kind}" />`);
 		expect(page).not.toMatch(/^npm (create|run) /m);
+		const existing = readFileSync(new URL('../../../pages/start/existing-site.mdx', import.meta.url), 'utf8');
+		expect(existing).toContain('<ManagerCommand kind="install" />');
+		expect(existing).not.toMatch(/^npm (install|run) /m);
 	});
 });

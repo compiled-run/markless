@@ -1,14 +1,15 @@
 import { storage } from '@markless/core';
 import { tabs } from '@markless/ui';
+import type { CommandKind } from './commands.ts';
 import Commands from './commands.tsrx';
 import { MANAGERS } from './facts.ts';
 
-/** The create command under a row of package managers marked like the sidebar's current page; the choice is saved as package-manager, which every Commands block on the page follows. */
-export default function CreateCommand() @{
+/** A command under a row of package managers marked like the sidebar's current page; the choice is saved as package-manager, which every Commands block on every page follows. */
+export default function ManagerCommand({ kind }: { readonly kind: CommandKind }) @{
 	let packageManager = storage('package-manager', 'npm');
 
 	<tabs.root
-		class="create-command"
+		class="manager-command"
 		value={packageManager}
 		onChange={(next: string) => {
 			packageManager = next;
@@ -21,13 +22,23 @@ export default function CreateCommand() @{
 				</tabs.trigger>
 			}
 		</tabs.list>
-		@for (const manager of MANAGERS; key manager.id) {
-			<tabs.content class="panel" value={manager.id} aria-label={manager.label}>
-				<Commands kind="create" only={manager.id} />
-			</tabs.content>
-		}
+		<tabs.content class="panel" value="npm" aria-label="npm">
+			<Commands kind={kind} only="npm" />
+		</tabs.content>
+		<tabs.content class="panel" value="pnpm" aria-label="pnpm">
+			<Commands kind={kind} only="pnpm" />
+		</tabs.content>
+		<tabs.content class="panel" value="yarn" aria-label="yarn">
+			<Commands kind={kind} only="yarn" />
+		</tabs.content>
+		<tabs.content class="panel" value="bun" aria-label="Bun">
+			<Commands kind={kind} only="bun" />
+		</tabs.content>
+		<tabs.content class="panel" value="deno" aria-label="Deno">
+			<Commands kind={kind} only="deno" />
+		</tabs.content>
 		<style>
-			.create-command {
+			.manager-command {
 				display: block;
 				margin-block-start: var(--space-s);
 			}
