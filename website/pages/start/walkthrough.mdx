@@ -1,6 +1,4 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import Callout from '../../components/docs/callout.tsrx';
-import Collapsible from '../../components/docs/collapsible.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
@@ -12,19 +10,19 @@ import Commands from '../../components/docs/walkthrough/commands.tsrx';
 
 <Sidebar />
 
-# Make your first app
+# Creating a new app
 
 <PageMeta level="Start here" time="5 min" assumes="nothing" sprite="plus" />
 
 <ThemeToggle />
 
-<Subtitle text="One command writes a small folder. One file in it is your first page. Change it, and the page changes." />
+<Subtitle text="Create an app, start it, change your first page, and ship it." />
 
-Only want one button on a web page you already have? Read [Add Markless to an existing site](/build/existing-site) instead.
+Adding Markless to a site you already have? See [Add Markless to an existing site](/build/existing-site).
 
-## Create your app
+## Create it
 
-Every new app starts with one page, the few config files that build it, and your editor already set up. Run the command below to watch them land, and point at any file to see what it does.
+Every new app starts with one page, the few config files that build it, and your editor already set up. Here is each one, and what it's for.
 
 <CreateAnatomy />
 
@@ -45,12 +43,6 @@ Then do it for real, in your new app's folder:
 <Commands kind="dev" />
 
 Open `http://localhost:3000`. You see the same page. All of it comes from one file, `pages/index.tsrx`.
-
-<Callout
-	sprite="cross"
-	title="Why does npm say Unknown command dev?"
-	text="On version 0.4.0, the steps printed at the end say npm dev. npm has no dev command, so it stops with Unknown command. Type npm run dev instead. From 0.5.0 the steps say npm run dev. With Deno they say deno task dev, and that one works."
-/>
 
 ## Change one line, see your page change
 
@@ -77,46 +69,16 @@ Make the same change in your own `pages/index.tsrx` and save it. The page at `lo
 
 The file is named `index`, so it is the page at `/`. Add `pages/about.tsrx`, and you have a page at `/about`.
 
-## Ship it, one script at a time
+## Ship it
 
-Your app comes with these scripts:
+Build your app, then serve the build to click through exactly what your users will get:
 
-<Commands kind="scripts" />
+<Commands kind="ship" />
 
-`dev` is where you spend your day. Before you ship, run `build` and then `preview`. It serves the real production build, so you click what your users will get.
-
-Something wrong with the setup? Run the `doctor` script first (Deno apps do not have one). It checks that the `@markless/*` packages are there, on matching versions. It checks the editor wiring in `tsconfig.json`, and then it runs a build.
-
-## Try a different starter
-
-Every starter writes the same base files, then a few of its own. Pick a different answer to the first question in the terminal above to see exactly which files each one writes.
-
-To skip the questions, name the folder, add `--yes` and pick a starter:
-
-<Commands kind="starters" />
-
-`--yes` takes the default for every question a flag did not answer. The other flags: `--format` with `node`, `deno` or `bun`, `--no-install`, `--no-git`, `--agents` with a list or `none`, `--workspace` or `--no-workspace`, and `--force` to write into a folder that is not empty.
-
-## If your app looks a little different
-
-These pages follow the code at version 0.5.0. npm still installs 0.4.0, and a few things differ there.
-
-<Callout
-	sprite="cross"
-	title="Why does npm run dev stop on document.tsrx?"
-	text="With version 0.4.0, the app and full-stack starters stop in dev with MARKLESS_CAPTURE_METADATA_MISSING. The error names document.tsrx. Version 0.5.0 fixes this. Until npm installs 0.5.0, run npm run build and then npm run preview. On 0.4.0 the minimal starter has no document.tsrx, so its dev server works. From 0.5.0 every starter writes one."
-/>
-
-<Collapsible
-	sprite="star-badge"
-	summary="Which version does npm create markless install?"
-	text="Today it installs 0.4.0, for create-markless and for every @markless package. Version 0.5.0 is not on npm yet. Each new app asks for the same version of every Markless package. The doctor script checks that they match."
-/>
+The build is a Node server by default, and it can target Vercel and other hosts. [Deploying](/router/deploying) shows how.
 
 ## Where to go next
 
-[Reading a .tsrx file](/start/reading-tsrx) goes through `pages/index.tsrx` line by line, and the other files in your new app.
-
-[State](/concepts/state) is about the one new word in that file.
+[Reading a .tsrx file](/start/reading-tsrx) goes through your first page line by line.
 
 <LikeHeart />

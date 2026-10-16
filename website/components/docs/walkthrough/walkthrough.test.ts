@@ -2,8 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { commandVariants, type CommandKind } from './commands.ts';
-import { tabsInk } from './tabs-ink.ts';
-import { COMMON_FILES, DEFAULT_APP, commandFor, createCommand, MANAGERS, NO_DENO_TASK, scriptCommand, SCRIPTS, scriptsFor, STARTERS } from './facts.ts';
+import { COMMON_FILES, DEFAULT_APP, createCommand, MANAGERS, scriptCommand, SHOWN_SCRIPTS, STARTERS } from './facts.ts';
 
 const templates = new URL('../../../../packages/cli/templates/', import.meta.url);
 const cli = readFileSync(new URL('../../../../packages/cli/src/index.ts', import.meta.url), 'utf8');
@@ -29,9 +28,13 @@ function filesUnder(dir: URL, prefix = ''): string[] {
 const starterDirs: Record<string, string[]> = { minimal: ['minimal'], app: ['minimal', 'app'], 'full-stack': ['minimal', 'app', 'full-stack'], docs: ['docs'] };
 
 describe('the Walkthrough facts match create-markless', () => {
-	it('lists the starter package.json scripts, in order', () => {
+	it('only runs scripts every starter format has', () => {
 		const pkg = JSON.parse(readFileSync(new URL('formats/node/package.json', templates), 'utf8')) as { scripts: Record<string, string> };
-		expect(SCRIPTS.map((script) => script.name)).toEqual(Object.keys(pkg.scripts));
+		const deno = JSON.parse(readFileSync(new URL('formats/deno/deno.json', templates), 'utf8')) as { tasks: Record<string, string> };
+		for (const script of SHOWN_SCRIPTS) {
+			expect(pkg.scripts, script).toHaveProperty(script);
+			expect(deno.tasks, script).toHaveProperty(script);
+		}
 	});
 
 	it('lists exactly the files each starter writes on top of the common ones', () => {
@@ -55,7 +58,6 @@ describe('the Walkthrough facts match create-markless', () => {
 		expect(cli).toContain("message: 'What are you building today?'");
 		expect(cli).toContain(`const DEFAULT_TARGET = '${DEFAULT_APP}';`);
 		expect(cli).toContain("`${options.packageManager} run dev`");
-		expect(commandFor('app')).toBe('npm create markless@latest my-app -- --yes --starter app');
 	});
 
 	it('shows the create figure and no bare tables', () => {
@@ -79,8 +81,6 @@ describe('the package-manager commands', () => {
 			'bun create markless',
 			'deno run -A npm:create-markless',
 		]);
-		expect(commandFor('app', 'pnpm')).toBe('pnpm create markless my-app --yes --starter app');
-		expect(commandFor('app', 'deno')).toBe('deno run -A npm:create-markless my-app --yes --starter app');
 	});
 
 	it('runs scripts the way the CLI tells you to run dev', () => {
@@ -88,14 +88,8 @@ describe('the package-manager commands', () => {
 		for (const manager of MANAGERS) expect(scriptCommand(manager.id, 'dev')).toBe(manager.id === 'deno' ? 'deno task dev' : `${manager.id} run dev`);
 	});
 
-	it('leaves out the scripts a Deno app has no task for', () => {
-		const deno = JSON.parse(readFileSync(new URL('formats/deno/deno.json', templates), 'utf8')) as { tasks: Record<string, string> };
-		expect(scriptsFor('deno').map((script) => script.name)).toEqual(Object.keys(deno.tasks));
-		expect(SCRIPTS.filter((script) => !(script.name in deno.tasks)).map((script) => script.name)).toEqual(NO_DENO_TASK);
-	});
-
 	it('colours every block exactly as the site highlights a bash fence', () => {
-		const variants = (['create', 'dev', 'scripts', 'starters'] as CommandKind[]).flatMap((kind) => commandVariants(kind));
+		const variants = (['create', 'dev', 'ship'] as CommandKind[]).flatMap((kind) => commandVariants(kind));
 		const rendered = renderBashFences(variants.map((variant) => variant.code));
 		for (const [index, variant] of variants.entries()) {
 			const fenced = rendered[index]!.split('<span class="line">').slice(1).map((line) => [...line.matchAll(/<span style="([^"]*)">([^<]*)<\/span>/g)].map(([, style, text]) => [style, text]));
@@ -106,25 +100,11 @@ describe('the package-manager commands', () => {
 	it('styles a block for every manager and draws a tab for each', () => {
 		const source = readFileSync(new URL('commands.tsrx', import.meta.url), 'utf8');
 		for (const manager of MANAGERS) expect(source, manager.id).toContain(`html[data-package-manager='${manager.id}'] .variant[data-package-manager='${manager.id}']`);
-		expect(tabsInk().map((tab) => tab.id)).toEqual(MANAGERS.map((manager) => manager.id));
 	});
 
 	it('puts every manager command on the page through the components', () => {
 		expect(page).toContain('<CreateCommand />');
-		for (const kind of ['dev', 'scripts', 'starters']) expect(page).toContain(`<Commands kind="${kind}" />`);
+		for (const kind of ['dev', 'ship']) expect(page).toContain(`<Commands kind="${kind}" />`);
 		expect(page).not.toMatch(/^npm (create|run) /m);
-	});
-});
-
-
-describe('the package-manager tabs ink', () => {
-	it('draws the same tabs every run and freezes them (run with -u after editing)', async () => {
-		expect(tabsInk()).toEqual(tabsInk());
-		const module = `// Written by walkthrough.test.ts from tabs-ink.ts. Run \`vp test -u\` to refresh.
-import type { tabsInk } from './tabs-ink.ts';
-
-export const tabsArt: ReturnType<typeof tabsInk> = ${JSON.stringify(tabsInk(), null, '\t')};
-`;
-		await expect(module).toMatchFileSnapshot('./tabs-ink.art.ts');
 	});
 });

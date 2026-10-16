@@ -5,9 +5,6 @@ import {
 	MANAGERS,
 	type ManagerId,
 	scriptCommand,
-	scriptsFor,
-	STARTERS,
-	commandFor,
 } from './facts.ts';
 
 /** shiki's github-light and github-dark colours for the four kinds of shell word these commands use; walkthrough.test.ts pins them to the site's fence highlighter. */
@@ -23,27 +20,18 @@ export type ShellLine = {
 	readonly id: string;
 	readonly runs: readonly ShellRun[];
 };
-export type CommandKind = 'create' | 'dev' | 'scripts' | 'starters';
+export type CommandKind = 'create' | 'dev' | 'ship';
 export type CommandVariant = {
 	readonly manager: ManagerId;
 	readonly code: string;
 	readonly lines: readonly ShellLine[];
 };
 
-const lower = (text: string) => text.charAt(0).toLowerCase() + text.slice(1).replace(/\.$/, '');
 
 function rows(kind: CommandKind, manager: ManagerId): [string, string?][] {
 	if (kind === 'create') return [[createCommand(manager)]];
 	if (kind === 'dev') return [[`cd ${DEFAULT_APP}`], [scriptCommand(manager, 'dev')]];
-	if (kind === 'scripts')
-		return scriptsFor(manager).map((script) => [
-			scriptCommand(manager, script.name),
-			lower(script.does),
-		]);
-	return STARTERS.map((starter) => [
-		commandFor(starter.id, manager),
-		`${starter.label}: ${starter.blurb}`,
-	]);
+	return [[scriptCommand(manager, 'build')], [scriptCommand(manager, 'preview')]];
 }
 
 /** Splits one line into runs the way shiki scopes it: each word keeps the spaces before it. */
