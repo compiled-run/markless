@@ -807,7 +807,8 @@ html.dark .prose .torn-strip {
 }
 
 .torn-below {
-	top: 100%;
+	/* Starts behind the torn edge, so the hatching meets the paper wherever the tear rises. */
+	top: calc(100% - 14px);
 	left: 0;
 	width: 100%;
 	height: 26px;
