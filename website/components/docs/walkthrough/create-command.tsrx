@@ -1,38 +1,47 @@
 import { storage } from '@markless/core';
+import { tabs } from '@markless/ui';
 import Commands from './commands.tsrx';
-import { MANAGERS } from './facts.ts';
+import { tabsArt } from './tabs-ink.art.ts';
 
-/** The create command under a row of package-manager tabs; the choice lands on <html> as data-pm, so every Commands block on the page follows it. */
+/** The create command under inked package-manager tabs; the choice is saved as pm, which every Commands block on the page follows. */
 export default function CreateCommand() @{
-	// oxlint-disable-next-line no-unused-vars -- the write persists the choice
 	let pm = storage('pm', 'npm');
 
-	<div class="create-command">
-		<div class="strip" role="group" aria-label="Package manager">
-			@for (const manager of MANAGERS; key manager.id) {
-				<button
-					class="tab"
-					type="button"
-					data-pm={manager.id}
-					onClick={() => {
-						pm = manager.id;
-					}}
-				>
-					{manager.label}
-					<span class="picked">, selected</span>
-				</button>;
+	<tabs.root
+		class="create-command"
+		value={pm}
+		onChange={(next: string) => {
+			pm = next;
+		}}
+	>
+		<tabs.list class="strip" aria-label="Package manager">
+			@for (const tab of tabsArt; key tab.id) {
+				<tabs.trigger class="tab" value={tab.id}>
+					<svg class="tab-art" viewBox="0 0 78 44" aria-hidden="true">
+						<path class="tab-back" d={tab.back} />
+						<path class="tab-paper" d={tab.paper} />
+						<path class="tab-tone" d={tab.tone} />
+						<path class="tab-ink" d={tab.ink} />
+					</svg>
+					<span class="tab-label">{tab.label}</span>
+				</tabs.trigger>
 			}
-		</div>
-		<Commands kind="create" />
+		</tabs.list>
+		@for (const tab of tabsArt; key tab.id) {
+			<tabs.content class="panel" value={tab.id} aria-label={tab.label}>
+				<Commands kind="create" only={tab.id} />
+			</tabs.content>
+		}
 		<style>
 			.create-command {
-				--tab-back: color-mix(in oklch, var(--ink) 9%, var(--paper));
-				--tab-front: color-mix(in oklch, var(--paper) 35%, white);
+				--tab-sheet: color-mix(in oklch, var(--paper) 35%, white);
+				--tab-back: color-mix(in oklch, var(--ink) 7%, var(--paper));
+				display: block;
 				margin-block-start: var(--space-m);
 
 				html.dark & {
-					--tab-back: color-mix(in oklch, var(--ink) 12%, var(--paper));
-					--tab-front: color-mix(in oklch, var(--paper) 88%, var(--ink));
+					--tab-sheet: color-mix(in oklch, var(--paper) 88%, var(--ink));
+					--tab-back: color-mix(in oklch, var(--ink) 10%, var(--paper));
 				}
 			}
 
@@ -41,79 +50,87 @@ export default function CreateCommand() @{
 				z-index: 2;
 				display: flex;
 				align-items: flex-end;
-				padding-inline-start: 0.6rem;
-				margin-block-end: calc(-1 * var(--space-m) - 4px);
+				padding-inline-start: 0.4rem;
+				margin-block-end: calc(-1 * var(--space-m) - 8px);
+				rotate: -0.3deg;
 			}
 
 			.tab {
 				position: relative;
-				margin-block-end: -2px;
-				padding: 0.25em 1.1em;
-				border: 2px solid var(--ink);
-				border-block-end: 0;
-				border-radius: 22px 24px 5px 4px / 18px 20px 5px 4px;
-				background: var(--tab-back);
-				color: color-mix(in oklch, var(--ink) 82%, var(--paper));
+				display: grid;
+				place-items: center;
+				inline-size: 78px;
+				block-size: 36px;
+				margin-inline-end: -6px;
+				padding: 0;
+				border: 0;
+				background: none;
+				color: color-mix(in oklch, var(--ink) 70%, var(--paper));
 				font-family: 'Shantell Sans', system-ui, sans-serif;
 				font-size: var(--step-0);
-				line-height: 1.35;
+				line-height: 1;
 				cursor: pointer;
-				transition: color 130ms ease;
 			}
 
-			.tab + .tab {
-				margin-inline-start: -0.3rem;
+			.tab-art {
+				position: absolute;
+				inset: 0 0 -8px;
+				inline-size: 78px;
+				block-size: 44px;
+				overflow: visible;
+				pointer-events: none;
 			}
 
-			.tab:hover {
+			.tab-label {
+				position: relative;
+				padding-block-start: 4px;
+			}
+
+			.tab-back {
+				fill: var(--tab-back);
+			}
+
+			.tab-paper {
+				fill: var(--tab-sheet);
+				visibility: hidden;
+			}
+
+			.tab-tone {
+				fill: var(--ink);
+				opacity: 0.45;
+			}
+
+			.tab-ink {
+				fill: var(--ink);
+			}
+
+			.tab[ui-selected] {
+				z-index: 1;
 				color: var(--ink);
+				font-weight: 700;
+
+				.tab-paper {
+					visibility: visible;
+				}
+
+				.tab-tone {
+					visibility: hidden;
+				}
+			}
+
+			.tab:hover .tab-tone {
+				opacity: 0.25;
 			}
 
 			.tab:focus-visible {
 				outline: 2px solid var(--ink);
-				outline-offset: 2px;
+				outline-offset: 3px;
+				border-radius: 6px;
 			}
 
-			/* Hidden text still names the button; display: none drops it from the name too. */
-			.picked {
+			.panel[hidden] {
 				display: none;
-				position: absolute;
-				inline-size: 1px;
-				block-size: 1px;
-				overflow: hidden;
-				clip-path: inset(50%);
-				white-space: nowrap;
-			}
-
-			/* The chosen tab follows <html data-pm>, which the storage seed sets before first paint; the island's own state wakes later. */
-			html:not([data-pm]) .tab[data-pm='npm'],
-			html[data-pm='npm'] .tab[data-pm='npm'],
-			html[data-pm='pnpm'] .tab[data-pm='pnpm'],
-			html[data-pm='yarn'] .tab[data-pm='yarn'],
-			html[data-pm='bun'] .tab[data-pm='bun'],
-			html[data-pm='deno'] .tab[data-pm='deno'] {
-				z-index: 1;
-				background: var(--tab-front);
-				color: var(--ink);
-				font-weight: 700;
-
-				.picked {
-					display: inline;
-				}
-			}
-
-			@media (max-width: 30rem) {
-				.tab {
-					padding-inline: 0.7em;
-					font-size: var(--step--1);
-				}
-			}
-
-			@media (prefers-reduced-motion: reduce) {
-				.tab {
-					transition: none;
-				}
 			}
 		</style>
-	</div>;
+	</tabs.root>;
 }

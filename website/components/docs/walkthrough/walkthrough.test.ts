@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { commandVariants, type CommandKind } from './commands.ts';
+import { tabsInk } from './tabs-ink.ts';
 import { COMMON_FILES, DEFAULT_APP, commandFor, createCommand, MANAGERS, NO_DENO_TASK, scriptCommand, SCRIPTS, scriptsFor, STARTERS } from './facts.ts';
 
 const templates = new URL('../../../../packages/cli/templates/', import.meta.url);
@@ -102,12 +103,10 @@ describe('the package-manager commands', () => {
 		}
 	});
 
-	it('styles a block and a tab for every manager', () => {
-		for (const file of ['commands.tsrx', 'create-command.tsrx']) {
-			const source = readFileSync(new URL(file, import.meta.url), 'utf8');
-			const part = file === 'commands.tsrx' ? '.variant' : '.tab';
-			for (const manager of MANAGERS) expect(source, `${file} ${manager.id}`).toContain(`html[data-pm='${manager.id}'] ${part}[data-pm='${manager.id}']`);
-		}
+	it('styles a block for every manager and draws a tab for each', () => {
+		const source = readFileSync(new URL('commands.tsrx', import.meta.url), 'utf8');
+		for (const manager of MANAGERS) expect(source, manager.id).toContain(`html[data-pm='${manager.id}'] .variant[data-pm='${manager.id}']`);
+		expect(tabsInk().map((tab) => tab.id)).toEqual(MANAGERS.map((manager) => manager.id));
 	});
 
 	it('puts every manager command on the page through the components', () => {
@@ -117,3 +116,15 @@ describe('the package-manager commands', () => {
 	});
 });
 
+
+describe('the package-manager tabs ink', () => {
+	it('draws the same tabs every run and freezes them (run with -u after editing)', async () => {
+		expect(tabsInk()).toEqual(tabsInk());
+		const module = `// Written by walkthrough.test.ts from tabs-ink.ts. Run \`vp test -u\` to refresh.
+import type { tabsInk } from './tabs-ink.ts';
+
+export const tabsArt: ReturnType<typeof tabsInk> = ${JSON.stringify(tabsInk(), null, '\t')};
+`;
+		await expect(module).toMatchFileSnapshot('./tabs-ink.art.ts');
+	});
+});

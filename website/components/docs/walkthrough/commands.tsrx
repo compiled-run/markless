@@ -1,10 +1,11 @@
 import { commandVariants, type CommandKind } from './commands.ts';
+import type { ManagerId } from './facts.ts';
 
-/** Every package manager's version of one shell block; the one named by `data-pm` on <html> shows, npm when none is. */
-export default function Commands({ kind }: { readonly kind: CommandKind }) @{
-	const variants = commandVariants(kind);
+/** Every package manager's version of one shell block; the one named by `data-pm` on <html> shows, npm when none is. With `only`, just that manager's block, always shown. */
+export default function Commands({ kind, only }: { readonly kind: CommandKind; readonly only?: ManagerId }) @{
+	const variants = commandVariants(kind).filter((variant) => !only || variant.manager === only);
 
-	<div class="commands">
+	<div class="commands" data-only={only ? 'yes' : 'no'}>
 		@for (const variant of variants; key variant.manager) {
 			<div class="variant" data-pm={variant.manager}>
 				<div class="torn-strip">
@@ -54,7 +55,8 @@ export default function Commands({ kind }: { readonly kind: CommandKind }) @{
 			html[data-pm='pnpm'] .variant[data-pm='pnpm'],
 			html[data-pm='yarn'] .variant[data-pm='yarn'],
 			html[data-pm='bun'] .variant[data-pm='bun'],
-			html[data-pm='deno'] .variant[data-pm='deno'] {
+			html[data-pm='deno'] .variant[data-pm='deno'],
+			.commands[data-only='yes'] .variant {
 				display: block;
 			}
 		</style>
