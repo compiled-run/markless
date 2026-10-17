@@ -36,6 +36,7 @@ export function registerServedArmEventRecords(
 	// An escalating branch open at first render serves its arm the same way, so
 	// its records need the same pre-runtime pass or its first click is dropped.
 	branches: ReadonlyArray<{
+		readonly id?: string;
 		readonly startAnchor: ResumeAsyncBoundaryPayload['startAnchor'];
 		readonly endAnchor: ResumeAsyncBoundaryPayload['endAnchor'];
 		readonly servedArmRecords?: unknown;
@@ -43,7 +44,7 @@ export function registerServedArmEventRecords(
 	}> = [],
 	// The arm a plain branch painted, read off the values the mount seeded.
 	paintedArm?: (branch: (typeof branches)[number]) => number | undefined,
-): void {
+): PaintedArmClaim | undefined {
 	let comments: ReadonlyArray<ResumeDomComment> | undefined;
 	const ranges: Array<{
 		readonly startAnchor: ResumeAsyncBoundaryPayload['startAnchor'];
@@ -68,24 +69,11 @@ export function registerServedArmEventRecords(
 				armRecords,
 			});
 	}
+	const painted = new Map<string, NonNullable<ServedBranchArm['events']>>();
 	for (const branch of branches) {
 		const arm = branch.servedArmRecords ? undefined : paintedArm?.(branch);
 		const events = arm === undefined ? undefined : branch.armRecords?.[arm]?.events;
-		if (!events?.length) continue;
-		comments ??= pageCommentCensus(root);
-		const end = comments[branch.endAnchor.index];
-		const armNodes: SiblingNode[] = [];
-		for (
-			let node = (comments[branch.startAnchor.index] as SiblingNode | undefined)?.nextSibling;
-			node && node !== end;
-			node = node.nextSibling
-		)
-			armNodes.push(node);
-		for (const record of events) {
-			let host: ResumeDomNode | undefined = armNodes[record.hostPath[0]!];
-			for (const index of record.hostPath.slice(1)) host = host?.childNodes?.[index];
-			if (host?.nodeType === 1) register(host, { hostNodeId: '', ...record });
-		}
+		if (events?.length && branch.id) painted.set(BRANCH_ANCHOR_PREFIX + branch.id, events);
 	}
 	for (const range of ranges) {
 		comments ??= pageCommentCensus(root);
@@ -102,9 +90,57 @@ export function registerServedArmEventRecords(
 			if (element) register(element, record);
 		}
 	}
+	return painted.size
+		? {
+				eventNames: [...new Set([...painted.values()].flat().map((record) => record.eventName))],
+				claim: (target) => claimPaintedArmHosts(target, painted, register),
+			}
+		: undefined;
 }
 
-type SiblingNode = ResumeDomNode & { readonly nextSibling?: SiblingNode | null };
+export type PaintedArmClaim = {
+	readonly eventNames: ReadonlyArray<string>;
+	readonly claim: (target: unknown) => void;
+};
+
+const BRANCH_ANCHOR_PREFIX = 'markless:branch:';
+
+type SiblingNode = ResumeDomNode & {
+	readonly data?: string;
+	readonly previousSibling?: SiblingNode | null;
+	readonly parentNode?: SiblingNode | null;
+};
+
+// Finds a painted arm's hosts from the event target up: each level's preceding siblings, never the page.
+function claimPaintedArmHosts(
+	target: unknown,
+	painted: Map<string, NonNullable<ServedBranchArm['events']>>,
+	register: (element: object, record: ResumeArmRecordSet['events'][number]) => void,
+): void {
+	const chain: SiblingNode[] = [];
+	const path: number[] = [];
+	for (let node = target as SiblingNode | null | undefined; node && painted.size; node = node.parentNode) {
+		chain.unshift(node);
+		let offset = 0;
+		for (let sibling = node.previousSibling; sibling; sibling = sibling.previousSibling, offset++) {
+			// An arm closed before this node cannot match: its records' first index is below the offset.
+			const data = sibling.nodeType === 8 ? sibling.data! : '';
+			if (painted.has(data)) {
+				const armPath = [offset, ...path];
+				const left = painted.get(data)!.filter((record) => {
+					const host = chain[record.hostPath.length - 1];
+					if (!record.hostPath.every((index, at) => armPath[at] === index) || host?.nodeType !== 1)
+						return true;
+					register(host, { hostNodeId: '', ...record });
+					return false;
+				});
+				if (left.length) painted.set(data, left);
+				else painted.delete(data);
+			}
+		}
+		path.unshift(offset);
+	}
+}
 
 type ServedBranchArm = {
 	readonly events?: ReadonlyArray<

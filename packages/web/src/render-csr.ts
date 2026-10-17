@@ -190,13 +190,19 @@ export async function renderCsrRuntime(input: {
 		},
 		loadSymbol,
 	);
-	registerServedArmEventRecords(
+	const claimPaintedArm = registerServedArmEventRecords(
 		output.root as unknown as ResumeDomElement,
 		view.asyncBoundaries as ReadonlyArray<ResumeAsyncBoundaryPayload>,
 		delegatedTriggers.registerEventRecord,
 		(view.branches ?? []) as Parameters<typeof registerServedArmEventRecords>[3],
 		(branch) => paintedBranchArm(branch as PaintedBranch, state),
 	);
+	// Once the runtime runs, it owns the arms and may have flipped the one painted at mount.
+	if (claimPaintedArm)
+		delegatedTriggers.claimTargets(
+			(target) => runtime || claimPaintedArm.claim(target),
+			claimPaintedArm.eventNames,
+		);
 	for (const hostNodeId of new Set(graphBehaviors.map((behavior) => behavior.hostNodeId)))
 		await (await demandRuntime()).activateBehaviors(hostNodeId);
 	// Set only by an app module with an `onIdle` record; the runtime it starts at idle queues the hosts.
@@ -342,8 +348,13 @@ function installDelegatedTriggers(
 ): {
 	readonly registerEventRecord: (element: object, record: ProtocolEventRecord) => void;
 	readonly registerRowEventName: (eventName: string) => void;
+	readonly claimTargets: (
+		claim: (target: unknown) => unknown,
+		eventNames: ReadonlyArray<string>,
+	) => void;
 	readonly dispose: () => void;
 } {
+	let claim: ((target: unknown) => unknown) | undefined;
 	// One capture listener remains the container's dispatch authority.
 	output.root.__marklessDelegatedDispatch = true;
 	const recordsByElement = new Map<object, Map<string, ProtocolEventRecord>>();
@@ -369,6 +380,7 @@ function installDelegatedTriggers(
 			// yet, so this listener takes every event of that name, named or not.
 			let named = false;
 			let syncPolicyApplied = false;
+			claim?.(event.target);
 			let actionKind: ProtocolEventActionKind | undefined = rowEventNames.has(event.type)
 				? PROTOCOL_EVENT_ACTION_KIND.event
 				: undefined;
@@ -442,6 +454,7 @@ function installDelegatedTriggers(
 		target: DelegatedEvent['target'],
 		namesFor: (element: NonNullable<DelegatedEvent['target']>) => ReadonlyArray<string>,
 	) => {
+		claim?.(target);
 		for (
 			let element: DelegatedEvent['target'] = target;
 			element;
@@ -472,18 +485,20 @@ function installDelegatedTriggers(
 			output.root.removeEventListener?.(triggerName, listener, { capture: true }),
 		);
 	};
+	const installEventNames = (eventName: string) => {
+		installEventListener(eventName);
+		if (isFocusPreloadEventName(eventName)) installPreloadTrigger('focusin', focusPreloadEventNames);
+		// pointerenter does not bubble, so a delegated listener would only ever see
+		// the container's own crossing.
+		if (PRESS_EVENT_NAMES.includes(eventName))
+			installPreloadTrigger('pointerover', () => PRESS_EVENT_NAMES);
+	};
 	const registerEventRecord = (element: object, record: ProtocolEventRecord) => {
 		const records = recordsByElement.get(element) ?? new Map<string, ProtocolEventRecord>();
 		if (records.get(record.eventName) === record) return;
 		records.set(record.eventName, record);
 		recordsByElement.set(element, records);
-		installEventListener(record.eventName);
-		if (isFocusPreloadEventName(record.eventName))
-			installPreloadTrigger('focusin', focusPreloadEventNames);
-		// pointerenter does not bubble, so a delegated listener would only ever see
-		// the container's own crossing.
-		if (PRESS_EVENT_NAMES.includes(record.eventName))
-			installPreloadTrigger('pointerover', () => PRESS_EVENT_NAMES);
+		installEventNames(record.eventName);
 	};
 	for (const record of view.events) {
 		if (record.eventName === PROTOCOL_VISIBLE_EVENT_NAME) continue;
@@ -501,6 +516,10 @@ function installDelegatedTriggers(
 		registerRowEventName(eventName) {
 			rowEventNames.add(eventName);
 			installEventListener(eventName);
+		},
+		claimTargets(next, eventNames) {
+			claim = next;
+			for (const eventName of eventNames) installEventNames(eventName);
 		},
 		dispose() {
 			for (const release of releases.splice(0)) release();
