@@ -70,6 +70,24 @@ export default function Nav({ mode }) @{
 		);
 	});
 
+	it('lowers an href-less Link with data-driven children to the anchor the component renders', async () => {
+		const source = `import { Link } from '@markless/router';
+export default function Tag({ tag }) @{
+	<Link class="nav-link"><i class="icon"></i>{tag}</Link>
+}`;
+		const plugin = anchorTransformPlugin();
+		const handler = (plugin.transform as { handler: Function }).handler;
+		(plugin.configResolved as Function)({ root: '/project' });
+		const result = await handler.call(
+			{ fs: routeTypegenFs(), parse: parseModule },
+			source,
+			'/project/tag.tsrx',
+		);
+		expect(result?.code).toContain(
+			'<a data-markless-router-link href="#" class="nav-link"><i class="icon"></i>{tag}</a>',
+		);
+	});
+
 	it('lowers native route-pattern anchors and preserves normal props', () => {
 		const source = `export default () => {
   const slug = "hello";

@@ -113,9 +113,10 @@ function lowerRouterLinks(code: string, ast: Node): string {
 		if (!name || !linkNames.has(jsxName(name) ?? '')) return;
 		const attributes = nodes(opening?.attributes);
 		if (attributes.some((attribute) => attribute.type === 'JSXSpreadAttribute')) return;
-		if (!findJsxAttribute(attributes, 'href') || findJsxAttribute(attributes, 'children'))
-			return;
-		edits.push({ ...rangeOf(name), text: `a ${LINK_ATTRIBUTE}` });
+		if (findJsxAttribute(attributes, 'children')) return;
+		// Link.renderSsr writes href="#" for a link without one.
+		const href = findJsxAttribute(attributes, 'href') ? '' : ' href="#"';
+		edits.push({ ...rangeOf(name), text: `a ${LINK_ATTRIBUTE}${href}` });
 		const closingName = node(node(current.closingElement)?.name);
 		if (closingName) edits.push({ ...rangeOf(closingName), text: 'a' });
 		for (const attribute of attributes) {
