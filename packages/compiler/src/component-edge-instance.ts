@@ -2,6 +2,9 @@ import { protocolInstanceSegment, protocolProjectionSegment } from '@markless/se
 import type {
 	ArtifactChildMaterialization,
 	BoundSymbolResolverArtifact,
+	BoundSymbolResolverRow,
+	CaptureAnalysisArtifact,
+	ExtractedCaptureSymbol,
 	SemanticComponentEdge,
 } from './artifacts.ts';
 
@@ -109,6 +112,8 @@ export function componentEdgeInstancePath(
 export type ComponentEdgeSymbolRoute = {
 	readonly prefix: string;
 	readonly componentEdgeId: string;
+	/** The child's own symbol ids this edge binds, to the bound row that carries the edge's captures. */
+	readonly boundSymbols?: Readonly<Record<string, string>>;
 } & (
 	| { readonly importSource: string; readonly selfRecursive?: true }
 	| { readonly self: true }
@@ -157,6 +162,10 @@ export function componentEdgeSymbolRoutes(
 			BoundSymbolResolverArtifact,
 			'componentEdgeInstancePaths'
 		>;
+		readonly captureAnalysis?: Pick<
+			CaptureAnalysisArtifact,
+			'boundResolverRows' | 'extractedSymbols'
+		>;
 	},
 	artifactChildMaterializations:
 		| Readonly<Record<string, ArtifactChildMaterialization>>
@@ -168,16 +177,21 @@ export function componentEdgeSymbolRoutes(
 			entry.instancePath,
 		]),
 	);
+	const boundByEdge = edgeBoundSymbols(compiled.captureAnalysis);
 	return compiled.semanticGraph.componentEdges
 		.flatMap((edge, index): ComponentEdgeSymbolRoute[] => {
 			if (artifactChildMaterializations?.[edge.id]) return [];
 			const prefix = instancePaths.get(edge.id) ?? protocolInstanceSegment(index);
+			const boundSymbols = boundByEdge.get(edge.id);
+			const bound = boundSymbols ? { boundSymbols } : {};
 			// A same-module child's symbols were emitted by THIS module, so its
 			// route strips the instance path and answers from the page's own
 			// resolver. It never names an import, so it never reaches the
 			// manifest's import resolution.
 			if (edge.importSource)
-				return [{ prefix, importSource: edge.importSource, componentEdgeId: edge.id }];
+				return [
+					{ prefix, importSource: edge.importSource, componentEdgeId: edge.id, ...bound },
+				];
 			// A cyclic same-module edge is entered once per rendered level, so what
 			// is left after one strip may carry more of the same segments. Naming
 			// this module itself re-enters this route table instead of dropping to
@@ -193,10 +207,36 @@ export function componentEdgeSymbolRoutes(
 							selfRecursive: true,
 							componentEdgeId: edge.id,
 						}
-					: { prefix, self: true, componentEdgeId: edge.id },
+					: { prefix, self: true, componentEdgeId: edge.id, ...bound },
 			];
 		})
 		.sort((left, right) => right.prefix.length - left.prefix.length);
+}
+
+/** The child's own symbol id a bound row binds through its last edge; a forwarded claim spells a grandchild's id instead. */
+export function boundRowChildSymbolId(
+	row: Pick<BoundSymbolResolverRow, 'baseSymbolId' | 'loaderSymbolId'>,
+	extractedSymbols: ReadonlyArray<ExtractedCaptureSymbol>,
+): { readonly symbolId: string; readonly forwarded: boolean } | undefined {
+	if (!row.loaderSymbolId) return { symbolId: row.baseSymbolId, forwarded: false };
+	const claim = extractedSymbols.find((symbol) => symbol.loaderSymbolId === row.loaderSymbolId);
+	return claim ? { symbolId: claim.symbolId, forwarded: claim.forwarded === true } : undefined;
+}
+
+function edgeBoundSymbols(
+	captureAnalysis: Pick<CaptureAnalysisArtifact, 'boundResolverRows' | 'extractedSymbols'> | undefined,
+): ReadonlyMap<string, Readonly<Record<string, string>>> {
+	const byEdge = new Map<string, Record<string, string>>();
+	if (!captureAnalysis) return byEdge;
+	for (const row of captureAnalysis.boundResolverRows ?? []) {
+		const edgeId = row.componentEdgePath.at(-1);
+		const child = boundRowChildSymbolId(row, captureAnalysis.extractedSymbols);
+		if (!edgeId || !child || child.forwarded) continue;
+		const table = byEdge.get(edgeId) ?? {};
+		table[child.symbolId] = row.id;
+		byEdge.set(edgeId, table);
+	}
+	return byEdge;
 }
 
 // Only routes that name a CHILD module belong in the manifest: the manifest's

@@ -11,6 +11,7 @@ import { ASYNC_PROTOCOL_VERSION } from '@markless/serializer';
 import type { RuntimeDemandMapArtifact } from '@markless/compiler';
 import { emitScalarPlanLoader } from './scalar-plan-loader.ts';
 import { scalarPlanSourceReference } from './scalar-plan-source.ts';
+import { emitReboundSymbolImport, emitReboundSymbolRoute } from './rebound-symbol-route.ts';
 
 export const MARKLESS_VIRTUAL_PREFIX = 'virtual:markless:';
 
@@ -29,6 +30,7 @@ export type SourceSymbolRow = {
 export type SourceSymbolRoute = {
 	readonly prefix: string;
 	readonly importSource: string;
+	readonly boundSymbols?: Readonly<Record<string, string>>;
 };
 
 // A child declared in the SAME module carries an instance path like any other
@@ -37,6 +39,7 @@ export type SourceSymbolRoute = {
 export type SourceSelfSymbolRoute = {
 	readonly prefix: string;
 	readonly self: true;
+	readonly boundSymbols?: Readonly<Record<string, string>>;
 };
 
 export type SourceLazySymbolRoute = SourceSymbolRoute | SourceSelfSymbolRoute;
@@ -976,21 +979,30 @@ function emitLazySymbolRouteFunction(
 	// A projected child's path nests under the component it was projected into,
 	// so the longer literal prefix must be tested first.
 	const ordered = [...routes].sort((left, right) => right.prefix.length - left.prefix.length);
+	const reboundName = `${functionName}Rebound`;
 	return [
+		emitReboundSymbolImport(ordered, reboundName),
 		`function ${functionName}(symbolId) {`,
-		...ordered.flatMap((route) => [
-			`	if (symbolId.startsWith(${JSON.stringify(route.prefix)})) {`,
-			'importSource' in route
-				? `		return import(${JSON.stringify(symbolRouteImportSource(route.importSource, includeScalarActionPlans))}).then((mod) => mod.loadSymbol ? mod.loadSymbol(symbolId.slice(${route.prefix.length})) : Promise.reject(new Error(\`Unknown child async symbol \${symbolId}\`)));`
-				: // Re-enter the table: what is left after one strip can itself carry
-					// another composed child's path. Each hop is strictly shorter, and an
-					// unmatched tail still reaches the closing fallback.
-					`		return ${route.prefix.length > 0 ? functionName : fallbackName}(symbolId.slice(${route.prefix.length}));`,
-			'	}',
-		]),
+		...ordered.flatMap((route) => {
+			const unbound =
+				'importSource' in route
+					? `import(${JSON.stringify(symbolRouteImportSource(route.importSource, includeScalarActionPlans))}).then((mod) => mod.loadSymbol ? mod.loadSymbol(symbolId.slice(${route.prefix.length})) : Promise.reject(new Error(\`Unknown child async symbol \${symbolId}\`)))`
+					: // Re-enter the table: what is left after one strip can itself carry
+						// another composed child's path. Each hop is strictly shorter, and an
+						// unmatched tail still reaches the closing fallback.
+						`${route.prefix.length > 0 ? functionName : fallbackName}(symbolId.slice(${route.prefix.length}))`;
+			return [
+				`	if (symbolId.startsWith(${JSON.stringify(route.prefix)})) {`,
+				...emitReboundSymbolRoute(route, reboundName, fallbackName, unbound, '\t\t'),
+				`		return ${unbound};`,
+				'	}',
+			];
+		}),
 		`	return ${fallbackName}(symbolId);`,
 		'}',
-	].join('\n');
+	]
+		.filter((line) => line !== '')
+		.join('\n');
 }
 
 function emitsClosurePlanLoader(
