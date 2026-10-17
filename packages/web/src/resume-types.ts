@@ -89,6 +89,8 @@ export type ResumeDomEvent = {
 	readonly bubbles?: boolean;
 	readonly preventDefault?: () => void;
 	readonly stopPropagation?: () => void;
+	// The nearest host with a record when the browser dispatched the event, kept by the queue that received it.
+	__marklessPressHost?: ResumeDomElement;
 };
 export type ResumeSharedPatchEvent = {
 	readonly type: 'async:shared-patch';

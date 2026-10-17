@@ -955,6 +955,8 @@ export function emitQueuedResumeContainerEvent(
 		// Events start in order, but a handler awaiting its own work does not hold the next one.
 		'\t\troot.__marklessDispatch = next => {',
 		'\t\t\tconst event = next.event, eventTime = event?.timeStamp;',
+		// The host the press-time walk matched; a script may take the target out before this dispatch runs.
+		'\t\t\tif (event && next.eventRecord && next.element) event.__marklessPressHost ??= next.element;',
 		'\t\t\tif (event === lastEvent && eventTime === lastEventTime) return done;',
 		'\t\t\tlastEvent = event;',
 		'\t\t\tlastEventTime = eventTime;',

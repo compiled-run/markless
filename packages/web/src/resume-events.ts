@@ -475,11 +475,17 @@ export function createEventWiring(input: {
 		const attached = containsElement(input.root, target);
 		const anchor = attached ? undefined : detachedRowAnchor(target);
 		const rowAnchor = anchor && containsElement(input.root, anchor) ? anchor : undefined;
-		if (!attached && !ignoredDisposed && !rowAnchor)
+		// A script outside Markless took the target out after the press found its host: the walk starts at that host.
+		const pressHost = event.__marklessPressHost;
+		const pressAnchor =
+			!attached && !rowAnchor && pressHost && containsElement(input.root, pressHost)
+				? pressHost
+				: undefined;
+		if (!attached && !ignoredDisposed && !rowAnchor && !pressAnchor)
 			throw unmatchedDispatchError(event, selector);
 		const bubbles = event.bubbles !== false;
 		const path = collectDispatchPath(
-			target,
+			pressAnchor ?? target,
 			event.type,
 			eventRecords,
 			rowEventRecords,

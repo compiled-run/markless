@@ -198,3 +198,33 @@ test('an async value in its own element beside a state hole in @try survives a c
 	expect(errors).toEqual([]);
 	await page.close();
 });
+
+// A script outside Markless draws links into an element whose own click handler is Markless's
+// and redraws them from a document listener, as a soft navigation does.
+async function drawForeignLinks(page: Page) {
+	await page.evaluate(() => {
+		const list = document.querySelector<HTMLElement>('[data-favourites]')!;
+		const draw = () => {
+			list.innerHTML = '<p><a href="#article" data-fav><img alt="" width="20" height="20" data-fav-img></a></p>';
+		};
+		draw();
+		document.addEventListener('click', (event) => {
+			if (!(event.target as Element).closest?.('[data-fav]')) return;
+			event.preventDefault();
+			draw();
+		});
+	});
+}
+
+test('a click on a link a foreign script redraws reaches its container handler, cold and warm', async () => {
+	const { page, errors } = await open('/foreign-links');
+	await drawForeignLinks(page);
+	await page.click('[data-fav-img]');
+	await expect.poll(() => text(page, '[data-opened]')).toBe('1');
+	await page.click('[data-fav-img]');
+	await expect.poll(() => text(page, '[data-opened]')).toBe('2');
+	await page.click('[data-like]');
+	await expect.poll(() => text(page, '[data-like]')).toBe('1');
+	expect(errors).toEqual([]);
+	await page.close();
+});

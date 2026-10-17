@@ -55,6 +55,7 @@ export function resumeContainerEvent(input) {
 		};
 		root.__marklessDispatch = next => {
 			const event = next.event, eventTime = event?.timeStamp;
+			if (event && next.eventRecord && next.element) event.__marklessPressHost ??= next.element;
 			if (event === lastEvent && eventTime === lastEventTime) return done;
 			lastEvent = event;
 			lastEventTime = eventTime;
