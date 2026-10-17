@@ -931,6 +931,42 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 	const events = new Map(
 		view.events.map((event) => [`${event.hostNodeId}\n${event.eventName}`, event] as const),
 	);
+	// A served @try arm's policy (preventDefault) must run before the default action, not after the runtime loads.
+	const armHostIds = new Map<Element, string>();
+	const armPolicyEvents = new Map<string, InlineEventRecord>();
+	if (__MARKLESS_INLINE_SYNC_POLICY__) {
+		const policyArms = view.asyncBoundaries.filter((boundary) => {
+			const armRecords = boundary.armRecords as ProtocolArmRecordSet | undefined;
+			return (
+				armRecords &&
+				!Array.isArray(armRecords) &&
+				(armRecords.events ?? []).some((event) => event.syncPolicy)
+			);
+		});
+		if (policyArms.length) {
+			const commentWalker = currentDocument.createTreeWalker(root, 129);
+			const elementsBeforeComment: number[] = [];
+			let elementCount = 1;
+			let node: Node | null;
+			while ((node = commentWalker.nextNode())) {
+				if (node.nodeType === 1) elementCount += 1;
+				else if (!/^\/?markless:arm-branch:/.test((node as Comment).data))
+					elementsBeforeComment.push(elementCount);
+			}
+			for (const boundary of policyArms) {
+				const armRecords = boundary.armRecords as ProtocolArmRecordSet;
+				const offset = elementsBeforeComment[boundary.startAnchor.index];
+				if (offset === undefined) continue;
+				for (const locator of armRecords.locators) {
+					const element = elements[offset + locator.index];
+					if (element) armHostIds.set(element, locator.hostNodeId);
+				}
+				for (const event of armRecords.events ?? [])
+					if (event.syncPolicy)
+						armPolicyEvents.set(`${event.hostNodeId}\n${event.eventName}`, event);
+			}
+		}
+	}
 
 	const globalScope = globalThis as typeof globalThis & {
 		__marklessInlineSyncPolicy?: InlineSyncPolicyRuntime;
@@ -1216,11 +1252,19 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 			root.addEventListener(primeEventName, prime, true);
 	}
 	const dispatch = (event: Event) => {
+		let armPolicyApplied = false;
 		for (
 			let element = event.target as Element | null;
 			element;
 			element = element.parentElement
 		) {
+			if (__MARKLESS_INLINE_SYNC_POLICY__ && !armPolicyApplied) {
+				const armEvent = armPolicyEvents.get(`${armHostIds.get(element)}\n${event.type}`);
+				if (armEvent) {
+					runSyncPolicy!(armEvent.syncPolicy!, event);
+					armPolicyApplied = true;
+				}
+			}
 			const hostNodeId = hostIds.get(element);
 			const eventRecord = hostNodeId ? events.get(`${hostNodeId}\n${event.type}`) : undefined;
 			if (eventRecord) {
@@ -1245,7 +1289,12 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 			if (element === root) break;
 		}
 		if ((forwardsUnknownElements || nestedEventNames.has(event.type)) && !leavesPage(event)) {
-			return forward({ event, element: event.target, eventRecord: null });
+			return forward({
+				event,
+				element: event.target,
+				eventRecord: null,
+				...(armPolicyApplied ? { syncPolicyAlreadyApplied: true } : {}),
+			});
 		}
 		if (__MARKLESS_INLINE_EXECUTION_LOG__ !== 'never' && globalScope.__mxLog) {
 			return forward({ event, element: event.target, eventRecord: null });

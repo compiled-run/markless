@@ -231,6 +231,7 @@ test('settled update commits the build-emitted arm record set without an evaluat
 	expect(commitArm).toHaveBeenCalledWith(boundary, {
 		html: '<p>settled</p>',
 		armRecords: tryRecords,
+		arm: ASYNC_BOUNDARY_ARM.try,
 	});
 });
 

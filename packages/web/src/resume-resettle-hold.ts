@@ -1,3 +1,4 @@
+import { ASYNC_BOUNDARY_ARM } from '@markless/serializer/async-boundary-arm';
 import {
 	MARKLESS_PENDING_MIN_VISIBLE_MS,
 	settleOrPendingDeadline,
@@ -109,6 +110,7 @@ export function wireResettleHold(input: {
 			input.commitArm(boundary, {
 				html: pendingArmHtmlById.get(boundary.id)!,
 				armRecords: { locators: [], events: [], behaviors: [], elementHandles: [] },
+				arm: ASYNC_BOUNDARY_ARM.pending,
 			}),
 	});
 }

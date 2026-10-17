@@ -90,3 +90,43 @@ test('a branch arm that rebuilds its rows shows the @empty block for an empty co
 	expect(branchModule?.source).toContain('"empty": "<li>Nobody</li>"');
 	expect(branchModule?.source).toContain('if (items.length === 0) return repeat.empty ?? "";');
 });
+
+test('rows written straight into an @try arm name the boundary arm they belong to', async () => {
+	const result = await compile(`import { computed } from '@markless/core';
+export function Page() @{
+	const crates = computed(async () => [{ code: 'k1' }]);
+	<section>
+		@try {
+			@for (const crate of crates; key crate.code) {
+				<p>{crate.code}</p>
+			}
+		} @pending {
+			<p>packing</p>
+		}
+		<footer>end</footer>
+	</section>
+}`);
+	expect(result.protocolView.keyedRepeats?.[0]?.branchArm).toEqual({
+		branchId: 'boundary:0',
+		arm: 0,
+	});
+});
+
+test('rows inside an element of their own in an @try arm name no boundary arm', async () => {
+	const result = await compile(`import { computed } from '@markless/core';
+export function Page() @{
+	const crates = computed(async () => [{ code: 'k1' }]);
+	<section>
+		@try {
+			<ul>
+				@for (const crate of crates; key crate.code) {
+					<li>{crate.code}</li>
+				}
+			</ul>
+		} @pending {
+			<p>packing</p>
+		}
+	</section>
+}`);
+	expect(result.protocolView.keyedRepeats?.[0]).not.toHaveProperty('branchArm');
+});

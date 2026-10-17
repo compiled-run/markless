@@ -1,3 +1,6 @@
+import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'pathe';
 import { expect, test } from 'vitest';
 import { machinePathLeaks } from '../src/build/machine-paths.ts';
 import { rootRelativeId } from '../src/module-id.ts';
@@ -66,4 +69,18 @@ test('machinePathLeaks catches a checkout path minted into an identifier', () =>
 		[root],
 	);
 	expect(leaks).toEqual(['build/minted.js', 'build/raw-minted.js']);
+});
+
+test('a file linked in from outside the checkout is spelled by its package, not a climb out of the root', async () => {
+	const base = await realpath(await mkdtemp(join(tmpdir(), 'markless-module-id-')));
+	try {
+		await mkdir(join(base, 'app'));
+		await mkdir(join(base, 'linked/src'), { recursive: true });
+		await writeFile(join(base, 'linked/package.json'), '{"name":"@acme/widgets"}');
+		await writeFile(join(base, 'linked/src/dial.tsrx'), '');
+		const id = rootRelativeId(join(base, 'linked/src/dial.tsrx'), join(base, 'app'));
+		expect(id).toBe('node_modules/@acme/widgets/src/dial.tsrx');
+	} finally {
+		await rm(base, { recursive: true, force: true });
+	}
 });

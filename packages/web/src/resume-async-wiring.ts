@@ -161,6 +161,15 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 		) {
 			for (const asyncRead of boundary.asyncReads)
 				input.graph.read(asyncRead.graphNodeId, ['status']);
+			// A runner another reader demanded first can settle before this subscribed, and no write follows to announce it.
+			const read = boundary.asyncReads[0];
+			if (input.demandOnStart && boundary.updateSymbolId && read && !input.settleTracker?.hasSettledContent(boundary.id)) {
+				const snapshot = boundaryGateSnapshot(input.graph, boundary, read.graphNodeId, input.graph.read(read.graphNodeId, []));
+				if (isSettledStatus((snapshot as { readonly status?: unknown } | null)?.status)) {
+					input.onAsyncSnapshot?.(boundary, snapshot);
+					void settleAsyncBoundaryRange(input, boundary, snapshot);
+				}
+			}
 		}
 	}
 }
@@ -234,6 +243,7 @@ export async function settleAsyncBoundaryRange(
 		await input.commitArm!(boundary, {
 			...rendered,
 			html: rendered.html,
+			arm: status === 'rejected' ? ASYNC_BOUNDARY_ARM.catch : ASYNC_BOUNDARY_ARM.try,
 			armRecords: (composedArmRecordQualifier()?.(boundary.id, armRecords, input.graph) ?? armRecords),
 		});
 		input.settleTracker?.markSettled(boundary.id);
@@ -264,6 +274,7 @@ export async function settleAsyncBoundaryRange(
 				...(computed && { computed }),
 				...(cells && { cells }),
 				html: update.html,
+				arm: status === 'rejected' ? ASYNC_BOUNDARY_ARM.catch : ASYNC_BOUNDARY_ARM.try,
 				armRecords: (composedArmRecordQualifier()?.(boundary.id, armRecords, input.graph) ?? armRecords),
 			});
 			input.settleTracker?.markSettled(boundary.id);

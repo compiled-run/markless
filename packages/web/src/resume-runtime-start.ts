@@ -139,6 +139,15 @@ export async function startResumeRuntime(input: {
 		);
 	}
 	if ((runtimeInput.view.keyedRepeats ?? []).length > 0) {
+		// Rows written straight into a boundary arm follow the arm each commit announces here.
+		if (runtimeInput.view.keyedRepeats!.some((repeat) => repeat.branchArm))
+			for (const boundary of prepared.asyncBoundariesById.values())
+				(runtimeInput.root.__marklessBranchArms ??= new Map()).set(boundary.id, {
+					arm: boundary.initiallyServedArm,
+					start: boundary.startAnchor,
+					end: boundary.endAnchor,
+					listeners: new Set(),
+				});
 		const keyedRepeats = await import('./resume-keyed-repeats-lazy.ts');
 		await keyedRepeats.primeKeyedRepeatCollections({
 			graph: runtimeInput.graph,

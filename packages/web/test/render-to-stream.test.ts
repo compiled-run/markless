@@ -348,19 +348,25 @@ function orchardArtifact(
 					{
 						version: ASYNC_PROTOCOL_VERSION,
 						cells: [],
-						computed: sensors.map((sensor) => ({
-							graphNodeId: `computed:${sensor.key}`,
-							name: sensor.key,
-							async: true,
-							...(sensor.dependsOn
-								? {
-										dependencies: sensor.dependsOn.map((dependency) => ({
-											graphNodeId: `computed:${dependency}`,
-											path: [],
-										})),
-									}
-								: {}),
-						})),
+						computed: sensors
+							.filter(
+								(sensor, index) =>
+									sensors.findIndex((other) => other.key === sensor.key) ===
+									index,
+							)
+							.map((sensor) => ({
+								graphNodeId: `computed:${sensor.key}`,
+								name: sensor.key,
+								async: true,
+								...(sensor.dependsOn
+									? {
+											dependencies: sensor.dependsOn.map((dependency) => ({
+												graphNodeId: `computed:${dependency}`,
+												path: [],
+											})),
+										}
+									: {}),
+							})),
 					} as never,
 					snapshots as never,
 				),
@@ -540,9 +546,7 @@ test('wake-channel streaming emits a zero-payload baseline shell without changin
 	expect(wake.pendingArmCount).toBe(1);
 	expect(wake.shell).toContain('<p>Scanning channels</p>');
 	expect(wake.shell.match(/<script type="markless\/(?:state|view)">/g) ?? []).toHaveLength(0);
-	expect(wake.shell).toContain(
-		'data-markless-resume-module="/build/prerender-wake-relay.js"',
-	);
+	expect(wake.shell).toContain('data-markless-resume-module="/build/prerender-wake-relay.js"');
 
 	const [legacyInstallments, wakeInstallments] = await Promise.all([
 		collect(legacy.appends()),
@@ -661,6 +665,27 @@ test('streamed commit invocations carry compiler-known dependency edges onto str
 	// dependent one names the streamed boundary its read set points at.
 	expect(appended).toContain('__mArm("orchard:0")');
 	expect(appended).toContain('__mArm("orchard:1",["orchard:0"])');
+});
+
+test('two boundaries reading one streamed async value both stream their settled arm', async () => {
+	const stream = await renderToStream(
+		orchardArtifact([
+			{ key: 'harvest', delayMs: 30, label: 'Harvest logged' },
+			{ key: 'harvest', delayMs: 30, label: 'Harvest logged' },
+		]) as never,
+		{},
+	);
+	expect(stream.pendingArmCount).toBe(2);
+
+	const appended = (await collect(stream.appends())).join('');
+	expect(appended).toContain(
+		'<template m:arm="orchard:0"><p data-sensor="harvest">Harvest logged</p></template>',
+	);
+	expect(appended).toContain(
+		'<template m:arm="orchard:1"><p data-sensor="harvest">Harvest logged</p></template>',
+	);
+	expect(appended).toContain('__mArm("orchard:0")');
+	expect(appended).toContain('__mArm("orchard:1")');
 });
 
 test('dependency edges onto inline-settled boundaries are not reveal dependencies', async () => {

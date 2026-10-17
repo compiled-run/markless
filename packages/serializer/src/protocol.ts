@@ -463,10 +463,11 @@ export type ProtocolViewPayload = {
 		 */
 		readonly indexKey?: true;
 		/**
-		 * Rows written straight into an `@if`/`@switch` arm, with no element of the
-		 * arm around them: they stand between that branch's anchors, and only while
-		 * `arm` is the one shown. `branchId` is spelled as the authoring module spells
-		 * it; composition prefixes it the way it prefixes this record's `id`.
+		 * Rows written straight into an `@if`/`@switch` arm or an `@try`/`@pending`/
+		 * `@catch` arm, with no element of the arm around them: they stand between
+		 * that range's anchors, and only while `arm` is the one shown. `branchId` is
+		 * the branch site or async boundary id as the authoring module spells it;
+		 * composition prefixes it the way it prefixes this record's `id`.
 		 */
 		readonly branchArm?: { readonly branchId: string; readonly arm: number };
 		readonly itemName: string;

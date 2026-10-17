@@ -221,6 +221,56 @@ test('emitSymbolResolverModule resolves bound rows and fails loudly for unknown 
 	expect(output).toContain('"ancestry":[{}]');
 });
 
+test('emitSymbolResolverModule reads a prop the root forwarded from its own props', async () => {
+	const moduleUrl = `data:text/javascript,${encodeURIComponent(
+		'export async function symbol_child(context) { return context.capture.read("slot:where"); }',
+	)}`;
+	const output = emitSymbolResolverModule({
+		symbols: [{ id: 'symbol:child', chunk: moduleUrl, exportName: 'symbol_child' }],
+		boundSymbols: [
+			{
+				id: 'bound:echo',
+				baseSymbolId: 'symbol:child',
+				componentEdgePath: ['edge:0'],
+				ancestry: [
+					{ componentEdgeId: 'edge:0', branchScopeIds: [], keyedRepeatScopeIds: [] },
+				],
+				captureSlots: [
+					{
+						slotId: 'slot:where',
+						path: [],
+						route: {
+							kind: 'passthrough-route',
+							componentEdgeId: 'edge:0',
+							bindingId: 'binding:0:3',
+							propName: 'url',
+							path: ['pathname'],
+						},
+					},
+				],
+			},
+		],
+	} as never);
+	const generatedModule = (await import(
+		`data:text/javascript,${encodeURIComponent(output)}`
+	)) as {
+		loadSymbol(id: string): Promise<(context: unknown) => unknown>;
+	};
+	const reads: unknown[] = [];
+	const bound = await generatedModule.loadSymbol('bound:echo');
+	await expect(
+		bound({
+			graph: {
+				read: (graphNodeId: string, path: string[]) => (
+					reads.push([graphNodeId, path]),
+					'/orders'
+				),
+			},
+		}),
+	).resolves.toBe('/orders');
+	expect(reads).toEqual([['prop:props', ['url', 'pathname']]]);
+});
+
 // The graph-less spellings the resolver used to emit; each fell through to the
 // runtime's per-dispatch `marklessWidgetScope.active` pointer, which two
 // containers with interleaving async symbol bodies share.

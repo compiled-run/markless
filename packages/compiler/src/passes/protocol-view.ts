@@ -1,4 +1,8 @@
-import { ASYNC_PROTOCOL_VERSION, type ProtocolViewPayload } from '@markless/serializer';
+import {
+	ASYNC_BOUNDARY_ARM,
+	ASYNC_PROTOCOL_VERSION,
+	type ProtocolViewPayload,
+} from '@markless/serializer';
 import type {
 	PayloadKeyedRepeat,
 	PlannedSymbol,
@@ -434,6 +438,7 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 				keyPath: repeat.keyPath,
 				...(positionKeyed ? { indexKey: true as const } : {}),
 				...branchArmField(input, repeat),
+				...asyncArmField(input, repeat),
 				itemName: render.itemName,
 				rowElementCount: render.rowElementCount,
 				// Pay-per-use: rows that already start the parent say nothing.
@@ -491,6 +496,27 @@ function branchArmField(
 			return hasSymbol && onlyTheRows
 				? { branchArm: { branchId: branch.branchSiteId, arm } }
 				: {};
+		}
+	}
+	return {};
+}
+
+// Rows written straight into an async boundary arm follow it the way branch-arm rows follow theirs.
+function asyncArmField(
+	input: ProtocolViewPayloadInput,
+	repeat: PayloadKeyedRepeat,
+): { readonly branchArm?: { readonly branchId: string; readonly arm: number } } {
+	if (repeat.enclosingRepeatId) return {};
+	const chunks = renderDataOf(input).chunks;
+	for (const boundary of renderDataOf(input).boundaries) {
+		for (const name of Object.keys(ASYNC_BOUNDARY_ARM) as Array<keyof typeof ASYNC_BOUNDARY_ARM>) {
+			const chunk = chunks.find((candidate) => candidate.id === boundary.armChunkIds[name]);
+			const holdsRepeat = chunk?.slots.some(
+				(slot) => slot.kind === 'repeat' && slot.repeatId === repeat.id,
+			);
+			if (!chunk || !holdsRepeat) continue;
+			if (chunk.hosts.some((host) => host.hostNodeId === repeat.parentHostNodeId)) return {};
+			return { branchArm: { branchId: boundary.boundaryId, arm: ASYNC_BOUNDARY_ARM[name] } };
 		}
 	}
 	return {};
