@@ -26,6 +26,7 @@ import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import {
 	type GraphReadScope,
 	collectCompositeTemplateExpression,
+	liftArmModuleValue,
 	mintTemplateExpressionComputed,
 	pureCompositeReadSources,
 	readsUnroutedGraphCell,
@@ -417,6 +418,22 @@ function componentPropBindings(
 		}
 		const constant =
 			expression && opaqueSource === source ? constantPropValue(expression, state) : null;
+		const lifted =
+			expression && opaqueSource === source && !constant?.value.ok
+				? liftArmModuleValue(expression, state)
+				: null;
+		if (lifted) {
+			props.push({
+				name,
+				source,
+				kind: 'graph-reference',
+				graphNodeId: lifted.graphNodeId,
+				graphBindingKind: 'computed',
+				path: [],
+				sourceSpan: span,
+			});
+			continue;
+		}
 		props.push({
 			name,
 			source: opaqueSource,

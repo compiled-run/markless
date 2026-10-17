@@ -245,6 +245,27 @@ export function collectCompositeTemplateExpression(
 	);
 }
 
+// A flipped arm rebuilds from graph reads alone, so a module value it shows rides a constant computed.
+export function liftArmModuleValue(
+	expression: AnyNode,
+	state: WalkState,
+): { readonly graphNodeId: string } | null {
+	if (!state.currentArmScope || state.currentKeyedRepeatScopeIds.length > 0) return null;
+	const readSources = pureCompositeReadSources(expression, state, {
+		methodCalls: true,
+		unaryOperators: true,
+	});
+	if (readSources?.length !== 0 || isLiteralExpression(expression)) return null;
+	return mintTemplateExpressionComputed(
+		`() => ${expressionSource(expression, state.source)}`,
+		[],
+		state,
+		false,
+		undefined,
+		true,
+	);
+}
+
 /**
  * Mints the synthetic computed that stands behind one recombined expression, so
  * every graph read inside it wakes a single DOM update instead of none.

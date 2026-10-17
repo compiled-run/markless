@@ -120,7 +120,14 @@ function flippedArmReadGraphNodeIds(input: PublicRenderModuleInput): ReadonlyArr
 				for (const attribute of slot.attributeSlots) addResidue(attribute.residue);
 				walk(slot.childChunkId);
 			} else if (slot.kind === 'branch') for (const armId of slot.armTemplateIds) walk(armId);
-			else if (slot.kind === 'repeat') {
+			else if (slot.kind === 'child-component') {
+				const edge = input.semanticGraph.componentEdges.find(
+					(candidate) => candidate.id === slot.componentEdgeId,
+				);
+				for (const prop of edge?.props ?? [])
+					if (prop.kind === 'graph-reference') reads.add(prop.graphNodeId);
+				if (slot.projectionChunkId) walk(slot.projectionChunkId);
+			} else if (slot.kind === 'repeat') {
 				const repeat = input.renderData.repeats.find(
 					(candidate) => candidate.repeatId === slot.repeatId,
 				);
