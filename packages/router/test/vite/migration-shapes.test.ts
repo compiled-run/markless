@@ -85,3 +85,11 @@ test('a callback prop called from another file receives its argument', async () 
 	expect(errors).toEqual([]);
 	await page.close();
 });
+
+test('a child handler reads the page props it was given', async () => {
+	const { page, errors } = await open('/echo?sort=asc');
+	await page.click('[data-echo]');
+	await expect.poll(() => page.locator('[data-heard]').textContent()).toBe('/echo?sort=asc');
+	expect(errors).toEqual([]);
+	await page.close();
+});

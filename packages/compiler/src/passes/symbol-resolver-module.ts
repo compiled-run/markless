@@ -123,6 +123,8 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'				const handle = elementHandleRoute(context, route);',
 		'				return handle ? handle.value : context.graph.read(route.graphNodeId, route.path ?? []);',
 		'			}',
+		// A prop the root forwarded from its own props: the root's props are the page-space `prop:props` cell.
+		'			if (route.kind === "passthrough-route") return context.graph.read("prop:props", [route.propName, ...(route.path ?? []), ...(slot.path ?? [])]);',
 		'			throw new Error(`Capture slot ${slotId} is a callback route`);',
 		'		},',
 		'		invoke(slotId, args) {',
