@@ -14,14 +14,12 @@ afterAll(() => Promise.all(outRoots.map((path) => rm(path, { force: true, recurs
 
 type Variant = {
 	readonly name: string;
-	readonly port: number;
 	readonly interact: (page: Page) => Promise<void>;
 };
 
 const variants: readonly Variant[] = [
 	{
 		name: 'vite-ssr',
-		port: 4346,
 		async interact(page) {
 			const counter = page.locator('button[data-counter]');
 			await expect.poll(() => counter.textContent()).toBe('0');
@@ -31,7 +29,6 @@ const variants: readonly Variant[] = [
 	},
 	{
 		name: 'vite-ssr-rows',
-		port: 4347,
 		async interact(page) {
 			const output = page.locator('main > output');
 			await expect.poll(() => output.textContent()).toBe('none');
@@ -43,7 +40,6 @@ const variants: readonly Variant[] = [
 	},
 	{
 		name: 'vite-prerender-multi-child',
-		port: 4348,
 		async interact(page) {
 			const left = page.locator('[data-counter-side="left"]');
 			const right = page.locator('[data-counter-side="right"]');
@@ -83,7 +79,7 @@ async function buildAndClick(variant: Variant, packed: boolean) {
 	);
 	outRoots.push(dist);
 	try {
-		await exec(process.execPath, [buildScript, variant.name, dist, String(variant.port)], {
+		await exec(process.execPath, [buildScript, variant.name, dist], {
 			cwd: resolve(fixtures, variant.name),
 			env: { ...process.env, MARKLESS_FIXTURE_NATIVE_PACKING: packed ? '1' : '0' },
 		});
@@ -108,7 +104,8 @@ async function buildAndClick(variant: Variant, packed: boolean) {
 			response.end();
 		}
 	});
-	await new Promise<void>((done) => server.listen(variant.port, '127.0.0.1', done));
+	await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
+	const { port } = server.address() as { port: number };
 	const browser = await chromium.launch();
 	try {
 		const page = await browser.newPage();
@@ -127,7 +124,7 @@ async function buildAndClick(variant: Variant, packed: boolean) {
 				),
 			);
 		});
-		await page.goto(`http://127.0.0.1:${variant.port}/`);
+		await page.goto(`http://127.0.0.1:${port}/`);
 		await page.waitForLoadState('networkidle');
 		const atLoad = scripts.length;
 		await variant.interact(page).catch((error: Error) => {
