@@ -35,6 +35,8 @@ export type ArmCommitUpdate = {
 	// Cells of components this render created: nothing in the live graph answers
 	// for them until the commit writes them in.
 	readonly cells?: ReadonlyArray<{ readonly graphNodeId: string; readonly value: unknown }>;
+	/** The async boundary arm this commit paints; rows written straight into it follow it. */
+	readonly arm?: number;
 };
 
 export type ArmRegistrationDeps = Parameters<typeof createArmCommitter>[0];
@@ -141,6 +143,11 @@ export function createArmCommitter(
 		const settled = registering.catch(() => undefined);
 		pending.add(settled);
 		const materialized = await registering.finally(() => pending.delete(settled));
+		const shown = update.arm === undefined ? undefined : deps.root.__marklessBranchArms?.get(boundary.id);
+		if (shown) {
+			Object.assign(shown, { arm: update.arm, start: boundary.startAnchor, end: boundary.endAnchor });
+			for (const paint of shown.listeners) paint();
+		}
 		restoreFocusScroll(deps, boundary, captured, materialized.elementsByHostId);
 	};
 }
