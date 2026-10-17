@@ -177,7 +177,11 @@ export async function assembleSsrContainer(
 		classification?.kind === 'divergent' ? classification.delta : requestRecords;
 	const payloadScripts =
 		hasPayload && browserTriggers && classification?.kind !== 'empty'
-			? renderPayloadScripts(payloadRecords)
+			? renderPayloadScripts(
+					payloadRecords === requestRecords
+						? { state, view: withNamedHostLocators(view) }
+						: payloadRecords,
+				)
 			: undefined;
 	const selectedResumeModuleUrl = wakeChannelEnabled ? prerenderWakeModuleUrl : resumeModuleUrl;
 	const artifactSources = artifactInlineResumerSources(component);
@@ -676,6 +680,26 @@ function branchServedArmEventNames(
 			repeat.rowEvents.map((event) => event.eventName),
 		),
 	];
+}
+
+// The browser only ever locates a host a top-level record names; arm record sets carry their own locators.
+export function withNamedHostLocators(view: ProtocolViewPayload): ProtocolViewPayload {
+	const named = new Set<string>();
+	for (const record of [
+		...view.events,
+		...view.domUpdates,
+		...view.behaviors,
+		...view.elementHandles,
+	])
+		named.add(record.hostNodeId);
+	for (const repeat of view.keyedRepeats ?? []) {
+		named.add(repeat.parentHostNodeId);
+		if (repeat.ownerHostNodeId) named.add(repeat.ownerHostNodeId);
+	}
+	for (const branch of view.branches ?? [])
+		for (const site of branch.idrefSites ?? []) named.add(site.hostNodeId);
+	const locators = view.locators.filter((locator) => named.has(locator.hostNodeId));
+	return locators.length === view.locators.length ? view : { ...view, locators };
 }
 
 function visibleHostIndexes(view: ProtocolViewPayload): ReadonlyArray<number> {

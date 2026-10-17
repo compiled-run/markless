@@ -238,7 +238,10 @@ describe('SSR browser HMR', () => {
 			const first = await requestHtml(server);
 			expect(first).toContain('child original');
 			expect(first).not.toContain('child added');
-			expect(marklessViewPayload(first).locators).toHaveLength(5);
+			expect(marklessViewPayload(first).locators.map((locator) => locator.tagName)).toEqual([
+				'button',
+				'button',
+			]);
 
 			const reloadsBeforeEdit = fullReloadCount(send, fixture.root);
 			await editFile(

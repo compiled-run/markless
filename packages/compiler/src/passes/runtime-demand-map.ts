@@ -76,7 +76,9 @@ const CLOSURE_DISPATCH_CORE = [...SCALAR_LEAN_DISPATCH_CORE, 'web/fns/closure-ac
 const SYNC_POLICY = ['web/inline/sync-policy-core'];
 const DOM_UPDATE: string[] = [];
 const KEYED_REPEAT = ['web/repeat-runtime', 'web/resume-keyed-repeats'];
-const BRANCH = ['web/resume-branches'];
+// Arm range commits and served-arm registration load only for records that own an arm.
+const ARM_COMMIT = ['web/resume-commit-arm'];
+const BRANCH = ['web/resume-branches', ...ARM_COMMIT];
 // Settle tracking, the re-settle hold and streamed-arm adoption load only for async boundaries.
 const ASYNC_BOUNDARY = [
 	'web/resume-async-boundaries',
@@ -103,7 +105,7 @@ const ROW_MINT = ['web/fns/row-mint'];
 // The component-rooted half of the same building step. It reaches the render
 // closure, so it is folded per record for the same reason: an app whose rows
 // root no component never names it and never emits its chunk.
-const ROW_COMPONENT_MINT = ['web/fns/row-component-mint'];
+const ROW_COMPONENT_MINT = ['web/fns/row-component-mint', ...ARM_COMMIT];
 // The template mint plus the page's render-data reader, for a row with expression slots.
 const ROW_SLOT_MINT = ['web/fns/row-slot-mint'];
 // Per-enclosing-row wiring, folded only into a repeat written inside another's rows.
@@ -936,6 +938,7 @@ function payloadDemandRecords(
 			runtimeModuleIds: unique([
 				...fullTier,
 				...ASYNC_BOUNDARY,
+				...ARM_COMMIT,
 				...symbolIdsDemand(
 					[
 						record.updateSymbolId,
@@ -1327,7 +1330,7 @@ type ArmRecordSetLike = {
 // Resume start wires every record kind the page holds, whichever action dispatches first.
 const RESUME_WIRING = {
 	branch: BRANCH,
-	'async-boundary': ASYNC_BOUNDARY,
+	'async-boundary': [...ASYNC_BOUNDARY, ...ARM_COMMIT],
 	behavior: BEHAVIOR,
 	'element-handle': FULL_RESUME_CORE,
 	'keyed-repeat': KEYED_REPEAT,

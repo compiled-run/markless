@@ -2660,7 +2660,7 @@ test('renderToString keeps fragment sibling roots as direct container children a
 				events: [{ hostNodeId: 'h1', eventName: 'click', symbolIds: ['symbol:click'] }],
 				domUpdates: [],
 				behaviors: [],
-				elementHandles: [],
+				elementHandles: [{ hostNodeId: 'h0', handleId: 'element:site', name: 'site' }],
 				asyncBoundaries: [],
 			},
 		}),
@@ -2683,6 +2683,79 @@ test('renderToString keeps fragment sibling roots as direct container children a
 	]);
 	expect(view.events).toEqual([
 		{ hostNodeId: 'h1', eventName: 'click', symbolIds: ['symbol:click'] },
+	]);
+});
+
+test('renderToString serves a locator only for a host some served record names', async () => {
+	const html = await renderToString({
+		renderSsr: () => ({
+			html: '<header>Site</header><nav><a>Docs</a></nav><button>0</button><p>0</p><ul></ul><span></span><label></label>',
+			state: createProtocolStatePayload({ cells: [] }),
+			view: {
+				version: ASYNC_PROTOCOL_VERSION,
+				locators: [
+					{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'header' },
+					{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'nav' },
+					{ hostNodeId: 'h2', strategy: 'dom-order', index: 2, tagName: 'a' },
+					{ hostNodeId: 'h3', strategy: 'dom-order', index: 3, tagName: 'button' },
+					{ hostNodeId: 'h4', strategy: 'dom-order', index: 4, tagName: 'p' },
+					{ hostNodeId: 'h5', strategy: 'dom-order', index: 5, tagName: 'ul' },
+					{ hostNodeId: 'h6', strategy: 'dom-order', index: 6, tagName: 'span' },
+					{ hostNodeId: 'h7', strategy: 'dom-order', index: 7, tagName: 'label' },
+				],
+				events: [{ hostNodeId: 'h3', eventName: 'click', symbolIds: ['symbol:click'] }],
+				domUpdates: [
+					{
+						hostNodeId: 'h4',
+						source: 'count',
+						graphNodeId: 'state:count',
+						path: [],
+						target: { kind: 'text' },
+						symbolId: 'symbol:text',
+					},
+				],
+				behaviors: [],
+				elementHandles: [{ hostNodeId: 'h6', handleId: 'element:box', name: 'box' }],
+				keyedRepeats: [
+					{
+						id: 'repeat:0',
+						parentHostNodeId: 'h5',
+						collectionGraphNodeId: 'state:items',
+						collectionPath: [],
+						keyPath: ['id'],
+						itemName: 'item',
+						rowElementCount: 1,
+						rowEvents: [],
+					},
+				],
+				branches: [
+					{
+						id: 'branch:0',
+						startAnchor: { strategy: 'dom-order-comment', index: 0 },
+						endAnchor: { strategy: 'dom-order-comment', index: 1 },
+						idrefSites: [
+							{
+								hostNodeId: 'h7',
+								attributeName: 'for',
+								handleReadId: 'markless:element-handle-id|element:box',
+								armIndex: 0,
+							},
+						],
+					},
+				],
+				asyncBoundaries: [],
+			},
+		}),
+	});
+
+	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;
+
+	expect(view.locators.map((locator) => [locator.hostNodeId, locator.index])).toEqual([
+		['h3', 4],
+		['h4', 5],
+		['h5', 6],
+		['h6', 7],
+		['h7', 8],
 	]);
 });
 

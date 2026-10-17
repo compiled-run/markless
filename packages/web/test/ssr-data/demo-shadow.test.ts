@@ -12,6 +12,7 @@ import {
 	assemblePrerenderContainer,
 	prepareSsrResumeRecords,
 	renderToString,
+	withNamedHostLocators,
 } from '../../src/render-to-string.ts';
 import {
 	derivePrerenderResumeRecords,
@@ -137,7 +138,7 @@ test('music-player records-from-chunks exactly match its renderToString twin', a
 		`<script type="markless/state">${JSON.stringify(derivedRecords.state)}</script>`,
 	);
 	expect(ssrTwin).toContain(
-		`<script type="markless/view">${JSON.stringify(derivedRecords.view)}</script>`,
+		`<script type="markless/view">${JSON.stringify(withNamedHostLocators(derivedRecords.view))}</script>`,
 	);
 });
 

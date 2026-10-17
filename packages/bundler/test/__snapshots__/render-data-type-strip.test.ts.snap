@@ -123,6 +123,7 @@ export const runtimeDemandMap = {
 		"web/resume-async-wiring",
 		"web/resume-behaviors",
 		"web/resume-branches",
+		"web/resume-commit-arm",
 		"web/resume-events",
 		"web/resume-keyed-repeats",
 		"web/resume-locators",
