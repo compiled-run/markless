@@ -62,6 +62,32 @@ website deploys the same way.
 Nitro has presets for many other hosts. We have tested two of them with Markless: the default Node
 server and Vercel. Treat the others as untested for now, and try a preview deploy first.
 
+## Memory is not shared
+
+A host runs your server as many copies, called instances, and starts or stops them as traffic
+changes. Each instance has its own memory. No host shares it between instances: not Vercel, not
+Netlify, not Cloudflare. A value you keep in a variable is gone on the next instance, and the
+next visitor may land there.
+
+A variable at the top of a module exists once per instance. It can also exist more than once inside
+one instance, because Nitro may load the same module into more than one bundle. To keep exactly one
+copy per instance, put it on `globalThis`:
+
+```ts
+const pool = (globalThis.dbPool ??= createPool(process.env.DATABASE_URL));
+```
+
+This is the right place for a database pool or a client: make it once per instance, then reuse it.
+
+State that must outlive a request, or that every visitor must see, belongs in a database or a
+key-value store. Counters, sessions and carts all go there, not in memory.
+
+<Callout
+	sprite="cross"
+	title="Does each route get its own function on Vercel?"
+	text="It looks that way, but Nitro's per-route Vercel functions are links to one shared bundle. Nitro keeps them so each route shows up on its own in Vercel's logs and metrics. A compatibilityDate.vercel earlier than 2025-07-15 turns them off. To get functions that are truly separate, with their own copy of the bundle, use vercel.functionRules."
+/>
+
 ## Nitro configuration
 
 Put Nitro configuration under a top-level `nitro` key in `vite.config.ts`. The router merges it into
