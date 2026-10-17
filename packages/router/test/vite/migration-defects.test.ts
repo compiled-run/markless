@@ -188,3 +188,13 @@ test('a plain const string passed to a child that reads it in a handler', async 
 	expect(errors).toEqual([]);
 	await page.close();
 });
+
+test('an async value in its own element beside a state hole in @try survives a click', async () => {
+	const { page, errors } = await open('/try-button');
+	await page.locator('[data-try-button]').waitFor();
+	expect(await text(page, '[data-try-button]')).toBe('Inbox 0');
+	await page.click('[data-try-button]');
+	await expect.poll(() => text(page, '[data-try-button]')).toBe('Inbox 1');
+	expect(errors).toEqual([]);
+	await page.close();
+});
