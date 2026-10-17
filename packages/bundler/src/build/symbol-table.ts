@@ -44,8 +44,9 @@ const SYMBOL_MANIFEST_TUPLE_RE = new RegExp(
 	'g',
 );
 const STRING_LITERAL_RE = /(["'`])([^"'`]*)\1/g;
-const SYMBOL_ROW_RE = /((?:["'`][^"'`]*["'`])\s*:\s*\[)(\d+)(,\s*\d+\])/g;
-const SYMBOL_ROW_CAPTURE_RE = /(["'`])([^"'`]*)\1\s*:\s*\[(\d+),\s*(\d+)\]/g;
+// The minifier prints round indexes in exponent form: 1000 as 1e3.
+const SYMBOL_ROW_RE = /((?:["'`][^"'`]*["'`])\s*:\s*\[)(\d+(?:e\d+)?)(,\s*\d+(?:e\d+)?\])/g;
+const SYMBOL_ROW_CAPTURE_RE = /(["'`])([^"'`]*)\1\s*:\s*\[(\d+(?:e\d+)?),\s*(\d+(?:e\d+)?)\]/g;
 
 export function rewriteGeneratedSymbolTableUrls(
 	bundle: Record<string, unknown>,
