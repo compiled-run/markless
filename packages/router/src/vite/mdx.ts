@@ -348,8 +348,8 @@ function routePartsFromHast(nodes: readonly HastNode[], context: RoutePartsConte
 			continue;
 		}
 
-		if (isMdxJsxFlowElement(node)) {
-			appendHtmlPart(parts, staticNodes, context.id);
+		if (isMdxJsxFlowElement(node) && !isIntrinsicElement(node, context)) {
+			appendHtmlPart(parts, staticNodes, context);
 			staticNodes = [];
 			parts.push(componentPart(node, context));
 			continue;
@@ -358,7 +358,7 @@ function routePartsFromHast(nodes: readonly HastNode[], context: RoutePartsConte
 		staticNodes.push(node);
 	}
 
-	appendHtmlPart(parts, staticNodes, context.id);
+	appendHtmlPart(parts, staticNodes, context);
 	return parts;
 }
 
@@ -371,7 +371,7 @@ function componentPart(node: MdxJsxElementNode, context: RoutePartsContext): Mdx
 
 	const componentIndex = context.components.length;
 	const props = componentProps(node, context.id);
-	const childNodes = normalizeStaticHastNodes(node.children, context.id);
+	const childNodes = normalizeStaticHastNodes(node.children, context);
 	const children = childNodes.length
 		? toHtml({ type: 'root', children: childNodes }, { allowDangerousHtml: true })
 		: '';
@@ -393,11 +393,11 @@ function componentPart(node: MdxJsxElementNode, context: RoutePartsContext): Mdx
 	return { kind: 'component', componentIndex };
 }
 
-function appendHtmlPart(parts: MdxPart[], nodes: readonly HastNode[], id: string) {
+function appendHtmlPart(parts: MdxPart[], nodes: readonly HastNode[], context: RoutePartsContext) {
 	if (nodes.length === 0) {
 		return;
 	}
-	const staticNodes = normalizeStaticHastNodes(nodes, id);
+	const staticNodes = normalizeStaticHastNodes(nodes, context);
 	const html = toHtml({ type: 'root', children: staticNodes }, { allowDangerousHtml: true });
 	if (html) {
 		const elementTags = hastElementTags(staticNodes);
@@ -417,35 +417,75 @@ function appendHtmlPart(parts: MdxPart[], nodes: readonly HastNode[], id: string
 // Static output is root content: a hast root only ever holds non-root nodes.
 type StaticHastNode = Exclude<HastNode, { type: 'root' }>;
 
-function normalizeStaticHastNodes(nodes: readonly HastNode[], id: string): StaticHastNode[] {
-	return nodes.flatMap((node) => normalizeStaticHastNode(node, id));
+function normalizeStaticHastNodes(
+	nodes: readonly HastNode[],
+	context: RoutePartsContext,
+): StaticHastNode[] {
+	return nodes.flatMap((node) => normalizeStaticHastNode(node, context));
 }
 
-function normalizeStaticHastNode(node: HastNode, id: string): StaticHastNode[] {
+function normalizeStaticHastNode(node: HastNode, context: RoutePartsContext): StaticHastNode[] {
+	const { id } = context;
 	if (isMdxEsm(node)) {
 		return [];
 	}
 	if (isMdxJsxFlowElement(node) || isMdxJsxTextElement(node)) {
-		throw new Error(
-			`Markless Router MDX only supports imported TSRX components as route-level MDX elements or static markdown children: ${id}`,
-		);
+		if (!isIntrinsicElement(node, context)) {
+			throw new Error(
+				`Markless Router MDX only supports imported TSRX components as route-level MDX elements or static markdown children: ${id}`,
+			);
+		}
+		return [intrinsicElement(node, context)];
 	}
 	if (isMdxExpression(node)) {
+		if (isEmptyMdxExpression(node.value)) return [];
 		const value = literalSafeExpressionValue(node.value, id);
 		return [{ type: 'text', value: value == null ? '' : String(value) }];
 	}
 	if (node.type === 'root') {
-		return normalizeStaticHastNodes(node.children, id);
+		return normalizeStaticHastNodes(node.children, context);
 	}
 	if ('children' in node && Array.isArray(node.children)) {
 		return [
 			{
 				...node,
-				children: normalizeStaticHastNodes(node.children as HastNode[], id),
+				children: normalizeStaticHastNodes(node.children as HastNode[], context),
 			} as StaticHastNode,
 		];
 	}
 	return [node];
+}
+
+// JSX reads a lowercase tag as an HTML element, never as a component binding.
+function isIntrinsicElement(node: MdxJsxElementNode, context: RoutePartsContext): boolean {
+	const name = node.name;
+	return (
+		typeof name === 'string' &&
+		/^[a-z][a-z0-9-]*$/.test(name) &&
+		!context.importedComponents.has(name)
+	);
+}
+
+const JSX_ATTRIBUTE_NAMES: Readonly<Record<string, string>> = {
+	className: 'class',
+	htmlFor: 'for',
+};
+
+function intrinsicElement(node: MdxJsxElementNode, context: RoutePartsContext): StaticHastNode {
+	const properties: Record<string, string | true> = {};
+	for (const { name, value } of componentProps(node, context.id)) {
+		if (value === false || value == null) continue;
+		if (typeof value !== 'string' && typeof value !== 'number' && value !== true)
+			throw literalExpressionError(context.id);
+		properties[JSX_ATTRIBUTE_NAMES[name] ?? name.toLowerCase()] =
+			value === true ? true : String(value);
+	}
+	return {
+		type: 'element',
+		tagName: node.name!,
+		properties,
+		children: normalizeStaticHastNodes(node.children, context),
+	} as StaticHastNode;
 }
 
 function componentProps(node: MdxJsxElementNode, id: string): MdxProp[] {
@@ -487,6 +527,11 @@ function literalSafeExpressionValue(source: string, id: string): unknown {
 		);
 	}
 	return evaluateLiteralExpression(statement.expression, id);
+}
+
+// `{/* note */}` is how MDX writes a comment; it has no value to render.
+function isEmptyMdxExpression(source: string): boolean {
+	return source.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, '').trim() === '';
 }
 
 function parseMdxExpressionValue(source: string, id: string): EstreeProgram | null {

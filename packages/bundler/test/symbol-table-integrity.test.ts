@@ -247,6 +247,57 @@ describe('generated symbol-table identity integrity', () => {
 		});
 	});
 
+	// The minifier prints 1000 as `1e3`, so a table past 1,000 rows carries exponent indexes.
+	test('reads and compacts table rows whose indexes the minifier printed with an exponent', () => {
+		const resolver = 'virtual:markless:resolver:wide';
+		const count = 2_001;
+		const symbols = Array.from({ length: count }, (_, index) => ({
+			symbolId: `symbol:${index}`,
+			virtualModuleId: `virtual:markless:symbol:wide:${index}`,
+			exportName: `run_${index}`,
+			kind: 'event' as const,
+		}));
+		const manifest = {
+			source: '/wide.tsrx',
+			payload: { virtualModuleId: 'payload' },
+			resolver: { virtualModuleId: resolver },
+			symbols,
+		};
+		const minified = (index: number) =>
+			index % 1000 === 0 && index > 0 ? `${index / 1000}e3` : String(index);
+		const rows = symbols
+			.map((symbol, index) => `"${symbol.symbolId}":[${minified(index)},${minified(index)}]`)
+			.join(',');
+		const bundle: Record<string, unknown> = {
+			'route.js': {
+				...chunk({ fileName: 'route.js', moduleIds: ['/wide.tsrx', resolver] }),
+				code: `const table=[1,null,${JSON.stringify(resolver)},${JSON.stringify(symbols.map((symbol) => symbol.virtualModuleId))},${JSON.stringify(symbols.map((symbol) => symbol.exportName))},{${rows}}];`,
+			},
+			'pack.js': {
+				...chunk({
+					fileName: 'pack.js',
+					moduleIds: symbols.map((symbol) => symbol.virtualModuleId),
+					exports: symbols.map((symbol) => symbol.exportName),
+				}),
+				modules: Object.fromEntries(
+					symbols.map((symbol) => [
+						symbol.virtualModuleId,
+						{ renderedExports: [symbol.exportName] },
+					]),
+				),
+			},
+		};
+
+		expect(rewriteGeneratedSymbolTableUrls(bundle).unresolved).toEqual([]);
+		const route = (bundle['route.js'] as { code: string }).code;
+		expect(route).toContain('"symbol:1000":[0,1e3]');
+		expect(route).toContain('"symbol:2000":[0,2e3]');
+		expect(verifyGeneratedSymbolTableRoutes(bundle, [manifest])).toEqual({
+			verified: count,
+			errors: [],
+		});
+	});
+
 	test('rejects unemitted and queried-id-only symbol chunks', () => {
 		const source = '/workspace/app/pages/index.tsrx';
 		const missingId = 'virtual:markless:symbol:missing';
