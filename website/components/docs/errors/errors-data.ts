@@ -3692,6 +3692,23 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_INLINE_DEFER_FACTORY_UNWRAPPABLE',
+		packageName: '@markless/bundler',
+		stage: 'build',
+		severity: 'error',
+		description: 'A Markless build tooling error from @markless/bundler.',
+		printed: [],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/bundler/src/inline-resumer.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/bundler/src/inline-resumer.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_INLINE_RESUMER_DEBUG_SOURCE_REQUIRED',
 		packageName: '@markless/web',
 		stage: 'runtime',
