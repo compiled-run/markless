@@ -255,4 +255,21 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 		what: 'This line is a summary. The build found errors in one `.tsrx` file and stopped.',
 		how: 'Read the blocks under this line. Each block starts with its own code, and each code has its own page.',
 	},
+	MARKLESS_SERVER_ONLY_PROP_BROWSER_READ: {
+		summary: "Code that runs in the browser reads a page's http prop.",
+		what: "A page's `http` prop holds the request, with its cookies and headers. It exists only while the page renders on the server. Here an event handler, an `attach`, a `computed()` the browser re-runs, or markup the browser rebuilds reads it. Whatever browser code reads is written into the page's HTML, so this would send the visitor's cookies and headers along with the page.",
+		how: 'Read `http` in the page body, which runs only on the server. If the browser needs one value from it, copy that value into `state()` there.',
+		example: [
+			'export default function Search({ http }: PageProps) @{',
+			"\tlet query = state(http.url.searchParams.get('q') ?? '');",
+			'',
+			'\t<button onClick={() => console.log(query)}>{query}</button>',
+			'}',
+		],
+	},
+	MARKLESS_ROUTER_RESPONSE_COMMITTED: {
+		summary: 'A page changed its status or headers after the response started streaming.',
+		what: 'The router sends the status and headers with the first bytes of the page. A page that waits on data keeps streaming after that. This write came later and tried to change what was already sent.',
+		how: 'Set `http.response.status` and `http.response.headers` in the page body, before anything the page waits on. Writing the same value again is fine.',
+	},
 };

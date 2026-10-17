@@ -35,6 +35,7 @@ export function compileCacheKey(input: CompileTsrxModuleInput): string | null {
 			input.resolverId ?? null,
 			input.omitAuthoredSource === true,
 			input.additionalFrameworkApiSources ?? null,
+			input.serverOnlyProps ?? null,
 			input.symbols,
 			sortedRecordEntries(input.importedModuleInterfaces),
 			sortedRecordEntries(input.importedModuleConstants),

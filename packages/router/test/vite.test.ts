@@ -74,6 +74,7 @@ test('can disable Nitro for route-only fixtures and apps', () => {
 	const names = plugins.map((plugin) => plugin.name);
 
 	expect(names).toEqual([
+		'markless-router:page-server-only-props',
 		'markless-router:mdx',
 		'markless-router:request-files',
 		'markless-router:typegen',
@@ -84,6 +85,30 @@ test('can disable Nitro for route-only fixtures and apps', () => {
 	expect(names).not.toContain('markless-router:vite');
 	expect(names).not.toContain('nitro:init');
 });
+
+test.each([[{}], [{ nitro: false }]] as const)(
+	'declares http server-only on page modules and nothing else (%o)',
+	(options) => {
+		const plugin = flattenPlugins([router(options)]).find(
+			(candidate) => candidate.name === 'markless-router:page-server-only-props',
+		);
+		let resolve: ((moduleId: string) => unknown) | undefined;
+		const markless = {
+			name: 'vite-plugin-markless',
+			api: { declareServerOnlyProps: (next: typeof resolve) => (resolve = next) },
+		};
+		(plugin!.configResolved as (config: unknown) => void)({ plugins: [markless] });
+
+		expect(resolve?.('pages/invoices/[id].tsrx')).toEqual([
+			expect.objectContaining({ exportName: 'default', propName: 'http' }),
+		]);
+		expect(resolve?.('pages/docs/index.mdx')).toEqual([
+			expect.objectContaining({ propName: 'http' }),
+		]);
+		expect(resolve?.('src/nav.tsrx')).toBeUndefined();
+		expect(resolve?.('components/pages/card.tsrx')).toBeUndefined();
+	},
+);
 
 test('transforms top-level API and middleware files through the Vite plugin', () => {
 	const requestPlugin = flattenPlugins([router()]).find(

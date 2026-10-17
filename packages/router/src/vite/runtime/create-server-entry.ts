@@ -29,6 +29,7 @@ import {
 } from '@markless/bundler/dev-error';
 import { __marklessDebugBootstrapSource } from '../../../../web/src/debug-channel.ts';
 import { appendModulePreloads, listenForLinkIntent } from '../link-intent.ts';
+import { createPageHttp } from './page-http.ts';
 import {
 	FRAGMENT_APPEND_END,
 	FRAGMENT_HOVER_DWELL_MS,
@@ -129,7 +130,6 @@ export function createServerEntry(options: ServerEntryOptions) {
 	async function fetch(request: Request): Promise<Response> {
 		const url = new URL(request.url);
 		const fragment = fragmentNavigation && request.headers.get(FRAGMENT_REQUEST_HEADER) === '1';
-		const cookie = request.headers.get('cookie');
 		if (isNitroApiPathname(url.pathname)) {
 			return new Response('Not found', { status: 404 });
 		}
@@ -142,12 +142,12 @@ export function createServerEntry(options: ServerEntryOptions) {
 				404,
 				'Not found',
 				fragment,
-				cookie,
+				request,
 			);
 		}
 
 		try {
-			return await renderPage(url, match.route.file, match.params, 200, fragment, cookie);
+			return await renderPage(url, match.route.file, match.params, 200, fragment, request);
 		} catch (error) {
 			// Surface the stack: a silent 500 hid the async-renderSsr break.
 			console.error('[markless-router] page render failed:', error);
@@ -161,7 +161,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 					500,
 					'Internal Server Error',
 					fragment,
-					cookie,
+					request,
 				);
 			} catch (errorPageError) {
 				console.error('[markless-router] error page render failed:', errorPageError);
@@ -203,13 +203,13 @@ export function createServerEntry(options: ServerEntryOptions) {
 		status: number,
 		fallbackText: string,
 		fragment: boolean,
-		cookie: string | null,
+		request: Request,
 	) {
 		if (!file) {
 			return new Response(fallbackText, { status });
 		}
 
-		return renderPage(url, file, {}, status, fragment, cookie);
+		return renderPage(url, file, {}, status, fragment, request);
 	}
 
 	async function renderPage(
@@ -218,15 +218,18 @@ export function createServerEntry(options: ServerEntryOptions) {
 		params: Readonly<Record<string, string>>,
 		status: number,
 		fragment: boolean,
-		cookie: string | null,
+		request: Request,
 	) {
 		const loadPageModule = options.pageModuleLoaders[file];
 		if (!loadPageModule) {
 			return new Response(`Page module not found: ${file}`, { status: 500 });
 		}
 
+		const cookie = request.headers.get('cookie');
 		const pageModule = (await loadPageModule()) as PageModule;
+		const http = createPageHttp(request, url);
 		const pageProps: PageComponentProps = {
+			http: http.context,
 			params,
 			url: {
 				href: url.href,
@@ -247,7 +250,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 		if (!renderSsr) {
 			const shell = await renderDocumentShell(documentModule, pageProps, '');
 			const message = `Page module must export an Markless compiled artifact: ${escapeHtml(file)}`;
-			return new Response(fillDocumentChildren(shell, message), { status, headers });
+			return new Response(fillDocumentChildren(shell, message), http.commit(status, headers));
 		}
 		const documentLoads = options.documentNavigation === 'document';
 		const linkIntent = fragmentNavigation || options.prefetch !== false;
@@ -317,7 +320,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 			const html = fragment
 				? fragmentDocument(shell, pageHtml.bodyHtml, documentLoads) + FRAGMENT_REGION_END
 				: fillDocumentChildren(shell, pageHtml.bodyHtml);
-			return new Response(html, { status, headers });
+			return new Response(html, http.commit(status, headers));
 		}
 
 		// Streaming default (owner ruling 2026-07-07): out-of-order streaming is
@@ -337,7 +340,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 			const html = fragment
 				? fragmentDocument(shell, pageHtml.bodyHtml, documentLoads) + FRAGMENT_REGION_END
 				: fillDocumentChildren(shell, pageHtml.bodyHtml);
-			return new Response(html, { status, headers });
+			return new Response(html, http.commit(status, headers));
 		}
 		const placeholderAt = shell.indexOf(DOCUMENT_CHILDREN_PLACEHOLDER);
 		// A fragment is a whole region document first; each settled arm then follows on its own, delimited.
@@ -352,6 +355,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 				: shell.slice(placeholderAt + DOCUMENT_CHILDREN_PLACEHOLDER.length);
 		const appendEnd = fragment ? FRAGMENT_APPEND_END : '';
 		const encoder = new TextEncoder();
+		const sent = http.commit(status, headers);
 		let cancelled = false;
 		let completed = false;
 		const body = new ReadableStream<Uint8Array>({
@@ -382,7 +386,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 				stream.cancel(reason);
 			},
 		});
-		return new Response(body, { status, headers });
+		return new Response(body, sent);
 	}
 
 	return { fetch };
@@ -510,6 +514,7 @@ function routedPageArtifact(
 // seeded the cell, and pages without a resumability payload, are untouched.
 function withPagePropsCell(state: unknown, props: PageComponentProps): unknown {
 	if (!state || typeof state !== 'object') return state;
+	const { http: _serverOnly, ...browserProps } = props;
 	const cells = (state as { readonly cells?: ReadonlyArray<{ readonly graphNodeId?: unknown }> })
 		.cells;
 	if (!Array.isArray(cells) || cells.some((cell) => cell?.graphNodeId === 'prop:props')) {
@@ -519,7 +524,12 @@ function withPagePropsCell(state: unknown, props: PageComponentProps): unknown {
 		...state,
 		cells: [
 			...cells,
-			{ graphNodeId: 'prop:props', name: 'props', valueKind: 'object', directValue: props },
+			{
+				graphNodeId: 'prop:props',
+				name: 'props',
+				valueKind: 'object',
+				directValue: browserProps,
+			},
 		],
 	};
 }

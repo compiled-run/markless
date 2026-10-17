@@ -28,6 +28,32 @@ export type SemanticGraphInput = {
 	readonly importedModuleConstants?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 	readonly artifactChildMaterializations?: Readonly<Record<string, ArtifactChildMaterialization>>;
 	readonly additionalFrameworkApiSources?: readonly string[];
+	/**
+	 * Props that exist only while the component renders on the server. Browser code
+	 * (handlers, attach, a computed that resumes, an arm the browser rebuilds) that
+	 * reads one is refused, because what browser code reads is serialized into the page.
+	 */
+	readonly serverOnlyProps?: readonly ServerOnlyProp[];
+};
+
+export type ServerOnlyProp = {
+	/** How the module exports the component: `default` or the export name. */
+	readonly exportName: string;
+	readonly propName: string;
+	/** What the prop holds, in a reader's words; the diagnostic names it. */
+	readonly description: string;
+};
+
+export type ServerOnlyPropsDiagnostic = CompilerDiagnostic & {
+	readonly code: 'MARKLESS_SERVER_ONLY_PROP_BROWSER_READ';
+	readonly passId: 'server-only-props';
+	readonly componentName: string;
+	readonly propName: string;
+};
+
+export type ServerOnlyPropsArtifact = {
+	readonly passId: 'server-only-props';
+	readonly diagnostics: ReadonlyArray<ServerOnlyPropsDiagnostic>;
 };
 
 export type ArtifactChildMaterialization = {
@@ -1175,6 +1201,11 @@ export type SemanticGraphArtifact = {
 	readonly filename: string;
 	readonly moduleId: string;
 	readonly components: ReadonlyArray<SemanticComponent>;
+	/** Props the host declared server-only: not graph state, so writes through them are plain JS. */
+	readonly serverOnlyProps?: ReadonlyArray<{
+		readonly componentName: string;
+		readonly propName: string;
+	}>;
 	readonly componentPropBindings: ReadonlyArray<SemanticComponentPropDeclaration>;
 	readonly componentEdges: ReadonlyArray<SemanticComponentEdge>;
 	readonly moduleImports: ReadonlyArray<SemanticModuleImport>;
@@ -2615,6 +2646,7 @@ export type CompileTsrxModuleResult = {
 	readonly payloadScripts: RenderedPayloadScripts;
 	readonly publicRenderPlan: PublicRenderPlanArtifact;
 	readonly publicRenderModule: PublicRenderModuleArtifact;
+	readonly serverOnlyProps: ServerOnlyPropsArtifact;
 	readonly symbolModules: SymbolModulesArtifact;
 	readonly runtimeDemandMap: RuntimeDemandMapArtifact;
 	readonly runtimeDemandMaps: RuntimeDemandMapsArtifact;

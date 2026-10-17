@@ -1,7 +1,7 @@
 // Defines the context object every hook body receives: one build's state, the
 // normalized options, the development graph, and the readers the plugin resolved
 // for its environment and root.
-import type { LinkedModuleChildResolution } from '@markless/compiler';
+import type { LinkedModuleChildResolution, SemanticGraphInput } from '@markless/compiler';
 import type { BuiltPrerenderRecords } from '../build/prerender.ts';
 import type { createMarklessDevGraph } from '../dev.ts';
 import type { ExecutionAttributionTables } from '../execution-log.ts';
@@ -17,6 +17,7 @@ export type Environment = MarklessEnvironment | ((context: unknown) => MarklessE
 export type InternalMarklessRolldownOptions = MarklessRolldownOptions & {
 	// Chunks name each other through an import map every document must carry, so it stays opt-in.
 	chunkImportMap?: boolean;
+	serverOnlyProps?: (moduleId: string) => SemanticGraphInput['serverOnlyProps'];
 	emitResumeModules?: boolean;
 	inlineResumerDebug?: boolean;
 	prerender?: boolean;

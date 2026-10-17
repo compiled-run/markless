@@ -14,6 +14,7 @@ import type {
 	RuntimeDemandMapsArtifact,
 	TriggerGroupArtifact,
 	SemanticGraphArtifact,
+	ServerOnlyPropsArtifact,
 	StateLoweringArtifact,
 	SymbolModulesArtifact,
 	SymbolResolverModuleInput,
@@ -46,6 +47,7 @@ import {
 	firstUseScope,
 	mergeFirstUseReach,
 } from './passes/runtime-demand-map.ts';
+import { checkServerOnlyProps } from './passes/server-only-props.ts';
 import { createTriggerGroups } from './passes/trigger-groups.ts';
 import { buildSemanticGraph } from './passes/semantic-graph/index.ts';
 import { createMutableSemanticGraphArtifact } from './passes/semantic-graph/types.ts';
@@ -92,6 +94,7 @@ async function runCompile(input: CompileTsrxModuleInput): Promise<CompileTsrxMod
 		readonly payloadScripts: PayloadScriptsArtifact['payloadScripts'];
 		readonly publicRenderPlan: PublicRenderPlanArtifact;
 		readonly publicRenderModule: PublicRenderModuleArtifact;
+		readonly serverOnlyProps: ServerOnlyPropsArtifact;
 		readonly symbolModules: SymbolModulesArtifact;
 		readonly runtimeDemandMap: RuntimeDemandMapArtifact;
 		readonly runtimeDemandMaps: RuntimeDemandMapsArtifact;
@@ -161,6 +164,7 @@ async function runCompile(input: CompileTsrxModuleInput): Promise<CompileTsrxMod
 		payloadScripts: artifacts.payloadScripts,
 		publicRenderPlan: artifacts.publicRenderPlan,
 		publicRenderModule: artifacts.publicRenderModule,
+		serverOnlyProps: artifacts.serverOnlyProps,
 		symbolModules: artifacts.symbolModules,
 		runtimeDemandMap: artifacts.runtimeDemandMap,
 		runtimeDemandMaps: artifacts.runtimeDemandMaps,
@@ -358,6 +362,34 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 					}
 					return {
 						publicRenderModule: emitPublicRenderModule({
+							source: sourceInput(inputs.source),
+							semanticGraph,
+							renderData: inputs.renderData as RenderDataArtifact,
+							publicRenderPlan: inputs.publicRenderPlan as PublicRenderPlanArtifact,
+							symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
+							captureAnalysis: inputs.captureAnalysis as CaptureAnalysisArtifact,
+							protocolState:
+								inputs.protocolState as CompileTsrxModuleResult['protocolState'],
+							protocolView:
+								inputs.protocolView as CompileTsrxModuleResult['protocolView'],
+						}),
+					};
+				},
+			};
+		}
+
+		if (pass.passId === 'server-only-props') {
+			return {
+				...pass,
+				run({ inputs }) {
+					const semanticGraph = inputs.semanticGraph as SemanticGraphArtifact;
+					if (hasUnserveableDiagnostic(semanticGraph)) {
+						return {
+							serverOnlyProps: { passId: 'server-only-props', diagnostics: [] },
+						};
+					}
+					return {
+						serverOnlyProps: checkServerOnlyProps({
 							source: sourceInput(inputs.source),
 							semanticGraph,
 							renderData: inputs.renderData as RenderDataArtifact,

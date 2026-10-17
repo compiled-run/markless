@@ -112,6 +112,7 @@ export function planTransformHookRequest(
 		filename: source,
 		moduleId: moduleIdFor(source, ctx.getRoot()),
 		source: code,
+		serverOnlyProps: internalOptions.serverOnlyProps?.(moduleIdFor(source, ctx.getRoot())),
 		dev: plan.dev,
 		buildId: internalOptions.buildId,
 		executionLog: normalizeExecutionLogMode(internalOptions.executionLog),

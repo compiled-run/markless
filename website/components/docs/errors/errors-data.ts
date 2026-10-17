@@ -3941,9 +3941,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 		severity: 'error',
 		description: 'Markless could not read a .tsrx file.',
 		printed: [
-			'MARKLESS_PARSE_ERROR: @tsrx/yuku reported: <message>',
+			'MARKLESS_PARSE_ERROR: `<closing>` and `<opening>` are sibling elements written back to back, so the parser reads the second `<` as a less-than operator (@tsrx/yuku reported: <message>).',
 			'The source could not enter the Markless compiler because the @tsrx/yuku parser failed at phase parse. Markless preserves the parser message and adapts its source location into the compiler diagnostic.',
-			'Check the TSRX syntax rules at https://tsrx.dev/specification and rewrite this source into supported TSRX syntax.',
+			'Put `;` after `<closing>` (line <line>), or start `<opening>` on its own line. In a component body each top-level element is a statement, and two statements on one line need `;` between them.',
 			'https://markless.dev/errors/MARKLESS_PARSE_ERROR',
 		],
 		structured: true,
@@ -4651,6 +4651,25 @@ export const errorEntries: readonly ErrorEntry[] = [
 		description: 'A Markless runtime error from @markless/web.',
 		printed: [
 			'MARKLESS_REPEAT_EMPTY_ARM_RENDERER_MISSING: has no document to render its @empty arm markup with.',
+		],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/web/src/fns/row-mint.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/fns/row-mint.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_REPEAT_EMPTY_ARM_UNMATCHED',
+		packageName: '@markless/web',
+		stage: 'runtime',
+		severity: 'error',
+		description: 'A Markless runtime error from @markless/web.',
+		printed: [
+			'MARKLESS_REPEAT_EMPTY_ARM_UNMATCHED: cannot find the @empty arm the server painted, so it cannot replace it with rows.',
 		],
 		structured: false,
 		sources: [
@@ -5795,6 +5814,59 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_ROUTER_RESPONSE_COMMITTED',
+		packageName: '@markless/router',
+		stage: 'runtime',
+		severity: 'error',
+		description: 'A page changed its status or headers after the response started streaming.',
+		printed: [
+			"MARKLESS_ROUTER_RESPONSE_COMMITTED: <write> ran after the page's response started streaming to the browser, so its status and headers were already sent. Set http.response before the first byte goes out: in the page body, before any await that outlives the first flush.",
+		],
+		structured: false,
+		guide: {
+			summary: 'A page changed its status or headers after the response started streaming.',
+			what: [
+				{
+					id: 's0',
+					text: 'The router sends the status and headers with the first bytes of the page. A page that waits on data keeps streaming after that. This write came later and tried to change what was already sent.',
+				},
+			],
+			how: [
+				{
+					id: 's0',
+					text: 'Set ',
+				},
+				{
+					id: 's1',
+					text: 'http.response.status',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ' and ',
+				},
+				{
+					id: 's3',
+					text: 'http.response.headers',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ' in the page body, before anything the page waits on. Writing the same value again is fine.',
+				},
+			],
+			example: [],
+		},
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/router/src/vite/runtime/page-http.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/router/src/vite/runtime/page-http.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_ROUTER_UNKNOWN_HASH_ROUTE',
 		packageName: '@markless/router',
 		stage: 'runtime',
@@ -6149,6 +6221,329 @@ export const errorEntries: readonly ErrorEntry[] = [
 				id: 'f0',
 				file: 'packages/compiler/src/passes/public-render/diagnostics.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/public-render/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_SERVER_ONLY_PROP_BROWSER_READ',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: "Code that runs in the browser reads a page's http prop.",
+		printed: [
+			'MARKLESS_SERVER_ONLY_PROP_BROWSER_READ: "<componentName>" reads its server-only prop "<propName>" (<description>) in <role>: `<source>`. That code runs in the browser after resume.',
+			'"<propName>" exists only while "<componentName>" renders on the server. Everything browser code reads is serialized into the page\'s HTML, so this read would send <description> to the browser, where anyone viewing the page can read it.',
+			'Read "<propName>" in the component body, which runs only on the server, and hand the browser just the plain value it needs, for example `let value = state(<propName>.someField)`. The state() copy is serialized, and nothing else of "<propName>" is.',
+			'https://markless.dev/errors/MARKLESS_SERVER_ONLY_PROP_BROWSER_READ',
+		],
+		structured: true,
+		guide: {
+			summary: "Code that runs in the browser reads a page's http prop.",
+			what: [
+				{
+					id: 's0',
+					text: "A page's ",
+				},
+				{
+					id: 's1',
+					text: 'http',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ' prop holds the request, with its cookies and headers. It exists only while the page renders on the server. Here an event handler, an ',
+				},
+				{
+					id: 's3',
+					text: 'attach',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ', a ',
+				},
+				{
+					id: 's5',
+					text: 'computed()',
+					code: true,
+				},
+				{
+					id: 's6',
+					text: " the browser re-runs, or markup the browser rebuilds reads it. Whatever browser code reads is written into the page's HTML, so this would send the visitor's cookies and headers along with the page.",
+				},
+			],
+			how: [
+				{
+					id: 's0',
+					text: 'Read ',
+				},
+				{
+					id: 's1',
+					text: 'http',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ' in the page body, which runs only on the server. If the browser needs one value from it, copy that value into ',
+				},
+				{
+					id: 's3',
+					text: 'state()',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ' there.',
+				},
+			],
+			example: [
+				{
+					id: 'l0',
+					runs: [
+						{
+							id: 'r0',
+							text: 'export',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r1',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'default',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: 'function',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r5',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: 'Search',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r7',
+							text: '({ ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r8',
+							text: 'http',
+							style: 'color:#e36209;--shiki-dark:#ffab70',
+						},
+						{
+							id: 'r9',
+							text: ' }',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r10',
+							text: ':',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r11',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r12',
+							text: 'PageProps',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r13',
+							text: ') ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r14',
+							text: '@{',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+					],
+				},
+				{
+					id: 'l1',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'let',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r2',
+							text: ' query ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r4',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r5',
+							text: 'state',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r6',
+							text: '(http.url.searchParams.',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r7',
+							text: 'get',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r8',
+							text: '(',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r9',
+							text: "'q'",
+							style: 'color:#032f62;--shiki-dark:#9ecbff',
+						},
+						{
+							id: 'r10',
+							text: ') ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r11',
+							text: '??',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r12',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r13',
+							text: "''",
+							style: 'color:#032f62;--shiki-dark:#9ecbff',
+						},
+						{
+							id: 'r14',
+							text: ');',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l2',
+					runs: [],
+				},
+				{
+					id: 'l3',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'button',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r2',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'onClick',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r4',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r5',
+							text: '{() ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: '=>',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r7',
+							text: ' console.',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r8',
+							text: 'log',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r9',
+							text: '(query)}>{query}</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r10',
+							text: 'button',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r11',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l4',
+					runs: [
+						{
+							id: 'r0',
+							text: '}',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+					],
+				},
+			],
+		},
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/server-only-props.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/server-only-props.ts',
 			},
 		],
 		moreSources: 0,

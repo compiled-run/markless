@@ -250,8 +250,16 @@ export async function buildSemanticGraph(
 		},
 	};
 
+	const serverOnlyProps = (input.serverOnlyProps ?? []).flatMap((declared) => {
+		const component = graph.components.find(
+			(entry) => entry.exportName === declared.exportName,
+		);
+		return component ? [{ componentName: component.name, propName: declared.propName }] : [];
+	});
+
 	return {
 		...graph,
+		...(serverOnlyProps.length > 0 ? { serverOnlyProps } : {}),
 		diagnostics: applyMarklessAllowDirectives({
 			source: input.source,
 			filename: input.filename,

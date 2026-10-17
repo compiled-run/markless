@@ -20,6 +20,10 @@ import {
 	splitStaticGraphPath,
 	uniqueBy,
 } from '../artifact-helpers/graph-paths.ts';
+import {
+	PROTOCOL_PROP_GRAPH_NODE_PREFIX,
+	PROTOCOL_PROPS_GRAPH_NODE_ID,
+} from '@markless/serializer';
 import { sourceWithoutStringOrCommentText } from '../artifact-helpers/source-text.ts';
 import { findLast, resolveSharedInstanceGraphPath } from './semantic-graph/collect-shared.ts';
 
@@ -249,6 +253,8 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 			diagnostics.push(unresolvedWriteDiagnostic(write, input.semanticGraph.filename));
 			continue;
 		}
+
+		if (writesServerOnlyProp(write, resolved, input.semanticGraph)) continue;
 
 		if (isConstBindingReassignment(write, resolved.binding, resolved.path)) {
 			diagnostics.push(constBindingReassignmentDiagnostic(write));
@@ -1438,4 +1444,19 @@ function fallbackSpan(filename: string): SourceSpan {
 		start: 0,
 		end: 0,
 	};
+}
+
+// A server-only prop is a host object the page mutates while it renders (a response status), never graph state.
+function writesServerOnlyProp(
+	write: SemanticStateWrite,
+	resolved: { readonly binding: SemanticGraphBinding; readonly path: ReadonlyArray<string> },
+	semanticGraph: SemanticGraphArtifact,
+): boolean {
+	return (semanticGraph.serverOnlyProps ?? []).some(
+		({ componentName, propName }) =>
+			write.componentName === componentName &&
+			((resolved.binding.id === PROTOCOL_PROPS_GRAPH_NODE_ID &&
+				resolved.path[0] === propName) ||
+				resolved.binding.id === `${PROTOCOL_PROP_GRAPH_NODE_PREFIX}${propName}`),
+	);
 }

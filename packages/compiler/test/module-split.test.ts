@@ -26,6 +26,7 @@ test('compiler split modules expose their owning boundaries', () => {
 		'protocol-state',
 		'protocol-view',
 		'public-render-module',
+		'server-only-props',
 		'payload-scripts',
 		'symbol-modules',
 		'runtime-demand-map',

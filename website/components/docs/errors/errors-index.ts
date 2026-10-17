@@ -2,8 +2,8 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 272,
-	guided: 38,
+	total: 275,
+	guided: 40,
 	groups: [
 		{
 			packageName: '@markless/compiler',
@@ -437,6 +437,11 @@ export const errorIndex: ErrorIndex = {
 					code: 'MARKLESS_SERVER_DERIVE_UNREACHABLE',
 					kind: 'compile error',
 					guided: false,
+				},
+				{
+					code: 'MARKLESS_SERVER_ONLY_PROP_BROWSER_READ',
+					kind: 'compile error',
+					guided: true,
 				},
 				{
 					code: 'MARKLESS_SHARED_CALL_UNBOUND',
@@ -944,6 +949,11 @@ export const errorIndex: ErrorIndex = {
 					guided: false,
 				},
 				{
+					code: 'MARKLESS_ROUTER_RESPONSE_COMMITTED',
+					kind: 'runtime error',
+					guided: true,
+				},
+				{
 					code: 'MARKLESS_ROUTER_UNKNOWN_HASH_ROUTE',
 					kind: 'runtime error',
 					guided: false,
@@ -1135,6 +1145,11 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_REPEAT_EMPTY_ARM_RENDERER_MISSING',
+					kind: 'runtime error',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_REPEAT_EMPTY_ARM_UNMATCHED',
 					kind: 'runtime error',
 					guided: false,
 				},

@@ -36,7 +36,7 @@ export interface RouteUpdate {
 	readonly onRendered?: () => void;
 }
 
-export function routePageProps(route: RouteState): PageProps {
+export function routePageProps(route: RouteState): Omit<PageProps, 'http'> {
 	const url = new URL(route.url);
 	return {
 		params: route.params,

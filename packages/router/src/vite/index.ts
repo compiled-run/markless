@@ -62,6 +62,17 @@ import { NAVIGATION_POLYFILL_MODULE } from '../navigation-polyfill.ts';
 import { listenForLinkIntent } from './link-intent.ts';
 import { documentNavigationFor } from './document-navigation.ts';
 import { startFragmentNavigation } from './fragment-navigation.ts';
+import { isPageModuleFile, normalizeRouteFileId } from '../route-manifest.ts';
+
+// The compiler refuses browser code that reads these page props: they hold request data.
+const PAGE_SERVER_ONLY_PROPS = [
+	{
+		exportName: 'default',
+		propName: 'http',
+		description:
+			'the request with its cookies and headers, the locals middleware set, and the response being written',
+	},
+] as const;
 
 const ROUTE_DISCOVERY_ID = 'virtual:markless-router/routes';
 const CLIENT_ENTRY_ID = 'virtual:markless-router/client-entry';
@@ -129,6 +140,7 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 	prerenderWakeChannelCaptured = process.env.MARKLESS_PRERENDER_WAKE === '1';
 	if (options.nitro === false) {
 		return [
+			pageServerOnlyPropsPlugin(),
 			mdxTransformPlugin(),
 			requestFileTransformPlugin(),
 			routeTypegenPlugin(),
@@ -155,6 +167,7 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 			fragmentEntry,
 		),
 		devSourceModuleRequestPlugin(),
+		pageServerOnlyPropsPlugin(),
 		mdxTransformPlugin(),
 		requestFileTransformPlugin(),
 		routeTypegenPlugin(),
@@ -170,6 +183,34 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 		),
 		nitroPlugins,
 	];
+}
+
+function pageServerOnlyPropsPlugin(): Plugin {
+	return {
+		name: 'markless-router:page-server-only-props',
+		configResolved(config) {
+			const markless = config.plugins.find(
+				(plugin) =>
+					typeof (plugin as { api?: { declareServerOnlyProps?: unknown } }).api
+						?.declareServerOnlyProps === 'function',
+			) as
+				| {
+						api: {
+							declareServerOnlyProps(
+								resolve: (
+									moduleId: string,
+								) => typeof PAGE_SERVER_ONLY_PROPS | undefined,
+							): void;
+						};
+				  }
+				| undefined;
+			markless?.api.declareServerOnlyProps((moduleId) =>
+				isPageModuleFile(normalizeRouteFileId(moduleId))
+					? PAGE_SERVER_ONLY_PROPS
+					: undefined,
+			);
+		},
+	};
 }
 
 // Dev module requests for authored source files: Vite's glob imports (the
