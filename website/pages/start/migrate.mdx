@@ -2,84 +2,41 @@ import PageMeta from '../../components/page-meta.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import Callout from '../../components/docs/callout.tsrx';
 import LikeHeart from '../../components/docs/like-heart.tsrx';
+import MigrateAnatomy from '../../components/figures/migrate/migrate-anatomy.tsrx';
 
 <Sidebar />
 
 # Migrating an existing app
 
-<PageMeta level="Start here" time="4 min" assumes="nothing" sprite="arrow-curve" />
+<PageMeta level="Start here" time="2 min" assumes="nothing" sprite="arrow-curve" />
 
 <ThemeToggle />
 
-<Subtitle text="Your coding agent moves your app to Markless one page at a time. Before a page switches over, it is checked against the original in a real browser, so your users get the same site, running far less code." />
+<Subtitle text="markless-migrate moves your app to Markless one page at a time, and proves each page still works the same before it goes live." />
 
-<Callout
-	sprite="cross"
-	title="This is a preview"
-	text="The migration tool, @markless/migrate, is not on npm yet. This page shows how it works and the apps already moved with it. Its source is at github.com/thejackshelton/markless-migrate."
-/>
+## What it does
 
-## How it works
+Your coding agent rewrites a page. markless-migrate opens the old page and the new one side by side, clicks everything, and compares what people, search engines and screen readers get. A page only goes live when they match. Until then, your old app keeps serving it.
 
-You keep your app running the whole time. A new Markless app sits in front of it and passes every page it has not taken over yet straight to the old one, so you can ship on day one.
+<MigrateAnatomy />
 
-1. **Plan.** The tool reads your app, live and from its source, and lists every page, link, form, script and library it uses.
-2. **Convert.** Your coding agent moves one page to Markless.
-3. **Check.** The tool opens that page in the old app and the new one, side by side in a real browser, and compares what users, search engines and screen readers would get. Anything different comes back with the line to fix, and your agent fixes it.
-4. **Switch.** When the page matches, it switches over. Then the next page.
+## Try it
 
-## What "matches" means
-
-A page only switches when all of these match the original:
-
-- what it shows, at desktop and phone sizes, in light and dark mode, hovered and focused
-- every button, link, menu, dialog and form, clicked and typed into
-- the requests it makes to your API or CMS, and what it saves
-- the title, description, links and metadata search engines read
-- what a screen reader announces, and the order the Tab key follows
-- every language your site offers
-- who can see it when signed in, signed out, or as each role
-- its fonts, images and files, at the same addresses
-
-Each page also shows how much JavaScript runs when it loads, before and after.
-
-Something you changed on purpose, like a fixed typo, can be accepted with a reason. Only a person can accept a difference, never the agent.
-
-## Use your own agent
-
-There is no new AI to sign up for. The tool works through the agent you already pay for: Claude Code, Codex, Cursor, Gemini CLI, GitHub Copilot or opencode. One command adds the migration tools and instructions to each one it finds on your machine:
+It works through the coding agent you already use, like Claude Code, Codex or Cursor. It is a preview and not on npm yet.
 
 ```bash
 npx @markless/migrate setup
 ```
 
-Then ask your agent to migrate your app. Or let it run on its own, page by page, until every page matches or one needs you:
-
-```bash
-npx @markless/migrate run --agent claude
-```
-
 ## Apps already moved
 
-Each of these was moved by a coding agent and checked with the tool. Every one runs pages from Markless and links to its report of every check, old against new.
-
-| App | Was built with | JavaScript run at load |
-| --- | --- | --- |
-| [htmx.org](https://mm-htmx-org.vercel.app) | Hugo and htmx | about 90 KB → 18 KB |
-| [alpinejs.dev](https://mm-alpinejs-dev.vercel.app) | Alpine.js | about 90 KB → 18 KB |
-| [Next.js dashboard](https://mm-next-dashboard.vercel.app) | Next.js, with sign-in | 171 KB → 0.5 KB |
-| [Remix notes](https://mm-remix-notes.vercel.app) | Remix, with sign-in | 93 KB → 1.2 KB |
-| [Conduit](https://mm-realworld.vercel.app) | Angular, with sign-in | about 75% less |
-| [Docusaurus](https://mm-docusaurus.vercel.app) | Docusaurus | about 85% less |
-
-## What doesn't carry over
-
-Libraries built for another framework, like React component kits, can't run inside Markless. The tool lists exactly which parts of each library your app uses. Plain libraries like zod or date-fns stay as they are. Components like menus and dialogs move to [@markless/ui](/ui). For the rest, your agent writes a Markless version of only the parts you use, and the same checks prove it behaves the same everywhere it appears.
-
-## Where to go next
-
-Starting fresh instead? See [Creating a new app](/start/new-app).
+| App | JavaScript run at load |
+| --- | --- |
+| [Next.js dashboard](https://mm-next-dashboard.vercel.app) | 171 KB → 0.5 KB |
+| [Remix notes](https://mm-remix-notes.vercel.app) | 93 KB → 1.2 KB |
+| [Docusaurus](https://mm-docusaurus.vercel.app) | about 85% less |
+| [Conduit](https://mm-realworld.vercel.app) | about 75% less |
+| [htmx.org](https://mm-htmx-org.vercel.app) | about 90 KB → 18 KB |
 
 <LikeHeart />

@@ -1,6 +1,5 @@
 // The shell blocks the Walkthrough shows for each package manager, as the highlighted runs a ```bash fence gets.
 import {
-	addCommand,
 	createCommand,
 	DEFAULT_APP,
 	MANAGERS,
@@ -21,7 +20,7 @@ export type ShellLine = {
 	readonly id: string;
 	readonly runs: readonly ShellRun[];
 };
-export type CommandKind = 'create' | 'dev' | 'ship' | 'install' | 'install-editor' | 'start' | 'build';
+export type CommandKind = 'create' | 'dev' | 'ship';
 export type CommandVariant = {
 	readonly manager: ManagerId;
 	readonly code: string;
@@ -32,10 +31,6 @@ export type CommandVariant = {
 function rows(kind: CommandKind, manager: ManagerId): [string, string?][] {
 	if (kind === 'create') return [[createCommand(manager)]];
 	if (kind === 'dev') return [[`cd ${DEFAULT_APP}`], [scriptCommand(manager, 'dev')]];
-	if (kind === 'install') return [[addCommand(manager, ['@markless/core', 'vite'])]];
-	if (kind === 'install-editor') return [[addCommand(manager, ['@markless/typescript-plugin', 'typescript'], true)]];
-	if (kind === 'start') return [[scriptCommand(manager, 'dev')]];
-	if (kind === 'build') return [[scriptCommand(manager, 'build')]];
 	return [[scriptCommand(manager, 'build')], [scriptCommand(manager, 'preview')]];
 }
 

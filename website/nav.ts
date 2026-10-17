@@ -60,20 +60,11 @@ export const nav: readonly NavSection[] = [
 					'Make a new app with one command, open it in your browser, and change it.',
 			},
 			{
-				title: 'Adding to an existing site',
-				href: '/start/existing-site',
-				sprite: 'square',
-				icon: 'first-app',
-				number: '3',
-				description:
-					'Put a Markless component into one element of an HTML page you already have, with Vite and render(), and ship static files.',
-			},
-			{
 				title: 'Migrating an existing app',
 				href: '/start/migrate',
 				sprite: 'arrow-curve',
 				icon: 'first-app',
-				number: '4',
+				number: '3',
 				description:
 					'Your coding agent moves your app to Markless one page at a time, and each page is checked against the original before it switches over.',
 			},
@@ -82,7 +73,7 @@ export const nav: readonly NavSection[] = [
 				href: '/start/reading-tsrx',
 				sprite: 'bookmark',
 				icon: 'reading-tsrx',
-				number: '5',
+				number: '4',
 				description:
 					'Every part of a .tsrx file, line by line, then the other files in a starter app.',
 			},
@@ -554,7 +545,6 @@ export function pagerFor(pathname: string): Pager {
  */
 export const concepts: Readonly<Record<string, NavEntry>> = {
 	'first-app': { title: 'your first app', href: '/start/new-app' },
-	'browser-only': { title: 'adding Markless to an existing site', href: '/start/existing-site' },
 	'reading-tsrx': { title: 'reading a .tsrx file', href: '/start/reading-tsrx' },
 	async: { title: 'async', href: '/concepts/async' },
 	computed: { title: 'computed', href: '/concepts/computed' },

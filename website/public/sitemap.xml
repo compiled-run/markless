@@ -10,10 +10,6 @@
 		<changefreq>weekly</changefreq>
 	</url>
 	<url>
-		<loc>https://markless.dev/start/existing-site</loc>
-		<changefreq>weekly</changefreq>
-	</url>
-	<url>
 		<loc>https://markless.dev/start/migrate</loc>
 		<changefreq>weekly</changefreq>
 	</url>

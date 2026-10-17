@@ -51,18 +51,6 @@ const CREATE: Record<ManagerId, string> = {
 export const createCommand = (manager: ManagerId, target?: string, flags?: string) =>
 	[CREATE[manager], target, flags && (manager === 'npm' ? '-- ' + flags : flags)].filter(Boolean).join(' ');
 
-const ADD: Record<ManagerId, { readonly run: string; readonly dev: string }> = {
-	npm: { run: 'npm install', dev: 'npm install --save-dev' },
-	pnpm: { run: 'pnpm add', dev: 'pnpm add -D' },
-	yarn: { run: 'yarn add', dev: 'yarn add -D' },
-	bun: { run: 'bun add', dev: 'bun add -d' },
-	deno: { run: 'deno add', dev: 'deno add --dev' },
-};
-
-/** Adds npm packages to a project; Deno names them with an npm: prefix. */
-export const addCommand = (manager: ManagerId, packages: readonly string[], dev = false) =>
-	[ADD[manager][dev ? 'dev' : 'run'], ...packages.map((name) => (manager === 'deno' ? 'npm:' + name : name))].join(' ');
-
 /** The same words the CLI prints for `dev` in its next steps. */
 export const scriptCommand = (manager: ManagerId, script: string) => (manager === 'deno' ? 'deno task ' : manager + ' run ') + script;
 

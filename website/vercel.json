@@ -11,7 +11,12 @@
 		},
 		{
 			"source": "/build/existing-site",
-			"destination": "/start/existing-site",
+			"destination": "/start/migrate",
+			"permanent": true
+		},
+		{
+			"source": "/start/existing-site",
+			"destination": "/start/migrate",
 			"permanent": true
 		}
 	]
