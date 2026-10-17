@@ -891,6 +891,38 @@
 			"from": 13549,
 			"to": 13515,
 			"reason": "measured: shrank, a re-wrapped scrolled box is found by its id instead of sweeping elements by tag"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/resume-branches",
+			"from": 15246,
+			"to": 15471,
+			"reason": "measured: the shared shown-arm helper is reverted; as its own module it cost +56 B rendered and +30 to +60 B of demand-map glue per construct, inside resume-locators +108 B, so each module builds its own entry again"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/resume-commit-arm",
+			"from": 9398,
+			"to": 9551,
+			"reason": "measured: the shared shown-arm helper is reverted; as its own module it cost +56 B rendered and +30 to +60 B of demand-map glue per construct, inside resume-locators +108 B, so each module builds its own entry again"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/resume-runtime-start",
+			"from": 8759,
+			"to": 8874,
+			"reason": "measured: the shared shown-arm helper is reverted; as its own module it cost +56 B rendered and +30 to +60 B of demand-map glue per construct, inside resume-locators +108 B, so each module builds its own entry again"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/resume-branch-arms",
+			"from": 549,
+			"to": null,
+			"reason": "measured: the shared shown-arm helper is reverted; as its own module it cost +56 B rendered and +30 to +60 B of demand-map glue per construct, inside resume-locators +108 B, so each module builds its own entry again"
 		}
 	],
 	"runtimeModules": {
@@ -976,10 +1008,9 @@
 		"web/resume-arm-records-lazy": 219,
 		"web/resume-async-wiring": 7339,
 		"web/resume-behaviors": 8804,
-		"web/resume-branch-arms": 549,
-		"web/resume-branches": 15246,
+		"web/resume-branches": 15471,
 		"web/resume-census": 1471,
-		"web/resume-commit-arm": 9398,
+		"web/resume-commit-arm": 9551,
 		"web/resume-events": 15538,
 		"web/resume-handle-qualifier": 685,
 		"web/resume-handoff": 1360,
@@ -990,7 +1021,7 @@
 		"web/resume-resettle-hold": 2572,
 		"web/resume-runtime": 14982,
 		"web/resume-runtime-shared": 2089,
-		"web/resume-runtime-start": 8759,
+		"web/resume-runtime-start": 8874,
 		"web/resume-shared-patch": 1200,
 		"web/resume-stream-patches": 2260,
 		"web/resume-sync-computed": 1538,

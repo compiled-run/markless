@@ -1,5 +1,4 @@
 import { materializeArmRecords } from './resume-arm-records.ts';
-import { showBranchArm } from './resume-branch-arms.ts';
 import {
 	containsElement,
 	elementsBetweenAnchors,
@@ -144,8 +143,11 @@ export function createArmCommitter(
 		const settled = registering.catch(() => undefined);
 		pending.add(settled);
 		const materialized = await registering.finally(() => pending.delete(settled));
-		if (update.arm !== undefined)
-			showBranchArm(deps.root, boundary.id, update.arm, boundary.startAnchor, boundary.endAnchor, false);
+		const shown = update.arm === undefined ? undefined : deps.root.__marklessBranchArms?.get(boundary.id);
+		if (shown) {
+			Object.assign(shown, { arm: update.arm, start: boundary.startAnchor, end: boundary.endAnchor });
+			for (const paint of shown.listeners) paint();
+		}
 		restoreFocusScroll(deps, boundary, captured, materialized.elementsByHostId);
 	};
 }
