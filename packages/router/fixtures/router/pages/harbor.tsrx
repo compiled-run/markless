@@ -4,28 +4,65 @@ import { computed, state } from '@markless/core';
 // forecast computed is deliberately slower than the first-flush deadline, so
 // the page streams: @pending flushes first, the settled arm arrives as an
 // inert template on the same response and must become interactive after
-// wake (the in-arm button writes state read by the shell's tally).
+// wake (the in-arm button writes state read by the shell's tally). The arm
+// nests an @if and a keyed @for, so a click held until the arm streams must
+// flip the @if inside the arm the server sent, and so must a click on the
+// @pending arm's own control.
 export default function Harbor() @{
 	let logged = state(0);
 	const forecast = computed(async () => {
 		await new Promise((resolve) => setTimeout(resolve, 300));
-		return { vessel: 'Petrel', berth: 7 };
+		return {
+			vessel: 'Petrel',
+			berth: 7,
+			tugs: [
+				{ id: 'bolt', name: 'Bolt' },
+				{ id: 'kestrel', name: 'Kestrel' },
+			],
+		};
 	});
 
 	<main>
 		<h1>Harbor arrivals</h1>
 		<output data-harbor-logged>Logged {logged}</output>
+		<button data-harbor-hail onClick={() => logged++}>
+			Hail
+		</button>
 		<section>
 			@try {
 				<article data-harbor-arrival>
-					<h2>{forecast.vessel} at berth {forecast.berth}</h2>
-					<button data-harbor-log onClick={() => logged++}>Log arrival</button>
-				</article>
+					<h2>
+						{forecast.vessel} at berth {forecast.berth}
+					</h2>
+					<button data-harbor-log onClick={() => logged++}>
+						Log arrival
+					</button>
+					@if (logged > 0) {
+						<p data-harbor-heard>Heard {logged}</p>;
+					} @else {
+						<p data-harbor-quiet>Quiet</p>;
+					}
+					<ul>
+						@for (const tug of forecast.tugs; key tug.id) {
+							<li
+								data-harbor-tug={tug.id}
+								onClick={() => logged++}
+							>
+								{tug.name}
+							</li>;
+						}
+					</ul>
+				</article>;
 			} @pending {
-				<p data-harbor-waiting>Scanning the horizon</p>
+				<p data-harbor-waiting>
+					Scanning the horizon
+					<button data-harbor-wait onClick={() => logged++}>
+						Wait
+					</button>
+				</p>;
 			} @catch {
-				<p data-harbor-fault>Harbor signal lost</p>
+				<p data-harbor-fault>Harbor signal lost</p>;
 			}
 		</section>
-	</main>
+	</main>;
 }

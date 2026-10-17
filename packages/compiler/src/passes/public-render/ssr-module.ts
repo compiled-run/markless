@@ -222,6 +222,10 @@ export function emitPublicSsrRenderModule(
 	);
 	const asyncRunnerDefinitions = collectSsrAsyncRunnerDefinitions(input);
 	const hasAsyncDependencyRegistry = asyncRunnerDefinitions.size > 0;
+	// A streamed arm's branches must name the arm this render painted; only an @pending arm streams.
+	const streamsArms = input.semanticGraph.markup.chunks.some((chunk) =>
+		chunk.slots.some((slot) => slot.kind === 'async' && slot.armTemplateIds.pending !== undefined),
+	);
 	// The SSR module is loaded as JavaScript, so a carried module-scope
 	// declaration is reprinted without its types rather than spliced verbatim.
 	const moduleScope = moduleScopeLines(input.source.source, input.source.filename).map((line) =>
@@ -337,6 +341,7 @@ export function emitPublicSsrRenderModule(
 		'		html,',
 		'		state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots),',
 		'		view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) },',
+		...(streamsArms ? ['		servedBranches: marklessSsrBranches,'] : []),
 		'		elementCount: marklessSsrComposition.elementCount,',
 		...(remapsGraphProps
 			? ['		m(graphProps, instancePath) { marklessSsrRemapGraphOutput(this, graphProps, instancePath); },']

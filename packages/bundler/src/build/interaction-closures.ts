@@ -16,7 +16,11 @@ import {
 	withUndemandedReExportDoors,
 } from './undemanded-runtime.ts';
 import { symbolVirtualModuleId, symbolVirtualModuleSourceFile } from '../source-module.ts';
-import { isRouteNavigationSourceRequest, normalizeVirtualId } from '../virtual-ids.ts';
+import {
+	isRouteNavigationSourceRequest,
+	isSymbolOnlySourceRequest,
+	normalizeVirtualId,
+} from '../virtual-ids.ts';
 
 export const MARKLESS_INTERACTION_CLOSURES_VERSION = 1;
 
@@ -125,10 +129,12 @@ export function computeInteractionClosures(input: {
 	readonly modules: ReadonlyMap<string, InteractionClosureModule>;
 	readonly routes: ReadonlyMap<string, readonly string[]>;
 	readonly demand: Iterable<InteractionDemandSource>;
+	// Landings stream every async boundary's arm, so one settles in the browser only when a control's writes reach its reads.
+	readonly landingArmsServed?: boolean;
 }): RouteInteractionClosures[] {
 	const { modules } = input;
 	const sources = [...input.demand];
-	const demand = mergeDemand(sources);
+	const demand = mergeDemand(sources, input.landingArmsServed === true);
 	const byRuntimeId = new Map<string, string[]>();
 	const byVirtualId = new Map<string, string>();
 	const symbolsByFile = new Map<string, string[]>();
@@ -157,20 +163,38 @@ export function computeInteractionClosures(input: {
 		reach: ReadonlySet<string>,
 		seeds: Iterable<string>,
 		bound?: { readonly runtimeIds?: ReadonlySet<string> },
+		// Symbols demand data names in a composed file that is also a route of its own: walked into that route.
+		named?: ReadonlySet<string>,
 	): string[] => {
 		const seen = new Set<string>();
-		const pending = [...seeds];
+		// The other route a walk entered through a named symbol, if any.
+		const pending: Array<readonly [string, string | undefined]> = [...seeds].map(
+			(id) => [id, undefined] as const,
+		);
 		while (pending.length) {
-			const id = pending.pop()!;
-			if (seen.has(id) || !reach.has(id)) continue;
+			const [id, via] = pending.pop()!;
+			if (seen.has(id)) continue;
+			const owner = routeOf.get(id);
+			const inside = reach.has(id)
+				? via
+				: named?.has(id) && owner !== undefined
+					? owner
+					: via !== undefined && (owner === undefined || owner === via)
+						? via
+						: null;
+			if (inside === null) continue;
 			const module = modules.get(id);
 			if (!module) continue;
 			seen.add(id);
-			pending.push(...module.dependencies);
+			// That file's symbol resolver is how the page loads the named symbol.
+			if (inside !== via && module.source)
+				for (const sibling of siblings.get(module.source) ?? [])
+					if (isSymbolOnlySourceRequest(sibling)) pending.push([sibling, inside]);
+			for (const dependency of module.dependencies) pending.push([dependency, inside]);
 			for (const target of module.dynamicDependencies ?? []) {
-				if (routeOf.has(target) && routeOf.get(target) !== route) continue;
+				if (routeOf.has(target) && routeOf.get(target) !== (inside ?? route)) continue;
 				if (!bound) {
-					pending.push(target);
+					pending.push([target, inside]);
 					continue;
 				}
 				const symbolFile = symbolVirtualModuleSourceFile(normalizeVirtualId(target));
@@ -189,7 +213,7 @@ export function computeInteractionClosures(input: {
 					!bound.runtimeIds.has(runtimeId)
 				)
 					continue;
-				pending.push(target);
+				pending.push([target, inside]);
 			}
 		}
 		return [...seen].sort();
@@ -288,7 +312,7 @@ export function computeInteractionClosures(input: {
 				key: 'boot',
 				kind: 'boot',
 				modules: bootBounded
-					? useClosure(route, reach, bootSeeds, {})
+					? useClosure(route, reach, bootSeeds, {}, bootSeeds)
 					: useClosure(route, reach, bootRoots),
 			},
 			...(renderRoots.length
@@ -379,7 +403,7 @@ export function computeInteractionClosures(input: {
 					...([...action.runtimeModuleIds].some((id) => LEAN_DISPATCH_MODULE_IDS.has(id))
 						? { lean: true }
 						: {}),
-					modules: useClosure(route, reach, seeds, { runtimeIds }),
+					modules: useClosure(route, reach, seeds, { runtimeIds }, seeds),
 				});
 			}
 		}
@@ -482,7 +506,10 @@ function routeUndemandedRuntime(
 	return undemanded;
 }
 
-function mergeDemand(sources: Iterable<InteractionDemandSource>): Map<string, MergedDemand> {
+function mergeDemand(
+	sources: Iterable<InteractionDemandSource>,
+	landingArmsServed: boolean,
+): Map<string, MergedDemand> {
 	const merged = new Map<string, MergedDemand>();
 	for (const { source, map } of sources) {
 		const file = source.split('?')[0]!;
@@ -508,12 +535,13 @@ function mergeDemand(sources: Iterable<InteractionDemandSource>): Map<string, Me
 			entry.missing = true;
 			continue;
 		}
-		mergePage(entry.page, map.firstUsePage);
+		mergePage(entry.page, map.firstUsePage, landingArmsServed);
 		if (map.recordKinds.some((kind) => kind.replaced)) entry.replaced = true;
 		for (const record of map.payloadRecords) {
 			const symbols = entry.records.get(record.recordId) ?? new Set<string>();
-			for (const id of record.symbolIds ?? []) symbols.add(id);
 			entry.records.set(record.recordId, symbols);
+			if (landingArmsServed && record.kind === 'async-boundary') continue;
+			for (const id of record.symbolIds ?? []) symbols.add(id);
 			if (RUNS_WITHOUT_INPUT[record.kind])
 				for (const id of record.symbolIds ?? []) entry.landingSymbols.add(id);
 		}
@@ -541,10 +569,18 @@ function mergeDemand(sources: Iterable<InteractionDemandSource>): Map<string, Me
 	return merged;
 }
 
-function mergePage(page: FilePage, published: RuntimeDemandMapManifest['firstUsePage']) {
+function mergePage(
+	page: FilePage,
+	published: RuntimeDemandMapManifest['firstUsePage'],
+	landingArmsServed: boolean,
+) {
 	// A map that publishes nothing for its page leaves resume start unbounded.
 	if (!published || published.resume === 'unknown') page.resume = 'unknown';
 	else if (page.resume !== 'unknown') page.resume.push(published.resume);
+	// A live runtime adopting a streamed arm runs the arm's bindings as soon as it lands.
+	if (landingArmsServed && published?.streamedSettle && page.resume !== 'unknown')
+		if (published.streamedSettle === 'unknown') page.resume = 'unknown';
+		else page.resume.push(published.streamedSettle);
 	for (const reader of published?.pageSpaceReaders ?? []) {
 		const reaches = page.pageSpaceReaders.get(reader.graphNodeId) ?? [];
 		reaches.push(reader.reach);

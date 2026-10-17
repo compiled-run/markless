@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import {
 	computeInteractionClosures,
 	interactionClosuresAsset,
@@ -326,6 +326,64 @@ test('a control whose writes re-render another module joins that module symbols'
 	expect(click.modules).toContain(symbol(child, 'symbol:1'));
 	expect(click.modules).not.toContain(symbol(child, 'symbol:0'));
 	expect(click.modules).toContain(symbol(file, 'symbol:0'));
+});
+
+test('a control whose writes re-render a module that is also a route of its own joins that module symbols', () => {
+	const file = `${root}/pages/index.tsrx`;
+	const child = `${root}/pages/summary.tsrx`;
+	const modules = new Map<string, InteractionClosureModule>([
+		[`${file}?markless-resume`, { dependencies: [], source: file }],
+		[symbol(file, 'symbol:0'), { dependencies: [], source: file }],
+		[
+			`${child}?markless-resume`,
+			{ dependencies: [], dynamicDependencies: [symbol(child, 'symbol:1')], source: child },
+		],
+		[symbol(child, 'symbol:0'), { dependencies: [`${child}?entry`], source: child }],
+		[`${child}?entry`, { dependencies: [runtime('fns/update-text')], source: child }],
+		[symbol(child, 'symbol:1'), { dependencies: [], source: child }],
+		[
+			`${child}?markless-symbols`,
+			{
+				dependencies: [],
+				dynamicDependencies: [symbol(child, 'symbol:0'), symbol(child, 'symbol:1')],
+				source: child,
+			},
+		],
+		[runtime('fns/update-text'), { dependencies: [], source: runtime('fns/update-text') }],
+	]);
+	const routes = new Map([
+		['pages/index.tsrx', [...modules.keys()].filter((id) => id.includes('index'))],
+		['pages/summary.tsrx', [...modules.keys()].filter((id) => id.includes('summary'))],
+	]);
+	const closures = computeInteractionClosures({
+		root,
+		modules,
+		routes,
+		demand: [
+			{
+				source: `${file}?markless-symbols`,
+				map: demandMap({
+					actions: [
+						click('h1', {
+							symbolIds: ['symbol:0'],
+							runtimeModuleIds: [],
+							foreign: [{ file: child, symbolIds: ['symbol:0'] }],
+						}),
+					],
+				}),
+			},
+			{ source: `${child}?markless-symbols`, map: demandMap({}) },
+		],
+	});
+	const index = closures.find((route) => route.route === 'pages/index.tsrx')!;
+	const press = index.consumers.find((consumer) => consumer.key.endsWith('#h1:click'))!;
+	expect(press.modules).toContain(symbol(child, 'symbol:0'));
+	expect(press.modules).toContain(`${child}?entry`);
+	expect(press.modules).toContain(runtime('fns/update-text'));
+	// The child's resolver is how the page loads that symbol.
+	expect(press.modules).toContain(`${child}?markless-symbols`);
+	expect(press.modules).not.toContain(symbol(child, 'symbol:1'));
+	expect(press.modules).not.toContain(`${child}?markless-resume`);
 });
 
 const click = (host: string, firstUse: KeydownFirstUse) => ({
@@ -888,4 +946,123 @@ test('marks an action lean by its lean dispatch runtime and joins controls writt
 		expect(armed?.lean).toBeUndefined();
 		expect(armed?.modules).toContain(symbol(file, 'symbol:2'));
 	}
+});
+
+describe('an async boundary on a landing page the server streams', () => {
+	const file = `${root}/screens/feed.tsrx`;
+	const modules = new Map<string, InteractionClosureModule>([
+		[`${file}?markless-resume`, { dependencies: [runtime('resume-events')], source: file }],
+		[symbol(file, 'symbol:0'), { dependencies: [], source: file }],
+		[symbol(file, 'symbol:1'), { dependencies: [], source: file }],
+		[symbol(file, 'symbol:6'), { dependencies: [], source: file }],
+		[
+			symbol(file, 'symbol:8'),
+			{ dependencies: [runtime('fns/prerender-resume')], source: file },
+		],
+		[runtime('resume-events'), { dependencies: [], source: runtime('resume-events') }],
+		[
+			runtime('fns/prerender-resume'),
+			{ dependencies: [], source: runtime('fns/prerender-resume') },
+		],
+	]);
+	const map = {
+		...demandMap({
+			payloadRecords: [
+				{
+					recordId: 'async-boundary:b0',
+					kind: 'async-boundary',
+					symbolIds: ['symbol:8', 'symbol:6'],
+					runtimeModuleIds: [],
+				},
+			],
+			actions: [
+				click('h2', { symbolIds: ['symbol:0'], runtimeModuleIds: [] }),
+				click('h3', {
+					symbolIds: ['symbol:1', 'symbol:8', 'symbol:6'],
+					runtimeModuleIds: [],
+				}),
+			],
+		}),
+		armActions: [
+			{
+				...click('h11', { symbolIds: ['symbol:1'], runtimeModuleIds: [] }),
+				recordKinds: ['event' as const, 'async-boundary' as const],
+				payloadRecordIds: ['async-boundary:b0'],
+			},
+		],
+	};
+	const consumers = (landingArmsServed: boolean) => {
+		const [route] = computeInteractionClosures({
+			root,
+			modules,
+			routes: new Map([
+				['screens/feed.tsrx', [...modules.keys()].filter((id) => id.includes('feed'))],
+			]),
+			demand: [{ source: `${file}?markless-symbols`, map }],
+			landingArmsServed,
+		});
+		return new Map(route!.consumers.map((consumer) => [consumer.key, consumer.modules]));
+	};
+
+	test('boot and the controls inside its arm never settle it, so they carry none of its settle code', () => {
+		const served = consumers(true);
+		for (const key of [
+			'boot',
+			'action:screens/feed.tsrx#h11:click',
+			'action:screens/feed.tsrx#h2:click',
+		]) {
+			expect(served.get(key)).not.toContain(symbol(file, 'symbol:8'));
+			expect(served.get(key)).not.toContain(runtime('fns/prerender-resume'));
+		}
+		expect(served.get('action:screens/feed.tsrx#h11:click')).toContain(
+			symbol(file, 'symbol:1'),
+		);
+	});
+
+	test('a control whose writes reach what the boundary reads still carries its settle code', () => {
+		const writes = consumers(true).get('action:screens/feed.tsrx#h3:click');
+		expect(writes).toContain(symbol(file, 'symbol:8'));
+		expect(writes).toContain(runtime('fns/prerender-resume'));
+	});
+
+	test('the bindings a streamed arm brings join boot, so adopting it after a click fetches nothing', () => {
+		const [route] = computeInteractionClosures({
+			root,
+			modules: new Map([
+				...modules,
+				[symbol(file, 'symbol:4'), { dependencies: [], source: file }],
+			]),
+			routes: new Map([
+				[
+					'screens/feed.tsrx',
+					[...modules.keys(), symbol(file, 'symbol:4')].filter((id) =>
+						id.includes('feed'),
+					),
+				],
+			]),
+			demand: [
+				{
+					source: `${file}?markless-symbols`,
+					map: {
+						...map,
+						firstUsePage: {
+							...map.firstUsePage!,
+							streamedSettle: { symbolIds: ['symbol:4'], runtimeModuleIds: [] },
+						},
+					},
+				},
+			],
+			landingArmsServed: true,
+		});
+		const boot = route!.consumers.find((consumer) => consumer.key === 'boot')!.modules;
+		expect(boot).toContain(symbol(file, 'symbol:4'));
+		expect(boot).not.toContain(symbol(file, 'symbol:8'));
+	});
+
+	test('a landing that can serve @pending without streaming the arm keeps the settle code at boot', () => {
+		expect(consumers(false).get('boot')).toContain(runtime('fns/prerender-resume'));
+		expect(consumers(false).get('action:screens/feed.tsrx#h11:click')).toContain(
+			runtime('fns/prerender-resume'),
+		);
+	});
 });

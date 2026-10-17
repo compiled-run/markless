@@ -156,6 +156,7 @@ export function nativePackingPlugins(
 					modules,
 					routes,
 					demand: demandSources(),
+					landingArmsServed: routeSources.size > 0,
 				});
 				// Entry-rooted builds resolve symbols through their source's symbol chunk, so their first use counts as unknown.
 				partitioned = routeSources.size > 0;

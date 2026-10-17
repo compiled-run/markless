@@ -543,6 +543,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 				payloadState: compiled.payloadScripts.state,
 				payloadView: containerScopedResumeView(compiled.payloadScripts.view),
 				hasIdleEvents: viewHasIdleEvents(compiled.payloadScripts.view),
+				streamsArms: authorsPendingArm(compiled.semanticGraph.markup),
 				runtimeDemandMap: compiled.runtimeDemandMap,
 				servedScalarPlans,
 				executionLog: input.executionLog,
@@ -1465,5 +1466,19 @@ function viewHasIdleEvents(view: ProtocolViewPayload): boolean {
 			(set.keyedRepeats ?? []).some((repeat) =>
 				repeat.rowEvents.some((event) => event.eventName === PROTOCOL_IDLE_EVENT_NAME),
 			),
+	);
+}
+
+function authorsPendingArm(markup: {
+	readonly chunks: ReadonlyArray<{
+		readonly slots: ReadonlyArray<{ readonly kind: string; readonly armTemplateIds?: unknown }>;
+	}>;
+}): boolean {
+	return markup.chunks.some((chunk) =>
+		chunk.slots.some(
+			(slot) =>
+				slot.kind === 'async' &&
+				(slot.armTemplateIds as { readonly pending?: string }).pending !== undefined,
+		),
 	);
 }

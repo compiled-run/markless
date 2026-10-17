@@ -2088,6 +2088,8 @@ export type RuntimeDemandMapFirstUseCall =
 export type RuntimeDemandMapFirstUsePage = {
 	// What resume start runs in this module and its composed children, whichever action wakes the page.
 	readonly resume: RuntimeDemandMapFirstUseReach;
+	// What runs here when a runtime that is already live adopts the arms the server streams.
+	readonly streamedSettle?: RuntimeDemandMapFirstUseReach;
 	// What re-runs here when another module changes a page-space cell this module reads.
 	readonly pageSpaceReaders: ReadonlyArray<{
 		readonly graphNodeId: string;

@@ -1527,6 +1527,8 @@ function consequenceReach(
 	recordIds: Set<string>,
 	affected: Affected,
 	calls: ReadonlyArray<RuntimeDemandMapFirstUseCall> = [],
+	// The boundaries settle from an arm the server streamed: their own settle and runner code never runs.
+	streamedSettle = false,
 ): RuntimeDemandMapFirstUseReach {
 	const { view, state } = scope;
 	const reads = (entries: ReadonlyArray<AffectedRead> | undefined) =>
@@ -1679,9 +1681,9 @@ function consequenceReach(
 	for (const boundary of view.asyncBoundaries ?? []) {
 		if (!reads(boundary.asyncReads)) continue;
 		recordIds.add(`async-boundary:${boundary.id}`);
-		if (boundary.updateSymbolId) symbolIds.add(boundary.updateSymbolId);
+		if (boundary.updateSymbolId && !streamedSettle) symbolIds.add(boundary.updateSymbolId);
 		for (const read of boundary.asyncReads)
-			if (read.runnerSymbolId) symbolIds.add(read.runnerSymbolId);
+			if (read.runnerSymbolId && !streamedSettle) symbolIds.add(read.runnerSymbolId);
 		const arms = boundary.armRecords;
 		for (const arm of Array.isArray(arms) ? arms : arms ? [arms] : [])
 			if (!armSymbols(arm as ArmRecordSetLike)) return 'unknown';
@@ -1853,8 +1855,25 @@ function firstUsePage(scope: FirstUseScope): RuntimeDemandMapFirstUsePage {
 		const slot = sharedCallbackSlotGraphNodeId(binding.definitionId, binding.slotName);
 		slots.set(`${slot}\0${binding.propName}`, { slot, prop: binding.propName });
 	}
+	const boundaries = scope.view.asyncBoundaries ?? [];
 	return {
 		resume: resumeStartReach(scope),
+		...(boundaries.length > 0
+			? {
+					streamedSettle: consequenceReach(
+						scope,
+						new Set(),
+						new Set(),
+						new Map(
+							boundaries.flatMap((boundary) =>
+								boundary.asyncReads.map((read) => [read.graphNodeId, null] as const),
+							),
+						),
+						[],
+						true,
+					),
+				}
+			: {}),
 		pageSpaceReaders: [...pageSpaceReads(scope)].sort().map((graphNodeId) => ({
 			graphNodeId,
 			reach: consequenceReach(scope, new Set(), new Set(), new Map([[graphNodeId, null]])),
