@@ -2,7 +2,7 @@ import type { Children } from '@markless/core';
 import { Html } from '@markless/router';
 
 // oxlint-disable-next-line no-unused-vars -- used inside <script>{…}</script>, which tsrx lint does not see
-const counter = 'window.__headRuns = (window.__headRuns || 0) + 1;';
+const counter = 'window.__headRuns = (window.__headRuns > 0 && window.__headRuns < 1e9 ? window.__headRuns : 0) + 1;';
 // oxlint-disable-next-line no-unused-vars -- used inside <script>{…}</script>, which tsrx lint does not see
 const lexical = 'const themeBoot = (document.documentElement.dataset.boot = "1");';
 
