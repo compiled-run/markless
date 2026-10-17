@@ -22,6 +22,7 @@ import {
 	patchRow,
 	refocus,
 	renderEmptyArm,
+	servedEmptyArm,
 	type RowMintGraph,
 } from './row-mint.ts';
 import { marklessRowSlotReader } from './row-slot-mint.ts';
@@ -74,6 +75,7 @@ export type MintedRow = {
 
 export type RowComponentMintApi = {
 	readonly renderEmptyArm: typeof renderEmptyArm;
+	readonly servedEmptyArm: typeof servedEmptyArm;
 	readonly focusPath: typeof focusPath;
 	readonly refocus: typeof refocus;
 	readonly patchRow: typeof patchRow;
@@ -157,6 +159,7 @@ export function marklessRowComponentMint(
 	void Promise.resolve(loadInstanceScope()).catch(() => undefined);
 	return {
 		renderEmptyArm,
+		servedEmptyArm,
 		focusPath,
 		patchRow,
 		refocus,

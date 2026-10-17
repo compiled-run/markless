@@ -19,6 +19,7 @@ const templateNodeTypes = new Set([
 	'Element',
 	'JSXElement',
 	'JSXScriptElement',
+	'JSXStyleElement',
 	'Fragment',
 	'JSXFragment',
 	'JSXIfExpression',
@@ -141,6 +142,7 @@ export function supportedFragmentRoot(fragment: AnyNode): AnyNode | null {
 	const children = asNodes(fragment.children).filter((child) => !isIgnorableTextNode(child));
 	const supported = children.length > 0 && children.every((child) =>
 		((child.type === 'Element' || child.type === 'JSXElement') && isPlainHostTemplateNode(child)) ||
+		child.type === 'JSXStyleElement' ||
 		child.type === 'JSXIfExpression' ||
 		child.type === 'JSXSwitchExpression' ||
 		child.type === 'JSXForExpression' ||

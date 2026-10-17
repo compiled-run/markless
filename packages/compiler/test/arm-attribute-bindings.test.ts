@@ -134,3 +134,65 @@ export function Rows() @{
 		'this @if (open) cannot be rebuilt when open changes because a repeated row inside it holds a attribute binding.',
 	);
 });
+
+// A flip rebuilds the arm from graph reads, so module values ride constant computeds the payload serves.
+test('module values an @if arm shows as attributes, text and child props rebuild with the arm', async () => {
+	const result = await compile(
+		'src/Menu.tsrx',
+		`
+import { state } from '@markless/core';
+import mark from './mark.svg';
+import { ROUTES } from './routes.ts';
+
+const SUFFIX = '!';
+
+function Badge(props: { src: string }) @{
+	<img src={props.src} alt="" />
+}
+
+export function Menu() @{
+	let open = state(false);
+	<div>
+		<button onClick={() => (open = !open)}>Flip</button>
+		@if (open) {
+			<a href={ROUTES.home} title={'go' + SUFFIX}>{ROUTES.label}</a>
+			<Badge src={mark} />
+		}
+	</div>
+}`,
+	);
+	expect(result.semanticGraph.diagnostics).toEqual([]);
+	const arm = branchModule(result);
+	expect(arm).toBeDefined();
+	const reads = [...(arm ?? '').matchAll(/computed:templateExpression:(\d+)/g)].map(
+		(match) => match[0],
+	);
+	expect(new Set(reads).size).toBe(4);
+	const lifted = result.semanticGraph.graphBindings.filter((binding) =>
+		binding.id.startsWith('computed:templateExpression:'),
+	);
+	expect(lifted.map((binding) => binding.functionSource)).toEqual([
+		'() => ROUTES.home',
+		"() => 'go' + SUFFIX",
+		'() => ROUTES.label',
+		'() => mark',
+	]);
+	expect(lifted.every((binding) => binding.dependencies?.length === 0)).toBe(true);
+});
+
+test('a module value outside any @if stays a plain authored value', async () => {
+	const result = await compile(
+		'src/Plain.tsrx',
+		`
+import { ROUTES } from './routes.ts';
+
+export function Plain() @{
+	<a href={ROUTES.home}>{ROUTES.label}</a>
+}`,
+	);
+	expect(
+		result.semanticGraph.graphBindings.some((binding) =>
+			binding.id.startsWith('computed:templateExpression:'),
+		),
+	).toBe(false);
+});

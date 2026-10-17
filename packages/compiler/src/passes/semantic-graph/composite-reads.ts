@@ -1,3 +1,4 @@
+import { GLOBAL_CONVERSION_FUNCTIONS } from '../../ast/globals.ts';
 import { asNodes, childNodes, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource } from '../../ast/source.ts';
 import type {
@@ -70,7 +71,8 @@ export function isCompositeTemplateExpression(
 		(node.type === 'MemberExpression' &&
 			node.computed === true &&
 			!isLiteralExpression(node.property as AnyNode | undefined)) ||
-		(options.methodCalls === true && isMethodCallExpression(node)) ||
+		(options.methodCalls === true &&
+			(isMethodCallExpression(node) || isGlobalConversionCall(node))) ||
 		// `delete` mutates rather than reads; the read collector already refuses it,
 		// so an operator that is not a pure value still reaches the loud refusal.
 		(options.unaryOperators === true && node.type === 'UnaryExpression')
@@ -84,6 +86,12 @@ function isMethodCallExpression(node: AnyNode): boolean {
 	if (node.type !== 'CallExpression') return false;
 	const callee = node.callee as AnyNode | undefined;
 	return callee?.type === 'MemberExpression' && callee.computed !== true;
+}
+
+function isGlobalConversionCall(node: AnyNode): boolean {
+	if (node.type !== 'CallExpression' || node.optional === true) return false;
+	const callee = node.callee as AnyNode | undefined;
+	return callee?.type === 'Identifier' && GLOBAL_CONVERSION_FUNCTIONS.has(String(callee.name));
 }
 
 export function pureCompositeReadSources(
@@ -140,9 +148,15 @@ function methodCallReadSources(
 	state: WalkState,
 	options: CompositeReadOptions,
 ): ReadonlyArray<string> | null {
-	if (!isMethodCallExpression(node)) return null;
 	const callee = node.callee as AnyNode;
-	const receiver = pureCompositeReadSources(callee.object as AnyNode | undefined, state, options);
+	// A conversion named by a binding of this module is that binding, not the global.
+	const offset = isGlobalConversionCall(node) ? rootIdentifierOffset(callee, state.source) : null;
+	if (offset !== null && resolvedSymbolAt(state.semantic(), offset) !== null) return null;
+	if (offset === null && !isMethodCallExpression(node)) return null;
+	const receiver =
+		offset === null
+			? pureCompositeReadSources(callee.object as AnyNode | undefined, state, options)
+			: [];
 	if (!receiver) return null;
 	return joinReadSources([
 		receiver,
@@ -228,6 +242,27 @@ export function collectCompositeTemplateExpression(
 		state,
 		options.requireWritableRead === true,
 		options.scope,
+	);
+}
+
+// A flipped arm rebuilds from graph reads alone, so a module value it shows rides a constant computed.
+export function liftArmModuleValue(
+	expression: AnyNode,
+	state: WalkState,
+): { readonly graphNodeId: string } | null {
+	if (!state.currentArmScope || state.currentKeyedRepeatScopeIds.length > 0) return null;
+	const readSources = pureCompositeReadSources(expression, state, {
+		methodCalls: true,
+		unaryOperators: true,
+	});
+	if (readSources?.length !== 0 || isLiteralExpression(expression)) return null;
+	return mintTemplateExpressionComputed(
+		`() => ${expressionSource(expression, state.source)}`,
+		[],
+		state,
+		false,
+		undefined,
+		true,
 	);
 }
 

@@ -49,6 +49,7 @@ import {
 import { createTriggerGroups } from './passes/trigger-groups.ts';
 import { buildSemanticGraph } from './passes/semantic-graph/index.ts';
 import { createMutableSemanticGraphArtifact } from './passes/semantic-graph/types.ts';
+import { parseJavaScriptModule } from './js-ast.ts';
 import { moduleIdOf } from './module-id.ts';
 import { lowerStateAccess } from './passes/state-lowering.ts';
 import { emitSymbolModules } from './passes/symbol-modules.ts';
@@ -541,24 +542,65 @@ function parseErrorDiagnostic(
 	source: CompileTsrxModuleInput,
 ): SemanticGraphArtifact['diagnostics'][number] {
 	const message = error.message;
+	const separator = missingSiblingSeparator(error, source);
 	return {
 		code: 'MARKLESS_PARSE_ERROR',
 		severity: 'error',
 		phase: 'parse',
-		title: 'TSRX parser rejected this source',
-		message: `@tsrx/yuku reported: ${message}`,
+		title: separator
+			? 'Sibling elements on one line need a separator'
+			: 'TSRX parser rejected this source',
+		message: separator
+			? `\`${separator.closing}\` and \`${separator.opening}\` are sibling elements written back to back, so the parser reads the second \`<\` as a less-than operator (@tsrx/yuku reported: ${message}).`
+			: `@tsrx/yuku reported: ${message}`,
 		why: 'The source could not enter the Markless compiler because the @tsrx/yuku parser failed at phase parse. Markless preserves the parser message and adapts its source location into the compiler diagnostic.',
-		primarySpan: parserErrorSpan(error, source),
+		primarySpan: separator
+			? { filename: source.filename, start: separator.offset, end: separator.offset + 1 }
+			: parserErrorSpan(error, source),
 		passId: 'tsrx-semantic-graph',
 		artifactKeys: ['semanticGraph'],
 		suggestions: [
 			{
-				message:
-					'Check the TSRX syntax rules at https://tsrx.dev/specification and rewrite this source into supported TSRX syntax.',
+				message: separator
+					? `Put \`;\` after \`${separator.closing}\` (line ${separator.line}), or start \`${separator.opening}\` on its own line. In a component body each top-level element is a statement, and two statements on one line need \`;\` between them.`
+					: 'Check the TSRX syntax rules at https://tsrx.dev/specification and rewrite this source into supported TSRX syntax.',
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_PARSE_ERROR',
 	};
+}
+
+const ELEMENT_ADJACENCY = /(<\/[A-Za-z][\w.:-]*\s*>|\/>)[ \t]*(<[A-Za-z][\w.:-]*)/g;
+
+// Blamed only when inserting the `;` lets the parser get further than it did.
+function missingSiblingSeparator(
+	error: SyntaxError,
+	source: CompileTsrxModuleInput,
+): { offset: number; line: number; closing: string; opening: string } | null {
+	const position = (error as SyntaxError & { readonly pos?: unknown }).pos;
+	if (typeof position !== 'number') return null;
+	const text = source.source;
+	const candidates = [...text.slice(0, position + 1).matchAll(ELEMENT_ADJACENCY)].reverse();
+	for (const match of candidates.slice(0, 8)) {
+		const offset = match.index + match[1]!.length;
+		const patched = `${text.slice(0, offset)};${text.slice(offset)}`;
+		let progressed = false;
+		try {
+			parseJavaScriptModule(patched, source.filename);
+			progressed = true;
+		} catch (retry) {
+			const next = (retry as { readonly pos?: unknown }).pos;
+			progressed = typeof next === 'number' && next - 1 > position;
+		}
+		if (progressed)
+			return {
+				offset,
+				line: text.slice(0, offset).split('\n').length,
+				closing: match[1]!.replace(/\s+/g, ''),
+				opening: `${match[2]}>`,
+			};
+	}
+	return null;
 }
 
 function parserErrorSpan(

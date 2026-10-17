@@ -36,6 +36,7 @@ import {
 	collectCompositeTemplateExpression,
 	type CompositeReadOptions,
 	joinReadSources,
+	liftArmModuleValue,
 	mintTemplateExpressionComputed,
 	pureCompositeReadSources,
 	readsUnroutedGraphCell,
@@ -187,7 +188,8 @@ export function collectTemplateExpression(
 		collectCompositeTemplateExpression(expression, state, {
 			...TEMPLATE_READ_OPTIONS,
 			requireWritableRead: true,
-		});
+		}) ??
+		liftArmModuleValue(expression, state);
 
 	if (!composite && refuseUnroutedExpression(expression, 'This text', state)) return;
 	const armScoped =
@@ -1165,10 +1167,11 @@ function collectAttribute(
 			return;
 		}
 		// A recombined value resolves to no graph node, so without this nothing subscribes it.
-		const composite = collectCompositeTemplateExpression(expressionValue, state, {
-			...TEMPLATE_READ_OPTIONS,
-			requireWritableRead: true,
-		});
+		const composite =
+			collectCompositeTemplateExpression(expressionValue, state, {
+				...TEMPLATE_READ_OPTIONS,
+				requireWritableRead: true,
+			}) ?? liftArmModuleValue(expressionValue, state);
 		if (!composite && refuseUnroutedExpression(expressionValue, `Attribute \`${attributeName}\``, state)) {
 			walk(expressionValue, state);
 			return;

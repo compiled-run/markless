@@ -52,6 +52,36 @@ export function renderEmptyArm(
 	return nodes;
 }
 
+// The server painted the arm without markers, so its nodes are found by matching the arm's own markup at the row span.
+export function servedEmptyArm(
+	parent: ResumeDomElement,
+	repeat: ResumeKeyedRepeatRecord,
+	rangeEnd?: ResumeDomNode,
+): ReadonlyArray<ResumeDomNode> {
+	const shape = renderEmptyArm(parent, repeat),
+		children = Array.from(parent.childNodes ?? []),
+		before = children.filter((node) => node.nodeType === 1)[(repeat.rowStartOffset ?? 0) - 1],
+		start = before ? children.indexOf(before) + 1 : 0,
+		served = children.slice(start, start + shape.length);
+	if (
+		served.length === shape.length &&
+		served.every(
+			(node, at) =>
+				node !== rangeEnd &&
+				node.nodeType === shape[at]!.nodeType &&
+				(node as { tagName?: string; data?: string }).tagName ===
+					(shape[at] as { tagName?: string }).tagName &&
+				(node as { data?: string }).data === (shape[at] as { data?: string }).data,
+		)
+	)
+		return served;
+	throw repeatRuntimeError(
+		repeat,
+		'MARKLESS_REPEAT_EMPTY_ARM_UNMATCHED',
+		'cannot find the @empty arm the server painted, so it cannot replace it with rows.',
+	);
+}
+
 /**
  * Build one row for a key that was never served, from the markup the record
  * carries.

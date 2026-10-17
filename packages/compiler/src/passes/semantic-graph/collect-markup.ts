@@ -1136,6 +1136,7 @@ function isPublicRoot(node: AnyNode): boolean {
 				child.type === 'JSXSwitchExpression' ||
 				child.type === 'JSXForExpression' ||
 				child.type === 'JSXTryExpression' ||
+				child.type === 'JSXStyleElement' ||
 				((child.type === 'Element' || child.type === 'JSXElement') &&
 					isPlainStaticHostSubtree(child)),
 		)
@@ -1144,7 +1145,12 @@ function isPublicRoot(node: AnyNode): boolean {
 
 function isPlainStaticHostSubtree(node: AnyNode): boolean {
 	if (isStaticTextNode(node)) return true;
-	if (node.type === 'JSXExpressionContainer' || node.type === 'TSRXExpression') return true;
+	if (
+		node.type === 'JSXExpressionContainer' ||
+		node.type === 'TSRXExpression' ||
+		node.type === 'JSXStyleElement'
+	)
+		return true;
 	if (
 		node.type !== 'Element' &&
 		node.type !== 'JSXElement' &&

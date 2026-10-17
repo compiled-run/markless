@@ -185,9 +185,10 @@ function fixture(
 		{ id: 'b', label: 'bravo' },
 	];
 	const rows = served.map((item) => servedRow(`${options.labelPrefix ?? ''}${item.label}`));
+	const servedArm = served.length === 0 && options.emptyArm ? [el('LI', [txt('nothing')])] : [];
 	const header = el('LI', [txt('header')]);
 	const footer = el('LI', [txt('footer')]);
-	const list = el('UL', [header, ...rows, footer]);
+	const list = el('UL', [header, ...rows, ...servedArm, footer]);
 	const root = el('SECTION', [list]);
 	const builds = { count: 0 };
 	root.ownerDocument = documentHost(builds);
@@ -405,16 +406,26 @@ test('a list emptied after boot takes its @empty arm back out when a row is mint
 	expect(census()).toEqual(elementsUnder(root));
 });
 
-// The one shape the mint declines: the SERVER painted the arm, so this runtime
-// holds no handle on those nodes and cannot take them out. Standing rows behind
-// a live "nothing matches" would be worse than the list staying as served.
-test('a page served empty with an @empty arm declines to mint', async () => {
-	const { builds, write, labels } = fixture({ emptyArm: true, served: [] });
+// The server painted the arm with no markers; the runtime finds it by the arm's own markup.
+test('a page served empty with an @empty arm takes the served arm out for its first row', async () => {
+	const { write, labels, census, root } = fixture({ emptyArm: true, served: [] });
+	expect(labels()).toEqual(['header', 'nothing', 'footer']);
 
 	await write([{ id: 'c', label: 'charlie' }]);
 
-	expect(builds.count).toBe(0);
-	expect(labels()).toEqual(['header', 'footer']);
+	expect(labels()).toEqual(['header', 'charlie', 'footer']);
+	expect(census()).toEqual(elementsUnder(root));
+
+	await write([]);
+	expect(labels()).toEqual(['header', 'nothing', 'footer']);
+});
+
+test('a served arm the record does not describe refuses loudly instead of stacking rows on it', async () => {
+	const { list, graph } = fixture({ emptyArm: true, served: [] });
+	(list.childNodes[1] as { tagName?: string }).tagName = 'P';
+
+	graph.write({ graphNodeId: 'state:rows', value: [{ id: 'c', label: 'charlie' }] });
+	await expect(graph.flush()).rejects.toThrowError(/MARKLESS_REPEAT_EMPTY_ARM_UNMATCHED/);
 });
 
 // The same page WITHOUT an arm has nothing to take out, so growth is ordinary.

@@ -1,4 +1,5 @@
 import { isEventAttribute } from '@tsrx/yuku';
+import { GLOBAL_CONVERSION_FUNCTIONS } from '../../ast/globals.ts';
 import { asNodes, childNodes, getIdentifierName, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource } from '../../ast/source.ts';
 import { moduleSemantics } from '../semantic-graph/shared-ast.ts';
@@ -461,11 +462,12 @@ function emittedTemplateReads(
 	return reads;
 }
 
-const knownRenderGlobals = new Set(
-	'Array Boolean Date Infinity Intl JSON Map Math NaN Number Object RegExp Set String false null true URL URLSearchParams undefined'.split(
+const knownRenderGlobals = new Set([
+	...'Array Date Infinity Intl JSON Map Math NaN Object RegExp Set false null true URL URLSearchParams undefined'.split(
 		' ',
 	),
-);
+	...GLOBAL_CONVERSION_FUNCTIONS,
+]);
 
 function unsupportedBodyStatementMessage(statement: AnyNode, source: string): string | null {
 	const declarations =
