@@ -337,7 +337,8 @@ function applyKeyedRepeatRowOrder(
 		if (focus) rowRoot = undefined;
 		if (!rowRoot) {
 			if (!(repeat.rowTemplate ?? repeat.rowComponent) || !mint || !values) return;
-			if (repeat.emptyArm && arm.mounted && arm.nodes.length === 0) return;
+			if (repeat.emptyArm && arm.mounted && arm.nodes.length === 0)
+				arm.nodes = mint.servedEmptyArm(parent, repeat, rangeEnd);
 			rowRoot = mint.mintRow(parent, repeat, item, graph, values);
 			if (!rowRoot) return;
 			if (focus?.length) focused.push([rowRoot, focus]);
@@ -396,7 +397,6 @@ function applyKeyedRepeatRowOrder(
 	arm.nodes = nodes;
 	if (census) spliceDomOrderCensus(census, [], nodes);
 }
-// `mounted` with no `nodes` is the server's own arm, never removed here.
 type MountedEmptyArm = { mounted: boolean; nodes: ReadonlyArray<ResumeDomNode> };
 type MutableRepeatParent = ResumeDomElement & {
 	readonly appendChild?: (node: ResumeDomNode) => unknown;
