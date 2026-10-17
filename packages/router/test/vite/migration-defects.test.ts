@@ -166,3 +166,17 @@ test('@for over a prop adds component rows, and row attributes follow their item
 	expect(errors).toEqual([]);
 	await page.close();
 });
+
+test('an @for loop variable named error builds and renders', async () => {
+	const { page, errors } = await open('/error-loop');
+	expect(await page.locator('[data-errors] li').allTextContents()).toEqual([
+		'too short',
+		'missing digit',
+	]);
+	await page.click('[data-clear]');
+	await expect
+		.poll(() => page.locator('[data-errors] li').allTextContents())
+		.toEqual(['missing digit']);
+	expect(errors).toEqual([]);
+	await page.close();
+});
