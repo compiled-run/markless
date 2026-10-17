@@ -113,3 +113,56 @@ test('a pending async handler does not hold later clicks', async () => {
 	expect(errors).toEqual([]);
 	await page.close();
 });
+
+test('@for over a computed list from a module function updates in the browser', async () => {
+	const { page, errors } = await open('/computed-list');
+	await expect.poll(() => page.locator('[data-plain] li').count()).toBe(3);
+	await page.fill('[data-needle]', 'a');
+	await expect
+		.poll(() => page.locator('[data-plain] li').allTextContents())
+		.toEqual(['Ada', 'Brian']);
+	await expect
+		.poll(() => page.locator('[data-components] li').allTextContents())
+		.toEqual(['Ada', 'Brian']);
+	await page.fill('[data-needle]', 'cl');
+	await expect.poll(() => page.locator('[data-plain] li').allTextContents()).toEqual(['Cleo']);
+	await expect
+		.poll(() => page.locator('[data-components] li').allTextContents())
+		.toEqual(['Cleo']);
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
+test('a text hole beside an element keeps the element when it updates', async () => {
+	const { page, errors } = await open('/text-beside');
+	await page.click('[data-page]');
+	await expect.poll(() => text(page, '[data-page]')).toMatch(/2\s*$/);
+	expect(await text(page, '[data-page] .sr-only')).toBe('Go to page 2');
+	await page.click('[data-page]');
+	await expect.poll(() => text(page, '[data-page] .sr-only')).toBe('Go to page 3');
+	expect((await text(page, '[data-page]'))?.trim()).toMatch(/^Go to page 3\s*3$/);
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
+test('@for over a prop adds component rows, and row attributes follow their items', async () => {
+	const { page, errors } = await open('/list-rows');
+	await page.click('[data-add-title]');
+	await expect
+		.poll(() => page.locator('[data-prop-rows] li').allTextContents())
+		.toEqual(['X', 'E1']);
+	await page.click('[data-flip]');
+	await expect
+		.poll(() =>
+			page
+				.locator('[data-attr-rows] li')
+				.evaluateAll((items) => items.map((item) => item.getAttribute('data-on'))),
+		)
+		.toEqual(['yes', 'yes']);
+	await page.click('[data-reverse]');
+	await expect
+		.poll(() => page.locator('[data-attr-rows] li').allTextContents())
+		.toEqual(['b', 'a']);
+	expect(errors).toEqual([]);
+	await page.close();
+});

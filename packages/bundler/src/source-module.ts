@@ -289,6 +289,7 @@ export function emitSourceModule(input: {
 	readonly renderDataId?: string;
 	// An imported component fills rows through its render-data reader.
 	readonly linkedRowSlotReaders?: boolean;
+	readonly linkedRowComponents?: boolean;
 	readonly canonicalRenderData?: boolean;
 	readonly symbols: ReadonlyArray<SourceSymbolRow>;
 	readonly behaviorSymbols?: ReadonlyArray<SourceSymbolRow>;
@@ -632,16 +633,17 @@ function demandsRowMint(runtimeDemandMap: unknown): boolean {
  * It answers the SAME global as the template mint, whose builders it re-exports:
  * the repeat runtime carries no second loader, so a page with no component row
  * ships not one byte of this path. Nothing page-specific is written here - every
- * page emits this same line - because one document can hold two page modules and
- * the last one evaluated owns the global. The surface travels on the runtime
- * input instead and arrives as the loader's first argument.
+ * page emits this same line - because one document can hold several modules that
+ * install a mint, and the one that builds every kind of row must keep the global
+ * whichever is evaluated last. The surface travels on the runtime input instead
+ * and arrives as the loader's first argument.
  */
 function emitRowComponentMintLoaderInstall(): string {
 	return [
-		'globalThis.__marklessRowMint = (...input) =>',
-		"\timport('@markless/web/fns/row-component-mint').then((mint) =>",
-		'\t\tmint.marklessRowComponentMint(...input),',
-		'\t);',
+		'globalThis.__marklessRowMint = Object.assign(',
+		"\t(...input) => import('@markless/web/fns/row-component-mint').then((mint) => mint.marklessRowComponentMint(...input)),",
+		'\t{ components: true },',
+		');',
 	].join('\n');
 }
 
@@ -651,9 +653,14 @@ function componentRowLoader(input: {
 	readonly renderDataId?: string;
 	readonly runtimeDemandMap?: unknown;
 	readonly linkedRowSlotReaders?: boolean;
+	readonly linkedRowComponents?: boolean;
 }): string | undefined {
 	if (!input.renderDataId) return undefined;
-	if (demandsKeyedRepeatModule(input.runtimeDemandMap, ROW_COMPONENT_MINT_RUNTIME_MODULE_ID))
+	// A child module's install runs only if that module is ever evaluated, which resume never needs.
+	if (
+		input.linkedRowComponents ||
+		demandsKeyedRepeatModule(input.runtimeDemandMap, ROW_COMPONENT_MINT_RUNTIME_MODULE_ID)
+	)
 		return emitRowComponentMintLoaderInstall();
 	return input.linkedRowSlotReaders ||
 		demandsKeyedRepeatModule(input.runtimeDemandMap, ROW_SLOT_MINT_RUNTIME_MODULE_ID)
@@ -666,6 +673,7 @@ function clientRowMintLoader(input: {
 	readonly renderDataId?: string;
 	readonly runtimeDemandMap?: unknown;
 	readonly linkedRowSlotReaders?: boolean;
+	readonly linkedRowComponents?: boolean;
 }): string | null {
 	const mint = demandsRowComponentMint(input.runtimeDemandMap)
 		? emitRowComponentMintLoaderInstall()
@@ -676,10 +684,10 @@ function clientRowMintLoader(input: {
 	return mint && nested ? `${mint}\n${nested}` : (mint ?? nested);
 }
 
-// Assigned, not defaulted: a page whose rows read expressions must not inherit a plain mint.
+// Assigned over a plain mint, which cannot read a row's expressions, but never over the component mint, which can.
 function emitRowSlotMintLoaderInstall(): string {
 	return [
-		'globalThis.__marklessRowMint = (...input) =>',
+		'if (!globalThis.__marklessRowMint?.components) globalThis.__marklessRowMint = (...input) =>',
 		"\timport('@markless/web/fns/row-slot-mint').then((mint) => mint.marklessRowSlotMint(...input));",
 	].join('\n');
 }
@@ -753,6 +761,7 @@ export function emitResumeModule(input: {
 	// has none - and a component row still has to reach the surface.
 	readonly renderDataId?: string;
 	readonly linkedRowSlotReaders?: boolean;
+	readonly linkedRowComponents?: boolean;
 	// The page's component tree derives from an element() roster, possibly through a child module whose computeds this payload never holds.
 	readonly rosterDerivation?: boolean;
 	readonly installResumeSummary?: boolean;

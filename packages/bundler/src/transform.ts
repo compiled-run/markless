@@ -7,6 +7,7 @@ import {
 	compileTsrxModule,
 	componentEdgeSymbolRoutes,
 	emitSymbolResolverModule,
+	importedRowComponentMints,
 	importedRowSlotReaders,
 	importedSymbolRoutes,
 	linkedRenderDataBoundarySymbols,
@@ -568,6 +569,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 						? renderDataId
 						: undefined,
 				linkedRowSlotReaders: importedRowSlotReaders(input.importedModuleInterfaces),
+				linkedRowComponents: importedRowComponentMints(input.importedModuleInterfaces),
 				rosterDerivation,
 				hasBoundSymbols: compiled.boundSymbolResolver.rows.length > 0,
 				boundSymbolDescriptors,
@@ -737,6 +739,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					renderDataId,
 					environment: input.environment ?? 'lib',
 					linkedRowSlotReaders: importedRowSlotReaders(input.importedModuleInterfaces),
+					linkedRowComponents: importedRowComponentMints(input.importedModuleInterfaces),
 					clientOutput: input.clientOutput ?? 'full',
 					executionLog: input.executionLog,
 					headInjections: headInjections.length > 0 ? headInjections : undefined,

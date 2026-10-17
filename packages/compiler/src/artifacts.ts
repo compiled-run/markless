@@ -335,6 +335,11 @@ export type ModuleGraphInterfaceArtifact = {
 			 */
 			readonly rowSlotReader?: true;
 			/**
+			 * Present when this component's tree holds a keyed repeat whose rows render
+			 * a component, so a page placing it must install the component-row mint.
+			 */
+			readonly rowComponentMint?: true;
+			/**
 			 * Present when this component's tree holds an action compiled as a
 			 * closure plan, so a composing page routes plan lookups toward it.
 			 */
