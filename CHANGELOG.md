@@ -4,8 +4,7 @@ Every published Markless package shares one version number: the packages
 (`@markless/analyzer`, `@markless/bundler`, `@markless/compiler`,
 `@markless/core`, `@markless/router`, `@markless/runtime`,
 `@markless/serializer`, `@markless/typescript-plugin`, `@markless/vitest-browser`,
-`@markless/web`, `@markless/ui`, `@markless/icons`, `@markless/ui-tools`, and
-`create-markless`) are always released together at the same
+`@markless/web`, and `create-markless`) are always released together at the same
 version, because a project scaffolded by `create-markless` asks for that exact
 version of everything else.
 
@@ -13,9 +12,85 @@ This file starts at 0.2.0. Earlier versions have no changelog entries.
 
 ## 0.5.0
 
+**TLDR:** links navigate without reloading the page, saved `storage()` state
+renders on the server, pages can set their HTTP status and read the request,
+`onIdle` loads background code after the page settles, and streamed content is
+picked up as it is instead of being rendered twice. Most apps need no changes.
+
 Markless now packs your app by default, navigates without reloading the page,
 and responds to clicks faster, with fewer requests and less code running at
-load. Most apps need no changes.
+load.
+
+### Held back: @markless/ui, @markless/icons, @markless/ui-tools
+
+These three packages are not part of 0.5.0 on npm. `@markless/ui` 0.5.0 needs
+`@markless/icons` and `@markless/ui-tools`, and those two names have never been
+published, so the release workflow cannot publish them yet (npm only lets a
+workflow publish a name that already exists). They ship in a later release once
+the names are claimed. `@markless/ui` 0.4.0 stays the latest on npm. Nothing in
+the framework packages or the `create-markless` starters depends on them.
+
+### Highlights
+
+- **Client-side navigation works.** Router links and plain `<a>` links to your
+  own pages swap in the next page without a reload (details below).
+- **`onIdle`.** `onIdle={handler}` runs once after the page has loaded and the
+  browser is idle. Use it to start third-party or background code without
+  slowing the first paint or the first click.
+- **`storage()` renders on the server.** A `storage()` value is now also saved
+  in a cookie named `markless-<key>`, so the server renders the saved value in
+  the first response. A saved tab or theme no longer flashes its default.
+  Pages that read `storage()` are sent `Cache-Control: private` and
+  `Vary: Cookie`.
+- **Pages can read the request and set the response.** Every page gets an
+  `http` prop with `request`, `url`, `locals` and `response`. Set
+  `http.response.status` or headers before the page starts streaming, for
+  example a 404 page. `http` is server-only: reading it from browser code fails
+  the build with `MARKLESS_SERVER_ONLY_PROP_BROWSER_READ`.
+- **Streamed content is adopted, not re-rendered.** When an `@try` section
+  streams in from the server, the browser takes over the HTML it received
+  instead of building it again, and a click made while it streams runs right
+  away.
+- **Resume survives third-party scripts.** If a script changes the page while
+  it loads (a search button filling itself in, a GitHub star button swapping
+  its link), the rest of the page still wakes up correctly. Only an element the
+  script replaced is affected, and it reports an error instead of breaking the
+  page.
+- **The link script is a cached file.** The router's link code is served once
+  as `/_markless/links.<hash>.js` with a long cache lifetime, instead of inline
+  in every page. Each later page view is about 2.7 kB smaller.
+- **Many fixes found by moving real apps to Markless:** htmx.org, alpinejs.dev,
+  the Next.js dashboard example, Remix notes, Conduit and a Docusaurus site.
+  See Compiler and Fixes below.
+- **`create-markless` asks which editor you use** (VS Code, Cursor, Windsurf,
+  Zed, or other) and writes only that editor's settings. Pass `--editor` to
+  skip the question. It also checks your Node.js version before asking
+  anything and tells you which version to install, and it works with Bun and
+  Deno. The next steps now point at the real dev port, 3000.
+
+### Fixes from migrating real apps
+
+- A `Link` without `href` builds, so links whose children come from data work.
+- MDX pages render lowercase JSX tags and `{/* comments */}`.
+- `document.tsrx` renders child components and `@for`, `@if` and `@switch`,
+  and the attributes written on `<Html>` reach the page.
+- `@try` sections render side by side on the server, two sections that read one
+  streamed value both fill, rows written straight into an `@try` follow it, and
+  forms inside one call `preventDefault` before the browser submits.
+- A child component reads page props its parent forwarded, and a callback prop
+  from another file receives its argument.
+- An inline `attach` function can read and write state.
+- An `@if` branch can show module values in attributes, text and child props.
+- Markup that calls `String()`, `Number()` and similar on state stays current.
+- A `<style>` written beside or inside a component's root elements ships.
+- Void elements like `<br>` and `<img>` are written without a closing tag.
+- Sibling elements with no separator get an error that names the missing
+  separator.
+- The first click inside an `@if` or `@switch` that is open when a
+  client-rendered page mounts counts.
+- A keyed list served empty replaces its `@empty` block with new rows.
+- Builds that link packages from outside the project folder name those
+  modules by package instead of by folder path.
 
 ### Packing is on by default
 
@@ -60,7 +135,9 @@ reloads the page once instead of doing nothing. Build manifests are no longer
 served publicly; they now live in a `.markless/` folder next to your build
 output, so add `.markless/` to your `.gitignore`.
 
-### @markless/ui and icons
+### @markless/ui and icons (held back, see above)
+
+These changes are in the repository and ship when the packages are published.
 
 `@markless/ui` adds 24 component families, including menu, menubar, toolbar,
 tooltip, hovercard, drawer, calendar, datebox, timebox, numberbox, colorpicker,

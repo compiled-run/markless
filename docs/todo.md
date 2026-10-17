@@ -4,26 +4,34 @@ Open work parked on 2026-09-25, when the focus moved to compiling to native.
 The detailed goal board lives in `docs/goals/packed-delivery-performance/`
 (gitignored, local only); this file is the durable summary.
 
-## Finish the 0.5.0 release
+## Publish @markless/ui, @markless/icons and @markless/ui-tools
 
-main is green at `7da890b4`, tag `v0.5.0` points there, and the release dry run
-passed for all 14 packages. Nothing is published yet.
+0.5.0 shipped without these three: `@markless/icons` and `@markless/ui-tools`
+have never been published, and the release workflow cannot claim a new name
+(it has no npm token by design). They are marked `"private": true` in their
+`package.json` until then; their `publishConfig` stays, so
+`verify-packed-manifests.mjs` still checks their tarballs on every run.
 
-1. Bootstrap the two new package names (needs the owner's npm login and 2FA).
-   `@markless/ui` depends on both, and packages publish in folder order, so
-   publishing before this would put `@markless/ui` 0.5.0 on npm with missing
-   dependencies. Placeholders are staged in `/tmp/ml-bootstrap/` (recreate them
-   as a bare `package.json` at version 0.0.1 if that folder is gone):
+To release them (needs the owner's npm login and 2FA):
+
+1. Remove `"private": true` from `packages/headless/icons/package.json`,
+   `packages/headless/tools/package.json` and
+   `packages/headless/components/package.json`. Do this first:
+   `pnpm release:trust --only` refuses a package that is still private.
+2. Claim the two new names with a placeholder: a bare `package.json` at version
+   0.0.1 for each, in `/tmp/ml-bootstrap/icons` and `/tmp/ml-bootstrap/ui-tools`.
+   Then attach the trusted publisher to all three:
    ```
    cd /tmp/ml-bootstrap/icons && npm publish --access public
    cd /tmp/ml-bootstrap/ui-tools && npm publish --access public
    pnpm release:trust --only @markless/icons
    pnpm release:trust --only @markless/ui-tools
+   pnpm release:trust --check
    ```
-2. Publish: `gh workflow run release.yml --ref v0.5.0 -f version=0.5.0 -f mode=publish -f confirm="publish markless 0.5.0"`.
-3. Create the GitHub Release from the `## 0.5.0` section of `CHANGELOG.md`:
-   `gh release create v0.5.0 --target 7da890b4 --title v0.5.0 --notes-file <notes> --latest`.
-4. Close PR #37; its commits are on main.
+3. Release as usual with `release.yml`. Packages publish in folder order, so
+   `@markless/ui` (`packages/headless/components`) goes out a moment before
+   its two dependencies; if the run stops between them, re-dispatch it so the
+   rest publish.
 
 ## Finish the packed-delivery goal
 
