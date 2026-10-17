@@ -11,7 +11,7 @@ import {
 	type PayloadScriptDocument,
 } from '../payload-document-common.ts';
 import { resumeFromPrerenderRecordsImpl } from '../payload-resume.ts';
-import { serializeRuntimeAsyncSnapshots } from '@markless/serializer';
+import { ASYNC_BOUNDARY_ARM, serializeRuntimeAsyncSnapshots } from '@markless/serializer';
 import { adoptFilledArms } from '../prerender/adopt-filled-arms.ts';
 import { isSettleKernelUnsupported, renderSettledArm } from '../settle-kernel.ts';
 
@@ -26,7 +26,9 @@ async function loadPrerenderEvaluator() {
 export async function derivePrerenderResumeRecords(
 	page: unknown,
 	propsOrLoadSymbol?: unknown,
-): Promise<ReturnType<Awaited<ReturnType<typeof loadPrerenderEvaluator>>['derivePrerenderResumeRecords']>> {
+): Promise<
+	ReturnType<Awaited<ReturnType<typeof loadPrerenderEvaluator>>['derivePrerenderResumeRecords']>
+> {
 	const evaluator = await loadPrerenderEvaluator();
 	return evaluator.derivePrerenderResumeRecords(page as never, propsOrLoadSymbol);
 }
@@ -109,19 +111,30 @@ async function adoptStreamedForWake<
 >(input: T): Promise<T> {
 	const documentHost = (
 		input.root as {
-			readonly ownerDocument?: { readonly querySelector?: (selector: string) => unknown };
+			readonly ownerDocument?: {
+				readonly querySelector?: (selector: string) => unknown;
+				readonly readyState?: string;
+			};
 		}
 	).ownerDocument;
 	if (
 		!documentHost?.querySelector?.(
 			'script[type="markless/arm"],script[type="markless/state-patch"]',
+		) &&
+		!(
+			documentHost?.readyState === 'loading' &&
+			input.view.asyncBoundaries.some(
+				(boundary) => boundary.initiallyServedArm === ASYNC_BOUNDARY_ARM.pending,
+			)
 		)
 	) {
 		(input.root as { __mAdopted?: boolean }).__mAdopted = true;
 		return input;
 	}
-	const { adoptStreamedArmPatches } = await import('../resume-stream-patches.ts');
-	return { ...input, ...(await adoptStreamedArmPatches(input, input.root)) };
+	const { adoptStreamedArmPatches, holdForStreamedArms } =
+		await import('../resume-stream-patches.ts');
+	await holdForStreamedArms(input.root as never);
+	return { ...input, ...adoptStreamedArmPatches(input, input.root) };
 }
 
 export async function resumeFromPrerenderRecords(

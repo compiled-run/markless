@@ -2,6 +2,7 @@
 // the demand map co-demands web/resume with web/payload-resume on every tier
 // that loads this module. The chunk groups keep resume core in its own chunk.
 import type { RuntimeGraph } from '@markless/runtime';
+import { ASYNC_BOUNDARY_ARM } from '@markless/serializer';
 import { createResumeRuntime, type ResumeRuntime } from './resume.ts';
 import {
 	type ResumeHandoff,
@@ -49,18 +50,29 @@ async function adoptStreamedPatchesIfPresent(
 ): Promise<ReturnType<typeof decodePayloadScripts>> {
 	const documentHost = (
 		root as {
-			readonly ownerDocument?: { readonly querySelector?: (selector: string) => unknown };
+			readonly ownerDocument?: {
+				readonly querySelector?: (selector: string) => unknown;
+				readonly readyState?: string;
+			};
 		}
 	).ownerDocument;
 	if (
 		!documentHost?.querySelector?.(
 			'script[type="markless/arm"],script[type="markless/state-patch"]',
+		) &&
+		!(
+			documentHost?.readyState === 'loading' &&
+			decoded.view.asyncBoundaries.some(
+				(boundary) => boundary.initiallyServedArm === ASYNC_BOUNDARY_ARM.pending,
+			)
 		)
 	) {
 		(root as { __mAdopted?: boolean }).__mAdopted = true;
 		return decoded;
 	}
-	const { adoptStreamedArmPatches } = await import('./resume-stream-patches.ts');
+	const { adoptStreamedArmPatches, holdForStreamedArms } =
+		await import('./resume-stream-patches.ts');
+	await holdForStreamedArms(root);
 	return adoptStreamedArmPatches(decoded, root);
 }
 

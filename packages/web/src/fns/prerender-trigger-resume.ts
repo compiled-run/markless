@@ -1,3 +1,4 @@
+import { ASYNC_BOUNDARY_ARM } from '@markless/serializer';
 import { PROTOCOL_VISIBLE_EVENT_NAME } from '../../../serializer/src/protocol-event-names.ts';
 import type { RuntimeGraph, RuntimeGraphUpdate } from '@markless/runtime';
 import type { ArmCommitUpdate } from '../resume-commit-arm.ts';
@@ -560,17 +561,28 @@ async function withoutCaptureListeners<T>(
 async function adoptStreamedForWake<T extends TriggerGroupInput>(input: T): Promise<T> {
 	const documentHost = (
 		input.root as {
-			readonly ownerDocument?: { readonly querySelector?: (selector: string) => unknown };
+			readonly ownerDocument?: {
+				readonly querySelector?: (selector: string) => unknown;
+				readonly readyState?: string;
+			};
 		}
 	).ownerDocument;
 	if (
 		!documentHost?.querySelector?.(
 			'script[type="markless/arm"],script[type="markless/state-patch"]',
+		) &&
+		!(
+			documentHost?.readyState === 'loading' &&
+			input.view.asyncBoundaries.some(
+				(boundary) => boundary.initiallyServedArm === ASYNC_BOUNDARY_ARM.pending,
+			)
 		)
 	) {
 		(input.root as { __mAdopted?: boolean }).__mAdopted = true;
 		return input;
 	}
-	const { adoptStreamedArmPatches } = await import('../resume-stream-patches.ts');
-	return { ...input, ...(await adoptStreamedArmPatches(input, input.root)) };
+	const { adoptStreamedArmPatches, holdForStreamedArms } =
+		await import('../resume-stream-patches.ts');
+	await holdForStreamedArms(input.root as never);
+	return { ...input, ...adoptStreamedArmPatches(input, input.root) };
 }

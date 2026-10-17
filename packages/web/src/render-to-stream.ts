@@ -34,9 +34,8 @@ import { __marklessDebugBootstrapSource } from './debug-channel.ts';
 // content into the anchor range — a page that never loads the runtime still
 // SHOWS settled content. The records and state-patch scripts stay in the
 // document; the resume runtime adopts them at wake (resume-stream-patches),
-// which makes the settled content INTERACTIVE. If the runtime woke first,
-// the pending snapshot re-demands the computed client-side and the client
-// settle path (commitArm) owns the boundary — a late template no-ops.
+// which makes the settled content INTERACTIVE. A wake that lands first holds
+// until the stream closes and adopts the arm (resume-stream-patches).
 
 // Per-request first-flush deadline: computeds that settle within it render
 // inline with zero streaming bytes; only still-pending boundaries stream.

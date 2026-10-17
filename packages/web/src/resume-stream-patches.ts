@@ -12,8 +12,8 @@ import type { ResumeDomOwnerDocument } from './resume-types.ts';
 //   (arm-relative, D3), never the pending arm the shell payload shipped.
 // Patches for ids outside this container's payload are ignored (another
 // container owns them). A malformed patch script throws — never half-adopt.
-// A template still present in the document is a commit the reveal train has
-// QUEUED but not flushed: its boundary still shows @pending, so neither its
+// A template still present after holdForStreamedArms is a commit the reveal train
+// could not flush: its boundary still shows @pending, so neither its
 // records nor its snapshot may be adopted — the runtime re-demands the
 // computed and owns the boundary (the queued commit no-ops at flush). Wakes
 // that find no patch scripts set `__mAdopted` themselves, at that check.
@@ -25,6 +25,22 @@ type StreamPatchDocumentRoot = {
 
 type StreamedStateDelta = Pick<ProtocolStatePayload, 'cells' | 'computed'>;
 
+// A wake while the response still streams an arm this container shows @pending holds until the
+// stream closes and the reveal trains flush, so it adopts the server's arm instead of rendering it.
+export async function holdForStreamedArms(root: StreamPatchDocumentRoot): Promise<void> {
+	const document = root.ownerDocument as
+		| { readonly readyState?: string; readonly addEventListener?: Document['addEventListener'] }
+		| undefined;
+	if (document?.readyState === 'loading')
+		await new Promise((resolve) =>
+			document.addEventListener?.('DOMContentLoaded', resolve, { once: true }),
+		);
+	const executor = (
+		globalThis as { readonly __mArm?: { readonly idle?: (run: () => void) => void } }
+	).__mArm;
+	if (executor?.idle) await new Promise<void>((resolve) => executor.idle!(resolve));
+}
+
 export function adoptStreamedArmPatches(
 	decoded: DecodedPayloadScripts,
 	root: StreamPatchDocumentRoot,
@@ -33,11 +49,7 @@ export function adoptStreamedArmPatches(
 	root.__mAdopted = true;
 	const query = root.ownerDocument?.querySelectorAll?.bind(root.ownerDocument);
 	if (!query) return decoded;
-	const scripts = [
-		...query(
-			'script[type="markless/arm"],script[type="markless/state-patch"]',
-		),
-	];
+	const scripts = [...query('script[type="markless/arm"],script[type="markless/state-patch"]')];
 	if (!scripts.length) return decoded;
 
 	const uncommittedBoundaryIds = new Set(
@@ -90,11 +102,7 @@ export function adoptStreamedArmPatches(
 function mergeStateRecords<
 	T extends StreamedStateDelta[keyof StreamedStateDelta][number],
 	K extends keyof StreamedStateDelta,
->(
-	base: ReadonlyArray<T>,
-	deltas: Iterable<StreamedStateDelta>,
-	key: K,
-): Map<string, T> {
+>(base: ReadonlyArray<T>, deltas: Iterable<StreamedStateDelta>, key: K): Map<string, T> {
 	const records = new Map(base.map((record) => [record.graphNodeId, record]));
 	for (const delta of deltas)
 		for (const addition of delta[key] as ReadonlyArray<T>) {
