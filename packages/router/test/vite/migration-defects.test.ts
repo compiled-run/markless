@@ -180,3 +180,11 @@ test('an @for loop variable named error builds and renders', async () => {
 	expect(errors).toEqual([]);
 	await page.close();
 });
+
+test('a plain const string passed to a child that reads it in a handler', async () => {
+	const { page, errors } = await open('/const-prop');
+	await page.click('[data-say]');
+	await expect.poll(() => text(page, '[data-said]')).toBe('hello');
+	expect(errors).toEqual([]);
+	await page.close();
+});

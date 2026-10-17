@@ -3,6 +3,7 @@ import {
 	childNodes,
 	getIdentifierName,
 	unwrapTypeAssertion,
+	walkNode,
 	type AnyNode,
 } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
@@ -1608,6 +1609,26 @@ export function moduleConstantInitializer(
 	}
 
 	return undefined;
+}
+
+/** The initializer of a `const` declared inside a function or component body, by its binding. */
+export function localConstantInitializer(
+	name: string,
+	symbolId: number,
+	state: WalkState,
+): AnyNode | undefined {
+	let initializer: AnyNode | undefined;
+	walkNode(ownedModuleAst(state, state.source, state.filename), (node) => {
+		if (initializer || node.type !== 'VariableDeclaration') return;
+		if (variableDeclarationKind(node) !== 'const') return;
+		for (const declarator of asNodes(node.declarations)) {
+			const id = declarator.id as AnyNode | undefined;
+			if (!id || typeof id.start !== 'number' || getIdentifierName(id) !== name) continue;
+			if (declaredSymbolAt(state.semantic(), id.start) !== symbolId) continue;
+			initializer = declarator.init as AnyNode | undefined;
+		}
+	});
+	return initializer;
 }
 
 export function evaluateSyncPolicyConstant(
