@@ -2,6 +2,7 @@ import { PROTOCOL_VISIBLE_EVENT_NAME } from '../../serializer/src/protocol-event
 import type { DomJournalEntry, DomJournalResult } from '@markless/runtime';
 // Only resume.ts loads this module, and it imports the locators statically already.
 import { elementsBetweenAnchors, hostIdsInsideRemovedElements } from './resume-locators.ts';
+import { showBranchArm } from './resume-branch-arms.ts';
 import type { AsyncBoundarySettleTracker } from './resume-async-wiring.ts';
 import type { ArmCommitUpdate } from './resume-commit-arm.ts';
 import type { OverlayHiddenBoundRoot } from './overlay-handoff.ts';
@@ -142,12 +143,13 @@ export async function startResumeRuntime(input: {
 		// Rows written straight into a boundary arm follow the arm each commit announces here.
 		if (runtimeInput.view.keyedRepeats!.some((repeat) => repeat.branchArm))
 			for (const boundary of prepared.asyncBoundariesById.values())
-				(runtimeInput.root.__marklessBranchArms ??= new Map()).set(boundary.id, {
-					arm: boundary.initiallyServedArm,
-					start: boundary.startAnchor,
-					end: boundary.endAnchor,
-					listeners: new Set(),
-				});
+				showBranchArm(
+					runtimeInput.root,
+					boundary.id,
+					boundary.initiallyServedArm,
+					boundary.startAnchor,
+					boundary.endAnchor,
+				);
 		const keyedRepeats = await import('./resume-keyed-repeats-lazy.ts');
 		await keyedRepeats.primeKeyedRepeatCollections({
 			graph: runtimeInput.graph,

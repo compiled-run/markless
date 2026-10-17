@@ -1,5 +1,6 @@
 import type { DomJournalEntry, DomJournalResult, RuntimeGraph } from '@markless/runtime';
 import { isArmBranchAnchorComment } from './resume-anchor-census.ts';
+import { showBranchArm } from './resume-branch-arms.ts';
 import type {
 	ResumeBehaviorRecord,
 	ResumeBranchRecord,
@@ -285,13 +286,7 @@ export function composedBranchGraph(graph: RuntimeGraph, branch: ResumeBranchRec
 
 // Rows written straight into an arm follow the arm painted, once it is in the DOM.
 function announceArm(root: ResumeDomElement, branch: ResumeBranchRecord, arm: number): void {
-	const arms = (root.__marklessBranchArms ??= new Map()),
-		shown = arms.get(branch.id) ?? { listeners: new Set() };
-	arms.set(
-		branch.id,
-		Object.assign(shown, { arm, start: branch.startAnchor, end: branch.endAnchor }),
-	);
-	for (const paint of shown.listeners) paint();
+	showBranchArm(root, branch.id, arm, branch.startAnchor, branch.endAnchor);
 }
 
 function onceRelease(release: () => void): () => void {
