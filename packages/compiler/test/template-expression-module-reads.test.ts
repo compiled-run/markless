@@ -169,3 +169,40 @@ export function Box({ children }) @{
 		texts.some((update) => update.graphNodeId.startsWith('computed:templateExpression:')),
 	).toBe(false);
 });
+
+test('a standard global conversion called on state is a read the page keeps current', async () => {
+	const result = await compile(`import { state } from '@markless/core';
+export function Menu() @{
+	let open = state(false);
+	let count = state(2);
+	<button aria-expanded={String(open)} data-count={Number(count) + 1} onClick={() => (open = !open)}>{encodeURIComponent(String(count))}</button>
+}
+`);
+	const [expanded] = updatesFor(result, 'aria-expanded');
+	expect(expanded?.graphNodeId).toMatch(/^computed:templateExpression:/);
+	expect(deriveSourceOf(result, expanded!.graphNodeId)).toContain(
+		'String(context.graph.read("state:open"))',
+	);
+	expect(updatesFor(result, 'data-count')[0]?.graphNodeId).toMatch(
+		/^computed:templateExpression:/,
+	);
+	const texts = result.protocolView.domUpdates.filter((update) => update.target?.kind === 'text');
+	expect(texts[0]?.graphNodeId).toMatch(/^computed:templateExpression:/);
+});
+
+test('a local function named like a global conversion is still refused', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Page.tsrx',
+		source: `import { state } from '@markless/core';
+function String(value: unknown) { return value ? 'yes' : 'no'; }
+export function Menu() @{
+	let open = state(false);
+	<button aria-expanded={String(open)} onClick={() => (open = !open)}>menu</button>
+}
+`,
+		symbols: [],
+	});
+	expect(result.semanticGraph.diagnostics.map((diagnostic) => diagnostic.code)).toContain(
+		'MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED',
+	);
+});
