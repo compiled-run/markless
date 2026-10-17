@@ -19,6 +19,7 @@ export {
 };
 export {
 	PROTOCOL_LOCATOR_PATHS_ATTRIBUTE,
+	PROTOCOL_SYNC_POLICY_HOST_ATTRIBUTE,
 	PROTOCOL_PROP_GRAPH_NODE_PREFIX,
 	PROTOCOL_PROPS_GRAPH_NODE_ID,
 	protocolInstancePath,
@@ -685,13 +686,6 @@ export type ProtocolViewPayload = {
 		readonly startAnchor: {
 			readonly strategy: 'dom-order-comment';
 			readonly index: number;
-			/**
-			 * Written by the server for a served arm whose events carry a sync
-			 * policy: the container-order index (the container is 0) of the arm's
-			 * first element, so the inline boot reaches the arm's hosts without
-			 * walking the page's comments.
-			 */
-			readonly elementIndex?: number;
 		};
 		readonly endAnchor: {
 			readonly strategy: 'dom-order-comment';

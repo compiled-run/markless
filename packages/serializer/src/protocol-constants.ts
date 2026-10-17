@@ -23,6 +23,7 @@ export {
 	PROTOCOL_VISIBLE_EVENT_NAME,
 } from './protocol-event-names.ts';
 export { PROTOCOL_LOCATOR_PATHS_ATTRIBUTE } from './protocol-locator-paths.ts';
+export { PROTOCOL_SYNC_POLICY_HOST_ATTRIBUTE } from './protocol-sync-policy-host.ts';
 
 export const ASYNC_BOUNDARY_ARM_MIN = 0;
 export const ASYNC_BOUNDARY_ARM_PENDING = 1;

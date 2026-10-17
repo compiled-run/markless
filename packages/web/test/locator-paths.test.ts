@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { decodeLocatorPaths } from '../src/fns/served-census-repair.ts';
 import { servedElementTree, servedLocatorPaths } from '../src/locator-paths.ts';
-import { withArmPolicyAnchors } from '../src/render-to-string.ts';
+import { withArmSyncPolicyHostMarks, withSyncPolicyHostMarks } from '../src/render-to-string.ts';
 
 function expectedEntries(html: string, indexes: ReadonlyArray<number>) {
 	const { elements, childCounts } = servedElementTree(html);
@@ -42,40 +42,36 @@ test('each page-level comment anchor records the index the next element takes', 
 	expect(servedElementTree(html).commentElementIndexes).toEqual([2, 6, 7]);
 });
 
-test('a served arm with a sync policy carries its first element index on its start anchor', () => {
+test('each element whose event carries a sync policy is marked with its record, in the shell and in an arm', () => {
 	const html =
-		'<h1>t</h1><!--markless:async:b0--><form><button>go</button></form><!--/markless:async:b0-->';
-	const event = {
-		hostNodeId: 'f',
+		'<h1>t</h1><form><input></form><!--markless:async:b0--><form><button>go</button></form><!--/markless:async:b0-->';
+	const policy = { when: { type: 'constant-truthy', value: true }, actions: ['preventDefault'] };
+	const submit = (hostNodeId: string, syncPolicy?: unknown) => ({
+		hostNodeId,
 		eventName: 'submit',
 		symbolIds: [],
-		syncPolicy: { kind: 'preventDefault' },
-	};
-	const view = (armRecords: unknown) =>
-		({
-			locators: [],
-			events: [],
-			asyncBoundaries: [
-				{
-					id: 'b0',
-					runnerGraphNodeId: null,
-					initiallyServedArm: 'try',
-					armRecords,
-					startAnchor: { strategy: 'dom-order-comment', index: 0 },
-					endAnchor: { strategy: 'dom-order-comment', index: 1 },
-					asyncReads: [],
-				},
-			],
-		}) as never;
-	const policy = withArmPolicyAnchors(
-		view({ locators: [{ hostNodeId: 'f', index: 0 }], events: [event] }),
-		html,
-	);
-	expect(policy.asyncBoundaries[0]!.startAnchor).toEqual({
-		strategy: 'dom-order-comment',
-		index: 0,
-		elementIndex: 2,
+		...(syncPolicy ? { syncPolicy } : {}),
 	});
-	const plain = view({ locators: [], events: [{ ...event, syncPolicy: undefined }] });
-	expect(withArmPolicyAnchors(plain, html)).toBe(plain);
+	const view = {
+		locators: [
+			{ hostNodeId: 'h0', index: 2 },
+			{ hostNodeId: 'h9', index: 1 },
+		],
+		events: [submit('h0', policy), submit('h9')],
+		asyncBoundaries: [
+			{
+				armRecords: { locators: [{ hostNodeId: 'a0', index: 0 }], events: [submit('a0', policy)] },
+				startAnchor: { strategy: 'dom-order-comment', index: 0 },
+			},
+		],
+	} as never;
+	expect(withSyncPolicyHostMarks(view, html)).toBe(
+		'<h1>t</h1><form data-markless-sync="h0"><input></form><!--markless:async:b0--><form data-markless-sync="a0"><button>go</button></form><!--/markless:async:b0-->',
+	);
+	expect(
+		withArmSyncPolicyHostMarks(
+			{ locators: [{ hostNodeId: 'a0', index: 1 }], events: [submit('a0', policy)] } as never,
+			'<p>x</p><form><b></b></form>',
+		),
+	).toBe('<p>x</p><form data-markless-sync="a0"><b></b></form>');
 });

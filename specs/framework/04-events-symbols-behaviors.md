@@ -304,6 +304,15 @@ from graph state, constants/props, and event fields, compilation fails with a
 diagnostic rather than silently emitting a handler whose default action is too
 late to matter.
 
+A served element whose event record carries a sync policy is the one element
+that carries an attribute for its event: the server writes
+`data-markless-sync="<hostNodeId>"` on it (`PROTOCOL_SYNC_POLICY_HOST_ATTRIBUTE`),
+in the shell, in a served `@try` arm and in a streamed arm. The inline boot and
+the streamed-arm executor walk from the event target up to the nearest marked
+element and run that record's policy before the event returns. The policy is
+never found by the element's position, so a script that changed the page before
+Markless woke cannot make a form submit natively.
+
 For `attach`, behavior entries install in authored order and clean up in reverse
 order. Each behavior has its own serialized input and code reference, so one
 behavior can be lazy-loaded or diagnosed independently from the others.
@@ -319,7 +328,8 @@ DOM locator + event name + optional sync policy IR + ordered handler symbol IDs
 ```
 
 The generated HTML does not need an `onClick={async (...) => import(...)}` shape,
-and production output should not require per-node event attributes. The
+and production output should not require per-node event attributes beyond the
+sync-policy mark above. The
 `markless/view` arena locates nodes by DOM-order streams, skip runs, branch anchors,
 or other private locator data, then the resumer builds internal side tables such
 as `WeakMap<Element, EventRecord>`.

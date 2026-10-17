@@ -9,6 +9,7 @@ import type {
 import {
 	PROTOCOL_EVENT_ACTION_KIND,
 	PROTOCOL_LOCATOR_PATHS_ATTRIBUTE,
+	PROTOCOL_SYNC_POLICY_HOST_ATTRIBUTE,
 	PROTOCOL_VISIBLE_EVENT_NAME,
 } from '@markless/serializer/protocol';
 import type { MarklessExecutionLogMode } from '../dev-log.ts';
@@ -44,6 +45,7 @@ declare const __MARKLESS_INLINE_RESUME_MODULE_URL__: string | undefined;
 declare const __MARKLESS_INLINE_VISIBLE_EVENT__: typeof PROTOCOL_VISIBLE_EVENT_NAME;
 declare const __MARKLESS_INLINE_CENSUS__: typeof marklessServedCensus;
 declare const __MARKLESS_INLINE_PATHS_ATTRIBUTE__: typeof PROTOCOL_LOCATOR_PATHS_ATTRIBUTE;
+declare const __MARKLESS_INLINE_SYNC_ATTRIBUTE__: typeof PROTOCOL_SYNC_POLICY_HOST_ATTRIBUTE;
 declare const __MARKLESS_INLINE_DEBUG_BOOTSTRAP__:
 	| ((root: Element, phase: 'ssr-inline', active: false) => InlineDebugControls)
 	| undefined;
@@ -199,6 +201,7 @@ const __MARKLESS_INLINE_RESUME_MODULE_URL__=${JSON.stringify(options.resumeModul
 const __MARKLESS_INLINE_VISIBLE_EVENT__=${JSON.stringify(PROTOCOL_VISIBLE_EVENT_NAME)};
 const __MARKLESS_INLINE_CENSUS__=${marklessServedCensus.toString()};
 const __MARKLESS_INLINE_PATHS_ATTRIBUTE__=${JSON.stringify(PROTOCOL_LOCATOR_PATHS_ATTRIBUTE)};
+const __MARKLESS_INLINE_SYNC_ATTRIBUTE__=${JSON.stringify(PROTOCOL_SYNC_POLICY_HOST_ATTRIBUTE)};
 const __MARKLESS_INLINE_DEBUG_BOOTSTRAP__=${debugBootstrap};
 const __MARKLESS_INLINE_DEBUG_REGISTER__=${debugRegistration};
 ${logging ? `(${runGeneralInlineLogSummary.toString()})(${JSON.stringify(options.executionLog)});\n` : ''}(${runInlineResumer.toString()})(${INLINE_MODULE_LOADER_SOURCE});
@@ -804,22 +807,21 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 	const events = new Map(
 		view.events.map((event) => [`${event.hostNodeId}\n${event.eventName}`, event] as const),
 	);
-	// A served @try arm's policy (preventDefault) must run before the default action, not after the runtime loads.
-	const armHostIds = new Map<Element, string>();
-	const armPolicyEvents = new Map<string, InlineEventRecord>();
+	// A sync policy runs before the default action, found from the event target's marked ancestor rather than by position.
+	const policyEvents = new Map<string, InlineEventRecord>();
 	if (__MARKLESS_INLINE_SYNC_POLICY__)
-		for (const boundary of view.asyncBoundaries) {
-			const offset = boundary.startAnchor.elementIndex;
-			if (offset === undefined) continue;
-			const armRecords = boundary.armRecords as ProtocolArmRecordSet;
-			for (const locator of armRecords.locators) {
-				const element = elements[offset + locator.index];
-				if (element) armHostIds.set(element, locator.hostNodeId);
-			}
-			for (const event of armRecords.events ?? [])
-				if (event.syncPolicy)
-					armPolicyEvents.set(`${event.hostNodeId}\n${event.eventName}`, event);
-		}
+		for (const event of [
+			...view.events,
+			...[
+				...view.asyncBoundaries.map((boundary) => boundary.armRecords),
+				...(view.branches ?? []).map((branch) => branch.servedArmRecords),
+			].flatMap((armRecords) =>
+				armRecords && !Array.isArray(armRecords)
+					? ((armRecords as ProtocolArmRecordSet).events ?? [])
+					: [],
+			),
+		])
+			if (event.syncPolicy) policyEvents.set(`${event.hostNodeId}\n${event.eventName}`, event);
 
 	const globalScope = globalThis as typeof globalThis & {
 		__marklessInlineSyncPolicy?: InlineSyncPolicyRuntime;
@@ -1107,27 +1109,28 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 			root.addEventListener(primeEventName, prime, true);
 	}
 	const dispatch = (event: Event) => {
-		let armPolicyApplied = false;
+		let policyApplied = false;
 		for (
 			let element = event.target as Element | null;
 			element;
 			element = element.parentElement
 		) {
-			if (__MARKLESS_INLINE_SYNC_POLICY__ && !armPolicyApplied) {
-				const armEvent = armPolicyEvents.get(`${armHostIds.get(element)}\n${event.type}`);
-				if (armEvent) {
-					runSyncPolicy!(armEvent.syncPolicy!, event);
-					armPolicyApplied = true;
+			if (__MARKLESS_INLINE_SYNC_POLICY__ && !policyApplied) {
+				const policyEvent = policyEvents.get(
+					`${element.getAttribute?.(__MARKLESS_INLINE_SYNC_ATTRIBUTE__)}\n${event.type}`,
+				);
+				if (policyEvent) {
+					runSyncPolicy!(policyEvent.syncPolicy!, event);
+					policyApplied = true;
 				}
 			}
 			const hostNodeId = hostIds.get(element);
 			const eventRecord = hostNodeId ? events.get(`${hostNodeId}\n${event.type}`) : undefined;
 			if (eventRecord) {
 				if (eventRecord.action) return;
-				let syncPolicyAlreadyApplied = false;
-				if (__MARKLESS_INLINE_SYNC_POLICY__ && eventRecord.syncPolicy) {
+				if (__MARKLESS_INLINE_SYNC_POLICY__ && eventRecord.syncPolicy && !policyApplied) {
 					runSyncPolicy!(eventRecord.syncPolicy, event);
-					syncPolicyAlreadyApplied = true;
+					policyApplied = true;
 				}
 				const input: Omit<InlineDispatchInput, 'root'> = {
 					event,
@@ -1137,7 +1140,7 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 				};
 				if (__MARKLESS_INLINE_SYNC_POLICY__) {
 					(input as { syncPolicyAlreadyApplied?: boolean }).syncPolicyAlreadyApplied =
-						syncPolicyAlreadyApplied;
+						policyApplied;
 				}
 				return forward(input);
 			}
@@ -1148,7 +1151,7 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 				event,
 				element: event.target,
 				eventRecord: null,
-				...(armPolicyApplied ? { syncPolicyAlreadyApplied: true } : {}),
+				...(policyApplied ? { syncPolicyAlreadyApplied: true } : {}),
 			});
 		}
 		if (__MARKLESS_INLINE_EXECUTION_LOG__ !== 'never' && globalScope.__mxLog) {

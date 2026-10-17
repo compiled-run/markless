@@ -59,6 +59,44 @@ const files: Record<string, string> = {
 		'\t</main>',
 		'}',
 	].join('\n'),
+	'public/insert.js': "document.querySelector('main').prepend(document.createElement('aside'));",
+	'src/note-form.tsrx': [
+		"import { state } from '@markless/core';",
+		'export default function NoteForm({ title }: { readonly title: string }) @{',
+		"\tlet saved = state('');",
+		'\t<form data-note-form onSubmit={(event) => { event.preventDefault(); saved = `saved ${title}`; }}>',
+		'\t\t<input name="body" value="draft" />',
+		'\t\t<button type="submit" data-save>save</button>',
+		'\t\t<output data-saved>{saved}</output>',
+		'\t</form>',
+		'}',
+	].join('\n'),
+	'pages/form.tsrx': [
+		"import NoteForm from '../src/note-form.tsrx';",
+		'export default function FormPage() @{',
+		'\t<main>',
+		'\t\t<p>notes</p>',
+		'\t\t<script src="/insert.js"></script>',
+		'\t\t<NoteForm title="plain note" />',
+		'\t</main>',
+		'}',
+	].join('\n'),
+	'pages/form-arm.tsrx': [
+		"import { computed } from '@markless/core';",
+		"import NoteForm from '../src/note-form.tsrx';",
+		'export default function FormArmPage() @{',
+		"\tconst note = computed(async () => ({ title: 'arm note' }));",
+		'\t<main>',
+		'\t\t<p>notes</p>',
+		'\t\t<script src="/insert.js"></script>',
+		'\t\t@try {',
+		'\t\t\t<NoteForm title={note.title} />;',
+		'\t\t} @pending {',
+		'\t\t\t<p>loading note</p>;',
+		'\t\t}',
+		'\t</main>',
+		'}',
+	].join('\n'),
 	'pages/owned.tsrx': [
 		"import { state } from '@markless/core';",
 		'export default function Owned() @{',
@@ -139,3 +177,24 @@ test('a script that swaps an element Markless updates leaves the rest of the pag
 	);
 	await page.close();
 }, 30_000);
+
+test.each([
+	['/form', 'plain note'],
+	['/form-arm', 'arm note'],
+])(
+	'a script that changed the page before wake leaves the first submit on %s prevented',
+	async (path, title) => {
+		const { page, errors } = await open(path);
+		expect(await page.locator('main > aside').count()).toBe(1);
+		expect(await page.locator('[data-note-form][data-markless-sync]').count()).toBe(1);
+		await page.click('[data-save]');
+		await page.waitForFunction(
+			(text) => document.querySelector('[data-saved]')?.textContent === text,
+			`saved ${title}`,
+		);
+		expect(new URL(page.url()).pathname + new URL(page.url()).search).toBe(path);
+		expect(errors).toEqual([]);
+		await page.close();
+	},
+	30_000,
+);

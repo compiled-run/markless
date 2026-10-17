@@ -44,12 +44,15 @@ type ServedTree = {
 	readonly childCounts: ReadonlyArray<number>;
 	/** Per page-level comment anchor in DOM order, the index the next element takes. */
 	readonly commentElementIndexes: ReadonlyArray<number>;
+	/** Per element, the html offset just past its tag name, where an attribute can be written. */
+	readonly nameEnds: ReadonlyArray<number>;
 };
 
 export function servedElementTree(html: string): ServedTree {
 	const elements: ServedElement[] = [{ tag: '', parent: -1, child: 0 }];
 	const childCounts = [0];
 	const commentElementIndexes: number[] = [];
+	const nameEnds = [0];
 	const stack: Array<{ readonly tag: string; readonly index: number }> = [];
 	let templateDepth = 0;
 	let foreignDepth = 0;
@@ -100,6 +103,7 @@ export function servedElementTree(html: string): ServedTree {
 		if (templateDepth === 0) {
 			index = elements.push({ tag, parent, child: childCounts[parent]!++ }) - 1;
 			childCounts.push(0);
+			nameEnds.push(nameStart + name.length);
 		}
 		if (VOID_TAGS.has(lower) || selfClosing) continue;
 		if (RAW_TEXT_TAGS.has(lower)) {
@@ -111,7 +115,25 @@ export function servedElementTree(html: string): ServedTree {
 		if (FOREIGN_ROOTS.has(lower)) foreignDepth++;
 		stack.push({ tag, index });
 	}
-	return { elements, childCounts, commentElementIndexes };
+	return { elements, childCounts, commentElementIndexes, nameEnds };
+}
+
+/** Writes `attribute="value"` on each element the map names by its index in servedElementTree(html). */
+export function withElementAttributes(
+	html: string,
+	nameEnds: ReadonlyArray<number>,
+	attribute: string,
+	values: ReadonlyMap<number, string>,
+): string {
+	let out = '';
+	let cursor = 0;
+	for (const index of [...values.keys()].sort((left, right) => left - right)) {
+		const at = nameEnds[index];
+		if (!index || at === undefined) continue;
+		out += `${html.slice(cursor, at)} ${attribute}="${values.get(index)!.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}"`;
+		cursor = at;
+	}
+	return out + html.slice(cursor);
 }
 
 function endOfTag(html: string, from: number): number {

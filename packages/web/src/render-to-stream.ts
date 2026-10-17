@@ -8,6 +8,10 @@ import {
 	type ProtocolSyncPolicyCondition,
 } from '@markless/serializer';
 import {
+	PROTOCOL_SYNC_POLICY_HOST_ATTRIBUTE,
+	type ProtocolArmRecordSet,
+} from '@markless/serializer/protocol';
+import {
 	MARKLESS_PENDING_MIN_VISIBLE_MS,
 	MARKLESS_REVEAL_TRAIN_CADENCE_MS,
 } from './pending-timing.ts';
@@ -19,6 +23,7 @@ import {
 	type RenderToStringOptions,
 	type SsrRenderable,
 	type SsrRenderOutput,
+	withArmSyncPolicyHostMarks,
 } from './render-to-string.ts';
 import { __marklessDebugBootstrapSource } from './debug-channel.ts';
 
@@ -343,7 +348,7 @@ function renderArmAppend(
 		: JSON.stringify(arm.boundaryId);
 
 	return (
-		`<template m:arm="${escapeAttribute(arm.boundaryId)}">${armHtml}</template>` +
+		`<template m:arm="${escapeAttribute(arm.boundaryId)}">${withArmSyncPolicyHostMarks(armRecords as ProtocolArmRecordSet, armHtml)}</template>` +
 		`<script type="markless/arm" data-boundary="${escapeAttribute(arm.boundaryId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(armPatch))}</script>` +
 		`<script type="markless/state-patch" data-graph-node="${escapeAttribute(arm.graphNodeId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(patch))}</script>` +
 		`<script${nonceAttribute}>__mArm(${escapeScriptJson(revealArguments)})</script>`
@@ -449,23 +454,15 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 			const records = (JSON.parse(rec.textContent || 'null') || [])[1] || {};
 			const names = new Set((records.events || []).map((x) => x.eventName));
 			const policies = new Map();
-			if ((records.events || []).some((x) => x.syncPolicy)) {
-				const armNodes = [];
-				for (let n = s.nextSibling; n && n !== e; n = n.nextSibling)
-					if (n.nodeType === 1) armNodes.push(n, ...n.getElementsByTagName('*'));
-				for (const x of records.events) {
-					const locator = x.syncPolicy && (records.locators || []).find((item) => item.hostNodeId === x.hostNodeId);
-					const element = locator && armNodes[locator.index];
-					if (element) policies.set(element, [...(policies.get(element) || []), x]);
-				}
-			}
+			for (const x of records.events || []) if (x.syncPolicy) policies.set(x.hostNodeId + ' ' + x.eventName, x);
 			const applyPolicy = ${applyStreamedArmSyncPolicy.toString()};
 			${debugSetup}
 			for (const t of names) {
 			r.addEventListener(t, async (e) => {
 				let applied = false;
 				for (let el = e.target; el && !applied; el = el.parentElement) {
-					for (const x of policies.get(el) || []) if (x.eventName === t && applyPolicy(x.syncPolicy, e, r)) applied = true;
+					const x = policies.get(el.getAttribute(${JSON.stringify(PROTOCOL_SYNC_POLICY_HOST_ATTRIBUTE)}) + ' ' + t);
+					if (x && applyPolicy(x.syncPolicy, e, r)) applied = true;
 					if (el === r) break;
 				}
 				const input = { root: r, event: e, element: e.target, eventRecord: null, ...(applied ? { syncPolicyAlreadyApplied: true } : {}) };
