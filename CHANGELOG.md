@@ -91,6 +91,27 @@ the framework packages or the `create-markless` starters depends on them.
 - A keyed list served empty replaces its `@empty` block with new rows.
 - Builds that link packages from outside the project folder name those
   modules by package instead of by folder path.
+- A slow `async` click handler no longer holds up every later click on the
+  page. The next event starts as soon as the handler reaches its first
+  `await`. Typing into a field still runs its handlers strictly in order, so
+  late writes never rewind what you typed.
+- A callback passed down through two levels of components, and called by the
+  innermost one, reaches the function it was given instead of throwing
+  `graph.read(...) is not a function`.
+- `if (event.key !== 'Enter') return; event.preventDefault();` cancels only
+  Enter. Before, the early return was ignored and every key was cancelled,
+  Tab included.
+- A click whose target a third-party script removes in the same moment still
+  runs its handler instead of logging `MARKLESS_EVENT_DISPATCH_UNMATCHED`.
+- A `@for` that renders a component per row, in a component imported from
+  another file, adds rows in the browser.
+- A `@for` row variable named `error` builds.
+- A `const` declared in a component body and passed to a child that reads it
+  in a handler builds, the same as a module-level `const`.
+- Text inside `@try` that joins an async value with state, like
+  `{data.title} {count}`, now fails the build with
+  `MARKLESS_ASYNC_TEXT_JOIN_UNSUPPORTED` and tells you to put the async value
+  in its own element. Before, the async part vanished on the first click.
 
 ### Packing is on by default
 
