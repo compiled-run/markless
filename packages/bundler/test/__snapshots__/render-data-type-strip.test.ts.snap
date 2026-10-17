@@ -211,18 +211,23 @@ export function resumeContainerEvent(input) {
 	const root = input.root;
 	if (root.__marklessShifted) return import('@markless/web/fns/served-census-repair').then((census) => (census.marklessRepairCensus(root), resumeContainerEvent(input)));
 	if (!root.__marklessDispatch) {
-		let handler = marklessResumeContainerEvent, tail = Promise.resolve(), lastEvent = null, lastEventTime = undefined;
+		let handler = marklessResumeContainerEvent, tail = Promise.resolve(), done = tail, lastEvent = null, lastEventTime = undefined;
 		root.__marklessRegisterDispatch = next => {
 			const fallback = handler;
 			handler = input => next(input, fallback);
 		};
 		root.__marklessDispatch = next => {
 			const event = next.event, eventTime = event?.timeStamp;
-			if (event === lastEvent && eventTime === lastEventTime) return tail;
+			if (event === lastEvent && eventTime === lastEventTime) return done;
 			lastEvent = event;
 			lastEventTime = eventTime;
-			const run = () => handler(next);
-			return tail = tail.then(run, run);
+			let release;
+			const started = new Promise(resolve => release = resolve);
+			const run = () => (root.__marklessReleaseDispatch = release, handler(next));
+			done = tail.then(run, run);
+			done.then(release, release);
+			tail = started;
+			return done;
 		};
 	}
 	return root.__marklessDispatch(input);

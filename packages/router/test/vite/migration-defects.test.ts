@@ -98,3 +98,18 @@ test('a spread-forwarding trigger nested in a component used many times opens it
 	expect(errors).toEqual([]);
 	await page.close();
 });
+
+test('a pending async handler does not hold later clicks', async () => {
+	const { page, errors } = await open('/async-handler');
+	await page.click('[data-slow]');
+	await expect.poll(() => text(page, '[data-slow-state]')).toBe('waiting');
+	await page.click('[data-quick]');
+	await page.click('[data-quick]');
+	// The slow handler stays pending until the page says so, so only a held queue keeps this at 0.
+	await expect.poll(() => text(page, '[data-quick-count]')).toBe('2');
+	expect(await text(page, '[data-slow-state]')).toBe('waiting');
+	await page.evaluate(() => (globalThis as { __finishSlow?: () => void }).__finishSlow?.());
+	await expect.poll(() => text(page, '[data-slow-state]')).toBe('done');
+	expect(errors).toEqual([]);
+	await page.close();
+});

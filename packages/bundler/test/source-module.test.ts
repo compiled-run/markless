@@ -280,7 +280,10 @@ test('every resume module serializes dispatch, streamed or not', () => {
 		expect(resumeCode).toContain('async function marklessResumeContainerEvent');
 		expect(resumeCode).not.toContain('export async function resumeContainerEvent');
 		expect(resumeCode).toContain('root.__marklessDispatch');
-		expect(resumeCode).toContain('return tail = tail.then(run, run);');
+		expect(resumeCode).toContain('done = tail.then(run, run);');
+		// The next dispatch waits until this one finishes or its handler first awaits its own work.
+		expect(resumeCode).toContain('done.then(release, release);');
+		expect(resumeCode).toContain('tail = started;');
 		// The same-event dedupe guard rides with the queue; it closed the
 		// lost-click defect and must not be separable from it.
 		expect(resumeCode).toContain('if (event === lastEvent && eventTime === lastEventTime)');

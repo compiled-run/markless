@@ -456,8 +456,9 @@ export function createEventWiring(input: {
 	}
 	async function dispatch(
 		event: ResumeDomEvent,
-		options: ResumeDispatchOptions = {},
+		dispatchOptions?: ResumeDispatchOptions,
 	): Promise<void> {
+		const options = { ...dispatchOptions, releaseQueue: input.root.__marklessReleaseDispatch };
 		const target = event.target;
 		if (!target) throw unmatchedDispatchError(event, undefined);
 		const selector = describeResumeEventTarget(target);
@@ -682,6 +683,7 @@ export function createEventWiring(input: {
 				element,
 				getElementHandle: readHandle,
 				...(locals ? { locals } : {}),
+				releaseQueue: options.releaseQueue,
 			} as DispatchSymbolContext;
 			const invokeCallback = (symbolId: string, args: ReadonlyArray<unknown>) =>
 				invokeSymbol(symbolId, { ...baseContext, args, invokeCallback, invokeSymbol });
