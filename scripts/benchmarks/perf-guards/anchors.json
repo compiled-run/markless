@@ -835,6 +835,62 @@
 			"from": 19425,
 			"to": 20269,
 			"reason": "measured: releases projections inside arms that were not taken (b9c42458)"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/resume-arm-records",
+			"from": 7003,
+			"to": 7741,
+			"reason": "measured: a CSR page claims the hosts of an arm painted at mount from the first event target inside it (its own ancestors and their preceding siblings) instead of walking every comment of the page at mount"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/render-csr",
+			"from": 16804,
+			"to": 17213,
+			"reason": "measured: the delegated listener hands each event target to that painted-arm claim first, and installs the claimed arms' event names up front"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/resume-branch-arms",
+			"from": null,
+			"to": 549,
+			"reason": "measured: new module, the one shared helper that records the arm a branch or boundary shows (was built three times)"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/resume-branches",
+			"from": 15471,
+			"to": 15246,
+			"reason": "measured: shrank, the branch-arm record now comes from the shared resume-branch-arms helper"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/resume-commit-arm",
+			"from": 9551,
+			"to": 9398,
+			"reason": "measured: shrank, the branch-arm record now comes from the shared resume-branch-arms helper"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/resume-runtime-start",
+			"from": 8874,
+			"to": 8759,
+			"reason": "measured: shrank, the branch-arm record now comes from the shared resume-branch-arms helper"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "router/vite/entries/fragment-entry",
+			"from": 13549,
+			"to": 13515,
+			"reason": "measured: shrank, a re-wrapped scrolled box is found by its id instead of sweeping elements by tag"
 		}
 	],
 	"runtimeModules": {
@@ -847,7 +903,7 @@
 		"router/route-state": 805,
 		"router/spa-navigation": 6391,
 		"router/vite/entries/client-entry": 2666,
-		"router/vite/entries/fragment-entry": 13549,
+		"router/vite/entries/fragment-entry": 13515,
 		"router/vite/entries/resume-entry": 2406,
 		"router/vite/runtime/create-route-discovery": 527,
 		"runtime/graph": 8422,
@@ -911,18 +967,19 @@
 		"web/reconcile-plane-slot": 344,
 		"web/render": 4003,
 		"web/render-canonical": 2642,
-		"web/render-csr": 16804,
+		"web/render-csr": 17213,
 		"web/render-route-holder": 753,
 		"web/repeat-runtime": 2594,
 		"web/resume": 3419,
 		"web/resume-anchor-census": 376,
-		"web/resume-arm-records": 7003,
+		"web/resume-arm-records": 7741,
 		"web/resume-arm-records-lazy": 219,
 		"web/resume-async-wiring": 7339,
 		"web/resume-behaviors": 8804,
-		"web/resume-branches": 15471,
+		"web/resume-branch-arms": 549,
+		"web/resume-branches": 15246,
 		"web/resume-census": 1471,
-		"web/resume-commit-arm": 9551,
+		"web/resume-commit-arm": 9398,
 		"web/resume-events": 15538,
 		"web/resume-handle-qualifier": 685,
 		"web/resume-handoff": 1360,
@@ -933,7 +990,7 @@
 		"web/resume-resettle-hold": 2572,
 		"web/resume-runtime": 14982,
 		"web/resume-runtime-shared": 2089,
-		"web/resume-runtime-start": 8874,
+		"web/resume-runtime-start": 8759,
 		"web/resume-shared-patch": 1200,
 		"web/resume-stream-patches": 2260,
 		"web/resume-sync-computed": 1538,
