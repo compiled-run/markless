@@ -13,6 +13,7 @@ const fixture = resolve(import.meta.dirname, '../../fixtures/vite-csr');
 const root = resolve(workDir, 'app');
 await rm(root, { force: true, recursive: true });
 await mkdir(resolve(root, 'src'), { recursive: true });
+// The fixture install is shared; cacheDir below keeps this build out of its .vite.
 await symlink(resolve(fixture, 'node_modules'), resolve(root, 'node_modules'));
 
 if (mode === 'emit') {
@@ -30,6 +31,7 @@ if (mode === 'emit') {
 	};
 	await build({
 		configFile: false,
+		cacheDir: resolve(workDir, 'vite-cache'),
 		root,
 		logLevel: 'error',
 		build: { outDir: resolve(workDir, 'dist'), emptyOutDir: true },
@@ -41,6 +43,7 @@ if (mode === 'emit') {
 	await writeFile(resolve(root, 'src/root.tsrx'), largeComponent(count));
 	await build({
 		configFile: false,
+		cacheDir: resolve(workDir, 'vite-cache'),
 		root,
 		logLevel: 'error',
 		build: { outDir: resolve(workDir, 'dist'), emptyOutDir: true },
