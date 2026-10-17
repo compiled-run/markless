@@ -1641,9 +1641,9 @@ test('a host the inline observer already fired does not fire again when the runt
 	const early = element('IMG');
 	const late = element('IMG');
 	const root = element('SECTION', [early, late]) as FakeElement & {
-		__marklessVisibleFired?: WeakSet<FakeElement>;
+		__mFired?: WeakSet<FakeElement>;
 	};
-	root.__marklessVisibleFired = new WeakSet([early]);
+	root.__mFired = new WeakSet([early]);
 	const loadedSymbols: string[] = [];
 	let visibilityCallback:
 		| ((entries: ReadonlyArray<{ target: FakeElement; isIntersecting: boolean }>) => void)
@@ -1682,7 +1682,7 @@ test('a host the inline observer already fired does not fire again when the runt
 	]);
 	await settleMicrotasks();
 	expect(loadedSymbols).toEqual(['symbol:late']);
-	expect(root.__marklessVisibleFired.has(late)).toBe(true);
+	expect(root.__mFired.has(late)).toBe(true);
 });
 
 test('resume runtime visible symbols read current graph values without subscribing', async () => {

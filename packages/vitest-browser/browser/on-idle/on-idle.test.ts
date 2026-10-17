@@ -12,30 +12,25 @@ type IdleWindow = typeof globalThis & {
 };
 const host = globalThis as IdleWindow;
 
-// Idle is held by the test so "not yet idle" is a state it can observe, not a race it hopes to win.
+// Idle is held by a clock every root inherits, so "not yet idle" is a state the test observes, not a race it hopes to win.
 function holdIdle() {
-	const queued = new Map<number, IdleRequestCallback>();
-	const request = window.requestIdleCallback;
-	const cancel = window.cancelIdleCallback;
-	let next = 0;
-	window.requestIdleCallback = (callback) => {
-		queued.set(++next, callback);
-		return next;
-	};
-	window.cancelIdleCallback = (handle) => void queued.delete(handle);
+	const queued: Array<() => void> = [];
+	Object.defineProperty(Element.prototype, '__mClock', {
+		configurable: true,
+		get: () => ({
+			frame: (run: () => void) => run(),
+			idle: (run: () => void) => queued.push(run),
+		}),
+	});
 	return {
 		get pending() {
-			return queued.size;
+			return queued.length;
 		},
 		release() {
-			const callbacks = [...queued.values()];
-			queued.clear();
-			for (const callback of callbacks)
-				callback({ didTimeout: false, timeRemaining: () => 50 });
+			for (const run of queued.splice(0)) run();
 		},
 		restore() {
-			window.requestIdleCallback = request;
-			window.cancelIdleCallback = cancel;
+			delete (Element.prototype as { __mClock?: unknown }).__mClock;
 		},
 	};
 }

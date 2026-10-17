@@ -20,8 +20,6 @@ const RUNTIME_MOUNT_SCAN_ALLOWLIST: Readonly<Record<string, string>> = {
 		'The neutral emitted locator helper walks elements by compiler-recorded DOM order.',
 	'packages/web/src/fns/row-component-mint.ts :: if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))':
 		"A client-minted row censuses the compiler-emitted branch anchors in the fragment it just built, before the row joins the page.",
-	'packages/web/src/fns/idle-trigger.ts :: const found = [root, ...root.querySelectorAll(`[${hostAttribute}]`)];':
-		'The idle trigger finds the compiler-emitted onIdle host marker to raise its event; it locates no component.',
 	'packages/web/src/fns/settle-plan.ts :: const walker = root.ownerDocument!.createTreeWalker(root, 128);':
 		'The settle filler finds the build-emitted hole comments inside one arm template.',
 	'packages/web/src/inline/payload-document.ts :: const text = element.textContent ?? element.text ?? element.innerHTML;':
@@ -32,8 +30,6 @@ const RUNTIME_MOUNT_SCAN_ALLOWLIST: Readonly<Record<string, string>> = {
 		'The prerender log summary counts module-preload links and does not locate components.',
 	'packages/web/src/inline/resumer.ts :: const walker = currentDocument.createTreeWalker(root, 1);':
 		'The inline resumer materializes compiler-recorded element locators in DOM order.',
-	'packages/web/src/inline/resumer.ts :: const walker = document.createTreeWalker(root, 1);':
-		'The visibility primer materializes compiler-recorded visible-event host locators in DOM order.',
 	'packages/web/src/inline/resumer.ts :: const walker = document.createTreeWalker(root, 128);':
 		'The settle boot censuses the build-emitted boundary comment anchors it fills between.',
 	'packages/web/src/payload-document-common.ts :: const text = element.textContent ?? element.text ?? element.innerHTML;':

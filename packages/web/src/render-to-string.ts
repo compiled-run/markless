@@ -28,9 +28,7 @@ import type { MarklessExecutionLogMode } from './dev-log.ts';
 import {
 	createInlineResumerDebugRegistrationSource,
 	createInlineResumerOverlayPrimerSource,
-	createInlineResumerVisiblePrimerSource,
 	createPrerenderInlineResumerSource,
-	createPrerenderInlineVisiblePrimerSource,
 	createInlineResumerSelfWakeSource,
 	createInlineResumerSource,
 	createInlineResumerStorageWakeSource,
@@ -38,7 +36,7 @@ import {
 	type InlineResumerSourceVariants,
 	type PrerenderBootArtifact,
 } from './inline/resumer.ts';
-import { createInlineIdleTriggerSource } from './fns/idle-trigger.ts';
+import { createInlineDeferTriggerSource, inlineDeferSource } from './inline/defer.ts';
 import { prepareSsrResumeRecords } from './prerender/records.ts';
 import {
 	marklessSsrRosterCounted,
@@ -216,15 +214,12 @@ export async function assembleSsrContainer(
 					syncPolicy,
 				});
 	const overlayPrimer = hasOverlayMark(output.html);
-	const hasVisibleEvents = view.events.some(
-		(event) => event.eventName === PROTOCOL_VISIBLE_EVENT_NAME,
-	);
 	const resumerScript =
 		hasPayload && browserTriggers
 			? renderInlineResumerScript(
 					wakeChannelEnabled
 						? createPrerenderInlineResumerSource(
-								prerenderBootEventNames(view),
+								browserEventNames(view),
 								selectedResumeModuleUrl,
 								{
 									...(typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' &&
@@ -246,10 +241,9 @@ export async function assembleSsrContainer(
 					undefined,
 					true,
 					overlayPrimer,
-					!wakeChannelEnabled && hasVisibleEvents,
-					idleTriggerSource(view) +
-						(wakeChannelEnabled ? prerenderVisiblePrimerSource(view) : '') +
+					deferredTriggerSource(view) +
 						(selfWake ? '' : storageWakeSource(state, selectedResumeModuleUrl)),
+					artifactSources?.defer,
 				)
 			: '';
 	const storageSeedScript = renderStorageSeedScript(
@@ -304,7 +298,7 @@ export async function assemblePrerenderPageParts(
 			: options.modulePreloads;
 	const modulePreloads =
 		optionPreloads ?? (browserTriggers ? artifactModulePreloads(component) : undefined);
-	const eventNames = prerenderBootEventNames(view);
+	const eventNames = browserEventNames(view);
 	const selfWake = hasUnsettledAsyncBoundaryRunner(view, state);
 	const boot = artifactPrerenderBoot(component);
 	// The settle path replaces the self-wake: it fills the arm from the plan and
@@ -330,10 +324,9 @@ export async function assemblePrerenderPageParts(
 					// body; only the authored fallback appends it separately.
 					!boot,
 					false,
-					false,
-					idleTriggerSource(view) +
-						prerenderVisiblePrimerSource(view) +
+					deferredTriggerSource(view) +
 						(selfWake ? '' : storageWakeSource(state, resumeModuleUrl)),
+					artifactInlineResumerSources(component)?.defer,
 				)
 			: '';
 
@@ -682,32 +675,24 @@ function branchServedArmEventNames(
 	];
 }
 
-function visibleHostIndexes(view: ProtocolViewPayload): ReadonlyArray<number> {
+function eventHostIndexes(view: ProtocolViewPayload, eventName: string): number[] {
 	const hosts = new Set(
-		view.events
-			.filter((event) => event.eventName === PROTOCOL_VISIBLE_EVENT_NAME)
-			.map((event) => event.hostNodeId),
+		view.events.filter((event) => event.eventName === eventName).map((event) => event.hostNodeId),
 	);
 	return view.locators
 		.filter((locator) => hosts.has(locator.hostNodeId))
 		.map((locator) => locator.index);
 }
 
-// A page served without a view script delegates the visible event like any other.
-function prerenderBootEventNames(view: ProtocolViewPayload): ReadonlyArray<string> {
-	const eventNames = browserEventNames(view);
-	return visibleHostIndexes(view).length > 0
-		? [...eventNames, PROTOCOL_VISIBLE_EVENT_NAME]
-		: eventNames;
-}
-
-function idleTriggerSource(view: ProtocolViewPayload): string {
-	return browserEventNames(view).includes(PROTOCOL_IDLE_EVENT_NAME) ? createInlineIdleTriggerSource() : '';
-}
-
-function prerenderVisiblePrimerSource(view: ProtocolViewPayload): string {
-	const hostIndexes = visibleHostIndexes(view);
-	return hostIndexes.length > 0 ? createPrerenderInlineVisiblePrimerSource(hostIndexes) : '';
+// Each deferred lane ships only when the page's records name its event; an idle record in an arm or row adds index 0, the container, so the runtime takes it.
+function deferredTriggerSource(view: ProtocolViewPayload): string {
+	const visible = eventHostIndexes(view, PROTOCOL_VISIBLE_EVENT_NAME);
+	const idle = eventHostIndexes(view, PROTOCOL_IDLE_EVENT_NAME);
+	if (browserEventNames({ ...view, events: [] }).includes(PROTOCOL_IDLE_EVENT_NAME)) idle.push(0);
+	return (
+		(visible.length > 0 ? createInlineDeferTriggerSource('visible', visible) : '') +
+		(idle.length > 0 ? createInlineDeferTriggerSource('idle', idle) : '')
+	);
 }
 
 function browserEventNames(view: ProtocolViewPayload): ReadonlyArray<string> {
@@ -762,8 +747,8 @@ function renderInlineResumerScript(
 	settleModuleUrl?: string,
 	appendSelfWakeSource = true,
 	overlayPrimer = false,
-	visiblePrimer = false,
 	appendedSource = '',
+	deferFactory?: string,
 ): string {
 	const nonceAttribute = nonce ? ` nonce="${escapeAttribute(nonce)}"` : '';
 	const resumeModuleAttribute = resumeModuleUrl
@@ -778,10 +763,14 @@ function renderInlineResumerScript(
 	const overlayPrimerSource = overlayPrimer
 		? createInlineResumerOverlayPrimerSource(resumeModuleUrl)
 		: '';
-	const visiblePrimerSource = visiblePrimer
-		? createInlineResumerVisiblePrimerSource(resumeModuleUrl)
-		: '';
-	return `<script data-async-resumer${nonceAttribute}${resumeModuleAttribute}${settleModuleAttribute}${selfWakeAttribute}>${escapeInlineScript(source + selfWakeSource + overlayPrimerSource + visiblePrimerSource + appendedSource)}</script>`;
+	// Every deferred lane names the helper; the first one installs it (minified when the build supplied it), the rest reference it.
+	const [first, ...rest] = (source + selfWakeSource + overlayPrimerSource + appendedSource).split(
+		inlineDeferSource(),
+	);
+	const body = rest.length
+		? `${first}${inlineDeferSource(deferFactory)}${rest.join('globalThis.__mDefer')}`
+		: first!;
+	return `<script data-async-resumer${nonceAttribute}${resumeModuleAttribute}${settleModuleAttribute}${selfWakeAttribute}>${escapeInlineScript(body)}</script>`;
 }
 
 /**

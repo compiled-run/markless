@@ -49,11 +49,18 @@ export function emitDirectPublicRenderModule(input: {
 	if (!bootstrapData) return '';
 	const { rootChunkId: _rootChunkId, chunks: _chunks, ...directRecords } = bootstrapData;
 	const graphMethods = publicGraphMethods(input.symbolResolver);
-	const idleTrigger = [
-		...(input.protocolView.events ?? []),
-		...(input.protocolView.keyedRepeats ?? []).flatMap((repeat) => repeat.rowEvents),
-	].some((event) => event.eventName === PROTOCOL_IDLE_EVENT_NAME)
-		? '\n\tstartMarklessIdleTrigger(root);'
+	// Idle rows stay on the runtime path, whose repeat wiring hands each row host to the idle queue.
+	if (
+		directRecords.repeats.some((repeat) =>
+			repeat.eventControls.some((control) => control.eventName === PROTOCOL_IDLE_EVENT_NAME),
+		)
+	)
+		return '';
+	const idlePaths = directRecords.events
+		.filter((event) => event.eventName === PROTOCOL_IDLE_EVENT_NAME)
+		.map((event) => event.hostPath);
+	const idleTrigger = idlePaths.length
+		? `\n\tqueueMarklessIdleHosts(root, ${JSON.stringify(idlePaths)});`
 		: '';
 
 	const body = [
@@ -82,7 +89,7 @@ export function emitDirectPublicRenderModule(input: {
 					'writeMarklessPublicDirtyArrayIndexes',
 				],
 			},
-			{ module: 'idle-trigger', names: ['startMarklessIdleTrigger'] },
+			{ module: 'idle-trigger', names: ['queueMarklessIdleHosts'] },
 		]),
 		bodySource,
 	]

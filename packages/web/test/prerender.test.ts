@@ -6,10 +6,8 @@ import {
 	STORAGE_SLOT_SYMBOL_KEY,
 } from '@markless/serializer';
 import { classifyResumeRecordDelta } from '@markless/serializer/resume-record-delta';
-import {
-	createPrerenderInlineResumerSource,
-	createPrerenderInlineVisiblePrimerSource,
-} from '../src/inline/resumer.ts';
+import { createInlineDeferTriggerSource } from '../src/inline/defer.ts';
+import { createPrerenderInlineResumerSource } from '../src/inline/resumer.ts';
 import {
 	derivePrerenderResumeRecords,
 	evaluateBuiltPageClosure,
@@ -440,7 +438,7 @@ test('assembles a prerendered container with delegated triggers and zero payload
 	expect(parts.container).not.toContain('rel="modulepreload"');
 });
 
-test('a prerendered page with a visible event delegates it and observes only its hosts', async () => {
+test('a prerendered page with a visible event ships the visible lane for its hosts only', async () => {
 	const artifact: SsrRenderArtifact = {
 		resumeModuleUrl: '/build/resume.js',
 		renderSsr: () => ({ html: '' }),
@@ -476,17 +474,12 @@ test('a prerendered page with a visible event delegates it and observes only its
 	});
 	const withVisible = await assemblePrerenderContainer(artifact, container(true), {});
 	const clickOnly = await assemblePrerenderContainer(artifact, container(false), {});
-	const primer = createPrerenderInlineVisiblePrimerSource([2]);
+	const lane = createInlineDeferTriggerSource('visible', [2]);
 
 	expect(withVisible).not.toContain('type="markless/view"');
-	expect(primer).toContain(`(${JSON.stringify(PROTOCOL_VISIBLE_EVENT_NAME)},[2]);`);
-	expect(withVisible).toContain(`(${JSON.stringify(PROTOCOL_VISIBLE_EVENT_NAME)},[2]);`);
-	expect(withVisible).toContain(
-		createPrerenderInlineResumerSource(
-			['click', PROTOCOL_VISIBLE_EVENT_NAME],
-			'/build/resume.js',
-		),
-	);
+	expect(withVisible).toContain(lane);
+	// The lane forwards to the wake module itself, so the boot delegates only gesture events.
+	expect(withVisible).toContain(createPrerenderInlineResumerSource(['click'], '/build/resume.js'));
 	expect(clickOnly).toContain(createPrerenderInlineResumerSource(['click'], '/build/resume.js'));
 	expect(clickOnly).not.toContain('IntersectionObserver');
 });
@@ -544,8 +537,8 @@ test('self-wakes an unsettled prerendered async boundary without payload scripts
 	expect(html).not.toContain('type="markless/state"');
 	expect(html).not.toContain('type="markless/view"');
 	expect(html).toContain('data-markless-self-wake');
-	expect(html).toContain('queueMicrotask');
-	expect(html).toContain('DOMContentLoaded');
+	expect(html).toContain('globalThis.__mDefer');
+	expect(html).toMatch(/addEventListener\(["']load["']/);
 });
 
 test('a storage page carries the values it was rendered with to the idle wake check, script-safe', async () => {

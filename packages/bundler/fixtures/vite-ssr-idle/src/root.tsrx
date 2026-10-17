@@ -8,6 +8,7 @@ export function App() @{
 			onIdle={() => {
 				runs++;
 				document.body.setAttribute('data-idle-ready-state', document.readyState);
+				document.body.setAttribute('data-idle-at', String(performance.now()));
 				return import('./analytics.ts').then((analytics) => analytics.record());
 			}}
 		>

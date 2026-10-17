@@ -89,6 +89,8 @@ test('Rolldown OXC includes only the requested inline feature blocks', async () 
 // ---------------------------------------------------------------------------
 
 function bootScript(source: string) {
+	// The deferred-trigger helper installs once per document; each boot here is its own document.
+	delete (globalThis as { __mDefer?: unknown }).__mDefer;
 	const listeners: Array<{ type: string; capture: unknown }> = [];
 	const imported: string[] = [];
 	const dispatched: unknown[] = [];

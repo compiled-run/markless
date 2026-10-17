@@ -1,70 +1,63 @@
-import {
-	PROTOCOL_IDLE_EVENT_NAME,
-	PROTOCOL_IDLE_HOST_ATTRIBUTE,
-} from '../../../serializer/src/protocol-event-names.ts';
+import { PROTOCOL_IDLE_EVENT_NAME } from '../../../serializer/src/protocol-event-names.ts';
+import { marklessDefer } from '../inline/defer.ts';
 
-// The longest a busy page may hold an idle handler back once it has loaded.
-export const IDLE_TRIGGER_TIMEOUT_MS = 2000;
-
-type IdleRoot = Element & { __marklessIdleWatched?: true };
-type IdleDocument = Document & { __marklessIdleFired?: WeakSet<Element> };
+type IdleRoot = {
+	__mIdleQueue?: Set<Element>;
+	__mFired?: WeakSet<Element>;
+};
 
 /**
- * Raises `idle` once on each marked host under `root`, after the page has
- * loaded and then gone idle. Hosts mounted later (an arm, a row) are picked up
- * by the next idle period; a host removed before then is never found. Written
- * self-contained because the server inlines it as source text.
+ * Queues one host whose `idle` record the runtime or renderer just bound to it.
+ * The queue drains at the next idle period after load: each host still in the
+ * page gets one non-bubbling `idle` event, so its record dispatches like any
+ * other; a host removed before then is dropped.
  */
-export function runIdleTrigger(
-	root: Element | null,
-	eventName: string,
-	hostAttribute: string,
-	timeout: number,
-	prepare?: () => unknown,
+export function queueMarklessIdleHost(root: Element, host: Element): void {
+	const owner = root as Element & IdleRoot;
+	const fired = (owner.__mFired ||= new WeakSet());
+	if (fired.has(host)) return;
+	const queue = (owner.__mIdleQueue ||= new Set());
+	queue.add(host);
+	if (queue.size > 1) return;
+	marklessDefer().idle(root, () => {
+		const due = [...queue];
+		queue.clear();
+		for (const element of due) {
+			if (!element.isConnected || fired.has(element)) continue;
+			fired.add(element);
+			element.dispatchEvent(new Event(PROTOCOL_IDLE_EVENT_NAME));
+		}
+	});
+}
+
+/** The direct renderer's idle hosts, addressed by the paths its records already carry. */
+export function queueMarklessIdleHosts(
+	root: Element,
+	paths: ReadonlyArray<ReadonlyArray<number>>,
 ): void {
-	if (!root || (root as IdleRoot).__marklessIdleWatched) return;
-	(root as IdleRoot).__marklessIdleWatched = true;
-	// One set per document: a host inside a nested container is under both roots.
-	const fired = ((document as IdleDocument).__marklessIdleFired ||= new WeakSet());
-	let waiting = false;
-	const fire = () => {
-		waiting = false;
-		const found = [root, ...root.querySelectorAll(`[${hostAttribute}]`)];
-		const hosts: Element[] = [];
-		for (const host of found)
-			if (host.hasAttribute?.(hostAttribute) && !fired.has(host)) {
-				fired.add(host);
-				hosts.push(host);
-			}
-		if (hosts.length)
-			Promise.resolve(prepare?.()).then(() => {
-				for (const host of hosts)
-					if (host.isConnected) host.dispatchEvent(new Event(eventName));
-			});
-	};
-	const wait = () => {
-		if (waiting || document.readyState !== 'complete') return;
-		waiting = true;
-		if (typeof requestIdleCallback === 'function') requestIdleCallback(fire, { timeout });
-		else setTimeout(fire, 1);
-	};
-	if (document.readyState !== 'complete') addEventListener('load', wait, { once: true });
-	new MutationObserver(wait).observe(root, { childList: true, subtree: true });
-	wait();
+	for (const path of paths) {
+		let host: Node | undefined = root;
+		for (const index of path) host = host?.childNodes[index];
+		if (host) queueMarklessIdleHost(root, host as Element);
+	}
 }
 
-/** `prepare` runs once hosts are due and before they are raised, so their records can register first. */
-export function startMarklessIdleTrigger(root: unknown, prepare?: () => unknown): void {
-	runIdleTrigger(
-		root as Element,
-		PROTOCOL_IDLE_EVENT_NAME,
-		PROTOCOL_IDLE_HOST_ATTRIBUTE,
-		IDLE_TRIGGER_TIMEOUT_MS,
-		prepare,
-	);
+/** A client-rendered mount's records live in its runtime, so idle starts it and the runtime queues the hosts. */
+export function startMarklessIdleWake(root: Element, start: () => unknown): void {
+	marklessDefer().idle(root, () => void start());
 }
 
-/** The trigger as inline source, appended to a served page whose records name an idle event. */
-export function createInlineIdleTriggerSource(): string {
-	return `;(${runIdleTrigger.toString()})(document.currentScript?.closest('[data-async-container]'),${JSON.stringify(PROTOCOL_IDLE_EVENT_NAME)},${JSON.stringify(PROTOCOL_IDLE_HOST_ATTRIBUTE)},${IDLE_TRIGGER_TIMEOUT_MS});`;
+export type MarklessIdleHost = typeof globalThis & {
+	__mIdle?: {
+		readonly wake: (root: unknown, start: () => unknown) => void;
+		readonly queue: (root: unknown, host: unknown) => void;
+	};
+};
+
+/** Run by an app or resume module that has an `onIdle` record; the runtime and a client mount reach the queue only through it. */
+export function installMarklessIdle(): void {
+	(globalThis as MarklessIdleHost).__mIdle ??= {
+		wake: (root, start) => startMarklessIdleWake(root as Element, start),
+		queue: (root, host) => queueMarklessIdleHost(root as Element, host as Element),
+	};
 }

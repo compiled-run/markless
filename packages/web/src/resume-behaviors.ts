@@ -172,8 +172,8 @@ export function createBehaviorRuntime(input: {
 				import('./resume-types.ts').ResumeEventRecord
 			>(),
 			fired = ((
-				input.root as { __marklessVisibleFired?: WeakSet<ResumeDomElement> }
-			).__marklessVisibleFired ||= new WeakSet());
+				input.root as { __mFired?: WeakSet<ResumeDomElement> }
+			).__mFired ||= new WeakSet());
 		for (const entry of visible) records.set(entry.element, entry.eventRecord);
 		visibilityObserver = createObserver((entries) => {
 			for (const entry of entries) {

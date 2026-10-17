@@ -3,7 +3,7 @@ import { createServer } from 'node:http';
 import { readdir, readFile, rm } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
-import { chromium } from '@playwright/test';
+import { chromium, webkit } from '@playwright/test';
 import { resolve } from 'pathe';
 import { expect, test } from 'vitest';
 import { listenOnFreePort } from './helpers/listen.ts';
@@ -13,11 +13,11 @@ const root = resolve(import.meta.dirname, '../../..');
 const fixtureDir = (wake: boolean) =>
 	resolve(root, `packages/bundler/fixtures/vite-ssr-idle${wake ? '-wake' : ''}`);
 
-// Held in the page so "not idle yet" is a state the test observes rather than a race it wins.
+// Held through the deferred-trigger clock seam so "not idle yet" is a state the test observes rather than a race it wins.
 const HOLD_IDLE = `(() => {
 	const queued = [];
-	window.requestIdleCallback = (callback) => queued.push(callback);
-	window.__releaseIdle = () => { for (const callback of queued.splice(0)) callback({ didTimeout: false, timeRemaining: () => 50 }); };
+	Object.defineProperty(Element.prototype, "__mClock", { configurable: true, get: () => ({ frame: (run) => run(), idle: (run) => queued.push(run) }) });
+	window.__releaseIdle = () => { for (const run of queued.splice(0)) run(); };
 })();`;
 
 test.each([
@@ -144,3 +144,50 @@ test.each([
 	},
 	120_000,
 );
+
+// WebKit has neither scheduler.postTask nor requestIdleCallback, so its idle is the timeout fallback.
+test('WebKit runs onIdle no sooner than 200 ms after load', async () => {
+	const fixture = fixtureDir(false);
+	const dist = resolve(fixture, 'dist');
+	await rm(dist, { force: true, recursive: true });
+	await exec(resolve(root, 'node_modules/.bin/vp'), ['build', '--app'], { cwd: fixture });
+	const entry = (await import(
+		`${pathToFileURL(resolve(dist, 'server-render/server.js')).href}?test=${Date.now()}`
+	)) as { render(): Promise<string> };
+	const html = `<!doctype html><html><head></head><body>${await entry.render()}</body></html>`;
+	const server = createServer(async (request, response) => {
+		const path = new URL(request.url ?? '/', 'http://fixture.local').pathname;
+		if (path === '/') {
+			response.setHeader('Content-Type', 'text/html;charset=utf-8');
+			response.end(html);
+			return;
+		}
+		try {
+			response.setHeader('Content-Type', 'text/javascript');
+			response.end(await readFile(resolve(dist, `.${path}`)));
+		} catch {
+			response.statusCode = 404;
+			response.end();
+		}
+	});
+	const port = await listenOnFreePort(server);
+	const browser = await webkit.launch();
+	try {
+		const page = await browser.newPage();
+		await page.addInitScript(() =>
+			addEventListener('load', () =>
+				document.documentElement.setAttribute('data-load-at', String(performance.now())),
+			),
+		);
+		await page.goto(`http://127.0.0.1:${port}/`);
+		await expect.poll(() => page.locator('output').textContent()).toBe('1');
+		const [loadAt, idleAt] = await page.evaluate(() => [
+			Number(document.documentElement.getAttribute('data-load-at')),
+			Number(document.body.getAttribute('data-idle-at')),
+		]);
+		expect(idleAt - loadAt).toBeGreaterThanOrEqual(200);
+	} finally {
+		await browser.close();
+		await new Promise((done) => server.close(done));
+	}
+}, 120_000);

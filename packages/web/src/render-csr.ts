@@ -26,15 +26,12 @@ import type {
 } from './resume-types.ts';
 import type { ResumeRuntime, ResumeRuntimeInput, ResumeSymbol } from './resume.ts';
 import { reportRuntimeErrorToHost } from './runtime-error-reporting.ts';
+import type { MarklessIdleHost } from './fns/idle-trigger.ts';
 
 // Even an evaluated module's import() costs a task.
 let journal: typeof import('./dom-journal.ts') | undefined;
 
 declare const __MARKLESS_DEV_ENABLED__: boolean;
-
-type MarklessIdleHost = typeof globalThis & {
-	__marklessIdleTrigger?: (root: unknown, prepare: () => unknown) => void;
-};
 
 type ExecutionLogGlobal = typeof globalThis & {
 	__mxLog?: Set<string>;
@@ -202,8 +199,8 @@ export async function renderCsrRuntime(input: {
 			readonly servedArmRecords?: unknown;
 		}>,
 	);
-	// Set only by an app module with an `onIdle` host; an arm open at mount registers its records once the runtime starts.
-	(globalThis as MarklessIdleHost).__marklessIdleTrigger?.(output.root, demandRuntime);
+	// Set only by an app module with an `onIdle` record; the runtime it starts at idle queues the hosts.
+	(globalThis as MarklessIdleHost).__mIdle?.wake(output.root, demandRuntime);
 	if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
 		await registerDelegatedTriggerDebug(output, view);
 	if ((globalThis as ExecutionLogGlobal).__mxLog) await marklessLogCsrSummary();

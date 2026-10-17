@@ -200,26 +200,30 @@ nothing better to do":
 Semantics:
 
 - An `on*` event handler where the event is "the page has loaded and gone
-  idle." It waits for the document's `load` event, then for
-  `requestIdleCallback` with a timeout (the timeout bounds how long a busy page
-  can hold it back); a browser without `requestIdleCallback` runs it in a task
-  right after `load`. The handler is a lazy symbol like any other: nothing it
-  names, its own code included, is fetched before it runs.
-- Fires once per element instance and receives the browser's own `idle`
-  `Event`, dispatched on the element without bubbling. An element mounted later
-  (an `@if` arm, an `@for` row) fires at the next idle period after it appears;
-  an element removed before then never fires. Unlike `onVisible`, the return
-  value is ignored, as for ordinary events.
-- The compiler writes a marker attribute (`PROTOCOL_IDLE_HOST_ATTRIBUTE` in
-  `@markless/serializer`) on each `onIdle` host in every markup it emits, and
-  the trigger finds hosts by that marker. On a served page the trigger is
-  inline source appended to the resumer only when the page's records name an
-  idle event; a client-rendered app gets it from the app module that has a host.
-  The handler then runs through the page's ordinary event path, so lean and
-  full resume treat it like a click.
-- Cost at load is the trigger registration only. Pages without `onIdle` are
-  unchanged on the server-rendered path; the client-rendered mount reads one
-  global the app module sets.
+  idle." It waits for the document's `load` event and for streamed arms to
+  land, then for `scheduler.postTask` at background priority, else
+  `requestIdleCallback` with a 2000 ms timeout, else a 200 ms timer (WebKit has
+  neither scheduler, so it never runs sooner than 200 ms after `load`). The
+  handler is a lazy symbol like any other: nothing it names, its own code
+  included, is fetched before it runs.
+- Fires once per element instance. An element mounted later (an `@if` arm, an
+  `@for` row) fires at the next idle period after it appears; an element
+  removed before then never fires. Unlike `onVisible`, the return value is
+  ignored, as for ordinary events.
+- Nothing scans the DOM for hosts. Each host is named by its own event record:
+  on a served page the inline trigger resolves top-level hosts through their
+  DOM-order locator indexes, and hands records inside arms and rows to the
+  runtime by raising the event on the container; the runtime, and a
+  client-rendered mount, queue each host when they bind its record to the
+  element they hold. Once due, a host's event runs through the page's ordinary
+  dispatch queue, behind any gesture already in flight.
+- Visible and idle share one inline startup helper (`packages/web/src/inline/defer.ts`),
+  served minified and only on a page that ships a deferred trigger, with one
+  per-root fired set and one idle wait; the self-wake and storage wake use the
+  same idle wait.
+- Cost at load is the trigger registration only. Server-rendered pages without
+  a deferred trigger are byte-identical; a client-rendered mount reads one
+  global that only an app module with an `onIdle` record sets.
 - **Not a lifecycle.** Like `onVisible`, it is not a reactive computation and
   not a mount hook: it needs an element, runs once, and reads current values.
 
