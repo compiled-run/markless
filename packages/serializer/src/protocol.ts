@@ -393,6 +393,8 @@ export type ProtocolViewPayload = {
 			readonly path: ReadonlyArray<string>;
 		}>;
 		readonly symbolId?: string;
+		/** The behavior reads or writes page state, so it runs against the page's graph. */
+		readonly usesGraph?: true;
 	}>;
 	readonly elementHandles: ReadonlyArray<{
 		readonly hostNodeId: string;

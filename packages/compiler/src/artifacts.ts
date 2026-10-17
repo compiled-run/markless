@@ -969,6 +969,9 @@ export type SemanticBehavior = {
 		readonly value: unknown;
 	}>;
 	readonly keyedRepeatScopeIds?: ReadonlyArray<string>;
+	/** Set when the behavior is a function written inline, whose graph reads and writes lower like a handler's. */
+	readonly functionSpan?: SourceSpan;
+	readonly functionParameters?: ReadonlyArray<string>;
 };
 
 /**
@@ -1456,7 +1459,10 @@ export type PayloadAsyncBoundary = {
 	readonly armRecords: ReadonlyArray<PayloadArmRecordSet>;
 };
 
-export type PayloadBehavior = Omit<SemanticBehavior, 'constantInputs'> & {
+export type PayloadBehavior = Omit<
+	SemanticBehavior,
+	'constantInputs' | 'functionSpan' | 'functionParameters'
+> & {
 	readonly inputValues?: ReadonlyArray<unknown>;
 	readonly inputGraphReads?: ReadonlyArray<{
 		readonly inputIndex: number;
@@ -1637,6 +1643,14 @@ export type PlannedSymbol =
 			readonly inputSources: ReadonlyArray<string>;
 			readonly moduleImport?: SemanticModuleImport;
 			readonly order: number;
+			// Present for an inline function that reads or writes its component's graph.
+			readonly graphAccess?: {
+				readonly sourceSpan: SourceSpan;
+				readonly parameters: ReadonlyArray<string>;
+				readonly moduleImports?: ReadonlyArray<SemanticModuleImport>;
+				readonly reads: ReadonlyArray<LoweredStateRead>;
+				readonly writes: ReadonlyArray<LoweredStateWrite>;
+			};
 	  }
 	| {
 			readonly id: string;

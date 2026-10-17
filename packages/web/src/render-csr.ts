@@ -66,6 +66,7 @@ export async function renderCsrRuntime(input: {
 		view,
 	);
 
+	const graphBehaviors = view.behaviors.filter((behavior) => behavior.usesGraph);
 	let graph: RuntimeGraph | undefined;
 	let runtime: ResumeRuntime | undefined;
 	let starting: Promise<ResumeRuntime> | undefined;
@@ -106,7 +107,7 @@ export async function renderCsrRuntime(input: {
 				const { createResumeRuntime } = await import('./resume.ts');
 				const runtimeView = {
 					...view,
-					behaviors: [],
+					behaviors: graphBehaviors,
 				};
 				const applyDomJournal =
 					options.applyDomJournal ??
@@ -198,6 +199,8 @@ export async function renderCsrRuntime(input: {
 			readonly servedArmRecords?: unknown;
 		}>,
 	);
+	for (const hostNodeId of new Set(graphBehaviors.map((behavior) => behavior.hostNodeId)))
+		await (await demandRuntime()).activateBehaviors(hostNodeId);
 	if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
 		await registerDelegatedTriggerDebug(output, view);
 	if ((globalThis as ExecutionLogGlobal).__mxLog) await marklessLogCsrSummary();
@@ -263,7 +266,7 @@ async function activateAuthoredBehaviors(
 ): Promise<Array<() => void>> {
 	const cleanup: Array<() => void> = [];
 	for (const behavior of view.behaviors) {
-		if (!behavior.symbolId) continue;
+		if (!behavior.symbolId || behavior.usesGraph) continue;
 		const element =
 			output.liveHostNodes?.get(behavior.hostNodeId) ??
 			(view.locators.length === 1 && view.locators[0]?.hostNodeId === behavior.hostNodeId
