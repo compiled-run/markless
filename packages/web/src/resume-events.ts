@@ -458,8 +458,14 @@ export function createEventWiring(input: {
 		event: ResumeDomEvent,
 		dispatchOptions?: ResumeDispatchOptions,
 	): Promise<void> {
-		const options = { ...dispatchOptions, releaseQueue: input.root.__marklessReleaseDispatch };
 		const target = event.target;
+		// A field's own events stay in order: its edit hold judges each write against non-overlapping dispatches.
+		const options = {
+			...dispatchOptions,
+			releaseQueue: marklessEditableControl(target)
+				? undefined
+				: input.root.__marklessReleaseDispatch,
+		};
 		if (!target) throw unmatchedDispatchError(event, undefined);
 		const selector = describeResumeEventTarget(target);
 		const ignoredDisposed = input.ignoredDisposedEventTargets.has(target);
