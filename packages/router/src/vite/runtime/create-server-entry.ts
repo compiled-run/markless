@@ -45,6 +45,8 @@ import {
 
 export interface ServerEntryOptions {
 	readonly dev?: boolean;
+	// The app's public base path; the shared link bridge module is served under it.
+	readonly base?: string;
 	readonly navigationEntryPath?: string;
 	// false: nothing is downloaded before a click (no intent or idle prefetch); links still navigate.
 	readonly prefetch?: boolean;
@@ -126,9 +128,27 @@ export function createServerEntry(options: ServerEntryOptions) {
 				}
 			: undefined;
 	const fragmentNavigation = fragmentBridge !== undefined;
+	const linkBridges =
+		!options.dev && options.navigationEntryPath
+			? linkBridgeModules(
+					options.base ?? '/',
+					options.navigationEntryPath,
+					fragmentNavigation || options.prefetch !== false,
+					options.documentNavigation === 'document',
+					fragmentBridge,
+				)
+			: undefined;
 
 	async function fetch(request: Request): Promise<Response> {
 		const url = new URL(request.url);
+		const linkBridge = linkBridges?.find((module) => module.path === url.pathname);
+		if (linkBridge)
+			return new Response(linkBridge.source, {
+				headers: {
+					'content-type': 'text/javascript;charset=utf-8',
+					'cache-control': 'public, max-age=31536000, s-maxage=31536000, immutable',
+				},
+			});
 		const fragment = fragmentNavigation && request.headers.get(FRAGMENT_REQUEST_HEADER) === '1';
 		if (isNitroApiPathname(url.pathname)) {
 			return new Response('Not found', { status: 404 });
@@ -279,6 +299,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 				: undefined,
 			documentLoads,
 			fragmentBridge,
+			linkBridges,
 		);
 		let rendersStorage = false;
 		const routedArtifact = {
@@ -302,7 +323,11 @@ export function createServerEntry(options: ServerEntryOptions) {
 			cookie,
 			props: pageProps,
 			resumeModuleUrl: options.resumeEntryPath ?? baseArtifact?.resumeModuleUrl,
-			modulePreloads: () => landingModulePreloads(options.routeSsrModulePreloads?.[file]),
+			modulePreloads: (html: string) =>
+				landingModulePreloads(
+					options.routeSsrModulePreloads?.[file],
+					linkBridges?.[html.includes('href="#/') ? 1 : 0].path,
+				),
 		};
 
 		// Blocking opt-out: the pre-T107 whole-page await.
@@ -461,6 +486,7 @@ function routedPageArtifact(
 	intentPreloads?: (html: string) => Record<string, readonly ModulePreloadInput[]>,
 	documentLoads = false,
 	fragment?: FragmentBridge,
+	linkBridgeModules?: readonly [LinkBridgeModule, LinkBridgeModule],
 ) {
 	// The document's own injections (dev links its scoped-style closure there) come first: the shell's CSS precedes the page's.
 	const headInjections = dedupeHeadLinks([
@@ -493,6 +519,7 @@ function routedPageArtifact(
 						documentLoads,
 						fragment,
 						output.html.includes('href="#/'),
+						linkBridgeModules,
 					)
 				: '';
 			const stateWithProps = withPagePropsCell(output.state, pageProps);
@@ -536,9 +563,11 @@ function withPagePropsCell(state: unknown, props: PageComponentProps): unknown {
 
 function landingModulePreloads(
 	routePreloads: readonly ModulePreloadInput[] | undefined,
+	linkBridgePath?: string,
 ): readonly ModulePreloadInput[] | undefined {
 	const preloads: ModulePreloadInput[] = [];
 	addModulePreloads(preloads, new Set(), routePreloads);
+	if (linkBridgePath) preloads.push(linkBridgePath);
 	return preloads.length > 0 ? preloads : undefined;
 }
 
@@ -735,25 +764,38 @@ function renderRouteScript(file: string): string {
 	return `<script type="${ROUTE_SCRIPT_TYPE}">${escapeScriptJson({ file })}</script>`;
 }
 
-function renderLinkBridgeScript(
+// Per page: the destinations this page links, and whether it links a '#/' route.
+interface LinkBridgePage {
+	readonly intentPreloads?: Record<string, readonly ModulePreloadInput[]>;
+	readonly hashLinks: boolean;
+}
+
+// The same body serves inline (dev) or as a cached module whose default export takes the page's part.
+function linkBridgeBody(
 	resumeEntryPath: string,
-	intentPreloads?: Record<string, readonly ModulePreloadInput[]>,
-	documentLoads = false,
-	fragment?: FragmentBridge,
-	hashLinks = false,
+	linkIntent: boolean,
+	documentLoads: boolean,
+	fragment: FragmentBridge | undefined,
+	page: LinkBridgePage | { readonly module: true; readonly hashLinks: boolean },
 ): string {
+	const inline = !('module' in page);
 	const fragmentNavigation = fragment !== undefined;
 	const fragmentSource = fragment
 		? `
-(${fragment.source})(d,()=>(${escapeScriptJson(fragmentConfig(fragment, documentLoads))}),${escapeScriptJson(intentPreloads ?? {})},(href)=>import(href));`
+(${fragment.source})(d,()=>(${escapeScriptJson(fragmentConfig(fragment, documentLoads))}),${inline ? escapeScriptJson((page as LinkBridgePage).intentPreloads ?? {}) : 'r'},(href)=>import(href));`
 		: '';
 	const indexed =
-		!fragmentNavigation && intentPreloads ? indexedPreloads(intentPreloads) : undefined;
+		!fragmentNavigation && linkIntent
+			? inline
+				? (page as LinkBridgePage).intentPreloads &&
+					indexedPreloads((page as LinkBridgePage).intentPreloads!)
+				: { preloads: 'preloads', destinations: 'destinations' }
+			: undefined;
 	// Routes share most of their packs, so each is written once and routes list indexes into it.
 	const intentSource = indexed
 		? `
-	const preloads = ${escapeScriptJson(indexed.preloads)};
-	const destinations = ${escapeScriptJson(indexed.destinations)};
+	const preloads = ${inline ? escapeScriptJson(indexed.preloads) : 'p'};
+	const destinations = ${inline ? escapeScriptJson(indexed.destinations) : 'q'};
 	const destination = (url) => destinations[url.pathname]?.map((index) => preloads[index]);
 	const append = (${appendModulePreloads.toString()});
 	(${listenForLinkIntent.toString()})(d, linkAttr, (url) => {
@@ -762,7 +804,7 @@ function renderLinkBridgeScript(
 		: '';
 	// Hash routes ('#/…') still render client-side; a fragment page carries that click path only when it links one.
 	const hashClickSource =
-		fragment && !hashLinks
+		fragment && !page.hashLinks
 			? ''
 			: `
 	if (d.__marklessRouterHashClickStarted) return;
@@ -806,16 +848,6 @@ function renderLinkBridgeScript(
 			location.assign(url.href);
 		}
 	}, true);`;
-	const debugBootstrap =
-		typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
-			? `<script data-markless-router-debug-bootstrap>${escapeInlineScript(`(() => {
-	const d = document;
-	const s = d.currentScript;
-	const r = s && s.closest('[data-async-container]');
-	if (!r) return;
-	try { globalThis[Symbol.for('markless.debug.channel.v1.bootstrap')] = ${__marklessDebugBootstrapSource()}(r, 'ssr-inline', false); } catch {}
-})();`)}</script>`
-			: '';
 	const debugRegistration =
 		typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
 			? `
@@ -825,7 +857,7 @@ function renderLinkBridgeScript(
 		if (md) { md.router('ssr-link-bridge'); md.activate(); }
 	} catch {}`
 			: '';
-	return `${debugBootstrap}<script data-markless-router-link-resumer>${escapeInlineScript(`(()=>{const d=document,s=d.currentScript,r=s&&s.closest('[data-async-container]');if(!r)return;${fragmentSource}${
+	return `${fragmentSource}${
 		fragment && !hashClickSource
 			? ''
 			: `
@@ -847,7 +879,72 @@ if(d.__marklessRouterLinkResumerStarted${fragment ? '&&d.__marklessRouterHashCli
 	const scrollAttr = ${JSON.stringify(SCROLL_ATTRIBUTE)};`
 			: ''
 	}${intentSource}
-if(location.hash&&location.hash.startsWith('#/'))import(${JSON.stringify(resumeEntryPath)}).catch(()=>{});${hashClickSource}${debugRegistration}
+if(location.hash&&location.hash.startsWith('#/'))import(${JSON.stringify(resumeEntryPath)}).catch(()=>{});${hashClickSource}${debugRegistration}`;
+}
+
+interface LinkBridgeModule {
+	readonly path: string;
+	readonly source: string;
+}
+
+// Served by this entry, never inlined: pages share an immutable copy the browser caches, one per '#/' variant.
+function linkBridgeModules(
+	base: string,
+	resumeEntryPath: string,
+	linkIntent: boolean,
+	documentLoads: boolean,
+	fragment: FragmentBridge | undefined,
+): readonly [withoutHashLinks: LinkBridgeModule, withHashLinks: LinkBridgeModule] {
+	const variant = (hashLinks: boolean): LinkBridgeModule => {
+		const source = `export default(r,p,q)=>{const d=document;${linkBridgeBody(resumeEntryPath, linkIntent, documentLoads, fragment, { module: true, hashLinks })}\n};`;
+		return {
+			path: `${base.replace(/\/?$/, '/')}_markless/links.${contentHash(source)}.js`,
+			source,
+		};
+	};
+	const withoutHashLinks = variant(false);
+	return [withoutHashLinks, fragment ? variant(true) : withoutHashLinks];
+}
+
+function contentHash(text: string): string {
+	let hash = 0x811c9dc5;
+	for (let at = 0; at < text.length; at++) hash = Math.imul(hash ^ text.charCodeAt(at), 0x01000193);
+	return (hash >>> 0).toString(36);
+}
+
+function renderLinkBridgeScript(
+	resumeEntryPath: string,
+	intentPreloads?: Record<string, readonly ModulePreloadInput[]>,
+	documentLoads = false,
+	fragment?: FragmentBridge,
+	hashLinks = false,
+	modules?: readonly [LinkBridgeModule, LinkBridgeModule],
+): string {
+	const debugBootstrap =
+		typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
+			? `<script data-markless-router-debug-bootstrap>${escapeInlineScript(`(() => {
+	const d = document;
+	const s = d.currentScript;
+	const r = s && s.closest('[data-async-container]');
+	if (!r) return;
+	try { globalThis[Symbol.for('markless.debug.channel.v1.bootstrap')] = ${__marklessDebugBootstrapSource()}(r, 'ssr-inline', false); } catch {}
+})();`)}</script>`
+			: '';
+	const module = modules?.[hashLinks ? 1 : 0];
+	if (module) {
+		const indexed = !fragment && intentPreloads ? indexedPreloads(intentPreloads) : undefined;
+		const args = fragment
+			? [escapeScriptJson(intentPreloads ?? {})]
+			: indexed
+				? ['0', escapeScriptJson(indexed.preloads), escapeScriptJson(indexed.destinations)]
+				: [];
+		return `${debugBootstrap}<script type="module" data-markless-router-link-resumer>${escapeInlineScript(`import b from${JSON.stringify(module.path)};b(${args.join(',')})`)}</script>`;
+	}
+	const body = linkBridgeBody(resumeEntryPath, intentPreloads !== undefined, documentLoads, fragment, {
+		intentPreloads,
+		hashLinks,
+	});
+	return `${debugBootstrap}<script data-markless-router-link-resumer>${escapeInlineScript(`(()=>{const d=document,s=d.currentScript,r=s&&s.closest('[data-async-container]');if(!r)return;${body}
 })();`)}</script>`;
 }
 

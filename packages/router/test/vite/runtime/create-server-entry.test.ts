@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { servedLinkBridge } from '../../support/link-bridge.ts';
 import { MarklessCompileError, serializeMarklessDevError } from '@markless/bundler/dev-error';
 import { ASYNC_BOUNDARY_ARM } from '../../../../serializer/src/index.ts';
 import { marklessSsrAttachSnapshots, marklessSsrRunAsyncComputed } from '@markless/web/fns/ssr';
@@ -355,12 +356,15 @@ describe('server entry rendering', () => {
 		const response = await entry.fetch(new Request('http://markless-router.test/'));
 		const html = await response.text();
 
+		const bridge = (await servedLinkBridge(html, entry, 'http://markless-router.test')) ?? '';
+
 		expect(response.status).toBe(200);
 		expect(html).toContain('data-markless-router-link');
 		expect(html).toContain('data-markless-router-link-resumer');
-		expect(html).toContain('import("/@id/virtual:markless-router/navigation-entry")');
-		expect(html).not.toContain('import("/@id/virtual:markless-router/resume-entry")');
-		expect(html).not.toContain('<script type="module"');
+		expect(bridge).toContain('import("/@id/virtual:markless-router/navigation-entry")');
+		expect(`${html}${bridge}`).not.toContain('import("/@id/virtual:markless-router/resume-entry")');
+		// The one module script is the shared link bridge; nothing else wakes at load.
+		expect(html.match(/<script type="module"(?! data-markless-router-link-resumer>)/)).toBeNull();
 		expect(html).not.toContain('virtual:markless-router/client-entry');
 		expect(html).not.toContain('__marklessRouterStartSpaNavigation');
 	});
@@ -385,11 +389,12 @@ describe('server entry rendering', () => {
 
 		// Plain hash anchors are no longer special-cased by the click handler:
 		// SPA navigation belongs to <Link> (data-markless-router-link) only.
-		expect(html).not.toContain('hashRouteAnchor');
-		expect(html).toContain('hasAttribute(linkAttr)');
+		const bridge = (await servedLinkBridge(html, entry, 'http://markless-router.test')) ?? '';
+		expect(bridge).not.toContain('hashRouteAnchor');
+		expect(bridge).toContain('hasAttribute(linkAttr)');
 		// The load-time '#/' deep-link check is about LANDING on a hash route,
 		// not clicking — it stays.
-		expect(html).toContain("location.hash.startsWith('#/')");
+		expect(bridge).toContain("location.hash.startsWith('#/')");
 	});
 
 	it('bridge client-navigates a document-rendered Link outside the page container', async () => {
@@ -416,9 +421,7 @@ describe('server entry rendering', () => {
 			routeFileIds: ['/pages/index.tsrx', '/pages/about.tsrx'],
 		});
 		const html = await (await entry.fetch(new Request('http://markless-router.test/'))).text();
-		const bridge = /<script data-markless-router-link-resumer>([\s\S]*?)<\/script>/.exec(
-			html,
-		)?.[1];
+		const bridge = await servedLinkBridge(html, entry, 'http://markless-router.test');
 		expect(bridge).toBeDefined();
 
 		class FakeElement {

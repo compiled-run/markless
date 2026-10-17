@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { servedLinkBridge } from '../support/link-bridge.ts';
 import { createServerEntry } from '../../src/vite/runtime/create-server-entry.ts';
 import { createServer } from 'node:http';
 import { chromium } from '@playwright/test';
@@ -56,11 +57,12 @@ test('link intent keeps destination packs out of initial modulepreload links', a
 		routeFileIds: ['/pages/index.tsrx', '/pages/next.tsrx'],
 	});
 	const html = await (await entry.fetch(new Request('https://docs.test/'))).text();
+	const bridge = (await servedLinkBridge(html, entry, 'https://docs.test')) ?? '';
 	expect(html).toContain('rel="modulepreload" href="/current.js"');
 	expect(html).not.toContain('rel="modulepreload" href="/destination.js"');
 	expect(html).toContain('/destination.js');
-	expect(html).toContain('pointerover');
-	expect(html).toContain('focusin');
+	expect(bridge).toContain('pointerover');
+	expect(bridge).toContain('focusin');
 });
 
 test('SSR link intent fetches only its destination without evaluating modules', async () => {
@@ -84,8 +86,14 @@ test('SSR link intent fetches only its destination without evaluating modules', 
 		},
 		routeFileIds: ['/pages/index.tsrx', '/pages/next.tsrx', '/pages/other.tsrx'],
 	});
+	const bridgeFetched: string[] = [];
 	const server = createServer(async (request, response) => {
-		if (request.url?.endsWith('.js')) {
+		if (request.url?.startsWith('/_markless/')) {
+			bridgeFetched.push(request.url);
+			const served = await entry.fetch(new Request(`https://docs.test${request.url}`));
+			response.setHeader('content-type', served.headers.get('content-type') ?? '');
+			response.end(await served.text());
+		} else if (request.url?.endsWith('.js')) {
 			fetched.push(request.url);
 			response.setHeader('content-type', 'text/javascript');
 			response.end('globalThis.intentModuleExecuted = true;');
@@ -110,13 +118,18 @@ test('SSR link intent fetches only its destination without evaluating modules', 
 			await page.locator('a span').dispatchEvent(event);
 			await expect.poll(() => fetched).toEqual(['/current.js', '/destination.js']);
 			await page.locator('a span').dispatchEvent(event);
-			expect(await page.locator('link[rel="modulepreload"]').count()).toBe(2);
+			expect(
+				await page.locator('link[rel="modulepreload"]:not([href^="/_markless/"])').count(),
+			).toBe(2);
 			expect(
 				await page.locator('link[href="/destination.js"]').getAttribute('fetchpriority'),
 			).toBe('low');
 			expect(
 				await page.evaluate(() => (globalThis as any).intentModuleExecuted),
 			).toBeUndefined();
+			// The shared bridge arrives with the page, never on an interaction.
+			expect(bridgeFetched.length).toBeLessThanOrEqual(1);
+			bridgeFetched.length = 0;
 			expect(errors).toEqual([]);
 			await context.close();
 		}
