@@ -1,4 +1,4 @@
-import { asNodes, getIdentifierName, walkNode, type AnyNode } from '../../ast/nodes.ts';
+import { asNodes, childNodes, getIdentifierName, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import {
 	graphBindingMap,
@@ -71,7 +71,7 @@ export function unextractableSyncPolicyDiagnostic(
 		suggestions: [
 			{
 				message:
-					'Move the browser-critical condition into graph state and simple event-field comparisons, or remove preventDefault()/stopPropagation() from the lazy handler.',
+					"Write the guard from event fields compared with literals (`event.key === 'Enter'`), modifier flags (`event.metaKey`), state, props and module constants, joined with &&, || and !: either `if (event.key === 'Enter' && !busy) event.preventDefault()` or an early `if (event.key !== 'Enter') return;` before an unconditional `event.preventDefault()`. A condition that reads the DOM (such as `event.target.closest('a')`) cannot run before the handler loads; keep what it decides in state, or remove the cancel from the lazy handler.",
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_SYNC_POLICY_UNEXTRACTABLE',
@@ -265,6 +265,8 @@ function locateSyncPolicy(
 	if (!body) return undefined;
 
 	const statements = body.type === 'BlockStatement' ? asNodes(body.body) : [body];
+	// A cancel after `if (guard) return;` runs only where every guard before it is false.
+	const guards: SemanticSyncPolicyCondition[] = [];
 	for (const statement of statements) {
 		if (statement.type !== 'IfStatement') {
 			const expression =
@@ -274,7 +276,10 @@ function locateSyncPolicy(
 			const action = syncActionCall(expression, eventParam);
 			if (action && expression) {
 				return {
-					branch: { when: { type: 'constant-truthy', value: true }, actions: [action] },
+					branch: {
+						when: guardedCondition(guards, { type: 'constant-truthy', value: true }),
+						actions: [action],
+					},
 					calls: [unwrapParens(expression) ?? expression],
 				};
 			}
@@ -283,18 +288,111 @@ function locateSyncPolicy(
 
 		const consequent = statement.consequent as AnyNode | undefined;
 		const actions = extractSyncActions(consequent, eventParam);
-		if (actions.length === 0) continue;
+		const test = statement.test as AnyNode | undefined;
+		if (actions.length === 0) {
+			if (statement.alternate || !exitsAtEnd(consequent)) continue;
+			// What the policy cannot read before the handler loads is taken as not leaving, so the cancel is never narrower than authored.
+			guards.push(negatedCondition(approximateCondition(test, eventParam, state, false)));
+			continue;
+		}
 
-		const when = extractSyncCondition(statement.test as AnyNode | undefined, eventParam, state);
+		const when = extractSyncCondition(test, eventParam, state);
 		if (!when) continue;
 
 		return {
-			branch: { when, actions },
+			branch: { when: guardedCondition(guards, when), actions },
 			calls: syncActionCallNodes(consequent, eventParam, new Set(actions)),
 		};
 	}
 
 	return undefined;
+}
+
+function guardedCondition(
+	guards: ReadonlyArray<SemanticSyncPolicyCondition>,
+	when: SemanticSyncPolicyCondition,
+): SemanticSyncPolicyCondition {
+	return combinedCondition('and', [...guards, when]);
+}
+
+function combinedCondition(
+	type: 'and' | 'or',
+	parts: ReadonlyArray<SemanticSyncPolicyCondition>,
+): SemanticSyncPolicyCondition {
+	const absorbing = type === 'or';
+	const conditions: SemanticSyncPolicyCondition[] = [];
+	for (const part of parts) {
+		if (part.type === 'constant-truthy') {
+			if (Boolean(part.value) === absorbing) return { type: 'constant-truthy', value: absorbing };
+			continue;
+		}
+		conditions.push(part);
+	}
+	if (conditions.length === 0) return { type: 'constant-truthy', value: !absorbing };
+	if (conditions.length === 1) return conditions[0]!;
+	return { type, conditions: flattenSyncConditions(type, conditions) };
+}
+
+function negatedCondition(condition: SemanticSyncPolicyCondition): SemanticSyncPolicyCondition {
+	if (condition.type === 'constant-truthy') return { type: 'constant-truthy', value: !condition.value };
+	return condition.type === 'not' ? condition.condition : { type: 'not', condition };
+}
+
+// The readable part of a guard, with every unreadable piece taken as `unreadable`.
+function approximateCondition(
+	input: AnyNode | undefined,
+	eventParam: string,
+	state: Pick<WalkState, 'graph' | 'source'>,
+	unreadable: boolean,
+): SemanticSyncPolicyCondition {
+	const exact = extractSyncCondition(input, eventParam, state);
+	if (exact) return exact;
+	const node = unwrapParens(input);
+	if (node?.type === 'LogicalExpression' && (node.operator === '&&' || node.operator === '||'))
+		return combinedCondition(node.operator === '&&' ? 'and' : 'or', [
+			approximateCondition(node.left as AnyNode | undefined, eventParam, state, unreadable),
+			approximateCondition(node.right as AnyNode | undefined, eventParam, state, unreadable),
+		]);
+	if (node?.type === 'UnaryExpression' && node.operator === '!')
+		return negatedCondition(
+			approximateCondition(node.argument as AnyNode | undefined, eventParam, state, !unreadable),
+		);
+	return { type: 'constant-truthy', value: unreadable };
+}
+
+// A `return` or `throw` the handler itself reaches; a nested function's own exits are not its.
+function mayExitEarly(node: AnyNode | undefined): boolean {
+	let exits = false;
+	const visit = (candidate: AnyNode | undefined): void => {
+		if (!candidate || exits) return;
+		if (candidate.type === 'ReturnStatement' || candidate.type === 'ThrowStatement') {
+			exits = true;
+			return;
+		}
+		if (isFunctionNode(candidate)) return;
+		for (const child of childNodes(candidate)) visit(child);
+	};
+	visit(node);
+	return exits;
+}
+
+// Only a guard that always leaves is a guard: `if (x) { log(); return; }`, never `if (x) { if (y) return; }`.
+function exitsAtEnd(node: AnyNode | undefined): boolean {
+	if (!node) return false;
+	if (node.type === 'ReturnStatement' || node.type === 'ThrowStatement') return true;
+	if (node.type !== 'BlockStatement') return false;
+	const body = asNodes(node.body);
+	const last = body.at(-1);
+	if (!last || !exitsAtEnd(last)) return false;
+	return body.slice(0, -1).every((statement) => !mayExitEarly(statement));
+}
+
+function isFunctionNode(node: AnyNode): boolean {
+	return (
+		node.type === 'FunctionExpression' ||
+		node.type === 'ArrowFunctionExpression' ||
+		node.type === 'FunctionDeclaration'
+	);
 }
 
 function extractSyncActions(
@@ -377,6 +475,16 @@ function unwrapParens(node: AnyNode | undefined): AnyNode | undefined {
 	return current;
 }
 
+// DOM event fields that are always booleans, so reading one alone is `=== true`.
+const BOOLEAN_EVENT_FIELDS: ReadonlySet<string> = new Set([
+	'altKey',
+	'ctrlKey',
+	'metaKey',
+	'shiftKey',
+	'repeat',
+	'isComposing',
+]);
+
 function extractSyncCondition(
 	input: AnyNode | undefined,
 	eventParam: string,
@@ -425,6 +533,9 @@ function extractSyncCondition(
 
 		return { type: 'not', condition };
 	}
+
+	const field = eventFieldName(node, eventParam);
+	if (field && BOOLEAN_EVENT_FIELDS.has(field)) return { type: 'event-equals', field, value: true };
 
 	const resolved = resolveGraphPath(
 		expressionSource(node, state.source),
