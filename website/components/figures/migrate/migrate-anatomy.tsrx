@@ -1,18 +1,33 @@
-// The old app and the new one as two sheets on a desk, with a front door wired to each page: a press moves the next page, checks it against the old one, and re-wires it when everything matches.
+// A terminal drawn on a sheet on the desk replaying a markless-migrate run on a small shop, with the report it writes lying below: Enter runs the next command.
 import { computed, state } from '@markless/core';
-import { buttonLabel, describe, flip, move, NEW, NOTE, OLD, PAGES, pageAt, SITE, TAG, TOUR, TOUR_MS } from './model.ts';
+import { completesAt, describe, doneOf, FOOTERS, focusRow, ghostFor, interrupt, JS, labelOf, MAX_TYPED, PAGE, print, printAll, printing, reportOf, ROUTES, ROWS, type Run, runCommand, screen, servedBy, showsFooter, START, submit, TICK_MS, tour, TOUR_START, type Tour } from './model.ts';
 import { art } from './migrate.art.ts';
+import { recall, remember } from '../create/history.ts';
+
+const FOOT = art.rows[ROWS - 1]!.matrix;
 
 export default function MigrateAnatomy() @{
-	let moved = state(0);
-	let beat = state('rest');
+	let run = state(START as Run);
+	let typed = state('');
+	let at = state(0);
+	let said = state('');
+	let ran = state([] as string[]);
+	let back = state(0);
+	let tick = state('a');
 	let touched = state(false);
-	const now = computed(() => String(moved - 1));
-	const late = computed(() => (moved > 0 && pageAt(moved - 1).miss !== '' ? 'yes' : 'no'));
-	const vars = computed(() => '--moved:' + moved);
-	const checked = computed(() => (moved > 0 ? pageAt(moved - 1).path : ''));
-	const label = computed(() => buttonLabel(moved));
-	const said = computed(() => describe(moved, beat !== 'rest'));
+	const lines = computed(() => {
+		const rows = screen(run, typed, at);
+		const focus = focusRow(rows);
+		return art.rows.map((slot) => ({ ...slot, ...rows[slot.key]!, focus: focus === slot.key ? 'yes' : 'no' }));
+	});
+	const completes = computed(() => completesAt(run, typed, at));
+	const label = computed(() => labelOf(run));
+	const report = computed(() => reportOf(run));
+	const suggesting = computed(() => (showsFooter(run, typed) ? 'yes' : 'no'));
+	const served0 = computed(() => servedBy(ROUTES[0], run));
+	const served1 = computed(() => servedBy(ROUTES[1], run));
+	const served2 = computed(() => servedBy(ROUTES[2], run));
+	const served3 = computed(() => servedBy(ROUTES[3], run));
 
 	<figure
 		class="anatomy"
@@ -20,247 +35,259 @@ export default function MigrateAnatomy() @{
 			const host = event.target as Element;
 			if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 			let seen = true;
-			let step = 0;
+			let t: Tour = TOUR_START;
 			const watcher = new IntersectionObserver((entries) => {
 				seen = Boolean(entries.at(-1)?.isIntersecting);
 			});
 			watcher.observe(host);
 			const timer = setInterval(() => {
-				if (!seen || touched) return;
-				const next = TOUR[step % TOUR.length];
-				step++;
-				if (next === 'move') {
-					moved = move(moved);
-					beat = moved === 0 ? 'rest' : flip(beat);
-				} else if (next === 'reset') {
-					moved = 0;
-					beat = 'rest';
+				if (!seen) return;
+				if (touched) {
+					if (!printing(run)) return;
+					run = print(run);
+					if (!printing(run)) said = describe(run);
+					return;
 				}
-			}, TOUR_MS);
+				t = tour(t);
+				if (t.entered || (printing(run) && !printing(t.run))) said = describe(t.run);
+				run = t.run;
+				typed = t.typed;
+				at = t.typed.length;
+			}, TICK_MS);
 			return () => {
 				clearInterval(timer);
 				watcher.disconnect();
 			};
 		}}
 	>
-		<button
-			type="button"
+		<label
 			class="stage"
-			aria-label="Move the next page to the new app"
-			onClick={() => {
-				touched = true;
-				moved = move(moved);
-				beat = moved === 0 ? 'rest' : flip(beat);
+			data-agent={run.agent}
+			data-suggesting={suggesting}
+			onClick={(event) => {
+				const pick = (event.target as Element).closest("[data-pick]:not([data-pick=''])")?.getAttribute('data-pick');
+				if (!pick) return;
+				const input = (event.target as Element).closest('.stage')!.querySelector('input')!;
+				const fill = runCommand(pick);
+				input.value = fill;
+				typed = fill;
+				at = fill.length;
+				input.focus();
 			}}
-			onKeyDown={(event) => {
-				if (event.key === 'Escape') {
-					touched = true;
-					moved = 0;
-					beat = 'rest';
-				}
+			onPointerDown={(event) => {
+				if (touched) return;
+				touched = true;
+				typed = '';
+				at = 0;
+				const input = (event.target as Element).closest('.stage')!.querySelector('input')!;
+				input.value = '';
 			}}
 		>
-			<svg class="scene" data-beat={beat} data-now={now} data-late={late} style={vars} viewBox={'0 0 ' + art.width + ' ' + art.height} aria-hidden="true">
-				<path class="pencil" d={art.old.pencil} />
-				<path class="pencil" d={art.fresh.pencil} />
-				<path class="pencil" d={art.door.pencil} />
-
-				<path class="shadow-wash light" d={art.old.deskWash} />
-				<path class="hatch deep light" d={art.old.desk} />
-				<path class="shadow-wash light" d={art.fresh.deskWash} />
-				<path class="hatch deep light" d={art.fresh.desk} />
-				<path class="shadow-wash light" d={art.door.deskWash} />
-				<path class="hatch deep light" d={art.door.desk} />
-				<path class="shadow-wash" d={art.old.curl.shadow} />
-				<path class="hatch deep" d={art.old.curl.hatch} />
-				<path class="shadow-wash" d={art.fresh.curl.shadow} />
-				<path class="hatch deep" d={art.fresh.curl.hatch} />
-				<path class="shadow-wash" d={art.door.curl.shadow} />
-				<path class="hatch deep" d={art.door.curl.hatch} />
-
-				<path class="shadow-wash" d={art.parcels.old.shadow} />
-				<path class="hatch deep" d={art.parcels.old.shadowHatch} />
-				<path class="kraft" d={art.parcels.old.paper} />
-				<path class="tape" d={art.parcels.old.tape} />
-				<path class="hatch" d={art.parcels.old.tone} />
-				<path class="jar-ink" d={art.parcels.old.ink} />
-				<path class="shadow-wash light" d={art.parcels.old.tag.cast} />
-				<path class="tag-paper" d={art.parcels.old.tag.paper} />
-				<path class="sheet-ink" d={art.parcels.old.tag.ink} />
-				<path class="jar-ink" d={art.parcels.old.tag.string} />
-				<text class="tag-text" transform={art.parcels.old.tag.matrix}>{TAG}</text>
-				<path class="shadow-wash" d={art.parcels.fresh.shadow} />
-				<path class="hatch deep" d={art.parcels.fresh.shadowHatch} />
-				<path class="kraft" d={art.parcels.fresh.paper} />
-				<path class="tape" d={art.parcels.fresh.tape} />
-				<path class="hatch" d={art.parcels.fresh.tone} />
-				<path class="jar-ink" d={art.parcels.fresh.ink} />
-				<path class="shadow-wash light" d={art.parcels.fresh.tag.cast} />
-				<path class="tag-paper" d={art.parcels.fresh.tag.paper} />
-				<path class="sheet-ink" d={art.parcels.fresh.tag.ink} />
-				<path class="jar-ink" d={art.parcels.fresh.tag.string} />
-				<text class="tag-text" transform={art.parcels.fresh.tag.matrix}>{TAG}</text>
-
-				<g class="sheet">
-					<path class="sheet-paper" d={art.old.paper} />
-					<path class="sheet-hatch light" d={art.old.bar.tone} />
-					<path class="sheet-ink" d={art.old.bar.ink} />
-					<path class="sheet-paper" d={art.old.pill.paper} />
-					<path class="sheet-ink" d={art.old.pill.ink} />
-					<text class="url" transform={art.old.pill.matrix}>{SITE}</text>
-					<text class="title" transform={art.old.title}>{OLD}</text>
-					@for (const p of art.pages; key p.key) {
-						<g class="tile">
-							<path class="sheet-paper" d={p.oldTile.paper} />
-							<path class="sheet-hatch" d={p.oldTile.tone} />
-							<path class="sheet-hatch" d={p.oldTile.extraTone} />
-							<path class="sheet-ink" d={p.oldTile.frame} />
-							<path class="sheet-ink" d={p.oldTile.ink} />
-							<path class="sheet-ink" d={p.oldTile.extra} />
-						</g>
+			<input
+				class="line-in"
+				type="text"
+				aria-label={label}
+				maxlength={MAX_TYPED}
+				autocomplete="off"
+				autocapitalize="off"
+				spellcheck="false"
+				enterkeyhint="go"
+				onFocus={(event) => {
+					if (touched) return;
+					touched = true;
+					typed = '';
+					at = 0;
+					(event.target as HTMLInputElement).value = '';
+				}}
+				onInput={(event) => {
+					const input = event.target as HTMLInputElement;
+					touched = true;
+					typed = input.value;
+					at = input.selectionStart ?? input.value.length;
+					tick = tick === 'a' ? 'b' : 'a';
+				}}
+				onSelectionChange={(event) => {
+					const input = event.target as HTMLInputElement;
+					const next = input.selectionStart ?? input.value.length;
+					if (next === at) return;
+					at = next;
+					tick = tick === 'a' ? 'b' : 'a';
+				}}
+				onKeyDown={(event) => {
+					touched = true;
+					if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Enter' || (event.key === 'c' && event.ctrlKey === true) || (event.key === 'Tab' && event.shiftKey === false && completes)) event.preventDefault();
+					const input = event.target as HTMLInputElement;
+					if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+						const step = recall(ran, back, event.key === 'ArrowUp' ? 1 : -1);
+						if (!step) return;
+						back = step.back;
+						input.value = step.line;
+						typed = step.line;
+						at = step.line.length;
+					} else if ((event.key === 'ArrowRight' || (event.key === 'Tab' && !event.shiftKey)) && input.selectionStart === input.value.length && ghostFor(run, input.value) !== '') {
+						input.value = (input.value + ghostFor(run, input.value)).slice(0, MAX_TYPED);
+						typed = input.value;
+						at = input.value.length;
+					} else if (event.key === 'Enter') {
+						const after = submit(run, input.value);
+						if (after === run) return;
+						const stepped = doneOf(after) > doneOf(run);
+						if (stepped) ran = remember(ran, input.value.trim() || ghostFor(run, ''));
+						back = 0;
+						run = stepped && window.matchMedia('(prefers-reduced-motion: reduce)').matches ? printAll(after) : after;
+						said = describe(run);
+						input.value = '';
+						typed = '';
+						at = 0;
+					} else if (event.key === 'c' && event.ctrlKey) {
+						back = 0;
+						run = interrupt(run, input.value);
+						said = describe(run);
+						input.value = '';
+						typed = '';
+						at = 0;
+					} else if (event.key === 'Escape') {
+						run = START;
+						ran = [];
+						back = 0;
+						said = 'Started over.';
+						input.value = '';
+						typed = '';
+						at = 0;
 					}
-					<path class="sheet-ink" d={art.old.curl.ink} />
-					<path class="sheet-ink" d={art.old.ink} />
-				</g>
+				}}
+			/>
+			<svg
+				class="scene"
+				data-tick={tick}
+				data-listed={report.listed}
+				data-check={report.check}
+				data-live={report.live}
+				viewBox={'0 0 ' + art.width + ' ' + art.height}
+				aria-hidden="true"
+			>
+				<path class="pencil" d={art.sheet.pencil} />
+				<path class="shadow-wash" d={art.report.shadow.wash} />
+				<path class="hatch deep light" d={art.report.shadow.hatch} />
+				<path class="hatch deep light" d={art.report.desk} />
+				<path class="report-paper" d={art.report.paper} />
+				<path class="pencil" d={art.report.pencil} />
+				<path class="ink" d={art.report.ink} />
 
-				<g class="sheet">
-					<path class="sheet-paper" d={art.fresh.paper} />
-					<path class="sheet-hatch light" d={art.fresh.bar.tone} />
-					<path class="sheet-ink" d={art.fresh.bar.ink} />
-					<path class="sheet-paper" d={art.fresh.pill.paper} />
-					<path class="sheet-ink" d={art.fresh.pill.ink} />
-					<text class="url" transform={art.fresh.pill.matrix}>{SITE}</text>
-					<text class="title" transform={art.fresh.title}>{NEW}</text>
-					<path class="pencil" d={art.fresh.slots} />
-					@for (const p of art.pages; key p.key) {
-						<g class="pg" data-i={p.rank} style={'--i:' + p.rank}>
-							<g class="tile-new">
-								<path class="sheet-paper" d={p.newTile.paper} />
-								<path class="sheet-hatch" d={p.newTile.tone} />
-								<path class="sheet-ink" d={p.newTile.frame} />
-								<path class="sheet-ink" d={p.newTile.ink} />
-								<g class="fix">
-									<path class="sheet-hatch" d={p.newTile.extraTone} />
-									<path class="sheet-ink" d={p.newTile.extra} />
-								</g>
+				<g class="list">
+					<text class="head" transform={art.report.head.route}>page</text>
+					<text class="head" transform={art.report.head.served}>served by</text>
+					@for (const r of art.report.routes; key r.key) {
+						<g class="route" data-route={r.key}>
+							<path class="pencil" d={r.rule} />
+							<g class="served-wash">
+								<path class="wash yellow" d={r.wash} />
+								<path class="wash yellow pool" d={r.pool} />
 							</g>
+							<text class="route-name" transform={r.route}>{ROUTES[r.key]}</text>
 						</g>
 					}
-					<path class="sheet-ink" d={art.fresh.curl.ink} />
-					<path class="sheet-ink" d={art.fresh.ink} />
+					<text class="served" transform={art.report.routes[0]!.served}>{served0}</text>
+					<text class="served" transform={art.report.routes[1]!.served}>{served1}</text>
+					<text class="served" transform={art.report.routes[2]!.served}>{served2}</text>
+					<text class="served" transform={art.report.routes[3]!.served}>{served3}</text>
+					<path class="ink tick" d={art.report.tick} />
+					<path class="red-ink cross" d={art.report.cross} />
+					<text class="hand live" transform={art.report.live}>LIVE</text>
 				</g>
 
-				@for (const c of art.cards; key c.key) {
+				<g class="shots">
+					<text class="shot-label" transform={art.report.old.label}>old<tspan class="wide"> {PAGE}</tspan></text>
+					<text class="shot-label" transform={art.report.fresh.label}>new<tspan class="wide"> {PAGE}</tspan></text>
+					<g class="thumb">
+						<path class="shadow-wash light" d={art.report.old.cast} />
+						<path class="sheet-paper" d={art.report.old.paper} />
+						<path class="sheet-hatch light" d={art.report.old.bar} />
+						<path class="sheet-ink" d={art.report.old.ink} />
+						<path class="wash pink" d={art.report.old.button.wash} />
+						<path class="sheet-ink" d={art.report.old.button.ink} />
+						<text class="btn" transform={art.report.old.button.matrix}>Settings</text>
+						<path class="sheet-paper" d={art.report.old.panel.paper} />
+						<path class="sheet-hatch light" d={art.report.old.panel.tone} />
+						<path class="sheet-ink" d={art.report.old.panel.ink} />
+						<path class="sheet-paper" d={art.report.old.cursor} />
+						<path class="sheet-ink" d={art.report.old.cursorInk} />
+					</g>
+					<g class="thumb">
+						<path class="shadow-wash light" d={art.report.fresh.cast} />
+						<path class="sheet-paper" d={art.report.fresh.paper} />
+						<path class="sheet-hatch light" d={art.report.fresh.bar} />
+						<path class="sheet-ink" d={art.report.fresh.ink} />
+						<path class="wash pink" d={art.report.fresh.button.wash} />
+						<path class="sheet-ink" d={art.report.fresh.button.ink} />
+						<text class="btn" transform={art.report.fresh.button.matrix}>Settings</text>
+						<g class="fixed">
+							<path class="sheet-paper" d={art.report.fresh.panel.paper} />
+							<path class="sheet-hatch light" d={art.report.fresh.panel.tone} />
+							<path class="sheet-ink" d={art.report.fresh.panel.ink} />
+						</g>
+						<g class="missing">
+							<path class="pencil gap" d={art.report.fresh.gap} />
+							<path class="red-ink" d={art.report.fresh.ring} />
+						</g>
+						<path class="sheet-paper" d={art.report.fresh.cursor} />
+						<path class="sheet-ink" d={art.report.fresh.cursorInk} />
+					</g>
+					<text class="caption" transform={art.report.caption}>after clicking Settings</text>
+				</g>
+				<g class="js">
 					<g>
-						<path class="shadow-wash" d={c.cast} />
-						<path class="hatch deep light" d={c.castHatch} />
-						<path class="sheet-paper" d={c.paper} />
-						<path class="sheet-ink" d={c.ink} />
+						<path class="wash yellow" d={art.report.js.wash} />
+						<path class="wash yellow pool" d={art.report.js.pool} />
 					</g>
-				}
-				<text class="card-label" transform={art.cards[0]!.label}>{checked}</text>
-				<text class="card-label" transform={art.cards[1]!.label}>{checked}</text>
-				@for (const p of art.pages; key p.key) {
-					<g class="pg" data-i={p.rank} style={'--i:' + p.rank}>
-						<g class="card-in">
-							<path class="sheet-hatch" d={p.oldCard.tone} />
-							<path class="sheet-hatch" d={p.oldCard.extraTone} />
-							<path class="sheet-ink" d={p.oldCard.ink} />
-							<path class="sheet-ink" d={p.oldCard.extra} />
-							<path class="sheet-hatch" d={p.newCard.tone} />
-							<path class="sheet-ink" d={p.newCard.ink} />
-							<g class="fix">
-								<path class="sheet-hatch" d={p.newCard.extraTone} />
-								<path class="sheet-ink" d={p.newCard.extra} />
-							</g>
-							<path class="ring" d={p.ring} />
-						</g>
-					</g>
-				}
-				<g class="marks">
-					@for (const m of art.marks; key m.key) {
-						<g class="mark" data-row={m.key}>
-							<path class="tick" d={m.tick.d} style={'--l:' + m.tick.length} />
-							<path class="cross" d={m.cross} />
-						</g>
-					}
+					<text class="head" transform={art.report.js.label}>JS at load</text>
+					<text class="js-at" transform={art.report.jsAt}>{JS.old} → {JS.new}</text>
 				</g>
 
-				<g class="sheet">
-					<path class="sheet-paper" d={art.door.paper} />
-					@for (const p of art.pages; key p.key) {
-						<g class="pg" data-i={p.rank} style={'--i:' + p.rank}>
-							<g class="label-wash">
-								<path class="wash yellow" d={art.door.sockets[p.key]!.wash} />
-								<path class="wash yellow pool" d={art.door.sockets[p.key]!.pool} />
-							</g>
+				<path class="shadow-wash light" d={art.sheet.deskWash} />
+				<path class="hatch deep" d={art.sheet.desk} />
+				<path class="shadow-wash" d={art.sheet.curl.shadow} />
+				<path class="hatch deep" d={art.sheet.curl.hatch} />
+				<path class="sheet-paper" d={art.sheet.paper} />
+				<path class="sheet-hatch light" d={art.sheet.bar.tone} />
+				<path class="sheet-ink" d={art.sheet.bar.ink} />
+				@for (const slot of lines; key slot.key) {
+					<g class="row" data-kind={slot.kind} data-invalid={slot.invalid}>
+						<text class="term" transform={slot.matrix}>
+							<tspan class="mark">{slot.mark}</tspan>
+							<tspan class="line" x="22">{slot.text}</tspan>
+							<tspan class="caret">{slot.caret}</tspan>
+							<tspan class="line">{slot.after}</tspan>
+							<tspan class="ghost">{slot.ghost}</tspan>
+							<tspan class="value" x="15em">{slot.value}</tspan>
+						</text>
+						<g class="focus" data-on={slot.focus}>
+							<path class="sheet-ink" d={slot.pointer} />
 						</g>
-					}
-					<text class="door-title" transform={art.door.title}>{SITE}</text>
-					<path class="sheet-hatch" d={art.door.doorTone} />
-					<path class="sheet-ink" d={art.door.doorway} />
-					<path class="sheet-ink" d={art.door.rule} />
-					@for (const s of art.door.sockets; key s.key) {
-						<g>
-							<path class="boot" d={s.paper} />
-							<path class="hatch" d={s.tone} />
-							<path class="jar-ink" d={s.ink} />
-							<text class="path" transform={s.label}>{PAGES[s.key]!.path}</text>
-						</g>
-					}
-					<g class="press" style={art.door.button.sink}>
-						<path class="sheet-hatch" d={art.door.button.side} />
-						<path class="sheet-paper" d={art.door.button.paper} />
-						<path class="wash pink" d={art.door.button.wash} />
-						<path class="wash pink pool" d={art.door.button.pool} />
-						<path class="sheet-ink" d={art.door.button.ink} />
-						<text class="button-text" transform={art.door.button.label}>{label}</text>
-					</g>
-					<path class="sheet-ink" d={art.door.curl.ink} />
-					<path class="sheet-ink" d={art.door.ink} />
-				</g>
-
-				@for (const p of art.pages; key p.key) {
-					<g class="pg" data-i={p.rank} style={'--i:' + p.rank}>
-						<g class="wire-old">
-							<path class="shadow-ink" d={p.oldWire.shadow} />
-							<path class="cord" d={p.oldWire.paper} />
-							<path class="jar-ink" d={p.oldWire.ink} />
-							<path class="shadow-wash" d={p.oldWire.clip.cast} />
-							<path class="boot" d={p.oldWire.clip.boot} />
-							<path class="brass" d={p.oldWire.clip.paper} />
-							<path class="wash brass-wash" d={p.oldWire.clip.wash} />
-							<path class="hatch" d={p.oldWire.clip.side} />
-							<path class="jar-ink" d={p.oldWire.clip.ink} />
-						</g>
-						<g class="wire-new">
-							<path class="shadow-ink" d={p.newWire.shadow} />
-							<path class="cord" d={p.newWire.paper} />
-							<path class="jar-ink" d={p.newWire.ink} />
-							<path class="shadow-wash" d={p.newWire.clip.cast} />
-							<path class="boot" d={p.newWire.clip.boot} />
-							<path class="brass" d={p.newWire.clip.paper} />
-							<path class="wash brass-wash" d={p.newWire.clip.wash} />
-							<path class="hatch" d={p.newWire.clip.side} />
-							<path class="jar-ink" d={p.newWire.clip.ink} />
-						</g>
-						<path class="pulse" d={p.newWire.centre} style={'--len:' + p.newWire.length} />
 					</g>
 				}
-
-				<path class="jar-ink" d={art.note.arrow} />
-				<text class="hand" x={art.note.at.x} y={art.note.at.y}>{NOTE}</text>
+				<text class="term footer" transform={FOOT}>
+					<tspan class="also" x="22">also: </tspan>
+					@for (const footer of FOOTERS; key footer.agent) {
+						<tspan class="others" data-for={footer.agent}>
+							@for (const other of footer.others; key other.id) {
+								<tspan class="gap">{other.gap}</tspan>
+								<tspan class="pick" data-pick={other.id}>{other.id}</tspan>
+							}
+						</tspan>
+					}
+				</text>
+				<path class="sheet-ink" d={art.sheet.curl.ink} />
+				<path class="sheet-ink" d={art.sheet.ink} />
 			</svg>
-		</button>
+		</label>
 		<figcaption class="sr">
-			A pen-and-ink drawing of a desk. At the back lie two browser sheets for {SITE}: the old app on the left with its four pages
-			drawn as small tiles, and the new app on the right with four empty spots. Behind the old app sits a big heavy box tagged
-			{TAG}; behind the new app, a tiny one with the same tag. In front, a card for the front door lists the pages /, /pricing,
-			/account and /blog, each with a wire running back to that page's tile on the old app. Between the sheets lie two blank cards
-			for the check. Press the drawing, or Enter or Space, to move the next page: its new version appears on the new app, the old
-			and new versions are laid side by side and ticked part by part, and only when every part matches does its wire move to the
-			new app. On /account the check first finds the settings button missing, and the wire moves only once it is fixed. Escape
-			puts every page back on the old app.
+			A pen-and-ink drawing of a desk. A sheet of paper drawn as a terminal replays a markless-migrate run on a small shop with four pages:
+			/, /pricing, /account and /blog. Press Enter to run each command in turn: plan lists the pages and what it read on each; Claude
+			Code converts /account; check compares the old and new /account in seven plain checks and fails one, because the new Settings button
+			opens nothing; Claude Code fixes it; check runs again and passes; switch makes /account live. Below lies the report: the four pages
+			and which app serves each, the old and new /account side by side, and the JavaScript run at load before and after. Arrow Up recalls
+			earlier commands, Escape starts over.
 		</figcaption>
 		<p class="sr" aria-live="polite">{said}</p>
 		<style>
@@ -271,18 +298,64 @@ export default function MigrateAnatomy() @{
 
 			.stage {
 				display: block;
-				width: 100%;
-				padding: 0;
-				border: 0;
-				background: none;
-				color: inherit;
-				cursor: pointer;
-				border-radius: 12px;
+				position: relative;
+				cursor: text;
+				user-select: none;
+				-webkit-user-select: none;
 			}
 
-			.stage:focus-visible {
-				outline: 2px dashed var(--ink);
-				outline-offset: 4px;
+			.line-in {
+				position: absolute;
+				left: 10%;
+				top: 2%;
+				width: 80%;
+				height: 50%;
+				padding: 0;
+				border: 0;
+				font-size: 16px;
+				opacity: 0;
+				pointer-events: none;
+			}
+
+			.row[data-invalid='yes'] .line,
+			.row[data-kind='fail'] :is(.line, .mark),
+			.red-ink {
+				fill: var(--red);
+			}
+
+			.focus,
+			.caret {
+				visibility: hidden;
+			}
+
+			.stage:focus-within .focus[data-on='yes'],
+			.stage:has(.line-in:focus) .caret {
+				visibility: visible;
+			}
+
+			.caret {
+				font-weight: 700;
+				animation: blink-a 1.06s steps(1) infinite;
+			}
+
+			.scene[data-tick='b'] .caret {
+				animation-name: blink-b;
+			}
+
+			@keyframes blink-a {
+				50% {
+					opacity: 0;
+				}
+			}
+
+			@keyframes blink-b {
+				50% {
+					opacity: 0;
+				}
+			}
+
+			.ghost {
+				opacity: 0.32;
 			}
 
 			.scene {
@@ -291,46 +364,41 @@ export default function MigrateAnatomy() @{
 				height: auto;
 				overflow: visible;
 				--sheet: color-mix(in oklch, var(--paper) 50%, white);
+				--report: color-mix(in oklch, var(--paper) 70%, white);
 				--sheet-ink: var(--ink);
 				--shade: color-mix(in oklch, var(--ink) 24%, transparent);
 				--shade-ink: var(--ink);
-				--card: oklch(76% 0.06 70);
-				--t3: 2100ms;
-				--sw: 2600ms;
+				--red: oklch(52% 0.19 27);
 
 				html.dark & {
+					--red: oklch(55% 0.2 27);
 					--sheet: color-mix(in oklch, var(--ink) 94%, var(--yellow));
+					--report: color-mix(in oklch, var(--ink) 90%, var(--yellow));
 					--sheet-ink: var(--paper);
 					--shade: rgb(0 0 0 / 0.55);
 					--shade-ink: rgb(0 0 0 / 0.85);
-					--card: oklch(52% 0.06 65);
 				}
 			}
 
-			.scene[data-late='yes'] {
-				--t3: 3300ms;
-				--sw: 3800ms;
-			}
-
-			.sheet-paper,
-			.tag-paper {
+			.sheet-paper {
 				fill: var(--sheet);
 			}
 
-			.sheet-ink {
+			.report-paper {
+				fill: var(--report);
+			}
+
+			.sheet-ink,
+			.ink {
 				fill: var(--sheet-ink);
 			}
 
 			.sheet-hatch {
 				fill: none;
 				stroke: var(--sheet-ink);
-				stroke-width: 0.55;
+				stroke-width: 0.6;
 				stroke-linecap: round;
-				opacity: 0.75;
-			}
-
-			.jar-ink {
-				fill: var(--ink);
+				opacity: 0.8;
 			}
 
 			.light {
@@ -340,7 +408,7 @@ export default function MigrateAnatomy() @{
 			.hatch {
 				fill: none;
 				stroke: var(--ink);
-				stroke-width: 0.7;
+				stroke-width: 0.75;
 				stroke-linecap: round;
 			}
 
@@ -352,45 +420,23 @@ export default function MigrateAnatomy() @{
 				fill: var(--shade);
 			}
 
-			.shadow-ink {
-				fill: var(--shade);
-				opacity: 0.9;
-			}
-
-			.cord,
-			.brass {
-				fill: var(--paper);
-			}
-
-			.kraft {
-				fill: var(--card);
-			}
-
-			.tape {
-				fill: color-mix(in oklch, var(--card) 70%, white);
-
-				html.dark & {
-					fill: color-mix(in oklch, var(--card) 80%, black);
-				}
-			}
-
-			.boot {
-				fill: oklch(48% 0.15 25);
-
-				html.dark & {
-					fill: oklch(52% 0.15 25);
-				}
-			}
-
 			.wash {
 				stroke-width: 1.2;
 				mix-blend-mode: multiply;
+
+				html.dark & {
+					mix-blend-mode: normal;
+				}
 			}
 
 			.yellow {
 				fill: var(--yellow);
 				stroke: var(--yellow);
 				opacity: 0.85;
+
+				html.dark & {
+					opacity: 0.45;
+				}
 			}
 
 			.pink {
@@ -405,76 +451,89 @@ export default function MigrateAnatomy() @{
 				opacity: 0.5;
 			}
 
-			.pink.pool {
-				fill: var(--pink);
-				opacity: 0.45;
-			}
-
-			.brass-wash {
-				fill: color-mix(in oklch, var(--yellow) 70%, oklch(60% 0.12 70));
-				stroke: none;
-				opacity: 0.8;
-
-				html.dark & {
-					mix-blend-mode: normal;
-				}
-			}
-
-			.title,
-			.url,
-			.door-title,
-			.path,
-			.button-text,
-			.card-label,
-			.tag-text {
-				font-family: 'Shantell Sans', system-ui, sans-serif;
+			.term,
+			.route-name,
+			.served,
+			.head,
+			.shot-label,
+			.btn,
+			.js-at {
+				font-family: var(--font-mono);
 				fill: var(--sheet-ink);
 			}
 
-			.title {
+			.term {
+				font-size: 14px;
+				white-space: pre;
+				font-variant-ligatures: none;
+			}
+
+			.value {
+				opacity: 0.45;
+			}
+
+			.mark {
+				opacity: 0.7;
+			}
+
+			.row:is([data-kind='cmd'], [data-kind='input'], [data-kind='head'], [data-kind='agent'], [data-kind='fail']) .line,
+			.row[data-kind='start'] .line {
+				font-weight: 700;
+			}
+
+			.row:is([data-kind='pass'], [data-kind='fail']) .mark {
+				opacity: 1;
+				font-weight: 700;
+			}
+
+			.row:is([data-kind='path'], [data-kind='reason'], [data-kind='try']) .line {
+				opacity: 0.62;
+			}
+
+			.row[data-kind='start'] .line {
+				opacity: 0.55;
+			}
+
+			.route-name {
 				font-size: 15px;
-				font-weight: 800;
+				font-weight: 700;
 			}
 
-			.url {
-				font-size: 7px;
-				opacity: 0.75;
+			.served {
+				font-size: 14px;
 			}
 
-			.door-title {
-				font-size: 12px;
-				font-weight: 800;
+			.head {
+				font-size: 11px;
+				opacity: 0.55;
 			}
 
-			.path {
+			.shot-label {
+				font-size: 11px;
+				font-weight: 700;
+			}
+
+			.btn {
+				font-size: 6.5px;
+				font-weight: 700;
+			}
+
+			.caption {
+				font-family: 'Joy Elia', system-ui, sans-serif;
 				font-size: 13px;
-				font-weight: 800;
-				text-anchor: middle;
+				fill: var(--sheet-ink);
 			}
 
-			.button-text {
-				font-size: 9.5px;
-				font-weight: 700;
-				text-anchor: middle;
-			}
-
-			.card-label {
-				font-size: 9px;
-				font-weight: 700;
-				text-anchor: middle;
-			}
-
-			.tag-text {
-				font-size: 9px;
+			.js-at {
+				font-size: 14px;
 				font-weight: 700;
 			}
 
 			.hand {
 				font-family: 'Joy Elia', system-ui, sans-serif;
-				font-size: 13px;
-				letter-spacing: 0.16em;
-				text-anchor: middle;
-				fill: var(--ink);
+				font-size: 14px;
+				letter-spacing: 0.14em;
+				fill: var(--sheet-ink);
 			}
 
 			.pencil {
@@ -489,261 +548,90 @@ export default function MigrateAnatomy() @{
 				}
 			}
 
-			.ring {
-				fill: none;
-				stroke: color-mix(in srgb, var(--pink) 70%, #e0603c);
-				stroke-width: 1.4;
-				stroke-linecap: round;
+			.pencil.gap {
+				stroke: var(--sheet-ink);
+				stroke-dasharray: 2 2;
+				opacity: 0.5;
+			}
+
+			.scene[data-listed='no'] .list,
+			.scene:not([data-check='red']) :is(.cross, .missing),
+			.scene[data-check='red'] .fixed,
+			.scene:not([data-check='green']) .tick,
+			.scene[data-check='none'] .shots,
+			.scene:not([data-check='green']) .js,
+			.scene[data-live='no'] :is(.live, .served-wash),
+			.scene[data-live='yes'] .tick,
+			.route:not([data-route='2']) .served-wash {
 				opacity: 0;
 			}
 
-			.tick {
-				fill: none;
-				stroke: var(--ink);
-				stroke-width: 2;
-				stroke-linecap: round;
-				stroke-linejoin: round;
-				stroke-dasharray: var(--l);
+			:is(.list, .shots, .cross, .tick, .js, .fixed, .missing, .served-wash, .live) {
+				transition: opacity 0.4s ease-out;
 			}
 
-			.cross {
-				fill: var(--ink);
-				opacity: 0;
+			.term.footer {
+				font-size: 12px;
+				opacity: 0.5;
+				visibility: hidden;
 			}
 
-			.scene[data-now='-1'] .marks {
+			.stage[data-suggesting='yes'] .footer {
+				visibility: visible;
+			}
+
+			.others {
 				display: none;
 			}
 
-			.pulse {
-				fill: none;
-				stroke: var(--ink);
-				stroke-width: 7;
-				stroke-linecap: round;
-				stroke-dasharray: 3 100000;
-				opacity: 0;
+			.stage[data-agent='claude'] .others[data-for='claude'],
+			.stage[data-agent='codex'] .others[data-for='codex'],
+			.stage[data-agent='cursor'] .others[data-for='cursor'],
+			.stage[data-agent='gemini'] .others[data-for='gemini'],
+			.stage[data-agent='copilot'] .others[data-for='copilot'],
+			.stage[data-agent='opencode'] .others[data-for='opencode'] {
+				display: inline;
 			}
 
-			.pg {
-				--on: clamp(0, calc(var(--moved) - var(--i)), 1);
-				--shown: 0;
-				--a-show: none;
-				--a-out: none;
-				--a-in: none;
-				--a-travel: none;
-				--a-flash: none;
+			.pick {
+				cursor: pointer;
 			}
 
-			.scene[data-now='0'] .pg[data-i='0'],
-			.scene[data-now='1'] .pg[data-i='1'],
-			.scene[data-now='2'] .pg[data-i='2'],
-			.scene[data-now='3'] .pg[data-i='3'] {
-				--shown: 1;
-				--a-show: var(--k-show);
-				--a-out: var(--k-out);
-				--a-in: var(--k-in);
-				--a-travel: var(--k-travel);
-				--a-flash: var(--k-flash);
-			}
-
-			.scene[data-beat='odd'] {
-				--k-show: show-a;
-				--k-out: out-a;
-				--k-in: in-a;
-				--k-travel: travel-a;
-				--k-flash: flash-a;
-				--k-draw: draw-a;
-				--k-sink: sink-a;
-			}
-
-			.scene[data-beat='even'] {
-				--k-show: show-b;
-				--k-out: out-b;
-				--k-in: in-b;
-				--k-travel: travel-b;
-				--k-flash: flash-b;
-				--k-draw: draw-b;
-				--k-sink: sink-b;
-			}
-
-			.press {
-				animation: var(--k-sink, none) 420ms cubic-bezier(0.3, 0.7, 0.4, 1);
-			}
-
-			.tile-new {
-				opacity: var(--on);
-				animation: var(--a-show) 700ms 250ms ease-out both;
-			}
-
-			.card-in {
-				opacity: var(--shown);
-				animation: var(--a-show) 450ms 900ms ease-out both;
-			}
-
-			.scene[data-late='yes'] .fix {
-				animation: var(--a-in) 500ms 2600ms ease-out both;
-			}
-
-			.scene[data-late='yes'] .ring {
-				animation: var(--a-flash) 1100ms 2100ms both;
-				animation-fill-mode: none;
-			}
-
-			.mark .tick {
-				--d: 1400ms;
-				animation: var(--k-draw, none) 320ms var(--d) ease-out both;
-			}
-
-			.mark[data-row='1'] .tick {
-				--d: 1750ms;
-			}
-
-			.mark[data-row='2'] .tick {
-				--d: var(--t3);
-			}
-
-			.scene[data-late='yes'] .mark[data-row='2'] .cross {
-				animation: var(--k-flash, none) 1100ms 2100ms;
-			}
-
-			.wire-old {
-				opacity: calc(1 - var(--on));
-				animation: var(--a-out) 300ms var(--sw) ease-in both;
-			}
-
-			.wire-new {
-				opacity: var(--on);
-				animation: var(--a-in) 400ms calc(var(--sw) + 100ms) ease-out both;
-			}
-
-			.pg .pulse {
-				animation: var(--a-travel) 800ms calc(var(--sw) + 200ms) ease-in-out both;
-			}
-
-			.label-wash {
-				opacity: var(--on);
-				animation: var(--a-in) 500ms calc(var(--sw) + 900ms) ease-out both;
-			}
-
-			@keyframes sink-a {
-				35% {
-					transform: translate(var(--sink-x), var(--sink-y));
-				}
-			}
-
-			@keyframes sink-b {
-				35% {
-					transform: translate(var(--sink-x), var(--sink-y));
-				}
-			}
-
-			@keyframes show-a {
-				from {
-					opacity: 0;
-					transform: translateY(-8px);
-				}
-			}
-
-			@keyframes show-b {
-				from {
-					opacity: 0;
-					transform: translateY(-8px);
-				}
-			}
-
-			@keyframes in-a {
-				from {
-					opacity: 0;
-				}
-			}
-
-			@keyframes in-b {
-				from {
-					opacity: 0;
-				}
-			}
-
-			@keyframes out-a {
-				from {
-					opacity: 1;
-				}
-			}
-
-			@keyframes out-b {
-				from {
-					opacity: 1;
-				}
-			}
-
-			@keyframes flash-a {
-				from,
-				to {
-					opacity: 1;
-				}
-			}
-
-			@keyframes flash-b {
-				from,
-				to {
-					opacity: 1;
-				}
-			}
-
-			@keyframes draw-a {
-				from {
-					stroke-dashoffset: var(--l);
-				}
-
-				to {
-					stroke-dashoffset: 0;
-				}
-			}
-
-			@keyframes draw-b {
-				from {
-					stroke-dashoffset: var(--l);
-				}
-
-				to {
-					stroke-dashoffset: 0;
-				}
-			}
-
-			@keyframes travel-a {
-				0% {
-					opacity: 1;
-					stroke-dashoffset: 2;
-				}
-
-				92% {
-					opacity: 1;
-				}
-
-				100% {
-					opacity: 0;
-					stroke-dashoffset: calc(var(--len) * -1px);
-				}
-			}
-
-			@keyframes travel-b {
-				0% {
-					opacity: 1;
-					stroke-dashoffset: 2;
-				}
-
-				92% {
-					opacity: 1;
-				}
-
-				100% {
-					opacity: 0;
-					stroke-dashoffset: calc(var(--len) * -1px);
-				}
+			.pick:hover {
+				text-decoration: underline;
 			}
 
 			@container anatomy (max-width: 520px) {
+				.term {
+					font-size: 17px;
+				}
+
+				.term.footer {
+					font-size: 15px;
+				}
+
+				.route-name,
+				.served,
+				.js-at {
+					font-size: 16px;
+				}
+
+				.wide {
+					display: none;
+				}
+
+				.head,
+				.shot-label {
+					font-size: 14px;
+				}
+
+				.caption,
 				.hand {
-					font-size: 20px;
+					font-size: 16px;
+				}
+
+				.hand {
+					letter-spacing: 0.04em;
 				}
 			}
 

@@ -3,6 +3,7 @@ import Subtitle from '../../components/docs/subtitle.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import LikeHeart from '../../components/docs/like-heart.tsrx';
+import ShowcaseGrid from '../../components/docs/showcase/showcase-grid.tsrx';
 import MigrateAnatomy from '../../components/figures/migrate/migrate-anatomy.tsrx';
 
 <Sidebar />
@@ -23,7 +24,7 @@ Your coding agent rewrites a page. markless-migrate opens the old page and the n
 
 ## Try it
 
-It works through the coding agent you already use, like Claude Code, Codex or Cursor. It is a preview and not on npm yet.
+It works through the coding agent you already use, like Claude Code, Codex or Cursor. It is open source under the MIT license: [github.com/thejackshelton/markless-migrate](https://github.com/thejackshelton/markless-migrate). It is a preview and not on npm yet.
 
 ```bash
 npx @markless/migrate setup
@@ -31,12 +32,8 @@ npx @markless/migrate setup
 
 ## Apps already moved
 
-| App | JavaScript run at load |
-| --- | --- |
-| [Next.js dashboard](https://mm-next-dashboard.vercel.app) | 171 KB → 0.5 KB |
-| [Remix notes](https://mm-remix-notes.vercel.app) | 93 KB → 1.2 KB |
-| [Docusaurus](https://mm-docusaurus.vercel.app) | about 85% less |
-| [Conduit](https://mm-realworld.vercel.app) | about 75% less |
-| [htmx.org](https://mm-htmx-org.vercel.app) | about 90 KB → 18 KB |
+Each card opens what was checked, what the numbers were before and after, and what is still left.
+
+<ShowcaseGrid />
 
 <LikeHeart />

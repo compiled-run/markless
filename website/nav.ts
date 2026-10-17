@@ -477,6 +477,9 @@ export function breadcrumbFor(pathname: string): Crumb {
 	for (const section of allNav)
 		for (const entry of section.entries)
 			if (entry.href === pathname) return { section: section.title, page: entry.title };
+	for (const section of allNav)
+		for (const entry of section.entries)
+			if (entry.href !== '/' && pathname.startsWith(entry.href + '/')) return { section: section.title, page: entry.title };
 	return { section: '', page: '' };
 }
 
@@ -501,6 +504,7 @@ export function headFor(
 	errorFor?: (
 		code: string,
 	) => { readonly code: string; readonly description: string } | undefined,
+	migratedAppFor?: (slug: string) => { readonly name: string; readonly builtWith: string } | undefined,
 ): Head {
 	const entry = allFlat.find((one) => one.href === pathname);
 	if (!entry) {
@@ -509,6 +513,14 @@ export function headFor(
 			: undefined;
 		if (error)
 			return { title: `${error.code} | ${siteName} docs`, description: error.description };
+		const app = pathname.startsWith('/start/migrate/')
+			? migratedAppFor?.(pathname.slice('/start/migrate/'.length))
+			: undefined;
+		if (app)
+			return {
+				title: `${app.name}, moved to Markless | ${siteName} docs`,
+				description: `${app.name} was built with ${app.builtWith}. What was checked, the JavaScript before and after, and what is left.`,
+			};
 		return { title: `${siteName} docs`, description: siteDescription };
 	}
 	return {
