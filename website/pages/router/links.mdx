@@ -61,6 +61,8 @@ The router writes your route types to `.output/markless/router/types/routes.d.ts
 When someone clicks a link to one of your pages, the browser keeps the page it has. The router asks
 the server for the next page and swaps in only the page area. The address bar changes, and Back and
 Forward bring back each page and its scroll position.
+A scrolled box such as a sidebar keeps its scroll too. If the next page puts that box inside a
+different element, give the box an `id` so the router can find it there.
 
 If `document.tsrx` reads a prop other than `children`, such as the URL, a click loads the whole new
 page instead.

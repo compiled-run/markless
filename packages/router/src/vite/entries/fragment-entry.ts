@@ -329,9 +329,10 @@ function morphNode(d: Document, from: ChildNode, to: ChildNode, fresh: Element[]
 }
 
 // Scrolled boxes (a sidebar) keep their offset when the same box is there after the swap:
-// at its old place in the tree, or else the one element of its kind when the next page wraps it differently.
+// at its old place in the tree, or else by its id when the next page wraps it differently.
 type ScrolledBox = {
 	readonly path: string | undefined;
+	readonly id: string;
 	readonly kind: string;
 	readonly top: number;
 	readonly left: number;
@@ -364,11 +365,8 @@ function elementAt(root: Element, path: string): Element | undefined {
 function sameBox(root: Element, box: ScrolledBox): Element | undefined {
 	const placed = box.path === undefined ? undefined : elementAt(root, box.path);
 	if (placed) return placed;
-	const name = box.kind.slice(0, box.kind.indexOf('#'));
-	const matches = [...root.getElementsByTagName(name)].filter(
-		(element) => boxKind(element) === box.kind,
-	);
-	return matches.length === 1 ? matches[0] : undefined;
+	const named = box.id ? root.ownerDocument.getElementById(box.id) : null;
+	return named && root.contains(named) && boxKind(named) === box.kind ? named : undefined;
 }
 
 // Streamed @pending arms arrive after the region, one delimited piece each, and run exactly as on a landing.
@@ -476,6 +474,7 @@ export async function navigate(
 		if (element.scrollTop || element.scrollLeft)
 			offsets.push({
 				path: elementPath(scope, element),
+				id: element.id,
 				kind: boxKind(element),
 				top: element.scrollTop,
 				left: element.scrollLeft,
