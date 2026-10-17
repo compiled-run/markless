@@ -34,8 +34,8 @@ import { __marklessDebugBootstrapSource } from './debug-channel.ts';
 // content into the anchor range — a page that never loads the runtime still
 // SHOWS settled content. The records and state-patch scripts stay in the
 // document; the resume runtime adopts them at wake (resume-stream-patches),
-// which makes the settled content INTERACTIVE. A wake that lands first holds
-// until the stream closes and adopts the arm (resume-stream-patches).
+// which makes the settled content INTERACTIVE. A runtime that woke first
+// adopts each later arm through `__mArm` handing it over (fns/streamed-arms).
 
 // Per-request first-flush deadline: computeds that settle within it render
 // inline with zero streaming bytes; only still-pending boundaries stream.
@@ -334,7 +334,10 @@ function renderArmAppend(
 		cells,
 		computed: serializeRuntimeAsyncSnapshots([...computedById.values()]),
 	};
-	const armPatch: ProtocolStreamedArmPatch = [boundary.initiallyServedArm, armRecords as never];
+	const armPatch: ProtocolStreamedArmPatch = [
+		boundary.initiallyServedArm,
+		withPaintedBranchArms(armRecords, output) as never,
+	];
 	const nonceAttribute = nonce ? ` nonce="${escapeAttribute(nonce)}"` : '';
 
 	const revealArguments = arm.revealDependencyIds.length
@@ -347,6 +350,23 @@ function renderArmAppend(
 		`<script type="markless/state-patch" data-graph-node="${escapeAttribute(arm.graphNodeId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(patch))}</script>` +
 		`<script${nonceAttribute}>__mArm(${escapeScriptJson(revealArguments)})</script>`
 	);
+}
+
+// A streamed arm can land after the page changed state, so its branches name the arm this render painted.
+function withPaintedBranchArms(armRecords: object, output: SsrRenderOutput): object {
+	const painted = new Map(
+		((output as { readonly servedBranches?: ReadonlyArray<{ readonly id: string; readonly takenArm: number }> })
+			.servedBranches ?? []).map((branch) => [branch.id, branch.takenArm]),
+	);
+	const branches = (armRecords as { readonly branches?: ReadonlyArray<{ readonly id: string }> })
+		.branches;
+	if (!painted.size || !branches?.length) return armRecords;
+	return {
+		...armRecords,
+		branches: branches.map((branch) =>
+			painted.has(branch.id) ? { ...branch, takenArm: painted.get(branch.id) } : branch,
+		),
+	};
 }
 
 // Serialized into the stream executor, so it stays self-contained.
@@ -499,6 +519,7 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 	}
 	if (!s || !e || s.parentNode !== e.parentNode) throw new Error('MARKLESS_STREAM_ARM_ANCHORS_MISSING: ' + id);
 	const root = s.parentElement && s.parentElement.closest && s.parentElement.closest('[data-async-container]');
+	if (root && root.__mArmLive && root.__mArmLive(id)) return;
 	if (root && root.__mAdopted) return;
 	if (root && !root.__marklessCensus && root.getElementsByTagName) {
 		const c = [root], all = root.getElementsByTagName('*');

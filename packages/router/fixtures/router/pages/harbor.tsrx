@@ -6,7 +6,8 @@ import { computed, state } from '@markless/core';
 // inert template on the same response and must become interactive after
 // wake (the in-arm button writes state read by the shell's tally). The arm
 // nests an @if and a keyed @for, so a click held until the arm streams must
-// flip the @if inside the arm the server sent.
+// flip the @if inside the arm the server sent, and so must a click on the
+// @pending arm's own control.
 export default function Harbor() @{
 	let logged = state(0);
 	const forecast = computed(async () => {
@@ -53,7 +54,12 @@ export default function Harbor() @{
 					</ul>
 				</article>;
 			} @pending {
-				<p data-harbor-waiting>Scanning the horizon</p>;
+				<p data-harbor-waiting>
+					Scanning the horizon
+					<button data-harbor-wait onClick={() => logged++}>
+						Wait
+					</button>
+				</p>;
 			} @catch {
 				<p data-harbor-fault>Harbor signal lost</p>;
 			}

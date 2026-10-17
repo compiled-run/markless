@@ -161,33 +161,41 @@ export default box(
 				buffered.close();
 			}
 
-			// (8) A click that lands while the arm is still streaming is held, then runs
-			// against the arm the server streamed: it flips the @if inside that arm, its
-			// streamed rows stay live, and the browser renders no arm itself, so it
-			// fetches no code the document did not preload.
-			const early = await visitWithEarlyClick(preview, {
-				path: '/harbor',
-				button: HAIL_BUTTON,
-				pending: '[data-harbor-waiting]',
-			});
-			try {
-				await expect.page.text(early.page, TALLY, 'Logged 1', WAIT);
-				await expect.page.text(early.page, HEARD, 'Heard 1', WAIT);
-				await early.page.click('[data-harbor-tug="kestrel"]', WAIT);
-				await expect.page.text(early.page, HEARD, 'Heard 2', WAIT);
-				await expect.page.text(early.page, TALLY, 'Logged 2', WAIT);
-				await expectOnlyPreloadedCode(early.page);
-				await expect.page.outcome(
-					early.page,
-					{ consoleErrors: 0, failedRequests: 0 },
-					WAIT,
+			// (8) A click that lands while the arm is still streaming runs at once: the
+			// proxy forwards the rest of the stream only after the shell shows the
+			// click's effect. The arm the server then streams is adopted, not rendered:
+			// the @if inside it reflects the earlier click, its streamed rows stay live,
+			// and nothing is fetched that the document did not preload. The same holds
+			// for a click on a control inside the @pending arm itself.
+			for (const scenario of [
+				{ button: HAIL_BUTTON, label: 'a shell control' },
+				{ button: '[data-harbor-wait]', label: 'a control inside the @pending arm' },
+			]) {
+				const early = await visitWithEarlyClick(preview, {
+					path: '/harbor',
+					button: scenario.button,
+					pending: '[data-harbor-waiting]',
+					shows: { selector: TALLY, text: 'Logged 1' },
+				});
+				try {
+					await expect.page.text(early.page, TALLY, 'Logged 1', WAIT);
+					await expect.page.text(early.page, HEARD, 'Heard 1', WAIT);
+					await early.page.click('[data-harbor-tug="kestrel"]', WAIT);
+					await expect.page.text(early.page, HEARD, 'Heard 2', WAIT);
+					await expect.page.text(early.page, TALLY, 'Logged 2', WAIT);
+					await expectOnlyPreloadedCode(early.page);
+					await expect.page.outcome(
+						early.page,
+						{ consoleErrors: 0, failedRequests: 0 },
+						WAIT,
+					);
+				} finally {
+					early.close();
+				}
+				receipt.note(
+					`a click on ${scenario.label} during the open stream updated the shell before the arm streamed, then the adopted arm reflected it with only preloaded code`,
 				);
-			} finally {
-				early.close();
 			}
-			receipt.note(
-				'a click during the open stream was held, then ran against the adopted streamed arm (nested @if and @for included) with only preloaded code',
-			);
 
 			receipt.note(
 				'out-of-order settle observed: pending painted from the open stream, settled arm committed from a later-flushed inert template, interactive after wake',
@@ -503,27 +511,39 @@ type EarlyClickPage = {
 	networkRequests(): Promise<ReadonlyArray<{ readonly url: string }>>;
 };
 
+type EarlyClick = {
+	readonly path: string;
+	readonly button: string;
+	readonly pending: string;
+	// What the shell must show before the proxy forwards the settled arm.
+	readonly shows: { readonly selector: string; readonly text: string };
+};
+
 // Visits `path` through a proxy that clicks `button` right after the shell parses,
-// while the server still holds the settled arm.
+// and holds the settled arm back until the page shows the click's effect.
 async function visitWithEarlyClick<Page extends EarlyClickPage>(
 	preview: { readonly url: string; readonly browser: { visit(path: string): Promise<Page> } },
-	input: { readonly path: string; readonly button: string; readonly pending: string },
+	input: EarlyClick,
 ): Promise<{ readonly page: Page; readonly close: () => void }> {
 	const proxy = await serveWithEarlyClick(new URL(preview.url), input);
 	const page = await preview.browser.visit(proxy.url);
 	const dom = await page.content();
-	if (!dom.includes('data-early-click="pending"')) {
+	const fail = (message: string): never => {
 		proxy.close();
-		throw new Error(
+		throw new Error(message);
+	};
+	if (!dom.includes('data-early-click="pending"'))
+		fail(
 			`The injected click on ${input.path} must land while the boundary still shows @pending.`,
 		);
-	}
-	if (/<template[^>]*m:arm/.test(dom)) {
-		proxy.close();
-		throw new Error(
-			`A click held during streaming on ${input.path} must adopt the streamed arm, not leave its template unflushed behind a browser render.`,
+	if (!dom.includes('data-early-release="shown"'))
+		fail(
+			`A click during streaming on ${input.path} must update the shell before the settled arm arrives; the proxy released the arm on its timeout instead.`,
 		);
-	}
+	if (/<template[^>]*m:arm/.test(dom))
+		fail(
+			`The arm streamed after an early click on ${input.path} must be adopted, not left unflushed behind a browser render.`,
+		);
 	return { page, close: proxy.close };
 }
 
@@ -548,15 +568,39 @@ async function expectOnlyPreloadedCode(page: EarlyClickPage): Promise<void> {
 	}
 }
 
+const EARLY_ACK_PATH = '/__early-click-shown';
+const EARLY_RELEASE_TIMEOUT_MS = 5_000;
+
 async function serveWithEarlyClick(
 	app: URL,
-	input: { readonly path: string; readonly button: string; readonly pending: string },
+	input: EarlyClick,
 ): Promise<{ url: string; close: () => void }> {
 	const click = `<script>(() => {
-		document.documentElement.setAttribute('data-early-click', document.querySelector(${JSON.stringify(input.pending)}) ? 'pending' : 'settled');
-		document.querySelector(${JSON.stringify(input.button)}).click();
+		const d = document;
+		d.documentElement.setAttribute('data-early-click', d.querySelector(${JSON.stringify(input.pending)}) ? 'pending' : 'settled');
+		d.querySelector(${JSON.stringify(input.button)}).click();
+		const shown = d.querySelector(${JSON.stringify(input.shows.selector)});
+		const done = () => (shown.textContent || '').trim() === ${JSON.stringify(input.shows.text)};
+		const ack = () => fetch(${JSON.stringify(EARLY_ACK_PATH)}).then((response) => response.text());
+		if (done()) ack();
+		else new MutationObserver((records, observer) => {
+			if (!done()) return;
+			observer.disconnect();
+			ack();
+		}).observe(shown, { subtree: true, childList: true, characterData: true });
 	})();</script>`;
+	let acknowledge = () => {};
+	const shown = new Promise<'shown' | 'timeout'>((resolve) => {
+		acknowledge = () => resolve('shown');
+		setTimeout(() => resolve('timeout'), EARLY_RELEASE_TIMEOUT_MS);
+	});
 	const server = createServer((request, response) => {
+		if (request.url === EARLY_ACK_PATH) {
+			acknowledge();
+			response.writeHead(200, { 'content-type': 'text/plain', 'cache-control': 'no-store' });
+			response.end('shown');
+			return;
+		}
 		void (async () => {
 			const early = request.url === EARLY_CLICK_PATH;
 			const upstream = await fetch(new URL(early ? input.path : (request.url ?? '/'), app));
@@ -569,12 +613,17 @@ async function serveWithEarlyClick(
 			const reader = upstream.body.getReader();
 			const decoder = new TextDecoder();
 			let shell = '';
-			let injected = false;
+			let held: Uint8Array[] | undefined;
+			let released = false;
 			for (;;) {
 				const { done, value } = await reader.read();
 				if (done) break;
-				if (injected) {
+				if (released) {
 					response.write(value);
+					continue;
+				}
+				if (held) {
+					held.push(value);
 					continue;
 				}
 				shell += decoder.decode(value, { stream: true });
@@ -585,10 +634,19 @@ async function serveWithEarlyClick(
 				}
 				if (/<script data-async-resumer[^>]*>[\s\S]*?<\/script>/.test(shell)) {
 					response.write(shell + click);
-					injected = true;
+					held = [];
+					void shown.then((outcome) => {
+						response.write(
+							`<script>document.documentElement.setAttribute('data-early-release', '${outcome}')</script>`,
+						);
+						for (const chunk of held!) response.write(chunk);
+						released = true;
+					});
 				}
 			}
-			response.end(injected ? undefined : shell);
+			await shown;
+			await Promise.resolve();
+			response.end(held ? undefined : shell);
 		})().catch((error: unknown) => {
 			response.destroy(error instanceof Error ? error : new Error(String(error)));
 		});

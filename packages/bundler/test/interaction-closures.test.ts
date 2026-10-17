@@ -1025,6 +1025,40 @@ describe('an async boundary on a landing page the server streams', () => {
 		expect(writes).toContain(runtime('fns/prerender-resume'));
 	});
 
+	test('the bindings a streamed arm brings join boot, so adopting it after a click fetches nothing', () => {
+		const [route] = computeInteractionClosures({
+			root,
+			modules: new Map([
+				...modules,
+				[symbol(file, 'symbol:4'), { dependencies: [], source: file }],
+			]),
+			routes: new Map([
+				[
+					'screens/feed.tsrx',
+					[...modules.keys(), symbol(file, 'symbol:4')].filter((id) =>
+						id.includes('feed'),
+					),
+				],
+			]),
+			demand: [
+				{
+					source: `${file}?markless-symbols`,
+					map: {
+						...map,
+						firstUsePage: {
+							...map.firstUsePage!,
+							streamedSettle: { symbolIds: ['symbol:4'], runtimeModuleIds: [] },
+						},
+					},
+				},
+			],
+			landingArmsServed: true,
+		});
+		const boot = route!.consumers.find((consumer) => consumer.key === 'boot')!.modules;
+		expect(boot).toContain(symbol(file, 'symbol:4'));
+		expect(boot).not.toContain(symbol(file, 'symbol:8'));
+	});
+
 	test('a landing that can serve @pending without streaming the arm keeps the settle code at boot', () => {
 		expect(consumers(false).get('boot')).toContain(runtime('fns/prerender-resume'));
 		expect(consumers(false).get('action:screens/feed.tsrx#h11:click')).toContain(

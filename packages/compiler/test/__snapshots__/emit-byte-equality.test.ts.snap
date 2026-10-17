@@ -294,6 +294,7 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 		html,
 		state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots),
 		view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) },
+		servedBranches: marklessSsrBranches,
 		elementCount: marklessSsrComposition.elementCount,
 		propEvents: marklessSsrPropEvents,
 		externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, props),

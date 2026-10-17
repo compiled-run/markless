@@ -753,6 +753,8 @@ export function emitResumeModule(input: {
 	// The page's component tree derives from an element() roster, possibly through a child module whose computeds this payload never holds.
 	readonly rosterDerivation?: boolean;
 	readonly installResumeSummary?: boolean;
+	// Some async boundary authors an @pending arm, so a served page of this module can stream it.
+	readonly streamsArms?: boolean;
 	// The wake variant serves pages whose container carries no payload
 	// scripts; lean routes read the payload document and must never emit.
 	readonly recordsOnly?: boolean;
@@ -804,6 +806,7 @@ export function emitResumeModule(input: {
 			(input.closurePlanRoutes ?? []).some((route) => 'importSource' in route) &&
 				scalarSpecializations.length > 0 &&
 				!input.prerenderDataId,
+			input.streamsArms === true,
 		),
 	);
 	const closureImports = [
@@ -1271,7 +1274,17 @@ function emitResumeContainerEvent(
 	componentRowRenderDataId?: string,
 	servedOnly = false,
 	routedClosures = false,
+	streamsArms = false,
 ): string {
+	// A runtime woken while a streamed @pending arm is still on its way adopts that arm.
+	const armsOpen = (indent: string) =>
+		streamsArms
+			? [
+					`${indent}const marklessArms = (await import('@markless/web/fns/streamed-arms')).marklessStreamedArms(handoff.root, ${loadSymbolName});`,
+				]
+			: [];
+	const armsStarted = (indent: string) => (streamsArms ? [`${indent}marklessArms.started();`] : []);
+	const wakeLoadSymbol = streamsArms ? 'marklessArms.loadSymbol' : loadSymbolName;
 	const resumeEntry = storageFreePayload
 		? STORAGE_FREE_RESUME_ENTRY_SPECIFIER
 		: RESUME_ENTRY_SPECIFIER;
@@ -1328,13 +1341,18 @@ function emitResumeContainerEvent(
 						"\t\tconst { derivePrerenderResumeRecords, mergePrerenderPayloadRecords, renderPrerenderBoundary, resumeFromPrerenderRecords } = await import('@markless/web/fns/prerender-resume');",
 						`\t\tconst records = await derivePrerenderResumeRecords(marklessPrerenderData, ${loadSymbolName});`,
 						'\t\tconst mergedRecords = mergePrerenderPayloadRecords(records, handoff.root);',
-						'\t\treturn (await resumeFromPrerenderRecords({',
+						...armsOpen('\t\t'),
+						streamsArms
+							? '\t\tconst resumed = await resumeFromPrerenderRecords({'
+							: '\t\treturn (await resumeFromPrerenderRecords({',
 						'\t\t\t...mergedRecords,',
 						'\t\t\troot: handoff.root,',
-						`\t\t\tloadSymbol: ${loadSymbolName},`,
+						`\t\t\tloadSymbol: ${wakeLoadSymbol},`,
 						`\t\t\trenderAsyncBoundary: (boundaryId, status, graph) => renderPrerenderBoundary(marklessPrerenderData, boundaryId, status, graph, ${loadSymbolName}),`,
 						...renderDataEntry('\t\t\t', 'marklessPrerenderData'),
-						'\t\t})).runtime;',
+						...(streamsArms
+							? ['\t\t});', ...armsStarted('\t\t'), '\t\treturn resumed.runtime;']
+							: ['\t\t})).runtime;']),
 						'\t})());',
 						'\tawait runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });',
 						'}',
@@ -1342,16 +1360,18 @@ function emitResumeContainerEvent(
 				: [
 						'async function marklessFullResumeHandoff(handoff) {',
 						'	handoff.root.__asyncResumeRuntimeStarted = true;',
+						...armsOpen('\t'),
 						`	const { resumeFromPayloadDocument } = await import('${resumeEntry}');`,
 						'	const { runtime } = await resumeFromPayloadDocument({',
 						'		document: handoff.document,',
 						'		root: handoff.root,',
-						`		loadSymbol: ${loadSymbolName},`,
+						`		loadSymbol: ${wakeLoadSymbol},`,
 						...renderDataEntry(
 							'\t\t',
 							`import('${componentRowRenderDataId}').then((data) => data.marklessPrerenderData)`,
 						),
 						'	});',
+						...armsStarted('\t'),
 						'	await runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });',
 						'}',
 					].join('\n');

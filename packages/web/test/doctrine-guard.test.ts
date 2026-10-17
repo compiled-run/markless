@@ -20,6 +20,10 @@ const RUNTIME_MOUNT_SCAN_ALLOWLIST: Readonly<Record<string, string>> = {
 		'The neutral emitted locator helper walks elements by compiler-recorded DOM order.',
 	'packages/web/src/fns/row-component-mint.ts :: if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))':
 		"A client-minted row censuses the compiler-emitted branch anchors in the fragment it just built, before the row joins the page.",
+	'packages/web/src/fns/streamed-arms.ts :: for (const patch of document.querySelectorAll(STATE_PATCH))':
+		'Streamed-arm adoption reads dependency edges from the inert state-patch scripts the server emitted.',
+	'packages/web/src/fns/streamed-arms.ts :: html: arm.innerHTML,':
+		'Streamed-arm adoption commits the inert arm template the server streamed instead of rendering the arm.',
 	'packages/web/src/fns/settle-plan.ts :: const walker = root.ownerDocument!.createTreeWalker(root, 128);':
 		'The settle filler finds the build-emitted hole comments inside one arm template.',
 	'packages/web/src/inline/payload-document.ts :: const text = element.textContent ?? element.text ?? element.innerHTML;':

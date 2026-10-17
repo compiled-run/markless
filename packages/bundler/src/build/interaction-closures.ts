@@ -535,7 +535,7 @@ function mergeDemand(
 			entry.missing = true;
 			continue;
 		}
-		mergePage(entry.page, map.firstUsePage);
+		mergePage(entry.page, map.firstUsePage, landingArmsServed);
 		if (map.recordKinds.some((kind) => kind.replaced)) entry.replaced = true;
 		for (const record of map.payloadRecords) {
 			const symbols = entry.records.get(record.recordId) ?? new Set<string>();
@@ -569,10 +569,18 @@ function mergeDemand(
 	return merged;
 }
 
-function mergePage(page: FilePage, published: RuntimeDemandMapManifest['firstUsePage']) {
+function mergePage(
+	page: FilePage,
+	published: RuntimeDemandMapManifest['firstUsePage'],
+	landingArmsServed: boolean,
+) {
 	// A map that publishes nothing for its page leaves resume start unbounded.
 	if (!published || published.resume === 'unknown') page.resume = 'unknown';
 	else if (page.resume !== 'unknown') page.resume.push(published.resume);
+	// A live runtime adopting a streamed arm runs the arm's bindings as soon as it lands.
+	if (landingArmsServed && published?.streamedSettle && page.resume !== 'unknown')
+		if (published.streamedSettle === 'unknown') page.resume = 'unknown';
+		else page.resume.push(published.streamedSettle);
 	for (const reader of published?.pageSpaceReaders ?? []) {
 		const reaches = page.pageSpaceReaders.get(reader.graphNodeId) ?? [];
 		reaches.push(reader.reach);

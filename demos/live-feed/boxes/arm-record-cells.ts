@@ -101,7 +101,7 @@ export const armRecordCells = [
 		timing: 'settle-after-interaction',
 		reachable: true,
 		coveredBy: 'ssr-streamed:settle-before-interaction + prerendered:settle-after-interaction',
-		reason: 'The witness browser visit awaits the page load event, which a streamed response fires only when the stream closes — no click can land inside the held-pending window (harness limitation, not framework behavior; durable fix = a waitUntil option on witness visit, flagged to the owner). packages/router/boxes/router-streaming-settle.box.ts clicks inside the open stream through a proxy and pins the hold: the click waits for the stream to close, then runs against the adopted arm with only preloaded code. Stream delivery + adoption + registration are pinned here by ssr-streamed:settle-before-interaction.',
+		reason: 'The witness browser visit awaits the page load event, which a streamed response fires only when the stream closes — no click can land inside the held-pending window (harness limitation, not framework behavior; durable fix = a waitUntil option on witness visit, flagged to the owner). packages/router/boxes/router-streaming-settle.box.ts clicks inside the open stream through a proxy (on a shell control and on a control inside the @pending arm): the click updates the page before the arm streams, and the adopted arm then reflects it with only preloaded code. Stream delivery + adoption + registration are pinned here by ssr-streamed:settle-before-interaction.',
 	},
 	{
 		id: 'ssr-streamed:queued-commit-at-wake',
