@@ -177,7 +177,15 @@ export async function assembleSsrContainer(
 	}
 	const payloadRecords =
 		classification?.kind === 'divergent' ? classification.delta : requestRecords;
-	const servedView = payloadRecords === requestRecords ? withNamedHostLocators(view) : view;
+	const executionLog =
+		options.executionLog ??
+		artifactExecutionLog(component) ??
+		artifactInlineResumerSources(component)?.executionLog ??
+		'auto';
+	const servedView =
+		payloadRecords === requestRecords
+			? withNamedHostLocators(executionLog === 'never' ? withoutReadSources(view) : view)
+			: view;
 	const payloadScripts =
 		hasPayload && browserTriggers && classification?.kind !== 'empty'
 			? renderPayloadScripts(
@@ -186,11 +194,6 @@ export async function assembleSsrContainer(
 			: undefined;
 	const selectedResumeModuleUrl = wakeChannelEnabled ? prerenderWakeModuleUrl : resumeModuleUrl;
 	const artifactSources = artifactInlineResumerSources(component);
-	const executionLog =
-		options.executionLog ??
-		artifactExecutionLog(component) ??
-		artifactSources?.executionLog ??
-		'auto';
 	const optionPreloads =
 		typeof options.modulePreloads === 'function'
 			? options.modulePreloads(output.html)
@@ -673,6 +676,18 @@ function branchServedArmEventNames(
 			repeat.rowEvents.map((event) => event.eventName),
 		),
 	];
+}
+
+// A read's authored `source` text only feeds dev tooling and the execution log; a `never` page serves none.
+export function withoutReadSources<Value>(value: Value): Value {
+	if (Array.isArray(value)) return value.map(withoutReadSources) as Value;
+	if (!value || typeof value !== 'object') return value;
+	const record = value as Record<string, unknown>;
+	const read = typeof record.source === 'string' && 'graphNodeId' in record && 'path' in record;
+	const copy: Record<string, unknown> = {};
+	for (const key in record)
+		if (!(read && key === 'source')) copy[key] = withoutReadSources(record[key]);
+	return copy as Value;
 }
 
 // The browser only ever locates a host a top-level record names; arm record sets carry their own locators.

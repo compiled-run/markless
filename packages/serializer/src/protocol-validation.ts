@@ -226,7 +226,7 @@ export function assertProtocolViewPayload(
 		const context = `markless/view domUpdate[${index}]`;
 		assertRecordShape(domUpdate, context);
 		assertStringField(domUpdate, 'hostNodeId', context);
-		assertStringField(domUpdate, 'source', context);
+		assertOptionalStringField(domUpdate, 'source', context);
 		assertStringField(domUpdate, 'graphNodeId', context);
 		assertStringArrayField(domUpdate, 'path', context);
 		assertOptionalDomUpdateTarget(domUpdate.target, `${context}.target`);
@@ -809,7 +809,7 @@ function assertOptionalGraphReads(
 	for (const [index, read] of reads.entries()) {
 		const readContext = `${context}.${key}[${index}]`;
 		assertRecordShape(read, readContext);
-		assertStringField(read, 'source', readContext);
+		assertOptionalStringField(read, 'source', readContext);
 		assertStringField(read, 'graphNodeId', readContext);
 		assertStringArrayField(read, 'path', readContext);
 	}
@@ -831,7 +831,7 @@ function assertOptionalBehaviorInputGraphReads(
 		const readContext = `${context}.inputGraphReads[${index}]`;
 		assertRecordShape(read, readContext);
 		assertNonNegativeIntegerField(read, 'inputIndex', readContext);
-		assertStringField(read, 'source', readContext);
+		assertOptionalStringField(read, 'source', readContext);
 		assertStringField(read, 'graphNodeId', readContext);
 		assertStringArrayField(read, 'path', readContext);
 	}
@@ -1499,7 +1499,7 @@ function assertAsyncBoundaryReads(value: unknown, context: string): void {
 	for (const [index, read] of value.entries()) {
 		const readContext = `${context}.asyncRead[${index}]`;
 		assertRecordShape(read, readContext);
-		assertStringField(read, 'source', readContext);
+		assertOptionalStringField(read, 'source', readContext);
 		assertStringField(read, 'graphNodeId', readContext);
 		assertStringArrayField(read, 'path', readContext);
 		assertOptionalStringField(read, 'runnerSymbolId', readContext);
