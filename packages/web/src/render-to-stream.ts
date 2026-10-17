@@ -196,7 +196,7 @@ async function* streamArmAppends(input: {
 	readonly resumeModuleUrl: string | undefined;
 	readonly shellState: ProtocolStatePayload | undefined;
 }): AsyncGenerator<string, void, void> {
-	const remaining = new Map(input.pendingArms.map((arm) => [arm.graphNodeId, arm]));
+	const remaining = new Map(input.pendingArms.map((arm) => [arm.boundaryId, arm]));
 	const signal = input.renderContext.streaming.signal;
 	if (signal.aborted) return;
 	let cancelAppends!: () => void;
@@ -255,7 +255,7 @@ async function* streamArmAppends(input: {
 					!(arm.entry.async === false && armTakenInWave.has(arm.boundaryId))
 				)
 					continue;
-				remaining.delete(arm.graphNodeId);
+				remaining.delete(arm.boundaryId);
 				if (!executorEmitted) {
 					parts.push(armExecutorScript(input.resumeModuleUrl, input.options.nonce));
 					executorEmitted = true;
