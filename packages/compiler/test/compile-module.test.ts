@@ -223,6 +223,48 @@ export function App() @{
 	);
 });
 
+test('a parse error from sibling elements written back to back names the separator that fixes it', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Siblings.tsrx',
+		source: `
+export function App() @{
+	const label = 'x';
+	<header>top</header><main>{label}</main>
+}
+`,
+		symbols: [],
+	});
+
+	const [diagnostic] = result.semanticGraph.diagnostics;
+	expect(diagnostic?.code).toBe('MARKLESS_PARSE_ERROR');
+	expect(diagnostic?.message).toContain('`</header>` and `<main>`');
+	expect(diagnostic?.suggestions[0]?.message).toContain(
+		'Put `;` after `</header>` (line 4), or start `<main>` on its own line',
+	);
+	const offset = result.semanticGraph.diagnostics[0]?.primarySpan?.start;
+	expect(offset).toBe(
+		`\nexport function App() @{\n\tconst label = 'x';\n\t<header>top</header>`.length,
+	);
+});
+
+test('a parse error with no sibling separator to blame keeps the parser message alone', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Broken.tsrx',
+		source: `
+export function App() @{
+	<ul><li>a</li><li>b</li></ul>
+	const = 1;
+}
+`,
+		symbols: [],
+	});
+
+	const [diagnostic] = result.semanticGraph.diagnostics;
+	expect(diagnostic?.code).toBe('MARKLESS_PARSE_ERROR');
+	expect(diagnostic?.suggestions[0]?.message).toContain('https://tsrx.dev/specification');
+	expect(diagnostic?.message).not.toContain('back to back');
+});
+
 test('compileTsrxModule does not swallow non-parser compiler bugs', async () => {
 	await expect(
 		compileTsrxModule({
