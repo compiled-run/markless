@@ -916,7 +916,11 @@ function emitBoundSymbolDescriptors(descriptors: BoundSymbolDescriptorMap): stri
 // Exported for witness/unit tests that synthesize demand modules: their
 // synthetic resume code must flow through the same queue wrapper the real
 // emission produces, never a restated copy.
-export function emitQueuedResumeContainerEvent(source: string): string {
+// `censusRepair: false` is for sources loaded where a bare import cannot resolve (data: URLs).
+export function emitQueuedResumeContainerEvent(
+	source: string,
+	{ censusRepair = true }: { readonly censusRepair?: boolean } = {},
+): string {
 	const implementation = source.replace(
 		'export async function resumeContainerEvent',
 		'async function marklessResumeContainerEvent',
@@ -926,6 +930,10 @@ export function emitQueuedResumeContainerEvent(source: string): string {
 		implementation,
 		'export function resumeContainerEvent(input) {',
 		'\tconst root = input.root;',
+		// Only a page a foreign script changed evaluates the repair; the packer keeps it beside this module.
+		censusRepair
+			? "\tif (root.__marklessShifted) return import('@markless/web/fns/served-census-repair').then((census) => (census.marklessRepairCensus(root), resumeContainerEvent(input)));"
+			: '',
 		'\tif (!root.__marklessDispatch) {',
 		'\t\tlet handler = marklessResumeContainerEvent, tail = Promise.resolve(), lastEvent = null, lastEventTime = undefined;',
 		'\t\troot.__marklessRegisterDispatch = next => {',

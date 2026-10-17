@@ -33,7 +33,7 @@ const RUNTIME_MOUNT_SCAN_ALLOWLIST: Readonly<Record<string, string>> = {
 	'packages/web/src/inline/resumer.ts :: const walker = document.createTreeWalker(root, 128);':
 		'The settle boot censuses the build-emitted boundary comment anchors it fills between.',
 	'packages/web/src/inline/served-census.ts :: const walker = document.createTreeWalker(root, 1);':
-		'The inline boots census the container in DOM order, matching located hosts by their served parent when a foreign script changed it.',
+		'The inline boots census the container in DOM order and flag a count the server did not serve.',
 	'packages/web/src/payload-document-common.ts :: const text = element.textContent ?? element.text ?? element.innerHTML;':
 		'Shared payload decoding accepts innerHTML only as a legacy script-text fallback.',
 	'packages/web/src/payload.ts :: const text = element.textContent ?? element.text ?? element.innerHTML;':

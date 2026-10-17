@@ -209,6 +209,7 @@ async function marklessResumeContainerEvent(input) {
 }
 export function resumeContainerEvent(input) {
 	const root = input.root;
+	if (root.__marklessShifted) return import('@markless/web/fns/served-census-repair').then((census) => (census.marklessRepairCensus(root), resumeContainerEvent(input)));
 	if (!root.__marklessDispatch) {
 		let handler = marklessResumeContainerEvent, tail = Promise.resolve(), lastEvent = null, lastEventTime = undefined;
 		root.__marklessRegisterDispatch = next => {

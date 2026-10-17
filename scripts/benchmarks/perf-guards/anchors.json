@@ -635,6 +635,22 @@
 			"from": 7778,
 			"to": 7807,
 			"reason": "+29 B is the web/resume-commit-arm entry the build-time demand map now names on async-boundary records (virtual payload module only, no shipped chunk carries it); it lets pages with no arm leave 9.2 kB of arm-commit code unpreloaded"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/fns/served-census-repair",
+			"from": null,
+			"to": 2704,
+			"reason": "measured: the served-parent census repair moved out of every inline boot (-212 B gzip per HTML response) into the preloaded resume chunk, imported lazily"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "serializer/protocol-locator-paths-format",
+			"from": null,
+			"to": 352,
+			"reason": "measured: the compact data-markless-paths alphabet the encoder and the repair share (paths attribute 286 -> 131 B gzip on music-player-ssr)"
 		}
 	],
 	"runtimeModules": {
@@ -665,6 +681,7 @@
 		"serializer/protocol-client": 6652,
 		"serializer/protocol-constants": 697,
 		"serializer/protocol-event-names": 264,
+		"serializer/protocol-locator-paths-format": 352,
 		"serializer/storage-slot": 487,
 		"serializer/value-constants": 360,
 		"serializer/value-decode-client": 3580,
@@ -686,6 +703,7 @@
 		"web/fns/row-slot-mint": 2633,
 		"web/fns/scalar-served": 3982,
 		"web/fns/scalar-specialized": 1426,
+		"web/fns/served-census-repair": 2704,
 		"web/fns/ssr": 29866,
 		"web/fns/update-text": 531,
 		"web/fns/write-scalar": 983,

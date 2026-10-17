@@ -266,7 +266,7 @@ test('wake-channel divergent request carries only its keyed delta records', asyn
 	const html = await assembleSsrContainer(artifact, request, { resumerSource: 'wake();' });
 
 	expect(html).toBe(
-		'<div data-async-container data-markless-paths="5;1,0,4,0,button"><button>Request</button>' +
+		'<div data-async-container data-markless-paths="5button|0100|4"><button>Request</button>' +
 			payload.stateScript +
 			payload.viewScript +
 			'<script data-async-resumer data-markless-resume-module="/build/prerender-wake-A1b2.js">' +
@@ -309,7 +309,7 @@ test('gated-off divergent request preserves the existing full-payload container 
 	const html = await assembleSsrContainer(artifact, request, { resumerSource: 'wake();' });
 
 	expect(html).toBe(
-		'<div data-async-container data-markless-paths="5;1,0,4,0,button"><button>Request</button>' +
+		'<div data-async-container data-markless-paths="5button|0100|4"><button>Request</button>' +
 			payload.stateScript +
 			payload.viewScript +
 			'<script data-async-resumer data-markless-resume-module="/build/resume.js">wake();</script></div>',

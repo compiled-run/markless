@@ -133,6 +133,8 @@ type InlineRoot = HTMLElement &
 		__marklessPrimedHover?: Element;
 		// DOM order as the first event found it; later changes splice it rather than renumbering around them.
 		__marklessCensus?: Array<Element | null>;
+		// Set when that census no longer matches what the server counted; resume renumbers it.
+		__marklessShifted?: number;
 	};
 type InlineDispatchInput = {
 	readonly root: InlineRoot;
@@ -372,7 +374,7 @@ function runPrerenderSettleBoot(
 		);
 	const dispatch = (event: Event) => {
 		root.__marklessDelegatedDispatch = true;
-		root.__marklessCensus ||= census(root, pathsAttribute);
+		if (!root.__marklessCensus) census(root, pathsAttribute);
 		replay(event.target as Element);
 		// Queued, not dropped: a gesture arriving before the arm settles
 		// waits for the fill. Dispatching it first would boot a runtime whose
@@ -674,7 +676,7 @@ function runPrerenderInlineResumer(
 	let loaded: Promise<InlineResumeModule> | undefined;
 	const dispatch = (event: Event) => {
 		root.__marklessDelegatedDispatch = true;
-		root.__marklessCensus ||= census(root, pathsAttribute);
+		if (!root.__marklessCensus) census(root, pathsAttribute);
 		return (loaded ||= loadModule(resumeModuleUrl)).then((module) =>
 			module.resumeContainerEvent({ root, event, element: event.target, eventRecord: null }),
 		);
@@ -796,7 +798,6 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 	const view = JSON.parse(viewScript.textContent || 'null') as InlineView;
 	// The shell's DOM order, before any arm commits or default action moves it.
 	const elements = __MARKLESS_INLINE_CENSUS__(root, __MARKLESS_INLINE_PATHS_ATTRIBUTE__);
-	root.__marklessCensus ||= elements;
 	const hostIds = new Map(
 		view.locators.map((locator) => [elements[locator.index], locator.hostNodeId] as const),
 	);
@@ -1042,7 +1043,9 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 		...armRecordSets.flatMap((arm) => (arm.events ?? []).map((event) => event.eventName)),
 	]);
 	// New component rows, escalating arms, and anything the runtime commits later have no initial DOM locator.
+	// No census means a script outside Markless changed the page: the resume module matches every event.
 	let forwardsUnknownElements =
+		!elements[0] ||
 		keyedRepeats.some((repeat) => repeat.rowComponent !== undefined) ||
 		branches.some((branch) => branch.escalates);
 	const eventNames = new Set([

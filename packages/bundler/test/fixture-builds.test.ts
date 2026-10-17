@@ -82,7 +82,7 @@ const fixtures = [
 		runtimeBudget: {
 			dist: 'packages/bundler/fixtures/vite-ssr/dist',
 			entryHtml: 'packages/bundler/fixtures/vite-ssr/dist/index.html',
-			maxRuntimeChunkGzipBytes: 2_175,
+			maxRuntimeChunkGzipBytes: 2_362, // re-anchor 2026-10-17: measured 2,350 (resume chunk 1,807 -> 2,376 B at gzip -9), margin 12 - the served-parent census repair moved out of every page's inline boot (-212 B gzip per HTML response, no longer executed at load) into this cached resume chunk. prior 2,175.
 			// anti-bloat wall — tightened by the runtime-stdlib goal; any increase must be justified
 			maxEmittedRuntimeGzipBytes: 14_550, // anti-bloat wall, measured 14,396; re-baselined 2026-07-06 after resume-time escalation made the fail-closed full-resume chain emit-reachable (emitted != fetched != executed; per-chunk caps unchanged and passing); tighten-only from here; runtime-stdlib goal shrinks the library itself
 			forbidVitePreloadHelper: true,

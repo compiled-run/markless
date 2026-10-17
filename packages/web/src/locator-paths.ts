@@ -1,3 +1,5 @@
+import { PROTOCOL_LOCATOR_PATHS_DIGITS } from '../../serializer/src/protocol-locator-paths-format.ts';
+
 // Server side of PROTOCOL_LOCATOR_PATHS_ATTRIBUTE: reads the element tree the
 // browser will build from the container's html, the way its parser does.
 const VOID_TAGS = new Set([
@@ -121,8 +123,7 @@ function endOfTag(html: string, from: number): number {
  * The attribute value for a container whose inner html is `containerHtml`, or
  * undefined when the html holds fewer elements than the locators name.
  * One entry per located element and each of its ancestors, so every entry is
- * one step from its parent: `index,parent,siblings,child,tag`, where `siblings`
- * is how many element children the parent was served with.
+ * one step from its parent; the format is documented on PROTOCOL_LOCATOR_PATHS_DIGITS.
  */
 export function servedLocatorPaths(
 	containerHtml: string,
@@ -136,11 +137,34 @@ export function servedLocatorPaths(
 		for (let at = index; at > 0 && !chain.has(at); at = elements[at]!.parent) chain.add(at);
 	}
 	if (chain.size === 0) return undefined;
-	const entries = [...chain]
-		.sort((left, right) => left - right)
-		.map((index) => {
-			const { tag, parent, child } = elements[index]!;
-			return `${index},${parent},${childCounts[parent]},${child},${tag}`;
-		});
-	return [elements.length, ...entries].join(';');
+	const tags: string[] = [];
+	const parents: number[] = [];
+	const stack = [0];
+	let entries = '';
+	let previous = 0;
+	for (const index of [...chain].sort((left, right) => left - right)) {
+		const { tag, parent, child } = elements[index]!;
+		let up = 0;
+		while (stack[stack.length - 1] !== parent) {
+			stack.pop();
+			up++;
+		}
+		if (!tags.includes(tag)) tags.push(tag);
+		if (!parents.includes(parent)) parents.push(parent);
+		entries +=
+			pathNumber(up) +
+			pathNumber(index - previous) +
+			pathNumber(child) +
+			pathNumber(tags.indexOf(tag));
+		stack.push(index);
+		previous = index;
+	}
+	return `${elements.length}${tags.join(',')}|${entries}|${parents.map((parent) => pathNumber(childCounts[parent]!)).join('')}`;
+}
+
+function pathNumber(value: number): string {
+	let digits = '';
+	for (; value >= 32; value = Math.floor(value / 32))
+		digits += PROTOCOL_LOCATOR_PATHS_DIGITS[32 + (value % 32)];
+	return digits + PROTOCOL_LOCATOR_PATHS_DIGITS[value];
 }

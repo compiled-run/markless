@@ -2,6 +2,7 @@ import {
 	PROTOCOL_IDLE_EVENT_NAME,
 	PROTOCOL_VISIBLE_EVENT_NAME,
 } from '../../../serializer/src/protocol-event-names.ts';
+import { PROTOCOL_LOCATOR_PATHS_ATTRIBUTE } from '../../../serializer/src/protocol-locator-paths.ts';
 
 /** Test seam: a root (or its prototype) may carry a clock that replaces the browser's frame and idle scheduling. */
 export type MarklessDeferClock = {
@@ -18,6 +19,7 @@ type DeferRoot = Element & {
 	__marklessDelegatedDispatch?: boolean | string;
 	__marklessArmRegistering?: Set<unknown>;
 	__marklessCensus?: Array<Element | null>;
+	__marklessShifted?: number;
 	__marklessDispatch?: (input: Parameters<DeferModule['resumeContainerEvent']>[0]) => unknown;
 };
 
@@ -47,6 +49,7 @@ export type MarklessDefer = ((
  */
 export function createMarklessDefer(
 	loadModule: (url: string) => Promise<DeferModule>,
+	pathsAttribute?: string,
 ): MarklessDefer {
 	const scope = globalThis as typeof globalThis & {
 		scheduler?: { postTask?: (run: () => void, options: { priority: string }) => unknown };
@@ -111,12 +114,15 @@ export function createMarklessDefer(
 			});
 		};
 		const all = root.getElementsByTagName('*');
-		// The boot's census, when it took one, already places each host under its served parent.
-		const census = root.__marklessCensus;
-		const hosts = hostIndexes.flatMap((index) => {
-			const host = census ? census[index] : index ? all[index - 1] : root;
-			return host ? [host] : [];
-		});
+		const paths = pathsAttribute && root.getAttribute?.(pathsAttribute);
+		if (paths && parseInt(paths) !== all.length + 1) root.__marklessShifted = 1;
+		// A page a script outside Markless changed hands the container to the runtime, which finds each host by its record.
+		const hosts = root.__marklessShifted
+			? [root]
+			: hostIndexes.flatMap((index) => {
+					const host = index ? all[index - 1] : root;
+					return host ? [host] : [];
+				});
 		if (lane === 'idle') return idle(root, () => hosts.forEach(claim));
 		const observer = new IntersectionObserver((entries) => {
 			for (const entry of entries)
@@ -134,7 +140,7 @@ export const INLINE_DEFER_LOADER_SOURCE = '(url) => import(/* @vite-ignore */ ur
 
 /** An expression that installs the helper once per document and evaluates to it; a build passes the factory minified. */
 export function inlineDeferSource(factory = createMarklessDefer.toString()): string {
-	return `(globalThis.__mDefer||=(${factory})(${INLINE_DEFER_LOADER_SOURCE}))`;
+	return `(globalThis.__mDefer||=(${factory})(${INLINE_DEFER_LOADER_SOURCE},${JSON.stringify(PROTOCOL_LOCATOR_PATHS_ATTRIBUTE)}))`;
 }
 
 /** One lane's registration, appended only to a served page whose records name that lane's event. */

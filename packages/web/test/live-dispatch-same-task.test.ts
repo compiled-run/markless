@@ -69,6 +69,7 @@ const nextTask = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 function routeModule(handoff: (input: { root: FakeElement; event: unknown }) => Promise<void>) {
 	const source = emitQueuedResumeContainerEvent(
 		'export async function resumeContainerEvent(input) { await handoff(input); }',
+		{ censusRepair: false },
 	).replace('export function resumeContainerEvent', 'return function resumeContainerEvent');
 	return new Function('handoff', source)(handoff) as (input: {
 		root: FakeElement;
