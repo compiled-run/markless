@@ -93,3 +93,16 @@ test('a child handler reads the page props it was given', async () => {
 	expect(errors).toEqual([]);
 	await page.close();
 });
+
+test.each(['/form-served', '/form-streamed'])(
+	'preventDefault stops a submit inside an @try arm (%s)',
+	async (path) => {
+		const { page, errors } = await open(path);
+		await page.locator('[data-save]').waitFor();
+		await page.click('[data-save]');
+		await expect.poll(() => page.locator('[data-saved]').textContent()).toMatch(/^saved /);
+		expect(new URL(page.url()).pathname + new URL(page.url()).search).toBe(path);
+		expect(errors).toEqual([]);
+		await page.close();
+	},
+);

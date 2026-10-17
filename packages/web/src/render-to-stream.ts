@@ -4,6 +4,8 @@ import {
 	serializeRuntimeStateCells,
 	type ProtocolStatePayload,
 	type ProtocolStreamedArmPatch,
+	type ProtocolSyncPolicy,
+	type ProtocolSyncPolicyCondition,
 } from '@markless/serializer';
 import {
 	MARKLESS_PENDING_MIN_VISIBLE_MS,
@@ -348,6 +350,56 @@ function renderArmAppend(
 	);
 }
 
+// Serialized into the stream executor, so it stays self-contained.
+function applyStreamedArmSyncPolicy(
+	policy: ProtocolSyncPolicy,
+	event: Event,
+	root: Element,
+): boolean {
+	const branches = 'branches' in policy ? policy.branches : [policy];
+	const readsGraph = (condition: ProtocolSyncPolicyCondition): boolean =>
+		condition.type === 'graph-truthy' ||
+		((condition.type === 'and' || condition.type === 'or') &&
+			condition.conditions.some(readsGraph)) ||
+		(condition.type === 'not' && readsGraph(condition.condition));
+	if (branches.some((branch) => readsGraph(branch.when))) {
+		const shared = (
+			globalThis as {
+				readonly __marklessInlineSyncPolicy?: {
+					readonly run?: (
+						policy: ProtocolSyncPolicy,
+						event: Event,
+						root: Element,
+					) => void;
+				};
+			}
+		).__marklessInlineSyncPolicy;
+		if (!shared?.run) return false;
+		shared.run(policy, event, root);
+		return true;
+	}
+	const matches = (condition: ProtocolSyncPolicyCondition): boolean =>
+		condition.type === 'and'
+			? condition.conditions.every(matches)
+			: condition.type === 'or'
+				? condition.conditions.some(matches)
+				: condition.type === 'not'
+					? !matches(condition.condition)
+					: condition.type === 'constant-truthy'
+						? !!condition.value
+						: condition.type === 'event-equals' &&
+							(event as unknown as Record<string, unknown>)[condition.field] ===
+								condition.value;
+	for (const branch of branches) {
+		if (!matches(branch.when)) continue;
+		for (const action of branch.actions) {
+			if (action === 'preventDefault') event.preventDefault();
+			if (action === 'stopPropagation') event.stopPropagation();
+		}
+	}
+	return true;
+}
+
 // The once-installed inline executor. Real range replacement between the
 // boundary's existing comment anchors (no reveal dance, no placeholder).
 // After the swap it wires wake triggers for the streamed arm's event names,
@@ -396,13 +448,35 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 		if (!rec || !r) return;
 			const records = (JSON.parse(rec.textContent || 'null') || [])[1] || {};
 			const names = new Set((records.events || []).map((x) => x.eventName));
+			const policies = new Map();
+			if ((records.events || []).some((x) => x.syncPolicy)) {
+				const armNodes = [r];
+				const armWalk = d.createTreeWalker(r, 129);
+				let armOffset = -1, armNode;
+				while ((armNode = armWalk.nextNode())) {
+					if (armNode === s) armOffset = armNodes.length;
+					if (armNode.nodeType === 1) armNodes.push(armNode);
+				}
+				for (const x of records.events) {
+					const locator = x.syncPolicy && armOffset >= 0 && (records.locators || []).find((item) => item.hostNodeId === x.hostNodeId);
+					const element = locator && armNodes[armOffset + locator.index];
+					if (element) policies.set(element, [...(policies.get(element) || []), x]);
+				}
+			}
+			const applyPolicy = ${applyStreamedArmSyncPolicy.toString()};
 			${debugSetup}
 			for (const t of names) {
 			r.addEventListener(t, async (e) => {
-				if (r.__marklessDispatch) return r.__marklessDispatch({ root: r, event: e, element: e.target, eventRecord: null });
+				let applied = false;
+				for (let el = e.target; el && !applied; el = el.parentElement) {
+					for (const x of policies.get(el) || []) if (x.eventName === t && applyPolicy(x.syncPolicy, e, r)) applied = true;
+					if (el === r) break;
+				}
+				const input = { root: r, event: e, element: e.target, eventRecord: null, ...(applied ? { syncPolicyAlreadyApplied: true } : {}) };
+				if (r.__marklessDispatch) return r.__marklessDispatch(input);
 				if (r.__asyncResumeRuntimeStarted) return;
 				const mod = await import(${JSON.stringify(resumeModuleUrl)});
-				await mod.resumeContainerEvent({ root: r, event: e, element: e.target, eventRecord: null });
+				await mod.resumeContainerEvent(input);
 			}, true);
 				${debugRegistration}
 			}

@@ -788,6 +788,12 @@ function viewSyncPolicies(view: ProtocolViewPayload): ReadonlyArray<ProtocolSync
 	return [
 		...view.events,
 		...(view.keyedRepeats ?? []).flatMap((repeat) => repeat.rowEvents),
+		...view.asyncBoundaries.flatMap((boundary) => {
+			const armRecords = boundary.armRecords;
+			return armRecords && !Array.isArray(armRecords)
+				? ((armRecords as { readonly events?: ProtocolViewPayload['events'] }).events ?? [])
+				: [];
+		}),
 	].flatMap((event) => (event.syncPolicy ? [event.syncPolicy] : []));
 }
 
