@@ -16,6 +16,7 @@ import {
 import { renderPayloadScripts } from '@markless/serializer';
 import {
 	protocolEventDispatchesMarkless,
+	PROTOCOL_LOCATOR_PATHS_ATTRIBUTE,
 	PROTOCOL_VISIBLE_EVENT_NAME,
 } from '@markless/serializer/protocol';
 import {
@@ -45,6 +46,7 @@ import {
 import { marklessRosterPositions } from './prerender/shared-seed-slot.ts';
 import { derivePrerenderResumeRecords } from './prerender/evaluator.ts';
 import { createEarlyEventCaptureSource } from './inline/early-events.ts';
+import { servedLocatorPaths } from './locator-paths.ts';
 
 export { prepareSsrResumeRecords } from './prerender/records.ts';
 export { CONTAINER_RETIRE_PROPERTY } from './payload-resume-registry.ts';
@@ -175,12 +177,11 @@ export async function assembleSsrContainer(
 	}
 	const payloadRecords =
 		classification?.kind === 'divergent' ? classification.delta : requestRecords;
+	const servedView = payloadRecords === requestRecords ? withNamedHostLocators(view) : view;
 	const payloadScripts =
 		hasPayload && browserTriggers && classification?.kind !== 'empty'
 			? renderPayloadScripts(
-					payloadRecords === requestRecords
-						? { state, view: withNamedHostLocators(view) }
-						: payloadRecords,
+					payloadRecords === requestRecords ? { state, view: servedView } : payloadRecords,
 				)
 			: undefined;
 	const selectedResumeModuleUrl = wakeChannelEnabled ? prerenderWakeModuleUrl : resumeModuleUrl;
@@ -265,12 +266,11 @@ export async function assembleSsrContainer(
 		resumerScript && selectedResumeModuleUrl && !wakeChannelEnabled && !options.resumerSource
 			? `<script${options.nonce ? ` nonce="${escapeAttribute(options.nonce)}"` : ''}>${escapeInlineScript(createEarlyEventCaptureSource(browserEventNames(view)))}</script>`
 			: '',
-		`<div${renderContainerAttributes(options.containerId)}>`,
-		output.html,
-		payloadScripts?.stateScript,
-		payloadScripts?.viewScript,
-		resumerScript,
-		'</div>',
+		renderContainer(
+			options.containerId,
+			[output.html, payloadScripts?.stateScript, payloadScripts?.viewScript, resumerScript],
+			resumerScript ? servedView.locators : [],
+		),
 	]
 		.filter(Boolean)
 		.join('');
@@ -344,15 +344,11 @@ export async function assemblePrerenderPageParts(
 	]
 		.filter(Boolean)
 		.join('');
-	const container = [
-		`<div${renderContainerAttributes(options.containerId)}>`,
-		output.html,
-		options.armEmission ?? '',
-		resumerScript,
-		'</div>',
-	]
-		.filter(Boolean)
-		.join('');
+	const container = renderContainer(
+		options.containerId,
+		[output.html, options.armEmission, resumerScript],
+		resumerScript ? view.locators : [],
+	);
 	return { head, container };
 }
 
@@ -746,10 +742,16 @@ function browserEventNames(view: ProtocolViewPayload): ReadonlyArray<string> {
 	].filter((eventName) => eventName !== PROTOCOL_VISIBLE_EVENT_NAME);
 }
 
-function renderContainerAttributes(containerId: string | undefined): string {
-	return containerId
-		? ` data-async-container="${escapeAttribute(containerId)}"`
-		: ' data-async-container';
+function renderContainer(
+	containerId: string | undefined,
+	parts: ReadonlyArray<string | undefined>,
+	locators: ProtocolViewPayload['locators'],
+): string {
+	const inner = parts.filter(Boolean).join('');
+	const paths = servedLocatorPaths(inner, locators);
+	const id = containerId ? `="${escapeAttribute(containerId)}"` : '';
+	const located = paths ? ` ${PROTOCOL_LOCATOR_PATHS_ATTRIBUTE}="${paths}"` : '';
+	return `<div data-async-container${id}${located}>${inner}</div>`;
 }
 
 /**

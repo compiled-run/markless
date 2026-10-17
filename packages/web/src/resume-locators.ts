@@ -12,6 +12,7 @@ import {
 } from './inline/resume-errors.ts';
 import { censusElements, spliceCensus } from './resume-census.ts';
 import { qualifiedElementHandleId } from './resume-handle-qualifier.ts';
+import { PROTOCOL_LOCATOR_PATHS_ATTRIBUTE } from '../../serializer/src/protocol-locator-paths.ts';
 
 export function materializeDomLocators(
 	root: ResumeDomElement,
@@ -22,12 +23,24 @@ export function materializeDomLocators(
 		byHostId = new Map<string, ResumeDomElement>();
 	for (const locator of locators) {
 		const element = elements[locator.index];
-		if (!element) throw missingElementLocatorError(locator);
 		const expected = locator.tagName.toLowerCase(),
-			actual = element.tagName.toLowerCase();
-		if (expected !== '*' && actual !== expected)
-			throw mismatchedElementLocatorError(locator, actual);
-		byHostId.set(locator.hostNodeId, element);
+			actual = element?.tagName.toLowerCase();
+		if (element && (expected === '*' || actual === expected)) {
+			byHostId.set(locator.hostNodeId, element);
+			continue;
+		}
+		const error = element
+			? mismatchedElementLocatorError(locator, actual!)
+			: missingElementLocatorError(locator);
+		// Paths are measured off the served html, so a mismatch under them means the page changed since.
+		if (!(root as unknown as Element).getAttribute?.(PROTOCOL_LOCATOR_PATHS_ATTRIBUTE)) throw error;
+		// A script outside Markless took this host: drop it alone so every other host still resumes.
+		if (!import.meta.env?.DEV) globalThis.reportError?.(error);
+		else
+			void import('./resume-foreign-dom.ts').then(({ describeForeignChange }) => {
+				error.message += describeForeignChange(root, elements, locator.index, element);
+				globalThis.reportError?.(error);
+			});
 	}
 	return byHostId;
 }

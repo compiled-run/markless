@@ -28,12 +28,12 @@ const RUNTIME_MOUNT_SCAN_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Debug instrumentation counts module-preload links and does not locate components.',
 	"packages/web/src/inline/resumer.ts :: const preloaded = document.querySelectorAll('link[rel=modulepreload]').length;":
 		'The prerender log summary counts module-preload links and does not locate components.',
-	'packages/web/src/inline/resumer.ts :: const walker = currentDocument.createTreeWalker(root, 1);':
-		'The inline resumer materializes compiler-recorded element locators in DOM order.',
 	'packages/web/src/inline/resumer.ts :: const walker = document.createTreeWalker(root, 1);':
 		'The visibility primer materializes compiler-recorded visible-event host locators in DOM order.',
 	'packages/web/src/inline/resumer.ts :: const walker = document.createTreeWalker(root, 128);':
 		'The settle boot censuses the build-emitted boundary comment anchors it fills between.',
+	'packages/web/src/inline/served-census.ts :: const walker = document.createTreeWalker(root, 1);':
+		'The inline boots census the container in DOM order, matching located hosts by their served parent when a foreign script changed it.',
 	'packages/web/src/payload-document-common.ts :: const text = element.textContent ?? element.text ?? element.innerHTML;':
 		'Shared payload decoding accepts innerHTML only as a legacy script-text fallback.',
 	'packages/web/src/payload.ts :: const text = element.textContent ?? element.text ?? element.innerHTML;':

@@ -542,7 +542,9 @@ function materializeDomLocators(
 	root: EventResumeDomElement,
 	locators: ProtocolViewPayload['locators'],
 ): Map<string, EventResumeDomElement> {
-	const elements = collectElements(root);
+	// The census the boot pinned already leaves out what foreign scripts added.
+	const elements =
+		(root.__marklessCensus as EventResumeDomElement[] | undefined) ?? collectElements(root);
 	const byHostId = new Map<string, EventResumeDomElement>();
 
 	for (const locator of locators) {
