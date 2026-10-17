@@ -807,39 +807,19 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 	// A served @try arm's policy (preventDefault) must run before the default action, not after the runtime loads.
 	const armHostIds = new Map<Element, string>();
 	const armPolicyEvents = new Map<string, InlineEventRecord>();
-	if (__MARKLESS_INLINE_SYNC_POLICY__) {
-		const policyArms = view.asyncBoundaries.filter((boundary) => {
-			const armRecords = boundary.armRecords as ProtocolArmRecordSet | undefined;
-			return (
-				armRecords &&
-				!Array.isArray(armRecords) &&
-				(armRecords.events ?? []).some((event) => event.syncPolicy)
-			);
-		});
-		if (policyArms.length) {
-			const commentWalker = currentDocument.createTreeWalker(root, 129);
-			const elementsBeforeComment: number[] = [];
-			let elementCount = 1;
-			let node: Node | null;
-			while ((node = commentWalker.nextNode())) {
-				if (node.nodeType === 1) elementCount += 1;
-				else if (!/^\/?markless:arm-branch:/.test((node as Comment).data))
-					elementsBeforeComment.push(elementCount);
+	if (__MARKLESS_INLINE_SYNC_POLICY__)
+		for (const boundary of view.asyncBoundaries) {
+			const offset = boundary.startAnchor.elementIndex;
+			if (offset === undefined) continue;
+			const armRecords = boundary.armRecords as ProtocolArmRecordSet;
+			for (const locator of armRecords.locators) {
+				const element = elements[offset + locator.index];
+				if (element) armHostIds.set(element, locator.hostNodeId);
 			}
-			for (const boundary of policyArms) {
-				const armRecords = boundary.armRecords as ProtocolArmRecordSet;
-				const offset = elementsBeforeComment[boundary.startAnchor.index];
-				if (offset === undefined) continue;
-				for (const locator of armRecords.locators) {
-					const element = elements[offset + locator.index];
-					if (element) armHostIds.set(element, locator.hostNodeId);
-				}
-				for (const event of armRecords.events ?? [])
-					if (event.syncPolicy)
-						armPolicyEvents.set(`${event.hostNodeId}\n${event.eventName}`, event);
-			}
+			for (const event of armRecords.events ?? [])
+				if (event.syncPolicy)
+					armPolicyEvents.set(`${event.hostNodeId}\n${event.eventName}`, event);
 		}
-	}
 
 	const globalScope = globalThis as typeof globalThis & {
 		__marklessInlineSyncPolicy?: InlineSyncPolicyRuntime;

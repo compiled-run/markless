@@ -1,3 +1,4 @@
+import { isArmBranchAnchorComment } from './resume-anchor-census.ts';
 import { PROTOCOL_LOCATOR_PATHS_DIGITS } from '../../serializer/src/protocol-locator-paths-format.ts';
 
 // Server side of PROTOCOL_LOCATOR_PATHS_ATTRIBUTE: reads the element tree the
@@ -41,11 +42,14 @@ type ServedTree = {
 	/** Every element the browser counts under the container, in DOM order; the container is 0. */
 	readonly elements: ReadonlyArray<ServedElement>;
 	readonly childCounts: ReadonlyArray<number>;
+	/** Per page-level comment anchor in DOM order, the index the next element takes. */
+	readonly commentElementIndexes: ReadonlyArray<number>;
 };
 
 export function servedElementTree(html: string): ServedTree {
 	const elements: ServedElement[] = [{ tag: '', parent: -1, child: 0 }];
 	const childCounts = [0];
+	const commentElementIndexes: number[] = [];
 	const stack: Array<{ readonly tag: string; readonly index: number }> = [];
 	let templateDepth = 0;
 	let foreignDepth = 0;
@@ -57,6 +61,9 @@ export function servedElementTree(html: string): ServedTree {
 		if (html.startsWith('<!--', open)) {
 			const end = html.indexOf('-->', open + 4);
 			at = end < 0 ? html.length : end + 3;
+			const data = html.slice(open + 4, end < 0 ? html.length : end);
+			if (templateDepth === 0 && !isArmBranchAnchorComment({ nodeType: 8, data }))
+				commentElementIndexes.push(elements.length);
 			continue;
 		}
 		const next = html[open + 1] ?? '';
@@ -104,7 +111,7 @@ export function servedElementTree(html: string): ServedTree {
 		if (FOREIGN_ROOTS.has(lower)) foreignDepth++;
 		stack.push({ tag, index });
 	}
-	return { elements, childCounts };
+	return { elements, childCounts, commentElementIndexes };
 }
 
 function endOfTag(html: string, from: number): number {

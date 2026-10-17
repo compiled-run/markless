@@ -450,16 +450,12 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 			const names = new Set((records.events || []).map((x) => x.eventName));
 			const policies = new Map();
 			if ((records.events || []).some((x) => x.syncPolicy)) {
-				const armNodes = [r];
-				const armWalk = d.createTreeWalker(r, 129);
-				let armOffset = -1, armNode;
-				while ((armNode = armWalk.nextNode())) {
-					if (armNode === s) armOffset = armNodes.length;
-					if (armNode.nodeType === 1) armNodes.push(armNode);
-				}
+				const armNodes = [];
+				for (let n = s.nextSibling; n && n !== e; n = n.nextSibling)
+					if (n.nodeType === 1) armNodes.push(n, ...n.getElementsByTagName('*'));
 				for (const x of records.events) {
-					const locator = x.syncPolicy && armOffset >= 0 && (records.locators || []).find((item) => item.hostNodeId === x.hostNodeId);
-					const element = locator && armNodes[armOffset + locator.index];
+					const locator = x.syncPolicy && (records.locators || []).find((item) => item.hostNodeId === x.hostNodeId);
+					const element = locator && armNodes[locator.index];
 					if (element) policies.set(element, [...(policies.get(element) || []), x]);
 				}
 			}

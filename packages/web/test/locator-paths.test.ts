@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import { decodeLocatorPaths } from '../src/fns/served-census-repair.ts';
 import { servedElementTree, servedLocatorPaths } from '../src/locator-paths.ts';
+import { withArmPolicyAnchors } from '../src/render-to-string.ts';
 
 function expectedEntries(html: string, indexes: ReadonlyArray<number>) {
 	const { elements, childCounts } = servedElementTree(html);
@@ -32,4 +33,49 @@ test('indexes, places and counts past one digit carry into more digits', () => {
 	const last = servedElementTree(html).elements.length - 1;
 	const value = servedLocatorPaths(html, [{ index: 40 }, { index: 1400 }, { index: last }])!;
 	expect(decodeLocatorPaths(value).entries).toEqual(expectedEntries(html, [40, 1400, last]));
+});
+
+test('each page-level comment anchor records the index the next element takes', () => {
+	const html =
+		'<p>a</p><!--markless:async:b0--><form><input></form><!--markless:arm-branch:x--><b></b>' +
+		'<template><!--inside--><i></i></template><!--/markless:async:b0--><script>"<!--no-->"</script><!--tail-->';
+	expect(servedElementTree(html).commentElementIndexes).toEqual([2, 6, 7]);
+});
+
+test('a served arm with a sync policy carries its first element index on its start anchor', () => {
+	const html =
+		'<h1>t</h1><!--markless:async:b0--><form><button>go</button></form><!--/markless:async:b0-->';
+	const event = {
+		hostNodeId: 'f',
+		eventName: 'submit',
+		symbolIds: [],
+		syncPolicy: { kind: 'preventDefault' },
+	};
+	const view = (armRecords: unknown) =>
+		({
+			locators: [],
+			events: [],
+			asyncBoundaries: [
+				{
+					id: 'b0',
+					runnerGraphNodeId: null,
+					initiallyServedArm: 'try',
+					armRecords,
+					startAnchor: { strategy: 'dom-order-comment', index: 0 },
+					endAnchor: { strategy: 'dom-order-comment', index: 1 },
+					asyncReads: [],
+				},
+			],
+		}) as never;
+	const policy = withArmPolicyAnchors(
+		view({ locators: [{ hostNodeId: 'f', index: 0 }], events: [event] }),
+		html,
+	);
+	expect(policy.asyncBoundaries[0]!.startAnchor).toEqual({
+		strategy: 'dom-order-comment',
+		index: 0,
+		elementIndex: 2,
+	});
+	const plain = view({ locators: [], events: [{ ...event, syncPolicy: undefined }] });
+	expect(withArmPolicyAnchors(plain, html)).toBe(plain);
 });
