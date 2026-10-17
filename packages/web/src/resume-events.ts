@@ -456,9 +456,16 @@ export function createEventWiring(input: {
 	}
 	async function dispatch(
 		event: ResumeDomEvent,
-		options: ResumeDispatchOptions = {},
+		dispatchOptions?: ResumeDispatchOptions,
 	): Promise<void> {
 		const target = event.target;
+		// A field's own events stay in order: its edit hold judges each write against non-overlapping dispatches.
+		const options = {
+			...dispatchOptions,
+			releaseQueue: marklessEditableControl(target)
+				? undefined
+				: input.root.__marklessReleaseDispatch,
+		};
 		if (!target) throw unmatchedDispatchError(event, undefined);
 		const selector = describeResumeEventTarget(target);
 		const ignoredDisposed = input.ignoredDisposedEventTargets.has(target);
@@ -468,11 +475,17 @@ export function createEventWiring(input: {
 		const attached = containsElement(input.root, target);
 		const anchor = attached ? undefined : detachedRowAnchor(target);
 		const rowAnchor = anchor && containsElement(input.root, anchor) ? anchor : undefined;
-		if (!attached && !ignoredDisposed && !rowAnchor)
+		// A script outside Markless took the target out after the press found its host: the walk starts at that host.
+		const pressHost = event.__marklessPressHost;
+		const pressAnchor =
+			!attached && !rowAnchor && pressHost && containsElement(input.root, pressHost)
+				? pressHost
+				: undefined;
+		if (!attached && !ignoredDisposed && !rowAnchor && !pressAnchor)
 			throw unmatchedDispatchError(event, selector);
 		const bubbles = event.bubbles !== false;
 		const path = collectDispatchPath(
-			target,
+			pressAnchor ?? target,
 			event.type,
 			eventRecords,
 			rowEventRecords,
@@ -682,6 +695,7 @@ export function createEventWiring(input: {
 				element,
 				getElementHandle: readHandle,
 				...(locals ? { locals } : {}),
+				releaseQueue: options.releaseQueue,
 			} as DispatchSymbolContext;
 			const invokeCallback = (symbolId: string, args: ReadonlyArray<unknown>) =>
 				invokeSymbol(symbolId, { ...baseContext, args, invokeCallback, invokeSymbol });

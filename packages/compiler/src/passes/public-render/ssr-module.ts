@@ -694,9 +694,13 @@ function emitSsrDataLines(
 	const preludeText = [
 		...new Set([...residueSources, ...renderDecisionSources(input, componentName)]),
 	].join('\n');
+	// A row variable named `error` takes the name, as the client residue reader already decides.
+	const rowNamesError = repeats.some(
+		(repeat) => repeat.itemName === 'error' || repeat.indexName === 'error',
+	);
 	const localLines = [
 		...repeatLocalLines(repeats),
-		'const error=marklessSsrDataContext.asyncError;',
+		...(rowNamesError ? [] : ['const error=marklessSsrDataContext.asyncError;']),
 		...sharedInstancePreludeLines(
 			input.semanticGraph,
 			componentName,

@@ -280,7 +280,10 @@ test('every resume module serializes dispatch, streamed or not', () => {
 		expect(resumeCode).toContain('async function marklessResumeContainerEvent');
 		expect(resumeCode).not.toContain('export async function resumeContainerEvent');
 		expect(resumeCode).toContain('root.__marklessDispatch');
-		expect(resumeCode).toContain('return tail = tail.then(run, run);');
+		expect(resumeCode).toContain('done = tail.then(run, run);');
+		// The next dispatch waits until this one finishes or its handler first awaits its own work.
+		expect(resumeCode).toContain('done.then(release, release);');
+		expect(resumeCode).toContain('tail = started;');
 		// The same-event dedupe guard rides with the queue; it closed the
 		// lost-click defect and must not be separable from it.
 		expect(resumeCode).toContain('if (event === lastEvent && eventTime === lastEventTime)');
@@ -999,6 +1002,42 @@ test('emitResumeModule writes the row-mint loader only for a repeat that can bui
 			]),
 		}),
 	).toContain("globalThis.__marklessRowMint ??= () => import('@markless/web/fns/row-mint');");
+});
+
+// One global serves every module on the page, so a later page module's expression-row mint
+// must not take it from the component mint a placed child needs; the reverse is fine.
+test('a page placing component rows from another module keeps the component mint', async () => {
+	const withRenderData = { ...baseInput, renderDataId: 'virtual:markless:render-data:page' };
+	const expressionRows = repeatDemandMap([
+		'web/repeat-runtime',
+		'web/resume-keyed-repeats',
+		'web/fns/row-slot-mint',
+	]);
+	const linked = emitResumeModule({
+		...withRenderData,
+		runtimeDemandMap: expressionRows,
+		linkedRowComponents: true,
+	});
+	expect(linked).toContain("import('@markless/web/fns/row-component-mint')");
+	expect(linked).not.toContain('fns/row-slot-mint');
+
+	const own = emitResumeModule({ ...withRenderData, runtimeDemandMap: expressionRows });
+	expect(own).toContain(
+		'if (!globalThis.__marklessRowMint?.components) globalThis.__marklessRowMint =',
+	);
+	const install = new Function(
+		'globalThis',
+		own.slice(
+			own.indexOf('if (!globalThis.__marklessRowMint'),
+			own.indexOf('marklessRowSlotMint(...input));') + 31,
+		),
+	);
+	const host: { __marklessRowMint?: { components?: boolean } } = {
+		__marklessRowMint: Object.assign(() => undefined, { components: true }),
+	};
+	const componentMint = host.__marklessRowMint;
+	install(host);
+	expect(host.__marklessRowMint).toBe(componentMint);
 });
 
 test('only a repeat nested in another repeat\'s rows installs the nested-repeat loader', () => {

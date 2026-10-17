@@ -16,6 +16,7 @@ import { emitSymbolResolverModule } from '@markless/compiler';
 import type { SourceSymbolRow } from './source-module.ts';
 import type { SourceLazySymbolRoute } from './source-module.ts';
 import { adaptImportedCaptureResolver } from './bound-resolver.ts';
+import { emitReboundSymbolImport, emitReboundSymbolRoute } from './rebound-symbol-route.ts';
 
 export type PrerenderTriggerGroup = {
 	readonly id: string;
@@ -72,23 +73,47 @@ export function emitPrerenderTriggerGroupModule(input: {
 		bundlerVisibleImports: input.literalImports,
 	});
 	// Keep routes exhaustive while demand-loading only their symbols.
-	const routes = input.symbolRoutes ?? [];
+	// This group's resolver holds only its own bound rows.
+	const routes = (input.symbolRoutes ?? []).map((route) =>
+		route.boundSymbols
+			? {
+					...route,
+					boundSymbols: Object.fromEntries(
+						Object.entries(route.boundSymbols).filter(([, rowId]) => ids.has(rowId)),
+					),
+				}
+			: route,
+	);
 	if (routes.length > 0) {
 		source = source.replaceAll('loadSymbol(', 'marklessLoadLocalSymbol(');
 		source += [
+			emitReboundSymbolImport(routes, 'marklessLoadSymbolRebound'),
 			'export function loadSymbol(symbolId) {',
-			...routes.flatMap((route) => [
-				`\tif (symbolId.startsWith(${JSON.stringify(route.prefix)})) {`,
-				'importSource' in route
-					? `\t\treturn import(${JSON.stringify(symbolRouteImportSource(route.importSource))}).then((mod) => mod.loadSymbol ? mod.loadSymbol(symbolId.slice(${route.prefix.length})) : Promise.reject(new Error(\`Unknown child async symbol \${symbolId}\`)));`
-					: // A same-module child's symbols are this page's own; re-enter the
-						// table so a remainder carrying another child's path routes too.
-						`\t\treturn ${route.prefix.length > 0 ? 'loadSymbol' : 'marklessLoadLocalSymbol'}(symbolId.slice(${route.prefix.length}));`,
-				'\t}',
-			]),
+			...routes.flatMap((route) => {
+				const unbound =
+					'importSource' in route
+						? `import(${JSON.stringify(symbolRouteImportSource(route.importSource))}).then((mod) => mod.loadSymbol ? mod.loadSymbol(symbolId.slice(${route.prefix.length})) : Promise.reject(new Error(\`Unknown child async symbol \${symbolId}\`)))`
+						: // A same-module child's symbols are this page's own; re-enter the
+							// table so a remainder carrying another child's path routes too.
+							`${route.prefix.length > 0 ? 'loadSymbol' : 'marklessLoadLocalSymbol'}(symbolId.slice(${route.prefix.length}))`;
+				return [
+					`\tif (symbolId.startsWith(${JSON.stringify(route.prefix)})) {`,
+					...emitReboundSymbolRoute(
+						route,
+						'marklessLoadSymbolRebound',
+						'marklessLoadLocalSymbol',
+						unbound,
+						'\t\t',
+					),
+					`\t\treturn ${unbound};`,
+					'\t}',
+				];
+			}),
 			'\treturn marklessLoadLocalSymbol(symbolId);',
 			'}',
-		].join('\n');
+		]
+			.filter((line) => line !== '')
+			.join('\n');
 	}
 	return [
 		armRendererModuleId

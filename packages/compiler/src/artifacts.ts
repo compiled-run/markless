@@ -335,6 +335,11 @@ export type ModuleGraphInterfaceArtifact = {
 			 */
 			readonly rowSlotReader?: true;
 			/**
+			 * Present when this component's tree holds a keyed repeat whose rows render
+			 * a component, so a page placing it must install the component-row mint.
+			 */
+			readonly rowComponentMint?: true;
+			/**
 			 * Present when this component's tree holds an action compiled as a
 			 * closure plan, so a composing page routes plan lookups toward it.
 			 */
@@ -766,6 +771,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_CALLBACK_PROP_ARITY_UNSUPPORTED'
 		| 'MARKLESS_COMPONENT_PROP_EXPRESSION_UNSUPPORTED'
 		| 'MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED'
+		| 'MARKLESS_ASYNC_TEXT_JOIN_UNSUPPORTED'
 		| 'MARKLESS_COMPONENT_SPREAD_UNSUPPORTED'
 		| 'MARKLESS_CALLBACK_SLOT_SOURCE_UNSUPPORTED'
 		| 'MARKLESS_CALLBACK_SLOT_UNBOUND'

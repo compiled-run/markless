@@ -1,6 +1,6 @@
 import { getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { resolvedSymbolAt } from './collect-expressions.ts';
-import { moduleConstantInitializer } from './collect-state.ts';
+import { localConstantInitializer, moduleConstantInitializer } from './collect-state.ts';
 import {
 	evaluateConstantExpression,
 	namesMutatedInModule,
@@ -34,8 +34,14 @@ export function constantPropValue(expression: AnyNode, state: WalkState): Consta
 		const semantic = state.semantic();
 		const symbolId = resolvedSymbolAt(semantic, identifier.start);
 		if (symbolId === null) return NOT_CONSTANT;
-		if (semantic.scope.kind(semantic.symbol.scopeId(symbolId)) !== 'module')
-			return NOT_CONSTANT;
+		// A `const` in a component body is as fixed as a module one when its initializer is constant data.
+		if (semantic.scope.kind(semantic.symbol.scopeId(symbolId)) !== 'module') {
+			if (mutatedModuleNames(state).has(name)) return NOT_CONSTANT;
+			const local = localConstantInitializer(name, symbolId, state);
+			if (!local) return NOT_CONSTANT;
+			const nextVisiting = new Set(visiting).add(name);
+			return evaluateConstantExpression(local, (next) => resolveName(next, nextVisiting));
+		}
 
 		const moduleImport = state.graph.moduleImports.find(
 			(candidate) => candidate.localName === name && candidate.typeOnly !== true,

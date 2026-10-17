@@ -11,6 +11,7 @@ import { ASYNC_PROTOCOL_VERSION } from '@markless/serializer';
 import type { RuntimeDemandMapArtifact } from '@markless/compiler';
 import { emitScalarPlanLoader } from './scalar-plan-loader.ts';
 import { scalarPlanSourceReference } from './scalar-plan-source.ts';
+import { emitReboundSymbolImport, emitReboundSymbolRoute } from './rebound-symbol-route.ts';
 
 export const MARKLESS_VIRTUAL_PREFIX = 'virtual:markless:';
 
@@ -29,6 +30,7 @@ export type SourceSymbolRow = {
 export type SourceSymbolRoute = {
 	readonly prefix: string;
 	readonly importSource: string;
+	readonly boundSymbols?: Readonly<Record<string, string>>;
 };
 
 // A child declared in the SAME module carries an instance path like any other
@@ -37,6 +39,7 @@ export type SourceSymbolRoute = {
 export type SourceSelfSymbolRoute = {
 	readonly prefix: string;
 	readonly self: true;
+	readonly boundSymbols?: Readonly<Record<string, string>>;
 };
 
 export type SourceLazySymbolRoute = SourceSymbolRoute | SourceSelfSymbolRoute;
@@ -286,6 +289,7 @@ export function emitSourceModule(input: {
 	readonly renderDataId?: string;
 	// An imported component fills rows through its render-data reader.
 	readonly linkedRowSlotReaders?: boolean;
+	readonly linkedRowComponents?: boolean;
 	readonly canonicalRenderData?: boolean;
 	readonly symbols: ReadonlyArray<SourceSymbolRow>;
 	readonly behaviorSymbols?: ReadonlyArray<SourceSymbolRow>;
@@ -629,16 +633,17 @@ function demandsRowMint(runtimeDemandMap: unknown): boolean {
  * It answers the SAME global as the template mint, whose builders it re-exports:
  * the repeat runtime carries no second loader, so a page with no component row
  * ships not one byte of this path. Nothing page-specific is written here - every
- * page emits this same line - because one document can hold two page modules and
- * the last one evaluated owns the global. The surface travels on the runtime
- * input instead and arrives as the loader's first argument.
+ * page emits this same line - because one document can hold several modules that
+ * install a mint, and the one that builds every kind of row must keep the global
+ * whichever is evaluated last. The surface travels on the runtime input instead
+ * and arrives as the loader's first argument.
  */
 function emitRowComponentMintLoaderInstall(): string {
 	return [
-		'globalThis.__marklessRowMint = (...input) =>',
-		"\timport('@markless/web/fns/row-component-mint').then((mint) =>",
-		'\t\tmint.marklessRowComponentMint(...input),',
-		'\t);',
+		'globalThis.__marklessRowMint = Object.assign(',
+		"\t(...input) => import('@markless/web/fns/row-component-mint').then((mint) => mint.marklessRowComponentMint(...input)),",
+		'\t{ components: true },',
+		');',
 	].join('\n');
 }
 
@@ -648,9 +653,14 @@ function componentRowLoader(input: {
 	readonly renderDataId?: string;
 	readonly runtimeDemandMap?: unknown;
 	readonly linkedRowSlotReaders?: boolean;
+	readonly linkedRowComponents?: boolean;
 }): string | undefined {
 	if (!input.renderDataId) return undefined;
-	if (demandsKeyedRepeatModule(input.runtimeDemandMap, ROW_COMPONENT_MINT_RUNTIME_MODULE_ID))
+	// A child module's install runs only if that module is ever evaluated, which resume never needs.
+	if (
+		input.linkedRowComponents ||
+		demandsKeyedRepeatModule(input.runtimeDemandMap, ROW_COMPONENT_MINT_RUNTIME_MODULE_ID)
+	)
 		return emitRowComponentMintLoaderInstall();
 	return input.linkedRowSlotReaders ||
 		demandsKeyedRepeatModule(input.runtimeDemandMap, ROW_SLOT_MINT_RUNTIME_MODULE_ID)
@@ -663,6 +673,7 @@ function clientRowMintLoader(input: {
 	readonly renderDataId?: string;
 	readonly runtimeDemandMap?: unknown;
 	readonly linkedRowSlotReaders?: boolean;
+	readonly linkedRowComponents?: boolean;
 }): string | null {
 	const mint = demandsRowComponentMint(input.runtimeDemandMap)
 		? emitRowComponentMintLoaderInstall()
@@ -673,10 +684,10 @@ function clientRowMintLoader(input: {
 	return mint && nested ? `${mint}\n${nested}` : (mint ?? nested);
 }
 
-// Assigned, not defaulted: a page whose rows read expressions must not inherit a plain mint.
+// Assigned over a plain mint, which cannot read a row's expressions, but never over the component mint, which can.
 function emitRowSlotMintLoaderInstall(): string {
 	return [
-		'globalThis.__marklessRowMint = (...input) =>',
+		'if (!globalThis.__marklessRowMint?.components) globalThis.__marklessRowMint = (...input) =>',
 		"\timport('@markless/web/fns/row-slot-mint').then((mint) => mint.marklessRowSlotMint(...input));",
 	].join('\n');
 }
@@ -750,6 +761,7 @@ export function emitResumeModule(input: {
 	// has none - and a component row still has to reach the surface.
 	readonly renderDataId?: string;
 	readonly linkedRowSlotReaders?: boolean;
+	readonly linkedRowComponents?: boolean;
 	// The page's component tree derives from an element() roster, possibly through a child module whose computeds this payload never holds.
 	readonly rosterDerivation?: boolean;
 	readonly installResumeSummary?: boolean;
@@ -938,18 +950,26 @@ export function emitQueuedResumeContainerEvent(
 			? "\tif (root.__marklessShifted) return import('@markless/web/fns/served-census-repair').then((census) => (census.marklessRepairCensus(root), resumeContainerEvent(input)));"
 			: '',
 		'\tif (!root.__marklessDispatch) {',
-		'\t\tlet handler = marklessResumeContainerEvent, tail = Promise.resolve(), lastEvent = null, lastEventTime = undefined;',
+		'\t\tlet handler = marklessResumeContainerEvent, tail = Promise.resolve(), done = tail, lastEvent = null, lastEventTime = undefined;',
 		'\t\troot.__marklessRegisterDispatch = next => {',
 		'\t\t\tconst fallback = handler;',
 		'\t\t\thandler = input => next(input, fallback);',
 		'\t\t};',
+		// Events start in order, but a handler awaiting its own work does not hold the next one.
 		'\t\troot.__marklessDispatch = next => {',
 		'\t\t\tconst event = next.event, eventTime = event?.timeStamp;',
-		'\t\t\tif (event === lastEvent && eventTime === lastEventTime) return tail;',
+		// The host the press-time walk matched; a script may take the target out before this dispatch runs.
+		'\t\t\tif (event && next.eventRecord && next.element) event.__marklessPressHost ??= next.element;',
+		'\t\t\tif (event === lastEvent && eventTime === lastEventTime) return done;',
 		'\t\t\tlastEvent = event;',
 		'\t\t\tlastEventTime = eventTime;',
-		'\t\t\tconst run = () => handler(next);',
-		'\t\t\treturn tail = tail.then(run, run);',
+		'\t\t\tlet release;',
+		'\t\t\tconst started = new Promise(resolve => release = resolve);',
+		'\t\t\tconst run = () => (root.__marklessReleaseDispatch = release, handler(next));',
+		'\t\t\tdone = tail.then(run, run);',
+		'\t\t\tdone.then(release, release);',
+		'\t\t\ttail = started;',
+		'\t\t\treturn done;',
 		'\t\t};',
 		'\t}',
 		'\treturn root.__marklessDispatch(input);',
@@ -979,21 +999,30 @@ function emitLazySymbolRouteFunction(
 	// A projected child's path nests under the component it was projected into,
 	// so the longer literal prefix must be tested first.
 	const ordered = [...routes].sort((left, right) => right.prefix.length - left.prefix.length);
+	const reboundName = `${functionName}Rebound`;
 	return [
+		emitReboundSymbolImport(ordered, reboundName),
 		`function ${functionName}(symbolId) {`,
-		...ordered.flatMap((route) => [
-			`	if (symbolId.startsWith(${JSON.stringify(route.prefix)})) {`,
-			'importSource' in route
-				? `		return import(${JSON.stringify(symbolRouteImportSource(route.importSource, includeScalarActionPlans))}).then((mod) => mod.loadSymbol ? mod.loadSymbol(symbolId.slice(${route.prefix.length})) : Promise.reject(new Error(\`Unknown child async symbol \${symbolId}\`)));`
-				: // Re-enter the table: what is left after one strip can itself carry
-					// another composed child's path. Each hop is strictly shorter, and an
-					// unmatched tail still reaches the closing fallback.
-					`		return ${route.prefix.length > 0 ? functionName : fallbackName}(symbolId.slice(${route.prefix.length}));`,
-			'	}',
-		]),
+		...ordered.flatMap((route) => {
+			const unbound =
+				'importSource' in route
+					? `import(${JSON.stringify(symbolRouteImportSource(route.importSource, includeScalarActionPlans))}).then((mod) => mod.loadSymbol ? mod.loadSymbol(symbolId.slice(${route.prefix.length})) : Promise.reject(new Error(\`Unknown child async symbol \${symbolId}\`)))`
+					: // Re-enter the table: what is left after one strip can itself carry
+						// another composed child's path. Each hop is strictly shorter, and an
+						// unmatched tail still reaches the closing fallback.
+						`${route.prefix.length > 0 ? functionName : fallbackName}(symbolId.slice(${route.prefix.length}))`;
+			return [
+				`	if (symbolId.startsWith(${JSON.stringify(route.prefix)})) {`,
+				...emitReboundSymbolRoute(route, reboundName, fallbackName, unbound, '\t\t'),
+				`		return ${unbound};`,
+				'	}',
+			];
+		}),
 		`	return ${fallbackName}(symbolId);`,
 		'}',
-	].join('\n');
+	]
+		.filter((line) => line !== '')
+		.join('\n');
 }
 
 function emitsClosurePlanLoader(

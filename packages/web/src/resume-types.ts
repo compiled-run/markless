@@ -45,6 +45,8 @@ export type ResumeDomElement = ResumeDomNode & {
 		readonly eventRecord?: ResumeEventRecord | null;
 		readonly syncPolicyAlreadyApplied?: boolean;
 	}) => Promise<void>;
+	// Set by the dispatch queue for the dispatch it is running: lets the next one start once this one's handler is running.
+	__marklessReleaseDispatch?: () => void;
 	__marklessEventOnlyGraph?: Map<string, unknown>;
 	// Container-scoped element census in DOM order, shared by every wake.
 	__marklessCensus?: ResumeDomElement[];
@@ -87,6 +89,8 @@ export type ResumeDomEvent = {
 	readonly bubbles?: boolean;
 	readonly preventDefault?: () => void;
 	readonly stopPropagation?: () => void;
+	// The nearest host with a record when the browser dispatched the event, kept by the queue that received it.
+	__marklessPressHost?: ResumeDomElement;
 };
 export type ResumeSharedPatchEvent = {
 	readonly type: 'async:shared-patch';
@@ -300,6 +304,8 @@ export type ResumeSymbolContext = {
 	readonly args?: ReadonlyArray<unknown>;
 	readonly invokeCallback?: (symbolId: string, args: ReadonlyArray<unknown>) => Promise<unknown>;
 	readonly invokeSymbol?: (symbolId: string, context: ResumeSymbolContext) => Promise<unknown>;
+	// Called at an authored `await` in a handler: the page's next event may start.
+	readonly releaseQueue?: () => void;
 };
 export type ResumeBehaviorCleanup = () => void;
 export type ResumeSymbol = (
@@ -382,6 +388,7 @@ export type ResumeDispatchOptions = {
 	readonly syncPolicyAlreadyApplied?: boolean;
 	readonly propagationStopped?: boolean;
 	readonly ignoreUnmatched?: boolean;
+	readonly releaseQueue?: () => void;
 };
 // whenAsyncBoundariesSettled/holdPendingSettleCommits: D8 navigation
 // transitions — a route swap holds the outgoing page until the destination's

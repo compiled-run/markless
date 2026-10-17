@@ -107,4 +107,8 @@ export {
 export { planSymbolResolver } from './passes/symbol-resolver.ts';
 
 export { componentExportPath, linkedComponentTarget } from './passes/link/component-target.ts';
-export { importedRowSlotReaders, rowSlotReaderComponents } from './passes/link/row-slot-readers.ts';
+export {
+	importedRowComponentMints,
+	importedRowSlotReaders,
+	rowSlotReaderComponents,
+} from './passes/link/row-slot-readers.ts';

@@ -392,8 +392,18 @@ type ScopedSymbol = ResumeSymbol & {
 	readonly marklessScopedPath?: string;
 };
 
+/** A symbol that places itself under the path that asked for it; see `fns/rebound-symbol`. */
+export type MarklessRescopingSymbol = ResumeSymbol & {
+	readonly marklessRescope?: (
+		instancePath: string,
+		scope: (symbol: ResumeSymbol, instancePath: string) => ResumeSymbol,
+	) => ResumeSymbol;
+};
+
 function scopeSymbol(symbol: ResumeSymbol, instancePath: string): ResumeSymbol {
 	if (composedSymbols.has(symbol)) return symbol;
+	const rescope = (symbol as MarklessRescopingSymbol).marklessRescope;
+	if (rescope) return rescope(instancePath, scopeSymbol);
 	// A loader beneath resume's scoped the row-free id at the row-free path: one instance, so the row path replaces it rather than stacking.
 	const { marklessScopedBase, marklessScopedPath } = symbol as ScopedSymbol;
 	if (

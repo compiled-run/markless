@@ -78,13 +78,20 @@ export async function renderCsrRuntime(input: {
 	) => Promise<void>;
 	let dispatchHandler: CsrDispatch;
 	let dispatchTail = Promise.resolve();
+	// Events start in order, but a handler awaiting its own work does not hold the next one.
 	const dispatchQueued: CsrDispatch = (event, dispatchOptions) => {
+		let release!: () => void;
+		const started = new Promise<void>((resolve) => (release = resolve));
 		// A queued dispatch can reach its turn after teardown; the container it
 		// was aimed at is gone, so it has nothing left to run.
-		const dispatch = async () =>
-			disposed ? undefined : dispatchHandler(event, dispatchOptions);
+		const dispatch = async () => {
+			if (disposed) return undefined;
+			(output.root as unknown as ResumeDomElement).__marklessReleaseDispatch = release;
+			return dispatchHandler(event, dispatchOptions);
+		};
 		const next = dispatchTail.then(dispatch, dispatch);
-		dispatchTail = next.catch(() => {});
+		next.then(release, release);
+		dispatchTail = started;
 		return next;
 	};
 	const cleanup = await activateAuthoredBehaviors(

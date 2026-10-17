@@ -6297,9 +6297,44 @@ function rewriteEventHandlerNode(
 		return asyncIfAwaited(node, rewritten);
 	}
 
+	if (node.type === 'AwaitExpression' && isNode(node.argument) && !awaitsInlinedMethod(node))
+		return {
+			...(node as unknown as EmissionNode),
+			argument: releasingDispatchNode(rewriteEventHandlerNode(node.argument, node, rewrite)),
+		};
+
 	return rewriteEventHandlerChildren(node, (child) =>
 		rewriteEventHandlerNode(child, node, rewrite),
 	);
+}
+
+// The shared-method inliner awaits a dispatching method as `await (async (...) => {...})(...)`; awaits inside it are walked on their own.
+function awaitsInlinedMethod(node: AnyNode): boolean {
+	const argument = node.argument as AnyNode;
+	const callee = argument.type === 'CallExpression' ? (argument.callee as AnyNode) : undefined;
+	return callee?.type === 'ArrowFunctionExpression' && callee.async === true;
+}
+
+/**
+ * `(context.releaseQueue?.(), <argument>)` for an `await` the author wrote: from the
+ * handler's first wait on its own work, the page's next event need not wait for it.
+ */
+function releasingDispatchNode(argument: EmissionNode): EmissionNode {
+	return {
+		type: 'SequenceExpression',
+		expressions: [
+			{
+				type: 'ChainExpression',
+				expression: {
+					type: 'CallExpression',
+					callee: memberChainNode('context.releaseQueue'),
+					arguments: [],
+					optional: true,
+				},
+			},
+			argument,
+		],
+	};
 }
 
 /**

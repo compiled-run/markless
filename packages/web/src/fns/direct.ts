@@ -119,7 +119,10 @@ export function attachMarklessPublicStaticEvents(
 				const loaded = loadSymbolForEvent(symbolId);
 				const symbol = isMarklessPublicThenable(loaded) ? await loaded : loaded;
 				const value = symbol({ graph, event, element, getElementHandle: () => undefined });
-				if (isMarklessPublicThenable(value)) await value;
+				if (isMarklessPublicThenable(value)) {
+					graph.flush();
+					await value;
+				}
 			}
 			graph.flush();
 		});
@@ -291,7 +294,11 @@ function attachDirectChunkEvents(
 				const loaded = loadSymbol(symbolId);
 				const symbol = isMarklessPublicThenable(loaded) ? await loaded : loaded;
 				const value = symbol({ graph, event, element, getElementHandle: () => undefined });
-				if (isMarklessPublicThenable(value)) await value;
+				if (isMarklessPublicThenable(value)) {
+					sync();
+					graph.flush();
+					await value;
+				}
 				sync();
 			}
 			graph.flush();
@@ -544,7 +551,11 @@ function attachDirectRepeatEvents(
 							getElementHandle: () => undefined,
 							locals: { [eventControl.itemContext.itemName]: record.item },
 						});
-						if (isMarklessPublicThenable(value)) await value;
+						if (isMarklessPublicThenable(value)) {
+							sync();
+							graph.flush();
+							await value;
+						}
 						ran = true;
 						if (stopped) break;
 					}
