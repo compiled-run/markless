@@ -923,6 +923,22 @@
 			"from": 549,
 			"to": null,
 			"reason": "measured: the shared shown-arm helper is reverted; as its own module it cost +56 B rendered and +30 to +60 B of demand-map glue per construct, inside resume-locators +108 B, so each module builds its own entry again"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/render-csr",
+			"from": 17213,
+			"to": 17390,
+			"reason": "async handlers release the dispatch queue at their first await and a direct CSR handler paints its writes before waiting (b51ed81a)"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/resume-events",
+			"from": 15538,
+			"to": 15929,
+			"reason": "queue release at a handler's first await, editable controls kept in order, and the dispatch walks from the press-time host when a script removed the target (b51ed81a, 5b3fd029, 7c0e0d61)"
 		}
 	],
 	"runtimeModules": {
@@ -999,7 +1015,7 @@
 		"web/reconcile-plane-slot": 344,
 		"web/render": 4003,
 		"web/render-canonical": 2642,
-		"web/render-csr": 17213,
+		"web/render-csr": 17390,
 		"web/render-route-holder": 753,
 		"web/repeat-runtime": 2594,
 		"web/resume": 3419,
@@ -1011,7 +1027,7 @@
 		"web/resume-branches": 15471,
 		"web/resume-census": 1471,
 		"web/resume-commit-arm": 9551,
-		"web/resume-events": 15538,
+		"web/resume-events": 15929,
 		"web/resume-handle-qualifier": 685,
 		"web/resume-handoff": 1360,
 		"web/resume-keyed-repeats": 15599,
