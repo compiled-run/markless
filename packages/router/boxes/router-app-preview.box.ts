@@ -1,4 +1,5 @@
 import { box } from '@async/witness';
+import { moduleScriptsAreOnlyLinkBridge } from '../src/vite/runtime/link-bridge-module.ts';
 
 const FIXTURE = 'fixtures/router-app';
 const NITRO_BUILD_DIR = 'node_modules/.nitro-router-app-preview';
@@ -61,9 +62,9 @@ export default box(
 			if (html.includes('?inline')) {
 				throw new Error('Router preview must not import scoped CSS as inline text.');
 			}
-			if (/<script\b[^>]*\btype\s*=\s*["']module["']/i.test(html)) {
+			if (!moduleScriptsAreOnlyLinkBridge(html)) {
 				throw new Error(
-					'Router preview must deliver scoped CSS without eager page JavaScript.',
+					'Router preview must deliver scoped CSS without eager page JavaScript; only the declared, cached router link bridge may load as a module.',
 				);
 			}
 			const css = (

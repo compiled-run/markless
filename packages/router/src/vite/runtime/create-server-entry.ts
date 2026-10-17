@@ -29,6 +29,7 @@ import {
 } from '@markless/bundler/dev-error';
 import { __marklessDebugBootstrapSource } from '../../../../web/src/debug-channel.ts';
 import { appendModulePreloads, listenForLinkIntent } from '../link-intent.ts';
+import { LINK_BRIDGE_SCRIPT_ATTRIBUTE, linkBridgeModulePath } from './link-bridge-module.ts';
 import { createPageHttp } from './page-http.ts';
 import {
 	FRAGMENT_APPEND_END,
@@ -898,7 +899,7 @@ function linkBridgeModules(
 	const variant = (hashLinks: boolean): LinkBridgeModule => {
 		const source = `export default(r,p,q)=>{const d=document;${linkBridgeBody(resumeEntryPath, linkIntent, documentLoads, fragment, { module: true, hashLinks })}\n};`;
 		return {
-			path: `${base.replace(/\/?$/, '/')}_markless/links.${contentHash(source)}.js`,
+			path: linkBridgeModulePath(base, contentHash(source)),
 			source,
 		};
 	};
@@ -938,13 +939,13 @@ function renderLinkBridgeScript(
 			: indexed
 				? ['0', escapeScriptJson(indexed.preloads), escapeScriptJson(indexed.destinations)]
 				: [];
-		return `${debugBootstrap}<script type="module" data-markless-router-link-resumer>${escapeInlineScript(`import b from${JSON.stringify(module.path)};b(${args.join(',')})`)}</script>`;
+		return `${debugBootstrap}<script type="module" ${LINK_BRIDGE_SCRIPT_ATTRIBUTE}>${escapeInlineScript(`import b from${JSON.stringify(module.path)};b(${args.join(',')})`)}</script>`;
 	}
 	const body = linkBridgeBody(resumeEntryPath, intentPreloads !== undefined, documentLoads, fragment, {
 		intentPreloads,
 		hashLinks,
 	});
-	return `${debugBootstrap}<script data-markless-router-link-resumer>${escapeInlineScript(`(()=>{const d=document,s=d.currentScript,r=s&&s.closest('[data-async-container]');if(!r)return;${body}
+	return `${debugBootstrap}<script ${LINK_BRIDGE_SCRIPT_ATTRIBUTE}>${escapeInlineScript(`(()=>{const d=document,s=d.currentScript,r=s&&s.closest('[data-async-container]');if(!r)return;${body}
 })();`)}</script>`;
 }
 

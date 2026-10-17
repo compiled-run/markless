@@ -71,6 +71,11 @@ start early. If the request fails, the browser loads the address the normal way.
 
 Plain `<a>` links to your pages navigate the same way.
 
+In a built app, the code that handles these clicks is one small file the browser downloads once and
+caches for every page. It starts when the browser finishes reading the page. A link clicked before
+that, while a long page is still loading, loads the whole new page the normal way. Nothing is lost;
+only that one click skips the swap.
+
 ## Props that change a click
 
 | Prop | What it does |

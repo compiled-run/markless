@@ -4,6 +4,7 @@ import { planModulePreloadUrls } from '../../bundler/src/build/preload-plan.ts';
 import type { MarklessBundleGraph } from '../../bundler/src/types.ts';
 import { EVENT_ONLY_RESUMER_TARGET_BYTES } from '../../../poc/fixtures/proofs/resumer-script/src/resumer-source.mjs';
 import { evaluateRouterPreloadWindow, evaluateRouterRequests } from './analyzer-gate.ts';
+import { moduleScriptsAreOnlyLinkBridge } from '../src/vite/runtime/link-bridge-module.ts';
 import { routerAnalyzerPolicy } from './analyzer/policy.ts';
 import { invalidateRouterAnalyzerReceipt, writeRouterAnalyzerReceipt } from './analyzer-receipt.ts';
 
@@ -58,9 +59,9 @@ export default box(
 			receipt.note(
 				`router production inline resumer gzip: ${inlineResumerGzip} / ${EVENT_ONLY_RESUMER_TARGET_BYTES} bytes`,
 			);
-			if (indexHtml.includes('<script type="module"')) {
+			if (!moduleScriptsAreOnlyLinkBridge(indexHtml)) {
 				throw new Error(
-					'Router preview HTML must not wake a module script on SSR startup.',
+					'Router preview HTML must not wake a module script on SSR startup other than the declared, cached router link bridge.',
 				);
 			}
 
