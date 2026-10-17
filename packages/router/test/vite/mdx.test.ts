@@ -409,6 +409,60 @@ Count: {2}
 		expect(code).toContain('<p>Count: 2</p>');
 	});
 
+	it('renders nothing for an MDX comment expression', async () => {
+		const code = await transformMdxRoute(
+			`## Requirements {/* #requirements */}
+
+{/* a note to editors */}
+
+Text
+`,
+			'/project/pages/docs.mdx',
+		);
+
+		expect(code).toContain('<h2>Requirements </h2>');
+		expect(code).toContain('<p>Text</p>');
+		expect(code).not.toContain('editors');
+	});
+
+	it('renders lowercase JSX tags as static HTML elements with their literal attributes', async () => {
+		const code = await transformMdxRoute(
+			`import Callout from '../../components/Callout.tsrx';
+
+<details class="admonition" open>
+<summary>More</summary>
+
+Hidden **copy** and <kbd data-key={"c"}>Ctrl</kbd>.
+
+</details>
+
+<Callout title="Docs">
+<div className="tip" hidden={false} tabIndex={0}>Tip</div>
+</Callout>
+`,
+			'/project/pages/docs/[...slug].mdx',
+		);
+
+		expect(code).toContain(
+			'<details class=\\"admonition\\" open><summary>More</summary><p>Hidden <strong>copy</strong> and <kbd data-key=\\"c\\">Ctrl</kbd>.</p></details>',
+		);
+		expect(code).toContain(`"children": "<div class=\\"tip\\" tabindex=\\"0\\">Tip</div>"`);
+	});
+
+	it('still rejects an imported component nested inside a lowercase tag', async () => {
+		await expect(
+			transformMdxRoute(
+				`import Callout from '../../components/Callout.tsrx';
+
+<div>
+<Callout title="Docs" />
+</div>
+`,
+				'/project/pages/docs/[...slug].mdx',
+			),
+		).rejects.toThrow('only supports imported TSRX components as route-level MDX elements');
+	});
+
 	it('rejects MDX spread attributes because Markless cannot preserve their scope safely', async () => {
 		await expect(
 			transformMdxRoute(
