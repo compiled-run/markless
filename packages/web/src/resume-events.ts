@@ -1,5 +1,8 @@
 import type { RuntimeGraph } from '@markless/runtime';
-import { protocolEventDispatchesMarkless } from '@markless/serializer/protocol';
+import {
+	PROTOCOL_IDLE_EVENT_NAME,
+	protocolEventDispatchesMarkless,
+} from '@markless/serializer/protocol';
 import {
 	marklessInstancePath,
 	marklessRecordRowScope,
@@ -8,6 +11,7 @@ import {
 	type MarklessScopedGraph,
 } from './fns/instance-scope.ts';
 import { marklessCodedError } from './coded-error.ts';
+import type { MarklessIdleHost } from './fns/idle-trigger.ts';
 import { marklessEditableControl, marklessNoteControlEdits } from './control-edit-hold.ts';
 import type { OverlayFocusOriginHost } from './overlay-handoff.ts';
 import type {
@@ -244,6 +248,11 @@ function isFocusPreloadEventName(eventName: string): boolean {
 	return EDITABLE_PRELOAD_EVENT_NAMES.includes(eventName);
 }
 
+// Set only by a module with an `onIdle` record.
+function queueIdleHost(root: unknown, host: unknown): void {
+	(globalThis as MarklessIdleHost).__mIdle?.queue(root, host);
+}
+
 export function createEventWiring(input: {
 	readonly root: ResumeDomElement;
 	readonly graph: RuntimeGraph;
@@ -319,6 +328,7 @@ export function createEventWiring(input: {
 		);
 		input.eventTypes.add(record.eventName);
 		input.delegatedTriggers?.registerEventRecord(element, record);
+		if (record.eventName === PROTOCOL_IDLE_EVENT_NAME) queueIdleHost(input.root, element);
 		wantPreload(record.eventName);
 		if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
 			trackDebug(
@@ -421,6 +431,7 @@ export function createEventWiring(input: {
 		byName.set(match.rowEvent.eventName, match);
 		input.eventTypes.add(match.rowEvent.eventName);
 		input.delegatedTriggers?.registerRowEventName(match.rowEvent.eventName);
+		if (match.rowEvent.eventName === PROTOCOL_IDLE_EVENT_NAME) queueIdleHost(input.root, host);
 		if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
 			trackDebug(
 				recordDebugInteraction(

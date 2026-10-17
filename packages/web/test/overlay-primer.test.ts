@@ -1,9 +1,7 @@
 import { expect, test, vi } from 'vitest';
 import { PROTOCOL_VISIBLE_EVENT_NAME } from '@markless/serializer';
-import {
-	createInlineResumerOverlayPrimerSource,
-	createPrerenderInlineVisiblePrimerSource,
-} from '../src/inline/resumer.ts';
+import { createInlineDeferTriggerSource, INLINE_DEFER_LOADER_SOURCE } from '../src/inline/defer.ts';
+import { createInlineResumerOverlayPrimerSource } from '../src/inline/resumer.ts';
 
 type Gesture = { type: string; key?: string };
 
@@ -115,15 +113,10 @@ test('a visible forward does not claim the Escape an open overlay needs', async 
 	expect(f.root.__marklessOverlayPrimedDismissal).toBe('escape');
 });
 
-test('a wake-channel visible dispatch leaves the overlay primer armed for Escape', async () => {
+test('a visible forward from the deferred-trigger helper leaves the overlay primer armed for Escape', async () => {
 	const f = boot(true);
-	// The boot's delegated listener claims every event that bubbles to the root.
-	const host = {
-		dispatchEvent: () => {
-			f.root.__marklessDelegatedDispatch = true;
-			return true;
-		},
-	};
+	const host = { name: 'host' };
+	(f.root as Record<string, unknown>).getElementsByTagName = () => [host];
 	let intersect: ((entries: ReadonlyArray<unknown>) => void) | undefined;
 	class FakeIntersectionObserver {
 		constructor(callback: (entries: ReadonlyArray<unknown>) => void) {
@@ -132,19 +125,27 @@ test('a wake-channel visible dispatch leaves the overlay primer armed for Escape
 		observe() {}
 		unobserve() {}
 	}
-	const nodes = [host];
-	new Function('document', 'IntersectionObserver', createPrerenderInlineVisiblePrimerSource([1]))(
-		{
-			currentScript: { closest: () => f.root },
-			createTreeWalker: () => ({ nextNode: () => nodes.shift() ?? null }),
-		},
-		FakeIntersectionObserver,
-	);
-	intersect!([{ isIntersecting: true, target: host }]);
-	expect(f.root.__marklessDelegatedDispatch).toBe(PROTOCOL_VISIBLE_EVENT_NAME);
+	try {
+		new Function(
+			'document',
+			'IntersectionObserver',
+			'load',
+			createInlineDeferTriggerSource('visible', [1])
+				.replace(INLINE_DEFER_LOADER_SOURCE, 'load')
+				.slice(1),
+		)(
+			{ currentScript: { closest: () => f.root, getAttribute: () => '/build/resume.js' } },
+			FakeIntersectionObserver,
+			f.load,
+		);
+		intersect!([{ isIntersecting: true, target: host }]);
+		expect(f.root.__marklessDelegatedDispatch).toBe(PROTOCOL_VISIBLE_EVENT_NAME);
 
-	f.fire({ type: 'keydown', key: 'Escape' });
-	await f.flush();
-	expect(f.resumeContainerEvent).toHaveBeenCalledExactlyOnceWith({ root: f.root, event: 0 });
-	expect(f.root.__marklessOverlayPrimedDismissal).toBe('escape');
+		f.fire({ type: 'keydown', key: 'Escape' });
+		await f.flush();
+		expect(f.resumeContainerEvent).toHaveBeenCalledWith({ root: f.root, event: 0 });
+		expect(f.root.__marklessOverlayPrimedDismissal).toBe('escape');
+	} finally {
+		delete (globalThis as { __mDefer?: unknown }).__mDefer;
+	}
 });

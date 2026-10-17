@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 271,
+	total: 272,
 	guided: 38,
 	groups: [
 		{
@@ -795,6 +795,11 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_IMPORTED_SYMBOL_CLAIMS_UNREADY',
+					kind: 'build error',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_INLINE_DEFER_FACTORY_UNWRAPPABLE',
 					kind: 'build error',
 					guided: false,
 				},

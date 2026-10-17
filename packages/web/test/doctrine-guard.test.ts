@@ -30,8 +30,6 @@ const RUNTIME_MOUNT_SCAN_ALLOWLIST: Readonly<Record<string, string>> = {
 		'The prerender log summary counts module-preload links and does not locate components.',
 	'packages/web/src/inline/resumer.ts :: const commentWalker = currentDocument.createTreeWalker(root, 129);':
 		"The inline resumer maps a served @try arm's compiler-recorded locators from its boundary comment anchor, so the arm's sync policy runs before the default action.",
-	'packages/web/src/inline/resumer.ts :: const walker = document.createTreeWalker(root, 1);':
-		'The visibility primer materializes compiler-recorded visible-event host locators in DOM order.',
 	'packages/web/src/inline/resumer.ts :: const walker = document.createTreeWalker(root, 128);':
 		'The settle boot censuses the build-emitted boundary comment anchors it fills between.',
 	'packages/web/src/inline/served-census.ts :: const walker = document.createTreeWalker(root, 1);':

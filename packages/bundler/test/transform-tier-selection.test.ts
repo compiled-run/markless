@@ -35,7 +35,7 @@ vi.mock('@markless/compiler', async (importOriginal) => {
 		prerenderInterfacesComplete: actual.prerenderInterfacesComplete,
 		collectTsrxModuleDiagnostics: vi.fn(() => []),
 		compileTsrxModule: vi.fn(async () => ({
-			semanticGraph: { componentEdges: compiler.componentEdges },
+			semanticGraph: { componentEdges: compiler.componentEdges, markup: { chunks: [] } },
 			protocolState: compiler.protocolState,
 			protocolView: compiler.protocolView,
 			// The real compiler always returns payloadArena (non-optional on

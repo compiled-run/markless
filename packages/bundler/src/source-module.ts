@@ -303,6 +303,7 @@ export function emitSourceModule(input: {
 	/** Whether the app's serialized state defines computed nodes. */
 	readonly hasComputedState?: boolean;
 	readonly hasOverlayMarks?: boolean;
+	readonly hasIdleEvents?: boolean;
 	readonly runtimeDemandMap?: unknown;
 	readonly scalarActions?: RuntimeDemandMapArtifact['actions'];
 	// Plain-SSR actions whose closure plans a composing page may route to.
@@ -378,6 +379,10 @@ export function emitSourceModule(input: {
 		// has to name the behaviour here or it would never install.
 		input.environment === 'client' && input.hasOverlayMarks === true
 			? emitOverlayLoaderInstall()
+			: null,
+		// And for `onIdle`: a CSR mount gets the idle wake only from an app module with an idle record.
+		input.environment === 'client' && input.hasIdleEvents === true && !symbolsOnly
+			? emitIdleTriggerInstall()
 			: null,
 		// And the same split again for the row mints. A CSR mount reaches
 		// the resume runtime through THIS module and never evaluates a resume
@@ -528,6 +533,13 @@ function payloadHasComputed(payloadState: unknown): boolean {
 	const computed = (payloadState as { readonly computed?: ReadonlyArray<unknown> } | undefined)
 		?.computed;
 	return Array.isArray(computed) && computed.length > 0;
+}
+
+export function emitIdleTriggerInstall(): string {
+	return [
+		"import { installMarklessIdle } from '@markless/web/fns/idle-trigger';",
+		'installMarklessIdle();',
+	].join('\n');
 }
 
 /**
@@ -720,6 +732,7 @@ export function emitResumeModule(input: {
 	// Scalar plans of a module compiled for the conservative demand class, for payload-document containers.
 	readonly servedScalarPlans?: unknown;
 	readonly needsFullResume?: boolean;
+	readonly hasIdleEvents?: boolean;
 	readonly symbols: ReadonlyArray<SourceSymbolRow>;
 	readonly symbolRoutes: ReadonlyArray<SourceLazySymbolRoute>;
 	readonly closurePlanRoutes?: ReadonlyArray<SourceLazySymbolRoute>;
@@ -833,6 +846,7 @@ export function emitResumeModule(input: {
 		// all. The loader stays unresolved until a resumed root turns out to carry
 		// a marked element, so having the mark somewhere is still not fetching it.
 		demandsOverlay(input.runtimeDemandMap) ? emitOverlayLoaderInstall() : null,
+		input.hasIdleEvents ? emitIdleTriggerInstall() : null,
 		// Row building is pay-per-use the same way: this module is the ONLY place
 		// the mint's specifier is written, so an app whose repeats carry neither
 		// `rowTemplate` nor `emptyArm` never emits its chunk. The loader stays

@@ -10,6 +10,7 @@ import {
 	type InlineResumerSourceVariants,
 } from '@markless/web/inline/resumer';
 import { __marklessDebugBootstrapSource } from '../../web/src/debug-channel.ts';
+import { createMarklessDefer } from '../../web/src/inline/defer.ts';
 import type { MarklessExecutionLogMode } from './types.ts';
 
 type OxcTools = Pick<typeof import('rolldown/experimental'), 'minifySync' | 'transformSync'>;
@@ -69,7 +70,29 @@ async function compileInlineResumerSourceVariants(options: {
 			syncPolicy: true,
 		}),
 	]);
-	return { ...shared, event, syncPolicy, graphSyncPolicyOwner, graphSyncPolicyConsumer };
+	const defer = await compileDeferFactorySource();
+	return { ...shared, event, syncPolicy, graphSyncPolicyOwner, graphSyncPolicyConsumer, defer };
+}
+
+// The factory is an expression, so it is minified as a named binding the mangler must keep and then unwrapped.
+export async function compileDeferFactorySource(): Promise<string> {
+	const binding = 'var __marklessDeferFactory=';
+	const { minifySync, transformSync } = await loadOxcTools();
+	const transformed = transformSync(
+		'markless-defer.js',
+		`${binding}${createMarklessDefer.toString()};`,
+		{ lang: 'js', sourceType: 'script', target: 'es2020' },
+	);
+	assertOxcResult('transform', transformed.errors);
+	const minified = minifySync('markless-defer.js', transformed.code, {
+		compress: true,
+		mangle: { toplevel: false },
+		module: false,
+	});
+	assertOxcResult('minify', minified.errors);
+	const code = minified.code.trim().replace(/;$/, '');
+	if (!code.startsWith(binding)) throw new Error('MARKLESS_INLINE_DEFER_FACTORY_UNWRAPPABLE');
+	return code.slice(binding.length);
 }
 
 export async function compileInlineResumerSource(

@@ -21,6 +21,7 @@ import {
 } from '@markless/compiler';
 import {
 	PROTOCOL_EVENT_ACTION_KIND,
+	PROTOCOL_IDLE_EVENT_NAME,
 	createStorageSeedMetadataFromGraphNodeId,
 	jsonSourceWithNonFiniteNumbers,
 	type ProtocolStatePayload,
@@ -541,6 +542,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 				resolverId,
 				payloadState: compiled.payloadScripts.state,
 				payloadView: containerScopedResumeView(compiled.payloadScripts.view),
+				hasIdleEvents: viewHasIdleEvents(compiled.payloadScripts.view),
 				runtimeDemandMap: compiled.runtimeDemandMap,
 				servedScalarPlans,
 				executionLog: input.executionLog,
@@ -584,6 +586,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 							resolverId,
 							payloadState: compiled.payloadScripts.state,
 							payloadView: containerScopedResumeView(compiled.payloadScripts.view),
+							hasIdleEvents: viewHasIdleEvents(compiled.payloadScripts.view),
 							runtimeDemandMap: compiled.runtimeDemandMap,
 							executionLog: input.executionLog,
 							needsFullResume: prerenderClosureNeedsWake,
@@ -750,6 +753,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					hasOverlayMarks: compiled.runtimeDemandMap.payloadRecords.some(
 						(record) => record.kind === 'overlay',
 					),
+					hasIdleEvents: viewHasIdleEvents(compiled.payloadScripts.view),
 					runtimeDemandMap: compiled.runtimeDemandMap,
 					resumeModuleUrl: input.resumeModuleUrl,
 					scalarActions: input.includeScalarActionPlans
@@ -1430,4 +1434,34 @@ function componentEdgesReachableFrom(
 		}
 	}
 	return edges;
+}
+
+type IdleEventRecordSet = {
+	readonly events?: ReadonlyArray<{ readonly eventName: string }>;
+	readonly keyedRepeats?: ReadonlyArray<{
+		readonly rowEvents: ReadonlyArray<{ readonly eventName: string }>;
+	}>;
+};
+
+// An idle record anywhere, arm and row records included, means a CSR mount wakes its runtime at idle.
+function viewHasIdleEvents(view: ProtocolViewPayload): boolean {
+	const sets: IdleEventRecordSet[] = [
+		view,
+		...(view.branches ?? []).flatMap((branch) => [
+			...(branch.armRecords ?? []),
+			...(branch.servedArmRecords ? [branch.servedArmRecords] : []),
+		]),
+		...view.asyncBoundaries.flatMap((boundary) =>
+			boundary.armRecords && !Array.isArray(boundary.armRecords)
+				? [boundary.armRecords as IdleEventRecordSet]
+				: [],
+		),
+	];
+	return sets.some(
+		(set) =>
+			(set.events ?? []).some((event) => event.eventName === PROTOCOL_IDLE_EVENT_NAME) ||
+			(set.keyedRepeats ?? []).some((repeat) =>
+				repeat.rowEvents.some((event) => event.eventName === PROTOCOL_IDLE_EVENT_NAME),
+			),
+	);
 }

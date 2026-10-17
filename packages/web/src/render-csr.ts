@@ -26,6 +26,7 @@ import type {
 } from './resume-types.ts';
 import type { ResumeRuntime, ResumeRuntimeInput, ResumeSymbol } from './resume.ts';
 import { reportRuntimeErrorToHost } from './runtime-error-reporting.ts';
+import type { MarklessIdleHost } from './fns/idle-trigger.ts';
 
 // Even an evaluated module's import() costs a task.
 let journal: typeof import('./dom-journal.ts') | undefined;
@@ -198,6 +199,8 @@ export async function renderCsrRuntime(input: {
 	);
 	for (const hostNodeId of new Set(graphBehaviors.map((behavior) => behavior.hostNodeId)))
 		await (await demandRuntime()).activateBehaviors(hostNodeId);
+	// Set only by an app module with an `onIdle` record; the runtime it starts at idle queues the hosts.
+	(globalThis as MarklessIdleHost).__mIdle?.wake(output.root, demandRuntime);
 	if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
 		await registerDelegatedTriggerDebug(output, view);
 	if ((globalThis as ExecutionLogGlobal).__mxLog) await marklessLogCsrSummary();

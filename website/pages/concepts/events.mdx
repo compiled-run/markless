@@ -84,6 +84,34 @@ does not reload the page.
 Your component runs once, to set up the page. A handler is different. Its code runs only when its
 event fires. This holds whether the page renders in the browser alone or on a server.
 
+## Code that waits until the page is idle
+
+Some code belongs on the page but should never slow it down: an analytics tag, a chat widget, any
+third-party script. No click asks for it.
+
+**`onIdle` runs its handler once, after the page has loaded and the browser has nothing better to
+do.** Put it on the element the code belongs to.
+
+```tsrx
+export default function Footer() @{
+	<footer
+		onIdle={async () => {
+			const analytics =
+				await import('./analytics.ts');
+			analytics.start();
+		}}
+	>
+		Made by Example Co.
+	</footer>
+}
+```
+
+Like any handler, its code downloads only when it runs. The `import()` inside it does the same for
+the analytics script, so neither one is part of the page load.
+
+It runs once per element. An element inside an `@if` or `@for` runs it after the element appears
+and the page is idle again. An element that is gone by then never runs it.
+
 ## Naming the prop
 
 Write `on` and then the event name. `click` becomes `onClick`, `input` becomes `onInput`, and

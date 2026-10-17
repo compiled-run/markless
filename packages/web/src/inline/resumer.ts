@@ -13,6 +13,7 @@ import {
 } from '@markless/serializer/protocol';
 import type { MarklessExecutionLogMode } from '../dev-log.ts';
 import type { OverlayInstalledRoot, OverlayPrimedDismissalHost } from '../overlay-handoff.ts';
+import { INLINE_DEFER_LOADER_SOURCE, inlineDeferSource, type MarklessDefer } from './defer.ts';
 import type { EarlyEventRoot } from './early-events.ts';
 import { marklessServedCensus } from './served-census.ts';
 
@@ -99,6 +100,8 @@ export type InlineResumerSourceVariants = {
 	readonly syncPolicy: string;
 	readonly graphSyncPolicyOwner: string;
 	readonly graphSyncPolicyConsumer: string;
+	/** The deferred-trigger helper factory, minified; served in place of its authored text. */
+	readonly defer?: string;
 };
 
 type InlineView = ProtocolViewPayload;
@@ -124,7 +127,7 @@ type InlineRoot = HTMLElement &
 		__marklessSettledArms?: Array<MarklessSettledArmHandoff>;
 		__marklessEventOnlyGraph?: Map<string, unknown>;
 		__marklessEventOnlyGraphInitialized?: boolean;
-		__marklessVisibleFired?: WeakSet<Element>;
+		__mFired?: WeakSet<Element>;
 		// The control a crossing woke this page on. A resting pointer sends no
 		// second crossing, so the runtime's own preload would otherwise miss it.
 		__marklessPrimedHover?: Element;
@@ -173,7 +176,7 @@ const _INLINE_EVENT_ACTIONS = {
 } as const satisfies Record<ProtocolEventActionKind, 'forward' | 'noop'>;
 
 // Written into startup scripts as text: a serialized function body containing import() would carry the host's transform of it.
-export const INLINE_MODULE_LOADER_SOURCE = '(url) => import(/* @vite-ignore */ url)';
+export const INLINE_MODULE_LOADER_SOURCE = INLINE_DEFER_LOADER_SOURCE;
 
 export function createInlineResumerSource(options: InlineResumerBuildOptions): string {
 	if (options.debug && (!options.debugBootstrapSource || !options.debugRegistrationSource)) {
@@ -205,7 +208,7 @@ export function createInlineResumerDebugRegistrationSource(): string {
 }
 
 export function createInlineResumerSelfWakeSource(resumeModuleUrl: string | undefined): string {
-	return `;(${runInlineResumerSelfWake.toString()})(${JSON.stringify(resumeModuleUrl)},${INLINE_MODULE_LOADER_SOURCE});`;
+	return `;(${runInlineResumerSelfWake.toString()})(${JSON.stringify(resumeModuleUrl)},${INLINE_MODULE_LOADER_SOURCE},${inlineDeferSource()});`;
 }
 
 // Appended only to a page that renders storage() cells. The head seed script has
@@ -217,7 +220,7 @@ export function createInlineResumerStorageWakeSource(
 	slotSymbolKey: string,
 	renderedJson: string,
 ): string {
-	return `;(${runInlineResumerStorageWake.toString()})(${JSON.stringify(slotSymbolKey)},${renderedJson},()=>(${runInlineResumerSelfWake.toString()})(${JSON.stringify(resumeModuleUrl)},${INLINE_MODULE_LOADER_SOURCE}));`;
+	return `;(${runInlineResumerStorageWake.toString()})(${JSON.stringify(slotSymbolKey)},${renderedJson},()=>(${runInlineResumerSelfWake.toString()})(${JSON.stringify(resumeModuleUrl)},${INLINE_MODULE_LOADER_SOURCE},${inlineDeferSource()}));`;
 }
 
 function runInlineResumerStorageWake(
@@ -687,32 +690,19 @@ function runPrerenderInlineResumer(
 function runInlineResumerSelfWake(
 	fallbackResumeModuleUrl: string | undefined,
 	loadModule: (url: string) => Promise<InlineResumeModule>,
+	defer: MarklessDefer,
 ): void {
 	const currentScript = document.currentScript as HTMLScriptElement | null;
 	const root = currentScript?.closest<InlineRoot>('[data-async-container]');
 	const resumeModuleUrl =
 		currentScript?.getAttribute?.('data-markless-resume-module') ?? fallbackResumeModuleUrl;
 	if (!root || !resumeModuleUrl) return;
-	// Streamed reveal trains may still hold commits (pre-paint frame or post-paint timer); adopt only after they land.
-	const wake = () =>
-		requestAnimationFrame(() => {
-			const start = () =>
-				queueMicrotask(async () => {
-					if (!root.__asyncResumeRuntimeStarted) {
-						root.__marklessDelegatedDispatch = true;
-						const module = await loadModule(resumeModuleUrl);
-						await module.resumeContainerEvent({ root, event: 0 });
-					}
-				});
-			const arms = (globalThis as { __mArm?: { idle?: (run: () => void) => void } }).__mArm;
-			if (arms?.idle) arms.idle(start);
-			else start();
-		});
-	if (document.readyState === 'loading') {
-		document.addEventListener('DOMContentLoaded', wake, { once: true });
-	} else {
-		wake();
-	}
+	defer.idle(root, async () => {
+		if (root.__asyncResumeRuntimeStarted) return;
+		root.__marklessDelegatedDispatch = true;
+		const module = await loadModule(resumeModuleUrl);
+		await module.resumeContainerEvent({ root, event: 0 });
+	});
 }
 
 // Retain Escape until installation; defer the wake so authored dispatch (`true`, never a visible forward) can claim it.
@@ -751,124 +741,6 @@ function runInlineResumerOverlayPrimer(
 	};
 	addEventListener('keydown', prime, true);
 	addEventListener('pointerdown', prime, true);
-}
-
-/**
- * The visibility observer, appended only to a page whose view carries a
- * visible event, so every other page ships a byte-identical resumer. It runs
- * at load with no gesture and forwards each host's first intersection to the
- * resume module. A started runtime observes hosts itself, so a host is marked
- * fired only when a lean path ran its handler.
- */
-export function createInlineResumerVisiblePrimerSource(
-	resumeModuleUrl: string | undefined,
-): string {
-	return `;(${runInlineResumerVisiblePrimer.toString()})(${JSON.stringify(PROTOCOL_VISIBLE_EVENT_NAME)},${JSON.stringify(resumeModuleUrl)},${INLINE_MODULE_LOADER_SOURCE});`;
-}
-
-function runInlineResumerVisiblePrimer(
-	visibleEventName: string,
-	fallbackResumeModuleUrl: string | undefined,
-	loadModule: (url: string) => Promise<InlineResumeModule>,
-): void {
-	const currentScript = document.currentScript as HTMLScriptElement | null;
-	const root = currentScript?.closest<InlineRoot>('[data-async-container]');
-	const resumeModuleUrl =
-		currentScript?.getAttribute?.('data-markless-resume-module') ?? fallbackResumeModuleUrl;
-	const viewScript = root?.querySelector('script[type="markless/view"]');
-	if (!root || !resumeModuleUrl || !viewScript || typeof IntersectionObserver !== 'function')
-		return;
-	const view = JSON.parse(viewScript.textContent || 'null') as InlineView;
-	const walker = document.createTreeWalker(root, 1);
-	const elements: Node[] = [root];
-	let next: Node | null;
-	while ((next = walker.nextNode())) elements.push(next);
-	const records = new Map<Element, InlineEventRecord>();
-	const fired = (root.__marklessVisibleFired ||= new WeakSet());
-	let pending = 0;
-	const observer = new IntersectionObserver((entries) => {
-		for (const entry of entries) {
-			const element = entry.target;
-			const eventRecord = records.get(element);
-			if (!entry.isIntersecting || !eventRecord) continue;
-			observer.unobserve(element);
-			records.delete(element);
-			if (fired.has(element) || root.__asyncResumeRuntimeStarted) continue;
-			root.__marklessDelegatedDispatch ||= visibleEventName;
-			if (!root.__marklessCensus) {
-				const census: Element[] = [root];
-				const all = root.getElementsByTagName?.('*') ?? [];
-				for (let index = 0; index < all.length; index++) census.push(all[index]!);
-				root.__marklessCensus = census;
-			}
-			pending++;
-			loadModule(resumeModuleUrl)
-				.then((module) =>
-					module.resumeContainerEvent({
-						root,
-						event: { type: visibleEventName, target: element } as unknown as Event,
-						element,
-						eventRecord,
-					}),
-				)
-				.then(() => {
-					if (root.__asyncResumeRuntimeStarted) return;
-					fired.add(element);
-					// A lean run leaves no runtime behind, so the hover/focus primer re-arms.
-					if (!--pending && root.__marklessDelegatedDispatch === visibleEventName)
-						root.__marklessDelegatedDispatch = undefined;
-				});
-		}
-	});
-	for (const eventRecord of view.events) {
-		const locator = view.locators.find((item) => item.hostNodeId === eventRecord.hostNodeId);
-		const element = locator && (elements[locator.index] as Element | undefined);
-		if (eventRecord.eventName !== visibleEventName || !element) continue;
-		records.set(element, eventRecord);
-		observer.observe(element);
-	}
-}
-
-/**
- * The visibility observer for a page served without a view script (wake
- * channel, prerender). The page's boot delegates the visible event name like
- * any other, so each host's first intersection is dispatched on the host and
- * reaches the resume module through the boot's own queue, where it takes that
- * host's trigger group.
- */
-export function createPrerenderInlineVisiblePrimerSource(
-	hostIndexes: ReadonlyArray<number>,
-): string {
-	return `;(${runPrerenderInlineVisiblePrimer.toString()})(${JSON.stringify(PROTOCOL_VISIBLE_EVENT_NAME)},${JSON.stringify(hostIndexes)});`;
-}
-
-function runPrerenderInlineVisiblePrimer(
-	visibleEventName: string,
-	hostIndexes: ReadonlyArray<number>,
-): void {
-	const root = (document.currentScript as HTMLScriptElement | null)?.closest<InlineRoot>(
-		'[data-async-container]',
-	);
-	if (!root || typeof IntersectionObserver !== 'function') return;
-	const walker = document.createTreeWalker(root, 1);
-	const elements: Node[] = [root];
-	let next: Node | null;
-	while ((next = walker.nextNode())) elements.push(next);
-	const fired = (root.__marklessVisibleFired ||= new WeakSet());
-	const observer = new IntersectionObserver((entries) => {
-		for (const entry of entries) {
-			if (!entry.isIntersecting) continue;
-			observer.unobserve(entry.target);
-			if (fired.has(entry.target)) continue;
-			const claimed = root.__marklessDelegatedDispatch;
-			entry.target.dispatchEvent(new Event(visibleEventName, { bubbles: true }));
-			root.__marklessDelegatedDispatch = claimed || visibleEventName;
-		}
-	});
-	for (const index of hostIndexes) {
-		const element = elements[index] as Element | undefined;
-		if (element) observer.observe(element);
-	}
 }
 
 function registerInlineResumerDebug(input: {

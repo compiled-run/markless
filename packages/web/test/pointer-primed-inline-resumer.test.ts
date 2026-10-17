@@ -1,8 +1,6 @@
 import { expect, test } from 'vitest';
-import {
-	createInlineResumerSource,
-	createInlineResumerVisiblePrimerSource,
-} from '../src/inline/resumer.ts';
+import { createInlineDeferTriggerSource, INLINE_DEFER_LOADER_SOURCE } from '../src/inline/defer.ts';
+import { createInlineResumerSource } from '../src/inline/resumer.ts';
 
 // The served boot is the only layer that can spend a crossing on the import,
 // because on a cold page nothing else is running yet. These pin that a hover
@@ -240,15 +238,19 @@ test('a visibility forward leaves the crossing primer armed', async () => {
 			visibleArrivals.push(input.event.type);
 		},
 	});
-	const primer = createInlineResumerVisiblePrimerSource('/build/resume-C3d4.js')
-		.replace('(url) => import(/* @vite-ignore */ url)', 'load')
+	resumer.root.getElementsByTagName = () => [resumer.host];
+	const primer = createInlineDeferTriggerSource('visible', [1])
+		.replace(INLINE_DEFER_LOADER_SOURCE, 'load')
 		.slice(1);
 	// eslint-disable-next-line @typescript-eslint/no-implied-eval
 	new Function('document', 'IntersectionObserver', 'load', primer)(
-		resumer.fakeDocument,
+		{
+			currentScript: { closest: () => resumer.root, getAttribute: () => '/build/resume-C3d4.js' },
+		},
 		FakeObserver,
 		loadVisible,
 	);
+	delete (globalThis as { __mDefer?: unknown }).__mDefer;
 	intersect?.([{ target: resumer.host, isIntersecting: true }]);
 	await settle();
 	expect(visibleArrivals).toEqual(['visible']);

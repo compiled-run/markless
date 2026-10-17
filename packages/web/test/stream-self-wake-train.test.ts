@@ -176,7 +176,7 @@ test('an event-less wake waits for a timer-held streamed commit before starting 
 		expect(page.timers).toHaveLength(1);
 
 		page.run(
-			createInlineResumerSelfWakeSource('/build/lighthouse-resume.js').replace(
+			createInlineResumerSelfWakeSource('/build/lighthouse-resume.js').replaceAll(
 				INLINE_MODULE_LOADER_SOURCE,
 				'__vite_ssr_dynamic_import__',
 			),
@@ -186,6 +186,11 @@ test('an event-less wake waits for a timer-held streamed commit before starting 
 
 		page.advance(200);
 		await page.drain();
+		expect(page.log).toEqual(['settled arm inserted']);
+
+		// With neither postTask nor requestIdleCallback in scope, idle is the 200 ms timeout after the drain.
+		page.advance(200);
+		await page.drain();
 		expect(page.log).toEqual([
 			'settled arm inserted',
 			'import /build/lighthouse-resume.js',
@@ -193,23 +198,28 @@ test('an event-less wake waits for a timer-held streamed commit before starting 
 		]);
 	} finally {
 		delete (globalThis as { __mArm?: unknown }).__mArm;
+		delete (globalThis as { __mDefer?: unknown }).__mDefer;
 	}
 });
 
-test('an event-less wake on a document with no queued streamed commit starts after one frame', async () => {
+test('an event-less wake on a document with no queued streamed commit starts at the first idle period after one frame', async () => {
 	const { executor } = await streamedExecutorAndCommit();
 	const page = paintedDocument();
 	try {
 		page.run(executor);
 		page.run(
-			createInlineResumerSelfWakeSource('/build/lighthouse-resume.js').replace(
+			createInlineResumerSelfWakeSource('/build/lighthouse-resume.js').replaceAll(
 				INLINE_MODULE_LOADER_SOURCE,
 				'__vite_ssr_dynamic_import__',
 			),
 		);
 		await page.drain();
+		expect(page.log).toEqual([]);
+		page.advance(200);
+		await page.drain();
 		expect(page.log).toEqual(['import /build/lighthouse-resume.js', 'wake event=0']);
 	} finally {
 		delete (globalThis as { __mArm?: unknown }).__mArm;
+		delete (globalThis as { __mDefer?: unknown }).__mDefer;
 	}
 });
