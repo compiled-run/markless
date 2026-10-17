@@ -5,7 +5,7 @@ import {
 	REPLACE_ATTRIBUTE,
 	SCROLL_ATTRIBUTE,
 } from '../../link-attributes.ts';
-import { ROUTE_SCRIPT_TYPE } from '../../route-dom.ts';
+import { HTML_ATTRIBUTES_SLOT, ROUTE_SCRIPT_TYPE } from '../../route-dom.ts';
 import {
 	buildRouteManifestFromFileIds,
 	matchRouteManifest,
@@ -632,11 +632,13 @@ async function renderDocumentShell(
 	headHtml: string,
 	importMap = '',
 ): Promise<string> {
-	const attributes = htmlAttributes(documentModule, pageProps);
-	const documentHtml = await renderDocumentModule(documentModule, {
-		...pageProps,
-		children: DOCUMENT_CHILDREN_PLACEHOLDER,
-	});
+	const written: Record<string, unknown> = {};
+	const documentHtml = await renderDocumentModule(
+		documentModule,
+		{ ...pageProps, children: DOCUMENT_CHILDREN_PLACEHOLDER },
+		written,
+	);
+	const attributes = htmlAttributes(documentModule, pageProps, written);
 	if (documentHtml !== undefined) {
 		return [
 			'<!doctype html>',
@@ -685,8 +687,11 @@ function fragmentDocument(shell: string, bodyHtml: string, documentLoads: boolea
 async function renderDocumentModule(
 	documentModule: DocumentModule | undefined,
 	props: PageComponentProps & { readonly children: string },
+	htmlAttributes: Record<string, unknown>,
 ): Promise<string | undefined> {
-	const output = await documentModule?.default?.renderSsr?.(props);
+	const output = await documentModule?.default?.renderSsr?.(props, {
+		[HTML_ATTRIBUTES_SLOT]: htmlAttributes,
+	});
 	assertDocumentStorageFree(output);
 	return output?.html;
 }
@@ -872,9 +877,14 @@ function fragmentConfig(
 	};
 }
 
-function htmlAttributes(documentModule: DocumentModule | undefined, pageProps: PageComponentProps) {
+function htmlAttributes(
+	documentModule: DocumentModule | undefined,
+	pageProps: PageComponentProps,
+	written: Readonly<Record<string, unknown>>,
+) {
 	const attributes = documentModule?.__marklessRouterHtmlAttributes?.(pageProps) ?? {
 		lang: 'en',
+		...written,
 	};
 	const normalized: Record<string, string> = {};
 

@@ -8,6 +8,7 @@ import {
 	REPLACE_ATTRIBUTE,
 	SCROLL_ATTRIBUTE,
 } from './link-attributes.ts';
+import { HTML_ATTRIBUTES_SLOT } from './route-dom.ts';
 
 export {
 	buildRouteManifestFromFileIds,
@@ -151,8 +152,14 @@ export const Html = Object.assign(
 		return props.children;
 	},
 	{
-		renderSsr(props: { readonly children?: __MarklessTypeService.Child } = {}) {
-			return { html: props.children == null ? '' : String(props.children), elementCount: 0 };
+		renderSsr(
+			props: { readonly children?: __MarklessTypeService.Child; readonly [name: string]: unknown } = {},
+			renderContext?: { readonly [HTML_ATTRIBUTES_SLOT]?: Record<string, unknown> },
+		) {
+			const { children, ...attributes } = props;
+			if (renderContext?.[HTML_ATTRIBUTES_SLOT])
+				Object.assign(renderContext[HTML_ATTRIBUTES_SLOT], attributes);
+			return { html: children == null ? '' : String(children), elementCount: 0 };
 		},
 	},
 );
