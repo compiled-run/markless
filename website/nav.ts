@@ -69,11 +69,20 @@ export const nav: readonly NavSection[] = [
 					'Put a Markless component into one element of an HTML page you already have, with Vite and render(), and ship static files.',
 			},
 			{
+				title: 'Migrating an existing app',
+				href: '/start/migrate',
+				sprite: 'arrow-curve',
+				icon: 'first-app',
+				number: '4',
+				description:
+					'Your coding agent moves your app to Markless one page at a time, and each page is checked against the original before it switches over.',
+			},
+			{
 				title: 'Reading a .tsrx file',
 				href: '/start/reading-tsrx',
 				sprite: 'bookmark',
 				icon: 'reading-tsrx',
-				number: '4',
+				number: '5',
 				description:
 					'Every part of a .tsrx file, line by line, then the other files in a starter app.',
 			},
