@@ -16,6 +16,7 @@ export {
 	STORAGE_PROTOCOL_VERSION,
 };
 export {
+	PROTOCOL_LOCATOR_PATHS_ATTRIBUTE,
 	PROTOCOL_PROP_GRAPH_NODE_PREFIX,
 	PROTOCOL_PROPS_GRAPH_NODE_ID,
 	protocolInstancePath,
@@ -393,6 +394,8 @@ export type ProtocolViewPayload = {
 			readonly path: ReadonlyArray<string>;
 		}>;
 		readonly symbolId?: string;
+		/** The behavior reads or writes page state, so it runs against the page's graph. */
+		readonly usesGraph?: true;
 	}>;
 	readonly elementHandles: ReadonlyArray<{
 		readonly hostNodeId: string;

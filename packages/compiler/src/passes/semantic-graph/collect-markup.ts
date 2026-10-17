@@ -46,6 +46,23 @@ import { PROJECTION_PROP_NAME } from '../public-render/shared-seed-pass.ts';
 import { propsRestSignature } from './spread-event-guard.ts';
 import type { MutableSemanticGraphArtifact } from './types.ts';
 
+// HTML void elements: a closing tag for one is parsed as a second element (`</br>` is another `<br>`).
+const VOID_TAG_NAMES: ReadonlySet<string> = new Set([
+	'area',
+	'base',
+	'br',
+	'col',
+	'embed',
+	'hr',
+	'img',
+	'input',
+	'link',
+	'meta',
+	'source',
+	'track',
+	'wbr',
+]);
+
 type CollectionContext = {
 	readonly source: string;
 	readonly filename: string;
@@ -588,7 +605,7 @@ function emitNode(
 	append(builder, '>');
 	if (node.type === 'JSXScriptElement') emitScriptBody(node, path, builder, context, repeat);
 	else emitNodes(asNodes(node.children), [...path, 0], builder, context, repeat);
-	append(builder, `</${tagName}>`);
+	if (!VOID_TAG_NAMES.has(tagName.toLowerCase())) append(builder, `</${tagName}>`);
 	return 1;
 }
 

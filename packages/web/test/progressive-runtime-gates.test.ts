@@ -24,6 +24,7 @@ afterEach(() => {
 	vi.doUnmock('../src/resume-behaviors.ts');
 	vi.doUnmock('../src/resume-branches.ts');
 	vi.doUnmock('../src/resume-handoff.ts');
+	vi.doUnmock('../src/resume-commit-arm.ts');
 	vi.resetModules();
 });
 
@@ -233,6 +234,57 @@ test('row collection writes do not import unrelated async or behavior capabiliti
 	expect(branchImports).toBe(1);
 	expect(asyncBoundaryImports).toBe(0);
 	expect(behaviorImports).toBe(0);
+});
+
+// The bundler leaves the arm committer out of a page whose records own no arm, so resume must never import it there.
+test('a page whose records own no arm starts and dispatches without importing the arm committer', async () => {
+	let armCommitImports = 0;
+	vi.doMock('../src/resume-commit-arm.ts', async () => {
+		armCommitImports++;
+		return await vi.importActual('../src/resume-commit-arm.ts');
+	});
+
+	const { createResumeRuntime } = await import('../src/resume.ts');
+	const button = element('BUTTON');
+	const label = element('P');
+	const root = element('SECTION', [button, label]);
+	const graph = createRuntimeGraph({ cells: [{ graphNodeId: 'state:open', value: false }] });
+	const runtime = createResumeRuntime({
+		root,
+		graph,
+		view: {
+			locators: [
+				{ hostNodeId: 'h0', strategy: 'dom-order', index: 1, tagName: 'button' },
+				{ hostNodeId: 'h1', strategy: 'dom-order', index: 2, tagName: 'p' },
+			],
+			events: [{ hostNodeId: 'h0', eventName: 'click', symbolIds: ['symbol:toggle'] }],
+			domUpdates: [
+				{
+					hostNodeId: 'h1',
+					source: 'open',
+					graphNodeId: 'state:open',
+					path: [],
+					target: { kind: 'class', trueValue: 'show', falseValue: '' },
+				},
+			],
+			behaviors: [],
+			elementHandles: [],
+			asyncBoundaries: [],
+			branches: [],
+			keyedRepeats: [],
+		},
+		loadSymbol: () => () => {
+			graph.write({ graphNodeId: 'state:open', value: true });
+		},
+		applyDomJournal: () => undefined,
+	});
+
+	await runtime.start();
+	await runtime.dispatch({ type: 'click', target: button });
+	await graph.flush();
+
+	expect(graph.read('state:open', [])).toBe(true);
+	expect(armCommitImports).toBe(0);
 });
 
 function progressiveMixedView(): ResumeViewRecord {

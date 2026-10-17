@@ -108,7 +108,7 @@ export function createProtocolViewPayload(
 			.filter((behavior) => !excludedHostIds.has(behavior.hostNodeId))
 			.map((behavior, index) => ({
 				...behavior,
-				symbolId: behaviorSymbols.get(behavior.hostNodeId)?.[index],
+				...behaviorSymbolFields(input, behaviorSymbols.get(behavior.hostNodeId)?.[index]),
 			})),
 		elementHandles: [
 			...input.payloadArena.view.elementHandles.filter(
@@ -824,7 +824,10 @@ function wiredArmRecordSet(
 			.filter((behavior) => !flipHostIds.has(behavior.hostNodeId))
 			.map((behavior, index) => ({
 				...behavior,
-				symbolId: behaviorSymbolsForArms(input).get(behavior.hostNodeId)?.[index],
+				...behaviorSymbolFields(
+					input,
+					behaviorSymbolsForArms(input).get(behavior.hostNodeId)?.[index],
+				),
 			})),
 		elementHandles: set.elementHandles.filter((handle) => !flipHostIds.has(handle.hostNodeId)),
 		...(branches ? { branches } : {}),
@@ -1034,7 +1037,10 @@ function branchArmRecords(input: ProtocolViewPayloadInput, branchSiteId: string)
 				.map((behavior, index) => ({
 					...behavior,
 					hostPath: hostIds.get(behavior.hostNodeId)!.path,
-					symbolId: behaviorSymbolsForArms(input).get(behavior.hostNodeId)?.[index],
+					...behaviorSymbolFields(
+						input,
+						behaviorSymbolsForArms(input).get(behavior.hostNodeId)?.[index],
+					),
 				})),
 			elementHandles: input.payloadArena.view.elementHandles
 				.filter((handle) => hostIds.has(handle.hostNodeId))
@@ -1153,6 +1159,16 @@ function bindArmBranchEventSymbols(
 				}
 			: {}),
 	}));
+}
+
+function behaviorSymbolFields(
+	input: ProtocolViewPayloadInput,
+	symbolId: string | undefined,
+): { readonly symbolId: string | undefined; readonly usesGraph?: true } {
+	const usesGraph = input.symbolResolver.symbols.some(
+		(symbol) => symbol.id === symbolId && symbol.kind === 'behavior' && symbol.graphAccess,
+	);
+	return usesGraph ? { symbolId, usesGraph: true } : { symbolId };
 }
 
 function behaviorSymbolsForArms(input: ProtocolViewPayloadInput): ReadonlyMap<string, string[]> {

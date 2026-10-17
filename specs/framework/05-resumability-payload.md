@@ -211,10 +211,35 @@ existing initially-rendered DOM. This is a locator-decoding step only:
 
 ```txt
 markless/view locator stream
--> TreeWalker over existing DOM
--> skip static nodes and ignored/nested regions
+-> TreeWalker over existing DOM (the census)
+-> if the container no longer holds the element count it was served with,
+   find each located host under its served parent instead of by position
 -> attach records to real elements/comment anchors
 ```
+
+A locator's DOM-order index counts every element the container was served
+with, so a third-party script that adds, removes or swaps an element before the
+page wakes would shift every later index. Resume does not trust positions alone
+for that reason. The container carries one `data-markless-paths` attribute
+(`PROTOCOL_LOCATOR_PATHS_ATTRIBUTE`), written by the server from the html it
+served: the served element count, then for every located host and each of its
+ancestors its parent, its parent's served element-child count, its place among
+those children and its tag. The inline boot walks the container once. When the
+count matches, the census is the walk. When it does not, each located element is
+matched by tag among its parent's children, scanning only as far as that
+parent's child count grew or shrank, so a change moves nothing outside the
+parent it happened in. Unlocated elements fill the census slots between located
+ones; extra elements are left out and missing ones leave null slots. Arm,
+boundary and keyed-row records already locate relative to their own comment
+anchor or row root, so they are unaffected by changes outside their range.
+
+No static node gains an attribute: the paths ride on the container element only.
+A foreign change that removes or swaps a located element itself drops that one
+host. Under the paths attribute a host whose element is missing or has the wrong
+tag is reported through `reportError` and skipped, and the rest of the page
+resumes; development builds add which node now stands there and where. Without
+the attribute (a page the server did not measure) the mismatch is still a thrown
+`MARKLESS_RESUME_LOCATOR_MISMATCH`, so a refused wake can retry.
 
 The resumer stores the result in internal side tables such as:
 

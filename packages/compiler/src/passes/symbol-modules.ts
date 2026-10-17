@@ -5473,6 +5473,8 @@ export type EventHandlerEmissionInput = {
 	 * that carries no declaration filters exactly the imports it did before.
 	 */
 	readonly moduleImports?: readonly SemanticModuleImport[];
+	/** An attach behavior's parameter is its element, not an event. */
+	readonly parametersFrom?: 'element';
 };
 
 /** The body of the `/* scalar leaf marker: ... *\/` comment, delimiters excluded. */
@@ -6003,6 +6005,8 @@ function eventHandlerParameterStatements(input: EventHandlerEmissionInput): Emis
 	});
 
 	return parameters.map((parameter, index) => {
+		if (input.parametersFrom === 'element')
+			return constDeclarationNode(parameter, memberChainNode('context.element'));
 		if (symbol.kind !== 'callback-prop') {
 			return constDeclarationNode(parameter, memberChainNode('context.event'));
 		}
@@ -6119,7 +6123,8 @@ function eventHandlerRewrite(
 			valueSource: undefined,
 			// `spliceEventHandlerBody` blanks the parameters for a callback prop's
 			// writes, because a callback prop has no DOM event to read fields off.
-			eventParameters: symbol.kind === 'callback-prop' ? [] : parameters,
+			eventParameters:
+				symbol.kind === 'callback-prop' || input.parametersFrom === 'element' ? [] : parameters,
 			graphReads: symbol.reads ?? [],
 			elementHandleReads: handleReads,
 			moduleImports: symbol.moduleImports ?? [],
@@ -7379,6 +7384,31 @@ export function buildSymbolModuleEmission(
 	}
 
 	if (symbol.kind === 'behavior') {
+		if (symbol.graphAccess && symbol.inputSources.length === 0)
+			return buildEventHandlerEmission({
+				symbol: {
+					id: symbol.id,
+					kind: 'event-handler',
+					hostNodeId: symbol.hostNodeId,
+					eventName: 'attach',
+					source: symbol.functionSource,
+					sourceSpan: symbol.graphAccess.sourceSpan,
+					parameters: symbol.graphAccess.parameters,
+					...(symbol.graphAccess.moduleImports
+						? { moduleImports: symbol.graphAccess.moduleImports }
+						: {}),
+					order: symbol.order,
+					reads: symbol.graphAccess.reads,
+					writes: symbol.graphAccess.writes,
+				},
+				localNames: input.localNames ?? emptyLocalNames,
+				captureSlots: [],
+				usesArgumentVector: false,
+				sourceFileName: input.sourceFileName,
+				moduleDeclarations: input.moduleDeclarations,
+				moduleImports: input.moduleImports,
+				parametersFrom: 'element',
+			});
 		if (!canEmitBehaviorModule(symbol)) return null;
 
 		return buildBehaviorEmission({

@@ -331,10 +331,10 @@ export function createResumeRuntime(
 			input.root.addEventListener?.(eventType, dispatchCaptured, { capture: true });
 	}
 	async function registerServedBoundaryArms(): Promise<void> {
-		const { registerArmRecordSet } = await import('./resume-commit-arm.ts');
 		for (const boundary of asyncBoundariesById.values()) {
 			const armRecords = boundary.armRecords as ResumeArmRecordSet | undefined;
 			if (!armRecords || Array.isArray(armRecords)) continue;
+			const { registerArmRecordSet } = await import('./resume-commit-arm.ts');
 			await registerArmRecordSet(
 				await armRegistrationDeps(armRecords),
 				installArmEventType,

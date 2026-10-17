@@ -190,6 +190,10 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 		...input.payloadArena.view.behaviors,
 		...input.payloadArena.view.keyedRepeats.flatMap((repeat) => repeat.rowBehaviors ?? []),
 	].forEach((behavior, order) => {
+		const authored = input.semanticGraph.behaviors.find(
+			(candidate) =>
+				candidate.hostNodeId === behavior.hostNodeId && candidate.source === behavior.source,
+		);
 		symbols.push({
 			id: `symbol:${nextSymbolId++}`,
 			kind: 'behavior',
@@ -202,6 +206,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 				behavior.functionSource,
 			),
 			order,
+			...behaviorGraphAccess(authored, input, semanticsReader),
 		});
 	});
 
@@ -936,6 +941,29 @@ function tailStatementExpressionSpan(
 	if (typeof expression?.start !== 'number' || typeof expression.end !== 'number') return null;
 
 	return { start: expression.start, end: expression.end };
+}
+
+function behaviorGraphAccess(
+	authored: SymbolResolverInput['semanticGraph']['behaviors'][number] | undefined,
+	input: SymbolResolverInput,
+	semanticsReader: SymbolSourceSemanticsReader,
+): Pick<Extract<PlannedSymbol, { readonly kind: 'behavior' }>, 'graphAccess'> {
+	const sourceSpan = authored?.functionSpan;
+	if (!authored || !sourceSpan) return {};
+	const source = authored.functionSource;
+	const reads = eventReads(input.stateLowering?.reads, [sourceSpan], source, semanticsReader);
+	const writes = eventWrites(source, input.stateLowering?.writes, [sourceSpan]);
+	if (reads.length === 0 && writes.length === 0) return {};
+	const moduleImports = referencedModuleImports(input.semanticGraph.moduleImports, source);
+	return {
+		graphAccess: {
+			sourceSpan,
+			parameters: authored.functionParameters ?? [],
+			...(moduleImports.length > 0 ? { moduleImports } : {}),
+			reads,
+			writes,
+		},
+	};
 }
 
 function eventWrites(

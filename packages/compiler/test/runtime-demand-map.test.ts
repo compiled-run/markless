@@ -380,6 +380,20 @@ test('a repeat that only reorders served rows demands no component mint', () => 
 	expect(repeatRecordModules(repeatDemandMap({}))).not.toContain('web/fns/row-component-mint');
 });
 
+test('only a record that owns an arm demands the arm committer, so other pages can leave it unloaded', () => {
+	const committer = 'web/resume-commit-arm';
+	const plain = repeatDemandMap({});
+	expect(plain.unknownRecordModuleIds).toContain(committer);
+	expect(plain.payloadRecords.flatMap((record) => record.runtimeModuleIds)).not.toContain(
+		committer,
+	);
+	expect(
+		repeatRecordModules(
+			repeatDemandMap({ rowComponent: { componentEdgeId: 'edge:0', componentName: 'App' } }),
+		),
+	).toContain(committer);
+});
+
 test('a repeat carrying row markup demands the row mint', () => {
 	expect(
 		repeatRecordModules(
@@ -482,6 +496,7 @@ test('a control that flips a branch through a computed reaches the flip, its der
 		'sync-computed-derive',
 	]);
 	expect(input.firstUse?.runtimeModuleIds).toContain('web/resume-branches');
+	expect(input.firstUse?.runtimeModuleIds).toContain('web/resume-commit-arm');
 });
 
 test('a control whose writes reach no branch leaves the branch symbols out', async () => {

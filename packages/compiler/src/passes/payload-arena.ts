@@ -444,7 +444,12 @@ function payloadBehavior(
 	bindings: ReadonlyMap<string, SemanticGraphBinding>,
 	aliases: ReturnType<typeof semanticAliasMap>,
 ): PayloadBehavior {
-	const { constantInputs, ...record } = behavior;
+	const {
+		constantInputs,
+		functionSpan: _functionSpan,
+		functionParameters: _functionParameters,
+		...record
+	} = behavior;
 	const inputGraphReads = behaviorInputGraphReads(behavior.inputSources, bindings, aliases);
 	const inputValues = behaviorInputValues(
 		behavior.inputSources,

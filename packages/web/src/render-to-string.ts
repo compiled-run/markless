@@ -16,6 +16,7 @@ import {
 import { renderPayloadScripts } from '@markless/serializer';
 import {
 	protocolEventDispatchesMarkless,
+	PROTOCOL_LOCATOR_PATHS_ATTRIBUTE,
 	PROTOCOL_VISIBLE_EVENT_NAME,
 } from '@markless/serializer/protocol';
 import {
@@ -45,6 +46,7 @@ import {
 import { marklessRosterPositions } from './prerender/shared-seed-slot.ts';
 import { derivePrerenderResumeRecords } from './prerender/evaluator.ts';
 import { createEarlyEventCaptureSource } from './inline/early-events.ts';
+import { servedLocatorPaths } from './locator-paths.ts';
 
 export { prepareSsrResumeRecords } from './prerender/records.ts';
 export { CONTAINER_RETIRE_PROPERTY } from './payload-resume-registry.ts';
@@ -175,9 +177,12 @@ export async function assembleSsrContainer(
 	}
 	const payloadRecords =
 		classification?.kind === 'divergent' ? classification.delta : requestRecords;
+	const servedView = payloadRecords === requestRecords ? withNamedHostLocators(view) : view;
 	const payloadScripts =
 		hasPayload && browserTriggers && classification?.kind !== 'empty'
-			? renderPayloadScripts(payloadRecords)
+			? renderPayloadScripts(
+					payloadRecords === requestRecords ? { state, view: servedView } : payloadRecords,
+				)
 			: undefined;
 	const selectedResumeModuleUrl = wakeChannelEnabled ? prerenderWakeModuleUrl : resumeModuleUrl;
 	const artifactSources = artifactInlineResumerSources(component);
@@ -261,12 +266,11 @@ export async function assembleSsrContainer(
 		resumerScript && selectedResumeModuleUrl && !wakeChannelEnabled && !options.resumerSource
 			? `<script${options.nonce ? ` nonce="${escapeAttribute(options.nonce)}"` : ''}>${escapeInlineScript(createEarlyEventCaptureSource(browserEventNames(view)))}</script>`
 			: '',
-		`<div${renderContainerAttributes(options.containerId)}>`,
-		output.html,
-		payloadScripts?.stateScript,
-		payloadScripts?.viewScript,
-		resumerScript,
-		'</div>',
+		renderContainer(
+			options.containerId,
+			[output.html, payloadScripts?.stateScript, payloadScripts?.viewScript, resumerScript],
+			resumerScript ? servedView.locators : [],
+		),
 	]
 		.filter(Boolean)
 		.join('');
@@ -340,15 +344,11 @@ export async function assemblePrerenderPageParts(
 	]
 		.filter(Boolean)
 		.join('');
-	const container = [
-		`<div${renderContainerAttributes(options.containerId)}>`,
-		output.html,
-		options.armEmission ?? '',
-		resumerScript,
-		'</div>',
-	]
-		.filter(Boolean)
-		.join('');
+	const container = renderContainer(
+		options.containerId,
+		[output.html, options.armEmission, resumerScript],
+		resumerScript ? view.locators : [],
+	);
 	return { head, container };
 }
 
@@ -678,6 +678,26 @@ function branchServedArmEventNames(
 	];
 }
 
+// The browser only ever locates a host a top-level record names; arm record sets carry their own locators.
+export function withNamedHostLocators(view: ProtocolViewPayload): ProtocolViewPayload {
+	const named = new Set<string>();
+	for (const record of [
+		...view.events,
+		...view.domUpdates,
+		...view.behaviors,
+		...view.elementHandles,
+	])
+		named.add(record.hostNodeId);
+	for (const repeat of view.keyedRepeats ?? []) {
+		named.add(repeat.parentHostNodeId);
+		if (repeat.ownerHostNodeId) named.add(repeat.ownerHostNodeId);
+	}
+	for (const branch of view.branches ?? [])
+		for (const site of branch.idrefSites ?? []) named.add(site.hostNodeId);
+	const locators = view.locators.filter((locator) => named.has(locator.hostNodeId));
+	return locators.length === view.locators.length ? view : { ...view, locators };
+}
+
 function visibleHostIndexes(view: ProtocolViewPayload): ReadonlyArray<number> {
 	const hosts = new Set(
 		view.events
@@ -722,10 +742,16 @@ function browserEventNames(view: ProtocolViewPayload): ReadonlyArray<string> {
 	].filter((eventName) => eventName !== PROTOCOL_VISIBLE_EVENT_NAME);
 }
 
-function renderContainerAttributes(containerId: string | undefined): string {
-	return containerId
-		? ` data-async-container="${escapeAttribute(containerId)}"`
-		: ' data-async-container';
+function renderContainer(
+	containerId: string | undefined,
+	parts: ReadonlyArray<string | undefined>,
+	locators: ProtocolViewPayload['locators'],
+): string {
+	const inner = parts.filter(Boolean).join('');
+	const paths = servedLocatorPaths(inner, locators);
+	const id = containerId ? `="${escapeAttribute(containerId)}"` : '';
+	const located = paths ? ` ${PROTOCOL_LOCATOR_PATHS_ATTRIBUTE}="${paths}"` : '';
+	return `<div data-async-container${id}${located}>${inner}</div>`;
 }
 
 /**

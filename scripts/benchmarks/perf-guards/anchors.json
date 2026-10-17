@@ -619,6 +619,22 @@
 			"from": 6738,
 			"to": 6649,
 			"reason": "T197: in-place row patch keeps each attribute slot's static part (scoped class); patch caches merged, trimmed 6738 -> 6649"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "construct",
+			"subject": "@if",
+			"from": 6106,
+			"to": 6135,
+			"reason": "+29 B is the web/resume-commit-arm entry the build-time demand map now names on branch records (virtual payload module only, no shipped chunk carries it); it lets pages with no arm leave 9.2 kB of arm-commit code unpreloaded"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "construct",
+			"subject": "async boundary",
+			"from": 7778,
+			"to": 7807,
+			"reason": "+29 B is the web/resume-commit-arm entry the build-time demand map now names on async-boundary records (virtual payload module only, no shipped chunk carries it); it lets pages with no arm leave 9.2 kB of arm-commit code unpreloaded"
 		}
 	],
 	"runtimeModules": {
@@ -725,8 +741,8 @@
 	"constructGlue": {
 		"event handler": 2951,
 		"text binding": 3779,
-		"@if": 6106,
+		"@if": 6135,
 		"keyed @for": 5343,
-		"async boundary": 7778
+		"async boundary": 7807
 	}
 }

@@ -26,6 +26,8 @@ export const EVENT_ONLY_RESUMER_ATTRIBUTION = {
 	navigationLinkGuard: 115,
 	// Paired OXC builds measured 1,219 -> 1,229: resume locators keep the shell's DOM order after a default action or streamed arm moves it.
 	shellCensus: 10,
+	// Paired OXC builds measured 1,229 -> 1,510: when a script outside Markless changed the page before it woke, each host is found under its served parent instead of by its shifted DOM position.
+	foreignDomCensus: 281,
 	gzipCrossTerm: 3,
 };
 

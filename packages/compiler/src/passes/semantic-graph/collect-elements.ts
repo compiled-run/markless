@@ -1834,10 +1834,12 @@ function behaviorSourceParts(
 	const behaviorSource = expressionSource(node, state.source);
 
 	if (node.type !== 'CallExpression') {
+		const span = isFunctionExpressionLike(node) ? sourceSpan(node, state.filename) : undefined;
 		return {
 			source: behaviorSource,
 			functionSource: localFunctionDeclarationSource(node, state) ?? behaviorSource,
 			inputSources: [],
+			...(span ? { functionSpan: span, functionParameters: handlerParameterNames(node) } : {}),
 		};
 	}
 

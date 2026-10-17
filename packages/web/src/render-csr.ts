@@ -66,6 +66,7 @@ export async function renderCsrRuntime(input: {
 		view,
 	);
 
+	const graphBehaviors = view.behaviors.filter((behavior) => behavior.usesGraph);
 	let graph: RuntimeGraph | undefined;
 	let runtime: ResumeRuntime | undefined;
 	let starting: Promise<ResumeRuntime> | undefined;
@@ -106,7 +107,7 @@ export async function renderCsrRuntime(input: {
 				const { createResumeRuntime } = await import('./resume.ts');
 				const runtimeView = {
 					...view,
-					behaviors: [],
+					behaviors: graphBehaviors,
 				};
 				const applyDomJournal =
 					options.applyDomJournal ??
@@ -192,12 +193,11 @@ export async function renderCsrRuntime(input: {
 		output.root as unknown as ResumeDomElement,
 		view.asyncBoundaries as ReadonlyArray<ResumeAsyncBoundaryPayload>,
 		delegatedTriggers.registerEventRecord,
-		(view.branches ?? []) as ReadonlyArray<{
-			readonly startAnchor: ResumeAsyncBoundaryPayload['startAnchor'];
-			readonly endAnchor: ResumeAsyncBoundaryPayload['endAnchor'];
-			readonly servedArmRecords?: unknown;
-		}>,
+		(view.branches ?? []) as Parameters<typeof registerServedArmEventRecords>[3],
+		(branch) => paintedBranchArm(branch as PaintedBranch, state),
 	);
+	for (const hostNodeId of new Set(graphBehaviors.map((behavior) => behavior.hostNodeId)))
+		await (await demandRuntime()).activateBehaviors(hostNodeId);
 	if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
 		await registerDelegatedTriggerDebug(output, view);
 	if ((globalThis as ExecutionLogGlobal).__mxLog) await marklessLogCsrSummary();
@@ -263,7 +263,7 @@ async function activateAuthoredBehaviors(
 ): Promise<Array<() => void>> {
 	const cleanup: Array<() => void> = [];
 	for (const behavior of view.behaviors) {
-		if (!behavior.symbolId) continue;
+		if (!behavior.symbolId || behavior.usesGraph) continue;
 		const element =
 			output.liveHostNodes?.get(behavior.hostNodeId) ??
 			(view.locators.length === 1 && view.locators[0]?.hostNodeId === behavior.hostNodeId
@@ -345,9 +345,7 @@ function installDelegatedTriggers(
 	output.root.__marklessDelegatedDispatch = true;
 	const recordsByElement = new Map<object, Map<string, ProtocolEventRecord>>();
 	const rowEventNames = new Set(
-		rowEventRepeats(view).flatMap((repeat) =>
-			repeat.rowEvents.map((event) => event.eventName),
-		),
+		rowEventRepeats(view).flatMap((repeat) => repeat.rowEvents.map((event) => event.eventName)),
 	);
 	const releases: Array<() => void> = [];
 	const installedEventNames = new Set<string>();
@@ -395,8 +393,9 @@ function installDelegatedTriggers(
 			// This container listener exists for whichever element registered the
 			// record; a sibling with no record of its own is simply not ours.
 			if (!actionKind) {
-				const pending = (output.root as { __marklessArmRegistering?: Set<Promise<unknown>> })
-					.__marklessArmRegistering;
+				const pending = (
+					output.root as { __marklessArmRegistering?: Set<Promise<unknown>> }
+				).__marklessArmRegistering;
 				return !retried && pending?.size
 					? Promise.all(pending).then(() => route(event, true))
 					: undefined;
@@ -524,6 +523,26 @@ function unroutedDelegatedTriggerError(actionKind: string): Error {
 	error.phase = 'event';
 	error.dispatchModuleId = 'web:render-csr';
 	return error;
+}
+
+type PaintedBranch = {
+	readonly takenArm?: number;
+	readonly testReads?: ReadonlyArray<{
+		readonly graphNodeId: string;
+		readonly path: ReadonlyArray<string>;
+	}>;
+	readonly armTests?: ReadonlyArray<unknown>;
+};
+
+// resume-branches' arm choice, read off the seeded values because the graph is not built yet.
+function paintedBranchArm(branch: PaintedBranch, state: ProtocolStatePayload): number | undefined {
+	if (typeof branch.takenArm === 'number') return branch.takenArm;
+	const read = branch.testReads?.[0];
+	if (!read) return undefined;
+	const value = readSeededStateValue(state, read.graphNodeId, read.path);
+	if (!branch.armTests) return value ? 0 : 1;
+	const arm = branch.armTests.findIndex((test) => test !== null && test === value);
+	return arm >= 0 ? arm : branch.armTests.indexOf(null);
 }
 
 // Live-channel values only: a served cell's encoded `value` is an envelope, and

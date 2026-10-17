@@ -268,7 +268,7 @@ test('wake-channel divergent request carries only its keyed delta records', asyn
 	const html = await assembleSsrContainer(artifact, request, { resumerSource: 'wake();' });
 
 	expect(html).toBe(
-		'<div data-async-container><button>Request</button>' +
+		'<div data-async-container data-markless-paths="5;1,0,4,0,button"><button>Request</button>' +
 			payload.stateScript +
 			payload.viewScript +
 			'<script data-async-resumer data-markless-resume-module="/build/prerender-wake-A1b2.js">' +
@@ -311,7 +311,7 @@ test('gated-off divergent request preserves the existing full-payload container 
 	const html = await assembleSsrContainer(artifact, request, { resumerSource: 'wake();' });
 
 	expect(html).toBe(
-		'<div data-async-container><button>Request</button>' +
+		'<div data-async-container data-markless-paths="5;1,0,4,0,button"><button>Request</button>' +
 			payload.stateScript +
 			payload.viewScript +
 			'<script data-async-resumer data-markless-resume-module="/build/resume.js">wake();</script></div>',
@@ -433,7 +433,7 @@ test('assembles a prerendered container with delegated triggers and zero payload
 
 	expect(html).not.toContain('type="markless/state"');
 	expect(html).not.toContain('type="markless/view"');
-	expect(html).not.toContain('createTreeWalker');
+	expect(html).not.toContain('script[type="markless/view"]');
 	expect(html).toContain('data-markless-resume-module="/build/resume.js"');
 	expect(html).toContain('addEventListener');
 	expect(parts.head).toContain('<link rel="modulepreload" href="/build/resume.js"');

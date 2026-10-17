@@ -8,11 +8,13 @@ import type {
 } from '@markless/serializer/protocol';
 import {
 	PROTOCOL_EVENT_ACTION_KIND,
+	PROTOCOL_LOCATOR_PATHS_ATTRIBUTE,
 	PROTOCOL_VISIBLE_EVENT_NAME,
 } from '@markless/serializer/protocol';
 import type { MarklessExecutionLogMode } from '../dev-log.ts';
 import type { OverlayInstalledRoot, OverlayPrimedDismissalHost } from '../overlay-handoff.ts';
 import type { EarlyEventRoot } from './early-events.ts';
+import { marklessServedCensus } from './served-census.ts';
 
 type InlineDebugControls = {
 	record(
@@ -39,13 +41,15 @@ declare const __MARKLESS_INLINE_DEBUG__: boolean;
 declare const __MARKLESS_INLINE_EXECUTION_LOG__: MarklessExecutionLogMode;
 declare const __MARKLESS_INLINE_RESUME_MODULE_URL__: string | undefined;
 declare const __MARKLESS_INLINE_VISIBLE_EVENT__: typeof PROTOCOL_VISIBLE_EVENT_NAME;
+declare const __MARKLESS_INLINE_CENSUS__: typeof marklessServedCensus;
+declare const __MARKLESS_INLINE_PATHS_ATTRIBUTE__: typeof PROTOCOL_LOCATOR_PATHS_ATTRIBUTE;
 declare const __MARKLESS_INLINE_DEBUG_BOOTSTRAP__:
 	| ((root: Element, phase: 'ssr-inline', active: false) => InlineDebugControls)
 	| undefined;
 declare const __MARKLESS_INLINE_DEBUG_REGISTER__:
 	| ((input: {
 			readonly controls: InlineDebugControls | undefined;
-			readonly elements: ReadonlyArray<Element>;
+			readonly elements: ReadonlyArray<Element | null>;
 			readonly eventName: string;
 			readonly view: InlineView;
 	  }) => void)
@@ -125,7 +129,7 @@ type InlineRoot = HTMLElement &
 		// second crossing, so the runtime's own preload would otherwise miss it.
 		__marklessPrimedHover?: Element;
 		// DOM order as the first event found it; later changes splice it rather than renumbering around them.
-		__marklessCensus?: Element[];
+		__marklessCensus?: Array<Element | null>;
 	};
 type InlineDispatchInput = {
 	readonly root: InlineRoot;
@@ -188,6 +192,8 @@ const __MARKLESS_INLINE_DEBUG__=${JSON.stringify(options.debug)};
 const __MARKLESS_INLINE_EXECUTION_LOG__=${JSON.stringify(options.executionLog)};
 const __MARKLESS_INLINE_RESUME_MODULE_URL__=${JSON.stringify(options.resumeModuleUrl)};
 const __MARKLESS_INLINE_VISIBLE_EVENT__=${JSON.stringify(PROTOCOL_VISIBLE_EVENT_NAME)};
+const __MARKLESS_INLINE_CENSUS__=${marklessServedCensus.toString()};
+const __MARKLESS_INLINE_PATHS_ATTRIBUTE__=${JSON.stringify(PROTOCOL_LOCATOR_PATHS_ATTRIBUTE)};
 const __MARKLESS_INLINE_DEBUG_BOOTSTRAP__=${debugBootstrap};
 const __MARKLESS_INLINE_DEBUG_REGISTER__=${debugRegistration};
 ${logging ? `(${runGeneralInlineLogSummary.toString()})(${JSON.stringify(options.executionLog)});\n` : ''}(${runInlineResumer.toString()})(${INLINE_MODULE_LOADER_SOURCE});
@@ -266,7 +272,7 @@ export function createPrerenderInlineResumerSource(
 		readonly executionLog?: MarklessExecutionLogMode;
 	},
 ): string {
-	const plain = `(${runPrerenderInlineResumer.toString()})(${JSON.stringify(eventNames)},${JSON.stringify(resumeModuleUrl)},u=>import(u));`;
+	const plain = `(${runPrerenderInlineResumer.toString()})(${JSON.stringify(eventNames)},${JSON.stringify(resumeModuleUrl)},u=>import(u),${marklessServedCensus.toString()},${JSON.stringify(PROTOCOL_LOCATOR_PATHS_ATTRIBUTE)});`;
 	const logging = options?.executionLog !== undefined && options.executionLog !== 'never';
 	if (!options?.debug && !logging) return plain;
 	return `{
@@ -283,7 +289,7 @@ export function createPrerenderSettleInlineResumerSource(
 	eventNames: ReadonlyArray<string>,
 	resumeModuleUrl: string | undefined,
 ): string {
-	return `(${runPrerenderSettleBoot.toString()})(${JSON.stringify(eventNames)},${JSON.stringify(resumeModuleUrl)},u=>import(u));`;
+	return `(${runPrerenderSettleBoot.toString()})(${JSON.stringify(eventNames)},${JSON.stringify(resumeModuleUrl)},u=>import(u),${marklessServedCensus.toString()},${JSON.stringify(PROTOCOL_LOCATOR_PATHS_ATTRIBUTE)});`;
 }
 
 type SettlePlanDocument = {
@@ -309,6 +315,8 @@ function runPrerenderSettleBoot(
 	eventNames: ReadonlyArray<string>,
 	fallbackResumeModuleUrl: string | undefined,
 	loadModule: (url: string) => Promise<InlineResumeModule & SettleModule>,
+	census: typeof marklessServedCensus,
+	pathsAttribute: string,
 ): void {
 	const currentScript = document.currentScript as HTMLScriptElement | null;
 	const root = currentScript?.closest<InlineRoot>('[data-async-container]');
@@ -361,12 +369,7 @@ function runPrerenderSettleBoot(
 		);
 	const dispatch = (event: Event) => {
 		root.__marklessDelegatedDispatch = true;
-		if (!root.__marklessCensus) {
-			const census: Element[] = [root];
-			const all = root.getElementsByTagName?.('*') ?? [];
-			for (let index = 0; index < all.length; index++) census.push(all[index]!);
-			root.__marklessCensus = census;
-		}
+		root.__marklessCensus ||= census(root, pathsAttribute);
 		replay(event.target as Element);
 		// Queued, not dropped: a gesture arriving before the arm settles
 		// waits for the fill. Dispatching it first would boot a runtime whose
@@ -655,6 +658,8 @@ function runPrerenderInlineResumer(
 	eventNames: ReadonlyArray<string>,
 	fallbackResumeModuleUrl: string | undefined,
 	loadModule: (url: string) => Promise<InlineResumeModule>,
+	census: typeof marklessServedCensus,
+	pathsAttribute: string,
 ): void {
 	const currentScript = document.currentScript as HTMLScriptElement | null;
 	const root = currentScript?.closest<InlineRoot>('[data-async-container]');
@@ -666,12 +671,7 @@ function runPrerenderInlineResumer(
 	let loaded: Promise<InlineResumeModule> | undefined;
 	const dispatch = (event: Event) => {
 		root.__marklessDelegatedDispatch = true;
-		if (!root.__marklessCensus) {
-			const census: Element[] = [root];
-			const all = root.getElementsByTagName?.('*') ?? [];
-			for (let index = 0; index < all.length; index++) census.push(all[index]!);
-			root.__marklessCensus = census;
-		}
+		root.__marklessCensus ||= census(root, pathsAttribute);
 		return (loaded ||= loadModule(resumeModuleUrl)).then((module) =>
 			module.resumeContainerEvent({ root, event, element: event.target, eventRecord: null }),
 		);
@@ -873,7 +873,7 @@ function runPrerenderInlineVisiblePrimer(
 
 function registerInlineResumerDebug(input: {
 	readonly controls: InlineDebugControls | undefined;
-	readonly elements: ReadonlyArray<Element>;
+	readonly elements: ReadonlyArray<Element | null>;
 	readonly eventName: string;
 	readonly view: InlineView;
 }): void {
@@ -922,11 +922,8 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 	const viewScript = root.querySelector<HTMLScriptElement>('script[type="markless/view"]');
 	if (!viewScript) return;
 	const view = JSON.parse(viewScript.textContent || 'null') as InlineView;
-	const walker = currentDocument.createTreeWalker(root, 1);
-	const elements: Element[] = [root];
-	let nextElement: Node | null;
-	while ((nextElement = walker.nextNode())) elements.push(nextElement as Element);
 	// The shell's DOM order, before any arm commits or default action moves it.
+	const elements = __MARKLESS_INLINE_CENSUS__(root, __MARKLESS_INLINE_PATHS_ATTRIBUTE__);
 	root.__marklessCensus ||= elements;
 	const hostIds = new Map(
 		view.locators.map((locator) => [elements[locator.index], locator.hostNodeId] as const),
