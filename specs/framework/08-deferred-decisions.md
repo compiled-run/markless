@@ -8,8 +8,9 @@ Deliberately out of scope for the first implementation plan, to be designed when
 their prerequisites exist:
 
 - Keeping imperative third-party state in sync after `onVisible` init (the
-  `chart.update` problem), plus possible `onVisible` variants (idle trigger,
-  `onHidden`).
+  `chart.update` problem), plus a possible `onHidden` variant. The idle trigger
+  is no longer deferred: it is `onIdle`, specified in
+  [04-events-symbols-behaviors.md](./04-events-symbols-behaviors.md).
 - Async caching policy beyond "current dependency key" and prefetch policy.
   Stale-while-revalidate on refresh is now specified (not implemented) in
   [13-resume-cache.md](./13-resume-cache.md); manual

@@ -303,6 +303,7 @@ export function emitSourceModule(input: {
 	/** Whether the app's serialized state defines computed nodes. */
 	readonly hasComputedState?: boolean;
 	readonly hasOverlayMarks?: boolean;
+	readonly hasIdleHosts?: boolean;
 	readonly runtimeDemandMap?: unknown;
 	readonly scalarActions?: RuntimeDemandMapArtifact['actions'];
 	// Plain-SSR actions whose closure plans a composing page may route to.
@@ -378,6 +379,10 @@ export function emitSourceModule(input: {
 		// has to name the behaviour here or it would never install.
 		input.environment === 'client' && input.hasOverlayMarks === true
 			? emitOverlayLoaderInstall()
+			: null,
+		// And for `onIdle`: the trigger ships and is handed to a CSR mount only from an app module that has a host.
+		input.environment === 'client' && input.hasIdleHosts === true && !symbolsOnly
+			? emitIdleTriggerInstall()
 			: null,
 		// And the same split again for the row mints. A CSR mount reaches
 		// the resume runtime through THIS module and never evaluates a resume
@@ -528,6 +533,13 @@ function payloadHasComputed(payloadState: unknown): boolean {
 	const computed = (payloadState as { readonly computed?: ReadonlyArray<unknown> } | undefined)
 		?.computed;
 	return Array.isArray(computed) && computed.length > 0;
+}
+
+export function emitIdleTriggerInstall(): string {
+	return [
+		"import { startMarklessIdleTrigger as marklessIdleTriggerInstall } from '@markless/web/fns/idle-trigger';",
+		'globalThis.__marklessIdleTrigger = marklessIdleTriggerInstall;',
+	].join('\n');
 }
 
 /**

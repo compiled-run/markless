@@ -73,4 +73,13 @@ export function IntrinsicContract() @{
 	>
 		Overlay dismissal
 	</div>
+	<section
+		onIdle={(event) => {
+			const kind: 'idle' = event.type;
+			const host: HTMLElement = event.currentTarget;
+			host.dataset.trigger = kind;
+		}}
+	>
+		Idle
+	</section>
 }

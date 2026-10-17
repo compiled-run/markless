@@ -50,7 +50,8 @@ dish. The ingredients can arrive early, and the cook still waits for each order.
 ## When code runs
 
 A symbol runs only when its trigger fires. A click runs its handler. A write runs the updates that
-read the written path. An `onVisible` handler runs when its element scrolls into view.
+read the written path. An `onVisible` handler runs when its element scrolls into view, and an `onIdle`
+handler runs once the page has loaded and gone idle.
 
 At mount, no handler runs. That is true on every path from [resuming](/how-it-works/resuming).
 

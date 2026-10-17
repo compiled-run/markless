@@ -16,6 +16,7 @@ import {
 import { renderPayloadScripts } from '@markless/serializer';
 import {
 	protocolEventDispatchesMarkless,
+	PROTOCOL_IDLE_EVENT_NAME,
 	PROTOCOL_VISIBLE_EVENT_NAME,
 } from '@markless/serializer/protocol';
 import {
@@ -37,6 +38,7 @@ import {
 	type InlineResumerSourceVariants,
 	type PrerenderBootArtifact,
 } from './inline/resumer.ts';
+import { createInlineIdleTriggerSource } from './fns/idle-trigger.ts';
 import { prepareSsrResumeRecords } from './prerender/records.ts';
 import {
 	marklessSsrRosterCounted,
@@ -245,7 +247,8 @@ export async function assembleSsrContainer(
 					true,
 					overlayPrimer,
 					!wakeChannelEnabled && hasVisibleEvents,
-					(wakeChannelEnabled ? prerenderVisiblePrimerSource(view) : '') +
+					idleTriggerSource(view) +
+						(wakeChannelEnabled ? prerenderVisiblePrimerSource(view) : '') +
 						(selfWake ? '' : storageWakeSource(state, selectedResumeModuleUrl)),
 				)
 			: '';
@@ -328,7 +331,8 @@ export async function assemblePrerenderPageParts(
 					!boot,
 					false,
 					false,
-					prerenderVisiblePrimerSource(view) +
+					idleTriggerSource(view) +
+						prerenderVisiblePrimerSource(view) +
 						(selfWake ? '' : storageWakeSource(state, resumeModuleUrl)),
 				)
 			: '';
@@ -695,6 +699,10 @@ function prerenderBootEventNames(view: ProtocolViewPayload): ReadonlyArray<strin
 	return visibleHostIndexes(view).length > 0
 		? [...eventNames, PROTOCOL_VISIBLE_EVENT_NAME]
 		: eventNames;
+}
+
+function idleTriggerSource(view: ProtocolViewPayload): string {
+	return browserEventNames(view).includes(PROTOCOL_IDLE_EVENT_NAME) ? createInlineIdleTriggerSource() : '';
 }
 
 function prerenderVisiblePrimerSource(view: ProtocolViewPayload): string {

@@ -21,6 +21,7 @@ import {
 } from '@markless/compiler';
 import {
 	PROTOCOL_EVENT_ACTION_KIND,
+	PROTOCOL_IDLE_HOST_ATTRIBUTE,
 	createStorageSeedMetadataFromGraphNodeId,
 	jsonSourceWithNonFiniteNumbers,
 	type ProtocolStatePayload,
@@ -750,6 +751,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					hasOverlayMarks: compiled.runtimeDemandMap.payloadRecords.some(
 						(record) => record.kind === 'overlay',
 					),
+					hasIdleHosts: markupHasIdleHosts(compiled.semanticGraph.markup),
 					runtimeDemandMap: compiled.runtimeDemandMap,
 					resumeModuleUrl: input.resumeModuleUrl,
 					scalarActions: input.includeScalarActionPlans
@@ -1430,4 +1432,17 @@ function componentEdgesReachableFrom(
 		}
 	}
 	return edges;
+}
+
+// The marker is the idle trigger's contract with rendered markup, so it alone decides whether the trigger ships.
+function markupHasIdleHosts(markup: CompileTsrxModuleResult['semanticGraph']['markup']): boolean {
+	const marker = ` ${PROTOCOL_IDLE_HOST_ATTRIBUTE}=""`;
+	return markup.chunks.some(
+		(chunk) =>
+			chunk.statics.some((text) => text.includes(marker)) ||
+			chunk.slots.some(
+				(slot) =>
+					slot.kind === 'dynamic-host' && PROTOCOL_IDLE_HOST_ATTRIBUTE in slot.staticAttributes,
+			),
+	);
 }

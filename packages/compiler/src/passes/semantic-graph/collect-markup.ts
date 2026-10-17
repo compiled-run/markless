@@ -1,4 +1,5 @@
-import { isEventAttribute } from '@tsrx/yuku';
+import { isEventAttribute, normalizeEventName } from '@tsrx/yuku';
+import { PROTOCOL_IDLE_EVENT_NAME, PROTOCOL_IDLE_HOST_ATTRIBUTE } from '@markless/serializer';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import {
@@ -498,6 +499,7 @@ function emitNode(
 			if (isElevated(attribute)) append(builder, ` ${OVERLAY_DOM_ATTRIBUTE}=""`);
 			continue;
 		}
+		if (name && isIdleEventAttribute(name)) append(builder, ` ${PROTOCOL_IDLE_HOST_ATTRIBUTE}=""`);
 		// A CSS anchor spelled as an attribute is refused by the semantic pass; it
 		// is dropped here so a refused module never leaks `anchorname="..."`.
 		if (
@@ -851,6 +853,7 @@ function emitDynamicHost(
 			if (isElevated(attribute)) staticAttributes[OVERLAY_DOM_ATTRIBUTE] = '';
 			continue;
 		}
+		if (name && isIdleEventAttribute(name)) staticAttributes[PROTOCOL_IDLE_HOST_ATTRIBUTE] = '';
 		if (
 			!name ||
 			isEventAttribute(name) ||
@@ -1291,4 +1294,8 @@ function staticAttributeText(name: string, value: unknown): string | null {
 	if (value === null || value === undefined || value === false) return null;
 	if (value === true) return name.startsWith('aria-') || name.startsWith('data-') ? 'true' : '';
 	return String(value);
+}
+
+function isIdleEventAttribute(name: string): boolean {
+	return isEventAttribute(name) && normalizeEventName(name) === PROTOCOL_IDLE_EVENT_NAME;
 }

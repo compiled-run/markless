@@ -32,6 +32,10 @@ let journal: typeof import('./dom-journal.ts') | undefined;
 
 declare const __MARKLESS_DEV_ENABLED__: boolean;
 
+type MarklessIdleHost = typeof globalThis & {
+	__marklessIdleTrigger?: (root: unknown, prepare: () => unknown) => void;
+};
+
 type ExecutionLogGlobal = typeof globalThis & {
 	__mxLog?: Set<string>;
 	__mxLoadLog?: () => Promise<{
@@ -198,6 +202,8 @@ export async function renderCsrRuntime(input: {
 			readonly servedArmRecords?: unknown;
 		}>,
 	);
+	// Set only by an app module with an `onIdle` host; an arm open at mount registers its records once the runtime starts.
+	(globalThis as MarklessIdleHost).__marklessIdleTrigger?.(output.root, demandRuntime);
 	if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
 		await registerDelegatedTriggerDebug(output, view);
 	if ((globalThis as ExecutionLogGlobal).__mxLog) await marklessLogCsrSummary();

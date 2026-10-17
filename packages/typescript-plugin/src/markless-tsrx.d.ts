@@ -82,6 +82,8 @@ declare namespace __MarklessTypeService {
 		dismiss: CustomEvent<OverlayDismissDetail>;
 		/** Fires once, the first time the element scrolls into view; `target` is the element. */
 		visible: { readonly type: 'visible'; readonly target: globalThis.Element };
+		/** Fires once, after the page has loaded and gone idle; `target` is the element. */
+		idle: globalThis.Event & { readonly type: 'idle'; readonly target: globalThis.Element };
 	};
 
 	type ElementEventMap<E extends globalThis.Element> = GlobalEventHandlersEventMap &

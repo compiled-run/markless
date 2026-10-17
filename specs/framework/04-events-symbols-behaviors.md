@@ -176,10 +176,52 @@ Semantics:
   no subscriptions, no re-runs. DOM-backed libraries that need setup, updates,
   and cleanup belong in `attach`, not `onVisible`.
 - The zero-JS guarantee gets a _scoped_, greppable asterisk: pages without
-  `onVisible` ship zero eager behavior; pages with it run exactly the symbols
-  whose elements are on screen. There is no free-floating equivalent
-  (`onMount()`, `client()`) and there never will be — anything without an
-  element doesn't belong in a component.
+  `onVisible` or `onIdle` (below) ship zero eager behavior; pages with
+  `onVisible` run exactly the symbols whose elements are on screen. There is no
+  free-floating equivalent (`onMount()`, `client()`) and there never will be —
+  anything without an element doesn't belong in a component.
+
+### `onIdle` — "after the page is idle" as an event
+
+Code that no gesture asks for, such as an analytics tag, a chat widget or any
+other third-party script, is ordinary code loaded by an element-owned event.
+There is no script API. `onIdle` is the one trigger for "when the page has
+nothing better to do":
+
+```tsrx
+<footer
+  onIdle={async () => {
+    const analytics = await import('./analytics.ts');
+    analytics.start();
+  }}
+/>
+```
+
+Semantics:
+
+- An `on*` event handler where the event is "the page has loaded and gone
+  idle." It waits for the document's `load` event, then for
+  `requestIdleCallback` with a timeout (the timeout bounds how long a busy page
+  can hold it back); a browser without `requestIdleCallback` runs it in a task
+  right after `load`. The handler is a lazy symbol like any other: nothing it
+  names, its own code included, is fetched before it runs.
+- Fires once per element instance and receives the browser's own `idle`
+  `Event`, dispatched on the element without bubbling. An element mounted later
+  (an `@if` arm, an `@for` row) fires at the next idle period after it appears;
+  an element removed before then never fires. Unlike `onVisible`, the return
+  value is ignored, as for ordinary events.
+- The compiler writes a marker attribute (`PROTOCOL_IDLE_HOST_ATTRIBUTE` in
+  `@markless/serializer`) on each `onIdle` host in every markup it emits, and
+  the trigger finds hosts by that marker. On a served page the trigger is
+  inline source appended to the resumer only when the page's records name an
+  idle event; a client-rendered app gets it from the app module that has a host.
+  The handler then runs through the page's ordinary event path, so lean and
+  full resume treat it like a click.
+- Cost at load is the trigger registration only. Pages without `onIdle` are
+  unchanged on the server-rendered path; the client-rendered mount reads one
+  global the app module sets.
+- **Not a lifecycle.** Like `onVisible`, it is not a reactive computation and
+  not a mount hook: it needs an element, runs once, and reads current values.
 
 A pure pull graph also deletes a class of resumability hazards: resume is
 always re-derivation, with no effect-ordering or "did it already run during

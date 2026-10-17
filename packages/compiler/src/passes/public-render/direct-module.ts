@@ -1,3 +1,4 @@
+import { PROTOCOL_IDLE_EVENT_NAME } from '@markless/serializer';
 import type {
 	PublicRenderModuleInput,
 	PublicRenderPlanArtifact,
@@ -48,13 +49,19 @@ export function emitDirectPublicRenderModule(input: {
 	if (!bootstrapData) return '';
 	const { rootChunkId: _rootChunkId, chunks: _chunks, ...directRecords } = bootstrapData;
 	const graphMethods = publicGraphMethods(input.symbolResolver);
+	const idleTrigger = [
+		...(input.protocolView.events ?? []),
+		...(input.protocolView.keyedRepeats ?? []).flatMap((repeat) => repeat.rowEvents),
+	].some((event) => event.eventName === PROTOCOL_IDLE_EVENT_NAME)
+		? '\n\tstartMarklessIdleTrigger(root);'
+		: '';
 
 	const body = [
 		'',
 		`const marklessDirectChunkData = {...marklessRenderData,rootChunkId:marklessRenderData.root.templateId,...${JSON.stringify(directRecords)}};`,
 		'const renderMarklessDirectChunk = createMarklessDirectChunkRenderer(marklessDirectChunkData);',
 		'',
-		`export function ${componentName}() {\n\tconst graph = createMarklessPublicGraph();\n\tconst root = renderMarklessDirectChunk(graph, loadSymbol);\n\treturn { root, graph, runtime: { async dispatch() {} } };\n}`,
+		`export function ${componentName}() {\n\tconst graph = createMarklessPublicGraph();\n\tconst root = renderMarklessDirectChunk(graph, loadSymbol);${idleTrigger}\n\treturn { root, graph, runtime: { async dispatch() {} } };\n}`,
 		'',
 		emitCreatePublicGraph(graphMethods, directPublicStateEntries, {
 			trackArrayIndexes: input.renderData.repeats.length > 0,
@@ -75,6 +82,7 @@ export function emitDirectPublicRenderModule(input: {
 					'writeMarklessPublicDirtyArrayIndexes',
 				],
 			},
+			{ module: 'idle-trigger', names: ['startMarklessIdleTrigger'] },
 		]),
 		bodySource,
 	]
