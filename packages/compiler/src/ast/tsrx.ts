@@ -62,7 +62,12 @@ export function getDynamicTagExpression(node: AnyNode): AnyNode | undefined {
 // @empty branches, whose element counts must be statically known.
 export function isPlainHostTemplateNode(node: AnyNode): boolean {
 	if (isStaticTextNode(node)) return true;
-	if (node.type === 'JSXExpressionContainer' || node.type === 'TSRXExpression') return true;
+	if (
+		node.type === 'JSXExpressionContainer' ||
+		node.type === 'TSRXExpression' ||
+		node.type === 'JSXStyleElement'
+	)
+		return true;
 	if (
 		node.type !== 'Element' &&
 		node.type !== 'JSXElement' &&
