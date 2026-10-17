@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it, vi } from 'vitest';
 import { STORAGE_RENDER_CONTEXT_READER } from '../../serializer/src/storage-cookie.ts';
 import { storageCookieName } from '../../serializer/src/storage-slot.ts';
+import { __marklessCreateHttpContext, type HttpContext } from '../src/index.ts';
 import { createServerEntry } from '../src/vite/runtime/create-server-entry.ts';
 
 describe('server entry with async compiled artifacts', () => {
@@ -179,5 +180,103 @@ describe('server entry with async compiled artifacts', () => {
 			expect.objectContaining({ message: 'boom from page render' }),
 		);
 		errorSpy.mockRestore();
+	});
+});
+
+type PageHttpProps = {
+	readonly http: HttpContext;
+	readonly params: Readonly<Record<string, string>>;
+};
+
+function pageEntry(
+	render: (props: PageHttpProps) => { html: string; state?: unknown },
+	render_mode?: 'blocking',
+) {
+	return createServerEntry({
+		documentModuleLoader: undefined,
+		...(render_mode ? { render: render_mode } : {}),
+		pageModuleLoaders: {
+			'pages/invoices/[id].tsrx': async () => ({
+				default: { renderSsr: async (props: PageHttpProps) => render(props) },
+			}),
+		},
+		routeFileIds: ['pages/invoices/[id].tsrx'],
+	});
+}
+
+describe('the page http object', () => {
+	it.each([['streaming'], ['blocking']] as const)(
+		'a %s page answers with the status and headers it set',
+		async (mode) => {
+			const entry = pageEntry(
+				({ http, params }) => {
+					if (params.id === 'missing') {
+						http.response.status = 404;
+						http.response.headers.set('cache-control', 'no-store');
+					}
+					http.response.headers.append('set-cookie', 'seen=1; Path=/');
+					http.response.headers.append('set-cookie', 'seen=1; Path=/');
+					return { html: `<h1>No invoice ${params.id}</h1>` };
+				},
+				mode === 'blocking' ? 'blocking' : undefined,
+			);
+
+			const missing = await entry.fetch(new Request('http://localhost/invoices/missing'));
+			const found = await entry.fetch(new Request('http://localhost/invoices/7'));
+
+			expect(missing.status).toBe(404);
+			expect(missing.headers.get('cache-control')).toBe('no-store');
+			expect(missing.headers.get('content-type')).toBe('text/html;charset=utf-8');
+			expect(missing.headers.getSetCookie()).toEqual(['seen=1; Path=/']);
+			expect(await missing.text()).toContain('<h1>No invoice missing</h1>');
+			expect(found.status).toBe(200);
+			expect(found.headers.get('cache-control')).toBeNull();
+		},
+	);
+
+	it('gives the page the request, its url, and the locals middleware set on that request', async () => {
+		let seen: HttpContext | undefined;
+		const entry = pageEntry(({ http }) => {
+			seen = http;
+			return { html: '<p>ok</p>' };
+		});
+		const request = new Request('http://localhost/invoices/7?tab=lines', {
+			headers: { cookie: 'session=abc' },
+		});
+		__marklessCreateHttpContext({ req: request, context: { requestId: 'mw-7' } });
+
+		await entry.fetch(request);
+
+		expect(seen?.request).toBe(request);
+		expect(seen?.url.search).toBe('?tab=lines');
+		expect(seen?.locals).toEqual({ requestId: 'mw-7' });
+	});
+
+	it('refuses a write that changes the response once it was sent, and allows repeating it', async () => {
+		let http: HttpContext | undefined;
+		const entry = pageEntry((props) => {
+			http = props.http;
+			http.response.status = 404;
+			http.response.headers.set('x-invoice', 'missing');
+			return { html: '<p>gone</p>' };
+		});
+
+		const response = await entry.fetch(new Request('http://localhost/invoices/missing'));
+
+		expect(response.status).toBe(404);
+		expect(() => {
+			http!.response.status = 404;
+			http!.response.headers.set('x-invoice', 'missing');
+		}).not.toThrow();
+		expect(() => {
+			http!.response.status = 500;
+		}).toThrow(/^MARKLESS_ROUTER_RESPONSE_COMMITTED: /);
+		expect(() => http!.response.headers.set('x-invoice', 'other')).toThrow(
+			/^MARKLESS_ROUTER_RESPONSE_COMMITTED: /,
+		);
+		expect(() => http!.response.headers.delete('content-type')).toThrow(
+			/^MARKLESS_ROUTER_RESPONSE_COMMITTED: /,
+		);
+		expect(response.headers.get('x-invoice')).toBe('missing');
 	});
 });

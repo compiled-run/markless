@@ -98,7 +98,7 @@ export function matchRouteManifest(
 	}
 }
 
-function isPageModuleFile(file: string): boolean {
+export function isPageModuleFile(file: string): boolean {
 	const pageFile = pageRelativeFile(file);
 	return pageFile !== undefined && PAGE_EXTENSIONS.has(extname(pageFile));
 }

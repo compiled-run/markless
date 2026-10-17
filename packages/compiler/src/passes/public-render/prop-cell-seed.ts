@@ -133,7 +133,18 @@ export function ssrPropCellSeeds(
 	component: AnyNode | undefined,
 	componentName: string,
 ): ReadonlyArray<SsrPropCellSeed> {
-	const bagCellId = component ? componentPropCellId(component) : null;
+	return ssrPropCellSeedsForCell(
+		input,
+		component ? componentPropCellId(component) : null,
+		componentName,
+	);
+}
+
+export function ssrPropCellSeedsForCell(
+	input: PublicRenderModuleInput,
+	bagCellId: string | null,
+	componentName: string,
+): ReadonlyArray<SsrPropCellSeed> {
 	const armKeysByCell = new Map<string, Set<string> | null>();
 	for (const { graphNodeId, path } of armRebuildPropReads(input, componentName)) {
 		if (!graphNodeId.startsWith('prop:')) continue;

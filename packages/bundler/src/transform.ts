@@ -1113,6 +1113,7 @@ async function compileWithBlockingDiagnostics(
 		| 'importedModuleConstants'
 		| 'artifactChildMaterializations'
 		| 'executionLog'
+		| 'serverOnlyProps'
 	>,
 	resolverId: string,
 ) {
@@ -1120,6 +1121,7 @@ async function compileWithBlockingDiagnostics(
 		filename: input.filename,
 		moduleId: input.moduleId,
 		source: input.source,
+		...(input.serverOnlyProps?.length ? { serverOnlyProps: input.serverOnlyProps } : {}),
 		buildId: input.buildId,
 		resolverId,
 		symbols: input.symbols ?? [],

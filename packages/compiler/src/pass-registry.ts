@@ -79,6 +79,21 @@ export const defaultCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 		produces: ['publicRenderModule'],
 	},
 	{
+		passId: 'server-only-props',
+		description: 'Refuse browser code that reads a prop the host declared server-only.',
+		consumes: [
+			'source',
+			'semanticGraph',
+			'renderData',
+			'publicRenderPlan',
+			'symbolResolver',
+			'captureAnalysis',
+			'protocolState',
+			'protocolView',
+		],
+		produces: ['serverOnlyProps'],
+	},
+	{
 		passId: 'payload-scripts',
 		description: 'Render markless/state and markless/view data scripts.',
 		consumes: ['protocolState', 'protocolView'],

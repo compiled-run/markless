@@ -8,6 +8,7 @@ import {
 	REPLACE_ATTRIBUTE,
 	SCROLL_ATTRIBUTE,
 } from './link-attributes.ts';
+import { rememberRequestLocals } from './request-locals.ts';
 
 export {
 	buildRouteManifestFromFileIds,
@@ -56,7 +57,17 @@ export type {
 	RouteUpdate,
 } from './route-state.ts';
 
-export interface PageProps<Params extends object = Readonly<Record<string, string>>> {
+export interface PageProps<
+	Params extends object = Readonly<Record<string, string>>,
+	Locals extends object = AppLocals,
+> {
+	/**
+	 * The request and the response being written, the same object API routes and middleware get.
+	 * It exists only while the page renders on the server: the compiler refuses any read of it from
+	 * code that runs in the browser. Set `http.response.status` and `http.response.headers` before the
+	 * first byte is sent; a later write that changes them throws `MARKLESS_ROUTER_RESPONSE_COMMITTED`.
+	 */
+	readonly http: HttpContext<Locals>;
 	readonly params: Readonly<Params>;
 	readonly url: {
 		readonly href: string;
@@ -136,6 +147,7 @@ export function __marklessCreateHttpContext<
 >(event: RuntimeHttpEvent): EndpointHttpContext<Params, Locals> {
 	const context = event.context ?? {};
 	const url = event.url ?? new URL('http://localhost/');
+	if (event.req) rememberRequestLocals(event.req, context);
 
 	return {
 		locals: context as Locals,

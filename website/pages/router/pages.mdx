@@ -50,7 +50,7 @@ If two files match one address, a plain name wins over `[param]`. A `[param]` wi
 
 ## Read the params
 
-A page gets three props: `params`, `url` and `status`.
+A page gets four props: `params`, `url`, `status` and `http`. This section is about `params`.
 
 ```tsrx
 import type { PageProps } from '@markless/router';
@@ -67,6 +67,43 @@ is one string: for `/docs/guide/intro`, `slug` is `guide/intro`.
 	sprite="cross"
 	title="Why does my build stop on a route?"
 	text="Some file names stop the build, and the message names the file. Two files for one address do it, like docs.tsrx next to docs.mdx. A partial bracket like post-[id].tsrx does it too. So does a catch-all that is not the last part. So does a 404.tsrx or 500.tsrx inside a folder, or any page file in pages/api/."
+/>
+
+## Answer with a status
+
+Say `/invoices/42` names an invoice that does not exist. The page should still show a message, but
+the response should say 404, so browsers, search engines and caches know the page is missing.
+
+The `http` prop is how a page talks to the response. It is the same object that
+[API routes and middleware](/router/api-routes) get: `request`, `url`, `locals` and `response`.
+
+```tsrx
+import type { PageProps } from '@markless/router';
+import { findInvoice } from '../../src/invoices.ts';
+
+export default function Invoice({ params, http }: PageProps<{ id: string }>) @{
+	const invoice = findInvoice(params.id);
+	if (!invoice) {
+		http.response.status = 404;
+		http.response.headers.set('cache-control', 'no-store');
+	}
+	const title = invoice ? `Invoice ${invoice.number}` : `No invoice ${params.id}`;
+
+	<h1>{title}</h1>
+}
+```
+
+Save that as `pages/invoices/[id].tsrx`. `GET /invoices/42` now answers 404 with
+**No invoice 42** as its body, and the `cache-control: no-store` header.
+
+The status and headers leave with the first bytes of the page. So set them in the page body, before
+anything the page waits on. A page with a slow `@try` keeps streaming after that, and a write that
+changes the status or headers then throws `MARKLESS_ROUTER_RESPONSE_COMMITTED`.
+
+<Callout
+	sprite="cross"
+	title="Why does my build stop on http?"
+	text="http holds the visitor's cookies and headers, so it only exists on the server. Event handlers, attach, a computed() and the parts of the page the browser redraws all run in the browser. Reading http there stops the build with MARKLESS_SERVER_ONLY_PROP_BROWSER_READ. Read it in the page body instead, and copy the one value the browser needs into state()."
 />
 
 ## One document around every page

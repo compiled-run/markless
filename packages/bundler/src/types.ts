@@ -82,6 +82,7 @@ export interface TransformTsrxModuleInput {
 	dev?: boolean;
 	importedModuleInterfaces?: SemanticGraphInput['importedModuleInterfaces'];
 	importedModuleConstants?: SemanticGraphInput['importedModuleConstants'];
+	serverOnlyProps?: SemanticGraphInput['serverOnlyProps'];
 	renderDataImportSources?: Readonly<Record<string, string>>;
 	artifactChildMaterializations?: Readonly<Record<string, ArtifactChildMaterialization>>;
 	symbols?: import('@markless/compiler').SymbolResolverModuleInput['symbols'];
@@ -240,6 +241,10 @@ export type MarklessRolldownPluginApi = {
 	chunkImportMap: () => boolean;
 	/** A plugin that writes every document the app serves turns chunk import maps on. */
 	enableChunkImportMap: () => void;
+	/** A host plugin names, per root-relative module id, the props browser code must never read. */
+	declareServerOnlyProps: (
+		resolve: (moduleId: string) => SemanticGraphInput['serverOnlyProps'],
+	) => void;
 	invalidateGeneratedModules: (
 		parent: string,
 		environment?: MarklessEnvironment,
