@@ -2,8 +2,9 @@
 // build carries no machine path. A dependency file reachable through a link in
 // `root/node_modules` (pnpm's store layout, a workspace package) is spelled
 // through that link, so the store spelling does not leak either.
-import { readdirSync, realpathSync } from 'node:fs';
-import { isAbsolute, join, normalize, relative, resolve } from 'pathe';
+import { readdirSync, readFileSync, realpathSync } from 'node:fs';
+import { dirname, isAbsolute, join, normalize, relative, resolve } from 'pathe';
+import { machinePathRoots } from './build/machine-paths.ts';
 import { symbolVirtualModuleId, symbolVirtualModuleSourceFile } from './source-module.ts';
 
 type LinkedPackage = { readonly id: string; readonly real: string };
@@ -17,7 +18,9 @@ export function moduleIdFor(filename: string, root: string | undefined): string 
 	const id =
 		!relativeId.startsWith('..') && !relativeId.includes('node_modules/')
 			? relativeId
-			: (packageRootedModuleId(filename, root) ?? relativeId);
+			: (packageRootedModuleId(filename, root) ??
+				(outsideCheckout(filename, root) ? namedPackageModuleId(filename) : null) ??
+				relativeId);
 	mintedSources.set(`${root}\0${id}`, filename);
 	return id;
 }
@@ -33,6 +36,37 @@ function packageRootedModuleId(filename: string, root: string): string | null {
 	for (const linked of linkedPackages(root)) {
 		if (real === linked.real) return linked.id;
 		if (real.startsWith(`${linked.real}/`)) return `${linked.id}${real.slice(linked.real.length)}`;
+	}
+	return null;
+}
+
+function outsideCheckout(filename: string, root: string): boolean {
+	const real = realpathOf(filename);
+	return !machinePathRoots(root).some(
+		(checkout) => filename.startsWith(`${checkout}/`) || real.startsWith(`${checkout}/`),
+	);
+}
+
+// A file linked in from outside the checkout is spelled by the package that holds it, as an install would place it.
+function namedPackageModuleId(filename: string): string | null {
+	const real = realpathOf(filename);
+	for (
+		let directory = dirname(real);
+		dirname(directory) !== directory;
+		directory = dirname(directory)
+	) {
+		let name: unknown;
+		try {
+			name = (
+				JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8')) as {
+					name?: unknown;
+				}
+			).name;
+		} catch {
+			continue;
+		}
+		if (typeof name === 'string' && name)
+			return `node_modules/${name}${real.slice(directory.length)}`;
 	}
 	return null;
 }

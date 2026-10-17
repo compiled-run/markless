@@ -1,5 +1,15 @@
-import { cp, mkdir, mkdtemp, rm, symlink } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import {
+	cp,
+	mkdir,
+	mkdtemp,
+	readdir,
+	readFile,
+	realpath,
+	rm,
+	stat,
+	symlink,
+} from 'node:fs/promises';
+import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
 import { chromium, type Browser, type Page } from '@playwright/test';
 import { createBuilder } from 'vite';
@@ -106,3 +116,20 @@ test.each(['/form-served', '/form-streamed'])(
 		await page.close();
 	},
 );
+
+test('client output spells no path of the machine that built it', async () => {
+	const publicDir = join(root, '.output/public');
+	const machinePaths = [root, await realpath(root), packagesRoot, homedir()].flatMap((path) => {
+		const spelled = `/${path.replace(/^\/+|\/+$/g, '')}/`;
+		return [spelled, encodeURIComponent(spelled)];
+	});
+	const leaks: string[] = [];
+	for (const file of await readdir(publicDir, { recursive: true })) {
+		const path = join(publicDir, file);
+		if (!(await stat(path)).isFile()) continue;
+		const text = await readFile(path, 'utf8');
+		for (const machinePath of machinePaths)
+			if (text.includes(machinePath)) leaks.push(`${file}: ${machinePath}`);
+	}
+	expect(leaks).toEqual([]);
+});
