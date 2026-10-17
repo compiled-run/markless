@@ -1,3 +1,5 @@
+import { LINK_BRIDGE_MODULE_PATH } from '../../src/vite/runtime/link-bridge-module.ts';
+
 export interface RouterAnalyzerNetworkRule {
 	readonly method: 'GET';
 	readonly origin: 'fixture';
@@ -30,6 +32,12 @@ export const routerAnalyzerPolicy = {
 				origin: 'fixture',
 				path: BUILD_MODULE,
 				reason: 'built route, navigation, resume, and interaction modules',
+			},
+			{
+				method: 'GET',
+				origin: 'fixture',
+				path: LINK_BRIDGE_MODULE_PATH,
+				reason: 'the router link bridge, served once by the server entry, immutable and preloaded',
 			},
 		] as readonly RouterAnalyzerNetworkRule[],
 	},

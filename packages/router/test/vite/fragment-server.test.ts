@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { servedLinkBridge } from '../support/link-bridge.ts';
 import {
 	createServerEntry,
 	type ServerEntryOptions,
@@ -74,9 +75,9 @@ test('a document request is unchanged but still varies on the fragment header', 
 });
 
 test('the link bridge carries each destination landing plan and no client-render code', async () => {
-	const html = await (await entry().fetch(new Request('https://app.test/'))).text();
-	const bridge =
-		/<script data-markless-router-link-resumer>([\s\S]*?)<\/script>/.exec(html)?.[1] ?? '';
+	const served = entry();
+	const html = await (await served.fetch(new Request('https://app.test/'))).text();
+	const bridge = (await servedLinkBridge(html, served, 'https://app.test')) ?? '';
 	expect(bridge).toContain('"/next":["/landing-next.js"]');
 	expect(bridge).toContain('"entry":"/fragment.js"');
 	expect(html).not.toContain('/client-render-next.js');
@@ -98,18 +99,16 @@ test('a fragment fetch of a missing route answers the status, so the client load
 });
 
 test('plain anchors to pages get their landing plan, and the bridge names every page route', async () => {
-	const html = await (
-		await entry({
-			pageModuleLoaders: {
-				'pages/index.tsrx': page(
-					'<div data-async-container><a href="/next">Next</a><a href="/notes.txt">Notes</a></div>',
-				),
-				'pages/next.tsrx': page('<div data-async-container><h1>Next</h1></div>'),
-			},
-		}).fetch(new Request('https://app.test/'))
-	).text();
-	const bridge =
-		/<script data-markless-router-link-resumer>([\s\S]*?)<\/script>/.exec(html)?.[1] ?? '';
+	const served = entry({
+		pageModuleLoaders: {
+			'pages/index.tsrx': page(
+				'<div data-async-container><a href="/next">Next</a><a href="/notes.txt">Notes</a></div>',
+			),
+			'pages/next.tsrx': page('<div data-async-container><h1>Next</h1></div>'),
+		},
+	});
+	const html = await (await served.fetch(new Request('https://app.test/'))).text();
+	const bridge = (await servedLinkBridge(html, served, 'https://app.test')) ?? '';
 	expect(bridge).toContain('"/next":["/landing-next.js"]');
 	expect(bridge).not.toContain('notes.txt');
 	expect(bridge).toContain('"pages":["/","/next"]');
@@ -117,10 +116,29 @@ test('plain anchors to pages get their landing plan, and the bridge names every 
 });
 
 test('prefetch: false turns every speculative fetch off in the bridge', async () => {
-	const html = await (
-		await entry({ prefetch: false }).fetch(new Request('https://app.test/'))
-	).text();
-	const bridge =
-		/<script data-markless-router-link-resumer>([\s\S]*?)<\/script>/.exec(html)?.[1] ?? '';
+	const served = entry({ prefetch: false });
+	const html = await (await served.fetch(new Request('https://app.test/'))).text();
+	const bridge = (await servedLinkBridge(html, served, 'https://app.test')) ?? '';
 	expect(bridge).toContain('"prefetch":false');
+});
+
+test('only a page that links a hash route loads the bridge carrying its click path', async () => {
+	const served = entry({
+		pageModuleLoaders: {
+			'pages/index.tsrx': page('<div data-async-container><a href="/next">Next</a></div>'),
+			'pages/next.tsrx': page(
+				'<div data-async-container><a href="#/r/alpha" data-markless-router-link>Alpha</a></div>',
+			),
+		},
+	});
+	const plainHtml = await (await served.fetch(new Request('https://app.test/'))).text();
+	const hashHtml = await (await served.fetch(new Request('https://app.test/next'))).text();
+	const plain = (await servedLinkBridge(plainHtml, served, 'https://app.test')) ?? '';
+	const hash = (await servedLinkBridge(hashHtml, served, 'https://app.test')) ?? '';
+	expect(plain).not.toContain('__marklessRouterHashClickStarted');
+	expect(hash).toContain('__marklessRouterHashClickStarted');
+	const modulePath = (html: string) => /import b from"([^"]+)"/.exec(html)?.[1];
+	expect(modulePath(plainHtml)).not.toBe(modulePath(hashHtml));
+	expect(plainHtml).toContain(`rel="modulepreload" href="${modulePath(plainHtml)}"`);
+	expect(hashHtml).toContain(`rel="modulepreload" href="${modulePath(hashHtml)}"`);
 });

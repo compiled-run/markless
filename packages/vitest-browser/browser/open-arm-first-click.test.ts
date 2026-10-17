@@ -39,4 +39,11 @@ for (const [mode, mount, mountShapes] of [
 		await userEvent.click(container.querySelector<HTMLButtonElement>('[data-else]')!);
 		await expect.poll(() => text(container, '[data-taps]')).toBe('11');
 	});
+
+	test(`${mode}: a first click on plain text in an open arm leaves its button's click counting`, async () => {
+		const container = await mountShapes();
+		await userEvent.click(container.querySelector<HTMLElement>('.panel > span')!);
+		await userEvent.click(container.querySelector<HTMLButtonElement>('[data-else]')!);
+		await expect.poll(() => text(container, '[data-taps]')).toBe('1');
+	});
 }

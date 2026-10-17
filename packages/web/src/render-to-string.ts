@@ -15,9 +15,11 @@ import {
 } from '@markless/serializer';
 import { renderPayloadScripts } from '@markless/serializer';
 import {
+	type ProtocolArmRecordSet,
 	protocolEventDispatchesMarkless,
 	PROTOCOL_IDLE_EVENT_NAME,
 	PROTOCOL_LOCATOR_PATHS_ATTRIBUTE,
+	PROTOCOL_SYNC_POLICY_HOST_ATTRIBUTE,
 	PROTOCOL_VISIBLE_EVENT_NAME,
 } from '@markless/serializer/protocol';
 import {
@@ -46,7 +48,7 @@ import {
 import { marklessRosterPositions } from './prerender/shared-seed-slot.ts';
 import { derivePrerenderResumeRecords } from './prerender/evaluator.ts';
 import { createEarlyEventCaptureSource } from './inline/early-events.ts';
-import { servedLocatorPaths } from './locator-paths.ts';
+import { servedElementTree, servedLocatorPaths, withElementAttributes } from './locator-paths.ts';
 
 export { prepareSsrResumeRecords } from './prerender/records.ts';
 export { CONTAINER_RETIRE_PROPERTY } from './payload-resume-registry.ts';
@@ -268,7 +270,9 @@ export async function assembleSsrContainer(
 			: '',
 		renderContainer(
 			options.containerId,
-			[output.html, payloadScripts?.stateScript, payloadScripts?.viewScript, resumerScript],
+			[
+				resumerScript && syncPolicy ? withSyncPolicyHostMarks(view, output.html) : output.html,
+				payloadScripts?.stateScript, payloadScripts?.viewScript, resumerScript],
 			resumerScript ? servedView.locators : [],
 		),
 	]
@@ -708,6 +712,57 @@ export function withNamedHostLocators(view: ProtocolViewPayload): ProtocolViewPa
 		for (const site of branch.idrefSites ?? []) named.add(site.hostNodeId);
 	const locators = view.locators.filter((locator) => named.has(locator.hostNodeId));
 	return locators.length === view.locators.length ? view : { ...view, locators };
+}
+
+// Each element whose event carries a sync policy names its record, so the boot reaches the policy from the event target alone.
+export function withSyncPolicyHostMarks(
+	view: Pick<ProtocolViewPayload, 'locators' | 'events' | 'asyncBoundaries' | 'branches'>,
+	html: string,
+): string {
+	const policyHosts = (events: ReadonlyArray<{ hostNodeId: string; syncPolicy?: unknown }>) =>
+		new Set(events.filter((event) => event.syncPolicy).map((event) => event.hostNodeId));
+	const tree = servedElementTree(html);
+	const marks = new Map<number, string>();
+	const mark = (
+		locators: ReadonlyArray<{ hostNodeId: string; index: number }>,
+		hosts: ReadonlySet<string>,
+		offset = 0,
+	) => {
+		for (const locator of locators)
+			if (hosts.has(locator.hostNodeId)) marks.set(offset + locator.index, locator.hostNodeId);
+	};
+	mark(view.locators, policyHosts(view.events));
+	for (const arm of [
+		...view.asyncBoundaries.map((boundary) => [boundary.startAnchor, boundary.armRecords] as const),
+		...(view.branches ?? []).map((branch) => [branch.startAnchor, branch.servedArmRecords] as const),
+	]) {
+		const [anchor, records] = arm;
+		if (!records || Array.isArray(records)) continue;
+		const set = records as ProtocolArmRecordSet;
+		const offset = tree.commentElementIndexes[anchor.index];
+		if (offset !== undefined) mark(set.locators, policyHosts(set.events ?? []), offset);
+	}
+	return marks.size
+		? withElementAttributes(html, tree.nameEnds, PROTOCOL_SYNC_POLICY_HOST_ATTRIBUTE, marks)
+		: html;
+}
+
+/** The same marks for one arm's html streamed on its own; its locators count from the arm's first element. */
+export function withArmSyncPolicyHostMarks(armRecords: ProtocolArmRecordSet, html: string): string {
+	const hosts = new Set(
+		(armRecords.events ?? []).filter((event) => event.syncPolicy).map((event) => event.hostNodeId),
+	);
+	const marks = new Map<number, string>();
+	for (const locator of armRecords.locators)
+		if (hosts.has(locator.hostNodeId)) marks.set(locator.index + 1, locator.hostNodeId);
+	return marks.size
+		? withElementAttributes(
+				html,
+				servedElementTree(html).nameEnds,
+				PROTOCOL_SYNC_POLICY_HOST_ATTRIBUTE,
+				marks,
+			)
+		: html;
 }
 
 function eventHostIndexes(view: ProtocolViewPayload, eventName: string): number[] {

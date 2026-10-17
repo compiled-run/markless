@@ -3,8 +3,8 @@ import { writeFile } from 'node:fs/promises';
 import { resolve } from 'pathe';
 import { createBuilder, preview, type InlineConfig } from 'vite';
 
-const [name, outDir, portFlag] = process.argv.slice(2);
-if (!name || !outDir || !portFlag) throw new Error('usage: <fixture> <outDir> <port>');
+const [name, outDir] = process.argv.slice(2);
+if (!name || !outDir) throw new Error('usage: <fixture> <outDir>');
 const fixture = resolve(import.meta.dirname, '../../fixtures', name);
 const prerender = name === 'vite-prerender-multi-child';
 
@@ -25,12 +25,14 @@ const builder = await createBuilder(config);
 await builder.buildApp();
 
 if (!prerender) {
-	const port = Number(portFlag);
+	// Port 0: concurrent checkouts on one machine run this same build.
 	const server = await preview({
 		...config,
-		preview: { host: '127.0.0.1', port, strictPort: true },
+		preview: { host: '127.0.0.1', port: 0, strictPort: true },
 	});
 	try {
+		const address = server.httpServer.address();
+		const port = typeof address === 'object' && address ? address.port : 0;
 		const response = await fetch(`http://127.0.0.1:${port}/`, {
 			headers: { accept: 'text/html' },
 		});

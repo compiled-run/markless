@@ -18,6 +18,7 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 	}));
 
 	<nav
+		id="docs-sidebar"
 		class="sidebar"
 		aria-label="Documentation"
 		onKeydown={(event) => {

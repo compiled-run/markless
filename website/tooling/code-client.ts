@@ -127,6 +127,11 @@ export function codeClient(): Plugin[] {
 				if (ref) return `export default import.meta.ROLLUP_FILE_URL_${ref};`;
 				return `export default ${JSON.stringify(`${base}@fs${entry.file}`)};`;
 			},
+			// A quoted relative path lets the bundler name the chunk through the import map, so a rename re-fetches only it.
+			resolveFileUrl({ referenceId, relativePath }) {
+				if (![...entryRefs.values()].includes(referenceId)) return null;
+				return JSON.stringify(relativePath.startsWith('.') ? relativePath : `./${relativePath}`);
+			},
 			generateBundle(_options, bundle) {
 				if (!frameRef || this.environment?.name !== 'client') return;
 				const script = this.getFileName(frameRef);

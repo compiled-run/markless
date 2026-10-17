@@ -958,6 +958,7 @@ function serverEntrySource(root: string, options: MarklessRouterOptions): string
 		`const documentModuleLoaders = import.meta.glob(['/document.tsrx']);`,
 		`const entry = createServerEntry({`,
 		`  dev: import.meta.env.DEV,`,
+		`  base: import.meta.env.BASE_URL,`,
 		`  resumeEntryPath,`,
 		`  prerenderWakeEntryPath,`,
 		`  navigationEntryPath,`,

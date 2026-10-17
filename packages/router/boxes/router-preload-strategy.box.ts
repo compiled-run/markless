@@ -4,6 +4,7 @@ import { box } from '@async/witness';
 import type { Plugin } from 'vite';
 import { NAVIGATION_POLYFILL_MODULE } from '../src/navigation-polyfill.ts';
 import { readClientAssetsManifest } from '../src/vite/client-assets-manifest.ts';
+import { isLinkBridgeModulePath } from '../src/vite/runtime/link-bridge-module.ts';
 import {
 	MARKLESS_CHUNK_SPECIFIER_PREFIX,
 	marklessImportMapPath,
@@ -387,7 +388,14 @@ async function expectHeadLanding(preview: Preview, route: RoutePlan): Promise<vo
 		throw new Error(
 			`Expected ${route.path} modulepreloads as head <link> elements only, saw ${placement.bodyCount} in body.`,
 		);
-	const head = [...placement.hrefs].map(pathOf).sort();
+	const preloaded = [...placement.hrefs].map(pathOf);
+	// The router's cached link bridge rides every landing next to the route's own code.
+	const bridges = preloaded.filter(isLinkBridgeModulePath);
+	if (bridges.length !== 1)
+		throw new Error(
+			`Expected ${route.path} head to preload the router link bridge once, saw: ${bridges.join(', ') || '(none)'}`,
+		);
+	const head = preloaded.filter((href) => !isLinkBridgeModulePath(href)).sort();
 	const landing = [...route.landing].map(pathOf).sort();
 	if (head.length !== new Set(head).size || head.join('\n') !== landing.join('\n'))
 		throw new Error(

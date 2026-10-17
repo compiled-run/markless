@@ -651,6 +651,278 @@
 			"from": null,
 			"to": 352,
 			"reason": "measured: the compact data-markless-paths alphabet the encoder and the repair share (paths attribute 286 -> 131 B gzip on music-player-ssr)"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/fns/row-mint",
+			"from": 6649,
+			"to": 7403,
+			"reason": "measured: a keyed repeat served empty now replaces the @empty arm the server painted with minted rows (b81168f6)"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/resume-arm-records",
+			"from": 6276,
+			"to": 7003,
+			"reason": "measured: CSR mount registers the event records of the arm a plain @if/@switch painted, so its first click counts (f2c64212)"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/resume-async-wiring",
+			"from": 6615,
+			"to": 7339,
+			"reason": "measured: catch-up settle for a runner that settled before its boundary subscribed, plus the arm number each commit announces (e314ad99); +99 B of it was already unanchored at 9d324340"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/resume-events",
+			"from": 15312,
+			"to": 15538,
+			"reason": "measured: an onIdle record queues its host when the runtime binds it, with no DOM scan (4a8d73b1)"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/resume-locators",
+			"from": 5483,
+			"to": 5644,
+			"reason": "measured: on a page a foreign script changed, resume drops only the host that changed and reports it instead of throwing; the dev-only diagnostic is stripped from production (29706746)"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/resume-runtime-start",
+			"from": 8576,
+			"to": 8874,
+			"reason": "measured: start-time table of each boundary's shown arm, so rows written straight into an @try arm follow it (e314ad99); anchor was already 98 B stale at 9d324340"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "serializer/protocol-locator-paths",
+			"from": null,
+			"to": 292,
+			"reason": "measured: the data-markless-paths attribute name the resume-side census repair reads; ships as its own module because resume-locators imports it directly (29706746), never anchored when 3b30ea80 anchored only the -format module"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "router/vite/entries/fragment-entry",
+			"from": 12951,
+			"to": 13549,
+			"reason": "measured: router landings scroll in one step and a re-wrapped scrolled box keeps its offset (18d0fcc1); +21 B already unanchored at 9d324340"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "serializer/storage-slot",
+			"from": 487,
+			"to": 780,
+			"reason": "measured: storage() cookie name and assignment, so the server renders saved state (2bfc331e)"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/storage-plane",
+			"from": 1659,
+			"to": 1810,
+			"reason": "measured: storage() writes its cookie beside localStorage (2bfc331e)"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/fns/instance-scope",
+			"from": 16966,
+			"to": 17232,
+			"reason": "measured: row values reach imported children through row roots (454ca492); +43 B already unanchored at 9d324340"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/fns/projection-html",
+			"from": null,
+			"to": 343,
+			"reason": "measured: new module, projection-mark constants split out so the renderer and SSR share them (b9c42458)"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/fns/ssr",
+			"from": 29866,
+			"to": 30297,
+			"reason": "measured: composition keeps only children whose hosts were served, and behavior reads remap through one helper (b9c42458, d1b4ac9c); +61 B already unanchored at 9d324340"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/fns/text-node",
+			"from": null,
+			"to": 507,
+			"reason": "measured: newly shipped on the bench, a text update beside sibling content writes its own text node instead of the host's text (compiler text fixes of 2026-10-07)"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/prerender/evaluator",
+			"from": 20934,
+			"to": 21312,
+			"reason": "measured: page-unique element() id scope and per-component shared seeds (b9c42458, 31b3899a)"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/render-canonical",
+			"from": 2017,
+			"to": 2642,
+			"reason": "measured: element() ids stay unique across several roots on one page (b9c42458)"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/render-csr",
+			"from": 15785,
+			"to": 16804,
+			"reason": "measured: painted-arm records at CSR mount, attach functions that read state, and the onIdle wake (f2c64212, c912710c, eb79bce0, 4a8d73b1); +221 B already unanchored at 9d324340"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/resume-behaviors",
+			"from": 8547,
+			"to": 8804,
+			"reason": "measured: attach factories receive a visible event (d1b4ac9c)"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/resume-branches",
+			"from": 15012,
+			"to": 15471,
+			"reason": "measured: a branch announces the arm it shows, so rows inside a branch arm follow it (edfbc6ed)"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/resume-commit-arm",
+			"from": 9080,
+			"to": 9551,
+			"reason": "measured: each arm commit announces the arm it painted (e314ad99, +315 B); +156 B already unanchored at 9d324340"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/resume-keyed-repeats",
+			"from": 14376,
+			"to": 15599,
+			"reason": "measured: index keys, following a branch arm, and adopting served rows again (edfbc6ed, b81168f6); +51 B already unanchored at 9d324340"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/resume-repeat-branch-arm",
+			"from": null,
+			"to": 1785,
+			"reason": "measured: new lazy module so rows inside a branch arm follow it; loaded only by repeats that carry branchArm (edfbc6ed)"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/ssr-data/renderer",
+			"from": 19425,
+			"to": 20269,
+			"reason": "measured: releases projections inside arms that were not taken (b9c42458)"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/resume-arm-records",
+			"from": 7003,
+			"to": 7741,
+			"reason": "measured: a CSR page claims the hosts of an arm painted at mount from the first event target inside it (its own ancestors and their preceding siblings) instead of walking every comment of the page at mount"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/render-csr",
+			"from": 16804,
+			"to": 17213,
+			"reason": "measured: the delegated listener hands each event target to that painted-arm claim first, and installs the claimed arms' event names up front"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/resume-branch-arms",
+			"from": null,
+			"to": 549,
+			"reason": "measured: new module, the one shared helper that records the arm a branch or boundary shows (was built three times)"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/resume-branches",
+			"from": 15471,
+			"to": 15246,
+			"reason": "measured: shrank, the branch-arm record now comes from the shared resume-branch-arms helper"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/resume-commit-arm",
+			"from": 9551,
+			"to": 9398,
+			"reason": "measured: shrank, the branch-arm record now comes from the shared resume-branch-arms helper"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/resume-runtime-start",
+			"from": 8874,
+			"to": 8759,
+			"reason": "measured: shrank, the branch-arm record now comes from the shared resume-branch-arms helper"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "router/vite/entries/fragment-entry",
+			"from": 13549,
+			"to": 13515,
+			"reason": "measured: shrank, a re-wrapped scrolled box is found by its id instead of sweeping elements by tag"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/resume-branches",
+			"from": 15246,
+			"to": 15471,
+			"reason": "measured: the shared shown-arm helper is reverted; as its own module it cost +56 B rendered and +30 to +60 B of demand-map glue per construct, inside resume-locators +108 B, so each module builds its own entry again"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/resume-commit-arm",
+			"from": 9398,
+			"to": 9551,
+			"reason": "measured: the shared shown-arm helper is reverted; as its own module it cost +56 B rendered and +30 to +60 B of demand-map glue per construct, inside resume-locators +108 B, so each module builds its own entry again"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/resume-runtime-start",
+			"from": 8759,
+			"to": 8874,
+			"reason": "measured: the shared shown-arm helper is reverted; as its own module it cost +56 B rendered and +30 to +60 B of demand-map glue per construct, inside resume-locators +108 B, so each module builds its own entry again"
+		},
+		{
+			"date": "2026-10-17",
+			"guard": "runtime",
+			"subject": "web/resume-branch-arms",
+			"from": 549,
+			"to": null,
+			"reason": "measured: the shared shown-arm helper is reverted; as its own module it cost +56 B rendered and +30 to +60 B of demand-map glue per construct, inside resume-locators +108 B, so each module builds its own entry again"
 		}
 	],
 	"runtimeModules": {
@@ -663,7 +935,7 @@
 		"router/route-state": 805,
 		"router/spa-navigation": 6391,
 		"router/vite/entries/client-entry": 2666,
-		"router/vite/entries/fragment-entry": 12951,
+		"router/vite/entries/fragment-entry": 13515,
 		"router/vite/entries/resume-entry": 2406,
 		"router/vite/runtime/create-route-discovery": 527,
 		"runtime/graph": 8422,
@@ -681,8 +953,9 @@
 		"serializer/protocol-client": 6652,
 		"serializer/protocol-constants": 697,
 		"serializer/protocol-event-names": 264,
+		"serializer/protocol-locator-paths": 292,
 		"serializer/protocol-locator-paths-format": 352,
-		"serializer/storage-slot": 487,
+		"serializer/storage-slot": 780,
 		"serializer/value-constants": 360,
 		"serializer/value-decode-client": 3580,
 		"serializer/value-decode-client-lazy": 230,
@@ -696,15 +969,17 @@
 		"web/fns/composition": 19605,
 		"web/fns/dom-order": 464,
 		"web/fns/element-handle-prop": 751,
-		"web/fns/instance-scope": 16966,
+		"web/fns/instance-scope": 17232,
+		"web/fns/projection-html": 343,
 		"web/fns/reconcile-plane": 334,
 		"web/fns/roster-resume": 5123,
-		"web/fns/row-mint": 6649,
+		"web/fns/row-mint": 7403,
 		"web/fns/row-slot-mint": 2633,
 		"web/fns/scalar-served": 3982,
 		"web/fns/scalar-specialized": 1426,
 		"web/fns/served-census-repair": 2704,
-		"web/fns/ssr": 29866,
+		"web/fns/ssr": 30297,
+		"web/fns/text-node": 507,
 		"web/fns/update-text": 531,
 		"web/fns/write-scalar": 983,
 		"web/inline/resume-errors": 1437,
@@ -717,35 +992,36 @@
 		"web/payload-resume-lazy": 203,
 		"web/payload-resume-registry": 1916,
 		"web/pending-timing": 521,
-		"web/prerender/evaluator": 20934,
+		"web/prerender/evaluator": 21312,
 		"web/prerender/owning-surface": 1212,
 		"web/prerender/shared-seed-slot": 2836,
 		"web/prerender/staged-graph": 411,
 		"web/reconcile-plane-slot": 344,
 		"web/render": 4003,
-		"web/render-canonical": 2017,
-		"web/render-csr": 15785,
+		"web/render-canonical": 2642,
+		"web/render-csr": 17213,
 		"web/render-route-holder": 753,
 		"web/repeat-runtime": 2594,
 		"web/resume": 3419,
 		"web/resume-anchor-census": 376,
-		"web/resume-arm-records": 6276,
+		"web/resume-arm-records": 7741,
 		"web/resume-arm-records-lazy": 219,
-		"web/resume-async-wiring": 6615,
-		"web/resume-behaviors": 8547,
-		"web/resume-branches": 15012,
+		"web/resume-async-wiring": 7339,
+		"web/resume-behaviors": 8804,
+		"web/resume-branches": 15471,
 		"web/resume-census": 1471,
-		"web/resume-commit-arm": 9080,
-		"web/resume-events": 15312,
+		"web/resume-commit-arm": 9551,
+		"web/resume-events": 15538,
 		"web/resume-handle-qualifier": 685,
 		"web/resume-handoff": 1360,
-		"web/resume-keyed-repeats": 14376,
+		"web/resume-keyed-repeats": 15599,
 		"web/resume-keyed-repeats-lazy": 227,
-		"web/resume-locators": 5483,
+		"web/resume-locators": 5644,
+		"web/resume-repeat-branch-arm": 1785,
 		"web/resume-resettle-hold": 2572,
 		"web/resume-runtime": 14982,
 		"web/resume-runtime-shared": 2089,
-		"web/resume-runtime-start": 8576,
+		"web/resume-runtime-start": 8874,
 		"web/resume-shared-patch": 1200,
 		"web/resume-stream-patches": 2260,
 		"web/resume-sync-computed": 1538,
@@ -753,8 +1029,8 @@
 		"web/runtime-error-reporting": 1876,
 		"web/ssr-data/awaitable": 856,
 		"web/ssr-data/branch-arm-idrefs": 1766,
-		"web/ssr-data/renderer": 19425,
-		"web/storage-plane": 1659
+		"web/ssr-data/renderer": 20269,
+		"web/storage-plane": 1810
 	},
 	"constructGlue": {
 		"event handler": 2951,

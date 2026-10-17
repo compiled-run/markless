@@ -1,13 +1,14 @@
 import { describe, expect, test } from 'vitest';
 import { createServerEntry } from '../src/vite/runtime/create-server-entry.ts';
+import { servedLinkBridge } from './support/link-bridge.ts';
 
 type BridgeOptions = Pick<
 	Parameters<typeof createServerEntry>[0],
-	'documentNavigation' | 'prefetch'
+	'documentNavigation' | 'prefetch' | 'dev'
 >;
 
-async function servedBridge(options: BridgeOptions = {}): Promise<string> {
-	const entry = createServerEntry({
+function bridgeEntry(options: BridgeOptions = {}) {
+	return createServerEntry({
 		navigationEntryPath: '/build/navigation.js',
 		pageModuleLoaders: {
 			'pages/index.tsrx': async () => ({
@@ -24,10 +25,14 @@ async function servedBridge(options: BridgeOptions = {}): Promise<string> {
 		routeFileIds: ['pages/index.tsrx', 'pages/about.tsrx'],
 		...options,
 	});
+}
+
+async function servedBridge(options: BridgeOptions = {}): Promise<string> {
+	const entry = bridgeEntry(options);
 	const html = await (await entry.fetch(new Request('http://router.test/'))).text();
-	const match = /<script data-markless-router-link-resumer>([\s\S]*?)<\/script>/.exec(html);
-	if (!match) throw new Error('served page carries no router link bridge');
-	return match[1]!;
+	const bridge = await servedLinkBridge(html, entry);
+	if (bridge === undefined) throw new Error('served page carries no router link bridge');
+	return bridge;
 }
 
 // Runs the bridge against a minimal document and reports whether a Link click is taken over.
@@ -72,6 +77,24 @@ function clickTakenOver(source: string, href: string): boolean {
 }
 
 describe('router link bridge', () => {
+	test('a built page calls one cached bridge module it preloads, and dev keeps the bridge inline', async () => {
+		const entry = bridgeEntry();
+		const html = await (await entry.fetch(new Request('http://router.test/'))).text();
+		const stub = /<script type="module" data-markless-router-link-resumer>import b from"([^"]+)";b\(/.exec(html);
+		expect(stub?.[1]).toMatch(/^\/_markless\/links\.[0-9a-z]+\.js$/);
+		expect(html).toContain(`<link rel="modulepreload" href="${stub![1]}"`);
+		expect(html).not.toContain('<script data-markless-router-link-resumer>');
+		const module = await entry.fetch(new Request(`http://router.test${stub![1]}`));
+		expect(module.headers.get('content-type')).toBe('text/javascript;charset=utf-8');
+		expect(module.headers.get('cache-control')).toContain('immutable');
+		expect(await module.text()).toMatch(/^export default\(r,p,q\)=>/);
+
+		const dev = bridgeEntry({ dev: true });
+		const devHtml = await (await dev.fetch(new Request('http://router.test/'))).text();
+		expect(devHtml).toContain('<script data-markless-router-link-resumer>');
+		expect(devHtml).not.toContain('/_markless/links.');
+	});
+
 	test('declares only what the page uses at load', async () => {
 		const source = await servedBridge({ prefetch: false });
 		expect(source).not.toContain('prefetchAttr');

@@ -32,8 +32,6 @@ const RUNTIME_MOUNT_SCAN_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Debug instrumentation counts module-preload links and does not locate components.',
 	"packages/web/src/inline/resumer.ts :: const preloaded = document.querySelectorAll('link[rel=modulepreload]').length;":
 		'The prerender log summary counts module-preload links and does not locate components.',
-	'packages/web/src/inline/resumer.ts :: const commentWalker = currentDocument.createTreeWalker(root, 129);':
-		"The inline resumer maps a served @try arm's compiler-recorded locators from its boundary comment anchor, so the arm's sync policy runs before the default action.",
 	'packages/web/src/inline/resumer.ts :: const walker = document.createTreeWalker(root, 128);':
 		'The settle boot censuses the build-emitted boundary comment anchors it fills between.',
 	'packages/web/src/inline/served-census.ts :: const walker = document.createTreeWalker(root, 1);':
@@ -42,8 +40,6 @@ const RUNTIME_MOUNT_SCAN_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Shared payload decoding accepts innerHTML only as a legacy script-text fallback.',
 	'packages/web/src/payload.ts :: const text = element.textContent ?? element.text ?? element.innerHTML;':
 		'Payload decoding accepts innerHTML only as a legacy script-text fallback.',
-	'packages/web/src/render-to-stream.ts :: const armWalk = d.createTreeWalker(r, 129);':
-		"The streamed-arm executor maps the arm's compiler-recorded locators so its sync policy runs before the default action.",
 	'packages/web/src/render-to-stream.ts :: const walk = d.createTreeWalker(r, 129);':
 		'Stream debug code maps compiler-recorded locators across elements and comments.',
 	'packages/web/src/render-to-stream.ts :: const w = d.createTreeWalker(d.body, 128);':
@@ -52,6 +48,8 @@ const RUNTIME_MOUNT_SCAN_ALLOWLIST: Readonly<Record<string, string>> = {
 		'CSR mount maps serialized boundary indexes to compiler-emitted comment anchors before the runtime starts.',
 	'packages/web/src/resume-arm-records.ts :: if (within && node.nodeType === 8 && isArmBranchAnchorComment(node as ResumeDomComment)) {':
 		'Arm-record adoption censuses compiler-emitted branch anchors within an explicit range.',
+	"packages/web/src/resume-arm-records.ts :: const data = sibling.nodeType === 8 ? sibling.data! : '';":
+		"A CSR event's own target claims a painted arm's hosts: it reads only the target's ancestors and their preceding siblings for the arm's start anchor, never the page.",
 	'packages/web/src/resume-async-boundaries.ts :: if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))':
 		'Async-boundary adoption maps serialized indexes to compiler-emitted comment anchors.',
 	'packages/web/src/resume-branches.ts :: (value as { readonly nodeType?: number }).nodeType === 8':

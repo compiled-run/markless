@@ -61,6 +61,8 @@ The router writes your route types to `.output/markless/router/types/routes.d.ts
 When someone clicks a link to one of your pages, the browser keeps the page it has. The router asks
 the server for the next page and swaps in only the page area. The address bar changes, and Back and
 Forward bring back each page and its scroll position.
+A scrolled box such as a sidebar keeps its scroll too. If the next page puts that box inside a
+different element, give the box an `id` so the router can find it there.
 
 If `document.tsrx` reads a prop other than `children`, such as the URL, a click loads the whole new
 page instead.
@@ -70,6 +72,11 @@ starts it. When the browser is idle, a few visible links start too. Links to `/a
 start early. If the request fails, the browser loads the address the normal way.
 
 Plain `<a>` links to your pages navigate the same way.
+
+In a built app, the code that handles these clicks is one small file the browser downloads once and
+caches for every page. It starts when the browser finishes reading the page. A link clicked before
+that, while a long page is still loading, loads the whole new page the normal way. Nothing is lost;
+only that one click skips the swap.
 
 ## Props that change a click
 

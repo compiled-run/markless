@@ -1,3 +1,5 @@
+import { LINK_BRIDGE_MODULE_PATH } from '../../../../packages/router/src/vite/runtime/link-bridge-module.ts';
+
 export interface MusicSsrNetworkRule {
 	readonly method: 'GET';
 	readonly origin: 'fixture' | 'https://www.youtube.com' | 'https://i.ytimg.com';
@@ -22,6 +24,12 @@ export const musicSsrAnalyzerPolicy = {
 			reason: 'built route assets and execution size map',
 		},
 		{ method: 'GET', origin: 'fixture', path: STYLE_ASSET, reason: 'built stylesheet' },
+		{
+			method: 'GET',
+			origin: 'fixture',
+			path: LINK_BRIDGE_MODULE_PATH,
+			reason: 'the router link bridge, served once by the server entry, immutable and preloaded',
+		},
 		{
 			method: 'GET',
 			origin: 'https://www.youtube.com',

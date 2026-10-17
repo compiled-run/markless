@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { servedLinkBridge } from './support/link-bridge.ts';
 import * as debugChannelModule from '../../web/src/debug-channel.ts';
 import {
 	__marklessDebugResetForTest,
@@ -10,6 +11,11 @@ import {
 } from '../src/spa-navigation.ts';
 import { createServerEntry } from '../src/vite/runtime/create-server-entry.ts';
 import type { MarklessDebugChannelV1 } from '../../web/src/debug-channel.ts';
+
+function requiredBridge(source: string | undefined): string {
+	if (source === undefined) throw new Error('served page carries no router link bridge');
+	return source;
+}
 
 function requiredScriptContent(text: string, pattern: RegExp): string {
 	const match = text.match(pattern);
@@ -155,10 +161,7 @@ describe('router debug registration', () => {
 			html,
 			/<script data-markless-router-debug-bootstrap>([\s\S]*?)<\/script>/,
 		);
-		const source = requiredScriptContent(
-			html,
-			/<script data-markless-router-link-resumer>([\s\S]*?)<\/script>/,
-		);
+		const source = requiredBridge(await servedLinkBridge(html, entry));
 		const root: any = {
 			isConnected: true,
 			listeners: new Map(),
@@ -233,10 +236,7 @@ describe('router debug registration', () => {
 			routeFileIds: ['pages/index.tsrx'],
 		});
 		const html = await (await entry.fetch(new Request('http://router.test/'))).text();
-		const source = requiredScriptContent(
-			html,
-			/<script data-markless-router-link-resumer>([\s\S]*?)<\/script>/,
-		);
+		const source = requiredBridge(await servedLinkBridge(html, entry));
 		const debugBootstrap = requiredScriptContent(
 			html,
 			/<script data-markless-router-debug-bootstrap>([\s\S]*?)<\/script>/,
@@ -310,10 +310,7 @@ describe('router debug registration', () => {
 				routeFileIds: ['pages/index.tsrx'],
 			});
 			const response = await entry.fetch(new Request('http://router.test/'));
-			const source = requiredScriptContent(
-				await response.text(),
-				/<script data-markless-router-link-resumer>([\s\S]*?)<\/script>/,
-			);
+			const source = requiredBridge(await servedLinkBridge(await response.text(), entry));
 			const root = {
 				listeners: new Map<string, unknown>(),
 				addEventListener(name: string, listener: unknown) {
