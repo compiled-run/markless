@@ -39,7 +39,10 @@ export function registerServedArmEventRecords(
 		readonly startAnchor: ResumeAsyncBoundaryPayload['startAnchor'];
 		readonly endAnchor: ResumeAsyncBoundaryPayload['endAnchor'];
 		readonly servedArmRecords?: unknown;
+		readonly armRecords?: ReadonlyArray<ServedBranchArm>;
 	}> = [],
+	// The arm a plain branch painted, read off the values the mount seeded.
+	paintedArm?: (branch: (typeof branches)[number]) => number | undefined,
 ): void {
 	let comments: ReadonlyArray<ResumeDomComment> | undefined;
 	const ranges: Array<{
@@ -65,6 +68,25 @@ export function registerServedArmEventRecords(
 				armRecords,
 			});
 	}
+	for (const branch of branches) {
+		const arm = branch.servedArmRecords ? undefined : paintedArm?.(branch);
+		const events = arm === undefined ? undefined : branch.armRecords?.[arm]?.events;
+		if (!events?.length) continue;
+		comments ??= pageCommentCensus(root);
+		const end = comments[branch.endAnchor.index];
+		const armNodes: SiblingNode[] = [];
+		for (
+			let node = (comments[branch.startAnchor.index] as SiblingNode | undefined)?.nextSibling;
+			node && node !== end;
+			node = node.nextSibling
+		)
+			armNodes.push(node);
+		for (const record of events) {
+			let host: ResumeDomNode | undefined = armNodes[record.hostPath[0]!];
+			for (const index of record.hostPath.slice(1)) host = host?.childNodes?.[index];
+			if (host?.nodeType === 1) register(host, { hostNodeId: '', ...record });
+		}
+	}
 	for (const range of ranges) {
 		comments ??= pageCommentCensus(root);
 		const startAnchor = comments[range.startAnchor.index];
@@ -81,6 +103,16 @@ export function registerServedArmEventRecords(
 		}
 	}
 }
+
+type SiblingNode = ResumeDomNode & { readonly nextSibling?: SiblingNode | null };
+
+type ServedBranchArm = {
+	readonly events?: ReadonlyArray<
+		Omit<ResumeArmRecordSet['events'][number], 'hostNodeId'> & {
+			readonly hostPath: ReadonlyArray<number>;
+		}
+	>;
+};
 
 function pageCommentCensus(root: ResumeDomElement): ReadonlyArray<ResumeDomComment> {
 	// Arm-branch anchors index in their boundary's own census, never here.
