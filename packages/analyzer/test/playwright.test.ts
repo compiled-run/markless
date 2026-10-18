@@ -29,17 +29,13 @@ describe('Playwright adapter', () => {
 			declaredApi: [],
 			phase: 'action',
 		});
-		const timer = setInterval(() => {
-			const request = {
-				method: () => 'GET',
-				url: () => 'https://app.test/api/poll',
-				resourceType: () => 'fetch',
-			};
-			page.emit('request', request);
-			page.emit('requestfinished', request);
-		}, 5);
+		// A request that never finishes keeps the network busy without racing timers against the quiet window.
+		page.emit('request', {
+			method: () => 'GET',
+			url: () => 'https://app.test/api/poll',
+			resourceType: () => 'fetch',
+		});
 		const failure = await ledger.waitForQuiet(10, 40);
-		clearInterval(timer);
 		expect(failure).toMatch(/network never went quiet/);
 		ledger.detach();
 	});
