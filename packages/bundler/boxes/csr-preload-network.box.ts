@@ -1,4 +1,6 @@
 import { box } from '@async/witness';
+import { marklessBuildManifestPath } from '../src/build/build-manifests.ts';
+import { MARKLESS_BUNDLE_GRAPH } from '../src/build/chunking.ts';
 import { planModulePreloadUrls } from '../src/build/preload-plan.ts';
 import type { MarklessBundleGraph } from '../src/types.ts';
 import {
@@ -17,7 +19,7 @@ import { unpackedFixture } from './unpacked-fixture.ts';
 const FIXTURE = 'fixtures/vite-csr-preloader';
 const COUNTER = '[data-counter]';
 const CSR_ROUTE = '/';
-const BUNDLE_GRAPH_REQUEST = '/build/bundle-graph.json';
+const BUNDLE_GRAPH = marklessBuildManifestPath(`${FIXTURE}/dist`, MARKLESS_BUNDLE_GRAPH);
 const WAIT = { timeoutMs: 10_000 };
 const MIN_CSR_PRELOAD_COUNT = 4;
 const SLOW_NETWORK = {
@@ -50,7 +52,7 @@ export default box(
 			}),
 		});
 		const expectedPreloadHrefs = expectedCsrPreloadHrefs(
-			JSON.parse(await preview.request(BUNDLE_GRAPH_REQUEST)) as MarklessBundleGraph,
+			JSON.parse((await build.artifact(BUNDLE_GRAPH)).text) as MarklessBundleGraph,
 		);
 		const page = await preview.browser.visit(CSR_ROUTE, {
 			networkConditions: SLOW_NETWORK,

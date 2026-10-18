@@ -36,7 +36,7 @@ import {
 	symbolVirtualModuleSourceFile,
 } from '@markless/bundler/preload';
 import {
-	MARKLESS_BUILD_METADATA_FILES,
+	MARKLESS_PUBLIC_BUILD_METADATA_FILES,
 	MARKLESS_BUILD_PREFIX,
 	MARKLESS_IMPORT_MAP_ASSET,
 	importMapScript,
@@ -646,7 +646,7 @@ function createNitroConfig(
 					headers: { 'cache-control': 'public, max-age=31536000, immutable' },
 				},
 				...Object.fromEntries(
-					MARKLESS_BUILD_METADATA_FILES.map((file) => [
+					MARKLESS_PUBLIC_BUILD_METADATA_FILES.map((file) => [
 						`/${file}`,
 						{ headers: { 'cache-control': 'public, max-age=0, must-revalidate' } },
 					]),

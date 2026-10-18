@@ -4,6 +4,8 @@ import { promisify } from 'node:util';
 import { resolve } from 'pathe';
 import { afterAll, expect, test } from 'vitest';
 import { nativePackingPlugins } from '../src/build/native-packing.ts';
+import { marklessBuildManifestPath } from '../src/build/build-manifests.ts';
+import { MARKLESS_INTERACTION_CLOSURES } from '../src/build/chunking.ts';
 
 const exec = promisify(execFile);
 const fixture = resolve(import.meta.dirname, '../fixtures/vite-ssr');
@@ -19,7 +21,7 @@ test('a real counter build names the click handler and its dispatch runtime in t
 		{ cwd: fixture },
 	);
 	const asset = JSON.parse(
-		await readFile(resolve(outDir, 'build/interaction-closures.json'), 'utf8'),
+		await readFile(marklessBuildManifestPath(outDir, MARKLESS_INTERACTION_CLOSURES), 'utf8'),
 	) as {
 		partition: string;
 		routes: { route: string; fallback?: string; consumers: Consumer[] }[];

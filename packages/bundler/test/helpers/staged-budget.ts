@@ -6,6 +6,7 @@ import { gzipSync } from 'node:zlib';
 import { resolve } from 'pathe';
 import { MARKLESS_BUILD_PREFIX, MARKLESS_BUNDLE_GRAPH } from '../../src/build/chunking.ts';
 import { MARKLESS_EXECUTION_SIZES } from '../../src/build/execution-sizes.ts';
+import { marklessBuildManifestPath } from '../../src/build/build-manifests.ts';
 import { parseBundleGraph, type ParsedBundleGraphRecord } from '../../src/build/preload-plan.ts';
 import type { MarklessBundleGraph } from '../../src/types.ts';
 import { startBuiltServer as startNitroServer } from '../../../../scripts/test-utils/built-server.ts';
@@ -196,7 +197,7 @@ export type ClientBuildArtifacts = {
 
 export async function readClientBuildArtifacts(publicDir: string): Promise<ClientBuildArtifacts> {
 	const sizes = JSON.parse(
-		await readFile(resolve(publicDir, MARKLESS_EXECUTION_SIZES), 'utf8'),
+		await readFile(marklessBuildManifestPath(publicDir, MARKLESS_EXECUTION_SIZES), 'utf8'),
 	) as Record<string, { readonly chunk?: string; readonly instrument?: true }>;
 	const aggregateChunks = [
 		...new Set(
@@ -207,7 +208,7 @@ export async function readClientBuildArtifacts(publicDir: string): Promise<Clien
 	].sort();
 	const graph = parseBundleGraph(
 		JSON.parse(
-			await readFile(resolve(publicDir, MARKLESS_BUNDLE_GRAPH), 'utf8'),
+			await readFile(marklessBuildManifestPath(publicDir, MARKLESS_BUNDLE_GRAPH), 'utf8'),
 		) as MarklessBundleGraph,
 	);
 	return {

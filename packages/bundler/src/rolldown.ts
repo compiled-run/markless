@@ -5,7 +5,11 @@ import {
 	type LinkedModuleChildResolution,
 } from '@markless/compiler';
 import { clearParsedChunkCode } from './build/chunk-ast.ts';
-import { moveImportMapOutOfClientOutput } from './build/build-manifests.ts';
+import {
+	moveBuildMetadataOutOfClientOutput,
+	moveImportMapOutOfClientOutput,
+} from './build/build-manifests.ts';
+import { executionLogActivationInjection } from './execution-log.ts';
 import { outputDefaults } from './build/chunking.ts';
 import { nativePackingPlugins } from './build/native-packing.ts';
 import {
@@ -272,8 +276,13 @@ export function createMarklessRolldownPlugin(input: {
 				this.error(
 					`Markless emitted chunks that import specifiers its import map does not resolve to an emitted chunk: ${unmapped.join(', ')}. A plugin changed chunk code or file names after the Markless finalize pass. ${DEBUGGING_PLAYBOOK_HINT}`,
 				);
-			if (output.dir)
+			if (output.dir) {
 				await moveImportMapOutOfClientOutput(output.dir, MARKLESS_IMPORT_MAP_ASSET in bundle);
+				await moveBuildMetadataOutOfClientOutput(output.dir, new Set(Object.keys(bundle)), {
+					executionLogActive:
+						executionLogActivationInjection(internalOptions.executionLog) !== null,
+				});
+			}
 		},
 	} satisfies Plugin & { api: MarklessRolldownPluginApi };
 
@@ -292,12 +301,17 @@ export {
 	MARKLESS_BUILD_METADATA_FILES,
 	MARKLESS_BUNDLE_GRAPH,
 	MARKLESS_BUILD_PREFIX,
+	MARKLESS_PUBLIC_BUILD_METADATA_FILES,
 	outputDefaults,
 } from './build/chunking.ts';
 export { createBuildMetadata } from './build/build-metadata.ts';
 export { convertManifestToBundleGraph, createPreloadGraphAdder } from './build/bundle-graph.ts';
 export { collectHeadLinkInjections } from './build/head-links.ts';
-export { marklessBuildManifestDir, marklessImportMapPath } from './build/build-manifests.ts';
+export {
+	marklessBuildManifestDir,
+	marklessBuildManifestPath,
+	marklessImportMapPath,
+} from './build/build-manifests.ts';
 export {
 	MARKLESS_CHUNK_SPECIFIER_PREFIX,
 	MARKLESS_IMPORT_MAP_ASSET,

@@ -8,6 +8,8 @@ import {
 	writeMusicSsrReceipt,
 } from './analyzer/analyzer-gate.ts';
 import { musicSsrAnalyzerPolicy } from './analyzer/policy.ts';
+import { marklessBuildManifestPath } from '../../../packages/bundler/src/build/build-manifests.ts';
+import { MARKLESS_BYTE_ATTRIBUTION } from '../../../packages/bundler/src/build/chunking.ts';
 
 // Product truth: the SSR demo must serve the player page (no internal server
 // error) with branch comment anchors in the html, resume in the browser, and
@@ -142,7 +144,7 @@ export default box(
 		await expect.page.attribute(page, PLAY_TOGGLE, 'class', 'play active', WAIT);
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-command', 'play', WAIT);
 		const sizes = await servedExecutionSizes(preview);
-		receipt.note(`dev-log module rendered bytes: ${await devLogRenderedBytes(preview, sizes)}`);
+		receipt.note(`dev-log module rendered bytes: ${await devLogRenderedBytes(build, sizes)}`);
 		const firstPlay = await waitForLogInteractionAttribute(page, 1, sizes, WAIT);
 		receipt.note(
 			`first-Play charge: app ${firstPlay.app} B, framework ${firstPlay.framework} B, instrument ${firstPlay.instrument} B over ` +
@@ -153,7 +155,7 @@ export default box(
 				'The first Play click charged no modules; the ledger mirrored nothing.',
 			);
 		const afterClickScripts = await waitForQuietBuildJs(page);
-		const instrumentChunks = await executionLogChunkPaths(preview);
+		const instrumentChunks = await executionLogChunkPaths(build);
 		const lazyChunks = afterClickScripts.filter(
 			(path) => !startupScripts.includes(path) && !instrumentChunks.has(path),
 		);
@@ -373,15 +375,24 @@ async function servedExecutionSizes(preview: {
 	return sizes;
 }
 
-async function executionLogChunkPaths(preview: {
-	request(path: string): Promise<string>;
-}): Promise<ReadonlySet<string>> {
-	const attribution = JSON.parse(await preview.request('/build/byte-attribution.json')) as {
-		readonly chunks: Record<
-			string,
-			{ readonly modules: ReadonlyArray<[string, string, number]> }
-		>;
-	};
+type BuiltClient = {
+	readonly outDirs: Record<string, string>;
+	artifact(path: string): Promise<{ readonly text: string }>;
+};
+
+type ByteAttribution = {
+	readonly chunks: Record<string, { readonly modules: ReadonlyArray<[string, string, number]> }>;
+};
+
+async function builtByteAttribution(build: BuiltClient): Promise<ByteAttribution> {
+	const clientDir = build.outDirs.client;
+	if (!clientDir) throw new Error('Expected the build to report a client output directory.');
+	const file = marklessBuildManifestPath(clientDir, MARKLESS_BYTE_ATTRIBUTION);
+	return JSON.parse((await build.artifact(file)).text) as ByteAttribution;
+}
+
+async function executionLogChunkPaths(build: BuiltClient): Promise<ReadonlySet<string>> {
+	const attribution = await builtByteAttribution(build);
 	return new Set(
 		Object.entries(attribution.chunks)
 			.filter(([, chunk]) =>
@@ -391,17 +402,9 @@ async function executionLogChunkPaths(preview: {
 	);
 }
 
-async function devLogRenderedBytes(
-	preview: { request(path: string): Promise<string> },
-	sizes: ExecutionSizeMap,
-): Promise<number> {
+async function devLogRenderedBytes(build: BuiltClient, sizes: ExecutionSizeMap): Promise<number> {
 	const id = Object.entries(sizes).find(([, entry]) => entry?.instrument === true)?.[0];
-	const attribution = JSON.parse(await preview.request('/build/byte-attribution.json')) as {
-		readonly chunks: Record<
-			string,
-			{ readonly modules: ReadonlyArray<[string, string, number]> }
-		>;
-	};
+	const attribution = await builtByteAttribution(build);
 	let bytes = 0;
 	for (const chunk of Object.values(attribution.chunks))
 		for (const [, key, rendered] of chunk.modules) if (key === id) bytes += rendered;

@@ -9,6 +9,7 @@ import { resolve } from 'pathe';
 import { expect, test } from 'vitest';
 import { renderToString, type SsrRenderable } from '@markless/web';
 import { MARKLESS_BUNDLE_GRAPH } from '../src/build/chunking.ts';
+import { marklessBuildManifestPath } from '../src/build/build-manifests.ts';
 import { parseBundleGraph, planModulePreloadUrls } from '../src/build/preload-plan.ts';
 
 const exec = promisify(execFile);
@@ -92,7 +93,7 @@ test.each([false, true])(
 		expect(clientClosure).toMatch(/rootComponentName:[`"']WakeChild[`"']/);
 		if (!packing) expect(clientClosure).toContain('resumeFromPrerenderRecords');
 		const bundleGraph = JSON.parse(
-			await readFile(resolve(dist, MARKLESS_BUNDLE_GRAPH), 'utf8'),
+			await readFile(marklessBuildManifestPath(dist, MARKLESS_BUNDLE_GRAPH), 'utf8'),
 		) as Array<string | number>;
 
 		const ineligible = chunks.find((chunk) =>

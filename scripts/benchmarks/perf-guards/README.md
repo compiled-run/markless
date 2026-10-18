@@ -13,7 +13,7 @@ Ports 4221 (benchmark app) and 4222 (docs) must be free; `MARKLESS_PERF_GUARD_PO
 
 ## What is gated: framework overhead, never app size
 
-Adding application code must never fail a guard; only a heavier framework may. Every shipped byte is classified from the build's own `build/byte-attribution.json` (emitted by `@markless/bundler` from Rolldown's per-module rendered lengths):
+Adding application code must never fail a guard; only a heavier framework may. Every shipped byte is classified from the build's own `byte-attribution.json` (written to `.output/.markless/public/` by `@markless/bundler` from Rolldown's per-module rendered lengths):
 
 - **runtime**: modules of the framework runtime packages (`web`, `core`, `runtime`, `router`, `serializer`), keyed the way the compiler's demand maps name them (`web/resume-branches`).
 - **glue**: code the compiler and bundler generate around the app: resume, render-data and resolver modules, payload tables, loaders, and the wrapper bytes the bundler adds to each chunk.

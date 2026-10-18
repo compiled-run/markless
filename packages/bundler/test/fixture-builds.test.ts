@@ -3,6 +3,9 @@ import { mkdir, writeFile, readFile, readdir, rm } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { resolve } from 'pathe';
 import { describe, expect, test } from 'vitest';
+import { buildInternalFilesInPublicOutput } from '../../../scripts/test-utils/public-build-output.ts';
+import { marklessBuildManifestPath } from '../src/build/build-manifests.ts';
+import { MARKLESS_BUNDLE_GRAPH, MARKLESS_EXECUTION_SIZES } from '../src/build/chunking.ts';
 import { runtimeSizeReport } from '../test-support/runtime-size.ts';
 import {
 	acceptFixtureRuntime,
@@ -19,7 +22,7 @@ const fixtures = [
 	{
 		filter: '@fixtures/vite-csr',
 		outputs: ['packages/bundler/fixtures/vite-csr/dist'],
-		bundleGraph: 'packages/bundler/fixtures/vite-csr/dist/build/bundle-graph.json',
+		clientDir: 'packages/bundler/fixtures/vite-csr/dist',
 		symbols: ['symbol:0', 'symbol:1'],
 		runtimeBudget: {
 			dist: 'packages/bundler/fixtures/vite-csr/dist',
@@ -77,7 +80,7 @@ const fixtures = [
 	{
 		filter: '@fixtures/vite-ssr',
 		outputs: ['packages/bundler/fixtures/vite-ssr/dist'],
-		bundleGraph: 'packages/bundler/fixtures/vite-ssr/dist/build/bundle-graph.json',
+		clientDir: 'packages/bundler/fixtures/vite-ssr/dist',
 		symbols: ['symbol:0', 'symbol:1'],
 		runtimeBudget: {
 			dist: 'packages/bundler/fixtures/vite-ssr/dist',
@@ -91,7 +94,7 @@ const fixtures = [
 	{
 		filter: '@fixtures/vite-plus',
 		outputs: ['packages/bundler/fixtures/vite-plus/dist'],
-		bundleGraph: 'packages/bundler/fixtures/vite-plus/dist/build/bundle-graph.json',
+		clientDir: 'packages/bundler/fixtures/vite-plus/dist',
 		symbols: ['symbol:0'],
 		runtimeBudget: {
 			dist: 'packages/bundler/fixtures/vite-plus/dist',
@@ -140,7 +143,9 @@ const fixtures = [
 	{
 		filter: '@fixtures/rolldown-basic',
 		outputs: ['packages/bundler/fixtures/rolldown-basic/dist'],
-		bundleGraph: 'packages/bundler/fixtures/rolldown-basic/dist/client/build/bundle-graph.json',
+		clientDir: 'packages/bundler/fixtures/rolldown-basic/dist/client',
+		// The bare Rolldown plugin defaults the execution log to auto, so its size table stays served.
+		executionLogActive: true,
 		symbols: ['symbol:0', 'symbol:1'],
 	},
 ] as const;
@@ -167,9 +172,18 @@ describe('fixture builds', () => {
 			for (const output of fixture.outputs)
 				await expectNoMachinePathInOutput(resolve(root, output));
 
-			if ('bundleGraph' in fixture) {
+			if ('clientDir' in fixture) {
+				const clientDir = resolve(root, fixture.clientDir);
+				expect(
+					await buildInternalFilesInPublicOutput(clientDir, {
+						executionLogActive: 'executionLogActive' in fixture,
+					}),
+				).toEqual([]);
 				const graph = JSON.parse(
-					await readFile(resolve(root, fixture.bundleGraph), 'utf8'),
+					await readFile(
+						marklessBuildManifestPath(clientDir, MARKLESS_BUNDLE_GRAPH),
+						'utf8',
+					),
 				);
 				expect(graph).toEqual(expect.any(Array));
 				for (const symbol of fixture.symbols) {
@@ -274,7 +288,7 @@ type ExecutionSizeEntry = {
 
 async function expectNoAppChunkStaticallyImportsInstrumentChunk(dist: string): Promise<void> {
 	const sizes = JSON.parse(
-		await readFile(resolve(dist, 'build/execution-sizes.json'), 'utf8'),
+		await readFile(marklessBuildManifestPath(dist, MARKLESS_EXECUTION_SIZES), 'utf8'),
 	) as Record<string, ExecutionSizeEntry>;
 	const instrumentChunks = new Set(
 		Object.values(sizes)

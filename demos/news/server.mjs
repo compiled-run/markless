@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import { createServer } from 'node:http';
 import { planModulePreloadUrls } from '@markless/bundler/preload';
+import { MARKLESS_BUNDLE_GRAPH, marklessBuildManifestPath } from '@markless/bundler/rolldown';
 import path from 'node:path';
 
 const MIME = {
@@ -27,7 +28,7 @@ export async function createNewsServer({ clientDirectory, renderApp, port = 0 })
 	// modulepreload every module the first interaction needs, or that fetch
 	// lands in the action window and fails the sample (preload-integrity).
 	const bundleGraph = JSON.parse(
-		fs.readFileSync(path.join(buildDirectory, 'bundle-graph.json'), 'utf8'),
+		fs.readFileSync(marklessBuildManifestPath(clientRoot, MARKLESS_BUNDLE_GRAPH), 'utf8'),
 	);
 	const modulePreloads = planModulePreloadUrls({
 		bundleGraph,

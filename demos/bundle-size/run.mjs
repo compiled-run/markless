@@ -6,6 +6,7 @@ import { brotliCompressSync, constants as zlibConstants, gzipSync } from 'node:z
 import { build } from 'vite';
 
 import { BYTE_CATEGORY } from '../../packages/bundler/src/build/byte-attribution.ts';
+import { marklessBuildManifestPath } from '../../packages/bundler/src/build/build-manifests.ts';
 import {
 	MARKLESS_BUILD_PREFIX,
 	MARKLESS_BUNDLE_GRAPH,
@@ -151,7 +152,7 @@ async function buildAndMeasure(definition) {
 }
 
 function readBuildJson(outputDirectory, fileName) {
-	return JSON.parse(fs.readFileSync(path.join(outputDirectory, fileName), 'utf8'));
+	return JSON.parse(fs.readFileSync(marklessBuildManifestPath(outputDirectory, fileName), 'utf8'));
 }
 
 function withoutBuildPrefix(fileName) {

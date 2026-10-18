@@ -16,7 +16,10 @@ import {
 	MARKLESS_DEFERRED_PACK,
 	MARKLESS_NAVIGATION_PACK_PREFIX,
 } from '@markless/bundler/preload';
-import { MARKLESS_BUILD_METADATA_FILES, MARKLESS_BUILD_PREFIX } from '@markless/bundler/rolldown';
+import {
+	MARKLESS_PUBLIC_BUILD_METADATA_FILES,
+	MARKLESS_BUILD_PREFIX,
+} from '@markless/bundler/rolldown';
 import { router } from '../src/vite/index.ts';
 import { LINK_BRIDGE_DIR } from '../src/vite/runtime/link-bridge-module.ts';
 import { NAVIGATION_POLYFILL_MODULE } from '../src/navigation-polyfill.ts';
@@ -243,7 +246,7 @@ test('production Nitro config serves hashed Markless chunks immutable and fixed-
 	const immutable = { headers: { 'cache-control': 'public, max-age=31536000, immutable' } };
 	const revalidate = { headers: { 'cache-control': 'public, max-age=0, must-revalidate' } };
 	const metadata = Object.fromEntries(
-		MARKLESS_BUILD_METADATA_FILES.map((file) => [`/${file}`, revalidate]),
+		MARKLESS_PUBLIC_BUILD_METADATA_FILES.map((file) => [`/${file}`, revalidate]),
 	);
 	const nitroFor = (command: 'build' | 'serve', nitro: Record<string, unknown> = {}) => {
 		const [plugin] = flattenPlugins([router()]);

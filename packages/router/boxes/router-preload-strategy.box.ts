@@ -2,11 +2,13 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { box } from '@async/witness';
 import type { Plugin } from 'vite';
+import { MARKLESS_EXECUTION_SIZES } from '../../bundler/src/build/chunking.ts';
 import { NAVIGATION_POLYFILL_MODULE } from '../src/navigation-polyfill.ts';
 import { readClientAssetsManifest } from '../src/vite/client-assets-manifest.ts';
 import { isLinkBridgeModulePath } from '../src/vite/runtime/link-bridge-module.ts';
 import {
 	MARKLESS_CHUNK_SPECIFIER_PREFIX,
+	marklessBuildManifestPath,
 	marklessImportMapPath,
 } from '@markless/bundler/rolldown';
 
@@ -15,7 +17,6 @@ const NITRO_BUILD_DIR = 'node_modules/.nitro-router-preload-strategy';
 // Nitro previews import the server entry in-process, so each box needs its own entry path.
 const NITRO_OUTPUT_DIR = '.output/router-preload-strategy';
 const BUNDLE_GRAPH_REQUEST = '/build/bundle-graph.json';
-const EXECUTION_SIZES_REQUEST = '/build/execution-sizes.json';
 const INDEX_ROUTE = 'pages/index.tsrx';
 const DOCS_ROUTE = 'pages/docs/[...slug].mdx';
 const DOCS_PATH = '/docs/getting-started';
@@ -358,7 +359,7 @@ async function deliveryPlan(
 			`Expected landing preloads to leave out the navigation polyfill, saw: ${polyfillInLanding.join(', ')}`,
 		);
 	}
-	const observabilityHrefs = await observabilityChunkHrefs(chunks, preview);
+	const observabilityHrefs = await observabilityChunkHrefs(chunks);
 	return {
 		index,
 		docs,
@@ -587,12 +588,9 @@ function publicBuildPath(path: string): string | undefined {
 	return index === -1 || !path.endsWith('.js') ? undefined : path.slice(index);
 }
 
-async function observabilityChunkHrefs(
-	chunks: ReadonlyMap<string, string>,
-	preview: Preview,
-): Promise<string[]> {
+async function observabilityChunkHrefs(chunks: ReadonlyMap<string, string>): Promise<string[]> {
 	const hrefs = new Set<string>();
-	for (const [moduleId, entry] of Object.entries(await executionSizes(preview))) {
+	for (const [moduleId, entry] of Object.entries(await executionSizes())) {
 		if (
 			typeof entry?.chunk === 'string' &&
 			isObservabilityChunk(chunks, moduleId, entry.chunk)
@@ -614,17 +612,13 @@ async function observabilityChunkHrefs(
 	return [...hrefs].sort();
 }
 
-async function executionSizes(
-	preview: Preview,
-): Promise<Record<string, { readonly chunk?: string }>> {
-	try {
-		return JSON.parse(await preview.request(EXECUTION_SIZES_REQUEST)) as Record<
-			string,
-			{ readonly chunk?: string }
-		>;
-	} catch {
-		return {};
-	}
+async function executionSizes(): Promise<Record<string, { readonly chunk?: string }>> {
+	const file = marklessBuildManifestPath(
+		`${FIXTURE}/${NITRO_OUTPUT_DIR}/public`,
+		MARKLESS_EXECUTION_SIZES,
+	);
+	if (!existsSync(file)) return {};
+	return JSON.parse(await readFile(file, 'utf8')) as Record<string, { readonly chunk?: string }>;
 }
 
 function isObservabilityChunk(

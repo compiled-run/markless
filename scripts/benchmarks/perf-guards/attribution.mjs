@@ -1,10 +1,11 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { isAbsolute, join, relative } from 'node:path';
+import { isAbsolute, relative } from 'node:path';
 import {
 	MARKLESS_BUILD_PREFIX,
 	MARKLESS_BYTE_ATTRIBUTION,
 	MARKLESS_EXECUTION_DEMAND,
 } from '../../../packages/bundler/src/build/chunking.ts';
+import { marklessBuildManifestPath } from '../../../packages/bundler/src/build/build-manifests.ts';
 import { CARRIES_UNLISTED_RECORDS } from '../../../packages/bundler/src/build/undemanded-runtime.ts';
 import { RUNTIME_CAPABILITY_MODULE_IDS } from '../../../packages/compiler/src/passes/runtime-demand-map.ts';
 
@@ -13,7 +14,7 @@ const UNATTRIBUTED = 'unattributed';
 const RUNTIME = CATEGORIES[0];
 
 export function readBuildJson(publicDir, asset) {
-	const file = join(publicDir, asset);
+	const file = marklessBuildManifestPath(publicDir, asset);
 	return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : null;
 }
 

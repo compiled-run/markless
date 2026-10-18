@@ -29,6 +29,8 @@ import {
 	undemandedRuntimeModules,
 } from './attribution.mjs';
 import { measureConstructGlue } from './construct-glue.mjs';
+import { marklessBuildManifestPath } from '../../../packages/bundler/src/build/build-manifests.ts';
+import { MARKLESS_EXECUTION_DEMAND } from '../../../packages/bundler/src/build/chunking.ts';
 import { LEAN_DISPATCH_MARKER_MODULES } from '../../../packages/compiler/src/lean-dispatch-modules.ts';
 import {
 	BENCH_APP_DIR,
@@ -228,7 +230,9 @@ export function actionPath(action) {
 }
 
 async function leanActions(publicDir, served, browser, origin) {
-	const demand = JSON.parse(readFileSync(join(publicDir, 'build/execution-demand.json'), 'utf8'));
+	const demand = JSON.parse(
+		readFileSync(marklessBuildManifestPath(publicDir, MARKLESS_EXECUTION_DEMAND), 'utf8'),
+	);
 	const out = {};
 	for (const [route, source] of Object.entries(BENCH_ROUTE_SOURCES)) {
 		const entry = Object.entries(demand).find(([id]) =>

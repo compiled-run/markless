@@ -1,11 +1,13 @@
 import { box } from '@async/witness';
+import { marklessBuildManifestPath } from '../src/build/build-manifests.ts';
+import { MARKLESS_BUILD_METADATA_FILES, MARKLESS_BUNDLE_GRAPH } from '../src/build/chunking.ts';
 
 // Product truth: a production Vite build of the CSR fixture must emit the
 // bundle graph and lazy symbol chunks through the
 // real Vite/Rolldown pipeline. Dev-only HMR wiring must not leak into those
 // production artifacts.
 const FIXTURE = 'fixtures/vite-csr';
-const BUNDLE_GRAPH = `${FIXTURE}/dist/build/bundle-graph.json`;
+const BUNDLE_GRAPH = marklessBuildManifestPath(`${FIXTURE}/dist`, MARKLESS_BUNDLE_GRAPH);
 const INDEX = `${FIXTURE}/dist/index.html`;
 const FORBIDDEN_DEV_STRINGS = [
 	'virtual:markless-dev-client',
@@ -31,7 +33,16 @@ export default box(
 
 		await expect.build.environment(build, 'client');
 		await expect.build.artifact(build, INDEX);
-		await expect.build.artifact(build, BUNDLE_GRAPH);
+		await expect.artifact.exists(build, BUNDLE_GRAPH);
+		const published = build.artifacts
+			.map((artifact) => artifact.path)
+			.filter((path) =>
+				MARKLESS_BUILD_METADATA_FILES.some((file) => path === `${FIXTURE}/dist/${file}`),
+			);
+		if (published.length > 0)
+			throw new Error(
+				`Expected build metadata outside the served output, but found ${published.join(', ')}`,
+			);
 
 		await expect.artifact.json(await build.artifact(BUNDLE_GRAPH), (json) => {
 			return (

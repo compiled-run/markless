@@ -10,6 +10,22 @@ version of everything else.
 
 This file starts at 0.2.0. Earlier versions have no changelog entries.
 
+## Unreleased
+
+### Build output
+
+0.5.0 said build manifests had moved out of the folder your host serves, but
+only the import map had. `bundle-graph.json`, `byte-attribution.json`,
+`execution-demand.json`, `execution-sizes.json` and `interaction-closures.json`
+were still published under `build/` (for a router app, in `.output/public/build/`).
+They now live in the `.markless/` folder next to your build output, for example
+`.output/.markless/public/` or `.markless/dist/`. The one exception is
+`execution-sizes.json`: when the in-page execution log can turn on
+(`executionLog: 'auto'` or `'always'`), a copy stays in `build/` because the log
+fetches it. Production Vite builds default to `executionLog: 'never'`, so they
+publish none of these files. If a script of yours read them from `build/`, read
+them from `.markless/` instead.
+
 ## 0.5.0
 
 **TLDR:** links navigate without reloading the page, saved `storage()` state

@@ -9,7 +9,7 @@ export const MARKLESS_EXECUTION_SIZES = `${MARKLESS_BUILD_PREFIX}execution-sizes
 export const MARKLESS_EXECUTION_DEMAND = `${MARKLESS_BUILD_PREFIX}execution-demand.json`;
 export const MARKLESS_INTERACTION_CLOSURES = `${MARKLESS_BUILD_PREFIX}interaction-closures.json`;
 export const MARKLESS_BYTE_ATTRIBUTION = `${MARKLESS_BUILD_PREFIX}byte-attribution.json`;
-// Fixed-name build metadata under the public build prefix: its bytes change every build, so hosts must revalidate it.
+// Fixed-name build metadata: written beside the client output, never inside the directory a host serves.
 export const MARKLESS_BUILD_METADATA_FILES = [
 	MARKLESS_BUNDLE_GRAPH,
 	MARKLESS_EXECUTION_SIZES,
@@ -17,6 +17,8 @@ export const MARKLESS_BUILD_METADATA_FILES = [
 	MARKLESS_INTERACTION_CLOSURES,
 	MARKLESS_BYTE_ATTRIBUTION,
 ] as const;
+// The in-page execution log fetches this one, so it also stays served (and revalidated) while the log can activate.
+export const MARKLESS_PUBLIC_BUILD_METADATA_FILES = [MARKLESS_EXECUTION_SIZES] as const;
 
 // Progressive runtime execution (specs/framework/06-runtime-resumer.md): each web
 // runtime capability chunks separately so an action never executes untouched

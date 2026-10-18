@@ -2,7 +2,11 @@ import { readdir, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { renderToString, type SsrRenderable } from '@markless/core';
-import { marklessImportMapPath } from '../../../src/build/build-manifests.ts';
+import {
+	marklessBuildManifestPath,
+	marklessImportMapPath,
+} from '../../../src/build/build-manifests.ts';
+import { MARKLESS_BUNDLE_GRAPH } from '../../../src/build/chunking.ts';
 import { importMapScript } from '../../../src/build/content-hash-names.ts';
 import { planModulePreloads, type ModulePreloadRoot } from '../../../src/build/preload-plan.ts';
 import type { MarklessBundleGraph } from '../../../src/types.ts';
@@ -240,7 +244,7 @@ async function readClientResumeModuleUrl(dist: string) {
 
 async function readBundleGraph(dist: string): Promise<MarklessBundleGraph | undefined> {
 	return JSON.parse(
-		await readFile(resolve(dist, 'build/bundle-graph.json'), 'utf8'),
+		await readFile(marklessBuildManifestPath(dist, MARKLESS_BUNDLE_GRAPH), 'utf8'),
 	) as MarklessBundleGraph;
 }
 

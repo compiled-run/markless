@@ -1,5 +1,7 @@
 import { gzipSync } from 'node:zlib';
 import { box } from '@async/witness';
+import { marklessBuildManifestPath } from '../../bundler/src/build/build-manifests.ts';
+import { MARKLESS_BUNDLE_GRAPH } from '../../bundler/src/build/chunking.ts';
 import { planModulePreloadUrls } from '../../bundler/src/build/preload-plan.ts';
 import type { MarklessBundleGraph } from '../../bundler/src/types.ts';
 import { EVENT_ONLY_RESUMER_TARGET_BYTES } from '../../../poc/fixtures/proofs/resumer-script/src/resumer-source.mjs';
@@ -11,7 +13,10 @@ import { invalidateRouterAnalyzerReceipt, writeRouterAnalyzerReceipt } from './a
 const FIXTURE = 'fixtures/router';
 const NITRO_BUILD_DIR = 'node_modules/.nitro-router-preview';
 const NITRO_OUTPUT_DIR = '.output-router-preview';
-const BUNDLE_GRAPH_REQUEST = '/build/bundle-graph.json';
+const BUNDLE_GRAPH = marklessBuildManifestPath(
+	`${FIXTURE}/${NITRO_OUTPUT_DIR}/public`,
+	MARKLESS_BUNDLE_GRAPH,
+);
 const COUNTER = 'button';
 const DOCS_LINK = 'a[data-markless-router-link]';
 const BACK_BUTTON = '[data-router-back]';
@@ -48,7 +53,7 @@ export default box(
 			const indexHtml = await preview.request('/');
 			const inlineResumerGzip = assertInlineResumerBudget(indexHtml);
 			const expectedPreloadHrefs = expectedInteractionPreloadHrefs(
-				JSON.parse(await preview.request(BUNDLE_GRAPH_REQUEST)) as MarklessBundleGraph,
+				JSON.parse((await build.artifact(BUNDLE_GRAPH)).text) as MarklessBundleGraph,
 				indexHtml,
 			);
 			await expect.html.contains(indexHtml, '<h1>Markless Router</h1>');

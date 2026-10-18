@@ -3,6 +3,8 @@ import { readdir, readFile, rm } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { resolve } from 'pathe';
 import { expect, test } from 'vitest';
+import { marklessBuildManifestPath } from '../src/build/build-manifests.ts';
+import { MARKLESS_EXECUTION_SIZES } from '../src/build/chunking.ts';
 import { withDemoBuildLock } from './helpers/demo-build-lock.ts';
 
 const exec = promisify(execFile);
@@ -45,7 +47,7 @@ async function buildOnce() {
 
 	const chunkNames = (await readdir(build)).filter((name) => name.endsWith('.js')).sort();
 	const sizes = JSON.parse(
-		await readFile(resolve(build, 'execution-sizes.json'), 'utf8'),
+		await readFile(marklessBuildManifestPath(dist, MARKLESS_EXECUTION_SIZES), 'utf8'),
 	) as Record<string, { readonly chunk?: string }>;
 	const byChunk = new Map<string, string[]>();
 	for (const [id, entry] of Object.entries(sizes)) {

@@ -1,10 +1,12 @@
 import { box } from '@async/witness';
+import { marklessBuildManifestPath } from '../src/build/build-manifests.ts';
+import { MARKLESS_BUNDLE_GRAPH } from '../src/build/chunking.ts';
 
 // Product truth: the Vite plugin also has to work when consumed through a
 // vite-plus config, matching the repo's preferred tooling surface.
 const FIXTURE = 'fixtures/vite-plus';
 const INDEX = `${FIXTURE}/dist/index.html`;
-const BUNDLE_GRAPH = `${FIXTURE}/dist/build/bundle-graph.json`;
+const BUNDLE_GRAPH = marklessBuildManifestPath(`${FIXTURE}/dist`, MARKLESS_BUNDLE_GRAPH);
 const DASHBOARD = '[data-dashboard]';
 const WAIT = { timeoutMs: 10_000 };
 
@@ -45,7 +47,7 @@ export default box(
 
 		await expect.build.environment(build, 'client');
 		await expect.build.artifact(build, INDEX);
-		await expect.build.artifact(build, BUNDLE_GRAPH);
+		await expect.artifact.exists(build, BUNDLE_GRAPH);
 		await expect.artifact.text(build, INDEX, { contains: '/build/chunk-' });
 		await expect.artifact.json(await build.artifact(BUNDLE_GRAPH), (json) => {
 			return Array.isArray(json) && json.includes('symbol:0');

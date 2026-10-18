@@ -1,4 +1,6 @@
 import { box } from '@async/witness';
+import { marklessBuildManifestPath } from '../src/build/build-manifests.ts';
+import { MARKLESS_BUNDLE_GRAPH } from '../src/build/chunking.ts';
 import { planModulePreloads } from '../src/build/preload-plan.ts';
 import { runtimeSizeReport, type RuntimeSizeReport } from '../test-support/runtime-size.ts';
 import type { MarklessBundleGraph } from '../src/types.ts';
@@ -11,7 +13,7 @@ import { unpackedFixture } from './unpacked-fixture.ts';
 const FIXTURE = 'fixtures/vite-csr';
 const DIST = `${FIXTURE}/dist`;
 const INDEX = `${FIXTURE}/dist/index.html`;
-const BUNDLE_GRAPH_REQUEST = '/build/bundle-graph.json';
+const BUNDLE_GRAPH = marklessBuildManifestPath(DIST, MARKLESS_BUNDLE_GRAPH);
 const COUNTER = '[data-counter]';
 const REQUESTS = '/__markless-fixture-requests';
 const WAIT = { timeoutMs: 10_000 };
@@ -70,7 +72,7 @@ export default box(
 		});
 		const page = await preview.browser.visit('/');
 		const expectedPreloadHrefs = expectedCsrPreloadHrefs(
-			JSON.parse(await preview.request(BUNDLE_GRAPH_REQUEST)) as MarklessBundleGraph,
+			JSON.parse((await build.artifact(BUNDLE_GRAPH)).text) as MarklessBundleGraph,
 		);
 		receipt.note(`CSR expected lazy symbol modulepreloads: ${expectedPreloadHrefs.join(', ')}`);
 

@@ -41,12 +41,6 @@ export const bundlerAnalyzerPolicy = {
 	network: {
 		'vite-csr-preloader': [
 			{ method: 'GET', origin: 'fixture', path: '/', reason: 'fixture document' },
-			{
-				method: 'GET',
-				origin: 'fixture',
-				path: '/build/bundle-graph.json',
-				reason: 'fixture-owned preload manifest',
-			},
 			{ method: 'GET', origin: 'fixture', path: BUILD_MODULE, reason: 'built module' },
 		],
 		'vite-ssr-preloader': [

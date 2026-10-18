@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import { createServer } from 'node:http';
 import path from 'node:path';
 import { planModulePreloadUrls } from '@markless/bundler/preload';
+import { MARKLESS_BUNDLE_GRAPH, marklessBuildManifestPath } from '@markless/bundler/rolldown';
 
 const MIME = {
 	'.css': 'text/css; charset=utf-8',
@@ -19,7 +20,7 @@ export async function createAsyncWaterfallServer({ clientDirectory, renderApp, p
 		.filter((name) => name.endsWith('.js'))
 		.find((name) => fs.readFileSync(path.join(buildDirectory, name), 'utf8').includes('resumeContainerEvent'));
 	if (!resumeAsset) throw new Error('async-waterfall client build contains no resume entry chunk');
-	const bundleGraph = JSON.parse(fs.readFileSync(path.join(buildDirectory, 'bundle-graph.json'), 'utf8'));
+	const bundleGraph = JSON.parse(fs.readFileSync(marklessBuildManifestPath(clientRoot, MARKLESS_BUNDLE_GRAPH), 'utf8'));
 	const modulePreloads = planModulePreloadUrls({ bundleGraph, roots: [resumeAsset], base: '/build/' });
 	const resumeModuleUrl = '/build/' + resumeAsset;
 	const server = createServer(async (request, response) => {

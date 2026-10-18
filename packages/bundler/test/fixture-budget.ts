@@ -2,6 +2,8 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'pathe';
 import { runtimeModuleSizes } from '../../../scripts/benchmarks/perf-guards/attribution.mjs';
 import { BUDGETS } from '../../../scripts/benchmarks/perf-guards/config.mjs';
+import { marklessBuildManifestPath } from '../src/build/build-manifests.ts';
+import { MARKLESS_BYTE_ATTRIBUTION } from '../src/build/chunking.ts';
 import type { RuntimeSizeReport } from '../test-support/runtime-size.ts';
 
 export type RuntimeBudget = {
@@ -82,7 +84,9 @@ export function runtimeModuleOverruns(
 
 export function fixtureRuntimeModules(dist: string): Record<string, number> {
 	return runtimeModuleSizes(
-		JSON.parse(readFileSync(resolve(dist, 'build/byte-attribution.json'), 'utf8')),
+		JSON.parse(
+			readFileSync(marklessBuildManifestPath(dist, MARKLESS_BYTE_ATTRIBUTION), 'utf8'),
+		),
 	);
 }
 

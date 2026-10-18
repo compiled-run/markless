@@ -1,7 +1,9 @@
 import { box } from '@async/witness';
+import { marklessBuildManifestPath } from '../../bundler/src/build/build-manifests.ts';
+import { MARKLESS_BUNDLE_GRAPH } from '../../bundler/src/build/chunking.ts';
 
 const FIXTURE = 'fixtures/router-docs';
-const BUNDLE_GRAPH = `${FIXTURE}/.output/public/build/bundle-graph.json`;
+const BUNDLE_GRAPH = marklessBuildManifestPath(`${FIXTURE}/.output/public`, MARKLESS_BUNDLE_GRAPH);
 
 export default box(
 	{
@@ -20,7 +22,7 @@ export default box(
 
 		await expect.build.environment(build, 'client');
 		await expect.build.environment(build, 'ssr');
-		await expect.build.artifact(build, BUNDLE_GRAPH);
+		await expect.artifact.exists(build, BUNDLE_GRAPH);
 
 		const preview = await pipeline.preview(build, {
 			config: (config) => ({
