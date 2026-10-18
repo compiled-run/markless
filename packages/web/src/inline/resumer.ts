@@ -1111,10 +1111,12 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 	}
 	const dispatch = (event: Event) => {
 		let policyApplied = false;
+		// The press-time path, so a target an earlier listener took out still reaches its host; a replayed early event has none.
+		const path = (event.composedPath?.() || []) as Element[];
 		for (
-			let element = event.target as Element | null;
+			let index = 0, element = event.target as Element | null;
 			element;
-			element = element.parentElement
+			element = path[++index] || element.parentElement
 		) {
 			if (__MARKLESS_INLINE_SYNC_POLICY__ && !policyApplied) {
 				const policyEvent = policyEvents.get(

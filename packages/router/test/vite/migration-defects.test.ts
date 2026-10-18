@@ -230,6 +230,67 @@ test('a click on a link a foreign script redraws reaches its container handler, 
 	await page.close();
 });
 
+// The same redraw from a capture-phase listener runs before Markless sees the press at all.
+async function drawForeignLinksRedrawnInCapture(
+	page: Page,
+	redrawn: '[data-favourites]' | '[data-panel]',
+) {
+	await page.evaluate((redrawn) => {
+		const list = document.querySelector<HTMLElement>('[data-favourites]')!;
+		const markup =
+			'<p><a href="#article" data-fav><img alt="" width="20" height="20" data-fav-img></a></p>';
+		list.innerHTML = markup;
+		document.addEventListener(
+			'click',
+			(event) => {
+				if (!(event.target as Element).closest?.('[data-fav]')) return;
+				event.preventDefault();
+				const element = document.querySelector<HTMLElement>(redrawn)!;
+				element.innerHTML = element === list ? markup : element.innerHTML;
+			},
+			true,
+		);
+	}, redrawn);
+}
+
+for (const [gesture, press] of [
+	['a click on the image', (page: Page) => page.click('[data-fav-img]')],
+	[
+		'Enter on the link',
+		async (page: Page) => {
+			await page.focus('[data-fav]');
+			await page.keyboard.press('Enter');
+		},
+	],
+] as const) {
+	test(`${gesture} a capture listener redraws reaches its container handler, cold and warm`, async () => {
+		const { page, errors } = await open('/foreign-links-capture');
+		await drawForeignLinksRedrawnInCapture(page, '[data-favourites]');
+		await press(page);
+		await page.waitForTimeout(100);
+		expect(errors).toEqual([]);
+		await expect.poll(() => text(page, '[data-opened]')).toBe('1');
+		await press(page);
+		await expect.poll(() => text(page, '[data-opened]')).toBe('2');
+		expect(errors).toEqual([]);
+		await page.close();
+	});
+
+	test(`${gesture} a capture listener redraws with the container's ancestor does not throw`, async () => {
+		const { page, errors } = await open('/foreign-links-capture');
+		await page.click('[data-like]');
+		await expect.poll(() => text(page, '[data-like]')).toBe('1');
+		await drawForeignLinksRedrawnInCapture(page, '[data-panel]');
+		await press(page);
+		await page.waitForTimeout(100);
+		expect(errors).toEqual([]);
+		await page.click('[data-like]');
+		await expect.poll(() => text(page, '[data-like]')).toBe('2');
+		expect(errors).toEqual([]);
+		await page.close();
+	});
+}
+
 test('a computed that reads another computed follows both after resume', async () => {
 	const { page, errors } = await open('/computed-chain');
 	const items = () => page.locator('[data-window] li').allTextContents();

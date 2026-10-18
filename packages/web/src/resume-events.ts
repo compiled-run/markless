@@ -481,6 +481,8 @@ export function createEventWiring(input: {
 			!attached && !rowAnchor && pressHost && containsElement(input.root, pressHost)
 				? pressHost
 				: undefined;
+		// The host itself went with the redraw: nothing on the page is left to run.
+		if (!attached && !rowAnchor && pressHost && !pressAnchor) return;
 		if (!attached && !ignoredDisposed && !rowAnchor && !pressAnchor)
 			throw unmatchedDispatchError(event, selector);
 		const bubbles = event.bubbles !== false;

@@ -88,6 +88,7 @@ export type ResumeDomEvent = {
 	readonly bubbles?: boolean;
 	readonly preventDefault?: () => void;
 	readonly stopPropagation?: () => void;
+	readonly composedPath?: () => ReadonlyArray<ResumeDomElement>;
 	// The nearest host with a record when the browser dispatched the event, kept by the queue that received it.
 	__marklessPressHost?: ResumeDomElement;
 };

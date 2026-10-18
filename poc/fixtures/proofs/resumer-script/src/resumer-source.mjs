@@ -28,6 +28,8 @@ export const EVENT_ONLY_RESUMER_ATTRIBUTION = {
 	shellCensus: 10,
 	// Paired OXC builds measured 1,229 -> 1,298: the boot flags a page a script outside Markless changed before it woke and forwards its events unmatched; the resume module finds each host under its served parent.
 	foreignDomCensus: 69,
+	// Paired OXC builds measured 1,298 -> 1,312: the press walks the path the browser built, so a target an earlier listener took out still reaches its host.
+	pressTimePath: 14,
 	gzipCrossTerm: 3,
 };
 

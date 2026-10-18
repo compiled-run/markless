@@ -391,15 +391,18 @@ function installDelegatedTriggers(
 			let actionKind: ProtocolEventActionKind | undefined = rowEventNames.has(event.type)
 				? PROTOCOL_EVENT_ACTION_KIND.event
 				: undefined;
+			// The press-time path: an earlier listener may already have taken the target out.
+			const path = event.composedPath?.() || [];
 			for (
-				let element = event.target;
+				let index = 0, element = event.target;
 				element && !actionKind;
-				element = element.parentElement ?? null
+				element = path[++index] || element.parentElement || null
 			) {
 				const record = recordsByElement.get(element)?.get(event.type);
 				if (record) {
 					actionKind = protocolEventActionKind(record);
 					named = true;
+					event.__marklessPressHost ??= element;
 					// The browser reads defaultPrevented when this dispatch returns,
 					// and the handler module is still being fetched then.
 					if (record.syncPolicy && actionKind === PROTOCOL_EVENT_ACTION_KIND.event) {

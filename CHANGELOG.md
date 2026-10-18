@@ -26,6 +26,15 @@ fetches it. Production Vite builds default to `executionLog: 'never'`, so they
 publish none of these files. If a script of yours read them from `build/`, read
 them from `.markless/` instead.
 
+### Fixes
+
+- A click (or Enter on a link) whose target a capture-phase `document`
+  listener redraws before Markless sees it now runs the handler of the
+  Markless element it was inside, instead of being dropped or logging
+  `MARKLESS_EVENT_DISPATCH_UNMATCHED`. The 0.5.0 fix covered only a redraw
+  from a bubbling listener. A redraw that also removes that Markless element
+  no longer reports an error either.
+
 ## 0.5.0
 
 **TLDR:** links navigate without reloading the page, saved `storage()` state
