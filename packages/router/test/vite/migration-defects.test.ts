@@ -450,3 +450,30 @@ test('an @if arm holding imported components with constant props flips between t
 	expect(errors).toEqual([]);
 	await page.close();
 });
+
+test.each(['inline', 'computed', 'state', 'same-module'])(
+	'a child keyed list driven by a changing prop adds rows (%s)',
+	async (variant) => {
+		const { page, errors } = await open(`/grow/${variant}`);
+		const names = () => page.locator('main li').allTextContents();
+		expect(await names()).toEqual(['Ada', 'Brian']);
+		await page.click('[data-more]');
+		await expect.poll(names).toEqual(['Ada', 'Brian', 'Cleo']);
+		await page.click('[data-more]');
+		await expect.poll(names).toEqual(['Ada', 'Brian', 'Cleo', 'Dora']);
+		expect(errors).toEqual([]);
+		await page.close();
+	},
+);
+
+test('an imported keyed list fed a filtered computed inserts rows between server-rendered ones', async () => {
+	const { page, errors } = await open('/grow/alternate');
+	const labels = () => page.locator('[data-strip] p').allTextContents();
+	expect(await labels()).toEqual(['seven', 'nine']);
+	await page.click('[data-lower]');
+	await expect.poll(labels).toEqual(['seven', 'three', 'nine']);
+	await page.click('[data-lower]');
+	await expect.poll(labels).toEqual(['seven', 'three', 'nine', 'one']);
+	expect(errors).toEqual([]);
+	await page.close();
+});
