@@ -8,70 +8,70 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 		builtWith: 'Next.js 16',
 		access: 'source',
 		signIn: true,
-		status: 'live',
-		checkedAt: '2026-10-17T14:05:16.864Z',
-		pagesGreen: 30,
+		status: 'in-progress',
+		checkedAt: '2026-10-18T02:32:23.728Z',
+		pagesGreen: 22,
 		pagesChecked: 30,
 		routes: [
 			{
 				pattern: '/',
 				kind: 'page',
-				switched: true,
+				switched: false,
 				forcedReason: null,
 				rows: [
 					{
 						role: 'anonymous',
 						pages: 1,
 						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
+						checksPassed: 14,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: {
 							before: {
-								min: 140967,
-								max: 140967,
+								min: 152680,
+								max: 152680,
 							},
 							after: {
-								min: 128577,
-								max: 128577,
+								min: 57167,
+								max: 57167,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 170773,
-								max: 170773,
+								min: 200584,
+								max: 200584,
 							},
 							after: {
-								min: 467,
-								max: 467,
+								min: 4954,
+								max: 4954,
 							},
 						},
 					},
 					{
 						role: 'signed-in',
 						pages: 1,
-						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
-						redChecks: [],
+						green: 0,
+						checksPassed: 11,
+						checksTotal: 14,
+						redChecks: ['a11y', 'behaviour', 'responsiveness'],
 						downloaded: {
 							before: {
-								min: 140657,
-								max: 140657,
+								min: 152258,
+								max: 152258,
 							},
 							after: {
-								min: 203795,
-								max: 203795,
+								min: 121935,
+								max: 121935,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 212831,
-								max: 212831,
+								min: 244813,
+								max: 244813,
 							},
 							after: {
-								min: 467,
-								max: 467,
+								min: 5899,
+								max: 5899,
 							},
 						},
 					},
@@ -80,62 +80,62 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			{
 				pattern: '/dashboard',
 				kind: 'page',
-				switched: true,
+				switched: false,
 				forcedReason: null,
 				rows: [
 					{
 						role: 'anonymous',
 						pages: 1,
 						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
+						checksPassed: 14,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: {
 							before: {
-								min: 132739,
-								max: 132739,
+								min: 143765,
+								max: 143765,
 							},
 							after: {
-								min: 162774,
-								max: 162774,
+								min: 51966,
+								max: 51966,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 154580,
-								max: 154580,
+								min: 179095,
+								max: 179095,
 							},
 							after: {
-								min: 1191,
-								max: 1191,
+								min: 2551,
+								max: 2551,
 							},
 						},
 					},
 					{
 						role: 'signed-in',
 						pages: 1,
-						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
-						redChecks: [],
+						green: 0,
+						checksPassed: 11,
+						checksTotal: 14,
+						redChecks: ['a11y', 'behaviour', 'responsiveness'],
 						downloaded: {
 							before: {
-								min: 140657,
-								max: 140657,
+								min: 152258,
+								max: 152258,
 							},
 							after: {
-								min: 203795,
-								max: 203795,
+								min: 121854,
+								max: 121854,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 214809,
-								max: 214809,
+								min: 244469,
+								max: 244469,
 							},
 							after: {
-								min: 467,
-								max: 467,
+								min: 5899,
+								max: 5899,
 							},
 						},
 					},
@@ -144,62 +144,62 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			{
 				pattern: '/dashboard/customers',
 				kind: 'page',
-				switched: true,
+				switched: false,
 				forcedReason: null,
 				rows: [
 					{
 						role: 'anonymous',
 						pages: 1,
 						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
+						checksPassed: 14,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: {
 							before: {
-								min: 132739,
-								max: 132739,
+								min: 143788,
+								max: 143788,
 							},
 							after: {
-								min: 162774,
-								max: 162774,
+								min: 51944,
+								max: 51944,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 152469,
-								max: 152469,
+								min: 179095,
+								max: 179095,
 							},
 							after: {
-								min: 1191,
-								max: 1191,
+								min: 2551,
+								max: 2551,
 							},
 						},
 					},
 					{
 						role: 'signed-in',
 						pages: 1,
-						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
-						redChecks: [],
+						green: 0,
+						checksPassed: 12,
+						checksTotal: 14,
+						redChecks: ['behaviour', 'responsiveness'],
 						downloaded: {
 							before: {
-								min: 147242,
-								max: 147242,
+								min: 159944,
+								max: 159944,
 							},
 							after: {
-								min: 265716,
-								max: 265716,
+								min: 121974,
+								max: 121974,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 202242,
-								max: 202242,
+								min: 231874,
+								max: 231874,
 							},
 							after: {
-								min: 1233,
-								max: 1233,
+								min: 7916,
+								max: 7916,
 							},
 						},
 					},
@@ -208,126 +208,126 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			{
 				pattern: '/dashboard/invoices',
 				kind: 'page',
-				switched: true,
+				switched: false,
 				forcedReason: null,
 				rows: [
 					{
 						role: 'anonymous',
 						pages: 1,
 						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
+						checksPassed: 14,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: {
 							before: {
-								min: 132739,
-								max: 132739,
+								min: 143767,
+								max: 143767,
 							},
 							after: {
-								min: 162774,
-								max: 162774,
+								min: 51965,
+								max: 51965,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 152469,
-								max: 152469,
+								min: 179095,
+								max: 179095,
 							},
 							after: {
-								min: 1191,
-								max: 1191,
+								min: 2551,
+								max: 2551,
 							},
 						},
 					},
 					{
 						role: 'signed-in',
 						pages: 1,
-						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
-						redChecks: [],
+						green: 0,
+						checksPassed: 12,
+						checksTotal: 14,
+						redChecks: ['behaviour', 'responsiveness'],
 						downloaded: {
 							before: {
-								min: 150718,
-								max: 150718,
+								min: 163786,
+								max: 163786,
 							},
 							after: {
-								min: 370737,
-								max: 370737,
+								min: 144654,
+								max: 144654,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 256007,
-								max: 256007,
+								min: 288248,
+								max: 288248,
 							},
 							after: {
-								min: 1247,
-								max: 1247,
+								min: 10269,
+								max: 10269,
 							},
 						},
 					},
 				],
 			},
 			{
-				pattern: '/dashboard/invoices/:id/edit',
+				pattern: '/dashboard/invoices/043d764b-105c-4385-86b8-3af9692b27bb/edit',
 				kind: 'page',
-				switched: true,
+				switched: false,
 				forcedReason: null,
 				rows: [
 					{
 						role: 'anonymous',
 						pages: 1,
 						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
+						checksPassed: 14,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: {
 							before: {
-								min: 132739,
-								max: 132739,
+								min: 143783,
+								max: 143783,
 							},
 							after: {
-								min: 162774,
-								max: 162774,
+								min: 51920,
+								max: 51920,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 152570,
-								max: 152570,
+								min: 179126,
+								max: 179126,
 							},
 							after: {
-								min: 1191,
-								max: 1191,
+								min: 2551,
+								max: 2551,
 							},
 						},
 					},
 					{
 						role: 'signed-in',
 						pages: 1,
-						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
-						redChecks: [],
+						green: 0,
+						checksPassed: 12,
+						checksTotal: 14,
+						redChecks: ['a11y', 'behaviour'],
 						downloaded: {
 							before: {
-								min: 143512,
-								max: 143512,
+								min: 155726,
+								max: 155726,
 							},
 							after: {
-								min: 308356,
-								max: 308356,
+								min: 140452,
+								max: 140452,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 186909,
-								max: 186909,
+								min: 217564,
+								max: 217564,
 							},
 							after: {
-								min: 1229,
-								max: 1229,
+								min: 8559,
+								max: 8559,
 							},
 						},
 					},
@@ -336,62 +336,62 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			{
 				pattern: '/dashboard/invoices/create',
 				kind: 'page',
-				switched: true,
+				switched: false,
 				forcedReason: null,
 				rows: [
 					{
 						role: 'anonymous',
 						pages: 1,
 						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
+						checksPassed: 14,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: {
 							before: {
-								min: 132739,
-								max: 132739,
+								min: 143812,
+								max: 143812,
 							},
 							after: {
-								min: 162774,
-								max: 162774,
+								min: 51983,
+								max: 51983,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 152570,
-								max: 152570,
+								min: 179089,
+								max: 179089,
 							},
 							after: {
-								min: 1191,
-								max: 1191,
+								min: 2551,
+								max: 2551,
 							},
 						},
 					},
 					{
 						role: 'signed-in',
 						pages: 1,
-						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
-						redChecks: [],
+						green: 0,
+						checksPassed: 11,
+						checksTotal: 14,
+						redChecks: ['a11y', 'behaviour', 'responsiveness'],
 						downloaded: {
 							before: {
-								min: 143473,
-								max: 143473,
+								min: 155612,
+								max: 155612,
 							},
 							after: {
-								min: 288494,
-								max: 288494,
+								min: 136738,
+								max: 136738,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 183414,
-								max: 183414,
+								min: 213475,
+								max: 213475,
 							},
 							after: {
-								min: 1229,
-								max: 1229,
+								min: 8443,
+								max: 8443,
 							},
 						},
 					},
@@ -400,62 +400,62 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			{
 				pattern: '/login',
 				kind: 'page',
-				switched: true,
+				switched: false,
 				forcedReason: null,
 				rows: [
 					{
 						role: 'anonymous',
 						pages: 1,
 						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
+						checksPassed: 14,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: {
 							before: {
-								min: 132739,
-								max: 132739,
+								min: 143764,
+								max: 143764,
 							},
 							after: {
-								min: 162774,
-								max: 162774,
+								min: 51941,
+								max: 51941,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 152483,
-								max: 152483,
+								min: 179140,
+								max: 179140,
 							},
 							after: {
-								min: 1191,
-								max: 1191,
+								min: 2551,
+								max: 2551,
 							},
 						},
 					},
 					{
 						role: 'signed-in',
 						pages: 1,
-						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
-						redChecks: [],
+						green: 0,
+						checksPassed: 11,
+						checksTotal: 14,
+						redChecks: ['a11y', 'behaviour', 'responsiveness'],
 						downloaded: {
 							before: {
-								min: 140657,
-								max: 140657,
+								min: 152366,
+								max: 152366,
 							},
 							after: {
-								min: 203795,
-								max: 203795,
+								min: 121917,
+								max: 121917,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 216262,
-								max: 216262,
+								min: 245007,
+								max: 245007,
 							},
 							after: {
-								min: 467,
-								max: 467,
+								min: 5899,
+								max: 5899,
 							},
 						},
 					},
@@ -472,7 +472,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 1,
 						green: 1,
 						checksPassed: 13,
-						checksTotal: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: null,
 						runAtLoad: null,
@@ -482,7 +482,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 1,
 						green: 1,
 						checksPassed: 13,
-						checksTotal: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: null,
 						runAtLoad: null,
@@ -491,8 +491,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			},
 			{
 				pattern: '/dashboard/',
-				kind: 'slash-redirect',
-				switched: true,
+				kind: 'page',
+				switched: false,
 				forcedReason: null,
 				rows: [
 					{
@@ -500,7 +500,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 1,
 						green: 1,
 						checksPassed: 13,
-						checksTotal: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: null,
 						runAtLoad: null,
@@ -510,7 +510,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 1,
 						green: 1,
 						checksPassed: 13,
-						checksTotal: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: null,
 						runAtLoad: null,
@@ -519,8 +519,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			},
 			{
 				pattern: '/dashboard/customers/',
-				kind: 'slash-redirect',
-				switched: true,
+				kind: 'page',
+				switched: false,
 				forcedReason: null,
 				rows: [
 					{
@@ -528,7 +528,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 1,
 						green: 1,
 						checksPassed: 13,
-						checksTotal: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: null,
 						runAtLoad: null,
@@ -538,7 +538,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 1,
 						green: 1,
 						checksPassed: 13,
-						checksTotal: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: null,
 						runAtLoad: null,
@@ -547,8 +547,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			},
 			{
 				pattern: '/dashboard/invoices/',
-				kind: 'slash-redirect',
-				switched: true,
+				kind: 'page',
+				switched: false,
 				forcedReason: null,
 				rows: [
 					{
@@ -556,7 +556,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 1,
 						green: 1,
 						checksPassed: 13,
-						checksTotal: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: null,
 						runAtLoad: null,
@@ -566,7 +566,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 1,
 						green: 1,
 						checksPassed: 13,
-						checksTotal: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: null,
 						runAtLoad: null,
@@ -574,9 +574,9 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 				],
 			},
 			{
-				pattern: '/dashboard/invoices/:id/edit/',
-				kind: 'slash-redirect',
-				switched: true,
+				pattern: '/dashboard/invoices/043d764b-105c-4385-86b8-3af9692b27bb/edit/',
+				kind: 'page',
+				switched: false,
 				forcedReason: null,
 				rows: [
 					{
@@ -584,7 +584,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 1,
 						green: 1,
 						checksPassed: 13,
-						checksTotal: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: null,
 						runAtLoad: null,
@@ -594,7 +594,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 1,
 						green: 1,
 						checksPassed: 13,
-						checksTotal: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: null,
 						runAtLoad: null,
@@ -603,8 +603,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			},
 			{
 				pattern: '/dashboard/invoices/create/',
-				kind: 'slash-redirect',
-				switched: true,
+				kind: 'page',
+				switched: false,
 				forcedReason: null,
 				rows: [
 					{
@@ -612,7 +612,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 1,
 						green: 1,
 						checksPassed: 13,
-						checksTotal: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: null,
 						runAtLoad: null,
@@ -622,7 +622,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 1,
 						green: 1,
 						checksPassed: 13,
-						checksTotal: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: null,
 						runAtLoad: null,
@@ -631,8 +631,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			},
 			{
 				pattern: '/login/',
-				kind: 'slash-redirect',
-				switched: true,
+				kind: 'page',
+				switched: false,
 				forcedReason: null,
 				rows: [
 					{
@@ -640,7 +640,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 1,
 						green: 1,
 						checksPassed: 13,
-						checksTotal: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: null,
 						runAtLoad: null,
@@ -650,7 +650,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 1,
 						green: 1,
 						checksPassed: 13,
-						checksTotal: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: null,
 						runAtLoad: null,
@@ -668,54 +668,54 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 1,
 						green: 1,
 						checksPassed: 13,
-						checksTotal: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: {
 							before: {
-								min: 130455,
-								max: 130455,
+								min: 141183,
+								max: 141183,
 							},
 							after: {
-								min: 112074,
-								max: 112074,
+								min: 45128,
+								max: 45128,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 139573,
-								max: 139573,
+								min: 166289,
+								max: 166289,
 							},
 							after: {
-								min: 467,
-								max: 467,
+								min: 454,
+								max: 454,
 							},
 						},
 					},
 					{
 						role: 'signed-in',
 						pages: 1,
-						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
-						redChecks: [],
+						green: 0,
+						checksPassed: 11,
+						checksTotal: 14,
+						redChecks: ['a11y', 'behaviour', 'responsiveness'],
 						downloaded: {
 							before: {
-								min: 140657,
-								max: 140657,
+								min: 152337,
+								max: 152337,
 							},
 							after: {
-								min: 203795,
-								max: 203795,
+								min: 121960,
+								max: 121960,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 216447,
-								max: 216447,
+								min: 246407,
+								max: 246407,
 							},
 							after: {
-								min: 467,
-								max: 467,
+								min: 5899,
+								max: 5899,
 							},
 						},
 					},
@@ -767,8 +767,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			},
 			{
 				name: 'a11y',
-				passed: 30,
-				failed: 0,
+				passed: 24,
+				failed: 6,
 				skipped: 0,
 			},
 			{
@@ -779,8 +779,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			},
 			{
 				name: 'behaviour',
-				passed: 30,
-				failed: 0,
+				passed: 22,
+				failed: 8,
 				skipped: 0,
 			},
 			{
@@ -801,13 +801,14 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 				failed: 0,
 				skipped: 0,
 			},
-		],
-		switchedWithoutCheck: [
 			{
-				route: '/api/*rest',
-				reason: 'Endpoints only the new app has (login, logout, the search lists, invoice writes); the switched pages call them from their scripts. The old app serves nothing under /api.',
+				name: 'responsiveness',
+				passed: 8,
+				failed: 7,
+				skipped: 15,
 			},
 		],
+		switchedWithoutCheck: [],
 		accepted: [
 			{
 				reason: 'Next.js mounts an empty route announcer (<next-route-announcer>, role=alert, aria-live=assertive) on every page to announce client-side navigations. The Markless port navigates with document loads, which assistive tech announces itself, so it has no announcer.',
@@ -826,22 +827,6 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 				],
 			},
 			{
-				reason: 'Markless modulepreloads the render data of every component a page could re-render (component statics plus absolute source paths), so it downloads more than Next on signed-in pages (for example /dashboard/invoices 151 kB to 369 kB uncompressed) while running far less at load (255 kB to 1.2 kB). Not reducible from app code beyond what was done (one module per icon and skeleton, static dashboard without async boundaries); logged as Markless limitation 15.',
-				by: "Claude Code (converting agent), per the owner's brief",
-				count: 14,
-				checks: ['weight'],
-				routes: [
-					'/dashboard',
-					'/dashboard/customers',
-					'/dashboard/invoices',
-					'/dashboard/invoices/043d764b-105c-4385-86b8-3af9692b27bb/edit',
-					'/dashboard/invoices/create',
-					'/login',
-					'/',
-					'/markless-migrate-no-such-page',
-				],
-			},
-			{
 				reason: 'Same as the invoices search: Next refetches the page as an RSC payload; Markless reads the customers from a JSON endpoint.',
 				by: "Claude Code (converting agent), per the owner's brief",
 				count: 1,
@@ -855,28 +840,154 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 				checks: ['behaviour'],
 				routes: ['/dashboard/invoices'],
 			},
+		],
+		red: [
 			{
-				reason: 'Next posts the form to the page as a server action (multipart fields 1_$ACTION_*, 1_amount, 1_customerId, 1_status). Markless has no server actions, so the form posts the same three fields to an API endpoint; validation messages, the redirect to /dashboard/invoices and the database write match.',
-				by: "Claude Code (converting agent), per the owner's brief",
+				route: '/',
+				check: 'behaviour',
 				count: 2,
-				checks: ['a11y', 'behaviour'],
-				routes: ['/dashboard/invoices/043d764b-105c-4385-86b8-3af9692b27bb/edit'],
+				example: 'click link "Acme": focus on body',
 			},
 			{
-				reason: 'Next posts the form to the page as a server action; Markless posts the same fields to an API endpoint. The validation messages shown and the form reset after a failed action match.',
-				by: "Claude Code (converting agent), per the owner's brief",
+				route: '/',
+				check: 'a11y',
+				count: 1,
+				example: 'press Enter on link "Acme": focus on body',
+			},
+			{
+				route: '/',
+				check: 'responsiveness',
 				count: 2,
-				checks: ['a11y', 'behaviour'],
-				routes: ['/dashboard/invoices/create'],
+				example:
+					'first interaction with link "Acme" (desktop): new 52 ms (runs 52 ms, 52 ms); likely cause: waits on 2 data fetches: /dashboard/customers, /dashboard; first-inte',
+			},
+			{
+				route: '/dashboard',
+				check: 'behaviour',
+				count: 2,
+				example: 'click link "Acme": focus on body',
+			},
+			{
+				route: '/dashboard',
+				check: 'a11y',
+				count: 1,
+				example: 'press Enter on link "Acme": focus on body',
+			},
+			{
+				route: '/dashboard',
+				check: 'responsiveness',
+				count: 1,
+				example:
+					'first interaction with link "Acme" (desktop): new 55 ms (runs 55 ms, 51 ms); likely cause: waits on 2 data fetches: /dashboard/customers, /dashboard; first-inte',
+			},
+			{
+				route: '/dashboard/customers',
+				check: 'behaviour',
+				count: 1,
+				example:
+					'not exercised: button "Sign Out": its name looks destructive (sign out, delete...), so check does not use it',
+			},
+			{
+				route: '/dashboard/customers',
+				check: 'responsiveness',
+				count: 1,
+				example:
+					'first interaction with textbox "Search customers..." (4x CPU, mobile): new 478 ms (runs 478 ms, 474 ms); likely cause: waits on 1 data fetch: /api/data/customer',
+			},
+			{
+				route: '/dashboard/invoices',
+				check: 'behaviour',
+				count: 7,
+				example:
+					'not exercised: button "Sign Out": its name looks destructive (sign out, delete...), so check does not use it',
+			},
+			{
+				route: '/dashboard/invoices',
+				check: 'responsiveness',
+				count: 3,
+				example:
+					'first interaction with textbox "Search invoices..." (4x CPU, mobile): new 492 ms (runs 492 ms, 485 ms); likely cause: waits on 1 data fetch: /api/data/invoices?',
+			},
+			{
+				route: '/dashboard/invoices/043d764b-105c-4385-86b8-3af9692b27bb/edit',
+				check: 'a11y',
+				count: 1,
+				example:
+					'press Enter on button "Edit Invoice": appears: (nothing); disappears: (nothing); requests: would POST /api/invoices/043d764b-105c-4385-86b8-3af9692b27bb {amount',
+			},
+			{
+				route: '/dashboard/invoices/043d764b-105c-4385-86b8-3af9692b27bb/edit',
+				check: 'behaviour',
+				count: 2,
+				example:
+					'fill spinbutton "Choose an amount" and submit with button "Edit Invoice": appears: - spinbutton "Choose an amount": "42"; disappears: - spinbutton "Choose an am',
+			},
+			{
+				route: '/dashboard/invoices/create',
+				check: 'a11y',
+				count: 1,
+				example:
+					'press Enter on button "Create Invoice": appears: (nothing); disappears: (nothing); requests: would POST /api/invoices {amount}; console errors: Unexpected end o',
+			},
+			{
+				route: '/dashboard/invoices/create',
+				check: 'behaviour',
+				count: 2,
+				example:
+					'fill spinbutton "Choose an amount" and submit with button "Create Invoice": appears: - spinbutton "Choose an amount": "42"; disappears: - spinbutton "Choose an ',
+			},
+			{
+				route: '/dashboard/invoices/create',
+				check: 'responsiveness',
+				count: 1,
+				example:
+					'navigation from link "Create Invoice" (4x CPU, mobile): new 166 ms (runs 131 ms, 166 ms); likely cause: no single cause seen: the handler itself is slower; slow',
+			},
+			{
+				route: '/login',
+				check: 'behaviour',
+				count: 2,
+				example: 'click link "Acme": focus on body',
+			},
+			{
+				route: '/login',
+				check: 'a11y',
+				count: 1,
+				example: 'press Enter on link "Acme": focus on body',
+			},
+			{
+				route: '/login',
+				check: 'responsiveness',
+				count: 2,
+				example:
+					'first interaction with link "Acme" (desktop): new 51 ms (runs 48 ms, 51 ms); likely cause: waits on 2 data fetches: /dashboard/customers, /dashboard; first-inte',
+			},
+			{
+				route: '/markless-migrate-no-such-page',
+				check: 'behaviour',
+				count: 2,
+				example: 'click link "Acme": focus on body',
+			},
+			{
+				route: '/markless-migrate-no-such-page',
+				check: 'a11y',
+				count: 1,
+				example: 'press Enter on link "Acme": focus on body',
+			},
+			{
+				route: '/markless-migrate-no-such-page',
+				check: 'responsiveness',
+				count: 2,
+				example:
+					'first interaction with link "Acme" (desktop): new 49 ms (runs 49 ms, 48 ms); likely cause: waits on 2 data fetches: /dashboard/customers, /dashboard; first-inte',
 			},
 		],
-		red: [],
 		gaps: [],
 		downloadedBasis: 'On the wire during the check, as the servers it compared sent it',
 		headline: {
 			route: '/',
-			before: 170773,
-			after: 467,
+			before: 200584,
+			after: 4954,
 		},
 		links: {
 			frontDoor: 'https://mm-next-dashboard.vercel.app',
@@ -896,9 +1007,9 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 		builtWith: 'Remix 2',
 		access: 'source',
 		signIn: true,
-		status: 'live',
-		checkedAt: '2026-10-17T14:07:50.468Z',
-		pagesGreen: 26,
+		status: 'in-progress',
+		checkedAt: '2026-10-18T04:41:42.283Z',
+		pagesGreen: 23,
 		pagesChecked: 26,
 		routes: [
 			{
@@ -911,17 +1022,17 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						role: 'anonymous',
 						pages: 1,
 						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
+						checksPassed: 14,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: {
 							before: {
-								min: 90529,
-								max: 90529,
+								min: 93724,
+								max: 93724,
 							},
 							after: {
-								min: 205944,
-								max: 205944,
+								min: 66659,
+								max: 66659,
 							},
 						},
 						runAtLoad: {
@@ -930,8 +1041,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 								max: 92517,
 							},
 							after: {
-								min: 1159,
-								max: 1159,
+								min: 6979,
+								max: 6979,
 							},
 						},
 					},
@@ -939,17 +1050,17 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						role: 'signed-in',
 						pages: 1,
 						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
+						checksPassed: 14,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: {
 							before: {
-								min: 90529,
-								max: 90529,
+								min: 93768,
+								max: 93768,
 							},
 							after: {
-								min: 205944,
-								max: 205944,
+								min: 65479,
+								max: 65479,
 							},
 						},
 						runAtLoad: {
@@ -958,8 +1069,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 								max: 92912,
 							},
 							after: {
-								min: 1159,
-								max: 1159,
+								min: 6766,
+								max: 6766,
 							},
 						},
 					},
@@ -975,17 +1086,17 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						role: 'anonymous',
 						pages: 1,
 						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
+						checksPassed: 14,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: {
 							before: {
-								min: 89884,
-								max: 89884,
+								min: 93232,
+								max: 93232,
 							},
 							after: {
-								min: 138749,
-								max: 138749,
+								min: 61646,
+								max: 61646,
 							},
 						},
 						runAtLoad: {
@@ -994,8 +1105,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 								max: 92315,
 							},
 							after: {
-								min: 1235,
-								max: 1235,
+								min: 7140,
+								max: 7140,
 							},
 						},
 					},
@@ -1003,17 +1114,17 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						role: 'signed-in',
 						pages: 1,
 						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
+						checksPassed: 14,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: {
 							before: {
-								min: 90529,
-								max: 90529,
+								min: 93751,
+								max: 93751,
 							},
 							after: {
-								min: 205944,
-								max: 205944,
+								min: 65535,
+								max: 65535,
 							},
 						},
 						runAtLoad: {
@@ -1022,8 +1133,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 								max: 92912,
 							},
 							after: {
-								min: 1159,
-								max: 1159,
+								min: 6766,
+								max: 6766,
 							},
 						},
 					},
@@ -1039,17 +1150,17 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						role: 'anonymous',
 						pages: 1,
 						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
+						checksPassed: 14,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: {
 							before: {
-								min: 89961,
-								max: 89961,
+								min: 93313,
+								max: 93313,
 							},
 							after: {
-								min: 139915,
-								max: 139915,
+								min: 61584,
+								max: 61584,
 							},
 						},
 						runAtLoad: {
@@ -1058,8 +1169,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 								max: 92669,
 							},
 							after: {
-								min: 1235,
-								max: 1235,
+								min: 7139,
+								max: 7139,
 							},
 						},
 					},
@@ -1067,17 +1178,17 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						role: 'signed-in',
 						pages: 1,
 						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
+						checksPassed: 14,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: {
 							before: {
-								min: 90529,
-								max: 90529,
+								min: 93733,
+								max: 93733,
 							},
 							after: {
-								min: 205944,
-								max: 205944,
+								min: 65532,
+								max: 65532,
 							},
 						},
 						runAtLoad: {
@@ -1086,8 +1197,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 								max: 92912,
 							},
 							after: {
-								min: 1159,
-								max: 1159,
+								min: 6766,
+								max: 6766,
 							},
 						},
 					},
@@ -1096,24 +1207,24 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			{
 				pattern: '/notes',
 				kind: 'page',
-				switched: true,
+				switched: false,
 				forcedReason: null,
 				rows: [
 					{
 						role: 'anonymous',
 						pages: 1,
 						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
+						checksPassed: 14,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: {
 							before: {
-								min: 89961,
-								max: 89961,
+								min: 93318,
+								max: 93318,
 							},
 							after: {
-								min: 139915,
-								max: 139915,
+								min: 61594,
+								max: 61594,
 							},
 						},
 						runAtLoad: {
@@ -1122,26 +1233,26 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 								max: 92752,
 							},
 							after: {
-								min: 1235,
-								max: 1235,
+								min: 7139,
+								max: 7139,
 							},
 						},
 					},
 					{
 						role: 'signed-in',
 						pages: 1,
-						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
-						redChecks: [],
+						green: 0,
+						checksPassed: 12,
+						checksTotal: 14,
+						redChecks: ['behaviour', 'responsiveness'],
 						downloaded: {
 							before: {
-								min: 89996,
-								max: 89996,
+								min: 93493,
+								max: 93493,
 							},
 							after: {
-								min: 186987,
-								max: 186987,
+								min: 73843,
+								max: 73843,
 							},
 						},
 						runAtLoad: {
@@ -1150,34 +1261,34 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 								max: 92195,
 							},
 							after: {
-								min: 1195,
-								max: 1195,
+								min: 8405,
+								max: 8405,
 							},
 						},
 					},
 				],
 			},
 			{
-				pattern: '/notes/:noteId',
+				pattern: '/notes/cmvcee9oe0002ag8afyyiylz8',
 				kind: 'page',
-				switched: true,
+				switched: false,
 				forcedReason: null,
 				rows: [
 					{
 						role: 'anonymous',
 						pages: 1,
 						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
+						checksPassed: 14,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: {
 							before: {
-								min: 89961,
-								max: 89961,
+								min: 93287,
+								max: 93287,
 							},
 							after: {
-								min: 139915,
-								max: 139915,
+								min: 61632,
+								max: 61632,
 							},
 						},
 						runAtLoad: {
@@ -1186,26 +1297,26 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 								max: 92752,
 							},
 							after: {
-								min: 1235,
-								max: 1235,
+								min: 7139,
+								max: 7139,
 							},
 						},
 					},
 					{
 						role: 'signed-in',
 						pages: 1,
-						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
-						redChecks: [],
+						green: 0,
+						checksPassed: 12,
+						checksTotal: 14,
+						redChecks: ['behaviour', 'responsiveness'],
 						downloaded: {
 							before: {
-								min: 90162,
-								max: 90162,
+								min: 93665,
+								max: 93665,
 							},
 							after: {
-								min: 208707,
-								max: 208707,
+								min: 73870,
+								max: 73870,
 							},
 						},
 						runAtLoad: {
@@ -1214,8 +1325,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 								max: 92853,
 							},
 							after: {
-								min: 1199,
-								max: 1199,
+								min: 8409,
+								max: 8409,
 							},
 						},
 					},
@@ -1224,24 +1335,24 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			{
 				pattern: '/notes/new',
 				kind: 'page',
-				switched: true,
+				switched: false,
 				forcedReason: null,
 				rows: [
 					{
 						role: 'anonymous',
 						pages: 1,
 						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
+						checksPassed: 14,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: {
 							before: {
-								min: 89961,
-								max: 89961,
+								min: 93286,
+								max: 93286,
 							},
 							after: {
-								min: 139915,
-								max: 139915,
+								min: 61633,
+								max: 61633,
 							},
 						},
 						runAtLoad: {
@@ -1250,26 +1361,26 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 								max: 92752,
 							},
 							after: {
-								min: 1235,
-								max: 1235,
+								min: 7139,
+								max: 7139,
 							},
 						},
 					},
 					{
 						role: 'signed-in',
 						pages: 1,
-						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
-						redChecks: [],
+						green: 0,
+						checksPassed: 12,
+						checksTotal: 14,
+						redChecks: ['behaviour', 'responsiveness'],
 						downloaded: {
 							before: {
-								min: 90354,
-								max: 90354,
+								min: 93857,
+								max: 93857,
 							},
 							after: {
-								min: 207145,
-								max: 207145,
+								min: 73936,
+								max: 73936,
 							},
 						},
 						runAtLoad: {
@@ -1278,8 +1389,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 								max: 94749,
 							},
 							after: {
-								min: 1378,
-								max: 1378,
+								min: 8515,
+								max: 8515,
 							},
 						},
 					},
@@ -1296,7 +1407,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 1,
 						green: 1,
 						checksPassed: 13,
-						checksTotal: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: null,
 						runAtLoad: null,
@@ -1306,7 +1417,91 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 1,
 						green: 1,
 						checksPassed: 13,
-						checksTotal: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/notes/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/notes/cmvcee9oe0002ag8afyyiylz8/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/notes/new/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: null,
 						runAtLoad: null,
@@ -1324,7 +1519,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 1,
 						green: 1,
 						checksPassed: 13,
-						checksTotal: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: null,
 						runAtLoad: null,
@@ -1334,7 +1529,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 1,
 						green: 1,
 						checksPassed: 13,
-						checksTotal: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: null,
 						runAtLoad: null,
@@ -1352,7 +1547,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 1,
 						green: 1,
 						checksPassed: 13,
-						checksTotal: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: null,
 						runAtLoad: null,
@@ -1362,91 +1557,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 1,
 						green: 1,
 						checksPassed: 13,
-						checksTotal: 13,
-						redChecks: [],
-						downloaded: null,
-						runAtLoad: null,
-					},
-				],
-			},
-			{
-				pattern: '/notes/',
-				kind: 'slash-redirect',
-				switched: true,
-				forcedReason: null,
-				rows: [
-					{
-						role: 'anonymous',
-						pages: 1,
-						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
-						redChecks: [],
-						downloaded: null,
-						runAtLoad: null,
-					},
-					{
-						role: 'signed-in',
-						pages: 1,
-						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
-						redChecks: [],
-						downloaded: null,
-						runAtLoad: null,
-					},
-				],
-			},
-			{
-				pattern: '/notes/:noteId/',
-				kind: 'slash-redirect',
-				switched: true,
-				forcedReason: null,
-				rows: [
-					{
-						role: 'anonymous',
-						pages: 1,
-						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
-						redChecks: [],
-						downloaded: null,
-						runAtLoad: null,
-					},
-					{
-						role: 'signed-in',
-						pages: 1,
-						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
-						redChecks: [],
-						downloaded: null,
-						runAtLoad: null,
-					},
-				],
-			},
-			{
-				pattern: '/notes/new/',
-				kind: 'slash-redirect',
-				switched: true,
-				forcedReason: null,
-				rows: [
-					{
-						role: 'anonymous',
-						pages: 1,
-						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
-						redChecks: [],
-						downloaded: null,
-						runAtLoad: null,
-					},
-					{
-						role: 'signed-in',
-						pages: 1,
-						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: null,
 						runAtLoad: null,
@@ -1464,7 +1575,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 1,
 						green: 1,
 						checksPassed: 13,
-						checksTotal: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: {
 							before: {
@@ -1472,8 +1583,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 								max: 0,
 							},
 							after: {
-								min: 111327,
-								max: 111327,
+								min: 45457,
+								max: 45457,
 							},
 						},
 						runAtLoad: {
@@ -1482,8 +1593,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 								max: 207,
 							},
 							after: {
-								min: 467,
-								max: 467,
+								min: 625,
+								max: 625,
 							},
 						},
 					},
@@ -1492,7 +1603,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 1,
 						green: 1,
 						checksPassed: 13,
-						checksTotal: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: {
 							before: {
@@ -1500,8 +1611,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 								max: 0,
 							},
 							after: {
-								min: 111327,
-								max: 111327,
+								min: 45438,
+								max: 45438,
 							},
 						},
 						runAtLoad: {
@@ -1510,8 +1621,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 								max: 207,
 							},
 							after: {
-								min: 467,
-								max: 467,
+								min: 625,
+								max: 625,
 							},
 						},
 					},
@@ -1575,8 +1686,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			},
 			{
 				name: 'behaviour',
-				passed: 26,
-				failed: 0,
+				passed: 23,
+				failed: 3,
 				skipped: 0,
 			},
 			{
@@ -1597,32 +1708,73 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 				failed: 0,
 				skipped: 0,
 			},
+			{
+				name: 'responsiveness',
+				passed: 9,
+				failed: 3,
+				skipped: 14,
+			},
 		],
 		switchedWithoutCheck: [],
 		accepted: [
 			{
 				reason: 'Markless modulepreloads its router runtime on every page (about 108 kB uncompressed even on the static 404 page, where Remix sends no script) and the render data of each component a page could re-render, so it downloads more (for example /notes/:noteId 90 kB to 209 kB) while running far less at load (93 kB to 1.2 kB). Not reducible from app code; logged as a Markless limitation.',
 				by: "Claude Code (converting agent), per the owner's brief",
-				count: 14,
+				count: 2,
 				checks: ['weight'],
-				routes: [
-					'/',
-					'/join',
-					'/login',
-					'/notes',
-					'/notes/cmvcee9oe0002ag8afyyiylz8',
-					'/notes/new',
-					'/markless-migrate-no-such-page',
-				],
+				routes: ['/markless-migrate-no-such-page'],
 			},
 		],
-		red: [],
+		red: [
+			{
+				route: '/notes',
+				check: 'behaviour',
+				count: 1,
+				example:
+					'not exercised: button "Logout": its name looks destructive (sign out, delete...), so check does not use it',
+			},
+			{
+				route: '/notes',
+				check: 'responsiveness',
+				count: 1,
+				example:
+					'navigation from link "Notes" (4x CPU, mobile): new 134 ms (runs 134 ms, 131 ms); likely cause: no single cause seen: the handler itself is slower; slower than t',
+			},
+			{
+				route: '/notes/cmvcee9oe0002ag8afyyiylz8',
+				check: 'behaviour',
+				count: 2,
+				example:
+					'not exercised: button "Delete": its name looks destructive (sign out, delete...), so check does not use it',
+			},
+			{
+				route: '/notes/cmvcee9oe0002ag8afyyiylz8',
+				check: 'responsiveness',
+				count: 1,
+				example:
+					'navigation from link "📝 My first note" (4x CPU, mobile): new 141 ms (runs 121 ms, 141 ms); likely cause: no single cause seen: the handler itself is slower; sl',
+			},
+			{
+				route: '/notes/new',
+				check: 'responsiveness',
+				count: 1,
+				example:
+					'navigation from link "+ New Note" (4x CPU, mobile): new 127 ms (runs 127 ms, 126 ms); likely cause: no single cause seen: the handler itself is slower; slower t',
+			},
+			{
+				route: '/notes/new',
+				check: 'behaviour',
+				count: 1,
+				example:
+					'not exercised: button "Logout", shared with /notes: its name looks destructive (sign out, delete...), so check does not use it',
+			},
+		],
 		gaps: [],
 		downloadedBasis: 'On the wire during the check, as the servers it compared sent it',
 		headline: {
 			route: '/',
 			before: 92517,
-			after: 1159,
+			after: 6979,
 		},
 		links: {
 			frontDoor: 'https://mm-remix-notes.vercel.app',
@@ -1642,42 +1794,42 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 		builtWith: 'Angular 21',
 		access: 'source',
 		signIn: true,
-		status: 'live',
-		checkedAt: '2026-10-17T17:20:12.848Z',
-		pagesGreen: 187,
+		status: 'in-progress',
+		checkedAt: '2026-10-18T05:22:05.743Z',
+		pagesGreen: 168,
 		pagesChecked: 188,
 		routes: [
 			{
 				pattern: '/',
 				kind: 'page',
-				switched: true,
+				switched: false,
 				forcedReason: null,
 				rows: [
 					{
 						role: 'anonymous',
 						pages: 1,
-						green: 1,
+						green: 0,
 						checksPassed: 13,
-						checksTotal: 13,
-						redChecks: [],
+						checksTotal: 14,
+						redChecks: ['responsiveness'],
 						downloaded: {
 							before: {
-								min: 314352,
-								max: 314352,
+								min: 107896,
+								max: 107896,
 							},
 							after: {
-								min: 197837,
-								max: 197837,
+								min: 70303,
+								max: 70303,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 182530,
-								max: 182530,
+								min: 182536,
+								max: 182536,
 							},
 							after: {
-								min: 44510,
-								max: 44510,
+								min: 53530,
+								max: 53530,
 							},
 						},
 					},
@@ -1685,91 +1837,1499 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						role: 'signed-in',
 						pages: 1,
 						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
+						checksPassed: 14,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: {
 							before: {
-								min: 314352,
-								max: 314352,
+								min: 108058,
+								max: 108058,
 							},
 							after: {
-								min: 197837,
-								max: 197837,
+								min: 70286,
+								max: 70286,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 186504,
-								max: 186504,
+								min: 186523,
+								max: 186523,
 							},
 							after: {
-								min: 45179,
-								max: 45179,
+								min: 53994,
+								max: 53994,
 							},
 						},
 					},
 				],
 			},
 			{
-				pattern: '/article/:slug',
+				pattern: '/article/A-field-guide-to-dragons-5b05e455',
 				kind: 'page',
-				switched: true,
+				switched: false,
 				forcedReason: null,
 				rows: [
 					{
 						role: 'anonymous',
-						pages: 23,
-						green: 23,
-						checksPassed: 299,
-						checksTotal: 299,
-						redChecks: [],
+						pages: 1,
+						green: 0,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: ['responsiveness'],
 						downloaded: {
 							before: {
-								min: 376962,
-								max: 376962,
+								min: 126086,
+								max: 126086,
 							},
 							after: {
-								min: 184491,
-								max: 184491,
+								min: 73276,
+								max: 73276,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 203993,
-								max: 204981,
+								min: 204022,
+								max: 204022,
 							},
 							after: {
-								min: 52275,
-								max: 52796,
+								min: 64248,
+								max: 64248,
 							},
 						},
 					},
 					{
 						role: 'signed-in',
-						pages: 23,
-						green: 23,
-						checksPassed: 299,
-						checksTotal: 299,
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: {
 							before: {
-								min: 376962,
-								max: 376962,
+								min: 126126,
+								max: 126126,
 							},
 							after: {
-								min: 184491,
-								max: 184491,
+								min: 73328,
+								max: 73328,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 216755,
-								max: 218986,
+								min: 217950,
+								max: 217950,
 							},
 							after: {
-								min: 52650,
-								max: 53557,
+								min: 64776,
+								max: 64776,
+							},
+						},
+					},
+				],
+			},
+			{
+				pattern: '/article/A-tour-of-HTTP-caching-ff4da25c',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126089,
+								max: 126089,
+							},
+							after: {
+								min: 73403,
+								max: 73403,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 205000,
+								max: 205000,
+							},
+							after: {
+								min: 64769,
+								max: 64769,
+							},
+						},
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126122,
+								max: 126122,
+							},
+							after: {
+								min: 73452,
+								max: 73452,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 218925,
+								max: 218925,
+							},
+							after: {
+								min: 65297,
+								max: 65297,
+							},
+						},
+					},
+				],
+			},
+			{
+				pattern: '/article/Debugging-with-a-moth-7f0c378d',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126063,
+								max: 126063,
+							},
+							after: {
+								min: 73272,
+								max: 73272,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 204051,
+								max: 204051,
+							},
+							after: {
+								min: 64248,
+								max: 64248,
+							},
+						},
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126126,
+								max: 126126,
+							},
+							after: {
+								min: 73430,
+								max: 73430,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 217968,
+								max: 217968,
+							},
+							after: {
+								min: 64770,
+								max: 64770,
+							},
+						},
+					},
+				],
+			},
+			{
+				pattern: '/article/Dragons-in-the-machine-2f97d8cb',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126092,
+								max: 126092,
+							},
+							after: {
+								min: 73332,
+								max: 73332,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 204051,
+								max: 204051,
+							},
+							after: {
+								min: 64248,
+								max: 64248,
+							},
+						},
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126149,
+								max: 126149,
+							},
+							after: {
+								min: 73284,
+								max: 73284,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 217970,
+								max: 217970,
+							},
+							after: {
+								min: 64770,
+								max: 64770,
+							},
+						},
+					},
+				],
+			},
+			{
+				pattern: '/article/Fonts-on-the-web-b53bd1af',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126079,
+								max: 126079,
+							},
+							after: {
+								min: 73270,
+								max: 73270,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 204957,
+								max: 204957,
+							},
+							after: {
+								min: 64739,
+								max: 64739,
+							},
+						},
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126127,
+								max: 126127,
+							},
+							after: {
+								min: 73338,
+								max: 73338,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 218901,
+								max: 218901,
+							},
+							after: {
+								min: 65255,
+								max: 65255,
+							},
+						},
+					},
+				],
+			},
+			{
+				pattern: '/article/How-to-train-your-dragon-9dbb672a',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126072,
+								max: 126072,
+							},
+							after: {
+								min: 73271,
+								max: 73271,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 204051,
+								max: 204051,
+							},
+							after: {
+								min: 64248,
+								max: 64248,
+							},
+						},
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126097,
+								max: 126097,
+							},
+							after: {
+								min: 73456,
+								max: 73456,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 217972,
+								max: 217972,
+							},
+							after: {
+								min: 64764,
+								max: 64764,
+							},
+						},
+					},
+				],
+			},
+			{
+				pattern: '/article/Keyboards-I-have-loved-69831c7f',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126128,
+								max: 126128,
+							},
+							after: {
+								min: 73385,
+								max: 73385,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 204035,
+								max: 204035,
+							},
+							after: {
+								min: 64248,
+								max: 64248,
+							},
+						},
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126118,
+								max: 126118,
+							},
+							after: {
+								min: 73363,
+								max: 73363,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 217969,
+								max: 217969,
+							},
+							after: {
+								min: 64764,
+								max: 64764,
+							},
+						},
+					},
+				],
+			},
+			{
+				pattern: '/article/Learning-Rust-as-a-JavaScript-developer-febab142',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126090,
+								max: 126090,
+							},
+							after: {
+								min: 73389,
+								max: 73389,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 204051,
+								max: 204051,
+							},
+							after: {
+								min: 64248,
+								max: 64248,
+							},
+						},
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126128,
+								max: 126128,
+							},
+							after: {
+								min: 73405,
+								max: 73405,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 217981,
+								max: 217981,
+							},
+							after: {
+								min: 64770,
+								max: 64770,
+							},
+						},
+					},
+				],
+			},
+			{
+				pattern: '/article/Markdown-is-enough-324850c1',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126087,
+								max: 126087,
+							},
+							after: {
+								min: 73321,
+								max: 73321,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 204038,
+								max: 204038,
+							},
+							after: {
+								min: 64248,
+								max: 64248,
+							},
+						},
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126126,
+								max: 126126,
+							},
+							after: {
+								min: 73334,
+								max: 73334,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 217972,
+								max: 217972,
+							},
+							after: {
+								min: 64764,
+								max: 64764,
+							},
+						},
+					},
+				],
+			},
+			{
+				pattern: '/article/Notes-from-a-hackathon-16449bd5',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126099,
+								max: 126099,
+							},
+							after: {
+								min: 73223,
+								max: 73223,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 204974,
+								max: 204974,
+							},
+							after: {
+								min: 64739,
+								max: 64739,
+							},
+						},
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 0,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: ['behaviour'],
+						downloaded: {
+							before: {
+								min: 126129,
+								max: 126129,
+							},
+							after: {
+								min: 73388,
+								max: 73388,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 218992,
+								max: 218992,
+							},
+							after: {
+								min: 65357,
+								max: 65357,
+							},
+						},
+					},
+				],
+			},
+			{
+				pattern: '/article/On-naming-things-595267c0',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126123,
+								max: 126123,
+							},
+							after: {
+								min: 73402,
+								max: 73402,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 204038,
+								max: 204038,
+							},
+							after: {
+								min: 64248,
+								max: 64248,
+							},
+						},
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126127,
+								max: 126127,
+							},
+							after: {
+								min: 73318,
+								max: 73318,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 217968,
+								max: 217968,
+							},
+							after: {
+								min: 64770,
+								max: 64770,
+							},
+						},
+					},
+				],
+			},
+			{
+				pattern: '/article/Pair-programming-remotely-3680cc82',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126109,
+								max: 126109,
+							},
+							after: {
+								min: 73362,
+								max: 73362,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 204987,
+								max: 204987,
+							},
+							after: {
+								min: 64739,
+								max: 64739,
+							},
+						},
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 0,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: ['behaviour'],
+						downloaded: {
+							before: {
+								min: 126127,
+								max: 126127,
+							},
+							after: {
+								min: 73334,
+								max: 73334,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 218981,
+								max: 218981,
+							},
+							after: {
+								min: 65351,
+								max: 65351,
+							},
+						},
+					},
+				],
+			},
+			{
+				pattern: '/article/Shipping-on-a-Friday-b9671b33',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126133,
+								max: 126133,
+							},
+							after: {
+								min: 73317,
+								max: 73317,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 204051,
+								max: 204051,
+							},
+							after: {
+								min: 64248,
+								max: 64248,
+							},
+						},
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 0,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: ['behaviour'],
+						downloaded: {
+							before: {
+								min: 126147,
+								max: 126147,
+							},
+							after: {
+								min: 73365,
+								max: 73365,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 216774,
+								max: 216774,
+							},
+							after: {
+								min: 64456,
+								max: 64456,
+							},
+						},
+					},
+				],
+			},
+			{
+				pattern: '/article/Signals-explained-slowly-b43658a5',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126102,
+								max: 126102,
+							},
+							after: {
+								min: 73274,
+								max: 73274,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 204051,
+								max: 204051,
+							},
+							after: {
+								min: 64248,
+								max: 64248,
+							},
+						},
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126128,
+								max: 126128,
+							},
+							after: {
+								min: 73329,
+								max: 73329,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 217945,
+								max: 217945,
+							},
+							after: {
+								min: 64770,
+								max: 64770,
+							},
+						},
+					},
+				],
+			},
+			{
+				pattern: '/article/Small-functions-big-programs-ac1a31ea',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126127,
+								max: 126127,
+							},
+							after: {
+								min: 73287,
+								max: 73287,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 204974,
+								max: 204974,
+							},
+							after: {
+								min: 64739,
+								max: 64739,
+							},
+						},
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 0,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: ['behaviour'],
+						downloaded: {
+							before: {
+								min: 126134,
+								max: 126134,
+							},
+							after: {
+								min: 73332,
+								max: 73332,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 217770,
+								max: 217770,
+							},
+							after: {
+								min: 65043,
+								max: 65043,
+							},
+						},
+					},
+				],
+			},
+			{
+				pattern: '/article/Ten-tips-for-code-review-414bc57b',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126133,
+								max: 126133,
+							},
+							after: {
+								min: 73317,
+								max: 73317,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 204051,
+								max: 204051,
+							},
+							after: {
+								min: 64248,
+								max: 64248,
+							},
+						},
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126129,
+								max: 126129,
+							},
+							after: {
+								min: 73335,
+								max: 73335,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 217983,
+								max: 217983,
+							},
+							after: {
+								min: 64770,
+								max: 64770,
+							},
+						},
+					},
+				],
+			},
+			{
+				pattern: '/article/Testing-in-production-7f7036a2',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126107,
+								max: 126107,
+							},
+							after: {
+								min: 73365,
+								max: 73365,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 204038,
+								max: 204038,
+							},
+							after: {
+								min: 64248,
+								max: 64248,
+							},
+						},
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126124,
+								max: 126124,
+							},
+							after: {
+								min: 73309,
+								max: 73309,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 217970,
+								max: 217970,
+							},
+							after: {
+								min: 64770,
+								max: 64770,
+							},
+						},
+					},
+				],
+			},
+			{
+				pattern: '/article/The-analytical-engine-revisited-27a6c43f',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126114,
+								max: 126114,
+							},
+							after: {
+								min: 73411,
+								max: 73411,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 204051,
+								max: 204051,
+							},
+							after: {
+								min: 64248,
+								max: 64248,
+							},
+						},
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126122,
+								max: 126122,
+							},
+							after: {
+								min: 73342,
+								max: 73342,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 217970,
+								max: 217970,
+							},
+							after: {
+								min: 64770,
+								max: 64770,
+							},
+						},
+					},
+				],
+			},
+			{
+				pattern: '/article/The-art-of-the-commit-message-f89543ed',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126104,
+								max: 126104,
+							},
+							after: {
+								min: 73356,
+								max: 73356,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 204038,
+								max: 204038,
+							},
+							after: {
+								min: 64248,
+								max: 64248,
+							},
+						},
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126126,
+								max: 126126,
+							},
+							after: {
+								min: 73314,
+								max: 73314,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 217979,
+								max: 217979,
+							},
+							after: {
+								min: 64776,
+								max: 64776,
+							},
+						},
+					},
+				],
+			},
+			{
+				pattern: '/article/The-quiet-joy-of-refactoring-27430a30',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126129,
+								max: 126129,
+							},
+							after: {
+								min: 73329,
+								max: 73329,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 204974,
+								max: 204974,
+							},
+							after: {
+								min: 64739,
+								max: 64739,
+							},
+						},
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 0,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: ['behaviour'],
+						downloaded: {
+							before: {
+								min: 126097,
+								max: 126097,
+							},
+							after: {
+								min: 73393,
+								max: 73393,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 218975,
+								max: 218975,
+							},
+							after: {
+								min: 65363,
+								max: 65363,
+							},
+						},
+					},
+				],
+			},
+			{
+				pattern: '/article/Why-I-still-use-plain-CSS-ad84ddf0',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126126,
+								max: 126126,
+							},
+							after: {
+								min: 73360,
+								max: 73360,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 204051,
+								max: 204051,
+							},
+							after: {
+								min: 64248,
+								max: 64248,
+							},
+						},
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 0,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: ['behaviour'],
+						downloaded: {
+							before: {
+								min: 126083,
+								max: 126083,
+							},
+							after: {
+								min: 73472,
+								max: 73472,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 216761,
+								max: 216761,
+							},
+							after: {
+								min: 64456,
+								max: 64456,
+							},
+						},
+					},
+				],
+			},
+			{
+				pattern: '/article/Why-accessibility-matters-d0309434',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126128,
+								max: 126128,
+							},
+							after: {
+								min: 73277,
+								max: 73277,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 204051,
+								max: 204051,
+							},
+							after: {
+								min: 64248,
+								max: 64248,
+							},
+						},
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 0,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: ['behaviour'],
+						downloaded: {
+							before: {
+								min: 126126,
+								max: 126126,
+							},
+							after: {
+								min: 73450,
+								max: 73450,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 216738,
+								max: 216738,
+							},
+							after: {
+								min: 64456,
+								max: 64456,
+							},
+						},
+					},
+				],
+			},
+			{
+				pattern: '/article/Writing-a-compiler-in-a-weekend-f3798ca1',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126123,
+								max: 126123,
+							},
+							after: {
+								min: 73327,
+								max: 73327,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 204038,
+								max: 204038,
+							},
+							after: {
+								min: 64248,
+								max: 64248,
+							},
+						},
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 126104,
+								max: 126104,
+							},
+							after: {
+								min: 73431,
+								max: 73431,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 217966,
+								max: 217966,
+							},
+							after: {
+								min: 64776,
+								max: 64776,
 							},
 						},
 					},
@@ -1785,17 +3345,17 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						role: 'anonymous',
 						pages: 1,
 						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
+						checksPassed: 14,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: {
 							before: {
-								min: 322717,
-								max: 322717,
+								min: 105688,
+								max: 105688,
 							},
 							after: {
-								min: 224652,
-								max: 224652,
+								min: 82311,
+								max: 82311,
 							},
 						},
 						runAtLoad: {
@@ -1804,8 +3364,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 								max: 173709,
 							},
 							after: {
-								min: 39416,
-								max: 39416,
+								min: 62212,
+								max: 62212,
 							},
 						},
 					},
@@ -1813,27 +3373,27 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						role: 'signed-in',
 						pages: 1,
 						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
+						checksPassed: 14,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: {
 							before: {
-								min: 324086,
-								max: 324086,
+								min: 107142,
+								max: 107142,
 							},
 							after: {
-								min: 195399,
-								max: 195399,
+								min: 73668,
+								max: 73668,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 182737,
-								max: 182737,
+								min: 182743,
+								max: 182743,
 							},
 							after: {
-								min: 40531,
-								max: 40531,
+								min: 52568,
+								max: 52568,
 							},
 						},
 					},
@@ -1849,17 +3409,17 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						role: 'anonymous',
 						pages: 1,
 						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
+						checksPassed: 14,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: {
 							before: {
-								min: 322717,
-								max: 322717,
+								min: 105688,
+								max: 105688,
 							},
 							after: {
-								min: 224670,
-								max: 224670,
+								min: 82299,
+								max: 82299,
 							},
 						},
 						runAtLoad: {
@@ -1868,8 +3428,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 								max: 173769,
 							},
 							after: {
-								min: 39416,
-								max: 39416,
+								min: 62249,
+								max: 62249,
 							},
 						},
 					},
@@ -1877,27 +3437,27 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						role: 'signed-in',
 						pages: 1,
 						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
+						checksPassed: 14,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: {
 							before: {
-								min: 351989,
-								max: 351989,
+								min: 119404,
+								max: 119404,
 							},
 							after: {
-								min: 215921,
-								max: 215921,
+								min: 73651,
+								max: 73651,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 220145,
-								max: 220145,
+								min: 220164,
+								max: 220164,
 							},
 							after: {
-								min: 45153,
-								max: 45153,
+								min: 66151,
+								max: 66151,
 							},
 						},
 					},
@@ -1913,17 +3473,17 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						role: 'anonymous',
 						pages: 1,
 						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
+						checksPassed: 14,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: {
 							before: {
-								min: 322717,
-								max: 322717,
+								min: 105687,
+								max: 105687,
 							},
 							after: {
-								min: 206586,
-								max: 206586,
+								min: 78981,
+								max: 78981,
 							},
 						},
 						runAtLoad: {
@@ -1932,8 +3492,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 								max: 171489,
 							},
 							after: {
-								min: 39416,
-								max: 39416,
+								min: 52278,
+								max: 52278,
 							},
 						},
 					},
@@ -1942,26 +3502,26 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 1,
 						green: 1,
 						checksPassed: 13,
-						checksTotal: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: {
 							before: {
-								min: 285071,
-								max: 285071,
+								min: 93999,
+								max: 93999,
 							},
 							after: {
-								min: 206586,
-								max: 206586,
+								min: 78975,
+								max: 78975,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 143361,
-								max: 143361,
+								min: 143367,
+								max: 143367,
 							},
 							after: {
-								min: 40383,
-								max: 40383,
+								min: 53112,
+								max: 53112,
 							},
 						},
 					},
@@ -1976,28 +3536,28 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 					{
 						role: 'anonymous',
 						pages: 4,
-						green: 3,
-						checksPassed: 39,
-						checksTotal: 52,
-						redChecks: ['http'],
+						green: 4,
+						checksPassed: 56,
+						checksTotal: 56,
+						redChecks: [],
 						downloaded: {
 							before: {
-								min: 300684,
-								max: 300684,
+								min: 104210,
+								max: 104239,
 							},
 							after: {
-								min: 185952,
-								max: 185952,
+								min: 73254,
+								max: 73344,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 175662,
-								max: 175666,
+								min: 175681,
+								max: 175685,
 							},
 							after: {
-								min: 43388,
-								max: 43392,
+								min: 55543,
+								max: 55547,
 							},
 						},
 					},
@@ -2005,27 +3565,27 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						role: 'signed-in',
 						pages: 4,
 						green: 4,
-						checksPassed: 52,
-						checksTotal: 52,
+						checksPassed: 56,
+						checksTotal: 56,
 						redChecks: [],
 						downloaded: {
 							before: {
-								min: 300684,
-								max: 300684,
+								min: 104179,
+								max: 104221,
 							},
 							after: {
-								min: 185952,
-								max: 185952,
+								min: 73265,
+								max: 73328,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 177024,
-								max: 177668,
+								min: 177030,
+								max: 177678,
 							},
 							after: {
-								min: 43658,
-								max: 43832,
+								min: 55646,
+								max: 55820,
 							},
 						},
 					},
@@ -2041,27 +3601,27 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						role: 'anonymous',
 						pages: 4,
 						green: 4,
-						checksPassed: 52,
-						checksTotal: 52,
+						checksPassed: 56,
+						checksTotal: 56,
 						redChecks: [],
 						downloaded: {
 							before: {
-								min: 300700,
-								max: 300700,
+								min: 104225,
+								max: 104274,
 							},
 							after: {
-								min: 186020,
-								max: 186020,
+								min: 73277,
+								max: 73442,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 171212,
-								max: 175653,
+								min: 171231,
+								max: 175672,
 							},
 							after: {
-								min: 42278,
-								max: 43395,
+								min: 54377,
+								max: 55550,
 							},
 						},
 					},
@@ -2069,27 +3629,27 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						role: 'signed-in',
 						pages: 4,
 						green: 4,
-						checksPassed: 52,
-						checksTotal: 52,
+						checksPassed: 56,
+						checksTotal: 56,
 						redChecks: [],
 						downloaded: {
 							before: {
-								min: 300700,
-								max: 300700,
+								min: 104206,
+								max: 104240,
 							},
 							after: {
-								min: 186020,
-								max: 186020,
+								min: 73278,
+								max: 73388,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 173212,
-								max: 177637,
+								min: 173220,
+								max: 177643,
 							},
 							after: {
-								min: 42698,
-								max: 43832,
+								min: 54630,
+								max: 55820,
 							},
 						},
 					},
@@ -2105,17 +3665,17 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						role: 'anonymous',
 						pages: 1,
 						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
+						checksPassed: 14,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: {
 							before: {
-								min: 322717,
-								max: 322717,
+								min: 105664,
+								max: 105664,
 							},
 							after: {
-								min: 205923,
-								max: 205923,
+								min: 78885,
+								max: 78885,
 							},
 						},
 						runAtLoad: {
@@ -2124,8 +3684,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 								max: 172202,
 							},
 							after: {
-								min: 42688,
-								max: 42688,
+								min: 56067,
+								max: 56067,
 							},
 						},
 					},
@@ -2134,26 +3694,26 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 1,
 						green: 1,
 						checksPassed: 13,
-						checksTotal: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: {
 							before: {
-								min: 285071,
-								max: 285071,
+								min: 94021,
+								max: 94021,
 							},
 							after: {
-								min: 205923,
-								max: 205923,
+								min: 78931,
+								max: 78931,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 143374,
-								max: 143374,
+								min: 143380,
+								max: 143380,
 							},
 							after: {
-								min: 43655,
-								max: 43655,
+								min: 56901,
+								max: 56901,
 							},
 						},
 					},
@@ -2162,24 +3722,24 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			{
 				pattern: '/settings',
 				kind: 'page',
-				switched: true,
+				switched: false,
 				forcedReason: null,
 				rows: [
 					{
 						role: 'anonymous',
 						pages: 1,
 						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
+						checksPassed: 14,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: {
 							before: {
-								min: 322717,
-								max: 322717,
+								min: 105689,
+								max: 105689,
 							},
 							after: {
-								min: 222646,
-								max: 222646,
+								min: 86224,
+								max: 86224,
 							},
 						},
 						runAtLoad: {
@@ -2188,127 +3748,1609 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 								max: 173452,
 							},
 							after: {
-								min: 39416,
-								max: 39416,
+								min: 63991,
+								max: 63991,
 							},
 						},
 					},
 					{
 						role: 'signed-in',
 						pages: 1,
-						green: 1,
+						green: 0,
 						checksPassed: 13,
-						checksTotal: 13,
-						redChecks: [],
+						checksTotal: 14,
+						redChecks: ['behaviour'],
 						downloaded: {
 							before: {
-								min: 322617,
-								max: 322617,
+								min: 105816,
+								max: 105816,
 							},
 							after: {
-								min: 193393,
-								max: 193393,
+								min: 77717,
+								max: 77717,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 182530,
-								max: 182530,
+								min: 182536,
+								max: 182536,
 							},
 							after: {
-								min: 40633,
-								max: 40633,
+								min: 54804,
+								max: 54804,
 							},
 						},
 					},
 				],
 			},
 			{
-				pattern: '/tag/:tag',
+				pattern: '/tag/css',
 				kind: 'page',
-				switched: true,
+				switched: false,
 				forcedReason: null,
 				rows: [
 					{
 						role: 'anonymous',
-						pages: 10,
-						green: 10,
-						checksPassed: 130,
-						checksTotal: 130,
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: {
 							before: {
-								min: 314352,
-								max: 314352,
+								min: 108009,
+								max: 108009,
 							},
 							after: {
-								min: 201898,
-								max: 201898,
+								min: 72055,
+								max: 72055,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 184627,
-								max: 184663,
+								min: 184633,
+								max: 184633,
 							},
 							after: {
-								min: 44550,
-								max: 44550,
+								min: 55214,
+								max: 55214,
 							},
 						},
 					},
 					{
 						role: 'signed-in',
-						pages: 10,
-						green: 10,
-						checksPassed: 130,
-						checksTotal: 130,
-						redChecks: [],
+						pages: 1,
+						green: 0,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: ['responsiveness'],
 						downloaded: {
 							before: {
-								min: 314352,
-								max: 314352,
+								min: 108057,
+								max: 108057,
 							},
 							after: {
-								min: 201898,
-								max: 201898,
+								min: 72159,
+								max: 72159,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 187915,
-								max: 187928,
+								min: 187934,
+								max: 187934,
 							},
 							after: {
-								min: 45137,
-								max: 45159,
+								min: 55573,
+								max: 55573,
 							},
 						},
 					},
 				],
 			},
 			{
-				pattern: '/article/:slug/',
-				kind: 'slash-redirect',
-				switched: true,
+				pattern: '/tag/debugging',
+				kind: 'page',
+				switched: false,
 				forcedReason: null,
 				rows: [
 					{
 						role: 'anonymous',
-						pages: 23,
-						green: 23,
-						checksPassed: 299,
-						checksTotal: 299,
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 108065,
+								max: 108065,
+							},
+							after: {
+								min: 72129,
+								max: 72129,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 184646,
+								max: 184646,
+							},
+							after: {
+								min: 55214,
+								max: 55214,
+							},
+						},
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 0,
+						checksPassed: 0,
+						checksTotal: 14,
+						redChecks: ['http'],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/tag/devops',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 108002,
+								max: 108002,
+							},
+							after: {
+								min: 72110,
+								max: 72110,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 184646,
+								max: 184646,
+							},
+							after: {
+								min: 55214,
+								max: 55214,
+							},
+						},
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 0,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: ['responsiveness'],
+						downloaded: {
+							before: {
+								min: 108034,
+								max: 108034,
+							},
+							after: {
+								min: 72091,
+								max: 72091,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 187934,
+								max: 187934,
+							},
+							after: {
+								min: 55649,
+								max: 55649,
+							},
+						},
+					},
+				],
+			},
+			{
+				pattern: '/tag/dragons',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 108006,
+								max: 108006,
+							},
+							after: {
+								min: 72195,
+								max: 72195,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 184646,
+								max: 184646,
+							},
+							after: {
+								min: 55214,
+								max: 55214,
+							},
+						},
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 0,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: ['responsiveness'],
+						downloaded: {
+							before: {
+								min: 108078,
+								max: 108078,
+							},
+							after: {
+								min: 72082,
+								max: 72082,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 187934,
+								max: 187934,
+							},
+							after: {
+								min: 55649,
+								max: 55649,
+							},
+						},
+					},
+				],
+			},
+			{
+				pattern: '/tag/history',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 108006,
+								max: 108006,
+							},
+							after: {
+								min: 72080,
+								max: 72080,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 184646,
+								max: 184646,
+							},
+							after: {
+								min: 55214,
+								max: 55214,
+							},
+						},
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 0,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: ['responsiveness'],
+						downloaded: {
+							before: {
+								min: 108035,
+								max: 108035,
+							},
+							after: {
+								min: 72073,
+								max: 72073,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 187934,
+								max: 187934,
+							},
+							after: {
+								min: 55595,
+								max: 55595,
+							},
+						},
+					},
+				],
+			},
+			{
+				pattern: '/tag/javascript',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 108010,
+								max: 108010,
+							},
+							after: {
+								min: 72051,
+								max: 72051,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 184646,
+								max: 184646,
+							},
+							after: {
+								min: 55214,
+								max: 55214,
+							},
+						},
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 0,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: ['responsiveness'],
+						downloaded: {
+							before: {
+								min: 108035,
+								max: 108035,
+							},
+							after: {
+								min: 72089,
+								max: 72089,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 187934,
+								max: 187934,
+							},
+							after: {
+								min: 55635,
+								max: 55635,
+							},
+						},
+					},
+				],
+			},
+			{
+				pattern: '/tag/programming',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 108010,
+								max: 108010,
+							},
+							after: {
+								min: 72127,
+								max: 72127,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 184646,
+								max: 184646,
+							},
+							after: {
+								min: 55214,
+								max: 55214,
+							},
+						},
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 0,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: ['responsiveness'],
+						downloaded: {
+							before: {
+								min: 108034,
+								max: 108034,
+							},
+							after: {
+								min: 72233,
+								max: 72233,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 187957,
+								max: 187957,
+							},
+							after: {
+								min: 55649,
+								max: 55649,
+							},
+						},
+					},
+				],
+			},
+			{
+				pattern: '/tag/teams',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 108007,
+								max: 108007,
+							},
+							after: {
+								min: 72208,
+								max: 72208,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 184646,
+								max: 184646,
+							},
+							after: {
+								min: 55214,
+								max: 55214,
+							},
+						},
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 0,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: ['responsiveness'],
+						downloaded: {
+							before: {
+								min: 108050,
+								max: 108050,
+							},
+							after: {
+								min: 72135,
+								max: 72135,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 187934,
+								max: 187934,
+							},
+							after: {
+								min: 55649,
+								max: 55649,
+							},
+						},
+					},
+				],
+			},
+			{
+				pattern: '/tag/web',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 108059,
+								max: 108059,
+							},
+							after: {
+								min: 72168,
+								max: 72168,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 184646,
+								max: 184646,
+							},
+							after: {
+								min: 55214,
+								max: 55214,
+							},
+						},
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 0,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: ['responsiveness'],
+						downloaded: {
+							before: {
+								min: 108052,
+								max: 108052,
+							},
+							after: {
+								min: 72244,
+								max: 72244,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 187957,
+								max: 187957,
+							},
+							after: {
+								min: 55649,
+								max: 55649,
+							},
+						},
+					},
+				],
+			},
+			{
+				pattern: '/tag/writing',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 14,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: {
+							before: {
+								min: 108007,
+								max: 108007,
+							},
+							after: {
+								min: 72156,
+								max: 72156,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 184646,
+								max: 184646,
+							},
+							after: {
+								min: 55214,
+								max: 55214,
+							},
+						},
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 0,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: ['responsiveness'],
+						downloaded: {
+							before: {
+								min: 108025,
+								max: 108025,
+							},
+							after: {
+								min: 72175,
+								max: 72175,
+							},
+						},
+						runAtLoad: {
+							before: {
+								min: 187957,
+								max: 187957,
+							},
+							after: {
+								min: 55649,
+								max: 55649,
+							},
+						},
+					},
+				],
+			},
+			{
+				pattern: '/article/A-field-guide-to-dragons-5b05e455/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: null,
 						runAtLoad: null,
 					},
 					{
 						role: 'signed-in',
-						pages: 23,
-						green: 23,
-						checksPassed: 299,
-						checksTotal: 299,
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/article/A-tour-of-HTTP-caching-ff4da25c/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/article/Debugging-with-a-moth-7f0c378d/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/article/Dragons-in-the-machine-2f97d8cb/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/article/Fonts-on-the-web-b53bd1af/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/article/How-to-train-your-dragon-9dbb672a/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/article/Keyboards-I-have-loved-69831c7f/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/article/Learning-Rust-as-a-JavaScript-developer-febab142/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/article/Markdown-is-enough-324850c1/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/article/Notes-from-a-hackathon-16449bd5/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/article/On-naming-things-595267c0/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/article/Pair-programming-remotely-3680cc82/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/article/Shipping-on-a-Friday-b9671b33/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/article/Signals-explained-slowly-b43658a5/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/article/Small-functions-big-programs-ac1a31ea/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/article/Ten-tips-for-code-review-414bc57b/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/article/Testing-in-production-7f7036a2/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/article/The-analytical-engine-revisited-27a6c43f/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/article/The-art-of-the-commit-message-f89543ed/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/article/The-quiet-joy-of-refactoring-27430a30/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/article/Why-I-still-use-plain-CSS-ad84ddf0/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/article/Why-accessibility-matters-d0309434/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/article/Writing-a-compiler-in-a-weekend-f3798ca1/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/settings/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/tag/css/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/tag/debugging/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/tag/devops/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/tag/dragons/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/tag/history/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/tag/javascript/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/tag/programming/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/tag/teams/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/tag/web/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+				],
+			},
+			{
+				pattern: '/tag/writing/',
+				kind: 'page',
+				switched: false,
+				forcedReason: null,
+				rows: [
+					{
+						role: 'anonymous',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
+						redChecks: [],
+						downloaded: null,
+						runAtLoad: null,
+					},
+					{
+						role: 'signed-in',
+						pages: 1,
+						green: 1,
+						checksPassed: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: null,
 						runAtLoad: null,
@@ -2326,7 +5368,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 1,
 						green: 1,
 						checksPassed: 13,
-						checksTotal: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: null,
 						runAtLoad: null,
@@ -2336,7 +5378,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 1,
 						green: 1,
 						checksPassed: 13,
-						checksTotal: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: null,
 						runAtLoad: null,
@@ -2354,7 +5396,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 1,
 						green: 1,
 						checksPassed: 13,
-						checksTotal: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: null,
 						runAtLoad: null,
@@ -2364,7 +5406,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 1,
 						green: 1,
 						checksPassed: 13,
-						checksTotal: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: null,
 						runAtLoad: null,
@@ -2382,7 +5424,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 1,
 						green: 1,
 						checksPassed: 13,
-						checksTotal: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: null,
 						runAtLoad: null,
@@ -2392,7 +5434,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 1,
 						green: 1,
 						checksPassed: 13,
-						checksTotal: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: null,
 						runAtLoad: null,
@@ -2410,7 +5452,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 4,
 						green: 4,
 						checksPassed: 52,
-						checksTotal: 52,
+						checksTotal: 56,
 						redChecks: [],
 						downloaded: null,
 						runAtLoad: null,
@@ -2420,7 +5462,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 4,
 						green: 4,
 						checksPassed: 52,
-						checksTotal: 52,
+						checksTotal: 56,
 						redChecks: [],
 						downloaded: null,
 						runAtLoad: null,
@@ -2438,7 +5480,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 4,
 						green: 4,
 						checksPassed: 52,
-						checksTotal: 52,
+						checksTotal: 56,
 						redChecks: [],
 						downloaded: null,
 						runAtLoad: null,
@@ -2448,7 +5490,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 4,
 						green: 4,
 						checksPassed: 52,
-						checksTotal: 52,
+						checksTotal: 56,
 						redChecks: [],
 						downloaded: null,
 						runAtLoad: null,
@@ -2466,7 +5508,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 1,
 						green: 1,
 						checksPassed: 13,
-						checksTotal: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: null,
 						runAtLoad: null,
@@ -2476,63 +5518,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 1,
 						green: 1,
 						checksPassed: 13,
-						checksTotal: 13,
-						redChecks: [],
-						downloaded: null,
-						runAtLoad: null,
-					},
-				],
-			},
-			{
-				pattern: '/settings/',
-				kind: 'slash-redirect',
-				switched: true,
-				forcedReason: null,
-				rows: [
-					{
-						role: 'anonymous',
-						pages: 1,
-						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
-						redChecks: [],
-						downloaded: null,
-						runAtLoad: null,
-					},
-					{
-						role: 'signed-in',
-						pages: 1,
-						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
-						redChecks: [],
-						downloaded: null,
-						runAtLoad: null,
-					},
-				],
-			},
-			{
-				pattern: '/tag/:tag/',
-				kind: 'slash-redirect',
-				switched: true,
-				forcedReason: null,
-				rows: [
-					{
-						role: 'anonymous',
-						pages: 10,
-						green: 10,
-						checksPassed: 130,
-						checksTotal: 130,
-						redChecks: [],
-						downloaded: null,
-						runAtLoad: null,
-					},
-					{
-						role: 'signed-in',
-						pages: 10,
-						green: 10,
-						checksPassed: 130,
-						checksTotal: 130,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: null,
 						runAtLoad: null,
@@ -2550,16 +5536,16 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 1,
 						green: 1,
 						checksPassed: 13,
-						checksTotal: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: {
 							before: {
-								min: 285071,
-								max: 285071,
+								min: 94021,
+								max: 94021,
 							},
 							after: {
-								min: 130089,
-								max: 130089,
+								min: 51154,
+								max: 51154,
 							},
 						},
 						runAtLoad: {
@@ -2568,8 +5554,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 								max: 127782,
 							},
 							after: {
-								min: 25525,
-								max: 25525,
+								min: 34701,
+								max: 34701,
 							},
 						},
 					},
@@ -2578,26 +5564,26 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						pages: 1,
 						green: 1,
 						checksPassed: 13,
-						checksTotal: 13,
+						checksTotal: 14,
 						redChecks: [],
 						downloaded: {
 							before: {
-								min: 285071,
-								max: 285071,
+								min: 94017,
+								max: 94017,
 							},
 							after: {
-								min: 130089,
-								max: 130089,
+								min: 51044,
+								max: 51044,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 138649,
-								max: 138649,
+								min: 138655,
+								max: 138655,
 							},
 							after: {
-								min: 26449,
-								max: 26449,
+								min: 35427,
+								max: 35427,
 							},
 						},
 					},
@@ -2661,8 +5647,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			},
 			{
 				name: 'behaviour',
-				passed: 187,
-				failed: 0,
+				passed: 179,
+				failed: 8,
 				skipped: 1,
 			},
 			{
@@ -2683,38 +5669,162 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 				failed: 0,
 				skipped: 1,
 			},
+			{
+				name: 'responsiveness',
+				passed: 80,
+				failed: 11,
+				skipped: 97,
+			},
 		],
 		switchedWithoutCheck: [],
-		accepted: [
-			{
-				reason: "Markless 0.4.0 has no working client-side navigation (Link fails the build, plain links load a new document), so the editor's redirect of a non-author to / is a second document load; the article's author and tags shown by the old single-page app after its in-place navigation are measured on the first document here. Same requests, same final page.",
-				by: 'Claude Code (converting agent)',
-				count: 1,
-				checks: ['network'],
-				routes: ['/editor/A-field-guide-to-dragons-5b05e455'],
-			},
-			{
-				reason: 'The same redirect as above: the old app navigates to / inside the page, so check sees the editor route itself land on / and its journeys start on a drawn home page; the Markless app loads / as a second document, which check reads as the route having redirected, and its journeys can start before that document has drawn its list. Same final URL, page and requests.',
-				by: 'Claude Code (converting agent)',
-				count: 1,
-				checks: ['a11y'],
-				routes: ['/editor/A-field-guide-to-dragons-5b05e455'],
-			},
-		],
+		accepted: [],
 		red: [
 			{
-				route: '/profile/demo',
+				route: '/',
+				check: 'responsiveness',
+				count: 1,
+				example:
+					'first interaction with button "2" (desktop): new 130 ms (runs 129 ms, 130 ms); likely cause: waits on 2 data fetches: /api/articles?limit=10&offset=10, /api/art',
+			},
+			{
+				route: '/article/A-field-guide-to-dragons-5b05e455',
+				check: 'responsiveness',
+				count: 2,
+				example:
+					'navigation from button " Follow linus" #2 (4x CPU, mobile): new 131 ms (runs 121 ms, 131 ms); likely cause: no single cause seen: the handler itself is slower;',
+			},
+			{
+				route: '/article/Notes-from-a-hackathon-16449bd5',
+				check: 'behaviour',
+				count: 1,
+				example:
+					'not exercised: clickable: it answers clicks or keys but has no text or label, so check cannot find it again on the new page: label it in the old app, or accept ',
+			},
+			{
+				route: '/article/Pair-programming-remotely-3680cc82',
+				check: 'behaviour',
+				count: 1,
+				example:
+					'not exercised: clickable: it answers clicks or keys but has no text or label, so check cannot find it again on the new page: label it in the old app, or accept ',
+			},
+			{
+				route: '/article/Shipping-on-a-Friday-b9671b33',
+				check: 'behaviour',
+				count: 2,
+				example:
+					'not exercised: button " Delete Article": its name looks destructive (sign out, delete...), so check does not use it',
+			},
+			{
+				route: '/article/Small-functions-big-programs-ac1a31ea',
+				check: 'behaviour',
+				count: 3,
+				example:
+					'not exercised: button " Delete Article": its name looks destructive (sign out, delete...), so check does not use it',
+			},
+			{
+				route: '/article/The-quiet-joy-of-refactoring-27430a30',
+				check: 'behaviour',
+				count: 1,
+				example:
+					'not exercised: clickable: it answers clicks or keys but has no text or label, so check cannot find it again on the new page: label it in the old app, or accept ',
+			},
+			{
+				route: '/article/Why-I-still-use-plain-CSS-ad84ddf0',
+				check: 'behaviour',
+				count: 2,
+				example:
+					'not exercised: button " Delete Article": its name looks destructive (sign out, delete...), so check does not use it',
+			},
+			{
+				route: '/article/Why-accessibility-matters-d0309434',
+				check: 'behaviour',
+				count: 2,
+				example:
+					'not exercised: button " Delete Article": its name looks destructive (sign out, delete...), so check does not use it',
+			},
+			{
+				route: '/settings',
+				check: 'behaviour',
+				count: 1,
+				example:
+					'not exercised: button "Or click here to logout.": its name looks destructive (sign out, delete...), so check does not use it',
+			},
+			{
+				route: '/tag/css',
+				check: 'responsiveness',
+				count: 1,
+				example:
+					'navigation from link "Your Feed" (4x CPU, mobile): new 128 ms (runs 106 ms, 128 ms); likely cause: no single cause seen: the handler itself is slower; slower th',
+			},
+			{
+				route: '/tag/debugging',
 				check: 'http',
 				count: 1,
 				example: 'page load: page.goto: Timeout 30000ms exceeded.',
+			},
+			{
+				route: '/tag/devops',
+				check: 'responsiveness',
+				count: 1,
+				example:
+					'navigation from link "Your Feed" (4x CPU, mobile): new 97 ms (runs 97 ms, 84 ms); likely cause: no single cause seen: the handler itself is slower; slower than ',
+			},
+			{
+				route: '/tag/dragons',
+				check: 'responsiveness',
+				count: 1,
+				example:
+					'navigation from link "Your Feed" (4x CPU, mobile): new 186 ms (runs 186 ms, 75 ms); likely cause: no single cause seen: the handler itself is slower; slower tha',
+			},
+			{
+				route: '/tag/history',
+				check: 'responsiveness',
+				count: 1,
+				example:
+					'navigation from link "Your Feed" (4x CPU, mobile): new 98 ms (runs 84 ms, 98 ms); likely cause: no single cause seen: the handler itself is slower; slower than ',
+			},
+			{
+				route: '/tag/javascript',
+				check: 'responsiveness',
+				count: 1,
+				example:
+					'navigation from link "Your Feed" (4x CPU, mobile): new 86 ms (runs 85 ms, 86 ms); likely cause: no single cause seen: the handler itself is slower; slower than ',
+			},
+			{
+				route: '/tag/programming',
+				check: 'responsiveness',
+				count: 1,
+				example:
+					'navigation from link "Your Feed" (4x CPU, mobile): new 93 ms (runs 93 ms, 82 ms); likely cause: no single cause seen: the handler itself is slower; slower than ',
+			},
+			{
+				route: '/tag/teams',
+				check: 'responsiveness',
+				count: 1,
+				example:
+					'navigation from link "Your Feed" (4x CPU, mobile): new 91 ms (runs 91 ms, 73 ms); likely cause: no single cause seen: the handler itself is slower; slower than ',
+			},
+			{
+				route: '/tag/web',
+				check: 'responsiveness',
+				count: 1,
+				example:
+					'navigation from link "Your Feed" (4x CPU, mobile): new 97 ms (runs 97 ms, 87 ms); likely cause: no single cause seen: the handler itself is slower; slower than ',
+			},
+			{
+				route: '/tag/writing',
+				check: 'responsiveness',
+				count: 1,
+				example:
+					'navigation from link "Your Feed" (4x CPU, mobile): new 101 ms (runs 101 ms, 74 ms); likely cause: no single cause seen: the handler itself is slower; slower tha',
 			},
 		],
 		gaps: [],
 		downloadedBasis: 'On the wire during the check, as the servers it compared sent it',
 		headline: {
 			route: '/',
-			before: 182530,
-			after: 44510,
+			before: 182536,
+			after: 53530,
 		},
 		links: {
 			frontDoor: 'https://mm-realworld.vercel.app',
@@ -2734,42 +5844,42 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 		builtWith: 'Docusaurus (React)',
 		access: 'source',
 		signIn: false,
-		status: 'live',
-		checkedAt: '2026-10-17T15:04:44.970Z',
-		pagesGreen: 3,
+		status: 'in-progress',
+		checkedAt: '2026-10-18T04:50:47.476Z',
+		pagesGreen: 0,
 		pagesChecked: 3,
 		routes: [
 			{
 				pattern: '/',
 				kind: 'page',
-				switched: true,
+				switched: false,
 				forcedReason: null,
 				rows: [
 					{
 						role: null,
 						pages: 1,
-						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
-						redChecks: [],
+						green: 0,
+						checksPassed: 9,
+						checksTotal: 14,
+						redChecks: ['visual', 'assets', 'a11y', 'behaviour', 'responsiveness'],
 						downloaded: {
 							before: {
-								min: 1297993,
-								max: 1297993,
+								min: 366151,
+								max: 366151,
 							},
 							after: {
-								min: 374553,
-								max: 374553,
+								min: 193132,
+								max: 193132,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 578118,
-								max: 578118,
+								min: 578031,
+								max: 578031,
 							},
 							after: {
-								min: 94159,
-								max: 94159,
+								min: 200881,
+								max: 200881,
 							},
 						},
 					},
@@ -2778,34 +5888,34 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			{
 				pattern: '/docs',
 				kind: 'page',
-				switched: true,
+				switched: false,
 				forcedReason: null,
 				rows: [
 					{
 						role: null,
 						pages: 1,
-						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
-						redChecks: [],
+						green: 0,
+						checksPassed: 11,
+						checksTotal: 14,
+						redChecks: ['a11y', 'behaviour', 'responsiveness'],
 						downloaded: {
 							before: {
-								min: 1611696,
-								max: 1611696,
+								min: 443873,
+								max: 443873,
 							},
 							after: {
-								min: 564553,
-								max: 564553,
+								min: 191974,
+								max: 191974,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 722244,
-								max: 722244,
+								min: 716056,
+								max: 716056,
 							},
 							after: {
-								min: 84972,
-								max: 84972,
+								min: 192252,
+								max: 192252,
 							},
 						},
 					},
@@ -2814,34 +5924,34 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			{
 				pattern: '/docs/installation',
 				kind: 'page',
-				switched: true,
+				switched: false,
 				forcedReason: null,
 				rows: [
 					{
 						role: null,
 						pages: 1,
-						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
-						redChecks: [],
+						green: 0,
+						checksPassed: 11,
+						checksTotal: 14,
+						redChecks: ['a11y', 'behaviour', 'responsiveness'],
 						downloaded: {
 							before: {
-								min: 1632534,
-								max: 1632534,
+								min: 448820,
+								max: 448820,
 							},
 							after: {
-								min: 810231,
-								max: 810231,
+								min: 192060,
+								max: 192060,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 714001,
-								max: 714001,
+								min: 720883,
+								max: 720883,
 							},
 							after: {
-								min: 84970,
-								max: 84970,
+								min: 192248,
+								max: 192248,
 							},
 						},
 					},
@@ -2869,8 +5979,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			},
 			{
 				name: 'visual',
-				passed: 3,
-				failed: 0,
+				passed: 2,
+				failed: 1,
 				skipped: 0,
 			},
 			{
@@ -2881,8 +5991,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			},
 			{
 				name: 'assets',
-				passed: 3,
-				failed: 0,
+				passed: 2,
+				failed: 1,
 				skipped: 0,
 			},
 			{
@@ -2893,8 +6003,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			},
 			{
 				name: 'a11y',
-				passed: 3,
-				failed: 0,
+				passed: 0,
+				failed: 3,
 				skipped: 0,
 			},
 			{
@@ -2905,8 +6015,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			},
 			{
 				name: 'behaviour',
-				passed: 3,
-				failed: 0,
+				passed: 0,
+				failed: 3,
 				skipped: 0,
 			},
 			{
@@ -2927,24 +6037,100 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 				failed: 0,
 				skipped: 0,
 			},
-		],
-		switchedWithoutCheck: [],
-		accepted: [
 			{
-				reason: "/showcase is not part of this migration: the new app has only the home page and two docs pages, so the link lands on the new app's 404 here. Through the front door it reaches the old site, whose showcase page makes the same image requests.",
-				by: 'Claude Code (converting agent)',
-				count: 2,
-				checks: ['behaviour', 'a11y'],
-				routes: ['/'],
+				name: 'responsiveness',
+				passed: 0,
+				failed: 3,
+				skipped: 0,
 			},
 		],
-		red: [],
+		switchedWithoutCheck: [],
+		accepted: [],
+		red: [
+			{
+				route: '/',
+				check: 'visual',
+				count: 1,
+				example:
+					'screenshot: 5935 pixels (0.19%) differ in x=33..148, y=4344..5560, first near img "Paul Armstrong" (main>img/img), strong "Paul Armstrong" (main/strong)',
+			},
+			{
+				route: '/',
+				check: 'assets',
+				count: 4,
+				example:
+					'image #13 https://unavatar.io/x/paularmstrong?fallback=https://github.com/paularmstrong.png: broken',
+			},
+			{
+				route: '/',
+				check: 'behaviour',
+				count: 21,
+				example:
+					'click link "Docusaurus 3.10 is out!️": console errors: registerSW failed TypeError: Cannot read properties of undefined (reading \'waiting\')',
+			},
+			{
+				route: '/',
+				check: 'a11y',
+				count: 5,
+				example:
+					'press Enter on link "Docusaurus 3.10 is out!️": console errors: registerSW failed TypeError: Cannot read properties of undefined (reading \'waiting\')',
+			},
+			{
+				route: '/',
+				check: 'responsiveness',
+				count: 1,
+				example:
+					'navigation from link "Get Started" (4x CPU, mobile): new 164 ms (runs 122 ms, 164 ms); likely cause: long task 109 ms, top script /_markless/links.1a47lin.js (i',
+			},
+			{
+				route: '/docs',
+				check: 'behaviour',
+				count: 72,
+				example:
+					'click link "best Docusaurus sites": console errors: registerSW failed TypeError: Cannot read properties of undefined (reading \'waiting\')',
+			},
+			{
+				route: '/docs',
+				check: 'a11y',
+				count: 36,
+				example:
+					'press Enter on link "best Docusaurus sites": console errors: registerSW failed TypeError: Cannot read properties of undefined (reading \'waiting\')',
+			},
+			{
+				route: '/docs',
+				check: 'responsiveness',
+				count: 5,
+				example:
+					'first interaction with button "Collapse sidebar category \'Getting Started\'" (desktop): new 48 ms (runs 40 ms, 48 ms); likely cause: no single cause seen: the ha',
+			},
+			{
+				route: '/docs/installation',
+				check: 'behaviour',
+				count: 97,
+				example:
+					'click link "Getting Started" #2: console errors: registerSW failed TypeError: Cannot read properties of undefined (reading \'waiting\')',
+			},
+			{
+				route: '/docs/installation',
+				check: 'a11y',
+				count: 42,
+				example:
+					'press Enter on link "Getting Started" #2: console errors: registerSW failed TypeError: Cannot read properties of undefined (reading \'waiting\')',
+			},
+			{
+				route: '/docs/installation',
+				check: 'responsiveness',
+				count: 1,
+				example:
+					'navigation from link "Home page" (4x CPU, mobile): new 122 ms (runs 118 ms, 122 ms); likely cause: long task 74 ms, top script /_markless/links.1a47lin.js (impo',
+			},
+		],
 		gaps: [],
 		downloadedBasis: 'On the wire during the check, as the servers it compared sent it',
 		headline: {
 			route: '/',
-			before: 578118,
-			after: 94159,
+			before: 578031,
+			after: 200881,
 		},
 		links: {
 			frontDoor: 'https://mm-docusaurus.vercel.app',
@@ -2964,24 +6150,24 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 		builtWith: 'htmx and hyperscript',
 		access: 'url-only',
 		signIn: false,
-		status: 'live',
-		checkedAt: '2026-10-17T05:09:46.322Z',
-		pagesGreen: 4,
+		status: 'in-progress',
+		checkedAt: '2026-10-18T01:20:42.474Z',
+		pagesGreen: 0,
 		pagesChecked: 4,
 		routes: [
 			{
 				pattern: '/',
 				kind: 'page',
-				switched: true,
+				switched: false,
 				forcedReason: null,
 				rows: [
 					{
 						role: null,
 						pages: 1,
-						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
-						redChecks: [],
+						green: 0,
+						checksPassed: 12,
+						checksTotal: 14,
+						redChecks: ['a11y', 'behaviour'],
 						downloaded: {
 							before: {
 								min: 177600,
@@ -2998,8 +6184,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 								max: 101198,
 							},
 							after: {
-								min: 18984,
-								max: 18984,
+								min: 24974,
+								max: 24974,
 							},
 						},
 					},
@@ -3008,16 +6194,16 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			{
 				pattern: '/docs/',
 				kind: 'page',
-				switched: true,
+				switched: false,
 				forcedReason: null,
 				rows: [
 					{
 						role: null,
 						pages: 1,
-						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
-						redChecks: [],
+						green: 0,
+						checksPassed: 12,
+						checksTotal: 14,
+						redChecks: ['a11y', 'behaviour'],
 						downloaded: {
 							before: {
 								min: 70600,
@@ -3034,8 +6220,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 								max: 99195,
 							},
 							after: {
-								min: 18769,
-								max: 18769,
+								min: 24759,
+								max: 24759,
 							},
 						},
 					},
@@ -3044,16 +6230,16 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			{
 				pattern: '/examples/',
 				kind: 'page',
-				switched: true,
+				switched: false,
 				forcedReason: null,
 				rows: [
 					{
 						role: null,
 						pages: 1,
-						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
-						redChecks: [],
+						green: 0,
+						checksPassed: 12,
+						checksTotal: 14,
+						redChecks: ['a11y', 'behaviour'],
 						downloaded: {
 							before: {
 								min: 70500,
@@ -3070,8 +6256,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 								max: 99195,
 							},
 							after: {
-								min: 18769,
-								max: 18769,
+								min: 24759,
+								max: 24759,
 							},
 						},
 					},
@@ -3080,16 +6266,16 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			{
 				pattern: '/examples/click-to-edit/',
 				kind: 'page',
-				switched: true,
+				switched: false,
 				forcedReason: null,
 				rows: [
 					{
 						role: null,
 						pages: 1,
-						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
-						redChecks: [],
+						green: 0,
+						checksPassed: 12,
+						checksTotal: 14,
+						redChecks: ['a11y', 'behaviour'],
 						downloaded: {
 							before: {
 								min: 682000,
@@ -3102,12 +6288,12 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						},
 						runAtLoad: {
 							before: {
-								min: 1742187,
-								max: 1742187,
+								min: 1742657,
+								max: 1742657,
 							},
 							after: {
-								min: 31680,
-								max: 31680,
+								min: 38074,
+								max: 38074,
 							},
 						},
 					},
@@ -3159,8 +6345,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			},
 			{
 				name: 'a11y',
-				passed: 4,
-				failed: 0,
+				passed: 0,
+				failed: 4,
 				skipped: 0,
 			},
 			{
@@ -3171,8 +6357,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			},
 			{
 				name: 'behaviour',
-				passed: 4,
-				failed: 0,
+				passed: 0,
+				failed: 4,
 				skipped: 0,
 			},
 			{
@@ -3189,6 +6375,12 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			},
 			{
 				name: 'weight',
+				passed: 4,
+				failed: 0,
+				skipped: 0,
+			},
+			{
+				name: 'responsiveness',
 				passed: 4,
 				failed: 0,
 				skipped: 0,
@@ -3225,27 +6417,6 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 				routes: ['/', '/docs/', '/examples/', '/examples/click-to-edit/'],
 			},
 			{
-				reason: 'hx-boost and preload="mouseover": htmx turns a nav-link click into an XHR GET of the next page and a body swap (and fetches it again on hover). The port navigates normally to the same URL and page. Markless\'s client-side navigation is off because document.tsrx reads the URL to write each page\'s head (the router then loads whole pages), and most nav targets (reference, talk, essays) stay htmx pages during the migration. Owner decision: keep plain navigation, or move per-page heads into the pages and use Link.',
-				by: 'Claude Code (converting agent), for owner review',
-				count: 15,
-				checks: ['behaviour'],
-				routes: ['/', '/docs/', '/examples/'],
-			},
-			{
-				reason: 'Same as the click: hx-boost fetches the next page by XHR; the port navigates normally to the same URL and page.',
-				by: 'Claude Code (converting agent), for owner review',
-				count: 15,
-				checks: ['a11y'],
-				routes: ['/', '/docs/', '/examples/'],
-			},
-			{
-				reason: "Markless 0.4.0 modulepreloads the page's whole template as client render data: 1.34 MB uncompressed for the 170 kB documentation page in this check (the mirror and the local server do not compress). Compressed as served (htmx.org against the deployed front door): 70.6 -> 178.4 kB. JavaScript that runs at load drops from 97 kB to 18 kB. Nothing in the port avoids the render data; it is the framework's.",
-				by: 'Claude Code (converting agent), for owner review',
-				count: 1,
-				checks: ['weight'],
-				routes: ['/docs/'],
-			},
-			{
 				reason: "The GitHub star button is a live third-party widget (buttons.github.io). On this page sinon's fake XMLHttpRequest pushes buttons.js into its iframe fallback, and the star count inside that iframe loads (or not) live from api.github.com; the port renders the same iframe, inside the span buttons.js would leave, because Markless resume finds elements by DOM position and an element swapped for another breaks it. The region may extend to the attribution badge at the bottom right.",
 				by: 'Claude Code (converting agent), for owner review',
 				count: 1,
@@ -3267,13 +6438,70 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 				routes: ['/examples/click-to-edit/'],
 			},
 		],
-		red: [],
+		red: [
+			{
+				route: '/',
+				check: 'behaviour',
+				count: 10,
+				example:
+					'browser storage after the page loads: missing sessionStorage htmx-current-path-for-history',
+			},
+			{
+				route: '/',
+				check: 'a11y',
+				count: 8,
+				example:
+					'press Enter on link "docs": requests: (none); kept in the browser: (no change)',
+			},
+			{
+				route: '/docs/',
+				check: 'behaviour',
+				count: 90,
+				example:
+					'browser storage after the page loads: missing sessionStorage htmx-current-path-for-history',
+			},
+			{
+				route: '/docs/',
+				check: 'a11y',
+				count: 7,
+				example:
+					'press Enter on link "docs", in the layout shared with /: requests: (none); kept in the browser: (no change)',
+			},
+			{
+				route: '/examples/',
+				check: 'behaviour',
+				count: 12,
+				example:
+					'browser storage after the page loads: missing sessionStorage htmx-current-path-for-history',
+			},
+			{
+				route: '/examples/',
+				check: 'a11y',
+				count: 7,
+				example:
+					'press Enter on link "docs", in the layout shared with /: requests: (none); kept in the browser: (no change)',
+			},
+			{
+				route: '/examples/click-to-edit/',
+				check: 'behaviour',
+				count: 11,
+				example:
+					'browser storage after the page loads: missing sessionStorage htmx-current-path-for-history',
+			},
+			{
+				route: '/examples/click-to-edit/',
+				check: 'a11y',
+				count: 7,
+				example:
+					'press Enter on link "docs", in the layout shared with /: requests: (none); kept in the browser: (no change)',
+			},
+		],
 		gaps: [],
 		downloadedBasis: 'Transferred, compressed: htmx.org to front door',
 		headline: {
 			route: '/',
 			before: 101198,
-			after: 18984,
+			after: 24974,
 		},
 		links: {
 			frontDoor: 'https://mm-htmx-org.vercel.app',
@@ -3293,24 +6521,24 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 		builtWith: 'Alpine.js',
 		access: 'url-only',
 		signIn: false,
-		status: 'live',
-		checkedAt: '2026-10-17T04:42:40.892Z',
-		pagesGreen: 3,
+		status: 'in-progress',
+		checkedAt: '2026-10-18T01:37:28.112Z',
+		pagesGreen: 0,
 		pagesChecked: 3,
 		routes: [
 			{
 				pattern: '/',
 				kind: 'page',
-				switched: true,
+				switched: false,
 				forcedReason: null,
 				rows: [
 					{
 						role: null,
 						pages: 1,
-						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
-						redChecks: [],
+						green: 0,
+						checksPassed: 12,
+						checksTotal: 14,
+						redChecks: ['a11y', 'behaviour'],
 						downloaded: {
 							before: {
 								min: 144600,
@@ -3327,8 +6555,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 								max: 78017,
 							},
 							after: {
-								min: 18153,
-								max: 18153,
+								min: 23888,
+								max: 23888,
 							},
 						},
 					},
@@ -3337,16 +6565,16 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			{
 				pattern: '/start-here',
 				kind: 'page',
-				switched: true,
+				switched: false,
 				forcedReason: null,
 				rows: [
 					{
 						role: null,
 						pages: 1,
-						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
-						redChecks: [],
+						green: 0,
+						checksPassed: 11,
+						checksTotal: 14,
+						redChecks: ['a11y', 'behaviour', 'responsiveness'],
 						downloaded: {
 							before: {
 								min: 145900,
@@ -3359,12 +6587,12 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						},
 						runAtLoad: {
 							before: {
-								min: 85876,
-								max: 85876,
+								min: 87517,
+								max: 87517,
 							},
 							after: {
-								min: 18190,
-								max: 18190,
+								min: 36401,
+								max: 36401,
 							},
 						},
 					},
@@ -3373,16 +6601,16 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			{
 				pattern: '/directives/model',
 				kind: 'page',
-				switched: true,
+				switched: false,
 				forcedReason: null,
 				rows: [
 					{
 						role: null,
 						pages: 1,
-						green: 1,
-						checksPassed: 13,
-						checksTotal: 13,
-						redChecks: [],
+						green: 0,
+						checksPassed: 11,
+						checksTotal: 14,
+						redChecks: ['a11y', 'behaviour', 'responsiveness'],
 						downloaded: {
 							before: {
 								min: 144500,
@@ -3395,12 +6623,12 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						},
 						runAtLoad: {
 							before: {
-								min: 85898,
-								max: 85898,
+								min: 86029,
+								max: 86029,
 							},
 							after: {
-								min: 18170,
-								max: 18170,
+								min: 36510,
+								max: 36510,
 							},
 						},
 					},
@@ -3452,8 +6680,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			},
 			{
 				name: 'a11y',
-				passed: 3,
-				failed: 0,
+				passed: 0,
+				failed: 3,
 				skipped: 0,
 			},
 			{
@@ -3464,8 +6692,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			},
 			{
 				name: 'behaviour',
-				passed: 3,
-				failed: 0,
+				passed: 0,
+				failed: 3,
 				skipped: 0,
 			},
 			{
@@ -3484,6 +6712,12 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 				name: 'weight',
 				passed: 3,
 				failed: 0,
+				skipped: 0,
+			},
+			{
+				name: 'responsiveness',
+				passed: 1,
+				failed: 2,
 				skipped: 0,
 			},
 		],
@@ -3525,16 +6759,9 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 				routes: ['/', '/start-here', '/directives/model'],
 			},
 			{
-				reason: "Markless 0.4.0 modulepreloads every page's whole template as client render data. Measured uncompressed in this check (the mirror and the local server do not compress): 630 kB of it on /directives/model, 295 kB on /start-here. Compressed as served (alpinejs.dev against the deployed front door): / 144.6 -> 117.4 kB, /start-here 145.9 -> 145.2 kB, /directives/model 144.5 -> 160.8 kB. JavaScript that runs at load drops from 76 to 84 kB to 18 kB on every route. Nothing in the port avoids the render data; it is the framework's.",
-				by: 'Claude Code (converting agent), for owner review',
-				count: 3,
-				checks: ['weight'],
-				routes: ['/', '/start-here', '/directives/model'],
-			},
-			{
 				reason: "Intended: the licence attribution this public demo copy must carry (Alpine.js, MIT), as a small fixed badge so it changes no layout the check compares. Matches only differences up to the badge's own area (356 x 54 = 19,224 pixels).",
 				by: 'Claude Code (converting agent), for owner review',
-				count: 21,
+				count: 22,
 				checks: ['visual'],
 				routes: ['/', '/start-here', '/directives/model'],
 			},
@@ -3553,13 +6780,70 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 				routes: ['/start-here'],
 			},
 		],
-		red: [],
+		red: [
+			{
+				route: '/',
+				check: 'behaviour',
+				count: 8,
+				example:
+					'browser storage after the page loads: missing cookie alpinejs_session HttpOnly SameSite=Lax',
+			},
+			{
+				route: '/',
+				check: 'a11y',
+				count: 1,
+				example:
+					'press Enter on link "Components": kept in the browser: + cookie alpinejs_session HttpOnly SameSite=Lax',
+			},
+			{
+				route: '/start-here',
+				check: 'behaviour',
+				count: 67,
+				example:
+					'browser storage after the page loads: missing cookie alpinejs_session HttpOnly SameSite=Lax',
+			},
+			{
+				route: '/start-here',
+				check: 'a11y',
+				count: 58,
+				example:
+					'press Enter on link "→ Read more about x-data": kept in the browser: + cookie alpinejs_session HttpOnly SameSite=Lax',
+			},
+			{
+				route: '/start-here',
+				check: 'responsiveness',
+				count: 1,
+				example:
+					'first interaction with button "Increment" (4x CPU, mobile): new 61 ms (runs 59 ms, 61 ms); likely cause: no single cause seen: the handler itself is slower; slo',
+			},
+			{
+				route: '/directives/model',
+				check: 'behaviour',
+				count: 57,
+				example:
+					'browser storage after the page loads: missing cookie alpinejs_session HttpOnly SameSite=Lax',
+			},
+			{
+				route: '/directives/model',
+				check: 'a11y',
+				count: 25,
+				example:
+					'press Enter on link "→ Read more about x-data": kept in the browser: + cookie alpinejs_session HttpOnly SameSite=Lax',
+			},
+			{
+				route: '/directives/model',
+				check: 'responsiveness',
+				count: 6,
+				example:
+					'first interaction with checkbox (4x CPU, mobile): new 84 ms (runs 81 ms, 84 ms); likely cause: first-interaction cost: 84 ms cold, 33 ms the second time; slower',
+			},
+		],
 		gaps: [],
 		downloadedBasis: 'Transferred, compressed: alpinejs.dev to front door',
 		headline: {
 			route: '/',
 			before: 78017,
-			after: 18153,
+			after: 23888,
 		},
 		links: {
 			frontDoor: 'https://mm-alpinejs-dev.vercel.app',
@@ -3580,7 +6864,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 		access: 'source',
 		signIn: false,
 		status: 'in-progress',
-		checkedAt: '2026-10-17T05:51:46.981Z',
+		checkedAt: '2026-10-18T06:14:17.939Z',
 		pagesGreen: 0,
 		pagesChecked: 1,
 		routes: [
@@ -3594,17 +6878,17 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 						role: null,
 						pages: 1,
 						green: 0,
-						checksPassed: 8,
-						checksTotal: 13,
-						redChecks: ['visual', 'a11y', 'behaviour', 'network', 'weight'],
+						checksPassed: 9,
+						checksTotal: 14,
+						redChecks: ['a11y', 'behaviour', 'network', 'weight', 'responsiveness'],
 						downloaded: {
 							before: {
-								min: 140085,
-								max: 140085,
+								min: 146790,
+								max: 146790,
 							},
 							after: {
-								min: 146733,
-								max: 146733,
+								min: 149105,
+								max: 149105,
 							},
 						},
 						runAtLoad: {
@@ -3613,8 +6897,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 								max: 210092,
 							},
 							after: {
-								min: 63098,
-								max: 63098,
+								min: 69338,
+								max: 69338,
 							},
 						},
 					},
@@ -3642,8 +6926,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			},
 			{
 				name: 'visual',
-				passed: 0,
-				failed: 1,
+				passed: 1,
+				failed: 0,
 				skipped: 0,
 			},
 			{
@@ -3700,6 +6984,12 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 				failed: 1,
 				skipped: 0,
 			},
+			{
+				name: 'responsiveness',
+				passed: 0,
+				failed: 1,
+				skipped: 0,
+			},
 		],
 		switchedWithoutCheck: [],
 		accepted: [],
@@ -3715,27 +7005,28 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 				check: 'weight',
 				count: 1,
 				example:
-					'JavaScript downloaded: 146733 bytes; new-only scripts: /islands/page.js (30775 B), /build/chunk-BT_t4VlE.js (22479 B), /build/chunk-11ETq0ul.js (10199 B)',
-			},
-			{
-				route: '/',
-				check: 'visual',
-				count: 7,
-				example: 'screenshot in viewport width 767px: 5327 pixels differ',
+					'JavaScript downloaded: 149105 bytes; new-only scripts: /build/chunk-xADJ3n8N.js (44067 B), /build/chunk-PbTKRkS5.js (37681 B), /islands/page.js (36864 B)',
 			},
 			{
 				route: '/',
 				check: 'behaviour',
-				count: 5,
+				count: 18,
 				example:
-					'click link "Guide": console errors: Failed to patch FloatingVue TypeError: Cannot read properties of undefined (reading \'Popper\')',
+					'click link "Get Started": console errors: Failed to patch FloatingVue TypeError: Cannot read properties of undefined (reading \'Popper\')',
 			},
 			{
 				route: '/',
 				check: 'a11y',
-				count: 5,
+				count: 12,
 				example:
-					'press Enter on link "Guide": console errors: Failed to patch FloatingVue TypeError: Cannot read properties of undefined (reading \'Popper\')',
+					'press Enter on link "Get Started": console errors: Failed to patch FloatingVue TypeError: Cannot read properties of undefined (reading \'Popper\')',
+			},
+			{
+				route: '/',
+				check: 'responsiveness',
+				count: 4,
+				example:
+					'first interaction with button "Search" (desktop): new 37 ms (runs 37 ms); likely cause: code fetch: /islands/search-index-Dq_7HJfv.js (144.5 kB); long task 51 m',
 			},
 		],
 		gaps: [
@@ -3765,7 +7056,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 		headline: {
 			route: '/',
 			before: 210092,
-			after: 63098,
+			after: 69338,
 		},
 		links: {
 			frontDoor: 'https://markless-migrate-demo.vercel.app',
@@ -3786,116 +7077,77 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 		access: 'source',
 		signIn: false,
 		status: 'in-progress',
-		checkedAt: '2026-10-17T17:58:16.308Z',
+		checkedAt: '2026-10-18T04:30:28.394Z',
 		pagesGreen: 0,
 		pagesChecked: 3,
 		routes: [
 			{
 				pattern: '/',
 				kind: 'page',
-				switched: true,
-				forcedReason:
-					"left red only by the old charts' Math.random data, T1, missing avatar files and the loading bar timing; see examples/shadcn-admin-LOG.md",
+				switched: false,
+				forcedReason: null,
 				rows: [
 					{
 						role: null,
 						pages: 1,
 						green: 0,
-						checksPassed: 9,
-						checksTotal: 13,
-						redChecks: ['visual', 'assets', 'css', 'a11y'],
-						downloaded: {
-							before: {
-								min: 1243881,
-								max: 1243881,
-							},
-							after: {
-								min: 544829,
-								max: 544829,
-							},
-						},
-						runAtLoad: {
-							before: {
-								min: 450550,
-								max: 450550,
-							},
-							after: {
-								min: 10369,
-								max: 10369,
-							},
-						},
+						checksPassed: 0,
+						checksTotal: 14,
+						redChecks: ['http'],
+						downloaded: null,
+						runAtLoad: null,
 					},
 				],
 			},
 			{
 				pattern: '/users',
 				kind: 'page',
-				switched: true,
-				forcedReason:
-					'left red only by T1, missing avatar files, the pagination font (G27) and JavaScript downloaded (G28); see examples/shadcn-admin-LOG.md',
+				switched: false,
+				forcedReason: null,
 				rows: [
 					{
 						role: null,
 						pages: 1,
 						green: 0,
-						checksPassed: 11,
-						checksTotal: 13,
-						redChecks: ['assets', 'weight'],
-						downloaded: {
-							before: {
-								min: 1510614,
-								max: 1510614,
-							},
-							after: {
-								min: 2815496,
-								max: 2815496,
-							},
-						},
-						runAtLoad: {
-							before: {
-								min: 738333,
-								max: 738333,
-							},
-							after: {
-								min: 3826,
-								max: 3826,
-							},
-						},
+						checksPassed: 0,
+						checksTotal: 14,
+						redChecks: ['http'],
+						downloaded: null,
+						runAtLoad: null,
 					},
 				],
 			},
 			{
 				pattern: '/sign-in',
 				kind: 'page',
-				switched: true,
-				forcedReason:
-					"left red only by T1 chunk names and the loading bar's first-frame timing; see examples/shadcn-admin-LOG.md",
+				switched: false,
+				forcedReason: null,
 				rows: [
 					{
 						role: null,
 						pages: 1,
 						green: 0,
-						checksPassed: 11,
-						checksTotal: 13,
-						redChecks: ['assets', 'css'],
+						checksPassed: 12,
+						checksTotal: 14,
+						redChecks: ['css', 'behaviour'],
 						downloaded: {
 							before: {
-								min: 758220,
-								max: 758220,
+								min: 244393,
+								max: 244393,
 							},
 							after: {
-								min: 459279,
-								max: 459279,
+								min: 96745,
+								max: 96745,
 							},
 						},
 						runAtLoad: {
 							before: {
-								min: 246931,
-								max: 246931,
+								min: 246941,
+								max: 246941,
 							},
 							after: {
-								min: 3675,
-								max: 3675,
+								min: 5170,
+								max: 5170,
 							},
 						},
 					},
@@ -3905,81 +7157,87 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 		checks: [
 			{
 				name: 'http',
-				passed: 3,
-				failed: 0,
-				skipped: 0,
-			},
-			{
-				name: 'auth',
-				passed: 3,
-				failed: 0,
-				skipped: 0,
-			},
-			{
-				name: 'rendered',
-				passed: 3,
-				failed: 0,
-				skipped: 0,
-			},
-			{
-				name: 'visual',
-				passed: 2,
-				failed: 1,
-				skipped: 0,
-			},
-			{
-				name: 'seo',
-				passed: 3,
-				failed: 0,
-				skipped: 0,
-			},
-			{
-				name: 'assets',
-				passed: 0,
-				failed: 3,
-				skipped: 0,
-			},
-			{
-				name: 'css',
 				passed: 1,
 				failed: 2,
 				skipped: 0,
 			},
 			{
-				name: 'a11y',
-				passed: 2,
+				name: 'auth',
+				passed: 1,
+				failed: 0,
+				skipped: 2,
+			},
+			{
+				name: 'rendered',
+				passed: 1,
+				failed: 0,
+				skipped: 2,
+			},
+			{
+				name: 'visual',
+				passed: 1,
+				failed: 0,
+				skipped: 2,
+			},
+			{
+				name: 'seo',
+				passed: 1,
+				failed: 0,
+				skipped: 2,
+			},
+			{
+				name: 'assets',
+				passed: 1,
+				failed: 0,
+				skipped: 2,
+			},
+			{
+				name: 'css',
+				passed: 0,
 				failed: 1,
-				skipped: 0,
+				skipped: 2,
+			},
+			{
+				name: 'a11y',
+				passed: 1,
+				failed: 0,
+				skipped: 2,
 			},
 			{
 				name: 'i18n',
-				passed: 3,
+				passed: 1,
 				failed: 0,
-				skipped: 0,
+				skipped: 2,
 			},
 			{
 				name: 'behaviour',
-				passed: 3,
-				failed: 0,
-				skipped: 0,
+				passed: 0,
+				failed: 1,
+				skipped: 2,
 			},
 			{
 				name: 'network',
-				passed: 3,
+				passed: 1,
 				failed: 0,
-				skipped: 0,
+				skipped: 2,
 			},
 			{
 				name: 'data',
-				passed: 3,
+				passed: 1,
 				failed: 0,
-				skipped: 0,
+				skipped: 2,
 			},
 			{
 				name: 'weight',
-				passed: 2,
-				failed: 1,
-				skipped: 0,
+				passed: 1,
+				failed: 0,
+				skipped: 2,
+			},
+			{
+				name: 'responsiveness',
+				passed: 1,
+				failed: 0,
+				skipped: 2,
 			},
 		],
 		switchedWithoutCheck: [],
@@ -3987,43 +7245,15 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 		red: [
 			{
 				route: '/',
-				check: 'visual',
-				count: 18,
-				example:
-					'screenshot: 24630 pixels (2.21%) differ in x=301..793, y=449..712, first near g (main>tabpanel>application/g), text (main>tabpanel>application/text)',
-			},
-			{
-				route: '/',
-				check: 'css',
-				count: 122,
-				example:
-					'computed style of generic (body/div): opacity: 0; transition-timing-function: ease-out',
-			},
-			{
-				route: '/',
-				check: 'a11y',
+				check: 'http',
 				count: 1,
-				example: 'motion under prefers-reduced-motion: reduce: running: opacity',
-			},
-			{
-				route: '/',
-				check: 'assets',
-				count: 7,
-				example: 'script /assets/users-Bkzkyznz.js: 404 application/json',
+				example: 'page load: page.goto: Timeout 30000ms exceeded.',
 			},
 			{
 				route: '/users',
-				check: 'assets',
-				count: 5,
-				example:
-					'rendered font of button "Go to page 11" (main>button/button) and 4 more elements: (no text)',
-			},
-			{
-				route: '/users',
-				check: 'weight',
+				check: 'http',
 				count: 1,
-				example:
-					'JavaScript downloaded: 2815496 bytes; new-only scripts: /build/chunk-BUKrhRrg.js (1234202 B), /build/chunk-9_c7aZH02.js (746101 B), /build/chunk-S-rbPa8v.js (27',
+				example: 'page load: page.goto: Timeout 30000ms exceeded.',
 			},
 			{
 				route: '/sign-in',
@@ -4034,9 +7264,10 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			},
 			{
 				route: '/sign-in',
-				check: 'assets',
-				count: 4,
-				example: 'script /assets/users-Bkzkyznz.js: 404 application/json',
+				check: 'behaviour',
+				count: 6,
+				example:
+					'type "Sample text from markless-migrate" into textbox "Password": focus on body',
 			},
 		],
 		gaps: [
@@ -4072,8 +7303,8 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 		downloadedBasis: 'On the wire during the check, as the servers it compared sent it',
 		headline: {
 			route: '/',
-			before: 450550,
-			after: 10369,
+			before: 0,
+			after: 0,
 		},
 		links: {
 			frontDoor: 'https://mm-shadcn-admin.vercel.app',
