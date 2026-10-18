@@ -8,6 +8,7 @@ import { resolve } from 'pathe';
 import { expect, test } from 'vitest';
 import { resumeModuleClosure, servedResumeModuleUrl } from './helpers/served-resume-module.ts';
 import { listenOnFreePort } from './helpers/listen.ts';
+import { dispatchesSettled, trackDispatches } from './helpers/dispatch-settled.ts';
 
 const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../..');
@@ -90,6 +91,7 @@ test.each([false, true])(
 			const fullRuntime = async () =>
 				packing ? fullStarted() : scripts.some((url) => fullResumeChunks.has(url));
 
+			await trackDispatches(page);
 			await page.goto(`http://127.0.0.1:${port}/`);
 			await expect.poll(total).toBe('0');
 			expect(await fullRuntime()).toBe(false);
@@ -98,7 +100,7 @@ test.each([false, true])(
 			await page.locator('[data-step]').hover();
 			await page.locator('[data-step]').click();
 			await expect.poll(total).toBe('1');
-			await page.waitForTimeout(200);
+			await dispatchesSettled(page);
 			expect(await fullRuntime()).toBe(false);
 
 			// The non-scalar control wakes the full runtime, which adopts the lean value.
@@ -109,7 +111,7 @@ test.each([false, true])(
 					.poll(() => scripts.filter((url) => fullResumeChunks.has(url)).length)
 					.toBe(1);
 			await expect.poll(fullStarted).toBe(true);
-			await page.waitForTimeout(200);
+			await dispatchesSettled(page);
 
 			await page.locator('[data-step]').click();
 			await expect.poll(total).toBe('12');
@@ -117,7 +119,7 @@ test.each([false, true])(
 			await expect.poll(total).toBe('22');
 			await page.locator('[data-step]').click();
 			await expect.poll(total).toBe('23');
-			await page.waitForTimeout(200);
+			await dispatchesSettled(page);
 			expect(await total()).toBe('23');
 			expect(errors).toEqual([]);
 		} finally {

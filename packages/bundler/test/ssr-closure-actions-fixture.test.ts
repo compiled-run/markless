@@ -8,6 +8,7 @@ import { resolve } from 'pathe';
 import { expect, test } from 'vitest';
 import { resumeModuleClosure, servedResumeModuleUrl } from './helpers/served-resume-module.ts';
 import { listenOnFreePort } from './helpers/listen.ts';
+import { dispatchesSettled, trackDispatches } from './helpers/dispatch-settled.ts';
 
 const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../..');
@@ -50,6 +51,7 @@ async function open(browser: Browser, mode: Mode) {
 	const page = await browser.newPage();
 	const errors: string[] = [];
 	page.on('pageerror', (error) => errors.push(error.message));
+	await trackDispatches(page);
 	await page.goto(`http://127.0.0.1:${port}/`);
 	await expect.poll(() => page.locator('[data-taps]').textContent()).toBe('0');
 	// The resume module hands every event to full resume once this is set, as it does after its first handoff.
@@ -89,11 +91,6 @@ function observe(page: Page) {
 			]),
 		};
 	});
-}
-
-async function settle(page: Page) {
-	await page.waitForTimeout(60);
-	await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => setTimeout(done))));
 }
 
 async function runtimeStarted(page: Page) {
@@ -147,8 +144,8 @@ test('compiled closure actions match full resume after every step of every actio
 			for (const [index, step] of sequence.entries()) {
 				await step.run(compiled.page);
 				await step.run(full.page);
-				await settle(compiled.page);
-				await settle(full.page);
+				await dispatchesSettled(compiled.page);
+				await dispatchesSettled(full.page);
 				expect(await observe(compiled.page), `${label} @${index}`).toEqual(
 					await observe(full.page),
 				);

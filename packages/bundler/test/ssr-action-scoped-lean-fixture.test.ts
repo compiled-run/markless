@@ -7,6 +7,7 @@ import { chromium, type Page } from '@playwright/test';
 import { resolve } from 'pathe';
 import { expect, test } from 'vitest';
 import { listenOnFreePort } from './helpers/listen.ts';
+import { dispatchesSettled, trackDispatches } from './helpers/dispatch-settled.ts';
 
 const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../..');
@@ -71,6 +72,7 @@ test.each([false, true])(
 				if (request.resourceType() === 'script')
 					scripts.push(new URL(request.url()).pathname);
 			});
+			await trackDispatches(page);
 			await page.goto(`http://127.0.0.1:${port}/`);
 			await expect.poll(() => text(page, '[data-taps]')).toBe('0');
 			const fullStarted = () =>
@@ -102,7 +104,7 @@ test.each([false, true])(
 				tap.click();
 			});
 			await expect.poll(() => text(lean.page, '[data-taps]')).toBe('3');
-			await lean.page.waitForTimeout(200);
+			await dispatchesSettled(lean.page);
 			expect(await lean.fullRuntime()).toBe(false);
 			expect(await lean.fullStarted()).toBe(false);
 			await lean.page.locator('[data-toggle]').click();
@@ -122,7 +124,7 @@ test.each([false, true])(
 			await expect.poll(() => text(keyboard.page, '[data-taps]')).toBe('1');
 			await keyboard.page.keyboard.press('Space');
 			await expect.poll(() => text(keyboard.page, '[data-taps]')).toBe('2');
-			await keyboard.page.waitForTimeout(200);
+			await dispatchesSettled(keyboard.page);
 			expect(await keyboard.fullRuntime()).toBe(false);
 			expect(keyboard.errors).toEqual([]);
 
@@ -148,7 +150,7 @@ test.each([false, true])(
 			});
 			await expect.poll(() => pending.page.locator('[data-shown]').count()).toBe(1);
 			await expect.poll(() => text(pending.page, '[data-taps]')).toBe('3');
-			await pending.page.waitForTimeout(200);
+			await dispatchesSettled(pending.page);
 			expect(await text(pending.page, '[data-taps]')).toBe('3');
 			expect(pending.errors).toEqual([]);
 		} finally {
