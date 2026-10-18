@@ -275,14 +275,15 @@ jobs:
     # restore this cache instead of each fetching its own copy, which is what
     # used to hang a runner for 28 minutes. Keyed by the lockfile, so the pinned
     # Playwright version is part of the key. WebKit rides along for the node
-    # tests that drive both engines.
+    # tests that drive both engines. The browsers sit beside the checkout, not
+    # in it, so a lint of the tree never sees them.
     prepare-playwright:
         needs: lanes
         if: needs.lanes.outputs.run_playwright == 'true'
         runs-on: ubuntu-latest
         timeout-minutes: 15
         env:
-            PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.cache/ms-playwright
+            PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/../ms-playwright
             NPM_CONFIG_AUDIT: 'false'
             NPM_CONFIG_FUND: 'false'
             NPM_CONFIG_PREFER_OFFLINE: 'true'
@@ -309,7 +310,7 @@ jobs:
               uses: actions/cache/restore@v4
               with:
                   key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
-                  path: .cache/ms-playwright
+                  path: ${{ github.workspace }}/../ms-playwright
 
             - name: Install Markless dependencies
               if: steps.playwright-cache.outputs.cache-hit != 'true'
@@ -325,7 +326,7 @@ jobs:
               uses: actions/cache/save@v4
               with:
                   key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
-                  path: .cache/ms-playwright
+                  path: ${{ github.workspace }}/../ms-playwright
 
     # The steps that used to run back-to-back inside one 30-minute `test` job
     # now run as the parallel lanes below. Nothing was dropped: every step of
@@ -345,7 +346,7 @@ jobs:
             matrix:
                 shard: ['1/3', '2/3', '3/3']
         env:
-            PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.cache/ms-playwright
+            PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/../ms-playwright
             NPM_CONFIG_AUDIT: 'false'
             NPM_CONFIG_FUND: 'false'
             NPM_CONFIG_PREFER_OFFLINE: 'true'
@@ -375,7 +376,7 @@ jobs:
               uses: actions/cache/restore@v4
               with:
                   key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
-                  path: .cache/ms-playwright
+                  path: ${{ github.workspace }}/../ms-playwright
 
             - name: Install Playwright system dependencies
               run: pnpm --dir packages/vitest-browser exec playwright install-deps chromium webkit
@@ -399,7 +400,7 @@ jobs:
             matrix:
                 shard: ['1/2', '2/2']
         env:
-            PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.cache/ms-playwright
+            PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/../ms-playwright
             NPM_CONFIG_AUDIT: 'false'
             NPM_CONFIG_FUND: 'false'
             NPM_CONFIG_PREFER_OFFLINE: 'true'
@@ -432,7 +433,7 @@ jobs:
               uses: actions/cache/restore@v4
               with:
                   key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
-                  path: .cache/ms-playwright
+                  path: ${{ github.workspace }}/../ms-playwright
 
             - name: Install Playwright system dependencies
               run: pnpm --dir packages/vitest-browser exec playwright install-deps chromium
@@ -505,7 +506,7 @@ jobs:
         runs-on: ubuntu-latest
         timeout-minutes: 25
         env:
-            PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.cache/ms-playwright
+            PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/../ms-playwright
             NPM_CONFIG_AUDIT: 'false'
             NPM_CONFIG_FUND: 'false'
             NPM_CONFIG_PREFER_OFFLINE: 'true'
@@ -535,7 +536,7 @@ jobs:
               uses: actions/cache/restore@v4
               with:
                   key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
-                  path: .cache/ms-playwright
+                  path: ${{ github.workspace }}/../ms-playwright
 
             - name: Install Playwright system dependencies
               run: pnpm --dir packages/vitest-browser exec playwright install-deps chromium
@@ -578,7 +579,7 @@ jobs:
         runs-on: ubuntu-latest
         timeout-minutes: 25
         env:
-            PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.cache/ms-playwright
+            PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/../ms-playwright
             NPM_CONFIG_AUDIT: 'false'
             NPM_CONFIG_FUND: 'false'
             NPM_CONFIG_PREFER_OFFLINE: 'true'
@@ -608,7 +609,7 @@ jobs:
               uses: actions/cache/restore@v4
               with:
                   key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
-                  path: .cache/ms-playwright
+                  path: ${{ github.workspace }}/../ms-playwright
 
             - name: Install Playwright system dependencies
               run: pnpm --dir packages/vitest-browser exec playwright install-deps chromium
@@ -648,7 +649,7 @@ jobs:
         runs-on: ubuntu-latest
         timeout-minutes: 25
         env:
-            PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.cache/ms-playwright
+            PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/../ms-playwright
             NPM_CONFIG_AUDIT: 'false'
             NPM_CONFIG_FUND: 'false'
             NPM_CONFIG_PREFER_OFFLINE: 'true'
@@ -678,7 +679,7 @@ jobs:
               uses: actions/cache/restore@v4
               with:
                   key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
-                  path: .cache/ms-playwright
+                  path: ${{ github.workspace }}/../ms-playwright
 
             - name: Install Playwright system dependencies
               run: pnpm --dir packages/vitest-browser exec playwright install-deps chromium
@@ -721,7 +722,7 @@ jobs:
         runs-on: ubuntu-latest
         timeout-minutes: 25
         env:
-            PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.cache/ms-playwright
+            PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/../ms-playwright
             NPM_CONFIG_AUDIT: 'false'
             NPM_CONFIG_FUND: 'false'
             NPM_CONFIG_PREFER_OFFLINE: 'true'
@@ -751,7 +752,7 @@ jobs:
               uses: actions/cache/restore@v4
               with:
                   key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
-                  path: .cache/ms-playwright
+                  path: ${{ github.workspace }}/../ms-playwright
 
             - name: Install Playwright system dependencies
               run: pnpm --dir packages/vitest-browser exec playwright install-deps chromium

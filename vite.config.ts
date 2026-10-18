@@ -285,6 +285,7 @@ export default defineConfig({
 			'node_modules/**',
 			'scripts/experiments/**/results/**',
 			'.claude/**',
+			'.cache/**',
 			'website/public/**',
 			'website/components/docs/playground/generated/**',
 			// Editor-completion probes and deliberately unparsable inputs, not source.
@@ -326,6 +327,7 @@ export default defineConfig({
 			'node_modules/**',
 			'scripts/experiments/**/results/**',
 			'.claude/**',
+			'.cache/**',
 			'website/public/**',
 			'website/components/docs/playground/generated/**',
 			// Editor-completion probes and deliberately unparsable inputs, not source.
