@@ -77,6 +77,12 @@ its message now names which and how to fix it.
 
 ### Fixes
 
+- `npm create markless my-app --editor zed` (without `--`) uses the editor you
+  named. npm reads `--editor` as its own setting there and passes it on only
+  in its environment, so 0.5.0 silently wrote VS Code settings instead. The
+  CLI docs now list `--editor` and say to put flags after `--` with npm, and a
+  new app's README says to run Vite commands through `vp`, since its `vite`
+  alias has no `vite` command.
 - When one handler changes both the rows of a component `@for` and some text
   elsewhere on the page, both changes now show up at the same time. Before, on
   the first click the rows could show up one task before the text, because the

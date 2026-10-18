@@ -305,6 +305,22 @@ test('--yes writes the settings of the editor detected from the environment', as
 	}
 });
 
+test('an --editor that npm create kept as its own setting still picks the editor', async () => {
+	const cases = [
+		{ env: { npm_config_user_agent: 'npm/12.0.1', npm_config_editor: 'zed' }, editor: 'zed' },
+		{ env: { npm_config_user_agent: 'npm/12.0.1', npm_config_editor: 'none' }, editor: 'none' },
+		{ env: { npm_config_user_agent: 'npm/12.0.1', npm_config_editor: 'vim' }, editor: 'vscode' },
+		{ env: { npm_config_user_agent: 'pnpm/10.33.2', npm_config_editor: 'zed' }, editor: 'vscode' },
+	] as const;
+	for (const { env, editor } of cases) {
+		const root = await makeWorkspace();
+		const host = runtime(root, { env });
+		const program = new CreateProgram();
+		const options = await program.interact(program.validate(['my-app', '--yes'], host), host);
+		expect(options.editor).toBe(editor);
+	}
+});
+
 test('--editor writes only the chosen editor settings and names them in the README', async () => {
 	const written = {
 		vscode: ['.vscode/extensions.json', '.vscode/settings.json'],

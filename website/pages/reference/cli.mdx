@@ -26,9 +26,11 @@ With no flags, the CLI asks you questions. With `--yes`, it takes the defaults, 
 npm create markless@latest my-app -- --yes --starter app --no-git
 ```
 
+With npm, put the flags after `--`. Without it, npm reads them as its own options: it keeps `--yes` and `--editor` for itself, and stops on `--no-install`. pnpm, yarn and bun pass flags through without `--`.
+
 ## Flags
 
-This is the real `--help` output. The repo source (`0.5.0`) and the npm release (`0.4.0`) print the same text.
+This is the real `--help` output of `create-markless` 0.5.0.
 
 ```txt
 create-markless
@@ -42,6 +44,7 @@ Options:
   --yes, -y          Use defaults
   --format <name>   node, deno, or bun
   --starter <name>  minimal, app, docs, or full-stack
+  --editor <name>   vscode, zed, or none
   --agents <list>   claude-code, codex, gemini-cli, github-copilot, or none
   --no-install      Skip dependency installation
   --no-git          Skip git initialization
@@ -65,13 +68,12 @@ All four starters are multi-page apps built on `@markless/router` and Nitro. Tha
 | `docs` | Write docs | An MDX docs site with a layout and sidebar components. |
 | `full-stack` | Full-stack app | The `app` files plus `api/` and `middleware/` folders. |
 
-A `minimal` app made with `--yes --no-install --no-git --agents none` holds these files:
+A `minimal` app made with `--yes --no-install --no-git --agents none --editor vscode` holds these files (`--editor zed` writes `.zed/settings.json` instead of the `.vscode` files, and `--editor none` writes neither):
 
 ```txt
 .gitignore
 .vscode/extensions.json
 .vscode/settings.json
-.zed/settings.json
 README.md
 package.json
 pages/index.tsrx
@@ -97,9 +99,11 @@ Cursor shows in the list, but you can't pick it. Its User Rules apply to every p
 - `npm run build` runs `vp build`. Builds the app and its server into `.output/`.
 - `npm run preview` runs `vp preview`. Serves the build.
 - `npm run check` runs `vp check`. Runs the Vite+ checks.
-- `npm run doctor` runs `node scripts/markless-doctor.mjs`. Checks the Markless packages and `tsconfig.json`, then runs `pnpm exec vp build`. Add `-- --no-build` to skip the build.
+- `npm run doctor` runs `node scripts/markless-doctor.mjs`. Checks the Markless packages and `tsconfig.json`, then runs `vp build`. Add `-- --no-build` to skip the build.
 - `npm run fmt` runs `vp fmt`. Formats the code.
 - `npm run test` runs `vp test`. Runs Vitest.
+
+Run Vite commands through `vp`, as these scripts do: `vp build -c other.config.ts`, not `vite build`. The app lists `vite` as an alias for `@voidzero-dev/vite-plus-core`, so that plugins asking for `vite` get Vite+, and that package has no `vite` command.
 
 A Deno app gets the same tasks in `deno.json`, without `doctor`. Run them with `deno task dev`.
 

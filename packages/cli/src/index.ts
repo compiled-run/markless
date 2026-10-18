@@ -280,6 +280,7 @@ export class CreateProgram {
 
 		return {
 			...parsed,
+			editor: parsed.editor ?? editorKeptByNpm(runtime.env),
 			cwd: runtime.cwd(),
 			packageManager: inferPackageManager(runtime.env),
 		};
@@ -929,6 +930,12 @@ function packageName(target: string): string {
 		.replace(/^-+|-+$/g, '');
 
 	return name || 'markless-app';
+}
+
+// `npm create markless app --editor zed` without `--` reads `--editor` as npm's own setting and passes it on only as npm_config_editor.
+function editorKeptByNpm(env: ProgramRuntime['env']): Editor | undefined {
+	if (!(env.npm_config_user_agent ?? '').startsWith('npm/')) return undefined;
+	return EDITOR_CHOICES.find((choice) => choice.value === env.npm_config_editor)?.value;
 }
 
 function inferPackageManager(env: ProgramRuntime['env']): PackageManager {
