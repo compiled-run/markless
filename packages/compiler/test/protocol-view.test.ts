@@ -432,6 +432,71 @@ export function App() @{
 	]);
 });
 
+test('every attach in a branch arm or an @try arm names its own behavior symbol', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/ArmAttach.tsrx',
+		source: `
+import { computed, state } from '@markless/core';
+
+function stamp(element: HTMLElement) {
+	element.dataset.stamped = 'yes';
+}
+function tint(color: string) {
+	return (element: HTMLElement) => { element.style.color = color; };
+}
+
+export function App() @{
+	let open = state(false);
+	const details = computed(async () => (await fetch('/api')).json());
+	<section>
+		<aside attach={stamp}>root</aside>
+		<button onClick={() => (open = !open)}>toggle</button>
+		@if (open) {
+			<p attach={[stamp, tint('red')]}>one</p>
+			<em attach={tint('blue')}>two</em>
+		}
+		@try {
+			<b attach={stamp}>{details.title}</b>
+		} @pending {
+			<i>Loading</i>
+		}
+	</section>
+}
+`,
+		symbols: [],
+	});
+	const behaviorSymbols = result.symbolResolver.symbols.filter(
+		(symbol) => symbol.kind === 'behavior',
+	);
+	const symbolFor = (hostNodeId: string, source: string) =>
+		behaviorSymbols.find(
+			(symbol) => symbol.hostNodeId === hostNodeId && symbol.source === source,
+		)?.id;
+	const view = result.protocolView;
+	const armBehaviors = [
+		...(view.branches ?? []).flatMap((branch) =>
+			(branch.armRecords ?? []).flatMap((arm) => arm.behaviors),
+		),
+		...view.asyncBoundaries.flatMap((boundary) =>
+			(Array.isArray(boundary.armRecords) ? boundary.armRecords : []).flatMap(
+				(arm) => arm.behaviors,
+			),
+		),
+	];
+	const named = [...view.behaviors, ...armBehaviors].map((behavior) => [
+		behavior.source,
+		behavior.symbolId,
+	]);
+	expect(named.length).toBe(5);
+	expect(named).toEqual(
+		[...view.behaviors, ...armBehaviors].map((behavior) => [
+			behavior.source,
+			symbolFor(behavior.hostNodeId, behavior.source),
+		]),
+	);
+	expect(named.every(([, symbolId]) => typeof symbolId === 'string')).toBe(true);
+});
+
 function allSupportedPlan(payloadArena: {
 	readonly view: { readonly asyncBoundaries: ReadonlyArray<{ readonly id: string }> };
 }) {

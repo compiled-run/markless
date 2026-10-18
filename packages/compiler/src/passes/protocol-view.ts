@@ -39,7 +39,6 @@ export function createProtocolViewPayload(
 	const boundDomUpdateSymbols = boundDomUpdateSymbolIds(input);
 	const eventSymbols = new Map<string, string[]>();
 	const domUpdateSymbols = new Map<string, string>();
-	const behaviorSymbols = new Map<string, string[]>();
 	const asyncRunnerSymbols = new Map<string, string>();
 
 	for (const symbol of input.symbolResolver.symbols) {
@@ -55,12 +54,6 @@ export function createProtocolViewPayload(
 				`${symbol.hostNodeId}:${domUpdateTargetKey(symbol.target)}:${symbol.graphNodeId}:${symbol.source}`,
 				boundDomUpdateSymbols.get(symbol.id) ?? symbol.id,
 			);
-		}
-
-		if (symbol.kind === 'behavior') {
-			const symbols = behaviorSymbols.get(symbol.hostNodeId) ?? [];
-			symbols[symbol.order] = symbol.id;
-			behaviorSymbols.set(symbol.hostNodeId, symbols);
 		}
 
 		if (symbol.kind === 'async-computed-runner') {
@@ -108,12 +101,12 @@ export function createProtocolViewPayload(
 				})),
 			...forwarded.domUpdates,
 		],
-		behaviors: input.payloadArena.view.behaviors
-			.filter((behavior) => !excludedHostIds.has(behavior.hostNodeId))
-			.map((behavior, index) => ({
-				...behavior,
-				...behaviorSymbolFields(input, behaviorSymbols.get(behavior.hostNodeId)?.[index]),
-			})),
+		behaviors: withBehaviorSymbols(
+			input,
+			input.payloadArena.view.behaviors.filter(
+				(behavior) => !excludedHostIds.has(behavior.hostNodeId),
+			),
+		),
 		elementHandles: [
 			...input.payloadArena.view.elementHandles.filter(
 				(handle) => !excludedHostIds.has(handle.hostNodeId),
@@ -911,15 +904,10 @@ function wiredArmRecordSet(
 				syncPolicy: event.syncPolicy,
 				symbolIds: eventSymbols.get(`${event.hostNodeId}:${event.eventName}`) ?? [],
 			})),
-		behaviors: set.behaviors
-			.filter((behavior) => !flipHostIds.has(behavior.hostNodeId))
-			.map((behavior, index) => ({
-				...behavior,
-				...behaviorSymbolFields(
-					input,
-					behaviorSymbolsForArms(input).get(behavior.hostNodeId)?.[index],
-				),
-			})),
+		behaviors: withBehaviorSymbols(
+			input,
+			set.behaviors.filter((behavior) => !flipHostIds.has(behavior.hostNodeId)),
+		),
 		elementHandles: set.elementHandles.filter((handle) => !flipHostIds.has(handle.hostNodeId)),
 		...(branches ? { branches } : {}),
 	};
@@ -1123,16 +1111,13 @@ function branchArmRecords(input: ProtocolViewPayloadInput, branchSiteId: string)
 						),
 					};
 				}),
-			behaviors: input.payloadArena.view.behaviors
-				.filter((behavior) => hostIds.has(behavior.hostNodeId))
-				.map((behavior, index) => ({
-					...behavior,
-					hostPath: hostIds.get(behavior.hostNodeId)!.path,
-					...behaviorSymbolFields(
-						input,
-						behaviorSymbolsForArms(input).get(behavior.hostNodeId)?.[index],
-					),
-				})),
+			behaviors: withBehaviorSymbols(
+				input,
+				input.payloadArena.view.behaviors.filter((behavior) => hostIds.has(behavior.hostNodeId)),
+			).map((behavior) => ({
+				...behavior,
+				hostPath: hostIds.get(behavior.hostNodeId)!.path,
+			})),
 			elementHandles: input.payloadArena.view.elementHandles
 				.filter((handle) => hostIds.has(handle.hostNodeId))
 				.map((handle) => ({
@@ -1262,13 +1247,25 @@ function behaviorSymbolFields(
 	return usesGraph ? { symbolId, usesGraph: true } : { symbolId };
 }
 
-function behaviorSymbolsForArms(input: ProtocolViewPayloadInput): ReadonlyMap<string, string[]> {
-	const behaviorSymbols = new Map<string, string[]>();
-	for (const symbol of input.symbolResolver.symbols) {
-		if (symbol.kind !== 'behavior') continue;
-		const symbols = behaviorSymbols.get(symbol.hostNodeId) ?? [];
-		symbols[symbol.order] = symbol.id;
-		behaviorSymbols.set(symbol.hostNodeId, symbols);
-	}
-	return behaviorSymbols;
+// Symbols are listed in module order and a host keeps its behaviors in authored order, so the nth on a host names its nth symbol.
+function withBehaviorSymbols<Behavior extends { readonly hostNodeId: string }>(
+	input: ProtocolViewPayloadInput,
+	behaviors: ReadonlyArray<Behavior>,
+): Array<Behavior & ReturnType<typeof behaviorSymbolFields>> {
+	const symbolsByHost = new Map<string, string[]>();
+	for (const symbol of input.symbolResolver.symbols)
+		if (symbol.kind === 'behavior')
+			symbolsByHost.set(symbol.hostNodeId, [
+				...(symbolsByHost.get(symbol.hostNodeId) ?? []),
+				symbol.id,
+			]);
+	const taken = new Map<string, number>();
+	return behaviors.map((behavior) => {
+		const rank = taken.get(behavior.hostNodeId) ?? 0;
+		taken.set(behavior.hostNodeId, rank + 1);
+		return {
+			...behavior,
+			...behaviorSymbolFields(input, symbolsByHost.get(behavior.hostNodeId)?.[rank]),
+		};
+	});
 }

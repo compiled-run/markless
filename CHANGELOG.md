@@ -34,6 +34,9 @@ them from `.markless/` instead.
   `MARKLESS_EVENT_DISPATCH_UNMATCHED`. The 0.5.0 fix covered only a redraw
   from a bubbling listener. A redraw that also removes that Markless element
   no longer reports an error either.
+- `attach` on an element inside an `@if` arm or an `@try` arm runs. Before,
+  the arm's behavior records named the wrong function or none, so an arm
+  element's `attach` never ran, or ran another element's function.
 
 ## 0.5.0
 
