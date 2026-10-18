@@ -631,12 +631,14 @@ for (const [name, browserType] of [
 			await page.close();
 		});
 
-		test('at idle, only a few visible page links fetch their fragments, never a dead link', async () => {
+		test('at idle, every page link in view fetches its fragment once, none cancelled, never a dead link', async () => {
 			const { page, requests, errors } = await open(browser);
+			const cancelled: string[] = [];
+			page.on('requestfailed', (request) => cancelled.push(new URL(request.url()).pathname));
 			await page.waitForTimeout(3500);
 			const fetched = requests.filter((request) => request.endsWith(' fragment'));
-			expect(fetched.length).toBeLessThanOrEqual(2);
-			expect(fetched).not.toContain('/missing fragment');
+			expect(fetched.toSorted()).toEqual(['/form fragment', '/other fragment', '/slow fragment']);
+			expect(cancelled).toEqual([]);
 			expect(errors).toEqual([]);
 			await page.close();
 		});

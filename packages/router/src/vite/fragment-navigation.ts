@@ -148,6 +148,36 @@ export function startFragmentNavigation(
 				tail: at === -1 ? '' : text.slice(at + config.regionEndMarker.length),
 			};
 		};
+		// An unused prefetch reads the rest of its response itself, so it frees its connection as soon as the server is done.
+		const drain = (
+			reader: ReadableStreamDefaultReader<Uint8Array>,
+			closed: () => void,
+		): ReadableStreamDefaultReader<Uint8Array> => {
+			const chunks: Uint8Array[] = [];
+			let ended = false;
+			let wake = () => {};
+			const end = () => {
+				ended = true;
+				closed();
+				wake();
+			};
+			void (async () => {
+				for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
+					chunks.push(chunk.value);
+					wake();
+				}
+			})().then(end, end);
+			return {
+				read: async () => {
+					while (!chunks.length && !ended)
+						await new Promise<void>((done) => (wake = done));
+					return chunks.length
+						? { done: false, value: chunks.shift()! }
+						: { done: true, value: undefined };
+				},
+				cancel: () => reader.cancel(),
+			} as ReadableStreamDefaultReader<Uint8Array>;
+		};
 		// One request: the destination's region document and its resume payload, parsed on arrival (no script runs), so the click only swaps.
 		const request = (url: URL, speculative: boolean): FragmentPrefetch => {
 			const controller = new AbortController();
@@ -172,25 +202,32 @@ export function startFragmentNavigation(
 				let text = '';
 				for (;;) {
 					if (text.includes(config.regionEndMarker))
-						return { ...parse(finalUrl.href, text), rest: reader };
+						return {
+							...parse(finalUrl.href, text),
+							rest: speculative ? drain(reader, closed) : reader,
+						};
 					const chunk = await reader.read();
 					if (chunk.done) {
-						entry.open = false;
+						closed();
 						return parse(finalUrl.href, text + decoder.decode());
 					}
 					text += decoder.decode(chunk.value, { stream: true });
 				}
+			};
+			const closed = () => {
+				entry.open = false;
+				queueMicrotask(pumpIdle);
 			};
 			const entry: FragmentPrefetch = {
 				at: w.performance.now(),
 				result: read(),
 				open: true,
 				abort: () => {
-					entry.open = false;
+					closed();
 					controller.abort();
 				},
 			};
-			entry.result.catch(() => (entry.open = false));
+			entry.result.catch(closed);
 			return entry;
 		};
 		// An unused prefetch still streaming holds a connection: drop it once stale, and keep only a few open,
@@ -221,6 +258,17 @@ export function startFragmentNavigation(
 		};
 		// Idle tier, fast unmetered connections only: preload (never run) the swap module and the landing code of links in view, one round.
 		let scanning = false;
+		let idleQueue: URL[] = [];
+		// Idle fetches wait for a free connection rather than cancel one another.
+		const pumpIdle = () => {
+			while (idleQueue.length) {
+				let open = 0;
+				for (const entry of state.prefetches.values()) if (entry.open) open += 1;
+				if (open >= config.prefetchConnections) return;
+				const url = idleQueue.shift()!;
+				if (!state.prefetches.has(pageKey(url))) state.prefetch(url);
+			}
+		};
 		const rescan = () => {
 			if (!state.idleDownloads || scanning) return;
 			scanning = true;
@@ -241,16 +289,13 @@ export function startFragmentNavigation(
 					if (!hit || (hit !== anchor && !anchor.contains(hit))) continue;
 					visible.set(pageKey(url), url);
 				}
-				// HTML is fetched at idle only while the next click is at least as likely as not to use it.
-				const fragments =
-					visible.size <= config.idleFragments * 2 ? config.idleFragments : 0;
-				let fetched = 0;
+				idleQueue = [];
 				for (const [key, url] of visible) {
 					preloadCode(url, true);
-					if (fetched >= fragments || state.prefetches.has(key)) continue;
-					fetched += 1;
-					state.prefetch(url);
+					if (idleQueue.length < config.idleFragments && !state.prefetches.has(key))
+						idleQueue.push(url);
 				}
+				pumpIdle();
 			};
 			const idle = () =>
 				w.requestIdleCallback
@@ -373,6 +418,6 @@ export const FRAGMENT_HOVER_DWELL_MS = 20;
 export const FRAGMENT_PREFETCH_TTL_MS = 30_000;
 // Unused prefetches still streaming their @pending pieces; older ones are cancelled past this.
 export const FRAGMENT_PREFETCH_CONNECTIONS = 2;
-export const FRAGMENT_IDLE_FRAGMENTS = 2;
+export const FRAGMENT_IDLE_FRAGMENTS = 6;
 // Browsers without the Network Information API (WebKit, Firefox) say nothing about the connection; the idle tier's own gate bounds what they fetch.
 export const FRAGMENT_IDLE_WITHOUT_CONNECTION_INFO = true;

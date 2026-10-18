@@ -23,7 +23,7 @@ export interface FragmentNavigationConfig {
 	readonly prefetchConnections: number;
 	// Paths the server answers with endpoints, not pages: never fetched before a click or as a fragment.
 	readonly endpointPrefixes: readonly string[];
-	// At most this many visible-link fragments are fetched at idle on fast connections, and only when the page shows no more than twice as many; 0 keeps HTML to intent only.
+	// At most this many visible-link fragments are fetched at idle on fast connections, in document order; 0 keeps HTML to intent only.
 	readonly idleFragments: number;
 	readonly idleWithoutConnectionInfo: boolean;
 	// false: nothing is fetched before a click.
