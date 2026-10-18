@@ -308,14 +308,14 @@ export function App() @{
 });
 
 // The transport rides the record, so it is gated by everything the record is
-// gated by: a repeat whose row start cannot be named ships nothing at all, row
-// markup included.
+// gated by: a repeat whose rows cannot be placed from either end ships nothing
+// at all, row markup included.
 test('a repeat that ships no record ships no row markup either', async () => {
 	const view = await viewOf(`${preamble}
 export function App() @{
 	let rows = state([{ id: 'a' }]);
 	let show = state(true);
-	<ul>@if (show) { <li>header</li> }@for (const row of rows; key row.id) { <li>{row.id}</li> }</ul>
+	<ul>@if (show) { <li>header</li> }@for (const row of rows; key row.id) { <li>{row.id}</li> }@if (show) { <li>footer</li> }</ul>
 }
 `);
 	expect(view.keyedRepeats ?? []).toHaveLength(0);

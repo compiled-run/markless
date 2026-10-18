@@ -515,6 +515,8 @@ function assertOptionalKeyedRepeats(record: Record<string, unknown>): void {
 		assertNonNegativeIntegerField(repeat, 'rowElementCount', context);
 		if (repeat.rowStartOffset !== undefined)
 			assertNonNegativeIntegerField(repeat, 'rowStartOffset', context);
+		if (repeat.rowEndOffset !== undefined)
+			assertNonNegativeIntegerField(repeat, 'rowEndOffset', context);
 		assertRowEvents(repeat.rowEvents, `${context}.rowEvents`);
 		assertOptionalRowElementHandles(repeat, `${context}.rowElementHandles`);
 		assertOptionalEmptyArm(repeat, `${context}.emptyArm`);

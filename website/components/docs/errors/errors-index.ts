@@ -49,11 +49,6 @@ export const errorIndex: ErrorIndex = {
 					guided: true,
 				},
 				{
-					code: 'MARKLESS_ASYNC_TEXT_JOIN_UNSUPPORTED',
-					kind: 'compile error',
-					guided: false,
-				},
-				{
 					code: 'MARKLESS_ATTACH_HOST_ELEMENT_REQUIRED',
 					kind: 'compile error',
 					guided: false,
@@ -321,6 +316,11 @@ export const errorIndex: ErrorIndex = {
 				{
 					code: 'MARKLESS_KEYED_REPEAT_ROW_MINT_UNSUPPORTED',
 					kind: 'compile warning',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_KEYED_REPEAT_ROWS_UNPLACED',
+					kind: 'compile error',
 					guided: false,
 				},
 				{

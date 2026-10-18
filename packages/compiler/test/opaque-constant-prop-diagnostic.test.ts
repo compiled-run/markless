@@ -153,8 +153,8 @@ export function Sidebar() @{
 
 // A keyed row's item is data the row was rendered from, and a changed item
 // rebuilds the row, so a DOM update reading it never needs it live. A handler
-// still does, and a value that is not the row's keeps the refusal.
-test('a prop passed a keyed row value binds a DOM update, and a handler still refuses it', async () => {
+// reads the item of the row it fired in, and a value that is not the row's keeps the refusal.
+test('a prop passed a keyed row value binds a DOM update, and a handler reads it from its row', async () => {
 	const rowParent = (expression: string) =>
 		compileParent(`
 import { Group } from './Group.tsrx';
@@ -207,5 +207,10 @@ export function Sidebar() @{
 			},
 		],
 	});
-	expect(opaqueDiagnostics(handlerParent)).toHaveLength(1);
+	expect(opaqueDiagnostics(handlerParent)).toEqual([]);
+	expect(
+		handlerParent.captureAnalysis.extractedSymbols.flatMap((symbol) =>
+			symbol.captureSlots.flatMap((slot) => slot.routes.map((route) => route.kind)),
+		),
+	).toContain('row-local');
 });

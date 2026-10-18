@@ -318,7 +318,7 @@ export function App() @{
 });
 
 // The transport rides the record, so it is gated by everything the record is
-// gated by: a repeat whose row start cannot be named ships nothing at all.
+// gated by: a repeat whose rows cannot be placed from either end ships nothing.
 test('a repeat that ships no record ships no component identity either', async () => {
 	const view = await viewOf(`import { state } from '@markless/core';
 function Row({ item }) @{
@@ -328,7 +328,7 @@ function Row({ item }) @{
 export function App() @{
 	let rows = state([{ id: 'a', label: 'A' }]);
 	let show = state(true);
-	<ul>@if (show) { <li>header</li> }@for (const row of rows; key row.id) { <Row item={row} /> }</ul>
+	<ul>@if (show) { <li>header</li> }@for (const row of rows; key row.id) { <Row item={row} /> }@if (show) { <li>footer</li> }</ul>
 }
 `);
 	expect(view.keyedRepeats ?? []).toHaveLength(0);

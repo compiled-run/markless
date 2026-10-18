@@ -257,23 +257,6 @@ export function templateExpressionUnsupportedDiagnostic(input: {
 	});
 }
 
-export function asyncTextJoinUnsupportedDiagnostic(input: {
-	readonly source: string;
-	readonly node: AnyNode;
-	readonly filename: string;
-}): SemanticGraphDiagnostic {
-	return semanticGraphDiagnostic({
-		code: 'MARKLESS_ASYNC_TEXT_JOIN_UNSUPPORTED',
-		title: 'An async value and a state value cannot share one text node',
-		message: `\`${input.source}\` puts an async value and other state in one run of text, so a later write to that state would replace the whole text with its own part alone.`,
-		why: 'Holes that render into one text node update as one joined value, and a joined value cannot read an async value: its @try block reads that value directly. Left alone, the next state write would erase the async text and nothing would say so.',
-		span: sourceSpan(input.node, input.filename),
-		suggestion:
-			'Give the async value its own element beside the rest of the text, e.g. `<button><span>{data.title}</span> {count}</button>`.',
-		docsUrl: 'https://markless.dev/errors/MARKLESS_ASYNC_TEXT_JOIN_UNSUPPORTED',
-	});
-}
-
 export function componentSpreadUnsupportedDiagnostic(input: {
 	readonly source: string;
 	readonly childComponentName: string;

@@ -29,14 +29,14 @@ export async function primeKeyedRepeatCollections(input: {
 	if (backing.size === 0) return;
 	for (const record of input.computed ?? []) {
 		if (!backing.has(record.graphNodeId)) continue;
-		if (record.async !== false || typeof record.deriveSymbolId !== 'string') continue;
+		const { deriveSymbolId } = record;
+		if (record.async !== false || typeof deriveSymbolId !== 'string') continue;
 		if (input.graph.read(record.graphNodeId, []) !== undefined) continue;
 		await (
 			await import('./resume-sync-computed.ts')
 		).refreshSyncComputed({
-			computed: record as Parameters<
-				typeof import('./resume-sync-computed.ts').refreshSyncComputed
-			>[0]['computed'],
+			computed: { ...record, deriveSymbolId },
+			records: input.computed,
 			graph: input.graph,
 			root: input.root,
 			loadSymbol: input.loadSymbol,
@@ -383,7 +383,7 @@ function applyKeyedRepeatRowOrder(
 	const anchor =
 		rangeEnd ??
 		elementChildren(parent)
-			.slice(repeat.rowStartOffset ?? 0)
+			.slice(rowsFrom(parent, repeat))
 			.find((child) => !knownRows.has(child));
 	for (const rowRoot of nextRows) insertRepeatNode(mutableParent, rowRoot, anchor);
 	mint?.refocus?.(parent, focused);
@@ -391,7 +391,7 @@ function applyKeyedRepeatRowOrder(
 		spliceDomOrderCensus(census, currentRows, nextRows);
 	if (nextRows.length > 0 || arm.mounted || !repeat.emptyArm || !mint) return;
 	const nodes = mint.renderEmptyArm(parent, repeat);
-	const armAnchor = rangeEnd ?? elementChildren(parent).slice(repeat.rowStartOffset ?? 0)[0];
+	const armAnchor = rangeEnd ?? elementChildren(parent).slice(rowsFrom(parent, repeat))[0];
 	for (const node of nodes) insertRepeatNode(mutableParent, node, armAnchor);
 	arm.mounted = true;
 	arm.nodes = nodes;
@@ -566,8 +566,13 @@ function repeatRowElements(
 	repeat: ResumeKeyedRepeatRecord,
 	count: number,
 ): ReadonlyArray<ResumeDomElement> {
-	const offset = repeat.rowStartOffset ?? 0;
+	const offset = rowsFrom(parent, repeat, count);
 	return elementChildren(parent).slice(offset, offset + count);
+}
+function rowsFrom(parent: ResumeDomElement, repeat: ResumeKeyedRepeatRecord, count = 0): number {
+	return repeat.rowEndOffset === undefined
+		? (repeat.rowStartOffset ?? 0)
+		: Math.max(0, elementChildren(parent).length - repeat.rowEndOffset - count);
 }
 function elementChildren(element: ResumeDomElement): ResumeDomElement[] {
 	return elementsOf(Array.from(element.childNodes ?? []));

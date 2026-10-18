@@ -45,10 +45,8 @@ export const BEHAVIOR_SYMBOL_EMIT_UNSUPPORTED_CODE =
 	'MARKLESS_BEHAVIOR_SYMBOL_EMIT_UNSUPPORTED' as const;
 export const EVENT_HANDLER_EMIT_UNSUPPORTED_CODE =
 	'MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED' as const;
-export const SHARED_FACTORY_CLASS_INSTANCE_CODE =
-	'MARKLESS_SHARED_FACTORY_CLASS_INSTANCE' as const;
-export const STATE_PROPERTY_CLASS_INSTANCE_CODE =
-	'MARKLESS_STATE_PROPERTY_CLASS_INSTANCE' as const;
+export const SHARED_FACTORY_CLASS_INSTANCE_CODE = 'MARKLESS_SHARED_FACTORY_CLASS_INSTANCE' as const;
+export const STATE_PROPERTY_CLASS_INSTANCE_CODE = 'MARKLESS_STATE_PROPERTY_CLASS_INSTANCE' as const;
 
 // Every source this pass re-parses came out of a `.tsrx` module, so it is
 // TypeScript. `parseJavaScriptModule` picks its dialect from the filename and
@@ -282,30 +280,44 @@ function importedCaptureSymbols(
 										)
 									: slot.routes.flatMap((route): CaptureSlotRoute[] =>
 											route.kind === 'graph-reference' ||
-											(republished && route.kind === 'compiler-known-constant')
+											(republished &&
+												route.kind === 'compiler-known-constant')
 												? edgePaths.map((path) => ({
 														...route,
-														...(route.kind === 'graph-reference' && republished
-															? republishedGraphNodeId(route.graphNodeId, path, input)
+														...(route.kind === 'graph-reference' &&
+														republished
+															? republishedGraphNodeId(
+																	route.graphNodeId,
+																	path,
+																	input,
+																)
 															: {}),
 														componentEdgeId: edge.id,
-														componentEdgePath: path.map((step) => step.id),
+														componentEdgePath: path.map(
+															(step) => step.id,
+														),
 													}))
 												: [route],
 										),
 					}))
 					.filter(
-						(slot) => republished || !wasProjectedThroughComponentEdge(slot.propName, edge),
+						(slot) =>
+							republished || !wasProjectedThroughComponentEdge(slot.propName, edge),
 					)
 					// A derive whose prop has no route on this edge stays unbound here and reads its own instance's props.
 					// A row's value is rendered with the row, and a changed item rebuilds it, so only a callback needs it later.
 					.flatMap((slot) => {
-						if (captureSymbol.kind === 'event-handler' || captureSymbol.kind === 'callback-prop')
+						if (
+							captureSymbol.kind === 'event-handler' ||
+							captureSymbol.kind === 'callback-prop'
+						)
 							return [slot];
 						const routes = slot.routes.filter(
 							(route) =>
-								route.kind !== 'unsupported-opaque' ||
-								(captureSymbol.kind !== 'sync-computed-derive' && route.rowValue !== true),
+								route.kind !== 'row-local' &&
+								(route.kind !== 'unsupported-opaque' ||
+									(captureSymbol.kind !== 'sync-computed-derive' &&
+										route.rowValue !== true)),
 						);
 						return routes.length > 0 ? [{ ...slot, routes }] : [];
 					}),
@@ -323,7 +335,8 @@ function republishedGraphNodeId(
 	return protocolInstanceQualifies(graphNodeId) === true
 		? {
 				graphNodeId:
-					componentEdgeInstancePath(path, input.semanticGraph.componentEdges) + graphNodeId,
+					componentEdgeInstancePath(path, input.semanticGraph.componentEdges) +
+					graphNodeId,
 			}
 		: {};
 }
@@ -417,7 +430,9 @@ function symbolCaptureSlots(
 	// could schedule it again. Keep callback captures fail-closed above, but drop
 	// opaque routes (and empty slots) for update-only symbols.
 	return slots.flatMap((slot) => {
-		const routes = slot.routes.filter((route) => route.kind !== 'unsupported-opaque');
+		const routes = slot.routes.filter(
+			(route) => route.kind !== 'unsupported-opaque' && route.kind !== 'row-local',
+		);
 		return routes.length > 0 ? [{ ...slot, routes }] : [];
 	});
 }
@@ -577,7 +592,10 @@ function resolveWidgetCallbackRoute(
 		? widgetRootPropCaptureRoute(rootEdge, route, input)
 		: {
 				kind: 'callback-slot-route',
-				graphNodeId: sharedCallbackSlotGraphNodeId(route.sharedDefinitionId, route.slotName),
+				graphNodeId: sharedCallbackSlotGraphNodeId(
+					route.sharedDefinitionId,
+					route.slotName,
+				),
 				rootPropName: route.rootPropName,
 				rootComponentName: route.rootComponentName,
 			};
@@ -1039,6 +1057,7 @@ function resolvePropCaptureRoute(
 			componentEdgePath: edgePathIds,
 			graphNodeId: scoped?.binding.id ?? prop.graphNodeId,
 			path: [...(scoped?.path ?? prop.path), ...forwardedPath, ...readPath],
+			...(edgeIndex < componentEdgePath.length - 1 ? { ownerEdgeCount: edgeIndex } : {}),
 		};
 	}
 	if (prop.kind === 'serializable') {
@@ -1077,6 +1096,15 @@ function resolvePropCaptureRoute(
 		}
 	}
 
+	const rowItem = rowItemPath(prop.source, edge, input);
+	if (rowItem)
+		return {
+			kind: 'row-local',
+			componentEdgeId: terminalEdgeId,
+			componentEdgePath: edgePathIds,
+			itemName: rowItem.itemName,
+			path: [...rowItem.path, ...forwardedPath, ...readPath],
+		};
 	return {
 		kind: 'unsupported-opaque',
 		componentEdgeId: terminalEdgeId,
@@ -1085,6 +1113,22 @@ function resolvePropCaptureRoute(
 		...(prop.sourceSpan ? { sourceSpan: prop.sourceSpan } : {}),
 		...(readsOnlyRowLocals(prop.source, edge, input) ? { rowValue: true as const } : {}),
 	};
+}
+
+// An edge prop that is the item of a keyed row the edge renders in, or a static member path on it.
+function rowItemPath(
+	source: string | undefined,
+	edge: SemanticComponentEdge,
+	input: CaptureAnalysisInput,
+): { readonly itemName: string; readonly path: ReadonlyArray<string> } | undefined {
+	if (!source || edge.keyedRepeatScopeIds.length === 0) return undefined;
+	const segments = source.trim().split('.');
+	if (!segments.every((segment) => /^[A-Za-z_$][\w$]*$/.test(segment))) return undefined;
+	const [itemName, ...path] = segments;
+	const enclosing = input.semanticGraph.keyedRepeats.some(
+		(repeat) => edge.keyedRepeatScopeIds.includes(repeat.id) && repeat.itemName === itemName,
+	);
+	return enclosing && itemName ? { itemName, path } : undefined;
 }
 
 // Whether an edge prop's expression reads nothing but the item and index of the keyed rows the edge renders in.
@@ -1446,7 +1490,9 @@ function lazySymbolRole(kind: string | undefined): string {
 }
 
 function asNode(value: unknown): AnyNode | undefined {
-	return typeof value === 'object' && value !== null && typeof (value as AnyNode).type === 'string'
+	return typeof value === 'object' &&
+		value !== null &&
+		typeof (value as AnyNode).type === 'string'
 		? (value as AnyNode)
 		: undefined;
 }
@@ -1533,7 +1579,9 @@ function unreducedPropReadDiagnostics(
 		const propName = declaration.propPath[0] ?? declaration.localName;
 		if (routed.has(propName) || routed.has(declaration.localName)) return [];
 		const wholeProps = declaration.propPath.length === 0;
-		const memberKeys = wholeProps ? sourceSemantics.staticMemberKeys(declaration.localName) : null;
+		const memberKeys = wholeProps
+			? sourceSemantics.staticMemberKeys(declaration.localName)
+			: null;
 		if (memberKeys && memberKeys.size > 0 && [...memberKeys].every((key) => routed.has(key)))
 			return [];
 		const componentName = declaration.componentName;
@@ -1671,7 +1719,10 @@ function classInstanceValueDiagnostics(
 		for (const returned of factoryReturnExpressions(definition.factorySource)) {
 			if (isClassInstanceValue(returned)) {
 				diagnostics.push(
-					sharedFactoryClassInstanceDiagnostic(definition, constructorDisplayName(returned)),
+					sharedFactoryClassInstanceDiagnostic(
+						definition,
+						constructorDisplayName(returned),
+					),
 				);
 				continue;
 			}
@@ -1806,10 +1857,7 @@ function factoryReturnExpressions(factorySource: string): ReadonlyArray<AnyNode>
  * the same hole one level down — but arrays and function bodies do not, because
  * neither is a field the graph declares.
  */
-function classInstanceProperties(
-	node: AnyNode,
-	prefix = '',
-): ReadonlyArray<ClassInstanceProperty> {
+function classInstanceProperties(node: AnyNode, prefix = ''): ReadonlyArray<ClassInstanceProperty> {
 	const expression = unwrapParens(node);
 	if (expression.type !== 'ObjectExpression') return [];
 
@@ -1841,7 +1889,8 @@ function propertyKeyName(property: AnyNode): string | undefined {
 /** How the message names the constructor. Display only — the classification is `isClassInstanceValue`. */
 function constructorDisplayName(node: AnyNode): string {
 	const callee = asNode(node.callee);
-	const name = callee?.type === 'Identifier' && typeof callee.name === 'string' ? callee.name : '';
+	const name =
+		callee?.type === 'Identifier' && typeof callee.name === 'string' ? callee.name : '';
 	if (name.startsWith('new ')) return `a \`${name.slice('new '.length)}\` instance`;
 
 	return name ? `a \`new ${name}()\`` : 'a class instance';

@@ -340,6 +340,13 @@ export type ModuleGraphInterfaceArtifact = {
 			 */
 			readonly rowComponentMint?: true;
 			/**
+			 * Present when this component's tree holds a keyed repeat whose rows the
+			 * template mint builds, so a page placing it must install that mint.
+			 */
+			readonly rowTemplateMint?: true;
+			/** Present when this component's tree holds a keyed repeat inside another repeat's rows. */
+			readonly nestedRepeats?: true;
+			/**
 			 * Present when this component's tree holds an action compiled as a
 			 * closure plan, so a composing page routes plan lookups toward it.
 			 */
@@ -771,7 +778,6 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_CALLBACK_PROP_ARITY_UNSUPPORTED'
 		| 'MARKLESS_COMPONENT_PROP_EXPRESSION_UNSUPPORTED'
 		| 'MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED'
-		| 'MARKLESS_ASYNC_TEXT_JOIN_UNSUPPORTED'
 		| 'MARKLESS_COMPONENT_SPREAD_UNSUPPORTED'
 		| 'MARKLESS_CALLBACK_SLOT_SOURCE_UNSUPPORTED'
 		| 'MARKLESS_CALLBACK_SLOT_UNBOUND'
@@ -1299,6 +1305,8 @@ export type RenderDataRepeat = {
 	// 'unknown' means the prefix holds a sibling whose element count is not a
 	// compile-time constant, so no offset exists and the repeat is not resumable.
 	readonly rowStartOffset?: number | 'unknown';
+	// Set only when the start is unknown: how many element children of the parent follow the rows.
+	readonly rowEndOffset?: number;
 	readonly parentPath?: ReadonlyArray<number>;
 	readonly classWrites?: ReadonlyArray<PublicRenderPlanClassWrite>;
 	readonly eventControls?: ReadonlyArray<PublicRenderPlanEventControl>;
@@ -1786,7 +1794,11 @@ export type BoundSymbolResolverRow = {
 	// under: one segment per imported component edge in the ancestry.
 	readonly instancePath?: string;
 	// Per ancestry edge when one sits in a keyed repeat: the host-id segment, the instance segment, and how many row segments precede it.
-	readonly rowPieces?: ReadonlyArray<readonly [hostSegment: string, instanceSegment: string, rows: number]>;
+	readonly rowPieces?: ReadonlyArray<
+		readonly [hostSegment: string, instanceSegment: string, rows: number]
+	>;
+	// The base symbol reads or writes a page-space node (`shared:`, `storage:`), which no instance path qualifies.
+	readonly touchesPageSpaceGraph?: true;
 	readonly componentEdgePath: ReadonlyArray<string>;
 	readonly ancestry: ReadonlyArray<{
 		readonly componentEdgeId: string;
@@ -1851,6 +1863,8 @@ export type CaptureSlotRoute =
 			readonly componentEdgePath?: ReadonlyArray<string>;
 			readonly graphNodeId: string;
 			readonly path: ReadonlyArray<string>;
+			/** Edges of `componentEdgePath` above the component that owns `graphNodeId`, when a prop forwarded it from further up. */
+			readonly ownerEdgeCount?: number;
 	  }
 	| {
 			readonly kind: 'compiler-known-constant';
@@ -1902,6 +1916,14 @@ export type CaptureSlotRoute =
 			readonly componentEdgePath?: ReadonlyArray<string>;
 			readonly bindingId: string;
 			readonly propName: string;
+			readonly path: ReadonlyArray<string>;
+	  }
+	| {
+			// The keyed row's item the edge passed (`item`, `item.cell`), read at dispatch from the row it fired in.
+			readonly kind: 'row-local';
+			readonly componentEdgeId: string;
+			readonly componentEdgePath?: ReadonlyArray<string>;
+			readonly itemName: string;
 			readonly path: ReadonlyArray<string>;
 	  }
 	| {

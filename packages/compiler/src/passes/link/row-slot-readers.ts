@@ -10,7 +10,7 @@ export type RowSlotReaderComponentsInput = {
 	readonly importedModuleInterfaces?: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 };
 
-type RowMintFlag = 'rowSlotReader' | 'rowComponentMint';
+type RowMintFlag = 'rowSlotReader' | 'rowComponentMint' | 'rowTemplateMint' | 'nestedRepeats';
 
 /** Components whose tree rebuilds rows through a render-data reader, transitively through imports. */
 export function rowSlotReaderComponents(input: RowSlotReaderComponentsInput): ReadonlySet<string> {
@@ -36,6 +36,21 @@ export function rowComponentMintComponents(
 			minting.add(edge.parentComponentName);
 	}
 	return withComposingComponents(minting, input, 'rowComponentMint');
+}
+
+/** Components whose tree builds plain template rows, transitively through imports. */
+export function rowTemplateMintComponents(
+	input: RowSlotReaderComponentsInput,
+	componentNames: ReadonlyArray<string>,
+	flag: 'rowTemplateMint' | 'nestedRepeats' = 'rowTemplateMint',
+): ReadonlySet<string> {
+	// A plain row record names no component, so every component of its module may own it.
+	const owns = (input.protocolView.keyedRepeats ?? []).some((repeat) =>
+		flag === 'nestedRepeats'
+			? repeat.enclosingRow !== undefined
+			: (repeat.rowTemplate ?? repeat.emptyArm) !== undefined,
+	);
+	return withComposingComponents(new Set(owns ? componentNames : []), input, flag);
 }
 
 function withComposingComponents(
@@ -71,7 +86,13 @@ export function withRowSlotReaders(
 ): ModuleGraphInterfaceArtifact {
 	const reading = rowSlotReaderComponents(input);
 	const minting = rowComponentMintComponents(input);
-	if (reading.size === 0 && minting.size === 0) return moduleGraphInterface;
+	const componentNames = moduleGraphInterface.render.components.map(
+		(component) => component.componentName,
+	);
+	const templating = rowTemplateMintComponents(input, componentNames);
+	const nesting = rowTemplateMintComponents(input, componentNames, 'nestedRepeats');
+	if (reading.size === 0 && minting.size === 0 && templating.size === 0 && nesting.size === 0)
+		return moduleGraphInterface;
 	return {
 		...moduleGraphInterface,
 		render: {
@@ -79,7 +100,13 @@ export function withRowSlotReaders(
 			components: moduleGraphInterface.render.components.map((component) => ({
 				...component,
 				...(reading.has(component.componentName) ? { rowSlotReader: true as const } : {}),
-				...(minting.has(component.componentName) ? { rowComponentMint: true as const } : {}),
+				...(minting.has(component.componentName)
+					? { rowComponentMint: true as const }
+					: {}),
+				...(templating.has(component.componentName)
+					? { rowTemplateMint: true as const }
+					: {}),
+				...(nesting.has(component.componentName) ? { nestedRepeats: true as const } : {}),
 			})),
 		},
 	};
@@ -100,5 +127,23 @@ export function importedRowComponentMints(
 ): boolean {
 	return Object.values(importedModuleInterfaces ?? {}).some((moduleInterface) =>
 		moduleInterface.render.components.some((component) => component.rowComponentMint === true),
+	);
+}
+
+/** Whether any component a module imports builds plain template rows, in its tree. */
+export function importedRowTemplateMints(
+	importedModuleInterfaces: Readonly<Record<string, ModuleGraphInterfaceArtifact>> | undefined,
+): boolean {
+	return Object.values(importedModuleInterfaces ?? {}).some((moduleInterface) =>
+		moduleInterface.render.components.some((component) => component.rowTemplateMint === true),
+	);
+}
+
+/** Whether any component a module imports holds a repeat inside another repeat's rows, in its tree. */
+export function importedNestedRepeats(
+	importedModuleInterfaces: Readonly<Record<string, ModuleGraphInterfaceArtifact>> | undefined,
+): boolean {
+	return Object.values(importedModuleInterfaces ?? {}).some((moduleInterface) =>
+		moduleInterface.render.components.some((component) => component.nestedRepeats === true),
 	);
 }

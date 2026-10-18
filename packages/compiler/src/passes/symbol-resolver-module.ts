@@ -43,6 +43,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 	const scopesWidgetGraphs =
 		scopesInstances &&
 		(input.symbols.some((symbol) => symbol.captureSymbol?.touchesPageSpaceGraph) ||
+			(input.boundSymbols ?? []).some((row) => row.touchesPageSpaceGraph) ||
 			(input.boundSymbols ?? []).some((row) =>
 				row.captureSlots.some(
 					(slot) =>
@@ -64,10 +65,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 				]
 			: []),
 		...(routesCallbackSlots
-			? [
-					`import { marklessInvokeCallbackSlot } from '@markless/web/fns/callback-slot';`,
-					'',
-				]
+			? [`import { marklessInvokeCallbackSlot } from '@markless/web/fns/callback-slot';`, '']
 			: []),
 		...(rowed
 			? [
@@ -92,7 +90,9 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'	if (bound) return loadBoundSymbol(bound);',
 		'	const row = symbolRows[id];',
 		'	if (!row) throw createUnknownSymbolError(id);',
-		input.literalImports ? '\treturn moduleLoads[id]()' : '	return import(/* @vite-ignore */ moduleUrls[row[0]])',
+		input.literalImports
+			? '\treturn moduleLoads[id]()'
+			: '	return import(/* @vite-ignore */ moduleUrls[row[0]])',
 		'		.then((mod) => {',
 		'			runGeneratedSymbolChunkInitializers(mod);',
 		'			return mod[exportNames[row[1]]];',
@@ -125,6 +125,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'			}',
 		// A prop the root forwarded from its own props: the root's props are the page-space `prop:props` cell.
 		'			if (route.kind === "passthrough-route") return context.graph.read("prop:props", [route.propName, ...(route.path ?? []), ...(slot.path ?? [])]);',
+		'			if (route.kind === "row-local") return route.path.reduce((value, key) => value == null ? value : value[key], context.locals?.[route.itemName]);',
 		'			throw new Error(`Capture slot ${slotId} is a callback route`);',
 		'		},',
 		'		invoke(slotId, args) {',
@@ -229,7 +230,10 @@ function instanceScopeLines(widgetAware: boolean, rowed: boolean): string[] {
 					'',
 					'function pathScopedBase(base, bound, path, rowedPath) {',
 				]
-			: ['function instanceScopedBase(base, bound) {', '	const path = bound.instancePath;']),
+			: [
+					'function instanceScopedBase(base, bound) {',
+					'	const path = bound.instancePath;',
+				]),
 		'	if (!path) return base;',
 		'	const pageSpace = new Set(bound.captureSlots.flatMap((slot) => slot.legacyGraphRead ? [slot.legacyGraphRead.graphNodeId] : []));',
 		// A `shared:`/`storage:` id belongs to the page, and a widget-scoped one to
@@ -290,6 +294,7 @@ function serializeBoundRows(rows: SymbolResolverModuleInput['boundSymbols']): st
 		row.id,
 		{
 			...row,
+			touchesPageSpaceGraph: undefined,
 			ancestry: row.ancestry.map(({ componentEdgeId: _componentEdgeId, ...entry }) => entry),
 			captureSlots: row.captureSlots.map((slot) =>
 				slot.route.kind === 'callback-route' && slot.route.composerPath
@@ -297,7 +302,8 @@ function serializeBoundRows(rows: SymbolResolverModuleInput['boundSymbols']): st
 							...slot,
 							route: {
 								...slot.route,
-								callbackSymbolId: slot.route.composerPath + slot.route.callbackSymbolId,
+								callbackSymbolId:
+									slot.route.composerPath + slot.route.callbackSymbolId,
 								composerPath: undefined,
 							},
 						}
@@ -305,14 +311,10 @@ function serializeBoundRows(rows: SymbolResolverModuleInput['boundSymbols']): st
 			),
 		},
 	]);
-	return JSON.stringify(
-		Object.fromEntries(serializedRows),
-		(key, value) =>
-			Array.isArray(value) &&
-			value.length === 0 &&
-			OMITTED_EMPTY_BOUND_ROW_FIELDS.has(key)
-				? undefined
-				: value,
+	return JSON.stringify(Object.fromEntries(serializedRows), (key, value) =>
+		Array.isArray(value) && value.length === 0 && OMITTED_EMPTY_BOUND_ROW_FIELDS.has(key)
+			? undefined
+			: value,
 	);
 }
 
@@ -326,14 +328,18 @@ function emitTableSymbolResolverModule(
 		JSON.stringify(manifest),
 		';',
 		'',
-		literalImports ? literalModuleLoads(manifest, symbols) : 'const moduleUrls = symbolManifest[3];',
+		literalImports
+			? literalModuleLoads(manifest, symbols)
+			: 'const moduleUrls = symbolManifest[3];',
 		'const exportNames = symbolManifest[4];',
 		'const symbolRows = symbolManifest[5];',
 		'',
 		'export async function loadSymbol(id) {',
 		'\tconst row = symbolRows[id];',
 		'\tif (!row) throw createUnknownSymbolError(id);',
-		literalImports ? '\treturn moduleLoads[id]()' : '\treturn import(/* @vite-ignore */ moduleUrls[row[0]])',
+		literalImports
+			? '\treturn moduleLoads[id]()'
+			: '\treturn import(/* @vite-ignore */ moduleUrls[row[0]])',
 		'\t\t.then((mod) => {',
 		'\t\t\trunGeneratedSymbolChunkInitializers(mod);',
 		'\t\t\treturn mod[exportNames[row[1]]];',
@@ -364,8 +370,15 @@ function literalModuleLoads(
 	manifest: SymbolResolverModuleManifest,
 	symbols: SymbolResolverModuleInput['symbols'],
 ): string {
-	const lazy = new Map(symbols.flatMap((symbol) => (symbol.lazyChunk ? [[symbol.id, symbol.lazyChunk]] : [])));
-	return `const moduleLoads = {${Object.entries(manifest[5]).map(([id, row]) => `${JSON.stringify(id)}:()=>import(${JSON.stringify(lazy.get(id) ?? manifest[3][row[0]])})`).join(',')}};`;
+	const lazy = new Map(
+		symbols.flatMap((symbol) => (symbol.lazyChunk ? [[symbol.id, symbol.lazyChunk]] : [])),
+	);
+	return `const moduleLoads = {${Object.entries(manifest[5])
+		.map(
+			([id, row]) =>
+				`${JSON.stringify(id)}:()=>import(${JSON.stringify(lazy.get(id) ?? manifest[3][row[0]])})`,
+		)
+		.join(',')}};`;
 }
 
 function emitSmallSymbolResolverModule(input: SymbolResolverModuleInput): string {

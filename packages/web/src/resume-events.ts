@@ -581,7 +581,11 @@ export function createEventWiring(input: {
 				// only the component edge, so without this the handler for row B would
 				// spell the same node as the handler for row A - the write lands
 				// nowhere, or worse, on the wrong row.
-				return { rowScope: marklessRecordRowScope(eventRecord.hostNodeId, input.graph) };
+				const rowScope = marklessRecordRowScope(eventRecord.hostNodeId, input.graph);
+				const locals = rowScope?.length
+					? (await import('./fns/row-locals.ts')).marklessRowLocals(input, element)
+					: undefined;
+				return { rowScope, locals };
 			},
 		);
 	}

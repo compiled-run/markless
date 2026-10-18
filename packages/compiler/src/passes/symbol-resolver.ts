@@ -2,6 +2,7 @@ import type {
 	BoundSymbolResolverArtifact,
 	BoundSymbolResolverInput,
 	BoundSymbolResolverRow,
+	BoundSymbolCaptureRoute,
 	LoweredElementHandleRead,
 	LoweredStateRead,
 	LoweredStateWrite,
@@ -192,7 +193,8 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 	].forEach((behavior, order) => {
 		const authored = input.semanticGraph.behaviors.find(
 			(candidate) =>
-				candidate.hostNodeId === behavior.hostNodeId && candidate.source === behavior.source,
+				candidate.hostNodeId === behavior.hostNodeId &&
+				candidate.source === behavior.source,
 		);
 		symbols.push({
 			id: `symbol:${nextSymbolId++}`,
@@ -422,9 +424,12 @@ export function planBoundSymbolResolver(
 			for (const path of pathsByTerminalEdge.get(terminalEdgeId) ?? []) {
 				const componentEdgePath = path.map((edge) => edge.id);
 				// A composer nested in this module holds its nodes under its own place; a republished symbol's routes already say so.
-				const composerPath =
+				const ownerPath = (ownerEdgeCount: number | undefined) =>
 					symbol.innerInstancePath === undefined
-						? componentEdgeInstancePath(path.slice(0, -1), input.semanticGraph.componentEdges)
+						? componentEdgeInstancePath(
+								path.slice(0, ownerEdgeCount ?? -1),
+								input.semanticGraph.componentEdges,
+							)
 						: '';
 				const captureSlots = edgeDependentSlots.flatMap((slot) => {
 					const route = slot.routes.find(
@@ -442,12 +447,7 @@ export function planBoundSymbolResolver(
 								{
 									slotId: slot.id,
 									path: slot.path,
-									route:
-										composerPath &&
-										route.kind === 'graph-reference' &&
-										protocolInstanceQualifies(route.graphNodeId) === true
-											? { ...route, graphNodeId: composerPath + route.graphNodeId }
-											: route,
+									route: qualifiedRoute(route, ownerPath),
 									...(slot.propName
 										? {
 												legacyGraphRead: {
@@ -490,6 +490,9 @@ export function planBoundSymbolResolver(
 					...(symbol.loaderSymbolId ? { loaderSymbolId: symbol.loaderSymbolId } : {}),
 					...(instancePath ? { instancePath } : {}),
 					...(rowPieces ? { rowPieces } : {}),
+					...(symbol.touchesPageSpaceGraph
+						? { touchesPageSpaceGraph: true as const }
+						: {}),
 					componentEdgePath,
 					ancestry,
 					captureSlots,
@@ -504,6 +507,18 @@ export function planBoundSymbolResolver(
 		return instancePath ? [{ componentEdgeId: edge.id, instancePath }] : [];
 	});
 	return { passId: 'bound-symbol-resolver', rows, componentEdgeInstancePaths };
+}
+
+function qualifiedRoute(
+	route: BoundSymbolCaptureRoute,
+	ownerPath: (ownerEdgeCount: number | undefined) => string,
+): BoundSymbolCaptureRoute {
+	if (route.kind !== 'graph-reference') return route;
+	const { ownerEdgeCount, ...rest } = route;
+	const composerPath = ownerPath(ownerEdgeCount);
+	return composerPath && protocolInstanceQualifies(rest.graphNodeId) === true
+		? { ...rest, graphNodeId: composerPath + rest.graphNodeId }
+		: rest;
 }
 
 function componentEdgePaths(edges: SymbolResolverInput['semanticGraph']['componentEdges']) {

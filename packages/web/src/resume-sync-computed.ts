@@ -52,13 +52,34 @@ function loadRosterResume(): Promise<RosterResumeModule> | undefined {
 	return pending;
 }
 
-export async function refreshSyncComputed(input: {
-	readonly computed: ResumeSyncComputedRecord;
-	readonly graph: RuntimeGraph;
-	readonly root: ResumeDomElement;
-	readonly loadSymbol: ResumeRuntimeInput['loadSymbol'];
-	readonly elementHandles: ElementHandleRegistry;
-}): Promise<void> {
+export async function refreshSyncComputed(
+	input: {
+		readonly computed: ResumeSyncComputedRecord;
+		readonly graph: RuntimeGraph;
+		readonly root: ResumeDomElement;
+		readonly loadSymbol: ResumeRuntimeInput['loadSymbol'];
+		readonly elementHandles: ElementHandleRegistry;
+		readonly records?: ReadonlyArray<
+			Omit<ResumeSyncComputedRecord, 'deriveSymbolId'> & {
+				readonly async?: boolean;
+				readonly deriveSymbolId?: string;
+			}
+		>;
+	},
+	deriving = new Set<string>(),
+): Promise<void> {
+	// No value is served for a computed only other computeds read: derive it before its reader.
+	deriving.add(input.computed.graphNodeId);
+	for (const { graphNodeId } of input.computed.dependencies ?? []) {
+		const record = input.records?.find(
+			(r) => r.graphNodeId === graphNodeId && r.async === false && r.deriveSymbolId,
+		);
+		if (record && !deriving.has(graphNodeId) && input.graph.read(graphNodeId, []) === undefined)
+			await refreshSyncComputed(
+				{ ...input, computed: record as ResumeSyncComputedRecord },
+				deriving,
+			);
+	}
 	const graph = seedSourceGraph(input.graph, input.computed);
 	const roster = await loadRosterResume();
 	const result = (await input.loadSymbol(input.computed.deriveSymbolId))({

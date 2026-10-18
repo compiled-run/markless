@@ -205,7 +205,8 @@ async function drawForeignLinks(page: Page) {
 	await page.evaluate(() => {
 		const list = document.querySelector<HTMLElement>('[data-favourites]')!;
 		const draw = () => {
-			list.innerHTML = '<p><a href="#article" data-fav><img alt="" width="20" height="20" data-fav-img></a></p>';
+			list.innerHTML =
+				'<p><a href="#article" data-fav><img alt="" width="20" height="20" data-fav-img></a></p>';
 		};
 		draw();
 		document.addEventListener('click', (event) => {
@@ -225,6 +226,166 @@ test('a click on a link a foreign script redraws reaches its container handler, 
 	await expect.poll(() => text(page, '[data-opened]')).toBe('2');
 	await page.click('[data-like]');
 	await expect.poll(() => text(page, '[data-like]')).toBe('1');
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
+test('a computed that reads another computed follows both after resume', async () => {
+	const { page, errors } = await open('/computed-chain');
+	const items = () => page.locator('[data-window] li').allTextContents();
+	expect(await items()).toEqual(['1', '2']);
+	await page.click('[data-down]');
+	await expect.poll(items).toEqual(['2', '3']);
+	await page.click('[data-flip]');
+	await expect.poll(items).toEqual(['2', '1']);
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
+test('an async value and state joined in one run of text in @try both update, in place', async () => {
+	const { page, errors } = await open('/async-join');
+	await page.locator('[data-join]').waitFor();
+	expect(await text(page, '[data-join]')).toBe('Inbox 0');
+	const button = await page.locator('[data-join]').elementHandle();
+	await page.click('[data-join]');
+	await expect.poll(() => text(page, '[data-join]')).toBe('Inbox 1');
+	await page.click('[data-join]');
+	await expect.poll(() => text(page, '[data-join]')).toBe('Inbox 2');
+	expect(await button!.evaluate((element) => element.isConnected)).toBe(true);
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
+test('a streamed @try joining its async value with state updates text and attribute', async () => {
+	const html = await (await fetch(`${server!.origin}/async-join-streamed`)).text();
+	expect(html).toContain('data-join-loading');
+	expect(html.indexOf('data-join-loading')).toBeLessThan(html.indexOf('data-join-title'));
+	const { page, errors } = await open('/async-join-streamed');
+	await page.locator('[data-join]').waitFor();
+	expect(await text(page, '[data-join]')).toBe('0 in Inbox');
+	expect(await page.getAttribute('[data-join-title]', 'title')).toBe('Inbox 0');
+	await page.click('[data-join]');
+	await expect.poll(() => text(page, '[data-join]')).toBe('1 in Inbox');
+	await expect.poll(() => page.getAttribute('[data-join-title]', 'title')).toBe('Inbox 1');
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
+test('a computed forwarded through a second component reaches the inner computed', async () => {
+	const { page, errors } = await open('/prop-forwarded');
+	await page.click('[data-next]');
+	await expect.poll(() => text(page, '[data-direct] p')).toBe('got v1');
+	await expect.poll(() => text(page, '[data-outer] p')).toBe('got v1');
+	await page.click('[data-next]');
+	await expect.poll(() => text(page, '[data-outer] p')).toBe('got v2');
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
+test('a component handing its child a value under its own prop name keeps following its own prop', async () => {
+	const { page, errors } = await open('/prop-name');
+	await page.click('[data-toggle]');
+	await expect.poll(() => text(page, '[data-dock]')).toBe('BOTTOM');
+	await expect.poll(() => page.getAttribute('[data-details]', 'class')).toBe('row');
+	await expect.poll(() => text(page, '[data-badge]')).toBe('badge BOTTOM');
+	await expect.poll(() => page.getAttribute('[data-gauge]', 'title')).toBe('left:4');
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
+test('nested @for rows in a component imported from a deeper folder fill both levels', async () => {
+	const { page, errors } = await open('/nested-forwarded');
+	await page.click('[data-fill]');
+	await expect
+		.poll(() =>
+			page
+				.locator('[data-field]')
+				.evaluateAll((rows) => rows.map((row) => row.getAttribute('data-field'))),
+		)
+		.toEqual(['b', 'c']);
+	await expect
+		.poll(() => page.locator('[data-item]').allTextContents())
+		.toEqual(['b1', 'b2', 'c1']);
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
+test('a callback a row passes its child reads that row, served and added', async () => {
+	const { page, errors } = await open('/row-callbacks');
+	await page.click('[data-sort-text="Time"]');
+	await expect.poll(() => text(page, '[data-sort]')).toBe('time');
+	await page.click('[data-sort-cell="Channel"]');
+	await expect.poll(() => text(page, '[data-sort]')).toBe('channel');
+	await page.click('[data-pick-cell="beta"]');
+	await expect.poll(() => text(page, '[data-picked]')).toBe('2');
+	await page.click('[data-shared-cell="Time"]');
+	await expect.poll(() => text(page, '[data-shared-sort]')).toBe('sorted by clicked');
+	await page.click('[data-local-cell="gamma"]');
+	await expect.poll(() => text(page, '[data-shared-picked]')).toBe('1');
+	await page.click('[data-reverse]');
+	await page.click('[data-sort-text="Serial"]');
+	await expect.poll(() => text(page, '[data-sort]')).toBe('serial');
+	await page.click('[data-add-col]');
+	await page.click('[data-sort-text="Args"]');
+	await expect.poll(() => text(page, '[data-sort]')).toBe('args');
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
+test('a same-module child given a state prop writes it into page-scope shared state', async () => {
+	const { page, errors } = await open('/child-writes');
+	await page.click('[data-count-button]');
+	await expect.poll(() => text(page, '[data-shared-picked]')).toBe('1');
+	await page.click('[data-label-button]');
+	await expect.poll(() => text(page, '[data-shared-sort]')).toBe('tagged');
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
+test('a child rendered per row reads its row prop in a handler, served and added', async () => {
+	const { page, errors } = await open('/row-props');
+	await page.click('[data-header-text="time"]');
+	await expect.poll(() => text(page, '[data-sort]')).toBe('time');
+	await page.click('[data-shared-header="channel"]');
+	await expect.poll(() => text(page, '[data-shared-sort]')).toBe('sorted by channel');
+	await page.click('[data-cell="b"]');
+	await expect.poll(() => text(page, '[data-picked]')).toBe('2');
+	await page.click('[data-bound-header="serial"]');
+	await expect.poll(() => text(page, '[data-sort]')).toBe('bound serial');
+	await page.click('[data-local-cell="c"]');
+	await expect.poll(() => text(page, '[data-shared-picked]')).toBe('3');
+	await page.click('[data-add-item]');
+	await page.click('[data-cell="d"]');
+	await expect.poll(() => text(page, '[data-picked]')).toBe('4');
+	await page.click('[data-local-cell="d"]');
+	await expect.poll(() => text(page, '[data-shared-picked]')).toBe('4');
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
+test('a keyed list after another list in the same parent follows its collection', async () => {
+	const { page, errors } = await open('/sibling-lists');
+	await page.click('[data-fill]');
+	const rows = (selector: string) =>
+		page.locator(selector).evaluateAll((items) => items.map((item) => item.textContent));
+	await expect.poll(() => rows('[data-local-row]')).toEqual(['robj', 'sval']);
+	await expect.poll(() => rows('[data-inline-row]')).toEqual(['robj', 'sval']);
+	await expect.poll(() => rows('[data-tag]')).toEqual(['r', 's']);
+	await expect.poll(() => rows('[data-imported-row]')).toEqual(['robj', 'sval']);
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
+test('an @if arm holding imported components with constant props flips between them', async () => {
+	const { page, errors } = await open('/theme-icon');
+	const icon = (name: string) => page.getAttribute('[data-theme] svg', name);
+	expect(await icon('data-icon')).toBe('sun');
+	await page.click('[data-theme]');
+	await expect.poll(() => icon('data-icon')).toBe('moon');
+	expect(await icon('width')).toBe('15');
+	await page.click('[data-theme]');
+	await expect.poll(() => icon('data-icon')).toBe('sun');
+	expect(await icon('height')).toBe('13');
 	expect(errors).toEqual([]);
 	await page.close();
 });

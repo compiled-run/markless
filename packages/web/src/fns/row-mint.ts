@@ -60,8 +60,15 @@ export function servedEmptyArm(
 ): ReadonlyArray<ResumeDomNode> {
 	const shape = renderEmptyArm(parent, repeat),
 		children = Array.from(parent.childNodes ?? []),
-		before = children.filter((node) => node.nodeType === 1)[(repeat.rowStartOffset ?? 0) - 1],
-		start = before ? children.indexOf(before) + 1 : 0,
+		elements = children.filter((node) => node.nodeType === 1),
+		before = elements[(repeat.rowStartOffset ?? 0) - 1],
+		after = repeat.rowEndOffset ? elements[elements.length - repeat.rowEndOffset] : undefined,
+		start =
+			repeat.rowEndOffset === undefined
+				? before
+					? children.indexOf(before) + 1
+					: 0
+				: (after ? children.indexOf(after) : children.length) - shape.length,
 		served = children.slice(start, start + shape.length);
 	if (
 		served.length === shape.length &&

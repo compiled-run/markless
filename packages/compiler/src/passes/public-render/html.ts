@@ -1,6 +1,6 @@
 import type { PublicRenderModuleInput } from '../../artifacts.ts';
 import { stripAuthoredExpression } from './authored-strip.ts';
-import { resolveBoundaryRunners } from './boundary-runner.ts';
+import { resolveBoundaryRunners, TEMPLATE_EXPRESSION_GRAPH_NODE_PREFIX } from './boundary-runner.ts';
 
 // Retained only as a type-compatible import for dead component-wiring helpers;
 // production module emission never calls the retired AST HTML renderer.
@@ -14,7 +14,12 @@ export function collectSsrAsyncRunners(
 	input: PublicRenderModuleInput,
 ): ReadonlyMap<
 	string,
-	{ readonly graphNodeId: string; readonly name: string; readonly source: string }
+	{
+		readonly graphNodeId: string;
+		readonly name: string;
+		readonly source: string;
+		readonly derived: ReadonlyArray<{ readonly graphNodeId: string; readonly source: string }>;
+	}
 > {
 	const definitions = collectSsrAsyncRunnerDefinitions(input);
 	const runnersByGraphNode = new Map(
@@ -29,14 +34,24 @@ export function collectSsrAsyncRunners(
 	);
 	const byBoundary = new Map<
 		string,
-		{ readonly graphNodeId: string; readonly name: string; readonly source: string }
+		{
+			readonly graphNodeId: string;
+			readonly name: string;
+			readonly source: string;
+			readonly derived: ReadonlyArray<{ readonly graphNodeId: string; readonly source: string }>;
+		}
 	>();
 	const boundaryRunners = resolveBoundaryRunners(input.semanticGraph);
 	for (const boundary of input.protocolView.asyncBoundaries) {
-		const read = boundaryRunners.get(boundary.id)?.authored;
+		const resolution = boundaryRunners.get(boundary.id);
+		const read = resolution?.authored;
 		const runner = read ? runnersByGraphNode.get(read.graphNodeId) : undefined;
+		const derived = (resolution?.derivedGraphNodeIds ?? []).flatMap((graphNodeId) => {
+			const definition = definitions.get(graphNodeId);
+			return definition ? [{ graphNodeId, source: definition.source }] : [];
+		});
 		if (read && runner)
-			byBoundary.set(boundary.id, { graphNodeId: read.graphNodeId, ...runner });
+			byBoundary.set(boundary.id, { graphNodeId: read.graphNodeId, ...runner, derived });
 	}
 	return byBoundary;
 }
@@ -171,7 +186,7 @@ export function collectSsrSharedComputedSources(
 	);
 }
 
-export const TEMPLATE_EXPRESSION_GRAPH_NODE_PREFIX = 'computed:templateExpression:';
+export { TEMPLATE_EXPRESSION_GRAPH_NODE_PREFIX };
 
 /**
  * A recombined template expression that reads a shared() instance has no

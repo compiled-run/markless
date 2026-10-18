@@ -1,8 +1,10 @@
 import { expect, test } from 'vitest';
 import {
 	compileTsrxModule,
+	importedNestedRepeats,
 	importedRowComponentMints,
 	importedRowSlotReaders,
+	importedRowTemplateMints,
 } from '../src/index.ts';
 
 /**
@@ -107,4 +109,39 @@ export default function Page() @{
 			).moduleGraphInterface,
 		}),
 	).toBe(false);
+});
+
+// The plain template mint and nested-row wiring are installed by the module that owns the repeat,
+// which resume never evaluates for an imported component, so the placing page installs them.
+test('item-only and nested rows reach the page that places their component', async () => {
+	const tree = await compileTsrxModule({
+		filename: 'src/deep/tree.tsrx',
+		source: `export type Field = { readonly name: string; readonly items: readonly string[] };
+export function Tree({ fields }: { readonly fields: readonly Field[] }) @{
+	<ul>@for (const field of fields; key field.name) { <li>{field.name}<ol>@for (const item of field.items; key item) { <li>{item}</li> }</ol></li> }</ul>
+}
+`,
+		symbols: [],
+	});
+	expect(tree.moduleGraphInterface.render.components).toEqual([
+		expect.objectContaining({
+			componentName: 'Tree',
+			rowTemplateMint: true,
+			nestedRepeats: true,
+		}),
+	]);
+	const page = await compileTsrxModule({
+		filename: 'src/page.tsrx',
+		source: `import { Tree } from './deep/tree.tsrx';
+export function Page() @{
+	<main><Tree fields={[]} /></main>
+}
+`,
+		symbols: [],
+		importedModuleInterfaces: { './deep/tree.tsrx': tree.moduleGraphInterface },
+	});
+	const interfaces = { './page.tsrx': page.moduleGraphInterface };
+	expect(importedRowTemplateMints(interfaces)).toBe(true);
+	expect(importedNestedRepeats(interfaces)).toBe(true);
+	expect(importedRowTemplateMints({})).toBe(false);
 });

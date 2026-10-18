@@ -405,6 +405,8 @@ function callsMethodOnReadValue(callee: AnyNode, state: WalkState): boolean {
 		semanticAliasMap(state.graph, state.currentSharedDefinitionId, state.currentComponentName),
 	);
 	if (!resolved) return false;
+	// A destructured prop (`{ dock }`) aliases `props.dock`: the receiver is already a member path.
+	if (resolved.binding.kind === 'prop' && resolved.path.length > 0) return true;
 
 	if (resolved.binding.kind === 'computed') return true;
 	// A state() cell holds serializable data, never a callable the graph declares.

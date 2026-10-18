@@ -69,15 +69,28 @@ export function App() @{
 	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowStartOffset');
 });
 
-// Fail closed: an `@if` in front of the rows renders an arm-dependent number of
-// elements, so no offset can be stated and the repeat ships no record at all
-// rather than a record that would pair every key with the wrong element.
-test('a branch in front of the rows drops the repeat record', async () => {
+// An `@if` in front of the rows renders an arm-dependent number of elements, so
+// the rows are counted from the parent's end instead.
+test('a branch in front of the rows places them from the parent end', async () => {
 	const view = await viewOf(`${preamble}
 export function App() @{
 	let rows = state([{ id: 'a' }]);
 	let show = state(true);
-	<ul>@if (show) { <li>header</li> }@for (const row of rows; key row.id) { <li>{row.id}</li> }</ul>
+	<ul>@if (show) { <li>header</li> }@for (const row of rows; key row.id) { <li>{row.id}</li> }<li>tail</li></ul>
+}
+`);
+	expect(view.keyedRepeats?.[0]?.rowStartOffset).toBeUndefined();
+	expect(view.keyedRepeats?.[0]?.rowEndOffset).toBe(1);
+});
+
+// Fail closed: with a run-time count on both sides no position can be stated, so
+// the repeat ships no record rather than one that pairs keys with wrong elements.
+test('a branch on both sides of the rows drops the repeat record', async () => {
+	const view = await viewOf(`${preamble}
+export function App() @{
+	let rows = state([{ id: 'a' }]);
+	let show = state(true);
+	<ul>@if (show) { <li>header</li> }@for (const row of rows; key row.id) { <li>{row.id}</li> }@if (show) { <li>footer</li> }</ul>
 }
 `);
 	expect(view.keyedRepeats ?? []).toHaveLength(0);

@@ -407,15 +407,6 @@ export function hasPropDependentComputed(input: PublicRenderModuleInput): boolea
 	);
 }
 
-export function composedGraphProps(input: PublicRenderModuleInput) {
-	return input.semanticGraph.componentEdges.flatMap((edge) =>
-		componentEdgeWithCaptureRouteHandoff(input, edge).props.flatMap((prop) =>
-			prop.kind === 'graph-reference'
-				? [{ name: prop.name, graphNodeId: prop.graphNodeId, path: prop.path }]
-				: [],
-		),
-	);
-}
 
 export function staticHostLocators(input: PublicRenderModuleInput) {
 	const rootChunkId = input.renderData.root?.templateId;
@@ -554,7 +545,9 @@ function componentEdgeWithCaptureRouteHandoff(
 					const route = slot.routes.find(
 						(candidate) =>
 							candidate.kind === 'graph-reference' &&
-							candidate.componentEdgeId === edge.id,
+							candidate.componentEdgeId === edge.id &&
+							// A node a component further up owns reaches this edge through the parent's own props.
+							candidate.ownerEdgeCount === undefined,
 					);
 					if (!route || route.kind !== 'graph-reference') continue;
 					const pathLength = Math.max(0, route.path.length - slot.path.length);

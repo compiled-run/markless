@@ -939,6 +939,46 @@
 			"from": 15538,
 			"to": 15929,
 			"reason": "queue release at a handler's first await, editable controls kept in order, and the dispatch walks from the press-time host when a script removed the target (b51ed81a, 5b3fd029, 7c0e0d61)"
+		},
+		{
+			"date": "2026-10-18",
+			"guard": "runtime",
+			"subject": "web/fns/row-locals",
+			"from": null,
+			"to": 942,
+			"reason": "row item lookup for a callback a row passes its child; loaded only on clicks from inside a row"
+		},
+		{
+			"date": "2026-10-18",
+			"guard": "runtime",
+			"subject": "web/fns/row-mint",
+			"from": 7403,
+			"to": 7614,
+			"reason": "rows counted back from the parent's last element when a list follows another list or a branch"
+		},
+		{
+			"date": "2026-10-18",
+			"guard": "runtime",
+			"subject": "web/resume-events",
+			"from": 15929,
+			"to": 16199,
+			"reason": "a callback a row passes its child reads that row's item"
+		},
+		{
+			"date": "2026-10-18",
+			"guard": "runtime",
+			"subject": "web/resume-keyed-repeats",
+			"from": 15599,
+			"to": 15886,
+			"reason": "derive records reach list priming, and rows count back from the parent's end"
+		},
+		{
+			"date": "2026-10-18",
+			"guard": "runtime",
+			"subject": "web/resume-sync-computed",
+			"from": 1538,
+			"to": 1976,
+			"reason": "a computed first derives an upstream computed that has no value yet"
 		}
 	],
 	"runtimeModules": {
@@ -989,7 +1029,8 @@
 		"web/fns/projection-html": 343,
 		"web/fns/reconcile-plane": 334,
 		"web/fns/roster-resume": 5123,
-		"web/fns/row-mint": 7403,
+		"web/fns/row-locals": 942,
+		"web/fns/row-mint": 7614,
 		"web/fns/row-slot-mint": 2633,
 		"web/fns/scalar-served": 3982,
 		"web/fns/scalar-specialized": 1426,
@@ -1027,10 +1068,10 @@
 		"web/resume-branches": 15471,
 		"web/resume-census": 1471,
 		"web/resume-commit-arm": 9551,
-		"web/resume-events": 15929,
+		"web/resume-events": 16199,
 		"web/resume-handle-qualifier": 685,
 		"web/resume-handoff": 1360,
-		"web/resume-keyed-repeats": 15599,
+		"web/resume-keyed-repeats": 15886,
 		"web/resume-keyed-repeats-lazy": 227,
 		"web/resume-locators": 5644,
 		"web/resume-repeat-branch-arm": 1785,
@@ -1040,7 +1081,7 @@
 		"web/resume-runtime-start": 8874,
 		"web/resume-shared-patch": 1200,
 		"web/resume-stream-patches": 2260,
-		"web/resume-sync-computed": 1538,
+		"web/resume-sync-computed": 1976,
 		"web/resume-sync-demand": 1099,
 		"web/runtime-error-reporting": 1876,
 		"web/ssr-data/awaitable": 856,

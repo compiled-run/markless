@@ -479,9 +479,16 @@ export type ProtocolViewPayload = {
 		 * Element children of the parent that stand before the rows. Rows occupy
 		 * `[rowStartOffset, rowStartOffset + items.length)` among the parent's child
 		 * elements; a repeat whose rows begin at 0 omits the field. A repeat whose
-		 * prefix has no compile-time element count ships no record at all.
+		 * prefix has no compile-time element count says `rowEndOffset` instead, or
+		 * ships no record at all when its suffix has none either.
 		 */
 		readonly rowStartOffset?: number;
+		/**
+		 * Element children of the parent that stand after the rows, set only when
+		 * the prefix has no compile-time element count. Rows then occupy the
+		 * `items.length` element children ending `rowEndOffset` before the last.
+		 */
+		readonly rowEndOffset?: number;
 		/**
 		 * The `@empty` arm's finished markup, for the mint that raises it when the
 		 * collection empties after resume and takes it back out when a row returns.
