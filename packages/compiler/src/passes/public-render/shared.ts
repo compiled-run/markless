@@ -407,15 +407,6 @@ export function hasPropDependentComputed(input: PublicRenderModuleInput): boolea
 	);
 }
 
-export function composedGraphProps(input: PublicRenderModuleInput) {
-	return input.semanticGraph.componentEdges.flatMap((edge) =>
-		componentEdgeWithCaptureRouteHandoff(input, edge).props.flatMap((prop) =>
-			prop.kind === 'graph-reference'
-				? [{ name: prop.name, graphNodeId: prop.graphNodeId, path: prop.path }]
-				: [],
-		),
-	);
-}
 
 export function staticHostLocators(input: PublicRenderModuleInput) {
 	const rootChunkId = input.renderData.root?.templateId;

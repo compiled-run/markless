@@ -66,7 +66,6 @@ import {
 	isComponentRoot,
 	edgeDeclaredComponentName,
 	publicRenderValueImports,
-	composedGraphProps,
 	componentOwnedStateNodes,
 	selectedStateNodeArguments,
 	SSR_CALLBACKS_PROP_NAME,
@@ -255,8 +254,6 @@ export function emitPublicSsrRenderModule(
 		),
 	);
 	const remapsGraphProps = hasPropDependentComputed(input);
-	const internalGraphProps = composedGraphProps(input);
-	const remapsInternalGraphProps = remapsGraphProps && internalGraphProps.length > 0;
 	const rootDataLines = emitSsrDataLines(input, rootInfo.componentName, references);
 	const dataRenderLines = rootDataLines.render;
 	const sameModuleComponents = emitSameModuleSsrComponents(
@@ -337,7 +334,7 @@ export function emitPublicSsrRenderModule(
 		'	const html = marklessSsrRendered.html;',
 		`	const marklessSsrComposition = marklessSsrComposeView(marklessSsrRendered.structure, ${ssrComposedPayloadView(input, rootInfo.componentName)}, marklessSsrChildren, marklessSsrAsyncSnapshots, marklessSsrIdPrefix);`,
 		`	const marklessSsrState = ${ssrComposeStateExpression(input, rootInfo.component, rootInfo.componentName)};`,
-		remapsInternalGraphProps ? '	const marklessSsrOutput = {' : '	return {',
+		'	return {',
 		'		html,',
 		'		state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots),',
 		'		view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) },',
@@ -354,10 +351,6 @@ export function emitPublicSsrRenderModule(
 			? [`	${widgetFallbacksOutputField(input, rootInfo.componentName).slice(2)},`]
 			: []),
 		'	};',
-		remapsInternalGraphProps
-			? `	marklessSsrRemapGraphOutput(marklessSsrOutput, ${JSON.stringify(internalGraphProps)});`
-			: null,
-		remapsInternalGraphProps ? '	return marklessSsrOutput;' : null,
 		'}',
 		sharedSeedMarkerLine(
 			componentSharedSeeds(input, rootInfo.componentName),

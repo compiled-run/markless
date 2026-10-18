@@ -281,3 +281,14 @@ test('a computed forwarded through a second component reaches the inner computed
 	expect(errors).toEqual([]);
 	await page.close();
 });
+
+test('a component handing its child a value under its own prop name keeps following its own prop', async () => {
+	const { page, errors } = await open('/prop-name');
+	await page.click('[data-toggle]');
+	await expect.poll(() => text(page, '[data-dock]')).toBe('BOTTOM');
+	await expect.poll(() => page.getAttribute('[data-details]', 'class')).toBe('row');
+	await expect.poll(() => text(page, '[data-badge]')).toBe('badge BOTTOM');
+	await expect.poll(() => page.getAttribute('[data-gauge]', 'title')).toBe('left:4');
+	expect(errors).toEqual([]);
+	await page.close();
+});

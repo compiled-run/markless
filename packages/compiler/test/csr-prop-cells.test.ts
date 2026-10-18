@@ -54,7 +54,7 @@ test('pages without props publish no prop cell', async () => {
 	expect(result.publicRenderModule.componentDefinitions[0]?.propCellId).toBeNull();
 });
 
-test('prop-dependent computeds publish linked graph metadata and the SSR remap hook', async () => {
+test('prop-dependent computeds publish linked graph metadata and the per-instance SSR remap hook', async () => {
 	const result = await compileTsrxModule({
 		filename: 'pages/computed-prop-chain.tsrx',
 		source: `import { computed, state } from '@markless/core';
@@ -78,8 +78,9 @@ export default function Page() @{
 	expect(result.publicRenderModule.ssrModuleSource).toContain(
 		'm(graphProps, instancePath) { marklessSsrRemapGraphOutput(this, graphProps, instancePath); }',
 	);
-	expect(result.publicRenderModule.ssrModuleSource).toContain(
-		'marklessSsrRemapGraphOutput(marklessSsrOutput, [{"name":"input","graphNodeId":"computed:parentValue","path":[]}]);',
+	// Each child edge composes its own instance; a module-wide remap would rewrite the root's own prop reads by a child's prop name.
+	expect(result.publicRenderModule.ssrModuleSource).not.toContain(
+		'marklessSsrRemapGraphOutput(marklessSsrOutput,',
 	);
 });
 
@@ -103,7 +104,9 @@ export default function Page() @{
 	const ssrGraphProps =
 		'"graphProps":[{"name":"libraryOpen","graphNodeId":"state:libraryOpen","path":[]}]';
 
-	expect(JSON.stringify(result.publicRenderModule.componentDefinitions)).toContain(linkedGraphProps);
+	expect(JSON.stringify(result.publicRenderModule.componentDefinitions)).toContain(
+		linkedGraphProps,
+	);
 	expect(result.publicRenderModule.ssrModuleSource).toContain(ssrGraphProps);
 });
 
@@ -120,7 +123,5 @@ export default function Page({ input }) @{
 		symbols: [],
 	});
 
-	expect(result.publicRenderModule.ssrModuleSource).not.toContain(
-		'marklessSsrRemapGraphOutput',
-	);
+	expect(result.publicRenderModule.ssrModuleSource).not.toContain('marklessSsrRemapGraphOutput');
 });
