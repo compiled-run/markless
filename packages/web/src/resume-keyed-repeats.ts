@@ -383,7 +383,7 @@ function applyKeyedRepeatRowOrder(
 	const anchor =
 		rangeEnd ??
 		elementChildren(parent)
-			.slice(repeat.rowStartOffset ?? 0)
+			.slice(rowsFrom(parent, repeat))
 			.find((child) => !knownRows.has(child));
 	for (const rowRoot of nextRows) insertRepeatNode(mutableParent, rowRoot, anchor);
 	mint?.refocus?.(parent, focused);
@@ -391,7 +391,7 @@ function applyKeyedRepeatRowOrder(
 		spliceDomOrderCensus(census, currentRows, nextRows);
 	if (nextRows.length > 0 || arm.mounted || !repeat.emptyArm || !mint) return;
 	const nodes = mint.renderEmptyArm(parent, repeat);
-	const armAnchor = rangeEnd ?? elementChildren(parent).slice(repeat.rowStartOffset ?? 0)[0];
+	const armAnchor = rangeEnd ?? elementChildren(parent).slice(rowsFrom(parent, repeat))[0];
 	for (const node of nodes) insertRepeatNode(mutableParent, node, armAnchor);
 	arm.mounted = true;
 	arm.nodes = nodes;
@@ -566,8 +566,13 @@ function repeatRowElements(
 	repeat: ResumeKeyedRepeatRecord,
 	count: number,
 ): ReadonlyArray<ResumeDomElement> {
-	const offset = repeat.rowStartOffset ?? 0;
+	const offset = rowsFrom(parent, repeat, count);
 	return elementChildren(parent).slice(offset, offset + count);
+}
+function rowsFrom(parent: ResumeDomElement, repeat: ResumeKeyedRepeatRecord, count = 0): number {
+	return repeat.rowEndOffset === undefined
+		? (repeat.rowStartOffset ?? 0)
+		: Math.max(0, elementChildren(parent).length - repeat.rowEndOffset - count);
 }
 function elementChildren(element: ResumeDomElement): ResumeDomElement[] {
 	return elementsOf(Array.from(element.childNodes ?? []));

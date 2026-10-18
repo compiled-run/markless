@@ -392,10 +392,9 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 		// The row still renders one root element per item, which is all the
 		// reconcile needs.
 		// An unknown row start means the parent's prefix holds a sibling whose
-		// element count is only known at render time, so no position can name a
-		// row. Shipping the record anyway would pair every key with the wrong
-		// element - the reconcile has no second way to find a row - so the repeat
-		// stays unresumed instead of resumed wrong.
+		// element count is only known at render time; the rows are then placed
+		// from the parent's end, and only when both sides are unknown does the
+		// repeat stay unresumed instead of resumed wrong.
 		// A position key resumes only where nothing reads a row's key off its item.
 		const positionKeyed = indexKeyed.has(repeat.id);
 		if (
@@ -404,7 +403,7 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 				(repeat.enclosingRepeatId !== undefined ||
 					nestedRepeatIds.has(repeat.id) ||
 					liveRowComponentMint(input, repeat, render) !== null)) ||
-			render.rowStartOffset === 'unknown' ||
+			(render.rowStartOffset === 'unknown' && render.rowEndOffset === undefined) ||
 			!rowRootsOneElement(input, render) ||
 			enclosingRow === null
 		) return [];
@@ -445,6 +444,7 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 				...(typeof render.rowStartOffset === 'number' && render.rowStartOffset > 0
 					? { rowStartOffset: render.rowStartOffset }
 					: {}),
+				...(render.rowEndOffset !== undefined ? { rowEndOffset: render.rowEndOffset } : {}),
 				...mintableEmptyArm(input, render),
 				...mintableRowTemplate(input, render, liveRowComponentMint(input, repeat, render)),
 				...mintableRowComponent(liveRowComponentMint(input, repeat, render)),

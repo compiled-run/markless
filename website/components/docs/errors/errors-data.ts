@@ -3793,6 +3793,28 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_KEYED_REPEAT_ROWS_UNPLACED',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'The browser cannot find this list’s rows: a Markless build error.',
+		printed: [
+			'MARKLESS_KEYED_REPEAT_ROWS_UNPLACED: This @for over <itemName> shares its parent element with another @for, @if, @switch, @try or component both before and after it, so how many elements stand on either side of its rows is only known when the page renders. The browser would show the rows the server sent and never update them.',
+			'After the page loads, the browser finds a list’s rows by counting the parent’s child elements from its start or from its end. That count needs every sibling on at least one side to be a plain element or text.',
+			'Wrap this @for, or the construct beside it, in its own element, so one side of the rows holds only plain elements and text.',
+			'https://markless.dev/errors/MARKLESS_KEYED_REPEAT_ROWS_UNPLACED',
+		],
+		structured: true,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/public-render/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/public-render/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_LEAN_PAYLOAD_MISSING',
 		packageName: '@markless/web',
 		stage: 'runtime',

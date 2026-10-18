@@ -1305,6 +1305,8 @@ export type RenderDataRepeat = {
 	// 'unknown' means the prefix holds a sibling whose element count is not a
 	// compile-time constant, so no offset exists and the repeat is not resumable.
 	readonly rowStartOffset?: number | 'unknown';
+	// Set only when the start is unknown: how many element children of the parent follow the rows.
+	readonly rowEndOffset?: number;
 	readonly parentPath?: ReadonlyArray<number>;
 	readonly classWrites?: ReadonlyArray<PublicRenderPlanClassWrite>;
 	readonly eventControls?: ReadonlyArray<PublicRenderPlanEventControl>;

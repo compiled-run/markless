@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 275,
+	total: 276,
 	guided: 40,
 	groups: [
 		{
@@ -316,6 +316,11 @@ export const errorIndex: ErrorIndex = {
 				{
 					code: 'MARKLESS_KEYED_REPEAT_ROW_MINT_UNSUPPORTED',
 					kind: 'compile warning',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_KEYED_REPEAT_ROWS_UNPLACED',
+					kind: 'compile error',
 					guided: false,
 				},
 				{

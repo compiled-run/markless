@@ -14,8 +14,10 @@ import {
 	resolveRowChunkMint,
 	resolveRowComponentMint,
 } from '../row-mint.ts';
+import { repeatRowsUnplaceable } from '../render-data/row-position.ts';
 import {
 	keyedRepeatRowMintUnsupportedDiagnostic,
+	keyedRepeatRowsUnplacedDiagnostic,
 	type KeyedRepeatRowMintRefusal,
 } from './diagnostics.ts';
 
@@ -46,6 +48,15 @@ export function collectKeyedRepeatRowMintDiagnostics(input: {
 		const repeat = pairedRepeat(node, input.semanticGraph, input.source, paired);
 		if (!repeat) return;
 		paired.add(repeat.id);
+		if (
+			repeat.collectionGraphNodeId &&
+			!repeat.enclosingRepeatId &&
+			repeat.projectedElementsBefore === undefined &&
+			repeatRowsUnplaceable(input.semanticGraph.markup.chunks, repeat.id)
+		)
+			diagnostics.push(
+				keyedRepeatRowsUnplacedDiagnostic({ itemName: repeat.itemName, node, filename: input.filename }),
+			);
 		const refusal = rowMintRefusal({
 			chunks: input.semanticGraph.markup.chunks,
 			componentEdges: input.semanticGraph.componentEdges,

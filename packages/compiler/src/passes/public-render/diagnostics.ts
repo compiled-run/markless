@@ -167,6 +167,31 @@ export function keyedRepeatRowMintUnsupportedDiagnostic(input: {
 	};
 }
 
+export function keyedRepeatRowsUnplacedDiagnostic(input: {
+	readonly itemName: string;
+	readonly node: AnyNode;
+	readonly filename: string;
+}): CompilerDiagnostic {
+	return {
+		code: 'MARKLESS_KEYED_REPEAT_ROWS_UNPLACED',
+		severity: 'error',
+		phase: PUBLIC_RENDER_PHASE,
+		title: 'The browser cannot find this list’s rows',
+		message: `This @for over ${input.itemName} shares its parent element with another @for, @if, @switch, @try or component both before and after it, so how many elements stand on either side of its rows is only known when the page renders. The browser would show the rows the server sent and never update them.`,
+		why: 'After the page loads, the browser finds a list’s rows by counting the parent’s child elements from its start or from its end. That count needs every sibling on at least one side to be a plain element or text.',
+		primarySpan: sourceSpan(input.node, input.filename),
+		passId: PUBLIC_RENDER_PLAN_PASS_ID,
+		artifactKeys: ['publicRenderPlan'],
+		suggestions: [
+			{
+				message:
+					'Wrap this @for, or the construct beside it, in its own element, so one side of the rows holds only plain elements and text.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_KEYED_REPEAT_ROWS_UNPLACED',
+	};
+}
+
 function refusalCause(
 	itemName: string,
 	refusal: KeyedRepeatRowMintRefusal,

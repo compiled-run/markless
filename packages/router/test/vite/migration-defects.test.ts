@@ -362,3 +362,16 @@ test('a child rendered per row reads its row prop in a handler, served and added
 	expect(errors).toEqual([]);
 	await page.close();
 });
+
+test('a keyed list after another list in the same parent follows its collection', async () => {
+	const { page, errors } = await open('/sibling-lists');
+	await page.click('[data-fill]');
+	const rows = (selector: string) =>
+		page.locator(selector).evaluateAll((items) => items.map((item) => item.textContent));
+	await expect.poll(() => rows('[data-local-row]')).toEqual(['robj', 'sval']);
+	await expect.poll(() => rows('[data-inline-row]')).toEqual(['robj', 'sval']);
+	await expect.poll(() => rows('[data-tag]')).toEqual(['r', 's']);
+	await expect.poll(() => rows('[data-imported-row]')).toEqual(['robj', 'sval']);
+	expect(errors).toEqual([]);
+	await page.close();
+});
