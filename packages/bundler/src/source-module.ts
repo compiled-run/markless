@@ -950,7 +950,7 @@ export function emitQueuedResumeContainerEvent(
 			? "\tif (root.__marklessShifted) return import('@markless/web/fns/served-census-repair').then((census) => (census.marklessRepairCensus(root), resumeContainerEvent(input)));"
 			: '',
 		'\tif (!root.__marklessDispatch) {',
-		'\t\tlet handler = marklessResumeContainerEvent, tail = Promise.resolve(), done = tail, lastEvent = null, lastEventTime = undefined;',
+		'\t\tlet handler = marklessResumeContainerEvent, tail = Promise.resolve(), done = tail, lastEvent = null, lastEventTime = undefined, seen = new WeakMap();',
 		'\t\troot.__marklessRegisterDispatch = next => {',
 		'\t\t\tconst fallback = handler;',
 		'\t\t\thandler = input => next(input, fallback);',
@@ -960,7 +960,9 @@ export function emitQueuedResumeContainerEvent(
 		'\t\t\tconst event = next.event, eventTime = event?.timeStamp;',
 		// The host the press-time walk matched; a script may take the target out before this dispatch runs.
 		'\t\t\tif (event && next.eventRecord && next.element) event.__marklessPressHost ??= next.element;',
-		'\t\t\tif (event === lastEvent && eventTime === lastEventTime) return done;',
+		// One click reaches here once per container listener, and a wake dispatch can land between the copies.
+		'\t\t\tif ((event === lastEvent && eventTime === lastEventTime) || (seen.has(event) && seen.get(event) === eventTime)) return done;',
+		'\t\t\tif (Object(event) === event) seen.set(event, eventTime);',
 		'\t\t\tlastEvent = event;',
 		'\t\t\tlastEventTime = eventTime;',
 		'\t\t\tlet release;',

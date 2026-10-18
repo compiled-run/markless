@@ -37,72 +37,94 @@ try {
 	process.exit(1);
 }
 
-const failures = [];
-
-// The registry's read replicas lag its write path. On the 0.2.0 release the
-// last package published at 04:12:25 and was read back 4 seconds later, which
-// returned E404 "No match found for version 0.2.0" for a package that had in
-// fact published correctly WITH provenance. That reported a good release as a
-// failed one.
-//
-// So a miss is retried before it is believed. Only a miss that survives every
-// attempt counts, which keeps the real signal (published without provenance)
-// while removing the false one (published seconds ago).
-const ATTEMPTS = 6;
-const BACKOFF_MS = 5000;
+// The registry's read replicas lag its write path: on 0.2.0 a package read back 4 s after
+// publishing returned E404, and on 0.5.0 six reads 5 s apart were not enough. A package that
+// is not visible yet, or visible without its attestation yet, is waited for until one shared
+// deadline; only what is still missing then counts as a failure.
+const DEADLINE_MS = Number(process.env.MARKLESS_PROVENANCE_DEADLINE_MS ?? 180_000);
+const FIRST_DELAY_MS = Number(process.env.MARKLESS_PROVENANCE_FIRST_DELAY_MS ?? 5_000);
+const MAX_DELAY_MS = Number(process.env.MARKLESS_PROVENANCE_MAX_DELAY_MS ?? 30_000);
 
 function sleep(ms) {
 	Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
-/** npm view, retried while the registry is still catching up. */
-function readAttestations(name) {
-	let last;
-	for (let attempt = 1; attempt <= ATTEMPTS; attempt += 1) {
-		last = spawnSync('npm', ['view', `${name}@${version}`, 'dist.attestations', '--json'], {
-			encoding: 'utf-8',
-		});
-		const settled = last.status === 0 && (last.stdout ?? '').trim() !== '';
-		if (settled || attempt === ATTEMPTS) {
-			return last;
-		}
-		console.log(
-			`  waiting for the registry to catch up on ${name}@${version} (attempt ${attempt}/${ATTEMPTS})`,
-		);
-		sleep(BACKOFF_MS);
-	}
-	return last;
-}
-
-for (const entry of releasePackages()) {
-	const result = readAttestations(entry.name);
-	const raw = (result.stdout ?? '').trim();
+/** One registry read: `attested`, `bare` (visible, no attestation), `missing`, or `error`. */
+function readPackage(name) {
+	const result = spawnSync(
+		'npm',
+		['view', `${name}@${version}`, 'version', 'dist.attestations', '--json'],
+		{ encoding: 'utf-8' },
+	);
+	const stdout = (result.stdout ?? '').trim();
+	const stderr = (result.stderr ?? '').trim();
 	if (result.status !== 0) {
-		failures.push(
-			`${entry.name}@${version}: npm view failed after ${ATTEMPTS} attempts — ${(result.stderr ?? '').trim() || 'no output'}`,
-		);
-		continue;
+		const notFound = /E404|No match found|could not be found/u.test(`${stderr}\n${stdout}`);
+		return { state: notFound ? 'missing' : 'error', detail: stderr || stdout || 'no output' };
 	}
-	let attestations;
+	let parsed;
 	try {
-		attestations = raw === '' ? undefined : JSON.parse(raw);
+		parsed = stdout === '' ? undefined : JSON.parse(stdout);
 	} catch {
-		failures.push(`${entry.name}@${version}: npm view returned unparseable output: ${raw}`);
-		continue;
+		return { state: 'error', detail: `unparseable output: ${stdout}` };
 	}
+	const view = Array.isArray(parsed) ? parsed.at(-1) : parsed;
+	if (view === undefined) return { state: 'missing', detail: 'empty output' };
+	const attestations =
+		view !== null && typeof view === 'object' ? view['dist.attestations'] : undefined;
 	if (
 		attestations === undefined ||
 		attestations === null ||
 		typeof attestations !== 'object' ||
 		Object.keys(attestations).length === 0
 	) {
-		failures.push(
-			`${entry.name}@${version}: dist.attestations is empty — published WITHOUT provenance, so this publish did not go through trusted publishing`,
-		);
-		continue;
+		return { state: 'bare', detail: '' };
 	}
-	console.log(`  provenance ok: ${entry.name}@${version} -> ${JSON.stringify(attestations)}`);
+	return { state: 'attested', detail: JSON.stringify(attestations) };
 }
+
+const started = Date.now();
+const pending = new Map(releasePackages().map((entry) => [entry.name, undefined]));
+let delay = FIRST_DELAY_MS;
+
+for (;;) {
+	for (const name of pending.keys()) {
+		const read = readPackage(name);
+		if (read.state === 'attested') {
+			console.log(`  provenance ok: ${name}@${version} -> ${read.detail}`);
+			pending.delete(name);
+		} else {
+			pending.set(name, read);
+		}
+	}
+	if (pending.size === 0) break;
+	const elapsed = Date.now() - started;
+	if (elapsed >= DEADLINE_MS) break;
+	for (const [name, read] of pending) {
+		const why =
+			read.state === 'missing'
+				? 'not visible on the registry yet'
+				: read.state === 'bare'
+					? 'visible, attestation not visible yet'
+					: `registry read failed (${read.detail})`;
+		console.log(`  ${why}: ${name}@${version}`);
+	}
+	const wait = Math.min(delay, DEADLINE_MS - elapsed);
+	console.log(
+		`  waiting ${(wait / 1000).toFixed(1)} s for the registry (${Math.round(elapsed / 1000)} of ${Math.round(DEADLINE_MS / 1000)} s used)`,
+	);
+	sleep(wait);
+	delay = Math.min(delay * 2, MAX_DELAY_MS);
+}
+
+const waited = `after ${Math.round((Date.now() - started) / 1000)} s`;
+const failures = [...pending].map(([name, read]) =>
+	read.state === 'bare'
+		? `${name}@${version}: dist.attestations is empty ${waited} — published WITHOUT provenance, so this publish did not go through trusted publishing`
+		: read.state === 'missing'
+			? `${name}@${version}: still not visible on the registry ${waited} — ${read.detail}`
+			: `${name}@${version}: npm view failed ${waited} — ${read.detail}`,
+);
 
 if (failures.length > 0) {
 	console.error('\nrelease failed its own oracle: provenance is missing\n');

@@ -63,8 +63,7 @@ test('configures Zed to highlight .tsrx as TSX and load the workspace plugin', (
 	]);
 });
 
-// First test to touch the TS program pays its creation; CI runner load has blown the 5s default.
-test('compiles TSRX source into type-checkable TSX for TypeScript', { timeout: 20_000 }, () => {
+test('compiles TSRX source into type-checkable TSX for TypeScript', () => {
 	const source = `
 		import { state } from '@markless/core';
 
@@ -90,9 +89,7 @@ test('compiles TSRX source into type-checkable TSX for TypeScript', { timeout: 2
 			}),
 		),
 	).toEqual([]);
-	// The first type-check in a worker builds the TypeScript program cold, which
-	// crossed the default 5s on a slow CI runner while passing everywhere else.
-}, 15000);
+});
 
 // The document shell is authored against framework components like the router's
 // Html, which are plain .ts functions that pass their children through.
@@ -120,9 +117,9 @@ test('document-shell markup type-checks: meta attributes and children-passthroug
 
 	// The public Children type from @markless/core is the contract's own child
 	// shape, so a passthrough shell interpolates its children with no diagnostic.
-	expect(
-		formatDiagnostics(typeCheckVirtualSource(fileName, virtualCode.generatedCode)),
-	).toEqual([]);
+	expect(formatDiagnostics(typeCheckVirtualSource(fileName, virtualCode.generatedCode))).toEqual(
+		[],
+	);
 });
 
 test('populates virtual code from the Markless compiler type-service artifact', () => {
@@ -282,7 +279,10 @@ test('escapes a literal less-than in markup text so the generated TSX type-check
 	// The `&lt;` grows only the mapping that covers the text; every other mapping,
 	// including the tag punctuation on either side, still points at its own source text.
 	const pairs = virtualCode.mappings.map((mapping) => ({
-		source: source.slice(mapping.sourceOffsets[0], mapping.sourceOffsets[0] + mapping.lengths[0]),
+		source: source.slice(
+			mapping.sourceOffsets[0],
+			mapping.sourceOffsets[0] + mapping.lengths[0],
+		),
 		generated: virtualCode.generatedCode.slice(
 			mapping.generatedOffsets[0],
 			mapping.generatedOffsets[0] + mapping.generatedLengths[0],
@@ -357,7 +357,11 @@ test.each([
 		markup: `const base = { color: 'red', marginTop: 4 };\n\t<div style={{ ...base, color: 'blue' }}>ok</div>`,
 		typechecks: true,
 	},
-	{ name: 'a css text string', markup: `<div style="position: absolute">ok</div>`, typechecks: true },
+	{
+		name: 'a css text string',
+		markup: `<div style="position: absolute">ok</div>`,
+		typechecks: true,
+	},
 	{
 		name: 'an interpolated css text string',
 		markup: '<div style={`transform: translate(${x}%, ${y}%)`}>ok</div>',
@@ -390,7 +394,10 @@ test.each([
 	},
 ])('type-checks $name on the style attribute', ({ name, markup, typechecks }) => {
 	const source = `export function Panel({ x, y }: { x: number; y: number }) @{\n\t${markup}\n}`;
-	const fileName = join(process.cwd(), `packages/core/src/Style-${name.replaceAll(' ', '-')}.tsrx`);
+	const fileName = join(
+		process.cwd(),
+		`packages/core/src/Style-${name.replaceAll(' ', '-')}.tsrx`,
+	);
 	const virtualCode = new MarklessTsrxVirtualCode(fileName, ts.ScriptSnapshot.fromString(source));
 	const diagnostics = typeCheckVirtualSource(fileName, virtualCode.generatedCode);
 
@@ -414,6 +421,9 @@ test.each([
 	).toEqual([{ inAttribute: true, message: expect.any(String) }]);
 });
 
+// Parsed library and workspace declarations, shared by every program this file builds.
+const declarationSourceFiles = new Map<string, ts.SourceFile>();
+
 function typeCheckVirtualSource(
 	sourceFileName: string,
 	source: string,
@@ -432,18 +442,36 @@ function typeCheckVirtualSource(
 	const host = ts.createCompilerHost(parsedConfig.options);
 	const fileExists = host.fileExists.bind(host);
 	const readFile = host.readFile.bind(host);
+	const getSourceFile = host.getSourceFile.bind(host);
 
 	host.fileExists = (fileName) => fileName === virtualPath || fileExists(fileName);
 	host.readFile = (fileName) => (fileName === virtualPath ? source : readFile(fileName));
+	host.getSourceFile = (fileName, languageVersion, onError, shouldCreate) => {
+		if (fileName === virtualPath)
+			return getSourceFile(fileName, languageVersion, onError, shouldCreate);
+		const key = `${String(typeof languageVersion === 'object' ? languageVersion.languageVersion : languageVersion)}:${fileName}`;
+		let sourceFile = declarationSourceFiles.get(key);
+		if (!sourceFile) {
+			sourceFile = getSourceFile(fileName, languageVersion, onError, shouldCreate);
+			if (sourceFile) declarationSourceFiles.set(key, sourceFile);
+		}
+		return sourceFile;
+	};
 
 	const program = ts.createProgram(
 		[virtualPath],
 		{ ...parsedConfig.options, jsx: ts.JsxEmit.Preserve, ...options },
 		host,
 	);
-	return ts
-		.getPreEmitDiagnostics(program)
-		.filter((diagnostic) => diagnostic.file?.fileName === virtualPath);
+	const virtualFile = program.getSourceFile(virtualPath);
+	if (!virtualFile) throw new Error(`Expected ${virtualPath} in the program.`);
+	return [
+		...program.getSyntacticDiagnostics(virtualFile),
+		...program.getSemanticDiagnostics(virtualFile),
+		...(program.getCompilerOptions().declaration
+			? program.getDeclarationDiagnostics(virtualFile)
+			: []),
+	];
 }
 
 function formatDiagnostics(diagnostics: readonly ts.Diagnostic[]): string[] {

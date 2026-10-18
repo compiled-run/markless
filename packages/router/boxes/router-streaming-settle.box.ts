@@ -197,6 +197,35 @@ export default box(
 				);
 			}
 
+			// (9) A click on the streamed arm while the resume code is still downloading
+			// reaches the runtime from two container listeners, and the idle self-wake can
+			// dispatch between the two copies; the click must still count once.
+			const slow = await serveWithHeldModules(new URL(preview.url));
+			try {
+				const slowPage = await preview.browser.visit(slow.url);
+				await slowPage.click(LOG_BUTTON, WAIT);
+				slow.release();
+				await expect.page.text(slowPage, TALLY, 'Logged 1', WAIT);
+				await slowPage.click(LOG_BUTTON, WAIT);
+				await expect.page.text(slowPage, TALLY, 'Logged 2', WAIT);
+				await expect.page.text(slowPage, HEARD, 'Heard 2', WAIT);
+				const tally = /<output data-harbor-logged[^>]*>([\s\S]*?)<\/output>/
+					.exec(await slowPage.content())?.[1]
+					?.replace(/<!--[\s\S]*?-->/g, '')
+					.trim();
+				if (tally !== 'Logged 2') {
+					throw new Error(
+						`Two clicks on the streamed arm must count twice, saw "${String(tally)}".`,
+					);
+				}
+				await expect.page.outcome(slowPage, { consoleErrors: 0, failedRequests: 0 }, WAIT);
+			} finally {
+				slow.close();
+			}
+			receipt.note(
+				'a click on the streamed arm while the resume code was still downloading counted once',
+			);
+
 			receipt.note(
 				'out-of-order settle observed: pending painted from the open stream, settled arm committed from a later-flushed inert template, interactive after wake',
 			);
@@ -689,5 +718,46 @@ async function serveBufferedCopy(
 	return {
 		url: `http://127.0.0.1:${String(address.port)}${BUFFERED_DOCUMENT_PATH}`,
 		close: () => server.close(),
+	};
+}
+
+const HELD_MODULES_PATH = '/harbor-held-modules';
+
+// Serves /harbor with every /build/ script held until `release()`, so a click can land before any resume code runs.
+async function serveWithHeldModules(
+	app: URL,
+): Promise<{ url: string; release: () => void; close: () => void }> {
+	let release = () => {};
+	const released = new Promise<void>((resolve) => (release = resolve));
+	const server = createServer((request, response) => {
+		void (async () => {
+			if (request.url?.startsWith('/build/')) await released;
+			const path = request.url === HELD_MODULES_PATH ? '/harbor' : (request.url ?? '/');
+			const upstream = await fetch(new URL(path, app));
+			const contentType = upstream.headers.get('content-type');
+			response.writeHead(upstream.status, contentType ? { 'content-type': contentType } : {});
+			const body = Buffer.from(await upstream.arrayBuffer());
+			// Without the preload links the load event does not wait for the held scripts.
+			response.end(
+				path === '/harbor'
+					? body.toString('utf8').replace(/<link rel="modulepreload"[^>]*>/g, '')
+					: body,
+			);
+		})().catch((error: unknown) => {
+			response.destroy(error instanceof Error ? error : new Error(String(error)));
+		});
+	});
+	await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+	const address = server.address();
+	if (address === null || typeof address === 'string') {
+		throw new Error('Held-modules server did not report a port.');
+	}
+	return {
+		url: `http://127.0.0.1:${String(address.port)}${HELD_MODULES_PATH}`,
+		release,
+		close: () => {
+			release();
+			server.close();
+		},
 	};
 }

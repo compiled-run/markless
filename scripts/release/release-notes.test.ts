@@ -2,7 +2,7 @@
 // exercises the production script and a real changelogen install;
 // MARKLESS_REPO_ROOT is the only test seam.
 import { spawnSync } from 'node:child_process';
-import { access, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -132,25 +132,123 @@ test('fixture git commands ignore a GIT_DIR inherited from a git hook', async ()
 	expect(await readFile(join(outer, '.git', 'config'), 'utf8')).toBe(outerConfig);
 });
 
-test('release notes include conventional and unclassified commits', async () => {
-	const { fixture, conventionalSha, proseSha } = await notesFixture();
-	const result = await runNotes(fixture, ['--from', 'v1.0.0', '--to', 'HEAD']);
-	// changelogen capitalizes conventional subjects.
-	expect(result.stdout).toContain('Conventional subject');
-	expect(result.stdout).toContain('Plain prose subject');
-	expect(result.stdout).toContain(conventionalSha.slice(0, 7));
-	expect(result.stdout).toContain(proseSha.slice(0, 7));
-	expect(result.stderr).toContain('2 covered');
-}, SPAWN_HEAVY_TIMEOUT_MS);
+test(
+	'release notes include conventional and unclassified commits',
+	async () => {
+		const { fixture, conventionalSha, proseSha } = await notesFixture();
+		const result = await runNotes(fixture, ['--from', 'v1.0.0', '--to', 'HEAD']);
+		// changelogen capitalizes conventional subjects.
+		expect(result.stdout).toContain('Conventional subject');
+		expect(result.stdout).toContain('Plain prose subject');
+		expect(result.stdout).toContain(conventionalSha.slice(0, 7));
+		expect(result.stdout).toContain(proseSha.slice(0, 7));
+		expect(result.stderr).toContain('2 covered');
+	},
+	SPAWN_HEAVY_TIMEOUT_MS,
+);
 
-test('invalid ranges fail without writing the output file', async () => {
-	const { fixture } = await notesFixture();
-	const out = join(fixture, 'notes.md');
-	const result = await runNotes(
+test(
+	'invalid ranges fail without writing the output file',
+	async () => {
+		const { fixture } = await notesFixture();
+		const out = join(fixture, 'notes.md');
+		const result = await runNotes(
+			fixture,
+			['--from', 'missing', '--to', 'HEAD', '--out', out],
+			{ reject: false },
+		);
+		expect(result.exitCode).toBe(1);
+		await expect(access(out)).rejects.toThrow();
+	},
+	SPAWN_HEAVY_TIMEOUT_MS,
+);
+
+async function commitFile(fixture: string, file: string, subject: string): Promise<void> {
+	await writeFile(join(fixture, file), `${subject}\n`);
+	git(fixture, ['add', file]);
+	git(fixture, ['commit', '-m', subject]);
+}
+
+async function changelogFixture(): Promise<string> {
+	const fixture = await mkdtemp(join(tmpdir(), 'markless-changelog-'));
+	git(fixture, ['init', '-b', 'main']);
+	git(fixture, ['remote', 'add', 'origin', 'git@github.com:example/fixture.git']);
+	await writeFile(join(fixture, 'pnpm-workspace.yaml'), "packages:\n  - 'packages/*'\n");
+	for (const [directory, manifest] of [
+		['harbor', { name: '@example/harbor', version: '1.0.0' }],
+		['tide', { name: '@example/tide', version: '1.0.0' }],
+		['dock', { name: '@example/dock', version: '1.0.0', private: true }],
+	] as const) {
+		const packageDirectory = join(fixture, 'packages', directory);
+		await mkdir(packageDirectory, { recursive: true });
+		await writeFile(join(packageDirectory, 'package.json'), `${JSON.stringify(manifest)}\n`);
+	}
+	await writeFile(join(fixture, 'package.json'), '{"version":"1.0.0"}\n');
+	git(fixture, ['add', '.']);
+	git(fixture, ['commit', '-m', 'Initial commit']);
+	git(fixture, ['tag', 'v1.0.0']);
+	await commitFile(
 		fixture,
-		['--from', 'missing', '--to', 'HEAD', '--out', out],
-		{ reject: false },
+		'a.txt',
+		'feat(tide): tides can be read in the U019 morning - the reader now keeps state',
 	);
-	expect(result.exitCode).toBe(1);
-	await expect(access(out)).rejects.toThrow();
-}, SPAWN_HEAVY_TIMEOUT_MS);
+	await commitFile(
+		fixture,
+		'b.txt',
+		'fix(harbor,tide): a berth keeps its name after a reload (T107)',
+	);
+	await commitFile(fixture, 'c.txt', 'perf(harbor): open the harbor in one round trip');
+	await commitFile(fixture, 'd.txt', 'fix(dock): a held package change stays out');
+	await commitFile(fixture, 'e.txt', 'test(harbor): pin the berth name');
+	await commitFile(fixture, 'f.txt', 'fix(website): docs page typo');
+	await commitFile(fixture, 'g.txt', 'feat(harbor)!: berths are numbered from one');
+	await commitFile(fixture, 'h.txt', 'fable-opus goal/U020 attempt 1 (partial)');
+	await commitFile(fixture, 'i.txt', 'fix: plain unscoped fix for defect 84');
+	return fixture;
+}
+
+test(
+	'--changelog drafts a plain-language section grouped by released package',
+	async () => {
+		const fixture = await changelogFixture();
+		const section = (await runNotes(fixture, ['--changelog', '--version', '1.1.0'])).stdout;
+		expect(section.startsWith('## 1.1.0\n')).toBe(true);
+		expect(section).toMatch(
+			/### Breaking changes\n\n- \*\*@example\/harbor:\*\* Berths are numbered from one\.\n/u,
+		);
+		expect(section).toMatch(
+			/### @example\/harbor\n\n(?:- .*\n)*- \*\*Fixed:\*\* A berth keeps its name after a reload\.\n/u,
+		);
+		expect(section).toContain('- **Faster:** Open the harbor in one round trip.');
+		expect(section).toMatch(
+			/### @example\/tide\n\n- \*\*New:\*\* Tides can be read in the morning\.\n/u,
+		);
+		expect(section).toMatch(/### General\n\n- \*\*Fixed:\*\* Plain unscoped fix\.\n/u);
+		for (const internal of [
+			'held package',
+			'pin the berth',
+			'docs page typo',
+			'fable-opus',
+			'U0',
+			'T107',
+			'defect',
+		]) {
+			expect(section).not.toContain(internal);
+		}
+		expect(section).toContain(
+			'[All 9 commits since v1.0.0](https://github.com/example/fixture/compare/v1.0.0...v1.1.0)',
+		);
+	},
+	SPAWN_HEAVY_TIMEOUT_MS,
+);
+
+test(
+	'--changelog needs --version',
+	async () => {
+		const fixture = await changelogFixture();
+		const result = await runNotes(fixture, ['--changelog'], { reject: false });
+		expect(result.exitCode).toBe(1);
+		expect(result.stderr).toContain('--changelog needs --version');
+	},
+	SPAWN_HEAVY_TIMEOUT_MS,
+);

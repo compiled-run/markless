@@ -34,7 +34,7 @@
 		"typecheck:sr": "node packages/typescript-plugin/src/tsc.ts -p packages/headless/components/test-support/tsconfig.json",
 		"typecheck:sr-real": "node packages/typescript-plugin/src/tsc.ts -p packages/headless/components/test-support/tsconfig.real.json",
 		"publish": "pnpm --filter '@markless/*' --filter create-markless publish --access public --no-git-checks",
-		"release": "bumpp package.json --no-commit --no-tag --no-push && node scripts/release/sync-version.mjs",
+		"release:cut": "node scripts/release/cut.mjs",
 		"release:check": "node scripts/release/sync-version.mjs --check",
 		"release:notes": "node scripts/release/release-notes.mjs",
 		"release:trust": "sh scripts/release/trust-publishers.sh",

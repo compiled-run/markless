@@ -56,7 +56,7 @@ Measured on `origin/main` at `1f6d2cd3` (Apple Silicon, warm pnpm store):
 
 `package-manager-matrix` runs when `bun`, `deno` and `corepack` are on `PATH` (they are on this Mac) and is skipped with a message otherwise. Browser jobs are skipped with a message when Playwright's Chromium is not installed; `--install` fixes that.
 
-Side effect to know about: the `agent-files` job runs `pnpm dlx @intellectronica/ruler apply`, which rewrites generated agent files and currently also creates an untracked `.agents/` directory. That is what CI does on its throwaway checkout; locally, delete `.agents/` afterwards or run with `--clean`.
+Side effect to know about: the `agent-files` job runs `pnpm dlx @intellectronica/ruler apply`, which rewrites the generated agent files, including the committed `.agents/` directory. That is what CI does on its throwaway checkout; locally, a change it leaves in `.agents/` means a generated file is stale and belongs in the commit (do not delete `.agents/`, it is tracked), or run with `--clean`.
 
 ## 2. Linux parity
 
@@ -129,6 +129,49 @@ Changes to `.github/workflows/*.yml` go through a PR, never straight to `main`. 
 - Every `uses:` action version exists. The screen-reader workflow has never been green because `guidepup/setup-action@v3` does not exist; a PR run of that workflow would have shown it on day one.
 - A job that runs tests which launch browsers installs them. The current red `unit` job is this mistake.
 - External clones used by CI (`js-framework-benchmark`) are pinned to a commit, so upstream changes cannot turn CI red overnight.
+
+## 8. Cutting a release
+
+Markless releases **minor versions only**: 0.6.0, 0.7.0, and so on. There are no patch releases. A fix ships in the next minor, so the way to ship a fix sooner is to cut the next minor sooner. No script or workflow accepts a release type; the next version is always the current one with the middle number raised by one.
+
+### One click
+
+Run `gh workflow run release.yml --ref main -f mode=cut` (or in GitHub: **Actions → Release → Run workflow** on `main`, mode `cut`). Nothing else is needed: no version, no confirmation phrase, no local step. The cut lives in `release.yml` itself because npm's trusted publishing checks the filename of the workflow that was dispatched; a separate workflow calling `release.yml` would be checked as itself and refused. The run:
+
+1. Refuses to start unless it was dispatched on `main`, the checkout is clean, and `main`'s latest CI run for that exact commit finished green.
+2. Bumps the root `package.json` to the next minor with `bumpp`, then `scripts/release/sync-version.mjs` moves every published package to the same version. Packages marked `"private": true` are skipped.
+3. Writes the new section at the top of `CHANGELOG.md` with `pnpm release:notes --changelog`: the `feat`, `fix` and `perf` commits since the last tag, grouped by the package their scope names, with internal ids removed and a link to every commit since the last release.
+4. Commits `chore(release): vX.Y.0` as `github-actions[bot]`. The commit runs the normal pre-commit hook (lint and CI's fast jobs), so the release commit passes the same checks as any other commit. Then it creates the tag `vX.Y.0`.
+5. Moves `main` to the release commit only after that exact commit passed CI. `main`'s branch protection requires the `test`, `typecheck` and `agent-files` checks on the pushed commit itself, so the cut pushes the commit to a temporary `release/vX.Y.0` branch (unprotected), dispatches the full `ci.yml` on it and waits, then `scripts/release/required-checks.mjs` reads the required check names from the GitHub API and confirms each one passed on that commit. Only then does it push `main` (a fast-forward to that commit) and the tag together (`git push --atomic`: both or neither), and delete the temporary branch. The checks GitHub sees are CI's own check runs; the cut posts no status of its own. Before any of this, `required-checks.mjs --names` (also run in `cut-dry-run`) confirms every required check name is a job in `ci.yml`, so a renamed job fails the cut at the start instead of at the end.
+6. The `release` job, the same job that has always published, checks out the tag and publishes it: it builds, checks the tarballs, publishes with npm trusted publishing and provenance, and waits up to 3 minutes for npm to show every package with its provenance attestation. It is the only job with `id-token: write`; steps 1 to 5 run in the `cut` job, which cannot publish.
+7. The `announce` job creates the GitHub Release `vX.Y.0` from the new changelog section and marks it latest.
+
+Expect about 40 to 45 minutes on GitHub's runners, estimated rather than measured, because a real release has not been cut this way yet: about 3 minutes of setup, about 10 for the pre-commit hook in step 4 running the whole unit suite on one runner, about 25 for the full CI run on the release commit in step 5 (main's last CI run took 23 minutes), and about 8 for the build, publish and provenance wait in step 6. Neither the commit hook nor the CI run is skipped to save time.
+
+The manual `dry-run` and `publish` modes still work as before for a version that is already committed, except that a publish now runs only on the commit tagged `v<version>`.
+
+If the run stops after step 5, run it again. The tag then exists without a GitHub Release, so the cut finishes that release (publishing whatever is missing, then creating the Release) instead of cutting the next one. If it stops before `main` moves, nothing is released: the temporary branch is deleted and the next run starts the same version again.
+
+### Rehearsing
+
+Dispatch with `-f mode=cut-dry-run`, or run `pnpm release:cut --dry-run` locally. Both do steps 1 to 4 for real, including the commit and its hooks, in a throwaway copy of the checkout, then run the checks the `release` job runs before publishing (`pnpm build`, the publish-readiness sweep, the tarball checks and `pnpm publish --dry-run` for every package). They do not create the tag, push, publish, or create a GitHub Release. The drafted changelog section is printed (and shown in the run summary on GitHub). Locally, a dry run on a branch other than `main` finishes all the steps and then exits with code 1, listing what the real cut would refuse.
+
+### One-time setup
+
+None. The cut uses only the workflow's built-in token: it pushes to an unprotected branch, dispatches CI, and pushes `main` once `main`'s own required checks are satisfied on that commit, which is what branch protection asks of any pusher. No job in `release.yml` reads a secret.
+
+### Keep `main` releasable
+
+Because a release is one click from whatever `main` is, `main` must always be releasable. Merge each fix as soon as its own checks pass, rather than batching fixes into one large push. A red `main` blocks the release cut as well as other pushes (see section 5).
+
+### Bringing back the held packages
+
+`@markless/ui`, `@markless/icons` and `@markless/ui-tools` are marked `"private": true`, so releases skip them. `@markless/icons` and `@markless/ui-tools` have never been published, and npm only lets a workflow publish a name that already exists. To bring them back (needs the owner's npm login and two-factor device, once):
+
+1. Remove `"private": true` from `packages/headless/icons/package.json`, `packages/headless/tools/package.json` and `packages/headless/components/package.json`. Do this first: `pnpm release:trust --only` refuses a package that is still private. Their `publishConfig` already exists, so `verify-packed-manifests.mjs` has been checking their tarballs on every release.
+2. Claim the two new names with a placeholder: a bare `package.json` at version 0.0.1 for each, published by hand (`npm publish --access public` in `/tmp/ml-bootstrap/icons` and `/tmp/ml-bootstrap/ui-tools`).
+3. Attach the trusted publisher to all three: `pnpm release:trust --only @markless/icons`, `pnpm release:trust --only @markless/ui-tools`, then `pnpm release:trust --check`.
+4. Merge the change from step 1 and cut the next release as usual. The cut moves the three packages to the release version with everything else. Packages publish in folder order, so `@markless/ui` goes out a moment before its two dependencies; if the run stops between them, run the cut again and it publishes the rest.
 
 ## Should we adopt `async/pipeline`?
 

@@ -286,7 +286,8 @@ test('every resume module serializes dispatch, streamed or not', () => {
 		expect(resumeCode).toContain('tail = started;');
 		// The same-event dedupe guard rides with the queue; it closed the
 		// lost-click defect and must not be separable from it.
-		expect(resumeCode).toContain('if (event === lastEvent && eventTime === lastEventTime)');
+		expect(resumeCode).toContain('(event === lastEvent && eventTime === lastEventTime)');
+		expect(resumeCode).toContain('seen.has(event) && seen.get(event) === eventTime');
 	}
 });
 

@@ -48,7 +48,7 @@ export function resumeContainerEvent(input) {
 	const root = input.root;
 	if (root.__marklessShifted) return import('@markless/web/fns/served-census-repair').then((census) => (census.marklessRepairCensus(root), resumeContainerEvent(input)));
 	if (!root.__marklessDispatch) {
-		let handler = marklessResumeContainerEvent, tail = Promise.resolve(), done = tail, lastEvent = null, lastEventTime = undefined;
+		let handler = marklessResumeContainerEvent, tail = Promise.resolve(), done = tail, lastEvent = null, lastEventTime = undefined, seen = new WeakMap();
 		root.__marklessRegisterDispatch = next => {
 			const fallback = handler;
 			handler = input => next(input, fallback);
@@ -56,7 +56,8 @@ export function resumeContainerEvent(input) {
 		root.__marklessDispatch = next => {
 			const event = next.event, eventTime = event?.timeStamp;
 			if (event && next.eventRecord && next.element) event.__marklessPressHost ??= next.element;
-			if (event === lastEvent && eventTime === lastEventTime) return done;
+			if ((event === lastEvent && eventTime === lastEventTime) || (seen.has(event) && seen.get(event) === eventTime)) return done;
+			if (Object(event) === event) seen.set(event, eventTime);
 			lastEvent = event;
 			lastEventTime = eventTime;
 			let release;

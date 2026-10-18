@@ -12,26 +12,8 @@ have never been published, and the release workflow cannot claim a new name
 `package.json` until then; their `publishConfig` stays, so
 `verify-packed-manifests.mjs` still checks their tarballs on every run.
 
-To release them (needs the owner's npm login and 2FA):
-
-1. Remove `"private": true` from `packages/headless/icons/package.json`,
-   `packages/headless/tools/package.json` and
-   `packages/headless/components/package.json`. Do this first:
-   `pnpm release:trust --only` refuses a package that is still private.
-2. Claim the two new names with a placeholder: a bare `package.json` at version
-   0.0.1 for each, in `/tmp/ml-bootstrap/icons` and `/tmp/ml-bootstrap/ui-tools`.
-   Then attach the trusted publisher to all three:
-   ```
-   cd /tmp/ml-bootstrap/icons && npm publish --access public
-   cd /tmp/ml-bootstrap/ui-tools && npm publish --access public
-   pnpm release:trust --only @markless/icons
-   pnpm release:trust --only @markless/ui-tools
-   pnpm release:trust --check
-   ```
-3. Release as usual with `release.yml`. Packages publish in folder order, so
-   `@markless/ui` (`packages/headless/components`) goes out a moment before
-   its two dependencies; if the run stops between them, re-dispatch it so the
-   rest publish.
+To release them (needs the owner's npm login and 2FA), follow "Bringing back
+the held packages" in `docs/ci-process.md`.
 
 ## Finish the packed-delivery goal
 
@@ -103,8 +85,6 @@ Lower priority or parked:
 
 - `packages/cli/test/starter-build.test.ts`: `serve()` gives the built server 100 polls x 100 ms (10 s) to serve its own first page; a cold start under machine load (load average about 8) takes longer. Use a time-based deadline well inside the 180 s test timeout.
 - `packages/bundler/test/helpers/demo-build-lock.ts`: a lock is stale only after 15 minutes, but `music-player-csr-budget.test.ts` waits 8 minutes in `beforeAll`, so one killed run makes the next run fail. Make staleness depend on the holder process being gone, or shorter than the hook timeout.
-
-- `packages/router/boxes/router-streaming-settle.box.ts` failed once on a CI rerun of main `8f972696` (2026-10-17): expected `[data-harbor-logged]` to read "Logged 2" but it read "Logged 4", so two clicks counted four times; it passed on the next rerun and in every local run. Find out whether a click can be replayed and also run live before treating it as a flake.
 
 ## Framework defects found while building docs figures 2026-10-11
 
