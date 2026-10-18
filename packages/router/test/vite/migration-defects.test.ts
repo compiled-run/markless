@@ -332,10 +332,12 @@ test('a callback a row passes its child reads that row, served and added', async
 	await page.close();
 });
 
-test('a same-module child given a state prop writes page-scope shared state', async () => {
+test('a same-module child given a state prop writes it into page-scope shared state', async () => {
 	const { page, errors } = await open('/child-writes');
 	await page.click('[data-count-button]');
 	await expect.poll(() => text(page, '[data-shared-picked]')).toBe('1');
+	await page.click('[data-label-button]');
+	await expect.poll(() => text(page, '[data-shared-sort]')).toBe('tagged');
 	expect(errors).toEqual([]);
 	await page.close();
 });

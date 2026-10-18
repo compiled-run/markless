@@ -4987,6 +4987,8 @@ export type ValueExpressionEmissionInput = {
 	 * `undefined`.
 	 */
 	readonly elementHandleReads?: ReadonlyArray<LoweredElementHandleRead>;
+	/** A handler's value captures: a prop read one of them routes is read through it, not the graph. */
+	readonly captureSlots?: ReadonlyArray<CaptureSlot>;
 	/** The authored file the value came from; names the map at the print site. */
 	readonly sourceFileName: string;
 };
@@ -5122,7 +5124,8 @@ function valueExpressionNode(
 	if (handle) return handle.kind === 'lowered' ? handle.node : null;
 
 	const leaf =
-		graphReadValueNode(text, input.graphReads) ?? localValueNode(text, input.localNames);
+		graphReadValueNode(text, input.graphReads, input.captureSlots) ??
+		localValueNode(text, input.localNames);
 	if (leaf) return leaf;
 
 	if (node.type === 'ArrayExpression') return arrayLiteralValueNode(node, source, input);
@@ -5186,9 +5189,12 @@ function eventFieldValueNode(
 function graphReadValueNode(
 	text: string,
 	graphReads: ReadonlyArray<LoweredStateRead>,
+	captureSlots: ReadonlyArray<CaptureSlot> = [],
 ): EmissionNode | null {
 	const graphRead = graphReads.find((read) => read.source === text);
 	if (!graphRead) return null;
+	const slot = captureSlots.find((candidate) => captureSlotMatchesRead(candidate, graphRead));
+	if (slot) return callNode(memberChainNode('context.capture.read'), [literalNode(slot.id)]);
 
 	return graphReadCall({
 		callee: 'context.graph.read',
@@ -5495,6 +5501,11 @@ function rewriteGraphReadsAndLocals(
 	if (handle) return node as unknown as EmissionNode;
 
 	const graphRead = text ? input.graphReads.find((read) => read.source === text) : undefined;
+	const graphSlot = graphRead
+		? input.captureSlots?.find((candidate) => captureSlotMatchesRead(candidate, graphRead))
+		: undefined;
+	if (graphSlot)
+		return callNode(memberChainNode('context.capture.read'), [literalNode(graphSlot.id)]);
 	if (graphRead) {
 		return graphReadCall({
 			callee: 'context.graph.read',
@@ -6279,6 +6290,7 @@ function eventHandlerRewrite(
 					: parameters,
 			graphReads: symbol.reads ?? [],
 			elementHandleReads: handleReads,
+			captureSlots: input.captureSlots.filter((slot) => !callbackCaptureSlot(slot)),
 			moduleImports: symbol.moduleImports ?? [],
 			localNames: input.localNames,
 			sourceFileName: input.sourceFileName,
