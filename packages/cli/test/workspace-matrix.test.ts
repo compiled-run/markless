@@ -716,6 +716,45 @@ describe.skipIf(!enabled || !fullEnabled)('full template smoke', () => {
 	);
 });
 
+const registryPackument = async (name: string) => {
+	const response = await fetch(`https://registry.npmjs.org/${name.replace('/', '%2f')}`);
+	if (!response.ok) throw new Error(`registry lookup for ${name} failed: ${response.status}`);
+	return (await response.json()) as {
+		'dist-tags': { latest: string };
+		versions: Record<string, unknown>;
+	};
+};
+
+const versionParts = (version: string) => version.split('.').map(Number);
+const isNewerVersion = (a: string, b: string) => {
+	const [left, right] = [versionParts(a), versionParts(b)];
+	const index = left.findIndex((part, i) => part !== right[i]);
+	return index !== -1 && left[index]! > right[index]!;
+};
+
+// A release commit's starter names the version that release is about to publish, which npm
+// cannot serve until the release job runs, so until then it installs the newest published one.
+const installableMarklessImports = async (imports: Record<string, string>) => {
+	const pinned = /^npm:@markless\/core@\^(\d+\.\d+\.\d+)$/.exec(imports['@markless/core'] ?? '');
+	if (!pinned) throw new Error(`unexpected @markless/core import: ${imports['@markless/core']}`);
+	const wanted = pinned[1]!;
+	const packument = await registryPackument('@markless/core');
+	if (wanted in packument.versions) return imports;
+	const latest = packument['dist-tags'].latest;
+	if (!isNewerVersion(wanted, latest))
+		throw new Error(
+			`the starter pins @markless/* ^${wanted}, which is unpublished and not newer than ${latest}`,
+		);
+	return Object.fromEntries(
+		Object.entries(imports).map(([name, specifier]) => [
+			name,
+			name.startsWith('@markless/')
+				? specifier.replace(`@^${wanted}`, `@^${latest}`)
+				: specifier,
+		]),
+	);
+};
+
 // The shipped Deno starter, installed by deno itself, builds with its own `deno task build`.
 describe.skipIf(!enabled)('deno starter build', () => {
 	test(
@@ -729,10 +768,14 @@ describe.skipIf(!enabled)('deno starter build', () => {
 				beforeInstall: async (appDir) => {
 					const manifest = JSON.parse(
 						await readFile(join(appDir, 'deno.json'), 'utf-8'),
-					) as object;
+					) as { imports: Record<string, string> };
 					await writeFile(
 						join(appDir, 'deno.json'),
-						asJson({ ...manifest, minimumDependencyAge: 0 }),
+						asJson({
+							...manifest,
+							imports: await installableMarklessImports(manifest.imports),
+							minimumDependencyAge: 0,
+						}),
 					);
 				},
 			});

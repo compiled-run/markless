@@ -1076,8 +1076,10 @@ jobs:
               run: |
                   if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
                     base="${{ github.event.pull_request.base.sha }}"
-                  else
+                  elif [ "$GITHUB_EVENT_NAME" = "push" ]; then
                     base="${{ github.event.before }}"
+                  else
+                    base="$(git rev-parse HEAD^)"
                   fi
                   bench=true
                   if [ -n "$base" ] && git cat-file -e "$base^{commit}" 2>/dev/null; then
@@ -1151,8 +1153,11 @@ jobs:
               run: |
                   if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
                     echo "MARKLESS_BASE_SHA=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_ENV"
-                  else
+                  elif [ "$GITHUB_EVENT_NAME" = "push" ]; then
                     echo "MARKLESS_BASE_SHA=${{ github.event.before }}" >> "$GITHUB_ENV"
+                  else
+                    # A dispatched run (the release cut's) has no previous push to compare against.
+                    echo "MARKLESS_BASE_SHA=$(git rev-parse HEAD^)" >> "$GITHUB_ENV"
                   fi
 
             - name: Checkout benchmark baseline revision
