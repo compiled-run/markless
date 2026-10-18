@@ -193,7 +193,8 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 	].forEach((behavior, order) => {
 		const authored = input.semanticGraph.behaviors.find(
 			(candidate) =>
-				candidate.hostNodeId === behavior.hostNodeId && candidate.source === behavior.source,
+				candidate.hostNodeId === behavior.hostNodeId &&
+				candidate.source === behavior.source,
 		);
 		symbols.push({
 			id: `symbol:${nextSymbolId++}`,
@@ -489,6 +490,9 @@ export function planBoundSymbolResolver(
 					...(symbol.loaderSymbolId ? { loaderSymbolId: symbol.loaderSymbolId } : {}),
 					...(instancePath ? { instancePath } : {}),
 					...(rowPieces ? { rowPieces } : {}),
+					...(symbol.touchesPageSpaceGraph
+						? { touchesPageSpaceGraph: true as const }
+						: {}),
 					componentEdgePath,
 					ancestry,
 					captureSlots,

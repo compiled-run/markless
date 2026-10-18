@@ -1792,7 +1792,11 @@ export type BoundSymbolResolverRow = {
 	// under: one segment per imported component edge in the ancestry.
 	readonly instancePath?: string;
 	// Per ancestry edge when one sits in a keyed repeat: the host-id segment, the instance segment, and how many row segments precede it.
-	readonly rowPieces?: ReadonlyArray<readonly [hostSegment: string, instanceSegment: string, rows: number]>;
+	readonly rowPieces?: ReadonlyArray<
+		readonly [hostSegment: string, instanceSegment: string, rows: number]
+	>;
+	// The base symbol reads or writes a page-space node (`shared:`, `storage:`), which no instance path qualifies.
+	readonly touchesPageSpaceGraph?: true;
 	readonly componentEdgePath: ReadonlyArray<string>;
 	readonly ancestry: ReadonlyArray<{
 		readonly componentEdgeId: string;
