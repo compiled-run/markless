@@ -147,7 +147,7 @@ export async function transformTsrxForBundler(
 			},
 		],
 		constraints: {
-			usesHydration: false,
+			rerunsComponentsOnResume: false,
 			usesVdom: false,
 			sharedCodeUsesNodeApis: false,
 			buildTooling: 'vite-rolldown-vite-plus',

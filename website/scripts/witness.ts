@@ -3085,8 +3085,8 @@ try {
 			'how-it-works defines semantic analysis in plain words',
 		);
 		check(
-			howItWorksText.includes('Hydration means the browser runs your components again'),
-			'how-it-works defines hydration before it rules it out',
+			howItWorksText.includes('When a server renders the page, its HTML arrives already wired.'),
+			'how-it-works says server HTML arrives already wired',
 		);
 		for (const href of flatNav
 			.map((entry) => entry.href)

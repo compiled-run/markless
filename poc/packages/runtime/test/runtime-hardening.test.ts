@@ -102,7 +102,7 @@ test('runtime hardening handles async races, keyed ranges, cleanup, no rollback,
 	);
 	expect(runtime.receipts().every((receipt) => receipt.inspectable)).toBe(true);
 	expect(runtime.constraints()).toEqual({
-		usesHydration: false,
+		rerunsComponentsOnResume: false,
 		usesVdom: false,
 		productionBrowserResume: false,
 	});

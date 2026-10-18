@@ -35,7 +35,7 @@ focus and scroll.
 
 Doctrine note: executing components during a tier-4/5 render is INITIAL
 render happening in the browser, which the unified render/resume model allows.
-"No hydration" forbids re-executing components over existing server HTML; it
+The resume model forbids re-executing components over existing server HTML; it
 does not forbid rendering new content client-side.
 
 ## D2. Escalation is never silent

@@ -23,11 +23,11 @@ Focused tests and browser receipts use this page to prove:
 - keydown applies sync policy before lazy symbol behavior;
 - lazy symbols write graph state;
 - DOM journal entries apply concrete DOM mutations;
-- no hydration or VDOM substitute is used.
+- no component re-execution or VDOM substitute is used.
 
 ## Non-Goals
 
 - No production SSR.
 - No full browser resume.
-- No hydration.
+- No component re-execution in the browser.
 - No VDOM.

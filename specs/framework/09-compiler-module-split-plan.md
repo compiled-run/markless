@@ -186,7 +186,7 @@ For compiler behavior goals, the final response should name:
 
 - Do not create a second compiler API while splitting files.
 - Do not introduce OXC, Rust, Babel, SWC, or another compiler backend.
-- Do not add VDOM, hydration, or client component re-execution paths.
+- Do not add VDOM or client component re-execution paths.
 - Do not move framework semantics into generic AST utilities.
 - Do not make downstream passes depend on raw AST nodes just to avoid extending
   an artifact.

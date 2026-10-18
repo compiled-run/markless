@@ -48,9 +48,9 @@ never before. See [lazy chunks](/how-it-works/lazy-chunks).
 **Multi-page apps.** `@markless/router` adds file routes on top of Nitro, which deploys to many
 targets.
 
-**No hydration.** _Hydration_ means the browser runs your components again over HTML a server
-already made. When a server renders the page, Markless _resumes_ instead: it reads records the server
-wrote and carries on from them. See [resuming](/how-it-works/resuming).
+**It resumes.** When a server renders the page, its HTML arrives already wired. The browser does not
+run your components again. It reads records the server wrote and carries on from them, and code
+loads only when an event needs it. See [resuming](/how-it-works/resuming).
 
 ## How it compares
 
@@ -59,9 +59,9 @@ table compares mechanisms, not speed.
 
 | | How you write a value | On update | Effect API | Over server HTML |
 | --- | --- | --- | --- | --- |
-| React | `useState` and a setter | Runs the component again, then diffs a virtual DOM | `useEffect` | Hydration |
-| Solid | `createSignal`, read as `count()` | Signals write the DOM | `createEffect` | Hydration |
-| Svelte 5 | The `$state` rune | Compiled signals | `$effect` | Hydration |
+| React | `useState` and a setter | Runs the component again, then diffs a virtual DOM | `useEffect` | Runs components again |
+| Solid | `createSignal`, read as `count()` | Signals write the DOM | `createEffect` | Runs components again |
+| Svelte 5 | The `$state` rune | Compiled signals | `$effect` | Runs components again |
 | Qwik | `useSignal`, read as `.value`, with `$` on lazy code | Signals | `useTask$` | Resumes |
 | Markless | `state(0)`, then plain `count` | Writes the compiler planned | None | Resumes |
 

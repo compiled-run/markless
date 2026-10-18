@@ -125,7 +125,7 @@ text into `01-tsrx-host-contract.md` and unlocks the first implementation
 slice.
 
 Non-negotiables that bind every option: CSS must ship without executing app
-JavaScript (no-hydration model), shared packages stay runtime-agnostic ESM,
+JavaScript (server HTML arrives already wired), shared packages stay runtime-agnostic ESM,
 and stylesheet emission goes through the Rolldown/Vite CSS pipeline only.
 
 - **Option A (recommended): compile-time scope class.** Each component with a
@@ -145,7 +145,7 @@ and stylesheet emission goes through the Rolldown/Vite CSS pipeline only.
   attribute stamping is.
 - **Option C: runtime constructable stylesheets.** Rejected as primary: it
   requires JavaScript execution before styles apply, which breaks SSR-first
-  no-hydration rendering.
+  rendering where server HTML arrives already wired.
 
 First implementation slice once accepted: compiler collects the style block
 into a `styleScope` artifact (scope id, compiled CSS text, selector

@@ -28,7 +28,7 @@ dataflow, and a plain-value state API tractable.
 The central model is: UI structure is a tree-shaped graph, but state dependencies
 are a general directed graph. Current web frameworks often force that general
 graph through tree-shaped tools: provider ancestry, hook call order, component
-subscriptions, rerender boundaries, and hydration boundaries. This framework
+subscriptions, rerender boundaries, and client re-execution boundaries. This framework
 does the opposite: the dataflow graph is the boundary. Components project graph
 nodes into DOM; events write back into graph nodes; async work derives graph
 nodes from awaited data; resumability serializes graph state and edges rather
@@ -99,7 +99,7 @@ Four implementation areas:
    includes a tiny inline browser resumer scoped to that container. The resumer
    attaches container-scoped event listeners and visibility observers, then
    lazy-loads app symbols only on interaction, visibility, or another explicit
-   trigger. No hydration pass, no component execution during browser resume.
+   trigger. No component execution during browser resume.
 4. **Build integration** — a Rolldown plugin base exported by
    `@markless/bundler`,
    with framework adapters such as Vite consuming that base plugin. Extracted

@@ -2,7 +2,7 @@
 
 The main measured cost is unnecessary compilation behind the UI package barrel. A named import such as `import { tree } from '@markless/ui'` was walking unrelated exported families and forcing their TSRX compilation. The work happens again for the browser environment when interaction begins. Cached transforms explain why later interactions feel fast.
 
-The candidate fix restricts the outer barrel walk to explicitly imported names/default exports. Namespace and unknown imports retain their conservative traversal; star re-exports remain traversable. It skips type-only bindings. No browser preload, hydration, dependency optimizer, runtime, website configuration, or eager initialization was added.
+The candidate fix restricts the outer barrel walk to explicitly imported names/default exports. Namespace and unknown imports retain their conservative traversal; star re-exports remain traversable. It skips type-only bindings. No browser preload, component re-execution, dependency optimizer, runtime, website configuration, or eager initialization was added.
 
 ## Measurements
 

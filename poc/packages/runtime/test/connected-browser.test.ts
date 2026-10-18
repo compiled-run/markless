@@ -66,7 +66,7 @@ test('connected-browser POC runs one page from bundler output through resume and
 
 	expect(page.constraints()).toEqual({
 		componentBodiesRunOnResume: false,
-		usesHydration: false,
+		rerunsComponentsOnResume: false,
 		usesVdom: false,
 	});
 	expect(stagesFor(page.receipts())).toEqual(

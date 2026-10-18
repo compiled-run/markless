@@ -1,7 +1,7 @@
 {
 	"name": "@markless/core",
 	"version": "0.5.0",
-	"description": "Markless core authoring APIs: resumable TSRX apps with no hydration and no VDOM.",
+	"description": "Markless core authoring APIs: resumable TSRX apps whose server HTML arrives already wired and loads code only when an event needs it.",
 	"license": "MIT",
 	"repository": {
 		"type": "git",

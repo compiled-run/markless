@@ -15,7 +15,7 @@ This runnable proof shows that navigation intent can start the destination page'
 
 `src/derive.mjs` deliberately fails when a demanded async computed has no `asyncRunners` entry. The prestart list therefore cannot silently survive a compiler regression by falling back to a handwritten fetch list.
 
-The POC executes compiler-emitted runner and sync-derive modules against a minimal graph-read shim. This is the honest intent-time option: running the destination component would begin rendering and defeat the measurement, while the runners' emitted contract already accepts graph reads, an abort signal, and a key. The shim does not emulate rendering, hydration, or a second component runtime.
+The POC executes compiler-emitted runner and sync-derive modules against a minimal graph-read shim. This is the honest intent-time option: running the destination component would begin rendering and defeat the measurement, while the runners' emitted contract already accepts graph reads, an abort signal, and a key. The shim does not emulate rendering, component re-execution, or a second component runtime.
 
 ## Measurement
 

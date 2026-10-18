@@ -1,6 +1,6 @@
 # Markless agent playbook
 
-Use this file as the guidance for the installed `@markless/core` version in the current project. Markless compiles `.tsrx` authoring into fine-grained DOM work; it does not use a virtual DOM or hydrate by rerunning component bodies in the browser.
+Use this file as the guidance for the installed `@markless/core` version in the current project. Markless compiles `.tsrx` authoring into fine-grained DOM work; it does not use a virtual DOM, and component bodies never rerun in the browser: the page resumes from the server's HTML and loads code only when an event needs it.
 
 ## Authoring
 
@@ -34,5 +34,5 @@ Do not copy channel protocol strings or configuration constants into application
 2. Run the doctor and fix version skew or build failures first.
 3. Use the analyzer's public payload-wiring and locator-resolution collectors to compare served payload claims, runtime registrations, and resolved DOM targets.
 4. Use the preload-integrity and request-window helpers for code that arrives too late, and the debug-strip evaluator to distinguish debug-enabled evidence from an unflagged production artifact.
-5. When testing explicit resume entry points, import the public resume helpers from `@markless/core` or its documented runtime entry points. Do not invent hydration or rerender as a recovery path.
+5. When testing explicit resume entry points, import the public resume helpers from `@markless/core` or its documented runtime entry points. Do not invent a rerender or a second run of component bodies as a recovery path.
 6. Preserve the smallest failing application case and its receipts, then run that application's checks after the fix.

@@ -42,7 +42,7 @@ Correctness, root `pnpm run typecheck`, relevant framework tests, and the consum
 ## Constraints
 
 - Native ESM and nonblocking modulepreload; no parser-blocking packs or delayed/hidden controls to improve scores.
-- No Markless service worker, warm-cache dependency, hydration, VDOM, or eager application initialization to move click costs before measurement.
+- No Markless service worker, warm-cache dependency, component re-execution, VDOM, or eager application initialization to move click costs before measurement.
 - Preserve fine-grained initialization; prove any narrower activation includes the state/effect dependencies needed by later interactions.
 - Use compiler analysis only where it can establish the required dependencies; handle uncertainty conservatively and report the cost.
 - Preserve unrelated work. No shared-branch push, package publication, or goal closure is implied.

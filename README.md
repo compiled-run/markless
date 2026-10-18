@@ -39,7 +39,8 @@ Markless turns that `.tsrx` file into:
 - small code chunks that execute only when needed.
 
 On the web, Markless turns this into HTML and DOM updates. The browser does not
-rerun `Counter()`, rebuild a virtual tree, or hydrate the app. When the button
+rerun `Counter()` or rebuild a virtual tree: the server's HTML arrives already
+wired, and code loads only when an event needs it. When the button
 is clicked, Markless executes the click code and updates only the text that depends
 on `count`.
 
@@ -68,7 +69,7 @@ Markless .tsrx source
 - Compiler-owned state, payloads, and lazy code execution.
 - One web-like authoring model that can target more than the browser.
 - Target adapters for DOM, UIKit, AppKit, and future hosts.
-- No hydration, no VDOM, and no client component replay.
+- No VDOM, and components never rerun in the browser.
 
 ## What This Does Not Mean
 

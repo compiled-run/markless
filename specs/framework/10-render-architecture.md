@@ -462,7 +462,7 @@ focused tests and fixture builds:
    chunks, component bodies, handlers, behavior symbols, or async runners.
 5. The first interaction imports only the expected lazy symbol chunk closure and
    updates concrete DOM through graph subscribers.
-6. Child component events work after SSR resume without hydration or component
+6. Child component events work after SSR resume without component
    re-execution.
 7. Browser symbol chunks for an SSR `.tsrx` entry are produced by framework build
    integration, not an app-authored client entry.

@@ -77,7 +77,7 @@ export type PipelineManifest = {
 };
 
 export type PipelineTransformConstraints = {
-	readonly usesHydration: false;
+	readonly rerunsComponentsOnResume: false;
 	readonly usesVdom: false;
 	readonly sharedCodeUsesNodeApis: false;
 	readonly buildTooling: 'vite-rolldown-vite-plus';

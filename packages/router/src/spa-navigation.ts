@@ -167,11 +167,7 @@ async function renderRoute(url: URL, context: NavigationContext, signal?: AbortS
 		return;
 	}
 
-	// Route swaps render the destination page CLIENT-SIDE: load its page
-	// module, dispatch a route update, and let the route renderer run
-	// renderCsr — async boundaries settle interactively through commitArm.
-	// (No hydration is violated only by re-executing components over existing
-	// server HTML; rendering NEW pages in the browser is the D7 model.)
+	// Rendering a new page in the browser is allowed; re-running components over existing server HTML is not.
 	preloadRouteModule(context, match.route.file);
 	const [page, document] = await Promise.all([
 		loadPageModule(),

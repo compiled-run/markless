@@ -65,7 +65,7 @@ test('bundler-pipeline fixture produces a compiler transform artifact', async ()
 		}),
 	]);
 	expect(artifact.constraints).toMatchObject({
-		usesHydration: false,
+		rerunsComponentsOnResume: false,
 		usesVdom: false,
 		sharedCodeUsesNodeApis: false,
 	});

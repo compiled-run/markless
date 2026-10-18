@@ -20,7 +20,7 @@ packages, not a published release.
 ## Rendering mode
 
 SSR (`renderMode: ssr`). Nitro serves every request and the router plugin renders it; the browser
-resumes the server's work instead of hydrating it. Configuration matches the docs site
+resumes the server's work: the HTML arrives already wired and code loads only when an event needs it. Configuration matches the docs site
 (`website/vite.config.ts`): `markless()`, which packs by default (`packing: false` opts out), plus
 `router()`. Navigation needs no setting: a link click fetches the destination's server-rendered
 region and resumes it (fragment navigation); a resting pointer, a press, focus or touch fetches it

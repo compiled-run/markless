@@ -167,7 +167,7 @@ explicit triggers such as interaction or visibility.
 ### Inline resumer boundary
 
 The inline resumer is a tiny browser trapdoor for an already-rendered container.
-It is not the app runtime, not the bundler, and not a hydration engine. Static
+It is not the app runtime, not the bundler, and it never re-runs components. Static
 SSR containers with no browser triggers emit no resumer script.
 
 For the event-only v1 path, the resumer owns only:

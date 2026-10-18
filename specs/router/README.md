@@ -23,7 +23,7 @@ file-routing and typed-route ideas, but its authoring contract is Markless-first
   resume. Spread attributes, non-literal expression attributes, non-literal
   inline MDX expressions, and non-`.tsrx` component imports are unsupported
   until the router has an explicit MDX scope/payload contract for preserving
-  those semantics without hydration or VDOM behavior.
+  those semantics without component re-execution or VDOM behavior.
 
 Read order:
 

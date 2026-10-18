@@ -22,7 +22,7 @@ export type ConnectedBrowserDomJournalEntry =
 
 export type ConnectedBrowserConstraints = {
 	readonly componentBodiesRunOnResume: false;
-	readonly usesHydration: false;
+	readonly rerunsComponentsOnResume: false;
 	readonly usesVdom: false;
 };
 
@@ -240,7 +240,7 @@ export function createConnectedBrowserPageFromBundlerOutput(
 		constraints() {
 			return {
 				componentBodiesRunOnResume: false,
-				usesHydration: false,
+				rerunsComponentsOnResume: false,
 				usesVdom: false,
 			};
 		},

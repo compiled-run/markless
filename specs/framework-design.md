@@ -55,8 +55,8 @@ wiring.
 
 The compiler is the primary implementation vehicle for marker-free resumability.
 Runtime packages execute the graph, serializer, and resume protocol artifacts,
-but they do not recover semantics by hydrating component trees or reconciling a
-VDOM.
+but they do not recover semantics by re-running component trees in the browser
+or reconciling a VDOM.
 
 ## Split Spec Index
 

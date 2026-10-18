@@ -71,7 +71,7 @@ pnpm exec vp pack
 - Import authoring APIs from `@markless/core`.
 - Do not add reactivity to plain `.ts` files.
 - Do not add TSX or JSX support unless the specs are deliberately reopened.
-- Do not add hydration or VDOM behavior.
+- Do not add VDOM behavior or re-run components in the browser over server HTML.
 - Keep compiler behavior in pass-owned modules with readable artifacts.
 - Keep shared compiler, runtime, serializer, and protocol code runtime-agnostic
   ESM.

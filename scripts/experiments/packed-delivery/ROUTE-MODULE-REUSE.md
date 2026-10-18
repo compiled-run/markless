@@ -36,7 +36,7 @@ Separate precise-coverage visits confirm zero framework execution before input i
 
 ## Verification and remaining scope
 
-Root `pnpm run typecheck`, docs typecheck, 205 router tests, 64 docs tests, touched-file lint, and both actual docs production builds pass. The docs runner still reports its existing shutdown warning after its passing tests. Six browser scenarios pass: independent control handoff, closed-menu input, keyboard and queued clicks, navigation/history/offline controls, delayed pack delivery, and observable failed pack delivery. No hydration, eager runtime import, additional package, blocking script, or app-state cache was introduced.
+Root `pnpm run typecheck`, docs typecheck, 205 router tests, 64 docs tests, touched-file lint, and both actual docs production builds pass. The docs runner still reports its existing shutdown warning after its passing tests. Six browser scenarios pass: independent control handoff, closed-menu input, keyboard and queued clicks, navigation/history/offline controls, delayed pack delivery, and observable failed pack delivery. No component re-execution, eager runtime import, additional package, blocking script, or app-state cache was introduced.
 
 Seven focused regressions failed before the fixes and pass after. The tests cover concurrent imports, independent roots, MDX and TSRX routes, navigation, failure retry, and preserving successful module loading after a handler error. The change retains promises only for loaded code; each event still uses its current root and state.
 

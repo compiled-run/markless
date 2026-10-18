@@ -1,6 +1,6 @@
 # @markless/core
 
-Markless core authoring APIs: resumable TSRX apps with no hydration and no VDOM.
+Markless core authoring APIs: resumable TSRX apps. Server HTML arrives already wired, and code loads only when an event needs it.
 
 ```sh
 npm install @markless/core

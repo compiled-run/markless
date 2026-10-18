@@ -5,7 +5,7 @@ This is the base guidance for every write packet. Read the applicable workflow o
 ## Framework boundaries
 
 - Author framework behavior in TSRX only. Do not add TSX/JSX support or reactive behavior to plain `.ts` files.
-- Do not hydrate. Component bodies run during initial render, not browser resume.
+- Component bodies run during initial render, never during browser resume. The browser resumes from server HTML that arrives already wired.
 - Do not introduce a VDOM, render-output reconciliation, or a client component rerender path. Runtime graph data represents state/dataflow and DOM locator metadata.
 - Initial render and browser resume are phases of one unified runtime/render model. Do not create a standalone server package or separate authoring model.
 - Treat libraries as internal implementation boundaries until tests prove a public surface. Keep consumers on the main package and curated re-exports; do not publish or document deep APIs prematurely.
@@ -30,4 +30,4 @@ Everything is test-driven.
 - Use Vitest browser mode for component and browser behavior, modeling the harness after the sibling `vitest-browser-qwik` repo adapted for this framework.
 - Never hardcode benchmark, fixture, or test particulars in production code. Select behavior only from general TSRX structure and compiler artifacts, not fixture names, IDs, state names, classes, positions, helper names, or magic indexes.
 - Prove hardcoding resistance with alternate-shaped fixtures that preserve the structural pattern while changing names, elements, properties, classes, and ordering. String blacklists are not adequate proof.
-- Before finishing, scan the diff for hydration, VDOM, Node-only APIs in shared code, non-Rolldown/Vite build tooling, fixture hardcoding, and untested behavior changes.
+- Before finishing, scan the diff for component re-execution in the browser, VDOM, Node-only APIs in shared code, non-Rolldown/Vite build tooling, fixture hardcoding, and untested behavior changes.

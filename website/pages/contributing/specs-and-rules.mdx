@@ -65,7 +65,7 @@ The `agent-files` CI job fails if the generated files drift from `.ruler/`. The 
 
 - Run `pnpm run typecheck` and `pnpm ci:local --fast` before you call a change done.
 - Write tests first. Run the narrowest failing test, then make the smallest change.
-- Do not add hydration, a virtual DOM, or a second build stack besides Rolldown and Vite.
+- Do not re-run components in the browser over server HTML. Do not add a virtual DOM or a second build stack besides Rolldown and Vite.
 - Keep compiler, runtime, serializer and render code free of Node-only APIs.
 - Import protocol and configuration facts from the package that owns them. Do not copy them as literals.
 - A merge or push to `main` needs the owner's explicit go-ahead. So does a push to any shared branch. Each go-ahead covers one change set, and it does not carry over to new commits.

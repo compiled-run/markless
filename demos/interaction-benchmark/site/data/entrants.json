@@ -34,7 +34,7 @@
 			"prereleaseSummary": "Unreleased working tree; Nitro v3 beta",
 			"renderMode": "ssr",
 			"renderingNote": "SSR on every request through Nitro; the router plugin renders each page.",
-			"activation": "Resume: the browser continues the server's work instead of hydrating; components do not re-run in the browser. Built with default packing and the router's automatic navigation.",
+			"activation": "Resume: server HTML arrives already wired and code loads only when an event needs it; components do not re-run in the browser. Built with default packing and the router's automatic navigation.",
 			"delivery": "About 71.7 KB gzip JS over 6 scripts on / at scaffold time; one ~68 KB chunk is modulepreloaded on every page (BENCH.md, 'Client JS on /').",
 			"navigation": "client",
 			"navigationNote": "Fragment navigation: a link click swaps in the destination's server-rendered region and resumes it; a resting pointer, press, focus or touch fetches it early, and pages with few links fetch at most two at idle.",
@@ -50,7 +50,7 @@
 				"Findings at scaffold time: a page with several sibling root elements failed the build; a Link in document.tsrx caused a full reload; hashed /build/* chunks were not marked immutable by the Nitro preset. Later framework fixes are tracked on the goal board, not in this file."
 			],
 			"observations": [],
-			"activationShort": "Resume (no hydration)",
+			"activationShort": "Resume (components never re-run)",
 			"earlyInput": "Not stated in BENCH.md; see early-phase failure counts"
 		},
 		{

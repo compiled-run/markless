@@ -102,4 +102,4 @@ Rules:
 The router package may integrate with an HTTP runtime through an adapter, but
 shared route manifesting and request-file parsing must stay runtime-agnostic.
 Renderer work must consume Markless compiled `.tsrx` artifacts; it must not
-reintroduce TSX, hydration, VDOM, or app-authored client/server entry ceremony.
+reintroduce TSX, client component re-execution, VDOM, or app-authored client/server entry ceremony.

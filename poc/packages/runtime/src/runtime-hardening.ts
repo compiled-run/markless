@@ -80,7 +80,7 @@ export type RuntimeHardeningPoc = {
 	readonly journal: () => ReadonlyArray<RuntimeHardeningJournalEntry>;
 	readonly receipts: () => ReadonlyArray<RuntimeHardeningReceipt>;
 	readonly constraints: () => {
-		readonly usesHydration: false;
+		readonly rerunsComponentsOnResume: false;
 		readonly usesVdom: false;
 		readonly productionBrowserResume: false;
 	};
@@ -266,7 +266,7 @@ export function createRuntimeHardeningPoc(): RuntimeHardeningPoc {
 		},
 		constraints() {
 			return {
-				usesHydration: false,
+				rerunsComponentsOnResume: false,
 				usesVdom: false,
 				productionBrowserResume: false,
 			};

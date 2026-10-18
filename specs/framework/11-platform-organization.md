@@ -159,7 +159,7 @@ records, event records, behavior records, and journal entries.
    adapter folders.
 6. Add adapter folders one at a time with fixture-backed receipts. Each adapter
    must prove that it consumes compiler artifacts and shared graph contracts
-   without requiring hydration, VDOM reconciliation, or component execution on
+   without requiring VDOM reconciliation or component execution on
    resume.
 7. Revisit `@markless/core/ui` only after platform capability records can express the
    needed primitives without importing web DOM or OS bridge code.
@@ -180,4 +180,4 @@ boundary:
 - adapter tests prove host/toolchain integration through real or witness-backed
   fixtures inside the owning platform package
 - guardrail scans prove shared packages did not gain DOM-only, OS-only,
-  Node-only, hydration, VDOM, or app-authored client/server-entry assumptions
+  Node-only, component re-execution, VDOM, or app-authored client/server-entry assumptions
