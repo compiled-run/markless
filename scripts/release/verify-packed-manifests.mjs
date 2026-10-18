@@ -23,7 +23,15 @@
 // includes packages deliberately still `private` (@markless/vitest-browser), so
 // their packaging is proven before the flag is ever flipped.
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	readdirSync,
+	rmSync,
+	symlinkSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import process from 'node:process';
@@ -209,6 +217,61 @@ try {
 			if (!present) {
 				failures.push(
 					`${label}: ${where} -> ${path} is not in the tarball — consumers would get an unresolvable import`,
+				);
+			}
+		}
+
+		const sourceManifest = JSON.parse(
+			readFileSync(join(entry.packageDir, 'package.json'), 'utf8'),
+		);
+		const packedBins = Object.entries(manifest.bin ?? {}).filter(([, path]) =>
+			existsSync(join(packageRoot, path)),
+		);
+		if (packedBins.length > 0) {
+			symlinkSync(
+				join(entry.packageDir, 'node_modules'),
+				join(packageRoot, 'node_modules'),
+				'dir',
+			);
+		}
+		for (const [binName, path] of packedBins) {
+			const packedHelp = run(process.execPath, [join(packageRoot, path), '--help']);
+			const sourceHelp = run(process.execPath, [
+				join(entry.packageDir, sourceManifest.bin[binName]),
+				'--help',
+			]);
+			if (packedHelp.status !== 0 || packedHelp.stdout !== sourceHelp.stdout) {
+				failures.push(
+					`${label}: the packed ${binName} --help differs from the source's — the tarball was built from other code than this checkout\n--- packed\n${packedHelp.stdout}${packedHelp.stderr}\n--- source\n${sourceHelp.stdout}`,
+				);
+			}
+		}
+		if (entry.name === 'create-markless' && packedBins.length > 0) {
+			const appParent = join(packDir, 'created');
+			mkdirSync(appParent);
+			const created = run(
+				process.execPath,
+				[
+					join(packageRoot, packedBins[0][1]),
+					'app',
+					'--yes',
+					'--editor',
+					'zed',
+					'--no-install',
+					'--no-git',
+					'--agents',
+					'none',
+				],
+				{ cwd: appParent },
+			);
+			const app = join(appParent, 'app');
+			if (
+				created.status !== 0 ||
+				!existsSync(join(app, '.zed/settings.json')) ||
+				existsSync(join(app, '.vscode'))
+			) {
+				failures.push(
+					`${label}: the packed bin did not create an app with --editor zed (exit ${created.status})\n${created.stdout}\n${created.stderr}`,
 				);
 			}
 		}
