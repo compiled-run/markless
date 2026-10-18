@@ -161,7 +161,7 @@ export function wireKeyedRepeats(
 		const items = readKeyedRepeatCollection(input.graph, repeat),
 			rowRootsByKey = new Map<unknown, ResumeDomElement>(),
 			served = new Map<unknown, [unknown, number]>(),
-				slots: RowSlots = {
+			slots: RowSlots = {
 				values: new Map(),
 				ready: !repeat.rowTemplate?.componentName,
 			};
@@ -222,7 +222,10 @@ export function wireKeyedRepeats(
 				}
 				if (slots.read && !slots.ready) {
 					for (const [rowKey, [item, index]] of served)
-						slots.values.set(rowKey, rowSlotValues(repeat, item, index, input.graph, slots.read));
+						slots.values.set(
+							rowKey,
+							rowSlotValues(repeat, item, index, input.graph, slots.read),
+						);
 					slots.ready = true;
 				}
 				slots.settled = true;
@@ -235,8 +238,16 @@ export function wireKeyedRepeats(
 			if (!builds) return { mint: undefined };
 			if (!cell?.mint || !(slots.ready || slots.settled)) return undefined;
 			if (repeat.rowComponent && (!pending || typeof pending === 'function'))
-				pending = cell.mint.rows?.(repeat, parent, rowRootsByKey, served, registerRowEvents);
-			return !repeat.rowComponent || typeof pending === 'function' ? { mint: cell.mint } : undefined;
+				pending = cell.mint.rows?.(
+					repeat,
+					parent,
+					rowRootsByKey,
+					served,
+					registerRowEvents,
+				);
+			return !repeat.rowComponent || typeof pending === 'function'
+				? { mint: cell.mint }
+				: undefined;
 		};
 		// Rows mint AT the write, so the handler's next statement sees them through an element() handle.
 		const observeWrites = input.graph.subscribeWrite?.({
@@ -291,14 +302,18 @@ export function wireKeyedRepeats(
 						return typeof held === 'function' ? held() : undefined;
 					}
 					return (
-						readyMint()?.then(
-							async (mint) => {
-								const commit = await (held ??
-									mint.rows?.(repeat, parent, rowRootsByKey, served, registerRowEvents));
-								apply(mint);
-								await commit?.();
-							},
-						) ?? apply(undefined)
+						readyMint()?.then(async (mint) => {
+							const commit = await (held ??
+								mint.rows?.(
+									repeat,
+									parent,
+									rowRootsByKey,
+									served,
+									registerRowEvents,
+								));
+							apply(mint);
+							await commit?.();
+						}) ?? apply(undefined)
 					);
 				},
 			}),
@@ -322,7 +337,9 @@ function applyKeyedRepeatRowOrder(
 	const knownRows = new Set(rowRootsByKey.values());
 	for (const [index, item] of readKeyedRepeatCollection(graph, repeat).entries()) {
 		const rowKey = repeatItemKey(item, repeat, index),
-			values = slots.ready ? rowSlotValues(repeat, item, index, graph, slots.read) : undefined,
+			values = slots.ready
+				? rowSlotValues(repeat, item, index, graph, slots.read)
+				: undefined,
 			seen = slots.values.get(rowKey);
 		let rowRoot = rowRootsByKey.get(rowKey);
 		// A row whose slot values moved is patched where it stands, else rebuilt.
@@ -385,7 +402,14 @@ function applyKeyedRepeatRowOrder(
 		elementChildren(parent)
 			.slice(repeat.rowStartOffset ?? 0)
 			.find((child) => !knownRows.has(child));
-	for (const rowRoot of nextRows) insertRepeatNode(mutableParent, rowRoot, anchor);
+	// A row already in place stays attached: re-inserting a focused row drops its focus.
+	let after = anchor;
+	for (let at = nextRows.length; at--; after = nextRows[at]) {
+		let next = (nextRows[at] as Sibling).nextSibling;
+		while (next && next !== after && next.nodeType !== 1) next = next.nextSibling;
+		if (nextRows[at]!.parentElement !== parent || next != after)
+			insertRepeatNode(mutableParent, nextRows[at]!, after);
+	}
 	mint?.refocus?.(parent, focused);
 	if (census && (currentRows.length > 0 || nextRows.length > 0))
 		spliceDomOrderCensus(census, currentRows, nextRows);
@@ -403,6 +427,7 @@ type MutableRepeatParent = ResumeDomElement & {
 	readonly insertBefore?: (node: ResumeDomNode, before: unknown) => unknown;
 	readonly removeChild?: (node: ResumeDomNode) => unknown;
 };
+type Sibling = ResumeDomNode & { readonly nextSibling?: Sibling | null };
 function insertRepeatNode(
 	parent: MutableRepeatParent,
 	node: ResumeDomNode,

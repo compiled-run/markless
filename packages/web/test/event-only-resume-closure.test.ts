@@ -95,7 +95,9 @@ const resumeOnDemandEntries = [
 // 2026-10-07: position keys, fresh rows for returning keys, and rows that follow the @if arm they are written in:
 // resume-keyed-repeats.ts 21,041 -> 22,411, resume-branches.ts 20,932 -> 21,508; minified+gzip 2,872 -> 3,102 and
 // 3,093 -> 3,180 bytes, both under the 4,800 gzip wall; the arm-following code is a lazy module only those rows load.
-const sourceByteLimit = 22411;
+// 2026-10-17: keyed rows already in order stay attached (a re-inserted focused row lost focus): resume-keyed-repeats.ts
+// 22,411 -> 22,915 (105 of it the formatter wrapping long lines); minified+gzip 3,092 -> 3,153 bytes, under the 4,800 gzip wall.
+const sourceByteLimit = 22915;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',
