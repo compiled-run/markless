@@ -2,7 +2,7 @@ import { LINK_BRIDGE_MODULE_PATH } from '../../../../packages/router/src/vite/ru
 
 export interface MusicSsrNetworkRule {
 	readonly method: 'GET';
-	readonly origin: 'fixture' | 'https://www.youtube.com' | 'https://i.ytimg.com';
+	readonly origin: 'fixture' | 'https://www.youtube.com';
 	readonly path: string | RegExp;
 	readonly reason: string;
 }
@@ -44,9 +44,9 @@ export const musicSsrAnalyzerPolicy = {
 		},
 		{
 			method: 'GET',
-			origin: 'https://i.ytimg.com',
-			path: /^\/vi\/[^?#]+\/maxresdefault\.jpg$/,
-			reason: 'track covers are the declared YouTube thumbnail assets (src/data.ts)',
+			origin: 'fixture',
+			path: /^\/covers\/[\w-]+\.svg$/,
+			reason: 'track covers, served same-origin by the box build (boxes/vite.config.ts) in place of i.ytimg.com',
 		},
 		{
 			method: 'GET',
