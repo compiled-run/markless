@@ -5628,9 +5628,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 		description:
 			'This @for renders its rows once and never updates them: a Markless build error.',
 		printed: [
-			'MARKLESS_REPEAT_ROWS_FROZEN: @for (const <itemName> of <collectionSource>) takes its rows from `<rootName>`, which is neither a state cell nor a computed, so the repeat resolves to no graph node and its rows are built on the server and never rebuilt in the browser. The row body reads `<readSource>`, a <value> that can change after that render, and those rows would silently keep their first-render values.',
-			'A keyed repeat reconciles through the graph node its collection resolves to; a collection that resolves to none renders its rows once, so any reactive read inside a row is frozen at its first-render value with nothing said at build time.',
-			'Put the collection on the graph - `const <rootName> = state([...])` or `const <rootName> = computed(() => ...)` inside the component - so the rows rebuild when `<readSource>` changes; or keep the rows static by reading only `<itemName>` inside them.',
+			'MARKLESS_REPEAT_ROWS_FROZEN: @for (const <itemName> of <collectionSource>) takes its rows from `<rootName>`, which is neither a state cell nor a computed, and the compiler cannot recompute it in the browser<input>. The row body reads `<readSource>`, a <value> that can change after that render, and those rows would silently keep their first-render values.',
+			'A keyed repeat updates its rows through the graph node its collection resolves to. A module constant or a `const` built from props, state and module values is turned into one automatically; a collection the browser cannot rebuild renders its rows once, so any reactive read inside a row would freeze at its first-render value.',
+			'Build the rows from values the browser can recompute: a module-level `const <rootName> = [...]`, `const <rootName> = state([...])`, or `const <rootName> = computed(() => ...)` inside the component<value>; or keep the rows static by reading only `<itemName>` inside them.',
 			'https://markless.dev/errors/MARKLESS_REPEAT_ROWS_FROZEN',
 		],
 		structured: true,

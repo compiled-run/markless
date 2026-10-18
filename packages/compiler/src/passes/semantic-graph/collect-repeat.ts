@@ -23,6 +23,7 @@ import {
 	enclosingKeyedRepeat,
 	enclosingRowItemPath,
 	liftRowHandlerCollection,
+	liftStaticCollection,
 	nestedRowHandlers,
 } from './static-repeat-lift.ts';
 import type { WalkState } from './types.ts';
@@ -165,18 +166,23 @@ export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | nu
 		);
 		return null;
 	}
-	const collection = resolvedCollection
+	let collection = resolvedCollection
 		? { graphNodeId: resolvedCollection.binding.id, path: resolvedCollection.path }
 		: rowHandlerCollection?.kind === 'lifted'
-			? { graphNodeId: rowHandlerCollection.graphNodeId, path: [] }
+			? { graphNodeId: rowHandlerCollection.graphNodeId, path: [] as ReadonlyArray<string> }
 			: null;
 
 	// An off-graph collection is a designed server-only path, correct while the
-	// rows are static. It is a defect only once a row reads something a later
-	// write can move: those rows never reconcile, so the read silently freezes.
+	// rows are static. Once a row reads something a later write can move, the
+	// collection is lifted onto the graph so those rows reconcile like any other.
 	if (!collection && !enclosingItemPath) {
 		const reactiveRead = firstReactiveRowRead(node, state, repeatRowNames(itemName, indexName));
-		if (reactiveRead) {
+		const lifted =
+			reactiveRead && !enclosing
+				? liftStaticCollection(node, collectionNode, itemName, state)
+				: null;
+		if (lifted?.kind === 'lifted') collection = { graphNodeId: lifted.graphNodeId, path: [] };
+		else if (reactiveRead) {
 			state.graph.diagnostics.push(
 				repeatFrozenRowsDiagnostic({
 					node,
@@ -185,6 +191,7 @@ export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | nu
 					rootName: splitStaticGraphPath(collectionSource)[0] ?? collectionSource,
 					readSource: reactiveRead.source,
 					readKind: reactiveRead.kind,
+					nested: Boolean(enclosing),
 					filename: state.filename,
 				}),
 			);

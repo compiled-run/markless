@@ -1483,15 +1483,16 @@ export function repeatFrozenRowsDiagnostic(input: {
 	readonly rootName: string;
 	readonly readSource: string;
 	readonly readKind: keyof typeof REACTIVE_READ_NOUN;
+	readonly nested: boolean;
 	readonly filename: string;
 }): SemanticGraphDiagnostic {
 	return semanticGraphDiagnostic({
 		code: 'MARKLESS_REPEAT_ROWS_FROZEN',
 		title: 'This @for renders its rows once and never updates them',
-		message: `@for (const ${input.itemName} of ${input.collectionSource}) takes its rows from \`${input.rootName}\`, which is neither a state cell nor a computed, so the repeat resolves to no graph node and its rows are built on the server and never rebuilt in the browser. The row body reads \`${input.readSource}\`, a ${REACTIVE_READ_NOUN[input.readKind]} that can change after that render, and those rows would silently keep their first-render values.`,
-		why: 'A keyed repeat reconciles through the graph node its collection resolves to; a collection that resolves to none renders its rows once, so any reactive read inside a row is frozen at its first-render value with nothing said at build time.',
+		message: `@for (const ${input.itemName} of ${input.collectionSource}) takes its rows from \`${input.rootName}\`, which is neither a state cell nor a computed, and the compiler cannot recompute it in the browser${input.nested ? ' from inside the row of the enclosing @for' : ' (it is built from a component-body value that only exists during the first render)'}. The row body reads \`${input.readSource}\`, a ${REACTIVE_READ_NOUN[input.readKind]} that can change after that render, and those rows would silently keep their first-render values.`,
+		why: 'A keyed repeat updates its rows through the graph node its collection resolves to. A module constant or a `const` built from props, state and module values is turned into one automatically; a collection the browser cannot rebuild renders its rows once, so any reactive read inside a row would freeze at its first-render value.',
 		span: sourceSpan(input.node, input.filename),
-		suggestion: `Put the collection on the graph - \`const ${input.rootName} = state([...])\` or \`const ${input.rootName} = computed(() => ...)\` inside the component - so the rows rebuild when \`${input.readSource}\` changes; or keep the rows static by reading only \`${input.itemName}\` inside them.`,
+		suggestion: `Build the rows from values the browser can recompute: a module-level \`const ${input.rootName} = [...]\`, \`const ${input.rootName} = state([...])\`, or \`const ${input.rootName} = computed(() => ...)\` inside the component${input.nested ? ', declared outside the enclosing @for' : ''}; or keep the rows static by reading only \`${input.itemName}\` inside them.`,
 		docsUrl: 'https://markless.dev/errors/MARKLESS_REPEAT_ROWS_FROZEN',
 	});
 }

@@ -50,6 +50,31 @@ guard that calls a function or reads the DOM, a guard that reads state an
 earlier statement in the same handler may change, or a cancel inside a loop,
 `switch`, `try` or nested function.
 
+### `@for` over a module constant updates rows that read props or state
+
+0.5.0 also started refusing a keyed `@for` over a module-level constant (or an
+imported array) whose rows read a prop, state or a computed
+(`MARKLESS_REPEAT_ROWS_FROZEN`), again without a note. Before that, 0.4.0
+built those rows once and never updated them. Now the compiler turns the
+constant into a value the browser can read, so the rows update in place:
+
+```tsx
+const LINKS = [{ href: '/', label: 'Home' }, { href: '/docs', label: 'Docs' }];
+
+export function Nav({ pathname }) @{
+	<ul>
+		@for (const link of LINKS; key link.href) {
+			<li class={pathname === link.href ? 'active' : ''}>{link.label}</li>
+		}
+	</ul>
+}
+```
+
+The list itself never changes; only what each row reads does. The error
+remains for rows built from a value the browser cannot rebuild (a `let` in the
+component body, or a constant looped over inside another `@for`'s row), and
+its message now names which and how to fix it.
+
 ### Fixes
 
 - A click (or Enter on a link) whose target a capture-phase `document`

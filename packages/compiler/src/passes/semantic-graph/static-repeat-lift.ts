@@ -72,6 +72,22 @@ export function liftRowHandlerCollection(
 ): RowHandlerCollection {
 	const handlerName = firstRowHandlerName(forNode.body as AnyNode | undefined);
 	if (!handlerName) return { kind: 'no-row-handlers' };
+	const lifted = liftStaticCollection(forNode, collectionNode, itemName, state);
+	return lifted.kind === 'unliftable' ? { ...lifted, handlerName } : lifted;
+}
+
+export type LiftedCollection =
+	| { readonly kind: 'writes-row-item' }
+	| { readonly kind: 'lifted'; readonly graphNodeId: string }
+	| { readonly kind: 'unliftable'; readonly reason: UnwiredReason };
+
+// An off-graph collection as a synthetic computed, so its rows get the records a graph-backed repeat's rows get.
+export function liftStaticCollection(
+	forNode: AnyNode,
+	collectionNode: AnyNode,
+	itemName: string,
+	state: WalkState,
+): LiftedCollection {
 	// Writing into a plain array's row has no graph element to land on; the symbol
 	// modules pass already refuses that, naming the row rather than a lifted node.
 	if (writesName(forNode.body as AnyNode | undefined, itemName))
@@ -81,7 +97,6 @@ export function liftRowHandlerCollection(
 	if (inlined.kind !== 'inlined')
 		return {
 			kind: 'unliftable',
-			handlerName,
 			reason:
 				inlined.kind === 'row-item'
 					? { kind: 'nested', enclosingItemName: inlined.name }
@@ -103,7 +118,7 @@ export function liftRowHandlerCollection(
 	);
 	return lifted
 		? { kind: 'lifted', graphNodeId: lifted.graphNodeId }
-		: { kind: 'unliftable', handlerName, reason: { kind: 'opaque' } };
+		: { kind: 'unliftable', reason: { kind: 'opaque' } };
 }
 
 function dependencySources(nodes: ReadonlyArray<AnyNode>, state: WalkState): ReadonlyArray<string> {

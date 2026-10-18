@@ -32,29 +32,14 @@ export function DayList() @{
 }
 `;
 
-test('a module-const collection whose row reads a state cell is refused', async () => {
+test('a module-const collection whose row reads a state cell is lifted onto the graph', async () => {
 	const compiled = await compile('src/frozen-state.tsrx', moduleConstStateRow);
-	const [diagnostic, ...rest] = errors(compiled);
 
-	expect(rest).toEqual([]);
-	expect(diagnostic?.code).toBe('MARKLESS_REPEAT_ROWS_FROZEN');
-	expect(diagnostic?.docsUrl).toBe('https://markless.dev/errors/MARKLESS_REPEAT_ROWS_FROZEN');
-	expect(diagnostic?.title).toBe('This @for renders its rows once and never updates them');
-	expect(diagnostic?.message).toContain('`WEEKDAYS`');
-	expect(diagnostic?.message).toContain('`s.picked`');
-	expect(diagnostic?.message).toContain('state cell');
-	expect(diagnostic?.suggestions[0]?.message).toContain('const WEEKDAYS = state([...])');
-	expect(diagnostic?.suggestions[0]?.message).toContain('reading only `day`');
-	expect(diagnostic?.primarySpan?.filename).toBe('src/frozen-state.tsrx');
-	expect(
-		moduleConstStateRow.slice(
-			diagnostic?.primarySpan?.start ?? 0,
-			diagnostic?.primarySpan?.end ?? 0,
-		),
-	).toContain('of WEEKDAYS; key day');
+	expect(errors(compiled)).toEqual([]);
+	expect(compiled.semanticGraph.keyedRepeats[0]?.collectionGraphNodeId).toMatch(/^computed:/);
 });
 
-test('a module-const collection whose row reads a shared-instance computed is refused', async () => {
+test('a module-const collection whose row reads a shared-instance computed is lifted', async () => {
 	const compiled = await compile(
 		'src/frozen-shared.tsrx',
 		`
@@ -78,15 +63,12 @@ export function DayList() @{
 }
 `,
 	);
-	const [diagnostic, ...rest] = errors(compiled);
 
-	expect(rest).toEqual([]);
-	expect(diagnostic?.title).toBe('This @for renders its rows once and never updates them');
-	expect(diagnostic?.message).toContain('`cal.label`');
-	expect(diagnostic?.message).toContain('computed value');
+	expect(errors(compiled)).toEqual([]);
+	expect(compiled.semanticGraph.keyedRepeats[0]?.collectionGraphNodeId).toMatch(/^computed:/);
 });
 
-test('an imported collection whose row reads a prop is refused', async () => {
+test('an imported collection whose row reads a prop is lifted', async () => {
 	const compiled = await compile(
 		'src/frozen-prop.tsrx',
 		`
@@ -101,16 +83,12 @@ export function DayList({ locale }: { locale: string }) @{
 }
 `,
 	);
-	const [diagnostic, ...rest] = errors(compiled);
 
-	expect(rest).toEqual([]);
-	expect(diagnostic?.title).toBe('This @for renders its rows once and never updates them');
-	expect(diagnostic?.message).toContain('`WEEKDAYS`');
-	expect(diagnostic?.message).toContain('`locale`');
-	expect(diagnostic?.message).toContain('component prop');
+	expect(errors(compiled)).toEqual([]);
+	expect(compiled.semanticGraph.keyedRepeats[0]?.collectionGraphNodeId).toMatch(/^computed:/);
 });
 
-test('a reactive read recombined with the row item is still refused', async () => {
+test('a reactive read recombined with the row item is lifted too', async () => {
 	const compiled = await compile(
 		'src/frozen-composite.tsrx',
 		`
@@ -129,7 +107,8 @@ export function DayList() @{
 `,
 	);
 
-	expect(errors(compiled)[0]?.message).toContain('`s.picked`');
+	expect(errors(compiled)).toEqual([]);
+	expect(compiled.semanticGraph.keyedRepeats[0]?.collectionGraphNodeId).toMatch(/^computed:/);
 });
 
 test('a module-const collection with static rows still compiles', async () => {
@@ -247,7 +226,7 @@ export function List() @{
 	expect(compiled.semanticGraph.keyedRepeats).toHaveLength(2);
 });
 
-test('a reactive read in a nested row of a frozen repeat is refused', async () => {
+test('a reactive read in a nested row lifts the outer module-const collection', async () => {
 	const compiled = await compile(
 		'src/nested-reactive.tsrx',
 		`
@@ -268,5 +247,69 @@ export function List() @{
 `,
 	);
 
-	expect(errors(compiled)[0]?.message).toContain('`s.picked`');
+	expect(errors(compiled)).toEqual([]);
+	expect(compiled.semanticGraph.keyedRepeats[0]?.collectionGraphNodeId).toMatch(/^computed:/);
+	expect(compiled.semanticGraph.keyedRepeats[1]?.enclosingItemPath).toEqual(['items']);
+});
+
+test('a collection built from a first-render-only body local is still refused, with the fix', async () => {
+	const compiled = await compile(
+		'src/frozen-let.tsrx',
+		`
+import { state } from '@markless/core';
+
+export function DayList() @{
+	const s = state({ picked: 'mon' });
+	let days = ['mon', 'tue'];
+	if (s.picked === 'sun') days = ['sun'];
+	<div>
+		@for (const day of days; key day) {
+			<span data-picked={s.picked}>{day}</span>
+		}
+	</div>
+}
+`,
+	);
+	const [diagnostic, ...rest] = errors(compiled);
+
+	expect(rest).toEqual([]);
+	expect(diagnostic?.code).toBe('MARKLESS_REPEAT_ROWS_FROZEN');
+	expect(diagnostic?.docsUrl).toBe('https://markless.dev/errors/MARKLESS_REPEAT_ROWS_FROZEN');
+	expect(diagnostic?.title).toBe('This @for renders its rows once and never updates them');
+	expect(diagnostic?.message).toContain('`days`');
+	expect(diagnostic?.message).toContain('`s.picked`');
+	expect(diagnostic?.message).toContain('state cell');
+	expect(diagnostic?.message).toContain('only exists during the first render');
+	expect(diagnostic?.suggestions[0]?.message).toContain('const days = state([...])');
+	expect(diagnostic?.suggestions[0]?.message).toContain('reading only `day`');
+});
+
+test('a module-const collection nested in another row is still refused, with the fix', async () => {
+	const compiled = await compile(
+		'src/frozen-nested-const.tsrx',
+		`
+import { state } from '@markless/core';
+
+const WEEKDAYS = ['mon', 'tue'];
+
+export function Weeks() @{
+	const s = state({ picked: 'mon', weeks: [{ id: 'w1' }] });
+	<div>
+		@for (const week of s.weeks; key week.id) {
+			<p>
+				@for (const day of WEEKDAYS; key day) {
+					<span data-picked={s.picked}>{day}</span>
+				}
+			</p>
+		}
+	</div>
+}
+`,
+	);
+	const [diagnostic, ...rest] = errors(compiled);
+
+	expect(rest).toEqual([]);
+	expect(diagnostic?.code).toBe('MARKLESS_REPEAT_ROWS_FROZEN');
+	expect(diagnostic?.message).toContain('from inside the row of the enclosing @for');
+	expect(diagnostic?.suggestions[0]?.message).toContain('declared outside the enclosing @for');
 });
