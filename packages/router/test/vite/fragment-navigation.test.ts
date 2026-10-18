@@ -203,6 +203,25 @@ for (const [name, browserType] of [
 			await page.close();
 		});
 
+		test('a link pressed before its click swaps the page before the next task runs', async () => {
+			const { page, errors } = await open(browser);
+			const link = page.locator('[data-nav="form"]');
+			await link.dispatchEvent('pointerdown');
+			await page.waitForTimeout(500);
+			const seen = await page.evaluate(
+				() =>
+					new Promise<string | null | undefined>((resolve) => {
+						(document.querySelector('[data-nav="form"]') as HTMLElement).click();
+						setTimeout(() =>
+							resolve(document.querySelector('[data-page]')?.getAttribute('data-page')),
+						);
+					}),
+			);
+			expect(seen).toBe('form');
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
 		test('route stylesheets and the title follow the destination', async () => {
 			const { page, errors } = await open(browser);
 			const color = () =>
@@ -637,7 +656,11 @@ for (const [name, browserType] of [
 			page.on('requestfailed', (request) => cancelled.push(new URL(request.url()).pathname));
 			await page.waitForTimeout(3500);
 			const fetched = requests.filter((request) => request.endsWith(' fragment'));
-			expect(fetched.toSorted()).toEqual(['/form fragment', '/other fragment', '/slow fragment']);
+			expect(fetched.toSorted()).toEqual([
+				'/form fragment',
+				'/other fragment',
+				'/slow fragment',
+			]);
 			expect(cancelled).toEqual([]);
 			expect(errors).toEqual([]);
 			await page.close();

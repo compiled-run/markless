@@ -69,9 +69,16 @@ export function startFragmentNavigation(
 		).connection;
 		const pageKey = (url: URL) => url.pathname + url.search;
 		let module: Promise<FragmentEntryModule> | undefined;
+		// Even a loaded module's import() resolves a task later, after the next paint: a click on a pressed link calls it directly.
+		let loaded: FragmentEntryModule | undefined;
 		const load = () => {
-			module ??= importModule(config.entry) as Promise<FragmentEntryModule>;
-			module.catch(() => (module = undefined));
+			if (!module) {
+				module = importModule(config.entry) as Promise<FragmentEntryModule>;
+				module.then(
+					(entry) => (loaded = entry),
+					() => (module = undefined),
+				);
+			}
 			return module;
 		};
 		// A same-origin anchor, router Link or plain, counts only when its path names one of the app's pages.
@@ -360,8 +367,10 @@ export function startFragmentNavigation(
 				type,
 				(event) => {
 					w.clearTimeout(restTimer);
-					const url = eligible(anchorOf(event));
+					const anchor = anchorOf(event);
+					const url = eligible(anchor);
 					if (url) prefetch(url);
+					if (url || eligible(anchor, true)) void load();
 				},
 				{ passive: true },
 			);
@@ -381,16 +390,10 @@ export function startFragmentNavigation(
 			const replace =
 				anchor.hasAttribute(config.replaceAttribute) || url.href === current.href;
 			const manual = anchor.getAttribute(config.scrollAttribute) === 'manual';
-			load().then(
-				(entry) =>
-					entry.navigate(
-						d,
-						url,
-						replace ? 'replace' : 'push',
-						manual ? 'manual' : 'reset',
-					),
-				() => location.assign(url.href),
-			);
+			const go = (entry: FragmentEntryModule) =>
+				entry.navigate(d, url, replace ? 'replace' : 'push', manual ? 'manual' : 'reset');
+			if (loaded) void go(loaded);
+			else load().then(go, () => location.assign(url.href));
 		};
 		d.addEventListener('click', follow(true), true);
 		d.addEventListener('click', follow(false));
