@@ -64,8 +64,11 @@ test('configures Zed to highlight .tsrx as TSX and load the workspace plugin', (
 });
 
 // First test to touch the TS program pays its creation; CI runner load has blown the 5s default.
-test('compiles TSRX source into type-checkable TSX for TypeScript', { timeout: 20_000 }, () => {
-	const source = `
+test(
+	'compiles TSRX source into type-checkable TSX for TypeScript',
+	{ timeout: 20_000 },
+	() => {
+		const source = `
 		import { state } from '@markless/core';
 
 		export function Counter() @{
@@ -73,31 +76,40 @@ test('compiles TSRX source into type-checkable TSX for TypeScript', { timeout: 2
 			<button class="counter" onClick={() => count++}>{count}</button>
 		}
 	`;
-	const fileName = join(process.cwd(), 'packages/core/src/Counter.tsrx');
-	const virtualCode = new MarklessTsrxVirtualCode(fileName, ts.ScriptSnapshot.fromString(source));
+		const fileName = join(process.cwd(), 'packages/core/src/Counter.tsrx');
+		const virtualCode = new MarklessTsrxVirtualCode(
+			fileName,
+			ts.ScriptSnapshot.fromString(source),
+		);
 
-	expect(virtualCode.generatedCode).toContain("import { state } from '@markless/core';");
-	expect(virtualCode.generatedCode).toContain('count++');
-	expect(virtualCode.generatedCode).toContain('return <button');
-	expect(virtualCode.generatedCode).not.toContain('react/jsx-runtime');
-	// The generated document is what every mapped editor answer is resolved against, so it
-	// has to type-check as TSX on its own - a scaffolding diagnostic here would surface to
-	// the user on a file they wrote correctly.
-	expect(
-		formatDiagnostics(
-			typeCheckVirtualSource(fileName, virtualCode.generatedCode, {
-				noUnusedLocals: true,
-			}),
-		),
-	).toEqual([]);
-	// The first type-check in a worker builds the TypeScript program cold, which
-	// crossed the default 5s on a slow CI runner while passing everywhere else.
-}, 15000);
+		expect(virtualCode.generatedCode).toContain("import { state } from '@markless/core';");
+		expect(virtualCode.generatedCode).toContain('count++');
+		expect(virtualCode.generatedCode).toContain('return <button');
+		expect(virtualCode.generatedCode).not.toContain('react/jsx-runtime');
+		// The generated document is what every mapped editor answer is resolved against, so it
+		// has to type-check as TSX on its own - a scaffolding diagnostic here would surface to
+		// the user on a file they wrote correctly.
+		expect(
+			formatDiagnostics(
+				typeCheckVirtualSource(fileName, virtualCode.generatedCode, {
+					noUnusedLocals: true,
+				}),
+			),
+		).toEqual([]);
+		// The first type-check in a worker builds the TypeScript program cold, which
+		// crossed the default 5s on a slow CI runner while passing everywhere else.
+	},
+	15000,
+);
 
 // The document shell is authored against framework components like the router's
 // Html, which are plain .ts functions that pass their children through.
-test('document-shell markup type-checks: meta attributes and children-passthrough components', () => {
-	const source = `
+// A cold program over the root tsconfig measured 7.9 to 8.8 s under the parallel unit run, like the test above.
+test(
+	'document-shell markup type-checks: meta attributes and children-passthrough components',
+	{ timeout: 20_000 },
+	() => {
+		const source = `
 		import type { Children } from '@markless/core';
 
 		function Shell(props: { readonly children?: Children }): unknown {
@@ -115,15 +127,19 @@ test('document-shell markup type-checks: meta attributes and children-passthroug
 			</Shell>
 		}
 	`;
-	const fileName = join(process.cwd(), 'packages/core/src/Document.tsrx');
-	const virtualCode = new MarklessTsrxVirtualCode(fileName, ts.ScriptSnapshot.fromString(source));
+		const fileName = join(process.cwd(), 'packages/core/src/Document.tsrx');
+		const virtualCode = new MarklessTsrxVirtualCode(
+			fileName,
+			ts.ScriptSnapshot.fromString(source),
+		);
 
-	// The public Children type from @markless/core is the contract's own child
-	// shape, so a passthrough shell interpolates its children with no diagnostic.
-	expect(
-		formatDiagnostics(typeCheckVirtualSource(fileName, virtualCode.generatedCode)),
-	).toEqual([]);
-});
+		// The public Children type from @markless/core is the contract's own child
+		// shape, so a passthrough shell interpolates its children with no diagnostic.
+		expect(
+			formatDiagnostics(typeCheckVirtualSource(fileName, virtualCode.generatedCode)),
+		).toEqual([]);
+	},
+);
 
 test('populates virtual code from the Markless compiler type-service artifact', () => {
 	const source = `import { state } from '@markless/core';
@@ -268,32 +284,42 @@ test('the CommonJS volar entry compiles TSRX the way the host reaches it', () =>
 // A `<` that cannot open a tag is literal markup text in TSRX, but the same character is
 // a malformed tag in TSX, so the generated document has to carry the entity instead. The
 // mappings around it must survive the three characters `&lt;` adds.
-test('escapes a literal less-than in markup text so the generated TSX type-checks', () => {
-	const source = `export function App() @{\n\t<span><3 <= x</span>\n}`;
-	const fileName = join(process.cwd(), 'packages/core/src/LessThanText.tsrx');
-	const virtualCode = new MarklessTsrxVirtualCode(fileName, ts.ScriptSnapshot.fromString(source));
+test(
+	'escapes a literal less-than in markup text so the generated TSX type-checks',
+	{ timeout: 20_000 },
+	() => {
+		const source = `export function App() @{\n\t<span><3 <= x</span>\n}`;
+		const fileName = join(process.cwd(), 'packages/core/src/LessThanText.tsrx');
+		const virtualCode = new MarklessTsrxVirtualCode(
+			fileName,
+			ts.ScriptSnapshot.fromString(source),
+		);
 
-	expect(virtualCode.generatedCode).toContain('<span>&lt;3 &lt;= x</span>');
-	expect(virtualCode.generatedCode).not.toMatch(/<span><3/);
-	expect(formatDiagnostics(typeCheckVirtualSource(fileName, virtualCode.generatedCode))).toEqual(
-		[],
-	);
+		expect(virtualCode.generatedCode).toContain('<span>&lt;3 &lt;= x</span>');
+		expect(virtualCode.generatedCode).not.toMatch(/<span><3/);
+		expect(
+			formatDiagnostics(typeCheckVirtualSource(fileName, virtualCode.generatedCode)),
+		).toEqual([]);
 
-	// The `&lt;` grows only the mapping that covers the text; every other mapping,
-	// including the tag punctuation on either side, still points at its own source text.
-	const pairs = virtualCode.mappings.map((mapping) => ({
-		source: source.slice(mapping.sourceOffsets[0], mapping.sourceOffsets[0] + mapping.lengths[0]),
-		generated: virtualCode.generatedCode.slice(
-			mapping.generatedOffsets[0],
-			mapping.generatedOffsets[0] + mapping.generatedLengths[0],
-		),
-	}));
+		// The `&lt;` grows only the mapping that covers the text; every other mapping,
+		// including the tag punctuation on either side, still points at its own source text.
+		const pairs = virtualCode.mappings.map((mapping) => ({
+			source: source.slice(
+				mapping.sourceOffsets[0],
+				mapping.sourceOffsets[0] + mapping.lengths[0],
+			),
+			generated: virtualCode.generatedCode.slice(
+				mapping.generatedOffsets[0],
+				mapping.generatedOffsets[0] + mapping.generatedLengths[0],
+			),
+		}));
 
-	expect(pairs).toContainEqual({ source: '<3 <= x', generated: '&lt;3 &lt;= x' });
-	for (const tagToken of ['<', 'span', '>', '</']) {
-		expect(pairs).toContainEqual({ source: tagToken, generated: tagToken });
-	}
-});
+		expect(pairs).toContainEqual({ source: '<3 <= x', generated: '&lt;3 &lt;= x' });
+		for (const tagToken of ['<', 'span', '>', '</']) {
+			expect(pairs).toContainEqual({ source: tagToken, generated: tagToken });
+		}
+	},
+);
 
 test('tsserver protocol opens configured .tsrx files without JSX or parser diagnostics', async () => {
 	const result = await runTsrxTsserverProbe();
@@ -357,7 +383,11 @@ test.each([
 		markup: `const base = { color: 'red', marginTop: 4 };\n\t<div style={{ ...base, color: 'blue' }}>ok</div>`,
 		typechecks: true,
 	},
-	{ name: 'a css text string', markup: `<div style="position: absolute">ok</div>`, typechecks: true },
+	{
+		name: 'a css text string',
+		markup: `<div style="position: absolute">ok</div>`,
+		typechecks: true,
+	},
 	{
 		name: 'an interpolated css text string',
 		markup: '<div style={`transform: translate(${x}%, ${y}%)`}>ok</div>',
@@ -390,7 +420,10 @@ test.each([
 	},
 ])('type-checks $name on the style attribute', ({ name, markup, typechecks }) => {
 	const source = `export function Panel({ x, y }: { x: number; y: number }) @{\n\t${markup}\n}`;
-	const fileName = join(process.cwd(), `packages/core/src/Style-${name.replaceAll(' ', '-')}.tsrx`);
+	const fileName = join(
+		process.cwd(),
+		`packages/core/src/Style-${name.replaceAll(' ', '-')}.tsrx`,
+	);
 	const virtualCode = new MarklessTsrxVirtualCode(fileName, ts.ScriptSnapshot.fromString(source));
 	const diagnostics = typeCheckVirtualSource(fileName, virtualCode.generatedCode);
 
