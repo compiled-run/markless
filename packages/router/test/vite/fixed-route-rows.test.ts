@@ -1,10 +1,12 @@
-import { cp, mkdir, mkdtemp, rm, symlink } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
 import { chromium } from '@playwright/test';
 import { createBuilder } from 'vite';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 import { markless } from '@markless/bundler/vite';
+import { marklessBuildManifestPath } from '../../../bundler/src/build/build-manifests.ts';
+import { MARKLESS_BYTE_ATTRIBUTION } from '../../../bundler/src/build/chunking.ts';
 import { router } from '../../src/vite/index.ts';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 
@@ -15,9 +17,10 @@ import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts
 const packagesRoot = resolve(import.meta.dirname, '../../..');
 const cleanups: Array<() => Promise<void> | void> = [];
 let origin = '';
+let appRoot = '';
 
 beforeAll(async () => {
-	const root = await mkdtemp(join(tmpdir(), 'markless-fixed-rows-'));
+	const root = (appRoot = await mkdtemp(join(tmpdir(), 'markless-fixed-rows-')));
 	cleanups.push(() => rm(root, { recursive: true, force: true }));
 	await cp(resolve(import.meta.dirname, '../fixtures/fixed-rows-app'), root, { recursive: true });
 	await mkdir(join(root, 'node_modules/@markless'), { recursive: true });
@@ -62,7 +65,12 @@ test('a page nothing imports ships its fixed rows without row-building code, and
 	await page.goto(`${origin}/solo`);
 	await page.click('[data-row="b"]');
 	await expect.poll(() => page.textContent('[data-picked]')).toBe('b');
-	const attribution = (await (await fetch(`${origin}/build/byte-attribution.json`)).json()) as {
+	const attribution = JSON.parse(
+		await readFile(
+			marklessBuildManifestPath(join(appRoot, '.output/public'), MARKLESS_BYTE_ATTRIBUTION),
+			'utf8',
+		),
+	) as {
 		readonly chunks: Record<
 			string,
 			{ readonly modules: ReadonlyArray<[string, string, number]> }
