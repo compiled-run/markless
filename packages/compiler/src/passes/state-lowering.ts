@@ -261,15 +261,19 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 			continue;
 		}
 
+		const handleProperty = elementHandlePropertyWrite(write, resolved);
+		if (handleProperty) {
+			reads.push(handleProperty);
+			continue;
+		}
+
 		if (!resolved.binding.writable) {
 			diagnostics.push(readOnlyWriteDiagnostic(write, resolved.binding));
 			continue;
 		}
 
 		if (isUnloweredSharedSeed(write, resolved.binding, input)) {
-			diagnostics.push(
-				sharedSeedUnsupportedDiagnostic(write, input.semanticGraph.filename),
-			);
+			diagnostics.push(sharedSeedUnsupportedDiagnostic(write, input.semanticGraph.filename));
 			continue;
 		}
 
@@ -835,9 +839,7 @@ function isUnloweredSharedSeed(
 // state from a component-body assignment. Every other reader — a template
 // position, an event handler, a computed — takes the raw prop, so it fails
 // closed instead of quietly rendering undefined where a default was authored.
-function escapedDefaultedPropDiagnostics(
-	input: StateLoweringInput,
-): StateLoweringDiagnostic[] {
+function escapedDefaultedPropDiagnostics(input: StateLoweringInput): StateLoweringDiagnostic[] {
 	return input.semanticGraph.componentPropBindings.flatMap((binding) => {
 		if (binding.defaultSource === undefined) return [];
 
@@ -926,7 +928,7 @@ function sharedSeedUnsupportedDiagnostic(
 		phase: 'state-lowering',
 		title: 'Cannot seed shared state from this expression',
 		message: `Cannot seed "${write.target}" from "${write.valueSource ?? write.target}" because a component body seeds a shared instance only from its own props or from constants.`,
-		why: 'A component body runs once during initial render. The compiler turns a shared-state assignment there into a per-instance initial value, which it can only build from values the render already has: this component\'s props and constants.',
+		why: "A component body runs once during initial render. The compiler turns a shared-state assignment there into a per-instance initial value, which it can only build from values the render already has: this component's props and constants.",
 		primarySpan: write.targetSpan ?? fallbackSpan(filename),
 		passId: 'state-lowering',
 		artifactKeys: ['semanticGraph', 'stateLowering'],
@@ -1031,6 +1033,33 @@ function restAliasExcludedPathDiagnostic({
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_REST_ALIAS_EXCLUDED_PATH',
+	};
+}
+
+/**
+ * `box.scrollTop = top` in a handler sets a property of the element the handle
+ * names, which is DOM work rather than a graph write. It lowers to a read of the
+ * handle, and the handler module assigns through `getElementHandle(...)`.
+ */
+function elementHandlePropertyWrite(
+	write: SemanticStateWrite,
+	resolved: ResolvedStateGraphPath,
+): LoweredStateRead | null {
+	if (resolved.binding.kind !== 'element' || resolved.path.length === 0) return null;
+	if (write.writeScope !== 'handler' || !write.targetSpan) return null;
+	if (write.operation !== 'assign' && write.operation !== 'update') return null;
+	const tail = `.${resolved.path.join('.')}`;
+	if (!write.target.endsWith(tail)) return null;
+	const source = write.target.slice(0, -tail.length);
+	return {
+		source,
+		sourceSpan: { ...write.targetSpan, end: write.targetSpan.start + source.length },
+		...(resolved.bindingId ? { bindingId: resolved.bindingId } : {}),
+		...((write.componentName ?? resolved.componentName)
+			? { componentName: write.componentName ?? resolved.componentName }
+			: {}),
+		graphNodeId: resolved.binding.id,
+		path: [],
 	};
 }
 
@@ -1400,7 +1429,8 @@ function unknownSharedStateMember(
 function sharedDefinitionName(graph: SemanticGraphArtifact, definitionId?: string): string {
 	return (
 		graph.sharedDefinitions.find((definition) => definition.id === definitionId)?.name ??
-		(definitionId ?? 'the shared definition')
+		definitionId ??
+		'the shared definition'
 	);
 }
 
