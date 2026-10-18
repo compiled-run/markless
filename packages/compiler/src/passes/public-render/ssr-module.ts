@@ -113,7 +113,7 @@ function elementHandleIdSource(handleGraphNodeId: string): string {
 			? widgetInstanceReadSource((key) => `marklessSsrRenderStateValues.get(${key})`)
 			: null,
 	});
-	return `(residue=>{${readCase}})({kind:'element-handle-id',handleGraphNodeId:${JSON.stringify(handleGraphNodeId)}})`;
+	return `(marklessResidue=>{${readCase}})({kind:'element-handle-id',handleGraphNodeId:${JSON.stringify(handleGraphNodeId)}})`;
 }
 
 /**
@@ -278,7 +278,7 @@ export function emitPublicSsrRenderModule(
 		// The optional render context is the per-request streaming channel
 		// (T107): renderToStream threads it through child renders and async
 		// runners. Omitted = exact blocking behavior.
-		'async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {',
+		'async function marklessRenderSsr(marklessSsrProps = {}, marklessSsrRenderContext) {',
 		destructureProps(rootInfo.propNames, rootInfo.component, input.source.source, input.source.filename),
 		...sharedSeedPassLines(
 			componentSharedSeeds(input, rootInfo.componentName),
@@ -331,11 +331,11 @@ export function emitPublicSsrRenderModule(
 			rootDataLines.bodySharedComputed,
 		),
 		...rootDataLines.serveComputed,
-		'	const html = marklessSsrRendered.html;',
+		'	const marklessSsrHtml = marklessSsrRendered.html;',
 		`	const marklessSsrComposition = marklessSsrComposeView(marklessSsrRendered.structure, ${ssrComposedPayloadView(input, rootInfo.componentName)}, marklessSsrChildren, marklessSsrAsyncSnapshots, marklessSsrIdPrefix);`,
 		`	const marklessSsrState = ${ssrComposeStateExpression(input, rootInfo.component, rootInfo.componentName)};`,
 		'	return {',
-		'		html,',
+		'		html: marklessSsrHtml,',
 		'		state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots),',
 		'		view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) },',
 		...(streamsArms ? ['		servedBranches: marklessSsrBranches,'] : []),
@@ -344,7 +344,7 @@ export function emitPublicSsrRenderModule(
 			? ['		m(graphProps, instancePath) { marklessSsrRemapGraphOutput(this, graphProps, instancePath); },']
 			: []),
 		'		propEvents: marklessSsrPropEvents,',
-		'		externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, props),',
+		'		externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, marklessSsrProps),',
 		'		structure: marklessSsrRendered.structure,',
 		'		structureTokens: marklessSsrRendered.structureTokens,',
 		...(widgetFallbacksOutputField(input, rootInfo.componentName)
@@ -782,7 +782,7 @@ function emitSsrDataLines(
 		.map((branch) => {
 			const arm = branchArmSources.get(branch.branchSiteId)?.source ?? '1';
 			const resolved = branchArmHandleResolution(input.renderData.chunks, branch.armChunkIds);
-			return `case ${JSON.stringify(branch.branchSiteId)}:{const arm=${arm};marklessSsrBranches.push({id:marklessSsrDataSlot.branchSiteId,takenArm:arm${resolved}});return arm;}`;
+			return `case ${JSON.stringify(branch.branchSiteId)}:{const marklessSsrArm=${arm};marklessSsrBranches.push({id:marklessSsrDataSlot.branchSiteId,takenArm:marklessSsrArm${resolved}});return marklessSsrArm;}`;
 		});
 	const repeatIds = new Set(chunks.flatMap((chunk) =>
 		chunk.slots.flatMap((slot) => slot.kind === 'repeat' ? [slot.repeatId] : []),
@@ -827,12 +827,12 @@ function emitSsrDataLines(
 			const derived = runner.derived
 				.map(
 					(value) =>
-						`{const derived=await marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots,${JSON.stringify(value.graphNodeId)},${value.source},marklessSsrRenderContext,false${extra});if(derived.status==='fulfilled')marklessSsrRenderStateValues.set(${JSON.stringify(value.graphNodeId)},derived.value);}`,
+						`{const marklessSsrDerived=await marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots,${JSON.stringify(value.graphNodeId)},${value.source},marklessSsrRenderContext,false${extra});if(marklessSsrDerived.status==='fulfilled')marklessSsrRenderStateValues.set(${JSON.stringify(value.graphNodeId)},marklessSsrDerived.value);}`,
 				)
 				.join('');
-			const settled = `marklessSsrRenderStateValues.set(${JSON.stringify(runner.graphNodeId)},snapshot.value);`;
+			const settled = `marklessSsrRenderStateValues.set(${JSON.stringify(runner.graphNodeId)},marklessSsrSnapshot.value);`;
 			return [
-				`case ${JSON.stringify(boundary.boundaryId)}:{const snapshot=await marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots,${JSON.stringify(runner.graphNodeId)},${runner.source},marklessSsrRenderContext,${String(!!boundary.armChunkIds.pending)}${extra});if(snapshot.status==='fulfilled')${derived ? `{${settled}${derived}}` : settled}return {arm:marklessSsrAsyncArm(snapshot),error:snapshot.error};}`,
+				`case ${JSON.stringify(boundary.boundaryId)}:{const marklessSsrSnapshot=await marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots,${JSON.stringify(runner.graphNodeId)},${runner.source},marklessSsrRenderContext,${String(!!boundary.armChunkIds.pending)}${extra});if(marklessSsrSnapshot.status==='fulfilled')${derived ? `{${settled}${derived}}` : settled}return {arm:marklessSsrAsyncArm(marklessSsrSnapshot),error:marklessSsrSnapshot.error};}`,
 			];
 		});
 	const edges = componentEdgesFor(input, componentName);
@@ -1004,11 +1004,11 @@ function emitSsrDataLines(
 			if (prop.kind !== 'graph-reference') return [];
 			if (prop.graphNodeId === 'prop:props')
 				return [
-					`${JSON.stringify(prop.name)}:marklessSsrCallbackSymbol(props,${JSON.stringify(prop.path)})`,
+					`${JSON.stringify(prop.name)}:marklessSsrCallbackSymbol(marklessSsrProps,${JSON.stringify(prop.path)})`,
 				];
 			if (prop.graphNodeId.startsWith('prop:'))
 				return [
-					`${JSON.stringify(prop.name)}:marklessSsrCallbackSymbol(props,${JSON.stringify([prop.graphNodeId.slice(5), ...prop.path])})`,
+					`${JSON.stringify(prop.name)}:marklessSsrCallbackSymbol(marklessSsrProps,${JSON.stringify([prop.graphNodeId.slice(5), ...prop.path])})`,
 				];
 			return [];
 		});
@@ -1266,7 +1266,9 @@ function emitSsrDataLines(
 		if (
 			binding.sharedDefinitionId !== undefined ||
 			!(binding.componentName === componentName || (!binding.componentName && componentName === input.renderData.root?.componentName)) ||
-			(binding.kind === 'computed' && binding.async === true)
+			(binding.kind === 'computed' && binding.async === true) ||
+			// Seeded from the render props just above; its name may be a user local.
+			binding.id === 'prop:props'
 		)
 			return [];
 		if (binding.kind === 'computed') derivedComputedIds.push(binding.id);
@@ -1349,7 +1351,7 @@ function emitSsrDataLines(
 		seedForward.length === 0
 			? []
 			: [
-					"marklessSsrRenderStateValues.set('prop:props',props);",
+					"marklessSsrRenderStateValues.set('prop:props',marklessSsrProps);",
 					...unfoldedSeedLines,
 					...bindingLines,
 					...sharedComputedLines,
@@ -1389,13 +1391,13 @@ function emitSsrDataLines(
 						)});`,
 					],
 		render: [
-		"marklessSsrRenderStateValues.set('prop:props',props);",
+		"marklessSsrRenderStateValues.set('prop:props',marklessSsrProps);",
 		...bindingLines,
 		...sharedComputedLines,
 		...templateComputedLines,
 		"const marklessSsrIdPrefix=marklessSsrRenderContext?.idPrefix??'';",
 		...deferLine,
-		`const marklessSsrReadData=(residue,marklessSsrDataContext)=>{${mintCase}if(residue.kind==='graph-read')return marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(residue.graphNodeId),residue.path);if(residue.kind==='repeat-item')return marklessSsrReadPublicPath(marklessSsrDataContext.repeatItem,residue.path);${localLines.join('')}switch(residue.source){${readCases.join('')}default:throw new Error('MARKLESS_SSR_DATA_RESIDUE_MISSING: '+residue.source);}};`,
+		`const marklessSsrReadData=(marklessResidue,marklessSsrDataContext)=>{${mintCase}if(marklessResidue.kind==='graph-read')return marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(marklessResidue.graphNodeId),marklessResidue.path);if(marklessResidue.kind==='repeat-item')return marklessSsrReadPublicPath(marklessSsrDataContext.repeatItem,marklessResidue.path);${localLines.join('')}switch(marklessResidue.source){${readCases.join('')}default:throw new Error('MARKLESS_SSR_DATA_RESIDUE_MISSING: '+marklessResidue.source);}};`,
 		// A component placed inside a widget root renders that widget's parts from
 		// its own template, and their seed pass reads this context, not the values map.
 		`const marklessSsrRendered=await renderSsrData({renderData:{...marklessRenderData,root:{componentName:${JSON.stringify(componentName)},templateId:${JSON.stringify(`template:${componentName}`)}}},idPrefix:marklessSsrIdPrefix,${

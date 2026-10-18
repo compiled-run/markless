@@ -132,7 +132,7 @@ export function App() @{
 	});
 
 	expect(result.publicRenderModule.ssrModuleSource).toContain(
-		'"onChoose":marklessSsrCallbackSymbol(props,["onChoose"])',
+		'"onChoose":marklessSsrCallbackSymbol(marklessSsrProps,["onChoose"])',
 	);
 });
 
@@ -182,7 +182,7 @@ export function TelescopePanel() @{
 	expect(source).toContain(
 		'marklessSsrReadPublicPath(marklessSsrRenderStateValues.get("computed:scan"),["tracking"])',
 	);
-	expect(source).not.toContain('const arm=((scan.tracking)?0:1)');
+	expect(source).not.toContain('const marklessSsrArm=((scan.tracking)?0:1)');
 });
 
 test('linked component definitions carry the async boundary owning a composed edge', async () => {
@@ -329,7 +329,7 @@ export function Shade({ children }) @{
 	expect(shadeStart).toBeGreaterThanOrEqual(0);
 	// The arm that shows projected children needs them back at flip time.
 	expect(source.slice(shadeStart)).toContain(
-		'marklessSsrSeedPropCells(marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren), props, [{"graphNodeId":"prop:props","keys":["children"]}])',
+		'marklessSsrSeedPropCells(marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren), marklessSsrProps, [{"graphNodeId":"prop:props","keys":["children"]}])',
 	);
 	// The root's arm owns its markup and reads no prop, so it seeds nothing:
 	// exactly one component in the module pays for a prop cell.

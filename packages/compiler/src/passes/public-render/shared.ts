@@ -347,11 +347,11 @@ export function destructureProps(
 	const param = component ? asNodes(component.params)[0] : undefined;
 	if (param?.type === 'Identifier') {
 		const name = getIdentifierName(param);
-		if (!name || name === 'props') return null;
-		return `	const ${name} = props ?? {};`;
+		if (!name) return null;
+		return `	const ${name} = marklessSsrProps ?? {};`;
 	}
 	if (param?.type !== 'ObjectPattern') {
-		return `	const { ${propNames.join(', ')} } = props ?? {};`;
+		return `	const { ${propNames.join(', ')} } = marklessSsrProps ?? {};`;
 	}
 
 	const bindings = asNodes(param.properties).flatMap((property) => {
@@ -387,7 +387,7 @@ export function destructureProps(
 		}
 		return [`${fallback}${defaultSource}`];
 	});
-	return `	const { ${bindings.join(', ')} } = props ?? {};`;
+	return `	const { ${bindings.join(', ')} } = marklessSsrProps ?? {};`;
 }
 
 // Page props live in the runtime graph under one cell, `prop:props`, however the

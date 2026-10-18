@@ -214,8 +214,8 @@ test('a single-read branch keeps the prelude it already had', async () => {
 		'const error=marklessSsrDataContext.asyncError;' +
 			'switch(marklessSsrDataSlot.branchSiteId){' +
 			'case "branch-site:0":{' +
-			'const arm=((marklessSsrReadPublicPath(marklessSsrRenderStateValues.get("state:lit"),[]))?0:1);' +
-			'marklessSsrBranches.push({id:marklessSsrDataSlot.branchSiteId,takenArm:arm});return arm;}' +
+			'const marklessSsrArm=((marklessSsrReadPublicPath(marklessSsrRenderStateValues.get("state:lit"),[]))?0:1);' +
+			'marklessSsrBranches.push({id:marklessSsrDataSlot.branchSiteId,takenArm:marklessSsrArm});return marklessSsrArm;}' +
 			"default:throw new Error('MARKLESS_SSR_DATA_BRANCH_MISSING: '+marklessSsrDataSlot.branchSiteId);}",
 	);
 });

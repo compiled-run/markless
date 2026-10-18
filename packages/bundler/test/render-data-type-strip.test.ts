@@ -170,7 +170,7 @@ test('a residue reader with no TypeScript keeps the exact bytes the compiler emi
 	const source = await renderDataSource('untypedTone', UNTYPED_MODULE_SOURCE);
 
 	// The compiler emits the reader without spaces; oxc's printer would add them.
-	expect(source).toContain('readResidue:(residue,marklessResidueContext)=>{');
+	expect(source).toContain('readResidue:(marklessResidue,marklessResidueContext)=>{');
 	expect(source).toContain("const TONES = { calm: 'Calm', loud: 'Loud' };");
 	expect(javaScriptParseErrors(source)).toEqual([]);
 });

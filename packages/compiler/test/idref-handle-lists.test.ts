@@ -282,7 +282,7 @@ test('the list branch joins bound ids and omits the parts that never rendered', 
 	expect(compiled.semanticGraph.diagnostics).toEqual([]);
 	// The list reads the SAME per-handle mint the single form reads, filters the
 	// handles this widget bound nothing for, and joins what is left with a space.
-	expect(source).toContain("residue.kind==='element-handle-id-list'");
+	expect(source).toContain("marklessResidue.kind==='element-handle-id-list'");
 	expect(source).toContain(".join(' ')");
 });
 
@@ -300,7 +300,7 @@ export function App() @{
 	const source = compiled.publicRenderModule.ssrModuleSource ?? '';
 
 	expect(compiled.semanticGraph.diagnostics).toEqual([]);
-	expect(source).toContain("residue.kind==='element-handle-id'");
+	expect(source).toContain("marklessResidue.kind==='element-handle-id'");
 	// Pay-per-use: the list costs nothing on the pages that never write one.
 	expect(source).not.toContain('element-handle-id-list');
 });

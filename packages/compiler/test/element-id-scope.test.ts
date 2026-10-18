@@ -9,7 +9,7 @@ import { elementHandleIdReadCase } from '../src/passes/public-render/residue-rea
 
 function reader(idPrefixSource: string, idScopeSource: string) {
 	return new Function(
-		'residue',
+		'marklessResidue',
 		'marklessSsrIdPrefix',
 		'marklessSsrRenderContext',
 		'context',

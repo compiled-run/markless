@@ -229,7 +229,7 @@ function callbackSlotSeedLine(
 
 	return `marklessSsrCallbackSlot(${statePayloadName}, ${JSON.stringify(
 		sharedCallbackSlotGraphNodeId(binding.definitionId, binding.slotName),
-	)}, marklessSsrCallbackSymbol(props, ${JSON.stringify([binding.propName])}));`;
+	)}, marklessSsrCallbackSymbol(marklessSsrProps, ${JSON.stringify([binding.propName])}));`;
 }
 
 function isSharedInstanceAssignment(

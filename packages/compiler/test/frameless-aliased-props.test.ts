@@ -18,11 +18,11 @@ test('public SSR renders preserve authored prop keys for simple aliases', async 
 
 	expect(compiled.semanticGraph.aliases).toEqual(
 		expect.arrayContaining([
-			expect.objectContaining({ name: 'displayLabel', target: 'props.label' }),
+			expect.objectContaining({ name: 'displayLabel', target: 'marklessProps.label' }),
 		]),
 	);
 	expect(compiled.publicRenderModule.ssrModuleSource).toContain(
-		'const { label: displayLabel } = props ?? {};',
+		'const { label: displayLabel } = marklessSsrProps ?? {};',
 	);
 });
 
@@ -38,7 +38,7 @@ test('same-module child factories preserve authored prop keys for simple aliases
 	`);
 
 	expect(compiled.publicRenderModule.ssrModuleSource).toContain(
-		'const { label: displayLabel } = props ?? {};',
+		'const { label: displayLabel } = marklessSsrProps ?? {};',
 	);
 });
 
@@ -49,7 +49,7 @@ test('a plain prop destructures under its own name', async () => {
 		}
 	`);
 
-	expect(plain.publicRenderModule.ssrModuleSource).toContain('const { label } = props ?? {};');
+	expect(plain.publicRenderModule.ssrModuleSource).toContain('const { label } = marklessSsrProps ?? {};');
 });
 
 test('a prop default is re-emitted on the body destructure, and a template read of it fails closed', async () => {
@@ -60,7 +60,7 @@ test('a prop default is re-emitted on the body destructure, and a template read 
 	`);
 
 	expect(defaulted.publicRenderModule.ssrModuleSource).toContain(
-		'const { label = "fallback" } = props ?? {};',
+		'const { label = "fallback" } = marklessSsrProps ?? {};',
 	);
 	// The template residue reads the prop cell, not the defaulted local, so the
 	// read is an error rather than a silent undefined.

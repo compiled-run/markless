@@ -209,5 +209,5 @@ export function ssrComposeStateExpression(
 	const cells = ssrPropCellSeeds(input, component, componentName);
 	return cells.length === 0
 		? composed
-		: `marklessSsrSeedPropCells(${composed}, props, ${JSON.stringify(cells)})`;
+		: `marklessSsrSeedPropCells(${composed}, marklessSsrProps, ${JSON.stringify(cells)})`;
 }

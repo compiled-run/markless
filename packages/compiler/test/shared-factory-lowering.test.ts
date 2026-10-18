@@ -379,7 +379,7 @@ test('a destructuring default reaches the SSR body local the seed reads', async 
 	const compiled = await compile('src/spike.tsrx', defaultedSeedSource);
 
 	expect(compiled.publicRenderModule.ssrModuleSource).toContain(
-		'const { checked = false, children } = props ?? {};',
+		'const { checked = false, children } = marklessSsrProps ?? {};',
 	);
 	expect(errors(compiled)).toEqual([]);
 });

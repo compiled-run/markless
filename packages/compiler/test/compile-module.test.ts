@@ -1479,7 +1479,7 @@ export function App({ suffix = 'tail' }) @{
 			source.indexOf('segments.push(suffix);'),
 		);
 	}
-	expect(ssrSource.indexOf('const html = ')).toBeGreaterThan(
+	expect(ssrSource.indexOf('const marklessSsrHtml = ')).toBeGreaterThan(
 		ssrSource.indexOf("const label = segments.join('-');"),
 	);
 
@@ -3096,7 +3096,7 @@ test('compileTsrxModule decides a non-atomic @if test from a seeded computed in 
 	const ssr = result.publicRenderModule.ssrModuleSource ?? '';
 
 	expect(ssr).toContain(
-		'const arm=((marklessSsrReadPublicPath(marklessSsrRenderStateValues.get("computed:templateExpression:0"),[]))?0:1)',
+		'const marklessSsrArm=((marklessSsrReadPublicPath(marklessSsrRenderStateValues.get("computed:templateExpression:0"),[]))?0:1)',
 	);
 	expect(ssr).toContain(
 		'marklessSsrRenderStateValues.set("computed:templateExpression:0",(() => primary ?? fallback)());',

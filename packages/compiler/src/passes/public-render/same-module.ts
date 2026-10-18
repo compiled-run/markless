@@ -110,7 +110,7 @@ export function emitSameModuleSsrComponents(
 			stateEntries(input, owned.seedCellIndexes).join(',\n'),
 			']);',
 			localName ? `const ${localName} = { renderSsr: ${functionName} };` : null,
-			`async function ${functionName}(props = {}, marklessSsrRenderContext) {`,
+			`async function ${functionName}(marklessSsrProps = {}, marklessSsrRenderContext) {`,
 			destructureProps(rootInfo.propNames, rootInfo.component, input.source.source, input.source.filename),
 			...sharedSeedPassLines(
 				componentSharedSeeds(input, componentName),
@@ -144,10 +144,10 @@ export function emitSameModuleSsrComponents(
 				dataLines.bodySharedComputed,
 			),
 			...dataLines.serveComputed,
-			'	const html = marklessSsrRendered.html;',
+			'	const marklessSsrHtml = marklessSsrRendered.html;',
 			`	const marklessSsrComposition = marklessSsrComposeView(marklessSsrRendered.structure, ${ssrComposedPayloadView(input, componentName)}, marklessSsrChildren, marklessSsrAsyncSnapshots, marklessSsrIdPrefix);`,
 			`	const marklessSsrState = ${ssrComposeStateExpression(input, rootInfo.component, componentName)};`,
-			`	return { html, state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots), view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) }, elementCount: marklessSsrComposition.elementCount, propEvents: [], externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, props), structure: marklessSsrRendered.structure, structureTokens: marklessSsrRendered.structureTokens${widgetFallbacksOutputField(input, componentName)}${remapsGraphProps ? ', m(graphProps, instancePath) { marklessSsrRemapGraphOutput(this, graphProps, instancePath); }' : ''} };`,
+			`	return { html: marklessSsrHtml, state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots), view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) }, elementCount: marklessSsrComposition.elementCount, propEvents: [], externalSymbolIds: marklessSsrHandedDown(marklessSsrComposition.externalSymbolIds, marklessSsrProps), structure: marklessSsrRendered.structure, structureTokens: marklessSsrRendered.structureTokens${widgetFallbacksOutputField(input, componentName)}${remapsGraphProps ? ', m(graphProps, instancePath) { marklessSsrRemapGraphOutput(this, graphProps, instancePath); }' : ''} };`,
 			'}',
 			sharedSeedMarkerLine(
 				componentSharedSeeds(input, componentName),

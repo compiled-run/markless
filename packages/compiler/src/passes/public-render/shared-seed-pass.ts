@@ -778,7 +778,7 @@ export function sharedSeedConsumeLine(
 function sharedSeedSource(seed: SharedSeedSymbol): string {
 	return seed.callbackSlotPropName === undefined
 		? seed.source
-		: `marklessSsrCallbackSymbol(props, ${JSON.stringify([seed.callbackSlotPropName])})`;
+		: `marklessSsrCallbackSymbol(marklessSsrProps, ${JSON.stringify([seed.callbackSlotPropName])})`;
 }
 
 // The seed replaces the node's whole value, so a property assignment returns the

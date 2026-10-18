@@ -66,7 +66,7 @@ test('the serve pass runs after the render body, where every derive has happened
 	const source = await ssr(HANDLER_READS_COMPUTED);
 	const derive = source.indexOf('#slider/computed:percent",(({read})');
 	const serve = source.indexOf('marklessSsrServeComputed(');
-	const html = source.indexOf('const html = marklessSsrRendered.html;');
+	const html = source.indexOf('const marklessSsrHtml = marklessSsrRendered.html;');
 
 	expect(derive).toBeGreaterThan(-1);
 	expect(serve).toBeGreaterThan(derive);

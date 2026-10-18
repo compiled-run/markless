@@ -115,7 +115,7 @@ export function App() @{
 	const source = compiled.publicRenderModule.ssrModuleSource ?? '';
 
 	// The minted-id spelling stays; the anchor spelling has no producer left.
-	expect(source).toContain("if(residue.kind==='element-handle-id')");
+	expect(source).toContain("if(marklessResidue.kind==='element-handle-id')");
 	expect(source).not.toContain('element-handle-anchor-style');
 	expect(source).not.toContain('anchor-name');
 });

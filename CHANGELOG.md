@@ -55,6 +55,12 @@ them from `.markless/` instead.
   server render passed an internal object instead, so a recursive tree written
   as `@for (const child of node.children) { <TreeNode node={child} /> }`
   rendered its nested levels empty.
+- A component-body `const` named like a name the compiler uses in its server
+  render (`html`, `props`, `child`, `childProps`, `output`, `residue`, `arm`,
+  `value`, `tests`, `match`) builds and renders its own value. Before,
+  `const html = 'ltr'` in a router `document.tsrx` failed the build with
+  `Identifier 'html' has already been declared`, and the others failed to load
+  or rendered the wrong value.
 
 ## 0.5.0
 

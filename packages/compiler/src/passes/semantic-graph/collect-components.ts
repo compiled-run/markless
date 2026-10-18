@@ -90,7 +90,7 @@ export function collectComponentProps(component: AnyNode, state: WalkState): voi
 
 	state.graph.graphBindings.push({
 		id: 'prop:props',
-		name: 'props',
+		name: 'marklessProps',
 		kind: 'prop',
 		bindingId,
 		componentId: state.currentComponentId,
@@ -100,7 +100,7 @@ export function collectComponentProps(component: AnyNode, state: WalkState): voi
 		writable: false,
 		valueKind: 'object',
 	});
-	collectObjectPatternAliases(firstParam, 'props', 'const', state, {
+	collectObjectPatternAliases(firstParam, 'marklessProps', 'const', state, {
 		componentId: state.currentComponentId,
 		componentName: state.currentComponentName,
 		propPath: [],

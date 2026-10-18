@@ -40,7 +40,7 @@ export function PanelContent({ value, children }) @{
 	const ssr = result.publicRenderModule.ssrModuleSource;
 	const content = componentSsrSource(ssr, 'marklessRenderSsrPanelContent');
 	expect(content).toContain(
-		'marklessSsrSeedPropCells(marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren), props, [{"graphNodeId":"prop:props","keys":[],"scalarKeys":["value"]}])',
+		'marklessSsrSeedPropCells(marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren), marklessSsrProps, [{"graphNodeId":"prop:props","keys":[],"scalarKeys":["value"]}])',
 	);
 	// Projected children are already in the served markup; seeding the whole bag
 	// would ship that HTML a second time.
@@ -97,7 +97,7 @@ export function StepperStep({ slug, badge, note, children }) @{
 		result.publicRenderModule.ssrModuleSource,
 		'marklessRenderSsrStepperStep',
 	);
-	const seed = /marklessSsrSeedPropCells\(.*, props, (\[.*?\])\);/.exec(step)?.[1];
+	const seed = /marklessSsrSeedPropCells\(.*, marklessSsrProps, (\[.*?\])\);/.exec(step)?.[1];
 	expect(seed).toBeDefined();
 	const cells = JSON.parse(seed as string) as ReadonlyArray<{
 		graphNodeId: string;
@@ -136,7 +136,7 @@ export function Summary({ updates, weight }) @{
 		result.publicRenderModule.ssrModuleSource,
 		'marklessRenderSsrSummary',
 	);
-	const seed = /marklessSsrSeedPropCells\(.*, props, (\[.*?\])\);/.exec(summary)?.[1];
+	const seed = /marklessSsrSeedPropCells\(.*, marklessSsrProps, (\[.*?\])\);/.exec(summary)?.[1];
 	const cells = JSON.parse(seed as string) as ReadonlyArray<{
 		keys: ReadonlyArray<string> | null;
 		scalarKeys?: ReadonlyArray<string>;
@@ -209,7 +209,7 @@ export function Plain({ labels }: { readonly labels: readonly string[] }) @{
 
 	const ssr = result.publicRenderModule.ssrModuleSource;
 	expect(componentSsrSource(ssr, 'marklessRenderSsr')).toContain(
-		'marklessSsrSeedPropCells(marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren), props, [{"graphNodeId":"prop:props","keys":[],"rowKeys":["labels"]}])',
+		'marklessSsrSeedPropCells(marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren), marklessSsrProps, [{"graphNodeId":"prop:props","keys":[],"rowKeys":["labels"]}])',
 	);
 	expect(componentSsrSource(ssr, 'marklessRenderSsrPlain')).not.toContain(
 		'marklessSsrSeedPropCells(',
@@ -238,6 +238,6 @@ export function Choices({ heading, choices, children }) @{
 	});
 
 	expect(result.publicRenderModule.ssrModuleSource).toContain(
-		'props, [{"graphNodeId":"prop:props","keys":[],"rowKeys":["choices"]}])',
+		'marklessSsrProps, [{"graphNodeId":"prop:props","keys":[],"rowKeys":["choices"]}])',
 	);
 });

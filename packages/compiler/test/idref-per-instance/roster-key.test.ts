@@ -91,7 +91,7 @@ function rosterKey(get: string, handle: string): string {
 }
 
 const filing = `${rosterKey('marklessSsrSeeds.get', 'marklessSsrHandle')},true);`;
-const servedRead = rosterKey('marklessSsrRenderStateValues.get', 'residue.handleGraphNodeId');
+const servedRead = rosterKey('marklessSsrRenderStateValues.get', 'marklessResidue.handleGraphNodeId');
 
 test('the served seed pass files every roster entry under a widget-instance token', () => {
 	expect(count(ssrSource, filing)).toBeGreaterThan(0);
@@ -113,7 +113,7 @@ test('the browser reader asks for the same key, handle by handle', () => {
 	// The handle expression differs between the single and the list form; the
 	// prefix, the token read and the separator do not.
 	for (const reader of readers) {
-		const single = rosterKey('marklessResidueContext.read', 'residue.handleGraphNodeId');
+		const single = rosterKey('marklessResidueContext.read', 'marklessResidue.handleGraphNodeId');
 		const list = rosterKey('marklessResidueContext.read', 'h');
 		expect(count(reader, single)).toBeGreaterThan(0);
 		expect(count(reader, `${boundKey}+`)).toBe(count(reader, single) + count(reader, list));

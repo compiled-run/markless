@@ -167,10 +167,10 @@ function ssrComponentPropsSource(
 		}
 		if (prop.kind !== 'graph-reference') return [];
 		if (prop.graphNodeId === 'prop:props') {
-			return `${JSON.stringify(prop.name)}: marklessSsrCallbackSymbol(props, ${JSON.stringify(prop.path)})`;
+			return `${JSON.stringify(prop.name)}: marklessSsrCallbackSymbol(marklessSsrProps, ${JSON.stringify(prop.path)})`;
 		}
 		if (prop.graphNodeId.startsWith('prop:')) {
-			return `${JSON.stringify(prop.name)}: marklessSsrCallbackSymbol(props, ${JSON.stringify([prop.graphNodeId.slice(5), ...prop.path])})`;
+			return `${JSON.stringify(prop.name)}: marklessSsrCallbackSymbol(marklessSsrProps, ${JSON.stringify([prop.graphNodeId.slice(5), ...prop.path])})`;
 		}
 		return [];
 	});

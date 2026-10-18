@@ -269,7 +269,7 @@ test('buildSemanticGraph creates the first production compiler artifact', async 
 				writable: false,
 			}),
 			expect.objectContaining({
-				name: 'props',
+				name: 'marklessProps',
 				kind: 'prop',
 				writable: false,
 				valueKind: 'object',
@@ -290,7 +290,7 @@ test('buildSemanticGraph creates the first production compiler artifact', async 
 	expect(graph.aliases).toEqual([
 		expect.objectContaining({
 			name: 'label',
-			target: 'props.label',
+			target: 'marklessProps.label',
 			declarationKind: 'const',
 			sourceSpan: expect.objectContaining({
 				filename: 'src/App.tsrx',

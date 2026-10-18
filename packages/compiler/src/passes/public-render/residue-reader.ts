@@ -199,7 +199,7 @@ export function branchArmIndexSource(
 	testSource: string | undefined,
 ): string {
 	return branch.kind === 'switch' && branch.armTests
-		? `(()=>{const value=(${testSource});const tests=${JSON.stringify(branch.armTests)};const match=tests.findIndex((test)=>test!==null&&Object.is(test,value));return match===-1?Math.max(0,tests.indexOf(null)):match;})()`
+		? `(()=>{const marklessArmValue=(${testSource});const marklessArmTests=${JSON.stringify(branch.armTests)};const marklessArmMatch=marklessArmTests.findIndex((marklessTest)=>marklessTest!==null&&Object.is(marklessTest,marklessArmValue));return marklessArmMatch===-1?Math.max(0,marklessArmTests.indexOf(null)):marklessArmMatch;})()`
 		: `((${testSource})?0:1)`;
 }
 
@@ -308,18 +308,20 @@ export function elementHandleIdReadCase(input: {
 	// Only an IDREF position can be omitted. The element that CARRIES the id mints
 	// unconditionally: it renders only when its own part renders, and an omission
 	// there would write `id="undefined"` instead of nothing.
-	const singleUnbound = unbound('residue.handleGraphNodeId');
-	const omitUnbound = singleUnbound ? `if(residue.idref&&${singleUnbound})return undefined;` : '';
-	const single = `if(residue.kind==='element-handle-id'){${omitUnbound}return 'mx-'+${slug('residue.handleGraphNodeId')};}`;
+	const singleUnbound = unbound('marklessResidue.handleGraphNodeId');
+	const omitUnbound = singleUnbound
+		? `if(marklessResidue.idref&&${singleUnbound})return undefined;`
+		: '';
+	const single = `if(marklessResidue.kind==='element-handle-id'){${omitUnbound}return 'mx-'+${slug('marklessResidue.handleGraphNodeId')};}`;
 	if (!input.lists) return single;
 	// A list is a referencing side by construction, so every entry is omitted on
 	// the same terms; an attribute naming nothing at all is absent rather than
 	// empty, which is what the single form already does.
 	const entryUnbound = unbound('h');
 	const kept = entryUnbound
-		? `residue.handleGraphNodeIds.filter(h=>!(${entryUnbound}))`
-		: 'residue.handleGraphNodeIds';
-	return `${single}if(residue.kind==='element-handle-id-list'){const ids=${kept}.map(h=>'mx-'+${slug('h')});return ids.length?ids.join(' '):undefined;}`;
+		? `marklessResidue.handleGraphNodeIds.filter(h=>!(${entryUnbound}))`
+		: 'marklessResidue.handleGraphNodeIds';
+	return `${single}if(marklessResidue.kind==='element-handle-id-list'){const ids=${kept}.map(h=>'mx-'+${slug('h')});return ids.length?ids.join(' '):undefined;}`;
 }
 
 /** Whether a chunk set writes any IDREF list, so its reader needs the branch. */
@@ -685,10 +687,10 @@ export function emitClientResidueReader(
 			: '';
 	return [
 		...(locals.length ? ['(()=>{const marklessLocalCache=new WeakMap();return '] : []),
-		`(residue,${CONTEXT})=>{`,
+		`(marklessResidue,${CONTEXT})=>{`,
 		mintCase,
 		lines.join(''),
-		`switch(residue.source){`,
+		`switch(marklessResidue.source){`,
 		authoredResidueReadCases(
 			evaluatedSources,
 			undefined,
@@ -725,7 +727,7 @@ export function emitClientResidueReader(
 					: [`case ${JSON.stringify(source)}:return (${literal});`];
 			})
 			.join(''),
-		`default:throw new Error('MARKLESS_PRERENDER_RESIDUE_MISSING: '+residue.source);}}`,
+		`default:throw new Error('MARKLESS_PRERENDER_RESIDUE_MISSING: '+marklessResidue.source);}}`,
 		...(locals.length ? [';})()'] : []),
 	].join('');
 }
