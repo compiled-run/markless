@@ -30,6 +30,8 @@ export const EVENT_ONLY_RESUMER_ATTRIBUTION = {
 	foreignDomCensus: 69,
 	// Paired OXC builds measured 1,298 -> 1,312: the press walks the path the browser built, so a target an earlier listener took out still reaches its host.
 	pressTimePath: 14,
+	// Paired OXC builds measured 1,312 -> 1,329: a press whose host left the page with a redrawn ancestor is dropped.
+	detachedHostDrop: 17,
 	gzipCrossTerm: 3,
 };
 

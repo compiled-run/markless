@@ -1130,7 +1130,10 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 			const hostNodeId = hostIds.get(element);
 			const eventRecord = hostNodeId ? events.get(`${hostNodeId}\n${event.type}`) : undefined;
 			if (eventRecord) {
-				if (eventRecord.action) return;
+				let up: Element | null = element;
+				while (up && up !== root) up = up.parentElement;
+				// The host left the page with an ancestor an earlier listener redrew: the press is dropped.
+				if (eventRecord.action || !up) return;
 				if (__MARKLESS_INLINE_SYNC_POLICY__ && eventRecord.syncPolicy && !policyApplied) {
 					runSyncPolicy!(eventRecord.syncPolicy, event);
 					policyApplied = true;

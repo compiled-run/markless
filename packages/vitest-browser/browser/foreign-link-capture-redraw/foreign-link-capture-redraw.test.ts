@@ -94,13 +94,25 @@ for (const mode of ['SSR', 'CSR'] as const) {
 			await expect.poll(opened).toBe('1');
 		});
 
-		test(`${mode}: ${gesture}, an ancestor of the container redrawn by a capture listener, does not throw`, async () => {
+		test(`${mode}: ${gesture}, an ancestor of the container redrawn by a capture listener before any wake, drops the press`, async () => {
+			await mount();
+			expect(await withCaptureRedraw(panel, press)).toEqual([]);
+			expect(opened()).toBe('0');
+			const like = document.querySelector<HTMLElement>('[data-like]')!;
+			await userEvent.click(like);
+			await expect.poll(() => like.textContent).toBe('1');
+			expect(opened()).toBe('0');
+		});
+
+		test(`${mode}: ${gesture}, an ancestor of the container redrawn by a capture listener after a wake, drops the press`, async () => {
 			await mount();
 			await wake();
 			expect(await withCaptureRedraw(panel, press)).toEqual([]);
+			expect(opened()).toBe('0');
 			const like = document.querySelector<HTMLElement>('[data-like]')!;
 			await userEvent.click(like);
 			await expect.poll(() => like.textContent).toBe('2');
+			expect(opened()).toBe('0');
 		});
 	}
 }

@@ -95,7 +95,9 @@ its message now names which and how to fix it.
   Markless element it was inside, instead of being dropped or logging
   `MARKLESS_EVENT_DISPATCH_UNMATCHED`. The 0.5.0 fix covered only a redraw
   from a bubbling listener. A redraw that also removes that Markless element
-  no longer reports an error either.
+  (it redraws one of its ancestors) drops the click without an error, on
+  server-rendered and client-rendered pages, before and after the page's code
+  has loaded.
 - The router's cached link script moved from `/_markless/links.<hash>.js` to
   `/_markless/links/<hash>.js`. On Vercel the long-cache rule for the old
   location also caught every navigation fetch under `/_markless/`, so link
