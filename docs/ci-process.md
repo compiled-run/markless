@@ -130,6 +130,47 @@ Changes to `.github/workflows/*.yml` go through a PR, never straight to `main`. 
 - A job that runs tests which launch browsers installs them. The current red `unit` job is this mistake.
 - External clones used by CI (`js-framework-benchmark`) are pinned to a commit, so upstream changes cannot turn CI red overnight.
 
+## 8. Cutting a release
+
+Markless releases **minor versions only**: 0.6.0, 0.7.0, and so on. There are no patch releases. A fix ships in the next minor, so the way to ship a fix sooner is to cut the next minor sooner. No script or workflow accepts a release type; the next version is always the current one with the middle number raised by one.
+
+### One click
+
+In GitHub, open **Actions → Release cut → Run workflow** on `main` and press the button (or run `gh workflow run release-cut.yml --ref main`). Nothing else is needed. The run:
+
+1. Refuses to start unless it was dispatched on `main`, the checkout is clean, and `main`'s latest CI run for that exact commit finished green.
+2. Bumps the root `package.json` to the next minor with `bumpp`, then `scripts/release/sync-version.mjs` moves every published package to the same version. Packages marked `"private": true` are skipped.
+3. Writes the new section at the top of `CHANGELOG.md` with `pnpm release:notes --changelog`: the `feat`, `fix` and `perf` commits since the last tag, grouped by the package their scope names, with internal ids removed and a link to every commit since the last release.
+4. Commits `chore(release): vX.Y.0` as `github-actions[bot]`. The commit runs the normal pre-commit hook (lint and CI's fast jobs), so the release commit passes the same checks as any other commit. Then it creates the tag `vX.Y.0`.
+5. Pushes the commit and the tag to `main` together (`git push --atomic`: both or neither).
+6. Dispatches `release.yml` in publish mode at the tag and waits for it. `release.yml` stays the only workflow that can publish: it builds, checks the tarballs, publishes with npm trusted publishing and provenance, and waits up to 3 minutes for npm to show every package with its provenance attestation.
+7. Creates the GitHub Release `vX.Y.0` from the new changelog section and marks it latest.
+
+Expect about 20 to 25 minutes on GitHub's runners, estimated rather than measured, because a real release has not been cut with this workflow yet. Most of that time is the pre-commit hook in step 4 running the whole unit suite on one runner (CI splits the same suite across three runners at 3 to 4 minutes each), plus the build in step 6. The commit hook is not skipped to save time.
+
+If the run stops after step 5, run it again. The tag then exists without a GitHub Release, so the cut finishes that release (publishing whatever is missing, then creating the Release) instead of cutting the next one. If it stops before step 5, nothing has left the runner.
+
+### Rehearsing
+
+Tick **dry run** when dispatching, or run `pnpm release:cut --dry-run` locally. Both do steps 1 to 4 for real, including the commit and its hooks, in a throwaway copy of the checkout, then run the checks `release.yml` runs before publishing (`pnpm build`, the publish-readiness sweep, the tarball checks and `pnpm publish --dry-run` for every package). They do not create the tag, push, publish, or create a GitHub Release. The drafted changelog section is printed (and shown in the run summary on GitHub). Locally, a dry run on a branch other than `main` finishes all the steps and then exits with code 1, listing what the real cut would refuse.
+
+### One-time setup
+
+`main` is protected: pushes from anyone but an admin need the `test`, `typecheck` and `agent-files` checks on the pushed commit, and the workflow's built-in token cannot skip that. Add a repository secret named `RELEASE_PUSH_TOKEN` holding a fine-grained personal access token from a repository admin, limited to this repository with **Contents: read and write**. The workflow pushes the release commit with it, and refuses a real cut (before changing anything) while the secret is missing. CI then runs on the release commit like on any other push to `main`. `release.yml` still uses no stored credential.
+
+### Keep `main` releasable
+
+Because a release is one click from whatever `main` is, `main` must always be releasable. Merge each fix as soon as its own checks pass, rather than batching fixes into one large push. A red `main` blocks the release cut as well as other pushes (see section 5).
+
+### Bringing back the held packages
+
+`@markless/ui`, `@markless/icons` and `@markless/ui-tools` are marked `"private": true`, so releases skip them. `@markless/icons` and `@markless/ui-tools` have never been published, and npm only lets a workflow publish a name that already exists. To bring them back (needs the owner's npm login and two-factor device, once):
+
+1. Remove `"private": true` from `packages/headless/icons/package.json`, `packages/headless/tools/package.json` and `packages/headless/components/package.json`. Do this first: `pnpm release:trust --only` refuses a package that is still private. Their `publishConfig` already exists, so `verify-packed-manifests.mjs` has been checking their tarballs on every release.
+2. Claim the two new names with a placeholder: a bare `package.json` at version 0.0.1 for each, published by hand (`npm publish --access public` in `/tmp/ml-bootstrap/icons` and `/tmp/ml-bootstrap/ui-tools`).
+3. Attach the trusted publisher to all three: `pnpm release:trust --only @markless/icons`, `pnpm release:trust --only @markless/ui-tools`, then `pnpm release:trust --check`.
+4. Merge the change from step 1 and cut the next release as usual. The cut moves the three packages to the release version with everything else. Packages publish in folder order, so `@markless/ui` goes out a moment before its two dependencies; if the run stops between them, run the cut again and it publishes the rest.
+
 ## Should we adopt `async/pipeline`?
 
 [`async/pipeline`](https://github.com/async/pipeline) writes the task graph once in a `pipeline.ts`, runs it locally, and generates a thin GitHub Actions workflow that calls the same graph. That is the right idea: one source for local and CI commands. The recommendation is **not now**:

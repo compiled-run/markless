@@ -18,8 +18,10 @@
 #
 # The workflow never writes to git: no commit, no tag, no GitHub release. It
 # publishes exactly the versions already committed at the dispatched ref, and
-# refuses to run if the `version` input disagrees with any manifest. Tagging and
-# release notes stay with the owner.
+# refuses to run if the `version` input disagrees with any manifest. A publish
+# runs only at the `v<version>` tag: release-cut.yml commits and tags the
+# release, dispatches this workflow at the tag, and creates the GitHub Release
+# once this run succeeds.
 name: Release
 
 on:
@@ -121,6 +123,16 @@ jobs:
                   fi
                   echo "confirmation accepted for ${RELEASE_VERSION}"
 
+            - name: Publish only the tagged release commit
+              if: inputs.mode == 'publish'
+              run: |
+                  set -euo pipefail
+                  if [ "$GITHUB_REF" != "refs/tags/v${RELEASE_VERSION}" ]; then
+                    echo "::error::A publish runs at the v${RELEASE_VERSION} tag, not ${GITHUB_REF}. Cut releases with release-cut.yml, which tags and dispatches this workflow."
+                    exit 1
+                  fi
+                  echo "publishing the commit tagged v${RELEASE_VERSION}"
+
             # No `version:` here on purpose: pnpm/action-setup reads
             # packageManager from package.json, so the pnpm that publishes is
             # the pnpm this repo pins. A second copy here could drift from it.
@@ -198,8 +210,8 @@ jobs:
               if: inputs.mode == 'publish'
               run: node scripts/release/verify-provenance.mjs --version "$RELEASE_VERSION"
 
-            - name: What is left for the owner
+            - name: Report the publish
               if: inputs.mode == 'publish'
               run: |
                   echo "Published ${RELEASE_VERSION} with provenance."
-                  echo "This workflow writes nothing to git. Still owner-side: tag v${RELEASE_VERSION}, push it, and create the GitHub release."
+                  echo "release-cut.yml creates the GitHub release for v${RELEASE_VERSION} once this run succeeds."

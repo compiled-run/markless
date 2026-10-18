@@ -12,26 +12,8 @@ have never been published, and the release workflow cannot claim a new name
 `package.json` until then; their `publishConfig` stays, so
 `verify-packed-manifests.mjs` still checks their tarballs on every run.
 
-To release them (needs the owner's npm login and 2FA):
-
-1. Remove `"private": true` from `packages/headless/icons/package.json`,
-   `packages/headless/tools/package.json` and
-   `packages/headless/components/package.json`. Do this first:
-   `pnpm release:trust --only` refuses a package that is still private.
-2. Claim the two new names with a placeholder: a bare `package.json` at version
-   0.0.1 for each, in `/tmp/ml-bootstrap/icons` and `/tmp/ml-bootstrap/ui-tools`.
-   Then attach the trusted publisher to all three:
-   ```
-   cd /tmp/ml-bootstrap/icons && npm publish --access public
-   cd /tmp/ml-bootstrap/ui-tools && npm publish --access public
-   pnpm release:trust --only @markless/icons
-   pnpm release:trust --only @markless/ui-tools
-   pnpm release:trust --check
-   ```
-3. Release as usual with `release.yml`. Packages publish in folder order, so
-   `@markless/ui` (`packages/headless/components`) goes out a moment before
-   its two dependencies; if the run stops between them, re-dispatch it so the
-   rest publish.
+To release them (needs the owner's npm login and 2FA), follow "Bringing back
+the held packages" in `docs/ci-process.md`.
 
 ## Finish the packed-delivery goal
 

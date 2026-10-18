@@ -1,7 +1,7 @@
 // Fail-closed publish guard. Wired as `prepublishOnly` in every release
 // package, so `pnpm publish` aborts unless the packed dist output matches the
 // published exports surface. Run with `--all` from the repo root to check the
-// whole release set (the `pnpm release` flow does this after `vp pack`).
+// whole release set (release.yml and `pnpm release:cut --dry-run` do this after `pnpm build`).
 //
 // The release set is derived from pnpm-workspace.yaml by release-packages.mjs.
 // It used to be an eight-name literal here, which had
