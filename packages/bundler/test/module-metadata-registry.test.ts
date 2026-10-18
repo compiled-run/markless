@@ -190,9 +190,11 @@ describe('module metadata identity registry', () => {
 
 		// Once the load edge is gone, the same read waits for the parent like any other.
 		let resolved = false;
-		const waiting = registry.awaitSourceClaimsPublished('server', parent, child).then((awaited) => {
-			resolved = awaited;
-		});
+		const waiting = registry
+			.awaitSourceClaimsPublished('server', parent, child)
+			.then((awaited) => {
+				resolved = awaited;
+			});
 		await Promise.resolve();
 		expect(resolved).toBe(false);
 		registry.finishSourceSymbolClaims('server', parent, parent);
@@ -288,6 +290,18 @@ describe('module metadata identity registry', () => {
 		expect(() => sourceSymbolManifest(registry, source, 'client')).toThrow(
 			'MARKLESS_SOURCE_SYMBOL_CLAIMS_UNSEALED',
 		);
+	});
+
+	test('a claim read of a source whose compile threw rethrows that compile error, not the barrier error', () => {
+		const source = '/workspace/app/components/Grid.tsrx';
+		const symbols = `${source}?markless-symbols`;
+		const registry = new ModuleMetadataRegistry();
+		const failure = new Error('MARKLESS_SYNC_POLICY_SECOND_CANCEL: two preventDefault calls');
+
+		registry.beginSourceSymbolClaims('client', source, symbols);
+		registry.releaseSourceSymbolClaims('client', source, symbols, failure);
+
+		expect(() => sourceSymbolManifest(registry, source, 'client')).toThrow(failure);
 	});
 
 	test('a failed variant an importer still expects rejects its seal with the compile error', async () => {

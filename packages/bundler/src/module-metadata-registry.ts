@@ -180,6 +180,15 @@ export class ModuleMetadataRegistry {
 		ModuleMetadataRegistry.#changed(publication);
 	}
 
+	/** The error the source's latest compile threw, in any environment, if nothing has published since. */
+	compileFailure(source: string): unknown {
+		for (const [key, publication] of this.#sourceClaimPublications) {
+			if (key.slice(key.indexOf('\0') + 1) !== source) continue;
+			for (const failure of publication.failed.values()) return failure;
+		}
+		return undefined;
+	}
+
 	/**
 	 * Drops an edited module's claims and the ledger entry that remembers it ever
 	 * published them, so the transform that recompiles it counts as a first
@@ -330,6 +339,8 @@ export class ModuleMetadataRegistry {
 		const unpublished = [...publication.begun].filter(
 			(emittedModule) => !publication.published.has(emittedModule),
 		);
+		// A variant whose compile threw is unpublished for that reason; its error is the one to show.
+		ModuleMetadataRegistry.#throwFailure(publication, unpublished);
 		throw new Error(
 			`MARKLESS_SOURCE_SYMBOL_CLAIMS_UNSEALED: Source ${JSON.stringify(source)} claims were consumed before final publication completed. Emitted variants that have not published: ${unpublished.map((emittedModule) => JSON.stringify(emittedModule)).join(', ')}.`,
 		);
