@@ -18,7 +18,8 @@ async function pinRowsFollowTheirItems() {
 
 	await userEvent.click(go('ben'));
 	await expect.poll(() => go('last').disabled).toBe(false);
-	expect(picked()).toBe('ben');
+	// The page-level text commits a task after the rows on a cold first click.
+	await expect.poll(() => picked()).toBe('ben');
 	expect(seen('ben').hidden).toBe(false);
 	expect(seen('ada').hidden).toBe(false);
 	expect(
