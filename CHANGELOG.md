@@ -104,6 +104,11 @@ its message now names which and how to fix it.
   server render passed an internal object instead, so a recursive tree written
   as `@for (const child of node.children) { <TreeNode node={child} /> }`
   rendered its nested levels empty.
+
+- When a component fails to compile, every file that imports it now reports
+  that component's error. Before, each importer failed with
+  `MARKLESS_SOURCE_SYMBOL_CLAIMS_UNSEALED`, an internal error that hid the real
+  one (in the dev server it was often the only error shown).
 - A component-body `const` named like a name the compiler uses in its server
   render (`html`, `props`, `child`, `childProps`, `output`, `residue`, `arm`,
   `value`, `tests`, `match`) builds and renders its own value. Before,
