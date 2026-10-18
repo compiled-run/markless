@@ -42,10 +42,28 @@ function gh(path) {
 	return JSON.parse(execFileSync('gh', ['api', path], { encoding: 'utf8' }));
 }
 
+/** Required checks from main's active rulesets and any classic branch protection, deduplicated. */
+export function requiredChecksFrom(rules, protection) {
+	const fromRules = rules
+		.filter((rule) => rule.type === 'required_status_checks')
+		.flatMap((rule) => rule.parameters?.required_status_checks ?? [])
+		.map(({ context, integration_id: appId }) => ({ context, app_id: appId }));
+	const fromProtection = protection?.required_status_checks?.checks ?? [];
+	const seen = new Set();
+	return [...fromRules, ...fromProtection].filter(({ context, app_id: appId }) => {
+		const key = `${context}\0${appId ?? ''}`;
+		if (seen.has(key)) return false;
+		seen.add(key);
+		return true;
+	});
+}
+
 function requiredChecks(repository) {
-	const branch = gh(`repos/${repository}/branches/main`);
-	const checks = branch.protection?.required_status_checks?.checks;
-	if (!Array.isArray(checks)) {
+	const checks = requiredChecksFrom(
+		gh(`repos/${repository}/rules/branches/main`),
+		gh(`repos/${repository}/branches/main`).protection,
+	);
+	if (checks.length === 0) {
 		throw new Error(`could not read main's required status checks for ${repository}`);
 	}
 	return checks;

@@ -3,7 +3,11 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from 'vitest';
 import { parse } from 'yaml';
-import { checkRunProblems, contextsMissingFromWorkflow } from './required-checks.mjs';
+import {
+	checkRunProblems,
+	contextsMissingFromWorkflow,
+	requiredChecksFrom,
+} from './required-checks.mjs';
 
 const required = [
 	{ context: 'test', app_id: 15368 },
@@ -61,4 +65,34 @@ test('a required context that is not a ci.yml job is reported', () => {
 	) as { jobs: Record<string, { name?: string }> };
 	expect(contextsMissingFromWorkflow(required, ci)).toEqual([]);
 	expect(contextsMissingFromWorkflow([{ context: 'lint', app_id: null }], ci)).toEqual(['lint']);
+});
+
+test('required checks come from main rulesets and classic protection, without duplicates', () => {
+	const rules = [
+		{ type: 'deletion' },
+		{
+			type: 'required_status_checks',
+			parameters: {
+				required_status_checks: [
+					{ context: 'test', integration_id: 15368 },
+					{ context: 'typecheck', integration_id: 15368 },
+				],
+			},
+		},
+	];
+	const protection = {
+		required_status_checks: {
+			checks: [
+				{ context: 'test', app_id: 15368 },
+				{ context: 'agent-files', app_id: 15368 },
+			],
+		},
+	};
+	expect(requiredChecksFrom(rules, protection)).toEqual([
+		{ context: 'test', app_id: 15368 },
+		{ context: 'typecheck', app_id: 15368 },
+		{ context: 'agent-files', app_id: 15368 },
+	]);
+	expect(requiredChecksFrom(rules, undefined)).toHaveLength(2);
+	expect(requiredChecksFrom([], undefined)).toEqual([]);
 });
