@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { nitro } from 'nitro/vite';
 import { dirname, isAbsolute, join, normalize, relative, resolve } from 'pathe';
 import {
@@ -63,6 +63,8 @@ import { listenForLinkIntent } from './link-intent.ts';
 import { documentNavigationFor } from './document-navigation.ts';
 import { startFragmentNavigation } from './fragment-navigation.ts';
 import { isPageModuleFile, normalizeRouteFileId } from '../route-manifest.ts';
+import { routerLinkBridgeModules, type LinkBridgeModule } from './runtime/create-server-entry.ts';
+import { LINK_BRIDGE_DIR } from './runtime/link-bridge-module.ts';
 
 // The compiler refuses browser code that reads these page props: they hold request data.
 const PAGE_SERVER_ONLY_PROPS = [
@@ -91,6 +93,7 @@ const FRAGMENT_ENTRY_PATH_ID = 'virtual:markless-router/fragment-entry-path';
 const ROUTE_PRELOADS_ID = 'virtual:markless-router/route-preloads';
 const ROUTE_PRELOADS_PLACEHOLDER = '__MARKLESS_ROUTER_ROUTE_PRELOADS__';
 const DOCUMENT_STYLESHEETS_PLACEHOLDER = '__MARKLESS_ROUTER_DOCUMENT_STYLESHEETS__';
+const LINK_BRIDGE_PATHS_PLACEHOLDER = '__MARKLESS_ROUTER_LINK_BRIDGE_PATHS__';
 const SERVER_ENTRY_ID = 'virtual:markless-router/server-entry';
 const ROUTE_HREF_ID = 'virtual:markless-router/route-href';
 const ROUTER_OPTIONS_ID = 'virtual:markless-router/options';
@@ -181,6 +184,7 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 			options,
 			fragmentEntry,
 		),
+		linkBridgeFilesPlugin(navigationEntry, fragmentEntry, options),
 		nitroPlugins,
 	];
 }
@@ -638,6 +642,9 @@ function createNitroConfig(
 				[`/${MARKLESS_BUILD_PREFIX}**`]: {
 					headers: { 'cache-control': 'public, max-age=31536000, immutable' },
 				},
+				[`/${LINK_BRIDGE_DIR}/**`]: {
+					headers: { 'cache-control': 'public, max-age=31536000, immutable' },
+				},
 				...Object.fromEntries(
 					MARKLESS_BUILD_METADATA_FILES.map((file) => [
 						`/${file}`,
@@ -942,10 +949,94 @@ function entryPathSource(
 	entryId: string,
 	root: string,
 ): string {
-	const path = entry.fileName
+	return `export const ${exportName} = ${JSON.stringify(entryPath(entry, entryId, root))};`;
+}
+
+function entryPath(entry: ResumeEntryState, entryId: string, root: string): string {
+	return entry.fileName
 		? joinURL(entry.base, entry.fileName)
 		: joinURL(entry.base, '@id', scopedVirtualEntryId(entryId, root));
-	return `export const ${exportName} = ${JSON.stringify(path)};`;
+}
+
+// Pages import the link bridge on load, so it is a static client file: app middleware never sees the request.
+function linkBridgeFilesPlugin(
+	navigationEntry: ResumeEntryState,
+	fragmentEntry: ResumeEntryState,
+	options: MarklessRouterOptions,
+): Plugin {
+	let root = '';
+	let base = '/';
+	let clientOutDir = '';
+	let debug = false;
+	let modules: readonly LinkBridgeModule[] = [];
+	return {
+		name: 'markless-router:link-bridge-files',
+		apply: 'build',
+		sharedDuringBuild: true,
+		configResolved(config) {
+			root = config.root;
+			base = config.base;
+			debug = config.define?.__MARKLESS_DEBUG_ENABLED__ === 'true';
+			const client = Object.values(config.environments).find(
+				(environment) => environment.consumer === 'client',
+			);
+			if (client) clientOutDir = resolve(config.root, client.build.outDir);
+		},
+		generateBundle: {
+			order: 'post',
+			async handler(_options, bundle) {
+				if (this.environment?.name !== 'ssr') return;
+				const chunks = outputChunks(bundle);
+				const target = chunks.find((chunk) =>
+					chunk.code?.includes(LINK_BRIDGE_PATHS_PLACEHOLDER),
+				);
+				if (!target) return;
+				if (!navigationEntry.fileName)
+					throw new Error(
+						'Markless Router built its server entry before its navigation entry.',
+					);
+				const documentFile = join(root, 'document.tsrx');
+				const documentSource = await readFile(documentFile, 'utf8').catch(() => undefined);
+				const built = routerLinkBridgeModules({
+					base,
+					navigationEntryPath: entryPath(navigationEntry, NAVIGATION_ENTRY_ID, root),
+					fragmentEntryPath: entryPath(fragmentEntry, FRAGMENT_ENTRY_ID, root),
+					fragmentNavigationSource: minifiedFragmentNavigationSource(),
+					prefetch: options.prefetch,
+					documentNavigation: documentNavigationFor(documentSource, documentFile),
+					routeFileIds: bundledPageFileIds(chunks, root),
+					debug,
+				})!;
+				modules = built;
+				target.code = target.code!.replace(
+					LINK_BRIDGE_PATHS_PLACEHOLDER,
+					jsStringLiteralContent(JSON.stringify(built.map((module) => module.path))),
+				);
+			},
+		},
+		async writeBundle() {
+			if (this.environment?.name !== 'ssr' || modules.length === 0) return;
+			const prefix = base.replace(/\/?$/, '/');
+			for (const module of modules) {
+				const file = join(clientOutDir, module.path.slice(prefix.length));
+				await mkdir(dirname(file), { recursive: true });
+				await writeFile(file, module.source, 'utf8');
+			}
+		},
+	};
+}
+
+function bundledPageFileIds(chunks: readonly OutputChunkLike[], root: string): string[] {
+	const files = new Set<string>();
+	for (const chunk of chunks)
+		for (const id of chunk.moduleIds ?? []) {
+			if (id.startsWith('\0')) continue;
+			const pathname = decodePath(parseURL(id).pathname);
+			if (!isAbsolute(pathname)) continue;
+			const file = normalizeRouteFileId(relative(root, pathname));
+			if (isPageModuleFile(file)) files.add(file);
+		}
+	return [...files];
 }
 
 function serverEntrySource(root: string, options: MarklessRouterOptions): string {
@@ -960,8 +1051,10 @@ function serverEntrySource(root: string, options: MarklessRouterOptions): string
 		`import { pageModuleLoaders, routeFileIds } from '${ROUTE_DISCOVERY_ID}${query}';`,
 		`import { documentNavigation } from '${ROUTER_OPTIONS_ID}${query}';`,
 		`const documentModuleLoaders = import.meta.glob(['/document.tsrx']);`,
+		`const linkBridgePathsJson = globalThis.__marklessRouterLinkBridgePathsJson ?? ${JSON.stringify(LINK_BRIDGE_PATHS_PLACEHOLDER)};`,
 		`const entry = createServerEntry({`,
 		`  dev: import.meta.env.DEV,`,
+		`  linkBridgePaths: linkBridgePathsJson === ${JSON.stringify(LINK_BRIDGE_PATHS_PLACEHOLDER)} ? undefined : JSON.parse(linkBridgePathsJson),`,
 		`  base: import.meta.env.BASE_URL,`,
 		`  resumeEntryPath,`,
 		`  prerenderWakeEntryPath,`,

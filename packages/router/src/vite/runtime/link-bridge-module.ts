@@ -1,11 +1,14 @@
 /** Marks the page's link bridge script: inline in dev, a module stub importing the shared bridge in a build. */
 export const LINK_BRIDGE_SCRIPT_ATTRIBUTE = 'data-markless-router-link-resumer';
 
-/** A built app serves its link bridge from its server entry under this pathname, immutable and preloaded. */
+/** The client output folder a build writes its link bridge files into, served as immutable static assets. */
+export const LINK_BRIDGE_DIR = '_markless';
+
+/** A built app's link bridge is a static client file under this pathname, immutable and preloaded. */
 export const LINK_BRIDGE_MODULE_PATH = /\/_markless\/links\.[0-9a-z]+\.js$/;
 
 export function linkBridgeModulePath(base: string, hash: string): string {
-	return `${base.replace(/\/?$/, '/')}_markless/links.${hash}.js`;
+	return `${base.replace(/\/?$/, '/')}${LINK_BRIDGE_DIR}/links.${hash}.js`;
 }
 
 export function isLinkBridgeModulePath(pathname: string): boolean {

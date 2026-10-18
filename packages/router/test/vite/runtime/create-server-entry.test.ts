@@ -356,15 +356,19 @@ describe('server entry rendering', () => {
 		const response = await entry.fetch(new Request('http://markless-router.test/'));
 		const html = await response.text();
 
-		const bridge = (await servedLinkBridge(html, entry, 'http://markless-router.test')) ?? '';
+		const bridge = servedLinkBridge(html, entry) ?? '';
 
 		expect(response.status).toBe(200);
 		expect(html).toContain('data-markless-router-link');
 		expect(html).toContain('data-markless-router-link-resumer');
 		expect(bridge).toContain('import("/@id/virtual:markless-router/navigation-entry")');
-		expect(`${html}${bridge}`).not.toContain('import("/@id/virtual:markless-router/resume-entry")');
+		expect(`${html}${bridge}`).not.toContain(
+			'import("/@id/virtual:markless-router/resume-entry")',
+		);
 		// The one module script is the shared link bridge; nothing else wakes at load.
-		expect(html.match(/<script type="module"(?! data-markless-router-link-resumer>)/)).toBeNull();
+		expect(
+			html.match(/<script type="module"(?! data-markless-router-link-resumer>)/),
+		).toBeNull();
 		expect(html).not.toContain('virtual:markless-router/client-entry');
 		expect(html).not.toContain('__marklessRouterStartSpaNavigation');
 	});
@@ -389,7 +393,7 @@ describe('server entry rendering', () => {
 
 		// Plain hash anchors are no longer special-cased by the click handler:
 		// SPA navigation belongs to <Link> (data-markless-router-link) only.
-		const bridge = (await servedLinkBridge(html, entry, 'http://markless-router.test')) ?? '';
+		const bridge = servedLinkBridge(html, entry) ?? '';
 		expect(bridge).not.toContain('hashRouteAnchor');
 		expect(bridge).toContain('hasAttribute(linkAttr)');
 		// The load-time '#/' deep-link check is about LANDING on a hash route,
@@ -421,7 +425,7 @@ describe('server entry rendering', () => {
 			routeFileIds: ['/pages/index.tsrx', '/pages/about.tsrx'],
 		});
 		const html = await (await entry.fetch(new Request('http://markless-router.test/'))).text();
-		const bridge = await servedLinkBridge(html, entry, 'http://markless-router.test');
+		const bridge = servedLinkBridge(html, entry);
 		expect(bridge).toBeDefined();
 
 		class FakeElement {

@@ -46,7 +46,7 @@ import {
 
 export interface ServerEntryOptions {
 	readonly dev?: boolean;
-	// The app's public base path; the shared link bridge module is served under it.
+	// The app's public base path; the shared link bridge module sits under it.
 	readonly base?: string;
 	readonly navigationEntryPath?: string;
 	// false: nothing is downloaded before a click (no intent or idle prefetch); links still navigate.
@@ -76,6 +76,8 @@ export interface ServerEntryOptions {
 	readonly fragmentEntryPath?: string;
 	// The inline half of fragment navigation, minified by the build (the source form serves otherwise).
 	readonly fragmentNavigationSource?: string;
+	// The link bridge files the build wrote into the client output; without them the entry derives the paths itself.
+	readonly linkBridgePaths?: readonly [withoutHashLinks: string, withHashLinks: string];
 }
 
 interface RenderOutput {
@@ -116,40 +118,68 @@ interface PageHtml {
 
 const DOCUMENT_CHILDREN_PLACEHOLDER = '__markless_router_document_children__';
 
+export type LinkBridgeOptions = Pick<
+	ServerEntryOptions,
+	| 'base'
+	| 'navigationEntryPath'
+	| 'prefetch'
+	| 'documentNavigation'
+	| 'navigation'
+	| 'fragmentEntryPath'
+	| 'fragmentNavigationSource'
+	| 'routeFileIds'
+> & {
+	// The build computes the bridge outside the bundle, where markless()'s debug define does not reach.
+	readonly debug?: boolean;
+};
+
+function fragmentBridgeFor(
+	options: LinkBridgeOptions,
+	manifest: ReturnType<typeof buildRouteManifestFromFileIds>,
+): FragmentBridge | undefined {
+	return options.fragmentEntryPath !== undefined && options.navigation !== 'render'
+		? {
+				entry: options.fragmentEntryPath,
+				source: options.fragmentNavigationSource ?? startFragmentNavigation.toString(),
+				prefetch: options.prefetch !== false,
+				pages: manifest.routes.map((route) => route.pathname.replace(/:[^/]+/g, ':')),
+			}
+		: undefined;
+}
+
+/** The link bridge modules a built app's pages import; the build writes them as static client files. */
+export function routerLinkBridgeModules(
+	options: LinkBridgeOptions,
+	manifest = buildRouteManifestFromFileIds(options.routeFileIds),
+): readonly [withoutHashLinks: LinkBridgeModule, withHashLinks: LinkBridgeModule] | undefined {
+	if (!options.navigationEntryPath) return undefined;
+	const fragmentBridge = fragmentBridgeFor(options, manifest);
+	return linkBridgeModules(
+		options.base ?? '/',
+		options.navigationEntryPath,
+		fragmentBridge !== undefined || options.prefetch !== false,
+		options.documentNavigation === 'document',
+		fragmentBridge,
+		options.debug,
+	);
+}
+
 export function createServerEntry(options: ServerEntryOptions) {
 	const manifest = buildRouteManifestFromFileIds(options.routeFileIds);
 	assertCurrentRouteAssets(options);
-	const fragmentBridge: FragmentBridge | undefined =
-		options.fragmentEntryPath !== undefined && options.navigation !== 'render'
-			? {
-					entry: options.fragmentEntryPath,
-					source: options.fragmentNavigationSource ?? startFragmentNavigation.toString(),
-					prefetch: options.prefetch !== false,
-					pages: manifest.routes.map((route) => route.pathname.replace(/:[^/]+/g, ':')),
-				}
-			: undefined;
+	const fragmentBridge = fragmentBridgeFor(options, manifest);
 	const fragmentNavigation = fragmentBridge !== undefined;
-	const linkBridges =
-		!options.dev && options.navigationEntryPath
-			? linkBridgeModules(
-					options.base ?? '/',
-					options.navigationEntryPath,
-					fragmentNavigation || options.prefetch !== false,
-					options.documentNavigation === 'document',
-					fragmentBridge,
-				)
-			: undefined;
+	const linkBridgeModules =
+		options.dev || options.linkBridgePaths
+			? undefined
+			: routerLinkBridgeModules(options, manifest);
+	const linkBridges: readonly [string, string] | undefined = options.dev
+		? undefined
+		: (options.linkBridgePaths ??
+			(linkBridgeModules && [linkBridgeModules[0].path, linkBridgeModules[1].path]));
 
 	async function fetch(request: Request): Promise<Response> {
 		const url = new URL(request.url);
-		const linkBridge = linkBridges?.find((module) => module.path === url.pathname);
-		if (linkBridge)
-			return new Response(linkBridge.source, {
-				headers: {
-					'content-type': 'text/javascript;charset=utf-8',
-					'cache-control': 'public, max-age=31536000, s-maxage=31536000, immutable',
-				},
-			});
 		const fragment = fragmentNavigation && request.headers.get(FRAGMENT_REQUEST_HEADER) === '1';
 		if (isNitroApiPathname(url.pathname)) {
 			return new Response('Not found', createPageHttp(request, url).commit(404, {}));
@@ -327,7 +357,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 			modulePreloads: (html: string) =>
 				landingModulePreloads(
 					options.routeSsrModulePreloads?.[file],
-					linkBridges?.[html.includes('href="#/') ? 1 : 0].path,
+					linkBridges?.[html.includes('href="#/') ? 1 : 0],
 				),
 		};
 
@@ -415,7 +445,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 		return new Response(body, sent);
 	}
 
-	return { fetch };
+	return { fetch, linkBridgeModules };
 }
 
 function flattenError(error: unknown): string {
@@ -487,7 +517,7 @@ function routedPageArtifact(
 	intentPreloads?: (html: string) => Record<string, readonly ModulePreloadInput[]>,
 	documentLoads = false,
 	fragment?: FragmentBridge,
-	linkBridgeModules?: readonly [LinkBridgeModule, LinkBridgeModule],
+	linkBridgePaths?: readonly [string, string],
 ) {
 	// The document's own injections (dev links its scoped-style closure there) come first: the shell's CSS precedes the page's.
 	const headInjections = dedupeHeadLinks([
@@ -522,7 +552,7 @@ function routedPageArtifact(
 						documentLoads,
 						fragment,
 						output.html.includes('href="#/'),
-						linkBridgeModules,
+						linkBridgePaths,
 					)
 				: '';
 			const stateWithProps = withPagePropsCell(output.state, pageProps);
@@ -780,6 +810,7 @@ function linkBridgeBody(
 	documentLoads: boolean,
 	fragment: FragmentBridge | undefined,
 	page: LinkBridgePage | { readonly module: true; readonly hashLinks: boolean },
+	debug = debugDefined(),
 ): string {
 	const inline = !('module' in page);
 	const fragmentNavigation = fragment !== undefined;
@@ -851,15 +882,14 @@ function linkBridgeBody(
 			location.assign(url.href);
 		}
 	}, true);`;
-	const debugRegistration =
-		typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
-			? `
+	const debugRegistration = debug
+		? `
 	try {
 		const key = Symbol.for('markless.debug.channel.v1.bootstrap');
 		const md = globalThis[key];
 		if (md) { md.router('ssr-link-bridge'); md.activate(); }
 	} catch {}`
-			: '';
+		: '';
 	return `${fragmentSource}${
 		fragment && !hashClickSource
 			? ''
@@ -885,21 +915,26 @@ if(d.__marklessRouterLinkResumerStarted${fragment ? '&&d.__marklessRouterHashCli
 if(location.hash&&location.hash.startsWith('#/'))import(${JSON.stringify(resumeEntryPath)}).catch(()=>{});${hashClickSource}${debugRegistration}`;
 }
 
-interface LinkBridgeModule {
+function debugDefined(): boolean {
+	return typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__;
+}
+
+export interface LinkBridgeModule {
 	readonly path: string;
 	readonly source: string;
 }
 
-// Served by this entry, never inlined: pages share an immutable copy the browser caches, one per '#/' variant.
+// Static client files, never inlined: pages share an immutable copy the browser caches, one per '#/' variant.
 function linkBridgeModules(
 	base: string,
 	resumeEntryPath: string,
 	linkIntent: boolean,
 	documentLoads: boolean,
 	fragment: FragmentBridge | undefined,
+	debug: boolean | undefined,
 ): readonly [withoutHashLinks: LinkBridgeModule, withHashLinks: LinkBridgeModule] {
 	const variant = (hashLinks: boolean): LinkBridgeModule => {
-		const source = `export default(r,p,q)=>{const d=document;${linkBridgeBody(resumeEntryPath, linkIntent, documentLoads, fragment, { module: true, hashLinks })}\n};`;
+		const source = `export default(r,p,q)=>{const d=document;${linkBridgeBody(resumeEntryPath, linkIntent, documentLoads, fragment, { module: true, hashLinks }, debug)}\n};`;
 		return {
 			path: linkBridgeModulePath(base, contentHash(source)),
 			source,
@@ -922,7 +957,7 @@ function renderLinkBridgeScript(
 	documentLoads = false,
 	fragment?: FragmentBridge,
 	hashLinks = false,
-	modules?: readonly [LinkBridgeModule, LinkBridgeModule],
+	modulePaths?: readonly [string, string],
 ): string {
 	const debugBootstrap =
 		typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
@@ -934,15 +969,15 @@ function renderLinkBridgeScript(
 	try { globalThis[Symbol.for('markless.debug.channel.v1.bootstrap')] = ${__marklessDebugBootstrapSource()}(r, 'ssr-inline', false); } catch {}
 })();`)}</script>`
 			: '';
-	const module = modules?.[hashLinks ? 1 : 0];
-	if (module) {
+	const modulePath = modulePaths?.[hashLinks ? 1 : 0];
+	if (modulePath) {
 		const indexed = !fragment && intentPreloads ? indexedPreloads(intentPreloads) : undefined;
 		const args = fragment
 			? [escapeScriptJson(intentPreloads ?? {})]
 			: indexed
 				? ['0', escapeScriptJson(indexed.preloads), escapeScriptJson(indexed.destinations)]
 				: [];
-		return `${debugBootstrap}<script type="module" ${LINK_BRIDGE_SCRIPT_ATTRIBUTE}>${escapeInlineScript(`import b from${JSON.stringify(module.path)};b(${args.join(',')})`)}</script>`;
+		return `${debugBootstrap}<script type="module" ${LINK_BRIDGE_SCRIPT_ATTRIBUTE}>${escapeInlineScript(`import b from${JSON.stringify(modulePath)};b(${args.join(',')})`)}</script>`;
 	}
 	const body = linkBridgeBody(
 		resumeEntryPath,

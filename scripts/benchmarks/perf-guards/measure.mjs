@@ -30,7 +30,6 @@ import {
 } from './attribution.mjs';
 import { measureConstructGlue } from './construct-glue.mjs';
 import { LEAN_DISPATCH_MARKER_MODULES } from '../../../packages/compiler/src/lean-dispatch-modules.ts';
-import { isLinkBridgeModulePath } from '../../../packages/router/src/vite/runtime/link-bridge-module.ts';
 import {
 	BENCH_APP_DIR,
 	BENCH_ROUTE_SOURCES,
@@ -121,15 +120,6 @@ function createFileReader(publicDir, base) {
 		}
 		return cache.get(pathname);
 	};
-	// The router's link bridge is the one module the server entry serves rather than the build writing it to disk.
-	read.serve = async (origin, pathname) => {
-		if (read(pathname) || !isLinkBridgeModulePath(pathname)) return;
-		const response = await fetch(new URL(pathname, origin));
-		if (!response.ok || !/\bimmutable\b/.test(response.headers.get('cache-control') ?? ''))
-			return;
-		const code = await response.text();
-		cache.set(pathname, { code, gzipBytes: gzipSync(code, { level: 9 }).length });
-	};
 	return read;
 }
 
@@ -179,7 +169,6 @@ async function staticRoute(origin, route, read) {
 		const file = read(path);
 		return file ? importsOf(file.code, path, STATIC_IMPORT, imports) : [];
 	};
-	for (const path of paths) await read.serve?.(origin, path);
 	const { rounds, chain, notPreloaded } = criticalPathRounds(roots, paths, staticImports);
 	const files = paths.filter((path) => isJsUrl(path));
 	const missingFiles = files.filter((path) => !read(path));

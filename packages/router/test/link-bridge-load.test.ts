@@ -4,7 +4,7 @@ import { servedLinkBridge } from './support/link-bridge.ts';
 
 type BridgeOptions = Pick<
 	Parameters<typeof createServerEntry>[0],
-	'documentNavigation' | 'prefetch' | 'dev'
+	'documentNavigation' | 'prefetch' | 'dev' | 'linkBridgePaths'
 >;
 
 function bridgeEntry(options: BridgeOptions = {}) {
@@ -30,7 +30,7 @@ function bridgeEntry(options: BridgeOptions = {}) {
 async function servedBridge(options: BridgeOptions = {}): Promise<string> {
 	const entry = bridgeEntry(options);
 	const html = await (await entry.fetch(new Request('http://router.test/'))).text();
-	const bridge = await servedLinkBridge(html, entry);
+	const bridge = servedLinkBridge(html, entry);
 	if (bridge === undefined) throw new Error('served page carries no router link bridge');
 	return bridge;
 }
@@ -80,14 +80,26 @@ describe('router link bridge', () => {
 	test('a built page calls one cached bridge module it preloads, and dev keeps the bridge inline', async () => {
 		const entry = bridgeEntry();
 		const html = await (await entry.fetch(new Request('http://router.test/'))).text();
-		const stub = /<script type="module" data-markless-router-link-resumer>import b from"([^"]+)";b\(/.exec(html);
+		const stub =
+			/<script type="module" data-markless-router-link-resumer>import b from"([^"]+)";b\(/.exec(
+				html,
+			);
 		expect(stub?.[1]).toMatch(/^\/_markless\/links\.[0-9a-z]+\.js$/);
 		expect(html).toContain(`<link rel="modulepreload" href="${stub![1]}"`);
 		expect(html).not.toContain('<script data-markless-router-link-resumer>');
-		const module = await entry.fetch(new Request(`http://router.test${stub![1]}`));
-		expect(module.headers.get('content-type')).toBe('text/javascript;charset=utf-8');
-		expect(module.headers.get('cache-control')).toContain('immutable');
-		expect(await module.text()).toMatch(/^export default\(r,p,q\)=>/);
+		const module = entry.linkBridgeModules?.find((candidate) => candidate.path === stub![1]);
+		expect(module?.source).toMatch(/^export default\(r,p,q\)=>/);
+		// The build writes the bridge as a static file, so the page handler never answers for it.
+		expect((await entry.fetch(new Request(`http://router.test${stub![1]}`))).status).toBe(404);
+
+		const prebuilt = bridgeEntry({
+			linkBridgePaths: ['/_markless/links.a.js', '/_markless/links.b.js'],
+		});
+		const prebuiltHtml = await (
+			await prebuilt.fetch(new Request('http://router.test/'))
+		).text();
+		expect(prebuiltHtml).toContain('import b from"/_markless/links.a.js"');
+		expect(prebuilt.linkBridgeModules).toBeUndefined();
 
 		const dev = bridgeEntry({ dev: true });
 		const devHtml = await (await dev.fetch(new Request('http://router.test/'))).text();

@@ -77,7 +77,7 @@ test('a document request is unchanged but still varies on the fragment header', 
 test('the link bridge carries each destination landing plan and no client-render code', async () => {
 	const served = entry();
 	const html = await (await served.fetch(new Request('https://app.test/'))).text();
-	const bridge = (await servedLinkBridge(html, served, 'https://app.test')) ?? '';
+	const bridge = servedLinkBridge(html, served) ?? '';
 	expect(bridge).toContain('"/next":["/landing-next.js"]');
 	expect(bridge).toContain('"entry":"/fragment.js"');
 	expect(html).not.toContain('/client-render-next.js');
@@ -108,7 +108,7 @@ test('plain anchors to pages get their landing plan, and the bridge names every 
 		},
 	});
 	const html = await (await served.fetch(new Request('https://app.test/'))).text();
-	const bridge = (await servedLinkBridge(html, served, 'https://app.test')) ?? '';
+	const bridge = servedLinkBridge(html, served) ?? '';
 	expect(bridge).toContain('"/next":["/landing-next.js"]');
 	expect(bridge).not.toContain('notes.txt');
 	expect(bridge).toContain('"pages":["/","/next"]');
@@ -118,7 +118,7 @@ test('plain anchors to pages get their landing plan, and the bridge names every 
 test('prefetch: false turns every speculative fetch off in the bridge', async () => {
 	const served = entry({ prefetch: false });
 	const html = await (await served.fetch(new Request('https://app.test/'))).text();
-	const bridge = (await servedLinkBridge(html, served, 'https://app.test')) ?? '';
+	const bridge = servedLinkBridge(html, served) ?? '';
 	expect(bridge).toContain('"prefetch":false');
 });
 
@@ -133,8 +133,8 @@ test('only a page that links a hash route loads the bridge carrying its click pa
 	});
 	const plainHtml = await (await served.fetch(new Request('https://app.test/'))).text();
 	const hashHtml = await (await served.fetch(new Request('https://app.test/next'))).text();
-	const plain = (await servedLinkBridge(plainHtml, served, 'https://app.test')) ?? '';
-	const hash = (await servedLinkBridge(hashHtml, served, 'https://app.test')) ?? '';
+	const plain = servedLinkBridge(plainHtml, served) ?? '';
+	const hash = servedLinkBridge(hashHtml, served) ?? '';
 	expect(plain).not.toContain('__marklessRouterHashClickStarted');
 	expect(hash).toContain('__marklessRouterHashClickStarted');
 	const modulePath = (html: string) => /import b from"([^"]+)"/.exec(html)?.[1];

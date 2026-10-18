@@ -57,7 +57,7 @@ test('link intent keeps destination packs out of initial modulepreload links', a
 		routeFileIds: ['/pages/index.tsrx', '/pages/next.tsrx'],
 	});
 	const html = await (await entry.fetch(new Request('https://docs.test/'))).text();
-	const bridge = (await servedLinkBridge(html, entry, 'https://docs.test')) ?? '';
+	const bridge = servedLinkBridge(html, entry) ?? '';
 	expect(html).toContain('rel="modulepreload" href="/current.js"');
 	expect(html).not.toContain('rel="modulepreload" href="/destination.js"');
 	expect(html).toContain('/destination.js');
@@ -88,11 +88,11 @@ test('SSR link intent fetches only its destination without evaluating modules', 
 	});
 	const bridgeFetched: string[] = [];
 	const server = createServer(async (request, response) => {
-		if (request.url?.startsWith('/_markless/')) {
-			bridgeFetched.push(request.url);
-			const served = await entry.fetch(new Request(`https://docs.test${request.url}`));
-			response.setHeader('content-type', served.headers.get('content-type') ?? '');
-			response.end(await served.text());
+		const bridge = entry.linkBridgeModules?.find((module) => module.path === request.url);
+		if (bridge) {
+			bridgeFetched.push(request.url!);
+			response.setHeader('content-type', 'text/javascript');
+			response.end(bridge.source);
 		} else if (request.url?.endsWith('.js')) {
 			fetched.push(request.url);
 			response.setHeader('content-type', 'text/javascript');

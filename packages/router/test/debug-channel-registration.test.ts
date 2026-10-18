@@ -161,7 +161,7 @@ describe('router debug registration', () => {
 			html,
 			/<script data-markless-router-debug-bootstrap>([\s\S]*?)<\/script>/,
 		);
-		const source = requiredBridge(await servedLinkBridge(html, entry));
+		const source = requiredBridge(servedLinkBridge(html, entry));
 		const root: any = {
 			isConnected: true,
 			listeners: new Map(),
@@ -236,7 +236,7 @@ describe('router debug registration', () => {
 			routeFileIds: ['pages/index.tsrx'],
 		});
 		const html = await (await entry.fetch(new Request('http://router.test/'))).text();
-		const source = requiredBridge(await servedLinkBridge(html, entry));
+		const source = requiredBridge(servedLinkBridge(html, entry));
 		const debugBootstrap = requiredScriptContent(
 			html,
 			/<script data-markless-router-debug-bootstrap>([\s\S]*?)<\/script>/,
@@ -310,7 +310,7 @@ describe('router debug registration', () => {
 				routeFileIds: ['pages/index.tsrx'],
 			});
 			const response = await entry.fetch(new Request('http://router.test/'));
-			const source = requiredBridge(await servedLinkBridge(await response.text(), entry));
+			const source = requiredBridge(servedLinkBridge(await response.text(), entry));
 			const root = {
 				listeners: new Map<string, unknown>(),
 				addEventListener(name: string, listener: unknown) {

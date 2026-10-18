@@ -105,10 +105,10 @@ describe('Link clicks under a URL-dependent document', () => {
 		});
 		const server = createServer(async (request, response) => {
 			const path = request.url ?? '/';
-			if (path.startsWith('/_markless/')) {
-				const served = await entry.fetch(new Request(`https://docs.test${path}`));
-				response.setHeader('content-type', served.headers.get('content-type') ?? '');
-				response.end(await served.text());
+			const bridge = entry.linkBridgeModules?.find((module) => module.path === path);
+			if (bridge) {
+				response.setHeader('content-type', 'text/javascript');
+				response.end(bridge.source);
 				return;
 			}
 			if (path.endsWith('.js')) {
