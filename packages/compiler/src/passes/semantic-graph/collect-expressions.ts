@@ -61,6 +61,7 @@ export function collectCollectionCall(node: AnyNode, state: WalkState): void {
 
 	const target = unwrapChainExpression(callee.object as AnyNode | undefined);
 	if (!target) return;
+	if (isFreshValue(target, state)) return;
 	if (diagnoseBannedWriteSite(node, target, state)) return;
 
 	for (const argument of asNodes(node.arguments)) {
@@ -164,10 +165,7 @@ export function collectDelete(node: AnyNode, state: WalkState): void {
  * walk still misses is not silent - the emission band leaves its target
  * authored, and the unresolved-reference guard fails the compile naming it.
  */
-export function collectNestedFunctionWrites(
-	value: AnyNode | undefined,
-	state: WalkState,
-): void {
+export function collectNestedFunctionWrites(value: AnyNode | undefined, state: WalkState): void {
 	if (!value) return;
 
 	if (isFunctionLikeNode(value)) {
@@ -307,7 +305,11 @@ function collectReadsIn(
 			}
 		}
 		// An optional method callee stays one read: the handle-call and callback-slot paths match it whole.
-		if (callee?.type === 'MemberExpression' && hasOptionalLink(callee) && namesABinding(callee)) {
+		if (
+			callee?.type === 'MemberExpression' &&
+			hasOptionalLink(callee) &&
+			namesABinding(callee)
+		) {
 			addStateRead(callee, state, region);
 			if (callee.computed === true) {
 				collectReadsIn(callee.property as AnyNode | undefined, state, region);
@@ -627,7 +629,9 @@ export function rootBindsInsideRegion(
 	if (symbolId === null) return false;
 
 	const scopeId = semantic.symbol.scopeId(symbolId);
-	return semantic.scope.start(scopeId) >= region.start && semantic.scope.end(scopeId) <= region.end;
+	return (
+		semantic.scope.start(scopeId) >= region.start && semantic.scope.end(scopeId) <= region.end
+	);
 }
 
 /**
@@ -750,6 +754,62 @@ function getStaticMemberPropertyName(member: AnyNode): string | null {
 	}
 
 	return null;
+}
+
+const copyReturningMethods = new Set([
+	'concat',
+	'filter',
+	'flat',
+	'flatMap',
+	'map',
+	'slice',
+	'toReversed',
+	'toSorted',
+	'toSpliced',
+	'with',
+]);
+const receiverReturningMethods = new Set(['copyWithin', 'fill', 'reverse', 'sort']);
+const copyingStatics = new Map([
+	['Array', new Set(['from', 'of'])],
+	['Object', new Set(['entries', 'keys', 'values', 'fromEntries', 'assign'])],
+]);
+
+/**
+ * Whether an expression always evaluates to a value no binding holds yet, so a
+ * mutating call on it (`[...rows].sort()`) changes only that copy.
+ */
+function isFreshValue(node: AnyNode | undefined, state: WalkState): boolean {
+	const value = unwrapValueWrappers(node);
+	if (!value) return false;
+	if (
+		value.type === 'ArrayExpression' ||
+		value.type === 'ObjectExpression' ||
+		value.type === 'NewExpression'
+	)
+		return true;
+	if (value.type !== 'CallExpression') return false;
+	const callee = unwrapValueWrappers(value.callee as AnyNode | undefined);
+	if (callee?.type === 'Identifier' && callee.name === 'structuredClone')
+		return isGlobalReference(callee, state);
+	if (callee?.type !== 'MemberExpression') return false;
+	const method = getStaticMemberPropertyName(callee);
+	if (!method) return false;
+	if (copyReturningMethods.has(method)) return true;
+	const receiver = unwrapValueWrappers(callee.object as AnyNode | undefined);
+	if (receiverReturningMethods.has(method)) return isFreshValue(receiver, state);
+	if (receiver?.type !== 'Identifier' || typeof receiver.name !== 'string') return false;
+	if (method === 'assign' && !isFreshValue(asNodes(value.arguments)[0], state)) return false;
+	return (
+		copyingStatics.get(receiver.name)?.has(method) === true &&
+		isGlobalReference(receiver, state)
+	);
+}
+
+function isGlobalReference(identifier: AnyNode, state: WalkState): boolean {
+	return (
+		typeof identifier.start === 'number' &&
+		resolvedSymbolAt(state.semantic(), identifier.start) === null
+	);
 }
 
 function isMutatingCollectionMethod(name: string): boolean {

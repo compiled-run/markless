@@ -61,6 +61,11 @@ them from `.markless/` instead.
   `const html = 'ltr'` in a router `document.tsrx` failed the build with
   `Identifier 'html' has already been declared`, and the others failed to load
   or rendered the wrong value.
+- `computed(() => [...rows].sort(...))` builds. Sorting, reversing or filling
+  a fresh copy (`[...rows]`, `Array.from(rows)`, `rows.slice()`, `rows.map(...)`
+  and the like) is not a write to `rows`, so it no longer fails with
+  `MARKLESS_STATE_UNRESOLVED_WRITE` or warns. `rows.sort()` on the state
+  itself is still reported.
 
 ## 0.5.0
 

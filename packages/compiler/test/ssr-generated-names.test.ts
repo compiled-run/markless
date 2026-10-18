@@ -75,7 +75,13 @@ async function renderPage(source: string, props: Record<string, unknown>) {
 			return {
 				html: `<i>${String(badgeProps.label)}</i>`,
 				elementCount: 1,
-				view: { locators: [], events: [], domUpdates: [], behaviors: [], elementHandles: [] },
+				view: {
+					locators: [],
+					events: [],
+					domUpdates: [],
+					behaviors: [],
+					elementHandles: [],
+				},
 			};
 		},
 	};
