@@ -987,6 +987,54 @@
 			"from": 15886,
 			"to": 16117,
 			"reason": "merge of reactivity + lists branches: rows count back from the parent's end, plus in-order rows stay attached and fixed page lists skip following their collection"
+		},
+		{
+			"date": "2026-10-18",
+			"guard": "runtime",
+			"subject": "runtime/graph",
+			"from": 8422,
+			"to": 8683,
+			"reason": "8422 -> 8683 B (+261): the flush holds subscription commits until the pass has run and lands them with that pass's journal, so one handler's rows and text land in one task"
+		},
+		{
+			"date": "2026-10-18",
+			"guard": "runtime",
+			"subject": "web/dom-journal-direct",
+			"from": null,
+			"to": 1223,
+			"reason": "new, 1223 B: element text/attribute/property writes moved out of render-csr (which shrinks by about the same code) and shared with payload resume, so a flush never waits on loading dom-journal"
+		},
+		{
+			"date": "2026-10-18",
+			"guard": "runtime",
+			"subject": "web/fns/visible-trigger",
+			"from": null,
+			"to": 791,
+			"reason": "new, 791 B: demand-loaded IntersectionObserver that fires onVisible for client-rendered hosts and for @if arm and @for row hosts the startup observer never saw"
+		},
+		{
+			"date": "2026-10-18",
+			"guard": "runtime",
+			"subject": "web/payload-resume",
+			"from": 4671,
+			"to": 4842,
+			"reason": "4671 -> 4842 B (+171): resume writes element-only journals through dom-journal-direct instead of loading dom-journal mid-flush, which put a task between a handler's rows and its text"
+		},
+		{
+			"date": "2026-10-18",
+			"guard": "runtime",
+			"subject": "web/resume-events",
+			"from": 16199,
+			"to": 16480,
+			"reason": "16199 -> 16480 B (+281): arm and row records naming visible load the observer when they bind, so onVisible runs in arms and rows added after load, and a press whose host left the page with a redraw is let go instead of throwing"
+		},
+		{
+			"date": "2026-10-18",
+			"guard": "runtime",
+			"subject": "web/render-csr",
+			"from": 17390,
+			"to": 17028,
+			"reason": "17390 -> 17028 B (-362): element journal writes moved to the shared dom-journal-direct module, net of the client-rendered onVisible wiring and the composed-path press walk"
 		}
 	],
 	"runtimeModules": {
@@ -1002,7 +1050,7 @@
 		"router/vite/entries/fragment-entry": 13515,
 		"router/vite/entries/resume-entry": 2406,
 		"router/vite/runtime/create-route-discovery": 527,
-		"runtime/graph": 8422,
+		"runtime/graph": 8683,
 		"runtime/graph-async": 4122,
 		"runtime/graph-collections": 4282,
 		"runtime/graph-computed": 2313,
@@ -1028,6 +1076,7 @@
 		"web/control-edit-hold": 1479,
 		"web/dom-attribute": 352,
 		"web/dom-journal": 7373,
+		"web/dom-journal-direct": 1223,
 		"web/fns/bound-symbol": 1497,
 		"web/fns/closure-action": 7401,
 		"web/fns/composition": 19605,
@@ -1046,6 +1095,7 @@
 		"web/fns/ssr": 30297,
 		"web/fns/text-node": 507,
 		"web/fns/update-text": 531,
+		"web/fns/visible-trigger": 791,
 		"web/fns/write-scalar": 983,
 		"web/inline/resume-errors": 1437,
 		"web/inline/sync-policy-core": 1255,
@@ -1053,7 +1103,7 @@
 		"web/payload-document-common": 2608,
 		"web/payload-full-storage-free": 773,
 		"web/payload-graph-construct": 4384,
-		"web/payload-resume": 4671,
+		"web/payload-resume": 4842,
 		"web/payload-resume-lazy": 203,
 		"web/payload-resume-registry": 1916,
 		"web/pending-timing": 521,
@@ -1064,7 +1114,7 @@
 		"web/reconcile-plane-slot": 344,
 		"web/render": 4003,
 		"web/render-canonical": 2642,
-		"web/render-csr": 17390,
+		"web/render-csr": 17028,
 		"web/render-route-holder": 753,
 		"web/repeat-runtime": 2594,
 		"web/resume": 3419,
@@ -1076,7 +1126,7 @@
 		"web/resume-branches": 15471,
 		"web/resume-census": 1471,
 		"web/resume-commit-arm": 9551,
-		"web/resume-events": 16199,
+		"web/resume-events": 16480,
 		"web/resume-handle-qualifier": 685,
 		"web/resume-handoff": 1360,
 		"web/resume-keyed-repeats": 16117,
