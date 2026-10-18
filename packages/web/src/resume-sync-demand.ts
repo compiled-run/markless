@@ -33,6 +33,7 @@ export function wireSyncComputedDemandTriggersWithoutLoadingCapability(input: {
 export function wireSyncComputedDemandRecordsWithoutLoadingCapability(input: {
 	readonly graph: ResumeRuntimeInput['graph'];
 	readonly computed: NonNullable<ResumeRuntimeInput['state']>['computed'];
+	readonly allComputed?: NonNullable<ResumeRuntimeInput['state']>['computed'];
 	readonly sharedSeeds?: NonNullable<ResumeRuntimeInput['state']>['sharedSeeds'];
 	readonly root: ResumeRuntimeInput['root'];
 	readonly loadSymbol: ResumeRuntimeInput['loadSymbol'];
@@ -56,6 +57,7 @@ export function wireSyncComputedDemandRecordsWithoutLoadingCapability(input: {
 						await (syncComputedModule ??=
 							await import('./resume-sync-computed.ts')).refreshSyncComputed({
 							computed,
+							records: input.allComputed ?? input.computed,
 							graph: input.graph,
 							root: input.root,
 							loadSymbol: input.loadSymbol,

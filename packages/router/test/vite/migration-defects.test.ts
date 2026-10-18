@@ -228,3 +228,15 @@ test('a click on a link a foreign script redraws reaches its container handler, 
 	expect(errors).toEqual([]);
 	await page.close();
 });
+
+test('a computed that reads another computed follows both after resume', async () => {
+	const { page, errors } = await open('/computed-chain');
+	const items = () => page.locator('[data-window] li').allTextContents();
+	expect(await items()).toEqual(['1', '2']);
+	await page.click('[data-down]');
+	await expect.poll(items).toEqual(['2', '3']);
+	await page.click('[data-flip]');
+	await expect.poll(items).toEqual(['2', '1']);
+	expect(errors).toEqual([]);
+	await page.close();
+});

@@ -113,6 +113,7 @@ export function createResumeRuntime(
 		).wireSyncComputedDemandRecordsWithoutLoadingCapability({
 			graph: input.graph,
 			computed: fresh,
+			allComputed: records,
 			sharedSeeds,
 			root: input.root,
 			loadSymbol: input.loadSymbol,

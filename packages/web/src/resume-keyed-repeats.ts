@@ -29,14 +29,14 @@ export async function primeKeyedRepeatCollections(input: {
 	if (backing.size === 0) return;
 	for (const record of input.computed ?? []) {
 		if (!backing.has(record.graphNodeId)) continue;
-		if (record.async !== false || typeof record.deriveSymbolId !== 'string') continue;
+		const { deriveSymbolId } = record;
+		if (record.async !== false || typeof deriveSymbolId !== 'string') continue;
 		if (input.graph.read(record.graphNodeId, []) !== undefined) continue;
 		await (
 			await import('./resume-sync-computed.ts')
 		).refreshSyncComputed({
-			computed: record as Parameters<
-				typeof import('./resume-sync-computed.ts').refreshSyncComputed
-			>[0]['computed'],
+			computed: { ...record, deriveSymbolId },
+			records: input.computed,
 			graph: input.graph,
 			root: input.root,
 			loadSymbol: input.loadSymbol,
