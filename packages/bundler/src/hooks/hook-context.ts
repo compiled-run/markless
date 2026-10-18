@@ -19,6 +19,8 @@ export type InternalMarklessRolldownOptions = MarklessRolldownOptions & {
 	chunkImportMap?: boolean;
 	serverOnlyProps?: (moduleId: string) => SemanticGraphInput['serverOnlyProps'];
 	routeModules?: (moduleId: string) => boolean;
+	// Set per build: a page no file imports, so only the router renders it and its props never change.
+	unimportedRouteModule?: (moduleId: string) => boolean;
 	emitResumeModules?: boolean;
 	inlineResumerDebug?: boolean;
 	prerender?: boolean;

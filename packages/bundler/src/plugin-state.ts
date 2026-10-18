@@ -77,8 +77,6 @@ export function createPluginState() {
 	const linkedTransformCache = new Map<string, LinkedTransformCacheEntry>();
 	const importedChildren = new Map<string, ImportedChild>();
 	const importedChildSources = new Set<string>();
-	// Pages compiled with lists the browser can never change, which holds only while nothing renders them as a child.
-	const fixedRowSources = new Set<string>();
 	const emittedClientResolverSources = new Set<string>();
 	const transformVirtualModules = new Map<string, Set<string>>();
 	// Source -> the scoped-style module ids of the source and every linked child under it.
@@ -116,7 +114,6 @@ export function createPluginState() {
 		linkedTransformCache,
 		importedChildren,
 		importedChildSources,
-		fixedRowSources,
 		emittedClientResolverSources,
 		transformVirtualModules,
 		styleClosures,
@@ -145,7 +142,6 @@ export function createPluginState() {
 			linkedTransformCache.clear();
 			importedChildren.clear();
 			importedChildSources.clear();
-			fixedRowSources.clear();
 			emittedClientResolverSources.clear();
 			transformVirtualModules.clear();
 			virtualModuleOwners.clear();
@@ -219,11 +215,6 @@ export function registerTransformArtifacts(
 		}
 	}
 	state.moduleMetadata.recordCaptureMetadata(input.source, input.result.manifest);
-	if (input.result.manifest.fixedRows) {
-		state.fixedRowSources.add(input.source);
-		for (const child of state.importedChildren.values())
-			if (child.source === input.source) throw fixedRowsComposedError(child);
-	} else state.fixedRowSources.delete(input.source);
 	if (input.finalPublication !== false && input.recordSymbolClaims !== false) {
 		recordEmittedClaimOwnership(state, {
 			source: input.source,
@@ -239,9 +230,7 @@ export function registerTransformArtifacts(
 			);
 		}
 	}
-	state
-		.moduleLinkArtifacts(input.environment)
-		.set(input.source, moduleLinkArtifact(input.result));
+	state.moduleLinkArtifacts(input.environment).set(input.source, moduleLinkArtifact(input.result));
 	const previouslyOwned = state.transformVirtualModules.get(input.owner) ?? new Set<string>();
 	if (input.replaceOwnedArtifacts === true) {
 		for (const staleId of previouslyOwned) {
@@ -348,18 +337,5 @@ export function registerRenderDataStyles(
 		input.source,
 		input.modules.map((module) => module.id),
 		'client',
-	);
-}
-
-/** A page's lists were compiled as fixed because its props never change, which a parent rendering it would break. */
-export function fixedRowsComposedError(child: {
-	readonly source: string;
-	readonly parent: string;
-}): Error {
-	return Object.assign(
-		new Error(
-			`MARKLESS_ROUTE_ROWS_COMPOSED: ${child.source} is a page whose lists were compiled as rows the browser never changes, because a page's props never change, but ${child.parent} renders it as a child component, whose props can. Move the part both use into its own module.`,
-		),
-		{ code: 'MARKLESS_ROUTE_ROWS_COMPOSED' },
 	);
 }

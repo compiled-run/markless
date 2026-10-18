@@ -170,8 +170,6 @@ export interface MarklessTransformManifest {
 	resolver: MarklessBuildModuleReference;
 	symbols: MarklessSymbolManifestEntry[];
 	runtimeDemandMap?: RuntimeDemandMapManifest;
-	/** A page whose lists the browser can never change: true only while nothing renders it as a child. */
-	fixedRows?: true;
 }
 
 export interface MarklessBuildModuleReference {

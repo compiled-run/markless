@@ -37,6 +37,7 @@ import { fallbackImportedSource } from './link-driver.ts';
 import { createPluginState } from './plugin-state.ts';
 import { encodedSymbolSource } from './source-module.ts';
 import { moduleIdFor } from './module-id.ts';
+import { importedRouteModules } from './composed-route-modules.ts';
 import type {
 	MarklessEnvironment,
 	MarklessRolldownOptions,
@@ -201,6 +202,25 @@ export function createMarklessRolldownPlugin(input: {
 			clearParsedChunkCode();
 
 			const currentRoot = getRoot();
+			const isRoute = internalOptions.routeModules;
+			// A dev server compiles modules one request at a time and never learns every importer first.
+			if (isRoute && internalOptions.dev !== true && currentRoot) {
+				const imported = await importedRouteModules({
+					root: currentRoot,
+					isRoute: (file) => isRoute(moduleIdFor(file, currentRoot)),
+					resolve: async (specifier, importer) =>
+						(
+							await this.resolve(specifier, importer, { skipSelf: true }).catch(
+								() => null,
+							)
+						)?.id,
+				});
+				const importedIds = new Set(
+					[...imported].map((file) => moduleIdFor(file, currentRoot)),
+				);
+				internalOptions.unimportedRouteModule = (moduleId) =>
+					isRoute(moduleId) && !importedIds.has(moduleId);
+			} else internalOptions.unimportedRouteModule = undefined;
 			if (getEnvironment(this) === 'client') {
 				for (const source of clientSymbolEntries(input.input, currentRoot)) {
 					clientSymbolEntrySources.add(source);
