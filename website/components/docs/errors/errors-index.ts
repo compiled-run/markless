@@ -2,8 +2,8 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 276,
-	guided: 40,
+	total: 277,
+	guided: 41,
 	groups: [
 		{
 			packageName: '@markless/compiler',
@@ -52,6 +52,11 @@ export const errorIndex: ErrorIndex = {
 					code: 'MARKLESS_ATTACH_HOST_ELEMENT_REQUIRED',
 					kind: 'compile error',
 					guided: false,
+				},
+				{
+					code: 'MARKLESS_ATTACH_NO_START_TRIGGER',
+					kind: 'compile warning',
+					guided: true,
 				},
 				{
 					code: 'MARKLESS_ATTRIBUTE_DUPLICATE',

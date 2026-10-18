@@ -8,6 +8,17 @@ export type GuideSource = {
 };
 
 export const guides: Readonly<Record<string, GuideSource>> = {
+	MARKLESS_ATTACH_NO_START_TRIGGER: {
+		summary: 'Nothing on a server-rendered page starts this attach function.',
+		what: 'On a page the server renders, `attach` waits until something on its element asks for code: an event handler on the element or inside it, or `onVisible` or `onIdle` on the element itself. This element has none of those, so the function never runs there.',
+		how: 'Add `onVisible` to start it when the element scrolls into view, or `onIdle` to start it once the page is idle. If the element only ever renders in the browser, where `attach` runs as soon as the element exists, silence the warning with a reason.',
+		example: [
+			'<canvas',
+			'\tattach={(canvas) => drawChart(canvas)}',
+			'\tonVisible={() => {}}',
+			'/>',
+		],
+	},
 	MARKLESS_FRAMEWORK_IMPORT_REQUIRED: {
 		summary: 'A .tsrx file calls state() or another Markless function without importing it.',
 		what: 'In a `.tsrx` file, Markless treats `state`, `computed`, `element`, `shared`, and `storage` as its own names. This call uses one of those names, but the name does not come from an import of `@markless/core`.',

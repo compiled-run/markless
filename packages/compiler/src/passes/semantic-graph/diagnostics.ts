@@ -1580,6 +1580,35 @@ export function attachHostElementRequiredDiagnostic(
 	};
 }
 
+export function attachNoStartTriggerDiagnostic(
+	tagName: string,
+	value: AnyNode,
+	state: Pick<WalkState, 'filename' | 'source'>,
+): SemanticGraphDiagnostic {
+	const source = expressionSource(value, state.source);
+	return {
+		code: 'MARKLESS_ATTACH_NO_START_TRIGGER',
+		severity: 'warning',
+		phase: 'semantic-graph',
+		title: 'Nothing starts this attach on a server-rendered page',
+		message: `attach={${source}} on <${tagName}> has no event handler on or inside the element, and no onVisible or onIdle on it. On a server-rendered page attach starts only when one of those runs, so ${source} never runs there.`,
+		why: 'A server-rendered page ships no code until something asks for it. attach starts the first time an event handler on its element or inside it runs, or when onVisible or onIdle on the same element fires. On a page rendered in the browser it runs as soon as the element is created.',
+		primarySpan: sourceSpan(value, state.filename),
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		suggestions: [
+			{
+				message: `Add onVisible={() => {}} to <${tagName}> to start it when the element scrolls into view, or onIdle={() => {}} to start it once the page is idle.`,
+			},
+			{
+				message:
+					'If this element is only ever rendered in the browser, silence this with `// markless-allow MARKLESS_ATTACH_NO_START_TRIGGER: rendered in the browser only` on the line above.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ATTACH_NO_START_TRIGGER',
+	};
+}
+
 /**
  * overlay marks structural elevation and carries no inputs, so its value has to
  * be readable at compile time. A non-literal is refused rather than lowered:

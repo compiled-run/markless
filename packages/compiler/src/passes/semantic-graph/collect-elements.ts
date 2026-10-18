@@ -28,7 +28,7 @@ import {
 	resolveGraphPath,
 	semanticAliasMap,
 } from '../../artifact-helpers/graph-paths.ts';
-import { PROJECTION_PROP_NAME } from '../public-render/shared-seed-pass.ts';
+import { collectAttachStartDiagnostic, isProjectedChildren } from './attach-start.ts';
 import { collectComponentEdge } from './collect-components.ts';
 import { constantPropValue } from './constant-props.ts';
 import { overlayLiteralValue } from './overlay-attribute.ts';
@@ -155,7 +155,10 @@ export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGr
 		);
 	}
 
-	if (isHostElement) joinHostText(node, state);
+	if (isHostElement) {
+		joinHostText(node, state);
+		collectAttachStartDiagnostic(node, tagName ?? '*', state);
+	}
 	const previousTextTarget = state.currentTextTarget;
 	const previousProjectionScope = state.currentProjectionScope;
 	if (componentEdgeId)
@@ -356,16 +359,6 @@ function readsRenderDefinition(source: string, state: WalkState): boolean {
 			graphBindingMap(state.graph, state.currentSharedDefinitionId),
 			semanticAliasMap(state.graph, state.currentSharedDefinitionId),
 		) && !resolveSharedInstanceGraphPath(source, state.graph, state.currentComponentName)
-	);
-}
-
-// Projected children are markup, not text.
-function isProjectedChildren(value: AnyNode | undefined): boolean {
-	if (!value) return false;
-	if (getIdentifierName(value) === PROJECTION_PROP_NAME) return true;
-	return (
-		value.type === 'MemberExpression' &&
-		getIdentifierName(value.property as AnyNode | undefined) === PROJECTION_PROP_NAME
 	);
 }
 

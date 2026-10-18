@@ -111,10 +111,25 @@ attach={}      installs longer-lived DOM behavior owned by this node
 The behavior result is never serialized. Initial render records the host element
 locator, the behavior code reference, and the serializable behavior inputs.
 Browser resume startup records that metadata but does not run app behavior code.
-The behavior symbol is imported only when an explicit browser trigger activates
-it, such as visibility, an event, or a future declared behavior policy. A behavior
-that must run eagerly when connected must be represented as an explicit opt-in
-trigger for that host; it is not component replay.
+On a server-rendered host the behavior symbol is imported only when one of these
+triggers activates it:
+
+- an event record on the host or on any element inside it dispatches (the
+  behavior starts before that record's handlers run; an event handled elsewhere
+  on the page does not start it, and neither does an event on an ancestor);
+- `onVisible` on the same host fires;
+- `onIdle` on the same host fires.
+
+`onVisible` and `onIdle` on the same element are the opt-in for "start when
+connected"; it is not component replay. A host the browser creates, either in a
+client-rendered mount or in a branch arm or keyed row the runtime inserts after
+a state change, runs its behaviors once the element is in the DOM.
+
+A served host with `attach` and none of those triggers on it or inside it gets
+the `MARKLESS_ATTACH_NO_START_TRIGGER` warning, since its behavior would never
+run. Hosts inside `@for` rows, and hosts holding a component, a spread, or
+projected children (which may carry a handler the host cannot see), are not
+warned.
 
 `attach` is compiler-special on host elements. In `attach={chart(config)}`, the
 factory call is not normal eager initial-render execution. The compiler treats

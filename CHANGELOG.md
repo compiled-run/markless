@@ -37,6 +37,12 @@ them from `.markless/` instead.
 - `attach` on an element inside an `@if` arm or an `@try` arm runs. Before,
   the arm's behavior records named the wrong function or none, so an arm
   element's `attach` never ran, or ran another element's function.
+- A new warning, `MARKLESS_ATTACH_NO_START_TRIGGER`, flags an `attach` that
+  nothing on a server-rendered page can start: no event handler on the element
+  or inside it, and no `onVisible` or `onIdle` on it. Such an `attach` never
+  runs there. Add `onVisible` or `onIdle` to the same element to start it when
+  it is visible or when the page is idle. The `attach` docs now explain when it
+  starts.
 
 ## 0.5.0
 

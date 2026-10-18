@@ -1395,6 +1395,75 @@ test('buildSemanticGraph reports attach on components instead of treating it as 
 	]);
 });
 
+const attachStartSource = `
+import { state } from '@markless/core';
+
+function mark(element: HTMLElement) {
+	element.dataset.ready = 'yes';
+}
+function Badge() @{
+	<i>badge</i>
+}
+
+export function App({ children }: { children?: unknown }) @{
+	let ran = state('no');
+	<main>
+		<p attach={mark}>{ran}</p>
+		<section attach={(node) => node.focus()}>
+			<span>plain</span>
+			@if (ran === 'yes') {
+				<b>bold</b>
+			}
+		</section>
+		<button onClick={() => (ran = 'yes')}>outside</button>
+		<div attach={mark}><button onClick={() => (ran = 'inside')}>inside</button></div>
+		<ul attach={mark}>
+			@for (const item of ['a']; key item) {
+				<li onKeyDown={() => {}}>{item}</li>
+			}
+		</ul>
+		<article attach={mark} onClick={() => {}}>self</article>
+		<figure attach={mark} onVisible={() => {}}>visible</figure>
+		<aside attach={mark} onIdle={() => {}}>idle</aside>
+		<nav attach={mark}><Badge /></nav>
+		<header attach={mark}>{children}</header>
+		<footer attach={mark} {...{ role: 'contentinfo' }}>spread</footer>
+		@for (const row of ['r']; key row) {
+			<em attach={mark}>{row}</em>
+		}
+	</main>
+}
+`;
+
+test('attach with nothing on or inside its element to start it is a warning naming the element', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/AttachStart.tsrx',
+		source: attachStartSource,
+	});
+	const warnings = graph.diagnostics.filter(
+		(diagnostic) => diagnostic.code === 'MARKLESS_ATTACH_NO_START_TRIGGER',
+	);
+	const markOnP = attachStartSource.indexOf('mark}>{ran}');
+
+	expect(warnings.map((warning) => warning.message)).toEqual([
+		'attach={mark} on <p> has no event handler on or inside the element, and no onVisible or onIdle on it. On a server-rendered page attach starts only when one of those runs, so mark never runs there.',
+		'attach={(node) => node.focus()} on <section> has no event handler on or inside the element, and no onVisible or onIdle on it. On a server-rendered page attach starts only when one of those runs, so (node) => node.focus() never runs there.',
+	]);
+	expect(warnings[0]).toEqual(
+		expect.objectContaining({
+			severity: 'warning',
+			phase: 'semantic-graph',
+			primarySpan: {
+				filename: 'src/AttachStart.tsrx',
+				start: markOnP,
+				end: markOnP + 'mark'.length,
+			},
+			docsUrl: 'https://markless.dev/errors/MARKLESS_ATTACH_NO_START_TRIGGER',
+		}),
+	);
+	expect(graph.diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+});
+
 test('buildSemanticGraph reports graph destructuring defaults as unsupported aliases', async () => {
 	const graph = await buildSemanticGraph({
 		filename: 'src/Menu.tsrx',

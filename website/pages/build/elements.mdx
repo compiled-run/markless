@@ -66,9 +66,9 @@ elements. A handle works this way in five attributes:
 
 ## Run setup code with `attach`
 
-Some code needs the element as soon as it exists, like an observer or a library from outside.
-`attach` hands the element to your function. If your function returns a cleanup function, Markless
-calls it when the element leaves the page.
+Some code needs the element itself, like an observer or a library from outside. `attach` hands the
+element to your function. If your function returns a cleanup function, Markless calls it when the
+element leaves the page.
 
 ```tsrx
 import { state } from '@markless/core';
@@ -91,6 +91,35 @@ export default function Watched() @{
 
 `attach` goes on page elements like `<button>`, not on components. On a component, the build stops
 with `MARKLESS_ATTACH_HOST_ELEMENT_REQUIRED`.
+
+### When `attach` runs
+
+A page the server renders loads no code until something on it asks for some. `attach` waits the same
+way. It starts at the first of these:
+
+| What is on the element | When `attach` starts |
+| --- | --- |
+| an event handler like `onClick`, on the element or on anything inside it | the first time that handler runs, just before it |
+| `onVisible` | when the element scrolls into view |
+| `onIdle` | once the page has loaded and the browser is idle |
+
+In the example above, the observer starts on the first click. A click somewhere else on the page
+does not start it.
+
+To start it as soon as the element is on screen, add `onVisible` to the same element. The handler can
+be empty:
+
+```tsrx
+<canvas attach={(canvas) => drawChart(canvas)} onVisible={() => {}} />
+```
+
+If an element has `attach` and none of these, the build warns with
+[`MARKLESS_ATTACH_NO_START_TRIGGER`](/errors/MARKLESS_ATTACH_NO_START_TRIGGER), because the function
+would never run on a server-rendered page.
+
+An element created in the browser does not wait. On a page rendered in the browser, or for an element
+that appears after a state change, like the inside of an `@if` that opens, `attach` runs as soon as
+the element is on the page.
 
 <Callout
 	sprite="cross"

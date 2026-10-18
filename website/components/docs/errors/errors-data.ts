@@ -835,6 +835,226 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_ATTACH_NO_START_TRIGGER',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'warning',
+		description: 'Nothing on a server-rendered page starts this attach function.',
+		printed: [
+			'MARKLESS_ATTACH_NO_START_TRIGGER: attach={<source>} on <<tagName>> has no event handler on or inside the element, and no onVisible or onIdle on it. On a server-rendered page attach starts only when one of those runs, so <source> never runs there.',
+			'A server-rendered page ships no code until something asks for it. attach starts the first time an event handler on its element or inside it runs, or when onVisible or onIdle on the same element fires. On a page rendered in the browser it runs as soon as the element is created.',
+			'Add onVisible={() => {}} to <<tagName>> to start it when the element scrolls into view, or onIdle={() => {}} to start it once the page is idle.',
+			'https://markless.dev/errors/MARKLESS_ATTACH_NO_START_TRIGGER',
+		],
+		structured: true,
+		guide: {
+			summary: 'Nothing on a server-rendered page starts this attach function.',
+			what: [
+				{
+					id: 's0',
+					text: 'On a page the server renders, ',
+				},
+				{
+					id: 's1',
+					text: 'attach',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ' waits until something on its element asks for code: an event handler on the element or inside it, or ',
+				},
+				{
+					id: 's3',
+					text: 'onVisible',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ' or ',
+				},
+				{
+					id: 's5',
+					text: 'onIdle',
+					code: true,
+				},
+				{
+					id: 's6',
+					text: ' on the element itself. This element has none of those, so the function never runs there.',
+				},
+			],
+			how: [
+				{
+					id: 's0',
+					text: 'Add ',
+				},
+				{
+					id: 's1',
+					text: 'onVisible',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ' to start it when the element scrolls into view, or ',
+				},
+				{
+					id: 's3',
+					text: 'onIdle',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ' to start it once the page is idle. If the element only ever renders in the browser, where ',
+				},
+				{
+					id: 's5',
+					text: 'attach',
+					code: true,
+				},
+				{
+					id: 's6',
+					text: ' runs as soon as the element exists, silence the warning with a reason.',
+				},
+			],
+			example: [
+				{
+					id: 'l0',
+					runs: [
+						{
+							id: 'r0',
+							text: '<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'canvas',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+					],
+				},
+				{
+					id: 'l1',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'attach',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r2',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r3',
+							text: '{(',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: 'canvas',
+							style: 'color:#e36209;--shiki-dark:#ffab70',
+						},
+						{
+							id: 'r5',
+							text: ') ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: '=>',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r7',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r8',
+							text: 'drawChart',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r9',
+							text: '(canvas)}',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l2',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'onVisible',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r2',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r3',
+							text: '{() ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: '=>',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r5',
+							text: ' {}}',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l3',
+					runs: [
+						{
+							id: 'r0',
+							text: '/>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+			],
+		},
+		allow: [
+			{
+				id: 'l0',
+				runs: [
+					{
+						id: 'r0',
+						text: '// markless-allow MARKLESS_ATTACH_NO_START_TRIGGER: the reason you accept it',
+						style: 'color:#6a737d;--shiki-dark:#6a737d',
+					},
+				],
+			},
+		],
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_ATTRIBUTE_DUPLICATE',
 		packageName: '@markless/compiler',
 		stage: 'compile',
