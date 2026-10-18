@@ -791,7 +791,13 @@ export function emitClientResidueReaderPrelude(
 			changed = true;
 		}
 	}
-	return { imports: keptImports, declarations: kept };
+	// Kept in source order: a declaration found through a later one still has to run before it.
+	return {
+		imports: keptImports,
+		declarations: declarations.flatMap((declaration) =>
+			kept.includes(declaration.source) ? [declaration.source] : [],
+		),
+	};
 }
 
 export function componentAstsForResidueReaders(source: string, filename: string) {

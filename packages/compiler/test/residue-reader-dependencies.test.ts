@@ -219,3 +219,39 @@ test('component locals do not shadow imports used inside module helpers', async 
 	)((text: string) => text.toUpperCase());
 	expect(reader({ source: 'caption(format)' }, { read: () => 'ready' })).toBe('READY!');
 });
+
+test.each([
+	{ name: 'Menu', list: 'ENTRIES', middle: 'SECTIONS', first: 'FIRST', rest: 'REST', tag: 'ul' },
+	{ name: 'Rail', list: 'items', middle: 'groups', first: 'lead', rest: 'tail', tag: 'ol' },
+])(
+	'a module constant read only through later ones still runs first in the $name prelude',
+	async ({ name, list, middle, first, rest, tag }) => {
+		const result = await compileTsrxModule({
+			filename: `/${name}-order.tsrx`,
+			symbols: [],
+			source: `const ${list} = ['a', 'b', 'c'];
+		const ${middle} = ${list}.map((entry) => entry.toUpperCase());
+		const ${first} = ${middle}.slice(0, 1);
+		const ${rest} = ${middle}.slice(1);
+		export function ${name}({ marker }) @{
+			const label = ${first}.join('') + ${rest}.join('') + marker;
+			<${tag} title={label} />
+		}`,
+		});
+		const definition = result.publicRenderModule.componentDefinitions.find(
+			(entry) => entry.name === name,
+		)!;
+		const prelude = (definition.residueReaderDeclarations as string[]).join('\n');
+		expect(
+			parseModule(prelude, 'prelude.ts').body.flatMap((node) =>
+				node.type === 'VariableDeclaration'
+					? node.declarations.map((entry) =>
+							entry.id.type === 'Identifier' ? entry.id.name : null,
+						)
+					: [],
+			),
+		).toEqual([list, middle, first, rest]);
+		const reader = new Function(`${prelude}; return (${definition.residueReaderSource});`)();
+		expect(reader({ source: 'label' }, { read: () => '!' })).toBe('ABC!');
+	},
+);
