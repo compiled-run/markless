@@ -84,8 +84,7 @@ export type ResumeDomEvent = {
 	readonly type: string;
 	readonly target: ResumeDomElement | null;
 	readonly [key: string]: unknown;
-	// Absent means bubbling, which is what every synthetic event this runtime
-	// constructs for itself already is; only a real DOM event says otherwise.
+	// Absent means bubbling; a real DOM event, or an idle or visible event aimed at its own host, says otherwise.
 	readonly bubbles?: boolean;
 	readonly preventDefault?: () => void;
 	readonly stopPropagation?: () => void;

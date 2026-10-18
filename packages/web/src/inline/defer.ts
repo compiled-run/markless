@@ -26,7 +26,11 @@ type DeferRoot = Element & {
 type DeferModule = {
 	resumeContainerEvent(input: {
 		readonly root: Element;
-		readonly event: { readonly type: string; readonly target: Element };
+		readonly event: {
+			readonly type: string;
+			readonly target: Element;
+			readonly bubbles: false;
+		};
 		readonly element: Element;
 	}): unknown;
 };
@@ -91,7 +95,7 @@ export function createMarklessDefer(
 			if (fired.has(host) || claimed.has(host)) return;
 			const input = {
 				root,
-				event: { type: eventName, target: host },
+				event: { type: eventName, target: host, bubbles: false as const },
 				element: host,
 			};
 			// A gesture already forwarded owns the root until its queue exists; join that queue behind it.

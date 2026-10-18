@@ -80,7 +80,7 @@ test('the first intersection forwards the visible host once, with no gesture', a
 	expect(f.load).toHaveBeenCalledExactlyOnceWith('/build/resume.js');
 	expect(f.resumeContainerEvent).toHaveBeenCalledExactlyOnceWith({
 		root: f.root,
-		event: { type: PROTOCOL_VISIBLE_EVENT_NAME, target: f.top },
+		event: { type: PROTOCOL_VISIBLE_EVENT_NAME, target: f.top, bubbles: false },
 		element: f.top,
 	});
 	expect(f.root.__marklessDelegatedDispatch).toBeUndefined();
