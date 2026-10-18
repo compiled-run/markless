@@ -708,3 +708,24 @@ describe.skipIf(!enabled || !fullEnabled)('full template smoke', () => {
 		FULL_TEST_TIMEOUT,
 	);
 });
+
+// The shipped Deno starter, installed by deno itself, builds with its own `deno task build`.
+describe.skipIf(!enabled)('deno starter build', () => {
+	test(
+		'deno: the shipped starter installs and builds with its own build task',
+		async () => {
+			const lane = LANES.find((entry) => entry.manager === 'deno')!;
+			const root = await makeTempDir('markless-pm-deno-build-');
+			const { appDir } = await scaffoldAndInstall(root, lane, 'app', { manifest: 'template' });
+
+			const build = spawnSync('deno', ['task', 'build'], {
+				cwd: appDir,
+				encoding: 'utf-8',
+				env: { ...process.env, NO_COLOR: '1' },
+			});
+			expect(build.status, `deno task build failed:\n${build.stdout}${build.stderr}`).toBe(0);
+			await expect(exists(join(appDir, '.output/server/index.mjs'))).resolves.toBe(true);
+		},
+		FULL_TEST_TIMEOUT,
+	);
+});

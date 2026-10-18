@@ -98,6 +98,10 @@ its message now names which and how to fix it.
   (it redraws one of its ancestors) drops the click without an error, on
   server-rendered and client-rendered pages, before and after the page's code
   has loaded.
+- A Deno app from `create-markless` builds. Its `deno task build` ran `vp
+  build`, which stopped with "Package not found in workspace" because the app
+  had no `package.json`. The Deno starter now writes a minimal one (name and
+  module type only; dependencies stay in `deno.json`).
 - The router's cached link script moved from `/_markless/links.<hash>.js` to
   `/_markless/links/<hash>.js`. On Vercel the long-cache rule for the old
   location also caught every navigation fetch under `/_markless/`, so link

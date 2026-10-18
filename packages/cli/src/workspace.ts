@@ -72,9 +72,10 @@ export interface InstallPlan {
 }
 
 /**
- * A deno-format app writes `deno.json` and no `package.json`, so an inferred
- * npm/pnpm/yarn/bun install has no manifest to work from at all. Deno owns that
- * manifest, so deno installs it.
+ * A deno-format app lists its dependencies in `deno.json`; its `package.json`
+ * carries only the name and module type vite-plus needs, so an inferred
+ * npm/pnpm/yarn/bun install has nothing to install. Deno owns that manifest,
+ * so deno installs it.
  */
 export function installManagerFor(options: {
 	readonly format: ProjectFormat;
