@@ -331,6 +331,19 @@ if (isCiSuite && !jobNames.includes(PLAYWRIGHT_JOB)) {
 		if (name !== PLAYWRIGHT_JOB && !needsOf(name).includes(PLAYWRIGHT_JOB))
 			fail(`Job \`${name}\` installs a Playwright browser but does not need \`${PLAYWRIGHT_JOB}\`.`);
 	}
+	// actions/cache rejects `..` (a warning, not a failure), and a path inside the checkout gets linted.
+	for (const name of jobNames) {
+		const browsersPath = jobs[name]?.env?.PLAYWRIGHT_BROWSERS_PATH;
+		if (browsersPath === undefined) continue;
+		if (/(^|\/)\.\.(\/|$)/.test(browsersPath) || /^\$\{\{\s*github\.workspace\s*\}\}\//.test(browsersPath) || !/^(\/|\$\{\{)/.test(browsersPath))
+			fail(`Job \`${name}\` sets \`PLAYWRIGHT_BROWSERS_PATH\` to \`${browsersPath}\`; it must be an absolute path outside the checkout with no \`..\` segment.`);
+		for (const step of stepsOf(name)) {
+			if (!usesAction(step, 'actions/cache')) continue;
+			const cachePath = withOf(step).path;
+			if (typeof cachePath === 'string' && cachePath.includes('ms-playwright') && cachePath !== browsersPath)
+				fail(`Step \`${step.name ?? step.id ?? 'unnamed'}\` in \`${name}\` caches \`${cachePath}\`, not the job's \`PLAYWRIGHT_BROWSERS_PATH\` \`${browsersPath}\`.`);
+		}
+	}
 	const launchers = nodeTestsLaunchingBrowsers();
 	if (launchers.length > 0 && jobNames.includes('unit')) {
 		const unitText = jobText('unit');

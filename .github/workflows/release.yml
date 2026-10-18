@@ -90,7 +90,7 @@ jobs:
         env:
             GH_TOKEN: ${{ github.token }}
             # Outside the checkout: the release commit's pre-commit hook lints the whole tree.
-            PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/../ms-playwright
+            PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}-ms-playwright
             NPM_CONFIG_AUDIT: 'false'
             NPM_CONFIG_FUND: 'false'
             PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
@@ -132,7 +132,7 @@ jobs:
               uses: actions/cache/restore@v4
               with:
                   key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
-                  path: ${{ github.workspace }}/../ms-playwright
+                  path: ${{ github.workspace }}-ms-playwright
 
             - name: Install Playwright system dependencies
               run: pnpm --dir packages/vitest-browser exec playwright install-deps chromium webkit
