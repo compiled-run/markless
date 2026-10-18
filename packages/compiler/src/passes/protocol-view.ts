@@ -445,9 +445,17 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 				...(typeof render.rowStartOffset === 'number' && render.rowStartOffset > 0
 					? { rowStartOffset: render.rowStartOffset }
 					: {}),
-				...mintableEmptyArm(input, render),
-				...mintableRowTemplate(input, render, liveRowComponentMint(input, repeat, render)),
-				...mintableRowComponent(liveRowComponentMint(input, repeat, render)),
+				...(fixedRows(input, repeat, render)
+					? { fixed: true as const }
+					: {
+							...mintableEmptyArm(input, render),
+							...mintableRowTemplate(
+								input,
+								render,
+								liveRowComponentMint(input, repeat, render),
+							),
+							...mintableRowComponent(liveRowComponentMint(input, repeat, render)),
+						}),
 				rowEvents: oneRecordPerEvent(input.payloadArena.view.events)
 					.filter((event) => rowHostPaths.has(event.hostNodeId))
 					.map((event) => ({
@@ -726,6 +734,63 @@ function nestedRepeatMints(
 	if (rowComponentMint(input, render)) return false;
 	const template = mintableRowTemplate(input, render, null).rowTemplate;
 	return template !== undefined;
+}
+
+/**
+ * Rows the browser can never add, remove, reorder or rewrite: the collection and
+ * every value a row shows depend only on computeds over a page root's props,
+ * which the router renders once and never changes in place. Such a repeat ships
+ * no row markup, so a page whose lists are all like this loads no row-building
+ * code. Anything else a row reads, or a row that only a render can build, keeps
+ * the general record.
+ */
+function fixedRows(
+	input: ProtocolViewPayloadInput,
+	repeat: PayloadKeyedRepeat,
+	render: RenderDataArtifact['repeats'][number],
+): boolean {
+	const graph = input.semanticGraph;
+	const root = renderDataOf(input).root?.componentName;
+	if (input.source?.routeRoot !== true || !graph || !root || repeat.enclosingRepeatId)
+		return false;
+	const semantic = graph.keyedRepeats.find((candidate) => candidate.id === repeat.id);
+	const chunk = renderDataOf(input).chunks.find(
+		(candidate) => candidate.id === render.rowChunkId,
+	);
+	if (!semantic || chunk?.componentName !== root || semantic.indexKey) return false;
+	if (rowComponentMint(input, render) || branchArmField(input, repeat).branchArm) return false;
+	const template = mintableRowTemplate(input, render, null).rowTemplate;
+	if (!template || template.componentName) return false;
+	const slots = [...(template.textSlots ?? []), ...(template.attributeSlots ?? [])];
+	if (slots.some((slot) => !('itemPath' in slot))) return false;
+	return invariantInBrowser(
+		graph,
+		root,
+		repeat.collectionGraphNodeId,
+		semantic.asyncBoundaryId !== undefined,
+	);
+}
+
+function invariantInBrowser(
+	graph: NonNullable<ProtocolViewPayloadInput['semanticGraph']>,
+	root: string,
+	graphNodeId: string,
+	asyncOwned: boolean,
+	seen = new Set<string>(),
+): boolean {
+	if (seen.has(graphNodeId)) return true;
+	seen.add(graphNodeId);
+	const binding = graph.graphBindings.find(
+		(candidate) => candidate.id === graphNodeId && (candidate.componentName ?? root) === root,
+	);
+	if (!binding || binding.sharedDefinitionId !== undefined) return false;
+	if (binding.kind === 'prop') return true;
+	if (binding.kind !== 'computed' || binding.storage) return false;
+	// A value that settles in the browser re-renders its own arm, so only rows inside that arm may read it.
+	if ((binding.async || binding.asyncCapable) && !asyncOwned) return false;
+	return (binding.dependencies ?? []).every((dependency) =>
+		invariantInBrowser(graph, root, dependency.graphNodeId, asyncOwned, seen),
+	);
 }
 
 // A collection no graph node holds never changes after load, so its rows are never built again.

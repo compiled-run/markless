@@ -18,6 +18,7 @@ export type InternalMarklessRolldownOptions = MarklessRolldownOptions & {
 	// Chunks name each other through an import map every document must carry, so it stays opt-in.
 	chunkImportMap?: boolean;
 	serverOnlyProps?: (moduleId: string) => SemanticGraphInput['serverOnlyProps'];
+	routeModules?: (moduleId: string) => boolean;
 	emitResumeModules?: boolean;
 	inlineResumerDebug?: boolean;
 	prerender?: boolean;

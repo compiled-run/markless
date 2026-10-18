@@ -31,6 +31,7 @@ import {
 	warnDelegateImportFailures,
 } from '../link-driver.ts';
 import { moduleIdFor, sourceForModuleId } from '../module-id.ts';
+import { fixedRowsComposedError } from '../plugin-state.ts';
 import { transformTsrxModuleWithPrerenderWakeClosure } from '../transform.ts';
 import type {
 	MarklessModuleLinkArtifact,
@@ -179,7 +180,10 @@ export async function linkTransformChildren(
 		resolvedBarrels && tsrxReexports
 			? {
 					interfaces: { ...resolvedBarrels.interfaces, ...tsrxReexports.interfaces },
-					children: mergeLinkedModuleChildren(resolvedBarrels.children, tsrxReexports.children),
+					children: mergeLinkedModuleChildren(
+						resolvedBarrels.children,
+						tsrxReexports.children,
+					),
 				}
 			: await linkBarrels(transformed.moduleImports);
 	// A real compiled interface wins over the barrel walk's entry, keeping the components the walk found it re-exporting.
@@ -217,6 +221,7 @@ export async function linkTransformChildren(
 		fallbackImportedSource,
 	);
 	for (const child of resolvedChildren) {
+		if (ctx.state.fixedRowSources.has(child.source)) throw fixedRowsComposedError(child);
 		linkedChildren.set(linkedModuleChildKey(child), child);
 		importedChildSources.add(child.source);
 	}
@@ -290,7 +295,10 @@ export async function linkTransformChildren(
 		linkedTransformInput = {
 			...linkedTransformInput,
 			symbols,
-			importedModuleInterfaces: overlayBarrelInterfaces(barrelLinkedInterfaces(), linkedGraph.interfaces),
+			importedModuleInterfaces: overlayBarrelInterfaces(
+				barrelLinkedInterfaces(),
+				linkedGraph.interfaces,
+			),
 			...(renderDataImportSources ? { renderDataImportSources } : {}),
 			linkedStyleModuleIds: [
 				...new Set(

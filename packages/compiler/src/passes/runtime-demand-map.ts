@@ -914,7 +914,7 @@ function payloadDemandRecords(
 				...(record.rowComponent ? ROW_COMPONENT_MINT : []),
 				...(!record.rowComponent && record.rowTemplate?.componentName ? ROW_SLOT_MINT : []),
 				...(record.enclosingRow ? NESTED_REPEATS : []),
-				...(replacement.scalarRows ? [] : renderRuntimeModuleIds),
+				...(replacement.scalarRows || record.fixed ? [] : renderRuntimeModuleIds),
 			]),
 		})),
 		...(view.branches ?? []).map((record): RuntimeDemandMapRecord => ({

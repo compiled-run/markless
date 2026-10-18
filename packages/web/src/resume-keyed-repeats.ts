@@ -198,7 +198,7 @@ export function wireKeyedRepeats(
 			arm.mounted = items.length === 0;
 			adopt(repeatRowElements(parent, repeat, items.length), items);
 		}
-		if (!repeat.collectionGraphNodeId) continue;
+		if (!repeat.collectionGraphNodeId || repeat.fixed) continue;
 		const apply = (mint: RowMint | undefined): void => {
 			if (follow && !follow.showing()) return;
 			applyKeyedRepeatRowOrder(

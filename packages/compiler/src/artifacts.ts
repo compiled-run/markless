@@ -34,6 +34,11 @@ export type SemanticGraphInput = {
 	 * reads one is refused, because what browser code reads is serialized into the page.
 	 */
 	readonly serverOnlyProps?: readonly ServerOnlyProp[];
+	/**
+	 * The router renders this module's root component as a page, and no module
+	 * renders it as a child, so its props never change in the browser.
+	 */
+	readonly routeRoot?: boolean;
 };
 
 export type ServerOnlyProp = {
@@ -2258,7 +2263,7 @@ export type ProtocolViewPayloadInput = {
 	readonly renderData?: RenderDataArtifact;
 	readonly captureAnalysis?: CaptureAnalysisArtifact;
 	readonly semanticGraph?: SemanticGraphArtifact;
-	readonly source?: Pick<CompileTsrxModuleInput, 'importedModuleInterfaces'>;
+	readonly source?: Pick<CompileTsrxModuleInput, 'importedModuleInterfaces' | 'routeRoot'>;
 };
 
 // Wire shape of a boundary arm record set: the payload arena plan with lazy
