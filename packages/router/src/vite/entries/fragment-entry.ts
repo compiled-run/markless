@@ -11,7 +11,7 @@ export interface FragmentNavigationConfig {
 	readonly retireProperty: string;
 	readonly streamExecutorGlobal: string;
 	readonly streamedArmSelector: string;
-	readonly requestParam: string;
+	readonly requestPrefix: string;
 	readonly regionEndMarker: string;
 	readonly appendMarker: string;
 	// 'document' apps swap the whole body: their shell renders from the request URL.

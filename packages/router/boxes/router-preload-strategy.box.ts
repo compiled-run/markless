@@ -6,6 +6,7 @@ import { MARKLESS_EXECUTION_SIZES } from '../../bundler/src/build/chunking.ts';
 import { NAVIGATION_POLYFILL_MODULE } from '../src/navigation-polyfill.ts';
 import { readClientAssetsManifest } from '../src/vite/client-assets-manifest.ts';
 import { isLinkBridgeModulePath } from '../src/vite/runtime/link-bridge-module.ts';
+import { fragmentPageUrl } from '../src/vite/fragment-navigation.ts';
 import {
 	MARKLESS_CHUNK_SPECIFIER_PREFIX,
 	marklessBuildManifestPath,
@@ -774,8 +775,10 @@ async function expectRouteDemandJs(
 	page.settledRequests = after;
 }
 
+// A navigation fetch counts as a request for the page it names.
 function pathOf(url: string): string {
-	return new URL(url, 'http://fixture.local').pathname;
+	const parsed = new URL(url, 'http://fixture.local');
+	return (fragmentPageUrl(parsed) ?? parsed).pathname;
 }
 
 function unescapeHtmlAttribute(value: string): string {

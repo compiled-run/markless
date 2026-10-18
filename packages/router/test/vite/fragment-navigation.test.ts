@@ -1,6 +1,4 @@
 import { cp, mkdir, mkdtemp, readFile, rm, symlink } from 'node:fs/promises';
-import { createServer } from 'node:http';
-import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
 import { clientAssetsManifestPath } from '../../src/vite/client-assets-manifest.ts';
@@ -11,10 +9,11 @@ import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
 import {
 	FRAGMENT_REGION_END,
-	FRAGMENT_REQUEST_PARAM,
+	fragmentPageUrl,
 	fragmentRequestUrl,
 } from '../../src/vite/fragment-navigation.ts';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
+import { urlKeyedCache } from '../support/url-keyed-cache.ts';
 
 // A built router app served by its real Nitro server and driven in real browsers:
 // every route change here is a fragment swap, and each case pins one thing the
@@ -108,49 +107,11 @@ async function open(browser: Browser, path = '/', base = origin): Promise<Sessio
 	});
 	page.on('request', (request) => {
 		const url = new URL(request.url());
-		const fragment = url.searchParams.get(FRAGMENT_REQUEST_PARAM) === '1';
-		requests.push(`${url.pathname}${fragment ? ' fragment' : ''}`);
+		const page = fragmentPageUrl(url);
+		requests.push(`${(page ?? url).pathname}${page ? ' fragment' : ''}`);
 	});
 	await page.goto(base + path);
 	return { page, errors, requests };
-}
-
-// A shared cache that keys every response on its URL and ignores Vary, as some CDNs do.
-async function urlKeyedCache(upstream: string) {
-	type Entry = { status: number; headers: Array<[string, string]>; body: Buffer };
-	const entries = new Map<string, Entry>();
-	const server = createServer(async (request, response) => {
-		const key = request.url ?? '/';
-		let entry = request.method === 'GET' ? entries.get(key) : undefined;
-		if (!entry) {
-			const headers = new Headers();
-			for (const [name, value] of Object.entries(request.headers))
-				if (typeof value === 'string' && name !== 'host' && name !== 'accept-encoding')
-					headers.set(name, value);
-			const fetched = await fetch(upstream + key, { headers, redirect: 'manual' });
-			entry = {
-				status: fetched.status,
-				headers: [...fetched.headers].filter(
-					([name]) => !['content-encoding', 'content-length', 'transfer-encoding'].includes(name),
-				),
-				body: Buffer.from(await fetched.arrayBuffer()),
-			};
-			if (request.method === 'GET' && fetched.ok) entries.set(key, entry);
-		}
-		response.writeHead(entry.status, entry.headers);
-		response.end(entry.body);
-	});
-	await new Promise<void>((listening) => server.listen(0, '127.0.0.1', listening));
-	const { port } = server.address() as AddressInfo;
-	return {
-		origin: `http://127.0.0.1:${port}`,
-		clear: () => entries.clear(),
-		close: () =>
-			new Promise<void>((closed) => {
-				server.close(() => closed());
-				server.closeAllConnections();
-			}),
-	};
 }
 
 async function landedOn(page: Page, name: string): Promise<void> {
@@ -420,7 +381,7 @@ for (const [name, browserType] of [
 			await landedOn(page, 'other');
 			let held = 0;
 			await page.route(
-				(url) => url.pathname === '/other',
+				(url) => (fragmentPageUrl(url) ?? url).pathname === '/other',
 				async (route) => {
 					held += 1;
 					await new Promise((resolveHold) => setTimeout(resolveHold, 5000));

@@ -107,18 +107,31 @@ Rules:
 ## Navigation
 
 A route change fetches the destination's page region from the server and
-swaps it in. That request names its own URL: the page URL with the query
-parameter `markless-fragment=1` appended (`FRAGMENT_REQUEST_PARAM` in
-`packages/router/src/vite/fragment-navigation.ts`). The server answers that
-URL with the region document and renders the page for the URL without the
-parameter, so `url` and `http.url` never show it. Every other request to the
-page URL answers the whole document.
+swaps it in. That request names its own path: the page path under the prefix
+`/_markless/fragment` (`FRAGMENT_PATH_PREFIX` in
+`packages/router/src/vite/fragment-navigation.ts`), with the page's query kept,
+so `/docs?tab=a` is fetched as `/_markless/fragment/docs?tab=a`. The server
+answers that path with the region document and renders the page for the page
+URL, so `url` and `http.url` never show the prefix. Every request to the page
+URL itself answers the whole document.
 
 - A page response depends on its URL alone, so a CDN or ISR cache that keys
   on the URL and ignores `Vary` keeps navigation fetches and page loads apart.
-- The address bar and history entries show the page URL, never the parameter.
-- A redirect that drops the parameter answers with a whole document; the
-  router then loads the destination as a document.
+- A host rewrite that drops the query string keeps them apart too. On Vercel,
+  Nitro's ISR rewrite passes the function only the path: a `/**` ISR rule
+  matches the fragment path and caches it under that path, and a narrower
+  rule such as `/docs/**` does not match it, so the fragment renders fresh.
+  A prerendered page's static file never answers its fragment path on Vercel;
+  on the Node server, Nitro's static handler sees the page path and answers a
+  prerendered page's fragment path with its whole document.
+- Route rules, middleware and request files see the page path: the router's
+  Nitro plugin rewrites the request URL before routing, so a guard on a page
+  path also guards its fragment. `http.request.url` keeps the fragment path.
+- The address bar and history entries show the page URL, never the prefix.
+- A redirect off the fragment path answers with a whole document; the router
+  then loads the destination as a document.
+- The prefix is root-relative; apps served under a non-root base path are not
+  covered yet.
 
 `navigate(href, { replace, scroll })` from `@markless/router` navigates from
 code exactly as a click on `<Link href={href} replace scroll>` does: a page of

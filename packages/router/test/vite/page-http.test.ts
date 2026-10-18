@@ -6,6 +6,10 @@ import { afterAll, beforeAll, expect, test, vi } from 'vitest';
 import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
+import {
+	FRAGMENT_REGION_END,
+	fragmentRequestUrl,
+} from '../../src/vite/fragment-navigation.ts';
 
 // A built router app whose pages read the server-only `http` prop.
 
@@ -97,6 +101,15 @@ test("a page keeps the middleware's headers and cookies", async () => {
 	expect(response.status).toBe(200);
 	expect(response.headers.get('x-request-id')).toBe('mw-1');
 	expect(response.headers.getSetCookie()).toEqual(['visit=mw-1; Path=/; HttpOnly']);
+});
+
+test('middleware sees the page path a navigation fetch names, so a page guard also guards its fragment', async () => {
+	const response = await fetch(fragmentRequestUrl(`${origin}/invoices/7`));
+
+	expect(response.headers.get('x-middleware-path')).toBe('/invoices/7');
+	const html = await response.text();
+	expect(html).toContain('Invoice INV-0007');
+	expect(html).toContain(FRAGMENT_REGION_END);
 });
 
 test('a status write after the response started streaming raises the named error', async () => {

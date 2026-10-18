@@ -62,6 +62,7 @@ import { NAVIGATION_POLYFILL_MODULE } from '../navigation-polyfill.ts';
 import { listenForLinkIntent } from './link-intent.ts';
 import { documentNavigationFor } from './document-navigation.ts';
 import { startFragmentNavigation } from './fragment-navigation.ts';
+import { fragmentRequestModule } from './nitro-fragment-requests.ts';
 import {
 	prerenderRendererModule,
 	recordServerEntry,
@@ -652,8 +653,12 @@ function createNitroConfig(
 			...publicAssets,
 		],
 		routesDir: nitroConfig?.routesDir ?? '.output/markless/router/nitro-routes',
+		modules: [
+			...(nitroConfig?.modules ?? []),
+			fragmentRequestModule(),
+			...(isBuild ? [prerenderRendererModule(serverBuild)] : []),
+		],
 		...(isBuild && {
-			modules: [...(nitroConfig?.modules ?? []), prerenderRendererModule(serverBuild)],
 			routeRules: {
 				[`/${MARKLESS_BUILD_PREFIX}**`]: {
 					headers: { 'cache-control': 'public, max-age=31536000, immutable' },

@@ -64,11 +64,13 @@ server and Vercel. Treat the others as untested for now, and try a preview deplo
 
 ## Caches in front of your server
 
-When a link swaps in the next page, the router asks for that page's address with
-`?markless-fragment=1` added, and the server answers with just the page area. Every other request
-for the address gets the whole page. Because the two never share an address, a CDN or a Vercel ISR
-cache that keys on the address alone keeps them apart. Keep that query parameter in the cache key;
-a cache that drops query parameters would hand one answer to both.
+When a link swaps in the next page, the router asks for that page under its own path, such as
+`/_markless/fragment/docs` for `/docs`, and the server answers with just the page area. Every
+request for `/docs` itself gets the whole page. Because the two never share an address, a CDN or a
+Vercel ISR cache keeps them apart, even one that ignores the query string. With an ISR rule for
+`/**`, Vercel caches the page areas too; with a narrower rule, they render fresh on each click.
+
+Your middleware and route rules see the page path, `/docs`, for both requests.
 
 ## Memory is not shared
 
