@@ -58,7 +58,10 @@ import type {
 
 /** The runtime's own registrar, handed to the loader positionally by the repeat runtime. */
 export type RowComponentMintHost = {
-	readonly runtimeInput: { readonly loadSymbol: (symbolId: string) => unknown };
+	readonly runtimeInput: {
+		readonly loadSymbol: (symbolId: string) => unknown;
+		readonly root?: ResumeDomElement & { __marklessArmRegistering?: Set<Promise<unknown>> };
+	};
 	readonly armRegistrationDeps: (records: ResumeArmRecordSet) => Promise<ArmRegistrationDeps>;
 	readonly installArmEventType: (eventType: string) => void;
 	/** The page's live host census, read to place the repeat inside a rendered widget. */
@@ -126,6 +129,20 @@ export function marklessRowComponentMint(
 	// flush behind it runs - a second write in one statement - must not drop the
 	// first batch's registration on the floor.
 	let awaitingCommit: MintedRow[] = [];
+	// A placed row is clickable before commit registers its events; the container's listener waits on this set.
+	let releaseRegistering: (() => void) | undefined;
+	const holdRegistering = (): void => {
+		const root = host?.runtimeInput.root;
+		if (!root || releaseRegistering) return;
+		const registering = (root.__marklessArmRegistering ??= new Set());
+		let resolve!: () => void;
+		const held = new Promise<void>((settle) => (resolve = settle));
+		registering.add(held);
+		releaseRegistering = () => {
+			registering.delete(held);
+			resolve();
+		};
+	};
 	let surface: PrerenderDataSurface | undefined;
 	let surfacePromise: Promise<PrerenderDataSurface> | undefined;
 	const primeSurface = (): void => {
@@ -244,11 +261,18 @@ export function marklessRowComponentMint(
 						: undefined;
 				return marklessThen(built, () => {
 					awaitingCommit = [...awaitingCommit, ...preparedRows.values()];
+					if (preparedRows.size > 0) holdRegistering();
 					return async () => {
 						prepared.delete(repeat.id);
 						const settling = awaitingCommit;
+						const release = releaseRegistering;
 						awaitingCommit = [];
-						for (const row of settling) await row.commit();
+						releaseRegistering = undefined;
+						try {
+							for (const row of settling) await row.commit();
+						} finally {
+							release?.();
+						}
 					};
 				});
 			} catch (error) {

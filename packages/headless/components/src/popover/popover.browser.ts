@@ -327,8 +327,9 @@ test('CSR: opening a second popover closes the first', async () => {
 	press(el<HTMLElement>(SecondTrigger));
 	await expect.poll(() => el(SecondContent).hasAttribute('hidden')).toBe(false);
 	expect(el(FirstContent).hasAttribute('hidden')).toBe(true);
-	expect(el(FirstValue).textContent).toBe('false');
-	expect(el(SecondValue).textContent).toBe('true');
+	// The consumer's onChange is its own module, fetched on its first call, so what it writes can land after the surface opened.
+	await expect.poll(() => el(FirstValue).textContent).toBe('false');
+	await expect.poll(() => el(SecondValue).textContent).toBe('true');
 });
 
 test('CSR: a click calls the consumer onChange once with the next value', async () => {
