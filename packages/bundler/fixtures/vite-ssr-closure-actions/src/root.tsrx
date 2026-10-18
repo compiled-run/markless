@@ -30,6 +30,7 @@ export function App() @{
 			tabindex={section === 'north' ? 0 : -1}
 			onClick={() => (section = 'north')}
 			onKeydown={(event) => {
+				if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
 				const next = nextSection(event.key, 'north');
 				if (next === null) return;
 				event.preventDefault();
@@ -44,6 +45,7 @@ export function App() @{
 			tabindex={section === 'south' ? 0 : -1}
 			onClick={() => (section = 'south')}
 			onKeydown={(event) => {
+				if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
 				const next = nextSection(event.key, 'south');
 				if (next === null) return;
 				event.preventDefault();

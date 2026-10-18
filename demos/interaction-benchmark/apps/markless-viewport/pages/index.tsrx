@@ -96,6 +96,7 @@ export default function Overview() @{
 					tabindex={selectedTab === summaryTab!.id ? 0 : -1}
 					onClick={() => (selectedTab = summaryTab!.id)}
 					onKeydown={(event) => {
+						if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' && event.key !== 'Home' && event.key !== 'End') return;
 						const next = tabForKey(event.key, summaryTab!.id);
 						if (next === null) return;
 						event.preventDefault();
@@ -114,6 +115,7 @@ export default function Overview() @{
 					tabindex={selectedTab === activityTab!.id ? 0 : -1}
 					onClick={() => (selectedTab = activityTab!.id)}
 					onKeydown={(event) => {
+						if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' && event.key !== 'Home' && event.key !== 'End') return;
 						const next = tabForKey(event.key, activityTab!.id);
 						if (next === null) return;
 						event.preventDefault();
@@ -132,6 +134,7 @@ export default function Overview() @{
 					tabindex={selectedTab === notesTab!.id ? 0 : -1}
 					onClick={() => (selectedTab = notesTab!.id)}
 					onKeydown={(event) => {
+						if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' && event.key !== 'Home' && event.key !== 'End') return;
 						const next = tabForKey(event.key, notesTab!.id);
 						if (next === null) return;
 						event.preventDefault();

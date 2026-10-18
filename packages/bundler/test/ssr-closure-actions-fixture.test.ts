@@ -161,6 +161,22 @@ test('compiled closure actions match full resume after every step of every actio
 			await compiled.page.close();
 			await full.page.close();
 		}
+		const keys = await open(browser, 'compiled');
+		await keys.page.evaluate(() => {
+			const seen: Record<string, boolean> = {};
+			(window as { __prevented?: typeof seen }).__prevented = seen;
+			window.addEventListener(
+				'keydown',
+				(event) => (seen[event.key] = event.defaultPrevented),
+			);
+		});
+		await key('tab', '[data-north]', 'Tab').run(keys.page);
+		await key('arrow', '[data-north]', 'ArrowRight').run(keys.page);
+		expect(
+			await keys.page.evaluate(() => (window as { __prevented?: unknown }).__prevented),
+		).toEqual({ Tab: false, ArrowRight: true });
+		expect(keys.errors).toEqual([]);
+		await keys.page.close();
 	} finally {
 		await browser.close();
 		await new Promise((done) => server.close(done));
