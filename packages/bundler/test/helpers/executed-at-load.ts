@@ -59,6 +59,12 @@ export async function executedAtLoad(
 	const browser = await chromium.launch();
 	try {
 		const page = await browser.newPage();
+		const origin = new URL(url).origin;
+		// Only same-origin JS is counted; live third-party images held the load event past 30 s.
+		await page.route(
+			(requestUrl) => requestUrl.origin !== origin,
+			(route) => route.abort('blockedbyclient'),
+		);
 		const cdp = await page.context().newCDPSession(page);
 		const scriptUrls = new Map<string, string>();
 		await cdp.send('Profiler.enable');
@@ -70,7 +76,6 @@ export async function executedAtLoad(
 			await page.waitForSelector(options.settledSelector, { state: 'attached' });
 		await page.waitForLoadState('networkidle');
 		const { result } = await cdp.send('Profiler.takePreciseCoverage');
-		const origin = new URL(url).origin;
 		let executed = 0;
 		for (const script of result) {
 			const scriptUrl = script.url || scriptUrls.get(script.scriptId) || '';
