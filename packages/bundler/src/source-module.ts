@@ -290,6 +290,8 @@ export function emitSourceModule(input: {
 	// An imported component fills rows through its render-data reader.
 	readonly linkedRowSlotReaders?: boolean;
 	readonly linkedRowComponents?: boolean;
+	readonly linkedRowTemplates?: boolean;
+	readonly linkedNestedRepeats?: boolean;
 	readonly canonicalRenderData?: boolean;
 	readonly symbols: ReadonlyArray<SourceSymbolRow>;
 	readonly behaviorSymbols?: ReadonlyArray<SourceSymbolRow>;
@@ -594,8 +596,8 @@ function emitRowMintLoaderInstall(): string {
  * The same one line for per-enclosing-row wiring: only a page holding a `@for`
  * inside another `@for`'s rows names the module, so no other app emits its chunk.
  */
-function nestedRepeatsLoader(runtimeDemandMap: unknown): string | null {
-	return demandsKeyedRepeatModule(runtimeDemandMap, NESTED_REPEATS_RUNTIME_MODULE_ID)
+function nestedRepeatsLoader(runtimeDemandMap: unknown, linked = false): string | null {
+	return linked || demandsKeyedRepeatModule(runtimeDemandMap, NESTED_REPEATS_RUNTIME_MODULE_ID)
 		? [
 				'globalThis.__marklessNestedRepeats ??= (...input) =>',
 				"\timport('@markless/web/fns/nested-repeats').then((nested) => nested.wireNestedRepeats(...input));",
@@ -654,6 +656,8 @@ function componentRowLoader(input: {
 	readonly runtimeDemandMap?: unknown;
 	readonly linkedRowSlotReaders?: boolean;
 	readonly linkedRowComponents?: boolean;
+	readonly linkedRowTemplates?: boolean;
+	readonly linkedNestedRepeats?: boolean;
 }): string | undefined {
 	if (!input.renderDataId) return undefined;
 	// A child module's install runs only if that module is ever evaluated, which resume never needs.
@@ -674,13 +678,17 @@ function clientRowMintLoader(input: {
 	readonly runtimeDemandMap?: unknown;
 	readonly linkedRowSlotReaders?: boolean;
 	readonly linkedRowComponents?: boolean;
+	readonly linkedRowTemplates?: boolean;
+	readonly linkedNestedRepeats?: boolean;
 }): string | null {
 	const mint = demandsRowComponentMint(input.runtimeDemandMap)
 		? emitRowComponentMintLoaderInstall()
 		: (componentRowLoader(input) ??
-			(demandsRowMint(input.runtimeDemandMap) ? emitRowMintLoaderInstall() : null));
+			(input.linkedRowTemplates || demandsRowMint(input.runtimeDemandMap)
+				? emitRowMintLoaderInstall()
+				: null));
 	// Nested repeats wire through the same client module, for the same reason.
-	const nested = nestedRepeatsLoader(input.runtimeDemandMap);
+	const nested = nestedRepeatsLoader(input.runtimeDemandMap, input.linkedNestedRepeats);
 	return mint && nested ? `${mint}\n${nested}` : (mint ?? nested);
 }
 
@@ -762,6 +770,8 @@ export function emitResumeModule(input: {
 	readonly renderDataId?: string;
 	readonly linkedRowSlotReaders?: boolean;
 	readonly linkedRowComponents?: boolean;
+	readonly linkedRowTemplates?: boolean;
+	readonly linkedNestedRepeats?: boolean;
 	// The page's component tree derives from an element() roster, possibly through a child module whose computeds this payload never holds.
 	readonly rosterDerivation?: boolean;
 	readonly installResumeSummary?: boolean;
@@ -870,8 +880,10 @@ export function emitResumeModule(input: {
 		// One global, so a page whose rows are components installs the bridge that
 		// re-exports the template mint instead of a second loader beside it.
 		componentRowLoader(input) ??
-			(demandsRowMint(input.runtimeDemandMap) ? emitRowMintLoaderInstall() : null),
-		nestedRepeatsLoader(input.runtimeDemandMap),
+			(input.linkedRowTemplates || demandsRowMint(input.runtimeDemandMap)
+				? emitRowMintLoaderInstall()
+				: null),
+		nestedRepeatsLoader(input.runtimeDemandMap, input.linkedNestedRepeats),
 		scalarSpecializations.length > 0
 			? [
 					"import { marklessDecodeScalarCell, marklessReadScalarCell, marklessScalarSpecializedError } from '@markless/web/fns/scalar-specialized';",

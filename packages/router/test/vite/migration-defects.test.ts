@@ -292,3 +292,20 @@ test('a component handing its child a value under its own prop name keeps follow
 	expect(errors).toEqual([]);
 	await page.close();
 });
+
+test('nested @for rows in a component imported from a deeper folder fill both levels', async () => {
+	const { page, errors } = await open('/nested-forwarded');
+	await page.click('[data-fill]');
+	await expect
+		.poll(() =>
+			page
+				.locator('[data-field]')
+				.evaluateAll((rows) => rows.map((row) => row.getAttribute('data-field'))),
+		)
+		.toEqual(['b', 'c']);
+	await expect
+		.poll(() => page.locator('[data-item]').allTextContents())
+		.toEqual(['b1', 'b2', 'c1']);
+	expect(errors).toEqual([]);
+	await page.close();
+});

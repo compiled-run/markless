@@ -340,6 +340,13 @@ export type ModuleGraphInterfaceArtifact = {
 			 */
 			readonly rowComponentMint?: true;
 			/**
+			 * Present when this component's tree holds a keyed repeat whose rows the
+			 * template mint builds, so a page placing it must install that mint.
+			 */
+			readonly rowTemplateMint?: true;
+			/** Present when this component's tree holds a keyed repeat inside another repeat's rows. */
+			readonly nestedRepeats?: true;
+			/**
 			 * Present when this component's tree holds an action compiled as a
 			 * closure plan, so a composing page routes plan lookups toward it.
 			 */
