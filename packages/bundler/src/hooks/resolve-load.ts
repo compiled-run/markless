@@ -10,7 +10,7 @@ import {
 	executionLogVirtualModuleSource,
 } from '../execution-log.ts';
 import type { ImportedChild } from '../plugin-state.ts';
-import { symbolVirtualModuleSourceFile } from '../source-module.ts';
+import { MARKLESS_VIRTUAL_PREFIX, symbolVirtualModuleSourceFile } from '../source-module.ts';
 import { marklessVirtualModuleSourceFile } from '../transform.ts';
 import type { MarklessEnvironment } from '../types.ts';
 import {
@@ -107,7 +107,10 @@ export async function loadHook(ctx: MarklessHookContext, pluginContext: PluginCo
 	const normalizedId = normalizeVirtualId(id);
 	const resolverSource = resolverVirtualModuleSourceFile(normalizedId);
 	const symbolSource = symbolVirtualModuleSourceFile(normalizedId);
-	const ownerSource = resolverSource ?? symbolSource;
+	const renderDataSource = normalizedId.startsWith(`${MARKLESS_VIRTUAL_PREFIX}render-data:`)
+		? marklessVirtualModuleSourceFile(normalizedId, ctx.getRoot())
+		: null;
+	const ownerSource = resolverSource ?? symbolSource ?? renderDataSource;
 	// The id resolves from its owner's first pass; only a final publication ships.
 	if (ownerSource) {
 		await moduleMetadata.awaitSourceClaimsPublished(
