@@ -8,6 +8,7 @@ import { chromium, type Locator, type Page } from 'playwright-core';
 import { flatNav, headFor, nav, siteOrigin } from '../nav.ts';
 import { findError } from '../components/docs/errors/lookup.ts';
 import { errorIndex } from '../components/docs/errors/errors-index.ts';
+import { defaultCompilerPasses } from '../../packages/compiler/src/pass-registry.ts';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const shotsDir =
@@ -533,69 +534,51 @@ try {
 			'llms.txt lists every page with a sentence about it',
 		);
 
-		// --- widget: the counter on the landing page ----------------------------
-		// The landing opens on the counter, so the resume proof lives there: the
-		// count is served at nought, and two clicks reach two.
+		// --- widget: the order ticket on the landing page -----------------------
+		// The landing opens on the order ticket, so the resume proof lives there:
+		// one press of Mark ready changes the status line and nothing else.
 		await page.goto(`${origin}/`, { waitUntil: 'load' });
-		const landingDemos = page.locator('.code-block [data-code-stage]');
-		const landingCount = landingDemos.first().getByRole('button');
-		await landingCount.waitFor();
-		const landingText = async () => ((await landingCount.textContent()) ?? '').trim();
+		const ticket = page.locator('.code-block [data-code-stage]').first();
+		const markReady = ticket.getByRole('button');
+		await markReady.waitFor();
+		const ticketLines = async () =>
+			(await ticket.locator('p').allTextContents()).map((text) => text.trim());
+		const buttonText = async () => ((await markReady.textContent()) ?? '').trim();
 		check(
-			(await landingText()) === 'Count 0',
-			'the landing counter serves Count 0 from the server',
-			await landingText(),
+			(await buttonText()) === 'Mark ready 🔔',
+			'the landing ticket serves its Mark ready button',
+			await buttonText(),
 		);
-		await landingCount.click();
+		const servedLines = await ticketLines();
+		check(
+			servedLines.join(' | ') === '☕ Latte for Marcus | Status: Brewing ⏳',
+			'the landing ticket serves the order as brewing',
+			servedLines.join(' | '),
+		);
+		await markReady.click();
 		await settleText(
-			landingCount,
-			(text) => text === 'Count 1',
-			'the landing counter counts the first click',
+			ticket.locator('p').nth(1),
+			(text) => text === 'Status: Ready for pickup ✅',
+			'pressing Mark ready marks the order ready',
+		);
+		const pressedLines = await ticketLines();
+		check(
+			pressedLines.join(' | ') === '☕ Latte for Marcus | Status: Ready for pickup ✅',
+			'one press changes only the status line, so the landing ticket resumed',
+			pressedLines.join(' | '),
 		);
 		check(
-			(await landingText()) === 'Count 1',
-			'clicking the counter adds one, so the landing island resumed',
-			await landingText(),
+			(await buttonText()) === 'Mark ready 🔔',
+			'the button label stays put after the press',
+			await buttonText(),
 		);
-		await landingCount.click();
-		await settleText(
-			landingCount,
-			(text) => text === 'Count 2',
-			'the landing counter counts a second click',
-		);
+		await markReady.click();
 		check(
-			(await landingText()) === 'Count 2',
-			'the count keeps adding on repeat clicks, so the island stayed awake',
-			await landingText(),
-		);
-
-		// --- widget: the rolled die on the landing page --------------------------
-		// The page's other claim is that the component body ran once: the die is
-		// rolled while the body runs, so it must read the same after a click.
-		const rolledLine = landingDemos.nth(1).locator('p').first();
-		const rolledCount = landingDemos.nth(1).getByRole('button');
-		await rolledCount.waitFor();
-		const rolledAt = ((await rolledLine.textContent()) ?? '').trim();
-		check(
-			/^Rolled at setup: [1-6]$/.test(rolledAt),
-			'the die opens on one roll, made when the body ran',
-			rolledAt,
-		);
-		await rolledCount.click();
-		await settleText(
-			rolledCount,
-			(text) => text === 'Count 1',
-			'the die demo counts its click',
-		);
-		check(
-			((await rolledCount.textContent()) ?? '').trim() === 'Count 1',
-			'the die demo button adds one too',
-			((await rolledCount.textContent()) ?? '').trim(),
-		);
-		check(
-			((await rolledLine.textContent()) ?? '').trim() === rolledAt,
-			'the die does not roll again, so the click ran no component body again',
-			((await rolledLine.textContent()) ?? '').trim(),
+			(await expectPoll(ticketLines, (lines: unknown) =>
+				(lines as string[]).join(' | ') === pressedLines.join(' | '),
+			)) && (await ticket.locator('p').count()) === 2,
+			'a second press leaves the ready order as it was',
+			(await ticketLines()).join(' | '),
 		);
 		await page.screenshot({
 			path: `${shotsDir}/T004-landing-widgets-after.png`,
@@ -2680,32 +2663,28 @@ try {
 		const card = (name: string) => page.locator(`section[data-preview="${name}"]`);
 		const watchOf = (name: string) => card(name).locator('.pv-watch-text');
 
+		// The home's Try this list ticks each step by itself once the reader has done it.
 		await page.goto(`${origin}/`, { waitUntil: 'load' });
-		await card('what-markless-noted').locator('.count').click();
-		await settleInner(
-			watchOf('what-markless-noted'),
-			(text) => text.startsWith('Click 1 ran count++'),
-			'the notes card says the click ran count++ and changed one piece of text',
-		);
+		const tryBlock = page.locator('.code-block').first();
+		const trySteps = tryBlock.locator('[data-code-step]');
+		const doneSteps = () =>
+			trySteps.evaluateAll((rows) => rows.map((row) => row.hasAttribute('data-done')));
 		check(
-			(await card('what-markless-noted').locator('.board').getAttribute('data-used')) === 'yes',
-			'after a click the notes and the number they name are marked',
+			(await trySteps.count()) === 3 && (await doneSteps()).every((done) => !done),
+			'the home Try this list serves three steps, none ticked',
+			JSON.stringify(await doneSteps()),
 		);
-		await card('where-it-runs').getByRole('radio', { name: 'server' }).check();
-		await settleInner(
-			card('where-it-runs').locator('.bar'),
-			(text) => text.includes('renderToString()'),
-			'picking server changes the frame to HTML from renderToString()',
-		);
+		await tryBlock.hover();
+		await tryBlock.and(page.locator('[data-code="ready"]')).waitFor({ timeout: 20000 });
+		await retype(page, tryBlock, 'Mark ready 🔔', 'Done 🎉');
+		await tryBlock
+			.frameLocator('.code-frame')
+			.getByRole('button', { name: 'Done 🎉' })
+			.waitFor({ timeout: 30000 });
 		check(
-			(await card('where-it-runs').locator('.pg-tab:visible').first().innerText()) === 'server.ts',
-			'the code band switches to the server file',
-		);
-		await card('where-it-runs').locator('.count').click();
-		await settleInner(
-			watchOf('where-it-runs'),
-			(text) => text.includes('click 1 changed only the number'),
-			'the same counter counts in every place',
+			await expectPoll(doneSteps, (done: unknown) => JSON.stringify(done) === '[true,false,false]'),
+			'renaming the button ticks the first step and only that one',
+			JSON.stringify(await doneSteps()),
 		);
 
 		await page.goto(`${origin}/tooling/editor-setup`, { waitUntil: 'load' });
@@ -2902,30 +2881,45 @@ try {
 		await page.goto(`${origin}/how-it-works/compiler`, { waitUntil: 'load' });
 		const passCard = page.locator('section[data-preview="compiler-passes"]');
 		const passWhere = passCard.locator('.where');
+		const passTotal = defaultCompilerPasses.length;
+		const viewReaders = defaultCompilerPasses
+			.slice(9)
+			.filter((pass) => pass.consumes.includes('protocolView')).length;
 		await passWhere.waitFor();
 		check(
-			((await passWhere.textContent()) ?? '').trim() === 'Pass 1 of 15',
+			((await passWhere.textContent()) ?? '').trim() === `Pass 1 of ${passTotal}`,
 			'the pass card opens on pass 1',
 			((await passWhere.textContent()) ?? '').trim(),
 		);
 		const passNext = passCard.getByRole('button', { name: 'Next →' });
 		await passNext.click();
-		await see(passWhere, (text) => text === 'Pass 2 of 15', 'Next moves to pass 2');
+		await see(passWhere, (text) => text === `Pass 2 of ${passTotal}`, 'Next moves to pass 2');
 		check(
 			(await passCard.locator('.chip.read').allTextContents()).join() === 'semanticGraph' &&
 				(await passCard.locator('.chip.new').allTextContents()).join() === 'stateLowering',
 			'pass 2 reads the semantic graph and writes stateLowering',
 		);
 		for (let pass = 3; pass <= 9; pass += 1) await passNext.click();
-		await see(passWhere, (text) => text === 'Pass 9 of 15', 'Next reaches pass 9');
+		await see(passWhere, (text) => text === `Pass 9 of ${passTotal}`, 'Next reaches pass 9');
 		await see(
 			passCard.locator('.pv-watch-text'),
-			(text) => text === 'New: protocolView. 5 later passes read it.',
+			(text) => text === `New: protocolView. ${viewReaders} later passes read it.`,
 			'the Watch line counts the later passes that read the view record',
 		);
 		check(
 			((await passCard.locator('.out').textContent()) ?? '').includes('"symbol:1"'),
 			'pass 9 shows the view record excerpt with its symbol IDs',
+		);
+		for (let pass = 10; pass <= passTotal; pass += 1) await passNext.click();
+		await see(
+			passWhere,
+			(text) => text === `Pass ${passTotal} of ${passTotal}`,
+			'Next steps through every pass to the last one',
+		);
+		await see(
+			passCard.locator('.pv-watch-text'),
+			(text) => text.endsWith('That is the last pass.'),
+			'the last pass says it is the last',
 		);
 
 		await page.goto(`${origin}/how-it-works/payload`, { waitUntil: 'load' });
@@ -3101,8 +3095,8 @@ try {
 			);
 		}
 
-		// --- the landing comparison stays behind its collapsible -------------------
-		await page.goto(`${origin}/`, { waitUntil: 'load' });
+		// --- the computed page keeps its framework comparison behind a collapsible --
+		await page.goto(`${origin}/concepts/computed`, { waitUntil: 'load' });
 		const comparison = page
 			.locator('.collapsible')
 			.filter({ has: page.getByRole('button', { name: 'Coming from another framework?' }) });
@@ -3119,7 +3113,7 @@ try {
 		await comparisonText.waitFor({ state: 'visible' });
 		check(
 			(await comparisonTrigger.getAttribute('aria-expanded')) === 'true' &&
-				/\.value/.test(await comparisonText.innerText()),
+				/dependency array/.test(await comparisonText.innerText()),
 			'opening the comparison exposes its actual text',
 		);
 		await comparisonTrigger.click();

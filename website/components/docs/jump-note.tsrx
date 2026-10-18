@@ -19,6 +19,9 @@ export default function JumpNote({ lead, link, href }: { readonly lead: string; 
 		<style>
 			.jump {
 				width: fit-content;
+				/* Leaves room for the cast shadow that hangs 26px past the right edge. */
+				box-sizing: border-box;
+				max-width: calc(100% - 20px);
 				margin: var(--space-l) auto;
 				padding: 1.1rem 1.6rem 1.7rem;
 				rotate: -0.8deg;

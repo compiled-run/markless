@@ -56,6 +56,11 @@ const NOTES: Record<string, { readonly does: string; readonly out: string; reado
 		out: 'export function Counter() { … }\n  ↑ the browser module\nasync function marklessRenderSsr(props = {}, …)\n  ↑ the server module',
 		marks: 'state',
 	},
+	'server-only-props': {
+		does: 'Stops the compile if browser code reads a prop the server keeps to itself.',
+		out: 'diagnostics  []',
+		marks: '',
+	},
 	'payload-scripts': {
 		does: 'Writes the markless/state and markless/view script tags.',
 		out: '<script type="markless/state">…</script>\n<script type="markless/view">…</script>',

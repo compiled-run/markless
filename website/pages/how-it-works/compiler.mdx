@@ -38,7 +38,7 @@ same output, or a cycle stops the compile with `MARKLESS_COMPILER_PASS_GRAPH_INV
 The _semantic graph_ is the first pass's output. It lists every piece of state, element, read and
 write in the file, with what each one means. Every later pass works from it.
 
-For the counter, the chain runs 15 passes, in this order:
+For the counter, the chain runs 16 passes, in this order:
 
 | Pass | What it does |
 | --- | --- |
@@ -52,6 +52,7 @@ For the counter, the chain runs 15 passes, in this order:
 | `protocol-state` | Writes the state record |
 | `protocol-view` | Writes the view record, with symbol IDs on each entry |
 | `public-render-module` | Writes the browser and server render modules, and picks the direct module when it can |
+| `server-only-props` | Stops the compile if browser code reads a prop the server keeps to itself |
 | `payload-scripts` | Writes the `markless/state` and `markless/view` script tags |
 | `symbol-modules` | Writes one module source per symbol |
 | `runtime-demand-map` | Maps each symbol and record to the runtime code it needs |

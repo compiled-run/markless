@@ -53,6 +53,9 @@ export function createStoragePlane(input: {
 					);
 				} catch {}
 				setStorageAttribute(record.key, value);
+				// A client navigation wakes the next page from this slot, so it must hold the live value.
+				const slot = storageSlot();
+				if (slot) slot[storageSlotEntryKeyFromGraphNodeId(record.graphNodeId)] = String(value);
 			},
 		}),
 	);

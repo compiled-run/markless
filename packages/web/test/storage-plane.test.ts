@@ -113,3 +113,22 @@ test('one throwing driver write does not block attributes or later storage subsc
 	expect(setAttribute).toHaveBeenCalledWith('data-contrast', 'high');
 	plane.dispose();
 });
+
+test('a write updates the protocol slot, so a page woken later on the same document adopts it', async () => {
+	(globalThis as typeof globalThis & Record<symbol, unknown>)[storageSlotSymbol] = {
+		'src/App.tsrx#theme-mode': 'light',
+	};
+	vi.stubGlobal('localStorage', { getItem: vi.fn(), setItem: vi.fn() });
+	vi.stubGlobal('document', { documentElement: { setAttribute: vi.fn() } });
+	vi.stubGlobal('location', { protocol: 'http:' });
+
+	const state = storageState();
+	const first = await createRuntimeGraphFromStatePayload(state as never);
+	const plane = createStoragePlane({ graph: first, state: state as never });
+	first.write({ graphNodeId: 'storage:src/App.tsrx#theme-mode', value: 'dark' });
+	await first.flush();
+	plane.dispose();
+
+	const next = await createRuntimeGraphFromStatePayload(state as never);
+	expect(next.read('storage:src/App.tsrx#theme-mode')).toBe('dark');
+});
