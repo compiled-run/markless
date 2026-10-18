@@ -16,6 +16,8 @@ export const checkNames: Readonly<Record<string, string>> = {
 	network: 'Every request the page makes',
 	data: 'Endpoints that return data, field by field',
 	weight: 'JavaScript downloaded and run at load',
+	responsiveness: 'How fast clicks and links answer',
+	coverage: 'Every page of the old site exists',
 };
 
 const kB = (bytes: number) => {
@@ -38,6 +40,17 @@ const host = (url: string) => new URL(url).host;
 const patternName = (pattern: string, kind: string) =>
 	kind === 'not-found' ? 'A page that does not exist' : pattern;
 
+/** `10 of 491`, or `not counted yet` before a coverage run. */
+export function pagesMoved(app: ShowcaseApp): string {
+	return app.coverage ? `${app.coverage.ported} of ${app.coverage.total}` : 'not counted yet';
+}
+
+/** Checks (report dimensions) with no failure left, of the checks that ran. */
+export function checksPassed(app: ShowcaseApp): string {
+	const ran = app.checks.filter((check) => check.passed + check.failed > 0);
+	return `${ran.filter((check) => check.failed === 0).length} of ${ran.length}`;
+}
+
 export type Card = {
 	readonly slug: string;
 	readonly name: string;
@@ -45,6 +58,9 @@ export type Card = {
 	readonly shot: string;
 	readonly alt: string;
 	readonly inProgress: boolean;
+	readonly statusLabel: string;
+	readonly pagesMoved: string;
+	readonly checksPassed: string;
 	readonly before: string;
 	readonly after: string;
 	readonly tone: string;
@@ -59,6 +75,9 @@ export const cards: readonly Card[] = showcaseApps.map((app, at) => ({
 	shot: app.shot,
 	alt: `The ${app.name} home page, served by Markless`,
 	inProgress: app.status === 'in-progress',
+	statusLabel: app.status === 'done' ? 'Done' : 'In progress',
+	pagesMoved: pagesMoved(app),
+	checksPassed: checksPassed(app),
 	before: kB(app.headline.before),
 	after: kB(app.headline.after),
 	tone: tones[at % tones.length],
@@ -118,7 +137,34 @@ export type AppView = {
 		readonly reason: string;
 	}[];
 	readonly status: string;
+	readonly pagesMoved: string;
+	readonly checksPassed: string;
+	readonly missing: readonly string[];
+	readonly missingMore: number;
 };
+
+const missingShown = 12;
+
+function statusText(app: ShowcaseApp, switchedCount: number, forced: boolean): string {
+	if (app.status === 'done') return 'Done: every page moved and every check passes.';
+	const coverage = app.coverage;
+	const left = [
+		!coverage
+			? 'Pages not counted yet.'
+			: coverage.ported < coverage.total
+				? `${coverage.total - coverage.ported} pages still to move.`
+				: '',
+		coverage?.signedOutOnly ? 'Signed-in pages not counted yet.' : '',
+		coverage?.partial ? 'The last count covered only part of the site.' : '',
+		app.checks.some((check) => check.failed > 0) ? 'Some checks are red.' : '',
+		!switchedCount
+			? 'The front door still serves the old app.'
+			: forced
+				? 'Some pages were switched by hand.'
+				: '',
+	].filter(Boolean);
+	return `In progress. ${left.join(' ')}`;
+}
 
 export function appView(app: ShowcaseApp): AppView {
 	const pages = app.routes.filter((route) => route.kind !== 'slash-redirect');
@@ -160,11 +206,11 @@ export function appView(app: ShowcaseApp): AppView {
 		.flatMap((route) => route.rows);
 	const slashPages = slashed.reduce((sum, row) => sum + row.pages, 0);
 	const slashGreen = slashed.reduce((sum, row) => sum + row.green, 0);
-	const live = app.status === 'live';
+	const done = app.status === 'done';
+	const forced = app.routes.some((route) => route.forcedReason !== null);
 	const switchedCount = app.routes.filter(
 		(route) => route.kind === 'page' && route.switched,
 	).length;
-	const pageCount = app.routes.filter((route) => route.kind === 'page').length;
 	return {
 		app,
 		hostName: host(app.links.frontDoor),
@@ -174,8 +220,8 @@ export function appView(app: ShowcaseApp): AppView {
 				id: 'access',
 				text:
 					app.access === 'url-only'
-						? 'Moved from the live URL alone, no source code'
-						: 'Moved from its source code',
+						? 'Working from the live URL alone, no source code'
+						: 'Working from its source code',
 			},
 			{ id: 'sign-in', text: app.signIn ? 'Has sign-in' : 'No sign-in' },
 		],
@@ -187,15 +233,15 @@ export function appView(app: ShowcaseApp): AppView {
 			timeZone: 'UTC',
 		}),
 		summary: `${app.pagesGreen} of ${app.pagesChecked} page checks green`,
-		status: live
-			? `Live: ${switchedCount} of ${pageCount} routes switched to Markless.`
-			: switchedCount
-				? `In progress: ${switchedCount} of ${pageCount} routes switched by hand while some checks are still red.`
-				: `In progress: not switched yet, so the front door still serves the old page.`,
+		status: statusText(app, switchedCount, forced),
+		pagesMoved: pagesMoved(app),
+		checksPassed: checksPassed(app),
+		missing: (app.coverage?.missing ?? []).slice(0, missingShown),
+		missingMore: Math.max(0, (app.coverage?.missing.length ?? 0) - missingShown),
 		links: [
 			{
 				id: 'front',
-				label: live || switchedCount ? 'Visit migrated site' : 'Visit the front door',
+				label: done ? 'Visit the site' : 'Visit the front door',
 				href: app.links.frontDoor,
 				main: true,
 			},

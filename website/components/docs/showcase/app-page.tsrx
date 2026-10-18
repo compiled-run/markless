@@ -19,6 +19,7 @@ export default function AppPage({ slug }: { readonly slug: string }) @{
 	const gaps = view ? view.gaps : [];
 	const red = view ? view.red : [];
 	const extra = view ? view.extra : [];
+	const missing = view ? view.missing : [];
 	const roles = app?.signIn ?? false;
 
 	<div class="app-page">
@@ -26,14 +27,14 @@ export default function AppPage({ slug }: { readonly slug: string }) @{
 		<ThemeToggle />
 		@if (view && app) {
 			<p class="crumb">
-				<Link href="/start/migrate">Apps already moved</Link>
+				<Link href="/start/migrate">Apps being moved</Link>
 				<span aria-hidden="true">/</span>
 				<span>{app.name}</span>
 			</p>
 			<div class="head">
 				<div class="title">
 					<h1>{app.name}</h1>
-					<span class="sticker" hidden={!inProgress}>In progress</span>
+					<span class={inProgress ? 'sticker' : 'sticker is-done'}>{inProgress ? 'In progress' : 'Done'}</span>
 				</div>
 				<ul class="facts">
 					@for (const fact of facts; key fact.id) {
@@ -54,6 +55,10 @@ export default function AppPage({ slug }: { readonly slug: string }) @{
 					/>
 				</BrowserFrame>
 				<div class="stat">
+					<span class="tally">
+						<span>Pages moved: <b>{view.pagesMoved}</b></span>
+						<span>Checks passed: <b>{view.checksPassed}</b></span>
+					</span>
 					<span class="stat-label">JavaScript run at load, home page</span>
 					<span class="stat-value">{view.headline}</span>
 					<span class="stat-note">{view.summary}, checked {view.checkedOn}.</span>
@@ -68,6 +73,18 @@ export default function AppPage({ slug }: { readonly slug: string }) @{
 					</li>
 				}
 			</ul>
+
+			@if (missing.length) {
+				<h2 id="not-moved-yet">Pages not moved yet</h2>
+				<ul class="plain-list note">
+					@for (const route of missing; key route) {
+						<li class="path">{route}</li>
+					}
+				</ul>
+				@if (view.missingMore) {
+					<p class="note">And {view.missingMore} more in the full report.</p>
+				}
+			}
 
 			<h2 id="before-and-after">Before and after, per route</h2>
 			<p class="lede">
@@ -147,7 +164,7 @@ export default function AppPage({ slug }: { readonly slug: string }) @{
 			}
 
 			<h2 id="what-was-checked">What was checked</h2>
-			<p class="lede">Every page was loaded in the old app and in Markless, at desktop and phone widths, and compared on each of these. Counts are pages that passed.</p>
+			<p class="lede">Every page was loaded in the old app and in Markless, at desktop and phone widths, and compared on each of these. Counts are pages that passed. Animations are not compared yet.</p>
 			<ul class="checks">
 				@for (const check of checks; key check.id) {
 					<li>
@@ -185,7 +202,7 @@ export default function AppPage({ slug }: { readonly slug: string }) @{
 			<div class="missing">
 				<h1>No app with that name</h1>
 				<p>
-					<Link href="/start/migrate">See every app already moved</Link>
+					<Link href="/start/migrate">See every app being moved</Link>
 				</p>
 			</div>
 		}
@@ -226,8 +243,8 @@ export default function AppPage({ slug }: { readonly slug: string }) @{
 				transform: rotate(-3deg);
 			}
 
-			.sticker[hidden] {
-				display: none;
+			.sticker.is-done {
+				background: var(--green-star);
 			}
 
 			.facts {
@@ -278,6 +295,18 @@ export default function AppPage({ slug }: { readonly slug: string }) @{
 
 			.stat span {
 				line-height: 1.35;
+			}
+
+			.tally {
+				display: grid;
+				gap: 0.15em;
+				margin-bottom: 0.5em;
+				font-size: var(--step-0);
+			}
+
+			.tally b {
+				font-family: var(--font-mono);
+				font-weight: 800;
 			}
 
 			.stat-label {

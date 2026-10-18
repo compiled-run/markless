@@ -37,13 +37,29 @@ export type ShowcaseAccepted = {
 
 export type ShowcaseGap = { readonly title: string; readonly detail: string };
 
+/** How many routes of the old site the new app has, from the coverage run. */
+export type ShowcaseCoverage = {
+	readonly ported: number;
+	readonly total: number;
+	/** Routes the new app lacks, when the report lists them. */
+	readonly missing: readonly string[];
+	/** The run checked only part of the site, or some routes did not answer. */
+	readonly partial: boolean;
+	/** Only signed-out routes were counted, on an app that has sign-in. */
+	readonly signedOutOnly: boolean;
+	readonly measuredAt: string;
+};
+
 export type ShowcaseApp = {
 	readonly slug: string;
 	readonly name: string;
 	readonly builtWith: string;
 	readonly access: 'source' | 'url-only';
 	readonly signIn: boolean;
-	readonly status: 'live' | 'in-progress';
+	/** `done` only when every route is ported, every check is green (or accepted) and every page is switched. */
+	readonly status: 'done' | 'in-progress';
+	/** `null` when no coverage run has been recorded. */
+	readonly coverage: ShowcaseCoverage | null;
 	readonly checkedAt: string;
 	readonly pagesGreen: number;
 	readonly pagesChecked: number;

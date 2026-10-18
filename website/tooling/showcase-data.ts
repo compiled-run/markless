@@ -1,13 +1,15 @@
-// Builds the "Apps already moved" showcase data from a markless-migrate checkout: the published check
+// Builds the migrate page's showcase data from a markless-migrate checkout: the published check
 // reports, the switched-route lists, the front doors' rewrites and the migration logs. Every number comes
 // from those files; every typed label carries an `evidence` string that must appear in the app's log.
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type {
 	BeforeAfter,
 	BytesRange,
 	ShowcaseAccepted,
 	ShowcaseApp,
+	ShowcaseCoverage,
 	ShowcaseGap,
 	ShowcaseRoute,
 	ShowcaseRow,
@@ -166,7 +168,54 @@ type Report = {
 	readonly startedAt: string;
 	readonly routes: readonly ReportRoute[];
 	readonly roles?: readonly string[];
+	readonly partial?: { readonly checked: number; readonly total: number | null };
+	readonly coverage?: {
+		readonly total: number;
+		readonly present: number;
+		readonly missing: readonly string[];
+		readonly unreachable?: readonly string[];
+	};
 };
+
+/** Coverage measured before the reports carried it, read from tooling/showcase-coverage.json. */
+export type CoverageOverride = {
+	readonly measuredAt: string;
+	readonly apps: Readonly<Record<string, { readonly ported: number; readonly total: number }>>;
+};
+
+export function readCoverageOverride(): CoverageOverride {
+	return JSON.parse(
+		readFileSync(fileURLToPath(new URL('./showcase-coverage.json', import.meta.url)), 'utf8'),
+	) as CoverageOverride;
+}
+
+/** The report's coverage when it has one, else the dated override; coverage is measured signed out. */
+export function routeCoverage(
+	slug: string,
+	report: Report,
+	override: CoverageOverride,
+): ShowcaseCoverage | null {
+	const signedOutOnly = Boolean(report.roles?.some((role) => role !== 'anonymous'));
+	if (report.coverage)
+		return {
+			ported: report.coverage.present,
+			total: report.coverage.total,
+			missing: [...report.coverage.missing],
+			partial: Boolean(report.partial) || Boolean(report.coverage.unreachable?.length),
+			signedOutOnly,
+			measuredAt: report.startedAt,
+		};
+	const measured = override.apps[slug];
+	if (!measured) return null;
+	return {
+		ported: measured.ported,
+		total: measured.total,
+		missing: [],
+		partial: false,
+		signedOutOnly,
+		measuredAt: override.measuredAt,
+	};
+}
 type Switched = {
 	readonly routes: readonly {
 		readonly route: string;
@@ -312,7 +361,12 @@ function unknownPath(root: string): string {
 	return found[1];
 }
 
-function buildApp(root: string, app: AppSource, notFound: string): ShowcaseApp {
+function buildApp(
+	root: string,
+	app: AppSource,
+	notFound: string,
+	override: CoverageOverride,
+): ShowcaseApp {
 	const log = readFileSync(resolve(root, 'examples', app.log), 'utf8');
 	const front = resolve(root, 'deploy', app.deploy, 'front');
 	const report = JSON.parse(
@@ -472,7 +526,15 @@ function buildApp(root: string, app: AppSource, notFound: string): ShowcaseApp {
 		}
 
 	const checkedPages = routes.filter((one) => one.kind === 'page');
-	const live = checkedPages.every((one) => one.switched && !one.forcedReason);
+	const switchedAll = checkedPages.every((one) => one.switched && !one.forcedReason);
+	const coverage = routeCoverage(app.slug, report, override);
+	const ported =
+		coverage !== null &&
+		coverage.ported === coverage.total &&
+		!coverage.partial &&
+		!coverage.signedOutOnly;
+	const checks = [...checkTotals.values()];
+	const green = checks.every((one) => one.failed === 0) && red.size === 0;
 	const home = report.routes.find((one) => one.route === '/' && one.weight);
 	if (!home?.weight) throw new Error(`showcase: ${app.slug} report has no weighed "/" route`);
 	const checkedPatterns = new Set(routes.map((one) => one.pattern));
@@ -486,12 +548,13 @@ function buildApp(root: string, app: AppSource, notFound: string): ShowcaseApp {
 		builtWith: checkedFact(app.builtWith, log, 'builtWith'),
 		access: /from the URL alone/.test(log.split('\n')[0]) ? 'url-only' : 'source',
 		signIn: Boolean(report.roles?.length),
-		status: live ? 'live' : 'in-progress',
+		status: switchedAll && ported && green ? 'done' : 'in-progress',
+		coverage,
 		checkedAt: report.startedAt,
 		pagesGreen: report.routes.filter((one) => one.ok).length,
 		pagesChecked: report.routes.length,
 		routes,
-		checks: [...checkTotals.values()],
+		checks,
 		switchedWithoutCheck: switched
 			.filter((one) => !checkedPatterns.has(one.route) && one.forced)
 			.map((one) => ({ route: one.route, reason: one.forced!.reason })),
@@ -527,9 +590,17 @@ function buildApp(root: string, app: AppSource, notFound: string): ShowcaseApp {
 }
 
 /** Every showcase app, in the order the page shows them, built from a markless-migrate checkout at `root`. */
-export function buildShowcase(root: string): ShowcaseApp[] {
+export function buildShowcase(
+	root: string,
+	override: CoverageOverride = readCoverageOverride(),
+): ShowcaseApp[] {
 	const notFound = unknownPath(root);
-	return apps.map((app) => buildApp(root, app, notFound));
+	const unknown = Object.keys(override.apps).filter(
+		(slug) => !apps.some((app) => app.slug === slug),
+	);
+	if (unknown.length)
+		throw new Error(`showcase: coverage override names no showcase app: ${unknown.join(', ')}`);
+	return apps.map((app) => buildApp(root, app, notFound, override));
 }
 
 /** The files `buildShowcase` reads, so a test can tell whether the checkout is on this machine. */

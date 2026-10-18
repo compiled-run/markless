@@ -1,0 +1,14 @@
+{
+	"why": "The published reports predate the coverage dimension. Delete an entry once its report.json carries coverage.",
+	"measuredAt": "2026-10-18",
+	"apps": {
+		"docusaurus": { "ported": 10, "total": 491 },
+		"htmx-org": { "ported": 6, "total": 300 },
+		"alpinejs-dev": { "ported": 3, "total": 101 },
+		"vite-dev": { "ported": 80, "total": 115 },
+		"shadcn-admin": { "ported": 2, "total": 7 },
+		"conduit": { "ported": 44, "total": 44 },
+		"remix-notes": { "ported": 3, "total": 3 },
+		"next-dashboard": { "ported": 2, "total": 2 }
+	}
+}

@@ -3,7 +3,7 @@ import { asset } from '../../../site-base.ts';
 import { cards } from './view.ts';
 
 export default function ShowcaseGrid() @{
-	<ul class="showcase" aria-label="Apps moved with markless-migrate">
+	<ul class="showcase" aria-label="Apps being moved with markless-migrate">
 		@for (const card of cards; key card.slug) {
 			<li class={'card tone-' + card.tone}>
 				<Link href="/start/migrate/[app]" params={{ app: card.slug }} class="hit">
@@ -12,6 +12,10 @@ export default function ShowcaseGrid() @{
 					</span>
 					<span class="name">{card.name}</span>
 					<span class="built">Was built with {card.builtWith}</span>
+					<span class="tally">
+						<span>Pages moved: <b>{card.pagesMoved}</b></span>
+						<span>Checks passed: <b>{card.checksPassed}</b></span>
+					</span>
 					<span class="metric">
 						<span class="metric-label">JavaScript run at load, home page</span>
 						<span class="metric-value">
@@ -22,7 +26,7 @@ export default function ShowcaseGrid() @{
 						</span>
 					</span>
 				</Link>
-				<span class="progress" hidden={!card.inProgress}>In progress</span>
+				<span class={card.inProgress ? 'progress' : 'progress is-done'}>{card.statusLabel}</span>
 			</li>
 		}
 		<style>
@@ -107,7 +111,20 @@ export default function ShowcaseGrid() @{
 			}
 
 			.name + .built {
+				margin-bottom: 0.3em;
+			}
+
+			.tally {
+				display: grid;
+				padding-inline: 0.2rem;
 				margin-bottom: 0.6em;
+				font-size: var(--step--1);
+				line-height: 1.35;
+			}
+
+			.tally b {
+				font-family: var(--font-mono);
+				font-weight: 800;
 			}
 
 			.built {
@@ -166,8 +183,8 @@ export default function ShowcaseGrid() @{
 				pointer-events: none;
 			}
 
-			.progress[hidden] {
-				display: none;
+			.progress.is-done {
+				background: var(--green-star);
 			}
 
 			.sr-only {
@@ -187,13 +204,13 @@ export default function ShowcaseGrid() @{
 				.hit {
 					display: grid;
 					grid-template-columns: 38% minmax(0, 1fr);
-					grid-template-rows: auto auto 1fr;
+					grid-template-rows: auto auto auto 1fr;
 					column-gap: 0.75em;
 					padding: 0.5rem;
 				}
 
 				.thumb {
-					grid-row: 1 / 4;
+					grid-row: 1 / 5;
 					align-self: start;
 					margin: 0;
 				}
@@ -202,7 +219,8 @@ export default function ShowcaseGrid() @{
 					font-size: var(--step-0);
 				}
 
-				.name + .built {
+				.name + .built,
+				.tally {
 					margin-bottom: 0.3em;
 				}
 
