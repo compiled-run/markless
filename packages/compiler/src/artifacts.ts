@@ -1917,6 +1917,14 @@ export type CaptureSlotRoute =
 			readonly path: ReadonlyArray<string>;
 	  }
 	| {
+			// The keyed row's item the edge passed (`item`, `item.cell`), read at dispatch from the row it fired in.
+			readonly kind: 'row-local';
+			readonly componentEdgeId: string;
+			readonly componentEdgePath?: ReadonlyArray<string>;
+			readonly itemName: string;
+			readonly path: ReadonlyArray<string>;
+	  }
+	| {
 			readonly kind: 'unsupported-opaque';
 			readonly componentEdgeId: string;
 			readonly componentEdgePath?: ReadonlyArray<string>;

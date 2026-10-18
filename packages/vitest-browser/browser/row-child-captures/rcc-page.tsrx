@@ -1,9 +1,8 @@
 import { state } from '@markless/core';
-import { SortHeader } from './rcc-cells.tsrx';
-
-type Column = { readonly id: string; readonly name: string };
+import { ColumnHeader, SortHeader, type Column } from './rcc-cells.tsrx';
 
 export default function RowChildCapturesPage() @{
+	let sortKey = state('');
 	let closed = state('');
 	let cols = state<Column[]>([
 		{ id: 'serial', name: 'Serial' },
@@ -17,6 +16,12 @@ export default function RowChildCapturesPage() @{
 		>
 			add
 		</button>
+		<div data-props>
+			@for (const col of cols; key col.id) {
+				<ColumnHeader col={col} onSort={(id) => (sortKey = id)} />;
+			}
+		</div>
+		<output data-sort>{sortKey}</output>
 		<div data-closures>
 			@for (const col of cols; key col.id) {
 				<SortHeader label={col.name} onSort={() => (closed = col.id)} />;

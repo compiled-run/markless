@@ -125,6 +125,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'			}',
 		// A prop the root forwarded from its own props: the root's props are the page-space `prop:props` cell.
 		'			if (route.kind === "passthrough-route") return context.graph.read("prop:props", [route.propName, ...(route.path ?? []), ...(slot.path ?? [])]);',
+		'			if (route.kind === "row-local") return route.path.reduce((value, key) => value == null ? value : value[key], context.locals?.[route.itemName]);',
 		'			throw new Error(`Capture slot ${slotId} is a callback route`);',
 		'		},',
 		'		invoke(slotId, args) {',

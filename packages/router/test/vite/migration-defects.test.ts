@@ -341,3 +341,24 @@ test('a same-module child given a state prop writes it into page-scope shared st
 	expect(errors).toEqual([]);
 	await page.close();
 });
+
+test('a child rendered per row reads its row prop in a handler, served and added', async () => {
+	const { page, errors } = await open('/row-props');
+	await page.click('[data-header-text="time"]');
+	await expect.poll(() => text(page, '[data-sort]')).toBe('time');
+	await page.click('[data-shared-header="channel"]');
+	await expect.poll(() => text(page, '[data-shared-sort]')).toBe('sorted by channel');
+	await page.click('[data-cell="b"]');
+	await expect.poll(() => text(page, '[data-picked]')).toBe('2');
+	await page.click('[data-bound-header="serial"]');
+	await expect.poll(() => text(page, '[data-sort]')).toBe('bound serial');
+	await page.click('[data-local-cell="c"]');
+	await expect.poll(() => text(page, '[data-shared-picked]')).toBe('3');
+	await page.click('[data-add-item]');
+	await page.click('[data-cell="d"]');
+	await expect.poll(() => text(page, '[data-picked]')).toBe('4');
+	await page.click('[data-local-cell="d"]');
+	await expect.poll(() => text(page, '[data-shared-picked]')).toBe('4');
+	expect(errors).toEqual([]);
+	await page.close();
+});
