@@ -86,8 +86,6 @@ Lower priority or parked:
 - `packages/cli/test/starter-build.test.ts`: `serve()` gives the built server 100 polls x 100 ms (10 s) to serve its own first page; a cold start under machine load (load average about 8) takes longer. Use a time-based deadline well inside the 180 s test timeout.
 - `packages/bundler/test/helpers/demo-build-lock.ts`: a lock is stale only after 15 minutes, but `music-player-csr-budget.test.ts` waits 8 minutes in `beforeAll`, so one killed run makes the next run fail. Make staleness depend on the holder process being gone, or shorter than the hook timeout.
 
-- `packages/router/boxes/router-streaming-settle.box.ts` failed once on a CI rerun of main `8f972696` (2026-10-17): expected `[data-harbor-logged]` to read "Logged 2" but it read "Logged 4", so two clicks counted four times; it passed on the next rerun and in every local run. Find out whether a click can be replayed and also run live before treating it as a flake.
-
 ## Framework defects found while building docs figures 2026-10-11
 
 - A keyed `@for` over a `computed()` list on an MDX page throws `MARKLESS_MDX_RENDER_DATA_ROOT_MISSING: 0` and stops clicks working. Worked around in `website/components/figures/state/` by looping over frozen art.
