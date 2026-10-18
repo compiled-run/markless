@@ -1039,6 +1039,7 @@ function resolvePropCaptureRoute(
 			componentEdgePath: edgePathIds,
 			graphNodeId: scoped?.binding.id ?? prop.graphNodeId,
 			path: [...(scoped?.path ?? prop.path), ...forwardedPath, ...readPath],
+			...(edgeIndex < componentEdgePath.length - 1 ? { ownerEdgeCount: edgeIndex } : {}),
 		};
 	}
 	if (prop.kind === 'serializable') {

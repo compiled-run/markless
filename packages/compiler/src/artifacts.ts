@@ -1850,6 +1850,8 @@ export type CaptureSlotRoute =
 			readonly componentEdgePath?: ReadonlyArray<string>;
 			readonly graphNodeId: string;
 			readonly path: ReadonlyArray<string>;
+			/** Edges of `componentEdgePath` above the component that owns `graphNodeId`, when a prop forwarded it from further up. */
+			readonly ownerEdgeCount?: number;
 	  }
 	| {
 			readonly kind: 'compiler-known-constant';

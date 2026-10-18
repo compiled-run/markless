@@ -270,3 +270,14 @@ test('a streamed @try joining its async value with state updates text and attrib
 	expect(errors).toEqual([]);
 	await page.close();
 });
+
+test('a computed forwarded through a second component reaches the inner computed', async () => {
+	const { page, errors } = await open('/prop-forwarded');
+	await page.click('[data-next]');
+	await expect.poll(() => text(page, '[data-direct] p')).toBe('got v1');
+	await expect.poll(() => text(page, '[data-outer] p')).toBe('got v1');
+	await page.click('[data-next]');
+	await expect.poll(() => text(page, '[data-outer] p')).toBe('got v2');
+	expect(errors).toEqual([]);
+	await page.close();
+});
