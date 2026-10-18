@@ -511,17 +511,56 @@ export function Row({ item }) @{
 	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowComponent');
 });
 
-// A count render time decides - here a nested @for - never resolves to a number,
-// so the interface answers "unknown" and the row refuses on that alone.
-test('an imported component whose element count is unknown ships no identity', async () => {
-	const view = await viewOfImportedRow(
-		`export function Row({ item }) @{
+// The browser renders the whole row, so a nested @for counts its own nodes there
+// and its rows wire from the row's own records: no known count is needed.
+test('an imported component holding a nested @for ships its identity', async () => {
+	const nestedRow = `export function Row({ item }) @{
 	<li>@for (const tag of item.tags; key tag.id) { <b>{tag.name}</b> }</li>
 }
-`,
-		importingApp,
-	);
-	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowComponent');
+`;
+	const child = await buildSemanticGraph({ filename: 'src/row.tsrx', source: nestedRow });
+	expect(child.moduleGraphInterface.render.components[0]?.constructReach).toBe('repeats');
+
+	const view = await viewOfImportedRow(nestedRow, importingApp);
+	expect(view.keyedRepeats?.[0]?.rowComponent).toEqual({
+		componentEdgeId: 'component-edge:0',
+		componentName: 'App',
+		itemPropName: 'item',
+	});
+});
+
+test('a local component that renders itself in its own @for ships its identity at both levels', async () => {
+	const view = await viewOf(`
+import { state } from '@markless/core';
+
+function Branch({ twig }) @{
+	<details data-twig={twig.key}>
+		<summary>{twig.label}</summary>
+		@for (const leaf of twig.leaves; key leaf.key) {
+			<Branch twig={leaf} />
+		}
+	</details>
+}
+
+export function App() @{
+	let twigs = state([{ key: 'root', label: 'Root', leaves: [] }]);
+
+	<aside>
+		@for (const twig of twigs; key twig.key) {
+			<Branch twig={twig} />
+		}
+	</aside>
+}
+`);
+	expect(
+		view.keyedRepeats?.map((repeat) => [
+			repeat.rowComponent?.componentName,
+			repeat.rowComponent?.itemPropName,
+		]),
+	).toEqual([
+		['Branch', 'twig'],
+		['App', 'twig'],
+	]);
 });
 
 /**

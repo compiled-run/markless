@@ -22,7 +22,7 @@ test('every refusal clause names itself in the author’s own words', () => {
 	// A component row is minted now, so the clause names the reason this one was
 	// not: what the child reaches, not the mere presence of a component.
 	expect(messageFor({ kind: 'component', componentName: 'Row' })).toContain(
-		'what <Row> renders either reaches a branch or an async boundary or could not be seen from here',
+		'what <Row> renders either reaches a @try or could not be seen from here',
 	);
 	expect(messageFor({ kind: 'nested-construct', label: 'an @if or @switch' })).toContain(
 		'holds an @if or @switch',

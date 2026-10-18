@@ -26,6 +26,7 @@ import {
 	type RowMintGraph,
 } from './row-mint.ts';
 import { marklessRowSlotReader } from './row-slot-mint.ts';
+import { PROTOCOL_PROPS_GRAPH_NODE_ID as PROPS } from '../../../serializer/src/protocol-constants.ts';
 import type {
 	ResumeArmBranchRecord,
 	ResumeArmRecordSet,
@@ -247,7 +248,8 @@ export function marklessRowComponentMint(
 													renderedIfRenderable({ ...rowInput, item: renderedFrom(rowKey) }),
 													(before) => {
 														rendered.set(rowKey, itemCopy(item));
-														if (before && !rowIsStale(parent, repeat, before, after, liveRow)) return;
+														if (before && !rowIsStale(parent, repeat, before, after, liveRow))
+															return followRowItem(rowGraph, repeat, after, item);
 														const row = placeMintedRow(rowInput, after);
 														preparedRows.set(rowKey, row);
 														replaceRow(parent, liveRow, row, rowKey, live, registerRow);
@@ -408,7 +410,7 @@ function renderComponentRow(input: ComponentRowInput): Awaitable<RenderedCompone
 		({ renderRepeatRowComponent, rowSegmentOf }) => {
 			// A composed page declares no child's components itself: the owner sits
 			// an import down, under the prefix its symbols must be spelled in.
-			const owner = marklessOwningSurface(
+			const found = marklessOwningSurface(
 				input.surface,
 				rowComponent.componentName,
 				input.repeat.ownerHostNodeId ?? input.repeat.parentHostNodeId,
@@ -416,6 +418,15 @@ function renderComponentRow(input: ComponentRowInput): Awaitable<RenderedCompone
 				surface: input.surface,
 				symbolPrefix: '',
 			};
+			// A repeat over its owner's own nodes names the instance it rendered in, deeper than the surface walk sees.
+			const instancePath = input.repeat.instancePath;
+			const owner =
+				instancePath !== undefined &&
+				instancePath === input.enclosing.instancePath &&
+				instancePath.length > found.symbolPrefix.length &&
+				instancePath.startsWith(found.symbolPrefix)
+					? { ...found, symbolPrefix: instancePath }
+					: found;
 			// The owner's prefix already names its own instance; the key carries only what it does not.
 			const fullPath = rowKeyInstancePath(input.repeat, input.enclosing),
 				rowInstancePath = fullPath.startsWith(owner.symbolPrefix)
@@ -472,6 +483,28 @@ function renderComponentRow(input: ComponentRowInput): Awaitable<RenderedCompone
 			);
 		},
 	);
+}
+
+// A kept row's child reads its item through its own prop cell, so its nested @for follows the item there.
+function followRowItem(
+	graph: RuntimeGraph,
+	repeat: ResumeKeyedRepeatRecord,
+	render: RenderedComponentRow,
+	item: unknown,
+): void {
+	const propName = repeat.rowComponent?.itemPropName;
+	if (!propName) return;
+	let cellId: string | undefined;
+	for (const cell of render.rendered.state.cells)
+		if (
+			cell.graphNodeId.startsWith(render.rowSegment) &&
+			cell.graphNodeId.endsWith(PROPS) &&
+			(cellId === undefined || cell.graphNodeId.length < cellId.length)
+		)
+			cellId = cell.graphNodeId;
+	if (cellId === undefined || graph.read(cellId, []) === undefined) return;
+	if (sameItem(graph.read(cellId, [propName]), item, 0)) return;
+	graph.write({ graphNodeId: cellId, path: [propName], value: item });
 }
 
 // A render of the item a live row was built from, or nothing when that item no longer renders.
@@ -550,15 +583,44 @@ function rowIsStale(
 	live: ResumeDomElement,
 ): boolean {
 	if (before.rendered.html === after.rendered.html) return false;
-	const root = (html: string) =>
-		parseRowNodes(parent, repeat, html).find((node) => node.nodeType === 1) as
-			| ComparableElement
-			| undefined;
+	const parsed = (render: RenderedComponentRow) => {
+		const nodes = parseRowNodes(parent, repeat, render.rendered.html);
+		return {
+			root: nodes.find((node) => node.nodeType === 1) as ComparableElement | undefined,
+			repeatParents: nestedRepeatParents(nodes, render.rendered.view),
+		};
+	};
+	const old = parsed(before),
+		next = parsed(after);
 	// A wrapped row's live root is the wrapper, not the component's own root.
 	return renderedSitesDiffer(
-		root(before.rendered.html),
-		root(after.rendered.html),
+		old.root,
+		next.root,
 		repeat.rowComponent?.slotPath ? undefined : (live as ComparableElement),
+		new Set([...old.repeatParents, ...next.repeatParents]),
+	);
+}
+
+// A nested @for keeps its own rows current, so the row's own render never decides they are stale.
+function nestedRepeatParents(
+	nodes: ReadonlyArray<ResumeDomNode>,
+	view: ProtocolViewPayload,
+): ReadonlySet<ResumeDomNode> {
+	const parentHostIds = new Set((view.keyedRepeats ?? []).map((nested) => nested.parentHostNodeId));
+	if (parentHostIds.size === 0) return new Set();
+	const elements: ResumeDomNode[] = [];
+	(function visit(list: ReadonlyArray<ResumeDomNode>): void {
+		for (const node of list) {
+			if (node.nodeType === 1) elements.push(node);
+			visit(node.childNodes ?? []);
+		}
+	})(nodes);
+	return new Set(
+		view.locators.flatMap((locator) =>
+			parentHostIds.has(locator.hostNodeId) && elements[locator.index]
+				? [elements[locator.index]!]
+				: [],
+		),
 	);
 }
 
@@ -571,6 +633,7 @@ function renderedSitesDiffer(
 	before: ComparableElement | undefined,
 	after: ComparableElement | undefined,
 	live: ComparableElement | undefined,
+	repeatParents: ReadonlySet<ResumeDomNode>,
 ): boolean {
 	if (!before || !after) return before !== after;
 	if (before.tagName !== after.tagName) return true;
@@ -587,13 +650,19 @@ function renderedSitesDiffer(
 	}
 	const text = ownText(after);
 	if (ownText(before) !== text && (!live || ownText(live) !== text)) return true;
+	if (repeatParents.has(before) || repeatParents.has(after)) return false;
 	const beforeChildren = childElements(before),
 		afterChildren = childElements(after),
 		liveChildren = live ? childElements(live) : [];
 	if (beforeChildren.length !== afterChildren.length) return true;
 	const aligned = liveChildren.length === afterChildren.length;
 	return beforeChildren.some((child, at) =>
-		renderedSitesDiffer(child, afterChildren[at], aligned ? liveChildren[at] : undefined),
+		renderedSitesDiffer(
+			child,
+			afterChildren[at],
+			aligned ? liveChildren[at] : undefined,
+			repeatParents,
+		),
 	);
 }
 

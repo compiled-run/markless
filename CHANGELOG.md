@@ -43,6 +43,13 @@ them from `.markless/` instead.
   runs there. Add `onVisible` or `onIdle` to the same element to start it when
   it is visible or when the page is idle. The `attach` docs now explain when it
   starts.
+
+- A `@for` row that renders a component with its own `@for` inside now grows in
+  the browser. Before, adding an item showed nothing and the build only warned
+  that the list could not grow. Recursive trees work too: a `TreeNode` that
+  renders `<TreeNode node={child} />` for each child gets new nodes at any
+  depth. When an item changes, the nested list updates in place and each
+  row's own state is kept, instead of the whole row being rebuilt.
 - A component inside a `@for` row now gets the row's item on the server even
   when the loop variable is named `child`, `childProps` or `output`. Before, the
   server render passed an internal object instead, so a recursive tree written

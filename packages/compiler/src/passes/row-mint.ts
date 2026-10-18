@@ -448,10 +448,10 @@ function memberReads(source: string, name: string): ReadonlySet<string> | null {
 }
 
 /**
- * Whether one component the row reaches is PROVABLY free of the constructs a
- * minted row cannot rebuild: an async boundary, whose settle bookkeeping the page
- * counted only for the rows it served, and a repeat or omittable host, whose node
- * count only the render knows.
+ * Whether one component the row reaches is PROVABLY free of an async boundary,
+ * whose settle bookkeeping the page counted only for the rows it served. A nested
+ * @for or a render-chosen tag is admitted: the row renders whole in the browser,
+ * so its own fragment counts their nodes and its records wire the nested rows.
  *
  * Provably is the whole point: a tree this module cannot reach is a refusal,
  * never a pass. A child declared here is answered from this module's own chunks.
@@ -472,9 +472,6 @@ function childIsMintable(
 		);
 		if (!entry) return false;
 	}
-	// The reach IS the proof: a repeat, an omittable host or an async arm each
-	// answer with their own name, and the answer is transitive, so a construct
-	// behind another import still reaches this question.
 	const reach = childConstructReach(input, edge, childTemplateId, seen);
-	return reach === 'free' || reach === 'branches';
+	return reach !== 'boundaries' && reach !== 'unknown';
 }

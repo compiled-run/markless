@@ -36,7 +36,9 @@ for (const [itemName, componentName, tag] of [
 	test(`a row bound as \`${itemName}\` hands its item, not an emitted local, to the child`, async () => {
 		const block = await childCase(itemName, componentName, tag);
 		expect(block).toContain(`entry:(${itemName})`);
-		const declared = [...block.matchAll(/\bconst ([A-Za-z_$][\w$]*)=/g)].map((match) => match[1]);
+		const declared = [...block.matchAll(/\bconst ([A-Za-z_$][\w$]*)=/g)].map(
+			(match) => match[1],
+		);
 		expect(declared.length).toBeGreaterThan(0);
 		expect(declared).not.toContain(itemName);
 		for (const name of declared) expect(name).toMatch(/^markless/);

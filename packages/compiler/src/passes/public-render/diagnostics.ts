@@ -199,8 +199,8 @@ function refusalCause(
 	switch (refusal.kind) {
 		case 'component':
 			return {
-				message: `This @for row renders <${refusal.componentName}>, and what <${refusal.componentName}> renders either reaches a branch or an async boundary or could not be seen from here - so the browser cannot tell how many anchors a new row would need.`,
-				suggestion: `Keep <${refusal.componentName}> and everything it renders free of @if, @switch and @try - and make sure the module declaring it is part of this build - or move <${refusal.componentName}> outside the @for and keep the row to plain elements and text read off ${itemName}.`,
+				message: `This @for row renders <${refusal.componentName}>, and what <${refusal.componentName}> renders either reaches a @try or could not be seen from here - and a @try settles against bookkeeping the page took only for the rows the server sent.`,
+				suggestion: `Keep <${refusal.componentName}> and everything it renders free of @try - and make sure the module declaring it is part of this build - or move <${refusal.componentName}> outside the @for and keep the row to plain elements and text read off ${itemName}.`,
 			};
 		case 'nested-construct':
 			return {
