@@ -27,7 +27,7 @@ async function createFixture() {
 			'\tlet keys = state(0);\n' +
 			'\t<input onKeydown={(event) => {\n' +
 			"\t\tif (event.key === 'Enter') event.preventDefault();\n" +
-			"\t\tif (event.key === 'Escape') event.preventDefault();\n" +
+			'\t\tsetTimeout(() => event.stopPropagation(), 0);\n' +
 			'\t\tkeys++;\n' +
 			'\t}} />\n}\n',
 	);
