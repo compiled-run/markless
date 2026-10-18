@@ -62,6 +62,12 @@ import { NAVIGATION_POLYFILL_MODULE } from '../navigation-polyfill.ts';
 import { listenForLinkIntent } from './link-intent.ts';
 import { documentNavigationFor } from './document-navigation.ts';
 import { startFragmentNavigation } from './fragment-navigation.ts';
+import {
+	prerenderRendererModule,
+	recordServerEntry,
+	serverBuildState,
+	type ServerBuildState,
+} from './nitro-prerender.ts';
 import { isPageModuleFile, normalizeRouteFileId } from '../route-manifest.ts';
 import { routerLinkBridgeModules, type LinkBridgeModule } from './runtime/create-server-entry.ts';
 import { LINK_BRIDGE_DIR } from './runtime/link-bridge-module.ts';
@@ -159,6 +165,7 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 	const navigationEntry = resumeEntryState();
 	const fragmentEntry = resumeEntryState();
 	const routePreloads = routePreloadState();
+	const serverBuild = serverBuildState();
 
 	return [
 		routerConfigPlugin(
@@ -168,6 +175,7 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 			navigationEntry,
 			routePreloads,
 			fragmentEntry,
+			serverBuild,
 		),
 		devSourceModuleRequestPlugin(),
 		pageServerOnlyPropsPlugin(),
@@ -264,6 +272,7 @@ function routerConfigPlugin(
 	navigationEntry: ResumeEntryState,
 	routePreloads: RoutePreloadState,
 	fragmentEntry: ResumeEntryState = resumeEntryState(),
+	serverBuild: ServerBuildState = serverBuildState(),
 ): Plugin {
 	let clientOutDir = '';
 	let clientEnvironmentName = '';
@@ -311,6 +320,7 @@ function routerConfigPlugin(
 					config.root,
 					serverWatch.ignored,
 					env?.command === 'build',
+					serverBuild,
 				),
 				server: {
 					...config.server,
@@ -499,11 +509,15 @@ function routerConfigPlugin(
 				}
 			},
 		},
-		async writeBundle(_options, bundle) {
+		async writeBundle(options, bundle) {
 			const environment = this.environment;
 			const isClientEnvironment = environment?.name
 				? environment.name === clientEnvironmentName
 				: environment?.config === clientEnvironmentConfig;
+			if (productionBuild && environment?.name === 'ssr')
+				recordServerEntry(serverBuild, options.dir, bundle, (id) =>
+					id.startsWith(`\0${SERVER_ENTRY_ID}`),
+				);
 			if (!productionBuild || !isClientEnvironment) return;
 			if (!pendingClientAssets) {
 				throw new Error(
@@ -614,6 +628,7 @@ function createNitroConfig(
 	root = '.',
 	serverWatchIgnored: readonly WatchIgnorePattern[] = [],
 	isBuild = false,
+	serverBuild: ServerBuildState = serverBuildState(),
 ): NonNullable<UserConfig['nitro']> {
 	const scanDirs = Array.isArray(nitroConfig?.scanDirs)
 		? nitroConfig.scanDirs.filter((dir): dir is string => typeof dir === 'string')
@@ -638,6 +653,7 @@ function createNitroConfig(
 		],
 		routesDir: nitroConfig?.routesDir ?? '.output/markless/router/nitro-routes',
 		...(isBuild && {
+			modules: [...(nitroConfig?.modules ?? []), prerenderRendererModule(serverBuild)],
 			routeRules: {
 				[`/${MARKLESS_BUILD_PREFIX}**`]: {
 					headers: { 'cache-control': 'public, max-age=31536000, immutable' },
