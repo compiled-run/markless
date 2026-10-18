@@ -96,6 +96,10 @@ its message now names which and how to fix it.
   `MARKLESS_EVENT_DISPATCH_UNMATCHED`. The 0.5.0 fix covered only a redraw
   from a bubbling listener. A redraw that also removes that Markless element
   no longer reports an error either.
+- The router's cached link script moved from `/_markless/links.<hash>.js` to
+  `/_markless/links/<hash>.js`. On Vercel the long-cache rule for the old
+  location also caught every navigation fetch under `/_markless/`, so link
+  clicks got a 404 and loaded the whole page instead.
 - `attach` on an element inside an `@if` arm or an `@try` arm runs. Before,
   the arm's behavior records named the wrong function or none, so an arm
   element's `attach` never ran, or ran another element's function.

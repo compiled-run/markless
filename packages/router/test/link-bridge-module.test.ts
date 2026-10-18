@@ -9,7 +9,7 @@ const bridge = linkBridgeModulePath('/', 'a1b2c3');
 
 describe('link bridge module checks', () => {
 	it('names the bridge under the app base', () => {
-		expect(linkBridgeModulePath('/docs', 'x9')).toBe('/docs/_markless/links.x9.js');
+		expect(linkBridgeModulePath('/docs', 'x9')).toBe('/docs/_markless/links/x9.js');
 		expect(isLinkBridgeModulePath(bridge)).toBe(true);
 		expect(isLinkBridgeModulePath('/build/links.a1b2c3.js')).toBe(false);
 	});

@@ -6,6 +6,7 @@ import { createBuilder } from 'vite';
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
 import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
+import { fragmentPageUrl } from '../../src/vite/fragment-navigation.ts';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 
 // A built app whose middleware redirects every path that is not one of its pages, as a signed-in-only app does.
@@ -75,7 +76,7 @@ async function linkBridgePath(): Promise<string> {
 
 test('the link bridge is a static file in the client output, served past the redirecting middleware', async () => {
 	const path = await linkBridgePath();
-	expect(path).toMatch(/^\/_markless\/links\.[0-9a-z]+\.js$/);
+	expect(path).toMatch(/^\/_markless\/links\/[0-9a-z]+\.js$/);
 	const written = await readFile(join(root, '.output/public', path), 'utf8');
 	const response = await fetch(origin + path, { redirect: 'manual' });
 	expect(response.status).toBe(200);
@@ -91,9 +92,10 @@ test('a link click still swaps the page in place', async () => {
 	const errors: string[] = [];
 	page.on('pageerror', (error) => errors.push(String(error)));
 	page.on('request', (request) => {
-		const pathname = new URL(request.url()).pathname;
-		if (request.resourceType() === 'document') documents.push(pathname);
-		else if (request.headers()['x-markless-fragment']) fragments.push(pathname);
+		const url = new URL(request.url());
+		const fragment = fragmentPageUrl(url);
+		if (request.resourceType() === 'document') documents.push(url.pathname);
+		else if (fragment) fragments.push(fragment.pathname);
 	});
 	await page.goto(origin);
 	await page.locator('[data-increment]').waitFor();

@@ -84,7 +84,7 @@ describe('router link bridge', () => {
 			/<script type="module" data-markless-router-link-resumer>import b from"([^"]+)";b\(/.exec(
 				html,
 			);
-		expect(stub?.[1]).toMatch(/^\/_markless\/links\.[0-9a-z]+\.js$/);
+		expect(stub?.[1]).toMatch(/^\/_markless\/links\/[0-9a-z]+\.js$/);
 		expect(html).toContain(`<link rel="modulepreload" href="${stub![1]}"`);
 		expect(html).not.toContain('<script data-markless-router-link-resumer>');
 		const module = entry.linkBridgeModules?.find((candidate) => candidate.path === stub![1]);
@@ -93,18 +93,18 @@ describe('router link bridge', () => {
 		expect((await entry.fetch(new Request(`http://router.test${stub![1]}`))).status).toBe(404);
 
 		const prebuilt = bridgeEntry({
-			linkBridgePaths: ['/_markless/links.a.js', '/_markless/links.b.js'],
+			linkBridgePaths: ['/_markless/links/a.js', '/_markless/links/b.js'],
 		});
 		const prebuiltHtml = await (
 			await prebuilt.fetch(new Request('http://router.test/'))
 		).text();
-		expect(prebuiltHtml).toContain('import b from"/_markless/links.a.js"');
+		expect(prebuiltHtml).toContain('import b from"/_markless/links/a.js"');
 		expect(prebuilt.linkBridgeModules).toBeUndefined();
 
 		const dev = bridgeEntry({ dev: true });
 		const devHtml = await (await dev.fetch(new Request('http://router.test/'))).text();
 		expect(devHtml).toContain('<script data-markless-router-link-resumer>');
-		expect(devHtml).not.toContain('/_markless/links.');
+		expect(devHtml).not.toContain('/_markless/links/');
 	});
 
 	test('declares only what the page uses at load', async () => {

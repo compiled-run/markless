@@ -2,13 +2,14 @@
 export const LINK_BRIDGE_SCRIPT_ATTRIBUTE = 'data-markless-router-link-resumer';
 
 /** The client output folder a build writes its link bridge files into, served as immutable static assets. */
-export const LINK_BRIDGE_DIR = '_markless';
+// Its own folder under `_markless/`: an immutable header rule on Vercel ends routing, so it must not cover navigation fetches.
+export const LINK_BRIDGE_DIR = '_markless/links';
 
 /** A built app's link bridge is a static client file under this pathname, immutable and preloaded. */
-export const LINK_BRIDGE_MODULE_PATH = /\/_markless\/links\.[0-9a-z]+\.js$/;
+export const LINK_BRIDGE_MODULE_PATH = /\/_markless\/links\/[0-9a-z]+\.js$/;
 
 export function linkBridgeModulePath(base: string, hash: string): string {
-	return `${base.replace(/\/?$/, '/')}${LINK_BRIDGE_DIR}/links.${hash}.js`;
+	return `${base.replace(/\/?$/, '/')}${LINK_BRIDGE_DIR}/${hash}.js`;
 }
 
 export function isLinkBridgeModulePath(pathname: string): boolean {
