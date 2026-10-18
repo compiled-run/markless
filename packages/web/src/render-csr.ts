@@ -9,8 +9,7 @@ import {
 } from '@markless/serializer/protocol';
 import type { DomJournalEntry } from '@markless/runtime';
 import type { RuntimeGraph } from '@markless/runtime';
-import { marklessAttributeValue } from './dom-attribute.ts';
-import { marklessControlWriteHeld } from './control-edit-hold.ts';
+import { applyDirectJournalEntries } from './dom-journal-direct.ts';
 import type { CsrRenderContainer, CsrRenderOptions, CsrRenderOutput } from './render.ts';
 import { marklessInstanceScopedLoadSymbol } from './fns/instance-scope.ts';
 import {
@@ -612,55 +611,11 @@ function delegatedTargetTag(target: { readonly tagName?: unknown } | null | unde
 	return typeof target?.tagName === 'string' ? target.tagName.toLowerCase() : 'element';
 }
 
-type CsrDomJournalTarget = {
-	textContent?: string | null;
-	setAttribute?: (name: string, value: string) => void;
-	removeAttribute?: (name: string) => void;
-	readonly [name: string]: unknown;
-};
-
 async function applyDefaultCsrDomJournal(
 	entries: ReadonlyArray<DomJournalEntry>,
 	runtime: ResumeRuntime,
 ): Promise<void> {
-	const deferred: DomJournalEntry[] = [];
-	for (const entry of entries) {
-		if (entry.type === 'setText') {
-			const target = runtime.getElement(String(entry.locator)) as
-				| CsrDomJournalTarget
-				| undefined;
-			if (!target) continue;
-			const node = (entry.node ? entry.node(target) : target) as CsrDomJournalTarget;
-			// A rewrite with the value already there is still a mutation, and an
-			// aria-live region announces on it.
-			const text = stringifyDomValue(entry.value);
-			if (node.textContent !== text) node.textContent = text;
-			continue;
-		}
-		if (entry.type === 'setAttr') {
-			const target = runtime.getElement(String(entry.locator)) as
-				| CsrDomJournalTarget
-				| undefined;
-			if (!target) continue;
-			const text = marklessAttributeValue(entry.name, entry.value);
-			if (text === null) {
-				target.removeAttribute?.(entry.name);
-			} else {
-				target.setAttribute?.(entry.name, text);
-			}
-			continue;
-		}
-		if (entry.type === 'setProp') {
-			const target = runtime.getElement(String(entry.locator)) as
-				| Record<string, unknown>
-				| undefined;
-			if (target && !marklessControlWriteHeld(target, entry.name, entry.value))
-				target[entry.name] = entry.value;
-			continue;
-		}
-		deferred.push(entry);
-	}
-
+	const deferred = applyDirectJournalEntries(entries, (locator) => runtime.getElement(locator));
 	if (deferred.length === 0) return;
 	const { applyDomJournalEntries } = (journal ??= await import('./dom-journal.ts'));
 	applyDomJournalEntries(deferred, {
@@ -742,11 +697,6 @@ function missingCsrJournalTargetError(locator: string): Error {
 	error.dispatchModuleId = 'web:render-csr';
 	error.docsUrl = 'https://markless.dev/errors/MARKLESS_CSR_DOM_JOURNAL_TARGET_MISSING';
 	return error;
-}
-
-function stringifyDomValue(value: unknown): string {
-	if (value == null) return '';
-	return String(value);
 }
 
 const EMPTY_PROTOCOL_VERSION = 1 satisfies ProtocolStatePayload['version'];

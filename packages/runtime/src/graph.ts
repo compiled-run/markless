@@ -205,11 +205,20 @@ export type RuntimeGraphDelete = {
 	readonly path: ReadonlyArray<string>;
 };
 
+/** DOM work a subscription holds back until its whole pass has run, so it lands in one task with that pass's journal. */
+export type RuntimeGraphCommit = () => void | Promise<void>;
+
 export type RuntimeGraphSubscription = {
 	readonly id: string;
 	readonly graphNodeId: string;
 	readonly path?: ReadonlyArray<string>;
-	readonly run: (value: unknown) => DomJournalResult | void | Promise<DomJournalResult | void>;
+	readonly run: (
+		value: unknown,
+	) =>
+		| DomJournalResult
+		| RuntimeGraphCommit
+		| void
+		| Promise<DomJournalResult | RuntimeGraphCommit | void>;
 };
 
 /**
@@ -460,6 +469,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 					plane?.recomputeSubscribed();
 					const pending = dirtyPaths.splice(0);
 					const ranSubscriptions = new Set<string>();
+					const commits: RuntimeGraphCommit[] = [];
 
 					for (const subscription of subscriptions) {
 						const subscriptionPath = subscription.path ?? [];
@@ -474,7 +484,13 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 						const entries = await subscription.run(
 							readGraph(subscription.graphNodeId, subscriptionPath),
 						);
-						appendJournalResult(journal, entries);
+						if (typeof entries === 'function') commits.push(entries);
+						else appendJournalResult(journal, entries);
+					}
+					if (commits.length > 0) {
+						const landing = commits.map((commit) => commit());
+						await notifyJournalListeners();
+						await Promise.all(landing);
 					}
 				}
 			} finally {

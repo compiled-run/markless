@@ -1,6 +1,7 @@
 import { userEvent } from 'vite-plus/test/browser';
 import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../../src/index.ts';
+import Board from './crr-board.tsrx';
 import Page from './crr-page.tsrx';
 import Projection from './crr-projection.tsrx';
 
@@ -10,9 +11,34 @@ const go = (label: string) => document.querySelector<HTMLButtonElement>(`[data-g
 const seen = (label: string) => document.querySelector<HTMLElement>(`[data-seen="${label}"]`)!;
 const picked = () => document.querySelector('[data-picked]')!.textContent;
 
+// A message posted from a mutation is read only after every microtask of that
+// task has drained, so a page caught half-written here would paint half-written.
+function watchTaskEnds(describe: () => string | undefined) {
+	const torn: string[] = [];
+	const channel = new MessageChannel();
+	channel.port1.onmessage = () => {
+		const tear = describe();
+		if (tear) torn.push(tear);
+	};
+	const observer = new MutationObserver(() => channel.port2.postMessage(null));
+	observer.observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
+	return {
+		torn,
+		stop() {
+			observer.disconnect();
+			channel.port1.close();
+		},
+	};
+}
+
 // The rows are keyed by id and never reorder: only the derived fields move, so a
 // row that stays as it was served shows the stale item.
 async function pinRowsFollowTheirItems() {
+	const watch = watchTaskEnds(() => {
+		const text = picked();
+		if (go('last')?.disabled !== (text === 'none')) return `last locked=${go('last')?.disabled} picked=${text}`;
+		if (seen('last')?.hidden !== (text !== 'last')) return `last seen=${!seen('last')?.hidden} picked=${text}`;
+	});
 	expect(go('last').disabled).toBe(true);
 	expect(seen('ben').hidden).toBe(true);
 
@@ -33,6 +59,8 @@ async function pinRowsFollowTheirItems() {
 	await expect.poll(() => picked()).toBe('last');
 	await expect.poll(() => seen('last').hidden).toBe(false);
 	expect(document.querySelectorAll('[data-entry]')).toHaveLength(3);
+	watch.stop();
+	expect(watch.torn).toEqual([]);
 }
 
 test('CSR: a component row re-renders when its item changes under the same key', async () => {
@@ -43,6 +71,46 @@ test('CSR: a component row re-renders when its item changes under the same key',
 test('SSR: a component row re-renders when its item changes under the same key', async () => {
 	await renderSSR(Page);
 	await pinRowsFollowTheirItems();
+});
+
+const choose = (code: string) => document.querySelector<HTMLButtonElement>(`[data-choose="${code}"]`)!;
+const mark = (code: string) => document.querySelector<HTMLElement>(`[data-mark="${code}"]`)!;
+const chosen = () => document.querySelector('[data-chosen]')!.textContent;
+const tally = () => document.querySelector('[data-count]')!.textContent;
+
+async function pinBoardWritesLandTogether() {
+	const watch = watchTaskEnds(() => {
+		const shown = [chosen(), tally(), choose('k4')?.disabled, mark('k2')?.hidden, mark('k4')?.hidden];
+		const agreeing = [
+			['-', '0', true, true, true],
+			['k2', '1', false, false, true],
+			['k4', '2', false, false, false],
+		];
+		if (!agreeing.some((state) => state.every((value, at) => value === shown[at])))
+			return JSON.stringify(shown);
+	});
+	expect(choose('k4').disabled).toBe(true);
+
+	await userEvent.click(choose('k2'));
+	await expect.poll(() => choose('k4').disabled).toBe(false);
+	expect([chosen(), tally(), mark('k2').hidden]).toEqual(['k2', '1', false]);
+
+	await userEvent.click(choose('k4'));
+	await expect.poll(() => mark('k4').hidden).toBe(false);
+	expect([chosen(), tally()]).toEqual(['k4', '2']);
+	expect(document.querySelectorAll('[data-tile]')).toHaveLength(4);
+	watch.stop();
+	expect(watch.torn).toEqual([]);
+}
+
+test('CSR: one handler writing rows and text lands them in one task', async () => {
+	await render(Board);
+	await pinBoardWritesLandTogether();
+});
+
+test('SSR: one handler writing rows and text lands them in one task', async () => {
+	await renderSSR(Board);
+	await pinBoardWritesLandTogether();
 });
 
 const count = (label: string) => document.querySelector(`[data-count="${label}"]`)!.textContent;

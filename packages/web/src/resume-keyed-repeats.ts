@@ -279,10 +279,10 @@ export function wireKeyedRepeats(
 						id: `keyed-repeat:${repeat.id}:read:${at}`,
 						graphNodeId: read.graphNodeId,
 						path: read.path,
-						run(): void | Promise<void> {
+						run() {
 							const settled = settledMint();
-							if (settled) return apply(settled.mint);
-							return readyMint()?.then((mint) => apply(mint));
+							if (settled) return () => apply(settled.mint);
+							return readyMint()?.then((mint) => () => apply(mint));
 						},
 					}),
 				);
@@ -291,28 +291,19 @@ export function wireKeyedRepeats(
 				id: `keyed-repeat:${repeat.id}:${repeat.collectionGraphNodeId}:${repeat.collectionPath.join('.')}`,
 				graphNodeId: repeat.collectionGraphNodeId,
 				path: repeat.collectionPath,
-				run(): void | Promise<void> {
+				run() {
 					validateOneRepeat(input.graph, repeat);
-					// `runFlush` awaits this run before any other pass, so no write overtakes a pending mint.
+					// Placed as the pass's commit, so the rows land with the journal beside them.
 					const settled = settledMint(),
 						held = pending;
 					pending = undefined;
-					if (settled) {
-						apply(settled.mint);
-						return typeof held === 'function' ? held() : undefined;
-					}
+					if (settled)
+						return () => (apply(settled.mint), typeof held === 'function' ? held() : undefined);
 					return (
 						readyMint()?.then(async (mint) => {
 							const commit = await (held ??
-								mint.rows?.(
-									repeat,
-									parent,
-									rowRootsByKey,
-									served,
-									registerRowEvents,
-								));
-							apply(mint);
-							await commit?.();
+								mint.rows?.(repeat, parent, rowRootsByKey, served, registerRowEvents));
+							return () => (apply(mint), commit?.());
 						}) ?? apply(undefined)
 					);
 				},

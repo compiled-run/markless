@@ -77,6 +77,13 @@ its message now names which and how to fix it.
 
 ### Fixes
 
+- When one handler changes both the rows of a component `@for` and some text
+  elsewhere on the page, both changes now show up at the same time. Before, on
+  the first click the rows could show up one task before the text, because the
+  rows were placed while Markless was still loading the code that updates the
+  text. Now every DOM change from one handler's writes lands in the same task,
+  on client-rendered and server-rendered pages, whether the code was already
+  loaded or not.
 - A click (or Enter on a link) whose target a capture-phase `document`
   listener redraws before Markless sees it now runs the handler of the
   Markless element it was inside, instead of being dropped or logging

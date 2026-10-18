@@ -323,12 +323,11 @@ function createEventResumeGraph(input: {
 							pathsIntersect(path.path, subscriptionPath),
 					);
 					if (!dirty) continue;
-					appendJournalResult(
-						journal,
-						await subscription.run(
-							graph.read(subscription.graphNodeId, subscriptionPath),
-						),
+					const result = await subscription.run(
+						graph.read(subscription.graphNodeId, subscriptionPath),
 					);
+					if (typeof result === 'function') await result();
+					else appendJournalResult(journal, result);
 				}
 			}
 

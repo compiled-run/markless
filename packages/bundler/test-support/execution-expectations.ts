@@ -206,6 +206,7 @@ const INTERPRETER_ROOTS_BY_KIND: Record<string, ReadonlyArray<string>> = {
 
 const GENERIC_PATH_MODULES = [
 	'web/dom-journal', // Generic graph writes stage their DOM commits through the journal.
+	'web/dom-journal-direct', // Element text and attribute writes apply without loading the range journal.
 	'web/inline/resume-errors', // Generic dispatch reports malformed resume state through fail-closed diagnostics.
 	'web/payload-document-common', // Generic payload lookup shares the document-script readers.
 	'web/payload-resume-registry', // Generic resume reuses decoded payload documents through the page registry.

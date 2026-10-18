@@ -144,6 +144,8 @@ export function marklessRowComponentMint(
 			resolve();
 		};
 	};
+	// Stale rows swap in from the commit, so they land with the flush's other writes.
+	let awaitingPlacement: Array<() => void> = [];
 	let surface: PrerenderDataSurface | undefined;
 	let surfacePromise: Promise<PrerenderDataSurface> | undefined;
 	const primeSurface = (): void => {
@@ -252,7 +254,9 @@ export function marklessRowComponentMint(
 															return followRowItem(rowGraph, repeat, after, item);
 														const row = placeMintedRow(rowInput, after);
 														preparedRows.set(rowKey, row);
-														replaceRow(parent, liveRow, row, rowKey, live, registerRow);
+														awaitingPlacement.push(() =>
+															replaceRow(parent, liveRow, row, rowKey, live, registerRow),
+														);
 													},
 												);
 											});
@@ -271,6 +275,7 @@ export function marklessRowComponentMint(
 						awaitingCommit = [];
 						releaseRegistering = undefined;
 						try {
+							for (const place of awaitingPlacement.splice(0)) place();
 							for (const row of settling) await row.commit();
 						} finally {
 							release?.();

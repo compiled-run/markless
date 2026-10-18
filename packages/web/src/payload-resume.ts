@@ -11,6 +11,7 @@ import {
 import type { decodePayloadScripts } from '../../serializer/src/protocol-client.ts';
 import type { DecodedPayloadScripts } from '../../serializer/src/protocol-client-storage.ts';
 import { createRuntimeGraphFromResumePayload } from './payload-graph-construct.ts';
+import { applyDirectJournalEntries, isDirectJournalEntry } from './dom-journal-direct.ts';
 import {
 	CONTAINER_RETIRE_PROPERTY,
 	type RetirableContainer,
@@ -194,6 +195,10 @@ async function startDecodedResume(
 	const applyDomJournal =
 		input.applyDomJournal ??
 		(async (entries) => {
+			if (entries.every(isDirectJournalEntry)) {
+				applyDirectJournalEntries(entries, (locator) => runtime?.getElement(locator));
+				return;
+			}
 			const { applyDomJournalEntries } = (journal ??= await import('./dom-journal.ts'));
 			applyDomJournalEntries(entries, {
 				resolveTarget(locator) {
