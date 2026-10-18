@@ -24,8 +24,9 @@ test('no key handler in the repo lifts a cancel for every key', async () => {
 		const graph = await buildSemanticGraph({ filename: file, source });
 		for (const event of graph.events) {
 			if (!KEY_EVENTS.has(event.eventName) || !event.syncPolicy) continue;
-			const { when } = event.syncPolicy;
-			if (when.type === 'constant-truthy' && when.value)
+			const branches =
+				'branches' in event.syncPolicy ? event.syncPolicy.branches : [event.syncPolicy];
+			if (branches.some(({ when }) => when.type === 'constant-truthy' && when.value))
 				everyKey.push(`${file} ${event.eventName}`);
 		}
 	}

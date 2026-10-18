@@ -78,33 +78,47 @@ export function unextractableSyncPolicyDiagnostic(
 	};
 }
 
-// The policy runs exactly the calls of the one statement it was lifted from; a
-// cancel anywhere else in the handler waits for the lazy symbol and never
-// reaches the event, so it is refused rather than left silently inert.
+export type StraySyncPolicyCall = {
+	readonly action: SemanticSyncPolicyAction;
+	readonly node: AnyNode;
+	readonly eventParam: string;
+	readonly reason: SyncPolicyRefusal;
+};
+
+// A cancel the policy does not run waits for the lazy symbol and never reaches
+// the event, so it is refused rather than left silently inert.
 export function secondSyncPolicyCancelDiagnostic(
 	attributeName: string,
-	stray: {
-		readonly action: SemanticSyncPolicyAction;
-		readonly node: AnyNode;
-		readonly eventParam: string;
-	},
+	stray: StraySyncPolicyCall,
 	state: Pick<WalkState, 'filename'>,
 ): SemanticGraphDiagnostic {
+	const call = `${stray.eventParam}.${stray.action}()`;
+	const reasons: Record<SyncPolicyRefusal, { readonly message: string; readonly fix: string }> = {
+		'unextractable-guard': {
+			message: `This ${stray.action}() for ${attributeName} is guarded by a condition that is not limited to event fields, state, props and constants, so it cannot join the cancels that run before the handler loads, and it would never reach the event.`,
+			fix: `Write its guard from event fields compared with literals, modifier flags, state, props and module constants joined with &&, || and !, e.g. \`if (${stray.eventParam}.key === 'ArrowDown') ${call}\`. Keep anything else the guard decides in state.`,
+		},
+		'guard-reads-written-state': {
+			message: `This ${stray.action}() for ${attributeName} is guarded by state that an earlier statement in the handler can change, and the cancels run before the handler does, so the guard would be read before that change.`,
+			fix: `Guard it with event fields only (\`if (${stray.eventParam}.key === 'ArrowUp') ${call}\`), or move it above the statement that changes the state.`,
+		},
+		'not-a-guard': {
+			message: `This ${stray.action}() for ${attributeName} is not the body of a top-level \`if\` in the handler (it sits in a loop, switch, try, nested function or after other code decides whether it runs), so it cannot run before the handler loads, and it would never reach the event.`,
+			fix: `Move it to its own top-level statement, \`if (condition) ${call}\`, with a condition built from event fields, state, props and constants.`,
+		},
+	};
+	const reason = reasons[stray.reason];
 	return {
 		code: 'MARKLESS_SYNC_POLICY_SECOND_CANCEL',
 		severity: 'error',
 		phase: 'sync-policy',
-		title: 'Only one cancel statement becomes the synchronous event policy',
+		title: 'This cancel cannot run before the handler loads',
 		passId: 'tsrx-semantic-graph',
 		artifactKeys: ['semanticGraph'],
-		message: `This ${stray.action}() for ${attributeName} sits outside the statement the synchronous policy was extracted from, so it would run only after the lazy handler loads and never reach the event.`,
-		why: 'The compiler lifts one guarded cancel per handler into the policy the resumer applies before the handler symbol loads; every other cancel stays in the lazy handler, where the event has already finished dispatching.',
+		message: reason.message,
+		why: 'preventDefault() and stopPropagation() take effect only while the event is dispatching. Each top-level `if (...) event.preventDefault()` in a handler becomes a policy the page applies before the handler symbol loads; a cancel the compiler cannot place there would run after the event has finished.',
 		primarySpan: sourceSpan(stray.node, state.filename),
-		suggestions: [
-			{
-				message: `Fold the guards into one extractable condition, e.g. \`if (first || second) ${stray.eventParam}.${stray.action}()\`, or remove the extra ${stray.action}().`,
-			},
-		],
+		suggestions: [{ message: reason.fix }],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_SYNC_POLICY_SECOND_CANCEL',
 	};
 }
@@ -113,8 +127,6 @@ function fallbackSpan(filename: string): SourceSpan {
 	return { filename, start: 0, end: 0 };
 }
 
-// One handler per event attribute, so a policy is one branch: the multi-branch
-// protocol shape has no compiler producer left.
 export function extractSyncPolicy(
 	node: AnyNode | undefined,
 	state: Pick<WalkState, 'graph' | 'source'>,
@@ -122,17 +134,13 @@ export function extractSyncPolicy(
 	if (!node) return undefined;
 
 	const eventParam = getIdentifierName(asNodes(node.params)[0]) ?? 'event';
-	return locateSyncPolicy(node.body as AnyNode | undefined, eventParam, state)?.branch;
+	return locateSyncPolicy(node.body as AnyNode | undefined, eventParam, state)?.policy;
 }
 
 export function uncoveredSyncPolicyCall(
 	node: AnyNode | undefined,
 	state: Pick<WalkState, 'graph' | 'source'>,
-): {
-	readonly action: SemanticSyncPolicyAction;
-	readonly node: AnyNode;
-	readonly eventParam: string;
-} | null {
+): StraySyncPolicyCall | null {
 	if (!node) return null;
 
 	const eventParam = getIdentifierName(asNodes(node.params)[0]) ?? 'event';
@@ -147,7 +155,9 @@ export function uncoveredSyncPolicyCall(
 	if (!stray) return null;
 
 	const action = syncActionCall(stray, eventParam);
-	return action ? { action, node: stray, eventParam } : null;
+	return action
+		? { action, node: stray, eventParam, reason: located.refused.get(stray) ?? 'not-a-guard' }
+		: null;
 }
 
 const ALL_SYNC_POLICY_ACTIONS: ReadonlySet<SemanticSyncPolicyAction> = new Set([
@@ -180,41 +190,31 @@ export function firstSyncPolicyActionCall(
 	return found;
 }
 
+// The cancel calls the policy already runs, so the lazy handler can drop them.
 export function extractedSyncPolicyActionCalls(
 	node: AnyNode | undefined,
 	eventParam: string,
 	actions: ReadonlySet<SemanticSyncPolicyAction>,
-	state?: Pick<WalkState, 'graph' | 'source'>,
+	state: Pick<WalkState, 'graph' | 'source'>,
 ): AnyNode[] {
 	if (!node || actions.size === 0) return [];
-
+	// Calls after the first plain statement stay in the lazy handler, as they always have.
 	const statements = node.type === 'BlockStatement' ? asNodes(node.body) : [node];
-	for (const statement of statements) {
-		if (statement.type !== 'IfStatement') {
-			const expression =
+	const horizon = statements.find(
+		(statement) =>
+			statement.type !== 'IfStatement' &&
+			!syncActionCall(
 				statement.type === 'ExpressionStatement'
 					? (statement.expression as AnyNode | undefined)
-					: statement;
-			const action = syncActionCall(expression, eventParam);
-			return action && actions.has(action) && expression ? [expression] : [];
-		}
-
-		const calls = syncActionCallNodes(
-			statement.consequent as AnyNode | undefined,
-			eventParam,
-			actions,
-		);
-		if (
-			calls.length > 0 &&
-			state &&
-			!extractSyncCondition(statement.test as AnyNode | undefined, eventParam, state)
-		) {
-			continue;
-		}
-		if (calls.length > 0) return calls;
-	}
-
-	return [];
+					: statement,
+				eventParam,
+			),
+	);
+	const end = horizon?.start ?? Number.POSITIVE_INFINITY;
+	return (locateSyncPolicy(node, eventParam, state)?.calls ?? []).filter((call) => {
+		const action = syncActionCall(call, eventParam);
+		return action !== null && actions.has(action) && (call.start ?? 0) < end;
+	});
 }
 
 export function firstDetachedSyncPolicyReference(node: AnyNode | undefined): {
@@ -253,10 +253,25 @@ export function firstDetachedSyncPolicyReference(node: AnyNode | undefined): {
 }
 
 type SyncPolicyLocation = {
-	readonly branch: SemanticSyncPolicyBranch;
+	readonly policy: SemanticSyncPolicy;
 	readonly calls: ReadonlyArray<AnyNode>;
+	readonly refused: ReadonlyMap<AnyNode, SyncPolicyRefusal>;
 };
 
+export type SyncPolicyRefusal = 'unextractable-guard' | 'guard-reads-written-state' | 'not-a-guard';
+
+type SyncPolicyScan = {
+	readonly eventParam: string;
+	readonly state: Pick<WalkState, 'graph' | 'source'>;
+	readonly branches: SemanticSyncPolicyBranch[];
+	readonly calls: AnyNode[];
+	readonly refused: Map<AnyNode, SyncPolicyRefusal>;
+	mayHaveWritten: boolean;
+};
+
+// Every top-level guarded cancel joins the policy; the resumer evaluates all of
+// them before the handler runs, so a guard is folded only when that is the same
+// answer the handler would reach at that statement.
 function locateSyncPolicy(
 	body: AnyNode | undefined,
 	eventParam: string,
@@ -265,47 +280,137 @@ function locateSyncPolicy(
 	if (!body) return undefined;
 
 	const statements = body.type === 'BlockStatement' ? asNodes(body.body) : [body];
+	const scan: SyncPolicyScan = {
+		eventParam,
+		state,
+		branches: [],
+		calls: [],
+		refused: new Map(),
+		mayHaveWritten: false,
+	};
 	// A cancel after `if (guard) return;` runs only where every guard before it is false.
 	const guards: SemanticSyncPolicyCondition[] = [];
 	for (const statement of statements) {
-		if (statement.type !== 'IfStatement') {
+		if (statement.type === 'IfStatement') {
+			scanIfStatement(statement, guards, scan, true);
+		} else {
 			const expression =
 				statement.type === 'ExpressionStatement'
 					? (statement.expression as AnyNode | undefined)
 					: statement;
 			const action = syncActionCall(expression, eventParam);
 			if (action && expression) {
-				return {
-					branch: {
-						when: guardedCondition(guards, { type: 'constant-truthy', value: true }),
-						actions: [action],
-					},
-					calls: [unwrapParens(expression) ?? expression],
-				};
+				scan.branches.push({
+					when: guardedCondition(guards, { type: 'constant-truthy', value: true }),
+					actions: [action],
+				});
+				scan.calls.push(unwrapParens(expression) ?? expression);
+				continue;
 			}
-			continue;
 		}
-
-		const consequent = statement.consequent as AnyNode | undefined;
-		const actions = extractSyncActions(consequent, eventParam);
-		const test = statement.test as AnyNode | undefined;
-		if (actions.length === 0) {
-			if (statement.alternate || !exitsAtEnd(consequent)) continue;
-			// What the policy cannot read before the handler loads is taken as not leaving, so the cancel is never narrower than authored.
-			guards.push(negatedCondition(approximateCondition(test, eventParam, state, false)));
-			continue;
-		}
-
-		const when = extractSyncCondition(test, eventParam, state);
-		if (!when) continue;
-
-		return {
-			branch: { when: guardedCondition(guards, when), actions },
-			calls: syncActionCallNodes(consequent, eventParam, new Set(actions)),
-		};
+		if (mayWrite(statement, eventParam)) scan.mayHaveWritten = true;
 	}
 
-	return undefined;
+	if (scan.branches.length === 0) return undefined;
+	return { policy: foldedPolicy(scan.branches), calls: scan.calls, refused: scan.refused };
+}
+
+function scanIfStatement(
+	statement: AnyNode,
+	guards: SemanticSyncPolicyCondition[],
+	scan: SyncPolicyScan,
+	topLevel: boolean,
+): void {
+	const consequent = statement.consequent as AnyNode | undefined;
+	const alternate = statement.alternate as AnyNode | undefined;
+	const test = statement.test as AnyNode | undefined;
+	const actions = extractSyncActions(consequent, scan.eventParam);
+	const alternateCancels = extractSyncActions(alternate, scan.eventParam).length > 0;
+	if (actions.length === 0 && !alternateCancels) {
+		if (!topLevel || alternate || !exitsAtEnd(consequent)) return;
+		// What the policy cannot read before the handler loads is taken as not leaving, so the cancel is never narrower than authored.
+		guards.push(
+			negatedCondition(approximateCondition(test, scan.eventParam, scan.state, false)),
+		);
+		return;
+	}
+
+	const when = extractSyncCondition(test, scan.eventParam, scan.state);
+	const refusal: SyncPolicyRefusal | null = !when
+		? 'unextractable-guard'
+		: scan.branches.length > 0 && scan.mayHaveWritten && readsGraph(when)
+			? 'guard-reads-written-state'
+			: null;
+	if (!when || refusal) {
+		for (const call of syncActionCallNodes(statement, scan.eventParam, ALL_SYNC_POLICY_ACTIONS))
+			scan.refused.set(call, refusal ?? 'unextractable-guard');
+		return;
+	}
+
+	if (actions.length > 0) {
+		scan.branches.push({ when: guardedCondition(guards, when), actions });
+		scan.calls.push(...syncActionCallNodes(consequent, scan.eventParam, new Set(actions)));
+	}
+	if (alternateCancels) {
+		const otherwise = [...guards, negatedCondition(when)];
+		if (alternate?.type === 'IfStatement') {
+			scanIfStatement(alternate, otherwise, scan, false);
+		} else {
+			const alternateActions = extractSyncActions(alternate, scan.eventParam);
+			scan.branches.push({
+				when: guardedCondition(otherwise, { type: 'constant-truthy', value: true }),
+				actions: alternateActions,
+			});
+			scan.calls.push(
+				...syncActionCallNodes(alternate, scan.eventParam, new Set(alternateActions)),
+			);
+		}
+	}
+	if (topLevel && !alternate && exitsAtEnd(consequent)) guards.push(negatedCondition(when));
+}
+
+// Branches cancelling the same actions are one branch whose guard is any of theirs.
+function foldedPolicy(branches: ReadonlyArray<SemanticSyncPolicyBranch>): SemanticSyncPolicy {
+	const actionKey = (branch: SemanticSyncPolicyBranch) => [...branch.actions].sort().join(',');
+	const first = branches[0]!;
+	if (branches.every((branch) => actionKey(branch) === actionKey(first))) {
+		return branches.length === 1
+			? first
+			: {
+					when: combinedCondition(
+						'or',
+						branches.map((branch) => branch.when),
+					),
+					actions: first.actions,
+				};
+	}
+	return { branches };
+}
+
+function readsGraph(condition: SemanticSyncPolicyCondition): boolean {
+	if (condition.type === 'graph-truthy') return true;
+	if (condition.type === 'and' || condition.type === 'or')
+		return condition.conditions.some(readsGraph);
+	return condition.type === 'not' ? readsGraph(condition.condition) : false;
+}
+
+// Anything that can change state before a later guard reads it: assignments,
+// updates, deletes, and any call other than the event's own cancel methods.
+function mayWrite(node: AnyNode | undefined, eventParam: string): boolean {
+	let writes = false;
+	walkNode(node, (candidate) => {
+		if (writes) return;
+		if (
+			candidate.type === 'AssignmentExpression' ||
+			candidate.type === 'UpdateExpression' ||
+			(candidate.type === 'UnaryExpression' && candidate.operator === 'delete') ||
+			(candidate.type === 'CallExpression' && !syncActionCall(candidate, eventParam)) ||
+			candidate.type === 'NewExpression' ||
+			candidate.type === 'AwaitExpression'
+		)
+			writes = true;
+	});
+	return writes;
 }
 
 function guardedCondition(
@@ -323,7 +428,8 @@ function combinedCondition(
 	const conditions: SemanticSyncPolicyCondition[] = [];
 	for (const part of parts) {
 		if (part.type === 'constant-truthy') {
-			if (Boolean(part.value) === absorbing) return { type: 'constant-truthy', value: absorbing };
+			if (Boolean(part.value) === absorbing)
+				return { type: 'constant-truthy', value: absorbing };
 			continue;
 		}
 		conditions.push(part);
@@ -334,7 +440,8 @@ function combinedCondition(
 }
 
 function negatedCondition(condition: SemanticSyncPolicyCondition): SemanticSyncPolicyCondition {
-	if (condition.type === 'constant-truthy') return { type: 'constant-truthy', value: !condition.value };
+	if (condition.type === 'constant-truthy')
+		return { type: 'constant-truthy', value: !condition.value };
 	return condition.type === 'not' ? condition.condition : { type: 'not', condition };
 }
 
@@ -355,7 +462,12 @@ function approximateCondition(
 		]);
 	if (node?.type === 'UnaryExpression' && node.operator === '!')
 		return negatedCondition(
-			approximateCondition(node.argument as AnyNode | undefined, eventParam, state, !unreadable),
+			approximateCondition(
+				node.argument as AnyNode | undefined,
+				eventParam,
+				state,
+				!unreadable,
+			),
 		);
 	return { type: 'constant-truthy', value: unreadable };
 }
@@ -535,7 +647,8 @@ function extractSyncCondition(
 	}
 
 	const field = eventFieldName(node, eventParam);
-	if (field && BOOLEAN_EVENT_FIELDS.has(field)) return { type: 'event-equals', field, value: true };
+	if (field && BOOLEAN_EVENT_FIELDS.has(field))
+		return { type: 'event-equals', field, value: true };
 
 	const resolved = resolveGraphPath(
 		expressionSource(node, state.source),

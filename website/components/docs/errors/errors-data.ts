@@ -9124,12 +9124,10 @@ export const errorEntries: readonly ErrorEntry[] = [
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
-		description:
-			'Only one cancel statement becomes the synchronous event policy: a Markless build error.',
+		description: 'This cancel cannot run before the handler loads: a Markless build error.',
 		printed: [
-			'MARKLESS_SYNC_POLICY_SECOND_CANCEL: This <action>() for <attributeName> sits outside the statement the synchronous policy was extracted from, so it would run only after the lazy handler loads and never reach the event.',
-			'The compiler lifts one guarded cancel per handler into the policy the resumer applies before the handler symbol loads; every other cancel stays in the lazy handler, where the event has already finished dispatching.',
-			'Fold the guards into one extractable condition, e.g. `if (first || second) <eventParam>.<action>()`, or remove the extra <action>().',
+			'MARKLESS_SYNC_POLICY_SECOND_CANCEL: This cancel cannot run before the handler loads',
+			'preventDefault() and stopPropagation() take effect only while the event is dispatching. Each top-level `if (...) event.preventDefault()` in a handler becomes a policy the page applies before the handler symbol loads; a cancel the compiler cannot place there would run after the event has finished.',
 			'https://markless.dev/errors/MARKLESS_SYNC_POLICY_SECOND_CANCEL',
 		],
 		structured: true,

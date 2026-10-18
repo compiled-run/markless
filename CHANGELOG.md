@@ -26,6 +26,30 @@ fetches it. Production Vite builds default to `executionLog: 'never'`, so they
 publish none of these files. If a script of yours read them from `build/`, read
 them from `.markless/` instead.
 
+### Several guarded cancels in one handler work again
+
+0.5.0 started refusing a handler with more than one `preventDefault()` or
+`stopPropagation()` statement (`MARKLESS_SYNC_POLICY_SECOND_CANCEL`), which
+broke key handlers that compiled on 0.4.0, and the 0.5.0 notes did not say so.
+A cancel only works if it runs while the event is dispatching, before the
+handler's code has loaded, and 0.5.0 could lift only one cancel statement to run
+that early. Now every top-level guarded cancel is lifted:
+
+```tsx
+onKeyDown={(event) => {
+	if (event.key === 'ArrowDown') { event.preventDefault(); active = active + 1; }
+	if (event.key === 'ArrowUp') { event.preventDefault(); active = active - 1; }
+}}
+```
+
+cancels ArrowDown and ArrowUp and nothing else. `if`/`else if`/`else` arms and
+mixed `preventDefault()`/`stopPropagation()` statements are lifted too.
+`MARKLESS_SYNC_POLICY_SECOND_CANCEL` remains only for a cancel that cannot run
+early, and its message now says which case it is and how to rewrite it: a
+guard that calls a function or reads the DOM, a guard that reads state an
+earlier statement in the same handler may change, or a cancel inside a loop,
+`switch`, `try` or nested function.
+
 ### Fixes
 
 - A click (or Enter on a link) whose target a capture-phase `document`
