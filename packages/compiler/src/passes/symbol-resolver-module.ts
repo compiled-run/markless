@@ -1,5 +1,6 @@
 import { ASYNC_PROTOCOL_VERSION, protocolInstanceQualifies } from '@markless/serializer';
 import type { SymbolResolverModuleInput, SymbolResolverModuleManifest } from '../artifacts.ts';
+import { decodeBoundRow, factorBoundRows, type JsonBoundRow } from './bound-row-table.ts';
 
 const SMALL_SYMBOL_SWITCH_LIMIT = 3;
 
@@ -82,11 +83,11 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 			: 'const moduleUrls = symbolManifest[3];',
 		'const exportNames = symbolManifest[4];',
 		'const symbolRows = symbolManifest[5];',
-		`const boundRows = ${serializeBoundRows(input.boundSymbols ?? [])};`,
+		...boundRowLookup(input.boundSymbols ?? []),
 		'const callbackRoute = "callback-route";',
 		'',
 		'export async function loadSymbol(id) {',
-		'	const bound = boundRows[id];',
+		'	const bound = boundRow(id);',
 		'	if (bound) return loadBoundSymbol(bound);',
 		'	const row = symbolRows[id];',
 		'	if (!row) throw createUnknownSymbolError(id);',
@@ -288,6 +289,19 @@ const OMITTED_EMPTY_BOUND_ROW_FIELDS = new Set([
 	'branchScopeIds',
 	'keyedRepeatScopeIds',
 ]);
+
+function boundRowLookup(rows: SymbolResolverModuleInput['boundSymbols']): string[] {
+	const serialized = serializeBoundRows(rows);
+	const tables = factorBoundRows(Object.values(JSON.parse(serialized)) as JsonBoundRow[]);
+	if (!tables)
+		return [`const boundRows = ${serialized};`, 'const boundRow = (id) => boundRows[id];'];
+	return [
+		`const boundRowTables = ${JSON.stringify(tables)};`,
+		'const boundRowCache = new Map();',
+		`const decodeBoundRow = ${decodeBoundRow.toString()};`,
+		'const boundRow = (id) => decodeBoundRow(boundRowTables, boundRowCache, id);',
+	];
+}
 
 function serializeBoundRows(rows: SymbolResolverModuleInput['boundSymbols']): string {
 	const serializedRows = (rows ?? []).map((row) => [

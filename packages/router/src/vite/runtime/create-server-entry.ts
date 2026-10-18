@@ -152,7 +152,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 			});
 		const fragment = fragmentNavigation && request.headers.get(FRAGMENT_REQUEST_HEADER) === '1';
 		if (isNitroApiPathname(url.pathname)) {
-			return new Response('Not found', { status: 404 });
+			return new Response('Not found', createPageHttp(request, url).commit(404, {}));
 		}
 
 		const match = matchRouteManifest(url.pathname, manifest);
@@ -227,7 +227,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 		request: Request,
 	) {
 		if (!file) {
-			return new Response(fallbackText, { status });
+			return new Response(fallbackText, createPageHttp(request, url).commit(status, {}));
 		}
 
 		return renderPage(url, file, {}, status, fragment, request);
@@ -493,11 +493,13 @@ function routedPageArtifact(
 	const headInjections = dedupeHeadLinks([
 		...documentHeadInjections,
 		...(baseArtifact?.headInjections ?? []),
-		...(stylesheetHrefs ?? []).map((href): RenderHeadInjection => ({
-			tag: 'link',
-			location: 'head',
-			attributes: { rel: 'stylesheet', href },
-		})),
+		...(stylesheetHrefs ?? []).map(
+			(href): RenderHeadInjection => ({
+				tag: 'link',
+				location: 'head',
+				attributes: { rel: 'stylesheet', href },
+			}),
+		),
 	]);
 	return {
 		resumeModuleUrl: baseArtifact?.resumeModuleUrl,
@@ -909,7 +911,8 @@ function linkBridgeModules(
 
 function contentHash(text: string): string {
 	let hash = 0x811c9dc5;
-	for (let at = 0; at < text.length; at++) hash = Math.imul(hash ^ text.charCodeAt(at), 0x01000193);
+	for (let at = 0; at < text.length; at++)
+		hash = Math.imul(hash ^ text.charCodeAt(at), 0x01000193);
 	return (hash >>> 0).toString(36);
 }
 
@@ -941,10 +944,16 @@ function renderLinkBridgeScript(
 				: [];
 		return `${debugBootstrap}<script type="module" ${LINK_BRIDGE_SCRIPT_ATTRIBUTE}>${escapeInlineScript(`import b from${JSON.stringify(module.path)};b(${args.join(',')})`)}</script>`;
 	}
-	const body = linkBridgeBody(resumeEntryPath, intentPreloads !== undefined, documentLoads, fragment, {
-		intentPreloads,
-		hashLinks,
-	});
+	const body = linkBridgeBody(
+		resumeEntryPath,
+		intentPreloads !== undefined,
+		documentLoads,
+		fragment,
+		{
+			intentPreloads,
+			hashLinks,
+		},
+	);
 	return `${debugBootstrap}<script ${LINK_BRIDGE_SCRIPT_ATTRIBUTE}>${escapeInlineScript(`(()=>{const d=document,s=d.currentScript,r=s&&s.closest('[data-async-container]');if(!r)return;${body}
 })();`)}</script>`;
 }

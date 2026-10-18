@@ -1321,3 +1321,47 @@ test('lowerStateAccess reports a structured diagnostic for const graph binding r
 		}),
 	]);
 });
+
+test('lowerStateAccess lowers a handler property write on an element() handle to a handle read', async () => {
+	const handleSource = `
+import { element } from '@markless/core';
+
+export function Scroller() @{
+	const box = element<HTMLDivElement>();
+	box.scrollTop = 4;
+
+	<div el={box} onClick={() => {
+		box.scrollTop = 10;
+		box.dataset.state = 'scrolled';
+	}}>scroll</div>
+}
+`;
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/Scroller.tsrx',
+		source: handleSource,
+	});
+	const lowered = lowerStateAccess({ semanticGraph });
+	const handlerWrite = handleSource.indexOf('box.scrollTop = 10');
+
+	expect(lowered.writes).toEqual([]);
+	expect(lowered.reads).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				source: 'box',
+				graphNodeId: 'element:box',
+				path: [],
+				sourceSpan: {
+					filename: 'src/Scroller.tsrx',
+					start: handlerWrite,
+					end: handlerWrite + 'box'.length,
+				},
+			}),
+		]),
+	);
+	expect(lowered.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_STATE_READ_ONLY_WRITE',
+			message: 'Cannot write to "box.scrollTop" because element bindings are read-only.',
+		}),
+	]);
+});

@@ -426,13 +426,18 @@ export async function forceImportedModules(
 	for (const child of children) {
 		const loadSource = linkedModuleLoadSource(child, moduleArtifacts.has(child.source));
 		if (loadSource !== undefined) {
-			await metadata.whileWaiting(environment, pathname(child.parent), child.source, async () => {
-				if (options.dev === true) {
-					await options.devServer?.transformRequest(loadSource, environment);
-				} else if (typeof context.load === 'function') {
-					await context.load({ id: loadSource });
-				}
-			});
+			await metadata.whileWaiting(
+				environment,
+				pathname(child.parent),
+				child.source,
+				async () => {
+					if (options.dev === true) {
+						await options.devServer?.transformRequest(loadSource, environment);
+					} else if (typeof context.load === 'function') {
+						await context.load({ id: loadSource });
+					}
+				},
+			);
 		}
 		// Read the child's metadata only once it has been forced: the claim plan
 		// is a fact about the loaded module, not about the request for it.
@@ -791,7 +796,8 @@ export function linkedInterfaceClaims(
 ): LinkedInterfaceClaim[] {
 	return imports.map((imported) => ({
 		source: imported.source,
-		symbols: sourceSymbolManifest(metadata, imported.source, environment, unawaited)?.symbols ?? [],
+		symbols:
+			sourceSymbolManifest(metadata, imported.source, environment, unawaited)?.symbols ?? [],
 	}));
 }
 
@@ -806,5 +812,9 @@ export function throwLinkedModuleChildDiagnostics(
 		parentCaptureMetadataForSource: (parent) =>
 			parentManifest?.captureMetadata ?? metadata.captureMetadataForSource(pathname(parent)),
 	});
-	if (diagnostic) throw new Error(diagnostic.message);
+	if (!diagnostic) return;
+	// A child whose own compile threw has no metadata for that reason; its error is the one to show.
+	const failure =
+		diagnostic.source === undefined ? undefined : metadata.compileFailure(diagnostic.source);
+	throw failure ?? new Error(diagnostic.message);
 }

@@ -979,6 +979,14 @@
 			"from": 1538,
 			"to": 1976,
 			"reason": "a computed first derives an upstream computed that has no value yet"
+		},
+		{
+			"date": "2026-10-18",
+			"guard": "runtime",
+			"subject": "web/resume-keyed-repeats",
+			"from": 15886,
+			"to": 16117,
+			"reason": "merge of reactivity + lists branches: rows count back from the parent's end, plus in-order rows stay attached and fixed page lists skip following their collection"
 		}
 	],
 	"runtimeModules": {
@@ -1071,7 +1079,7 @@
 		"web/resume-events": 16199,
 		"web/resume-handle-qualifier": 685,
 		"web/resume-handoff": 1360,
-		"web/resume-keyed-repeats": 15886,
+		"web/resume-keyed-repeats": 16117,
 		"web/resume-keyed-repeats-lazy": 227,
 		"web/resume-locators": 5644,
 		"web/resume-repeat-branch-arm": 1785,

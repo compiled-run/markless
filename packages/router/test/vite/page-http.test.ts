@@ -82,6 +82,23 @@ test('a page for a present record answers 200 with the header it set', async () 
 	expect(await response.text()).toContain('Invoice INV-0007');
 });
 
+test("the 404 page for an unknown path keeps the middleware's headers and cookies", async () => {
+	const response = await fetch(`${origin}/no-such-page`);
+
+	expect(response.status).toBe(404);
+	expect(await response.text()).toContain('Page not found');
+	expect(response.headers.get('x-request-id')).toBe('mw-1');
+	expect(response.headers.getSetCookie()).toEqual(['visit=mw-1; Path=/; HttpOnly']);
+});
+
+test("a page keeps the middleware's headers and cookies", async () => {
+	const response = await fetch(`${origin}/invoices/7`);
+
+	expect(response.status).toBe(200);
+	expect(response.headers.get('x-request-id')).toBe('mw-1');
+	expect(response.headers.getSetCookie()).toEqual(['visit=mw-1; Path=/; HttpOnly']);
+});
+
 test('a status write after the response started streaming raises the named error', async () => {
 	const response = await fetch(`${origin}/late`);
 	expect(response.status).toBe(200);

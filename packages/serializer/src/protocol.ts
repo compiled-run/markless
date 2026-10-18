@@ -490,6 +490,13 @@ export type ProtocolViewPayload = {
 		 */
 		readonly rowEndOffset?: number;
 		/**
+		 * The browser can never change these rows: the collection and every value a
+		 * row shows are fixed once the page is served, so the record carries no row
+		 * markup and resume neither follows the collection nor loads row-building
+		 * code. Pay-per-use: a repeat whose rows can change omits the field.
+		 */
+		readonly fixed?: true;
+		/**
 		 * The `@empty` arm's finished markup, for the mint that raises it when the
 		 * collection empties after resume and takes it back out when a row returns.
 		 * Carried only for a repeat that HAS an `@empty` arm whose markup is fully

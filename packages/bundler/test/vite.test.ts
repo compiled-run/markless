@@ -567,7 +567,11 @@ export function App() @{
 		]);
 		for (const row of rows) expect(parent.code).toContain(row.id);
 		const resolver = parent.virtualModules.find((module) => module.type === 'resolver')!;
-		for (const row of rows) expect(resolver.source).toContain(row.id);
+		// The resolver keys each edge's routes by the edge half of the bound id.
+		for (const row of rows)
+			expect(resolver.source).toContain(
+				JSON.stringify(row.id.slice(row.id.indexOf(':', 6) + 1)),
+			);
 	});
 
 	test('resolves and loads virtual module ids carrying the ?import suffix Vite adds to .tsrx-shaped imports', async () => {

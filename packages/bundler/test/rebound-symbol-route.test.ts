@@ -8,7 +8,8 @@ import { markless } from '../src/vite/index.ts';
 // page's route must answer it with the bound row carrying that edge's captures.
 const fixtureRoot = fileURLToPath(new URL('./fixtures/rebound-route', import.meta.url));
 
-const ROUTE_FUNCTION = /function marklessSsrLoadSymbolRoute\(symbolId\) \{[\s\S]*?\n\}/;
+const ROUTE_FUNCTION =
+	/const marklessSsrLoadSymbolRouteImports = [\s\S]*?function marklessSsrLoadSymbolRoute\(symbolId\) \{[\s\S]*?\n\}/;
 const REBOUND_IMPORT =
 	/import \{ marklessReboundSymbol as marklessSsrLoadSymbolRouteRebound \} from "[^"]*rebound-symbol[^"]*";/;
 

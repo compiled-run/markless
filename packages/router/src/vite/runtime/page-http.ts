@@ -1,5 +1,5 @@
 import type { AppLocals, HttpContext, HttpResponse } from '../../index.ts';
-import { requestLocals } from '../../request-locals.ts';
+import { requestLocals, takeMiddlewareHeaders } from '../../request-locals.ts';
 
 export const RESPONSE_COMMITTED_CODE = 'MARKLESS_ROUTER_RESPONSE_COMMITTED';
 
@@ -55,8 +55,12 @@ export function createPageHttp(request: Request, url: URL): PageHttp {
 		context,
 		commit(fallbackStatus, routerHeaders) {
 			const sent = new Headers(routerHeaders);
-			for (const [name, value] of headers) if (name !== 'set-cookie') sent.set(name, value);
-			for (const cookie of headers.getSetCookie()) sent.append('set-cookie', cookie);
+			const middleware = takeMiddlewareHeaders(request);
+			for (const source of middleware ? [middleware, headers] : [headers]) {
+				for (const [name, value] of source)
+					if (name !== 'set-cookie') sent.set(name, value);
+				for (const cookie of source.getSetCookie()) sent.append('set-cookie', cookie);
+			}
 			committed = { status: status ?? fallbackStatus, statusText, headers: sent };
 			return {
 				status: committed.status,

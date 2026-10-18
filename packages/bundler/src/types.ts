@@ -83,6 +83,7 @@ export interface TransformTsrxModuleInput {
 	importedModuleInterfaces?: SemanticGraphInput['importedModuleInterfaces'];
 	importedModuleConstants?: SemanticGraphInput['importedModuleConstants'];
 	serverOnlyProps?: SemanticGraphInput['serverOnlyProps'];
+	routeRoot?: SemanticGraphInput['routeRoot'];
 	renderDataImportSources?: Readonly<Record<string, string>>;
 	artifactChildMaterializations?: Readonly<Record<string, ArtifactChildMaterialization>>;
 	symbols?: import('@markless/compiler').SymbolResolverModuleInput['symbols'];
@@ -245,6 +246,8 @@ export type MarklessRolldownPluginApi = {
 	declareServerOnlyProps: (
 		resolve: (moduleId: string) => SemanticGraphInput['serverOnlyProps'],
 	) => void;
+	/** A host plugin names, per root-relative module id, the modules it renders as pages. */
+	declareRouteModules: (isRoute: (moduleId: string) => boolean) => void;
 	invalidateGeneratedModules: (
 		parent: string,
 		environment?: MarklessEnvironment,

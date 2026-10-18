@@ -11,7 +11,7 @@ import { ASYNC_PROTOCOL_VERSION } from '@markless/serializer';
 import type { RuntimeDemandMapArtifact } from '@markless/compiler';
 import { emitScalarPlanLoader } from './scalar-plan-loader.ts';
 import { scalarPlanSourceReference } from './scalar-plan-source.ts';
-import { emitReboundSymbolImport, emitReboundSymbolRoute } from './rebound-symbol-route.ts';
+import { emitSymbolRouteTable } from './rebound-symbol-route.ts';
 
 export const MARKLESS_VIRTUAL_PREFIX = 'virtual:markless:';
 
@@ -333,7 +333,10 @@ export function emitSourceModule(input: {
 	// wherever this is true.
 	const emitsSsrBody =
 		!!input.publicSsrModuleSource &&
-		!(input.environment === 'client' && (symbolsOnly || (!input.prerenderRecords && !input.dev)));
+		!(
+			input.environment === 'client' &&
+			(symbolsOnly || (!input.prerenderRecords && !input.dev))
+		);
 	// The direct-CSR module only reaches the emitted module in the variants below;
 	// everywhere else its root has no binding here, so `renderCsr` has nothing to
 	// point at and the root's published name carries the SSR surface alone.
@@ -367,7 +370,9 @@ export function emitSourceModule(input: {
 		// Server-rendered apps install it in their resume module: putting it here
 		// too would drag the plane into the eager container chunk of a page that
 		// may never resume.
-		input.environment === 'client' && input.directCsr === true && input.hasComputedState === true
+		input.environment === 'client' &&
+		input.directCsr === true &&
+		input.hasComputedState === true
 			? [
 					"import { installMarklessDerivedReconcile } from '@markless/web/fns/reconcile-plane';",
 					'installMarklessDerivedReconcile();',
@@ -816,7 +821,10 @@ export function emitResumeModule(input: {
 				ASYNC_PROTOCOL_VERSION,
 			servedPlansOnly
 				? 'scalar'
-				: composedLeanMode(input.symbolRoutes.length > 0, leanResumeMode(input.runtimeDemandMap)),
+				: composedLeanMode(
+						input.symbolRoutes.length > 0,
+						leanResumeMode(input.runtimeDemandMap),
+					),
 			scalarSpecializations,
 			input.runtimeDemandMap,
 			input.executionLog !== 'never',
@@ -891,7 +899,9 @@ export function emitResumeModule(input: {
 						? `import { marklessScalarLocate, marklessScalarServedOwner, marklessScalarServedPrime${resumeContainerEvent.includes('marklessScalarServedRecord') ? ', marklessScalarServedRecord' : ''} } from '@markless/web/fns/scalar-served';`
 						: '',
 					...(closureImports.length > 0
-						? [`import { ${closureImports.join(', ')} } from '@markless/web/fns/closure-action';`]
+						? [
+								`import { ${closureImports.join(', ')} } from '@markless/web/fns/closure-action';`,
+							]
 						: []),
 					"import { marklessWriteScalar } from '@markless/web/fns/write-scalar';",
 					"import { marklessUpdateText } from '@markless/web/fns/update-text';",
@@ -1013,30 +1023,22 @@ function emitLazySymbolRouteFunction(
 	// A projected child's path nests under the component it was projected into,
 	// so the longer literal prefix must be tested first.
 	const ordered = [...routes].sort((left, right) => right.prefix.length - left.prefix.length);
-	const reboundName = `${functionName}Rebound`;
-	return [
-		emitReboundSymbolImport(ordered, reboundName),
-		`function ${functionName}(symbolId) {`,
-		...ordered.flatMap((route) => {
-			const unbound =
-				'importSource' in route
-					? `import(${JSON.stringify(symbolRouteImportSource(route.importSource, includeScalarActionPlans))}).then((mod) => mod.loadSymbol ? mod.loadSymbol(symbolId.slice(${route.prefix.length})) : Promise.reject(new Error(\`Unknown child async symbol \${symbolId}\`)))`
-					: // Re-enter the table: what is left after one strip can itself carry
-						// another composed child's path. Each hop is strictly shorter, and an
-						// unmatched tail still reaches the closing fallback.
-						`${route.prefix.length > 0 ? functionName : fallbackName}(symbolId.slice(${route.prefix.length}))`;
-			return [
-				`	if (symbolId.startsWith(${JSON.stringify(route.prefix)})) {`,
-				...emitReboundSymbolRoute(route, reboundName, fallbackName, unbound, '\t\t'),
-				`		return ${unbound};`,
-				'	}',
-			];
-		}),
-		`	return ${fallbackName}(symbolId);`,
-		'}',
-	]
-		.filter((line) => line !== '')
-		.join('\n');
+	return emitSymbolRouteTable({
+		routes: ordered.map((route) =>
+			'importSource' in route
+				? {
+						...route,
+						importSource: symbolRouteImportSource(
+							route.importSource,
+							includeScalarActionPlans,
+						),
+					}
+				: route,
+		),
+		functionName,
+		fallbackName,
+		reboundName: `${functionName}Rebound`,
+	});
 }
 
 function emitsClosurePlanLoader(
@@ -1326,7 +1328,8 @@ function emitResumeContainerEvent(
 					`${indent}const marklessArms = (await import('@markless/web/fns/streamed-arms')).marklessStreamedArms(handoff.root, ${loadSymbolName});`,
 				]
 			: [];
-	const armsStarted = (indent: string) => (streamsArms ? [`${indent}marklessArms.started();`] : []);
+	const armsStarted = (indent: string) =>
+		streamsArms ? [`${indent}marklessArms.started();`] : [];
 	const wakeLoadSymbol = streamsArms ? 'marklessArms.loadSymbol' : loadSymbolName;
 	const resumeEntry = storageFreePayload
 		? STORAGE_FREE_RESUME_ENTRY_SPECIFIER
@@ -1715,7 +1718,8 @@ function closureSpecialization(
 	const host = view?.locators?.find((locator) => locator?.hostNodeId === action.hostNodeId);
 	const event = view?.events?.find(
 		(candidate) =>
-			candidate?.hostNodeId === action.hostNodeId && candidate?.eventName === action.eventName,
+			candidate?.hostNodeId === action.hostNodeId &&
+			candidate?.eventName === action.eventName,
 	);
 	// The closure runs the planned symbol under its own id, so a routed or bound id keeps full resume.
 	const symbolId = scalarActionSymbolId(plan.symbolId, event, input.symbolRoutes ?? []);
@@ -1853,10 +1857,12 @@ type ScalarHostResolution = 'static' | 'served' | 'served-only';
 
 // Closure actions resolve their updates through the served view, so a static match never names one.
 function emitStaticScalarMatches(actions: ReadonlyArray<ScalarSpecialization>): string[] {
-	return actions.filter((action) => action.kind === 'scalar').map(
-		(action) =>
-			`	if (marklessScalarEventMatches(input, marklessFindElementAtDomOrderIndex(input.root, ${action.hostIndex}), ${JSON.stringify(action.hostTagName.toLowerCase())}, ${JSON.stringify(action.eventName)}, ${JSON.stringify(action.hostNodeId)})) return ${action.name};`,
-	);
+	return actions
+		.filter((action) => action.kind === 'scalar')
+		.map(
+			(action) =>
+				`	if (marklessScalarEventMatches(input, marklessFindElementAtDomOrderIndex(input.root, ${action.hostIndex}), ${JSON.stringify(action.hostTagName.toLowerCase())}, ${JSON.stringify(action.eventName)}, ${JSON.stringify(action.hostNodeId)})) return ${action.name};`,
+		);
 }
 
 // Ownership comes from the served view, so ancestors, handles, behaviors and open overlays on the path escalate.
@@ -1931,7 +1937,9 @@ function emitScalarHostLookup(
 function closureShapes(actions: ReadonlyArray<ScalarSpecialization>): string[] {
 	return [
 		...new Set(
-			actions.flatMap((action) => (action.kind === 'closure' ? [JSON.stringify(action.plan)] : [])),
+			actions.flatMap((action) =>
+				action.kind === 'closure' ? [JSON.stringify(action.plan)] : [],
+			),
 		),
 	];
 }

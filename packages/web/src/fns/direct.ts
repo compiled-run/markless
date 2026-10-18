@@ -106,9 +106,7 @@ export function attachMarklessPublicStaticEvents(
 	root: Element,
 	graph: DirectGraph,
 	loadSymbolForEvent: DirectLoadSymbol,
-	staticEvents: ReadonlyArray<
-		readonly [ReadonlyArray<number>, string, ReadonlyArray<string>]
-	>,
+	staticEvents: ReadonlyArray<readonly [ReadonlyArray<number>, string, ReadonlyArray<string>]>,
 ) {
 	let debugRegistrations: Array<Promise<void>> | undefined;
 	for (const [path, eventName, symbolIds] of staticEvents) {
@@ -535,7 +533,11 @@ function attachDirectRepeatEvents(
 				let target: Node | null = event.target as Node | null;
 				while (target && target !== parent) {
 					let ran = false;
-					for (let eventIndex = 0; eventIndex < repeat.eventControls.length; eventIndex++) {
+					for (
+						let eventIndex = 0;
+						eventIndex < repeat.eventControls.length;
+						eventIndex++
+					) {
 						const eventControl = repeat.eventControls[eventIndex];
 						if (eventControl.eventName !== eventName) continue;
 						const record = (target as unknown as DirectExpandoElement)[
@@ -684,17 +686,18 @@ export function replaceMarklessPublicRows(
 	state: DirectRepeatState,
 	keys: ReadonlyArray<unknown>,
 ) {
-	const fragment = document.createDocumentFragment();
-	for (const key of keys) {
-		const record = state.rows.get(key);
-		if (record) fragment.appendChild(record.root);
+	// Rows already in order stay attached: re-inserting a focused row drops its focus.
+	let after: Node | null = null;
+	for (let index = keys.length; index--;) {
+		const root = state.rows.get(keys[index])?.root;
+		if (!root) continue;
+		if (root.nextSibling !== after || root.parentNode !== parent)
+			parent.insertBefore(root, after);
+		after = root;
 	}
-	parent.replaceChildren(fragment);
+	while (parent.firstChild && parent.firstChild !== after) parent.removeChild(parent.firstChild);
 }
-export function pruneMarklessPublicRows(
-	state: DirectRepeatState,
-	keys: ReadonlyArray<unknown>,
-) {
+export function pruneMarklessPublicRows(state: DirectRepeatState, keys: ReadonlyArray<unknown>) {
 	const retainedKeys = new Set(keys);
 	for (const [key, record] of state.rows)
 		if (!retainedKeys.has(key)) {

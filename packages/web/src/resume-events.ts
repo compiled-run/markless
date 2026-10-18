@@ -493,11 +493,11 @@ export function createEventWiring(input: {
 		);
 		if (path.length === 0) {
 			if (ignoredDisposed) return;
-			// A capture listener on the container receives a non-bubbling event from
+			// A capture listener on the container receives a non-bubbling DOM event from
 			// every descendant in turn, so "the target itself carries no record" is the
 			// ordinary case rather than a routing defect: the element that does carry
 			// one gets its own event when the pointer enters it.
-			if (!bubbles) return;
+			if (!bubbles && event.stopPropagation) return;
 			await marklessLogInteraction({
 				eventName: event.type,
 				eventRecord: null,

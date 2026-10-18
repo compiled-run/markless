@@ -6633,6 +6633,11 @@ function unclaimedWriteNode(node: AnyNode, rewrite: EventHandlerRewrite): Emissi
  * both legal and required.
  */
 function eventWriteTargetNode(node: AnyNode, rewrite: EventHandlerRewrite): EmissionNode {
+	// `box.scrollTop = top` assigns through the element the handle names.
+	const text = valueNodeText(node, rewrite.source);
+	const handle = text ? elementHandleReadLowering(text, rewrite) : null;
+	if (handle?.kind === 'lowered' && handle.node.type !== 'ChainExpression') return handle.node;
+
 	if (node.type === 'MemberExpression') {
 		return {
 			...(node as unknown as EmissionNode),

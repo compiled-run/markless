@@ -97,7 +97,11 @@ const resumeOnDemandEntries = [
 // 3,093 -> 3,180 bytes, both under the 4,800 gzip wall; the arm-following code is a lazy module only those rows load.
 // 2026-10-17: rows placed from the parent's end, so a list after another list or a branch follows its collection:
 // resume-keyed-repeats.ts 22,392 -> 22,647 raw, minified+gzip 3,074 -> 3,111 bytes, under the 4,800 gzip wall.
-const sourceByteLimit = 22647;
+// 2026-10-17: keyed rows already in order stay attached (a re-inserted focused row lost focus): resume-keyed-repeats.ts
+// 22,411 -> 22,915 (105 of it the formatter wrapping long lines); minified+gzip 3,092 -> 3,153 bytes, under the 4,800 gzip wall.
+// 2026-10-18: a repeat whose rows the browser can never change skips following its collection: 22,931.
+// 2026-10-18: merge of reactivity + lists branches (both changes above together): 23,165.
+const sourceByteLimit = 23165;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',

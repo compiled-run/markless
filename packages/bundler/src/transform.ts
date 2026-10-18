@@ -1128,6 +1128,7 @@ async function compileWithBlockingDiagnostics(
 		| 'artifactChildMaterializations'
 		| 'executionLog'
 		| 'serverOnlyProps'
+		| 'routeRoot'
 	>,
 	resolverId: string,
 ) {
@@ -1136,6 +1137,7 @@ async function compileWithBlockingDiagnostics(
 		moduleId: input.moduleId,
 		source: input.source,
 		...(input.serverOnlyProps?.length ? { serverOnlyProps: input.serverOnlyProps } : {}),
+		...(input.routeRoot ? { routeRoot: true } : {}),
 		buildId: input.buildId,
 		resolverId,
 		symbols: input.symbols ?? [],

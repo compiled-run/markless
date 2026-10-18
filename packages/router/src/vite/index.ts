@@ -201,6 +201,7 @@ function pageServerOnlyPropsPlugin(): Plugin {
 									moduleId: string,
 								) => typeof PAGE_SERVER_ONLY_PROPS | undefined,
 							): void;
+							declareRouteModules?(isRoute: (moduleId: string) => boolean): void;
 						};
 				  }
 				| undefined;
@@ -208,6 +209,9 @@ function pageServerOnlyPropsPlugin(): Plugin {
 				isPageModuleFile(normalizeRouteFileId(moduleId))
 					? PAGE_SERVER_ONLY_PROPS
 					: undefined,
+			);
+			markless?.api.declareRouteModules?.((moduleId) =>
+				isPageModuleFile(normalizeRouteFileId(moduleId)),
 			);
 		},
 	};
