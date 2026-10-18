@@ -760,6 +760,14 @@ function devCommand(options: Pick<CreateOptions, 'format' | 'packageManager'>): 
 	return options.format === 'deno' ? 'deno task dev' : `${options.packageManager} run dev`;
 }
 
+/** The port each starter's `dev` script serves on; every starter is a Router app on Nitro, whose dev server defaults to 3000. */
+export const STARTER_DEV_PORTS = {
+	minimal: 3000,
+	app: 3000,
+	docs: 3000,
+	'full-stack': 3000,
+} as const satisfies Record<Starter, number>;
+
 function nextSteps(options: CreateOptions): string {
 	return [
 		'Next steps:',
@@ -767,7 +775,7 @@ function nextSteps(options: CreateOptions): string {
 		`  ${devCommand(options)}`,
 		'',
 		'Then open:',
-		'  http://localhost:3000',
+		`  http://localhost:${STARTER_DEV_PORTS[options.starter]}`,
 	].join('\n');
 }
 

@@ -3,10 +3,10 @@ import { mkdir, mkdtemp, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { promisify } from 'node:util';
 import { join, resolve } from 'pathe';
-import { createBuilder } from 'vite';
+import { createBuilder, resolveConfig } from 'vite';
 import { afterEach, expect, test } from 'vitest';
 import { startBuiltServer } from '../../../scripts/test-utils/built-server.ts';
-import { CreateProgram, STARTER_CHOICES, type Starter } from '../src/index.ts';
+import { CreateProgram, STARTER_CHOICES, STARTER_DEV_PORTS, type Starter } from '../src/index.ts';
 import { createNodeRuntime } from '../src/node-runtime.ts';
 
 const repoRoot = resolve(import.meta.dirname, '../../..');
@@ -44,10 +44,10 @@ const servedPages: Record<Starter, ReadonlyArray<readonly [path: string, text: s
 	],
 };
 
-async function scaffold(starter: Starter): Promise<string> {
+async function scaffold(starter: Starter, printed: string[] = []): Promise<string> {
 	const root = await mkdtemp(join(tmpdir(), `markless-starter-${starter}-`));
 	cleanups.push(() => rm(root, { force: true, recursive: true }));
-	const writable = { write: () => undefined };
+	const writable = { write: (chunk: string) => void printed.push(chunk) };
 	await new CreateProgram().run(
 		['app', '--starter', starter, '--no-install', '--no-git'],
 		createNodeRuntime({
@@ -83,6 +83,27 @@ test('the starter list this build covers is the list the CLI offers', () => {
 		Object.keys(servedPages).toSorted(),
 	);
 });
+
+test.each(STARTER_CHOICES.map((choice) => choice.value))(
+	'the next steps for a %s starter print the port its dev server resolves to',
+	async (starter) => {
+		const printed: string[] = [];
+		const appRoot = await scaffold(starter, printed);
+		const { PORT: _port, ...env } = process.env;
+		const savedEnv = process.env;
+		process.env = env;
+		cleanups.push(() => {
+			process.env = savedEnv;
+		});
+		const config = await resolveConfig(
+			{ root: appRoot, configFile: join(appRoot, 'vite.config.ts'), logLevel: 'silent' },
+			'serve',
+		);
+		expect(config.server.port).toBe(STARTER_DEV_PORTS[starter]);
+		expect(printed.join('')).toContain(`http://localhost:${config.server.port}\n`);
+	},
+	60_000,
+);
 
 test.each(STARTER_CHOICES.map((choice) => choice.value))(
 	'a freshly scaffolded %s starter builds with its own vite config and serves its pages',
