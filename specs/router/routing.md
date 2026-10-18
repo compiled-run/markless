@@ -80,6 +80,11 @@ Rules:
   changes the status, status text, or headers throws
   `MARKLESS_ROUTER_RESPONSE_COMMITTED`; on a streamed page that error ends the
   stream.
+- Headers middleware adds to `http.response.headers` (including every
+  `set-cookie`) go out with every page response, whatever its status: a
+  matched page, a page that set an error status, and the `404`/`500` status
+  pages. A page header replaces a middleware header of the same name;
+  `set-cookie` values are kept from both.
 - Page props are serialized into the resumable payload; the router leaves
   `http` out of that payload.
 - The compiler refuses browser code that reads `http`: event handlers,

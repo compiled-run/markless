@@ -43,6 +43,16 @@ export default box(
 			);
 		}
 
+		for (const path of ['/', '/no-such-page']) {
+			const response = await environment.client.fetch(path);
+			const cookie = String(response.headers['set-cookie'] ?? '');
+			if (!cookie.includes('router-full-stack=1')) {
+				throw new Error(
+					`Expected ${path} (${response.status}) to carry the middleware set-cookie, saw ${cookie || '<missing>'}`,
+				);
+			}
+		}
+
 		const asset = await environment.client.fetch('/markless-router.txt');
 		await expect.response.matches(asset, {
 			status: 200,
