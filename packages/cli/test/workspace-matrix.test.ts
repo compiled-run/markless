@@ -369,6 +369,8 @@ const scaffoldAndInstall = async (
 		readonly extraArgs?: readonly string[];
 		/** 'slim' swaps in one tiny dependency; 'template' installs what ships. */
 		readonly manifest?: 'slim' | 'template';
+		/** Runs on the scaffolded app just before the install. */
+		readonly beforeInstall?: (appDir: string) => Promise<void>;
 	} = {},
 ) => {
 	const extraArgs = scaffoldOptions.extraArgs ?? [];
@@ -404,7 +406,12 @@ const scaffoldAndInstall = async (
 
 	const appDir = join(root, appPath);
 	if (scaffoldOptions.manifest !== 'template') await slimManifest(appDir, lane);
-	await installDependencies(options, appDir, runtime);
+	await scaffoldOptions.beforeInstall?.(appDir);
+	await installDependencies(options, appDir, runtime).catch((error: unknown) => {
+		throw new Error(`${lane.name} install failed:\n${commands.at(-1)?.output ?? ''}`, {
+			cause: error,
+		});
+	});
 
 	const install = commands.at(-1);
 	expect(install, `${lane.name}: no install command ran`).toBeDefined();
@@ -716,7 +723,19 @@ describe.skipIf(!enabled)('deno starter build', () => {
 		async () => {
 			const lane = LANES.find((entry) => entry.manager === 'deno')!;
 			const root = await makeTempDir('markless-pm-deno-build-');
-			const { appDir } = await scaffoldAndInstall(root, lane, 'app', { manifest: 'template' });
+			const { appDir } = await scaffoldAndInstall(root, lane, 'app', {
+				manifest: 'template',
+				// Deno 2.9 refuses packages published in the last 24 hours, and this lane installs the Markless release cut today.
+				beforeInstall: async (appDir) => {
+					const manifest = JSON.parse(
+						await readFile(join(appDir, 'deno.json'), 'utf-8'),
+					) as object;
+					await writeFile(
+						join(appDir, 'deno.json'),
+						asJson({ ...manifest, minimumDependencyAge: 0 }),
+					);
+				},
+			});
 
 			const build = spawnSync('deno', ['task', 'build'], {
 				cwd: appDir,
