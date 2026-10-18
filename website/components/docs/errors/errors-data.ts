@@ -6037,6 +6037,25 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_ROUTER_NAVIGATE_SERVER',
+		packageName: '@markless/router',
+		stage: 'runtime',
+		severity: 'error',
+		description: 'A Markless runtime error from @markless/router.',
+		printed: [
+			'MARKLESS_ROUTER_NAVIGATE_SERVER: navigate() runs in the browser. Call it from an event handler or other browser code, not while the page renders on the server.',
+		],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/router/src/navigate.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/router/src/navigate.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_ROUTER_RENDER_DATA_MISSING',
 		packageName: '@markless/router',
 		stage: 'runtime',
