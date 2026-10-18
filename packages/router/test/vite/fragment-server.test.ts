@@ -4,10 +4,7 @@ import {
 	createServerEntry,
 	type ServerEntryOptions,
 } from '../../src/vite/runtime/create-server-entry.ts';
-import {
-	FRAGMENT_REGION_END,
-	FRAGMENT_REQUEST_HEADER,
-} from '../../src/vite/fragment-navigation.ts';
+import { FRAGMENT_REGION_END, fragmentRequestUrl } from '../../src/vite/fragment-navigation.ts';
 
 const page = (html: string) => async () => ({
 	default: { renderSsr: () => ({ html, state: { version: 1, cells: [] } }) },
@@ -43,13 +40,11 @@ function entry(options: Partial<ServerEntryOptions> & { readonly shell?: string 
 	});
 }
 
-const fragmentRequest = (url: string) =>
-	new Request(url, { headers: { [FRAGMENT_REQUEST_HEADER]: '1' } });
+const fragmentRequest = (url: string) => new Request(fragmentRequestUrl(url));
 
 test('a fragment fetch of a client-navigation app answers the shell head and the page region only', async () => {
 	const response = await entry().fetch(fragmentRequest('https://app.test/next'));
 	const html = await response.text();
-	expect(response.headers.get('vary')).toBe(FRAGMENT_REQUEST_HEADER);
 	expect(html.endsWith(FRAGMENT_REGION_END)).toBe(true);
 	expect(html).toContain('<title>Shell</title>');
 	expect(html).toContain('<h1>Next</h1>');
@@ -66,10 +61,31 @@ test('a fragment fetch of a document-navigation app answers the whole document',
 	expect(html).toContain('<h1>Next</h1>');
 });
 
-test('a document request is unchanged but still varies on the fragment header', async () => {
+test('a fragment request renders the page for its own URL, query kept and the fragment parameter left out', async () => {
+	const pages = {
+		'pages/index.tsrx': page('<div data-async-container></div>'),
+		'pages/next.tsrx': async () => ({
+			default: {
+				renderSsr: (props: { readonly url: { readonly href: string } }) => ({
+					html: `<div data-async-container><p data-href>${props.url.href}</p></div>`,
+					state: { version: 1, cells: [] },
+				}),
+			},
+		}),
+	};
+	const html = await (
+		await entry({ pageModuleLoaders: pages }).fetch(
+			fragmentRequest('https://app.test/next?tab=a%20b'),
+		)
+	).text();
+	expect(html.endsWith(FRAGMENT_REGION_END)).toBe(true);
+	expect(html).toContain('<p data-href>https://app.test/next?tab=a%20b</p>');
+});
+
+test('a document request answers the document and its body depends on the URL alone', async () => {
 	const response = await entry().fetch(new Request('https://app.test/next'));
 	const html = await response.text();
-	expect(response.headers.get('vary')).toBe(FRAGMENT_REQUEST_HEADER);
+	expect(response.headers.get('vary')).toBeNull();
 	expect(html).not.toContain(FRAGMENT_REGION_END);
 	expect(html).toContain('class="chrome"');
 });
@@ -84,7 +100,7 @@ test('the link bridge carries each destination landing plan and no client-render
 	expect(html).not.toContain('rel="modulepreload" href="/navigation.js"');
 });
 
-test('without the fragment entry, route changes stay client-rendered and responses do not vary', async () => {
+test('without the fragment entry, the fragment URL answers the page document', async () => {
 	const response = await entry({ fragmentEntryPath: undefined }).fetch(
 		fragmentRequest('https://app.test/next'),
 	);

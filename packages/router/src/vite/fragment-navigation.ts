@@ -189,20 +189,28 @@ export function startFragmentNavigation(
 		const request = (url: URL, speculative: boolean): FragmentPrefetch => {
 			const controller = new AbortController();
 			const read = async (): Promise<FragmentFetched> => {
-				const response = await w.fetch(url.href, {
+				const marker = `${config.requestParam}=1`;
+				const target = new URL(url.href);
+				target.hash = '';
+				target.search = target.search ? `${target.search}&${marker}` : `?${marker}`;
+				const response = await w.fetch(target.href, {
 					credentials: 'same-origin',
-					headers: speculative
-						? { [config.requestHeader]: '1', purpose: 'prefetch' }
-						: { [config.requestHeader]: '1' },
+					headers: speculative ? { purpose: 'prefetch' } : {},
 					priority: speculative ? 'auto' : 'high',
 					signal: controller.signal,
 				} as RequestInit);
 				const type = response.headers.get('content-type') ?? '';
 				if (!response.ok || !type.includes('text/html') || !response.body)
 					throw new Error(`MARKLESS_ROUTER_FRAGMENT_UNAVAILABLE: ${response.status}`);
-				const finalUrl = new URL(response.url || url.href);
+				const finalUrl = new URL(response.url || target.href);
 				if (finalUrl.origin !== location.origin)
 					throw new Error('MARKLESS_ROUTER_FRAGMENT_OFF_ORIGIN');
+				// A redirect that dropped the parameter answered with a whole document.
+				const params = finalUrl.search.slice(1).split('&');
+				const at = params.lastIndexOf(marker);
+				if (at === -1) throw new Error('MARKLESS_ROUTER_FRAGMENT_UNAVAILABLE: redirected');
+				params.splice(at, 1);
+				finalUrl.search = params.join('&');
 				finalUrl.hash = url.hash;
 				const reader = response.body.getReader();
 				const decoder = new TextDecoder();
@@ -412,8 +420,26 @@ export function startFragmentNavigation(
 	};
 }
 
-// Request header a fragment fetch carries; page responses vary on it.
-export const FRAGMENT_REQUEST_HEADER = 'x-markless-fragment';
+// A fragment fetch asks for the page URL with this query parameter set to 1, so a cache keyed on the URL alone keeps it apart from the page.
+export const FRAGMENT_REQUEST_PARAM = 'markless-fragment';
+
+export function fragmentRequestUrl(url: string | URL): URL {
+	const target = new URL(url);
+	const marker = `${FRAGMENT_REQUEST_PARAM}=1`;
+	target.search = target.search ? `${target.search}&${marker}` : `?${marker}`;
+	return target;
+}
+
+// The page URL a fragment request names, or undefined for any other request.
+export function fragmentPageUrl(url: URL): URL | undefined {
+	const params = url.search.slice(1).split('&');
+	const at = params.lastIndexOf(`${FRAGMENT_REQUEST_PARAM}=1`);
+	if (at === -1) return undefined;
+	params.splice(at, 1);
+	const page = new URL(url);
+	page.search = params.join('&');
+	return page;
+}
 // The response's region document ends here; each streamed @pending arm after it ends with the append marker.
 export const FRAGMENT_REGION_END = '<!--markless:region-end-->';
 export const FRAGMENT_APPEND_END = '<!--markless:append-end-->';

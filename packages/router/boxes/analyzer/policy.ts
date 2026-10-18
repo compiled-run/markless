@@ -1,3 +1,4 @@
+import { fragmentRequestUrl } from '../../src/vite/fragment-navigation.ts';
 import { LINK_BRIDGE_MODULE_PATH } from '../../src/vite/runtime/link-bridge-module.ts';
 
 export interface RouterAnalyzerNetworkRule {
@@ -8,6 +9,11 @@ export interface RouterAnalyzerNetworkRule {
 }
 
 const BUILD_MODULE = /^\/build\/[^?#]+\.js$/;
+
+function navigationFetch(path: string): string {
+	const url = fragmentRequestUrl(new URL(path, 'http://fixture.test'));
+	return url.pathname + url.search;
+}
 
 /** E1: every browser-observed request in the built router fixture is declared here. */
 export const routerAnalyzerPolicy = {
@@ -27,6 +33,18 @@ export const routerAnalyzerPolicy = {
 				reason: 'streaming route document',
 			},
 			{ method: 'GET', origin: 'fixture', path: '/missing', reason: '404 route document' },
+			{
+				method: 'GET',
+				origin: 'fixture',
+				path: navigationFetch('/'),
+				reason: 'home route region, fetched by a link or Back',
+			},
+			{
+				method: 'GET',
+				origin: 'fixture',
+				path: navigationFetch('/docs/getting-started'),
+				reason: 'MDX route region, fetched by a link',
+			},
 			{
 				method: 'GET',
 				origin: 'fixture',

@@ -62,6 +62,14 @@ website deploys the same way.
 Nitro has presets for many other hosts. We have tested two of them with Markless: the default Node
 server and Vercel. Treat the others as untested for now, and try a preview deploy first.
 
+## Caches in front of your server
+
+When a link swaps in the next page, the router asks for that page's address with
+`?markless-fragment=1` added, and the server answers with just the page area. Every other request
+for the address gets the whole page. Because the two never share an address, a CDN or a Vercel ISR
+cache that keys on the address alone keeps them apart. Keep that query parameter in the cache key;
+a cache that drops query parameters would hand one answer to both.
+
 ## Memory is not shared
 
 A host runs your server as many copies, called instances, and starts or stops them as traffic

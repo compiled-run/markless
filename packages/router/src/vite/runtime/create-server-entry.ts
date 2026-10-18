@@ -39,7 +39,8 @@ import {
 	FRAGMENT_PREFETCH_TTL_MS,
 	FRAGMENT_PREFETCH_CONNECTIONS,
 	FRAGMENT_REGION_END,
-	FRAGMENT_REQUEST_HEADER,
+	FRAGMENT_REQUEST_PARAM,
+	fragmentPageUrl,
 	startFragmentNavigation,
 	type FragmentNavigationConfig,
 } from '../fragment-navigation.ts';
@@ -179,8 +180,10 @@ export function createServerEntry(options: ServerEntryOptions) {
 			(linkBridgeModules && [linkBridgeModules[0].path, linkBridgeModules[1].path]));
 
 	async function fetch(request: Request): Promise<Response> {
-		const url = new URL(request.url);
-		const fragment = fragmentNavigation && request.headers.get(FRAGMENT_REQUEST_HEADER) === '1';
+		const requestUrl = new URL(request.url);
+		const fragmentUrl = fragmentNavigation ? fragmentPageUrl(requestUrl) : undefined;
+		const fragment = fragmentUrl !== undefined;
+		const url = fragmentUrl ?? requestUrl;
 		if (isNitroApiPathname(url.pathname)) {
 			return new Response('Not found', createPageHttp(request, url).commit(404, {}));
 		}
@@ -293,8 +296,6 @@ export function createServerEntry(options: ServerEntryOptions) {
 			? ((await options.documentModuleLoader()) as DocumentModule)
 			: undefined;
 		const headers: Record<string, string> = { 'content-type': 'text/html;charset=utf-8' };
-		// A page URL answers with a document or, for a fragment fetch, the region document: caches must key on the header.
-		if (fragmentNavigation) headers.vary = FRAGMENT_REQUEST_HEADER;
 
 		const baseArtifact = pageModule.default;
 		const renderSsr = baseArtifact?.renderSsr ?? pageModule.marklessRenderSsr;
@@ -1014,7 +1015,7 @@ function fragmentConfig(
 		retireProperty: CONTAINER_RETIRE_PROPERTY,
 		streamExecutorGlobal: STREAM_ARM_EXECUTOR_GLOBAL,
 		streamedArmSelector: STREAMED_ARM_SELECTOR,
-		requestHeader: FRAGMENT_REQUEST_HEADER,
+		requestParam: FRAGMENT_REQUEST_PARAM,
 		regionEndMarker: FRAGMENT_REGION_END,
 		appendMarker: FRAGMENT_APPEND_END,
 		documentLoads,

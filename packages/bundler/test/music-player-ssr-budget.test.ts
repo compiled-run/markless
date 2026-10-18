@@ -10,7 +10,7 @@ import { withoutDemand } from '../../../scripts/benchmarks/perf-guards/attributi
 import { clientAssetsManifestPath } from '../../router/src/vite/client-assets-manifest.ts';
 import {
 	FRAGMENT_REGION_END,
-	FRAGMENT_REQUEST_HEADER,
+	fragmentRequestUrl,
 } from '../../router/src/vite/fragment-navigation.ts';
 import {
 	chunkName,
@@ -223,7 +223,7 @@ async function firstFragmentNavigation(
 		const html = await (await fetch(served.url)).text();
 		const link = /<a\b(?=[^>]*\bdata-markless-router-link\b)[^>]*\bhref="([^"]*)"/.exec(html);
 		const destination = new URL(link?.[1] ?? '/', served.url);
-		const response = await fetch(destination, { headers: { [FRAGMENT_REQUEST_HEADER]: '1' } });
+		const response = await fetch(fragmentRequestUrl(destination));
 		const body = await response.text();
 		const end = body.indexOf(FRAGMENT_REGION_END);
 		if (!response.ok || end === -1)

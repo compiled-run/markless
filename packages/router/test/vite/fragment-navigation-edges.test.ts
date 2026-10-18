@@ -6,6 +6,7 @@ import { createBuilder } from 'vite';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
+import { fragmentPageUrl } from '../../src/vite/fragment-navigation.ts';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 
 // Links the fragment router must leave to the browser, or fetch no more than once:
@@ -70,11 +71,11 @@ async function open(browser: Browser, path = '/'): Promise<Session> {
 	});
 	page.on('request', (request) => {
 		const url = new URL(request.url());
-		const headers = request.headers();
+		const page = fragmentPageUrl(url);
 		requests.push({
-			path: url.pathname + url.search,
-			fragment: headers['x-markless-fragment'] === '1',
-			purpose: headers.purpose,
+			path: (page ?? url).pathname + (page ?? url).search,
+			fragment: page !== undefined,
+			purpose: request.headers().purpose,
 		});
 	});
 	await page.goto(origin + path);

@@ -1,4 +1,6 @@
 import { cp, mkdir, mkdtemp, readFile, rm, symlink } from 'node:fs/promises';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
 import { clientAssetsManifestPath } from '../../src/vite/client-assets-manifest.ts';
@@ -7,6 +9,11 @@ import { createBuilder } from 'vite';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
+import {
+	FRAGMENT_REGION_END,
+	FRAGMENT_REQUEST_PARAM,
+	fragmentRequestUrl,
+} from '../../src/vite/fragment-navigation.ts';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 
 // A built router app served by its real Nitro server and driven in real browsers:
@@ -99,13 +106,51 @@ async function open(browser: Browser, path = '/', base = origin): Promise<Sessio
 	page.on('console', (message) => {
 		if (message.type() === 'error') errors.push(message.text());
 	});
-	page.on('request', (request) =>
-		requests.push(
-			`${new URL(request.url()).pathname}${request.headers()['x-markless-fragment'] ? ' fragment' : ''}`,
-		),
-	);
+	page.on('request', (request) => {
+		const url = new URL(request.url());
+		const fragment = url.searchParams.get(FRAGMENT_REQUEST_PARAM) === '1';
+		requests.push(`${url.pathname}${fragment ? ' fragment' : ''}`);
+	});
 	await page.goto(base + path);
 	return { page, errors, requests };
+}
+
+// A shared cache that keys every response on its URL and ignores Vary, as some CDNs do.
+async function urlKeyedCache(upstream: string) {
+	type Entry = { status: number; headers: Array<[string, string]>; body: Buffer };
+	const entries = new Map<string, Entry>();
+	const server = createServer(async (request, response) => {
+		const key = request.url ?? '/';
+		let entry = request.method === 'GET' ? entries.get(key) : undefined;
+		if (!entry) {
+			const headers = new Headers();
+			for (const [name, value] of Object.entries(request.headers))
+				if (typeof value === 'string' && name !== 'host' && name !== 'accept-encoding')
+					headers.set(name, value);
+			const fetched = await fetch(upstream + key, { headers, redirect: 'manual' });
+			entry = {
+				status: fetched.status,
+				headers: [...fetched.headers].filter(
+					([name]) => !['content-encoding', 'content-length', 'transfer-encoding'].includes(name),
+				),
+				body: Buffer.from(await fetched.arrayBuffer()),
+			};
+			if (request.method === 'GET' && fetched.ok) entries.set(key, entry);
+		}
+		response.writeHead(entry.status, entry.headers);
+		response.end(entry.body);
+	});
+	await new Promise<void>((listening) => server.listen(0, '127.0.0.1', listening));
+	const { port } = server.address() as AddressInfo;
+	return {
+		origin: `http://127.0.0.1:${port}`,
+		clear: () => entries.clear(),
+		close: () =>
+			new Promise<void>((closed) => {
+				server.close(() => closed());
+				server.closeAllConnections();
+			}),
+	};
 }
 
 async function landedOn(page: Page, name: string): Promise<void> {
@@ -374,11 +419,14 @@ for (const [name, browserType] of [
 			await page.locator('[data-nav="other"]').click();
 			await landedOn(page, 'other');
 			let held = 0;
-			await page.route('**/other', async (route) => {
-				held += 1;
-				await new Promise((resolveHold) => setTimeout(resolveHold, 5000));
-				await route.continue().catch(() => {});
-			});
+			await page.route(
+				(url) => url.pathname === '/other',
+				async (route) => {
+					held += 1;
+					await new Promise((resolveHold) => setTimeout(resolveHold, 5000));
+					await route.continue().catch(() => {});
+				},
+			);
 			await page.locator('[data-nav="form"]').click();
 			await landedOn(page, 'form');
 			await page.locator('[data-nav="other"]').hover();
@@ -666,16 +714,48 @@ for (const [name, browserType] of [
 			await page.close();
 		});
 
-		test('fragment responses vary on the fragment header', async () => {
-			const response = await fetch(`${origin}/other`, {
-				headers: { 'x-markless-fragment': '1' },
-			});
-			expect(response.headers.get('vary')).toContain('x-markless-fragment');
-			const body = await response.text();
-			expect(body).toContain('<!--markless:region-end-->');
+		test('a fragment fetch names its own URL; the page URL always answers the document', async () => {
+			const fragment = await fetch(fragmentRequestUrl(`${origin}/other`));
+			expect(await fragment.text()).toContain(FRAGMENT_REGION_END);
 			const document = await fetch(`${origin}/other`);
-			expect(document.headers.get('vary')).toContain('x-markless-fragment');
-			expect(await document.text()).not.toContain('<!--markless:region-end-->');
+			expect(await document.text()).not.toContain(FRAGMENT_REGION_END);
+		});
+
+		test('a cache keyed on the URL alone never serves a navigation fetch as a page load, or the reverse', async () => {
+			const cdn = await urlKeyedCache(origin);
+			try {
+				const { page, errors, requests } = await open(browser, '/', cdn.origin);
+				await page.locator('[data-nav="other"]').click();
+				await landedOn(page, 'other');
+				expect(page.url()).toBe(`${cdn.origin}/other`);
+				expect(requests).toContain('/other fragment');
+				const load = await page.goto(`${cdn.origin}/other`);
+				expect(await load?.text()).not.toContain(FRAGMENT_REGION_END);
+				await page.locator('[data-tap]').click();
+				await expect.poll(() => text(page, '[data-taps]')).toBe('1');
+				expect(errors).toEqual([]);
+				await page.close();
+
+				cdn.clear();
+				const reverse = await open(browser, '/other', cdn.origin);
+				const documents: string[] = [];
+				reverse.page.on('request', (request) => {
+					if (request.resourceType() === 'document')
+						documents.push(new URL(request.url()).pathname);
+				});
+				await reverse.page.goto(`${cdn.origin}/`);
+				await reverse.page.locator('[data-nav="other"]').click();
+				await landedOn(reverse.page, 'other');
+				expect(documents).toEqual(['/']);
+				expect(reverse.page.url()).toBe(`${cdn.origin}/other`);
+				expect(await reverse.page.locator('[data-async-container]').count()).toBe(1);
+				await reverse.page.locator('[data-tap]').click();
+				await expect.poll(() => text(reverse.page, '[data-taps]')).toBe('1');
+				expect(reverse.errors).toEqual([]);
+				await reverse.page.close();
+			} finally {
+				await cdn.close();
+			}
 		});
 
 		test('a click whose route chunk a deploy removed loads the page again once, then clicks work', async () => {

@@ -104,6 +104,22 @@ Rules:
   answers with an error status such as 404, and lists it as a failed route
   (the build stops only with `prerender.failOnError`).
 
+## Navigation
+
+A route change fetches the destination's page region from the server and
+swaps it in. That request names its own URL: the page URL with the query
+parameter `markless-fragment=1` appended (`FRAGMENT_REQUEST_PARAM` in
+`packages/router/src/vite/fragment-navigation.ts`). The server answers that
+URL with the region document and renders the page for the URL without the
+parameter, so `url` and `http.url` never show it. Every other request to the
+page URL answers the whole document.
+
+- A page response depends on its URL alone, so a CDN or ISR cache that keys
+  on the URL and ignores `Vary` keeps navigation fetches and page loads apart.
+- The address bar and history entries show the page URL, never the parameter.
+- A redirect that drops the parameter answers with a whole document; the
+  router then loads the destination as a document.
+
 The router package may integrate with an HTTP runtime through an adapter, but
 shared route manifesting and request-file parsing must stay runtime-agnostic.
 Renderer work must consume Markless compiled `.tsrx` artifacts; it must not
