@@ -21,9 +21,10 @@
 # Modes:
 #   cut          One click (`gh workflow run release.yml -f mode=cut` on main):
 #                the `cut` job bumps to the next minor, writes the CHANGELOG
-#                section, commits and tags vX.Y.0 and pushes both; the `release`
-#                job publishes that tag; the `announce` job creates the GitHub
-#                Release. See docs/ci-process.md, "Cutting a release".
+#                section, commits and tags vX.Y.0, runs CI on that commit, and
+#                moves main and the tag to it once main's required checks pass;
+#                the `release` job publishes that tag; the `announce` job creates
+#                the GitHub Release. See docs/ci-process.md, "Cutting a release".
 #   cut-dry-run  The cut's bump, changelog, hooked commit and pack checks, with no
 #                tag, push, publish or GitHub Release.
 #   dry-run / publish  Publish `version` exactly as committed at the dispatched
@@ -74,12 +75,14 @@ jobs:
     cut:
         if: github.repository == 'compiled-run/markless' && startsWith(inputs.mode, 'cut')
         runs-on: ubuntu-latest
-        timeout-minutes: 45
+        timeout-minutes: 90
         permissions:
-            # Push the release commit and tag.
+            # Push the release branch, main and the tag.
             contents: write
-            # Read main's CI runs.
-            actions: read
+            # Dispatch and watch CI on the release commit.
+            actions: write
+            # Read the release commit's check runs.
+            checks: read
         outputs:
             version: ${{ steps.cut.outputs.version }}
             tag: ${{ steps.cut.outputs.tag }}
@@ -104,23 +107,9 @@ jobs:
                   echo "::error::Releases are cut from main only; this run was dispatched on ${GITHUB_REF}."
                   exit 1
 
-            - name: Refuse a real cut that cannot push to protected main
-              if: inputs.mode == 'cut'
-              env:
-                  HAS_PUSH_TOKEN: ${{ secrets.RELEASE_PUSH_TOKEN != '' }}
-              run: |
-                  set -euo pipefail
-                  protected="$(gh api "repos/${GITHUB_REPOSITORY}/branches/main" --jq '.protected')"
-                  if [ "$protected" = "true" ] && [ "$HAS_PUSH_TOKEN" != "true" ]; then
-                    echo "::error::main is protected and the RELEASE_PUSH_TOKEN secret is not set, so the release commit could not be pushed. See docs/ci-process.md, 'Cutting a release'."
-                    exit 1
-                  fi
-
             - uses: actions/checkout@v4
               with:
                   fetch-depth: 0
-                  # The release commit is pushed with these credentials.
-                  token: ${{ secrets.RELEASE_PUSH_TOKEN || github.token }}
 
             - uses: pnpm/action-setup@v4
 
@@ -131,6 +120,9 @@ jobs:
 
             - name: Install Markless dependencies
               run: pnpm install --frozen-lockfile
+
+            - name: Check that ci.yml reports every check main's protection requires
+              run: node scripts/release/required-checks.mjs --names
 
             # The release commit runs the pre-commit hook, which runs CI's fast jobs; their unit
             # tests launch Chromium and WebKit.
@@ -175,11 +167,57 @@ jobs:
                   path: ${{ runner.temp }}/release-notes.md
                   if-no-files-found: error
 
-            - name: Push the release commit and tag
+            # main's protection requires checks on the pushed commit itself, so the release
+            # commit gets a full CI run on an unprotected branch before main moves to it.
+            - name: Push the release commit to its release branch
               if: inputs.mode == 'cut' && steps.cut.outputs.resumed != 'true'
               env:
                   TAG: ${{ steps.cut.outputs.tag }}
-              run: git push --atomic origin HEAD:refs/heads/main "refs/tags/${TAG}"
+              run: git push origin "HEAD:refs/heads/release/${TAG}"
+
+            - name: Run CI on the release commit
+              if: inputs.mode == 'cut' && steps.cut.outputs.resumed != 'true'
+              env:
+                  TAG: ${{ steps.cut.outputs.tag }}
+                  SHA: ${{ steps.cut.outputs.sha }}
+              run: |
+                  set -euo pipefail
+                  gh workflow run ci.yml --ref "release/${TAG}"
+                  run_id=''
+                  for _ in $(seq 1 24); do
+                    run_id="$(gh run list --workflow ci.yml --event workflow_dispatch --commit "$SHA" \
+                      --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
+                    [ -n "$run_id" ] && break
+                    sleep 5
+                  done
+                  if [ -z "$run_id" ]; then
+                    echo "::error::CI was dispatched on release/${TAG} but its run did not appear within 2 minutes."
+                    exit 1
+                  fi
+                  echo "Watching CI run ${run_id} on ${SHA}"
+                  gh run watch "$run_id" --exit-status --interval 30
+
+            - name: Require every check main's protection names on the release commit
+              if: inputs.mode == 'cut' && steps.cut.outputs.resumed != 'true'
+              env:
+                  SHA: ${{ steps.cut.outputs.sha }}
+              run: node scripts/release/required-checks.mjs --sha "$SHA"
+
+            - name: Move main to the release commit and push the tag
+              if: inputs.mode == 'cut' && steps.cut.outputs.resumed != 'true'
+              env:
+                  TAG: ${{ steps.cut.outputs.tag }}
+                  SHA: ${{ steps.cut.outputs.sha }}
+              run: git push --atomic origin "${SHA}:refs/heads/main" "refs/tags/${TAG}"
+
+            - name: Delete the release branch
+              if: always() && inputs.mode == 'cut' && steps.cut.outputs.tag != ''
+              env:
+                  TAG: ${{ steps.cut.outputs.tag }}
+              run: |
+                  if git ls-remote --exit-code --heads origin "release/${TAG}" >/dev/null; then
+                    git push origin --delete "release/${TAG}"
+                  fi
 
     # Runs after `release` has published the tag the cut pushed.
     announce:
@@ -262,7 +300,7 @@ jobs:
                   # fail here rather than quietly publish with a token again.
                   # Comment lines are excluded so the explanation above can name
                   # the thing it forbids. The scan covers this job, which is last in
-                  # the file; only the `cut` job, which cannot publish, reads a secret.
+                  # the file; no other job reads a secret either, and none can publish.
                   if sed -n '/^    release:$/,$p' .github/workflows/release.yml | grep -vE '^[[:space:]]*#' | grep -nE 'secrets\.'; then
                     echo "::error::The publishing job reads a repository secret. Trusted publishing must use no stored credential."
                     failed=1

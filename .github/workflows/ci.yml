@@ -5,6 +5,8 @@ on:
     push:
         branches:
             - main
+    # The release cut runs CI on its release commit before main moves to it (release.yml, mode=cut).
+    workflow_dispatch:
 
 concurrency:
     group: ci-${{ github.ref }}

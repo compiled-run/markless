@@ -63,10 +63,39 @@ describe('release.yml mode=cut', () => {
 		expect(run).toContain('node scripts/release/cut.mjs\n');
 	});
 
-	test('pushes commit and tag together, never on a dry run or a resumed cut', () => {
-		const push = step(cut, 'Push the release commit and tag');
-		expect(push.if).toBe("inputs.mode == 'cut' && steps.cut.outputs.resumed != 'true'");
-		expect(push.run).toBe('git push --atomic origin HEAD:refs/heads/main "refs/tags/${TAG}"');
+	test('moves main only after CI passed every required check on the release commit itself', () => {
+		const order = [
+			'Push the release commit to its release branch',
+			'Run CI on the release commit',
+			"Require every check main's protection names on the release commit",
+			'Move main to the release commit and push the tag',
+		];
+		for (const name of order) {
+			expect(step(cut, name).if).toBe(
+				"inputs.mode == 'cut' && steps.cut.outputs.resumed != 'true'",
+			);
+		}
+		const positions = order.map((name) => names(cut).indexOf(name));
+		expect(positions).toEqual(positions.toSorted((left, right) => left - right));
+		expect(step(cut, order[0]!).run).toBe('git push origin "HEAD:refs/heads/release/${TAG}"');
+		expect(step(cut, order[1]!).run).toContain('gh workflow run ci.yml --ref "release/${TAG}"');
+		expect(step(cut, order[1]!).run).toContain('gh run watch "$run_id" --exit-status');
+		expect(step(cut, order[2]!).run).toBe(
+			'node scripts/release/required-checks.mjs --sha "$SHA"',
+		);
+		expect(step(cut, order[3]!).run).toBe(
+			'git push --atomic origin "${SHA}:refs/heads/main" "refs/tags/${TAG}"',
+		);
+		expect(step(cut, 'Delete the release branch').if).toContain('always()');
+		expect(
+			step(cut, "Check that ci.yml reports every check main's protection requires").run,
+		).toBe('node scripts/release/required-checks.mjs --names');
+	});
+
+	test('posts no commit status of its own', () => {
+		const commands = cut.steps.map((candidate) => candidate.run ?? '').join('\n');
+		expect(commands).not.toMatch(/\/statuses\/|check-runs -X|--method POST/u);
+		expect(cut.permissions!.statuses).toBeUndefined();
 	});
 
 	test('the cut and announce jobs cannot publish', () => {
@@ -101,10 +130,9 @@ describe('release.yml release job', () => {
 		);
 	});
 
-	test('reads no secret, and is last so its own guard scans exactly it', () => {
+	test('no job reads a secret, and the release job is last so its own guard scans it', () => {
 		expect(Object.keys(workflow.jobs).at(-1)).toBe('release');
-		const releaseJobSource = source.slice(source.indexOf('\n    release:\n'));
-		const executable = releaseJobSource
+		const executable = source
 			.split('\n')
 			.filter((line) => !/^\s*#/u.test(line))
 			.join('\n');
