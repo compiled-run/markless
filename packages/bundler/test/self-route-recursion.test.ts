@@ -12,7 +12,8 @@ import type { SourceLazySymbolRoute } from '../src/source-module.ts';
 // that catches a route which strips one segment and stops.
 const rowsFilename = fileURLToPath(new URL('./fixtures/self-route/rows.tsrx', import.meta.url));
 
-const ROUTE_FUNCTION = /function marklessSsrLoadSymbolRoute\(symbolId\) \{[\s\S]*?\n\}/;
+const ROUTE_FUNCTION =
+	/const marklessSsrLoadSymbolRouteImports = [\s\S]*?function marklessSsrLoadSymbolRoute\(symbolId\) \{[\s\S]*?\n\}/;
 
 async function rowsRouteFunctionSource(): Promise<string> {
 	const result = await transformTsrxModule({
@@ -94,14 +95,9 @@ test('an id no route claims still reaches the closing fallback', async () => {
 test('the self branch recurses while child-module branches keep their bytes', async () => {
 	const source = await rowsRouteFunctionSource();
 
-	expect(source).toContain(
-		'	if (symbolId.startsWith("c4:p5:")) {\n		return marklessSsrLoadSymbolRoute(symbolId.slice(6));\n	}',
-	);
-	// Unchanged: a route naming a child module still imports that module's
-	// symbols variant and hands it the remainder.
-	expect(source).toContain(
-		'	if (symbolId.startsWith("c0:p1:")) {\n		return import("./index.ts?markless-symbols").then((mod) => mod.loadSymbol ? mod.loadSymbol(symbolId.slice(6)) : Promise.reject(new Error(`Unknown child async symbol ${symbolId}`)));\n	}',
-	);
+	expect(source).toMatch(/\[\s*"c4:p5:",\s*-1,/);
+	// A route naming a child module imports that module's symbols variant and hands it the remainder.
+	expect(source).toContain('() => import("./index.ts?markless-symbols")');
 	expect(source.endsWith('	return marklessLoadLocalSymbol(symbolId);\n}')).toBe(true);
 });
 
@@ -142,9 +138,8 @@ test('a prerendered page routes its same-module children too', async () => {
 
 	// The self route survives into the prerendered page and recurses, so a level-2
 	// id routes there exactly as it does on the CSR page.
-	expect(source).toContain(
-		'\tif (symbolId.startsWith("c4:p5:")) {\n\t\treturn loadSymbol(symbolId.slice(6));\n\t}',
-	);
+	expect(source).toContain('["c4:p5:", -1, 0]');
+	expect(source).toContain('(prefix ? loadSymbol(rest) : marklessLoadLocalSymbol(rest))');
 	expect(source).toContain('import("./rows.tsrx?markless-symbols")');
 	expect(source).toContain('import("./index.ts?markless-symbols")');
 	expect(source).toContain('\treturn marklessLoadLocalSymbol(symbolId);');

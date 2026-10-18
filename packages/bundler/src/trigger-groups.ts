@@ -16,7 +16,7 @@ import { emitSymbolResolverModule } from '@markless/compiler';
 import type { SourceSymbolRow } from './source-module.ts';
 import type { SourceLazySymbolRoute } from './source-module.ts';
 import { adaptImportedCaptureResolver } from './bound-resolver.ts';
-import { emitReboundSymbolImport, emitReboundSymbolRoute } from './rebound-symbol-route.ts';
+import { emitSymbolRouteTable } from './rebound-symbol-route.ts';
 
 export type PrerenderTriggerGroup = {
 	readonly id: string;
@@ -86,34 +86,19 @@ export function emitPrerenderTriggerGroupModule(input: {
 	);
 	if (routes.length > 0) {
 		source = source.replaceAll('loadSymbol(', 'marklessLoadLocalSymbol(');
-		source += [
-			emitReboundSymbolImport(routes, 'marklessLoadSymbolRebound'),
-			'export function loadSymbol(symbolId) {',
-			...routes.flatMap((route) => {
-				const unbound =
+		source +=
+			'\n' +
+			emitSymbolRouteTable({
+				routes: routes.map((route) =>
 					'importSource' in route
-						? `import(${JSON.stringify(symbolRouteImportSource(route.importSource))}).then((mod) => mod.loadSymbol ? mod.loadSymbol(symbolId.slice(${route.prefix.length})) : Promise.reject(new Error(\`Unknown child async symbol \${symbolId}\`)))`
-						: // A same-module child's symbols are this page's own; re-enter the
-							// table so a remainder carrying another child's path routes too.
-							`${route.prefix.length > 0 ? 'loadSymbol' : 'marklessLoadLocalSymbol'}(symbolId.slice(${route.prefix.length}))`;
-				return [
-					`\tif (symbolId.startsWith(${JSON.stringify(route.prefix)})) {`,
-					...emitReboundSymbolRoute(
-						route,
-						'marklessLoadSymbolRebound',
-						'marklessLoadLocalSymbol',
-						unbound,
-						'\t\t',
-					),
-					`\t\treturn ${unbound};`,
-					'\t}',
-				];
-			}),
-			'\treturn marklessLoadLocalSymbol(symbolId);',
-			'}',
-		]
-			.filter((line) => line !== '')
-			.join('\n');
+						? { ...route, importSource: symbolRouteImportSource(route.importSource) }
+						: route,
+				),
+				functionName: 'loadSymbol',
+				fallbackName: 'marklessLoadLocalSymbol',
+				reboundName: 'marklessLoadSymbolRebound',
+				exported: true,
+			});
 	}
 	return [
 		armRendererModuleId
@@ -233,240 +218,254 @@ export function planPrerenderTriggerGroups(input: {
 	];
 	const groups: Array<PrerenderTriggerGroup & { adoptsSettledArm?: true }> = routes.flatMap(
 		({ event, branch, branchIndex, hostPath, selfWakeBoundaries }) => {
-		const closureView = selfWakeBoundaries ? completeView : input.view;
-		const host = branch
-			? undefined
-			: input.view.locators.find((locator) => locator.hostNodeId === event.hostNodeId);
-		if (!host && !branch && !selfWakeBoundaries) return [];
-		const compilerGroup = input.triggerGroups.groups.find(
-			(group) => group.hostNodeId === event.hostNodeId && group.eventName === event.eventName,
-		);
-		const graphNodeIds = new Set<string>();
-		const symbolIds = new Set(event.symbolIds ?? []);
-		const selected = {
-			domUpdates: new Set<number>(),
-			behaviors: new Set<number>(),
-			branches: new Set<number>(),
-			boundaries: new Set<number>(),
-			repeats: new Set<number>(),
-			elementHandles: new Set<number>(),
-		};
-		if (branch && branchIndex !== undefined) {
-			selected.branches.add(branchIndex);
-			if (branch.symbolId) symbolIds.add(branch.symbolId);
-			for (const read of branch.testReads ?? []) graphNodeIds.add(read.graphNodeId);
-			for (const arm of branch.armRecords ?? [])
-				collectCompleteArmRecordClosure(arm, graphNodeIds, symbolIds);
-		}
-		const adoptedBoundaryIds = new Set<string>();
-		const escalatedHostNodeIds = new Set<string>();
-		for (const boundaryIndex of selfWakeBoundaries ?? []) {
-			const servedBoundary = input.view.asyncBoundaries[boundaryIndex]!;
-			selected.boundaries.add(boundaryIndex);
-			collectSettledBoundaryClosure(
-				input,
-				completeBoundaries.get(servedBoundary.id) ?? servedBoundary,
-				graphNodeIds,
-				symbolIds,
+			const closureView = selfWakeBoundaries ? completeView : input.view;
+			const host = branch
+				? undefined
+				: input.view.locators.find((locator) => locator.hostNodeId === event.hostNodeId);
+			if (!host && !branch && !selfWakeBoundaries) return [];
+			const compilerGroup = input.triggerGroups.groups.find(
+				(group) =>
+					group.hostNodeId === event.hostNodeId && group.eventName === event.eventName,
 			);
-		}
-		closureView.behaviors.forEach((behavior, index) => {
-			if (selfWakeBoundaries) return;
-			const recordId = `behavior:${behavior.hostNodeId}:${behavior.symbolId ?? ''}`;
-			// Zero-input host behavior closes over linked child triggers too.
-			if (
-				(behavior.inputGraphReads?.length ?? 0) > 0 &&
-				!compilerGroup?.payloadRecordIds.includes(recordId)
-			)
-				return;
-			selected.behaviors.add(index);
-			if (behavior.symbolId) symbolIds.add(behavior.symbolId);
-		});
-		let changed = true;
-		while (changed) {
-			const before = closureSize(graphNodeIds, symbolIds, selected);
-			// Snapshot: the loop grows symbolIds while iterating the closure.
-			const currentSymbolIds = Array.from(symbolIds);
-			for (const symbolId of currentSymbolIds) {
-				const bound = bounds.get(symbolId);
-				if (bound) {
-					symbolIds.add(bound.loaderSymbolId ?? bound.baseSymbolId);
-					for (const slot of bound.captureSlots) {
-						if (slot.route.kind === 'graph-reference')
-							graphNodeIds.add(slot.route.graphNodeId);
-						if (slot.route.kind === 'callback-route')
-							symbolIds.add(slot.route.callbackSymbolId);
-					}
-				}
-				const symbol = symbols.get(symbolId);
-				if (!symbol) continue;
-				if ('reads' in symbol)
-					for (const read of symbol.reads ?? []) graphNodeIds.add(read.graphNodeId);
-				if ('writes' in symbol)
-					for (const write of symbol.writes ?? []) graphNodeIds.add(write.graphNodeId);
-				if (
-					symbol.kind === 'async-computed-runner' ||
-					symbol.kind === 'sync-computed-derive'
-				) {
-					graphNodeIds.add(symbol.graphNodeId);
-					for (const dependency of symbol.dependencies ?? [])
-						graphNodeIds.add(dependency.graphNodeId);
-				}
-				if ('elementHandleCalls' in symbol)
-					for (const call of symbol.elementHandleCalls ?? [])
-						closureView.elementHandles.forEach((handle, index) => {
-							if (handle.name === call.handleName) selected.elementHandles.add(index);
-						});
-				// A handle read as a VALUE needs its record in this page's payload
-				// just as much as a method call on it does: without the record the
-				// resume registry has no entry and the handler reads `undefined`.
-				if ('elementHandleReads' in symbol)
-					for (const read of symbol.elementHandleReads ?? [])
-						closureView.elementHandles.forEach((handle, index) => {
-							if (handle.handleId === read.handleId || handle.name === read.handleName)
-								selected.elementHandles.add(index);
-						});
+			const graphNodeIds = new Set<string>();
+			const symbolIds = new Set(event.symbolIds ?? []);
+			const selected = {
+				domUpdates: new Set<number>(),
+				behaviors: new Set<number>(),
+				branches: new Set<number>(),
+				boundaries: new Set<number>(),
+				repeats: new Set<number>(),
+				elementHandles: new Set<number>(),
+			};
+			if (branch && branchIndex !== undefined) {
+				selected.branches.add(branchIndex);
+				if (branch.symbolId) symbolIds.add(branch.symbolId);
+				for (const read of branch.testReads ?? []) graphNodeIds.add(read.graphNodeId);
+				for (const arm of branch.armRecords ?? [])
+					collectCompleteArmRecordClosure(arm, graphNodeIds, symbolIds);
 			}
-			closeComputedGraph(graphNodeIds, input.state);
-			for (const computed of input.state.computed)
-				if (computed.deriveSymbolId && graphNodeIds.has(computed.graphNodeId))
-					symbolIds.add(computed.deriveSymbolId);
-			for (const graphNodeId of graphNodeIds) {
-				const runnerSymbolId = closureView.asyncRunners?.[graphNodeId];
-				if (runnerSymbolId) symbolIds.add(runnerSymbolId);
-			}
-			selectViewSubscribers(closureView, graphNodeIds, symbolIds, selected);
-			const escalatedBranchIds = new Set<string>();
-			for (const index of selected.branches) {
-				const record = closureView.branches?.[index];
-				if (record?.escalates) escalatedBranchIds.add(record.id);
-			}
-			for (const index of selected.boundaries) {
-				const served = closureView.asyncBoundaries[index]!;
-				for (const arm of boundaryArmRecordSets(completeBoundaries.get(served.id) ?? served))
-					collectEscalatedArmBranchIds(arm, escalatedBranchIds);
-			}
-			for (const branchId of escalatedBranchIds)
-				collectEscalatedBranchClosure(
+			const adoptedBoundaryIds = new Set<string>();
+			const escalatedHostNodeIds = new Set<string>();
+			for (const boundaryIndex of selfWakeBoundaries ?? []) {
+				const servedBoundary = input.view.asyncBoundaries[boundaryIndex]!;
+				selected.boundaries.add(boundaryIndex);
+				collectSettledBoundaryClosure(
 					input,
-					branchId,
+					completeBoundaries.get(servedBoundary.id) ?? servedBoundary,
 					graphNodeIds,
 					symbolIds,
-					escalatedHostNodeIds,
 				);
-			// A gesture whose cells the settled arm reads must OWN that arm, or its
-			// write lands on a graph no record inside the arm is bound to and the
-			// next interaction there forks a second runtime off the raw prerender
-			// records. Same closure the self-wake route takes, on the same arm.
-			if (!selfWakeBoundaries)
-				input.view.asyncBoundaries.forEach((servedBoundary, index) => {
-					if (adoptedBoundaryIds.has(servedBoundary.id)) return;
-					const boundary =
-						completeBoundaries.get(servedBoundary.id) ?? servedBoundary;
+			}
+			closureView.behaviors.forEach((behavior, index) => {
+				if (selfWakeBoundaries) return;
+				const recordId = `behavior:${behavior.hostNodeId}:${behavior.symbolId ?? ''}`;
+				// Zero-input host behavior closes over linked child triggers too.
+				if (
+					(behavior.inputGraphReads?.length ?? 0) > 0 &&
+					!compilerGroup?.payloadRecordIds.includes(recordId)
+				)
+					return;
+				selected.behaviors.add(index);
+				if (behavior.symbolId) symbolIds.add(behavior.symbolId);
+			});
+			let changed = true;
+			while (changed) {
+				const before = closureSize(graphNodeIds, symbolIds, selected);
+				// Snapshot: the loop grows symbolIds while iterating the closure.
+				const currentSymbolIds = Array.from(symbolIds);
+				for (const symbolId of currentSymbolIds) {
+					const bound = bounds.get(symbolId);
+					if (bound) {
+						symbolIds.add(bound.loaderSymbolId ?? bound.baseSymbolId);
+						for (const slot of bound.captureSlots) {
+							if (slot.route.kind === 'graph-reference')
+								graphNodeIds.add(slot.route.graphNodeId);
+							if (slot.route.kind === 'callback-route')
+								symbolIds.add(slot.route.callbackSymbolId);
+						}
+					}
+					const symbol = symbols.get(symbolId);
+					if (!symbol) continue;
+					if ('reads' in symbol)
+						for (const read of symbol.reads ?? []) graphNodeIds.add(read.graphNodeId);
+					if ('writes' in symbol)
+						for (const write of symbol.writes ?? [])
+							graphNodeIds.add(write.graphNodeId);
 					if (
-						!settledArmReadGraphNodeIds(input, boundary).some((graphNodeId) =>
-							graphNodeIds.has(graphNodeId),
-						)
-					)
-						return;
-					adoptedBoundaryIds.add(servedBoundary.id);
-					selected.boundaries.add(index);
-					collectSettledBoundaryClosure(input, boundary, graphNodeIds, symbolIds);
-					collectSettledArmHostRecordClosure(
-						completeView,
-						boundary,
+						symbol.kind === 'async-computed-runner' ||
+						symbol.kind === 'sync-computed-derive'
+					) {
+						graphNodeIds.add(symbol.graphNodeId);
+						for (const dependency of symbol.dependencies ?? [])
+							graphNodeIds.add(dependency.graphNodeId);
+					}
+					if ('elementHandleCalls' in symbol)
+						for (const call of symbol.elementHandleCalls ?? [])
+							closureView.elementHandles.forEach((handle, index) => {
+								if (handle.name === call.handleName)
+									selected.elementHandles.add(index);
+							});
+					// A handle read as a VALUE needs its record in this page's payload
+					// just as much as a method call on it does: without the record the
+					// resume registry has no entry and the handler reads `undefined`.
+					if ('elementHandleReads' in symbol)
+						for (const read of symbol.elementHandleReads ?? [])
+							closureView.elementHandles.forEach((handle, index) => {
+								if (
+									handle.handleId === read.handleId ||
+									handle.name === read.handleName
+								)
+									selected.elementHandles.add(index);
+							});
+				}
+				closeComputedGraph(graphNodeIds, input.state);
+				for (const computed of input.state.computed)
+					if (computed.deriveSymbolId && graphNodeIds.has(computed.graphNodeId))
+						symbolIds.add(computed.deriveSymbolId);
+				for (const graphNodeId of graphNodeIds) {
+					const runnerSymbolId = closureView.asyncRunners?.[graphNodeId];
+					if (runnerSymbolId) symbolIds.add(runnerSymbolId);
+				}
+				selectViewSubscribers(closureView, graphNodeIds, symbolIds, selected);
+				const escalatedBranchIds = new Set<string>();
+				for (const index of selected.branches) {
+					const record = closureView.branches?.[index];
+					if (record?.escalates) escalatedBranchIds.add(record.id);
+				}
+				for (const index of selected.boundaries) {
+					const served = closureView.asyncBoundaries[index]!;
+					for (const arm of boundaryArmRecordSets(
+						completeBoundaries.get(served.id) ?? served,
+					))
+						collectEscalatedArmBranchIds(arm, escalatedBranchIds);
+				}
+				for (const branchId of escalatedBranchIds)
+					collectEscalatedBranchClosure(
+						input,
+						branchId,
 						graphNodeIds,
 						symbolIds,
+						escalatedHostNodeIds,
 					);
-				});
-			if (selfWakeBoundaries || adoptedBoundaryIds.size > 0) {
-				// Boundary rendering consumes render-data initial values through this
-				// group's resolver. Claim each non-literal initializer for its graph.
-				for (const symbol of symbols.values())
-					if (
-						symbol.kind === 'state-initializer' &&
-						graphNodeIds.has(symbol.graphNodeId)
-					)
-						symbolIds.add(symbol.id);
-			}
-			changed = closureSize(graphNodeIds, symbolIds, selected) !== before;
-		}
-
-		// The arm commit registers an escalated arm's own hosts against the DOM it renders.
-		dropEscalatedHostRecords(closureView, selected, escalatedHostNodeIds);
-		const neededHosts = new Set<string>(branch ? [] : [event.hostNodeId]);
-		for (const index of selected.domUpdates)
-			neededHosts.add(closureView.domUpdates[index]!.hostNodeId);
-		for (const index of selected.behaviors)
-			neededHosts.add(closureView.behaviors[index]!.hostNodeId);
-		for (const index of selected.repeats)
-			neededHosts.add(closureView.keyedRepeats![index]!.parentHostNodeId);
-		for (const index of selected.elementHandles)
-			neededHosts.add(closureView.elementHandles[index]!.hostNodeId);
-		const selectedBoundaryIds = new Set(
-			[...selected.boundaries].map((index) => closureView.asyncBoundaries[index]!.id),
-		);
-		const view: ProtocolViewPayload = {
-			...input.view,
-			locators: closureView.locators.filter((locator) => neededHosts.has(locator.hostNodeId)),
-			events: branch || selfWakeBoundaries ? [] : [event],
-			domUpdates: closureView.domUpdates.filter((_, index) => selected.domUpdates.has(index)),
-			behaviors: closureView.behaviors.filter((_, index) => selected.behaviors.has(index)),
-			elementHandles: closureView.elementHandles.filter((_, index) =>
-				selected.elementHandles.has(index),
-			),
-			keyedRepeats: closureView.keyedRepeats?.filter((_, index) =>
-				selected.repeats.has(index),
-			),
-			branches: closureView.branches?.filter((_, index) => selected.branches.has(index)),
-			// Self-wake carries the build-emitted per-arm record sets. The demand-
-			// loaded update symbol renders HTML; settle selects the matching records
-			// here and commits both through the ordinary arm machinery. An adopting
-			// gesture group takes the same complete record set: the served one
-			// describes @pending, which is not what its wake will find in the DOM.
-			asyncBoundaries: closureView.asyncBoundaries
-				.filter((boundary) => selectedBoundaryIds.has(boundary.id))
-				.map((boundary) =>
-					adoptedBoundaryIds.has(boundary.id)
-						? (completeBoundaries.get(boundary.id) ?? boundary)
-						: boundary,
-				),
-			...(closureView.asyncRunners
-				? {
-						asyncRunners: Object.fromEntries(
-							Object.entries(closureView.asyncRunners).filter(([graphNodeId]) =>
+				// A gesture whose cells the settled arm reads must OWN that arm, or its
+				// write lands on a graph no record inside the arm is bound to and the
+				// next interaction there forks a second runtime off the raw prerender
+				// records. Same closure the self-wake route takes, on the same arm.
+				if (!selfWakeBoundaries)
+					input.view.asyncBoundaries.forEach((servedBoundary, index) => {
+						if (adoptedBoundaryIds.has(servedBoundary.id)) return;
+						const boundary =
+							completeBoundaries.get(servedBoundary.id) ?? servedBoundary;
+						if (
+							!settledArmReadGraphNodeIds(input, boundary).some((graphNodeId) =>
 								graphNodeIds.has(graphNodeId),
-							),
-						),
-					}
-				: {}),
-		};
-		const graphIds = [...graphNodeIds].sort();
-		return [
-			{
-				id: selfWakeBoundaries
-					? 'self-wake'
-					: branch
-						? `branch:${branch.id}:${event.eventName}:${hostPath!.join('.')}`
-						: `${event.hostNodeId}:${event.eventName}`,
-				hostNodeId: event.hostNodeId,
-				eventName: event.eventName,
-				hostIndex: host?.index ?? -1,
-				hostTagName: host?.tagName ?? '*',
-				...(branch
+							)
+						)
+							return;
+						adoptedBoundaryIds.add(servedBoundary.id);
+						selected.boundaries.add(index);
+						collectSettledBoundaryClosure(input, boundary, graphNodeIds, symbolIds);
+						collectSettledArmHostRecordClosure(
+							completeView,
+							boundary,
+							graphNodeIds,
+							symbolIds,
+						);
+					});
+				if (selfWakeBoundaries || adoptedBoundaryIds.size > 0) {
+					// Boundary rendering consumes render-data initial values through this
+					// group's resolver. Claim each non-literal initializer for its graph.
+					for (const symbol of symbols.values())
+						if (
+							symbol.kind === 'state-initializer' &&
+							graphNodeIds.has(symbol.graphNodeId)
+						)
+							symbolIds.add(symbol.id);
+				}
+				changed = closureSize(graphNodeIds, symbolIds, selected) !== before;
+			}
+
+			// The arm commit registers an escalated arm's own hosts against the DOM it renders.
+			dropEscalatedHostRecords(closureView, selected, escalatedHostNodeIds);
+			const neededHosts = new Set<string>(branch ? [] : [event.hostNodeId]);
+			for (const index of selected.domUpdates)
+				neededHosts.add(closureView.domUpdates[index]!.hostNodeId);
+			for (const index of selected.behaviors)
+				neededHosts.add(closureView.behaviors[index]!.hostNodeId);
+			for (const index of selected.repeats)
+				neededHosts.add(closureView.keyedRepeats![index]!.parentHostNodeId);
+			for (const index of selected.elementHandles)
+				neededHosts.add(closureView.elementHandles[index]!.hostNodeId);
+			const selectedBoundaryIds = new Set(
+				[...selected.boundaries].map((index) => closureView.asyncBoundaries[index]!.id),
+			);
+			const view: ProtocolViewPayload = {
+				...input.view,
+				locators: closureView.locators.filter((locator) =>
+					neededHosts.has(locator.hostNodeId),
+				),
+				events: branch || selfWakeBoundaries ? [] : [event],
+				domUpdates: closureView.domUpdates.filter((_, index) =>
+					selected.domUpdates.has(index),
+				),
+				behaviors: closureView.behaviors.filter((_, index) =>
+					selected.behaviors.has(index),
+				),
+				elementHandles: closureView.elementHandles.filter((_, index) =>
+					selected.elementHandles.has(index),
+				),
+				keyedRepeats: closureView.keyedRepeats?.filter((_, index) =>
+					selected.repeats.has(index),
+				),
+				branches: closureView.branches?.filter((_, index) => selected.branches.has(index)),
+				// Self-wake carries the build-emitted per-arm record sets. The demand-
+				// loaded update symbol renders HTML; settle selects the matching records
+				// here and commits both through the ordinary arm machinery. An adopting
+				// gesture group takes the same complete record set: the served one
+				// describes @pending, which is not what its wake will find in the DOM.
+				asyncBoundaries: closureView.asyncBoundaries
+					.filter((boundary) => selectedBoundaryIds.has(boundary.id))
+					.map((boundary) =>
+						adoptedBoundaryIds.has(boundary.id)
+							? (completeBoundaries.get(boundary.id) ?? boundary)
+							: boundary,
+					),
+				...(closureView.asyncRunners
 					? {
-							branchStartIndex: branch.startAnchor.index,
-							branchEndIndex: branch.endAnchor.index,
-							hostPath,
+							asyncRunners: Object.fromEntries(
+								Object.entries(closureView.asyncRunners).filter(([graphNodeId]) =>
+									graphNodeIds.has(graphNodeId),
+								),
+							),
 						}
 					: {}),
-				graphNodeIds: graphIds,
-				symbolIds: [...symbolIds].sort(),
-				state: filterState(input.state, new Set(graphIds)),
-				view,
-				...(adoptedBoundaryIds.size > 0 ? { adoptsSettledArm: true as const } : {}),
-			},
-		];
+			};
+			const graphIds = [...graphNodeIds].sort();
+			return [
+				{
+					id: selfWakeBoundaries
+						? 'self-wake'
+						: branch
+							? `branch:${branch.id}:${event.eventName}:${hostPath!.join('.')}`
+							: `${event.hostNodeId}:${event.eventName}`,
+					hostNodeId: event.hostNodeId,
+					eventName: event.eventName,
+					hostIndex: host?.index ?? -1,
+					hostTagName: host?.tagName ?? '*',
+					...(branch
+						? {
+								branchStartIndex: branch.startAnchor.index,
+								branchEndIndex: branch.endAnchor.index,
+								hostPath,
+							}
+						: {}),
+					graphNodeIds: graphIds,
+					symbolIds: [...symbolIds].sort(),
+					state: filterState(input.state, new Set(graphIds)),
+					view,
+					...(adoptedBoundaryIds.size > 0 ? { adoptsSettledArm: true as const } : {}),
+				},
+			];
 		},
 	);
 	// The boundary renderer the self-wake group already ships is emitted one slot
@@ -574,7 +573,8 @@ function dropEscalatedHostRecords(
 ): void {
 	if (hostNodeIds.size === 0) return;
 	const drop = (indexes: Set<number>, hostOf: (index: number) => string | undefined) => {
-		for (const index of indexes) if (hostNodeIds.has(hostOf(index) ?? '')) indexes.delete(index);
+		for (const index of indexes)
+			if (hostNodeIds.has(hostOf(index) ?? '')) indexes.delete(index);
 	};
 	drop(selected.domUpdates, (index) => view.domUpdates[index]?.hostNodeId);
 	drop(selected.behaviors, (index) => view.behaviors[index]?.hostNodeId);
@@ -597,7 +597,10 @@ function collectEscalatedArmBranchIds(
 	for (const branch of arm.branches ?? []) {
 		if (!branch.symbolId && (branch.testReads?.length ?? 0) > 0) branchIds.add(branch.id);
 		for (const nested of branch.armRecords ?? [])
-			collectEscalatedArmBranchIds(nested as Parameters<typeof collectEscalatedArmBranchIds>[0], branchIds);
+			collectEscalatedArmBranchIds(
+				nested as Parameters<typeof collectEscalatedArmBranchIds>[0],
+				branchIds,
+			);
 	}
 }
 
@@ -614,7 +617,9 @@ function collectEscalatedBranchClosure(
 	hostNodeIds: Set<string>,
 ): void {
 	const renderData = input.renderData;
-	const branch = renderData?.branches.find((candidate) => candidate.branchSiteId === branchSiteId);
+	const branch = renderData?.branches.find(
+		(candidate) => candidate.branchSiteId === branchSiteId,
+	);
 	if (!renderData || !branch) return;
 	const chunks = new Map(renderData.chunks.map((chunk) => [chunk.id, chunk]));
 	const edgeIds = new Set<string>();
@@ -744,7 +749,8 @@ function selectViewSubscribers(
 		for (const arm of arms) collectCompleteArmRecordClosure(arm, graphNodeIds, symbolIds);
 	});
 	(view.keyedRepeats ?? []).forEach((record, index) => {
-		if (!record.collectionGraphNodeId || !graphNodeIds.has(record.collectionGraphNodeId)) return;
+		if (!record.collectionGraphNodeId || !graphNodeIds.has(record.collectionGraphNodeId))
+			return;
 		selected.repeats.add(index);
 		for (const rowEvent of record.rowEvents)
 			for (const symbolId of rowEvent.symbolIds ?? []) symbolIds.add(symbolId);

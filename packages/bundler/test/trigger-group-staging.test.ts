@@ -314,8 +314,8 @@ test('keeps symbol route tables exhaustive while the routed symbols stay lazy', 
 		],
 	});
 
-	expect(source).toContain('symbolId.startsWith("c0:")');
-	expect(source).toContain('symbolId.startsWith("c1:")');
+	expect(source).toContain('["c0:", ');
+	expect(source).toContain('["c1:", ');
 });
 
 test('a packed trigger group loads its symbols through imports the bundler can see', () => {
@@ -353,7 +353,8 @@ test('a packed trigger group loads its symbols through imports the bundler can s
 	expect(emit(false)).toContain('@vite-ignore');
 	const packed = emit(true);
 	expect(packed).not.toContain('@vite-ignore');
-	for (const symbol of symbols) expect(packed).toContain(`import(${JSON.stringify(symbol.chunk)})`);
+	for (const symbol of symbols)
+		expect(packed).toContain(`import(${JSON.stringify(symbol.chunk)})`);
 });
 
 test('self-wake groups render settled arms through their demand-loaded update symbol', () => {
@@ -391,9 +392,7 @@ test('self-wake groups render settled arms through their demand-loaded update sy
 	expect(source).toContain('marklessPrepareBoundaryArm(boundaryId, status, graph, loadSymbol)');
 	expect(source).toContain('marklessRenderBoundaryArm(boundaryId, status, graph, loadSymbol)');
 
-	const renderer = emitPrerenderBoundaryRendererModule(
-		'virtual:markless:render-data:App',
-	);
+	const renderer = emitPrerenderBoundaryRendererModule('virtual:markless:render-data:App');
 	expect(renderer).toContain('export function renderBoundaryArm');
 	expect(renderer).toContain('export async function prepareBoundaryArm');
 	expect(renderer).toContain(
@@ -417,7 +416,12 @@ test('a boundary prepared on two graphs at once renders each graph its own arm',
 		`${body}\nreturn { prepareBoundaryArm, renderBoundaryArm };`,
 	) as (
 		data: unknown,
-		render: (data: unknown, boundaryId: string, status: string, graph: object) => Promise<unknown>,
+		render: (
+			data: unknown,
+			boundaryId: string,
+			status: string,
+			graph: object,
+		) => Promise<unknown>,
 	) => {
 		prepareBoundaryArm: (boundaryId: string, status: string, graph: object) => Promise<void>;
 		renderBoundaryArm: (boundaryId: string, status: string, graph: object) => unknown;
@@ -431,8 +435,12 @@ test('a boundary prepared on two graphs at once renders each graph its own arm',
 	]);
 
 	expect(renderer.renderBoundaryArm('boundary:0', 'fulfilled', first)).toEqual({ graph: first });
-	expect(renderer.renderBoundaryArm('boundary:0', 'fulfilled', second)).toEqual({ graph: second });
-	expect(() => renderer.renderBoundaryArm('boundary:0', 'fulfilled', first)).toThrow(/was not prepared/);
+	expect(renderer.renderBoundaryArm('boundary:0', 'fulfilled', second)).toEqual({
+		graph: second,
+	});
+	expect(() => renderer.renderBoundaryArm('boundary:0', 'fulfilled', first)).toThrow(
+		/was not prepared/,
+	);
 });
 
 test('keeps every arm record and its lazy symbols when a staged group touches a branch', () => {
@@ -1153,7 +1161,9 @@ test('a group that selects a sync computed carries its derive symbol and the der
 			},
 			view: {
 				version: 1,
-				locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 1, tagName: 'button' }],
+				locators: [
+					{ hostNodeId: 'h0', strategy: 'dom-order', index: 1, tagName: 'button' },
+				],
 				events: [{ hostNodeId: 'h0', eventName: 'click', symbolIds: ['symbol:click'] }],
 				domUpdates: [],
 				behaviors: [],
