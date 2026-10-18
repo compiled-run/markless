@@ -122,15 +122,20 @@ export function armEscalationCandidateSiteIds(input: SymbolModulesInput): Readon
 	);
 	if (!flippable) return new Set();
 	return new Set(
-		renderBranchArms(input, asyncComputedGraphNodeIds(input.semanticGraph)).escalationCandidates.map(
-			(candidate) => candidate.branchSiteId,
-		),
+		renderBranchArms(
+			input,
+			asyncComputedGraphNodeIds(input.semanticGraph),
+		).escalationCandidates.map((candidate) => candidate.branchSiteId),
 	);
 }
 
 export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtifact {
 	const moduleDeclarations = sourceModuleScopeLines(input.source);
-	const localNamesBySymbol = rowLocalNamesBySymbol(input.renderData);
+	const localNamesBySymbol = rowLocalNamesBySymbol(
+		input.renderData,
+		input.semanticGraph,
+		input.symbolResolver,
+	);
 	const captureSlotsBySymbol = new Map(
 		input.captureAnalysis.extractedSymbols.flatMap((symbol) =>
 			symbol.loaderSymbolId
@@ -190,7 +195,8 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 	]);
 	const unsupportedCaptureSymbolIds = new Set(
 		input.captureAnalysis.extractedSymbols.flatMap((symbol) =>
-			!symbol.loaderSymbolId && symbol.captureSlots.some((slot) =>
+			!symbol.loaderSymbolId &&
+			symbol.captureSlots.some((slot) =>
 				slot.routes.some((route) => route.kind === 'unsupported-opaque'),
 			)
 				? [symbol.symbolId]
@@ -203,7 +209,8 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 	const boundaryArmsById = renderBoundaryArms(input.renderData, asyncComputedNodeIds);
 	const sourceFileName = input.source?.filename ?? 'markless-module.tsrx';
 	const authoredSource = input.source?.source ?? '';
-	const emittedModules: GeneratedSymbolModule[] = input.symbolResolver.symbols.flatMap((symbol) => {
+	const emittedModules: GeneratedSymbolModule[] = input.symbolResolver.symbols.flatMap(
+		(symbol) => {
 			if (unsupportedCaptureSymbolIds.has(symbol.id)) return [];
 			if (symbol.kind === 'branch-update') {
 				const arms = branchArms.armsBySite.get(symbol.branchSiteId);
@@ -213,8 +220,12 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 						symbolId: symbol.id,
 						kind: symbol.kind,
 						exportName: symbolExportName(symbol.id),
-						source: emitBranchUpdateModuleNodes({ symbol, arms, sourceFileName, authoredSource })
-							.code,
+						source: emitBranchUpdateModuleNodes({
+							symbol,
+							arms,
+							sourceFileName,
+							authoredSource,
+						}).code,
 					},
 				];
 			}
@@ -259,7 +270,8 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 				input.omitAuthoredSource === true,
 				sourceFileName,
 			);
-	});
+		},
+	);
 
 	const foreignScope = foreignFactoryScopeCarry(input, emittedModules, captureSlotsBySymbol);
 	const modules = foreignScope.modules;
@@ -309,7 +321,9 @@ function readOnlyRowWriteNames(graph: SemanticGraphArtifact | undefined): Readon
 			? graph?.keyedRepeats.find((candidate) => candidate.id === write.rowRepeatId)
 			: undefined;
 		const binding = repeat?.collectionGraphNodeId
-			? graph?.graphBindings.find((candidate) => candidate.id === repeat.collectionGraphNodeId)
+			? graph?.graphBindings.find(
+					(candidate) => candidate.id === repeat.collectionGraphNodeId,
+				)
 			: undefined;
 		if (repeat && binding && !binding.writable) names.add(repeat.itemName);
 	}
@@ -402,7 +416,13 @@ function unboundForeignBodyNames(
 		symbolId: symbol.id,
 		kind: symbol.kind,
 		exportName: symbolExportName(symbol.id),
-		source: emitSyncComputedDeriveModule({ ...symbol, moduleImports: [] }, captureSlots, true, [], []),
+		source: emitSyncComputedDeriveModule(
+			{ ...symbol, moduleImports: [] },
+			captureSlots,
+			true,
+			[],
+			[],
+		),
 	};
 	return new Set([...freeIdentifierNames(bare)].filter((name) => !isPlatformGlobal(name)));
 }
@@ -431,7 +451,7 @@ function foreignFactoryScopeDiagnostic(
 		message: held
 			? `The browser re-derives "${body.name}" by fetching a module built from a copy of its expression in ${body.definedIn} (${module.symbolId}). The copied expression names "${name}", which ${body.definedIn} means as its own, and THIS file already binds "${name}" as ${held.text}; one module scope cannot hold both, and matched against it by name alone the browser would re-derive the value from this module's "${name}" rather than the one ${body.definedIn} means.`
 			: `The browser re-derives "${body.name}" by fetching a module built from a copy of its expression in ${body.definedIn} (${module.symbolId}). The copied expression names "${name}", and nothing in that module binds it, so the first re-derive in the browser would throw a ReferenceError.`,
-		why: 'A shared() factory has no instance inside a symbol module to ask for a computed value, so the browser re-derives the value from a copy of the factory\'s own expression. Copying text moves the statements but not the scope they were written in. The imports and module-scope constants the expression names travel with the definition and are emitted beside the copy, but a name the reading file already binds from somewhere else cannot be: the emitted module would bind it twice, and matching by name alone would re-derive the value from this file\'s value instead. The server renders the first paint correctly either way, so the failure would first appear on a refresh or a client write.',
+		why: "A shared() factory has no instance inside a symbol module to ask for a computed value, so the browser re-derives the value from a copy of the factory's own expression. Copying text moves the statements but not the scope they were written in. The imports and module-scope constants the expression names travel with the definition and are emitted beside the copy, but a name the reading file already binds from somewhere else cannot be: the emitted module would bind it twice, and matching by name alone would re-derive the value from this file's value instead. The server renders the first paint correctly either way, so the failure would first appear on a refresh or a client write.",
 		suggestions: [
 			held
 				? {
@@ -765,7 +785,9 @@ function unresolvedGraphReferences(
 	moduleDeclaredNames: ReadonlySet<string>,
 	moduleImportNames: ReadonlySet<string> = new Set(),
 ): ReadonlyArray<UnresolvedGraphReference> {
-	const anyCrossModuleInline = symbols.some((symbol) => crossModuleInlineOf(symbol) !== undefined);
+	const anyCrossModuleInline = symbols.some(
+		(symbol) => crossModuleInlineOf(symbol) !== undefined,
+	);
 	if (
 		graphNames.size === 0 &&
 		localNamesBySymbol.size === 0 &&
@@ -805,9 +827,7 @@ function unresolvedGraphReferences(
 				// Lowest precedence of the three: a name the graph or a row already
 				// explains is explained better by them. This claims only the names
 				// none of the others do — the ones an emitter should have carried.
-				...(moduleDeclaredNames.has(name) &&
-				!graphNames.has(name) &&
-				!localNames.has(name)
+				...(moduleDeclaredNames.has(name) && !graphNames.has(name) && !localNames.has(name)
 					? { moduleDeclaration: true }
 					: {}),
 				// Lowest of all: an import is only the explanation when nothing this
@@ -874,9 +894,7 @@ function crossModuleInlineOf(
  * statements, and it must — an import IS emitted into the module that needs it,
  * so counting its local would report every correctly emitted import as a gap.
  */
-function sourceModuleScopeDeclaredNames(
-	source: SymbolModulesInput['source'],
-): ReadonlySet<string> {
+function sourceModuleScopeDeclaredNames(source: SymbolModulesInput['source']): ReadonlySet<string> {
 	if (!source) return new Set();
 	try {
 		return new Set(
@@ -1040,7 +1058,8 @@ function unresolvedGraphReferenceDiagnostic(
 	// none of them is true of a name that arrived from another file.
 	if (reference.crossModuleInline) return sharedMethodCrossModuleDiagnostic(reference, where);
 	if (reference.rowLocal === true) return rowLocalReferenceDiagnostic(reference, where);
-	if (reference.sharedInstance === true) return sharedInstanceReferenceDiagnostic(reference, where);
+	if (reference.sharedInstance === true)
+		return sharedInstanceReferenceDiagnostic(reference, where);
 	if (reference.moduleDeclaration === true) {
 		return moduleDeclarationReferenceDiagnostic(reference, where);
 	}
@@ -1100,7 +1119,7 @@ function sharedMethodCrossModuleDiagnostic(
 		artifactKeys: ['symbolModules'],
 		title: `A shared() method cannot be called from another module yet (${methods || 'a shared() method'})`,
 		message: `The emitted ${reference.kind} module for ${reference.symbolId} was built by copying the body of ${methods || 'a shared() method'} out of ${files} into this file. ${where} ${what}`,
-		why: 'Calling a shared() method compiles to copying the method\'s authored body into the calling handler, because no shared instance exists inside a handler module to call the method on. Copying text moves the statements but not the scope they were written in, so the copy only means what the author wrote while the definition and the call are in one file. Across files the definition module\'s imports and module-scope declarations do not travel, and the calling module\'s imports are matched against the copied text by name, which can capture a same-named binding that means something else entirely. Both failures are invisible until the gesture runs, so this build refuses instead.',
+		why: "Calling a shared() method compiles to copying the method's authored body into the calling handler, because no shared instance exists inside a handler module to call the method on. Copying text moves the statements but not the scope they were written in, so the copy only means what the author wrote while the definition and the call are in one file. Across files the definition module's imports and module-scope declarations do not travel, and the calling module's imports are matched against the copied text by name, which can capture a same-named binding that means something else entirely. Both failures are invisible until the gesture runs, so this build refuses instead.",
 		suggestions: [
 			{
 				message: `Call ${methods || 'the method'} from a part the family itself publishes, in ${files}, and compose that part here. Inside its own module the same call compiles and runs today.`,
@@ -1171,7 +1190,7 @@ function sharedInstanceReferenceDiagnostic(
 		artifactKeys: ['symbolModules'],
 		title: `This expression passes "${reference.name}" around instead of calling it`,
 		message: `The emitted ${reference.kind} module for ${reference.symbolId} still names "${reference.name}" directly. ${where} "${reference.name}" is a shared() instance built by the component, and no instance exists inside the handler module, so this module would throw a ReferenceError the first time it runs.`,
-		why: 'A handler is compiled into a module of its own, and a call to a shared() method is compiled by copying that method\'s body in. Only a call has a body to copy: a method read as a value — passed to a function, stored in a local, or set as an object property — leaves the instance name standing with nothing behind it.',
+		why: "A handler is compiled into a module of its own, and a call to a shared() method is compiled by copying that method's body in. Only a call has a body to copy: a method read as a value — passed to a function, stored in a local, or set as an object property — leaves the instance name standing with nothing behind it.",
 		suggestions: [
 			{
 				message: `Call it inside a closure at the point of use: \`() => ${reference.name}.<method>()\`. The call is copied into the handler module, and the closure around it is passed on as an ordinary function.`,
@@ -1207,7 +1226,7 @@ function moduleDeclarationReferenceDiagnostic(
 		artifactKeys: ['symbolModules'],
 		title: `The emitted module for ${reference.symbolId} is missing the declaration of "${reference.name}"`,
 		message: `The emitted ${reference.kind} module for ${reference.symbolId} still names "${reference.name}" directly. ${where} "${reference.name}" is declared at module scope in this file, and the emitted module does not declare it, so this module would throw a ReferenceError the first time it runs in the browser. The server render would not: it evaluates the authored module, where the declaration is in scope.`,
-		why: 'Every symbol is compiled into a module that is fetched and evaluated on its own, so a module-scope declaration it still names has to be copied into it. That copy is the compiler\'s to make, and this check exists because a missing one is invisible otherwise: the server renders from the authored module and stays green, so the gap reaches the browser and crashes on the first re-render rather than failing the build.',
+		why: "Every symbol is compiled into a module that is fetched and evaluated on its own, so a module-scope declaration it still names has to be copied into it. That copy is the compiler's to make, and this check exists because a missing one is invisible otherwise: the server renders from the authored module and stays green, so the gap reaches the browser and crashes on the first re-render rather than failing the build.",
 		suggestions: [
 			{
 				message: `This is a compiler gap, not a mistake in this file: reading a module-scope declaration from a component is supported. Report it with the authored source of "${reference.name}" and the symbol kind above.`,
@@ -1405,7 +1424,10 @@ function renderBranchArms(
 					refusals.length > 0 &&
 					refusals.every((refusal) => refusal.escalatable)
 				)
-					escalationCandidates.push({ branchSiteId: branch.branchSiteId, symbolId: symbol.id });
+					escalationCandidates.push({
+						branchSiteId: branch.branchSiteId,
+						symbolId: symbol.id,
+					});
 			}
 			continue;
 		}
@@ -1456,19 +1478,26 @@ function renderBoundaryArms(
 	asyncComputedNodeIds: ReadonlySet<string>,
 ): ReadonlyMap<string, PublicRenderPlanAsyncBoundaryArms> {
 	if (!renderData) return new Map();
-	return new Map((renderData.boundaries ?? []).flatMap((boundary) => {
-		const chunkIds = [boundary.armChunkIds.try, boundary.armChunkIds.catch].filter(
-			(candidate): candidate is string => candidate !== undefined,
-		);
-		const arms = chunkIds.map((chunkId) =>
-			renderChunkParts({ renderData, asyncComputedNodeIds }, chunkId),
-		);
-		if (arms.some((arm) => arm === null)) return [];
-		return [[boundary.boundaryId, {
-			boundaryId: boundary.boundaryId,
-			arms: arms as PublicRenderPlanAsyncBoundaryArms['arms'],
-		}] as const];
-	}));
+	return new Map(
+		(renderData.boundaries ?? []).flatMap((boundary) => {
+			const chunkIds = [boundary.armChunkIds.try, boundary.armChunkIds.catch].filter(
+				(candidate): candidate is string => candidate !== undefined,
+			);
+			const arms = chunkIds.map((chunkId) =>
+				renderChunkParts({ renderData, asyncComputedNodeIds }, chunkId),
+			);
+			if (arms.some((arm) => arm === null)) return [];
+			return [
+				[
+					boundary.boundaryId,
+					{
+						boundaryId: boundary.boundaryId,
+						arms: arms as PublicRenderPlanAsyncBoundaryArms['arms'],
+					},
+				] as const,
+			];
+		}),
+	);
 }
 
 function renderChunkParts(
@@ -1487,7 +1516,9 @@ function renderChunkParts(
 		});
 		return null;
 	};
-	const chunk = (child?.chunks ?? renderData.chunks).find((candidate) => candidate.id === chunkId);
+	const chunk = (child?.chunks ?? renderData.chunks).find(
+		(candidate) => candidate.id === chunkId,
+	);
 	if (!chunk) return refuse('its content has no compiled markup');
 	const parts: Array<PublicRenderPlanBranchArms['arms'][number][number]> = [];
 	const pushText = (text: string) => {
@@ -1499,7 +1530,9 @@ function renderChunkParts(
 	};
 	for (let staticIndex = 0; staticIndex < chunk.statics.length; staticIndex++) {
 		pushText(chunk.statics[staticIndex] ?? '');
-		for (const slot of chunk.slots.filter((candidate) => candidate.staticIndex === staticIndex)) {
+		for (const slot of chunk.slots.filter(
+			(candidate) => candidate.staticIndex === staticIndex,
+		)) {
 			if (slot.kind === 'text' && slot.residue.kind === 'graph-read') {
 				const scoped = scopedPropPart(scope, slot.residue.graphNodeId, slot.residue.path);
 				if (scoped === 'unsupported')
@@ -1551,20 +1584,49 @@ function renderChunkParts(
 				continue;
 			}
 			if (slot.kind === 'repeat') {
-				const repeat = renderData.repeats.find((candidate) => candidate.repeatId === slot.repeatId);
-				const row = repeat ? renderData.chunks.find((candidate) => candidate.id === repeat.rowChunkId) : undefined;
+				const repeat = renderData.repeats.find(
+					(candidate) => candidate.repeatId === slot.repeatId,
+				);
+				const row = repeat
+					? renderData.chunks.find((candidate) => candidate.id === repeat.rowChunkId)
+					: undefined;
 				if (!repeat?.collectionGraphNodeId || !row)
 					return refuse('it repeats over a collection with no compiled row');
-				const rowParts: Array<{ text: string } | { read: { graphNodeId: string; path: ReadonlyArray<string> } } | { itemPath: ReadonlyArray<string> }> = [];
+				const rowParts: Array<
+					| { text: string }
+					| { read: { graphNodeId: string; path: ReadonlyArray<string> } }
+					| { itemPath: ReadonlyArray<string> }
+				> = [];
 				for (let rowIndex = 0; rowIndex < row.statics.length; rowIndex++) {
-					const text = (row.statics[rowIndex] ?? '').replace(/<!--markless-slot:\d+-->/g, '');
+					const text = (row.statics[rowIndex] ?? '').replace(
+						/<!--markless-slot:\d+-->/g,
+						'',
+					);
 					if (text) rowParts.push({ text });
-					for (const rowSlot of row.slots.filter((candidate) => candidate.staticIndex === rowIndex)) {
+					for (const rowSlot of row.slots.filter(
+						(candidate) => candidate.staticIndex === rowIndex,
+					)) {
 						if (rowSlot.kind !== 'text')
-							return refuse(`a repeated row inside it holds a ${rowSlot.kind} binding`);
-						if (rowSlot.residue.kind === 'repeat-item') rowParts.push({ itemPath: rowSlot.residue.path });
-						else if (rowSlot.residue.kind === 'graph-read') rowParts.push({ read: { graphNodeId: rowSlot.residue.graphNodeId, path: armPartReadPath(rowSlot.residue.graphNodeId, rowSlot.residue.path, asyncComputedNodeIds) } });
-						else return refuse('a repeated row inside it reads a value that cannot be recomputed');
+							return refuse(
+								`a repeated row inside it holds a ${rowSlot.kind} binding`,
+							);
+						if (rowSlot.residue.kind === 'repeat-item')
+							rowParts.push({ itemPath: rowSlot.residue.path });
+						else if (rowSlot.residue.kind === 'graph-read')
+							rowParts.push({
+								read: {
+									graphNodeId: rowSlot.residue.graphNodeId,
+									path: armPartReadPath(
+										rowSlot.residue.graphNodeId,
+										rowSlot.residue.path,
+										asyncComputedNodeIds,
+									),
+								},
+							});
+						else
+							return refuse(
+								'a repeated row inside it reads a value that cannot be recomputed',
+							);
 					}
 				}
 				const emptyChunk = repeat.emptyChunkId
@@ -1573,18 +1635,20 @@ function renderChunkParts(
 				if (emptyChunk && emptyChunk.slots.length > 0)
 					return refuse('its @empty block holds a value that changes');
 				const empty = emptyChunk?.statics.join('');
-				parts.push({ repeat: {
-					read: {
-						graphNodeId: repeat.collectionGraphNodeId,
-						path: armPartReadPath(
-							repeat.collectionGraphNodeId,
-							repeat.collectionPath,
-							asyncComputedNodeIds,
-						),
+				parts.push({
+					repeat: {
+						read: {
+							graphNodeId: repeat.collectionGraphNodeId,
+							path: armPartReadPath(
+								repeat.collectionGraphNodeId,
+								repeat.collectionPath,
+								asyncComputedNodeIds,
+							),
+						},
+						rowParts,
+						...(empty ? { empty } : {}),
 					},
-					rowParts,
-					...(empty ? { empty } : {}),
-				} });
+				});
 				continue;
 			}
 			// The id a bound element carries, or an always-written reference names, is
@@ -1597,10 +1661,12 @@ function renderChunkParts(
 				slot.residue.kind === 'element-handle-id' &&
 				!child
 			) {
-				parts.push({ read: {
-					graphNodeId: protocolElementHandleReadId(slot.residue.handleGraphNodeId),
-					path: [],
-				} });
+				parts.push({
+					read: {
+						graphNodeId: protocolElementHandleReadId(slot.residue.handleGraphNodeId),
+						path: [],
+					},
+				});
 				continue;
 			}
 			if (
@@ -1612,7 +1678,9 @@ function renderChunkParts(
 			) {
 				const scoped = scopedPropPart(scope, slot.residue.graphNodeId, slot.residue.path);
 				if (scoped !== null && (scoped === 'unsupported' || !('read' in scoped)))
-					return refuse('an attribute it sets comes from a prop the flip cannot recompute');
+					return refuse(
+						'an attribute it sets comes from a prop the flip cannot recompute',
+					);
 				const read = scoped ?? {
 					read: {
 						graphNodeId: slot.residue.graphNodeId,
@@ -1623,11 +1691,13 @@ function renderChunkParts(
 						),
 					},
 				};
-				parts.push({ attribute: {
-					name: slot.name,
-					read: read.read,
-					...(slot.alwaysPresent ? { alwaysPresent: true as const } : {}),
-				} });
+				parts.push({
+					attribute: {
+						name: slot.name,
+						read: read.read,
+						...(slot.alwaysPresent ? { alwaysPresent: true as const } : {}),
+					},
+				});
 				continue;
 			}
 			return refuse(armSlotRefusalDetail(slot));
@@ -1666,7 +1736,11 @@ function scopedPropPart(
 	scope: ArmPropScope | undefined,
 	graphNodeId: string,
 	path: ReadonlyArray<string>,
-): { readonly text: string } | { readonly read: { graphNodeId: string; path: ReadonlyArray<string> } } | 'unsupported' | null {
+):
+	| { readonly text: string }
+	| { readonly read: { graphNodeId: string; path: ReadonlyArray<string> } }
+	| 'unsupported'
+	| null {
 	if (!scope) return null;
 	const name = graphNodeId === 'prop:props' ? path[0] : graphNodeId.slice('prop:'.length);
 	const rest = graphNodeId === 'prop:props' ? path.slice(1) : path;
@@ -1807,6 +1881,8 @@ const emptyLocalNames = new Set<string>();
 
 function rowLocalNamesBySymbol(
 	renderData: RenderDataArtifact | undefined,
+	semanticGraph?: SemanticGraphArtifact,
+	symbolResolver?: SymbolResolverPlan,
 ): ReadonlyMap<string, ReadonlySet<string>> {
 	const localNamesBySymbol = new Map<string, Set<string>>();
 	const addLocal = (symbolId: string, itemName: string): void => {
@@ -1825,6 +1901,15 @@ function rowLocalNamesBySymbol(
 				for (const symbolId of interaction.symbolIds) addLocal(symbolId, repeat.itemName);
 			}
 		}
+	}
+	// A callback a row passes its child closes over the row's item, which the child's dispatch supplies.
+	for (const symbol of symbolResolver?.symbols ?? []) {
+		if (symbol.kind !== 'callback-prop') continue;
+		const edge = semanticGraph?.componentEdges.find(
+			(candidate) => candidate.id === symbol.componentEdgeId,
+		);
+		for (const repeat of semanticGraph?.keyedRepeats ?? [])
+			if (edge?.keyedRepeatScopeIds.includes(repeat.id)) addLocal(symbol.id, repeat.itemName);
 	}
 	return localNamesBySymbol;
 }
@@ -1858,7 +1943,8 @@ function renderChunkHostIds(
 								? [slot.childChunkId]
 								: [];
 		for (const childChunkId of childChunkIds) {
-			for (const hostId of renderChunkHostIds(renderData, childChunkId, seen)) hostIds.add(hostId);
+			for (const hostId of renderChunkHostIds(renderData, childChunkId, seen))
+				hostIds.add(hostId);
 		}
 	}
 	return hostIds;
@@ -2020,7 +2106,8 @@ export function buildDomBindingEmission(input: DomBindingEmissionInput): Emissio
 	const body = isPlainTextUpdateLeaf(input.symbol.target)
 		? domTextLeafBody(exportName, input.symbol.hostNodeId)
 		: [
-				...(input.symbol.target.kind === 'text' && input.symbol.target.textNode !== undefined
+				...(input.symbol.target.kind === 'text' &&
+				input.symbol.target.textNode !== undefined
 					? [
 							moduleImportNode({
 								kind: 'named',
@@ -2191,8 +2278,7 @@ function classDomUpdateValueNode(
 
 	let composed =
 		leading === undefined ? mapped() : binaryNode('+', literalNode(`${leading} `), mapped());
-	if (constant !== undefined)
-		composed = binaryNode('+', composed, literalNode(` ${constant}`));
+	if (constant !== undefined) composed = binaryNode('+', composed, literalNode(` ${constant}`));
 	return conditionalNode(
 		mapped(),
 		composed,
@@ -2360,20 +2446,24 @@ export function buildBehaviorEmission(input: BehaviorEmissionInput): EmissionPri
 			),
 		),
 		exportNamedDeclarationNode(
-			functionDeclarationNode(exportName, ['context'], [
-				constDeclarationNode('inputs', behaviorInputsExpression(inputCount)),
-				constDeclarationNode(
-					'behavior',
-					inputCount > 0
-						? callNode(projection.functionExpression, [
-								spreadNode(identifierNode('inputs')),
-							])
-						: projection.functionExpression,
-				),
-				returnStatementNode(
-					callNode(identifierNode('behavior'), [memberChainNode('context.element')]),
-				),
-			]),
+			functionDeclarationNode(
+				exportName,
+				['context'],
+				[
+					constDeclarationNode('inputs', behaviorInputsExpression(inputCount)),
+					constDeclarationNode(
+						'behavior',
+						inputCount > 0
+							? callNode(projection.functionExpression, [
+									spreadNode(identifierNode('inputs')),
+								])
+							: projection.functionExpression,
+					),
+					returnStatementNode(
+						callNode(identifierNode('behavior'), [memberChainNode('context.element')]),
+					),
+				],
+			),
 		),
 	];
 
@@ -2404,10 +2494,9 @@ function behaviorInputsExpression(inputCount: number): EmissionNode {
 	return logicalNode(
 		'??',
 		memberChainNode('context.behaviorInputs'),
-		callNode(
-			memberNode(newNode(identifierNode('Array'), [literalNode(inputCount)]), 'fill'),
-			[identifierNode('undefined')],
-		),
+		callNode(memberNode(newNode(identifierNode('Array'), [literalNode(inputCount)]), 'fill'), [
+			identifierNode('undefined'),
+		]),
 	);
 }
 
@@ -2587,7 +2676,9 @@ export function buildStateInitializerEmission(
 	]);
 	const imports = dedupeModuleImports([
 		...(input.symbol.moduleImports ?? []),
-		...input.moduleImports.filter((moduleImport) => referencedNames.has(moduleImport.localName)),
+		...input.moduleImports.filter((moduleImport) =>
+			referencedNames.has(moduleImport.localName),
+		),
 	]);
 
 	const body: EmissionNode[] = [
@@ -2608,16 +2699,12 @@ export function buildStateInitializerEmission(
 					),
 				]),
 		exportNamedDeclarationNode(
-			functionDeclarationNode(
-				exportName,
-				input.propReads.length > 0 ? ['context'] : [],
-				[
-					...input.propReads.flatMap((propRead) =>
-						stateInitializerPropReadStatements(propRead, input.sourceFileName),
-					),
-					returnStatementNode(projection.initializerExpression),
-				],
-			),
+			functionDeclarationNode(exportName, input.propReads.length > 0 ? ['context'] : [], [
+				...input.propReads.flatMap((propRead) =>
+					stateInitializerPropReadStatements(propRead, input.sourceFileName),
+				),
+				returnStatementNode(projection.initializerExpression),
+			]),
 		),
 	];
 
@@ -2689,17 +2776,21 @@ export function buildSharedSeedEmission(input: SharedSeedEmissionInput): Emissio
 		return {
 			program: moduleProgramNode([
 				exportNamedDeclarationNode(
-					functionDeclarationNode(exportName, ['context'], [
-						returnStatementNode(
-							callNode(memberChainNode('context.graph.read'), [
-								literalNode(PROTOCOL_PROPS_GRAPH_NODE_ID),
-								stringArrayNode([
-									SSR_CALLBACKS_PROP_NAME,
-									input.symbol.callbackSlotPropName,
+					functionDeclarationNode(
+						exportName,
+						['context'],
+						[
+							returnStatementNode(
+								callNode(memberChainNode('context.graph.read'), [
+									literalNode(PROTOCOL_PROPS_GRAPH_NODE_ID),
+									stringArrayNode([
+										SSR_CALLBACKS_PROP_NAME,
+										input.symbol.callbackSlotPropName,
+									]),
 								]),
-							]),
-						),
-					]),
+							),
+						],
+					),
 				),
 			]),
 			source: input.symbol.source,
@@ -2717,26 +2808,30 @@ export function buildSharedSeedEmission(input: SharedSeedEmissionInput): Emissio
 			}),
 		),
 		exportNamedDeclarationNode(
-			functionDeclarationNode(exportName, ['context'], [
-				...input.propReads.flatMap((propRead) =>
-					stateInitializerPropReadStatements(propRead, input.sourceFileName),
-				),
-				constDeclarationNode(
-					seedLocal,
-					expressionFromSource(input.symbol.source, input.sourceFileName),
-				),
-				returnStatementNode(
-					sharedSeedValueNode(
-						() =>
-							callNode(memberChainNode('context.graph.read'), [
-								literalNode(input.symbol.graphNodeId),
-								stringArrayNode([]),
-							]),
-						input.symbol.path,
-						identifierNode(seedLocal),
+			functionDeclarationNode(
+				exportName,
+				['context'],
+				[
+					...input.propReads.flatMap((propRead) =>
+						stateInitializerPropReadStatements(propRead, input.sourceFileName),
 					),
-				),
-			]),
+					constDeclarationNode(
+						seedLocal,
+						expressionFromSource(input.symbol.source, input.sourceFileName),
+					),
+					returnStatementNode(
+						sharedSeedValueNode(
+							() =>
+								callNode(memberChainNode('context.graph.read'), [
+									literalNode(input.symbol.graphNodeId),
+									stringArrayNode([]),
+								]),
+							input.symbol.path,
+							identifierNode(seedLocal),
+						),
+					),
+				],
+			),
 		),
 	];
 
@@ -2939,8 +3034,7 @@ export function stateInitializerPropReads(
 	if (!semanticGraph) return [];
 	const componentName =
 		semanticGraph.localDeclarations.find(
-			(declaration) =>
-				declaration.scope === 'component' && declaration.name === symbol.name,
+			(declaration) => declaration.scope === 'component' && declaration.name === symbol.name,
 		)?.componentName ?? renderData?.root?.componentName;
 	if (!componentName) return [];
 
@@ -3114,7 +3208,9 @@ function declaredStatementNames(program: AnyNode): string[] {
 			return [...names];
 		}
 		const id = statement.id;
-		return isNode(id) && id.type === 'Identifier' && typeof id.name === 'string' ? [id.name] : [];
+		return isNode(id) && id.type === 'Identifier' && typeof id.name === 'string'
+			? [id.name]
+			: [];
 	});
 }
 
@@ -3891,7 +3987,9 @@ function asyncRunnerReadBindingStatement(): EmissionNode {
 		'read',
 		conditionalNode(
 			optionalMemberNode(memberChainNode('context.graph'), 'read'),
-			callNode(memberChainNode('context.graph.read.bind'), [memberChainNode('context.graph')]),
+			callNode(memberChainNode('context.graph.read.bind'), [
+				memberChainNode('context.graph'),
+			]),
 			memberChainNode('context.read'),
 		),
 	);
@@ -3917,7 +4015,9 @@ function asyncRunnerDependencyStatements(
 		if (!binding || seenNames.has(binding.name)) continue;
 
 		seenNames.add(binding.name);
-		const slot = captureSlots.find((candidate) => captureSlotMatchesRead(candidate, dependency));
+		const slot = captureSlots.find((candidate) =>
+			captureSlotMatchesRead(candidate, dependency),
+		);
 		statements.push(
 			constDeclarationNode(
 				binding.name,
@@ -4230,41 +4330,48 @@ export function buildBranchUpdateEmission(input: BranchUpdateEmissionInput): Emi
 		constDeclarationNode('marklessBranchArms', jsonValueNode(arms.arms)),
 		...(arms.armTests ? [switchArmSelectorFunctionNode()] : []),
 		exportNamedDeclarationNode(
-			functionDeclarationNode(exportName, ['context'], [
-				constDeclarationNode(
-					'arm',
-					logicalNode('??', memberChainNode('context.arm'), armSelector),
-				),
-				constDeclarationNode(
-					'armParts',
-					computedMemberNode(identifierNode('marklessBranchArms'), identifierNode('arm')),
-				),
-				// The runtime's proof the arm exists: empty html is then a value, not a miss.
-				constDeclarationNode(
-					'resolved',
-					binaryNode('!==', identifierNode('armParts'), identifierNode('undefined')),
-				),
-				constDeclarationNode(
-					'parts',
-					logicalNode('??', identifierNode('armParts'), arrayNode([])),
-				),
-				constDeclarationNode(
-					'html',
-					armPartsHtmlExpression(
-						'marklessBranchText',
-						hasRepeatParts,
-						hasAttributeParts,
-						hasRawParts,
+			functionDeclarationNode(
+				exportName,
+				['context'],
+				[
+					constDeclarationNode(
+						'arm',
+						logicalNode('??', memberChainNode('context.arm'), armSelector),
 					),
-				),
-				returnStatementNode(
-					objectNode([
-						shorthandPropertyNode('arm'),
-						shorthandPropertyNode('html'),
-						shorthandPropertyNode('resolved'),
-					]),
-				),
-			]),
+					constDeclarationNode(
+						'armParts',
+						computedMemberNode(
+							identifierNode('marklessBranchArms'),
+							identifierNode('arm'),
+						),
+					),
+					// The runtime's proof the arm exists: empty html is then a value, not a miss.
+					constDeclarationNode(
+						'resolved',
+						binaryNode('!==', identifierNode('armParts'), identifierNode('undefined')),
+					),
+					constDeclarationNode(
+						'parts',
+						logicalNode('??', identifierNode('armParts'), arrayNode([])),
+					),
+					constDeclarationNode(
+						'html',
+						armPartsHtmlExpression(
+							'marklessBranchText',
+							hasRepeatParts,
+							hasAttributeParts,
+							hasRawParts,
+						),
+					),
+					returnStatementNode(
+						objectNode([
+							shorthandPropertyNode('arm'),
+							shorthandPropertyNode('html'),
+							shorthandPropertyNode('resolved'),
+						]),
+					),
+				],
+			),
 		),
 		armTextEscaperFunctionNode('marklessBranchText'),
 		...(hasRepeatParts
@@ -4325,7 +4432,10 @@ export function buildAsyncBoundaryUpdateEmission(
 	const armRecordsNode = rowsShiftLocators
 		? callNode(identifierNode('marklessBoundaryArmRecords'), [
 				armRecordsAt(),
-				computedMemberNode(identifierNode('marklessBoundaryRowElements'), identifierNode('arm')),
+				computedMemberNode(
+					identifierNode('marklessBoundaryRowElements'),
+					identifierNode('arm'),
+				),
 				identifierNode('parts'),
 				memberChainNode('context.graph'),
 			])
@@ -4338,39 +4448,60 @@ export function buildAsyncBoundaryUpdateEmission(
 			? [constDeclarationNode('marklessBoundaryRecords', jsonValueNode(records.arms))]
 			: []),
 		...(records && rowsShiftLocators
-			? [constDeclarationNode('marklessBoundaryRowElements', jsonValueNode(records.rowElements))]
+			? [
+					constDeclarationNode(
+						'marklessBoundaryRowElements',
+						jsonValueNode(records.rowElements),
+					),
+				]
 			: []),
 		exportNamedDeclarationNode(
-			functionDeclarationNode(exportName, ['context'], [
-				// The runtime passes the settled status; arm 1 is @catch, arm 0 is @try.
-				constDeclarationNode(
-					'arm',
-					conditionalNode(
-						binaryNode('===', memberChainNode('context.status'), literalNode('rejected')),
-						literalNode(1),
-						literalNode(0),
+			functionDeclarationNode(
+				exportName,
+				['context'],
+				[
+					// The runtime passes the settled status; arm 1 is @catch, arm 0 is @try.
+					constDeclarationNode(
+						'arm',
+						conditionalNode(
+							binaryNode(
+								'===',
+								memberChainNode('context.status'),
+								literalNode('rejected'),
+							),
+							literalNode(1),
+							literalNode(0),
+						),
 					),
-				),
-				constDeclarationNode(
-					'parts',
-					logicalNode(
-						'??',
-						computedMemberNode(identifierNode('marklessBoundaryArms'), identifierNode('arm')),
-						arrayNode([]),
+					constDeclarationNode(
+						'parts',
+						logicalNode(
+							'??',
+							computedMemberNode(
+								identifierNode('marklessBoundaryArms'),
+								identifierNode('arm'),
+							),
+							arrayNode([]),
+						),
 					),
-				),
-				constDeclarationNode(
-					'html',
-					armPartsHtmlExpression('marklessBoundaryText', hasRepeatParts, false, hasRawParts),
-				),
-				returnStatementNode(
-					objectNode([
-						shorthandPropertyNode('arm'),
-						shorthandPropertyNode('html'),
-						...(records ? [propertyNode('armRecords', armRecordsNode)] : []),
-					]),
-				),
-			]),
+					constDeclarationNode(
+						'html',
+						armPartsHtmlExpression(
+							'marklessBoundaryText',
+							hasRepeatParts,
+							false,
+							hasRawParts,
+						),
+					),
+					returnStatementNode(
+						objectNode([
+							shorthandPropertyNode('arm'),
+							shorthandPropertyNode('html'),
+							...(records ? [propertyNode('armRecords', armRecordsNode)] : []),
+						]),
+					),
+				],
+			),
 		),
 		armTextEscaperFunctionNode('marklessBoundaryText'),
 		...(hasRepeatParts
@@ -4403,7 +4534,11 @@ function boundaryArmRecordsFunctionNode(): EmissionNode {
 					callNode(memberChainNode('parts.filter'), [
 						arrowFunctionNode(
 							['part'],
-							binaryNode('!==', memberChainNode('part.repeat'), identifierNode('undefined')),
+							binaryNode(
+								'!==',
+								memberChainNode('part.repeat'),
+								identifierNode('undefined'),
+							),
 						),
 					]),
 					'map',
@@ -4473,7 +4608,10 @@ function boundaryArmRecordsFunctionNode(): EmissionNode {
 							arrowFunctionNode(
 								['locator'],
 								objectNode([
-									propertyNode('hostNodeId', memberChainNode('locator.hostNodeId')),
+									propertyNode(
+										'hostNodeId',
+										memberChainNode('locator.hostNodeId'),
+									),
 									propertyNode('index', shiftedIndex),
 									propertyNode('tagName', memberChainNode('locator.tagName')),
 								]),
@@ -4555,7 +4693,11 @@ function armPartsHtmlExpression(
 				arrowFunctionNode(
 					['part'],
 					conditionalNode(
-						binaryNode('!==', memberChainNode('part.text'), identifierNode('undefined')),
+						binaryNode(
+							'!==',
+							memberChainNode('part.text'),
+							identifierNode('undefined'),
+						),
 						memberChainNode('part.text'),
 						nonTextPart,
 					),
@@ -4629,24 +4771,28 @@ function switchArmSelectorFunctionNode(): EmissionNode {
 	const testAtIndex = (): EmissionNode =>
 		computedMemberNode(identifierNode('tests'), identifierNode('index'));
 
-	return functionDeclarationNode('marklessSelectSwitchArm', ['value', 'tests'], [
-		forStatementNode(
-			letDeclarationNode('index', literalNode(0)),
-			binaryNode('<', identifierNode('index'), memberChainNode('tests.length')),
-			postfixUpdateNode('++', identifierNode('index')),
-			[
-				ifStatementNode(
-					logicalNode(
-						'&&',
-						binaryNode('!==', testAtIndex(), literalNode(null)),
-						binaryNode('===', identifierNode('value'), testAtIndex()),
+	return functionDeclarationNode(
+		'marklessSelectSwitchArm',
+		['value', 'tests'],
+		[
+			forStatementNode(
+				letDeclarationNode('index', literalNode(0)),
+				binaryNode('<', identifierNode('index'), memberChainNode('tests.length')),
+				postfixUpdateNode('++', identifierNode('index')),
+				[
+					ifStatementNode(
+						logicalNode(
+							'&&',
+							binaryNode('!==', testAtIndex(), literalNode(null)),
+							binaryNode('===', identifierNode('value'), testAtIndex()),
+						),
+						returnStatementNode(identifierNode('index')),
 					),
-					returnStatementNode(identifierNode('index')),
-				),
-			],
-		),
-		returnStatementNode(callNode(memberChainNode('tests.indexOf'), [literalNode(null)])),
-	]);
+				],
+			),
+			returnStatementNode(callNode(memberChainNode('tests.indexOf'), [literalNode(null)])),
+		],
+	);
 }
 
 /**
@@ -4698,38 +4844,47 @@ function branchRowsFunctionNode(
 		[literalNode('')],
 	);
 
-	return functionDeclarationNode('marklessBranchRows', ['repeat', 'graph'], [
-		constDeclarationNode(
-			'items',
-			callNode(memberChainNode('graph.read'), [
-				memberChainNode('repeat.read.graphNodeId'),
-				memberChainNode('repeat.read.path'),
-			]),
-		),
-		ifStatementNode(
-			unaryNode('!', callNode(memberChainNode('Array.isArray'), [identifierNode('items')])),
-			returnStatementNode(literalNode('')),
-		),
-		...(withEmpty
-			? [
-					ifStatementNode(
-						binaryNode('===', memberChainNode('items.length'), literalNode(0)),
-						returnStatementNode(
-							logicalNode('??', memberChainNode('repeat.empty'), literalNode('')),
-						),
-					),
-				]
-			: []),
-		returnStatementNode(
-			callNode(
-				memberNode(
-					callNode(memberChainNode('items.map'), [arrowFunctionNode(['item'], rowHtml)]),
-					'join',
-				),
-				[literalNode('')],
+	return functionDeclarationNode(
+		'marklessBranchRows',
+		['repeat', 'graph'],
+		[
+			constDeclarationNode(
+				'items',
+				callNode(memberChainNode('graph.read'), [
+					memberChainNode('repeat.read.graphNodeId'),
+					memberChainNode('repeat.read.path'),
+				]),
 			),
-		),
-	]);
+			ifStatementNode(
+				unaryNode(
+					'!',
+					callNode(memberChainNode('Array.isArray'), [identifierNode('items')]),
+				),
+				returnStatementNode(literalNode('')),
+			),
+			...(withEmpty
+				? [
+						ifStatementNode(
+							binaryNode('===', memberChainNode('items.length'), literalNode(0)),
+							returnStatementNode(
+								logicalNode('??', memberChainNode('repeat.empty'), literalNode('')),
+							),
+						),
+					]
+				: []),
+			returnStatementNode(
+				callNode(
+					memberNode(
+						callNode(memberChainNode('items.map'), [
+							arrowFunctionNode(['item'], rowHtml),
+						]),
+						'join',
+					),
+					[literalNode('')],
+				),
+			),
+		],
+	);
 }
 
 // ---------------------------------------------------------------------------
@@ -4966,7 +5121,8 @@ function valueExpressionNode(
 	);
 	if (handle) return handle.kind === 'lowered' ? handle.node : null;
 
-	const leaf = graphReadValueNode(text, input.graphReads) ?? localValueNode(text, input.localNames);
+	const leaf =
+		graphReadValueNode(text, input.graphReads) ?? localValueNode(text, input.localNames);
 	if (leaf) return leaf;
 
 	if (node.type === 'ArrayExpression') return arrayLiteralValueNode(node, source, input);
@@ -5338,9 +5494,7 @@ function rewriteGraphReadsAndLocals(
 	// would otherwise swallow into a `graph.read` that answers `undefined`.
 	if (handle) return node as unknown as EmissionNode;
 
-	const graphRead = text
-		? input.graphReads.find((read) => read.source === text)
-		: undefined;
+	const graphRead = text ? input.graphReads.find((read) => read.source === text) : undefined;
 	if (graphRead) {
 		return graphReadCall({
 			callee: 'context.graph.read',
@@ -5349,7 +5503,11 @@ function rewriteGraphReadsAndLocals(
 		});
 	}
 
-	if (node.type === 'Identifier' && typeof node.name === 'string' && input.localNames.has(node.name)) {
+	if (
+		node.type === 'Identifier' &&
+		typeof node.name === 'string' &&
+		input.localNames.has(node.name)
+	) {
 		return optionalPathNode(memberChainNode('context.locals'), [node.name]);
 	}
 
@@ -5555,7 +5713,9 @@ export function buildEventHandlerEmission(
 	const source = projection?.source ?? symbol.source;
 
 	const scalarLeaf =
-		input.captureSlots.length === 0 ? eventHandlerScalarLeafStatements(input, projection) : null;
+		input.captureSlots.length === 0
+			? eventHandlerScalarLeafStatements(input, projection)
+			: null;
 	if (scalarLeaf) {
 		return {
 			program: moduleProgramNode([
@@ -5586,13 +5746,7 @@ export function buildEventHandlerEmission(
 
 	// The string path decides which imports survive by scanning the emitted
 	// *body* text only, so this reads the same statements and no others.
-	const carried = eventHandlerModuleScopeCarry(
-		input,
-		symbol,
-		projection,
-		source,
-		statementsFor,
-	);
+	const carried = eventHandlerModuleScopeCarry(input, symbol, projection, source, statementsFor);
 	const { bodyStatements, declarationStatements } = carried;
 	const referenced = carried.referenced;
 	const imports = uniqueModuleImports(
@@ -5889,9 +6043,7 @@ function eventHandlerProjection(
 }
 
 /** The parsed handler when it is a function; `null` for every other shape. */
-function eventHandlerFunctionExpression(
-	projection: EventHandlerProjection | null,
-): AnyNode | null {
+function eventHandlerFunctionExpression(projection: EventHandlerProjection | null): AnyNode | null {
 	const expression = projection?.expression;
 	if (!expression) return null;
 	if (expression.type !== 'ArrowFunctionExpression' && expression.type !== 'FunctionExpression') {
@@ -6049,9 +6201,7 @@ function eventHandlerAuthoredStatements(
 		];
 	}
 
-	const directReferenceRead = (symbol.reads ?? []).find(
-		(read) => read.source.trim() === trimmed,
-	);
+	const directReferenceRead = (symbol.reads ?? []).find((read) => read.source.trim() === trimmed);
 	if (directReferenceRead && VALUE_IDENTIFIER_PATTERN.test(trimmed)) {
 		return [
 			returnStatementNode(
@@ -6124,7 +6274,9 @@ function eventHandlerRewrite(
 			// `spliceEventHandlerBody` blanks the parameters for a callback prop's
 			// writes, because a callback prop has no DOM event to read fields off.
 			eventParameters:
-				symbol.kind === 'callback-prop' || input.parametersFrom === 'element' ? [] : parameters,
+				symbol.kind === 'callback-prop' || input.parametersFrom === 'element'
+					? []
+					: parameters,
 			graphReads: symbol.reads ?? [],
 			elementHandleReads: handleReads,
 			moduleImports: symbol.moduleImports ?? [],
@@ -6152,10 +6304,7 @@ function isFunctionLikeNode(node: AnyNode): boolean {
 }
 
 // Nested bindings shadow component handles without changing the shared claim sets.
-function scopedEventHandlerRewrite(
-	fn: AnyNode,
-	rewrite: EventHandlerRewrite,
-): EventHandlerRewrite {
+function scopedEventHandlerRewrite(fn: AnyNode, rewrite: EventHandlerRewrite): EventHandlerRewrite {
 	const localNames = localNamesVisibleIn(fn, rewrite.localNames);
 	const boundHandleNames = new Set(rewrite.boundHandleNames);
 	for (const parameter of asNodes(fn.params)) collectPatternNames(parameter, boundHandleNames);
@@ -6163,7 +6312,8 @@ function scopedEventHandlerRewrite(
 	if (
 		localNames === rewrite.localNames &&
 		boundHandleNames.size === rewrite.boundHandleNames.size
-	) return rewrite;
+	)
+		return rewrite;
 
 	return {
 		...rewrite,
@@ -6174,10 +6324,7 @@ function scopedEventHandlerRewrite(
 }
 
 /** The row locals a function neither takes as a parameter nor declares. */
-function localNamesVisibleIn(
-	fn: AnyNode,
-	localNames: ReadonlySet<string>,
-): ReadonlySet<string> {
+function localNamesVisibleIn(fn: AnyNode, localNames: ReadonlySet<string>): ReadonlySet<string> {
 	if (localNames.size === 0) return localNames;
 
 	const bound = new Set<string>();
@@ -6518,10 +6665,7 @@ function rewriteEventHandlerChildren(
 }
 
 /** `await context.capture.invoke("slot", [ ... ])`. */
-function captureInvocationNode(
-	node: AnyNode,
-	rewrite: EventHandlerRewrite,
-): EmissionNode | null {
+function captureInvocationNode(node: AnyNode, rewrite: EventHandlerRewrite): EmissionNode | null {
 	if (node.type !== 'CallExpression' || !isNode(node.callee)) return null;
 
 	const calleeText = valueNodeText(node.callee, rewrite.source);
@@ -6634,7 +6778,10 @@ function rewriteCaptureArgumentNode(
 	}
 
 	if (node.type === 'ChainExpression' && isNode(node.expression)) {
-		return chainExpressionNode(node, rewriteCaptureArgumentNode(node.expression, node, rewrite));
+		return chainExpressionNode(
+			node,
+			rewriteCaptureArgumentNode(node.expression, node, rewrite),
+		);
 	}
 
 	if (node.type === 'MemberExpression' && node.computed !== true && isNode(node.object)) {
@@ -7041,7 +7188,8 @@ function elementHandleValueLowering(
 
 	// Only a tail the author wrote as plain dots is rebuildable from the path:
 	// `els[0].id` arrives here as `["0", "id"]`, and `?.0.id` is not JavaScript.
-	if (!path.every((segment) => VALUE_IDENTIFIER_PATTERN.test(segment))) return { kind: 'refused' };
+	if (!path.every((segment) => VALUE_IDENTIFIER_PATTERN.test(segment)))
+		return { kind: 'refused' };
 
 	const tail = `.${path.join('.')}`;
 	if (!handle.source.endsWith(tail)) return { kind: 'refused' };
@@ -7139,7 +7287,8 @@ function elementHandleArgumentNodes(
 		callee.optional === true &&
 		callee.computed !== true &&
 		node.optional !== true;
-	if (!supported && (!optionalMember || rewrite.boundHandleNames.has(call.handleName))) return null;
+	if (!supported && (!optionalMember || rewrite.boundHandleNames.has(call.handleName)))
+		return null;
 
 	const args = Array.isArray(node.arguments) ? node.arguments : [];
 	if (args.length !== call.argumentSources.length) return null;
@@ -7214,11 +7363,7 @@ function eventHandlerScalarLeafStatements(
 	const value = literalValueNode(right, text) ?? localValueNode(text, input.localNames);
 	if (!value) return null;
 
-	return [
-		returnStatementNode(
-			graphScalarWriteCall({ graphNodeId: write.graphNodeId, value }),
-		),
-	];
+	return [returnStatementNode(graphScalarWriteCall({ graphNodeId: write.graphNodeId, value }))];
 }
 
 /**

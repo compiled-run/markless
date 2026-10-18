@@ -309,3 +309,25 @@ test('nested @for rows in a component imported from a deeper folder fill both le
 	expect(errors).toEqual([]);
 	await page.close();
 });
+
+test('a callback a row passes its child reads that row, served and added', async () => {
+	const { page, errors } = await open('/row-callbacks');
+	await page.click('[data-sort-text="Time"]');
+	await expect.poll(() => text(page, '[data-sort]')).toBe('time');
+	await page.click('[data-sort-cell="Channel"]');
+	await expect.poll(() => text(page, '[data-sort]')).toBe('channel');
+	await page.click('[data-pick-cell="beta"]');
+	await expect.poll(() => text(page, '[data-picked]')).toBe('2');
+	await page.click('[data-shared-cell="Time"]');
+	await expect.poll(() => text(page, '[data-shared-sort]')).toBe('sorted by clicked');
+	await page.click('[data-local-cell="gamma"]');
+	await expect.poll(() => text(page, '[data-shared-picked]')).toBe('1');
+	await page.click('[data-reverse]');
+	await page.click('[data-sort-text="Serial"]');
+	await expect.poll(() => text(page, '[data-sort]')).toBe('serial');
+	await page.click('[data-add-col]');
+	await page.click('[data-sort-text="Args"]');
+	await expect.poll(() => text(page, '[data-sort]')).toBe('args');
+	expect(errors).toEqual([]);
+	await page.close();
+});
