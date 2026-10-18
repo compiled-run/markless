@@ -813,29 +813,6 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
-		code: 'MARKLESS_ASYNC_TEXT_JOIN_UNSUPPORTED',
-		packageName: '@markless/compiler',
-		stage: 'compile',
-		severity: 'error',
-		description:
-			'An async value and a state value cannot share one text node: a Markless build error.',
-		printed: [
-			'MARKLESS_ASYNC_TEXT_JOIN_UNSUPPORTED: `<source>` puts an async value and other state in one run of text, so a later write to that state would replace the whole text with its own part alone.',
-			'Holes that render into one text node update as one joined value, and a joined value cannot read an async value: its @try block reads that value directly. Left alone, the next state write would erase the async text and nothing would say so.',
-			'Give the async value its own element beside the rest of the text, e.g. `<button><span>{data.title}</span> {count}</button>`.',
-			'https://markless.dev/errors/MARKLESS_ASYNC_TEXT_JOIN_UNSUPPORTED',
-		],
-		structured: true,
-		sources: [
-			{
-				id: 'f0',
-				file: 'packages/compiler/src/passes/semantic-graph/diagnostics.ts',
-				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/diagnostics.ts',
-			},
-		],
-		moreSources: 0,
-	},
-	{
 		code: 'MARKLESS_ATTACH_HOST_ELEMENT_REQUIRED',
 		packageName: '@markless/compiler',
 		stage: 'compile',

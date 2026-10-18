@@ -6,6 +6,8 @@ import {
 	semanticAliasMap,
 } from '../../artifact-helpers/graph-paths.ts';
 
+export const TEMPLATE_EXPRESSION_GRAPH_NODE_PREFIX = 'computed:templateExpression:';
+
 export type BoundaryRunnerRead = {
 	readonly source: string;
 	readonly graphNodeId: string;
@@ -16,6 +18,8 @@ export type BoundaryRunnerResolution = {
 	readonly authored: BoundaryRunnerRead | null;
 	readonly runnerGraphNodeId: string | null;
 	readonly reads: ReadonlyArray<BoundaryRunnerRead>;
+	// Joined template values the settled block reads, computed once its gate settles.
+	readonly derivedGraphNodeIds: ReadonlyArray<string>;
 	readonly unresolvedSources: ReadonlyArray<string>;
 };
 
@@ -54,6 +58,7 @@ export function resolveBoundaryRunners(
 			const reads: BoundaryRunnerRead[] = [];
 			const unresolvedSources: string[] = [];
 			const seenGraphNodeIds = new Set<string>();
+			const derivedGraphNodeIds = new Set<string>();
 			for (const read of boundaryReads) {
 				if (read.asyncBoundaryId !== boundary.id) continue;
 				const composite = read.computedGraphNodeId
@@ -66,19 +71,37 @@ export function resolveBoundaryRunners(
 					unresolvedSources.push(read.source);
 					continue;
 				}
-				if (
-					resolved.binding.kind !== 'computed' ||
-					resolved.binding.asyncCapable !== true ||
-					seenGraphNodeIds.has(resolved.binding.id)
-				) {
+				if (resolved.binding.kind !== 'computed' || resolved.binding.asyncCapable !== true)
 					continue;
-				}
-				seenGraphNodeIds.add(resolved.binding.id);
-				reads.push({
-					source: read.source,
-					graphNodeId: resolved.binding.id,
-					path: runtimeGraphReadPath(resolved.binding, resolved.path),
+				const asyncInputs = (resolved.binding.dependencies ?? []).flatMap((dependency) => {
+					const binding = bindingsById.get(dependency.graphNodeId);
+					return binding?.kind === 'computed' && binding.asyncCapable === true
+						? [{ binding, read: dependency }]
+						: [];
 				});
+				// A template value that also reads state is gated by its async inputs alone, so a
+				// write to that state updates it in place instead of settling the block again.
+				const derived =
+					resolved.binding.id.startsWith(TEMPLATE_EXPRESSION_GRAPH_NODE_PREFIX) &&
+					asyncInputs.length < (resolved.binding.dependencies ?? []).length;
+				if (derived) derivedGraphNodeIds.add(resolved.binding.id);
+				const gates = derived
+					? asyncInputs
+					: [
+							{
+								binding: resolved.binding,
+								read: { source: read.source, path: resolved.path },
+							},
+						];
+				for (const gate of gates) {
+					if (seenGraphNodeIds.has(gate.binding.id)) continue;
+					seenGraphNodeIds.add(gate.binding.id);
+					reads.push({
+						source: gate.read.source,
+						graphNodeId: gate.binding.id,
+						path: runtimeGraphReadPath(gate.binding, gate.read.path),
+					});
+				}
 			}
 
 			// A directly authored sync computed is the boundary's settle node. Its
@@ -100,6 +123,7 @@ export function resolveBoundaryRunners(
 					authored,
 					runnerGraphNodeId: authored?.graphNodeId ?? null,
 					reads,
+					derivedGraphNodeIds: [...derivedGraphNodeIds],
 					unresolvedSources,
 				},
 			] as const;

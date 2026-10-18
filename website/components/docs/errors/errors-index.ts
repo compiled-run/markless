@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 276,
+	total: 275,
 	guided: 40,
 	groups: [
 		{
@@ -47,11 +47,6 @@ export const errorIndex: ErrorIndex = {
 					code: 'MARKLESS_ASYNC_POST_AWAIT_READ',
 					kind: 'compile error',
 					guided: true,
-				},
-				{
-					code: 'MARKLESS_ASYNC_TEXT_JOIN_UNSUPPORTED',
-					kind: 'compile error',
-					guided: false,
 				},
 				{
 					code: 'MARKLESS_ATTACH_HOST_ELEMENT_REQUIRED',

@@ -830,8 +830,16 @@ function emitSsrDataLines(
 			const extra = collectSsrAsyncRunnerDefinitions(input).size > 0
 				? ',marklessSsrAsyncRunnerDefinitions,marklessSsrAsyncRuns'
 				: '';
+			// The gate has settled, so a derived value never races the first-flush deadline.
+			const derived = runner.derived
+				.map(
+					(value) =>
+						`{const derived=await marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots,${JSON.stringify(value.graphNodeId)},${value.source},marklessSsrRenderContext,false${extra});if(derived.status==='fulfilled')marklessSsrRenderStateValues.set(${JSON.stringify(value.graphNodeId)},derived.value);}`,
+				)
+				.join('');
+			const settled = `marklessSsrRenderStateValues.set(${JSON.stringify(runner.graphNodeId)},snapshot.value);`;
 			return [
-				`case ${JSON.stringify(boundary.boundaryId)}:{const snapshot=await marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots,${JSON.stringify(runner.graphNodeId)},${runner.source},marklessSsrRenderContext,${String(!!boundary.armChunkIds.pending)}${extra});if(snapshot.status==='fulfilled')marklessSsrRenderStateValues.set(${JSON.stringify(runner.graphNodeId)},snapshot.value);return {arm:marklessSsrAsyncArm(snapshot),error:snapshot.error};}`,
+				`case ${JSON.stringify(boundary.boundaryId)}:{const snapshot=await marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots,${JSON.stringify(runner.graphNodeId)},${runner.source},marklessSsrRenderContext,${String(!!boundary.armChunkIds.pending)}${extra});if(snapshot.status==='fulfilled')${derived ? `{${settled}${derived}}` : settled}return {arm:marklessSsrAsyncArm(snapshot),error:snapshot.error};}`,
 			];
 		});
 	const edges = componentEdgesFor(input, componentName);

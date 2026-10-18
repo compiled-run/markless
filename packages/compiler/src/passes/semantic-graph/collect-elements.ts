@@ -73,7 +73,6 @@ import {
 	unboundIdrefElementHandleDiagnostic,
 	cssAnchorAttributeDiagnostic,
 	templateExpressionUnsupportedDiagnostic,
-	asyncTextJoinUnsupportedDiagnostic,
 } from './diagnostics.ts';
 import { acceptsIdrefList, isCssAnchorAttribute, isIdrefAttribute } from './idref-attributes.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
@@ -326,20 +325,12 @@ function joinTextParts(
 	]);
 	if (!readSources) return null;
 	const asyncReads = readSources.filter((source) => readsAsyncComputed(source, state));
-	if (asyncReads.length > 0) {
-		if (asyncReads.length < readSources.length) {
-			const holes = children.filter(isTemplateExpressionChild);
-			const first = holes[0]!;
-			state.graph.diagnostics.push(
-				asyncTextJoinUnsupportedDiagnostic({
-					source: state.source.slice(first.start ?? 0, holes.at(-1)!.end ?? 0),
-					node: first,
-					filename: state.filename,
-				}),
-			);
-		}
+	// Joined with other reads, an async value is gated by the @try block it renders in.
+	if (
+		asyncReads.length > 0 &&
+		(asyncReads.length === readSources.length || !state.currentAsyncBoundaryId)
+	)
 		return null;
-	}
 	const parts = children.map((child) =>
 		isTemplateExpressionChild(child)
 			? `\${(${inlined.get(child.expression as AnyNode)!.source}) ?? ''}`

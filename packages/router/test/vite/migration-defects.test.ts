@@ -205,7 +205,8 @@ async function drawForeignLinks(page: Page) {
 	await page.evaluate(() => {
 		const list = document.querySelector<HTMLElement>('[data-favourites]')!;
 		const draw = () => {
-			list.innerHTML = '<p><a href="#article" data-fav><img alt="" width="20" height="20" data-fav-img></a></p>';
+			list.innerHTML =
+				'<p><a href="#article" data-fav><img alt="" width="20" height="20" data-fav-img></a></p>';
 		};
 		draw();
 		document.addEventListener('click', (event) => {
@@ -237,6 +238,35 @@ test('a computed that reads another computed follows both after resume', async (
 	await expect.poll(items).toEqual(['2', '3']);
 	await page.click('[data-flip]');
 	await expect.poll(items).toEqual(['2', '1']);
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
+test('an async value and state joined in one run of text in @try both update, in place', async () => {
+	const { page, errors } = await open('/async-join');
+	await page.locator('[data-join]').waitFor();
+	expect(await text(page, '[data-join]')).toBe('Inbox 0');
+	const button = await page.locator('[data-join]').elementHandle();
+	await page.click('[data-join]');
+	await expect.poll(() => text(page, '[data-join]')).toBe('Inbox 1');
+	await page.click('[data-join]');
+	await expect.poll(() => text(page, '[data-join]')).toBe('Inbox 2');
+	expect(await button!.evaluate((element) => element.isConnected)).toBe(true);
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
+test('a streamed @try joining its async value with state updates text and attribute', async () => {
+	const html = await (await fetch(`${server!.origin}/async-join-streamed`)).text();
+	expect(html).toContain('data-join-loading');
+	expect(html.indexOf('data-join-loading')).toBeLessThan(html.indexOf('data-join-title'));
+	const { page, errors } = await open('/async-join-streamed');
+	await page.locator('[data-join]').waitFor();
+	expect(await text(page, '[data-join]')).toBe('0 in Inbox');
+	expect(await page.getAttribute('[data-join-title]', 'title')).toBe('Inbox 0');
+	await page.click('[data-join]');
+	await expect.poll(() => text(page, '[data-join]')).toBe('1 in Inbox');
+	await expect.poll(() => page.getAttribute('[data-join-title]', 'title')).toBe('Inbox 1');
 	expect(errors).toEqual([]);
 	await page.close();
 });
