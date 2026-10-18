@@ -148,7 +148,7 @@ export function __marklessCreateHttpContext<
 >(event: RuntimeHttpEvent): EndpointHttpContext<Params, Locals> {
 	const context = event.context ?? {};
 	const url = event.url ?? new URL('http://localhost/');
-	if (event.req) rememberRequestLocals(event.req, context);
+	if (event.req) rememberRequestLocals(event.req, context, event.res?.headers);
 
 	return {
 		locals: context as Locals,
@@ -165,7 +165,10 @@ export const Html = Object.assign(
 	},
 	{
 		renderSsr(
-			props: { readonly children?: __MarklessTypeService.Child; readonly [name: string]: unknown } = {},
+			props: {
+				readonly children?: __MarklessTypeService.Child;
+				readonly [name: string]: unknown;
+			} = {},
 			renderContext?: { readonly [HTML_ATTRIBUTES_SLOT]?: Record<string, unknown> },
 		) {
 			const { children, ...attributes } = props;
