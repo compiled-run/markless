@@ -105,7 +105,8 @@ test('CSR: a month change focuses the row whose key the same handler wrote', asy
 	await expect.poll(daysListed).toBe('2026-09-01,2026-09-02,2026-09-03');
 
 	expect(document.activeElement).toBe(dayAt('2026-09-02'));
-	expect(textOf('rows-seen')()).toBe('2026-09-01,2026-09-02,2026-09-03');
+	// The rows commit before the output's text binding, so its text is waited on, not read.
+	await expect.poll(textOf('rows-seen')).toBe('2026-09-01,2026-09-02,2026-09-03');
 });
 
 test('SSR: a month change focuses the row whose key the same handler wrote', async () => {
@@ -115,7 +116,8 @@ test('SSR: a month change focuses the row whose key the same handler wrote', asy
 	await expect.poll(daysListed).toBe('2026-09-01,2026-09-02,2026-09-03');
 
 	expect(document.activeElement).toBe(dayAt('2026-09-02'));
-	expect(textOf('rows-seen')()).toBe('2026-09-01,2026-09-02,2026-09-03');
+	// The rows commit before the output's text binding, so its text is waited on, not read.
+	await expect.poll(textOf('rows-seen')).toBe('2026-09-01,2026-09-02,2026-09-03');
 });
 
 test('CSR: hiding the surface focus is in and returning focus to the trigger holds', async () => {
