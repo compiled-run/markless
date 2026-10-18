@@ -939,6 +939,14 @@
 			"from": 15538,
 			"to": 15929,
 			"reason": "queue release at a handler's first await, editable controls kept in order, and the dispatch walks from the press-time host when a script removed the target (b51ed81a, 5b3fd029, 7c0e0d61)"
+		},
+		{
+			"date": "2026-10-18",
+			"guard": "runtime",
+			"subject": "web/resume-keyed-repeats",
+			"from": 15599,
+			"to": 15830,
+			"reason": "keyed rows already in order stay attached (+215 B, keeps a focused row focused when rows are added) and fixed page lists skip following their collection (+16 B)"
 		}
 	],
 	"runtimeModules": {
@@ -1030,7 +1038,7 @@
 		"web/resume-events": 15929,
 		"web/resume-handle-qualifier": 685,
 		"web/resume-handoff": 1360,
-		"web/resume-keyed-repeats": 15599,
+		"web/resume-keyed-repeats": 15830,
 		"web/resume-keyed-repeats-lazy": 227,
 		"web/resume-locators": 5644,
 		"web/resume-repeat-branch-arm": 1785,
