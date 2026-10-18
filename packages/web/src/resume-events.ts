@@ -1,6 +1,7 @@
 import type { RuntimeGraph } from '@markless/runtime';
 import {
 	PROTOCOL_IDLE_EVENT_NAME,
+	PROTOCOL_VISIBLE_EVENT_NAME,
 	protocolEventDispatchesMarkless,
 } from '@markless/serializer/protocol';
 import {
@@ -248,9 +249,14 @@ function isFocusPreloadEventName(eventName: string): boolean {
 	return EDITABLE_PRELOAD_EVENT_NAMES.includes(eventName);
 }
 
-// Set only by a module with an `onIdle` record.
-function queueIdleHost(root: unknown, host: unknown): void {
-	(globalThis as MarklessIdleHost).__mIdle?.queue(root, host);
+// `__mIdle` is set only by a module with an `onIdle` record.
+function queueDeferredHost(root: unknown, host: unknown, eventName: string): void {
+	if (eventName === PROTOCOL_IDLE_EVENT_NAME)
+		(globalThis as MarklessIdleHost).__mIdle?.queue(root, host);
+	else if (eventName === PROTOCOL_VISIBLE_EVENT_NAME)
+		void import('./fns/visible-trigger.ts').then((trigger) =>
+			trigger.queueMarklessVisibleHost(root as object, host as object),
+		);
 }
 
 export function createEventWiring(input: {
@@ -328,7 +334,7 @@ export function createEventWiring(input: {
 		);
 		input.eventTypes.add(record.eventName);
 		input.delegatedTriggers?.registerEventRecord(element, record);
-		if (record.eventName === PROTOCOL_IDLE_EVENT_NAME) queueIdleHost(input.root, element);
+		queueDeferredHost(input.root, element, record.eventName);
 		wantPreload(record.eventName);
 		if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
 			trackDebug(
@@ -431,7 +437,7 @@ export function createEventWiring(input: {
 		byName.set(match.rowEvent.eventName, match);
 		input.eventTypes.add(match.rowEvent.eventName);
 		input.delegatedTriggers?.registerRowEventName(match.rowEvent.eventName);
-		if (match.rowEvent.eventName === PROTOCOL_IDLE_EVENT_NAME) queueIdleHost(input.root, host);
+		queueDeferredHost(input.root, host, match.rowEvent.eventName);
 		if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
 			trackDebug(
 				recordDebugInteraction(

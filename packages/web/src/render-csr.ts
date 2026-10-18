@@ -210,6 +210,16 @@ export async function renderCsrRuntime(input: {
 			(target) => runtime || claimPaintedArm.claim(target),
 			claimPaintedArm.eventNames,
 		);
+	// Only the runtime finds row and painted-arm hosts, so their visible records start it.
+	if (
+		claimPaintedArm?.eventNames.includes(PROTOCOL_VISIBLE_EVENT_NAME) ||
+		rowEventRepeats(view).some((repeat) =>
+			repeat.rowEvents.some((event) => event.eventName === PROTOCOL_VISIBLE_EVENT_NAME),
+		)
+	)
+		void import('./fns/visible-trigger.ts').then((trigger) =>
+			trigger.onceMarklessVisible(output.root, () => void deferredRuntime.start()),
+		);
 	for (const hostNodeId of new Set(graphBehaviors.map((behavior) => behavior.hostNodeId)))
 		await (await demandRuntime()).activateBehaviors(hostNodeId);
 	// Set only by an app module with an `onIdle` record; the runtime it starts at idle queues the hosts.
@@ -380,7 +390,7 @@ function installDelegatedTriggers(
 		[PROTOCOL_EVENT_ACTION_KIND.externalDelegate]: async () => {},
 	} satisfies Record<ProtocolEventActionKind, DelegatedRoute>;
 	const installEventListener = (eventName: string) => {
-		if (eventName === PROTOCOL_VISIBLE_EVENT_NAME || installedEventNames.has(eventName)) return;
+		if (installedEventNames.has(eventName)) return;
 		installedEventNames.add(eventName);
 		const route = async (event: DelegatedEvent, retried?: boolean): Promise<void> => {
 			// A row event name is listened for on behalf of rows that may not exist
@@ -509,9 +519,12 @@ function installDelegatedTriggers(
 		records.set(record.eventName, record);
 		recordsByElement.set(element, records);
 		installEventNames(record.eventName);
+		if (record.eventName === PROTOCOL_VISIBLE_EVENT_NAME)
+			void import('./fns/visible-trigger.ts').then((trigger) =>
+				trigger.queueMarklessVisibleHost(output.root, element),
+			);
 	};
 	for (const record of view.events) {
-		if (record.eventName === PROTOCOL_VISIBLE_EVENT_NAME) continue;
 		const element =
 			output.liveHostNodes?.get(record.hostNodeId) ??
 			(view.locators.length === 1 && view.locators[0]?.hostNodeId === record.hostNodeId

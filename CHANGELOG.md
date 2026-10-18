@@ -120,6 +120,10 @@ its message now names which and how to fix it.
   and the like) is not a write to `rows`, so it no longer fails with
   `MARKLESS_STATE_UNRESOLVED_WRITE` or warns. `rows.sort()` on the state
   itself is still reported.
+- `onVisible` runs in client-rendered pages (`render()` into a container).
+  Before, it never ran there. It also runs, on both client-rendered and
+  server-rendered pages, on an element inside an `@if` arm or a `@for` row,
+  including arms and rows added after the page loads.
 
 ## 0.5.0
 

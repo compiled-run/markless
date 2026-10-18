@@ -774,11 +774,13 @@ function eventHostIndexes(view: ProtocolViewPayload, eventName: string): number[
 		.map((locator) => locator.index);
 }
 
-// Each deferred lane ships only when the page's records name its event; an idle record in an arm or row adds index 0, the container, so the runtime takes it.
+// Each deferred lane ships only when the page's records name its event; a visible or idle record in an arm or row adds index 0, the container, so the runtime takes it.
 function deferredTriggerSource(view: ProtocolViewPayload): string {
 	const visible = eventHostIndexes(view, PROTOCOL_VISIBLE_EVENT_NAME);
 	const idle = eventHostIndexes(view, PROTOCOL_IDLE_EVENT_NAME);
-	if (browserEventNames({ ...view, events: [] }).includes(PROTOCOL_IDLE_EVENT_NAME)) idle.push(0);
+	const nested = deferredEventNames({ ...view, events: [] });
+	if (nested.includes(PROTOCOL_VISIBLE_EVENT_NAME)) visible.push(0);
+	if (nested.includes(PROTOCOL_IDLE_EVENT_NAME)) idle.push(0);
 	return (
 		(visible.length > 0 ? createInlineDeferTriggerSource('visible', visible) : '') +
 		(idle.length > 0 ? createInlineDeferTriggerSource('idle', idle) : '')
@@ -786,6 +788,10 @@ function deferredTriggerSource(view: ProtocolViewPayload): string {
 }
 
 function browserEventNames(view: ProtocolViewPayload): ReadonlyArray<string> {
+	return deferredEventNames(view).filter((eventName) => eventName !== PROTOCOL_VISIBLE_EVENT_NAME);
+}
+
+function deferredEventNames(view: ProtocolViewPayload): ReadonlyArray<string> {
 	return [
 		...new Set([
 			...view.events.filter(protocolEventDispatchesMarkless).map((event) => event.eventName),
@@ -802,7 +808,7 @@ function browserEventNames(view: ProtocolViewPayload): ReadonlyArray<string> {
 			]),
 			...view.asyncBoundaries.flatMap(boundaryArmEventNames),
 		]),
-	].filter((eventName) => eventName !== PROTOCOL_VISIBLE_EVENT_NAME);
+	];
 }
 
 function renderContainer(
