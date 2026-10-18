@@ -49,6 +49,34 @@ test('visible and idle lanes visit no nodes at load', async () => {
 	expect(visible).toBe(plain);
 });
 
+test('once an idle handler has started the page, a click reaches its dispatch queue before the next task', async () => {
+	holdIdle();
+	const { container } = await renderSSR(IdleGesture);
+	await expect
+		.poll(() => {
+			for (const run of queued.splice(0)) run();
+			return host.__deferLog?.join() ?? '';
+		})
+		.toBe('idle');
+	const root = container.querySelector('[data-async-container]') as HTMLElement & {
+		__marklessDispatch?: (input: { readonly event?: Event }) => unknown;
+	};
+	await expect.poll(() => typeof root.__marklessDispatch).toBe('function');
+	const queue = root.__marklessDispatch!;
+	const arrivals: string[] = [];
+	root.__marklessDispatch = (input) => {
+		arrivals.push(input.event?.type ?? 'none');
+		return queue(input);
+	};
+	const button = container.querySelector<HTMLButtonElement>('button[data-press]')!;
+	await new Promise((done) => {
+		button.click();
+		setTimeout(done);
+	});
+	expect(arrivals).toEqual(['click']);
+	await expect.poll(() => host.__deferLog?.join()).toBe('idle,click');
+});
+
 test('a gesture made while an idle callback is pending runs first and is not dropped', async () => {
 	holdIdle();
 	const { container } = await renderSSR(IdleGesture);

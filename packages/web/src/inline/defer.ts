@@ -21,6 +21,7 @@ type DeferRoot = Element & {
 	__marklessCensus?: Array<Element | null>;
 	__marklessShifted?: number;
 	__marklessDispatch?: (input: Parameters<DeferModule['resumeContainerEvent']>[0]) => unknown;
+	__mResume?: Promise<DeferModule>;
 };
 
 type DeferModule = {
@@ -109,7 +110,9 @@ export function createMarklessDefer(
 			pending++;
 			(queue
 				? Promise.resolve(queue(input))
-				: loadModule(url).then((module) => module.resumeContainerEvent(input))
+				: (root.__mResume ||= loadModule(url)).then((module) =>
+						module.resumeContainerEvent(input),
+					)
 			).then(() => {
 				if (root.__asyncResumeRuntimeStarted) return;
 				fired.add(host);

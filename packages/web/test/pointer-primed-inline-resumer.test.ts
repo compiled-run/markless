@@ -217,7 +217,7 @@ test('a crossing that lands after the page already woke stays quiet', async () =
 	expect(resumer.loadCount()).toBe(1);
 });
 
-test('a visibility forward leaves the crossing primer armed', async () => {
+test('a visibility forward leaves the crossing primer armed, and both share one import', async () => {
 	const resumer = bootResumer({
 		events: [
 			{ hostNodeId: 'h1', eventName: 'visible' },
@@ -233,11 +233,15 @@ test('a visibility forward leaves the crossing primer armed', async () => {
 		unobserve() {}
 	}
 	const visibleArrivals: string[] = [];
-	const loadVisible = async () => ({
-		resumeContainerEvent: (input: { readonly event: { readonly type: string } }) => {
-			visibleArrivals.push(input.event.type);
-		},
-	});
+	let visibleLoads = 0;
+	const loadVisible = async () => {
+		visibleLoads += 1;
+		return {
+			resumeContainerEvent: (input: { readonly event: { readonly type: string } | 0 }) => {
+				visibleArrivals.push(input.event === 0 ? 'wake' : input.event.type);
+			},
+		};
+	};
 	resumer.root.getElementsByTagName = () => [resumer.host];
 	const primer = createInlineDeferTriggerSource('visible', [1])
 		.replace(INLINE_DEFER_LOADER_SOURCE, 'load')
@@ -256,17 +260,16 @@ test('a visibility forward leaves the crossing primer armed', async () => {
 	expect(visibleArrivals).toEqual(['visible']);
 
 	resumer.fire('pointerover');
-	expect(resumer.loadCount()).toBe(1);
-	resumer.finishLoad();
 	await settle();
-	expect(resumer.arrivals).toEqual(['wake']);
+	expect(visibleArrivals).toEqual(['visible', 'wake']);
 	expect(resumer.primedHover()).toBe(resumer.host);
 
 	resumer.fire('click');
 	await settle();
-	expect(resumer.arrivals).toEqual(['wake', 'click']);
+	expect(visibleArrivals).toEqual(['visible', 'wake', 'click']);
 	resumer.fire('pointerover');
 	await settle();
-	expect(resumer.loadCount()).toBe(1);
-	expect(resumer.arrivals).toEqual(['wake', 'click']);
+	expect(visibleArrivals).toEqual(['visible', 'wake', 'click']);
+	expect(visibleLoads).toBe(1);
+	expect(resumer.loadCount()).toBe(0);
 });

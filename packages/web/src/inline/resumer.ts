@@ -126,6 +126,8 @@ type InlineRoot = HTMLElement &
 		__asyncResumeRuntimeStarted?: boolean;
 		__marklessDelegatedDispatch?: boolean | string;
 		__marklessListen?: (eventName: string) => void;
+		// The resume module's import, shared by every startup script on this root: a resolved one answers in the same task.
+		__mResume?: Promise<InlineResumeModule>;
 		__marklessSettledArms?: Array<MarklessSettledArmHandoff>;
 		__marklessEventOnlyGraph?: Map<string, unknown>;
 		__marklessEventOnlyGraphInitialized?: boolean;
@@ -705,7 +707,7 @@ function runInlineResumerSelfWake(
 	defer.idle(root, async () => {
 		if (root.__asyncResumeRuntimeStarted) return;
 		root.__marklessDelegatedDispatch = true;
-		const module = await loadModule(resumeModuleUrl);
+		const module = await (root.__mResume ||= loadModule(resumeModuleUrl));
 		await module.resumeContainerEvent({ root, event: 0 });
 	});
 }
@@ -788,10 +790,9 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 		__MARKLESS_INLINE_RESUME_MODULE_URL__;
 	if (!root || !resumeModuleUrl) return;
 	// Reuse the import promise to preserve native event arrival order.
-	let loaded: Promise<InlineResumeModule> | undefined;
 	const forward = (input: Omit<InlineDispatchInput, 'root'>) => {
 		root.__marklessDelegatedDispatch = true;
-		return (loaded ||= loadModule(resumeModuleUrl)).then((module) =>
+		return (root.__mResume ||= loadModule(resumeModuleUrl)).then((module) =>
 			module.resumeContainerEvent({ root, ...input }),
 		);
 	};
