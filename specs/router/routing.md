@@ -120,6 +120,16 @@ page URL answers the whole document.
 - A redirect that drops the parameter answers with a whole document; the
   router then loads the destination as a document.
 
+`navigate(href, { replace, scroll })` from `@markless/router` navigates from
+code exactly as a click on `<Link href={href} replace scroll>` does: a page of
+the app swaps in place, and anything the router cannot take (a path that names
+no page, another origin, a call before the router has started) loads as a
+document. `replace` replaces the
+current history entry; `scroll: false` keeps the scroll position. It returns a
+promise that resolves once the new page is in place; a navigation that loads a
+new document leaves the page, so its promise never settles. It runs in the
+browser only and throws `MARKLESS_ROUTER_NAVIGATE_SERVER` on the server.
+
 The router package may integrate with an HTTP runtime through an adapter, but
 shared route manifesting and request-file parsing must stay runtime-agnostic.
 Renderer work must consume Markless compiled `.tsrx` artifacts; it must not

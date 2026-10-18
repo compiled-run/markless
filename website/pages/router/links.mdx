@@ -95,6 +95,37 @@ Links still work.
 	text="Some pages do work on every request, like a one-time token or a view counter. An early request counts as a visit. Set prefetch={false} on links to those pages, so only a real click asks for them."
 />
 
+## Navigate from code
+
+To change pages from code, such as after an order is placed, call `navigate`. It does exactly what a
+click on a `Link` to the same address does.
+
+```tsrx
+import { navigate } from '@markless/router';
+
+export default function Checkout() @{
+	<button
+		type="button"
+		onClick={async () => {
+			await fetch('/api/orders', { method: 'POST' });
+			await navigate('/orders', { replace: true });
+		}}
+	>
+		Place order
+	</button>
+}
+```
+
+| Option | What it does |
+| --- | --- |
+| `replace: true` | replaces the current history entry instead of adding one |
+| `scroll: false` | keeps the scroll position |
+
+`navigate` returns a promise that resolves once the new page is in place. If the address is not one
+of your pages, the browser loads it the normal way, and the promise never resolves because this page
+is gone. `navigate` runs in the browser only, so call it from an event handler, not while the page
+renders.
+
 ## Try it yourself
 
 Add a link to `/blog/[slug]` with `params={{ slug: 'second' }}`. Start the app, open the page, and

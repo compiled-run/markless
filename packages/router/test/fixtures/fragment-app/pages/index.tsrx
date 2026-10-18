@@ -1,5 +1,5 @@
 import { state, storage } from '@markless/core';
-import { Link } from '@markless/router';
+import { Link, navigate } from '@markless/router';
 import Nav from '../src/nav.tsrx';
 import { session } from '../src/session.tsrx';
 
@@ -36,6 +36,17 @@ export default function Home() @{
 				count = 99;
 			}}
 		>Late write</button>
+		<button
+			type="button"
+			data-navigate
+			onClick={() =>
+				navigate('/other').then(() =>
+					document.documentElement.setAttribute('data-navigated', location.pathname),
+				)
+			}
+		>Go other</button>
+		<button type="button" data-navigate-replace onClick={() => navigate('/other', { replace: true })}>Replace with other</button>
+		<button type="button" data-navigate-unknown onClick={() => navigate('/nowhere')}>Go nowhere</button>
 		<input data-field value="" />
 		<button type="button" data-open onClick={() => (open = true)}>Open</button>
 		<div data-backdrop overlay hidden={!open}>

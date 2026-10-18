@@ -714,6 +714,56 @@ for (const [name, browserType] of [
 			await page.close();
 		});
 
+		test('navigate() swaps the page in place like a Link click and resolves once it is in', async () => {
+			const { page, errors, requests } = await open(browser);
+			const documents: string[] = [];
+			page.on('request', (request) => {
+				if (request.resourceType() === 'document') documents.push(request.url());
+			});
+			const before = await page.evaluate(() => history.length);
+			await page.locator('[data-navigate]').click();
+			await landedOn(page, 'other');
+			await expect
+				.poll(() => page.evaluate(() => document.documentElement.dataset.navigated))
+				.toBe('/other');
+			expect(page.url()).toBe(`${origin}/other`);
+			expect(await page.evaluate(() => history.length)).toBe(before + 1);
+			expect(documents).toEqual([]);
+			expect(requests).toContain('/other fragment');
+			await page.locator('[data-tap]').click();
+			await expect.poll(() => text(page, '[data-taps]')).toBe('1');
+			await page.goBack();
+			await landedOn(page, 'home');
+			expect(documents).toEqual([]);
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
+		test('navigate() with replace swaps in place and replaces the history entry', async () => {
+			const { page, errors } = await open(browser);
+			const documents: string[] = [];
+			page.on('request', (request) => {
+				if (request.resourceType() === 'document') documents.push(request.url());
+			});
+			const before = await page.evaluate(() => history.length);
+			await page.locator('[data-navigate-replace]').click();
+			await landedOn(page, 'other');
+			expect(page.url()).toBe(`${origin}/other`);
+			expect(await page.evaluate(() => history.length)).toBe(before);
+			expect(documents).toEqual([]);
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
+		test('navigate() to a path that names no page loads it as a document', async () => {
+			const { page } = await open(browser);
+			const loaded = page.waitForEvent('load');
+			await page.locator('[data-navigate-unknown]').click();
+			await loaded;
+			expect(new URL(page.url()).pathname).toBe('/nowhere');
+			await page.close();
+		});
+
 		test('a fragment fetch names its own URL; the page URL always answers the document', async () => {
 			const fragment = await fetch(fragmentRequestUrl(`${origin}/other`));
 			expect(await fragment.text()).toContain(FRAGMENT_REGION_END);
