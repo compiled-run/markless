@@ -375,3 +375,17 @@ test('a keyed list after another list in the same parent follows its collection'
 	expect(errors).toEqual([]);
 	await page.close();
 });
+
+test('an @if arm holding imported components with constant props flips between them', async () => {
+	const { page, errors } = await open('/theme-icon');
+	const icon = (name: string) => page.getAttribute('[data-theme] svg', name);
+	expect(await icon('data-icon')).toBe('sun');
+	await page.click('[data-theme]');
+	await expect.poll(() => icon('data-icon')).toBe('moon');
+	expect(await icon('width')).toBe('15');
+	await page.click('[data-theme]');
+	await expect.poll(() => icon('data-icon')).toBe('sun');
+	expect(await icon('height')).toBe('13');
+	expect(errors).toEqual([]);
+	await page.close();
+});

@@ -32,6 +32,7 @@ import {
 	protocolElementHandleReadId,
 } from '@markless/serializer';
 import type { SourceSpan } from '../diagnostics.ts';
+import { staticAttributeText } from './semantic-graph/collect-markup.ts';
 import { boundarySettleRecords, type BoundarySettleRecords } from './boundary-settle-records.ts';
 import {
 	armChildDescent,
@@ -1669,6 +1670,17 @@ function renderChunkParts(
 				});
 				continue;
 			}
+			if (slot.kind === 'attribute' && slot.residue.kind === 'graph-read' && !slot.directClassMatch) {
+				const constant = scopedPropConstant(scope, slot.residue.graphNodeId, slot.residue.path);
+				if (constant) {
+					pushText(constantAttributeHtml(slot.name, constant.value, slot.alwaysPresent === true));
+					continue;
+				}
+				if (child?.imported)
+					return refuse(
+						`<${child.componentName}> sets ${slot.name} from a value that changes after it is shown`,
+					);
+			}
 			if (
 				context.inline &&
 				slot.kind === 'attribute' &&
@@ -1759,6 +1771,34 @@ function scopedPropPart(
 	}
 	if (value !== null && typeof value === 'object') return 'unsupported';
 	return { text: armTextEscape(value) };
+}
+
+// The value a prop read resolves to when the caller passed a constant, or null when it is not one.
+function scopedPropConstant(
+	scope: ArmPropScope | undefined,
+	graphNodeId: string,
+	path: ReadonlyArray<string>,
+): { readonly value: unknown } | null {
+	if (!scope || !graphNodeId.startsWith('prop:')) return null;
+	const name = graphNodeId === 'prop:props' ? path[0] : graphNodeId.slice('prop:'.length);
+	if (name === undefined) return null;
+	const prop = scope.get(name);
+	if (!prop) return { value: undefined };
+	if (prop.kind !== 'constant') return null;
+	let value: unknown = prop.value;
+	for (const segment of graphNodeId === 'prop:props' ? path.slice(1) : path) {
+		if (value === null || value === undefined) return { value: undefined };
+		if (typeof value !== 'object') return null;
+		value = (value as Record<string, unknown>)[segment];
+	}
+	return value !== null && typeof value === 'object' ? null : { value };
+}
+
+function constantAttributeHtml(name: string, value: unknown, alwaysPresent: boolean): string {
+	const text = staticAttributeText(name, value);
+	if (text === null) return '';
+	const escaped = armTextEscape(text).replaceAll('"', '&quot;');
+	return alwaysPresent ? escaped : ` ${name}="${escaped}"`;
 }
 
 // Where a prop read sits in the instance's own props cell, or null for any other read.

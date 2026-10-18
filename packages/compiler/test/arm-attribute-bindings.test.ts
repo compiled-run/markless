@@ -196,3 +196,28 @@ export function Plain() @{
 		),
 	).toBe(false);
 });
+
+test('a child in an @if arm writes the attributes its constant props decide into the arm markup', async () => {
+	const result = await compile(
+		'src/Icons.tsrx',
+		`
+import { state } from '@markless/core';
+
+function Glyph({ size, label, hidden, tone }) @{
+	<svg width={size} aria-label={label} aria-hidden={hidden} class={tone}></svg>
+}
+
+export function Toggle() @{
+	let on = state(false);
+	let tone = state('calm');
+	<button onClick={() => (on = !on)}>
+		@if (on) { <Glyph size={15} label={'say "hi"'} hidden={true} tone={tone} /> } @else { <Glyph size={13} hidden={false} tone="x" /> }
+	</button>
+}`,
+	);
+	expect(result.symbolModules.diagnostics).toEqual([]);
+	const module = branchModule(result) ?? '';
+	expect(module).toContain(
+		'[[{ "text": "<svg width=\\"15\\" aria-label=\\"say &quot;hi&quot;\\" aria-hidden=\\"true\\"" }, { "attribute": { "name": "class", "read": { "graphNodeId": "state:tone", "path": [] } } }, { "text": "></svg>" }], [{ "text": "<svg width=\\"13\\" class=\\"x\\"></svg>" }]]',
+	);
+});

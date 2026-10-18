@@ -1310,7 +1310,7 @@ function isAlwaysPresentValue(expression: AnyNode): boolean {
 
 // The compile-time half of the presence rule marklessAttributeValue owns for
 // values only the runtime sees; both halves must agree.
-function staticAttributeText(name: string, value: unknown): string | null {
+export function staticAttributeText(name: string, value: unknown): string | null {
 	if (value === null || value === undefined || value === false) return null;
 	if (value === true) return name.startsWith('aria-') || name.startsWith('data-') ? 'true' : '';
 	return String(value);
