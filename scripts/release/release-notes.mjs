@@ -17,6 +17,10 @@
 //
 // Usage:
 //   node scripts/release/release-notes.mjs [--from <ref>] [--to <ref>] [--out <path>]
+//   node scripts/release/release-notes.mjs --changelog --version <v> [--from] [--to] [--out]
+//
+//   --changelog  print the CHANGELOG.md section for <v> instead: user-facing commits only,
+//                grouped by released package, internal ids stripped, no changelogen.
 //
 //   --from  defaults to the most recent tag reachable from --to, and to the
 //           repository's first commit when no tag exists yet.
@@ -31,7 +35,7 @@
 //
 // This script never commits, never tags, and never leaves a file behind:
 // changelogen is pointed at a temporary directory that is removed before exit.
-// It never writes the repository's curated CHANGELOG.md.
+// It never writes CHANGELOG.md itself; the release cut inserts the --changelog section.
 import { execFile as execFileCallback, execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -40,7 +44,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 import { promisify } from 'node:util';
-import { repoRoot } from './release-packages.mjs';
+import { repoRoot, workspacePackages } from './release-packages.mjs';
 
 const execFile = promisify(execFileCallback);
 const require = createRequire(import.meta.url);
@@ -55,13 +59,17 @@ function git(args) {
 }
 
 function parseArguments(argv) {
-	const options = { from: null, to: 'HEAD', out: null };
+	const options = { from: null, to: 'HEAD', out: null, changelog: false, version: null };
 	for (let index = 0; index < argv.length; index += 1) {
 		const flag = argv[index];
 		const value = argv[index + 1];
 		switch (flag) {
+			case '--changelog':
+				options.changelog = true;
+				break;
 			case '--from':
 			case '--to':
+			case '--version':
 			case '--out': {
 				if (!value || value.startsWith('--')) {
 					throw new NotesError(`${flag} needs a value`);
@@ -130,8 +138,14 @@ function repositoryUrl() {
  * subject can never introduce a second line and split on the first two spaces
  * is unambiguous.
  */
-function commitsInRange(from, to) {
-	const raw = git(['log', '--reverse', '--format=%H %h %s', `${from}..${to}`]);
+function commitsInRange(from, to, { merges = true } = {}) {
+	const raw = git([
+		'log',
+		'--reverse',
+		...(merges ? [] : ['--no-merges']),
+		'--format=%H %h %s',
+		`${from}..${to}`,
+	]);
 	if (!raw) return [];
 	return raw
 		.split('\n')
@@ -214,7 +228,9 @@ function emittedShas(section, commits) {
 function otherChangesSection(commits, url) {
 	const lines = commits.map((commit) => {
 		const subject = commit.subject.replace(/\s+/gu, ' ').trim();
-		const link = url ? ` ([${commit.short}](${url}/commit/${commit.sha}))` : ` (${commit.short})`;
+		const link = url
+			? ` ([${commit.short}](${url}/commit/${commit.sha}))`
+			: ` (${commit.short})`;
 		return `- ${subject}${link}`;
 	});
 	return [
@@ -238,8 +254,114 @@ function spliceSection(section, addition) {
 	return `${section.slice(0, marker).trimEnd()}\n\n${addition}\n\n${section.slice(marker)}`;
 }
 
+// --changelog: the CHANGELOG.md section the release cut writes. Only feat, fix and perf
+// commits scoped to a released package (or unscoped) are user-facing; everything else is
+// counted in the closing commit-list link instead of listed.
+const CHANGE_KINDS = { feat: 'New', fix: 'Fixed', perf: 'Faster' };
+const INTERNAL_SCOPES = new Set([
+	'agents',
+	'bench',
+	'benchmarks',
+	'changelog',
+	'ci',
+	'demo',
+	'demos',
+	'deps',
+	'docs',
+	'perf-guards',
+	'release',
+	'skills',
+	'website',
+]);
+const CONVENTIONAL_SUBJECT =
+	/^(?<type>[a-z]+)(?:\((?<scopes>[^)]*)\))?(?<breaking>!)?:\s*(?<summary>.+)$/u;
+const INTERNAL_ID = String.raw`(?:#\d+|[A-Z]\d{1,4}|[A-Z]{2,4}-[A-Z]?\d+)`;
+
+function plainSummary(text) {
+	let summary = text.split(/\s+-\s+|;\s+/u)[0] ?? '';
+	summary = summary
+		.replace(new RegExp(String.raw`\s*\(${INTERNAL_ID}(?:[,\s/]+${INTERNAL_ID})*\)`, 'gu'), '')
+		.replace(/\s*\b(?:for\s+)?defects?\s+\d+(?:\s*(?:,|and)\s*\d+)*/giu, '')
+		.replace(new RegExp(String.raw`\b${INTERNAL_ID}\b\s*`, 'gu'), '')
+		.replace(/\s{2,}/gu, ' ')
+		.replace(/\s+([,.;:])/gu, '$1')
+		.trim()
+		.replace(/[,;:]$/u, '');
+	if (summary === '') return null;
+	summary = `${summary[0].toUpperCase()}${summary.slice(1)}`;
+	return /[.!?]$/u.test(summary) ? summary : `${summary}.`;
+}
+
+function releaseAreas() {
+	try {
+		return workspacePackages(root);
+	} catch {
+		return [];
+	}
+}
+
+/** The released package a commit belongs to, `general` when unscoped, or null when internal. */
+function areaOf(scopes, packages) {
+	if (scopes.length === 0) return 'General';
+	let internal = false;
+	for (const scope of scopes) {
+		const entry = packages.find(
+			(candidate) =>
+				candidate.name === scope ||
+				candidate.name.split('/').at(-1) === scope ||
+				path.basename(candidate.directory) === scope,
+		);
+		if (entry && entry.manifest.private !== true) return entry.name;
+		if (entry || INTERNAL_SCOPES.has(scope)) internal = true;
+	}
+	return internal ? null : 'Other changes';
+}
+
+function changelogSection({ commits, from, version, url }) {
+	const packages = releaseAreas();
+	const breaking = [];
+	const areas = new Map();
+	for (const commit of commits) {
+		const match = CONVENTIONAL_SUBJECT.exec(commit.subject.trim());
+		const kind = match ? CHANGE_KINDS[match.groups.type] : undefined;
+		if (!match || !kind) continue;
+		const scopes = (match.groups.scopes ?? '')
+			.split(',')
+			.map((scope) => scope.trim())
+			.filter(Boolean);
+		const area = areaOf(scopes, packages);
+		const summary = plainSummary(match.groups.summary);
+		if (area === null || summary === null) continue;
+		if (match.groups.breaking) {
+			breaking.push(`- **${area}:** ${summary}`);
+			continue;
+		}
+		const lines = areas.get(area) ?? new Set();
+		lines.add(`- **${kind}:** ${summary}`);
+		areas.set(area, lines);
+	}
+	const order = [...areas.keys()].sort((left, right) => {
+		const rank = (area) => (area === 'General' ? 0 : area === 'Other changes' ? 2 : 1);
+		return rank(left) - rank(right) || left.localeCompare(right);
+	});
+	const blocks = [`## ${version}`];
+	if (breaking.length > 0) blocks.push(`### Breaking changes\n\n${breaking.join('\n')}`);
+	for (const area of order) blocks.push(`### ${area}\n\n${[...areas.get(area)].join('\n')}`);
+	if (breaking.length === 0 && areas.size === 0) {
+		blocks.push('No user-facing changes in the released packages.');
+	}
+	const plural = commits.length === 1 ? 'commit' : 'commits';
+	blocks.push(
+		url
+			? `[All ${commits.length} ${plural} since ${from}](${url}/compare/${from}...v${version})`
+			: `${commits.length} ${plural} since ${from}.`,
+	);
+	return `${blocks.join('\n\n')}\n`;
+}
+
 async function main(argv) {
 	const options = parseArguments(argv);
+	if (options.changelog && !options.version) throw new NotesError('--changelog needs --version');
 	const to = options.to;
 	const from = options.from ?? defaultFrom(to);
 
@@ -265,6 +387,20 @@ async function main(argv) {
 	}
 
 	const url = repositoryUrl();
+	if (options.changelog) {
+		const section = changelogSection({
+			commits: commitsInRange(fromResolved, toResolved, { merges: false }),
+			from,
+			version: options.version,
+			url,
+		});
+		if (options.out) await writeFile(path.resolve(process.cwd(), options.out), section);
+		else process.stdout.write(section);
+		console.error(
+			`release-notes: drafted the ${options.version} changelog section from ${from}..${to}`,
+		);
+		return 0;
+	}
 	const outputDirectory = await mkdtemp(path.join(tmpdir(), 'markless-release-notes-'));
 	let section;
 	try {
@@ -279,7 +415,9 @@ async function main(argv) {
 	const remainder = commits.filter((commit) => !emitted.has(commit.sha));
 
 	let body =
-		remainder.length > 0 ? spliceSection(section, otherChangesSection(remainder, url)) : section;
+		remainder.length > 0
+			? spliceSection(section, otherChangesSection(remainder, url))
+			: section;
 	body = `${body.trim()}\n`;
 
 	// The point of the whole script, checked against the finished text rather

@@ -63,7 +63,16 @@ const [first, second] = releasePackages().map((entry) => entry.name) as [string,
 
 test('a package the registry does not show yet is waited for, not failed', async () => {
 	const fake = await fakeRegistry({
-		[first]: ['missing', 'missing', 'missing', 'missing', 'missing', 'missing', 'missing', 'attested'],
+		[first]: [
+			'missing',
+			'missing',
+			'missing',
+			'missing',
+			'missing',
+			'missing',
+			'missing',
+			'attested',
+		],
 	});
 	const result = runVerify(fake, 10_000);
 	expect(result.stderr).toBe('');
