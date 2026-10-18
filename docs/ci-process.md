@@ -136,27 +136,29 @@ Markless releases **minor versions only**: 0.6.0, 0.7.0, and so on. There are no
 
 ### One click
 
-In GitHub, open **Actions → Release cut → Run workflow** on `main` and press the button (or run `gh workflow run release-cut.yml --ref main`). Nothing else is needed. The run:
+Run `gh workflow run release.yml --ref main -f mode=cut` (or in GitHub: **Actions → Release → Run workflow** on `main`, mode `cut`). Nothing else is needed: no version, no confirmation phrase, no local step. The cut lives in `release.yml` itself because npm's trusted publishing checks the filename of the workflow that was dispatched; a separate workflow calling `release.yml` would be checked as itself and refused. The run:
 
 1. Refuses to start unless it was dispatched on `main`, the checkout is clean, and `main`'s latest CI run for that exact commit finished green.
 2. Bumps the root `package.json` to the next minor with `bumpp`, then `scripts/release/sync-version.mjs` moves every published package to the same version. Packages marked `"private": true` are skipped.
 3. Writes the new section at the top of `CHANGELOG.md` with `pnpm release:notes --changelog`: the `feat`, `fix` and `perf` commits since the last tag, grouped by the package their scope names, with internal ids removed and a link to every commit since the last release.
 4. Commits `chore(release): vX.Y.0` as `github-actions[bot]`. The commit runs the normal pre-commit hook (lint and CI's fast jobs), so the release commit passes the same checks as any other commit. Then it creates the tag `vX.Y.0`.
 5. Pushes the commit and the tag to `main` together (`git push --atomic`: both or neither).
-6. Dispatches `release.yml` in publish mode at the tag and waits for it. `release.yml` stays the only workflow that can publish: it builds, checks the tarballs, publishes with npm trusted publishing and provenance, and waits up to 3 minutes for npm to show every package with its provenance attestation.
-7. Creates the GitHub Release `vX.Y.0` from the new changelog section and marks it latest.
+6. The `release` job, the same job that has always published, checks out the tag and publishes it: it builds, checks the tarballs, publishes with npm trusted publishing and provenance, and waits up to 3 minutes for npm to show every package with its provenance attestation. It is the only job with `id-token: write`; steps 1 to 5 run in the `cut` job, which cannot publish.
+7. The `announce` job creates the GitHub Release `vX.Y.0` from the new changelog section and marks it latest.
 
-Expect about 20 to 25 minutes on GitHub's runners, estimated rather than measured, because a real release has not been cut with this workflow yet. Most of that time is the pre-commit hook in step 4 running the whole unit suite on one runner (CI splits the same suite across three runners at 3 to 4 minutes each), plus the build in step 6. The commit hook is not skipped to save time.
+Expect about 20 to 25 minutes on GitHub's runners, estimated rather than measured, because a real release has not been cut this way yet. Most of that time is the pre-commit hook in step 4 running the whole unit suite on one runner (CI splits the same suite across three runners at 3 to 4 minutes each), plus the build in step 6. The commit hook is not skipped to save time.
+
+The manual `dry-run` and `publish` modes still work as before for a version that is already committed, except that a publish now runs only on the commit tagged `v<version>`.
 
 If the run stops after step 5, run it again. The tag then exists without a GitHub Release, so the cut finishes that release (publishing whatever is missing, then creating the Release) instead of cutting the next one. If it stops before step 5, nothing has left the runner.
 
 ### Rehearsing
 
-Tick **dry run** when dispatching, or run `pnpm release:cut --dry-run` locally. Both do steps 1 to 4 for real, including the commit and its hooks, in a throwaway copy of the checkout, then run the checks `release.yml` runs before publishing (`pnpm build`, the publish-readiness sweep, the tarball checks and `pnpm publish --dry-run` for every package). They do not create the tag, push, publish, or create a GitHub Release. The drafted changelog section is printed (and shown in the run summary on GitHub). Locally, a dry run on a branch other than `main` finishes all the steps and then exits with code 1, listing what the real cut would refuse.
+Dispatch with `-f mode=cut-dry-run`, or run `pnpm release:cut --dry-run` locally. Both do steps 1 to 4 for real, including the commit and its hooks, in a throwaway copy of the checkout, then run the checks the `release` job runs before publishing (`pnpm build`, the publish-readiness sweep, the tarball checks and `pnpm publish --dry-run` for every package). They do not create the tag, push, publish, or create a GitHub Release. The drafted changelog section is printed (and shown in the run summary on GitHub). Locally, a dry run on a branch other than `main` finishes all the steps and then exits with code 1, listing what the real cut would refuse.
 
 ### One-time setup
 
-`main` is protected: pushes from anyone but an admin need the `test`, `typecheck` and `agent-files` checks on the pushed commit, and the workflow's built-in token cannot skip that. Add a repository secret named `RELEASE_PUSH_TOKEN` holding a fine-grained personal access token from a repository admin, limited to this repository with **Contents: read and write**. The workflow pushes the release commit with it, and refuses a real cut (before changing anything) while the secret is missing. CI then runs on the release commit like on any other push to `main`. `release.yml` still uses no stored credential.
+`main` is protected: pushes from anyone but an admin need the `test`, `typecheck` and `agent-files` checks on the pushed commit, and the workflow's built-in token cannot skip that. Add a repository secret named `RELEASE_PUSH_TOKEN` holding a fine-grained personal access token from a repository admin, limited to this repository with **Contents: read and write**. The `cut` job pushes the release commit with it, and refuses a real cut (before changing anything) while the secret is missing. CI then runs on the release commit like on any other push to `main`. The `release` job, which publishes, still reads no secret, and its own guard fails if one is ever added to it.
 
 ### Keep `main` releasable
 

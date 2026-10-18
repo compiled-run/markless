@@ -1,4 +1,4 @@
-// Contract for the two release workflows: release-cut.yml cuts and announces, release.yml alone publishes.
+// Contract for release.yml: mode=cut releases end to end, and only the `release` job can publish.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
@@ -10,27 +10,25 @@ type Step = {
 	readonly run?: string;
 	readonly uses?: string;
 	readonly with?: Record<string, unknown>;
+	readonly env?: Record<string, string>;
 };
 type Job = {
 	readonly if?: string;
+	readonly needs?: string | readonly string[];
 	readonly permissions?: Record<string, string>;
+	readonly env?: Record<string, string>;
 	readonly steps: readonly Step[];
 };
-type Workflow = {
-	readonly on: Record<string, { readonly inputs?: Record<string, { readonly type: string }> }>;
-	readonly concurrency: { readonly group: string; readonly 'cancel-in-progress': boolean };
-	readonly permissions: Record<string, string>;
+
+const source = readFileSync(
+	fileURLToPath(new URL('../../.github/workflows/release.yml', import.meta.url)),
+	'utf8',
+);
+const workflow = parse(source) as {
+	readonly on: Record<string, { readonly inputs: Record<string, Record<string, unknown>> }>;
 	readonly jobs: Record<string, Job>;
 };
-
-function workflow(file: string): Workflow {
-	return parse(
-		readFileSync(
-			fileURLToPath(new URL(`../../.github/workflows/${file}`, import.meta.url)),
-			'utf8',
-		),
-	) as Workflow;
-}
+const { cut, announce, release } = workflow.jobs as Record<'cut' | 'announce' | 'release', Job>;
 
 function step(job: Job, name: string): Step {
 	const found = job.steps.find((candidate) => candidate.name === name);
@@ -38,74 +36,81 @@ function step(job: Job, name: string): Step {
 	return found;
 }
 
-const cut = workflow('release-cut.yml');
-const cutJob = cut.jobs.cut!;
-const release = workflow('release.yml');
-const releaseJob = release.jobs.release!;
+function names(job: Job): Array<string | undefined> {
+	return job.steps.map((candidate) => candidate.name);
+}
 
-describe('release-cut.yml', () => {
-	test('one click: dispatch only, with nothing to choose but a dry run', () => {
-		expect(Object.keys(cut.on)).toEqual(['workflow_dispatch']);
-		expect(cut.on.workflow_dispatch!.inputs).toEqual({
-			dry_run: expect.objectContaining({ type: 'boolean', default: false }),
-		});
-	});
-
-	test('runs on main of the real repository only', () => {
-		expect(cutJob.if).toBe("github.repository == 'compiled-run/markless'");
-		expect(step(cutJob, 'Refuse anything but main').if).toBe("github.ref != 'refs/heads/main'");
-	});
-
-	test('never waits on its own concurrency group', () => {
-		expect(cut.concurrency.group).not.toBe(release.concurrency.group);
-		expect(cut.concurrency['cancel-in-progress']).toBe(false);
-	});
-
-	test('cannot publish: no OIDC token and no publish command', () => {
-		expect(cut.permissions).toEqual({ contents: 'read' });
-		expect(cutJob.permissions).toEqual({ contents: 'write', actions: 'write' });
-		const commands = cutJob.steps.map((candidate) => candidate.run ?? '').join('\n');
-		expect(commands).not.toMatch(/npm publish|pnpm publish|publish-workspace/u);
-	});
-
-	test('cuts with the minor-only script and pushes commit and tag together, except on a dry run', () => {
-		expect(step(cutJob, 'Cut the next minor version').run).toContain(
-			'node scripts/release/cut.mjs --dry-run',
+describe('release.yml mode=cut', () => {
+	test('one dispatch with no version or confirmation to type', () => {
+		const inputs = workflow.on.workflow_dispatch!.inputs;
+		expect(inputs.mode!.options).toEqual(['dry-run', 'publish', 'cut', 'cut-dry-run']);
+		expect(inputs.version!.required).toBe(false);
+		expect(release.env!.RELEASE_VERSION).toBe(
+			'${{ needs.cut.outputs.version || inputs.version }}',
 		);
-		const push = step(cutJob, 'Push the release commit and tag');
-		expect(push.if).toContain('!inputs.dry_run');
+		expect(step(release, 'Require the typed confirmation phrase').if).toBe(
+			"inputs.mode == 'publish'",
+		);
+	});
+
+	test('cuts on main of the real repository only, with the minor-only script', () => {
+		expect(cut.if).toBe(
+			"github.repository == 'compiled-run/markless' && startsWith(inputs.mode, 'cut')",
+		);
+		expect(step(cut, 'Refuse anything but main').if).toBe("github.ref != 'refs/heads/main'");
+		const run = step(cut, 'Cut the next minor version').run;
+		expect(run).toContain('node scripts/release/cut.mjs --dry-run');
+		expect(run).toContain('node scripts/release/cut.mjs\n');
+	});
+
+	test('pushes commit and tag together, never on a dry run or a resumed cut', () => {
+		const push = step(cut, 'Push the release commit and tag');
+		expect(push.if).toBe("inputs.mode == 'cut' && steps.cut.outputs.resumed != 'true'");
 		expect(push.run).toBe('git push --atomic origin HEAD:refs/heads/main "refs/tags/${TAG}"');
 	});
 
-	test('publishes by dispatching release.yml at the tag and waiting for it', () => {
-		const publish = step(cutJob, 'Publish through release.yml at the tag');
-		expect(publish.if).toContain('!inputs.dry_run');
-		expect(publish.run).toContain('gh workflow run release.yml --ref "$TAG"');
-		expect(publish.run).toContain('-f mode=publish -f confirm="publish markless ${VERSION}"');
-		expect(publish.run).toContain('gh run watch "$run_id" --exit-status');
+	test('the cut and announce jobs cannot publish', () => {
+		for (const job of [cut, announce]) {
+			expect(job.permissions!['id-token']).toBeUndefined();
+			const commands = job.steps.map((candidate) => candidate.run ?? '').join('\n');
+			expect(commands).not.toMatch(/npm publish|pnpm publish|publish-workspace/u);
+		}
 	});
 
-	test('announces the changelog section as the latest GitHub Release after publishing', () => {
-		const names = cutJob.steps.map((candidate) => candidate.name);
-		const announce = step(cutJob, 'Create the GitHub Release');
-		expect(names.indexOf('Create the GitHub Release')).toBeGreaterThan(
-			names.indexOf('Publish through release.yml at the tag'),
+	test('publishes the pushed tag in the existing release job, then announces it', () => {
+		expect(release.needs).toBe('cut');
+		expect(release.if).toContain("(inputs.mode == 'cut' && needs.cut.result == 'success')");
+		expect(release.env!.RELEASE_MODE).toBe(
+			"${{ inputs.mode == 'cut' && 'publish' || inputs.mode }}",
 		);
-		expect(announce.run).toContain(
-			'gh release create "$TAG" --title "$TAG" --notes-file "$NOTES_FILE" --latest --verify-tag',
-		);
+		expect(release.steps[0]!.with!.ref).toBe('${{ needs.cut.outputs.tag || github.ref }}');
+		expect(announce.needs).toEqual(['cut', 'release']);
+		expect(announce.if).toBe("inputs.mode == 'cut' && needs.release.result == 'success'");
+		expect(step(announce, 'Create the GitHub Release').run).toContain('--latest --verify-tag');
 	});
 });
 
-describe('release.yml', () => {
-	test('stays the only publisher, and publishes only at the version tag', () => {
-		expect(releaseJob.permissions).toEqual({ contents: 'read', 'id-token': 'write' });
-		const names = releaseJob.steps.map((candidate) => candidate.name);
-		const gate = step(releaseJob, 'Publish only the tagged release commit');
-		expect(gate.if).toBe("inputs.mode == 'publish'");
-		expect(gate.run).toContain('"$GITHUB_REF" != "refs/tags/v${RELEASE_VERSION}"');
-		expect(names.indexOf('Publish only the tagged release commit')).toBeLessThan(
-			names.indexOf('Publish to npm via trusted publishing'),
+describe('release.yml release job', () => {
+	test('is the only job with an OIDC token, and publishes only the tagged commit', () => {
+		expect(release.permissions).toEqual({ contents: 'read', 'id-token': 'write' });
+		const gate = step(release, 'Publish only the tagged release commit');
+		expect(gate.if).toBe("env.RELEASE_MODE == 'publish'");
+		expect(gate.run).toContain('refs/tags/v${RELEASE_VERSION}^{commit}');
+		expect(names(release).indexOf('Publish only the tagged release commit')).toBeLessThan(
+			names(release).indexOf('Publish to npm via trusted publishing'),
+		);
+	});
+
+	test('reads no secret, and is last so its own guard scans exactly it', () => {
+		expect(Object.keys(workflow.jobs).at(-1)).toBe('release');
+		const releaseJobSource = source.slice(source.indexOf('\n    release:\n'));
+		const executable = releaseJobSource
+			.split('\n')
+			.filter((line) => !/^\s*#/u.test(line))
+			.join('\n');
+		expect(executable).not.toMatch(/\$\{\{\s*secrets\./u);
+		expect(step(release, 'Refuse to run with a stored npm token available').run).toContain(
+			"sed -n '/^    release:$/,$p' .github/workflows/release.yml",
 		);
 	});
 });

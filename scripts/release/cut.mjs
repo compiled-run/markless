@@ -3,7 +3,7 @@
 // release package in lockstep, write the CHANGELOG section, commit, and tag v<X.Y.0>.
 // Markless releases minor versions only, so there is no release-type argument to get wrong.
 //
-// Pushing, publishing and the GitHub Release belong to .github/workflows/release-cut.yml.
+// Pushing, publishing and the GitHub Release belong to release.yml's mode=cut jobs.
 // --dry-run performs every step in a throwaway worktree (commit hooks included), skips the
 // tag, then runs the same pack and publish checks release.yml runs, without touching npm.
 //
