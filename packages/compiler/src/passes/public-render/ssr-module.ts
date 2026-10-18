@@ -1049,14 +1049,14 @@ function emitSsrDataLines(
 		// A same-module child answers at compile time; an imported one is asked
 		// through the marker the compiler stamped on its render function.
 		const seedCall = edge.importSource
-			? `await marklessSsrSeedChild(${component},${declaredName ? JSON.stringify(declaredName) : 'undefined'},childProps,marklessSsrRenderContext,marklessSsrSeeds);`
+			? `await marklessSsrSeedChild(${component},${declaredName ? JSON.stringify(declaredName) : 'undefined'},marklessSsrChildProps,marklessSsrRenderContext,marklessSsrSeeds);`
 			: componentSharedSeeds(input, edge.childComponentName).length > 0
-				? `await ${childSurface}?.renderSsr?.(childProps,{...marklessSsrRenderContext,marklessSharedSeeds:marklessSsrSeeds});`
+				? `await ${childSurface}?.renderSsr?.(marklessSsrChildProps,{...marklessSsrRenderContext,marklessSharedSeeds:marklessSsrSeeds});`
 				: '';
 		if (seedCall)
 			seedBlockByEdgeId.set(
 				edge.id,
-				`{const childProps={${seedProps.join(',')}};${seedCall}}`,
+				`{const marklessSsrChildProps={${seedProps.join(',')}};${seedCall}}`,
 			);
 		// Static registration before descent: the widget root's instance token
 		// is written into the seed map the parts placed inside it read, so a
@@ -1123,10 +1123,10 @@ function emitSsrDataLines(
 			? `marklessSsrRowPlacement(${childLiteral},marklessSsrDataContext.repeatKey)`
 			: childLiteral;
 		const refusal = rowScoped
-			? `if(marklessSsrDataContext.repeatKey===undefined){marklessAssertPresentationalRowChild(output,${JSON.stringify(edge.childComponentName)});return output;}`
-			: `if(marklessSsrDataContext.repeatItem!==undefined){marklessAssertPresentationalRowChild(output,${JSON.stringify(edge.childComponentName)});return output;}`;
+			? `if(marklessSsrDataContext.repeatKey===undefined){marklessAssertPresentationalRowChild(marklessSsrChildOutput,${JSON.stringify(edge.childComponentName)});return marklessSsrChildOutput;}`
+			: `if(marklessSsrDataContext.repeatItem!==undefined){marklessAssertPresentationalRowChild(marklessSsrChildOutput,${JSON.stringify(edge.childComponentName)});return marklessSsrChildOutput;}`;
 		return [
-			`case ${JSON.stringify(edge.id)}:{const child=${placement};const childProps={${props.join(',')}};const output=await ${childSurface}?.renderSsr?.(childProps,{...marklessSsrRenderContext,idPrefix:marklessSsrIdPrefix+child.hostPrefix${
+			`case ${JSON.stringify(edge.id)}:{const marklessSsrPlacedChild=${placement};const marklessSsrChildProps={${props.join(',')}};const marklessSsrChildOutput=await ${childSurface}?.renderSsr?.(marklessSsrChildProps,{...marklessSsrRenderContext,idPrefix:marklessSsrIdPrefix+marklessSsrPlacedChild.hostPrefix${
 					// A widget ROOT reads its own instance's seeds too: the parts placed
 					// inside it wrote them before it rendered, and its consume line
 					// merges them over its statics. Not the child THIS component
@@ -1139,7 +1139,7 @@ function emitSsrDataLines(
 					(projectionChunkId !== undefined && !childrenRootEdgeIds.includes(edge.id))
 						? ',sharedSeeds:marklessSsrDataContext.sharedSeeds'
 						: ''
-				}});if(!output)throw new Error('MARKLESS_SSR_DATA_CHILD_RENDER_MISSING: ${edge.id}');${refusal}marklessSsrChildren.push({...child,output,callbackProps:childProps.__marklessSsrCallbacks??{}});return output;}`,
+				}});if(!marklessSsrChildOutput)throw new Error('MARKLESS_SSR_DATA_CHILD_RENDER_MISSING: ${edge.id}');${refusal}marklessSsrChildren.push({...marklessSsrPlacedChild,output:marklessSsrChildOutput,callbackProps:marklessSsrChildProps.__marklessSsrCallbacks??{}});return marklessSsrChildOutput;}`,
 		];
 	});
 	// U-H: every part of one widget instance seeds before any part renders, so a

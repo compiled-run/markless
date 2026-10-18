@@ -72,7 +72,7 @@ async function compilePage(family: string, page: string) {
 // call is the one that passes `marklessSharedSeeds` and renders nothing.
 function seedCallProps(ssr: string, componentReference: string): string | undefined {
 	const call = new RegExp(
-		`const childProps=\\{([^;]*)\\};await ${componentReference}\\?\\.renderSsr\\?\\.\\(childProps,\\{\\.\\.\\.marklessSsrRenderContext,marklessSharedSeeds:`,
+		`const marklessSsrChildProps=\\{([^;]*)\\};await ${componentReference}\\?\\.renderSsr\\?\\.\\(marklessSsrChildProps,\\{\\.\\.\\.marklessSsrRenderContext,marklessSharedSeeds:`,
 	);
 	return call.exec(ssr)?.[1];
 }

@@ -43,6 +43,11 @@ them from `.markless/` instead.
   runs there. Add `onVisible` or `onIdle` to the same element to start it when
   it is visible or when the page is idle. The `attach` docs now explain when it
   starts.
+- A component inside a `@for` row now gets the row's item on the server even
+  when the loop variable is named `child`, `childProps` or `output`. Before, the
+  server render passed an internal object instead, so a recursive tree written
+  as `@for (const child of node.children) { <TreeNode node={child} /> }`
+  rendered its nested levels empty.
 
 ## 0.5.0
 

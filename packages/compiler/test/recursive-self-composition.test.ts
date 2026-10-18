@@ -166,7 +166,7 @@ test('each level renders under its own instance path, so its nodes and state are
 	// is what makes level 2's counter a different cell from level 1's.
 	expect(emitted).toContain('"hostPrefix":"c0:"');
 	expect(emitted).toContain('"symbolPrefix":"c0:"');
-	expect(emitted).toContain('idPrefix:marklessSsrIdPrefix+child.hostPrefix');
+	expect(emitted).toContain('idPrefix:marklessSsrIdPrefix+marklessSsrPlacedChild.hostPrefix');
 	// Each level clones the payload state for itself rather than sharing one map.
 	expect(emitted).toContain('const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);');
 });

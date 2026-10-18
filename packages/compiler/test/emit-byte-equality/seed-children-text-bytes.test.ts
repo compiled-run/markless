@@ -50,7 +50,7 @@ async function compiled(children: string) {
 	if (!chunk) throw new Error('Expected the label placement to carry a projection chunk.');
 	return {
 		statics: chunk.statics.join(''),
-		seedProp: /const childProps=\{(children:[^}]*)\};await __marklessSsrComponent2/.exec(
+		seedProp: /const marklessSsrChildProps=\{(children:[^}]*)\};await __marklessSsrComponent2/.exec(
 			result.publicRenderModule.ssrModuleSource,
 		)?.[1],
 		diagnostics: result.publicRenderModule.diagnostics,

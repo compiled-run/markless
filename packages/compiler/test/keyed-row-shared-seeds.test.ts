@@ -56,7 +56,7 @@ async function compile(source: string) {
 function childRenderCall(ssrModuleSource: string, componentEdgeId: string): string {
 	const start = ssrModuleSource.indexOf(`case ${JSON.stringify(componentEdgeId)}:`);
 	expect(start, `no emitted case for ${componentEdgeId}`).toBeGreaterThan(-1);
-	const call = ssrModuleSource.slice(start, ssrModuleSource.indexOf('if(!output)', start));
+	const call = ssrModuleSource.slice(start, ssrModuleSource.indexOf('if(!marklessSsrChildOutput)', start));
 	expect(call).toContain('renderSsr');
 	return call;
 }

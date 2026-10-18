@@ -123,8 +123,8 @@ test('the served module decides the arm by reading that node', async () => {
 test('the page module hands the self-closed placement no children prop', async () => {
 	const { page } = await compileFamilyAndPage();
 	const ssr = page.publicRenderModule.ssrModuleSource;
-	const selfClosed = /case "component-edge:1":\{[\s\S]*?const childProps=(\{[^}]*\})/.exec(ssr);
+	const selfClosed = /case "component-edge:1":\{[\s\S]*?const marklessSsrChildProps=(\{[^}]*\})/.exec(ssr);
 
 	expect(selfClosed?.[1]).toBe('{}');
-	expect(ssr).toContain('const childProps={children:marklessSsrDataContext.projectionHtml}');
+	expect(ssr).toContain('const marklessSsrChildProps={children:marklessSsrDataContext.projectionHtml}');
 });
