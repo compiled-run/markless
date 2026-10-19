@@ -544,7 +544,7 @@ export function collapseLazyModuleFacades(
 		additions
 			.get(fileName)!
 			.push(
-				`(globalThis.${PACK_REGISTRY}??={})[import.meta.url]={${[...loaders].join(',')}};`,
+				`${PACK_REGISTRATION}={${[...loaders].join(',')}};`,
 			);
 	for (const chunk of chunks.values()) {
 		if (facades.has(chunk.fileName)) continue;
@@ -626,7 +626,8 @@ export function collapseLazyModuleFacades(
 }
 
 // A pack registers its loaders when it evaluates, because import() of an evaluated module still resolves a task later.
-const PACK_REGISTRY = '__marklessPacks';
+export const PACK_REGISTRY = '__marklessPacks';
+export const PACK_REGISTRATION = `(globalThis.${PACK_REGISTRY}??={})[import.meta.url]`;
 // Loader names are exports every registering pack spells out at evaluation, so they stay short.
 export const PACK_LOADER_PREFIX = '$ml';
 const PACKED_NAME_PATTERN = /\$ml[\w$]*|__marklessNamespace[\w$]*/g;

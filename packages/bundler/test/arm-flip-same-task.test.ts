@@ -1,10 +1,11 @@
 import { execFile } from 'node:child_process';
-import { mkdir, rm, symlink } from 'node:fs/promises';
+import { mkdir, readFile, rm, symlink } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { chromium, type Browser, type Page } from '@playwright/test';
 import { resolve } from 'pathe';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { startBuiltServer } from '../../../scripts/test-utils/built-server.ts';
+import { PACK_REGISTRATION, PACK_REGISTRY } from '../src/build/lazy-module-facades.ts';
 
 // Code the page preloaded is used in the input's own task: no request, and no task hop for an import().
 
@@ -62,6 +63,34 @@ async function flip(page: Page, selector: string, present: boolean, act: () => P
 	] as const);
 	await act();
 	return page.evaluate(() => (window as unknown as ProbeWindow).flip);
+}
+
+// The packs a page preloads register their loaders as they evaluate; once every one has, a press needs no import.
+async function packsRegistered(page: Page) {
+	const preloaded = await page.evaluate(() =>
+		Array.from(
+			document.querySelectorAll<HTMLLinkElement>('link[rel="modulepreload"]'),
+			(link) => link.href,
+		),
+	);
+	const packs: string[] = [];
+	for (const href of preloaded) {
+		const source = await readFile(
+			resolve(app, '.output/public', `.${new URL(href).pathname}`),
+			'utf8',
+		);
+		if (source.includes(PACK_REGISTRATION)) packs.push(href);
+	}
+	expect(packs.length).toBeGreaterThan(0);
+	await page.waitForFunction(
+		([registry, urls]) => {
+			const registered = (
+				globalThis as unknown as Record<string, Record<string, unknown> | undefined>
+			)[registry];
+			return urls.every((url) => registered?.[url] !== undefined);
+		},
+		[PACK_REGISTRY, packs] as const,
+	);
 }
 
 async function open(browser: Browser, url: string) {
@@ -138,7 +167,7 @@ describe('routed first uses', () => {
 				// A reader's pointer rests on a control before pressing it; that intent loads what it needs.
 				const primed = await open(browser, `${origin}/`);
 				await primed.page.locator('[data-toggle]').hover();
-				await primed.page.waitForTimeout(300);
+				await packsRegistered(primed.page);
 				const primedStart = await flip(primed.page, 'main > p.off', true, () =>
 					primed.page.locator('[data-toggle]').click(),
 				);
