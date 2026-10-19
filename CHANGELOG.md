@@ -10,6 +10,81 @@ version of everything else.
 
 This file starts at 0.2.0. Earlier versions have no changelog entries.
 
+## 0.6.0
+
+### General
+
+- **Faster:** Skip row-building code for page lists the browser can never change.
+
+### @markless/bundler
+
+- **Fixed:** A click forwarded by two container listeners runs once even when a wake lands between the copies.
+- **Fixed:** Show a child's own compile error instead of the link errors it causes.
+- **Fixed:** Tab-key handlers cancel only the keys they handle.
+- **Fixed:** Item-only and nested rows of an imported component fill on a resumed page.
+- **Fixed:** A render-data load waits for its owner's linked publication.
+- **Faster:** Route composed-child symbols through one table-driven loader.
+- **Fixed:** Fall back to changeable rows for a page another module imports.
+- **Fixed:** Keep build manifests out of the served client output.
+- **Fixed:** An importer reading the claims of a component that failed to compile reports that compile error instead of MARKLESS_SOURCE_SYMBOL_CLAIMS_UNSEALED.
+- **Faster:** A lean page's first click and the navigation to it no longer download the full resume runtime.
+- **Fixed:** A new.tsrx file no loaded module imports reloads no page in dev.
+- **Fixed:** A dev page served before an edit reloads even if its client connects late.
+
+### @markless/compiler
+
+- **Fixed:** Let a handler set DOM properties through an element() handle.
+- **Fixed:** An async value joined with state in one run of text inside @try updates in place.
+- **Fixed:** A computed calling a method on a destructured prop follows the parent.
+- **Fixed:** A prop forwarded through a second same-module component follows the page.
+- **Fixed:** A prop name a component reuses for its child no longer rewires its own reads.
+- **Fixed:** A callback a row passes its child reads that row's item.
+- **Fixed:** A same-module child's bound handler writes page-scope shared state in page space.
+- **Fixed:** A handler writes a captured prop's value, not page-space props.
+- **Fixed:** A child rendered per row reads its row prop in a handler.
+- **Faster:** Ship bound symbol rows once per symbol and once per component edge.
+- **Fixed:** A keyed list after another list or a branch in its parent follows its collection.
+- **Fixed:** An @if arm holding a component with constant props flips.
+- **Fixed:** Render-data prelude keeps module constants in source order.
+- **Fixed:** Every attach in an @if or @try arm names its own behavior symbol.
+- **New:** Warn when nothing on a served page can start an attach.
+- **Fixed:** A row binding named child, childProps or output reaches the child on the server.
+- **Fixed:** Browser-built component rows may hold their own @for, so recursive trees grow.
+- **Fixed:** Names the server render declares no longer collide with component-body locals.
+- **Fixed:** A mutating call on a fresh copy is not a state write.
+- **Fixed:** Every top-level guarded cancel in a handler joins the synchronous policy.
+- **Fixed:** A keyed @for over a module constant whose rows read props or state is lifted onto the graph, so the rows update in place instead of failing with MARKLESS_REPEAT_ROWS_FROZEN.
+- **Fixed:** A page whose child module declares storage() resumes with storage.
+- **Fixed:** A page's top-level @for renders, resumes and edits its rows.
+
+### @markless/runtime
+
+- **Fixed:** One handler's row and text writes land in the same task.
+- **Fixed:** A callback a handler calls lands its writes in the handler's task.
+
+### @markless/web
+
+- **Fixed:** Keep keyed rows that stay in order attached when rows are added or moved.
+- **Fixed:** Run an onIdle or onVisible handler once per element when its ancestor has one too.
+- **Fixed:** A computed that reads another computed has its value after resume.
+- **Faster:** Startup scripts on a root share one resume-module import.
+- **Fixed:** Hold a press on a just-minted component row until its events register.
+- **Fixed:** A press whose target a capture listener redraws still reaches its host.
+- **Fixed:** OnVisible runs in client-rendered pages and in @if arms and @for rows.
+- **Fixed:** A click inside a container whose ancestor was redrawn is dropped, before and after the page wakes.
+- **Faster:** First interaction no longer walks the page per @if arm or waits for row code of constant-prop lists.
+- **Faster:** Read the constant-prop list rule page-wide and drop the root walk fallback.
+- **Fixed:** Dispatch each press once after a streamed arm wakes the runtime.
+
+### create-markless
+
+- **Fixed:** An --editor npm create kept as its own setting still picks the editor.
+- **Fixed:** Print each starter's dev URL from one port table the starter build test resolves.
+- **Fixed:** A Deno starter declares vite-plus, so its tasks have a vp to run.
+- **Fixed:** The Deno starter writes a minimal package.json, so vite-plus builds it.
+
+[All 114 commits since v0.5.0](https://github.com/compiled-run/markless/compare/v0.5.0...v0.6.0)
+
 ## Unreleased
 
 ### Build output

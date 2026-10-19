@@ -1,6 +1,6 @@
 {
 	"name": "@markless/serializer",
-	"version": "0.5.0",
+	"version": "0.6.0",
 	"description": "Markless serialization tiers and resumability payload protocol.",
 	"license": "MIT",
 	"repository": {
